@@ -422,10 +422,10 @@ class Selector:
                     tkMarkdown.MarkdownData.text(corr.instance + '\n', tkMarkdown.TextTag.CODE),
                     corr.desc,
                     tkMarkdown.MarkdownData.text('\nFixups:\n', tkMarkdown.TextTag.BOLD),
-                    tkMarkdown.convert('\n'.join([
+                    tkMarkdown.convert(TransToken.untranslated('\n'.join([
                         f'* `{var}`: `{value}`'
                         for var, value in corr.fixups.items()
-                    ]), None)
+                    ])), None)
                 ))
             else:
                 self.wid_desc.set_text(corr.desc)

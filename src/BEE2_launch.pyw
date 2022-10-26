@@ -49,10 +49,10 @@ if __name__ == '__main__':
     utils.check_cython(LOGGER.warning)
 
     import localisation
-    localisation.setup(LOGGER)
+    localisation.setup()
 
     # Check early on for a common mistake - putting the BEE2 folder directly in Portal 2 means
-    # when we export we'll try and overwrite ourself. Use Steam's appid file as a marker.
+    # when we export we'll try and overwrite ourselves. Use Steam's appid file as a marker.
     if utils.install_path('../steam_appid.txt').exists() and utils.install_path('.').name.casefold() == 'bee2':
         from app import gameMan
         gameMan.app_in_game_error()

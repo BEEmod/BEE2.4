@@ -159,7 +159,7 @@ class ItemVariant:
         if 'description' in props:
             desc = desc_parse(props, source, pak_id)
         else:
-            desc = self.desc.copy()
+            desc = self.desc
 
         if 'appenddesc' in props:
             desc = tkMarkdown.join(

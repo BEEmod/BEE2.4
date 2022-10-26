@@ -1037,8 +1037,8 @@ def desc_parse(
                 lines.append(line.value)
         else:
             lines.append(prop.value)
-
-    return tkMarkdown.convert('\n'.join(lines), pak_id)
+    token = TransToken.parse(pak_id, '\n'.join(lines))
+    return tkMarkdown.convert(token, pak_id)
 
 
 def sep_values(string: str, delimiters: Iterable[str] = ',;/') -> list[str]:

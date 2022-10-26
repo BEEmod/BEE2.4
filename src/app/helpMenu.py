@@ -470,8 +470,9 @@ class Dialog(tk.Toplevel):
         """Display the help dialog."""
         # The first time we're shown, decode the text.
         # That way we don't need to do it on startup.
+        # Don't translate this, it's all legal text - not really our business to change.
         if self.text is not None:
-            parsed_text = tkMarkdown.convert(self.text, package=None)
+            parsed_text = tkMarkdown.convert(TransToken.untranslated(self.text), package=None)
             self.textbox.set_text(parsed_text)
             self.text = None
 

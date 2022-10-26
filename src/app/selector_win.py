@@ -5,6 +5,8 @@ It appears as a textbox-like widget with a ... button to open the selection wind
 Each item has a description, author, and icon.
 """
 from __future__ import annotations
+
+import copy
 from typing import Generic, Optional, Union, Iterable, Mapping, Callable, AbstractSet
 from typing_extensions import Concatenate, ParamSpec, TypeAlias
 from tkinter import font as tk_font
@@ -115,6 +117,7 @@ TRANS_SUGGESTED_MAC = TransToken.untranslated("\u250E\u2500{sugg}\u2500\u2512").
 TRANS_GROUPLESS = TransToken.ui('Other')
 TRANS_AUTHORS = TransToken.ui_plural('Author: {authors}', 'Authors: {authors}')
 TRANS_NO_AUTHORS = TransToken.ui('Authors: Unknown')
+TRANS_DEV_ITEM_ID = TransToken.untranslated('**ID:** {item}')
 
 
 @attrs.define
@@ -263,7 +266,7 @@ class Item:
         large_icon: img.Handle | None = None,
         previews: Iterable[img.Handle] = (),
         authors: Iterable[str] = (),
-        desc: tkMarkdown.MarkdownData | TransToken = tkMarkdown.MarkdownData(),
+        desc: tkMarkdown.MarkdownData = tkMarkdown.MarkdownData.text(''),
         group: str = '',
         sort_key: str | None = None,
         attributes: Mapping[str, AttrValues] = EmptyMapping,
@@ -381,7 +384,7 @@ class Item:
         item.icon = self.icon
         item.large_icon = self.large_icon
         item.previews = self.previews.copy()
-        item.desc = self.desc.copy() if isinstance(self.desc, tkMarkdown.MarkdownData) else self.desc
+        item.desc = copy.copy(self.desc)
         item.authors = self.authors.copy()
         item.group_id = self.group_id
         item.group = self.group
@@ -547,7 +550,7 @@ class SelectorWin(Generic[CallbackT]):
             name='<NONE>',
             short_name=TransToken.untranslated(''),
             icon=none_icon,
-            desc=none_desc,
+            desc=tkMarkdown.convert(none_desc, None),
             attributes=dict(none_attrs),
         )
         self.noneItem.context_lbl = none_name
@@ -1261,22 +1264,21 @@ class SelectorWin(Generic[CallbackT]):
         else:
             self.prop_icon['cursor'] = tk_tools.Cursors.REGULAR
 
-        item_desc = item.desc
-        if isinstance(item_desc, TransToken):  # Translate now.
-            item_desc = tkMarkdown.MarkdownData.text(str(item_desc))
         if DEV_MODE.get():
             # Show the ID of the item in the description
             if item is self.noneItem:
-                text = tkMarkdown.convert('**ID:** *NONE*', None)
+                text = tkMarkdown.convert(TRANS_DEV_ITEM_ID.format(item='*NONE*'), None)
             else:
-                text = tkMarkdown.convert(f'**ID:** `{item.package}`{":" if item.package else ""}`{item.name}`', None)
+                text = tkMarkdown.convert(TRANS_DEV_ITEM_ID.format(
+                    item=f'`{item.package}`:`{item.name}`' if item.package else f'`{item.name}`',
+                ), None)
             self.prop_desc.set_text(tkMarkdown.join(
                 text,
                 tkMarkdown.MarkdownData.text('\n'),
-                item_desc,
+                item.desc,
             ))
         else:
-            self.prop_desc.set_text(item_desc)
+            self.prop_desc.set_text(item.desc)
 
         self.selected.button.state(('!alternate',))
         self.selected = item

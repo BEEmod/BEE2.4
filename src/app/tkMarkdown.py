@@ -4,10 +4,10 @@ This produces a stream of values, which are fed into richTextBox to display.
 """
 from __future__ import annotations
 
-import itertools
-from typing import Iterable, List, Mapping, Sequence
+from typing import Iterator, Mapping, Sequence
 from contextvars import ContextVar
 import urllib.parse
+import itertools
 import enum
 
 import attrs
@@ -17,6 +17,8 @@ import srctools.logger
 
 from app.img import Handle as ImgHandle
 import utils
+from localisation import TransToken
+
 
 LOGGER = srctools.logger.get_logger(__name__)
 
@@ -90,16 +92,30 @@ BULLETS = [
 
 class MarkdownData:
     """Protocol for objects holding Markdown data."""
-    def __iter__(self) -> Iterable[Block]:
+    def __iter__(self) -> Iterator[Block]:
         pass
 
-    def copy(self) -> MarkdownData:
-        ...
-
     @staticmethod
-    def text(text: str, *tags: TextTag, url: str | None = None) -> MarkdownData:
+    def text(text: str, *tags: TextTag, url: str | None = None) -> SingleMarkdown:
         """Construct data with a single text segment."""
         return SingleMarkdown([TextSegment(text, tags, url)])
+
+
+@attrs.define
+class TranslatedMarkdown(MarkdownData):
+    """Markdown data parsed out of translated sources."""
+    source: TransToken
+    package: str | None
+    _blocks: Sequence[Block] = attrs.Factory(list)
+    _cache_hash: int = -1
+
+    def __iter__(self) -> Iterator[Block]:
+        """Convert if necessary, then return the blocks."""
+        text = str(self.source)
+        if hash(text) != self._cache_hash:
+            self._blocks = list(_convert(text, self.package))
+            self._cache_hash = hash(text)
+        return iter(self._blocks)
 
 
 @attrs.define
@@ -111,18 +127,12 @@ class SingleMarkdown(MarkdownData):
     # External users shouldn't modify directly, so make it readonly.
     blocks: Sequence[Block] = attrs.field(factory=[].copy)
 
-    def __iter__(self) -> Iterable[Block]:
+    def __iter__(self) -> Iterator[Block]:
         return iter(self.blocks)
 
     def __bool__(self) -> bool:
         """Empty data is false."""
         return bool(self.blocks)
-
-    def copy(self) -> MarkdownData:
-        """Create and return a duplicate of this object."""
-        return SingleMarkdown(list(self.blocks))
-
-    __copy__ = copy
 
 
 @attrs.define
@@ -130,20 +140,16 @@ class JoinedMarkdown(MarkdownData):
     """Multiple blocks of data which has been joined together."""
     children: list[MarkdownData]
 
-    def __iter__(self) -> Iterable[Block]:
+    def __iter__(self) -> Iterator[Block]:
         """Recursively iterate children."""
         return itertools.chain.from_iterable(self.children)
-
-    def copy(self) -> MarkdownData:
-        """Shallow copy this markdown."""
-        return JoinedMarkdown(self.children.copy())
 
 
 @attrs.define
 class RenderState:
     """The data needed to convert tokens.
 
-    This is used so we don't store it on the TKRenderer, since it's shared.
+    Since the TKRenderer is shared, we need this to prevent storing state on that.
     """
     package: str
     # The lists we're currently generating.
@@ -158,12 +164,12 @@ state = ContextVar('tk_markdown_state', default=no_state)
 class TKRenderer(base_renderer.BaseRenderer):
     """Extension needed to extract our list from the tree.
     """
-    def render(self, token: btok.BlockToken) -> MarkdownData:
+    def render(self, token: btok.BlockToken) -> SingleMarkdown:
         """Indicate the correct types for this."""
         assert state.get() is not no_state
         return super().render(token)
 
-    def render_inner(self, token: stok.SpanToken | btok.BlockToken) -> MarkdownData:
+    def render_inner(self, token: stok.SpanToken | btok.BlockToken) -> SingleMarkdown:
         """
         Recursively renders child tokens. Joins the rendered
         strings with no space in between.
@@ -190,66 +196,62 @@ class TKRenderer(base_renderer.BaseRenderer):
 
         return SingleMarkdown(blocks)
 
-    def _with_tag(self, token: stok.SpanToken | btok.BlockToken, *tags: TextTag, url: str=None) -> MarkdownData:
+    def _with_tag(self, token: stok.SpanToken | btok.BlockToken, *tags: TextTag, url: str=None) -> SingleMarkdown:
         added_tags = set(tags)
         result = self.render_inner(token)
-        for i, data in enumerate(result.blocks):
+        for i, data in enumerate(result):
             if isinstance(data, TextSegment):
                 new_seg = TextSegment(data.text, tuple(added_tags.union(data.tags)), url or data.url)
                 result.blocks[i] = new_seg  # type: ignore  # Readonly to users.
         return result
 
-    def render_auto_link(self, token: stok.AutoLink) -> MarkdownData:
+    def render_auto_link(self, token: stok.AutoLink) -> SingleMarkdown:
         """An automatic link - the child is a single raw token."""
         [child] = token.children
         assert isinstance(child, stok.RawText)
         return MarkdownData.text(child.content, TextTag.LINK, url=token.target)
 
-    def render_block_code(self, token: btok.BlockCode) -> MarkdownData:
+    def render_block_code(self, token: btok.BlockCode) -> SingleMarkdown:
         """Render full code blocks."""
         [child] = token.children
         assert isinstance(child, stok.RawText)
         # TODO: Code block.
         return MarkdownData.text(child.content, TextTag.CODE)
 
-    def render_document(self, token: btok.Document) -> MarkdownData:
+    def render_document(self, token: btok.Document) -> SingleMarkdown:
         """Render the outermost document."""
         self.footnotes.update(token.footnotes)
-        result = self.render_inner(token)
-        if not result.blocks:
-            return result
+        return self.render_inner(token)
 
-        return result
-
-    def render_escape_sequence(self, token: stok.EscapeSequence) -> MarkdownData:
+    def render_escape_sequence(self, token: stok.EscapeSequence) -> SingleMarkdown:
         """Render backslash escaped text."""
         [child] = token.children
         assert isinstance(child, stok.RawText)
         return SingleMarkdown.text(child.content)
 
-    def render_image(self, token: stok.Image) -> MarkdownData:
+    def render_image(self, token: stok.Image) -> SingleMarkdown:
         """Embed an image into a file."""
         uri = utils.PackagePath.parse(urllib.parse.unquote(token.src), state.get().package)
         return SingleMarkdown([Image(ImgHandle.parse_uri(uri))])
 
-    def render_inline_code(self, token: stok.InlineCode) -> MarkdownData:
+    def render_inline_code(self, token: stok.InlineCode) -> SingleMarkdown:
         """Render inline code segments."""
         [child] = token.children
         assert isinstance(child, stok.RawText)
         return MarkdownData.text(child.content, TextTag.CODE)
 
-    def render_line_break(self, token: stok.LineBreak) -> MarkdownData:
+    def render_line_break(self, token: stok.LineBreak) -> SingleMarkdown:
         """Render a newline."""
         if token.soft:
             return SingleMarkdown([])
         else:
             return MarkdownData.text('\n')
 
-    def render_link(self, token: stok.Link) -> MarkdownData:
+    def render_link(self, token: stok.Link) -> SingleMarkdown:
         """Render links."""
         return self._with_tag(token, url=token.target)
 
-    def render_list(self, token: btok.List) -> MarkdownData:
+    def render_list(self, token: btok.List) -> SingleMarkdown:
         """The wrapping around a list, specifying the type and start number."""
         stack = state.get().list_stack
         stack.append(token.start)
@@ -258,7 +260,7 @@ class TKRenderer(base_renderer.BaseRenderer):
         finally:
             stack.pop()
 
-    def render_list_item(self, token: btok.ListItem) -> MarkdownData:
+    def render_list_item(self, token: btok.ListItem) -> SingleMarkdown:
         """The individual items in a list."""
         stack = state.get().list_stack
         count = stack[-1]
@@ -270,67 +272,70 @@ class TKRenderer(base_renderer.BaseRenderer):
             prefix = f'{count}. '
             stack[-1] += 1
 
-        result = join(
+        return _merge(
             MarkdownData.text(prefix, TextTag.LIST_START),
             self._with_tag(token, TextTag.LIST),
         )
 
-        return result
-
-    def render_paragraph(self, token: btok.Paragraph) -> MarkdownData:
+    def render_paragraph(self, token: btok.Paragraph) -> SingleMarkdown:
         if state.get().list_stack:  # Collapse together.
-            return join(self.render_inner(token), MarkdownData.text('\n'))
+            return _merge(self.render_inner(token), MarkdownData.text('\n'))
         else:
-            return join(MarkdownData.text('\n'), self.render_inner(token), MarkdownData.text('\n'))
+            return _merge(MarkdownData.text('\n'), self.render_inner(token), MarkdownData.text('\n'))
 
-    def render_raw_text(self, token: stok.RawText) -> MarkdownData:
+    def render_raw_text(self, token: stok.RawText) -> SingleMarkdown:
         return MarkdownData.text(token.content)
 
-    def render_table(self, token: btok.Table) -> MarkdownData:
+    def render_table(self, token: btok.Table) -> SingleMarkdown:
         """We don't support tables."""
         # TODO?
         return MarkdownData.text('<Tables not supported>')
 
-    def render_table_cell(self, token: btok.TableCell) -> MarkdownData:
+    def render_table_cell(self, token: btok.TableCell) -> SingleMarkdown:
         """Unimplemented table cells."""
         return MarkdownData.text('<Tables not supported>')
 
-    def render_table_row(self, token: btok.TableRow) -> MarkdownData:
+    def render_table_row(self, token: btok.TableRow) -> SingleMarkdown:
         """Unimplemented table rows."""
         return MarkdownData.text('<Tables not supported>')
 
-    def render_thematic_break(self, token: btok.ThematicBreak) -> MarkdownData:
+    def render_thematic_break(self, token: btok.ThematicBreak) -> SingleMarkdown:
         """Render a horizontal rule."""
         return SingleMarkdown(_HR.copy())
 
-    def render_heading(self, token: btok.Heading) -> MarkdownData:
+    def render_heading(self, token: btok.Heading) -> SingleMarkdown:
         """Render a level 1-6 heading."""
         return self._with_tag(token, TAG_HEADINGS[token.level])
 
-    def render_quote(self, token: btok.Quote) -> MarkdownData:
+    def render_quote(self, token: btok.Quote) -> SingleMarkdown:
         """Render blockquotes."""
         return self._with_tag(token, TextTag.INDENT)
 
-    def render_strikethrough(self, token: stok.Strikethrough) -> MarkdownData:
+    def render_strikethrough(self, token: stok.Strikethrough) -> SingleMarkdown:
         """Render strikethroughed text."""
         return self._with_tag(token, TextTag.STRIKETHROUGH)
 
-    def render_strong(self, token: stok.Strong) -> MarkdownData:
+    def render_strong(self, token: stok.Strong) -> SingleMarkdown:
         """Render <strong> tags, with bold fonts."""
         return self._with_tag(token, TextTag.BOLD)
 
-    def render_emphasis(self, token: stok.Emphasis) -> MarkdownData:
+    def render_emphasis(self, token: stok.Emphasis) -> SingleMarkdown:
         """Render <em> tags, with italic fonts."""
         return self._with_tag(token, TextTag.ITALIC)
 
 _RENDERER = TKRenderer()
 
 
-def convert(text: str, package: str | None) -> MarkdownData:
-    """Convert Markdown syntax into data ready to be passed to richTextBox.
+def _merge(*blocks: SingleMarkdown) -> SingleMarkdown:
+    """Merge single markdown blocks together."""
+    result: list[Block] = []
+    for seg in blocks:
+        result.extend(seg.blocks)
+    return SingleMarkdown(result)
 
-    The package must be passed to allow using images in the document.
-    """
+
+def _convert(text: str, package: str | None) -> SingleMarkdown:
+    """Actually convert markdown data."""
     tok = state.set(RenderState(package))
     try:
         return _RENDERER.render(mistletoe.Document(text))
@@ -338,6 +343,19 @@ def convert(text: str, package: str | None) -> MarkdownData:
         state.reset(tok)
 
 
+def convert(text: TransToken, package: str | None) -> MarkdownData:
+    """Convert Markdown syntax into data ready to be passed to richTextBox.
+
+    The package must be passed to allow using images in the document.
+    """
+    # If untranslated, it'll never change so convert to blocks and discard the source.
+    if text.is_untranslated:
+        return _convert(str(text), package)
+    # Otherwise, keep the source, don't change later.
+    return TranslatedMarkdown(text, package)
+
+
 def join(*args: MarkdownData) -> MarkdownData:
     """Merge several mardown blocks together."""
+    # This preserves the originals so they can be translated separately.
     return JoinedMarkdown(list(args))
