@@ -9,7 +9,6 @@ import locale
 import sys
 
 import attrs
-from srctools.property_parser import PROP_FLAGS_DEFAULT
 from srctools import EmptyMapping, logger
 
 import utils
@@ -374,11 +373,6 @@ def set_language(lang_code: str) -> None:
 
     LOGGER.info('Language: {!r}', lang_code)
     LOGGER.debug('Language codes: {!r}', expanded_langs)
-
-    # Add these to Property's default flags, so config files can also
-    # be localised.
-    for lang in expanded_langs:
-        PROP_FLAGS_DEFAULT['lang_' + lang] = True
 
     lang_folder = utils.install_path('i18n')
 
