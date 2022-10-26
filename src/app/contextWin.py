@@ -113,6 +113,7 @@ TRANS_TOOL_CUBE = TransToken.ui(
     'the floor to face 360 degrees.'
 )
 TRANS_NO_VERSIONS = TransToken.ui('No Alternate Versions')
+TRANS_BLANK = TransToken.untranslated('')
 
 
 def set_sprite(pos: SPR, sprite: str) -> None:
@@ -310,9 +311,10 @@ def load_item_data() -> None:
 
     if selected_item.data.url is None:
         wid['moreinfo'].state(['disabled'])
+        tooltip.set_tooltip(wid['moreinfo'], TRANS_BLANK)
     else:
         wid['moreinfo'].state(['!disabled'])
-    tooltip.set_tooltip(wid['moreinfo'], TransToken.untranslated(selected_item.data.url))
+        tooltip.set_tooltip(wid['moreinfo'], TransToken.untranslated(selected_item.data.url))
 
     editor = item_data.editor
     has_timer = any(prop.kind is prop_timer_delay for prop in editor.properties.values())
