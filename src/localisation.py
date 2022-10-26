@@ -368,8 +368,10 @@ def set_language(lang_code: str) -> None:
     """Change the app's language."""
     global _TRANSLATOR
 
-    # Expands single code to parent categories.
-    expanded_langs = gettext_mod._expand_lang(lang_code)
+    # Include the generic and specific, if provided.
+    expanded_langs = [lang_code.casefold()]
+    if '_' in lang_code:
+        expanded_langs.append(lang_code[:lang_code.index('_')])
 
     LOGGER.info('Language: {!r}', lang_code)
     LOGGER.debug('Language codes: {!r}', expanded_langs)
