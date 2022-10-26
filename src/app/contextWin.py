@@ -291,7 +291,7 @@ def load_item_data() -> None:
             for name, inst in editor.cust_instances.items():
                 inst_desc.append(tkMarkdown.TextSegment(f'"{name}": ', (tkMarkdown.TextTag.INDENT, )))
                 inst_desc.append(tkMarkdown.TextSegment(f'{inst}\n', (tkMarkdown.TextTag.CODE, )))
-        desc = tkMarkdown.join(desc, tkMarkdown.MarkdownData(inst_desc))
+        desc = tkMarkdown.join(desc, tkMarkdown.SingleMarkdown(inst_desc))
 
     wid['desc'].set_text(desc)
 

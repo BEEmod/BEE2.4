@@ -3,13 +3,15 @@
 This produces a stream of values, which are fed into richTextBox to display.
 """
 from __future__ import annotations
-from typing import Mapping, Sequence
+
+import itertools
+from typing import Iterable, List, Mapping, Sequence
 from contextvars import ContextVar
 import urllib.parse
 import enum
 
 import attrs
-from mistletoe import block_token as btok, span_token as stok
+from mistletoe import block_token as btok, span_token as stok, base_renderer
 import mistletoe
 import srctools.logger
 
@@ -17,6 +19,12 @@ from app.img import Handle as ImgHandle
 import utils
 
 LOGGER = srctools.logger.get_logger(__name__)
+
+__all__ = [
+    'MarkdownData', 'convert',  'join',
+    # For richtextbox only.
+    'TextTag', 'TextSegment', 'Block', 'Image', 'TAG_HEADINGS',
+]
 
 
 class TextTag(str, enum.Enum):
@@ -80,8 +88,22 @@ BULLETS = [
 ]
 
 
-@attrs.define
 class MarkdownData:
+    """Protocol for objects holding Markdown data."""
+    def __iter__(self) -> Iterable[Block]:
+        pass
+
+    def copy(self) -> MarkdownData:
+        ...
+
+    @staticmethod
+    def text(text: str, *tags: TextTag, url: str | None = None) -> MarkdownData:
+        """Construct data with a single text segment."""
+        return SingleMarkdown([TextSegment(text, tags, url)])
+
+
+@attrs.define
+class SingleMarkdown(MarkdownData):
     """The output of the conversion, a set of tags and link references for callbacks.
 
     Blocks are a list of data.
@@ -89,20 +111,32 @@ class MarkdownData:
     # External users shouldn't modify directly, so make it readonly.
     blocks: Sequence[Block] = attrs.field(factory=[].copy)
 
+    def __iter__(self) -> Iterable[Block]:
+        return iter(self.blocks)
+
     def __bool__(self) -> bool:
         """Empty data is false."""
         return bool(self.blocks)
 
     def copy(self) -> MarkdownData:
         """Create and return a duplicate of this object."""
-        return MarkdownData(list(self.blocks))
-
-    @classmethod
-    def text(cls, text: str, *tags: TextTag, url: str | None = None) -> MarkdownData:
-        """Construct data with a single text segment."""
-        return cls([TextSegment(text, tags, url)])
+        return SingleMarkdown(list(self.blocks))
 
     __copy__ = copy
+
+
+@attrs.define
+class JoinedMarkdown(MarkdownData):
+    """Multiple blocks of data which has been joined together."""
+    children: list[MarkdownData]
+
+    def __iter__(self) -> Iterable[Block]:
+        """Recursively iterate children."""
+        return itertools.chain.from_iterable(self.children)
+
+    def copy(self) -> MarkdownData:
+        """Shallow copy this markdown."""
+        return JoinedMarkdown(self.children.copy())
 
 
 @attrs.define
@@ -121,7 +155,7 @@ no_state = RenderState('')
 state = ContextVar('tk_markdown_state', default=no_state)
 
 
-class TKRenderer(mistletoe.BaseRenderer):
+class TKRenderer(base_renderer.BaseRenderer):
     """Extension needed to extract our list from the tree.
     """
     def render(self, token: btok.BlockToken) -> MarkdownData:
@@ -145,7 +179,7 @@ class TKRenderer(mistletoe.BaseRenderer):
         blocks: list[Block] = []
         # Merge together adjacent text segments.
         for child in token.children:
-            for data in self.render(child).blocks:
+            for data in self.render(child):
                 if isinstance(data, TextSegment) and blocks:
                     last = blocks[-1]
                     if isinstance(last, TextSegment):
@@ -154,7 +188,7 @@ class TKRenderer(mistletoe.BaseRenderer):
                             continue
                 blocks.append(data)
 
-        return MarkdownData(blocks)
+        return SingleMarkdown(blocks)
 
     def _with_tag(self, token: stok.SpanToken | btok.BlockToken, *tags: TextTag, url: str=None) -> MarkdownData:
         added_tags = set(tags)
@@ -191,12 +225,12 @@ class TKRenderer(mistletoe.BaseRenderer):
         """Render backslash escaped text."""
         [child] = token.children
         assert isinstance(child, stok.RawText)
-        return MarkdownData.text(child.content)
+        return SingleMarkdown.text(child.content)
 
     def render_image(self, token: stok.Image) -> MarkdownData:
         """Embed an image into a file."""
         uri = utils.PackagePath.parse(urllib.parse.unquote(token.src), state.get().package)
-        return MarkdownData([Image(ImgHandle.parse_uri(uri))])
+        return SingleMarkdown([Image(ImgHandle.parse_uri(uri))])
 
     def render_inline_code(self, token: stok.InlineCode) -> MarkdownData:
         """Render inline code segments."""
@@ -205,8 +239,9 @@ class TKRenderer(mistletoe.BaseRenderer):
         return MarkdownData.text(child.content, TextTag.CODE)
 
     def render_line_break(self, token: stok.LineBreak) -> MarkdownData:
+        """Render a newline."""
         if token.soft:
-            return MarkdownData([])
+            return SingleMarkdown([])
         else:
             return MarkdownData.text('\n')
 
@@ -266,7 +301,7 @@ class TKRenderer(mistletoe.BaseRenderer):
 
     def render_thematic_break(self, token: btok.ThematicBreak) -> MarkdownData:
         """Render a horizontal rule."""
-        return MarkdownData(_HR.copy())
+        return SingleMarkdown(_HR.copy())
 
     def render_heading(self, token: btok.Heading) -> MarkdownData:
         """Render a level 1-6 heading."""
@@ -304,24 +339,5 @@ def convert(text: str, package: str | None) -> MarkdownData:
 
 
 def join(*args: MarkdownData) -> MarkdownData:
-    """Join several text blocks together.
-
-    This merges together blocks, reassigning link callbacks as needed.
-    """
-    if len(args) == 1:
-        # We only have one block, just copy and return.
-        return MarkdownData(args[0].blocks)
-
-    blocks: list[Block] = []
-
-    for child in args:
-        for data in child.blocks:
-            # We also want to combine text segments next to each other.
-            if isinstance(data, TextSegment) and blocks:
-                last = blocks[-1]
-                if isinstance(last, TextSegment) and last.tags == data.tags and last.url == data.url:
-                    blocks[-1] = TextSegment(last.text + data.text, last.tags, last.url)
-                    continue
-            blocks.append(data)
-
-    return MarkdownData(blocks)
+    """Merge several mardown blocks together."""
+    return JoinedMarkdown(list(args))
