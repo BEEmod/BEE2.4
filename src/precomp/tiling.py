@@ -1065,7 +1065,7 @@ class TileDef:
         U and V should be 1 or -1.
         """
         # If there's a fully solid block on this side, we don't need to.
-        if BLOCK_POS['world': self.uv_offset(128*u, 128*v, 0)].inside_map:
+        if BLOCK_POS.lookup_world(self.uv_offset(128*u, 128*v, 0)).inside_map:
             return True
 
         # Otherwise, check for another tile attached to our side.
@@ -1077,7 +1077,7 @@ class TileDef:
         except KeyError:
             # No tile. As a special case, if we're an EMBED and this side is
             # empty then embed so the instance can fit.
-            if BLOCK_POS['world': self.pos] is Block.EMBED:
+            if BLOCK_POS.lookup_world(self.pos) is Block.EMBED:
                 try:
                     tiledef = TILES[
                         (self.pos + 128 * side_norm).as_tuple(),
@@ -1825,7 +1825,7 @@ def tiledefs_from_cube(face_to_tile: dict[int, TileDef], brush: Solid, grid_pos:
         # These cubes don't contain any items, so it's fine
         # if we get rid of sides that aren't useful.
         # if it's bordering void or another solid, it's unneeded.
-        neighbour_block = BLOCK_POS['world': grid_pos + 128 * normal]
+        neighbour_block = BLOCK_POS.lookup_world(grid_pos + 128 * normal)
         if not neighbour_block.traversable:
             continue
 
@@ -1856,7 +1856,7 @@ def tiledefs_from_large_tile(
     """Generate a tiledef matching a 128x128x4 side."""
     tex_kind, front_face = find_front_face(brush, grid_pos, norm)
 
-    neighbour_block = BLOCK_POS['world': grid_pos + 128 * norm]
+    neighbour_block = BLOCK_POS.lookup_world(grid_pos + 128 * norm)
 
     if neighbour_block is Block.VOID:
         tex_kind = TileType.NODRAW

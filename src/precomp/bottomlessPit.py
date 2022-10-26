@@ -142,7 +142,7 @@ def make_bottomless_pit(vmf: VMF, max_height):
 
     # First, remove all of Valve's triggers inside pits.
     for trig in vmf.by_class['trigger_multiple'] | vmf.by_class['trigger_hurt']:
-        if brushLoc.POS['world': Vec.from_str(trig['origin'])].is_pit:
+        if brushLoc.POS.lookup_world(Vec.from_str(trig['origin'])).is_pit:
             trig.remove()
 
     # Potential locations of bordering brushes..
@@ -261,13 +261,13 @@ def make_bottomless_pit(vmf: VMF, max_height):
 
     for pos in wall_pos:
         pos = Vec(pos)
-        if not brushLoc.POS['world': pos].is_solid:
+        if not brushLoc.POS.lookup_world(pos).is_solid:
             # Not actually a wall here!
             continue
 
         # CONN_TYPES has n,s,e,w as keys - whether there's something in that direction.
         nsew = tuple(
-            brushLoc.POS['world': pos + off].is_pit
+            brushLoc.POS.lookup_world(pos + off).is_pit
             for off in
             side_dirs
         )

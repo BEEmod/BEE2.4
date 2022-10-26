@@ -125,7 +125,7 @@ def associate_faith_plates(vmf: VMF) -> None:
         norm = (origin - grid_pos).norm()
 
         # If we're on the floor above the top of goo, move down to the surface.
-        block_type = brushLoc.POS['world': tile_pos - (0, 0, 64)]
+        block_type = brushLoc.POS.lookup_world(tile_pos - (0, 0, 64))
         if block_type.is_goo and block_type.is_top:
             tile_pos.z -= 32
 
