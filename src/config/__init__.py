@@ -13,8 +13,7 @@ import os
 
 import attrs
 import trio
-from atomicwrites import atomic_write
-from srctools import KeyValError, Property, logger
+from srctools import KeyValError, AtomicWriter, Property, logger
 from srctools.dmx import Element
 
 import utils
@@ -428,7 +427,7 @@ class ConfigSpec:
 
         props = Property.root()
         props.extend(self.build_kv1(self._current))
-        with atomic_write(self.filename, encoding='utf8', overwrite=True) as file:
+        with AtomicWriter(self.filename) as file:
             for prop in props:
                 for line in prop.export():
                     file.write(line)

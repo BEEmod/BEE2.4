@@ -22,11 +22,10 @@ import pickle
 import pickletools
 import copy
 import webbrowser
-from atomicwrites import atomic_write
 
 from srctools import (
     Vec, VPK, Vec_tuple,
-    Property,
+    Property, AtomicWriter,
     VMF, Output,
     FileSystem, FileSystemChain,
 )
@@ -374,7 +373,7 @@ class Game:
                 break
 
         # Then add our stuff!
-        with atomic_write(file, overwrite=True, encoding='utf8') as f:
+        with AtomicWriter(file, encoding='utf8') as f:
             f.writelines(file_data)
             f.write(EDITOR_SOUND_LINE + '\n')
             for sound in sounds:
@@ -425,7 +424,7 @@ class Game:
                         )
                     continue
 
-                with atomic_write(info_path, overwrite=True, encoding='utf8') as file2:
+                with AtomicWriter(info_path, encoding='utf8') as file2:
                     for line in data:
                         file2.write(line)
         if not add_line:
@@ -808,7 +807,7 @@ class Game:
             # atomicwrites writes to a temporary file, then renames in one step.
             # This ensures editoritems won't be half-written.
             LOGGER.info('Writing Editoritems script...')
-            with atomic_write(self.abs_path('portal2_dlc2/scripts/editoritems.txt'), overwrite=True, encoding='utf8') as editor_file:
+            with AtomicWriter(self.abs_path('portal2_dlc2/scripts/editoritems.txt'), encoding='utf8') as editor_file:
                 editoritems.Item.export(editor_file, all_items, renderables, id_filenames=False)
             export_screen.step('EXP', 'editoritems')
 

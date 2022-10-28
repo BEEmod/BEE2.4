@@ -11,9 +11,8 @@ import logging
 import pickle
 from io import StringIO
 from collections import defaultdict, namedtuple, Counter
-from atomicwrites import atomic_write
 
-from srctools import Property, Vec, Vec_tuple, Angle, Matrix
+from srctools import AtomicWriter, Property, Vec, Vec_tuple, Angle, Matrix
 from srctools.vmf import VMF, Entity, Output
 from srctools.game import Game
 from BEE2_config import ConfigFile
@@ -1283,7 +1282,7 @@ def save(vmf: VMF, path: str) -> None:
     """
     LOGGER.info("Saving New Map...")
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    with atomic_write(path, overwrite=True, encoding='utf8') as f:
+    with AtomicWriter(path) as f:
         vmf.export(dest_file=f, inc_version=True)
     LOGGER.info("Complete!")
 

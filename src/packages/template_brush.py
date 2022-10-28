@@ -2,10 +2,9 @@
 from __future__ import annotations
 
 import trio
-from atomicwrites import atomic_write
 import os
 
-from srctools import VMF, Property, KeyValError
+from srctools import VMF, Property, KeyValError, AtomicWriter
 from srctools.filesys import File
 from srctools.dmx import Element as DMXElement, ValueType as DMXValue, Attribute as DMXAttr
 import srctools.logger
@@ -96,5 +95,5 @@ def write_templates(game: gameMan.Game) -> None:
         temp_el['path'] = path.path
         template_list.append(temp_el)
 
-    with atomic_write(game.abs_path('bin/bee2/templates.lst'), mode='wb', overwrite=True) as f:
+    with AtomicWriter(game.abs_path('bin/bee2/templates.lst'), is_bytes=True) as f:
         root.export_binary(f, fmt_name='bee_templates', unicode='format')

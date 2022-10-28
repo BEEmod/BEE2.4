@@ -23,8 +23,8 @@ import shutil
 from pathlib import Path
 from typing import List, Optional
 
+from srctools import AtomicWriter
 from srctools.filesys import RawFileSystem
-import atomicwrites
 import trio
 
 from BEE2_config import GEN_OPTS, get_package_locs
@@ -84,7 +84,7 @@ def get_package(file: Path) -> RawFileSystem:
         except KeyError:
             continue
         if isinstance(fsys, RawFileSystem):
-            with atomicwrites.atomic_write(CONF, overwrite=True) as f:
+            with AtomicWriter(CONF) as f:
                 f.write(pack_id + '\n')
             return fsys
         else:

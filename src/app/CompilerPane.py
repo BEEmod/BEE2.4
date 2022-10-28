@@ -12,11 +12,10 @@ import io
 import random
 
 from PIL import Image, ImageTk
-from atomicwrites import atomic_write
 import attrs
 import trio
 
-from srctools import bool_as_int
+from srctools import AtomicWriter, bool_as_int
 from srctools.logger import get_logger
 
 import app
@@ -121,7 +120,7 @@ async def apply_state(state: CompilePaneState) -> None:
     cleanup_screenshot.set(state.sshot_cleanup)
 
     if state.sshot_type == 'CUST' and state.sshot_cust:
-        with atomic_write(SCREENSHOT_LOC, mode='wb', overwrite=True) as f:
+        with AtomicWriter(SCREENSHOT_LOC, is_bytes=True) as f:
             f.write(state.sshot_cust)
 
     # Refresh these.
