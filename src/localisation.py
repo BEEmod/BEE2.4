@@ -22,7 +22,11 @@ if TYPE_CHECKING:  # Don't import at runtime, we don't want TK in the compiler.
     from tkinter import ttk
     import packages
 
-__all__ = ['TransToken', 'load_basemodui', 'setup']
+__all__ = [
+    'TransToken', 'load_basemodui',
+    'DUMMY', 'Language', 'set_language', 'load_package_langs',
+    'setup', 'expand_langcode',
+]
 
 LOGGER = logger.get_logger(__name__)
 P = ParamSpec('P')
@@ -65,9 +69,8 @@ class Language:
 _CURRENT_LANG = Language(
     '<None>', 'en', {},
 )
-
-
-DUMMY = Language('Dummy', 'dummy', {})
+# Special language which replaces all text with ## to easily identify untranslatable text.
+DUMMY: Final = Language('Dummy', 'dummy', {})
 
 
 @attrs.frozen(eq=False)
@@ -465,8 +468,11 @@ async def load_package_langs(packset: 'packages.PackagesSet', lang: Language = N
     if lang is None:
         lang = _CURRENT_LANG
 
-    if _CURRENT_LANG.lang_code == 'dummy':
-        return  # Ignores the actual packages.
+    if lang is DUMMY:
+        # Dummy does not need to load packages.
+        set_language(lang)
+        return
+
     # Preserve only the UI translations.
     lang_map = {NS_UI: lang._trans[NS_UI]}
     expanded = expand_langcode(lang.lang_code)

@@ -296,14 +296,20 @@ async def init_gen_tab(
         """Load languages when the window opens."""
         lang_order.clear()
         disp_names = []
+        i = -1
         for i, lang in enumerate(localisation.get_languages()):
-            LOGGER.info('Language: {!r}', lang)
             lang_order.append(lang)
             disp_names.append(lang.display_name)
             lang_code_to_ind[lang.lang_code] = i
 
-        lang_box['values'] = disp_names
         conf = config.APP.get_cur_conf(GenOptions)
+        if conf.language == localisation.DUMMY.lang_code or DEV_MODE.get():
+            # Add the dummy translation.
+            lang_order.append(localisation.DUMMY)
+            disp_names.append('<DUMMY>')
+            lang_code_to_ind[localisation.DUMMY.lang_code] = i + 1
+
+        lang_box['values'] = disp_names
         try:
             lang_box.current(lang_code_to_ind[conf.language])
         except KeyError:
