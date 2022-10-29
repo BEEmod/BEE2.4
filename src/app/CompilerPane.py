@@ -253,7 +253,7 @@ def find_screenshot(e=None) -> None:
         image = Image.open(file_name).convert('RGB')  # Remove alpha channel if present.
         buf = io.BytesIO()
         image.save(buf, 'png')
-        with atomic_write(SCREENSHOT_LOC, mode='wb', overwrite=True) as f:
+        with AtomicWriter(SCREENSHOT_LOC, is_bytes=True) as f:
             f.write(buf.getvalue())
 
         COMPILE_CFG['Screenshot']['LOC'] = SCREENSHOT_LOC
@@ -283,7 +283,7 @@ async def set_screen_type() -> None:
     COMPILE_CFG.save_check()
 
 
-def set_screenshot(image: Image=None) -> None:
+def set_screenshot(image: Image.Image=None) -> None:
     """Show the screenshot on the UI."""
     # Make the visible screenshot small
     global tk_screenshot
@@ -753,7 +753,7 @@ async def make_pane(tool_frame: tk.Frame, menu_bar: tk.Menu, corr: corridor_sele
 def init_application() -> None:
     """Initialise when standalone."""
     global window
-    window = cast(SubPane, TK_ROOT)
+    window = cast(SubPane.SubPane, TK_ROOT)
     TransToken.ui('Compiler Options - {ver}').format(ver=utils.BEE_VERSION).apply_title(window)
     window.resizable(True, False)
 
