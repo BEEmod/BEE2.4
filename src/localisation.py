@@ -31,8 +31,8 @@ NS_UNTRANSLATED: Final = '<NOTRANSLATE>'  # Legacy values which don't have trans
 # The prefix for all Valve's editor keys.
 PETI_KEY_PREFIX: Final = 'PORTAL2_PuzzleEditor'
 
-# The currently loaded translations. First is the namespace, then the token -> string.
-TRANSLATIONS: Dict[str, Dict[str, str]] = {}
+# The loaded translations from basemodui.txt
+GAME_TRANSLATIONS: Dict[str, str] = {}
 
 # Widgets that have a 'text' property.
 TextWidget: TypeAlias = Union[
@@ -55,35 +55,16 @@ class Language:
     """Wrapper around the GNU translator, storing the filename and display name."""
     display_name: str
     lang_code: str
-    _gnu: gettext_mod.NullTranslations
+    _trans: Dict[str, gettext_mod.NullTranslations]
 
 
-_TRANSLATOR = Language(
-    '<None>', 'en',
-    gettext_mod.NullTranslations()
+# The current language.
+_CURRENT_LANG = Language(
+    '<None>', 'en', {},
 )
 
 
-class DummyTranslations(gettext_mod.NullTranslations):
-    """Dummy form for identifying missing translation entries."""
-
-    def gettext(self, message: str) -> str:
-        """Generate placeholder of the right size."""
-        # We don't want to leave {arr} intact.
-        return ''.join([
-            '#' if s.isalnum() or s in '{}' else s
-            for s in message
-        ])
-
-    def ngettext(self, msgid1: str, msgid2: str, n: int) -> str:
-        """Generate placeholder of the right size for plurals."""
-        return self.gettext(msgid1 if n == 1 else msgid2)
-
-    lgettext = gettext
-    lngettext = ngettext
-
-
-DUMMY = Language('Dummy', 'dummy', DummyTranslations())
+DUMMY = Language('Dummy', 'dummy', {})
 
 
 @attrs.frozen(eq=False)
@@ -203,14 +184,17 @@ class TransToken:
         # If in the untranslated namespace or blank, don't translate.
         if self.namespace == NS_UNTRANSLATED or not self.token:
             result = self.token
-        elif _TRANSLATOR is DUMMY:
+        elif _CURRENT_LANG is DUMMY:
             return '#' * len(self.token)
-        elif self.namespace == NS_UI:
-            # noinspection PyProtectedMember
-            result = _TRANSLATOR._gnu.gettext(self.token)
+        elif self.namespace == NS_GAME:
+            try:
+                result = GAME_TRANSLATIONS[self.token]
+            except KeyError:
+                result = self.token
         else:
             try:
-                result = TRANSLATIONS[self.namespace][self.token]
+                # noinspection PyProtectedMember
+                result = _CURRENT_LANG._trans[self.namespace].gettext(self.token)
             except KeyError:
                 result = self.token
         if self.parameters:
@@ -299,13 +283,16 @@ class PluralTransToken(TransToken):
         # If in the untranslated namespace or blank, don't translate.
         if self.namespace == NS_UNTRANSLATED or not self.token:
             result = self.token if n == 1 else self.token_plural
-        elif isinstance(_TRANSLATOR, DummyTranslations):
-            return '#' * len(self.token)
-        elif self.namespace == NS_UI:
-            # noinspection PyProtectedMember
-            result = _TRANSLATOR._gnu.ngettext(self.token, self.token_plural, n)
+        elif _CURRENT_LANG is DUMMY:
+            return '#' * len(self.token if n == 1 else self.token_plural)
+        elif self.namespace == NS_GAME:
+            raise ValueError('Game namespace cannot be pluralised!')
         else:
-            raise ValueError(f'Namespace "{self.namespace}" is not allowed.')
+            try:
+                # noinspection PyProtectedMember
+                result = _CURRENT_LANG._trans[self.namespace].ngettext(self.token, self.token_plural, n)
+            except KeyError:
+                result = self.token
 
         if self.parameters:
             return result.format_map(self.parameters)
@@ -345,7 +332,7 @@ class JoinTransToken(TransToken):
 
 def load_basemodui(basemod_loc: str) -> None:
     """Load basemodui.txt from Portal 2, to provide translations for the default items."""
-    if NS_GAME in TRANSLATIONS:
+    if GAME_TRANSLATIONS:
         # Already loaded.
         return
 
@@ -355,7 +342,7 @@ def load_basemodui(basemod_loc: str) -> None:
     except FileNotFoundError:
         return
 
-    trans_data = TRANSLATIONS[NS_GAME] = {}
+    GAME_TRANSLATIONS.clear()
 
     with basemod_file:
         # This file is in keyvalues format, supposedly.
@@ -369,7 +356,7 @@ def load_basemodui(basemod_loc: str) -> None:
                 continue
             # Ignore non-puzzlemaker keys.
             if key.startswith(PETI_KEY_PREFIX):
-                trans_data[key] = value.replace("\\'", "'")
+                GAME_TRANSLATIONS[key] = value.replace("\\'", "'")
 
 
 def setup(conf_lang: str) -> None:
@@ -403,7 +390,9 @@ def setup(conf_lang: str) -> None:
         with file:
             translator = gettext_mod.GNUTranslations(file)
         # i18n: This is displayed in the options menu to switch to this language.
-        language = Language(translator.gettext('__LanguageName'), lang_code, translator)
+        language = Language(translator.gettext('__LanguageName'), lang_code, {
+            NS_UI: translator,
+        })
         break
     else:
         # To help identify missing translations, replace everything with
@@ -418,7 +407,7 @@ def setup(conf_lang: str) -> None:
                     "Can't find translation for codes: {!r}!",
                     expanded_langs,
                 )
-            language = Language('English', 'en', gettext_mod.NullTranslations())
+            language = Language('English', 'en', {})
 
     set_language(language)
 
@@ -438,14 +427,14 @@ def get_languages() -> Iterator[Language]:
             # Special case, hardcode this name since this is the template.
             'English' if filename.stem == 'en' else translator.gettext('__LanguageName'),
             translator.info().get('Language', filename.stem),
-            translator,
+            {NS_UI: translator},
         )
 
 
 def set_language(lang: Language) -> None:
     """Change the app's language."""
-    global _TRANSLATOR
-    _TRANSLATOR = lang
+    global _CURRENT_LANG
+    _CURRENT_LANG = lang
 
     conf = config.APP.get_cur_conf(GenOptions)
     config.APP.store_conf(attrs.evolve(conf, language=lang.lang_code))

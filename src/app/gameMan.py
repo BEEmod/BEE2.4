@@ -1047,7 +1047,7 @@ class Game:
         if we didn't convert them.
         """
         # Already loaded
-        if localisation.NS_GAME in localisation.TRANSLATIONS:
+        if localisation.GAME_TRANSLATIONS:
             return
 
         # Allow overriding.
