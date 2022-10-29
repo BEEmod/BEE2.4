@@ -11,6 +11,7 @@ import attrs
 import srctools.logger
 
 import localisation
+import packages
 from app.tooltip import add_tooltip
 from app import (
     TK_ROOT, LAUNCH_AFTER_EXPORT, PRESERVE_RESOURCES, DEV_MODE, background_run,
@@ -313,7 +314,8 @@ async def init_gen_tab(
     def language_changed(e) -> None:
         """Set the language when the combo box is changed"""
         if lang_order:
-            localisation.set_language(lang_order[lang_box.current()])
+            new_lang = lang_order[lang_box.current()]
+            background_run(localisation.load_package_langs, packages.LOADED, new_lang)
 
     lang_box.bind('<<ComboboxSelected>>', language_changed)
 

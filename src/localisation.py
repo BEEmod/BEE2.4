@@ -9,8 +9,9 @@ import gettext as gettext_mod
 import locale
 import sys
 
+import trio
 import attrs
-from srctools import EmptyMapping, logger
+from srctools import EmptyMapping, FileSystem, logger
 
 from config.gen_opts import GenOptions
 import config
@@ -19,6 +20,7 @@ import utils
 if TYPE_CHECKING:  # Don't import at runtime, we don't want TK in the compiler.
     import tkinter as tk
     from tkinter import ttk
+    import packages
 
 __all__ = ['TransToken', 'load_basemodui', 'setup']
 
@@ -48,6 +50,7 @@ _applied_menu_tokens: 'WeakKeyDictionary[tk.Menu, Dict[int, TransToken]]' = Weak
 _langchange_callback: List[Callable[[], object]] = []
 
 FOLDER = utils.install_path('i18n')
+PARSE_CANCEL = trio.CancelScope()
 
 
 @attrs.frozen
@@ -330,6 +333,13 @@ class JoinTransToken(TransToken):
         return sep.join(items)
 
 
+def expand_langcode(lang_code: str) -> List[str]:
+    """If a language is a lang/country specific code like en_AU, return that and the generic version."""
+    expanded = [lang_code.casefold()]
+    if '_' in lang_code:
+        expanded.append(lang_code[:lang_code.index('_')].casefold())
+    return expanded
+
 def load_basemodui(basemod_loc: str) -> None:
     """Load basemodui.txt from Portal 2, to provide translations for the default items."""
     if GAME_TRANSLATIONS:
@@ -374,10 +384,7 @@ def setup(conf_lang: str) -> None:
                 lang_code = arg[5:]
                 break
 
-    # Include the generic and specific, if provided.
-    expanded_langs = [lang_code.casefold()]
-    if '_' in lang_code:
-        expanded_langs.append(lang_code[:lang_code.index('_')])
+    expanded_langs = expand_langcode(lang_code)
 
     LOGGER.info('Language: {!r}', lang_code)
     LOGGER.debug('Language codes: {!r}', expanded_langs)
@@ -424,7 +431,7 @@ def get_languages() -> Iterator[Language]:
             LOGGER.warning('Could not parse "{}"', filename, exc_info=True)
             continue
         yield Language(
-            # Special case, hardcode this name since this is the template.
+            # Special case, hardcode this name since this is the template and will produce the token.
             'English' if filename.stem == 'en' else translator.gettext('__LanguageName'),
             translator.info().get('Language', filename.stem),
             {NS_UI: translator},
@@ -434,6 +441,7 @@ def get_languages() -> Iterator[Language]:
 def set_language(lang: Language) -> None:
     """Change the app's language."""
     global _CURRENT_LANG
+    PARSE_CANCEL.cancel()
     _CURRENT_LANG = lang
 
     conf = config.APP.get_cur_conf(GenOptions)
@@ -447,3 +455,40 @@ def set_language(lang: Language) -> None:
             menu.entryconfigure(index, label=str(token))
     for func in _langchange_callback:
         func()
+
+
+async def load_package_langs(packset: 'packages.PackagesSet', lang: Language = None) -> None:
+    """Load translations from packages, in the background."""
+    global PARSE_CANCEL
+    PARSE_CANCEL.cancel()  # Stop any in progress loads.
+
+    if lang is None:
+        lang = _CURRENT_LANG
+
+    if _CURRENT_LANG.lang_code == 'dummy':
+        return  # Ignores the actual packages.
+    # Preserve only the UI translations.
+    lang_map = {NS_UI: lang._trans[NS_UI]}
+    expanded = expand_langcode(lang.lang_code)
+
+    async def loader(pak_id: str, fsys: FileSystem) -> None:
+        """Load the package language in the background."""
+        for code in expanded:
+            try:
+                file = fsys[f'resources/i18n/{code}.mo']
+            except FileNotFoundError:
+                continue
+            LOGGER.debug('Found localisation file {}:{}', pak_id, file.path)
+            try:
+                with file.open_bin() as f:
+                    lang_map[pak_id] = await trio.to_thread.run_sync(gettext_mod.GNUTranslations, f)
+                return
+            except OSError:
+                LOGGER.warning('Invalid localisation file {}:{}', pak_id, file.path, exc_info=True)
+
+    with trio.CancelScope() as PARSE_CANCEL:
+        async with trio.open_nursery() as nursery:
+            for pack in packset.packages.values():
+                nursery.start_soon(loader, pack.id, pack.fsys)
+    # We're not canceled, replace the global language with our new translations.
+    set_language(attrs.evolve(lang, trans=lang_map))

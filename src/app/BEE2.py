@@ -8,6 +8,7 @@ from outcome import Outcome, Error
 from srctools import Property
 import trio
 
+import localisation
 from BEE2_config import GEN_OPTS
 from app import (
     TK_ROOT, sound, img, gameMan, music_conf,
@@ -69,6 +70,7 @@ async def init_app() -> None:
     loadScreen.main_loader.step('UI', 'pre_ui')
     app.background_run(img.init, package_sys)
     app.background_run(sound.sound_task)
+    app.background_run(localisation.load_package_langs, packages.LOADED)
 
     # Load filesystems into various modules
     music_conf.load_filesystems(package_sys.values())
