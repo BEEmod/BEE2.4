@@ -462,6 +462,7 @@ class PackagePath:
 
 
 ResultT = TypeVar('ResultT')
+SyncResultT = TypeVar('SyncResultT')
 ArgsT = TypeVarTuple('ArgsT')
 _NO_RESULT: Any = object()
 
@@ -480,19 +481,21 @@ class Result(Generic[ResultT]):
     ) -> None:
         self._nursery: Optional[trio.Nursery] = nursery
         self._result: ResultT = _NO_RESULT
-        nursery.start_soon(self._task, func, args, name=name or func)
+        if not name:
+            name = func
+        nursery.start_soon(self._task, func, args, name=name)
 
     @classmethod
     def sync(
         cls,
         nursery: trio.Nursery,
-        func: Callable[[Unpack[ArgsT]], ResultT],
+        func: Callable[[Unpack[ArgsT]], SyncResultT],
         /, *args: Unpack[ArgsT],
         cancellable: bool = False,
         limiter: trio.CapacityLimiter | None = None,
-    ) -> 'Result[ResultT]':
+    ) -> 'Result[SyncResultT]':
         """Wrap a sync task, using to_thread.run_sync()."""
-        async def task() -> ResultT:
+        async def task() -> SyncResultT:
             """Run in a thread."""
             return await trio.to_thread.run_sync(func, *args, cancellable=cancellable, limiter=limiter)
 
