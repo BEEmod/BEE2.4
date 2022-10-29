@@ -314,6 +314,17 @@ async def init_gen_tab(
             lang_box.current(lang_code_to_ind[conf.language])
         except KeyError:
             pass
+        for code in localisation.expand_langcode(conf.language):
+            try:
+                lang_box.current(lang_code_to_ind[code])
+                break
+            except KeyError:
+                pass
+        else:
+            LOGGER.warning(
+                'Couldn\'t restore language: "{}" not in known languages {}',
+                conf.language, list(lang_code_to_ind),
+            )
 
     _load_langs = load_langs
 
