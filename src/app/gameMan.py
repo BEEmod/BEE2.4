@@ -475,7 +475,7 @@ class Game:
                 del data[i:]
                 break
 
-        with atomic_write(fgd_path, overwrite=True, mode='wb') as file:
+        with AtomicWriter(fgd_path, is_bytes=True) as file:
             for line in data:
                 file.write(line)
             if add_lines:
