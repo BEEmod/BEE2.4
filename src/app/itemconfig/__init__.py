@@ -55,7 +55,7 @@ TIMER_NUM_TRANS = {
     for num in TIMER_NUM
 }
 TIMER_NUM_TRANS['inf'] = INF
-TRANS_TIM_COLON = TransToken.untranslated('{tim}:')
+TRANS_COLON = TransToken.untranslated('{text}: ')
 # For the item-variant widget, we need to refresh on style changes.
 ITEM_VARIANT_LOAD: List[Tuple[str, Callable[[], object]]] = []
 
@@ -86,7 +86,7 @@ class Widget:
     """Common logic for both kinds of widget that can appear on a ConfigGroup."""
     group_id: str
     id: str
-    name: str
+    name: TransToken
     tooltip: TransToken
     config: Property
     create_func: SingleCreateFunc
@@ -226,7 +226,10 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
             is_timer = wid.bool('UseTimer')
             use_inf = is_timer and wid.bool('HasInf')
             wid_id = wid['id'].casefold()
-            name = wid['Label', wid_id]
+            try:
+                name = TransToken.parse(data.pak_id, wid['Label'])
+            except LookupError:
+                name = TransToken.untranslated(wid_id)
             tooltip = TransToken.parse(data.pak_id, wid['Tooltip', ''])
             default_prop = wid.find_key('Default', '')
             values: list[tuple[str, tk.StringVar]]
@@ -367,11 +370,14 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
                 label: Optional[ttk.Label] = None
                 if s_wid.name:
                     if getattr(s_wid.create_func, 'wide', False):
-                        wid_frame = ttk.LabelFrame(wid_frame, text=s_wid.name + ': ')
+                        wid_frame = TRANS_COLON.format(text=s_wid.name).apply(
+                            ttk.LabelFrame(wid_frame)
+                        )
                         wid_frame.grid(row=0, column=0, columnspan=2, sticky='ew', pady=5)
                         wid_frame.columnconfigure(0, weight=1)
                     else:
-                        label = ttk.Label(wid_frame, text=s_wid.name + ': ')
+                        label = ttk.Label(wid_frame)
+                        TRANS_COLON.format(text=s_wid.name).apply(label)
                         label.grid(row=0, column=0)
                 try:
                     widget, s_wid.ui_cback = await s_wid.create_func(wid_frame, s_wid.value, s_wid.config)
@@ -402,7 +408,9 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
             if widget_count == 1 or not m_wid.name:
                 wid_frame = ttk.Frame(frame)
             else:
-                wid_frame = ttk.LabelFrame(frame, text=m_wid.name)
+                wid_frame = TRANS_COLON.format(text=m_wid.name).apply(
+                    ttk.LabelFrame(frame)
+                )
 
             wid_frame.grid(row=row, column=0, sticky='ew', pady=5)
             assert isinstance(m_wid.values, list)
@@ -574,7 +582,7 @@ def widget_timer_generic(widget_func: SingleCreateFunc) -> MultiCreateFunc:
             parent.columnconfigure(1, weight=1)
 
             label = ttk.Label(parent)
-            TRANS_TIM_COLON.format(tim=timer_disp).apply(label)
+            TRANS_COLON.format(text=timer_disp).apply(label)
             label.grid(row=row, column=0)
             widget, update = await widget_func(
                 parent,
