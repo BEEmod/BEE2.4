@@ -53,7 +53,7 @@ class SelitemData:
     large_icon: img.Handle | None  # Larger, landscape icon.
     previews: list[img.Handle]  # Full size images used for previews.
     desc: tkMarkdown.MarkdownData
-    group: str
+    group: TransToken
     sort_key: str
     # The packages used to define this, used for debugging.
     packages: frozenset[str] = attrs.Factory(frozenset)
@@ -63,9 +63,12 @@ class SelitemData:
         """Parse from a property block."""
         auth = sep_values(info['authors', ''])
         name = TransToken.parse(pack_id, info['name'])
-        group = info['group', '']
         sort_key = info['sort_key', '']
         desc = desc_parse(info, info['id'], pack_id)
+        try:
+            group = TransToken.parse(pack_id, info['group'])
+        except LookupError:
+            group = TransToken.untranslated('')
         try:
             short_name = TransToken.parse(pack_id, info['shortName'])
         except LookupError:

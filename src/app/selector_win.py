@@ -236,6 +236,7 @@ class Item:
     - group: Items with the same group name will be shown together.
     - attrs: a dictionary containing the attribute values for this item.
     - button, Set later, the button TK object for this item
+    - source: For debugging only, the packages the item came from.
     """
     __slots__ = [
         'name',
@@ -252,7 +253,7 @@ class Item:
         'button',
         'snd_sample',
         'attrs',
-        'package',
+        'source',
         '_selector',
         '_context_lbl',
         '_context_ind',
@@ -267,20 +268,20 @@ class Item:
         previews: Iterable[img.Handle] = (),
         authors: Iterable[str] = (),
         desc: tkMarkdown.MarkdownData = tkMarkdown.MarkdownData.text(''),
-        group: str = '',
+        group: TransToken = TransToken.untranslated(''),
         sort_key: str | None = None,
         attributes: Mapping[str, AttrValues] = EmptyMapping,
         snd_sample: str | None = None,
-        package: str = '',
+        source: str = '',
     ) -> None:
         # Not a name, actually an ID
         self.name = name
         self.shortName = short_name
-        self.group_id = group.strip().casefold()
-        self.group = TransToken.parse(package, group)
+        self.group_id = group.token.casefold()
+        self.group = group
         self.longName = long_name or short_name
         self.sort_key = sort_key
-        self.package = package
+        self.source = source
         if len(self.longName.token) > 20:
             self._context_lbl = self.shortName
         else:
@@ -353,7 +354,7 @@ class Item:
             group=data.group,
             sort_key=data.sort_key,
             attributes=attrs,
-            package=', '.join(sorted(data.packages)),
+            source=', '.join(sorted(data.packages)),
         )
 
     def _on_click(self, _: tk.Event = None) -> None:
@@ -392,7 +393,7 @@ class Item:
         item.snd_sample = self.snd_sample
         item._context_lbl = self._context_lbl
         item.attrs = self.attrs
-        item.package = self.package
+        item.source = self.source
 
         item._selector = item.button = None
         return item
@@ -1270,7 +1271,7 @@ class SelectorWin(Generic[CallbackT]):
                 text = tkMarkdown.convert(TRANS_DEV_ITEM_ID.format(item='*NONE*'), None)
             else:
                 text = tkMarkdown.convert(TRANS_DEV_ITEM_ID.format(
-                    item=f'`{item.package}`:`{item.name}`' if item.package else f'`{item.name}`',
+                    item=f'`{item.source}`:`{item.name}`' if item.source else f'`{item.name}`',
                 ), None)
             self.prop_desc.set_text(tkMarkdown.join(
                 text,
