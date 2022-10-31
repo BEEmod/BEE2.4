@@ -23,7 +23,7 @@ from . import (
 )
 import utils
 import srctools.logger
-from editoritems import Handle as RotHandle, Surface, ItemClass
+from editoritems import Handle as RotHandle, Surface, ItemClass, FSPath
 from editoritems_props import prop_timer_delay
 from localisation import TransToken
 
@@ -287,10 +287,16 @@ def load_item_data() -> None:
             inst_desc.append(tkMarkdown.TextSegment(heading, (tkMarkdown.TextTag.BOLD, )))
             for ind, inst in enumerate(editor.instances):
                 inst_desc.append(tkMarkdown.TextSegment(f'{ind}: ', (tkMarkdown.TextTag.INDENT, )))
-                inst_desc.append(tkMarkdown.TextSegment(f'{inst.inst}\n', (tkMarkdown.TextTag.CODE, )))
-            for name, inst in editor.cust_instances.items():
+                inst_desc.append(
+                    tkMarkdown.TextSegment(f'{inst.inst}\n', (tkMarkdown.TextTag.CODE, ))
+                    if inst.inst != FSPath() else tkMarkdown.TextSegment('""\n')
+                )
+            for name, inst_path in editor.cust_instances.items():
                 inst_desc.append(tkMarkdown.TextSegment(f'"{name}": ', (tkMarkdown.TextTag.INDENT, )))
-                inst_desc.append(tkMarkdown.TextSegment(f'{inst}\n', (tkMarkdown.TextTag.CODE, )))
+                inst_desc.append(
+                    tkMarkdown.TextSegment(f'{inst_path}\n', (tkMarkdown.TextTag.CODE, ))
+                    if inst_path != FSPath() else tkMarkdown.TextSegment('""\n')
+                )
         desc = tkMarkdown.join(desc, tkMarkdown.SingleMarkdown(inst_desc))
 
     wid['desc'].set_text(desc)
