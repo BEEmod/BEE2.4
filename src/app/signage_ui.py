@@ -29,7 +29,7 @@ TRANS_SIGN_NAME = TransToken.ui('Signage: {name}')
 
 def export_data() -> List[Tuple[str, str]]:
     """Returns selected items, for Signage.export() to use."""
-    conf: Layout = config.APP.get_cur_conf(Layout)
+    conf: Layout = config.APP.get_cur_conf(Layout, default=Layout())
     return [
         (str(ind), sign_id)
         for ind in SIGN_IND
