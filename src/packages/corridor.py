@@ -22,6 +22,7 @@ from corridor import (
     CORRIDOR_COUNTS, ID_TO_CORR,
     Corridor, ExportedConf,
 )
+from localisation import TransToken
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -32,6 +33,7 @@ FALLBACKS: Final[Mapping[Tuple[GameMode, Direction], str]] = {
     (GameMode.SP, Direction.EXIT): 'sp_exit',
     (GameMode.COOP, Direction.EXIT): 'coop',
 }
+TRANS_CORRIDOR_GENERIC = TransToken.ui('Corridor')
 EMPTY_DESC: Final = tkMarkdown.MarkdownData.text('')
 
 IMG_WIDTH_SML: Final = 144
@@ -46,7 +48,7 @@ ICON_GENERIC_LRG = img.Handle.builtin('BEE2/corr_generic', IMG_WIDTH_LRG, IMG_HE
 @attrs.frozen
 class CorridorUI(Corridor):
     """Additional data only useful for the UI. """
-    name: str
+    name: TransToken
     config: lazy_conf.LazyConf
     desc: tkMarkdown.MarkdownData = attrs.field(repr=False)
     images: List[img.Handle]
@@ -147,12 +149,16 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                         f'Non-horizontal {mode.value}_{direction.value}_{orient.value} corridor '
                         f'"{prop["Name", prop["instance"]]}" cannot be defined as a legacy corridor!'
                     )
+            try:
+                name = TransToken.parse(data.pak_id, prop['Name'])
+            except LookupError:
+                name = TRANS_CORRIDOR_GENERIC
 
             corridors[mode, direction, orient].append(CorridorUI(
                 instance=prop['instance'],
-                name=prop['Name', 'Corridor'],
+                name=name,
                 authors=packages.sep_values(prop['authors', '']),
-                desc=packages.desc_parse(prop, '', data.pak_id),
+                desc=packages.desc_parse(prop, 'Corridor', data.pak_id),
                 orig_index=prop.int('DefaultIndex', 0),
                 config=packages.get_config(prop, 'items', data.pak_id, source='Corridor ' + prop.name),
                 images=images,
@@ -225,7 +231,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                         if mode is GameMode.COOP and direction is Direction.ENTRY:
                             corridor = CorridorUI(
                                 instance=fname,
-                                name='Corridor',
+                                name=TRANS_CORRIDOR_GENERIC,
                                 images=[ICON_GENERIC_LRG],
                                 dnd_icon=ICON_GENERIC_SML,
                                 authors=style.selitem_data.auth,
@@ -239,7 +245,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                             style_info = style.legacy_corridors[mode, direction, ind + 1]
                             corridor = CorridorUI(
                                 instance=fname,
-                                name=style_info.name,
+                                name=TRANS_CORRIDOR_GENERIC,
                                 images=[img.Handle.file(style_info.icon, IMG_WIDTH_LRG, IMG_HEIGHT_LRG)],
                                 dnd_icon=img.Handle.file(style_info.icon, IMG_WIDTH_SML, IMG_HEIGHT_SML),
                                 authors=style.selitem_data.auth,
@@ -377,9 +383,9 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
             count = CORRIDOR_COUNTS[mode, direction]
             # For all items these are at the start.
             for i in range(count):
-                item.set_inst(i, editoritems.InstCount(
+                item.set_inst(i, editoritems.InstCount(editoritems.FSPath(
                     f'instances/bee2_corridor/{mode.value}/{direction.value}/corr_{i + 1}.vmf'
-                ))
+                )))
             item.offset = Vec(64, 64, 64)
             # If vertical corridors exist, allow placement there.
             if export[mode, direction, Orient.UP]:

@@ -39,6 +39,8 @@ GRP_UNSELECTED: Final = 'unselected'
 HEADER_HEIGHT: Final = 20
 HEADER_PAD: Final = 10
 
+TRANS_BLANK = TransToken.untranslated('')
+
 # If no groups are defined for a style, use this.
 FALLBACK = corridor.CorridorGroup(
     '<Fallback>',
@@ -317,7 +319,7 @@ class Selector:
         # Put all remaining in a spare slot.
         for slot, corr in zip(
             self.slots[next_slot:],
-            sorted(inst_to_corr.values(), key=lambda corr: corr.name),
+            sorted(inst_to_corr.values(), key=lambda corr: corr.name.token),
         ):
             slot.contents = corr
             slot.flexi_group = GRP_UNSELECTED
@@ -415,7 +417,7 @@ class Selector:
             self.cur_images = corr.images
             self._sel_img(0)  # Updates the buttons.
 
-            self.wid_title['text'] = corr.name
+            corr.name.apply(self.wid_title)
             if DEV_MODE.get():
                 # Show the instance in the description, plus fixups that are assigned.
                 self.wid_desc.set_text(tkMarkdown.join(
@@ -430,7 +432,7 @@ class Selector:
             else:
                 self.wid_desc.set_text(corr.desc)
         else:  # Reset.
-            self.wid_title['text'] = ''
+            TRANS_BLANK.apply(self.wid_title)
             self.wid_desc.set_text(corridor.EMPTY_DESC)
             img.apply(self.wid_image, IMG_CORR_BLANK)
             self.wid_image_left.state(('disabled', ))
