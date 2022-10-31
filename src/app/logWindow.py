@@ -3,6 +3,7 @@
 The implementation is in bg_daemon, to ensure it remains responsive.
 """
 import logging
+import math
 import multiprocessing
 from typing import Union
 
@@ -16,6 +17,9 @@ import config
 
 _PIPE_MAIN_REC, PIPE_DAEMON_SEND = multiprocessing.Pipe(duplex=False)
 PIPE_DAEMON_REC, _PIPE_MAIN_SEND = multiprocessing.Pipe(duplex=False)
+_SEND_LOGS: trio.MemorySendChannel
+_REC_LOGS: trio.MemoryReceiveChannel
+_SEND_LOGS, _REC_LOGS = trio.open_memory_channel(384)
 
 
 class TextHandler(logging.Handler):
@@ -39,23 +43,43 @@ class TextHandler(logging.Handler):
         finally:
             # Undo the record overwrite, so other handlers get the correct object.
             record.msg = msg
-        _PIPE_MAIN_SEND.send(('log', record.levelname, text))
+        try:
+            _SEND_LOGS.send_nowait(('log', record.levelname, text))
+        except trio.WouldBlock:
+            print('Log queue overflowed!')
 
     def set_visible(self, is_visible: bool) -> None:
         """Show or hide the window."""
         conf = config.APP.get_cur_conf(GenOptions)
         config.APP.store_conf(attrs.evolve(conf, show_log_win=is_visible))
-        _PIPE_MAIN_SEND.send(('visible', is_visible, None))
+        _SEND_LOGS.send_nowait(('visible', is_visible, None))
 
     def setLevel(self, level: Union[int, str]) -> None:
         """Set the level of the log window."""
         if isinstance(level, int):
             level = logging.getLevelName(level)
         super(TextHandler, self).setLevel(level)
-        _PIPE_MAIN_SEND.send(('level', level, None))
+        _SEND_LOGS.send_nowait(('level', level, None))
 
 HANDLER = TextHandler()
 logging.getLogger().addHandler(HANDLER)
+
+
+async def loglevel_bg() -> None:
+    """Tasks that run in the background of the main application."""
+    global _SEND_LOGS
+    async with trio.open_nursery() as nursery:
+        nursery.start_soon(emit_logs)
+        nursery.start_soon(setting_apply)
+        await trio.sleep_forever()
+
+
+async def emit_logs() -> None:
+    """Send logs across the pipe in a background thread, since it can wait for synchronisation."""
+    sender = _PIPE_MAIN_SEND.send
+    while True:
+        msg = await _REC_LOGS.receive()
+        await trio.to_thread.run_sync(sender, msg)
 
 
 async def setting_apply() -> None:

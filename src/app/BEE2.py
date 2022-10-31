@@ -43,7 +43,7 @@ async def init_app() -> None:
 
     logWindow.HANDLER.set_visible(conf.show_log_win)
     logWindow.HANDLER.setLevel(conf.log_win_level)
-    app.background_run(logWindow.setting_apply)
+    app.background_run(logWindow.loglevel_bg)
 
     LOGGER.debug('Loading settings...')
 
