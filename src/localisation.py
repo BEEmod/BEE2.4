@@ -548,7 +548,7 @@ async def rebuild_package_langs(packset: 'packages.PackagesSet') -> None:
         await pack_path.mkdir(parents=True, exist_ok=True)
         catalog.header_comment = PACKAGE_HEADER
         with open(pack_path / 'en.pot', 'wb') as f:
-            write_po(f, catalog, include_previous=True, width=120)
+            write_po(f, catalog, include_previous=True, sort_output=True, width=120)
         for lang_file in await pack_path.iterdir():
             if lang_file.suffix != '.po':
                 continue
