@@ -1,10 +1,13 @@
 """Wraps gettext, to localise all UI text."""
+import io
 from typing import (
     Callable, Dict, Iterable, Iterator, List, Mapping, Sequence, TYPE_CHECKING, TypeVar, Union,
     cast,
 )
+
+from srctools.filesys import RawFileSystem
 from typing_extensions import ParamSpec, Final, TypeAlias
-from weakref import WeakKeyDictionary
+from weakref import WeakKeyDictionary, WeakSet
 import gettext as gettext_mod
 import locale
 import sys
@@ -52,6 +55,8 @@ _applied_tokens: 'WeakKeyDictionary[TextWidget, TransToken]' = WeakKeyDictionary
 _applied_menu_tokens: 'WeakKeyDictionary[tk.Menu, Dict[int, TransToken]]' = WeakKeyDictionary()
 # For anything else, this is called which will apply tokens.
 _langchange_callback: List[Callable[[], object]] = []
+# Track all loaded tokens, so we can export those back out to the packages.
+_loaded_tokens: 'WeakSet[TransToken]' = WeakSet()
 
 FOLDER = utils.install_path('i18n')
 PARSE_CANCEL = trio.CancelScope()
@@ -72,6 +77,11 @@ _CURRENT_LANG = Language(
 # Special language which replaces all text with ## to easily identify untranslatable text.
 DUMMY: Final = Language('Dummy', 'dummy', {})
 
+PACKAGE_HEADER = """\
+# Translations template for BEEmod package "PROJECT".
+# Built with BEEmod version VERSION.
+#"""
+
 
 @attrs.frozen(eq=False)
 class TransToken:
@@ -83,6 +93,9 @@ class TransToken:
     # Keyword arguments passed when formatting.
     # If a blank dict is passed, use EmptyMapping to save memory.
     parameters: Mapping[str, object] = attrs.field(converter=lambda m: m or EmptyMapping)
+
+    def __attrs_post_init__(self) -> None:
+        _loaded_tokens.add(self)
 
     @classmethod
     def parse(cls, package: str, text: str) -> 'TransToken':
@@ -498,3 +511,61 @@ async def load_package_langs(packset: 'packages.PackagesSet', lang: Language = N
                 nursery.start_soon(loader, pack.id, pack.fsys)
     # We're not canceled, replace the global language with our new translations.
     set_language(attrs.evolve(lang, trans=lang_map))
+
+
+async def rebuild_package_langs(packset: 'packages.PackagesSet') -> None:
+    """Write out POT templates for unzipped packages."""
+    from collections import defaultdict
+    from babel import messages
+    from babel.messages.pofile import read_po, write_po
+    from babel.messages.mofile import write_mo
+
+    tok2pack: dict[Union[str, tuple[str, str]], set[str]] = defaultdict(set)
+
+    pack_paths: dict[str, tuple[trio.Path, messages.Catalog]] = {}
+    for pak_id, pack in packset.packages.items():
+        if isinstance(pack.fsys, RawFileSystem):
+            pack_paths[pak_id.casefold()] = trio.Path(pack.path, 'resources', 'i18n'), messages.Catalog(
+                project=pack.disp_name.token,
+                version=utils.BEE_VERSION,
+            )
+    LOGGER.info('Collecting translations...')
+    for tok in list(_loaded_tokens):  # Get strong refs, so this doesn't change underneath us.
+        try:
+            pack_path, catalog = pack_paths[tok.namespace.casefold()]
+        except KeyError:
+            continue
+        if isinstance(tok, PluralTransToken):
+            catalog.add((tok.token, tok.token_plural))
+            tok2pack[tok.token, tok.token_plural].add(tok.namespace)
+        elif tok.token:  # Skip blank tokens.
+            catalog.add(tok.token)
+            tok2pack[tok.token].add(tok.namespace)
+
+    LOGGER.info('{} translations.', len(_loaded_tokens))
+    for pak_id, (pack_path, catalog) in pack_paths.items():
+        LOGGER.info('Exporting translations for {}...', pak_id.upper())
+        await pack_path.mkdir(parents=True, exist_ok=True)
+        catalog.header_comment = PACKAGE_HEADER
+        with open(pack_path / 'en.pot', 'wb') as f:
+            write_po(f, catalog, include_previous=True, width=120)
+        for lang_file in await pack_path.iterdir():
+            if lang_file.suffix != '.po':
+                continue
+            data = await lang_file.read_text()
+            existing: messages.Catalog = read_po(io.StringIO(data))
+            existing.update(catalog)
+            catalog.header_comment = PACKAGE_HEADER
+            existing.version = utils.BEE_VERSION
+            LOGGER.info('- Rewriting {}', lang_file)
+            with open(lang_file, 'wb') as f:
+                write_po(f, existing, sort_output=True, width=120)
+            with open(lang_file.with_suffix('.mo'), 'wb') as f:
+                write_mo(f, existing)
+
+    LOGGER.info('Repeated tokens:\n{}', '\n'.join([
+        f'{", ".join(sorted(tok_pack))} -> {token!r} '
+        for (token, tok_pack) in
+        sorted(tok2pack.items(), key=lambda t: len(t[1]), reverse=True)
+        if len(tok_pack) > 1
+    ]))

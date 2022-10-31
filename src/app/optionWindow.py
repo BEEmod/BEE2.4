@@ -494,6 +494,17 @@ async def init_dev_tab(f: ttk.Frame) -> None:
     ))
     reload_img.grid(row=10, column=2)
 
+    build_trans_btn = ttk.Button(f, command=lambda: background_run(
+        localisation.rebuild_package_langs,
+        packages.LOADED,
+    ))
+    TransToken.ui('Build Package Translations').apply(build_trans_btn)
+    add_tooltip(build_trans_btn, TransToken.ui(
+        "Export translation files for all unzipped packages. This will update existing "
+        "localisations, creating them for packages that don't have any."
+    ))
+    build_trans_btn.grid(row=11, column=0, columnspan=2)
+
 # Various "reports" that can be produced.
 
 
