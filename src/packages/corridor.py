@@ -183,7 +183,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
 
     @classmethod
     async def post_parse(cls, packset: packages.PackagesSet) -> None:
-        """After items are parsed, convert definitions in the item into these groups."""
+        """After items are parsed, convert legacy definitions in the item into these groups."""
         # Need both of these to be parsed.
         await packset.ready(packages.Item).wait()
         await packset.ready(packages.Style).wait()
@@ -202,8 +202,9 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                     try:
                         corridor_group = packset.obj_by_id(cls, style_id)
                     except KeyError:
+                        # Synthesise a new group to match.
                         corridor_group = cls(style_id, {})
-                        packset.add(corridor_group)
+                        packset.add(corridor_group, item.pak_id, item.pak_name)
 
                     corr_list = corridor_group.corridors.setdefault(
                         (mode, direction, Orient.HORIZONTAL),

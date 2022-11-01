@@ -407,9 +407,12 @@ class PackagesSet:
             raise ValueError(cls.__name__ + ' has not been parsed yet!')
         return cast(PakT, self.objects[cls][object_id.casefold()])
 
-    def add(self, obj: PakT) -> None:
-        """Add an object to our dataset."""
+    def add(self, obj: PakT, pak_id: str, pak_name: str) -> None:
+        """Add an object to our dataset later, with the given package name."""
         self.objects[type(obj)][obj.id.casefold()] = obj
+        if not hasattr(obj, 'pak_id'):
+            obj.pak_id = pak_id
+            obj.pak_name = pak_name
 
 
 # Global loaded packages. TODO: This should become local.

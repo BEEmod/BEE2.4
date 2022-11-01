@@ -51,6 +51,8 @@ FALLBACK = corridor.CorridorGroup(
         for orient in Orient
     }
 )
+FALLBACK.pak_id = '<fallback>'
+FALLBACK.pak_name = '???'
 
 
 class Selector:
