@@ -295,8 +295,8 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
         for (mode, direction, orient), corridors in self.corridors.items():
             source = f'corridors/{self.id}.{mode.value}_{direction.value}_{orient.value}'
             for corr in corridors:
-                yield corr.name, self.pak_id, source + 'name'
-                yield from tkMarkdown.iter_tokens(corr.desc, self.pak_id, source + 'desc')
+                yield corr.name, self.pak_id, source + '.name'
+                yield from tkMarkdown.iter_tokens(corr.desc, self.pak_id, source + '.desc')
 
     def defaults(self, mode: GameMode, direction: Direction, orient: Orient) -> list[CorridorUI]:
         """Fetch the default corridor set for this mode, direction and orientation."""
