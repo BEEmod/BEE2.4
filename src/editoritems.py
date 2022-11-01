@@ -15,7 +15,7 @@ from srctools.tokenizer import Tokenizer, Token
 from connections import Config as ConnConfig, InputType, OutNames
 from editoritems_props import ItemProp, ItemPropKind, PROP_TYPES
 from collisions import CollideType, BBox, NonBBoxError
-from localisation import TransToken
+from localisation import TransToken, TransTokenSource
 
 
 LOGGER = logger.get_logger(__name__)
@@ -1976,3 +1976,9 @@ class Item:
             and self.cls is not ItemClass.TRACK_PLATFORM
         ):
             LOGGER.warning('Items with inputs or outputs need ConnectionPoints definition!')
+
+    def iter_trans_tokens(self, source: str) -> Iterator[TransTokenSource]:
+        """Iterate over translation tokens in this item."""
+        for subtype in self.subtypes:
+            yield subtype.name, source + '.name'
+            yield subtype.pal_name, source + '.pal_name'

@@ -8,7 +8,7 @@ import operator
 import re
 import copy
 from enum import Enum
-from typing import Iterable, Match, cast
+from typing import Iterable, Iterator, Match, cast
 from pathlib import PurePosixPath as FSPath
 
 import attrs
@@ -19,7 +19,7 @@ from srctools.tokenizer import Tokenizer, Token
 import config.gen_opts
 from app import tkMarkdown, img, lazy_conf, DEV_MODE
 import config
-from localisation import TransToken
+from localisation import TransToken, TransTokenSource
 from packages import (
     PackagesSet, PakObject, ParseData, ExportData, Style,
     sep_values, desc_parse, get_config,
@@ -211,6 +211,15 @@ class ItemVariant:
 
         return variant
 
+    def iter_trans_tokens(self, source: str) -> Iterator[TransTokenSource]:
+        """Iterate over the tokens in this item variant."""
+        yield from self.editor.iter_trans_tokens(source)
+        if self.all_name is not None:
+            yield self.all_name, source + '.all_name'
+        yield from tkMarkdown.iter_tokens(self.desc, source + '.desc')
+        for item in self.editor_extra:
+            yield from item.iter_trans_tokens(f'{source}:{item.id}')
+
     def _modify_editoritems(
         self,
         props: Property,
@@ -391,7 +400,7 @@ class ItemVariant:
         return editor
 
 
-@attrs.define
+@attrs.define(repr=False)
 class Version:
     """Versions are a set of styles defined for an item.
 
@@ -401,7 +410,7 @@ class Version:
     During parsing, the styles are UnParsedItemVariant and def_style is the ID.
     We convert that in setup_style_tree.
     """
-    name: str
+    name: str  # Todo: Translation token?
     id: str
     isolate: bool
     styles: dict[str, ItemVariant]
@@ -622,6 +631,13 @@ class Item(PakObject, needs_foreground=True):
 
     def __repr__(self) -> str:
         return f'<Item:{self.id}>'
+
+    def iter_trans_tokens(self) -> Iterator[TransTokenSource]:
+        """Yield all translation tokens in this item."""
+        yield from tkMarkdown.iter_tokens(self.glob_desc, f'items/{self.id}.desc')
+        for version in self.versions.values():
+            for style_id, variant in version.styles.items():
+                yield from variant.iter_trans_tokens(f'items/{self.id}/{style_id}')
 
     @classmethod
     async def post_parse(cls, packset: PackagesSet) -> None:

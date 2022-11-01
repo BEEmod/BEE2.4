@@ -26,8 +26,9 @@ else:
 EXCLUDES = [
     'bz2',  # We aren't using this compression format (shutil, zipfile etc handle ImportError)..
 
-    # This isn't ever used in the compiler.
+    # These aren't ever used in the compiler.
     'tkinter',
+    'babel',
 
     'win32api',
     'win32com',

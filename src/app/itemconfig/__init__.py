@@ -3,6 +3,7 @@ from typing import Iterable, Optional, Callable, List, Tuple, Dict, Set, Iterato
 from typing_extensions import TypeAlias
 from tkinter import ttk
 import tkinter as tk
+import itertools
 
 from srctools import EmptyMapping, Property, Vec, logger
 import trio
@@ -11,7 +12,7 @@ import attrs
 from app import TK_ROOT, UI, background_run, signage_ui, tkMarkdown, sound, tk_tools, StyleVarPane
 from app.tooltip import add_tooltip
 from config.widgets import WidgetConfig
-from localisation import TransToken
+from localisation import TransToken, TransTokenSource
 import BEE2_config
 import config
 import utils
@@ -317,6 +318,14 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
             widgets,
             multi_widgets,
         )
+
+    def iter_trans_tokens(self) -> Iterator[TransTokenSource]:
+        """Yield translation tokens for this config group."""
+        source = f'configgroup/{self.id}'
+        yield self.name, source + '.name'
+        for widget in itertools.chain(self.widgets, self.multi_widgets):
+            yield widget.name, f'{source}/{widget.id}.name'
+            yield widget.tooltip, f'{source}/{widget.id}.tooltip'
 
     def add_over(self, override: 'ConfigGroup') -> None:
         """Override a ConfigGroup to add additional widgets."""

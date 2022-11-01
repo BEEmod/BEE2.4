@@ -17,7 +17,7 @@ import srctools.logger
 
 from app.img import Handle as ImgHandle
 import utils
-from localisation import TransToken
+from localisation import TransToken, TransTokenSource
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -361,7 +361,7 @@ def join(*args: MarkdownData) -> MarkdownData:
     return JoinedMarkdown(list(args))
 
 
-def iter_tokens(data: MarkdownData, source: str) -> Iterator[Tuple[TransToken, str, str]]:
+def iter_tokens(data: MarkdownData, source: str) -> Iterator[TransTokenSource]:
     """Yield all tokens present in this data block."""
     if isinstance(data, TranslatedMarkdown):
         yield (data.source, source)

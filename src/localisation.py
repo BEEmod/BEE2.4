@@ -58,8 +58,6 @@ _applied_tokens: 'WeakKeyDictionary[TextWidget, TransToken]' = WeakKeyDictionary
 _applied_menu_tokens: 'WeakKeyDictionary[tk.Menu, Dict[int, TransToken]]' = WeakKeyDictionary()
 # For anything else, this is called which will apply tokens.
 _langchange_callback: List[Callable[[], object]] = []
-# Track all loaded tokens, so we can export those back out to the packages.
-_loaded_tokens: 'WeakSet[TransToken]' = WeakSet()
 
 FOLDER = utils.install_path('i18n')
 PARSE_CANCEL = trio.CancelScope()
@@ -98,9 +96,6 @@ class TransToken:
     # Keyword arguments passed when formatting.
     # If a blank dict is passed, use EmptyMapping to save memory.
     parameters: Mapping[str, object] = attrs.field(converter=lambda m: m or EmptyMapping)
-
-    def __attrs_post_init__(self) -> None:
-        _loaded_tokens.add(self)
 
     @classmethod
     def parse(cls, package: str, text: str) -> 'TransToken':
@@ -528,11 +523,20 @@ async def get_package_tokens(packset: 'packages.PackagesSet') -> AsyncIterator[T
     for pack in packset.packages.values():
         yield pack.disp_name, 'package/name'
         yield pack.desc, 'package/desc'
-    for obj_dict in packset.objects.values():
-        for obj in obj_dict.values():
+    for obj_type in packset.objects:
+        LOGGER.debug('Checking object type {}', obj_type.__name__)
+        for obj in packset.all_obj(obj_type):
             for tup in obj.iter_trans_tokens():
                 yield tup
             await trio.lowlevel.checkpoint()
+
+
+def _get_children(tok: TransToken) -> Iterator[TransToken]:
+    """If this token has children, yield those."""
+    yield tok
+    for val in tok.parameters.values():
+        if isinstance(val, TransToken):
+            yield from _get_children(val)
 
 
 async def rebuild_package_langs(packset: 'packages.PackagesSet') -> None:
@@ -543,30 +547,38 @@ async def rebuild_package_langs(packset: 'packages.PackagesSet') -> None:
     from babel.messages.mofile import write_mo
 
     tok2pack: dict[Union[str, tuple[str, str]], set[str]] = defaultdict(set)
-    # Track tokens, so we can check we're not missing iter_trans_tokens() methods.
-    found_tokens: set[TransToken] = set()
-
     pack_paths: dict[str, tuple[trio.Path, messages.Catalog]] = {}
+
     for pak_id, pack in packset.packages.items():
         if isinstance(pack.fsys, RawFileSystem):
             pack_paths[pak_id.casefold()] = trio.Path(pack.path, 'resources', 'i18n'), messages.Catalog(
                 project=pack.disp_name.token,
                 version=utils.BEE_VERSION,
             )
-    LOGGER.info('Collecting translations...')
-    for tok in list(_loaded_tokens):  # Get strong refs, so this doesn't change underneath us.
-        try:
-            pack_path, catalog = pack_paths[tok.namespace.casefold()]
-        except KeyError:
-            continue
-        if isinstance(tok, PluralTransToken):
-            catalog.add((tok.token, tok.token_plural))
-            tok2pack[tok.token, tok.token_plural].add(tok.namespace)
-        elif tok.token:  # Skip blank tokens.
-            catalog.add(tok.token)
-            tok2pack[tok.token].add(tok.namespace)
 
-    LOGGER.info('{} translations.', len(_loaded_tokens))
+    LOGGER.info('Collecting translations...')
+    async for orig_tok, source in get_package_tokens(packset):
+        for tok in _get_children(orig_tok):
+            if not tok:
+                continue  # Ignore blank tokens, not important to translate.
+            try:
+                pack_path, catalog = pack_paths[tok.namespace.casefold()]
+            except KeyError:
+                continue
+            # Line number is just zero - we don't know which lines these originated from.
+            if tok.namespace.casefold() != tok.orig_pack.casefold():
+                # Originated from a different package, include that.
+                loc = [(f'{tok.orig_pack}:{source}', 0)]
+            else:  # Omit, most of the time.
+                loc = [(source, 0)]
+
+            if isinstance(tok, PluralTransToken):
+                catalog.add((tok.token, tok.token_plural), locations=loc)
+                tok2pack[tok.token, tok.token_plural].add(tok.namespace)
+            else:
+                catalog.add(tok.token, locations=loc)
+                tok2pack[tok.token].add(tok.namespace)
+
     for pak_id, (pack_path, catalog) in pack_paths.items():
         LOGGER.info('Exporting translations for {}...', pak_id.upper())
         await pack_path.mkdir(parents=True, exist_ok=True)

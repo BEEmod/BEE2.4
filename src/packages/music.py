@@ -148,7 +148,7 @@ class Music(PakObject, needs_foreground=True):
 
     def iter_trans_tokens(self) -> Iterator[TransTokenSource]:
         """Yield all translation tokens used by this music."""
-        return self.selitem_data.iter_trans_tokens('music/' + self.id)
+        yield from self.selitem_data.iter_trans_tokens('music/' + self.id)
 
     def provides_channel(self, channel: MusicChannel) -> bool:
         """Check if this music has this channel."""

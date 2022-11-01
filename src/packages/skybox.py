@@ -1,4 +1,8 @@
+from typing import Iterator
+
 from srctools import Property
+
+from localisation import TransTokenSource
 from packages import (
     PakObject, ExportData, ParseData, SelitemData,
     get_config, lazy_conf
@@ -51,6 +55,10 @@ class Skybox(PakObject, needs_foreground=True):
         self.selitem_data += override.selitem_data
         self.config = lazy_conf.concat(self.config, override.config)
         self.fog_opts += override.fog_opts.copy()
+
+    def iter_trans_tokens(self) -> Iterator[TransTokenSource]:
+        """Yield translation tokens used by this skybox."""
+        return self.selitem_data.iter_trans_tokens('skyboxes/' + self.id)
 
     def __repr__(self) -> str:
         return f'<Skybox {self.id}>'
