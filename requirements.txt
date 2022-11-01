@@ -1,11 +1,11 @@
-attrs >= 21.4.0
+attrs >= 22.1.0
 mistletoe >= 0.7.2
 Pillow >= 8.3.2
 pyglet == 1.5.18
 PyInstaller >= 5.2.0
 pygtrie >= 2.4.0
 babel >= 2.9.1
-trio >= 0.19.0
+trio >= 0.22.0
 outcome >= 1.1.0  # Trio dependency
 versioningit >= 0.3.0
 srctools >= 2.3.4
