@@ -1,7 +1,8 @@
 """Wraps gettext, to localise all UI text."""
 import io
 from typing import (
-    Callable, Dict, Iterable, Iterator, List, Mapping, Sequence, TYPE_CHECKING, Tuple, TypeVar,
+    AsyncIterator, Callable, Dict, Iterable, Iterator, List, Mapping, Sequence, TYPE_CHECKING,
+    Tuple, TypeVar,
     Union,
     cast,
 )
@@ -518,14 +519,16 @@ async def load_package_langs(packset: 'packages.PackagesSet', lang: Language = N
     set_language(attrs.evolve(lang, trans=lang_map))
 
 
-def get_package_tokens(packset: 'packages.PackagesSet') -> Iterator[TransTokenSource]:
+async def get_package_tokens(packset: 'packages.PackagesSet') -> AsyncIterator[TransTokenSource]:
     """Get all the tokens from all packages."""
     for pack in packset.packages.values():
         yield pack.disp_name, pack.id, 'package/name'
         yield pack.desc, pack.id, 'package/desc'
     for obj_dict in packset.objects.values():
         for obj in obj_dict.values():
-            yield from obj.iter_trans_tokens()
+            for tup in obj.iter_trans_tokens():
+                yield tup
+            await trio.lowlevel.checkpoint()
 
 
 async def rebuild_package_langs(packset: 'packages.PackagesSet') -> None:
