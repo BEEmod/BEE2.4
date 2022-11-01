@@ -4,7 +4,7 @@ This produces a stream of values, which are fed into richTextBox to display.
 """
 from __future__ import annotations
 
-from typing import Iterator, Mapping, Sequence
+from typing import Iterator, Mapping, Sequence, Tuple
 from contextvars import ContextVar
 import urllib.parse
 import itertools
@@ -359,3 +359,12 @@ def join(*args: MarkdownData) -> MarkdownData:
     """Merge several mardown blocks together."""
     # This preserves the originals so they can be translated separately.
     return JoinedMarkdown(list(args))
+
+
+def iter_tokens(data: MarkdownData, pak_id: str, source: str) -> Iterator[Tuple[TransToken, str, str]]:
+    """Yield all tokens present in this data block."""
+    if isinstance(data, TranslatedMarkdown):
+        yield (data.source, pak_id, source)
+    elif isinstance(data, JoinedMarkdown):
+        for child in data.children:
+            yield from iter_tokens(child, pak_id, source)

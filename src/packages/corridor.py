@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pickle
 from collections import defaultdict
-from typing import Dict, List, Tuple, Mapping
+from typing import Dict, Iterator, List, Tuple, Mapping
 from typing_extensions import Final
 import itertools
 
@@ -289,6 +289,14 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                                 f'{orient.value}!\n {corr.instance}'
                             )
                         dup_check.add(folded)
+
+    def iter_trans_tokens(self) -> Iterator[packages.TransTokenSource]:
+        """Iterate over translation tokens in the corridor."""
+        for (mode, direction, orient), corridors in self.corridors.items():
+            source = f'corridors/{self.id}.{mode.value}_{direction.value}_{orient.value}'
+            for corr in corridors:
+                yield corr.name, self.pak_id, source + 'name'
+                yield from tkMarkdown.iter_tokens(corr.desc, self.pak_id, source + 'desc')
 
     def defaults(self, mode: GameMode, direction: Direction, orient: Orient) -> list[CorridorUI]:
         """Fetch the default corridor set for this mode, direction and orientation."""

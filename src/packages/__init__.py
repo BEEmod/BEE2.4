@@ -24,11 +24,11 @@ from corridor import CORRIDOR_COUNTS, GameMode, Direction
 import srctools.logger
 
 from typing import (
-    NoReturn, ClassVar, Optional, Any, TYPE_CHECKING, TypeVar, Type,
+    Iterator, NoReturn, ClassVar, Optional, Any, TYPE_CHECKING, TypeVar, Type,
     Collection, Iterable, cast,
 )
 
-from localisation import TransToken
+from localisation import TransToken, TransTokenSource
 
 
 if TYPE_CHECKING:  # Prevent circular import
@@ -145,6 +145,13 @@ class SelitemData:
             other.sort_key or self.sort_key,
             self.packages | other.packages,
         )
+
+    def iter_trans_tokens(self, pak_id: str, source: str) -> Iterator[TransTokenSource]:
+        """Yield the tokens in this data."""
+        yield self.name, pak_id, source + '.long_name'
+        yield self.short_name, pak_id, source + '.short_name'
+        yield self.group, pak_id, source + '.group'
+        yield from tkMarkdown.iter_tokens(self.desc, pak_id, source + '.desc')
 
 
 @attrs.define
@@ -279,6 +286,13 @@ class PakObject:
         - game: The game we're exporting to.
         """
         raise NotImplementedError
+
+    def iter_trans_tokens(self) -> Iterator[TransTokenSource]:
+        """Yields translation tokens in this object.
+
+        This is used to regenerate package translation files.
+        """
+        return iter(())
 
     @classmethod
     async def post_parse(cls, packset: PackagesSet) -> None:
@@ -1015,6 +1029,10 @@ class Style(PakObject, needs_foreground=True):
 
     def __repr__(self) -> str:
         return f'<Style: {self.id}>'
+
+    def iter_trans_tokens(self) -> Iterator[TransTokenSource]:
+        """Iterate over translation tokens in the style."""
+        return self.selitem_data.iter_trans_tokens(self.pak_id, 'styles/' + self.id)
 
     @staticmethod
     def export(exp_data: ExportData) -> None:

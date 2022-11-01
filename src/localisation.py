@@ -1,7 +1,8 @@
 """Wraps gettext, to localise all UI text."""
 import io
 from typing import (
-    Callable, Dict, Iterable, Iterator, List, Mapping, Sequence, TYPE_CHECKING, TypeVar, Union,
+    Callable, Dict, Iterable, Iterator, List, Mapping, Sequence, TYPE_CHECKING, Tuple, TypeVar,
+    Union,
     cast,
 )
 
@@ -261,6 +262,10 @@ class TransToken:
             func()
 
 
+# Token, package id and "source" string, for updating translation files.
+TransTokenSource = Tuple[TransToken, str, str]
+
+
 @attrs.frozen(eq=False)
 class PluralTransToken(TransToken):
     """A pair of tokens, swapped between depending on the number of items.
@@ -513,6 +518,16 @@ async def load_package_langs(packset: 'packages.PackagesSet', lang: Language = N
     set_language(attrs.evolve(lang, trans=lang_map))
 
 
+def get_package_tokens(packset: 'packages.PackagesSet') -> Iterator[TransTokenSource]:
+    """Get all the tokens from all packages."""
+    for pack in packset.packages.values():
+        yield pack.disp_name, pack.id, 'package/name'
+        yield pack.desc, pack.id, 'package/desc'
+    for obj_dict in packset.objects.values():
+        for obj in obj_dict.values():
+            yield from obj.iter_trans_tokens()
+
+
 async def rebuild_package_langs(packset: 'packages.PackagesSet') -> None:
     """Write out POT templates for unzipped packages."""
     from collections import defaultdict
@@ -521,6 +536,8 @@ async def rebuild_package_langs(packset: 'packages.PackagesSet') -> None:
     from babel.messages.mofile import write_mo
 
     tok2pack: dict[Union[str, tuple[str, str]], set[str]] = defaultdict(set)
+    # Track tokens, so we can check we're not missing iter_trans_tokens() methods.
+    found_tokens: set[TransToken] = set()
 
     pack_paths: dict[str, tuple[trio.Path, messages.Catalog]] = {}
     for pak_id, pack in packset.packages.items():

@@ -1,5 +1,12 @@
+"""Definitions for elevator videos.
+
+We can't pack BIKs, so this is mainly for Valve's existing ones.
+"""
+from typing import Iterator
+
 from srctools import Property
-from packages import ParseData, ExportData, SelitemData, PakObject, Style
+
+from packages import ParseData, ExportData, SelitemData, PakObject, Style, TransTokenSource
 
 
 class Elevator(PakObject, needs_foreground=True):
@@ -50,6 +57,10 @@ class Elevator(PakObject, needs_foreground=True):
     def __repr__(self) -> str:
         return f'<Elevator {self.id}>'
 
+    def iter_trans_tokens(self) -> Iterator[TransTokenSource]:
+        """Yield translation tokens present in the elevator."""
+        return self.selitem_data.iter_trans_tokens(self.pak_id, 'elevators/' + self.id)
+
     @staticmethod
     def export(exp_data: ExportData) -> None:
         """Export the chosen video into the configs."""
@@ -60,12 +71,9 @@ class Elevator(PakObject, needs_foreground=True):
             elevator = None
         else:
             try:
-                elevator = Elevator.by_id(exp_data.selected)
+                elevator = exp_data.packset.obj_by_id(Elevator, exp_data.selected)
             except KeyError:
-                raise Exception(
-                    "Selected elevator ({}) "
-                    "doesn't exist?".format(exp_data.selected)
-                ) from None
+                raise Exception(f"Selected elevator ({exp_data.selected}) doesn't exist?") from None
 
         if style.has_video:
             if elevator is None:
