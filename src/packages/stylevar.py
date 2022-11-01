@@ -1,7 +1,9 @@
 """Style specific features which can be enabled or disabled."""
 from __future__ import annotations
 
-from localisation import TransToken
+from typing import Iterator
+
+from localisation import TransToken, TransTokenSource
 from packages import PakObject, Style, ParseData, ExportData
 from srctools import Property, bool_as_int
 
@@ -91,6 +93,11 @@ class StyleVar(PakObject, allow_mult=True, needs_foreground=True):
             f'default={self.default}, '
             f'styles={self.styles}>:\n{self.desc}'
         )
+
+    def iter_trans_tokens(self) -> Iterator[TransTokenSource]:
+        """Yield translation tokens used by this stylevar."""
+        yield self.name, self.id + '.name'
+        yield self.desc, self.id + '.desc'
 
     def applies_to_style(self, style: Style) -> bool:
         """Check to see if this will apply for the given style.

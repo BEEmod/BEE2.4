@@ -31,6 +31,7 @@ __all__ = [
     'TransToken', 'load_basemodui',
     'DUMMY', 'Language', 'set_language', 'load_package_langs',
     'setup', 'expand_langcode',
+    'TransTokenSource', 'rebuild_package_langs',
 ]
 
 LOGGER = logger.get_logger(__name__)
@@ -90,6 +91,8 @@ class TransToken:
     """A named section of text that can be translated later on."""
     # The package name, or a NS_* constant.
     namespace: str
+    # Original package where this was parsed from.
+    orig_pack: str
     # The token to lookup, or the default if undefined.
     token: str
     # Keyword arguments passed when formatting.
@@ -102,6 +105,7 @@ class TransToken:
     @classmethod
     def parse(cls, package: str, text: str) -> 'TransToken':
         """Parse a string to find a translation token, if any."""
+        orig_pack = package
         if text.startswith('[['):  # "[[package]] default"
             try:
                 package, token = text[2:].split(']]', 1)
@@ -111,34 +115,34 @@ class TransToken:
                     raise ValueError
             except ValueError:
                 LOGGER.warning('Unparsable translation token - expected "[[package]] text", got:\n{}', text)
-                return cls(package, text, EmptyMapping)
+                return cls(package, orig_pack, text, EmptyMapping)
             else:
                 if not package:
                     package = NS_UNTRANSLATED
-                return cls(package, token, EmptyMapping)
+                return cls(package, orig_pack, token, EmptyMapping)
         elif text.startswith(PETI_KEY_PREFIX):
-            return cls(NS_GAME, text, EmptyMapping)
+            return cls(NS_GAME, orig_pack, text, EmptyMapping)
         else:
-            return cls(package, text, EmptyMapping)
+            return cls(package, orig_pack, text, EmptyMapping)
 
     @classmethod
     def ui(cls, token: str, /, **kwargs: str) -> 'TransToken':
         """Make a token for a UI string."""
-        return cls(NS_UI, token, kwargs)
+        return cls(NS_UI, NS_UI, token, kwargs)
 
     @staticmethod
     def ui_plural(singular: str, plural: str,  /, **kwargs: str) -> 'PluralTransToken':
         """Make a plural token for a UI string."""
-        return PluralTransToken(NS_UI, singular, kwargs, plural)
+        return PluralTransToken(NS_UI, NS_UI, singular, kwargs, plural)
 
     def join(self, children: Iterable['TransToken'], sort: bool=False) -> 'JoinTransToken':
         """Use this as a separator to join other tokens together."""
-        return JoinTransToken(self.namespace, self.token, self.parameters, list(children), sort)
+        return JoinTransToken(self.namespace, self.orig_pack, self.token, self.parameters, list(children), sort)
 
     @classmethod
     def from_valve(cls, text: str) -> 'TransToken':
         """Make a token for a string that should be looked up in Valve's translation files."""
-        return cls(NS_GAME, text, EmptyMapping)
+        return cls(NS_GAME, NS_GAME, text, EmptyMapping)
 
     @classmethod
     def untranslated(cls, text: str) -> 'TransToken':
@@ -146,7 +150,7 @@ class TransToken:
 
         In this case, the token is the literal text to use.
         """
-        return cls(NS_UNTRANSLATED, text, EmptyMapping)
+        return cls(NS_UNTRANSLATED, NS_UNTRANSLATED, text, EmptyMapping)
 
     @property
     def is_game(self) -> bool:
@@ -263,8 +267,8 @@ class TransToken:
             func()
 
 
-# Token, package id and "source" string, for updating translation files.
-TransTokenSource = Tuple[TransToken, str, str]
+# Token and "source" string, for updating translation files.
+TransTokenSource = Tuple[TransToken, str]
 
 
 @attrs.frozen(eq=False)
@@ -522,8 +526,8 @@ async def load_package_langs(packset: 'packages.PackagesSet', lang: Language = N
 async def get_package_tokens(packset: 'packages.PackagesSet') -> AsyncIterator[TransTokenSource]:
     """Get all the tokens from all packages."""
     for pack in packset.packages.values():
-        yield pack.disp_name, pack.id, 'package/name'
-        yield pack.desc, pack.id, 'package/desc'
+        yield pack.disp_name, 'package/name'
+        yield pack.desc, 'package/desc'
     for obj_dict in packset.objects.values():
         for obj in obj_dict.values():
             for tup in obj.iter_trans_tokens():

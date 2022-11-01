@@ -146,12 +146,12 @@ class SelitemData:
             self.packages | other.packages,
         )
 
-    def iter_trans_tokens(self, pak_id: str, source: str) -> Iterator[TransTokenSource]:
+    def iter_trans_tokens(self, source: str) -> Iterator[TransTokenSource]:
         """Yield the tokens in this data."""
-        yield self.name, pak_id, source + '.long_name'
-        yield self.short_name, pak_id, source + '.short_name'
-        yield self.group, pak_id, source + '.group'
-        yield from tkMarkdown.iter_tokens(self.desc, pak_id, source + '.desc')
+        yield self.name, source + '.long_name'
+        yield self.short_name, source + '.short_name'
+        yield self.group, source + '.group'
+        yield from tkMarkdown.iter_tokens(self.desc, source + '.desc')
 
 
 @attrs.define
@@ -1032,7 +1032,7 @@ class Style(PakObject, needs_foreground=True):
 
     def iter_trans_tokens(self) -> Iterator[TransTokenSource]:
         """Iterate over translation tokens in the style."""
-        return self.selitem_data.iter_trans_tokens(self.pak_id, 'styles/' + self.id)
+        return self.selitem_data.iter_trans_tokens('styles/' + self.id)
 
     @staticmethod
     def export(exp_data: ExportData) -> None:

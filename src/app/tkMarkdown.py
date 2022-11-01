@@ -361,10 +361,10 @@ def join(*args: MarkdownData) -> MarkdownData:
     return JoinedMarkdown(list(args))
 
 
-def iter_tokens(data: MarkdownData, pak_id: str, source: str) -> Iterator[Tuple[TransToken, str, str]]:
+def iter_tokens(data: MarkdownData, source: str) -> Iterator[Tuple[TransToken, str, str]]:
     """Yield all tokens present in this data block."""
     if isinstance(data, TranslatedMarkdown):
-        yield (data.source, pak_id, source)
+        yield (data.source, source)
     elif isinstance(data, JoinedMarkdown):
         for child in data.children:
-            yield from iter_tokens(child, pak_id, source)
+            yield from iter_tokens(child, source)

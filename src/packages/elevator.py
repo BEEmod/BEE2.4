@@ -59,7 +59,7 @@ class Elevator(PakObject, needs_foreground=True):
 
     def iter_trans_tokens(self) -> Iterator[TransTokenSource]:
         """Yield translation tokens present in the elevator."""
-        return self.selitem_data.iter_trans_tokens(self.pak_id, 'elevators/' + self.id)
+        return self.selitem_data.iter_trans_tokens('elevators/' + self.id)
 
     @staticmethod
     def export(exp_data: ExportData) -> None:
