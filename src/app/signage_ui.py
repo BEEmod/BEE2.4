@@ -9,6 +9,7 @@ import srctools.logger
 from app import dragdrop, img, tk_tools, TK_ROOT
 from config.signage import DEFAULT_IDS, Layout
 from packages import Signage, Style
+import packages
 from localisation import TransToken
 import config
 
@@ -49,7 +50,7 @@ async def apply_config(data: Layout) -> None:
         value = data.signs.get(timer, '')
         if value:
             try:
-                slot.contents = Signage.by_id(value)
+                slot.contents = packages.LOADED.obj_by_id(Signage, value)
             except KeyError:
                 LOGGER.warning('No signage with id "{}"!', value)
         else:
@@ -59,7 +60,7 @@ async def apply_config(data: Layout) -> None:
 def style_changed(new_style: Style) -> None:
     """Update the icons for the selected signage."""
     icon: Optional[img.Handle]
-    for sign in Signage.all():
+    for sign in packages.LOADED.all_obj(Signage):
         for potential_style in new_style.bases:
             try:
                 icon = sign.styles[potential_style.id.upper()].icon
@@ -93,11 +94,6 @@ def style_changed(new_style: Style) -> None:
 async def init_widgets(master: tk.Widget) -> Optional[tk.Widget]:
     """Construct the widgets, returning the configuration button.
     """
-
-    if not any(Signage.all()):
-        # There's no signage, disable the configurator. This will be invisible basically.
-        return ttk.Frame(master)
-
     window.resizable(True, True)
     TransToken.ui('Configure Signage').apply_title(window)
 
@@ -130,13 +126,9 @@ async def init_widgets(master: tk.Widget) -> Optional[tk.Widget]:
     preview_left.grid(row=0, column=0)
     preview_right.grid(row=0, column=1)
 
-    try:
-        sign_arrow = Signage.by_id('SIGN_ARROW')
-    except KeyError:
-        LOGGER.warning('No arrow signage defined!')
-        sign_arrow = None
-
-    hover_scope: Optional[trio.CancelScope] = None
+    # Dummy initial parameter, will be overwritten. Allows us to stop the display when the mouse
+    # leaves.
+    hover_scope = trio.CancelScope()
 
     async def on_hover(hovered: dragdrop.Slot[Signage]) -> None:
         """Show the signage when hovered, then toggle."""
@@ -145,19 +137,22 @@ async def init_widgets(master: tk.Widget) -> Optional[tk.Widget]:
         if hover_sign is None:
             await on_leave(hovered)
             return
-        if hover_scope is not None:
-            hover_scope.cancel()
+        hover_scope.cancel()
 
         TRANS_SIGN_NAME.format(name=hover_sign.name).apply(name_label)
 
         sng_left = hover_sign.dnd_icon
-        sng_right = sign_arrow.dnd_icon if sign_arrow is not None else IMG_BLANK
         try:
-            dbl_left = Signage.by_id(hover_sign.prim_id or '').dnd_icon
+            sng_right = packages.LOADED.obj_by_id(Signage, 'SIGN_ARROW').dnd_icon
+        except KeyError:
+            LOGGER.warning('No arrow signage defined!')
+            sng_right = IMG_BLANK
+        try:
+            dbl_left = packages.LOADED.obj_by_id(Signage, hover_sign.prim_id or '').dnd_icon
         except KeyError:
             dbl_left = hover_sign.dnd_icon
         try:
-            dbl_right = Signage.by_id(hover_sign.sec_id or '').dnd_icon
+            dbl_right = packages.LOADED.obj_by_id(Signage, hover_sign.sec_id or '').dnd_icon
         except KeyError:
             dbl_right = IMG_BLANK
 
@@ -174,9 +169,7 @@ async def init_widgets(master: tk.Widget) -> Optional[tk.Widget]:
         """Reset the visible sign when left."""
         nonlocal hover_scope
         name_label['text'] = ''
-        if hover_scope is not None:
-            hover_scope.cancel()
-            hover_scope = None
+        hover_scope.cancel()
         img.apply(preview_left, IMG_BLANK)
         img.apply(preview_right, IMG_BLANK)
 
@@ -194,10 +187,11 @@ async def init_widgets(master: tk.Widget) -> Optional[tk.Widget]:
         prev_id = DEFAULT_IDS.get(i, '')
         if prev_id:
             try:
-                slot.contents = Signage.by_id(prev_id)
+                slot.contents = packages.LOADED.obj_by_id(Signage, prev_id)
             except KeyError:
                 LOGGER.warning('Missing sign id: {}', prev_id)
 
+    # TODO: Dynamically refresh this.
     for sign in sorted(Signage.all(), key=lambda s: s.name):
         if not sign.hidden:
             slot = drag_man.slot_source(canv_all)
