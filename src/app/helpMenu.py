@@ -54,7 +54,7 @@ DB_LOCATION = 'https://raw.githubusercontent.com/BEEmod/BEE2.4/master/help_urls.
 url_data: Element = NULL
 
 # This produces a '-------' instead.
-SEPERATOR = WebResource(TransToken.untranslated(''), '', ResIcon.NONE)
+SEPERATOR = WebResource(TransToken.BLANK, '', ResIcon.NONE)
 
 Res: Callable[[TransToken, str, ResIcon], WebResource] = cast(Any, WebResource)
 WEB_RESOURCES = [

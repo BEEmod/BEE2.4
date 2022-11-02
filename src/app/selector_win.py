@@ -104,7 +104,6 @@ class AttrTypes(Enum):
 # TransToken is str()-ified.
 AttrValues: TypeAlias = Union[str, TransToken, Iterable[Union[str, TransToken]], bool, Vec]
 CallbackT = ParamSpec('CallbackT')
-TRANS_BLANK = TransToken.untranslated('')
 TRANS_COMMA = TransToken.untranslated(', ')
 TRANS_ATTR_DESC = TransToken.untranslated('{desc}: ')
 TRANS_ATTR_COLOR = TransToken.ui('Color: R={r}, G={g}, B={b}')  # i18n: Tooltip for colour swatch.
@@ -131,24 +130,24 @@ class AttrDef:
     label: ttk.Label = attrs.field(init=False)
 
     @classmethod
-    def string(cls, attr_id: str, desc: TransToken=TRANS_BLANK, default: str='') -> AttrDef:
+    def string(cls, attr_id: str, desc: TransToken=TransToken.BLANK, default: str='') -> AttrDef:
         """Alternative constructor for string-type attrs."""
         return AttrDef(attr_id, desc, default, AttrTypes.STRING)
 
     @classmethod
-    def list(cls, attr_id: str, desc: TransToken=TRANS_BLANK, default: list=None) -> AttrDef:
+    def list(cls, attr_id: str, desc: TransToken=TransToken.BLANK, default: list=None) -> AttrDef:
         """Alternative constructor for list-type attrs."""
         if default is None:
             default = []
         return AttrDef(attr_id, desc, default, AttrTypes.LIST)
 
     @classmethod
-    def bool(cls, attr_id: str, desc: TransToken=TRANS_BLANK, default: bool=False) -> AttrDef:
+    def bool(cls, attr_id: str, desc: TransToken=TransToken.BLANK, default: bool=False) -> AttrDef:
         """Alternative constructor for bool-type attrs."""
         return AttrDef(attr_id, desc, default, AttrTypes.BOOL)
 
     @classmethod
-    def color(cls, attr_id: str, desc: TransToken=TRANS_BLANK, default: Vec=None) -> AttrDef:
+    def color(cls, attr_id: str, desc: TransToken=TransToken.BLANK, default: Vec=None) -> AttrDef:
         """Alternative constructor for color-type attrs."""
         if default is None:
             default = Vec(255, 255, 255)
@@ -268,7 +267,7 @@ class Item:
         previews: Iterable[img.Handle] = (),
         authors: Iterable[str] = (),
         desc: tkMarkdown.MarkdownData = tkMarkdown.MarkdownData.text(''),
-        group: TransToken = TransToken.untranslated(''),
+        group: TransToken = TransToken.BLANK,
         sort_key: str | None = None,
         attributes: Mapping[str, AttrValues] = EmptyMapping,
         snd_sample: str | None = None,
@@ -501,8 +500,8 @@ class SelectorWin(Generic[CallbackT]):
         # i18n: 'None' item name.
         none_name: TransToken = TransToken.ui("<None>"),
         title: TransToken = TransToken.untranslated('???'),
-        desc: TransToken = TRANS_BLANK,
-        readonly_desc: TransToken = TRANS_BLANK,
+        desc: TransToken = TransToken.BLANK,
+        readonly_desc: TransToken = TransToken.BLANK,
         callback: Optional[Callable[Concatenate[Optional[str], CallbackT], None]]=None,
         callback_params: CallbackT.args=(),
         callback_keywords: CallbackT.kwargs = EmptyMapping,
@@ -549,7 +548,7 @@ class SelectorWin(Generic[CallbackT]):
         """
         self.noneItem = Item(
             name='<NONE>',
-            short_name=TransToken.untranslated(''),
+            short_name=TransToken.BLANK,
             icon=none_icon,
             desc=tkMarkdown.convert(none_desc, None),
             attributes=dict(none_attrs),

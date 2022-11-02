@@ -657,7 +657,7 @@ class SubType:
     Should not be constructed directly.
     """
     # The name, shown on remove connection windows.
-    name: TransToken = TransToken.untranslated('')
+    name: TransToken = TransToken.BLANK
     # The models this uses, in order. The editoritems format includes
     # a texture name for each of these, but it's never used.
     models: list[FSPath] = attrs.Factory(list)
@@ -668,7 +668,7 @@ class SubType:
 
     # The capitalised name to display in the bottom of the palette window.
     # If not on the palette, set to blank
-    pal_name: TransToken = TransToken.untranslated('')
+    pal_name: TransToken = TransToken.BLANK
     # X/Y position on the palette, or None if not on the palette
     pal_pos: tuple[int, int] | None = None
     # The path to the icon VTF, in 'models/props_map_editor'.

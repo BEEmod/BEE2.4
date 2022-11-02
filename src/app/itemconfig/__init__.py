@@ -198,7 +198,7 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
 
         if data.is_override:
             # Override doesn't have a name
-            group_name = TransToken.untranslated('')
+            group_name = TransToken.BLANK
         else:
             group_name = TransToken.parse(data.pak_id, props['Name'])
 

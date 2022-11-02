@@ -77,7 +77,7 @@ class Item(Generic[UserT]):
     def __init__(
         self: 'Item[None]',
         *values: TransToken,
-        hover_text: TransToken = TransToken.untranslated(''),
+        hover_text: TransToken = TransToken.BLANK,
         lock_check: bool=False,
         state: bool=False,
     ) -> None: ...
@@ -85,7 +85,7 @@ class Item(Generic[UserT]):
     def __init__(
         self: 'Item[UserT]',
         *values: TransToken,
-        hover_text: TransToken = TransToken.untranslated(''),
+        hover_text: TransToken = TransToken.BLANK,
         lock_check: bool=False,
         state: bool=False,
         user: UserT,
@@ -93,7 +93,7 @@ class Item(Generic[UserT]):
     def __init__(
         self,
         *values: TransToken,
-        hover_text: TransToken = TransToken.untranslated(''),
+        hover_text: TransToken = TransToken.BLANK,
         lock_check: bool=False,
         state: bool=False,
         user: UserT | None = None,

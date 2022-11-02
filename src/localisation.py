@@ -1,7 +1,8 @@
 """Wraps gettext, to localise all UI text."""
 import io
 from typing import (
-    AsyncIterator, Callable, Dict, Iterable, Iterator, List, Mapping, Sequence, TYPE_CHECKING,
+    AsyncIterator, Callable, ClassVar, Dict, Iterable, Iterator, List, Mapping, Sequence,
+    TYPE_CHECKING,
     Tuple, TypeVar,
     Union,
     cast,
@@ -96,6 +97,8 @@ class TransToken:
     # Keyword arguments passed when formatting.
     # If a blank dict is passed, use EmptyMapping to save memory.
     parameters: Mapping[str, object] = attrs.field(converter=lambda m: m or EmptyMapping)
+
+    BLANK: ClassVar['TransToken']   # Quick access to blank token.
 
     @classmethod
     def parse(cls, package: str, text: str) -> 'TransToken':
@@ -264,6 +267,7 @@ class TransToken:
 
 # Token and "source" string, for updating translation files.
 TransTokenSource = Tuple[TransToken, str]
+TransToken.BLANK = TransToken.untranslated('')
 
 
 @attrs.frozen(eq=False)

@@ -68,7 +68,7 @@ class SelitemData:
         try:
             group = TransToken.parse(pack_id, info['group'])
         except LookupError:
-            group = TransToken.untranslated('')
+            group = TransToken.BLANK
         try:
             short_name = TransToken.parse(pack_id, info['shortName'])
         except LookupError:

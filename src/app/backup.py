@@ -92,17 +92,17 @@ game_name = tk.StringVar()
 
 # Loadscreens used as basic progress bars
 copy_loader = loadScreen.LoadScreen(
-    ('COPY', TransToken.untranslated('')),
+    ('COPY', TransToken.BLANK),
     title_text=TransToken.ui('Copying maps'),
 )
 
 reading_loader = loadScreen.LoadScreen(
-    ('READ', TransToken.untranslated('')),
+    ('READ', TransToken.BLANK),
     title_text=TransToken.ui('Loading maps'),
 )
 
 deleting_loader = loadScreen.LoadScreen(
-    ('DELETE', TransToken.untranslated('')),
+    ('DELETE', TransToken.BLANK),
     title_text=TransToken.ui('Deleting maps'),
 )
 

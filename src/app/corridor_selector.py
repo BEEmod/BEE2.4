@@ -39,8 +39,6 @@ GRP_UNSELECTED: Final = 'unselected'
 HEADER_HEIGHT: Final = 20
 HEADER_PAD: Final = 10
 
-TRANS_BLANK = TransToken.untranslated('')
-
 # If no groups are defined for a style, use this.
 FALLBACK = corridor.CorridorGroup(
     '<Fallback>',
@@ -434,7 +432,7 @@ class Selector:
             else:
                 self.wid_desc.set_text(corr.desc)
         else:  # Reset.
-            TRANS_BLANK.apply(self.wid_title)
+            TransToken.BLANK.apply(self.wid_title)
             self.wid_desc.set_text(corridor.EMPTY_DESC)
             img.apply(self.wid_image, IMG_CORR_BLANK)
             self.wid_image_left.state(('disabled', ))

@@ -104,7 +104,6 @@ TRANS_EXPORTED_NO_VPK = TransToken.ui(
 TRANS_EXPORTED_TITLE = TransToken.ui('BEE2 - Export Complete')
 TRANS_MAIN_TITLE = TransToken.ui('BEEMOD {version} - {game}')
 TRANS_ERROR = TransToken.untranslated('???')
-TRANS_BLANK = TransToken.untranslated('')
 
 
 class Item:
@@ -845,7 +844,7 @@ def set_disp_name(item: PalItem, e=None) -> None:
 
 def clear_disp_name(e=None) -> None:
     """Callback to reset the item name."""
-    TRANS_BLANK.apply(UI['pre_disp_name'])
+    TransToken.BLANK.apply(UI['pre_disp_name'])
 
 
 def conv_screen_to_grid(x: float, y: float) -> Tuple[int, int]:
