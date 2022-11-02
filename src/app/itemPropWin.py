@@ -80,11 +80,11 @@ PROP_TYPES = {
     'catapultspeed': (PropTypes.NONE, TransToken.ui('Faith Plate Speed')),
     'targetname': (PropTypes.NONE, TransToken.ui('Faith Target Name')),
 
-    'cubetype': (PropTypes.SUB_TYPE, TransToken.ui('Cube Type')),
-    'hazardtype': (PropTypes.SUB_TYPE, TransToken.ui('Fizzler Type')),
-    'barriertype': (PropTypes.SUB_TYPE, TransToken.ui('Barrier Type')),
-    'buttontype': (PropTypes.SUB_TYPE, TransToken.ui('Button Type')),
-    'painttype': (PropTypes.SUB_TYPE, TransToken.ui('Gel Type')),
+    'cubetype': (PropTypes.SUB_TYPE, TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_cube_type')),
+    'hazardtype': (PropTypes.SUB_TYPE, TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_barrier_hazard_type')),
+    'barriertype': (PropTypes.SUB_TYPE, TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_barrier_type')),
+    'buttontype': (PropTypes.SUB_TYPE, TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_button_type')),
+    'painttype': (PropTypes.SUB_TYPE, TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_paint_type')),
 }
 # valid property types:
 #  checkbox, timerDel, pistPlat, gelType, panAngle, railLift, none, subType
