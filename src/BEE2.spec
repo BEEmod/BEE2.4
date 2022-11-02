@@ -89,7 +89,7 @@ def do_localisation() -> None:
             trans_cat = read_po(src, locale)
         trans_cat.update(catalog)
         with trans.open('wb') as dest:
-            write_po(dest, trans_cat)
+            write_po(dest, trans_cat, include_lineno=False)
 
         # Compile them all.
         comp = trans.with_suffix('.mo')

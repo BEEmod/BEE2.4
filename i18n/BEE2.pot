@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: https://github.com/BEEmod/BEE2.4/issues\n"
-"POT-Creation-Date: 2022-10-26 14:16+1000\n"
+"POT-Creation-Date: 2022-11-02 18:02+1000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -1283,26 +1283,6 @@ msgid "Faith Target Name"
 msgstr ""
 
 #: app/itemPropWin.py
-msgid "Cube Type"
-msgstr ""
-
-#: app/itemPropWin.py
-msgid "Fizzler Type"
-msgstr ""
-
-#: app/itemPropWin.py
-msgid "Barrier Type"
-msgstr ""
-
-#: app/itemPropWin.py
-msgid "Button Type"
-msgstr ""
-
-#: app/itemPropWin.py
-msgid "Gel Type"
-msgstr ""
-
-#: app/itemPropWin.py
 msgid "BEE2 - {item}"
 msgstr ""
 
@@ -1570,6 +1550,10 @@ msgid "After exporting, launch the selected game automatically."
 msgstr ""
 
 #: app/optionWindow.py
+msgid "Language:"
+msgstr ""
+
+#: app/optionWindow.py
 msgid "Play Sounds"
 msgstr ""
 
@@ -1723,6 +1707,16 @@ msgstr ""
 
 #: app/optionWindow.py
 msgid "Reload all images in the app. Expect the app to freeze momentarily."
+msgstr ""
+
+#: app/optionWindow.py
+msgid "Build Package Translations"
+msgstr ""
+
+#: app/optionWindow.py
+msgid ""
+"Export translation files for all unzipped packages. This will update "
+"existing localisations, creating them for packages that don't have any."
 msgstr ""
 
 #: app/packageMan.py
@@ -2042,6 +2036,7 @@ msgstr ""
 msgid "No description!"
 msgstr ""
 
-#: test/test_localisation.py
-msgid "Save As"
+#: packages/corridor.py
+msgid "Corridor"
 msgstr ""
+
