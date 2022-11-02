@@ -47,9 +47,11 @@ def do_localisation() -> None:
         msgid_bugs_address='https://github.com/BEEmod/BEE2.4/issues',
     )
 
+    # Type hint specifies -> None, incorrect.
     extracted: Iterable[tuple[
         str, int, Union[str, Tuple[str, ...]], List[str], Optional[str]
-    ]] = cast(Any, babel.messages.extract.extract_from_dir(
+    ]]
+    extracted = babel.messages.extract.extract_from_dir(  # type: ignore  # noqa
         '.',
         comment_tags=['i18n:'],
         keywords={
@@ -57,7 +59,7 @@ def do_localisation() -> None:
             'ui': (1, ),
             'ui_plural': (1, 2),
         },
-    ))
+    )
     for filename, lineno, message, comments, context in extracted:
         catalog.add(
             message,
