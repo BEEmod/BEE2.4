@@ -405,105 +405,129 @@ async def init_win_tab(
 async def init_dev_tab(f: ttk.Frame) -> None:
     """Various options useful for development."""
     f.columnconfigure(0, weight=1)
-    f.columnconfigure(2, weight=1)
+    frm_check = ttk.Frame(f)
+    frm_check.grid(row=0, column=0, sticky='ew')
+
+    frm_check.columnconfigure(0, weight=1)
+    frm_check.columnconfigure(1, weight=1)
+
+    ttk.Separator(orient='horizontal').grid(row=1, column=0, sticky='ew')
 
     make_checkbox(
-        f, 'log_missing_ent_count',
+        frm_check, 'log_missing_ent_count',
         desc=TransToken.ui('Log missing entity counts'),
         tooltip=TransToken.ui(
             'When loading items, log items with missing entity counts in their properties.txt file.'
         ),
-    ).grid(row=0, column=0, columnspan=2, sticky='W')
+    ).grid(row=0, column=0, sticky='W')
 
     make_checkbox(
-        f, 'log_missing_styles',
+        frm_check, 'log_missing_styles',
         desc=TransToken.ui("Log when item doesn't have a style"),
         tooltip=TransToken.ui(
             'Log items have no applicable version for a particular style. This usually means it '
             'will look very bad.'
         ),
-    ).grid(row=1, column=0, columnspan=2, sticky='W')
+    ).grid(row=1, column=0, sticky='W')
 
     make_checkbox(
-        f, 'log_item_fallbacks',
+        frm_check, 'log_item_fallbacks',
         desc=TransToken.ui("Log when item uses parent's style"),
         tooltip=TransToken.ui(
             'Log when an item reuses a variant from a parent style (1970s using 1950s items, '
             'for example). This is usually fine, but may need to be fixed.'
         ),
-    ).grid(row=2, column=0, columnspan=2, sticky='W')
+    ).grid(row=2, column=0, sticky='W')
 
     make_checkbox(
-        f, 'visualise_inheritance',
+        frm_check, 'visualise_inheritance',
         desc=TransToken.ui("Display item inheritance"),
         tooltip=TransToken.ui(
             'Add overlays to item icons to display which inherit from parent styles or '
             'have no applicable style.'
         ),
-    ).grid(row=3, column=0, columnspan=2, sticky='W')
+    ).grid(row=3, column=0, sticky='W')
 
     make_checkbox(
-        f, 'dev_mode',
+        frm_check, 'dev_mode',
         var=DEV_MODE,
         desc=TransToken.ui("Development Mode"),
         tooltip=TransToken.ui(
             'Enables displaying additional UI specific for '
             'development purposes. Requires restart to have an effect.'
         ),
-    ).grid(row=0, column=2, columnspan=2, sticky='W')
+    ).grid(row=0, column=1, sticky='W')
 
     make_checkbox(
-        f, 'preserve_resources',
+        frm_check, 'preserve_resources',
         desc=TransToken.ui('Preserve Game Directories'),
         var=PRESERVE_RESOURCES,
         tooltip=TransToken.ui(
             'When exporting, do not copy resources to \n"bee2/" and "sdk_content/maps/bee2/".\n'
             "Only enable if you're developing new content, to ensure it is not overwritten."
         ),
-    ).grid(row=1, column=2, columnspan=2, sticky='W')
+    ).grid(row=1, column=1, sticky='W')
 
     make_checkbox(
-        f, 'show_log_win',
+        frm_check, 'show_log_win',
         desc=TransToken.ui('Show Log Window'),
         tooltip=TransToken.ui('Show the log file in real-time.'),
-    ).grid(row=2, column=2, columnspan=2, sticky='W')
+    ).grid(row=2, column=1, sticky='W')
 
     make_checkbox(
-        f, 'force_all_editor_models',
+        frm_check, 'force_all_editor_models',
         desc=TransToken.ui("Force Editor Models"),
         tooltip=TransToken.ui(
             'Make all props_map_editor models available for use. Portal 2 has a limit of 1024 '
             'models loaded in memory at once, so we need to disable unused ones to free this up.'
         ),
-    ).grid(row=3, column=2, columnspan=2, sticky='W')
+    ).grid(row=3, column=1, sticky='W')
 
-    ttk.Separator(orient='horizontal').grid(row=9, column=0, columnspan=3, sticky='EW')
+    frm_btn1 = ttk.Frame(f)
+    frm_btn1.grid(row=2, column=0, sticky='ew')
+    frm_btn1.columnconfigure(0, weight=1)
+    frm_btn1.columnconfigure(2, weight=1)
 
     TransToken.ui('Dump All Objects').apply(
-        ttk.Button(f,  command=report_all_obj)
-    ).grid(row=10, column=0)
+        ttk.Button(frm_btn1,  command=report_all_obj)
+    ).grid(row=0, column=0)
 
     TransToken.ui('Dump Items List').apply(
-        ttk.Button(f, command=report_items)
-    ).grid(row=10, column=1)
+        ttk.Button(frm_btn1, command=report_items)
+    ).grid(row=0, column=1)
 
-    reload_img = ttk.Button(f, command=img.refresh_all)
+    reload_img = ttk.Button(frm_btn1, command=img.refresh_all)
     TransToken.ui('Reload Images').apply(reload_img)
     add_tooltip(reload_img, TransToken.ui(
         'Reload all images in the app. Expect the app to freeze momentarily.'
     ))
-    reload_img.grid(row=10, column=2)
+    reload_img.grid(row=0, column=2)
 
-    build_trans_btn = ttk.Button(f, command=lambda: background_run(
+    frm_btn2 = ttk.Frame(f)
+    frm_btn2.grid(row=3, column=0, sticky='ew')
+    frm_btn2.columnconfigure(0, weight=1)
+    frm_btn2.columnconfigure(1, weight=1)
+
+    build_app_trans_btn = ttk.Button(frm_btn2, command=lambda: background_run(
+        localisation.rebuild_app_langs,
+    ))
+    TransToken.ui('Build UI Translations').apply(build_app_trans_btn)
+    add_tooltip(build_app_trans_btn, TransToken.ui(
+        "Compile '.po' UI translation files into '.mo'. This requires those to have been "
+        "downloaded from the source repo."
+    ))
+    build_app_trans_btn.grid(row=0, column=0, sticky='w')
+
+    build_pack_trans_btn = ttk.Button(frm_btn2, command=lambda: background_run(
         localisation.rebuild_package_langs,
         packages.LOADED,
     ))
-    TransToken.ui('Build Package Translations').apply(build_trans_btn)
-    add_tooltip(build_trans_btn, TransToken.ui(
+    TransToken.ui('Build Package Translations').apply(build_pack_trans_btn)
+    add_tooltip(build_pack_trans_btn, TransToken.ui(
         "Export translation files for all unzipped packages. This will update existing "
         "localisations, creating them for packages that don't have any."
     ))
-    build_trans_btn.grid(row=11, column=0, columnspan=2)
+    build_pack_trans_btn.grid(row=0, column=1, sticky='e')
 
 # Various "reports" that can be produced.
 

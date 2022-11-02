@@ -79,11 +79,8 @@ def do_localisation() -> None:
     print('Updating translations: ')
 
     for trans in i18n.glob('*.po'):
-
         locale = trans.stem
-
         print('>', locale)
-
         # Update the translations.
         with trans.open('rb') as src:
             trans_cat = read_po(src, locale)

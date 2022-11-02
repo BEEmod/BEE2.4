@@ -1,5 +1,12 @@
-"""Wraps gettext, to localise all UI text."""
+"""An object-oriented approach to localising text.
+
+All translations are stored as token objects, which translate when str() is called. They also store
+the widgets they are applied to, so those can be refreshed when swapping languages.
+
+This is also imported in the compiler, so UI imports must be inside functions.
+"""
 import io
+from pathlib import Path
 from typing import (
     AsyncIterator, Callable, ClassVar, Dict, Iterable, Iterator, List, Mapping, Sequence,
     TYPE_CHECKING,
@@ -10,7 +17,7 @@ from typing import (
 
 from srctools.filesys import RawFileSystem
 from typing_extensions import ParamSpec, Final, TypeAlias
-from weakref import WeakKeyDictionary, WeakSet
+from weakref import WeakKeyDictionary
 import gettext as gettext_mod
 import locale
 import sys
@@ -482,6 +489,34 @@ def set_language(lang: Language) -> None:
         func()
 
 
+async def rebuild_app_langs() -> None:
+    """Compile .po files for the app into .mo files. This does not extract tokens, that needs source."""
+    from babel.messages.pofile import read_po
+    from babel.messages.mofile import write_mo
+    from app import tk_tools
+
+    def build_file(filename: Path) -> None:
+        """Synchronous I/O code run as a backround thread."""
+        with filename.open('rb') as src:
+            catalog = read_po(src, locale=filename.stem)
+        with filename.with_suffix('.mo').open('wb') as dest:
+            write_mo(dest, catalog)
+
+    async def build_lang(filename: Path) -> None:
+        try:
+            await trio.to_thread.run_sync(build_file, fname)
+        except (IOError, OSError):
+            LOGGER.warning('Could not convert "{}"', filename, exc_info=True)
+        else:
+            LOGGER.info('Converted "{}"', filename)
+
+    async with trio.open_nursery() as nursery:
+        for fname in FOLDER.iterdir():
+            if fname.suffix == '.po':
+                nursery.start_soon(build_lang, fname)
+    tk_tools.showinfo(TransToken.ui('BEEMod'), TransToken.ui('UI Translations rebuilt.'))
+
+
 async def load_package_langs(packset: 'packages.PackagesSet', lang: Language = None) -> None:
     """Load translations from packages, in the background."""
     global PARSE_CANCEL
@@ -496,6 +531,7 @@ async def load_package_langs(packset: 'packages.PackagesSet', lang: Language = N
         return
 
     # Preserve only the UI translations.
+    # noinspection PyProtectedMember
     lang_map = {NS_UI: lang._trans[NS_UI]}
     expanded = expand_langcode(lang.lang_code)
 
