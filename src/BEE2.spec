@@ -61,6 +61,9 @@ def do_localisation() -> None:
         },
     )
     for filename, lineno, message, comments, context in extracted:
+        if 'test_localisation' in filename:
+            # Test code for the localisation module, skip these tokens.
+            continue
         catalog.add(
             message,
             locations=[(os.path.normpath(filename), lineno)],
