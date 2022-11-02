@@ -5,7 +5,6 @@ import tkinter as tk
 from typing import Optional, Set, Callable, Tuple
 
 import srctools.logger
-import trio
 from pygtrie import CharTrie
 
 from app import UI, TK_ROOT
@@ -14,7 +13,6 @@ from localisation import TransToken
 LOGGER = srctools.logger.get_logger(__name__)
 word_to_ids: 'CharTrie[Set[Tuple[str, int]]]' = CharTrie()
 _type_cback: Optional[Callable[[], None]] = None
-_update_scope: trio.CancelScope = trio.CancelScope()
 
 
 def init(frm: ttk.Frame, refresh_cback: Callable[[Optional[Set[Tuple[str, int]]]], None]) -> None:
@@ -77,32 +75,20 @@ def init(frm: ttk.Frame, refresh_cback: Callable[[Optional[Set[Tuple[str, int]]]
     _type_cback = on_type
 
 
-async def rebuild_database() -> None:
+def rebuild_database() -> None:
     """Rebuild the search database."""
-    global _update_scope
     LOGGER.info('Updating search database...')
     # Clear and reset.
+    word_set: set[tuple[str, int]]
     word_to_ids.clear()
 
-    # Prevent multiple from running.
-    _update_scope.cancel()
-    with trio.CancelScope() as scope:
-        _update_scope = scope
-        await trio.to_thread.run_sync(_update_db, scope, cancellable=True)
-
-        LOGGER.info('Computed {} tags.', sum(1 for _ in word_to_ids.iterkeys()))
-        if _type_cback is not None:
-            _type_cback()
-
-
-def _update_db(scope: trio.CancelScope) -> None:
-    """Push this to a background thread, there's a lot of tags."""
-    word_set: set[tuple[str, int]]
     for item in UI.item_list.values():
-        if scope is not _update_scope:
-            break
         for subtype_ind in item.visual_subtypes:
             for tag in item.get_tags(subtype_ind):
                 for word in tag.split():
                     word_set = word_to_ids.setdefault(word.casefold(), set())
                     word_set.add((item.id, subtype_ind))
+
+    LOGGER.info('Computed {} tags.', sum(1 for _ in word_to_ids.iterkeys()))
+    if _type_cback is not None:
+        _type_cback()

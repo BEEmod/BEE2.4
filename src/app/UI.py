@@ -1691,7 +1691,7 @@ async def init_windows() -> None:
         elev_win.readonly = not style_obj.has_video
 
         signage_ui.style_changed(style_obj)
-        background_run(item_search.rebuild_database)
+        item_search.rebuild_database()
 
         sugg = style_obj.suggested
         win_types = (
