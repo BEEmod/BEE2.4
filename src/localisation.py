@@ -6,13 +6,11 @@ the widgets they are applied to, so those can be refreshed when swapping languag
 This is also imported in the compiler, so UI imports must be inside functions.
 """
 import io
+import os.path
 from pathlib import Path
 from typing import (
     AsyncIterator, Callable, ClassVar, Dict, Iterable, Iterator, List, Mapping, Sequence,
-    TYPE_CHECKING,
-    Tuple, TypeVar,
-    Union,
-    cast,
+    TYPE_CHECKING, Tuple, TypeVar, Union, cast,
 )
 
 from srctools.filesys import RawFileSystem
@@ -34,12 +32,13 @@ if TYPE_CHECKING:  # Don't import at runtime, we don't want TK in the compiler.
     import tkinter as tk
     from tkinter import ttk
     import packages
+    from app import gameMan
 
 __all__ = [
-    'TransToken', 'load_basemodui',
-    'DUMMY', 'Language', 'set_language', 'load_package_langs',
+    'TransToken',
+    'DUMMY', 'Language', 'set_language', 'load_aux_langs',
     'setup', 'expand_langcode',
-    'TransTokenSource', 'rebuild_package_langs',
+    'TransTokenSource', 'rebuild_app_langs', 'rebuild_package_langs',
 ]
 
 LOGGER = logger.get_logger(__name__)
@@ -50,6 +49,8 @@ NS_GAME: Final = '<PORTAL2>'   # Lookup from basemodui.txt
 NS_UNTRANSLATED: Final = '<NOTRANSLATE>'  # Legacy values which don't have translation
 # The prefix for all Valve's editor keys.
 PETI_KEY_PREFIX: Final = 'PORTAL2_PuzzleEditor'
+# Location of basemodui, relative to Portal 2
+BASEMODUI_PATH = 'portal2_dlc2/resource/basemodui_{}.txt'
 
 # The loaded translations from basemodui.txt
 GAME_TRANSLATIONS: Dict[str, str] = {}
@@ -90,6 +91,42 @@ PACKAGE_HEADER = """\
 # Translations template for BEEmod package "PROJECT".
 # Built with BEEmod version VERSION.
 #"""
+
+
+# Country code -> Source name suffix.
+STEAM_LANGS = {
+    'ar': 'arabic',  # Not in P2.
+    'pt_br': 'brazilian',
+    'bg': 'bulgarian',
+    'cs': 'czech',
+    'da': 'danish',
+    'nl': 'dutch',
+    'en': 'english',
+    'fi': 'finnish',
+    'fr': 'french',
+    'de': 'german',
+    'el': 'greek',
+    'hu': 'hungarian',
+    'it': 'italian',
+    'ja': 'japanese',
+    'ko': 'korean',
+    # 'ko': 'koreana',  # North? identical.
+    'es_419': 'latam',
+    'no': 'norwegian',
+    # '': 'pirate',  # Not real.
+    'pl': 'polish',
+    'pt': 'portuguese',
+    'ro': 'romanian',
+    'ru': 'russian',
+    'zh_cn': 'schinese',
+    'es': 'spanish',
+    'sv': 'swedish',
+    'zh_tw': 'tchinese',
+    'th': 'thai',
+    'tr': 'turkish',
+    'uk': 'ukrainian',
+    'vn': 'vietnamese',
+}
 
 
 @attrs.frozen(eq=False)
@@ -372,33 +409,59 @@ def expand_langcode(lang_code: str) -> List[str]:
         expanded.append(lang_code[:lang_code.index('_')].casefold())
     return expanded
 
-def load_basemodui(basemod_loc: str) -> None:
+
+def find_basemodui(games: List['gameMan.Game'], langs: List[str]) -> str:
     """Load basemodui.txt from Portal 2, to provide translations for the default items."""
-    if GAME_TRANSLATIONS:
-        # Already loaded.
-        return
+    # Check Portal 2 first, others might not be fully correct?
+    games.sort(key=lambda gm: gm.steamID != '620')
 
-    # Basemod files are encoded in UTF-16.
-    try:
-        basemod_file = open(basemod_loc, encoding='utf16')
-    except FileNotFoundError:
-        return
+    for lang in langs:
+        try:
+            game_lang = STEAM_LANGS[lang.casefold()]
+            break
+        except KeyError:
+            pass
+    else:
+        game_lang = ''
 
-    GAME_TRANSLATIONS.clear()
+    for game in games:
+        if game_lang:
+            loc = game.abs_path(BASEMODUI_PATH.format(game_lang))
+            LOGGER.debug('Checking lang "{}"', loc)
+            if os.path.exists(loc):
+                return loc
+        # Fall back to configured language.
+        game_lang = game.get_game_lang()
+        if game_lang:
+            loc = game.abs_path(BASEMODUI_PATH.format(game_lang))
+            LOGGER.debug('Checking lang "{}"', loc)
+            if os.path.exists(loc):
+                return loc
 
-    with basemod_file:
-        # This file is in keyvalues format, supposedly.
-        # But it's got a bunch of syntax errors - extra quotes,
-        # missing brackets.
-        # The structure doesn't matter, so just process line by line.
-        for line in basemod_file:
-            try:
-                __, key, __, value, __ = line.split('"')
-            except ValueError:
-                continue
-            # Ignore non-puzzlemaker keys.
-            if key.startswith(PETI_KEY_PREFIX):
-                GAME_TRANSLATIONS[key] = value.replace("\\'", "'")
+    # Nothing found, pick first english copy.
+    for game in games:
+        loc = game.abs_path(BASEMODUI_PATH.format('english'))
+        LOGGER.debug('Checking lang "{}"', loc)
+        if os.path.exists(loc):
+            return loc
+
+
+def parse_basemodui(data: str) -> dict[str, str]:
+    """Parse the basemodui keyvalues file."""
+    result: dict[str, str] = {}
+    # This file is in keyvalues format, supposedly.
+    # But it's got a bunch of syntax errors - extra quotes,
+    # missing brackets.
+    # The structure doesn't matter, so just process line by line.
+    for line in io.StringIO(data):
+        try:
+            __, key, __, value, __ = line.split('"')
+        except ValueError:
+            continue
+        # Ignore non-puzzlemaker keys.
+        if key.startswith(PETI_KEY_PREFIX):
+            result[key] = value.replace("\\'", "'")
+    return result
 
 
 def setup(conf_lang: str) -> None:
@@ -517,25 +580,34 @@ async def rebuild_app_langs() -> None:
     tk_tools.showinfo(TransToken.ui('BEEMod'), TransToken.ui('UI Translations rebuilt.'))
 
 
-async def load_package_langs(packset: 'packages.PackagesSet', lang: Language = None) -> None:
-    """Load translations from packages, in the background."""
+async def load_aux_langs(
+    games: Iterable['gameMan.Game'],
+    packset: 'packages.PackagesSet',
+    lang: Language = None,
+) -> None:
+    """Load all our non-UI translation files in the background.
+
+    We already loaded the UI langs to create Language.
+    """
     global PARSE_CANCEL
-    PARSE_CANCEL.cancel()  # Stop any in progress loads.
+    PARSE_CANCEL.cancel()  # Stop any other in progress loads.
 
     if lang is None:
         lang = _CURRENT_LANG
 
     if lang is DUMMY:
-        # Dummy does not need to load packages.
+        # Dummy does not need to load these files.
         set_language(lang)
         return
 
     # Preserve only the UI translations.
     # noinspection PyProtectedMember
     lang_map = {NS_UI: lang._trans[NS_UI]}
+
+    # Expand to a generic country code.
     expanded = expand_langcode(lang.lang_code)
 
-    async def loader(pak_id: str, fsys: FileSystem) -> None:
+    async def package_lang(pak_id: str, fsys: FileSystem) -> None:
         """Load the package language in the background."""
         for code in expanded:
             try:
@@ -550,10 +622,27 @@ async def load_package_langs(packset: 'packages.PackagesSet', lang: Language = N
             except OSError:
                 LOGGER.warning('Invalid localisation file {}:{}', pak_id, file.path, exc_info=True)
 
+    async def game_lang(game_it: Iterable['gameMan.Game'], expanded_langs: List[str]) -> None:
+        """Load the game language in the background."""
+        basemod_loc = find_basemodui(list(game_it), expanded_langs)
+        if not basemod_loc:
+            LOGGER.warning('Could not find BaseModUI file for Portal 2!')
+            return
+        try:
+            # BaseModUI files are encoded in UTF-16.
+            data = await trio.Path(basemod_loc).read_text('utf16')
+        except FileNotFoundError:
+            LOGGER.warning('BaseModUI file "{}" does not exist!', basemod_loc)
+        else:
+            result = await trio.to_thread.run_sync(parse_basemodui, data)
+            GAME_TRANSLATIONS.clear()
+            GAME_TRANSLATIONS.update(result)
+
     with trio.CancelScope() as PARSE_CANCEL:
         async with trio.open_nursery() as nursery:
+            nursery.start_soon(game_lang, games, expanded)
             for pack in packset.packages.values():
-                nursery.start_soon(loader, pack.id, pack.fsys)
+                nursery.start_soon(package_lang, pack.id, pack.fsys)
     # We're not canceled, replace the global language with our new translations.
     set_language(attrs.evolve(lang, trans=lang_map))
 

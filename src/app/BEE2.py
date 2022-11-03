@@ -70,7 +70,7 @@ async def init_app() -> None:
     loadScreen.main_loader.step('UI', 'pre_ui')
     app.background_run(img.init, package_sys)
     app.background_run(sound.sound_task)
-    app.background_run(localisation.load_package_langs, packages.LOADED)
+    app.background_run(localisation.load_aux_langs, gameMan.all_games, packages.LOADED)
 
     # Load filesystems into various modules
     music_conf.load_filesystems(package_sys.values())
@@ -79,11 +79,6 @@ async def init_app() -> None:
         nurs.start_soon(UI.load_packages, packages.LOADED)
     loadScreen.main_loader.step('UI', 'package_load')
     LOGGER.info('Done!')
-
-    # Check games for Portal 2's basemodui.txt file, so we can translate items.
-    LOGGER.info('Loading Item Translations...')
-    for game in gameMan.all_games:
-        game.init_trans()
 
     LOGGER.info('Initialising UI...')
     async with trio.open_nursery() as nurs:

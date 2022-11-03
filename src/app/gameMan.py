@@ -1040,37 +1040,21 @@ class Game:
 
         return copied_files
 
-    def init_trans(self) -> None:
-        """Try and load a copy of basemodui from Portal 2 to translate.
-
-        Valve's items use special translation strings which would look ugly
-        if we didn't convert them.
-        """
-        # Already loaded
-        if localisation.GAME_TRANSLATIONS:
-            return
-
-        # Allow overriding.
+    def get_game_lang(self) -> str:
+        """Load the app manifest file to determine Portal 2's language."""
+        # We need to first figure out what language is used (if not English),
+        # then load in the file. This is saved in the 'appmanifest'.
         try:
-            lang = os.environ['BEE2_P2_LANG']
-        except KeyError:
-            # We need to first figure out what language is used (if not English),
-            # then load in the file. This is saved in the 'appmanifest'.
-            try:
-                appman_file = open(self.abs_path('../../appmanifest_620.acf'))
-            except FileNotFoundError:
-                # Portal 2 isn't here...
-                return
-
-            with appman_file:
-                appman = Property.parse(appman_file, 'appmanifest_620.acf')
-            try:
-                lang = appman.find_key('AppState').find_key('UserConfig')['language']
-            except LookupError:
-                return
-
-        basemod_loc = self.abs_path(f'../Portal 2/portal2_dlc2/resource/basemodui_{lang}.txt')
-        localisation.load_basemodui(basemod_loc)
+            appman_file = open(self.abs_path('../../appmanifest_620.acf'))
+        except FileNotFoundError:
+            # Portal 2 isn't here...
+            return 'en'
+        with appman_file:
+            appman = Property.parse(appman_file, 'appmanifest_620.acf')
+        try:
+            return appman.find_key('AppState').find_key('UserConfig')['language']
+        except LookupError:
+            return ''
 
     def get_export_text(self) -> TransToken:
         """Return the text to use on export button labels."""

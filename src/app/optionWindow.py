@@ -4,7 +4,7 @@ from pathlib import Path
 
 import tkinter as tk
 import trio
-from tkinter import ttk, messagebox
+from tkinter import ttk
 from typing import Callable, List, Optional, Tuple, Dict
 
 import attrs
@@ -332,7 +332,7 @@ async def init_gen_tab(
         """Set the language when the combo box is changed"""
         if lang_order:
             new_lang = lang_order[lang_box.current()]
-            background_run(localisation.load_package_langs, packages.LOADED, new_lang)
+            background_run(localisation.load_aux_langs, gameMan.all_games, packages.LOADED, new_lang)
 
     lang_box.bind('<<ComboboxSelected>>', language_changed)
 
