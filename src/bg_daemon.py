@@ -139,6 +139,7 @@ class BaseLoadScreen:
         ))
 
     def op_hide(self) -> None:
+        """Hide the window."""
         self.is_shown = False
         self.win.withdraw()
 
@@ -799,8 +800,7 @@ def run_background(
     pipe_rec: multiprocessing.connection.Connection,
     log_pipe_send: multiprocessing.connection.Connection,
     log_pipe_rec: multiprocessing.connection.Connection,
-    # Pass in various bits of translated text
-    # so we don't need to do it here.
+    # Pass in various bits of translated text so, we don't need to do it here.
     translations: dict,
 ) -> None:
     """Runs in the other process, with an end of a pipe for input."""
@@ -847,8 +847,14 @@ def run_background(
                         raise ValueError(f'Bad command "{operation}"!')
                     try:
                         func(*args)
-                    except Exception:
-                        raise Exception(operation)
+                    except Exception as e:  # Note which function caused the problem.
+                        try:
+                            # noinspection PyUnresolvedReferences
+                            e.add_note(f'Function: {func!r}')
+                            raise
+                        except AttributeError:  # < 3.10
+                            pass
+                        raise TypeError(func) from e
             while log_pipe_rec.poll():
                 log_window.handle(log_pipe_rec.recv())
         except BrokenPipeError:
@@ -859,7 +865,7 @@ def run_background(
 
         # Continually re-run this function in the TK loop.
         # If we didn't find anything in the pipe, wait longer.
-        # Otherwise we hog the CPU.
+        # Otherwise, we hog the CPU.
         TK_ROOT.after(1 if had_values else 200, check_queue)
 
     TK_ROOT.after(10, check_queue)
