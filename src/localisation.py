@@ -52,9 +52,6 @@ PETI_KEY_PREFIX: Final = 'PORTAL2_PuzzleEditor'
 # Location of basemodui, relative to Portal 2
 BASEMODUI_PATH = 'portal2_dlc2/resource/basemodui_{}.txt'
 
-# The loaded translations from basemodui.txt
-GAME_TRANSLATIONS: Dict[str, str] = {}
-
 # Widgets that have a 'text' property.
 TextWidget: TypeAlias = Union[
     'tk.Label', 'tk.LabelFrame', 'tk.Button', 'tk.Radiobutton', 'tk.Checkbutton',
@@ -78,6 +75,8 @@ class Language:
     display_name: str
     lang_code: str
     _trans: Dict[str, gettext_mod.NullTranslations]
+    # The loaded translations from basemodui.txt
+    game_trans: Mapping[str, str] = EmptyMapping
 
 
 # The current language.
@@ -255,7 +254,7 @@ class TransToken:
             return '#' * len(self.token)
         elif self.namespace == NS_GAME:
             try:
-                result = GAME_TRANSLATIONS[self.token]
+                result = _CURRENT_LANG.game_trans[self.token]
             except KeyError:
                 result = self.token
         else:
@@ -446,9 +445,8 @@ def find_basemodui(games: List['gameMan.Game'], langs: List[str]) -> str:
             return loc
 
 
-def parse_basemodui(data: str) -> dict[str, str]:
+def parse_basemodui(result: dict[str, str], data: str) -> None:
     """Parse the basemodui keyvalues file."""
-    result: dict[str, str] = {}
     # This file is in keyvalues format, supposedly.
     # But it's got a bunch of syntax errors - extra quotes,
     # missing brackets.
@@ -461,7 +459,6 @@ def parse_basemodui(data: str) -> dict[str, str]:
         # Ignore non-puzzlemaker keys.
         if key.startswith(PETI_KEY_PREFIX):
             result[key] = value.replace("\\'", "'")
-    return result
 
 
 def setup(conf_lang: str) -> None:
@@ -603,6 +600,8 @@ async def load_aux_langs(
     # Preserve only the UI translations.
     # noinspection PyProtectedMember
     lang_map = {NS_UI: lang._trans[NS_UI]}
+    # The parsed game translations.
+    game_dict: dict[str, str] = {}
 
     # Expand to a generic country code.
     expanded = expand_langcode(lang.lang_code)
@@ -634,9 +633,7 @@ async def load_aux_langs(
         except FileNotFoundError:
             LOGGER.warning('BaseModUI file "{}" does not exist!', basemod_loc)
         else:
-            result = await trio.to_thread.run_sync(parse_basemodui, data)
-            GAME_TRANSLATIONS.clear()
-            GAME_TRANSLATIONS.update(result)
+            await trio.to_thread.run_sync(parse_basemodui, game_dict, data)
 
     with trio.CancelScope() as PARSE_CANCEL:
         async with trio.open_nursery() as nursery:
@@ -644,7 +641,7 @@ async def load_aux_langs(
             for pack in packset.packages.values():
                 nursery.start_soon(package_lang, pack.id, pack.fsys)
     # We're not canceled, replace the global language with our new translations.
-    set_language(attrs.evolve(lang, trans=lang_map))
+    set_language(attrs.evolve(lang, trans=lang_map, game_trans=game_dict))
 
 
 async def get_package_tokens(packset: 'packages.PackagesSet') -> AsyncIterator[TransTokenSource]:
