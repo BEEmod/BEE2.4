@@ -10,15 +10,15 @@ import trio
 from app import (
     TK_ROOT, DEV_MODE, background_run,
     dragdrop,
-    img, sound, tk_tools,
+    img, localisation, sound, tk_tools,
     tkMarkdown,
 )
 from app.richTextBox import tkRichText
-from localisation import gettext
 from packages import corridor
 from corridor import GameMode, Direction, Orient
 from config.last_sel import LastSelected
 from config.corridors import UIState, Config
+from transtoken import TransToken
 import event
 import config
 import packages
@@ -49,6 +49,8 @@ FALLBACK = corridor.CorridorGroup(
         for orient in Orient
     }
 )
+FALLBACK.pak_id = '<fallback>'
+FALLBACK.pak_name = '???'
 
 
 class Selector:
@@ -121,7 +123,10 @@ class Selector:
         self.wid_desc.grid(row=2, column=0, sticky='nsew')
         frm_right.rowconfigure(2, weight=1)
 
-        ttk.Button(frm_right, text=gettext('Close'), command=self.hide).grid(row=3, column=0)
+        localisation.set_text(
+            ttk.Button(frm_right, command=self.hide),
+            TransToken.ui('Close'),
+).grid(row=3, column=0)
 
         self.event_bus = event.EventBus()
 
@@ -133,19 +138,19 @@ class Selector:
         button_frm.grid(row=0, column=0, columnspan=3)
         self.btn_mode = tk_tools.EnumButton(
             button_frm, self.event_bus, conf.last_mode,
-            (GameMode.SP, gettext('SP')),
-            (GameMode.COOP, gettext('Coop')),
+            (GameMode.SP, TransToken.ui('SP')),
+            (GameMode.COOP, TransToken.ui('Coop')),
         )
         self.btn_direction = tk_tools.EnumButton(
             button_frm, self.event_bus, conf.last_direction,
-            (Direction.ENTRY, gettext('Entry')),
-            (Direction.EXIT, gettext('Exit')),
+            (Direction.ENTRY, TransToken.ui('Entry')),
+            (Direction.EXIT, TransToken.ui('Exit')),
         )
         self.btn_orient = tk_tools.EnumButton(
             button_frm, self.event_bus, conf.last_orient,
-            (Orient.FLAT, gettext('Flat')),
-            (Orient.UP, gettext('Upward')),
-            (Orient.DN, gettext('Downward')),
+            (Orient.FLAT, TransToken.ui('Flat')),
+            (Orient.UP, TransToken.ui('Upward')),
+            (Orient.DN, TransToken.ui('Downward')),
         )
         self.btn_mode.frame.grid(row=0, column=0, padx=8)
         self.btn_direction.frame.grid(row=0, column=1, padx=8)
@@ -176,8 +181,8 @@ class Selector:
         reflow: Callable[[], Awaitable[object]] = self.reflow  # Avoid making self a cell var.
         self.canvas.bind('<Configure>', lambda e: background_run(reflow))
 
-        self.header_sel = tk_tools.LineHeader(self.canvas, gettext('Selected:'))
-        self.header_unsel = tk_tools.LineHeader(self.canvas, gettext('Unused:'))
+        self.header_sel = tk_tools.LineHeader(self.canvas, TransToken.ui('Selected:'))
+        self.header_unsel = tk_tools.LineHeader(self.canvas, TransToken.ui('Unused:'))
         self.header_sel_win = self.canvas.create_window(
             0, 384,
             anchor='nw',
@@ -315,7 +320,7 @@ class Selector:
         # Put all remaining in a spare slot.
         for slot, corr in zip(
             self.slots[next_slot:],
-            sorted(inst_to_corr.values(), key=lambda corr: corr.name),
+            sorted(inst_to_corr.values(), key=lambda corr: corr.name.token),
         ):
             slot.contents = corr
             slot.flexi_group = GRP_UNSELECTED
@@ -412,23 +417,22 @@ class Selector:
             self.img_ind = 0
             self.cur_images = corr.images
             self._sel_img(0)  # Updates the buttons.
-
-            self.wid_title['text'] = corr.name
+            localisation.set_text(self.wid_title, corr.name)
             if DEV_MODE.get():
                 # Show the instance in the description, plus fixups that are assigned.
                 self.wid_desc.set_text(tkMarkdown.join(
                     tkMarkdown.MarkdownData.text(corr.instance + '\n', tkMarkdown.TextTag.CODE),
                     corr.desc,
                     tkMarkdown.MarkdownData.text('\nFixups:\n', tkMarkdown.TextTag.BOLD),
-                    tkMarkdown.convert('\n'.join([
+                    tkMarkdown.convert(TransToken.untranslated('\n'.join([
                         f'* `{var}`: `{value}`'
                         for var, value in corr.fixups.items()
-                    ]), None)
+                    ])), None)
                 ))
             else:
                 self.wid_desc.set_text(corr.desc)
         else:  # Reset.
-            self.wid_title['text'] = ''
+            localisation.set_text(self.wid_title, TransToken.BLANK)
             self.wid_desc.set_text(corridor.EMPTY_DESC)
             img.apply(self.wid_image, IMG_CORR_BLANK)
             self.wid_image_left.state(('disabled', ))

@@ -6,6 +6,8 @@ from typing import Callable, Generic, Sequence, Type, TypeVar
 import attrs
 from srctools import Angle, bool_as_int, conv_bool, conv_float, conv_int
 
+from transtoken import TransToken
+
 
 ValueT = TypeVar('ValueT')
 EnumT = TypeVar('EnumT', bound=Enum)
@@ -22,7 +24,7 @@ class ItemPropKind(Generic[ValueT]):
     # Property name for this. This is case-sensitive!
     id: str = attrs.field(kw_only=True)
     # The translation keyword for this, if it exists.
-    trans_name: str =  attrs.field(kw_only=True)
+    name: TransToken =  attrs.field(kw_only=True)
     # The instance variable this sets, if any.
     instvar: str = attrs.field(kw_only=True)
     # All the possible values this can have, if used as a subtype.
@@ -40,7 +42,7 @@ class ItemPropKind(Generic[ValueT]):
         """Create a kind for an unknown property."""
         return ItemPropKind[str](
             id=id,
-            trans_name='',
+            name=TransToken.BLANK,
             instvar='',
             parse=_unknown_parse,
             allow_user_default=False,
@@ -97,7 +99,7 @@ _known_to_attr: dict[ItemPropKind, str] = {}
 
 def bool_prop(
     id: str,
-    trans_name: str,
+    name: TransToken,
     instvar: str,
     allow_user_default: bool = True,
 ) -> ItemPropKind[bool]:
@@ -108,7 +110,7 @@ def bool_prop(
         subtype_values=(False, True),
 
         id=id,
-        trans_name=trans_name,
+        name=name,
         instvar=instvar,
         allow_user_default=allow_user_default,
     )
@@ -117,7 +119,7 @@ def bool_prop(
 def enum_prop(
     enum: Type[EnumT],
     id: str,
-    trans_name: str,
+    name: TransToken,
     instvar: str,
     allow_user_default: bool = True,
 ) -> ItemPropKind[EnumT]:
@@ -136,7 +138,7 @@ def enum_prop(
 
     return ItemPropKind(
         id=id,
-        trans_name=trans_name,
+        name=name,
         instvar=instvar,
         allow_user_default=allow_user_default,
         parse=parse,
@@ -207,56 +209,56 @@ class GlassTypes(Enum):
 prop_start_enabled = bool_prop(
     id='StartEnabled',
     instvar='$start_enabled',
-    trans_name='PORTAL2_PuzzleEditor_ContextMenu_start_enabled',
+    name=TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_start_enabled'),
 )
 
 # Polarity value for Excursion Funnels.
 prop_start_reversed = bool_prop(
     id='StartReversed',
     instvar='$start_reversed',
-    trans_name='PORTAL2_PuzzleEditor_ContextMenu_start_reversed',
+    name=TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_start_reversed'),
 )
 
 # Starting position for Angled Panels.
 prop_start_deployed = bool_prop(
     id='StartDeployed',
     instvar='$start_deployed',
-    trans_name='PORTAL2_PuzzleEditor_ContextMenu_start_deployed',
+    name=TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_start_deployed'),
 )
 
 # Specifies if the SP Exit Door starts open or not.
 prop_start_open = bool_prop(
     id='StartOpen',
     instvar='$start_open',
-    trans_name='PORTAL2_PuzzleEditor_ContextMenu_start_open',
+    name=TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_start_open'),
 )
 
 # Specifies if the Coop Exit Door starts locked.
 prop_start_locked = bool_prop(
     id='StartLocked',
     instvar='$start_locked',
-    trans_name='PORTAL2_PuzzleEditor_ContextMenu_coop_exit_starts_locked',
+    name=TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_coop_exit_starts_locked'),
 )
 
 # Specifies if the flip panel starts portalable."""
 prop_portalable = bool_prop(
     id='Portalable',
     instvar='$start_deployed',
-    trans_name='PORTAL2_PuzzleEditor_ContextMenu_portalable',
+    name=TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_portalable'),
 )
 
 # For doors, specifies the map mode and therefore which door is used.
 prop_is_coop = bool_prop(
     id='coopmode',
     instvar='',  # Controls which item is used.
-    trans_name='PORTAL2_PuzzleEditor_ContextMenu_coop_puzzle',
+    name=TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_coop_puzzle'),
 )
 
 # Enables or disables the dropper for Cubes and Paint.
 prop_dropper_enabled = bool_prop(
     id='DropperEnabled',
     instvar='',  # Controls which item exports.
-    trans_name='PORTAL2_PuzzleEditor_ContextMenu_dropper_enabled',
+    name=TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_dropper_enabled'),
 )
 
 # For cube droppers, decides if it triggers when the player enters.
@@ -264,7 +266,7 @@ prop_dropper_enabled = bool_prop(
 prop_auto_drop = bool_prop(
     id='AutoDrop',
     instvar='$disable_autodrop',
-    trans_name='PORTAL2_PuzzleEditor_ContextMenu_auto_drop_cube',
+    name=TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_auto_drop_cube'),
 )
 
 # For cube droppers, decides if it replaces destroyed cubes.
@@ -272,14 +274,14 @@ prop_auto_drop = bool_prop(
 prop_cube_auto_respawn = bool_prop(
     id='AutoRespawn',
     instvar='$disable_autorespawn',
-    trans_name='PORTAL2_PuzzleEditor_ContextMenu_auto_respawn_cube',
+    name=TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_auto_respawn_cube'),
 )
 
 # A property which turns off some of the cube dropper's clips. This is always disabled.
 prop_cube_fall_straight_Down = bool_prop(
     id='ItemFallStraightDown',
     instvar='$item_fall_straight_down',
-    trans_name='', # Not visible
+    name=TransToken.BLANK,  # Not visible
 )
 
 # Track Platform prop types:
@@ -289,14 +291,14 @@ prop_cube_fall_straight_Down = bool_prop(
 prop_track_start_active = bool_prop(
     id='StartActive',
     instvar='$start_active',
-    trans_name='PORTAL2_PuzzleEditor_ContextMenu_rail_start_active',
+    name=TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_rail_start_active'),
 )
 
 # The mode for Track Platforms.
 prop_track_is_ocillating = bool_prop(
     id='Oscillate',
     instvar='',  # Picks instance
-    trans_name='PORTAL2_PuzzleEditor_ContextMenu_rail_oscillate',
+    name=TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_rail_oscillate'),
 )
 
 # The starting fractional position of Track Platforms.
@@ -304,7 +306,7 @@ prop_track_starting_pos = ItemPropKind[float](
     id='StartingPosition',
     instvar='$starting_position',
     parse=conv_float,
-    trans_name='',  # Hidden
+    name=TransToken.BLANK,  # Hidden
 )
 
 
@@ -313,7 +315,7 @@ prop_track_move_distance = ItemPropKind[float](
     id='TravelDistance',
     instvar='$travel_distance',
     parse=conv_float,
-    trans_name='',  # Hidden
+    name=TransToken.BLANK,  # Hidden
 )
 
 # The speed the Track Platform moves at.
@@ -321,7 +323,7 @@ prop_track_move_distance = ItemPropKind[float](
 prop_track_speed = ItemPropKind[float](
     id='Speed',
     # Not really right, but should be about right.
-    trans_name='PORTAL2_PuzzleEditor_ContextMenu_paint_type_speed',
+    name=TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_paint_type_speed'),
     instvar='$speed',
     parse=conv_float,
 )
@@ -330,7 +332,7 @@ prop_track_speed = ItemPropKind[float](
 prop_track_move_direction = ItemPropKind[Angle](
     id='TravelDirection',
     instvar='$travel_direction',
-    trans_name='',  # Hidden prop
+    name=TransToken.BLANK,  # Hidden prop
     parse=Angle.from_str,
 )
 
@@ -370,7 +372,7 @@ def _parse_pist_upper(value: str) -> int:
 prop_pist_lower = ItemPropKind(
     id='BottomLevel',
     instvar='$bottom_level',
-    trans_name='',  # Controlled by the widgets.
+    name=TransToken.BLANK,  # Controlled by the widgets.
     subtype_values=[0, 1, 2, 3],
     parse=_parse_pist_lower,
     export=str,
@@ -378,7 +380,7 @@ prop_pist_lower = ItemPropKind(
 prop_pist_upper = ItemPropKind(
     id='TopLevel',
     instvar='$top_level',
-    trans_name='',  # Controlled by the widgets.
+    name=TransToken.BLANK,  # Controlled by the widgets.
     subtype_values=[1, 2, 3, 4],
     parse=_parse_pist_upper,
     export=str,
@@ -387,20 +389,20 @@ prop_pist_upper = ItemPropKind(
 prop_pist_start_up = bool_prop(
     id='StartUp',
     instvar='$start_up',
-    trans_name='',  # Internal property.
+    name=TransToken.BLANK,  # Internal property.
 )
 # Determines if the piston moves automatically.
 prop_pist_auto_trigger = bool_prop(
     id='AutoTrigger',
     instvar='$allow_auto_trigger',
-    trans_name='',  # Internal property.
+    name=TransToken.BLANK,  # Internal property.
 )
 
 
 # Paint stuff.
 def paint_type_prop(
     *order: PaintTypes,
-    id: str, instvar: str, trans_name: str,
+    id: str, instvar: str, name: TransToken,
 ) -> ItemPropKind[PaintTypes]:
     """There's two paint type properties with different configuration."""
     def parse(value: str) -> PaintTypes:
@@ -419,7 +421,7 @@ def paint_type_prop(
     return ItemPropKind[PaintTypes](
         id=id,
         instvar=instvar,
-        trans_name=trans_name,
+        name=name,
         subtype_values=order,
         parse=parse,
         export=lambda value: str(order.index(value)),
@@ -436,7 +438,7 @@ prop_paint_type = paint_type_prop(
 
     id='PaintType',
     instvar='',  # Done through the other props.
-    trans_name='PORTAL2_PuzzleEditor_ContextMenu_paint_type',
+    name=TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_paint_type'),
 )
 
 # An internal property that exports the actual paint type used.
@@ -449,7 +451,7 @@ prop_paint_export_type = paint_type_prop(
     PaintTypes.ERASE,
     id='PaintExportType',
     instvar='$paint_type',
-    trans_name='',  # Internal prop.
+    name=TransToken.BLANK,  # Internal prop.
 )
 
 
@@ -465,7 +467,7 @@ prop_paint_flow_type = enum_prop(
     PaintFlows,
     id='PaintFlowType',
     instvar='$blobs_per_second',
-    trans_name='$PORTAL2_PuzzleEditor_ContextMenu_paint_flow_type',
+    name=TransToken.from_valve('$PORTAL2_PuzzleEditor_ContextMenu_paint_flow_type'),
 )
 
 
@@ -474,7 +476,7 @@ prop_paint_flow_type = enum_prop(
 prop_paint_allow_streaks = bool_prop(
     id = 'AllowStreak',
     instvar='$streak_time',
-    trans_name='PORTAL2_PuzzleEditor_ContextMenu_allow_streak_paint',
+    name=TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_allow_streak_paint'),
 )
 
 
@@ -487,14 +489,14 @@ def _parse_connection_count(value: str) -> int:
 prop_connection_count = ItemPropKind[int](
     id='ConnectionCount',
     instvar="$connectioncount",
-    trans_name='PORTAL2_PuzzleEditor_ContextMenu_tbeam_activate',
+    name=TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_tbeam_activate'),
     parse=_parse_connection_count,
 )
 # Specific for funnels, tracks the number of polarity-type input items.
 prop_connection_count_polarity = ItemPropKind[int](
     id='ConnectionCountPolarity',
     instvar="$connectioncountpolarity",
-    trans_name='PORTAL2_PuzzleEditor_ContextMenu_tbeam_polarity',
+    name=TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_tbeam_polarity'),
     parse=_parse_connection_count,
 )
 
@@ -507,7 +509,7 @@ def _parse_timer_delay(value: str) -> int:
 prop_timer_delay = ItemPropKind[int](
     id="TimerDelay",
     instvar="$timer_delay",
-    trans_name = 'PORTAL2_PuzzleEditor_ContextMenu_timer_delay',
+    name=TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_timer_delay'),
     subtype_values=range(0, 31),
     parse=_parse_timer_delay,
 )
@@ -516,7 +518,7 @@ prop_timer_delay = ItemPropKind[int](
 prop_timer_sound = bool_prop(
     id='TimerSound',
     instvar='$timer_sound',
-    trans_name='',  # Not visible.
+    name=TransToken.BLANK,  # Not visible.
 )
 
 
@@ -524,14 +526,14 @@ prop_timer_sound = bool_prop(
 prop_faith_vertical_alignment = bool_prop(
     id='VerticalAlignment',
     instvar='',  # None!
-    trans_name='',  # Not visible.
+    name=TransToken.BLANK,  # Not visible.
 )
 
 # Stores the Faith Plate's speed, defining the arc height.
 prop_faith_speed = ItemPropKind[float](
     id='CatapultSpeed',
     instvar='$catapult_speed',
-    trans_name='',  # Not visible.
+    name=TransToken.BLANK,  # Not visible.
     parse=conv_float,
 )
 
@@ -539,7 +541,7 @@ prop_faith_speed = ItemPropKind[float](
 prop_door_is_coop = bool_prop(
     id='CoopDoor',
     instvar='PORTAL2_PuzzleEditor_ContextMenu_coop_puzzle',
-    trans_name='',  # Not visible.
+    name=TransToken.BLANK,  # Not visible.
 )
 
 
@@ -547,7 +549,7 @@ prop_door_is_coop = bool_prop(
 prop_antline_indicator = ItemPropKind[str](
     id='IndicatorName',
     instvar='$indicator_name',
-    trans_name='',  # Inaccessible to users.
+    name=TransToken.BLANK,  # Inaccessible to users.
     parse=str,
 )
 
@@ -556,7 +558,7 @@ prop_antline_indicator = ItemPropKind[str](
 prop_antline_is_timer = bool_prop(
     id='IsTimer',
     instvar='$is_timer',
-    trans_name='',  # Inaccessible to users.
+    name=TransToken.BLANK,  # Inaccessible to users.
 )
 
 
@@ -564,7 +566,7 @@ prop_antline_is_timer = bool_prop(
 prop_helper_radius = ItemPropKind[float](
     id='HelperRadius',
     instvar='$helper_radius',
-    trans_name='',  # Not visible.
+    name=TransToken.BLANK,  # Not visible.
     parse=conv_float,
 )
 
@@ -573,7 +575,7 @@ prop_helper_radius = ItemPropKind[float](
 prop_helper_use_angles = bool_prop(
     id='UseHelperAngles',
     instvar='$use_helper_angles',
-    trans_name='',  # Not visible.
+    name=TransToken.BLANK,  # Not visible.
 )
 
 
@@ -581,7 +583,7 @@ prop_helper_use_angles = bool_prop(
 prop_helper_force_placement = bool_prop(
     id='ForcePlacement',
     instvar='$force_placement',
-    trans_name='',  # Not visible.
+    name=TransToken.BLANK,  # Not visible.
 )
 
 
@@ -591,7 +593,7 @@ prop_faith_targetname = ItemPropKind[str](
     id='TargetName',
     instvar='',
     parse=str,
-    trans_name='',  # Hidden
+    name=TransToken.BLANK,  # Hidden
 )
 
 
@@ -599,7 +601,7 @@ prop_faith_targetname = ItemPropKind[str](
 # Defaults to 2 always, so the value isn't important.
 prop_angled_panel_type = ItemPropKind[str](
     id='AngledPanelType',
-    trans_name='',  # Hidden
+    name=TransToken.BLANK,  # Hidden
     instvar='',  # None!
     parse=str,
 )
@@ -625,7 +627,7 @@ def _parse_angled_panel_anim(value: str) -> PanelAnimation:
 prop_angled_panel_anim = ItemPropKind[PanelAnimation](
     id='AngledPanelAnimation',
     instvar='$animation',
-    trans_name='PORTAL2_PuzzleEditor_ContextMenu_angled_panel_type',
+    name=TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_angled_panel_type'),
     subtype_values=list(PanelAnimation),
     parse=_parse_angled_panel_anim,
     export=lambda ang: f'ramp_{ang.value}_deg_open',
@@ -635,7 +637,7 @@ prop_cube_type = enum_prop(
     CubeTypes,
     id='CubeType',
     instvar='$cubetype',
-    trans_name='PORTAL2_PuzzleEditor_ContextMenu_cube_type',
+    name=TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_cube_type'),
 )
 
 
@@ -643,7 +645,7 @@ prop_button_type = enum_prop(
     ButtonTypes,
     id='ButtonType',
     instvar='',  # Sets instance index.
-    trans_name='PORTAL2_PuzzleEditor_ContextMenu_button_type',
+    name=TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_button_type'),
 )
 
 
@@ -651,7 +653,7 @@ prop_fizzler_type = enum_prop(
     FizzlerTypes,
     id='HazardType',
     instvar='$skin',
-    trans_name='PORTAL2_PuzzleEditor_ContextMenu_barrier_hazard_type',
+    name=TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_barrier_hazard_type'),
 )
 
 
@@ -659,7 +661,7 @@ prop_glass_type = enum_prop(
     GlassTypes,
     id='BarrierType',
     instvar='',  # Brushes placed only
-    trans_name='PORTAL2_PuzzleEditor_ContextMenu_barrier_type',
+    name=TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_barrier_type'),
 )
 
 

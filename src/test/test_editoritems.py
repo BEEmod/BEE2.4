@@ -4,7 +4,8 @@ from editoritems import (
     Item, ItemClass,
     OccupiedVoxel, Coord, OccuType, DesiredFacing, FSPath, Sound, Handle, ConnSide, InstCount,
 )
-import pytest
+
+from app.localisation import TransToken
 
 
 # Definition for a simple item, with 'exporting' open.
@@ -87,14 +88,14 @@ def test_parse_goo() -> None:
     assert item.cls is ItemClass.GOO
     assert len(item.subtypes) == 1
     [subtype] = item.subtypes
-    assert subtype.name == "PORTAL2_PuzzleEditor_Item_goo"
+    assert subtype.name == TransToken.from_valve("PORTAL2_PuzzleEditor_Item_goo")
     assert subtype.models == [
         # Regardless of original extension, both become .mdl since that's more
         # correct.
         FSPath("goo_man.mdl"),
         FSPath("goo_man_water.mdl"),
     ]
-    assert subtype.pal_name == "PORTAL2_PuzzleEditor_Palette_goo"
+    assert subtype.pal_name == TransToken.from_valve("PORTAL2_PuzzleEditor_Palette_goo")
     assert subtype.pal_icon == FSPath("palette/goo.vtf")
     assert subtype.pal_pos == (2, 6)
 

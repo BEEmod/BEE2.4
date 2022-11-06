@@ -209,7 +209,7 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
     # Valve doesn't implement convex corners, we'll do it ourselves.
     convex_corner_left = instanceLocs.resolve_one('[glass_left_convex_corner]')
     convex_corner_right = instanceLocs.resolve_one('[glass_right_convex_corner]')
-    convex_corners: List[Tuple[Matrix, str, int]] = [
+    convex_corners: List[Tuple[Matrix, str, float]] = [
         (orient, filename, side)
         # We don't include 90 and 270, the other filename covers those.
         for orient in map(Matrix.from_yaw, [0.0, 180.0])

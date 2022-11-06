@@ -3,6 +3,7 @@ from typing import Optional, Set, Iterator
 
 import srctools
 import utils
+from transtoken import TransTokenSource
 from packages import (
     PackagesSet, PakObject, set_cond_source, ParseData,
     get_config, ExportData, LOGGER, SelitemData,
@@ -233,3 +234,10 @@ class QuotePack(PakObject, needs_foreground=True):
                         'voice ID "{}"!', voice.id, quote_id,
                     )
                 used.add(quote_id)
+
+    def iter_trans_tokens(self) -> Iterator[TransTokenSource]:
+        """Yield all translation tokens in this voice pack.
+
+        TODO: Parse out translations in the pack itself.
+        """
+        return self.selitem_data.iter_trans_tokens(f'voiceline/{self.id}')

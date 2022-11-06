@@ -256,7 +256,7 @@ def vactube_gen(vmf: VMF) -> None:
 
         # If the end is placed in goo, don't add logic - it isn't visible, and
         # the object is on a one-way trip anyway.
-        if not (BLOCK_POS['world': end_loc].is_goo and end_norm.z < -1e-6):
+        if not (BLOCK_POS.lookup_world(end_loc).is_goo and end_norm.z < -1e-6):
             end_logic = end.ent.copy()
             vmf.add_ent(end_logic)
             end_logic['file'] = end.conf.inst_exit

@@ -2,8 +2,13 @@
 
 # Version `<dev>`
 
+### Enhancements
+* If funnel music is disabled, keep the base music playing while inside funnels.
+* Rebuilt localisation system, allowing languages to be changed in the options menu.
+
 ### Bugfixes
 * Do not composite signage VTFs with PeTI backgrounds.
+* Fix signage not exporting if the UI was not opened at least once before exporting.
 
 ------------------------------------------
 

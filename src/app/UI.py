@@ -1,7 +1,6 @@
 """Main UI module, brings everything together."""
 import tkinter as tk
 from tkinter import ttk  # themed ui components that match the OS
-from tkinter import messagebox  # simple, standard modal dialogs
 from typing import List, Dict, Tuple, Optional, Set, Iterator, Callable, Any, Union
 import itertools
 import operator
@@ -13,7 +12,7 @@ import srctools.logger
 import trio
 
 import loadScreen
-from app import TK_ROOT, background_run
+from app import TK_ROOT, background_run, localisation
 from app.itemPropWin import PROP_TYPES
 from BEE2_config import ConfigFile, GEN_OPTS
 from loadScreen import main_loader as loader
@@ -25,7 +24,7 @@ from config.gen_opts import GenOptions, AfterExport
 from config.last_sel import LastSelected
 from config.windows import WindowState
 import config
-from localisation import gettext
+from transtoken import TransToken
 from app import (
     img,
     itemconfig,
@@ -84,8 +83,6 @@ ICO_GEAR_DIS = img.Handle.sprite('icons/gear_disabled', 10, 10)
 IMG_BLANK = img.Handle.color(img.PETI_ITEM_BG, 64, 64)
 
 selected_style = "BEE2_CLEAN"
-# Variable used for export button (changes to include game name)
-EXPORT_CMD_VAR = tk.StringVar(value=gettext('Export...'))
 
 # Maps item IDs to our wrapper for the object.
 item_list: Dict[str, 'Item'] = {}
@@ -97,6 +94,16 @@ item_opts = ConfigFile('item_configs.cfg')
 # Piles of global widgets, should be made local...
 frmScroll: ttk.Frame  # Frame holding the item list.
 pal_canvas: tk.Canvas  # Canvas for the item list to scroll.
+
+
+TRANS_EXPORTED = TransToken.ui('Selected Items and Style successfully exported!')
+TRANS_EXPORTED_NO_VPK = TransToken.ui(
+    '{exported}\n\nWarning: VPK files were not exported, quit Portal 2 and '
+    'Hammer to ensure editor wall previews are changed.'
+).format(exported=TRANS_EXPORTED)
+TRANS_EXPORTED_TITLE = TransToken.ui('BEE2 - Export Complete')
+TRANS_MAIN_TITLE = TransToken.ui('BEEMOD {version} - {game}')
+TRANS_ERROR = TransToken.untranslated('???')
 
 
 class Item:
@@ -159,12 +166,16 @@ class Item:
         yield from self.data.tags
         yield from self.data.authors
         try:
-            yield gameMan.translate(self.data.editor.subtypes[subtype].name)
+            name = self.data.editor.subtypes[subtype].name
         except IndexError:
             LOGGER.warning(
                 'No subtype number {} for {} in {} style!',
                 subtype, self.id, selected_style,
             )
+        else:  # Include both the original and translated versions.
+            if not name.is_game:
+                yield name.token
+            yield str(name)
 
     def get_icon(self, subKey, allow_single=False, single_num=1) -> img.Handle:
         """Get an icon for the given subkey.
@@ -301,8 +312,6 @@ class PalItem:
         self.item = item
         self.subKey = sub
         self.id = item.id
-        # Cached translated palette name.
-        self.name = '??'
         # Used to distinguish between picker and palette items
         self.is_pre = is_pre
         self.needs_unlock = item.item.needs_unlock
@@ -337,6 +346,18 @@ class PalItem:
 
         # Rightclick does the same as the icon.
         tk_tools.bind_rightclick(self.info_btn, click_func)
+
+    @property
+    def name(self) -> TransToken:
+        """Get the current name for this subtype."""
+        try:
+            return self.item.data.editor.subtypes[self.subKey].name
+        except IndexError:
+            LOGGER.warning(
+                'Item <{}> in <{}> style has mismatched subtype count!',
+                self.id, selected_style,
+            )
+            return TRANS_ERROR
 
     def rollover(self, _: tk.Event) -> None:
         """Show the name of a subitem and info button when moused over."""
@@ -388,14 +409,6 @@ class PalItem:
 
         Call whenever the style changes, so the icons update.
         """
-        try:
-            self.name = gameMan.translate(self.item.data.editor.subtypes[self.subKey].name)
-        except IndexError:
-            LOGGER.warning(
-                'Item <{}> in <{}> style has mismatched subtype count!',
-                self.id, selected_style,
-            )
-            self.name = '???'
         img.apply(self.label, self.item.get_icon(self.subKey, self.is_pre))
 
     def clear(self) -> bool:
@@ -515,7 +528,7 @@ async def load_packages(packset: packages.PackagesSet) -> None:
     for sel_list, obj_type, attrs in obj_types:
         # Extract the display properties out of the object, and create
         # a SelectorWin item to display with.
-        for obj in sorted(packset.all_obj(obj_type), key=operator.attrgetter('selitem_data.name')):
+        for obj in sorted(packset.all_obj(obj_type), key=operator.attrgetter('selitem_data.name.token')):
             sel_list.append(selWinItem.from_data(
                 obj.id,
                 obj.selitem_data,
@@ -557,8 +570,8 @@ async def load_packages(packset: packages.PackagesSet) -> None:
         TK_ROOT,
         sky_list,
         save_id='skyboxes',
-        title=gettext('Select Skyboxes'),
-        desc=gettext(
+        title=TransToken.ui('Select Skyboxes'),
+        desc=TransToken.ui(
             'The skybox decides what the area outside the chamber is like. It chooses the colour '
             'of sky (seen in some items), the style of bottomless pit (if present), as well as '
             'color of "fog" (seen in larger chambers).'
@@ -567,8 +580,8 @@ async def load_packages(packset: packages.PackagesSet) -> None:
         has_none=False,
         callback=win_callback,
         attributes=[
-            SelAttr.bool('3D', gettext('3D Skybox'), False),
-            SelAttr.color('COLOR', gettext('Fog Color')),
+            SelAttr.bool('3D', TransToken.ui('3D Skybox'), False),
+            SelAttr.color('COLOR', TransToken.ui('Fog Color')),
         ],
     )
 
@@ -576,23 +589,23 @@ async def load_packages(packset: packages.PackagesSet) -> None:
         TK_ROOT,
         voice_list,
         save_id='voicelines',
-        title=gettext('Select Additional Voice Lines'),
-        desc=gettext(
+        title=TransToken.ui('Select Additional Voice Lines'),
+        desc=TransToken.ui(
             'Voice lines choose which extra voices play as the player enters or exits a chamber. '
             'They are chosen based on which items are present in the map. The additional '
             '"Multiverse" Cave lines are controlled separately in Style Properties.'
         ),
         has_none=True,
         default_id='BEE2_GLADOS_CLEAN',
-        none_desc=gettext('Add no extra voice lines, only Multiverse Cave if enabled.'),
+        none_desc=TransToken.ui('Add no extra voice lines, only Multiverse Cave if enabled.'),
         none_attrs={
-            'CHAR': [gettext('<Multiverse Cave only>')],
+            'CHAR': [TransToken.ui('<Multiverse Cave only>')],
         },
         callback=voice_callback,
         attributes=[
-            SelAttr.list('CHAR', gettext('Characters'), ['??']),
-            SelAttr.bool('TURRET', gettext('Turret Shoot Monitor'), False),
-            SelAttr.bool('MONITOR', gettext('Monitor Visuals'), False),
+            SelAttr.list('CHAR', TransToken.ui('Characters'), ['??']),
+            SelAttr.bool('TURRET', TransToken.ui('Turret Shoot Monitor'), False),
+            SelAttr.bool('MONITOR', TransToken.ui('Monitor Visuals'), False),
         ],
     )
 
@@ -601,8 +614,8 @@ async def load_packages(packset: packages.PackagesSet) -> None:
         style_list,
         save_id='styles',
         default_id='BEE2_CLEAN',
-        title=gettext('Select Style'),
-        desc=gettext(
+        title=TransToken.ui('Select Style'),
+        desc=TransToken.ui(
             'The Style controls many aspects of the map. It decides the materials used for walls, '
             'the appearance of entrances and exits, the design for most items as well as other '
             'settings.\n\nThe style broadly defines the time period a chamber is set in.'
@@ -614,7 +627,7 @@ async def load_packages(packset: packages.PackagesSet) -> None:
         modal=True,
         # callback set in the main initialisation function..
         attributes=[
-            SelAttr.bool('VID', gettext('Elevator Videos'), default=True),
+            SelAttr.bool('VID', TransToken.ui('Elevator Videos'), default=True),
         ]
     )
 
@@ -622,21 +635,21 @@ async def load_packages(packset: packages.PackagesSet) -> None:
         TK_ROOT,
         elev_list,
         save_id='elevators',
-        title=gettext('Select Elevator Video'),
-        desc=gettext(
+        title=TransToken.ui('Select Elevator Video'),
+        desc=TransToken.ui(
             'Set the video played on the video screens in modern Aperture elevator rooms. Not all '
             'styles feature these. If set to "None", a random video will be selected each time the '
             'map is played, like in the default PeTI.'
         ),
-        readonly_desc=gettext('This style does not have a elevator video screen.'),
+        readonly_desc=TransToken.ui('This style does not have a elevator video screen.'),
         has_none=True,
         has_def=True,
         none_icon=img.Handle.builtin('BEE2/random', 96, 96),
-        none_name=gettext('Random'),
-        none_desc=gettext('Choose a random video.'),
+        none_name=TransToken.ui('Random'),
+        none_desc=TransToken.ui('Choose a random video.'),
         callback=win_callback,
         attributes=[
-            SelAttr.bool('ORIENT', gettext('Multiple Orientations')),
+            SelAttr.bool('ORIENT', TransToken.ui('Multiple Orientations')),
         ]
     )
 
@@ -782,21 +795,17 @@ def export_editoritems(pal_ui: paletteUI.PaletteUI, bar: MenuBar) -> None:
         item_opts.save_check()
         config.APP.write_file()
 
-        message = gettext('Selected Items and Style successfully exported!')
-        if not vpk_success:
-            message += gettext(
-                '\n\nWarning: VPK files were not exported, quit Portal 2 and '
-                'Hammer to ensure editor wall previews are changed.'
-            )
+        message = TRANS_EXPORTED if vpk_success else TRANS_EXPORTED_NO_VPK
 
         if conf.launch_after_export or conf.after_export is not config.gen_opts.AfterExport.NORMAL:
-            do_action = messagebox.askyesno(
-                'BEEMOD2',
-                message + optionWindow.AFTER_EXPORT_TEXT[conf.after_export, conf.launch_after_export],
-                parent=TK_ROOT,
+            do_action = tk_tools.askyesno(
+                TRANS_EXPORTED_TITLE,
+                optionWindow.AFTER_EXPORT_TEXT[
+                    conf.after_export, conf.launch_after_export,
+                ].format(msg=message),
             )
         else:  # No action to do, so just show an OK.
-            messagebox.showinfo('BEEMOD2', message, parent=TK_ROOT)
+            tk_tools.showinfo(TRANS_EXPORTED_TITLE, message)
             do_action = False
 
         # Do the desired action - if quit, we don't bother to update UI.
@@ -830,12 +839,12 @@ def export_editoritems(pal_ui: paletteUI.PaletteUI, bar: MenuBar) -> None:
 
 def set_disp_name(item: PalItem, e=None) -> None:
     """Callback to display the name of the item."""
-    UI['pre_disp_name'].configure(text=item.name)
+    localisation.set_text(UI['pre_disp_name'], item.name)
 
 
 def clear_disp_name(e=None) -> None:
     """Callback to reset the item name."""
-    UI['pre_disp_name'].configure(text='')
+    localisation.set_text(UI['pre_disp_name'], TransToken.BLANK)
 
 
 def conv_screen_to_grid(x: float, y: float) -> Tuple[int, int]:
@@ -1079,32 +1088,37 @@ async def init_option(
     frame.grid(row=0, column=0, sticky='nsew')
     frame.columnconfigure(0, weight=1)
 
-    pal_save = ttk.Button(
-        frame,
-        text=gettext("Save Palette..."),
-        command=pal_ui.event_save,
-    )
+    pal_save = ttk.Button(frame, command=pal_ui.event_save)
+    localisation.set_text(pal_save, TransToken.ui("Save Palette..."))
     pal_save.grid(row=0, sticky="EW", padx=5)
     pal_ui.save_btn_state = pal_save.state
-    ttk.Button(
-        frame,
-        text=gettext("Save Palette As..."),
-        command=pal_ui.event_save_as,
+
+    localisation.set_text(
+        ttk.Button(frame, command=pal_ui.event_save_as),
+        TransToken.ui("Save Palette As..."),
     ).grid(row=1, sticky="EW", padx=5)
 
     pal_ui.make_option_checkbox(frame).grid(row=2, sticky="EW", padx=5)
 
     ttk.Separator(frame, orient='horizontal').grid(row=3, sticky="EW")
 
-    UI['pal_export'] = ttk.Button(frame, textvariable=EXPORT_CMD_VAR, command=export)
+    UI['pal_export'] = ttk.Button(frame, command=export)
     UI['pal_export'].state(('disabled',))
     UI['pal_export'].grid(row=4, sticky="EW", padx=5)
+
+    async def game_changed(game: gameMan.Game) -> None:
+        """When the game changes, update this button."""
+        localisation.set_text(UI['pal_export'], game.get_export_text())
+
+    await gameMan.EVENT_BUS.register_and_prime(None, gameMan.Game, game_changed)
 
     props = ttk.Frame(frame, width="50")
     props.columnconfigure(1, weight=1)
     props.grid(row=5, sticky="EW")
 
-    music_frame = ttk.Labelframe(props, text=gettext('Music: '))
+    music_frame = ttk.Labelframe(props)
+    localisation.set_text(music_frame, TransToken.ui('Music: '))
+
     async with trio.open_nursery() as nursery:
         nursery.start_soon(music_conf.make_widgets, packages.LOADED, music_frame, pane)
     music_win = music_conf.WINDOWS[music_conf.MusicChannel.BASE]
@@ -1129,15 +1143,14 @@ async def init_option(
         for win in (voice_win, music_win, skybox_win, elev_win):
             win.set_disp()
 
-    UI['suggested_style'] = ttk.Button(
-        props,
-        # '\u2193' is the downward arrow symbol.
-        text=gettext("{arr} Use Suggested {arr}").format(arr='\u2193'),
-        command=suggested_style_set,
-        )
-    UI['suggested_style'].grid(row=1, column=1, columnspan=2, sticky="EW", padx=0)
-    UI['suggested_style'].bind('<Enter>', suggested_style_mousein)
-    UI['suggested_style'].bind('<Leave>', suggested_style_mouseout)
+    UI['suggested_style'] = sugg_btn =  ttk.Button(props, command=suggested_style_set)
+    # '\u2193' is the downward arrow symbol.
+    localisation.set_text(sugg_btn, TransToken.ui(
+        "{down_arrow} Use Suggested {down_arrow}"
+    ).format(down_arrow='\u2193'))
+    sugg_btn.grid(row=1, column=1, columnspan=2, sticky="EW", padx=0)
+    sugg_btn.bind('<Enter>', suggested_style_mousein)
+    sugg_btn.bind('<Leave>', suggested_style_mouseout)
 
     def configure_voice() -> None:
         """Open the voiceEditor window to configure a Quote Pack."""
@@ -1148,16 +1161,16 @@ async def init_option(
         else:
             voiceEditor.show(chosen_voice)
     for ind, name in enumerate([
-            gettext("Style: "),
+            TransToken.ui("Style: "),
             None,
-            gettext("Voice: "),
-            gettext("Skybox: "),
-            gettext("Elev Vid: "),
+            TransToken.ui("Voice: "),
+            TransToken.ui("Skybox: "),
+            TransToken.ui("Elev Vid: "),
             ]):
         if name is None:
             # This is the "Suggested" button!
             continue
-        ttk.Label(props, text=name).grid(row=ind)
+        localisation.set_text(ttk.Label(props), name).grid(row=ind)
 
     voice_frame = ttk.Frame(props)
     voice_frame.columnconfigure(1, weight=1)
@@ -1170,7 +1183,7 @@ async def init_option(
     img.apply(UI['conf_voice'], ICO_GEAR_DIS)
     tooltip.add_tooltip(
         UI['conf_voice'],
-        gettext('Enable or disable particular voice lines, to prevent them from being added.'),
+        TransToken.ui('Enable or disable particular voice lines, to prevent them from being added.'),
     )
 
     if utils.WIN:
@@ -1256,20 +1269,11 @@ def init_preview(f: Union[tk.Frame, ttk.Frame]) -> None:
 def init_picker(f: Union[tk.Frame, ttk.Frame]) -> None:
     """Construct the frame holding all the items."""
     global frmScroll, pal_canvas
-    ttk.Label(
-        f,
-        text=gettext("All Items: "),
-        anchor="center",
-    ).grid(
-        row=0,
-        column=0,
-        sticky="EW",
-    )
-    UI['picker_frame'] = cframe = ttk.Frame(
-        f,
-        borderwidth=4,
-        relief="sunken",
-        )
+    localisation.set_text(
+        ttk.Label(f, anchor="center"),
+        TransToken.ui("All Items: "),
+    ).grid(row=0, column=0, sticky="EW")
+    UI['picker_frame'] = cframe = ttk.Frame(f, borderwidth=4, relief="sunken")
     cframe.grid(row=1, column=0, sticky="NSEW")
     f.rowconfigure(1, weight=1)
     f.columnconfigure(0, weight=1)
@@ -1387,9 +1391,8 @@ async def set_game(game: 'gameMan.Game') -> None:
 
     This updates the title bar to match, and saves it into the config.
     """
-    TK_ROOT.title(f'BEEMOD {utils.BEE_VERSION} - {game.name}')
+    localisation.set_win_title(TK_ROOT, TRANS_MAIN_TITLE.format(version=utils.BEE_VERSION, game=game.name))
     config.APP.store_conf(LastSelected(game.name), 'game')
-    EXPORT_CMD_VAR.set(game.get_export_text())
 
 
 def refresh_palette_icons() -> None:
@@ -1514,7 +1517,7 @@ async def init_windows() -> None:
 
     windows['pal'] = SubPane.SubPane(
         TK_ROOT,
-        title=gettext('Palettes'),
+        title=TransToken.ui('Palettes'),
         name='pal',
         menu_bar=menu_bar.view_menu,
         resize_x=True,
@@ -1551,7 +1554,7 @@ async def init_windows() -> None:
 
     windows['opt'] = SubPane.SubPane(
         TK_ROOT,
-        title=gettext('Export Options'),
+        title=TransToken.ui('Export Options'),
         name='opt',
         menu_bar=menu_bar.view_menu,
         resize_x=True,
@@ -1587,7 +1590,7 @@ async def init_windows() -> None:
     )
     tooltip.add_tooltip(
         UI['shuffle_pal'],
-        gettext('Fill empty spots in the palette with random items.'),
+        TransToken.ui('Fill empty spots in the palette with random items.'),
     )
 
     # Make scrollbar work globally

@@ -1,12 +1,14 @@
 """Definitions for background music used in the map."""
 from __future__ import annotations
 from collections.abc import Iterable
+from typing import Iterator
 
 from srctools import Property
 import srctools.logger
 
 from consts import MusicChannel
 from app import lazy_conf
+from transtoken import TransTokenSource
 from packages import PackagesSet, PakObject, ParseData, SelitemData, get_config, ExportData
 
 
@@ -143,6 +145,10 @@ class Music(PakObject, needs_foreground=True):
 
     def __repr__(self) -> str:
         return f'<Music {self.id}>'
+
+    def iter_trans_tokens(self) -> Iterator[TransTokenSource]:
+        """Yield all translation tokens used by this music."""
+        yield from self.selitem_data.iter_trans_tokens('music/' + self.id)
 
     def provides_channel(self, channel: MusicChannel) -> bool:
         """Check if this music has this channel."""

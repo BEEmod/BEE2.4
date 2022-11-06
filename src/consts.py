@@ -1,6 +1,6 @@
 """Various constant values (Mainly texture names.)"""
 from __future__ import annotations
-from typing import cast, Any, TypeVar, Type, MutableMapping, Iterator
+from typing import cast, Any, MutableMapping, Iterator
 from uuid import UUID, uuid5
 
 from typing_extensions import Final, Self

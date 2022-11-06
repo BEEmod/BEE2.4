@@ -509,6 +509,7 @@ def load_config(conf: Property):
                     ])
                 ])
         textures: Dict[str, List[str]] = {}
+        tex_name: str
 
         # First parse the options.
         options = parse_options({

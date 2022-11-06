@@ -93,13 +93,13 @@ def load(opt_blocks: Iterator[Property]) -> None:
                 fallback_opts.append(opt)
                 assert opt.fallback in options, 'Invalid fallback in ' + opt.id
             else:
-                SETTINGS[opt.id] = opt.default
+                SETTINGS[opt.id] = opt.default  # type: ignore
             continue
         if opt.type is TYPE.VEC:
             # Pass NaN so we can check if it failed..
             parsed_vals = parse_vec_str(val, math.nan)
             if math.isnan(parsed_vals[0]):
-                SETTINGS[opt.id] = opt.default
+                SETTINGS[opt.id] = opt.default  # type: ignore
             else:
                 SETTINGS[opt.id] = Vec(*parsed_vals)
         elif opt.type is TYPE.BOOL:

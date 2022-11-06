@@ -5,10 +5,11 @@ GitHub repo, which ensures we're able to change them retroactively if the old UR
 whatever reason.
 """
 import io
-import urllib.request, urllib.error
+import urllib.request
+import urllib.error
 from enum import Enum
 from typing import Any, Callable, Dict, cast
-from tkinter import ttk, messagebox
+from tkinter import ttk
 import tkinter as tk
 import webbrowser
 import functools
@@ -19,8 +20,8 @@ import srctools.logger
 import trio.to_thread
 
 from app.richTextBox import tkRichText
-from app import tkMarkdown, tk_tools, sound, img, TK_ROOT, background_run
-from localisation import gettext
+from app import localisation, tkMarkdown, tk_tools, sound, img, TK_ROOT, background_run
+from transtoken import TransToken
 
 # For version info
 import PIL
@@ -40,10 +41,11 @@ class ResIcon(Enum):
     MUSIC_CHANGER = 'menu_music_changer'
     PORTAL2 = 'menu_p2'
 
+
 @attrs.frozen
 class WebResource:
     """Definition for the links in the help menu."""
-    name: str
+    name: TransToken
     url_key: str
     icon: ResIcon
 
@@ -53,24 +55,24 @@ DB_LOCATION = 'https://raw.githubusercontent.com/BEEmod/BEE2.4/master/help_urls.
 url_data: Element = NULL
 
 # This produces a '-------' instead.
-SEPERATOR = WebResource('', '', ResIcon.NONE)
+SEPERATOR = WebResource(TransToken.BLANK, '', ResIcon.NONE)
 
-Res: Callable[[str, str, ResIcon], WebResource] = cast(Any, WebResource)
+Res: Callable[[TransToken, str, ResIcon], WebResource] = cast(Any, WebResource)
 WEB_RESOURCES = [
-    Res(gettext('Wiki...'), 'wiki_bee2', ResIcon.BEE2),
-    Res(gettext('Original Items...'), "wiki_peti", ResIcon.PORTAL2),
+    Res(TransToken.ui('Wiki...'), 'wiki_bee2', ResIcon.BEE2),
+    Res(TransToken.ui('Original Items...'), "wiki_peti", ResIcon.PORTAL2),
     # i18n: The chat program.
-    Res(gettext('Discord Server...'), "discord_bee2", ResIcon.DISCORD),
-    Res(gettext("aerond's Music Changer..."), "music_changer", ResIcon.MUSIC_CHANGER),
-    Res(gettext('Purchase Portal 2'), "store_portal2", ResIcon.PORTAL2),
+    Res(TransToken.ui('Discord Server...'), "discord_bee2", ResIcon.DISCORD),
+    Res(TransToken.ui("aerond's Music Changer..."), "music_changer", ResIcon.MUSIC_CHANGER),
+    Res(TransToken.ui('Purchase Portal 2'), "store_portal2", ResIcon.PORTAL2),
     SEPERATOR,
-    Res(gettext('Application Repository...'), "repo_bee2", ResIcon.GITHUB),
-    Res(gettext('Items Repository...'), "repo_items", ResIcon.GITHUB),
-    Res(gettext('Music Repository...'), "repo_music", ResIcon.GITHUB),
+    Res(TransToken.ui('Application Repository...'), "repo_bee2", ResIcon.GITHUB),
+    Res(TransToken.ui('Items Repository...'), "repo_items", ResIcon.GITHUB),
+    Res(TransToken.ui('Music Repository...'), "repo_music", ResIcon.GITHUB),
     SEPERATOR,
-    Res(gettext('Submit Application Bugs...'), "issues_app", ResIcon.BUGS),
-    Res(gettext('Submit Item Bugs...'), "issues_items", ResIcon.BUGS),
-    Res(gettext('Submit Music Bugs...'), "issues_music", ResIcon.BUGS),
+    Res(TransToken.ui('Submit Application Bugs...'), "issues_app", ResIcon.BUGS),
+    Res(TransToken.ui('Submit Item Bugs...'), "issues_items", ResIcon.BUGS),
+    Res(TransToken.ui('Submit Music Bugs...'), "issues_music", ResIcon.BUGS),
 ]
 del Res
 
@@ -428,10 +430,10 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 class Dialog(tk.Toplevel):
     """Show a dialog with a message."""
-    def __init__(self, title: str, text: str):
+    def __init__(self, title: TransToken, text: str):
         super().__init__(TK_ROOT)
         self.withdraw()
-        self.title(title)
+        localisation.set_win_title(self, title)
         self.transient(master=TK_ROOT)
         self.resizable(width=True, height=True)
         self.text = text
@@ -461,20 +463,18 @@ class Dialog(tk.Toplevel):
         scrollbox.grid(row=0, column=1, sticky='ns')
         self.textbox['yscrollcommand'] = scrollbox.set
 
-        ttk.Button(
-            frame,
-            text=gettext('Close'),
-            command=self.withdraw,
-        ).grid(
-            row=1, column=0,
-        )
+        localisation.set_text(
+            ttk.Button(frame, command=self.withdraw),
+            TransToken.ui('Close'),
+        ).grid(row=1, column=0)
 
     async def show(self) -> None:
         """Display the help dialog."""
         # The first time we're shown, decode the text.
         # That way we don't need to do it on startup.
+        # Don't translate this, it's all legal text - not really our business to change.
         if self.text is not None:
-            parsed_text = tkMarkdown.convert(self.text, package=None)
+            parsed_text = tkMarkdown.convert(TransToken.untranslated(self.text), package=None)
             self.textbox.set_text(parsed_text)
             self.text = None
 
@@ -503,18 +503,16 @@ async def open_url(url_key: str) -> None:
             url_data = await trio.to_thread.run_sync(load_database)
         except urllib.error.URLError as exc:
             LOGGER.error('Failed to download help url file:', exc_info=exc)
-            messagebox.showerror(
-                gettext('BEEMOD2 - Failed to open URL'),
-                gettext('Failed to download list of URLs. Help menu links will not function. Check your Internet?'),
-                master=TK_ROOT,
+            tk_tools.showerror(
+                TransToken.ui('BEEMOD2 - Failed to open URL'),
+                TransToken.ui('Failed to download list of URLs. Help menu links will not function. Check your Internet?'),
             )
             return
         except (IOError, ValueError) as exc:
             LOGGER.error('Failed to parse help url file:', exc_info=exc)
-            messagebox.showerror(
-                gettext('BEEMOD2 - Failed to open URL'),
-                gettext('Failed to parse help menu URLs file. Help menu links will not function.'),
-                master=TK_ROOT,
+            tk_tools.showerror(
+                TransToken.ui('BEEMOD2 - Failed to open URL'),
+                TransToken.ui('Failed to parse help menu URLs file. Help menu links will not function.'),
             )
             return
         LOGGER.debug('Help URLs:\n{}', '\n'.join([
@@ -527,10 +525,9 @@ async def open_url(url_key: str) -> None:
     except KeyError:
         LOGGER.warning('Invalid URL key "{}"!', url_key)
     else:
-        if messagebox.askyesno(
-            gettext('BEEMOD 2 - Open URL'),
-            gettext('Do you wish to open the following URL?\n') + url,
-            master=TK_ROOT,
+        if tk_tools.askyesno(
+            TransToken.ui('BEEMOD 2 - Open URL'),
+            TransToken.ui('Do you wish to open the following URL?\n{url}').format(url=url),
         ):
             webbrowser.open(url)
 
@@ -538,9 +535,10 @@ async def open_url(url_key: str) -> None:
 def make_help_menu(parent: tk.Menu) -> None:
     """Create the application 'Help' menu."""
     # Using this name displays this correctly in OS X
-    help = tk.Menu(parent, name='help')
+    help_menu = tk.Menu(parent, name='help')
 
-    parent.add_cascade(menu=help, label=gettext('Help'))
+    parent.add_cascade(menu=help_menu)
+    localisation.set_menu_text(parent, TransToken.ui('Help'))
 
     icons: Dict[ResIcon, img.Handle] = {
         icon: img.Handle.sprite('icons/' + icon.value, 16, 16)
@@ -549,21 +547,19 @@ def make_help_menu(parent: tk.Menu) -> None:
     }
     icons[ResIcon.NONE] = img.Handle.blank(16, 16)
 
-    credit_window = Dialog(title=gettext('BEE2 Credits'), text=CREDITS_TEXT)
+    credit_window = Dialog(title=TransToken.ui('BEE2 Credits'), text=CREDITS_TEXT)
 
     for res in WEB_RESOURCES:
         if res is SEPERATOR:
-            help.add_separator()
+            help_menu.add_separator()
         else:
-            help.add_command(
-                label=res.name,
+            help_menu.add_command(
                 command=functools.partial(background_run, open_url, res.url_key),
                 compound='left',
                 image=icons[res.icon].get_tk(),
             )
+            localisation.set_menu_text(help_menu, res.name)
 
-    help.add_separator()
-    help.add_command(
-        label=gettext('Credits...'),
-        command=functools.partial(background_run, credit_window.show),
-    )
+    help_menu.add_separator()
+    help_menu.add_command(command=functools.partial(background_run, credit_window.show))
+    localisation.set_menu_text(help_menu, TransToken.ui('Credits...'))

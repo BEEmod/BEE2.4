@@ -22,17 +22,19 @@ from idlelib.redirector import WidgetRedirector
 from idlelib.query import Query
 import trio
 
-from app import TK_ROOT, background_run
+from app import TK_ROOT, background_run, localisation
 from config.gen_opts import GenOptions
 import event
 import config
 import utils
+from transtoken import TransToken
 
 
 # Set icons for the application.
 
 ICO_PATH = str(utils.install_path('BEE2.ico'))
 PosArgsT = TypeVarTuple('PosArgsT')
+T = TypeVar('T')
 
 if utils.WIN:
     # Ensure everything has our icon (including dialogs)
@@ -497,7 +499,7 @@ else:
 
 
 def prompt(
-    title: str, message: str,
+    title: TransToken, message: TransToken,
     initialvalue: str = '',
     parent: tk.Misc = TK_ROOT,
     validator: Callable[[str], str] = _default_validator,
@@ -515,7 +517,34 @@ def prompt(
             query_cls = BasicQueryValidator
         else:
             query_cls = QueryValidator
-        return query_cls(parent, title, message, initialvalue, validator).result
+        return query_cls(parent, str(title), str(message), initialvalue, validator).result
+
+
+class _MsgBoxFunc(Generic[T]):
+    """Wrap messagebox functions that take TransToken."""
+    def __init__(self, original: Callable[..., T]) -> None:
+        self.orig = original
+
+    def __call__(
+        self,
+        title: Optional[TransToken]=None,
+        message: Optional[TransToken]=None,
+        parent: tk.Misc=TK_ROOT,
+        **options: Any,
+    ) -> T:
+        disp_title = str(title) if title is not None else None
+        disp_msg = str(message) if message is not None else None
+        return self.orig(disp_title, disp_msg, parent=parent, master=TK_ROOT, **options)
+
+
+showinfo       = _MsgBoxFunc(messagebox.showinfo)
+showwarning    = _MsgBoxFunc(messagebox.showwarning)
+showerror      = _MsgBoxFunc(messagebox.showerror)
+askquestion    = _MsgBoxFunc(messagebox.askquestion)
+askokcancel    = _MsgBoxFunc(messagebox.askokcancel)
+askyesno       = _MsgBoxFunc(messagebox.askyesno)
+askyesnocancel = _MsgBoxFunc(messagebox.askyesnocancel)
+askretrycancel = _MsgBoxFunc(messagebox.askretrycancel)
 
 
 class HidingScroll(ttk.Scrollbar):
@@ -549,7 +578,8 @@ class ReadOnlyEntry(ttk.Entry):
         setattr(self, 'delete', redir.register('delete', event_cancel))
 
 
-class ttk_Spinbox(ttk.Widget, tk.Spinbox):
+# Widget and Spinbox have conflicting identify() definitions, not important.
+class ttk_Spinbox(ttk.Widget, tk.Spinbox):  # type: ignore[misc]
     """This is missing from ttk, but still exists."""
     def __init__(self, master: tk.Misc, range: Union[range, slice] = None, **kw: Any) -> None:
         """Initialise a spinbox.
@@ -648,7 +678,7 @@ class FileField(ttk.Frame):
         self.columnconfigure(0, weight=1)
         bind_leftclick(self.textbox, self.browse)
         # The full location is displayed in a tooltip.
-        add_tooltip(self.textbox, self._location)
+        add_tooltip(self.textbox, TransToken.untranslated(self._location))
         self.textbox.bind('<Configure>', self._text_configure)
 
         self.browse_btn = ttk.Button(
@@ -687,7 +717,7 @@ class FileField(ttk.Frame):
         from app import tooltip
         self.callback(path)
         self._location = path
-        tooltip.set_tooltip(self, path)
+        tooltip.set_tooltip(self, TransToken.untranslated(path))
         self._text_var.set(self._truncate(path))
 
     def _truncate(self, path: str) -> str:
@@ -725,7 +755,7 @@ class EnumButton(Generic[EnumT]):
         master: tk.Misc,
         event_bus: event.EventBus,
         current: EnumT,
-        *values: Tuple[EnumT, str],
+        *values: Tuple[EnumT, TransToken],
     ) -> None:
         self.frame = ttk.Frame(master)
         self._current = current
@@ -734,10 +764,11 @@ class EnumButton(Generic[EnumT]):
 
         for x, (val, label) in enumerate(values):
             btn = ttk.Button(
-                self.frame, text=label,
+                self.frame,
                 # Make partial do the method binding.
                 command=functools.partial(EnumButton._select, self, val),
             )
+            localisation.set_text(btn, label)
             btn.grid(row=0, column=x)
             self.buttons[val] = btn
             if val is current:
@@ -770,7 +801,7 @@ class EnumButton(Generic[EnumT]):
 
 class LineHeader(ttk.Frame):
     """A resizable line, with a title in the middle."""
-    def __init__(self, parent: tk.Misc, title: str) -> None:
+    def __init__(self, parent: tk.Misc, title: TransToken) -> None:
         super().__init__(parent)
         sep_left = ttk.Separator(self)
         sep_left.grid(row=0, column=0, sticky='EW')
@@ -778,11 +809,10 @@ class LineHeader(ttk.Frame):
 
         self.title = ttk.Label(
             self,
-            text=title,
-            width=len(title) + 2,
             font='TkMenuFont',
             anchor='center',
         )
+        localisation.set_text(self.title, title)
         self.title.grid(row=0, column=1)
 
         sep_right = ttk.Separator(self)

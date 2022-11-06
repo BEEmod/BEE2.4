@@ -164,7 +164,7 @@ def res_set_option(res: Property) -> object:
 
 
 @conditions.make_result('styleVar')
-def res_set_style_var(res: Property) -> bool:
+def res_set_style_var(res: Property) -> object:
     """Set Style Vars.
 
     The value should be a set of `SetTrue` and `SetFalse` keyvalues.

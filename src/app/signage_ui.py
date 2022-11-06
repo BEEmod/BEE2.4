@@ -6,10 +6,11 @@ from tkinter import ttk
 
 import srctools.logger
 
-from app import dragdrop, img, tk_tools, TK_ROOT
+from app import dragdrop, img, localisation, tk_tools, TK_ROOT
 from config.signage import DEFAULT_IDS, Layout
 from packages import Signage, Style
-from localisation import gettext
+import packages
+from transtoken import TransToken
 import config
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -24,13 +25,16 @@ SIGN_IND: Sequence[int] = range(3, 31)
 IMG_ERROR = img.Handle.error(64, 64)
 IMG_BLANK = img.Handle.color(img.PETI_ITEM_BG, 64, 64)
 
+TRANS_SIGN_NAME = TransToken.ui('Signage: {name}')
+
 
 def export_data() -> List[Tuple[str, str]]:
     """Returns selected items, for Signage.export() to use."""
+    conf: Layout = config.APP.get_cur_conf(Layout, default=Layout())
     return [
-        (str(ind), slot.contents.id)
-        for ind, slot in SLOTS_SELECTED.items()
-        if slot.contents is not None
+        (str(ind), sign_id)
+        for ind in SIGN_IND
+        if (sign_id := conf.signs.get(ind, '')) != ''
     ]
 
 
@@ -46,7 +50,7 @@ async def apply_config(data: Layout) -> None:
         value = data.signs.get(timer, '')
         if value:
             try:
-                slot.contents = Signage.by_id(value)
+                slot.contents = packages.LOADED.obj_by_id(Signage, value)
             except KeyError:
                 LOGGER.warning('No signage with id "{}"!', value)
         else:
@@ -56,7 +60,7 @@ async def apply_config(data: Layout) -> None:
 def style_changed(new_style: Style) -> None:
     """Update the icons for the selected signage."""
     icon: Optional[img.Handle]
-    for sign in Signage.all():
+    for sign in packages.LOADED.all_obj(Signage):
         for potential_style in new_style.bases:
             try:
                 icon = sign.styles[potential_style.id.upper()].icon
@@ -90,20 +94,11 @@ def style_changed(new_style: Style) -> None:
 async def init_widgets(master: tk.Widget) -> Optional[tk.Widget]:
     """Construct the widgets, returning the configuration button.
     """
-
-    if not any(Signage.all()):
-        # There's no signage, disable the configurator. This will be invisible basically.
-        return ttk.Frame(master)
-
     window.resizable(True, True)
-    window.title(gettext('Configure Signage'))
+    localisation.set_win_title(window, TransToken.ui('Configure Signage'))
 
-    frame_selected = ttk.Labelframe(
-        window,
-        text=gettext('Selected'),
-        relief='raised',
-        labelanchor='n',
-    )
+    frame_selected = ttk.Labelframe(window, relief='raised', labelanchor='n')
+    localisation.set_text(frame_selected, TransToken.ui('Selected'))
 
     canv_all = tk.Canvas(window)
 
@@ -131,13 +126,9 @@ async def init_widgets(master: tk.Widget) -> Optional[tk.Widget]:
     preview_left.grid(row=0, column=0)
     preview_right.grid(row=0, column=1)
 
-    try:
-        sign_arrow = Signage.by_id('SIGN_ARROW')
-    except KeyError:
-        LOGGER.warning('No arrow signage defined!')
-        sign_arrow = None
-
-    hover_scope: Optional[trio.CancelScope] = None
+    # Dummy initial parameter, will be overwritten. Allows us to stop the display when the mouse
+    # leaves.
+    hover_scope = trio.CancelScope()
 
     async def on_hover(hovered: dragdrop.Slot[Signage]) -> None:
         """Show the signage when hovered, then toggle."""
@@ -146,19 +137,22 @@ async def init_widgets(master: tk.Widget) -> Optional[tk.Widget]:
         if hover_sign is None:
             await on_leave(hovered)
             return
-        if hover_scope is not None:
-            hover_scope.cancel()
+        hover_scope.cancel()
 
-        name_label['text'] = gettext('Signage: {}').format(hover_sign.name)
+        localisation.set_text(name_label, TRANS_SIGN_NAME.format(name=hover_sign.name))
 
         sng_left = hover_sign.dnd_icon
-        sng_right = sign_arrow.dnd_icon if sign_arrow is not None else IMG_BLANK
         try:
-            dbl_left = Signage.by_id(hover_sign.prim_id or '').dnd_icon
+            sng_right = packages.LOADED.obj_by_id(Signage, 'SIGN_ARROW').dnd_icon
+        except KeyError:
+            LOGGER.warning('No arrow signage defined!')
+            sng_right = IMG_BLANK
+        try:
+            dbl_left = packages.LOADED.obj_by_id(Signage, hover_sign.prim_id or '').dnd_icon
         except KeyError:
             dbl_left = hover_sign.dnd_icon
         try:
-            dbl_right = Signage.by_id(hover_sign.sec_id or '').dnd_icon
+            dbl_right = packages.LOADED.obj_by_id(Signage, hover_sign.sec_id or '').dnd_icon
         except KeyError:
             dbl_right = IMG_BLANK
 
@@ -175,9 +169,7 @@ async def init_widgets(master: tk.Widget) -> Optional[tk.Widget]:
         """Reset the visible sign when left."""
         nonlocal hover_scope
         name_label['text'] = ''
-        if hover_scope is not None:
-            hover_scope.cancel()
-            hover_scope = None
+        hover_scope.cancel()
         img.apply(preview_left, IMG_BLANK)
         img.apply(preview_right, IMG_BLANK)
 
@@ -195,10 +187,11 @@ async def init_widgets(master: tk.Widget) -> Optional[tk.Widget]:
         prev_id = DEFAULT_IDS.get(i, '')
         if prev_id:
             try:
-                slot.contents = Signage.by_id(prev_id)
+                slot.contents = packages.LOADED.obj_by_id(Signage, prev_id)
             except KeyError:
                 LOGGER.warning('Missing sign id: {}', prev_id)
 
+    # TODO: Dynamically refresh this.
     for sign in sorted(Signage.all(), key=lambda s: s.name):
         if not sign.hidden:
             slot = drag_man.slot_source(canv_all)
@@ -227,8 +220,7 @@ async def init_widgets(master: tk.Widget) -> Optional[tk.Widget]:
 
     window.protocol("WM_DELETE_WINDOW", hide_window)
     await config.APP.set_and_run_ui_callback(Layout, apply_config)
-    return ttk.Button(
-        master,
-        text=gettext('Configure Signage'),
-        command=show_window,
-    )
+
+    show_btn = ttk.Button(master, command=show_window)
+    localisation.set_text(show_btn, TransToken.ui('Configure Signage'))
+    return show_btn

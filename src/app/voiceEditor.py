@@ -9,13 +9,15 @@ from tkinter import *
 from tkinter import font
 from tkinter import ttk
 
-from app import img, TK_ROOT
-import srctools.logger
-from app import tk_tools
-from localisation import gettext
-from BEE2_config import ConfigFile
-from app.tooltip import add_tooltip
 from srctools import Property
+import srctools.logger
+
+from BEE2_config import ConfigFile
+from packages import QuotePack
+from transtoken import TransToken
+from app.tooltip import add_tooltip
+from app import img, TK_ROOT, localisation
+from app import tk_tools
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -29,28 +31,33 @@ QUOTE_FONT = font.nametofont('TkHeadingFont').copy()
 QUOTE_FONT['weight'] = 'bold'
 
 
-IMG: Dict[str, Tuple[img.Handle, str]] = {
+IMG: Dict[str, Tuple[img.Handle, TransToken]] = {
     spr: (img.Handle.builtin('icons/quote_' + spr), ctx)
     for spr, ctx in [
-        ('sp', gettext('Singleplayer')),
-        ('coop', gettext('Cooperative')),
-        ('atlas', gettext('ATLAS (SP/Coop)')),
-        ('pbody', gettext('P-Body (SP/Coop)')),
-        ('bendy', gettext('Bendy')),
-        ('chell', gettext('Chell')),
-        ('human', gettext('Human characters (Bendy and Chell)')),
-        ('robot', gettext('AI characters (ATLAS, P-Body, or Coop)')),
+        ('sp', TransToken.ui('Singleplayer')),
+        ('coop', TransToken.ui('Cooperative')),
+        ('atlas', TransToken.ui('ATLAS (SP/Coop)')),
+        ('pbody', TransToken.ui('P-Body (SP/Coop)')),
+        ('bendy', TransToken.ui('Bendy')),
+        ('chell', TransToken.ui('Chell')),
+        ('human', TransToken.ui('Human characters (Bendy and Chell)')),
+        ('robot', TransToken.ui('AI characters (ATLAS, P-Body, or Coop)')),
     ]
 }
 
 
-# Friendly names given to certain response channels.
 RESPONSE_NAMES = {
-    'death_goo': gettext('Death - Toxic Goo'),
-    'death_turret': gettext('Death - Turrets'),
-    'death_crush': gettext('Death - Crusher'),
-    'death_laserfield': gettext('Death - LaserField'),
+    'death_generic': TransToken.ui('Death - Generic'),
+    'death_goo': TransToken.ui('Death - Toxic Goo'),
+    'death_turret': TransToken.ui('Death - Turrets'),
+    'death_crush': TransToken.ui('Death - Crusher'),
+    'death_laserfield': TransToken.ui('Death - LaserField'),
+
+    # TODO: Fill in the other "animations" for these.
+    'taunt_generic': TransToken.ui('Taunts - Generic'),
+    'camera_generic': TransToken.ui('Camera Gesture - Generic'),
 }
+TRANS_NO_NAME = TransToken.ui('No Name!')
 
 config: Optional[ConfigFile] = None
 config_mid: Optional[ConfigFile] = None
@@ -100,14 +107,7 @@ def init_widgets():
     trans_frame.rowconfigure(1, weight=1)
     trans_frame.columnconfigure(0, weight=1)
 
-    ttk.Label(
-        trans_frame,
-        text=gettext('Transcript:'),
-        ).grid(
-            row=0,
-            column=0,
-            sticky=W,
-            )
+    localisation.set_text(ttk.Label(trans_frame), TransToken.ui('Transcript:')).grid(row=0, column=0, sticky=W)
 
     trans_inner_frame = ttk.Frame(trans_frame, borderwidth=2, relief='sunken')
     trans_inner_frame.grid(row=1, column=0, sticky='NSEW')
@@ -139,11 +139,7 @@ def init_widgets():
     UI['trans_scroll'].grid(row=0, column=1, sticky='NS')
     UI['trans'].grid(row=0, column=0, sticky='NSEW')
 
-    ttk.Button(
-        win,
-        text=gettext('Save'),
-        command=save,
-        ).grid(row=2, column=0)
+    localisation.set_text(ttk.Button(win, command=save), TransToken.ui('Save')).grid(row=2, column=0)
 
     # Don't allow resizing the transcript box to be smaller than the
     # original size.
@@ -151,7 +147,7 @@ def init_widgets():
     pane.paneconfigure(trans_frame, minsize=trans_frame.winfo_reqheight())
 
 
-def quote_sort_func(quote):
+def quote_sort_func(quote: Property) -> Decimal:
     """The quotes will be sorted by their priority value."""
     # Use Decimal so any number of decimal points can be used.
     try:
@@ -160,7 +156,7 @@ def quote_sort_func(quote):
         return Decimal('0')
 
 
-def show_trans(e):
+def show_trans(e) -> None:
     """Add the transcript to the list."""
     text = UI['trans']
     text['state'] = 'normal'
@@ -190,7 +186,7 @@ def save():
         win.withdraw()
 
 
-def add_tabs():
+def add_tabs() -> None:
     """Add the tabs to the notebook."""
     notebook = UI['tabs']
     # Save the current tab index so we can restore it after.
@@ -215,17 +211,17 @@ def add_tabs():
                 tab,
                 compound=RIGHT,
                 image=img.Handle.builtin('icons/resp_quote', 16, 16),
-                #Note: 'response' tab name, should be short.
-                text=gettext('Resp')
-                )
+                # i18n: 'response' tab name, should be short.
+                text=str(TransToken.ui('Resp')),
+            )
         else:
-            notebook.tab(tab, text=tab.nb_text)
+            notebook.tab(tab, text=str(tab.nb_text))
 
     if current_tab is not None:
         notebook.select(current_tab)
 
 
-def show(quote_pack):
+def show(quote_pack: QuotePack):
     """Display the editing window."""
     global voice_item, config, config_mid, config_resp
     if voice_item is not None:
@@ -233,7 +229,9 @@ def show(quote_pack):
 
     voice_item = quote_pack
 
-    win.title(gettext('BEE2 - Configure "{}"').format(voice_item.selitem_data.name))
+    localisation.set_win_title(win, TransToken.ui(
+        'BEE2 - Configure "{item}"',
+    ).format(item=voice_item.selitem_data.name))
     win.grab_set()
     notebook = UI['tabs']
 
@@ -261,6 +259,7 @@ def show(quote_pack):
 
     for group in quote_data.find_all('quotes', 'group'):
         make_tab(
+            quote_pack.pak_id,
             group,
             config,
             TabTypes.NORM
@@ -276,6 +275,7 @@ def show(quote_pack):
 
     if len(mid_quotes):
         make_tab(
+            quote_pack.pak_id,
             mid_quotes,
             config_mid,
             TabTypes.MIDCHAMBER,
@@ -290,6 +290,7 @@ def show(quote_pack):
 
     if len(responses):
         make_tab(
+            quote_pack.pak_id,
             responses,
             config_resp,
             TabTypes.RESPONSE,
@@ -306,27 +307,30 @@ def show(quote_pack):
     win.lift()
 
 
-def make_tab(group, config: ConfigFile, tab_type):
+def make_tab(pak_id: str, group: Property, config: ConfigFile, tab_type: TabTypes) -> None:
     """Create all the widgets for a tab."""
     if tab_type is TabTypes.MIDCHAMBER:
         # Mid-chamber voice lines have predefined values.
-        group_name = gettext('Mid - Chamber')
+        group_name = TransToken.ui('Mid - Chamber')
         group_id = 'MIDCHAMBER'
-        group_desc = gettext(
+        group_desc = TransToken.ui(
             'Lines played during the actual chamber, '
             'after specific events have occurred.'
         )
     elif tab_type is TabTypes.RESPONSE:
         # Note: 'Response' tab header, and description
-        group_name = gettext('Responses')
+        group_name = TransToken.ui('Responses')
         group_id = None
-        group_desc = gettext(
+        group_desc = TransToken.ui(
             'Lines played in response to certain events in Coop.'
         )
     elif tab_type is TabTypes.NORM:
-        group_name = group['name', 'No Name!']
-        group_id = group_name.upper()
-        group_desc = group['desc', ''] + ':'
+        try:
+            group_name = TransToken.parse(pak_id, group['name'])
+        except LookupError:
+            group_name = TransToken.ui('No Name!')
+        group_id = group_name.token.upper()
+        group_desc = TransToken.parse(pak_id, group['desc', ''])
     else:
         raise ValueError('Invalid tab type!')
 
@@ -335,7 +339,7 @@ def make_tab(group, config: ConfigFile, tab_type):
     outer_frame.columnconfigure(0, weight=1)
     outer_frame.rowconfigure(0, weight=1)
 
-    TABS[group_name] = outer_frame
+    TABS[group_name.token] = outer_frame
     # We add this attribute so the refresh() method knows all the
     # tab names
     outer_frame.nb_text = group_name
@@ -364,25 +368,12 @@ def make_tab(group, config: ConfigFile, tab_type):
     frame.columnconfigure(0, weight=1)
     canv.create_window(0, 0, window=frame, anchor="nw")
 
-    ttk.Label(
-        frame,
-        text=group_name,
-        anchor='center',
-        font='tkHeadingFont',
-        ).grid(
-            row=0,
-            column=0,
-            sticky='EW',
-            )
+    localisation.set_text(
+        ttk.Label(frame, anchor='center', font='tkHeadingFont'),
+        group_name,
+    ).grid(row=0,column=0, sticky='EW')
 
-    ttk.Label(
-        frame,
-        text=group_desc,
-        ).grid(
-            row=1,
-            column=0,
-            sticky='EW',
-            )
+    localisation.set_text(ttk.Label(frame), group_desc).grid(row=1, column=0, sticky='EW')
 
     ttk.Separator(frame, orient=HORIZONTAL).grid(
         row=2,
@@ -402,32 +393,26 @@ def make_tab(group, config: ConfigFile, tab_type):
             reverse=True,
         )
 
-    for quote in sorted_quotes:  # type: Property
+    for quote in sorted_quotes:
         if not quote.has_children():
-            continue # Skip over config commands..
+            continue  # Skip over config commands..
 
         if tab_type is TabTypes.RESPONSE:
             try:
                 name = RESPONSE_NAMES[quote.name]
             except KeyError:
-                # Convert channels of the form 'death_goo' into 'Death - Goo'.
-                channel, ch_arg = quote.name.split('_', 1)
-                name = channel.title() + ' - ' + ch_arg.title()
-                del channel, ch_arg
+                LOGGER.warning('No name for response: "{}"', quote.real_name)
+                name = TransToken.untranslated(quote.real_name)
 
             group_id = quote.name
         else:
             # note: default for quote names
-            name = quote['name', gettext('No Name!')]
+            try:
+                name = TransToken.parse(pak_id, quote['name'])
+            except LookupError:
+                name = TRANS_NO_NAME
 
-        ttk.Label(
-            frame,
-            text=name,
-            font=QUOTE_FONT,
-        ).grid(
-            column=0,
-            sticky=W,
-        )
+        localisation.set_text(ttk.Label(frame, font=QUOTE_FONT), name).grid(column=0, sticky=W)
 
         if tab_type is TabTypes.RESPONSE:
             line_iter = find_resp_lines(quote)
@@ -451,11 +436,11 @@ def make_tab(group, config: ConfigFile, tab_type):
 
             line_frame.columnconfigure(len(badges), weight=1)
 
-            check = ttk.Checkbutton(
-                line_frame,
-                # note: default voice line name next to checkbox.
-                text=line['name', gettext('No Name?')],
-            )
+            check = ttk.Checkbutton(line_frame)
+            try:
+                check['text'] = line['name']
+            except LookupError:
+                localisation.set_text(check, TRANS_NO_NAME)
 
             check.quote_var = IntVar(
                 value=config.get_bool(group_id, line_id, True),
@@ -476,7 +461,7 @@ def make_tab(group, config: ConfigFile, tab_type):
             )
             check.bind("<Enter>", show_trans)
 
-    def configure_canv(e):
+    def configure_canv(e) -> None:
         """Allow resizing the windows."""
         canv['scrollregion'] = (
             4,
@@ -488,11 +473,9 @@ def make_tab(group, config: ConfigFile, tab_type):
 
     canv.bind('<Configure>', configure_canv)
 
-    return outer_frame
-
 
 def find_lines(quote_block: Property) -> Iterator[Tuple[
-    List[Tuple[img.Handle, str]],
+    List[Tuple[img.Handle, TransToken]],
     Property,
     str,
 ]]:
@@ -522,7 +505,7 @@ def find_lines(quote_block: Property) -> Iterator[Tuple[
 
 
 def find_resp_lines(quote_block: Property) -> Iterator[Tuple[
-    List[Tuple[img.Handle, str]],
+    List[Tuple[img.Handle, TransToken]],
     Property,
     str,
 ]]:

@@ -1,6 +1,8 @@
 """Backup and restore P2C maps.
 
 """
+from tkinter import filedialog, ttk
+import tkinter as tk
 import atexit
 import os
 import shutil
@@ -8,20 +10,18 @@ import string
 import time
 from datetime import datetime
 from io import BytesIO, TextIOWrapper
-from typing import List, TYPE_CHECKING, Dict, Any, Optional
+from typing import List, TYPE_CHECKING, Dict, Any, Optional, cast
 from zipfile import ZipFile, ZIP_LZMA
 
 import loadScreen
 import srctools.logger
 from app import tk_tools, img, TK_ROOT
-import tkinter as tk
 import utils
 from app.CheckDetails import CheckDetails, Item as CheckItem
 from FakeZip import FakeZip, zip_names, zip_open_bin
 from srctools import Property, KeyValError
-from tkinter import filedialog, messagebox, ttk
 from app.tooltip import add_tooltip
-from localisation import gettext, ngettext
+from app.localisation import TransToken, set_text, set_menu_text, set_win_title
 if TYPE_CHECKING:
     from app import gameMan
 
@@ -42,7 +42,25 @@ BACKUP_CHARS = set(string.ascii_letters + string.digits + '_-.')
 # Format for the backup filename
 AUTO_BACKUP_FILE = 'back_{game}{ind}.zip'
 
-HEADERS = ['Name', 'Mode', 'Date']
+HEADERS = [TransToken.ui('Name'), TransToken.ui('Mode'), TransToken.ui('Date')]
+
+TRANS_SP = TransToken.ui('SP')
+TRANS_COOP = TransToken.ui('Coop')
+TRANS_DELETE_DESC = TransToken.ui_plural(
+    'Do you wish to delete {n} map?\n{maps}',
+    'Do you wish to delete {n} maps?\n{maps}',
+)
+TRANS_OVERWRITE_GAME = TransToken.ui(
+    'This map is already in the game directory. Do you wish to overwrite it? ({mapname})'
+)
+TRANS_OVERWRITE_BACKUP = TransToken.ui(
+    'This filename is already in the backup. Do you wish to overwrite it? ({mapname})'
+)
+TRANS_OVERWRITE_TITLE = TransToken.ui('Overwrite File?')
+TRANS_FAIL_PARSE = TransToken.ui('Failed to parse this puzzle file. It can still be backed up.')
+TRANS_NO_DESC = TransToken.ui('No description found.')
+TRANS_UNSAVED = TransToken.ui('Unsaved Backup')
+TRANS_FILETYPE = TransToken.ui('Backup ZIP archive')
 
 # The game subfolder where puzzles are located
 PUZZLE_FOLDERS = {
@@ -74,18 +92,18 @@ game_name = tk.StringVar()
 
 # Loadscreens used as basic progress bars
 copy_loader = loadScreen.LoadScreen(
-    ('COPY', ''),
-    title_text=gettext('Copying maps'),
+    ('COPY', TransToken.BLANK),
+    title_text=TransToken.ui('Copying maps'),
 )
 
 reading_loader = loadScreen.LoadScreen(
-    ('READ', ''),
-    title_text=gettext('Loading maps'),
+    ('READ', TransToken.BLANK),
+    title_text=TransToken.ui('Loading maps'),
 )
 
 deleting_loader = loadScreen.LoadScreen(
-    ('DELETE', ''),
-    title_text=gettext('Deleting maps'),
+    ('DELETE', TransToken.BLANK),
+    title_text=TransToken.ui('Deleting maps'),
 )
 
 
@@ -95,10 +113,10 @@ class P2C:
         self,
         filename,
         zip_file,
-        create_time,
-        mod_time,
+        create_time: 'Date',
+        mod_time: 'Date',
         title='<untitled>',
-        desc='',
+        desc: TransToken = TRANS_NO_DESC,
         is_coop=False,
     ) -> None:
         self.filename = filename
@@ -132,15 +150,18 @@ class P2C:
                     props = Property.parse(textfile, path)
         except KeyValError:
             # Silently fail if we can't parse the file. That way it's still
-            # possible to backup.
+            # possible to back up.
             LOGGER.warning('Failed parsing puzzle file!', path, exc_info=True)
             props = Property('portal2_puzzle', [])
             title = None
-            desc = gettext('Failed to parse this puzzle file. It can still be backed up.')
+            desc = TRANS_FAIL_PARSE
         else:
             props = props.find_key('portal2_puzzle', or_blank=True)
             title = props['title', None]
-            desc = props['description', gettext('No description found.')]
+            try:
+                desc = TransToken.untranslated(props['description'])
+            except LookupError:
+                desc = TRANS_NO_DESC
 
         if title is None:
             title = '<' + path.rsplit('/', 1)[-1] + '.p2c>'
@@ -170,9 +191,9 @@ class P2C:
     def make_item(self) -> CheckItem['P2C']:
         """Make a corresponding CheckItem object."""
         return CheckItem(
-            self.title,
-            (gettext('Coop') if self.is_coop else gettext('SP')),
-            self.mod_time,
+            TransToken.untranslated(self.title),
+            TRANS_COOP if self.is_coop else TRANS_SP,
+            TransToken.untranslated(str(self.mod_time)),
             hover_text=self.desc,
             user=self,
         )
@@ -330,18 +351,12 @@ def backup_maps(maps: List[P2C]) -> None:
     for p2c in maps:
         scr_path = p2c.filename + '.jpg'
         map_path = p2c.filename + '.p2c'
-        if (
-                map_path in zip_names(back_zip) or
-                scr_path in zip_names(back_zip)
-                ):
-            if not messagebox.askyesno(
-                    title='Overwrite File?',
-                    message=gettext('This filename is already in the backup.'
-                              'Do you wish to overwrite it? '
-                              '({})').format(p2c.title),
-                    parent=window,
-                    icon=messagebox.QUESTION,
-                    ):
+        if map_path in zip_names(back_zip) or scr_path in zip_names(back_zip):
+            if not tk_tools.askyesno(
+                title=TRANS_OVERWRITE_TITLE,
+                message=TRANS_OVERWRITE_BACKUP.format(mapname=p2c.title),
+                parent=window,
+            ):
                 continue
         new_item = p2c.copy()
         map_dict[p2c.filename] = new_item
@@ -437,10 +452,7 @@ def save_backup() -> None:
     ]
 
     if not maps:
-        messagebox.showerror(
-            gettext('BEE2 Backup'),
-            gettext('No maps were chosen to backup!'),
-        )
+        tk_tools.showerror(TransToken.ui('BEE2 Backup'), TransToken.ui('No maps were chosen to backup!'))
         return
 
     copy_loader.set_length('COPY', len(maps))
@@ -493,21 +505,14 @@ def restore_maps(maps: List[P2C]) -> None:
             map_path = p2c.filename + '.p2c'
             abs_scr = os.path.join(game_dir, scr_path)
             abs_map = os.path.join(game_dir, map_path)
-            if (
-                    os.path.isfile(abs_scr) or
-                    os.path.isfile(abs_map)
-                    ):
-                if not messagebox.askyesno(
-                        title='Overwrite File?',
-                        message=gettext('This map is already in the game directory.'
-                                  'Do you wish to overwrite it? '
-                                  '({})').format(p2c.title),
-                        parent=window,
-                        icon=messagebox.QUESTION,
-                        ):
+            if os.path.isfile(abs_scr) or os.path.isfile(abs_map):
+                if not tk_tools.askyesno(
+                    title=TRANS_OVERWRITE_TITLE,
+                    message=TRANS_OVERWRITE_GAME.format(mapname=p2c.title),
+                    parent=window,
+                ):
                     copy_loader.step('COPY')
                     continue
-
             if scr_path in zip_names(back_zip):
                     with zip_open_bin(back_zip, scr_path) as src:
                         with open(abs_scr, 'wb') as dest:
@@ -561,8 +566,8 @@ def show_window() -> None:
 def ui_load_backup() -> None:
     """Prompt and load in a backup file."""
     file = filedialog.askopenfilename(
-        title=gettext('Load Backup'),
-        filetypes=[(gettext('Backup zip'), '.zip')],
+        title=str(TransToken.ui('Load Backup')),
+        filetypes=[(str(TRANS_FILETYPE), '.zip')],
     )
     if not file:
         return
@@ -595,7 +600,7 @@ def ui_new_backup() -> None:
     BACKUPS['back'].clear()
     BACKUPS['backup_name'] = None
     BACKUPS['backup_path'] = None
-    backup_name.set(gettext('Unsaved Backup'))
+    backup_name.set(str(TRANS_UNSAVED))
     BACKUPS['unsaved_file'] = unsaved = BytesIO()
     BACKUPS['backup_zip'] = ZipFile(
         unsaved,
@@ -620,8 +625,8 @@ def ui_save_backup() -> None:
 def ui_save_backup_as() -> None:
     """Prompt for a name, and then save a backup."""
     path = filedialog.asksaveasfilename(
-        title=gettext('Save Backup As'),
-        filetypes=[(gettext('Backup zip'), '.zip')],
+        title=str(TransToken.ui('Save Backup As')),
+        filetypes=[(str(TRANS_FILETYPE), '.zip')],
     )
     if not path:
         return
@@ -713,18 +718,10 @@ def ui_delete_game() -> None:
 
     if not to_delete:
         return
-    map_count = len(to_delete)
-    if not messagebox.askyesno(
-        gettext('Confirm Deletion'),
-        ngettext(
-            'Do you wish to delete {} map?\n',
-            'Do you wish to delete {} maps?\n',
-            map_count,
-        ).format(map_count) + '\n'.join([
-            '{} ({})'.format(map.title, map.filename)
-            for map in to_delete
-        ])
-    ):
+    if not tk_tools.askyesno(TransToken.ui('Confirm Deletion'), TRANS_DELETE_DESC.format(
+        n=len(to_delete),
+        maps='\n'.join([f'- "{p2c.title}" ({p2c.filename}.p2c)' for p2c in to_delete]),
+    )):
         return
 
     deleting_loader.set_length('DELETE', len(to_delete))
@@ -753,9 +750,9 @@ def ui_delete_game() -> None:
 def init() -> None:
     """Initialise all widgets in the given window."""
     for cat, btn_text in [
-            ('back_', gettext('Restore:')),
-            ('game_', gettext('Backup:')),
-            ]:
+        ('back_', TransToken.ui('Restore:')),
+        ('game_', TransToken.ui('Backup:')),
+    ]:
         UI[cat + 'frame'] = frame = ttk.Frame(
             window,
         )
@@ -779,45 +776,31 @@ def init() -> None:
         frame.rowconfigure(1, weight=1)
         frame.columnconfigure(0, weight=1)
 
-        button_frame = ttk.Frame(
-            frame,
-        )
+        button_frame = ttk.Frame(frame)
         button_frame.grid(column=0, row=2)
-        ttk.Label(button_frame, text=btn_text).grid(row=0, column=0)
+        set_text(ttk.Label(button_frame), btn_text).grid(row=0, column=0)
         UI[cat + 'btn_all'] = ttk.Button(
             button_frame,
             text='All',
             width=3,
         )
-        UI[cat + 'btn_sel'] = ttk.Button(
-            button_frame,
-            text=gettext('Checked'),
-            width=8,
-        )
+        UI[cat + 'btn_sel'] = set_text(ttk.Button(button_frame, width=8), TransToken.ui('Checked'))
+
         UI[cat + 'btn_all'].grid(row=0, column=1)
         UI[cat + 'btn_sel'].grid(row=0, column=2)
 
-        UI[cat + 'btn_del'] = ttk.Button(
-            button_frame,
-            text=gettext('Delete Checked'),
-            width=14,
-        )
-        UI[cat + 'btn_del'].grid(row=1, column=0, columnspan=3)
+        UI[cat + 'btn_del'] = btn_del = ttk.Button(button_frame, width=14)
+        set_text(btn_del, TransToken.ui('Delete Checked'))
+        btn_del.grid(row=1, column=0, columnspan=3)
 
-        tk_tools.add_mousewheel(
-            UI[cat + 'details'].wid_canvas,
-            UI[cat + 'frame'],
-        )
+        tk_tools.add_mousewheel(UI[cat + 'details'].wid_canvas, UI[cat + 'frame'])
 
     game_refresh = ttk.Button(
         UI['game_title_frame'],
         command=ui_refresh_game,
     )
     game_refresh.grid(row=0, column=1, sticky='E')
-    add_tooltip(
-        game_refresh,
-        "Reload the map list.",
-    )
+    add_tooltip(game_refresh, TransToken.ui("Reload the map list."))
     img.apply(game_refresh, img.Handle.builtin('icons/tool_sub', 16, 16))
 
     UI['game_title']['textvariable'] = game_name
@@ -847,10 +830,10 @@ def init_application() -> None:
     """Initialise the standalone application."""
     from app import gameMan
     global window
-    window = TK_ROOT
-    TK_ROOT.title(
-        gettext('BEEMOD {} - Backup / Restore Puzzles').format(utils.BEE_VERSION)
-    )
+    window = cast(tk.Toplevel, TK_ROOT)
+    set_win_title(TK_ROOT, TransToken.ui(
+        'BEEMOD {version} - Backup / Restore Puzzles',
+    ).format(version=utils.BEE_VERSION))
 
     init()
 
@@ -861,21 +844,30 @@ def init_application() -> None:
         # Name is used to make this the special 'BEE2' menu item
         file_menu = menus['file'] = tk.Menu(bar, name='apple')
     else:
-        file_menu = menus['file'] = tk.Menu(bar)
-    file_menu.add_command(label=gettext('New Backup'), command=ui_new_backup)
-    file_menu.add_command(label=gettext('Open Backup'), command=ui_load_backup)
-    file_menu.add_command(label=gettext('Save Backup'), command=ui_save_backup)
-    file_menu.add_command(label=gettext('Save Backup As'), command=ui_save_backup_as)
+        file_menu = menus['file'] = tk.Menu(bar, name='file')
 
-    bar.add_cascade(menu=file_menu, label=gettext('File'))
+    file_menu.add_command(command=ui_new_backup)
+    set_menu_text(file_menu, TransToken.ui('New Backup'))
+    file_menu.add_command(command=ui_load_backup)
+    set_menu_text(file_menu, TransToken.ui('Open Backup'))
+    file_menu.add_command(command=ui_save_backup)
+    set_menu_text(file_menu, TransToken.ui('Save Backup'))
+    file_menu.add_command(command=ui_save_backup_as)
+    set_menu_text(file_menu, TransToken.ui('Save Backup As'))
+
+    bar.add_cascade(menu=file_menu)
+    set_menu_text(bar, TransToken.ui('File'))
 
     game_menu = menus['game'] = tk.Menu(bar)
 
-    game_menu.add_command(label=gettext('Add Game'), command=gameMan.add_game)
-    game_menu.add_command(label=gettext('Remove Game'), command=gameMan.remove_game)
+    game_menu.add_command(command=gameMan.add_game)
+    set_menu_text(game_menu, TransToken.ui('Add Game'))
+    game_menu.add_command(command=gameMan.remove_game)
+    set_menu_text(game_menu, TransToken.ui('Remove Game'))
     game_menu.add_separator()
 
-    bar.add_cascade(menu=game_menu, label=gettext('Game'))
+    bar.add_cascade(menu=game_menu)
+    set_menu_text(bar, TransToken.ui('Game'))
     gameMan.game_menu = game_menu
 
     from app import helpMenu
@@ -923,10 +915,10 @@ def init_backup_settings() -> None:
     )
     UI['auto_enable'] = enable_check = ttk.Checkbutton(
         frame,
-        text=gettext('Automatic Backup After Export'),
         variable=check_var,
         command=check_callback,
     )
+    set_text(enable_check, TransToken.ui('Automatic Backup After Export'))
 
     frame['labelwidget'] = enable_check
     frame.grid(row=2, column=0, columnspan=3)
@@ -953,10 +945,7 @@ def init_backup_settings() -> None:
         frame,
     )
     count_frame.grid(row=0, column=1)
-    ttk.Label(
-        count_frame,
-        text=gettext('Keep (Per Game):'),
-    ).grid(row=0, column=0)
+    set_text(ttk.Label(count_frame), TransToken.ui('Keep (Per Game):')).grid(row=0, column=0)
 
     count = tk_tools.ttk_Spinbox(
         count_frame,
@@ -973,49 +962,39 @@ def init_toplevel() -> None:
     window = tk.Toplevel(TK_ROOT)
     window.transient(TK_ROOT)
     window.withdraw()
-    window.title(gettext('Backup/Restore Puzzles'))
+    set_win_title(window, TransToken.ui('Backup/Restore Puzzles'))
 
-    def quit_command():
+    def quit_command() -> None:
+        """Close the window."""
         from BEE2_config import GEN_OPTS
         window.withdraw()
         GEN_OPTS.save_check()
 
-    # Don't destroy window when quit!
     window.protocol("WM_DELETE_WINDOW", quit_command)
 
     init()
     init_backup_settings()
 
     # When embedded in the BEE2, use regular buttons and a dropdown!
-    toolbar_frame = ttk.Frame(
-        window,
-    )
-    ttk.Button(
-        toolbar_frame,
-        text=gettext('New Backup'),
-        command=ui_new_backup,
-        width=14,
+    toolbar_frame = ttk.Frame(window)
+    set_text(
+        ttk.Button(toolbar_frame, command=ui_new_backup),
+        TransToken.ui('New Backup'),
     ).grid(row=0, column=0)
 
-    ttk.Button(
-        toolbar_frame,
-        text=gettext('Open Backup'),
-        command=ui_load_backup,
-        width=13,
+    set_text(
+        ttk.Button(toolbar_frame, command=ui_load_backup),
+        TransToken.ui('Open Backup'),
     ).grid(row=0, column=1)
 
-    ttk.Button(
-        toolbar_frame,
-        text=gettext('Save Backup'),
-        command=ui_save_backup,
-        width=11,
+    set_text(
+        ttk.Button(toolbar_frame, command=ui_save_backup),
+        TransToken.ui('Save Backup'),
     ).grid(row=0, column=2)
 
-    ttk.Button(
-        toolbar_frame,
-        text='.. As',
-        command=ui_save_backup_as,
-        width=5,
+    set_text(
+        ttk.Button(toolbar_frame, command=ui_save_backup_as),
+        TransToken.ui('.. As'),
     ).grid(row=0, column=3)
 
     toolbar_frame.grid(row=0, column=0, columnspan=3, sticky='W')

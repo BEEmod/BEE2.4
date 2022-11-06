@@ -9,15 +9,12 @@ The destination will be 'Portal 2/bee2_dev/' if that exists, or 'Portal 2/bee2/'
 otherwise.
 """
 import utils
-import gettext
 import srctools.logger
 
 utils.fix_cur_directory()
 # Don't write to a log file, users of this should be able to handle a command
 # prompt.
 LOGGER = srctools.logger.init_logging(main_logger=__name__)
-# This is needed to allow us to import things properly.
-gettext.NullTranslations().install(['gettext', 'ngettext'])
 
 import os
 import sys
@@ -26,8 +23,8 @@ import shutil
 from pathlib import Path
 from typing import List, Optional
 
+from srctools import AtomicWriter
 from srctools.filesys import RawFileSystem
-import atomicwrites
 import trio
 
 from BEE2_config import GEN_OPTS, get_package_locs
@@ -87,7 +84,7 @@ def get_package(file: Path) -> RawFileSystem:
         except KeyError:
             continue
         if isinstance(fsys, RawFileSystem):
-            with atomicwrites.atomic_write(CONF, overwrite=True) as f:
+            with AtomicWriter(CONF) as f:
                 f.write(pack_id + '\n')
             return fsys
         else:

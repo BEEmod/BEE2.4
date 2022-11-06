@@ -3,15 +3,19 @@ from typing import Iterable, Optional, Callable, List, Tuple, Dict, Set, Iterato
 from typing_extensions import TypeAlias
 from tkinter import ttk
 import tkinter as tk
+import itertools
 
 from srctools import EmptyMapping, Property, Vec, logger
 import trio
 import attrs
 
-from app import TK_ROOT, UI, background_run, signage_ui, tkMarkdown, sound, tk_tools, StyleVarPane
+from app import (
+    TK_ROOT, UI, background_run, localisation, signage_ui, tkMarkdown, sound, tk_tools,
+    StyleVarPane,
+)
 from app.tooltip import add_tooltip
 from config.widgets import WidgetConfig
-from localisation import gettext
+from app.localisation import TransToken, TransTokenSource
 import BEE2_config
 import config
 import utils
@@ -48,8 +52,14 @@ CONFIG = BEE2_config.ConfigFile('item_cust_configs.cfg')
 TIMER_NUM = list(map(str, range(3, 31)))
 TIMER_NUM_INF = ['inf', *TIMER_NUM]
 
-INF = '∞'
-
+INF = TransToken.untranslated('∞')
+# This is mainly a cache to save creating a bunch of copies of these tokens.
+TIMER_NUM_TRANS = {
+    num: TransToken.untranslated(num)
+    for num in TIMER_NUM
+}
+TIMER_NUM_TRANS['inf'] = INF
+TRANS_COLON = TransToken.untranslated('{text}: ')
 # For the item-variant widget, we need to refresh on style changes.
 ITEM_VARIANT_LOAD: List[Tuple[str, Callable[[], object]]] = []
 
@@ -80,8 +90,8 @@ class Widget:
     """Common logic for both kinds of widget that can appear on a ConfigGroup."""
     group_id: str
     id: str
-    name: str
-    tooltip: str
+    name: TransToken
+    tooltip: TransToken
     config: Property
     create_func: SingleCreateFunc
 
@@ -169,7 +179,7 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
     def __init__(
         self,
         conf_id: str,
-        group_name: str,
+        group_name: TransToken,
         desc,
         widgets: List[SingleWidget],
         multi_widgets: List[MultiWidget],
@@ -191,9 +201,9 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
 
         if data.is_override:
             # Override doesn't have a name
-            group_name = ''
+            group_name = TransToken.BLANK
         else:
-            group_name = props['Name']
+            group_name = TransToken.parse(data.pak_id, props['Name'])
 
         desc = packages.desc_parse(props, data.id, data.pak_id)
 
@@ -220,8 +230,11 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
             is_timer = wid.bool('UseTimer')
             use_inf = is_timer and wid.bool('HasInf')
             wid_id = wid['id'].casefold()
-            name = wid['Label', wid_id]
-            tooltip = wid['Tooltip', '']
+            try:
+                name = TransToken.parse(data.pak_id, wid['Label'])
+            except LookupError:
+                name = TransToken.untranslated(wid_id)
+            tooltip = TransToken.parse(data.pak_id, wid['Tooltip', ''])
             default_prop = wid.find_key('Default', '')
             values: list[tuple[str, tk.StringVar]]
 
@@ -309,6 +322,14 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
             multi_widgets,
         )
 
+    def iter_trans_tokens(self) -> Iterator[TransTokenSource]:
+        """Yield translation tokens for this config group."""
+        source = f'configgroup/{self.id}'
+        yield self.name, source + '.name'
+        for widget in itertools.chain(self.widgets, self.multi_widgets):
+            yield widget.name, f'{source}/{widget.id}.name'
+            yield widget.tooltip, f'{source}/{widget.id}.tooltip'
+
     def add_over(self, override: 'ConfigGroup') -> None:
         """Override a ConfigGroup to add additional widgets."""
         # Make sure they don't double-up.
@@ -361,11 +382,15 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
                 label: Optional[ttk.Label] = None
                 if s_wid.name:
                     if getattr(s_wid.create_func, 'wide', False):
-                        wid_frame = ttk.LabelFrame(wid_frame, text=s_wid.name + ': ')
+                        wid_frame = localisation.set_text(
+                            ttk.LabelFrame(wid_frame),
+                            TRANS_COLON.format(text=s_wid.name),
+                        )
                         wid_frame.grid(row=0, column=0, columnspan=2, sticky='ew', pady=5)
                         wid_frame.columnconfigure(0, weight=1)
                     else:
-                        label = ttk.Label(wid_frame, text=s_wid.name + ': ')
+                        label = ttk.Label(wid_frame)
+                        localisation.set_text(label, TRANS_COLON.format(text=s_wid.name))
                         label.grid(row=0, column=0)
                 try:
                     widget, s_wid.ui_cback = await s_wid.create_func(wid_frame, s_wid.value, s_wid.config)
@@ -396,7 +421,10 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
             if widget_count == 1 or not m_wid.name:
                 wid_frame = ttk.Frame(frame)
             else:
-                wid_frame = ttk.LabelFrame(frame, text=m_wid.name)
+                wid_frame = localisation.set_text(
+                    ttk.LabelFrame(frame),
+                    TRANS_COLON.format(text=m_wid.name),
+                )
 
             wid_frame.grid(row=row, column=0, sticky='ew', pady=5)
             assert isinstance(m_wid.values, list)
@@ -421,7 +449,7 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
 
 
 # Special group injected for the stylevar display.
-STYLEVAR_GROUP = ConfigGroup('_STYLEVAR', gettext('Style Properties'), '', [], [])
+STYLEVAR_GROUP = ConfigGroup('_STYLEVAR', TransToken.ui('Style Properties'), '', [], [])
 
 
 async def make_pane(tool_frame: tk.Frame, menu_bar: tk.Menu, update_item_vis: Callable[[], None]) -> None:
@@ -433,7 +461,7 @@ async def make_pane(tool_frame: tk.Frame, menu_bar: tk.Menu, update_item_vis: Ca
 
     window = SubPane(
         TK_ROOT,
-        title=gettext('Style/Item Properties'),
+        title=TransToken.ui('Style/Item Properties'),
         name='item',
         legacy_name='style',
         menu_bar=menu_bar,
@@ -445,17 +473,27 @@ async def make_pane(tool_frame: tk.Frame, menu_bar: tk.Menu, update_item_vis: Ca
 
     ordered_conf: List[ConfigGroup] = sorted(
         packages.LOADED.all_obj(ConfigGroup),
-        key=lambda grp: grp.name,
+        key=lambda grp: str(grp.name),
     )
     ordered_conf.insert(0, STYLEVAR_GROUP)
     selector = ttk.Combobox(
         window,
         exportselection=False,
         state='readonly',
-        values=[grp.name for grp in ordered_conf],
+        values=[str(grp.name) for grp in ordered_conf],
     )
     selector.grid(row=0, column=0, columnspan=2, sticky='ew')
-    selector.set(STYLEVAR_GROUP.name)
+
+    @localisation.add_callback(call=False)
+    def update_selector() -> None:
+        """Update translations in the selector box."""
+        old_sel = ordered_conf[selector.current()]
+        # Stylevar always goes at the start.
+        ordered_conf.sort(key=lambda grp: (0 if grp is STYLEVAR_GROUP else 1, str(grp.name)))
+        selector['values'] = [str(grp.name) for grp in ordered_conf]
+        selector.current(ordered_conf.index(old_sel))
+
+    selector.current(ordered_conf.index(STYLEVAR_GROUP))
 
     # Need to use a canvas to allow scrolling.
     canvas = tk.Canvas(window, highlightthickness=0)
@@ -480,7 +518,8 @@ async def make_pane(tool_frame: tk.Frame, menu_bar: tk.Menu, update_item_vis: Ca
     stylevar_frame = ttk.Frame(canvas_frame)
     await StyleVarPane.make_stylevar_pane(stylevar_frame, packages.LOADED, update_item_vis)
 
-    loading_text = ttk.Label(canvas_frame, text=gettext('Loading...'))
+    loading_text = ttk.Label(canvas_frame)
+    localisation.set_text(loading_text, TransToken.ui('Loading...'))
     loading_text.grid(row=0, column=0, sticky='ew')
     loading_text.grid_forget()
 
@@ -553,20 +592,13 @@ def widget_timer_generic(widget_func: SingleCreateFunc) -> MultiCreateFunc:
     ) -> AsyncIterator[Tuple[str, UpdateFunc]]:
         """Generically make a set of labels."""
         for row, (tim_val, var) in enumerate(values):
-            if tim_val == 'inf':
-                timer_disp = INF
-            else:
-                timer_disp = tim_val
-
+            timer_disp = TIMER_NUM_TRANS[tim_val]
             parent.columnconfigure(1, weight=1)
 
-            label = ttk.Label(parent, text=timer_disp + ':')
+            label = ttk.Label(parent)
+            localisation.set_text(label, TRANS_COLON.format(text=timer_disp))
             label.grid(row=row, column=0)
-            widget, update = await widget_func(
-                parent,
-                var,
-                conf,
-            )
+            widget, update = await widget_func(parent, var, conf)
             yield tim_val, update
             widget.grid(row=row, column=1, sticky='ew')
 
@@ -576,14 +608,14 @@ def widget_timer_generic(widget_func: SingleCreateFunc) -> MultiCreateFunc:
 def multi_grid(
     values: List[Tuple[str, tk.StringVar]],
     columns: int = 10,
-) -> Iterator[Tuple[int, int, str, str, tk.StringVar]]:
+) -> Iterator[Tuple[int, int, str, TransToken, tk.StringVar]]:
     """Generate the row and columns needed for a nice layout of widgets."""
     for tim, var in values:
         if tim == 'inf':
             tim_disp = INF
             index = 0
         else:
-            tim_disp = str(tim)
+            tim_disp = TIMER_NUM_TRANS[tim]
             index = int(tim)
         row, column = divmod(index - 1, columns)
         yield row, column, tim, tim_disp, var
