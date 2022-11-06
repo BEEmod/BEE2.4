@@ -2,27 +2,27 @@
 
 The widgets tokens are applied to are stored, so changing language can update the UI.
 """
+from __future__ import annotations
+from typing import AsyncIterator, Callable, Iterable, Iterator, TypeVar, Union, TYPE_CHECKING
+from typing_extensions import ParamSpec, TypeAlias
+from tkinter import ttk
+import tkinter as tk
 import io
 import os.path
 from pathlib import Path
-from typing import (
-    AsyncIterator, Callable, Dict, Iterable, Iterator, List,
-    TYPE_CHECKING, TypeVar, Union,
-)
-
-from srctools.filesys import RawFileSystem
-from typing_extensions import ParamSpec, Final, TypeAlias
 from weakref import WeakKeyDictionary
 import gettext as gettext_mod
 import locale
 import sys
 
+from srctools.filesys import RawFileSystem
+from srctools import FileSystem, logger
 import trio
 import attrs
-from srctools import FileSystem, logger
 
 from config.gen_opts import GenOptions
 import config
+import packages
 import utils
 
 from transtoken import (
@@ -31,10 +31,8 @@ from transtoken import (
 )
 import transtoken
 
-if TYPE_CHECKING:  # Don't import at runtime, we don't want TK in the compiler.
-    import tkinter as tk
-    from tkinter import ttk
-    import packages
+# Circular import issues.
+if TYPE_CHECKING:
     from app import gameMan
 
 __all__ = [
@@ -53,17 +51,17 @@ BASEMODUI_PATH = 'portal2_dlc2/resource/basemodui_{}.txt'
 
 # Widgets that have a 'text' property.
 TextWidget: TypeAlias = Union[
-    'tk.Label', 'tk.LabelFrame', 'tk.Button', 'tk.Radiobutton', 'tk.Checkbutton',
-    'ttk.Label', 'ttk.LabelFrame', 'ttk.Button', 'ttk.Radiobutton', 'ttk.Checkbutton'
+    tk.Label, tk.LabelFrame, tk.Button, tk.Radiobutton, tk.Checkbutton,
+    ttk.Label, ttk.LabelFrame, ttk.Button, ttk.Radiobutton, ttk.Checkbutton,
 ]
 TextWidgetT = TypeVar('TextWidgetT', bound=TextWidget)
 CBackT = TypeVar('CBackT', bound=Callable[[], object])
 # Assigns to widget['text'].
-_applied_tokens: 'WeakKeyDictionary[TextWidget, TransToken]' = WeakKeyDictionary()
+_applied_tokens: WeakKeyDictionary[TextWidget, TransToken] = WeakKeyDictionary()
 # menu -> index -> token.
-_applied_menu_tokens: 'WeakKeyDictionary[tk.Menu, Dict[int, TransToken]]' = WeakKeyDictionary()
+_applied_menu_tokens: WeakKeyDictionary[tk.Menu, dict[int, TransToken]] = WeakKeyDictionary()
 # For anything else, this is called which will apply tokens.
-_langchange_callback: List[Callable[[], object]] = []
+_langchange_callback: list[Callable[[], object]] = []
 
 FOLDER = utils.install_path('i18n')
 PARSE_CANCEL = trio.CancelScope()
@@ -117,12 +115,12 @@ def set_text(widget: TextWidgetT, token: TransToken) -> TextWidgetT:
     return widget
 
 
-def set_win_title(win: Union['tk.Toplevel', 'tk.Tk'], token: TransToken) -> None:
+def set_win_title(win: tk.Toplevel | tk.Tk, token: TransToken) -> None:
     """Set the title of a window to this token."""
     add_callback(call=True)(lambda: win.title(str(token)))
 
 
-def set_menu_text(menu: 'tk.Menu', token: TransToken, index: Union[str, int] = 'end') -> None:
+def set_menu_text(menu: tk.Menu, token: TransToken, index: str | int = 'end') -> None:
     """Apply this text to the item on the specified menu.
 
     By default, it is applied to the last item.
@@ -156,7 +154,7 @@ def add_callback(*, call: bool) -> Callable[[CBackT], CBackT]:
     return deco
 
 
-def expand_langcode(lang_code: str) -> List[str]:
+def expand_langcode(lang_code: str) -> list[str]:
     """If a language is a lang/country specific code like en_AU, return that and the generic version."""
     expanded = [lang_code.casefold()]
     if '_' in lang_code:
@@ -164,7 +162,7 @@ def expand_langcode(lang_code: str) -> List[str]:
     return expanded
 
 
-def find_basemodui(games: List['gameMan.Game'], langs: List[str]) -> str:
+def find_basemodui(games: list[gameMan.Game], langs: list[str]) -> str:
     """Load basemodui.txt from Portal 2, to provide translations for the default items."""
     # Check Portal 2 first, others might not be fully correct?
     games.sort(key=lambda gm: gm.steamID != '620')
@@ -333,8 +331,8 @@ async def rebuild_app_langs() -> None:
 
 
 async def load_aux_langs(
-    games: Iterable['gameMan.Game'],
-    packset: 'packages.PackagesSet',
+    games: Iterable[gameMan.Game],
+    packset: packages.PackagesSet,
     lang: Language = None,
 ) -> None:
     """Load all our non-UI translation files in the background.
@@ -376,7 +374,7 @@ async def load_aux_langs(
             except OSError:
                 LOGGER.warning('Invalid localisation file {}:{}', pak_id, file.path, exc_info=True)
 
-    async def game_lang(game_it: Iterable['gameMan.Game'], expanded_langs: List[str]) -> None:
+    async def game_lang(game_it: Iterable[gameMan.Game], expanded_langs: list[str]) -> None:
         """Load the game language in the background."""
         basemod_loc = find_basemodui(list(game_it), expanded_langs)
         if not basemod_loc:
@@ -399,7 +397,7 @@ async def load_aux_langs(
     set_language(attrs.evolve(lang, trans=lang_map, game_trans=game_dict))
 
 
-async def get_package_tokens(packset: 'packages.PackagesSet') -> AsyncIterator[TransTokenSource]:
+async def get_package_tokens(packset: packages.PackagesSet) -> AsyncIterator[TransTokenSource]:
     """Get all the tokens from all packages."""
     for pack in packset.packages.values():
         yield pack.disp_name, 'package/name'
@@ -420,14 +418,14 @@ def _get_children(tok: TransToken) -> Iterator[TransToken]:
             yield from _get_children(val)
 
 
-async def rebuild_package_langs(packset: 'packages.PackagesSet') -> None:
+async def rebuild_package_langs(packset: packages.PackagesSet) -> None:
     """Write out POT templates for unzipped packages."""
     from collections import defaultdict
     from babel import messages
     from babel.messages.pofile import read_po, write_po
     from babel.messages.mofile import write_mo
 
-    tok2pack: dict[Union[str, tuple[str, str]], set[str]] = defaultdict(set)
+    tok2pack: dict[str | tuple[str, str], set[str]] = defaultdict(set)
     pack_paths: dict[str, tuple[trio.Path, messages.Catalog]] = {}
 
     for pak_id, pack in packset.packages.items():

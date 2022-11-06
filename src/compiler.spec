@@ -42,8 +42,6 @@ EXCLUDES = [
 
     # Imported in utils, but not required in compiler.
     'bg_daemon',
-    # Imported in localisation, but not required in compiler.
-    'packages', 'tk_tools', 'app',
     # We don't need to actually run versioning at runtime.
     'versioningit',
 ]

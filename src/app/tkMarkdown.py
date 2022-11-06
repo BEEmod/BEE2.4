@@ -17,7 +17,7 @@ import srctools.logger
 
 from app.img import Handle as ImgHandle
 import utils
-from app.localisation import TransToken, TransTokenSource
+from transtoken import TransToken, TransTokenSource
 
 
 LOGGER = srctools.logger.get_logger(__name__)
