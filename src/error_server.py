@@ -25,9 +25,9 @@ import quart
 import trio
 
 import utils
-from user_errors import ErrorInfo, Kind, SimpleTile, DATA_LOC, SERVER_PORT
+from user_errors import ErrorInfo, DATA_LOC, SERVER_PORT, TOK_ERR_FAIL_LOAD, TOK_ERR_MISSING
 
-root_path = utils.install_path('error_display').resolve()
+root_path = utils.install_path('error_display').absolute()
 LOGGER.info('Root path: ', root_path)
 
 app = QuartTrio(
@@ -41,14 +41,18 @@ DELAY = 5 * 60  # After 5 minutes of no response, quit.
 # It starts with an infinite deadline, to ensure there's time to boot the server.
 TIMEOUT_CANCEL = trio.CancelScope(deadline=math.inf)
 
-current_error = ErrorInfo('<strong>No error?</strong>', [], {})
+current_error = ErrorInfo(TOK_ERR_MISSING)
 
 
 @app.route('/')
 async def route_display_errors() -> str:
     """Display the current error."""
     update_deadline()
-    return await quart.render_template('index.html.jinja2', error_text=current_error.message)
+    return await quart.render_template(
+        'index.html.jinja2',
+        error_text=current_error.message,
+        log_context=current_error.context,
+    )
 
 
 @app.route('/displaydata')
@@ -86,6 +90,8 @@ async def route_static_js(filename: str) -> quart.Response:
         directory=app.static_folder,
         file_name=filename + '.js',
         mimetype='text/javascript',
+        # Disable cache. Steam Overlay doesn't easily let you clear cache, and it's local anyway.
+        cache_timeout=1,
     )
 
 
@@ -105,7 +111,7 @@ def load_info() -> None:
             raise ValueError
     except Exception:
         LOGGER.exception('Failed to load pickle!')
-        current_error = ErrorInfo('Failed to load error!', [], {})
+        current_error = ErrorInfo(TOK_ERR_FAIL_LOAD)
     else:
         current_error = data
 

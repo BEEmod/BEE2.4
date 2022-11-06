@@ -52,6 +52,11 @@ window.addEventListener("load", () => {
 	const black_mats = [0, 1, 2].map((i) =>
 		new THREE.MeshToonMaterial({map: loader.load(`static/grid${i}b.png`)})
 	);
+
+	const select_mat = new THREE.MeshToonMaterial({
+		color: 0xFAFA28, transparent: true, opacity: 0.5, side: THREE.DoubleSide,
+	});
+
 	const renderer = new THREE.WebGLRenderer();
 	const controls = new OrbitControls( camera, renderer.domElement );
 
@@ -105,6 +110,14 @@ window.addEventListener("load", () => {
 			// mesh.instanceMatrix.needsUpdate = true;
 			// scene.add(mesh);
 		}
+
+		const point_geo = new THREE.BoxGeometry(0.5, 0.5, 0.5);
+		for(const point of data.points) {
+			const mesh = new THREE.Mesh(point_geo, select_mat);
+			mesh.position.set(point[0], point[2], -point[1]);
+			scene.add(mesh);
+		}
+
 		camera.position.set(-5, 3, 5);
 		controls.update();
 
@@ -121,7 +134,7 @@ window.addEventListener("load", () => {
 		.then((json) => {updateScene(json)})
 		.catch((reason) => {
 			console.error(reason);
-			content_box.append('Could not fetch display!');
+			content_box.innerText = 'Could not fetch display: ' + reason;
 	});
 
 	// Lock the article to use multiples of the tile size.
