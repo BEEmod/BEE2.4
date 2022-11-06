@@ -15,7 +15,7 @@ from srctools.tokenizer import Tokenizer, Token
 from connections import Config as ConnConfig, InputType, OutNames
 from editoritems_props import ItemProp, ItemPropKind, PROP_TYPES
 from collisions import CollideType, BBox, NonBBoxError
-from localisation import TransToken, TransTokenSource
+from transtoken import TransToken, TransTokenSource
 
 
 LOGGER = logger.get_logger(__name__)

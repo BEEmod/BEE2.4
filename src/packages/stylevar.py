@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Iterator
 
-from localisation import TransToken, TransTokenSource
+from transtoken import TransToken, TransTokenSource
 from packages import PakObject, Style, ParseData, ExportData
 from srctools import Property, bool_as_int
 

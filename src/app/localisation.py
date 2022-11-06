@@ -1,17 +1,13 @@
-"""An object-oriented approach to localising text.
+"""Handles parsing language files, and updating UI widgets.
 
-All translations are stored as token objects, which translate when str() is called. They also store
-the widgets they are applied to, so those can be refreshed when swapping languages.
-
-This is also imported in the compiler, so UI imports must be inside functions.
+The widgets tokens are applied to are stored, so changing language can update the UI.
 """
 import io
 import os.path
-import warnings
 from pathlib import Path
 from typing import (
-    AsyncIterator, Callable, ClassVar, Dict, Iterable, Iterator, List, Mapping, Sequence,
-    TYPE_CHECKING, Tuple, TypeVar, Union, cast,
+    AsyncIterator, Callable, Dict, Iterable, Iterator, List,
+    TYPE_CHECKING, TypeVar, Union,
 )
 
 from srctools.filesys import RawFileSystem
@@ -23,12 +19,17 @@ import sys
 
 import trio
 import attrs
-from srctools import EmptyMapping, FileSystem, logger
+from srctools import FileSystem, logger
 
 from config.gen_opts import GenOptions
 import config
 import utils
 
+from transtoken import (
+    NS_UI, PETI_KEY_PREFIX, DUMMY,
+    TransToken, TransTokenSource, PluralTransToken, Language,
+)
+import transtoken
 
 if TYPE_CHECKING:  # Don't import at runtime, we don't want TK in the compiler.
     import tkinter as tk
@@ -38,7 +39,7 @@ if TYPE_CHECKING:  # Don't import at runtime, we don't want TK in the compiler.
 
 __all__ = [
     'TransToken',
-    'set_text', 'set_menu_text', 'set_win_title', 'add_callback',
+    'set_text', 'set_menu_text', 'clear_stored_menu', 'set_win_title', 'add_callback',
     'DUMMY', 'Language', 'set_language', 'load_aux_langs',
     'setup', 'expand_langcode',
     'TransTokenSource', 'rebuild_app_langs', 'rebuild_package_langs',
@@ -47,11 +48,6 @@ __all__ = [
 LOGGER = logger.get_logger(__name__)
 P = ParamSpec('P')
 
-NS_UI: Final = '<BEE2>'  # Our UI translations.
-NS_GAME: Final = '<PORTAL2>'   # Lookup from basemodui.txt
-NS_UNTRANSLATED: Final = '<NOTRANSLATE>'  # Legacy values which don't have translation
-# The prefix for all Valve's editor keys.
-PETI_KEY_PREFIX: Final = 'PORTAL2_PuzzleEditor'
 # Location of basemodui, relative to Portal 2
 BASEMODUI_PATH = 'portal2_dlc2/resource/basemodui_{}.txt'
 
@@ -61,6 +57,7 @@ TextWidget: TypeAlias = Union[
     'ttk.Label', 'ttk.LabelFrame', 'ttk.Button', 'ttk.Radiobutton', 'ttk.Checkbutton'
 ]
 TextWidgetT = TypeVar('TextWidgetT', bound=TextWidget)
+CBackT = TypeVar('CBackT', bound=Callable[[], object])
 # Assigns to widget['text'].
 _applied_tokens: 'WeakKeyDictionary[TextWidget, TransToken]' = WeakKeyDictionary()
 # menu -> index -> token.
@@ -70,24 +67,6 @@ _langchange_callback: List[Callable[[], object]] = []
 
 FOLDER = utils.install_path('i18n')
 PARSE_CANCEL = trio.CancelScope()
-
-
-@attrs.frozen
-class Language:
-    """Wrapper around the GNU translator, storing the filename and display name."""
-    display_name: str
-    lang_code: str
-    _trans: Dict[str, gettext_mod.NullTranslations]
-    # The loaded translations from basemodui.txt
-    game_trans: Mapping[str, str] = EmptyMapping
-
-
-# The current language.
-_CURRENT_LANG = Language(
-    '<None>', 'en', {},
-)
-# Special language which replaces all text with ## to easily identify untranslatable text.
-DUMMY: Final = Language('Dummy', 'dummy', {})
 
 PACKAGE_HEADER = """\
 # Translations template for BEEmod package "PROJECT".
@@ -131,262 +110,6 @@ STEAM_LANGS = {
 }
 
 
-@attrs.frozen(eq=False)
-class TransToken:
-    """A named section of text that can be translated later on."""
-    # The package name, or a NS_* constant.
-    namespace: str
-    # Original package where this was parsed from.
-    orig_pack: str
-    # The token to lookup, or the default if undefined.
-    token: str
-    # Keyword arguments passed when formatting.
-    # If a blank dict is passed, use EmptyMapping to save memory.
-    parameters: Mapping[str, object] = attrs.field(converter=lambda m: m or EmptyMapping)
-
-    BLANK: ClassVar['TransToken']   # Quick access to blank token.
-
-    @classmethod
-    def parse(cls, package: str, text: str) -> 'TransToken':
-        """Parse a string to find a translation token, if any."""
-        orig_pack = package
-        if text.startswith('[['):  # "[[package]] default"
-            try:
-                package, token = text[2:].split(']]', 1)
-                token = token.lstrip()  # Allow whitespace between "]" and text.
-                # Don't allow specifying our special namespaces.
-                if package.startswith('<') or package.endswith('>'):
-                    raise ValueError
-            except ValueError:
-                LOGGER.warning('Unparsable translation token - expected "[[package]] text", got:\n{}', text)
-                return cls(package, orig_pack, text, EmptyMapping)
-            else:
-                if not package:
-                    package = NS_UNTRANSLATED
-                return cls(package, orig_pack, token, EmptyMapping)
-        elif text.startswith(PETI_KEY_PREFIX):
-            return cls(NS_GAME, orig_pack, text, EmptyMapping)
-        else:
-            return cls(package, orig_pack, text, EmptyMapping)
-
-    @classmethod
-    def ui(cls, token: str, /, **kwargs: str) -> 'TransToken':
-        """Make a token for a UI string."""
-        return cls(NS_UI, NS_UI, token, kwargs)
-
-    @staticmethod
-    def ui_plural(singular: str, plural: str,  /, **kwargs: str) -> 'PluralTransToken':
-        """Make a plural token for a UI string."""
-        return PluralTransToken(NS_UI, NS_UI, singular, kwargs, plural)
-
-    def join(self, children: Iterable['TransToken'], sort: bool=False) -> 'JoinTransToken':
-        """Use this as a separator to join other tokens together."""
-        return JoinTransToken(self.namespace, self.orig_pack, self.token, self.parameters, list(children), sort)
-
-    @classmethod
-    def from_valve(cls, text: str) -> 'TransToken':
-        """Make a token for a string that should be looked up in Valve's translation files."""
-        return cls(NS_GAME, NS_GAME, text, EmptyMapping)
-
-    @classmethod
-    def untranslated(cls, text: str) -> 'TransToken':
-        """Make a token that is not actually translated at all.
-
-        In this case, the token is the literal text to use.
-        """
-        return cls(NS_UNTRANSLATED, NS_UNTRANSLATED, text, EmptyMapping)
-
-    @property
-    def is_game(self) -> bool:
-        """Check if this is a token from basemodui."""
-        return self.namespace == NS_GAME
-
-    @property
-    def is_untranslated(self) -> bool:
-        """Check if this is literal text."""
-        return self.namespace == NS_UNTRANSLATED
-
-    @property
-    def is_ui(self) -> bool:
-        """Check if this is builtin UI text."""
-        return self.namespace == NS_UI
-
-    def format(self, /, **kwargs: object) -> 'TransToken':
-        """Return a new token with the provided parameters added in."""
-        return attrs.evolve(self, parameters={**self.parameters, **kwargs})
-
-    def as_game_token(self) -> str:
-        """Return the value which should be written in files read by the game.
-
-        If this is a Valve token, the raw token is returned so the game can do the translation.
-        In all other cases, we do the translation immediately.
-        """
-        if self.namespace == NS_GAME and not self.parameters:
-            return self.token
-        return str(self)
-
-    def __bool__(self) -> bool:
-        """The boolean value of a token is whether the token is entirely blank.
-
-        In that case it's not going to translate to anything.
-        """
-        return self.token != '' and not self.token.isspace()
-
-    def __eq__(self, other) -> bool:
-        if type(other) is TransToken:
-            return (
-                self.namespace == other.namespace and
-                self.token == other.token and
-                self.parameters == other.parameters
-            )
-        return NotImplemented
-
-    def __hash__(self) -> int:
-        """Allow hashing the token."""
-        return hash((
-            self.namespace, self.token,
-            frozenset(self.parameters.items()),
-        ))
-
-    def __str__(self) -> str:
-        """Calling str on a token translates it."""
-        # If in the untranslated namespace or blank, don't translate.
-        if self.namespace == NS_UNTRANSLATED or not self.token:
-            result = self.token
-        elif _CURRENT_LANG is DUMMY:
-            return '#' * len(self.token)
-        elif self.namespace == NS_GAME:
-            try:
-                result = _CURRENT_LANG.game_trans[self.token]
-            except KeyError:
-                result = self.token
-        else:
-            try:
-                # noinspection PyProtectedMember
-                result = _CURRENT_LANG._trans[self.namespace].gettext(self.token)
-            except KeyError:
-                result = self.token
-        if self.parameters:
-            return result.format_map(self.parameters)
-        else:
-            return result
-
-    def apply(self, widget: TextWidgetT) -> TextWidgetT:
-        warnings.warn('Use the function', DeprecationWarning, stacklevel=2)
-        return set_text(widget, self)
-
-    def apply_title(self, win: Union['tk.Toplevel', 'tk.Tk']) -> None:
-        warnings.warn('Use the function', DeprecationWarning, stacklevel=2)
-        set_win_title(win, self)
-
-    def apply_menu(self, menu: 'tk.Menu', index: Union[str, int] = 'end') -> None:
-        warnings.warn('Use the function', DeprecationWarning, stacklevel=2)
-        set_menu_text(menu, self, index)
-
-    @classmethod
-    def clear_stored_menu(cls, menu: 'tk.Menu') -> None:
-        """Clear the tokens for the specified menu."""
-        clear_stored_menu(menu)
-
-    @classmethod
-    def add_callback(cls, func: Callable[[], object], call: bool = True) -> None:
-        add_callback(func, call)
-
-TransToken.BLANK = TransToken.untranslated('')
-
-
-@attrs.frozen(eq=False)
-class PluralTransToken(TransToken):
-    """A pair of tokens, swapped between depending on the number of items.
-
-    It must be formatted with an "n" parameter.
-    """
-    token_plural: str
-
-    ui = ui_plural = untranslated = from_valve = None  # Cannot construct via these.
-
-    def join(self, children: Iterable['TransToken'], sort: bool = False) -> 'JoinTransToken':
-        """Joining is not allowed."""
-        raise NotImplementedError('This is not allowed.')
-
-    def __eq__(self, other) -> bool:
-        if type(other) is PluralTransToken:
-            return (
-                self.namespace == other.namespace and
-                self.token == other.token and
-                self.token_plural == other.token_plural and
-                self.parameters == other.parameters
-            )
-        return NotImplemented
-
-    def __hash__(self) -> int:
-        """Allow hashing the token."""
-        return hash((
-            self.namespace, self.token, self.token_plural,
-            frozenset(self.parameters.items()),
-        ))
-
-    def __str__(self) -> str:
-        """Calling str on a token translates it. Plural tokens require an "n" parameter."""
-        try:
-            n = int(cast(str, self.parameters['n']))
-        except KeyError:
-            raise ValueError('Plural token requires "n" parameter!')
-
-        # If in the untranslated namespace or blank, don't translate.
-        if self.namespace == NS_UNTRANSLATED or not self.token:
-            result = self.token if n == 1 else self.token_plural
-        elif _CURRENT_LANG is DUMMY:
-            return '#' * len(self.token if n == 1 else self.token_plural)
-        elif self.namespace == NS_GAME:
-            raise ValueError('Game namespace cannot be pluralised!')
-        else:
-            try:
-                # noinspection PyProtectedMember
-                result = _CURRENT_LANG._trans[self.namespace].ngettext(self.token, self.token_plural, n)
-            except KeyError:
-                result = self.token
-
-        if self.parameters:
-            return result.format_map(self.parameters)
-        else:
-            return result
-
-
-@attrs.frozen(eq=False)
-class JoinTransToken(TransToken):
-    """A list of tokens which will be joined together to form a list.
-
-    The token is the joining value.
-    """
-    children: Sequence[TransToken]
-    sort: bool
-
-    def __hash__(self) -> int:
-        return hash((self.namespace, self.token, *self.children))
-
-    def __eq__(self, other) -> bool:
-        if type(other) is JoinTransToken:
-            return (
-                self.namespace == other.namespace and
-                self.token == other.token and
-                self.children == other.children
-            )
-        return NotImplemented
-
-    def __str__(self) -> str:
-        """Translate the token."""
-        sep = super().__str__()
-        items = [str(child) for child in self.children]
-        if self.sort:
-            items.sort()
-        return sep.join(items)
-
-
-# Token and "source" string, for updating translation files.
-TransTokenSource = Tuple[TransToken, str]
-
-
 def set_text(widget: TextWidgetT, token: TransToken) -> TextWidgetT:
     """Apply a token to the specified label/button/etc."""
     widget['text'] = str(token)
@@ -396,7 +119,7 @@ def set_text(widget: TextWidgetT, token: TransToken) -> TextWidgetT:
 
 def set_win_title(win: Union['tk.Toplevel', 'tk.Tk'], token: TransToken) -> None:
     """Set the title of a window to this token."""
-    add_callback(lambda: win.title(str(token)))
+    add_callback(call=True)(lambda: win.title(str(token)))
 
 
 def set_menu_text(menu: 'tk.Menu', token: TransToken, index: Union[str, int] = 'end') -> None:
@@ -418,15 +141,19 @@ def clear_stored_menu(menu: 'tk.Menu') -> None:
     _applied_menu_tokens.pop(menu, None)
 
 
-def add_callback(func: Callable[[], object], call: bool = True) -> None:
+def add_callback(*, call: bool) -> Callable[[CBackT], CBackT]:
     """Register a function which is called after translations are reloaded.
 
     This should be used to re-apply tokens in complicated situations after languages change.
     If call is true, the function will immediately be called to apply it now.
     """
-    _langchange_callback.append(func)
-    if call:
-        func()
+    def deco(func: CBackT) -> CBackT:
+        """Register when called as a decorator."""
+        _langchange_callback.append(func)
+        if call:
+            func()
+        return func
+    return deco
 
 
 def expand_langcode(lang_code: str) -> List[str]:
@@ -471,6 +198,7 @@ def find_basemodui(games: List['gameMan.Game'], langs: List[str]) -> str:
         LOGGER.debug('Checking lang "{}"', loc)
         if os.path.exists(loc):
             return loc
+    return ''  # Failed.
 
 
 def parse_basemodui(result: dict[str, str], data: str) -> None:
@@ -560,9 +288,8 @@ def get_languages() -> Iterator[Language]:
 
 def set_language(lang: Language) -> None:
     """Change the app's language."""
-    global _CURRENT_LANG
     PARSE_CANCEL.cancel()
-    _CURRENT_LANG = lang
+    transtoken._CURRENT_LANG = lang
 
     conf = config.APP.get_cur_conf(GenOptions)
     config.APP.store_conf(attrs.evolve(conf, language=lang.lang_code))
@@ -618,7 +345,7 @@ async def load_aux_langs(
     PARSE_CANCEL.cancel()  # Stop any other in progress loads.
 
     if lang is None:
-        lang = _CURRENT_LANG
+        lang = transtoken._CURRENT_LANG  # noqa
 
     if lang is DUMMY:
         # Dummy does not need to load these files.

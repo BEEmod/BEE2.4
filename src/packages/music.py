@@ -8,7 +8,7 @@ import srctools.logger
 
 from consts import MusicChannel
 from app import lazy_conf
-from localisation import TransTokenSource
+from transtoken import TransTokenSource
 from packages import PackagesSet, PakObject, ParseData, SelitemData, get_config, ExportData
 
 

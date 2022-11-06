@@ -11,7 +11,7 @@ from uuid import UUID, uuid4, uuid5
 import srctools.logger
 from srctools import Property, NoKeyError, KeyValError
 
-from localisation import TransToken
+from transtoken import TransToken
 import config
 import consts
 import utils

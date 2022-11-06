@@ -13,7 +13,7 @@ import tkinter as tk
 import attr
 
 from app import TK_ROOT, img
-from localisation import TransToken, set_text
+from app.localisation import TransToken, set_text
 
 __all__ = ['set_tooltip', 'add_tooltip']
 

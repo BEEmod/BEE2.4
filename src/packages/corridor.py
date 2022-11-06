@@ -22,7 +22,7 @@ from corridor import (
     CORRIDOR_COUNTS, ID_TO_CORR,
     Corridor, ExportedConf,
 )
-from localisation import TransToken
+from transtoken import TransToken
 
 
 LOGGER = srctools.logger.get_logger(__name__)

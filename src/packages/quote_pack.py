@@ -3,7 +3,7 @@ from typing import Optional, Set, Iterator
 
 import srctools
 import utils
-from localisation import TransTokenSource
+from transtoken import TransTokenSource
 from packages import (
     PackagesSet, PakObject, set_cond_source, ParseData,
     get_config, ExportData, LOGGER, SelitemData,

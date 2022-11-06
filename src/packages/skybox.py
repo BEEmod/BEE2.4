@@ -2,7 +2,7 @@ from typing import Iterator
 
 from srctools import Property
 
-from localisation import TransTokenSource
+from transtoken import TransTokenSource
 from packages import (
     PakObject, ExportData, ParseData, SelitemData,
     get_config, lazy_conf

@@ -19,10 +19,9 @@ from srctools import AtomicWriter, bool_as_int
 from srctools.logger import get_logger
 
 import app
-import localisation
-from app import SubPane, tk_tools, TK_ROOT, corridor_selector
+from app import SubPane, localisation, tk_tools, TK_ROOT, corridor_selector
 from app.tooltip import add_tooltip, set_tooltip
-from localisation import TransToken, set_text
+from app.localisation import TransToken
 from config.compile_pane import CompilePaneState, PLAYER_MODEL_ORDER
 import config
 import BEE2_config
@@ -324,7 +323,7 @@ async def make_widgets(corr: corridor_selector.Selector) -> None:
     make_setter('General', 'vrad_compile_type', vrad_compile_type)
 
     reload_lbl = ttk.Label(window, justify='center')
-    set_text(reload_lbl, TransToken.ui(
+    localisation.set_text(reload_lbl, TransToken.ui(
         "Options on this panel can be changed \n"
         "without exporting or restarting the game."
     ))
@@ -344,7 +343,7 @@ async def make_widgets(corr: corridor_selector.Selector) -> None:
     comp_frame = ttk.Frame(nbook, name='comp_settings')
     nbook.add(comp_frame, text='Comp')
 
-    @TransToken.add_callback
+    @localisation.add_callback(call=True)
     def set_tab_names() -> None:
         """Set the tab names."""
         nbook.tab(0, text=str(TRANS_TAB_MAP))
@@ -371,7 +370,7 @@ async def make_comp_widgets(frame: ttk.Frame) -> None:
     frame.columnconfigure(0, weight=1)
 
     thumb_frame = ttk.LabelFrame(frame, labelanchor=tk.N)
-    set_text(thumb_frame, TransToken.ui('Thumbnail'))
+    localisation.set_text(thumb_frame, TransToken.ui('Thumbnail'))
     thumb_frame.grid(row=0, column=0, sticky=tk.EW)
     thumb_frame.columnconfigure(0, weight=1)
 
@@ -379,21 +378,21 @@ async def make_comp_widgets(frame: ttk.Frame) -> None:
         """Event handler when radio buttons are clicked."""
         app.background_run(set_screen_type)
 
-    UI['thumb_auto'] = set_text(ttk.Radiobutton(
+    UI['thumb_auto'] = localisation.set_text(ttk.Radiobutton(
         thumb_frame,
         value='AUTO',
         variable=chosen_thumb,
         command=set_screen,
     ), TransToken.ui('Thumbnail'))
 
-    UI['thumb_peti'] = set_text(ttk.Radiobutton(
+    UI['thumb_peti'] = localisation.set_text(ttk.Radiobutton(
         thumb_frame,
         value='PETI',
         variable=chosen_thumb,
         command=set_screen,
     ), TransToken.ui('PeTI'))
 
-    UI['thumb_custom'] = set_text(ttk.Radiobutton(
+    UI['thumb_custom'] = localisation.set_text(ttk.Radiobutton(
         thumb_frame,
         value='CUST',
         variable=chosen_thumb,
@@ -407,7 +406,7 @@ async def make_comp_widgets(frame: ttk.Frame) -> None:
     )
     UI['thumb_label'].bind(tk_tools.EVENTS['LEFT'], find_screenshot)
 
-    UI['thumb_cleanup'] = set_text(
+    UI['thumb_cleanup'] = localisation.set_text(
         ttk.Checkbutton(thumb_frame, variable=cleanup_screenshot),
         TransToken.ui('Cleanup old screenshots'),
     )
@@ -442,22 +441,22 @@ async def make_comp_widgets(frame: ttk.Frame) -> None:
     set_screenshot()  # Load the last saved screenshot
 
     vrad_frame = ttk.LabelFrame(frame, labelanchor='n')
-    set_text(vrad_frame, TransToken.ui('Lighting:'))
+    localisation.set_text(vrad_frame, TransToken.ui('Lighting:'))
     vrad_frame.grid(row=1, column=0, sticky='ew')
 
-    UI['light_none'] = set_text(ttk.Radiobutton(
+    UI['light_none'] = localisation.set_text(ttk.Radiobutton(
         vrad_frame,
         value='NONE',
         variable=vrad_compile_type,
     ), TransToken.ui('None'))
     UI['light_none'].grid(row=0, column=0)
-    UI['light_fast'] = set_text(ttk.Radiobutton(
+    UI['light_fast'] = localisation.set_text(ttk.Radiobutton(
         vrad_frame,
         value='FAST',
         variable=vrad_compile_type,
     ), TransToken.ui('Fast'))
     UI['light_fast'].grid(row=0, column=1)
-    UI['light_full'] = set_text(ttk.Radiobutton(
+    UI['light_full'] = localisation.set_text(ttk.Radiobutton(
         vrad_frame,
         value='FULL',
         variable=vrad_compile_type,
@@ -492,7 +491,7 @@ async def make_comp_widgets(frame: ttk.Frame) -> None:
         ), keymode=TransToken.ui("Fast"),
     ))
 
-    packfile_enable = set_text(ttk.Checkbutton(
+    packfile_enable = localisation.set_text(ttk.Checkbutton(
         frame,
         variable=packfile_auto_enable,
     ), TransToken.ui('Enable packing'))
@@ -503,7 +502,7 @@ async def make_comp_widgets(frame: ttk.Frame) -> None:
         "correctly. Regardless of this setting, packing is enabled when publishing. "
     ))
 
-    packfile_dump_enable_chk = set_text(ttk.Checkbutton(
+    packfile_dump_enable_chk = localisation.set_text(ttk.Checkbutton(
         frame,
         variable=packfile_dump_enable,
         command=set_pack_dump_enabled,
@@ -530,13 +529,16 @@ async def make_comp_widgets(frame: ttk.Frame) -> None:
     ))
 
     count_frame = ttk.LabelFrame(frame, labelanchor='n')
-    set_text(count_frame, TransToken.ui('Last Compile:'))
+    localisation.set_text(count_frame, TransToken.ui('Last Compile:'))
 
     count_frame.grid(row=7, column=0, sticky='ew')
     count_frame.columnconfigure(0, weight=1)
     count_frame.columnconfigure(2, weight=1)
 
-    set_text(ttk.Label(count_frame, anchor='n'), TransToken.ui('Entity')).grid(row=0, column=0, columnspan=3, sticky='ew')
+    localisation.set_text(
+        ttk.Label(count_frame, anchor='n'),
+        TransToken.ui('Entity'),
+    ).grid(row=0, column=0, columnspan=3, sticky='ew')
 
     count_entity = LimitCounter(
         count_frame,
@@ -561,7 +563,7 @@ async def make_comp_widgets(frame: ttk.Frame) -> None:
         padx=5,
     )
 
-    set_text(
+    localisation.set_text(
         ttk.Label(count_frame, anchor='center'),
         TransToken.ui('Overlay'),
     ).grid(row=2, column=0, sticky='ew')
@@ -590,7 +592,7 @@ async def make_comp_widgets(frame: ttk.Frame) -> None:
         "performed to show the new values."
     ))
 
-    set_text(
+    localisation.set_text(
         ttk.Label(count_frame, anchor='center'),
         TransToken.ui('Brush'),
     ).grid(row=2, column=2, sticky=tk.EW)
@@ -619,7 +621,7 @@ async def make_map_widgets(frame: ttk.Frame, corr: corridor_selector.Selector) -
     frame.columnconfigure(0, weight=1)
 
     voice_frame = ttk.LabelFrame(frame, labelanchor='nw')
-    set_text(voice_frame, TransToken.ui('Voicelines:'))
+    localisation.set_text(voice_frame, TransToken.ui('Voicelines:'))
     voice_frame.grid(row=1, column=0, sticky='ew')
 
     def set_voice_priority() -> None:
@@ -636,7 +638,7 @@ async def make_map_widgets(frame: ttk.Frame, corr: corridor_selector.Selector) -
         variable=VOICE_PRIORITY_VAR,
         command=set_voice_priority,
     )
-    set_text(voice_priority, TransToken.ui("Use voiceline priorities"))
+    localisation.set_text(voice_priority, TransToken.ui("Use voiceline priorities"))
     voice_priority.grid(row=0, column=0)
     add_tooltip(voice_priority, TransToken.ui(
         "Only choose the highest-priority voicelines. This means more generic "
@@ -645,7 +647,7 @@ async def make_map_widgets(frame: ttk.Frame, corr: corridor_selector.Selector) -
     ))
 
     elev_frame = ttk.LabelFrame(frame, labelanchor='n')
-    set_text(elev_frame, TransToken.ui('Spawn at:'))
+    localisation.set_text(elev_frame, TransToken.ui('Spawn at:'))
     elev_frame.grid(row=2, column=0, sticky='ew')
     elev_frame.columnconfigure(0, weight=1)
     elev_frame.columnconfigure(1, weight=1)
@@ -672,8 +674,8 @@ async def make_map_widgets(frame: ttk.Frame, corr: corridor_selector.Selector) -
         command=functools.partial(elev_changed, True),
     )
 
-    set_text(elev_preview, TransToken.ui('Entry Door'))
-    set_text(elev_elevator, TransToken.ui('Elevator'))
+    localisation.set_text(elev_preview, TransToken.ui('Entry Door'))
+    localisation.set_text(elev_elevator, TransToken.ui('Elevator'))
     elev_preview.grid(row=0, column=0, sticky='w')
     elev_elevator.grid(row=0, column=1, sticky='w')
 
@@ -690,13 +692,13 @@ async def make_map_widgets(frame: ttk.Frame, corr: corridor_selector.Selector) -
         "When previewing in SP, spawn just before the entry door."
     )))
 
-    set_text(
+    localisation.set_text(
         ttk.Button(frame, command=corr.show),
         TransToken.ui('Select Corridors'),
     ).grid(row=3, column=0, sticky='ew')
 
     model_frame = ttk.LabelFrame(frame, labelanchor='n')
-    set_text(model_frame, TransToken.ui('Player Model (SP):'))
+    localisation.set_text(model_frame, TransToken.ui('Player Model (SP):'))
     model_frame.grid(row=4, column=0, sticky='ew')
 
     player_model_combo = player_mdl = ttk.Combobox(model_frame, exportselection=False, width=20)
@@ -704,11 +706,11 @@ async def make_map_widgets(frame: ttk.Frame, corr: corridor_selector.Selector) -
     player_mdl.state(['readonly'])
     player_mdl.grid(row=0, column=0, sticky=tk.EW)
 
+    @localisation.add_callback(call=True)
     def update_model_values() -> None:
         """Update the combo box when translations change."""
         player_mdl['values'] = [str(PLAYER_MODELS[mdl]) for mdl in PLAYER_MODEL_ORDER]
 
-    TransToken.add_callback(update_model_values, call=True)
     try:
         start_ind = PLAYER_MODEL_ORDER.index(COMPILE_CFG.get_val('General', 'player_model', 'PETI'))
     except IndexError:

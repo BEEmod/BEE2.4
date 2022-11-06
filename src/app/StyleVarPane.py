@@ -9,10 +9,9 @@ import itertools
 from srctools.logger import get_logger
 import trio
 
-import localisation
 from packages import Style, StyleVar, PackagesSet
-from app import tooltip
-from localisation import TransToken
+from app import localisation, tooltip
+from transtoken import TransToken
 from config.stylevar import State
 import config
 

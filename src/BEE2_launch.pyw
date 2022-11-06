@@ -33,7 +33,7 @@ DEFAULT_SETTINGS = {
 }
 
 import srctools.logger
-from app import on_error, TK_ROOT
+from app import localisation, on_error, TK_ROOT
 import utils
 
 if __name__ == '__main__':
@@ -79,7 +79,6 @@ if __name__ == '__main__':
     utils.DEV_MODE = conf.dev_mode
     app.DEV_MODE.set(conf.dev_mode)
 
-    import localisation
     localisation.setup(conf.language)
 
     # Check early on for a common mistake - putting the BEE2 folder directly in Portal 2 means

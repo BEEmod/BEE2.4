@@ -6,7 +6,7 @@ from typing import Callable, Generic, Sequence, Type, TypeVar
 import attrs
 from srctools import Angle, bool_as_int, conv_bool, conv_float, conv_int
 
-from localisation import TransToken
+from transtoken import TransToken
 
 
 ValueT = TypeVar('ValueT')

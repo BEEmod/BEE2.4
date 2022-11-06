@@ -4,7 +4,7 @@ This produces a stream of values, which are fed into richTextBox to display.
 """
 from __future__ import annotations
 
-from typing import Iterator, Mapping, Sequence, Tuple
+from typing import Iterator, Mapping, Sequence
 from contextvars import ContextVar
 import urllib.parse
 import itertools
@@ -17,7 +17,7 @@ import srctools.logger
 
 from app.img import Handle as ImgHandle
 import utils
-from localisation import TransToken, TransTokenSource
+from app.localisation import TransToken, TransTokenSource
 
 
 LOGGER = srctools.logger.get_logger(__name__)

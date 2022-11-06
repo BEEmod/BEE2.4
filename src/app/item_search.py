@@ -7,8 +7,8 @@ from typing import Optional, Set, Callable, Tuple
 import srctools.logger
 from pygtrie import CharTrie
 
-from app import UI, TK_ROOT
-import localisation
+from app import UI, TK_ROOT, localisation
+
 
 LOGGER = srctools.logger.get_logger(__name__)
 word_to_ids: 'CharTrie[Set[Tuple[str, int]]]' = CharTrie()

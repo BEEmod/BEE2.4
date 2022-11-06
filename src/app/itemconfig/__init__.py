@@ -9,11 +9,13 @@ from srctools import EmptyMapping, Property, Vec, logger
 import trio
 import attrs
 
-import localisation
-from app import TK_ROOT, UI, background_run, signage_ui, tkMarkdown, sound, tk_tools, StyleVarPane
+from app import (
+    TK_ROOT, UI, background_run, localisation, signage_ui, tkMarkdown, sound, tk_tools,
+    StyleVarPane,
+)
 from app.tooltip import add_tooltip
 from config.widgets import WidgetConfig
-from localisation import TransToken, TransTokenSource
+from app.localisation import TransToken, TransTokenSource
 import BEE2_config
 import config
 import utils
@@ -482,6 +484,7 @@ async def make_pane(tool_frame: tk.Frame, menu_bar: tk.Menu, update_item_vis: Ca
     )
     selector.grid(row=0, column=0, columnspan=2, sticky='ew')
 
+    @localisation.add_callback(call=False)
     def update_selector() -> None:
         """Update translations in the selector box."""
         old_sel = ordered_conf[selector.current()]
@@ -490,7 +493,6 @@ async def make_pane(tool_frame: tk.Frame, menu_bar: tk.Menu, update_item_vis: Ca
         selector['values'] = [str(grp.name) for grp in ordered_conf]
         selector.current(ordered_conf.index(old_sel))
 
-    TransToken.add_callback(update_selector, call=False)
     selector.current(ordered_conf.index(STYLEVAR_GROUP))
 
     # Need to use a canvas to allow scrolling.

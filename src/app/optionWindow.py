@@ -14,11 +14,10 @@ import packages
 from app.tooltip import add_tooltip
 from app import (
     TK_ROOT, LAUNCH_AFTER_EXPORT, PRESERVE_RESOURCES, DEV_MODE, background_run,
-    contextWin, gameMan, tk_tools, sound, logWindow, img, UI,
+    contextWin, gameMan, localisation, tk_tools, sound, logWindow, img, UI,
 )
 from config.gen_opts import GenOptions, AfterExport
-from localisation import TransToken
-import localisation
+from transtoken import TransToken
 import loadScreen
 import config
 
@@ -188,7 +187,7 @@ async def init_widgets(
     fr_dev = ttk.Frame(nbook)
     nbook.add(fr_dev)
 
-    @TransToken.add_callback
+    @localisation.add_callback(call=True)
     def set_tab_names() -> None:
         """Set the tab names, when translations refresh."""
         nbook.tab(0, text=str(TRANS_TAB_GEN))

@@ -1,6 +1,6 @@
 """Test the localisation system."""
 from srctools import EmptyMapping
-from localisation import TransToken, NS_GAME, NS_UI, NS_UNTRANSLATED
+from app.localisation import TransToken, NS_GAME, NS_UI, NS_UNTRANSLATED
 
 
 def token_constructor() -> None:

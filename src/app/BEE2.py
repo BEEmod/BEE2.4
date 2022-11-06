@@ -8,10 +8,8 @@ from outcome import Outcome, Error
 from srctools import Property
 import trio
 
-import localisation
-from BEE2_config import GEN_OPTS
 from app import (
-    TK_ROOT, sound, img, gameMan, music_conf,
+    TK_ROOT, localisation, sound, img, gameMan, music_conf,
     UI, logWindow,
 )
 from config.gen_opts import GenOptions

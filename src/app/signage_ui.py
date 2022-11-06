@@ -6,12 +6,11 @@ from tkinter import ttk
 
 import srctools.logger
 
-import localisation
-from app import dragdrop, img, tk_tools, TK_ROOT
+from app import dragdrop, img, localisation, tk_tools, TK_ROOT
 from config.signage import DEFAULT_IDS, Layout
 from packages import Signage, Style
 import packages
-from localisation import TransToken
+from transtoken import TransToken
 import config
 
 LOGGER = srctools.logger.get_logger(__name__)

@@ -7,19 +7,18 @@ from typing_extensions import TypeAlias, Final
 import srctools.logger
 import trio
 
-import localisation
 from app import (
     TK_ROOT, DEV_MODE, background_run,
     dragdrop,
-    img, sound, tk_tools,
+    img, localisation, sound, tk_tools,
     tkMarkdown,
 )
 from app.richTextBox import tkRichText
-from localisation import TransToken
 from packages import corridor
 from corridor import GameMode, Direction, Orient
 from config.last_sel import LastSelected
 from config.corridors import UIState, Config
+from transtoken import TransToken
 import event
 import config
 import packages

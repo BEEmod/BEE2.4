@@ -12,7 +12,7 @@ from app.itemconfig import (
     multi_grid, parse_color, widget_sfx,
 )
 from app.tooltip import add_tooltip
-from localisation import TransToken
+from app.localisation import TransToken
 
 
 TRANS_SELECT_TITLE = TransToken.ui('Choose a Color')

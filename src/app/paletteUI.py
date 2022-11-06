@@ -9,11 +9,10 @@ import tkinter as tk
 import srctools.logger
 
 from app.paletteLoader import Palette
-from app import background_run, tk_tools, paletteLoader, TK_ROOT, img
+from app import background_run, localisation, tk_tools, paletteLoader, TK_ROOT, img
 from consts import PALETTE_FORCE_SHOWN, UUID_BLANK, UUID_EXPORT, UUID_PORTAL2
 from config.palette import PaletteState
-from localisation import TransToken
-import localisation
+from transtoken import TransToken
 import config
 
 
@@ -155,7 +154,7 @@ class PaletteUI:
 
         menu.add_separator()
         self.ui_menu_palettes_index = menu.index('end') + 1
-        TransToken.add_callback(self.update_state, call=True)
+        localisation.add_callback(call=True)(self.update_state)
 
     @property
     def selected(self) -> Palette:

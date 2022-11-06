@@ -7,9 +7,11 @@ from pathlib import Path
 
 import BEE2_config
 import utils
-from localisation import TransToken
-import localisation
-from app import gameMan, helpMenu, optionWindow, packageMan, tk_tools, backup as backup_win
+from transtoken import TransToken
+from app import (
+    gameMan, helpMenu, localisation, optionWindow, packageMan, tk_tools,
+    backup as backup_win,
+)
 
 
 EXPORT_BTN_POS: Final = 0  # Position of the export button.

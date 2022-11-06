@@ -9,13 +9,13 @@ import attrs
 
 from app.selector_win import Item as SelItem, SelectorWin, AttrDef as SelAttr
 from app.SubPane import SubPane
-from app import TK_ROOT
+from app import TK_ROOT, localisation
 from config.gen_opts import GenOptions
 import config
 from consts import MusicChannel
 from packages import PackagesSet, Music
-from localisation import TransToken
-import localisation
+from transtoken import TransToken
+
 
 BTN_EXPAND = '▽'
 BTN_EXPAND_HOVER = '▼'

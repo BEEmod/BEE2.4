@@ -12,8 +12,7 @@ import srctools.logger
 import trio
 
 import loadScreen
-import localisation
-from app import TK_ROOT, background_run
+from app import TK_ROOT, background_run, localisation
 from app.itemPropWin import PROP_TYPES
 from BEE2_config import ConfigFile, GEN_OPTS
 from loadScreen import main_loader as loader
@@ -25,7 +24,7 @@ from config.gen_opts import GenOptions, AfterExport
 from config.last_sel import LastSelected
 from config.windows import WindowState
 import config
-from localisation import TransToken
+from transtoken import TransToken
 from app import (
     img,
     itemconfig,

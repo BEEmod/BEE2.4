@@ -3,10 +3,9 @@ from typing import Callable, Any, Union
 import tkinter as tk
 from tkinter import ttk
 
-import localisation
-from app import tooltip, tk_tools, sound
+from app import localisation, tooltip, tk_tools, sound
 from app.img import Handle as ImgHandle, apply as apply_img
-from localisation import TransToken
+from transtoken import TransToken
 from config.windows import WindowState
 import utils
 import config

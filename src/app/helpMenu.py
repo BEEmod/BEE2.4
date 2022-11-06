@@ -19,10 +19,9 @@ import attrs
 import srctools.logger
 import trio.to_thread
 
-import localisation
 from app.richTextBox import tkRichText
-from app import tkMarkdown, tk_tools, sound, img, TK_ROOT, background_run
-from localisation import TransToken
+from app import localisation, tkMarkdown, tk_tools, sound, img, TK_ROOT, background_run
+from transtoken import TransToken
 
 # For version info
 import PIL

@@ -12,12 +12,11 @@ from tkinter import ttk
 from srctools import Property
 import srctools.logger
 
-import localisation
 from BEE2_config import ConfigFile
-from localisation import TransToken
 from packages import QuotePack
+from transtoken import TransToken
 from app.tooltip import add_tooltip
-from app import img, TK_ROOT
+from app import img, TK_ROOT, localisation
 from app import tk_tools
 
 

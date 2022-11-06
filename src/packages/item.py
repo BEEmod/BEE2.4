@@ -19,7 +19,7 @@ from srctools.tokenizer import Tokenizer, Token
 import config.gen_opts
 from app import tkMarkdown, img, lazy_conf, DEV_MODE
 import config
-from localisation import TransToken, TransTokenSource
+from transtoken import TransToken, TransTokenSource
 from packages import (
     PackagesSet, PakObject, ParseData, ExportData, Style,
     sep_values, desc_parse, get_config,

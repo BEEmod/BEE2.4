@@ -27,17 +27,16 @@ import srctools.logger
 
 from app.richTextBox import tkRichText
 from app.tooltip import add_tooltip, set_tooltip
-from app import tkMarkdown, tk_tools, sound, img, TK_ROOT, DEV_MODE
+from app import localisation, tkMarkdown, tk_tools, sound, img, TK_ROOT, DEV_MODE
 from packages import SelitemData
 from consts import (
     SEL_ICON_SIZE as ICON_SIZE,
     SEL_ICON_SIZE_LRG as ICON_SIZE_LRG,
     SEL_ICON_CROP_SHRINK as ICON_CROP_SHRINK
 )
-from localisation import TransToken
+from transtoken import TransToken
 from config.last_sel import LastSelected
 from config.windows import SelectorState
-import localisation
 import utils
 import config
 
@@ -910,7 +909,7 @@ class SelectorWin(Generic[CallbackT]):
         self.set_disp()
         self.refresh()
         self.wid_canvas.bind("<Configure>", self.flow_items)
-        TransToken.add_callback(self._update_translations, call=False)
+        localisation.add_callback(call=False)(self._update_translations)
 
     async def _load_selected(self, selected: LastSelected) -> None:
         """Load a new selected item."""

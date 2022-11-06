@@ -35,8 +35,7 @@ import srctools.fgd
 from BEE2_config import ConfigFile
 from app import backup, tk_tools, resource_gen, TK_ROOT, DEV_MODE, background_run
 from config.gen_opts import GenOptions
-from localisation import TransToken
-import localisation
+from transtoken import TransToken
 import loadScreen
 import packages
 import packages.template_brush

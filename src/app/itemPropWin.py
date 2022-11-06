@@ -9,9 +9,8 @@ import random
 
 import utils
 import srctools
-from app import contextWin, tk_tools, sound, TK_ROOT
-from localisation import TransToken
-import localisation
+from app import contextWin, localisation, tk_tools, sound, TK_ROOT
+from transtoken import TransToken
 import srctools.logger
 
 

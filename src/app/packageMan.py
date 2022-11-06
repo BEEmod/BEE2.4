@@ -5,11 +5,10 @@ from typing import Iterable
 from tkinter import ttk
 import tkinter as tk
 
-import localisation
-from app import TK_ROOT, tk_tools
+from app import TK_ROOT, localisation, tk_tools
 
 from app.CheckDetails import CheckDetails, Item as CheckItem
-from localisation import TransToken
+from transtoken import TransToken
 import packages
 import utils
 

@@ -15,7 +15,7 @@ import attrs
 
 from app.tooltip import add_tooltip, set_tooltip
 from app import tk_tools
-from localisation import TransToken, set_text
+from app.localisation import TransToken, set_text
 
 
 UP_ARROW = '\u25B3'

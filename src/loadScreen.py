@@ -16,9 +16,9 @@ import attrs
 import srctools.logger
 
 import config.gen_opts
-from app import logWindow
+from app import localisation, logWindow
 import config
-from localisation import TransToken
+from transtoken import TransToken
 import utils
 
 from typing import Set, Tuple, List, cast, Any, Type
@@ -233,14 +233,13 @@ def shutdown() -> None:
         pass
 
 
+@localisation.add_callback(call=False)
 def _update_translations() -> None:
     """Update the translations."""
     _PIPE_MAIN_SEND.send((
         'update_translations', 0,
         {key: str(tok) for key, tok in TRANSLATIONS.items()},
     ))
-
-TransToken.add_callback(_update_translations, call=False)
 
 # Initialise the daemon.
 # noinspection PyProtectedMember

@@ -3,13 +3,12 @@ from tkinter.font import Font as tkFont, nametofont
 from tkinter.messagebox import askokcancel
 
 from typing import Iterable, Iterator, TypeVar, Union, Tuple, Dict, Callable
-from typing_extensions import Literal
 import webbrowser
 
 from app import tkMarkdown
 from app.tkMarkdown import TextTag, TAG_HEADINGS
 from app.tk_tools import Cursors
-from localisation import TransToken
+from transtoken import TransToken
 import srctools.logger
 
 LOGGER = srctools.logger.get_logger(__name__)

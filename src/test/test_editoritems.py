@@ -4,9 +4,8 @@ from editoritems import (
     Item, ItemClass,
     OccupiedVoxel, Coord, OccuType, DesiredFacing, FSPath, Sound, Handle, ConnSide, InstCount,
 )
-import pytest
 
-from localisation import TransToken
+from app.localisation import TransToken
 
 
 # Definition for a simple item, with 'exporting' open.

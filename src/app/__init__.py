@@ -4,7 +4,6 @@ from types import TracebackType
 from typing import Any, Awaitable, Callable, Optional, Type
 from typing_extensions import TypeVarTuple, Unpack
 
-import config.gen_opts
 import utils
 import trio  # Import first, so it monkeypatches traceback before us.
 
@@ -93,7 +92,7 @@ def on_error(
     # Put it onscreen.
     try:
         from tkinter import messagebox
-        from localisation import TransToken
+        from transtoken import TransToken
         # Use directly, so we don't actually need the tk_tools dependency.
         messagebox.showerror(
             title=str(

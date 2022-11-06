@@ -22,13 +22,12 @@ from idlelib.redirector import WidgetRedirector
 from idlelib.query import Query
 import trio
 
-import localisation
-from app import TK_ROOT, background_run
+from app import TK_ROOT, background_run, localisation
 from config.gen_opts import GenOptions
 import event
 import config
 import utils
-from localisation import TransToken
+from transtoken import TransToken
 
 
 # Set icons for the application.

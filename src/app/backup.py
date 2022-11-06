@@ -21,7 +21,7 @@ from app.CheckDetails import CheckDetails, Item as CheckItem
 from FakeZip import FakeZip, zip_names, zip_open_bin
 from srctools import Property, KeyValError
 from app.tooltip import add_tooltip
-from localisation import TransToken, set_text, set_menu_text, set_win_title
+from app.localisation import TransToken, set_text, set_menu_text, set_win_title
 if TYPE_CHECKING:
     from app import gameMan
 

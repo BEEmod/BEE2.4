@@ -28,7 +28,7 @@ from typing import (
     Collection, Iterable, cast,
 )
 
-from localisation import TransToken, TransTokenSource
+from transtoken import TransToken, TransTokenSource
 
 
 if TYPE_CHECKING:  # Prevent circular import
