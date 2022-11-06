@@ -13,7 +13,7 @@ from precomp.instanceLocs import resolve as resolve_inst
 from srctools.vmf import VMF, Entity, EntityFixup, Output
 from srctools import EmptyMapping, Property, Vec, Matrix, Angle
 import srctools.logger
-from user_errors import UserError
+import user_errors
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -462,20 +462,28 @@ class CubeType:
         try:
             cube_type = CubeEntType(conf['cubetype'].upper())
         except ValueError:
-            raise UserError(
-                'Bad cube type "{}" for {}',
-                conf['cubetype'], cube_id
-            ) from None
+            raise user_errors.UserError(user_errors.TOK_INVALID_PARAM.format(
+                option='CubeType',
+                value=conf['cubetype'],
+                kind='Cube',
+                id=cube_id,
+            )) from None
         except LookupError:
-            raise UserError('No cube type for "{}"!', cube_id) from None
+            raise user_errors.UserError(user_errors.TOK_INVALID_PARAM.format(
+                option='cubetype',
+                kind='Cube',
+                id=cube_id,
+            )) from None
 
         try:
             model_swap_meth = ModelSwapMeth(conf['modelswapmeth', 'SETMODEL'].upper())
         except ValueError:
-            raise UserError(
-                'Bad model swapping method "{}" for {}',
-                conf['modelswapmeth'], cube_id
-            ) from None
+            raise user_errors.UserError(user_errors.TOK_INVALID_PARAM.format(
+                option='ModelSwapMeth',
+                value=conf['modelswapmeth'],
+                kind='Cube',
+                id=cube_id,
+            )) from None
 
         if cube_type is CubeEntType.franken:
             # Frankenturrets can't swap their model.
@@ -633,7 +641,10 @@ def parse_conf(conf: Property):
         cube = CubeType.parse(cube_conf)
 
         if cube.id in CUBE_TYPES:
-            raise UserError('Duplicate cube ID "{}"', cube.id)
+            raise user_errors.UserError(user_errors.TOK_DUPLICATE_ID.format(
+                kind='Cube',
+                id=cube.id,
+            ))
 
         CUBE_TYPES[cube.id] = cube
 
@@ -641,7 +652,10 @@ def parse_conf(conf: Property):
         dropp = DropperType.parse(dropper_conf)
 
         if dropp.id in DROPPER_TYPES:
-            raise UserError('Duplicate dropper ID "{}"', dropp.id)
+            raise user_errors.UserError(user_errors.TOK_DUPLICATE_ID.format(
+                kind='Dropper',
+                id=dropp.id,
+            ))
 
         DROPPER_TYPES[dropp.id] = dropp
 
@@ -649,7 +663,10 @@ def parse_conf(conf: Property):
         addon = CubeAddon.parse(addon_conf)
 
         if addon.id in ADDON_TYPES:
-            raise UserError('Duplicate cube addon ID "{}"', addon.id)
+            raise user_errors.UserError(user_errors.TOK_DUPLICATE_ID.format(
+                kind='CubeItem',
+                id=addon.id,
+            ))
 
         ADDON_TYPES[addon.id] = addon
 
@@ -709,7 +726,8 @@ def parse_filter_types(
             if cube_id == 'any':
                 # All cubes.
                 if invert:
-                    raise UserError("Defining a filter that excludes everything is useless.")
+                    LOGGER.warning("Defining a filter that excludes everything is useless.")
+                    return all_cubes, set(), all_cubes.copy()
                 targ_set |= all_cubes
             elif cube_id == 'companion':
                 for cube in all_cubes:
@@ -923,7 +941,10 @@ def flag_cube_type(inst: Entity, res: Property) -> bool:
     cube_type = res.value
 
     if not cube_type:
-        raise UserError('"CubeType" result used but with no type specified!')
+        raise user_errors.UserError(
+            user_errors.TOK_CUBE_NO_CUBETYPE_FLAG,
+            docsurl='https://github.com/BEEmod/BEE2-items/wiki/vbsp_config-conditions#cubetype',
+        )
 
     if cube_type[0] == '<' and cube_type[-1] == '>':
         # Special checks.
@@ -946,7 +967,10 @@ def flag_cube_type(inst: Entity, res: Property) -> bool:
         elif cube_type == 'cube':
             return inst is pair.cube
         else:
-            raise UserError('Unrecognised value "{}"', res.value)
+            raise user_errors.UserError(
+                user_errors.TOK_CUBE_BAD_SPECIAL_CUBETYPE.format(type=res.value),
+                docsurl='https://github.com/BEEmod/BEE2-items/wiki/vbsp_config-conditions#cubetype',
+            )
 
     return pair.cube_type.id == cube_type.upper()
 
@@ -975,10 +999,10 @@ def res_dropper_addon(inst: Entity, res: Property):
     try:
         addon = ADDON_TYPES[res.value]
     except KeyError:
-        raise UserError(
-            'Unknown Cube Addon: <var>"{}"</code>',
-            res.value,
-        )
+        raise user_errors.UserError(user_errors.TOK_UNKNOWN_ID.format(
+            kind='CubeAddon',
+            id=res.value,
+        ))
 
     try:
         pair = INST_TO_PAIR[inst]
@@ -1017,7 +1041,10 @@ def res_change_cube_type(inst: Entity, res: Property) -> None:
     try:
         pair.cube_type = CUBE_TYPES[res.value]
     except KeyError:
-        raise UserError('Unknown cube type "{}"!', res.value)
+        raise user_errors.UserError(user_errors.TOK_UNKNOWN_ID.format(
+            kind='CubeType',
+            id=res.value,
+        ))
 
 
 @conditions.make_result('CubeFilter')
@@ -1124,9 +1151,9 @@ def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
     # Origin -> instances
     dropper_pos: dict[tuple[float, float, float], tuple[Entity, DropperType]] = {}
     # Timer value -> instances if not 0.
-    dropper_timer: dict[int, tuple[Entity, DropperType] | tuple[None, None]] = {}
-    # Instance -> has a cube linked to this yet?
-    used_droppers: dict[Entity, bool] = {}
+    dropper_timer: dict[int, tuple[Entity, DropperType]] = {}
+    # Instance -> if linked, the position of the cube.
+    used_droppers: dict[Entity, str] = {}
 
     # Cube items.
     cubes: list[tuple[Entity, CubeType]] = []
@@ -1153,10 +1180,8 @@ def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
         if 3 < timer <= 30:
             if timer in dropper_timer:
                 other_inst, _ = dropper_timer[timer]
-                raise UserError(
-                    'Two droppers with the same '
-                    'timer value: <code>{}</code>',
-                    timer,
+                raise user_errors.UserError(
+                    user_errors.TOK_CUBE_TIMERS_DUPLICATE.format(timer=timer),
                     points=[
                         Vec.from_str(inst['origin']),
                         Vec.from_str(other_inst['origin']),
@@ -1166,7 +1191,7 @@ def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
                 dropper_timer[timer] = inst, drop_type
         # For setup later.
         dropper_pos[Vec.from_str(inst['origin']).as_tuple()] = inst, drop_type
-        used_droppers[inst] = False
+        used_droppers[inst] = ''
 
     # Now link and match up all the cubes.
     for cube, cube_type in cubes:
@@ -1181,17 +1206,20 @@ def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
             try:
                 dropper, drop_type = dropper_timer[timer]
             except KeyError:
-                raise UserError(
-                    'Unknown cube "linkage" value ({}) in cube!\n'
-                    'A cube has a timer set which doesn\'t match '
-                    'any droppers.', timer
+                raise user_errors.UserError(
+                    user_errors.TOK_CUBE_TIMERS_INVALID_CUBEVAL.format(timer=timer),
+                    points=[Vec.from_str(cube['origin'])],
                 ) from None
             if used_droppers[dropper]:
-                raise UserError(
-                    'Dropper tried to link to two cubes! (timer={})',
-                    timer,
+                raise user_errors.UserError(
+                    user_errors.TOK_CUBE_TIMERS_DUPLICATE.format(timer=timer),
+                    points=[
+                        Vec.from_str(cube['origin']),
+                        Vec.from_str(used_droppers[dropper]),
+                        Vec.from_str(dropper['origin']),
+                    ]
                 ) from None
-            used_droppers[dropper] = True
+            used_droppers[dropper] = cube['origin']
 
             # Autodrop on the dropper shouldn't be on - that makes
             # linking useless since the cube immediately fizzles.
@@ -1220,13 +1248,15 @@ def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
                 pass  # Drop out of if
             else:
                 if used_droppers[dropper]:
-                    raise UserError(
-                        'Dropper above custom cube is already'
-                        ' linked!\n'
-                        'Cube type: {}',
-                        cube_type.id
+                    raise user_errors.UserError(
+                        user_errors.TOK_CUBE_DROPPER_LINKED.format(type=cube_type.id),
+                        points=[
+                            Vec.from_str(cube['origin']),
+                            Vec.from_str(used_droppers[dropper]),
+                            Vec.from_str(dropper['origin']),
+                        ]
                     ) from None
-                used_droppers[dropper] = True
+                used_droppers[dropper] = cube['origin']
                 cube.remove()
                 PAIRS.append(CubePair(cube_type, drop_type, dropper, cube_fixup=cube.fixup))
                 continue
@@ -1243,16 +1273,21 @@ def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
         try:
             cube_type_id = VALVE_CUBE_IDS[cube_type_num]
         except KeyError:
-            raise UserError(
-                '<var>$cube_type={}</var> is not a valid cube type value!',
-                dropper.fixup["$cube_type"],
+            raise user_errors.UserError(
+                user_errors.TOK_INVALID_PARAM.format(
+                    option='$cube_type',
+                    value=cube_type_num,
+                    kind='Valve Cube',
+                    id=dropper['targetname']
+                ),
+                points=[Vec.from_str(dropper['origin'])],
             ) from None
         try:
             cube_type = CUBE_TYPES[cube_type_id]
         except KeyError:
-            raise UserError(
-                'No Valve cube type "{}" available!',
-                cube_type_id
+            raise user_errors.UserError(
+                user_errors.TOK_UNKNOWN_ID.format(kind='Valve cube', id=cube_type_id),
+                points=[Vec.from_str(dropper['origin'])],
             ) from None
 
         drop_type = inst_to_drop[dropper['file'].casefold()]

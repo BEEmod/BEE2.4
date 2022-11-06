@@ -84,6 +84,21 @@ class UserError(BaseException):
 # Define a translation token for every error message that can be produced. The app will translate
 # them all during export, then store that for the compiler's use.
 
+# Generic tokens:
+TOK_INVALID_PARAM = TransToken.ui(
+    'Invalid <code>{option}=</code>"<code>{value}</code>" for {kind} "<var>{id}</var>"!'
+)
+TOK_REQUIRED_PARAM = TransToken.ui(
+    'Option <code>{option}</code> is required for {kind} "<var>{id}</var>"!'
+)
+TOK_DUPLICATE_ID = TransToken.ui(
+    'Duplicate {kind} ID "<var>{id}</var>". Change the ID of one of them.'
+)
+TOK_UNKNOWN_ID = TransToken.ui('Unknown {kind} ID "<var>{id}</var>".')
+
+TOK_SEEDOCS = TransToken.untranslated('{msg}\n<p><a href="{url}">See the documentation</a>.</p>')
+
+# Specific errors:
 
 TOK_GLASS_FLOORBEAM_TEMPLATE = TransToken.ui(
     'Bad Glass Floorbeam template! The template must have a single brush, with one face '
@@ -107,3 +122,30 @@ TOK_CONNECTIONS_INSTANCE_NO_IO = TransToken.ui(
 )
 
 TOK_NO_CORRIDOR = TransToken.ui('No corridors available for {orient} {mode} {dir} group!')
+
+TOK_CUBE_NO_CUBETYPE_FLAG = TransToken.ui('"CubeType" result used but with no type specified!')
+TOK_CUBE_BAD_SPECIAL_CUBETYPE = TransToken.ui('Unrecognised special cube type "<var>{type}</var>"!')
+
+TOK_CUBE_TIMERS_DUPLICATE = TransToken.ui(
+    'Two or more cubes/droppers have the same timer value (<var>{timer}</var>). These are used to '
+    'link a cube and dropper item together, so the cube is preplaced in the map but respawns '
+    'from the specified dropper.'
+)
+TOK_CUBE_TIMERS_INVALID_CUBEVAL = TransToken.ui(
+    'The specified cube has a timer value <var>{timer}</var>, which does not match any droppers. '
+    'A dropper should be placed with a matching timer value, to specify the respawn point for this '
+    'preplaced cube.'
+)
+TOK_CUBE_DROPPER_LINKED = TransToken.ui(
+    'Dropper above custom cube of type <var>{type}</var> is already linked! Custom cubes convert'
+    'droppers above them into their type, to allow having droppers.',
+)
+
+# Tokens used when the system fails.
+TOK_ERR_MISSING = TransToken.ui('<strong>No error?</strong>')
+TOK_ERR_FAIL_LOAD = TransToken.ui('Failed to load error!')
+
+ALL_TOKENS = [
+    tok for name, tok in globals().items()
+    if name.startswith('TOK_') and isinstance(tok, TransToken)
+]
