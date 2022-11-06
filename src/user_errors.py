@@ -144,6 +144,10 @@ TOK_CUBE_DROPPER_LINKED = TransToken.ui(
     'droppers above them into their type, to allow having droppers.',
 )
 
+TOK_FIZZLER_NO_ITEM = TransToken.ui('No item ID for fizzler instance <var>"{inst}"</var>!')
+TOK_FIZZLER_UNKNOWN_TYPE = TransToken.ui('No fizzler type for {item} (<var>"{inst}"</var>)!')
+TOK_FIZZLER_NO_MODEL_SIDE = TransToken.ui('No model specified for one side of "{id}" fizzlers.')
+
 # Tokens used when the system fails.
 TOK_ERR_MISSING = TransToken.ui('<strong>No error?</strong>')
 TOK_ERR_FAIL_LOAD = TransToken.ui('Failed to load error!')
