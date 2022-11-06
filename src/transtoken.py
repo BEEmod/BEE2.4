@@ -4,7 +4,7 @@ To actually translate the localisation module is required, for the app only, in 
 exist so that data structures can be shared.
 """
 from typing import ClassVar, Dict, Iterable, Mapping, Protocol, Sequence, Tuple, cast
-from typing_extensions import Final
+from typing_extensions import Final, LiteralString
 import attrs
 
 from srctools import EmptyMapping, logger
@@ -83,12 +83,12 @@ class TransToken:
             return cls(package, orig_pack, text, EmptyMapping)
 
     @classmethod
-    def ui(cls, token: str, /, **kwargs: str) -> 'TransToken':
+    def ui(cls, token: LiteralString, /, **kwargs: str) -> 'TransToken':
         """Make a token for a UI string."""
         return cls(NS_UI, NS_UI, token, kwargs)
 
     @staticmethod
-    def ui_plural(singular: str, plural: str,  /, **kwargs: str) -> 'PluralTransToken':
+    def ui_plural(singular: LiteralString, plural: LiteralString,  /, **kwargs: str) -> 'PluralTransToken':
         """Make a plural token for a UI string."""
         return PluralTransToken(NS_UI, NS_UI, singular, kwargs, plural)
 
