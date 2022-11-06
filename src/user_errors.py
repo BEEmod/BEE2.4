@@ -74,7 +74,10 @@ class UserError(BaseException):
             message,
             ctx,
             self._simple_tiles,
-            list(map(tuple, points)),
+            [
+                (point.x / 128, point.y / 128, point.z / 128)
+                for point in points
+            ],
         )
 
     def __str__(self) -> str:
