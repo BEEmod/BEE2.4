@@ -6,6 +6,7 @@ from __future__ import annotations
 from typing import AsyncIterator, Callable, Iterable, Iterator, TypeVar, Union, TYPE_CHECKING
 from typing_extensions import ParamSpec, TypeAlias
 from tkinter import ttk
+from collections import defaultdict
 import tkinter as tk
 import io
 import os.path
@@ -17,10 +18,14 @@ import sys
 
 from srctools.filesys import RawFileSystem
 from srctools import FileSystem, logger
+from babel.messages.pofile import read_po, write_po
+from babel.messages.mofile import write_mo
+from babel import messages
 import trio
 import attrs
 
 from config.gen_opts import GenOptions
+from app import tk_tools
 import config
 import packages
 import utils
@@ -304,10 +309,6 @@ def set_language(lang: Language) -> None:
 
 async def rebuild_app_langs() -> None:
     """Compile .po files for the app into .mo files. This does not extract tokens, that needs source."""
-    from babel.messages.pofile import read_po
-    from babel.messages.mofile import write_mo
-    from app import tk_tools
-
     def build_file(filename: Path) -> None:
         """Synchronous I/O code run as a backround thread."""
         with filename.open('rb') as src:
@@ -420,11 +421,6 @@ def _get_children(tok: TransToken) -> Iterator[TransToken]:
 
 async def rebuild_package_langs(packset: packages.PackagesSet) -> None:
     """Write out POT templates for unzipped packages."""
-    from collections import defaultdict
-    from babel import messages
-    from babel.messages.pofile import read_po, write_po
-    from babel.messages.mofile import write_mo
-
     tok2pack: dict[str | tuple[str, str], set[str]] = defaultdict(set)
     pack_paths: dict[str, tuple[trio.Path, messages.Catalog]] = {}
 
