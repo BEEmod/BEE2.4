@@ -23,9 +23,11 @@ class SimpleTile(TypedDict):
 class ErrorInfo:
     """Data to display to the user."""
     message: TransToken
-    context: str  # Logging context
-    faces: Dict[Kind, List[SimpleTile]]
-    points: List[Tuple[float, float, float]]  # Points of interest in the map.
+    # Logging context
+    context: str = ''
+    faces: Dict[Kind, List[SimpleTile]] = attrs.Factory(dict)
+    # Points of interest in the map.
+    points: List[Tuple[float, float, float]] = attrs.Factory(list)
 
 
 DATA_LOC = utils.conf_location('compile_error.pickle')
@@ -40,17 +42,23 @@ class UserError(BaseException):
     """
     _simple_tiles: ClassVar[Dict[Kind, List[SimpleTile]]] = {}
 
-    def __init__(self, message: TransToken, points: Iterable[Vec]=()) -> None:
+    def __init__(
+        self,
+        message: TransToken,
+        points: Iterable[Vec]=(),
+        docsurl: str='',
+    ) -> None:
         """Specify the info to show to the user.
 
-        * message is a translation token potentially containing HTML. Strings formatted into it
-        will be escaped. TODO implement.
-        * points is a list of offending map locations, which will be placed
-          in a copy of the map for the user to see.
+        :param message: This is a translation token potentially containing HTML. Strings formatted into it
+            will be escaped. TODO implement.
+        :param points: This is a list of offending map locations, which will be displayed in a
+            render of the map.
+        :param docsurl: If specified, adds a link to relevant documentation.
         """
         if utils.DEV_MODE:
             try:
-                ctx = '<br><br>Error occured in: ' + ', '.join(logger.CTX_STACK.get())
+                ctx = f'Error occured in: <code>{", ".join(logger.CTX_STACK.get())}</code>'
             except LookupError:
                 ctx = ''
         else:
@@ -58,6 +66,9 @@ class UserError(BaseException):
 
         if isinstance(message, str):  # Temporary, prevent this breaking.
             message = TransToken.untranslated(message)
+
+        if docsurl:
+            message = TOK_SEEDOCS.format(msg=message, url=docsurl)
 
         self.info = ErrorInfo(
             message,
