@@ -123,7 +123,7 @@ class BaseLoadScreen:
             y=self.win.winfo_y() + (event.y - self.drag_y),
         ))
 
-    def op_show(self, title: str, labels: list[str]) -> None:
+    def op_show(self, title: str, labels: List[str]) -> None:
         """Show the window."""
         self.win.title(title)
         for (st_id, _), name in zip(self.stages, labels):
@@ -267,7 +267,7 @@ class LoadScreen(BaseLoadScreen):
             max_val,
         )
 
-    def op_show(self, title: str, labels: list[str]) -> None:
+    def op_show(self, title: str, labels: List[str]) -> None:
         """Show the window."""
         self.title_text = title
         self.win.title(title)
