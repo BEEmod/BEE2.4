@@ -9,8 +9,9 @@ import random
 
 import utils
 import srctools
-from app import contextWin, gameMan, tk_tools, sound, TK_ROOT
+from app import contextWin, tk_tools, sound, TK_ROOT
 from localisation import TransToken
+import localisation
 import srctools.logger
 
 
@@ -225,9 +226,9 @@ def save_tim(key: str, val: str) -> None:
         widgets[key].set(new_val)
         enable_tim_callback = True
 
-        TRANS_TIMER_DELAY.format(
+        localisation.set_text(labels[key], TRANS_TIMER_DELAY.format(
             tim='∞' if new_val == 0 else str(new_val),
-        ).apply(labels[key])
+        ))
 
         if new_val > values[key]:
             sound.fx_blockable('add')
@@ -357,9 +358,9 @@ def init(cback: Callable[[dict[str, str]], None]) -> None:
     frame.columnconfigure(0, weight=1)
 
     labels['noOptions'] = ttk.Label(frame)
-    TransToken.ui('No Properties available!').apply(labels['noOptions'])
+    localisation.set_text(labels['noOptions'], TransToken.ui('No Properties available!'))
     widgets['saveButton'] = ttk.Button(frame, command=exit_win)
-    TransToken.ui('Close').apply(widgets['saveButton'])
+    localisation.set_text(widgets['saveButton'], TransToken.ui('Close'))
     widgets['titleLabel'] = ttk.Label(frame, text='')
     widgets['titleLabel'].grid(columnspan=9)
 
@@ -369,7 +370,7 @@ def init(cback: Callable[[dict[str, str]], None]) -> None:
 
     for key, (prop_type, prop_name) in PROP_TYPES.items():
         labels[key] = ttk.Label(frame)
-        TRANS_LABEL.format(name=prop_name).apply(labels[key])
+        localisation.set_text(labels[key], TRANS_LABEL.format(name=prop_name))
         if prop_type is PropTypes.CHECKBOX:
             values[key] = tk.IntVar(value=DEFAULTS[key])
             out_values[key] = srctools.bool_as_int(DEFAULTS[key])
@@ -377,7 +378,7 @@ def init(cback: Callable[[dict[str, str]], None]) -> None:
                 frame,
                 variable=values[key],
                 command=func_partial(set_check, key),
-                )
+            )
             widgets[key].bind(
                 '<Return>',
                 func_partial(
@@ -407,7 +408,7 @@ def init(cback: Callable[[dict[str, str]], None]) -> None:
                     value=str(angle),
                     command=func_partial(save_angle, key, angle),
                 )
-                trans_tok.apply(radio)
+                localisation.set_text(radio, trans_tok)
                 radio.grid(row=0, column=pos)
                 frm.columnconfigure(pos, weight=1)
 
@@ -422,7 +423,7 @@ def init(cback: Callable[[dict[str, str]], None]) -> None:
                     value=pos,
                     command=func_partial(save_paint, key, pos),
                 )
-                trans_tok.apply(radio)
+                localisation.set_text(radio, trans_tok)
                 radio.grid(row=0, column=pos)
                 frm.columnconfigure(pos, weight=1)
             out_values[key] = str(DEFAULTS[key])
@@ -607,8 +608,8 @@ def show_window(used_props: dict[str, str], parent: tk.Toplevel, item_name: Tran
     # playing
     sound.block_fx()
 
-    TRANS_TITLE.format(item=item_name).apply_title(win)
-    TRANS_SUBTITLE.format(item=item_name).apply(widgets['titleLabel'])
+    localisation.set_win_title(win, TRANS_TITLE.format(item=item_name))
+    localisation.set_text(widgets['titleLabel'], TRANS_SUBTITLE.format(item=item_name))
     win.deiconify()
     win.lift(parent)
     win.grab_set()

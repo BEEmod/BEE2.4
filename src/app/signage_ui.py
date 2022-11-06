@@ -6,6 +6,7 @@ from tkinter import ttk
 
 import srctools.logger
 
+import localisation
 from app import dragdrop, img, tk_tools, TK_ROOT
 from config.signage import DEFAULT_IDS, Layout
 from packages import Signage, Style
@@ -95,10 +96,10 @@ async def init_widgets(master: tk.Widget) -> Optional[tk.Widget]:
     """Construct the widgets, returning the configuration button.
     """
     window.resizable(True, True)
-    TransToken.ui('Configure Signage').apply_title(window)
+    localisation.set_win_title(window, TransToken.ui('Configure Signage'))
 
     frame_selected = ttk.Labelframe(window, relief='raised', labelanchor='n')
-    TransToken.ui('Selected').apply(frame_selected)
+    localisation.set_text(frame_selected, TransToken.ui('Selected'))
 
     canv_all = tk.Canvas(window)
 
@@ -139,7 +140,7 @@ async def init_widgets(master: tk.Widget) -> Optional[tk.Widget]:
             return
         hover_scope.cancel()
 
-        TRANS_SIGN_NAME.format(name=hover_sign.name).apply(name_label)
+        localisation.set_text(name_label, TRANS_SIGN_NAME.format(name=hover_sign.name))
 
         sng_left = hover_sign.dnd_icon
         try:
@@ -222,5 +223,5 @@ async def init_widgets(master: tk.Widget) -> Optional[tk.Widget]:
     await config.APP.set_and_run_ui_callback(Layout, apply_config)
 
     show_btn = ttk.Button(master, command=show_window)
-    TransToken.ui('Configure Signage').apply(show_btn)
+    localisation.set_text(show_btn, TransToken.ui('Configure Signage'))
     return show_btn

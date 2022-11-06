@@ -7,6 +7,7 @@ from typing_extensions import TypeAlias, Final
 import srctools.logger
 import trio
 
+import localisation
 from app import (
     TK_ROOT, DEV_MODE, background_run,
     dragdrop,
@@ -123,9 +124,10 @@ class Selector:
         self.wid_desc.grid(row=2, column=0, sticky='nsew')
         frm_right.rowconfigure(2, weight=1)
 
-        TransToken.ui('Close').apply(
-            ttk.Button(frm_right, command=self.hide)
-        ).grid(row=3, column=0)
+        localisation.set_text(
+            ttk.Button(frm_right, command=self.hide),
+            TransToken.ui('Close'),
+).grid(row=3, column=0)
 
         self.event_bus = event.EventBus()
 
@@ -416,8 +418,7 @@ class Selector:
             self.img_ind = 0
             self.cur_images = corr.images
             self._sel_img(0)  # Updates the buttons.
-
-            corr.name.apply(self.wid_title)
+            localisation.set_text(self.wid_title, corr.name)
             if DEV_MODE.get():
                 # Show the instance in the description, plus fixups that are assigned.
                 self.wid_desc.set_text(tkMarkdown.join(
@@ -432,7 +433,7 @@ class Selector:
             else:
                 self.wid_desc.set_text(corr.desc)
         else:  # Reset.
-            TransToken.BLANK.apply(self.wid_title)
+            localisation.set_text(self.wid_title, TransToken.BLANK)
             self.wid_desc.set_text(corridor.EMPTY_DESC)
             img.apply(self.wid_image, IMG_CORR_BLANK)
             self.wid_image_left.state(('disabled', ))

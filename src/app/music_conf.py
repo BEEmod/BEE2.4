@@ -15,6 +15,7 @@ import config
 from consts import MusicChannel
 from packages import PackagesSet, Music
 from localisation import TransToken
+import localisation
 
 BTN_EXPAND = '▽'
 BTN_EXPAND_HOVER = '▼'
@@ -212,7 +213,7 @@ async def make_widgets(packset: PackagesSet, frame: ttk.LabelFrame, pane: SubPan
         is_collapsed = True
         conf = config.APP.get_cur_conf(GenOptions)
         config.APP.store_conf(attrs.evolve(conf, music_collapsed=True))
-        TRANS_BASE_COLL.apply(base_lbl)
+        localisation.set_text(base_lbl, TRANS_BASE_COLL)
         toggle_btn_exit()
 
         # Set all music to the children - so those are used.
@@ -227,7 +228,7 @@ async def make_widgets(packset: PackagesSet, frame: ttk.LabelFrame, pane: SubPan
         is_collapsed = False
         conf = config.APP.get_cur_conf(GenOptions)
         config.APP.store_conf(attrs.evolve(conf, music_collapsed=False))
-        TRANS_BASE_EXP.apply(base_lbl)
+        localisation.set_text(base_lbl, TRANS_BASE_EXP)
         toggle_btn_exit()
         for wid in exp_widgets:
             wid.grid()
@@ -265,7 +266,7 @@ async def make_widgets(packset: PackagesSet, frame: ttk.LabelFrame, pane: SubPan
         TransToken.ui('Speed:'),
     ], start=1):
         label = ttk.Label(frame)
-        text.apply(label)
+        localisation.set_text(label, text)
         exp_widgets.append(label)
         label.grid(row=row, column=1, sticky='EW')
 

@@ -37,6 +37,7 @@ from consts import (
 from localisation import TransToken
 from config.last_sel import LastSelected
 from config.windows import SelectorState
+import localisation
 import utils
 import config
 
@@ -333,8 +334,9 @@ class Item:
         """Update the context menu whenver this is set."""
         self._context_lbl = value
         if self._selector and self._context_ind is not None:
-            self._context_lbl.apply_menu(
+            localisation.set_menu_text(
                 self._selector.context_menus[self.group_id],
+                self._context_lbl,
                 self._context_ind,
             )
 
@@ -427,7 +429,7 @@ class PreviewWindow:
     def show(self, parent: SelectorWin, item: Item) -> None:
         """Show the window."""
         self.win.transient(parent.win)
-        TRANS_PREVIEW_TITLE.format(item=item.longName).apply_title(self.win)
+        localisation.set_win_title(self.win, TRANS_PREVIEW_TITLE.format(item=item.longName))
 
         self.parent = parent
         self.index = 0
@@ -620,7 +622,7 @@ class SelectorWin(Generic[CallbackT]):
         self.win = tk.Toplevel(parent, name='selwin_' + save_id)
         self.win.withdraw()
         self.win.transient(master=parent)
-        TRANS_WINDOW_TITLE.format(subtitle=title).apply_title(self.win)
+        localisation.set_win_title(self.win, TRANS_WINDOW_TITLE.format(subtitle=title))
 
         # Allow resizing in X and Y.
         self.win.resizable(True, True)
@@ -660,7 +662,7 @@ class SelectorWin(Generic[CallbackT]):
             width=5,  # Keep a small width, so this doesn't affect the
             # initial window size.
         )
-        desc.apply(self.desc_label)
+        localisation.set_text(self.desc_label, desc)
         self.desc_label.grid(row=0, column=0, sticky='EW')
 
         # PanedWindow allows resizing the two areas independently.
@@ -794,11 +796,11 @@ class SelectorWin(Generic[CallbackT]):
         )
         self.prop_desc['yscrollcommand'] = self.prop_scroll.set
 
-        TransToken.ui('OK').apply(ttk.Button(
+        localisation.set_text(ttk.Button(
             self.prop_frm,
             name='btn_ok',
             command=self.save,
-        )).grid(row=6, column=0, padx=(8, 8))
+        ), TransToken.ui('OK')).grid(row=6, column=0, padx=(8, 8))
 
         if self.has_def:
             self.prop_reset = ttk.Button(
@@ -806,22 +808,18 @@ class SelectorWin(Generic[CallbackT]):
                 name='btn_suggest',
                 command=self.sel_suggested,
             )
-            TransToken.ui("Select Suggested").apply(self.prop_reset)
+            localisation.set_text(self.prop_reset, TransToken.ui("Select Suggested"))
             self.prop_reset.grid(
                 row=6,
                 column=1,
                 sticky='ew',
             )
 
-        TransToken.ui("Cancel").apply(ttk.Button(
+        localisation.set_text(ttk.Button(
             self.prop_frm,
             name='btn_cancel',
             command=self.exit,
-        )).grid(
-            row=6,
-            column=2,
-            padx=(8, 8),
-        )
+        ), TransToken.ui("Cancel")).grid(row=6, column=2, padx=(8, 8))
 
         self.win.option_add('*tearOff', False)
         self.context_menu = tk.Menu(self.win)
@@ -872,7 +870,7 @@ class SelectorWin(Generic[CallbackT]):
             for attr in self.attrs:
                 attr_frame = ttk.Frame(attrs_frame)
                 desc_label = ttk.Label(attr_frame)
-                TRANS_ATTR_DESC.format(desc=attr.desc).apply(desc_label)
+                localisation.set_text(desc_label, TRANS_ATTR_DESC.format(desc=attr.desc))
                 attr.label = ttk.Label(attr_frame)
 
                 if attr.type is AttrTypes.COLOR:
@@ -1016,7 +1014,7 @@ class SelectorWin(Generic[CallbackT]):
                         name='item_' + item.name,
                         compound='top',
                     )
-                    item.shortName.apply(item.button)
+                    localisation.set_text(item.button, item.shortName)
 
                 # noinspection PyProtectedMember
                 tk_tools.bind_leftclick(item.button, item._on_click)
@@ -1039,7 +1037,7 @@ class SelectorWin(Generic[CallbackT]):
                 variable=self.context_var,
                 value=item.name,
             )
-            item.context_lbl.apply_menu(group._menu)
+            localisation.set_menu_text(group._menu, item.context_lbl)
             item._context_ind = group._menu.index('end')
 
         # Convert to a normal dictionary, after adding all items.
@@ -1055,7 +1053,7 @@ class SelectorWin(Generic[CallbackT]):
                 continue
             group = self.group_widgets[group_key]
             self.context_menu.add_cascade(menu=group._menu)
-            self.group_names[group_key].apply_menu(self.context_menu)
+            localisation.set_menu_text(self.context_menu, self.group_names[group_key])
             # Track the menu's index. The one at the end is the one we just added.
             group._menu_pos = self.context_menu.index('end')
         if self.win.winfo_ismapped():
@@ -1247,12 +1245,12 @@ class SelectorWin(Generic[CallbackT]):
         """Select the specified item."""
         self.prop_name['text'] = item.longName
         if len(item.authors) == 0:
-            TRANS_NO_AUTHORS.apply(self.prop_author)
+            localisation.set_text(self.prop_author, TRANS_NO_AUTHORS)
         else:
-            TRANS_AUTHORS.format(
+            localisation.set_text(self.prop_author, TRANS_AUTHORS.format(
                 authors=', '.join(item.authors),
                 n=len(item.authors),
-            ).apply(self.prop_author)
+            ))
 
         # We have a large icon, use it.
         icon = item.large_icon if item.large_icon is not None else item.icon
@@ -1321,15 +1319,15 @@ class SelectorWin(Generic[CallbackT]):
             elif attr.type is AttrTypes.LIST:
                 # Join the values (in alphabetical order)
                 assert isinstance(val, Iterable) and not isinstance(val, Vec), repr(val)
-                TRANS_COMMA.join([
+                localisation.set_text(attr.label, TRANS_COMMA.join([
                     txt if isinstance(txt, TransToken) else TransToken.untranslated(txt)
                     for txt in val
-                ]).apply(attr.label)
+                ]))
             elif attr.type is AttrTypes.STRING:
                 # Just a string.
                 if not isinstance(val, TransToken):
                     val = TransToken.untranslated(str(val))
-                val.apply(attr.label)
+                localisation.set_text(attr.label, val)
             else:
                 raise ValueError(f'Invalid attribute type: "{attr.type}"')
 
@@ -1533,7 +1531,7 @@ class SelectorWin(Generic[CallbackT]):
                                 self.pal_frame,
                                 name=f'suggest_label_{suggest_ind}',
                             )
-                            TRANS_SUGGESTED_MAC.apply(sugg_lbl)
+                            localisation.set_text(sugg_lbl, TRANS_SUGGESTED_MAC)
                         else:
                             sugg_lbl = ttk.LabelFrame(
                                 self.pal_frame,
@@ -1541,7 +1539,7 @@ class SelectorWin(Generic[CallbackT]):
                                 labelanchor='n',
                                 height=50,
                             )
-                            TRANS_SUGGESTED.apply(sugg_lbl)
+                            localisation.set_text(sugg_lbl, TRANS_SUGGESTED)
                         self._suggest_lbl.append(sugg_lbl)
                     suggest_ind += 1
                     sugg_lbl.place(

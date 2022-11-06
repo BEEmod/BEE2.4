@@ -12,6 +12,7 @@ import srctools.logger
 import trio
 
 import loadScreen
+import localisation
 from app import TK_ROOT, background_run
 from app.itemPropWin import PROP_TYPES
 from BEE2_config import ConfigFile, GEN_OPTS
@@ -839,12 +840,12 @@ def export_editoritems(pal_ui: paletteUI.PaletteUI, bar: MenuBar) -> None:
 
 def set_disp_name(item: PalItem, e=None) -> None:
     """Callback to display the name of the item."""
-    item.name.apply(UI['pre_disp_name'])
+    localisation.set_text(UI['pre_disp_name'], item.name)
 
 
 def clear_disp_name(e=None) -> None:
     """Callback to reset the item name."""
-    TransToken.BLANK.apply(UI['pre_disp_name'])
+    localisation.set_text(UI['pre_disp_name'], TransToken.BLANK)
 
 
 def conv_screen_to_grid(x: float, y: float) -> Tuple[int, int]:
@@ -1089,12 +1090,13 @@ async def init_option(
     frame.columnconfigure(0, weight=1)
 
     pal_save = ttk.Button(frame, command=pal_ui.event_save)
-    TransToken.ui("Save Palette...").apply(pal_save)
+    localisation.set_text(pal_save, TransToken.ui("Save Palette..."))
     pal_save.grid(row=0, sticky="EW", padx=5)
     pal_ui.save_btn_state = pal_save.state
 
-    TransToken.ui("Save Palette As...").apply(
-        ttk.Button(frame, command=pal_ui.event_save_as)
+    localisation.set_text(
+        ttk.Button(frame, command=pal_ui.event_save_as),
+        TransToken.ui("Save Palette As..."),
     ).grid(row=1, sticky="EW", padx=5)
 
     pal_ui.make_option_checkbox(frame).grid(row=2, sticky="EW", padx=5)
@@ -1107,7 +1109,7 @@ async def init_option(
 
     async def game_changed(game: gameMan.Game) -> None:
         """When the game changes, update this button."""
-        game.get_export_text().apply(UI['pal_export'])
+        localisation.set_text(UI['pal_export'], game.get_export_text())
 
     await gameMan.EVENT_BUS.register_and_prime(None, gameMan.Game, game_changed)
 
@@ -1116,7 +1118,7 @@ async def init_option(
     props.grid(row=5, sticky="EW")
 
     music_frame = ttk.Labelframe(props)
-    TransToken.ui('Music: ').apply(music_frame)
+    localisation.set_text(music_frame, TransToken.ui('Music: '))
 
     async with trio.open_nursery() as nursery:
         nursery.start_soon(music_conf.make_widgets, packages.LOADED, music_frame, pane)
@@ -1144,7 +1146,9 @@ async def init_option(
 
     UI['suggested_style'] = sugg_btn =  ttk.Button(props, command=suggested_style_set)
     # '\u2193' is the downward arrow symbol.
-    TransToken.ui("{down_arrow} Use Suggested {down_arrow}").format(down_arrow='\u2193').apply(sugg_btn)
+    localisation.set_text(sugg_btn, TransToken.ui(
+        "{down_arrow} Use Suggested {down_arrow}"
+    ).format(down_arrow='\u2193'))
     sugg_btn.grid(row=1, column=1, columnspan=2, sticky="EW", padx=0)
     sugg_btn.bind('<Enter>', suggested_style_mousein)
     sugg_btn.bind('<Leave>', suggested_style_mouseout)
@@ -1167,7 +1171,7 @@ async def init_option(
         if name is None:
             # This is the "Suggested" button!
             continue
-        name.apply(ttk.Label(props)).grid(row=ind)
+        localisation.set_text(ttk.Label(props), name).grid(row=ind)
 
     voice_frame = ttk.Frame(props)
     voice_frame.columnconfigure(1, weight=1)
@@ -1266,8 +1270,9 @@ def init_preview(f: Union[tk.Frame, ttk.Frame]) -> None:
 def init_picker(f: Union[tk.Frame, ttk.Frame]) -> None:
     """Construct the frame holding all the items."""
     global frmScroll, pal_canvas
-    TransToken.ui("All Items: ").apply(
-        ttk.Label(f, anchor="center")
+    localisation.set_text(
+        ttk.Label(f, anchor="center"),
+        TransToken.ui("All Items: "),
     ).grid(row=0, column=0, sticky="EW")
     UI['picker_frame'] = cframe = ttk.Frame(f, borderwidth=4, relief="sunken")
     cframe.grid(row=1, column=0, sticky="NSEW")
@@ -1387,7 +1392,7 @@ async def set_game(game: 'gameMan.Game') -> None:
 
     This updates the title bar to match, and saves it into the config.
     """
-    TRANS_MAIN_TITLE.format(version=utils.BEE_VERSION, game=game.name).apply_title(TK_ROOT)
+    localisation.set_win_title(TK_ROOT, TRANS_MAIN_TITLE.format(version=utils.BEE_VERSION, game=game.name))
     config.APP.store_conf(LastSelected(game.name), 'game')
 
 

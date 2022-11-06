@@ -15,7 +15,7 @@ import attrs
 
 from app.tooltip import add_tooltip, set_tooltip
 from app import tk_tools
-from localisation import TransToken
+from localisation import TransToken, set_text
 
 
 UP_ARROW = '\u25B3'
@@ -146,7 +146,7 @@ class Item(Generic[UserT]):
                 anchor=tk.W,
                 background='white',
             )
-            value.apply(wid)
+            set_text(wid, value)
             add_tooltip(wid, self.hover_text)
 
             if not self.locked:
@@ -176,12 +176,11 @@ class Item(Generic[UserT]):
             )
             short_text = truncate(str(text), width-5)
             if short_text is None:
-                text.apply(widget)
+                set_text(widget, text)
                 set_tooltip(widget, self.hover_text)
             else:
-                short_text.apply(widget)
-                if not self.hover_text:
-                    set_tooltip(widget, text)
+                set_text(widget, short_text)
+                set_tooltip(widget, self.hover_text or text)
             x += width
 
     def destroy(self) -> None:
@@ -334,7 +333,7 @@ class CheckDetails(ttk.Frame, Generic[UserT]):
         label = ttk.Label(frame, font='TkHeadingFont')
         sorter = ttk.Label(frame, font='TkHeadingFont', text='')
         header = Header(frame, label, sorter)
-        text.apply(label)
+        set_text(label, text)
 
         label.grid(row=0, column=0, sticky='EW')
         sorter.grid(row=0, column=1, sticky='E')

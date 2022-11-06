@@ -22,6 +22,7 @@ from idlelib.redirector import WidgetRedirector
 from idlelib.query import Query
 import trio
 
+import localisation
 from app import TK_ROOT, background_run
 from config.gen_opts import GenOptions
 import event
@@ -768,7 +769,7 @@ class EnumButton(Generic[EnumT]):
                 # Make partial do the method binding.
                 command=functools.partial(EnumButton._select, self, val),
             )
-            label.apply(btn)
+            localisation.set_text(btn, label)
             btn.grid(row=0, column=x)
             self.buttons[val] = btn
             if val is current:
@@ -812,7 +813,7 @@ class LineHeader(ttk.Frame):
             font='TkMenuFont',
             anchor='center',
         )
-        title.apply(self.title)
+        localisation.set_text(self.title, title)
         self.title.grid(row=0, column=1)
 
         sep_right = ttk.Separator(self)

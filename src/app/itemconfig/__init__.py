@@ -9,6 +9,7 @@ from srctools import EmptyMapping, Property, Vec, logger
 import trio
 import attrs
 
+import localisation
 from app import TK_ROOT, UI, background_run, signage_ui, tkMarkdown, sound, tk_tools, StyleVarPane
 from app.tooltip import add_tooltip
 from config.widgets import WidgetConfig
@@ -379,14 +380,15 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
                 label: Optional[ttk.Label] = None
                 if s_wid.name:
                     if getattr(s_wid.create_func, 'wide', False):
-                        wid_frame = TRANS_COLON.format(text=s_wid.name).apply(
-                            ttk.LabelFrame(wid_frame)
+                        wid_frame = localisation.set_text(
+                            ttk.LabelFrame(wid_frame),
+                            TRANS_COLON.format(text=s_wid.name),
                         )
                         wid_frame.grid(row=0, column=0, columnspan=2, sticky='ew', pady=5)
                         wid_frame.columnconfigure(0, weight=1)
                     else:
                         label = ttk.Label(wid_frame)
-                        TRANS_COLON.format(text=s_wid.name).apply(label)
+                        localisation.set_text(label, TRANS_COLON.format(text=s_wid.name))
                         label.grid(row=0, column=0)
                 try:
                     widget, s_wid.ui_cback = await s_wid.create_func(wid_frame, s_wid.value, s_wid.config)
@@ -417,8 +419,9 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
             if widget_count == 1 or not m_wid.name:
                 wid_frame = ttk.Frame(frame)
             else:
-                wid_frame = TRANS_COLON.format(text=m_wid.name).apply(
-                    ttk.LabelFrame(frame)
+                wid_frame = localisation.set_text(
+                    ttk.LabelFrame(frame),
+                    TRANS_COLON.format(text=m_wid.name),
                 )
 
             wid_frame.grid(row=row, column=0, sticky='ew', pady=5)
@@ -514,7 +517,7 @@ async def make_pane(tool_frame: tk.Frame, menu_bar: tk.Menu, update_item_vis: Ca
     await StyleVarPane.make_stylevar_pane(stylevar_frame, packages.LOADED, update_item_vis)
 
     loading_text = ttk.Label(canvas_frame)
-    TransToken.ui('Loading...').apply(loading_text)
+    localisation.set_text(loading_text, TransToken.ui('Loading...'))
     loading_text.grid(row=0, column=0, sticky='ew')
     loading_text.grid_forget()
 
@@ -591,13 +594,9 @@ def widget_timer_generic(widget_func: SingleCreateFunc) -> MultiCreateFunc:
             parent.columnconfigure(1, weight=1)
 
             label = ttk.Label(parent)
-            TRANS_COLON.format(text=timer_disp).apply(label)
+            localisation.set_text(label, TRANS_COLON.format(text=timer_disp))
             label.grid(row=row, column=0)
-            widget, update = await widget_func(
-                parent,
-                var,
-                conf,
-            )
+            widget, update = await widget_func(parent, var, conf)
             yield tim_val, update
             widget.grid(row=row, column=1, sticky='ew')
 

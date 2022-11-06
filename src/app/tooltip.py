@@ -13,7 +13,7 @@ import tkinter as tk
 import attr
 
 from app import TK_ROOT, img
-from localisation import TransToken
+from localisation import TransToken, set_text
 
 __all__ = ['set_tooltip', 'add_tooltip']
 
@@ -62,7 +62,7 @@ def _show(widget: tk.Misc, mouse_x: int, mouse_y: int) -> None:
     except KeyError:
         return
 
-    data.text.apply(context_label)
+    set_text(context_label, data.text)
     img.apply(context_label, data.img)
 
     window.deiconify()

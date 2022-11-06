@@ -21,7 +21,7 @@ from app.CheckDetails import CheckDetails, Item as CheckItem
 from FakeZip import FakeZip, zip_names, zip_open_bin
 from srctools import Property, KeyValError
 from app.tooltip import add_tooltip
-from localisation import TransToken
+from localisation import TransToken, set_text, set_menu_text, set_win_title
 if TYPE_CHECKING:
     from app import gameMan
 
@@ -778,27 +778,22 @@ def init() -> None:
 
         button_frame = ttk.Frame(frame)
         button_frame.grid(column=0, row=2)
-        btn_text.apply(ttk.Label(button_frame)).grid(row=0, column=0)
+        set_text(ttk.Label(button_frame), btn_text).grid(row=0, column=0)
         UI[cat + 'btn_all'] = ttk.Button(
             button_frame,
             text='All',
             width=3,
         )
-        UI[cat + 'btn_sel'] = TransToken.ui('Checked').apply(
-            ttk.Button(button_frame, width=8)
-        )
+        UI[cat + 'btn_sel'] = set_text(ttk.Button(button_frame, width=8), TransToken.ui('Checked'))
+
         UI[cat + 'btn_all'].grid(row=0, column=1)
         UI[cat + 'btn_sel'].grid(row=0, column=2)
 
-        UI[cat + 'btn_del'] = TransToken.ui('Delete Checked').apply(
-            ttk.Button(button_frame, width=14)
-        )
-        UI[cat + 'btn_del'].grid(row=1, column=0, columnspan=3)
+        UI[cat + 'btn_del'] = btn_del = ttk.Button(button_frame, width=14)
+        set_text(btn_del, TransToken.ui('Delete Checked'))
+        btn_del.grid(row=1, column=0, columnspan=3)
 
-        tk_tools.add_mousewheel(
-            UI[cat + 'details'].wid_canvas,
-            UI[cat + 'frame'],
-        )
+        tk_tools.add_mousewheel(UI[cat + 'details'].wid_canvas, UI[cat + 'frame'])
 
     game_refresh = ttk.Button(
         UI['game_title_frame'],
@@ -836,9 +831,9 @@ def init_application() -> None:
     from app import gameMan
     global window
     window = cast(tk.Toplevel, TK_ROOT)
-    TransToken.ui(
-        'BEEMOD {version} - Backup / Restore Puzzles'
-    ).format(version=utils.BEE_VERSION).apply_title(TK_ROOT)
+    set_win_title(TK_ROOT, TransToken.ui(
+        'BEEMOD {version} - Backup / Restore Puzzles',
+    ).format(version=utils.BEE_VERSION))
 
     init()
 
@@ -852,27 +847,27 @@ def init_application() -> None:
         file_menu = menus['file'] = tk.Menu(bar, name='file')
 
     file_menu.add_command(command=ui_new_backup)
-    TransToken.ui('New Backup').apply_menu(file_menu)
+    set_menu_text(file_menu, TransToken.ui('New Backup'))
     file_menu.add_command(command=ui_load_backup)
-    TransToken.ui('Open Backup').apply_menu(file_menu)
+    set_menu_text(file_menu, TransToken.ui('Open Backup'))
     file_menu.add_command(command=ui_save_backup)
-    TransToken.ui('Save Backup').apply_menu(file_menu)
+    set_menu_text(file_menu, TransToken.ui('Save Backup'))
     file_menu.add_command(command=ui_save_backup_as)
-    TransToken.ui('Save Backup As').apply_menu(file_menu)
+    set_menu_text(file_menu, TransToken.ui('Save Backup As'))
 
     bar.add_cascade(menu=file_menu)
-    TransToken.ui('File').apply_menu(bar)
+    set_menu_text(bar, TransToken.ui('File'))
 
     game_menu = menus['game'] = tk.Menu(bar)
 
     game_menu.add_command(command=gameMan.add_game)
-    TransToken.ui('Add Game').apply_menu(game_menu)
+    set_menu_text(game_menu, TransToken.ui('Add Game'))
     game_menu.add_command(command=gameMan.remove_game)
-    TransToken.ui('Remove Game').apply_menu(game_menu)
+    set_menu_text(game_menu, TransToken.ui('Remove Game'))
     game_menu.add_separator()
 
     bar.add_cascade(menu=game_menu)
-    TransToken.ui('Game').apply_menu(bar)
+    set_menu_text(bar, TransToken.ui('Game'))
     gameMan.game_menu = game_menu
 
     from app import helpMenu
@@ -923,7 +918,7 @@ def init_backup_settings() -> None:
         variable=check_var,
         command=check_callback,
     )
-    TransToken.ui('Automatic Backup After Export').apply(enable_check)
+    set_text(enable_check, TransToken.ui('Automatic Backup After Export'))
 
     frame['labelwidget'] = enable_check
     frame.grid(row=2, column=0, columnspan=3)
@@ -950,9 +945,7 @@ def init_backup_settings() -> None:
         frame,
     )
     count_frame.grid(row=0, column=1)
-    TransToken.ui('Keep (Per Game):').apply(
-        ttk.Label(count_frame)
-    ).grid(row=0, column=0)
+    set_text(ttk.Label(count_frame), TransToken.ui('Keep (Per Game):')).grid(row=0, column=0)
 
     count = tk_tools.ttk_Spinbox(
         count_frame,
@@ -969,7 +962,7 @@ def init_toplevel() -> None:
     window = tk.Toplevel(TK_ROOT)
     window.transient(TK_ROOT)
     window.withdraw()
-    TransToken.ui('Backup/Restore Puzzles').apply_title(window)
+    set_win_title(window, TransToken.ui('Backup/Restore Puzzles'))
 
     def quit_command() -> None:
         """Close the window."""
@@ -984,20 +977,24 @@ def init_toplevel() -> None:
 
     # When embedded in the BEE2, use regular buttons and a dropdown!
     toolbar_frame = ttk.Frame(window)
-    TransToken.ui('New Backup').apply(
-        ttk.Button(toolbar_frame, command=ui_new_backup)
+    set_text(
+        ttk.Button(toolbar_frame, command=ui_new_backup),
+        TransToken.ui('New Backup'),
     ).grid(row=0, column=0)
 
-    TransToken.ui('Open Backup').apply(
-        ttk.Button(toolbar_frame, command=ui_load_backup)
+    set_text(
+        ttk.Button(toolbar_frame, command=ui_load_backup),
+        TransToken.ui('Open Backup'),
     ).grid(row=0, column=1)
 
-    TransToken.ui('Save Backup').apply(
-        ttk.Button(toolbar_frame, command=ui_save_backup)
+    set_text(
+        ttk.Button(toolbar_frame, command=ui_save_backup),
+        TransToken.ui('Save Backup'),
     ).grid(row=0, column=2)
 
-    TransToken.ui('.. As').apply(
-        ttk.Button(toolbar_frame, command=ui_save_backup_as)
+    set_text(
+        ttk.Button(toolbar_frame, command=ui_save_backup_as),
+        TransToken.ui('.. As'),
     ).grid(row=0, column=3)
 
     toolbar_frame.grid(row=0, column=0, columnspan=3, sticky='W')

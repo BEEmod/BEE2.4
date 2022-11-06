@@ -3,6 +3,7 @@ from typing import Callable, Any, Union
 import tkinter as tk
 from tkinter import ttk
 
+import localisation
 from app import tooltip, tk_tools, sound
 from app.img import Handle as ImgHandle, apply as apply_img
 from localisation import TransToken
@@ -80,11 +81,11 @@ class SubPane(tk.Toplevel):
         tooltip.add_tooltip(self.tool_button, text=TOOL_BTN_TOOLTIP.format(window=title))
 
         menu_bar.add_checkbutton(variable=self.visible, command=self._set_state_from_menu)
-        title.apply_menu(menu_bar)
+        localisation.set_menu_text(menu_bar, title)
 
         self.transient(master=parent)
         self.resizable(resize_x, resize_y)
-        title.apply_title(self)
+        localisation.set_win_title(self, title)
         tk_tools.set_window_icon(self)
 
         self.protocol("WM_DELETE_WINDOW", self.hide_win)

@@ -26,6 +26,7 @@ import srctools.logger
 from editoritems import Handle as RotHandle, Surface, ItemClass, FSPath
 from editoritems_props import prop_timer_delay
 from localisation import TransToken
+import localisation
 
 LOGGER = srctools.logger.get_logger(__name__)
 
@@ -267,7 +268,7 @@ def load_item_data() -> None:
     wid_subitem[pos_for_item(selected_sub_item.subKey)]['relief'] = 'raised'
 
     wid['author']['text'] = ', '.join(item_data.authors)
-    selected_sub_item.name.apply(wid['name'])
+    localisation.set_text(wid['name'], selected_sub_item.name)
     wid['ent_count']['text'] = item_data.ent_count or '??'
 
     desc = get_description(
@@ -462,9 +463,7 @@ def init_widgets() -> None:
     f = ttk.Frame(window, relief="raised", borderwidth="4")
     f.grid(row=0, column=0)
 
-    TransToken.ui("Properties:").apply(
-        ttk.Label(f, anchor="center")
-    ).grid(
+    localisation.set_text(ttk.Label(f, anchor="center"), TransToken.ui("Properties:")).grid(
         row=0,
         column=0,
         columnspan=3,
@@ -507,8 +506,9 @@ def init_widgets() -> None:
         tk_tools.bind_leftclick(wid_subitem[i], functools.partial(sub_sel, i))
         tk_tools.bind_rightclick(wid_subitem[i], functools.partial(sub_open, i))
 
-    TransToken.ui("Description:").apply(
-        ttk.Label(f, anchor="sw")
+    localisation.set_text(
+        ttk.Label(f, anchor="sw"),
+        TransToken.ui("Description:")
     ).grid(row=5, column=0, sticky="SW")
 
     spr_frame = ttk.Frame(f, borderwidth=4, relief="sunken")
@@ -562,12 +562,12 @@ def init_widgets() -> None:
             hide_context(None)
 
     wid['moreinfo'] = ttk.Button(f, command=show_more_info)
-    TransToken.ui("More Info>>").apply(wid['moreinfo'])
+    localisation.set_text(wid['moreinfo'], TransToken.ui("More Info>>"))
     wid['moreinfo'].grid(row=7, column=2, sticky='e')
     tooltip.add_tooltip(wid['moreinfo'])
 
     def show_item_props() -> None:
-        """Display the item properties pane."""
+        """Display the item property pane."""
         sound.fx('expand')
         itemPropWin.show_window(
             selected_item.get_properties(),
@@ -576,7 +576,7 @@ def init_widgets() -> None:
         )
 
     wid['changedefaults'] = ttk.Button(f, command=show_item_props)
-    TransToken.ui("Change Defaults...").apply(wid['changedefaults'])
+    localisation.set_text(wid['changedefaults'], TransToken.ui("Change Defaults..."))
     wid['changedefaults'].grid(row=7, column=1)
     tooltip.add_tooltip(
         wid['changedefaults'],

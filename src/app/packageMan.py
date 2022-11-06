@@ -4,6 +4,8 @@ from __future__ import annotations
 from typing import Iterable
 from tkinter import ttk
 import tkinter as tk
+
+import localisation
 from app import TK_ROOT, tk_tools
 
 from app.CheckDetails import CheckDetails, Item as CheckItem
@@ -82,7 +84,7 @@ def make_window() -> None:
     """Initialise the window."""
     global list_widget
     window.transient(TK_ROOT)
-    TransToken.ui('BEE2 - Manage Packages').apply_title(window)
+    localisation.set_win_title(window, TransToken.ui('BEE2 - Manage Packages'))
 
     # Don't destroy window when quit!
     window.protocol("WM_DELETE_WINDOW", cancel)
@@ -102,10 +104,12 @@ def make_window() -> None:
     frame.columnconfigure(0, weight=1)
     frame.rowconfigure(0, weight=1)
 
-    TransToken.ui('OK').apply(
-        ttk.Button(frame, command=apply_changes)
+    localisation.set_text(
+        ttk.Button(frame, command=apply_changes),
+        TransToken.ui('OK'),
     ).grid(row=1, column=0, sticky='W')
 
-    TransToken.ui('Cancel').apply(
-        ttk.Button(frame, command=cancel)
+    localisation.set_text(
+        ttk.Button(frame, command=cancel),
+        TransToken.ui('Cancel'),
     ).grid(row=1, column=1, sticky='E')

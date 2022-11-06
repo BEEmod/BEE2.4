@@ -5,7 +5,8 @@ GitHub repo, which ensures we're able to change them retroactively if the old UR
 whatever reason.
 """
 import io
-import urllib.request, urllib.error
+import urllib.request
+import urllib.error
 from enum import Enum
 from typing import Any, Callable, Dict, cast
 from tkinter import ttk
@@ -18,6 +19,7 @@ import attrs
 import srctools.logger
 import trio.to_thread
 
+import localisation
 from app.richTextBox import tkRichText
 from app import tkMarkdown, tk_tools, sound, img, TK_ROOT, background_run
 from localisation import TransToken
@@ -432,7 +434,7 @@ class Dialog(tk.Toplevel):
     def __init__(self, title: TransToken, text: str):
         super().__init__(TK_ROOT)
         self.withdraw()
-        title.apply_title(self)
+        localisation.set_win_title(self, title)
         self.transient(master=TK_ROOT)
         self.resizable(width=True, height=True)
         self.text = text
@@ -462,8 +464,9 @@ class Dialog(tk.Toplevel):
         scrollbox.grid(row=0, column=1, sticky='ns')
         self.textbox['yscrollcommand'] = scrollbox.set
 
-        TransToken.ui('Close').apply(
-            ttk.Button(frame, command=self.withdraw)
+        localisation.set_text(
+            ttk.Button(frame, command=self.withdraw),
+            TransToken.ui('Close'),
         ).grid(row=1, column=0)
 
     async def show(self) -> None:
@@ -536,7 +539,7 @@ def make_help_menu(parent: tk.Menu) -> None:
     help_menu = tk.Menu(parent, name='help')
 
     parent.add_cascade(menu=help_menu)
-    TransToken.ui('Help').apply_menu(parent)
+    localisation.set_menu_text(parent, TransToken.ui('Help'))
 
     icons: Dict[ResIcon, img.Handle] = {
         icon: img.Handle.sprite('icons/' + icon.value, 16, 16)
@@ -556,8 +559,8 @@ def make_help_menu(parent: tk.Menu) -> None:
                 compound='left',
                 image=icons[res.icon].get_tk(),
             )
-            res.name.apply_menu(help_menu)
+            localisation.set_menu_text(help_menu, res.name)
 
     help_menu.add_separator()
     help_menu.add_command(command=functools.partial(background_run, credit_window.show))
-    TransToken.ui('Credits...').apply_menu(help_menu)
+    localisation.set_menu_text(help_menu, TransToken.ui('Credits...'))

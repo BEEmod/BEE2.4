@@ -10,9 +10,10 @@ import srctools.logger
 
 from app.paletteLoader import Palette
 from app import background_run, tk_tools, paletteLoader, TK_ROOT, img
-from localisation import TransToken
 from consts import PALETTE_FORCE_SHOWN, UUID_BLANK, UUID_EXPORT, UUID_PORTAL2
 from config.palette import PaletteState
+from localisation import TransToken
+import localisation
 import config
 
 
@@ -64,8 +65,9 @@ class PaletteUI:
 
         f.rowconfigure(1, weight=1)
         f.columnconfigure(0, weight=1)
-        TransToken.ui('Clear Palette').apply(
-            ttk.Button(f, command=cmd_clear)
+        localisation.set_text(
+            ttk.Button(f, command=cmd_clear),
+            TransToken.ui('Clear Palette'),
         ).grid(row=0, sticky="EW")
 
         self.ui_treeview = treeview = ttk.Treeview(f, show='tree', selectmode='browse')
@@ -93,7 +95,7 @@ class PaletteUI:
         self.ui_treeview['yscrollcommand'] = scrollbar.set
 
         self.ui_remove = ttk.Button(f, command=self.event_remove)
-        TransToken.ui("Delete Palette").apply(self.ui_remove)
+        localisation.set_text(self.ui_remove, TransToken.ui("Delete Palette"))
         self.ui_remove.grid(row=2, sticky="EW")
 
         if tk_tools.USE_SIZEGRIP:
@@ -166,6 +168,8 @@ class PaletteUI:
 
     def update_state(self) -> None:
         """Update the UI to show correct state."""
+        # This is called if languages change, so we can just immediately convert translation tokens.
+
         # Clear out all the current data.
         for grp_menu in self.ui_group_menus.values():
             grp_menu.delete(0, 'end')
@@ -252,7 +256,7 @@ class PaletteUI:
                 self.ui_menu_delete_index,
                 label=TransToken.ui('Hide Palette "{name}"').format(name=self.selected.name),
             )
-            TRANS_HIDE.apply(self.ui_remove)
+            localisation.set_text(self.ui_remove, TRANS_HIDE)
 
             self.save_btn_state(('disabled',))
             for ind in self.ui_readonly_indexes:
@@ -262,7 +266,7 @@ class PaletteUI:
                 self.ui_menu_delete_index,
                 label=TransToken.ui('Delete Palette "{name}"').format(name=self.selected.name),
             )
-            TRANS_DELETE.apply(self.ui_remove)
+            localisation.set_text(self.ui_remove, TRANS_DELETE)
 
             self.save_btn_state(('!disabled',))
             for ind in self.ui_readonly_indexes:
@@ -282,7 +286,7 @@ class PaletteUI:
             variable=self.var_save_settings,
             command=self._store_configuration,
         )
-        TransToken.ui('Save Settings in Palettes').apply(check)
+        localisation.set_text(check, TransToken.ui('Save Settings in Palettes'))
         return check
 
     def _store_configuration(self) -> None:
