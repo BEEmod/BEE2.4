@@ -64,6 +64,9 @@ def do_localisation() -> None:
         if 'test_localisation' in filename:
             # Test code for the localisation module, skip these tokens.
             continue
+        elif 'user_errors.py' in filename:
+            # Tokens for the error display are here, so indicate they accept HTML.
+            comments.append('This uses HTML syntax.')
         catalog.add(
             message,
             locations=[(os.path.normpath(filename), lineno)],

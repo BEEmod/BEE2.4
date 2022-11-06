@@ -7,6 +7,7 @@ import attrs
 from srctools import Vec, logger
 
 import utils
+from transtoken import TransToken
 
 
 Kind = Literal["white", "black", "goo", "goopartial", "goofull", "back"]
@@ -21,7 +22,7 @@ class SimpleTile(TypedDict):
 @attrs.frozen
 class ErrorInfo:
     """Data to display to the user."""
-    message: str
+    message: TransToken
     context: str  # Logging context
     faces: Dict[Kind, List[SimpleTile]]
     points: List[Tuple[float, float, float]]  # Points of interest in the map.
@@ -39,10 +40,11 @@ class UserError(BaseException):
     """
     _simple_tiles: ClassVar[Dict[Kind, List[SimpleTile]]] = {}
 
-    def __init__(self, message: str, *args: object, points: Iterable[Vec]=()) -> None:
+    def __init__(self, message: TransToken, points: Iterable[Vec]=()) -> None:
         """Specify the info to show to the user.
 
-        * message is a str.format() string, using args as the parameters.
+        * message is a translation token potentially containing HTML. Strings formatted into it
+        will be escaped. TODO implement.
         * points is a list of offending map locations, which will be placed
           in a copy of the map for the user to see.
         """
@@ -55,11 +57,16 @@ class UserError(BaseException):
             ctx = ''
 
         self.info = ErrorInfo(
-            message.format(*args),
+            message,
             ctx,
             self._simple_tiles,
             list(map(tuple, points)),
         )
 
     def __str__(self) -> str:
-        return 'Error message: ' + self.info.message
+        return f'Error message: {self.info.message}'
+
+
+# Define a translation token for every error message that can be produced. The app will translate
+# them all during export, then store that for the compiler's use.
+
