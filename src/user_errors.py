@@ -46,7 +46,9 @@ class UserError(BaseException):
         self,
         message: TransToken,
         points: Iterable[Vec]=(),
+        *,
         docsurl: str='',
+        textlist: Iterable[str]=(),
     ) -> None:
         """Specify the info to show to the user.
 
@@ -66,6 +68,17 @@ class UserError(BaseException):
 
         if isinstance(message, str):  # Temporary, prevent this breaking.
             message = TransToken.untranslated(message)
+
+        if textlist:
+            # Build up a bullet list.
+            tok_list_elem = TransToken.untranslated('<li><code>{text}</code></li>\n')
+            message = TransToken.untranslated('{msg}\n<ul>{list}</ul>').format(
+                msg=message,
+                list=TransToken.untranslated('\n').join([
+                    tok_list_elem.format(text=value)
+                    for value in textlist
+                ]),
+            )
 
         if docsurl:
             message = TOK_SEEDOCS.format(msg=message, url=docsurl)
@@ -147,6 +160,14 @@ TOK_CUBE_DROPPER_LINKED = TransToken.ui(
 TOK_FIZZLER_NO_ITEM = TransToken.ui('No item ID for fizzler instance <var>"{inst}"</var>!')
 TOK_FIZZLER_UNKNOWN_TYPE = TransToken.ui('No fizzler type for {item} (<var>"{inst}"</var>)!')
 TOK_FIZZLER_NO_MODEL_SIDE = TransToken.ui('No model specified for one side of "{id}" fizzlers.')
+
+TOK_INSTLOC_EMPTY = TransToken.ui(
+    'Instance lookup path <code>"{path}"</code> returned no instances.'
+)
+TOK_INSTLOC_MULTIPLE = TransToken.ui(
+    'Instance lookup path <code>"{path}"</code> was expected to provide one instance, '
+    'but it returned multiple instances:'
+)
 
 # Tokens used when the system fails.
 TOK_ERR_MISSING = TransToken.ui('<strong>No error?</strong>')

@@ -16,7 +16,7 @@ from typing import (
     List, Dict, Tuple, TypeVar, Iterable,
 )
 import corridor
-from user_errors import UserError
+import user_errors
 
 LOGGER = srctools.logger.get_logger(__name__)
 
@@ -328,11 +328,14 @@ def resolve_one(path, default: Union[str, Default_T]='', error=False) -> Union[s
     instances = resolve(path)
     if not instances:
         if error:
-            raise UserError('Path "{}" has no instances!', path)
+            raise user_errors.UserError(user_errors.TOK_INSTLOC_EMPTY.format(path=path))
         return default
     if len(instances) > 1:
         if error:
-            raise UserError('Path "{}" has multiple instances!', path)
+            raise user_errors.UserError(
+                user_errors.TOK_INSTLOC_MULTIPLE.format(path=path),
+                textlist=instances,
+            )
         LOGGER.warning('Path "{}" returned multiple instances', path)
     return instances[0]
 
