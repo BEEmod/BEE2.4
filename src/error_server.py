@@ -61,6 +61,7 @@ async def route_render_data() -> dict:
     return {
         'tiles': current_error.faces,
         'points': current_error.points,
+        'leak': current_error.leakpoints,
     }
 
 

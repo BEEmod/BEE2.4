@@ -2,9 +2,9 @@
 
 UserError is imported all over, so this needs to have minimal imports to avoid cycles.
 """
-from typing import ClassVar, Dict, Iterable, List, Literal, Tuple, TypedDict
+from typing import ClassVar, Collection, Dict, Iterable, List, Literal, Tuple, TypedDict
 import attrs
-from srctools import Vec, logger
+from srctools import Matrix, Vec, logger
 
 import utils
 from transtoken import TransToken
@@ -28,10 +28,21 @@ class ErrorInfo:
     faces: Dict[Kind, List[SimpleTile]] = attrs.Factory(dict)
     # Points of interest in the map.
     points: List[Tuple[float, float, float]] = attrs.Factory(list)
+    # Special list of locations forming a pointfile line.
+    leakpoints: List[Tuple[float, float, float]] = attrs.Factory(list)
 
 
 DATA_LOC = utils.conf_location('compile_error.pickle')
 SERVER_PORT = utils.conf_location('error_server_url.txt')
+
+
+def to_threespace(vec: Vec) -> Tuple[float, float, float]:
+    """Convert a vector to the conventions THREE.js uses."""
+    return (
+        vec.x / 128.0,
+        vec.z / 128.0,
+        vec.y / -128.0,
+    )
 
 
 class UserError(BaseException):
@@ -48,7 +59,8 @@ class UserError(BaseException):
         points: Iterable[Vec]=(),
         *,
         docsurl: str='',
-        textlist: Iterable[str]=(),
+        textlist: Collection[str]=(),
+        leakpoints: Collection[Vec]=(),
     ) -> None:
         """Specify the info to show to the user.
 
@@ -57,6 +69,8 @@ class UserError(BaseException):
         :param points: This is a list of offending map locations, which will be displayed in a
             render of the map.
         :param docsurl: If specified, adds a link to relevant documentation.
+        :param textlist: If specified, adds the specified strings as a bulleted list.
+        :param leakpoints: Specifies pointfile locations to display a leak.
         """
         if utils.DEV_MODE:
             try:
@@ -69,9 +83,12 @@ class UserError(BaseException):
         if isinstance(message, str):  # Temporary, prevent this breaking.
             message = TransToken.untranslated(message)
 
+        if leakpoints:
+            textlist = [f'({point})' for point in leakpoints]
+
         if textlist:
             # Build up a bullet list.
-            tok_list_elem = TransToken.untranslated('<li><code>{text}</code></li>\n')
+            tok_list_elem = TransToken.untranslated('<li><code>{text}</code></li>')
             message = TransToken.untranslated('{msg}\n<ul>{list}</ul>').format(
                 msg=message,
                 list=TransToken.untranslated('\n').join([
@@ -87,10 +104,8 @@ class UserError(BaseException):
             message,
             ctx,
             self._simple_tiles,
-            [
-                (point.x / 128, point.y / 128, point.z / 128)
-                for point in points
-            ],
+            points=list(map(to_threespace, points)),
+            leakpoints=list(map(to_threespace, leakpoints)),
         )
 
     def __str__(self) -> str:
@@ -115,6 +130,13 @@ TOK_UNKNOWN_ID = TransToken.ui('Unknown {kind} ID "<var>{id}</var>".')
 TOK_SEEDOCS = TransToken.untranslated('{msg}\n<p><a href="{url}">See the documentation</a>.</p>')
 
 # Specific errors:
+
+TOK_LEAK = TransToken.ui(
+    'This map has <a href="https://developer.valvesoftware.com/wiki/Leak">"leaked"</a>. This is a '
+    'bug in an item or style, which should be fixed. The displayed line indicates the location of '
+    'the leak, you may be able to resolve it by removing/modifying items in that area. Please '
+    'submit a bug report to the author of the item so this can be resolved. Leak coordinates:'
+)
 
 TOK_GLASS_FLOORBEAM_TEMPLATE = TransToken.ui(
     'Bad Glass Floorbeam template! The template must have a single brush, with one face '

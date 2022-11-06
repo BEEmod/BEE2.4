@@ -56,6 +56,7 @@ window.addEventListener("load", () => {
 	const select_mat = new THREE.MeshToonMaterial({
 		color: 0xFAFA28, transparent: true, opacity: 0.5, side: THREE.DoubleSide,
 	});
+	const pointfile_mat = new THREE.LineBasicMaterial({color: 0xFF0000});
 
 	const renderer = new THREE.WebGLRenderer();
 	const controls = new OrbitControls( camera, renderer.domElement );
@@ -114,10 +115,16 @@ window.addEventListener("load", () => {
 		const point_geo = new THREE.BoxGeometry(0.5, 0.5, 0.5);
 		for(const point of data.points) {
 			const mesh = new THREE.Mesh(point_geo, select_mat);
-			mesh.position.set(point[0], point[2], -point[1]);
+			mesh.position.set(point[0], point[1], point[2]);
 			scene.add(mesh);
 		}
 
+		if (data.leak) {
+			const geo = new THREE.BufferGeometry().setFromPoints(data.leak.map(
+				point => new THREE.Vector3(point[0], point[1], point[2])
+			));
+			scene.add(new THREE.Line(geo, pointfile_mat));
+		}
 		camera.position.set(-5, 3, 5);
 		controls.update();
 

@@ -47,7 +47,7 @@ from precomp import (
 import consts
 import editoritems
 
-from typing import Any, Dict, List, Tuple, Set, Iterable, Optional
+from typing import Any, Dict, Tuple, Set, Iterable, Optional
 from typing_extensions import TypedDict
 
 
@@ -1288,8 +1288,8 @@ def save(vmf: VMF, path: str) -> None:
     LOGGER.info("Complete!")
 
 
-def run_vbsp(vbsp_args, path, new_path=None) -> None:
-    """Execute the original VBSP, copying files around so it works correctly.
+def run_vbsp(vbsp_args, path, new_path=None, is_error_map: bool=False) -> None:
+    """Execute the original VBSP, copying files around to make it work correctly.
 
     vbsp_args are the arguments to pass.
     path is the original .vmf, new_path is the styled/ name.
@@ -1327,6 +1327,20 @@ def run_vbsp(vbsp_args, path, new_path=None) -> None:
         'linux32/vbsp' if utils.LINUX else 'vbsp',
         vbsp_args, vbsp_logger,
     )
+
+    # Check for leaks!
+    if new_path is not None and not is_error_map:
+        pointfile = new_path.replace(".vmf", ".lin")
+        LOGGER.info('Files present: {}', os.listdir(os.path.dirname(new_path)))
+        if os.path.isfile(pointfile):  # We leaked!
+            points = []
+            with open(pointfile) as f:
+                for line in f:
+                    points.append(Vec.from_str(line.strip()))
+            # Preserve this.
+            os.replace(pointfile, pointfile[:-4] + ".bee2.lin")
+            raise errors.UserError(errors.TOK_LEAK, leakpoints=points)
+
     if code != 0:
         # VBSP didn't succeed.
         if is_peti:  # Ignore Hammer maps
@@ -1609,6 +1623,18 @@ def main() -> None:
                 out.comma_sep = False
         # Set this so VRAD can know.
         vmf.spawn['BEE2_is_preview'] = info.is_preview
+        # Ensure VRAD knows that the map is PeTI, it can't figure that out
+        # from parameters.
+        vmf.spawn['BEE2_is_peti'] = True
+
+        # Save and run VBSP. If this leaks, this will raise UserError, and we'll compile again.
+        if not skip_vbsp:
+            save(vmf, new_path)
+            run_vbsp(
+                vbsp_args=new_args,
+                path=path,
+                new_path=new_path,
+            )
     except errors.UserError as error:
         # The user did something wrong, so the map is invalid.
         # Compile a special map which displays the message.
@@ -1618,19 +1644,16 @@ def main() -> None:
         # Flag as preview and errored for VRAD.
         vmf.spawn['BEE2_is_preview'] = True
         vmf.spawn['BEE2_is_error'] = True
+        vmf.spawn['BEE2_is_peti'] = True
 
-    # Ensure VRAD knows that the map is PeTI, it can't figure that out
-    # from parameters.
-    vmf.spawn['BEE2_is_peti'] = True
-
-    # In both user-error and normal cases, we just save and run VBSP.
-    if not skip_vbsp:
-        save(vmf, new_path)
-        run_vbsp(
-            vbsp_args=new_args,
-            path=path,
-            new_path=new_path,
-        )
+        if not skip_vbsp:
+            save(vmf, new_path)
+            run_vbsp(
+                vbsp_args=new_args,
+                path=path,
+                new_path=new_path,
+                is_error_map=True,
+            )
 
     LOGGER.info("BEE2 VBSP hook finished!")
 

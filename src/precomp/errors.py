@@ -6,9 +6,12 @@ from typing import Iterable
 import consts
 from srctools import Vec, VMF, AtomicWriter
 
-from user_errors import DATA_LOC, UserError
+from user_errors import DATA_LOC, UserError, TOK_LEAK
 from precomp.tiling import TileDef, TileType
 from precomp.brushLoc import Grid
+
+
+__all__ = ['UserError', 'TOK_LEAK', 'load_tiledefs']
 
 
 def load_tiledefs(tiles: Iterable[TileDef], grid: Grid) -> None:
