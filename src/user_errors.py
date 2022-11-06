@@ -56,6 +56,9 @@ class UserError(BaseException):
         else:
             ctx = ''
 
+        if isinstance(message, str):  # Temporary, prevent this breaking.
+            message = TransToken.untranslated(message)
+
         self.info = ErrorInfo(
             message,
             ctx,
@@ -70,3 +73,26 @@ class UserError(BaseException):
 # Define a translation token for every error message that can be produced. The app will translate
 # them all during export, then store that for the compiler's use.
 
+
+TOK_GLASS_FLOORBEAM_TEMPLATE = TransToken.ui(
+    'Bad Glass Floorbeam template! The template must have a single brush, with one face '
+    'pointing in the <var>+X</var> direction.'
+)
+
+TOK_CONNECTION_REQUIRED_ITEM = TransToken.ui(
+    'No I/O configuration specified for special indicator item "<var>{item}</var>"! This is '
+    'required for antlines to work.'
+)
+
+TOK_CONNECTIONS_UNKNOWN_INSTANCE = TransToken.ui(
+    'The instance named "<var>{item}</var>" is not recognised! If you just swapped styles and '
+    'exported, you will need to restart Portal 2. Otherwise check the relevant package.'
+)
+
+TOK_CONNECTIONS_INSTANCE_NO_IO = TransToken.ui(
+    'The instance "<var>{inst}</var>" is reciving inputs, but none were configured in the item. '
+    'Check for reuse of the instance in multiple items, or restart Portal 2 '
+    'if you just exported.'
+)
+
+TOK_NO_CORRIDOR = TransToken.ui('No corridors available for {orient} {mode} {dir} group!')

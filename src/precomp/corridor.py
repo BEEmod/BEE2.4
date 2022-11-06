@@ -16,7 +16,7 @@ from corridor import (  # noqa
     CORRIDOR_COUNTS, CORR_TO_ID, ID_TO_CORR,
     Corridor, ExportedConf, parse_filename,
 )
-from user_errors import UserError
+import user_errors
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -135,10 +135,11 @@ def analyse_and_modify(
             max_count = CORRIDOR_COUNTS[corr_mode, corr_dir]
             poss_corr = conf[corr_mode, corr_dir, corr_orient]
             if not poss_corr:
-                raise UserError(
-                    f'No corridors available for {corr_orient.value} {corr_mode.value} '
-                    f'{corr_dir.value.title()}!'
-                )
+                raise user_errors.UserError(user_errors.TOK_NO_CORRIDOR.format(
+                    orient=corr_orient.value.title(),
+                    mode=corr_mode.value.title(),
+                    dir=corr_dir.value.title(),
+                ))
             elif len(poss_corr) > max_count:
                 # More than the entropy we have, use our randomisation.
                 chosen = rand.seed(b'corridor', file).choice(poss_corr)

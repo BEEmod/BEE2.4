@@ -14,7 +14,7 @@ from precomp import (
     template_brush, conditions, collisions,
 )
 import consts
-from user_errors import UserError
+import user_errors
 from precomp.grid_optim import optimise as grid_optimise
 from precomp.instanceLocs import resolve_one, resolve
 
@@ -577,7 +577,7 @@ def add_glass_floorbeams(vmf: VMF, temp_name: str):
     try:
         [beam_template] = template.visgrouped_solids()
     except ValueError:
-        raise UserError('Bad Glass Floorbeam template! Must have exactly one brush.')
+        raise user_errors.UserError(user_errors.TOK_GLASS_FLOORBEAM_TEMPLATE)
 
     # Grab the 'end' side, which we move around.
     for side in beam_template.sides:
@@ -585,7 +585,7 @@ def add_glass_floorbeams(vmf: VMF, temp_name: str):
             beam_end_face = side
             break
     else:
-        raise UserError('Glass Floorbeam template is not an axis-aligned beam, cannot find faces to resize!')
+        raise user_errors.UserError(user_errors.TOK_GLASS_FLOORBEAM_TEMPLATE)
 
     separation = options.get(int, 'glass_floorbeam_sep') + 1
     separation *= 128
