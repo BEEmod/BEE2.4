@@ -7,6 +7,7 @@ This is also imported in the compiler, so UI imports must be inside functions.
 """
 import io
 import os.path
+import warnings
 from pathlib import Path
 from typing import (
     AsyncIterator, Callable, ClassVar, Dict, Iterable, Iterator, List, Mapping, Sequence,
@@ -28,6 +29,7 @@ from config.gen_opts import GenOptions
 import config
 import utils
 
+
 if TYPE_CHECKING:  # Don't import at runtime, we don't want TK in the compiler.
     import tkinter as tk
     from tkinter import ttk
@@ -36,6 +38,7 @@ if TYPE_CHECKING:  # Don't import at runtime, we don't want TK in the compiler.
 
 __all__ = [
     'TransToken',
+    'set_text', 'set_menu_text', 'set_win_title', 'add_callback',
     'DUMMY', 'Language', 'set_language', 'load_aux_langs',
     'setup', 'expand_langcode',
     'TransTokenSource', 'rebuild_app_langs', 'rebuild_package_langs',
@@ -269,47 +272,26 @@ class TransToken:
             return result
 
     def apply(self, widget: TextWidgetT) -> TextWidgetT:
-        """Apply this text to the specified label/button/etc."""
-        widget['text'] = str(self)
-        _applied_tokens[widget] = self
-        return widget
+        warnings.warn('Use the function', DeprecationWarning, stacklevel=2)
+        return set_text(widget, self)
 
     def apply_title(self, win: Union['tk.Toplevel', 'tk.Tk']) -> None:
-        """Set the title of a window to this token."""
-        self.add_callback(lambda: win.title(str(self)))
+        warnings.warn('Use the function', DeprecationWarning, stacklevel=2)
+        set_win_title(win, self)
 
     def apply_menu(self, menu: 'tk.Menu', index: Union[str, int] = 'end') -> None:
-        """Apply this text to the item on the specified menu.
-
-        By default, it is applied to the last item.
-        """
-        try:
-            tok_map = _applied_menu_tokens[menu]
-        except KeyError:
-            tok_map = _applied_menu_tokens[menu] = {}
-        ind = menu.index(index)
-        menu.entryconfigure(ind, label=str(self))
-        tok_map[ind] = self
+        warnings.warn('Use the function', DeprecationWarning, stacklevel=2)
+        set_menu_text(menu, self, index)
 
     @classmethod
     def clear_stored_menu(cls, menu: 'tk.Menu') -> None:
         """Clear the tokens for the specified menu."""
-        _applied_menu_tokens.pop(menu, None)
+        clear_stored_menu(menu)
 
     @classmethod
     def add_callback(cls, func: Callable[[], object], call: bool = True) -> None:
-        """Register a function which is called after translations are reloaded.
+        add_callback(func, call)
 
-        This should be used to re-apply tokens in complicated situations after languages change.
-        If call is true, the function will immediately be called to apply it now.
-        """
-        _langchange_callback.append(func)
-        if call:
-            func()
-
-
-# Token and "source" string, for updating translation files.
-TransTokenSource = Tuple[TransToken, str]
 TransToken.BLANK = TransToken.untranslated('')
 
 
@@ -399,6 +381,52 @@ class JoinTransToken(TransToken):
         if self.sort:
             items.sort()
         return sep.join(items)
+
+
+# Token and "source" string, for updating translation files.
+TransTokenSource = Tuple[TransToken, str]
+
+
+def set_text(widget: TextWidgetT, token: TransToken) -> TextWidgetT:
+    """Apply a token to the specified label/button/etc."""
+    widget['text'] = str(token)
+    _applied_tokens[widget] = token
+    return widget
+
+
+def set_win_title(win: Union['tk.Toplevel', 'tk.Tk'], token: TransToken) -> None:
+    """Set the title of a window to this token."""
+    add_callback(lambda: win.title(str(token)))
+
+
+def set_menu_text(menu: 'tk.Menu', token: TransToken, index: Union[str, int] = 'end') -> None:
+    """Apply this text to the item on the specified menu.
+
+    By default, it is applied to the last item.
+    """
+    try:
+        tok_map = _applied_menu_tokens[menu]
+    except KeyError:
+        tok_map = _applied_menu_tokens[menu] = {}
+    ind = menu.index(index)
+    menu.entryconfigure(ind, label=str(token))
+    tok_map[ind] = token
+
+
+def clear_stored_menu(menu: 'tk.Menu') -> None:
+    """Clear the tokens for the specified menu."""
+    _applied_menu_tokens.pop(menu, None)
+
+
+def add_callback(func: Callable[[], object], call: bool = True) -> None:
+    """Register a function which is called after translations are reloaded.
+
+    This should be used to re-apply tokens in complicated situations after languages change.
+    If call is true, the function will immediately be called to apply it now.
+    """
+    _langchange_callback.append(func)
+    if call:
+        func()
 
 
 def expand_langcode(lang_code: str) -> List[str]:
