@@ -1600,8 +1600,6 @@ def main() -> None:
         change_overlays(vmf)
         fix_worldspawn(vmf)
 
-        raise errors.UserError('<p>Something is horribly wrong with this test chamber:</p>')
-
         if utils.DEV_MODE:
             coll.dump(vmf, vis_name='collisions')
 
