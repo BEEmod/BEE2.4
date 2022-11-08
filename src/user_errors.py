@@ -10,7 +10,7 @@ import utils
 from transtoken import TransToken
 
 
-Kind = Literal["white", "black", "goo", "goopartial", "goofull", "back"]
+Kind = Literal["white", "black", "goo", "goopartial", "goofull", "back", "glass", "grating"]
 
 
 class SimpleTile(TypedDict):

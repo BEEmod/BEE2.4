@@ -39,12 +39,23 @@ window.addEventListener("load", () => {
 	mats.set("black", new THREE.MeshToonMaterial({map: loader.load('static/grid3b.png')}));
 	mats.set("goopartial", new THREE.MeshToonMaterial({map: loader.load('static/grid_goo_partial.png')}));
 	mats.set("goofull", new THREE.MeshToonMaterial({map: loader.load('static/grid_goo_full.png')}));
-	mats.set("goo", new THREE.MeshBasicMaterial({
+	mats.set("glass", new THREE.MeshToonMaterial({
+		color: 0x3CA1ED,
+		transparent: true,
+		opacity: 0.33,
+		side: THREE.DoubleSide,
+	}));
+	mats.set("grating", new THREE.MeshToonMaterial({
+		map: loader.load('static/grating.png'),
+		transparent: true,
+		side: THREE.DoubleSide,
+	}));
+	mats.set("goo", new THREE.MeshToonMaterial({
 		color: 0x5C6D72,
 		transparent: true,
 		opacity: 0.8,
 	}));
-	mats.set("back", new THREE.MeshBasicMaterial({color: 0x777777}));
+	mats.set("back", new THREE.MeshToonMaterial({color: 0x777777}));
 
 	const white_mats = [0, 1, 2].map((i) =>
 		new THREE.MeshToonMaterial({map: loader.load(`static/grid${i}.png`)})
@@ -72,7 +83,7 @@ window.addEventListener("load", () => {
 		console.log("Scene data:", data);
 
 		const tile_geo = new THREE.PlaneGeometry(1.0, 1.0);
-
+		const grate_geo = new THREE.PlaneGeometry(1.0, 1.0);
 		const orients = new Map();
 		orients.set("n", new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI));
 		orients.set("s", new THREE.Quaternion());
@@ -81,7 +92,7 @@ window.addEventListener("load", () => {
 		orients.set("u", new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0),-Math.PI/2.0));
 		orients.set("d", new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0),+Math.PI/2.0));
 
-		for (const kind of ["white", "black", "goo", "goopartial", "goofull", "back"]) {
+		for (const kind of ["white", "black", "goo", "goopartial", "goofull", "back", "glass", "grating"]) {
 			const tileList = data.tiles[kind];
 			if (tileList === undefined) {
 				continue;
@@ -103,7 +114,7 @@ window.addEventListener("load", () => {
 				} else {
 					mat = mats.get(kind);
 				}
-				const mesh = new THREE.Mesh(tile_geo, mat);
+				const mesh = new THREE.Mesh(kind === "grating" ? grate_geo : tile_geo, mat);
 				mesh.position.set(tile.position[0], tile.position[2], -tile.position[1]);
 				mesh.applyQuaternion(orients.get(tile.orient));
 				scene.add(mesh);

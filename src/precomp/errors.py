@@ -8,30 +8,31 @@ from srctools import Vec, VMF, AtomicWriter
 
 from user_errors import DATA_LOC, UserError, TOK_LEAK
 from precomp.tiling import TileDef, TileType
+from precomp.barriers import BarrierType
 from precomp.brushLoc import Grid
 
 
 __all__ = ['UserError', 'TOK_LEAK', 'load_tiledefs']
+
+NORM_2_ORIENT = {
+    (0.0, 0.0, +1.0): 'u',
+    (0.0, 0.0, -1.0): 'd',
+    (0.0, +1.0, 0.0): 'n',
+    (0.0, -1.0, 0.0): 's',
+    (+1.0, 0.0, 0.0): 'e',
+    (-1.0, 0.0, 0.0): 'w',
+}
 
 
 def load_tiledefs(tiles: Iterable[TileDef], grid: Grid) -> None:
     """Load tiledef info into a simplified tiles list."""
     # noinspection PyProtectedMember
     simple_tiles = UserError._simple_tiles
-    simple_tiles.clear()
 
     tiles_white = simple_tiles["white"] = []
     tiles_black = simple_tiles["black"] = []
     tiles_goo_partial = simple_tiles["goopartial"] = []
     tiles_goo_full = simple_tiles["goofull"] = []
-    orients = {
-        (0, 0, 1): 'u',
-        (0, 0, -1): 'd',
-        (0, 1, 0): 'n',
-        (0, -1, 0): 's',
-        (1, 0, 0): 'e',
-        (-1, 0, 0): 'w',
-    }
     for tile in tiles:
         if not tile.base_type.is_tile:
             continue
@@ -49,7 +50,7 @@ def load_tiledefs(tiles: Iterable[TileDef], grid: Grid) -> None:
         else:
             tile_list = tiles_black
         tile_list.append({
-            'orient': orients[tile.normal.as_tuple()],
+            'orient': NORM_2_ORIENT[tile.normal.as_tuple()],
             'position': tuple((tile.pos + 64 * tile.normal) / 128),
         })
     goo_tiles = simple_tiles["goo"] = []
@@ -59,6 +60,27 @@ def load_tiledefs(tiles: Iterable[TileDef], grid: Grid) -> None:
                 'orient': 'd',
                 'position': tuple((pos + (0.5, 0.5, 0.75)).as_tuple()),
             })
+
+
+def load_barriers(barriers: dict[
+    tuple[tuple[float, float, float], tuple[float, float, float]],
+    BarrierType,
+]) -> None:
+    """Load barrier data for display in errors."""
+    # noinspection PyProtectedMember
+    glass_list = UserError._simple_tiles["glass"] = []
+    # noinspection PyProtectedMember
+    grate_list = UserError._simple_tiles["grating"] = []
+    kind_to_list = {
+        BarrierType.GLASS: glass_list,
+        BarrierType.GRATING: grate_list,
+    }
+    for (pos_tup, normal_tup), kind in barriers.items():
+        pos = Vec(pos_tup) + 56.0 * Vec(normal_tup)
+        kind_to_list[kind].append({
+            'orient': NORM_2_ORIENT[normal_tup],
+            'position': tuple((pos / 128.0).as_tuple()),
+        })
 
 
 def make_map(error: UserError) -> VMF:
