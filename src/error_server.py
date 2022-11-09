@@ -60,7 +60,7 @@ async def route_render_data() -> dict:
     """Return the geometry for rendering the current error."""
     return {
         'tiles': current_error.faces,
-        'points': current_error.points,
+        'voxels': current_error.voxels,
         'leak': current_error.leakpoints,
     }
 

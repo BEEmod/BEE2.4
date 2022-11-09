@@ -123,10 +123,10 @@ window.addEventListener("load", () => {
 			// scene.add(mesh);
 		}
 
-		const point_geo = new THREE.BoxGeometry(0.5, 0.5, 0.5);
-		for(const point of data.points) {
-			const mesh = new THREE.Mesh(point_geo, select_mat);
-			mesh.position.set(point[0], point[1], point[2]);
+		const voxels_geo = new THREE.BoxGeometry(0.5, 0.5, 0.5);
+		for(const voxels of data.voxels) {
+			const mesh = new THREE.Mesh(voxels_geo, select_mat);
+			mesh.position.set(voxels[0], voxels[1], voxels[2]);
 			scene.add(mesh);
 		}
 

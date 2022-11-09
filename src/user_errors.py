@@ -56,17 +56,17 @@ class UserError(BaseException):
     def __init__(
         self,
         message: TransToken,
-        points: Iterable[Vec]=(),
         *,
+        voxels: Iterable[Vec]=(),
         docsurl: str='',
         textlist: Collection[str]=(),
         leakpoints: Collection[Vec]=(),
     ) -> None:
         """Specify the info to show to the user.
 
-        :param message: This is a translation token potentially containing HTML. Strings formatted into it
-            will be escaped. TODO implement.
-        :param points: This is a list of offending map locations, which will be displayed in a
+        :param message: This is a translation token potentially containing HTML. Strings
+            formatted into it will be escaped. TODO implement.
+        :param voxels: This is a list of offending map locations, which will be displayed in a
             render of the map.
         :param docsurl: If specified, adds a link to relevant documentation.
         :param textlist: If specified, adds the specified strings as a bulleted list.
@@ -104,7 +104,7 @@ class UserError(BaseException):
             message,
             ctx,
             self._simple_tiles,
-            points=list(map(to_threespace, points)),
+            voxels=list(map(to_threespace, voxels)),
             leakpoints=list(map(to_threespace, leakpoints)),
         )
 

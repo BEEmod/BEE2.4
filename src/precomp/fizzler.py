@@ -1072,7 +1072,7 @@ def parse_map(vmf: VMF, info: conditions.MapInfo) -> None:
         except KeyError:
             raise user_errors.UserError(
                 user_errors.TOK_FIZZLER_NO_ITEM.format(inst=base_inst['file']),
-                points=[Vec.from_str(base_inst['origin'])],
+                voxels=[Vec.from_str(base_inst['origin'])],
             ) from None
         try:
             fizz_type = fizz_types[item_id, model_skin]
@@ -1081,7 +1081,7 @@ def parse_map(vmf: VMF, info: conditions.MapInfo) -> None:
             raise user_errors.UserError(user_errors.TOK_FIZZLER_UNKNOWN_TYPE.format(
                 item=f'{item_id}:{item_subtype}',
                 inst=base_inst["file"],
-            ), points=[Vec.from_str(base_inst['origin'])]) from None
+            ), voxels=[Vec.from_str(base_inst['origin'])]) from None
 
         info.set_attr(*fizz_type.voice_attrs)
 
@@ -1242,7 +1242,7 @@ def generate_fizzlers(vmf: VMF) -> None:
         if not model_min or not model_max:
             raise user_errors.UserError(
                 user_errors.TOK_FIZZLER_NO_MODEL_SIDE.format(id=fizz_type.id),
-                points=[pos for minmax in fizz.emitters for pos in minmax],
+                voxels=[pos for minmax in fizz.emitters for pos in minmax],
             )
 
         # Define a function to do the model names.

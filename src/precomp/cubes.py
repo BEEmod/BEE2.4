@@ -1182,7 +1182,7 @@ def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
                 other_inst, _ = dropper_timer[timer]
                 raise user_errors.UserError(
                     user_errors.TOK_CUBE_TIMERS_DUPLICATE.format(timer=timer),
-                    points=[
+                    voxels=[
                         Vec.from_str(inst['origin']),
                         Vec.from_str(other_inst['origin']),
                     ]
@@ -1208,12 +1208,12 @@ def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
             except KeyError:
                 raise user_errors.UserError(
                     user_errors.TOK_CUBE_TIMERS_INVALID_CUBEVAL.format(timer=timer),
-                    points=[Vec.from_str(cube['origin'])],
+                    voxels=[Vec.from_str(cube['origin'])],
                 ) from None
             if used_droppers[dropper]:
                 raise user_errors.UserError(
                     user_errors.TOK_CUBE_TIMERS_DUPLICATE.format(timer=timer),
-                    points=[
+                    voxels=[
                         Vec.from_str(cube['origin']),
                         Vec.from_str(used_droppers[dropper]),
                         Vec.from_str(dropper['origin']),
@@ -1250,7 +1250,7 @@ def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
                 if used_droppers[dropper]:
                     raise user_errors.UserError(
                         user_errors.TOK_CUBE_DROPPER_LINKED.format(type=cube_type.id),
-                        points=[
+                        voxels=[
                             Vec.from_str(cube['origin']),
                             Vec.from_str(used_droppers[dropper]),
                             Vec.from_str(dropper['origin']),
@@ -1280,14 +1280,14 @@ def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
                     kind='Valve Cube',
                     id=dropper['targetname']
                 ),
-                points=[Vec.from_str(dropper['origin'])],
+                voxels=[Vec.from_str(dropper['origin'])],
             ) from None
         try:
             cube_type = CUBE_TYPES[cube_type_id]
         except KeyError:
             raise user_errors.UserError(
                 user_errors.TOK_UNKNOWN_ID.format(kind='Valve cube', id=cube_type_id),
-                points=[Vec.from_str(dropper['origin'])],
+                voxels=[Vec.from_str(dropper['origin'])],
             ) from None
 
         drop_type = inst_to_drop[dropper['file'].casefold()]
