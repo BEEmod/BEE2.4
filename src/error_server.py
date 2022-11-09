@@ -35,6 +35,7 @@ app = QuartTrio(
     root_path=str(root_path),
 )
 config = Config()
+config.debug = True
 config.bind = ["localhost:8080"]  # Use localhost, request any free port.
 DELAY = 5 * 60  # After 5 minutes of no response, quit.
 # This cancel scope is cancelled after no response from the client, to shut us down.
@@ -61,7 +62,9 @@ async def route_render_data() -> dict:
     return {
         'tiles': current_error.faces,
         'voxels': current_error.voxels,
+        'points': current_error.points,
         'leak': current_error.leakpoints,
+        'barrier_hole': current_error.barrier_hole,
     }
 
 

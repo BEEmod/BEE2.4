@@ -1,5 +1,6 @@
 import * as THREE from './three.js';
 import {OrbitControls} from "./OrbitControls.js";
+import {OBJLoader} from "./OBJLoader.js";
 
 window.addEventListener("load", () => {
 	const TILE_SIZE = 64;
@@ -40,6 +41,7 @@ window.addEventListener("load", () => {
 	async function updateScene(data) {
 		const mats = new Map();
 		const loader_tex = new THREE.TextureLoader();
+		const loader_obj = new OBJLoader();
 		mats.set("white", new THREE.MeshToonMaterial({
 			map: await loader_tex.loadAsync('static/grid3.png'),
 		}));
@@ -70,12 +72,16 @@ window.addEventListener("load", () => {
 		}));
 		mats.set("back", new THREE.MeshToonMaterial({color: 0x777777}));
 
-		const white_mats = [0, 1, 2].map((i) =>
-			new THREE.MeshToonMaterial({map: loader_tex.load(`static/grid${i}.png`)})
-		);
-		const black_mats = [0, 1, 2].map((i) =>
-			new THREE.MeshToonMaterial({map: loader_tex.load(`static/grid${i}b.png`)})
-		);
+		const white_mats = [null, null, null];
+		const black_mats = [null, null, null];
+		for (let i = 0; i < 3; i++) {
+			white_mats[i] = new THREE.MeshToonMaterial({
+				map: await loader_tex.loadAsync(`static/grid${i}.png`),
+			});
+			black_mats[i] = new THREE.MeshToonMaterial({
+				map: await loader_tex.loadAsync(`static/grid${i}b.png`),
+			});
+		}
 
 		const select_mat = new THREE.MeshToonMaterial({
 			color: 0xFAFA28, transparent: true, opacity: 0.5, side: THREE.DoubleSide,
@@ -100,6 +106,11 @@ window.addEventListener("load", () => {
 		orients.set("u", new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 2.0));
 		orients.set("d", new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), +Math.PI / 2.0));
 
+		const axes = new Map();
+		axes.set("x", new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI / 2));
+		axes.set("y", new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2));
+		axes.set("z", new THREE.Quaternion());
+
 		for (const kind of ["white", "black", "goo", "goopartial", "goofull", "back", "glass", "grating"]) {
 			const tileList = data.tiles[kind];
 			if (tileList === undefined) {
@@ -107,11 +118,11 @@ window.addEventListener("load", () => {
 			}
 			// TODO: Maybe use this for efficiency?
 			// const mesh = new THREE.InstancedMesh(tile_geo, mats.get(kind), tileList.length);
-			// const mat = new THREE.Matrix4();
+			// const matrix = new THREE.Matrix4();
 			// const scale = new THREE.Vector3(1, 1, 1);
 			for (let i = 0; i < tileList.length; i++) {
 				const tile = tileList[i];
-				// mesh.setMatrixAt(i, mat.compose(
+				// mesh.setMatrixAt(i, matrix.compose(
 				// 	new THREE.Vector3(tile.position[0], tile.position[1], tile.position[2]),
 				// 	rot,
 				// 	scale,
@@ -151,6 +162,31 @@ window.addEventListener("load", () => {
 			));
 			scene.add(new THREE.Line(geo, pointfile_mat));
 		}
+
+		if (data.barrier_hole) {
+			await loader_obj.loadAsync(
+				`static/barrier_hole_${data.barrier_hole.large ? 'large': 'small'}.obj`
+			).then((hole_geo) => {
+				console.log("Hole: ", hole_geo);
+				const hole_mats = new Map();
+				hole_mats.set("selection", select_mat);
+				hole_mats.set("framing", new THREE.MeshToonMaterial({color: 0xCCCCCC}));
+				for (const child of hole_geo.children) {
+					const mdl = new THREE.Mesh(
+						child.geometry,
+						child.material.map((mat) => hole_mats.get(mat.name))
+					);
+					mdl.position.set(
+							data.barrier_hole.pos[0],
+							data.barrier_hole.pos[1],
+							data.barrier_hole.pos[2],
+					);
+					mdl.setRotationFromQuaternion(axes.get(data.barrier_hole.axis));
+					scene.add(mdl);
+				}
+			});
+		}
+
 		camera.position.set(-5, 3, 5);
 		controls.update();
 

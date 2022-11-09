@@ -160,9 +160,14 @@ def res_glass_hole(inst: Entity, res: Property):
         inst['origin'] = inv_origin
         inst['angles'] = inv_normal.to_angle()
     else:
-        LOGGER.warning('No center barrier at {} with axis  {}', origin, normal)
-        # Remove the instance, so this does nothing.
-        inst.remove()
+        raise user_errors.UserError(
+            user_errors.TOK_BARRIER_HOLE_MISPLACED,
+            barrier_hole={
+                'pos': user_errors.to_threespace(origin + 64 * normal),
+                'axis': normal.axis(),
+                'large': hole_type is HoleType.LARGE,
+            }
+        )
 
 
 def template_solids_and_coll(
@@ -335,6 +340,7 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
             offsets = (-80, -48, -16, 16, 48, 80)
         else:
             offsets = (-16, 16)
+        bad_locs: List[Vec] = []
         for u_off in offsets:
             for v_off in offsets:
                 # Remove these squares, but keep them in the Plane,
@@ -345,14 +351,24 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
                 )
                 if uv in slice_plane:
                     slice_plane[uv] = None
-                # These have to be present, except for the corners
-                # on the large hole.
+                # These have to be present, except for the corners on the large hole.
                 elif abs(u_off) != 80 or abs(v_off) != 80:
                     u_ax, v_ax = Vec.INV_AXIS[norm_axis]
-                    LOGGER.warning(
-                        'Hole tried to remove missing tile at ({})?',
-                        Vec.with_axes(norm_axis, norm_pos, u_ax, u + u_off, v_ax, v + v_off),
-                    )
+                    bad_locs.append(Vec.with_axes(
+                        norm_axis, norm_pos,
+                        u_ax, u + u_off,
+                        v_ax, v + v_off,
+                    ))
+        if bad_locs:
+            raise user_errors.UserError(
+                user_errors.TOK_BARRIER_HOLE_FOOTPRINT,
+                points=bad_locs,
+                barrier_hole={
+                    'pos': user_errors.to_threespace(origin + 64 * normal),
+                    'axis': norm_axis,
+                    'large': hole_type is HoleType.LARGE,
+                }
+            )
 
         # Now generate the curved brushwork.
         if barr_type is BarrierType.GLASS:

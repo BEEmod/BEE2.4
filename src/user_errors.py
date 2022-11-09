@@ -2,7 +2,7 @@
 
 UserError is imported all over, so this needs to have minimal imports to avoid cycles.
 """
-from typing import ClassVar, Collection, Dict, Iterable, List, Literal, Tuple, TypedDict
+from typing import ClassVar, Collection, Dict, Iterable, List, Literal, Optional, Tuple, TypedDict
 import attrs
 from srctools import Matrix, Vec, logger
 
@@ -19,6 +19,13 @@ class SimpleTile(TypedDict):
     orient: Literal["n", "s", "e", "w", "u", "d"]
 
 
+class BarrierHole(TypedDict):
+    """Information for improperly placed glass/grating hole items."""
+    pos: Tuple[float, float, float]
+    axis: Literal["x", "y", "z"]
+    large: bool
+
+
 @attrs.frozen
 class ErrorInfo:
     """Data to display to the user."""
@@ -32,6 +39,8 @@ class ErrorInfo:
     points: List[Tuple[float, float, float]] = attrs.Factory(list)
     # Special list of locations forming a pointfile line.
     leakpoints: List[Tuple[float, float, float]] = attrs.Factory(list)
+    # If a glass/grating hole is misplaced, show its location.
+    barrier_hole: Optional[BarrierHole] = None
 
 
 DATA_LOC = utils.conf_location('compile_error.pickle')
@@ -64,6 +73,7 @@ class UserError(BaseException):
         points: Iterable[Vec]=(),
         textlist: Collection[str]=(),
         leakpoints: Collection[Vec]=(),
+        barrier_hole: Optional[BarrierHole]=None,
     ) -> None:
         """Specify the info to show to the user.
 
@@ -75,6 +85,7 @@ class UserError(BaseException):
         :param docsurl: If specified, adds a link to relevant documentation.
         :param textlist: If specified, adds the specified strings as a bulleted list.
         :param leakpoints: Specifies pointfile locations to display a leak.
+        :param barrier_hole: If set, an errored glass/grating hole to place.
         """
         if utils.DEV_MODE:
             try:
@@ -111,6 +122,7 @@ class UserError(BaseException):
             voxels=list(map(to_threespace, voxels)),
             points=list(map(to_threespace, points)),
             leakpoints=list(map(to_threespace, leakpoints)),
+            barrier_hole=barrier_hole,
         )
 
     def __str__(self) -> str:
@@ -182,6 +194,21 @@ TOK_CUBE_TIMERS_INVALID_CUBEVAL = TransToken.ui(
 TOK_CUBE_DROPPER_LINKED = TransToken.ui(
     'Dropper above custom cube of type <var>{type}</var> is already linked! Custom cubes convert'
     'droppers above them into their type, to allow having droppers.',
+)
+
+TOK_BARRIER_HOLE_FOOTPRINT = TransToken.ui(
+    'A glass/grating Hole does not have sufficent space. The entire highlighted yellow area should '
+    'be occupied by continous glass or grating. For large holes, the diagonally adjacient voxels '
+    'are not required.'
+)
+
+TOK_BARRIER_HOLE_MISPLACED = TransToken.ui(
+    'A glass/grating Hole was misplaced. The item must be placed against a glass or grating sheet, '
+    'which it will then cut a hole into. To rotate the item properly, you may need to place it on '
+    'a wall with the same orientation first, then drag it onto the glass without dragging it over '
+    'surfaces with different orientations. Alternatively put a block temporarily in the glass or '
+    "grating's location to position the hole item, then carve into the block from a side to remove "
+    'it while keeping the hole in the same position.'
 )
 
 TOK_FIZZLER_NO_ITEM = TransToken.ui('No item ID for fizzler instance <var>"{inst}"</var>!')
