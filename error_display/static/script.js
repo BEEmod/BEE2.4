@@ -138,6 +138,13 @@ window.addEventListener("load", () => {
 			scene.add(mesh);
 		}
 
+		const points_geo = new THREE.SphereGeometry(12.0, 16, 16);
+		for (const points of data.points) {
+			const mesh = new THREE.Mesh(points_geo, select_mat);
+			mesh.position.set(points[0], points[1], points[2]);
+			scene.add(mesh);
+		}
+
 		if (data.leak) {
 			const geo = new THREE.BufferGeometry().setFromPoints(data.leak.map(
 				point => new THREE.Vector3(point[0], point[1], point[2])

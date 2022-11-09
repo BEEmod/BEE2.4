@@ -26,6 +26,8 @@ class ErrorInfo:
     # Logging context
     context: str = ''
     faces: Dict[Kind, List[SimpleTile]] = attrs.Factory(dict)
+    # Voxels of interest in the map.
+    voxels: List[Tuple[float, float, float]] = attrs.Factory(list)
     # Points of interest in the map.
     points: List[Tuple[float, float, float]] = attrs.Factory(list)
     # Special list of locations forming a pointfile line.
@@ -57,8 +59,9 @@ class UserError(BaseException):
         self,
         message: TransToken,
         *,
-        voxels: Iterable[Vec]=(),
         docsurl: str='',
+        voxels: Iterable[Vec]=(),
+        points: Iterable[Vec]=(),
         textlist: Collection[str]=(),
         leakpoints: Collection[Vec]=(),
     ) -> None:
@@ -66,8 +69,9 @@ class UserError(BaseException):
 
         :param message: This is a translation token potentially containing HTML. Strings
             formatted into it will be escaped. TODO implement.
-        :param voxels: This is a list of offending map locations, which will be displayed in a
-            render of the map.
+        :param voxels: A list of offending voxel locations, which will be displayed in
+            the render of the map as 64x64 boxes.
+        :param points: A list of smaller points, which are displayed as 12 unit spheres.
         :param docsurl: If specified, adds a link to relevant documentation.
         :param textlist: If specified, adds the specified strings as a bulleted list.
         :param leakpoints: Specifies pointfile locations to display a leak.
@@ -105,6 +109,7 @@ class UserError(BaseException):
             ctx,
             self._simple_tiles,
             voxels=list(map(to_threespace, voxels)),
+            points=list(map(to_threespace, points)),
             leakpoints=list(map(to_threespace, leakpoints)),
         )
 
