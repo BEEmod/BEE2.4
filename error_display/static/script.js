@@ -1,3 +1,5 @@
+import * as THREE from './three.js';
+import {OrbitControls} from "./OrbitControls.js";
 
 window.addEventListener("load", () => {
 	const TILE_SIZE = 64;

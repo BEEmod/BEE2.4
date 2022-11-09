@@ -1,4 +1,12 @@
-// This is example code from three.js.
+import {
+	EventDispatcher,
+	MOUSE,
+	Quaternion,
+	Spherical,
+	TOUCH,
+	Vector2,
+	Vector3
+} from './three.js';
 
 // This set of controls performs orbiting, dollying (zooming), and panning.
 // Unlike TrackballControls, it maintains the "up" direction object.up (+Y by default).
@@ -11,7 +19,7 @@ const _changeEvent = { type: 'change' };
 const _startEvent = { type: 'start' };
 const _endEvent = { type: 'end' };
 
-class OrbitControls extends THREE.EventDispatcher {
+class OrbitControls extends EventDispatcher {
 
 	constructor( object, domElement ) {
 
@@ -25,7 +33,7 @@ class OrbitControls extends THREE.EventDispatcher {
 		this.enabled = true;
 
 		// "target" sets the location of focus, where the object orbits around
-		this.target = new THREE.Vector3();
+		this.target = new Vector3();
 
 		// How far you can dolly in and out ( PerspectiveCamera only )
 		this.minDistance = 0;
@@ -74,10 +82,10 @@ class OrbitControls extends THREE.EventDispatcher {
 		this.keys = { LEFT: 'ArrowLeft', UP: 'ArrowUp', RIGHT: 'ArrowRight', BOTTOM: 'ArrowDown' };
 
 		// Mouse buttons
-		this.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
+		this.mouseButtons = { LEFT: MOUSE.ROTATE, MIDDLE: MOUSE.DOLLY, RIGHT: MOUSE.PAN };
 
 		// Touch fingers
-		this.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
+		this.touches = { ONE: TOUCH.ROTATE, TWO: TOUCH.DOLLY_PAN };
 
 		// for reset
 		this.target0 = this.target.clone();
@@ -142,14 +150,14 @@ class OrbitControls extends THREE.EventDispatcher {
 		// this method is exposed, but perhaps it would be better if we can make it private...
 		this.update = function () {
 
-			const offset = new THREE.Vector3();
+			const offset = new Vector3();
 
 			// so camera.up is the orbit axis
-			const quat = new THREE.Quaternion().setFromUnitVectors( object.up, new THREE.Vector3( 0, 1, 0 ) );
+			const quat = new Quaternion().setFromUnitVectors( object.up, new Vector3( 0, 1, 0 ) );
 			const quatInverse = quat.clone().invert();
 
-			const lastPosition = new THREE.Vector3();
-			const lastQuaternion = new THREE.Quaternion();
+			const lastPosition = new Vector3();
+			const lastQuaternion = new Quaternion();
 
 			const twoPI = 2 * Math.PI;
 
@@ -325,24 +333,24 @@ class OrbitControls extends THREE.EventDispatcher {
 		const EPS = 0.000001;
 
 		// current position in spherical coordinates
-		const spherical = new THREE.Spherical();
-		const sphericalDelta = new THREE.Spherical();
+		const spherical = new Spherical();
+		const sphericalDelta = new Spherical();
 
 		let scale = 1;
-		const panOffset = new THREE.Vector3();
+		const panOffset = new Vector3();
 		let zoomChanged = false;
 
-		const rotateStart = new THREE.Vector2();
-		const rotateEnd = new THREE.Vector2();
-		const rotateDelta = new THREE.Vector2();
+		const rotateStart = new Vector2();
+		const rotateEnd = new Vector2();
+		const rotateDelta = new Vector2();
 
-		const panStart = new THREE.Vector2();
-		const panEnd = new THREE.Vector2();
-		const panDelta = new THREE.Vector2();
+		const panStart = new Vector2();
+		const panEnd = new Vector2();
+		const panDelta = new Vector2();
 
-		const dollyStart = new THREE.Vector2();
-		const dollyEnd = new THREE.Vector2();
-		const dollyDelta = new THREE.Vector2();
+		const dollyStart = new Vector2();
+		const dollyEnd = new Vector2();
+		const dollyDelta = new Vector2();
 
 		const pointers = [];
 		const pointerPositions = {};
@@ -373,7 +381,7 @@ class OrbitControls extends THREE.EventDispatcher {
 
 		const panLeft = function () {
 
-			const v = new THREE.Vector3();
+			const v = new Vector3();
 
 			return function panLeft( distance, objectMatrix ) {
 
@@ -388,7 +396,7 @@ class OrbitControls extends THREE.EventDispatcher {
 
 		const panUp = function () {
 
-			const v = new THREE.Vector3();
+			const v = new Vector3();
 
 			return function panUp( distance, objectMatrix ) {
 
@@ -414,7 +422,7 @@ class OrbitControls extends THREE.EventDispatcher {
 		// deltaX and deltaY are in pixels; right and down are positive
 		const pan = function () {
 
-			const offset = new THREE.Vector3();
+			const offset = new Vector3();
 
 			return function pan( deltaX, deltaY ) {
 
@@ -879,7 +887,7 @@ class OrbitControls extends THREE.EventDispatcher {
 
 			switch ( mouseAction ) {
 
-				case THREE.MOUSE.DOLLY:
+				case MOUSE.DOLLY:
 
 					if ( scope.enableZoom === false ) return;
 
@@ -889,7 +897,7 @@ class OrbitControls extends THREE.EventDispatcher {
 
 					break;
 
-				case THREE.MOUSE.ROTATE:
+				case MOUSE.ROTATE:
 
 					if ( event.ctrlKey || event.metaKey || event.shiftKey ) {
 
@@ -911,7 +919,7 @@ class OrbitControls extends THREE.EventDispatcher {
 
 					break;
 
-				case THREE.MOUSE.PAN:
+				case MOUSE.PAN:
 
 					if ( event.ctrlKey || event.metaKey || event.shiftKey ) {
 
@@ -1011,7 +1019,7 @@ class OrbitControls extends THREE.EventDispatcher {
 
 					switch ( scope.touches.ONE ) {
 
-						case THREE.TOUCH.ROTATE:
+						case TOUCH.ROTATE:
 
 							if ( scope.enableRotate === false ) return;
 
@@ -1021,7 +1029,7 @@ class OrbitControls extends THREE.EventDispatcher {
 
 							break;
 
-						case THREE.TOUCH.PAN:
+						case TOUCH.PAN:
 
 							if ( scope.enablePan === false ) return;
 
@@ -1043,7 +1051,7 @@ class OrbitControls extends THREE.EventDispatcher {
 
 					switch ( scope.touches.TWO ) {
 
-						case THREE.TOUCH.DOLLY_PAN:
+						case TOUCH.DOLLY_PAN:
 
 							if ( scope.enableZoom === false && scope.enablePan === false ) return;
 
@@ -1053,7 +1061,7 @@ class OrbitControls extends THREE.EventDispatcher {
 
 							break;
 
-						case THREE.TOUCH.DOLLY_ROTATE:
+						case TOUCH.DOLLY_ROTATE:
 
 							if ( scope.enableZoom === false && scope.enableRotate === false ) return;
 
@@ -1176,7 +1184,7 @@ class OrbitControls extends THREE.EventDispatcher {
 
 			if ( position === undefined ) {
 
-				position = new THREE.Vector2();
+				position = new Vector2();
 				pointerPositions[ event.pointerId ] = position;
 
 			}
@@ -1226,12 +1234,14 @@ class MapControls extends OrbitControls {
 
 		this.screenSpacePanning = false; // pan orthogonal to world-space direction camera.up
 
-		this.mouseButtons.LEFT = THREE.MOUSE.PAN;
-		this.mouseButtons.RIGHT = THREE.MOUSE.ROTATE;
+		this.mouseButtons.LEFT = MOUSE.PAN;
+		this.mouseButtons.RIGHT = MOUSE.ROTATE;
 
-		this.touches.ONE = THREE.TOUCH.PAN;
-		this.touches.TWO = THREE.TOUCH.DOLLY_ROTATE;
+		this.touches.ONE = TOUCH.PAN;
+		this.touches.TWO = TOUCH.DOLLY_ROTATE;
 
 	}
 
 }
+
+export { OrbitControls, MapControls };
