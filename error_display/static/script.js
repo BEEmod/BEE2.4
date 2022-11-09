@@ -34,54 +34,60 @@ window.addEventListener("load", () => {
 	const container = document.querySelector("#render");
 	scene.background = new THREE.Color(0xC9D3CF);  // PeTI BG.
 	const camera = new THREE.PerspectiveCamera( 75, 1.0, 0.01, 100 );
-
-	const mats = new Map();
-	const loader = new THREE.TextureLoader();
-	mats.set("white", new THREE.MeshToonMaterial({map: loader.load('static/grid3.png')}));
-	mats.set("black", new THREE.MeshToonMaterial({map: loader.load('static/grid3b.png')}));
-	mats.set("goopartial", new THREE.MeshToonMaterial({map: loader.load('static/grid_goo_partial.png')}));
-	mats.set("goofull", new THREE.MeshToonMaterial({map: loader.load('static/grid_goo_full.png')}));
-	mats.set("glass", new THREE.MeshToonMaterial({
-		color: 0x3CA1ED,
-		transparent: true,
-		opacity: 0.33,
-		side: THREE.DoubleSide,
-	}));
-	mats.set("grating", new THREE.MeshToonMaterial({
-		map: loader.load('static/grating.png'),
-		transparent: true,
-		side: THREE.DoubleSide,
-	}));
-	mats.set("goo", new THREE.MeshToonMaterial({
-		color: 0x5C6D72,
-		transparent: true,
-		opacity: 0.8,
-	}));
-	mats.set("back", new THREE.MeshToonMaterial({color: 0x777777}));
-
-	const white_mats = [0, 1, 2].map((i) =>
-		new THREE.MeshToonMaterial({map: loader.load(`static/grid${i}.png`)})
-	);
-	const black_mats = [0, 1, 2].map((i) =>
-		new THREE.MeshToonMaterial({map: loader.load(`static/grid${i}b.png`)})
-	);
-
-	const select_mat = new THREE.MeshToonMaterial({
-		color: 0xFAFA28, transparent: true, opacity: 0.5, side: THREE.DoubleSide,
-	});
-	const pointfile_mat = new THREE.LineBasicMaterial({color: 0xFF0000});
-
 	const renderer = new THREE.WebGLRenderer();
 	const controls = new OrbitControls( camera, renderer.domElement );
 
-	scene.add( new THREE.AmbientLight( 0x888888 ) );
-	const lighting = new THREE.DirectionalLight( 0xffffff, 0.5 );
-	scene.add(lighting);
-	lighting.position.set(-20, 50, 20);
-	lighting.target.position.set(5, 0, 5);
-	scene.add(lighting.target);
+	async function updateScene(data) {
+		const mats = new Map();
+		const loader_tex = new THREE.TextureLoader();
+		mats.set("white", new THREE.MeshToonMaterial({
+			map: await loader_tex.loadAsync('static/grid3.png'),
+		}));
+		mats.set("black", new THREE.MeshToonMaterial({
+			map: await loader_tex.loadAsync('static/grid3b.png'),
+		}));
+		mats.set("goopartial", new THREE.MeshToonMaterial({
+			map: await loader_tex.loadAsync('static/grid_goo_partial.png'),
+		}));
+		mats.set("goofull", new THREE.MeshToonMaterial({
+			map: await loader_tex.loadAsync('static/grid_goo_full.png'),
+}		));
+		mats.set("glass", new THREE.MeshToonMaterial({
+			color: 0x3CA1ED,
+			transparent: true,
+			opacity: 0.33,
+			side: THREE.DoubleSide,
+		}));
+		mats.set("grating", new THREE.MeshToonMaterial({
+			map: await loader_tex.loadAsync('static/grating.png'),
+			transparent: true,
+			side: THREE.DoubleSide,
+		}));
+		mats.set("goo", new THREE.MeshToonMaterial({
+			color: 0x5C6D72,
+			transparent: true,
+			opacity: 0.8,
+		}));
+		mats.set("back", new THREE.MeshToonMaterial({color: 0x777777}));
 
-	function updateScene(data) {
+		const white_mats = [0, 1, 2].map((i) =>
+			new THREE.MeshToonMaterial({map: loader_tex.load(`static/grid${i}.png`)})
+		);
+		const black_mats = [0, 1, 2].map((i) =>
+			new THREE.MeshToonMaterial({map: loader_tex.load(`static/grid${i}b.png`)})
+		);
+
+		const select_mat = new THREE.MeshToonMaterial({
+			color: 0xFAFA28, transparent: true, opacity: 0.5, side: THREE.DoubleSide,
+		});
+		const pointfile_mat = new THREE.LineBasicMaterial({color: 0xFF0000});
+
+		scene.add( new THREE.AmbientLight( 0x888888 ) );
+		const lighting = new THREE.DirectionalLight( 0xffffff, 0.5 );
+		scene.add(lighting);
+		lighting.position.set(-20, 50, 20);
+		lighting.target.position.set(5, 0, 5);
+		scene.add(lighting.target);
 		console.log("Scene data:", data);
 
 		const tile_geo = new THREE.PlaneGeometry(1.0, 1.0);
@@ -89,10 +95,10 @@ window.addEventListener("load", () => {
 		const orients = new Map();
 		orients.set("n", new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI));
 		orients.set("s", new THREE.Quaternion());
-		orients.set("e", new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0),Math.PI / 2));
+		orients.set("e", new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2));
 		orients.set("w", new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), 3 * Math.PI / 2));
-		orients.set("u", new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0),-Math.PI/2.0));
-		orients.set("d", new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0),+Math.PI/2.0));
+		orients.set("u", new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 2.0));
+		orients.set("d", new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), +Math.PI / 2.0));
 
 		for (const kind of ["white", "black", "goo", "goopartial", "goofull", "back", "glass", "grating"]) {
 			const tileList = data.tiles[kind];
@@ -126,7 +132,7 @@ window.addEventListener("load", () => {
 		}
 
 		const voxels_geo = new THREE.BoxGeometry(0.5, 0.5, 0.5);
-		for(const voxels of data.voxels) {
+		for (const voxels of data.voxels) {
 			const mesh = new THREE.Mesh(voxels_geo, select_mat);
 			mesh.position.set(voxels[0], voxels[1], voxels[2]);
 			scene.add(mesh);
@@ -151,7 +157,7 @@ window.addEventListener("load", () => {
 
 	fetch("/displaydata")
 		.then((data) => data.json())
-		.then((json) => {updateScene(json)})
+		.then(updateScene)
 		.catch((reason) => {
 			console.error(reason);
 			content_box.innerText = 'Could not fetch display: ' + reason;
