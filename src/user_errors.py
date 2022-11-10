@@ -213,6 +213,12 @@ TOK_BARRIER_HOLE_MISPLACED = TransToken.ui(
     'it while keeping the hole in the same position.'
 )
 
+TOK_SENDTOR_BAD_OUTPUT = TransToken.ui(
+    'A Sendificator was connected to an item which is not a Discouragement Beam Emitter '
+    '(<var>{out_item}</var>). The output connection is used to specify the emitter that cubes will '
+    'teleport to, so it cannot be an arbitary item.'
+)
+
 TOK_FIZZLER_NO_ITEM = TransToken.ui('No item ID for fizzler instance <var>"{inst}"</var>!')
 TOK_FIZZLER_UNKNOWN_TYPE = TransToken.ui('No fizzler type for {item} (<var>"{inst}"</var>)!')
 TOK_FIZZLER_NO_MODEL_SIDE = TransToken.ui('No model specified for one side of "{id}" fizzlers.')
