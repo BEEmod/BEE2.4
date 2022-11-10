@@ -149,7 +149,7 @@ window.addEventListener("load", () => {
 			scene.add(mesh);
 		}
 
-		const points_geo = new THREE.SphereGeometry(12.0, 16, 16);
+		const points_geo = new THREE.SphereGeometry(12.0/128.0, 16, 16);
 		for (const points of data.points) {
 			const mesh = new THREE.Mesh(points_geo, select_mat);
 			mesh.position.set(points[0], points[1], points[2]);
