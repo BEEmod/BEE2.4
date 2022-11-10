@@ -19,7 +19,7 @@ from srctools.vmf import EntityFixup, Entity, EntityGroup, Solid, Side, VMF, UVA
 from srctools.dmx import Element as DMElement
 import srctools.logger
 
-from user_errors import UserError
+import user_errors
 from .texturing import Portalable, GenCat, TileSize
 from .tiling import TileType
 from . import tiling, texturing, options, rand, collisions
@@ -481,6 +481,8 @@ def _parse_template(loc: UnparsedTemplate) -> Template:
     tile_setters: list[TileSetter] = []
     voxel_setters: list[VoxelSetter] = []
 
+    # The BEE2 app verified all of this, so it should not normally be possible to get mismatches
+    # here. Crash the compiler if that happens.
     conf_ents = vmf.by_class['bee2_template_conf']
     if len(conf_ents) > 1:
         raise ValueError(f'Multiple configuration entities in template <var>"{loc.id}"</var>!')
@@ -523,11 +525,11 @@ def _parse_template(loc: UnparsedTemplate) -> Template:
         for brushes, is_detail, vis_ids in yield_world_detail():
             visgroups = list(map(visgroup_names.__getitem__, vis_ids))
             if len(visgroups) > 1:
-                raise UserError(
-                    'Template "{}" has brush with two visgroups! ({})',
-                    loc.id,
-                    ', '.join(visgroups)
-                )
+                raise user_errors.UserError(user_errors.TOK_TEMPLATE_MULTI_VISGROUPS.format(
+                    id=loc.id,
+                    kind='brush',
+                    groups=', '.join(visgroups),
+                ))
             # No visgroup = ''
             visgroup = visgroups[0] if visgroups else ''
 
@@ -550,10 +552,11 @@ def _parse_template(loc: UnparsedTemplate) -> Template:
     for ent in vmf.by_class['info_overlay']:
         visgroups = list(map(visgroup_names.__getitem__, ent.visgroup_ids))
         if len(visgroups) > 1:
-            raise UserError(
-                'Template "{}" has overlay with two visgroups! ({})',
-                loc.id, ', '.join(visgroups)
-            )
+            raise user_errors.UserError(user_errors.TOK_TEMPLATE_MULTI_VISGROUPS.format(
+                id=loc.id,
+                kind='overlay',
+                groups=', '.join(visgroups),
+            ))
         # No visgroup = ''
         overlay_ents[visgroups[0] if visgroups else ''].append(ent)
 
@@ -562,20 +565,22 @@ def _parse_template(loc: UnparsedTemplate) -> Template:
         try:
             priority = Decimal(ent['priority'])
         except ArithmeticError:
-            LOGGER.warning(
-                'Bad priority for colorpicker in "{}" template!',
-                loc.id,
-            )
-            priority = Decimal(0)
+            raise user_errors.UserError(user_errors.TOK_INVALID_PARAM.format(
+                option='priority',
+                value=ent['remove_brush'],
+                kind='Template ColorPicker',
+                id=f'{loc.id}:{ent["targetname"]}',
+            ))
 
         try:
             remove_after = AfterPickMode(ent['remove_brush', '0'])
         except ValueError:
-            LOGGER.warning(
-                'Bad remove-brush mode for colorpicker in "{}" template!',
-                loc.id,
-            )
-            remove_after = AfterPickMode.NONE
+            raise user_errors.UserError(user_errors.TOK_INVALID_PARAM.format(
+                option='remove_brush',
+                value=ent['remove_brush'],
+                kind='Template ColorPicker',
+                id=f'{loc.id}:{ent["targetname"]}',
+            ))
 
         color_pickers.append(ColorPicker(
             priority=priority,
@@ -616,8 +621,12 @@ def _parse_template(loc: UnparsedTemplate) -> Template:
         elif color == 'match':
             color = None
         elif color != 'copy':
-            raise ValueError('Invalid TileSetter color '
-                             '"{}" for "{}"'.format(color, loc.id))
+            raise user_errors.UserError(user_errors.TOK_INVALID_PARAM.format(
+                option='color',
+                value=color,
+                kind='Template TileSetter',
+                id=loc.id,
+            ))
 
         tile_setters.append(TileSetter(
             offset=Vec.from_str(ent['origin']),

@@ -219,6 +219,11 @@ TOK_SENDTOR_BAD_OUTPUT = TransToken.ui(
     'teleport to, so it cannot be an arbitary item.'
 )
 
+TOK_TEMPLATE_MULTI_VISGROUPS = TransToken.ui(
+    'The template "{id}" has a {type} with two visgroups: <var>{groups}</var>. Brushes and'
+    'overlays in templates may currently only use one visgroup each.'
+)
+
 TOK_FIZZLER_NO_ITEM = TransToken.ui('No item ID for fizzler instance <var>"{inst}"</var>!')
 TOK_FIZZLER_UNKNOWN_TYPE = TransToken.ui('No fizzler type for {item} (<var>"{inst}"</var>)!')
 TOK_FIZZLER_NO_MODEL_SIDE = TransToken.ui('No model specified for one side of "{id}" fizzlers.')
