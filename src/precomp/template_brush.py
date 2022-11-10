@@ -444,7 +444,7 @@ def load_templates(path: str) -> None:
     with open(path, 'rb') as f:
         dmx, fmt_name, fmt_ver = DMElement.parse(f, unicode=True)
     if fmt_name != 'bee_templates' or fmt_ver not in [1]:
-        raise UserError('Invalid template file format "{}" v{}', fmt_name, fmt_ver)
+        raise ValueError(f'Invalid template file format "{fmt_name}" v{fmt_ver}')
     for template in dmx['temp'].iter_elem():
         _TEMPLATES[template.name.casefold()] = UnparsedTemplate(
             template.name.upper(),
@@ -483,17 +483,14 @@ def _parse_template(loc: UnparsedTemplate) -> Template:
 
     conf_ents = vmf.by_class['bee2_template_conf']
     if len(conf_ents) > 1:
-        raise UserError('Multiple configuration entities in template <var>"{}"</var>!', loc.id)
+        raise ValueError(f'Multiple configuration entities in template <var>"{loc.id}"</var>!')
     elif not conf_ents:
-        raise UserError('No configration entity for template <var>"{}"</var>!', loc.id)
+        raise ValueError(f'No configration entity for template <var>"{loc.id}"</var>!')
     else:
         [conf] = conf_ents
 
     if conf['template_id'].upper() != loc.id:
-        raise UserError(
-            'Mismatch in template IDs: <var>"{}"</var> &ne; <var>"{}"</var>!',
-            conf["template_id"], loc.id,
-        )
+        raise ValueError(f'Mismatch in template IDs: "{conf["template_id"]}" != "{loc.id}"!')
 
     def yield_world_detail() -> Iterator[tuple[list[Solid], bool, set[str]]]:
         """Yield all world/detail solids in the map.
