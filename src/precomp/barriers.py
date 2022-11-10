@@ -104,7 +104,11 @@ def test_hole_spot(origin: Vec, normal: Vec, hole_type: HoleType) -> Literal['no
     """Check if the given position is valid for holes.
 
     We need to check that it's actually placed on glass/grating, and that
-    all the parts are the same. Otherwise, it'd collide with the borders.
+    all the parts are the same. Otherwise, it'd collide with the borders. This returns:
+
+    * 'valid' if the position is valid.
+    * 'noglass' if the centerpoint isn't glass/grating.
+    * 'nospace' if no adjacient panel is present.
     """
     try:
         center_type = BARRIERS[origin.as_tuple(), normal.as_tuple()]
@@ -133,6 +137,10 @@ def test_hole_spot(origin: Vec, normal: Vec, hole_type: HoleType) -> Literal['no
             # Different type.
             LOGGER.warning('Wrong barrier type at {}, {}', pos, normal)
             return 'nospace'
+        # Also check if a large hole is here, we'll collide.
+        if HOLES.get((pos.as_tuple(), normal.as_tuple())) is HoleType.LARGE:
+            # TODO: Draw this other hole as well?
+            return 'nospace'
     return 'valid'
 
 
@@ -146,33 +154,47 @@ def res_glass_hole(inst: Entity, res: Property):
 
     first_placement = test_hole_spot(origin, normal, hole_type)
     if first_placement == 'valid':
-        HOLES[origin.as_tuple(), normal.as_tuple()] = hole_type
-        inst['origin'] = origin
-        inst['angles'] = normal.to_angle()
-        return
-
-    # Test the opposite side of the glass too.
-    inv_origin = origin + 128 * normal
-    inv_normal = -normal
-
-    sec_placement = test_hole_spot(inv_origin, inv_normal, hole_type)
-    if sec_placement == 'valid':
-        HOLES[inv_origin.as_tuple(), inv_normal.as_tuple()] = hole_type
-        inst['origin'] = inv_origin
-        inst['angles'] = inv_normal.to_angle()
+        sel_origin = origin
+        sel_normal = normal
     else:
+        # Test the opposite side of the glass too.
+        inv_origin = origin + 128 * normal
+        inv_normal = -normal
+
+        sec_placement = test_hole_spot(inv_origin, inv_normal, hole_type)
+        if sec_placement == 'valid':
+            sel_origin = inv_origin
+            sel_normal = inv_normal
+        else:
+            raise user_errors.UserError(
+                user_errors.TOK_BARRIER_HOLE_FOOTPRINT
+                if first_placement == 'nospace' or sec_placement == 'nospace' else
+                user_errors.TOK_BARRIER_HOLE_MISPLACED,
+                barrier_hole=user_errors.BarrierHole(
+                    pos=user_errors.to_threespace(origin + 64 * normal),
+                    axis=normal.axis(),
+                    large=hole_type is HoleType.LARGE,
+                    small=hole_type is HoleType.SMALL,
+                    footprint=True,
+                )
+            )
+    # Place it, or error if there's already one here.
+    key = (sel_origin.as_tuple(), sel_normal.as_tuple())
+    if key in HOLES:
         raise user_errors.UserError(
-            user_errors.TOK_BARRIER_HOLE_FOOTPRINT
-            if first_placement == 'nospace' or sec_placement == 'nospace' else
-            user_errors.TOK_BARRIER_HOLE_MISPLACED,
-            barrier_hole={
-                'pos': user_errors.to_threespace(origin + 64 * normal),
-                'axis': normal.axis(),
-                'large': hole_type is HoleType.LARGE,
-                'small': hole_type is HoleType.SMALL,
-                'footprint': True,  
-            }
+            user_errors.TOK_BARRIER_HOLE_FOOTPRINT,
+            points=[sel_origin + 64 * sel_normal],
+            barrier_hole=user_errors.BarrierHole(
+                pos=user_errors.to_threespace(sel_origin + 64 * sel_normal),
+                axis=sel_normal.axis(),
+                large=hole_type is HoleType.LARGE or HOLES[key] is HoleType.LARGE,
+                small=hole_type is HoleType.SMALL or HOLES[key] is HoleType.SMALL,
+                footprint=False,
+            ),
         )
+    HOLES[key] = hole_type
+    inst['origin'] = sel_origin
+    inst['angles'] = sel_normal.to_angle()
 
 
 def template_solids_and_coll(

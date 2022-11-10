@@ -15,7 +15,7 @@ Kind = Literal["white", "black", "goo", "goopartial", "goofull", "back", "glass"
 
 class SimpleTile(TypedDict):
     """A super simplified version of tiledef data for the error window. This can be converted right to JSON."""
-    pos: Tuple[float, float, float]
+    position: Tuple[float, float, float]
     orient: Literal["n", "s", "e", "w", "u", "d"]
 
 
@@ -24,6 +24,8 @@ class BarrierHole(TypedDict):
     pos: Tuple[float, float, float]
     axis: Literal["x", "y", "z"]
     large: bool
+    small: bool
+    footprint: bool
 
 
 @attrs.frozen
@@ -199,7 +201,7 @@ TOK_CUBE_DROPPER_LINKED = TransToken.ui(
 TOK_BARRIER_HOLE_FOOTPRINT = TransToken.ui(
     'A glass/grating Hole does not have sufficent space. The entire highlighted yellow area should '
     'be occupied by continous glass or grating. For large holes, the diagonally adjacient voxels '
-    'are not required.'
+    'are not required. In addition, two Hole items cannot overlap each other.'
 )
 
 TOK_BARRIER_HOLE_MISPLACED = TransToken.ui(
