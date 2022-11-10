@@ -164,22 +164,24 @@ window.addEventListener("load", () => {
 		}
 
 		if (data.barrier_hole) {
-			await loader_obj.loadAsync(
-				`static/barrier_hole_${data.barrier_hole.large ? 'large': 'small'}.obj`
-			).then((hole_geo) => {
+			await loader_obj.loadAsync('static/barrier_hole.obj').then((hole_geo) => {
 				console.log("Hole: ", hole_geo);
 				const hole_mats = new Map();
 				hole_mats.set("selection", select_mat);
 				hole_mats.set("framing", new THREE.MeshToonMaterial({color: 0xCCCCCC}));
 				for (const child of hole_geo.children) {
-					const mdl = new THREE.Mesh(
-						child.geometry,
-						child.material.map((mat) => hole_mats.get(mat.name))
-					);
+					// name = small/large, kind = frame/footprint
+					// Data has large, small, footprint booleans.
+					const [name, kind] = child.name.split("_");
+					if (
+						!data.barrier_hole[name]  ||
+						(kind === "footprint" && !data.barrier_hole.footprint)
+					) { continue }
+					const mdl = new THREE.Mesh(child.geometry, hole_mats.get(child.material.name));
 					mdl.position.set(
-							data.barrier_hole.pos[0],
-							data.barrier_hole.pos[1],
-							data.barrier_hole.pos[2],
+						data.barrier_hole.pos[0],
+						data.barrier_hole.pos[1],
+						data.barrier_hole.pos[2],
 					);
 					mdl.setRotationFromQuaternion(axes.get(data.barrier_hole.axis));
 					scene.add(mdl);

@@ -169,6 +169,8 @@ def res_glass_hole(inst: Entity, res: Property):
                 'pos': user_errors.to_threespace(origin + 64 * normal),
                 'axis': normal.axis(),
                 'large': hole_type is HoleType.LARGE,
+                'small': hole_type is HoleType.SMALL,
+                'footprint': True,  
             }
         )
 
@@ -370,6 +372,8 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
                     'pos': user_errors.to_threespace(origin + 64 * normal),
                     'axis': norm_axis,
                     'large': hole_type is HoleType.LARGE,
+                    'small': hole_type is HoleType.SMALL,
+                    'footprint': True,
                 }
             )
 
