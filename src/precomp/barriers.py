@@ -7,6 +7,7 @@ from typing import Callable, List, Tuple
 
 from srctools import VMF, Vec, Solid, Property, Entity, Angle, Matrix
 import srctools.logger
+from typing_extensions import Literal
 
 from plane import Plane
 from precomp import (
@@ -99,20 +100,19 @@ def parse_map(vmf: VMF, info: conditions.MapInfo) -> None:
         packing.pack_list(vmf, options.get(str, 'glass_pack'))
 
 
-def test_hole_spot(origin: Vec, normal: Vec, hole_type: HoleType):
+def test_hole_spot(origin: Vec, normal: Vec, hole_type: HoleType) -> Literal['noglass', 'valid', 'nospace']:
     """Check if the given position is valid for holes.
 
     We need to check that it's actually placed on glass/grating, and that
     all the parts are the same. Otherwise, it'd collide with the borders.
     """
-
     try:
         center_type = BARRIERS[origin.as_tuple(), normal.as_tuple()]
     except KeyError:
-        return False
+        return 'noglass'
 
     if hole_type is HoleType.SMALL:
-        return True
+        return 'valid'
 
     u, v = Vec.INV_AXIS[normal.axis()]
     # The corners don't matter, but all 4 neighbours must be there.
@@ -128,12 +128,12 @@ def test_hole_spot(origin: Vec, normal: Vec, hole_type: HoleType):
         except KeyError:
             # No side
             LOGGER.warning('No offset barrier at {}, {}', pos, normal)
-            return False
+            return 'nospace'
         if off_type is not center_type:
             # Different type.
             LOGGER.warning('Wrong barrier type at {}, {}', pos, normal)
-            return False
-    return True
+            return 'nospace'
+    return 'valid'
 
 
 @conditions.make_result('GlassHole')
@@ -144,23 +144,26 @@ def res_glass_hole(inst: Entity, res: Property):
     normal: Vec = round(Vec(z=-1) @ Angle.from_str(inst['angles']), 6)
     origin: Vec = Vec.from_str(inst['origin']) // 128 * 128 + 64
 
-    if test_hole_spot(origin, normal, hole_type):
+    first_placement = test_hole_spot(origin, normal, hole_type)
+    if first_placement == 'valid':
         HOLES[origin.as_tuple(), normal.as_tuple()] = hole_type
         inst['origin'] = origin
         inst['angles'] = normal.to_angle()
         return
 
     # Test the opposite side of the glass too.
-
     inv_origin = origin + 128 * normal
     inv_normal = -normal
 
-    if test_hole_spot(inv_origin, inv_normal, hole_type):
+    sec_placement = test_hole_spot(inv_origin, inv_normal, hole_type)
+    if sec_placement == 'valid':
         HOLES[inv_origin.as_tuple(), inv_normal.as_tuple()] = hole_type
         inst['origin'] = inv_origin
         inst['angles'] = inv_normal.to_angle()
     else:
         raise user_errors.UserError(
+            user_errors.TOK_BARRIER_HOLE_FOOTPRINT
+            if first_placement == 'nospace' or sec_placement == 'nospace' else
             user_errors.TOK_BARRIER_HOLE_MISPLACED,
             barrier_hole={
                 'pos': user_errors.to_threespace(origin + 64 * normal),
