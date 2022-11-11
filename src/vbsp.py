@@ -1560,6 +1560,7 @@ def main() -> None:
         )
         return
 
+    is_publishing = False
     try:
         LOGGER.info("PeTI map detected!")
 
@@ -1580,6 +1581,7 @@ def main() -> None:
             elev_override=BEE2_config.get_bool('General', 'spawn_elev'),
             voice_attrs=settings['has_attr'],
         )
+        is_publishing = info.is_publishing
 
         ant, side_to_antline = antlines.parse_antlines(vmf)
 
@@ -1639,7 +1641,9 @@ def main() -> None:
             )
     except errors.UserError as error:
         # The user did something wrong, so the map is invalid.
-        # Compile a special map which displays the message.
+        # In preview, compile a special map which displays the message.
+        if is_publishing:  # But force an error to prevent publishing.
+            raise
         LOGGER.error('"User" error detected, aborting compile: ', exc_info=True)
         vmf = errors.make_map(error)
 
