@@ -146,6 +146,10 @@ TOK_DUPLICATE_ID = TransToken.ui(
 )
 TOK_UNKNOWN_ID = TransToken.ui('Unknown {kind} ID "<var>{id}</var>".')
 
+TOK_WRONG_ITEM_TYPE = TransToken.ui(
+    'The item "<var>{item}</var>" is not a {kind}!<br>Instance: <code>{inst}</code>'
+)
+
 TOK_SEEDOCS = TransToken.untranslated('{msg}\n<p><a href="{url}">See the documentation</a>.</p>')
 
 # Specific errors:
