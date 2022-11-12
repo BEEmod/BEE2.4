@@ -161,6 +161,39 @@ class TransToken:
             frozenset(self.parameters.items()),
         ))
 
+    def _untranslate_params(self) -> Dict[str, object]:
+        """Convert our parameters to untranslated tokens
+
+        If no conversion is needed return the original.
+        """
+        new_params: Dict[str, object] = {}
+        changed = False
+        for key, value in self.parameters.items():
+            if isinstance(value, TransToken):
+                changed = True
+                new_params[key] = value.to_untranslated()
+            else:
+                new_params[key] = value
+        return new_params if changed else self.parameters
+
+    def to_untranslated(self) -> 'TransToken':
+        """Fix the current translation, by converting this to an untranslated token.
+
+        If paramerterised, any token parameters will be converted recursively.
+        """
+        # If untranslated and there's no tokens in our parameters, there's no need to produce a new
+        # token.
+        new_params = self._untranslate_params()
+        if self.namespace == NS_UNTRANSLATED and new_params is self.parameters:
+            return self
+        else:
+            return TransToken(
+                NS_UNTRANSLATED,
+                self.orig_pack,
+                self._convert_token(),
+                new_params,
+            )
+
     def _convert_token(self) -> str:
         """Return the translated version of our token."""
         # If in the untranslated namespace or blank, don't translate.
@@ -226,6 +259,27 @@ class PluralTransToken(TransToken):
             frozenset(self.parameters.items()),
         ))
 
+    def to_untranslated(self) -> 'PluralTransToken':
+        """Fix the current translation, by converting this to an untranslated token.
+
+        If paramerterised, any token parameters will be converted recursively.
+        """
+        # If in the untranslated namespace or blank, don't translate.
+        if self.namespace == NS_UNTRANSLATED or not self.token:
+            singular = self.token
+            plural = self.token_plural
+        elif _CURRENT_LANG is DUMMY:
+            singular = '#' * len(self.token)
+            plural = '#' * len(self.token_plural)
+        elif self.namespace == NS_GAME:
+            raise ValueError('Game namespace cannot be pluralised!')
+        else:
+            raise NotImplementedError(
+                'Translating plural catalogs requires handling the plural function!'
+            )
+        new_params = self._untranslate_params()
+        return PluralTransToken(NS_UNTRANSLATED, self.orig_pack, singular, new_params, plural)
+
     def _convert_token(self) -> str:
         """Return the translated version of our token, handling plurals."""
         try:
@@ -282,3 +336,17 @@ class JoinTransToken(TransToken):
         if self.sort:
             items.sort()
         return sep.join(items)
+
+    def to_untranslated(self) -> 'TransToken':
+        """Fix the current translation, by converting this to an untranslated token.
+
+        The children will be converted recursively.
+        """
+        return JoinTransToken(
+            NS_UNTRANSLATED,
+            self.orig_pack,
+            self._convert_token(),
+            EmptyMapping,
+            [tok.to_untranslated() for tok in self.children],
+            self.sort,
+        )
