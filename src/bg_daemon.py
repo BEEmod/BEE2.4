@@ -849,8 +849,7 @@ def run_background(
                         func(*args)
                     except Exception as e:  # Note which function caused the problem.
                         try:
-                            # noinspection PyUnresolvedReferences
-                            e.add_note(f'Function: {func!r}')
+                            e.add_note(f'Function: {func!r}')  # noqa
                             raise
                         except AttributeError:  # < 3.10
                             pass
