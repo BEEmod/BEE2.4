@@ -48,7 +48,7 @@ def res_conveyor_belt(vmf: VMF, inst: Entity, res: Property) -> None:
     move_dir = move_dir @ orig_orient
     start_offset = inst.fixup.float('$starting_position')
     teleport_to_start = res.bool('TrackTeleport', True)
-    segment_inst_file = instanceLocs.resolve_one(res['SegmentInst', ''])
+    segment_inst_file = instanceLocs.resolve_one(res['SegmentInst', ''], error=False)
     rail_template = res['RailTemplate', None]
 
     track_speed = res['speed', None]

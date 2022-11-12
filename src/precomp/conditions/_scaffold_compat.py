@@ -59,7 +59,7 @@ def resolve_optional(prop: Property, key: str) -> Optional[str]:
         file = prop[key]
     except LookupError:
         return None
-    return instanceLocs.resolve_one(file)
+    return instanceLocs.resolve_one(file, error=False)
 
 
 # The name we give to instances and other parts.

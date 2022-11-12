@@ -87,7 +87,7 @@ def res_reshape_fizzler(vmf: VMF, shape_inst: Entity, res: Property):
             targetname=shape_name,
             origin=shape_inst['origin'],
             angles=shape_inst['angles'],
-            file=resolve_one('<ITEM_BARRIER_HAZARD:fizz_base>'),
+            file=resolve_one('<ITEM_BARRIER_HAZARD:fizz_base>', error=True),
         )
         base_inst.fixup.update(shape_inst.fixup)
         fizz = fizzler.FIZZLERS[shape_name] = fizzler.Fizzler(

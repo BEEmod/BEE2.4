@@ -318,7 +318,7 @@ def resolve(path: str, silent: bool=False) -> List[str]:
 Default_T = TypeVar('Default_T')
 
 
-def resolve_one(path, default: Union[str, Default_T]='', error=False) -> Union[str, Default_T]:
+def resolve_one(path, default: Union[str, Default_T]='', *, error: bool) -> Union[str, Default_T]:
     """Resolve a path into one instance.
 
     If multiple are given, this returns the first.

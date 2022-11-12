@@ -69,7 +69,7 @@ def parse_map(vmf: VMF, info: conditions.MapInfo) -> None:
     The frames are updated with a fixup var, as appropriate.
     """
     frame_inst = resolve('[glass_frames]', silent=True)
-    glass_inst = resolve_one('[glass_128]')
+    glass_inst = resolve_one('[glass_128]', error=False)
 
     for entities, voice_attr, material, barrier_type in [
         (vmf.by_class['func_detail'], 'glass', consts.Special.GLASS, BarrierType.GLASS),
@@ -85,7 +85,7 @@ def parse_map(vmf: VMF, info: conditions.MapInfo) -> None:
 
     for inst in vmf.by_class['func_instance']:
         filename = inst['file'].casefold()
-        if filename == glass_inst:
+        if filename and filename == glass_inst:
             inst.remove()
         elif filename in frame_inst:
             # Add a fixup to allow distinguishing the type.
@@ -239,8 +239,8 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
     floorbeam_temp = options.get(str, 'glass_floorbeam_temp')
 
     # Valve doesn't implement convex corners, we'll do it ourselves.
-    convex_corner_left = instanceLocs.resolve_one('[glass_left_convex_corner]')
-    convex_corner_right = instanceLocs.resolve_one('[glass_right_convex_corner]')
+    convex_corner_left = instanceLocs.resolve_one('[glass_left_convex_corner]', error=False)
+    convex_corner_right = instanceLocs.resolve_one('[glass_right_convex_corner]', error=False)
     convex_corners: List[Tuple[Matrix, str, float]] = [
         (orient, filename, side)
         # We don't include 90 and 270, the other filename covers those.

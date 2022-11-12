@@ -136,8 +136,8 @@ def res_camera(vmf: VMF, res: Property) -> conditions.ResultCallable:
     yaw_off = Vec.from_str(res['YawOff', ''])
     pitch_off = Vec.from_str(res['PitchOff', ''])
 
-    yaw_inst = instanceLocs.resolve_one(res['yawInst', ''])
-    pitch_inst = instanceLocs.resolve_one(res['pitchInst', ''])
+    yaw_inst = instanceLocs.resolve_one(res['yawInst', ''], error=False)
+    pitch_inst = instanceLocs.resolve_one(res['pitchInst', ''], error=False)
 
     yaw_range = srctools.conv_int(res['YawRange', ''], 90)
     pitch_range = srctools.conv_int(res['PitchRange', ''], 90)

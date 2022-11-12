@@ -48,7 +48,7 @@ def resolve_optional(prop: Property, key: str) -> str:
         file = prop[key]
     except LookupError:
         return ''
-    return instanceLocs.resolve_one(file) or ''
+    return instanceLocs.resolve_one(file, error=False) or ''
 
 # Store the nodes for items so we can join them up later.
 ITEMS_TO_LINK: dict[str, list[item_chain.Node[Config]]] = {}
