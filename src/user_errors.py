@@ -80,7 +80,7 @@ class UserError(BaseException):
         """Specify the info to show to the user.
 
         :param message: This is a translation token potentially containing HTML. Strings
-            formatted into it will be escaped. TODO implement.
+            formatted into it will be escaped.
         :param voxels: A list of offending voxel locations, which will be displayed in
             the render of the map as 64x64 boxes.
         :param points: A list of smaller points, which are displayed as 12 unit spheres.

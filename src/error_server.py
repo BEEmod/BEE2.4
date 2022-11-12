@@ -51,7 +51,7 @@ async def route_display_errors() -> str:
     update_deadline()
     return await quart.render_template(
         'index.html.jinja2',
-        error_text=current_error.message,
+        error_text=current_error.message.translate_html(),
         log_context=current_error.context,
     )
 

@@ -3,8 +3,11 @@
 To actually translate the localisation module is required, for the app only, in the compiler these
 exist so that data structures can be shared.
 """
-from typing import ClassVar, Dict, Iterable, Mapping, NoReturn, Protocol, Sequence, Tuple, cast
+from typing import Any, ClassVar, Dict, Iterable, Mapping, NoReturn, Protocol, Sequence, Tuple, cast
 from typing_extensions import Final, LiteralString
+from html import escape as html_escape
+import string
+
 import attrs
 
 from srctools import EmptyMapping, logger
@@ -42,6 +45,19 @@ _CURRENT_LANG = Language(
 )
 # Special language which replaces all text with ## to easily identify untranslatable text.
 DUMMY: Final = Language('Dummy', 'dummy', {}, {})
+
+
+class HTMLFormatter(string.Formatter):
+    """Custom format variant which escapes fields for HTML."""
+    def format_field(self, value: Any, format_spec: str) -> str:
+        """Called to convert a field in the format string."""
+        if isinstance(value, TransToken):
+            return format(value.translate_html(), format_spec)
+        else:
+            return html_escape(format(value, format_spec))
+
+
+HTML_FORMAT = HTMLFormatter()
 
 
 @attrs.frozen(eq=False)
@@ -165,7 +181,7 @@ class TransToken:
         """Return the translated version of our token."""
         # If in the untranslated namespace or blank, don't translate.
         if self.namespace == NS_UNTRANSLATED or not self.token:
-            result = self.token
+            return self.token
         elif _CURRENT_LANG is DUMMY:
             return '#' * len(self.token)
         elif self.namespace == NS_GAME:
@@ -185,6 +201,17 @@ class TransToken:
         text = self._convert_token()
         if self.parameters:
             return text.format_map(self.parameters)
+        else:
+            return text
+
+    def translate_html(self) -> str:
+        """Translate to text, escaping parameters for HTML.
+
+        Any non-token parameters will have HTML syntax escaped.
+        """
+        text = self._convert_token()
+        if self.parameters:
+            return HTML_FORMAT.vformat(text, (), self.parameters)
         else:
             return text
 
@@ -279,6 +306,19 @@ class JoinTransToken(TransToken):
             raise ValueError(f'Cannot format joined token: {vars(self)}')
         sep = self._convert_token()
         items = [str(child) for child in self.children]
+        if self.sort:
+            items.sort()
+        return sep.join(items)
+
+    def translate_html(self) -> str:
+        """Translate to text, escaping parameters for HTML.
+
+        Any non-token parameters in children will have HTML syntax escaped.
+        """
+        if self.parameters:
+            raise ValueError(f'Cannot format joined token: {vars(self)}')
+        sep = self._convert_token()
+        items = [child.translate_html() for child in self.children]
         if self.sort:
             items.sort()
         return sep.join(items)
