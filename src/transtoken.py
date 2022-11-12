@@ -3,7 +3,7 @@
 To actually translate the localisation module is required, for the app only, in the compiler these
 exist so that data structures can be shared.
 """
-from typing import ClassVar, Dict, Iterable, Mapping, Protocol, Sequence, Tuple, cast
+from typing import ClassVar, Dict, Iterable, Mapping, NoReturn, Protocol, Sequence, Tuple, cast
 from typing_extensions import Final, LiteralString
 import attrs
 
@@ -161,8 +161,8 @@ class TransToken:
             frozenset(self.parameters.items()),
         ))
 
-    def __str__(self) -> str:
-        """Calling str on a token translates it."""
+    def _convert_token(self) -> str:
+        """Return the translated version of our token."""
         # If in the untranslated namespace or blank, don't translate.
         if self.namespace == NS_UNTRANSLATED or not self.token:
             result = self.token
@@ -170,19 +170,23 @@ class TransToken:
             return '#' * len(self.token)
         elif self.namespace == NS_GAME:
             try:
-                result = _CURRENT_LANG.game_trans[self.token]
+                return _CURRENT_LANG.game_trans[self.token]
             except KeyError:
-                result = self.token
+                return self.token
         else:
             try:
                 # noinspection PyProtectedMember
-                result = _CURRENT_LANG._trans[self.namespace].gettext(self.token)
+                return _CURRENT_LANG._trans[self.namespace].gettext(self.token)
             except KeyError:
-                result = self.token
+                return self.token
+
+    def __str__(self) -> str:
+        """Calling str on a token translates it."""
+        text = self._convert_token()
         if self.parameters:
-            return result.format_map(self.parameters)
+            return text.format_map(self.parameters)
         else:
-            return result
+            return text
 
 
 TransToken.BLANK = TransToken.untranslated('')
@@ -222,8 +226,8 @@ class PluralTransToken(TransToken):
             frozenset(self.parameters.items()),
         ))
 
-    def __str__(self) -> str:
-        """Calling str on a token translates it. Plural tokens require an "n" parameter."""
+    def _convert_token(self) -> str:
+        """Return the translated version of our token, handling plurals."""
         try:
             n = int(cast(str, self.parameters['n']))
         except KeyError:
@@ -231,7 +235,7 @@ class PluralTransToken(TransToken):
 
         # If in the untranslated namespace or blank, don't translate.
         if self.namespace == NS_UNTRANSLATED or not self.token:
-            result = self.token if n == 1 else self.token_plural
+            return self.token if n == 1 else self.token_plural
         elif _CURRENT_LANG is DUMMY:
             return '#' * len(self.token if n == 1 else self.token_plural)
         elif self.namespace == NS_GAME:
@@ -239,14 +243,9 @@ class PluralTransToken(TransToken):
         else:
             try:
                 # noinspection PyProtectedMember
-                result = _CURRENT_LANG._trans[self.namespace].ngettext(self.token, self.token_plural, n)
+                return _CURRENT_LANG._trans[self.namespace].ngettext(self.token, self.token_plural, n)
             except KeyError:
-                result = self.token
-
-        if self.parameters:
-            return result.format_map(self.parameters)
-        else:
-            return result
+                return self.token
 
 
 @attrs.frozen(eq=False)
@@ -257,6 +256,10 @@ class JoinTransToken(TransToken):
     """
     children: Sequence[TransToken]
     sort: bool
+
+    def format(self, /, **kwargs: object) -> NoReturn:
+        """Joined tokens cannot be formatted."""
+        raise NotImplementedError('Cannot format joined tokens!')
 
     def __hash__(self) -> int:
         return hash((self.namespace, self.token, *self.children))
@@ -272,7 +275,9 @@ class JoinTransToken(TransToken):
 
     def __str__(self) -> str:
         """Translate the token."""
-        sep = super().__str__()
+        if self.parameters:
+            raise ValueError(f'Cannot format joined token: {vars(self)}')
+        sep = self._convert_token()
         items = [str(child) for child in self.children]
         if self.sort:
             items.sort()
