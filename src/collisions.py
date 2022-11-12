@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import operator
 from enum import Flag, auto as enum_auto
-from typing import Iterable, Iterator, Sequence, overload
+from typing import Callable, Iterable, Iterator, Sequence, overload
 
 import attrs
 import functools
@@ -129,16 +129,23 @@ class BBox:
         name: str = '',
     ) -> None:
         """Allow constructing from Vec, and flip values to make them min/max."""
+        min_x: int
+        max_x: int
+        min_y: int
+        max_y: int
+        min_z: int
+        max_z: int
         if len(args) == 6:
             try:
-                min_x, min_y, min_z, max_x, max_y, max_z = map(round, args)
+                # None of these should be Vec.
+                min_x, min_y, min_z, max_x, max_y, max_z = map(round, args)  # type: ignore
             except (TypeError, ValueError):
                 raise TypeError('6 numbers must be supplied!')
         elif len(args) == 2:
             point1, point2 = args
             if isinstance(point1, Vec) and isinstance(point2, Vec):
-                min_x, min_y, min_z = map(round, point1)
-                max_x, max_y, max_z = map(round, point2)
+                min_x, min_y, min_z = round(point1.x), round(point1.y), round(point1.z)
+                max_x, max_y, max_z = round(point2.x), round(point2.y), round(point2.z)
             else:
                 raise TypeError(f'Expected 2 vectors, got {type(point1).__name__} and {type(point2).__name__}')
         else:

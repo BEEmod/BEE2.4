@@ -14,8 +14,8 @@ tuple3 = Tuple[int, int, int]
 
 def assert_bbox(
     bbox: BBox,
-    mins: Iterable[int],
-    maxes: Iterable[int],
+    mins: Iterable[int | float],
+    maxes: Iterable[int | float],
     contents: CollideType,
     tags: set[str],
     msg='',
