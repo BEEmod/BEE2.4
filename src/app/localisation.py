@@ -241,16 +241,20 @@ def setup(conf_lang: str) -> None:
     LOGGER.debug('Language codes: {!r}', expanded_langs)
 
     for lang in expanded_langs:
+        filename = FOLDER / (lang + '.mo')
         try:
-            file = open(FOLDER / (lang + '.mo'), 'rb')
+            file = open(filename, 'rb')
         except FileNotFoundError:
             continue
         with file:
             translator = gettext_mod.GNUTranslations(file)
-        # i18n: This is displayed in the options menu to switch to this language.
-        language = Language(translator.gettext('__LanguageName'), lang_code, {
-            NS_UI: translator,
-        })
+        language = Language(
+            # i18n: This is displayed in the options menu to switch to this language.
+            display_name=translator.gettext('__LanguageName'), # TODO: Use babel's inbuilt DB instead.
+            lang_code=lang_code,
+            ui_filename=filename,
+            trans={NS_UI: translator},
+        )
         break
     else:
         # To help identify missing translations, replace everything with
@@ -265,7 +269,7 @@ def setup(conf_lang: str) -> None:
                     "Can't find translation for codes: {!r}!",
                     expanded_langs,
                 )
-            language = Language('English', 'en', {})
+            language = Language(display_name='English', lang_code='en', trans={})
 
     set_language(language)
 
@@ -283,9 +287,10 @@ def get_languages() -> Iterator[Language]:
             continue
         yield Language(
             # Special case, hardcode this name since this is the template and will produce the token.
-            'English' if filename.stem == 'en' else translator.gettext('__LanguageName'),
-            translator.info().get('Language', filename.stem),
-            {NS_UI: translator},
+            display_name='English' if filename.stem == 'en' else translator.gettext('__LanguageName'),
+            lang_code=translator.info().get('Language', filename.stem),
+            ui_filename=filename,
+            trans={NS_UI: translator},
         )
 
 

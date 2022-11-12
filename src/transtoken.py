@@ -3,9 +3,13 @@
 To actually translate the localisation module is required, for the app only, in the compiler these
 exist so that data structures can be shared.
 """
-from typing import Any, ClassVar, Dict, Iterable, Mapping, NoReturn, Protocol, Sequence, Tuple, cast
+from typing import (
+    Any, ClassVar, Dict, Iterable, Mapping, NoReturn, Optional, Protocol, Sequence,
+    Tuple, cast,
+)
 from typing_extensions import Final, LiteralString
 from html import escape as html_escape
+from pathlib import Path
 import string
 
 import attrs
@@ -29,22 +33,21 @@ class GetText(Protocol):
     def ngettext(self, single: str, plural: str, n: int, /) -> str: ...
 
 
-@attrs.frozen
+@attrs.frozen(kw_only=True)
 class Language:
     """A language which may be loaded, and the associated translations."""
     display_name: str
     lang_code: str
+    ui_filename: Optional[Path] = None # Filename of the UI translation, if it exists.
     _trans: Dict[str, GetText]
     # The loaded translations from basemodui.txt
     game_trans: Mapping[str, str] = EmptyMapping
 
 
 # The current language.
-_CURRENT_LANG = Language(
-    '<None>', 'en', {}, {}
-)
+_CURRENT_LANG = Language(display_name='<None>', lang_code='en', trans={})
 # Special language which replaces all text with ## to easily identify untranslatable text.
-DUMMY: Final = Language('Dummy', 'dummy', {}, {})
+DUMMY: Final = Language(display_name='Dummy', lang_code='dummy', trans={})
 
 
 class HTMLFormatter(string.Formatter):
