@@ -1,7 +1,9 @@
 """Handles user errors found, displaying a friendly interface to the user."""
 from __future__ import annotations
 import pickle
-from typing import Iterable
+from typing import Iterable, Mapping, Tuple
+
+from typing_extensions import Final, Literal
 
 import consts
 from srctools import Vec, VMF, AtomicWriter
@@ -14,7 +16,10 @@ from precomp.brushLoc import Grid
 
 __all__ = ['UserError', 'TOK_LEAK', 'load_tiledefs']
 
-NORM_2_ORIENT = {
+NORM_2_ORIENT: Final[Mapping[
+    Tuple[float, float, float],
+    Literal['u', 'd', 'n', 's', 'e', 'w']
+]] = {
     (0.0, 0.0, +1.0): 'u',
     (0.0, 0.0, -1.0): 'd',
     (0.0, +1.0, 0.0): 'n',
