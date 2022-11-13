@@ -2,9 +2,17 @@
 
 # Version `<dev>`
 
+## New features:
+
+* New error display system: If a known error occurs during compilation (leaks, items 
+  used incorrectly, etc), the Steam Overlay will be opened, and a webpage opened with
+  information on the error, as well as a interactive view of the chamber to show the
+  location of the issue and relevant items.
+* Languages can now be selected in the options menu, and packages now have more usable
+  translation support.
+
 ### Enhancements
 * If funnel music is disabled, keep the base music playing while inside funnels.
-* Rebuilt localisation system, allowing languages to be changed in the options menu.
 
 ### Bugfixes
 * Do not composite signage VTFs with PeTI backgrounds.
