@@ -16,7 +16,7 @@ else:
 
 if app_name in ('vbsp.exe', 'vbsp_osx', 'vbsp_linux'):
     import vbsp
-    vbsp.main()
+    trio.run(vbsp.main)
 elif app_name in ('vrad.exe', 'vrad_osx', 'vrad_linux'):
     if '--errorserver' in sys.argv:
         import error_server

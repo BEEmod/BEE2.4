@@ -4,22 +4,27 @@ from srctools.logger import init_logging
 
 LOGGER = init_logging('bee2/vbsp.log')
 
+
+from typing import Any, Dict, List, Tuple, Set, Iterable, Optional
+from typing_extensions import TypedDict
+from io import StringIO
+from collections import defaultdict, namedtuple, Counter
 import os
 import sys
 import shutil
 import logging
 import pickle
-from io import StringIO
-from collections import defaultdict, namedtuple, Counter
 
 from srctools import AtomicWriter, Property, Vec, Vec_tuple, Angle, Matrix
 from srctools.vmf import VMF, Entity, Output
 from srctools.game import Game
-from BEE2_config import ConfigFile
-import utils
 import srctools
 import srctools.run
 import srctools.logger
+import trio
+
+from BEE2_config import ConfigFile
+import utils
 from precomp.collisions import Collisions
 from precomp import (
     instance_traits,
@@ -46,9 +51,6 @@ from precomp import (
 )
 import consts
 import editoritems
-
-from typing import Any, Dict, Tuple, Set, Iterable, Optional
-from typing_extensions import TypedDict
 
 
 class _Settings(TypedDict):
@@ -1453,7 +1455,7 @@ def process_vbsp_fail(output: str) -> None:
     BEE2_config.save_check()
 
 
-def main() -> None:
+async def main() -> None:
     """Main program code.
 
     """
@@ -1672,4 +1674,4 @@ def main() -> None:
 
 
 if __name__ == '__main__':
-    main()
+    trio.run(main)
