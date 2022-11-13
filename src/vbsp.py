@@ -1645,6 +1645,13 @@ def main() -> None:
         if is_publishing:  # But force an error to prevent publishing.
             raise
         LOGGER.error('"User" error detected, aborting compile: ', exc_info=True)
+
+        # Try to preserve the current map.
+        try:
+            save(vmf, new_path[:-4] + '.error.vmf')  # noqa
+        except Exception:
+            pass
+
         vmf = errors.make_map(error)
 
         # Flag as preview and errored for VRAD.
