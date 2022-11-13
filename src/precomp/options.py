@@ -569,7 +569,7 @@ DEFAULTS = [
     # The following are set by the BEE2.4 app automatically:
 
     Opt('dev_mode', False,
-        """Whether 'development mode' is enabled in the app.
+        """(Automatic) Whether 'development mode' is enabled in the app.
         
         This enables extra outputs for assisting with package development.
         """),
@@ -577,39 +577,39 @@ DEFAULTS = [
         """(Automatic) The game's steam ID.
         """),
     Opt('music_instance', TYPE.STR,
-        """The instance for the chosen music.
+        """(Automatic) The instance for the chosen music.
         """),
     Opt('error_translations', '',
         """(Automatic) Set to the `.mo` translation to use for error text."""
         ),
     Opt('music_looplen', 0,
-        """If set, re-trigger music after this number of seconds.
+        """(Automatic) If set, re-trigger music after this number of seconds.
         """),
     Opt('music_sync_tbeam', False,
-        """If set, funnel music syncs with the main track.
+        """(Automatic) If set, funnel music syncs with the main track.
         """),
     Opt('skybox', 'sky_black',
-        """The skybox name to use for the map.
+        """(Automatic) The skybox name to use for the map.
         """),
     Opt('elev_type', "RAND",
-        """What type of elevator script to use:
+        """(Automatic) What type of elevator script to use:
 
         This should be set to one of `RAND`, `FORCE`, `NONE` or `BSOD`
         """),
     Opt('elev_horiz', TYPE.STR,
-        """The horizontal elevator video to use.
+        """(Automatic) The horizontal elevator video to use.
         """),
     Opt('elev_vert', TYPE.STR,
-        """The vertical elevator video to use.
+        """(Automatic) The vertical elevator video to use.
         """),
     Opt('voice_id', "<NONE>",
-        """The ID of the selected voice pack.
+        """(Automatic) The ID of the selected voice pack.
         """),
     Opt('voice_char', TYPE.STR,
-        """Comma-separated list of characters in the pack.
+        """(Automatic) Comma-separated list of characters in the pack.
         """),
     Opt('cave_port_skin', TYPE.INT,
-        """If a Cave map, indicate which portrait to use.
+        """(Automatic) If a Cave map, indicate which portrait to use.
         
         * 0: 50's Cave
         * 1: 80's Cave
@@ -618,26 +618,26 @@ DEFAULTS = [
         """),
 
     Opt('voice_studio_inst', TYPE.STR,
-        """Instance to use for monitor backdrop.
+        """(Automatic) Instance to use for monitor backdrop.
         """),
     Opt('voice_studio_inter_chance', 0.0,
-        """Chance to switch to the voice character.
+        """(Automatic) Chance to switch to the voice character.
         """),
     Opt('voice_studio_cam_loc', Vec(0, 0, 0),
-        """Offset for the camera in the studio.
+        """(Automatic) Offset for the camera in the studio.
         """),
     Opt('voice_studio_cam_pitch', 0.0,
-        """Pitch direction of the camera.
+        """(Automatic) Pitch direction of the camera.
         """),
     Opt('voice_studio_cam_yaw', 0.0,
-        """Yaw direction of the camera.
+        """(Automatic) Yaw direction of the camera.
         """),
     Opt('voice_studio_actor', TYPE.STR,
-        """Indicates that an actor is in the instance.
+        """(Automatic) Indicates that an actor is in the instance.
 
         If set, no bullseye is output with this name in voicelines.
         """),
     Opt('voice_studio_should_shoot', False,
-        """Should turrets shoot at this character when shown?
+        """(Automatic) Should turrets shoot at this character when shown?
         """),
 ]
