@@ -579,6 +579,9 @@ DEFAULTS = [
     Opt('music_instance', TYPE.STR,
         """The instance for the chosen music.
         """),
+    Opt('error_translations', '',
+        """(Automatic) Set to the `.mo` translation to use for error text."""
+        ),
     Opt('music_looplen', 0,
         """If set, re-trigger music after this number of seconds.
         """),

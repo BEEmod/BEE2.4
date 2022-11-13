@@ -1,21 +1,26 @@
 """Handles user errors found, displaying a friendly interface to the user."""
 from __future__ import annotations
-import pickle
-from typing import Iterable, Mapping, Tuple
 
+from pathlib import Path
 from typing_extensions import Final, Literal
+from typing import Iterable, Mapping, Tuple
+import os.path
+import pickle
 
-import consts
-from srctools import Vec, VMF, AtomicWriter
+from srctools import Vec, VMF, AtomicWriter, logger
+import attrs
 
 from user_errors import DATA_LOC, UserError, TOK_LEAK
 from precomp.tiling import TileDef, TileType
 from precomp.barriers import BarrierType
 from precomp.brushLoc import Grid
+from precomp import options
+import consts
 
 
 __all__ = ['UserError', 'TOK_LEAK', 'load_tiledefs']
 
+LOGGER = logger.get_logger(__name__)
 NORM_2_ORIENT: Final[Mapping[
     Tuple[float, float, float],
     Literal['u', 'd', 'n', 's', 'e', 'w']
@@ -94,8 +99,15 @@ def make_map(error: UserError) -> VMF:
     This map is as simple as possible to make compile time quick.
     The content loc is the location of the web resources.
     """
+    lang_filename = options.get(str, 'error_translations')
+    if lang_filename and (lang_path := Path(lang_filename)).is_file():
+        info = attrs.evolve(error.info, language_file=lang_path)
+    else:
+        info = error.info
     with AtomicWriter(DATA_LOC, is_bytes=True) as f:
-        pickle.dump(error.info, f, pickle.HIGHEST_PROTOCOL)
+        pickle.dump(info, f, pickle.HIGHEST_PROTOCOL)
+
+    LOGGER.info('Localisation file: {!r}', lang_filename)
 
     vmf = VMF()
     vmf.map_ver = 1

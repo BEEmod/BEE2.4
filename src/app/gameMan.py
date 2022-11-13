@@ -36,6 +36,7 @@ from BEE2_config import ConfigFile
 from app import backup, tk_tools, resource_gen, TK_ROOT, DEV_MODE, background_run
 from config.gen_opts import GenOptions
 from transtoken import TransToken
+import transtoken
 import loadScreen
 import packages
 import packages.template_brush
@@ -709,6 +710,11 @@ class Game:
 
             vbsp_config.set_key(('Options', 'Game_ID'), self.steamID)
             vbsp_config.set_key(('Options', 'dev_mode'), srctools.bool_as_int(DEV_MODE.get()))
+            if transtoken.CURRENT_LANG.ui_filename is not None:
+                vbsp_config.set_key(
+                    ('Options', 'error_translations'),
+                    str(transtoken.CURRENT_LANG.ui_filename),
+                )
 
             # If there are multiple of these blocks, merge them together.
             # They will end up in this order.
@@ -803,7 +809,7 @@ class Game:
                 self.edit_fgd(True)
             export_screen.step('EXP', 'fgd')
 
-            # atomicwrites writes to a temporary file, then renames in one step.
+            # AtomicWriter writes to a temporary file, then renames in one step.
             # This ensures editoritems won't be half-written.
             LOGGER.info('Writing Editoritems script...')
             with AtomicWriter(self.abs_path('portal2_dlc2/scripts/editoritems.txt'), encoding='utf8') as editor_file:

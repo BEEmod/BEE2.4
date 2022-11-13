@@ -3,11 +3,13 @@
 UserError is imported all over, so this needs to have minimal imports to avoid cycles.
 """
 from typing import ClassVar, Collection, Dict, Iterable, List, Literal, Optional, Tuple, TypedDict
-import attrs
-from srctools import Matrix, Vec, logger
+from pathlib import Path
 
-import utils
+from srctools import Vec, logger
+import attrs
+
 from transtoken import TransToken
+import utils
 
 
 Kind = Literal["white", "black", "goo", "goopartial", "goofull", "back", "glass", "grating"]
@@ -28,10 +30,11 @@ class BarrierHole(TypedDict):
     footprint: bool
 
 
-@attrs.frozen
+@attrs.frozen(kw_only=True)
 class ErrorInfo:
     """Data to display to the user."""
     message: TransToken
+    language_file: Optional[Path] = None
     # Logging context
     context: str = ''
     faces: Dict[Kind, List[SimpleTile]] = attrs.Factory(dict)
@@ -118,9 +121,10 @@ class UserError(BaseException):
             message = TOK_SEEDOCS.format(msg=message, url=docsurl)
 
         self.info = ErrorInfo(
-            message,
-            ctx,
-            self._simple_tiles,
+            message=message,
+            language_file=None,
+            context=ctx,
+            faces=self._simple_tiles,
             voxels=list(map(to_threespace, voxels)),
             points=list(map(to_threespace, points)),
             leakpoints=list(map(to_threespace, leakpoints)),

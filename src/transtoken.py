@@ -38,14 +38,14 @@ class Language:
     """A language which may be loaded, and the associated translations."""
     display_name: str
     lang_code: str
-    ui_filename: Optional[Path] = None # Filename of the UI translation, if it exists.
+    ui_filename: Optional[Path] = None  # Filename of the UI translation, if it exists.
     _trans: Dict[str, GetText]
     # The loaded translations from basemodui.txt
     game_trans: Mapping[str, str] = EmptyMapping
 
 
-# The current language.
-_CURRENT_LANG = Language(display_name='<None>', lang_code='en', trans={})
+# The current language. Can be set to change language, but don't do that in the UI.
+CURRENT_LANG = Language(display_name='<None>', lang_code='en', trans={})
 # Special language which replaces all text with ## to easily identify untranslatable text.
 DUMMY: Final = Language(display_name='Dummy', lang_code='dummy', trans={})
 
@@ -185,17 +185,17 @@ class TransToken:
         # If in the untranslated namespace or blank, don't translate.
         if self.namespace == NS_UNTRANSLATED or not self.token:
             return self.token
-        elif _CURRENT_LANG is DUMMY:
+        elif CURRENT_LANG is DUMMY:
             return '#' * len(self.token)
         elif self.namespace == NS_GAME:
             try:
-                return _CURRENT_LANG.game_trans[self.token]
+                return CURRENT_LANG.game_trans[self.token]
             except KeyError:
                 return self.token
         else:
             try:
                 # noinspection PyProtectedMember
-                return _CURRENT_LANG._trans[self.namespace].gettext(self.token)
+                return CURRENT_LANG._trans[self.namespace].gettext(self.token)
             except KeyError:
                 return self.token
 
@@ -266,14 +266,14 @@ class PluralTransToken(TransToken):
         # If in the untranslated namespace or blank, don't translate.
         if self.namespace == NS_UNTRANSLATED or not self.token:
             return self.token if n == 1 else self.token_plural
-        elif _CURRENT_LANG is DUMMY:
+        elif CURRENT_LANG is DUMMY:
             return '#' * len(self.token if n == 1 else self.token_plural)
         elif self.namespace == NS_GAME:
             raise ValueError('Game namespace cannot be pluralised!')
         else:
             try:
                 # noinspection PyProtectedMember
-                return _CURRENT_LANG._trans[self.namespace].ngettext(self.token, self.token_plural, n)
+                return CURRENT_LANG._trans[self.namespace].ngettext(self.token, self.token_plural, n)
             except KeyError:
                 return self.token
 

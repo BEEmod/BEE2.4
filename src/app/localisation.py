@@ -297,7 +297,7 @@ def get_languages() -> Iterator[Language]:
 def set_language(lang: Language) -> None:
     """Change the app's language."""
     PARSE_CANCEL.cancel()
-    transtoken._CURRENT_LANG = lang
+    transtoken.CURRENT_LANG = lang
 
     conf = config.APP.get_cur_conf(GenOptions)
     config.APP.store_conf(attrs.evolve(conf, language=lang.lang_code))
@@ -349,7 +349,7 @@ async def load_aux_langs(
     PARSE_CANCEL.cancel()  # Stop any other in progress loads.
 
     if lang is None:
-        lang = transtoken._CURRENT_LANG  # noqa
+        lang = transtoken.CURRENT_LANG
 
     if lang is DUMMY:
         # Dummy does not need to load these files.

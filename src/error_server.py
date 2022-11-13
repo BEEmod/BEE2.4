@@ -11,11 +11,11 @@ This has 3 endpoints:
 import srctools.logger
 LOGGER = srctools.logger.init_logging('bee2/error_server.log')
 
-
 import functools
 import http
 import math
 import pickle
+import gettext
 from typing import List
 
 from hypercorn.config import Config
@@ -26,6 +26,7 @@ import trio
 
 import utils
 from user_errors import ErrorInfo, DATA_LOC, SERVER_PORT, TOK_ERR_FAIL_LOAD, TOK_ERR_MISSING
+import transtoken
 
 root_path = utils.install_path('error_display').absolute()
 LOGGER.info('Root path: ', root_path)
@@ -42,7 +43,7 @@ DELAY = 5 * 60  # After 5 minutes of no response, quit.
 # It starts with an infinite deadline, to ensure there's time to boot the server.
 TIMEOUT_CANCEL = trio.CancelScope(deadline=math.inf)
 
-current_error = ErrorInfo(TOK_ERR_MISSING)
+current_error = ErrorInfo(message=TOK_ERR_MISSING)
 
 
 @app.route('/')
@@ -115,9 +116,21 @@ def load_info() -> None:
             raise ValueError
     except Exception:
         LOGGER.exception('Failed to load pickle!')
-        current_error = ErrorInfo(TOK_ERR_FAIL_LOAD)
+        current_error = ErrorInfo(message=TOK_ERR_FAIL_LOAD)
     else:
         current_error = data
+    if current_error.language_file is not None:
+        try:
+            with open(current_error.language_file, 'rb') as f:
+                lang = gettext.GNUTranslations(f)
+        except OSError:
+            return
+        transtoken.CURRENT_LANG = transtoken.Language(
+            display_name='??',
+            lang_code='',
+            ui_filename=current_error.language_file,
+            trans={transtoken.NS_UI: lang},
+        )
 
 
 async def main() -> None:
