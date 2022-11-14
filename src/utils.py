@@ -58,8 +58,10 @@ STEAM_IDS = {
 copyreg.add_extension('srctools.math', '_mk_vec', 240)
 copyreg.add_extension('srctools.math', '_mk_ang', 241)
 copyreg.add_extension('srctools.math', '_mk_mat', 242)
-copyreg.add_extension('srctools.math', 'Vec_tuple', 243)
-copyreg.add_extension('srctools.property_parser', 'Property', 244)
+copyreg.add_extension('srctools.math', '_mk_fvec', 243)
+copyreg.add_extension('srctools.math', '_mk_fang', 244)
+copyreg.add_extension('srctools.math', '_mk_fmat', 245)
+copyreg.add_extension('srctools.keyvalues', 'Keyvalues', 246)
 
 
 # Appropriate locations to store config options for each OS.
