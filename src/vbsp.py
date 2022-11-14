@@ -17,6 +17,7 @@ import sys
 import shutil
 import logging
 import pickle
+import contextlib
 
 from srctools import AtomicWriter, Property, Vec, Vec_tuple, Angle, Matrix
 from srctools.vmf import VMF, Entity, Output
@@ -88,19 +89,45 @@ IGNORED_OVERLAYS: Set[Entity] = set()
 PRESET_CLUMPS = []  # Additional clumps set by conditions, for certain areas.
 
 
-def load_settings() -> Tuple[
+async def load_settings() -> Tuple[
     antlines.AntType, antlines.AntType,
     Dict[str, editoritems.Item],
     corridor.ExportedConf,
 ]:
     """Load in all our settings from vbsp_config."""
+    # Do all our file parsing concurrently.
     try:
-        with open("bee2/vbsp_config.cfg", encoding='utf8') as config:
-            conf = Property.parse(config, 'bee2/vbsp_config.cfg')
+        with contextlib.ExitStack() as file_stack:
+            file_config = file_stack.enter_context(open("bee2/vbsp_config.cfg", encoding='utf8'))
+            file_editor = file_stack.enter_context(open('bee2/editor.bin', 'rb'))
+            file_corridor = file_stack.enter_context(open('bee2/corridors.bin', 'rb'))
+            file_packlist = file_stack.enter_context(open('bee2/pack_list.cfg'))
+
+            async with trio.open_nursery() as nursery:
+                res_conf = utils.Result.sync(nursery, Property.parse, file_config)
+                res_editor: utils.Result[
+                    Iterable[editoritems.Item]
+                ] = utils.Result.sync(nursery, pickle.load, file_editor)
+                res_corr: utils.Result[corridor.ExportedConf] = utils.Result.sync(
+                    nursery,
+                    pickle.load, file_corridor,
+                )
+                res_packlist = utils.Result.sync(
+                    nursery,
+                    Property.parse, file_packlist, 'bee2/pack_list.cfg',
+                )
+                # Load in templates locations.
+                nursery.start_soon(template_brush.load_templates, 'bee2/templates.lst')
     except FileNotFoundError:
-        LOGGER.warning('Error: No vbsp_config file!')
-        conf = Property(None, [])
-        # All the find_all commands will fail, and we will use the defaults.
+        LOGGER.exception(
+            'Failed to parse required config file. Recompile the compiler '
+            'and/or export the palette.'
+            if utils.DEV_MODE else
+            'Failed to parse required config file. Re-export BEE2.'
+        )
+        sys.exit(1)
+
+    conf = res_conf()
 
     texturing.load_config(conf.find_block('textures', or_blank=True))
 
@@ -133,36 +160,17 @@ def load_settings() -> Tuple[
         for var in stylevar_block:
             settings['style_vars'][var.name.casefold()] = srctools.conv_bool(var.value)
 
-    # Load in templates locations.
-    template_brush.load_templates('bee2/templates.lst')
-
     # Load a copy of the item configuration.
     id_to_item: dict[str, editoritems.Item] = {}
-    item: editoritems.Item
-    with open('bee2/editor.bin', 'rb') as inst:
-        try:
-            for item in pickle.load(inst):
-                id_to_item[item.id.casefold()] = item
-        except Exception:  # Anything from __setstate__ etc.
-            LOGGER.exception(
-                'Failed to parse editoritems dump. Recompile the compiler '
-                'and/or export the palette.'
-                if utils.DEV_MODE else
-                'Failed to parse editoritems dump. Re-export BEE2.'
-            )
-            sys.exit(1)
+    for item in res_editor():
+        id_to_item[item.id.casefold()] = item
 
     # Send that data to the relevant modules.
     instanceLocs.load_conf(id_to_item.values())
     connections.read_configs(id_to_item.values())
 
     # Parse packlist data.
-    with open('bee2/pack_list.cfg') as f:
-        props = Property.parse(
-            f,
-            'bee2/pack_list.cfg'
-        )
-    packing.parse_packlists(props)
+    packing.parse_packlists(res_packlist())
 
     # Parse all the conditions.
     for cond in conf.find_all('conditions', 'condition'):
@@ -175,8 +183,7 @@ def load_settings() -> Tuple[
     fizzler.read_configs(conf)
 
     # Selected corridors.
-    with open('bee2/corridors.bin', 'rb') as bf:
-        corridor_conf: corridor.ExportedConf = pickle.load(bf)
+    corridor_conf = res_corr()
 
     # Signage items
     from precomp.conditions.signage import load_signs
@@ -228,13 +235,13 @@ def load_settings() -> Tuple[
     return ant_floor, ant_wall, id_to_item, corridor_conf
 
 
-def load_map(map_path: str) -> VMF:
+async def load_map(map_path: str) -> VMF:
     """Load in the VMF file."""
     with open(map_path) as file:
         LOGGER.info("Parsing Map...")
-        props = Property.parse(file, map_path)
+        props = await trio.to_thread.run_sync(Property.parse, file, map_path)
     LOGGER.info('Reading Map...')
-    vmf = VMF.parse(props)
+    vmf = await trio.to_thread.run_sync(VMF.parse, props)
     LOGGER.info("Loading complete!")
     return vmf
 
@@ -1603,9 +1610,13 @@ async def main() -> None:
         LOGGER.info("PeTI map detected!")
 
         LOGGER.info("Loading settings...")
-        ant_floor, ant_wall, id_to_item, corridor_conf = load_settings()
+        async with trio.open_nursery() as nursery:
+            res_settings = utils.Result(nursery, load_settings)
+            vmf_res = utils.Result(nursery, load_map, path)
 
-        vmf = load_map(path)
+        ant_floor, ant_wall, id_to_item, corridor_conf = res_settings()
+        vmf: VMF = vmf_res()
+
         coll = Collisions()
 
         instance_traits.set_traits(vmf, id_to_item, coll)
