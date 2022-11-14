@@ -158,11 +158,16 @@ TOK_SEEDOCS = TransToken.untranslated('{msg}\n<p><a href="{url}">See the documen
 
 # Specific errors:
 
-TOK_LEAK = TransToken.ui(
+TOK_VBSP_LEAK = TransToken.ui(
     'This map has <a href="https://developer.valvesoftware.com/wiki/Leak">"leaked"</a>. This is a '
     'bug in an item or style, which should be fixed. The displayed line indicates the location of '
     'the leak, you may be able to resolve it by removing/modifying items in that area. Please '
     'submit a bug report to the author of the item so this can be resolved. Leak coordinates:'
+)
+
+TOK_VBSP_MISSING_INSTANCE = TransToken.ui(
+    'The instance <code>{inst}</code> does not exist, meaning the map cannot be compiled! '
+    'Try other configurations for this item, it may be the case that only some are missing.',
 )
 
 TOK_GLASS_FLOORBEAM_TEMPLATE = TransToken.ui(

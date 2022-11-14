@@ -2,6 +2,9 @@
 # Do this very early, so we log the startup sequence.
 from srctools.logger import init_logging
 
+import user_errors
+
+
 LOGGER = init_logging('bee2/vbsp.log')
 
 
@@ -1259,6 +1262,28 @@ def fix_worldspawn(vmf: VMF) -> None:
     vmf.spawn['skyname'] = options.get(str, 'skybox')
 
 
+async def find_missing_instances(game: Game, vmf: VMF) -> List[Vec]:
+    """Go through the map, and check for missing instances.
+
+    We don't raise an error immediately, because it could be possible that VBSP checks differently
+    and can find them anyway. In that case just let it continue successfully.
+    """
+    missing: List[Vec] = []
+    sdk_content = await trio.Path(game.path / '../sdk_content/maps/').absolute()
+
+    async def check(inst: Entity) -> None:
+        """See if this file exists."""
+        filename = inst['file']
+        if not await (sdk_content / filename).exists():
+            missing.append(Vec.from_str(inst['origin']))
+
+    async with trio.open_nursery() as nursery:
+        for instance in vmf.by_class['func_instance']:
+            nursery.start_soon(check, instance)
+
+    return missing
+
+
 def instance_symlink() -> None:
     """On OS X and Linux, Valve broke VBSP's instances/ finding code.
 
@@ -1290,7 +1315,13 @@ def save(vmf: VMF, path: str) -> None:
     LOGGER.info("Complete!")
 
 
-def run_vbsp(vbsp_args, path, new_path=None, is_error_map: bool=False) -> None:
+def run_vbsp(
+    vbsp_args: List[str],
+    path: str,
+    new_path: Optional[str] = None,
+    is_error_map: bool = False,
+    maybe_missing_inst: Iterable[Vec]=(),
+) -> None:
     """Execute the original VBSP, copying files around to make it work correctly.
 
     vbsp_args are the arguments to pass.
@@ -1341,12 +1372,12 @@ def run_vbsp(vbsp_args, path, new_path=None, is_error_map: bool=False) -> None:
                     points.append(Vec.from_str(line.strip()))
             # Preserve this.
             os.replace(pointfile, pointfile[:-4] + ".bee2.lin")
-            raise errors.UserError(errors.TOK_LEAK, leakpoints=points)
+            raise errors.UserError(errors.TOK_VBSP_LEAK, leakpoints=points)
 
     if code != 0:
         # VBSP didn't succeed.
         if is_peti:  # Ignore Hammer maps
-            process_vbsp_fail(buff.getvalue())
+            process_vbsp_fail(buff.getvalue(), maybe_missing_inst)
 
         # Propagate the fail code to Portal 2, and quit.
         sys.exit(code)
@@ -1419,7 +1450,7 @@ def process_vbsp_log(output: str) -> None:
     BEE2_config.save()
 
 
-def process_vbsp_fail(output: str) -> None:
+def process_vbsp_fail(output: str, missing_locs: Iterable[Vec]) -> None:
     """Read through VBSP's logs when failing, to update counts."""
     # VBSP doesn't output the actual entity counts, so set the errorred
     # one to max and the others to zero.
@@ -1430,6 +1461,12 @@ def process_vbsp_fail(output: str) -> None:
     count_section['max_overlay'] = '512'
 
     for line in reversed(output.splitlines()):
+        if 'Could not open instance file' in line:
+            filename = line.split('file', 1)[1].strip()
+            raise user_errors.UserError(
+                user_errors.TOK_VBSP_MISSING_INSTANCE.format(inst=filename),
+                points=missing_locs,
+            )
         if 'MAX_MAP_OVERLAYS' in line:
             count_section['entity'] = '0'
             count_section['brush'] = '0'
@@ -1477,8 +1514,7 @@ async def main() -> None:
         LOGGER.info('Done. Exiting now!')
         sys.exit()
 
-    # Just in case we fail, overwrite the VRAD config so it doesn't use old
-    # data.
+    # Just in case we fail, overwrite the VRAD config, so it doesn't use old data.
     open('bee2/vrad_config.cfg', 'w').close()
 
     args = " ".join(sys.argv)
@@ -1640,6 +1676,7 @@ async def main() -> None:
                 vbsp_args=new_args,
                 path=path,
                 new_path=new_path,
+                maybe_missing_inst=await find_missing_instances(game, vmf),
             )
     except errors.UserError as error:
         # The user did something wrong, so the map is invalid.

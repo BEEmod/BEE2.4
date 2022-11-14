@@ -10,7 +10,7 @@ import pickle
 from srctools import Vec, VMF, AtomicWriter, logger
 import attrs
 
-from user_errors import DATA_LOC, UserError, TOK_LEAK
+from user_errors import DATA_LOC, UserError, TOK_VBSP_LEAK
 from precomp.tiling import TileDef, TileType
 from precomp.barriers import BarrierType
 from precomp.brushLoc import Grid
@@ -18,7 +18,7 @@ from precomp import options
 import consts
 
 
-__all__ = ['UserError', 'TOK_LEAK', 'load_tiledefs']
+__all__ = ['UserError', 'TOK_VBSP_LEAK', 'load_tiledefs']
 
 LOGGER = logger.get_logger(__name__)
 NORM_2_ORIENT: Final[Mapping[
