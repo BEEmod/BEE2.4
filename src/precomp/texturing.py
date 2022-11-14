@@ -922,6 +922,7 @@ class GenClump(Generator):
             tile_pos = next(itertools.islice(
                 remaining_tiles,
                 clump_rand.randrange(0, len(remaining_tiles)),
+                None,
             ))
             remaining_tiles.remove(tile_pos)
 
