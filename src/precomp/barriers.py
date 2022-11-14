@@ -270,19 +270,14 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
     # Group the positions by planes in each orientation.
     # This makes them 2D grids which we can optimise.
     # (normal_dist, positive_axis, type) -> Plane(type)
-    slices: dict[
-        tuple[tuple[float, float, float], bool],
-        Plane[BarrierType | None]
-    ] = defaultdict(Plane)
+    slices: dict[tuple[FrozenVec, bool], Plane[BarrierType | None]] = defaultdict(Plane)
     # We have this on the 32-grid to allow us to cut squares for holes.
     for (origin, normal), barr_type in BARRIERS.items():
         norm_axis = normal.axis()
         u, v = origin.other_axes(norm_axis)
-        norm_pos = Vec.with_axes(norm_axis, origin)
-        slice_plane = slices[
-            norm_pos.as_tuple(),  # distance from origin to this plane.
-            normal[norm_axis] > 0,
-        ]
+        # Distance from origin to this plane.
+        norm_pos = FrozenVec.with_axes(norm_axis, origin)
+        slice_plane = slices[norm_pos, normal[norm_axis] > 0]
         for u_off in [-48, -16, 16, 48]:
             for v_off in [-48, -16, 16, 48]:
                 slice_plane[
@@ -347,11 +342,8 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
         barr_type = BARRIERS[origin, normal]
         norm_axis = normal.axis()
         u, v = origin.other_axes(norm_axis)
-        norm_pos = Vec.with_axes(norm_axis, origin)
-        slice_plane = slices[
-            norm_pos.as_tuple(),
-            normal[norm_axis] > 0,
-        ]
+        norm_pos = FrozenVec.with_axes(norm_axis, origin)
+        slice_plane = slices[norm_pos, normal[norm_axis] > 0]
         offsets: tuple[int, ...]
         if hole_type is HoleType.LARGE:
             offsets = (-80, -48, -16, 16, 48, 80)
@@ -472,8 +464,7 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
             solid_pane_func,
         )
 
-    for (plane_pos_tup, is_pos), pos_slice in slices.items():
-        plane_pos = Vec(plane_pos_tup)
+    for (plane_pos, is_pos), pos_slice in slices.items():
         norm_axis = plane_pos.axis()
         normal = FrozenVec.with_axes(norm_axis, 1 if is_pos else -1)
 
@@ -626,39 +617,35 @@ def add_glass_floorbeams(vmf: VMF, temp_name: str):
     # This is a mapping from some glass piece to its group list.
     groups = {}
 
-    for (origin, normal_tup), barr_type in BARRIERS.items():
+    for (origin, normal), barr_type in BARRIERS.items():
         # Grating doesn't use it.
         if barr_type is not BarrierType.GLASS:
             continue
 
-        normal = Vec(normal_tup)
-
-        if not normal.z:
+        if abs(normal.z) < 0.125:
             # Not walls.
             continue
 
-        pos = Vec(origin) + normal * 62
+        pos = FrozenVec(origin) + normal * 62
 
-        groups[pos.as_tuple()] = [pos]
+        groups[pos] = [pos]
 
     # Loop over every pos and check in the +x/y directions for another glass
     # piece. If there, merge the two lists and set every pos in the group to
     # point to the new list.
     # Once done, every unique list = a group.
 
-    for pos_tup in groups.keys():
-        pos = Vec(pos_tup)
+    for pos in groups.keys():
         for off in ((128, 0, 0), (0, 128, 0)):
-            neighbour = (pos + off).as_tuple()
+            neighbour = pos + off
             if neighbour in groups:
-                our_group = groups[pos_tup]
+                our_group = groups[pos]
                 neigh_group = groups[neighbour]
                 if our_group is neigh_group:
                     continue
 
                 # Now merge the two lists. We then need to update all dict
                 # locations to point to the new list.
-
                 if len(neigh_group) > len(our_group):
                     small_group, large_group = our_group, neigh_group
                 else:
@@ -666,9 +653,9 @@ def add_glass_floorbeams(vmf: VMF, temp_name: str):
 
                 large_group.extend(small_group)
                 for pos in small_group:
-                    groups[pos.as_tuple()] = large_group
+                    groups[pos] = large_group
 
-    # Remove duplicates objects by using the ID as key..
+    # Remove duplicate objects by using the ID as key..
     groups = list({
         id(group): group
         for group in groups.values()
