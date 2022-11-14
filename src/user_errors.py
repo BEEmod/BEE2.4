@@ -191,7 +191,26 @@ TOK_CONNECTIONS_INSTANCE_NO_IO = TransToken.ui(
     'if you just exported.'
 )
 
-TOK_NO_CORRIDOR = TransToken.ui('No corridors available for {orient} {mode} {dir} group!')
+TOK_CORRIDOR_EMPTY_GROUP = TransToken.ui(
+    'No corridors available for the <var>{orient}_{mode}_{dir}</var> group!'
+)
+
+# Format in so it automatically matches the stylevar name.
+UNLOCK_DEFAULT = TransToken.ui('Unlock Default Items'),  # i18n: Reference to the stylevar
+TOK_CORRIDOR_NO_CORR_ITEM = TransToken.ui(
+    'The map appears to be missing the {kind} door. This could be caused by an export from BEE2 while '
+    'the game was open - close and reopen the game if that is the case. If it has been deleted, '
+    'enable "{stylevar}" in Style Properties, then add it your palette so it can be put back in the '
+    'map. If the door is present, this is likely an issue with the style definitions. '
+).format(stylevar=UNLOCK_DEFAULT)
+
+TOK_CORRIDOR_BOTH_MODES = TransToken.ui(
+    'The map contains both singleplayer and coop entry/exit corridors. This can happen if they are'
+    'manually added using the "{stylevar"} stylevar. In that case delete one of them.'
+).format(stylevar=UNLOCK_DEFAULT)
+
+TOK_CORRIDOR_ENTRY = TransToken.ui('Entry')  # i18n: Entry door
+TOK_CORRIDOR_EXIT = TransToken.ui('Exit')  # i18n: Entry door
 
 TOK_CUBE_NO_CUBETYPE_FLAG = TransToken.ui('"CubeType" result used but with no type specified!')
 TOK_CUBE_BAD_SPECIAL_CUBETYPE = TransToken.ui('Unrecognised special cube type "<var>{type}</var>"!')
@@ -252,8 +271,3 @@ TOK_INSTLOC_MULTIPLE = TransToken.ui(
 # Tokens used when the system fails.
 TOK_ERR_MISSING = TransToken.ui('<strong>No error?</strong>')
 TOK_ERR_FAIL_LOAD = TransToken.ui('Failed to load error!')
-
-ALL_TOKENS = [
-    tok for name, tok in globals().items()
-    if name.startswith('TOK_') and isinstance(tok, TransToken)
-]
