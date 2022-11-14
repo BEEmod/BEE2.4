@@ -5,10 +5,10 @@ from struct import Struct
 import hashlib
 
 from precomp import instanceLocs
-from srctools import VMF, Vec, Angle, Entity, logger, Matrix
+from srctools import FrozenAngle, FrozenMatrix, FrozenVec, VMF, Vec, Angle, Entity, logger, Matrix
 
 
-# A hash object which we seed using the map layout, so it is somewhat unique.
+# A hash object which we seed using the map layout, so it is unique.
 # This should be copied to use for specific purposes, never modified.
 MAP_HASH = hashlib.sha256()
 ONE_FLOAT = Struct('f')
@@ -74,7 +74,10 @@ def init_seed(vmf: VMF) -> str:
     return b'|'.join(light_names).decode()  # TODO Remove
 
 
-def seed(name: bytes, *values: str | Entity | Vec | Angle | Matrix | float | bytes | bytearray) -> Random:
+def seed(
+    name: bytes,
+    *values: str | Entity | float | bytes | bytearray | Vec | FrozenVec | Angle | FrozenAngle | Matrix | FrozenMatrix,
+) -> Random:
     """Initialise a random number generator with these starting arguments.
 
     The name is used to make this unique among other calls, then the arguments
@@ -85,12 +88,12 @@ def seed(name: bytes, *values: str | Entity | Vec | Angle | Matrix | float | byt
     for val in values:
         if isinstance(val, str):
             algo.update(val.encode('utf8'))
-        elif isinstance(val, (Vec, Angle)):
+        elif isinstance(val, (Vec, FrozenVec, Angle, FrozenAngle)):
             a, b, c = val
             algo.update(THREE_FLOATS.pack(round(a, 6), round(b, 6), round(c, 6)))
         elif isinstance(val, float):
             algo.update(ONE_FLOAT.pack(val))
-        elif isinstance(val, Matrix):
+        elif isinstance(val, (Matrix, FrozenMatrix)):
             algo.update(NINE_FLOATS.pack(
                 val[0, 0], val[0, 1], val[0, 2],
                 val[1, 0], val[1, 1], val[1, 2],
