@@ -8,7 +8,7 @@ import sys
 from enum import Enum
 from typing import Dict, Iterable
 
-from srctools import Output, Property, Vec
+from srctools import Output, Keyvalues, Vec
 
 
 class ConnType(Enum):
@@ -229,15 +229,15 @@ class Config:
         self.output_unlock = output_unlock
 
     @staticmethod
-    def parse(item_id: str, conf: Property) -> Config:
+    def parse(item_id: str, conf: Keyvalues) -> Config:
         """Read the item type info from the given config."""
 
-        def get_outputs(prop_name: str) -> list[Output]:
+        def get_outputs(kv_name: str) -> list[Output]:
             """Parse all the outputs with this name."""
             outputs = []
-            for prop in conf.find_all(prop_name):
-                if prop.value != '':
-                    out = Output.parse(prop)
+            for kv in conf.find_all(kv_name):
+                if kv.value != '':
+                    out = Output.parse(kv)
                     out.output = ''  # Clear this, it's unused.
                     outputs.append(out)
             return outputs
@@ -319,10 +319,10 @@ class Config:
                 item_id, conf['DualType'],
             )) from None
 
-        def get_input(prop_name: str) -> tuple[str | None, str] | None:
+        def get_input(kv_name: str) -> tuple[str | None, str] | None:
             """Parse an input command."""
             try:
-                return Output.parse_name(conf[prop_name])
+                return Output.parse_name(conf[kv_name])
             except IndexError:
                 return None
 
@@ -334,15 +334,15 @@ class Config:
         timer_start = timer_stop = None
         if 'out_timer_start' in conf:
             timer_start = [
-                Output.parse_name(prop.value)
-                for prop in conf.find_all('out_timer_start')
-                if prop.value
+                Output.parse_name(kv.value)
+                for kv in conf.find_all('out_timer_start')
+                if kv.value
             ]
         if 'out_timer_stop' in conf:
             timer_stop = [
-                Output.parse_name(prop.value)
-                for prop in conf.find_all('out_timer_stop')
-                if prop.value
+                Output.parse_name(kv.value)
+                for kv in conf.find_all('out_timer_stop')
+                if kv.value
             ]
 
         return Config(
