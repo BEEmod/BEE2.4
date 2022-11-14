@@ -1,10 +1,9 @@
 import os
 from typing import List
 
-from srctools import Property
+from srctools import Keyvalues
 import srctools.logger
 
-import config
 from packages import PakObject, ParseData, ExportData
 
 
@@ -68,7 +67,7 @@ class PackList(PakObject, allow_mult=True):
     def export(exp_data: ExportData) -> None:
         """Export all the packlists."""
 
-        pack_block = Property('PackList', [])
+        pack_block = Keyvalues('PackList', [])
 
         for pack in exp_data.packset.all_obj(PackList):
             # Build a
@@ -79,11 +78,11 @@ class PackList(PakObject, allow_mult=True):
             # }
             # block for each packlist
             files = [
-                Property('File', file)
+                Keyvalues('File', file)
                 for file in
                 pack.files
             ]
-            pack_block.append(Property(
+            pack_block.append(Keyvalues(
                 pack.id,
                 files,
             ))

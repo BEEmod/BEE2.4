@@ -16,7 +16,7 @@ from BEE2_config import ConfigFile
 from app import tkMarkdown, img, lazy_conf, background_run
 import utils
 import consts
-from srctools import Property, NoKeyError
+from srctools import Keyvalues, NoKeyError
 from srctools.tokenizer import TokenSyntaxError
 from srctools.filesys import FileSystem, RawFileSystem, ZipFileSystem, VPKFileSystem
 from editoritems import Item as EditorItem, Renderable, RenderableType
@@ -59,8 +59,8 @@ class SelitemData:
     packages: frozenset[str] = attrs.Factory(frozenset)
 
     @classmethod
-    def parse(cls, info: Property, pack_id: str) -> SelitemData:
-        """Parse from a property block."""
+    def parse(cls, info: Keyvalues, pack_id: str) -> SelitemData:
+        """Parse from a keyvalues block."""
         auth = sep_values(info['authors', ''])
         name = TransToken.parse(pack_id, info['name'])
         sort_key = info['sort_key', '']
@@ -106,10 +106,10 @@ class SelitemData:
                 previews = []
         else:
             previews = [img.Handle.parse(
-                prop,
+                kv,
                 pack_id,
                 0, 0,
-            ) for prop in preview_block]
+            ) for kv in preview_block]
 
         return cls(
             name,
@@ -161,7 +161,7 @@ class ObjData:
     This allows us to parse all packages before loading objects.
     """
     fsys: FileSystem
-    info_block: Property = attrs.field(repr=False)
+    info_block: Keyvalues = attrs.field(repr=False)
     pak_id: str
     disp_name: TransToken
 
@@ -171,7 +171,7 @@ class ParseData:
     """The arguments for pak_object.parse()."""
     fsys: FileSystem
     id: str
-    info: Property = attrs.field(repr=False)
+    info: Keyvalues = attrs.field(repr=False)
     pak_id: str
     is_override: bool
 
@@ -185,7 +185,7 @@ class ExportData:
     selected_style: Style
     all_items: list[EditorItem]  # All the items in the map
     renderables: dict[RenderableType, Renderable]  # The error/connection icons
-    vbsp_conf: Property  # vbsp_config.cfg file.
+    vbsp_conf: Keyvalues  # vbsp_config.cfg file.
     packset: PackagesSet  # The entire loaded packages set.
     game: Game  # The current game.
     # As objects export, they may fill this to include additional resources
@@ -262,7 +262,7 @@ class PakObject:
         ParseData is a namedtuple containing relevant info:
         - fsys, the package's FileSystem
         - id, the ID of the item
-        - info, the Property block in info.txt
+        - info, the Keyvalues block in info.txt
         - pak_id, the ID of the package
         """
         raise NotImplementedError
@@ -281,8 +281,8 @@ class PakObject:
         ExportData is a namedtuple containing various data:
         - selected: The ID of the selected item (or None)
         - selected_style: The selected style object
-        - editoritems: The Property block for editoritems.txt
-        - vbsp_conf: The Property block for vbsp_config
+        - editoritems: The Keyvalues block for editoritems.txt
+        - vbsp_conf: The Keyvalues block for vbsp_config
         - game: The game we're exporting to.
         """
         raise NotImplementedError
@@ -317,7 +317,7 @@ def reraise_keyerror(err: NoKeyError | IndexError, obj_id: str) -> NoReturn:
     key_error: NoKeyError
     if isinstance(err, IndexError):
         if isinstance(err.__cause__, NoKeyError):
-            # Property.__getitem__ raises IndexError from
+            # Keyvalues.__getitem__ raises IndexError from
             # NoKeyError, so read from the original
             key_error = err.__cause__
         else:
@@ -334,7 +334,7 @@ def reraise_keyerror(err: NoKeyError | IndexError, obj_id: str) -> NoReturn:
 
 
 def get_config(
-    prop_block: Property,
+    prop_block: Keyvalues,
     folder: str,
     pak_id: str,
     prop_name: str='config',
@@ -367,14 +367,14 @@ def get_config(
     return lazy_conf.from_file(utils.PackagePath(pak_id, path), source=source)
 
 
-def set_cond_source(props: Property, source: str) -> None:
+def set_cond_source(kv: Keyvalues, source: str) -> None:
     """Set metadata for Conditions in the given config blocks.
 
     This generates '__src__' keyvalues in Condition blocks with info like
     the source object ID and originating file, so errors can be traced back
     to the config file creating it.
     """
-    for cond in props.find_all('Conditions', 'Condition'):
+    for cond in kv.find_all('Conditions', 'Condition'):
         cond['__src__'] = source
 
 
@@ -465,7 +465,7 @@ async def find_packages(nursery: trio.Nursery, packset: PackagesSet, pak_dir: Pa
 
         # Valid packages must have an info.txt file!
         try:
-            info = await trio.to_thread.run_sync(filesys.read_prop, 'info.txt', cancellable=True)
+            info = await trio.to_thread.run_sync(filesys.read_kv1, 'info.txt', cancellable=True)
         except FileNotFoundError:
             if name.is_dir():
                 # This isn't a package, so check the subfolders too...
@@ -782,7 +782,7 @@ class Package:
         self,
         pak_id: str,
         filesystem: FileSystem,
-        info: Property,
+        info: Keyvalues,
         path: Path,
     ) -> None:
         try:
@@ -900,11 +900,11 @@ class Style(PakObject, needs_foreground=True):
             'skybox': set(),
             'elev': set(),
         }
-        for prop in info.find_children('suggested'):
+        for kv in info.find_children('suggested'):
             try:
-                sugg[prop.name].add(prop.value)
+                sugg[kv.name].add(kv.value)
             except KeyError:
-                LOGGER.warning('Unknown suggestion types for style {}: {}', data.id, prop.name)
+                LOGGER.warning('Unknown suggestion types for style {}: {}', data.id, kv.name)
 
         sugg_tup = (
             sugg['quote'],
@@ -923,24 +923,24 @@ class Style(PakObject, needs_foreground=True):
                 group = LEGACY_CORRIDORS[mode, direction]
             except KeyError:  # Coop entry
                 continue
-            group_prop = corr_conf.find_key(group, or_blank=True)
+            group_kv = corr_conf.find_key(group, or_blank=True)
             for i in range(1, length + 1):
-                prop = group_prop.find_key(str(i), '')
+                kv = group_kv.find_key(str(i), '')
 
                 if icon_folder:
                     icon = utils.PackagePath(data.pak_id, 'corr/{}/{}/{}.jpg'.format(icon_folder, group, i))
                 else:
                     icon = img.PATH_BLANK
 
-                if prop.has_children():
+                if kv.has_children():
                     legacy_corridors[mode, direction, i] = LegacyCorr(
-                        name=prop['name', ''],
-                        icon=utils.PackagePath.parse(prop['icon', icon], data.pak_id),
-                        desc=prop['Desc', ''],
+                        name=kv['name', ''],
+                        icon=utils.PackagePath.parse(kv['icon', icon], data.pak_id),
+                        desc=kv['Desc', ''],
                     )
                 else:
                     legacy_corridors[mode, direction, i] = LegacyCorr(
-                        name=prop.value,
+                        name=kv.value,
                         icon=icon,
                         desc='',
                     )
@@ -1041,7 +1041,7 @@ class Style(PakObject, needs_foreground=True):
 
 
 def desc_parse(
-    info: Property,
+    info: Keyvalues,
     source: str,
     pak_id: str,
     *,
@@ -1052,15 +1052,15 @@ def desc_parse(
     """
     has_warning = False
     lines = []
-    for prop in info.find_all(prop_name):
-        if prop.has_children():
-            for line in prop:
+    for kv in info.find_all(prop_name):
+        if kv.has_children():
+            for line in kv:
                 if line.name and not has_warning:
                     LOGGER.warning('Old desc format: {}', source)
                     has_warning = True
                 lines.append(line.value)
         else:
-            lines.append(prop.value)
+            lines.append(kv.value)
     token = TransToken.parse(pak_id, '\n'.join(lines))
     return tkMarkdown.convert(token, pak_id)
 

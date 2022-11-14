@@ -4,7 +4,7 @@ from __future__ import annotations
 import trio
 import os
 
-from srctools import VMF, Property, KeyValError, AtomicWriter
+from srctools import VMF, Keyvalues, KeyValError, AtomicWriter
 from srctools.filesys import File
 from srctools.dmx import Element as DMXElement, ValueType as DMXValue, Attribute as DMXAttr
 import srctools.logger
@@ -24,7 +24,7 @@ async def parse_template(pak_id: str, file: File) -> None:
     if not temp_id:
         LOGGER.warning('Fast-parse failure on {}!', path)
         with file.open_str() as f:
-            props = await trio.to_thread.run_sync(Property.parse, f, cancellable=True)
+            props = await trio.to_thread.run_sync(Keyvalues.parse, f, cancellable=True)
         vmf = await trio.to_thread.run_sync(VMF.parse, props, cancellable=True)
         del props
         conf_ents = list(vmf.by_class['bee2_template_conf'])

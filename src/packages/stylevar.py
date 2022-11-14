@@ -5,7 +5,7 @@ from typing import Iterator
 
 from transtoken import TransToken, TransTokenSource
 from packages import PakObject, Style, ParseData, ExportData
-from srctools import Property, bool_as_int
+from srctools import Keyvalues, bool_as_int
 
 
 class StyleVar(PakObject, allow_mult=True, needs_foreground=True):
@@ -132,8 +132,8 @@ class StyleVar(PakObject, allow_mult=True, needs_foreground=True):
         The .selected attribute is a dict mapping ids to the boolean value.
         """
         # Add the StyleVars block, containing each style_var.
-        exp_data.vbsp_conf.append(Property('StyleVars', [
-            Property(key, bool_as_int(val))
+        exp_data.vbsp_conf.append(Keyvalues('StyleVars', [
+            Keyvalues(key, bool_as_int(val))
             for key, val in
             exp_data.selected.items()
         ]))

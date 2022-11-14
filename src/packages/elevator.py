@@ -4,9 +4,7 @@ We can't pack BIKs, so this is mainly for Valve's existing ones.
 """
 from typing import Iterator
 
-from srctools import Property
-
-from packages import ParseData, ExportData, SelitemData, PakObject, Style, TransTokenSource
+from packages import ParseData, ExportData, SelitemData, PakObject, TransTokenSource
 
 
 class Elevator(PakObject, needs_foreground=True):
@@ -64,9 +62,6 @@ class Elevator(PakObject, needs_foreground=True):
     @staticmethod
     def export(exp_data: ExportData) -> None:
         """Export the chosen video into the configs."""
-        style: Style = exp_data.selected_style
-        vbsp_config: Property = exp_data.vbsp_conf
-
         if exp_data.selected is None:
             elevator = None
         else:
@@ -75,35 +70,17 @@ class Elevator(PakObject, needs_foreground=True):
             except KeyError:
                 raise Exception(f"Selected elevator ({exp_data.selected}) doesn't exist?") from None
 
-        if style.has_video:
+        if exp_data.selected_style.has_video:
             if elevator is None:
                 # Use a randomised video
-                vbsp_config.set_key(
-                    ('Elevator', 'type'),
-                    'RAND',
-                )
+                exp_data.vbsp_conf.set_key(('Elevator', 'type'), 'RAND')
             elif elevator.id == 'VALVE_BLUESCREEN':
                 # This video gets a special script and handling
-                vbsp_config.set_key(
-                    ('Elevator', 'type'),
-                    'BSOD',
-                )
+                exp_data.vbsp_conf.set_key(('Elevator', 'type'), 'BSOD')
             else:
                 # Use the particular selected video
-                vbsp_config.set_key(
-                    ('Elevator', 'type'),
-                    'FORCE',
-                )
-                vbsp_config.set_key(
-                    ('Elevator', 'horiz'),
-                    elevator.horiz_video,
-                )
-                vbsp_config.set_key(
-                    ('Elevator', 'vert'),
-                    elevator.vert_video,
-                )
+                exp_data.vbsp_conf.set_key(('Elevator', 'type'), 'FORCE')
+                exp_data.vbsp_conf.set_key(('Elevator', 'horiz'), elevator.horiz_video)
+                exp_data.vbsp_conf.set_key(('Elevator', 'vert'), elevator.vert_video)
         else:  # No elevator video for this style
-            vbsp_config.set_key(
-                ('Elevator', 'type'),
-                'NONE',
-            )
+            exp_data.vbsp_conf.set_key(('Elevator', 'type'), 'NONE')
