@@ -16,7 +16,7 @@ from operator import attrgetter
 import attrs
 from srctools import Property
 from srctools.filesys import FileSystem, ZipFileSystem, RawFileSystem, VPKFileSystem
-from srctools.math import FrozenVec, Vec, Angle, Matrix, to_matrix
+from srctools.math import AnyAngle, AnyMatrix, FrozenVec, Vec, Angle, Matrix, to_matrix
 from srctools.vmf import EntityFixup, Entity, EntityGroup, Solid, Side, VMF, UVAxis, VisGroup
 from srctools.dmx import Element as DMElement
 import srctools.logger
@@ -494,7 +494,7 @@ def _parse_template(loc: UnparsedTemplate) -> Template:
     if conf['template_id'].upper() != loc.id:
         raise ValueError(f'Mismatch in template IDs: "{conf["template_id"]}" != "{loc.id}"!')
 
-    def yield_world_detail() -> Iterator[tuple[list[Solid], bool, set[str]]]:
+    def yield_world_detail() -> Iterator[tuple[list[Solid], bool, set[int]]]:
         """Yield all world/detail solids in the map.
 
         This also indicates if it's a func_detail, and the visgroup IDs.
@@ -682,7 +682,7 @@ def import_template(
     vmf: VMF,
     temp_name: Union[str, Template],
     origin: Vec,
-    angles: Optional[Union[Angle, Matrix]]=None,
+    angles: Optional[Union[AnyAngle, AnyMatrix]]=None,
     targetname: str='',
     force_type: TEMP_TYPES=TEMP_TYPES.default,
     add_to_map: bool=True,
@@ -896,7 +896,7 @@ def import_template(
         orig_ids=id_mapping,
         template=template,
         origin=origin,
-        orient=orient,
+        orient=Matrix(orient),
         visgroups=chosen_groups,
         picker_results={},  # Filled by retexture_template.
         picker_type_results={},

@@ -1245,8 +1245,8 @@ def res_transfer_bullseye(inst: Entity, props: Property):
     start_pos = conditions.resolve_offset(inst, props['start_pos', ''])
     end_pos = conditions.resolve_offset(inst, props['end_pos', ''])
     angles = Angle.from_str(inst['angles'])
-    start_norm = props.vec('start_norm', 0, 0, 1) @ angles
-    end_norm = props.vec('end_norm', 0, 0, 1) @ angles
+    start_norm: Vec = props.vec('start_norm', 0, 0, 1) @ angles
+    end_norm: Vec = props.vec('end_norm', 0, 0, 1) @ angles
 
     try:
         start_tile = tiling.TILES[
@@ -1271,9 +1271,9 @@ def res_transfer_bullseye(inst: Entity, props: Property):
         orient = start_tile.portal_helper_orient.copy()
         # If it's directly opposite, just mirror - we have no clue what the
         # intent is.
-        if Vec.dot(start_norm, end_norm) != -1.0:
+        if Vec.dot(start_norm, end_norm) > -0.999:
             # Use the dict to compute the rotation to apply.
-            orient @= NORM_ROTATIONS[start_norm, end_norm]
+            orient @= NORM_ROTATIONS[start_norm.freeze(), end_norm.freeze()]
         end_tile.add_portal_helper(orient)
     elif start_tile.has_portal_helper:
         # Non-oriented, don't orient.

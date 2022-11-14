@@ -529,9 +529,7 @@ class Panel:
         if orient.up() != tile.normal:
             # It's not aligned to ourselves, so dump the rotation for our
             # logic.
-            orient = Matrix.from_angstr(
-                conditions.PETI_INST_ANGLE[tile.normal.as_tuple()]
-            )
+            orient = Matrix.from_angstr(conditions.PETI_INST_ANGLE[tile.normal.freeze()])
         front_pos = Vec(0, 0, 64) @ orient + tile.pos
 
         offset = self.offset.copy()

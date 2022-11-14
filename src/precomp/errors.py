@@ -68,10 +68,7 @@ def load_tiledefs(tiles: Iterable[TileDef], grid: Grid) -> None:
             })
 
 
-def load_barriers(barriers: dict[
-    tuple[tuple[float, float, float], tuple[float, float, float]],
-    BarrierType,
-]) -> None:
+def load_barriers(barriers: dict[tuple[FrozenVec, FrozenVec], BarrierType]) -> None:
     """Load barrier data for display in errors."""
     # noinspection PyProtectedMember
     glass_list = UserError._simple_tiles["glass"] = []
@@ -81,10 +78,10 @@ def load_barriers(barriers: dict[
         BarrierType.GLASS: glass_list,
         BarrierType.GRATING: grate_list,
     }
-    for (pos_tup, normal_tup), kind in barriers.items():
-        pos = Vec(pos_tup) + 56.0 * Vec(normal_tup)
+    for (pos, normal), kind in barriers.items():
+        pos = pos + 56.0 * normal
         kind_to_list[kind].append({
-            'orient': NORM_2_ORIENT[FrozenVec(normal_tup)],
+            'orient': NORM_2_ORIENT[normal],
             'position': tuple((pos / 128.0).as_tuple()),
         })
 

@@ -9,7 +9,7 @@ import attrs
 import functools
 
 from srctools import Entity, Side, VMF, conv_bool, logger
-from srctools.math import Vec, Angle, Matrix, to_matrix
+from srctools.math import AnyAngle, AnyMatrix, FrozenVec, Vec, Angle, Matrix, to_matrix
 
 import consts
 
@@ -113,7 +113,7 @@ class BBox:
     @overload
     def __init__(
         self,
-        point1: Vec, point2: Vec,
+        point1: Vec | FrozenVec, point2: Vec | FrozenVec,
         /, *,
         contents: CollideType = CollideType.SOLID,
         tags: Iterable[str] | str = frozenset(),
@@ -123,7 +123,7 @@ class BBox:
     def __init__(
         self,
         /,
-        *args: Vec | int | float,
+        *args: Vec | FrozenVec | int | float,
         contents: CollideType = CollideType.SOLID,
         tags: Iterable[str] | str = frozenset(),
         name: str = '',
@@ -143,7 +143,7 @@ class BBox:
                 raise TypeError('6 numbers must be supplied!')
         elif len(args) == 2:
             point1, point2 = args
-            if isinstance(point1, Vec) and isinstance(point2, Vec):
+            if isinstance(point1, (Vec, FrozenVec)) and isinstance(point2, (Vec, FrozenVec)):
                 min_x, min_y, min_z = round(point1.x), round(point1.y), round(point1.z)
                 max_x, max_y, max_z = round(point2.x), round(point2.y), round(point2.z)
             else:
@@ -216,7 +216,7 @@ class BBox:
             return Vec(0.0, 0.0, 1.0)
         return None
 
-    def with_points(self, point1: Vec, point2: Vec) -> BBox:
+    def with_points(self, point1: Vec | FrozenVec, point2: Vec | FrozenVec) -> BBox:
         """Return a new bounding box with the specified points, but this collision and tags."""
         return BBox(point1, point2, contents=self.contents, tags=self.tags, name=self.name)
 
@@ -345,7 +345,7 @@ class BBox:
         except NonBBoxError:  # Edge or corner, don't count those.
             return None
 
-    def __matmul__(self, other: Angle | Matrix) -> BBox:
+    def __matmul__(self, other: AnyAngle | AnyMatrix) -> BBox:
         """Rotate the bounding box by an angle. This should be multiples of 90 degrees."""
         # https://gamemath.com/book/geomprims.html#transforming_aabbs
         m = to_matrix(other)
@@ -419,13 +419,13 @@ class BBox:
             name=self.name,
         )
 
-    def __add__(self, other: Vec | tuple[float, float, float]) -> BBox:
+    def __add__(self, other: Vec | FrozenVec | tuple[float, float, float]) -> BBox:
         """Add a vector to the mins and maxes."""
         if isinstance(other, BBox):  # Special-case error.
             raise TypeError('Two bounding boxes cannot be added!')
         return self.with_points(self.mins + other, self.maxes + other)
 
-    def __sub__(self, other: Vec | tuple[float, float, float]) -> BBox:
+    def __sub__(self, other: Vec | FrozenVec | tuple[float, float, float]) -> BBox:
         """Add a vector to the mins and maxes."""
         return self.with_points(self.mins - other, self.maxes - other)
 

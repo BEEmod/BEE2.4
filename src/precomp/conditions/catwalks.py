@@ -110,7 +110,7 @@ def place_catwalk_connections(
     catwalks[point_b.as_tuple()].apply_norm(-direction)
 
     if diff.z > 0:
-        angle = conditions.INST_ANGLE[direction.as_tuple()]
+        angle = conditions.INST_ANGLE[direction.freeze()]
         # We need to add stairs
         for stair_pos in range(0, int(diff.z), 128):
             # Move twice the vertical horizontally
@@ -132,7 +132,7 @@ def place_catwalk_connections(
     elif diff.z < 0:
         # We need to add downward stairs
         # They point opposite to normal ones
-        angle = conditions.INST_ANGLE[(-direction).as_tuple()]
+        angle = conditions.INST_ANGLE[(-direction).freeze()]
         for stair_pos in range(0, -int(diff.z), 128):
             LOGGER.debug(stair_pos)
             # Move twice the vertical horizontally
@@ -276,7 +276,7 @@ def res_make_catwalk(vmf: VMF, res: Property):
 
         if new_type is utils.CONN_TYPES.side:
             # If the end piece is pointing at a wall, switch the instance.
-            if normal.z == 0:
+            if abs(normal.z) < 0.01:
                 if normal == dir_mask.conn_dir():
                     conditions.add_inst(
                         vmf,
@@ -289,12 +289,12 @@ def res_make_catwalk(vmf: VMF, res: Property):
         elif new_type is utils.CONN_TYPES.none:
             # Unconnected catwalks on the wall switch to a special instance.
             # This lets players stand next to a portal surface on the wall.
-            if normal.z == 0:
+            if abs(normal.z) < 0.01:
                 conditions.add_inst(
                     vmf,
                     file=instances[Instances.SINGLE_WALL],
                     origin=inst['origin'],
-                    angles=conditions.INST_ANGLE[normal.as_tuple()],
+                    angles=conditions.INST_ANGLE[normal.freeze()],
                 )
                 catwalks[pos_tup] = EMPTY
             continue  # These don't get supports otherwise
@@ -317,7 +317,7 @@ def res_make_catwalk(vmf: VMF, res: Property):
             conditions.add_inst(
                 vmf,
                 origin=inst['origin'],
-                angles=conditions.INST_ANGLE[normal.as_tuple()],
+                angles=conditions.INST_ANGLE[normal.freeze()],
                 file=supp,
             )
 

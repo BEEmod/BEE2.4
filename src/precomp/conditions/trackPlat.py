@@ -2,7 +2,7 @@
 from typing import Set, Dict, Tuple
 
 from precomp import instanceLocs, conditions
-from srctools import Matrix, Vec, Property, Entity, VMF, logger
+from srctools import FrozenVec, Matrix, Vec, Property, Entity, VMF, logger
 
 
 COND_MOD_NAME = 'Track Platforms'
@@ -51,8 +51,8 @@ def res_track_plat(vmf: VMF, res: Property) -> object:
     platforms = [inst_plat, inst_plat_oscil]
 
     # All the track_set in the map, indexed by origin
-    track_instances = {
-        Vec.from_str(inst['origin']).as_tuple(): inst
+    track_instances: Dict[FrozenVec, Entity] = {
+        FrozenVec.from_str(inst['origin']): inst
         for inst in
         vmf.by_class['func_instance']
         if inst['file'].casefold() in track_files
@@ -159,7 +159,7 @@ def res_track_plat(vmf: VMF, res: Property) -> object:
 
 def track_scan(
     tr_set: Set[Entity],
-    track_inst: Dict[Tuple[float, float, float], Entity],
+    track_inst: Dict[FrozenVec, Entity],
     start_track: Entity,
     middle_file: str,
     x_dir: int,
@@ -175,8 +175,8 @@ def track_scan(
     while track:
         tr_set.add(track)
 
-        next_pos = Vec.from_str(track['origin']) + move_dir
-        track = track_inst.get(next_pos.as_tuple(), None)
+        next_pos = FrozenVec.from_str(track['origin']) + move_dir
+        track = track_inst.get(next_pos, None)
         if track is None:
             return
         if track['file'].casefold() != middle_file:
