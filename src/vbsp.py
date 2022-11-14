@@ -19,7 +19,7 @@ import logging
 import pickle
 import contextlib
 
-from srctools import AtomicWriter, Property, Vec, Vec_tuple, Angle, Matrix
+from srctools import AtomicWriter, Keyvalues, Vec, FrozenVec, Angle, Matrix
 from srctools.vmf import VMF, Entity, Output
 from srctools.game import Game
 import srctools
@@ -63,7 +63,7 @@ class _Settings(TypedDict):
     options: Dict[str, Any]
     fog: Dict[str, Any]
     elevator: Dict[str, str]
-    music_conf: Optional[Property]
+    music_conf: Optional[Keyvalues]
 
     style_vars: Dict[str, bool]
     has_attr: Dict[str, bool]
@@ -104,7 +104,7 @@ async def load_settings() -> Tuple[
             file_packlist = file_stack.enter_context(open('bee2/pack_list.cfg'))
 
             async with trio.open_nursery() as nursery:
-                res_conf = utils.Result.sync(nursery, Property.parse, file_config)
+                res_conf = utils.Result.sync(nursery, Keyvalues.parse, file_config)
                 res_editor: utils.Result[
                     Iterable[editoritems.Item]
                 ] = utils.Result.sync(nursery, pickle.load, file_editor)
@@ -114,7 +114,7 @@ async def load_settings() -> Tuple[
                 )
                 res_packlist = utils.Result.sync(
                     nursery,
-                    Property.parse, file_packlist, 'bee2/pack_list.cfg',
+                    Keyvalues.parse, file_packlist, 'bee2/pack_list.cfg',
                 )
                 # Load in templates locations.
                 nursery.start_soon(template_brush.load_templates, 'bee2/templates.lst')
@@ -134,14 +134,14 @@ async def load_settings() -> Tuple[
     # Antline texturing settings.
     # We optionally allow different ones for floors.
     ant_wall = ant_floor = None
-    for prop in conf.find_all('Textures', 'Antlines'):
-        if 'floor' in prop:
-            ant_floor = antlines.AntType.parse(prop.find_key('floor'))
-        if 'wall' in prop:
-            ant_wall = antlines.AntType.parse(prop.find_key('wall'))
+    for kv in conf.find_all('Textures', 'Antlines'):
+        if 'floor' in kv:
+            ant_floor = antlines.AntType.parse(kv.find_key('floor'))
+        if 'wall' in kv:
+            ant_wall = antlines.AntType.parse(kv.find_key('wall'))
         # If both are not there, allow omitting the subkey.
         if ant_wall is ant_floor is None:
-            ant_wall = ant_floor = antlines.AntType.parse(prop)
+            ant_wall = ant_floor = antlines.AntType.parse(kv)
     if ant_wall is None:
         ant_wall = antlines.AntType.default()
     if ant_floor is None:
@@ -151,7 +151,7 @@ async def load_settings() -> Tuple[
     options.load(conf.find_all('Options'))
     utils.DEV_MODE = options.get(bool, 'dev_mode')
 
-    # The voice line property block
+    # The voice line keyvalues block
     for quote_block in conf.find_all("quotes"):
         voice_line.QUOTE_DATA.extend(quote_block)
 
@@ -239,9 +239,9 @@ async def load_map(map_path: str) -> VMF:
     """Load in the VMF file."""
     with open(map_path) as file:
         LOGGER.info("Parsing Map...")
-        props = await trio.to_thread.run_sync(Property.parse, file, map_path)
+        kv = await trio.to_thread.run_sync(Keyvalues.parse, file, map_path)
     LOGGER.info('Reading Map...')
-    vmf = await trio.to_thread.run_sync(VMF.parse, props)
+    vmf = await trio.to_thread.run_sync(VMF.parse, kv)
     LOGGER.info("Loading complete!")
     return vmf
 
@@ -821,7 +821,7 @@ def set_elev_videos(vmf: VMF, info: corridor.Info) -> None:
         )
 
 
-def add_goo_mist(vmf, sides: Iterable[Vec_tuple]):
+def add_goo_mist(vmf, sides: Iterable[FrozenVec]):
     """Add water_mist* particle systems to goo.
 
     This uses larger particles when needed to save ents.
@@ -868,8 +868,8 @@ def add_goo_mist(vmf, sides: Iterable[Vec_tuple]):
 
 def fit_goo_mist(
     vmf: VMF,
-    sides: Iterable[Vec_tuple],
-    needs_mist: Set[Tuple[float, float, float]],
+    sides: Iterable[FrozenVec],
+    needs_mist: Set[FrozenVec],
     grid_x: int,
     grid_y: int,
     particle: str,
@@ -885,7 +885,7 @@ def fit_goo_mist(
         if pos not in needs_mist:
             continue  # We filled this space already
         for x, y in utils.iter_grid(grid_x, grid_y, stride=128):
-            if (pos.x+x, pos.y+y, pos.z) not in needs_mist:
+            if (pos + (x, y, 0.0)) not in needs_mist:
                 break  # Doesn't match
         else:
             vmf.create_ent(
@@ -893,15 +893,11 @@ def fit_goo_mist(
                 targetname='@goo_mist',
                 start_active='1',
                 effect_name=particle,
-                origin='{x!s} {y!s} {z!s}'.format(
-                    x=pos.x + (grid_x/2 - 64),
-                    y=pos.y + (grid_y/2 - 64),
-                    z=pos.z + 48,
-                ),
+                origin=pos.thaw() + (grid_x/2 - 64, grid_y/2 - 64, 48.0),
                 angles=angles,
             )
             for (x, y) in utils.iter_grid(grid_x, grid_y, stride=128):
-                needs_mist.remove((pos.x+x, pos.y+y, pos.z))
+                needs_mist.remove(pos + (x, y, 0.0))
 
 
 def change_brush(vmf: VMF) -> None:
@@ -914,7 +910,7 @@ def change_brush(vmf: VMF) -> None:
     make_goo_mist = options.get(bool, 'goo_mist') and srctools.conv_bool(
         settings['style_vars'].get('AllowGooMist', '1')
     )
-    mist_solids = set()
+    mist_solids: Set[FrozenVec] = set()
 
     make_bottomless = bottomlessPit.pits_allowed()
     LOGGER.info('Make Bottomless Pit: {}', make_bottomless)
@@ -949,9 +945,7 @@ def change_brush(vmf: VMF) -> None:
             )
             if face.mat in consts.Goo:
                 if make_goo_mist:
-                    mist_solids.add(
-                        solid.get_origin().as_tuple()
-                    )
+                    mist_solids.add(solid.get_origin().freeze())
                 # Apply goo scaling
                 face.scale = goo_scale
                 # Use fancy goo on the level with the
@@ -984,7 +978,7 @@ Clump = namedtuple('Clump', [
 
 
 @conditions.make_result('SetAreaTex')
-def cond_force_clump(res: Property) -> conditions.ResultCallable:
+def cond_force_clump(res: Keyvalues) -> conditions.ResultCallable:
     """Force an area to use certain textures.
 
     This only works in styles using the clumping texture algorithm.
@@ -1164,11 +1158,11 @@ def change_overlays(vmf: VMF) -> None:
             # Resize the signage overlays
             # These are the 4 vertex locations
             # Each axis is set to -16, 16 or 0 by default
-            for prop in ('uv0', 'uv1', 'uv2', 'uv3'):
-                val = Vec.from_str(over[prop])
+            for key in ('uv0', 'uv1', 'uv2', 'uv3'):
+                val = Vec.from_str(over[key])
                 val /= 16
                 val *= sign_size
-                over[prop] = val.join(' ')
+                over[key] = val.join(' ')
 
 
 def add_extra_ents(vmf: VMF, info: corridor.Info) -> None:
