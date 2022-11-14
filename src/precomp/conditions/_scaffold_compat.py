@@ -4,7 +4,7 @@ from typing import Dict, Tuple, Optional, Any, Union
 from enum import Enum
 import math
 
-from srctools import Vec, Property, VMF
+from srctools import Vec, Keyvalues, VMF
 import srctools.logger
 
 from precomp import instanceLocs, item_chain, conditions
@@ -53,10 +53,10 @@ def get_config(
     return orient, offset
 
 
-def resolve_optional(prop: Property, key: str) -> Optional[str]:
+def resolve_optional(kv: Keyvalues, key: str) -> Optional[str]:
     """Resolve the given instance, or return None if not defined."""
     try:
-        file = prop[key]
+        file = kv[key]
     except LookupError:
         return None
     return instanceLocs.resolve_one(file, error=False)
@@ -73,7 +73,7 @@ SCAFFOLD_CONFIGS: Dict[str, Tuple[
 
 
 @conditions.make_result('UnstScaffold')
-def res_old_unst_scaffold(res: Property) -> None:
+def res_old_unst_scaffold(res: Keyvalues) -> None:
     """The pre-2.4.40 version of the condition used to generate Unstationary Scaffolds.
 
     This has since been swapped to use the LinkedItems result, but this is kept for package

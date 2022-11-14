@@ -8,14 +8,14 @@ import operator
 import srctools.logger
 from precomp.conditions import make_flag, make_result
 from precomp import instance_traits, instanceLocs, conditions, options
-from srctools import Property, Angle, Vec, Entity, Output, VMF, conv_bool
+from srctools import Keyvalues, Angle, Vec, Entity, Output, VMF, conv_bool
 
 LOGGER = srctools.logger.get_logger(__name__, 'cond.instances')
 COND_MOD_NAME = 'Instances'
 
 
 @make_flag('instance')
-def flag_file_equal(flag: Property) -> Callable[[Entity], bool]:
+def flag_file_equal(flag: Keyvalues) -> Callable[[Entity], bool]:
     """Evaluates True if the instance matches the given file."""
     inst_list = set(instanceLocs.resolve(flag.value))
 
@@ -28,20 +28,20 @@ def flag_file_equal(flag: Property) -> Callable[[Entity], bool]:
 
 
 @make_flag('instFlag', 'InstPart')
-def flag_file_cont(inst: Entity, flag: Property) -> bool:
+def flag_file_cont(inst: Entity, flag: Keyvalues) -> bool:
     """Evaluates True if the instance contains the given portion."""
     return flag.value in inst['file'].casefold()
 
 
 @make_flag('hasInst')
-def flag_has_inst(flag: Property) -> Callable[[Entity], bool]:
+def flag_has_inst(flag: Keyvalues) -> Callable[[Entity], bool]:
     """Checks if the given instance is present anywhere in the map."""
     flags = set(instanceLocs.resolve(flag.value))
     return lambda inst: flags.isdisjoint(conditions.ALL_INST)
 
 
 @make_flag('hasTrait')
-def flag_has_trait(inst: Entity, flag: Property) -> bool:
+def flag_has_trait(inst: Entity, flag: Keyvalues) -> bool:
     """Check if the instance has a specific 'trait', which is set by code.
 
     Current traits:
@@ -121,7 +121,7 @@ INSTVAR_COMP: dict[str, Callable[[Any, Any], Any]] = {
 
 
 @make_flag('instVar')
-def flag_instvar(inst: Entity, flag: Property) -> bool:
+def flag_instvar(inst: Entity, flag: Keyvalues) -> bool:
     """Checks if the $replace value matches the given value.
 
     The flag value follows the form `A == B`, with any of the three permitted
@@ -140,6 +140,7 @@ def flag_instvar(inst: Entity, flag: Property) -> bool:
         if val_b in INSTVAR_COMP:
             # User did "$var ==", treat as comparing against an empty string.
             comp_func = INSTVAR_COMP[val_b]
+            op = val_b
             val_b = ""
         else:
             # With just two vars, assume equality.
@@ -175,7 +176,7 @@ def flag_instvar(inst: Entity, flag: Property) -> bool:
 
 
 @make_flag('offsetDist')
-def flag_offset_distance(inst: Entity, flag: Property) -> bool:
+def flag_offset_distance(inst: Entity, flag: Keyvalues) -> bool:
     """Check if the given instance is in an offset position.
 
     This computes the distance between the instance location and the center
@@ -202,14 +203,14 @@ def flag_offset_distance(inst: Entity, flag: Property) -> bool:
 
 
 @make_result('rename', 'changeInstance')
-def res_change_instance(inst: Entity, res: Property):
+def res_change_instance(inst: Entity, res: Keyvalues) -> None:
     """Set the file to a value."""
     inst['file'] = filename = instanceLocs.resolve_one(res.value, error=True)
     conditions.ALL_INST.add(filename.casefold())
 
 
 @make_result('suffix', 'instSuffix')
-def res_add_suffix(inst: Entity, res: Property):
+def res_add_suffix(inst: Entity, res: Keyvalues) -> None:
     """Add the specified suffix to the filename."""
     suffix = inst.fixup.substitute(res.value)
     if suffix:
@@ -217,7 +218,7 @@ def res_add_suffix(inst: Entity, res: Property):
 
 
 @make_result('setKey')
-def res_set_key(inst: Entity, res: Property):
+def res_set_key(inst: Entity, res: Keyvalues) -> None:
     """Set a keyvalue to the given value.
 
     The name and value should be separated by a space.
@@ -230,7 +231,7 @@ def res_set_key(inst: Entity, res: Property):
 
 
 @make_result('instVar', 'instVarSuffix')
-def res_add_inst_var(inst: Entity, res: Property):
+def res_add_inst_var(inst: Entity, res: Keyvalues) -> None:
     """Append the value of an instance variable to the filename.
 
     Pass either the variable name, or a set of value->suffix pairs for a
@@ -249,7 +250,7 @@ def res_add_inst_var(inst: Entity, res: Property):
 
 
 @conditions.make_result('setInstVar', 'assign', 'setFixupVar')
-def res_set_inst_var(inst: Entity, res: Property) -> None:
+def res_set_inst_var(inst: Entity, res: Keyvalues) -> None:
     """Set an instance variable to the given value.
 
     Values follow the format `$start_enabled 1`, with or without the `$`.
@@ -260,7 +261,7 @@ def res_set_inst_var(inst: Entity, res: Property) -> None:
 
 
 @conditions.make_result('mapInstVar')
-def res_map_inst_var(res: Property) -> conditions.ResultCallable:
+def res_map_inst_var(res: Keyvalues) -> conditions.ResultCallable:
     """Set one instance var based on the value of another.
 
     The first value is the in -> out var, and all following are values to map.
@@ -288,13 +289,13 @@ def res_clear_outputs(inst: Entity) -> None:
 
 
 @make_result('removeFixup', 'deleteFixup', 'removeInstVar', 'deleteInstVar')
-def res_rem_fixup(inst: Entity, res: Property) -> None:
+def res_rem_fixup(inst: Entity, res: Keyvalues) -> None:
     """Remove a fixup from the instance."""
     del inst.fixup[res.value]
 
 
 @make_result('localTarget')
-def res_local_targetname(inst: Entity, res: Property) -> None:
+def res_local_targetname(inst: Entity, res: Keyvalues) -> None:
     """Generate a instvar with an instance-local name.
 
     Useful with AddOutput commands, or other values which use
@@ -310,7 +311,7 @@ def res_local_targetname(inst: Entity, res: Property) -> None:
 
 
 @make_result('replaceInstance')
-def res_replace_instance(vmf: VMF, inst: Entity, res: Property):
+def res_replace_instance(vmf: VMF, inst: Entity, res: Keyvalues) -> None:
     """Replace an instance with another entity.
 
     `keys` and `localkeys` defines the new keyvalues used.
@@ -346,7 +347,7 @@ ON_LOAD = object()
 
 
 @conditions.make_result('GlobalInput')
-def res_global_input(vmf: VMF, res: Property) -> conditions.ResultCallable:
+def res_global_input(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
     """Trigger an input either on map spawn, or when a relay is triggered.
 
     Arguments:
@@ -457,7 +458,7 @@ def global_input(
 
 
 @make_result('ScriptVar')
-def res_script_var(vmf: VMF, inst: Entity, res: Property):
+def res_script_var(vmf: VMF, inst: Entity, res: Keyvalues) -> None:
     """Set a variable on a script, via a logic_auto.
 
     Name is the local name for the script entity.

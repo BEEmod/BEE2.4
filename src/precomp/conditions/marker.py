@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import attrs
-from srctools import Property, Entity, Vec, Matrix
+from srctools import Keyvalues, Entity, Vec, Matrix
 import srctools.logger
 
 from precomp.conditions import make_flag, make_result
@@ -22,7 +22,7 @@ class Marker:
 
 
 @make_result('SetMarker')
-def res_set_marker(inst: Entity, res: Property) -> None:
+def res_set_marker(inst: Entity, res: Keyvalues) -> None:
     """Set a marker at a specific position.
 
     Parameters:
@@ -49,7 +49,7 @@ def res_set_marker(inst: Entity, res: Property) -> None:
 
 
 @make_flag('CheckMarker')
-def flag_check_marker(inst: Entity, flag: Property) -> bool:
+def flag_check_marker(inst: Entity, flag: Keyvalues) -> bool:
     """Check if markers are present at a position.
 
     Parameters:

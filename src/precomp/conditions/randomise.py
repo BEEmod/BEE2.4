@@ -1,7 +1,7 @@
 """Conditions for randomising instances."""
 from typing import Callable
 
-from srctools import Property, Vec, Entity, Angle
+from srctools import Keyvalues, Vec, Entity, Angle
 import srctools
 
 from precomp import collisions, conditions, rand
@@ -11,7 +11,7 @@ COND_MOD_NAME = 'Randomisation'
 
 
 @make_flag('random')
-def flag_random(res: Property) -> Callable[[Entity], bool]:
+def flag_random(res: Keyvalues) -> Callable[[Entity], bool]:
     """Randomly is either true or false."""
     if res.has_children():
         chance_str = res['chance', '100']
@@ -30,7 +30,7 @@ def flag_random(res: Property) -> Callable[[Entity], bool]:
 
 
 @make_result('random')
-def res_random(coll: collisions.Collisions, info: MapInfo, res: Property) -> conditions.ResultCallable:
+def res_random(coll: collisions.Collisions, info: MapInfo, res: Keyvalues) -> conditions.ResultCallable:
     """Randomly choose one of the sub-results to execute.
 
     The `chance` value defines the percentage chance for any result to be
@@ -89,7 +89,7 @@ def res_random(coll: collisions.Collisions, info: MapInfo, res: Property) -> con
 
 
 @make_result('variant')
-def res_add_variant(res: Property):
+def res_add_variant(res: Keyvalues) -> Callable[[Entity], None]:
     """This allows using a random instance from a weighted group.
 
     A suffix will be added in the form `_var4`.
@@ -133,7 +133,7 @@ def res_add_variant(res: Property):
 
 
 @make_result('RandomNum')
-def res_rand_num(res: Property) -> Callable[[Entity], None]:
+def res_rand_num(res: Keyvalues) -> Callable[[Entity], None]:
     """Generate a random number and save in a fixup value.
 
     If 'decimal' is true, the value will contain decimals. 'max' and 'min' are
@@ -158,7 +158,7 @@ def res_rand_num(res: Property) -> Callable[[Entity], None]:
 
 
 @make_result('RandomVec')
-def res_rand_vec(inst: Entity, res: Property) -> None:
+def res_rand_vec(inst: Entity, res: Keyvalues) -> None:
     """A modification to RandomNum which generates a random vector instead.
 
     `decimal`, `seed` and `ResultVar` work like RandomNum. `min_x`, `max_y` etc
@@ -189,7 +189,7 @@ def res_rand_vec(inst: Entity, res: Property) -> None:
 
 
 @make_result('randomShift')
-def res_rand_inst_shift(res: Property) -> Callable[[Entity], None]:
+def res_rand_inst_shift(res: Keyvalues) -> Callable[[Entity], None]:
     """Randomly shift a instance by the given amounts.
 
     The positions are local to the instance.

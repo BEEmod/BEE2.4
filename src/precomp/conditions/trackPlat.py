@@ -1,8 +1,8 @@
 """Conditions relating to track platforms."""
-from typing import Set, Dict, Tuple
+from typing import Set, Dict
 
 from precomp import instanceLocs, conditions
-from srctools import FrozenVec, Matrix, Vec, Property, Entity, VMF, logger
+from srctools import FrozenVec, Matrix, Vec, Keyvalues, Entity, VMF, logger
 
 
 COND_MOD_NAME = 'Track Platforms'
@@ -16,7 +16,7 @@ FACINGS = {
 
 
 @conditions.make_result('trackPlatform')
-def res_track_plat(vmf: VMF, res: Property) -> object:
+def res_track_plat(vmf: VMF, res: Keyvalues) -> object:
     """Logic specific to Track Platforms.
 
     This allows switching the instances used depending on if the track

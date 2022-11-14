@@ -3,7 +3,7 @@
 """
 from __future__ import annotations
 from typing import Callable
-from srctools import Property, Entity
+from srctools import Keyvalues, Entity
 import srctools.logger
 
 from precomp import connections, antlines, conditions
@@ -15,7 +15,7 @@ LOGGER = srctools.logger.get_logger(__name__, alias='cond.custItems')
 
 
 @conditions.make_result('custAntline')
-def res_cust_antline_setup(res: Property) -> Callable[[Entity], None]:
+def res_cust_antline_setup(res: Keyvalues) -> Callable[[Entity], None]:
     """Customise the output antlines.
 
     Options:
@@ -63,14 +63,14 @@ def res_cust_antline_setup(res: Property) -> Callable[[Entity], None]:
 
 
 @conditions.make_result('changeOutputs')
-def res_change_outputs():
+def res_change_outputs() -> object:
     """Deprecated, use ChangeIOType."""
     LOGGER.warning('ChangeOutputs is deprecated. Use ChangeIOType.')
     return conditions.RES_EXHAUSTED
 
 
 @conditions.make_result('changeInputs')
-def res_change_inputs():
+def res_change_inputs() -> object:
     """Deprecated, use ChangeIOType."""
     LOGGER.warning('ChangeInputs is deprecated. Use ChangeIOType.')
     return conditions.RES_EXHAUSTED

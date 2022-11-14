@@ -5,7 +5,7 @@ from enum import Enum
 import srctools.logger
 from precomp import tiling, texturing, template_brush, conditions
 import consts
-from srctools import Property, Entity, VMF, Vec, NoKeyError, Matrix
+from srctools import Keyvalues, Entity, VMF, Vec, NoKeyError, Matrix
 from srctools.vmf import make_overlay, Side
 import vbsp
 
@@ -43,11 +43,11 @@ class Sign:
         self.type = sign_type
 
     @classmethod
-    def parse(cls, prop: Property) -> 'Sign':
+    def parse(cls, kv: Keyvalues) -> 'Sign':
         return cls(
-            prop['world', ''],
-            prop['overlay', ''],
-            SignType(prop['type', 'square']),
+            kv['world', ''],
+            kv['overlay', ''],
+            SignType(kv['type', 'square']),
         )
 
 
@@ -72,7 +72,7 @@ CONN_SIGNAGES: Dict[str, Sign] = {
 }
 
 
-def load_signs(conf: Property) -> None:
+def load_signs(conf: Keyvalues) -> None:
     """Load in the signage data."""
     for prop in conf.find_children('Signage'):
         SIGNAGES[prop.name] = sign = Sign.parse(prop)
@@ -93,7 +93,7 @@ def load_signs(conf: Property) -> None:
 
 
 @conditions.make_result('SignageItem')
-def res_signage(vmf: VMF, inst: Entity, res: Property):
+def res_signage(vmf: VMF, inst: Entity, res: Keyvalues) -> None:
     """Implement the Signage item."""
     sign: Optional[Sign]
     try:

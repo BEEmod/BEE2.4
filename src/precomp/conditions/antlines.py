@@ -7,7 +7,7 @@ import attrs
 from precomp import instanceLocs, connections, conditions, antlines
 import srctools.logger
 from precomp.conditions import make_result
-from srctools import VMF, Property, Output, Vec, Entity, Matrix
+from srctools import VMF, Keyvalues, Output, Vec, Entity, Matrix
 
 
 COND_MOD_NAME = None
@@ -173,7 +173,7 @@ class Group:
 
 
 @make_result('AntLaser')
-def res_antlaser(vmf: VMF, res: Property) -> object:
+def res_antlaser(vmf: VMF, res: Keyvalues) -> object:
     """The condition to generate AntLasers and Antline Corners.
 
     This is executed once to modify all instances.
@@ -210,9 +210,9 @@ def res_antlaser(vmf: VMF, res: Property) -> object:
         conf_beam_flags = 0
 
     conf_outputs = [
-        Output.parse(prop)
-        for prop in res
-        if prop.name in ('onenabled', 'ondisabled')
+        Output.parse(kv)
+        for kv in res
+        if kv.name in ('onenabled', 'ondisabled')
     ]
 
     # Find all the markers.
@@ -465,8 +465,8 @@ def res_antlaser(vmf: VMF, res: Property) -> object:
                 if glow_conf:
                     # First add the sprite at the right height.
                     sprite = vmf.create_ent('env_sprite')
-                    for prop in glow_conf:
-                        sprite[prop.name] = conditions.resolve_value(node.inst, prop.value)
+                    for kv in glow_conf:
+                        sprite[kv.name] = conditions.resolve_value(node.inst, kv.value)
 
                     sprite['origin'] = sprite_pos
                     sprite['targetname'] = NAME_SPR(base_name, i)
@@ -482,8 +482,8 @@ def res_antlaser(vmf: VMF, res: Property) -> object:
                     # Now the beam going from below up to the sprite.
                     beam_pos = node.pos + conf_las_start @ node.orient
                     beam = vmf.create_ent('env_beam')
-                    for prop in beam_conf:
-                        beam[prop.name] = conditions.resolve_value(node.inst, prop.value)
+                    for kv in beam_conf:
+                        beam[kv.name] = conditions.resolve_value(node.inst, kv.value)
 
                     beam['origin'] = beam['targetpoint'] = beam_pos
                     beam['targetname'] = NAME_BEAM_LOW(base_name, i)
@@ -523,7 +523,7 @@ def build_cables(
     group: Group,
     cable_points: dict[Node, Union[Entity, str]],
     base_name: str,
-    beam_conf: Property,
+    beam_conf: Keyvalues,
     conf_rope_off: Vec,
 ) -> None:
     """Place Old-Aperture style cabling."""
@@ -563,8 +563,8 @@ def build_cables(
         # Need to make the A rope if we don't have one that's unlinked.
         if state_a is not RopeState.UNLINKED:
             rope_a = vmf.create_ent('move_rope')
-            for prop in beam_conf:
-                rope_a[prop.name] = node_a.inst.fixup.substitute(prop.value)
+            for kv in beam_conf:
+                rope_a[kv.name] = node_a.inst.fixup.substitute(kv.value)
             rope_a['origin'] = pos_a
             rope_ind += 1
             rope_a['targetname'] = NAME_CABLE(base_name, rope_ind)
@@ -576,8 +576,8 @@ def build_cables(
         # Only need to make the B rope if it doesn't have one.
         if state_b is RopeState.NONE:
             rope_b = vmf.create_ent('move_rope')
-            for prop in beam_conf:
-                rope_b[prop.name] = node_b.inst.fixup.substitute(prop.value)
+            for kv in beam_conf:
+                rope_b[kv.name] = node_b.inst.fixup.substitute(kv.value)
             rope_b['origin'] = pos_b
             rope_ind += 1
             name_b = rope_b['targetname'] = NAME_CABLE(base_name, rope_ind)

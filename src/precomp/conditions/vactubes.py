@@ -4,7 +4,7 @@ from __future__ import annotations
 from collections.abc import Iterator, Iterable
 
 import attrs
-from srctools import Vec, Property, Entity, VMF, Solid, Matrix
+from srctools import Vec, Keyvalues, Entity, VMF, Solid, Matrix
 import srctools.logger
 
 from precomp import tiling, instanceLocs, conditions, connections, template_brush
@@ -81,7 +81,7 @@ VAC_CONFIGS: dict[str, dict[str, tuple[Config, int]]] = {}
 
 
 @conditions.make_result('CustVactube')
-def res_vactubes(vmf: VMF, res: Property) -> conditions.ResultCallable:
+def res_vactubes(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
     """Specialised result to parse vactubes from markers.
 
     Only runs once, and then quits the condition list. After priority 400,

@@ -1,6 +1,6 @@
 """Continuously moving belts, like in BTS.
 """
-from srctools import Property, Vec, Entity, Output, VMF, Matrix
+from srctools import Keyvalues, Vec, Entity, Output, VMF, Matrix
 
 import srctools.logger
 from precomp import instanceLocs, template_brush, conditions
@@ -12,7 +12,7 @@ LOGGER = srctools.logger.get_logger(__name__, alias='cond.conveyorBelt')
 
 
 @conditions.make_result('ConveyorBelt')
-def res_conveyor_belt(vmf: VMF, inst: Entity, res: Property) -> None:
+def res_conveyor_belt(vmf: VMF, inst: Entity, res: Keyvalues) -> None:
     """Create a conveyor belt.
 
     * Options:

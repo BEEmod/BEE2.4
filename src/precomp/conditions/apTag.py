@@ -5,7 +5,7 @@ import os
 from typing import Optional
 
 from precomp.connections import Item
-from srctools import Vec, Property, VMF, Entity, Output, Angle, Matrix
+from srctools import Vec, Keyvalues, VMF, Entity, Output, Angle, Matrix
 import srctools.logger
 
 from precomp import instanceLocs, options, connections, conditions
@@ -26,7 +26,7 @@ TRANSITION_ENTS = 'instances/bee2/transition_ents_tag.vmf'
 
 
 @conditions.make_result('ATLAS_SpawnPoint')
-def res_make_tag_coop_spawn(vmf: VMF, info: conditions.MapInfo, inst: Entity, res: Property) -> object:
+def res_make_tag_coop_spawn(vmf: VMF, info: conditions.MapInfo, inst: Entity, res: Keyvalues) -> object:
     """Create the spawn point for ATLAS in the entry corridor.
 
     It produces either an instance or the normal spawn entity. This is required since ATLAS may need to have the paint gun logic.
@@ -105,7 +105,7 @@ def ap_tag_modifications(vmf: VMF):
     LOGGER.info('Performing Aperture Tag modifications...')
 
     has = vbsp.settings['has_attr']
-    # This will enable the PaintInMap property.
+    # This will enable the PaintInMap keyvalue.
     has['Gel'] = True
 
     # Set as if the player spawned with no pgun
@@ -139,7 +139,7 @@ def ap_tag_modifications(vmf: VMF):
 
 
 @conditions.make_result('TagFizzler')
-def res_make_tag_fizzler(vmf: VMF, info: conditions.MapInfo, res: Property) -> conditions.ResultCallable:
+def res_make_tag_fizzler(vmf: VMF, info: conditions.MapInfo, res: Keyvalues) -> conditions.ResultCallable:
     """Add an Aperture Tag Paint Gun activation fizzler.
 
     These fizzlers are created via signs, and work very specially.

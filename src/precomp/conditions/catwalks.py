@@ -4,7 +4,7 @@ from enum import Enum
 from typing import Optional, Dict, Tuple, Mapping
 
 import attrs
-from srctools import Angle, Vec, Property, VMF
+from srctools import Angle, Vec, Keyvalues, VMF
 from srctools.logger import get_logger
 import srctools
 
@@ -165,7 +165,7 @@ def place_catwalk_connections(
 
 
 @conditions.make_result('makeCatwalk')
-def res_make_catwalk(vmf: VMF, res: Property):
+def res_make_catwalk(vmf: VMF, res: Keyvalues) -> object:
     """Speciallised result to generate catwalks from markers.
 
     Only runs once, and then quits the condition list.

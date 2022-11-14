@@ -6,7 +6,7 @@ import srctools.logger
 from consts import FixupVars
 from precomp.connections import ITEMS
 from precomp.instanceLocs import resolve_one as resolve_single
-from srctools import Entity, Matrix, VMF, Property, Output, Vec
+from srctools import Entity, Matrix, VMF, Keyvalues, Output, Vec
 from precomp.texturing import GenCat
 from precomp.tiling import TILES, Panel
 
@@ -38,7 +38,7 @@ INST_NAMES = [
 
 
 @conditions.make_result('PistonPlatform')
-def res_piston_plat(vmf: VMF, res: Property) -> conditions.ResultCallable:
+def res_piston_plat(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
     """Generates piston platforms with optimized logic."""
     # Allow reading instances direct from the ID.
     # But use direct ones first.

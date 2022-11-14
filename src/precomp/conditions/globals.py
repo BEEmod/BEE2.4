@@ -4,7 +4,7 @@ from __future__ import annotations
 import re
 from typing import Collection, NoReturn
 
-from srctools import Vec, Property, Entity, conv_bool, VMF
+from srctools import Vec, Keyvalues, Entity, conv_bool, VMF
 import srctools.logger
 
 from precomp import options, conditions
@@ -31,7 +31,7 @@ def global_bool(val: bool) -> bool:
 
 
 @conditions.make_flag('styleVar')
-def flag_stylevar(flag: Property) -> bool:
+def flag_stylevar(flag: Keyvalues) -> bool:
     """Checks if the given Style Var is true.
 
     Use the NOT flag to invert if needed.
@@ -40,7 +40,7 @@ def flag_stylevar(flag: Property) -> bool:
 
 
 @conditions.make_flag('has')
-def flag_voice_has(info: conditions.MapInfo, flag: Property) -> bool:
+def flag_voice_has(info: conditions.MapInfo, flag: Keyvalues) -> bool:
     """Checks if the given Voice Attribute is present.
 
     Use the NOT flag to invert if needed.
@@ -59,7 +59,7 @@ def flag_music() -> NoReturn:
 
 
 @conditions.make_flag('Game')
-def flag_game(flag: Property) -> bool:
+def flag_game(flag: Keyvalues) -> bool:
     """Checks which game is being modded.
 
     Accepts the following aliases instead of a Steam ID:
@@ -81,7 +81,7 @@ def flag_game(flag: Property) -> bool:
 
 
 @conditions.make_flag('has_char')
-def flag_voice_char(flag: Property) -> bool:
+def flag_voice_char(flag: Keyvalues) -> bool:
     """Checks to see if the given charcter is present in the voice pack.
 
     `<NONE>` means no voice pack is chosen.
@@ -105,19 +105,19 @@ def res_cave_portrait() -> bool:
 
 
 @conditions.make_flag('entryCorridor')
-def res_check_entry_corridor(info: conditions.MapInfo, flag: Property) -> bool:
+def res_check_entry_corridor(info: conditions.MapInfo, flag: Keyvalues) -> bool:
     """Check the selected entry corridor matches this filename."""
     return global_bool(info.corr_entry.instance.casefold() == flag.value.casefold())
 
 
 @conditions.make_flag('exitCorridor')
-def res_check_exit_corridor(info: conditions.MapInfo, flag: Property) -> bool:
+def res_check_exit_corridor(info: conditions.MapInfo, flag: Keyvalues) -> bool:
     """Check the selected exit corridor matches this filename."""
     return global_bool(info.corr_exit.instance.casefold() == flag.value.casefold())
 
 
 @conditions.make_flag('ifMode', 'iscoop', 'gamemode')
-def flag_game_mode(info: conditions.MapInfo, flag: Property) -> bool:
+def flag_game_mode(info: conditions.MapInfo, flag: Keyvalues) -> bool:
     """Checks if the game mode is `SP` or `COOP`.
     """
     mode = flag.value.casefold()
@@ -130,7 +130,7 @@ def flag_game_mode(info: conditions.MapInfo, flag: Property) -> bool:
 
 
 @conditions.make_flag('ifPreview', 'preview')
-def flag_is_preview(info: conditions.MapInfo, flag: Property) -> bool:
+def flag_is_preview(info: conditions.MapInfo, flag: Keyvalues) -> bool:
     """Checks if the preview mode status equals the given value.
 
     If preview mode is enabled, the player will start before the entry
@@ -153,7 +153,7 @@ def flag_has_exit_signage(vmf: VMF) -> bool:
 
 
 @conditions.make_result('setOption')
-def res_set_option(res: Property) -> object:
+def res_set_option(res: Keyvalues) -> object:
     """Set a value in the "options" part of VBSP_config.
 
     Each child property will be set.
@@ -164,7 +164,7 @@ def res_set_option(res: Property) -> object:
 
 
 @conditions.make_result('styleVar')
-def res_set_style_var(res: Property) -> object:
+def res_set_style_var(res: Keyvalues) -> object:
     """Set Style Vars.
 
     The value should be a set of `SetTrue` and `SetFalse` keyvalues.
@@ -178,7 +178,7 @@ def res_set_style_var(res: Property) -> object:
 
 
 @conditions.make_result('has')
-def res_set_voice_attr(info: conditions.MapInfo, res: Property) -> object:
+def res_set_voice_attr(info: conditions.MapInfo, res: Keyvalues) -> object:
     """Sets a number of Voice Attributes.
 
     Each child property will be set. The value is ignored, but must
@@ -197,7 +197,7 @@ CACHED_MODELS: dict[str, tuple[set[int], Entity]] = {}
 
 
 @conditions.make_result('PreCacheModel')
-def res_pre_cache_model(vmf: VMF, res: Property) -> None:
+def res_pre_cache_model(vmf: VMF, res: Keyvalues) -> None:
     """Precache the given model for switching.
 
     This places it as a `prop_dynamic_override`.
@@ -246,7 +246,7 @@ def precache_model(vmf: VMF, mdl_name: str, skinset: Collection[int]=()) -> None
         ent['skinset'] = ''
 
 
-def get_itemconf(inst: Entity, res: Property) -> str | None:
+def get_itemconf(inst: Entity, res: Keyvalues) -> str | None:
     """Implement ItemConfig and GetItemConfig shared logic."""
     timer_delay: int | None
 
@@ -271,7 +271,7 @@ def get_itemconf(inst: Entity, res: Property) -> str | None:
 
 
 @conditions.make_flag('ItemConfig')
-def res_match_item_config(inst: Entity, res: Property) -> bool:
+def res_match_item_config(inst: Entity, res: Keyvalues) -> bool:
     """Check if an Item Config Panel value matches another value.
 
     * `ID` is the ID of the group.
@@ -289,7 +289,7 @@ def res_match_item_config(inst: Entity, res: Property) -> bool:
 
 
 @conditions.make_result('GetItemConfig')
-def res_item_config_to_fixup(inst: Entity, res: Property) -> None:
+def res_item_config_to_fixup(inst: Entity, res: Keyvalues) -> None:
     """Load a config from the item config panel onto a fixup.
 
     * `ID` is the ID of the group.

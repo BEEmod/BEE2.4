@@ -2,7 +2,7 @@
 
 """
 from typing import Iterable, Optional, Callable
-from srctools import Vec, Entity, Property, VMF, Angle
+from srctools import Vec, Entity, Keyvalues, VMF, Angle
 import srctools.logger
 
 from precomp import instanceLocs, options, collisions, conditions, rand, corridor
@@ -14,7 +14,7 @@ LOGGER = srctools.logger.get_logger(__name__, 'cond.addInstance')
 
 
 @conditions.make_result('addGlobal')
-def res_add_global_inst(vmf: VMF, inst: Entity, res: Property) -> object:
+def res_add_global_inst(vmf: VMF, inst: Entity, res: Keyvalues) -> object:
     """Add one instance in a specific location.
 
     Options:
@@ -32,7 +32,7 @@ def res_add_global_inst(vmf: VMF, inst: Entity, res: Property) -> object:
         interact with nearby object should not be placed there.
     """
     if not res.has_children():
-        res = Property('AddGlobal', [Property('File', res.value)])
+        res = Keyvalues('AddGlobal', [Keyvalues('File', res.value)])
     file = instanceLocs.resolve_one(inst.fixup.substitute(res['file']), error=True)
 
     if res.bool('allow_multiple') or file.casefold() not in conditions.GLOBAL_INSTANCES:
@@ -61,7 +61,7 @@ def res_add_global_inst(vmf: VMF, inst: Entity, res: Property) -> object:
 
 
 @conditions.make_result('addOverlay', 'overlayinst')
-def res_add_overlay_inst(vmf: VMF, inst: Entity, res: Property) -> Optional[Entity]:
+def res_add_overlay_inst(vmf: VMF, inst: Entity, res: Keyvalues) -> Optional[Entity]:
     """Add another instance on top of this one.
 
     If a single value, this sets only the filename.
@@ -89,8 +89,8 @@ def res_add_overlay_inst(vmf: VMF, inst: Entity, res: Property) -> Optional[Enti
 
     if not res.has_children():
         # Use all the defaults.
-        res = Property('AddOverlay', [
-            Property('File', res.value)
+        res = Keyvalues('AddOverlay', [
+            Keyvalues('File', res.value)
         ])
 
     if 'angles' in res:
@@ -139,7 +139,7 @@ def res_add_overlay_inst(vmf: VMF, inst: Entity, res: Property) -> Optional[Enti
 
 @conditions.make_result('addShuffleGroup')
 def res_add_shuffle_group(
-    vmf: VMF, coll: collisions.Collisions, info: corridor.Info, res: Property,
+    vmf: VMF, coll: collisions.Collisions, info: corridor.Info, res: Keyvalues,
 ) -> Callable[[Entity], None]:
     """Pick from a pool of instances to randomise decoration.
 
@@ -165,7 +165,7 @@ def res_add_shuffle_group(
         conf_pools.setdefault(prop.name, []).append(prop.value)
 
     # (flag, value, pools)
-    conf_selectors: list[tuple[list[Property], str, frozenset[str]]] = []
+    conf_selectors: list[tuple[list[Keyvalues], str, frozenset[str]]] = []
     for prop in res.find_all('selector'):
         conf_value = prop['value', '']
         conf_flags = list(prop.find_children('conditions'))
@@ -214,7 +214,7 @@ def res_add_shuffle_group(
 
 
 @conditions.make_result('addCavePortrait')
-def res_cave_portrait(vmf: VMF, inst: Entity, res: Property) -> None:
+def res_cave_portrait(vmf: VMF, inst: Entity, res: Keyvalues) -> None:
     """A variant of AddOverlay for adding Cave Portraits.
 
     If the set quote pack is not Cave Johnson, this does nothing.

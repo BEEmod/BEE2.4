@@ -13,7 +13,7 @@ from precomp import (
 )
 import consts
 from perlin import SimplexNoise
-from srctools import Property, Vec_tuple, Vec, Side, UVAxis, VMF
+from srctools import Keyvalues, Vec_tuple, Vec, Side, UVAxis, VMF
 
 
 COND_MOD_NAME = None
@@ -61,7 +61,7 @@ def add_signage_loc(sign_locs: Set[Tuple[float, float, float]], loc: Vec):
 
 
 @conditions.make_result('CutOutTile')
-def res_cutout_tile(vmf: srctools.VMF, res: Property):
+def res_cutout_tile(vmf: srctools.VMF, res: Keyvalues):
     """Generate random quarter tiles, like in Destroyed or Retro maps.
 
     - `MarkerItem` is the instance file to look for (`<ITEM_BEE2_CUTOUT_TILE>`)
