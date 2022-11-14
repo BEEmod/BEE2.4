@@ -5,7 +5,7 @@ from collections import defaultdict
 from random import Random
 
 from srctools import Property, NoKeyError, Output, Entity, VMF
-from srctools.math import Vec, Angle, Matrix, Vec_tuple, to_matrix
+from srctools.math import Vec, Angle, Matrix, FrozenVec, to_matrix
 import srctools.logger
 
 from precomp import (
@@ -708,7 +708,7 @@ def res_antigel(inst: Entity) -> None:
         tiling.TILES[pos.as_tuple(), norm.as_tuple()].is_antigel = True
     except KeyError:
         LOGGER.warning('No tile to set antigel at {}, {}', pos, norm)
-    texturing.ANTIGEL_LOCS.add((origin // 128).as_tuple())
+    texturing.ANTIGEL_LOCS.add((origin // 128).freeze())
 
 
 # Position -> entity
@@ -1099,7 +1099,7 @@ def edit_panel(vmf: VMF, inst: Entity, props: Property, create: bool) -> None:
             panel = tiling.Panel(
                 None, inst, tiling.PanelType.NORMAL,
                 thickness=4,
-                bevels=(),
+                bevels=set(),
             )
             panel.points = uvs
             tile.panels.append(panel)
@@ -1217,21 +1217,21 @@ def edit_panel(vmf: VMF, inst: Entity, props: Property, create: bool) -> None:
             panel.brush_ent = brush_ent
 
 
-def _fill_norm_rotations() -> dict[tuple[Vec_tuple, Vec_tuple], Matrix]:
+def _fill_norm_rotations() -> dict[tuple[FrozenVec, FrozenVec], Matrix]:
     """Given a norm->norm rotation, return the angles producing that."""
-    rotations: dict[tuple[Vec_tuple, Vec_tuple], Matrix] = {}
+    rotations: dict[tuple[FrozenVec, FrozenVec], Matrix] = {}
     for norm_ax in 'xyz':
         for norm_mag in [-1, +1]:
-            norm = Vec.with_axes(norm_ax, norm_mag)
+            norm = FrozenVec.with_axes(norm_ax, norm_mag)
             for angle_ax in ('pitch', 'yaw', 'roll'):
                 for angle_mag in (-90, 90):
                     angle = Matrix.from_angle(Angle.with_axes(angle_ax, angle_mag))
                     new_norm = norm @ angle
                     if new_norm != norm:
-                        rotations[norm.as_tuple(), new_norm.as_tuple()] = angle
+                        rotations[norm, new_norm] = angle
             # Assign a null rotation as well.
-            rotations[norm.as_tuple(), norm.as_tuple()] = Matrix()
-            rotations[norm.as_tuple(), (-norm).as_tuple()] = Matrix()
+            rotations[norm, norm] = Matrix()
+            rotations[norm, -norm] = Matrix()
     return rotations
 
 
@@ -1273,10 +1273,7 @@ def res_transfer_bullseye(inst: Entity, props: Property):
         # intent is.
         if Vec.dot(start_norm, end_norm) != -1.0:
             # Use the dict to compute the rotation to apply.
-            orient @= NORM_ROTATIONS[
-                start_norm.as_tuple(),
-                end_norm.as_tuple()
-            ]
+            orient @= NORM_ROTATIONS[start_norm, end_norm]
         end_tile.add_portal_helper(orient)
     elif start_tile.has_portal_helper:
         # Non-oriented, don't orient.

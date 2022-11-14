@@ -1,7 +1,7 @@
 """Adds breakable glass."""
 from typing import Iterator, Any, Tuple, Dict, List, Optional
 
-from srctools import Property, Vec, VMF, Side, Entity, Output, Angle
+from srctools import FrozenVec, Keyvalues, Vec, VMF, Side, Entity, Output, Angle
 import srctools.logger
 
 from precomp import template_brush, conditions
@@ -18,7 +18,7 @@ BREAKABLE_GLASS_CONF = {}
 # For each direction, whether min/max
 # zero should be the normal axis.
 CORNER_NAMES = ['lowerleft', 'lowerright', 'upperleft', 'upperright']
-CORNER_POINTS = {
+CORNER_POINTS: Dict[FrozenVec, List[Tuple[Any, Any, Any]]] = {
     Vec.N: [
         (min, 0, min),
         (max, 0, min),
@@ -55,7 +55,7 @@ CORNER_POINTS = {
         (max, max, 0),
         (max, min, 0),
     ]
-}  # type: Dict[Tuple[float, float, float], List[Tuple[Any, Any, Any]]]
+}
 
 
 def glass_item_setup(conf: dict, item_id, config_dict):
@@ -82,7 +82,7 @@ def find_glass_items(config, vmf: VMF) -> Iterator[Tuple[str, Vec, Vec, Vec, dic
         except KeyError:
             continue
         targ = inst['targetname']
-        norm = Vec(x=1).rotate_by_str(inst['angles'])
+        norm = Vec(x=1) @ Angle.from_str(inst['angles'])
         origin = Vec.from_str(inst['origin']) - 64 * norm
         try:
             bbox_min, bbox_max, group_norm, group_conf = glass_items[targ]
@@ -160,8 +160,8 @@ def make_frames(
             angles = norm.to_angle(roll)
             # The two directions with a border in the corner instance.
             # We want to put it on those sides.
-            corner_a = Vec(y=-1).rotate(*angles)
-            corner_b = Vec(z=-1).rotate(*angles)
+            corner_a = Vec(y=-1) @ angles
+            corner_b = Vec(z=-1) @ angles
 
             # If the normal is positive, we want to be bbox_max in that axis,
             # otherwise bbox_min.
@@ -211,9 +211,8 @@ def make_frames(
         )
 
 
-
 @conditions.make_result_setup('BreakableGlass')
-def res_breakable_glass_setup(res: Property):
+def res_breakable_glass_setup(res: Keyvalues):
     item_id = res['item']
     conf = {
         'template': template_brush.get_scaling_template(res['template']),
@@ -229,7 +228,7 @@ def res_breakable_glass_setup(res: Property):
 
 
 @conditions.make_result('BreakableGlass')
-def res_breakable_glass(inst: Entity, res: Property):
+def res_breakable_glass(inst: Entity, res: Keyvalues) -> object:
     """Adds breakable glass to the map.
 
     Parameters:
@@ -335,7 +334,7 @@ def res_breakable_glass(inst: Entity, res: Property):
         # We need to set "lowerleft", "upperright" etc keyvalues to the corner
         # locations.
         # These are used to place the shattered glass, when it breaks.
-        for name, points in zip(CORNER_NAMES, CORNER_POINTS[norm.as_tuple()]):
+        for name, points in zip(CORNER_NAMES, CORNER_POINTS[norm.freeze()]):
             corner = Vec()
             for axis, axis_type in zip('xyz', points):
                 if axis == norm_axis:  # solid_min is aligned to the front.

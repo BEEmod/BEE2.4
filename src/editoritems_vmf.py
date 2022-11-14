@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from typing import Callable
-from srctools import Matrix, Angle, Vec, logger, conv_int
+from srctools import FrozenVec, Matrix, Angle, Vec, logger, conv_int
 from srctools.vmf import VMF, Entity
 
 from collisions import BBox
@@ -39,16 +39,16 @@ def save(item: Item) -> VMF:
     return vmf
 
 
-SKIN_TO_CONN_OFFSETS = {
+SKIN_TO_CONN_OFFSETS: dict[str, FrozenVec] = {
     # Skin -> antline offset.
-    '1': Vec(-0.5, +0.5),
-    '2': Vec(-0.5, -0.5),
-    '3': Vec(+0.5, +0.5),
-    '4': Vec(+0.5, -0.5),
+    '1': FrozenVec(-0.5, +0.5),
+    '2': FrozenVec(-0.5, -0.5),
+    '3': FrozenVec(+0.5, +0.5),
+    '4': FrozenVec(+0.5, -0.5),
 }
 # Opposite transform.
-CONN_OFFSET_TO_SKIN = {
-    (2 * vec).as_tuple(): skin
+CONN_OFFSET_TO_SKIN: dict[FrozenVec, str] = {
+    (2 * vec): skin
     for skin, vec in SKIN_TO_CONN_OFFSETS.items()
 }
 
@@ -120,7 +120,7 @@ def save_editor_connectionpoint(item: Item, vmf: VMF) -> None:
 
             offset = (ant_pos - sign_pos) @ inv_orient
             try:
-                skin = CONN_OFFSET_TO_SKIN[offset.as_tuple()]
+                skin = CONN_OFFSET_TO_SKIN[offset]
             except KeyError:
                 LOGGER.warning('Pos=({}), Sign=({}) -> ({}) is not a valid offset for signs!', point.pos, point.sign_off, offset)
                 continue

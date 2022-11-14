@@ -1216,11 +1216,7 @@ def generate_fizzlers(vmf: VMF) -> None:
                 classname='func_brush',
                 origin=fizz.base_inst['origin'],
             )
-            conditions.set_ent_keys(
-                template_brush_ent,
-                fizz.base_inst,
-                fizz_type.temp_brush_keys,
-            )
+            conditions.set_ent_keys(template_brush_ent, fizz.base_inst, fizz_type.temp_brush_keys)
         else:
             template_brush_ent = None
 
