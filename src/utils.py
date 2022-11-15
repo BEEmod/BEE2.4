@@ -94,9 +94,9 @@ def get_git_version(inst_path: Path | str) -> str:
             'default-version': '(dev)',
             'format': {
                 # Ignore dirtyness, we generate the translation files every time.
-                'distance': '{version}.dev+{rev}',
-                'dirty': '{version}',
-                'distance-dirty': '{version}.dev+{rev}',
+                'distance': '{base_version}.dev+{rev}',
+                'dirty': '{base_version}',
+                'distance-dirty': '{base_version}.dev+{rev}',
             },
         },
     )
