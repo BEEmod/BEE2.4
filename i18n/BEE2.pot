@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: https://github.com/BEEmod/BEE2.4/issues\n"
-"POT-Creation-Date: 2022-11-02 18:02+1000\n"
+"POT-Creation-Date: 2022-11-15 15:57+1000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -69,9 +69,234 @@ msgstr ""
 msgid "Better Extended Editor for Portal 2"
 msgstr ""
 
-#. i18n: This is displayed in the options menu to switch to this language.
-#: localisation.py localisation.py
-msgid "__LanguageName"
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"Invalid <code>{option}=</code>\"<code>{value}</code>\" for {kind} "
+"\"<var>{id}</var>\"!"
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid "Option <code>{option}</code> is required for {kind} \"<var>{id}</var>\"!"
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid "Duplicate {kind} ID \"<var>{id}</var>\". Change the ID of one of them."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid "Unknown {kind} ID \"<var>{id}</var>\"."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"The item \"<var>{item}</var>\" is not a {kind}!<br>Instance: "
+"<code>{inst}</code>"
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"This map has <a "
+"href=\"https://developer.valvesoftware.com/wiki/Leak\">\"leaked\"</a>. "
+"This is a bug in an item or style, which should be fixed. The displayed "
+"line indicates the location of the leak, you may be able to resolve it by"
+" removing/modifying items in that area. Please submit a bug report to the"
+" author of the item so this can be resolved. Leak coordinates:"
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"The instance <code>{inst}</code> does not exist, meaning the map cannot "
+"be compiled! Try other configurations for this item, it may be the case "
+"that only some are missing."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"Bad Glass Floorbeam template! The template must have a single brush, with"
+" one face pointing in the <var>+X</var> direction."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"No I/O configuration specified for special indicator item "
+"\"<var>{item}</var>\"! This is required for antlines to work."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"The instance named \"<var>{item}</var>\" is not recognised! If you just "
+"swapped styles and exported, you will need to restart Portal 2. Otherwise"
+" check the relevant package."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"The instance \"<var>{inst}</var>\" is reciving inputs, but none were "
+"configured in the item. Check for reuse of the instance in multiple "
+"items, or restart Portal 2 if you just exported."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid "No corridors available for the <var>{orient}_{mode}_{dir}</var> group!"
+msgstr ""
+
+#. i18n: Reference to the stylevar
+#. This uses HTML syntax.
+#: app/StyleVarPane.py user_errors.py
+msgid "Unlock Default Items"
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"The map appears to be missing the {kind} door. This could be caused by an"
+" export from BEE2 while the game was open - close and reopen the game if "
+"that is the case. If it has been deleted, enable \"{stylevar}\" in Style "
+"Properties, then add it your palette so it can be put back in the map. If"
+" the door is present, this is likely an issue with the style definitions."
+" "
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"The map contains both singleplayer and coop entry/exit corridors. This "
+"can happen if they are manually added using the \"{stylevar\"} stylevar. "
+"In that case delete one of them."
+msgstr ""
+
+#. This uses HTML syntax.
+#: app/corridor_selector.py user_errors.py
+msgid "Entry"
+msgstr ""
+
+#. i18n: Entry door
+#. This uses HTML syntax.
+#: app/corridor_selector.py user_errors.py
+msgid "Exit"
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid "\"CubeType\" result used but with no type specified!"
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid "Unrecognised special cube type \"<var>{type}</var>\"!"
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"Two or more cubes/droppers have the same timer value "
+"(<var>{timer}</var>). These are used to link a cube and dropper item "
+"together, so the cube is preplaced in the map but respawns from the "
+"specified dropper."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"The specified cube has a timer value <var>{timer}</var>, which does not "
+"match any droppers. A dropper should be placed with a matching timer "
+"value, to specify the respawn point for this preplaced cube."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"Dropper above custom cube of type <var>{type}</var> is already linked! "
+"Custom cubes convertdroppers above them into their type, to allow having "
+"droppers."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"A glass/grating Hole does not have sufficent space. The entire "
+"highlighted yellow area should be occupied by continous glass or grating."
+" For large holes, the diagonally adjacient voxels are not required. In "
+"addition, two Hole items cannot overlap each other."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"A glass/grating Hole was misplaced. The item must be placed against a "
+"glass or grating sheet, which it will then cut a hole into. To rotate the"
+" item properly, you may need to place it on a wall with the same "
+"orientation first, then drag it onto the glass without dragging it over "
+"surfaces with different orientations. Alternatively put a block "
+"temporarily in the glass or grating's location to position the hole item,"
+" then carve into the block from a side to remove it while keeping the "
+"hole in the same position."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"A Sendificator was connected to an item which is not a Discouragement "
+"Beam Emitter (<var>{out_item}</var>). The output connection is used to "
+"specify the emitter that cubes will teleport to, so it cannot be an "
+"arbitary item."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"The template \"{id}\" has a {type} with two visgroups: "
+"<var>{groups}</var>. Brushes andoverlays in templates may currently only "
+"use one visgroup each."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid "No item ID for fizzler instance <var>\"{inst}\"</var>!"
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid "No fizzler type for {item} (<var>\"{inst}\"</var>)!"
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid "No model specified for one side of \"{id}\" fizzlers."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid "Instance lookup path <code>\"{path}\"</code> returned no instances."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"Instance lookup path <code>\"{path}\"</code> was expected to provide one "
+"instance, but it returned multiple instances:"
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid "<strong>No error?</strong>"
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid "Failed to load error!"
 msgstr ""
 
 #: app/CheckDetails.py
@@ -363,10 +588,6 @@ msgstr ""
 
 #: app/StyleVarPane.py
 msgid "Disable all voicelines other than entry and exit lines."
-msgstr ""
-
-#: app/StyleVarPane.py
-msgid "Unlock Default Items"
 msgstr ""
 
 #: app/StyleVarPane.py
@@ -965,14 +1186,6 @@ msgid "Close"
 msgstr ""
 
 #: app/corridor_selector.py
-msgid "Entry"
-msgstr ""
-
-#: app/corridor_selector.py
-msgid "Exit"
-msgstr ""
-
-#: app/corridor_selector.py
 msgid "Flat"
 msgstr ""
 
@@ -1302,6 +1515,20 @@ msgstr ""
 
 #: app/item_search.py
 msgid "Search:"
+msgstr ""
+
+#. i18n: This is displayed in the options menu to switch to this language.
+#: app/localisation.py app/localisation.py
+msgid "__LanguageName"
+msgstr ""
+
+#. i18n: BEEmod 1 palette.
+#: app/localisation.py app/paletteLoader.py
+msgid "BEEMod"
+msgstr ""
+
+#: app/localisation.py
+msgid "UI Translations rebuilt."
 msgstr ""
 
 #: app/menu_bar.py
@@ -1710,6 +1937,16 @@ msgid "Reload all images in the app. Expect the app to freeze momentarily."
 msgstr ""
 
 #: app/optionWindow.py
+msgid "Build UI Translations"
+msgstr ""
+
+#: app/optionWindow.py
+msgid ""
+"Compile '.po' UI translation files into '.mo'. This requires those to "
+"have been downloaded from the source repo."
+msgstr ""
+
+#: app/optionWindow.py
 msgid "Build Package Translations"
 msgstr ""
 
@@ -1741,11 +1978,6 @@ msgstr ""
 #. i18n: Empty palette name
 #: app/paletteLoader.py
 msgid "Blank"
-msgstr ""
-
-#. i18n: BEEmod 1 palette.
-#: app/paletteLoader.py
-msgid "BEEMod"
 msgstr ""
 
 #. i18n: Default items merged together
@@ -2038,5 +2270,9 @@ msgstr ""
 
 #: packages/corridor.py
 msgid "Corridor"
+msgstr ""
+
+#: test/test_transtoken.py
+msgid "Save As"
 msgstr ""
 

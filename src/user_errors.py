@@ -196,7 +196,9 @@ TOK_CORRIDOR_EMPTY_GROUP = TransToken.ui(
 )
 
 # Format in so it automatically matches the stylevar name.
-UNLOCK_DEFAULT = TransToken.ui('Unlock Default Items'),  # i18n: Reference to the stylevar
+# i18n: Reference to the stylevar
+UNLOCK_DEFAULT = TransToken.ui('Unlock Default Items')
+
 TOK_CORRIDOR_NO_CORR_ITEM = TransToken.ui(
     'The map appears to be missing the {kind} door. This could be caused by an export from BEE2 while '
     'the game was open - close and reopen the game if that is the case. If it has been deleted, '
@@ -205,7 +207,7 @@ TOK_CORRIDOR_NO_CORR_ITEM = TransToken.ui(
 ).format(stylevar=UNLOCK_DEFAULT)
 
 TOK_CORRIDOR_BOTH_MODES = TransToken.ui(
-    'The map contains both singleplayer and coop entry/exit corridors. This can happen if they are'
+    'The map contains both singleplayer and coop entry/exit corridors. This can happen if they are '
     'manually added using the "{stylevar"} stylevar. In that case delete one of them.'
 ).format(stylevar=UNLOCK_DEFAULT)
 

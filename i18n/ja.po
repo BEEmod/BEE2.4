@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2022-11-02 18:02+1000\n"
+"POT-Creation-Date: 2022-11-15 15:57+1000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: ja\n"
@@ -71,10 +71,236 @@ msgstr ""
 msgid "Better Extended Editor for Portal 2"
 msgstr ""
 
-#. i18n: This is displayed in the options menu to switch to this language.
-#: localisation.py localisation.py
-msgid "__LanguageName"
-msgstr "日本語 (Japanese)"
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"Invalid <code>{option}=</code>\"<code>{value}</code>\" for {kind} "
+"\"<var>{id}</var>\"!"
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid "Option <code>{option}</code> is required for {kind} \"<var>{id}</var>\"!"
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid "Duplicate {kind} ID \"<var>{id}</var>\". Change the ID of one of them."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid "Unknown {kind} ID \"<var>{id}</var>\"."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"The item \"<var>{item}</var>\" is not a {kind}!<br>Instance: "
+"<code>{inst}</code>"
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"This map has <a "
+"href=\"https://developer.valvesoftware.com/wiki/Leak\">\"leaked\"</a>. "
+"This is a bug in an item or style, which should be fixed. The displayed "
+"line indicates the location of the leak, you may be able to resolve it by"
+" removing/modifying items in that area. Please submit a bug report to the"
+" author of the item so this can be resolved. Leak coordinates:"
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"The instance <code>{inst}</code> does not exist, meaning the map cannot "
+"be compiled! Try other configurations for this item, it may be the case "
+"that only some are missing."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"Bad Glass Floorbeam template! The template must have a single brush, with"
+" one face pointing in the <var>+X</var> direction."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"No I/O configuration specified for special indicator item "
+"\"<var>{item}</var>\"! This is required for antlines to work."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"The instance named \"<var>{item}</var>\" is not recognised! If you just "
+"swapped styles and exported, you will need to restart Portal 2. Otherwise"
+" check the relevant package."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"The instance \"<var>{inst}</var>\" is reciving inputs, but none were "
+"configured in the item. Check for reuse of the instance in multiple "
+"items, or restart Portal 2 if you just exported."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid "No corridors available for the <var>{orient}_{mode}_{dir}</var> group!"
+msgstr ""
+
+#. i18n: Reference to the stylevar
+#. This uses HTML syntax.
+#: app/StyleVarPane.py user_errors.py
+msgid "Unlock Default Items"
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"The map appears to be missing the {kind} door. This could be caused by an"
+" export from BEE2 while the game was open - close and reopen the game if "
+"that is the case. If it has been deleted, enable \"{stylevar}\" in Style "
+"Properties, then add it your palette so it can be put back in the map. If"
+" the door is present, this is likely an issue with the style definitions."
+" "
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"The map contains both singleplayer and coop entry/exit corridors. This "
+"can happen if they are manually added using the \"{stylevar\"} stylevar. "
+"In that case delete one of them."
+msgstr ""
+
+#. This uses HTML syntax.
+#: app/corridor_selector.py user_errors.py
+#, fuzzy
+msgid "Entry"
+msgstr "Bendy"
+
+#. i18n: Entry door
+#. This uses HTML syntax.
+#: app/corridor_selector.py user_errors.py
+msgid "Exit"
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid "\"CubeType\" result used but with no type specified!"
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid "Unrecognised special cube type \"<var>{type}</var>\"!"
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"Two or more cubes/droppers have the same timer value "
+"(<var>{timer}</var>). These are used to link a cube and dropper item "
+"together, so the cube is preplaced in the map but respawns from the "
+"specified dropper."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"The specified cube has a timer value <var>{timer}</var>, which does not "
+"match any droppers. A dropper should be placed with a matching timer "
+"value, to specify the respawn point for this preplaced cube."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"Dropper above custom cube of type <var>{type}</var> is already linked! "
+"Custom cubes convertdroppers above them into their type, to allow having "
+"droppers."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"A glass/grating Hole does not have sufficent space. The entire "
+"highlighted yellow area should be occupied by continous glass or grating."
+" For large holes, the diagonally adjacient voxels are not required. In "
+"addition, two Hole items cannot overlap each other."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"A glass/grating Hole was misplaced. The item must be placed against a "
+"glass or grating sheet, which it will then cut a hole into. To rotate the"
+" item properly, you may need to place it on a wall with the same "
+"orientation first, then drag it onto the glass without dragging it over "
+"surfaces with different orientations. Alternatively put a block "
+"temporarily in the glass or grating's location to position the hole item,"
+" then carve into the block from a side to remove it while keeping the "
+"hole in the same position."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"A Sendificator was connected to an item which is not a Discouragement "
+"Beam Emitter (<var>{out_item}</var>). The output connection is used to "
+"specify the emitter that cubes will teleport to, so it cannot be an "
+"arbitary item."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"The template \"{id}\" has a {type} with two visgroups: "
+"<var>{groups}</var>. Brushes andoverlays in templates may currently only "
+"use one visgroup each."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid "No item ID for fizzler instance <var>\"{inst}\"</var>!"
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid "No fizzler type for {item} (<var>\"{inst}\"</var>)!"
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid "No model specified for one side of \"{id}\" fizzlers."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid "Instance lookup path <code>\"{path}\"</code> returned no instances."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"Instance lookup path <code>\"{path}\"</code> was expected to provide one "
+"instance, but it returned multiple instances:"
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid "<strong>No error?</strong>"
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid "Failed to load error!"
+msgstr ""
 
 #: app/CheckDetails.py
 msgid "Toggle all checkboxes."
@@ -366,10 +592,6 @@ msgstr ""
 
 #: app/StyleVarPane.py
 msgid "Disable all voicelines other than entry and exit lines."
-msgstr ""
-
-#: app/StyleVarPane.py
-msgid "Unlock Default Items"
 msgstr ""
 
 #: app/StyleVarPane.py
@@ -969,15 +1191,6 @@ msgid "Close"
 msgstr "閉じる"
 
 #: app/corridor_selector.py
-#, fuzzy
-msgid "Entry"
-msgstr "Bendy"
-
-#: app/corridor_selector.py
-msgid "Exit"
-msgstr ""
-
-#: app/corridor_selector.py
 msgid "Flat"
 msgstr ""
 
@@ -1307,6 +1520,20 @@ msgstr ""
 
 #: app/item_search.py
 msgid "Search:"
+msgstr ""
+
+#. i18n: This is displayed in the options menu to switch to this language.
+#: app/localisation.py app/localisation.py
+msgid "__LanguageName"
+msgstr "日本語 (Japanese)"
+
+#. i18n: BEEmod 1 palette.
+#: app/localisation.py app/paletteLoader.py
+msgid "BEEMod"
+msgstr "BEEMod"
+
+#: app/localisation.py
+msgid "UI Translations rebuilt."
 msgstr ""
 
 #: app/menu_bar.py
@@ -1720,6 +1947,16 @@ msgid "Reload all images in the app. Expect the app to freeze momentarily."
 msgstr ""
 
 #: app/optionWindow.py
+msgid "Build UI Translations"
+msgstr ""
+
+#: app/optionWindow.py
+msgid ""
+"Compile '.po' UI translation files into '.mo'. This requires those to "
+"have been downloaded from the source repo."
+msgstr ""
+
+#: app/optionWindow.py
 msgid "Build Package Translations"
 msgstr ""
 
@@ -1752,11 +1989,6 @@ msgstr ""
 #: app/paletteLoader.py
 msgid "Blank"
 msgstr "空ろ"
-
-#. i18n: BEEmod 1 palette.
-#: app/paletteLoader.py
-msgid "BEEMod"
-msgstr "BEEMod"
 
 #. i18n: Default items merged together
 #: app/paletteLoader.py
@@ -2051,15 +2283,9 @@ msgstr "オプションありません！"
 msgid "Corridor"
 msgstr ""
 
-#~ msgid "Add no extra voice lines."
-#~ msgstr ""
-
-#~ msgid ""
-#~ "This controls the background music used"
-#~ " for a map. Some tracks have "
-#~ "variations which are played when "
-#~ "interacting with certain testing elements."
-#~ msgstr ""
+#: test/test_transtoken.py
+msgid "Save As"
+msgstr ""
 
 #~ msgid "Add no music to the map at all."
 #~ msgstr "音楽を含めない。"
@@ -2067,132 +2293,11 @@ msgstr ""
 #~ msgid "Excursion Funnel SFX"
 #~ msgstr "エクスカーションファンネルSFX"
 
-#~ msgid "Properties"
-#~ msgstr ""
-
-#~ msgid "About"
-#~ msgstr ""
-
-#~ msgid ""
-#~ "\n"
-#~ "(Reflection Cube only)"
-#~ msgstr ""
-
-#~ msgid "Loading"
-#~ msgstr ""
-
-#~ msgid "Extracting Images"
-#~ msgstr ""
-
-#~ msgid "Show WIP items"
-#~ msgstr ""
-
-#~ msgid ""
-#~ "The skybox decides what the area "
-#~ "outside the chamber is like. It "
-#~ "chooses the colour of sky (seen in"
-#~ " some items), the style of bottomless"
-#~ " pit (if present), as well as "
-#~ "color of \"fog\" (seen in larger "
-#~ "chambers."
-#~ msgstr ""
-
-#~ msgid "No Item Configuration!"
-#~ msgstr ""
-
-#~ msgid "Item: {}"
-#~ msgstr ""
-
-#~ msgid "Steam Group..."
-#~ msgstr ""
-
-#~ msgid "Allow Restart?"
-#~ msgstr ""
-
-#~ msgid "Restart the BEE2 to re-extract packages?"
-#~ msgstr ""
-
-#~ msgid "Force re-extracting all package resources. This requires a restart."
-#~ msgstr ""
-
-#~ msgid "Copying compiler file {file} failed.Ensure the {game} is not running."
-#~ msgstr ""
-
-#~ msgid "Copying compiler file {file} failed. Ensure {game} is not running."
-#~ msgstr ""
-
-#~ msgid ""
-#~ "Copying compiler file {file} failed. "
-#~ "Ensure {game} and Hammer are not "
-#~ "running."
-#~ msgstr ""
-
-#~ msgid "No Alternate Versions!"
-#~ msgstr ""
-
-#~ msgid ""
-#~ "Entities are the things in the map"
-#~ " that have functionality. Removing complex"
-#~ " moving items will help reduce this."
-#~ " Items have their entity count listed"
-#~ " in the item description window.\n"
-#~ "\n"
-#~ "This isn't totally accurate, some entity"
-#~ " types are counted here but don't "
-#~ "affect the ingame limit. "
-#~ msgstr ""
-
-#~ msgid ""
-#~ "Overlays are smaller images affixed to"
-#~ " surfaces, like signs or indicator "
-#~ "lights. Hiding long antlines or setting"
-#~ " them to signage will reduce this."
-#~ msgstr ""
-
-#~ msgid ""
-#~ "Compile with high-quality lighting. This"
-#~ " looks correct, but takes longer to"
-#~ " compute. Use if you're arranging "
-#~ "lights. When publishing, this is always"
-#~ " used."
-#~ msgstr ""
-
-#~ msgid ""
-#~ "When previewing in SP, spawn inside "
-#~ "the entry elevator. This also disables"
-#~ " the map restarts when you reach "
-#~ "the exit door. Use this to examine"
-#~ " the entry and exit corridors."
-#~ msgstr ""
-
-#~ msgid ""
-#~ "When previewing in SP, spawn just "
-#~ "before the entry door. When you "
-#~ "reach the exit door, the map will"
-#~ " restart."
-#~ msgstr ""
-
-#~ msgid ""
-#~ "\n"
-#~ " Launch Game?"
-#~ msgstr ""
-
-#~ msgid ""
-#~ "When exporting, do not overwrite \n"
-#~ "\"bee2/\" and\n"
-#~ "\"sdk_content/maps/bee2/\".\n"
-#~ "Enable if you're developing new content,"
-#~ " to ensure it is not overwritten."
-#~ msgstr ""
-
 #~ msgid "Coop:"
 #~ msgstr "生協出口："
 
 #~ msgid "Tags"
 #~ msgstr "付箋"
-
-#~ msgid "Authors"
-#~ msgstr ""
 
 #~ msgid "Any"
 #~ msgstr "選ぶ"
@@ -2200,47 +2305,11 @@ msgstr ""
 #~ msgid "All"
 #~ msgstr "全て"
 
-#~ msgid "Available Tags (click):"
-#~ msgstr ""
-
-#~ msgid "Loading Images"
-#~ msgstr ""
-
-#~ msgid "Enables displaying additional UI specific for development purposes."
-#~ msgstr ""
-
-#~ msgid "This palette already exists. Overwrite?"
-#~ msgstr ""
-
-#~ msgid "Reset to Default"
-#~ msgstr ""
-
 #~ msgid "Corridor"
 #~ msgstr "廊下"
 
-#~ msgid ""
-#~ "Randomly choose a corridor. This is "
-#~ "saved in the puzzle data and will"
-#~ " not change."
-#~ msgstr ""
-
-#~ msgid ""
-#~ "You can hold down Shift during the"
-#~ " start of the Lighting stage to "
-#~ "invert this configuration on the fly."
-#~ msgstr ""
-
 #~ msgid "Corridor:"
 #~ msgstr "廊下："
-
-#~ msgid "Singleplayer Entry Corridor"
-#~ msgstr ""
-
-#~ msgid "Singleplayer Exit Corridor"
-#~ msgstr ""
-
-#~ msgid "Coop Exit Corridor"
-#~ msgstr ""
 
 #~ msgid "SP Entry:"
 #~ msgstr "SP入口："
@@ -2248,49 +2317,11 @@ msgstr ""
 #~ msgid "SP Exit:"
 #~ msgstr "SP出口："
 
-#~ msgid "Coop Exit:"
-#~ msgstr ""
-
-#~ msgid "Styles"
-#~ msgstr ""
-
-#~ msgid "Items"
-#~ msgstr ""
-
-#~ msgid ""
-#~ "Log items have no applicable version "
-#~ "for a particular style.This usually "
-#~ "means it will look very bad."
-#~ msgstr ""
-
-#~ msgid "Log missing packfile resources"
-#~ msgstr ""
-
-#~ msgid ""
-#~ "Log when the resources a \"PackList\""
-#~ " refers to are not present in "
-#~ "the zip. This may be fine (in "
-#~ "a prerequisite zip), but it often "
-#~ "indicates an error."
-#~ msgstr ""
-
-#~ msgid ""
-#~ "You can hold down Shift during the"
-#~ " start of the Lighting stage to "
-#~ "switch to "
-#~ msgstr ""
-
-#~ msgid " lighting on the fly."
-#~ msgstr ""
-
 #~ msgid "Portal Stories: Mel"
 #~ msgstr "Portal Stories: Mel"
 
 #~ msgid "Thinking With Time Machine"
 #~ msgstr "Thinking With Time Machine"
-
-#~ msgid "Logs - {}"
-#~ msgstr ""
 
 #~ msgid "__LANG_USE_SANS_SERIF__"
 #~ msgstr "YES"
@@ -2298,178 +2329,6 @@ msgstr ""
 #~ msgid "Auto"
 #~ msgstr "自動"
 
-#~ msgid ""
-#~ "You can hold down Shift during the"
-#~ " start of the Lighting stage to "
-#~ "switch to {} lighting on the fly."
-#~ msgstr ""
-
-#~ msgid ""
-#~ "Only choose the highest-priority "
-#~ "voicelines. This means more generic "
-#~ "lines will can only be chosen if"
-#~ " few test elements are in the "
-#~ "map. If disabled any applicable lines"
-#~ " will be used."
-#~ msgstr ""
-
-#~ msgid ""
-#~ "You can hold down Shift during the"
-#~ " start of the Geometry stage to "
-#~ "quickly swap whichlocation you spawn at"
-#~ " on the fly."
-#~ msgstr ""
-
-#~ msgid "Compiler Options - {}"
-#~ msgstr ""
-
-#~ msgid "Hide/Show the \"{}\" window."
-#~ msgstr ""
-
-#~ msgid "Export..."
-#~ msgstr ""
-
-#~ msgid ""
-#~ "\n"
-#~ "\n"
-#~ "Warning: VPK files were not exported,"
-#~ " quit Portal 2 and Hammer to "
-#~ "ensure editor wall previews are changed."
-#~ msgstr ""
-
-#~ msgid "{arr} Use Suggested {arr}"
-#~ msgstr ""
-
-#~ msgid "BEEMOD {} Error!"
-#~ msgstr ""
-
-#~ msgid ""
-#~ "An error occurred: \n"
-#~ "{}\n"
-#~ "\n"
-#~ "This has been copied to the clipboard."
-#~ msgstr ""
-
-#~ msgid ""
-#~ "This filename is already in the "
-#~ "backup.Do you wish to overwrite it? "
-#~ "({})"
-#~ msgstr ""
-
-#~ msgid ""
-#~ "This map is already in the game"
-#~ " directory.Do you wish to overwrite "
-#~ "it? ({})"
-#~ msgstr ""
-
-#~ msgid "Backup zip"
-#~ msgstr ""
-
-#~ msgid "BEEMOD {} - Backup / Restore Puzzles"
-#~ msgstr ""
-
-#~ msgid ""
-#~ "This item can be rotated on the"
-#~ " floor to face 360 degrees, for "
-#~ "Reflection Cubes only."
-#~ msgstr ""
-
-#~ msgid "Export to \"{}\"..."
-#~ msgstr ""
-
-#~ msgid ""
-#~ "\n"
-#~ " (BEE2 will quit, this is the last game set!)"
-#~ msgstr ""
-
-#~ msgid "Are you sure you want to delete \"{}\"?"
-#~ msgstr ""
-
-#~ msgid "Do you wish to open the following URL?\n"
-#~ msgstr ""
-
-#~ msgid "Settings for \"{}\""
-#~ msgstr ""
-
-#~ msgid "BEE2 - {}"
-#~ msgstr ""
-
-#~ msgid "Base: "
-#~ msgstr ""
-
-#~ msgid ""
-#~ "\n"
-#~ "Launch Game?"
-#~ msgstr ""
-
-#~ msgid ""
-#~ "\n"
-#~ "Minimise BEE2?"
-#~ msgstr ""
-
-#~ msgid ""
-#~ "\n"
-#~ "Launch Game and minimise BEE2?"
-#~ msgstr ""
-
-#~ msgid ""
-#~ "\n"
-#~ "Quit BEE2?"
-#~ msgstr ""
-
-#~ msgid ""
-#~ "\n"
-#~ "Launch Game and quit BEE2?"
-#~ msgstr ""
-
-#~ msgid "\"Preserve Game Resources\" has been disabled."
-#~ msgstr ""
-
-#~ msgid "Dump All objects"
-#~ msgstr ""
-
-#~ msgid "Dump Items list"
-#~ msgstr ""
-
-#~ msgid "Hide Palette \"{}\""
-#~ msgstr ""
-
-#~ msgid "Delete Palette \"{}\""
-#~ msgstr ""
-
-#~ msgid "Open \"{}\" in the default browser?"
-#~ msgstr ""
-
-#~ msgid "{} Preview"
-#~ msgstr ""
-
-#~ msgid "Signage: {}"
-#~ msgstr ""
-
-#~ msgid "BEE2 - Configure \"{}\""
-#~ msgstr ""
-
 #~ msgid "No Name?"
 #~ msgstr "名前ありません？"
-
-#~ msgid "Have no music playing when inside funnels."
-#~ msgstr ""
-
-#~ msgid "Cube Type"
-#~ msgstr ""
-
-#~ msgid "Fizzler Type"
-#~ msgstr ""
-
-#~ msgid "Barrier Type"
-#~ msgstr ""
-
-#~ msgid "Button Type"
-#~ msgstr ""
-
-#~ msgid "Gel Type"
-#~ msgstr ""
-
-#~ msgid "Save As"
-#~ msgstr ""
 

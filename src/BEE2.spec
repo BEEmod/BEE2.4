@@ -86,8 +86,16 @@ def do_localisation() -> None:
         print('>', locale)
         # Update the translations.
         with trans.open('rb') as src:
-            trans_cat = read_po(src, locale)
+            trans_cat: babel.messages.Catalog = read_po(src, locale)
         trans_cat.update(catalog)
+
+        # Go through, and discard untranslated and removed messages.
+        for msg_id in [
+            msg.id for msg in trans_cat.obsolete.values()
+            if not msg.string
+        ]:
+            del trans_cat.obsolete[msg_id]
+
         with trans.open('wb') as dest:
             write_po(dest, trans_cat, include_lineno=False)
 
