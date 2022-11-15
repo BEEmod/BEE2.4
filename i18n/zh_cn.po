@@ -42,7 +42,7 @@ msgstr "显示："
 #: loadScreen.py
 #, fuzzy
 msgid "Logs - {ver}"
-msgstr "日志 - {}"
+msgstr "日志 - {ver}"
 
 #: loadScreen.py
 msgid "Debug messages"
@@ -603,7 +603,7 @@ msgstr "编译选项"
 #: app/CompilerPane.py
 #, fuzzy
 msgid "Compiler Options - {ver}"
-msgstr "开发者选项 - {}"
+msgstr "开发者选项 - {ver}"
 
 #: app/StyleVarPane.py
 msgid "Multiverse Cave"
@@ -696,7 +696,7 @@ msgstr "默认：开启"
 #, fuzzy
 msgid "Style: {styles}"
 msgid_plural "Styles: {styles}"
-msgstr[0] "风格：{}"
+msgstr[0] "风格：{styles}"
 
 #. i18n: StyleVar which is totally unstyled.
 #: app/StyleVarPane.py
@@ -743,7 +743,7 @@ msgstr "无！"
 #: app/SubPane.py
 #, fuzzy
 msgid "Hide/Show the \"{window}\" window."
-msgstr "隐藏/显示 \"{}\" 窗口。"
+msgstr "隐藏/显示 \"{window}\" 窗口。"
 
 #: app/UI.py
 msgid "Selected Items and Style successfully exported!"
@@ -965,7 +965,7 @@ msgid ""
 msgid_plural ""
 "Do you wish to delete {n} maps?\n"
 "{maps}"
-msgstr[0] "确定要删除 {} 张地图？\n"
+msgstr[0] "确定要删除 {n} 张地图？\n"
 
 #: app/backup.py
 #, fuzzy
@@ -974,7 +974,7 @@ msgid ""
 "({mapname})"
 msgstr ""
 "游戏目录中已存在同名的地图文件，是否要覆盖它？\n"
-"({})"
+"({mapname})"
 
 #: app/backup.py
 #, fuzzy
@@ -983,7 +983,7 @@ msgid ""
 "({mapname})"
 msgstr ""
 "已存在同名的备份文件，是否要覆盖它？\n"
-"({})"
+"({mapname})"
 
 #: app/backup.py
 msgid "Overwrite File?"
@@ -1061,7 +1061,7 @@ msgstr ""
 #: app/backup.py
 #, fuzzy
 msgid "BEEMOD {version} - Backup / Restore Puzzles"
-msgstr "BEEMOD {} - 备份/恢复 谜题"
+msgstr "BEEMOD {version} - 备份/恢复 谜题"
 
 #: app/backup.py app/backup.py
 msgid "New Backup"
@@ -1314,12 +1314,12 @@ msgstr "导出"
 #: app/gameMan.py
 #, fuzzy
 msgid "Export to \"{game}\"..."
-msgstr "导出到 \"{}\"..."
+msgstr "导出到 \"{game}\"..."
 
 #: app/gameMan.py
 #, fuzzy
 msgid "Export to \"{game}\"*..."
-msgstr "导出到 \"{}\"..."
+msgstr "导出到 \"{game}\"*..."
 
 #: app/gameMan.py app/gameMan.py
 msgid "BEE2 - Export Failed!"
@@ -1413,7 +1413,7 @@ msgstr ""
 #: app/gameMan.py
 #, fuzzy
 msgid "Are you sure you want to delete \"{game}\"?"
-msgstr "你确定要删除 \"{}\" 吗？"
+msgstr "你确定要删除 \"{game}\" 吗？"
 
 #: app/gameMan.py
 #, fuzzy
@@ -2121,7 +2121,7 @@ msgstr "保存模板"
 #: app/paletteUI.py
 #, fuzzy
 msgid "Are you sure you want to delete \"{palette}\"?"
-msgstr "你确定要删除 \"{}\" 吗？"
+msgstr "你确定要删除 \"{palette}\" 吗？"
 
 #: app/paletteUI.py
 msgid "Builtin / Readonly"
@@ -2156,12 +2156,12 @@ msgstr "保存模板"
 #: app/paletteUI.py
 #, fuzzy
 msgid "Hide Palette \"{name}\""
-msgstr "删除模板 \"{}\""
+msgstr "删除模板 \"{name}\""
 
 #: app/paletteUI.py
 #, fuzzy
 msgid "Delete Palette \"{name}\""
-msgstr "删除模板 \"{}\""
+msgstr "删除模板 \"{name}\""
 
 #: app/paletteUI.py
 #, fuzzy
@@ -2187,7 +2187,7 @@ msgstr ""
 #: app/richTextBox.py
 #, fuzzy
 msgid "Open \"{url}\" in the default browser?"
-msgstr "在默认浏览器中打开 \"{}\" ？"
+msgstr "在默认浏览器中打开 \"{url}\" ？"
 
 #: app/selector_win.py
 msgid "Color: R={r}, G={g}, B={b}"
@@ -2216,7 +2216,7 @@ msgstr "其它"
 #, fuzzy
 msgid "Author: {authors}"
 msgid_plural "Authors: {authors}"
-msgstr[0] "作者: {}"
+msgstr[0] "作者: {authors}"
 
 #: app/selector_win.py
 msgid "Authors: Unknown"
@@ -2244,7 +2244,7 @@ msgstr "建议"
 #: app/signage_ui.py
 #, fuzzy
 msgid "Signage: {name}"
-msgstr "指示标志: {}"
+msgstr "指示标志: {name}"
 
 #: app/signage_ui.py app/signage_ui.py
 msgid "Configure Signage"
@@ -2327,7 +2327,7 @@ msgstr "响应"
 #: app/voiceEditor.py
 #, fuzzy
 msgid "BEE2 - Configure \"{item}\""
-msgstr "BEE2 - 配置 \"{}\""
+msgstr "BEE2 - 配置 \"{item}\""
 
 #: app/voiceEditor.py
 msgid "Mid - Chamber"
@@ -2436,32 +2436,8 @@ msgstr ""
 #~ msgid "Authors"
 #~ msgstr "制作组"
 
-#~ msgid "Any"
-#~ msgstr "任何"
-
-#~ msgid "All"
-#~ msgstr "所有"
-
-#~ msgid "Available Tags (click):"
-#~ msgstr "可用标签（点击）"
-
-#~ msgid "Loading Images"
-#~ msgstr "正在载入图像"
-
-#~ msgid "This palette already exists. Overwrite?"
-#~ msgstr "已经存在同名模板，是否覆盖？"
-
 #~ msgid "Reset to Default"
 #~ msgstr "重置为默认值"
-
-#~ msgid "Corridor"
-#~ msgstr "走廊"
-
-#~ msgid ""
-#~ "Randomly choose a corridor. This is "
-#~ "saved in the puzzle data and will"
-#~ " not change."
-#~ msgstr "随机选择一个走廊，被随机选中的走廊将保存在地图编辑器中且不会再次变更。"
 
 #~ msgid "Corridor:"
 #~ msgstr "走廊样式"
@@ -2478,34 +2454,8 @@ msgstr ""
 #~ msgid "Items"
 #~ msgstr "物品属性"
 
-#~ msgid "Log missing packfile resources"
-#~ msgstr "记录丢失的数据包"
-
-#~ msgid ""
-#~ "Log when the resources a \"PackList\""
-#~ " refers to are not present in "
-#~ "the zip. This may be fine (in "
-#~ "a prerequisite zip), but it often "
-#~ "indicates an error."
-#~ msgstr "记录“数据包列表”里丢失的zip文件。这可能没问题（必备的数据包还在），但通常会报错。"
-
-#~ msgid "Portal Stories: Mel"
-#~ msgstr "传送门：梅尔的故事"
-
-#~ msgid "Thinking With Time Machine"
-#~ msgstr "传送门：时间机器"
-
 #~ msgid "Auto"
 #~ msgstr "自动获取截图"
-
-#~ msgid "Export..."
-#~ msgstr "导出到..."
-
-#~ msgid ""
-#~ "This item can be rotated on the"
-#~ " floor to face 360 degrees, for "
-#~ "Reflection Cubes only."
-#~ msgstr "该物品可以在地面上360°旋转放置。（仅适用于透镜方块）"
 
 #~ msgid "No Name?"
 #~ msgstr "没有名称？"
@@ -2515,4 +2465,3 @@ msgstr ""
 
 #~ msgid "Gel Type"
 #~ msgstr "选择风格"
-

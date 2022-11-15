@@ -42,7 +42,7 @@ msgstr "Mostrar:"
 #: loadScreen.py
 #, fuzzy
 msgid "Logs - {ver}"
-msgstr "Registros - {}"
+msgstr "Registros - {ver}"
 
 #: loadScreen.py
 msgid "Debug messages"
@@ -182,15 +182,14 @@ msgstr ""
 
 #. This uses HTML syntax.
 #: app/corridor_selector.py user_errors.py
-#, fuzzy
 msgid "Entry"
-msgstr "Bendy"
+msgstr "Entrada"
 
 #. i18n: Entry door
 #. This uses HTML syntax.
 #: app/corridor_selector.py user_errors.py
 msgid "Exit"
-msgstr ""
+msgstr "Salida"
 
 #. This uses HTML syntax.
 #: user_errors.py
@@ -622,7 +621,7 @@ msgstr "Opciones de Compilación"
 #: app/CompilerPane.py
 #, fuzzy
 msgid "Compiler Options - {ver}"
-msgstr "Opciones de Compilación - {}"
+msgstr "Opciones de Compilación - {ver}"
 
 #: app/StyleVarPane.py
 msgid "Multiverse Cave"
@@ -722,11 +721,10 @@ msgstr "Predeterminado: Activado"
 
 #. i18n: Tooltip when specific styles are used
 #: app/StyleVarPane.py
-#, fuzzy
 msgid "Style: {styles}"
 msgid_plural "Styles: {styles}"
-msgstr[0] "Estilo: {}"
-msgstr[1] "Estilos: {}"
+msgstr[0] "Estilo: {styles}"
+msgstr[1] "Estilos: {styles}"
 
 #. i18n: StyleVar which is totally unstyled.
 #: app/StyleVarPane.py
@@ -771,9 +769,8 @@ msgid "None!"
 msgstr "¡Ninguno!"
 
 #: app/SubPane.py
-#, fuzzy
 msgid "Hide/Show the \"{window}\" window."
-msgstr "Oculta/Muestra las \"{}\" ventanas."
+msgstr "Oculta/Muestra las \"{window}\" ventanas."
 
 #: app/UI.py
 msgid "Selected Items and Style successfully exported!"
@@ -787,7 +784,7 @@ msgid ""
 "Warning: VPK files were not exported, quit Portal 2 and Hammer to ensure "
 "editor wall previews are changed."
 msgstr ""
-"\n"
+"{exported}\n"
 "\n"
 "Atención: Los archivos VPK no han sido exportados. Cierre Portal 2 y "
 "Hammer para asegurarse de que las vistas previas de las paredes del "
@@ -929,9 +926,8 @@ msgid "Music: "
 msgstr "Música:"
 
 #: app/UI.py
-#, fuzzy
 msgid "{down_arrow} Use Suggested {down_arrow}"
-msgstr "{arr} Usar Recomendado {arr}"
+msgstr "{down_arrow} Usar Recomendado {down_arrow}"
 
 #: app/UI.py
 msgid "Style: "
@@ -1007,31 +1003,31 @@ msgid "Coop"
 msgstr "Cooperativo"
 
 #: app/backup.py
-#, fuzzy
 msgid ""
 "Do you wish to delete {n} map?\n"
 "{maps}"
 msgid_plural ""
 "Do you wish to delete {n} maps?\n"
 "{maps}"
-msgstr[0] "¿Desea eliminar {} mapa?\n"
-msgstr[1] "¿Desea eliminar {} mapas?\n"
+msgstr[0] "¿Desea eliminar {n} mapa?\n"
+"{maps}"
+msgstr[1] "¿Desea eliminar {n} mapas?\n"
+"{maps}"
 
 #: app/backup.py
 #, fuzzy
 msgid ""
 "This map is already in the game directory. Do you wish to overwrite it? "
 "({mapname})"
-msgstr "Este mapa ya está en el directorio del juego. ¿Desea reemplazarlo? ({})"
+msgstr "Este mapa ya está en el directorio del juego. ¿Desea reemplazarlo? ({mapname})"
 
 #: app/backup.py
-#, fuzzy
 msgid ""
 "This filename is already in the backup. Do you wish to overwrite it? "
 "({mapname})"
 msgstr ""
 "Este nombre de archivo ya está en la copia de seguridad. Desea "
-"reemplazarlo? ({})"
+"reemplazarlo? ({mapname})"
 
 #: app/backup.py
 msgid "Overwrite File?"
@@ -1111,7 +1107,7 @@ msgstr ""
 #: app/backup.py
 #, fuzzy
 msgid "BEEMOD {version} - Backup / Restore Puzzles"
-msgstr "BEEMOD {} - Copia de Seguridad / Restaurar Mapas"
+msgstr "BEEMOD {version} - Copia de Seguridad / Restaurar Mapas"
 
 #: app/backup.py app/backup.py
 msgid "New Backup"
@@ -1270,7 +1266,8 @@ msgstr ""
 msgid ""
 "{generic_rot} However when this is set to Reflection Cube, this item can "
 "instead rotated on the floor to face 360 degrees."
-msgstr "Este elemento se puede rotar en el piso para hacer frente a 360 grados."
+msgstr ""
+"{generic_rot} Este elemento se puede rotar en el piso para hacer frente a 360 grados."
 
 #: app/contextWin.py
 #, fuzzy
@@ -1378,14 +1375,12 @@ msgid "Exporting"
 msgstr "Exportar"
 
 #: app/gameMan.py
-#, fuzzy
 msgid "Export to \"{game}\"..."
-msgstr "Exportar a \"{}\"..."
+msgstr "Exportar a \"{game}\"..."
 
 #: app/gameMan.py
-#, fuzzy
 msgid "Export to \"{game}\"*..."
-msgstr "Exportar a \"{}\"..."
+msgstr "Exportar a \"{game}\"*..."
 
 #: app/gameMan.py app/gameMan.py
 msgid "BEE2 - Export Failed!"
@@ -1487,7 +1482,7 @@ msgstr ""
 #: app/gameMan.py
 #, fuzzy
 msgid "Are you sure you want to delete \"{game}\"?"
-msgstr "¿Estas seguro que deseas borrar \"{}\"?"
+msgstr "¿Estas seguro que deseas borrar \"{game}\"?"
 
 #: app/gameMan.py
 #, fuzzy
@@ -2222,7 +2217,7 @@ msgstr "Guardar Paleta"
 #: app/paletteUI.py
 #, fuzzy
 msgid "Are you sure you want to delete \"{palette}\"?"
-msgstr "¿Estas seguro que deseas borrar \"{}\"?"
+msgstr "¿Estas seguro que deseas borrar \"{palette}\"?"
 
 #: app/paletteUI.py
 msgid "Builtin / Readonly"
@@ -2257,17 +2252,16 @@ msgstr "Guardar Paleta"
 #: app/paletteUI.py
 #, fuzzy
 msgid "Hide Palette \"{name}\""
-msgstr "Borrar Paleta \"{}\""
+msgstr "Borrar Paleta \"{name}\""
 
 #: app/paletteUI.py
 #, fuzzy
 msgid "Delete Palette \"{name}\""
-msgstr "Borrar Paleta \"{}\""
+msgstr "Borrar Paleta \"{name}\""
 
 #: app/paletteUI.py
-#, fuzzy
 msgid "BEE2 - Delete Palette"
-msgstr "Borrar Paleta"
+msgstr "BEE2 - Borrar Paleta"
 
 #: app/paletteUI.py app/paletteUI.py
 msgid "BEE2 - Save Palette"
@@ -2286,9 +2280,8 @@ msgid "Enter the name of the group for this palette, or \"\" to ungroup."
 msgstr ""
 
 #: app/richTextBox.py
-#, fuzzy
 msgid "Open \"{url}\" in the default browser?"
-msgstr "Abrir \"{}\" en el navegador predeterminado?"
+msgstr "Abrir \"{url}\" en el navegador predeterminado?"
 
 #: app/selector_win.py
 msgid "Color: R={r}, G={g}, B={b}"
@@ -2314,11 +2307,10 @@ msgid "Other"
 msgstr "Otro"
 
 #: app/selector_win.py
-#, fuzzy
 msgid "Author: {authors}"
 msgid_plural "Authors: {authors}"
-msgstr[0] "Autor: {}"
-msgstr[1] "Autores: {}"
+msgstr[0] "Autor: {authors}"
+msgstr[1] "Autores: {authors}"
 
 #: app/selector_win.py
 msgid "Authors: Unknown"
@@ -2344,18 +2336,16 @@ msgid "Select Suggested"
 msgstr "Recomendado"
 
 #: app/signage_ui.py
-#, fuzzy
 msgid "Signage: {name}"
-msgstr "Cartel: {}"
+msgstr "Cartel: {name}"
 
 #: app/signage_ui.py app/signage_ui.py
 msgid "Configure Signage"
 msgstr "Configurar Cartel"
 
 #: app/signage_ui.py
-#, fuzzy
 msgid "Selected"
-msgstr "Seleccionado:"
+msgstr "Seleccionado"
 
 #: app/voiceEditor.py
 msgid "Singleplayer"
@@ -2431,7 +2421,7 @@ msgstr "Resp"
 #: app/voiceEditor.py
 #, fuzzy
 msgid "BEE2 - Configure \"{item}\""
-msgstr "BEE2 - Configurar \"{}\""
+msgstr "BEE2 - Configurar \"{item}\""
 
 #: app/voiceEditor.py
 msgid "Mid - Chamber"
@@ -2508,100 +2498,8 @@ msgstr "Descripción:"
 
 #: packages/corridor.py
 msgid "Corridor"
-msgstr ""
+msgstr "Pasillo"
 
 #: test/test_transtoken.py
 msgid "Save As"
 msgstr ""
-
-#~ msgid "Coop:"
-#~ msgstr "Coop:"
-
-#~ msgid "Tags"
-#~ msgstr "Etiquetas"
-
-#~ msgid "Authors"
-#~ msgstr "Autores"
-
-#~ msgid "Any"
-#~ msgstr "Cualquiera"
-
-#~ msgid "All"
-#~ msgstr "Todo"
-
-#~ msgid "Available Tags (click):"
-#~ msgstr "Etiquetas Disponibles (click)"
-
-#~ msgid "Loading Images"
-#~ msgstr "Cargando Imagenes"
-
-#~ msgid "This palette already exists. Overwrite?"
-#~ msgstr "Esta paleta ya existe. ¿Desea reemplazarla?"
-
-#~ msgid "Reset to Default"
-#~ msgstr "Restablecer a predeterminado."
-
-#~ msgid "Corridor"
-#~ msgstr "Pasillo"
-
-#~ msgid ""
-#~ "Randomly choose a corridor. This is "
-#~ "saved in the puzzle data and will"
-#~ " not change."
-#~ msgstr ""
-#~ "Seleccionar un pasillo de forma "
-#~ "aleatoria. Esto es guardado en los "
-#~ "datos del puzzle y no cambiará."
-
-#~ msgid "Corridor:"
-#~ msgstr "Pasillo:"
-
-#~ msgid "SP Entry:"
-#~ msgstr "Entrada SP:"
-
-#~ msgid "SP Exit:"
-#~ msgstr "Salida SP:"
-
-#~ msgid "Styles"
-#~ msgstr "Estilos"
-
-#~ msgid "Items"
-#~ msgstr "Ítems"
-
-#~ msgid "Log missing packfile resources"
-#~ msgstr "Registrar recursos packfile que faltan"
-
-#~ msgid ""
-#~ "Log when the resources a \"PackList\""
-#~ " refers to are not present in "
-#~ "the zip. This may be fine (in "
-#~ "a prerequisite zip), but it often "
-#~ "indicates an error."
-#~ msgstr ""
-#~ "Registrar cuando los recursos a los "
-#~ "que \"PackList\" se refiere no se "
-#~ "encuentran presentes en el zip. Esto "
-#~ "puede estar bien (en un zip "
-#~ "requerido), pero normalmente indica un "
-#~ "error."
-
-#~ msgid "Auto"
-#~ msgstr "Automático"
-
-#~ msgid "Export..."
-#~ msgstr "Exportar..."
-
-#~ msgid ""
-#~ "This item can be rotated on the"
-#~ " floor to face 360 degrees, for "
-#~ "Reflection Cubes only."
-#~ msgstr "Este elemento se puede rotar en el piso para hacer frente a 360 grados."
-
-#~ msgid "No Name?"
-#~ msgstr "¿Sin nombre?"
-
-#~ msgid "Have no music playing when inside funnels."
-#~ msgstr ""
-#~ "Selecciona la música usada al estar "
-#~ "dentro de los Embudos de Translación."
-

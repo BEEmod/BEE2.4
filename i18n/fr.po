@@ -40,9 +40,8 @@ msgid "Show:"
 msgstr "Montrer:"
 
 #: loadScreen.py
-#, fuzzy
 msgid "Logs - {ver}"
-msgstr "Logs - {}"
+msgstr "Logs - {ver}"
 
 #: loadScreen.py
 msgid "Debug messages"
@@ -622,9 +621,8 @@ msgid "Compile Options"
 msgstr "Options de compilation"
 
 #: app/CompilerPane.py
-#, fuzzy
 msgid "Compiler Options - {ver}"
-msgstr "Options de compilateur - {}"
+msgstr "Options de compilateur - {ver}"
 
 #: app/StyleVarPane.py
 msgid "Multiverse Cave"
@@ -719,11 +717,10 @@ msgstr "Par défaut: On"
 
 #. i18n: Tooltip when specific styles are used
 #: app/StyleVarPane.py
-#, fuzzy
 msgid "Style: {styles}"
 msgid_plural "Styles: {styles}"
-msgstr[0] "Style: {}"
-msgstr[1] "Styles: {}"
+msgstr[0] "Style: {styles}"
+msgstr[1] "Styles: {styles}"
 
 #. i18n: StyleVar which is totally unstyled.
 #: app/StyleVarPane.py
@@ -768,9 +765,8 @@ msgid "None!"
 msgstr "Aucun(e)"
 
 #: app/SubPane.py
-#, fuzzy
 msgid "Hide/Show the \"{window}\" window."
-msgstr "Cacher/Montrer la fenêtre \"{}\""
+msgstr "Cacher/Montrer la fenêtre \"{window}\""
 
 #: app/UI.py
 msgid "Selected Items and Style successfully exported!"
@@ -980,7 +976,7 @@ msgid ""
 "This has been copied to the clipboard."
 msgstr ""
 "Une erreur s'est produite : \n"
-"{}\n"
+"{err}\n"
 "\n"
 "Ceci a été copié dans le presse-papiers."
 
@@ -1014,11 +1010,11 @@ msgid_plural ""
 "Do you wish to delete {n} maps?\n"
 "{maps}"
 msgstr[0] ""
-"Voulez-vous supprimer {} carte ?\n"
-"\n"
+"Voulez-vous supprimer {n} carte ?\n"
+"{maps}"
 msgstr[1] ""
-"Voulez-vous supprimer {} cartes ?\n"
-"\n"
+"Voulez-vous supprimer {n} cartes ?\n"
+"{maps}"
 
 #: app/backup.py
 #, fuzzy
@@ -1026,8 +1022,8 @@ msgid ""
 "This map is already in the game directory. Do you wish to overwrite it? "
 "({mapname})"
 msgstr ""
-"Cette carte est déjà dans les fichiers du jeu. Voulez-vous la remplacer ?"
-" ({})"
+"Cette carte est déjà dans les fichiers du jeu. Voulez-vous la "
+"remplacer ? ({mapname})"
 
 #: app/backup.py
 #, fuzzy
@@ -1036,7 +1032,7 @@ msgid ""
 "({mapname})"
 msgstr ""
 "Ce nom de fichier est déjà présent dans la sauvegarde. Voulez-vous le "
-"remplacer ? ({})"
+"remplacer ? ({mapname})"
 
 #: app/backup.py
 msgid "Overwrite File?"
@@ -1114,9 +1110,8 @@ msgid "Reload the map list."
 msgstr ""
 
 #: app/backup.py
-#, fuzzy
 msgid "BEEMOD {version} - Backup / Restore Puzzles"
-msgstr "BEEMOD {} - Sauvegarder / Restaurer les puzzles"
+msgstr "BEEMOD {version} - Sauvegarder / Restaurer les puzzles"
 
 #: app/backup.py app/backup.py
 msgid "New Backup"
@@ -1379,12 +1374,11 @@ msgstr "Exporter"
 #: app/gameMan.py
 #, fuzzy
 msgid "Export to \"{game}\"..."
-msgstr "Exporter vers \"{}\"..."
+msgstr "Exporter vers \"{game}\"..."
 
 #: app/gameMan.py
-#, fuzzy
 msgid "Export to \"{game}\"*..."
-msgstr "Exporter vers \"{}\"..."
+msgstr "Exporter vers \"{game}\"*..."
 
 #: app/gameMan.py app/gameMan.py
 msgid "BEE2 - Export Failed!"
@@ -1663,9 +1657,8 @@ msgid "BEE2 - {item}"
 msgstr ""
 
 #: app/itemPropWin.py
-#, fuzzy
 msgid "Settings for \"{item}\""
-msgstr "Paramètres pour \"{}\""
+msgstr "Paramètres pour \"{item}\""
 
 #: app/itemPropWin.py
 msgid ""
@@ -2272,12 +2265,12 @@ msgstr "Enregistrer la palette"
 #: app/paletteUI.py
 #, fuzzy
 msgid "Hide Palette \"{name}\""
-msgstr "Supprimer la palette \"{}\""
+msgstr "Supprimer la palette \"{name}\""
 
 #: app/paletteUI.py
 #, fuzzy
 msgid "Delete Palette \"{name}\""
-msgstr "Supprimer la palette \"{}\""
+msgstr "Supprimer la palette \"{name}\""
 
 #: app/paletteUI.py
 #, fuzzy
@@ -2303,7 +2296,7 @@ msgstr "Entrez le nom du groupe pour cette palette, ou \"\" pour dissocier."
 #: app/richTextBox.py
 #, fuzzy
 msgid "Open \"{url}\" in the default browser?"
-msgstr "Ouvrir \"{}\" dans le navigateur par défaut ?"
+msgstr "Ouvrir \"{url}\" dans le navigateur par défaut ?"
 
 #: app/selector_win.py
 msgid "Color: R={r}, G={g}, B={b}"
@@ -2332,8 +2325,8 @@ msgstr "Autre"
 #, fuzzy
 msgid "Author: {authors}"
 msgid_plural "Authors: {authors}"
-msgstr[0] "Auteur: {}"
-msgstr[1] "Auteurs: {}"
+msgstr[0] "Auteur: {authors}"
+msgstr[1] "Auteurs: {authors}"
 
 #: app/selector_win.py
 msgid "Authors: Unknown"
@@ -2361,7 +2354,7 @@ msgstr "Suggéré"
 #: app/signage_ui.py
 #, fuzzy
 msgid "Signage: {name}"
-msgstr "Signalisation: {}"
+msgstr "Signalisation: {name}"
 
 #: app/signage_ui.py app/signage_ui.py
 msgid "Configure Signage"
@@ -2446,7 +2439,7 @@ msgstr "Rép."
 #: app/voiceEditor.py
 #, fuzzy
 msgid "BEE2 - Configure \"{item}\""
-msgstr "BEE2 - Configurer \"{}\""
+msgstr "BEE2 - Configurer \"{item}\""
 
 #: app/voiceEditor.py
 msgid "Mid - Chamber"
@@ -2544,32 +2537,14 @@ msgstr ""
 #~ msgid "All"
 #~ msgstr "Tout"
 
-#~ msgid "Available Tags (click):"
-#~ msgstr "Tags disponibles (cliquez):"
-
-#~ msgid "Loading Images"
-#~ msgstr "Chargement des images"
-
 #~ msgid "Enables displaying additional UI specific for development purposes."
 #~ msgstr "Montre des éléments supplémentaires au UI pour le développement."
-
-#~ msgid "This palette already exists. Overwrite?"
-#~ msgstr "Cette palette existe déjà. Remplacer ?"
 
 #~ msgid "Reset to Default"
 #~ msgstr "Réinitialiser aux valeurs par défaut"
 
 #~ msgid "Corridor"
 #~ msgstr "Corridor"
-
-#~ msgid ""
-#~ "Randomly choose a corridor. This is "
-#~ "saved in the puzzle data and will"
-#~ " not change."
-#~ msgstr ""
-#~ "Choisit un corridor aléatoire. Ceci est"
-#~ " sauvegardé dans le data dde la "
-#~ "salle et ne va pas changer."
 
 #~ msgid "Corridor:"
 #~ msgstr "Corridor:"
@@ -2598,23 +2573,6 @@ msgstr ""
 #~ msgid "Items"
 #~ msgstr "Objets"
 
-#~ msgid "Log missing packfile resources"
-#~ msgstr "Enregistrer dans un fichier les ressources empaquetées manquantes"
-
-#~ msgid ""
-#~ "Log when the resources a \"PackList\""
-#~ " refers to are not present in "
-#~ "the zip. This may be fine (in "
-#~ "a prerequisite zip), but it often "
-#~ "indicates an error."
-#~ msgstr ""
-#~ "Enregistrer dans un fichier quand les"
-#~ " ressources référées par une \"PackList\""
-#~ " ne sont pas présentes dans le "
-#~ "zip. Cela peut être normal (dans "
-#~ "un zip prérequis) mais peut autrement"
-#~ " indiquer un erreur."
-
 #~ msgid "Portal Stories: Mel"
 #~ msgstr "Portal Stories: Mel"
 
@@ -2626,18 +2584,6 @@ msgstr ""
 
 #~ msgid "Export..."
 #~ msgstr "Exportation..."
-
-#~ msgid "BEEMOD {} Error!"
-#~ msgstr "BEEMOD {} Erreur !"
-
-#~ msgid ""
-#~ "This item can be rotated on the"
-#~ " floor to face 360 degrees, for "
-#~ "Reflection Cubes only."
-#~ msgstr "Cet objet peut être tourné sur le sol à 360°."
-
-#~ msgid "BEE2 - {}"
-#~ msgstr "BEE2 - {}"
 
 #~ msgid ""
 #~ "\n"
@@ -2654,4 +2600,3 @@ msgstr ""
 
 #~ msgid "Gel Type"
 #~ msgstr "Sélectionnez un style"
-

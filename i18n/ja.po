@@ -2296,15 +2296,6 @@ msgstr ""
 #~ msgid "Coop:"
 #~ msgstr "生協出口："
 
-#~ msgid "Tags"
-#~ msgstr "付箋"
-
-#~ msgid "Any"
-#~ msgstr "選ぶ"
-
-#~ msgid "All"
-#~ msgstr "全て"
-
 #~ msgid "Corridor"
 #~ msgstr "廊下"
 
@@ -2317,12 +2308,6 @@ msgstr ""
 #~ msgid "SP Exit:"
 #~ msgstr "SP出口："
 
-#~ msgid "Portal Stories: Mel"
-#~ msgstr "Portal Stories: Mel"
-
-#~ msgid "Thinking With Time Machine"
-#~ msgstr "Thinking With Time Machine"
-
 #~ msgid "__LANG_USE_SANS_SERIF__"
 #~ msgstr "YES"
 
@@ -2331,4 +2316,3 @@ msgstr ""
 
 #~ msgid "No Name?"
 #~ msgstr "名前ありません？"
-

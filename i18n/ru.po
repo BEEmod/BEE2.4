@@ -2496,20 +2496,8 @@ msgstr ""
 #~ msgid "This palette already exists. Overwrite?"
 #~ msgstr "Такая палитра уже существует. Перезаписать?"
 
-#~ msgid "Reset to Default"
-#~ msgstr "Сбросить до значений по умолчанию"
-
 #~ msgid "Corridor"
 #~ msgstr "Коридор"
-
-#~ msgid ""
-#~ "Randomly choose a corridor. This is "
-#~ "saved in the puzzle data and will"
-#~ " not change."
-#~ msgstr ""
-#~ "Коридор будет выбран случайно. Он "
-#~ "сохранится в данных головоломки и не "
-#~ "изменится."
 
 #~ msgid "Corridor:"
 #~ msgstr "Коридор:"
@@ -2538,51 +2526,11 @@ msgstr ""
 #~ msgid "Items"
 #~ msgstr "Предметы"
 
-#~ msgid "Portal Stories: Mel"
-#~ msgstr "Portal Stories: Mel"
-
-#~ msgid "Thinking With Time Machine"
-#~ msgstr "Thinking With Time Machine"
-
-#~ msgid "Log missing packfile resources"
-#~ msgstr "[Логировать] недоступные ресурсы файлов пакетов"
-
-#~ msgid ""
-#~ "Log when the resources a \"PackList\""
-#~ " refers to are not present in "
-#~ "the zip. This may be fine (in "
-#~ "a prerequisite zip), but it often "
-#~ "indicates an error."
-#~ msgstr ""
-#~ "[Логировать] предметы, на которые ссылается"
-#~ " \"Список пакетов\", отсутствующие в zip."
-#~ " Это может быть нормально (в "
-#~ "предварительном zip-файле), но часто указывает"
-#~ " на ошибку."
-
 #~ msgid "__LANG_USE_SANS_SERIF__"
-#~ msgstr "__LANG_USE_SANS_SERIF__"
-
-#~ msgid "Auto"
-#~ msgstr "Авто"
-
-#~ msgid "Export..."
-#~ msgstr "Экспорт..."
+#~ msgstr "NO"
 
 #~ msgid "BEEMOD {} Error!"
 #~ msgstr "Ошибка BEEMOD {}!"
-
-#~ msgid ""
-#~ "This item can be rotated on the"
-#~ " floor to face 360 degrees, for "
-#~ "Reflection Cubes only."
-#~ msgstr ""
-#~ "Этот предмет может быть повёрнут на "
-#~ "360 градусов, но только как отражающий"
-#~ " куб."
-
-#~ msgid "BEE2 - {}"
-#~ msgstr "BEE2 - {}"
 
 #~ msgid ""
 #~ "\n"
@@ -2591,17 +2539,8 @@ msgstr ""
 #~ "\n"
 #~ "Выйти из BEE2?"
 
-#~ msgid "{} Preview"
-#~ msgstr "Превью {}"
-
 #~ msgid "No Name?"
 #~ msgstr "Нет имени?"
 
-#~ msgid "Have no music playing when inside funnels."
-#~ msgstr ""
-#~ "Устанавливает музыку, которая проигрывается "
-#~ "внутри экскурсионных воронок."
-
 #~ msgid "Gel Type"
 #~ msgstr "Выберите стиль"
-

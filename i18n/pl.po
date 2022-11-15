@@ -43,7 +43,7 @@ msgstr "Pokaż:"
 #: loadScreen.py
 #, fuzzy
 msgid "Logs - {ver}"
-msgstr "Logi - {}"
+msgstr "Logi - {ver}"
 
 #: loadScreen.py
 msgid "Debug messages"
@@ -613,7 +613,7 @@ msgstr "Opcje kompilacji"
 #: app/CompilerPane.py
 #, fuzzy
 msgid "Compiler Options - {ver}"
-msgstr "Opcje kompilatora - {}"
+msgstr "Opcje kompilatora - {ver}"
 
 #: app/StyleVarPane.py
 msgid "Multiverse Cave"
@@ -711,9 +711,9 @@ msgstr "Domyślnie włączone"
 #, fuzzy
 msgid "Style: {styles}"
 msgid_plural "Styles: {styles}"
-msgstr[0] "Styl: {}"
-msgstr[1] "Style: {}"
-msgstr[2] "Style {}:"
+msgstr[0] "Styl: {styles}"
+msgstr[1] "Style: {styles}"
+msgstr[2] "Style: {styles}"
 
 #. i18n: StyleVar which is totally unstyled.
 #: app/StyleVarPane.py
@@ -760,7 +760,7 @@ msgstr "Brak!"
 #: app/SubPane.py
 #, fuzzy
 msgid "Hide/Show the \"{window}\" window."
-msgstr "Pokaż/ukryj okno \"{}\""
+msgstr "Pokaż/ukryj okno \"{window}\""
 
 #: app/UI.py
 msgid "Selected Items and Style successfully exported!"
@@ -995,23 +995,23 @@ msgid ""
 msgid_plural ""
 "Do you wish to delete {n} maps?\n"
 "{maps}"
-msgstr[0] "Czy chcesz usunąć mapę {}?\n"
-msgstr[1] "Czy chcesz usunąć mapy {}?\n"
-msgstr[2] "Czy chcesz usunąć mapy {}?\n"
+msgstr[0] "Czy chcesz usunąć mapę {n}?\n"
+msgstr[1] "Czy chcesz usunąć mapy {n}?\n"
+msgstr[2] "Czy chcesz usunąć mapy {n}?\n"
 
 #: app/backup.py
 #, fuzzy
 msgid ""
 "This map is already in the game directory. Do you wish to overwrite it? "
 "({mapname})"
-msgstr "Ta mapa już jest w katalogu gry. Czy chcesz ją nadpisać? ({})"
+msgstr "Ta mapa już jest w katalogu gry. Czy chcesz ją nadpisać? ({mapname})"
 
 #: app/backup.py
 #, fuzzy
 msgid ""
 "This filename is already in the backup. Do you wish to overwrite it? "
 "({mapname})"
-msgstr "Ten plik już jest w kopii zapasowej. Czy chcesz go nadpisać? ({})"
+msgstr "Ten plik już jest w kopii zapasowej. Czy chcesz go nadpisać? ({mapname})"
 
 #: app/backup.py
 msgid "Overwrite File?"
@@ -1089,7 +1089,7 @@ msgstr ""
 #: app/backup.py
 #, fuzzy
 msgid "BEEMOD {version} - Backup / Restore Puzzles"
-msgstr "BEEMOD {} - Kopia zapasowa"
+msgstr "BEEMOD {version} - Kopia zapasowa"
 
 #: app/backup.py app/backup.py
 msgid "New Backup"
@@ -1352,12 +1352,12 @@ msgstr "Wyeksportuj"
 #: app/gameMan.py
 #, fuzzy
 msgid "Export to \"{game}\"..."
-msgstr "Wyeksportuj do \"{}\"..."
+msgstr "Wyeksportuj do \"{game}\"..."
 
 #: app/gameMan.py
 #, fuzzy
 msgid "Export to \"{game}\"*..."
-msgstr "Wyeksportuj do \"{}\"..."
+msgstr "Wyeksportuj do \"{game}\"*..."
 
 #: app/gameMan.py app/gameMan.py
 msgid "BEE2 - Export Failed!"
@@ -1456,7 +1456,7 @@ msgstr ""
 #: app/gameMan.py
 #, fuzzy
 msgid "Are you sure you want to delete \"{game}\"?"
-msgstr "Na pewno chcesz usunąć \"{}\"?"
+msgstr "Na pewno chcesz usunąć \"{game}\"?"
 
 #: app/gameMan.py
 #, fuzzy
@@ -2192,7 +2192,7 @@ msgstr "Zapisz paletę"
 #: app/paletteUI.py
 #, fuzzy
 msgid "Are you sure you want to delete \"{palette}\"?"
-msgstr "Na pewno chcesz usunąć \"{}\"?"
+msgstr "Na pewno chcesz usunąć \"{palette}\"?"
 
 #: app/paletteUI.py
 msgid "Builtin / Readonly"
@@ -2227,12 +2227,12 @@ msgstr "Zapisz paletę"
 #: app/paletteUI.py
 #, fuzzy
 msgid "Hide Palette \"{name}\""
-msgstr "Usuń paletę \"{}\""
+msgstr "Usuń paletę \"{name}\""
 
 #: app/paletteUI.py
 #, fuzzy
 msgid "Delete Palette \"{name}\""
-msgstr "Usuń paletę \"{}\""
+msgstr "Usuń paletę \"{name}\""
 
 #: app/paletteUI.py
 #, fuzzy
@@ -2258,7 +2258,7 @@ msgstr ""
 #: app/richTextBox.py
 #, fuzzy
 msgid "Open \"{url}\" in the default browser?"
-msgstr "Otworzyć \"{}\" w domyślnej przeglądarce?"
+msgstr "Otworzyć \"{url}\" w domyślnej przeglądarce?"
 
 #: app/selector_win.py
 msgid "Color: R={r}, G={g}, B={b}"
@@ -2287,9 +2287,9 @@ msgstr "Inne"
 #, fuzzy
 msgid "Author: {authors}"
 msgid_plural "Authors: {authors}"
-msgstr[0] "Autor: {}"
-msgstr[1] "Autorzy: {}"
-msgstr[2] "Autorzy: {}"
+msgstr[0] "Autor: {authors}"
+msgstr[1] "Autorzy: {authors}"
+msgstr[2] "Autorzy: {authors}"
 
 #: app/selector_win.py
 msgid "Authors: Unknown"
@@ -2317,7 +2317,7 @@ msgstr "Sugerowane"
 #: app/signage_ui.py
 #, fuzzy
 msgid "Signage: {name}"
-msgstr "Symbol: {}"
+msgstr "Symbol: {name}"
 
 #: app/signage_ui.py app/signage_ui.py
 msgid "Configure Signage"
@@ -2400,7 +2400,7 @@ msgstr "Odp."
 #: app/voiceEditor.py
 #, fuzzy
 msgid "BEE2 - Configure \"{item}\""
-msgstr "BEE2 - Konfiguracja \"{}\""
+msgstr "BEE2 - Konfiguracja \"{item}\""
 
 #: app/voiceEditor.py
 msgid "Mid - Chamber"
@@ -2478,26 +2478,8 @@ msgstr ""
 msgid "Save As"
 msgstr ""
 
-#~ msgid "This palette already exists. Overwrite?"
-#~ msgstr "Ta paleta już istnieje. Nadpisać?"
-
-#~ msgid "Reset to Default"
-#~ msgstr "Zresetuj do domyślnych"
-
 #~ msgid "Corridor"
 #~ msgstr "Korytarz"
-
-#~ msgid ""
-#~ "Randomly choose a corridor. This is "
-#~ "saved in the puzzle data and will"
-#~ " not change."
-#~ msgstr ""
-#~ "Losowo wybiera korytarz. Jest on "
-#~ "zapisywany w danych mapy i nie "
-#~ "zmienia się przed ponownym zapisaniem."
-
-#~ msgid "Corridor:"
-#~ msgstr "Korytarz:"
 
 #~ msgid "SP Entry:"
 #~ msgstr "Wejście (1-os.):"
@@ -2514,45 +2496,14 @@ msgstr ""
 #~ msgid "Items"
 #~ msgstr "Przedmioty"
 
-#~ msgid "Log missing packfile resources"
-#~ msgstr "Loguj brakujące źródła z plików paczek"
-
-#~ msgid ""
-#~ "Log when the resources a \"PackList\""
-#~ " refers to are not present in "
-#~ "the zip. This may be fine (in "
-#~ "a prerequisite zip), but it often "
-#~ "indicates an error."
-#~ msgstr ""
-#~ "Loguj, gdy zasoby, do których odnosi "
-#~ "się \"PackList\", nie są obecne w "
-#~ "pliku zip. Często wskazuje błąd nawet,"
-#~ " gdy w wymaganym zip-ie wszystko "
-#~ "jest w porządku."
-
-#~ msgid "Portal Stories: Mel"
-#~ msgstr "Portal Stories: Mel"
-
-#~ msgid "Thinking With Time Machine"
-#~ msgstr "Thinking With Time Machine"
-
 #~ msgid "__LANG_USE_SANS_SERIF__"
-#~ msgstr "__LANG_USE_SANS_SERIF__"
+#~ msgstr "NO"
 
 #~ msgid "Auto"
 #~ msgstr "Automatyczna"
 
 #~ msgid "Export..."
 #~ msgstr "Wyeksportuj..."
-
-#~ msgid ""
-#~ "This item can be rotated on the"
-#~ " floor to face 360 degrees, for "
-#~ "Reflection Cubes only."
-#~ msgstr ""
-#~ "Ten przedmiot może być obrócony na "
-#~ "podłodze o 360 stopni (dotyczy tylko "
-#~ "kostki odbijającej)."
 
 #~ msgid ""
 #~ "\n"
@@ -2569,4 +2520,3 @@ msgstr ""
 
 #~ msgid "Gel Type"
 #~ msgstr "Wybierz styl"
-
