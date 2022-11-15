@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: https://github.com/BEEmod/BEE2.4/issues\n"
-"POT-Creation-Date: 2022-11-15 15:57+1000\n"
+"POT-Creation-Date: 2022-11-15 16:31+1000\n"
 "PO-Revision-Date: 2019-11-22 10:47+1000\n"
 "Last-Translator: Antecer <antecer@outlook.com>\n"
 "Language: zh\n"
@@ -99,6 +99,11 @@ msgstr ""
 msgid ""
 "The item \"<var>{item}</var>\" is not a {kind}!<br>Instance: "
 "<code>{inst}</code>"
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid "See the documentation"
 msgstr ""
 
 #. This uses HTML syntax.
@@ -2465,3 +2470,4 @@ msgstr ""
 
 #~ msgid "Gel Type"
 #~ msgstr "选择风格"
+

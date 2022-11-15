@@ -154,7 +154,9 @@ TOK_WRONG_ITEM_TYPE = TransToken.ui(
     'The item "<var>{item}</var>" is not a {kind}!<br>Instance: <code>{inst}</code>'
 )
 
-TOK_SEEDOCS = TransToken.untranslated('{msg}\n<p><a href="{url}">See the documentation</a>.</p>')
+TOK_SEEDOCS = TransToken.untranslated('{msg}\n<p><a href="{url}">{docs}</a>.</p>').format(
+    docs=TransToken.ui('See the documentation')
+)
 
 # Specific errors:
 

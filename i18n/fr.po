@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version:  BEEMOD2\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2022-11-15 15:57+1000\n"
+"POT-Creation-Date: 2022-11-15 16:31+1000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: fr\n"
@@ -98,6 +98,11 @@ msgstr ""
 msgid ""
 "The item \"<var>{item}</var>\" is not a {kind}!<br>Instance: "
 "<code>{inst}</code>"
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid "See the documentation"
 msgstr ""
 
 #. This uses HTML syntax.
@@ -1022,8 +1027,8 @@ msgid ""
 "This map is already in the game directory. Do you wish to overwrite it? "
 "({mapname})"
 msgstr ""
-"Cette carte est déjà dans les fichiers du jeu. Voulez-vous la "
-"remplacer ? ({mapname})"
+"Cette carte est déjà dans les fichiers du jeu. Voulez-vous la remplacer ?"
+" ({mapname})"
 
 #: app/backup.py
 #, fuzzy
@@ -2600,3 +2605,4 @@ msgstr ""
 
 #~ msgid "Gel Type"
 #~ msgstr "Sélectionnez un style"
+

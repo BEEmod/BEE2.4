@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2022-11-15 15:57+1000\n"
+"POT-Creation-Date: 2022-11-15 16:31+1000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: es\n"
@@ -99,6 +99,11 @@ msgstr ""
 msgid ""
 "The item \"<var>{item}</var>\" is not a {kind}!<br>Instance: "
 "<code>{inst}</code>"
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid "See the documentation"
 msgstr ""
 
 #. This uses HTML syntax.
@@ -1009,9 +1014,11 @@ msgid ""
 msgid_plural ""
 "Do you wish to delete {n} maps?\n"
 "{maps}"
-msgstr[0] "¿Desea eliminar {n} mapa?\n"
+msgstr[0] ""
+"¿Desea eliminar {n} mapa?\n"
 "{maps}"
-msgstr[1] "¿Desea eliminar {n} mapas?\n"
+msgstr[1] ""
+"¿Desea eliminar {n} mapas?\n"
 "{maps}"
 
 #: app/backup.py
@@ -1019,7 +1026,9 @@ msgstr[1] "¿Desea eliminar {n} mapas?\n"
 msgid ""
 "This map is already in the game directory. Do you wish to overwrite it? "
 "({mapname})"
-msgstr "Este mapa ya está en el directorio del juego. ¿Desea reemplazarlo? ({mapname})"
+msgstr ""
+"Este mapa ya está en el directorio del juego. ¿Desea reemplazarlo? "
+"({mapname})"
 
 #: app/backup.py
 msgid ""
@@ -1267,7 +1276,8 @@ msgid ""
 "{generic_rot} However when this is set to Reflection Cube, this item can "
 "instead rotated on the floor to face 360 degrees."
 msgstr ""
-"{generic_rot} Este elemento se puede rotar en el piso para hacer frente a 360 grados."
+"{generic_rot} Este elemento se puede rotar en el piso para hacer frente a"
+" 360 grados."
 
 #: app/contextWin.py
 #, fuzzy
@@ -2503,3 +2513,4 @@ msgstr "Pasillo"
 #: test/test_transtoken.py
 msgid "Save As"
 msgstr ""
+
