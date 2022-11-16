@@ -3,6 +3,7 @@ Handles scanning through the zip packages to find all items, styles, etc.
 """
 from __future__ import annotations
 
+import os
 import warnings
 from collections import defaultdict
 from pathlib import Path
@@ -503,14 +504,18 @@ def no_packages_err(pak_dirs: list[Path], msg: TransToken) -> NoReturn:
     import sys
     # We don't have a package directory!
     if len(pak_dirs) == 1:
-        trailer = TransToken.untranslated(str(pak_dirs[0]))
+        trailer = TransToken.untranslated(str((os.getcwd() / pak_dirs[0]).resolve()))
     else:
         trailer = TransToken.ui(
             'one of the following locations:\n{loc}'
-        ).format(loc='\n'.join(f' - {fold}' for fold in pak_dirs))
+        ).format(loc='\n'.join(
+            f' - {(os.getcwd() / fold).resolve()}'
+            for fold in pak_dirs
+        ))
     message = TransToken.ui(
-        '{msg}\nGet the packages from "https://github.com/BEEmod/BEE2-items" and place them in {trailer}'
-    ).format(msg=msg, loc=trailer)
+        '{msg}\nGet the packages from "https://github.com/BEEmod/BEE2-items" '
+        'and place them in {trailer}'
+    ).format(msg=msg, trailer=trailer)
 
     LOGGER.error(message)
     tk_tools.showerror(TransToken.ui('BEE2 - Invalid Packages Directory!'), message=message)
