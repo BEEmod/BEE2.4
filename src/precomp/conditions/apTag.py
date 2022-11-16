@@ -257,7 +257,7 @@ def res_make_tag_fizzler(vmf: VMF, info: conditions.MapInfo, res: Property) -> c
             blue_loc = loc
             oran_loc = loc
 
-        if inst_normal.z != 0:
+        if abs(inst_normal.z) > 0.5:
             # If on floors/ceilings, rotate to point at the fizzler!
             sign_floor_loc = sign_loc.copy()
             sign_floor_loc.z = 0  # We don't care about z-positions.

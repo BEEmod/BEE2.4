@@ -17,6 +17,9 @@
 ### Bugfixes
 * Do not composite signage VTFs with PeTI backgrounds.
 * Fix signage not exporting if the UI was not opened at least once before exporting.
+* BEEmod/BEE2-items#4252: Correctly check orientation of Tag Fizzlers.
+* Display the absolute location of the package location if empty.
+* Handle unparsable existing antigel materials gracefully.
 
 ------------------------------------------
 
