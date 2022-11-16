@@ -5,6 +5,7 @@ from enum import Enum
 from pathlib import Path
 
 import attrs
+import trio
 
 import srctools.logger
 from precomp import rand
@@ -632,7 +633,7 @@ def load_config(conf: Property):
     OVERLAYS = GENERATORS[GenCat.OVERLAYS]
 
 
-def setup(game: Game, vmf: VMF, tiles: List['TileDef']) -> None:
+async def setup(game: Game, vmf: VMF, tiles: List['TileDef']) -> None:
     """Do various setup steps, needed for generating textures.
 
     - Set randomisation seed on all the generators.
@@ -650,13 +651,22 @@ def setup(game: Game, vmf: VMF, tiles: List['TileDef']) -> None:
     # And all the filenames that exist.
     antigel_mats: Set[str] = set()
 
-    # First, check existing materials to determine which are already created.
-    for vmt_file in antigel_loc.glob('*.vmt'):
-        with vmt_file.open() as f:
-            mat = Material.parse(f, str(vmt_file))
-        mat_name = str(vmt_file.relative_to(material_folder).with_suffix('')).replace('\\', '/')
-        texture = None
-        for block in mat.blocks:
+    async def check_existing(filename: Path) -> None:
+        """First, check existing materials to determine which are already created."""
+        try:
+            with filename.open() as f:
+                exist_mat = await trio.to_thread.run_sync(Material.parse, f, str(filename))
+        except FileNotFoundError:
+            # It should exist, we just checked for it? Doesn't matter though.
+            return
+        except TokenSyntaxError:
+            LOGGER.warning('Unable to parse antigel material {}!', filename, exc_info=True)
+            # Delete the bad file.
+            await trio.to_thread.run_sync(filename.unlink)
+            return
+        mat_name = str(filename.relative_to(material_folder).with_suffix('')).replace('\\', '/')
+        texture: Optional[str] = None
+        for block in exist_mat.blocks:
             if block.name not in ['insert', 'replace']:
                 continue
             try:
@@ -666,9 +676,13 @@ def setup(game: Game, vmf: VMF, tiles: List['TileDef']) -> None:
                 pass
         if texture is None:
             LOGGER.warning('No $basetexture in antigel material {}!', mat_name)
-            continue
+            return
         tex_to_antigel[texture.casefold()] = mat_name
-        antigel_mats.add(vmt_file.stem)
+        antigel_mats.add(filename.stem)
+
+    async with trio.open_nursery() as nursery:
+        for vmt_file in antigel_loc.glob('*.vmt'):
+            nursery.start_soon(check_existing, vmt_file)
 
     for generator in GENERATORS.values():
         generator.setup(vmf, tiles)

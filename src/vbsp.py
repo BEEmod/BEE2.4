@@ -1657,7 +1657,7 @@ async def main() -> None:
         # We have tiles, pass to our error display.
         errors.load_tiledefs(tiling.TILES.values(), brushLoc.POS)
 
-        texturing.setup(game, vmf, list(tiling.TILES.values()))
+        await texturing.setup(game, vmf, list(tiling.TILES.values()))
 
         conditions.check_all(vmf, coll, info)
         add_extra_ents(vmf, info)
