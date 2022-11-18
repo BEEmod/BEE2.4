@@ -222,7 +222,7 @@ class LoadScreen:
     def unsuppress(self) -> None:
         """Undo temporarily hiding the screen."""
         self.active = True
-        self._send_msg('show')
+        self._send_msg('show', str(self.title), list(map(str, self.stage_labels)))
 
 
 def shutdown() -> None:
