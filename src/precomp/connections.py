@@ -1032,10 +1032,7 @@ def add_item_inputs(
                 item.inst['classname'] = 'logic_auto'
                 dummy_logic_ents.append(item.inst)
             else:
-                is_inverted = conv_bool(conditions.resolve_value(
-                    item.inst,
-                    invert_var,
-                ))
+                is_inverted = conv_bool(item.inst.fixup.substitute(invert_var, '', allow_invert=True))
                 logic_auto = item.inst.map.create_ent(
                     'logic_auto',
                     origin=item.inst['origin'],
@@ -1126,10 +1123,7 @@ def add_item_inputs(
 
         return
 
-    is_inverted = conv_bool(conditions.resolve_value(
-        item.inst,
-        invert_var,
-    ))
+    is_inverted = conv_bool(item.inst.fixup.substitute(invert_var, default='', allow_invert=True))
 
     invert_lag = 0.0
     if is_inverted:
