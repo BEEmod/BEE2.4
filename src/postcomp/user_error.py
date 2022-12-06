@@ -16,9 +16,16 @@ from user_errors import SERVER_PORT
 # If it returns true, it has popped up the Steam Overlay.
 # We then trigger the puzzlemaker command to switch in the background, behind the webpage.
 # That pauses, so if you tab back it'll repeat.
+# In Coop though, there's no URL show function, so we just display a hud message.
 SCRIPT_TEMPLATE = '''\
 function Think() {
-\tif (ScriptSteamShowURL("http://127.0.0.1:%/")) SendToConsole("puzzlemaker_show 1");
+    if (IsMultiplayer()) {
+        EntFire("coop_disp", "Display", "");
+        return 1.0;
+    }
+    if (ScriptSteamShowURL("http://127.0.0.1:%/")) {
+        SendToConsole("puzzlemaker_show 1");
+    }
 }
 '''
 
@@ -36,17 +43,42 @@ async def start_error_server(ctx: Context) -> None:
         port = await load_server()
         LOGGER.info('Server at port {}', port)
         ctx.add_code(ent, SCRIPT_TEMPLATE.replace('%', str(port)))
+
+        for channel, y, text in [
+            # 4,5,6 are the same size.
+            (4, 0.45, 'Compile Error. Open the following URL'),
+            (5, 0.5, 'in a browser on this computer to see:'),
+            (6, 0.55, f'http://localhost:{port}/'),
+        ]:
+            ctx.vmf.create_ent(
+                'game_text',
+                targetname='coop_disp',
+                message=text,
+                effect=0,
+                color='200 0 0',
+                holdtime=9999.0,
+                autobreak=1,
+                fadein=1.5,
+                fadeout=0.5,
+                fxtime=0.25,
+                spawnflags=1,  # All players
+                channel=channel,
+                x=-1,
+                y=y,
+            )
+
         if not utils.FROZEN:
             # We're running outside Portal 2, pop it open in regular Chrome.
             import webbrowser
             webbrowser.get('chrome').open(f'http://127.0.0.1:{port}/')
 
 
-async def load_server() -> int:
-    """Load the webserver."""
+async def load_server() -> Tuple[int, List[str]]:
+    """Load the webserver, then return the port and the localised error text."""
     # We need to boot the web server.
     try:
-        port = int(await ASYNC_PORT.read_text('utf8'))
+        port_text, *error_lines = (await ASYNC_PORT.read_text('utf8')).splitlines()
+        port = int(port_text)
     except (FileNotFoundError, ValueError):
         pass
     else:
