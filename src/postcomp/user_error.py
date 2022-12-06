@@ -1,5 +1,8 @@
 """Inject VScript if a user error occurs."""
-import re
+import json
+
+from typing import List, Tuple
+
 import subprocess
 
 import trio
@@ -10,7 +13,7 @@ import srctools.logger
 
 import utils
 from hammeraddons.bsp_transform import Context, trans
-from user_errors import SERVER_PORT
+from user_errors import SERVER_INFO_FILE
 
 # Repeatedly show the URL whenever the user switches to the page.
 # If it returns true, it has popped up the Steam Overlay.
@@ -30,7 +33,7 @@ function Think() {
 '''
 
 LOGGER = srctools.logger.get_logger(__name__)
-ASYNC_PORT = trio.Path(SERVER_PORT)
+ASYNC_SERVER_INFO = trio.Path(SERVER_INFO_FILE)
 
 
 @trans('BEE2: User Error')
@@ -40,14 +43,21 @@ async def start_error_server(ctx: Context) -> None:
         ent['thinkfunction'] = 'Think'
         ent['classname'] = 'info_player_start'
 
-        port = await load_server()
+        port, error_text = await load_server()
         LOGGER.info('Server at port {}', port)
         ctx.add_code(ent, SCRIPT_TEMPLATE.replace('%', str(port)))
 
+        try:
+            error_1, error_2 = error_text.splitlines()
+        except ValueError:
+            LOGGER.warning('Bad translation for error text: {}', error_text)
+            error_1 = 'Compile Error. Open the following URL'
+            error_2 = 'in a browser on this computer to see:'
+
         for channel, y, text in [
             # 4,5,6 are the same size.
-            (4, 0.45, 'Compile Error. Open the following URL'),
-            (5, 0.5, 'in a browser on this computer to see:'),
+            (4, 0.45, error_1),
+            (5, 0.5, error_2),
             (6, 0.55, f'http://localhost:{port}/'),
         ]:
             ctx.vmf.create_ent(
@@ -73,25 +83,28 @@ async def start_error_server(ctx: Context) -> None:
             webbrowser.get('chrome').open(f'http://127.0.0.1:{port}/')
 
 
-async def load_server() -> Tuple[int, List[str]]:
+async def load_server() -> Tuple[int, str]:
     """Load the webserver, then return the port and the localised error text."""
     # We need to boot the web server.
     try:
-        port_text, *error_lines = (await ASYNC_PORT.read_text('utf8')).splitlines()
-        port = int(port_text)
-    except (FileNotFoundError, ValueError):
+        data = json.loads(await ASYNC_SERVER_INFO.read_text('utf8'))
+    except (FileNotFoundError, json.JSONDecodeError):
         pass
     else:
+        port = data['port']
+        coop_text = data.get('coop_text', '')
+        assert isinstance(port, int), data
+        assert isinstance(coop_text, str), data
         LOGGER.debug('Server port file = {}', port)
         # Server appears to be live. Connect to it, so we can make it reload + check it's alive.
         try:
             urlopen(f'http://127.0.0.1:{port}/reload', timeout=5.0)
         except OSError:  # No response, it's likely dead.
             LOGGER.debug('No response from server.')
-            await ASYNC_PORT.unlink()  # This is invalid.
+            await ASYNC_SERVER_INFO.unlink()  # This is invalid.
         else:
             LOGGER.debug('Server responded from localhost:{}', port)
-            return port  # This is live and its timeout was just refreshed, good to go.
+            return port, coop_text  # This is live and its timeout was just refreshed, good to go.
 
     if utils.FROZEN:
         args = [sys.executable]
@@ -114,13 +127,17 @@ async def load_server() -> Tuple[int, List[str]]:
     with trio.move_on_after(5.0):
         while proc.returncode is None:
             try:
-                port = int(await ASYNC_PORT.read_text('utf8'))
-            except (FileNotFoundError, ValueError):
+                data = json.loads(await ASYNC_SERVER_INFO.read_text('utf8'))
+            except (FileNotFoundError, json.JSONDecodeError):
                 await trio.sleep(0.1)
                 continue
             else:
+                port = data['port']
+                coop_text = data.get('coop_text', '')
+                assert isinstance(port, int), data
+                assert isinstance(coop_text, str), data
                 # Successfully booted. Hack: set the return code of the subprocess.Process object,
                 # so it thinks the server has already quit and doesn't try killing it when we exit.
                 proc._proc.returncode = 0
-                return port
+                return port, coop_text
     raise ValueError('Failed to start error server!')

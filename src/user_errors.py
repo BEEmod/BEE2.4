@@ -49,7 +49,8 @@ class ErrorInfo:
 
 
 DATA_LOC = utils.conf_location('compile_error.pickle')
-SERVER_PORT = utils.conf_location('error_server_url.txt')
+# When the error server starts, it writes its port, then a localised error text for coop here
+SERVER_INFO_FILE = utils.conf_location('error_server_info.json')
 
 
 def to_threespace(vec: Vec) -> Tuple[float, float, float]:
@@ -137,6 +138,12 @@ class UserError(BaseException):
 
 # Define a translation token for every error message that can be produced. The app will translate
 # them all during export, then store that for the compiler's use.
+
+# i18n: Special token, must be exactly two lines, shown via game_text if an error occurs in Coop.
+TOK_COOP_SHOWURL = TransToken.ui(
+    'Compile Error. Open the following URL\n'
+    'in a browser on this computer to see:'
+)
 
 # Generic tokens:
 TOK_INVALID_PARAM = TransToken.ui(

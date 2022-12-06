@@ -64,8 +64,9 @@ def do_localisation() -> None:
         if 'test_localisation' in filename:
             # Test code for the localisation module, skip these tokens.
             continue
-        elif 'user_errors.py' in filename:
+        elif 'user_errors.py' in filename and all('game_text' not in comm for comm in comments):
             # Tokens for the error display are here, so indicate they accept HTML.
+            # But not the message shown in game_text.
             comments.append('This uses HTML syntax.')
         catalog.add(
             message,

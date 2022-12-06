@@ -16,6 +16,7 @@ import http
 import math
 import pickle
 import gettext
+import json
 from typing import List
 
 from hypercorn.config import Config
@@ -25,7 +26,10 @@ import quart
 import trio
 
 import utils
-from user_errors import ErrorInfo, DATA_LOC, SERVER_PORT, TOK_ERR_FAIL_LOAD, TOK_ERR_MISSING
+from user_errors import (
+    ErrorInfo, DATA_LOC, SERVER_INFO_FILE,
+    TOK_ERR_FAIL_LOAD, TOK_ERR_MISSING, TOK_COOP_SHOWURL,
+)
 import transtoken
 
 root_path = utils.install_path('error_display').absolute()
@@ -147,7 +151,7 @@ async def main() -> None:
         stop_sleeping.cancel()
 
     load_info()
-    SERVER_PORT.unlink(missing_ok=True)
+    SERVER_INFO_FILE.unlink(missing_ok=True)
     try:
         async with trio.open_nursery() as nursery:
             binds = await nursery.start(functools.partial(
@@ -160,12 +164,15 @@ async def main() -> None:
             LOGGER.info('Current time: ', trio.current_time(), 'Deadline:', TIMEOUT_CANCEL.deadline)
             if len(binds):
                 url, port = binds[0].rsplit(':', 1)
-                with srctools.AtomicWriter(SERVER_PORT) as f:
-                    f.write(f'{port}\n')
+                with srctools.AtomicWriter(SERVER_INFO_FILE) as f:
+                    json.dump({
+                        'port': int(port),
+                        'coop_text': str(TOK_COOP_SHOWURL),
+                    }, f)
             else:
                 return # No connection?
             with stop_sleeping:
                 await trio.sleep_forever()
     finally:
-        SERVER_PORT.unlink(missing_ok=True)  # We quit, indicate that.
+        SERVER_INFO_FILE.unlink(missing_ok=True)  # We quit, indicate that.
     LOGGER.info('Shut down successfully.')

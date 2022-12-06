@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version:  BEEMOD2\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2022-11-15 16:31+1000\n"
+"POT-Creation-Date: 2022-12-06 11:11+1000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: fr\n"
@@ -70,6 +70,14 @@ msgstr "Initialisation de l'interface"
 #: loadScreen.py
 msgid "Better Extended Editor for Portal 2"
 msgstr "Better Extended Editor pour Portal 2"
+
+#. i18n: Special token, must be exactly two lines, shown via game_text if an
+#. error occurs in Coop.
+#: user_errors.py
+msgid ""
+"Compile Error. Open the following URL\n"
+"in a browser on this computer to see:"
+msgstr ""
 
 #. This uses HTML syntax.
 #: user_errors.py
