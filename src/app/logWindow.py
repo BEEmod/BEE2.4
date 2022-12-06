@@ -2,10 +2,11 @@
 
 The implementation is in bg_daemon, to ensure it remains responsive.
 """
+from __future__ import annotations
 import logging
 import multiprocessing
 import queue
-from typing import Union
+from typing import Literal, Tuple, Type, Union
 
 import srctools.logger
 import trio
@@ -18,7 +19,12 @@ import config
 _PIPE_MAIN_REC, PIPE_DAEMON_SEND = multiprocessing.Pipe(duplex=False)
 PIPE_DAEMON_REC, _PIPE_MAIN_SEND = multiprocessing.Pipe(duplex=False)
 # We need a queue because logs could be sent in from another thread.
-_LOG_QUEUE = queue.Queue(394)
+_LOG_QUEUE: queue.Queue[
+    Type[StopIteration] |
+    Tuple[Literal['log'], str, str] |
+    Tuple[Literal['visible'], bool, None] |
+    Tuple[Literal['level'], str | int, None],
+] = queue.Queue(394)
 _SHUTDOWN = False
 
 
