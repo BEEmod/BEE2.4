@@ -11,3 +11,6 @@ versioningit >= 2.1.0
 srctools >= 2.3.4
 rtree >= 0.9.7
 typing_extensions >= 4.1.1
+hypercorn>=0.14.3
+quart>=0.18.3
+quart-trio>=0.10.0
