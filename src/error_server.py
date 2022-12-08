@@ -104,6 +104,14 @@ async def route_static_js(filename: str) -> quart.ResponseReturnValue:
     )
 
 
+@app.route('/shutdown')
+async def route_shutdown() -> quart.ResponseReturnValue:
+    """Called by the application to force us to shut down so this can be updated."""
+    LOGGER.info('Recieved shutdown request!')
+    TIMEOUT_CANCEL.cancel()
+    return 'DONE'
+
+
 def update_deadline() -> None:
     """When interacted with, the deadline is reset into the future."""
     TIMEOUT_CANCEL.deadline = trio.current_time() + DELAY

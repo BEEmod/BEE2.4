@@ -723,12 +723,12 @@ def suggested_refresh() -> None:
             UI['suggested_style'].state(['!disabled'])
 
 
-def export_editoritems(pal_ui: paletteUI.PaletteUI, bar: MenuBar) -> None:
+async def export_editoritems(pal_ui: paletteUI.PaletteUI, bar: MenuBar) -> None:
     """Export the selected Items and Style into the chosen game."""
     # Disable, so you can't double-export.
     UI['pal_export'].state(('disabled',))
     bar.set_export_allowed(False)
-    TK_ROOT.update_idletasks()
+    await tk_tools.wait_eventloop()
     try:
         # Convert IntVar to boolean, and only export values in the selected style
         chosen_style = current_style()
@@ -754,7 +754,7 @@ def export_editoritems(pal_ui: paletteUI.PaletteUI, bar: MenuBar) -> None:
         }
         conf = config.APP.get_cur_conf(config.gen_opts.GenOptions)
 
-        success, vpk_success = gameMan.selected_game.export(
+        success, vpk_success = await gameMan.selected_game.export(
             style=chosen_style,
             selected_objects={
                 # Specify the 'chosen item' for each object type
@@ -831,7 +831,7 @@ def export_editoritems(pal_ui: paletteUI.PaletteUI, bar: MenuBar) -> None:
             pal_ui.update_state()
 
         # Re-fire this, so we clear the '*' on buttons if extracting cache.
-        background_run(gameMan.EVENT_BUS, None, gameMan.selected_game)
+        await gameMan.EVENT_BUS(None, gameMan.selected_game)
     finally:
         UI['pal_export'].state(('!disabled',))
         bar.set_export_allowed(True)
@@ -1407,7 +1407,7 @@ async def init_windows() -> None:
     """
     def export() -> None:
         """Export the palette, passing the required UI objects."""
-        export_editoritems(pal_ui, menu_bar)
+        background_run(export_editoritems, pal_ui, menu_bar)
 
     menu_bar = MenuBar(
         TK_ROOT,
@@ -1542,7 +1542,7 @@ async def init_windows() -> None:
 
     TK_ROOT.bind_all(tk_tools.KEY_SAVE, lambda e: pal_ui.event_save())
     TK_ROOT.bind_all(tk_tools.KEY_SAVE_AS, lambda e: pal_ui.event_save_as())
-    TK_ROOT.bind_all(tk_tools.KEY_EXPORT, lambda e: export_editoritems(pal_ui, menu_bar))
+    TK_ROOT.bind_all(tk_tools.KEY_EXPORT, lambda e: background_run(export_editoritems, pal_ui, menu_bar))
 
     await trio.sleep(0)
     loader.step('UI', 'palette')

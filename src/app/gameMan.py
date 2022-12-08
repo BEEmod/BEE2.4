@@ -6,21 +6,24 @@ Does stuff related to the actual games.
 - Generating and saving editoritems/vbsp_config
 """
 from __future__ import annotations
-from typing import NoReturn, Optional, Union, Any, Type, IO, Iterable, Iterator
+
+from typing import NoReturn, Optional, Union, Any, Type, IO, Iterable, Iterator, cast
 from pathlib import Path
 
-import attrs
 from tkinter import *  # ui library
 from tkinter import filedialog  # open/save as dialog creator
 
-import os
-import shutil
-import math
-import re
+import copy
 import io
+import json
+import math
+import os
 import pickle
 import pickletools
-import copy
+import re
+import shutil
+import urllib.error
+import urllib.request
 import webbrowser
 
 from srctools import (
@@ -31,6 +34,8 @@ from srctools import (
 )
 import srctools.logger
 import srctools.fgd
+import trio
+import attrs
 
 from BEE2_config import ConfigFile
 from app import backup, tk_tools, resource_gen, TK_ROOT, DEV_MODE, background_run
@@ -43,6 +48,7 @@ import packages.template_brush
 import editoritems
 import utils
 import config
+import user_errors
 import event
 
 
@@ -262,6 +268,37 @@ def should_backup_app(file: str) -> bool:
         end_data = f.read(SIZE)
         # We also look for BenVlodgi, to catch the BEE 1.06 precompiler.
         return b'BenVlodgi' not in end_data and b'MEI\014\013\012\013\016' not in end_data
+
+
+async def terminate_error_server() -> bool:
+    """If the error server is running, send it a message to get it to terminate.
+
+    :returns: If we think it could be running.
+    """
+    try:
+        data: user_errors.ServerInfo = json.loads(await trio.to_thread.run_sync(
+            user_errors.SERVER_INFO_FILE.read_text
+        ))
+    except FileNotFoundError:
+        LOGGER.info("No error server file, it's not running.")
+        return False
+    with trio.move_on_after(10.0):
+        port = data['port']
+        LOGGER.info('Error server port: {}', port)
+        try:
+            with urllib.request.urlopen(f'http://127.0.0.1:{port}/shutdown') as response:
+                response.read()
+        except urllib.error.URLError as exc:
+            LOGGER.info("No response from error server, assuming it's dead: {}", exc.reason)
+            return False
+        else:
+            # Wait for the file to be deleted.
+            while user_errors.SERVER_INFO_FILE.exists():
+                await trio.sleep(0.125)
+            return False
+    # noinspection PyUnreachableCode
+    LOGGER.warning('Hit error server timeout, may still be running!')
+    return True  # Hit our timeout.
 
 
 @attrs.define(eq=False)
@@ -589,7 +626,7 @@ class Game:
 
         self.mod_times.clear()
 
-    def export(
+    async def export(
         self,
         style: packages.Style,
         selected_objects: dict[Type[packages.PakObject], Any],
@@ -734,7 +771,7 @@ class Game:
                 backup_path = self.abs_path(file + '_original' + ext)
 
                 if not os.path.isfile(item_path):
-                    # We can't backup at all.
+                    # We can't back up at all.
                     should_backup = False
                 elif name == 'Editoritems':
                     should_backup = not os.path.isfile(backup_path)
@@ -829,6 +866,8 @@ class Game:
                     vbsp_file.write(line)
             export_screen.step('EXP', 'vbsp_config')
 
+            error_server_running = await terminate_error_server()
+
             if num_compiler_files > 0:
                 LOGGER.info('Copying Custom Compiler!')
                 compiler_src = utils.install_path('compiler')
@@ -855,16 +894,22 @@ class Game:
                     except PermissionError:
                         # We might not have permissions, if the compiler is currently
                         # running.
+                        if error_server_running:
+                            # Use a different error if this might be running.
+                            msg = TransToken.ui(
+                                'Copying compiler file {file} failed. '
+                                'Ensure {game} is not running. The webserver for the error display '
+                                'may also be running, quit the vrad process or wait a few minutes.'
+                            )
+                        else:
+                            msg = TransToken.ui(
+                                'Copying compiler file {file} failed. '
+                                'Ensure {game} is not running.'
+                            )
                         export_screen.reset()
                         tk_tools.showerror(
                             title=TransToken.ui('BEE2 - Export Failed!'),
-                            message=TransToken.ui(
-                                'Copying compiler file {file} failed. '
-                                'Ensure {game} is not running.'
-                            ).format(
-                                file=comp_file,
-                                game=self.name,
-                            ),
+                            message=msg.format(file=comp_file, game=self.name),
                         )
                         return False, vpk_success
                     export_screen.step('COMP', str(comp_file))
