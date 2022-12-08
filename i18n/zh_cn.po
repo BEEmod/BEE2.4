@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: https://github.com/BEEmod/BEE2.4/issues\n"
-"POT-Creation-Date: 2022-12-08 14:28+1000\n"
+"POT-Creation-Date: 2022-12-08 14:52+1000\n"
 "PO-Revision-Date: 2019-11-22 10:47+1000\n"
 "Last-Translator: Antecer <antecer@outlook.com>\n"
 "Language: zh\n"
@@ -368,11 +368,12 @@ msgid "Thumbnail"
 msgstr "地图预览快照"
 
 #: app/CompilerPane.py
-msgid "Auto"
-msgstr "自动获取截图"
+msgid "Screenshot"
+msgstr ""
 
 #: app/CompilerPane.py
-msgid "PeTI"
+#, fuzzy
+msgid "Editor View"
 msgstr "编辑器预览图"
 
 #: app/CompilerPane.py

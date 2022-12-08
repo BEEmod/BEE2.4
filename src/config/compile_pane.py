@@ -23,7 +23,7 @@ class CompilePaneState(config.Data, conf_name='CompilerPane'):
         - compile counts
     This is because these are more system-dependent than map dependent.
     """
-    sshot_type: str = 'AUTO'
+    sshot_type: str = 'PETI'
     sshot_cleanup: bool = False
     sshot_cust: bytes = attrs.field(repr=False, default=b'')
     spawn_elev: bool = False
@@ -52,7 +52,7 @@ class CompilePaneState(config.Data, conf_name='CompilerPane'):
         else:
             screenshot_data = b''
 
-        sshot_type = data['sshot_type', 'AUTO'].upper()
+        sshot_type = data['sshot_type', 'PETI'].upper()
         if sshot_type not in ['AUTO', 'CUST', 'PETI']:
             LOGGER.warning('Unknown screenshot type "{}"!', sshot_type)
             sshot_type = 'AUTO'

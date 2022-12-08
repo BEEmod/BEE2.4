@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: https://github.com/BEEmod/BEE2.4/issues\n"
-"POT-Creation-Date: 2022-12-08 14:28+1000\n"
+"POT-Creation-Date: 2022-12-08 14:52+1000\n"
 "PO-Revision-Date: 2021-06-07 15:18+0200\n"
 "Last-Translator: \n"
 "Language: pl\n"
@@ -369,12 +369,13 @@ msgid "Thumbnail"
 msgstr "Miniatura mapy"
 
 #: app/CompilerPane.py
-msgid "Auto"
+#, fuzzy
+msgid "Screenshot"
 msgstr ""
 
 #: app/CompilerPane.py
-msgid "PeTI"
-msgstr "PeTI"
+msgid "Editor View"
+msgstr ""
 
 #: app/CompilerPane.py
 msgid "Custom:"
@@ -2516,9 +2517,6 @@ msgstr ""
 #~ msgid "__LANG_USE_SANS_SERIF__"
 #~ msgstr "NO"
 
-#~ msgid "Auto"
-#~ msgstr "Automatyczna"
-
 #~ msgid "Export..."
 #~ msgstr "Wyeksportuj..."
 
@@ -2537,4 +2535,3 @@ msgstr ""
 
 #~ msgid "Gel Type"
 #~ msgstr "Wybierz styl"
-

@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2022-12-08 14:28+1000\n"
+"POT-Creation-Date: 2022-12-08 14:52+1000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: ja\n"
@@ -365,12 +365,12 @@ msgid "Thumbnail"
 msgstr "サムネイル"
 
 #: app/CompilerPane.py
-msgid "Auto"
-msgstr "自動"
+msgid "Screenshot"
+msgstr ""
 
 #: app/CompilerPane.py
-msgid "PeTI"
-msgstr "PeTI"
+msgid "Editor View"
+msgstr ""
 
 #: app/CompilerPane.py
 msgid "Custom:"

@@ -383,14 +383,14 @@ async def make_comp_widgets(frame: ttk.Frame) -> None:
         value='AUTO',
         variable=chosen_thumb,
         command=set_screen,
-    ), TransToken.ui('Auto'))
+    ), TransToken.ui('Screenshot'))
 
     UI['thumb_peti'] = localisation.set_text(ttk.Radiobutton(
         thumb_frame,
         value='PETI',
         variable=chosen_thumb,
         command=set_screen,
-    ), TransToken.ui('PeTI'))
+    ), TransToken.ui('Editor View'))
 
     UI['thumb_custom'] = localisation.set_text(ttk.Radiobutton(
         thumb_frame,

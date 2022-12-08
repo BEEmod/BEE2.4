@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: https://github.com/BEEmod/BEE2.4/issues\n"
-"POT-Creation-Date: 2022-12-08 14:28+1000\n"
+"POT-Creation-Date: 2022-12-08 14:52+1000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -362,11 +362,11 @@ msgid "Thumbnail"
 msgstr ""
 
 #: app/CompilerPane.py
-msgid "Auto"
+msgid "Screenshot"
 msgstr ""
 
 #: app/CompilerPane.py
-msgid "PeTI"
+msgid "Editor View"
 msgstr ""
 
 #: app/CompilerPane.py
