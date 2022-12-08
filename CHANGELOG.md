@@ -13,11 +13,13 @@
 
 ### Enhancements
 * If funnel music is disabled, keep the base music playing while inside funnels.
+* Tweak the naming for the chamber thumbnail options to be a little more clear.
 
 ### Bugfixes
 * Do not composite signage VTFs with PeTI backgrounds.
 * Fix signage not exporting if the UI was not opened at least once before exporting.
-* BEEmod/BEE2-items#4252: Correctly check orientation of Tag Fizzlers.
+* [#4252](https://github.com/BEEmod/BEE2-items/issues/4252): Correctly place Tag Fizzler signage 
+  when on walls.
 * Display the absolute location of the package location if empty.
 * Handle unparsable existing antigel materials gracefully.
 
