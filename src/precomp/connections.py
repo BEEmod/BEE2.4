@@ -620,16 +620,23 @@ def calc_connections(
                 # It's a funnel - we need to figure out if this is polarity,
                 # or normal on/off.
                 for out in in_outputs:
-                    if out.input in tbeam_polarity:
+                    try:
+                        funnel_out = OutNames(out.input.upper())
+                    except ValueError:
+                        LOGGER.warning('Unknown input for funnel: {}', out)
+                        continue
+                    if funnel_out in tbeam_polarity:
                         conn_type = ConnType.TBEAM_DIR
                         break
-                    elif out.input in tbeam_io:
+                    elif funnel_out in tbeam_io:
                         conn_type = ConnType.TBEAM_IO
                         break
+                    else:
+                        raise AssertionError(f'Input is an output name? {out}')
                 else:
                     raise ValueError(
-                        'Excursion Funnel "{}" has inputs, '
-                        'but no valid types!'.format(inp_item.name)
+                        f'Excursion Funnel "{inp_item.name}" has inputs, but no '
+                        f'valid types: {[out.input for out in in_outputs]}'
                     )
 
             conn = Connection(

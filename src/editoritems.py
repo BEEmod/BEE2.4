@@ -1743,16 +1743,16 @@ class Item:
             if has_prim_input:
                 f.write(f'\t\t\t"{ConnTypes.NORMAL.value}"\n')
                 f.write('\t\t\t\t{\n')
-                f.write(f'\t\t\t\t"Activate" "{OutNames.IN_ACT}"\n')
-                f.write(f'\t\t\t\t"Deactivate" "{OutNames.IN_DEACT}"\n')
+                f.write(f'\t\t\t\t"Activate" "{OutNames.IN_ACT.value}"\n')
+                f.write(f'\t\t\t\t"Deactivate" "{OutNames.IN_DEACT.value}"\n')
                 f.write('\t\t\t\t}\n')
             # Only add the tbeam input for actual funnels.
             # It doesn't work there.
             if has_sec_input and self.id.casefold() == 'item_tbeam':
                 f.write(f'\t\t\t"{ConnTypes.POLARITY.value}"\n')
                 f.write('\t\t\t\t{\n')
-                f.write(f'\t\t\t\t"Activate" "{OutNames.IN_SEC_ACT}"\n')
-                f.write(f'\t\t\t\t"Deactivate" "{OutNames.IN_SEC_DEACT}"\n')
+                f.write(f'\t\t\t\t"Activate" "{OutNames.IN_SEC_ACT.value}"\n')
+                f.write(f'\t\t\t\t"Deactivate" "{OutNames.IN_SEC_DEACT.value}"\n')
                 f.write('\t\t\t\t}\n')
             for conn_type, conn in self.conn_inputs.items():
                 conn.write(f, conn_type.value)
@@ -1762,8 +1762,8 @@ class Item:
             if has_output:
                 f.write(f'\t\t\t"{ConnTypes.NORMAL.value}"\n')
                 f.write('\t\t\t\t{\n')
-                f.write(f'\t\t\t\t"Activate" "{OutNames.OUT_ACT}"\n')
-                f.write(f'\t\t\t\t"Deactivate" "{OutNames.OUT_DEACT}"\n')
+                f.write(f'\t\t\t\t"Activate" "{OutNames.OUT_ACT.value}"\n')
+                f.write(f'\t\t\t\t"Deactivate" "{OutNames.OUT_DEACT.value}"\n')
                 f.write('\t\t\t\t}\n')
             for conn_type, conn in self.conn_outputs.items():
                 conn.write(f, conn_type.value)
