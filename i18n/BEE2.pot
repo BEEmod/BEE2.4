@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: https://github.com/BEEmod/BEE2.4/issues\n"
-"POT-Creation-Date: 2022-12-06 11:11+1000\n"
+"POT-Creation-Date: 2022-12-08 14:28+1000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -357,8 +357,12 @@ msgid ""
 "without exporting or restarting the game."
 msgstr ""
 
-#: app/CompilerPane.py app/CompilerPane.py
+#: app/CompilerPane.py
 msgid "Thumbnail"
+msgstr ""
+
+#: app/CompilerPane.py
+msgid "Auto"
 msgstr ""
 
 #: app/CompilerPane.py

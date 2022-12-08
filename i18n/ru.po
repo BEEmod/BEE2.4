@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version:  BEEMOD2\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2022-12-06 11:11+1000\n"
+"POT-Creation-Date: 2022-12-08 14:28+1000\n"
 "PO-Revision-Date: 2021-11-18 17:18+0300\n"
 "Last-Translator: \n"
 "Language: ru\n"
@@ -365,9 +365,13 @@ msgstr ""
 "изменены без экспорта или\n"
 "перезапуска игры."
 
-#: app/CompilerPane.py app/CompilerPane.py
+#: app/CompilerPane.py
 msgid "Thumbnail"
 msgstr "Превью"
+
+#: app/CompilerPane.py
+msgid "Auto"
+msgstr "Авто"
 
 #: app/CompilerPane.py
 msgid "PeTI"
@@ -2557,4 +2561,3 @@ msgstr ""
 
 #~ msgid "Gel Type"
 #~ msgstr "Выберите стиль"
-

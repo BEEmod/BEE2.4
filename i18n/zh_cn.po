@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: https://github.com/BEEmod/BEE2.4/issues\n"
-"POT-Creation-Date: 2022-12-06 11:11+1000\n"
+"POT-Creation-Date: 2022-12-08 14:28+1000\n"
 "PO-Revision-Date: 2019-11-22 10:47+1000\n"
 "Last-Translator: Antecer <antecer@outlook.com>\n"
 "Language: zh\n"
@@ -363,9 +363,13 @@ msgstr ""
 "修改此面板的选项将立即生效，\n"
 "而无需导出或重新启动游戏。"
 
-#: app/CompilerPane.py app/CompilerPane.py
+#: app/CompilerPane.py
 msgid "Thumbnail"
 msgstr "地图预览快照"
+
+#: app/CompilerPane.py
+msgid "Auto"
+msgstr "自动获取截图"
 
 #: app/CompilerPane.py
 msgid "PeTI"
@@ -2478,4 +2482,3 @@ msgstr ""
 
 #~ msgid "Gel Type"
 #~ msgstr "选择风格"
-

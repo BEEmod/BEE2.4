@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2022-12-06 11:11+1000\n"
+"POT-Creation-Date: 2022-12-08 14:28+1000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: ja\n"
@@ -360,9 +360,13 @@ msgid ""
 "without exporting or restarting the game."
 msgstr ""
 
-#: app/CompilerPane.py app/CompilerPane.py
+#: app/CompilerPane.py
 msgid "Thumbnail"
 msgstr "サムネイル"
+
+#: app/CompilerPane.py
+msgid "Auto"
+msgstr "自動"
 
 #: app/CompilerPane.py
 msgid "PeTI"
@@ -2329,4 +2333,3 @@ msgstr ""
 
 #~ msgid "No Name?"
 #~ msgstr "名前ありません？"
-

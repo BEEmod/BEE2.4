@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version:  BEEMOD2\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2022-12-06 11:11+1000\n"
+"POT-Creation-Date: 2022-12-08 14:28+1000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: fr\n"
@@ -362,9 +362,13 @@ msgstr ""
 "Les options de ce panneau peuvent être modifiées sans exporter ou "
 "redémarrer le jeu."
 
-#: app/CompilerPane.py app/CompilerPane.py
+#: app/CompilerPane.py
 msgid "Thumbnail"
 msgstr "Miniature"
+
+#: app/CompilerPane.py
+msgid "Auto"
+msgstr "Auto"
 
 #: app/CompilerPane.py
 msgid "PeTI"
@@ -2613,4 +2617,3 @@ msgstr ""
 
 #~ msgid "Gel Type"
 #~ msgstr "Sélectionnez un style"
-
