@@ -48,8 +48,14 @@ class ErrorInfo:
     barrier_hole: Optional[BarrierHole] = None
 
 
+class ServerInfo(TypedDict):
+    """When the error server is active it writes this JSON to disk to communicate with us."""
+    port: int  # The server should respond to 'https//localhost:{port}'.
+    coop_text: str  # Localised copy of TOK_COOP_SHOWURL, so VRAD can set it in a game_text.
+
+
 DATA_LOC = utils.conf_location('compile_error.pickle')
-# When the error server starts, it writes its port, then a localised error text for coop here
+# The location of the ServerInfo data.
 SERVER_INFO_FILE = utils.conf_location('error_server_info.json')
 
 

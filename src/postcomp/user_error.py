@@ -13,7 +13,7 @@ import srctools.logger
 
 import utils
 from hammeraddons.bsp_transform import Context, trans
-from user_errors import SERVER_INFO_FILE
+from user_errors import SERVER_INFO_FILE, ServerInfo
 
 # Repeatedly show the URL whenever the user switches to the page.
 # If it returns true, it has popped up the Steam Overlay.
@@ -87,14 +87,12 @@ async def load_server() -> Tuple[int, str]:
     """Load the webserver, then return the port and the localised error text."""
     # We need to boot the web server.
     try:
-        data = json.loads(await ASYNC_SERVER_INFO.read_text('utf8'))
+        data: ServerInfo = json.loads(await ASYNC_SERVER_INFO.read_text('utf8'))
     except (FileNotFoundError, json.JSONDecodeError):
         pass
     else:
         port = data['port']
         coop_text = data.get('coop_text', '')
-        assert isinstance(port, int), data
-        assert isinstance(coop_text, str), data
         LOGGER.debug('Server port file = {}', port)
         # Server appears to be live. Connect to it, so we can make it reload + check it's alive.
         try:

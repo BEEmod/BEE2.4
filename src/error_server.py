@@ -27,7 +27,7 @@ import trio
 
 import utils
 from user_errors import (
-    ErrorInfo, DATA_LOC, SERVER_INFO_FILE,
+    ErrorInfo, DATA_LOC, SERVER_INFO_FILE, ServerInfo,
     TOK_ERR_FAIL_LOAD, TOK_ERR_MISSING, TOK_COOP_SHOWURL,
 )
 import transtoken
@@ -74,7 +74,7 @@ async def route_render_data() -> dict:
 
 
 @app.route('/heartbeat', methods=['GET', 'POST', 'HEAD'])
-async def route_heartbeat() -> quart.Response:
+async def route_heartbeat() -> quart.ResponseReturnValue:
     """This route is continually accessed to keep the server alive while the page is visible."""
     update_deadline()
     resp = await app.make_response(('', http.HTTPStatus.NO_CONTENT))
@@ -83,7 +83,7 @@ async def route_heartbeat() -> quart.Response:
 
 
 @app.route('/reload')
-async def route_reload() -> quart.Response:
+async def route_reload() -> quart.ResponseReturnValue:
     """Called by our VRAD, to make existing servers reload their data."""
     update_deadline()
     load_info()
@@ -93,7 +93,7 @@ async def route_reload() -> quart.Response:
 
 
 @app.route('/static/<path:filename>.js')
-async def route_static_js(filename: str) -> quart.Response:
+async def route_static_js(filename: str) -> quart.ResponseReturnValue:
     """Ensure javascript is returned with the right MIME type."""
     return await quart.send_from_directory(
         directory=app.static_folder,
@@ -165,12 +165,12 @@ async def main() -> None:
             if len(binds):
                 url, port = binds[0].rsplit(':', 1)
                 with srctools.AtomicWriter(SERVER_INFO_FILE) as f:
-                    json.dump({
+                    json.dump(ServerInfo({
                         'port': int(port),
                         'coop_text': str(TOK_COOP_SHOWURL),
-                    }, f)
+                    }), f)
             else:
-                return # No connection?
+                return  # No connection?
             with stop_sleeping:
                 await trio.sleep_forever()
     finally:
