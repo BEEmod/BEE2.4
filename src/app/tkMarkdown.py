@@ -50,6 +50,10 @@ class TextTag(str, enum.Enum):
     HRULE = 'hrule'
     LINK = 'link'
 
+    def __str__(self) -> str:
+        """Pass to tkinter as the value."""
+        return self.value
+
 
 TAG_HEADINGS: Mapping[int, TextTag] = {
     int(tag.name[-1]): tag

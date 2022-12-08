@@ -171,6 +171,10 @@ if utils.WIN:
         MOVE_ITEM = 'fleur'
         DESTROY_ITEM = 'x_cursor'
         INVALID_DRAG = 'no'
+
+        def __str__(self) -> str:
+            """Allow passing to tkinter."""
+            return self.value
 elif utils.MAC:
     class Cursors(str, Enum):  # type: ignore
         """Cursors we use, mapping to the relevant OS cursor."""
@@ -183,6 +187,10 @@ elif utils.MAC:
         MOVE_ITEM = 'movearrow'
         DESTROY_ITEM = 'poof'
         INVALID_DRAG = 'notallowed'
+
+        def __str__(self) -> str:
+            """Allow passing to tkinter."""
+            return self.value
 elif utils.LINUX:
     class Cursors(str, Enum):  # type: ignore
         """Cursors we use, mapping to the relevant OS cursor."""
@@ -195,6 +203,10 @@ elif utils.LINUX:
         MOVE_ITEM = 'fleur'
         DESTROY_ITEM = 'X_cursor'
         INVALID_DRAG = 'circle'
+
+        def __str__(self) -> str:
+            """Allow passing to tkinter."""
+            return self.value
 else:
     raise AssertionError
 
