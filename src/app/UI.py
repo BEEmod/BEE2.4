@@ -1,6 +1,6 @@
 """Main UI module, brings everything together."""
 import tkinter as tk
-from tkinter import ttk  # themed ui components that match the OS
+from tkinter import ttk
 from typing import List, Dict, Tuple, Optional, Set, Iterator, Callable, Any, Union
 import itertools
 import operator
@@ -1437,11 +1437,9 @@ async def init_windows() -> None:
 
     frames['preview'] = tk.Frame(ui_bg, bg=ItemsBG, name='preview')
     frames['preview'].grid(
-        row=0,
-        column=3,
+        row=0, column=3,
         sticky="NW",
-        padx=(2, 5),
-        pady=5,
+        padx=(2, 5), pady=5,
     )
     init_preview(frames['preview'])
     frames['preview'].update_idletasks()
@@ -1453,15 +1451,10 @@ async def init_windows() -> None:
     await trio.sleep(0)
     loader.step('UI', 'preview')
 
-    ttk.Separator(
-        ui_bg,
-        orient='vertical',
-    ).grid(
-        row=0,
-        column=4,
+    ttk.Separator(ui_bg, orient='vertical').grid(
+        row=0, column=4,
         sticky="NS",
-        padx=10,
-        pady=10,
+        padx=10, pady=10,
     )
 
     picker_split_frame = tk.Frame(ui_bg, bg=ItemsBG, name='picker_split')
