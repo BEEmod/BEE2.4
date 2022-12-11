@@ -397,11 +397,18 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                 )))
             item.offset = Vec(64, 64, 64)
             # If vertical corridors exist, allow placement there.
+            has_vert = False
             if export[mode, direction, Orient.UP]:
                 item.invalid_surf.discard(
                     editoritems.Surface.FLOOR if direction is Direction.ENTRY else editoritems.Surface.CEIL
                 )
+                has_vert = True
             if export[mode, direction, Orient.DN]:
                 item.invalid_surf.discard(
                     editoritems.Surface.CEIL if direction is Direction.ENTRY else editoritems.Surface.FLOOR
                 )
+                has_vert = True
+            if has_vert:
+                # Add a rotation handle and desired facing.
+                item.handle = editoritems.Handle.QUAD
+                item.facing = editoritems.DesiredFacing.NEGX
