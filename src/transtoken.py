@@ -145,7 +145,14 @@ class TransToken:
 
     def format(self, /, **kwargs: object) -> 'TransToken':
         """Return a new token with the provided parameters added in."""
-        return attrs.evolve(self, parameters={**self.parameters, **kwargs})
+        # Only merge together if we had parameters, otherwise just store the dict.
+        if self.parameters and kwargs:
+            return attrs.evolve(self, parameters={**self.parameters, **kwargs})
+        elif kwargs:
+            # This can be shared, we don't allow editing it.
+            return attrs.evolve(self, parameters=kwargs)
+        else:
+            return self
 
     def as_game_token(self) -> str:
         """Return the value which should be written in files read by the game.
