@@ -633,8 +633,6 @@ async def setup(game: Game, vmf: VMF, tiles: List['TileDef']) -> None:
     antigel_loc = material_folder / ANTIGEL_PATH
     antigel_loc.mkdir(parents=True, exist_ok=True)
 
-    fsys = game.get_filesystem()
-
     # Basetexture -> material name
     tex_to_antigel: Dict[str, str] = {}
     # And all the filenames that exist.
@@ -670,9 +668,13 @@ async def setup(game: Game, vmf: VMF, tiles: List['TileDef']) -> None:
         antigel_mats.add(filename.stem)
 
     async with trio.open_nursery() as nursery:
+        # Parse the filesystems (importantly the VPKs) in the background while we check the existing
+        # VMTs.
+        fsys_res = utils.Result.sync(nursery, game.get_filesystem)
         for vmt_file in antigel_loc.glob('*.vmt'):
             nursery.start_soon(check_existing, vmt_file)
 
+    fsys = fsys_res()
     materials: set[str] = set()
 
     for generator in GENERATORS.values():
