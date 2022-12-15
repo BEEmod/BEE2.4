@@ -1,7 +1,10 @@
 """Conditions relating to track platforms."""
-from typing import Set, Dict, Tuple
+import math
 
-from precomp import instanceLocs, conditions
+from typing import Optional, Set, Dict, Tuple
+
+import consts
+from precomp import instanceLocs, conditions, brushLoc, texturing
 from srctools import Matrix, Vec, Property, Entity, VMF, logger
 
 
@@ -38,6 +41,10 @@ def res_track_plat(vmf: VMF, res: Property) -> object:
       provided $fixup variable.
     * `track_var`: If set, save `N`, `S`, `E`, or `W` to the provided $fixup
       variable to indicate the relative direction the top faces.
+    * `goo_bottom`, `goo_top`: If set, these generate goo brushes if required to continue adjacent
+      goo pits into the platform embed area. The two values should be offsets relative to their
+      respective end instances. The produced brush will be the bounding box encompassing those two
+      points, clipped down to wherever the goo is.
     """
     # Get the instances from editoritems
     (
@@ -153,6 +160,38 @@ def res_track_plat(vmf: VMF, res: Property) -> object:
 
         for track in track_set:
             track.fixup.update(plat_inst.fixup)
+
+        # Don't generate goo on floors/ceilings. Floors will be hidden, on ceilings it doesn't
+        # reach there.
+        if True or 'goo_top' not in res or 'goo_bottom' not in res or abs(orient.up().z) > 0.5:
+            continue
+
+        top_point: Optional[Vec] = None
+        bottom_point: Optional[Vec] = None
+        highest_goo_z = -math.inf
+        for track in track_set:
+            # Go through
+            track_type = track['file'].casefold()
+            track_pos = Vec.from_str(track['origin'])
+            if (track_type == inst_top or track_type == inst_single) and 'goo_top' in res:
+                top_point = res.vec('goo_top')
+                top_point.localise(track_pos, orient)
+            if (track_type == inst_bottom or track_type == inst_single) and 'goo_bottom' in res:
+                bottom_point = res.vec('goo_bottom')
+                bottom_point.localise(track_pos, orient)
+
+            goo_pos = track_pos + (0.0, 0.0, 32.0)
+            if brushLoc.POS.lookup_world(goo_pos).is_goo and highest_goo_z < goo_pos.z:
+                highest_goo_z = goo_pos.z
+
+        # If both points are valid, and goo is present, place the brush.
+        if top_point is not None and bottom_point is not None and math.isfinite(highest_goo_z):
+            bbox_min, bbox_max = Vec.bbox(top_point, bottom_point)
+            bbox_max.z = min(bbox_max.z, highest_goo_z)
+            if (bbox_max - bbox_min) > (1.0, 1.0, 1.0):  # Ensure we don't generate degenerate solids.
+                prism = vmf.make_prism(bbox_min, bbox_max, consts.Tools.NODRAW)
+                texturing.apply(texturing.GenCat.SPECIAL, prism.top, 'goo_cheap')
+                vmf.add_brush(prism.solid)
 
     return conditions.RES_EXHAUSTED  # Don't re-run
 
