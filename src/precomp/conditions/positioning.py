@@ -467,7 +467,7 @@ def res_force_upright(inst: Entity):
     instances are unaffected.
     """
     normal = Vec(0, 0, 1) @ Angle.from_str(inst['angles'])
-    if normal.z != 0:
+    if abs(normal.z) > 0.1:
         return
     ang = math.degrees(math.atan2(normal.y, normal.x))
     inst['angles'] = '0 {:g} 0'.format(ang % 360)  # Don't use negatives
