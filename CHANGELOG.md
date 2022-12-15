@@ -22,6 +22,7 @@
   when on walls.
 * Display the absolute location of the package location if empty.
 * Handle unparsable existing antigel materials gracefully.
+* Fix issues with P1 Track Platforms not generating correctly.
 
 ------------------------------------------
 
