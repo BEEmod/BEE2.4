@@ -196,9 +196,9 @@ class CubeTypes(Enum):
 
 class ButtonTypes(Enum):
     """The different types of floor buttons."""
-    FLOOR = WEIGHTED = 0
-    BOX = CUBE = 1
-    BALL = SPHERE = 2
+    WEIGHTED = FLOOR = 0
+    CUBE = BOX = 1
+    SPHERE = BALL = 2
 
 
 class FizzlerTypes(Enum):
@@ -210,7 +210,7 @@ class FizzlerTypes(Enum):
 class GlassTypes(Enum):
     """The different types of glass."""
     GLASS = 0
-    GRATE = GRATING = 1
+    GRATING = GRATE = 1
 
 
 # First all the generic bools.
@@ -305,7 +305,7 @@ prop_track_start_active = bool_prop(
 )
 
 # The mode for Track Platforms.
-prop_track_is_ocillating = bool_prop(
+prop_track_is_oscillating = bool_prop(
     id='Oscillate',
     instvar='',  # Picks instance
     name=TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_rail_oscillate'),
@@ -477,7 +477,7 @@ prop_paint_flow_type = enum_prop(
     PaintFlows,
     id='PaintFlowType',
     instvar='$blobs_per_second',
-    name=TransToken.from_valve('$PORTAL2_PuzzleEditor_ContextMenu_paint_flow_type'),
+    name=TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_paint_flow_type'),
 )
 
 
