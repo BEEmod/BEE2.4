@@ -576,7 +576,7 @@ def init_widgets() -> None:
         """Display the item property pane."""
         sound.fx('expand')
         await prop_window.show(
-            selected_item,
+            selected_item.data.editor,
             wid['changedefaults'],
             selected_sub_item.name,
         )

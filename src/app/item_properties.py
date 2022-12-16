@@ -2,7 +2,7 @@
 from __future__ import annotations
 import tkinter as tk
 from tkinter import ttk
-from typing import Callable, Iterator, Optional, Tuple, List
+from typing import Callable, ClassVar, Iterator, Optional, Tuple, List
 from typing_extensions import TypeAlias
 
 import utils
@@ -14,6 +14,7 @@ from transtoken import TransToken
 import srctools.logger
 
 
+__all__ = ['PropertyWindow']
 LOGGER = srctools.logger.get_logger(__name__)
 TRANS_TITLE = TransToken.ui('BEE2 - {item}')
 TRANS_SUBTITLE = TransToken.ui('Settings for "{item}"')
@@ -23,8 +24,12 @@ TRANS_TIMER_DELAY = TransToken.ui('Timer Delay:\n        ({tim})')
 
 class PropGroup:
     """A group of widgets for modifying one or more props."""
-    def __init__(self, frame: ttk.Frame) -> None:
-        self.frame = frame
+    LARGE: ClassVar[bool] = False
+    label: ttk.Label
+    def __init__(self, parent: ttk.Frame, label_text: TransToken) -> None:
+        self.frame = tk.Frame(parent)
+        self.label = ttk.Label(parent)
+        localisation.set_text(self.label, TRANS_LABEL.format(name=label_text))
 
     def apply_conf(self, options: dict[ItemPropKind, str]) -> None:
         """Apply the specified options to the UI"""
@@ -41,15 +46,14 @@ PropGroupFactory: TypeAlias = Tuple[List[ItemPropKind], Callable[[ttk.Frame], Pr
 class BoolPropGroup(PropGroup):
     """A property controlling a regular boolean."""
 
-    def __init__(self, frame: ttk.Frame, prop: ItemPropKind[bool]) -> None:
-        super().__init__(frame)
+    def __init__(self, parent: ttk.Frame, prop: ItemPropKind[bool]) -> None:
+        super().__init__(parent, prop.name)
         self.prop = prop
         if set(prop.subtype_values) != {False, True}:
             raise ValueError(f'Non-boolean property {prop}!')
         self.var = tk.BooleanVar(value=False)
-        self.check = ttk.Checkbutton(frame, variable=self.var)
+        self.check = ttk.Checkbutton(self.frame, variable=self.var)
         self.check.grid(row=0, column=0)
-        localisation.set_text(self.check, prop.name)
 
     @classmethod
     def factory(cls, prop: ItemPropKind[bool]) -> PropGroupFactory:
@@ -118,6 +122,18 @@ PROP_GROUPS: list[PropGroupFactory] = [
 ]
 
 
+def has_editable(item: Item, props: List[ItemPropKind]) -> bool:
+    """Check if any of these properties are present in the item and are editable."""
+    for kind in props:
+        try:
+            prop = item.properties[kind.id.casefold()]
+        except KeyError:
+            continue
+        if prop.allow_user_default:
+            return True
+    return False
+
+
 class PropertyWindow:
     """The window used for configuring properties."""
     def __init__(self, close_callback: Callable[[], object]) -> None:
@@ -140,10 +156,14 @@ class PropertyWindow:
             # Switch to use the 'modal' window style on Mac.
             TK_ROOT.call('::tk::unsupported::MacWindowStyle', 'style', self.win, 'moveableModal', '')
 
-        frame = ttk.Frame(self.win, padding=10)
+        self.frame = frame = ttk.Frame(self.win, padding=10)
         frame.grid(row=0, column=0, sticky='NSEW')
         frame.rowconfigure(0, weight=1)
         frame.columnconfigure(0, weight=1)
+
+        self.div_left = ttk.Separator(frame, orient="vertical")
+        self.div_right = ttk.Separator(frame, orient="vertical")
+        self.div_horiz = ttk.Separator(frame, orient="horizontal")
 
         self.lbl_no_options = ttk.Label(frame)
         localisation.set_text(self.lbl_no_options, TransToken.ui('No Properties available!'))
@@ -157,9 +177,8 @@ class PropertyWindow:
         """Check if any properties on this item could be edited."""
         LOGGER.info('Can edit: {}', item.properties)
         for group, factory in PROP_GROUPS:
-            for kind in group:
-                if (prop := item.properties.get(kind.id.casefold())) is not None and prop.allow_user_default:
-                    return True
+            if has_editable(item, group):
+                return True
         return False
 
     def evt_exit(self) -> None:
@@ -188,6 +207,102 @@ class PropertyWindow:
         """Display the window."""
         self.cur_item = item
 
+        large_groups: list[PropGroup] = []
+        small_groups: list[PropGroup] = []
+        group: PropGroup
+        maybe_group: PropGroup | None
+
+        # Go through all our groups, constructing them if required.
+        for i, (props, factory) in enumerate(PROP_GROUPS):
+            maybe_group = self.groups[i]
+            if has_editable(item, props):
+                if maybe_group is not None:
+                    group = maybe_group
+                else:
+                    self.groups[i] = group = factory(self.frame)
+                (large_groups if group.LARGE else small_groups).append(group)
+            elif maybe_group is not None:  # Constructed but now hiding.
+                maybe_group.label.grid_forget()
+                maybe_group.frame.grid_forget()
+
+        large_row = 1
+        for large_row, group in large_groups:
+            group.label.grid(
+                row=large_row,
+                column=0,
+                sticky='e',
+                padx=2, pady=5,
+            )
+            group.frame.grid(
+                row=large_row,
+                column=1,
+                sticky="ew",
+                padx=2, pady=5,
+                columnspan=9,
+            )
+            large_row += 1
+        # if we have a large prop, add the divider between the types.
+        if large_groups:
+            self.div_horiz.grid(
+                row=large_row + 1,
+                columnspan=9,
+                sticky="ew",
+            )
+            large_row += 2
+        else:
+            self.div_horiz.grid_remove()
+
+        ind = 0
+        for group in small_groups:
+            group.label.grid(
+                row=(ind // 3) + large_row,
+                column=(ind % 3) * 3,
+                sticky="e",
+                padx=2,
+                pady=5,
+            )
+            group.frame.grid(
+                row=(ind // 3) + large_row,
+                column=(ind % 3) * 3 + 1,
+                sticky="ew",
+                padx=2,
+                pady=5,
+            )
+            ind += 1
+
+        if ind > 1:  # is there more than 1 checkbox? (add left divider)
+            self.div_left.grid(
+                row=large_row,
+                column=2,
+                sticky="ns",
+                rowspan=(ind // 3) + 1
+            )
+        else:
+            self.div_left.grid_remove()
+
+        if ind > 2:  # are there more than 2 checkboxes? (add right divider)
+            self.div_right.grid(
+                row=large_row,
+                column=5,
+                sticky="ns",
+                rowspan=(ind // 3) + 1,
+            )
+        else:
+            self.div_right.grid_remove()
+
+        if small_groups or large_groups:
+            self.lbl_no_options.grid_remove()
+        else:
+            # There aren't any items, display error message
+            self.lbl_no_options.grid(row=1, columnspan=9)
+            ind = 1
+
+        self.btn_save.grid(
+            row=ind + large_row,
+            columnspan=9,
+            sticky="EW",
+        )
+
         localisation.set_win_title(self.win, TRANS_TITLE.format(item=sub_name))
         localisation.set_text(self.lbl_title, TRANS_SUBTITLE.format(item=sub_name))
         self.win.wm_deiconify()
@@ -195,6 +310,6 @@ class PropertyWindow:
         self.win.lift(parent)
         self.win.grab_set()
         self.win.wm_geometry(
-            f'+{str(parent.winfo_rootx() - 30)}'
-            f'+{str(parent.winfo_rooty() - self.win.winfo_reqheight() - 30)}'
+            f'+{parent.winfo_rootx() - 30}'
+            f'+{parent.winfo_rooty() - self.win.winfo_reqheight() - 30}'
         )
