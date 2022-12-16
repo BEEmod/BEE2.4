@@ -1,8 +1,10 @@
 """Window for adjusting the default values of item properties."""
 from __future__ import annotations
+
+from enum import Enum
 import tkinter as tk
 from tkinter import ttk
-from typing import Callable, ClassVar, Iterator, Optional, Tuple, List
+from typing import Callable, ClassVar, Generic, Iterator, Optional, Tuple, List, TypeVar
 from typing_extensions import TypeAlias
 
 import utils
@@ -20,6 +22,7 @@ TRANS_TITLE = TransToken.ui('BEE2 - {item}')
 TRANS_SUBTITLE = TransToken.ui('Settings for "{item}"')
 TRANS_LABEL = TransToken.untranslated('{name}: ')
 TRANS_TIMER_DELAY = TransToken.ui('Timer Delay:\n        ({tim})')
+EnumT = TypeVar('EnumT', bound=Enum)
 
 
 class PropGroup:
@@ -45,7 +48,6 @@ PropGroupFactory: TypeAlias = Tuple[List[ItemPropKind], Callable[[ttk.Frame], Pr
 
 class BoolPropGroup(PropGroup):
     """A property controlling a regular boolean."""
-
     def __init__(self, parent: ttk.Frame, prop: ItemPropKind[bool]) -> None:
         super().__init__(parent, prop.name)
         self.prop = prop
@@ -57,7 +59,7 @@ class BoolPropGroup(PropGroup):
 
     @classmethod
     def factory(cls, prop: ItemPropKind[bool]) -> PropGroupFactory:
-        """Make the tuple used in PROP_GROUP_FACTORIES."""
+        """Make the tuple used in PROP_GROUPS."""
         return ([prop], lambda frame: BoolPropGroup(frame, prop))
 
     def apply_conf(self, options: dict[ItemPropKind, str]) -> None:
@@ -74,6 +76,51 @@ class BoolPropGroup(PropGroup):
         yield self.prop, srctools.bool_as_int(self.var.get())
 
 
+class ComboPropGroup(PropGroup, Generic[EnumT]):
+    """A prop group which uses a combobox to select specific options."""
+    LARGE: ClassVar[bool] = True
+
+    def __init__(self, parent: ttk.Frame, prop: ItemPropKind[EnumT], values: dict[EnumT, TransToken]) -> None:
+        super().__init__(parent, prop.name)
+        self.prop = prop
+        self.translated = values
+        self.value_order = list(values)
+        if prop.subtype_values and set(self.value_order) != set(prop.subtype_values):
+            raise ValueError(f'{self.value_order!r} != {prop.subtype_values!r}')
+        self.combo = ttk.Combobox(self.frame, exportselection=False)
+        self.combo.state(['readonly'])  # Disallow typing text.
+        localisation.add_callback(call=True)(self._update_combo)
+        self.combo.grid(row=0, column=0)
+
+    def _update_combo(self) -> None:
+        """Update the combo box when translations change."""
+        self.combo['values'] = [str(self.translated[key]) for key in self.value_order]
+
+    @classmethod
+    def factory(cls, prop: ItemPropKind[EnumT], values: dict[EnumT, TransToken]) -> PropGroupFactory:
+        """Make the factory used in PROP_GROUPS."""
+        return ([prop], lambda parent: cls(parent, prop, values))
+
+    def apply_conf(self, options: dict[ItemPropKind, str]) -> None:
+        """Apply the specified options to the UI."""
+        try:
+            val_str = options[self.prop]
+        except KeyError:
+            LOGGER.warning('Missing property {} from config {}', self.prop, options)
+            return
+        try:
+            value = self.prop.parse(val_str)
+        except ValueError:
+            LOGGER.warning('Could not parse "{}" for property type "{}"', val_str, self.prop.id, exc_info=True)
+            return
+        self.combo.current(self.value_order.index(value))
+
+    def get_conf(self) -> Iterator[tuple[ItemPropKind, str]]:
+        """Return the current UI configuration."""
+        value = self.value_order[self.combo.current()]
+        yield self.prop, self.prop.export(value)
+
+
 PROP_GROUPS: list[PropGroupFactory] = [
     BoolPropGroup.factory(all_props.prop_start_enabled),
     BoolPropGroup.factory(all_props.prop_start_reversed),
@@ -81,13 +128,13 @@ PROP_GROUPS: list[PropGroupFactory] = [
     BoolPropGroup.factory(all_props.prop_start_open),
     BoolPropGroup.factory(all_props.prop_start_locked),
     BoolPropGroup.factory(all_props.prop_portalable),
-    # BoolPropGroup.factory(all_props.prop_is_coop),
+    # all_props.prop_is_coop,
     BoolPropGroup.factory(all_props.prop_dropper_enabled),
     BoolPropGroup.factory(all_props.prop_auto_drop),
     BoolPropGroup.factory(all_props.prop_cube_auto_respawn),
     # all_props.prop_cube_fall_straight_Down,
     # all_props.prop_track_start_active,
-    # all_props.prop_track_is_ocillating,
+    # all_props.prop_track_is_oscillating,
     # all_props.prop_track_starting_pos,
     # all_props.prop_track_move_distance,
     # all_props.prop_track_speed,
@@ -98,8 +145,11 @@ PROP_GROUPS: list[PropGroupFactory] = [
     # all_props.prop_pist_auto_trigger,
     # all_props.prop_paint_type,
     # all_props.prop_paint_export_type,
-    # all_props.prop_paint_flow_type,
-    # all_props.prop_paint_allow_streaks,
+    ComboPropGroup.factory(all_props.prop_paint_flow_type, {
+        flow: TransToken.from_valve(f'PORTAL2_PuzzleEditor_ContextMenu_paint_flow_type_{flow.name.lower()}')
+        for flow in all_props.PaintFlows
+    }),
+    BoolPropGroup.factory(all_props.prop_paint_allow_streaks),
     # all_props.prop_connection_count,
     # all_props.prop_connection_count_polarity,
     # all_props.prop_timer_delay,
@@ -115,16 +165,34 @@ PROP_GROUPS: list[PropGroupFactory] = [
     # all_props.prop_faith_targetname,
     # all_props.prop_angled_panel_type,
     # all_props.prop_angled_panel_anim,
-    # all_props.prop_cube_type,
-    # all_props.prop_button_type,
-    # all_props.prop_fizzler_type,
-    # all_props.prop_glass_type,
+    ComboPropGroup.factory(all_props.prop_cube_type, {
+        typ: TransToken.from_valve(f'PORTAL2_PuzzleEditor_ContextMenu_cube_type_{name}')
+        for typ, name in zip(
+            all_props.CubeTypes,
+            ['standard', 'companion', 'reflective', 'sphere', 'frankenturret']
+        )
+    }),
+    ComboPropGroup.factory(all_props.prop_button_type, {
+        typ: TransToken.from_valve(f'PORTAL2_PuzzleEditor_ContextMenu_button_type_{typ.name.lower()}')
+        for typ in all_props.ButtonTypes
+    }),
+    ComboPropGroup.factory(all_props.prop_fizzler_type, {
+        typ: TransToken.from_valve(f'PORTAL2_PuzzleEditor_ContextMenu_hazard_type_{typ.name.lower()}')
+        for typ in all_props.FizzlerTypes
+    }),
+    ComboPropGroup.factory(all_props.prop_glass_type, {
+        typ: TransToken.from_valve(f'PORTAL2_PuzzleEditor_ContextMenu_barrier_type_{typ.name.lower()}')
+        for typ in all_props.GlassTypes
+    }),
 ]
 
 
 def has_editable(item: Item, props: List[ItemPropKind]) -> bool:
     """Check if any of these properties are present in the item and are editable."""
     for kind in props:
+        # Subtype properties get their default overridden.
+        if kind is item.subtype_prop:
+            continue
         try:
             prop = item.properties[kind.id.casefold()]
         except KeyError:
@@ -148,7 +216,6 @@ class PropertyWindow:
         self.win.withdraw()
         self.win.transient(TK_ROOT)
         self.win.wm_attributes('-topmost', True)
-        localisation.set_win_title(self.win, TransToken.ui("BEE2"))
         self.win.resizable(False, False)
         tk_tools.set_window_icon(self.win)
         self.win.protocol("WM_DELETE_WINDOW", self.evt_exit)
@@ -196,10 +263,11 @@ class PropertyWindow:
                 try:
                     prop = self.cur_item.properties[prop_kind.id]
                 except KeyError:
-                    LOGGER.warning('No property {} in {}!', prop_kind.id, self.cur_item)
+                    LOGGER.warning('No property {}={!r} in {}!', prop_kind.id, value, self.cur_item.id)
                     continue
                 if prop.allow_user_default:
                     out[prop_kind] = value
+        LOGGER.info('Set properties: {}', out)
 
         self.callback()
 
@@ -226,7 +294,7 @@ class PropertyWindow:
                 maybe_group.frame.grid_forget()
 
         large_row = 1
-        for large_row, group in large_groups:
+        for group in large_groups:
             group.label.grid(
                 row=large_row,
                 column=0,
