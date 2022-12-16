@@ -53,6 +53,16 @@ class ItemPropKind(Generic[ValueT]):
         """Check if this is an unknown property."""
         return self.parse is _unknown_parse
 
+    def __hash__(self) -> int:
+        """Allow using as a dict key."""
+        return hash(self.id)
+
+    def __eq__(self, other) -> bool:
+        """Item properties are compared by ID."""
+        if isinstance(other, ItemPropKind):
+            return self.id == other.id
+        return NotImplemented
+
     def __reduce__(self) -> str | tuple:
         """Handle pickling specially.
 
