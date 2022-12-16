@@ -18,9 +18,10 @@ from tkinter import ttk
 
 from .richTextBox import tkRichText
 from . import (
-    itemPropWin, itemconfig, localisation, tkMarkdown, tooltip, tk_tools, sound, img, UI,
-    TK_ROOT, DEV_MODE,
+    itemconfig, localisation, tkMarkdown, tooltip, tk_tools, sound, img, UI,
+    TK_ROOT, DEV_MODE, background_run
 )
+from .item_properties import PropertyWindow
 import utils
 import srctools.logger
 from editoritems import Handle as RotHandle, Surface, ItemClass, FSPath
@@ -142,10 +143,12 @@ def ind_for_pos(pos: int) -> int | None:
         return selected_item.visual_subtypes[ind]
 
 
-def hide_item_props(vals) -> None:
+def hide_item_props() -> None:
     """Called when the item properties panel is hidden."""
     sound.fx('contract')
-    selected_item.set_properties(vals)
+    if is_visible():
+        # Restore the context window if we hid it earlier.
+        window.deiconify()
 
 
 def sub_sel(pos, e=None) -> None:
@@ -308,7 +311,9 @@ def load_item_data() -> None:
     else:
         wid['item_id'].grid_remove()
 
-    if itemPropWin.can_edit(selected_item.properties()):
+    editor = item_data.editor
+
+    if PropertyWindow.can_edit(editor):
         wid['changedefaults'].state(['!disabled'])
     else:
         wid['changedefaults'].state(['disabled'])
@@ -322,7 +327,6 @@ def load_item_data() -> None:
         wid['moreinfo'].state(['!disabled'])
         tooltip.set_tooltip(wid['moreinfo'], TransToken.untranslated(selected_item.data.url))
 
-    editor = item_data.editor
     has_timer = any(prop.kind is prop_timer_delay for prop in editor.properties.values())
 
     if editor.has_prim_input():
@@ -566,16 +570,21 @@ def init_widgets() -> None:
     wid['moreinfo'].grid(row=7, column=2, sticky='e')
     tooltip.add_tooltip(wid['moreinfo'])
 
-    def show_item_props() -> None:
+    prop_window = PropertyWindow(hide_item_props)
+
+    async def show_item_props() -> None:
         """Display the item property pane."""
         sound.fx('expand')
-        itemPropWin.show_window(
-            selected_item.get_properties(),
+        await prop_window.show(
+            selected_item,
             wid['changedefaults'],
             selected_sub_item.name,
         )
+        if is_visible():
+            # Temporarily hide the context window while we're open.
+            window.withdraw()
 
-    wid['changedefaults'] = ttk.Button(f, command=show_item_props)
+    wid['changedefaults'] = ttk.Button(f, command=lambda: background_run(show_item_props))
     localisation.set_text(wid['changedefaults'], TransToken.ui("Change Defaults..."))
     wid['changedefaults'].grid(row=7, column=1)
     tooltip.add_tooltip(
@@ -594,5 +603,3 @@ def init_widgets() -> None:
     wid['variant'].bind('<<ComboboxSelected>>', set_item_version)
     wid['variant'].current(0)
     wid['variant'].grid(row=7, column=0, sticky='w')
-
-    itemPropWin.init(hide_item_props)
