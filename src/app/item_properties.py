@@ -32,7 +32,7 @@ class PropGroup:
     def __init__(self, parent: ttk.Frame, label_text: TransToken) -> None:
         self.frame = tk.Frame(parent)
         self.label = ttk.Label(parent)
-        localisation.set_text(self.label, TRANS_LABEL.format(name=label_text))
+        localisation.set_text(self.label, label_text)
 
     def apply_conf(self, options: dict[ItemPropKind, str]) -> None:
         """Apply the specified options to the UI"""
@@ -40,7 +40,7 @@ class PropGroup:
 
     def get_conf(self) -> Iterator[tuple[ItemPropKind, str]]:
         """Export options from the UI configuration."""
-        return iter([])
+        raise NotImplementedError
 
 # The prop kinds that require this group, then a function to create it.
 PropGroupFactory: TypeAlias = Tuple[List[ItemPropKind], Callable[[ttk.Frame], PropGroup]]
@@ -49,7 +49,7 @@ PropGroupFactory: TypeAlias = Tuple[List[ItemPropKind], Callable[[ttk.Frame], Pr
 class BoolPropGroup(PropGroup):
     """A property controlling a regular boolean."""
     def __init__(self, parent: ttk.Frame, prop: ItemPropKind[bool]) -> None:
-        super().__init__(parent, prop.name)
+        super().__init__(parent, TRANS_LABEL.format(name=prop.name))
         self.prop = prop
         if set(prop.subtype_values) != {False, True}:
             raise ValueError(f'Non-boolean property {prop}!')
@@ -67,7 +67,7 @@ class BoolPropGroup(PropGroup):
         try:
             value = srctools.conv_bool(options[self.prop], False)
         except KeyError:
-            LOGGER.warning('Missing property {} from config {}', self.prop, options)
+            LOGGER.warning('Missing property {} from config: {}', self.prop, options)
         else:
             self.var.set(value)
 
@@ -81,7 +81,7 @@ class ComboPropGroup(PropGroup, Generic[EnumT]):
     LARGE: ClassVar[bool] = True
 
     def __init__(self, parent: ttk.Frame, prop: ItemPropKind[EnumT], values: dict[EnumT, TransToken]) -> None:
-        super().__init__(parent, prop.name)
+        super().__init__(parent, TRANS_LABEL.format(name=prop.name))
         self.prop = prop
         self.translated = values
         self.value_order = list(values)
@@ -106,7 +106,7 @@ class ComboPropGroup(PropGroup, Generic[EnumT]):
         try:
             val_str = options[self.prop]
         except KeyError:
-            LOGGER.warning('Missing property {} from config {}', self.prop, options)
+            LOGGER.warning('Missing property {} from config: {}', self.prop, options)
             return
         try:
             value = self.prop.parse(val_str)
@@ -119,6 +119,60 @@ class ComboPropGroup(PropGroup, Generic[EnumT]):
         """Return the current UI configuration."""
         value = self.value_order[self.combo.current()]
         yield self.prop, self.prop.export(value)
+
+
+class TimerPropGroup(PropGroup):
+    """Special property group for timer delays."""
+    def __init__(self, parent: ttk.Frame) -> None:
+        super().__init__(parent, TRANS_TIMER_DELAY.format(tim=0))
+
+        self.scale = ttk.Scale(
+            self.frame,
+            from_=0, to=30,
+            orient="horizontal",
+            command=self.widget_changed,
+        )
+        self.scale.grid(row=0, column=0)
+        self.old_val = 3
+        self._enable_cback = True
+
+    def apply_conf(self, options: dict[ItemPropKind, str]) -> None:
+        """Apply the timer delay option to the UI."""
+        try:
+            value = options[all_props.prop_timer_delay]
+        except KeyError:
+            LOGGER.warning('Missing property TimerDelay from config: {}', options)
+            return
+        self._enable_cback = False
+        self.scale.set(all_props.prop_timer_delay.parse(value))
+        self._enable_cback = True
+
+    def get_conf(self) -> Iterator[tuple[ItemPropKind, str]]:
+        """Get the current UI configuration."""
+        cur_value = round(self.scale.get())
+        yield all_props.prop_timer_delay, str(cur_value)
+
+    def widget_changed(self, val: str) -> None:
+        """Called when the widget changes."""
+        if not self._enable_cback:
+            return
+        # Lock to whole numbers.
+        new_val = round(float(val))
+
+        # .set() will recuse, stop that.
+        self._enable_cback = False
+        self.scale.set(new_val)
+        self._enable_cback = True
+
+        localisation.set_text(self.label, TRANS_TIMER_DELAY.format(
+            tim='∞' if new_val == 0 else str(new_val),
+        ))
+
+        if new_val > self.old_val:
+            sound.fx_blockable('add')
+        elif new_val < self.old_val:
+            sound.fx_blockable('subtract')
+        self.old_val = new_val
 
 
 PROP_GROUPS: list[PropGroupFactory] = [
@@ -152,7 +206,7 @@ PROP_GROUPS: list[PropGroupFactory] = [
     BoolPropGroup.factory(all_props.prop_paint_allow_streaks),
     # all_props.prop_connection_count,
     # all_props.prop_connection_count_polarity,
-    # all_props.prop_timer_delay,
+    ([all_props.prop_timer_delay], TimerPropGroup),
     # all_props.prop_timer_sound,
     # all_props.prop_faith_vertical_alignment,
     # all_props.prop_faith_speed,
