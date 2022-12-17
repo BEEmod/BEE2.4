@@ -143,14 +143,6 @@ def ind_for_pos(pos: int) -> int | None:
         return selected_item.visual_subtypes[ind]
 
 
-def hide_item_props() -> None:
-    """Called when the item properties panel is hidden."""
-    sound.fx('contract')
-    if is_visible():
-        # Restore the context window if we hid it earlier.
-        window.deiconify()
-
-
 def sub_sel(pos, e=None) -> None:
     """Change the currently-selected sub-item."""
     ind = ind_for_pos(pos)
@@ -570,19 +562,30 @@ def init_widgets() -> None:
     wid['moreinfo'].grid(row=7, column=2, sticky='e')
     tooltip.add_tooltip(wid['moreinfo'])
 
-    prop_window = PropertyWindow(hide_item_props)
+    was_temp_hidden = False
+
+    def hide_item_props() -> None:
+        """Called when the item properties panel is hidden."""
+        sound.fx('contract')
+        if was_temp_hidden:
+            # Restore the context window if we hid it earlier.
+            window.deiconify()
 
     async def show_item_props() -> None:
         """Display the item property pane."""
+        nonlocal was_temp_hidden
         sound.fx('expand')
         await prop_window.show(
             selected_item.data.editor,
             wid['changedefaults'],
             selected_sub_item.name,
         )
-        if is_visible():
+        was_temp_hidden = is_visible()
+        if was_temp_hidden:
             # Temporarily hide the context window while we're open.
             window.withdraw()
+
+    prop_window = PropertyWindow(hide_item_props)
 
     wid['changedefaults'] = ttk.Button(f, command=lambda: background_run(show_item_props))
     localisation.set_text(wid['changedefaults'], TransToken.ui("Change Defaults..."))
