@@ -461,7 +461,7 @@ PALETTE: ConfigSpec = ConfigSpec(None)
 
 # Import submodules, so they're registered.
 from config import (
-    compile_pane, corridors, gen_opts,
+    compile_pane, corridors, gen_opts, item_defaults,
     last_sel, palette, signage,
     stylevar, widgets, windows,
 )
