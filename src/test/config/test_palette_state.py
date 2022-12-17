@@ -6,28 +6,30 @@ from srctools.dmx import Element
 
 from config.palette import PaletteState
 from consts import UUID_PORTAL2, UUID_EXPORT
-from . import isolate_gen_opts, GEN_OPTS
+from BEE2_config import GEN_OPTS
+from . import isolate_conf
 
 
-def test_parse_legacy(isolate_gen_opts) -> None:
+def test_parse_legacy() -> None:
     """Test parsing out palette state from the legacy config."""
-    state_dict = PaletteState.parse_legacy(Keyvalues('Config', []))
-    assert len(state_dict) == 1
-    state = state_dict['']
-    assert state.selected == UUID_PORTAL2
-    assert state.save_settings is False
-    assert state.hidden_defaults == frozenset()
+    with isolate_conf(GEN_OPTS):
+        state_dict = PaletteState.parse_legacy(Keyvalues('Config', []))
+        assert len(state_dict) == 1
+        state = state_dict['']
+        assert state.selected == UUID_PORTAL2
+        assert state.save_settings is False
+        assert state.hidden_defaults == frozenset()
 
-    some_uuid = uuid.uuid4()
-    GEN_OPTS['Last_Selected']['palette_uuid'] = some_uuid.hex
-    GEN_OPTS['General']['palette_save_settings'] = '1'
+        some_uuid = uuid.uuid4()
+        GEN_OPTS['Last_Selected']['palette_uuid'] = some_uuid.hex
+        GEN_OPTS['General']['palette_save_settings'] = '1'
 
-    state_dict = PaletteState.parse_legacy(Keyvalues('Config', []))
-    assert len(state_dict) == 1
-    state = state_dict['']
-    assert state.selected == some_uuid
-    assert state.save_settings is True
-    assert state.hidden_defaults == frozenset()
+        state_dict = PaletteState.parse_legacy(Keyvalues('Config', []))
+        assert len(state_dict) == 1
+        state = state_dict['']
+        assert state.selected == some_uuid
+        assert state.save_settings is True
+        assert state.hidden_defaults == frozenset()
 
 
 @pytest.mark.parametrize('save', [0, 1])
