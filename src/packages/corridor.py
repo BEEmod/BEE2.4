@@ -343,34 +343,30 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                     for corr in group.corridors[mode, direction, orient]
                 }
             except KeyError:
-                # None defined?
-                if orient is Orient.HORIZONTAL:
-                    LOGGER.warning(
-                        'No corridors defined for {}:{}_{}', 
-                        style_id, mode.value, direction.value
-                    )
+                # None defined for this corridor. This is not an error for vertical ones.
+                (LOGGER.warning if orient is Orient.HORIZONTAL else LOGGER.debug)(
+                    'No corridors defined for {}:{}_{}',
+                    style_id, mode.value, direction.value
+                )
                 export[mode, direction, orient] = []
                 continue
 
-            if not conf.selected:  # Use default setup.
-                export[mode, direction, orient] = [
-                    corr.strip_ui() for corr in
-                    group.defaults(mode, direction, orient)
+            if conf.selected:
+                chosen = [
+                    corr
+                    for corr_id in conf.selected
+                    if (corr := inst_to_corr.get(corr_id.casefold())) is not None
                 ]
-                continue
 
-            chosen = [
-                corr
-                for corr_id in conf.selected
-                if (corr := inst_to_corr.get(corr_id.casefold())) is not None
-            ]
-
-            if not chosen:
-                LOGGER.warning(
-                    'No corridors selected for {}:{}_{}_{}', 
-                    style_id, 
-                    mode.value, direction.value, orient.value,
-                )
+                if not chosen:
+                    LOGGER.warning(
+                        'No corridors selected for {}:{}_{}_{}',
+                        style_id,
+                        mode.value, direction.value, orient.value,
+                    )
+                    chosen = group.defaults(mode, direction, orient)
+            else:
+                # Use default setup, don't warn.
                 chosen = group.defaults(mode, direction, orient)
 
             for corr in chosen:
