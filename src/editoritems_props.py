@@ -259,7 +259,7 @@ prop_portalable = bool_prop(
 
 # For doors, specifies the map mode and therefore which door is used.
 prop_is_coop = bool_prop(
-    id='CoopMode',
+    id='CoopDoor',
     instvar='',  # Controls which item is used.
     name=TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_coop_puzzle'),
 )
