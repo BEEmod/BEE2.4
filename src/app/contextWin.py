@@ -237,7 +237,7 @@ def set_version_combobox(box: ttk.Combobox, item: 'UI.Item') -> list[str]:
     else:
         box.state(['!disabled'])
         box['values'] = version_names
-        box.current(ver_lookup.index(item.selected_ver))
+        box.current(ver_lookup.index(item.selected_version().id))
     return ver_lookup
 
 
