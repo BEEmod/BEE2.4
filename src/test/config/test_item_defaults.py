@@ -51,9 +51,12 @@ def test_parse_kv1() -> None:
     assert ItemDefault.parse_kv1(Keyvalues('', []), 1) == ItemDefault('VER_DEFAULT', {})
 
     assert ItemDefault.parse_kv1(Keyvalues('', [
-        Keyvalues('StartEnabled', '1'),
-        Keyvalues('AngledpANElAnimation', 'ramp_45_deg_open'),
-        Keyvalues('SomeUnknownProp', 'hello world'),
+        Keyvalues('Version', 'SELECTED_VER'),
+        Keyvalues('Properties', [
+            Keyvalues('StartEnabled', '1'),
+            Keyvalues('AngledpANElAnimation', 'ramp_45_deg_open'),
+            Keyvalues('SomeUnknownProp', 'hello world'),
+        ]),
     ]), 1) == ItemDefault('SELECTED_VER', {
         editoritems_props.prop_start_enabled: '1',
         editoritems_props.prop_angled_panel_anim: 'ramp_45_deg_open',
@@ -66,31 +69,36 @@ def test_parse_kv1() -> None:
 
 def test_export_kv1() -> None:
     """Test exporting keyvalues1 data."""
-    conf = ItemDefault({
+    conf = ItemDefault('SELECTED_VER', {
         editoritems_props.prop_start_enabled: '1',
         editoritems_props.prop_angled_panel_anim: 'ramp_60_deg_open',
         ItemPropKind.unknown('SomeUnknownProp'): 'hello world',
     }).export_kv1()
-    assert len(conf) == 3
+    assert len(conf) == 2
+    assert conf['version'] == 'SELECTED_VER'
+    props = conf.find_key('properties')
+    assert len(props) == 3
     # Ensure case is correct.
-    assert conf.find_key('StartEnabled').real_name == 'StartEnabled'
-    assert conf.find_key('StartEnabled').value == '1'
+    assert props.find_key('StartEnabled').real_name == 'StartEnabled'
+    assert props.find_key('StartEnabled').value == '1'
 
-    assert conf.find_key('AngledPanelAnimation').real_name == 'AngledPanelAnimation'
-    assert conf.find_key('AngledPanelAnimation').value == 'ramp_60_deg_open'
+    assert props.find_key('AngledPanelAnimation').real_name == 'AngledPanelAnimation'
+    assert props.find_key('AngledPanelAnimation').value == 'ramp_60_deg_open'
 
-    assert conf.find_key('SomeUnknownProp').real_name == 'SomeUnknownProp'
-    assert conf.find_key('SomeUnknownProp').value == 'hello world'
+    assert props.find_key('SomeUnknownProp').real_name == 'SomeUnknownProp'
+    assert props.find_key('SomeUnknownProp').value == 'hello world'
 
 
 def test_parse_dmx() -> None:
     """Test parsing DMX configs."""
     elem = Element('LastSelected', 'DMElement')
-    elem['StartEnabled'] = '1'
-    elem['StartEnabled'] = 'ramp_45_deg_open'
-    elem['SomeUnknownProp'] = 'hello world'
+    elem['version'] = 'SELECTED_VER'
+    elem['properties'] = props = Element('Properties', 'DMElement')
+    props['StartEnabled'] = '1'
+    props['AngledpANElAnimation'] = 'ramp_45_deg_open'
+    props['SomeUnknownProp'] = 'hello world'
 
-    assert ItemDefault.parse_dmx(elem, 1) == ItemDefault({
+    assert ItemDefault.parse_dmx(elem, 1) == ItemDefault('SELECTED_VER', {
         editoritems_props.prop_start_enabled: '1',
         editoritems_props.prop_angled_panel_anim: 'ramp_45_deg_open',
         ItemPropKind.unknown('SomeUnknownProp'): 'hello world',
@@ -102,20 +110,25 @@ def test_parse_dmx() -> None:
 
 def test_export_dmx() -> None:
     """Test exporting DMX configs."""
-    elem = ItemDefault({
+    elem = ItemDefault('SELECTED_VER', {
         editoritems_props.prop_start_enabled: '1',
         editoritems_props.prop_angled_panel_anim: 'ramp_60_deg_open',
         ItemPropKind.unknown('SomeUnknownProp'): 'hello world',
     }).export_dmx()
-    assert len(elem) == 3
-    assert elem['StartEnabled'].name == 'StartEnabled'
-    assert elem['StartEnabled'].type is ValueType.STRING
-    assert elem['StartEnabled'].val_string == '1'
+    assert len(elem) == 2
 
-    assert elem['AngledPanelAnimation'].name == 'AngledPanelAnimation'
-    assert elem['AngledPanelAnimation'].type is ValueType.STRING
-    assert elem['AngledPanelAnimation'].val_string == 'ramp_60_deg_open'
+    assert elem['version'].val_string == 'SELECTED_VER'
+    props = elem['properties'].val_elem
+    assert len(props) == 3
 
-    assert elem['SomeUnknownProp'].name == 'SomeUnknownProp'
-    assert elem['SomeUnknownProp'].type is ValueType.STRING
-    assert elem['SomeUnknownProp'].val_string == 'hello world'
+    assert props['StartEnabled'].name == 'StartEnabled'
+    assert props['StartEnabled'].type is ValueType.STRING
+    assert props['StartEnabled'].val_string == '1'
+
+    assert props['AngledPanelAnimation'].name == 'AngledPanelAnimation'
+    assert props['AngledPanelAnimation'].type is ValueType.STRING
+    assert props['AngledPanelAnimation'].val_string == 'ramp_60_deg_open'
+
+    assert props['SomeUnknownProp'].name == 'SomeUnknownProp'
+    assert props['SomeUnknownProp'].type is ValueType.STRING
+    assert props['SomeUnknownProp'].val_string == 'hello world'
