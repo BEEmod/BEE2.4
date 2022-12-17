@@ -1269,14 +1269,15 @@ def load() -> None:
     global selected_game
     all_games.clear()
     for gm in CONFIG:
-        if gm != 'DEFAULT':
-            try:
-                new_game = Game.parse(gm, CONFIG)
-            except ValueError:
-                LOGGER.warning("Can't parse game: ", exc_info=True)
-                continue
-            all_games.append(new_game)
-            LOGGER.info('Load game: {}', new_game)
+        if gm == CONFIG.default_section:
+            continue
+        try:
+            new_game = Game.parse(gm, CONFIG)
+        except ValueError:
+            LOGGER.warning("Can't parse game: ", exc_info=True)
+            continue
+        all_games.append(new_game)
+        LOGGER.info('Load game: {}', new_game)
     if len(all_games) == 0:
         # Hide the loading screen, since it appears on top
         loadScreen.main_loader.suppress()
