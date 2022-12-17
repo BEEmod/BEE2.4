@@ -5,6 +5,7 @@ They can then fetch the current state and store new state.
 """
 import abc
 from pathlib import Path
+from typing_extensions import Self
 from typing import (
     ClassVar, Optional, Set, TypeVar, Callable, NewType, Union, cast,
     Type, Dict, Awaitable, Iterator, Tuple,
@@ -62,13 +63,13 @@ class Data(abc.ABC):
         return cls.__info
 
     @classmethod
-    def parse_legacy(cls: Type[DataT], conf: Property) -> Dict[str, DataT]:
+    def parse_legacy(cls, conf: Property) -> Dict[str, Self]:
         """Parse from the old legacy config. The user has to handle the uses_id style."""
         return {}
 
     @classmethod
     @abc.abstractmethod
-    def parse_kv1(cls: Type[DataT], data: Property, version: int) -> DataT:
+    def parse_kv1(cls, data: Property, version: int) -> Self:
         """Parse keyvalues config values."""
         raise NotImplementedError
 
@@ -78,7 +79,7 @@ class Data(abc.ABC):
         raise NotImplementedError
 
     @classmethod
-    def parse_dmx(cls: Type[DataT], data: Element, version: int) -> DataT:
+    def parse_dmx(cls, data: Element, version: int) -> Self:
         """Parse DMX config values."""
         return cls.parse_kv1(data.to_kv1(), version)
 
