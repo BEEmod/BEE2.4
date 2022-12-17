@@ -13,7 +13,6 @@ import trio
 
 import loadScreen
 from app import TK_ROOT, background_run, localisation
-from app.itemPropWin import PROP_TYPES
 from BEE2_config import ConfigFile, GEN_OPTS
 from loadScreen import main_loader as loader
 import packages
@@ -233,12 +232,6 @@ class Item:
             self.data.pak_id, str(subtype.pal_icon)
         ), 64, 64)
 
-    def properties(self) -> Iterator[str]:
-        """Iterate through all properties for this item."""
-        for prop_name, prop in self.data.editor.properties.items():
-            if prop.allow_user_default:
-                yield prop_name
-
     def get_properties(self) -> Dict[str, Any]:
         """Return a dictionary of properties and the current value for them.
 
@@ -262,11 +255,6 @@ class Item:
                     self.id,
                 )
         return result
-
-    def set_properties(self, props: Dict[str, Any]) -> None:
-        """Apply the properties to the item."""
-        for prop, value in props.items():
-            item_opts[self.id]['PROP_' + prop] = str(value)
 
     def refresh_subitems(self) -> None:
         """Call load_data() on all our subitems, so they reload icons and names."""
@@ -736,22 +724,6 @@ async def export_editoritems(pal_ui: paletteUI.PaletteUI, bar: MenuBar) -> None:
         # The chosen items on the palette
         pal_data = [(it.id, it.subKey) for it in pal_picked]
 
-        item_versions = {
-            it_id: item.selected_ver
-            for it_id, item in
-            item_list.items()
-        }
-
-        item_properties = {
-            it_id: {
-                key[5:]: value
-                for key, value in
-                section.items() if
-                key.startswith('prop_')
-            }
-            for it_id, section in
-            item_opts.items()
-        }
         conf = config.APP.get_cur_conf(config.gen_opts.GenOptions)
 
         success, vpk_success = await gameMan.selected_game.export(
@@ -763,7 +735,7 @@ async def export_editoritems(pal_ui: paletteUI.PaletteUI, bar: MenuBar) -> None:
                 packages.QuotePack: voice_win.chosen_id,
                 packages.Elevator: elev_win.chosen_id,
 
-                packages.Item: (pal_data, item_versions, item_properties),
+                packages.Item: pal_data,
                 packages.StyleVar: StyleVarPane.export_data(chosen_style),
                 packages.Signage: signage_ui.export_data(),
 

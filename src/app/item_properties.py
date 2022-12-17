@@ -1,19 +1,23 @@
 """Window for adjusting the default values of item properties."""
 from __future__ import annotations
 
+import attrs
 from enum import Enum
 import tkinter as tk
 from tkinter import ttk
 from typing import Callable, ClassVar, Generic, Iterator, Optional, Tuple, List, TypeVar
 from typing_extensions import TypeAlias
 
-import utils
 import srctools
+import srctools.logger
+
+from config.item_defaults import ItemDefault
 from app import localisation, tk_tools, sound, TK_ROOT
 from editoritems import ItemPropKind, Item
 import editoritems_props as all_props
 from transtoken import TransToken
-import srctools.logger
+import utils
+import config
 
 
 __all__ = ['PropertyWindow']
@@ -143,9 +147,7 @@ class TimerPropGroup(PropGroup):
         except KeyError:
             LOGGER.warning('Missing property TimerDelay from config: {}', options)
             return
-        self._enable_cback = False
         self.scale.set(all_props.prop_timer_delay.parse(value))
-        self._enable_cback = True
 
     def get_conf(self) -> Iterator[tuple[ItemPropKind, str]]:
         """Get the current UI configuration."""
@@ -309,19 +311,23 @@ class PropertyWindow:
         self.win.grab_release()
         self.win.withdraw()
 
+        old_conf = config.APP.get_cur_conf(ItemDefault, self.cur_item.id, ItemDefault())
+
         out: dict[ItemPropKind, str] = {}
+        out.update(old_conf.defaults)  # Keep any extra values, just in case.
         for group in self.groups:
             if group is None:
                 continue
             for prop_kind, value in group.get_conf():
                 try:
-                    prop = self.cur_item.properties[prop_kind.id]
+                    prop = self.cur_item.properties[prop_kind.id.casefold()]
                 except KeyError:
                     LOGGER.warning('No property {}={!r} in {}!', prop_kind.id, value, self.cur_item.id)
                     continue
                 if prop.allow_user_default:
                     out[prop_kind] = value
-        LOGGER.info('Set properties: {}', out)
+
+        config.APP.store_conf(attrs.evolve(old_conf, defaults=out), self.cur_item.id)
 
         self.callback()
 
@@ -334,6 +340,11 @@ class PropertyWindow:
         group: PropGroup
         maybe_group: PropGroup | None
 
+        conf = config.APP.get_cur_conf(ItemDefault, item.id, ItemDefault())
+
+        # Stop our adjustment of the widgets from making sounds.
+        sound.block_fx()
+
         # Go through all our groups, constructing them if required.
         for i, (props, factory) in enumerate(PROP_GROUPS):
             maybe_group = self.groups[i]
@@ -343,6 +354,18 @@ class PropertyWindow:
                 else:
                     self.groups[i] = group = factory(self.frame)
                 (large_groups if group.LARGE else small_groups).append(group)
+                group_options = {}
+                for prop_kind in props:
+                    # Filter to properties actually in the item
+                    try:
+                        editor_prop = item.properties[prop_kind.id.casefold()]
+                    except KeyError:
+                        continue
+                    try:
+                        group_options[prop_kind] = conf.defaults[prop_kind]
+                    except KeyError:
+                        group_options[prop_kind] = prop_kind.export(editor_prop.default)
+                group.apply_conf(group_options)
             elif maybe_group is not None:  # Constructed but now hiding.
                 maybe_group.label.grid_forget()
                 maybe_group.frame.grid_forget()
