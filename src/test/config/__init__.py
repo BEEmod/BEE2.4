@@ -22,11 +22,3 @@ def isolate_conf(config: ConfigFile) -> Generator[ConfigFile, None, None]:
         config.filename = old_filename
         for section, values in old_data.items():
             config[section] = values
-
-
-
-@pytest.fixture
-def isolate_gen_opts() -> Generator[None, None, None]:
-    """Ensure GEN_OPTS cannot write to files, and is cleared of data."""
-    with isolate_conf(GEN_OPTS):
-        yield
