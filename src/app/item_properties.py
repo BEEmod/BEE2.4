@@ -234,8 +234,8 @@ class PistonPropGroup(PropGroup):
 
     IMG_PIST = img.Handle.builtin('BEE2/piston_top', 12, 64)
     IMG_PIST_SEL = img.Handle.builtin('BEE2/piston_top_sel', 12, 64)
-    IMG_DEST = img.Handle.builtin('BEE2/piston_dest', 8, 64)
-    IMG_DEST_SEL = img.Handle.builtin('BEE2/piston_dest_sel', 8, 64)
+    IMG_DEST = img.Handle.builtin('BEE2/piston_dest', 4, 64)
+    IMG_DEST_SEL = img.Handle.builtin('BEE2/piston_dest_sel', 4, 64)
 
     def __init__(self, parent: ttk.Frame):
         super().__init__(parent, TransToken.ui('Position: '))
@@ -256,12 +256,13 @@ class PistonPropGroup(PropGroup):
         # Line representing the piston itself.
         self.canv_pist = self.canvas.create_line(7, 34, 28, 34, width=4, fill='#CEC9C6')
         # Line between top and selection.
-        self.canv_move = self.canvas.create_line(36, 34, 40, 34, width=2, fill='#6B95BD')
+        self.canv_move = self.canvas.create_line(36, 34, 40, 34, width=2, fill='#6B95BD', arrow='last')
 
         tk_tools.bind_leftclick(self.canvas, self.evt_mouse_down)
         self.canvas.bind('<Motion>', self.evt_mouse_hover)
         self.canvas.bind(tk_tools.EVENTS['LEFT_MOVE'], self.evt_mouse_drag)
         self.canvas.bind(tk_tools.EVENTS['LEFT_RELEASE'], self.evt_mouse_up)
+        self.canvas.bind('<Leave>', self.evt_mouse_leave)
 
     def apply_conf(self, options: dict[ItemPropKind, str]) -> None:
         """Apply the specified options to the UI."""
@@ -318,9 +319,9 @@ class PistonPropGroup(PropGroup):
     def get_hit(self, x: int) -> Literal['plat', 'dest', None]:
         pist_pos = self._pos2x(self.platform)
         dest_pos = self._pos2x(self.destination)
-        if pist_pos - 4 <= x <= pist_pos + 16:
+        if pist_pos - 8 <= x <= pist_pos + 24:
             return 'plat'
-        elif dest_pos - 8 <= x <= dest_pos + 8:
+        elif dest_pos - 4 <= x <= dest_pos + 24:
             return 'dest'
         else:
             return None
@@ -333,6 +334,12 @@ class PistonPropGroup(PropGroup):
     def evt_mouse_up(self, event: tk.Event) -> None:
         """Stop dragging."""
         self.cur_drag = None
+
+    def evt_mouse_leave(self, event: tk.Event) -> None:
+        """Failsafe, when the mouse fully leaves reset them all."""
+        self.cur_drag = None
+        self.canvas.itemconfigure(self.canv_plat, image=self.IMG_PIST.get_tk())
+        self.canvas.itemconfigure(self.canv_dest, image=self.IMG_DEST.get_tk())
 
     def evt_mouse_hover(self, event: tk.Event) -> None:
         """Update mouseover effects depending on position."""
@@ -382,19 +389,19 @@ class PistonPropGroup(PropGroup):
         """Update the canvas to match the specified positions."""
         self.canvas.coords(self.canv_plat, self._pos2x(self.platform) + 8, 2)
         self.canvas.coords(self.canv_pist, 7, 34, self._pos2x(self.platform) + 4, 34)
-        self.canvas.coords(self.canv_dest, self._pos2x(self.destination) + 8, 2)
+        self.canvas.coords(self.canv_dest, self._pos2x(self.destination) + 12, 2)
         if self.destination > self.platform:
             self.canvas.coords(
                 self.canv_move,
                 self._pos2x(self.platform) + 24, 34,
-                self._pos2x(self.destination) - 4, 34,
+                self._pos2x(self.destination), 34,
             )
         else:
             # Offset down to not overlap.
             self.canvas.coords(
                 self.canv_move,
-                self._pos2x(self.destination) + 16, 48,
                 self._pos2x(self.platform) - 4, 48,
+                self._pos2x(self.destination) + 20, 48,
             )
 
 
