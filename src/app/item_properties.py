@@ -12,7 +12,7 @@ import srctools
 import srctools.logger
 
 from config.item_defaults import ItemDefault
-from app import localisation, tk_tools, sound, TK_ROOT, tooltip
+from app import img, localisation, tk_tools, sound, TK_ROOT, tooltip
 from editoritems import ItemPropKind, Item
 import editoritems_props as all_props
 from transtoken import TransToken
@@ -29,6 +29,10 @@ TRANS_TIMER_DELAY = TransToken.ui('Timer Delay:\n        ({tim})')
 TRANS_START_ACTIVE_DISABLED = TransToken.ui('When Oscillating mode is disabled, Start Active has no effect.')
 EnumT = TypeVar('EnumT', bound=Enum)
 
+PIST_PROPS = [
+    ('lower', all_props.prop_pist_lower),
+    ('upper', all_props.prop_pist_upper),
+]
 
 class PropGroup:
     """A group of widgets for modifying one or more props."""
@@ -225,6 +229,70 @@ class TrackStartActivePropGroup(BoolPropGroup):
             tooltip.set_tooltip(self.check, TransToken.BLANK)
 
 
+class PistonPropGroup(PropGroup):
+    """Complex combo widget that handles all three piston properties."""
+    LARGE: ClassVar[bool] = True
+    def __init__(self, parent: ttk.Frame):
+        super().__init__(parent, TransToken.ui('Position: '))
+        self.start_up = False
+        self.lower = 0
+        self.upper = 1
+
+        self.canvas = tk.Canvas(self.frame, width=300, height=66)
+        self.canvas.grid(row=0, column=0)
+        self.canv_base = self.canvas.create_image(
+            0, 2, anchor='nw',
+            image=img.Handle.builtin('BEE2/piston_base', 16, 64).get_tk(),
+        )
+        self.canv_top = self.canvas.create_image(
+            32, 2, anchor='n',
+            image=img.Handle.builtin('BEE2/piston_top', 12, 64).get_tk(),
+            activeimage=img.Handle.builtin('BEE2/piston_top_sel', 12, 64).get_tk(),
+        )
+        self.canv_pist = self.canvas.create_line(
+            7, 34, 28, 34, width=4, fill='#CEC9C6',
+        )
+
+    def apply_conf(self, options: dict[ItemPropKind, str]) -> None:
+        """Apply the specified options to the UI."""
+        try:
+            self.start_up = srctools.conv_bool(options[all_props.prop_pist_start_up])
+        except KeyError:
+            LOGGER.warning('Missing property StartUp from config: {}', options)
+            self.start_up = False
+        self.lower = 0
+        self.upper = 1
+        for attr, prop in PIST_PROPS:
+            try:
+                val_str = options[prop]
+            except KeyError:
+                LOGGER.warning('Missing property {} from config: {}', prop.id, options)
+                continue
+            try:
+                setattr(self, attr, prop.parse(val_str))
+            except ValueError:
+                LOGGER.warning(
+                    'Could not parse "{}" for property type "{}"',
+                    val_str, prop.id, exc_info=True,
+                )
+        self.reposition()
+
+    def get_conf(self) -> Iterator[tuple[ItemPropKind, str]]:
+        """Export options from the UI configuration."""
+        return iter([])
+
+    def reposition(self) -> None:
+        """Update the canvas to match the specified positions."""
+        if self.start_up:
+            platform = self.upper
+            dest = self.lower
+        else:
+            platform = self.lower
+            dest = self.upper
+        self.canvas.coords(self.canv_top, 16 + 64 * platform, 2)
+        self.canvas.coords(self.canv_pist, 7, 34, 12 + 64 * platform, 34)
+
+
 PROP_GROUPS: list[PropGroupFactory] = [
     BoolPropGroup.factory(all_props.prop_start_enabled),
     BoolPropGroup.factory(all_props.prop_start_reversed),
@@ -243,9 +311,11 @@ PROP_GROUPS: list[PropGroupFactory] = [
     # all_props.prop_track_move_distance,
     # all_props.prop_track_speed,
     # all_props.prop_track_move_direction,
-    # all_props.prop_pist_lower,
-    # all_props.prop_pist_upper,
-    # all_props.prop_pist_start_up,
+    ([
+        all_props.prop_pist_lower,
+        all_props.prop_pist_upper,
+        all_props.prop_pist_start_up,
+    ], PistonPropGroup),
     # all_props.prop_pist_auto_trigger,
     # all_props.prop_paint_type,
     # all_props.prop_paint_export_type,
