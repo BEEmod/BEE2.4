@@ -12,7 +12,7 @@ import srctools
 import srctools.logger
 
 from config.item_defaults import ItemDefault
-from app import localisation, tk_tools, sound, TK_ROOT
+from app import localisation, tk_tools, sound, TK_ROOT, tooltip
 from editoritems import ItemPropKind, Item
 import editoritems_props as all_props
 from transtoken import TransToken
@@ -26,6 +26,7 @@ TRANS_TITLE = TransToken.ui('BEE2 - {item}')
 TRANS_SUBTITLE = TransToken.ui('Settings for "{item}"')
 TRANS_LABEL = TransToken.untranslated('{name}: ')
 TRANS_TIMER_DELAY = TransToken.ui('Timer Delay:\n        ({tim})')
+TRANS_START_ACTIVE_DISABLED = TransToken.ui('When Oscillating mode is disabled, Start Active has no effect.')
 EnumT = TypeVar('EnumT', bound=Enum)
 
 
@@ -64,7 +65,7 @@ class BoolPropGroup(PropGroup):
     @classmethod
     def factory(cls, prop: ItemPropKind[bool]) -> PropGroupFactory:
         """Make the tuple used in PROP_GROUPS."""
-        return ([prop], lambda frame: BoolPropGroup(frame, prop))
+        return ([prop], lambda frame: cls(frame, prop))
 
     def apply_conf(self, options: dict[ItemPropKind, str]) -> None:
         """Apply the specified options to the UI."""
@@ -177,6 +178,53 @@ class TimerPropGroup(PropGroup):
         self.old_val = new_val
 
 
+class TrackStartActivePropGroup(BoolPropGroup):
+    """The start active boolean is only useable if oscillating mode is enabled."""
+    def __init__(self, parent: ttk.Frame, prop: ItemPropKind[bool]) -> None:
+        super().__init__(parent, prop)
+        self.osc_prop: Optional[BoolPropGroup] = None
+        self.has_osc = False
+        tooltip.add_tooltip(self.check, show_when_disabled=True, delay=100)
+
+    def apply_conf(self, options: dict[ItemPropKind, str]) -> None:
+        """Apply the configuration to the UI."""
+        super().apply_conf(options)
+        self.has_osc = all_props.prop_track_is_oscillating in options
+        self._update()
+
+    def get_conf(self) -> Iterator[tuple[ItemPropKind, str]]:
+        """Get the current configuration."""
+        if self.osc_prop is not None and self.has_osc and not self.osc_prop.var.get():
+            # Forced off.
+            yield self.prop, '0'
+        else:
+            yield self.prop, srctools.bool_as_int(self.var.get())
+
+    def set_oscillating(self, osc_prop: BoolPropGroup) -> None:
+        """Attach the oscillating prop."""
+        if self.osc_prop is None:
+            self.osc_prop = osc_prop
+            update = self._update
+
+            def update_check() -> None:
+                """Update the checkbox."""
+                sound.fx_blockable('config')
+                update()
+
+            osc_prop.check['command'] = update_check
+            update()
+
+    def _update(self) -> None:
+        """Update the enabled/disabled state."""
+        if self.osc_prop is not None and self.has_osc and not self.osc_prop.var.get():
+            self.check.state(('disabled', ))
+            tooltip.set_tooltip(self.check, TRANS_START_ACTIVE_DISABLED)
+            self.var.set(False)
+        else:
+            self.check.state(('!disabled', ))
+            tooltip.set_tooltip(self.check, TransToken.BLANK)
+
+
 PROP_GROUPS: list[PropGroupFactory] = [
     BoolPropGroup.factory(all_props.prop_start_enabled),
     BoolPropGroup.factory(all_props.prop_start_reversed),
@@ -189,8 +237,8 @@ PROP_GROUPS: list[PropGroupFactory] = [
     BoolPropGroup.factory(all_props.prop_auto_drop),
     BoolPropGroup.factory(all_props.prop_cube_auto_respawn),
     # all_props.prop_cube_fall_straight_Down,
-    # all_props.prop_track_start_active,
-    # all_props.prop_track_is_oscillating,
+    TrackStartActivePropGroup.factory(all_props.prop_track_start_active),
+    BoolPropGroup.factory(all_props.prop_track_is_oscillating),
     # all_props.prop_track_starting_pos,
     # all_props.prop_track_move_distance,
     # all_props.prop_track_speed,
@@ -339,11 +387,22 @@ class PropertyWindow:
         small_groups: list[PropGroup] = []
         group: PropGroup
         maybe_group: PropGroup | None
+        # The Start Active prop needs to disable depending on this one's value.
+        oscillating_prop: Optional[BoolPropGroup] = None
+        start_active_prop: Optional[TrackStartActivePropGroup] = None
 
         conf = config.APP.get_cur_conf(ItemDefault, item.id, ItemDefault())
 
         # Stop our adjustment of the widgets from making sounds.
         sound.block_fx()
+
+        # Build the options to pass into each prop group, to update it.
+        group_options = {}
+        for editor_prop in item.properties.values():
+            try:
+                group_options[editor_prop.kind] = conf.defaults[editor_prop.kind]
+            except KeyError:
+                group_options[editor_prop.kind] = editor_prop.export()
 
         # Go through all our groups, constructing them if required.
         for i, (props, factory) in enumerate(PROP_GROUPS):
@@ -354,21 +413,19 @@ class PropertyWindow:
                 else:
                     self.groups[i] = group = factory(self.frame)
                 (large_groups if group.LARGE else small_groups).append(group)
-                group_options = {}
-                for prop_kind in props:
-                    # Filter to properties actually in the item
-                    try:
-                        editor_prop = item.properties[prop_kind.id.casefold()]
-                    except KeyError:
-                        continue
-                    try:
-                        group_options[prop_kind] = conf.defaults[prop_kind]
-                    except KeyError:
-                        group_options[prop_kind] = prop_kind.export(editor_prop.default)
                 group.apply_conf(group_options)
+                # Identify these two groups.
+                if isinstance(group, BoolPropGroup) and group.prop is all_props.prop_track_is_oscillating:
+                    oscillating_prop = group
+                elif isinstance(group, TrackStartActivePropGroup):
+                    start_active_prop = group
             elif maybe_group is not None:  # Constructed but now hiding.
                 maybe_group.label.grid_forget()
                 maybe_group.frame.grid_forget()
+
+        # Link these up.
+        if start_active_prop is not None and oscillating_prop is not None:
+            start_active_prop.set_oscillating(oscillating_prop)
 
         large_row = 1
         for group in large_groups:
