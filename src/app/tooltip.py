@@ -13,7 +13,8 @@ import tkinter as tk
 import attr
 
 from app import TK_ROOT, img
-from app.localisation import TransToken, set_text
+# Give a private name, could get confused with tooltip setter.
+from app.localisation import TransToken, set_text as _apply_token
 
 __all__ = ['set_tooltip', 'add_tooltip']
 
@@ -62,7 +63,7 @@ def _show(widget: tk.Misc, mouse_x: int, mouse_y: int) -> None:
     except KeyError:
         return
 
-    set_text(context_label, data.text)
+    _apply_token(context_label, data.text)
     img.apply(context_label, data.img)
 
     window.deiconify()
@@ -138,6 +139,7 @@ def set_tooltip(
 def add_tooltip(
     targ_widget: tk.Misc,
     text: TransToken = TransToken.BLANK,
+    *,
     image: img.Handle=None,
     delay: int=500,
     show_when_disabled: bool=False,
