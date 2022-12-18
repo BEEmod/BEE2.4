@@ -6,7 +6,7 @@ from enum import Enum
 import tkinter as tk
 from tkinter import ttk
 from typing import Callable, ClassVar, Generic, Iterator, Optional, Tuple, List, TypeVar
-from typing_extensions import TypeAlias
+from typing_extensions import Final, Literal, TypeAlias
 
 import srctools
 import srctools.logger
@@ -29,10 +29,7 @@ TRANS_TIMER_DELAY = TransToken.ui('Timer Delay:\n        ({tim})')
 TRANS_START_ACTIVE_DISABLED = TransToken.ui('When Oscillating mode is disabled, Start Active has no effect.')
 EnumT = TypeVar('EnumT', bound=Enum)
 
-PIST_PROPS = [
-    ('lower', all_props.prop_pist_lower),
-    ('upper', all_props.prop_pist_upper),
-]
+PIST_PROPS = [all_props.prop_pist_lower, all_props.prop_pist_upper]
 
 class PropGroup:
     """A group of widgets for modifying one or more props."""
@@ -232,65 +229,173 @@ class TrackStartActivePropGroup(BoolPropGroup):
 class PistonPropGroup(PropGroup):
     """Complex combo widget that handles all three piston properties."""
     LARGE: ClassVar[bool] = True
+    MOVE_DIST: Final = 48  # Distance for each position
+    BASE_OFF: Final = 12  # 0 starts this far from the left.
+
+    IMG_PIST = img.Handle.builtin('BEE2/piston_top', 12, 64)
+    IMG_PIST_SEL = img.Handle.builtin('BEE2/piston_top_sel', 12, 64)
+    IMG_DEST = img.Handle.builtin('BEE2/piston_dest', 8, 64)
+    IMG_DEST_SEL = img.Handle.builtin('BEE2/piston_dest_sel', 8, 64)
+
     def __init__(self, parent: ttk.Frame):
         super().__init__(parent, TransToken.ui('Position: '))
-        self.start_up = False
-        self.lower = 0
-        self.upper = 1
+        self.platform = 0
+        self.destination = 1
+        self.cur_drag: Literal['plat', 'dest', None] = None
 
-        self.canvas = tk.Canvas(self.frame, width=300, height=66)
+        self.canvas = tk.Canvas(self.frame, width=250, height=66)
         self.canvas.grid(row=0, column=0)
+        # Base grating visual.
         self.canv_base = self.canvas.create_image(
             0, 2, anchor='nw',
             image=img.Handle.builtin('BEE2/piston_base', 16, 64).get_tk(),
         )
-        self.canv_top = self.canvas.create_image(
-            32, 2, anchor='n',
-            image=img.Handle.builtin('BEE2/piston_top', 12, 64).get_tk(),
-            activeimage=img.Handle.builtin('BEE2/piston_top_sel', 12, 64).get_tk(),
-        )
-        self.canv_pist = self.canvas.create_line(
-            7, 34, 28, 34, width=4, fill='#CEC9C6',
-        )
+        # The two movable ends.
+        self.canv_plat = self.canvas.create_image(32, 2, anchor='n', image=self.IMG_PIST.get_tk())
+        self.canv_dest = self.canvas.create_image(48, 2, anchor='n', image=self.IMG_DEST.get_tk())
+        # Line representing the piston itself.
+        self.canv_pist = self.canvas.create_line(7, 34, 28, 34, width=4, fill='#CEC9C6')
+        # Line between top and selection.
+        self.canv_move = self.canvas.create_line(36, 34, 40, 34, width=2, fill='#6B95BD')
+
+        tk_tools.bind_leftclick(self.canvas, self.evt_mouse_down)
+        self.canvas.bind('<Motion>', self.evt_mouse_hover)
+        self.canvas.bind(tk_tools.EVENTS['LEFT_MOVE'], self.evt_mouse_drag)
+        self.canvas.bind(tk_tools.EVENTS['LEFT_RELEASE'], self.evt_mouse_up)
 
     def apply_conf(self, options: dict[ItemPropKind, str]) -> None:
         """Apply the specified options to the UI."""
         try:
-            self.start_up = srctools.conv_bool(options[all_props.prop_pist_start_up])
+            start_up = srctools.conv_bool(options[all_props.prop_pist_start_up])
         except KeyError:
             LOGGER.warning('Missing property StartUp from config: {}', options)
-            self.start_up = False
-        self.lower = 0
-        self.upper = 1
-        for attr, prop in PIST_PROPS:
+            start_up = False
+        pos = {
+            all_props.prop_pist_lower: 0,
+            all_props.prop_pist_upper: 1,
+        }
+        for prop in PIST_PROPS:
             try:
                 val_str = options[prop]
             except KeyError:
                 LOGGER.warning('Missing property {} from config: {}', prop.id, options)
                 continue
             try:
-                setattr(self, attr, prop.parse(val_str))
+                pos[prop] = prop.parse(val_str)
             except ValueError:
                 LOGGER.warning(
                     'Could not parse "{}" for property type "{}"',
                     val_str, prop.id, exc_info=True,
                 )
+        if start_up:
+            self.platform = pos[all_props.prop_pist_upper]
+            self.destination = pos[all_props.prop_pist_lower]
+        else:
+            self.destination = pos[all_props.prop_pist_upper]
+            self.platform = pos[all_props.prop_pist_lower]
         self.reposition()
 
     def get_conf(self) -> Iterator[tuple[ItemPropKind, str]]:
         """Export options from the UI configuration."""
-        return iter([])
+        if self.destination > self.platform:
+            yield all_props.prop_pist_start_up, '0'
+            yield all_props.prop_pist_lower, str(self.platform)
+            yield all_props.prop_pist_upper, str(self.destination)
+        else:
+            yield all_props.prop_pist_start_up, '1'
+            yield all_props.prop_pist_lower, str(self.destination)
+            yield all_props.prop_pist_upper, str(self.platform)
+
+    def _pos2x(self, pos: int) -> int:
+        """Convert a position into an X coordinate."""
+        return self.BASE_OFF + self.MOVE_DIST * pos
+
+    def _x2pos(self, x: int) -> int:
+        """Find the nearest position to this coordinate."""
+        pos = round((x - self.BASE_OFF) / self.MOVE_DIST)
+        return max(0, min(4, pos))
+
+    def get_hit(self, x: int) -> Literal['plat', 'dest', None]:
+        pist_pos = self._pos2x(self.platform)
+        dest_pos = self._pos2x(self.destination)
+        if pist_pos - 4 <= x <= pist_pos + 16:
+            return 'plat'
+        elif dest_pos - 8 <= x <= dest_pos + 8:
+            return 'dest'
+        else:
+            return None
+
+    def evt_mouse_down(self, event: tk.Event) -> None:
+        """Start dragging, when the canvas is clicked."""
+        # Y is irrelevant
+        self.cur_drag = self.get_hit(event.x)
+
+    def evt_mouse_up(self, event: tk.Event) -> None:
+        """Stop dragging."""
+        self.cur_drag = None
+
+    def evt_mouse_hover(self, event: tk.Event) -> None:
+        """Update mouseover effects depending on position."""
+        # If currently dragging, always highlight, otherwise highlight those under the cursor.
+        hover = self.cur_drag or self.get_hit(event.x)
+        self.canvas.itemconfigure(
+            self.canv_plat,
+            image=(self.IMG_PIST_SEL if hover == 'plat' else self.IMG_PIST).get_tk()
+        )
+        self.canvas.itemconfigure(
+            self.canv_dest,
+            image=(self.IMG_DEST_SEL if hover == 'dest' else self.IMG_DEST).get_tk()
+        )
+
+    def evt_mouse_drag(self, event: tk.Event) -> None:
+        """Called when mouse is held and dragged. If we are currently dragging, move items."""
+        if self.cur_drag is None:
+            return
+        pos = self._x2pos(event.x)
+
+        if self.cur_drag == 'plat':
+            if pos == self.destination:
+                # Swap!
+                self.destination = self.platform
+                sound.fx('swap')
+            elif pos != self.platform:
+                sound.fx('move')
+            else:
+                return  # No change.
+            self.platform = pos
+        elif self.cur_drag == 'dest':
+            if pos == self.platform:
+                # Swap!
+                self.platform = self.destination
+                sound.fx('swap')
+            elif pos != self.destination:
+                sound.fx('move')
+            else:
+                return  # No change.
+            self.destination = pos
+        else:
+            raise AssertionError(self.cur_drag)
+        # One changed, update.
+        self.reposition()
 
     def reposition(self) -> None:
         """Update the canvas to match the specified positions."""
-        if self.start_up:
-            platform = self.upper
-            dest = self.lower
+        self.canvas.coords(self.canv_plat, self._pos2x(self.platform) + 8, 2)
+        self.canvas.coords(self.canv_pist, 7, 34, self._pos2x(self.platform) + 4, 34)
+        self.canvas.coords(self.canv_dest, self._pos2x(self.destination) + 8, 2)
+        if self.destination > self.platform:
+            self.canvas.coords(
+                self.canv_move,
+                self._pos2x(self.platform) + 24, 34,
+                self._pos2x(self.destination) - 4, 34,
+            )
         else:
-            platform = self.lower
-            dest = self.upper
-        self.canvas.coords(self.canv_top, 16 + 64 * platform, 2)
-        self.canvas.coords(self.canv_pist, 7, 34, 12 + 64 * platform, 34)
+            # Offset down to not overlap.
+            self.canvas.coords(
+                self.canv_move,
+                self._pos2x(self.destination) + 16, 48,
+                self._pos2x(self.platform) - 4, 48,
+            )
 
 
 PROP_GROUPS: list[PropGroupFactory] = [
@@ -517,7 +622,7 @@ class PropertyWindow:
         if large_groups:
             self.div_horiz.grid(
                 row=large_row + 1,
-                columnspan=9,
+                columnspan=10,
                 sticky="ew",
             )
             large_row += 2
@@ -570,8 +675,8 @@ class PropertyWindow:
             ind = 1
 
         self.btn_save.grid(
-            row=ind + large_row,
-            columnspan=9,
+            row=ind // 3 + 1 + large_row,
+            columnspan=10,
             sticky="EW",
         )
 
