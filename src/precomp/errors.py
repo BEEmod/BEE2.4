@@ -141,18 +141,52 @@ def make_map(error: UserError) -> VMF:
         origin="64 64 1",
         angles="0 0 0",
     )
-    # We need a light, so the map compiles lights and doesn't turn on
-    # mat_fullbright.
+    # We need a light, so the map compiles lights and doesn't turn on mat_fullbright.
     vmf.create_ent(
         'light',
         origin="64 64 64",
         angles="0 0 0",
         spawnflags="0",
-        _light="255 255 255 200",
+        _light="255 255 255 1",
         _lightHDR="-1 -1 -1 -1",
         _lightscaleHDR="1",
         _constant_attn="0",
         _quadratic_attn="1",
         _linear_attn="1",
     )
+    # Needed to get a default cubemap to be generated.
+    vmf.create_ent('env_cubemap', origin='64 64 64')
+    # Put two coop spawns in there too.
+    vmf.create_ent(
+        'info_coop_spawn',
+        origin="64 32 1",
+        angles="0 0 0",
+        forcegunonspawn=0,
+        targetname='supress_orange_portalgun_spawn',  # Stop guns
+        startingteam=2,
+        enabled=1,
+    )
+    vmf.create_ent(
+        'info_coop_spawn',
+        origin="64 96 1",
+        angles="0 0 0",
+        forcegunonspawn=0,
+        targetname='supress_blue_portalgun_spawn',
+        startingteam=3,
+        enabled=1,
+    )
+    # Suppress portalgun spawn, pinging, taunts
+    for state in [
+        'portalgun_nospawn',
+        'no_pinging_blue', 'no_pinging_orange',
+        'no_taunting_blue', 'no_taunting_orange',
+    ]:
+        vmf.create_ent(
+            'env_global',
+            origin='64 64 32',
+            globalstate=state,
+            initialstate=1,
+            counter=0,
+            spawnflags=1,  # Set initial state
+        )
     return vmf

@@ -23,6 +23,8 @@ from user_errors import SERVER_INFO_FILE, ServerInfo
 SCRIPT_TEMPLATE = '''\
 function Think() {
     if (IsMultiplayer()) {
+        // EntFireByHandle(self, "RunScriptCode", "MapPostLoaded()", 0.0, self, self);
+        SendToConsole("ss_force_primary_fullscreen 1");
         EntFire("coop_disp", "Display", "");
         return 1.0;
     }
@@ -41,6 +43,8 @@ async def start_error_server(ctx: Context) -> None:
     """If the map contains the marker entity indicating a user error, inject the VScript."""
     for ent in ctx.vmf.by_class['bee2_user_error']:
         ent['thinkfunction'] = 'Think'
+        # Load the coop script, so we don't disconnect.
+        ent['vscripts'] = 'debug_scripts/mp_coop_transition_list.nut'
         ent['classname'] = 'info_player_start'
 
         port, error_text = await load_server()
