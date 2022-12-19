@@ -173,6 +173,12 @@ TOK_SEEDOCS = TransToken.untranslated('{msg}\n<p><a href="{url}">{docs}</a>.</p>
 
 # Specific errors:
 
+TOK_BRUSHLOC_LEAK = TransToken.ui(
+    'One or more items were placed ouside the map! Move these back inside the map, or delete them. '
+    'Items with no collision (like Half Walls or logic gates) can be left when rooms are moved, '
+    'look for those.',
+)
+
 TOK_VBSP_LEAK = TransToken.ui(
     'This map has <a href="https://developer.valvesoftware.com/wiki/Leak">"leaked"</a>. This is a '
     'bug in an item or style, which should be fixed. The displayed line indicates the location of '

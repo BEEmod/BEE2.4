@@ -8,9 +8,11 @@ from collections import deque
 from typing import Union, Any, Tuple, ItemsView, MutableMapping
 from enum import Enum
 
-from srctools import Vec, Matrix, Angle, VMF
+from srctools import Vec, Matrix, VMF
 
 import srctools.logger
+
+import user_errors
 import utils
 import editoritems
 
@@ -424,8 +426,8 @@ class Grid(MutableMapping[_grid_keys, Block]):
             # There's a buffer region since large embedded areas may
             # be interpreted as small air pockets, that's fine.
             if not ((-15, -15, -15) <= pos <= (40, 40, 40)):
-                LOGGER.warning('Attempted leak at {}', pos)
-                continue
+                # We're too early to actually visualise anything.
+                raise user_errors.UserError(user_errors.TOK_BRUSHLOC_LEAK)
 
             # For go we need to determine which kind to use.
             # We only fill from underneath the surface, so
