@@ -1377,8 +1377,8 @@ def run_vbsp(
             with open(pointfile) as f:
                 for line in f:
                     points.append(Vec.from_str(line.strip()))
-            # Preserve this.
-            os.replace(pointfile, pointfile[:-4] + ".bee2.lin")
+            # Preserve this, rename to match the error map we generate.
+            os.replace(pointfile, pointfile[:-4] + ".error.lin")
             raise errors.UserError(errors.TOK_VBSP_LEAK, leakpoints=points)
 
     if code != 0:
