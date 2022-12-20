@@ -195,7 +195,7 @@ class Condition:
     source: str = None
 
     @classmethod
-    def parse(cls, prop_block: Property) -> Condition:
+    def parse(cls, prop_block: Property, *, toplevel: bool) -> Condition:
         """Create a condition from a Property block."""
         flags: list[Property] = []
         results: list[Property] = []
@@ -222,6 +222,11 @@ class Condition:
                 prop.name = 'switch'
                 else_results.append(prop)
             elif prop.name == 'priority':
+                if not toplevel:
+                    LOGGER.warning(
+                        'Condition has priority definition, but is not at the toplevel! '
+                        'This will not function:\n{}', prop_block
+                    )
                 try:
                     priority = Decimal(prop.value)
                 except ArithmeticError:
@@ -663,7 +668,7 @@ def make_result_setup(*names: str) -> Callable[[CallableT], CallableT]:
 
 def add(prop_block: Property) -> None:
     """Parse and add a condition to the list."""
-    con = Condition.parse(prop_block)
+    con = Condition.parse(prop_block, toplevel=True)
     if con.results or con.else_results:
         conditions.append(con)
 
@@ -1220,7 +1225,7 @@ def res_timed_relay(vmf: VMF, res: Property) -> Callable[[Entity], None]:
 @make_result('condition')
 def res_sub_condition(coll: collisions.Collisions, info: MapInfo, res: Property) -> ResultCallable:
     """Check a different condition if the outer block is true."""
-    cond = Condition.parse(res)
+    cond = Condition.parse(res, toplevel=False)
 
     def test_cond(inst: Entity) -> None:
         """For child conditions, we need to check every time."""
