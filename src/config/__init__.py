@@ -293,6 +293,10 @@ class ConfigSpec:
                 # Don't try to parse, it'll be invalid.
                 continue
             elif version != info.version:
+                LOGGER.warning(
+                    'Upgrading config section "{}" from {} -> {}',
+                    info.name, version, info.version,
+                )
                 upgraded = True
             data_map: Dict[str, Data] = {}
             conf[cls] = data_map

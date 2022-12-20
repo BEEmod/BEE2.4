@@ -14,6 +14,7 @@
 ### Enhancements
 * If funnel music is disabled, keep the base music playing while inside funnels.
 * Tweak the naming for the chamber thumbnail options to be a little more clear.
+* Add option to disable modifying the FGD file.
 
 ### Bugfixes
 * Do not composite signage VTFs with PeTI backgrounds.

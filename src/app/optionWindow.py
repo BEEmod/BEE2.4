@@ -13,7 +13,7 @@ import srctools.logger
 import packages
 from app.tooltip import add_tooltip
 from app import (
-    TK_ROOT, LAUNCH_AFTER_EXPORT, PRESERVE_RESOURCES, DEV_MODE, background_run,
+    TK_ROOT, LAUNCH_AFTER_EXPORT, DEV_MODE, background_run,
     contextWin, gameMan, localisation, tk_tools, sound, logWindow, img, UI,
 )
 from config.gen_opts import GenOptions, AfterExport
@@ -465,7 +465,6 @@ async def init_dev_tab(f: ttk.Frame) -> None:
     make_checkbox(
         frm_check, 'preserve_resources',
         desc=TransToken.ui('Preserve Game Directories'),
-        var=PRESERVE_RESOURCES,
         tooltip=TransToken.ui(
             'When exporting, do not copy resources to \n"bee2/" and "sdk_content/maps/bee2/".\n'
             "Only enable if you're developing new content, to ensure it is not overwritten."
@@ -473,10 +472,19 @@ async def init_dev_tab(f: ttk.Frame) -> None:
     ).grid(row=1, column=1, sticky='W')
 
     make_checkbox(
+        frm_check, 'preserve_fgd',
+        desc=TransToken.ui('Preserve FGD'),
+        tooltip=TransToken.ui(
+            'When exporting, do not modify the FGD files.\n'
+            "Enable this if you have a custom one, to prevent it from being overwritten."
+        ),
+    ).grid(row=2, column=1, sticky='W')
+
+    make_checkbox(
         frm_check, 'show_log_win',
         desc=TransToken.ui('Show Log Window'),
         tooltip=TransToken.ui('Show the log file in real-time.'),
-    ).grid(row=2, column=1, sticky='W')
+    ).grid(row=3, column=1, sticky='W')
 
     make_checkbox(
         frm_check, 'force_all_editor_models',
@@ -485,7 +493,7 @@ async def init_dev_tab(f: ttk.Frame) -> None:
             'Make all props_map_editor models available for use. Portal 2 has a limit of 1024 '
             'models loaded in memory at once, so we need to disable unused ones to free this up.'
         ),
-    ).grid(row=3, column=1, sticky='W')
+    ).grid(row=4, column=1, sticky='W')
 
     frm_btn1 = ttk.Frame(f)
     frm_btn1.grid(row=2, column=0, sticky='ew')

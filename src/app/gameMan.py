@@ -7,7 +7,7 @@ Does stuff related to the actual games.
 """
 from __future__ import annotations
 
-from typing import NoReturn, Optional, Union, Any, Type, IO, Iterable, Iterator, cast
+from typing import NoReturn, Optional, Union, Any, Type, IO, Iterable, Iterator
 from pathlib import Path
 
 from tkinter import *  # ui library
@@ -716,6 +716,7 @@ class Game:
 
             export_screen.step('EXP', 'style-conf')
 
+            conf = config.APP.get_cur_conf(GenOptions)
             vpk_success = True
 
             # Export each object type.
@@ -841,7 +842,7 @@ class Game:
             self.edit_gameinfo(True)
             export_screen.step('EXP', 'gameinfo')
 
-            if not config.APP.get_cur_conf(GenOptions).preserve_resources:
+            if not config.APP.get_cur_conf(GenOptions).preserve_fgd:
                 LOGGER.info('Adding ents to FGD.')
                 self.edit_fgd(True)
             export_screen.step('EXP', 'fgd')
@@ -1269,7 +1270,7 @@ def load() -> None:
     global selected_game
     all_games.clear()
     for gm in CONFIG:
-        if gm != 'DEFAULT':
+        if gm != CONFIG.default_section:
             try:
                 new_game = Game.parse(gm, CONFIG)
             except ValueError:
