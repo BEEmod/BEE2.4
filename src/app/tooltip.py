@@ -49,9 +49,10 @@ context_label.grid(row=0, column=0)
 
 @attr.frozen
 class TooltipData:
-    """The current text for a widget."""
+    """The current configuration for a widget."""
     text: TransToken
     img: 'img.Handle | None'
+    delay: int
 
 DATA: weakref.WeakKeyDictionary[tk.Misc, TooltipData] = weakref.WeakKeyDictionary()
 
@@ -128,12 +129,25 @@ def set_tooltip(
     widget: tk.Misc,
     text: TransToken=TransToken.BLANK,
     image: img.Handle=None,
+    *,
+    delay: int=-1,
 ) -> None:
-    """Change the tooltip for a widget."""
+    """Change the tooltip for a widget.
+
+    Keyword arguments will not change settings if unset.
+    """
     if isinstance(text, str):
         warnings.warn(f'Untranslated text {text!r}!', DeprecationWarning, stacklevel=2)
         text = TransToken.untranslated(text)
-    DATA[widget] = TooltipData(text, image)
+    try:
+        old = DATA[widget]
+    except KeyError:
+        raise ValueError('add_tooltip() must be called before set_tooltip()!') from None
+
+    DATA[widget] = TooltipData(
+        text, image,
+        delay if delay >= 0 else old.delay,
+    )
 
 
 def add_tooltip(
@@ -157,7 +171,7 @@ def add_tooltip(
         warnings.warn(f'Untranslated text {text!r}!', DeprecationWarning, stacklevel=2)
         text = TransToken.untranslated(text)
 
-    set_tooltip(targ_widget, text, image)
+    DATA[targ_widget] = TooltipData(text, image, delay)
 
     event_id = None  # The id of the enter event, so we can cancel it.
 
@@ -186,7 +200,7 @@ def add_tooltip(
             if disabled_check is not None and not disabled_check(('!disabled',)):
                 return
             event_id = TK_ROOT.after(
-                delay,
+                data.delay,
                 after_complete,
                 event.x_root, event.y_root,
             )
