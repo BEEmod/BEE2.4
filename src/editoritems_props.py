@@ -78,12 +78,21 @@ class ItemPropKind(Generic[ValueT]):
 
 class ItemProp(Generic[ValueT]):
     """A property for an item."""
-    def __init__(self, kind: ItemPropKind[ValueT], default: str, index: int, allow_user_default: bool) -> None:
+    def __init__(
+        self,
+        kind: ItemPropKind[ValueT],
+        default: str,
+        index: int,
+        allow_user_default: bool,
+        desc: TransToken,
+    ) -> None:
         self.kind = kind
         self.default = kind.parse(default)
         self.index = index
-        # Is overridden for subtypes.
+        # The item author and kind must both allow alteration, and it also must not be the
+        # SubtypeProperty.
         self.allow_user_default = kind.allow_user_default and allow_user_default
+        self.desc = desc
 
     def __repr__(self) -> str:
         """Generic repr() for properties."""
