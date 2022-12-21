@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: https://github.com/BEEmod/BEE2.4/issues\n"
-"POT-Creation-Date: 2022-12-08 14:52+1000\n"
+"POT-Creation-Date: 2022-12-21 13:14+1000\n"
 "PO-Revision-Date: 2021-06-07 15:18+0200\n"
 "Last-Translator: \n"
 "Language: pl\n"
@@ -113,6 +113,14 @@ msgstr ""
 #. This uses HTML syntax.
 #: user_errors.py
 msgid "See the documentation"
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"One or more items were placed ouside the map! Move these back inside the "
+"map, or delete them. Items with no collision (like Half Walls or logic "
+"gates) can be left when rooms are moved, look for those."
 msgstr ""
 
 #. This uses HTML syntax.
@@ -1391,6 +1399,13 @@ msgstr ""
 "ponownie."
 
 #: app/gameMan.py
+msgid ""
+"Copying compiler file {file} failed. Ensure {game} is not running. The "
+"webserver for the error display may also be running, quit the vrad "
+"process or wait a few minutes."
+msgstr ""
+
+#: app/gameMan.py
 msgid "Copying compiler file {file} failed. Ensure {game} is not running."
 msgstr ""
 "Kopiowanie pliku kompilatora {file} nie powiodło się. Upewnij się, że gra"
@@ -2099,6 +2114,17 @@ msgstr ""
 " została nadpisana."
 
 #: app/optionWindow.py
+msgid "Preserve FGD"
+msgstr ""
+
+#: app/optionWindow.py
+msgid ""
+"When exporting, do not modify the FGD files.\n"
+"Enable this if you have a custom one, to prevent it from being "
+"overwritten."
+msgstr ""
+
+#: app/optionWindow.py
 msgid "Show Log Window"
 msgstr "Pokazuj okno logów"
 
@@ -2535,3 +2561,4 @@ msgstr ""
 
 #~ msgid "Gel Type"
 #~ msgstr "Wybierz styl"
+

@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2022-12-08 14:52+1000\n"
+"POT-Creation-Date: 2022-12-21 13:14+1000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: es\n"
@@ -112,6 +112,14 @@ msgstr ""
 #. This uses HTML syntax.
 #: user_errors.py
 msgid "See the documentation"
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"One or more items were placed ouside the map! Move these back inside the "
+"map, or delete them. Items with no collision (like Half Walls or logic "
+"gates) can be left when rooms are moved, look for those."
 msgstr ""
 
 #. This uses HTML syntax.
@@ -1419,6 +1427,13 @@ msgstr ""
 "exportar de nuevo."
 
 #: app/gameMan.py
+msgid ""
+"Copying compiler file {file} failed. Ensure {game} is not running. The "
+"webserver for the error display may also be running, quit the vrad "
+"process or wait a few minutes."
+msgstr ""
+
+#: app/gameMan.py
 #, fuzzy
 msgid "Copying compiler file {file} failed. Ensure {game} is not running."
 msgstr ""
@@ -2128,6 +2143,17 @@ msgstr ""
 "este no sea reemplazado."
 
 #: app/optionWindow.py
+msgid "Preserve FGD"
+msgstr ""
+
+#: app/optionWindow.py
+msgid ""
+"When exporting, do not modify the FGD files.\n"
+"Enable this if you have a custom one, to prevent it from being "
+"overwritten."
+msgstr ""
+
+#: app/optionWindow.py
 msgid "Show Log Window"
 msgstr "Mostrar la Ventana Log"
 
@@ -2526,3 +2552,4 @@ msgstr "Pasillo"
 #: test/test_transtoken.py
 msgid "Save As"
 msgstr ""
+
