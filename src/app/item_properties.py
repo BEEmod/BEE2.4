@@ -31,6 +31,7 @@ EnumT = TypeVar('EnumT', bound=Enum)
 
 PIST_PROPS = [all_props.prop_pist_lower, all_props.prop_pist_upper]
 
+
 class PropGroup:
     """A group of widgets for modifying one or more props."""
     LARGE: ClassVar[bool] = False
@@ -48,6 +49,9 @@ class PropGroup:
         """Export options from the UI configuration."""
         raise NotImplementedError
 
+    def set_tooltip(self, tok: TransToken) -> None:
+        """Set a user tooltip on this group."""
+
 # The prop kinds that require this group, then a function to create it.
 PropGroupFactory: TypeAlias = Tuple[List[ItemPropKind], Callable[[ttk.Frame], PropGroup]]
 
@@ -61,12 +65,18 @@ class BoolPropGroup(PropGroup):
             raise ValueError(f'Non-boolean property {prop}!')
         self.var = tk.BooleanVar(value=False)
         self.check = ttk.Checkbutton(self.frame, variable=self.var)
+        # Showing when disabled is required for Start Active's logic.
+        tooltip.add_tooltip(self.check, show_when_disabled=True)
         self.check.grid(row=0, column=0)
 
     @classmethod
     def factory(cls, prop: ItemPropKind[bool]) -> PropGroupFactory:
         """Make the tuple used in PROP_GROUPS."""
         return ([prop], lambda frame: cls(frame, prop))
+
+    def set_tooltip(self, tok: TransToken) -> None:
+        """Set a user tooltip on this group."""
+        tooltip.set_tooltip(self.check, tok)
 
     def apply_conf(self, options: dict[ItemPropKind, str]) -> None:
         """Apply the specified options to the UI."""
@@ -96,6 +106,7 @@ class ComboPropGroup(PropGroup, Generic[EnumT]):
         self.combo = ttk.Combobox(self.frame, exportselection=False)
         self.combo.state(['readonly'])  # Disallow typing text.
         localisation.add_callback(call=True)(self._update_combo)
+        tooltip.add_tooltip(self.combo)
         self.combo.grid(row=0, column=0)
 
     def _update_combo(self) -> None:
@@ -106,6 +117,10 @@ class ComboPropGroup(PropGroup, Generic[EnumT]):
     def factory(cls, prop: ItemPropKind[EnumT], values: dict[EnumT, TransToken]) -> PropGroupFactory:
         """Make the factory used in PROP_GROUPS."""
         return ([prop], lambda parent: cls(parent, prop, values))
+
+    def set_tooltip(self, tok: TransToken) -> None:
+        """Set a user tooltip on this group."""
+        tooltip.set_tooltip(self.combo, tok)
 
     def apply_conf(self, options: dict[ItemPropKind, str]) -> None:
         """Apply the specified options to the UI."""
@@ -138,6 +153,7 @@ class TimerPropGroup(PropGroup):
             orient="horizontal",
             command=self.widget_changed,
         )
+        tooltip.add_tooltip(self.scale)
         self.scale.grid(row=0, column=0)
         self.old_val = 3
         self._enable_cback = True
@@ -155,6 +171,10 @@ class TimerPropGroup(PropGroup):
         """Get the current UI configuration."""
         cur_value = round(self.scale.get())
         yield all_props.prop_timer_delay, str(cur_value)
+
+    def set_tooltip(self, tok: TransToken) -> None:
+        """Set a user tooltip on this group."""
+        tooltip.set_tooltip(self.scale, tok)
 
     def widget_changed(self, val: str) -> None:
         """Called when the widget changes."""
@@ -185,7 +205,7 @@ class TrackStartActivePropGroup(BoolPropGroup):
         super().__init__(parent, prop)
         self.osc_prop: Optional[BoolPropGroup] = None
         self.has_osc = False
-        tooltip.add_tooltip(self.check, show_when_disabled=True, delay=100)
+        self.user_tooltip = TransToken.BLANK
 
     def apply_conf(self, options: dict[ItemPropKind, str]) -> None:
         """Apply the configuration to the UI."""
@@ -219,11 +239,23 @@ class TrackStartActivePropGroup(BoolPropGroup):
         """Update the enabled/disabled state."""
         if self.osc_prop is not None and self.has_osc and not self.osc_prop.var.get():
             self.check.state(('disabled', ))
-            tooltip.set_tooltip(self.check, TRANS_START_ACTIVE_DISABLED)
+            if self.user_tooltip:
+                tooltip.set_tooltip(self.frame, TransToken.untranslated('\n').join([
+                    TRANS_START_ACTIVE_DISABLED,
+                    self.user_tooltip,
+                    # Decrease delay, the widget isn't interactive.
+                ]), delay=100)
+            else:
+                tooltip.set_tooltip(self.frame, TRANS_START_ACTIVE_DISABLED, delay=100)
             self.var.set(False)
         else:
             self.check.state(('!disabled', ))
-            tooltip.set_tooltip(self.check, TransToken.BLANK)
+            tooltip.set_tooltip(self.frame, self.user_tooltip, delay=500)
+
+    def set_tooltip(self, tok: TransToken) -> None:
+        """Set a user tooltip on this group."""
+        self.user_tooltip = tok
+        self._update()
 
 
 class PistonPropGroup(PropGroup):
@@ -473,8 +505,9 @@ PROP_GROUPS: list[PropGroupFactory] = [
 ]
 
 
-def has_editable(item: Item, props: List[ItemPropKind]) -> bool:
-    """Check if any of these properties are present in the item and are editable."""
+def editable_props(item: Item, props: List[ItemPropKind]) -> List[all_props.ItemProp]:
+    """Return the properties in this item that match our props which can be edited."""
+    found: list[all_props.ItemProp] = []
     for kind in props:
         # Subtype properties get their default overridden.
         if kind is item.subtype_prop:
@@ -484,8 +517,8 @@ def has_editable(item: Item, props: List[ItemPropKind]) -> bool:
         except KeyError:
             continue
         if prop.allow_user_default:
-            return True
-    return False
+            found.append(prop)
+    return found
 
 
 class PropertyWindow:
@@ -530,7 +563,7 @@ class PropertyWindow:
         """Check if any properties on this item could be edited."""
         LOGGER.info('Can edit: {}', item.properties)
         for group, factory in PROP_GROUPS:
-            if has_editable(item, group):
+            if editable_props(item, group):
                 return True
         return False
 
@@ -545,8 +578,8 @@ class PropertyWindow:
 
         out: dict[ItemPropKind, str] = {}
         out.update(old_conf.defaults)  # Keep any extra values, just in case.
-        for group in self.groups:
-            if group is None:
+        for (props, factory), group in zip(PROP_GROUPS, self.groups):
+            if group is None or not editable_props(self.cur_item, props):
                 continue
             for prop_kind, value in group.get_conf():
                 try:
@@ -589,7 +622,8 @@ class PropertyWindow:
         # Go through all our groups, constructing them if required.
         for i, (props, factory) in enumerate(PROP_GROUPS):
             maybe_group = self.groups[i]
-            if has_editable(item, props):
+            editable = editable_props(item, props)
+            if editable:
                 if maybe_group is not None:
                     group = maybe_group
                 else:
@@ -601,6 +635,13 @@ class PropertyWindow:
                     oscillating_prop = group
                 elif isinstance(group, TrackStartActivePropGroup):
                     start_active_prop = group
+                tooltip_bits = [prop.desc for prop in editable if prop.desc]
+                if len(tooltip_bits) > 1:
+                    group.set_tooltip(TransToken.untranslated('\n').join(tooltip_bits))
+                elif len(tooltip_bits) == 1:
+                    group.set_tooltip(tooltip_bits[0])
+                else:
+                    group.set_tooltip(TransToken.BLANK)
             elif maybe_group is not None:  # Constructed but now hiding.
                 maybe_group.label.grid_forget()
                 maybe_group.frame.grid_forget()
