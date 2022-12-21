@@ -145,7 +145,7 @@ class PygletSound(NullSound):
                 sounds = NullSound()
                 return 0.1
             duration = snd.duration
-            if duration is None:
+            if duration is not None:
                 return duration
             else:
                 LOGGER.warning('No duration: {}', sound)
