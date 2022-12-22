@@ -7,6 +7,8 @@ from weakref import WeakKeyDictionary
 from enum import Enum
 from typing import NamedTuple, MutableMapping
 
+import attrs
+
 from precomp import brushLoc, options, packing, conditions
 from precomp.conditions.globals import precache_model
 from precomp.instanceLocs import resolve as resolve_inst
@@ -540,9 +542,10 @@ class CubePair:
         tint: Vec=None,
     ):
         self.cube_type = cube_type
+        # This may be None if it's a dropper-only pair.
         self.cube = cube
 
-        # May be None for dropperless!
+        # These may be None, if dropperless!
         self.drop_type = drop_type
         self.dropper = dropper
 
@@ -561,6 +564,9 @@ class CubePair:
 
         # If set, the cube has this paint type.
         self.paint_type: CubePaintType | None = None
+
+        # If set, this is quantum-entangled.
+        self.superpos: Superposition | None = None
 
         self.tint = tint  # If set, Colorizer color to use.
 
@@ -596,6 +602,16 @@ class CubePair:
         # Cache of comp_kv_setters adding outputs to dropper ents.
         self._kv_setters: dict[str, Entity] = {}
 
+    @property
+    def is_superpos_ghost(self) -> bool:
+        """Return if this is the superpos ghost pair."""
+        return self.superpos is not None and self.superpos.ghost is self
+
+    @property
+    def is_superpos_real(self) -> bool:
+        """Return if this is the superpos real pair."""
+        return self.superpos is not None and self.superpos.real is self
+
     def __repr__(self) -> str:
         drop_id = drop = cube = ''
         if self.dropper:
@@ -607,7 +623,7 @@ class CubePair:
         return f'<CubePair{drop_id} -> "{self.cube_type.id}": {drop!r} -> {cube!r}, {self.tint!s}>'
 
     def use_rusty_version(self, has_gel: bool) -> bool:
-        """Check if we can can use the rusty version.
+        """Check if we can use the rusty version.
 
         This is only allowed if it's one of Valve's cubes,
         no color is used, and no gels are present.
@@ -633,6 +649,14 @@ class CubePair:
                 target=name,
             )
             return kv_setter
+
+
+@attrs.define
+class Superposition:
+    """Joins two cube pairs into a quantum-entangled superposition cube pair."""
+    real: CubePair
+    ghost: CubePair
+    swap_inst: Entity  # The superposition item itself, with the logic for swapping.
 
 
 def parse_conf(conf: Property):
