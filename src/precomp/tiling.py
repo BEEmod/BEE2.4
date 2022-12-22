@@ -2309,6 +2309,7 @@ def generate_goo(vmf: VMF) -> None:
     )
     trig_phys.add_out(
         Output('OnStartTouch', '!activator', 'SilentDissolve'),
+        Output('OnStartTouch', '!activator', 'CallScriptFunction', 'FellInGoo', delay=0.01),
         Output('OnStartTouch', '!activator', 'Kill', delay=0.1),
     )
 

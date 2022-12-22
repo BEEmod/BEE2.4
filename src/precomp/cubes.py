@@ -1588,11 +1588,13 @@ def make_cube(
         # If in droppers, disable portal funnelling until it falls out.
         ent['AllowFunnel'] = not in_dropper
         ent['angles'] = angles
-        # Add a dummy entity to force fixup names.
+        # Add a dummy entity to force fixup names. We don't need it to exist, just be in the
+        # map file so point_template thinks it needs to do fixup.
         vmf.create_ent(
             'info_null',
             targetname=conditions.local_name(targ_inst, 'cube_addon_superpos_dummy'),
             parentname=conditions.local_name(targ_inst, 'box'),
+            origin=origin,
         )
         return False, ent
 
@@ -2003,6 +2005,26 @@ def generate_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
                     CubeVoiceEvents.RESPAWN_CCUBE.add_out(drop_cube, 'OnFizzled')
                 else:
                     CubeVoiceEvents.RESPAWN_NORM.add_out(drop_cube, 'OnFizzled')
+
+            # For ghost cubes, they're not prop_weighted_cube, so OnFizzled doesn't work for goo.
+            # Move it to a relay, call that instead.
+            if pair.is_superpos_ghost:
+                fizzle_rl = vmf.create_ent(
+                    'logic_relay',
+                    targetname=f'{pair.dropper["targetname"]}_respawn_rl',
+                    origin=drop_cube['origin'],
+                )
+                cube_outputs = drop_cube.outputs
+                drop_cube.outputs = [
+                    Output('OnFizzled', fizzle_rl, 'Trigger'),
+                ]
+                for out in cube_outputs:
+                    if out.output.casefold() == 'onfizzled':
+                        out.output = 'OnTrigger'
+                        fizzle_rl.outputs.append(out)
+                        out.only_once = False
+                    else:
+                        drop_cube.outputs.append(out)
 
         if pair.cube:
             pos = Vec.from_str(pair.cube['origin'])
