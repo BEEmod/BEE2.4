@@ -1941,6 +1941,16 @@ def generate_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
                     kv_name='filtername',
                     kv_value_global=conditions.local_name(pair.dropper, pair.drop_type.filter_name),
                 )
+                # Ghost doesn't support the Fizzle input, hook that up ourselves.
+                if pair.is_superpos_ghost:
+                    pair.get_kv_setter(drop_done_name).add_out(Output(
+                        drop_done_command,'!activator',
+                        'CallScriptFunction','Spawned',
+                    ))
+                    drop_cube.outputs.append(Output(
+                        'OnUser1', '!self',
+                        'CallScriptFunction', 'FizzleIfOutside',
+                    ))
 
             # After it spawns, swap the cube type back to the actual value
             # for the item. Then it'll properly behave with gel, buttons,
