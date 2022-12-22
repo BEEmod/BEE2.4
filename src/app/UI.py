@@ -1642,7 +1642,7 @@ async def init_windows() -> None:
                 f'+{windows["pal"].winfo_reqwidth() + 50}+{TK_ROOT.winfo_rooty()}'
             )
         else:
-            TK_ROOT.geometry(f'{TK_ROOT.winfo_rootx()}+{TK_ROOT.winfo_rooty()}')
+            TK_ROOT.geometry(f'+{TK_ROOT.winfo_rootx()}+{TK_ROOT.winfo_rooty()}')
     else:
         start_x, start_y = tk_tools.adjust_inside_screen(
             main_win_state.x, main_win_state.y,
