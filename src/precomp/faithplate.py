@@ -191,7 +191,7 @@ def associate_faith_plates(vmf: VMF) -> None:
         PLATES[name] = PaintDropper(instances[name], trig, pos)
 
 
-def gen_faithplates(vmf: VMF) -> None:
+def gen_faithplates(vmf: VMF, has_superpos: bool) -> None:
     """Place the targets and catapults into the map."""
     # Target positions -> list of triggers wanting to aim there.
     pos_to_trigs: dict[
@@ -227,6 +227,8 @@ def gen_faithplates(vmf: VMF) -> None:
             elif plate.trig_offset:
                 for solid in trig.solids:
                     solid.translate(plate.trig_offset)
+            if has_superpos:
+                trig['filtername'] = '@not_superpos_ghost_filter'
 
     # Now, generate each target needed.
     for pos_or_tile, trigs in pos_to_trigs.items():
