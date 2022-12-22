@@ -252,6 +252,15 @@ TOK_CUBE_DROPPER_LINKED = TransToken.ui(
     'Dropper above custom cube of type <var>{type}</var> is already linked! Custom cubes convert'
     'droppers above them into their type, to allow having droppers.',
 )
+TOK_CUBE_SUPERPOS_BAD_REAL = TransToken.ui(
+    'Superposition Entanglers must be placed on top of a single dropper.'
+)
+TOK_CUBE_SUPERPOS_BAD_GHOST = TransToken.ui(
+    'Superposition Entanglers must be connected to a single dropper, not any other items.'
+)
+TOK_CUBE_SUPERPOS_MULTILINK = TransToken.ui(
+    'Two Superposition Entanglers cannot be connected to a single dropper!'
+)
 
 TOK_BARRIER_HOLE_FOOTPRINT = TransToken.ui(
     'A glass/grating Hole does not have sufficent space. The entire highlighted yellow area should '

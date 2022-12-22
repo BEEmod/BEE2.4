@@ -7,14 +7,14 @@ from weakref import WeakKeyDictionary
 from enum import Enum
 from typing import NamedTuple, MutableMapping
 
-import attrs
-
-from precomp import brushLoc, options, packing, conditions
-from precomp.conditions.globals import precache_model
-from precomp.instanceLocs import resolve as resolve_inst
 from srctools.vmf import VMF, Entity, EntityFixup, Output
 from srctools import EmptyMapping, Property, Vec, Matrix, Angle
 import srctools.logger
+import attrs
+
+from precomp import brushLoc, options, packing, conditions, connections
+from precomp.conditions.globals import precache_model
+from precomp.instanceLocs import resolve as resolve_inst
 import user_errors
 
 
@@ -1317,8 +1317,9 @@ def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
         drop_type = inst_to_drop[dropper['file'].casefold()]
         PAIRS.append(CubePair(cube_type, drop_type, dropper=dropper))
 
-    # Check for colorisers and gel splats in the map, and apply those.
+    # Check for colorisers, superpos entanglers and gel splats in the map, and apply those.
     coloriser_inst = resolve_inst('<ITEM_BEE2_CUBE_COLORISER>', silent=True)
+    superpos_inst = resolve_inst('<ITEM_BEE2_SUPERPOSITION_ENTANGLER>', silent=True)
     splat_inst = resolve_inst('<ITEM_PAINT_SPLAT>', silent=True)
 
     for inst in vmf.by_class['func_instance']:
@@ -1326,6 +1327,8 @@ def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
 
         if file in coloriser_inst:
             kind = coloriser_inst
+        elif file in superpos_inst:
+            kind = superpos_inst
         elif file in splat_inst:
             kind = splat_inst
         else:
@@ -1379,6 +1382,54 @@ def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
                     used = True
             if used:
                 inst.remove()
+        elif kind is superpos_inst:
+            try:
+                superpos_item = connections.ITEMS[inst['targetname']]
+            except KeyError:
+                LOGGER.warning('No item for superpos instance "{}"!', inst['targetname'])
+                continue
+            real_pair: CubePair
+            conn: connections.Connection
+            try:
+                # Don't link to dropperless cubes.
+                [real_pair] = filter(lambda p: p.dropper is not None, pairs)
+            except ValueError:
+                raise user_errors.UserError(
+                    user_errors.TOK_CUBE_SUPERPOS_BAD_REAL,
+                    voxels=[Vec.from_str(inst['origin'])],
+                )
+            try:
+                [conn] = superpos_item.outputs
+                ghost_pair = INST_TO_PAIR[conn.to_item.inst]
+            except (ValueError, KeyError):
+                raise user_errors.UserError(
+                    user_errors.TOK_CUBE_SUPERPOS_BAD_GHOST,
+                    voxels=[Vec.from_str(inst['origin'])],
+                )
+            conn.remove()
+            superpos_item.delete_antlines()
+            if real_pair.superpos is not None:
+                raise user_errors.UserError(
+                    user_errors.TOK_CUBE_SUPERPOS_MULTILINK,
+                    voxels=[
+                        Vec.from_str(inst['origin']),
+                        Vec.from_str(real_pair.dropper['origin']),
+                    ]
+                )
+            if ghost_pair.superpos is not None:
+                raise user_errors.UserError(
+                    user_errors.TOK_CUBE_SUPERPOS_MULTILINK,
+                    voxels=[
+                        Vec.from_str(inst['origin']),
+                        Vec.from_str(ghost_pair.dropper['origin']),
+                    ]
+                )
+            real_pair.superpos = ghost_pair.superpos = superpos = Superposition(
+                real_pair, ghost_pair, inst,
+            )
+            LOGGER.info('Superpos link: {}', superpos)
+        else:
+            raise AssertionError(f'Unknown kind {kind!r}?')
 
     # After that's done, save what cubes are present for filter optimisation,
     # and set Voice 'Has' attrs.
