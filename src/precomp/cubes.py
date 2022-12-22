@@ -136,6 +136,7 @@ class CubeOutputs(Enum):
     SPAWN = 'OnSpawn'  # When created - !self replaced by cube.
     FIZZLED = 'OnFizzle'  # When dissolved...
     DROP_DONE = 'OnFinishedDrop'  # When totally out of the dropper.
+    # When picked up/dropped by the player.
     ON_PICKUP = 'OnPickup'
     ON_DROP = 'OnDrop'
 
@@ -314,6 +315,7 @@ class DropperType:
         out_start_drop: tuple[str | None, str],
         out_finish_drop: tuple[str | None, str],
         in_respawn: tuple[str | None, str],
+        filter_name: str,
         bounce_paint_file: str,
     ) -> None:
         self.id = drop_id
@@ -331,6 +333,9 @@ class DropperType:
 
         # Instance input to respawn the cube.
         self.in_respawn = in_respawn
+
+        # Name of the filter which detects only the cube, used to link up superpos logic.
+        self.filter_name = filter_name
 
         # The instance to use to bounce-paint the dropped cube.
         self.bounce_paint_file = bounce_paint_file
@@ -358,14 +363,15 @@ class DropperType:
             cube_orient = Angle()
 
         return cls(
-            conf['id'].upper(),
-            conf['itemid'],
-            conf.vec('cube_pos'),
-            cube_orient,
+            drop_id=conf['id'].upper(),
+            item_id=conf['itemid'],
+            cube_pos=conf.vec('cube_pos'),
+            cube_orient=cube_orient,
             out_start_drop=Output.parse_name(conf['OutStartDrop']),
             out_finish_drop=Output.parse_name(conf['OutFinishDrop']),
             in_respawn=Output.parse_name(conf['InputRespawn']),
             bounce_paint_file=conf['BluePaintInst', ''],
+            filter_name=conf['filtername', 'filter'],
         )
 
 
@@ -435,7 +441,7 @@ class CubeType:
         self.color_in_map = False
 
     @classmethod
-    def parse(cls, conf: Property):
+    def parse(cls: type[CubeType], conf: Property) -> CubeType:
         """Parse from vbsp_config."""
         cube_id = conf['id'].upper()
 
@@ -1401,6 +1407,8 @@ def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
             try:
                 [conn] = superpos_item.outputs
                 ghost_pair = INST_TO_PAIR[conn.to_item.inst]
+                if ghost_pair.dropper is None:
+                    raise ValueError
             except (ValueError, KeyError):
                 raise user_errors.UserError(
                     user_errors.TOK_CUBE_SUPERPOS_BAD_GHOST,
@@ -1427,6 +1435,9 @@ def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
             real_pair.superpos = ghost_pair.superpos = superpos = Superposition(
                 real_pair, ghost_pair, inst,
             )
+            inst.fixup['$ghost_alpha'] = min(255, max(0, options.get(
+                int, 'superposition_ghost_alpha',
+            )))
             LOGGER.info('Superpos link: {}', superpos)
         else:
             raise AssertionError(f'Unknown kind {kind!r}?')
@@ -1540,6 +1551,51 @@ def make_cube(
         angles = Angle(0, 180, 0) @ Angle.from_str(pair.cube['angles'])
         targ_inst = pair.cube
 
+    cust_model = cube_type.model
+    pack: str | list[str] | None = cube_type.pack
+
+    if is_frank:
+        # No tinting or custom models for this.
+        cust_model = pack = None
+        rendercolor = '255 255 255'
+    elif pair.tint is not None:
+        cust_model = cube_type.model_color
+        pack = cube_type.pack_color
+        # Multiply the two tints together.
+        # a/255 * b/255 * 255 -> a*b/255
+        r = cube_type.base_tint.x * pair.tint.x // 255
+        g = cube_type.base_tint.y * pair.tint.y // 255
+        b = cube_type.base_tint.z * pair.tint.z // 255
+        ent['rendercolor'] = rendercolor = f'{int(r)} {int(g)} {int(b)}'
+    else:
+        ent['rendercolor'] = rendercolor = cube_type.base_tint
+
+    if pair.superpos is not None and pair.is_superpos_ghost:
+        # Superposition ghost cubes are regular physics props, most of this functionality doesn't
+        # apply.
+        del ent['PaintPower']
+        ent['classname'] = 'prop_physics_override'
+        ent['rendermode'] = '9'  # World Space Glow
+        ent['renderamt'] = ghost_alpha = pair.superpos.swap_inst.fixup['$ghost_alpha']
+        ent['responsecontext'] = 'nofizzle:1,superpos_ghost:1'
+        ent['spawnflags'] = 1048576 | 256  # Can always pickup, generate output on USE.
+        ent['vscripts'] = 'BEE2/superpos_ghost.nut'
+        ent['thinkfunction'] = 'Think'
+        # The VScript needs to know the color, so it can reset after painting.
+        ent['vscript_init_code'] = f"ghost_color <- `{rendercolor}`; ghost_alpha <- {ghost_alpha}"
+
+        ent['model'] = cust_model or DEFAULT_MODELS[cube_type.type]
+        # If in droppers, disable portal funnelling until it falls out.
+        ent['AllowFunnel'] = not in_dropper
+        ent['angles'] = angles
+        # Add a dummy entity to force fixup names.
+        vmf.create_ent(
+            'info_null',
+            targetname=conditions.local_name(targ_inst, 'cube_addon_superpos_dummy'),
+            parentname=conditions.local_name(targ_inst, 'box'),
+        )
+        return False, ent
+
     if pair.paint_type is not None:
         if is_frank:
             # Special case - frankenturrets don't have inputs for it.
@@ -1633,9 +1689,6 @@ def make_cube(
                 # Don't paint it on spawn.
                 spawn_paint = None
 
-    cust_model = cube_type.model
-    pack: str | list[str] | None = cube_type.pack
-
     has_addon_inst = False
     vscripts = []
     for addon in pair.addons:
@@ -1668,21 +1721,6 @@ def make_cube(
         packing.pack_list(vmf, addon.pack)
         if addon.vscript:
             vscripts.append(addon.vscript.strip())
-
-    if is_frank:
-        # No tinting or custom models for this.
-        cust_model = pack = None
-    elif pair.tint is not None:
-        cust_model = cube_type.model_color
-        pack = cube_type.pack_color
-        # Multiply the two tints together.
-        # a/255 * b/255 * 255 -> a*b/255
-        r = cube_type.base_tint.x * pair.tint.x // 255
-        g = cube_type.base_tint.y * pair.tint.y // 255
-        b = cube_type.base_tint.z * pair.tint.z // 255
-        ent['rendercolor'] = f'{int(r)} {int(g)} {int(b)}'
-    else:
-        ent['rendercolor'] = cube_type.base_tint
 
     if is_frank:
         ent['classname'] = 'prop_monster_box'
@@ -1772,6 +1810,11 @@ def generate_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
         # Don't include the original cube instance.
         if pair.cube:
             pair.cube.remove()
+
+        if pair.is_superpos_ghost:
+            # Ghost does not have functionality, and cannot be painted.
+            pair.addons.clear()
+            pair.paint_type = None
 
         # Add the custom model logic. But skip if we use the rusty version.
         # That overrides it to be using the normal model.
@@ -1871,9 +1914,33 @@ def generate_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
                     pair.dropper,
                     'OnUser4',
                 )
-                # After first firing, it deletes so it doesn't trigger after.
+                # After first firing, it deletes, so it doesn't trigger after.
                 out.only_once = True
                 drop_cube.add_out(out)
+
+            if pair.superpos is not None:
+                # Link up our half to the swapper instance.
+                superpos_script = conditions.local_name(pair.superpos.swap_inst, 'script')
+                kind = 'Ghost' if pair.is_superpos_ghost else 'Real'
+                pair.get_kv_setter(drop_done_name).add_out(Output(
+                    drop_done_command, superpos_script, 'CallScriptFunction',
+                    'Spawned' + kind,
+                ))
+                drop_cube.outputs.append(Output(
+                    'OnFizzled', superpos_script, 'CallScriptFunction',
+                    'Fizzled' + kind,
+                ))
+                vmf.create_ent(
+                    'comp_kv_setter',
+                    origin=pair.superpos.swap_inst['origin'],
+                    target=conditions.local_name(
+                        pair.superpos.swap_inst,
+                        'tele_ghost' if pair.is_superpos_ghost else 'tele_real',
+                    ),
+                    mode='kv',
+                    kv_name='filtername',
+                    kv_value_global=conditions.local_name(pair.dropper, pair.drop_type.filter_name),
+                )
 
             # After it spawns, swap the cube type back to the actual value
             # for the item. Then it'll properly behave with gel, buttons,

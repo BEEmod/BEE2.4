@@ -459,6 +459,12 @@ DEFAULTS = [
         lighting. It should be set to the ambient light color.
         """),
 
+    Opt('superposition_ghost_alpha', 50,
+        """The amount of transparency to give Quantum Superposition Ghost Cubes.
+        
+        Ranges from 0-255.
+        """),
+
     Opt('glass_hole_temp', TYPE.STR,
         """Template used to generate glass/grating holes. This should have 
         'large' and 'small' visgroup sections. It should range from x=60-64.
