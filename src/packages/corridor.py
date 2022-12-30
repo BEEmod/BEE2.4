@@ -407,4 +407,6 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
             if has_vert:
                 # Add a rotation handle and desired facing.
                 item.handle = editoritems.Handle.QUAD
-                item.facing = editoritems.DesiredFacing.NEGX
+                # Set desired facing so they move upright.
+                # Note unlock default items also does this!
+                item.facing = editoritems.DesiredFacing.UP

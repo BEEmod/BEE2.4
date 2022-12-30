@@ -832,7 +832,9 @@ class Game:
                     # If the Unlock Default Items stylevar is enabled, we
                     # want to force the corridors and obs room to be
                     # deletable and copyable
-                    # Also add DESIRES_UP, so they place in the correct orientation
+                    # Also add DESIRES_UP, so they place in the correct orientation.
+                    # That would have already been done for vertical-enabled corridors, but that's
+                    # fine.
                     if item.id in _UNLOCK_ITEMS:
                         all_items[i] = item = copy.copy(item)
                         item.deletable = item.copiable = True
