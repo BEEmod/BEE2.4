@@ -2,6 +2,10 @@
 
 # Version `<dev>`
 
+------------------------------------------
+
+# Version 4.43.0
+
 ## New features:
 
 * New error display system: If a known error occurs during compilation (leaks, items 
