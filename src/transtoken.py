@@ -36,7 +36,6 @@ class GetText(Protocol):
 @attrs.frozen(kw_only=True)
 class Language:
     """A language which may be loaded, and the associated translations."""
-    display_name: str
     lang_code: str
     ui_filename: Optional[Path] = None  # Filename of the UI translation, if it exists.
     _trans: Dict[str, GetText]
@@ -45,9 +44,9 @@ class Language:
 
 
 # The current language. Can be set to change language, but don't do that in the UI.
-CURRENT_LANG = Language(display_name='<None>', lang_code='en', trans={})
+CURRENT_LANG = Language(lang_code='en', trans={})
 # Special language which replaces all text with ## to easily identify untranslatable text.
-DUMMY: Final = Language(display_name='Dummy', lang_code='dummy', trans={})
+DUMMY: Final = Language(lang_code='dummy', trans={})
 
 
 class HTMLFormatter(string.Formatter):

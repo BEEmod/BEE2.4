@@ -9,7 +9,9 @@ from tkinter import ttk
 from collections import defaultdict
 import tkinter as tk
 import io
+import itertools
 import os.path
+
 from pathlib import Path
 from weakref import WeakKeyDictionary
 import gettext as gettext_mod
@@ -20,7 +22,7 @@ from srctools.filesys import RawFileSystem
 from srctools import FileSystem, logger
 from babel.messages.pofile import read_po, write_po
 from babel.messages.mofile import write_mo
-from babel import messages
+from babel.localedata import load as load_cldr
 import trio
 import attrs
 
@@ -167,6 +169,58 @@ def expand_langcode(lang_code: str) -> list[str]:
     return expanded
 
 
+def get_lang_name(lang: Language) -> str:
+    """Fetch the name of this language from the Unicode Common Locale Data Repository.
+
+     This shows the name of the language both in its own language and the current one.
+     This does NOT get affected by the dummy lang, so users can swap back.
+     """
+    if lang is DUMMY:
+        # Fake langauge code for debugging, no need to translate.
+        return '<DUMMY>'
+
+    if transtoken.CURRENT_LANG is DUMMY:
+        # Use english in lang code mode.
+        cur_lang = 'en_au'
+    else:
+        cur_lang = transtoken.CURRENT_LANG.lang_code
+
+    targ_langs = expand_langcode(lang.lang_code)
+    cur_langs = expand_langcode(cur_lang)
+
+    # Try every combination of country/generic language.
+    # First the language in its own language.
+    for targ, key in itertools.product(targ_langs, targ_langs):
+        try:
+            name_in_lang = load_cldr(targ)['languages'][targ]
+            break
+        except (KeyError, FileNotFoundError):
+            pass
+    else:
+        LOGGER.warning('No name in database for "{}"', lang.lang_code)
+        name_in_lang = lang.lang_code  # Use the raw lang code.
+
+    # Then it translated in the current language.
+    for cur, targ in itertools.product(cur_langs, targ_langs):
+        try:
+            name_in_cur = load_cldr(cur)['languages'][targ]
+            break
+        except (KeyError, FileNotFoundError):
+            pass
+    else:
+        LOGGER.warning(
+            'No name in database for "{}" in "{}"',
+            lang.lang_code, cur_lang,
+        )
+        # Just return the name we have.
+        return name_in_lang
+
+    if name_in_lang == name_in_cur:
+        return name_in_lang
+    else:
+        return f'{name_in_lang} ({name_in_cur})'
+
+
 def find_basemodui(games: list[gameMan.Game], langs: list[str]) -> str:
     """Load basemodui.txt from Portal 2, to provide translations for the default items."""
     # Check Portal 2 first, others might not be fully correct?
@@ -249,8 +303,6 @@ def setup(conf_lang: str) -> None:
         with file:
             translator = gettext_mod.GNUTranslations(file)
         language = Language(
-            # i18n: This is displayed in the options menu to switch to this language.
-            display_name=translator.gettext('__LanguageName'), # TODO: Use babel's inbuilt DB instead.
             lang_code=lang_code,
             ui_filename=filename,
             trans={NS_UI: translator},
@@ -269,7 +321,7 @@ def setup(conf_lang: str) -> None:
                     "Can't find translation for codes: {!r}!",
                     expanded_langs,
                 )
-            language = Language(display_name='English', lang_code='en', trans={})
+            language = Language(lang_code='en', trans={})
 
     set_language(language)
 
@@ -287,7 +339,6 @@ def get_languages() -> Iterator[Language]:
             continue
         yield Language(
             # Special case, hardcode this name since this is the template and will produce the token.
-            display_name='English' if filename.stem == 'en' else translator.gettext('__LanguageName'),
             lang_code=translator.info().get('Language', filename.stem),
             ui_filename=filename,
             trans={NS_UI: translator},

@@ -138,7 +138,6 @@ def load_info() -> None:
         except OSError:
             return
         transtoken.CURRENT_LANG = transtoken.Language(
-            display_name='??',
             lang_code='',
             ui_filename=current_error.language_file,
             trans={transtoken.NS_UI: lang},

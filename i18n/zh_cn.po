@@ -1642,11 +1642,6 @@ msgstr "没有可用的属性！"
 msgid "Search:"
 msgstr ""
 
-#. i18n: This is displayed in the options menu to switch to this language.
-#: app/localisation.py app/localisation.py
-msgid "__LanguageName"
-msgstr "Chinese"
-
 #. i18n: BEEmod 1 palette.
 #: app/localisation.py app/paletteLoader.py
 msgid "BEEMod"
@@ -2509,4 +2504,3 @@ msgstr ""
 
 #~ msgid "Gel Type"
 #~ msgstr "选择风格"
-

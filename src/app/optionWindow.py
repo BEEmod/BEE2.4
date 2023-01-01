@@ -1,4 +1,5 @@
 """Window for configuring BEE2's options, as well as the home of some options."""
+import itertools
 from collections import defaultdict
 from pathlib import Path
 
@@ -299,18 +300,17 @@ async def init_gen_tab(
         """Load languages when the window opens."""
         lang_order.clear()
         disp_names = []
-        i = -1
-        for i, lang in enumerate(localisation.get_languages()):
-            lang_order.append(lang)
-            disp_names.append(lang.display_name)
-            lang_code_to_ind[lang.lang_code] = i
-
         conf = config.APP.get_cur_conf(GenOptions)
+
+        lang_iter = localisation.get_languages()
         if conf.language == localisation.DUMMY.lang_code or DEV_MODE.get():
             # Add the dummy translation.
-            lang_order.append(localisation.DUMMY)
-            disp_names.append('<DUMMY>')
-            lang_code_to_ind[localisation.DUMMY.lang_code] = i + 1
+            lang_iter = itertools.chain(lang_iter, [localisation.DUMMY])
+
+        for i, lang in enumerate(lang_iter):
+            lang_order.append(lang)
+            disp_names.append(localisation.get_lang_name(lang))
+            lang_code_to_ind[lang.lang_code] = i
 
         lang_box['values'] = disp_names
         try:
@@ -331,13 +331,15 @@ async def init_gen_tab(
 
     _load_langs = load_langs
 
-    def language_changed(e) -> None:
+    async def language_changed() -> None:
         """Set the language when the combo box is changed"""
         if lang_order:
             new_lang = lang_order[lang_box.current()]
-            background_run(localisation.load_aux_langs, gameMan.all_games, packages.LOADED, new_lang)
+            await localisation.load_aux_langs(gameMan.all_games, packages.LOADED, new_lang)
+            if lang_box.winfo_viewable():
+                _load_langs()
 
-    lang_box.bind('<<ComboboxSelected>>', language_changed)
+    lang_box.bind('<<ComboboxSelected>>', tk_tools.make_handler(language_changed))
 
     mute_desc = TransToken.ui('Play Sounds')
     if sound.has_sound():

@@ -1716,11 +1716,6 @@ msgstr "¡No hay propiedades disponibles!"
 msgid "Search:"
 msgstr ""
 
-#. i18n: This is displayed in the options menu to switch to this language.
-#: app/localisation.py app/localisation.py
-msgid "__LanguageName"
-msgstr "Español (Spanish)"
-
 #. i18n: BEEmod 1 palette.
 #: app/localisation.py app/paletteLoader.py
 msgid "BEEMod"
@@ -2552,4 +2547,3 @@ msgstr "Pasillo"
 #: test/test_transtoken.py
 msgid "Save As"
 msgstr ""
-
