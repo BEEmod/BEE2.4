@@ -16,6 +16,7 @@ from corridor import (  # noqa
     CORRIDOR_COUNTS, CORR_TO_ID, ID_TO_CORR,
     Corridor, ExportedConf, parse_filename,
 )
+import user_errors
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -134,10 +135,11 @@ def analyse_and_modify(
             max_count = CORRIDOR_COUNTS[corr_mode, corr_dir]
             poss_corr = conf[corr_mode, corr_dir, corr_orient]
             if not poss_corr:
-                raise ValueError(
-                    f'No corridors available for {corr_orient.value} {corr_mode.value} '
-                    f'{corr_dir.value.title()}!'
-                )
+                raise user_errors.UserError(user_errors.TOK_CORRIDOR_EMPTY_GROUP.format(
+                    orient=corr_orient.value.title(),
+                    mode=corr_mode.value.title(),
+                    dir=corr_dir.value.title(),
+                ))
             elif len(poss_corr) > max_count:
                 # More than the entropy we have, use our randomisation.
                 chosen = rand.seed(b'corridor', file).choice(poss_corr)
@@ -213,23 +215,27 @@ def analyse_and_modify(
     LOGGER.info("Game Mode: {}", seen_game_modes)
     LOGGER.info("Player Start: {}", seen_no_player_start)
 
+    if chosen_entry is None:
+        raise user_errors.UserError(
+            user_errors.TOK_CORRIDOR_NO_CORR_ITEM.format(kind=user_errors.TOK_CORRIDOR_ENTRY)
+        )
+    if chosen_exit is None:
+        raise user_errors.UserError(
+            user_errors.TOK_CORRIDOR_NO_CORR_ITEM.format(kind=user_errors.TOK_CORRIDOR_EXIT)
+        )
+
     if not seen_game_modes:
-        raise Exception('Unknown game mode - Map missing exit room!')
+        # Should be caught by above UserError if actually missing.
+        raise Exception('Unknown game mode - No corridors??')
     if len(seen_game_modes) > 2:
-        raise Exception('Both singleplayer and coop corridors present! This is nonsensical!')
+        raise user_errors.UserError(user_errors.TOK_CORRIDOR_BOTH_MODES)
 
     if not seen_no_player_start:
-        raise Exception(
-            "Can't determine if preview is enabled "
-            '- Map likely missing entry room!'
-        )
+        # Should be caught by above UserError if missing, something else is wrong.
+        raise Exception("Can't determine if preview is enabled - no fixups on corridors?")
     if len(seen_no_player_start) > 2:
+        # Should be impossible.
         raise Exception("Preview mode is both enabled and disabled! Recompile the map!")
-
-    if chosen_entry is None:
-        raise Exception('Entry corridor is missing!')
-    if chosen_exit is None:
-        raise Exception('Exit corridor is missing!')
 
     # Apply selected fixups to the elevator also.
     if inst_elev_entry is not None:

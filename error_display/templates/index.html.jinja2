@@ -1,0 +1,22 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<title>BEEmod Compilation Error</title>
+	<link rel="icon" type="image/png" href="static/favicon.png">
+	<link rel="stylesheet" href="static/styles.css" >
+	<script type="module" src="static/script.js"></script>
+</head>
+
+<body>
+<main>
+	<article>
+		{{ error_text }}
+		{% if context %}
+			<aside>{{ context }}</aside>
+		{% endif %}
+	</article>
+	<section id="render"></section>
+</main>
+</body>
+</html>

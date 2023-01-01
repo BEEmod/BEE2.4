@@ -99,10 +99,13 @@ ICONS['load_3'] = _load_icon.transpose(Image.FLIP_TOP_BOTTOM)
 ICONS['load_4'] = _load_icon.transpose(Image.ROTATE_180)
 ICONS['load_5'] = _load_icon_flip.transpose(Image.ROTATE_90)
 ICONS['load_6'] = _load_icon.transpose(Image.ROTATE_90)
+# Frame indices in order.
+LOAD_FRAME_IND = range(8)
 
 del _load_icon, _load_icon_flip
 # Loader handles, which we want to cycle animate.
-_load_handles: dict[tuple[int, int], ImgIcon] = {}
+# The first icon is the one users use, the others are each frame (manually loaded).
+_load_handles: dict[tuple[int, int], tuple[ImgIcon, list[ImgIcon]]] = {}
 
 # Once initialised, schedule here.
 _load_nursery: trio.Nursery | None = None
@@ -461,10 +464,15 @@ class Handle:
     def ico_loading(cls, width: int, height: int) -> ImgIcon:
         """Shortcut for getting a handle to a 'loading' icon."""
         try:
-            return _load_handles[width, height]
+            return _load_handles[width, height][0]
         except KeyError:
-            res = _load_handles[width, height] = ImgIcon._deduplicate(width, height, 'load')
-            return res
+            main_ico = ImgIcon._deduplicate(width, height, 'load')
+            # Build an additional load icon for each frame, so that can be cached.
+            _load_handles[width, height] = main_ico, [
+                ImgIcon._deduplicate(width, height, f'load_{i}')
+                for i in LOAD_FRAME_IND
+            ]
+            return main_ico
 
     @classmethod
     def blank(cls, width: int, height: int) -> ImgAlpha:
@@ -486,6 +494,10 @@ class Handle:
             [self, ImgTextOverlay._deduplicate(self.width, self.height, text, size)],
             self.width, self.height
         )
+
+    def has_users(self) -> bool:
+        """Check if this image is being used."""
+        return self._force_loaded or bool(self._users)
 
     def get_pil(self) -> Image.Image:
         """Load the PIL image if required, then return it."""
@@ -871,14 +883,15 @@ async def _spin_load_icons() -> None:
         f'load_{i}'
         for i in range(8)
     ]
-    for load_name in itertools.cycle(fnames):
+    for i in itertools.cycle(LOAD_FRAME_IND):
         await trio.sleep(0.125)
-        for handle in _load_handles.values():
-            handle.icon_name = load_name
-            handle._cached_pil = None
+        for handle, frames in _load_handles.values():
+            # This will keep the frame loaded, so next time it's cheap.
+            handle._cached_pil = frames[i].get_pil()
             if handle._cached_tk is not None:
                 # This updates the TK widget directly.
                 handle._cached_tk.paste(handle._load_pil())
+            # Otherwise, this isn't being used.
 
 
 # noinspection PyProtectedMember
@@ -913,7 +926,6 @@ def refresh_all() -> None:
         # If force-loaded it's builtin UI etc we shouldn't reload.
         # If already loading, no point.
         if handle._force_loaded:
-            LOGGER.warning('Could not reload force-loaded {!r}', handle)
             continue
         if not handle._loading:
             _discard_tk_img(handle._cached_tk)

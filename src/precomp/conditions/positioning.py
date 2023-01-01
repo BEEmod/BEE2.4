@@ -352,9 +352,7 @@ def flag_goo_at_loc(inst: Entity, flag: Property):
 
     `0 0 0` is the origin of the instance, values are in `128` increments.
     """
-    offset = resolve_offset(inst, flag.value, scale=128)
-    block = brushLoc.POS['world': offset]
-    return block.is_goo
+    return brushLoc.POS.lookup_world(resolve_offset(inst, flag.value, scale=128)).is_goo
 
 
 @make_flag('BlockType')
@@ -403,7 +401,7 @@ def flag_blockpos_type(inst: Entity, flag: Property):
         bbox = [pos1]
 
     for pos in bbox:
-        block = brushLoc.POS['world': pos]
+        block = brushLoc.POS.lookup_world(pos)
         for block_type in types:
             try:
                 allowed = brushLoc.BLOCK_LOOKUP[block_type.casefold()]
@@ -456,9 +454,9 @@ def res_set_block(inst: Entity, res: Property) -> None:
     if 'offset2' in res:
         pos2 = resolve_offset(inst, res['offset2', '0 0 0'], scale=128, zoff=-128)
         for pos in Vec.iter_grid(*Vec.bbox(pos1, pos2), stride=128):
-            brushLoc.POS['world': pos] = new_val
+            brushLoc.POS.set_world(pos, new_val)
     else:
-        brushLoc.POS['world': pos1] = new_val
+        brushLoc.POS.set_world(pos1, new_val)
 
 
 @make_result('forceUpright')
@@ -469,7 +467,7 @@ def res_force_upright(inst: Entity):
     instances are unaffected.
     """
     normal = Vec(0, 0, 1) @ Angle.from_str(inst['angles'])
-    if normal.z != 0:
+    if abs(normal.z) > 0.1:
         return
     ang = math.degrees(math.atan2(normal.y, normal.x))
     inst['angles'] = '0 {:g} 0'.format(ang % 360)  # Don't use negatives
@@ -557,7 +555,7 @@ def res_calc_opposite_wall_dist(inst: Entity, res: Property):
         mask,
     )
 
-    if adjust_goo and brushLoc.POS['world': opposing_pos + 128 * normal].is_goo:
+    if adjust_goo and brushLoc.POS.lookup_world(opposing_pos + 128 * normal).is_goo:
         # If the top is goo, adjust so the 64 below is the top of the goo.
         dist_off += 32
 

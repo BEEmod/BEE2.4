@@ -2,12 +2,13 @@
 """
 from __future__ import annotations
 from typing import Iterable
-from tkinter import ttk, messagebox
+from tkinter import ttk
 import tkinter as tk
-from app import TK_ROOT, tk_tools
+
+from app import TK_ROOT, localisation, tk_tools
 
 from app.CheckDetails import CheckDetails, Item as CheckItem
-from localisation import gettext
+from transtoken import TransToken
 import packages
 import utils
 
@@ -34,7 +35,7 @@ def make_packitems() -> Iterable[CheckItem]:
     for pack in packages.LOADED.packages.values():
         item = CheckItem(
             pack.disp_name,
-            hover_text=pack.desc or 'No description!',
+            hover_text=pack.desc,
             # The clean package can't be disabled!
             lock_check=(pack.id.casefold() == packages.CLEAN_PACKAGE),
             state=pack.enabled
@@ -56,10 +57,10 @@ def apply_changes() -> None:
         window.grab_release()
         return
 
-    if messagebox.askokcancel(
-        title=gettext('BEE2 - Restart Required!'),
-        message=gettext('Changing enabled packages requires a restart.\nContinue?'),
-        master=window,
+    if tk_tools.askokcancel(
+        title=TransToken.ui('BEE2 - Restart Required!'),
+        message=TransToken.ui('Changing enabled packages requires a restart.\nContinue?'),
+        parent=window,
     ):
         window.withdraw()
         window.grab_release()
@@ -82,7 +83,7 @@ def make_window() -> None:
     """Initialise the window."""
     global list_widget
     window.transient(TK_ROOT)
-    window.title(gettext('BEE2 - Manage Packages'))
+    localisation.set_win_title(window, TransToken.ui('BEE2 - Manage Packages'))
 
     # Don't destroy window when quit!
     window.protocol("WM_DELETE_WINDOW", cancel)
@@ -94,7 +95,7 @@ def make_window() -> None:
 
     list_widget = CheckDetails(
         frame,
-        headers=['Name'],
+        headers=[TransToken.ui('Name')],
         items=make_packitems(),
     )
 
@@ -102,14 +103,12 @@ def make_window() -> None:
     frame.columnconfigure(0, weight=1)
     frame.rowconfigure(0, weight=1)
 
-    ttk.Button(
-        frame,
-        text=gettext('OK'),
-        command=apply_changes,
+    localisation.set_text(
+        ttk.Button(frame, command=apply_changes),
+        TransToken.ui('OK'),
     ).grid(row=1, column=0, sticky='W')
 
-    ttk.Button(
-        frame,
-        text=gettext('Cancel'),
-        command=cancel,
+    localisation.set_text(
+        ttk.Button(frame, command=cancel),
+        TransToken.ui('Cancel'),
     ).grid(row=1, column=1, sticky='E')

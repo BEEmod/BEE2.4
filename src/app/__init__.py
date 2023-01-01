@@ -4,7 +4,6 @@ from types import TracebackType
 from typing import Any, Awaitable, Callable, Optional, Type
 from typing_extensions import TypeVarTuple, Unpack
 
-import config.gen_opts
 import utils
 import trio  # Import first, so it monkeypatches traceback before us.
 
@@ -93,14 +92,17 @@ def on_error(
     # Put it onscreen.
     try:
         from tkinter import messagebox
-        from localisation import gettext
-        messagebox.showinfo(
-            title=gettext('BEEMOD {} Error!').format(utils.BEE_VERSION),
-            message=gettext(
-                'An error occurred: \n{}\n\n'
+        from transtoken import TransToken
+        # Use directly, so we don't actually need the tk_tools dependency.
+        messagebox.showerror(
+            title=str(
+                TransToken.ui('BEEMOD {version} Error!')
+                .format(version=utils.BEE_VERSION)
+            ),
+            message=str(TransToken.ui(
+                'An error occurred: \n{err}\n\n'
                 'This has been copied to the clipboard.'
-            ).format(err),
-            icon=messagebox.ERROR,
+            ).format(err=err)),
         )
     except Exception:
         pass
@@ -137,5 +139,4 @@ def background_run(
 
 # Various configuration booleans.
 LAUNCH_AFTER_EXPORT = tk.BooleanVar(value=True, name='OPT_launch_after_export')
-PRESERVE_RESOURCES = tk.BooleanVar(value=False, name='OPT_preserve_bee2_resource_dir')
 DEV_MODE = tk.BooleanVar(value=utils.DEV_MODE, name='OPT_development_mode')

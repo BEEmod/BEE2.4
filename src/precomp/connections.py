@@ -7,7 +7,7 @@ from enum import Enum
 from collections import defaultdict
 
 from connections import InputType, FeatureMode, Config, ConnType, OutNames
-from srctools import VMF, Entity, Output, Property, conv_bool, Vec, Angle
+from srctools import VMF, Entity, Output, conv_bool, Vec, Angle
 from precomp.antlines import Antline, AntType
 from precomp import (
     instance_traits, instanceLocs,
@@ -20,6 +20,7 @@ import consts
 import srctools.logger
 
 from typing import Optional, Iterable, Dict, List, Set, Tuple, Iterator, Union
+import user_errors
 
 
 COND_MOD_NAME = "Item Connections"
@@ -434,11 +435,12 @@ def read_configs(all_items: Iterable[editoritems.Item]) -> None:
         else:
             ITEM_TYPES[item.id.casefold()] = item.conn_config
 
-    if ITEM_TYPES.get('item_indicator_panel') is None:
-        raise ValueError('No I/O for checkmark panel item type!')
-
-    if ITEM_TYPES.get('item_indicator_panel_timer') is None:
-        raise ValueError('No I/O for timer panel item type!')
+    # These must exist.
+    for item_id in ['item_indicator_panel', 'item_indicator_panel_timer']:
+        if ITEM_TYPES.get(item_id) is None:
+            raise user_errors.UserError(
+                user_errors.TOK_CONNECTION_REQUIRED_ITEM.format(item=item_id.upper())
+            )
 
 
 def calc_connections(
@@ -597,14 +599,15 @@ def calc_connections(
                 try:
                     inp_item = ITEMS[out_name]
                 except KeyError:
-                    raise ValueError('"{}" is not a known instance!'.format(out_name))
+                    raise user_errors.UserError(
+                        user_errors.TOK_CONNECTIONS_UNKNOWN_INSTANCE.format(item=out_name)
+                    )
                 else:
                     input_items.append(inp_item)
                     if inp_item.config is None:
-                        raise ValueError(
-                            'No connections for item "{}", '
-                            'but inputs in the map!'.format(
-                                instance_traits.get_item_id(inp_item.inst)
+                        raise user_errors.UserError(
+                            user_errors.TOK_CONNECTIONS_INSTANCE_NO_IO.format(
+                                inst=inp_item.inst['filename'],
                             )
                         )
 
@@ -617,16 +620,23 @@ def calc_connections(
                 # It's a funnel - we need to figure out if this is polarity,
                 # or normal on/off.
                 for out in in_outputs:
-                    if out.input in tbeam_polarity:
+                    try:
+                        funnel_out = OutNames(out.input.upper())
+                    except ValueError:
+                        LOGGER.warning('Unknown input for funnel: {}', out)
+                        continue
+                    if funnel_out in tbeam_polarity:
                         conn_type = ConnType.TBEAM_DIR
                         break
-                    elif out.input in tbeam_io:
+                    elif funnel_out in tbeam_io:
                         conn_type = ConnType.TBEAM_IO
                         break
+                    else:
+                        raise AssertionError(f'Input is an output name? {out}')
                 else:
                     raise ValueError(
-                        'Excursion Funnel "{}" has inputs, '
-                        'but no valid types!'.format(inp_item.name)
+                        f'Excursion Funnel "{inp_item.name}" has inputs, but no '
+                        f'valid types: {[out.input for out in in_outputs]}'
                     )
 
             conn = Connection(
@@ -916,6 +926,23 @@ def add_locking(item: Item) -> None:
             )
 
 
+def localise_output(
+    out: Output, out_name: str, inst: Entity,
+    *,
+    delay: float=0.0, only_once: bool=False,
+) -> Output:
+    """Create a copy of an output, with instance fixups substituted and with names localised."""
+    return Output(
+        out_name,
+        conditions.local_name(inst, inst.fixup.substitute(out.target)) or inst['targetname'],
+        inst.fixup.substitute(out.input),
+        inst.fixup.substitute(out.params, allow_invert=True),
+        inst_in=out.inst_in,
+        delay=out.delay + delay,
+        times=1 if only_once else out.times,
+    )
+
+
 def add_timer_relay(item: Item, has_sounds: bool) -> None:
     """Make a relay to play timer sounds, or fire once the outputs are done."""
     assert item.timer is not None
@@ -941,15 +968,7 @@ def add_timer_relay(item: Item, has_sounds: bool) -> None:
 
     for cmd in item.config.timer_done_cmd:
         if cmd:
-            relay.add_out(Output(
-                'OnTrigger',
-                conditions.local_name(item.inst, cmd.target) or item.inst,
-                conditions.resolve_value(item.inst, cmd.input),
-                conditions.resolve_value(item.inst, cmd.params),
-                inst_in=cmd.inst_in,
-                delay=item.timer + cmd.delay,
-                times=cmd.times,
-            ))
+            relay.add_out(localise_output(cmd, 'OnTrigger', item.inst, delay=item.timer))
 
     if item.config.timer_sound_pos is not None and has_sounds:
         timer_sound = options.get(str, 'timer_sound')
@@ -1029,29 +1048,23 @@ def add_item_inputs(
                 item.inst['classname'] = 'logic_auto'
                 dummy_logic_ents.append(item.inst)
             else:
-                is_inverted = conv_bool(conditions.resolve_value(
-                    item.inst,
-                    invert_var,
-                ))
+                is_inverted = conv_bool(item.inst.fixup.substitute(invert_var, '', allow_invert=True))
                 logic_auto = item.inst.map.create_ent(
                     'logic_auto',
                     origin=item.inst['origin'],
                     spawnflags=1,
                 )
                 for cmd in (enable_cmd if is_inverted else disable_cmd):
-                    logic_auto.add_out(
-                        Output(
-                            'OnMapSpawn',
-                            conditions.local_name(
-                                item.inst,
-                                conditions.resolve_value(item.inst, cmd.target),
-                            ) or item.inst,
-                            conditions.resolve_value(item.inst, cmd.input),
-                            conditions.resolve_value(item.inst, cmd.params),
-                            delay=cmd.delay,
-                            only_once=True,
+                    try:
+                        logic_auto.add_out(localise_output(
+                            cmd, 'OnMapSpawn', item.inst,
+                            only_once=True
+                        ))
+                    except KeyError as exc:  # Fixup missing, skip this output.
+                        LOGGER.warning(
+                            'Item "{}" missing fixups for OnMapSpawn output:',
+                            item.name, exc_info=exc,
                         )
-                    )
         return  # The rest of this function requires at least one input.
 
     if logic_type is InputType.DEFAULT:
@@ -1064,17 +1077,22 @@ def add_item_inputs(
                 (inp_item.output_deact(), disable_cmd)
             ]:
                 for cmd in input_cmds:
-                    inp_item.add_io_command(
-                        output,
-                        conditions.local_name(
-                            item.inst,
-                            conditions.resolve_value(item.inst, cmd.target),
-                        ) or item.inst,
-                        conditions.resolve_value(item.inst, cmd.input),
-                        conditions.resolve_value(item.inst, cmd.params),
-                        inst_in=cmd.inst_in,
-                        delay=cmd.delay,
-                    )
+                    try:
+                        inp_item.add_io_command(
+                            output,
+                            conditions.local_name(
+                                item.inst, item.inst.fixup.substitute(cmd.target),
+                            ) or item.inst,
+                            item.inst.fixup.substitute(cmd.input),
+                            item.inst.fixup.substitute(cmd.params, allow_invert=True),
+                            inst_in=cmd.inst_in,
+                            delay=cmd.delay,
+                        )
+                    except KeyError as exc:  # Fixup missing, skip this output.
+                        LOGGER.warning(
+                            'Item "{}" missing fixups for proxy output:',
+                            item.name, exc_info=exc,
+                        )
         return
     elif logic_type is InputType.DAISYCHAIN:
         # Another special case, these items AND themselves with their inputs.
@@ -1123,10 +1141,7 @@ def add_item_inputs(
 
         return
 
-    is_inverted = conv_bool(conditions.resolve_value(
-        item.inst,
-        invert_var,
-    ))
+    is_inverted = conv_bool(item.inst.fixup.substitute(invert_var, default='', allow_invert=True))
 
     invert_lag = 0.0
     if is_inverted:
@@ -1190,19 +1205,13 @@ def add_item_inputs(
             ('On' + disable_user, disable_cmd)
         ]:
             for cmd in input_cmds:
-                spawn_relay.add_out(
-                    Output(
-                        output_name,
-                        conditions.local_name(
-                            item.inst,
-                            conditions.resolve_value(item.inst, cmd.target),
-                        ) or item.inst,
-                        conditions.resolve_value(item.inst, cmd.input),
-                        conditions.resolve_value(item.inst, cmd.params),
-                        delay=cmd.delay,
-                        times=cmd.times,
+                try:
+                    spawn_relay.add_out(localise_output(cmd, output_name, item.inst))
+                except KeyError as exc:  # Missing fixups, skip.
+                    LOGGER.warning(
+                        'Item "{}" missing fixups for spawn relay:',
+                        item.name, exc_info=exc,
                     )
-                )
 
         # Now overwrite input commands to redirect to the relay.
         enable_cmd = [
@@ -1254,26 +1263,22 @@ def add_item_inputs(
             return
         else:
             # Should never happen, not other types.
-            raise ValueError('Unknown counter logic type: ' + repr(logic_type))
+            raise ValueError(
+                f'Unknown counter logic type "{logic_type}" in item {item.config.id}!'
+            )
 
         for output_name, input_cmds in [
             (count_on, enable_cmd),
             (count_off, disable_cmd)
         ]:
             for cmd in input_cmds:
-                counter.add_out(
-                    Output(
-                        output_name,
-                        conditions.local_name(
-                            item.inst,
-                            conditions.resolve_value(item.inst, cmd.target),
-                        ) or item.inst,
-                        conditions.resolve_value(item.inst, cmd.input),
-                        conditions.resolve_value(item.inst, cmd.params),
-                        delay=cmd.delay + invert_lag,
-                        times=cmd.times,
+                try:
+                    counter.add_out(localise_output(cmd, output_name, item.inst, delay=invert_lag))
+                except KeyError as exc:  # Fixup missing, skip this output.
+                    LOGGER.warning(
+                        'Item "{}" missing fixups for input command:',
+                        item.name, exc_info=exc,
                     )
-                )
 
     else:  # No counter - fire directly.
         for conn in inputs:
@@ -1283,17 +1288,23 @@ def add_item_inputs(
                 (inp_item.output_deact(), disable_cmd)
             ]:
                 for cmd in input_cmds:
-                    inp_item.add_io_command(
-                        output,
-                        conditions.local_name(
-                            item.inst,
-                            conditions.resolve_value(item.inst, cmd.target),
-                        ) or item.inst,
-                        conditions.resolve_value(item.inst, cmd.input),
-                        conditions.resolve_value(item.inst, cmd.params),
-                        delay=cmd.delay + invert_lag,
-                        times=cmd.times,
-                    )
+                    try:
+                        inp_item.add_io_command(
+                            output,
+                            conditions.local_name(
+                                item.inst,
+                                item.inst.fixup.substitute(cmd.target),
+                            ) or item.inst['targetname'],
+                            item.inst.fixup.substitute(cmd.input),
+                            item.inst.fixup.substitute(cmd.params, allow_invert=True),
+                            delay=cmd.delay + invert_lag,
+                            times=cmd.times,
+                        )
+                    except KeyError as exc:  # Fixup missing, skip this output.
+                        LOGGER.warning(
+                            'Item "{}" missing fixups for input command:',
+                            item.name, exc_info=exc,
+                        )
 
 
 def add_item_indicators(
@@ -1333,7 +1344,7 @@ def add_item_indicators(
         else:
             needs_toggle = has_ant and not has_sign
     else:
-        raise ValueError('Bad switch style ' + repr(inst_type))
+        raise ValueError(f'Bad switch style "{inst_type}" in item {item.config.id}!')
 
     first_inst = True
 
@@ -1367,10 +1378,10 @@ def add_item_indicators(
                         output,
                         conditions.local_name(
                             pan,
-                            conditions.resolve_value(item.inst, cmd.target),
+                            item.inst.fixup.substitute(cmd.target),
                         ) or pan,
-                        conditions.resolve_value(item.inst, cmd.input),
-                        conditions.resolve_value(item.inst, cmd.params),
+                        item.inst.fixup.substitute(cmd.input),
+                        item.inst.fixup.substitute(cmd.params, allow_invert=True),
                         delay=cmd.delay,
                         inst_in=cmd.inst_in,
                         times=cmd.times,

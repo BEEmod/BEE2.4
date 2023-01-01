@@ -2,6 +2,7 @@
 from srctools import Property, Entity, Vec, VMF, Matrix
 import srctools.logger
 
+import user_errors
 from precomp.instanceLocs import resolve_one
 from precomp import conditions, connections, fizzler
 
@@ -28,13 +29,16 @@ def res_change_fizzler_type(inst: Entity, res: Property):
     try:
         fizz = fizzler.FIZZLERS[fizz_name]
     except KeyError:
-        LOGGER.warning('ChangeFizzlerType not run on a fizzler ("{}")!', fizz_name)
-        return
+        raise user_errors.UserError(user_errors.TOK_WRONG_ITEM_TYPE.format(
+            item=fizz_name,
+            kind='Fizzler',
+            inst=inst['file'],
+        ))
 
     try:
         fizz.fizz_type = fizzler.FIZZ_TYPES[res.value]
     except KeyError:
-        raise ValueError('Invalid fizzler type "{}"!', res.value)
+        raise user_errors.UserError(user_errors.TOK_UNKNOWN_ID.format(kind='Fizzler', id=res.value))
 
 
 @conditions.make_result('ReshapeFizzler')
@@ -83,7 +87,7 @@ def res_reshape_fizzler(vmf: VMF, shape_inst: Entity, res: Property):
             targetname=shape_name,
             origin=shape_inst['origin'],
             angles=shape_inst['angles'],
-            file=resolve_one('<ITEM_BARRIER_HAZARD:fizz_base>'),
+            file=resolve_one('<ITEM_BARRIER_HAZARD:fizz_base>', error=True),
         )
         base_inst.fixup.update(shape_inst.fixup)
         fizz = fizzler.FIZZLERS[shape_name] = fizzler.Fizzler(

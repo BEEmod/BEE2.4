@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pickle
 from collections import defaultdict
-from typing import Dict, List, Tuple, Mapping
+from typing import Dict, Iterator, List, Tuple, Mapping
 from typing_extensions import Final
 import itertools
 
@@ -22,6 +22,7 @@ from corridor import (
     CORRIDOR_COUNTS, ID_TO_CORR,
     Corridor, ExportedConf,
 )
+from transtoken import TransToken
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -32,6 +33,7 @@ FALLBACKS: Final[Mapping[Tuple[GameMode, Direction], str]] = {
     (GameMode.SP, Direction.EXIT): 'sp_exit',
     (GameMode.COOP, Direction.EXIT): 'coop',
 }
+TRANS_CORRIDOR_GENERIC = TransToken.ui('Corridor')
 EMPTY_DESC: Final = tkMarkdown.MarkdownData.text('')
 
 IMG_WIDTH_SML: Final = 144
@@ -46,7 +48,7 @@ ICON_GENERIC_LRG = img.Handle.builtin('BEE2/corr_generic', IMG_WIDTH_LRG, IMG_HE
 @attrs.frozen
 class CorridorUI(Corridor):
     """Additional data only useful for the UI. """
-    name: str
+    name: TransToken
     config: lazy_conf.LazyConf
     desc: tkMarkdown.MarkdownData = attrs.field(repr=False)
     images: List[img.Handle]
@@ -147,12 +149,16 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                         f'Non-horizontal {mode.value}_{direction.value}_{orient.value} corridor '
                         f'"{prop["Name", prop["instance"]]}" cannot be defined as a legacy corridor!'
                     )
+            try:
+                name = TransToken.parse(data.pak_id, prop['Name'])
+            except LookupError:
+                name = TRANS_CORRIDOR_GENERIC
 
             corridors[mode, direction, orient].append(CorridorUI(
                 instance=prop['instance'],
-                name=prop['Name', 'Corridor'],
+                name=name,
                 authors=packages.sep_values(prop['authors', '']),
-                desc=packages.desc_parse(prop, '', data.pak_id),
+                desc=packages.desc_parse(prop, 'Corridor', data.pak_id),
                 orig_index=prop.int('DefaultIndex', 0),
                 config=packages.get_config(prop, 'items', data.pak_id, source='Corridor ' + prop.name),
                 images=images,
@@ -177,7 +183,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
 
     @classmethod
     async def post_parse(cls, packset: packages.PackagesSet) -> None:
-        """After items are parsed, convert definitions in the item into these groups."""
+        """After items are parsed, convert legacy definitions in the item into these groups."""
         # Need both of these to be parsed.
         await packset.ready(packages.Item).wait()
         await packset.ready(packages.Style).wait()
@@ -196,8 +202,9 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                     try:
                         corridor_group = packset.obj_by_id(cls, style_id)
                     except KeyError:
+                        # Synthesise a new group to match.
                         corridor_group = cls(style_id, {})
-                        packset.add(corridor_group)
+                        packset.add(corridor_group, item.pak_id, item.pak_name)
 
                     corr_list = corridor_group.corridors.setdefault(
                         (mode, direction, Orient.HORIZONTAL),
@@ -225,7 +232,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                         if mode is GameMode.COOP and direction is Direction.ENTRY:
                             corridor = CorridorUI(
                                 instance=fname,
-                                name='Corridor',
+                                name=TRANS_CORRIDOR_GENERIC,
                                 images=[ICON_GENERIC_LRG],
                                 dnd_icon=ICON_GENERIC_SML,
                                 authors=style.selitem_data.auth,
@@ -239,7 +246,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                             style_info = style.legacy_corridors[mode, direction, ind + 1]
                             corridor = CorridorUI(
                                 instance=fname,
-                                name=style_info.name,
+                                name=TRANS_CORRIDOR_GENERIC,
                                 images=[img.Handle.file(style_info.icon, IMG_WIDTH_LRG, IMG_HEIGHT_LRG)],
                                 dnd_icon=img.Handle.file(style_info.icon, IMG_WIDTH_SML, IMG_HEIGHT_SML),
                                 authors=style.selitem_data.auth,
@@ -282,6 +289,14 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                                 f'{orient.value}!\n {corr.instance}'
                             )
                         dup_check.add(folded)
+
+    def iter_trans_tokens(self) -> Iterator[packages.TransTokenSource]:
+        """Iterate over translation tokens in the corridor."""
+        for (mode, direction, orient), corridors in self.corridors.items():
+            source = f'corridors/{self.id}.{mode.value}_{direction.value}_{orient.value}'
+            for corr in corridors:
+                yield corr.name, source + '.name'
+                yield from tkMarkdown.iter_tokens(corr.desc, source + '.desc')
 
     def defaults(self, mode: GameMode, direction: Direction, orient: Orient) -> list[CorridorUI]:
         """Fetch the default corridor set for this mode, direction and orientation."""
@@ -328,34 +343,30 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                     for corr in group.corridors[mode, direction, orient]
                 }
             except KeyError:
-                # None defined?
-                if orient is Orient.HORIZONTAL:
-                    LOGGER.warning(
-                        'No corridors defined for {}:{}_{}', 
-                        style_id, mode.value, direction.value
-                    )
+                # None defined for this corridor. This is not an error for vertical ones.
+                (LOGGER.warning if orient is Orient.HORIZONTAL else LOGGER.debug)(
+                    'No corridors defined for {}:{}_{}',
+                    style_id, mode.value, direction.value
+                )
                 export[mode, direction, orient] = []
                 continue
 
-            if not conf.selected:  # Use default setup.
-                export[mode, direction, orient] = [
-                    corr.strip_ui() for corr in
-                    group.defaults(mode, direction, orient)
+            if conf.selected:
+                chosen = [
+                    corr
+                    for corr_id in conf.selected
+                    if (corr := inst_to_corr.get(corr_id.casefold())) is not None
                 ]
-                continue
 
-            chosen = [
-                corr
-                for corr_id in conf.selected
-                if (corr := inst_to_corr.get(corr_id.casefold())) is not None
-            ]
-
-            if not chosen:
-                LOGGER.warning(
-                    'No corridors selected for {}:{}_{}_{}', 
-                    style_id, 
-                    mode.value, direction.value, orient.value,
-                )
+                if not chosen:
+                    LOGGER.warning(
+                        'No corridors selected for {}:{}_{}_{}',
+                        style_id,
+                        mode.value, direction.value, orient.value,
+                    )
+                    chosen = group.defaults(mode, direction, orient)
+            else:
+                # Use default setup, don't warn.
                 chosen = group.defaults(mode, direction, orient)
 
             for corr in chosen:
@@ -377,16 +388,25 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
             count = CORRIDOR_COUNTS[mode, direction]
             # For all items these are at the start.
             for i in range(count):
-                item.set_inst(i, editoritems.InstCount(
+                item.set_inst(i, editoritems.InstCount(editoritems.FSPath(
                     f'instances/bee2_corridor/{mode.value}/{direction.value}/corr_{i + 1}.vmf'
-                ))
+                )))
             item.offset = Vec(64, 64, 64)
             # If vertical corridors exist, allow placement there.
+            has_vert = False
             if export[mode, direction, Orient.UP]:
                 item.invalid_surf.discard(
                     editoritems.Surface.FLOOR if direction is Direction.ENTRY else editoritems.Surface.CEIL
                 )
+                has_vert = True
             if export[mode, direction, Orient.DN]:
                 item.invalid_surf.discard(
                     editoritems.Surface.CEIL if direction is Direction.ENTRY else editoritems.Surface.FLOOR
                 )
+                has_vert = True
+            if has_vert:
+                # Add a rotation handle and desired facing.
+                item.handle = editoritems.Handle.QUAD
+                # Set desired facing so they move upright.
+                # Note unlock default items also does this!
+                item.facing = editoritems.DesiredFacing.UP

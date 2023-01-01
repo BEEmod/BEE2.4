@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: https://github.com/BEEmod/BEE2.4/issues\n"
-"POT-Creation-Date: 2022-10-04 13:31+1000\n"
+"POT-Creation-Date: 2022-12-21 13:14+1000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -18,7 +18,7 @@ msgid "Skipped!"
 msgstr ""
 
 #: loadScreen.py
-msgid "Version: "
+msgid "Version: {ver}"
 msgstr ""
 
 #: app/optionWindow.py app/packageMan.py app/selector_win.py loadScreen.py
@@ -38,7 +38,7 @@ msgid "Show:"
 msgstr ""
 
 #: loadScreen.py
-msgid "Logs - {}"
+msgid "Logs - {ver}"
 msgstr ""
 
 #: loadScreen.py
@@ -69,8 +69,255 @@ msgstr ""
 msgid "Better Extended Editor for Portal 2"
 msgstr ""
 
-#: localisation.py
-msgid "__LANG_USE_SANS_SERIF__"
+#. i18n: Special token, must be exactly two lines, shown via game_text if an
+#. error occurs in Coop.
+#: user_errors.py
+msgid ""
+"Compile Error. Open the following URL\n"
+"in a browser on this computer to see:"
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"Invalid <code>{option}=</code>\"<code>{value}</code>\" for {kind} "
+"\"<var>{id}</var>\"!"
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid "Option <code>{option}</code> is required for {kind} \"<var>{id}</var>\"!"
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid "Duplicate {kind} ID \"<var>{id}</var>\". Change the ID of one of them."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid "Unknown {kind} ID \"<var>{id}</var>\"."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"The item \"<var>{item}</var>\" is not a {kind}!<br>Instance: "
+"<code>{inst}</code>"
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid "See the documentation"
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"One or more items were placed ouside the map! Move these back inside the "
+"map, or delete them. Items with no collision (like Half Walls or logic "
+"gates) can be left when rooms are moved, look for those."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"This map has <a "
+"href=\"https://developer.valvesoftware.com/wiki/Leak\">\"leaked\"</a>. "
+"This is a bug in an item or style, which should be fixed. The displayed "
+"line indicates the location of the leak, you may be able to resolve it by"
+" removing/modifying items in that area. Please submit a bug report to the"
+" author of the item so this can be resolved. Leak coordinates:"
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"The instance <code>{inst}</code> does not exist, meaning the map cannot "
+"be compiled! Try other configurations for this item, it may be the case "
+"that only some are missing."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"Bad Glass Floorbeam template! The template must have a single brush, with"
+" one face pointing in the <var>+X</var> direction."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"No I/O configuration specified for special indicator item "
+"\"<var>{item}</var>\"! This is required for antlines to work."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"The instance named \"<var>{item}</var>\" is not recognised! If you just "
+"swapped styles and exported, you will need to restart Portal 2. Otherwise"
+" check the relevant package."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"The instance \"<var>{inst}</var>\" is reciving inputs, but none were "
+"configured in the item. Check for reuse of the instance in multiple "
+"items, or restart Portal 2 if you just exported."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid "No corridors available for the <var>{orient}_{mode}_{dir}</var> group!"
+msgstr ""
+
+#. i18n: Reference to the stylevar
+#. This uses HTML syntax.
+#: app/StyleVarPane.py user_errors.py
+msgid "Unlock Default Items"
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"The map appears to be missing the {kind} door. This could be caused by an"
+" export from BEE2 while the game was open - close and reopen the game if "
+"that is the case. If it has been deleted, enable \"{stylevar}\" in Style "
+"Properties, then add it your palette so it can be put back in the map. If"
+" the door is present, this is likely an issue with the style definitions."
+" "
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"The map contains both singleplayer and coop entry/exit corridors. This "
+"can happen if they are manually added using the \"{stylevar\"} stylevar. "
+"In that case delete one of them."
+msgstr ""
+
+#. This uses HTML syntax.
+#: app/corridor_selector.py user_errors.py
+msgid "Entry"
+msgstr ""
+
+#. i18n: Entry door
+#. This uses HTML syntax.
+#: app/corridor_selector.py user_errors.py
+msgid "Exit"
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid "\"CubeType\" result used but with no type specified!"
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid "Unrecognised special cube type \"<var>{type}</var>\"!"
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"Two or more cubes/droppers have the same timer value "
+"(<var>{timer}</var>). These are used to link a cube and dropper item "
+"together, so the cube is preplaced in the map but respawns from the "
+"specified dropper."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"The specified cube has a timer value <var>{timer}</var>, which does not "
+"match any droppers. A dropper should be placed with a matching timer "
+"value, to specify the respawn point for this preplaced cube."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"Dropper above custom cube of type <var>{type}</var> is already linked! "
+"Custom cubes convertdroppers above them into their type, to allow having "
+"droppers."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"A glass/grating Hole does not have sufficent space. The entire "
+"highlighted yellow area should be occupied by continous glass or grating."
+" For large holes, the diagonally adjacient voxels are not required. In "
+"addition, two Hole items cannot overlap each other."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"A glass/grating Hole was misplaced. The item must be placed against a "
+"glass or grating sheet, which it will then cut a hole into. To rotate the"
+" item properly, you may need to place it on a wall with the same "
+"orientation first, then drag it onto the glass without dragging it over "
+"surfaces with different orientations. Alternatively put a block "
+"temporarily in the glass or grating's location to position the hole item,"
+" then carve into the block from a side to remove it while keeping the "
+"hole in the same position."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"A Sendificator was connected to an item which is not a Discouragement "
+"Beam Emitter (<var>{out_item}</var>). The output connection is used to "
+"specify the emitter that cubes will teleport to, so it cannot be an "
+"arbitary item."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"The template \"{id}\" has a {type} with two visgroups: "
+"<var>{groups}</var>. Brushes andoverlays in templates may currently only "
+"use one visgroup each."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid "No item ID for fizzler instance <var>\"{inst}\"</var>!"
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid "No fizzler type for {item} (<var>\"{inst}\"</var>)!"
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid "No model specified for one side of \"{id}\" fizzlers."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid "Instance lookup path <code>\"{path}\"</code> returned no instances."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"Instance lookup path <code>\"{path}\"</code> was expected to provide one "
+"instance, but it returned multiple instances:"
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid "<strong>No error?</strong>"
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid "Failed to load error!"
 msgstr ""
 
 #: app/CheckDetails.py
@@ -98,12 +345,6 @@ msgid "Image Files"
 msgstr ""
 
 #: app/CompilerPane.py
-msgid ""
-"Options on this panel can be changed \n"
-"without exporting or restarting the game."
-msgstr ""
-
-#: app/CompilerPane.py
 msgid "Map Settings"
 msgstr ""
 
@@ -111,16 +352,29 @@ msgstr ""
 msgid "Compile Settings"
 msgstr ""
 
+#. i18n: Tooltip format for compiler limit bars.
+#: app/CompilerPane.py
+msgid ""
+"{count}/{max} ({frac:.2%}):\n"
+"{blurb}"
+msgstr ""
+
+#: app/CompilerPane.py
+msgid ""
+"Options on this panel can be changed \n"
+"without exporting or restarting the game."
+msgstr ""
+
 #: app/CompilerPane.py
 msgid "Thumbnail"
 msgstr ""
 
 #: app/CompilerPane.py
-msgid "Auto"
+msgid "Screenshot"
 msgstr ""
 
 #: app/CompilerPane.py
-msgid "PeTI"
+msgid "Editor View"
 msgstr ""
 
 #: app/CompilerPane.py
@@ -174,8 +428,10 @@ msgstr ""
 
 #: app/CompilerPane.py
 msgid ""
+"{desc}\n"
+"\n"
 "You can hold down Shift during the start of the Lighting stage to switch "
-"to {} lighting on the fly."
+"to {keymode} lighting on the fly."
 msgstr ""
 
 #: app/CompilerPane.py
@@ -282,8 +538,8 @@ msgstr ""
 #: app/CompilerPane.py
 msgid ""
 "Only choose the highest-priority voicelines. This means more generic "
-"lines will can only be chosen if few test elements are in the map. If "
-"disabled any applicable lines will be used."
+"lines will only be chosen if few test elements are in the map. If "
+"disabled a random applicable lines will be used."
 msgstr ""
 
 #: app/CompilerPane.py
@@ -300,6 +556,8 @@ msgstr ""
 
 #: app/CompilerPane.py
 msgid ""
+"{desc}\n"
+"\n"
 "You can hold down Shift during the start of the Geometry stage to quickly"
 " swap whichlocation you spawn at on the fly."
 msgstr ""
@@ -327,7 +585,7 @@ msgid "Compile Options"
 msgstr ""
 
 #: app/CompilerPane.py
-msgid "Compiler Options - {}"
+msgid "Compiler Options - {ver}"
 msgstr ""
 
 #: app/StyleVarPane.py
@@ -355,10 +613,6 @@ msgstr ""
 
 #: app/StyleVarPane.py
 msgid "Disable all voicelines other than entry and exit lines."
-msgstr ""
-
-#: app/StyleVarPane.py
-msgid "Unlock Default Items"
 msgstr ""
 
 #: app/StyleVarPane.py
@@ -402,12 +656,19 @@ msgstr ""
 
 #. i18n: StyleVar default value.
 #: app/StyleVarPane.py
-msgid "Default: On"
+msgid "Default: Off"
 msgstr ""
 
 #: app/StyleVarPane.py
-msgid "Default: Off"
+msgid "Default: On"
 msgstr ""
+
+#. i18n: Tooltip when specific styles are used
+#: app/StyleVarPane.py
+msgid "Style: {styles}"
+msgid_plural "Styles: {styles}"
+msgstr[0] ""
+msgstr[1] ""
 
 #. i18n: StyleVar which is totally unstyled.
 #: app/StyleVarPane.py
@@ -419,11 +680,17 @@ msgstr ""
 msgid "Styles: All"
 msgstr ""
 
+#. i18n: Order of lines in the tooltip.
 #: app/StyleVarPane.py
-msgid "Style: {}"
-msgid_plural "Styles: {}"
-msgstr[0] ""
-msgstr[1] ""
+msgid ""
+"{desc}\n"
+"{defaults}\n"
+"{styles}"
+msgstr ""
+
+#: app/StyleVarPane.py
+msgid ", "
+msgstr ""
 
 #: app/StyleVarPane.py
 msgid "All:"
@@ -446,11 +713,27 @@ msgid "None!"
 msgstr ""
 
 #: app/SubPane.py
-msgid "Hide/Show the \"{}\" window."
+msgid "Hide/Show the \"{window}\" window."
 msgstr ""
 
 #: app/UI.py
-msgid "Export..."
+msgid "Selected Items and Style successfully exported!"
+msgstr ""
+
+#: app/UI.py
+msgid ""
+"{exported}\n"
+"\n"
+"Warning: VPK files were not exported, quit Portal 2 and Hammer to ensure "
+"editor wall previews are changed."
+msgstr ""
+
+#: app/UI.py
+msgid "BEE2 - Export Complete"
+msgstr ""
+
+#: app/UI.py
+msgid "BEEMOD {version} - {game}"
 msgstr ""
 
 #: app/UI.py
@@ -549,18 +832,6 @@ msgid "Multiple Orientations"
 msgstr ""
 
 #: app/UI.py
-msgid "Selected Items and Style successfully exported!"
-msgstr ""
-
-#: app/UI.py
-msgid ""
-"\n"
-"\n"
-"Warning: VPK files were not exported, quit Portal 2 and Hammer to ensure "
-"editor wall previews are changed."
-msgstr ""
-
-#: app/UI.py
 msgid "Save Palette..."
 msgstr ""
 
@@ -568,12 +839,12 @@ msgstr ""
 msgid "Save Palette As..."
 msgstr ""
 
-#: app/UI.py app/music_conf.py
+#: app/UI.py
 msgid "Music: "
 msgstr ""
 
 #: app/UI.py
-msgid "{arr} Use Suggested {arr}"
+msgid "{down_arrow} Use Suggested {down_arrow}"
 msgstr ""
 
 #: app/UI.py
@@ -615,15 +886,77 @@ msgid "Fill empty spots in the palette with random items."
 msgstr ""
 
 #: app/__init__.py
-msgid "BEEMOD {} Error!"
+msgid "BEEMOD {version} Error!"
 msgstr ""
 
 #: app/__init__.py
 msgid ""
 "An error occurred: \n"
-"{}\n"
+"{err}\n"
 "\n"
 "This has been copied to the clipboard."
+msgstr ""
+
+#: app/backup.py app/packageMan.py
+msgid "Name"
+msgstr ""
+
+#: app/backup.py
+msgid "Mode"
+msgstr ""
+
+#: app/backup.py
+msgid "Date"
+msgstr ""
+
+#: app/backup.py app/corridor_selector.py
+msgid "SP"
+msgstr ""
+
+#: app/backup.py app/corridor_selector.py
+msgid "Coop"
+msgstr ""
+
+#: app/backup.py
+msgid ""
+"Do you wish to delete {n} map?\n"
+"{maps}"
+msgid_plural ""
+"Do you wish to delete {n} maps?\n"
+"{maps}"
+msgstr[0] ""
+msgstr[1] ""
+
+#: app/backup.py
+msgid ""
+"This map is already in the game directory. Do you wish to overwrite it? "
+"({mapname})"
+msgstr ""
+
+#: app/backup.py
+msgid ""
+"This filename is already in the backup. Do you wish to overwrite it? "
+"({mapname})"
+msgstr ""
+
+#: app/backup.py
+msgid "Overwrite File?"
+msgstr ""
+
+#: app/backup.py
+msgid "Failed to parse this puzzle file. It can still be backed up."
+msgstr ""
+
+#: app/backup.py
+msgid "No description found."
+msgstr ""
+
+#: app/backup.py
+msgid "Unsaved Backup"
+msgstr ""
+
+#: app/backup.py
+msgid "Backup ZIP archive"
 msgstr ""
 
 #: app/backup.py
@@ -639,26 +972,6 @@ msgid "Deleting maps"
 msgstr ""
 
 #: app/backup.py
-msgid "Failed to parse this puzzle file. It can still be backed up."
-msgstr ""
-
-#: app/backup.py
-msgid "No description found."
-msgstr ""
-
-#: app/backup.py app/corridor_selector.py
-msgid "Coop"
-msgstr ""
-
-#: app/backup.py app/corridor_selector.py
-msgid "SP"
-msgstr ""
-
-#: app/backup.py
-msgid "This filename is already in the backup.Do you wish to overwrite it? ({})"
-msgstr ""
-
-#: app/backup.py
 msgid "BEE2 Backup"
 msgstr ""
 
@@ -667,21 +980,7 @@ msgid "No maps were chosen to backup!"
 msgstr ""
 
 #: app/backup.py
-msgid ""
-"This map is already in the game directory.Do you wish to overwrite it? "
-"({})"
-msgstr ""
-
-#: app/backup.py
 msgid "Load Backup"
-msgstr ""
-
-#: app/backup.py app/backup.py
-msgid "Backup zip"
-msgstr ""
-
-#: app/backup.py
-msgid "Unsaved Backup"
 msgstr ""
 
 #: app/backup.py app/backup.py
@@ -691,12 +990,6 @@ msgstr ""
 #: app/backup.py
 msgid "Confirm Deletion"
 msgstr ""
-
-#: app/backup.py
-msgid "Do you wish to delete {} map?\n"
-msgid_plural "Do you wish to delete {} maps?\n"
-msgstr[0] ""
-msgstr[1] ""
 
 #: app/backup.py
 msgid "Restore:"
@@ -715,7 +1008,11 @@ msgid "Delete Checked"
 msgstr ""
 
 #: app/backup.py
-msgid "BEEMOD {} - Backup / Restore Puzzles"
+msgid "Reload the map list."
+msgstr ""
+
+#: app/backup.py
+msgid "BEEMOD {version} - Backup / Restore Puzzles"
 msgstr ""
 
 #: app/backup.py app/backup.py
@@ -756,6 +1053,10 @@ msgstr ""
 
 #: app/backup.py
 msgid "Backup/Restore Puzzles"
+msgstr ""
+
+#: app/backup.py
+msgid ".. As"
 msgstr ""
 
 #: app/contextWin.py
@@ -855,17 +1156,17 @@ msgid "This item can be placed in any orientation."
 msgstr ""
 
 #: app/contextWin.py
-msgid "No Alternate Versions"
-msgstr ""
-
-#: app/contextWin.py
 msgid "Excursion Funnels accept a on/off input and a directional input."
 msgstr ""
 
 #: app/contextWin.py
 msgid ""
-"This item can be rotated on the floor to face 360 degrees, for Reflection"
-" Cubes only."
+"{generic_rot} However when this is set to Reflection Cube, this item can "
+"instead rotated on the floor to face 360 degrees."
+msgstr ""
+
+#: app/contextWin.py
+msgid "No Alternate Versions"
 msgstr ""
 
 #: app/contextWin.py
@@ -881,6 +1182,10 @@ msgstr ""
 
 #: app/contextWin.py
 msgid "Description:"
+msgstr ""
+
+#: app/contextWin.py
+msgid "BEE2 - Error"
 msgstr ""
 
 #: app/contextWin.py
@@ -906,14 +1211,6 @@ msgid "Close"
 msgstr ""
 
 #: app/corridor_selector.py
-msgid "Entry"
-msgstr ""
-
-#: app/corridor_selector.py
-msgid "Exit"
-msgstr ""
-
-#: app/corridor_selector.py
 msgid "Flat"
 msgstr ""
 
@@ -933,6 +1230,42 @@ msgstr ""
 msgid "Unused:"
 msgstr ""
 
+#: app/gameMan.py
+msgid "Backup Original Files"
+msgstr ""
+
+#: app/gameMan.py
+msgid "Backup Puzzles"
+msgstr ""
+
+#: app/gameMan.py
+msgid "Export Configuration"
+msgstr ""
+
+#: app/gameMan.py
+msgid "Copy Compiler"
+msgstr ""
+
+#: app/gameMan.py
+msgid "Copy Resources"
+msgstr ""
+
+#: app/gameMan.py
+msgid "Copy Music"
+msgstr ""
+
+#: app/gameMan.py
+msgid "Exporting"
+msgstr ""
+
+#: app/gameMan.py
+msgid "Export to \"{game}\"..."
+msgstr ""
+
+#: app/gameMan.py
+msgid "Export to \"{game}\"*..."
+msgstr ""
+
 #: app/gameMan.py app/gameMan.py
 msgid "BEE2 - Export Failed!"
 msgstr ""
@@ -944,15 +1277,18 @@ msgid ""
 msgstr ""
 
 #: app/gameMan.py
-msgid "Copying compiler file {file} failed. Ensure {game} is not running."
-msgstr ""
-
-#: app/gameMan.py app/menu_bar.py
-msgid "Quit"
+msgid ""
+"Copying compiler file {file} failed. Ensure {game} is not running. The "
+"webserver for the error display may also be running, quit the vrad "
+"process or wait a few minutes."
 msgstr ""
 
 #: app/gameMan.py
-msgid "Export to \"{}\"..."
+msgid "Copying compiler file {file} failed. Ensure {game} is not running."
+msgstr ""
+
+#: app/gameMan.py
+msgid "BEE2 - Aperture Tag Files Missing"
 msgstr ""
 
 #: app/gameMan.py
@@ -962,7 +1298,7 @@ msgid ""
 msgstr ""
 
 #: app/gameMan.py
-msgid "BEE2 - Aperture Tag Files Missing"
+msgid "BEE2"
 msgstr ""
 
 #: app/gameMan.py
@@ -975,12 +1311,11 @@ msgid ""
 msgstr ""
 
 #: app/gameMan.py
-msgid "Select the folder where the game executable is located ({appname})..."
+msgid "BEE2 - Add Game"
 msgstr ""
 
-#: app/gameMan.py app/gameMan.py app/gameMan.py app/gameMan.py app/gameMan.py
 #: app/gameMan.py
-msgid "BEE2 - Add Game"
+msgid "Select the folder where the game executable is located ({appname})..."
 msgstr ""
 
 #: app/gameMan.py
@@ -1017,12 +1352,16 @@ msgstr ""
 
 #: app/gameMan.py
 msgid ""
-"\n"
-" (BEE2 will quit, this is the last game set!)"
+"Are you sure you want to delete \"{game}\"?\n"
+"(BEE2 will quit, this is the last game set!)"
 msgstr ""
 
-#: app/gameMan.py app/paletteUI.py
-msgid "Are you sure you want to delete \"{}\"?"
+#: app/gameMan.py
+msgid "Are you sure you want to delete \"{game}\"?"
+msgstr ""
+
+#: app/gameMan.py
+msgid "BEE2 - Remove Game"
 msgstr ""
 
 #: app/helpMenu.py
@@ -1089,7 +1428,9 @@ msgid "BEEMOD 2 - Open URL"
 msgstr ""
 
 #: app/helpMenu.py
-msgid "Do you wish to open the following URL?\n"
+msgid ""
+"Do you wish to open the following URL?\n"
+"{url}"
 msgstr ""
 
 #: app/helpMenu.py
@@ -1119,19 +1460,107 @@ msgid ""
 msgstr ""
 
 #: app/itemPropWin.py
+msgid "Timer Sound"
+msgstr ""
+
+#: app/itemPropWin.py
+msgid "Angled Panel Type"
+msgstr ""
+
+#: app/itemPropWin.py
+msgid "Disable Cube Dropper Clips"
+msgstr ""
+
+#: app/itemPropWin.py
+msgid "Gel Export Type"
+msgstr ""
+
+#: app/itemPropWin.py
+msgid "Automatically Move"
+msgstr ""
+
+#: app/itemPropWin.py
+msgid "Connection Count"
+msgstr ""
+
+#: app/itemPropWin.py
+msgid "Polarity Connection Count"
+msgstr ""
+
+#: app/itemPropWin.py
+msgid "Is Coop?"
+msgstr ""
+
+#: app/itemPropWin.py
+msgid "Flip Panel Portalability"
+msgstr ""
+
+#: app/itemPropWin.py
+msgid "Track Platform Speed"
+msgstr ""
+
+#: app/itemPropWin.py
+msgid "Initial Track Platform Position"
+msgstr ""
+
+#: app/itemPropWin.py
+msgid "Track Platform Direction"
+msgstr ""
+
+#: app/itemPropWin.py
+msgid "Track Platform Distance"
+msgstr ""
+
+#: app/itemPropWin.py
+msgid "Start Up"
+msgstr ""
+
+#: app/itemPropWin.py
+msgid "Vertical Alignment"
+msgstr ""
+
+#: app/itemPropWin.py
+msgid "Faith Plate Speed"
+msgstr ""
+
+#: app/itemPropWin.py
+msgid "Faith Target Name"
+msgstr ""
+
+#: app/itemPropWin.py
+msgid "BEE2 - {item}"
+msgstr ""
+
+#: app/itemPropWin.py
+msgid "Settings for \"{item}\""
+msgstr ""
+
+#: app/itemPropWin.py
+msgid ""
+"Timer Delay:\n"
+"        ({tim})"
+msgstr ""
+
+#: app/itemPropWin.py
 msgid "No Properties available!"
-msgstr ""
-
-#: app/itemPropWin.py
-msgid "Settings for \"{}\""
-msgstr ""
-
-#: app/itemPropWin.py
-msgid "BEE2 - {}"
 msgstr ""
 
 #: app/item_search.py
 msgid "Search:"
+msgstr ""
+
+#. i18n: This is displayed in the options menu to switch to this language.
+#: app/localisation.py app/localisation.py
+msgid "__LanguageName"
+msgstr ""
+
+#. i18n: BEEmod 1 palette.
+#: app/localisation.py app/paletteLoader.py
+msgid "BEEMod"
+msgstr ""
+
+#: app/localisation.py
+msgid "UI Translations rebuilt."
 msgstr ""
 
 #: app/menu_bar.py
@@ -1175,11 +1604,23 @@ msgid "Options"
 msgstr ""
 
 #: app/menu_bar.py
+msgid "Quit"
+msgstr ""
+
+#: app/menu_bar.py
 msgid "Palette"
 msgstr ""
 
 #: app/menu_bar.py
 msgid "View"
+msgstr ""
+
+#: app/music_conf.py
+msgid "Music:"
+msgstr ""
+
+#: app/music_conf.py
+msgid "Base:"
 msgstr ""
 
 #: app/music_conf.py
@@ -1223,7 +1664,7 @@ msgid "Set the music used while inside Excursion Funnels."
 msgstr ""
 
 #: app/music_conf.py
-msgid "Have no music playing when inside funnels."
+msgid "The regular base track will continue to play normally."
 msgstr ""
 
 #: app/music_conf.py
@@ -1253,10 +1694,6 @@ msgid "Add no music while running fast."
 msgstr ""
 
 #: app/music_conf.py
-msgid "Base: "
-msgstr ""
-
-#: app/music_conf.py
 msgid "Funnel:"
 msgstr ""
 
@@ -1270,50 +1707,36 @@ msgstr ""
 
 #: app/optionWindow.py
 msgid ""
-"\n"
+"{msg}\n"
 "Launch Game?"
 msgstr ""
 
 #: app/optionWindow.py
 msgid ""
-"\n"
+"{msg}\n"
 "Minimise BEE2?"
 msgstr ""
 
 #: app/optionWindow.py
 msgid ""
-"\n"
+"{msg}\n"
 "Launch Game and minimise BEE2?"
 msgstr ""
 
 #: app/optionWindow.py
 msgid ""
-"\n"
+"{msg}\n"
 "Quit BEE2?"
 msgstr ""
 
 #: app/optionWindow.py
 msgid ""
-"\n"
+"{msg}\n"
 "Launch Game and quit BEE2?"
 msgstr ""
 
 #: app/optionWindow.py
 msgid "BEE2 Options"
-msgstr ""
-
-#: app/optionWindow.py
-msgid ""
-"Package cache times have been reset. These will now be extracted during "
-"the next export."
-msgstr ""
-
-#: app/optionWindow.py
-msgid "\"Preserve Game Resources\" has been disabled."
-msgstr ""
-
-#: app/optionWindow.py
-msgid "Packages Reset"
 msgstr ""
 
 #: app/optionWindow.py
@@ -1326,6 +1749,23 @@ msgstr ""
 
 #: app/optionWindow.py
 msgid "Development"
+msgstr ""
+
+#: app/optionWindow.py
+msgid "Packages Reset"
+msgstr ""
+
+#: app/optionWindow.py
+msgid ""
+"Package cache times have been reset. These will now be extracted during "
+"the next export."
+msgstr ""
+
+#: app/optionWindow.py
+msgid ""
+"{cache_reset}\n"
+"\n"
+"\"Preserve Game Resources\" has been disabled."
 msgstr ""
 
 #: app/optionWindow.py app/packageMan.py app/selector_win.py
@@ -1368,7 +1808,11 @@ msgstr ""
 msgid "After exporting, launch the selected game automatically."
 msgstr ""
 
-#: app/optionWindow.py app/optionWindow.py
+#: app/optionWindow.py
+msgid "Language:"
+msgstr ""
+
+#: app/optionWindow.py
 msgid "Play Sounds"
 msgstr ""
 
@@ -1490,6 +1934,17 @@ msgid ""
 msgstr ""
 
 #: app/optionWindow.py
+msgid "Preserve FGD"
+msgstr ""
+
+#: app/optionWindow.py
+msgid ""
+"When exporting, do not modify the FGD files.\n"
+"Enable this if you have a custom one, to prevent it from being "
+"overwritten."
+msgstr ""
+
+#: app/optionWindow.py
 msgid "Show Log Window"
 msgstr ""
 
@@ -1509,11 +1964,11 @@ msgid ""
 msgstr ""
 
 #: app/optionWindow.py
-msgid "Dump All objects"
+msgid "Dump All Objects"
 msgstr ""
 
 #: app/optionWindow.py
-msgid "Dump Items list"
+msgid "Dump Items List"
 msgstr ""
 
 #: app/optionWindow.py
@@ -1522,6 +1977,26 @@ msgstr ""
 
 #: app/optionWindow.py
 msgid "Reload all images in the app. Expect the app to freeze momentarily."
+msgstr ""
+
+#: app/optionWindow.py
+msgid "Build UI Translations"
+msgstr ""
+
+#: app/optionWindow.py
+msgid ""
+"Compile '.po' UI translation files into '.mo'. This requires those to "
+"have been downloaded from the source repo."
+msgstr ""
+
+#: app/optionWindow.py
+msgid "Build Package Translations"
+msgstr ""
+
+#: app/optionWindow.py
+msgid ""
+"Export translation files for all unzipped packages. This will update "
+"existing localisations, creating them for packages that don't have any."
 msgstr ""
 
 #: app/packageMan.py
@@ -1548,11 +2023,6 @@ msgstr ""
 msgid "Blank"
 msgstr ""
 
-#. i18n: BEEmod 1 palette.
-#: app/paletteLoader.py
-msgid "BEEMod"
-msgstr ""
-
 #. i18n: Default items merged together
 #: app/paletteLoader.py
 msgid "Portal 2 Collapsed"
@@ -1568,12 +2038,24 @@ msgstr ""
 msgid "Aperture Tag"
 msgstr ""
 
-#: app/paletteUI.py
-msgid "Clear Palette"
+#: app/paletteUI.py app/paletteUI.py
+msgid "Delete Palette"
 msgstr ""
 
-#: app/paletteUI.py app/paletteUI.py app/paletteUI.py
-msgid "Delete Palette"
+#: app/paletteUI.py
+msgid "Hide Palette"
+msgstr ""
+
+#: app/paletteUI.py
+msgid "Are you sure you want to delete \"{palette}\"?"
+msgstr ""
+
+#: app/paletteUI.py
+msgid "Builtin / Readonly"
+msgstr ""
+
+#: app/paletteUI.py
+msgid "Clear Palette"
 msgstr ""
 
 #: app/paletteUI.py
@@ -1597,19 +2079,15 @@ msgid "Save Palette"
 msgstr ""
 
 #: app/paletteUI.py
-msgid "Builtin / Readonly"
+msgid "Hide Palette \"{name}\""
 msgstr ""
 
 #: app/paletteUI.py
-msgid "Hide Palette \"{}\""
+msgid "Delete Palette \"{name}\""
 msgstr ""
 
 #: app/paletteUI.py
-msgid "Hide Palette"
-msgstr ""
-
-#: app/paletteUI.py
-msgid "Delete Palette \"{}\""
+msgid "BEE2 - Delete Palette"
 msgstr ""
 
 #: app/paletteUI.py app/paletteUI.py
@@ -1629,11 +2107,40 @@ msgid "Enter the name of the group for this palette, or \"\" to ungroup."
 msgstr ""
 
 #: app/richTextBox.py
-msgid "Open \"{}\" in the default browser?"
+msgid "Open \"{url}\" in the default browser?"
 msgstr ""
 
 #: app/selector_win.py
-msgid "{} Preview"
+msgid "Color: R={r}, G={g}, B={b}"
+msgstr ""
+
+#. i18n: Tooltip for colour swatch.
+#: app/selector_win.py
+msgid "BEE2 - {subtitle}"
+msgstr ""
+
+#. i18n: Window titles.
+#: app/selector_win.py
+msgid "Preview - {item}"
+msgstr ""
+
+#. i18n: Preview window.
+#: app/selector_win.py
+msgid "Suggested"
+msgstr ""
+
+#: app/selector_win.py
+msgid "Other"
+msgstr ""
+
+#: app/selector_win.py
+msgid "Author: {authors}"
+msgid_plural "Authors: {authors}"
+msgstr[0] ""
+msgstr[1] ""
+
+#: app/selector_win.py
+msgid "Authors: Unknown"
 msgstr ""
 
 #. i18n: 'None' item description
@@ -1654,23 +2161,8 @@ msgstr ""
 msgid "Select Suggested"
 msgstr ""
 
-#: app/selector_win.py
-msgid "Other"
-msgstr ""
-
-#: app/selector_win.py
-msgid "Author: {}"
-msgid_plural "Authors: {}"
-msgstr[0] ""
-msgstr[1] ""
-
-#. i18n: Tooltip for colour swatch.
-#: app/selector_win.py
-msgid "Color: R={r}, G={g}, B={b}"
-msgstr ""
-
-#: app/selector_win.py app/selector_win.py
-msgid "Suggested"
+#: app/signage_ui.py
+msgid "Signage: {name}"
 msgstr ""
 
 #: app/signage_ui.py app/signage_ui.py
@@ -1679,10 +2171,6 @@ msgstr ""
 
 #: app/signage_ui.py
 msgid "Selected"
-msgstr ""
-
-#: app/signage_ui.py
-msgid "Signage: {}"
 msgstr ""
 
 #: app/voiceEditor.py
@@ -1710,6 +2198,10 @@ msgid "AI characters (ATLAS, P-Body, or Coop)"
 msgstr ""
 
 #: app/voiceEditor.py
+msgid "Death - Generic"
+msgstr ""
+
+#: app/voiceEditor.py
 msgid "Death - Toxic Goo"
 msgstr ""
 
@@ -1726,6 +2218,18 @@ msgid "Death - LaserField"
 msgstr ""
 
 #: app/voiceEditor.py
+msgid "Taunts - Generic"
+msgstr ""
+
+#: app/voiceEditor.py
+msgid "Camera Gesture - Generic"
+msgstr ""
+
+#: app/voiceEditor.py app/voiceEditor.py
+msgid "No Name!"
+msgstr ""
+
+#: app/voiceEditor.py
 msgid "Transcript:"
 msgstr ""
 
@@ -1733,12 +2237,13 @@ msgstr ""
 msgid "Save"
 msgstr ""
 
+#. i18n: 'response' tab name, should be short.
 #: app/voiceEditor.py
 msgid "Resp"
 msgstr ""
 
 #: app/voiceEditor.py
-msgid "BEE2 - Configure \"{}\""
+msgid "BEE2 - Configure \"{item}\""
 msgstr ""
 
 #: app/voiceEditor.py
@@ -1759,14 +2264,6 @@ msgstr ""
 msgid "Lines played in response to certain events in Coop."
 msgstr ""
 
-#: app/voiceEditor.py
-msgid "No Name!"
-msgstr ""
-
-#: app/voiceEditor.py
-msgid "No Name?"
-msgstr ""
-
 #: app/itemconfig/__init__.py
 msgid "Style Properties"
 msgstr ""
@@ -1781,5 +2278,44 @@ msgstr ""
 
 #: app/itemconfig/color.py
 msgid "Choose a Color"
+msgstr ""
+
+#: packages/__init__.py
+msgid ""
+"one of the following locations:\n"
+"{loc}"
+msgstr ""
+
+#: packages/__init__.py
+msgid ""
+"{msg}\n"
+"Get the packages from \"https://github.com/BEEmod/BEE2-items\" and place "
+"them in {trailer}"
+msgstr ""
+
+#: packages/__init__.py
+msgid "BEE2 - Invalid Packages Directory!"
+msgstr ""
+
+#: packages/__init__.py
+msgid "No packages found!"
+msgstr ""
+
+#: packages/__init__.py
+msgid ""
+"No Clean Style package! This is required for some essential resources and"
+" objects."
+msgstr ""
+
+#: packages/__init__.py
+msgid "No description!"
+msgstr ""
+
+#: packages/corridor.py
+msgid "Corridor"
+msgstr ""
+
+#: test/test_transtoken.py
+msgid "Save As"
 msgstr ""
 

@@ -73,6 +73,7 @@ def chain(
                 # Not one of our instances - fine, it's just actual IO.
                 continue
             conn.remove()
+            # TODO: Render the node points.
             if node.next is not None:
                 raise ValueError(f'Item "{node.item.name}" links to multiple output items!')
             if next_node.prev is not None:

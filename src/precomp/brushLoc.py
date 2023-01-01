@@ -8,9 +8,11 @@ from collections import deque
 from typing import Union, Any, Tuple, ItemsView, MutableMapping
 from enum import Enum
 
-from srctools import Vec, Matrix, Angle, VMF
+from srctools import Vec, Matrix, VMF
 
 import srctools.logger
+
+import user_errors
 import utils
 import editoritems
 
@@ -226,7 +228,7 @@ class Grid(MutableMapping[_grid_keys, Block]):
 
     def lookup_world(self, pos: Iterable[float]) -> Block:
         """Lookup a world position."""
-        return self._grid.get(tuple(world_to_grid(Vec(pos))), Block.VOID)
+        return self._grid.get(world_to_grid(Vec(pos)).as_tuple(), Block.VOID)
 
     def __getitem__(self, pos: _grid_keys) -> Block:
         return self._grid.get(_conv_key(pos), Block.VOID)
@@ -238,6 +240,13 @@ class Grid(MutableMapping[_grid_keys, Block]):
             ))
 
         self._grid[_conv_key(pos)] = value
+
+    def set_world(self, pos: Iterable[float], value: Block) -> None:
+        """Set a world position."""
+        if type(value) is not Block:
+            raise ValueError(f'Must be set to a Block item, not "{type(value).__name__}"!')
+
+        self._grid[world_to_grid(Vec(pos)).as_tuple()] = value
 
     def __delitem__(self, pos: _grid_keys) -> None:
         del self._grid[_conv_key(pos)]
@@ -417,8 +426,8 @@ class Grid(MutableMapping[_grid_keys, Block]):
             # There's a buffer region since large embedded areas may
             # be interpreted as small air pockets, that's fine.
             if not ((-15, -15, -15) <= pos <= (40, 40, 40)):
-                LOGGER.warning('Attempted leak at {}', pos)
-                continue
+                # We're too early to actually visualise anything.
+                raise user_errors.UserError(user_errors.TOK_BRUSHLOC_LEAK)
 
             # For go we need to determine which kind to use.
             # We only fill from underneath the surface, so

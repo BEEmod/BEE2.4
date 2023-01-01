@@ -26,6 +26,11 @@ TRANSLATION = {
     'skip': 'Skipped',
     'version': 'Version: 2.4.389',
     'cancel': 'Cancel',
+    'log_title': 'Logs',
+    'log_show': 'Show:',
+    'level_debug': 'Debug',
+    'level_info': 'Info',
+    'level_warn': 'Warnings only',
 }
 
 SPLASH_FONTS = [
@@ -50,8 +55,12 @@ BOX_LEVELS = [
 ]
 START = '1.0'  # Row 1, column 0 = first character
 
+
 class BaseLoadScreen:
     """Code common to both loading screen types."""
+    drag_x: Optional[int]
+    drag_y: Optional[int]
+
     def __init__(
         self,
         scr_id: int,
@@ -82,7 +91,7 @@ class BaseLoadScreen:
             self.names[st_id] = stage_name
 
         # Because of wm_overrideredirect, we have to manually do dragging.
-        self.drag_x = self.drag_y = None  # type: Optional[int]
+        self.drag_x = self.drag_y = None
 
         self.win.bind('<Button-1>', self.move_start)
         self.win.bind('<ButtonRelease-1>', self.move_stop)
@@ -114,8 +123,12 @@ class BaseLoadScreen:
             y=self.win.winfo_y() + (event.y - self.drag_y),
         ))
 
-    def op_show(self) -> None:
+    def op_show(self, title: str, labels: List[str]) -> None:
         """Show the window."""
+        self.win.title(title)
+        for (st_id, _), name in zip(self.stages, labels):
+            self.names[st_id] = name
+
         self.is_shown = True
         self.win.deiconify()
         self.win.lift()
@@ -126,6 +139,7 @@ class BaseLoadScreen:
         ))
 
     def op_hide(self) -> None:
+        """Hide the window."""
         self.is_shown = False
         self.win.withdraw()
 
@@ -178,36 +192,36 @@ class LoadScreen(BaseLoadScreen):
         self.frame = ttk.Frame(self.win, cursor=tk_tools.Cursors.WAIT)
         self.frame.grid(row=0, column=0)
 
-        ttk.Label(
+        self.title_lbl = ttk.Label(
             self.frame,
             text=self.title_text + '...',
             font=("Helvetica", 12, "bold"),
             cursor=tk_tools.Cursors.WAIT,
-        ).grid(row=0, column=0)
+        )
+        self.title_lbl.grid(row=0, column=0)
         ttk.Separator(
             self.frame,
             orient=tk.HORIZONTAL,
             cursor=tk_tools.Cursors.WAIT,
         ).grid(row=1, sticky="EW", columnspan=2)
 
-        ttk.Button(
-            self.frame,
-            text=TRANSLATION['cancel'],
-            command=self.cancel,
-        ).grid(row=0, column=1)
+        self.cancel_btn = ttk.Button(self.frame, command=self.cancel)
+        self.cancel_btn.grid(row=0, column=1)
 
         self.bar_var = {}
         self.bars = {}
+        self.titles = {}
         self.labels = {}
 
         for ind, (st_id, stage_name) in enumerate(self.stages):
             if stage_name:
                 # If stage name is blank, don't add a caption
-                ttk.Label(
+                self.titles[st_id] = ttk.Label(
                     self.frame,
                     text=stage_name + ':',
                     cursor=tk_tools.Cursors.WAIT,
-                ).grid(
+                )
+                self.titles[st_id].grid(
                     row=ind * 2 + 2,
                     columnspan=2,
                     sticky="W",
@@ -229,6 +243,10 @@ class LoadScreen(BaseLoadScreen):
             self.bars[st_id].grid(row=ind * 2 + 3, column=0, columnspan=2)
             self.labels[st_id].grid(row=ind * 2 + 2, column=1, sticky="E")
 
+    def update_translations(self) -> None:
+        """Update translations."""
+        self.cancel_btn['text'] = TRANSLATION['cancel']
+
     def reset_stages(self) -> None:
         """Put the stage in the initial state, before maxes are provided."""
         for stage in self.values.keys():
@@ -249,6 +267,16 @@ class LoadScreen(BaseLoadScreen):
             max_val,
         )
 
+    def op_show(self, title: str, labels: List[str]) -> None:
+        """Show the window."""
+        self.title_text = title
+        self.win.title(title)
+        self.title_lbl['text'] = title + '...',
+        for (st_id, _), name in zip(self.stages, labels):
+            if st_id in self.titles:
+                self.titles[st_id]['text'] = name + ':'
+        super().op_show(title, labels)
+
     def op_skip_stage(self, stage: str) -> None:
         """Skip over this stage of the loading process."""
         self.values[stage] = 0
@@ -258,7 +286,11 @@ class LoadScreen(BaseLoadScreen):
 
 
 class SplashScreen(BaseLoadScreen):
-    """The splash screen shown when booting up."""
+    """The splash screen shown when booting up.
+
+    Since this is only shown once before you can access the settings window, we don't need to worry
+    about reloading translations.
+    """
 
     def __init__(self, *args) -> None:
         super().__init__(*args)
@@ -476,6 +508,7 @@ class SplashScreen(BaseLoadScreen):
                 )
 
     def update_stage(self, stage: str) -> None:
+        """Update all the text."""
         if self.maxes[stage] == 0:
             text = f'{self.names[stage]}: (0/0)'
             self.set_bar(stage, 1)
@@ -531,6 +564,7 @@ class SplashScreen(BaseLoadScreen):
             canvas.tag_lower('tick_' + stage, 'bar_' + stage)
 
     def reset_stages(self) -> None:
+        """Reset all stages."""
         pass
 
     def op_skip_stage(self, stage: str) -> None:
@@ -584,13 +618,12 @@ class SplashScreen(BaseLoadScreen):
 
 class LogWindow:
     """Implements the logging window."""
-    def __init__(self, translations: dict, pipe: multiprocessing.connection.Connection) -> None:
+    def __init__(self, pipe: multiprocessing.connection.Connection) -> None:
         """Initialise the window."""
         self.win = window = tk.Toplevel(TK_ROOT)
         self.pipe = pipe
         window.columnconfigure(0, weight=1)
         window.rowconfigure(0, weight=1)
-        window.title(translations['log_title'])
         window.protocol('WM_DELETE_WINDOW', self.evt_close)
         window.withdraw()
 
@@ -635,35 +668,35 @@ class LogWindow:
         button_frame = ttk.Frame(window, name='button_frame')
         button_frame.grid(row=1, column=0, columnspan=2, sticky='EW')
 
-        ttk.Button(
+        self.clear_btn = ttk.Button(
             button_frame,
             name='clear_btn',
-            text=translations['clear'],
             command=self.evt_clear,
-        ).grid(row=0, column=0)
+        )
+        self.clear_btn.grid(row=0, column=0)
 
-        ttk.Button(
+        self.copy_btn = ttk.Button(
             button_frame,
             name='copy_btn',
-            text=translations['copy'],
             command=self.evt_copy,
-        ).grid(row=0, column=1)
+        )
+        self.copy_btn.grid(row=0, column=1)
 
         sel_frame = ttk.Frame(button_frame)
         sel_frame.grid(row=0, column=2, sticky='EW')
         button_frame.columnconfigure(2, weight=1)
 
-        ttk.Label(
+        self.log_show = ttk.Label(
             sel_frame,
-            text=translations['log_show'],
             anchor='e',
             justify='right',
-        ).grid(row=0, column=0, sticky='E')
+        )
+        self.log_show.grid(row=0, column=0, sticky='E')
 
         self.level_selector = ttk.Combobox(
             sel_frame,
             name='level_selector',
-            values=translations['level_text'],
+            values=BOX_LEVELS,
             exportselection=False,
         )
         # On Mac this defaults to being way too wide!
@@ -680,6 +713,21 @@ class LogWindow:
 
         if tk_tools.USE_SIZEGRIP:
             ttk.Sizegrip(button_frame).grid(row=0, column=3)
+        self.update_translations()
+
+    def update_translations(self) -> None:
+        """Apply translations."""
+        self.win.title(TRANSLATION['log_title'])
+        self.clear_btn['text'] = TRANSLATION['clear']
+        self.copy_btn['text'] = TRANSLATION['copy']
+        self.log_show['text'] = TRANSLATION['log_show']
+        old_current = self.level_selector.current()
+        self.level_selector['values'] = [
+            TRANSLATION['level_debug'],
+            TRANSLATION['level_info'],
+            TRANSLATION['level_warn'],
+        ]
+        self.level_selector.current(old_current)
 
     def log(self, level_name: str, text: str) -> None:
         """Write a log message to the window."""
@@ -752,8 +800,7 @@ def run_background(
     pipe_rec: multiprocessing.connection.Connection,
     log_pipe_send: multiprocessing.connection.Connection,
     log_pipe_rec: multiprocessing.connection.Connection,
-    # Pass in various bits of translated text
-    # so we don't need to do it here.
+    # Pass in various bits of translated text so, we don't need to do it here.
     translations: dict,
 ) -> None:
     """Runs in the other process, with an end of a pipe for input."""
@@ -764,9 +811,9 @@ def run_background(
 
     force_ontop = True
 
-    log_window = LogWindow(translations, log_pipe_send)
+    log_window = LogWindow(log_pipe_send)
 
-    def check_queue():
+    def check_queue() -> None:
         """Update stages from the parent process."""
         nonlocal force_ontop
         had_values = False
@@ -784,10 +831,15 @@ def run_background(
                     log_pipe_send.send('quit')
                     TK_ROOT.quit()
                     return
-                elif operation == 'set_force_ontop':
-                    [force_ontop] = args
+                elif operation == 'update_translations':
+                    TRANSLATION.update(args)
+                    log_window.update_translations()
                     for screen in SCREENS.values():
-                        screen.win.attributes('-topmost', force_ontop)
+                        if isinstance(screen, LoadScreen):
+                            screen.update_translations()
+                elif operation == 'set_force_ontop':
+                    for screen in SCREENS.values():
+                        screen.win.attributes('-topmost', args)
                 else:
                     try:
                         func = getattr(SCREENS[scr_id], 'op_' + operation)
@@ -795,8 +847,13 @@ def run_background(
                         raise ValueError(f'Bad command "{operation}"!')
                     try:
                         func(*args)
-                    except Exception:
-                        raise Exception(operation)
+                    except Exception as e:  # Note which function caused the problem.
+                        try:
+                            e.add_note(f'Function: {func!r}')  # noqa
+                            raise
+                        except AttributeError:  # < 3.10
+                            pass
+                        raise TypeError(func) from e
             while log_pipe_rec.poll():
                 log_window.handle(log_pipe_rec.recv())
         except BrokenPipeError:
@@ -807,7 +864,7 @@ def run_background(
 
         # Continually re-run this function in the TK loop.
         # If we didn't find anything in the pipe, wait longer.
-        # Otherwise we hog the CPU.
+        # Otherwise, we hog the CPU.
         TK_ROOT.after(1 if had_values else 200, check_queue)
 
     TK_ROOT.after(10, check_queue)

@@ -15,7 +15,7 @@ import attrs
 
 from app.tooltip import add_tooltip, set_tooltip
 from app import tk_tools
-from localisation import gettext
+from app.localisation import TransToken, set_text
 
 
 UP_ARROW = '\u25B3'
@@ -36,18 +36,20 @@ style.configure('CheckDetails.TCheckbutton', background='white')
 EVENT_NO_CHECKS = '<<NoItemsChecked>>'
 EVENT_HAS_CHECKS = '<<ItemsChecked>>'
 
+TRANS_ELLIPSIS = TransToken.untranslated(ELLIPSIS)
 
-def truncate(text: str, width: int) -> str:
+
+def truncate(text: str, width: int) -> Optional[TransToken]:
     """Truncate text to fit in the given space."""
     if BODY_FONT.measure(text) < width:
-        return text  # No truncation needed!
+        return None  # No truncation needed!
 
     # Chop one character off the end at a time
     for ind in reversed(range(len(text))):
         short = text[:ind] + ELLIPSIS
         if BODY_FONT.measure(short) < width:
-            return short
-    return ELLIPSIS
+            return TransToken.untranslated(short)
+    return TRANS_ELLIPSIS
 
 
 @attrs.define
@@ -74,24 +76,24 @@ class Item(Generic[UserT]):
     @overload
     def __init__(
         self: 'Item[None]',
-        *values: str,
-        hover_text: str='',
+        *values: TransToken,
+        hover_text: TransToken = TransToken.BLANK,
         lock_check: bool=False,
         state: bool=False,
     ) -> None: ...
     @overload
     def __init__(
         self: 'Item[UserT]',
-        *values: str,
-        hover_text: str='',
+        *values: TransToken,
+        hover_text: TransToken = TransToken.BLANK,
         lock_check: bool=False,
         state: bool=False,
         user: UserT,
     ) -> None: ...
     def __init__(
         self,
-        *values: str,
-        hover_text: str='',
+        *values: TransToken,
+        hover_text: TransToken = TransToken.BLANK,
         lock_check: bool=False,
         state: bool=False,
         user: UserT | None = None,
@@ -140,12 +142,12 @@ class Item(Generic[UserT]):
         for value in self.values:
             wid = tk.Label(
                 master.wid_frame,
-                text=value,
                 justify=tk.LEFT,
                 anchor=tk.W,
                 background='white',
             )
-            add_tooltip(wid, self.hover_text or '')
+            set_text(wid, value)
+            add_tooltip(wid, self.hover_text)
 
             if not self.locked:
                 # Allow clicking on the row to toggle the checkbox
@@ -172,10 +174,13 @@ class Item(Generic[UserT]):
                 width=width,
                 height=ROW_HEIGHT,
             )
-            text = str(text)
-            short_text = widget['text'] = truncate(text, width-5)
-            if not self.hover_text:
-                set_tooltip(widget, text if short_text != text else '')
+            short_text = truncate(str(text), width-5)
+            if short_text is None:
+                set_text(widget, text)
+                set_tooltip(widget, self.hover_text)
+            else:
+                set_text(widget, short_text)
+                set_tooltip(widget, self.hover_text or text)
             x += width
 
     def destroy(self) -> None:
@@ -218,7 +223,7 @@ class CheckDetails(ttk.Frame, Generic[UserT]):
         self,
         parent: tk.Misc,
         items: Iterable[Item[UserT]]=(),
-        headers: Iterable[str]=(),
+        headers: Iterable[TransToken]=(),
         add_sizegrip: bool=False,
     ) -> None:
         """Initialise a CheckDetails pane.
@@ -245,7 +250,7 @@ class CheckDetails(ttk.Frame, Generic[UserT]):
         )
         self.wid_head_check.grid(row=0, column=0)
 
-        add_tooltip(self.wid_head_check, gettext("Toggle all checkboxes."))
+        add_tooltip(self.wid_head_check, TransToken.ui("Toggle all checkboxes."))
 
         def checkbox_enter(_: tk.Event) -> None:
             """When hovering over the 'all' checkbox, highlight the others."""
@@ -322,12 +327,13 @@ class CheckDetails(ttk.Frame, Generic[UserT]):
             self.wid_header,
         )
 
-    def _make_header(self, ind: int, text: str) -> Header:
+    def _make_header(self, ind: int, text: TransToken) -> Header:
         """Generate the heading widgets."""
         frame = ttk.Frame(self.wid_header, relief=tk.RAISED)
-        label = ttk.Label(frame, font='TkHeadingFont', text=text)
+        label = ttk.Label(frame, font='TkHeadingFont')
         sorter = ttk.Label(frame, font='TkHeadingFont', text='')
         header = Header(frame, label, sorter)
+        set_text(label, text)
 
         label.grid(row=0, column=0, sticky='EW')
         sorter.grid(row=0, column=1, sticky='E')
@@ -493,7 +499,7 @@ class CheckDetails(ttk.Frame, Generic[UserT]):
         self.headers[index].sorter['text'] = UP_ARROW if self.rev_sort else DN_ARROW
         self.sort_ind = index
 
-        self.items.sort(key=lambda item: item.values[index], reverse=self.rev_sort)
+        self.items.sort(key=lambda item: item.values[index].token, reverse=self.rev_sort)
         self.refresh()
 
     def checked(self) -> Iterator[Item]:
@@ -511,16 +517,17 @@ class CheckDetails(ttk.Frame, Generic[UserT]):
 
 if __name__ == '__main__':
     from app import TK_ROOT
+    tt = TransToken.untranslated
     test_inst = CheckDetails[None](
         parent=TK_ROOT,
-        headers=['Name', 'Author', 'Description'],
+        headers=[tt('Name'), tt('Author'), tt('Description')],
         items=[
-            Item('Item1', 'Auth1', 'Blah blah blah'),
-            Item('Item5', 'Auth3', 'Lorem Ipsum'),
-            Item('Item3', 'Auth2', '.........'),
-            Item('Item4', 'Auth2', '.........'),
-            Item('Item6', 'Sir VeryLongName', '.....'),
-            Item('Item2', 'Auth1', '...'),
+            Item(tt('Item1'), tt('Auth1'), tt('Blah blah blah')),
+            Item(tt('Item5'), tt('Auth3'), tt('Lorem Ipsum')),
+            Item(tt('Item3'), tt('Auth2'), tt('.........')),
+            Item(tt('Item4'), tt('Auth2'), tt('.........')),
+            Item(tt('Item6'), tt('Sir VeryLongName'), tt('.....')),
+            Item(tt('Item2'), tt('Auth1'), tt('...')),
         ]
     )
     test_inst.grid(sticky='NSEW')

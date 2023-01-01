@@ -2,9 +2,11 @@
 from __future__ import annotations
 from collections import defaultdict
 
-from precomp import connections, conditions
-import srctools.logger
 from srctools import Property, Entity, VMF, Vec, Output, Matrix
+import srctools.logger
+
+from precomp import connections, conditions
+import user_errors
 
 
 COND_MOD_NAME = None
@@ -49,8 +51,11 @@ def res_sendificator(vmf: VMF, inst: Entity):
         try:
             targ_offset, targ_normal = SENDTOR_TARGETS[las_item.name]
         except KeyError:
-            LOGGER.warning('"{}" is not a Sendificator target!', las_item.name)
-            continue
+            raise user_errors.UserError(
+                user_errors.TOK_SENDTOR_BAD_OUTPUT.format(out_item=las_item.name),
+                voxels=[Vec.from_str(sendtor.inst['origin'])],
+                points=[Vec.from_str(las_item.inst['origin'])],
+            )
 
         orient = Matrix.from_angstr(las_item.inst['angles'])
 

@@ -8,9 +8,8 @@ from outcome import Outcome, Error
 from srctools import Property
 import trio
 
-from BEE2_config import GEN_OPTS
 from app import (
-    TK_ROOT, sound, img, gameMan, music_conf,
+    TK_ROOT, localisation, sound, img, gameMan, music_conf,
     UI, logWindow,
 )
 from config.gen_opts import GenOptions
@@ -26,34 +25,10 @@ import srctools.logger
 LOGGER = srctools.logger.get_logger('BEE2')
 APP_NURSERY: trio.Nursery
 
-DEFAULT_SETTINGS = {
-    'Directories': {
-        'package': 'packages/',
-    },
-    'General': {
-        # A token used to indicate the time the current cache/ was extracted.
-        # This tells us whether to copy it to the game folder.
-        'cache_time': '0',
-        # We need this value to detect just removing a package.
-        'cache_pack_count': '0',
-    },
-}
-
 
 async def init_app() -> None:
     """Initialise the application."""
-    GEN_OPTS.load()
-    GEN_OPTS.set_defaults(DEFAULT_SETTINGS)
-    config.APP.read_file()
-    try:
-        conf = config.APP.get_cur_conf(GenOptions)
-    except KeyError:
-        conf = GenOptions()
-        config.APP.store_conf(conf)
-
-    # Special case, load in this early, so it applies.
-    utils.DEV_MODE = conf.dev_mode
-    app.DEV_MODE.set(conf.dev_mode)
+    conf = config.APP.get_cur_conf(GenOptions)
 
     LOGGER.debug('Starting loading screen...')
     loadScreen.main_loader.set_length('UI', 16)
@@ -66,7 +41,7 @@ async def init_app() -> None:
 
     logWindow.HANDLER.set_visible(conf.show_log_win)
     logWindow.HANDLER.setLevel(conf.log_win_level)
-    app.background_run(logWindow.setting_apply)
+    app.background_run(logWindow.loglevel_bg)
 
     LOGGER.debug('Loading settings...')
 
@@ -93,6 +68,7 @@ async def init_app() -> None:
     loadScreen.main_loader.step('UI', 'pre_ui')
     app.background_run(img.init, package_sys)
     app.background_run(sound.sound_task)
+    app.background_run(localisation.load_aux_langs, gameMan.all_games, packages.LOADED)
 
     # Load filesystems into various modules
     music_conf.load_filesystems(package_sys.values())
@@ -101,11 +77,6 @@ async def init_app() -> None:
         nurs.start_soon(UI.load_packages, packages.LOADED)
     loadScreen.main_loader.step('UI', 'package_load')
     LOGGER.info('Done!')
-
-    # Check games for Portal 2's basemodui.txt file, so we can translate items.
-    LOGGER.info('Loading Item Translations...')
-    for game in gameMan.all_games:
-        game.init_trans()
 
     LOGGER.info('Initialising UI...')
     async with trio.open_nursery() as nurs:

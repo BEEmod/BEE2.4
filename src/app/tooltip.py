@@ -4,6 +4,8 @@
 Call add_tooltip with a widget to add all the events automatically.
 """
 from __future__ import annotations
+
+import warnings
 import weakref
 from typing import Callable
 import tkinter as tk
@@ -11,6 +13,7 @@ import tkinter as tk
 import attr
 
 from app import TK_ROOT, img
+from app.localisation import TransToken, set_text
 
 __all__ = ['set_tooltip', 'add_tooltip']
 
@@ -46,7 +49,7 @@ context_label.grid(row=0, column=0)
 @attr.frozen
 class TooltipData:
     """The current text for a widget."""
-    text: str
+    text: TransToken
     img: 'img.Handle | None'
 
 DATA: weakref.WeakKeyDictionary[tk.Misc, TooltipData] = weakref.WeakKeyDictionary()
@@ -59,7 +62,7 @@ def _show(widget: tk.Misc, mouse_x: int, mouse_y: int) -> None:
     except KeyError:
         return
 
-    context_label['text'] = data.text
+    set_text(context_label, data.text)
     img.apply(context_label, data.img)
 
     window.deiconify()
@@ -120,14 +123,21 @@ def _show(widget: tk.Misc, mouse_x: int, mouse_y: int) -> None:
     window.geometry(f'+{round(x)}+{round(y)}')
 
 
-def set_tooltip(widget: tk.Misc, text: str='', image: img.Handle=None) -> None:
+def set_tooltip(
+    widget: tk.Misc,
+    text: TransToken=TransToken.BLANK,
+    image: img.Handle=None,
+) -> None:
     """Change the tooltip for a widget."""
+    if isinstance(text, str):
+        warnings.warn(f'Untranslated text {text!r}!', DeprecationWarning, stacklevel=2)
+        text = TransToken.untranslated(text)
     DATA[widget] = TooltipData(text, image)
 
 
 def add_tooltip(
     targ_widget: tk.Misc,
-    text: str='',
+    text: TransToken = TransToken.BLANK,
     image: img.Handle=None,
     delay: int=500,
     show_when_disabled: bool=False,
@@ -141,6 +151,10 @@ def add_tooltip(
     If show_when_disabled is false, no context menu will be shown if the
     target widget is disabled.
     """
+    if isinstance(text, str):
+        warnings.warn(f'Untranslated text {text!r}!', DeprecationWarning, stacklevel=2)
+        text = TransToken.untranslated(text)
+
     set_tooltip(targ_widget, text, image)
 
     event_id = None  # The id of the enter event, so we can cancel it.

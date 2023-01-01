@@ -16,6 +16,7 @@ from typing import (
     List, Dict, Tuple, TypeVar, Iterable,
 )
 import corridor
+import user_errors
 
 LOGGER = srctools.logger.get_logger(__name__)
 
@@ -317,7 +318,7 @@ def resolve(path: str, silent: bool=False) -> List[str]:
 Default_T = TypeVar('Default_T')
 
 
-def resolve_one(path, default: Union[str, Default_T]='', error=False) -> Union[str, Default_T]:
+def resolve_one(path, default: Union[str, Default_T]='', *, error: bool) -> Union[str, Default_T]:
     """Resolve a path into one instance.
 
     If multiple are given, this returns the first.
@@ -327,11 +328,14 @@ def resolve_one(path, default: Union[str, Default_T]='', error=False) -> Union[s
     instances = resolve(path)
     if not instances:
         if error:
-            raise ValueError('Path "{}" has no instances!'.format(path))
+            raise user_errors.UserError(user_errors.TOK_INSTLOC_EMPTY.format(path=path))
         return default
     if len(instances) > 1:
         if error:
-            raise ValueError('Path "{}" has multiple instances!'.format(path))
+            raise user_errors.UserError(
+                user_errors.TOK_INSTLOC_MULTIPLE.format(path=path),
+                textlist=instances,
+            )
         LOGGER.warning('Path "{}" returned multiple instances', path)
     return instances[0]
 
@@ -350,7 +354,7 @@ def _resolve(path: str) -> List[str]:
                 try:
                     item_id, subitems = _RE_SUBITEMS.fullmatch(group).groups()
                 except (ValueError, AttributeError):  # None.groups fail
-                    LOGGER.warning('Could not parse instance lookup "{}"!'.format(group))
+                    LOGGER.warning('Could not parse instance lookup "{}"!', group)
                     return []
 
                 item_id = item_id.casefold()

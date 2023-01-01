@@ -2,6 +2,7 @@ import os
 import sys
 from pathlib import Path
 import contextlib
+from typing import Any, Iterable, List, Optional, Tuple, Union, cast
 
 from babel.messages import Catalog
 import babel.messages.frontend
@@ -46,11 +47,27 @@ def do_localisation() -> None:
         msgid_bugs_address='https://github.com/BEEmod/BEE2.4/issues',
     )
 
-    extracted = babel.messages.extract.extract_from_dir(
+    # Type hint specifies -> None, incorrect.
+    extracted: Iterable[tuple[
+        str, int, Union[str, Tuple[str, ...]], List[str], Optional[str]
+    ]]
+    extracted = babel.messages.extract.extract_from_dir(  # type: ignore  # noqa
         '.',
         comment_tags=['i18n:'],
+        keywords={
+            **babel.messages.extract.DEFAULT_KEYWORDS,
+            'ui': (1, ),
+            'ui_plural': (1, 2),
+        },
     )
     for filename, lineno, message, comments, context in extracted:
+        if 'test_localisation' in filename:
+            # Test code for the localisation module, skip these tokens.
+            continue
+        elif 'user_errors.py' in filename and all('game_text' not in comm for comm in comments):
+            # Tokens for the error display are here, so indicate they accept HTML.
+            # But not the message shown in game_text.
+            comments.append('This uses HTML syntax.')
         catalog.add(
             message,
             locations=[(os.path.normpath(filename), lineno)],
@@ -66,17 +83,22 @@ def do_localisation() -> None:
     print('Updating translations: ')
 
     for trans in i18n.glob('*.po'):
-
         locale = trans.stem
-
         print('>', locale)
-
         # Update the translations.
         with trans.open('rb') as src:
-            trans_cat = read_po(src, locale)
+            trans_cat: babel.messages.Catalog = read_po(src, locale)
         trans_cat.update(catalog)
+
+        # Go through, and discard untranslated and removed messages.
+        for msg_id in [
+            msg.id for msg in trans_cat.obsolete.values()
+            if not msg.string
+        ]:
+            del trans_cat.obsolete[msg_id]
+
         with trans.open('wb') as dest:
-            write_po(dest, trans_cat)
+            write_po(dest, trans_cat, include_lineno=False)
 
         # Compile them all.
         comp = trans.with_suffix('.mo')
@@ -85,6 +107,7 @@ def do_localisation() -> None:
 
         data_files.append((str(comp), 'i18n/'))
 
+    # Build out the English translation from the template.
     catalog.locale = 'en'
     with (i18n / 'en.mo').open('wb') as dest:
         write_mo(dest, catalog)

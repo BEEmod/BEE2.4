@@ -18,12 +18,11 @@ class AfterExport(Enum):
 
 @config.APP.register
 @attrs.frozen(slots=False)
-class GenOptions(config.Data, conf_name='Options', palette_stores=False):
+class GenOptions(config.Data, conf_name='Options', palette_stores=False, version=2):
     """General app config options, mainly booleans. These are all changed in the options window."""
     # The boolean values are handled the same way, using the metadata to record the old legacy names.
     # If the name has a :, the first is the section and the second is the name.
     # Otherwise, it's just the section name and the attr name is the same as the option name.
-
     after_export: AfterExport = AfterExport.NORMAL
     launch_after_export: bool = attrs.field(default=True, metadata={'legacy': 'General:launch_game'})
 
@@ -39,12 +38,16 @@ class GenOptions(config.Data, conf_name='Options', palette_stores=False):
 
     # Stuff mainly for devs.
     preserve_resources: bool = attrs.field(default=False, metadata={'legacy': 'General:preserve_bee2_resource_dir'})
+    # Split from preserve_resources, before v2 use that value.
+    preserve_fgd: bool = False
     dev_mode: bool = attrs.field(default=False, metadata={'legacy': 'Debug:development_mode'})
     log_missing_ent_count: bool = attrs.field(default=False, metadata={'legacy': 'Debug'})
     log_missing_styles: bool = attrs.field(default=False, metadata={'legacy': 'Debug'})
     log_item_fallbacks: bool = attrs.field(default=False, metadata={'legacy': 'Debug'})
     visualise_inheritance: bool = False
     force_all_editor_models: bool = attrs.field(default=False, metadata={'legacy': 'Debug'})
+
+    language: str = ''
 
     @classmethod
     def parse_legacy(cls, conf: Property) -> Dict[str, 'GenOptions']:
@@ -75,13 +78,16 @@ class GenOptions(config.Data, conf_name='Options', palette_stores=False):
         return {'': GenOptions(
             after_export=after_export,
             log_win_level=log_win_level,
+            preserve_fgd=res['preserve_resources'],
             **res,
         )}
 
     @classmethod
     def parse_kv1(cls, data: Property, version: int) -> 'GenOptions':
         """Parse KV1 values."""
-        assert version == 1
+        if version > 2:
+            raise AssertionError('Unknown version!')
+        preserve_fgd = data.bool('preserve_fgd' if version > 1 else 'preserve_resources')
         try:
             after_export = AfterExport(data.int('after_export', 0))
         except ValueError:
@@ -90,6 +96,8 @@ class GenOptions(config.Data, conf_name='Options', palette_stores=False):
         return GenOptions(
             after_export=after_export,
             log_win_level=data['log_win_level', 'INFO'],
+            language=data['language', ''],
+            preserve_fgd=preserve_fgd,
             **{
                 field.name: data.bool(field.name, field.default)
                 for field in gen_opts_bool
@@ -101,6 +109,8 @@ class GenOptions(config.Data, conf_name='Options', palette_stores=False):
         prop = Property('', [
             Property('after_export', str(self.after_export.value)),
             Property('log_win_level', self.log_win_level),
+            Property('language', self.language),
+            Property('preserve_fgd', '1' if self.preserve_fgd else '0')
         ])
         for field in gen_opts_bool:
             prop[field.name] = '1' if getattr(self, field.name) else '0'
@@ -109,12 +119,27 @@ class GenOptions(config.Data, conf_name='Options', palette_stores=False):
     @classmethod
     def parse_dmx(cls, data: Element, version: int) -> 'GenOptions':
         """Parse DMX configuration."""
-        assert version == 1
+        if version > 2:
+            raise AssertionError('Unknown version!')
+
         res: dict[str, Any] = {}
+        try:
+            res['preserve_fgd'] = data['preserve_fgd' if version > 1 else 'preserve_resources'].val_bool
+        except KeyError:
+            res['preserve_fgd'] = False
         try:
             res['after_export'] = AfterExport(data['after_export'].val_int)
         except (KeyError, ValueError):
             res['after_export'] = AfterExport.NORMAL
+        try:
+            res['log_win_level'] = data['log_win_level'].val_str
+        except (KeyError, ValueError):
+            res['log_win_level'] = 'INFO'
+        try:
+            res['language'] = data['language'].val_str
+        except KeyError:
+            res['language'] = ''
+
         for field in gen_opts_bool:
             try:
                 res[field.name] = data[field.name].val_bool
@@ -126,6 +151,8 @@ class GenOptions(config.Data, conf_name='Options', palette_stores=False):
         """Produce DMX configuration."""
         elem = Element('Options', 'DMElement')
         elem['after_export'] = self.after_export.value
+        elem['language'] = self.language
+        elem['preserve_fgd'] = self.preserve_fgd
         for field in gen_opts_bool:
             elem[field.name] = getattr(self, field.name)
         return elem
@@ -135,4 +162,5 @@ gen_opts_bool = [
     field
     for field in attrs.fields(GenOptions)
     if field.default in (True, False)
+    if field.name != 'preserve_fgd'  # Needs special handling
 ]

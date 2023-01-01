@@ -32,7 +32,7 @@ from BEE2_config import ConfigFile
 from postcomp import music, screenshot
 # Load our BSP transforms.
 # noinspection PyUnresolvedReferences
-from postcomp import coop_responses, filter
+from postcomp import coop_responses, filter, user_error
 import utils
 
 

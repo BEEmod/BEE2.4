@@ -8,10 +8,10 @@ from srctools import Matrix, Vec, Property, Entity, VMF, logger
 COND_MOD_NAME = 'Track Platforms'
 LOGGER = logger.get_logger(__name__, alias='cond.trackPlat')
 FACINGS = {
-    (+1.0, 0.0): 'N',
-    (-1.0, 0.0): 'S',
-    (0.0, +1.0): 'E',
-    (0.0, -1.0): 'W',
+    (0.0, +1.0): 'N',
+    (0.0, -1.0): 'S',
+    (+1.0, 0.0): 'E',
+    (-1.0, 0.0): 'W',
 }
 
 
@@ -44,7 +44,7 @@ def res_track_plat(vmf: VMF, res: Property) -> object:
         inst_bot_grate, inst_bottom, inst_middle,
         inst_top, inst_plat, inst_plat_oscil, inst_single
     ) = instanceLocs.resolve(res['orig_item'])
-    single_plat_inst = instanceLocs.resolve_one(res['single_plat', ''])
+    single_plat_inst = instanceLocs.resolve_one(res['single_plat', ''], error=False)
     track_targets = res['track_name', '']
 
     track_files = [inst_bottom, inst_middle, inst_top, inst_single]
@@ -132,7 +132,7 @@ def res_track_plat(vmf: VMF, res: Property) -> object:
         # The direction horizontal track is offset
         orient = Matrix.from_angstr(first_track['angles'])
         local_facing = round(facing @ orient.transpose(), 3)
-        if local_facing.z != 0:
+        if abs(local_facing.z) > 0.125:
             raise ValueError(
                 'Platform facing is not in line with track: \n'
                 f'track={first_track["angles"]}, plat={plat_inst["angles"]}, facing={local_facing}'

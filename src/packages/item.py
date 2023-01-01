@@ -8,7 +8,7 @@ import operator
 import re
 import copy
 from enum import Enum
-from typing import Iterable, Match, cast
+from typing import Iterable, Iterator, Match, cast
 from pathlib import PurePosixPath as FSPath
 
 import attrs
@@ -19,6 +19,7 @@ from srctools.tokenizer import Tokenizer, Token
 import config.gen_opts
 from app import tkMarkdown, img, lazy_conf, DEV_MODE
 import config
+from transtoken import TransToken, TransTokenSource
 from packages import (
     PackagesSet, PakObject, ParseData, ExportData, Style,
     sep_values, desc_parse, get_config,
@@ -70,7 +71,7 @@ class ItemVariant:
         icons: dict[str, img.Handle],
         ent_count: str='',
         url: str = None,
-        all_name: str=None,
+        all_name: TransToken=None,
         all_icon: FSPath=None,
         source: str='',
     ) -> None:
@@ -158,7 +159,7 @@ class ItemVariant:
         if 'description' in props:
             desc = desc_parse(props, source, pak_id)
         else:
-            desc = self.desc.copy()
+            desc = self.desc
 
         if 'appenddesc' in props:
             desc = tkMarkdown.join(
@@ -210,6 +211,15 @@ class ItemVariant:
 
         return variant
 
+    def iter_trans_tokens(self, source: str) -> Iterator[TransTokenSource]:
+        """Iterate over the tokens in this item variant."""
+        yield from self.editor.iter_trans_tokens(source)
+        if self.all_name is not None:
+            yield self.all_name, source + '.all_name'
+        yield from tkMarkdown.iter_tokens(self.desc, source + '.desc')
+        for item in self.editor_extra:
+            yield from item.iter_trans_tokens(f'{source}:{item.id}')
+
     def _modify_editoritems(
         self,
         props: Property,
@@ -236,7 +246,12 @@ class ItemVariant:
                 pal_icon = FSPath(item['icon'])
             except LookupError:
                 pal_icon = None
-            pal_name = item['pal_name', None]  # Name for the palette icon
+
+            try:  # Name for the palette icon
+                pal_name = TransToken.parse(pak_id, item['pal_name'])
+            except LookupError:
+                pal_name = None
+
             try:
                 bee2_icon = img.Handle.parse(
                     item.find_key('BEE2'), pak_id,
@@ -283,8 +298,8 @@ class ItemVariant:
                         else:
                             subtype.models.append(FSPath(prop.value))
 
-            if item['name', None]:
-                subtype.name = item['name']  # Name for the subtype
+            if 'name' in item:  # Name for the subtype
+                subtype.name = TransToken.parse(pak_id, item['name'])
 
             if bee2_icon:
                 if is_extra:
@@ -385,7 +400,7 @@ class ItemVariant:
         return editor
 
 
-@attrs.define
+@attrs.define(repr=False)
 class Version:
     """Versions are a set of styles defined for an item.
 
@@ -395,7 +410,7 @@ class Version:
     During parsing, the styles are UnParsedItemVariant and def_style is the ID.
     We convert that in setup_style_tree.
     """
-    name: str
+    name: str  # Todo: Translation token?
     id: str
     isolate: bool
     styles: dict[str, ItemVariant]
@@ -617,6 +632,13 @@ class Item(PakObject, needs_foreground=True):
     def __repr__(self) -> str:
         return f'<Item:{self.id}>'
 
+    def iter_trans_tokens(self) -> Iterator[TransTokenSource]:
+        """Yield all translation tokens in this item."""
+        yield from tkMarkdown.iter_tokens(self.glob_desc, f'items/{self.id}.desc')
+        for version in self.versions.values():
+            for style_id, variant in version.styles.items():
+                yield from variant.iter_trans_tokens(f'items/{self.id}/{style_id}')
+
     @classmethod
     async def post_parse(cls, packset: PackagesSet) -> None:
         """After styles and items are done, assign all the versions."""
@@ -702,7 +724,6 @@ class Item(PakObject, needs_foreground=True):
 
         for index, subtype in enumerate(new_item.subtypes):
             if index in palette_items:
-
                 if len(palette_items) == 1:
                     # Switch to the 'Grouped' icon and name
                     if item_data.all_name is not None:
@@ -820,7 +841,7 @@ async def parse_item_folder(
                 if tok_type is Token.STRING:
                     if tok_value.casefold() != 'item':
                         raise tok.error('Unknown item option "{}"!', tok_value)
-                    items.append(EditorItem.parse_one(tok))
+                    items.append(EditorItem.parse_one(tok, pak_id))
                 elif tok_type is not Token.NEWLINE:
                     raise tok.error(tok_type)
         return items
@@ -882,6 +903,11 @@ async def parse_item_folder(
     except LookupError:
         all_icon = None
 
+    try:
+        all_name = TransToken.parse(pak_id, props['all_name'])
+    except LookupError:
+        all_name = None
+
     # Add the folder the item definition comes from,
     # so we can trace it later for debug messages.
     source = f'<{pak_id}>/items/{fold}'
@@ -906,7 +932,7 @@ async def parse_item_folder(
             for prop in
             props.find_children('icon')
         },
-        all_name=props['all_name', None],
+        all_name=all_name,
         all_icon=all_icon,
         vbsp_config=lazy_conf.from_file(
             utils.PackagePath(pak_id, config_path),
@@ -1018,6 +1044,7 @@ async def assign_styled_items(all_styles: Iterable[Style], item: Item) -> None:
             # folder: str  # If set, use the given folder from our package.
             # style: str  # Inherit from a specific style (implies folder is None)
             # config: Property  # Config for editing
+            start_data: UnParsedItemVariant | ItemVariant | None
             for sty_id, conf in to_change:
                 if conf.style:
                     try:

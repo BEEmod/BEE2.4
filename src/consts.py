@@ -1,9 +1,9 @@
 """Various constant values (Mainly texture names.)"""
 from __future__ import annotations
-from typing import cast, Any, TypeVar, Type, MutableMapping, Iterator
+from typing import cast, Any, MutableMapping, Iterator, TypeVar
 from uuid import UUID, uuid5
 
-from typing_extensions import Final, Self
+from typing_extensions import Final
 from enum import Enum, EnumMeta
 from srctools import Side
 
@@ -24,6 +24,9 @@ __all__ = [
     'PALETTE_FORCE_SHOWN', 'PALETTE_NS',
     'UUID_BLANK', 'UUID_EXPORT', 'UUID_PORTAL2',
 ]
+
+
+_MaterialGroupT = TypeVar('_MaterialGroupT')
 
 
 class _MaterialGroupNS(MutableMapping[str, Any]):
@@ -80,7 +83,7 @@ class MaterialGroupMeta(EnumMeta):
             return value.mat.casefold() in cls._value2member_map_
         return super().__contains__(value)
 
-    def __call__(cls, value: str, *args, **kwargs) -> Self:
+    def __call__(cls: type[_MaterialGroupT], value: str, *args, **kwargs) -> _MaterialGroupT:
         """Find the existing member with this name."""
         if args or kwargs:  # Constructing the enum itself, keep unchanged.
             return super().__call__(value, *args, **kwargs)  # type: ignore

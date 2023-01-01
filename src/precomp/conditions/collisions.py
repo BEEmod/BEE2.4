@@ -8,6 +8,7 @@ from precomp.collisions import CollideType, Collisions, BBox
 from typing import Callable
 
 
+COND_MOD_NAME = 'Collisions'
 LOGGER = logger.get_logger('cond.collisions')
 CollModification = Callable[[Entity, Collisions], None]
 

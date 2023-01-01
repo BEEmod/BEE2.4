@@ -102,7 +102,7 @@ def res_add_overlay_inst(vmf: VMF, inst: Entity, res: Property) -> Optional[Enti
         angles @= Angle.from_str(inst['angles', '0 0 0'])
 
     orig_name = conditions.resolve_value(inst, res['file', ''])
-    filename = instanceLocs.resolve_one(orig_name)
+    filename = instanceLocs.resolve_one(orig_name, error=True)
 
     if not filename:
         if not res.bool('silentLookup'):

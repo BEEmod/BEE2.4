@@ -5,6 +5,7 @@ They can then fetch the current state and store new state.
 """
 import abc
 from pathlib import Path
+from typing_extensions import Self
 from typing import (
     ClassVar, Optional, Set, TypeVar, Callable, NewType, Union, cast,
     Type, Dict, Awaitable, Iterator, Tuple,
@@ -13,8 +14,7 @@ import os
 
 import attrs
 import trio
-from atomicwrites import atomic_write
-from srctools import KeyValError, Property, logger
+from srctools import KeyValError, AtomicWriter, Property, logger
 from srctools.dmx import Element
 
 import utils
@@ -63,13 +63,13 @@ class Data(abc.ABC):
         return cls.__info
 
     @classmethod
-    def parse_legacy(cls: Type[DataT], conf: Property) -> Dict[str, DataT]:
+    def parse_legacy(cls, conf: Property) -> Dict[str, Self]:
         """Parse from the old legacy config. The user has to handle the uses_id style."""
         return {}
 
     @classmethod
     @abc.abstractmethod
-    def parse_kv1(cls: Type[DataT], data: Property, version: int) -> DataT:
+    def parse_kv1(cls, data: Property, version: int) -> Self:
         """Parse keyvalues config values."""
         raise NotImplementedError
 
@@ -79,7 +79,7 @@ class Data(abc.ABC):
         raise NotImplementedError
 
     @classmethod
-    def parse_dmx(cls: Type[DataT], data: Element, version: int) -> DataT:
+    def parse_dmx(cls, data: Element, version: int) -> Self:
         """Parse DMX config values."""
         return cls.parse_kv1(data.to_kv1(), version)
 
@@ -293,6 +293,10 @@ class ConfigSpec:
                 # Don't try to parse, it'll be invalid.
                 continue
             elif version != info.version:
+                LOGGER.warning(
+                    'Upgrading config section "{}" from {} -> {}',
+                    info.name, version, info.version,
+                )
                 upgraded = True
             data_map: Dict[str, Data] = {}
             conf[cls] = data_map
@@ -428,7 +432,7 @@ class ConfigSpec:
 
         props = Property.root()
         props.extend(self.build_kv1(self._current))
-        with atomic_write(self.filename, encoding='utf8', overwrite=True) as file:
+        with AtomicWriter(self.filename) as file:
             for prop in props:
                 for line in prop.export():
                     file.write(line)
@@ -456,5 +460,13 @@ async def apply_pal_conf(conf: Config) -> None:
 
 
 # Main application configs.
-APP = ConfigSpec(utils.conf_location('config/config.vdf'))
-PALETTE = ConfigSpec(None)
+APP: ConfigSpec = ConfigSpec(utils.conf_location('config/config.vdf'))
+PALETTE: ConfigSpec = ConfigSpec(None)
+
+
+# Import submodules, so they're registered.
+from config import (
+    compile_pane, corridors, gen_opts,
+    last_sel, palette, signage,
+    stylevar, widgets, windows,
+)

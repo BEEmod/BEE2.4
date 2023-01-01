@@ -94,9 +94,9 @@ def get_git_version(inst_path: Path | str) -> str:
             'default-version': '(dev)',
             'format': {
                 # Ignore dirtyness, we generate the translation files every time.
-                'distance': '{version}.dev+{rev}',
-                'dirty': '{version}',
-                'distance-dirty': '{version}.dev+{rev}',
+                'distance': '{base_version}.dev+{rev}',
+                'dirty': '{base_version}',
+                'distance-dirty': '{base_version}.dev+{rev}',
             },
         },
     )
@@ -147,6 +147,9 @@ def conf_location(path: str) -> Path:
     # Create folders if needed.
     folder.mkdir(parents=True, exist_ok=True)
     return loc
+
+# Location of a message shown when user errors occur.
+COMPILE_USER_ERROR_PAGE = conf_location('error.html')
 
 
 def fix_cur_directory() -> None:
@@ -462,6 +465,7 @@ class PackagePath:
 
 
 ResultT = TypeVar('ResultT')
+SyncResultT = TypeVar('SyncResultT')
 ArgsT = TypeVarTuple('ArgsT')
 _NO_RESULT: Any = object()
 
@@ -480,19 +484,21 @@ class Result(Generic[ResultT]):
     ) -> None:
         self._nursery: Optional[trio.Nursery] = nursery
         self._result: ResultT = _NO_RESULT
-        nursery.start_soon(self._task, func, args, name=name or func)
+        if not name:
+            name = func
+        nursery.start_soon(self._task, func, args, name=name)
 
     @classmethod
     def sync(
         cls,
         nursery: trio.Nursery,
-        func: Callable[[Unpack[ArgsT]], ResultT],
+        func: Callable[[Unpack[ArgsT]], SyncResultT],
         /, *args: Unpack[ArgsT],
         cancellable: bool = False,
         limiter: trio.CapacityLimiter | None = None,
-    ) -> 'Result[ResultT]':
+    ) -> 'Result[SyncResultT]':
         """Wrap a sync task, using to_thread.run_sync()."""
-        async def task() -> ResultT:
+        async def task() -> SyncResultT:
             """Run in a thread."""
             return await trio.to_thread.run_sync(func, *args, cancellable=cancellable, limiter=limiter)
 

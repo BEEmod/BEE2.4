@@ -7,6 +7,7 @@ from typing import Callable, List, Tuple
 
 from srctools import VMF, Vec, Solid, Property, Entity, Angle, Matrix
 import srctools.logger
+from typing_extensions import Literal
 
 from plane import Plane
 from precomp import (
@@ -14,6 +15,7 @@ from precomp import (
     template_brush, conditions, collisions,
 )
 import consts
+import user_errors
 from precomp.grid_optim import optimise as grid_optimise
 from precomp.instanceLocs import resolve_one, resolve
 
@@ -67,7 +69,7 @@ def parse_map(vmf: VMF, info: conditions.MapInfo) -> None:
     The frames are updated with a fixup var, as appropriate.
     """
     frame_inst = resolve('[glass_frames]', silent=True)
-    glass_inst = resolve_one('[glass_128]')
+    glass_inst = resolve_one('[glass_128]', error=False)
 
     for entities, voice_attr, material, barrier_type in [
         (vmf.by_class['func_detail'], 'glass', consts.Special.GLASS, BarrierType.GLASS),
@@ -83,7 +85,7 @@ def parse_map(vmf: VMF, info: conditions.MapInfo) -> None:
 
     for inst in vmf.by_class['func_instance']:
         filename = inst['file'].casefold()
-        if filename == glass_inst:
+        if filename and filename == glass_inst:
             inst.remove()
         elif filename in frame_inst:
             # Add a fixup to allow distinguishing the type.
@@ -98,20 +100,23 @@ def parse_map(vmf: VMF, info: conditions.MapInfo) -> None:
         packing.pack_list(vmf, options.get(str, 'glass_pack'))
 
 
-def test_hole_spot(origin: Vec, normal: Vec, hole_type: HoleType):
+def test_hole_spot(origin: Vec, normal: Vec, hole_type: HoleType) -> Literal['noglass', 'valid', 'nospace']:
     """Check if the given position is valid for holes.
 
     We need to check that it's actually placed on glass/grating, and that
-    all the parts are the same. Otherwise, it'd collide with the borders.
-    """
+    all the parts are the same. Otherwise, it'd collide with the borders. This returns:
 
+    * 'valid' if the position is valid.
+    * 'noglass' if the centerpoint isn't glass/grating.
+    * 'nospace' if no adjacient panel is present.
+    """
     try:
         center_type = BARRIERS[origin.as_tuple(), normal.as_tuple()]
     except KeyError:
-        return False
+        return 'noglass'
 
     if hole_type is HoleType.SMALL:
-        return True
+        return 'valid'
 
     u, v = Vec.INV_AXIS[normal.axis()]
     # The corners don't matter, but all 4 neighbours must be there.
@@ -127,12 +132,16 @@ def test_hole_spot(origin: Vec, normal: Vec, hole_type: HoleType):
         except KeyError:
             # No side
             LOGGER.warning('No offset barrier at {}, {}', pos, normal)
-            return False
+            return 'nospace'
         if off_type is not center_type:
             # Different type.
             LOGGER.warning('Wrong barrier type at {}, {}', pos, normal)
-            return False
-    return True
+            return 'nospace'
+        # Also check if a large hole is here, we'll collide.
+        if HOLES.get((pos.as_tuple(), normal.as_tuple())) is HoleType.LARGE:
+            # TODO: Draw this other hole as well?
+            return 'nospace'
+    return 'valid'
 
 
 @conditions.make_result('GlassHole')
@@ -143,25 +152,49 @@ def res_glass_hole(inst: Entity, res: Property):
     normal: Vec = round(Vec(z=-1) @ Angle.from_str(inst['angles']), 6)
     origin: Vec = Vec.from_str(inst['origin']) // 128 * 128 + 64
 
-    if test_hole_spot(origin, normal, hole_type):
-        HOLES[origin.as_tuple(), normal.as_tuple()] = hole_type
-        inst['origin'] = origin
-        inst['angles'] = normal.to_angle()
-        return
-
-    # Test the opposite side of the glass too.
-
-    inv_origin = origin + 128 * normal
-    inv_normal = -normal
-
-    if test_hole_spot(inv_origin, inv_normal, hole_type):
-        HOLES[inv_origin.as_tuple(), inv_normal.as_tuple()] = hole_type
-        inst['origin'] = inv_origin
-        inst['angles'] = inv_normal.to_angle()
+    first_placement = test_hole_spot(origin, normal, hole_type)
+    if first_placement == 'valid':
+        sel_origin = origin
+        sel_normal = normal
     else:
-        LOGGER.warning('No center barrier at {} with axis  {}', origin, normal)
-        # Remove the instance, so this does nothing.
-        inst.remove()
+        # Test the opposite side of the glass too.
+        inv_origin = origin + 128 * normal
+        inv_normal = -normal
+
+        sec_placement = test_hole_spot(inv_origin, inv_normal, hole_type)
+        if sec_placement == 'valid':
+            sel_origin = inv_origin
+            sel_normal = inv_normal
+        else:
+            raise user_errors.UserError(
+                user_errors.TOK_BARRIER_HOLE_FOOTPRINT
+                if first_placement == 'nospace' or sec_placement == 'nospace' else
+                user_errors.TOK_BARRIER_HOLE_MISPLACED,
+                barrier_hole=user_errors.BarrierHole(
+                    pos=user_errors.to_threespace(origin + 64 * normal),
+                    axis=normal.axis(),
+                    large=hole_type is HoleType.LARGE,
+                    small=hole_type is HoleType.SMALL,
+                    footprint=True,
+                )
+            )
+    # Place it, or error if there's already one here.
+    key = (sel_origin.as_tuple(), sel_normal.as_tuple())
+    if key in HOLES:
+        raise user_errors.UserError(
+            user_errors.TOK_BARRIER_HOLE_FOOTPRINT,
+            points=[sel_origin + 64 * sel_normal],
+            barrier_hole=user_errors.BarrierHole(
+                pos=user_errors.to_threespace(sel_origin + 64 * sel_normal),
+                axis=sel_normal.axis(),
+                large=hole_type is HoleType.LARGE or HOLES[key] is HoleType.LARGE,
+                small=hole_type is HoleType.SMALL or HOLES[key] is HoleType.SMALL,
+                footprint=False,
+            ),
+        )
+    HOLES[key] = hole_type
+    inst['origin'] = sel_origin
+    inst['angles'] = sel_normal.to_angle()
 
 
 def template_solids_and_coll(
@@ -206,9 +239,9 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
     floorbeam_temp = options.get(str, 'glass_floorbeam_temp')
 
     # Valve doesn't implement convex corners, we'll do it ourselves.
-    convex_corner_left = instanceLocs.resolve_one('[glass_left_convex_corner]')
-    convex_corner_right = instanceLocs.resolve_one('[glass_right_convex_corner]')
-    convex_corners: List[Tuple[Matrix, str, int]] = [
+    convex_corner_left = instanceLocs.resolve_one('[glass_left_convex_corner]', error=False)
+    convex_corner_right = instanceLocs.resolve_one('[glass_right_convex_corner]', error=False)
+    convex_corners: List[Tuple[Matrix, str, float]] = [
         (orient, filename, side)
         # We don't include 90 and 270, the other filename covers those.
         for orient in map(Matrix.from_yaw, [0.0, 180.0])
@@ -334,6 +367,7 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
             offsets = (-80, -48, -16, 16, 48, 80)
         else:
             offsets = (-16, 16)
+        bad_locs: List[Vec] = []
         for u_off in offsets:
             for v_off in offsets:
                 # Remove these squares, but keep them in the Plane,
@@ -344,14 +378,26 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
                 )
                 if uv in slice_plane:
                     slice_plane[uv] = None
-                # These have to be present, except for the corners
-                # on the large hole.
+                # These have to be present, except for the corners on the large hole.
                 elif abs(u_off) != 80 or abs(v_off) != 80:
                     u_ax, v_ax = Vec.INV_AXIS[norm_axis]
-                    LOGGER.warning(
-                        'Hole tried to remove missing tile at ({})?',
-                        Vec.with_axes(norm_axis, norm_pos, u_ax, u + u_off, v_ax, v + v_off),
-                    )
+                    bad_locs.append(Vec.with_axes(
+                        norm_axis, norm_pos,
+                        u_ax, u + u_off,
+                        v_ax, v + v_off,
+                    ))
+        if bad_locs:
+            raise user_errors.UserError(
+                user_errors.TOK_BARRIER_HOLE_FOOTPRINT,
+                points=bad_locs,
+                barrier_hole={
+                    'pos': user_errors.to_threespace(origin + 64 * normal),
+                    'axis': norm_axis,
+                    'large': hole_type is HoleType.LARGE,
+                    'small': hole_type is HoleType.SMALL,
+                    'footprint': True,
+                }
+            )
 
         # Now generate the curved brushwork.
         if barr_type is BarrierType.GLASS:
@@ -576,7 +622,7 @@ def add_glass_floorbeams(vmf: VMF, temp_name: str):
     try:
         [beam_template] = template.visgrouped_solids()
     except ValueError:
-        raise ValueError('Bad Glass Floorbeam template! Must have exactly one brush.')
+        raise user_errors.UserError(user_errors.TOK_GLASS_FLOORBEAM_TEMPLATE)
 
     # Grab the 'end' side, which we move around.
     for side in beam_template.sides:
@@ -584,7 +630,7 @@ def add_glass_floorbeams(vmf: VMF, temp_name: str):
             beam_end_face = side
             break
     else:
-        raise ValueError('Not aligned to world...')
+        raise user_errors.UserError(user_errors.TOK_GLASS_FLOORBEAM_TEMPLATE)
 
     separation = options.get(int, 'glass_floorbeam_sep') + 1
     separation *= 128

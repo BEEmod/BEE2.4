@@ -2,16 +2,45 @@ import tkinter
 from tkinter.font import Font as tkFont, nametofont
 from tkinter.messagebox import askokcancel
 
-from typing import Union, Tuple, Dict, Callable
+from typing import Iterable, Iterator, TypeVar, Union, Tuple, Dict, Callable
 import webbrowser
 
 from app import tkMarkdown
 from app.tkMarkdown import TextTag, TAG_HEADINGS
 from app.tk_tools import Cursors
-from localisation import gettext
+from transtoken import TransToken
 import srctools.logger
 
 LOGGER = srctools.logger.get_logger(__name__)
+TRANS_WEBBROWSER = TransToken.ui('Open "{url}" in the default browser?')
+T = TypeVar('T')
+
+
+def iter_firstlast(iterable: Iterable[T]) -> Iterator[Tuple[bool, T, bool]]:
+    """Iterate over anything, tracking if the value is the first or last one."""
+    it = iter(iterable)
+    try:
+        first = next(it)
+    except StopIteration:
+        return  # Empty.
+
+    try:
+        prev = next(it)
+    except StopIteration:
+        # Only one, special case.
+        yield True, first, True
+        return
+    # We now know there's at least two values,
+    yield True, first, False
+
+    while True:
+        try:
+            current = next(it)
+        except StopIteration:
+            yield False, prev, True
+            break
+        yield False, prev, False
+        prev = current
 
 
 class tkRichText(tkinter.Text):
@@ -131,56 +160,57 @@ class tkRichText(tkinter.Text):
         self._link_commands.clear()
 
         self['state'] = "normal"
-        self.delete(1.0, 'end')
+        try:
+            self.delete(1.0, 'end')
 
-        # Basic mode, insert just blocks of text.
-        if isinstance(text_data, str):
-            super().insert("end", text_data)
-            return
+            # Basic mode, insert just blocks of text.
+            if isinstance(text_data, str):
+                super().insert("end", text_data)
+                return
 
-        segment: tkMarkdown.TextSegment
-        for i, block in enumerate(text_data.blocks):
-            if isinstance(block, tkMarkdown.TextSegment):
-                tags: tuple[str, ...]
-                if block.url:
-                    try:
-                        cmd_tag, _ = self._link_commands[block.url]
-                    except KeyError:
-                        cmd_tag = f'link_cb_{len(self._link_commands)}'
-                        cmd_id = self.tag_bind(
-                            cmd_tag,
-                            '<Button-1>',
-                            self.make_link_callback(block.url),
-                        )
-                        self._link_commands[block.url] = cmd_tag, cmd_id
-                    tags = block.tags + (cmd_tag, TextTag.LINK)
+            segment: tkMarkdown.TextSegment
+            for is_first, block, is_last in iter_firstlast(text_data):
+                if isinstance(block, tkMarkdown.TextSegment):
+                    tags: tuple[str, ...]
+                    if block.url:
+                        try:
+                            cmd_tag, _ = self._link_commands[block.url]
+                        except KeyError:
+                            cmd_tag = f'link_cb_{len(self._link_commands)}'
+                            cmd_id = self.tag_bind(
+                                cmd_tag,
+                                '<Button-1>',
+                                self.make_link_callback(block.url),
+                            )
+                            self._link_commands[block.url] = cmd_tag, cmd_id
+                        tags = block.tags + (cmd_tag, TextTag.LINK)
+                    else:
+                        tags = block.tags
+                    # Strip newlines from the beginning and end of the textbox.
+                    text = block.text
+                    if is_first:
+                        text = text.lstrip('\n')
+                    if is_last:
+                        text = text.rstrip('\n')
+                    super().insert('end', text, tags)
+                elif isinstance(block, tkMarkdown.Image):
+                    super().insert('end', '\n')
+                    # TODO: Setup apply to handle this?
+                    block.handle._force_loaded = True
+                    self.image_create('end', image=block.handle._load_tk())
+                    super().insert('end', '\n')
                 else:
-                    tags = block.tags
-                # Strip newlines from the beginning and end of the textbox.
-                text = block.text
-                if i == 0:
-                    text = text.lstrip('\n')
-                elif i + 1 == len(text_data.blocks):
-                    text = text.rstrip('\n')
-                super().insert('end', text, tags)
-            elif isinstance(block, tkMarkdown.Image):
-                super().insert('end', '\n')
-                # TODO: Setup apply to handle this?
-                block.handle._force_loaded = True
-                self.image_create('end', image=block.handle._load_tk())
-                super().insert('end', '\n')
-            else:
-                raise ValueError('Unknown block {!r}?'.format(block))
-
-        self['state'] = "disabled"
+                    raise ValueError('Unknown block {!r}?'.format(block))
+        finally:
+            self['state'] = "disabled"
 
     def make_link_callback(self, url: str) -> Callable[[tkinter.Event], None]:
         """Create a link callback for the given URL."""
-
-        def callback(e):
+        def callback(e) -> None:
+            """The callback function."""
             if askokcancel(
                 title='BEE2 - Open URL?',
-                message=gettext('Open "{}" in the default browser?').format(url),
+                message=str(TRANS_WEBBROWSER.format(url=url)),
                 parent=self,
             ):
                 webbrowser.open(url)

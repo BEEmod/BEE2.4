@@ -7,12 +7,11 @@ Note: We also store a list of tiledefs in overlay entities in the map, if
 they were attached to the original brushes.
 """
 from __future__ import annotations
-
+from typing import Iterable, cast
 from collections.abc import Iterator, MutableMapping
 from collections import defaultdict, Counter
 import math
 from enum import Enum
-from typing import Optional, Union, cast, Tuple
 from weakref import WeakKeyDictionary
 
 import attrs
@@ -46,7 +45,7 @@ LOGGER = srctools.logger.get_logger(__name__)
 # TILE_TEMP[tile_norm]['back'] = back_face
 TILE_TEMP: dict[
     tuple[float, float, float],
-    dict[Union[str, tuple[int, int, int, bool]], Side]
+    dict[str | tuple[int, int, int, bool], Side]
 ] = {}
 
 NORMALS = [Vec(x=+1), Vec(x=-1), Vec(y=+1), Vec(y=-1), Vec(z=+1), Vec(z=-1)]
@@ -71,7 +70,7 @@ TILES: dict[tuple[tuple[float, float, float], tuple[float, float, float]], TileD
 # Special key for TileDef.subtile - this is set to 'u' or 'v' to
 # indicate the center section should be nodrawed.
 # This isn't a U,V tuple, but pretend it is, so we can use it as a key.
-SUBTILE_FIZZ_KEY: tuple[int, int] = cast(Tuple[int, int], object())
+SUBTILE_FIZZ_KEY: tuple[int, int] = cast('tuple[int, int]', object())
 
 # For each overlay, stores any tiledefs that they're affixed to. We then
 # add the front faces of those to the ent at the end.
@@ -421,6 +420,11 @@ def _make_patterns() -> None:
 _make_patterns()
 
 
+def _panel_bevel_conv(val: Iterable[tuple[int, int]] = ()) -> set[tuple[int, int]]:
+    """Explicitly specify the generic for converters, inference isn't possible."""
+    return set(val)
+
+
 @attrs.define(eq=False)
 class Panel:
     # noinspection PyUnresolvedReferences
@@ -446,11 +450,11 @@ class Panel:
         seal: If true, place nodraw tiles behind the panel instead of void.
         offset: Offset the tile by this much (local to the instance).
     """
-    brush_ent: Optional[Entity]
+    brush_ent: Entity | None
     inst: Entity
     pan_type: PanelType
     thickness: int
-    bevels: set[tuple[int, int]] = attrs.field(converter=set)
+    bevels: set[tuple[int, int]] = attrs.field(converter=_panel_bevel_conv)
 
     points: set[tuple[int, int]] = attrs.Factory({
         (x, y)
@@ -491,6 +495,22 @@ class Panel:
             # The brush entity isn't used.
             if self.brush_ent in vmf.entities:
                 self.brush_ent.remove()
+            # In dev mode, display a visual of this location.
+            if utils.DEV_MODE:
+                try:
+                    [visgroup] = [vis for vis in vmf.vis_tree if vis.name == 'TilePanels']
+                except ValueError:
+                    visgroup = vmf.create_visgroup('TilePanels')
+                panel_trace = vmf.create_ent(
+                    'info_particle_system',
+                    origin=tile.pos,
+                    targetname=self.inst['targetname'],
+                    angles=tile.normal.to_angle(),
+                )
+                panel_trace.comments = tile.format_tiles().replace('\n', ', ')
+                panel_trace.vis_shown = False
+                panel_trace.hidden = True
+                panel_trace.visgroup_ids.add(visgroup.id)
             return
         else:
             # We do use it.
@@ -806,11 +826,11 @@ class TileDef:
 
     brush_faces: list[Side]
     panels: list[Panel]
-    _sub_tiles: Optional[dict[tuple[int, int], TileType]]
-    override: Optional[tuple[str, template_brush.ScalingTemplate]]
+    _sub_tiles: dict[tuple[int, int], TileType] | None
+    override: tuple[str, template_brush.ScalingTemplate] | None
 
     bullseye_count: int
-    _portal_helper: Union[int, Vec]
+    _portal_helper: int | Vec
 
     def __init__(
         self,
@@ -898,7 +918,7 @@ class TileDef:
         else:
             return self._sub_tiles
 
-    def __getitem__(self, item: Tuple[int, int]) -> TileType:
+    def __getitem__(self, item: tuple[int, int]) -> TileType:
         """Lookup the tile type at a particular sub-location."""
         u, v = item
         if u not in (0, 1, 2, 3) or v not in (0, 1, 2, 3):
@@ -1049,7 +1069,7 @@ class TileDef:
         U and V should be 1 or -1.
         """
         # If there's a fully solid block on this side, we don't need to.
-        if BLOCK_POS['world': self.uv_offset(128*u, 128*v, 0)].inside_map:
+        if BLOCK_POS.lookup_world(self.uv_offset(128*u, 128*v, 0)).inside_map:
             return True
 
         # Otherwise, check for another tile attached to our side.
@@ -1061,7 +1081,7 @@ class TileDef:
         except KeyError:
             # No tile. As a special case, if we're an EMBED and this side is
             # empty then embed so the instance can fit.
-            if BLOCK_POS['world': self.pos] is Block.EMBED:
+            if BLOCK_POS.lookup_world(self.pos) is Block.EMBED:
                 try:
                     tiledef = TILES[
                         (self.pos + 128 * side_norm).as_tuple(),
@@ -1207,7 +1227,7 @@ class TileDef:
         vec_offset: Vec=None,
         is_panel: bool=False,
         add_bullseye: bool=False,
-        face_output: Optional[dict[tuple[int, int], Side]]=None,
+        face_output: dict[tuple[int, int], Side] | None=None,
         interior_bevel: bool=True,
     ) -> tuple[list[Side], list[Solid]]:
         """Generate a bunch of tiles, and return the front faces.
@@ -1277,7 +1297,7 @@ class TileDef:
                         gen_cat, normal, tile_type.color,
                     ).get(tile_center, grid_size, antigel=self.is_antigel)
 
-                template: Optional[template_brush.ScalingTemplate]
+                template: template_brush.ScalingTemplate | None
                 if self.override is not None:
                     tex, template = self.override
                 else:
@@ -1498,7 +1518,7 @@ def make_tile(
     panel_edge: bool=False,
     u_align: int=512,
     v_align: int=512,
-    antigel: Optional[bool] = None,
+    antigel: bool | None = None,
 ) -> tuple[Solid, Side]:
     """Generate a tile.
 
@@ -1623,7 +1643,7 @@ def gen_tile_temp() -> None:
     for norm, orient in zip(NORMALS, NORMAL_ANGLES):
         axis_norm = norm.axis()
 
-        temp_part: dict[Union[str, tuple[int, int, int, bool]], Side] = {}
+        temp_part: dict[str | tuple[int, int, int, bool], Side] = {}
         TILE_TEMP[norm.as_tuple()] = temp_part
 
         for (thickness, bevel), temp in categories.items():
@@ -1809,7 +1829,7 @@ def tiledefs_from_cube(face_to_tile: dict[int, TileDef], brush: Solid, grid_pos:
         # These cubes don't contain any items, so it's fine
         # if we get rid of sides that aren't useful.
         # if it's bordering void or another solid, it's unneeded.
-        neighbour_block = BLOCK_POS['world': grid_pos + 128 * normal]
+        neighbour_block = BLOCK_POS.lookup_world(grid_pos + 128 * normal)
         if not neighbour_block.traversable:
             continue
 
@@ -1840,7 +1860,7 @@ def tiledefs_from_large_tile(
     """Generate a tiledef matching a 128x128x4 side."""
     tex_kind, front_face = find_front_face(brush, grid_pos, norm)
 
-    neighbour_block = BLOCK_POS['world': grid_pos + 128 * norm]
+    neighbour_block = BLOCK_POS.lookup_world(grid_pos + 128 * norm)
 
     if neighbour_block is Block.VOID:
         tex_kind = TileType.NODRAW
@@ -1878,7 +1898,7 @@ def tiledef_from_angled_panel(brush_ent: Entity, panel_ent: Entity) -> None:
         panel_ent,
         PanelType.NORMAL,
         thickness=2,
-        bevels=BEVEL_AROUND,
+        bevels=set(BEVEL_AROUND),
     ))
 
 
@@ -1905,7 +1925,7 @@ def tiledef_from_flip_panel(brush_ent: Entity, panel_ent: Entity) -> None:
         panel_ent,
         PanelType.FLIP_BLACK,
         thickness=4,
-        bevels=(),
+        bevels=set(),
     ))
 
 
@@ -2187,11 +2207,11 @@ def generate_goo(vmf: VMF) -> None:
     """Generate goo pit brushes and triggers."""
     # We want to use as few brushes as possible.
     # So group them by their min/max Z, and then produce bounding boxes.
-    goo_pos: dict[tuple[float, float], dict[tuple[float, float], bool]] = defaultdict(dict)
+    goo_pos: dict[tuple[float, float], dict[tuple[int, int], int]] = defaultdict(dict)
 
     # For triggers, we want to only group by the top surface, we don't care
     # how deep.
-    trig_pos: dict[float, dict[tuple[float, float], bool]] = defaultdict(dict)
+    trig_pos: dict[float, dict[tuple[int, int], bool]] = defaultdict(dict)
 
     # Calculate the z-level with the largest number of goo brushes,
     # so we can ensure the 'fancy' pit is the largest one.
@@ -2203,19 +2223,19 @@ def generate_goo(vmf: VMF) -> None:
     # Z, x-cell, y-cell, x-norm, y-norm = overlay ent.
     tideline_over: dict[tuple[float, float, float, int, int], Tideline] = {}
 
-    pos: Optional[Vec] = None
+    pos: Vec | None = None
     for pos, block_type in BLOCK_POS.items():
         if block_type is Block.GOO_SINGLE:
-            goo_pos[pos.z, pos.z][pos.x, pos.y] = True
+            goo_pos[pos.z, pos.z][round(pos.x), round(pos.y)] = True
         elif block_type is Block.GOO_TOP:
             # Multi-layer..
             lower_pos = BLOCK_POS.raycast(pos, Vec(0, 0, -1))
 
-            goo_pos[lower_pos.z, pos.z][pos.x, pos.y] = True
+            goo_pos[lower_pos.z, pos.z][round(pos.x), round(pos.y)] = True
         else:  # Not goo.
             continue
         goo_heights[pos.z] += 1
-        trig_pos[pos.z][pos.x, pos.y] = True
+        trig_pos[pos.z][round(pos.x), round(pos.y)] = True
         if use_tidelines:
             voxel_center = 128 * pos + 64
             for x, y in [(-1, 0), (0, -1), (1, 0), (0, 1)]:

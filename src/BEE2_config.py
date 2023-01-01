@@ -8,9 +8,8 @@ from pathlib import Path
 from typing import Any, Optional, Iterator, Mapping
 from threading import Lock, Event
 
-from atomicwrites import atomic_write
-
 import utils
+from srctools import AtomicWriter
 import srctools.logger
 
 
@@ -109,7 +108,7 @@ class ConfigFile(ConfigParser):
 
             # Create the parent if it hasn't already.
             self.filename.parent.mkdir(parents=True, exist_ok=True)
-            with atomic_write(self.filename, overwrite=True, encoding='utf8') as conf:
+            with AtomicWriter(self.filename) as conf:
                 self.write(conf)
             self.has_changed.clear()
 

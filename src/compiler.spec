@@ -26,8 +26,10 @@ else:
 EXCLUDES = [
     'bz2',  # We aren't using this compression format (shutil, zipfile etc handle ImportError)..
 
-    # This isn't ever used in the compiler.
+    # These aren't ever used in the compiler.
     'tkinter',
+    'numpy',
+    'babel',
 
     'win32api',
     'win32com',
@@ -37,7 +39,6 @@ EXCLUDES = [
     'win32evtlog',
     'win32evtlogutil',
     'smtplib',
-    'http',
 
     # Imported in utils, but not required in compiler.
     'bg_daemon',
@@ -104,6 +105,19 @@ if utils.WIN and utils.BITNESS == '32':
 # Now we can collect the appropriate path.
 binaries = collect_dynamic_libs('rtree')
 
+# Copy error display web resources to the compiler folder.
+data_files = []
+error_display_folder = Path(SPECPATH, '..', 'error_display').resolve()
+for dirpath, dirname, filenames in os.walk(error_display_folder):
+    for file in filenames:
+        full_path = Path(dirpath, file)
+        data_files.append((
+            str(full_path),
+            str('error_display' / full_path.relative_to(error_display_folder).parent),
+        ))
+
+print('DATA:', data_files)
+
 # Write this to the temp folder, so it's picked up and included.
 # Don't write it out though if it's the same, so PyInstaller doesn't reparse.
 version_val = 'BEE_VERSION=' + repr(utils.get_git_version(SPECPATH))
@@ -126,6 +140,7 @@ vbsp_vrad_an = Analysis(
     pathex=[workpath, str(hammeraddons / 'src')],
     binaries=binaries,
     hiddenimports=INCLUDES,
+    datas=data_files,
     excludes=EXCLUDES,
     noarchive=False,
 )

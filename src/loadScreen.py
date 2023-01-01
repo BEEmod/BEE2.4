@@ -16,12 +16,12 @@ import attrs
 import srctools.logger
 
 import config.gen_opts
-from app import logWindow
+from app import localisation, logWindow
 import config
-from localisation import gettext
+from transtoken import TransToken
 import utils
 
-from typing import Set, Tuple, cast, Any, Type
+from typing import Set, Tuple, List, cast, Any, Type
 
 
 # Keep a reference to all loading screens, so we can close them globally.
@@ -42,6 +42,19 @@ class Cancelled(SystemExit):
 
 
 LOGGER = srctools.logger.get_logger(__name__)
+# All tokens used by the subprocess. We translate here before passing it down.
+TRANSLATIONS = {
+    'skip': TransToken.ui('Skipped!'),
+    'version': TransToken.ui('Version: {ver}').format(ver=utils.BEE_VERSION),
+    'cancel': TransToken.ui('Cancel'),
+    'clear': TransToken.ui('Clear'),
+    'copy': TransToken.ui('Copy'),
+    'log_show': TransToken.ui('Show:'),
+    'log_title': TransToken.ui('Logs - {ver}').format(ver=utils.BEE_VERSION),
+    'level_debug': TransToken.ui('Debug messages'),
+    'level_info': TransToken.ui('Default'),
+    'level_warn': TransToken.ui('Warnings Only'),
+}
 
 
 def close_all() -> None:
@@ -57,10 +70,8 @@ def show_main_loader(is_compact: bool) -> None:
 
 
 def set_force_ontop(ontop: bool) -> None:
-    """Set whether or not screens will be forced on top."""
-    # The loadscreen ID is ignored for this, it applies to all of them.
-    # But we know this one exists.
-    main_loader._send_msg('set_force_ontop', ontop)
+    """Set whether screens will be forced on top."""
+    _PIPE_MAIN_SEND.send(('set_force_ontop', None, ontop))
 
 
 @contextlib.contextmanager
@@ -96,20 +107,27 @@ class LoadScreen:
 
     def __init__(
         self,
-        *stages: Tuple[str, str],
-        title_text: str,
+        *stages: Tuple[str, TransToken],
+        title_text: TransToken,
         is_splash: bool=False,
     ):
-        self.active = False
-        self._time = 0.0
-        self.stage_ids = {st_id for st_id, title in stages}
         # active determines whether the screen is on, and if False stops most
         # functions from doing anything
+        self.active = False
+        self._time = 0.0
+        self.stage_ids: Set[str] = set()
+        self.stage_labels: List[TransToken] = []
+        self.title = title_text
 
+        init: List[Tuple[str, str]] = []
+        for st_id, title in stages:
+            init.append((st_id, str(title)))
+            self.stage_labels.append(title)
+            self.stage_ids.add(st_id)
+
+        # Order the daemon to make this screen. We pass translated text in for the splash screen.
+        self._send_msg('init', is_splash, str(title_text), init)
         _ALL_SCREENS.add(self)
-
-        # Order the daemon to make this screen.
-        self._send_msg('init', is_splash, title_text, stages)
 
     def __enter__(self) -> 'LoadScreen':
         """LoadScreen can be used as a context manager.
@@ -182,7 +200,8 @@ class LoadScreen:
         """Display the loading screen."""
         self.active = True
         self._time = time.perf_counter()
-        self._send_msg('show')
+        # Translate and send these across now.
+        self._send_msg('show', str(self.title), list(map(str, self.stage_labels)))
 
     def reset(self) -> None:
         """Hide the loading screen and reset all the progress bars."""
@@ -203,15 +222,24 @@ class LoadScreen:
     def unsuppress(self) -> None:
         """Undo temporarily hiding the screen."""
         self.active = True
-        self._send_msg('show')
+        self._send_msg('show', str(self.title), list(map(str, self.stage_labels)))
 
 
 def shutdown() -> None:
-    """Instruct the daemon process to shutdown."""
+    """Instruct the daemon process to shut down."""
     try:
         _PIPE_MAIN_SEND.send(('quit_daemon', None, None))
     except BrokenPipeError:  # Already quit, don't care.
         pass
+
+
+@localisation.add_callback(call=False)
+def _update_translations() -> None:
+    """Update the translations."""
+    _PIPE_MAIN_SEND.send((
+        'update_translations', 0,
+        {key: str(tok) for key, tok in TRANSLATIONS.items()},
+    ))
 
 # Initialise the daemon.
 # noinspection PyProtectedMember
@@ -222,21 +250,8 @@ BG_PROC = multiprocessing.Process(
         _PIPE_DAEMON_REC,
         logWindow.PIPE_DAEMON_SEND,
         logWindow.PIPE_DAEMON_REC,
-        # Pass translation strings.
-        {
-            'skip': gettext('Skipped!'),
-            'version': gettext('Version: ') + utils.BEE_VERSION,
-            'cancel': gettext('Cancel'),
-            'clear': gettext('Clear'),
-            'copy': gettext('Copy'),
-            'log_show': gettext('Show:'),
-            'log_title': gettext('Logs - {}').format(utils.BEE_VERSION),
-            'level_text': [
-                gettext('Debug messages'),
-                gettext('Default'),
-                gettext('Warnings Only'),
-            ],
-        }
+        # Convert and pass translation strings.
+        {key: str(tok) for key, tok in TRANSLATIONS.items()},
     ),
     name='bg_daemon',
     daemon=True,
@@ -244,9 +259,9 @@ BG_PROC = multiprocessing.Process(
 BG_PROC.start()
 
 main_loader = LoadScreen(
-    ('PAK', gettext('Packages')),
-    ('OBJ', gettext('Loading Objects')),
-    ('UI', gettext('Initialising UI')),
-    title_text=gettext('Better Extended Editor for Portal 2'),
+    ('PAK', TransToken.ui('Packages')),
+    ('OBJ', TransToken.ui('Loading Objects')),
+    ('UI', TransToken.ui('Initialising UI')),
+    title_text=TransToken.ui('Better Extended Editor for Portal 2'),
     is_splash=True,
 )

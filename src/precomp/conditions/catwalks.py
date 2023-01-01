@@ -213,7 +213,7 @@ def res_make_catwalk(vmf: VMF, res: Property):
         origin = origin // 128 * 128
         origin += 64
 
-        while brushLoc.POS['world': origin].is_goo:
+        while brushLoc.POS.lookup_world(origin).is_goo:
             # The instance is in goo! Switch to floor orientation, and move
             # up until it's in air.
             inst['angles'] = '0 0 0'
@@ -304,7 +304,7 @@ def res_make_catwalk(vmf: VMF, res: Property):
             # If in goo, use different supports!
             origin = Vec.from_str(inst['origin'])
             origin.z -= 128
-            if brushLoc.POS['world': origin].is_goo:
+            if brushLoc.POS.lookup_world(origin).is_goo:
                 supp = instances[Instances.SUPP_GOO]
             else:
                 supp = instances[Instances.SUPP_FLOOR]

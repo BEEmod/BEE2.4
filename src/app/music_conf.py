@@ -9,12 +9,13 @@ import attrs
 
 from app.selector_win import Item as SelItem, SelectorWin, AttrDef as SelAttr
 from app.SubPane import SubPane
-from app import TK_ROOT
+from app import TK_ROOT, localisation
 from config.gen_opts import GenOptions
 import config
 from consts import MusicChannel
 from packages import PackagesSet, Music
-from localisation import gettext
+from transtoken import TransToken
+
 
 BTN_EXPAND = '▽'
 BTN_EXPAND_HOVER = '▼'
@@ -29,6 +30,8 @@ SEL_ITEMS: Dict[str, SelItem] = {}
 is_collapsed: bool = False
 
 filesystem = FileSystemChain()
+TRANS_BASE_COLL = TransToken.ui('Music:')
+TRANS_BASE_EXP = TransToken.ui('Base:')
 
 
 def load_filesystems(systems: Iterable[FileSystem]):
@@ -130,21 +133,24 @@ async def make_widgets(packset: PackagesSet, frame: ttk.LabelFrame, pane: SubPan
         TK_ROOT,
         for_channel(MusicChannel.BASE),
         save_id='music_base',
-        title=gettext('Select Background Music - Base'),
-        desc=gettext('This controls the background music used for a map. Expand the dropdown to set '
-                     'tracks for specific test elements.'),
+        title=TransToken.ui('Select Background Music - Base'),
+        desc=TransToken.ui(
+            'This controls the background music used for a map. Expand the dropdown to set tracks '
+            'for specific test elements.'
+        ),
         has_none=True,
         default_id='VALVE_PETI',
         sound_sys=filesystem,
-        none_desc=gettext('Add no music to the map at all. Testing Element-specific music may still '
-                          'be added.'),
+        none_desc=TransToken.ui(
+            'Add no music to the map at all. Testing Element-specific music may still be added.'
+        ),
         callback=selwin_callback,
         callback_params=[MusicChannel.BASE],
         attributes=[
-            SelAttr.bool('SPEED', gettext('Propulsion Gel SFX')),
-            SelAttr.bool('BOUNCE', gettext('Repulsion Gel SFX')),
-            SelAttr.bool('TBEAM', gettext('Excursion Funnel Music')),
-            SelAttr.bool('TBEAM_SYNC', gettext('Synced Funnel Music')),
+            SelAttr.bool('SPEED', TransToken.ui('Propulsion Gel SFX')),
+            SelAttr.bool('BOUNCE', TransToken.ui('Repulsion Gel SFX')),
+            SelAttr.bool('TBEAM', TransToken.ui('Excursion Funnel Music')),
+            SelAttr.bool('TBEAM_SYNC', TransToken.ui('Synced Funnel Music')),
         ],
     )
 
@@ -152,15 +158,15 @@ async def make_widgets(packset: PackagesSet, frame: ttk.LabelFrame, pane: SubPan
         TK_ROOT,
         for_channel(MusicChannel.TBEAM),
         save_id='music_tbeam',
-        title=gettext('Select Excursion Funnel Music'),
-        desc=gettext('Set the music used while inside Excursion Funnels.'),
+        title=TransToken.ui('Select Excursion Funnel Music'),
+        desc=TransToken.ui('Set the music used while inside Excursion Funnels.'),
         has_none=True,
         sound_sys=filesystem,
-        none_desc=gettext('Have no music playing when inside funnels.'),
+        none_desc=TransToken.ui('The regular base track will continue to play normally.'),
         callback=selwin_callback,
         callback_params=[MusicChannel.TBEAM],
         attributes=[
-            SelAttr.bool('TBEAM_SYNC', gettext('Synced Funnel Music')),
+            SelAttr.bool('TBEAM_SYNC', TransToken.ui('Synced Funnel Music')),
         ],
     )
 
@@ -168,11 +174,11 @@ async def make_widgets(packset: PackagesSet, frame: ttk.LabelFrame, pane: SubPan
         TK_ROOT,
         for_channel(MusicChannel.BOUNCE),
         save_id='music_bounce',
-        title=gettext('Select Repulsion Gel Music'),
-        desc=gettext('Select the music played when players jump on Repulsion Gel.'),
+        title=TransToken.ui('Select Repulsion Gel Music'),
+        desc=TransToken.ui('Select the music played when players jump on Repulsion Gel.'),
         has_none=True,
         sound_sys=filesystem,
-        none_desc=gettext('Add no music when jumping on Repulsion Gel.'),
+        none_desc=TransToken.ui('Add no music when jumping on Repulsion Gel.'),
         callback=selwin_callback,
         callback_params=[MusicChannel.BOUNCE],
     )
@@ -181,11 +187,11 @@ async def make_widgets(packset: PackagesSet, frame: ttk.LabelFrame, pane: SubPan
         TK_ROOT,
         for_channel(MusicChannel.SPEED),
         save_id='music_speed',
-        title=gettext('Select Propulsion Gel Music'),
-        desc=gettext('Select music played when players have large amounts of horizontal velocity.'),
+        title=TransToken.ui('Select Propulsion Gel Music'),
+        desc=TransToken.ui('Select music played when players have large amounts of horizontal velocity.'),
         has_none=True,
         sound_sys=filesystem,
-        none_desc=gettext('Add no music while running fast.'),
+        none_desc=TransToken.ui('Add no music while running fast.'),
         callback=selwin_callback,
         callback_params=[MusicChannel.SPEED],
     )
@@ -207,7 +213,7 @@ async def make_widgets(packset: PackagesSet, frame: ttk.LabelFrame, pane: SubPan
         is_collapsed = True
         conf = config.APP.get_cur_conf(GenOptions)
         config.APP.store_conf(attrs.evolve(conf, music_collapsed=True))
-        base_lbl['text'] = gettext('Music: ')
+        localisation.set_text(base_lbl, TRANS_BASE_COLL)
         toggle_btn_exit()
 
         # Set all music to the children - so those are used.
@@ -222,7 +228,7 @@ async def make_widgets(packset: PackagesSet, frame: ttk.LabelFrame, pane: SubPan
         is_collapsed = False
         conf = config.APP.get_cur_conf(GenOptions)
         config.APP.store_conf(attrs.evolve(conf, music_collapsed=False))
-        base_lbl['text'] = gettext('Base: ')
+        localisation.set_text(base_lbl, TRANS_BASE_EXP)
         toggle_btn_exit()
         for wid in exp_widgets:
             wid.grid()
@@ -255,11 +261,12 @@ async def make_widgets(packset: PackagesSet, frame: ttk.LabelFrame, pane: SubPan
         btn.grid(row=row, column=2, sticky='EW')
 
     for row, text in enumerate([
-        gettext('Funnel:'),
-        gettext('Bounce:'),
-        gettext('Speed:'),
+        TransToken.ui('Funnel:'),
+        TransToken.ui('Bounce:'),
+        TransToken.ui('Speed:'),
     ], start=1):
-        label = ttk.Label(frame, text=text)
+        label = ttk.Label(frame)
+        localisation.set_text(label, text)
         exp_widgets.append(label)
         label.grid(row=row, column=1, sticky='EW')
 

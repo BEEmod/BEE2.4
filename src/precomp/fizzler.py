@@ -21,8 +21,10 @@ from precomp import (
     conditions, rand,
 )
 import consts
+import user_errors
 
 
+COND_MOD_NAME = None
 LOGGER = logger.get_logger(__name__)
 
 FIZZ_TYPES: dict[str, FizzlerType] = {}
@@ -108,7 +110,7 @@ def read_configs(conf: Property) -> None:
             fizz = FizzlerType.parse(fizz_conf)
 
         if fizz.id in FIZZ_TYPES:
-            raise ValueError('Duplicate fizzler ID "{}"'.format(fizz.id))
+            raise user_errors.UserError(user_errors.TOK_DUPLICATE_ID.format(kind='Fizzler', id=fizz.id))
 
         FIZZ_TYPES[fizz.id] = fizz
 
@@ -289,7 +291,7 @@ class FizzlerType:
             LOGGER.warning('Packlist definitions are deprecated, use auto packing or comp_pack!')
 
         brushes = [
-            FizzlerBrush.parse(prop)
+            FizzlerBrush.parse(prop, fizz_id)
             for prop in
             conf.find_all('Brush')
         ]
@@ -679,7 +681,7 @@ class FizzlerBrush:
             self.textures[group] = textures.get(group, None)
 
     @classmethod
-    def parse(cls, conf: Property) -> FizzlerBrush:
+    def parse(cls, conf: Property, fizz_id: str) -> FizzlerBrush:
         """Parse from a config file."""
         if 'side_color' in conf:
             side_color = conf.vec('side_color')
@@ -709,7 +711,11 @@ class FizzlerBrush:
         }
 
         if 'classname' not in keys:
-            raise ValueError(f'Fizzler Brush "{conf["name"]}" does not have a classname!')
+            raise user_errors.UserError(user_errors.TOK_REQUIRED_PARAM.format(
+                option='option',
+                kind='Fizzler Brush',
+                id=f'{fizz_id}:{conf["name"]}',
+            ))
 
         return FizzlerBrush(
             name=conf['name'],
@@ -1064,17 +1070,18 @@ def parse_map(vmf: VMF, info: conditions.MapInfo) -> None:
         try:
             item_id, item_subtype = instanceLocs.ITEM_FOR_FILE[base_inst['file'].casefold()]
         except KeyError:
-            raise ValueError('No item id for "{}"!'.format(
-                base_inst['file'],
-            )) from None
+            raise user_errors.UserError(
+                user_errors.TOK_FIZZLER_NO_ITEM.format(inst=base_inst['file']),
+                voxels=[Vec.from_str(base_inst['origin'])],
+            ) from None
         try:
             fizz_type = fizz_types[item_id, model_skin]
         except KeyError:
             LOGGER.warning('Fizzler types: {}', fizz_types.keys())
-            raise ValueError(
-                f'No fizzler type for {item_id}:{item_subtype} '
-                f'("{base_inst["file"]}")!'
-            ) from None
+            raise user_errors.UserError(user_errors.TOK_FIZZLER_UNKNOWN_TYPE.format(
+                item=f'{item_id}:{item_subtype}',
+                inst=base_inst["file"],
+            ), voxels=[Vec.from_str(base_inst['origin'])]) from None
 
         info.set_attr(*fizz_type.voice_attrs)
 
@@ -1233,9 +1240,9 @@ def generate_fizzlers(vmf: VMF) -> None:
         )
 
         if not model_min or not model_max:
-            raise ValueError(
-                'No model specified for one side of "{}"'
-                ' fizzlers'.format(fizz_type.id),
+            raise user_errors.UserError(
+                user_errors.TOK_FIZZLER_NO_MODEL_SIDE.format(id=fizz_type.id),
+                voxels=[pos for minmax in fizz.emitters for pos in minmax],
             )
 
         # Define a function to do the model names.
@@ -1259,7 +1266,7 @@ def generate_fizzlers(vmf: VMF) -> None:
                 model_index += 1
                 return f'{fizz_name}-{fizz_type.model_name}{model_index:02}'
         else:
-            raise ValueError('Bad ModelName?')
+            raise AssertionError(f'No model name {fizz_type.model_name!r}')
 
         # Generate env_beam pairs.
         for beam in fizz_type.beams:

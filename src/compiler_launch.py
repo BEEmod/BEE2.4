@@ -1,6 +1,7 @@
 """Launches the correct compiler."""
 import os
 import sys
+import trio  # Install its import hook
 
 if hasattr(sys, 'frozen'):
     app_name = os.path.basename(sys.executable).casefold()
@@ -15,11 +16,14 @@ else:
 
 if app_name in ('vbsp.exe', 'vbsp_osx', 'vbsp_linux'):
     import vbsp
-    vbsp.main()
+    trio.run(vbsp.main)
 elif app_name in ('vrad.exe', 'vrad_osx', 'vrad_linux'):
-    import vrad
-    import trio
-    trio.run(vrad.main, sys.argv)
+    if '--errorserver' in sys.argv:
+        import error_server
+        trio.run(error_server.main)
+    else:
+        import vrad
+        trio.run(vrad.main, sys.argv)
 elif 'original' in app_name:
     sys.exit('Original compilers replaced, verify game cache!')
 else:

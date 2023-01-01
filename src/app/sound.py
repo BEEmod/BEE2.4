@@ -86,13 +86,14 @@ class NullSound:
         if play_fx() and self._block_count == 0:
             self._block_count += 1
             try:
-                await self.fx(sound)
-                await trio.sleep(0.75)
+                duration = await self.fx(sound)
+                await trio.sleep(duration)
             finally:
                 self._block_count -= 1
 
-    async def fx(self, sound: str) -> None:
-        """Play a sound effect."""
+    async def fx(self, sound: str) -> float:
+        """Play a sound effect, and return its expected length."""
+        return 0.0
 
 
 class PygletSound(NullSound):
@@ -108,7 +109,7 @@ class PygletSound(NullSound):
         path = str(utils.install_path('sounds/{}.ogg'.format(fname)))
         LOGGER.info('Loading sound "{}" -> {}', name, path)
         try:
-            src = await trio.to_thread.run_sync(functools.partial(
+            src: pyglet.media.Source = await trio.to_thread.run_sync(functools.partial(
                 decoder.decode,
                 file=None,
                 filename=path,
@@ -124,8 +125,8 @@ class PygletSound(NullSound):
             self.sources[name] = src
             return src
 
-    async def fx(self, sound: str) -> None:
-        """Play a sound effect."""
+    async def fx(self, sound: str) -> float:
+        """Play a sound effect, and return its expected length."""
         global sounds
         if play_fx():
             try:
@@ -142,6 +143,13 @@ class PygletSound(NullSound):
                 LOGGER.info('UI sounds disabled.')
                 _nursery.cancel_scope.cancel()
                 sounds = NullSound()
+                return 0.1
+            duration = snd.duration
+            if duration is not None:
+                return duration
+            else:
+                LOGGER.warning('No duration: {}', sound)
+                return 0.75  # Should be long enough.
 
 
 async def sound_task() -> None:

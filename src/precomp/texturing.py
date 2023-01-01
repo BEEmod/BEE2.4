@@ -1,30 +1,23 @@
 """Manages the list of textures used for brushes, and how they are applied."""
+from typing import TYPE_CHECKING, Union, Type, Any, Dict, List, Tuple, Optional, Iterable, Set
+from pathlib import Path
+from enum import Enum
 import itertools
 import abc
-from enum import Enum
-from pathlib import Path
 
 import attrs
+import trio
 
-import srctools.logger
-from precomp import rand
 from srctools import Property, Vec, conv_bool
 from srctools.game import Game
 from srctools.tokenizer import TokenSyntaxError
 from srctools.vmf import VisGroup, VMF, Side, Solid
 from srctools.vmt import Material
+import srctools.logger
+
+from precomp import rand
 from precomp.brushLoc import POS as BLOCK_TYPE
-
 import consts
-
-from typing import (
-    TYPE_CHECKING,
-    Union, Type, Any,
-    Dict, List, Tuple,
-    Optional, Iterable,
-    Set,
-)
-
 import utils
 
 if TYPE_CHECKING:
@@ -344,7 +337,7 @@ def parse_options(settings: Dict[str, Any], global_settings: Dict[str, Any]) -> 
         elif isinstance(default, float):
             options[opt] = srctools.conv_float(value, default)
         else:
-            raise ValueError('Bad default {!r} for "{}"!'.format(default, opt))
+            raise ValueError(f'Bad default {default!r} for "{opt}"!')
     return options
 
 
@@ -509,6 +502,7 @@ def load_config(conf: Property):
                     ])
                 ])
         textures: Dict[str, List[str]] = {}
+        tex_name: str
 
         # First parse the options.
         options = parse_options({
@@ -581,8 +575,7 @@ def load_config(conf: Property):
             textures.update(data[GenCat.NORMAL, gen_orient, gen_portal][1])
 
         if not textures[TileSize.TILE_4x4]:
-            raise ValueError(
-                'No 4x4 tile set for "{}"!'.format(gen_key))
+            raise ValueError(f'No 4x4 tile set for "{gen_key}"!')
 
         # Copy 4x4, 2x2, 2x1 textures to the 1x1 size if the option was set.
         # Do it before inheriting tiles, so there won't be duplicates.
@@ -608,9 +601,7 @@ def load_config(conf: Property):
             try:
                 generator = GEN_CLASSES[algo]
             except KeyError:
-                raise ValueError('Invalid algorithm "{}" for {}!'.format(
-                    algo, gen_key
-                ))
+                raise ValueError(f'Invalid algorithm "{algo}" for {gen_key}!')
         else:
             # Signage, Overlays always use the Random generator.
             generator = GenRandom
@@ -631,7 +622,7 @@ def load_config(conf: Property):
     OVERLAYS = GENERATORS[GenCat.OVERLAYS]
 
 
-def setup(game: Game, vmf: VMF, tiles: List['TileDef']) -> None:
+async def setup(game: Game, vmf: VMF, tiles: List['TileDef']) -> None:
     """Do various setup steps, needed for generating textures.
 
     - Set randomisation seed on all the generators.
@@ -642,20 +633,27 @@ def setup(game: Game, vmf: VMF, tiles: List['TileDef']) -> None:
     antigel_loc = material_folder / ANTIGEL_PATH
     antigel_loc.mkdir(parents=True, exist_ok=True)
 
-    fsys = game.get_filesystem()
-
     # Basetexture -> material name
     tex_to_antigel: Dict[str, str] = {}
     # And all the filenames that exist.
     antigel_mats: Set[str] = set()
 
-    # First, check existing materials to determine which are already created.
-    for vmt_file in antigel_loc.glob('*.vmt'):
-        with vmt_file.open() as f:
-            mat = Material.parse(f, str(vmt_file))
-        mat_name = str(vmt_file.relative_to(material_folder).with_suffix('')).replace('\\', '/')
-        texture = None
-        for block in mat.blocks:
+    async def check_existing(filename: Path) -> None:
+        """First, check existing materials to determine which are already created."""
+        try:
+            with filename.open() as f:
+                exist_mat = await trio.to_thread.run_sync(Material.parse, f, str(filename))
+        except FileNotFoundError:
+            # It should exist, we just checked for it? Doesn't matter though.
+            return
+        except TokenSyntaxError:
+            LOGGER.warning('Unable to parse antigel material {}!', filename, exc_info=True)
+            # Delete the bad file.
+            await trio.to_thread.run_sync(filename.unlink)
+            return
+        mat_name = str(filename.relative_to(material_folder).with_suffix('')).replace('\\', '/')
+        texture: Optional[str] = None
+        for block in exist_mat.blocks:
             if block.name not in ['insert', 'replace']:
                 continue
             try:
@@ -665,9 +663,19 @@ def setup(game: Game, vmf: VMF, tiles: List['TileDef']) -> None:
                 pass
         if texture is None:
             LOGGER.warning('No $basetexture in antigel material {}!', mat_name)
-            continue
+            return
         tex_to_antigel[texture.casefold()] = mat_name
-        antigel_mats.add(vmt_file.stem)
+        antigel_mats.add(filename.stem)
+
+    async with trio.open_nursery() as nursery:
+        # Parse the filesystems (importantly the VPKs) in the background while we check the existing
+        # VMTs.
+        fsys_res = utils.Result.sync(nursery, game.get_filesystem)
+        for vmt_file in antigel_loc.glob('*.vmt'):
+            nursery.start_soon(check_existing, vmt_file)
+
+    fsys = fsys_res()
+    materials: set[str] = set()
 
     for generator in GENERATORS.values():
         generator.setup(vmf, tiles)
@@ -679,54 +687,56 @@ def setup(game: Game, vmf: VMF, tiles: List['TileDef']) -> None:
         if generator.category is GenCat.OVERLAYS:
             continue
 
-        materials = {
-            mat_name
-            for (mat_cat, mats) in generator.textures.items()
+        for (mat_cat, mats) in generator.textures.items():
             #  Skip these special mats.
-            if mat_cat not in ('glass', 'grating', 'goo', 'goo_cheap')
-            for mat_name in mats
-        }
+            if mat_cat not in ('glass', 'grating', 'goo', 'goo_cheap'):
+                materials.update(mats)
 
+    async def generate_mat(mat_name: str) -> None:
+        """Generate an antigel material."""
+        try:
+            with fsys[f'materials/{mat_name}.vmt'].open_str() as f:
+                mat = await trio.to_thread.run_sync(Material.parse, f, mat_name)
+            mat = await trio.to_thread.run_sync(mat.apply_patches, fsys)
+        except FileNotFoundError:
+            LOGGER.warning('Material {} does not exist?', mat_name)
+            return
+        except TokenSyntaxError:
+            LOGGER.warning('Material {} cannot be parsed for antigel:', mat_name, exc_info=True)
+            return
+        try:
+            texture = mat['$basetexture']
+        except KeyError:
+            LOGGER.warning('No $basetexture in material {}?', mat_name)
+            return
+        if mat_name.casefold() in ANTIGEL_MATS:
+            return
+        try:
+            ANTIGEL_MATS[mat_name.casefold()] = tex_to_antigel[texture.casefold()]
+            return
+        except KeyError:
+            pass
+        noportal = conv_bool(mat.get('%noportal', False))
+        # We have to generate.
+        antigel_filename = str(antigel_loc / Path(texture).stem)
+        if antigel_filename in antigel_mats:
+            antigel_filename_base = antigel_filename.rstrip('0123456789')
+            for i in itertools.count(1):
+                antigel_filename = f'{antigel_filename_base}{i:02}'
+                if antigel_filename not in antigel_mats:
+                    break
+        with open(antigel_filename + '.vmt', 'w') as f:
+            f.write(ANTIGEL_TEMPLATE.format(
+                path=texture,
+                noportal=int(noportal),
+            ))
+        antigel_mat = str(Path(antigel_filename).relative_to(material_folder)).replace('\\', '/')
+        ANTIGEL_MATS[mat_name.casefold()] = tex_to_antigel[texture.casefold()] = antigel_mat
+        antigel_mats.add(antigel_mat)
+
+    async with trio.open_nursery() as nursery:
         for mat_name in materials:
-            if mat_name.casefold() in ANTIGEL_MATS:
-                continue
-            try:
-                with fsys[f'materials/{mat_name}.vmt'].open_str() as f:
-                    mat = Material.parse(f, mat_name)
-                mat = mat.apply_patches(fsys)
-            except FileNotFoundError:
-                LOGGER.warning('Material {} does not exist?', mat_name)
-                continue
-            except TokenSyntaxError:
-                LOGGER.warning('Material {} cannot be parsed for antigel:', mat_name, exc_info=True)
-                continue
-            try:
-                texture = mat['$basetexture']
-            except KeyError:
-                LOGGER.warning('No $basetexture in material {}?', mat_name)
-                continue
-            try:
-                ANTIGEL_MATS[mat_name.casefold()] = tex_to_antigel[texture.casefold()]
-                continue
-            except KeyError:
-                pass
-            noportal = conv_bool(mat.get('%noportal', False))
-            # We have to generate.
-            antigel_filename = str(antigel_loc / Path(texture).stem)
-            if antigel_filename in antigel_mats:
-                antigel_filename_base = antigel_filename.rstrip('0123456789')
-                for i in itertools.count(1):
-                    antigel_filename = f'{antigel_filename_base}{i:02}'
-                    if antigel_filename not in antigel_mats:
-                        break
-            with open(antigel_filename + '.vmt', 'w') as f:
-                f.write(ANTIGEL_TEMPLATE.format(
-                    path=texture,
-                    noportal=int(noportal),
-                ))
-            antigel_mat = str(Path(antigel_filename).relative_to(material_folder)).replace('\\', '/')
-            ANTIGEL_MATS[mat_name.casefold()] = tex_to_antigel[texture.casefold()] = antigel_mat
-            antigel_mats.add(antigel_mat)
+            nursery.start_soon(generate_mat, mat_name)
 
 
 class Generator(abc.ABC):
@@ -734,7 +744,7 @@ class Generator(abc.ABC):
 
     # The settings which apply to all generators.
     # Since they're here all subclasses and instances can access this.
-    global_settings = {}  # type: Dict[str, Any]
+    global_settings: Dict[str, Any] = {}
 
     def __init__(
         self,
@@ -789,13 +799,10 @@ class Generator(abc.ABC):
         return texture
 
     def setup(self, vmf: VMF, tiles: List['TileDef']) -> None:
-        """Scan tiles in the map and setup the generator."""
+        """Scan tiles in the map and set up the generator."""
 
     def _missing_error(self, tex_name: str):
-        return ValueError('Bad texture name: {}\n Allowed: {!r}'.format(
-            tex_name,
-            list(self.textures.keys()),
-        ))
+        return ValueError(f'Bad texture name: {tex_name}\n Allowed: {list(self.textures.keys())!r}')
 
     @abc.abstractmethod
     def _get(self, loc: Vec, tex_name: str) -> str:

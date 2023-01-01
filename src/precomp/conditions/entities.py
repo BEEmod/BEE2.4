@@ -205,8 +205,7 @@ def res_water_splash(vmf: VMF,  res: Property) -> conditions.ResultCallable:
             grid_pos = pos // 128.0 * 128.0
             grid_pos += (64.0, 64.0, 64.0)
 
-            block = BLOCK_POS['world': pos]
-            if block.is_goo:
+            if BLOCK_POS.lookup_world(pos).is_goo:
                 break
         else:
             return  # Not in goo at all

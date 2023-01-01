@@ -79,7 +79,7 @@ class FeatureMode(Enum):
             return self.value == 'always'
 
 
-class OutNames(str, Enum):
+class OutNames(Enum):
     """Fake input/outputs used in generation of the real ones."""
     # Needs to match gameMan.Game.build_instance_data().
     IN_ACT = 'ACTIVATE'

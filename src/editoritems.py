@@ -15,6 +15,7 @@ from srctools.tokenizer import Tokenizer, Token
 from connections import Config as ConnConfig, InputType, OutNames
 from editoritems_props import ItemProp, ItemPropKind, PROP_TYPES
 from collisions import CollideType, BBox, NonBBoxError
+from transtoken import TransToken, TransTokenSource
 
 
 LOGGER = logger.get_logger(__name__)
@@ -430,8 +431,11 @@ FACE_TYPES: dict[str, FaceType] = {
     for face in FaceType
 }
 OCCU_TYPES: dict[str, OccuType] = {
-    'COLLIDE_' + coll.name: coll
-    for coll in OccuType
+    'COLLIDE_' + name: OccuType[name]
+    for name in [
+        "NOTHING", "SOLID", "GRATING", "GLASS", "BRIDGE", "FIZZLER", "PHYSICS",
+        "ANTLINES", "EVERYTHING",
+    ]
 }
 
 # The defaults, if this is unset.
@@ -653,7 +657,7 @@ class SubType:
     Should not be constructed directly.
     """
     # The name, shown on remove connection windows.
-    name: str = ''
+    name: TransToken = TransToken.BLANK
     # The models this uses, in order. The editoritems format includes
     # a texture name for each of these, but it's never used.
     models: list[FSPath] = attrs.Factory(list)
@@ -663,8 +667,8 @@ class SubType:
     anims: dict[Anim, int] = attrs.Factory(dict)
 
     # The capitalised name to display in the bottom of the palette window.
-    # If not on the palette, set to ''.
-    pal_name: str = ''
+    # If not on the palette, set to blank
+    pal_name: TransToken = TransToken.BLANK
     # X/Y position on the palette, or None if not on the palette
     pal_pos: tuple[int, int] | None = None
     # The path to the icon VTF, in 'models/props_map_editor'.
@@ -740,13 +744,13 @@ class SubType:
             self.pal_pos = None
 
     @classmethod
-    def parse(cls, tok: Tokenizer) -> SubType:
+    def parse(cls, tok: Tokenizer, pak_id: str) -> SubType:
         """Parse a subtype from editoritems."""
         subtype = SubType()
         for key in tok.block('Subtype'):
             folded_key = key.casefold()
             if folded_key == 'name':
-                subtype.name = tok.expect(Token.STRING)
+                subtype.name = TransToken.parse(pak_id, tok.expect(Token.STRING))
             elif folded_key == 'model':
                 # In the original file this is a block, but allow a name
                 # since the texture is unused.
@@ -776,7 +780,7 @@ class SubType:
                 for subkey in tok.block('Palette'):
                     subkey = subkey.casefold()
                     if subkey == 'tooltip':
-                        subtype.pal_name = tok.expect(Token.STRING)
+                        subtype.pal_name = TransToken.parse(pak_id, tok.expect(Token.STRING))
                     elif subkey == 'image':
                         # Usually defined in file as PNG, but actually VTF.
                         subtype.pal_icon = FSPath(tok.expect(Token.STRING)).with_suffix('.vtf')
@@ -810,14 +814,14 @@ class SubType:
         """Write the subtype to a file."""
         f.write('\t\t"SubType"\n\t\t\t{\n')
         if self.name:
-            f.write(f'\t\t\t"Name" "{self.name}"\n')
+            f.write(f'\t\t\t"Name" "{self.name.as_game_token()}"\n')
         for model in self.models:
             # It has to be a .3ds file, even though it's really MDL.
             model = model.with_suffix('.3ds')
             f.write(f'\t\t\t"Model" {{ "ModelName" "{model}" }}\n')
         if self.pal_pos is not None:
             f.write('\t\t\t"Palette"\n\t\t\t\t{\n')
-            f.write(f'\t\t\t\t"Tooltip"  "{self.pal_name}"\n')
+            f.write(f'\t\t\t\t"Tooltip"  "{self.pal_name.as_game_token()}"\n')
             if self.pal_icon is not None:
                 # Similarly needs to be PNG even though it's really VTF.
                 pal_icon = self.pal_icon.with_suffix('.png')
@@ -999,7 +1003,7 @@ class Item:
         return items, icons
 
     @classmethod
-    def parse_one(cls, tok: Tokenizer) -> Item:
+    def parse_one(cls, tok: Tokenizer, pak_id: str='') -> Item:
         """Parse an item.
 
         This expects the "Item" token to have been read already.
@@ -1037,7 +1041,7 @@ class Item:
                 except KeyError:
                     raise tok.error('Unknown item class {}!', item_class)
             elif tok_value == 'editor':
-                item._parse_editor_block(tok)
+                item._parse_editor_block(tok, pak_id)
             elif tok_value == 'properties':
                 item._parse_properties_block(tok)
             elif tok_value == 'exporting':
@@ -1080,12 +1084,12 @@ class Item:
         'pseudohandle': 'pseudo_handle',
     }
 
-    def _parse_editor_block(self, tok: Tokenizer) -> None:
+    def _parse_editor_block(self, tok: Tokenizer, pak_id: str) -> None:
         """Parse the editor block of the item definitions."""
         for key in tok.block('Editor'):
             folded_key = key.casefold()
             if folded_key == 'subtype':
-                self.subtypes.append(SubType.parse(tok))
+                self.subtypes.append(SubType.parse(tok, pak_id))
             elif folded_key == 'animations':
                 Anim.parse_block(self.animations, tok)
             elif folded_key == 'movementhandle':
@@ -1178,7 +1182,6 @@ class Item:
         Since the standard input/output blocks must be parsed in one group, we collect those in the
         passed-in property block for later parsing.
         """
-
         for key in tok.block('Exporting'):
             folded_key = key.casefold()
             if folded_key == 'targetname':
@@ -1244,9 +1247,9 @@ class Item:
                     raise tok.error('Unknown instance option {}', block_key)
             if inst_file is None:
                 raise tok.error('No instance filename provided!')
-            inst = InstCount(inst_file, ent_count, brush_count, side_count)
+            inst = InstCount(FSPath(inst_file), ent_count, brush_count, side_count)
         elif block_tok is Token.STRING:
-            inst = InstCount(inst_file)
+            inst = InstCount(FSPath(inst_file))
         else:
             raise tok.error(block_tok)
         if inst_ind is not None:
@@ -1740,16 +1743,16 @@ class Item:
             if has_prim_input:
                 f.write(f'\t\t\t"{ConnTypes.NORMAL.value}"\n')
                 f.write('\t\t\t\t{\n')
-                f.write(f'\t\t\t\t"Activate" "{OutNames.IN_ACT}"\n')
-                f.write(f'\t\t\t\t"Deactivate" "{OutNames.IN_DEACT}"\n')
+                f.write(f'\t\t\t\t"Activate" "{OutNames.IN_ACT.value}"\n')
+                f.write(f'\t\t\t\t"Deactivate" "{OutNames.IN_DEACT.value}"\n')
                 f.write('\t\t\t\t}\n')
             # Only add the tbeam input for actual funnels.
             # It doesn't work there.
             if has_sec_input and self.id.casefold() == 'item_tbeam':
                 f.write(f'\t\t\t"{ConnTypes.POLARITY.value}"\n')
                 f.write('\t\t\t\t{\n')
-                f.write(f'\t\t\t\t"Activate" "{OutNames.IN_SEC_ACT}"\n')
-                f.write(f'\t\t\t\t"Deactivate" "{OutNames.IN_SEC_DEACT}"\n')
+                f.write(f'\t\t\t\t"Activate" "{OutNames.IN_SEC_ACT.value}"\n')
+                f.write(f'\t\t\t\t"Deactivate" "{OutNames.IN_SEC_DEACT.value}"\n')
                 f.write('\t\t\t\t}\n')
             for conn_type, conn in self.conn_inputs.items():
                 conn.write(f, conn_type.value)
@@ -1759,8 +1762,8 @@ class Item:
             if has_output:
                 f.write(f'\t\t\t"{ConnTypes.NORMAL.value}"\n')
                 f.write('\t\t\t\t{\n')
-                f.write(f'\t\t\t\t"Activate" "{OutNames.OUT_ACT}"\n')
-                f.write(f'\t\t\t\t"Deactivate" "{OutNames.OUT_DEACT}"\n')
+                f.write(f'\t\t\t\t"Activate" "{OutNames.OUT_ACT.value}"\n')
+                f.write(f'\t\t\t\t"Deactivate" "{OutNames.OUT_DEACT.value}"\n')
                 f.write('\t\t\t\t}\n')
             for conn_type, conn in self.conn_outputs.items():
                 conn.write(f, conn_type.value)
@@ -1973,3 +1976,9 @@ class Item:
             and self.cls is not ItemClass.TRACK_PLATFORM
         ):
             LOGGER.warning('Items with inputs or outputs need ConnectionPoints definition!')
+
+    def iter_trans_tokens(self, source: str) -> Iterator[TransTokenSource]:
+        """Iterate over translation tokens in this item."""
+        for subtype in self.subtypes:
+            yield subtype.name, source + '.name'
+            yield subtype.pal_name, source + '.pal_name'

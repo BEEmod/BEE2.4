@@ -4,6 +4,34 @@
 
 ------------------------------------------
 
+# Version 4.43.0
+
+## New features:
+
+* New error display system: If a known error occurs during compilation (leaks, items 
+  used incorrectly, etc), the Steam Overlay will be opened, and a webpage opened with
+  information on the error, as well as a interactive view of the chamber to show the
+  location of the issue and relevant items.
+* Languages can now be selected in the options menu, and packages now have more usable
+  translation support.
+
+### Enhancements
+* If funnel music is disabled, keep the base music playing while inside funnels.
+* Tweak the naming for the chamber thumbnail options to be a little more clear.
+* Add option to disable modifying the FGD file.
+
+### Bugfixes
+* Do not composite signage VTFs with PeTI backgrounds.
+* Fix signage not exporting if the UI was not opened at least once before exporting.
+* [#4252](https://github.com/BEEmod/BEE2-items/issues/4252): Correctly place Tag Fizzler signage 
+  when on walls.
+* Display the absolute location of the package location if empty.
+* Handle unparsable existing antigel materials gracefully.
+* Fix issues with P1 Track Platforms not generating correctly.
+* Fix export of corridor configuration in some cases when picking default corridors.
+
+------------------------------------------
+
 # Version 4.42.0
 
 ### New features:

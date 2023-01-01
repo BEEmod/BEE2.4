@@ -2,25 +2,33 @@
 # Do this very early, so we log the startup sequence.
 from srctools.logger import init_logging
 
+import user_errors
+
+
 LOGGER = init_logging('bee2/vbsp.log')
 
+
+from typing import Any, Dict, List, Tuple, Set, Iterable, Optional
+from typing_extensions import TypedDict
+from io import StringIO
+from collections import defaultdict, namedtuple, Counter
 import os
 import sys
 import shutil
 import logging
 import pickle
-from io import StringIO
-from collections import defaultdict, namedtuple, Counter
-from atomicwrites import atomic_write
+import contextlib
 
-from srctools import Property, Vec, Vec_tuple, Angle, Matrix
+from srctools import AtomicWriter, Property, Vec, Vec_tuple, Angle, Matrix
 from srctools.vmf import VMF, Entity, Output
 from srctools.game import Game
-from BEE2_config import ConfigFile
-import utils
 import srctools
 import srctools.run
 import srctools.logger
+import trio
+
+from BEE2_config import ConfigFile
+import utils
 from precomp.collisions import Collisions
 from precomp import (
     instance_traits,
@@ -28,7 +36,6 @@ from precomp import (
     bottomlessPit,
     instanceLocs,
     corridor,
-    cubes,
     template_brush,
     texturing,
     tiling,
@@ -43,12 +50,11 @@ from precomp import (
     voice_line,
     music,
     rand,
+    cubes,
+    errors,
 )
 import consts
 import editoritems
-
-from typing import Any, Dict, List, Tuple, Set, Iterable, Optional
-from typing_extensions import TypedDict
 
 
 class _Settings(TypedDict):
@@ -61,7 +67,6 @@ class _Settings(TypedDict):
 
     style_vars: Dict[str, bool]
     has_attr: Dict[str, bool]
-    packtrigger: Dict[str, List[str]]
 
 settings: _Settings = {
     "textures":       {},
@@ -72,7 +77,6 @@ settings: _Settings = {
 
     "style_vars":     defaultdict(bool),
     "has_attr":       defaultdict(bool),
-    "packtrigger":    defaultdict(list),
 }
 
 COND_MOD_NAME = 'VBSP'
@@ -85,19 +89,45 @@ IGNORED_OVERLAYS: Set[Entity] = set()
 PRESET_CLUMPS = []  # Additional clumps set by conditions, for certain areas.
 
 
-def load_settings() -> Tuple[
+async def load_settings() -> Tuple[
     antlines.AntType, antlines.AntType,
     Dict[str, editoritems.Item],
     corridor.ExportedConf,
 ]:
     """Load in all our settings from vbsp_config."""
+    # Do all our file parsing concurrently.
     try:
-        with open("bee2/vbsp_config.cfg", encoding='utf8') as config:
-            conf = Property.parse(config, 'bee2/vbsp_config.cfg')
+        with contextlib.ExitStack() as file_stack:
+            file_config = file_stack.enter_context(open("bee2/vbsp_config.cfg", encoding='utf8'))
+            file_editor = file_stack.enter_context(open('bee2/editor.bin', 'rb'))
+            file_corridor = file_stack.enter_context(open('bee2/corridors.bin', 'rb'))
+            file_packlist = file_stack.enter_context(open('bee2/pack_list.cfg'))
+
+            async with trio.open_nursery() as nursery:
+                res_conf = utils.Result.sync(nursery, Property.parse, file_config)
+                res_editor: utils.Result[
+                    Iterable[editoritems.Item]
+                ] = utils.Result.sync(nursery, pickle.load, file_editor)
+                res_corr: utils.Result[corridor.ExportedConf] = utils.Result.sync(
+                    nursery,
+                    pickle.load, file_corridor,
+                )
+                res_packlist = utils.Result.sync(
+                    nursery,
+                    Property.parse, file_packlist, 'bee2/pack_list.cfg',
+                )
+                # Load in templates locations.
+                nursery.start_soon(template_brush.load_templates, 'bee2/templates.lst')
     except FileNotFoundError:
-        LOGGER.warning('Error: No vbsp_config file!')
-        conf = Property(None, [])
-        # All the find_all commands will fail, and we will use the defaults.
+        LOGGER.exception(
+            'Failed to parse required config file. Recompile the compiler '
+            'and/or export the palette.'
+            if utils.DEV_MODE else
+            'Failed to parse required config file. Re-export BEE2.'
+        )
+        sys.exit(1)
+
+    conf = res_conf()
 
     texturing.load_config(conf.find_block('textures', or_blank=True))
 
@@ -117,7 +147,7 @@ def load_settings() -> Tuple[
     if ant_floor is None:
         ant_floor = ant_wall
 
-    # Load in our main configs..
+    # Load in our main configs...
     options.load(conf.find_all('Options'))
     utils.DEV_MODE = options.get(bool, 'dev_mode')
 
@@ -130,36 +160,17 @@ def load_settings() -> Tuple[
         for var in stylevar_block:
             settings['style_vars'][var.name.casefold()] = srctools.conv_bool(var.value)
 
-    # Load in templates locations.
-    template_brush.load_templates('bee2/templates.lst')
-
     # Load a copy of the item configuration.
     id_to_item: dict[str, editoritems.Item] = {}
-    item: editoritems.Item
-    with open('bee2/editor.bin', 'rb') as inst:
-        try:
-            for item in pickle.load(inst):
-                id_to_item[item.id.casefold()] = item
-        except Exception:  # Anything from __setstate__ etc.
-            LOGGER.exception(
-                'Failed to parse editoritems dump. Recompile the compiler '
-                'and/or export the palette.'
-                if utils.DEV_MODE else
-                'Failed to parse editoritems dump. Re-export BEE2.'
-            )
-            sys.exit(1)
+    for item in res_editor():
+        id_to_item[item.id.casefold()] = item
 
     # Send that data to the relevant modules.
     instanceLocs.load_conf(id_to_item.values())
     connections.read_configs(id_to_item.values())
 
     # Parse packlist data.
-    with open('bee2/pack_list.cfg') as f:
-        props = Property.parse(
-            f,
-            'bee2/pack_list.cfg'
-        )
-    packing.parse_packlists(props)
+    packing.parse_packlists(res_packlist())
 
     # Parse all the conditions.
     for cond in conf.find_all('conditions', 'condition'):
@@ -172,8 +183,7 @@ def load_settings() -> Tuple[
     fizzler.read_configs(conf)
 
     # Selected corridors.
-    with open('bee2/corridors.bin', 'rb') as bf:
-        corridor_conf: corridor.ExportedConf = pickle.load(bf)
+    corridor_conf = res_corr()
 
     # Signage items
     from precomp.conditions.signage import load_signs
@@ -225,13 +235,13 @@ def load_settings() -> Tuple[
     return ant_floor, ant_wall, id_to_item, corridor_conf
 
 
-def load_map(map_path: str) -> VMF:
+async def load_map(map_path: str) -> VMF:
     """Load in the VMF file."""
     with open(map_path) as file:
         LOGGER.info("Parsing Map...")
-        props = Property.parse(file, map_path)
+        props = await trio.to_thread.run_sync(Property.parse, file, map_path)
     LOGGER.info('Reading Map...')
-    vmf = VMF.parse(props)
+    vmf = await trio.to_thread.run_sync(VMF.parse, props)
     LOGGER.info("Loading complete!")
     return vmf
 
@@ -1259,6 +1269,28 @@ def fix_worldspawn(vmf: VMF) -> None:
     vmf.spawn['skyname'] = options.get(str, 'skybox')
 
 
+async def find_missing_instances(game: Game, vmf: VMF) -> List[Vec]:
+    """Go through the map, and check for missing instances.
+
+    We don't raise an error immediately, because it could be possible that VBSP checks differently
+    and can find them anyway. In that case just let it continue successfully.
+    """
+    missing: List[Vec] = []
+    sdk_content = await trio.Path(game.path / '../sdk_content/maps/').absolute()
+
+    async def check(inst: Entity) -> None:
+        """See if this file exists."""
+        filename = inst['file']
+        if not await (sdk_content / filename).exists():
+            missing.append(Vec.from_str(inst['origin']))
+
+    async with trio.open_nursery() as nursery:
+        for instance in vmf.by_class['func_instance']:
+            nursery.start_soon(check, instance)
+
+    return missing
+
+
 def instance_symlink() -> None:
     """On OS X and Linux, Valve broke VBSP's instances/ finding code.
 
@@ -1285,13 +1317,19 @@ def save(vmf: VMF, path: str) -> None:
     """
     LOGGER.info("Saving New Map...")
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    with atomic_write(path, overwrite=True, encoding='utf8') as f:
+    with AtomicWriter(path) as f:
         vmf.export(dest_file=f, inc_version=True)
     LOGGER.info("Complete!")
 
 
-def run_vbsp(vbsp_args, path, new_path=None) -> None:
-    """Execute the original VBSP, copying files around so it works correctly.
+def run_vbsp(
+    vbsp_args: List[str],
+    path: str,
+    new_path: Optional[str] = None,
+    is_error_map: bool = False,
+    maybe_missing_inst: Iterable[Vec]=(),
+) -> None:
+    """Execute the original VBSP, copying files around to make it work correctly.
 
     vbsp_args are the arguments to pass.
     path is the original .vmf, new_path is the styled/ name.
@@ -1329,10 +1367,24 @@ def run_vbsp(vbsp_args, path, new_path=None) -> None:
         'linux32/vbsp' if utils.LINUX else 'vbsp',
         vbsp_args, vbsp_logger,
     )
+
+    # Check for leaks!
+    if new_path is not None and not is_error_map:
+        pointfile = new_path.replace(".vmf", ".lin")
+        LOGGER.info('Files present: {}', os.listdir(os.path.dirname(new_path)))
+        if os.path.isfile(pointfile):  # We leaked!
+            points = []
+            with open(pointfile) as f:
+                for line in f:
+                    points.append(Vec.from_str(line.strip()))
+            # Preserve this, rename to match the error map we generate.
+            os.replace(pointfile, pointfile[:-4] + ".error.lin")
+            raise errors.UserError(errors.TOK_VBSP_LEAK, leakpoints=points)
+
     if code != 0:
         # VBSP didn't succeed.
         if is_peti:  # Ignore Hammer maps
-            process_vbsp_fail(buff.getvalue())
+            process_vbsp_fail(buff.getvalue(), maybe_missing_inst)
 
         # Propagate the fail code to Portal 2, and quit.
         sys.exit(code)
@@ -1405,7 +1457,7 @@ def process_vbsp_log(output: str) -> None:
     BEE2_config.save()
 
 
-def process_vbsp_fail(output: str) -> None:
+def process_vbsp_fail(output: str, missing_locs: Iterable[Vec]) -> None:
     """Read through VBSP's logs when failing, to update counts."""
     # VBSP doesn't output the actual entity counts, so set the errorred
     # one to max and the others to zero.
@@ -1416,6 +1468,12 @@ def process_vbsp_fail(output: str) -> None:
     count_section['max_overlay'] = '512'
 
     for line in reversed(output.splitlines()):
+        if 'Could not open instance file' in line:
+            filename = line.split('file', 1)[1].strip()
+            raise user_errors.UserError(
+                user_errors.TOK_VBSP_MISSING_INSTANCE.format(inst=filename),
+                points=missing_locs,
+            )
         if 'MAX_MAP_OVERLAYS' in line:
             count_section['entity'] = '0'
             count_section['brush'] = '0'
@@ -1441,7 +1499,7 @@ def process_vbsp_fail(output: str) -> None:
     BEE2_config.save_check()
 
 
-def main() -> None:
+async def main() -> None:
     """Main program code.
 
     """
@@ -1463,8 +1521,7 @@ def main() -> None:
         LOGGER.info('Done. Exiting now!')
         sys.exit()
 
-    # Just in case we fail, overwrite the VRAD config so it doesn't use old
-    # data.
+    # Just in case we fail, overwrite the VRAD config, so it doesn't use old data.
     open('bee2/vrad_config.cfg', 'w').close()
 
     args = " ".join(sys.argv)
@@ -1546,13 +1603,20 @@ def main() -> None:
             vbsp_args=old_args,
             path=path,
         )
-    else:
+        return
+
+    is_publishing = False
+    try:
         LOGGER.info("PeTI map detected!")
 
         LOGGER.info("Loading settings...")
-        ant_floor, ant_wall, id_to_item, corridor_conf = load_settings()
+        async with trio.open_nursery() as nursery:
+            res_settings = utils.Result(nursery, load_settings)
+            vmf_res = utils.Result(nursery, load_map, path)
 
-        vmf = load_map(path)
+        ant_floor, ant_wall, id_to_item, corridor_conf = res_settings()
+        vmf: VMF = vmf_res()
+
         coll = Collisions()
 
         instance_traits.set_traits(vmf, id_to_item, coll)
@@ -1566,6 +1630,7 @@ def main() -> None:
             elev_override=BEE2_config.get_bool('General', 'spawn_elev'),
             voice_attrs=settings['has_attr'],
         )
+        is_publishing = info.is_publishing
 
         ant, side_to_antline = antlines.parse_antlines(vmf)
 
@@ -1582,13 +1647,17 @@ def main() -> None:
 
         fizzler.parse_map(vmf, info)
         barriers.parse_map(vmf, info)
+        # We have barriers, pass to our error display.
+        errors.load_barriers(barriers.BARRIERS)
 
         tiling.gen_tile_temp()
         tiling.analyse_map(vmf, side_to_antline)
 
         del side_to_antline
+        # We have tiles, pass to our error display.
+        errors.load_tiledefs(tiling.TILES.values(), brushLoc.POS)
 
-        texturing.setup(game, vmf, list(tiling.TILES.values()))
+        await texturing.setup(game, vmf, list(tiling.TILES.values()))
 
         conditions.check_all(vmf, coll, info)
         add_extra_ents(vmf, info)
@@ -1605,23 +1674,52 @@ def main() -> None:
         for ent in vmf.entities:
             for out in ent.outputs:
                 out.comma_sep = False
-
+        # Set this so VRAD can know.
+        vmf.spawn['BEE2_is_preview'] = info.is_preview
         # Ensure VRAD knows that the map is PeTI, it can't figure that out
         # from parameters.
         vmf.spawn['BEE2_is_peti'] = True
-        # Set this so VRAD can know.
-        vmf.spawn['BEE2_is_preview'] = info.is_preview
 
-        save(vmf, new_path)
+        # Save and run VBSP. If this leaks, this will raise UserError, and we'll compile again.
         if not skip_vbsp:
+            save(vmf, new_path)
             run_vbsp(
                 vbsp_args=new_args,
                 path=path,
                 new_path=new_path,
+                maybe_missing_inst=await find_missing_instances(game, vmf),
+            )
+    except errors.UserError as error:
+        # The user did something wrong, so the map is invalid.
+        # In preview, compile a special map which displays the message.
+        if is_publishing:  # But force an error to prevent publishing.
+            raise
+        LOGGER.error('"User" error detected, aborting compile: ', exc_info=True)
+
+        # Try to preserve the current map.
+        try:
+            save(vmf, new_path[:-4] + '.error.vmf')  # noqa
+        except Exception:
+            pass
+
+        vmf = errors.make_map(error)
+
+        # Flag as preview and errored for VRAD.
+        vmf.spawn['BEE2_is_preview'] = True
+        vmf.spawn['BEE2_is_error'] = True
+        vmf.spawn['BEE2_is_peti'] = True
+
+        if not skip_vbsp:
+            save(vmf, new_path)
+            run_vbsp(
+                vbsp_args=new_args,
+                path=path,
+                new_path=new_path,
+                is_error_map=True,
             )
 
     LOGGER.info("BEE2 VBSP hook finished!")
 
 
 if __name__ == '__main__':
-    main()
+    trio.run(main)
