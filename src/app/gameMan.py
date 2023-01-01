@@ -716,7 +716,6 @@ class Game:
 
             export_screen.step('EXP', 'style-conf')
 
-            conf = config.APP.get_cur_conf(GenOptions)
             vpk_success = True
 
             # Export each object type.
@@ -824,8 +823,7 @@ class Game:
             # Backup puzzles, if desired
             backup.auto_backup(selected_game, export_screen)
 
-            # Special-case: implement the UnlockDefault stlylevar here,
-            # so all items are modified.
+            # Special-case: implement the UnlockDefault stylevar here, so all items are modified.
             if selected_objects[packages.StyleVar]['UnlockDefault']:
                 LOGGER.info('Unlocking Items!')
                 for i, item in enumerate(all_items):
