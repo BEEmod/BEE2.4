@@ -9,11 +9,11 @@ import functools
 import math
 
 import srctools.logger
+import attrs
 import trio
 
 import loadScreen
 from app import TK_ROOT, background_run, localisation
-from app.itemPropWin import PROP_TYPES
 from BEE2_config import ConfigFile, GEN_OPTS
 from loadScreen import main_loader as loader
 import packages
@@ -23,6 +23,7 @@ import consts
 from config.gen_opts import GenOptions, AfterExport
 from config.last_sel import LastSelected
 from config.windows import WindowState
+from config.item_defaults import ItemDefault
 import config
 from transtoken import TransToken
 from app import (
@@ -110,7 +111,6 @@ class Item:
     """Represents an item that can appear on the list."""
     __slots__ = [
         'ver_list',
-        'selected_ver',
         'item',
         'def_data',
         'data',
@@ -128,16 +128,6 @@ class Item:
     def __init__(self, item: packages.Item) -> None:
         self.ver_list = sorted(item.versions.keys())
 
-        self.selected_ver = item_opts.get_val(
-            item.id,
-            'sel_version',
-            item.def_ver.id,
-        )
-        # If the last-selected value doesn't exist, fallback to the default.
-        if self.selected_ver not in item.versions:
-            LOGGER.warning('Version ID {} is not valid for item {}', self.selected_ver, item.id)
-            self.selected_ver = item.def_ver.id
-
         self.item = item
         self.def_data = item.def_ver.def_style
         # The indexes of subtypes that are actually visible.
@@ -154,11 +144,21 @@ class Item:
 
         self.load_data()
 
+    def selected_version(self) -> packages.item.Version:
+        """Fetch the selected version for this item."""
+        conf = config.APP.get_cur_conf(ItemDefault, self.id, ItemDefault())
+        try:
+            return self.item.versions[conf.version]
+        except KeyError:
+            LOGGER.warning('Version ID {} is not valid for item {}', conf.version, self.item.id)
+            config.APP.store_conf(attrs.evolve(conf, version=self.item.def_ver.id), self.id)
+            return self.item.def_ver
+
     def load_data(self) -> None:
         """Reload data from the item."""
-        vers = self.item.versions[self.selected_ver]
-        self.data = vers.styles.get(selected_style, self.def_data)
-        self.inherit_kind = vers.inherit_kind.get(selected_style, InheritKind.UNSTYLED)
+        version = self.selected_version()
+        self.data = version.styles.get(selected_style, self.def_data)
+        self.inherit_kind = version.inherit_kind.get(selected_style, InheritKind.UNSTYLED)
 
     def get_tags(self, subtype: int) -> Iterator[str]:
         """Return all the search keywords for this item/subtype."""
@@ -233,41 +233,6 @@ class Item:
             self.data.pak_id, str(subtype.pal_icon)
         ), 64, 64)
 
-    def properties(self) -> Iterator[str]:
-        """Iterate through all properties for this item."""
-        for prop_name, prop in self.data.editor.properties.items():
-            if prop.allow_user_default:
-                yield prop_name
-
-    def get_properties(self) -> Dict[str, Any]:
-        """Return a dictionary of properties and the current value for them.
-
-        """
-        result = {}
-        for prop_name, prop in self.data.editor.properties.items():
-            if not prop.allow_user_default:
-                continue
-
-            # PROP_TYPES is a dict holding all the modifiable properties.
-            if prop_name in PROP_TYPES:
-                result[prop_name] = item_opts.get_val(
-                    self.id,
-                    'PROP_' + prop_name,
-                    prop.export(),
-                )
-            else:
-                LOGGER.warning(
-                    'Unknown property "{}" in {}',
-                    prop_name,
-                    self.id,
-                )
-        return result
-
-    def set_properties(self, props: Dict[str, Any]) -> None:
-        """Apply the properties to the item."""
-        for prop, value in props.items():
-            item_opts[self.id]['PROP_' + prop] = str(value)
-
     def refresh_subitems(self) -> None:
         """Call load_data() on all our subitems, so they reload icons and names."""
         for item in pal_picked:
@@ -282,7 +247,8 @@ class Item:
     def change_version(self, version: str) -> None:
         """Set the version of this item."""
         item_opts[self.id]['sel_version'] = version
-        self.selected_ver = version
+        old_conf = config.APP.get_cur_conf(ItemDefault, self.id, ItemDefault())
+        config.APP.store_conf(attrs.evolve(old_conf, version=version), self.id)
         self.load_data()
         self.refresh_subitems()
 
@@ -736,22 +702,6 @@ async def export_editoritems(pal_ui: paletteUI.PaletteUI, bar: MenuBar) -> None:
         # The chosen items on the palette
         pal_data = [(it.id, it.subKey) for it in pal_picked]
 
-        item_versions = {
-            it_id: item.selected_ver
-            for it_id, item in
-            item_list.items()
-        }
-
-        item_properties = {
-            it_id: {
-                key[5:]: value
-                for key, value in
-                section.items() if
-                key.startswith('prop_')
-            }
-            for it_id, section in
-            item_opts.items()
-        }
         conf = config.APP.get_cur_conf(config.gen_opts.GenOptions)
 
         success, vpk_success = await gameMan.selected_game.export(
@@ -763,7 +713,7 @@ async def export_editoritems(pal_ui: paletteUI.PaletteUI, bar: MenuBar) -> None:
                 packages.QuotePack: voice_win.chosen_id,
                 packages.Elevator: elev_win.chosen_id,
 
-                packages.Item: (pal_data, item_versions, item_properties),
+                packages.Item: pal_data,
                 packages.StyleVar: StyleVarPane.export_data(chosen_style),
                 packages.Signage: signage_ui.export_data(),
 

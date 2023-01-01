@@ -53,6 +53,16 @@ class ItemPropKind(Generic[ValueT]):
         """Check if this is an unknown property."""
         return self.parse is _unknown_parse
 
+    def __hash__(self) -> int:
+        """Allow using as a dict key."""
+        return hash(self.id)
+
+    def __eq__(self, other) -> bool:
+        """Item properties are compared by ID."""
+        if isinstance(other, ItemPropKind):
+            return self.id == other.id
+        return NotImplemented
+
     def __reduce__(self) -> str | tuple:
         """Handle pickling specially.
 
@@ -68,12 +78,21 @@ class ItemPropKind(Generic[ValueT]):
 
 class ItemProp(Generic[ValueT]):
     """A property for an item."""
-    def __init__(self, kind: ItemPropKind[ValueT], default: str, index: int, allow_user_default: bool) -> None:
+    def __init__(
+        self,
+        kind: ItemPropKind[ValueT],
+        default: str,
+        index: int,
+        allow_user_default: bool,
+        desc: TransToken,
+    ) -> None:
         self.kind = kind
         self.default = kind.parse(default)
         self.index = index
-        # Is overridden for subtypes.
+        # The item author and kind must both allow alteration, and it also must not be the
+        # SubtypeProperty.
         self.allow_user_default = kind.allow_user_default and allow_user_default
+        self.desc = desc
 
     def __repr__(self) -> str:
         """Generic repr() for properties."""
@@ -186,9 +205,9 @@ class CubeTypes(Enum):
 
 class ButtonTypes(Enum):
     """The different types of floor buttons."""
-    FLOOR = WEIGHTED = 0
-    BOX = CUBE = 1
-    BALL = SPHERE = 2
+    WEIGHTED = FLOOR = 0
+    CUBE = BOX = 1
+    SPHERE = BALL = 2
 
 
 class FizzlerTypes(Enum):
@@ -200,7 +219,7 @@ class FizzlerTypes(Enum):
 class GlassTypes(Enum):
     """The different types of glass."""
     GLASS = 0
-    GRATE = GRATING = 1
+    GRATING = GRATE = 1
 
 
 # First all the generic bools.
@@ -249,7 +268,7 @@ prop_portalable = bool_prop(
 
 # For doors, specifies the map mode and therefore which door is used.
 prop_is_coop = bool_prop(
-    id='coopmode',
+    id='CoopDoor',
     instvar='',  # Controls which item is used.
     name=TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_coop_puzzle'),
 )
@@ -295,7 +314,7 @@ prop_track_start_active = bool_prop(
 )
 
 # The mode for Track Platforms.
-prop_track_is_ocillating = bool_prop(
+prop_track_is_oscillating = bool_prop(
     id='Oscillate',
     instvar='',  # Picks instance
     name=TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_rail_oscillate'),
@@ -467,7 +486,7 @@ prop_paint_flow_type = enum_prop(
     PaintFlows,
     id='PaintFlowType',
     instvar='$blobs_per_second',
-    name=TransToken.from_valve('$PORTAL2_PuzzleEditor_ContextMenu_paint_flow_type'),
+    name=TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_paint_flow_type'),
 )
 
 
@@ -535,13 +554,6 @@ prop_faith_speed = ItemPropKind[float](
     instvar='$catapult_speed',
     name=TransToken.BLANK,  # Not visible.
     parse=conv_float,
-)
-
-# Set on the entry/exit doors, to indicate their type.
-prop_door_is_coop = bool_prop(
-    id='CoopDoor',
-    instvar='PORTAL2_PuzzleEditor_ContextMenu_coop_puzzle',
-    name=TransToken.BLANK,  # Not visible.
 )
 
 

@@ -1043,7 +1043,7 @@ class Item:
             elif tok_value == 'editor':
                 item._parse_editor_block(tok, pak_id)
             elif tok_value == 'properties':
-                item._parse_properties_block(tok)
+                item._parse_properties_block(tok, pak_id)
             elif tok_value == 'exporting':
                 item._parse_export_block(tok, connections)
             elif tok_value in ('author', 'description', 'filter'):
@@ -1140,7 +1140,7 @@ class Item:
                 else:
                     setattr(self, conf_attr, conv_bool(tok.expect(Token.STRING)))
 
-    def _parse_properties_block(self, tok: Tokenizer) -> None:
+    def _parse_properties_block(self, tok: Tokenizer, pak_id: str) -> None:
         """Parse the properties block of the item definitions."""
         for prop_str in tok.block('Properties'):
             prop_type: ItemPropKind | None
@@ -1153,6 +1153,7 @@ class Item:
             default = ''
             index = 0
             user_default = True
+            desc = TransToken.BLANK
             for prop_value in tok.block(prop_str + ' options'):
                 prop_value = prop_value.casefold()
                 if prop_value == 'defaultvalue':
@@ -1162,13 +1163,18 @@ class Item:
                 elif prop_value == 'bee2_ignore':
                     user_default = conv_bool(tok.expect(Token.STRING), user_default)
                     if prop_type.is_unknown:
-                        LOGGER.warning('Unknown properties cannot have defaults set!')
+                        LOGGER.warning(
+                            'Disabling setting defaults for property "{}" is not useful, '
+                            'the property is unknown and so will not have UI!',
+                            prop_str,
+                        )
+                elif prop_value in ('desc', 'description'):
+                    desc = TransToken.parse(pak_id, tok.expect(Token.STRING))
                 else:
                     raise tok.error('Unknown property option "{}"!', prop_value)
             try:
                 self.properties[prop_type.id.casefold()] = ItemProp(
-                    prop_type, default,
-                    index, user_default,
+                    prop_type,default, index, user_default, desc,
                 )
             except ValueError:
                 raise tok.error(

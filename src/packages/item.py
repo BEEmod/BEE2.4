@@ -24,6 +24,7 @@ from packages import (
     PackagesSet, PakObject, ParseData, ExportData, Style,
     sep_values, desc_parse, get_config,
 )
+from config.item_defaults import ItemDefault, DEFAULT_VERSION
 from editoritems import Item as EditorItem, InstCount
 from connections import Config as ConnConfig
 import editoritems_vmf
@@ -476,7 +477,7 @@ class Item(PakObject, needs_foreground=True):
 
         for ver in data.info.find_all('version'):
             ver_name = ver['name', 'Regular']
-            ver_id = ver['ID', 'VER_DEFAULT']
+            ver_id = ver['ID', DEFAULT_VERSION]
             styles: dict[str, ItemVariant] = {}
             inherit_kind: dict[str, InheritKind] = {}
             ver_isolate = ver.bool('isolated')
@@ -654,24 +655,19 @@ class Item(PakObject, needs_foreground=True):
     def export(exp_data: ExportData) -> None:
         """Export all items into the configs.
 
-        For the selected attribute, this takes a tuple of values:
-        (pal_list, versions, prop_conf)
-        Pal_list is a list of (item, subitem) tuples representing the palette.
-        Versions is a {item:version_id} dictionary.
-        prop_conf is a {item_id: {prop_name: value}} nested dictionary for
-         overridden property names. Empty dicts can be passed instead.
+        For the selected attribute, this is a list of (item, subitem) tuples representing the
+        palette.
         """
         vbsp_config = exp_data.vbsp_conf
-        pal_list, versions, prop_conf = exp_data.selected
+        pal_list = exp_data.selected
 
         style_id = exp_data.selected_style.id
         item: Item
+        default_conf = ItemDefault()
         for item in sorted(exp_data.packset.all_obj(Item), key=operator.attrgetter('id')):
-            ver_id = versions.get(item.id, 'VER_DEFAULT')
+            prop_conf = config.APP.get_cur_conf(ItemDefault, item.id, default_conf)
 
-            (items, config_part) = item._get_export_data(
-                pal_list, ver_id, style_id, prop_conf,
-            )
+            (items, config_part) = item._get_export_data(pal_list, style_id, prop_conf)
 
             exp_data.all_items.extend(items)
             vbsp_config.extend(apply_replacements(config_part(), item.id))
@@ -684,7 +680,7 @@ class Item(PakObject, needs_foreground=True):
             else:
                 vbsp_config.extend(apply_replacements(aux_conf.all_conf(), item.id + ':aux_all'))
                 try:
-                    version_data = aux_conf.versions[ver_id]
+                    version_data = aux_conf.versions[prop_conf.version]
                 except KeyError:
                     pass  # No override.
                 else:
@@ -700,10 +696,9 @@ class Item(PakObject, needs_foreground=True):
 
     def _get_export_data(
         self,
-        pal_list,
-        ver_id,
-        style_id,
-        prop_conf: dict[str, dict[str, str]],
+        pal_list: list[tuple[str, int]],
+        style_id: str,
+        prop_conf: ItemDefault,
     ) -> tuple[list[EditorItem], lazy_conf.LazyConf]:
         """Get the data for an exported item."""
 
@@ -716,7 +711,12 @@ class Item(PakObject, needs_foreground=True):
             if item == self.id
         }
 
-        item_data = self.versions[ver_id].styles[style_id]
+        try:
+            sel_version = self.versions[prop_conf.version]
+        except KeyError:
+            LOGGER.warning('Version ID {} is not valid for item {}', prop_conf.version, self.id)
+            sel_version = self.def_ver
+        item_data = sel_version.styles[style_id]
 
         new_item = copy.deepcopy(item_data.editor)
         new_item.id = self.id  # Set the item ID to match our item
@@ -740,11 +740,10 @@ class Item(PakObject, needs_foreground=True):
                 subtype.pal_pos = None
 
         # Apply configured default values to this item
-        prop_overrides = prop_conf.get(self.id, {})
-        for prop_name, prop in new_item.properties.items():
+        for prop in new_item.properties.values():
             if prop.allow_user_default:
                 try:
-                    prop.default = prop.parse_value(prop_overrides[prop_name.casefold()])
+                    prop.default = prop.parse_value(prop_conf.defaults[prop.kind])
                 except KeyError:
                     pass
         return (
@@ -784,7 +783,7 @@ class ItemConfig(PakObject, allow_mult=True):
         )
 
         for ver in data.info.find_all('Version'):
-            ver_id = ver['ID', 'VER_DEFAULT']
+            ver_id = ver['ID', DEFAULT_VERSION]
             vers[ver_id] = styles = {}
             for sty_block in ver.find_all('Styles'):
                 for style in sty_block:

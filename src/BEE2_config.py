@@ -54,7 +54,8 @@ class ConfigFile(ConfigParser):
         If in_conf_folder is set, The folder is relative to the 'config/'
         folder in the BEE2 folder.
         """
-        super().__init__()
+        # Special section holding names outside braces, we never use this.
+        super().__init__(default_section='__XXX_DEFAULT_SECTION')
 
         self.has_changed = Event()
         self._file_lock = Lock()
