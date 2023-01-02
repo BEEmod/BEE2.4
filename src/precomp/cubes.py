@@ -8,7 +8,7 @@ from enum import Enum
 from typing import NamedTuple, MutableMapping
 
 from srctools.vmf import VMF, Entity, EntityFixup, Output
-from srctools import EmptyMapping, FrozenVec, Property, Vec, Matrix, Angle
+from srctools import EmptyMapping, FrozenVec, Keyvalues, Vec, Matrix, Angle
 import srctools.logger
 import attrs
 
@@ -38,7 +38,7 @@ DROPPERLESS_OFFSET = 22 - 64
 # By position.
 # These won't overlap - droppers occupy space, and dropperless cubes
 # also do. Dropper+cube items only give the dropper.
-# We also snap to nearest voxel, to allow cubes to use an offset handle.
+# We also snap to the nearest voxel, to allow cubes to use an offset handle.
 CUBE_POS: dict[FrozenVec, CubePair] = {}
 
 # Prevents duplicating different filter entities. A number of different keys are used depending on
@@ -251,49 +251,49 @@ class CubeAddon:
             self.outputs[out_type] = list(outputs.get(out_type, ()))
 
     @classmethod
-    def parse(cls, props: Property) -> 'CubeAddon':
+    def parse(cls, kv: Keyvalues) -> 'CubeAddon':
         addon = cls(
-            props['id'],
-            props['instance', ''],
-            props['packlist', ''],
-            props['vscript', ''],
-            cls._parse_outputs(props),
-            cls._parse_fixups(props),
+            kv['id'],
+            kv['instance', ''],
+            kv['packlist', ''],
+            kv['vscript', ''],
+            cls._parse_outputs(kv),
+            cls._parse_fixups(kv),
         )
         return addon
 
     @classmethod
-    def base_parse(cls, cube_id: str, props: Property):
+    def base_parse(cls, cube_id: str, kv: Keyvalues):
         """Parse from the config for cube types."""
-        inst = props['overlay_inst', '']
-        pack = props['overlay_pack', '']
-        script = props['vscript', '']
-        outputs = cls._parse_outputs(props)
-        fixups = cls._parse_fixups(props)
+        inst = kv['overlay_inst', '']
+        pack = kv['overlay_pack', '']
+        script = kv['vscript', '']
+        outputs = cls._parse_outputs(kv)
+        fixups = cls._parse_fixups(kv)
         if inst or pack or script or any(outputs.values()) or fixups:
             return cls(cube_id, inst, pack, script, outputs, fixups)
         else:
             return None
 
     @staticmethod
-    def _parse_outputs(props: Property) -> dict[CubeOutputs, list[Output]]:
+    def _parse_outputs(conf: Keyvalues) -> dict[CubeOutputs, list[Output]]:
         """Parse addon outputs."""
         outputs: dict[CubeOutputs, list[Output]] = {}
         out_list: list[Output]
 
         for out_type in CubeOutputs:
             outputs[out_type] = out_list = []
-            for prop in props.find_all(out_type.value):
-                out_list.append(Output.parse(prop))
+            for child in conf.find_all(out_type.value):
+                out_list.append(Output.parse(child))
 
         return outputs
 
     @staticmethod
-    def _parse_fixups(props: Property) -> list[tuple[str, AddonFixups | str]] | None:
+    def _parse_fixups(conf: Keyvalues) -> list[tuple[str, AddonFixups | str]] | None:
         src: AddonFixups | str
         fixups: list[tuple[str, AddonFixups | str]] = []
         found = False
-        for parent in props.find_all('Fixups'):
+        for parent in conf.find_all('Fixups'):
             found = True
             for prop in parent:
                 if prop.value.startswith('<') and prop.value.endswith('>'):
@@ -341,7 +341,7 @@ class DropperType:
         self.bounce_paint_file = bounce_paint_file
 
     @classmethod
-    def parse(cls, conf: Property) -> DropperType:
+    def parse(cls, conf: Keyvalues) -> DropperType:
         """Parse from vbsp_config."""
         if 'cube_ang' in conf:
             cube_orient = Angle.from_str(conf['cube_ang'])
@@ -441,7 +441,7 @@ class CubeType:
         self.color_in_map = False
 
     @classmethod
-    def parse(cls: type[CubeType], conf: Property) -> CubeType:
+    def parse(cls: type[CubeType], conf: Keyvalues) -> CubeType:
         """Parse from vbsp_config."""
         cube_id = conf['id'].upper()
 
@@ -665,7 +665,7 @@ class Superposition:
     swap_inst: Entity  # The superposition item itself, with the logic for swapping.
 
 
-def parse_conf(conf: Property):
+def parse_conf(conf: Keyvalues) -> None:
     """Parse the config file for cube info."""
     for cube_conf in conf.find_all('DropperItems', 'Cube'):
         cube = CubeType.parse(cube_conf)
@@ -947,7 +947,7 @@ def _make_multi_filter(
 
 
 @conditions.make_flag('CubeType')
-def flag_cube_type(inst: Entity, res: Property) -> bool:
+def flag_cube_type(inst: Entity, res: Keyvalues) -> bool:
     """Check if an instance is/should be a cube.
 
     This is only valid on `ITEM_BOX_DROPPER`, `ITEM_CUBE`, and items marked as
@@ -1006,7 +1006,7 @@ def flag_cube_type(inst: Entity, res: Property) -> bool:
 
 
 @conditions.make_flag('DropperColor')
-def flag_dropper_color(inst: Entity, res: Property) -> bool:
+def flag_dropper_color(inst: Entity, res: Keyvalues) -> bool:
     """Detect the color of a cube on droppers.
 
     This is `True` if the cube is coloured. The value should be a `$fixup`
@@ -1024,7 +1024,7 @@ def flag_dropper_color(inst: Entity, res: Property) -> bool:
 
 
 @conditions.make_result('CubeAddon', 'DropperAddon')
-def res_dropper_addon(inst: Entity, res: Property):
+def res_dropper_addon(inst: Entity, res: Keyvalues) -> None:
     """Attach an addon to an item."""
     try:
         addon = ADDON_TYPES[res.value]
@@ -1044,7 +1044,7 @@ def res_dropper_addon(inst: Entity, res: Property):
 
 
 @conditions.make_result('SetDropperOffset')
-def res_set_dropper_off(inst: Entity, res: Property) -> None:
+def res_set_dropper_off(inst: Entity, res: Keyvalues) -> None:
     """Update the position cubes will be spawned at for a dropper."""
     try:
         pair = INST_TO_PAIR[inst]
@@ -1056,8 +1056,8 @@ def res_set_dropper_off(inst: Entity, res: Property) -> None:
 
 
 @conditions.make_result('ChangeCubeType', 'SetCubeType')
-def res_change_cube_type(inst: Entity, res: Property) -> None:
-    """Change the cube type of a cube item.
+def res_change_cube_type(inst: Entity, res: Keyvalues) -> None:
+    """Change the cube-type of a cube item.
 
     This is only valid on `ITEM_BOX_DROPPER`, `ITEM_CUBE`, and instances
     marked as a custom dropperless cube.
@@ -1078,7 +1078,7 @@ def res_change_cube_type(inst: Entity, res: Property) -> None:
 
 
 @conditions.make_result('CubeFilter')
-def res_cube_filter(vmf: VMF, inst: Entity, res: Property) -> None:
+def res_cube_filter(vmf: VMF, inst: Entity, res: Keyvalues) -> None:
     """Given a set of cube-type IDs, generate a filter for them.
 
     Each cube should be the name of an ID, with `!` before to exclude it.
@@ -1101,7 +1101,7 @@ def res_cube_filter(vmf: VMF, inst: Entity, res: Property) -> None:
 
 
 @conditions.make_result('VScriptCubePredicate')
-def res_script_cube_predicate(vmf: VMF, ent: Entity, res: Property) -> object:
+def res_script_cube_predicate(vmf: VMF, ent: Entity, res: Keyvalues) -> object:
     """Given a set of cube-type IDs, generate VScript code to identify them.
 
     This produces a script to include, which will define the specified function
