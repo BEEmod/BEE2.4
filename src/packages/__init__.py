@@ -476,7 +476,10 @@ async def find_packages(nursery: trio.Nursery, packset: PackagesSet, pak_dir: Pa
                 LOGGER.warning('ERROR: package "{}" has no info.txt!', name)
             # Don't continue to parse this "package"
             continue
-        pak_id = info['ID']
+        try:
+            pak_id = info['ID']
+        except LookupError:
+            raise ValueError('No package ID in {}/info.txt!', filesys.path)
 
         if pak_id.casefold() in packset.packages:
             duplicate = packset.packages[pak_id.casefold()]
