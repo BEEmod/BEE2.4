@@ -5,7 +5,7 @@ import copyreg
 from typing import (
     Awaitable, TypeVar, Any, NoReturn, Generic, Optional, TYPE_CHECKING, Tuple,
     SupportsInt, Callable, Sequence, Iterator, Iterable, Mapping, Generator, Type,
-    KeysView, ValuesView, ItemsView,
+    KeysView, ValuesView, ItemsView, overload,
 )
 from typing_extensions import TypeVarTuple, Unpack
 import logging
@@ -468,8 +468,14 @@ class PackagePath:
 
 ResultT = TypeVar('ResultT')
 SyncResultT = TypeVar('SyncResultT')
-ArgsT = TypeVarTuple('ArgsT')
+# ArgsT = TypeVarTuple('ArgsT')
 _NO_RESULT: Any = object()
+
+T1 = TypeVar('T1')
+T2 = TypeVar('T2')
+T3 = TypeVar('T3')
+T4 = TypeVar('T4')
+T5 = TypeVar('T5')
 
 
 class Result(Generic[ResultT]):
@@ -477,11 +483,49 @@ class Result(Generic[ResultT]):
 
     Once the nursery has closed, the result is accessible.
     """
+    # TODO: Remove once mypy supports TypeVarTuple.
+    @overload
+    def __init__(
+        self, nursery: trio.Nursery, func: Callable[[], Awaitable[ResultT]],
+        /, *, name: object=None,
+    ) -> None: ...
+    @overload
+    def __init__(
+        self, nursery: trio.Nursery, func: Callable[[T1], Awaitable[ResultT]],
+        arg1: T1,
+        /, *, name: object=None,
+    ) -> None: ...
+    @overload
+    def __init__(
+        self, nursery: trio.Nursery, func: Callable[[T1, T2], Awaitable[ResultT]],
+        arg1: T1, arg2: T2,
+        /, *, name: object=None,
+    ) -> None: ...
+    @overload
+    def __init__(
+        self, nursery: trio.Nursery, func: Callable[[T1, T2, T3], Awaitable[ResultT]],
+        arg1: T1, arg2: T2, arg3: T3, /, *, name: object=None,
+    ) -> None: ...
+    @overload
+    def __init__(
+        self, nursery: trio.Nursery, func: Callable[[T1, T2, T3, T4], Awaitable[ResultT]],
+        arg1: T1, arg2: T2, arg3: T3, arg4: T4,
+        /, *, name: object=None,
+    ) -> None: ...
+    @overload
+    def __init__(
+        self, nursery: trio.Nursery, func: Callable[[T1, T2, T3, T4, T5], Awaitable[ResultT]],
+        arg1: T1, arg2: T2, arg3: T3, arg4: T4, arg5: T5,
+        /, *, name: object=None,
+    ) -> None: ...
+
     def __init__(
         self,
         nursery: trio.Nursery,
-        func: Callable[[Unpack[ArgsT]], Awaitable[ResultT]],
-        /, *args: Unpack[ArgsT],
+        # func: Callable[[Unpack[ArgsT]], Awaitable[ResultT]],
+        # /, *args: Unpack[ArgsT],,
+        func: Callable[..., Awaitable[ResultT]],
+        /, *args: Any,
         name: object = None,
     ) -> None:
         self._nursery: Optional[trio.Nursery] = nursery
@@ -491,11 +535,85 @@ class Result(Generic[ResultT]):
         nursery.start_soon(self._task, func, args, name=name)
 
     @classmethod
+    @overload
     def sync(
         cls,
         nursery: trio.Nursery,
-        func: Callable[[Unpack[ArgsT]], SyncResultT],
-        /, *args: Unpack[ArgsT],
+        func: Callable[[], SyncResultT],
+        /, *,
+        cancellable: bool = False,
+        limiter: trio.CapacityLimiter | None = None,
+    ) -> 'Result[SyncResultT]': ...
+
+    @classmethod
+    @overload
+    def sync(
+        cls,
+        nursery: trio.Nursery,
+        func: Callable[[T1], SyncResultT],
+        arg1: T1,
+        /, *,
+        cancellable: bool = False,
+        limiter: trio.CapacityLimiter | None = None,
+    ) -> 'Result[SyncResultT]': ...
+
+    @classmethod
+    @overload
+    def sync(
+        cls,
+        nursery: trio.Nursery,
+        func: Callable[[T1, T2], SyncResultT],
+        arg1: T1, arg2: T2,
+        /, *,
+        cancellable: bool = False,
+        limiter: trio.CapacityLimiter | None = None,
+    ) -> 'Result[SyncResultT]': ...
+
+    @classmethod
+    @overload
+    def sync(
+        cls,
+        nursery: trio.Nursery,
+        func: Callable[[T1, T2, T3], SyncResultT],
+        arg1: T1, arg2: T2, arg3: T3,
+        /, *,
+        cancellable: bool = False,
+        limiter: trio.CapacityLimiter | None = None,
+    ) -> 'Result[SyncResultT]': ...
+
+    @classmethod
+    @overload
+    def sync(
+        cls,
+        nursery: trio.Nursery,
+        func: Callable[[T1, T2, T3, T4], SyncResultT],
+        arg1: T1, arg2: T2, arg3: T3, arg4: T4,
+        /, *,
+        cancellable: bool = False,
+        limiter: trio.CapacityLimiter | None = None,
+    ) -> 'Result[SyncResultT]': ...
+
+    @classmethod
+    @overload
+    def sync(
+        cls,
+        nursery: trio.Nursery,
+        func: Callable[[T1, T2, T3, T4, T5], SyncResultT],
+        arg1: T1, arg2: T2, arg3: T3, arg4: T4, arg5: T5,
+        /, *,
+        cancellable: bool = False,
+        limiter: trio.CapacityLimiter | None = None,
+    ) -> 'Result[SyncResultT]': ...
+
+    @classmethod
+    def sync(
+        cls,
+        nursery: trio.Nursery,
+        # TODO: Enable once TypeVarTuple works.
+        # func: Callable[[Unpack[ArgsT]], SyncResultT],
+        # /, *args: Unpack[ArgsT],
+        func: Callable[..., SyncResultT],
+        /, *args: Any,
         cancellable: bool = False,
         limiter: trio.CapacityLimiter | None = None,
     ) -> 'Result[SyncResultT]':
@@ -506,7 +624,9 @@ class Result(Generic[ResultT]):
 
         return Result(nursery, task, name=func)
 
-    async def _task(self, func: Callable[[Unpack[ArgsT]], Awaitable[ResultT]], args: Tuple[Unpack[ArgsT]]) -> None:
+    # TODO: Enable once TypeVarTuple works.
+    # async def _task(self, func: Callable[[Unpack[ArgsT]], Awaitable[ResultT]], args: Tuple[Unpack[ArgsT]]) -> None:
+    async def _task(self, func: Callable[..., Awaitable[ResultT]], args: tuple) -> None:
         """The task that is run."""
         self._result = await func(*args)
 
