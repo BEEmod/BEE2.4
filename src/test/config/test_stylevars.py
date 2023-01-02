@@ -57,5 +57,5 @@ def test_parse_dmx(value: bool) -> None:
 def test_export_dmx(value: bool) -> None:
     """Test constructing DMX configs."""
     elem = State(value).export_dmx()
-    assert len(elem) == 1
+    assert len(elem) == 2
     assert elem['value'].val_bool is value

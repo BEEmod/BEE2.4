@@ -70,11 +70,11 @@ def test_parse_dmx() -> None:
 def test_export_dmx() -> None:
     """Test exporting DMX configs."""
     elem = LastSelected('SomeValueWITHCasing').export_dmx()
-    assert len(elem) == 1
+    assert len(elem) == 2
     assert elem['selected'].type is ValueType.STRING
     assert elem['selected'].val_string == 'SomeValueWITHCasing'
 
     elem = LastSelected(None).export_dmx()
-    assert len(elem) == 1
+    assert len(elem) == 2
     assert elem['selected_none'].type is ValueType.BOOL
     assert elem['selected_none'].val_bool is True

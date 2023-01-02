@@ -62,7 +62,7 @@ def test_conf_parse_dmx() -> None:
 def test_conf_export_dmx() -> None:
     """Test exporting DMX configs."""
     elem = Config(selected=CORR_SEL, unselected=CORR_UNSEL).export_dmx()
-    assert len(elem) == 2
+    assert len(elem) == 3
     assert list(elem['selected'].iter_string()) == CORR_SEL
     assert list(elem['unselected'].iter_string()) == CORR_UNSEL
 
@@ -134,7 +134,7 @@ def test_ui_export_dmx(mode: GameMode, orient: Orient, direction: Direction) -> 
         last_mode=mode, last_orient=orient, last_direction=direction,
         width=272, height=849,
     ).export_dmx()
-    assert len(elem) == 5
+    assert len(elem) == 6
     assert elem['mode'].val_string == mode.value
     assert elem['orient'].val_string == orient.value
     assert elem['width'].val_int == 272

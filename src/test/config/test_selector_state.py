@@ -143,7 +143,7 @@ def test_export_dmx() -> None:
         }
     )
     elem = state.export_dmx()
-    assert len(elem) == 4
+    assert len(elem) == 5
     assert elem['width'].val_int == 198
     assert elem['height'].val_int == 1685
     assert set(elem['opened'].iter_string()) == {'', 'open group', 'anothergroup'}

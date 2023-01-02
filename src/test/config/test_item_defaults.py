@@ -115,11 +115,11 @@ def test_export_dmx() -> None:
         editoritems_props.prop_angled_panel_anim: 'ramp_60_deg_open',
         ItemPropKind.unknown('SomeUnknownProp'): 'hello world',
     }).export_dmx()
-    assert len(elem) == 2
+    assert len(elem) == 3
 
     assert elem['version'].val_string == 'SELECTED_VER'
     props = elem['properties'].val_elem
-    assert len(props) == 3
+    assert len(props) == 4
 
     assert props['StartEnabled'].name == 'StartEnabled'
     assert props['StartEnabled'].type is ValueType.STRING

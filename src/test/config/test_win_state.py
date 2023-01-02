@@ -85,7 +85,6 @@ def test_parse_dmx() -> None:
     state = WindowState.parse_dmx(elem, 1)
     assert state == WindowState(x=-1, y=-1, width=-1, height=-1, visible=True)
 
-    assert len(elem) == 0
     elem['pos'] = Attribute.vec2('pos', (450, 320))
     elem['visible'] = Attribute.bool('visible', False)
     elem['width'] = Attribute.int('width', 1283)
@@ -114,7 +113,7 @@ def test_export_dmx() -> None:
     )
 
     elem = state.export_dmx()
-    assert len(elem) == 4
+    assert len(elem) == 5
     assert elem['pos'].val_vec2 == Vec2(289, 371)
     assert elem['width'].val_int == 289
     assert elem['height'].val_int == 189

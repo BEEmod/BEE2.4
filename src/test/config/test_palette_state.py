@@ -115,7 +115,7 @@ def test_export_dmx(save: bool) -> None:
         save_settings=bool(save),
     )
     elem = state.export_dmx()
-    assert len(elem) == 3
+    assert len(elem) == 4
     assert elem['selected'].val_bytes == some_uuid.bytes
     assert elem['save_settings'].val_bool is save
     hiddens = set(elem['hidden'].iter_binary())

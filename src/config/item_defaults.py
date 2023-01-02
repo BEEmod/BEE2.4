@@ -80,6 +80,8 @@ class ItemDefault(config.Data, conf_name='ItemDefault', uses_id=True):
             item_version = DEFAULT_VERSION
         props: Dict[ItemPropKind, str] = {}
         for attr in data['properties'].val_elem.values():
+            if attr.name == 'name':  # The 'properties' name itself.
+                continue
             try:
                 prop_type = PROP_TYPES[attr.name.casefold()]
             except KeyError:
