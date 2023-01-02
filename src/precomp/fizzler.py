@@ -8,7 +8,7 @@ import itertools
 import attrs
 import srctools.vmf
 from srctools.vmf import VMF, Solid, Entity, Side, Output
-from srctools import Property, NoKeyError, Vec, Matrix, Angle, logger
+from srctools import Keyvalues, NoKeyError, Vec, Matrix, Angle, logger
 
 import utils
 from precomp import (
@@ -98,12 +98,12 @@ class MatModify:
 class FizzBeam:
     """Configuration for env_beams added across fizzlers."""
     offset: list[Vec]
-    keys: Property
+    keys: Keyvalues
     speed_min: int
     speed_max: int
 
 
-def read_configs(conf: Property) -> None:
+def read_configs(conf: Keyvalues) -> None:
     """Read in the fizzler data."""
     for fizz_conf in conf.find_all('Fizzlers', 'Fizzler'):
         with logger.context(fizz_conf['id', '??']):
@@ -172,7 +172,7 @@ class FizzlerType:
         beams: list[FizzBeam],
         inst: dict[tuple[FizzInst, bool], list[str]],
 
-        temp_brush_keys: Property,
+        temp_brush_keys: Keyvalues,
         temp_min: str | None,
         temp_max: str | None,
         temp_single: str | None,
@@ -224,7 +224,7 @@ class FizzlerType:
         LOGGER.debug('{}: blocks={}, fizzles={}', fizz_id, self.blocks_portals, self.fizzles_portals)
 
     @classmethod
-    def parse(cls, conf: Property):
+    def parse(cls, conf: Keyvalues):
         """Read in a fizzler from a config."""
         fizz_id = conf['id']
         item_ids = [
@@ -303,7 +303,7 @@ class FizzlerType:
                 for off in
                 beam_prop.find_all('pos')
             ]
-            keys = Property('', [
+            keys = Keyvalues('', [
                 beam_prop.find_key('Keys', or_blank=True),
                 beam_prop.find_key('LocalKeys', or_blank=True)
             ])
@@ -319,7 +319,7 @@ class FizzlerType:
         except NoKeyError:
             temp_brush_keys = temp_min = temp_max = temp_single = None
         else:
-            temp_brush_keys = Property('--', [
+            temp_brush_keys = Keyvalues('--', [
                 temp_conf.find_key('Keys'),
                 temp_conf.find_key('LocalKeys', or_blank=True),
             ])
@@ -681,7 +681,7 @@ class FizzlerBrush:
             self.textures[group] = textures.get(group, None)
 
     @classmethod
-    def parse(cls, conf: Property, fizz_id: str) -> FizzlerBrush:
+    def parse(cls, conf: Keyvalues, fizz_id: str) -> FizzlerBrush:
         """Parse from a config file."""
         if 'side_color' in conf:
             side_color = conf.vec('side_color')
