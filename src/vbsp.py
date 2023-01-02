@@ -1663,7 +1663,7 @@ async def main() -> None:
         add_extra_ents(vmf, info)
 
         tiling.generate_brushes(vmf)
-        faithplate.gen_faithplates(vmf)
+        faithplate.gen_faithplates(vmf, info.has_attr('superposition'))
         change_overlays(vmf)
         fix_worldspawn(vmf)
 
