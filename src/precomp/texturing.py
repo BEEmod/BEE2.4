@@ -8,7 +8,7 @@ import abc
 import attrs
 import trio
 
-from srctools import FrozenVec, Property, Vec, conv_bool
+from srctools import FrozenVec, Keyvalues, Vec, conv_bool
 from srctools.game import Game
 from srctools.tokenizer import TokenSyntaxError
 from srctools.vmf import VisGroup, VMF, Side, Solid
@@ -428,7 +428,7 @@ def apply(
     face.mat = generator.get(loc + face.normal(), tex_name)
 
 
-def load_config(conf: Property):
+def load_config(conf: Keyvalues) -> None:
     """Setup all the generators from the config data."""
     global SPECIAL, OVERLAYS
     global_options = {
@@ -451,7 +451,7 @@ def load_config(conf: Property):
     # Use this to allow alternate names for generators.
     conf_for_gen: Dict[
         Tuple[GenCat, Optional[Orient], Optional[Portalable]],
-        Property,
+        Keyvalues,
     ] = {}
 
     for prop in conf:
@@ -482,23 +482,23 @@ def load_config(conf: Property):
             try:
                 gen_conf = conf_for_gen[gen_key, None, None]
             except KeyError:
-                gen_conf = Property(gen_key.value, [])
+                gen_conf = Keyvalues(gen_key.value, [])
         else:
             # Tile-type generator
             is_tile = True
             try:
                 gen_conf = conf_for_gen[gen_key]
             except KeyError:
-                gen_conf = Property('', [])
+                gen_conf = Keyvalues('', [])
 
             if not gen_conf.has_children():
                 # Special case - using a single value to indicate that all
                 # textures are the same.
-                gen_conf = Property(gen_conf.real_name, [
-                    Property('4x4', gen_conf.value),
-                    Property('Options', [
+                gen_conf = Keyvalues(gen_conf.real_name, [
+                    Keyvalues('4x4', gen_conf.value),
+                    Keyvalues('Options', [
                         # Clumping isn't useful since it's all the same.
-                        Property('Algorithm', 'RAND'),
+                        Keyvalues('Algorithm', 'RAND'),
                     ])
                 ])
         textures: Dict[str, List[str]] = {}
