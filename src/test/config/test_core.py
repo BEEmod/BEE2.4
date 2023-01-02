@@ -2,7 +2,7 @@
 import io
 import uuid
 
-from srctools import Property, bool_as_int
+from srctools import Keyvalues, bool_as_int
 import pytest
 
 import config
@@ -20,7 +20,7 @@ class DataSingle(config.Data, conf_name='TestName', version=2, uses_id=False):
         return NotImplemented
 
     @classmethod
-    def parse_kv1(cls, data: Property, version: int) -> 'DataSingle':
+    def parse_kv1(cls, data: Keyvalues, version: int) -> 'DataSingle':
         """Parse keyvalues."""
         if version == 2:
             triple_str = data['triple']
@@ -34,11 +34,11 @@ class DataSingle(config.Data, conf_name='TestName', version=2, uses_id=False):
             raise ValueError('Unknown version', version)
         return DataSingle(data['value'], triple)
 
-    def export_kv1(self) -> Property:
+    def export_kv1(self) -> Keyvalues:
         """Write out KV1 data."""
-        return Property('TestData', [
-            Property('value', self.value),
-            Property('triple', self.triple),
+        return Keyvalues('TestData', [
+            Keyvalues('value', self.value),
+            Keyvalues('triple', self.triple),
         ])
 
 
@@ -74,27 +74,27 @@ def test_parse_kv1_upgrades(value: str, triple: str) -> None:
     spec = config.ConfigSpec(None)
     spec.register(DataSingle)
 
-    props = Property.root(
-        Property('version', '1'),
-        Property('TestName', [
-            Property('_version', '1'),
-            Property('value', value),
-            Property('is_bee', bool_as_int(triple == 'b')),
+    kv = Keyvalues.root(
+        Keyvalues('version', '1'),
+        Keyvalues('TestName', [
+            Keyvalues('_version', '1'),
+            Keyvalues('value', value),
+            Keyvalues('is_bee', bool_as_int(triple == 'b')),
         ])
     )
-    conf, upgraded = spec.parse_kv1(props)
+    conf, upgraded = spec.parse_kv1(kv)
     assert upgraded
     assert conf == {DataSingle: {'': DataSingle(value, triple)}}
 
-    props = Property.root(
-        Property('version', '1'),
-        Property('TestName', [
-            Property('_version', '2'),
-            Property('value', value),
-            Property('triple', triple),
+    kv = Keyvalues.root(
+        Keyvalues('version', '1'),
+        Keyvalues('TestName', [
+            Keyvalues('_version', '2'),
+            Keyvalues('value', value),
+            Keyvalues('triple', triple),
         ])
     )
-    conf, upgraded = spec.parse_kv1(props)
+    conf, upgraded = spec.parse_kv1(kv)
     assert not upgraded
     assert conf == {DataSingle: {'': DataSingle(value, triple)}}
 
@@ -109,7 +109,7 @@ def test_export_kv1_regress(value: str, triple: str, file_regression) -> None:
     conf = config.Config({
         DataSingle: {'': DataSingle(value, triple)}
     })
-    props = Property.root(*spec.build_kv1(conf))
+    props = Keyvalues.root(*spec.build_kv1(conf))
 
     buf = io.StringIO()
     buf.writelines(props.export())

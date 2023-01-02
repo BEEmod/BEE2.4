@@ -1,7 +1,7 @@
 import uuid
 
 import pytest
-from srctools import Property as Keyvalues
+from srctools import Keyvalues
 from srctools.dmx import Element
 
 from config.palette import PaletteState

@@ -6,7 +6,7 @@ from typing import Iterable, Tuple, no_type_check
 from pathlib import Path
 import pytest
 
-from srctools import Angle, Matrix, VMF, Vec, Property, Solid
+from srctools import Angle, Matrix, VMF, Vec, Keyvalues, Solid
 from collisions import BBox, CollideType
 
 tuple3 = Tuple[int, int, int]
@@ -147,7 +147,7 @@ def test_bbox_is_frozen() -> None:
     with pytest.raises(AttributeError):
         bb.tags = frozenset({'tag1', 'tag2', 'tag3'})
     with pytest.raises(AttributeError):
-        bb.tags.add('extra')
+        bb.tags.add('extra')  # type: ignore
     # Check all these assignments didn't actually do anything.
     assert_bbox(bb, (40, 60, 80), (120, 450, 730), CollideType.PHYSICS, set())
 
@@ -186,7 +186,7 @@ def test_reorder_helper() -> None:
 def get_intersect_testcases() -> Iterable:
     """Use a VMF to make it easier to generate the bounding boxes."""
     with Path(__file__, '../bbox_samples.vmf').open() as f:
-        vmf = VMF.parse(Property.parse(f))
+        vmf = VMF.parse(Keyvalues.parse(f))
 
     def process(brush: Solid | None) -> tuple[tuple[int, ...], tuple[int, ...]] | None:
         """Extract the bounding box from the brush."""

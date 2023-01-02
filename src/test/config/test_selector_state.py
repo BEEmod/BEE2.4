@@ -1,6 +1,6 @@
 """Test selectorwin UI state configuration."""
 import pytest
-from srctools import Property as Keyvalues
+from srctools import Keyvalues
 from srctools.dmx import Element
 
 from config.windows import SelectorState

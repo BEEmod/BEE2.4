@@ -1,6 +1,6 @@
 """Test parsing corridor configurations."""
 import pytest
-from srctools import Property as Keyvalues
+from srctools import Keyvalues
 from srctools.dmx import Element, Attribute, ValueType
 
 from config.corridors import Direction, GameMode, Orient, Config, UIState

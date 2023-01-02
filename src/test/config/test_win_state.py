@@ -1,7 +1,7 @@
 """Test parsing window state definitions."""
 import attrs
 import pytest
-from srctools import Property as Keyvalues
+from srctools import Keyvalues
 from srctools.dmx import Element, Attribute, Vec2
 
 from BEE2_config import GEN_OPTS

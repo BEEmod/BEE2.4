@@ -1,6 +1,6 @@
 """Test item default configs."""
 import pytest
-from srctools import Property as Keyvalues
+from srctools import Keyvalues
 from srctools.dmx import Element, Attribute, ValueType
 
 from config.item_defaults import ItemDefault, LEGACY
