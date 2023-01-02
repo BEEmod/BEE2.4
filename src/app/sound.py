@@ -150,6 +150,7 @@ class PygletSound(NullSound):
             else:
                 LOGGER.warning('No duration: {}', sound)
                 return 0.75  # Should be long enough.
+        return 0.0
 
 
 async def sound_task() -> None:
