@@ -1,7 +1,7 @@
 """Handles adding music to the level."""
-from typing import Set, List
+from typing import List
 
-from srctools import VMF, Vec, Property, Output
+from srctools import VMF, Vec, Keyvalues, Output
 from precomp import corridor, options, conditions
 from consts import MusicChannel as Channel
 import srctools.logger
@@ -12,7 +12,7 @@ LOGGER = srctools.logger.get_logger(__name__)
 def add(
     vmf: VMF,
     loc: Vec,
-    conf: Property,
+    conf: Keyvalues,
     info: corridor.Info,
 ) -> None:
     """Add music to the map."""

@@ -14,7 +14,7 @@ from enum import Enum
 from operator import attrgetter
 
 import attrs
-from srctools import Property
+from srctools import Keyvalues
 from srctools.filesys import FileSystem, ZipFileSystem, RawFileSystem, VPKFileSystem
 from srctools.math import AnyAngle, AnyMatrix, FrozenVec, Vec, Angle, Matrix, to_matrix
 from srctools.vmf import EntityFixup, Entity, EntityGroup, Solid, Side, VMF, UVAxis, VisGroup
@@ -468,9 +468,9 @@ def _parse_template(loc: UnparsedTemplate) -> Template:
             raise ValueError(f'Unknown filesystem type for "{loc.pak_path}"!')
 
     with filesys[loc.path].open_str() as f:
-        props = Property.parse(f, f'{loc.pak_path}:{loc.path}')
-    vmf = srctools.VMF.parse(props, preserve_ids=True)
-    del props, filesys, f  # Discard all this data.
+        kv = Keyvalues.parse(f, f'{loc.pak_path}:{loc.path}')
+    vmf = srctools.VMF.parse(kv, preserve_ids=True)
+    del kv, filesys, f  # Discard all this data.
 
     # visgroup -> list of brushes/overlays
     detail_ents: dict[str, list[Solid]] = defaultdict(list)

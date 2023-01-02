@@ -3,22 +3,22 @@ from typing import Dict, Set
 
 import srctools.logger
 from precomp import options, conditions
-from srctools import VMF, Property, Vec
+from srctools import VMF, Keyvalues, Vec
 
 
 LOGGER = srctools.logger.get_logger(__name__)
 COND_MOD_NAME = 'Packing'
 
 # Filenames we've packed, so we can avoid adding duplicate ents.
-_PACKED_FILES = set()  # type: Set[str]
+_PACKED_FILES: Set[str] = set()
 
-PACKLISTS = {}  # type: Dict[str, Set[str]]
+PACKLISTS: Dict[str, Set[str]] = {}
 
 
-def parse_packlists(props: Property) -> None:
+def parse_packlists(kv: Keyvalues) -> None:
     """Parse the packlists.cfg file, to load our packing lists."""
-    for prop in props.find_children('Packlist'):
-        PACKLISTS[prop.name] = set(prop.as_array())
+    for child in kv.find_children('Packlist'):
+        PACKLISTS[child.name] = set(child.as_array())
 
 
 def pack_list(
@@ -59,15 +59,14 @@ def pack_files(
 
 
 @conditions.make_result('Pack')
-def res_packlist(vmf: VMF, res: Property):
+def res_packlist(vmf: VMF, res: Keyvalues):
     """Pack files from a packing list."""
     pack_list(vmf, res.value)
     return conditions.RES_EXHAUSTED
 
 
 @conditions.make_result('PackFile')
-def pack_file_cond(vmf: VMF, res: Property):
+def pack_file_cond(vmf: VMF, res: Keyvalues):
     """Adda single file to the map."""
     pack_files(vmf, res.value)
     return conditions.RES_EXHAUSTED
-

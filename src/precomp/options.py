@@ -4,7 +4,7 @@ from enum import Enum, EnumMeta
 
 import inspect
 
-from srctools import Property, Vec, parse_vec_str
+from srctools import Keyvalues, Vec, parse_vec_str
 from BEE2_config import ConfigFile
 import srctools.logger
 
@@ -65,10 +65,10 @@ class Opt:
             )
 
 
-def load(opt_blocks: Iterator[Property]) -> None:
+def load(opt_blocks: Iterator[Keyvalues]) -> None:
     """Read settings from the given property block."""
     SETTINGS.clear()
-    set_vals = {}
+    set_vals: dict[str, str] = {}
     for opt_block in opt_blocks:
         for prop in opt_block:
             set_vals[prop.name] = prop.value
