@@ -83,11 +83,11 @@ def suppress_screens() -> Any:
             continue
         screen.suppress()
         active.append(screen)
-
-    yield
-
-    for screen in active:
-        screen.unsuppress()
+    try:
+        yield
+    finally:
+        for screen in active:
+            screen.unsuppress()
 
 
 # Patch various tk windows to hide loading screens while they're are open.
