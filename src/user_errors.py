@@ -2,10 +2,13 @@
 
 UserError is imported all over, so this needs to have minimal imports to avoid cycles.
 """
-from typing import ClassVar, Collection, Dict, Iterable, List, Literal, Optional, Tuple, TypedDict
+from typing import (
+    ClassVar, Collection, Dict, Iterable, List, Literal, Optional, Tuple, TypedDict,
+    Union,
+)
 from pathlib import Path
 
-from srctools import Vec, logger
+from srctools import logger, FrozenVec, Vec
 import attrs
 
 from transtoken import TransToken
@@ -59,7 +62,7 @@ DATA_LOC = utils.conf_location('compile_error.pickle')
 SERVER_INFO_FILE = utils.conf_location('error_server_info.json')
 
 
-def to_threespace(vec: Vec) -> Tuple[float, float, float]:
+def to_threespace(vec: Union[Vec, FrozenVec]) -> Tuple[float, float, float]:
     """Convert a vector to the conventions THREE.js uses."""
     return (
         vec.x / 128.0,
@@ -81,10 +84,10 @@ class UserError(BaseException):
         message: TransToken,
         *,
         docsurl: str='',
-        voxels: Iterable[Vec]=(),
-        points: Iterable[Vec]=(),
+        voxels: Iterable[Union[Vec, FrozenVec]]=(),
+        points: Iterable[Union[Vec, FrozenVec]]=(),
         textlist: Collection[str]=(),
-        leakpoints: Collection[Vec]=(),
+        leakpoints: Collection[Union[Vec, FrozenVec]]=(),
         barrier_hole: Optional[BarrierHole]=None,
     ) -> None:
         """Specify the info to show to the user.

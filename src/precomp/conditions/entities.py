@@ -1,5 +1,5 @@
 """Conditions related to specific kinds of entities."""
-from srctools import Matrix, Property, Vec, VMF, Entity, Angle
+from srctools import Matrix, Keyvalues, Vec, VMF, Entity, Angle
 import srctools.logger
 
 from precomp import tiling, texturing, template_brush, conditions, rand
@@ -11,7 +11,7 @@ LOGGER = srctools.logger.get_logger(__name__, alias='cond.entities')
 
 
 @conditions.make_result('TemplateOverlay')
-def res_insert_overlay(vmf: VMF, res: Property):
+def res_insert_overlay(vmf: VMF, res: Keyvalues):
     """Use a template to insert one or more overlays on a surface.
 
     Options:
@@ -104,7 +104,7 @@ def res_insert_overlay(vmf: VMF, res: Property):
 
 
 @conditions.make_result('createEntity')
-def res_create_entity(vmf: VMF, inst: Entity, res: Property):
+def res_create_entity(vmf: VMF, inst: Entity, res: Keyvalues) -> None:
     """Create an entity.
 
     * `keys` and `localkeys` defines the new keyvalues used.
@@ -128,7 +128,7 @@ def res_create_entity(vmf: VMF, inst: Entity, res: Property):
 
 
 @conditions.make_result('WaterSplash')
-def res_water_splash(vmf: VMF,  res: Property) -> conditions.ResultCallable:
+def res_water_splash(vmf: VMF,  res: Keyvalues) -> conditions.ResultCallable:
     """Creates splashes when something goes in and out of water.
 
     Arguments:

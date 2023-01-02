@@ -13,7 +13,7 @@ from pathlib import PurePosixPath as FSPath
 
 import attrs
 import trio
-from srctools import FileSystem, Property, VMF, logger
+from srctools import FileSystem, Keyvalues, VMF, logger
 from srctools.tokenizer import Tokenizer, Token
 
 import config.gen_opts
@@ -54,7 +54,7 @@ class UnParsedItemVariant:
     filesys: FileSystem  # The original filesystem.
     folder: str | None  # If set, use the given folder from our package.
     style: str | None  # Inherit from a specific style (implies folder is None)
-    config: Property | None  # Config for editing
+    config: Keyvalues | None  # Config for editing
 
 
 class ItemVariant:
@@ -125,56 +125,56 @@ class ItemVariant:
         self.vbsp_config = lazy_conf.concat(self.vbsp_config, other.vbsp_config)
         self.desc = tkMarkdown.join(self.desc, other.desc)
 
-    async def modify(self, pak_id: str, props: Property, source: str) -> ItemVariant:
+    async def modify(self, pak_id: str, kv: Keyvalues, source: str) -> ItemVariant:
         """Apply a config to this item variant.
 
         This produces a copy with various modifications - switching
         out palette or instance values, changing the config, etc.
         """
         vbsp_config: lazy_conf.LazyConf
-        if 'config' in props:
+        if 'config' in kv:
             # Item.parse() has resolved this to the actual config.
             vbsp_config = get_config(
-                props,
+                kv,
                 'items',
                 pak_id,
             )
         else:
             vbsp_config = self.vbsp_config
 
-        if 'replace' in props:
+        if 'replace' in kv:
             # Replace property values in the config via regex.
             vbsp_config = lazy_conf.replace(vbsp_config, [
                 (re.compile(prop.real_name, re.IGNORECASE), prop.value)
                 for prop in
-                props.find_children('Replace')
+                kv.find_children('Replace')
             ])
 
         vbsp_config = lazy_conf.concat(vbsp_config, get_config(
-            props,
+            kv,
             'items',
             pak_id,
             prop_name='append',
         ))
 
-        if 'description' in props:
-            desc = desc_parse(props, source, pak_id)
+        if 'description' in kv:
+            desc = desc_parse(kv, source, pak_id)
         else:
             desc = self.desc
 
-        if 'appenddesc' in props:
+        if 'appenddesc' in kv:
             desc = tkMarkdown.join(
                 desc,
-                desc_parse(props, source, pak_id, prop_name='appenddesc'),
+                desc_parse(kv, source, pak_id, prop_name='appenddesc'),
             )
 
-        if 'authors' in props:
-            authors = sep_values(props['authors', ''])
+        if 'authors' in kv:
+            authors = sep_values(kv['authors', ''])
         else:
             authors = self.authors
 
-        if 'tags' in props:
-            tags = sep_values(props['tags', ''])
+        if 'tags' in kv:
+            tags = sep_values(kv['tags', ''])
         else:
             tags = self.tags.copy()
 
@@ -187,23 +187,23 @@ class ItemVariant:
             tags=tags,
             desc=desc,
             icons=self.icons.copy(),
-            ent_count=props['ent_count', self.ent_count],
-            url=props['url', self.url],
+            ent_count=kv['ent_count', self.ent_count],
+            url=kv['url', self.url],
             all_name=self.all_name,
             all_icon=self.all_icon,
             source=f'{source} from {self.source}',
         )
         [variant.editor] = variant._modify_editoritems(
-            props,
+            kv,
             [variant.editor],
             pak_id,
             source,
             is_extra=False,
         )
 
-        if 'extra' in props:
+        if 'extra' in kv:
             variant.editor_extra = variant._modify_editoritems(
-                props.find_key('extra'),
+                kv.find_key('extra'),
                 variant.editor_extra,
                 pak_id,
                 source,
@@ -223,7 +223,7 @@ class ItemVariant:
 
     def _modify_editoritems(
         self,
-        props: Property,
+        kv: Keyvalues,
         editor: list[EditorItem],
         pak_id: str,
         source: str,
@@ -242,7 +242,7 @@ class ItemVariant:
         ]
 
         # Implement overriding palette items
-        for item in props.find_children('Palette'):
+        for item in kv.find_children('Palette'):
             try:
                 pal_icon = FSPath(item['icon'])
             except LookupError:
@@ -318,7 +318,7 @@ class ItemVariant:
             if pal_icon is not None:
                 subtype.pal_icon = pal_icon
 
-        if 'Collisions' in props:
+        if 'Collisions' in kv:
             # Adjust collisions.
             if len(editor) != 1:
                 raise ValueError(
@@ -326,7 +326,7 @@ class ItemVariant:
                     f'editoritems blocks in {source}!'
                 )
             editor[0].collisions = editor[0].collisions.copy()
-            for coll_prop in props.find_children('Collisions'):
+            for coll_prop in kv.find_children('Collisions'):
                 if coll_prop.name == 'remove':
                     if coll_prop.value == '*':
                         editor[0].collisions.clear()
@@ -345,7 +345,7 @@ class ItemVariant:
                 else:
                     raise ValueError(f'Unknown collision type "{coll_prop.real_name}" in {source}')
 
-        if 'Instances' in props:
+        if 'Instances' in kv:
             if len(editor) != 1:
                 raise ValueError(
                     'Cannot specify instances for multiple '
@@ -354,7 +354,7 @@ class ItemVariant:
             editor[0].instances = editor[0].instances.copy()
             editor[0].cust_instances = editor[0].cust_instances.copy()
 
-        for inst in props.find_children('Instances'):
+        for inst in kv.find_children('Instances'):
             if inst.has_children():
                 inst_data = InstCount(
                     FSPath(inst['name']),
@@ -384,7 +384,7 @@ class ItemVariant:
 
         # Override IO commands.
         try:
-            io_props = props.find_key('IOConf')
+            io_props = kv.find_key('IOConf')
         except LookupError:
             pass
         else:
@@ -848,7 +848,7 @@ async def parse_item_folder(
     def _parse_vmf(path: str) -> VMF | None:
         """Parse the VMF portion."""
         try:
-            vmf_keyvalues = filesystem.read_prop(path)
+            vmf_keyvalues = filesystem.read_kv1(path)
         except FileNotFoundError:
             return None
         else:
@@ -856,7 +856,7 @@ async def parse_item_folder(
 
     try:
         async with trio.open_nursery() as nursery:
-            props_res = utils.Result.sync(nursery, filesystem.read_prop, prop_path, cancellable=True)
+            props_res = utils.Result.sync(nursery, filesystem.read_kv1, prop_path, cancellable=True)
             all_items = utils.Result.sync(nursery, _parse_items, editor_path, cancellable=True)
             editor_vmf = utils.Result.sync(nursery, _parse_vmf, vmf_path, cancellable=True)
         props = props_res().find_key('Properties')
@@ -961,7 +961,7 @@ async def parse_item_folder(
     return variant
 
 
-def apply_replacements(conf: Property, item_id: str) -> Property:
+def apply_replacements(conf: Keyvalues, item_id: str) -> Keyvalues:
     """Apply a set of replacement values to a config file, returning a new copy.
 
     The replacements are found in a 'Replacements' block in the property.
@@ -969,15 +969,15 @@ def apply_replacements(conf: Property, item_id: str) -> Property:
     allows literal percents. Unassigned values are an error.
     """
     replace: dict[str, str] = {}
-    new_conf = Property.root() if conf.is_root() else Property(conf.real_name, [])
+    new_conf = Keyvalues.root() if conf.is_root() else Keyvalues(conf.real_name, [])
 
     # Strip the replacement blocks from the config, and save the values.
-    for prop in conf:
-        if prop.name == 'replacements':
-            for rep_prop in prop:
+    for kv in conf:
+        if kv.name == 'replacements':
+            for rep_prop in kv:
                 replace[rep_prop.name.strip('%')] = rep_prop.value
         else:
-            new_conf.append(prop)
+            new_conf.append(kv)
 
     def rep_func(match: Match) -> str:
         """Does the replacement."""
@@ -989,10 +989,10 @@ def apply_replacements(conf: Property, item_id: str) -> Property:
         except KeyError:
             raise ValueError(f'Unresolved variable in "{item_id}": {var!r}\nValid vars: {replace}')
 
-    for prop in new_conf.iter_tree(blocks=True):
-        prop.name = RE_PERCENT_VAR.sub(rep_func, prop.real_name)
-        if not prop.has_children():
-            prop.value = RE_PERCENT_VAR.sub(rep_func, prop.value)
+    for kv in new_conf.iter_tree(blocks=True):
+        kv.name = RE_PERCENT_VAR.sub(rep_func, kv.real_name)
+        if not kv.has_children():
+            kv.value = RE_PERCENT_VAR.sub(rep_func, kv.value)
 
     return new_conf
 
@@ -1085,11 +1085,8 @@ async def assign_styled_items(all_styles: Iterable[Style], item: Item) -> None:
                 if conf.config is None:
                     styles[sty_id] = start_data.copy()
                 else:
-                    styles[sty_id] = await start_data.modify(
-                        conf.pak_id,
-                        conf.config,
-                        f'<{item.id}:{vers.id}.{sty_id}>',
-                    )
+                    styles[sty_id] = await start_data.modify(conf.pak_id, conf.config,
+                                                             f'<{item.id}:{vers.id}.{sty_id}>')
 
             # If we defer all the styles, there must be a loop somewhere.
             # We can't resolve that!

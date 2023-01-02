@@ -8,7 +8,7 @@ from enum import Enum
 from typing import NamedTuple, MutableMapping
 
 from srctools.vmf import VMF, Entity, EntityFixup, Output
-from srctools import EmptyMapping, Property, Vec, Matrix, Angle
+from srctools import EmptyMapping, FrozenVec, Property, Vec, Matrix, Angle
 import srctools.logger
 import attrs
 
@@ -39,7 +39,7 @@ DROPPERLESS_OFFSET = 22 - 64
 # These won't overlap - droppers occupy space, and dropperless cubes
 # also do. Dropper+cube items only give the dropper.
 # We also snap to nearest voxel, to allow cubes to use an offset handle.
-CUBE_POS: dict[tuple[float, float, float], CubePair] = {}
+CUBE_POS: dict[FrozenVec, CubePair] = {}
 
 # Prevents duplicating different filter entities. A number of different keys are used depending on
 # exactly which kind of filter.
@@ -597,12 +597,12 @@ class CubePair:
         # Ensure we can look up the pair by origin and instance.
         # Round to the nearest voxel to allow the cube to be offset.
         if dropper is not None:
-            pos = Vec.from_str(dropper['origin']) // 128
-            CUBE_POS[pos.as_tuple()] = self
+            pos = FrozenVec.from_str(dropper['origin']) // 128
+            CUBE_POS[pos] = self
             INST_TO_PAIR[dropper] = self
         if cube is not None:
-            pos = Vec.from_str(cube['origin']) // 128
-            CUBE_POS[pos.as_tuple()] = self
+            pos = FrozenVec.from_str(cube['origin']) // 128
+            CUBE_POS[pos] = self
             INST_TO_PAIR[cube] = self
 
         # Cache of comp_kv_setters adding outputs to dropper ents.
@@ -1179,7 +1179,7 @@ def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
     }
 
     # Origin -> instances
-    dropper_pos: dict[tuple[float, float, float], tuple[Entity, DropperType]] = {}
+    dropper_pos: dict[FrozenVec, tuple[Entity, DropperType]] = {}
     # Timer value -> instances if not 0.
     dropper_timer: dict[int, tuple[Entity, DropperType]] = {}
     # Instance -> if linked, the position of the cube.
@@ -1220,7 +1220,7 @@ def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
             else:
                 dropper_timer[timer] = inst, drop_type
         # For setup later.
-        dropper_pos[Vec.from_str(inst['origin']).as_tuple()] = inst, drop_type
+        dropper_pos[FrozenVec.from_str(inst['origin'])] = inst, drop_type
         used_droppers[inst] = ''
 
     # Now link and match up all the cubes.
@@ -1273,7 +1273,7 @@ def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
                 direction=(0, 0, 1),
             )
             try:
-                dropper, drop_type = dropper_pos[ceil_pos.as_tuple()]
+                dropper, drop_type = dropper_pos[ceil_pos.freeze()]
             except KeyError:
                 pass  # Drop out of if
             else:
@@ -1347,7 +1347,7 @@ def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
         orient = Matrix.from_angstr(inst['angles'])
 
         with suppress(KeyError):
-            pairs.append(CUBE_POS[(origin // 128).as_tuple()])
+            pairs.append(CUBE_POS[FrozenVec(origin // 128)])
 
         # If pointing up, check the ceiling too, so droppers can find a
         # colorizer
@@ -1358,7 +1358,7 @@ def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
                 direction=(0, 0, 1),
             ) // 128
             with suppress(KeyError):
-                pairs.append(CUBE_POS[pos.as_tuple()])
+                pairs.append(CUBE_POS[pos.freeze()])
 
         if kind is coloriser_inst:
             # The instance is useless now we know about it.

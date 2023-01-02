@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import Iterator
 
-from srctools import Property
+from srctools import Keyvalues
 import srctools.logger
 
 from consts import MusicChannel
@@ -214,7 +214,7 @@ class Music(PakObject, needs_foreground=True):
         if base_music is not None:
             vbsp_config += base_music.config()
 
-        music_conf = Property('MusicScript', [])
+        music_conf = Keyvalues('MusicScript', [])
         vbsp_config.append(music_conf)
         to_pack = set()
 
@@ -224,10 +224,10 @@ class Music(PakObject, needs_foreground=True):
 
             sounds = music.sound[channel]
             if len(sounds) == 1:
-                music_conf.append(Property(channel.value, sounds[0]))
+                music_conf.append(Keyvalues(channel.value, sounds[0]))
             else:
-                music_conf.append(Property(channel.value, [
-                    Property('snd', snd)
+                music_conf.append(Keyvalues(channel.value, [
+                    Keyvalues('snd', snd)
                     for snd in sounds
                 ]))
 
@@ -236,8 +236,8 @@ class Music(PakObject, needs_foreground=True):
         # If we need to pack, add the files to be unconditionally
         # packed.
         if to_pack:
-            music_conf.append(Property('pack', [
-                Property('file', filename)
+            music_conf.append(Keyvalues('pack', [
+                Keyvalues('file', filename)
                 for filename in to_pack
             ]))
 

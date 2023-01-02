@@ -2,7 +2,7 @@
 from __future__ import annotations
 from collections import defaultdict
 
-from srctools import Property, Entity, VMF, Vec, Output, Matrix
+from srctools import Keyvalues, Entity, VMF, Vec, Output, Matrix
 import srctools.logger
 
 from precomp import connections, conditions
@@ -19,7 +19,7 @@ SENDTOR_RELAYS: dict[str, list[Entity]] = defaultdict(list)
 
 
 @conditions.make_result('SendificatorLaser')
-def res_sendificator_laser(res: Property):
+def res_sendificator_laser(res: Keyvalues) -> conditions.ResultCallable:
     """Record the position of the target for Sendificator Lasers."""
     target = res.vec('offset'), res.vec('direction', 0, 0, 1)
 
@@ -30,7 +30,7 @@ def res_sendificator_laser(res: Property):
 
 
 @conditions.make_result('Sendificator')
-def res_sendificator(vmf: VMF, inst: Entity):
+def res_sendificator(vmf: VMF, inst: Entity) -> None:
     """Implement Sendificators."""
     # For our version, we know which Sendificator connects to what laser,
     # so we can couple the logic together (avoiding `@sendtor_mutex`).

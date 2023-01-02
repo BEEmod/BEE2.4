@@ -3,7 +3,7 @@ from typing import Callable
 
 
 from precomp import connections, conditions
-from srctools import Property, Entity, Output, logger
+from srctools import Keyvalues, Entity, Output, logger
 import srctools
 
 COND_MOD_NAME = 'I/O'
@@ -11,7 +11,7 @@ LOGGER = logger.get_logger(__name__, alias='cond.connections')
 
 
 @conditions.make_result('AddOutput')
-def res_add_output(res: Property) -> Callable[[Entity], None]:
+def res_add_output(res: Keyvalues) -> Callable[[Entity], None]:
     """Add an output from an instance to a global or local name.
 
     Values:
@@ -78,14 +78,14 @@ def res_add_output(res: Property) -> Callable[[Entity], None]:
 
 
 @conditions.make_result('ChangeIOType')
-def res_change_io_type(props: Property) -> Callable[[Entity], None]:
+def res_change_io_type(kv: Keyvalues) -> Callable[[Entity], None]:
     """Switch an item to use different inputs or outputs.
 
     Must be done before priority level -250.
     The contents are the same as that allowed in the input BEE2 block in
     editoritems.
     """
-    conf = connections.Config.parse('<ChangeIOType: {:X}>'.format(id(props)), props)
+    conf = connections.Config.parse('<ChangeIOType: {:X}>'.format(id(kv)), kv)
 
     def change_item(inst: Entity) -> None:
         """Alter the type of each item passed in."""
@@ -107,7 +107,7 @@ def res_change_io_type(props: Property) -> Callable[[Entity], None]:
 
 
 @conditions.make_result('AppendConnInputs')
-def res_append_io_type(res: Property) -> Callable[[Entity], None]:
+def res_append_io_type(res: Keyvalues) -> Callable[[Entity], None]:
     """Append additional outputs to an item's connections, which are fired when inputs change.
 
     Must be done before priority level -250. This has the same format of the editoritems BEE2 block,

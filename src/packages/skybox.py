@@ -1,6 +1,6 @@
 from typing import Iterator
 
-from srctools import Property
+from srctools import Keyvalues
 
 from transtoken import TransTokenSource
 from packages import (
@@ -16,7 +16,7 @@ class Skybox(PakObject, needs_foreground=True):
         sky_id,
         selitem_data: SelitemData,
         config: lazy_conf.LazyConf,
-        fog_opts: Property,
+        fog_opts: Keyvalues,
         mat,
     ) -> None:
         self.id = sky_id

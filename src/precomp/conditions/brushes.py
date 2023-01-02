@@ -4,8 +4,8 @@ from typing import Callable, Iterable
 from collections import defaultdict
 from random import Random
 
-from srctools import Property, NoKeyError, Output, Entity, VMF
-from srctools.math import Vec, Angle, Matrix, Vec_tuple, to_matrix
+from srctools import Keyvalues, NoKeyError, Output, Entity, VMF
+from srctools.math import Vec, Angle, Matrix, FrozenVec, to_matrix
 import srctools.logger
 
 from precomp import (
@@ -55,7 +55,7 @@ FLAG_ROTATING = {
 
 
 @conditions.make_result('GenRotatingEnt')
-def res_fix_rotation_axis(vmf: VMF, ent: Entity, res: Property):
+def res_fix_rotation_axis(vmf: VMF, ent: Entity, res: Keyvalues) -> None:
     """Properly setup rotating brush entities to match the instance.
 
     This uses the orientation of the instance to determine the correct
@@ -198,7 +198,7 @@ def res_fix_rotation_axis(vmf: VMF, ent: Entity, res: Property):
 
 
 @conditions.make_result('AlterTexture', 'AlterTex', 'AlterFace')
-def res_set_texture(inst: Entity, res: Property):
+def res_set_texture(inst: Entity, res: Keyvalues) -> None:
     """Set the tile at a particular place to use a specific texture.
 
     This can only be set for an entire voxel side at once.
@@ -266,7 +266,7 @@ def res_set_texture(inst: Entity, res: Property):
 
 
 @conditions.make_result('AddBrush')
-def res_add_brush(vmf: VMF, inst: Entity, res: Property) -> None:
+def res_add_brush(vmf: VMF, inst: Entity, res: Keyvalues) -> None:
     """Spawn in a brush at the indicated points.
 
     - `point1` and `point2` are locations local to the instance, with `0 0 0`
@@ -374,7 +374,7 @@ def res_import_template(
     vmf: VMF,
     coll: collisions.Collisions,
     info: corridor.Info,
-    res: Property,
+    res: Keyvalues,
 ) -> conditions.ResultCallable:
     """Import a template VMF file, retexturing it to match orientation.
 
@@ -440,7 +440,7 @@ def res_import_template(
         orig_temp_id = res['id']
     else:
         orig_temp_id = res.value
-        res = Property('TemplateBrush', [])
+        res = Keyvalues('TemplateBrush', [])
 
     force = res['force', ''].casefold().split()
     conf_force_colour: template_brush.ForceColour
@@ -496,7 +496,7 @@ def res_import_template(
 
     key_values = res.find_block("Keys", or_blank=True)
     if key_values:
-        key_block = Property("", [
+        key_block = Keyvalues("", [
             key_values,
             res.find_block("LocalKeys", or_blank=True),
         ])
@@ -708,7 +708,7 @@ def res_antigel(inst: Entity) -> None:
         tiling.TILES[pos.as_tuple(), norm.as_tuple()].is_antigel = True
     except KeyError:
         LOGGER.warning('No tile to set antigel at {}, {}', pos, norm)
-    texturing.ANTIGEL_LOCS.add((origin // 128).as_tuple())
+    texturing.ANTIGEL_LOCS.add((origin // 128).freeze())
 
 
 # Position -> entity
@@ -738,7 +738,7 @@ CHECKPOINT_NEIGHBOURS.remove(Vec(0, 0, 0))
 
 
 @conditions.make_result('CheckpointTrigger')
-def res_checkpoint_trigger(info: conditions.MapInfo, inst: Entity, res: Property) -> None:
+def res_checkpoint_trigger(info: conditions.MapInfo, inst: Entity, res: Keyvalues) -> None:
     """Generate a trigger underneath coop checkpoint items.
 
     """
@@ -787,7 +787,7 @@ def res_checkpoint_trigger(info: conditions.MapInfo, inst: Entity, res: Property
 
 
 @conditions.make_result('SetTile', 'SetTiles')
-def res_set_tile(inst: Entity, res: Property) -> None:
+def res_set_tile(inst: Entity, res: Keyvalues) -> None:
     """Set 4x4 parts of a tile to the given values.
 
     `Offset` defines the position of the upper-left tile in the grid.
@@ -900,7 +900,7 @@ def res_set_tile(inst: Entity, res: Property) -> None:
 
 
 @conditions.make_result('addPlacementHelper')
-def res_add_placement_helper(inst: Entity, res: Property):
+def res_add_placement_helper(inst: Entity, res: Keyvalues) -> None:
     """Add a placement helper to a specific tile.
 
     `Offset` and `normal` specify the position and direction out of the surface
@@ -933,7 +933,7 @@ def res_add_placement_helper(inst: Entity, res: Property):
     for pan in ['Panel', 'Pan']
     for opts in ['Options', 'Opts']
 ])
-def res_set_panel_options(vmf: VMF, inst: Entity, props: Property) -> None:
+def res_set_panel_options(vmf: VMF, inst: Entity, kv: Keyvalues) -> None:
     """Modify an existing panel associated with this instance.
 
     See `CreatePanel` to add new ones.
@@ -980,11 +980,11 @@ def res_set_panel_options(vmf: VMF, inst: Entity, props: Property) -> None:
       If not provided or the classname is set to '', the panel is generated as
       a world brush.
     """
-    edit_panel(vmf, inst, props, create=False)
+    edit_panel(vmf, inst, kv, create=False)
 
 
 @conditions.make_result('CreatePanel')
-def res_create_panel(vmf: VMF, inst: Entity, props: Property) -> None:
+def res_create_panel(vmf: VMF, inst: Entity, kv: Keyvalues) -> None:
     """Convert a set of tiles into a dynamic entity.
 
     See `SetPanelOptions` to add new ones.
@@ -1028,10 +1028,10 @@ def res_create_panel(vmf: VMF, inst: Entity, props: Property) -> None:
     - `keys`, `localkeys`: Make the panel use a brush entity with these options.
       If not provided the panel is generated as a world brush.
     """
-    edit_panel(vmf, inst, props, create=True)
+    edit_panel(vmf, inst, kv, create=True)
 
 
-def edit_panel(vmf: VMF, inst: Entity, props: Property, create: bool) -> None:
+def edit_panel(vmf: VMF, inst: Entity, props: Keyvalues, create: bool) -> None:
     """Implements SetPanelOptions and CreatePanel."""
     orient = Matrix.from_angstr(inst['angles'])
     normal: Vec = round(props.vec('normal', 0, 0, 1) @ orient, 6)
@@ -1099,7 +1099,7 @@ def edit_panel(vmf: VMF, inst: Entity, props: Property, create: bool) -> None:
             panel = tiling.Panel(
                 None, inst, tiling.PanelType.NORMAL,
                 thickness=4,
-                bevels=(),
+                bevels=set(),
             )
             panel.points = uvs
             tile.panels.append(panel)
@@ -1217,21 +1217,21 @@ def edit_panel(vmf: VMF, inst: Entity, props: Property, create: bool) -> None:
             panel.brush_ent = brush_ent
 
 
-def _fill_norm_rotations() -> dict[tuple[Vec_tuple, Vec_tuple], Matrix]:
+def _fill_norm_rotations() -> dict[tuple[FrozenVec, FrozenVec], Matrix]:
     """Given a norm->norm rotation, return the angles producing that."""
-    rotations: dict[tuple[Vec_tuple, Vec_tuple], Matrix] = {}
+    rotations: dict[tuple[FrozenVec, FrozenVec], Matrix] = {}
     for norm_ax in 'xyz':
         for norm_mag in [-1, +1]:
-            norm = Vec.with_axes(norm_ax, norm_mag)
+            norm = FrozenVec.with_axes(norm_ax, norm_mag)
             for angle_ax in ('pitch', 'yaw', 'roll'):
                 for angle_mag in (-90, 90):
                     angle = Matrix.from_angle(Angle.with_axes(angle_ax, angle_mag))
                     new_norm = norm @ angle
                     if new_norm != norm:
-                        rotations[norm.as_tuple(), new_norm.as_tuple()] = angle
+                        rotations[norm, new_norm] = angle
             # Assign a null rotation as well.
-            rotations[norm.as_tuple(), norm.as_tuple()] = Matrix()
-            rotations[norm.as_tuple(), (-norm).as_tuple()] = Matrix()
+            rotations[norm, norm] = Matrix()
+            rotations[norm, -norm] = Matrix()
     return rotations
 
 
@@ -1240,13 +1240,13 @@ del _fill_norm_rotations
 
 
 @conditions.make_result("TransferBullseye")
-def res_transfer_bullseye(inst: Entity, props: Property):
+def res_transfer_bullseye(inst: Entity, kv: Keyvalues) -> None:
     """Transfer catapult targets and placement helpers from one tile to another."""
-    start_pos = conditions.resolve_offset(inst, props['start_pos', ''])
-    end_pos = conditions.resolve_offset(inst, props['end_pos', ''])
+    start_pos = conditions.resolve_offset(inst, kv['start_pos', ''])
+    end_pos = conditions.resolve_offset(inst, kv['end_pos', ''])
     angles = Angle.from_str(inst['angles'])
-    start_norm = props.vec('start_norm', 0, 0, 1) @ angles
-    end_norm = props.vec('end_norm', 0, 0, 1) @ angles
+    start_norm: Vec = kv.vec('start_norm', 0, 0, 1) @ angles
+    end_norm: Vec = kv.vec('end_norm', 0, 0, 1) @ angles
 
     try:
         start_tile = tiling.TILES[
@@ -1271,12 +1271,9 @@ def res_transfer_bullseye(inst: Entity, props: Property):
         orient = start_tile.portal_helper_orient.copy()
         # If it's directly opposite, just mirror - we have no clue what the
         # intent is.
-        if Vec.dot(start_norm, end_norm) != -1.0:
+        if Vec.dot(start_norm, end_norm) > -0.999:
             # Use the dict to compute the rotation to apply.
-            orient @= NORM_ROTATIONS[
-                start_norm.as_tuple(),
-                end_norm.as_tuple()
-            ]
+            orient @= NORM_ROTATIONS[start_norm.freeze(), end_norm.freeze()]
         end_tile.add_portal_helper(orient)
     elif start_tile.has_portal_helper:
         # Non-oriented, don't orient.

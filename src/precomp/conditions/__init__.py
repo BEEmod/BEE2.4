@@ -20,7 +20,7 @@ flags. Each argument must be typed as one of the following to recieve a specific
 value:
     * VMF to recieve the overall map.
     * Entity to recieve the current instance.
-    * Property to recieve keyvalues configuration.
+    * Keyvalues to recieve keyvalues configuration.
 
 If the entity is not provided, the first time the result/flag is called it
 can return a callable which will instead be called with each entity. This allows
@@ -45,9 +45,7 @@ from typing import Generic, TypeVar, Any, Callable, TextIO, Tuple, Type, overloa
 import attrs
 import srctools.logger
 from srctools import (
-    Property,
-    Vec_tuple, Vec,
-    VMF, Entity, Output, Solid, Angle, Matrix,
+    Keyvalues, FrozenVec, Vec, VMF, Entity, Output, Solid, Angle, Matrix,
 )
 
 from precomp import instanceLocs, rand, collisions
@@ -93,12 +91,12 @@ class SWITCH_TYPE(Enum):
     ALL = 'all'  # Run all matching commands
 
 
-xp = Vec_tuple(1, 0, 0)
-xn = Vec_tuple(-1, 0, 0)
-yp = Vec_tuple(0, 1, 0)
-yn = Vec_tuple(0, -1, 0)
-zp = Vec_tuple(0, 0, 1)
-zn = Vec_tuple(0, 0, -1)
+xp = FrozenVec(1, 0, 0)
+xn = FrozenVec(-1, 0, 0)
+yp = FrozenVec(0, 1, 0)
+yn = FrozenVec(0, -1, 0)
+zp = FrozenVec(0, 0, 1)
+zn = FrozenVec(0, 0, -1)
 
 DIRECTIONS = {
     # Translate these words into a normal vector
@@ -188,51 +186,51 @@ RES_EXHAUSTED = object()
 @attrs.define
 class Condition:
     """A single condition which may be evaluated."""
-    flags: list[Property] = attrs.Factory(list)
-    results: list[Property] = attrs.Factory(list)
-    else_results: list[Property] = attrs.Factory(list)
+    flags: list[Keyvalues] = attrs.Factory(list)
+    results: list[Keyvalues] = attrs.Factory(list)
+    else_results: list[Keyvalues] = attrs.Factory(list)
     priority: Decimal = Decimal()
     source: str = None
 
     @classmethod
-    def parse(cls, prop_block: Property, *, toplevel: bool) -> Condition:
-        """Create a condition from a Property block."""
-        flags: list[Property] = []
-        results: list[Property] = []
-        else_results: list[Property] = []
+    def parse(cls, kv_block: Keyvalues, *, toplevel: bool) -> Condition:
+        """Create a condition from a Keyvalues block."""
+        flags: list[Keyvalues] = []
+        results: list[Keyvalues] = []
+        else_results: list[Keyvalues] = []
         priority = Decimal()
         source = None
-        for prop in prop_block:
-            if prop.name == 'result':
-                results.extend(prop)  # join multiple ones together
-            elif prop.name == 'else':
-                else_results.extend(prop)
-            elif prop.name == '__src__':
+        for kv in kv_block:
+            if kv.name == 'result':
+                results.extend(kv)  # join multiple ones together
+            elif kv.name == 'else':
+                else_results.extend(kv)
+            elif kv.name == '__src__':
                 # Value injected by the BEE2 export, this specifies
                 # the original source of the config.
-                source = prop.value
+                source = kv.value
 
-            elif prop.name in ('condition', 'switch'):
+            elif kv.name in ('condition', 'switch'):
                 # Shortcut to eliminate lots of Result - Condition pairs
-                results.append(prop)
-            elif prop.name == 'elsecondition':
-                prop.name = 'condition'
-                else_results.append(prop)
-            elif prop.name == 'elseswitch':
-                prop.name = 'switch'
-                else_results.append(prop)
-            elif prop.name == 'priority':
+                results.append(kv)
+            elif kv.name == 'elsecondition':
+                kv.name = 'condition'
+                else_results.append(kv)
+            elif kv.name == 'elseswitch':
+                kv.name = 'switch'
+                else_results.append(kv)
+            elif kv.name == 'priority':
                 if not toplevel:
                     LOGGER.warning(
                         'Condition has priority definition, but is not at the toplevel! '
-                        'This will not function:\n{}', prop_block
+                        'This will not function:\n{}', kv_block
                     )
                 try:
-                    priority = Decimal(prop.value)
+                    priority = Decimal(kv.value)
                 except ArithmeticError:
                     pass
             else:
-                flags.append(prop)
+                flags.append(kv)
 
         return Condition(
             flags,
@@ -243,7 +241,7 @@ class Condition:
         )
 
     @staticmethod
-    def test_result(coll: collisions.Collisions, info: MapInfo, inst: Entity, res: Property) -> bool | object:
+    def test_result(coll: collisions.Collisions, info: MapInfo, inst: Entity, res: Keyvalues) -> bool | object:
         """Execute the given result."""
         try:
             cond_call = RESULT_LOOKUP[res.name]
@@ -454,24 +452,24 @@ def conv_setup_pair(
     setup: Callable[..., Any],
     result: Callable[..., CallResultT],
 ) -> Callable[
-    [srctools.VMF, Property],
+    [srctools.VMF, Keyvalues],
     Callable[[Entity], CallResultT]
 ]:
     """Convert the old explict setup function into a new closure."""
     setup_wrap, _ = annotation_caller(
         setup,
-        srctools.VMF, Property,
+        srctools.VMF, Keyvalues,
     )
     result_wrap, _ = annotation_caller(
         result,
-        srctools.VMF, Entity, Property,
+        srctools.VMF, Entity, Keyvalues,
     )
 
-    def func(vmf: srctools.VMF, prop: Property) -> Callable[[Entity], CallResultT]:
+    def func(vmf: srctools.VMF, kv: Keyvalues) -> Callable[[Entity], CallResultT]:
         """Replacement function which performs the legacy behaviour."""
         # The old system for setup functions - smuggle them in by
-        # setting Property.value to an arbitrary object.
-        smuggle = Property(prop.real_name, setup_wrap(vmf, prop))
+        # setting Keyvalues.value to an arbitrary object.
+        smuggle = Keyvalues(kv.real_name, setup_wrap(vmf, kv))
 
         def closure(ent: Entity) -> CallResultT:
             """Use the closure to store the smuggled setup data."""
@@ -500,10 +498,10 @@ class CondCall(Generic[CallResultT]):
         self.group = group
         cback, arg_order = annotation_caller(
             func,
-            srctools.VMF, collisions.Collisions, MapInfo, Entity, Property,
+            srctools.VMF, collisions.Collisions, MapInfo, Entity, Keyvalues,
         )
         self._cback: Callable[
-            [srctools.VMF, collisions.Collisions, MapInfo, Entity, Property],
+            [srctools.VMF, collisions.Collisions, MapInfo, Entity, Keyvalues],
             CallResultT | Callable[[Entity], CallResultT],
         ] = cback
         if Entity not in arg_order:
@@ -513,10 +511,10 @@ class CondCall(Generic[CallResultT]):
             self._setup_data = None
 
     @property
-    def __doc__(self) -> str:  # type: ignore  # object.__doc__ is not a property.
+    def __doc__(self) -> str:  # type: ignore  # object.__doc__ is not a Keyvalues.
         return self.func.__doc__
 
-    def __call__(self, coll: collisions.Collisions, info: MapInfo, ent: Entity, conf: Property) -> CallResultT:
+    def __call__(self, coll: collisions.Collisions, info: MapInfo, ent: Entity, conf: Keyvalues) -> CallResultT:
         """Execute the callback."""
         if self._setup_data is None:
             return self._cback(ent.map, coll, info, ent, conf)  # type: ignore
@@ -562,7 +560,7 @@ def add_meta(func: Callable[..., object], priority: Decimal | int, only_once=Tru
     """
     dec_priority = Decimal(priority)
     # This adds a condition result like "func" (with quotes), which cannot
-    # be entered into property files.
+    # be entered into keyvalues files.
     # The qualified name will be unique across modules.
     name = f'"{func.__qualname__}"'
     LOGGER.debug(
@@ -575,14 +573,14 @@ def add_meta(func: Callable[..., object], priority: Decimal | int, only_once=Tru
     RESULT_LOOKUP[name] = wrapper = CondCall(func, _get_cond_group(func))
 
     cond = Condition(
-        results=[Property(name, '')],
+        results=[Keyvalues(name, '')],
         priority=dec_priority,
         source='MetaCondition {}'.format(name)
     )
 
     if only_once:
         cond.results.append(
-            Property('endCondition', '')
+            Keyvalues('endCondition', '')
         )
     conditions.append(cond)
     ALL_META.append((name, dec_priority, wrapper))
@@ -666,9 +664,9 @@ def make_result_setup(*names: str) -> Callable[[CallableT], CallableT]:
     return x
 
 
-def add(prop_block: Property) -> None:
+def add(kv_block: Keyvalues) -> None:
     """Parse and add a condition to the list."""
-    con = Condition.parse(prop_block, toplevel=True)
+    con = Condition.parse(kv_block, toplevel=True)
     if con.results or con.else_results:
         conditions.append(con)
 
@@ -759,7 +757,7 @@ def check_all(vmf: VMF, coll: collisions.Collisions, info: MapInfo) -> None:
 
 
 def check_flag(
-    flag: Property,
+    flag: Keyvalues,
     coll: collisions.Collisions, info: MapInfo,
     inst: Entity, can_skip: bool = False,
 ) -> bool:
@@ -957,15 +955,14 @@ def add_inst(
     )
 
 
-
-def add_output(inst: Entity, prop: Property, target: str) -> None:
+def add_output(inst: Entity, kv: Keyvalues, target: str) -> None:
     """Add a customisable output to an instance."""
     inst.add_out(Output(
-        prop['output', ''],
+        kv['output', ''],
         target,
-        prop['input', ''],
-        inst_in=prop['targ_in', ''],
-        inst_out=prop['targ_out', ''],
+        kv['input', ''],
+        inst_in=kv['targ_in', ''],
+        inst_out=kv['targ_out', ''],
         ))
 
 
@@ -1049,28 +1046,28 @@ def widen_fizz_brush(brush: Solid, thickness: float, bounds: tuple[Vec, Vec]=Non
 def set_ent_keys(
     ent: typing.MutableMapping[str, str],
     inst: Entity,
-    prop_block: Property,
+    kv_block: Keyvalues,
     block_name: str='Keys',
 ) -> None:
     """Copy the given key prop block to an entity.
 
-    This uses the keys and 'localkeys' properties on the prop_block.
+    This uses the keys and 'localkeys' properties on the kv_block.
     Values with $fixup variables will be treated appropriately.
     LocalKeys keys will be changed to use instance-local names, where needed.
-    block_name lets you change the 'keys' suffix on the prop_block name.
+    block_name lets you change the 'keys' suffix on the kv_block name.
     ent can be any mapping.
     """
-    for prop in prop_block.find_block(block_name, or_blank=True):
-        ent[prop.real_name] = resolve_value(inst, prop.value)
-    for prop in prop_block.find_block('Local' + block_name, or_blank=True):
-        if prop.value.startswith('$'):
-            val = inst.fixup[prop.value]
+    for kv in kv_block.find_block(block_name, or_blank=True):
+        ent[kv.real_name] = resolve_value(inst, kv.value)
+    for kv in kv_block.find_block('Local' + block_name, or_blank=True):
+        if kv.value.startswith('$'):
+            val = inst.fixup[kv.value]
         else:
-            val = prop.value
+            val = kv.value
         if val.startswith('@'):
-            ent[prop.real_name] = val
+            ent[kv.real_name] = val
         else:
-            ent[prop.real_name] = local_name(inst, val)
+            ent[kv.real_name] = local_name(inst, val)
 
 T = TypeVar('T')
 
@@ -1135,25 +1132,25 @@ def resolve_offset(inst, value: str, scale: float=1, zoff: float=0) -> Vec:
 
 @make_flag('debug')
 @make_result('debug')
-def debug_flag(inst: Entity, props: Property):
+def debug_flag(inst: Entity, kv: Keyvalues) -> bool:
     """Displays text when executed, for debugging conditions.
 
     If the text ends with an '=', the instance will also be displayed.
     As a flag, this always evaluates as true.
     """
-    # Mark as a warning so it's more easily seen.
-    if props.has_children():
-        LOGGER.warning('Debug:\n{!s}\n{!s}', props, inst)
+    # Mark as a warning, so it's more easily seen.
+    if kv.has_children():
+        LOGGER.warning('Debug:\n{!s}\n{!s}', kv, inst)
     else:
         LOGGER.warning('Debug: {props}{inst!s}'.format(
             inst=inst,
-            props=props.value,
+            props=kv.value,
         ))
     return True  # The flag is always true
 
 
 @make_result('dummy', 'nop', 'do_nothing')
-def dummy_result(inst: Entity, props: Property):
+def dummy_result(inst: Entity, kv: Keyvalues):
     """Dummy result that doesn't do anything."""
     pass
 
@@ -1171,7 +1168,7 @@ def remove_blank_inst(inst: Entity) -> None:
 
 
 @make_result('timedRelay')
-def res_timed_relay(vmf: VMF, res: Property) -> Callable[[Entity], None]:
+def res_timed_relay(vmf: VMF, res: Keyvalues) -> Callable[[Entity], None]:
     """Generate a logic_relay with outputs delayed by a certain amount.
 
     This allows triggering outputs based $timer_delay values.
@@ -1223,7 +1220,7 @@ def res_timed_relay(vmf: VMF, res: Property) -> Callable[[Entity], None]:
 
 
 @make_result('condition')
-def res_sub_condition(coll: collisions.Collisions, info: MapInfo, res: Property) -> ResultCallable:
+def res_sub_condition(coll: collisions.Collisions, info: MapInfo, res: Keyvalues) -> ResultCallable:
     """Check a different condition if the outer block is true."""
     cond = Condition.parse(res, toplevel=False)
 
@@ -1255,13 +1252,13 @@ def res_end_condition() -> None:
 
 
 @make_result('switch')
-def res_switch(coll: collisions.Collisions, info: MapInfo, res: Property) -> ResultCallable:
+def res_switch(coll: collisions.Collisions, info: MapInfo, res: Keyvalues) -> ResultCallable:
     """Run the same flag multiple times with different arguments.
 
     `method` is the way the search is done - `first`, `last`, `random`, or `all`.
     `flag` is the name of the flag.
     `seed` sets the randomisation seed for this block, for the random mode.
-    Each property group is a case to check - the property name is the flag
+    Each keyvalues group is a case to check - the Keyvalues name is the flag
     argument, and the contents are the results to execute in that case.
     The special group `"<default>"` is only run if no other flag is valid.
     For `random` mode, you can omit the flag to choose from all objects. In
@@ -1269,32 +1266,32 @@ def res_switch(coll: collisions.Collisions, info: MapInfo, res: Property) -> Res
     """
     flag_name = ''
     method = SWITCH_TYPE.FIRST
-    raw_cases: list[Property] = []
-    default: list[Property] = []
+    raw_cases: list[Keyvalues] = []
+    default: list[Keyvalues] = []
     rand_seed = ''
-    for prop in res:
-        if prop.has_children():
-            if prop.name == '<default>':
-                default.extend(prop)
+    for kv in res:
+        if kv.has_children():
+            if kv.name == '<default>':
+                default.extend(kv)
             else:
-                raw_cases.append(prop)
+                raw_cases.append(kv)
         else:
-            if prop.name == 'flag':
-                flag_name = prop.value
+            if kv.name == 'flag':
+                flag_name = kv.value
                 continue
-            if prop.name == 'method':
+            if kv.name == 'method':
                 try:
-                    method = SWITCH_TYPE(prop.value.casefold())
+                    method = SWITCH_TYPE(kv.value.casefold())
                 except ValueError:
                     pass
-            elif prop.name == 'seed':
-                rand_seed = prop.value
+            elif kv.name == 'seed':
+                rand_seed = kv.value
 
     if method is SWITCH_TYPE.LAST:
         raw_cases.reverse()
 
-    conf_cases: list[tuple[Property, list[Property]]] = [
-        (Property(flag_name, case.real_name), list(case))
+    conf_cases: list[tuple[Keyvalues, list[Keyvalues]]] = [
+        (Keyvalues(flag_name, case.real_name), list(case))
         for case in raw_cases
     ]
 
@@ -1324,7 +1321,7 @@ def res_switch(coll: collisions.Collisions, info: MapInfo, res: Property) -> Res
 
 
 @make_result('staticPiston')
-def make_static_pist(vmf: srctools.VMF, res: Property) -> Callable[[Entity], None]:
+def make_static_pist(vmf: srctools.VMF, res: Keyvalues) -> Callable[[Entity], None]:
     """Convert a regular piston into a static version.
 
     This is done to save entities and improve lighting.
@@ -1424,7 +1421,7 @@ def make_static_pist(vmf: srctools.VMF, res: Property) -> Callable[[Entity], Non
 
 
 @make_result('GooDebris')
-def res_goo_debris(vmf: VMF, res: Property) -> object:
+def res_goo_debris(vmf: VMF, res: Keyvalues) -> object:
     """Add random instances to goo squares.
 
     Options:

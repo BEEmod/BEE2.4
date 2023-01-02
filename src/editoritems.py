@@ -9,7 +9,7 @@ from pathlib import PurePosixPath as FSPath
 
 import attrs
 
-from srctools import Vec, logger, conv_int, conv_bool, Property, Output
+from srctools import Vec, logger, conv_int, conv_bool, Keyvalues, Output
 from srctools.tokenizer import Tokenizer, Token
 
 from connections import Config as ConnConfig, InputType, OutNames
@@ -1008,7 +1008,7 @@ class Item:
 
         This expects the "Item" token to have been read already.
         """
-        connections = Property('Connections', [])
+        connections = Keyvalues('Connections', [])
         tok.expect(Token.BRACE_OPEN)
         item = Item('')
 
@@ -1066,7 +1066,7 @@ class Item:
             except KeyError:
                 LOGGER.warning('Subtype property of "{}" set, but property not present!', prop_name)
 
-        # Parse the connections info, if it exists.
+        # Parse the connection info, if it exists.
         if connections or item.conn_inputs or item.conn_outputs:
             item.conn_config = ConnConfig.parse(item.id, connections)
             item._finalise_connections()
@@ -1182,11 +1182,11 @@ class Item:
                     default, prop_type.id,
                 )
 
-    def _parse_export_block(self, tok: Tokenizer, connections: Property) -> None:
+    def _parse_export_block(self, tok: Tokenizer, connections: Keyvalues) -> None:
         """Parse the export block of the item definitions. This returns the parsed connection's info.
 
         Since the standard input/output blocks must be parsed in one group, we collect those in the
-        passed-in property block for later parsing.
+        passed-in keyvalues block for later parsing.
         """
         for key in tok.block('Exporting'):
             folded_key = key.casefold()
@@ -1266,14 +1266,14 @@ class Item:
     def _parse_connections(
         self,
         tok: Tokenizer,
-        prop_block: Property,
+        kv_block: Keyvalues,
         target: dict[ConnTypes, Connection],
     ) -> None:
         """Parse either an inputs or outputs block.
 
         This is either a regular PeTI block with Activate/Deactivate options,
         or the BEE2 block with custom options. In the latter case it's stored
-        in a property block for later parsing (since inputs/outputs need to
+        in a keyvalues block for later parsing (since inputs/outputs need to
         be combined).
         """
         for conn_name in tok.block('Connection'):
@@ -1291,7 +1291,7 @@ class Item:
                             if 'out' in value:
                                 self.force_output = True
                         else:
-                            prop_block.append(Property(key, value))
+                            kv_block.append(Keyvalues(key, value))
                     continue  # We deal with this after the export block is done.
                 else:
                     raise tok.error('Unknown connection type "{}"!', conn_name)
@@ -1946,10 +1946,7 @@ class Item:
             self.force_output,
         ) = state
 
-        self.properties = {
-            prop.kind.id.casefold(): prop
-            for prop in props
-        }
+        self.properties = {prop.kind.id.casefold(): prop for prop in props}
         self.antline_points = dict(zip(ConnSide, antline_points))
 
     def validate(self) -> None:

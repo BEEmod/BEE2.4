@@ -16,7 +16,7 @@ from operator import attrgetter
 import attrs
 from srctools import Property
 from srctools.filesys import FileSystem, ZipFileSystem, RawFileSystem, VPKFileSystem
-from srctools.math import Vec, Angle, Matrix, to_matrix
+from srctools.math import AnyAngle, AnyMatrix, FrozenVec, Vec, Angle, Matrix, to_matrix
 from srctools.vmf import EntityFixup, Entity, EntityGroup, Solid, Side, VMF, UVAxis, VisGroup
 from srctools.dmx import Element as DMElement
 import srctools.logger
@@ -233,8 +233,8 @@ class ExportedTemplate:
 
 # Make_prism() generates faces aligned to world, copy the required UVs.
 realign_solid: Solid = VMF().make_prism(Vec(-16, -16, -16), Vec(16, 16, 16)).solid
-REALIGN_UVS = {
-    face.normal().as_tuple(): (face.uaxis, face.vaxis)
+REALIGN_UVS: Dict[FrozenVec, Tuple[UVAxis, UVAxis]] = {
+    face.normal().freeze(): (face.uaxis, face.vaxis)
     for face in realign_solid
 }
 del realign_solid
@@ -360,14 +360,14 @@ class ScalingTemplate(Mapping[
     def __init__(
         self,
         temp_id: str,
-        axes: dict[tuple[float, float, float], tuple[str, UVAxis, UVAxis, float]],
+        axes: dict[FrozenVec, tuple[str, UVAxis, UVAxis, float]],
     ):
         self.id = temp_id
         self._axes = axes
         missing = {
-            (0, 0, 1), (0, 0, -1),
-            (1, 0, 0), (-1, 0, 0),
-            (0, -1, 0), (0, 1, 0),
+            FrozenVec(0, 0, 1), FrozenVec(0, 0, -1),
+            FrozenVec(1, 0, 0), FrozenVec(-1, 0, 0),
+            FrozenVec(0, -1, 0), FrozenVec(0, 1, 0),
         } - axes.keys()
         if missing:
             raise ValueError(f'Missing axes for scaling template {temp_id}: {missing}')
@@ -400,30 +400,28 @@ class ScalingTemplate(Mapping[
 
     def __getitem__(
         self,
-        normal: Union[Vec, tuple[float, float, float]],
+        normal: Union[Vec, FrozenVec, tuple[float, float, float]],
     ) -> tuple[str, UVAxis, UVAxis, float]:
-        if isinstance(normal, Vec):
-            normal = normal.as_tuple()
-        mat, axis_u, axis_v, rotation = self._axes[normal]
+        mat, axis_u, axis_v, rotation = self._axes[FrozenVec(normal)]
         return mat, axis_u.copy(), axis_v.copy(), rotation
 
     def rotate(self, angles: Union[Angle, Matrix], origin: Optional[Vec]=None) -> ScalingTemplate:
         """Rotate this template, and return a new template with those angles."""
-        new_axis: dict[tuple[float, float, float], tuple[str, UVAxis, UVAxis, float]] = {}
+        new_axis: dict[FrozenVec, tuple[str, UVAxis, UVAxis, float]] = {}
         if origin is None:
             origin = Vec()
 
+        orient = to_matrix(angles)
         for norm, (mat, axis_u, axis_v, rot) in self._axes.items():
-            axis_u = axis_u.localise(origin, angles)
-            axis_v = axis_v.localise(origin, angles)
-            v_norm = Vec(norm) @ angles
-            new_axis[v_norm.as_tuple()] = mat, axis_u, axis_v, rot
+            axis_u = axis_u.localise(origin, orient)
+            axis_v = axis_v.localise(origin, orient)
+            new_axis[norm @ orient] = mat, axis_u, axis_v, rot
 
         return ScalingTemplate(self.id, new_axis)
 
     def apply(self, face: Side, *, change_mat: bool=True) -> None:
         """Apply the template to a face."""
-        mat, face.uaxis, face.vaxis, face.ham_rot = self[face.normal().as_tuple()]
+        mat, face.uaxis, face.vaxis, face.ham_rot = self[face.normal()]
         if change_mat:
             face.mat = mat
 
@@ -496,7 +494,7 @@ def _parse_template(loc: UnparsedTemplate) -> Template:
     if conf['template_id'].upper() != loc.id:
         raise ValueError(f'Mismatch in template IDs: "{conf["template_id"]}" != "{loc.id}"!')
 
-    def yield_world_detail() -> Iterator[tuple[list[Solid], bool, set[str]]]:
+    def yield_world_detail() -> Iterator[tuple[list[Solid], bool, set[int]]]:
         """Yield all world/detail solids in the map.
 
         This also indicates if it's a func_detail, and the visgroup IDs.
@@ -684,7 +682,7 @@ def import_template(
     vmf: VMF,
     temp_name: Union[str, Template],
     origin: Vec,
-    angles: Optional[Union[Angle, Matrix]]=None,
+    angles: Optional[Union[AnyAngle, AnyMatrix]]=None,
     targetname: str='',
     force_type: TEMP_TYPES=TEMP_TYPES.default,
     add_to_map: bool=True,
@@ -898,7 +896,7 @@ def import_template(
         orig_ids=id_mapping,
         template=template,
         origin=origin,
-        orient=orient,
+        orient=Matrix(orient),
         visgroups=chosen_groups,
         picker_results={},  # Filled by retexture_template.
         picker_type_results={},
@@ -919,11 +917,11 @@ def get_scaling_template(temp_id: str) -> ScalingTemplate:
     except KeyError:
         pass
     temp = get_template(temp_name)
-    uvs: dict[tuple[float, float, float], tuple[str, UVAxis, UVAxis, float]] = {}
+    uvs: dict[FrozenVec, tuple[str, UVAxis, UVAxis, float]] = {}
 
     for brush in temp.visgrouped_solids(over_names):
         for side in brush.sides:
-            uvs[side.normal().as_tuple()] = (
+            uvs[side.normal().freeze()] = (
                 side.mat,
                 side.uaxis.copy(),
                 side.vaxis.copy(),
@@ -1251,11 +1249,11 @@ def retexture_template(
 
             folded_mat = face.mat.casefold()
 
-            norm = face.normal()
+            norm = face.normal().freeze()
 
             if orig_id in template.realign_faces:
                 try:
-                    uaxis, vaxis = REALIGN_UVS[norm.as_tuple()]
+                    uaxis, vaxis = REALIGN_UVS[norm]
                 except KeyError:
                     LOGGER.warning(
                         'Realign face in template "{}" ({} in final) is '
@@ -1327,7 +1325,7 @@ def retexture_template(
                 texturing.apply(gen_type, face, tex_name)
 
                 if tex_name in ('goo', 'goo_cheap'):
-                    if norm != (0, 0, -1):
+                    if norm.z > -0.9:
                         # Goo must be facing upright!
                         # Retexture to nodraw, so a template can be made with
                         # all faces goo to work in multiple orientations.

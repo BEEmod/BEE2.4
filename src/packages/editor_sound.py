@@ -1,6 +1,6 @@
 """Adds sounds useable in the editor."""
 from packages import PakObject, ParseData, ExportData
-from srctools import Property
+from srctools import Keyvalues
 
 
 class EditorSound(PakObject):
@@ -11,7 +11,7 @@ class EditorSound(PakObject):
     The ID is the name of the sound, prefixed with 'BEE2_Editor.'.
     The values in 'keys' will form the soundscript body.
     """
-    def __init__(self, snd_name: str, data: Property) -> None:
+    def __init__(self, snd_name: str, data: Keyvalues) -> None:
         self.id = snd_name
         self.data = data
         data.name = 'BEE2_Editor.' + self.id

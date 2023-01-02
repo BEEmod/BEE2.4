@@ -6,7 +6,7 @@ from typing import NamedTuple, Optional
 from PIL import Image
 
 from srctools.vtf import ImageFormats, VTF, VTFFlags
-from srctools import Property
+from srctools import Keyvalues
 import srctools.logger
 
 from packages import PackagesSet, PakObject, ParseData, ExportData, Style
@@ -182,7 +182,7 @@ class Signage(PakObject, allow_mult=True, needs_foreground=True):
 
         sel_icons: dict[int, ImgHandle] = {}
 
-        conf = Property('Signage', [])
+        conf = Keyvalues('Signage', [])
 
         for tim_id, sign_id in sel_ids:
             try:
@@ -190,7 +190,7 @@ class Signage(PakObject, allow_mult=True, needs_foreground=True):
             except KeyError:
                 LOGGER.warning('Signage "{}" does not exist!', sign_id)
                 continue
-            prop_block = Property(str(tim_id), [])
+            prop_block = Keyvalues(str(tim_id), [])
 
             sty_sign = sign._serialise(prop_block, exp_data.selected_style)
 
@@ -206,7 +206,7 @@ class Signage(PakObject, allow_mult=True, needs_foreground=True):
                             'Signage "{}"\'s {} "{}" '
                             'does not exist!', sign_id, sub_name, sub_id)
                     else:
-                        sub_block = Property(sub_name, [])
+                        sub_block = Keyvalues(sub_name, [])
                         sub_sign._serialise(sub_block, exp_data.selected_style)
                         if sub_block:
                             prop_block.append(sub_block)
@@ -223,7 +223,7 @@ class Signage(PakObject, allow_mult=True, needs_foreground=True):
             exp_data.packset, exp_data.selected_style, sel_icons,
         )
 
-    def _serialise(self, parent: Property, style: Style) -> Optional[SignStyle]:
+    def _serialise(self, parent: Keyvalues, style: Style) -> Optional[SignStyle]:
         """Write this sign's data for the style to the provided property."""
         for potential_style in style.bases:
             try:
@@ -241,9 +241,9 @@ class Signage(PakObject, allow_mult=True, needs_foreground=True):
                 data = self.styles['BEE2_CLEAN']
             except KeyError:
                 return None
-        parent.append(Property('world', data.world))
-        parent.append(Property('overlay', data.overlay))
-        parent.append(Property('type', data.type))
+        parent.append(Keyvalues('world', data.world))
+        parent.append(Keyvalues('overlay', data.overlay))
+        parent.append(Keyvalues('type', data.type))
         return data
 
 

@@ -8,7 +8,7 @@ from packages import (
     PackagesSet, PakObject, set_cond_source, ParseData,
     get_config, ExportData, LOGGER, SelitemData,
 )
-from srctools import Property, Vec, NoKeyError
+from srctools import Keyvalues, Vec, NoKeyError
 
 
 class QuotePack(PakObject, needs_foreground=True):
@@ -17,7 +17,7 @@ class QuotePack(PakObject, needs_foreground=True):
         self,
         quote_id,
         selitem_data: 'SelitemData',
-        config: Property,
+        config: Keyvalues,
         chars: Optional[Set[str]]=None,
         skin: Optional[int]=None,
         studio: str=None,
@@ -94,7 +94,7 @@ class QuotePack(PakObject, needs_foreground=True):
             turret_hate=turret_hate,
             )
 
-    def add_over(self, override: 'QuotePack'):
+    def add_over(self, override: 'QuotePack') -> None:
         """Add the additional lines to ourselves."""
         self.selitem_data += override.selitem_data
         self.config += override.config
@@ -124,13 +124,13 @@ class QuotePack(PakObject, needs_foreground=True):
             return  # No quote pack!
 
         try:
-            voice = QuotePack.by_id(exp_data.selected)  # type: QuotePack
+            voice = QuotePack.by_id(exp_data.selected)
         except KeyError:
             raise Exception(
                 "Selected voice ({}) doesn't exist?".format(exp_data.selected)
             ) from None
 
-        vbsp_config = exp_data.vbsp_conf  # type: Property
+        vbsp_config = exp_data.vbsp_conf
 
         # We want to strip 'trans' sections from the voice pack, since
         # they're not useful.
@@ -178,20 +178,20 @@ class QuotePack(PakObject, needs_foreground=True):
                 LOGGER.info('No {} voice config!', pretty)
 
     @staticmethod
-    def strip_quote_data(prop: Property, _depth=0) -> Property:
+    def strip_quote_data(kv: Keyvalues, _depth=0) -> Keyvalues:
         """Strip unused property blocks from the config files.
 
         This removes data like the captions which the compiler doesn't need.
         The returned property tree is a deep-copy of the original.
         """
         children = []
-        for sub_prop in prop:
+        for sub_prop in kv:
             # Make sure it's in the right nesting depth - flags might
-            # have arbitrary props in lower depths..
+            # have arbitrary props in lower depths...
             if _depth == 3:  # 'Line' blocks
                 if sub_prop.name == 'trans':
                     continue
-                elif sub_prop.name == 'name' and 'id' in prop:
+                elif sub_prop.name == 'name' and 'id' in kv:
                     continue  # The name isn't needed if an ID is available
             elif _depth == 2 and sub_prop.name == 'name':
                 # In the "quote" section, the name isn't used in the compiler.
@@ -200,14 +200,14 @@ class QuotePack(PakObject, needs_foreground=True):
             if sub_prop.has_children():
                 children.append(QuotePack.strip_quote_data(sub_prop, _depth + 1))
             else:
-                children.append(Property(sub_prop.real_name, sub_prop.value))
-        return Property(prop.real_name, children)
+                children.append(Keyvalues(sub_prop.real_name, sub_prop.value))
+        return Keyvalues(kv.real_name, children)
 
     @classmethod
     async def post_parse(cls, packset: PackagesSet) -> None:
         """Verify no quote packs have duplicate IDs."""
 
-        def iter_lines(conf: Property) -> Iterator[Property]:
+        def iter_lines(conf: Keyvalues) -> Iterator[Keyvalues]:
             """Iterate over the varios line blocks."""
             yield from conf.find_all("Quotes", "Group", "Quote", "Line")
 

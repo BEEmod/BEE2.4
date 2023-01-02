@@ -1,5 +1,5 @@
 """Generates Bottomless Pits."""
-from srctools import Vec, Property, VMF, Solid, Side, Output, Angle
+from srctools import Vec, Keyvalues, VMF, Solid, Side, Output, Angle
 import srctools.logger
 import utils
 from precomp import brushLoc, options, rand, conditions
@@ -16,7 +16,7 @@ SETTINGS = {}
 PIT_INST = {}
 
 
-def pits_allowed():
+def pits_allowed() -> bool:
     """Are bottomless pits allowed in the configs?"""
     return bool(SETTINGS)
 
@@ -26,7 +26,7 @@ def is_pit(bbox_min: Vec, bbox_max: Vec):
     return BOTTOMLESS_PIT_MIN >= bbox_min.z
 
 
-def load_settings(pit: Property):
+def load_settings(pit: Keyvalues) -> None:
     if not pit:
         SETTINGS.clear()
         # No pits are permitted..
@@ -160,7 +160,7 @@ def make_bottomless_pit(vmf: VMF, max_height):
     tele_trig = None
     hurt_trig = None
 
-    for grid_pos, block_type in brushLoc.POS.items():  # type: Vec, brushLoc.Block
+    for grid_pos, block_type in brushLoc.POS.items():
         pos = brushLoc.grid_to_world(grid_pos)
         if not block_type.is_pit:
             continue

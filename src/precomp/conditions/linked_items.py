@@ -5,7 +5,7 @@ from enum import Enum
 import math
 
 import attrs
-from srctools import Property, VMF, Entity
+from srctools import Keyvalues, VMF, Entity
 import srctools.logger
 
 from precomp import instanceLocs, item_chain, conditions
@@ -42,7 +42,7 @@ class Config:
     scaff_endcap_free_rot: bool
 
 
-def resolve_optional(prop: Property, key: str) -> str:
+def resolve_optional(prop: Keyvalues, key: str) -> str:
     """Resolve the given instance, or return '' if not defined."""
     try:
         file = prop[key]
@@ -55,7 +55,7 @@ ITEMS_TO_LINK: dict[str, list[item_chain.Node[Config]]] = {}
 
 
 @conditions.make_result('LinkedItem')
-def res_linked_item(res: Property) -> Callable[[Entity], None]:
+def res_linked_item(res: Keyvalues) -> Callable[[Entity], None]:
     """Marks the current instance for linkage together into a chain.
 
     At priority level -300, the sequence of similarly-marked items this links
@@ -89,7 +89,7 @@ def res_linked_item(res: Property) -> Callable[[Entity], None]:
       facing upwards, and is the end for a mostly horizontal beam it is switched
       to this instance, and rotated to face towards the previous track.
     * endcap_free_rotate: If true, the endcap can point in any angle, otherwise
-      it points in the nearest 90 degree angle.
+      it points in the nearest 90-degree angle.
     """
     try:
         group = res['group'].casefold()

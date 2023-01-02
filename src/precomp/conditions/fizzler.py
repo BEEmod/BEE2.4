@@ -1,5 +1,5 @@
 """Results for custom fizzlers."""
-from srctools import Property, Entity, Vec, VMF, Matrix
+from srctools import Keyvalues, Entity, Vec, VMF, Matrix
 import srctools.logger
 
 import user_errors
@@ -13,7 +13,7 @@ LOGGER = srctools.logger.get_logger(__name__, alias='cond.fizzler')
 
 
 @conditions.make_flag('FizzlerType')
-def flag_fizz_type(inst: Entity, flag: Property):
+def flag_fizz_type(inst: Entity, flag: Keyvalues) -> bool:
     """Check if a fizzler is the specified type name."""
     try:
         fizz = fizzler.FIZZLERS[inst['targetname']]
@@ -23,7 +23,7 @@ def flag_fizz_type(inst: Entity, flag: Property):
 
 
 @conditions.make_result('ChangeFizzlerType')
-def res_change_fizzler_type(inst: Entity, res: Property):
+def res_change_fizzler_type(inst: Entity, res: Keyvalues) -> None:
     """Change the type of the fizzler. Only valid when run on the base instance."""
     fizz_name = inst['targetname']
     try:
@@ -42,7 +42,7 @@ def res_change_fizzler_type(inst: Entity, res: Property):
 
 
 @conditions.make_result('ReshapeFizzler')
-def res_reshape_fizzler(vmf: VMF, shape_inst: Entity, res: Property):
+def res_reshape_fizzler(vmf: VMF, shape_inst: Entity, res: Keyvalues) -> None:
     """Convert a fizzler connected via the output to a new shape.
 
     This allows for different placing of fizzler items.

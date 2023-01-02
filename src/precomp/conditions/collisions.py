@@ -1,6 +1,6 @@
 """Conditions which query or modify item collisions."""
 from __future__ import annotations
-from srctools import Matrix, Vec, Property, VMF, Entity, conv_float, logger
+from srctools import Matrix, Vec, Keyvalues, VMF, Entity, conv_float, logger
 
 from precomp import conditions, instance_traits
 from precomp.collisions import CollideType, Collisions, BBox
@@ -14,7 +14,7 @@ CollModification = Callable[[Entity, Collisions], None]
 
 
 @conditions.make_result('Collisions')
-def res_mod_conditions(vmf: VMF, inst: Entity, coll: Collisions, res: Property) -> None:
+def res_mod_conditions(vmf: VMF, inst: Entity, coll: Collisions, res: Keyvalues) -> None:
     """Modify conditions on the current item. Each block inside is applied one by one:
 
     - BBox: Add a new collision box for this item:

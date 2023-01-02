@@ -1,5 +1,5 @@
 """Modify and inspect faith plates."""
-from srctools import Angle, Property, Entity, logger
+from srctools import Angle, Keyvalues, Entity, logger
 from precomp import faithplate, template_brush, conditions
 
 
@@ -8,7 +8,7 @@ LOGGER = logger.get_logger(__name__, alias='cond.faithplate')
 
 
 @conditions.make_flag("FaithType")
-def flag_faith_type(inst: Entity, flag: Property) -> bool:
+def flag_faith_type(inst: Entity, flag: Keyvalues) -> bool:
     """Determine the type of faith plate used.
 
     The value can be set to 'straight', 'straightup', 'angled',
@@ -39,7 +39,7 @@ def flag_faith_type(inst: Entity, flag: Property) -> bool:
 
 
 @conditions.make_result('setFaithAttrs', 'setFaith', 'setFaithAttr')
-def res_set_faith(res: Property) -> conditions.ResultCallable:
+def res_set_faith(res: Keyvalues) -> conditions.ResultCallable:
     """Modify the `trigger_catapult`s used for `ItemFaithPlate` items.
 
     This can also be used to modify the catapult for bomb-type Gel Droppers.

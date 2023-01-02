@@ -1,6 +1,6 @@
 """Logic for trigger items, allowing them to be resized."""
 from contextlib import suppress
-from srctools import Property, Vec, Output, VMF
+from srctools import Keyvalues, Vec, Output, VMF
 import srctools.logger
 
 from precomp import instanceLocs, connections, options, conditions
@@ -14,7 +14,7 @@ LOGGER = srctools.logger.get_logger(__name__, alias='cond.resizeTrig')
 
 
 @conditions.make_result('ResizeableTrigger')
-def res_resizeable_trigger(vmf: VMF, info: conditions.MapInfo, res: Property) -> object:
+def res_resizeable_trigger(vmf: VMF, info: conditions.MapInfo, res: Keyvalues) -> object:
     """Replace two markers with a trigger brush.
 
     This is run once to affect all of an item.

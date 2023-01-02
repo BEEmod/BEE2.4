@@ -27,8 +27,8 @@ import urllib.request
 import webbrowser
 
 from srctools import (
-    Vec, VPK, Vec_tuple,
-    Property, AtomicWriter,
+    Vec, VPK, FrozenVec,
+    Keyvalues, AtomicWriter,
     VMF, Output,
     FileSystem, FileSystemChain,
 )
@@ -707,7 +707,7 @@ class Game:
             os.makedirs(self.abs_path('bin/bee2/'), exist_ok=True)
 
             # Start off with the style's data.
-            vbsp_config = Property.root()
+            vbsp_config = Keyvalues.root()
             vbsp_config += style.config().copy()
 
             all_items = style.items.copy()
@@ -1007,14 +1007,14 @@ class Game:
         else:
             LOGGER.warning('No custom editor models!')
 
-    def generate_fizzler_sides(self, conf: Property):
+    def generate_fizzler_sides(self, conf: Keyvalues):
         """Create the VMTs used for fizzler sides."""
-        fizz_colors: dict[Vec_tuple, tuple[float, str]] = {}
+        fizz_colors: dict[FrozenVec, tuple[float, str]] = {}
         mat_path = self.abs_path('bee2/materials/bee2/fizz_sides/side_color_')
         for brush_conf in conf.find_all('Fizzlers', 'Fizzler', 'Brush'):
             fizz_color = brush_conf['Side_color', '']
             if fizz_color:
-                fizz_colors[Vec.from_str(fizz_color).as_tuple()] = (
+                fizz_colors[FrozenVec.from_str(fizz_color)] = (
                     brush_conf.float('side_alpha', 1),
                     brush_conf['side_vortex', fizz_color]
                 )
@@ -1027,7 +1027,7 @@ class Game:
                 round(fizz_color_vec.z * 255),
             )
             with open(file_path, 'w') as f:
-                f.write(FIZZLER_EDGE_MAT.format(Vec(fizz_color_vec), fizz_vortex_color))
+                f.write(FIZZLER_EDGE_MAT.format(fizz_color_vec, fizz_vortex_color))
                 if alpha != 1:
                     # Add the alpha value, but replace 0.5 -> .5 to save a char.
                     f.write('$outputintensity {}\n'.format(format(alpha, 'g').replace('0.', '.')))
@@ -1101,7 +1101,7 @@ class Game:
             # Portal 2 isn't here...
             return 'en'
         with appman_file:
-            appman = Property.parse(appman_file, 'appmanifest_620.acf')
+            appman = Keyvalues.parse(appman_file, 'appmanifest_620.acf')
         try:
             return appman.find_key('AppState').find_key('UserConfig')['language']
         except LookupError:

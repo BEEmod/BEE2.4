@@ -10,7 +10,7 @@ from precomp.conditions import (
     DIRECTIONS,
 )
 from precomp import tiling, brushLoc
-from srctools import Vec, Angle, Matrix, conv_float, Property, Entity
+from srctools import Vec, Angle, Matrix, conv_float, Keyvalues, Entity
 from srctools.logger import get_logger
 
 
@@ -31,7 +31,7 @@ TILE_PREDICATES: Dict[str, Set[tiling.TileType]] = {}
     'dir',
     'direction',
 )
-def flag_angles(flag: Property) -> Callable[[Entity], bool]:
+def flag_angles(flag: Keyvalues) -> Callable[[Entity], bool]:
     """Check that a instance is pointed in a direction.
 
     The value should be either just the angle to check, or a block of
@@ -79,7 +79,7 @@ def flag_angles(flag: Property) -> Callable[[Entity], bool]:
 
 def brush_at_loc(
     inst: Entity,
-    props: Property,
+    kv: Keyvalues,
 ) -> Tuple[tiling.TileType, bool, Set[tiling.TileType]]:
     """Common code for posIsSolid and ReadSurfType.
 
@@ -90,23 +90,23 @@ def brush_at_loc(
     orient = Matrix.from_angstr(inst['angles'])
 
     # Allow using pos1 instead, to match pos2.
-    pos = props.vec('pos1' if 'pos1' in props else 'pos')
+    pos = kv.vec('pos1' if 'pos1' in kv else 'pos')
     pos.z -= 64  # Subtract so origin is the floor-position
 
     pos.localise(origin, orient)
 
-    norm: Vec = round(props.vec('dir', 0, 0, 1) @ orient, 6)
+    norm: Vec = round(kv.vec('dir', 0, 0, 1) @ orient, 6)
 
-    if props.bool('gridpos') and norm is not None:
+    if kv.bool('gridpos') and norm is not None:
         for axis in 'xyz':
             # Don't realign things in the normal's axis -
             # those are already fine.
             if norm[axis] == 0:
                 pos[axis] = pos[axis] // 128 * 128 + 64
 
-    result_var = props['setVar', '']
+    result_var = kv['setVar', '']
     # RemoveBrush is the pre-tiling name.
-    should_remove = props.bool('RemoveTile', props.bool('RemoveBrush', False))
+    should_remove = kv.bool('RemoveTile', kv.bool('RemoveBrush', False))
 
     tile_types: Set[tiling.TileType] = set()
     both_colors = False
@@ -125,8 +125,8 @@ def brush_at_loc(
     else:
         visgroup = first_trace = None
 
-    if 'pos2' in props:
-        pos2 = props.vec('pos2')
+    if 'pos2' in kv:
+        pos2 = kv.vec('pos2')
         pos2.z -= 64  # Subtract so origin is the floor-position
         pos2.localise(origin, orient)
 
@@ -200,7 +200,7 @@ def brush_at_loc(
 
 
 @make_flag('posIsSolid')
-def flag_brush_at_loc(inst: Entity, flag: Property):
+def flag_brush_at_loc(inst: Entity, flag: Keyvalues) -> bool:
     """Checks to see if a tile is present at the given location.
 
     - `Pos` is the position of the tile, where `0 0 0` is the floor-position
@@ -326,7 +326,7 @@ del _fill_predicates
 
 
 @make_result('ReadSurfType')
-def res_brush_at_loc(inst: Entity, res: Property):
+def res_brush_at_loc(inst: Entity, res: Keyvalues) -> None:
     """Read the type of surface at a particular location.
 
     - `Pos` is the position of the tile, where `0 0 0` is the floor-position
@@ -347,7 +347,7 @@ def res_brush_at_loc(inst: Entity, res: Property):
 
 
 @make_flag('PosIsGoo')
-def flag_goo_at_loc(inst: Entity, flag: Property):
+def flag_goo_at_loc(inst: Entity, flag: Keyvalues) -> bool:
     """Check to see if a given location is submerged in goo.
 
     `0 0 0` is the origin of the instance, values are in `128` increments.
@@ -356,7 +356,7 @@ def flag_goo_at_loc(inst: Entity, flag: Property):
 
 
 @make_flag('BlockType')
-def flag_blockpos_type(inst: Entity, flag: Property):
+def flag_blockpos_type(inst: Entity, flag: Keyvalues) -> bool:
     """Determine the type of a grid position.
 
     If the value is single value, that should be the type.
@@ -415,7 +415,7 @@ def flag_blockpos_type(inst: Entity, flag: Property):
 
 
 @make_result('SetBlock')
-def res_set_block(inst: Entity, res: Property) -> None:
+def res_set_block(inst: Entity, res: Keyvalues) -> None:
     """Set a block to the given value, overwriting the existing value.
 
     - `type` is the type of block to set:
@@ -474,7 +474,7 @@ def res_force_upright(inst: Entity):
 
 
 @make_result('switchOrientation')
-def res_alt_orientation(res: Property) -> Callable[[Entity], None]:
+def res_alt_orientation(res: Keyvalues) -> Callable[[Entity], None]:
     """Apply an alternate orientation.
 
     "wall" makes the attaching surface in the -X direction, making obs rooms,
@@ -497,13 +497,13 @@ def res_alt_orientation(res: Property) -> Callable[[Entity], None]:
 
 
 @make_result('setAngles')
-def res_set_angles(inst: Entity, res: Property):
+def res_set_angles(inst: Entity, res: Keyvalues) -> None:
     """Set the orientation of an instance to a certain angle."""
     inst['angles'] = inst.fixup.substitute(res.value)
 
 
 @make_result('OffsetInst', 'offsetinstance')
-def res_translate_inst(inst: Entity, res: Property):
+def res_translate_inst(inst: Entity, res: Keyvalues) -> None:
     """Translate the instance locally by the given amount.
 
     The special values `<piston>`, `<piston_bottom>` and `<piston_top>` can be
@@ -514,7 +514,7 @@ def res_translate_inst(inst: Entity, res: Property):
 
 
 @make_result('OppositeWallDist')
-def res_calc_opposite_wall_dist(inst: Entity, res: Property):
+def res_calc_opposite_wall_dist(inst: Entity, res: Keyvalues) -> None:
     """Calculate the distance between this item and the opposing wall.
 
     The value is stored in the `$var` specified by the property value.
@@ -563,7 +563,7 @@ def res_calc_opposite_wall_dist(inst: Entity, res: Property):
 
 
 @make_result('RotateInst', 'RotateInstance')
-def res_rotate_inst(inst: Entity, res: Property) -> None:
+def res_rotate_inst(inst: Entity, res: Keyvalues) -> None:
     """Rotate the instance around an axis.
 
     If `axis` is specified, it should be a normal vector and the instance will

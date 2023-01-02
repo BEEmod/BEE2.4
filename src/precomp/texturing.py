@@ -8,7 +8,7 @@ import abc
 import attrs
 import trio
 
-from srctools import Property, Vec, conv_bool
+from srctools import FrozenVec, Property, Vec, conv_bool
 from srctools.game import Game
 from srctools.tokenizer import TokenSyntaxError
 from srctools.vmf import VisGroup, VMF, Side, Solid
@@ -129,7 +129,7 @@ ANTIGEL_MATS: Dict[str, str] = {}
 ANTIGEL_PATH = 'BEE2/antigel/gen/'
 # The center of each voxel containing an antigel marker.
 # Surfaces inside here that aren't a voxel side will be converted.
-ANTIGEL_LOCS: Set[Tuple[float, float, float]] = set()
+ANTIGEL_LOCS: Set[FrozenVec] = set()
 
 ANTIGEL_TEMPLATE = '''\
 Patch
@@ -773,7 +773,7 @@ class Generator(abc.ABC):
         grid_loc = loc // 128
 
         if antigel is None:
-            antigel = grid_loc.as_tuple() in ANTIGEL_LOCS
+            antigel = grid_loc.freeze() in ANTIGEL_LOCS
         if antigel and self.category is GenCat.BULLSEYE and not self.options['antigel_bullseye']:
             assert self.orient is not None or self.portal is not None
             # We can't use antigel on bullseye materials, so revert to normal
@@ -903,8 +903,8 @@ class GenClump(Generator):
 
         # The tiles currently present in the map.
         orient_z = self.orient.z
-        remaining_tiles: Set[Tuple[float, float, float]] = {
-            (tile.pos + 64 * tile.normal // 128 * 128).as_tuple() for tile in tiles
+        remaining_tiles: Set[FrozenVec] = {
+            (tile.pos + 64 * tile.normal // 128 * 128).freeze() for tile in tiles
             if tile.normal.z == orient_z
         }
 
@@ -928,7 +928,7 @@ class GenClump(Generator):
             tile_pos = next(itertools.islice(
                 remaining_tiles,
                 clump_rand.randrange(0, len(remaining_tiles)),
-                len(remaining_tiles),
+                None,
             ))
             remaining_tiles.remove(tile_pos)
 
@@ -945,10 +945,7 @@ class GenClump(Generator):
                 pos_min[axis] = pos[axis] - clump_rand.randint(0, dist) * 128
                 pos_max[axis] = pos[axis] + clump_rand.randint(0, dist) * 128
 
-            remaining_tiles.difference_update(map(
-                Vec.as_tuple,
-                Vec.iter_grid(pos_min, pos_max, 128)
-            ))
+            remaining_tiles.difference_update(FrozenVec.iter_grid(pos_min, pos_max, 128))
 
             self._clump_locs.append(Clump(
                 pos_min.x, pos_min.y, pos_min.z,

@@ -119,15 +119,15 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
     async def parse(cls, data: packages.ParseData) -> CorridorGroup:
         """Parse from the file."""
         corridors: dict[CorrKind, list[CorridorUI]] = defaultdict(list)
-        for prop in data.info:
-            if prop.name in {'id'}:
+        for kv in data.info:
+            if kv.name in {'id'}:
                 continue
             images = [
                 img.Handle.parse(subprop, data.pak_id, IMG_WIDTH_LRG, IMG_HEIGHT_LRG)
-                for subprop in prop.find_all('Image')
+                for subprop in kv.find_all('Image')
             ]
-            if 'icon' in prop:
-                icon = img.Handle.parse(prop.find_key('icon'), data.pak_id, IMG_WIDTH_SML, IMG_HEIGHT_SML)
+            if 'icon' in kv:
+                icon = img.Handle.parse(kv.find_key('icon'), data.pak_id, IMG_WIDTH_SML, IMG_HEIGHT_SML)
             elif images:
                 icon = images[0].resize(IMG_WIDTH_SML, IMG_HEIGHT_SML)
             else:
@@ -135,38 +135,38 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
             if not images:
                 images.append(ICON_GENERIC_LRG)
 
-            mode, direction, orient = parse_specifier(prop.name)
+            mode, direction, orient = parse_specifier(kv.name)
 
-            if is_legacy := prop.bool('legacy'):
+            if is_legacy := kv.bool('legacy'):
 
                 if orient is Orient.HORIZONTAL:
                     LOGGER.warning(
                         '{.value}_{.value}_{.value} has legacy corridor "{}"',
-                        mode, direction, orient, prop['Name', prop['instance']],
+                        mode, direction, orient, kv['Name', kv['instance']],
                     )
                 else:
                     raise ValueError(
                         f'Non-horizontal {mode.value}_{direction.value}_{orient.value} corridor '
-                        f'"{prop["Name", prop["instance"]]}" cannot be defined as a legacy corridor!'
+                        f'"{kv["Name", kv["instance"]]}" cannot be defined as a legacy corridor!'
                     )
             try:
-                name = TransToken.parse(data.pak_id, prop['Name'])
+                name = TransToken.parse(data.pak_id, kv['Name'])
             except LookupError:
                 name = TRANS_CORRIDOR_GENERIC
 
             corridors[mode, direction, orient].append(CorridorUI(
-                instance=prop['instance'],
+                instance=kv['instance'],
                 name=name,
-                authors=packages.sep_values(prop['authors', '']),
-                desc=packages.desc_parse(prop, 'Corridor', data.pak_id),
-                orig_index=prop.int('DefaultIndex', 0),
-                config=packages.get_config(prop, 'items', data.pak_id, source='Corridor ' + prop.name),
+                authors=packages.sep_values(kv['authors', '']),
+                desc=packages.desc_parse(kv, 'Corridor', data.pak_id),
+                orig_index=kv.int('DefaultIndex', 0),
+                config=packages.get_config(kv, 'items', data.pak_id, source='Corridor ' + kv.name),
                 images=images,
                 dnd_icon=icon,
                 legacy=is_legacy,
                 fixups={
                     subprop.name: subprop.value
-                    for subprop in prop.find_children('fixups')
+                    for subprop in kv.find_children('fixups')
                 },
             ))
         return CorridorGroup(data.id, dict(corridors))
