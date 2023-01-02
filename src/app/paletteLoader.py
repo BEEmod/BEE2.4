@@ -9,7 +9,7 @@ import io
 from uuid import UUID, uuid4, uuid5
 
 import srctools.logger
-from srctools import Property, NoKeyError, KeyValError
+from srctools import Keyvalues, NoKeyError, KeyValError
 
 from transtoken import TransToken
 import config
@@ -251,7 +251,7 @@ class Palette:
         """Parse a palette from a file."""
         needs_save = False
         with open(path, encoding='utf8') as f:
-            props = Property.parse(f, path)
+            props = Keyvalues.parse(f, path)
         name = props['Name', '??']
         items = []
         for item in props.find_children('Items'):
@@ -301,14 +301,14 @@ class Palette:
         versions). Otherwise those palettes always create a new file.
         """
         LOGGER.info('Saving "{}"!', self.name)
-        props = Property.root(
-            Property('Name', 'name'),
-            Property('TransName', 'trans_name'),
-            Property('Group', self.group),
-            Property('ReadOnly', srctools.bool_as_int(self.readonly)),
-            Property('UUID', self.uuid.hex),
-            Property('Items', [
-                Property(item_id, str(subitem))
+        kv = Keyvalues.root(
+            Keyvalues('Name', 'name'),
+            Keyvalues('TransName', 'trans_name'),
+            Keyvalues('Group', self.group),
+            Keyvalues('ReadOnly', srctools.bool_as_int(self.readonly)),
+            Keyvalues('UUID', self.uuid.hex),
+            Keyvalues('Items', [
+                Keyvalues(item_id, str(subitem))
                 for item_id, subitem in self.pos
             ])
         )
@@ -316,16 +316,16 @@ class Palette:
         # Remove the translated name, in case it's not going to write
         # properly to the file.
         if self.trans_name:
-            props['TransName'] = self.trans_name
-            props['Name'] = ''
+            kv['TransName'] = self.trans_name
+            kv['Name'] = ''
         else:
-            props['Name'] = self.name.token
-            del props['TransName']
+            kv['Name'] = self.name.token
+            del kv['TransName']
 
         if self.settings is not None:
-            settings_prop = Property('settings', [])
+            settings_prop = Keyvalues('settings', [])
             settings_prop.extend(config.APP.build_kv1(self.settings))
-            props.append(settings_prop)
+            kv.append(settings_prop)
 
         # We need to write a new file, determine a valid path.
         # Use a hash to ensure it's a valid path (without '-' if negative)
@@ -345,7 +345,7 @@ class Palette:
         else:
             file = open(os.path.join(PAL_DIR, self.filename), 'w', encoding='utf8')
         with file:
-            for line in props.export():
+            for line in kv.export():
                 file.write(line)
 
     def delete_from_disk(self) -> None:
@@ -428,8 +428,8 @@ def load_palettes() -> Iterator[Palette]:
 
 def parse_legacy(posfile, propfile, path) -> Palette | None:
     """Parse the original BEE2.2 palette format."""
-    props = Property.parse(propfile, path + ':properties.txt')
-    name = props['name', 'Unnamed']
+    kv = Keyvalues.parse(propfile, path + ':properties.txt')
+    name = kv['name', 'Unnamed']
     pos = []
     for dirty_line in posfile:
         line = srctools.clean_line(dirty_line)

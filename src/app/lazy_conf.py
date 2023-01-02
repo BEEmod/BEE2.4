@@ -4,7 +4,7 @@ from typing import Callable, Pattern
 import functools
 
 import trio
-from srctools import Property, logger, KeyValError
+from srctools import Keyvalues, logger, KeyValError
 from srctools.filesys import File
 
 import app
@@ -13,16 +13,16 @@ import utils
 
 
 LOGGER = logger.get_logger(__name__)
-LazyConf = Callable[[], Property]
+LazyConf = Callable[[], Keyvalues]
 # Empty property.
-BLANK: LazyConf = lambda: Property.root()
+BLANK: LazyConf = lambda: Keyvalues.root()
 
 
-def raw_prop(block: Property, source: str= '') -> LazyConf:
+def raw_prop(block: Keyvalues, source: str= '') -> LazyConf:
 	"""Make an existing property conform to the interface."""
 	if block or block.name is not None:
 		if source:
-			def copier() -> Property:
+			def copier() -> Keyvalues:
 				"""Copy the config, then apply the source."""
 				copy = block.copy()
 				packages.set_cond_source(copy, source)
@@ -49,17 +49,17 @@ def from_file(path: utils.PackagePath, missing_ok: bool=False, source: str= '') 
 			LOGGER.warning('File does not exist: "{}"', path)
 		return BLANK
 
-	def loader() -> Property:
+	def loader() -> Keyvalues:
 		"""Load and parse the specified file when called."""
 		try:
 			with file.open_str() as f:
-				props = Property.parse(f)
+				kv = Keyvalues.parse(f)
 		except (KeyValError, FileNotFoundError, UnicodeDecodeError):
 			LOGGER.exception('Unable to read "{}"', path)
 			raise
 		if source:
-			packages.set_cond_source(props, source)
-		return props
+			packages.set_cond_source(kv, source)
+		return kv
 
 	if app.DEV_MODE.get():
 		app.background_run(devmod_check, file, path)
@@ -71,7 +71,7 @@ async def devmod_check(file: File, path: utils.PackagePath) -> None:
 	# Parse immediately, to check syntax.
 	try:
 		with file.open_str() as f:
-			await trio.to_thread.run_sync(Property.parse, f, cancellable=True)
+			await trio.to_thread.run_sync(Keyvalues.parse, f, cancellable=True)
 	except (KeyValError, FileNotFoundError, UnicodeDecodeError):
 		LOGGER.exception('Unable to read "{}"', path)
 
@@ -86,12 +86,12 @@ def concat(a: LazyConf, b: LazyConf) -> LazyConf:
 	if b is BLANK:
 		return a
 
-	def concat_inner() -> Property:
+	def concat_inner() -> Keyvalues:
 		"""Resolve then merge the configs."""
-		prop = Property.root()
-		prop.extend(a())
-		prop.extend(b())
-		return prop
+		kv = Keyvalues.root()
+		kv.extend(a())
+		kv.extend(b())
+		return kv
 	return concat_inner
 
 
@@ -102,7 +102,7 @@ def replace(base: LazyConf, replacements: list[tuple[Pattern[str], str]]) -> Laz
 		for pattern, repl in replacements
 	]
 
-	def replacer() -> Property:
+	def replacer() -> Keyvalues:
 		"""Replace values."""
 		copy = base()
 		for prop in copy.iter_tree():

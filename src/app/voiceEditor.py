@@ -9,7 +9,7 @@ from tkinter import *
 from tkinter import font
 from tkinter import ttk
 
-from srctools import Property
+from srctools import Keyvalues
 import srctools.logger
 
 from BEE2_config import ConfigFile
@@ -147,7 +147,7 @@ def init_widgets():
     pane.paneconfigure(trans_frame, minsize=trans_frame.winfo_reqheight())
 
 
-def quote_sort_func(quote: Property) -> Decimal:
+def quote_sort_func(quote: Keyvalues) -> Decimal:
     """The quotes will be sorted by their priority value."""
     # Use Decimal so any number of decimal points can be used.
     try:
@@ -266,7 +266,7 @@ def show(quote_pack: QuotePack):
         )
 
     # Merge all blocks into one
-    mid_quotes = Property(
+    mid_quotes = Keyvalues(
         'midChamber',
         list(itertools.chain.from_iterable(
             quote_data.find_all('quotes', 'midChamber')
@@ -281,7 +281,7 @@ def show(quote_pack: QuotePack):
             TabTypes.MIDCHAMBER,
         )
 
-    responses = Property(
+    responses = Keyvalues(
         'CoopResponses',
         list(itertools.chain.from_iterable(
             quote_data.find_all('quotes', 'CoopResponses')
@@ -307,7 +307,7 @@ def show(quote_pack: QuotePack):
     win.lift()
 
 
-def make_tab(pak_id: str, group: Property, config: ConfigFile, tab_type: TabTypes) -> None:
+def make_tab(pak_id: str, group: Keyvalues, config: ConfigFile, tab_type: TabTypes) -> None:
     """Create all the widgets for a tab."""
     if tab_type is TabTypes.MIDCHAMBER:
         # Mid-chamber voice lines have predefined values.
@@ -474,9 +474,9 @@ def make_tab(pak_id: str, group: Property, config: ConfigFile, tab_type: TabType
     canv.bind('<Configure>', configure_canv)
 
 
-def find_lines(quote_block: Property) -> Iterator[Tuple[
+def find_lines(quote_block: Keyvalues) -> Iterator[Tuple[
     List[Tuple[img.Handle, TransToken]],
-    Property,
+    Keyvalues,
     str,
 ]]:
     """Find the line property blocks in a quote."""
@@ -504,9 +504,9 @@ def find_lines(quote_block: Property) -> Iterator[Tuple[
             yield images, prop, line_id
 
 
-def find_resp_lines(quote_block: Property) -> Iterator[Tuple[
+def find_resp_lines(quote_block: Keyvalues) -> Iterator[Tuple[
     List[Tuple[img.Handle, TransToken]],
-    Property,
+    Keyvalues,
     str,
 ]]:
     """Find the line blocks in response items."""

@@ -10,7 +10,7 @@ import string
 import time
 from datetime import datetime
 from io import BytesIO, TextIOWrapper
-from typing import List, TYPE_CHECKING, Dict, Any, Optional, cast
+from typing import List, TYPE_CHECKING, Dict, Any, Optional, Union, cast
 from zipfile import ZipFile, ZIP_LZMA
 
 import loadScreen
@@ -19,7 +19,7 @@ from app import tk_tools, img, TK_ROOT
 import utils
 from app.CheckDetails import CheckDetails, Item as CheckItem
 from FakeZip import FakeZip, zip_names, zip_open_bin
-from srctools import Property, KeyValError
+from srctools import Keyvalues, KeyValError
 from app.tooltip import add_tooltip
 from app.localisation import TransToken, set_text, set_menu_text, set_win_title
 if TYPE_CHECKING:
@@ -128,7 +128,7 @@ class P2C:
         self.is_coop = is_coop
 
     @classmethod
-    def from_file(cls, path, zip_file):
+    def from_file(cls, path: str, zip_file: Union[ZipFile, FakeZip]) -> 'P2C':
         """Initialise from a file.
 
         path is the file path for the map inside the zip, without extension.
@@ -147,19 +147,19 @@ class P2C:
                     encoding='utf-8',
                     errors='replace',
                 ) as textfile:
-                    props = Property.parse(textfile, path)
+                    kv = Keyvalues.parse(textfile, path)
         except KeyValError:
             # Silently fail if we can't parse the file. That way it's still
             # possible to back up.
             LOGGER.warning('Failed parsing puzzle file!', path, exc_info=True)
-            props = Property('portal2_puzzle', [])
+            kv = Keyvalues('portal2_puzzle', [])
             title = None
             desc = TRANS_FAIL_PARSE
         else:
-            props = props.find_key('portal2_puzzle', or_blank=True)
-            title = props['title', None]
+            kv = kv.find_key('portal2_puzzle', or_blank=True)
+            title = kv['title', None]
             try:
-                desc = TransToken.untranslated(props['description'])
+                desc = TransToken.untranslated(kv['description'])
             except LookupError:
                 desc = TRANS_NO_DESC
 
@@ -171,9 +171,9 @@ class P2C:
             zip_file=zip_file,
             title=title,
             desc=desc,
-            is_coop=srctools.conv_bool(props['coop', '0']),
-            create_time=Date(props['timestamp_created', '']),
-            mod_time=Date(props['timestamp_modified', '']),
+            is_coop=srctools.conv_bool(kv['coop', '0']),
+            create_time=Date(kv['timestamp_created', '']),
+            mod_time=Date(kv['timestamp_modified', '']),
         )
 
     def copy(self):

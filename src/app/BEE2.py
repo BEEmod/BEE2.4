@@ -5,7 +5,7 @@ import time
 import collections
 
 from outcome import Outcome, Error
-from srctools import Property
+from srctools import Keyvalues
 import trio
 
 from app import (
@@ -138,10 +138,14 @@ class Tracer(trio.abc.Instrument):
             args = {
                 name: val
                 for name, val in args.items()
-                if not isinstance(val, (dict, Property, packages.PackagesSet)) and (
-                    type(val).__repr__ is not object.__repr__ or  # Objects with no useful info.
+                # Hide objects with really massive reprs.
+                if not isinstance(val, (dict, Keyvalues, packages.PackagesSet))
+                # Objects with no useful info.
+                if (
+                    type(val).__repr__ is not object.__repr__ or
                     type(val).__str__ is not object.__str__
-                ) and 'KI_PROTECTION' not in name   # Trio flag.
+                )
+                if 'KI_PROTECTION' not in name   # Trio flag.
             }
             self.slow.append((elapsed, f'Task time={elapsed:.06}: {task!r}, args={args}'))
 
