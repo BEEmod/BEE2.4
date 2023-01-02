@@ -15,7 +15,7 @@ from enum import Enum
 from weakref import WeakKeyDictionary
 
 import attrs
-from srctools import Vec, Angle, Matrix
+from srctools import FrozenMatrix, FrozenVec, Vec, Angle, Matrix
 from srctools.vmf import VMF, Entity, Side, Solid, Output, UVAxis
 import srctools.logger
 import srctools.vmf
@@ -48,19 +48,26 @@ TILE_TEMP: dict[
     dict[str | tuple[int, int, int, bool], Side]
 ] = {}
 
-NORMALS = [Vec(x=+1), Vec(x=-1), Vec(y=+1), Vec(y=-1), Vec(z=+1), Vec(z=-1)]
+NORMALS = [
+    FrozenVec(x=+1),
+    FrozenVec(x=-1),
+    FrozenVec(y=+1),
+    FrozenVec(y=-1),
+    FrozenVec(z=+1),
+    FrozenVec(z=-1),
+]
 # Specific corresponding, these ensure the textures align to world once done.
 # IE upright on walls, up=north for floor and ceilings.
 NORMAL_ANGLES = [
-    Matrix.from_angle(0.0, 0.0, 0.0),
-    Matrix.from_angle(0.0, 180, 0.0),
-    Matrix.from_angle(0.0, 90., 0.0),
-    Matrix.from_angle(0.0, 270, 0.0),
-    Matrix.from_angle(270, 270, 0.0),
-    Matrix.from_angle(90., 90., 0.0),
+    FrozenMatrix.from_angle(0.0, 0.0, 0.0),
+    FrozenMatrix.from_angle(0.0, 180, 0.0),
+    FrozenMatrix.from_angle(0.0, 90., 0.0),
+    FrozenMatrix.from_angle(0.0, 270, 0.0),
+    FrozenMatrix.from_angle(270, 270, 0.0),
+    FrozenMatrix.from_angle(90., 90., 0.0),
 ]
 NORMAL_NAMES = dict(zip(
-    map(Vec.as_tuple, NORMALS),
+    NORMALS,
     ['east', 'west', 'north', 'south', 'up', 'down'],
 ))
 # All the tiledefs in the map.
@@ -874,7 +881,7 @@ class TileDef:
     def __repr__(self) -> str:
         return '<{} TileDef @ {} of {}>'.format(
             self.base_type.name,
-            NORMAL_NAMES.get(self.normal.as_tuple(), self.normal),
+            NORMAL_NAMES.get(self.normal.freeze(), self.normal),
             self.pos,
         )
 
@@ -1653,14 +1660,14 @@ def gen_tile_temp() -> None:
                     # Only copy the front and back from the normal template.
                     if thickness == 4 and not bevel:
                         temp_part['back'] = face
-                        face.translate(2 * norm)
+                        face.translate(+2.0 * norm)
                         # Set it to zero here, so we don't need to reset
                         # it in make_tile.
                         face.offset = 0
                 elif face.mat in consts.BlackPan or face.mat in consts.WhitePan:
                     if thickness == 4 and not bevel:
                         temp_part['front'] = face
-                        face.translate(-2 * norm)
+                        face.translate(-2.0 * norm)
                 else:
                     # Squarebeams.
                     # Rounding the position of the face gives us the direction
