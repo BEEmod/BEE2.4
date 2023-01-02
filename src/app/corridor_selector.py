@@ -461,7 +461,8 @@ class Selector:
 
 async def test() -> None:
     from app import background_run
-    background_run(img.init, {})
+    from typing import Dict
+    background_run(img.init, Dict[str, srctools.FileSystem]())
     background_run(sound.sound_task)
 
     test_sel = Selector(packages.LOADED)
