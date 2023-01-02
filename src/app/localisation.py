@@ -22,6 +22,7 @@ from srctools.filesys import RawFileSystem
 from srctools import FileSystem, logger
 from babel.messages.pofile import read_po, write_po
 from babel.messages.mofile import write_mo
+from babel.messages import Catalog
 from babel.localedata import load as load_cldr
 import trio
 import attrs
@@ -478,11 +479,11 @@ def _get_children(tok: TransToken) -> Iterator[TransToken]:
 async def rebuild_package_langs(packset: packages.PackagesSet) -> None:
     """Write out POT templates for unzipped packages."""
     tok2pack: dict[str | tuple[str, str], set[str]] = defaultdict(set)
-    pack_paths: dict[str, tuple[trio.Path, messages.Catalog]] = {}
+    pack_paths: dict[str, tuple[trio.Path, Catalog]] = {}
 
     for pak_id, pack in packset.packages.items():
         if isinstance(pack.fsys, RawFileSystem):
-            pack_paths[pak_id.casefold()] = trio.Path(pack.path, 'resources', 'i18n'), messages.Catalog(
+            pack_paths[pak_id.casefold()] = trio.Path(pack.path, 'resources', 'i18n'), Catalog(
                 project=pack.disp_name.token,
                 version=utils.BEE_VERSION,
             )
@@ -520,7 +521,7 @@ async def rebuild_package_langs(packset: packages.PackagesSet) -> None:
             if lang_file.suffix != '.po':
                 continue
             data = await lang_file.read_text()
-            existing: messages.Catalog = read_po(io.StringIO(data))
+            existing: Catalog = read_po(io.StringIO(data))
             existing.update(catalog)
             catalog.header_comment = PACKAGE_HEADER
             existing.version = utils.BEE_VERSION
