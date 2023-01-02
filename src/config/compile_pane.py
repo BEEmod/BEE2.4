@@ -3,7 +3,7 @@ from typing import Sequence
 import base64
 
 import attrs
-from srctools import Property, bool_as_int, logger
+from srctools import Keyvalues, bool_as_int, logger
 from srctools.dmx import Element
 
 import config
@@ -31,7 +31,7 @@ class CompilePaneState(config.Data, conf_name='CompilerPane'):
     use_voice_priority: bool = False
 
     @classmethod
-    def parse_legacy(cls, conf: Property) -> dict[str, CompilePaneState]:
+    def parse_legacy(cls, conf: Keyvalues) -> dict[str, CompilePaneState]:
         """Parse legacy config data."""
         # No change from new KV1 format.
         return {'': cls.parse_kv1(
@@ -40,7 +40,7 @@ class CompilePaneState(config.Data, conf_name='CompilerPane'):
         )}
 
     @classmethod
-    def parse_kv1(cls, data: Property, version: int) -> CompilePaneState:
+    def parse_kv1(cls, data: Keyvalues, version: int) -> CompilePaneState:
         """Parse Keyvalues1 format data."""
         if 'sshot_data' in data:
             screenshot_parts = b'\n'.join([
@@ -71,14 +71,14 @@ class CompilePaneState(config.Data, conf_name='CompilerPane'):
             use_voice_priority=data.bool('voiceline_priority', False),
         )
 
-    def export_kv1(self) -> Property:
+    def export_kv1(self) -> Keyvalues:
         """Generate keyvalues1 format data."""
-        props = Property('', [
-            Property('sshot_type', self.sshot_type),
-            Property('sshot_cleanup', bool_as_int(self.sshot_cleanup)),
-            Property('spawn_elev', bool_as_int(self.spawn_elev)),
-            Property('player_model', self.player_mdl),
-            Property('voiceline_priority', bool_as_int(self.use_voice_priority)),
+        kv = Keyvalues('', [
+            Keyvalues('sshot_type', self.sshot_type),
+            Keyvalues('sshot_cleanup', bool_as_int(self.sshot_cleanup)),
+            Keyvalues('spawn_elev', bool_as_int(self.spawn_elev)),
+            Keyvalues('player_model', self.player_mdl),
+            Keyvalues('voiceline_priority', bool_as_int(self.use_voice_priority)),
         ])
 
         # Embed the screenshot in so we can load it later.
@@ -86,14 +86,14 @@ class CompilePaneState(config.Data, conf_name='CompilerPane'):
             # encodebytes() splits it into multiple lines, which we write
             # in individual blocks to prevent having a massively long line
             # in the file.
-            props.append(Property(
+            kv.append(Keyvalues(
                 'sshot_data',
                 [
-                    Property('b64', data) for data in
+                    Keyvalues('b64', data) for data in
                     base64.encodebytes(self.sshot_cust).decode('ascii').splitlines()
                 ]
             ))
-        return props
+        return kv
 
     def export_dmx(self) -> Element:
         """Generate DMX format data."""

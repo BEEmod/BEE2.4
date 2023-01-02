@@ -1,7 +1,7 @@
 from typing import Dict, Mapping, Union
 
 import attrs
-from srctools import EmptyMapping, Property, logger
+from srctools import EmptyMapping, Keyvalues, logger
 from srctools.dmx import Element
 
 import config
@@ -18,7 +18,7 @@ class WidgetConfig(config.Data, conf_name='ItemVar', uses_id=True):
     values: Union[str, Mapping[str, str]] = EmptyMapping
 
     @classmethod
-    def parse_legacy(cls, props: Property) -> Dict[str, 'WidgetConfig']:
+    def parse_legacy(cls, props: Keyvalues) -> Dict[str, 'WidgetConfig']:
         """Parse from the old legacy config."""
         data = {}
         for group in props.find_children('ItemVar'):
@@ -29,7 +29,7 @@ class WidgetConfig(config.Data, conf_name='ItemVar', uses_id=True):
         return data
 
     @classmethod
-    def parse_kv1(cls, data: Property, version: int) -> 'WidgetConfig':
+    def parse_kv1(cls, data: Keyvalues, version: int) -> 'WidgetConfig':
         """Parse Keyvalues config values."""
         assert version == 1
         if data.has_children():
@@ -40,13 +40,13 @@ class WidgetConfig(config.Data, conf_name='ItemVar', uses_id=True):
         else:
             return WidgetConfig(data.value)
 
-    def export_kv1(self) -> Property:
+    def export_kv1(self) -> Keyvalues:
         """Generate keyvalues for saving configuration."""
         if isinstance(self.values, str):
-            return Property('', self.values)
+            return Keyvalues('', self.values)
         else:
-            return Property('', [
-                Property(tim, value)
+            return Keyvalues('ItemVar', [
+                Keyvalues(tim, value)
                 for tim, value in self.values.items()
             ])
 

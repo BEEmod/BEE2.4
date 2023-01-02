@@ -1,7 +1,7 @@
 from typing import Dict, Union
 
 import attrs
-from srctools import Property
+from srctools import Keyvalues
 from srctools.dmx import Element
 
 import config
@@ -14,7 +14,7 @@ class LastSelected(config.Data, conf_name='LastSelected', uses_id=True):
     id: Union[str, None] = None
 
     @classmethod
-    def parse_legacy(cls, conf: Property) -> Dict[str, 'LastSelected']:
+    def parse_legacy(cls, conf: Keyvalues) -> Dict[str, 'LastSelected']:
         """Parse legacy config data."""
         result = {}
         last_sel = conf.find_key('LastSelected', or_blank=True)
@@ -42,7 +42,7 @@ class LastSelected(config.Data, conf_name='LastSelected', uses_id=True):
         return result
 
     @classmethod
-    def parse_kv1(cls, data: Property, version: int) -> 'LastSelected':
+    def parse_kv1(cls, data: Keyvalues, version: int) -> 'LastSelected':
         """Parse Keyvalues data."""
         assert version == 1, version
         if data.has_children():
@@ -51,9 +51,9 @@ class LastSelected(config.Data, conf_name='LastSelected', uses_id=True):
             return cls(None)
         return cls(data.value)
 
-    def export_kv1(self) -> Property:
+    def export_kv1(self) -> Keyvalues:
         """Export to a property block."""
-        return Property('', '<NONE>' if self.id is None else self.id)
+        return Keyvalues('', '<NONE>' if self.id is None else self.id)
 
     @classmethod
     def parse_dmx(cls, data: Element, version: int) -> 'LastSelected':

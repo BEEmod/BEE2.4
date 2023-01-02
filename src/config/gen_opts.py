@@ -2,7 +2,7 @@ from enum import Enum
 from typing import Any, Dict
 
 import attrs
-from srctools import Property
+from srctools import Keyvalues
 from srctools.dmx import Element
 
 from BEE2_config import GEN_OPTS as LEGACY_CONF
@@ -50,7 +50,7 @@ class GenOptions(config.Data, conf_name='Options', palette_stores=False, version
     language: str = ''
 
     @classmethod
-    def parse_legacy(cls, conf: Property) -> Dict[str, 'GenOptions']:
+    def parse_legacy(cls, conf: Keyvalues) -> Dict[str, 'GenOptions']:
         """Parse from the GEN_OPTS config file."""
         log_win_level = LEGACY_CONF['Debug']['window_log_level']
         try:
@@ -83,7 +83,7 @@ class GenOptions(config.Data, conf_name='Options', palette_stores=False, version
         )}
 
     @classmethod
-    def parse_kv1(cls, data: Property, version: int) -> 'GenOptions':
+    def parse_kv1(cls, data: Keyvalues, version: int) -> 'GenOptions':
         """Parse KV1 values."""
         if version > 2:
             raise AssertionError('Unknown version!')
@@ -104,17 +104,17 @@ class GenOptions(config.Data, conf_name='Options', palette_stores=False, version
             },
         )
 
-    def export_kv1(self) -> Property:
+    def export_kv1(self) -> Keyvalues:
         """Produce KV1 values."""
-        prop = Property('', [
-            Property('after_export', str(self.after_export.value)),
-            Property('log_win_level', self.log_win_level),
-            Property('language', self.language),
-            Property('preserve_fgd', '1' if self.preserve_fgd else '0')
+        kv = Keyvalues('', [
+            Keyvalues('after_export', str(self.after_export.value)),
+            Keyvalues('log_win_level', self.log_win_level),
+            Keyvalues('language', self.language),
+            Keyvalues('preserve_fgd', '1' if self.preserve_fgd else '0')
         ])
         for field in gen_opts_bool:
-            prop[field.name] = '1' if getattr(self, field.name) else '0'
-        return prop
+            kv.append(Keyvalues(field.name, '1' if getattr(self, field.name) else '0'))
+        return kv
 
     @classmethod
     def parse_dmx(cls, data: Element, version: int) -> 'GenOptions':

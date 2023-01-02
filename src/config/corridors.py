@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import List
 
 import attrs
-from srctools import Property
+from srctools import Keyvalues
 from srctools.dmx import Attribute as DMAttr, Element, ValueType as DMXValue
 
 import config
@@ -28,7 +28,7 @@ class Config(config.Data, conf_name='Corridor', uses_id=True, version=1):
         return f'{style.casefold()}:{mode.value}_{direction.value}_{orient.value}'
 
     @classmethod
-    def parse_kv1(cls, data: Property, version: int) -> 'Config':
+    def parse_kv1(cls, data: Keyvalues, version: int) -> 'Config':
         """Parse from KeyValues1 configs."""
         assert version == 1, version
         selected = []
@@ -41,15 +41,15 @@ class Config(config.Data, conf_name='Corridor', uses_id=True, version=1):
 
         return Config(selected=selected, unselected=unselected)
 
-    def export_kv1(self) -> Property:
+    def export_kv1(self) -> Keyvalues:
         """Serialise to a Keyvalues1 config."""
-        prop = Property('Corridors', [])
+        kv = Keyvalues('Corridors', [])
         for corr in self.selected:
-            prop.append(Property('selected', corr))
+            kv.append(Keyvalues('selected', corr))
         for corr in self.unselected:
-            prop.append(Property('unselected', corr))
+            kv.append(Keyvalues('unselected', corr))
 
-        return Property('Corridor', [prop])
+        return Keyvalues('Corridor', [kv])
 
     @classmethod
     def parse_dmx(cls, data: Element, version: int) -> 'Config':
@@ -88,7 +88,7 @@ class UIState(config.Data, conf_name='CorridorUIState', palette_stores=False):
     height: int = -1
 
     @classmethod
-    def parse_kv1(cls, data: Property, version: int) -> 'UIState':
+    def parse_kv1(cls, data: Keyvalues, version: int) -> 'UIState':
         """Parse Keyvalues 1 configuration."""
         assert version == 1, version
         try:
@@ -112,14 +112,14 @@ class UIState(config.Data, conf_name='CorridorUIState', palette_stores=False):
             data.int('height', -1),
         )
 
-    def export_kv1(self) -> Property:
+    def export_kv1(self) -> Keyvalues:
         """Export Keyvalues 1 configuration."""
-        return Property('', [
-            Property('mode', self.last_mode.value),
-            Property('direction', self.last_direction.value),
-            Property('orient', self.last_orient.value),
-            Property('width', str(self.width)),
-            Property('height', str(self.height)),
+        return Keyvalues('', [
+            Keyvalues('mode', self.last_mode.value),
+            Keyvalues('direction', self.last_direction.value),
+            Keyvalues('orient', self.last_orient.value),
+            Keyvalues('width', str(self.width)),
+            Keyvalues('height', str(self.height)),
         ])
 
     @classmethod

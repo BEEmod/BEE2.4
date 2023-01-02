@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Dict, Mapping
 import attrs
-from srctools import Property, conv_bool, bool_as_int, logger
+from srctools import Keyvalues, conv_bool, bool_as_int, logger
 from srctools.dmx import Attribute, Element, ValueType, Vec2
 
 from BEE2_config import GEN_OPTS as LEGACY_CONF
@@ -22,7 +22,7 @@ class WindowState(config.Data, conf_name='PaneState', uses_id=True, palette_stor
     visible: bool = True
 
     @classmethod
-    def parse_legacy(cls, conf: Property) -> Dict[str, 'WindowState']:
+    def parse_legacy(cls, conf: Keyvalues) -> Dict[str, 'WindowState']:
         """Convert old GEN_OPTS configuration."""
         opt_block = LEGACY_CONF['win_state']
         names: set[str] = set()
@@ -44,7 +44,7 @@ class WindowState(config.Data, conf_name='PaneState', uses_id=True, palette_stor
         }
 
     @classmethod
-    def parse_kv1(cls, data: Property, version: int) -> 'WindowState':
+    def parse_kv1(cls, data: Keyvalues, version: int) -> 'WindowState':
         """Parse keyvalues1 data."""
         assert version == 1, version
         return WindowState(
@@ -55,18 +55,18 @@ class WindowState(config.Data, conf_name='PaneState', uses_id=True, palette_stor
             data.bool('visible', True),
         )
 
-    def export_kv1(self) -> Property:
+    def export_kv1(self) -> Keyvalues:
         """Create keyvalues1 data."""
-        prop = Property('', [
-            Property('visible', '1' if self.visible else '0'),
-            Property('x', str(self.x)),
-            Property('y', str(self.y)),
+        kv = Keyvalues('WindowState', [
+            Keyvalues('visible', '1' if self.visible else '0'),
+            Keyvalues('x', str(self.x)),
+            Keyvalues('y', str(self.y)),
         ])
         if self.width >= 0:
-            prop['width'] = str(self.width)
+            kv['width'] = str(self.width)
         if self.height >= 0:
-            prop['height'] = str(self.height)
-        return prop
+            kv['height'] = str(self.height)
+        return kv
 
     @classmethod
     def parse_dmx(cls, data: Element, version: int) -> 'WindowState':
@@ -102,7 +102,7 @@ class SelectorState(config.Data, conf_name='SelectorWindow', palette_stores=Fals
     height: int = 0
 
     @classmethod
-    def parse_legacy(cls, conf: Property) -> dict[str, SelectorState]:
+    def parse_legacy(cls, conf: Keyvalues) -> dict[str, SelectorState]:
         """Convert the old legacy configuration."""
         result: dict[str, SelectorState] = {}
         for prop in conf.find_children('Selectorwindow'):
@@ -110,7 +110,7 @@ class SelectorState(config.Data, conf_name='SelectorWindow', palette_stores=Fals
         return result
 
     @classmethod
-    def parse_kv1(cls, data: Property, version: int) -> SelectorState:
+    def parse_kv1(cls, data: Keyvalues, version: int) -> SelectorState:
         """Parse from keyvalues."""
         assert version == 1
         open_groups = {
@@ -122,16 +122,16 @@ class SelectorState(config.Data, conf_name='SelectorWindow', palette_stores=Fals
             data.int('width', -1), data.int('height', -1),
         )
 
-    def export_kv1(self) -> Property:
+    def export_kv1(self) -> Keyvalues:
         """Generate keyvalues."""
-        props = Property('', [])
-        with props.build() as builder:
+        kv = Keyvalues('SelectorWindow', [])
+        with kv.build() as builder:
             builder.width(str(self.width))
             builder.height(str(self.height))
             with builder.Groups:
                 for name, is_open in self.open_groups.items():
                     builder[name](bool_as_int(is_open))
-        return props
+        return kv
 
     @classmethod
     def parse_dmx(cls, data: Element, version: int) -> SelectorState:

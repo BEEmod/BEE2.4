@@ -14,7 +14,7 @@ import os
 
 import attrs
 import trio
-from srctools import KeyValError, AtomicWriter, Property, logger
+from srctools import KeyValError, AtomicWriter, Keyvalues, logger
 from srctools.dmx import Element
 
 import utils
@@ -63,18 +63,18 @@ class Data(abc.ABC):
         return cls.__info
 
     @classmethod
-    def parse_legacy(cls, conf: Property) -> Dict[str, Self]:
+    def parse_legacy(cls, conf: Keyvalues) -> Dict[str, Self]:
         """Parse from the old legacy config. The user has to handle the uses_id style."""
         return {}
 
     @classmethod
     @abc.abstractmethod
-    def parse_kv1(cls, data: Property, version: int) -> Self:
+    def parse_kv1(cls, data: Keyvalues, version: int) -> Self:
         """Parse keyvalues config values."""
         raise NotImplementedError
 
     @abc.abstractmethod
-    def export_kv1(self) -> Property:
+    def export_kv1(self) -> Keyvalues:
         """Generate keyvalues for saving configuration."""
         raise NotImplementedError
 
@@ -255,22 +255,22 @@ class ConfigSpec:
         except KeyError:
             self._current[cls] = {data_id: data}
 
-    def parse_kv1(self, props: Property) -> Tuple[Config, bool]:
+    def parse_kv1(self, kv: Keyvalues) -> Tuple[Config, bool]:
         """Parse a configuration file into individual data.
 
         The data is in the form {conf_type: {id: data}}, and a bool indicating if it was upgraded
         and so should be resaved.
         """
-        if 'version' not in props:  # New conf format
-            return self._parse_legacy(props), True
+        if 'version' not in kv:  # New conf format
+            return self._parse_legacy(kv), True
 
-        version = props.int('version')
+        version = kv.int('version')
         if version != 1:
             raise ValueError(f'Unknown config version {version}!')
 
         conf = Config({})
         upgraded = False
-        for child in props:
+        for child in kv:
             if child.name == 'version':
                 continue
             try:
@@ -321,39 +321,39 @@ class ConfigSpec:
                     )
         return conf, upgraded
 
-    def _parse_legacy(self, props: Property) -> Config:
+    def _parse_legacy(self, kv: Keyvalues) -> Config:
         """Parse the old config format."""
         conf = Config({})
         # Convert legacy configs.
         for cls in self._name_to_type.values():
             info = cls.get_conf_info()
             if hasattr(cls, 'parse_legacy'):
-                conf[cls] = new = cls.parse_legacy(props)
+                conf[cls] = new = cls.parse_legacy(kv)
                 LOGGER.info('Converted legacy {} to {}', info.name, new)
             else:
                 LOGGER.warning('No legacy conf for "{}"!', info.name)
                 conf[cls] = {}
         return conf
 
-    def build_kv1(self, conf: Config) -> Iterator[Property]:
+    def build_kv1(self, conf: Config) -> Iterator[Keyvalues]:
         """Build out a configuration file from some data.
 
         The data is in the form {conf_type: {id: data}}.
         """
-        yield Property('version', '1')
+        yield Keyvalues('version', '1')
         for cls, data_map in conf.items():
             if not data_map or cls not in self._registered:
                 # Blank or not in our definition, don't save.
                 continue
             info = cls.get_conf_info()
-            prop = Property(info.name, [
-                Property('_version', str(info.version)),
+            kv = Keyvalues(info.name, [
+                Keyvalues('_version', str(info.version)),
             ])
             if info.uses_id:
                 for data_id, data in data_map.items():
                     sub_prop = data.export_kv1()
                     sub_prop.name = data_id
-                    prop.append(sub_prop)
+                    kv.append(sub_prop)
             else:
                 # Must be a single '' key.
                 if list(data_map.keys()) != ['']:
@@ -362,8 +362,8 @@ class ConfigSpec:
                         f'"{info.name}", got:\n{data_map}'
                     )
                 [data] = data_map.values()
-                prop.extend(data.export_kv1())
-            yield prop
+                kv.extend(data.export_kv1())
+            yield kv
 
     def build_dmx(self, conf: Config) -> Element:
         """Build out a configuration file from some data.
@@ -407,7 +407,7 @@ class ConfigSpec:
             return
         try:
             with file:
-                props = Property.parse(file)
+                kv = Keyvalues.parse(file)
         except KeyValError:
             LOGGER.warning('Cannot parse {}!', self.filename.name, exc_info=True)
             # Try and move to a backup name, if not don't worry about it.
@@ -416,7 +416,7 @@ class ConfigSpec:
             except IOError:
                 pass
 
-        conf, _ = self.parse_kv1(props)
+        conf, _ = self.parse_kv1(kv)
         self._current.clear()
         self._current.update(conf)
 
@@ -430,10 +430,10 @@ class ConfigSpec:
             # This could happen while parsing, for example.
             return
 
-        props = Property.root()
-        props.extend(self.build_kv1(self._current))
+        kv = Keyvalues.root()
+        kv.extend(self.build_kv1(self._current))
         with AtomicWriter(self.filename) as file:
-            for prop in props:
+            for prop in kv:
                 for line in prop.export():
                     file.write(line)
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 from uuid import UUID
 
 import attrs
-from srctools import Property, bool_as_int
+from srctools import Keyvalues, bool_as_int
 from srctools.dmx import Attribute as DMAttribute, Element, ValueType
 
 from consts import UUID_PORTAL2, PALETTE_FORCE_SHOWN as FORCE_SHOWN
@@ -23,7 +23,7 @@ class PaletteState(config.Data, conf_name='Palette', palette_stores=False):
     hidden_defaults: frozenset[UUID] = attrs.Factory(frozenset)
 
     @classmethod
-    def parse_legacy(cls, conf: Property) -> dict[str, PaletteState]:
+    def parse_legacy(cls, conf: Keyvalues) -> dict[str, PaletteState]:
         """Convert the legacy config options to the new format."""
         # These are all in the GEN_OPTS config.
         try:
@@ -38,7 +38,7 @@ class PaletteState(config.Data, conf_name='Palette', palette_stores=False):
         )}
 
     @classmethod
-    def parse_kv1(cls, data: Property, version: int) -> PaletteState:
+    def parse_kv1(cls, data: Keyvalues, version: int) -> PaletteState:
         """Parse Keyvalues data."""
         assert version == 1
         hidden = {
@@ -53,15 +53,15 @@ class PaletteState(config.Data, conf_name='Palette', palette_stores=False):
         hidden -= FORCE_SHOWN
         return PaletteState(uuid, data.bool('save_settings', False), frozenset(hidden))
 
-    def export_kv1(self) -> Property:
+    def export_kv1(self) -> Keyvalues:
         """Export to a property block."""
-        prop = Property('', [
-            Property('selected', self.selected.hex),
-            Property('save_settings', bool_as_int(self.save_settings)),
+        kv = Keyvalues('', [
+            Keyvalues('selected', self.selected.hex),
+            Keyvalues('save_settings', bool_as_int(self.save_settings)),
         ])
         for hidden in self.hidden_defaults:
-            prop.append(Property('hidden', hidden.hex))
-        return prop
+            kv.append(Keyvalues('hidden', hidden.hex))
+        return kv
 
     @classmethod
     def parse_dmx(cls, data: Element, version: int) -> PaletteState:

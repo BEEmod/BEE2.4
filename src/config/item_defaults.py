@@ -3,7 +3,7 @@ from typing import Dict
 from typing_extensions import Final
 
 import attrs
-from srctools import Property, logger
+from srctools import Keyvalues, logger
 from srctools.dmx import Element
 
 from BEE2_config import ConfigFile
@@ -24,7 +24,7 @@ class ItemDefault(config.Data, conf_name='ItemDefault', uses_id=True):
     defaults: Dict[ItemPropKind, str] = attrs.Factory(dict)
 
     @classmethod
-    def parse_legacy(cls, conf: Property) -> Dict[str, 'ItemDefault']:
+    def parse_legacy(cls, conf: Keyvalues) -> Dict[str, 'ItemDefault']:
         """Parse the data in the legacy item_configs.cfg file."""
         result: Dict[str, ItemDefault] = {}
         for item_id, section in LEGACY.items():
@@ -45,7 +45,7 @@ class ItemDefault(config.Data, conf_name='ItemDefault', uses_id=True):
         return result
 
     @classmethod
-    def parse_kv1(cls, data: Property, version: int) -> 'ItemDefault':
+    def parse_kv1(cls, data: Keyvalues, version: int) -> 'ItemDefault':
         """Parse keyvalues1 data."""
         if version != 1:
             raise AssertionError(version)
@@ -59,12 +59,12 @@ class ItemDefault(config.Data, conf_name='ItemDefault', uses_id=True):
             props[prop_type] = kv.value
         return cls(data['version', DEFAULT_VERSION], props)
 
-    def export_kv1(self) -> Property:
+    def export_kv1(self) -> Keyvalues:
         """Export as keyvalues1 data."""
-        return Property('', [
-            Property('Version', self.version),
-            Property('Properties', [
-                Property(prop.id, value)
+        return Keyvalues('', [
+            Keyvalues('Version', self.version),
+            Keyvalues('Properties', [
+                Keyvalues(prop.id, value)
                 for prop, value in self.defaults.items()
             ])
         ])
