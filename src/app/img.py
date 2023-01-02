@@ -22,7 +22,7 @@ from PIL import ImageFont, ImageTk, Image, ImageDraw
 import attrs
 import trio
 
-from srctools import Vec, Property
+from srctools import Vec, Keyvalues
 from srctools.vtf import VTFFlags, VTF
 from srctools.filesys import FileSystem, RawFileSystem, FileSystemChain
 import srctools.logger
@@ -289,7 +289,7 @@ class Handle:
     @classmethod
     def parse(
         cls: Type[Handle],
-        prop: Property,
+        kv: Keyvalues,
         pack: str,
         width: int,
         height: int,
@@ -297,22 +297,22 @@ class Handle:
         subkey: str='',
         subfolder: str='',
     ) -> Handle:
-        """Parse a property into an image handle.
+        """Parse a keyvalue into an image handle.
 
         If a package isn't specified, the given package will be used.
-        Optionally, 'subkey' can be used to specify that the property is a subkey.
+        Optionally, 'subkey' can be used to use the child key of the passed block.
         An error icon will then be produced automatically.
         If subfolder is specified, files will be relative to this folder.
         The width/height may be zero to indicate it should not be resized.
         """
         if subkey:
             try:
-                prop = prop.find_key(subkey)
+                kv = kv.find_key(subkey)
             except LookupError:
                 return cls.error(width, height)
-        if prop.has_children():
+        if kv.has_children():
             children: list[Handle] = []
-            for child in prop:
+            for child in kv:
                 if child.name in ('noalpha', 'stripalpha'):
                     children.append(cls.parse(
                         child, pack,
@@ -329,7 +329,7 @@ class Handle:
                     raise ValueError(f'Unknown compound type "{child.real_name}"!')
             return cls.composite(children, width, height)
 
-        return cls.parse_uri(utils.PackagePath.parse(prop.value, pack), width, height, subfolder=subfolder)
+        return cls.parse_uri(utils.PackagePath.parse(kv.value, pack), width, height, subfolder=subfolder)
 
     @classmethod
     def parse_uri(
