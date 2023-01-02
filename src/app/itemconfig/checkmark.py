@@ -3,7 +3,7 @@ from typing import AsyncIterator, List, Tuple
 from tkinter import ttk
 import tkinter as tk
 
-from srctools import Property, conv_bool
+from srctools import Keyvalues, conv_bool
 
 from app.itemconfig import (
     UpdateFunc, WidgetLookup, WidgetLookupMulti,
@@ -13,7 +13,7 @@ from app.tooltip import add_tooltip
 
 
 @WidgetLookup('boolean', 'bool', 'checkbox')
-async def widget_checkmark(parent: tk.Widget, var: tk.StringVar, conf: Property) -> Tuple[tk.Widget, UpdateFunc]:
+async def widget_checkmark(parent: tk.Widget, var: tk.StringVar, conf: Keyvalues) -> Tuple[tk.Widget, UpdateFunc]:
     """Allows ticking a box."""
     # Ensure it's a bool value.
     if conv_bool(var.get()):
@@ -35,7 +35,7 @@ async def widget_checkmark(parent: tk.Widget, var: tk.StringVar, conf: Property)
 async def widget_checkmark_multi(
     parent: tk.Widget,
     values: List[Tuple[str, tk.StringVar]],
-    conf: Property,
+    conf: Keyvalues,
 ) -> AsyncIterator[Tuple[str, UpdateFunc]]:
     """For checkmarks, display in a more compact form."""
     for row, column, _, tim_text, var in multi_grid(values):

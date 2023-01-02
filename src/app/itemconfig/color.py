@@ -4,7 +4,7 @@ from tkinter import ttk
 from tkinter.colorchooser import askcolor
 import tkinter as tk
 
-from srctools import Property
+from srctools import Keyvalues
 
 from app import img, tk_tools
 from app.itemconfig import (
@@ -22,7 +22,7 @@ TRANS_SELECT_TITLE = TransToken.ui('Choose a Color')
 async def widget_color_single(
     parent: tk.Widget,
     var: tk.StringVar,
-    conf: Property,
+    conf: Keyvalues,
 ) -> tuple[tk.Widget, UpdateFunc]:
     """Provides a colour swatch for specifying colours.
 
@@ -36,7 +36,7 @@ async def widget_color_single(
 
 
 @WidgetLookupMulti('color', 'colour', 'rgb')
-async def widget_color_multi(parent: tk.Widget, values: list[tuple[str, tk.StringVar]], conf: Property):
+async def widget_color_multi(parent: tk.Widget, values: list[tuple[str, tk.StringVar]], conf: Keyvalues):
     """For color swatches, display in a more compact form."""
     for row, column, tim_val, tim_text, var in multi_grid(values):
         swatch, update = make_color_swatch(parent, var, 16)
