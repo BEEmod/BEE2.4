@@ -118,9 +118,9 @@ def save_editor_connectionpoint(item: Item, vmf: VMF) -> None:
             ant_pos = Vec(point.pos.x, -point.pos.y, -64)
             sign_pos = Vec(point.sign_off.x, -point.sign_off.y, -64)
 
-            offset = (ant_pos - sign_pos) @ inv_orient
+            offset: Vec = (ant_pos - sign_pos) @ inv_orient
             try:
-                skin = CONN_OFFSET_TO_SKIN[offset]
+                skin = CONN_OFFSET_TO_SKIN[offset.freeze()]
             except KeyError:
                 LOGGER.warning('Pos=({}), Sign=({}) -> ({}) is not a valid offset for signs!', point.pos, point.sign_off, offset)
                 continue
