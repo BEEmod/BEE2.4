@@ -2,6 +2,9 @@
 
 # Version `<dev>`
 
+### Enhancements:
+* If a duplicate package is present, include the paths of both in the error message.
+
 ------------------------------------------
 
 # Version 4.43.0

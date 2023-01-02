@@ -479,9 +479,12 @@ async def find_packages(nursery: trio.Nursery, packset: PackagesSet, pak_dir: Pa
         pak_id = info['ID']
 
         if pak_id.casefold() in packset.packages:
+            duplicate = packset.packages[pak_id.casefold()]
             raise ValueError(
                 f'Duplicate package with id "{pak_id}"!\n'
-                'If you just updated the mod, delete any old files in packages/.'
+                'If you just updated the mod, delete any old files in packages/.\n'
+                f'Package 1: {duplicate.fsys.path}\n'
+                f'Package 2: {filesys.path}'
             ) from None
 
         PACKAGE_SYS[pak_id.casefold()] = filesys
