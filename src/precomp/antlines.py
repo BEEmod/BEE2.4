@@ -6,7 +6,7 @@ from enum import Enum
 import math
 
 import attrs
-from srctools import Vec, Matrix, Property, conv_float, logger
+from srctools import Vec, Matrix, Keyvalues, conv_float, logger
 from srctools.vmf import VMF, overlay_bounds, make_overlay
 
 from precomp import tiling, rand
@@ -29,27 +29,27 @@ class AntTex:
     scale: float
     static: bool
 
-    @staticmethod
-    def parse(prop: Property):
-        """Parse from property values.
+    @classmethod
+    def parse(cls, kv: Keyvalues) -> AntTex:
+        """Parse from keyvalue blocks.
 
         The value can be in four forms:
-        "prop" "material"
-        "prop" "<scale>|material"
-        "prop" "<scale>|material|static"
-        "prop"
+        "antline_kind" "material"
+        "antline_kind" "<scale>|material"
+        "antline_kind" "<scale>|material|static"
+        "antline_kind"
             {
             "tex"    "<mat>"
             "scale"  "<scale>"
             "static" "<is_static>"
             }
         """
-        if prop.has_children():
-            tex = prop['tex']
-            scale = prop.float('scale', 0.25)
-            static = prop.bool('static')
+        if kv.has_children():
+            tex = kv['tex']
+            scale = kv.float('scale', 0.25)
+            static = kv.bool('static')
         else:
-            vals = prop.value.split('|')
+            vals = kv.value.split('|')
             opts: Container[str] = ()
             scale_str = '0.25'
 
@@ -63,7 +63,7 @@ class AntTex:
             scale = conv_float(scale_str, 0.25)
             static = 'static' in opts
 
-        return AntTex(tex, scale, static)
+        return cls(tex, scale, static)
 
 
 @attrs.define(eq=False)
@@ -83,9 +83,9 @@ class AntType:
     broken_chance: float
 
     @classmethod
-    def parse(cls, prop: Property) -> AntType:
+    def parse(cls, kv: Keyvalues) -> AntType:
         """Parse this from a property block."""
-        broken_chance = prop.float('broken_chance')
+        broken_chance = kv.float('broken_chance')
         tex_straight: list[AntTex] = []
         tex_corner: list[AntTex] = []
         brok_straight: list[AntTex] = []
@@ -94,14 +94,14 @@ class AntType:
             [tex_straight, tex_corner, brok_straight, brok_corner],
             ('straight', 'corner', 'broken_straight', 'broken_corner'),
         ):
-            for sub_prop in prop.find_all(name):
+            for sub_prop in kv.find_all(name):
                 ant_list.append(AntTex.parse(sub_prop))
 
         if broken_chance < 0.0:
-            LOGGER.warning('Antline broken chance must be between 0-100, got "{}"!', prop['broken_chance'])
+            LOGGER.warning('Antline broken chance must be between 0-100, got "{}"!', kv['broken_chance'])
             broken_chance = 0.0
         if broken_chance > 100.0:
-            LOGGER.warning('Antline broken chance must be between 0-100, got "{}"!', prop['broken_chance'])
+            LOGGER.warning('Antline broken chance must be between 0-100, got "{}"!', kv['broken_chance'])
             broken_chance = 100.0
 
         if broken_chance == 0.0:
