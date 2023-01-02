@@ -1042,7 +1042,7 @@ async def assign_styled_items(all_styles: Iterable[Style], item: Item) -> None:
             # filesys: FileSystem  # The original filesystem.
             # folder: str  # If set, use the given folder from our package.
             # style: str  # Inherit from a specific style (implies folder is None)
-            # config: Property  # Config for editing
+            # config: Keyvalues  # Config for editing
             start_data: UnParsedItemVariant | ItemVariant | None
             for sty_id, conf in to_change:
                 if conf.style:

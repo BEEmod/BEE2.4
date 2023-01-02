@@ -29,7 +29,7 @@ LOGGER = logger.get_logger(__name__)
 UpdateFunc: TypeAlias = Callable[[str], Awaitable[None]]
 
 # Functions for each widget.
-# The function is passed a parent frame, StringVar, and Property block.
+# The function is passed a parent frame, StringVar, and Keyvalues block.
 # The widget to be installed should be returned, and a callback to refresh the UI.
 # If wide is set, the widget is put into a labelframe, instead of having a label to the side.
 SingleCreateFunc: TypeAlias = Callable[
