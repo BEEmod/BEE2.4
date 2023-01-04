@@ -4,6 +4,8 @@ These need to be used while we are busy doing stuff in the main UI loop.
 We do this in another process to sidestep the GIL, and ensure the screen
 remains responsive. This is a separate module to reduce the required dependencies.
 """
+import sys
+
 import logging
 from typing import Callable, Optional, Dict, Tuple, List
 
@@ -848,12 +850,11 @@ def run_background(
                     try:
                         func(*args)
                     except Exception as e:  # Note which function caused the problem.
-                        try:
+                        if sys.version_info >= (3, 11):
                             e.add_note(f'Function: {func!r}')  # noqa
                             raise
-                        except AttributeError:  # < 3.10
-                            pass
-                        raise TypeError(func) from e
+                        else:
+                            raise TypeError(func) from e
             while log_pipe_rec.poll():
                 log_window.handle(log_pipe_rec.recv())
         except BrokenPipeError:

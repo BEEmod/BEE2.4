@@ -354,9 +354,9 @@ class DropperType:
             )
             cube_dir_str = conf['cube_dir']
             try:
-                cube_dir = Vec(conditions.DIRECTIONS[cube_dir_str])
+                cube_dir = conditions.DIRECTIONS[cube_dir_str]
             except KeyError:
-                cube_dir = Vec.from_str(cube_dir_str, x=1)
+                cube_dir = FrozenVec.from_str(cube_dir_str, x=1)
             # Set roll to counteract us being on the ceiling.
             cube_orient = cube_dir.to_angle(180)
         else:
@@ -1568,7 +1568,7 @@ def make_cube(
         b = cube_type.base_tint.z * pair.tint.z // 255
         ent['rendercolor'] = rendercolor = f'{int(r)} {int(g)} {int(b)}'
     else:
-        ent['rendercolor'] = rendercolor = cube_type.base_tint
+        ent['rendercolor'] = rendercolor = str(cube_type.base_tint)
 
     if pair.superpos is not None and pair.is_superpos_ghost:
         # Superposition ghost cubes are regular physics props, most of this functionality doesn't

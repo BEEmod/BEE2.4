@@ -307,8 +307,7 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
 
     # Compute contiguous sections of any barrier type, then place hint brushes to ensure sorting
     # is done correctly.
-    for (plane_pos_tup, is_pos), pos_slice in slices.items():
-        plane_pos = Vec(plane_pos_tup)
+    for (plane_pos, is_pos), pos_slice in slices.items():
         norm_axis = plane_pos.axis()
         normal = FrozenVec.with_axes(norm_axis, 1 if is_pos else -1)
 

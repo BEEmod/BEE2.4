@@ -536,6 +536,7 @@ def set_player_portalgun(vmf: VMF, info: corridor.Info) -> None:
 
         # Detect the group ID of portals placed in the map, and write to
         # the entities what we determine.
+        port_ids: Iterable[int]
         if info.is_coop:
             port_ids = (0, 1, 2)
         else:
@@ -915,12 +916,12 @@ def change_brush(vmf: VMF) -> None:
     make_bottomless = bottomlessPit.pits_allowed()
     LOGGER.info('Make Bottomless Pit: {}', make_bottomless)
 
-    highest_brush = 0
+    highest_brush = 0.0
 
     # Calculate the z-level with the largest number of goo brushes,
     # so we can ensure the 'fancy' pit is the largest one.
     # Valve just does it semi-randomly.
-    goo_heights = Counter()
+    goo_heights: Counter[float] = Counter()
     for pos, block in brushLoc.POS.items():
         if block.is_goo and block.is_top:
             # Block position is the center,

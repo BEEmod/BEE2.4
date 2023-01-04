@@ -175,7 +175,7 @@ class Grid(MutableMapping[_grid_keys, Block]):
     def raycast(
         self,
         pos: _grid_keys,
-        direction: Vec,
+        direction: Vec | Tuple[int, int, int],
         collide: Iterable[Block]=frozenset({
             Block.SOLID, Block.EMBED,
             Block.PIT_BOTTOM, Block.PIT_SINGLE,
@@ -194,19 +194,17 @@ class Grid(MutableMapping[_grid_keys, Block]):
         map.
         """
         start_pos = pos = Vec(*_conv_key(pos))
-        direction = Vec(direction)
+        direction_v = Vec(direction)
         collide_set = frozenset(collide)
         # 50x50x50 diagonal = 86, so that's the largest distance
         # you could possibly move.
         for i in range(90):
-            next_pos = pos + direction
+            next_pos = pos + direction_v
             block = super().get(next_pos.as_tuple(), Block.VOID)
             if block is Block.VOID:
                 raise ValueError(
-                    'Reached VOID at ({}) when '
-                    'raycasting from {} with direction {}!'.format(
-                        next_pos, start_pos, direction
-                    )
+                    f'Reached VOID at ({next_pos}) when raycasting from {start_pos} with '
+                    f'direction {direction_v}!'
                 )
             if block in collide_set:
                 return pos
@@ -217,7 +215,7 @@ class Grid(MutableMapping[_grid_keys, Block]):
     def raycast_world(
         self,
         pos: Vec,
-        direction: Vec,
+        direction: Vec | Tuple[int, int, int],
         collide: Iterable[Block]=frozenset({
             Block.SOLID, Block.EMBED,
             Block.PIT_BOTTOM, Block.PIT_SINGLE,

@@ -312,17 +312,17 @@ def res_make_tag_fizzler(vmf: VMF, info: conditions.MapInfo, res: Keyvalues) -> 
             sign_yaw = int(sign_yaw - 90) % 360
 
             if inst_normal.z > 0:
-                sign_angle = '0 {} 0'.format(sign_yaw)
+                sign_angle = f'0 {sign_yaw} 0'
             elif inst_normal.z < 0:
                 # Flip upside-down for ceilings
-                sign_angle = '0 {} 180'.format(sign_yaw)
+                sign_angle = f'0 {sign_yaw} 180'
             else:
                 raise AssertionError('Cannot be zero here!')
         else:
             # On a wall, face upright
-            sign_angle = conditions.PETI_INST_ANGLE[inst_normal.as_tuple()]
+            sign_angle = conditions.PETI_INST_ANGLE[inst_normal.freeze()]
 
-        # If disable_other, we show off signs. Otherwise we don't use that sign.
+        # If disable_other, we show off signs. Otherwise, we don't use that sign.
         blue_sign = blue_sign_on if blue_enabled else blue_sign_off if disable_other else None
         oran_sign = oran_sign_on if oran_enabled else oran_sign_off if disable_other else None
 

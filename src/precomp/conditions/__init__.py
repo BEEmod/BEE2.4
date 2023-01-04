@@ -37,6 +37,7 @@ import pkgutil
 import sys
 import typing
 import warnings
+from collections.abc import Mapping
 from collections import defaultdict
 from decimal import Decimal
 from enum import Enum
@@ -98,7 +99,7 @@ yn = FrozenVec(0, -1, 0)
 zp = FrozenVec(0, 0, 1)
 zn = FrozenVec(0, 0, -1)
 
-DIRECTIONS = {
+DIRECTIONS: Mapping[str, FrozenVec] = {
     # Translate these words into a normal vector
     '+x': xp,
     '-x': xn,

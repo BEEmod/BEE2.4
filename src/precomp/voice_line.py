@@ -559,7 +559,7 @@ def add_voice(
     for group in itertools.chain(
         QUOTE_DATA.find_all('group'),
         QUOTE_DATA.find_all('midchamber'),
-    ):  # type: Property
+    ):
 
         quote_targetname = group['Choreo_Name', '@choreo']
         use_dings = group.bool('use_dings', allow_dings)

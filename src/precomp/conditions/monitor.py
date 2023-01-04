@@ -276,7 +276,7 @@ def mon_camera_link(vmf: VMF) -> None:
         else:
             # Start in arrival_departure_transition_ents...
             start_pos = Vec(-2500, -2500, 0)
-            start_angles = '0 90 0'
+            start_angles = Angle(0, 90, 0)
 
     cam_ent = vmf.create_ent(
         classname='point_camera',

@@ -2,7 +2,7 @@
 import ast
 from typing import Any, Container
 
-from precomp.conditions import make_result
+from precomp import conditions
 from srctools import Keyvalues, Vec, Entity, conv_bool
 import srctools.logger
 
@@ -106,8 +106,8 @@ class Checker(ast.NodeVisitor):
     visit_Constant = safe_visit
 
 
-@make_result('Python', 'Operation')
-def res_python_setup(res: Keyvalues) -> None:
+@conditions.make_result('Python', 'Operation')
+def res_python_setup(res: Keyvalues) -> conditions.ResultCallable:
     """Apply a function to a fixup."""
     variables = {}
     variable_order = []

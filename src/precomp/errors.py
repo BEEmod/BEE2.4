@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing_extensions import Final, Literal
-from typing import Iterable, Mapping
+from typing import Iterable, Mapping, Tuple
 import pickle
 
 from srctools import FrozenVec, Vec, VMF, AtomicWriter, logger
@@ -30,6 +30,11 @@ NORM_2_ORIENT: Final[Mapping[FrozenVec, Literal['u', 'd', 'n', 's', 'e', 'w']]] 
 }
 
 
+def _vec2tup(vec: Vec | FrozenVec) -> tuple[float, float, float]:
+    """Convert a vector to a tuple for putting in the error JSON."""
+    return (round(vec.x, 12), round(vec.y, 12), round(vec.z, 12))
+
+
 def load_tiledefs(tiles: Iterable[TileDef], grid: Grid) -> None:
     """Load tiledef info into a simplified tiles list."""
     # noinspection PyProtectedMember
@@ -42,7 +47,7 @@ def load_tiledefs(tiles: Iterable[TileDef], grid: Grid) -> None:
     for tile in tiles:
         if not tile.base_type.is_tile:
             continue
-        block_type = grid['world': (tile.pos + 128 * tile.normal)]
+        block_type = grid.lookup_world(tile.pos + 128 * tile.normal)
         if not block_type.inside_map:
             continue
         # Tint the area underneath goo, by just using two textures with the appropriate tints.
@@ -57,14 +62,14 @@ def load_tiledefs(tiles: Iterable[TileDef], grid: Grid) -> None:
             tile_list = tiles_black
         tile_list.append({
             'orient': NORM_2_ORIENT[tile.normal.freeze()],
-            'position': tuple((tile.pos + 64 * tile.normal) / 128),
+            'position': _vec2tup((tile.pos + 64 * tile.normal) / 128),
         })
     goo_tiles = simple_tiles["goo"] = []
     for pos, block in grid.items():
         if block.is_top:  # Both goo and bottomless pits.
             goo_tiles.append({
                 'orient': 'd',
-                'position': tuple((pos + (0.5, 0.5, 0.75)).as_tuple()),
+                'position': _vec2tup(pos + (0.5, 0.5, 0.75)),
             })
 
 
@@ -82,7 +87,7 @@ def load_barriers(barriers: dict[tuple[FrozenVec, FrozenVec], BarrierType]) -> N
         pos = pos + 56.0 * normal
         kind_to_list[kind].append({
             'orient': NORM_2_ORIENT[normal],
-            'position': tuple((pos / 128.0).as_tuple()),
+            'position': _vec2tup(pos / 128.0),
         })
 
 
