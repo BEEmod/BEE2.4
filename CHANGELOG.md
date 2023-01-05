@@ -4,6 +4,7 @@
 
 ### Enhancements:
 * If a duplicate package is present, include the paths of both in the error message.
+* Properly pick free port for error server.
 
 ------------------------------------------
 

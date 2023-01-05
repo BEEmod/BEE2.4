@@ -40,8 +40,7 @@ app = QuartTrio(
     root_path=str(root_path),
 )
 config = Config()
-config.debug = True
-config.bind = ["localhost:8080"]  # Use localhost, request any free port.
+config.bind = ["localhost:0"]  # Use localhost, request any free port.
 DELAY = 5 * 60  # After 5 minutes of no response, quit.
 # This cancel scope is cancelled after no response from the client, to shut us down.
 # It starts with an infinite deadline, to ensure there's time to boot the server.
