@@ -357,8 +357,12 @@ class DropperType:
                 cube_dir = conditions.DIRECTIONS[cube_dir_str]
             except KeyError:
                 cube_dir = FrozenVec.from_str(cube_dir_str, x=1)
-            # Set roll to counteract us being on the ceiling.
-            cube_orient = cube_dir.to_angle(180)
+            if cube_dir == 'WALL':
+                LOGGER.warning('Cube type "{}" uses cube_dir=WALL, this makes no sense', conf['id'])
+                cube_orient = Angle()
+            else:
+                # Set roll to counteract us being on the ceiling.
+                cube_orient = cube_dir.to_angle(180)
         else:
             cube_orient = Angle()
 

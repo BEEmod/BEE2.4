@@ -48,6 +48,7 @@ import srctools.logger
 from srctools import (
     Keyvalues, FrozenVec, Vec, VMF, Entity, Output, Solid, Angle, Matrix,
 )
+from typing_extensions import Literal
 
 from precomp import instanceLocs, rand, collisions
 from precomp.corridor import Info as MapInfo
@@ -99,7 +100,7 @@ yn = FrozenVec(0, -1, 0)
 zp = FrozenVec(0, 0, 1)
 zn = FrozenVec(0, 0, -1)
 
-DIRECTIONS: Mapping[str, FrozenVec] = {
+DIRECTIONS: Mapping[str, FrozenVec | Literal['WALL']] = {
     # Translate these words into a normal vector
     '+x': xp,
     '-x': xn,
