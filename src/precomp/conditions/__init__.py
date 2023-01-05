@@ -527,7 +527,7 @@ class CondCall(Generic[CallResultT]):
             except KeyError:
                 # The entity should never be used in setup functions. Pass a dummy object
                 # so errors occur if it's used.
-                cback = self._setup_data[id(conf)] = self._cback(
+                cback = self._setup_data[id(conf)] = self._cback(  # type: ignore
                     ent.map, coll, info,
                     cast(Entity, object()),
                     conf,
@@ -625,6 +625,7 @@ def make_result(orig_name: str, *aliases: str) -> Callable[[CallableT], Callable
     def x(result_func: CallableT) -> CallableT:
         """Create the result when the function is supplied."""
         # Legacy setup func support.
+        func: Callable[..., Callable[[Entity], object] | object]
         try:
             setup_func = RESULT_SETUP.pop(orig_name.casefold())
         except KeyError:
@@ -647,7 +648,7 @@ def make_result(orig_name: str, *aliases: str) -> Callable[[CallableT], Callable
                 alias_setup = RESULT_SETUP.pop(name.casefold())
                 assert alias_setup is setup_func, alias_setup
         ALL_RESULTS.append((orig_name, aliases, wrapper))
-        return func
+        return result_func
     return x
 
 
@@ -868,11 +869,11 @@ def dump_conditions(file: TextIO) -> None:
         dump_func_docs(file, func)
         file.write('\n')
 
-    lookup: list[tuple[str, tuple[str, ...], CondCall]]
-    for lookup, name in [
+    all_cond_types: list[tuple[list[tuple[str, tuple[str, ...], CondCall]], str]] = [
         (ALL_FLAGS, 'Flags'),
         (ALL_RESULTS, 'Results'),
-    ]:
+    ]
+    for lookup, name in all_cond_types:
         print('<!------->', file=file)
         print(f'# {name}', file=file)
         print('<!------->', file=file)
