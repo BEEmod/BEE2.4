@@ -1029,6 +1029,7 @@ async def init_option(
     pane: SubPane.SubPane,
     pal_ui: paletteUI.PaletteUI,
     export: Callable[[], object],
+    corridor: corridor_selector.Selector,
 ) -> None:
     """Initialise the options pane."""
     pane.columnconfigure(0, weight=1)
@@ -1116,6 +1117,7 @@ async def init_option(
             TransToken.ui("Voice: "),
             TransToken.ui("Skybox: "),
             TransToken.ui("Elev Vid: "),
+            TransToken.ui("Corridor: "),
             ]):
         if name is None:
             # This is the "Suggested" button!
@@ -1149,8 +1151,11 @@ async def init_option(
     voice_frame.grid(row=2, column=1, sticky='EW')
     (await skybox_win.widget(props)).grid(row=3, column=1, sticky='EW', padx=left_pad)
     (await elev_win.widget(props)).grid(row=4, column=1, sticky='EW', padx=left_pad)
-    music_frame.grid(row=5, column=0, sticky='EW', columnspan=2)
-
+    localisation.set_text(
+        ttk.Button(props, command=corridor.show),
+        TransToken.ui('Select'),
+    ).grid(row=5, column=1, sticky='EW')
+    music_frame.grid(row=6, column=0, sticky='EW', columnspan=2)
     (await voice_win.widget(voice_frame)).grid(row=0, column=1, sticky='EW', padx=left_pad)
 
     if tk_tools.USE_SIZEGRIP:
@@ -1507,7 +1512,10 @@ async def init_windows() -> None:
     )
 
     async with trio.open_nursery() as nurs:
-        nurs.start_soon(init_option, windows['opt'], pal_ui, export)
+        corridor = corridor_selector.Selector(packages.LOADED)
+        nurs.start_soon(init_option, windows['opt'], pal_ui, export, corridor)
+    async with trio.open_nursery() as nurs:
+        nurs.start_soon(corridor.refresh)
     loader.step('UI', 'options')
 
     async with trio.open_nursery() as nurs:
@@ -1515,10 +1523,7 @@ async def init_windows() -> None:
     loader.step('UI', 'itemvar')
 
     async with trio.open_nursery() as nurs:
-        corridor = corridor_selector.Selector(packages.LOADED)
-        nurs.start_soon(CompilerPane.make_pane, frames['toolMenu'], menu_bar.view_menu, corridor)
-    async with trio.open_nursery() as nurs:
-        nurs.start_soon(corridor.refresh)
+        nurs.start_soon(CompilerPane.make_pane, frames['toolMenu'], menu_bar.view_menu)
     loader.step('UI', 'compiler')
 
     UI['shuffle_pal'] = SubPane.make_tool_button(
