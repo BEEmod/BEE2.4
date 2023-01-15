@@ -409,8 +409,15 @@ async def load_aux_langs(
         return
 
     # Preserve only the UI translations.
-    # noinspection PyProtectedMember
-    lang_map = {NS_UI: lang._trans[NS_UI]}
+    lang_map: dict[str, transtoken.GetText] = {}
+    try:
+        # noinspection PyProtectedMember
+        lang_map[NS_UI] = lang._trans[NS_UI]
+    except KeyError:
+        # Should always be there, perhaps this is early initialisation, dummy lang, error etc.
+        # Continue to load, will likely just produce errors and fall back but that's fine.
+        LOGGER.warning('Loading lang "{}" which has no UI translations!', lang.lang_code)
+
     # The parsed game translations.
     game_dict: dict[str, str] = {}
 
