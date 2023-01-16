@@ -8,8 +8,8 @@ they are loaded in the background, then unloaded if removed from all widgets.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, ClassVar, Iterator, Literal, TypeVar, Union, Type, cast
-from typing_extensions import TypeAlias, Final
+from typing import Any, ClassVar, Iterator, Tuple, TypeVar, Union, Type, cast
+from typing_extensions import TypeAlias, Final, Literal
 from collections.abc import Sequence, Mapping
 from weakref import ref as WeakRef
 from tkinter import ttk
@@ -716,30 +716,20 @@ class ImgBuiltin(Handle):
     uri: utils.PackagePath
     allow_raw: ClassVar[bool] = True
     alpha_result: ClassVar[bool] = True
+    resize_mode: ClassVar[Literal[0, 1, 2, 3, 4, 5]] = Image.ANTIALIAS
 
     def _make_image(self) -> Image.Image:
         """Load from the builtin UI resources."""
-        return _load_file(FSYS_BUILTIN, self.uri, self.width, self.height, Image.ANTIALIAS)
+        return _load_file(FSYS_BUILTIN, self.uri, self.width, self.height, self.resize_mode)
 
     def resize(self, width: int, height: int) -> ImgBuiltin:
         """Return a copy with a different size."""
         return self._deduplicate(width, height, self.uri)
 
 
-@attrs.define(eq=False)
-class ImgSprite(Handle):
+class ImgSprite(ImgBuiltin):
     """An image loaded from builtin UI resources, with nearest-neighbour resizing."""
-    uri: utils.PackagePath
-    allow_raw: ClassVar[bool] = True
-    alpha_result: ClassVar[bool] = True
-
-    def _make_image(self) -> Image.Image:
-        """Load from the builtin UI resources, but use nearest-neighbour resizing."""
-        return _load_file(FSYS_BUILTIN, self.uri, self.width, self.height, Image.NEAREST)
-
-    def resize(self, width: int, height: int) -> ImgSprite:
-        """Return a copy with a different size."""
-        return self._deduplicate(width, height, self.uri)
+    resize_mode: ClassVar[Literal[0, 1, 2, 3, 4, 5]] = Image.NEAREST
 
 
 @attrs.define(eq=False)
