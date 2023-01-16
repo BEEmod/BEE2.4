@@ -64,9 +64,17 @@ PACK_SYSTEMS: dict[str, FileSystem] = {}
 # Silence DEBUG messages from Pillow, they don't help.
 logging.getLogger('PIL').setLevel(logging.INFO)
 
+# The currently selected theme for images.
+Theme: TypeAlias = Literal['light', 'dark']
+_current_theme: Theme = 'light'
+
 # Colour of the palette item background
 PETI_ITEM_BG: Final = (229, 233, 233)
 PETI_ITEM_BG_HEX: Final = '#{:2X}{:2X}{:2X}'.format(*PETI_ITEM_BG)
+BACKGROUNDS: Mapping[Theme, Tuple[int, int, int]] = {
+    'light': (229, 233, 233),  # Same as palette items ingame.
+    'dark': (26, 22, 22),
+}
 
 FLIP_LEFT_RIGHT: Final = Image.FLIP_LEFT_RIGHT
 FLIP_TOP_BOTTOM: Final = Image.FLIP_TOP_BOTTOM
@@ -82,7 +90,7 @@ def _load_special(path: str) -> Image.Image:
         return img.convert('RGBA')
     except Exception:
         LOGGER.warning('"{}" icon could not be loaded!', path, exc_info=True)
-        return Image.new('RGBA', (64, 64), PETI_ITEM_BG)
+        return Image.new('RGBA', (64, 64), (0, 0, 0, 0))
 
 ICONS: dict[str, Image.Image] = {
     name: _load_special(name)
@@ -150,7 +158,7 @@ PATH_BLANK = utils.PackagePath('<special>', 'blank')
 PATH_ERROR = utils.PackagePath('<special>', 'error')
 PATH_LOAD = utils.PackagePath('<special>', 'load')
 PATH_NONE = utils.PackagePath('<special>', 'none')
-PATH_BG = utils.PackagePath('color', PETI_ITEM_BG_HEX[1:])
+PATH_BG = utils.PackagePath('<special>', 'bg')
 PATH_BLACK = utils.PackagePath('<color>', '000')
 PATH_WHITE = utils.PackagePath('<color>', 'fff')
 
@@ -195,7 +203,7 @@ def _load_file(
 
     if img_file is None:
         LOGGER.error('"{}" does not exist!', uri)
-        return Handle.error(width, height).get_pil()
+        return Handle.error(width, height).get_pil(), False
 
     try:
         with img_file.open_bin() as file:
@@ -366,8 +374,7 @@ class Handle:
                     typ = ImgIcon
                     args = [name]
                 elif name == 'bg':
-                    typ = ImgColor
-                    args = [PETI_ITEM_BG]
+                    typ = ImgBackground
                 else:
                     raise ValueError(f'Unknown special type "{uri.path}"!')
             elif special_name in ('color', 'colour', 'rgb'):
@@ -478,6 +485,11 @@ class Handle:
     def blank(cls, width: int, height: int) -> ImgAlpha:
         """Shortcut for getting a handle to an empty image."""
         return ImgAlpha._deduplicate(width, height)
+
+    @classmethod
+    def background(cls, width: int, height: int) -> ImgBackground:
+        """Shortcut for getting a handle to an image containing the background."""
+        return ImgBackground._deduplicate(width, height)
 
     @classmethod
     def color(cls, color: tuple[int, int, int] | Vec, width: int, height: int) -> ImgColor:
@@ -647,6 +659,24 @@ class ImgColor(Handle):
             (self.red, self.green, self.blue, 255),
         )
 
+    def resize(self: HandleT, width: int, height: int) -> HandleT:
+        """Return the same colour with a different image size."""
+        return self._deduplicate(width, height)
+@attrs.define(eq=False)
+class ImgBackground(Handle):
+    """A solid image with the theme-appropriate background."""
+
+    def _make_image(self) -> Image.Image:
+        """Directly produce an image of this size with the specified color."""
+        return Image.new(
+            'RGBA',
+            (self.width or 16, self.height or 16),
+            BACKGROUNDS[_current_theme],  # This is a 3-tuple, but PIL fills alpha=255.
+        )
+
+    def resize(self: HandleT, width: int, height: int) -> HandleT:
+        """Return a new background with this image size."""
+        return self._deduplicate(width, height)
 
 class ImgAlpha(Handle):
     """An image which is entirely transparent."""

@@ -81,7 +81,7 @@ ItemsBG = "#CDD0CE"  # Colour of the main background to match the menu image
 ICO_MOVING = img.Handle.builtin('BEE2/item_moving', 64, 64)
 ICO_GEAR = img.Handle.sprite('icons/gear', 10, 10)
 ICO_GEAR_DIS = img.Handle.sprite('icons/gear_disabled', 10, 10)
-IMG_BLANK = img.Handle.color(img.PETI_ITEM_BG, 64, 64)
+IMG_BLANK = img.Handle.background(64, 64)
 
 selected_style = "BEE2_CLEAN"
 

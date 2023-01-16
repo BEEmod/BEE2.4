@@ -23,7 +23,7 @@ SLOTS_SELECTED: Dict[int, dragdrop.Slot[Signage]] = {}
 # The valid timer indexes for signs.
 SIGN_IND: Sequence[int] = range(3, 31)
 IMG_ERROR = img.Handle.error(64, 64)
-IMG_BLANK = img.Handle.color(img.PETI_ITEM_BG, 64, 64)
+IMG_BLANK = img.Handle.background(64, 64)
 
 TRANS_SIGN_NAME = TransToken.ui('Signage: {name}')
 

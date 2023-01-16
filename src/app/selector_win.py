@@ -312,7 +312,7 @@ class Item:
                     width=ICON_SIZE, height=ICON_SIZE,
                 )
             else:
-                self._icon = img.Handle.color(img.PETI_ITEM_BG, ICON_SIZE, ICON_SIZE)
+                self._icon = img.Handle.background(ICON_SIZE, ICON_SIZE)
         return self._icon
 
     @icon.setter
