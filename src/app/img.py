@@ -75,6 +75,10 @@ BACKGROUNDS: Mapping[Theme, Tuple[int, int, int]] = {
     'light': (229, 233, 233),  # Same as palette items ingame.
     'dark': (26, 22, 22),
 }
+FOREGROUNDS: Mapping[Theme, Tuple[int, int, int, int]] = {
+    'light': (0, 0, 0, 255),
+    'dark': (255, 255, 255, 255),
+}
 
 FLIP_LEFT_RIGHT: Final = Image.FLIP_LEFT_RIGHT
 FLIP_TOP_BOTTOM: Final = Image.FLIP_TOP_BOTTOM
@@ -169,7 +173,7 @@ def _load_file(
     width: int, height: int,
     resize_algo: Literal[0, 1, 2, 3, 4, 5],
     check_other_packages: bool=False,
-) -> Image.Image:
+) -> Tuple[Image.Image, bool]:
     """Load an image from a filesystem."""
     path = uri.path.casefold()
     if path[-4:-3] == '.':
@@ -179,13 +183,14 @@ def _load_file(
 
     image: Image.Image
     try:
-        # TODO: Just for now, always light styled.
-        img_file = fsys[f'{path}.light.{ext}']
+        img_file = fsys[f'{path}.{_current_theme}.{ext}']
+        uses_theme = True
     except (KeyError, FileNotFoundError):
         try:
             img_file = fsys[f'{path}.{ext}']
         except (KeyError, FileNotFoundError):
             img_file = None
+        uses_theme = False
 
     # Deprecated behaviour, check the other packages.
     if img_file is None and check_other_packages:
@@ -232,11 +237,11 @@ def _load_file(
             uri,
             exc_info=True,
         )
-        return Handle.error(width, height).get_pil()
+        return Handle.error(width, height).get_pil(), False
 
     if width > 0 and height > 0 and (width, height) != image.size:
         image = image.resize((width, height), resample=resize_algo)
-    return image
+    return image, uses_theme
 
 
 @attrs.define(eq=False)
@@ -259,6 +264,8 @@ class Handle:
     _loading: bool = attrs.field(init=False, default=False)
     # When no users are present, schedule cleaning up the handle's data to reuse.
     _cancel_cleanup: trio.CancelScope = attrs.field(init=False, factory=trio.CancelScope, repr=False)
+    # This is set if a PeTI background was automatically composited behind a transparent image.
+    _bg_composited: bool = attrs.field(init=False, default=False)
 
     # Determines whether `get_pil()` and `get_tk()` can be called directly.
     allow_raw: ClassVar[bool] = False
@@ -282,6 +289,20 @@ class Handle:
     def resize(self: HandleT, width: int, height: int) -> HandleT:
         """Return a copy with a different size."""
         raise NotImplementedError
+
+    def _is_themed(self) -> bool:
+        """Return if this image may need to reload when the theme changes.
+
+        This only needs to be set after the image is loaded at least once.
+        """
+        raise NotImplementedError
+
+    def is_themed(self) -> bool:
+        """Return if this image may need to reload when the theme changes.
+
+        This only needs to be set after the image is loaded at least once.
+        """
+        return self._bg_composited or self._is_themed()
 
     @classmethod
     def _deduplicate(cls: Type[HandleT], width: int | tuple[int, int], height: int, *args: Any) -> HandleT:
@@ -567,9 +588,10 @@ class Handle:
             res = self._load_pil()
             # Except for builtin types (icons), composite onto the PeTI BG.
             if not self.alpha_result and res.mode == 'RGBA':
-                bg = Image.new('RGBA', res.size, PETI_ITEM_BG)
+                bg = Image.new('RGBA', res.size, BACKGROUNDS[_current_theme])
                 bg.alpha_composite(res)
                 res = bg.convert('RGB')
+                self._bg_composited = True
             self._cached_tk = _get_tk_img(res.width, res.height)
             self._cached_tk.paste(res)
         return self._cached_tk
@@ -662,6 +684,12 @@ class ImgColor(Handle):
     def resize(self: HandleT, width: int, height: int) -> HandleT:
         """Return the same colour with a different image size."""
         return self._deduplicate(width, height)
+
+    def _is_themed(self) -> bool:
+        """This is never themed."""
+        return False
+
+
 @attrs.define(eq=False)
 class ImgBackground(Handle):
     """A solid image with the theme-appropriate background."""
@@ -678,6 +706,11 @@ class ImgBackground(Handle):
         """Return a new background with this image size."""
         return self._deduplicate(width, height)
 
+    def _is_themed(self) -> bool:
+        """This image must reload when the theme changes."""
+        return True
+
+
 class ImgAlpha(Handle):
     """An image which is entirely transparent."""
     alpha_result: ClassVar[bool] = True
@@ -687,8 +720,12 @@ class ImgAlpha(Handle):
         return Image.new('RGBA', (self.width or 16, self.height or 16), (0, 0, 0, 0))
 
     def resize(self, width: int, height: int) -> ImgAlpha:
-        """Return a copy with a different size."""
+        """Return a transparent image with a different size."""
         return self._deduplicate(width, height)
+
+    def _is_themed(self) -> bool:
+        """This is never themed."""
+        return False
 
 
 @attrs.define(eq=False)
@@ -713,6 +750,10 @@ class ImgStripAlpha(Handle):
         """Yield all the handles this depends on."""
         yield self.original
 
+    def _is_themed(self) -> bool:
+        """This is themed if the original is."""
+        return self.original.is_themed()
+
     @classmethod
     def _to_key(cls, args: tuple) -> tuple:
         """Handles aren't hashable, so we need to use identity."""
@@ -724,6 +765,7 @@ class ImgStripAlpha(Handle):
 class ImgFile(Handle):
     """An image loaded from a package."""
     uri: utils.PackagePath
+    _uses_theme: bool = False
 
     def _make_image(self) -> Image.Image:
         """Load from a app package."""
@@ -733,11 +775,18 @@ class ImgFile(Handle):
             LOGGER.warning('Unknown package for loading images: "{}"!', self.uri)
             return Handle.error(self.width, self.height).get_pil()
 
-        return _load_file(fsys, self.uri, self.width, self.height, Image.ANTIALIAS, True)
+        img, uses_theme = _load_file(fsys, self.uri, self.width, self.height, Image.ANTIALIAS, True)
+        if uses_theme:
+            self._uses_theme = True
+        return img
 
     def resize(self, width: int, height: int) -> ImgFile:
         """Return a copy with a different size."""
         return self._deduplicate(width, height, self.uri)
+
+    def _is_themed(self) -> bool:
+        """Return it this uses a themed image."""
+        return self._uses_theme
 
 
 @attrs.define(eq=False)
@@ -747,14 +796,22 @@ class ImgBuiltin(Handle):
     allow_raw: ClassVar[bool] = True
     alpha_result: ClassVar[bool] = True
     resize_mode: ClassVar[Literal[0, 1, 2, 3, 4, 5]] = Image.ANTIALIAS
+    _uses_theme: bool = False
 
     def _make_image(self) -> Image.Image:
         """Load from the builtin UI resources."""
-        return _load_file(FSYS_BUILTIN, self.uri, self.width, self.height, self.resize_mode)
+        img, uses_theme = _load_file(FSYS_BUILTIN, self.uri, self.width, self.height, self.resize_mode)
+        if uses_theme:
+            self._uses_theme = True
+        return img
 
     def resize(self, width: int, height: int) -> ImgBuiltin:
         """Return a copy with a different size."""
         return self._deduplicate(width, height, self.uri)
+
+    def _is_themed(self) -> bool:
+        """Return it this uses a themed image."""
+        return self._uses_theme
 
 
 class ImgSprite(ImgBuiltin):
@@ -772,6 +829,10 @@ class ImgComposite(Handle):
     def _to_key(cls, children: tuple[Handle, ...]) -> tuple:
         """Handles aren't hashable, so we need to use identity."""
         return tuple(map(id, children))
+
+    def _is_themed(self) -> bool:
+        """Check if this needs to be updated for theming."""
+        return any(layer.is_themed() for layer in self.layers)
 
     def _make_image(self) -> Image.Image:
         """Combine several images into one."""
@@ -815,6 +876,9 @@ class ImgCrop(Handle):
         [child, bounds, transpose] = args
         return (id(child), bounds, transpose)
 
+    def _is_themed(self) -> bool:
+        return self.source.is_themed()
+
     def _make_image(self) -> Image.Image:
         """Crop this image down to part of the source."""
         src_w = self.source.width
@@ -853,7 +917,7 @@ class ImgIcon(Handle):
         width = self.width or ico.width
         height = self.height or ico.height
 
-        img = Image.new('RGBA', (width, height), PETI_ITEM_BG)
+        img = Image.new('RGBA', (width, height), BACKGROUNDS[_current_theme])
 
         if width >= ico.width and height >= ico.height:
             # Center the 64x64 icon.
@@ -865,6 +929,10 @@ class ImgIcon(Handle):
     def resize(self, width: int, height: int) -> ImgIcon:
         """Return a copy with a different size."""
         return self._deduplicate(width, height, self.icon_name)
+
+    def _is_themed(self) -> bool:
+        """This includes the background."""
+        return True
 
 
 @attrs.define(eq=False)
@@ -885,19 +953,23 @@ class ImgTextOverlay(Handle):
             font=font,
             anchor='ld',
         )
-        draw.rectangle(bbox, fill=PETI_ITEM_BG)
+        draw.rectangle(bbox, fill=BACKGROUNDS[_current_theme])
         draw.text(
             (0, self.height),
             self.text,
             font=font,
             anchor='ld',
-            fill=(0, 0, 0, 255),
+            fill=FOREGROUNDS[_current_theme],
         )
         return img
 
     def resize(self, width: int, height: int) -> ImgTextOverlay:
         """Return a copy with a different size."""
         return self._deduplicate(width, height, self.text, self.size)
+
+    def _is_themed(self) -> bool:
+        """This includes the background."""
+        return True
 
 
 def _label_destroyed(ref: WeakRef[tkImgWidgetsT]) -> None:
@@ -951,6 +1023,19 @@ async def init(filesystems: Mapping[str, FileSystem]) -> None:
                 _load_nursery.start_soon(Handle._load_task, handle)
         _load_nursery.start_soon(_spin_load_icons)
         await trio.sleep_forever()
+
+
+def set_theme(new_theme: Theme) -> None:
+    """Change the image theme."""
+    global _current_theme
+    if _current_theme != new_theme:
+        _current_theme = new_theme
+        done = 0
+        for handle in list(_handles.values()):
+            # noinspection PyProtectedMember
+            if (handle._bg_composited or handle.is_themed()) and handle.reload():
+                done += 1
+        LOGGER.info('Queued {} images to reload for new theme "{}".', done, new_theme)
 
 
 def refresh_all() -> None:

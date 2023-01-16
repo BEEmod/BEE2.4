@@ -12,6 +12,7 @@ import attrs
 import srctools.logger
 
 import packages
+import utils
 from app.tooltip import add_tooltip
 from app import (
     TK_ROOT, LAUNCH_AFTER_EXPORT, DEV_MODE, background_run,
@@ -406,6 +407,18 @@ async def init_win_tab(
         ttk.Button(f, command=reset_all_win),
         TransToken.ui('Reset All Window Positions'),
     ).grid(row=1, column=1, sticky='E')
+
+    if not utils.FROZEN:  # Temporary button for testing.
+        ttk.Button(
+            f,
+            text='Light mode',
+            command=lambda: img.set_theme('light'),
+        ).grid(row=2, column=0, sticky='EW')
+        ttk.Button(
+            f,
+            text='Dark mode',
+            command=lambda: img.set_theme('dark'),
+        ).grid(row=2, column=1, sticky='EW')
 
 
 async def init_dev_tab(f: ttk.Frame) -> None:
