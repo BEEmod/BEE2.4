@@ -499,6 +499,26 @@ class Handle:
         """Check if this image is being used."""
         return self._force_loaded or bool(self._users)
 
+    def reload(self) -> bool:
+        """Reload this handle if permitted to, returning whether it was queued.
+
+        Reloading will not occur if the handle was forced loaded or already loading.
+        """
+        # If force-loaded it's builtin UI etc we shouldn't reload.
+        # If already loading, no point.
+        if self._force_loaded or self._loading:
+            return False
+
+        _discard_tk_img(self._cached_tk)
+        self._cached_tk = self._cached_pil = None
+        loading = self._request_load()
+        for label_ref in self._users:
+            if isinstance(label_ref, WeakRef):
+                label: tkImgWidgets | None = label_ref()
+                if label is not None:
+                    label['image'] = loading
+        return True
+
     def get_pil(self) -> Image.Image:
         """Load the PIL image if required, then return it."""
         if self.allow_raw:
@@ -879,10 +899,6 @@ def _label_destroyed(ref: WeakRef[tkImgWidgetsT]) -> None:
 # noinspection PyProtectedMember
 async def _spin_load_icons() -> None:
     """Cycle loading icons."""
-    fnames = [
-        f'load_{i}'
-        for i in range(8)
-    ]
     for i in itertools.cycle(LOAD_FRAME_IND):
         await trio.sleep(0.125)
         for handle, frames in _load_handles.values():
@@ -917,26 +933,13 @@ async def init(filesystems: Mapping[str, FileSystem]) -> None:
         await trio.sleep_forever()
 
 
-# noinspection PyProtectedMember
 def refresh_all() -> None:
     """Force all images to reload."""
     LOGGER.info('Forcing all images to reload!')
     done = 0
     for handle in list(_handles.values()):
-        # If force-loaded it's builtin UI etc we shouldn't reload.
-        # If already loading, no point.
-        if handle._force_loaded:
-            continue
-        if not handle._loading:
-            _discard_tk_img(handle._cached_tk)
-            handle._cached_tk = handle._cached_pil = None
-            loading = handle._request_load()
+        if handle.reload():
             done += 1
-            for label_ref in handle._users:
-                if isinstance(label_ref, WeakRef):
-                    label: tkImgWidgets | None = label_ref()
-                    if label is not None:
-                        label['image'] = loading
     LOGGER.info('Queued {} images to reload.', done)
 
 
