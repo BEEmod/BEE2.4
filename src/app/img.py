@@ -85,36 +85,37 @@ FLIP_TOP_BOTTOM: Final = Image.FLIP_TOP_BOTTOM
 FLIP_ROTATE: Final = Image.ROTATE_180
 
 
-def _load_special(path: str) -> Image.Image:
+def _load_special(path: str, theme: Theme) -> Image.Image:
     """Various special images we have to load."""
     img: Image.Image
     try:
-        img = Image.open(utils.install_path(f'images/BEE2/{path}.png'))
+        img = Image.open(utils.install_path(f'images/BEE2/{path}.{theme.value}.png'))
         img.load()
         return img.convert('RGBA')
     except Exception:
         LOGGER.warning('"{}" icon could not be loaded!', path, exc_info=True)
         return Image.new('RGBA', (64, 64), (0, 0, 0, 0))
 
-ICONS: dict[str, Image.Image] = {
-    name: _load_special(name)
+ICONS: Dict[Tuple[str, Theme], Image.Image] = {
+    (name, theme): _load_special(name, theme)
     for name in ['error', 'none', 'load']
+    for theme in Theme
 }
 # The icon has 8 parts, with the gap in the 1 pos. So mirror/rotate to
 # derive the others.
-
-ICONS['load_0'] = _load_icon = ICONS['load']
-ICONS['load_7'] = _load_icon_flip = _load_icon.transpose(Image.FLIP_LEFT_RIGHT)
-ICONS['load_1'] = _load_icon_flip.transpose(Image.ROTATE_270)
-ICONS['load_2'] = _load_icon.transpose(Image.ROTATE_270)
-ICONS['load_3'] = _load_icon.transpose(Image.FLIP_TOP_BOTTOM)
-ICONS['load_4'] = _load_icon.transpose(Image.ROTATE_180)
-ICONS['load_5'] = _load_icon_flip.transpose(Image.ROTATE_90)
-ICONS['load_6'] = _load_icon.transpose(Image.ROTATE_90)
+for _theme in Theme:
+    ICONS['load_0', _theme] = _load_icon = ICONS['load', _theme]
+    ICONS['load_7', _theme] = _load_icon_flip = _load_icon.transpose(Image.FLIP_LEFT_RIGHT)
+    ICONS['load_1', _theme] = _load_icon_flip.transpose(Image.ROTATE_270)
+    ICONS['load_2', _theme] = _load_icon.transpose(Image.ROTATE_270)
+    ICONS['load_3', _theme] = _load_icon.transpose(Image.FLIP_TOP_BOTTOM)
+    ICONS['load_4', _theme] = _load_icon.transpose(Image.ROTATE_180)
+    ICONS['load_5', _theme] = _load_icon_flip.transpose(Image.ROTATE_90)
+    ICONS['load_6', _theme] = _load_icon.transpose(Image.ROTATE_90)
 # Frame indices in order.
 LOAD_FRAME_IND = range(8)
 
-del _load_icon, _load_icon_flip
+del _load_icon, _load_icon_flip, _theme
 # Loader handles, which we want to cycle animate.
 # The first icon is the one users use, the others are each frame (manually loaded).
 _load_handles: dict[tuple[int, int], tuple[ImgIcon, list[ImgIcon]]] = {}
@@ -913,7 +914,7 @@ class ImgIcon(Handle):
 
     def _make_image(self) -> Image.Image:
         """Construct an image with an overlaid icon."""
-        ico = ICONS[self.icon_name]
+        ico = ICONS[self.icon_name, _current_theme]
         width = self.width or ico.width
         height = self.height or ico.height
 
@@ -1036,6 +1037,10 @@ def set_theme(new_theme: Theme) -> None:
             # noinspection PyProtectedMember
             if (handle._bg_composited or handle.is_themed()) and handle.reload():
                 done += 1
+        # Invalidate all loading images, these need to be redone.
+        for load, load_frames in _load_handles.values():
+            for handle in load_frames:
+                handle._cached_pil = None
         LOGGER.info('Queued {} images to reload for new theme "{}".', done, new_theme)
 
 
