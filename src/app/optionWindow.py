@@ -19,6 +19,7 @@ from app import (
     contextWin, gameMan, localisation, tk_tools, sound, logWindow, img, UI,
 )
 from config.gen_opts import GenOptions, AfterExport
+from consts import Theme
 from transtoken import TransToken
 import loadScreen
 import config
@@ -412,12 +413,12 @@ async def init_win_tab(
         ttk.Button(
             f,
             text='Light mode',
-            command=lambda: img.set_theme('light'),
+            command=lambda: img.set_theme(Theme.LIGHT),
         ).grid(row=2, column=0, sticky='EW')
         ttk.Button(
             f,
             text='Dark mode',
-            command=lambda: img.set_theme('dark'),
+            command=lambda: img.set_theme(Theme.DARK),
         ).grid(row=2, column=1, sticky='EW')
 
 

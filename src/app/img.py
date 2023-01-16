@@ -8,7 +8,7 @@ they are loaded in the background, then unloaded if removed from all widgets.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, ClassVar, Iterator, Tuple, TypeVar, Union, Type, cast
+from typing import Any, ClassVar, Dict, Iterator, Tuple, TypeVar, Union, Type, cast
 from typing_extensions import TypeAlias, Final, Literal
 from collections.abc import Sequence, Mapping
 from weakref import ref as WeakRef
@@ -28,6 +28,7 @@ from srctools.filesys import FileSystem, RawFileSystem, FileSystemChain
 import srctools.logger
 
 from app import TK_ROOT
+from consts import Theme
 import utils
 
 # Widgets with an image attribute that can be set.
@@ -65,19 +66,18 @@ PACK_SYSTEMS: dict[str, FileSystem] = {}
 logging.getLogger('PIL').setLevel(logging.INFO)
 
 # The currently selected theme for images.
-Theme: TypeAlias = Literal['light', 'dark']
-_current_theme: Theme = 'light'
+_current_theme: Theme = Theme.LIGHT
 
 # Colour of the palette item background
 PETI_ITEM_BG: Final = (229, 233, 233)
 PETI_ITEM_BG_HEX: Final = '#{:2X}{:2X}{:2X}'.format(*PETI_ITEM_BG)
 BACKGROUNDS: Mapping[Theme, Tuple[int, int, int]] = {
-    'light': (229, 233, 233),  # Same as palette items ingame.
-    'dark': (26, 22, 22),
+    Theme.LIGHT: (229, 233, 233),  # Same as palette items ingame.
+    Theme.DARK: (26, 22, 22),
 }
 FOREGROUNDS: Mapping[Theme, Tuple[int, int, int, int]] = {
-    'light': (0, 0, 0, 255),
-    'dark': (255, 255, 255, 255),
+    Theme.LIGHT: (0, 0, 0, 255),
+    Theme.DARK: (255, 255, 255, 255),
 }
 
 FLIP_LEFT_RIGHT: Final = Image.FLIP_LEFT_RIGHT
@@ -183,7 +183,7 @@ def _load_file(
 
     image: Image.Image
     try:
-        img_file = fsys[f'{path}.{_current_theme}.{ext}']
+        img_file = fsys[f'{path}.{_current_theme.value}.{ext}']
         uses_theme = True
     except (KeyError, FileNotFoundError):
         try:
@@ -1028,9 +1028,10 @@ async def init(filesystems: Mapping[str, FileSystem]) -> None:
 def set_theme(new_theme: Theme) -> None:
     """Change the image theme."""
     global _current_theme
-    if _current_theme != new_theme:
+    if _current_theme is not new_theme:
         _current_theme = new_theme
         done = 0
+
         for handle in list(_handles.values()):
             # noinspection PyProtectedMember
             if (handle._bg_composited or handle.is_themed()) and handle.reload():

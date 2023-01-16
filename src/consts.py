@@ -11,7 +11,7 @@ from srctools import Side
 __all__ = [
     'MaterialGroup',
 
-    'MusicChannel',
+    'MusicChannel', 'Theme',
 
     'WhitePan', 'BlackPan',
     'Signage', 'Antlines',
@@ -265,6 +265,12 @@ class MusicChannel(Enum):
     TBEAM = 'tbeam'  # Funnel audio
     BOUNCE = 'bouncegel'  # Jumping on repulsion gel.
     SPEED = 'speedgel'  # Moving fast horizontally
+
+
+class Theme(Enum):
+    """Different themes for the UI."""
+    LIGHT = 'light'
+    DARK = 'dark'
 
 
 # Outputs we need to use to make a math_counter act like
