@@ -1336,9 +1336,9 @@ def init_drag_icon() -> None:
     UI['drag_lbl'].grid(row=0, column=0)
     windows['drag_win'] = drag_win
 
-    drag_win.passed_over_pal = False  # has the cursor passed over the palette
-    drag_win.from_pal = False  # are we dragging a palette item?
-    drag_win.drag_item = None  # the item currently being moved
+    drag_win.passed_over_pal = False  # type: ignore  # Has the cursor passed over the palette
+    drag_win.from_pal = False  # type: ignore  # Are we dragging a palette item?
+    drag_win.drag_item = None  # type: ignore  # The item currently being moved
 
 
 async def set_game(game: 'gameMan.Game') -> None:
