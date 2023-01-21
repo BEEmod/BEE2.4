@@ -270,7 +270,8 @@ class Handle:
 
     # Determines whether `get_pil()` and `get_tk()` can be called directly.
     allow_raw: ClassVar[bool] = False
-    # Whether the result can be transparent.
+    # If set, assigning this handle to a widget preserves the alpha. This is only set on UI icons
+    # and the like, not packages.
     alpha_result: ClassVar[bool] = False
 
     # Subclass methods
@@ -823,7 +824,7 @@ class ImgSprite(ImgBuiltin):
 @attrs.define(eq=False)
 class ImgComposite(Handle):
     """An image composed of multiple layers composited together."""
-    alpha_result: ClassVar[bool] = True
+    alpha_result: ClassVar[bool] = False
     layers: Sequence[Handle]
 
     @classmethod
