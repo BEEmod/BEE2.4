@@ -699,9 +699,16 @@ async def export_editoritems(pal_ui: paletteUI.PaletteUI, bar: MenuBar) -> None:
         # Convert IntVar to boolean, and only export values in the selected style
         chosen_style = current_style()
 
-        # The chosen items on the palette. TODO: Transition items away from old layout.
-        old_pal_data = [(it.id, it.subKey) for it in pal_picked]
-        new_pal_data: paletteUI.ItemPos = dict(zip(paletteUI.COORDS, old_pal_data))
+        # The chosen items on the palette.
+        pal_data: paletteUI.ItemPos = {
+            pos: (it.id, it.subKey)
+            for pos, it in zip(paletteUI.COORDS, pal_picked)
+        }
+        # Group palette data by each item ID, so it can easily determine which items are actually
+        # on the palette at all.
+        pal_by_item: dict[str, dict[int, tuple[int, int]]] = {}
+        for pos, (item_id, subkey) in pal_data.items():
+            pal_by_item.setdefault(item_id.casefold(), {})[subkey] = pos
 
         conf = config.APP.get_cur_conf(config.gen_opts.GenOptions)
 
@@ -714,7 +721,7 @@ async def export_editoritems(pal_ui: paletteUI.PaletteUI, bar: MenuBar) -> None:
                 packages.QuotePack: voice_win.chosen_id,
                 packages.Elevator: elev_win.chosen_id,
 
-                packages.Item: old_pal_data,
+                packages.Item: pal_by_item,
                 packages.StyleVar: StyleVarPane.export_data(chosen_style),
                 packages.Signage: signage_ui.export_data(),
 
@@ -731,7 +738,7 @@ async def export_editoritems(pal_ui: paletteUI.PaletteUI, bar: MenuBar) -> None:
         except KeyError:
             last_export = pal_ui.palettes[paletteUI.UUID_EXPORT] = paletteUI.Palette(
                 '',
-                new_pal_data,
+                pal_data,
                 # This makes it lookup the translated name
                 # instead of using a configured one.
                 trans_name='LAST_EXPORT',
@@ -739,7 +746,7 @@ async def export_editoritems(pal_ui: paletteUI.PaletteUI, bar: MenuBar) -> None:
                 readonly=True,
             )
         else:
-            last_export.items = new_pal_data
+            last_export.items = pal_data
         last_export.save(ignore_readonly=True)
 
         # Save the configs since we're writing to disk lots anyway.
@@ -778,7 +785,7 @@ async def export_editoritems(pal_ui: paletteUI.PaletteUI, bar: MenuBar) -> None:
 
         # Select the last_export palette, so reloading loads this item selection.
         # But leave it at the current palette, if it's unmodified.
-        if pal_ui.selected.items != new_pal_data:
+        if pal_ui.selected.items != pal_data:
             pal_ui.select_palette(paletteUI.UUID_EXPORT)
             pal_ui.update_state()
 

@@ -645,9 +645,6 @@ class Game:
 
         LOGGER.info('Style = {}', style.id)
         for obj_type, selected in selected_objects.items():
-            # Skip the massive dict in items
-            if obj_type is packages.Item:
-                selected = selected[0]
             LOGGER.info('{} = {}', obj_type, selected)
 
         # VBSP, VRAD, editoritems

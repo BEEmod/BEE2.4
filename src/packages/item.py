@@ -8,12 +8,12 @@ import operator
 import re
 import copy
 from enum import Enum
-from typing import Iterable, Iterator, Match, cast
+from typing import Iterable, Iterator, Mapping, Match, cast
 from pathlib import PurePosixPath as FSPath
 
 import attrs
 import trio
-from srctools import FileSystem, Keyvalues, VMF, logger
+from srctools import FileSystem, Keyvalues, VMF, logger, EmptyMapping
 from srctools.tokenizer import Tokenizer, Token
 
 import config.gen_opts
@@ -659,7 +659,7 @@ class Item(PakObject, needs_foreground=True):
         palette.
         """
         vbsp_config = exp_data.vbsp_conf
-        pal_list = exp_data.selected
+        pal_list: dict[str, dict[int, tuple[int, int]]] = exp_data.selected
 
         style_id = exp_data.selected_style.id
         item: Item
@@ -696,7 +696,7 @@ class Item(PakObject, needs_foreground=True):
 
     def _get_export_data(
         self,
-        pal_list: list[tuple[str, int]],
+        pal_list: dict[str, dict[int, tuple[int, int]]],
         style_id: str,
         prop_conf: ItemDefault,
     ) -> tuple[list[EditorItem], lazy_conf.LazyConf]:
@@ -704,12 +704,7 @@ class Item(PakObject, needs_foreground=True):
 
         # Build a dictionary of this item's palette positions,
         # if any exist.
-        palette_items = {
-            subitem: (index % 4, index // 4)
-            for index, (item, subitem) in
-            enumerate(pal_list)
-            if item == self.id
-        }
+        palette_items: Mapping[int, tuple[int, int]] = pal_list.get(self.id.casefold(), EmptyMapping)
 
         try:
             sel_version = self.versions[prop_conf.version]
@@ -1043,7 +1038,7 @@ async def assign_styled_items(all_styles: Iterable[Style], item: Item) -> None:
             # folder: str  # If set, use the given folder from our package.
             # style: str  # Inherit from a specific style (implies folder is None)
             # config: Keyvalues  # Config for editing
-            start_data: UnParsedItemVariant | ItemVariant | None
+            start_data: ItemVariant | None
             for sty_id, conf in to_change:
                 if conf.style:
                     try:
