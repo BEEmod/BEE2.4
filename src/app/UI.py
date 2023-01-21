@@ -699,8 +699,9 @@ async def export_editoritems(pal_ui: paletteUI.PaletteUI, bar: MenuBar) -> None:
         # Convert IntVar to boolean, and only export values in the selected style
         chosen_style = current_style()
 
-        # The chosen items on the palette
-        pal_data = [(it.id, it.subKey) for it in pal_picked]
+        # The chosen items on the palette. TODO: Transition items away from old layout.
+        old_pal_data = [(it.id, it.subKey) for it in pal_picked]
+        new_pal_data: paletteUI.ItemPos = dict(zip(paletteUI.COORDS, old_pal_data))
 
         conf = config.APP.get_cur_conf(config.gen_opts.GenOptions)
 
@@ -713,7 +714,7 @@ async def export_editoritems(pal_ui: paletteUI.PaletteUI, bar: MenuBar) -> None:
                 packages.QuotePack: voice_win.chosen_id,
                 packages.Elevator: elev_win.chosen_id,
 
-                packages.Item: pal_data,
+                packages.Item: old_pal_data,
                 packages.StyleVar: StyleVarPane.export_data(chosen_style),
                 packages.Signage: signage_ui.export_data(),
 
@@ -730,14 +731,15 @@ async def export_editoritems(pal_ui: paletteUI.PaletteUI, bar: MenuBar) -> None:
         except KeyError:
             last_export = pal_ui.palettes[paletteUI.UUID_EXPORT] = paletteUI.Palette(
                 '',
-                pal_data,
+                new_pal_data,
                 # This makes it lookup the translated name
                 # instead of using a configured one.
                 trans_name='LAST_EXPORT',
                 uuid=paletteUI.UUID_EXPORT,
                 readonly=True,
             )
-        last_export.pos = pal_data
+        else:
+            last_export.items = new_pal_data
         last_export.save(ignore_readonly=True)
 
         # Save the configs since we're writing to disk lots anyway.
@@ -776,7 +778,7 @@ async def export_editoritems(pal_ui: paletteUI.PaletteUI, bar: MenuBar) -> None:
 
         # Select the last_export palette, so reloading loads this item selection.
         # But leave it at the current palette, if it's unmodified.
-        if pal_ui.selected.pos != pal_data:
+        if pal_ui.selected.items != new_pal_data:
             pal_ui.select_palette(paletteUI.UUID_EXPORT)
             pal_ui.update_state()
 
@@ -953,11 +955,15 @@ def drag_fast(drag_item: PalItem, e: tk.Event) -> None:
 async def set_palette(chosen_pal: paletteUI.Palette) -> None:
     """Select a palette."""
     pal_clear()
-    for item, sub in chosen_pal.pos:
+    for coord in paletteUI.COORDS:
+        try:
+            item, sub = chosen_pal.items[coord]
+        except KeyError:
+            break  # TODO: Handle gaps.
         try:
             item_group = item_list[item]
         except KeyError:
-            LOGGER.warning('Unknown item "{}"! for palette', item)
+            LOGGER.warning('Unknown item "{}" for palette!', item)
             continue
 
         if sub not in item_group.visual_subtypes:

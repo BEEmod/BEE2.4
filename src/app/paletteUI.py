@@ -8,7 +8,7 @@ import tkinter as tk
 
 import srctools.logger
 
-from app.paletteLoader import Palette
+from app.paletteLoader import Palette, ItemPos, VertInd, HorizInd, COORDS, VERT, HORIZ
 from app import background_run, localisation, tk_tools, paletteLoader, TK_ROOT, img
 from consts import PALETTE_FORCE_SHOWN, UUID_BLANK, UUID_EXPORT, UUID_PORTAL2
 from config.palette import PaletteState
@@ -23,7 +23,9 @@ ICO_GEAR = img.Handle.sprite('icons/gear', 10, 10)
 
 # Re-export paletteLoader values for convenience.
 __all__ = [
-    'PaletteUI', 'Palette', 'UUID', 'UUID_EXPORT', 'UUID_PORTAL2', 'UUID_BLANK',
+    'PaletteUI',
+    'Palette', 'ItemPos', 'VertInd', 'HorizInd', 'VERT', 'HORIZ', 'COORDS',
+    'UUID', 'UUID_EXPORT', 'UUID_PORTAL2', 'UUID_BLANK',
 ]
 TRANS_DELETE = TransToken.ui("Delete Palette")
 TRANS_HIDE = TransToken.ui("Hide Palette")
@@ -37,16 +39,16 @@ class PaletteUI:
         *,
         cmd_clear: Callable[[], None],
         cmd_shuffle: Callable[[], None],
-        get_items: Callable[[], list[tuple[str, int]]],
+        get_items: Callable[[], ItemPos],
         set_items: Callable[[Palette], Awaitable[None]],
     ) -> None:
         """Initialises the palette pane.
 
         The parameters are used to communicate with the item list:
         - cmd_clear and cmd_shuffle are called to do those actions to the list.
-        - pal_get_items is called to retrieve the current list of selected items.
-        - cmd_save_btn_state is the .state() method on the save button.
-        - cmd_set_items is called to apply a palette to the list of items.
+        - get_items is called to retrieve the current list of selected items.
+        - save_btn_state is the .state() method on the save button.
+        - set_items is called to apply a palette to the list of items.
         """
         self.palettes: dict[UUID, Palette] = {
             pal.uuid: pal
@@ -326,7 +328,7 @@ class PaletteUI:
             self.event_save_as()
             return
         else:
-            self.selected.pos = self.get_items()
+            self.selected.items = self.get_items()
             if self.var_save_settings.get():
                 self.selected.settings = config.get_pal_conf()
             else:
