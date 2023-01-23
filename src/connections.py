@@ -8,7 +8,7 @@ import sys
 from enum import Enum
 from typing import Dict, Iterable
 
-from srctools import Output, Keyvalues, Vec
+from srctools import Output, Keyvalues, Vec, conv_bool
 
 
 class ConnType(Enum):
@@ -38,6 +38,7 @@ CONN_TYPE_NAMES.update(
     (conn.value.casefold(), conn)
     for conn in ConnType
 )
+VALID_CONN_TYPE_NAMES = ', '.join([f'"{x}"' for x in sorted(CONN_TYPE_NAMES)])
 
 
 class InputType(Enum):
@@ -237,7 +238,14 @@ class Config:
             outputs = []
             for kv in conf.find_all(kv_name):
                 if kv.value != '':
-                    out = Output.parse(kv)
+                    try:
+                        out = Output.parse(kv)
+                    except ValueError:
+                        raise ValueError(
+                            f'Could not parse output value for item "{item_id}": {kv_name}="{kv.value}"\n'
+                            'A value similar to AddOutput in the form '
+                            '"target_ent,input,parameters,delay,times_to_fire" is expected.\n'
+                        ) from None
                     out.output = ''  # Clear this, it's unused.
                     outputs.append(out)
             return outputs
@@ -262,26 +270,34 @@ class Config:
                 conf['Type', 'default'].casefold()
             )
         except ValueError:
-            raise ValueError('Invalid input type "{}": {}'.format(
+            raise ValueError('Invalid input type for "{}": {}'.format(
                 item_id, conf['type'],
             )) from None
 
         invert_var = conf['invertVar', '0']
 
+        spawn_fire_str = conf['spawnfire', 'never']
         try:
-            spawn_fire = FeatureMode(conf['spawnfire', 'never'].casefold())
+            spawn_fire = FeatureMode(spawn_fire_str.casefold())
         except ValueError:
             # Older config option - it was a bool for always/never.
-            spawn_fire_bool = conf.bool('spawnfire', None)
+            spawn_fire_bool = conv_bool('spawnfire', None)
             if spawn_fire_bool is None:
-                raise  # Nope, not a bool.
+                # Not a bool or the expected value, complain.
+                raise ValueError(
+                    f'Invalid spawnfire option for item "{item_id}: "{spawn_fire_str}"\n'
+                    'Valid options: "always", "dynamic", "never"'
+                ) from None
 
             spawn_fire = FeatureMode.ALWAYS if spawn_fire_bool else FeatureMode.NEVER
 
         try:
             sec_spawn_fire = FeatureMode(conf['sec_spawnfire', 'never'].casefold())
         except ValueError:  # Default to primary value.
-            sec_spawn_fire = FeatureMode.NEVER
+            raise ValueError(
+                f'Invalid secondary spawnfire option for item "{item_id}: "{conf["sec_spawnfire"]}"\n'
+                'Valid options: "always", "dynamic", "never"'
+            ) from None
 
         if input_type is InputType.DUAL:
             sec_enable_cmd = get_outputs('sec_enable_cmd')
@@ -292,19 +308,20 @@ class Config:
                     conf['Default_Dual', 'primary'].casefold()
                 ]
             except KeyError:
-                raise ValueError('Invalid default type for "{}": {}'.format(
-                    item_id, conf['Default_Dual'],
-                )) from None
+                raise ValueError(
+                    f'Invalid default type for "{item_id}": {conf["Default_Dual"]}\n'
+                    f'Valid values: {VALID_CONN_TYPE_NAMES}'
+                ) from None
 
             # We need an affinity to use when nothing else specifies it.
             if default_dual is ConnType.DEFAULT:
-                raise ValueError('Must specify a default type for "{}"!'.format(
-                    item_id,
-                )) from None
+                raise ValueError(
+                    f'Must specify a "default_dual" type for "{item_id}" when using type=dual!'
+                ) from None
 
             sec_invert_var = conf['sec_invertVar', '0']
         else:
-            # No dual type, set to dummy values.
+            # No dual type, set to default values.
             sec_enable_cmd = []
             sec_disable_cmd = []
             default_dual = ConnType.DEFAULT
@@ -315,34 +332,43 @@ class Config:
                 conf['DualType', 'default'].casefold()
             ]
         except KeyError:
-            raise ValueError('Invalid output affinity for "{}": {}'.format(
-                item_id, conf['DualType'],
-            )) from None
+            raise ValueError(
+                f'Invalid output affinity for "{item_id}": {conf["DualType"]}\n'
+                f'Valid values: {VALID_CONN_TYPE_NAMES}'
+            ) from None
 
-        def get_input(kv_name: str) -> tuple[str | None, str] | None:
+        def get_input(kv_name: str, inp_str: str) -> tuple[str | None, str] | None:
             """Parse an input command."""
-            try:
-                return Output.parse_name(conf[kv_name])
-            except IndexError:
+            if not inp_str:
                 return None
+            try:
+                return Output.parse_name(inp_str)
+            except ValueError:
+                raise ValueError(
+                    f'Could not parse output name for item "{item_id}": {kv_name}="{inp_str}"\n'
+                    'This should be either an instance output name like '
+                    '"instance:ent_name;OnSomeOutput", or a simple output name like "OnStartTouch" '
+                    'if the instance is being replaced by a single entity.'
+                ) from None
 
-        out_act = get_input('out_activate')
-        out_deact = get_input('out_deactivate')
-        out_lock = get_input('out_lock')
-        out_unlock = get_input('out_unlock')
+        out_act = get_input('out_activate', conf['out_activate', ''])
+        out_deact = get_input('out_deactivate', conf['out_deactivate', ''])
+        out_lock = get_input('out_lock', conf['out_lock', ''])
+        out_unlock = get_input('out_unlock', conf['out_unlock', ''])
 
-        timer_start = timer_stop = None
+        timer_start: list[tuple[str | None, str]] | None = None
         if 'out_timer_start' in conf:
             timer_start = [
-                Output.parse_name(kv.value)
+                param
                 for kv in conf.find_all('out_timer_start')
-                if kv.value
+                if (param := get_input('out_timer_start', kv.value)) is not None
             ]
+        timer_stop: list[tuple[str | None, str]] | None = None
         if 'out_timer_stop' in conf:
             timer_stop = [
-                Output.parse_name(kv.value)
+                param
                 for kv in conf.find_all('out_timer_stop')
-                if kv.value
+                if (param := get_input('out_timer_stop', kv.value)) is not None
             ]
 
         return Config(
@@ -471,6 +497,7 @@ class Config:
         if self.output_deact is not None:
             text.append('Deactivation: ' + format_output_name(self.output_deact))
 
+        print(f'{self.timer_start=!r}, {self.timer_stop=!r}')
         if self.timer_start is not None:
             for out in self.timer_start:
                 text.append('Timer Start: ' + format_output_name(out))
