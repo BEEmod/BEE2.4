@@ -497,7 +497,6 @@ class Config:
         if self.output_deact is not None:
             text.append('Deactivation: ' + format_output_name(self.output_deact))
 
-        print(f'{self.timer_start=!r}, {self.timer_stop=!r}')
         if self.timer_start is not None:
             for out in self.timer_start:
                 text.append('Timer Start: ' + format_output_name(out))
