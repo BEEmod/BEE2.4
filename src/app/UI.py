@@ -1497,7 +1497,10 @@ async def init_windows() -> None:
         pal_frame, menu_bar.pal_menu,
         cmd_clear=pal_clear,
         cmd_shuffle=pal_shuffle,
-        get_items=lambda: [(it.id, it.subKey) for it in pal_picked],
+        get_items=lambda: {
+            pos: (it.id, it.subKey)
+            for pos, it in zip(paletteUI.COORDS, pal_picked)
+        },
         set_items=set_palette,
     )
 
