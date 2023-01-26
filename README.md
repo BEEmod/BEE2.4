@@ -67,3 +67,10 @@ To generate the packages zips, either manually zip the contents of each folder o
 use the `compile_packages` script in BEE2-items. 
 This does the same thing, but additionally removes some unnessary content 
 to decrease file sizes - comments, blank lines, hidden visgroups.
+
+
+### Want to translate gmpublisher to your language?
+
+1. Create an empty JSON in https://github.com/BEEmod/BEE2.4/i18n
+2. Update the [inlang.config.js](./inlang.config.js) file to include the new language. 
+3. Open https://inlang.com/editor/github.com/BEEmod/BEE2.4
