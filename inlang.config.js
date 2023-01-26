@@ -10,7 +10,7 @@ export async function defineConfig(env) {
   // for the required config and correct usage.
   const pluginConfig = {
     pathPattern: "./i18n/{language}/.po",
-    referenceResourcePath: "./i18n/BEE2/.po",
+    referenceResourcePath: "./i18n/BEE2/.pot",
   };
 
   return {
