@@ -69,6 +69,7 @@ This does the same thing, but additionally removes some unnessary content
 to decrease file sizes - comments, blank lines, hidden visgroups.
 
 
+## Contributing 
 ### Want to translate gmpublisher to your language?
 
 1. Create an empty JSON in https://github.com/BEEmod/BEE2.4/i18n
