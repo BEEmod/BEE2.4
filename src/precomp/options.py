@@ -8,7 +8,10 @@ from srctools import Keyvalues, Vec, parse_vec_str
 from BEE2_config import ConfigFile
 import srctools.logger
 
-from typing import Union, Tuple, TypeVar, Type, Optional, Iterator, Any, TextIO, Dict, cast
+from typing import (
+    Union, Tuple, TypeVar, Type, Optional, Iterable, Iterator, Any, TextIO, Dict, cast,
+    overload,
+)
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -36,7 +39,8 @@ TYPE_NAMES = {
     TYPE.VEC: 'Vector',
 }
 
-OptionT = TypeVar('OptionT')
+EnumT = TypeVar('EnumT', bound=Enum)
+OptionT = TypeVar('OptionT', bound=Union[str, int, float, bool, Vec])
 
 
 class Opt:
@@ -93,13 +97,13 @@ def load(opt_blocks: Iterator[Keyvalues]) -> None:
                 fallback_opts.append(opt)
                 assert opt.fallback in options, 'Invalid fallback in ' + opt.id
             else:
-                SETTINGS[opt.id] = opt.default  # type: ignore
+                SETTINGS[opt.id] = opt.default
             continue
         if opt.type is TYPE.VEC:
-            # Pass NaN so we can check if it failed..
+            # Pass NaN, so we can check if it failed..
             parsed_vals = parse_vec_str(val, math.nan)
             if math.isnan(parsed_vals[0]):
-                SETTINGS[opt.id] = opt.default  # type: ignore
+                SETTINGS[opt.id] = opt.default
             else:
                 SETTINGS[opt.id] = Vec(*parsed_vals)
         elif opt.type is TYPE.BOOL:
@@ -147,7 +151,11 @@ def set_opt(opt_name: str, value: str) -> None:
             pass
 
 
-def get(expected_type: Type[OptionT], name: str) -> Optional[OptionT]:
+@overload
+def get(expected_type: Type[EnumT], name: str) -> Optional[EnumT]: ...
+@overload
+def get(expected_type: Type[OptionT], name: str) -> Optional[OptionT]: ...
+def get(expected_type: Union[Type[OptionT], Type[EnumT]], name: str) -> Union[OptionT, EnumT, None]:
     """Get the given option.
     expected_type should be the class of the value that's expected.
     The value can be None if unset.
@@ -166,19 +174,11 @@ def get(expected_type: Type[OptionT], name: str) -> Optional[OptionT]:
 
     if isinstance(expected_type, EnumMeta):
         enum_type = expected_type
-        expected_type = str
-    else:
-        enum_type = None
+        if not isinstance(val, str):
+            raise ValueError(
+                f'Option "{name}" is {val!r} which is a {type(val)} (expected a string)'
+            )
 
-    # Don't allow subclasses (bool/int)
-    if type(val) is not expected_type:
-        raise ValueError('Option "{}" is {} (expected {})'.format(
-            name,
-            type(val),
-            expected_type,
-        ))
-
-    if enum_type is not None:
         try:
             return enum_type(val)
         except ValueError:
@@ -188,13 +188,20 @@ def get(expected_type: Type[OptionT], name: str) -> Optional[OptionT]:
                 name,
                 '\n'.join([mem.value for mem in enum_type])
             )
-            return next(iter(enum_type))
+            # EnumT isn't iterable...
+            return next(iter(cast('Iterable[EnumT]', enum_type)))
+
+    # Don't allow subclasses (bool/int)
+    if type(val) is not expected_type:
+        raise ValueError(
+            f'Option "{name}" is {val!r} which is a '
+            f'{type(val)} (expected {expected_type})'
+        )
 
     # Vec is mutable, don't allow modifying the original.
-    if expected_type is Vec:
-        return cast(Vec, val).copy()
-    else:
-        return cast(OptionT, val)
+    if isinstance(val, Vec):
+        val = val.copy()
+    return cast(OptionT, val)
 
 
 def get_itemconf(
@@ -233,18 +240,22 @@ def get_itemconf(
     if not value:
         return default
 
+    result: Union[str, Vec, bool, float, None]
     if isinstance(default, str) or default is None:
-        return value
+        result = value
     elif isinstance(default, Vec):
-        return Vec.from_str(value, default.x, default.y, default.z)
+        result = Vec.from_str(value, default.x, default.y, default.z)
     elif isinstance(default, bool):
-        return srctools.conv_bool(value, default)
+        result = srctools.conv_bool(value, default)
     elif isinstance(default, float):
-        return srctools.conv_float(value, default)
+        result = srctools.conv_float(value, default)
     elif isinstance(default, int):
-        return srctools.conv_int(value, default)
+        result = cast(OptionT, srctools.conv_int(value, default))
     else:
-        raise TypeError('Invalid default type "{}"!'.format(type(default).__name__))
+        raise TypeError(f'Invalid default type "{type(default).__name__}"!')
+
+    assert result is None or type(result) is type(default)
+    return result  # type: ignore
 
 
 INFO_DUMP_FORMAT = """\
