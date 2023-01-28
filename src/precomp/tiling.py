@@ -1814,10 +1814,10 @@ def analyse_map(vmf_file: VMF, side_to_ant_seg: dict[int, list[antlines.Segment]
     goo_replaceable = [TileType.BLACK, TileType.BLACK_4x4]
     for pos, block in BLOCK_POS.items():
         if block.is_goo:
-            for norm in NORMALS:
-                grid_pos = grid_to_world(pos) - 128 * norm
+            for fnorm in NORMALS:
+                grid_pos = grid_to_world(pos) - 128 * fnorm
                 try:
-                    tile = TILES[grid_pos.as_tuple(), norm.as_tuple()]
+                    tile = TILES[grid_pos.as_tuple(), fnorm.as_tuple()]
                 except KeyError:
                     continue
 
