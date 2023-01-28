@@ -524,7 +524,7 @@ def make_ubend(
         first_straight = (out_off + 128) - 128 * second_size
         second_straight = (first_size - second_size) * 128
 
-        side_straight = (side_dist / 128 - first_size - second_size) * 128
+        side_straight = (side_dist // 128 - first_size - second_size) * 128
 
     elif out_off < 0:
         # The first tube is further away than the second - the second bend
@@ -540,7 +540,7 @@ def make_ubend(
         first_straight = (second_size - first_size) * 128
         second_straight = (-out_off + 128) - 128 * second_size
 
-        side_straight = (side_dist / 128 - first_size - second_size) * 128
+        side_straight = (side_dist // 128 - first_size - second_size) * 128
     else:
         return []  # Not possible..
 
