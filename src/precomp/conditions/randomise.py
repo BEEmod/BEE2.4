@@ -133,59 +133,72 @@ def res_add_variant(res: Keyvalues) -> Callable[[Entity], None]:
 
 
 @make_result('RandomNum')
-def res_rand_num(res: Keyvalues) -> Callable[[Entity], None]:
+def res_rand_num(inst: Entity, res: Keyvalues) -> None:
     """Generate a random number and save in a fixup value.
 
-    If 'decimal' is true, the value will contain decimals. 'max' and 'min' are
-    inclusive. 'ResultVar' is the variable the result will be saved in.
-    If 'seed' is set, it will be used to keep the value constant across
-    map recompiles. This should be unique.
-    """
-    is_float = srctools.conv_bool(res['decimal'])
-    max_val = srctools.conv_float(res['max', 1.0])
-    min_val = srctools.conv_float(res['min', 0.0])
-    var = res['resultvar', '$random']
-    seed = res['seed', '']
+    Parameters:
 
-    def randomise(inst: Entity) -> None:
-        """Apply the random number."""
-        rng = rand.seed(b'rand_num', inst, seed)
-        if is_float:
-            inst.fixup[var] = rng.uniform(min_val, max_val)
+    - `decimal`: If true, the value will contain decimals, otherwise it is integer only.
+    - `ResultVar` is the `$fixup` variable the result will be saved in.
+    - `seed`: If this is set, it will be used to keep the value constant across map recompiles.
+       This should be unique to this use of `RandomVec`.
+    - `min`, `max` etc: These are used to define the range to generate (inclusive). If the min
+       and max are equal that number will always be used instead.
+    """
+    var = res['resultvar', '$random']
+    rng = rand.seed(b'rand_num', inst, res['seed', ''])
+
+    if res.bool('decimal'):
+        max_float = res.float('max', 1.0)
+        min_float = res.float('min', 0.0)
+        if min_float == max_float:
+            inst.fixup[var] = min_float
         else:
-            inst.fixup[var] = rng.randint(round(min_val), round(max_val))
-    return randomise
+            inst.fixup[var] = rng.uniform(min_float, max_float)
+    else:
+        max_int = res.int('max', 1)
+        min_int = res.int('min', 0)
+        if min_int == max_int:
+            inst.fixup[var] = min_int
+        else:
+            inst.fixup[var] = rng.randint(min_int, max_int)
 
 
 @make_result('RandomVec')
 def res_rand_vec(inst: Entity, res: Keyvalues) -> None:
-    """A modification to RandomNum which generates a random vector instead.
+    """A variant of `RandomNum` which generates a random vector instead.
 
-    `decimal`, `seed` and `ResultVar` work like RandomNum. `min_x`, `max_y` etc
-    are used to define the boundaries. If the min and max are equal that number
-    will be always used instead.
+    Parameters:
+
+    - `decimal`: If true, the value will contain decimals, otherwise it is integer only.
+    - `ResultVar` is the `$fixup` variable the result will be saved in.
+    - `seed`: If this is set, it will be used to keep the value constant across map recompiles.
+       This should be unique to this use of `RandomVec`.
+    - `min_x`, `max_y` etc: These are used to define the range to generate (inclusive). If the min
+       and max are equal that number will always be used instead.
     """
-    is_float = srctools.conv_bool(res['decimal'])
     var = res['resultvar', '$random']
-
     rng = rand.seed(b'rand_vec', inst, res['seed', ''])
 
-    if is_float:
-        func = rng.uniform
-    else:
-        func = rng.randint
-
     value = Vec()
+    if res.bool('decimal'):
+        for axis in 'xyz':
+            max_float = res.float('max_' + axis, 0.0)
+            min_float = res.float('min_' + axis, 0.0)
+            if min_float == max_float:
+                value[axis] = min_float
+            else:
+                value[axis] = rng.uniform(min_float, max_float)
+    else:
+        for axis in 'xyz':
+            max_int = res.int('max_' + axis, 0)
+            min_int = res.int('min_' + axis, 0)
+            if min_int == max_int:
+                value[axis] = min_int
+            else:
+                value[axis] = rng.randint(min_int, max_int)
 
-    for axis in 'xyz':
-        max_val = srctools.conv_float(res['max_' + axis, 0.0])
-        min_val = srctools.conv_float(res['min_' + axis, 0.0])
-        if min_val == max_val:
-            value[axis] = min_val
-        else:
-            value[axis] = func(min_val, max_val)
-
-    inst.fixup[var] = value.join(' ')
+    inst.fixup[var] = value
 
 
 @make_result('randomShift')
