@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any, ClassVar, Dict, Iterator, Tuple, TypeVar, Union, Type, cast
-from typing_extensions import TypeAlias, Final, Literal
+from typing_extensions import TypeAlias, Final
 from collections.abc import Sequence, Mapping
 from weakref import ref as WeakRef
 from tkinter import ttk
@@ -56,7 +56,7 @@ _handles: dict[tuple[Type[Handle], tuple, int, int], Handle] = {}
 _wid_tk: dict[WidgetWeakRef, Handle] = {}
 
 # TK images have unique IDs, so preserve discarded image objects.
-_unused_tk_img: dict[tuple[int, int], list[tk.PhotoImage]] = {}
+_unused_tk_img: dict[tuple[int, int], list[ImageTk.PhotoImage]] = {}
 
 LOGGER = srctools.logger.get_logger('img')
 FSYS_BUILTIN = RawFileSystem(str(utils.install_path('images')))
@@ -80,9 +80,10 @@ FOREGROUNDS: Mapping[Theme, Tuple[int, int, int, int]] = {
     Theme.DARK: (255, 255, 255, 255),
 }
 
-FLIP_LEFT_RIGHT: Final = Image.FLIP_LEFT_RIGHT
-FLIP_TOP_BOTTOM: Final = Image.FLIP_TOP_BOTTOM
-FLIP_ROTATE: Final = Image.ROTATE_180
+# Re-exported from PIL.
+FLIP_LEFT_RIGHT: Final = Image.Transpose.FLIP_LEFT_RIGHT
+FLIP_TOP_BOTTOM: Final = Image.Transpose.FLIP_TOP_BOTTOM
+FLIP_ROTATE: Final = Image.Transpose.ROTATE_180
 
 
 def _load_special(path: str, theme: Theme) -> Image.Image:
@@ -105,13 +106,13 @@ ICONS: Dict[Tuple[str, Theme], Image.Image] = {
 # derive the others.
 for _theme in Theme:
     ICONS['load_0', _theme] = _load_icon = ICONS['load', _theme]
-    ICONS['load_7', _theme] = _load_icon_flip = _load_icon.transpose(Image.FLIP_LEFT_RIGHT)
-    ICONS['load_1', _theme] = _load_icon_flip.transpose(Image.ROTATE_270)
-    ICONS['load_2', _theme] = _load_icon.transpose(Image.ROTATE_270)
-    ICONS['load_3', _theme] = _load_icon.transpose(Image.FLIP_TOP_BOTTOM)
-    ICONS['load_4', _theme] = _load_icon.transpose(Image.ROTATE_180)
-    ICONS['load_5', _theme] = _load_icon_flip.transpose(Image.ROTATE_90)
-    ICONS['load_6', _theme] = _load_icon.transpose(Image.ROTATE_90)
+    ICONS['load_7', _theme] = _load_icon_flip = _load_icon.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
+    ICONS['load_1', _theme] = _load_icon_flip.transpose(Image.Transpose.ROTATE_270)
+    ICONS['load_2', _theme] = _load_icon.transpose(Image.Transpose.ROTATE_270)
+    ICONS['load_3', _theme] = _load_icon.transpose(Image.Transpose.FLIP_TOP_BOTTOM)
+    ICONS['load_4', _theme] = _load_icon.transpose(Image.Transpose.ROTATE_180)
+    ICONS['load_5', _theme] = _load_icon_flip.transpose(Image.Transpose.ROTATE_90)
+    ICONS['load_6', _theme] = _load_icon.transpose(Image.Transpose.ROTATE_90)
 # Frame indices in order.
 LOAD_FRAME_IND = range(8)
 
@@ -172,7 +173,7 @@ def _load_file(
     fsys: FileSystem,
     uri: utils.PackagePath,
     width: int, height: int,
-    resize_algo: Literal[0, 1, 2, 3, 4, 5],
+    resize_algo: Image.Resampling,
     check_other_packages: bool=False,
 ) -> Tuple[Image.Image, bool]:
     """Load an image from a filesystem."""
@@ -465,7 +466,7 @@ class Handle:
     def crop(
         self,
         bounds: tuple[int, int, int, int] | None = None,
-        transpose: int | None = None,
+        transpose: Image.Transpose | None = None,
         width: int = 0, height: int = 0,
     ) -> ImgCrop:
         """Wrap a handle to crop it into a smaller size."""
@@ -777,7 +778,7 @@ class ImgFile(Handle):
             LOGGER.warning('Unknown package for loading images: "{}"!', self.uri)
             return Handle.error(self.width, self.height).get_pil()
 
-        img, uses_theme = _load_file(fsys, self.uri, self.width, self.height, Image.ANTIALIAS, True)
+        img, uses_theme = _load_file(fsys, self.uri, self.width, self.height, Image.Resampling.LANCZOS, True)
         if uses_theme:
             self._uses_theme = True
         return img
@@ -797,7 +798,7 @@ class ImgBuiltin(Handle):
     uri: utils.PackagePath
     allow_raw: ClassVar[bool] = True
     alpha_result: ClassVar[bool] = True
-    resize_mode: ClassVar[Literal[0, 1, 2, 3, 4, 5]] = Image.ANTIALIAS
+    resize_mode: ClassVar[Image.Resampling] = Image.Resampling.LANCZOS
     _uses_theme: bool = False
 
     def _make_image(self) -> Image.Image:
@@ -818,7 +819,7 @@ class ImgBuiltin(Handle):
 
 class ImgSprite(ImgBuiltin):
     """An image loaded from builtin UI resources, with nearest-neighbour resizing."""
-    resize_mode: ClassVar[Literal[0, 1, 2, 3, 4, 5]] = Image.NEAREST
+    resize_mode: ClassVar[Image.Resampling] = Image.Resampling.NEAREST
 
 
 @attrs.define(eq=False)
@@ -866,8 +867,7 @@ class ImgCrop(Handle):
     alpha_result: ClassVar[bool] = True
     source: Handle
     bounds: tuple[int, int, int, int] | None  # left, top, right, bottom coords.
-    # Image.FLIP_TOP_BOTTOM | Image.FLIP_LEFT_RIGHT | Image.ROTATE_180 | None
-    transpose: Literal[0, 1, 3] | None
+    transpose: Image.Transpose | None
 
     def _children(self) -> Iterator[Handle]:
         yield self.source
@@ -890,7 +890,7 @@ class ImgCrop(Handle):
         # Shrink down the source to the final source so the bounds apply.
         # TODO: Rescale bounds to actual source size to improve result?
         if src_w > 0 and src_h > 0 and (src_w, src_h) != image.size:
-            image = image.resize((src_w, src_h), resample=Image.ANTIALIAS)
+            image = image.resize((src_w, src_h), resample=Image.Resampling.LANCZOS)
 
         if self.bounds is not None:
             image = image.crop(self.bounds)
@@ -899,7 +899,7 @@ class ImgCrop(Handle):
             image = image.transpose(self.transpose)
 
         if self.width > 0 and self.height > 0 and (self.width, self.height) != image.size:
-            image = image.resize((self.width, self.height), resample=Image.ANTIALIAS)
+            image = image.resize((self.width, self.height), resample=Image.Resampling.LANCZOS)
         return image
 
     def resize(self, width: int, height: int) -> ImgCrop:

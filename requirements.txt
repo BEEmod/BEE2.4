@@ -1,6 +1,6 @@
 attrs >= 22.1.0
 mistletoe >= 1.0.1
-Pillow >= 8.3.2
+Pillow >= 9.4.0
 pyglet == 1.5.18
 PyInstaller >= 5.2.0
 pygtrie >= 2.4.0
