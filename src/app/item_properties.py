@@ -642,12 +642,16 @@ class PropertyWindow:
         group_options: dict[ItemPropKind, tuple[str, bool]] = {}
         for editor_prop in item.properties.values():
             readonly = editor_prop.kind is item.subtype_prop or not editor_prop.allow_user_default
-            try:
-                group_options[editor_prop.kind] = conf.defaults[editor_prop.kind], readonly
-            except KeyError:
-                group_options[editor_prop.kind] = editor_prop.export(), readonly
+            if readonly:
+                value = editor_prop.export()  # Discard the stored option.
+            else:
+                try:
+                    value = conf.defaults[editor_prop.kind]
+                except KeyError:
+                    value = editor_prop.export()
+            group_options[editor_prop.kind] = value, readonly
 
-        # Go through all our groups, constructing them if required.
+            # Go through all our groups, constructing them if required.
         for i, (props, factory) in enumerate(PROP_GROUPS):
             maybe_group = self.groups[i]
             matching = matching_props(item, props)
