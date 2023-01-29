@@ -10,7 +10,7 @@ import utils
 from transtoken import TransToken
 from app import (
     gameMan, helpMenu, localisation, optionWindow, packageMan, tk_tools,
-    backup as backup_win,
+    backup as backup_win, background_run,
 )
 
 
@@ -66,7 +66,7 @@ class MenuBar:
         self.file_menu.add_command(command=gameMan.add_game)
         localisation.set_menu_text(self.file_menu, TransToken.ui("Add Game"))
 
-        self.file_menu.add_command(command=gameMan.remove_game)
+        self.file_menu.add_command(command=lambda: background_run(gameMan.remove_game))
         localisation.set_menu_text(self.file_menu, TransToken.ui("Uninstall from Selected Game"))
 
         self.file_menu.add_command(command=backup_win.show_window)

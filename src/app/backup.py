@@ -15,7 +15,7 @@ from zipfile import ZipFile, ZIP_LZMA
 
 import loadScreen
 import srctools.logger
-from app import tk_tools, img, TK_ROOT
+from app import tk_tools, img, TK_ROOT, background_run
 import utils
 from app.CheckDetails import CheckDetails, Item as CheckItem
 from FakeZip import FakeZip, zip_names, zip_open_bin
@@ -862,7 +862,7 @@ def init_application() -> None:
 
     game_menu.add_command(command=gameMan.add_game)
     set_menu_text(game_menu, TransToken.ui('Add Game'))
-    game_menu.add_command(command=gameMan.remove_game)
+    game_menu.add_command(command=lambda: background_run(gameMan.remove_game))
     set_menu_text(game_menu, TransToken.ui('Remove Game'))
     game_menu.add_separator()
 

@@ -477,7 +477,6 @@ class Game:
                 elif os.path.isfile(backup_path):
                     LOGGER.info('Restoring original "{}"!', name)
                     shutil.move(backup_path, item_path)
-            self.clear_cache()
 
     def edit_fgd(self, add_lines: bool=False) -> None:
         """Add our FGD files to the game folder.
@@ -1344,7 +1343,7 @@ def add_game(e=None):
         return True
 
 
-def remove_game(e=None):
+async def remove_game() -> None:
     """Remove the currently-chosen game from the game list."""
     global selected_game
     lastgame_mess = (
@@ -1358,8 +1357,10 @@ def remove_game(e=None):
         title=TransToken.ui('BEE2 - Remove Game'),
         message=lastgame_mess.format(game=selected_game.name),
     ):
+        await terminate_error_server()
         selected_game.edit_gameinfo(add_line=False)
         selected_game.edit_fgd(add_lines=False)
+        selected_game.clear_cache()
 
         all_games.remove(selected_game)
         CONFIG.remove_section(selected_game.name)
@@ -1410,7 +1411,7 @@ def set_game_by_name(name: str) -> None:
 
 if __name__ == '__main__':
     Button(TK_ROOT, text='Add', command=add_game).grid(row=0, column=0)
-    Button(TK_ROOT, text='Remove', command=remove_game).grid(row=0, column=1)
+    Button(TK_ROOT, text='Remove', command=lambda: background_run(remove_game)).grid(row=0, column=1)
     test_menu = Menu(TK_ROOT)
     dropdown = Menu(test_menu)
     test_menu.add_cascade(menu=dropdown, label='Game')
