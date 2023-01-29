@@ -61,9 +61,7 @@ TIMER_NUM_TRANS = {
 }
 TIMER_NUM_TRANS['inf'] = INF
 TRANS_COLON = TransToken.untranslated('{text}: ')
-TRANS_GROUP_HEADER = TransToken.untranslated('{name} ({i}/{len})')
-TRANS_GROUP_HEADER_DESEL = TransToken.untranslated('{name}▽ ({i}/{len})')
-TRANS_GROUP_HEADER_SEL = TransToken.untranslated('{name}▼ ({i}/{len})')
+TRANS_GROUP_HEADER = TransToken.ui('{name} ({page}/{count})')  # i18n: Header layout for Item Properties pane.
 # For the item-variant widget, we need to refresh on style changes.
 ITEM_VARIANT_LOAD: List[Tuple[str, Callable[[], object]]] = []
 
@@ -602,8 +600,8 @@ async def make_pane(tool_frame: tk.Frame, menu_bar: tk.Menu, update_item_vis: Ca
         """Update widgets if the group has changed."""
         localisation.set_text(group_label, TRANS_GROUP_HEADER.format(
             name=cur_group.name,
-            i=ordered_conf.index(cur_group) + 1,
-            len=len(ordered_conf),
+            page=ordered_conf.index(cur_group) + 1,
+            count=len(ordered_conf),
         ))
         pos = ordered_conf.index(cur_group)
         group_var.set(cur_group.id)
