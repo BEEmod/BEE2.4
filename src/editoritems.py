@@ -1985,3 +1985,5 @@ class Item:
         for subtype in self.subtypes:
             yield subtype.name, source + '.name'
             yield subtype.pal_name, source + '.pal_name'
+        for prop in self.properties.values():
+            yield prop.desc, f'{source}.property.{prop.kind.id}'
