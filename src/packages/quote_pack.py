@@ -121,14 +121,12 @@ class QuotePack(PakObject, needs_foreground=True):
     def export(exp_data: ExportData) -> None:
         """Export the quotepack."""
         if exp_data.selected is None:
-            return  # No quote pack!
+            return  # No quote pack selected at all, don't write anything.
 
         try:
-            voice = QuotePack.by_id(exp_data.selected)
+            voice = exp_data.packset.obj_by_id(QuotePack, exp_data.selected)
         except KeyError:
-            raise Exception(
-                "Selected voice ({}) doesn't exist?".format(exp_data.selected)
-            ) from None
+            raise Exception(f"Selected voice ({exp_data.selected}) doesn't exist?") from None
 
         vbsp_config = exp_data.vbsp_conf
 
