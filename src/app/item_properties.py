@@ -5,7 +5,7 @@ import attrs
 from enum import Enum
 import tkinter as tk
 from tkinter import ttk
-from typing import Callable, ClassVar, Generic, Iterator, Optional, Tuple, List, TypeVar
+from typing import Callable, ClassVar, Generic, Iterator, Optional, Tuple, Dict, List, TypeVar
 from typing_extensions import Final, Literal, TypeAlias
 
 import srctools
@@ -26,7 +26,13 @@ TRANS_TITLE = TransToken.ui('BEE2 - {item}')
 TRANS_SUBTITLE = TransToken.ui('Settings for "{item}"')
 TRANS_LABEL = TransToken.untranslated('{name}: ')
 TRANS_TIMER_DELAY = TransToken.ui('Timer Delay:\n        ({tim})')
-TRANS_START_ACTIVE_DISABLED = TransToken.ui('When Oscillating mode is disabled, Start Active has no effect.')
+TRANS_START_ACTIVE_DISABLED = TransToken.ui(
+    'When Oscillating mode is disabled, Start Active has no effect.'
+)
+TRANS_READONLY_SUBTYPE = TransToken.ui(
+    'This option picks which sub-item is used. '
+    'Put a different item on the palette to change the default instead.'
+)
 EnumT = TypeVar('EnumT', bound=Enum)
 
 PIST_PROPS = [all_props.prop_pist_lower, all_props.prop_pist_upper]
@@ -41,8 +47,12 @@ class PropGroup:
         self.label = ttk.Label(parent)
         localisation.set_text(self.label, label_text)
 
-    def apply_conf(self, options: dict[ItemPropKind, str]) -> None:
-        """Apply the specified options to the UI"""
+    def apply_conf(self, options: Dict[ItemPropKind, Tuple[str, bool]]) -> None:
+        """Apply the specified options to the UI.
+
+        For each property, this specifies the current value, and a boolean which is set if the option
+        was specified to be readonly.
+        """
         raise NotImplementedError
 
     def get_conf(self) -> Iterator[tuple[ItemPropKind, str]]:
@@ -65,7 +75,6 @@ class BoolPropGroup(PropGroup):
             raise ValueError(f'Non-boolean property {prop}!')
         self.var = tk.BooleanVar(value=False)
         self.check = ttk.Checkbutton(self.frame, variable=self.var)
-        # Showing when disabled is required for Start Active's logic.
         tooltip.add_tooltip(self.check, show_when_disabled=True)
         self.check.grid(row=0, column=0)
 
@@ -78,14 +87,16 @@ class BoolPropGroup(PropGroup):
         """Set a user tooltip on this group."""
         tooltip.set_tooltip(self.check, tok)
 
-    def apply_conf(self, options: dict[ItemPropKind, str]) -> None:
+    def apply_conf(self, options: Dict[ItemPropKind, Tuple[str, bool]]) -> None:
         """Apply the specified options to the UI."""
         try:
-            value = srctools.conv_bool(options[self.prop], False)
+            value, readonly = options[self.prop]
         except KeyError:
             LOGGER.warning('Missing property {} from config: {}', self.prop, options)
+            self.check.state(['disabled'])
         else:
-            self.var.set(value)
+            self.var.set(srctools.conv_bool(value, False))
+            self.check.state(['disabled' if readonly else '!disabled'])
 
     def get_conf(self) -> Iterator[tuple[ItemPropKind, str]]:
         """Return the current UI configuration."""
@@ -96,7 +107,7 @@ class ComboPropGroup(PropGroup, Generic[EnumT]):
     """A prop group which uses a combobox to select specific options."""
     LARGE: ClassVar[bool] = True
 
-    def __init__(self, parent: ttk.Frame, prop: ItemPropKind[EnumT], values: dict[EnumT, TransToken]) -> None:
+    def __init__(self, parent: ttk.Frame, prop: ItemPropKind[EnumT], values: Dict[EnumT, TransToken]) -> None:
         super().__init__(parent, TRANS_LABEL.format(name=prop.name))
         self.prop = prop
         self.translated = values
@@ -106,7 +117,7 @@ class ComboPropGroup(PropGroup, Generic[EnumT]):
         self.combo = ttk.Combobox(self.frame, exportselection=False)
         self.combo.state(['readonly'])  # Disallow typing text.
         localisation.add_callback(call=True)(self._update_combo)
-        tooltip.add_tooltip(self.combo)
+        tooltip.add_tooltip(self.combo, show_when_disabled=True)
         self.combo.grid(row=0, column=0)
 
     def _update_combo(self) -> None:
@@ -114,7 +125,7 @@ class ComboPropGroup(PropGroup, Generic[EnumT]):
         self.combo['values'] = [str(self.translated[key]) for key in self.value_order]
 
     @classmethod
-    def factory(cls, prop: ItemPropKind[EnumT], values: dict[EnumT, TransToken]) -> PropGroupFactory:
+    def factory(cls, prop: ItemPropKind[EnumT], values: Dict[EnumT, TransToken]) -> PropGroupFactory:
         """Make the factory used in PROP_GROUPS."""
         return ([prop], lambda parent: cls(parent, prop, values))
 
@@ -122,19 +133,22 @@ class ComboPropGroup(PropGroup, Generic[EnumT]):
         """Set a user tooltip on this group."""
         tooltip.set_tooltip(self.combo, tok)
 
-    def apply_conf(self, options: dict[ItemPropKind, str]) -> None:
+    def apply_conf(self, options: Dict[ItemPropKind, Tuple[str, bool]]) -> None:
         """Apply the specified options to the UI."""
         try:
-            val_str = options[self.prop]
+            val_str, readonly = options[self.prop]
         except KeyError:
             LOGGER.warning('Missing property {} from config: {}', self.prop, options)
+            self.combo.state(['disabled'])
             return
         try:
             value = self.prop.parse(val_str)
         except ValueError:
             LOGGER.warning('Could not parse "{}" for property type "{}"', val_str, self.prop.id, exc_info=True)
+            self.combo.state(['disabled'])
             return
         self.combo.current(self.value_order.index(value))
+        self.combo.state(['disabled' if readonly else '!disabled'])
 
     def get_conf(self) -> Iterator[tuple[ItemPropKind, str]]:
         """Return the current UI configuration."""
@@ -153,19 +167,21 @@ class TimerPropGroup(PropGroup):
             orient="horizontal",
             command=self.widget_changed,
         )
-        tooltip.add_tooltip(self.scale)
+        tooltip.add_tooltip(self.scale, show_when_disabled=True)
         self.scale.grid(row=0, column=0)
         self.old_val = 3
         self._enable_cback = True
 
-    def apply_conf(self, options: dict[ItemPropKind, str]) -> None:
+    def apply_conf(self, options: Dict[ItemPropKind, Tuple[str, bool]]) -> None:
         """Apply the timer delay option to the UI."""
         try:
-            value = options[all_props.prop_timer_delay]
+            value, readonly = options[all_props.prop_timer_delay]
         except KeyError:
             LOGGER.warning('Missing property TimerDelay from config: {}', options)
+            self.scale.state(['disabled'])
             return
         self.scale.set(all_props.prop_timer_delay.parse(value))
+        self.scale.state(['disabled' if readonly else '!disabled'])
 
     def get_conf(self) -> Iterator[tuple[ItemPropKind, str]]:
         """Get the current UI configuration."""
@@ -207,13 +223,13 @@ class TrackStartActivePropGroup(BoolPropGroup):
         self.has_osc = False
         self.user_tooltip = TransToken.BLANK
 
-    def apply_conf(self, options: dict[ItemPropKind, str]) -> None:
+    def apply_conf(self, options: Dict[ItemPropKind, Tuple[str, bool]]) -> None:
         """Apply the configuration to the UI."""
         super().apply_conf(options)
         self.has_osc = all_props.prop_track_is_oscillating in options
         self._update()
 
-    def get_conf(self) -> Iterator[tuple[ItemPropKind, str]]:
+    def get_conf(self) -> Iterator[Tuple[ItemPropKind, str]]:
         """Get the current configuration."""
         if self.osc_prop is not None and self.has_osc and not self.osc_prop.var.get():
             # Forced off.
@@ -274,6 +290,7 @@ class PistonPropGroup(PropGroup):
         self.platform = 0
         self.destination = 1
         self.cur_drag: Literal['plat', 'dest', None] = None
+        self.readonly = False
 
         self.canvas = tk.Canvas(self.frame, width=250, height=66)
         self.canvas.grid(row=0, column=0)
@@ -296,23 +313,30 @@ class PistonPropGroup(PropGroup):
         self.canvas.bind(tk_tools.EVENTS['LEFT_RELEASE'], self.evt_mouse_up)
         self.canvas.bind('<Leave>', self.evt_mouse_leave)
 
-    def apply_conf(self, options: dict[ItemPropKind, str]) -> None:
+    def apply_conf(self, options: Dict[ItemPropKind, Tuple[str, bool]]) -> None:
         """Apply the specified options to the UI."""
+        self.readonly = False
         try:
-            start_up = srctools.conv_bool(options[all_props.prop_pist_start_up])
+            start_up_str, readonly_start_up = options[all_props.prop_pist_start_up]
         except KeyError:
             LOGGER.warning('Missing property StartUp from config: {}', options)
             start_up = False
+        else:
+            start_up = srctools.conv_bool(start_up_str)
+            if readonly_start_up:
+                self.readonly = True
         pos = {
             all_props.prop_pist_lower: 0,
             all_props.prop_pist_upper: 1,
         }
         for prop in PIST_PROPS:
             try:
-                val_str = options[prop]
+                val_str, readonly_val = options[prop]
             except KeyError:
                 LOGGER.warning('Missing property {} from config: {}', prop.id, options)
                 continue
+            if readonly_val:
+                self.readonly = True
             try:
                 pos[prop] = prop.parse(val_str)
             except ValueError:
@@ -328,7 +352,7 @@ class PistonPropGroup(PropGroup):
             self.platform = pos[all_props.prop_pist_lower]
         self.reposition()
 
-    def get_conf(self) -> Iterator[tuple[ItemPropKind, str]]:
+    def get_conf(self) -> Iterator[Tuple[ItemPropKind, str]]:
         """Export options from the UI configuration."""
         if self.destination > self.platform:
             yield all_props.prop_pist_start_up, '0'
@@ -349,6 +373,7 @@ class PistonPropGroup(PropGroup):
         return max(0, min(4, pos))
 
     def get_hit(self, x: int) -> Literal['plat', 'dest', None]:
+        """Figure out which sprite is being clicked on."""
         pist_pos = self._pos2x(self.platform)
         dest_pos = self._pos2x(self.destination)
         if pist_pos - 8 <= x <= pist_pos + 24:
@@ -360,8 +385,9 @@ class PistonPropGroup(PropGroup):
 
     def evt_mouse_down(self, event: tk.Event) -> None:
         """Start dragging, when the canvas is clicked."""
-        # Y is irrelevant
-        self.cur_drag = self.get_hit(event.x)
+        if not self.readonly:
+            # Y is irrelevant
+            self.cur_drag = self.get_hit(event.x)
 
     def evt_mouse_up(self, event: tk.Event) -> None:
         """Stop dragging."""
@@ -375,20 +401,21 @@ class PistonPropGroup(PropGroup):
 
     def evt_mouse_hover(self, event: tk.Event) -> None:
         """Update mouseover effects depending on position."""
-        # If currently dragging, always highlight, otherwise highlight those under the cursor.
-        hover = self.cur_drag or self.get_hit(event.x)
-        self.canvas.itemconfigure(
-            self.canv_plat,
-            image=(self.IMG_PIST_SEL if hover == 'plat' else self.IMG_PIST).get_tk()
-        )
-        self.canvas.itemconfigure(
-            self.canv_dest,
-            image=(self.IMG_DEST_SEL if hover == 'dest' else self.IMG_DEST).get_tk()
-        )
+        if not self.readonly:
+            # If currently dragging, always highlight, otherwise highlight those under the cursor.
+            hover = self.cur_drag or self.get_hit(event.x)
+            self.canvas.itemconfigure(
+                self.canv_plat,
+                image=(self.IMG_PIST_SEL if hover == 'plat' else self.IMG_PIST).get_tk()
+            )
+            self.canvas.itemconfigure(
+                self.canv_dest,
+                image=(self.IMG_DEST_SEL if hover == 'dest' else self.IMG_DEST).get_tk()
+            )
 
     def evt_mouse_drag(self, event: tk.Event) -> None:
         """Called when mouse is held and dragged. If we are currently dragging, move items."""
-        if self.cur_drag is None:
+        if self.cur_drag is None or self.readonly:
             return
         pos = self._x2pos(event.x)
 
@@ -448,7 +475,7 @@ PROP_GROUPS: list[PropGroupFactory] = [
     BoolPropGroup.factory(all_props.prop_dropper_enabled),
     BoolPropGroup.factory(all_props.prop_auto_drop),
     BoolPropGroup.factory(all_props.prop_cube_auto_respawn),
-    # all_props.prop_cube_fall_straight_Down,
+    # all_props.prop_cube_fall_straight_down,
     TrackStartActivePropGroup.factory(all_props.prop_track_start_active),
     BoolPropGroup.factory(all_props.prop_track_is_oscillating),
     # all_props.prop_track_starting_pos,
@@ -505,19 +532,19 @@ PROP_GROUPS: list[PropGroupFactory] = [
 ]
 
 
-def editable_props(item: Item, props: List[ItemPropKind]) -> List[all_props.ItemProp]:
-    """Return the properties in this item that match our props which can be edited."""
-    found: list[all_props.ItemProp] = []
+def matching_props(item: Item, props: List[ItemPropKind]) -> List[Tuple[all_props.ItemProp, bool]]:
+    """Return the properties in this item that match a specific group of properties."""
+    found: List[Tuple[all_props.ItemProp, bool]] = []
     for kind in props:
         # Subtype properties get their default overridden.
-        if kind is item.subtype_prop:
-            continue
+        readonly = kind is item.subtype_prop
         try:
             prop = item.properties[kind.id.casefold()]
         except KeyError:
             continue
-        if prop.allow_user_default:
-            found.append(prop)
+        if not prop.allow_user_default:
+            readonly = True
+        found.append((prop, readonly))
     return found
 
 
@@ -563,7 +590,7 @@ class PropertyWindow:
         """Check if any properties on this item could be edited."""
         LOGGER.info('Can edit: {}', item.properties)
         for group, factory in PROP_GROUPS:
-            if editable_props(item, group):
+            if matching_props(item, group):
                 return True
         return False
 
@@ -579,7 +606,7 @@ class PropertyWindow:
         out: dict[ItemPropKind, str] = {}
         out.update(old_conf.defaults)  # Keep any extra values, just in case.
         for (props, factory), group in zip(PROP_GROUPS, self.groups):
-            if group is None or not editable_props(self.cur_item, props):
+            if group is None or not matching_props(self.cur_item, props):
                 continue
             for prop_kind, value in group.get_conf():
                 try:
@@ -612,18 +639,19 @@ class PropertyWindow:
         sound.block_fx()
 
         # Build the options to pass into each prop group, to update it.
-        group_options = {}
+        group_options: dict[ItemPropKind, tuple[str, bool]] = {}
         for editor_prop in item.properties.values():
+            readonly = editor_prop.kind is item.subtype_prop or not editor_prop.allow_user_default
             try:
-                group_options[editor_prop.kind] = conf.defaults[editor_prop.kind]
+                group_options[editor_prop.kind] = conf.defaults[editor_prop.kind], readonly
             except KeyError:
-                group_options[editor_prop.kind] = editor_prop.export()
+                group_options[editor_prop.kind] = editor_prop.export(), readonly
 
         # Go through all our groups, constructing them if required.
         for i, (props, factory) in enumerate(PROP_GROUPS):
             maybe_group = self.groups[i]
-            editable = editable_props(item, props)
-            if editable:
+            matching = matching_props(item, props)
+            if matching:
                 if maybe_group is not None:
                     group = maybe_group
                 else:
@@ -635,7 +663,9 @@ class PropertyWindow:
                     oscillating_prop = group
                 elif isinstance(group, TrackStartActivePropGroup):
                     start_active_prop = group
-                tooltip_bits = [prop.desc for prop in editable if prop.desc]
+                tooltip_bits = [prop.desc for prop, readonly in matching if prop.desc]
+                if any(prop.kind is item.subtype_prop for prop, readonly in matching):
+                    tooltip_bits.insert(0, TRANS_READONLY_SUBTYPE)
                 if len(tooltip_bits) > 1:
                     group.set_tooltip(TransToken.untranslated('\n').join(tooltip_bits))
                 elif len(tooltip_bits) == 1:
