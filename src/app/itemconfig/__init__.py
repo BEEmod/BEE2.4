@@ -4,6 +4,7 @@ from typing_extensions import TypeAlias
 from tkinter import ttk
 import tkinter as tk
 import itertools
+import functools
 
 from srctools import EmptyMapping, Keyvalues, Vec, logger
 import trio
@@ -60,6 +61,9 @@ TIMER_NUM_TRANS = {
 }
 TIMER_NUM_TRANS['inf'] = INF
 TRANS_COLON = TransToken.untranslated('{text}: ')
+TRANS_GROUP_HEADER = TransToken.untranslated('{name} ({i}/{len})')
+TRANS_GROUP_HEADER_DESEL = TransToken.untranslated('{name}▽ ({i}/{len})')
+TRANS_GROUP_HEADER_SEL = TransToken.untranslated('{name}▼ ({i}/{len})')
 # For the item-variant widget, we need to refresh on style changes.
 ITEM_VARIANT_LOAD: List[Tuple[str, Callable[[], object]]] = []
 
@@ -476,28 +480,43 @@ async def make_pane(tool_frame: tk.Frame, menu_bar: tk.Menu, update_item_vis: Ca
         key=lambda grp: str(grp.name),
     )
     ordered_conf.insert(0, STYLEVAR_GROUP)
-    selector = ttk.Combobox(
-        window,
-        exportselection=False,
-        state='readonly',
-        values=[str(grp.name) for grp in ordered_conf],
+
+    selection_frame = ttk.Frame(window)
+    selection_frame.grid(row=0, column=0, columnspan=2, sticky='ew')
+
+    arrow_left = ttk.Button(
+        selection_frame,
+        text='◀', width=2,
+        command=lambda: select_directional(-1),
     )
-    selector.grid(row=0, column=0, columnspan=2, sticky='ew')
+    group_label = ttk.Label(
+        selection_frame,
+        text='Group Name', anchor='center',
+        cursor=tk_tools.Cursors.LINK,
+    )
+    arrow_right = ttk.Button(
+        selection_frame,
+        text='▶', width=2,
+        command=lambda: select_directional(+1),
+    )
 
-    @localisation.add_callback(call=False)
-    def update_selector() -> None:
-        """Update translations in the selector box."""
-        old_sel = ordered_conf[selector.current()]
-        # Stylevar always goes at the start.
-        ordered_conf.sort(key=lambda grp: (0 if grp is STYLEVAR_GROUP else 1, str(grp.name)))
-        selector['values'] = [str(grp.name) for grp in ordered_conf]
-        selector.current(ordered_conf.index(old_sel))
+    arrow_left.grid(row=0, column=0)
+    group_label.grid(row=0, column=1, sticky='ew')
+    selection_frame.columnconfigure(1, weight=1)
+    arrow_right.grid(row=0, column=2)
 
-    selector.current(ordered_conf.index(STYLEVAR_GROUP))
+    label_font = tk.font.nametofont('TkHeadingFont').copy()
+    label_font.config(weight='bold')
+    group_label['font'] = label_font
+
+    group_menu = tk.Menu(group_label, tearoff=False)
+    group_var = tk.StringVar(window)
+
+    ttk.Separator(window, orient='horizontal').grid(row=1, column=0, columnspan=2, sticky='EW')
 
     # Need to use a canvas to allow scrolling.
     canvas = tk.Canvas(window, highlightthickness=0)
-    canvas.grid(row=1, column=0, sticky='NSEW', padx=(5, 0))
+    canvas.grid(row=2, column=0, sticky='NSEW', padx=(5, 0))
     window.columnconfigure(0, weight=1)
     window.rowconfigure(1, weight=1)
 
@@ -506,7 +525,7 @@ async def make_pane(tool_frame: tk.Frame, menu_bar: tk.Menu, update_item_vis: Ca
         orient='vertical',
         command=canvas.yview,
     )
-    scrollbar.grid(row=1, column=1, sticky="ns")
+    scrollbar.grid(row=2, column=1, sticky="ns")
     canvas['yscrollcommand'] = scrollbar.set
 
     tk_tools.add_mousewheel(canvas, canvas, window)
@@ -548,15 +567,16 @@ async def make_pane(tool_frame: tk.Frame, menu_bar: tk.Menu, update_item_vis: Ca
                 window.geometry(f'{width + scroll_width}x{window.winfo_height()}')
             canvas.itemconfigure(frame_winid, width=win_max_width)
 
-    def select_group(_: tk.Event) -> None:
+    def select_group(group: ConfigGroup) -> None:
         """Callback when the combobox is changed."""
         nonlocal cur_group
-        new_group = ordered_conf[selector.current()]
+        new_group = group
         if new_group is cur_group:  # Pointless to reselect.
             return
-        if cur_group.ui_frame is not None and cur_group.ui_frame.winfo_ismapped():
+        if cur_group.ui_frame is not None:
             cur_group.ui_frame.grid_forget()
         cur_group = new_group
+        update_disp()
         if new_group.ui_frame is not None:
             # Ready, add.
             background_run(display_group, new_group)
@@ -571,7 +591,48 @@ async def make_pane(tool_frame: tk.Frame, menu_bar: tk.Menu, update_item_vis: Ca
                 background_run(task)
                 new_group.creating = True
 
-    selector.bind('<<ComboboxSelected>>', select_group)
+    def select_directional(direction: int) -> None:
+        """Change the selection in some direction."""
+        # Clamp to ±1 since scrolling can send larger numbers.
+        pos = ordered_conf.index(cur_group) + (+1 if direction > 0 else -1)
+        if 0 <= pos < len(ordered_conf):
+            select_group(ordered_conf[pos])
+
+    def update_disp() -> None:
+        """Update widgets if the group has changed."""
+        localisation.set_text(group_label, TRANS_GROUP_HEADER.format(
+            name=cur_group.name,
+            i=ordered_conf.index(cur_group) + 1,
+            len=len(ordered_conf),
+        ))
+        pos = ordered_conf.index(cur_group)
+        group_var.set(cur_group.id)
+        arrow_left.state(['disabled' if pos == 0 else '!disabled'])
+        arrow_right.state(['disabled' if pos + 1 == len(ordered_conf) else '!disabled'])
+
+    cmd_cache = {}
+
+    @localisation.add_callback(call=True)
+    def update_selector() -> None:
+        """Update translations in the display, reordering if necessary."""
+        # Stylevar always goes at the start.
+        ordered_conf.sort(key=lambda grp: (0 if grp is STYLEVAR_GROUP else 1, str(grp.name)))
+        # Remake all the menu widgets.
+        group_menu.delete(0, 'end')
+        for group in ordered_conf:
+            try:
+                cmd = cmd_cache[group]
+            except KeyError:
+                cmd = cmd_cache[group] = group_menu.register(functools.partial(select_group, group))
+            group_menu.insert_radiobutton('end', label=str(group.name), variable=group_var, value=group.id, command=cmd)
+        update_disp()
+
+    tk_tools.bind_leftclick(group_label, lambda evt: group_menu.post(evt.x_root, evt.y_root))
+    tk_tools.bind_mousewheel([
+        selection_frame, arrow_left, arrow_right, group_label,
+    ], select_directional)
+    group_label.bind('<Enter>', lambda e: group_label.configure(foreground='#2873FF'))
+    group_label.bind('<Leave>', lambda e: group_label.configure(foreground=''))
 
     await tk_tools.wait_eventloop()
 
