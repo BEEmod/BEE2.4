@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2022-12-21 13:14+1000\n"
+"POT-Creation-Date: 2023-01-29 10:53+1000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: ja\n"
@@ -245,6 +245,23 @@ msgid ""
 "Dropper above custom cube of type <var>{type}</var> is already linked! "
 "Custom cubes convertdroppers above them into their type, to allow having "
 "droppers."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid "Superposition Entanglers must be placed on top of a single dropper."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"Superposition Entanglers must be connected to a single dropper, not any "
+"other items."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid "Two Superposition Entanglers cannot be connected to a single dropper!"
 msgstr ""
 
 #. This uses HTML syntax.
@@ -560,24 +577,19 @@ msgstr "エレベーター"
 
 #: app/CompilerPane.py
 msgid ""
-"{desc}\n"
+"When previewing in SP, spawn inside the entry elevator. Use this to "
+"examine the entry and exit corridors.\n"
 "\n"
 "You can hold down Shift during the start of the Geometry stage to quickly"
-" swap whichlocation you spawn at on the fly."
+" swap which location you spawn at on the fly."
 msgstr ""
 
 #: app/CompilerPane.py
 msgid ""
-"When previewing in SP, spawn inside the entry elevator. Use this to "
-"examine the entry and exit corridors."
-msgstr ""
-
-#: app/CompilerPane.py
-msgid "When previewing in SP, spawn just before the entry door."
-msgstr ""
-
-#: app/CompilerPane.py
-msgid "Select Corridors"
+"When previewing in SP, spawn just before the entry door.\n"
+"\n"
+"You can hold down Shift during the start of the Geometry stage to quickly"
+" swap which location you spawn at on the fly."
 msgstr ""
 
 #: app/CompilerPane.py
@@ -726,7 +738,7 @@ msgstr ""
 
 #: app/UI.py
 msgid ""
-"{exported}\n"
+"Selected Items and Style successfully exported!\n"
 "\n"
 "Warning: VPK files were not exported, quit Portal 2 and Hammer to ensure "
 "editor wall previews are changed."
@@ -868,9 +880,17 @@ msgid "Elev Vid: "
 msgstr "エレベータービデオ："
 
 #: app/UI.py
+msgid "Corridor: "
+msgstr ""
+
+#: app/UI.py
 msgid ""
 "Enable or disable particular voice lines, to prevent them from being "
 "added."
+msgstr ""
+
+#: app/UI.py
+msgid "Select"
 msgstr ""
 
 #: app/UI.py
@@ -1211,7 +1231,7 @@ msgstr ""
 msgid "Change the default settings for this item when placed."
 msgstr ""
 
-#: app/corridor_selector.py app/helpMenu.py app/itemPropWin.py
+#: app/corridor_selector.py app/helpMenu.py app/item_properties.py
 msgid "Close"
 msgstr "閉じる"
 
@@ -1450,103 +1470,30 @@ msgstr "BEE2のクレジット"
 msgid "Credits..."
 msgstr "クレジット。。。"
 
-#: app/itemPropWin.py
-msgid "Start Position"
-msgstr ""
-
-#: app/itemPropWin.py
-msgid "End Position"
-msgstr ""
-
-#: app/itemPropWin.py
-msgid ""
-"Delay \n"
-"(0=infinite)"
-msgstr ""
-
-#: app/itemPropWin.py
-msgid "Timer Sound"
-msgstr ""
-
-#: app/itemPropWin.py
-msgid "Angled Panel Type"
-msgstr ""
-
-#: app/itemPropWin.py
-msgid "Disable Cube Dropper Clips"
-msgstr ""
-
-#: app/itemPropWin.py
-msgid "Gel Export Type"
-msgstr ""
-
-#: app/itemPropWin.py
-msgid "Automatically Move"
-msgstr ""
-
-#: app/itemPropWin.py
-msgid "Connection Count"
-msgstr ""
-
-#: app/itemPropWin.py
-msgid "Polarity Connection Count"
-msgstr ""
-
-#: app/itemPropWin.py
-msgid "Is Coop?"
-msgstr ""
-
-#: app/itemPropWin.py
-msgid "Flip Panel Portalability"
-msgstr ""
-
-#: app/itemPropWin.py
-msgid "Track Platform Speed"
-msgstr ""
-
-#: app/itemPropWin.py
-msgid "Initial Track Platform Position"
-msgstr ""
-
-#: app/itemPropWin.py
-msgid "Track Platform Direction"
-msgstr ""
-
-#: app/itemPropWin.py
-msgid "Track Platform Distance"
-msgstr ""
-
-#: app/itemPropWin.py
-msgid "Start Up"
-msgstr ""
-
-#: app/itemPropWin.py
-msgid "Vertical Alignment"
-msgstr ""
-
-#: app/itemPropWin.py
-msgid "Faith Plate Speed"
-msgstr ""
-
-#: app/itemPropWin.py
-msgid "Faith Target Name"
-msgstr ""
-
-#: app/itemPropWin.py
+#: app/item_properties.py
 msgid "BEE2 - {item}"
 msgstr ""
 
-#: app/itemPropWin.py
+#: app/item_properties.py
 msgid "Settings for \"{item}\""
 msgstr ""
 
-#: app/itemPropWin.py
+#: app/item_properties.py
 msgid ""
 "Timer Delay:\n"
 "        ({tim})"
 msgstr ""
 
-#: app/itemPropWin.py
+#: app/item_properties.py
+msgid "When Oscillating mode is disabled, Start Active has no effect."
+msgstr ""
+
+#: app/item_properties.py
+#, fuzzy
+msgid "Position: "
+msgstr "環境設定"
+
+#: app/item_properties.py
 msgid "No Properties available!"
 msgstr ""
 
@@ -2270,6 +2217,10 @@ msgid "Lines played in response to certain events in Coop."
 msgstr ""
 
 #: app/itemconfig/__init__.py
+msgid "{name} ({page}/{count})"
+msgstr ""
+
+#: app/itemconfig/__init__.py
 msgid "Style Properties"
 msgstr ""
 
@@ -2354,3 +2305,4 @@ msgstr ""
 
 #~ msgid "No Name?"
 #~ msgstr "名前ありません？"
+

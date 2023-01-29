@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version:  BEEMOD2\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2022-12-21 13:14+1000\n"
+"POT-Creation-Date: 2023-01-29 10:53+1000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: fr\n"
@@ -245,6 +245,23 @@ msgid ""
 "Dropper above custom cube of type <var>{type}</var> is already linked! "
 "Custom cubes convertdroppers above them into their type, to allow having "
 "droppers."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid "Superposition Entanglers must be placed on top of a single dropper."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"Superposition Entanglers must be connected to a single dropper, not any "
+"other items."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid "Two Superposition Entanglers cannot be connected to a single dropper!"
 msgstr ""
 
 #. This uses HTML syntax.
@@ -607,19 +624,11 @@ msgstr "Ascenseur"
 #: app/CompilerPane.py
 #, fuzzy
 msgid ""
-"{desc}\n"
+"When previewing in SP, spawn inside the entry elevator. Use this to "
+"examine the entry and exit corridors.\n"
 "\n"
 "You can hold down Shift during the start of the Geometry stage to quickly"
-" swap whichlocation you spawn at on the fly."
-msgstr ""
-"Vous pouvez maintenir Shift appuyé pendant le démarrage du calcul "
-"géométrique pour changer le point d'apparition."
-
-#: app/CompilerPane.py
-#, fuzzy
-msgid ""
-"When previewing in SP, spawn inside the entry elevator. Use this to "
-"examine the entry and exit corridors."
+" swap which location you spawn at on the fly."
 msgstr ""
 "Lors d'une prévisualisation en solo, cela fait apparaître dans "
 "l'ascenseur. Cela empêche aussi le redémarrage de la carte quand vous "
@@ -628,14 +637,14 @@ msgstr ""
 
 #: app/CompilerPane.py
 #, fuzzy
-msgid "When previewing in SP, spawn just before the entry door."
+msgid ""
+"When previewing in SP, spawn just before the entry door.\n"
+"\n"
+"You can hold down Shift during the start of the Geometry stage to quickly"
+" swap which location you spawn at on the fly."
 msgstr ""
-"Lors d'une prévisualisation en solo, cela fait apparaître derrière la "
-"porte d'entrée. Quand vous atteindrez la sortie, la carte redémarrera."
-
-#: app/CompilerPane.py
-msgid "Select Corridors"
-msgstr ""
+"Vous pouvez maintenir Shift appuyé pendant le démarrage du calcul "
+"géométrique pour changer le point d'apparition."
 
 #: app/CompilerPane.py
 msgid "Player Model (SP):"
@@ -800,7 +809,7 @@ msgstr "Le style et les objets sélectionnés ont été exportés avec succès !
 #: app/UI.py
 #, fuzzy
 msgid ""
-"{exported}\n"
+"Selected Items and Style successfully exported!\n"
 "\n"
 "Warning: VPK files were not exported, quit Portal 2 and Hammer to ensure "
 "editor wall previews are changed."
@@ -965,12 +974,21 @@ msgid "Elev Vid: "
 msgstr "Vid Asc: "
 
 #: app/UI.py
+msgid "Corridor: "
+msgstr ""
+
+#: app/UI.py
 msgid ""
 "Enable or disable particular voice lines, to prevent them from being "
 "added."
 msgstr ""
 "Activer ou désactiver certaines répliques pour les empêcher d'être "
 "ajoutées."
+
+#: app/UI.py
+#, fuzzy
+msgid "Select"
+msgstr "Style choisi:"
 
 #: app/UI.py
 msgid "All Items: "
@@ -1341,7 +1359,7 @@ msgstr "Changer les valeurs par défaut..."
 msgid "Change the default settings for this item when placed."
 msgstr "Changer les réglages par défaut pour cet objet lorsqu'il est placé."
 
-#: app/corridor_selector.py app/helpMenu.py app/itemPropWin.py
+#: app/corridor_selector.py app/helpMenu.py app/item_properties.py
 msgid "Close"
 msgstr "Fermer"
 
@@ -1600,105 +1618,30 @@ msgstr "Crédits de BEE2"
 msgid "Credits..."
 msgstr "Crédits..."
 
-#: app/itemPropWin.py
-msgid "Start Position"
-msgstr "Position de départ"
-
-#: app/itemPropWin.py
-msgid "End Position"
-msgstr "Position de fin"
-
-#: app/itemPropWin.py
-msgid ""
-"Delay \n"
-"(0=infinite)"
-msgstr ""
-"Délai\n"
-"(0=infinite)"
-
-#: app/itemPropWin.py
-msgid "Timer Sound"
-msgstr ""
-
-#: app/itemPropWin.py
-msgid "Angled Panel Type"
-msgstr ""
-
-#: app/itemPropWin.py
-msgid "Disable Cube Dropper Clips"
-msgstr ""
-
-#: app/itemPropWin.py
-msgid "Gel Export Type"
-msgstr ""
-
-#: app/itemPropWin.py
-msgid "Automatically Move"
-msgstr ""
-
-#: app/itemPropWin.py
-msgid "Connection Count"
-msgstr ""
-
-#: app/itemPropWin.py
-msgid "Polarity Connection Count"
-msgstr ""
-
-#: app/itemPropWin.py
-msgid "Is Coop?"
-msgstr ""
-
-#: app/itemPropWin.py
-msgid "Flip Panel Portalability"
-msgstr ""
-
-#: app/itemPropWin.py
-msgid "Track Platform Speed"
-msgstr ""
-
-#: app/itemPropWin.py
-msgid "Initial Track Platform Position"
-msgstr ""
-
-#: app/itemPropWin.py
-msgid "Track Platform Direction"
-msgstr ""
-
-#: app/itemPropWin.py
-msgid "Track Platform Distance"
-msgstr ""
-
-#: app/itemPropWin.py
-msgid "Start Up"
-msgstr ""
-
-#: app/itemPropWin.py
-msgid "Vertical Alignment"
-msgstr ""
-
-#: app/itemPropWin.py
-msgid "Faith Plate Speed"
-msgstr ""
-
-#: app/itemPropWin.py
-msgid "Faith Target Name"
-msgstr ""
-
-#: app/itemPropWin.py
+#: app/item_properties.py
 msgid "BEE2 - {item}"
 msgstr ""
 
-#: app/itemPropWin.py
+#: app/item_properties.py
 msgid "Settings for \"{item}\""
 msgstr "Paramètres pour \"{item}\""
 
-#: app/itemPropWin.py
+#: app/item_properties.py
 msgid ""
 "Timer Delay:\n"
 "        ({tim})"
 msgstr ""
 
-#: app/itemPropWin.py
+#: app/item_properties.py
+msgid "When Oscillating mode is disabled, Start Active has no effect."
+msgstr ""
+
+#: app/item_properties.py
+#, fuzzy
+msgid "Position: "
+msgstr "Position de fin"
+
+#: app/item_properties.py
 msgid "No Properties available!"
 msgstr "Aucune propriété disponible !"
 
@@ -2498,6 +2441,10 @@ msgid "Lines played in response to certain events in Coop."
 msgstr "Répliques jouées en réponse à certains événements en Coop."
 
 #: app/itemconfig/__init__.py
+msgid "{name} ({page}/{count})"
+msgstr ""
+
+#: app/itemconfig/__init__.py
 #, fuzzy
 msgid "Style Properties"
 msgstr "Propriétés de style/d'objet"
@@ -2638,3 +2585,21 @@ msgstr ""
 
 #~ msgid "Gel Type"
 #~ msgstr "Sélectionnez un style"
+
+#~ msgid "When previewing in SP, spawn just before the entry door."
+#~ msgstr ""
+#~ "Lors d'une prévisualisation en solo, "
+#~ "cela fait apparaître derrière la porte"
+#~ " d'entrée. Quand vous atteindrez la "
+#~ "sortie, la carte redémarrera."
+
+#~ msgid "Start Position"
+#~ msgstr "Position de départ"
+
+#~ msgid ""
+#~ "Delay \n"
+#~ "(0=infinite)"
+#~ msgstr ""
+#~ "Délai\n"
+#~ "(0=infinite)"
+
