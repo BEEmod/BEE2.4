@@ -709,6 +709,7 @@ class Game:
             all_items = style.items.copy()
             renderables = style.renderables.copy()
             resources: dict[str, bytes] = {}
+            packset = packages.LOADED  # TODO
 
             export_screen.step('EXP', 'style-conf')
 
@@ -728,7 +729,7 @@ class Game:
                         all_items=all_items,
                         renderables=renderables,
                         vbsp_conf=vbsp_config,
-                        packset=packages.LOADED,  # TODO
+                        packset=packset,
                         selected_style=style,
                         resources=resources,
                     ))
@@ -922,7 +923,7 @@ class Game:
 
             LOGGER.info('Writing fizzler sides...')
             self.generate_fizzler_sides(vbsp_config)
-            resource_gen.make_cube_colourizer_legend(Path(self.abs_path('bee2')))
+            resource_gen.make_cube_colourizer_legend(packset, Path(self.abs_path('bee2')))
             export_screen.step('EXP', 'fizzler_sides')
 
             # Write generated resources, after the regular ones have been copied.

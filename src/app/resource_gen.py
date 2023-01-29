@@ -8,6 +8,7 @@ import colorsys
 from srctools.vtf import VTF, ImageFormats
 import srctools.logger
 
+from packages import PackagesSet
 from app.itemconfig import ConfigGroup, parse_color
 from app import img
 
@@ -22,12 +23,12 @@ CELL_SIZE = 96
 LEGEND_SIZE = 512
 
 
-def make_cube_colourizer_legend(bee2_loc: Path) -> None:
+def make_cube_colourizer_legend(packset: PackagesSet, bee2_loc: Path) -> None:
     """Create a cube colourizer legend, showing the colours."""
     # Find the colourizer group, and grab its values. If not currently present,
     # we don't need to generate.
     try:
-        config = ConfigGroup.by_id('BEE2_CUBE_COLORISER')
+        config = packset.obj_by_id(ConfigGroup, 'BEE2_CUBE_COLORISER')
     except KeyError:
         LOGGER.debug('No cube colorizer config group!')
         return
