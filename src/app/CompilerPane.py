@@ -679,18 +679,17 @@ async def make_map_widgets(frame: ttk.Frame) -> None:
     elev_preview.grid(row=0, column=0, sticky='w')
     elev_elevator.grid(row=0, column=1, sticky='w')
 
-    elev_conf_swap = TransToken.ui(
-        "{desc}\n\n"
-        "You can hold down Shift during the start of the Geometry stage to quickly swap which"
-        "location you spawn at on the fly."
-    )
-    add_tooltip(elev_elevator, elev_conf_swap.format(desc=TransToken.ui(
+    add_tooltip(elev_elevator, TransToken.ui(
         "When previewing in SP, spawn inside the entry elevator. Use this to "
-        "examine the entry and exit corridors."
-    )))
-    add_tooltip(elev_preview, elev_conf_swap.format(desc=TransToken.ui(
-        "When previewing in SP, spawn just before the entry door."
-    )))
+        "examine the entry and exit corridors.\n\n"
+        "You can hold down Shift during the start of the Geometry stage to quickly swap which "
+        "location you spawn at on the fly."
+    ))
+    add_tooltip(elev_preview, TransToken.ui(
+        "When previewing in SP, spawn just before the entry door.\n\n"
+        "You can hold down Shift during the start of the Geometry stage to quickly swap which "
+        "location you spawn at on the fly."
+    ))
 
     model_frame = ttk.LabelFrame(frame, labelanchor='n')
     localisation.set_text(model_frame, TransToken.ui('Player Model (SP):'))

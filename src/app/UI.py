@@ -99,9 +99,10 @@ pal_canvas: tk.Canvas  # Canvas for the item list to scroll.
 
 TRANS_EXPORTED = TransToken.ui('Selected Items and Style successfully exported!')
 TRANS_EXPORTED_NO_VPK = TransToken.ui(
-    '{exported}\n\nWarning: VPK files were not exported, quit Portal 2 and '
+    'Selected Items and Style successfully exported!\n\n'
+    'Warning: VPK files were not exported, quit Portal 2 and '
     'Hammer to ensure editor wall previews are changed.'
-).format(exported=TRANS_EXPORTED)
+)
 TRANS_EXPORTED_TITLE = TransToken.ui('BEE2 - Export Complete')
 TRANS_MAIN_TITLE = TransToken.ui('BEEMOD {version} - {game}')
 TRANS_ERROR = TransToken.untranslated('???')
