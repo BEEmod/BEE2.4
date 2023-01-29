@@ -277,7 +277,7 @@ def build_texture(
         if y == 5:  # Last row is shifted over to center.
             x += 1
         try:
-            ico = icons[i + 3].get_pil().resize((CELL_SIZE, CELL_SIZE), Image.ANTIALIAS).convert('RGB')
+            ico = icons[i + 3].get_pil().resize((CELL_SIZE, CELL_SIZE), Image.Resampling.LANCZOS).convert('RGB')
         except KeyError:
             if blank_img is None:
                 continue
