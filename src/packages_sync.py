@@ -40,6 +40,9 @@ PACKAGE_REPEAT: Optional[RawFileSystem] = None
 SKIPPED_FILES: List[str] = []
 CONF = utils.conf_location('last_package_sync.txt')
 
+class SkipPackage(Exception):
+    """Raised to skip a package."""
+
 
 def get_package(file: Path) -> RawFileSystem:
     """Get the package desired for a file."""
@@ -54,9 +57,9 @@ def get_package(file: Path) -> RawFileSystem:
         if PACKAGE_REPEAT is not None:
             return PACKAGE_REPEAT
 
-        message = f'Choose package ID for "{file}", or blank to assume {last_package}: '
+        message = f'Choose package ID for "{file}", blank to assume {last_package}, * to repeat last for all, or X to skip: '
     else:
-        message = f'Choose package ID for "{file}": '
+        message = f'Choose package ID for "{file}", or X to skip: '
 
     error_message = 'Invalid package!\n' + message
 
@@ -65,6 +68,9 @@ def get_package(file: Path) -> RawFileSystem:
 
         # After first time, always use the 'invalid package' warning.
         message = error_message
+
+        if pack_id == 'X':
+            raise SkipPackage
 
         if pack_id == '*' and last_package:
             try:
@@ -152,7 +158,7 @@ def check_file(file: Path, portal2: Path, packages: Path) -> None:
             # This file is totally new.
             try:
                 target_systems.append(get_package(rel_loc))
-            except KeyboardInterrupt:
+            except SkipPackage:
                 return
 
         for fsys in target_systems:
