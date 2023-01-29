@@ -1152,7 +1152,7 @@ class Item:
 
             default = ''
             index = 0
-            user_default = True
+            disable_prop = False
             desc = TransToken.BLANK
             for prop_value in tok.block(prop_str + ' options'):
                 prop_value = prop_value.casefold()
@@ -1161,7 +1161,7 @@ class Item:
                 elif prop_value == 'index':
                     index = conv_int(tok.expect(Token.STRING))
                 elif prop_value == 'bee2_ignore':
-                    user_default = conv_bool(tok.expect(Token.STRING), user_default)
+                    disable_prop = conv_bool(tok.expect(Token.STRING), disable_prop)
                     if prop_type.is_unknown:
                         LOGGER.warning(
                             'Disabling setting defaults for property "{}" is not useful, '
@@ -1174,7 +1174,7 @@ class Item:
                     raise tok.error('Unknown property option "{}"!', prop_value)
             try:
                 self.properties[prop_type.id.casefold()] = ItemProp(
-                    prop_type,default, index, user_default, desc,
+                    prop_type,default, index, not disable_prop, desc,
                 )
             except ValueError:
                 raise tok.error(
