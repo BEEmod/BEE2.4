@@ -68,6 +68,7 @@ CBackT = TypeVar('CBackT', bound=Callable[[], object])
 _applied_tokens: WeakKeyDictionary[TextWidget, TransToken] = WeakKeyDictionary()
 # menu -> index -> token.
 _applied_menu_tokens: WeakKeyDictionary[tk.Menu, dict[int, TransToken]] = WeakKeyDictionary()
+_window_titles: WeakKeyDictionary[tk.Wm, TransToken] = WeakKeyDictionary()
 # For anything else, this is called which will apply tokens.
 _langchange_callback: list[Callable[[], object]] = []
 
@@ -123,9 +124,10 @@ def set_text(widget: TextWidgetT, token: TransToken) -> TextWidgetT:
     return widget
 
 
-def set_win_title(win: tk.Toplevel | tk.Tk, token: TransToken) -> None:
+def set_win_title(win: tk.Wm, token: TransToken) -> None:
     """Set the title of a window to this token."""
-    add_callback(call=True)(lambda: win.title(str(token)))
+    win.wm_title(str(token))
+    _window_titles[win] = token
 
 
 def set_menu_text(menu: tk.Menu, token: TransToken, index: str | int = 'end') -> None:
@@ -156,6 +158,7 @@ def add_callback(*, call: bool) -> Callable[[CBackT], CBackT]:
     def deco(func: CBackT) -> CBackT:
         """Register when called as a decorator."""
         _langchange_callback.append(func)
+        LOGGER.debug('Add lang callback: {!r}, {} total', func, len(_langchange_callback))
         if call:
             func()
         return func
@@ -360,6 +363,8 @@ def set_language(lang: Language) -> None:
     for menu, menu_map in _applied_menu_tokens.items():
         for index, token in menu_map.items():
             menu.entryconfigure(index, label=str(token))
+    for window, token in _window_titles.items():
+        window.wm_title(str(token))
     for func in _langchange_callback:
         func()
 
