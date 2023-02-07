@@ -3,7 +3,8 @@ from __future__ import annotations
 
 import pickle
 from collections import defaultdict
-from typing import Dict, Iterator, List, Tuple, Mapping
+from collections.abc import Sequence, Iterator, Mapping
+from typing import Dict, List, Tuple
 from typing_extensions import Final
 import itertools
 
@@ -51,9 +52,9 @@ class CorridorUI(Corridor):
     name: TransToken
     config: lazy_conf.LazyConf
     desc: tkMarkdown.MarkdownData = attrs.field(repr=False)
-    images: List[img.Handle]
+    images: Sequence[img.Handle]
     dnd_icon: img.Handle
-    authors: List[str]
+    authors: Sequence[str]
 
     def strip_ui(self) -> Corridor:
         """Strip these UI attributes for the compiler export."""
