@@ -88,6 +88,7 @@ class Selector:
         self.win = tk.Toplevel(TK_ROOT)
         self.win.withdraw()
         self.win.wm_protocol("WM_DELETE_WINDOW", self.hide)
+        localisation.set_win_title(self.win, TransToken.ui('BEEmod - Select Corridor'))
 
         self.win.rowconfigure(0, weight=1)
         self.win.columnconfigure(0, weight=1)
