@@ -6,6 +6,7 @@
 * If a duplicate package is present, include the paths of both in the error message.
 * Change palette item format to permit "holes" in the position of items. This isn't exposed in the UI yet.
 * Redo the selector on the Item Properties pane to make it more clear that it swaps pages.
+* Display the authors of corridors.
 
 ### Bugfixes:
 * Properly pick free port for error server.

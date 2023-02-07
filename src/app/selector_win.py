@@ -728,11 +728,12 @@ class SelectorWin(Generic[CallbackT]):
             name='prop_name',
             text="",
             justify='center',
+            anchor='center',
             font=("Helvetica", 12, "bold"),
         )
         name_frame.grid(row=1, column=0, columnspan=4)
         name_frame.columnconfigure(0, weight=1)
-        self.prop_name.grid(row=0, column=0)
+        self.prop_name.grid(row=0, column=0, sticky='ew')
 
         # For music items, add a '>' button to play sound samples
         if sound_sys is not None and sound.has_sound():

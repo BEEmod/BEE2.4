@@ -52,6 +52,9 @@ FALLBACK = corridor.CorridorGroup(
 FALLBACK.pak_id = '<fallback>'
 FALLBACK.pak_name = '???'
 
+TRANS_AUTHORS = TransToken.ui_plural('Author: {authors}', 'Authors: {authors}')
+TRANS_NO_AUTHORS = TransToken.ui('Authors: Unknown')
+
 
 class Selector:
     """Corridor selection UI."""
@@ -61,6 +64,7 @@ class Selector:
     # Widgets to display info about the corridor on the right side.
     wid_image: ttk.Label
     wid_title: ttk.Label
+    wid_authors: ttk.Label
     wid_desc: tkRichText
     # When you click a corridor, it's saved here and displayed when others aren't
     # moused over. Reset on style/group swap.
@@ -117,17 +121,30 @@ class Selector:
         img.apply(self.wid_image, IMG_CORR_BLANK)
         img.apply(self.wid_image_right, IMG_ARROW_RIGHT)
 
-        self.wid_title = ttk.Label(frm_right, text='')
+        self.wid_title = ttk.Label(
+            frm_right,
+            justify='center',
+            anchor='center',
+            font=("Helvetica", 12, "bold"),
+            text='',
+        )
         self.wid_title.grid(row=1, column=0, sticky='ew')
+        self.wid_authors = ttk.Label(
+            frm_right,
+            justify='center',
+            anchor='center',
+            text='',
+        )
+        self.wid_authors.grid(row=2, column=0, sticky='ew')
 
         self.wid_desc = tkRichText(frm_right)
-        self.wid_desc.grid(row=2, column=0, sticky='nsew')
-        frm_right.rowconfigure(2, weight=1)
+        self.wid_desc.grid(row=3, column=0, sticky='nsew')
+        frm_right.rowconfigure(3, weight=1)
 
         localisation.set_text(
             ttk.Button(frm_right, command=self.hide),
             TransToken.ui('Close'),
-).grid(row=3, column=0)
+        ).grid(row=4, column=0)
 
         self.event_bus = event.EventBus()
 
@@ -419,6 +436,15 @@ class Selector:
             self.cur_images = corr.images
             self._sel_img(0)  # Updates the buttons.
             localisation.set_text(self.wid_title, corr.name)
+
+            if len(corr.authors) == 0:
+                localisation.set_text(self.wid_authors, TRANS_NO_AUTHORS)
+            else:
+                localisation.set_text(self.wid_authors, TRANS_AUTHORS.format(
+                    authors=', '.join(corr.authors),
+                    n=len(corr.authors),
+                ))
+
             if DEV_MODE.get():
                 # Show the instance in the description, plus fixups that are assigned.
                 self.wid_desc.set_text(tkMarkdown.join(
@@ -435,6 +461,7 @@ class Selector:
         else:  # Reset.
             localisation.set_text(self.wid_title, TransToken.BLANK)
             self.wid_desc.set_text(corridor.EMPTY_DESC)
+            localisation.set_text(self.wid_authors, TransToken.BLANK)
             img.apply(self.wid_image, IMG_CORR_BLANK)
             self.wid_image_left.state(('disabled', ))
             self.wid_image_right.state(('disabled', ))
