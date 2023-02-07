@@ -911,6 +911,9 @@ class SelectorWin(Generic[CallbackT]):
         self.wid_canvas.bind("<Configure>", self.flow_items)
         localisation.add_callback(call=False)(self._update_translations)
 
+    def __repr__(self) -> str:
+        return f'<SelectorWin "{self.save_id}">'
+
     async def _load_selected(self, selected: LastSelected) -> None:
         """Load a new selected item."""
         self.sel_item_id('<NONE>' if selected.id is None else selected.id)
