@@ -8,6 +8,10 @@
 * Redo the selector on the Item Properties pane to make it more clear that it swaps pages.
 * Display the authors of corridors.
 
+### UCP-Relevant Enhancements:
+* Added an `Inherit` option to Corridor Groups. This specifies the ID of another style, causing all
+  corridors to be copied from that other style.
+
 ### Bugfixes:
 * Properly pick free port for error server.
 * Set a title for the corridor selector window.

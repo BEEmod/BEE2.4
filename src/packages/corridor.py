@@ -115,13 +115,18 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
     """A collection of corridors defined for the style with this ID."""
     id: str
     corridors: Dict[CorrKind, List[CorridorUI]]
+    inherit: Sequence[str] = ()  # Copy all the corridors defined in these groups.
 
     @classmethod
     async def parse(cls, data: packages.ParseData) -> CorridorGroup:
         """Parse from the file."""
         corridors: dict[CorrKind, list[CorridorUI]] = defaultdict(list)
+        inherits: list[str] = []
         for kv in data.info:
-            if kv.name in {'id'}:
+            if kv.name == 'id':
+                continue
+            if kv.name == 'inherit':
+                inherits.append(kv.value)
                 continue
             images = [
                 img.Handle.parse(subprop, data.pak_id, IMG_WIDTH_LRG, IMG_HEIGHT_LRG)
@@ -170,7 +175,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                     for subprop in kv.find_children('fixups')
                 },
             ))
-        return CorridorGroup(data.id, dict(corridors))
+        return CorridorGroup(data.id, dict(corridors), inherits)
 
     def add_over(self: CorridorGroup, override: CorridorGroup) -> None:
         """Merge two corridor group definitions."""
@@ -181,6 +186,8 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                 self.corridors[key] = corr_over
             else:
                 corr_base.extend(corr_over)
+        if override.inherit:
+            self.inherit = override.inherit
 
     @classmethod
     async def post_parse(cls, packset: packages.PackagesSet) -> None:
@@ -262,20 +269,29 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                     if had_legacy:
                         LOGGER.warning('Legacy corridor definition for {}:{}_{}!', style_id, mode.value, direction.value)
 
-                    if not corr_list:
-                        # Look for parent styles with definitions to inherit.
-                        for parent_style in style.bases[1:]:
-                            try:
-                                parent_group = packset.obj_by_id(CorridorGroup, parent_style.id)
-                                parent_corr = parent_group.corridors[mode, direction, Orient.HORIZONTAL]
-                            except KeyError:
-                                continue
-                            if not parent_corr:
-                                continue
-                            for corridor in parent_corr:
-                                if not corridor.legacy:
-                                    corr_list.append(corridor)
-                            break # Only do first parent.
+        # Apply inheritance.
+        for corridor_group in packset.all_obj(cls):
+            for inherit in corridor_group.inherit:
+                try:
+                    parent_group = packset.obj_by_id(cls, inherit)
+                except KeyError:
+                    LOGGER.warning('Corridor Group "{}" is trying to inherit from nonexistent group "{}"!', corridor_group.id, inherit)
+                    continue
+                if parent_group.inherit:
+                    # Disable recursive inheritance for simplicity, can add later if it's actually
+                    # useful.
+                    LOGGER.warning(
+                        'Corridor Groups "{}" cannot inherit from a group that '
+                        'itself inherits ("{}"). If you need this, ask for '
+                        'it to be supported.',
+                        corridor_group.id, inherit,
+                    )
+                    continue
+                for kind, corridors in parent_group.corridors.items():
+                    try:
+                        corridor_group.corridors[kind].extend(corridors)
+                    except KeyError:
+                        corridor_group.corridors[kind] = corridors.copy()
 
         if utils.DEV_MODE:
             # Check no duplicate corridors exist.
