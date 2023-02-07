@@ -10,7 +10,7 @@ from precomp.conditions import (
     DIRECTIONS,
 )
 from precomp import tiling, brushLoc
-from srctools import Vec, Angle, Matrix, conv_float, Keyvalues, Entity
+from srctools import Vec, FrozenVec, Angle, Matrix, conv_float, Keyvalues, Entity
 from srctools.logger import get_logger
 
 
@@ -48,32 +48,34 @@ def flag_angles(flag: Keyvalues) -> Callable[[Entity], bool]:
     if flag.has_children():
         targ_angle = flag['direction', '0 0 0']
         from_dir_str = flag['from_dir', '0 0 1']
-        if from_dir_str.casefold() in DIRECTIONS:
-            from_dir = Vec(DIRECTIONS[from_dir_str.casefold()])
-        else:
-            from_dir = Vec.from_str(from_dir_str, 0, 0, 1)
+        try:
+            from_dir = DIRECTIONS[from_dir_str.casefold()]
+        except KeyError:
+            from_dir = FrozenVec.from_str(from_dir_str, 0, 0, 1)
         allow_inverse = flag.bool('allow_inverse')
     else:
         targ_angle = flag.value
-        from_dir = Vec(0, 0, 1)
+        from_dir = FrozenVec(0, 0, 1)
         allow_inverse = False
 
-    try:
-        normal = DIRECTIONS[targ_angle.casefold()]
-    except KeyError:
-        normal = Vec.from_str(targ_angle)
-
-    def check_orient(inst: Entity) -> bool:
-        """Check the orientation against the instance."""
-        inst_normal = from_dir @ Matrix.from_angstr(inst['angles'])
-
-        if normal == 'WALL':
-            # Special case - it's not on the floor or ceiling
+    targ_angle = targ_angle.casefold()
+    if targ_angle in ('wall', 'walls'):
+        def check_orient(inst: Entity) -> bool:
+            """Check if the instance is facing any wall."""
+            inst_normal = from_dir @ Matrix.from_angstr(inst['angles'])
             return abs(inst_normal.z) < 1e-6
-        else:
-            return inst_normal == normal or (
-                allow_inverse and -inst_normal == normal
-            )
+    else:
+        try:
+            normal = DIRECTIONS[targ_angle]
+        except KeyError:
+            normal = FrozenVec.from_str(targ_angle)
+
+        def check_orient(inst: Entity) -> bool:
+            """Check the orientation against the instance."""
+            inst_normal = from_dir @ Matrix.from_angstr(inst['angles'])
+
+            dot = inst_normal.dot(normal)
+            return dot > 0.99 or (allow_inverse and dot < -0.99)
     return check_orient
 
 

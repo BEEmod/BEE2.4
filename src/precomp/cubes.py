@@ -346,7 +346,7 @@ class DropperType:
         if 'cube_ang' in conf:
             cube_orient = Angle.from_str(conf['cube_ang'])
         elif 'cube_dir' in conf:
-            # Old configuration - the X forward direction.+
+            # Old configuration - the X forward direction.
             LOGGER.warning(
                 'Cube type "{}" uses deprectated cube_dir option, '
                 'use cube_angles instead.',
@@ -354,15 +354,11 @@ class DropperType:
             )
             cube_dir_str = conf['cube_dir']
             try:
-                cube_dir = conditions.DIRECTIONS[cube_dir_str]
+                cube_dir = conditions.DIRECTIONS[cube_dir_str.casefold()]
             except KeyError:
                 cube_dir = FrozenVec.from_str(cube_dir_str, x=1)
-            if cube_dir == 'WALL':
-                LOGGER.warning('Cube type "{}" uses cube_dir=WALL, this makes no sense', conf['id'])
-                cube_orient = Angle()
-            else:
-                # Set roll to counteract us being on the ceiling.
-                cube_orient = cube_dir.to_angle(180)
+            # Set roll to counteract us being on the ceiling.
+            cube_orient = cube_dir.to_angle(180)
         else:
             cube_orient = Angle()
 

@@ -100,7 +100,7 @@ yn = FrozenVec(0, -1, 0)
 zp = FrozenVec(0, 0, 1)
 zn = FrozenVec(0, 0, -1)
 
-DIRECTIONS: Mapping[str, FrozenVec | Literal['WALL']] = {
+DIRECTIONS: Mapping[str, FrozenVec] = {
     # Translate these words into a normal vector
     '+x': xp,
     '-x': xn,
@@ -131,9 +131,6 @@ DIRECTIONS: Mapping[str, FrozenVec | Literal['WALL']] = {
     'east': xp,
     'w': xn,
     'west': xn,
-
-    'wall': 'WALL',  # Special case, not floor/ceiling
-    'walls': 'WALL',
 }
 
 INST_ANGLE = {
