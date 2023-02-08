@@ -13,7 +13,7 @@ import srctools.logger
 
 from typing import (
     Callable, Optional, Union,
-    List, Dict, Tuple, TypeVar, Iterable,
+    List, Dict, Tuple, TypeVar, Iterable, overload,
 )
 import corridor
 import user_errors
@@ -318,6 +318,10 @@ def resolve(path: str, silent: bool=False) -> List[str]:
 Default_T = TypeVar('Default_T')
 
 
+@overload
+def resolve_one(path, *, error: bool) -> str: ...
+@overload
+def resolve_one(path, default: Default_T, *, error: bool) -> Union[str, Default_T]: ...
 def resolve_one(path, default: Union[str, Default_T]='', *, error: bool) -> Union[str, Default_T]:
     """Resolve a path into one instance.
 
