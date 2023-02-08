@@ -411,13 +411,13 @@ class PackagesSet:
         """Get the list of objects parsed."""
         if cls not in self._parsed:
             raise ValueError(cls.__name__ + ' has not been parsed yet!')
-        return cast('Collection[PakT]', self.objects[cls].values())
+        return cast('dict[str, PakT]', self.objects[cls]).values()
 
     def obj_by_id(self, cls: Type[PakT], object_id: str) -> PakT:
         """Return the object with a given ID."""
         if cls not in self._parsed:
             raise ValueError(cls.__name__ + ' has not been parsed yet!')
-        return cast(PakT, self.objects[cls][object_id.casefold()])
+        return cast('dict[str, PakT]', self.objects[cls])[object_id.casefold()]
 
     def add(self, obj: PakT, pak_id: str, pak_name: str) -> None:
         """Add an object to our dataset later, with the given package name."""
