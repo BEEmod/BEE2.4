@@ -291,7 +291,7 @@ if hasattr(zipfile, '_SharedFile'):
             # changed by another thread - instead keep our own private value.
             self.tell = lambda: self._pos
 
-    zipfile._SharedFile = _SharedZipFile  # type: ignore
+    zipfile._SharedFile = _SharedZipFile
 
 
 class FuncLookup(Generic[LookupT], Mapping[str, LookupT]):
@@ -300,7 +300,7 @@ class FuncLookup(Generic[LookupT], Mapping[str, LookupT]):
     Functions are added by using this as a decorator. Positional arguments
     are aliases, keyword arguments will set attributes on the functions.
     If casefold is True, this will casefold keys to be case-insensitive.
-    Additionally overwriting names is not allowed.
+    Additionally, overwriting names is not allowed.
     Iteration yields all functions.
     """
     def __init__(

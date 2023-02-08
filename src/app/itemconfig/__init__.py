@@ -608,7 +608,7 @@ async def make_pane(tool_frame: tk.Frame, menu_bar: tk.Menu, update_item_vis: Ca
         arrow_left.state(['disabled' if pos == 0 else '!disabled'])
         arrow_right.state(['disabled' if pos + 1 == len(ordered_conf) else '!disabled'])
 
-    cmd_cache = {}
+    cmd_cache: dict[ConfigGroup, str] = {}
 
     @localisation.add_callback(call=True)
     def update_selector() -> None:

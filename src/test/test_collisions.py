@@ -147,7 +147,7 @@ def test_bbox_is_frozen() -> None:
     with pytest.raises(AttributeError):
         bb.tags = frozenset({'tag1', 'tag2', 'tag3'})
     with pytest.raises(AttributeError):
-        bb.tags.add('extra')  # type: ignore
+        bb.tags.add('extra')  # noqa
     # Check all these assignments didn't actually do anything.
     assert_bbox(bb, (40, 60, 80), (120, 450, 730), CollideType.PHYSICS, set())
 
