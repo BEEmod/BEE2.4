@@ -256,17 +256,17 @@ class TrackStartActivePropGroup(BoolPropGroup):
         if self.osc_prop is not None and self.has_osc and not self.osc_prop.var.get():
             self.check.state(('disabled', ))
             if self.user_tooltip:
-                tooltip.set_tooltip(self.frame, TransToken.untranslated('\n').join([
+                tooltip.set_tooltip(self.check, TransToken.untranslated('\n').join([
                     TRANS_START_ACTIVE_DISABLED,
                     self.user_tooltip,
                     # Decrease delay, the widget isn't interactive.
                 ]), delay=100)
             else:
-                tooltip.set_tooltip(self.frame, TRANS_START_ACTIVE_DISABLED, delay=100)
+                tooltip.set_tooltip(self.check, TRANS_START_ACTIVE_DISABLED, delay=100)
             self.var.set(False)
         else:
             self.check.state(('!disabled', ))
-            tooltip.set_tooltip(self.frame, self.user_tooltip, delay=500)
+            tooltip.set_tooltip(self.check, self.user_tooltip, delay=500)
 
     def set_tooltip(self, tok: TransToken) -> None:
         """Set a user tooltip on this group."""
