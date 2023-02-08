@@ -217,6 +217,7 @@ class NoVPKExport(Exception):
 
 T = TypeVar('T')
 PakT = TypeVar('PakT', bound='PakObject')
+style_suggest_keys: dict[str, type['PakObject']] = {}
 
 
 class PakObject:
@@ -227,6 +228,8 @@ class PakObject:
     Set 'has_img' to control whether the object will count towards the images
     loading bar - this should be stepped in the UI.load_packages() method.
     Setting `needs_foreground` indicates that it is unable to load after the main UI.
+    If `style_suggest_key` is set, this is the keyvalue in Style definitions containing IDs to suggest.
+    `suggest_default` is then the default item to provide if none are specified.
     """
     # ID of the object
     id: str
@@ -238,20 +241,28 @@ class PakObject:
     _id_to_obj: ClassVar[dict[str, PakObject]]
     allow_mult: ClassVar[bool]
     needs_foreground: ClassVar[bool]
+    suggest_default: ClassVar[str]
 
     def __init_subclass__(
         cls,
         allow_mult: bool = False,
         needs_foreground: bool = False,
-        **kwargs,
+        style_suggest_key: str = '',
+        suggest_default: str = '<NONE>',
     ) -> None:
-        super().__init_subclass__(**kwargs)
+        super().__init_subclass__()
         OBJ_TYPES[cls.__name__.casefold()] = cls
 
         # Maps object IDs to the object.
         cls._id_to_obj = {}
         cls.allow_mult = allow_mult
         cls.needs_foreground = needs_foreground
+        if style_suggest_key:
+            assert style_suggest_key.casefold() not in style_suggest_keys
+            style_suggest_keys[style_suggest_key.casefold()] = cls
+            cls.suggest_default = suggest_default
+        else:
+            cls.suggest_default = ''
 
     @classmethod
     async def parse(cls, data: ParseData) -> Self:
@@ -857,7 +868,7 @@ class Style(PakObject, needs_foreground=True):
         selitem_data: SelitemData,
         items: list[EditorItem],
         renderables: dict[RenderableType, Renderable],
-        suggested: tuple[set[str], set[str], set[str], set[str]],
+        suggested: dict[type[PakObject], set[str]],
         config: lazy_conf.LazyConf = lazy_conf.BLANK,
         base_style: Optional[str]=None,
         has_video: bool=True,
@@ -902,24 +913,17 @@ class Style(PakObject, needs_foreground=True):
         items: list[EditorItem]
         renderables: dict[RenderableType, Renderable]
 
-        sugg: dict[str, set[str]] = {
-            'quote': set(),
-            'music': set(),
-            'skybox': set(),
-            'elev': set(),
+        suggested: dict[type[PakObject], set[str]] = {
+            pak_type: set()
+            for pak_type in style_suggest_keys.values()
         }
         for kv in info.find_children('suggested'):
             try:
-                sugg[kv.name].add(kv.value)
+                sugg_cls = style_suggest_keys[kv.name]
             except KeyError:
                 LOGGER.warning('Unknown suggestion types for style {}: {}', data.id, kv.name)
-
-        sugg_tup = (
-            sugg['quote'],
-            sugg['music'],
-            sugg['skybox'],
-            sugg['elev'],
-        )
+            else:
+                suggested[sugg_cls].add(kv.value)
 
         corr_conf = info.find_key('corridors', or_blank=True)
         legacy_corridors: dict[tuple[GameMode, Direction, int], LegacyCorr] = {}
@@ -982,7 +986,7 @@ class Style(PakObject, needs_foreground=True):
             renderables=renderables,
             config=vbsp,
             base_style=base,
-            suggested=sugg_tup,
+            suggested=suggested,
             has_video=has_video,
             legacy_corridors=legacy_corridors,
             vpk_name=vpk_name,
@@ -997,21 +1001,16 @@ class Style(PakObject, needs_foreground=True):
 
         self.has_video = self.has_video or override.has_video
         # If overrides have suggested IDs, add those.
-        self.suggested = tuple(
-            over_sugg | self_sugg
-            for self_sugg, over_sugg in
-            zip(self.suggested, override.suggested)
-        )
+        for sugg_cls, sugg in override.suggested.items():
+            self.suggested[sugg_cls].update(sugg)
 
     @classmethod
     async def post_parse(cls, packset: PackagesSet) -> None:
         """Assign the bases lists for all styles, and set default suggested items."""
-        defaults = ['<NONE>', '<NONE>', 'SKY_BLACK', '<NONE>']
-
         for style in packset.all_obj(Style):
-            for default, sugg_set in zip(defaults, style.suggested):
+            for sugg_cls, sugg_set in style.suggested.items():
                 if not sugg_set:
-                    sugg_set.add(default)
+                    sugg_set.add(sugg_cls.suggest_default)
 
             base = []
             b_style = style

@@ -58,11 +58,12 @@ windows: Dict[str, Any] = {}  # Toplevel | SubPane
 frames: Dict[str, Union[tk.Frame, ttk.Frame]] = {}
 UI: Dict[str, Any] = {}  # Various widgets.
 
-# These panes.
+# These panes and a dict mapping object type to them.
 skybox_win: 'SelectorWin[[]]'
 voice_win: 'SelectorWin[[]]'
 style_win: 'SelectorWin[[]]'
 elev_win: 'SelectorWin[[]]'
+suggest_windows: dict[type[packages.PakObject], SelectorWin] = {}
 
 # Items chosen for the palette.
 pal_picked: List['PalItem'] = []
@@ -620,6 +621,10 @@ async def load_packages(packset: packages.PackagesSet) -> None:
         ]
     )
 
+    suggest_windows[packages.QuotePack] = voice_win
+    suggest_windows[packages.Skybox] = skybox_win
+    suggest_windows[packages.Elevator] = elev_win
+
 
 def current_style() -> packages.Style:
     """Return the currently selected style."""
@@ -1086,13 +1091,12 @@ async def init_option(
 
     async with trio.open_nursery() as nursery:
         nursery.start_soon(music_conf.make_widgets, packages.LOADED, music_frame, pane)
-    music_win = music_conf.WINDOWS[music_conf.MusicChannel.BASE]
+    suggest_windows[packages.Music] = music_conf.WINDOWS[music_conf.MusicChannel.BASE]
 
     def suggested_style_set() -> None:
         """Set music, skybox, voices, etc to the settings defined for a style."""
-        win_types = (voice_win, music_win, skybox_win, elev_win)
         has_suggest = False
-        for win in win_types:
+        for win in suggest_windows.values():
             win.sel_suggested()
             if win.can_suggest():
                 has_suggest = True
@@ -1100,12 +1104,12 @@ async def init_option(
 
     def suggested_style_mousein(_: tk.Event) -> None:
         """When mousing over the button, show the suggested items."""
-        for win in (voice_win, music_win, skybox_win, elev_win):
+        for win in suggest_windows.values():
             win.rollover_suggest()
 
     def suggested_style_mouseout(_: tk.Event) -> None:
         """Return text to the normal value on mouseout."""
-        for win in (voice_win, music_win, skybox_win, elev_win):
+        for win in suggest_windows.values():
             win.set_disp()
 
     UI['suggested_style'] = sugg_btn =  ttk.Button(props, command=suggested_style_set)
@@ -1662,15 +1666,8 @@ async def init_windows() -> None:
         signage_ui.style_changed(style_obj)
         item_search.rebuild_database()
 
-        sugg = style_obj.suggested
-        win_types = (
-            voice_win,
-            music_conf.WINDOWS[consts.MusicChannel.BASE],
-            skybox_win,
-            elev_win,
-        )
-        for win, sugg_val in zip(win_types, sugg):
-            win.set_suggested(sugg_val)
+        for sugg_cls, win in suggest_windows.items():
+            win.set_suggested(style_obj.suggested[sugg_cls])
         suggested_refresh()
         StyleVarPane.refresh(style_obj)
         corridor.load_corridors(packages.LOADED)

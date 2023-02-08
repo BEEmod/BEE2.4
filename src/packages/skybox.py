@@ -9,7 +9,11 @@ from packages import (
 )
 
 
-class Skybox(PakObject, needs_foreground=True):
+class Skybox(
+    PakObject,
+    needs_foreground=True,
+    style_suggest_key='skybox', suggest_default='SKY_BLACK',
+):
     """Configures skybox and fog settings."""
     def __init__(
         self,

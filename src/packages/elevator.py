@@ -7,7 +7,7 @@ from typing import Iterator
 from packages import ParseData, ExportData, SelitemData, PakObject, TransTokenSource
 
 
-class Elevator(PakObject, needs_foreground=True):
+class Elevator(PakObject, needs_foreground=True, style_suggest_key='elev'):
     """An elevator video definition.
 
     This is mainly defined just for Valve's items - you can't pack BIKs.

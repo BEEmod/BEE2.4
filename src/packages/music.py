@@ -15,7 +15,7 @@ from packages import PackagesSet, PakObject, ParseData, SelitemData, get_config,
 LOGGER = srctools.logger.get_logger(__name__)
 
 
-class Music(PakObject, needs_foreground=True):
+class Music(PakObject, needs_foreground=True, style_suggest_key='music'):
     """Allows specifying background music for the map."""
     def __init__(
         self,

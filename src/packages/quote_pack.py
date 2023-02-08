@@ -11,7 +11,7 @@ from packages import (
 from srctools import Keyvalues, Vec, NoKeyError
 
 
-class QuotePack(PakObject, needs_foreground=True):
+class QuotePack(PakObject, needs_foreground=True, style_suggest_key='quote'):
     """Adds lists of voice lines which are automatically chosen."""
     def __init__(
         self,
