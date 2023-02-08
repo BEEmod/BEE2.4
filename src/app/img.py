@@ -8,8 +8,8 @@ they are loaded in the background, then unloaded if removed from all widgets.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, ClassVar, Dict, Iterator, Tuple, TypeVar, Union, Type, cast
-from typing_extensions import TypeAlias, Final
+from typing import Any, ClassVar, Dict, Iterator, Tuple, TypeVar, Union, Type
+from typing_extensions import Self, TypeAlias, Final
 from collections.abc import Sequence, Mapping
 from weakref import ref as WeakRef
 from tkinter import ttk
@@ -47,8 +47,6 @@ WidgetWeakRef: TypeAlias = Union[
     'WeakRef[tk.Button]', 'WeakRef[ttk.Button]',
     'WeakRef[tk.Button | ttk.Button]',
 ]
-
-HandleT = TypeVar('HandleT', bound='Handle')
 
 # Used to keep track of the used handles, so we can deduplicate them.
 _handles: dict[tuple[Type[Handle], tuple, int, int], Handle] = {}
@@ -289,7 +287,7 @@ class Handle:
         """Override in subclasses to convert mutable attributes to deduplicate."""
         return args
 
-    def resize(self: HandleT, width: int, height: int) -> HandleT:
+    def resize(self, width: int, height: int) -> Self:
         """Return a copy with a different size."""
         raise NotImplementedError
 
@@ -308,12 +306,14 @@ class Handle:
         return self._bg_composited or self._is_themed()
 
     @classmethod
-    def _deduplicate(cls: Type[HandleT], width: int | tuple[int, int], height: int, *args: Any) -> HandleT:
+    def _deduplicate(cls, width: int | tuple[int, int], height: int, *args: Any) -> Self:
         if isinstance(width, tuple):
             width, height = width
         key = cls._to_key(args)
         try:
-            return cast(HandleT, _handles[cls, key, width, height])
+            any_handle = _handles[cls, key, width, height]
+            assert isinstance(any_handle, cls)
+            return any_handle
         except KeyError:
             handle = _handles[cls, key, width, height] = cls(width, height, *args)
             return handle
@@ -684,7 +684,7 @@ class ImgColor(Handle):
             (self.red, self.green, self.blue, 255),
         )
 
-    def resize(self: HandleT, width: int, height: int) -> HandleT:
+    def resize(self, width: int, height: int) -> Self:
         """Return the same colour with a different image size."""
         return self._deduplicate(width, height)
 
@@ -705,7 +705,7 @@ class ImgBackground(Handle):
             BACKGROUNDS[_current_theme],  # This is a 3-tuple, but PIL fills alpha=255.
         )
 
-    def resize(self: HandleT, width: int, height: int) -> HandleT:
+    def resize(self, width: int, height: int) -> Self:
         """Return a new background with this image size."""
         return self._deduplicate(width, height)
 

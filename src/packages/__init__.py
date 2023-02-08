@@ -2,15 +2,17 @@
 Handles scanning through the zip packages to find all items, styles, etc.
 """
 from __future__ import annotations
+from typing import Iterator, NoReturn, ClassVar, Optional, Any, TYPE_CHECKING, TypeVar, Type, cast
+from typing_extensions import Self
 
 import os
 import warnings
+from collections.abc import Collection, Iterable
 from collections import defaultdict
 from pathlib import Path
 
 import attrs
 import trio
-
 import srctools
 
 from BEE2_config import ConfigFile
@@ -23,11 +25,6 @@ from srctools.filesys import FileSystem, RawFileSystem, ZipFileSystem, VPKFileSy
 from editoritems import Item as EditorItem, Renderable, RenderableType
 from corridor import CORRIDOR_COUNTS, GameMode, Direction
 import srctools.logger
-
-from typing import (
-    Iterator, NoReturn, ClassVar, Optional, Any, TYPE_CHECKING, TypeVar, Type,
-    Collection, Iterable, cast,
-)
 
 from transtoken import TransToken, TransTokenSource
 
@@ -257,7 +254,7 @@ class PakObject:
         cls.needs_foreground = needs_foreground
 
     @classmethod
-    async def parse(cls: Type[PakT], data: ParseData) -> PakT:
+    async def parse(cls, data: ParseData) -> Self:
         """Parse the package object from the info.txt block.
 
         ParseData is a namedtuple containing relevant info:
@@ -268,7 +265,7 @@ class PakObject:
         """
         raise NotImplementedError
 
-    def add_over(self: PakT, override: PakT):
+    def add_over(self, override: Self) -> None:
         """Called to override values.
         self is the originally defined item, and override is the override item
         to copy values from.
@@ -301,13 +298,13 @@ class PakObject:
         pass
 
     @classmethod
-    def all(cls: Type[PakT]) -> Collection[PakT]:
+    def all(cls) -> Collection[Self]:
         """Get the list of objects parsed."""
         warnings.warn('Make this local!', DeprecationWarning, stacklevel=2)
         return LOADED.all_obj(cls)
 
     @classmethod
-    def by_id(cls: Type[PakT], object_id: str) -> PakT:
+    def by_id(cls, object_id: str) -> Self:
         """Return the object with a given ID."""
         warnings.warn('Make this local!', DeprecationWarning, stacklevel=2)
         return LOADED.obj_by_id(cls, object_id)
