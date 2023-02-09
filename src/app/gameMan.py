@@ -119,7 +119,7 @@ INST_PATH = 'sdk_content/maps/instances/BEE2'
 # The line we inject to add our BEE2 folder into the game search path.
 # We always add ours such that it's the highest priority, other
 # than '|gameinfo_path|.'
-GAMEINFO_LINE = 'Game\t"BEE2"'
+GAMEINFO_LINE = 'Game\t|gameinfo_path|../bee2'
 
 # We inject this line to recognise where our sounds start, so we can modify
 # them.
