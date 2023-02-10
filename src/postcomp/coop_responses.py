@@ -13,7 +13,7 @@ def generate_coop_responses(ctx: Context) -> None:
     responses: Dict[str, List[str]] = {}
     for response in ctx.vmf.by_class['bee2_coop_response']:
         responses[response['type']] = [
-            value for key, value in response.keys.items()
+            value for key, value in response.items()
             if key.startswith('choreo')
         ]
         response.remove()
