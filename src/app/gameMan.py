@@ -119,7 +119,8 @@ INST_PATH = 'sdk_content/maps/instances/BEE2'
 # The line we inject to add our BEE2 folder into the game search path.
 # We always add ours such that it's the highest priority, other
 # than '|gameinfo_path|.'
-GAMEINFO_LINE = 'Game\t"BEE2"'
+GAMEINFO_LINE = 'Game\t|gameinfo_path|../bee2'
+OLD_GAMEINFO_LINE = 'Game\t"BEE2"'
 
 # We inject this line to recognise where our sounds start, so we can modify
 # them.
@@ -435,7 +436,14 @@ class Game:
                     if add_line:
                         if clean_line == GAMEINFO_LINE:
                             break  # Already added!
-                        elif '|gameinfo_path|' in clean_line:
+                        elif clean_line == OLD_GAMEINFO_LINE:
+                            LOGGER.debug(
+                                "Updating gameinfo hook to {}",
+                                info_path,
+                            )
+                            data[line_num] = utils.get_indent(line) + GAMEINFO_LINE + '\n'
+                            break
+                        elif '|gameinfo_path|' in clean_line and GAMEINFO_LINE not in line:
                             LOGGER.debug(
                                 "Adding gameinfo hook to {}",
                                 info_path,
@@ -447,7 +455,7 @@ class Game:
                                 )
                             break
                     else:
-                        if clean_line == GAMEINFO_LINE:
+                        if clean_line == GAMEINFO_LINE or clean_line == OLD_GAMEINFO_LINE:
                             LOGGER.debug(
                                 "Removing gameinfo hook from {}", info_path
                             )
