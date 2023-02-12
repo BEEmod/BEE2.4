@@ -1437,13 +1437,12 @@ def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
                         Vec.from_str(ghost_pair.dropper['origin']),
                     ]
                 )
-            real_pair.superpos = ghost_pair.superpos = superpos = Superposition(
+            real_pair.superpos = ghost_pair.superpos = Superposition(
                 real_pair, ghost_pair, inst,
             )
             inst.fixup['$ghost_alpha'] = min(255, max(0, options.get(
                 int, 'superposition_ghost_alpha',
             )))
-            LOGGER.info('Superpos link: {}', superpos)
         else:
             raise AssertionError(f'Unknown kind {kind!r}?')
 
@@ -1453,6 +1452,19 @@ def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
         info.set_attr('cube')
 
     for pair in PAIRS:
+        # For superposition cubes, if there isn't a colouriser applied use some preset colours.
+        if pair.tint is None and pair.superpos is not None:
+            if pair.is_superpos_real:
+                pair.tint = Vec.from_str(options.get_itemconf(
+                    ('BEE2_SUPERPOSITION_CUBES', 'COLOR_REAL'),
+                    '255 0 88',
+                ))
+            elif pair.is_superpos_ghost:
+                pair.tint = Vec.from_str(options.get_itemconf(
+                    ('BEE2_SUPERPOSITION_CUBES', 'COLOR_GHOST'),
+                    '0 255 146',
+                ))
+
         if pair.tint is not None:
             pair.cube_type.color_in_map = True
         else:
@@ -1582,6 +1594,7 @@ def make_cube(
         ent['classname'] = 'prop_physics_override'
         ent['rendermode'] = '9'  # World Space Glow
         ent['renderamt'] = ghost_alpha = pair.superpos.swap_inst.fixup['$ghost_alpha']
+        # Set response contexts for detection via `filter_activator_context`.
         ent['responsecontext'] = 'nofizzle:1,superpos_ghost:1'
         ent['spawnflags'] = 1048576 | 256  # Can always pickup, generate output on USE.
         ent['vscripts'] = 'BEE2/superpos_ghost.nut'
@@ -1594,13 +1607,14 @@ def make_cube(
         ent['AllowFunnel'] = not in_dropper
         ent['angles'] = angles
         # Add a dummy entity to force fixup names. We don't need it to exist, just be in the
-        # map file so point_template thinks it needs to do fixup.
+        # map file and reference another template ent. Then point_template will add the `&xxx` names.
         vmf.create_ent(
             'info_null',
             targetname=conditions.local_name(targ_inst, 'cube_addon_superpos_dummy'),
             parentname=conditions.local_name(targ_inst, 'box'),
             origin=origin,
         )
+        # Do not deal with the rest of the logic here.
         return False, ent
 
     if pair.paint_type is not None:
@@ -1825,9 +1839,11 @@ def generate_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
 
         # Add the custom model logic. But skip if we use the rusty version.
         # That overrides it to be using the normal model.
+        # Superpos ghosts are prop_physics, so they don't need it at all.
         if (
             pair.cube_type.model_swap_meth is ModelSwapMeth.SETMODEL
             and not pair.use_rusty_version(bounce_in_map or speed_in_map)
+            and not pair.is_superpos_ghost
         ):
             cust_model = (
                 pair.cube_type.model_color
