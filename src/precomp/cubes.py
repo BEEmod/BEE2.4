@@ -387,6 +387,7 @@ class CubeType:
         try_rusty: bool,
         model: str | None,
         model_color: str | None,
+        model_superpos_ghost: str | None,
         model_swap_meth: ModelSwapMeth,
         pack: str | list[str],
         pack_color: str | list[str],
@@ -412,6 +413,8 @@ class CubeType:
         self.model_color = model_color
         # Technique to use.
         self.model_swap_meth = model_swap_meth
+        # For superposition cubes, an alt model to use for ghosts.
+        self.model_superpos_ghost = model_superpos_ghost
 
         # List of files, or a str packlist ID.
         self.pack = pack
@@ -495,10 +498,11 @@ class CubeType:
 
         if cube_type is CubeEntType.franken:
             # Frankenturrets can't swap their model.
-            cust_model = cust_model_color = None
+            cust_model = cust_model_color = cust_model_superpos_ghost = None
         else:
             cust_model = conf['model', None]
             cust_model_color = conf['modelColor', None]
+            cust_model_superpos_ghost = conf['modelSuperpos', None]
 
         return cls(
             cube_id,
@@ -509,6 +513,7 @@ class CubeType:
             conf.bool('tryRusty'),
             cust_model,
             cust_model_color,
+            cust_model_superpos_ghost,
             model_swap_meth,
             packlist,
             packlist_color,
@@ -1584,7 +1589,7 @@ def make_cube(
         # The VScript needs to know the color, so it can reset after painting.
         ent['vscript_init_code'] = f"ghost_color <- `{rendercolor}`; ghost_alpha <- {ghost_alpha}"
 
-        ent['model'] = cust_model or DEFAULT_MODELS[cube_type.type]
+        ent['model'] = cube_type.model_superpos_ghost or cust_model or DEFAULT_MODELS[cube_type.type]
         # If in droppers, disable portal funnelling until it falls out.
         ent['AllowFunnel'] = not in_dropper
         ent['angles'] = angles
