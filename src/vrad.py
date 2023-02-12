@@ -248,7 +248,7 @@ async def main(argv: List[str]) -> None:
     if enable_packing:
         LOGGER.info('Scanning map for files to pack:')
         packlist.pack_from_bsp(bsp_file)
-        packlist.pack_fgd(bsp_file.ents, fgd)
+        packlist.pack_from_ents(bsp_file.ents, Path(path).stem, ['P2'])
         packlist.eval_dependencies()
         LOGGER.info('Done!')
 
