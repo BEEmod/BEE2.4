@@ -242,8 +242,9 @@ def get_itemconf(
 
     result: Union[str, Vec, bool, float, None]
     if isinstance(default, str) or default is None:
-        result = value
-    elif isinstance(default, Vec):
+        return value  # type: ignore
+
+    if isinstance(default, Vec):
         result = Vec.from_str(value, default.x, default.y, default.z)
     elif isinstance(default, bool):
         result = srctools.conv_bool(value, default)
@@ -254,7 +255,7 @@ def get_itemconf(
     else:
         raise TypeError(f'Invalid default type "{type(default).__name__}"!')
 
-    assert result is None or type(result) is type(default)
+    assert type(result) is type(default), f'{default!r} -> {result!r}'
     return result  # type: ignore
 
 
