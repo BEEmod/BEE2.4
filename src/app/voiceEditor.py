@@ -437,20 +437,17 @@ def make_tab(pak_id: str, group: Keyvalues, config: ConfigFile, tab_type: TabTyp
             line_frame.columnconfigure(len(badges), weight=1)
 
             check = ttk.Checkbutton(line_frame)
+            quote_var = IntVar(value=config.get_bool(group_id, line_id, True))
             try:
                 check['text'] = line['name']
             except LookupError:
-                localisation.set_text(check, TRANS_NO_NAME)
+                check['text'] = ''
 
-            check.quote_var = IntVar(
-                value=config.get_bool(group_id, line_id, True),
-            )
-
-            check['variable'] = check.quote_var
+            check['variable'] = quote_var
 
             check['command'] = functools.partial(
                 check_toggled,
-                var=check.quote_var,
+                var=quote_var,
                 config_section=config[group_id],
                 quote_id=line_id,
             )
