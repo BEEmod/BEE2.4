@@ -40,6 +40,7 @@ tkImgWidgetsT = TypeVar(
     tk.Button, ttk.Button,
     Union[tk.Button, ttk.Button],
 )
+tkImg: TypeAlias = Union[ImageTk.PhotoImage, tk.PhotoImage]
 # WeakRef is only generic in stubs!
 WidgetWeakRef: TypeAlias = Union[
     'WeakRef[tk.Label]', 'WeakRef[ttk.Label]',
