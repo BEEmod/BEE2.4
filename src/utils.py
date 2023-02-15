@@ -7,7 +7,6 @@ from typing import (
     SupportsInt, Callable, Sequence, Iterator, Iterable, Mapping, Generator, Type,
     KeysView, ValuesView, ItemsView, overload,
 )
-from typing_extensions import TypeVarTuple, Unpack
 import logging
 import os
 import stat
