@@ -11,6 +11,7 @@
 ### UCP-Relevant Enhancements:
 * Added an `Inherit` option to Corridor Groups. This specifies the ID of another style, causing all
   corridors to be copied from that other style.
+* Make `addOverlay` properly permit options to use `$fixup` variables.
 
 ### Bugfixes:
 * Properly pick free port for error server.

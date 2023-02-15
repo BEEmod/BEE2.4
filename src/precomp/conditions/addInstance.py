@@ -94,20 +94,21 @@ def res_add_overlay_inst(vmf: VMF, inst: Entity, res: Keyvalues) -> Optional[Ent
         ])
 
     if 'angles' in res:
-        angles = Angle.from_str(res['angles'])
+        angles = Angle.from_str(inst.fixup.substitute(res['angles']))
         if 'rotation' in res:
             LOGGER.warning('"angles" option overrides "rotation"!')
     else:
-        angles = Angle.from_str(res['rotation', '0 0 0'])
+        angles = Angle.from_str(inst.fixup.substitute(res['rotation', '0 0 0']))
         angles @= Angle.from_str(inst['angles', '0 0 0'])
 
-    orig_name = conditions.resolve_value(inst, res['file', ''])
-    filename = instanceLocs.resolve_one(orig_name, error=True)
+    orig_name = res['file', '']
+    filename = instanceLocs.resolve_one(inst.fixup.substitute(orig_name), error=True)
 
     if not filename:
-        if not res.bool('silentLookup'):
+        # Don't show an error if it's being read from a fixup.
+        if not res.bool('silentLookup') and not orig_name.startswith('$'):
             LOGGER.warning('Bad filename for "{}" when adding overlay!', orig_name)
-        # Don't bother making a overlay which will be deleted.
+        # Don't bother making an overlay instance which will be deleted.
         return None
 
     overlay_inst = conditions.add_inst(
@@ -119,7 +120,7 @@ def res_add_overlay_inst(vmf: VMF, inst: Entity, res: Keyvalues) -> Optional[Ent
         fixup_style=res.int('fixup_style'),
     )
     # Don't run if the fixup block exists..
-    if srctools.conv_bool(res['copy_fixup', '1']):
+    if srctools.conv_bool(inst.fixup.substitute(res['copy_fixup', '1'])):
         if 'fixup' not in res and 'localfixup' not in res:
             # Copy the fixup values across from the original instance
             for fixup, value in inst.fixup.items():
