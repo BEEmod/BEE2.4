@@ -10,7 +10,7 @@ from typing import (
     Awaitable, Generic, Iterable, overload, cast, Any, TypeVar, Protocol, Union, Callable, Optional,
     Tuple, Literal,
 )
-from typing_extensions import TypeAlias, Unpack, TypeVarTuple
+from typing_extensions import TypeAlias
 
 from tkinter import ttk
 from tkinter import font as _tk_font
@@ -33,7 +33,6 @@ from transtoken import TransToken
 # Set icons for the application.
 
 ICO_PATH = str(utils.install_path('BEE2.ico'))
-PosArgsT = TypeVarTuple('PosArgsT')
 T = TypeVar('T')
 
 if utils.WIN:
@@ -234,10 +233,53 @@ async def wait_eventloop() -> None:
     await _cur_update.wait()
 
 
+# TODO: TypeVarTuple support in mypy
+# PosArgsT = TypeVarTuple('PosArgsT')
+# def bind_mousewheel(
+#     widgets: Union[Iterable[tk.Misc], tk.Misc],
+#     func: Callable[[int, Unpack[PosArgsT]], object],
+#     args: Tuple[Unpack[PosArgsT]] = (),
+# ) -> None:
+T1 = TypeVar('T1')
+T2 = TypeVar('T2')
+T3 = TypeVar('T3')
+T4 = TypeVar('T4')
+T5 = TypeVar('T5')
+
+
+@overload
 def bind_mousewheel(
     widgets: Union[Iterable[tk.Misc], tk.Misc],
-    func: Callable[[int, Unpack[PosArgsT]], object],
-    args: Tuple[Unpack[PosArgsT]] = (),
+    func: Callable[[int], object], args: Tuple[()]=...,
+) -> None: ...
+@overload
+def bind_mousewheel(
+    widgets: Union[Iterable[tk.Misc], tk.Misc],
+    func: Callable[[int, T1], object], args: Tuple[T1],
+) -> None: ...
+@overload
+def bind_mousewheel(
+    widgets: Union[Iterable[tk.Misc], tk.Misc],
+    func: Callable[[int, T1, T2], object], args: Tuple[T1, T2],
+) -> None: ...
+@overload
+def bind_mousewheel(
+    widgets: Union[Iterable[tk.Misc], tk.Misc],
+    func: Callable[[int, T1, T2, T3], object], args: Tuple[T1, T2, T3],
+) -> None: ...
+@overload
+def bind_mousewheel(
+    widgets: Union[Iterable[tk.Misc], tk.Misc],
+    func: Callable[[int, T1, T2, T3, T4], object], args: Tuple[T1, T2, T3, T4],
+) -> None: ...
+@overload
+def bind_mousewheel(
+    widgets: Union[Iterable[tk.Misc], tk.Misc],
+    func: Callable[[int, T1, T2, T3, T4, T5], object], args: Tuple[T1, T2, T3, T4, T5],
+) -> None: ...
+def bind_mousewheel(
+    widgets: Union[Iterable[tk.Misc], tk.Misc],
+    func: Callable[..., object], args: tuple = (),
 ) -> None:
     """Bind mousewheel events, which function differently on each platform.
 
