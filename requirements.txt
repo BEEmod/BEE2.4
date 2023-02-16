@@ -4,11 +4,11 @@ Pillow >= 9.4.0
 pyglet == 1.5.18
 PyInstaller >= 5.2.0
 pygtrie >= 2.4.0
-babel >= 2.9.1
+babel >= 2.11.0
 trio >= 0.22.0
 outcome >= 1.1.0  # Trio dependency
 versioningit >= 2.1.0
-srctools >= 2.3.4
+srctools >= 2.3.9
 rtree >= 0.9.7
 typing_extensions >= 4.1.1
 hypercorn>=0.14.3
