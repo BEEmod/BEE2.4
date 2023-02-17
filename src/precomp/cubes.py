@@ -1336,6 +1336,14 @@ def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
     superpos_inst = resolve_inst('<ITEM_BEE2_SUPERPOSITION_ENTANGLER>', silent=True)
     splat_inst = resolve_inst('<ITEM_PAINT_SPLAT>', silent=True)
 
+    LOGGER.info(
+        'Looking for special-cased instances for cubes:\n'
+        'Coloriser: {}\n'
+        'Superpos: {}\n'
+        'Paint Splat: {}',
+        coloriser_inst, superpos_inst, splat_inst,
+    )
+
     for inst in vmf.by_class['func_instance']:
         file = inst['file'].casefold()
 
@@ -1443,6 +1451,7 @@ def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
             real_pair.superpos = ghost_pair.superpos = Superposition(
                 real_pair, ghost_pair, inst,
             )
+            LOGGER.info('Found superposition link:\n* real = {}\n* ghost = {}', real_pair, ghost_pair)
             inst.fixup['$ghost_alpha'] = min(255, max(0, options.get(
                 int, 'superposition_ghost_alpha',
             )))
