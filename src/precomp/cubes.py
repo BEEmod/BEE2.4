@@ -624,14 +624,17 @@ class CubePair:
         return self.superpos is not None and self.superpos.real is self
 
     def __repr__(self) -> str:
-        drop_id = drop = cube = ''
-        if self.dropper:
-            drop = self.dropper['targetname']
-        if self.cube:
-            cube = self.cube['targetname']
+        drop_id = name = ''
+        if self.cube and self.dropper:
+            name = f'{self.dropper["targetname"]!r} -> {self.cube["targetname"]!r}'
+        elif self.dropper:
+            name = repr(self.dropper['targetname'])
+        elif self.cube:
+            name = repr(self.cube['targetname'])
+
         if self.drop_type:
             drop_id = f' "{self.drop_type.id}"'
-        return f'<CubePair{drop_id} -> "{self.cube_type.id}": {drop!r} -> {cube!r}, {self.tint!s}>'
+        return f'<CubePair{drop_id} -> "{self.cube_type.id}": {name}, tint={self.tint!s}>'
 
     def use_rusty_version(self, has_gel: bool) -> bool:
         """Check if we can use the rusty version.
