@@ -260,6 +260,8 @@ bee2_a = Analysis(
     datas=data_files,
     hiddenimports=[
         'PIL._tkinter_finder',
+        # Needed to unpickle the CLDR.
+        'babel.numbers',
     ],
     binaries=binaries,
     hookspath=[],
