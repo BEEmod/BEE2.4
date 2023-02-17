@@ -16,6 +16,7 @@
 ### Bugfixes:
 * Properly pick free port for error server.
 * Set a title for the corridor selector window.
+* Always pack generated resources even if packing is disabled in options.
 
 ------------------------------------------
 

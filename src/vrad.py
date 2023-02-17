@@ -244,8 +244,9 @@ async def main(argv: List[str]) -> None:
     LOGGER.info('Run transformations...')
     await run_transformations(bsp_file.ents, fsys, packlist, bsp_file, game)
 
-    enable_packing = not is_preview or config.getboolean("General", "packfile_auto_enable", True)
-    if enable_packing:
+    if '-no_pack' not in args and (
+        not is_preview or config.getboolean("General", "packfile_auto_enable", True)
+    ):
         LOGGER.info('Scanning map for files to pack:')
         packlist.pack_from_bsp(bsp_file)
         packlist.pack_from_ents(bsp_file.ents, Path(path).stem, ['P2'])
@@ -281,22 +282,21 @@ async def main(argv: List[str]) -> None:
     else:
         dump_loc = None
 
-    if '-no_pack' not in args and enable_packing:
-        # Cubemap files packed into the map already.
-        existing = set(bsp_file.pakfile.namelist())
+    # Cubemap files packed into the map already.
+    existing = set(bsp_file.pakfile.namelist())
 
-        LOGGER.info('Writing to BSP...')
-        packlist.pack_into_zip(
-            bsp_file,
-            ignore_vpk=True,
-            whitelist=pack_whitelist,
-            blacklist=pack_blacklist,
-            dump_loc=dump_loc,
-        )
+    LOGGER.info('Writing to BSP...')
+    packlist.pack_into_zip(
+        bsp_file,
+        ignore_vpk=True,
+        whitelist=pack_whitelist,
+        blacklist=pack_blacklist,
+        dump_loc=dump_loc,
+    )
 
-        LOGGER.info('Packed files:\n{}', '\n'.join(
-            set(bsp_file.pakfile.namelist()) - existing
-        ))
+    LOGGER.info('Packed files:\n{}', '\n'.join(
+        set(bsp_file.pakfile.namelist()) - existing
+    ))
 
     LOGGER.info('Writing BSP...')
     bsp_file.save()
