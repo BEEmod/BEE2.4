@@ -1,5 +1,7 @@
 import os
 import sys
+import shutil
+import zipfile
 from pathlib import Path
 import contextlib
 from typing import Any, Iterable, List, Optional, Tuple, Union, cast
@@ -218,13 +220,25 @@ EXCLUDES = [
 binaries = []
 if utils.WIN:
     lib_path = Path(SPECPATH, '..', 'lib-' + utils.BITNESS).absolute()
-    try:
-        for dll in lib_path.iterdir():
-            if dll.suffix == '.dll' and dll.stem.startswith(('av', 'swscale', 'swresample')):
-                binaries.append((str(dll), '.'))
-    except FileNotFoundError:
-        lib_path.mkdir(exist_ok=True)
-        pass
+    ci_zip = list(Path('libs').glob('*.zip'))
+    if ci_zip:
+        # Downloaded from releases, unpack.
+        with zipfile.ZipFile(ci_zip[0]) as zipf:
+            for info in zipf.infolist():
+                if info.filename.endswith('.dll'):
+                    dest = Path('libs', Path(info.filename).name)
+                    with zipf.open(info) as srcf, dest.open('wb') as destf:
+                        shutil.copyfileobj(srcf, destf)
+                    binaries.append((str(dest), '.'))
+    else:
+        try:
+            for dll in lib_path.iterdir():
+                if dll.suffix == '.dll' and dll.stem.startswith(('av', 'swscale', 'swresample')):
+                    binaries.append((str(dll), '.'))
+        except FileNotFoundError:  # Make the directory for the user to copy to.
+            lib_path.mkdir(exist_ok=True)
+            pass
+
     if not binaries:  # Not found.
         raise ValueError(f'FFmpeg dlls should be downloaded into "{lib_path}".')
 
