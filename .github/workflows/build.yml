@@ -24,19 +24,19 @@ jobs:
             python-version: '3.8.10'
             arch: 'x86'
             os: 'windows-latest'
-            bitness: '32bit'
+            bitness: '32'
             ffmpeg-repo: 'sudo-nautilus/FFmpeg-Builds-Win32'
           - artifact-name: 'win64'
             python-version: '3.11'
             arch: 'x64'
             os: 'windows-latest'
-            bitness: '64bit'
+            bitness: '64'
             ffmpeg-repo: 'BtbN/FFmpeg-Builds'
 #          - artifact-name: 'linux64'
 #            python-version: '3.11'
 #            arch: 'x64'
 #            os: 'ubuntu-latest'
-#            bitness: '64bit'
+#            bitness: '64'
 #            ffmpeg-repo: ''
     runs-on: ${{ matrix.os }}
     steps:
@@ -80,14 +80,14 @@ jobs:
           repository: ${{ matrix.ffmpeg-repo }}
           latest: true
 
-          fileName: "ffmpeg-master-latest-${{ matrix.bitness }}-lgpl-shared.zip"
+          fileName: "ffmpeg-master-latest-win${{ matrix.bitness }}-lgpl-shared.zip"
           out-file-path: "libs"
 
       - name: Freeze compiler
-        run: python -m PyInstaller --distpath ../dist/${{ matrix.bitness }} -y compiler.spec
+        run: python -m PyInstaller --distpath "../dist/${{ matrix.bitness }}bit/" -y compiler.spec
         working-directory: ./src/
       - name: Freeze application
-        run: python -m PyInstaller --distpath ../dist/${{ matrix.bitness }} -y BEE2.spec
+        run: python -m PyInstaller --distpath "../dist/${{ matrix.bitness }}bit/" -y BEE2.spec
         working-directory: ./src/
 
       - name: Artifact upload (tag)
@@ -95,7 +95,7 @@ jobs:
         if: github.event_name == 'create'
         with:
           name: beemod2_${{ github.event.ref }}_${{ matrix.artifact-name }}
-          path: ./dist/${{ matrix.bitness }}/BEE2/
+          path: ./dist/${{ matrix.bitness }}bit/BEE2/
           if-no-files-found: error
 
       - name: Artifact upload (hash)
@@ -103,5 +103,5 @@ jobs:
         if: github.event_name != 'create'
         with:
           name: beemod2_${{ github.sha }}_${{ matrix.artifact-name }}
-          path: ./dist/${{ matrix.bitness }}/BEE2/
+          path: ./dist/${{ matrix.bitness }}bit/BEE2/
           if-no-files-found: error
