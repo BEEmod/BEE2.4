@@ -1,13 +1,13 @@
 """Defines the palette data structure and file saving/loading logic."""
 from __future__ import annotations
-from typing import Final, IO, Iterator, Dict, Tuple, cast
+from typing import IO, Iterator, Dict, Tuple, cast
 from collections.abc import Sequence
 import os
 import shutil
 import zipfile
 import random
 import io
-from typing_extensions import TypeAlias, TypeGuard, Literal
+from typing_extensions import TypeAlias, TypeGuard, Literal, Final
 from uuid import UUID, uuid4, uuid5
 
 import srctools.logger
@@ -21,8 +21,9 @@ import utils
 
 LOGGER = srctools.logger.get_logger(__name__)
 PAL_DIR = utils.conf_location('palettes/')
-GROUP_BUILTIN = '<BUILTIN>'
-PAL_EXT = '.bee2_palette'
+GROUP_BUILTIN: Final = '<BUILTIN>'
+PAL_EXT: Final = '.bee2_palette'
+CUR_VERSION: Final = 3
 
 HorizInd: TypeAlias = Literal[0, 1, 2, 3]
 VertInd: TypeAlias = Literal[0, 1, 2, 3, 4, 5, 6, 7]
@@ -297,8 +298,9 @@ class Palette:
 
         items: ItemPos = {}
 
-        if version == 2:
-            for item_prop in props.find_children('Items'):
+        # v2 reused the Items key, v3 restores a copy of the old block for backward compat.
+        if version in (2, 3):
+            for item_prop in props.find_children('Positions' if version == 3 else 'Items'):
                 try:
                     x_str, y_str = item_prop.name.split()
                     x = int(x_str)
@@ -316,13 +318,15 @@ class Palette:
                 items[x, y] = (item_id, item_prop.int('subtype', 0))
 
         elif version == 1:
-            needs_save = True
             for pos, item in zip(COORDS, props.find_children('Items')):
                 items[pos] = (item.real_name, int(item.value))
         elif version < 1:
             raise ValueError(f'Invalid version {version}!')
         else:
             raise FutureVersionError(version)
+
+        if version != CUR_VERSION:
+            needs_save = True
 
         trans_name = props['TransName', '']
         if trans_name:
@@ -368,23 +372,32 @@ class Palette:
         versions). Otherwise, those palettes always create a new file.
         """
         LOGGER.info('Saving "{}"!', self.name)
-        item_kv = Keyvalues('Items', [])
+        item_kv = Keyvalues('Positions', [])
+        # Still support v1 app, by writing them out as the original block.
+        legacy_kv = Keyvalues('Items', [])
         kv = Keyvalues.root(
             Keyvalues('Name', 'name'),
-            Keyvalues('Version', '2'),
+            Keyvalues('Version', str(CUR_VERSION)),
             Keyvalues('TransName', 'trans_name'),
             Keyvalues('Group', self.group),
             Keyvalues('ReadOnly', srctools.bool_as_int(self.readonly)),
             Keyvalues('UUID', self.uuid.hex),
             item_kv,
+            legacy_kv,
         )
-        for (x, y), (item_id, subtype) in self.items.items():
-            item_kv.append(Keyvalues(f'{x} {y}', [
-                Keyvalues('id', item_id),
-                Keyvalues('subtype', str(subtype)),
-            ]))
+        for (x, y) in COORDS:
+            try:
+                item_id, subtype = self.items[x, y]
+            except KeyError:
+                pass
+            else:
+                item_kv.append(Keyvalues(f'{x} {y}', [
+                    Keyvalues('id', item_id),
+                    Keyvalues('subtype', str(subtype)),
+                ]))
+                legacy_kv.append(Keyvalues(item_id, str(subtype)))
 
-        # If default, don't include in the palette file.
+        # If defaulted, don't include in the palette file.
         # Remove the translated name, in case it's not going to write
         # properly to the file.
         if self.trans_name:
