@@ -74,7 +74,7 @@ jobs:
           python -m pip install -U setuptools pip wheel
           python -m pip install -r requirements.txt
       - name: Download FFmpeg
-        if: ${{ inputs.ffpmegRepo }}
+        if: ${{ inputs.ffmpegRepo }}
         uses: robinraju/release-downloader@v1.7
         with:
           repository: ${{ inputs.ffmpegRepo }}
