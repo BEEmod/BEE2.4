@@ -219,14 +219,15 @@ EXCLUDES = [
 
 binaries = []
 if utils.WIN:
-    lib_path = Path(SPECPATH, '..', 'lib-' + utils.BITNESS).absolute()
-    ci_zip = list(Path(SPECPATH, '..', 'libs').glob('*.zip'))
+    lib_path = Path(SPECPATH, '..', 'lib-' + utils.BITNESS).resolve()
+    ci_folder = Path(SPECPATH, '..', 'libs').resolve()
+    ci_zip = list(ci_folder.glob('*.zip'))
     if ci_zip:
         # Downloaded from releases, unpack.
         with zipfile.ZipFile(ci_zip[0]) as zipf:
             for info in zipf.infolist():
                 if info.filename.endswith('.dll'):
-                    dest = Path('libs', Path(info.filename).name)
+                    dest = Path(ci_folder, Path(info.filename).name).resolve()
                     with zipf.open(info) as srcf, dest.open('wb') as destf:
                         shutil.copyfileobj(srcf, destf)
                     binaries.append((str(dest), '.'))
