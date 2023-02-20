@@ -25,19 +25,19 @@ jobs:
             arch: 'x86'
             os: 'windows-latest'
             bitness: '32bit'
-            ffmpegRepo: 'sudo-nautilus/FFmpeg-Builds-Win32'
+            ffmpeg-repo: 'sudo-nautilus/FFmpeg-Builds-Win32'
           - artifact-name: 'win64'
             python-version: '3.11'
             arch: 'x64'
             os: 'windows-latest'
             bitness: '64bit'
-            ffmpegRepo: 'BtbN/FFmpeg-Builds'
+            ffmpeg-repo: 'BtbN/FFmpeg-Builds'
 #          - artifact-name: 'linux64'
 #            python-version: '3.11'
 #            arch: 'x64'
 #            os: 'ubuntu-latest'
 #            bitness: '64bit'
-#            ffmpegRepo: ''
+#            ffmpeg-repo: ''
     runs-on: ${{ matrix.os }}
     steps:
       # Use the tag if created there, dev each week, or what's specified when done manually.
@@ -74,10 +74,10 @@ jobs:
           python -m pip install -U setuptools pip wheel
           python -m pip install -r requirements.txt
       - name: Download FFmpeg
-        if: ${{ inputs.ffmpegRepo }}
+        if: ${{ inputs.ffmpeg-repo }}
         uses: robinraju/release-downloader@v1.7
         with:
-          repository: ${{ inputs.ffmpegRepo }}
+          repository: ${{ inputs.ffmpeg-repo }}
           latest: true
 
           fileName: "ffmpeg-master-latest-${{ inputs.bitness }}-lgpl-shared.zip"
