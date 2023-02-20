@@ -1,0 +1,92 @@
+name: Freeze Application
+on:
+  schedule:
+    - cron: '47 9 * * THUR' # Run at 9:47 (7:47pm local) on Thursday
+  create:
+    ref_type: 'tag'
+  workflow_dispatch:
+    # Allow triggering manually whenever it's useful.
+    inputs:
+      source:
+        description: 'Branch/Tag'
+        required: true
+        default: 'dev'
+        type: string
+
+jobs:
+  freeze:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # We want 3.8 because it works on Windows 7.
+          - artifact-name: 'win32'
+            python-version: '3.8.10'
+            arch: 'x86'
+            os: 'windows-latest'
+          - artifact-name: 'win64'
+            python-version: '3.11'
+            arch: 'x64'
+            os: 'windows-latest'
+          - artifact-name: 'linux64'
+            python-version: '3.11'
+            arch: 'x64'
+            os: 'ubuntu-latest'
+    runs-on: ${{ matrix.os }}
+    steps:
+      # Use the tag if created there, dev each week, or what's specified when done manually.
+      - name: Checkout tag
+        if: github.event_name == 'create'
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          submodules: true
+      - name: Checkout dev
+        if: github.event_name == 'schedule'
+        uses: actions/checkout@v3
+        with:
+          ref: 'dev'
+          fetch-depth: 0
+          submodules: true
+      - name: Checkout reference
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ inputs.source }}
+          fetch-depth: 0
+          submodules: true
+
+      - name: Set up Python ${{ matrix.python-version }}-${{ matrix.arch }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+          architecture: ${{ matrix.arch }}
+          cache: 'pip'
+          cache-dependency-path: 'requirements.txt'
+      - name: Install dependencies
+        run: |
+          python -m pip install -U setuptools pip wheel
+          python -m pip install -r requirements.txt
+
+      - name: Freeze compiler
+        run: python -m PyInstaller --distpath . -y compiler.spec
+        working-directory: ./src/
+      - name: Freeze application
+        run: python -m PyInstaller --distpath ../build/ -y BEE2.spec
+        working-directory: ./src/
+
+      - name: Artifact upload (tag)
+        uses: actions/upload-artifact@v3
+        if: github.event_name == 'create'
+        with:
+          name: beemod2_${{ github.event.ref }}_${{ matrix.artifact-name }}
+          path: ./build/
+          if-no-files-found: error
+
+      - name: Artifact upload (hash)
+        uses: actions/upload-artifact@v3
+        if: github.event_name != 'create'
+        with:
+          name: beemod2_${{ github.sha }}_${{ matrix.artifact-name }}
+          path: ./build/BEE2/
+          if-no-files-found: error
