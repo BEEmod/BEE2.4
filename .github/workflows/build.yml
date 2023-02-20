@@ -74,13 +74,13 @@ jobs:
           python -m pip install -U setuptools pip wheel
           python -m pip install -r requirements.txt
       - name: Download FFmpeg
-        if: ${{ inputs.ffmpeg-repo }}
+        if: ${{ matrix.ffmpeg-repo }}
         uses: robinraju/release-downloader@v1.7
         with:
-          repository: ${{ inputs.ffmpeg-repo }}
+          repository: ${{ matrix.ffmpeg-repo }}
           latest: true
 
-          fileName: "ffmpeg-master-latest-${{ inputs.bitness }}-lgpl-shared.zip"
+          fileName: "ffmpeg-master-latest-${{ matrix.bitness }}-lgpl-shared.zip"
           out-file-path: "libs"
 
       - name: Freeze compiler
