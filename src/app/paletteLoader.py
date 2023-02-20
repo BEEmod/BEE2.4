@@ -230,6 +230,13 @@ def validate_y(y: int) -> TypeGuard[VertInd]:
     return y in VERT
 
 
+class FutureVersionError(Exception):
+    """Raised if a palette is from a future version."""
+    def __init__(self, version: int) -> None:
+        super().__init__(f'Unknown version {version}!')
+        self.version = version
+
+
 class Palette:
     """A palette, saving an arrangement of items for editoritems.txt"""
     def __init__(
@@ -312,8 +319,10 @@ class Palette:
             needs_save = True
             for pos, item in zip(COORDS, props.find_children('Items')):
                 items[pos] = (item.real_name, int(item.value))
+        elif version < 1:
+            raise ValueError(f'Invalid version {version}!')
         else:
-            raise ValueError(f'Unknown version {version}!')
+            raise FutureVersionError(version)
 
         trans_name = props['TransName', '']
         if trans_name:
@@ -452,6 +461,8 @@ def load_palettes() -> Iterator[Palette]:
                     # We don't need the traceback, this isn't an error in the app
                     # itself.
                     LOGGER.warning('Could not parse palette file, skipping:\n{}', exc)
+                except FutureVersionError as fut:
+                    LOGGER.warning('Palette file "{}" using future version {}, skipping...',  name, fut.version)
                 continue
             elif name.endswith('.zip'):
                 # Extract from a zip
