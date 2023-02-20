@@ -1,7 +1,7 @@
 name: Freeze Application
 on:
   schedule:
-    - cron: '47 9 * * THUR' # Run at 9:47 (7:47pm local) on Thursday
+    - cron: '47 9 * * THU' # Run at 9:47 (7:47pm local) on Thursday
   create:
     ref_type: 'tag'
   workflow_dispatch:
