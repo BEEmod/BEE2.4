@@ -25,16 +25,19 @@ jobs:
             arch: 'x86'
             os: 'windows-latest'
             bitness: '32bit'
+            ffpmegRepo: 'sudo-nautilus/FFmpeg-Builds-Win32'
           - artifact-name: 'win64'
             python-version: '3.11'
             arch: 'x64'
             os: 'windows-latest'
             bitness: '64bit'
+            ffpmegRepo: 'BtbN/FFmpeg-Builds'
           - artifact-name: 'linux64'
             python-version: '3.11'
             arch: 'x64'
             os: 'ubuntu-latest'
             bitness: '64bit'
+            ffpmegRepo: ''
     runs-on: ${{ matrix.os }}
     steps:
       # Use the tag if created there, dev each week, or what's specified when done manually.
@@ -70,6 +73,15 @@ jobs:
         run: |
           python -m pip install -U setuptools pip wheel
           python -m pip install -r requirements.txt
+      - name: Download FFmpeg
+        if: ${{ inputs.ffpmegRepo }}
+        uses: robinraju/release-downloader@v1.7
+        with:
+          repository: ${{ inputs.ffmpegRepo }}
+          latest: true
+
+          fileName: "ffmpeg-master-latest-${{ inputs.bitness }}-lgpl-shared.zip"
+          out-file-path: "libs"
 
       - name: Freeze compiler
         run: python -m PyInstaller --distpath ../dist/${{ matrix.bitness }} -y compiler.spec
