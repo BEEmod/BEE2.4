@@ -118,7 +118,7 @@ def do_localisation() -> None:
 def build_fgd() -> None:
     """Export out a copy of the srctools-specific FGD data."""
     sys.path.append(str(hammeraddons))
-    print('Loading FGD database...')
+    print('Loading FGD database. path=', sys.path)
     from hammeraddons import unify_fgd, __version__ as version
     database, base_ent = unify_fgd.load_database(hammeraddons / 'fgd')
 
