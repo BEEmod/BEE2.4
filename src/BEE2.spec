@@ -220,7 +220,7 @@ EXCLUDES = [
 binaries = []
 if utils.WIN:
     lib_path = Path(SPECPATH, '..', 'lib-' + utils.BITNESS).absolute()
-    ci_zip = list(Path('libs').glob('*.zip'))
+    ci_zip = list(Path(SPECPATH, '..', 'libs').glob('*.zip'))
     if ci_zip:
         # Downloaded from releases, unpack.
         with zipfile.ZipFile(ci_zip[0]) as zipf:
