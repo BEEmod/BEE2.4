@@ -287,6 +287,16 @@ TOK_BARRIER_HOLE_MISPLACED = TransToken.ui(
     'it while keeping the hole in the same position.'
 )
 
+TOK_CHAINING_MULTI_INPUT = TransToken.ui(
+    'A chain of items has multiple inputs to a single item. The chain should form a single '
+    'path, not have branches.'
+)
+
+TOK_CHAINING_MULTI_OUTPUT = TransToken.ui(
+    'A chain of items has multiple outputs from a single item. The chain should form a '
+    'single path, not have branches.'
+)
+
 TOK_SENDTOR_BAD_OUTPUT = TransToken.ui(
     'A Sendificator was connected to an item which is not a Discouragement Beam Emitter '
     '(<var>{out_item}</var>). The output connection is used to specify the emitter that cubes will '

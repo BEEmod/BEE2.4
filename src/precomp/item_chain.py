@@ -10,6 +10,7 @@ import attrs
 
 from precomp import connections
 from precomp.connections import Item
+import user_errors
 
 __all__ = ['Node', 'chain']
 ConfT = TypeVar('ConfT')
@@ -46,7 +47,7 @@ class Node(Generic[ConfT]):
         try:
             return Node(connections.ITEMS[name], conf)
         except KeyError:
-            raise ValueError('No item for "{}"?'.format(name)) from None
+            raise ValueError(f'No item for "{name}"?') from None
 
 
 def chain(
@@ -73,11 +74,32 @@ def chain(
                 # Not one of our instances - fine, it's just actual IO.
                 continue
             conn.remove()
-            # TODO: Render the node points.
             if node.next is not None:
-                raise ValueError(f'Item "{node.item.name}" links to multiple output items!')
+                raise user_errors.UserError(
+                    user_errors.TOK_CHAINING_MULTI_OUTPUT,
+                    points=[
+                        node.pos,
+                        node.next.pos,
+                        next_node.pos,
+                    ],
+                    lines=[
+                        (node.pos, node.next.pos),
+                        (node.pos, next_node.pos),
+                    ],
+                )
             if next_node.prev is not None:
-                raise ValueError(f'Item "{next_node.item.name}" links to multiple input items!')
+                raise user_errors.UserError(
+                    user_errors.TOK_CHAINING_MULTI_INPUT,
+                    points=[
+                        node.pos,
+                        next_node.prev.pos,
+                        next_node.pos,
+                    ],
+                    lines=[
+                        (node.pos, next_node.pos),
+                        (next_node.prev.pos, next_node.pos),
+                    ],
+                )
             node.next = next_node
             next_node.prev = node
 
