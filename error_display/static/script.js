@@ -87,6 +87,7 @@ window.addEventListener("load", () => {
 			color: 0xFAFA28, transparent: true, opacity: 0.5, side: THREE.DoubleSide,
 		});
 		const pointfile_mat = new THREE.LineBasicMaterial({color: 0xFF0000});
+		const lines_mat = new THREE.LineBasicMaterial({color: 0x00FFFF});
 
 		scene.add( new THREE.AmbientLight( 0x888888 ) );
 		const lighting = new THREE.DirectionalLight( 0xffffff, 0.5 );
@@ -161,6 +162,16 @@ window.addEventListener("load", () => {
 				point => new THREE.Vector3(point[0], point[1], point[2])
 			));
 			scene.add(new THREE.Line(geo, pointfile_mat));
+		}
+
+		if (data.lines) {
+			const geo = new THREE.BufferGeometry().setFromPoints(data.lines.flatMap(
+				pair => [
+					new THREE.Vector3(pair[0][0], pair[0][1], pair[0][2]),
+					new THREE.Vector3(pair[1][0], pair[1][1], pair[1][2]),
+				]
+			));
+			scene.add(new THREE.LineSegments(geo, lines_mat));
 		}
 
 		if (data.barrier_hole) {

@@ -68,6 +68,7 @@ async def route_render_data() -> dict:
         'voxels': current_error.voxels,
         'points': current_error.points,
         'leak': current_error.leakpoints,
+        'lines': current_error.lines,
         'barrier_hole': current_error.barrier_hole,
     }
 

@@ -6,6 +6,7 @@ from typing import (
     ClassVar, Collection, Dict, Iterable, List, Literal, Optional, Tuple, TypedDict,
     Union,
 )
+from typing_extensions import TypeAlias
 from pathlib import Path
 
 from srctools import logger, FrozenVec, Vec
@@ -15,18 +16,19 @@ from transtoken import TransToken
 import utils
 
 
-Kind = Literal["white", "black", "goo", "goopartial", "goofull", "back", "glass", "grating"]
+Kind: TypeAlias = Literal["white", "black", "goo", "goopartial", "goofull", "back", "glass", "grating"]
+TuplePos: TypeAlias = Tuple[float, float, float]
 
 
 class SimpleTile(TypedDict):
     """A super simplified version of tiledef data for the error window. This can be converted right to JSON."""
-    position: Tuple[float, float, float]
+    position: TuplePos
     orient: Literal["n", "s", "e", "w", "u", "d"]
 
 
 class BarrierHole(TypedDict):
     """Information for improperly placed glass/grating hole items."""
-    pos: Tuple[float, float, float]
+    pos: TuplePos
     axis: Literal["x", "y", "z"]
     large: bool
     small: bool
@@ -42,11 +44,13 @@ class ErrorInfo:
     context: str = ''
     faces: Dict[Kind, List[SimpleTile]] = attrs.Factory(dict)
     # Voxels of interest in the map.
-    voxels: List[Tuple[float, float, float]] = attrs.Factory(list)
+    voxels: List[TuplePos] = attrs.Factory(list)
     # Points of interest in the map.
-    points: List[Tuple[float, float, float]] = attrs.Factory(list)
+    points: List[TuplePos] = attrs.Factory(list)
     # Special list of locations forming a pointfile line.
-    leakpoints: List[Tuple[float, float, float]] = attrs.Factory(list)
+    leakpoints: List[TuplePos] = attrs.Factory(list)
+    # A list of point pairs which get lines drawn.
+    lines: List[Tuple[TuplePos, TuplePos]] = attrs.Factory(list)
     # If a glass/grating hole is misplaced, show its location.
     barrier_hole: Optional[BarrierHole] = None
 
@@ -62,7 +66,7 @@ DATA_LOC = utils.conf_location('compile_error.pickle')
 SERVER_INFO_FILE = utils.conf_location('error_server_info.json')
 
 
-def to_threespace(vec: Union[Vec, FrozenVec]) -> Tuple[float, float, float]:
+def to_threespace(vec: Union[Vec, FrozenVec]) -> TuplePos:
     """Convert a vector to the conventions THREE.js uses."""
     return (
         vec.x / 128.0,
@@ -88,6 +92,7 @@ class UserError(BaseException):
         points: Iterable[Union[Vec, FrozenVec]]=(),
         textlist: Collection[str]=(),
         leakpoints: Collection[Union[Vec, FrozenVec]]=(),
+        lines: Iterable[Tuple[Union[Vec, FrozenVec], Union[Vec, FrozenVec]]]=(),
         barrier_hole: Optional[BarrierHole]=None,
     ) -> None:
         """Specify the info to show to the user.
@@ -100,6 +105,7 @@ class UserError(BaseException):
         :param docsurl: If specified, adds a link to relevant documentation.
         :param textlist: If specified, adds the specified strings as a bulleted list.
         :param leakpoints: Specifies pointfile locations to display a leak.
+        :param lines: A list of point pairs which get lines drawn.
         :param barrier_hole: If set, an errored glass/grating hole to place.
         """
         if utils.DEV_MODE:
@@ -138,6 +144,7 @@ class UserError(BaseException):
             voxels=list(map(to_threespace, voxels)),
             points=list(map(to_threespace, points)),
             leakpoints=list(map(to_threespace, leakpoints)),
+            lines=[(to_threespace(a), to_threespace(b)) for a, b in lines],
             barrier_hole=barrier_hole,
         )
 
