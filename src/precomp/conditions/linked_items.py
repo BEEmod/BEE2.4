@@ -2,6 +2,7 @@
 from __future__ import annotations
 from typing import Optional, Callable
 from enum import Enum
+import itertools
 import math
 
 import attrs
@@ -23,7 +24,7 @@ class AntlineHandling(Enum):
     MOVE = 'move'
 
 
-@attrs.define
+@attrs.define(kw_only=True)
 class Config:
     """Configuration for linked items."""
     group: str  # For reporting.
@@ -33,8 +34,12 @@ class Config:
     logic_loop: Optional[str]
 
     antline: AntlineHandling
-    allow_loop: bool
     transfer_io: bool
+
+    allow_start: bool
+    allow_mid: bool
+    allow_end: bool
+    allow_loop: bool
 
     # Special feature for unstationary scaffolds. This is rotated to face
     # the next track!
@@ -70,26 +75,29 @@ def res_linked_item(res: Keyvalues) -> Callable[[Entity], None]:
     for an example usage.
 
     Parameters:
-    * Group: Should be set to a unique name. All calls with this name can be
+    * `Group`: Should be set to a unique name. All calls with this name can be
       linked together. If not used, only this specific result call will link.
-    * AllowLoop: If true, allow constructing a loop of items. In this situation, the
+    * `AllowLoop`: If true, allow constructing a loop of items. In this situation, the
       indexes will start at some item at random, and proceed around. The last will then
       link to the first.
-    * TransferIO: If true (default), all inputs and outputs are transferred to the first
+    * `AllowStart`, `AllowEnd`, `AllowMid`: If false, disallows this item to be used in this role.
+      This defaults to true.
+    * `TransferIO`: If true (default), all inputs and outputs are transferred to the first
       item (index = 1). This instance can then forward the results to the other items in the group.
-    * StartLogic/MidLogic/EndLogic/LoopLogic: These instances will be overlaid on the
+    * `StartLogic`/`MidLogic`/`EndLogic`/`LoopLogic`: These instances will be overlaid on the
       instance, depending on whether it starts/ends or is in the middle of the
-      path. If the item loops, all use LoopLogic.
-    * Antlines: Controls what happens to antlines linking between the items.
+      path. If the item loops, all use LoopLogic. If `MidLogic` is not specified, an error is
+      produced if the chain is longer than 2 items.
+    * `Antlines`: Controls what happens to antlines linking between the items.
       If one of the items outputs to a non-linked item, those antlines must be
       kept. Three behaviours are available:
       * `remove` (default): Completely remove the antlines.
       * `keep`: Leave them untouched.
       * `move`: Move them all to the first item.
-    * EndcapInst: Special instance for Unstationary Scaffolds. If the item is
+    * `EndcapInst`: Special instance for Unstationary Scaffolds. If the item is
       facing upwards, and is the end for a mostly horizontal beam it is switched
       to this instance, and rotated to face towards the previous track.
-    * endcap_free_rotate: If true, the endcap can point in any angle, otherwise
+    * `endcap_free_rotate`: If true, the endcap can point in any angle, otherwise
       it points in the nearest 90-degree angle.
     """
     try:
@@ -119,6 +127,9 @@ def res_linked_item(res: Keyvalues) -> Callable[[Entity], None]:
         logic_end=resolve_optional(res, 'endLogic'),
         logic_loop=resolve_optional(res, 'loopLogic'),
         allow_loop=res.bool('allowLoop'),
+        allow_start=res.bool('allowStart', True),
+        allow_mid=res.bool('allowMid', True),
+        allow_end=res.bool('allowEnd', True),
         transfer_io=res.bool('transferIO', True),
         antline=antline,
         scaff_endcap=resolve_optional(res, 'EndcapInst'),
@@ -143,6 +154,10 @@ def link_item(vmf: VMF, group: list[item_chain.Node[Config]]) -> None:
     """Link together a single group of items."""
     chains = item_chain.chain(group, allow_loop=True)
     for group_counter, node_list in enumerate(chains):
+        if len(node_list) <= 1:
+            # Single or no links, ignore.
+            # TODO: Should this raise an error?
+            continue
         is_looped = False
         if node_list[0].prev is not None:  # It's looped, check if it's allowed.
             if not all(node.conf.allow_loop for node in node_list):
@@ -156,6 +171,24 @@ def link_item(vmf: VMF, group: list[item_chain.Node[Config]]) -> None:
                 )
             else:
                 is_looped = True
+        # Check nodes are in allowed locations.
+        banned_points = [not node.conf.allow_mid for node in node_list[1:-1]]
+        banned_points.insert(0, not node_list[0].conf.allow_start)
+        banned_points.append(not node_list[-1].conf.allow_end)
+        if any(banned_points):
+            raise user_errors.UserError(
+                user_errors.TOK_CHAINING_INVALID_KIND,
+                # Only highlight nodes that are wrong. The others are indicated by the lines.
+                points=[
+                    node.pos for node in
+                    itertools.compress(node_list, banned_points)
+                ],
+                lines=[
+                    (a.pos, b.pos) for a, b in
+                    zip(node_list, node_list[1:])
+                ],
+            )
+
         for index, node in enumerate(node_list):
             conf = node.conf
             is_floor = node.orient.up().z > 0.99

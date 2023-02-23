@@ -302,6 +302,11 @@ TOK_CHAINING_LOOP = TransToken.ui(
     'support a loop. Break the connection at some point.'
 )
 
+TOK_CHAINING_INVALID_KIND = TransToken.ui(
+    'The highlighted items in this chain do not support being linked together in this '
+    'fashion. Check the order of connections.'
+)
+
 TOK_SENDTOR_BAD_OUTPUT = TransToken.ui(
     'A Sendificator was connected to an item which is not a Discouragement Beam Emitter '
     '(<var>{out_item}</var>). The output connection is used to specify the emitter that cubes will '
