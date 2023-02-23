@@ -1,6 +1,6 @@
 """Manages reading general options from vbsp_config."""
 import math
-from enum import Enum, EnumMeta
+from enum import Enum
 
 import inspect
 
@@ -172,8 +172,8 @@ def get(expected_type: Union[Type[OptionT], Type[EnumT]], name: str) -> Union[Op
     if val is None:
         return None
 
-    if isinstance(expected_type, EnumMeta):
-        enum_type = expected_type
+    if issubclass(expected_type, Enum):
+        enum_type: Type[EnumT] = expected_type  # type: ignore
         if not isinstance(val, str):
             raise ValueError(
                 f'Option "{name}" is {val!r} which is a {type(val)} (expected a string)'
@@ -189,7 +189,7 @@ def get(expected_type: Union[Type[OptionT], Type[EnumT]], name: str) -> Union[Op
                 '\n'.join([mem.value for mem in enum_type])
             )
             # EnumT isn't iterable...
-            return next(iter(cast('Iterable[EnumT]', enum_type)))
+            return next(iter(cast(Iterable[EnumT], enum_type)))
 
     # Don't allow subclasses (bool/int)
     if type(val) is not expected_type:
