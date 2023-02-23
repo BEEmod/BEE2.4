@@ -297,6 +297,11 @@ TOK_CHAINING_MULTI_OUTPUT = TransToken.ui(
     'single path, not have branches.'
 )
 
+TOK_CHAINING_LOOP = TransToken.ui(
+    'A chain of items has been constructed with a loop, but this type of item does not '
+    'support a loop. Break the connection at some point.'
+)
+
 TOK_SENDTOR_BAD_OUTPUT = TransToken.ui(
     'A Sendificator was connected to an item which is not a Discouragement Beam Emitter '
     '(<var>{out_item}</var>). The output connection is used to specify the emitter that cubes will '

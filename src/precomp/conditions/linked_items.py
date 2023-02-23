@@ -9,6 +9,7 @@ from srctools import Keyvalues, VMF, Entity
 import srctools.logger
 
 from precomp import instanceLocs, item_chain, conditions
+import user_errors
 
 
 COND_MOD_NAME = 'Item Linkage'
@@ -145,8 +146,14 @@ def link_item(vmf: VMF, group: list[item_chain.Node[Config]]) -> None:
         is_looped = False
         if node_list[0].prev is not None:  # It's looped, check if it's allowed.
             if not all(node.conf.allow_loop for node in node_list):
-                LOGGER.warning('- Group is looped, but this is not allowed! Arbitarily breaking.')
-                node_list[0].prev = node_list[-1].next = None
+                raise user_errors.UserError(
+                    user_errors.TOK_CHAINING_LOOP,
+                    points=[node.pos for node in node_list],
+                    lines=[
+                        (a.pos, b.pos) for a, b in
+                        zip(node_list, [*node_list[1:], node_list[0]])
+                    ]
+                )
             else:
                 is_looped = True
         for index, node in enumerate(node_list):

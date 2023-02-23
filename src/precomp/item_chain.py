@@ -106,24 +106,36 @@ def chain(
     todo = set(nodes.values())
     while todo:
         # Grab a random node, then go backwards until we find the start.
-        # If we return back to this node, it's an infinite loop.
+        # If we return back to this node, it's an infinite loop. In that case
+        # we just pick an arbitrary node to be the "start" of the list.
         pop_node = todo.pop()
 
+        # First gather in this backwards order in case we do have a loop to error about.
+        node_list: list[Node[ConfT]] = []
         if pop_node.prev is None:
             start_node = pop_node
         else:
             start_node = pop_node.prev
             while True:
+                node_list.append(start_node)
                 if start_node.prev is None:
                     break
                 # We've looped back.
                 elif start_node is pop_node:
                     if not allow_loop:
-                        raise ValueError('Loop in linked items!')
+                        raise user_errors.UserError(
+                            user_errors.TOK_CHAINING_LOOP,
+                            points=[node.pos for node in node_list],
+                            lines=[
+                                (a.pos, b.pos) for a, b in
+                                zip(node_list, [*node_list[1:], node_list[0]])
+                            ]
+                        )
                     break
                 start_node = start_node.prev
 
-        node_list = []
+        # Now we have the start, go forwards through the chain to collect them in the right order.
+        node_list.clear()
         node = start_node
         while True:
             node_list.append(node)
@@ -131,7 +143,7 @@ def chain(
             if node.next is None:
                 break
             node = node.next
-            if node is start_node:
+            if node is start_node:  # We're looping, stop here.
                 break
 
         yield node_list
