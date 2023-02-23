@@ -281,7 +281,7 @@ def _exc_freeze(
 
 # Patch zipfile to fix an issue with it not being threadsafe.
 # See https://bugs.python.org/issue42369
-if hasattr(zipfile, '_SharedFile'):
+if sys.version_info < (3, 9) and hasattr(zipfile, '_SharedFile'):
     # noinspection PyProtectedMember
     class _SharedZipFile(zipfile._SharedFile):  # type: ignore
         def __init__(self, *args, **kwargs) -> None:
