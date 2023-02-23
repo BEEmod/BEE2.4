@@ -111,13 +111,13 @@ def chain(
         pop_node = todo.pop()
 
         # First gather in this backwards order in case we do have a loop to error about.
-        node_list: list[Node[ConfT]] = []
+        node_out: list[Node[ConfT]] = []
         if pop_node.prev is None:
             start_node = pop_node
         else:
             start_node = pop_node.prev
             while True:
-                node_list.append(start_node)
+                node_out.append(start_node)
                 if start_node.prev is None:
                     break
                 # We've looped back.
@@ -125,20 +125,20 @@ def chain(
                     if not allow_loop:
                         raise user_errors.UserError(
                             user_errors.TOK_CHAINING_LOOP,
-                            points=[node.pos for node in node_list],
+                            points=[node.pos for node in node_out],
                             lines=[
                                 (a.pos, b.pos) for a, b in
-                                zip(node_list, [*node_list[1:], node_list[0]])
+                                zip(node_out, [*node_out[1:], node_out[0]])
                             ]
                         )
                     break
                 start_node = start_node.prev
 
         # Now we have the start, go forwards through the chain to collect them in the right order.
-        node_list.clear()
+        node_out.clear()
         node = start_node
         while True:
-            node_list.append(node)
+            node_out.append(node)
             todo.discard(node)
             if node.next is None:
                 break
@@ -146,4 +146,4 @@ def chain(
             if node is start_node:  # We're looping, stop here.
                 break
 
-        yield node_list
+        yield node_out
