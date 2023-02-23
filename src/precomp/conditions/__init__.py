@@ -510,8 +510,12 @@ class CondCall(Generic[CallResultT]):
             self._setup_data = None
 
     @property
-    def __doc__(self) -> str:  # type: ignore  # object.__doc__ is not a Keyvalues.
+    def __doc__(self) -> str:
         return self.func.__doc__
+
+    @__doc__.setter
+    def __doc__(self, value: str) -> None:
+        self.func.__doc__ = value
 
     def __call__(self, coll: collisions.Collisions, info: MapInfo, ent: Entity, conf: Keyvalues) -> CallResultT:
         """Execute the callback."""
