@@ -449,9 +449,9 @@ def res_import_template(
     elif 'black' in force:
         conf_force_colour = texturing.Portalable.black
     elif 'invert' in force:
-        conf_force_colour = 'INVERT'
+        conf_force_colour = template_brush.AppliedColour.INVERT
     else:
-        conf_force_colour = None
+        conf_force_colour = template_brush.AppliedColour.MATCH
 
     if 'world' in force:
         force_type = template_brush.TEMP_TYPES.world

@@ -1,19 +1,18 @@
 """Templates are sets of brushes which can be copied into the map."""
 from __future__ import annotations
 
+from typing import AbstractSet, Callable, Union, Optional, Dict, Tuple, Mapping, Iterable, Iterator
+from typing_extensions import Literal, TypeAlias, assert_never
 import itertools
 import os
 from collections import defaultdict
-from typing import AbstractSet, Callable, Union, Optional, Dict, Tuple, Mapping, Iterable, Iterator
-
-import trio
-from typing_extensions import Literal, TypeAlias
-
 from decimal import Decimal
 from enum import Enum
 from operator import attrgetter
 
+import trio
 import attrs
+
 from srctools import Keyvalues
 from srctools.filesys import FileSystem, ZipFileSystem, RawFileSystem, VPKFileSystem
 from srctools.math import AnyAngle, AnyMatrix, FrozenVec, Vec, Angle, Matrix, to_matrix
@@ -22,6 +21,7 @@ from srctools.dmx import Element as DMElement
 import srctools.logger
 
 import user_errors
+import utils
 from .texturing import Portalable, GenCat, TileSize
 from .tiling import TileType
 from . import tiling, texturing, options, rand, collisions
@@ -70,6 +70,28 @@ class AfterPickMode(Enum):
     NODRAW = '2'  # Convert to nodraw.
 
 
+@utils.freeze_enum_props
+class AppliedColour(Enum):
+    """Different behaviours for tilesetters, other than forcing a specific colour.
+
+    "tile" is also allowed, but that gets converted to Portalable instead.
+    """
+    MATCH = 'match'
+    INVERT = 'invert'
+    COPY = 'copy'
+
+    @property
+    def inverted(self) -> AppliedColour:
+        """Invert this operation."""
+        if self is AppliedColour.MATCH:
+            return AppliedColour.INVERT
+        if self is AppliedColour.INVERT:
+            return AppliedColour.MATCH
+        if self is AppliedColour.COPY:
+            return self
+        assert_never(self)
+
+
 @attrs.define
 class UnparsedTemplate:
     """Holds the location of a template that hasn't been parsed yet."""
@@ -115,7 +137,7 @@ class VoxelSetter(TemplateEntity):
 @attrs.define
 class TileSetter(VoxelSetter):
     """Set tiles in a particular position."""
-    color: Union[Portalable, str, None]  # Portalable value, 'INVERT' or None
+    color: AppliedColour | Portalable
     picker_name: str  # Name of colorpicker to use for the color.
 
 
@@ -199,12 +221,12 @@ TEMP_TILE_PIX_SIZE = {
 
 
 # 'Opposite' values for retexture_template(force_colour)
-ForceColour: TypeAlias = Union[texturing.Portalable, Literal['INVERT'], None]
+ForceColour: TypeAlias = Union[Portalable, Literal[AppliedColour.MATCH, AppliedColour.INVERT]]
 TEMP_COLOUR_INVERT: Dict[ForceColour, ForceColour] = {
     Portalable.white: Portalable.black,
     Portalable.black: Portalable.white,
-    None: 'INVERT',
-    'INVERT': None,
+    AppliedColour.MATCH: AppliedColour.INVERT,
+    AppliedColour.INVERT: AppliedColour.MATCH,
 }
 
 
@@ -609,24 +631,24 @@ def _parse_template(loc: UnparsedTemplate) -> Template:
 
     for ent in vmf.by_class['bee2_template_tilesetter']:
         tile_type = SKIN_TO_TILETYPE[srctools.conv_int(ent['skin'])]
-        color = ent['color']
-        if color == 'tile':
+        color_str = ent['color']
+        color: Portalable | AppliedColour
+        if color_str == 'tile':
             try:
                 color = tile_type.color
             except ValueError:
                 # Non-tile types.
-                color = None
-        elif color == 'invert':
-            color = 'INVERT'
-        elif color == 'match':
-            color = None
-        elif color != 'copy':
-            raise user_errors.UserError(user_errors.TOK_INVALID_PARAM.format(
-                option='color',
-                value=color,
-                kind='Template TileSetter',
-                id=loc.id,
-            ))
+                color = AppliedColour.MATCH
+        else:
+            try:
+                color = AppliedColour(color_str)
+            except ValueError:
+                raise user_errors.UserError(user_errors.TOK_INVALID_PARAM.format(
+                    option='color',
+                    value=color_str,
+                    kind='Template TileSetter',
+                    id=loc.id,
+                )) from None
 
         tile_setters.append(TileSetter(
             offset=Vec.from_str(ent['origin']),
@@ -937,7 +959,7 @@ def retexture_template(
     origin: Vec,
     fixup: EntityFixup=None,
     replace_tex: Mapping[str, Union[list[str], str]]=srctools.EmptyMapping,
-    force_colour: ForceColour=None,
+    force_colour: ForceColour=AppliedColour.MATCH,
     force_grid: TileSize=None,
     generator: GenCat=GenCat.NORMAL,
     sense_offset: Optional[Vec]=None,
@@ -951,8 +973,7 @@ def retexture_template(
       same type.
     - replace_tex is a replacement table. This overrides everything else.
       The values should either be a list (random), or a single value.
-    - If force_colour is set, all tile textures will be switched accordingly.
-      If set to 'INVERT', white and black textures will be swapped.
+    - force_colour controls how textures are overridden.
     - If force_grid is set, all tile textures will be that size.
     - generator defines the generator category to use for surfaces.
     - Fixup is the inst.fixup value, used to allow $replace in replace_tex.
@@ -1160,9 +1181,10 @@ def retexture_template(
                 skin=TILETYPE_TO_SKIN[setter_type],
                 force=tile_setter.force,
                 picker_name=tile_setter.picker_name,
+                color=repr(tile_setter.color),
             )
 
-        if tile_setter.color == 'copy':
+        if tile_setter.color is AppliedColour.COPY:
             if not tile_setter.picker_name:
                 raise ValueError(
                     '"{}": Tile Setter set to copy mode '
@@ -1217,7 +1239,7 @@ def retexture_template(
                 )
 
             # Inverting applies to all of these.
-            if force_colour == 'INVERT':
+            if force_colour is AppliedColour.INVERT:
                 setter_color = ~setter_color
 
             setter_type = TileType.with_color_and_size(
@@ -1356,10 +1378,10 @@ def retexture_template(
                     face.mat = force_colour_face
                     continue
                 tex_colour = force_colour_face
-            elif force_colour == 'INVERT':
+            elif force_colour is AppliedColour.INVERT:
                 # Invert the texture
                 tex_colour = ~tex_colour
-            elif force_colour is not None:
+            elif force_colour is not AppliedColour.MATCH:
                 tex_colour = force_colour
 
             if force_grid is not None:
