@@ -5,4 +5,3 @@ pytest-trio>=0.7.0
 types-Pillow>=9.4.0.5
 types-atomicwrites>=1.4.0
 trio-typing>=0.7.0
-types-babel>=2.10.0
