@@ -281,7 +281,7 @@ def parse_basemodui(result: dict[str, str], data: str) -> None:
 def setup(conf_lang: str) -> None:
     """Setup localisations."""
     # Get the 'en_US' style language code
-    lang_code = locale.getdefaultlocale()[0]
+    lang_code, encoding = locale.getlocale()
 
     if conf_lang:
         lang_code = conf_lang
@@ -292,6 +292,9 @@ def setup(conf_lang: str) -> None:
             if arg.casefold().startswith('lang='):
                 lang_code = arg[5:]
                 break
+
+    if lang_code is None:
+        lang_code = 'en'
 
     expanded_langs = expand_langcode(lang_code)
 
@@ -372,13 +375,14 @@ def set_language(lang: Language) -> None:
 async def rebuild_app_langs() -> None:
     """Compile .po files for the app into .mo files. This does not extract tokens, that needs source."""
     def build_file(filename: Path) -> None:
-        """Synchronous I/O code run as a backround thread."""
+        """Synchronous I/O code run as a background thread."""
         with filename.open('rb') as src:
             catalog = read_po(src, locale=filename.stem)
         with filename.with_suffix('.mo').open('wb') as dest:
             write_mo(dest, catalog)
 
     async def build_lang(filename: Path) -> None:
+        """Taks run to compile each file simultaneously."""
         try:
             await trio.to_thread.run_sync(build_file, fname)
         except (IOError, OSError):
