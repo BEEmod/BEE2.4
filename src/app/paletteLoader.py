@@ -1,7 +1,6 @@
 """Defines the palette data structure and file saving/loading logic."""
 from __future__ import annotations
-from typing import IO, Iterator, Dict, Tuple, cast
-from collections.abc import Sequence
+from typing import IO, Sequence, Iterator, Dict, Tuple, cast
 import os
 import shutil
 import zipfile

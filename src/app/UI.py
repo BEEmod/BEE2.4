@@ -1,7 +1,7 @@
 """Main UI module, brings everything together."""
 import tkinter as tk
 from tkinter import ttk
-from typing import List, Dict, Tuple, Optional, Set, Iterator, Callable, Any, Union
+from typing import List, Type, Dict, Tuple, Optional, Set, Iterator, Callable, Any, Union
 import itertools
 import operator
 import random
@@ -63,7 +63,7 @@ skybox_win: 'SelectorWin[[]]'
 voice_win: 'SelectorWin[[]]'
 style_win: 'SelectorWin[[]]'
 elev_win: 'SelectorWin[[]]'
-suggest_windows: dict[type[packages.PakObject], SelectorWin] = {}
+suggest_windows: Dict[Type[packages.PakObject], SelectorWin] = {}
 
 # Items chosen for the palette.
 pal_picked: List['PalItem'] = []
