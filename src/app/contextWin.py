@@ -262,7 +262,9 @@ def load_item_data() -> None:
 
     wid_subitem[pos_for_item(selected_sub_item.subKey)]['relief'] = 'raised'
 
-    wid['author']['text'] = ', '.join(item_data.authors)
+    localisation.set_text(wid['author'], TransToken.list_and(
+        map(TransToken.untranslated, item_data.authors), sort=True,
+    ))
     localisation.set_text(wid['name'], selected_sub_item.name)
     wid['ent_count']['text'] = item_data.ent_count or '??'
 

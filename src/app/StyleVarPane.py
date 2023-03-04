@@ -155,7 +155,7 @@ def make_desc(packset: PackagesSet, var: StyleVar) -> TransToken:
                 for style in app_styles
             ]
             style_desc = TRANS_STYLES.format(
-                styles=TRANS_COMMA.join(style_list, sort=True),
+                styles=TransToken.list_or(style_list, sort=True),
                 n=len(style_list),
             )
 

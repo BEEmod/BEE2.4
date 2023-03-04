@@ -304,7 +304,7 @@ class Item:
         self.desc = desc
 
         self.snd_sample = snd_sample
-        self.authors: list[str] = list(authors)
+        self.authors: list[TransToken] = list(map(TransToken.untranslated, authors))
         self.attrs: dict[str, AttrValues] = dict(attributes)
         # The button widget for this item.
         self.button: ttk.Button | None= None
@@ -1263,7 +1263,7 @@ class SelectorWin(Generic[CallbackT]):
             localisation.set_text(self.prop_author, TRANS_NO_AUTHORS)
         else:
             localisation.set_text(self.prop_author, TRANS_AUTHORS.format(
-                authors=', '.join(item.authors),
+                authors=TransToken.list_and(item.authors),
                 n=len(item.authors),
             ))
 

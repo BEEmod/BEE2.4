@@ -54,7 +54,7 @@ class CorridorUI(Corridor):
     desc: tkMarkdown.MarkdownData = attrs.field(repr=False)
     images: Sequence[img.Handle]
     dnd_icon: img.Handle
-    authors: Sequence[str]
+    authors: Sequence[TransToken]
 
     def strip_ui(self) -> Corridor:
         """Strip these UI attributes for the compiler export."""
@@ -163,7 +163,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
             corridors[mode, direction, orient].append(CorridorUI(
                 instance=kv['instance'],
                 name=name,
-                authors=packages.sep_values(kv['authors', '']),
+                authors=list(map(TransToken.untranslated, packages.sep_values(kv['authors', '']))),
                 desc=packages.desc_parse(kv, 'Corridor', data.pak_id),
                 orig_index=kv.int('DefaultIndex', 0),
                 config=packages.get_config(kv, 'items', data.pak_id, source='Corridor ' + kv.name),
@@ -243,7 +243,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                                 name=TRANS_CORRIDOR_GENERIC,
                                 images=[ICON_GENERIC_LRG],
                                 dnd_icon=ICON_GENERIC_SML,
-                                authors=style.selitem_data.auth,
+                                authors=list(map(TransToken.untranslated, style.selitem_data.auth)),
                                 desc=EMPTY_DESC,
                                 config=lazy_conf.BLANK,
                                 orig_index=ind + 1,
@@ -257,7 +257,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                                 name=TRANS_CORRIDOR_GENERIC,
                                 images=[img.Handle.file(style_info.icon, IMG_WIDTH_LRG, IMG_HEIGHT_LRG)],
                                 dnd_icon=img.Handle.file(style_info.icon, IMG_WIDTH_SML, IMG_HEIGHT_SML),
-                                authors=style.selitem_data.auth,
+                                authors=list(map(TransToken.untranslated, style.selitem_data.auth)),
                                 desc=tkMarkdown.MarkdownData.text(style_info.desc),
                                 config=lazy_conf.BLANK,
                                 orig_index=ind + 1,

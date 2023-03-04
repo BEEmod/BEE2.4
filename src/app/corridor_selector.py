@@ -441,7 +441,7 @@ class Selector:
                 localisation.set_text(self.wid_authors, TRANS_NO_AUTHORS)
             else:
                 localisation.set_text(self.wid_authors, TRANS_AUTHORS.format(
-                    authors=', '.join(corr.authors),
+                    authors=TransToken.list_and(corr.authors),
                     n=len(corr.authors),
                 ))
 
