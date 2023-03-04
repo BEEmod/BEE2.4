@@ -118,7 +118,6 @@ class Item:
         'data',
         'inherit_kind',
         'visual_subtypes',
-        'authors',
         'id',
         'pak_id',
         'pak_name',
@@ -139,7 +138,6 @@ class Item:
             if sub.pal_name or sub.pal_icon
         ]
 
-        self.authors = self.def_data.authors
         self.id = item.id
         self.pak_id = item.pak_id
         self.pak_name = item.pak_name
