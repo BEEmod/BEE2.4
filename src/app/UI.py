@@ -571,7 +571,7 @@ async def load_packages(packset: packages.PackagesSet) -> None:
         },
         callback=voice_callback,
         attributes=[
-            SelAttr.list('CHAR', TransToken.ui('Characters'), ['??']),
+            SelAttr.list_and('CHAR', TransToken.ui('Characters'), ['??']),
             SelAttr.bool('TURRET', TransToken.ui('Turret Shoot Monitor'), False),
             SelAttr.bool('MONITOR', TransToken.ui('Monitor Visuals'), False),
         ],

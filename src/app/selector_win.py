@@ -91,20 +91,25 @@ class NAV_KEYS(Enum):
 class AttrTypes(Enum):
     """The type of labels used for selectoritem attributes."""
     STR = STRING = 'string'  # Normal text
-    LIST = 'list'  # A sequence, joined by commas
+    LIST_AND = 'list_and'  # A sequence, joined by commas
+    LIST_OR = 'list_or'  # A sequence, joined by commas
     BOOL = 'bool'  # A yes/no checkmark
     COLOR = COLOUR = 'color'  # A Vec 0-255 RGB colour
 
     @property
     def is_wide(self) -> bool:
         """Determine if this should be placed on its own row, or paired with another."""
-        return self.value in ('string', 'list')
+        return self.value in ('string', 'list_and', 'list_or')
+
+    @property
+    def is_list(self) -> bool:
+        """Determine if this is a list."""
+        return self.value.startswith('list_')
 
 
 # TransToken is str()-ified.
 AttrValues: TypeAlias = Union[str, TransToken, Iterable[Union[str, TransToken]], bool, Vec]
 CallbackT = ParamSpec('CallbackT')
-TRANS_COMMA = TransToken.untranslated(', ')
 TRANS_ATTR_DESC = TransToken.untranslated('{desc}: ')
 TRANS_ATTR_COLOR = TransToken.ui('Color: R={r}, G={g}, B={b}')  # i18n: Tooltip for colour swatch.
 TRANS_WINDOW_TITLE = TransToken.ui('BEE2 - {subtitle}')  # i18n: Window titles.
@@ -135,11 +140,18 @@ class AttrDef:
         return AttrDef(attr_id, desc, default, AttrTypes.STRING)
 
     @classmethod
-    def list(cls, attr_id: str, desc: TransToken=TransToken.BLANK, default: list=None) -> AttrDef:
-        """Alternative constructor for list-type attrs."""
+    def list_and(cls, attr_id: str, desc: TransToken=TransToken.BLANK, default: list=None) -> AttrDef:
+        """Alternative constructor for list-type attrs, which should be joined with AND."""
         if default is None:
             default = []
-        return AttrDef(attr_id, desc, default, AttrTypes.LIST)
+        return AttrDef(attr_id, desc, default, AttrTypes.LIST_AND)
+
+    @classmethod
+    def list_or(cls, attr_id: str, desc: TransToken=TransToken.BLANK, default: list=None) -> AttrDef:
+        """Alternative constructor for list-type attrs, which should be joined with OR."""
+        if default is None:
+            default = []
+        return AttrDef(attr_id, desc, default, AttrTypes.LIST_OR)
 
     @classmethod
     def bool(cls, attr_id: str, desc: TransToken=TransToken.BLANK, default: bool=False) -> AttrDef:
@@ -1319,13 +1331,17 @@ class SelectorWin(Generic[CallbackT]):
                 set_tooltip(attr.label, TRANS_ATTR_COLOR.format(
                     r=int(val.x), g=int(val.y), b=int(val.z),
                 ))
-            elif attr.type is AttrTypes.LIST:
+            elif attr.type.is_list:
                 # Join the values (in alphabetical order)
                 assert isinstance(val, Iterable) and not isinstance(val, Vec), repr(val)
-                localisation.set_text(attr.label, TRANS_COMMA.join([
+                children = [
                     txt if isinstance(txt, TransToken) else TransToken.untranslated(txt)
                     for txt in val
-                ]))
+                ]
+                if attr.type is AttrTypes.LIST_AND:
+                    localisation.set_text(attr.label, TransToken.list_and(children, sort=True))
+                else:
+                    localisation.set_text(attr.label, TransToken.list_or(children, sort=True))
             elif attr.type is AttrTypes.STRING:
                 # Just a string.
                 if not isinstance(val, TransToken):
