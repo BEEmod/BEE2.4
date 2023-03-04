@@ -14,6 +14,7 @@ import io
 import itertools
 import os.path
 import functools
+import datetime
 
 from pathlib import Path
 from weakref import WeakKeyDictionary
@@ -27,6 +28,7 @@ from babel.messages.pofile import read_po, write_po
 from babel.messages.mofile import write_mo
 from babel.messages import Catalog
 from babel.numbers import format_decimal
+from babel.dates import format_date, format_datetime
 from babel.localedata import load as load_cldr
 import babel
 import trio
@@ -143,6 +145,10 @@ class UIFormatter(string.Formatter):
                 # This is the standard format for this language.
                 format_spec = self.locale.decimal_formats[None]
             return format_decimal(value, format_spec, self.locale)
+        if isinstance(value, datetime.datetime):
+            return format_datetime(value, format_spec or 'medium', locale=self.locale)
+        if isinstance(value, datetime.date):
+            return format_date(value, format_spec or 'medium', self.locale)
         return format(value, format_spec)
 
 

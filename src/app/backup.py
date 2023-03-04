@@ -193,7 +193,7 @@ class P2C:
         return CheckItem(
             TransToken.untranslated(self.title),
             TRANS_COOP if self.is_coop else TRANS_SP,
-            TransToken.untranslated(str(self.mod_time)),
+            self.mod_time.as_token(),
             hover_text=self.desc,
             user=self,
         )
@@ -211,15 +211,12 @@ class Date:
         else:
             self.date = datetime.fromtimestamp(val)
 
-    def __str__(self):
+    def as_token(self) -> TransToken:
         """Return value for display."""
         if self.date is None:
-            return '???'
+            return TransToken.untranslated('???')
         else:
-            return time.strftime(
-                '%d %b %Y, %I:%M%p',
-                self.date.timetuple(),
-            )
+            return TransToken.untranslated('{date:medium}').format(date=self.date)
 
     # No date = always earlier
     def __lt__(self, other: 'Date') -> bool:
