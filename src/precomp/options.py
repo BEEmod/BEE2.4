@@ -9,7 +9,7 @@ from BEE2_config import ConfigFile
 import srctools.logger
 
 from typing import (
-    Union, Tuple, TypeVar, Type, Optional, Iterable, Iterator, Any, TextIO, Dict, cast,
+    Union, Tuple, TypeVar, Type, Optional, Iterator, Any, TextIO, Dict, cast,
     overload,
 )
 
@@ -188,8 +188,7 @@ def get(expected_type: Union[Type[OptionT], Type[EnumT]], name: str) -> Union[Op
                 name,
                 '\n'.join([mem.value for mem in enum_type])
             )
-            # EnumT isn't iterable...
-            return next(iter(cast(Iterable[EnumT], enum_type)))
+            return next(iter(enum_type))
 
     # Don't allow subclasses (bool/int)
     if type(val) is not expected_type:
@@ -251,7 +250,7 @@ def get_itemconf(
     elif isinstance(default, float):
         result = srctools.conv_float(value, default)
     elif isinstance(default, int):
-        result = cast(OptionT, srctools.conv_int(value, default))
+        result = srctools.conv_int(value, default)
     else:
         raise TypeError(f'Invalid default type "{type(default).__name__}"!')
 

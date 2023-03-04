@@ -229,8 +229,7 @@ def freeze_enum_props(cls: Type[EnumT]) -> Type[EnumT]:
 
     Call the getter on each member, and then replace it with a dict lookup.
     """
-    ns = vars(cls)
-    for name, value in list(ns.items()):
+    for name, value in list(vars(cls).items()):
         if not isinstance(value, property) or value.fset is not None or value.fdel is not None:
             continue
         data = {}
@@ -283,7 +282,7 @@ def _exc_freeze(
 # See https://bugs.python.org/issue42369
 if sys.version_info < (3, 9) and hasattr(zipfile, '_SharedFile'):
     # noinspection PyProtectedMember
-    class _SharedZipFile(zipfile._SharedFile):  # type: ignore
+    class _SharedZipFile(zipfile._SharedFile):
         def __init__(self, *args, **kwargs) -> None:
             super().__init__(*args, **kwargs)
             # tell() reads the actual file position, but that may have been
