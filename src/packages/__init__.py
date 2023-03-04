@@ -46,7 +46,7 @@ class SelitemData:
     """Options which are displayed on the selector window."""
     name: TransToken  # Longer full name.
     short_name: TransToken  # Shorter name for the icon.
-    auth: list[str]  # List of authors.
+    auth: set[str]  # List of authors.
     icon: img.Handle | None  # Small square icon.
     large_icon: img.Handle | None  # Larger, landscape icon.
     previews: list[img.Handle]  # Full size images used for previews.
@@ -59,7 +59,7 @@ class SelitemData:
     @classmethod
     def parse(cls, info: Keyvalues, pack_id: str) -> SelitemData:
         """Parse from a keyvalues block."""
-        auth = sep_values(info['authors', ''])
+        auth = set(sep_values(info['authors', '']))
         name = TransToken.parse(pack_id, info['name'])
         sort_key = info['sort_key', '']
         desc = desc_parse(info, info['id'], pack_id)
@@ -134,7 +134,7 @@ class SelitemData:
         return SelitemData(
             self.name,
             self.short_name,
-            self.auth + other.auth,
+            self.auth | other.auth,
             other.icon or self.icon,
             other.large_icon or self.large_icon,
             self.previews + other.previews,
