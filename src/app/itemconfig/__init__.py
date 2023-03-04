@@ -608,8 +608,6 @@ async def make_pane(tool_frame: tk.Frame, menu_bar: tk.Menu, update_item_vis: Ca
         arrow_left.state(['disabled' if pos == 0 else '!disabled'])
         arrow_right.state(['disabled' if pos + 1 == len(ordered_conf) else '!disabled'])
 
-    cmd_cache: dict[ConfigGroup, str] = {}
-
     @localisation.add_callback(call=True)
     def update_selector() -> None:
         """Update translations in the display, reordering if necessary."""
@@ -618,11 +616,11 @@ async def make_pane(tool_frame: tk.Frame, menu_bar: tk.Menu, update_item_vis: Ca
         # Remake all the menu widgets.
         group_menu.delete(0, 'end')
         for group in ordered_conf:
-            try:
-                cmd = cmd_cache[group]
-            except KeyError:
-                cmd = cmd_cache[group] = group_menu.register(functools.partial(select_group, group))
-            group_menu.insert_radiobutton('end', label=str(group.name), variable=group_var, value=group.id, command=cmd)
+            group_menu.insert_radiobutton(
+                'end', label=str(group.name),
+                variable=group_var, value=group.id,
+                command=functools.partial(select_group, group),
+            )
         update_disp()
 
     tk_tools.bind_leftclick(group_label, lambda evt: group_menu.post(evt.x_root, evt.y_root))
