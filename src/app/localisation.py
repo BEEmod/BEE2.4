@@ -5,7 +5,10 @@ The widgets tokens are applied to are stored, so changing language can update th
 from __future__ import annotations
 
 import string
-from typing import Any, AsyncIterator, Callable, Iterable, Iterator, TypeVar, Union, TYPE_CHECKING
+from typing import (
+    Any, AsyncIterator, Callable, Iterable, Iterator, List, TypeVar, Union,
+    TYPE_CHECKING,
+)
 from typing_extensions import ParamSpec, TypeAlias
 from tkinter import ttk
 from collections import defaultdict
@@ -30,6 +33,7 @@ from babel.messages import Catalog
 from babel.numbers import format_decimal
 from babel.dates import format_date, format_datetime
 from babel.localedata import load as load_cldr
+from babel.lists import format_list
 import babel
 import trio
 import attrs
@@ -153,7 +157,13 @@ def _get_locale(lang_code: str) -> babel.Locale:
         return babel.Locale.parse('en_US')  # Should exist?
 
 
+def _format_list(lang_code: str, list_kind: transtoken.ListStyle, items: List[str]) -> str:
+    """Formate a list according to the locale."""
+    return format_list(items, list_kind.value, _get_locale(lang_code))
+
+
 transtoken.ui_format_getter = UIFormatter
+transtoken.ui_list_getter = _format_list
 
 
 def set_text(widget: TextWidgetT, token: TransToken) -> TextWidgetT:

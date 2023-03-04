@@ -4,11 +4,12 @@ Translation only occurs in the app, using the localisation module. In the compil
 so that data structures can be shared.
 We take care not to directly import gettext and babel, so the compiler can omit those.
 """
+from enum import Enum
 from typing import (
-    Any, Callable, ClassVar, Dict, Iterable, Mapping, NoReturn, Optional, Protocol, Sequence,
+    Any, Callable, ClassVar, List, Dict, Iterable, Mapping, NoReturn, Optional, Protocol, Sequence,
     Tuple, cast,
 )
-from typing_extensions import Final, LiteralString
+from typing_extensions import Final, LiteralString, TypeAlias
 from html import escape as html_escape
 from pathlib import Path
 import string
@@ -26,6 +27,17 @@ NS_UNTRANSLATED: Final = '<NOTRANSLATE>'  # Legacy values which don't have trans
 
 # The prefix for all Valve's editor keys.
 PETI_KEY_PREFIX: Final = 'PORTAL2_PuzzleEditor'
+
+
+class ListStyle(Enum):
+    """Kind of comma-separated list to produce."""
+    AND = 'standard'
+    OR = 'or'
+    AND_SHORT = 'standard-short'
+    OR_SHORT = 'or-short'
+    UNIT = 'unit'
+    UNIT_SHORT = 'unit-short'
+    UNIT_NARROW = 'unit-narrow'
 
 
 class GetText(Protocol):
@@ -49,8 +61,12 @@ CURRENT_LANG = Language(lang_code='en', trans={})
 # Special language which replaces all text with ## to easily identify untranslatable text.
 DUMMY: Final = Language(lang_code='dummy', trans={})
 # Set by the localisation module to a function which gets a formatter for UI text, given the lang code.
-ui_format_getter: Callable[[str], Optional[string.Formatter]]
-globals()['ui_format_getter'] = lambda lang: None
+ui_format_getter: Callable[[str], Optional[string.Formatter]] = lambda lang: None
+# Similarly, joins a list given the language, kind of list and children.
+ui_list_getter: Callable[
+    [str, ListStyle, List[str]],
+    str,
+] = lambda lang, kind, children: ' ,'.join(children)
 
 
 class HTMLFormatter(string.Formatter):
@@ -130,6 +146,22 @@ class TransToken:
         In this case, the token is the literal text to use.
         """
         return cls(NS_UNTRANSLATED, NS_UNTRANSLATED, text, EmptyMapping)
+
+    @classmethod
+    def list_and(cls, children: Iterable['TransToken'], sort: bool=False) -> 'ListTransToken':
+        """Join multiple tokens together in an and-list."""
+        return ListTransToken(
+            NS_UNTRANSLATED, NS_UNTRANSLATED, ', ', EmptyMapping,
+            list(children), sort, ListStyle.AND,
+        )
+
+    @classmethod
+    def list_or(cls, children: Iterable['TransToken'], sort: bool=False) -> 'ListTransToken':
+        """Join multiple tokens together in an or-list."""
+        return ListTransToken(
+            NS_UNTRANSLATED, NS_UNTRANSLATED, ', ', EmptyMapping,
+            list(children), sort, ListStyle.OR,
+        )
 
     @property
     def is_game(self) -> bool:
@@ -234,7 +266,7 @@ class TransToken:
 TransToken.BLANK = TransToken.untranslated('')
 
 # Token and "source" string, for updating translation files.
-TransTokenSource = Tuple[TransToken, str]
+TransTokenSource: TypeAlias = Tuple[TransToken, str]
 
 
 @attrs.frozen(eq=False)
@@ -337,3 +369,32 @@ class JoinTransToken(TransToken):
         if self.sort:
             items.sort()
         return sep.join(items)
+
+
+@attrs.frozen(eq=False)
+class ListTransToken(JoinTransToken):
+    """A special variant of JoinTransToken which uses language-specific joiners."""
+    kind: ListStyle
+
+    def format(self, /, **kwargs: object) -> NoReturn:
+        """List tokens cannot be formatted."""
+        raise NotImplementedError('Cannot format list tokens!')
+
+    def __eq__(self, other) -> bool:
+        if type(other) is ListTransToken:
+            return (
+                self.namespace == other.namespace and
+                self.token == other.token and
+                self.children == other.children
+            )
+        return NotImplemented
+
+    def __str__(self) -> str:
+        """Translate the token."""
+        if self.parameters:
+            raise ValueError(f'Cannot format list token: {vars(self)}')
+        sep = self._convert_token()
+        items = [str(child) for child in self.children]
+        if self.sort:
+            items.sort()
+        return ui_list_getter(CURRENT_LANG.lang_code, self.kind, items)
