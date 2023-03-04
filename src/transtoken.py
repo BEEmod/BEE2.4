@@ -248,6 +248,8 @@ class TransToken:
             formatter = ui_format_getter(CURRENT_LANG.lang_code)
             if formatter is not None:
                 return formatter.vformat(text, (), self.parameters)
+            else:
+                return text.format_map(self.parameters)
         else:
             return text
 
