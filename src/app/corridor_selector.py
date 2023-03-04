@@ -224,6 +224,7 @@ class Selector:
             size=(WIDTH, HEIGHT),
             pick_flexi_group=self._get_flexi_group,
         )
+        tk_tools.add_mousewheel(self.canvas, self.win)
         drop.event_bus.register(dragdrop.Event.HOVER_ENTER, Slot, self.evt_hover_enter)
         drop.event_bus.register(dragdrop.Event.HOVER_EXIT, Slot, self.evt_hover_exit)
         drop.event_bus.register(dragdrop.Event.REDROPPED, Slot, self.evt_redropped)
