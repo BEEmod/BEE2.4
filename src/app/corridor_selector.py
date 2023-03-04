@@ -199,10 +199,17 @@ class Selector:
         reflow: Callable[[], Awaitable[object]] = self.reflow  # Avoid making self a cell var.
         self.canvas.bind('<Configure>', lambda e: background_run(reflow))
 
+        self.help_lbl = ttk.Label(self.canvas)
+        localisation.set_text(self.help_lbl, TransToken.ui(
+            "Drag corridors to the 'selected' and 'unused' areas to specify which are used. "
+            "Ingame, a random corridor from the 'selected' group will be picked for each map."
+        ))
+        self.help_lbl_win = self.canvas.create_window(0, 0, anchor='nw', window=self.help_lbl)
+
         self.header_sel = tk_tools.LineHeader(self.canvas, TransToken.ui('Selected:'))
         self.header_unsel = tk_tools.LineHeader(self.canvas, TransToken.ui('Unused:'))
         self.header_sel_win = self.canvas.create_window(
-            0, 384,
+            0, 128,
             anchor='nw',
             window=self.header_sel,
         )
@@ -365,8 +372,14 @@ class Selector:
         self.canvas.delete('sel_bg')
         pos = dragdrop.Positioner(self.canvas, WIDTH, HEIGHT)
 
+        self.canvas.itemconfigure(self.help_lbl_win, width=pos.width)
+        self.help_lbl['wraplength'] = pos.width
         self.canvas.itemconfigure(self.header_sel_win, width=pos.width - 2 * HEADER_PAD)
         self.canvas.itemconfigure(self.header_unsel_win, width=pos.width - 2 * HEADER_PAD)
+
+        await tk_tools.wait_eventloop()
+        (x1, y1, x2, y2) = self.canvas.bbox(self.help_lbl_win)
+        pos.yoff += y2 - y1
 
         self.canvas.coords(self.header_sel_win, HEADER_PAD, pos.yoff)
         pos.yoff += HEADER_HEIGHT + 10
