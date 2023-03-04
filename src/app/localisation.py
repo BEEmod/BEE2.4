@@ -3,7 +3,9 @@
 The widgets tokens are applied to are stored, so changing language can update the UI.
 """
 from __future__ import annotations
-from typing import AsyncIterator, Callable, Iterable, Iterator, TypeVar, Union, TYPE_CHECKING
+
+import string
+from typing import Any, AsyncIterator, Callable, Iterable, Iterator, TypeVar, Union, TYPE_CHECKING
 from typing_extensions import ParamSpec, TypeAlias
 from tkinter import ttk
 from collections import defaultdict
@@ -11,6 +13,7 @@ import tkinter as tk
 import io
 import itertools
 import os.path
+import functools
 
 from pathlib import Path
 from weakref import WeakKeyDictionary
@@ -23,7 +26,9 @@ from srctools import FileSystem, logger
 from babel.messages.pofile import read_po, write_po
 from babel.messages.mofile import write_mo
 from babel.messages import Catalog
+from babel.numbers import format_decimal
 from babel.localedata import load as load_cldr
+import babel
 import trio
 import attrs
 
@@ -115,6 +120,33 @@ STEAM_LANGS = {
     'uk': 'ukrainian',
     'vn': 'vietnamese',
 }
+
+
+class UIFormatter(string.Formatter):
+    """Alters field formatting to use babel's locale-sensitive format functions."""
+    def __init__(self, lang_code: str) -> None:
+        try:
+            self.locale = babel.Locale.parse(lang_code)
+        except (babel.UnknownLocaleError, ValueError) as exc:
+            LOGGER.warning('Could not find locale data for language "{}":', lang_code, exc_info=exc)
+            self.locale = babel.Locale.parse('en_US')  # Should exist?
+
+    @classmethod
+    def from_lang(cls, lang: Language) -> 'UIFormatter':
+        """Build a UI formatter for a specific language."""
+        return cls(lang.lang_code)
+
+    def format_field(self, value: Any, format_spec: str) -> Any:
+        """Format a field."""
+        if isinstance(value, (int, float)):
+            if not format_spec:
+                # This is the standard format for this language.
+                format_spec = self.locale.decimal_formats[None]
+            return format_decimal(value, format_spec, self.locale)
+        return format(value, format_spec)
+
+
+transtoken.ui_format_getter = functools.lru_cache(maxsize=1)(UIFormatter)
 
 
 def set_text(widget: TextWidgetT, token: TransToken) -> TextWidgetT:

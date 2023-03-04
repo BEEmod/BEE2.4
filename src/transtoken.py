@@ -1,10 +1,11 @@
 """Translation tokens represent a potentially translatable string.
 
-To actually translate the localisation module is required, for the app only, in the compiler these
-exist so that data structures can be shared.
+Translation only occurs in the app, using the localisation module. In the compiler this exists still
+so that data structures can be shared.
+We take care not to directly import gettext and babel, so the compiler can omit those.
 """
 from typing import (
-    Any, ClassVar, Dict, Iterable, Mapping, NoReturn, Optional, Protocol, Sequence,
+    Any, Callable, ClassVar, Dict, Iterable, Mapping, NoReturn, Optional, Protocol, Sequence,
     Tuple, cast,
 )
 from typing_extensions import Final, LiteralString
@@ -33,7 +34,7 @@ class GetText(Protocol):
     def ngettext(self, single: str, plural: str, n: int, /) -> str: ...
 
 
-@attrs.frozen(kw_only=True)
+@attrs.frozen(kw_only=True, eq=False)
 class Language:
     """A language which may be loaded, and the associated translations."""
     lang_code: str
@@ -47,6 +48,9 @@ class Language:
 CURRENT_LANG = Language(lang_code='en', trans={})
 # Special language which replaces all text with ## to easily identify untranslatable text.
 DUMMY: Final = Language(lang_code='dummy', trans={})
+# Set by the localisation module to a function which gets a formatter for UI text, given the lang code.
+ui_format_getter: Callable[[str], Optional[string.Formatter]]
+globals()['ui_format_getter'] = lambda lang: None
 
 
 class HTMLFormatter(string.Formatter):
@@ -209,6 +213,10 @@ class TransToken:
         """Calling str on a token translates it."""
         text = self._convert_token()
         if self.parameters:
+            if self.namespace == NS_UI:
+                formatter = ui_format_getter(CURRENT_LANG.lang_code)
+                if formatter is not None:
+                    return formatter.vformat(text, (), self.parameters)
             return text.format_map(self.parameters)
         else:
             return text
