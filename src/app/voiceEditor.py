@@ -4,6 +4,7 @@ import itertools
 from decimal import Decimal
 from enum import Enum
 from typing import Iterator, List, Tuple, Dict, Optional, Any
+from configparser import SectionProxy
 
 from tkinter import *
 from tkinter import font
@@ -156,12 +157,12 @@ def quote_sort_func(quote: Keyvalues) -> Decimal:
         return Decimal('0')
 
 
-def show_trans(e) -> None:
+def show_trans(transcript: List[Tuple[str, str]], e: Event) -> None:
     """Add the transcript to the list."""
     text = UI['trans']
     text['state'] = 'normal'
     text.delete(1.0, END)
-    for actor, line in e.widget.transcript:
+    for actor, line in transcript:
         text.insert('end', actor, ('bold',))
         text.insert('end', line + '\n\n')
     # Remove the trailing newlines
@@ -169,7 +170,7 @@ def show_trans(e) -> None:
     text['state'] = 'disabled'
 
 
-def check_toggled(var, config_section, quote_id):
+def check_toggled(var: BooleanVar, config_section: SectionProxy, quote_id: str) -> None:
     """Update the config file to match the checkbox."""
     config_section[quote_id] = srctools.bool_as_int(var.get())
 
@@ -451,14 +452,13 @@ def make_tab(pak_id: str, group: Keyvalues, config: ConfigFile, tab_type: TabTyp
                 config_section=config[group_id],
                 quote_id=line_id,
             )
-            check.transcript = list(get_trans_lines(line))
             check.grid(
                 row=0,
                 column=len(badges),
             )
-            check.bind("<Enter>", show_trans)
+            check.bind("<Enter>", functools.partial(show_trans, list(get_trans_lines(line))))
 
-    def configure_canv(e) -> None:
+    def configure_canv(e: Event) -> None:
         """Allow resizing the windows."""
         canv['scrollregion'] = (
             4,
