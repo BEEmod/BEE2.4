@@ -19,7 +19,7 @@ from srctools import AtomicWriter, bool_as_int
 from srctools.logger import get_logger
 
 import app
-from app import SubPane, localisation, tk_tools, TK_ROOT, corridor_selector
+from app import SubPane, localisation, tk_tools, TK_ROOT
 from app.tooltip import add_tooltip, set_tooltip
 from app.localisation import TransToken
 from config.compile_pane import CompilePaneState, PLAYER_MODEL_ORDER
@@ -144,7 +144,7 @@ async def apply_state(state: CompilePaneState) -> None:
 class LimitCounter:
     """Displays the current status of various compiler limits."""
     # i18n: Tooltip format for compiler limit bars.
-    TOOLTIP = TransToken.ui('{count}/{max} ({frac:.2%}):\n{blurb}')
+    TOOLTIP = TransToken.ui('{count}/{max} ({frac:0.##%}):\n{blurb}')
     def __init__(
         self,
         master: ttk.LabelFrame,

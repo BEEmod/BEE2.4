@@ -25,7 +25,7 @@ LOGGER = srctools.logger.get_logger(__name__)
 TRANS_TITLE = TransToken.ui('BEE2 - {item}')
 TRANS_SUBTITLE = TransToken.ui('Settings for "{item}"')
 TRANS_LABEL = TransToken.untranslated('{name}: ')
-TRANS_TIMER_DELAY = TransToken.ui('Timer Delay:\n        ({tim})')
+TRANS_TIMER_DELAY = TransToken.ui('Timer Delay:\n        ({tim:00})')
 TRANS_START_ACTIVE_DISABLED = TransToken.ui(
     'When Oscillating mode is disabled, Start Active has no effect.'
 )
@@ -205,7 +205,8 @@ class TimerPropGroup(PropGroup):
         self._enable_cback = True
 
         localisation.set_text(self.label, TRANS_TIMER_DELAY.format(
-            tim='∞' if new_val == 0 else str(new_val),
+            # Babel formats infinity with the right symbol.
+            tim=float('inf') if new_val == 0 else str(new_val),
         ))
 
         if new_val > self.old_val:

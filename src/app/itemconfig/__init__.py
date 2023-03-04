@@ -54,11 +54,13 @@ TIMER_NUM = list(map(str, range(3, 31)))
 TIMER_NUM_INF = ['inf', *TIMER_NUM]
 
 INF = TransToken.untranslated('∞')
-# This is mainly a cache to save creating a bunch of copies of these tokens.
+# i18n: The format for timer numerals.
+_TIMER_TRANS = TransToken.ui('{timer_num:00}')
 TIMER_NUM_TRANS = {
-    num: TransToken.untranslated(num)
+    num: _TIMER_TRANS.format(timer_num=num)
     for num in TIMER_NUM
 }
+del _TIMER_TRANS
 TIMER_NUM_TRANS['inf'] = INF
 TRANS_COLON = TransToken.untranslated('{text}: ')
 TRANS_GROUP_HEADER = TransToken.ui('{name} ({page}/{count})')  # i18n: Header layout for Item Properties pane.
