@@ -311,20 +311,24 @@ def find_basemodui(games: list[gameMan.Game], langs: list[str]) -> str:
     return ''  # Failed.
 
 
-def parse_basemodui(result: dict[str, str], data: str) -> None:
+def parse_basemodui(result: dict[str, str], data: bytes) -> None:
     """Parse the basemodui keyvalues file."""
     # This file is in keyvalues format, supposedly.
     # But it's got a bunch of syntax errors - extra quotes,
     # missing brackets.
     # The structure doesn't matter, so just process line by line.
-    for line in io.StringIO(data):
+    # Also operate on the raw bytes, because the line endings are sometimes ASCII-style, not UTF16!
+    # We instead parse each key/value pair individually.
+    for line in data.splitlines():
+        key_byte: bytes
         try:
-            __, key, __, value, __ = line.split('"')
+            __, key_byte, __, value, __ = line.split(b'"\x00')
         except ValueError:
             continue
+        key = key_byte.decode('utf_16_le')
         # Ignore non-puzzlemaker keys.
         if key.startswith(PETI_KEY_PREFIX):
-            result[key] = value.replace("\\'", "'")
+            result[key] = value.decode('utf_16_le').replace("\\'", "'")
 
 
 def setup(conf_lang: str) -> None:
@@ -494,8 +498,8 @@ async def load_aux_langs(
                 with file.open_bin() as f:
                     lang_map[pak_id] = await trio.to_thread.run_sync(gettext_mod.GNUTranslations, f)
                 return
-            except OSError:
-                LOGGER.warning('Invalid localisation file {}:{}', pak_id, file.path, exc_info=True)
+            except (OSError, UnicodeDecodeError) as exc:
+                LOGGER.warning('Invalid localisation file {}:{}', pak_id, file.path, exc_info=exc)
 
     async def game_lang(game_it: Iterable[gameMan.Game], expanded_langs: list[str]) -> None:
         """Load the game language in the background."""
@@ -504,12 +508,14 @@ async def load_aux_langs(
             LOGGER.warning('Could not find BaseModUI file for Portal 2!')
             return
         try:
-            # BaseModUI files are encoded in UTF-16.
-            data = await trio.Path(basemod_loc).read_text('utf16')
+            # BaseModUI files are encoded in UTF-16. But it's kinda broken, with line endings
+            # sometimes 1-char long.
+            data = await trio.Path(basemod_loc).read_bytes()
+            await trio.to_thread.run_sync(parse_basemodui, game_dict, data)
         except FileNotFoundError:
             LOGGER.warning('BaseModUI file "{}" does not exist!', basemod_loc)
-        else:
-            await trio.to_thread.run_sync(parse_basemodui, game_dict, data)
+        except (OSError, UnicodeDecodeError, ValueError) as exc:
+            LOGGER.warning('Invalid BaseModUI file "{}"', basemod_loc, exc_info=exc)
 
     with trio.CancelScope() as PARSE_CANCEL:
         async with trio.open_nursery() as nursery:
