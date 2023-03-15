@@ -1967,7 +1967,10 @@ class Item:
                 'The ButtonType property does nothing if the '
                 'item class is not ItemButtonFloor, only instance 0 is shown.'
             )
-        if self.has_prim_input() and 'connectioncount' not in self.properties:
+        # The indicator items are special, they always have just one input...
+        if self.has_prim_input() and 'connectioncount' not in self.properties and self.id not in [
+            'ITEM_INDICATOR_TOGGLE', 'ITEM_INDICATOR_PANEL', 'ITEM_INDICATOR_PANEL_TIMER',
+        ]:
             LOGGER.warning(
                 'Items with inputs must have ConnectionCount to work!'
             )
