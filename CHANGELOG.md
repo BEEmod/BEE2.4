@@ -14,6 +14,7 @@
 * Added an `Inherit` option to Corridor Groups. This specifies the ID of another style, causing all
   corridors to be copied from that other style.
 * Make `addOverlay` properly permit options to use `$fixup` variables.
+* `properties.txt` for items is now optional, since most of these options can be set elsewhere.
 
 ### Bugfixes:
 * Properly pick free port for error server.

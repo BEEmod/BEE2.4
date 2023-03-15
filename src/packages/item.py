@@ -829,10 +829,14 @@ async def parse_item_folder(
     vmf_path = f'items/{fold}/editoritems.vmf'
     config_path = f'items/{fold}/vbsp_config.cfg'
 
-    def _parse_items(path: str) -> list[EditorItem]:
+    def parse_items(path: str) -> list[EditorItem]:
         """Parse the editoritems in order in a file."""
         items: list[EditorItem] = []
-        with filesystem[path].open_str() as f:
+        try:
+            f = filesystem[path].open_str()
+        except FileNotFoundError as err:
+            raise IOError(f'"{pak_id}:items/{fold}" not valid! Folder likely missing! ') from err
+        with f:
             tok = Tokenizer(f, path)
             for tok_type, tok_value in tok:
                 if tok_type is Token.STRING:
@@ -843,7 +847,7 @@ async def parse_item_folder(
                     raise tok.error(tok_type)
         return items
 
-    def _parse_vmf(path: str) -> VMF | None:
+    def parse_vmf(path: str) -> VMF | None:
         """Parse the VMF portion."""
         try:
             vmf_keyvalues = filesystem.read_kv1(path)
@@ -852,14 +856,20 @@ async def parse_item_folder(
         else:
             return VMF.parse(vmf_keyvalues)
 
-    try:
-        async with trio.open_nursery() as nursery:
-            props_res = utils.Result.sync(nursery, filesystem.read_kv1, prop_path, cancellable=True)
-            all_items = utils.Result.sync(nursery, _parse_items, editor_path, cancellable=True)
-            editor_vmf = utils.Result.sync(nursery, _parse_vmf, vmf_path, cancellable=True)
-        props = props_res().find_key('Properties')
-    except FileNotFoundError as err:
-        raise IOError(f'"{pak_id}:items/{fold}" not valid! Folder likely missing! ') from err
+    def parse_props(path: str) -> Keyvalues:
+        """Parse the keyvalues file containing extra metadata."""
+        try:
+            prop = filesystem.read_kv1(path)
+        except FileNotFoundError:
+            return Keyvalues('Properties', [])
+        else:
+            return prop.find_key('Properties', or_blank=True)
+
+    async with trio.open_nursery() as nursery:
+        props_res = utils.Result.sync(nursery, parse_props, prop_path, cancellable=True)
+        all_items = utils.Result.sync(nursery, parse_items, editor_path, cancellable=True)
+        editor_vmf = utils.Result.sync(nursery, parse_vmf, vmf_path, cancellable=True)
+    props = props_res()
 
     try:
         first_item, *extra_items = all_items()
