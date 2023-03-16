@@ -723,9 +723,6 @@ def gen_item_outputs(vmf: VMF) -> None:
     """
     LOGGER.info('Generating item IO...')
 
-    pan_switching_check = options.get(PanelSwitchingStyle, 'ind_pan_check_switching')
-    pan_switching_timer = options.get(PanelSwitchingStyle, 'ind_pan_timer_switching')
-
     pan_check_type = ITEM_TYPES['item_indicator_panel']
     pan_timer_type = ITEM_TYPES['item_indicator_panel_timer']
 
@@ -772,9 +769,9 @@ def gen_item_outputs(vmf: VMF) -> None:
         # Add outputs for antlines.
         if item.antlines or item.ind_panels:
             if item.timer is None:
-                add_item_indicators(item, pan_switching_check, pan_check_type)
+                add_item_indicators(item, item.ind_style.check_switching, pan_check_type)
             else:
-                add_item_indicators(item, pan_switching_timer, pan_timer_type)
+                add_item_indicators(item, item.ind_style.timer_switching, pan_timer_type)
 
         if item.config.input_type is InputType.DUAL:
             prim_inputs = [

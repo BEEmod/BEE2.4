@@ -12,7 +12,7 @@ import attrs
 from srctools import Vec, Matrix, Keyvalues, conv_float, logger
 from srctools.vmf import VMF, overlay_bounds, make_overlay
 
-from precomp import tiling, rand
+from precomp import options, tiling, rand
 import consts
 import editoritems
 
@@ -147,6 +147,9 @@ class IndicatorStyle:
     wall: AntType
     floor: AntType
 
+    check_switching: PanelSwitchingStyle
+    timer_switching: PanelSwitchingStyle
+
     @classmethod
     def parser(cls, kv: Keyvalues) -> Callable[[Self], Self]:
         """Parse the style from a configuration block.
@@ -171,18 +174,35 @@ class IndicatorStyle:
         elif floor is None and wall is not None:
             floor = wall
 
+        try:
+            check_switching = PanelSwitchingStyle(kv['check_switching'])
+        except (LookupError, ValueError):
+            check_switching = None
+
+        try:
+            timer_switching = PanelSwitchingStyle(kv['timer_switching'])
+        except (LookupError, ValueError):
+            timer_switching = None
+
         def build(parent: Self) -> Self:
             """Build the config, using parent params if specified."""
             return cls(
-                wall=wall if wall is not None else parent.wall,
-                floor=floor if floor is not None else parent.floor,
+                wall=wall or parent.wall,
+                floor=floor or parent.floor,
+                check_switching=check_switching or parent.check_switching,
+                timer_switching=timer_switching or parent.timer_switching,
             )
         return build
 
     @classmethod
     def from_legacy(cls, id_to_item: dict[str, editoritems.Item]) -> Self:
         """Produce the original legacy configs by reading from editoritems."""
-        return cls(wall=AntType.default(), floor=AntType.default())
+        return cls(
+            wall=AntType.default(),
+            floor=AntType.default(),
+            check_switching=options.get(PanelSwitchingStyle, 'ind_pan_check_switching'),
+            timer_switching=options.get(PanelSwitchingStyle, 'ind_pan_timer_switching'),
+        )
 
 
 @attrs.define(eq=False)
