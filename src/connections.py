@@ -111,6 +111,24 @@ def format_output_name(out_tup: tuple[str | None, str]) -> str:
         return out
 
 
+def get_outputs(conf: Keyvalues,  desc: str, kv_name: str) -> list[Output]:
+    """Parse all the outputs with this name."""
+    outputs = []
+    for kv in conf.find_all(kv_name):
+        if kv.value != '':
+            try:
+                out = Output.parse(kv)
+            except ValueError:
+                raise ValueError(
+                    f'Could not parse output value for {desc}: {kv_name}="{kv.value}"\n'
+                    'A value similar to AddOutput in the form '
+                    '"target_ent,input,parameters,delay,times_to_fire" is expected.\n'
+                ) from None
+            out.output = ''  # Clear this, it's unused.
+            outputs.append(out)
+    return outputs
+
+
 class Config:
     """Represents a type of item, with inputs and outputs.
 
@@ -232,32 +250,16 @@ class Config:
     @staticmethod
     def parse(item_id: str, conf: Keyvalues) -> Config:
         """Read the item type info from the given config."""
+        desc = f'item "{item_id}"'
 
-        def get_outputs(kv_name: str) -> list[Output]:
-            """Parse all the outputs with this name."""
-            outputs = []
-            for kv in conf.find_all(kv_name):
-                if kv.value != '':
-                    try:
-                        out = Output.parse(kv)
-                    except ValueError:
-                        raise ValueError(
-                            f'Could not parse output value for item "{item_id}": {kv_name}="{kv.value}"\n'
-                            'A value similar to AddOutput in the form '
-                            '"target_ent,input,parameters,delay,times_to_fire" is expected.\n'
-                        ) from None
-                    out.output = ''  # Clear this, it's unused.
-                    outputs.append(out)
-            return outputs
-
-        enable_cmd = get_outputs('enable_cmd')
-        disable_cmd = get_outputs('disable_cmd')
-        lock_cmd = get_outputs('lock_cmd')
-        unlock_cmd = get_outputs('unlock_cmd')
+        enable_cmd = get_outputs(conf, desc, 'enable_cmd')
+        disable_cmd = get_outputs(conf, desc, 'disable_cmd')
+        lock_cmd = get_outputs(conf, desc, 'lock_cmd')
+        unlock_cmd = get_outputs(conf, desc, 'unlock_cmd')
 
         inf_lock_only = conf.bool('inf_lock_only')
 
-        timer_done_cmd = get_outputs('timer_done_cmd')
+        timer_done_cmd = get_outputs(conf, desc, 'timer_done_cmd')
         if 'timer_sound_pos' in conf:
             timer_sound_pos = conf.vec('timer_sound_pos')
             force_timer_sound = conf.bool('force_timer_sound')
@@ -300,8 +302,8 @@ class Config:
             ) from None
 
         if input_type is InputType.DUAL:
-            sec_enable_cmd = get_outputs('sec_enable_cmd')
-            sec_disable_cmd = get_outputs('sec_disable_cmd')
+            sec_enable_cmd = get_outputs(conf, desc, 'sec_enable_cmd')
+            sec_disable_cmd = get_outputs(conf, desc, 'sec_disable_cmd')
 
             try:
                 default_dual = CONN_TYPE_NAMES[
