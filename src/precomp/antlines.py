@@ -26,6 +26,13 @@ class SegType(Enum):
     CORNER = 1
 
 
+class PanelSwitchingStyle(Enum):
+    """How the panel instance does its switching."""
+    CUSTOM = 'custom'      # Some logic, we don't do anything.
+    EXTERNAL = 'external'  # Provide a toggle to the instance.
+    INTERNAL = 'internal'  # The inst has a toggle or panel, so we can reuse it.
+
+
 @attrs.define
 class AntTex:
     """Represents a single texture, and the parameters it has."""

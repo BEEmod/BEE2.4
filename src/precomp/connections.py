@@ -3,12 +3,11 @@
 This allows checking which items are connected to what, and also regenerates
 the outputs with optimisations and custom settings.
 """
-from enum import Enum
 from collections import defaultdict
 
 from connections import InputType, FeatureMode, Config, ConnType, OutNames
 from srctools import VMF, Entity, Output, conv_bool, Vec, Angle
-from precomp.antlines import Antline, AntType, IndicatorStyle
+from precomp.antlines import Antline, AntType, IndicatorStyle, PanelSwitchingStyle
 from precomp import (
     instance_traits, instanceLocs,
     options,
@@ -52,14 +51,6 @@ function snd() {{
     self.EmitSound("{snd}");
 }}
 '''
-
-
-class PanelSwitchingStyle(Enum):
-    """How the panel instance does its switching."""
-    CUSTOM = 'custom'      # Some logic, we don't do anything.
-    EXTERNAL = 'external'  # Provide a toggle to the instance.
-    INTERNAL = 'internal'  # The inst has a toggle or panel, so we can reuse it.
-
 
 CONN_NAMES = {
     ConnType.DEFAULT: 'DEF',
