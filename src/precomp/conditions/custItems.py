@@ -29,17 +29,7 @@ def res_cust_antline_setup(res: Keyvalues) -> Callable[[Entity], None]:
         antlines. This is a fixup var which will be set to the name of the
         overlays, for user control.
     """
-    wall_style: antlines.AntType | None
-    floor_type: antlines.AntType | None
-    if 'wall' in res:
-        wall_style = antlines.AntType.parse(res.find_key('wall'))
-    else:
-        wall_style = None
-
-    if 'floor' in res:
-        floor_style = antlines.AntType.parse(res.find_key('floor'))
-    else:
-        floor_style = wall_style
+    make_style = antlines.IndicatorStyle.parser(res)
 
     remove_signs = res.bool('remove_signs')
     toggle_var = res['toggle_var', '']
@@ -47,10 +37,7 @@ def res_cust_antline_setup(res: Keyvalues) -> Callable[[Entity], None]:
     def change_antlines(inst: Entity) -> None:
         """Change the antlines of an item."""
         item = connections.ITEMS[inst['targetname']]
-        if wall_style is not None:
-            item.ant_wall_style = wall_style
-        if floor_style is not None:
-            item.ant_floor_style = floor_style
+        item.ind_style = make_style(item.ind_style)
 
         if remove_signs:
             for sign in item.ind_panels:

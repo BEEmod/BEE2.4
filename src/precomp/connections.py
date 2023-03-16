@@ -8,7 +8,7 @@ from collections import defaultdict
 
 from connections import InputType, FeatureMode, Config, ConnType, OutNames
 from srctools import VMF, Entity, Output, conv_bool, Vec, Angle
-from precomp.antlines import Antline, AntType
+from precomp.antlines import Antline, AntType, IndicatorStyle
 from precomp import (
     instance_traits, instanceLocs,
     options,
@@ -140,7 +140,7 @@ class Item:
         'inst', 'config', '_kv_setters',
         'ind_panels',
         'antlines', 'shape_signs',
-        'ant_wall_style', 'ant_floor_style',
+        'ind_style',
         'timer',
         'inputs', 'outputs',
         'enable_cmd', 'disable_cmd',
@@ -153,8 +153,7 @@ class Item:
         inst: Entity,
         item_type: Config,
         *,  # Don't mix up antlines!
-        ant_floor_style: AntType,
-        ant_wall_style: AntType,
+        ind_style: IndicatorStyle,
         panels: Iterable[Entity]=(),
         antlines: Iterable[Antline]=(),
         shape_signs: Iterable[ShapeSignage]=(),
@@ -170,8 +169,7 @@ class Item:
         self.shape_signs = list(shape_signs)
 
         # And the style to use for the antlines.
-        self.ant_floor_style = ant_floor_style
-        self.ant_wall_style = ant_wall_style
+        self.ind_style = ind_style
 
         # If set, the item has special antlines. This is a fixup var,
         # which gets the antline name filled in for us.
@@ -198,6 +196,14 @@ class Item:
         self._kv_setters: Dict[str, Entity] = {}
 
         assert self.name, 'Blank name!'
+
+    @property
+    def ant_floor_style(self) -> AntType:
+        return self.ind_style.floor
+
+    @property
+    def ant_wall_style(self) -> AntType:
+        return self.ind_style.wall
 
     def __repr__(self) -> str:
         return '<Item {}: "{}">'.format(self.config.id, self.name)
@@ -448,9 +454,7 @@ def calc_connections(
     antlines: Dict[str, List[Antline]],
     shape_frame_tex: List[str],
     enable_shape_frame: bool,
-    *,  # Don't mix up antlines!
-    antline_wall: AntType,
-    antline_floor: AntType,
+    ind_style: IndicatorStyle,
 ) -> None:
     """Compute item connections from the map file.
 
@@ -513,8 +517,7 @@ def calc_connections(
             # Pass in the defaults for antline styles.
             ITEMS[inst_name] = Item(
                 inst, item_type,
-                ant_floor_style=antline_floor,
-                ant_wall_style=antline_wall,
+                ind_style=ind_style,
             )
 
             # Strip off the original connection count variables, these are
@@ -1320,7 +1323,7 @@ def add_item_indicators(
     for ant in item.antlines:
         ant.name = ant_name
 
-        ant.export(item.inst.map, wall_conf=item.ant_wall_style, floor_conf=item.ant_floor_style)
+        ant.export(item.inst.map, item.ind_style)
 
     # Special case - the item wants full control over its antlines.
     if has_ant and item.ant_toggle_var:
@@ -1328,17 +1331,19 @@ def add_item_indicators(
         # We don't have antlines to control.
         has_ant = False
 
+    # If either is defined, the item wants to do custom control over the timer.
+    independent_timer = (
+        item.config.timer_start is not None or
+        item.config.timer_stop is not None
+    )
+
     if inst_type is PanelSwitchingStyle.CUSTOM:
         needs_toggle = has_ant
     elif inst_type is PanelSwitchingStyle.EXTERNAL:
         needs_toggle = has_ant or has_sign
     elif inst_type is PanelSwitchingStyle.INTERNAL:
-        if (
-            item.config.timer_start is not None or
-            item.config.timer_stop is not None
-        ):
-            # The item is doing custom control over the timer, so
-            # don't tie antline control to the timer.
+        if independent_timer:
+            # We need to not tie antline control to the timer.
             needs_toggle = has_ant
             inst_type = PanelSwitchingStyle.CUSTOM
         else:

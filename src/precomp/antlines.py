@@ -1,5 +1,8 @@
 """Manages parsing and regenerating antlines."""
 from __future__ import annotations
+from typing import Callable, Optional
+from typing_extensions import Self
+
 from collections import defaultdict
 from collections.abc import Iterator, Container
 from enum import Enum
@@ -11,6 +14,7 @@ from srctools.vmf import VMF, overlay_bounds, make_overlay
 
 from precomp import tiling, rand
 import consts
+import editoritems
 
 
 LOGGER = logger.get_logger(__name__)
@@ -130,6 +134,50 @@ class AntType:
         )
 
 
+@attrs.define(eq=False, kw_only=True)
+class IndicatorStyle:
+    """Represents complete configuration for antlines and indicator panels."""
+    wall: AntType
+    floor: AntType
+
+    @classmethod
+    def parser(cls, kv: Keyvalues) -> Callable[[Self], Self]:
+        """Parse the style from a configuration block.
+
+        This returns a callable which should be passed the default values, so that it can inherit
+        from that if sections are not specified.
+        """
+        wall: Optional[AntType] = None
+        floor: Optional[AntType] = None
+        if 'floor' in kv:
+            floor = AntType.parse(kv.find_key('floor'))
+        if 'wall' in kv:
+            wall = AntType.parse(kv.find_key('wall'))
+
+        # If both are not there but some textures are, allow omitting the subkey.
+        if wall is floor is None and ('straight' in kv or 'corner' in kv):
+            wall = floor = AntType.parse(kv)
+
+        # If only one is defined, use that for both.
+        if wall is None and floor is not None:
+            wall = floor
+        elif floor is None and wall is not None:
+            floor = wall
+
+        def build(parent: Self) -> Self:
+            """Build the config, using parent params if specified."""
+            return cls(
+                wall=wall if wall is not None else parent.wall,
+                floor=floor if floor is not None else parent.floor,
+            )
+        return build
+
+    @classmethod
+    def from_legacy(cls, id_to_item: dict[str, editoritems.Item]) -> Self:
+        """Produce the original legacy configs by reading from editoritems."""
+        return cls(wall=AntType.default(), floor=AntType.default())
+
+
 @attrs.define(eq=False)
 class Segment:
     """A single section of an antline - a straight section or corner.
@@ -184,7 +232,7 @@ class Antline:
     name: str
     line: list[Segment]
 
-    def export(self, vmf: VMF, *, wall_conf: AntType, floor_conf: AntType) -> None:
+    def export(self, vmf: VMF, style: IndicatorStyle) -> None:
         """Add the antlines into the map."""
 
         # First, do some optimisation. If corners aren't defined, try and
@@ -192,12 +240,12 @@ class Antline:
         # before/after it into the corners.
 
         collapse_line: list[Segment | None]
-        if not wall_conf.tex_corner or not floor_conf.tex_corner:
+        if not style.wall.tex_corner or not style.floor.tex_corner:
             collapse_line = list(self.line)
             for i, seg in enumerate(collapse_line):
                 if seg is None or seg.type is not SegType.STRAIGHT:
                     continue
-                if (floor_conf if seg.on_floor else wall_conf).tex_corner:
+                if (style.floor if seg.on_floor else style.wall).tex_corner:
                     continue
                 for corner_ind in [i-1, i+1]:
                     if i == -1:
@@ -234,7 +282,7 @@ class Antline:
             LOGGER.info('Collapsed {} antline corners', collapse_line.count(None))
 
         for seg in self.line:
-            conf = floor_conf if seg.on_floor else wall_conf
+            conf = style.floor if seg.on_floor else style.wall
             # Check tiledefs in the voxels, and assign just in case.
             # antline corner items don't have them defined, and some embed-faces don't work
             # properly. But we keep any segments actually defined also.
