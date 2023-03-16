@@ -5,6 +5,8 @@ the outputs with optimisations and custom settings.
 """
 from collections import defaultdict
 
+from typing_extensions import assert_never
+
 from connections import InputType, FeatureMode, Config, ConnType, OutNames
 from srctools import VMF, Entity, Output, conv_bool, Vec, Angle
 from precomp.antlines import Antline, AntType, IndicatorStyle, PanelSwitchingStyle
@@ -474,8 +476,8 @@ def calc_connections(
 
     for inst in vmf.by_class['func_instance']:
         inst_name = inst['targetname']
-        # No connections, so nothing to worry about.
-        if not inst_name:
+        # Ignore to-be-removed instances, or those which won't have I/O...
+        if not inst_name or not inst['file']:
             continue
 
         traits = instance_traits.get(inst)
@@ -768,10 +770,7 @@ def gen_item_outputs(vmf: VMF) -> None:
 
         # Add outputs for antlines.
         if item.antlines or item.ind_panels:
-            if item.timer is None:
-                add_item_indicators(item, item.ind_style.check_switching, pan_check_type)
-            else:
-                add_item_indicators(item, item.ind_style.timer_switching, pan_timer_type)
+            add_item_indicators(item, item.ind_style)
 
         if item.config.input_type is InputType.DUAL:
             prim_inputs = [
@@ -1300,13 +1299,13 @@ def add_item_inputs(
 
 def add_item_indicators(
     item: Item,
-    inst_type: PanelSwitchingStyle,
-    pan_item: Config,
+    style: IndicatorStyle,
 ) -> None:
     """Generate the commands for antlines and the overlays themselves."""
     ant_name = '@{}_overlay'.format(item.name)
     has_sign = len(item.ind_panels) > 0
     has_ant = len(item.antlines) > 0
+    is_timer = item.timer is not None
 
     for ant in item.antlines:
         ant.name = ant_name
@@ -1325,6 +1324,19 @@ def add_item_indicators(
         item.config.timer_stop is not None
     )
 
+    if is_timer:
+        inst_type = style.timer_switching
+        conn_pairs = [
+            (item.timer_output_start(), style.check_cmd),
+            (item.timer_output_stop(), style.cross_cmd),
+        ]
+    else:
+        inst_type = style.check_switching
+        conn_pairs = [
+            (item.timer_output_start(), style.timer_start_cmd),
+            (item.timer_output_stop(), style.timer_stop_cmd),
+        ]
+
     if inst_type is PanelSwitchingStyle.CUSTOM:
         needs_toggle = has_ant
     elif inst_type is PanelSwitchingStyle.EXTERNAL:
@@ -1337,7 +1349,7 @@ def add_item_indicators(
         else:
             needs_toggle = has_ant and not has_sign
     else:
-        raise ValueError(f'Bad switch style "{inst_type}" in item {item.config.id}!')
+        raise assert_never(inst_type)
 
     first_inst = True
 
@@ -1354,17 +1366,14 @@ def add_item_indicators(
             pan.fixup[consts.FixupVars.TOGGLE_OVERLAY] = '-'
 
         # Overwrite the timer delay value, in case a sign changed ownership.
-        if item.timer is not None:
+        if is_timer:
             pan.fixup[consts.FixupVars.TIM_DELAY] = item.timer
             pan.fixup[consts.FixupVars.TIM_ENABLED] = '1'
         else:
             pan.fixup[consts.FixupVars.TIM_DELAY] = '99999999999'
             pan.fixup[consts.FixupVars.TIM_ENABLED] = '0'
 
-        for outputs, input_cmds in [
-            (item.timer_output_start(), pan_item.enable_cmd),
-            (item.timer_output_stop(), pan_item.disable_cmd)
-        ]:
+        for outputs, input_cmds in conn_pairs:
             for output in outputs:
                 for cmd in input_cmds:
                     item.add_io_command(
