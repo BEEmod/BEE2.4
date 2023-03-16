@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import sys
 from enum import Enum
-from typing import Dict, Iterable
+from typing import Dict, Final, Iterable
 
 from srctools import Output, Keyvalues, Vec, conv_bool
 
@@ -91,6 +91,11 @@ class OutNames(Enum):
 
     OUT_ACT = 'ON_ACTIVATED'
     OUT_DEACT = 'ON_DEACTIVATED'
+
+
+# Item IDs used for the checkmark/timer panels.
+INDICATOR_CHECK_ID: Final = 'ITEM_INDICATOR_PANEL'
+INDICATOR_TIMER_ID: Final = 'ITEM_INDICATOR_PANEL_TIMER'
 
 
 def _intern_out(out: tuple[str | None, str] | None) -> tuple[str | None, str] | None:
