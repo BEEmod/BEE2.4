@@ -725,9 +725,6 @@ def gen_item_outputs(vmf: VMF) -> None:
     """
     LOGGER.info('Generating item IO...')
 
-    pan_check_type = ITEM_TYPES['item_indicator_panel']
-    pan_timer_type = ITEM_TYPES['item_indicator_panel_timer']
-
     # For logic items without inputs, collect the instances to fix up later.
     dummy_logic_ents: list[Entity] = []
 
@@ -820,21 +817,6 @@ def gen_item_outputs(vmf: VMF) -> None:
                 item.config.spawn_fire,
                 '_inv_rl',
             )
-
-    # Check/cross instances sometimes don't match the kind of timer delay.
-    # We also might want to swap them out.
-
-    panel_timer = instanceLocs.resolve_one('[indPanTimer]', error=True)
-    panel_check = instanceLocs.resolve_one('[indPanCheck]', error=True)
-
-    for item in ITEMS.values():
-        desired_panel_inst = panel_check if item.timer is None else panel_timer
-
-        for pan in item.ind_panels:
-            pan['file'] = desired_panel_inst
-            pan.fixup[consts.FixupVars.TIM_ENABLED] = item.timer is not None
-        if item.ind_panels:
-            conditions.ALL_INST.add(desired_panel_inst.casefold())
 
     logic_auto = vmf.create_ent(
         'logic_auto',
@@ -1326,16 +1308,20 @@ def add_item_indicators(
 
     if is_timer:
         inst_type = style.timer_switching
+        pan_filename = style.timer_inst
         conn_pairs = [
             (item.timer_output_start(), style.check_cmd),
             (item.timer_output_stop(), style.cross_cmd),
         ]
     else:
         inst_type = style.check_switching
+        pan_filename = style.check_inst
         conn_pairs = [
             (item.timer_output_start(), style.timer_start_cmd),
             (item.timer_output_stop(), style.timer_stop_cmd),
         ]
+    if pan_filename:
+        conditions.ALL_INST.add(pan_filename.casefold())
 
     if inst_type is PanelSwitchingStyle.CUSTOM:
         needs_toggle = has_ant
@@ -1364,6 +1350,9 @@ def add_item_indicators(
             # VBSP and/or Hammer seems to get confused with totally empty
             # instance var, so give it a blank name.
             pan.fixup[consts.FixupVars.TOGGLE_OVERLAY] = '-'
+
+        if pan_filename:
+            pan['file'] = pan_filename
 
         # Overwrite the timer delay value, in case a sign changed ownership.
         if is_timer:

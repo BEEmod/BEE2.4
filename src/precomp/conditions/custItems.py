@@ -29,7 +29,7 @@ def res_cust_antline_setup(res: Keyvalues) -> Callable[[Entity], None]:
         antlines. This is a fixup var which will be set to the name of the
         overlays, for user control.
     """
-    make_style = antlines.IndicatorStyle.parser(res)
+    make_style = antlines.IndicatorStyle.parser(res, 'custAntline block')
 
     remove_signs = res.bool('remove_signs')
     toggle_var = res['toggle_var', '']

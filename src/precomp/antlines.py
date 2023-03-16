@@ -1,6 +1,6 @@
 """Manages parsing and regenerating antlines."""
 from __future__ import annotations
-from typing import Callable, Optional
+from typing import Callable, final, List, Optional, Sequence
 from typing_extensions import Self
 
 from collections import defaultdict
@@ -10,9 +10,10 @@ import math
 
 import attrs
 from srctools import Vec, Matrix, Keyvalues, conv_float, logger
-from srctools.vmf import VMF, overlay_bounds, make_overlay
+from srctools.vmf import Output, VMF, overlay_bounds, make_overlay
 
 from precomp import options, tiling, rand
+from connections import get_outputs
 import consts
 import editoritems
 
@@ -136,22 +137,36 @@ class AntType:
         """Make a copy of the original PeTI antline config."""
         return AntType(
             [AntTex(consts.Antlines.STRAIGHT, 0.25, False)],
-            [AntTex(consts.Antlines.CORNER, 1, False)],
-            [], [], 0,
+            [AntTex(consts.Antlines.CORNER, 1.0, False)],
+            [], [], 0.0,
         )
 
 
-@attrs.define(eq=False, kw_only=True)
+@final
+@attrs.frozen(eq=False, kw_only=True)
 class IndicatorStyle:
     """Represents complete configuration for antlines and indicator panels."""
     wall: AntType
     floor: AntType
 
+    # Instance to use for checkmark signs.
+    check_inst: str
     check_switching: PanelSwitchingStyle
+    # Sign inputs to swap the two versions.
+    check_cmd: Sequence[Output]
+    cross_cmd: Sequence[Output]
+
+    # Instance to use for timer signs.
+    timer_inst: str
     timer_switching: PanelSwitchingStyle
+    # Outputs to use to swap skins, and to start/stop the indicator.
+    timer_blue_cmd: Sequence[Output]
+    timer_oran_cmd: Sequence[Output]
+    timer_start_cmd: Sequence[Output]
+    timer_stop_cmd: Sequence[Output]
 
     @classmethod
-    def parser(cls, kv: Keyvalues) -> Callable[[Self], Self]:
+    def parser(cls, kv: Keyvalues, desc: str) -> Callable[[Self], Self]:
         """Parse the style from a configuration block.
 
         This returns a callable which should be passed the default values, so that it can inherit
@@ -164,9 +179,13 @@ class IndicatorStyle:
         if 'wall' in kv:
             wall = AntType.parse(kv.find_key('wall'))
 
-        # If both are not there but some textures are, allow omitting the subkey.
-        if wall is floor is None and ('straight' in kv or 'corner' in kv):
-            wall = floor = AntType.parse(kv)
+        # Allow 'antline' to specify both.
+        if wall is None and floor is None:
+            if 'antline' in kv:
+                wall = floor = AntType.parse(kv.find_key('antline'))
+            # If both are not there but some textures are, allow omitting the subkey.
+            elif 'straight' in kv or 'corner' in kv:
+                wall = floor = AntType.parse(kv)
 
         # If only one is defined, use that for both.
         if wall is None and floor is not None:
@@ -174,34 +193,89 @@ class IndicatorStyle:
         elif floor is None and wall is not None:
             floor = wall
 
-        try:
-            check_switching = PanelSwitchingStyle(kv['check_switching'])
-        except (LookupError, ValueError):
-            check_switching = None
+        check_inst: Optional[str] = None
+        timer_inst: Optional[str] = None
+        check_cmd: Optional[List[Output]] = None
+        cross_cmd: Optional[List[Output]] = None
+        timer_start_cmd: Optional[List[Output]] = None
+        timer_stop_cmd: Optional[List[Output]] = None
+        timer_blue_cmd: Optional[List[Output]] = None
+        timer_oran_cmd: Optional[List[Output]] = None
+        check_switching = PanelSwitchingStyle.CUSTOM
+        timer_switching = PanelSwitchingStyle.CUSTOM
 
-        try:
-            timer_switching = PanelSwitchingStyle(kv['timer_switching'])
-        except (LookupError, ValueError):
-            timer_switching = None
+        check_kv = kv.find_block('check', or_blank=True)
+        has_check = bool(check_kv)
+        if has_check:
+            check_inst = check_kv['inst']
+            try:
+                check_switching = PanelSwitchingStyle(check_kv['switching'])
+            except (LookupError, ValueError):
+                check_switching = PanelSwitchingStyle.CUSTOM  #  Assume no optimisations
+            check_cmd = get_outputs(check_kv, desc, 'check_cmd')
+            cross_cmd = get_outputs(check_kv, desc, 'cross_cmd')
 
-        def build(parent: Self) -> Self:
+        timer_kv = kv.find_block('timer', or_blank=True)
+        has_timer = bool(timer_kv)
+        if has_timer:
+            timer_inst = timer_kv['inst']
+            try:
+                timer_switching = PanelSwitchingStyle(timer_kv['switching'])
+            except (LookupError, ValueError):
+                timer_switching = PanelSwitchingStyle.CUSTOM  #  Assume no optimisations
+            timer_start_cmd = get_outputs(timer_kv, desc, 'start_cmd')
+            timer_stop_cmd = get_outputs(timer_kv, desc, 'stop_cmd')
+            timer_blue_cmd = get_outputs(timer_kv, desc, 'blue_cmd')
+            timer_oran_cmd = get_outputs(timer_kv, desc, 'oran_cmd')
+
+        def build(parent: IndicatorStyle) -> IndicatorStyle:
             """Build the config, using parent params if specified."""
-            return cls(
+            conf = attrs.evolve(
+                parent,
                 wall=wall or parent.wall,
                 floor=floor or parent.floor,
-                check_switching=check_switching or parent.check_switching,
-                timer_switching=timer_switching or parent.timer_switching,
             )
+            if has_check:
+                conf = attrs.evolve(
+                    conf,
+                    check_inst=check_inst,
+                    check_switching=check_switching,
+                    check_cmd=check_cmd,
+                    cross_cmd=cross_cmd,
+                )
+            if has_timer:
+                conf = attrs.evolve(
+                    conf,
+                    timer_inst=timer_inst,
+                    timer_switching=timer_switching,
+                    timer_start_cmd=timer_start_cmd,
+                    timer_stop_cmd=timer_stop_cmd,
+                    timer_blue_cmd=timer_blue_cmd,
+                    timer_oran_cmd=timer_oran_cmd,
+                )
+            return conf
         return build
 
     @classmethod
     def from_legacy(cls, id_to_item: dict[str, editoritems.Item]) -> Self:
         """Produce the original legacy configs by reading from editoritems."""
+        check_item = id_to_item['item_indicator_panel']
+        timer_item = id_to_item['item_indicator_panel_timer']
+
         return cls(
             wall=AntType.default(),
             floor=AntType.default(),
+            check_inst=str(check_item.instances[0].inst) if check_item.instances else '',
             check_switching=options.get(PanelSwitchingStyle, 'ind_pan_check_switching'),
+            check_cmd=check_item.conn_config.enable_cmd if check_item.conn_config is not None else [],
+            cross_cmd=check_item.conn_config.disable_cmd if check_item.conn_config is not None else [],
+
+            timer_inst=str(timer_item.instances[0].inst) if timer_item.instances else '',
             timer_switching=options.get(PanelSwitchingStyle, 'ind_pan_timer_switching'),
+            timer_start_cmd=timer_item.conn_config.enable_cmd if timer_item.conn_config is not None else [],
+            timer_stop_cmd=timer_item.conn_config.disable_cmd if timer_item.conn_config is not None else [],
+            timer_blue_cmd=[],
+            timer_oran_cmd=[],
         )
 
 
@@ -233,12 +307,12 @@ class Segment:
         Neighbouring sections will be merged when they have the same
         type.
         """
-        rng = rand.seed(b'ant_broken', self.start, self.end, chance)
+        rng = rand.seed(b'ant_broken', self.start, self.end, float(chance))
         offset = self.end - self.start
         dist = offset.mag() // 16
         norm = 16 * offset.norm()
 
-        if dist < 3 or chance == 0:
+        if dist < 3 or chance == 0.0:
             # Short antlines always are either on/off.
             yield self.start, self.end, (rng.randrange(100) < chance)
         else:
