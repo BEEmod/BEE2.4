@@ -155,11 +155,11 @@ async def load_settings() -> Tuple[
     connections.read_configs(id_to_item.values())
 
     # Antline texturing settings.
-    # The double-call here is used elsewhere to allow this to be used to modify configs later.
-    indicators = antlines.IndicatorStyle.parser(
+    indicators = antlines.IndicatorStyle.parse(
         tex_block.find_block('Antlines', or_blank=True),
         'the main antline configuration',
-    )(antlines.IndicatorStyle.from_legacy(id_to_item))
+        antlines.IndicatorStyle.from_legacy(id_to_item),
+    )
 
     # Parse packlist data.
     packing.parse_packlists(res_packlist())

@@ -1,7 +1,6 @@
 """Manages parsing and regenerating antlines."""
 from __future__ import annotations
 from typing import Callable, final, List, Optional, Sequence
-from typing_extensions import Self
 
 from collections import defaultdict
 from collections.abc import Iterator, Container
@@ -166,11 +165,19 @@ class IndicatorStyle:
     timer_stop_cmd: Sequence[Output]
 
     @classmethod
-    def parser(cls, kv: Keyvalues, desc: str) -> Callable[[Self], Self]:
+    def parse(cls, kv: Keyvalues, desc: str, parent: IndicatorStyle) -> IndicatorStyle:
         """Parse the style from a configuration block.
 
-        This returns a callable which should be passed the default values, so that it can inherit
-        from that if sections are not specified.
+        If sections are not specified, they will be inherited from the parent.
+        """
+        return cls.parser(kv, desc)(parent)
+
+    @classmethod
+    def parser(cls, kv: Keyvalues, desc: str) -> Callable[[IndicatorStyle], IndicatorStyle]:
+        """Parse the style from a configuration block.
+
+        This parses immediately, then returns a callable to allows passing in the parent to inherit
+        from later.
         """
         wall: Optional[AntType] = None
         floor: Optional[AntType] = None
@@ -229,7 +236,7 @@ class IndicatorStyle:
             timer_oran_cmd = get_outputs(timer_kv, desc, 'oran_cmd')
 
         def build(parent: IndicatorStyle) -> IndicatorStyle:
-            """Build the config, using parent params if specified."""
+            """Build the config, using parent params if not specified."""
             conf = attrs.evolve(
                 parent,
                 wall=wall or parent.wall,
@@ -257,7 +264,7 @@ class IndicatorStyle:
         return build
 
     @classmethod
-    def from_legacy(cls, id_to_item: dict[str, editoritems.Item]) -> Self:
+    def from_legacy(cls, id_to_item: dict[str, editoritems.Item]) -> IndicatorStyle:
         """Produce the original legacy configs by reading from editoritems."""
         check_item = id_to_item['item_indicator_panel']
         timer_item = id_to_item['item_indicator_panel_timer']
