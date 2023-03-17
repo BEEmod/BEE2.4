@@ -128,7 +128,7 @@ async def load_settings() -> Tuple[
         sys.exit(1)
 
     conf = res_conf()
-    tex_block = conf.find_block('textures', or_blank=True)
+    tex_block = Keyvalues('Textures', list(conf.find_children('textures')))
 
     texturing.load_config(tex_block)
 
@@ -156,7 +156,8 @@ async def load_settings() -> Tuple[
 
     # Antline texturing settings.
     indicators = antlines.IndicatorStyle.parse(
-        tex_block.find_block('Antlines', or_blank=True),
+        # Collect all blocks, since they may be in separate blocks for antlines/checkmarks/timers.
+        Keyvalues('Antlines', list(tex_block.find_children('antlines'))),
         'the main antline configuration',
         antlines.IndicatorStyle.from_legacy(id_to_item),
     )
