@@ -20,7 +20,7 @@ import editoritems
 import consts
 import srctools.logger
 
-from typing import Optional, Iterable, Dict, List, Set, Tuple, Iterator, Union
+from typing import Optional, Iterable, Dict, List, Sequence, Set, Tuple, Iterator, Union
 import user_errors
 
 
@@ -251,12 +251,32 @@ class Item:
 
         return self.config.output_deact
 
-    def timer_output_start(self) -> List[Tuple[Optional[str], str]]:
-        """Return the output to use for starting timers."""
-        if self.config.timer_start is None:
+    def timer_output_countup(self) -> List[Tuple[Optional[str], str]]:
+        """Return the output to use for making the timer count up."""
+        if self.config.timer_countup is None:
             out = self.output_act()
             return [] if out is None else [out]
-        return self.config.timer_start
+        return self.config.timer_countup
+
+    def timer_output_countdown(self) -> List[Tuple[Optional[str], str]]:
+        """Return the output to use for making the timer count down."""
+        if self.config.timer_countdown is None:
+            out = self.output_act()
+            return [] if out is None else [out]
+        return self.config.timer_countdown
+
+    def timer_output_start(self) -> List[Tuple[Optional[str], str]]:
+        """Return the outputs to use when the timer starts in either direction.."""
+        result: List[Tuple[Optional[str], str]] = []
+        if self.config.timer_countdown is not None:
+            result.extend(self.config.timer_countdown)
+        if self.config.timer_countup is not None:
+            result.extend(self.config.timer_countup)
+        if not result:
+            out = self.output_act()
+            if out is not None:
+                result.append(out)
+        return result
 
     def timer_output_stop(self) -> List[Tuple[Optional[str], str]]:
         """Return the output to use for stopping timers."""
@@ -1302,25 +1322,40 @@ def add_item_indicators(
 
     # If either is defined, the item wants to do custom control over the timer.
     independent_timer = (
-        item.config.timer_start is not None or
+        item.config.timer_countup is not None or
+        item.config.timer_countdown is not None or
         item.config.timer_stop is not None
     )
+    # If that is defined, use advanced/custom timer logic if the style supports it.
+    adv_timer = independent_timer and style.has_advanced_timer()
 
+    conn_pairs: List[Tuple[List[Tuple[Optional[str], str]], Sequence[Output]]]
     if is_timer:
         inst_type = style.timer_switching
         pan_filename = style.timer_inst
-        conn_pairs = [
-            (item.timer_output_start(), style.check_cmd),
-            (item.timer_output_stop(), style.cross_cmd),
-        ]
+        if adv_timer:
+            conn_pairs = [
+                (item.timer_output_stop(), style.timer_adv_stop_cmd),
+                ([item.output_act()], style.timer_oran_cmd),
+                ([item.output_deact()], style.timer_blue_cmd),
+            ]
+            if item.config.timer_countup:
+                conn_pairs.append((item.config.timer_countup, style.timer_countup_cmd))
+            if item.config.timer_countdown:
+                conn_pairs.append((item.config.timer_countdown, style.timer_countdn_cmd))
+        else:  # No advanced timer, use start/stop to approximate.
+            conn_pairs = [
+                (item.timer_output_start(), style.timer_basic_start_cmd),
+                (item.timer_output_stop(), style.timer_basic_stop_cmd),
+            ]
     else:
         inst_type = style.check_switching
         pan_filename = style.check_inst
         conn_pairs = [
-            (item.timer_output_start(), style.timer_start_cmd),
-            (item.timer_output_stop(), style.timer_stop_cmd),
+            ([item.output_act()], style.check_cmd),
+            ([item.output_deact()], style.cross_cmd),
         ]
-    if pan_filename:
+    if pan_filename and item.ind_panels:
         conditions.ALL_INST.add(pan_filename.casefold())
 
     if inst_type is PanelSwitchingStyle.CUSTOM:
@@ -1358,6 +1393,11 @@ def add_item_indicators(
         if is_timer:
             pan.fixup[consts.FixupVars.TIM_DELAY] = item.timer
             pan.fixup[consts.FixupVars.TIM_ENABLED] = '1'
+            # Also set vars to show the advanced timer state.
+            pan.fixup['$advanced'] = adv_timer
+            if adv_timer:
+                pan.fixup['$has_countup'] = '1' if item.config.timer_countup else '0'
+                pan.fixup['$has_countdown'] = '1' if item.config.timer_countdown else '0'
         else:
             pan.fixup[consts.FixupVars.TIM_DELAY] = '99999999999'
             pan.fixup[consts.FixupVars.TIM_ENABLED] = '0'

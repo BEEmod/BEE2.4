@@ -172,7 +172,8 @@ class Config:
         timer_done_cmd: Iterable[Output]=(),
         force_timer_sound: bool=False,
 
-        timer_start: list[tuple[str | None, str]] | None=None,
+        timer_countup: list[tuple[str | None, str]] | None = None,
+        timer_countdown: list[tuple[str | None, str]] | None=None,
         timer_stop: list[tuple[str | None, str]] | None=None,
     ):
         self.id = id
@@ -232,8 +233,9 @@ class Config:
         self.force_timer_sound = force_timer_sound
 
         # If set, these allow alternate inputs for controlling timers.
-        # Multiple can be given. If None, we use the normal output.
-        self.timer_start = timer_start
+        # Multiple can be given. If None, we use the normal outputs for countdown.
+        self.timer_countup = timer_countup
+        self.timer_countdown = timer_countdown
         self.timer_stop = timer_stop
 
         # For locking buttons, this is the command to reactivate,
@@ -363,20 +365,22 @@ class Config:
         out_lock = get_input('out_lock', conf['out_lock', ''])
         out_unlock = get_input('out_unlock', conf['out_unlock', ''])
 
-        timer_start: list[tuple[str | None, str]] | None = None
-        if 'out_timer_start' in conf:
-            timer_start = [
-                param
-                for kv in conf.find_all('out_timer_start')
-                if (param := get_input('out_timer_start', kv.value)) is not None
-            ]
-        timer_stop: list[tuple[str | None, str]] | None = None
-        if 'out_timer_stop' in conf:
-            timer_stop = [
-                param
-                for kv in conf.find_all('out_timer_stop')
-                if (param := get_input('out_timer_stop', kv.value)) is not None
-            ]
+        def get_inputs(block: Keyvalues, kv_name: str) -> list[tuple[str | None, str]] | None:
+            """Get a list of inputs for timers."""
+            if kv_name in block:
+                return [
+                    param
+                    for kv in block.find_all(kv_name)
+                    if (param := get_input(kv_name, kv.value)) is not None
+                ]
+            return None
+
+        timer_countup = get_inputs(conf, 'out_timer_countup')
+        timer_countdown = get_inputs(conf, 'out_timer_countdown')
+        timer_stop = get_inputs(conf, 'out_timer_stop')
+        # Old deprecated name
+        if timer_countdown is None:
+            timer_countdown = get_inputs(conf, 'out_timer_start')
 
         return Config(
             item_id, default_dual, input_type,
@@ -385,14 +389,18 @@ class Config:
             output_type, out_act, out_deact,
             lock_cmd, unlock_cmd, out_lock, out_unlock, inf_lock_only,
             timer_sound_pos, timer_done_cmd, force_timer_sound,
-            timer_start, timer_stop,
+            timer_countup, timer_countdown, timer_stop,
         )
 
     def __getstate__(self) -> tuple:
-        if self.timer_start is None:
-            timer_start = None
+        if self.timer_countup is None:
+            timer_countup = None
         else:
-            timer_start = list(map(_intern_out, self.timer_start))
+            timer_countup = list(map(_intern_out, self.timer_countup))
+        if self.timer_countdown is None:
+            timer_countdown = None
+        else:
+            timer_countdown = list(map(_intern_out, self.timer_countdown))
         if self.timer_stop is None:
             timer_stop = None
         else:
@@ -416,7 +424,8 @@ class Config:
             self.timer_sound_pos,
             self.timer_done_cmd,
             self.force_timer_sound,
-            timer_start,
+            timer_countup,
+            timer_countdown,
             timer_stop,
             self.lock_cmd,
             self.unlock_cmd,
@@ -444,7 +453,8 @@ class Config:
             self.timer_sound_pos,
             self.timer_done_cmd,
             self.force_timer_sound,
-            self.timer_start,
+            self.timer_countup,
+            self.timer_countdown,
             self.timer_stop,
             self.lock_cmd,
             self.unlock_cmd,
@@ -504,9 +514,12 @@ class Config:
         if self.output_deact is not None:
             text.append('Deactivation: ' + format_output_name(self.output_deact))
 
-        if self.timer_start is not None:
-            for out in self.timer_start:
-                text.append('Timer Start: ' + format_output_name(out))
+        if self.timer_countup is not None:
+            for out in self.timer_countup:
+                text.append('Timer Countup: ' + format_output_name(out))
+        if self.timer_countdown is not None:
+            for out in self.timer_countdown:
+                text.append('Timer Countdown: ' + format_output_name(out))
         if self.timer_stop is not None:
             for out in self.timer_stop:
                 text.append('Timer Stop: ' + format_output_name(out))

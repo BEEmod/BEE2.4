@@ -158,11 +158,16 @@ class IndicatorStyle:
     # Instance to use for timer signs.
     timer_inst: str
     timer_switching: PanelSwitchingStyle
-    # Outputs to use to swap skins, and to start/stop the indicator.
+    # Outputs to use for the advanced version to swap skins, and to start/stop the indicator
+    # in both directions.
     timer_blue_cmd: Sequence[Output]
     timer_oran_cmd: Sequence[Output]
-    timer_start_cmd: Sequence[Output]
-    timer_stop_cmd: Sequence[Output]
+    timer_countup_cmd: Sequence[Output]
+    timer_countdn_cmd: Sequence[Output]
+    timer_adv_stop_cmd: Sequence[Output]
+    # And the simplified on/off inputs.
+    timer_basic_start_cmd: Sequence[Output]
+    timer_basic_stop_cmd: Sequence[Output]
 
     @classmethod
     def parse(cls, kv: Keyvalues, desc: str, parent: IndicatorStyle) -> IndicatorStyle:
@@ -204,10 +209,13 @@ class IndicatorStyle:
         timer_inst: Optional[str] = None
         check_cmd: Optional[List[Output]] = None
         cross_cmd: Optional[List[Output]] = None
-        timer_start_cmd: Optional[List[Output]] = None
-        timer_stop_cmd: Optional[List[Output]] = None
+        timer_countup_cmd: Optional[List[Output]] = None
+        timer_countdn_cmd: Optional[List[Output]] = None
+        timer_adv_stop_cmd: Optional[List[Output]] = None
         timer_blue_cmd: Optional[List[Output]] = None
         timer_oran_cmd: Optional[List[Output]] = None
+        timer_basic_start_cmd: Optional[List[Output]] = None
+        timer_basic_stop_cmd: Optional[List[Output]] = None
         check_switching = PanelSwitchingStyle.CUSTOM
         timer_switching = PanelSwitchingStyle.CUSTOM
 
@@ -230,10 +238,13 @@ class IndicatorStyle:
                 timer_switching = PanelSwitchingStyle(timer_kv['switching'])
             except (LookupError, ValueError):
                 timer_switching = PanelSwitchingStyle.CUSTOM  #  Assume no optimisations
-            timer_start_cmd = get_outputs(timer_kv, desc, 'start_cmd')
-            timer_stop_cmd = get_outputs(timer_kv, desc, 'stop_cmd')
+            timer_countup_cmd = get_outputs(timer_kv, desc, 'countup_cmd')
+            timer_countdn_cmd = get_outputs(timer_kv, desc, 'countdn_cmd')
+            timer_adv_stop_cmd = get_outputs(timer_kv, desc, 'stop_cmd')
             timer_blue_cmd = get_outputs(timer_kv, desc, 'blue_cmd')
             timer_oran_cmd = get_outputs(timer_kv, desc, 'oran_cmd')
+            timer_basic_start_cmd = get_outputs(timer_kv, desc, 'basic_start_cmd')
+            timer_basic_stop_cmd = get_outputs(timer_kv, desc, 'basic_stop_cmd')
 
         def build(parent: IndicatorStyle) -> IndicatorStyle:
             """Build the config, using parent params if not specified."""
@@ -255,10 +266,13 @@ class IndicatorStyle:
                     conf,
                     timer_inst=timer_inst,
                     timer_switching=timer_switching,
-                    timer_start_cmd=timer_start_cmd,
-                    timer_stop_cmd=timer_stop_cmd,
+                    timer_countup_cmd=timer_countup_cmd,
+                    timer_countdn_cmd=timer_countdn_cmd,
+                    timer_adv_stop_cmd=timer_adv_stop_cmd,
                     timer_blue_cmd=timer_blue_cmd,
                     timer_oran_cmd=timer_oran_cmd,
+                    timer_basic_start_cmd=timer_basic_start_cmd,
+                    timer_basic_stop_cmd=timer_basic_stop_cmd,
                 )
             return conf
         return build
@@ -279,11 +293,19 @@ class IndicatorStyle:
 
             timer_inst=str(timer_item.instances[0].inst) if timer_item.instances else '',
             timer_switching=options.get(PanelSwitchingStyle, 'ind_pan_timer_switching'),
-            timer_start_cmd=timer_item.conn_config.enable_cmd if timer_item.conn_config is not None else [],
-            timer_stop_cmd=timer_item.conn_config.disable_cmd if timer_item.conn_config is not None else [],
+            timer_basic_start_cmd=timer_item.conn_config.enable_cmd if timer_item.conn_config is not None else [],
+            timer_basic_stop_cmd=timer_item.conn_config.disable_cmd if timer_item.conn_config is not None else [],
+            # No advanced configs
+            timer_countup_cmd=[],
+            timer_countdn_cmd=[],
+            timer_adv_stop_cmd=[],
             timer_blue_cmd=[],
             timer_oran_cmd=[],
         )
+
+    def has_advanced_timer(self) -> bool:
+        """Check if this has advanced timer options."""
+        return bool(self.timer_countup_cmd or self.timer_countdn_cmd)
 
 
 @attrs.define(eq=False)
