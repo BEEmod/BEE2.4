@@ -1,8 +1,9 @@
 """Generates Bottomless Pits."""
-from srctools import Vec, Keyvalues, VMF, Solid, Side, Output, Angle
+from srctools import Matrix, Vec, Keyvalues, VMF, Solid, Side, Output, Angle
 import srctools.logger
 import utils
 from precomp import brushLoc, options, rand, conditions
+import consts
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -12,7 +13,7 @@ LOGGER = srctools.logger.get_logger(__name__)
 BOTTOMLESS_PIT_MIN = 192
 
 # The set config options for pits. If SETTINGS is empty, no pits are used.
-SETTINGS = {}
+SETTINGS: dict = {}  # TODO: Type correctly
 PIT_INST = {}
 
 
@@ -299,8 +300,7 @@ def make_bottomless_pit(vmf: VMF, max_height):
                     file=file,
                     targetname='goo_side',
                     origin=tele_off + pos,
-                    # Reverse direction
-                    angles=Angle.from_str(angle) + (0, 180, 0),
+                    angles=Angle.from_str(angle) @ Matrix.from_yaw(180.0),
                 ).make_unique()
 
 
