@@ -167,12 +167,10 @@ def res_python_setup(res: Keyvalues) -> conditions.ResultCallable:
                 kwargs=None,
             )
         )
-        for line_num, var_name in enumerate(
-            variable_order, start=1,
-        )
+        for var_name in variable_order
     ]
     # The last statement returns the target expression.
-    statements.append(ast.Return(expression, lineno=len(variable_order)+1, col_offset=0))
+    statements.append(ast.Return(expression))
 
     args = ast.arguments(
         vararg=None, 
@@ -196,12 +194,8 @@ def res_python_setup(res: Keyvalues) -> conditions.ResultCallable:
                 decorator_list=[],
             ),
         ],
-        lineno=1,
-        col_offset=0,
+        type_ignores=[],
     )
-    # Python 3.8 also
-    if 'type_ignores' in func._fields:
-        func.type_ignores = []
 
     # Fill in lineno and col_offset
     ast.fix_missing_locations(func)
