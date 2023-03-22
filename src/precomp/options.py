@@ -51,6 +51,7 @@ class Opt:
         default: Union[TYPE, OptionT],
         doc: str,
         fallback: str=None,
+        hidden: bool=False,
     ) -> None:
         if isinstance(default, TYPE):
             self.type = default
@@ -61,6 +62,7 @@ class Opt:
         self.id = opt_id.casefold()
         self.name = opt_id
         self.fallback = fallback
+        self.hidden = hidden
         # Remove indentation, and trailing carriage return
         self.doc = inspect.cleandoc(doc).rstrip().splitlines()
         if fallback is not None:
@@ -278,6 +280,8 @@ def dump_info(file: TextIO) -> None:
     print(DOC_HEADER, file=file)
 
     for opt in DEFAULTS:
+        if opt.hidden:
+            continue
         if opt.default is None:
             default = ''
         elif type(opt.default) is Vec:
