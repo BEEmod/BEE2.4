@@ -3,12 +3,16 @@
 This controls how I/O is generated for each item.
 """
 from __future__ import annotations
+from typing import Dict, Final, Iterable
+from typing_extensions import Self
 
+import attrs
 import sys
 from enum import Enum
-from typing import Dict, Final, Iterable
 
 from srctools import Output, Keyvalues, Vec, conv_bool
+
+import utils
 
 
 class ConnType(Enum):
@@ -41,6 +45,7 @@ CONN_TYPE_NAMES.update(
 VALID_CONN_TYPE_NAMES = ', '.join([f'"{x}"' for x in sorted(CONN_TYPE_NAMES)])
 
 
+@utils.freeze_enum_props
 class InputType(Enum):
     """Indicates the kind of input behaviour to use."""
     # Normal PeTI, pass activate/deactivate via proxy.
@@ -116,6 +121,26 @@ def format_output_name(out_tup: tuple[str | None, str]) -> str:
         return out
 
 
+def format_delay(offset: float, add_timer_delay: bool) -> str:
+    """Format a number which may have $timer_delay added to it."""
+    if add_timer_delay:
+        if offset == 0.0:
+            return f'$timer_delay'
+        else:
+            return f'$timer_delay{offset:+}'
+    else:
+        if offset == 0.0:
+            return ''
+        else:
+            return str(offset)
+
+OUT_NAME_DESC = (
+    'This should be either an instance output name like '
+    '"instance:ent_name;OnSomeOutput", or a simple output name like "OnStartTouch" '
+    'if the instance is being replaced by a single entity.'
+)
+
+
 def get_input(kv_name: str, desc: str, inp_str: str) -> tuple[str | None, str] | None:
     """Parse an input command."""
     if not inp_str:
@@ -124,10 +149,7 @@ def get_input(kv_name: str, desc: str, inp_str: str) -> tuple[str | None, str] |
         return Output.parse_name(inp_str)
     except ValueError:
         raise ValueError(
-            f'Could not parse output name for {desc}: {kv_name}="{inp_str}"\n'
-            'This should be either an instance output name like '
-            '"instance:ent_name;OnSomeOutput", or a simple output name like "OnStartTouch" '
-            'if the instance is being replaced by a single entity.'
+            f'Could not parse output name for {desc}: {kv_name}="{inp_str}"\n{OUT_NAME_DESC}'
         ) from None
 
 
@@ -147,6 +169,61 @@ def get_outputs(conf: Keyvalues,  desc: str, kv_name: str) -> list[Output]:
             out.output = ''  # Clear this, it's unused.
             outputs.append(out)
     return outputs
+
+
+@utils.freeze_enum_props
+class TimerModes(Enum):
+    """Modes for timer indicator panel commands."""
+    COUNT_UP = 'countup'  # Go from empty to full.
+    COUNT_DOWN = 'countdown'  # Go from full to empty.
+    RESET_FULL = 'resetfull'  # Reset back to full, over about 0.25 seconds.
+    RESET_EMPTY = 'resetempty'  # Reset back to empty, over about 0.25 seconds.
+
+    @property
+    def is_count(self) -> bool:
+        """Return whether this is a gradual count."""
+        return self.name.startswith('COUNT')
+
+    @property
+    def is_reset(self) -> bool:
+        """Return whether this resets the timer."""
+        return self.name.startswith('RESET')
+
+
+@attrs.frozen
+class TimerCommand:
+    """Outputs to generate to control timer indicator panels."""
+    output: tuple[str | None, str]  # Output to use plus the name.
+    mode: TimerModes  # Basically the input.
+    delay: float  = attrs.field(kw_only=True, default=0.0)  # Output delay.
+    delay_add_timer: bool = attrs.field(kw_only=True) # If set, add $timer_delay to delay.
+    fadetime: float = attrs.field(kw_only=True, default=0.0)  # The time taken to do the fade.
+    fadetime_add_timer: bool = attrs.field(kw_only=True)  # If set, add $timer_delay to fadetime.
+
+    @classmethod
+    def parse(cls, kv: Keyvalues, desc: str) -> Self:
+        """Parse a command from keyvalues."""
+        output = get_input('output', desc,kv['output', ''])
+        if output is None:
+            raise ValueError(f'Timer command in {desc} must have an output name provided!\n{OUT_NAME_DESC}')
+
+        mode_str = kv['mode', 'countdown'].casefold()
+        try:
+            mode = TimerModes(mode_str)
+        except ValueError:
+            raise ValueError(
+                f'Timer command uses invalid mode "{mode_str}"! The mode must be one of '
+                f'"CountUp", "CountDown", "ResetFull" or "ResetEmpty".'
+            ) from None
+
+        return cls(
+            output,
+            mode,
+            delay=kv.float('delay'),
+            delay_add_timer=kv.bool('delay_add_timer'),
+            fadetime=kv.float('fadetime'),
+            fadetime_add_timer=kv.bool('fadetime_add_timer'),
+        )
 
 
 class Config:
@@ -186,10 +263,7 @@ class Config:
         timer_sound_pos: Vec | None=None,
         timer_done_cmd: Iterable[Output]=(),
         force_timer_sound: bool=False,
-
-        timer_countup: list[tuple[str | None, str]] | None = None,
-        timer_countdown: list[tuple[str | None, str]] | None=None,
-        timer_stop: list[tuple[str | None, str]] | None=None,
+        timer_outputs: Iterable[TimerCommand]=(),
     ):
         self.id = id
 
@@ -247,11 +321,9 @@ class Config:
         # a timer dial.
         self.force_timer_sound = force_timer_sound
 
-        # If set, these allow alternate inputs for controlling timers.
-        # Multiple can be given. If None, we use the normal outputs for countdown.
-        self.timer_countup = timer_countup
-        self.timer_countdown = timer_countdown
-        self.timer_stop = timer_stop
+        # If set, connections for controlling timer indicator panels. If empty, we use the normal
+        # outputs for countdown.
+        self.timer_outputs = list(timer_outputs)
 
         # For locking buttons, this is the command to reactivate,
         # and force-lock it.
@@ -376,12 +448,31 @@ class Config:
                 ]
             return None
 
-        timer_countup = get_inputs(conf, 'out_timer_countup')
-        timer_countdown = get_inputs(conf, 'out_timer_countdown')
-        timer_stop = get_inputs(conf, 'out_timer_stop')
-        # Old deprecated name
-        if timer_countdown is None:
-            timer_countdown = get_inputs(conf, 'out_timer_start')
+        timer_outputs = [
+            TimerCommand.parse(cmd, desc)
+            for cmd in conf.find_all('TimerCommand')
+        ]
+        if not timer_outputs:
+            # The original deprecated commands, which control the regular style timer.
+            for kv in conf:
+                if kv.name == 'out_timer_start':
+                    output = get_input(kv.real_name, desc,kv.value)
+                    if output is not None:
+                        timer_outputs.append(TimerCommand(
+                            output,
+                            mode=TimerModes.COUNT_DOWN,
+                            delay_add_timer=False,
+                            fadetime_add_timer=True,
+                        ))
+                elif kv.name == 'out_timer_stop':
+                    output = get_input(kv.real_name, desc, kv.value)
+                    if output is not None:
+                        timer_outputs.append(TimerCommand(
+                            output,
+                            mode=TimerModes.RESET_FULL,
+                            delay_add_timer=False,
+                            fadetime_add_timer=False,
+                        ))
 
         return Config(
             item_id, default_dual, input_type,
@@ -389,23 +480,10 @@ class Config:
             sec_spawn_fire, sec_invert_var, sec_enable_cmd, sec_disable_cmd,
             output_type, out_act, out_deact,
             lock_cmd, unlock_cmd, out_lock, out_unlock, inf_lock_only,
-            timer_sound_pos, timer_done_cmd, force_timer_sound,
-            timer_countup, timer_countdown, timer_stop,
+            timer_sound_pos, timer_done_cmd, force_timer_sound, timer_outputs,
         )
 
     def __getstate__(self) -> tuple:
-        if self.timer_countup is None:
-            timer_countup = None
-        else:
-            timer_countup = list(map(_intern_out, self.timer_countup))
-        if self.timer_countdown is None:
-            timer_countdown = None
-        else:
-            timer_countdown = list(map(_intern_out, self.timer_countdown))
-        if self.timer_stop is None:
-            timer_stop = None
-        else:
-            timer_stop = list(map(_intern_out, self.timer_stop))
 
         return (
             self.id,
@@ -425,9 +503,7 @@ class Config:
             self.timer_sound_pos,
             self.timer_done_cmd,
             self.force_timer_sound,
-            timer_countup,
-            timer_countdown,
-            timer_stop,
+            self.timer_outputs,
             self.lock_cmd,
             self.unlock_cmd,
             self.inf_lock_only,
@@ -454,9 +530,7 @@ class Config:
             self.timer_sound_pos,
             self.timer_done_cmd,
             self.force_timer_sound,
-            self.timer_countup,
-            self.timer_countdown,
-            self.timer_stop,
+            self.timer_outputs,
             self.lock_cmd,
             self.unlock_cmd,
             self.inf_lock_only,
@@ -515,15 +589,12 @@ class Config:
         if self.output_deact is not None:
             text.append('Deactivation: ' + format_output_name(self.output_deact))
 
-        if self.timer_countup is not None:
-            for out in self.timer_countup:
-                text.append('Timer Countup: ' + format_output_name(out))
-        if self.timer_countdown is not None:
-            for out in self.timer_countdown:
-                text.append('Timer Countdown: ' + format_output_name(out))
-        if self.timer_stop is not None:
-            for out in self.timer_stop:
-                text.append('Timer Stop: ' + format_output_name(out))
+        for cmd in self.timer_outputs:
+            text.append(
+                f'Timer Cmd: {format_output_name(cmd.output)} => {cmd.mode.value}('
+                f'{format_delay(cmd.delay, cmd.delay_add_timer)}'
+                f') @ {format_delay(cmd.delay, cmd.delay_add_timer)} sec'
+            )
 
         if self.timer_sound_pos is not None:
             text += [

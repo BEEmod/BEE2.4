@@ -10,12 +10,7 @@ from typing_extensions import assert_never
 from connections import InputType, FeatureMode, Config, ConnType, OutNames
 from srctools import VMF, Entity, Output, conv_bool, Vec, Angle
 from precomp.antlines import Antline, AntType, IndicatorStyle, PanelSwitchingStyle
-from precomp import (
-    instance_traits, instanceLocs,
-    options,
-    packing,
-    conditions,
-)
+from precomp import instance_traits, options, packing, conditions
 import editoritems
 import consts
 import srctools.logger
@@ -250,40 +245,6 @@ class Item:
             return None, consts.COUNTER_OR_OFF
 
         return self.config.output_deact
-
-    def timer_output_countup(self) -> List[Tuple[Optional[str], str]]:
-        """Return the output to use for making the timer count up."""
-        if self.config.timer_countup is None:
-            out = self.output_act()
-            return [] if out is None else [out]
-        return self.config.timer_countup
-
-    def timer_output_countdown(self) -> List[Tuple[Optional[str], str]]:
-        """Return the output to use for making the timer count down."""
-        if self.config.timer_countdown is None:
-            out = self.output_act()
-            return [] if out is None else [out]
-        return self.config.timer_countdown
-
-    def timer_output_start(self) -> List[Tuple[Optional[str], str]]:
-        """Return the outputs to use when the timer starts in either direction.."""
-        result: List[Tuple[Optional[str], str]] = []
-        if self.config.timer_countdown is not None:
-            result.extend(self.config.timer_countdown)
-        if self.config.timer_countup is not None:
-            result.extend(self.config.timer_countup)
-        if not result:
-            out = self.output_act()
-            if out is not None:
-                result.append(out)
-        return result
-
-    def timer_output_stop(self) -> List[Tuple[Optional[str], str]]:
-        """Return the output to use for stopping timers."""
-        if self.config.timer_stop is None:
-            out = self.output_deact()
-            return [] if out is None else [out]
-        return self.config.timer_stop
 
     def delete_antlines(self) -> None:
         """Delete the antlines and checkmarks outputting from this item."""
@@ -1005,12 +966,18 @@ def add_timer_relay(item: Item, has_sounds: bool) -> None:
                     delay=delay,
                 ))
 
-    for outputs, cmd in [
-        (item.timer_output_start(), 'Trigger'),
-        (item.timer_output_stop(), 'CancelPending')
-    ]:
-        for output in outputs:
-            item.add_io_command(output, rl_name, cmd)
+    if item.config.timer_outputs:
+        for tim_cmd in item.config.timer_outputs:
+            if tim_cmd.mode.is_count:
+                inp_cmd = 'Trigger'
+            elif tim_cmd.mode.is_reset:
+                inp_cmd = 'CancelPending'
+            else:
+                continue
+            item.add_io_command(tim_cmd.output, rl_name, inp_cmd)
+    else:  # Just regular I/O.
+        item.add_io_command(item.output_act(), rl_name, 'Trigger')
+        item.add_io_command(item.output_deact(), rl_name, 'CancelPending')
 
 
 def add_item_inputs(
@@ -1307,7 +1274,7 @@ def add_item_indicators(
     ant_name = '@{}_overlay'.format(item.name)
     has_sign = len(item.ind_panels) > 0
     has_ant = len(item.antlines) > 0
-    is_timer = item.timer is not None
+    timer_delay = item.timer
 
     for ant in item.antlines:
         ant.name = ant_name
@@ -1321,39 +1288,61 @@ def add_item_indicators(
         has_ant = False
 
     # If either is defined, the item wants to do custom control over the timer.
-    independent_timer = (
-        item.config.timer_countup is not None or
-        item.config.timer_countdown is not None or
-        item.config.timer_stop is not None
-    )
+    independent_timer = bool(item.config.timer_outputs)
     # If that is defined, use advanced/custom timer logic if the style supports it.
     adv_timer = independent_timer and style.has_advanced_timer()
 
-    conn_pairs: List[Tuple[List[Tuple[Optional[str], str]], Sequence[Output]]]
-    if is_timer:
+    conn_pairs: List[Tuple[Tuple[Optional[str], str], float, Sequence[Output]]]
+    if timer_delay is not None:  # We have a timer.
         inst_type = style.timer_switching
         pan_filename = style.timer_inst
         if adv_timer:
             conn_pairs = [
-                (item.timer_output_stop(), style.timer_adv_stop_cmd),
-                ([item.output_act()], style.timer_oran_cmd),
-                ([item.output_deact()], style.timer_blue_cmd),
+                (item.output_act(), 0.0, style.timer_oran_cmd),
+                (item.output_deact(), 0.0, style.timer_blue_cmd),
             ]
-            if item.config.timer_countup:
-                conn_pairs.append((item.config.timer_countup, style.timer_countup_cmd))
-            if item.config.timer_countdown:
-                conn_pairs.append((item.config.timer_countdown, style.timer_countdn_cmd))
-        else:  # No advanced timer, use start/stop to approximate.
+            for timer_cmd in item.config.timer_outputs:
+                delay = timer_cmd.delay
+                fade_time = timer_cmd.fadetime
+                if timer_cmd.delay_add_timer:
+                    delay += item.timer
+                if timer_cmd.fadetime_add_timer:
+                    fade_time += item.timer
+                conn_pairs.append((timer_cmd.output, delay, [
+                    Output(
+                        '', out.target, out.input,
+                        out.params.replace('$$', str(fade_time)),
+                        out.delay,
+                        times=out.times,
+                        inst_in=out.inst_in,
+                        inst_out=out.inst_out,
+                    )
+                    for out in style.timer_adv_cmds.get(timer_cmd.mode, ())
+                ]))
+        elif independent_timer:
+            # Item wants independent timer, but there's no advanced version.
+            # Use basic start/stop to approximate.
+            conn_pairs = []
+            for timer_cmd in item.config.timer_outputs:
+                delay = timer_cmd.delay
+                if timer_cmd.delay_add_timer:
+                    delay += item.timer
+                if timer_cmd.mode.is_count:
+                    conn_pairs.append((timer_cmd.output, delay, style.timer_basic_start_cmd))
+                elif timer_cmd.mode.is_reset:
+                    conn_pairs.append((timer_cmd.output, delay, style.timer_basic_start_cmd))
+        else:
+            # Regular timer.
             conn_pairs = [
-                (item.timer_output_start(), style.timer_basic_start_cmd),
-                (item.timer_output_stop(), style.timer_basic_stop_cmd),
+                (item.output_act(), 0.0, style.timer_basic_start_cmd),
+                (item.output_deact(), 0.0, style.timer_basic_stop_cmd),
             ]
     else:
         inst_type = style.check_switching
         pan_filename = style.check_inst
         conn_pairs = [
-            ([item.output_act()], style.check_cmd),
-            ([item.output_deact()], style.cross_cmd),
+            (item.output_act(), 0.0, style.check_cmd),
+            (item.output_deact(), 0.0, style.cross_cmd),
         ]
     if pan_filename and item.ind_panels:
         conditions.ALL_INST.add(pan_filename.casefold())
@@ -1390,33 +1379,29 @@ def add_item_indicators(
             pan['file'] = pan_filename
 
         # Overwrite the timer delay value, in case a sign changed ownership.
-        if is_timer:
-            pan.fixup[consts.FixupVars.TIM_DELAY] = item.timer
+        if timer_delay is not None:
+            pan.fixup[consts.FixupVars.TIM_DELAY] = timer_delay
             pan.fixup[consts.FixupVars.TIM_ENABLED] = '1'
-            # Also set vars to show the advanced timer state.
+            # Set a var to tell the instance whether it needs this logic.
             pan.fixup['$advanced'] = adv_timer
-            if adv_timer:
-                pan.fixup['$has_countup'] = '1' if item.config.timer_countup else '0'
-                pan.fixup['$has_countdown'] = '1' if item.config.timer_countdown else '0'
         else:
             pan.fixup[consts.FixupVars.TIM_DELAY] = '99999999999'
             pan.fixup[consts.FixupVars.TIM_ENABLED] = '0'
 
-        for outputs, input_cmds in conn_pairs:
-            for output in outputs:
-                for cmd in input_cmds:
-                    item.add_io_command(
-                        output,
-                        conditions.local_name(
-                            pan,
-                            item.inst.fixup.substitute(cmd.target),
-                        ) or pan,
-                        item.inst.fixup.substitute(cmd.input),
-                        item.inst.fixup.substitute(cmd.params, allow_invert=True),
-                        delay=cmd.delay,
-                        inst_in=cmd.inst_in,
-                        times=cmd.times,
-                    )
+        for output, delay, input_cmds in conn_pairs:
+            for cmd in input_cmds:
+                item.add_io_command(
+                    output,
+                    conditions.local_name(
+                        pan,
+                        item.inst.fixup.substitute(cmd.target),
+                    ) or pan,
+                    item.inst.fixup.substitute(cmd.input),
+                    item.inst.fixup.substitute(cmd.params, allow_invert=True),
+                    delay=delay + cmd.delay,
+                    inst_in=cmd.inst_in,
+                    times=cmd.times,
+                )
 
     if needs_toggle:
         toggle = item.inst.map.create_ent(
