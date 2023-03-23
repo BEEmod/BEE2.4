@@ -116,6 +116,21 @@ def format_output_name(out_tup: tuple[str | None, str]) -> str:
         return out
 
 
+def get_input(kv_name: str, desc: str, inp_str: str) -> tuple[str | None, str] | None:
+    """Parse an input command."""
+    if not inp_str:
+        return None
+    try:
+        return Output.parse_name(inp_str)
+    except ValueError:
+        raise ValueError(
+            f'Could not parse output name for {desc}: {kv_name}="{inp_str}"\n'
+            'This should be either an instance output name like '
+            '"instance:ent_name;OnSomeOutput", or a simple output name like "OnStartTouch" '
+            'if the instance is being replaced by a single entity.'
+        ) from None
+
+
 def get_outputs(conf: Keyvalues,  desc: str, kv_name: str) -> list[Output]:
     """Parse all the outputs with this name."""
     outputs = []
@@ -346,24 +361,10 @@ class Config:
                 f'Valid values: {VALID_CONN_TYPE_NAMES}'
             ) from None
 
-        def get_input(kv_name: str, inp_str: str) -> tuple[str | None, str] | None:
-            """Parse an input command."""
-            if not inp_str:
-                return None
-            try:
-                return Output.parse_name(inp_str)
-            except ValueError:
-                raise ValueError(
-                    f'Could not parse output name for item "{item_id}": {kv_name}="{inp_str}"\n'
-                    'This should be either an instance output name like '
-                    '"instance:ent_name;OnSomeOutput", or a simple output name like "OnStartTouch" '
-                    'if the instance is being replaced by a single entity.'
-                ) from None
-
-        out_act = get_input('out_activate', conf['out_activate', ''])
-        out_deact = get_input('out_deactivate', conf['out_deactivate', ''])
-        out_lock = get_input('out_lock', conf['out_lock', ''])
-        out_unlock = get_input('out_unlock', conf['out_unlock', ''])
+        out_act = get_input('out_activate', desc,conf['out_activate', ''])
+        out_deact = get_input('out_deactivate', desc, conf['out_deactivate', ''])
+        out_lock = get_input('out_lock', desc, conf['out_lock', ''])
+        out_unlock = get_input('out_unlock', desc, conf['out_unlock', ''])
 
         def get_inputs(block: Keyvalues, kv_name: str) -> list[tuple[str | None, str]] | None:
             """Get a list of inputs for timers."""
@@ -371,7 +372,7 @@ class Config:
                 return [
                     param
                     for kv in block.find_all(kv_name)
-                    if (param := get_input(kv_name, kv.value)) is not None
+                    if (param := get_input(kv_name, desc,kv.value)) is not None
                 ]
             return None
 
