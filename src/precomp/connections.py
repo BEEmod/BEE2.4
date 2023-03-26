@@ -8,7 +8,9 @@ from collections import defaultdict
 from typing_extensions import assert_never
 
 from connections import InputType, FeatureMode, Config, ConnType, OutNames
-from srctools import VMF, Entity, Output, conv_bool, Vec, Angle
+from srctools import conv_bool
+from srctools.math import Vec, Angle, format_float
+from srctools.vmf import VMF, EntityFixup, Entity, Output
 from precomp.antlines import Antline, AntType, IndicatorStyle, PanelSwitchingStyle
 from precomp import instance_traits, options, packing, conditions
 import editoritems
@@ -1293,6 +1295,7 @@ def add_item_indicators(
     adv_timer = independent_timer and style.has_advanced_timer()
 
     conn_pairs: List[Tuple[Tuple[Optional[str], str], float, Sequence[Output]]]
+    panel_fixup = EntityFixup(item.inst.fixup.copy_values())
     if timer_delay is not None:  # We have a timer.
         inst_type = style.timer_switching
         pan_filename = style.timer_inst
@@ -1308,10 +1311,13 @@ def add_item_indicators(
                     delay += item.timer
                 if timer_cmd.fadetime_add_timer:
                     fade_time += item.timer
+                panel_fixup['$time'] = format_float(fade_time)
+                # This gives the appropriate SetPlaybackRate input for a 30s timer dial.
+                panel_fixup['$playback'] = format_float(30.0 / fade_time) if fade_time != 0.0 else '0'
                 conn_pairs.append((timer_cmd.output, delay, [
                     Output(
                         '', out.target, out.input,
-                        out.params.replace('$$', str(fade_time)),
+                        panel_fixup.substitute(out.params, allow_invert=True),
                         out.delay,
                         times=out.times,
                         inst_in=out.inst_in,
@@ -1330,7 +1336,7 @@ def add_item_indicators(
                 if timer_cmd.mode.is_count:
                     conn_pairs.append((timer_cmd.output, delay, style.timer_basic_start_cmd))
                 elif timer_cmd.mode.is_reset:
-                    conn_pairs.append((timer_cmd.output, delay, style.timer_basic_start_cmd))
+                    conn_pairs.append((timer_cmd.output, delay, style.timer_basic_stop_cmd))
         else:
             # Regular timer.
             conn_pairs = [
@@ -1346,6 +1352,10 @@ def add_item_indicators(
         ]
     if pan_filename and item.ind_panels:
         conditions.ALL_INST.add(pan_filename.casefold())
+
+    if timer_delay is not None:
+        panel_fixup['$time'] = format_float(timer_delay)
+        panel_fixup['$playback'] = format_float(30.0 / timer_delay) if timer_delay != 0.0 else '0'
 
     if inst_type is PanelSwitchingStyle.CUSTOM:
         needs_toggle = has_ant
@@ -1397,7 +1407,7 @@ def add_item_indicators(
                         item.inst.fixup.substitute(cmd.target),
                     ) or pan,
                     item.inst.fixup.substitute(cmd.input),
-                    item.inst.fixup.substitute(cmd.params, allow_invert=True),
+                    panel_fixup.substitute(cmd.params, allow_invert=True),
                     delay=delay + cmd.delay,
                     inst_in=cmd.inst_in,
                     times=cmd.times,
