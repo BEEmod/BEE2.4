@@ -26,7 +26,7 @@ from packages import (
 )
 from config.item_defaults import ItemDefault, DEFAULT_VERSION
 from editoritems import Item as EditorItem, InstCount
-from connections import Config as ConnConfig
+from connections import Config as ConnConfig, INDICATOR_CHECK_ID
 import editoritems_vmf
 import collisions
 import utils
@@ -696,6 +696,26 @@ class Item(PakObject, needs_foreground=True):
                                 item.id + ':aux'
                             ))
                             break
+
+            # Special case - if this is the indicator panel item, extract and apply the configured
+            # instances.
+            if item.id == INDICATOR_CHECK_ID:
+                [check_item, timer_item] = items
+                for ant_conf in vbsp_config.find_all('Textures', 'Antlines'):
+                    if 'check' in ant_conf:
+                        try:
+                            check_item.instances = [
+                                InstCount(FSPath(ant_conf.find_block('check')['inst']))
+                            ]
+                        except LookupError:
+                            raise ValueError('No "inst" defined for checkmarks in antline configuration!')
+                    if 'timer' in ant_conf:
+                        try:
+                            timer_item.instances = [
+                                InstCount(FSPath(ant_conf.find_block('timer')['inst']))
+                            ]
+                        except LookupError:
+                            raise ValueError('No "inst" defined for timers in antline configuration!')
 
     def _get_export_data(
         self,

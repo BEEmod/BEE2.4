@@ -3,12 +3,16 @@
 This controls how I/O is generated for each item.
 """
 from __future__ import annotations
+from typing import Dict, Final, Iterable
+from typing_extensions import Self
 
+import attrs
 import sys
 from enum import Enum
-from typing import Dict, Iterable
 
 from srctools import Output, Keyvalues, Vec, conv_bool
+
+import utils
 
 
 class ConnType(Enum):
@@ -41,6 +45,7 @@ CONN_TYPE_NAMES.update(
 VALID_CONN_TYPE_NAMES = ', '.join([f'"{x}"' for x in sorted(CONN_TYPE_NAMES)])
 
 
+@utils.freeze_enum_props
 class InputType(Enum):
     """Indicates the kind of input behaviour to use."""
     # Normal PeTI, pass activate/deactivate via proxy.
@@ -93,6 +98,11 @@ class OutNames(Enum):
     OUT_DEACT = 'ON_DEACTIVATED'
 
 
+# Item IDs used for the checkmark/timer panels.
+INDICATOR_CHECK_ID: Final = 'ITEM_INDICATOR_PANEL'
+INDICATOR_TIMER_ID: Final = 'ITEM_INDICATOR_PANEL_TIMER'
+
+
 def _intern_out(out: tuple[str | None, str] | None) -> tuple[str | None, str] | None:
     if out is None:
         return None
@@ -109,6 +119,111 @@ def format_output_name(out_tup: tuple[str | None, str]) -> str:
         return f'{inst} -> {out}'
     else:
         return out
+
+
+def format_delay(offset: float, add_timer_delay: bool) -> str:
+    """Format a number which may have $timer_delay added to it."""
+    if add_timer_delay:
+        if offset == 0.0:
+            return f'$timer_delay'
+        else:
+            return f'$timer_delay{offset:+}'
+    else:
+        if offset == 0.0:
+            return ''
+        else:
+            return str(offset)
+
+OUT_NAME_DESC = (
+    'This should be either an instance output name like '
+    '"instance:ent_name;OnSomeOutput", or a simple output name like "OnStartTouch" '
+    'if the instance is being replaced by a single entity.'
+)
+
+
+def get_input(kv_name: str, desc: str, inp_str: str) -> tuple[str | None, str] | None:
+    """Parse an input command."""
+    if not inp_str:
+        return None
+    try:
+        return Output.parse_name(inp_str)
+    except ValueError:
+        raise ValueError(
+            f'Could not parse output name for {desc}: {kv_name}="{inp_str}"\n{OUT_NAME_DESC}'
+        ) from None
+
+
+def get_outputs(conf: Keyvalues,  desc: str, kv_name: str) -> list[Output]:
+    """Parse all the outputs with this name."""
+    outputs = []
+    for kv in conf.find_all(kv_name):
+        if kv.value != '':
+            try:
+                out = Output.parse(kv)
+            except ValueError:
+                raise ValueError(
+                    f'Could not parse output value for {desc}: {kv_name}="{kv.value}"\n'
+                    'A value similar to AddOutput in the form '
+                    '"target_ent,input,parameters,delay,times_to_fire" is expected.\n'
+                ) from None
+            out.output = ''  # Clear this, it's unused.
+            outputs.append(out)
+    return outputs
+
+
+@utils.freeze_enum_props
+class TimerModes(Enum):
+    """Modes for timer indicator panel commands."""
+    COUNT_UP = 'countup'  # Go from empty to full.
+    COUNT_DOWN = 'countdown'  # Go from full to empty.
+    RESET_FULL = 'resetfull'  # Reset back to full, over about 0.25 seconds.
+    RESET_EMPTY = 'resetempty'  # Reset back to empty, over about 0.25 seconds.
+
+    @property
+    def is_count(self) -> bool:
+        """Return whether this is a gradual count."""
+        return self.name.startswith('COUNT')
+
+    @property
+    def is_reset(self) -> bool:
+        """Return whether this resets the timer."""
+        return self.name.startswith('RESET')
+
+
+@attrs.frozen
+class TimerCommand:
+    """Outputs to generate to control timer indicator panels."""
+    output: tuple[str | None, str]  # Output to use plus the name.
+    mode: TimerModes  # Basically the input.
+    delay: float  = attrs.field(kw_only=True, default=0.0)  # Output delay.
+    delay_add_timer: bool = attrs.field(kw_only=True) # If set, add $timer_delay to delay.
+    fadetime: float = attrs.field(kw_only=True, default=0.0)  # The time taken to do the fade.
+    fadetime_add_timer: bool = attrs.field(kw_only=True)  # If set, add $timer_delay to fadetime.
+
+    @classmethod
+    def parse(cls, kv: Keyvalues, desc: str) -> Self:
+        """Parse a command from keyvalues."""
+        output = get_input('output', desc,kv['output', ''])
+        if output is None:
+            raise ValueError(f'Timer command in {desc} must have an output name provided!\n{OUT_NAME_DESC}')
+
+        mode_str = kv['mode', 'countdown'].casefold()
+        try:
+            mode = TimerModes(mode_str)
+        except ValueError:
+            raise ValueError(
+                f'Timer command uses invalid mode "{mode_str}"! The mode must be one of '
+                f'"CountUp", "CountDown", "ResetFull" or "ResetEmpty".'
+            ) from None
+
+        return cls(
+            output,
+            mode,
+            delay=kv.float('delay'),
+            delay_add_timer=kv.bool('delay_add_timer'),
+            fadetime=kv.float('fadetime'),
+            fadetime_add_timer=kv.bool('fadetime_add_timer'),
+        )
 
 
 class Config:
@@ -148,9 +263,7 @@ class Config:
         timer_sound_pos: Vec | None=None,
         timer_done_cmd: Iterable[Output]=(),
         force_timer_sound: bool=False,
-
-        timer_start: list[tuple[str | None, str]] | None=None,
-        timer_stop: list[tuple[str | None, str]] | None=None,
+        timer_outputs: Iterable[TimerCommand]=(),
     ):
         self.id = id
 
@@ -208,10 +321,9 @@ class Config:
         # a timer dial.
         self.force_timer_sound = force_timer_sound
 
-        # If set, these allow alternate inputs for controlling timers.
-        # Multiple can be given. If None, we use the normal output.
-        self.timer_start = timer_start
-        self.timer_stop = timer_stop
+        # If set, connections for controlling timer indicator panels. If empty, we use the normal
+        # outputs for countdown.
+        self.timer_outputs = list(timer_outputs)
 
         # For locking buttons, this is the command to reactivate,
         # and force-lock it.
@@ -232,32 +344,16 @@ class Config:
     @staticmethod
     def parse(item_id: str, conf: Keyvalues) -> Config:
         """Read the item type info from the given config."""
+        desc = f'item "{item_id}"'
 
-        def get_outputs(kv_name: str) -> list[Output]:
-            """Parse all the outputs with this name."""
-            outputs = []
-            for kv in conf.find_all(kv_name):
-                if kv.value != '':
-                    try:
-                        out = Output.parse(kv)
-                    except ValueError:
-                        raise ValueError(
-                            f'Could not parse output value for item "{item_id}": {kv_name}="{kv.value}"\n'
-                            'A value similar to AddOutput in the form '
-                            '"target_ent,input,parameters,delay,times_to_fire" is expected.\n'
-                        ) from None
-                    out.output = ''  # Clear this, it's unused.
-                    outputs.append(out)
-            return outputs
-
-        enable_cmd = get_outputs('enable_cmd')
-        disable_cmd = get_outputs('disable_cmd')
-        lock_cmd = get_outputs('lock_cmd')
-        unlock_cmd = get_outputs('unlock_cmd')
+        enable_cmd = get_outputs(conf, desc, 'enable_cmd')
+        disable_cmd = get_outputs(conf, desc, 'disable_cmd')
+        lock_cmd = get_outputs(conf, desc, 'lock_cmd')
+        unlock_cmd = get_outputs(conf, desc, 'unlock_cmd')
 
         inf_lock_only = conf.bool('inf_lock_only')
 
-        timer_done_cmd = get_outputs('timer_done_cmd')
+        timer_done_cmd = get_outputs(conf, desc, 'timer_done_cmd')
         if 'timer_sound_pos' in conf:
             timer_sound_pos = conf.vec('timer_sound_pos')
             force_timer_sound = conf.bool('force_timer_sound')
@@ -300,8 +396,8 @@ class Config:
             ) from None
 
         if input_type is InputType.DUAL:
-            sec_enable_cmd = get_outputs('sec_enable_cmd')
-            sec_disable_cmd = get_outputs('sec_disable_cmd')
+            sec_enable_cmd = get_outputs(conf, desc, 'sec_enable_cmd')
+            sec_disable_cmd = get_outputs(conf, desc, 'sec_disable_cmd')
 
             try:
                 default_dual = CONN_TYPE_NAMES[
@@ -337,39 +433,46 @@ class Config:
                 f'Valid values: {VALID_CONN_TYPE_NAMES}'
             ) from None
 
-        def get_input(kv_name: str, inp_str: str) -> tuple[str | None, str] | None:
-            """Parse an input command."""
-            if not inp_str:
-                return None
-            try:
-                return Output.parse_name(inp_str)
-            except ValueError:
-                raise ValueError(
-                    f'Could not parse output name for item "{item_id}": {kv_name}="{inp_str}"\n'
-                    'This should be either an instance output name like '
-                    '"instance:ent_name;OnSomeOutput", or a simple output name like "OnStartTouch" '
-                    'if the instance is being replaced by a single entity.'
-                ) from None
+        out_act = get_input('out_activate', desc,conf['out_activate', ''])
+        out_deact = get_input('out_deactivate', desc, conf['out_deactivate', ''])
+        out_lock = get_input('out_lock', desc, conf['out_lock', ''])
+        out_unlock = get_input('out_unlock', desc, conf['out_unlock', ''])
 
-        out_act = get_input('out_activate', conf['out_activate', ''])
-        out_deact = get_input('out_deactivate', conf['out_deactivate', ''])
-        out_lock = get_input('out_lock', conf['out_lock', ''])
-        out_unlock = get_input('out_unlock', conf['out_unlock', ''])
+        def get_inputs(block: Keyvalues, kv_name: str) -> list[tuple[str | None, str]] | None:
+            """Get a list of inputs for timers."""
+            if kv_name in block:
+                return [
+                    param
+                    for kv in block.find_all(kv_name)
+                    if (param := get_input(kv_name, desc,kv.value)) is not None
+                ]
+            return None
 
-        timer_start: list[tuple[str | None, str]] | None = None
-        if 'out_timer_start' in conf:
-            timer_start = [
-                param
-                for kv in conf.find_all('out_timer_start')
-                if (param := get_input('out_timer_start', kv.value)) is not None
-            ]
-        timer_stop: list[tuple[str | None, str]] | None = None
-        if 'out_timer_stop' in conf:
-            timer_stop = [
-                param
-                for kv in conf.find_all('out_timer_stop')
-                if (param := get_input('out_timer_stop', kv.value)) is not None
-            ]
+        timer_outputs = [
+            TimerCommand.parse(cmd, desc)
+            for cmd in conf.find_all('TimerCommand')
+        ]
+        if not timer_outputs:
+            # The original deprecated commands, which control the regular style timer.
+            for kv in conf:
+                if kv.name == 'out_timer_start':
+                    output = get_input(kv.real_name, desc,kv.value)
+                    if output is not None:
+                        timer_outputs.append(TimerCommand(
+                            output,
+                            mode=TimerModes.COUNT_DOWN,
+                            delay_add_timer=False,
+                            fadetime_add_timer=True,
+                        ))
+                elif kv.name == 'out_timer_stop':
+                    output = get_input(kv.real_name, desc, kv.value)
+                    if output is not None:
+                        timer_outputs.append(TimerCommand(
+                            output,
+                            mode=TimerModes.RESET_FULL,
+                            delay_add_timer=False,
+                            fadetime_add_timer=False,
+                        ))
 
         return Config(
             item_id, default_dual, input_type,
@@ -377,19 +480,10 @@ class Config:
             sec_spawn_fire, sec_invert_var, sec_enable_cmd, sec_disable_cmd,
             output_type, out_act, out_deact,
             lock_cmd, unlock_cmd, out_lock, out_unlock, inf_lock_only,
-            timer_sound_pos, timer_done_cmd, force_timer_sound,
-            timer_start, timer_stop,
+            timer_sound_pos, timer_done_cmd, force_timer_sound, timer_outputs,
         )
 
     def __getstate__(self) -> tuple:
-        if self.timer_start is None:
-            timer_start = None
-        else:
-            timer_start = list(map(_intern_out, self.timer_start))
-        if self.timer_stop is None:
-            timer_stop = None
-        else:
-            timer_stop = list(map(_intern_out, self.timer_stop))
 
         return (
             self.id,
@@ -409,8 +503,7 @@ class Config:
             self.timer_sound_pos,
             self.timer_done_cmd,
             self.force_timer_sound,
-            timer_start,
-            timer_stop,
+            self.timer_outputs,
             self.lock_cmd,
             self.unlock_cmd,
             self.inf_lock_only,
@@ -437,8 +530,7 @@ class Config:
             self.timer_sound_pos,
             self.timer_done_cmd,
             self.force_timer_sound,
-            self.timer_start,
-            self.timer_stop,
+            self.timer_outputs,
             self.lock_cmd,
             self.unlock_cmd,
             self.inf_lock_only,
@@ -497,12 +589,12 @@ class Config:
         if self.output_deact is not None:
             text.append('Deactivation: ' + format_output_name(self.output_deact))
 
-        if self.timer_start is not None:
-            for out in self.timer_start:
-                text.append('Timer Start: ' + format_output_name(out))
-        if self.timer_stop is not None:
-            for out in self.timer_stop:
-                text.append('Timer Stop: ' + format_output_name(out))
+        for cmd in self.timer_outputs:
+            text.append(
+                f'Timer Cmd: {format_output_name(cmd.output)} => {cmd.mode.value}('
+                f'{format_delay(cmd.delay, cmd.delay_add_timer)}'
+                f') @ {format_delay(cmd.delay, cmd.delay_add_timer)} sec'
+            )
 
         if self.timer_sound_pos is not None:
             text += [

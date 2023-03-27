@@ -177,8 +177,7 @@ def res_resizeable_trigger(vmf: VMF, info: conditions.MapInfo, res: Keyvalues) -
             item = connections.Item(
                 out_ent,
                 conn_conf_coop,
-                ant_floor_style=mark1.ant_floor_style,
-                ant_wall_style=mark1.ant_wall_style,
+                ind_style=mark1.ind_style,
             )
 
             if coop_only_once:
@@ -197,8 +196,7 @@ def res_resizeable_trigger(vmf: VMF, info: conditions.MapInfo, res: Keyvalues) -
             item = connections.Item(
                 trig_ent,
                 conn_conf_sp,
-                ant_floor_style=mark1.ant_floor_style,
-                ant_wall_style=mark1.ant_wall_style,
+                ind_style=mark1.ind_style,
             )
 
         # Register, and copy over all the antlines.

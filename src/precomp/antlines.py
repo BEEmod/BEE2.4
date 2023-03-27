@@ -1,16 +1,20 @@
 """Manages parsing and regenerating antlines."""
 from __future__ import annotations
+from typing import Callable, Dict, Mapping, final, List, Optional, Sequence
+
 from collections import defaultdict
 from collections.abc import Iterator, Container
 from enum import Enum
 import math
 
 import attrs
-from srctools import Vec, Matrix, Keyvalues, conv_float, logger
-from srctools.vmf import VMF, overlay_bounds, make_overlay
+from srctools import EmptyMapping, Vec, Matrix, Keyvalues, conv_float, logger
+from srctools.vmf import Output, VMF, overlay_bounds, make_overlay
 
-from precomp import tiling, rand
+from precomp import options, tiling, rand
+from connections import TimerCommand, get_outputs, TimerModes
 import consts
+import editoritems
 
 
 LOGGER = logger.get_logger(__name__)
@@ -20,6 +24,13 @@ class SegType(Enum):
     """Type of segment."""
     STRAIGHT = 0
     CORNER = 1
+
+
+class PanelSwitchingStyle(Enum):
+    """How the panel instance does its switching."""
+    CUSTOM = 'custom'      # Some logic, we don't do anything.
+    EXTERNAL = 'external'  # Provide a toggle to the instance.
+    INTERNAL = 'internal'  # The inst has a toggle or panel, so we can reuse it.
 
 
 @attrs.define
@@ -125,9 +136,168 @@ class AntType:
         """Make a copy of the original PeTI antline config."""
         return AntType(
             [AntTex(consts.Antlines.STRAIGHT, 0.25, False)],
-            [AntTex(consts.Antlines.CORNER, 1, False)],
-            [], [], 0,
+            [AntTex(consts.Antlines.CORNER, 1.0, False)],
+            [], [], 0.0,
         )
+
+
+@final
+@attrs.frozen(eq=False, kw_only=True)
+class IndicatorStyle:
+    """Represents complete configuration for antlines and indicator panels."""
+    wall: AntType
+    floor: AntType
+
+    # Instance to use for checkmark signs.
+    check_inst: str
+    check_switching: PanelSwitchingStyle
+    # Sign inputs to swap the two versions.
+    check_cmd: Sequence[Output]
+    cross_cmd: Sequence[Output]
+
+    # Instance to use for timer signs.
+    timer_inst: str
+    timer_switching: PanelSwitchingStyle
+    # Outputs to use for the advanced version to swap skins, and to control the indicator.
+    timer_blue_cmd: Sequence[Output]
+    timer_oran_cmd: Sequence[Output]
+    timer_adv_cmds: Mapping[TimerModes, Sequence[Output]]
+    # And the simplified on/off inputs.
+    timer_basic_start_cmd: Sequence[Output]
+    timer_basic_stop_cmd: Sequence[Output]
+
+    @classmethod
+    def parse(cls, kv: Keyvalues, desc: str, parent: IndicatorStyle) -> IndicatorStyle:
+        """Parse the style from a configuration block.
+
+        If sections are not specified, they will be inherited from the parent.
+        """
+        return cls.parser(kv, desc)(parent)
+
+    @classmethod
+    def parser(cls, kv: Keyvalues, desc: str) -> Callable[[IndicatorStyle], IndicatorStyle]:
+        """Parse the style from a configuration block.
+
+        This parses immediately, then returns a callable to allows passing in the parent to inherit
+        from later.
+        """
+        wall: Optional[AntType] = None
+        floor: Optional[AntType] = None
+        if 'floor' in kv:
+            floor = AntType.parse(kv.find_key('floor'))
+        if 'wall' in kv:
+            wall = AntType.parse(kv.find_key('wall'))
+
+        # Allow 'antline' to specify both.
+        if wall is None and floor is None:
+            if 'antline' in kv:
+                wall = floor = AntType.parse(kv.find_key('antline'))
+            # If both are not there but some textures are, allow omitting the subkey.
+            elif 'straight' in kv or 'corner' in kv:
+                wall = floor = AntType.parse(kv)
+
+        # If only one is defined, use that for both.
+        if wall is None and floor is not None:
+            wall = floor
+        elif floor is None and wall is not None:
+            floor = wall
+
+        check_inst: Optional[str] = None
+        timer_inst: Optional[str] = None
+        check_cmd: Optional[List[Output]] = None
+        cross_cmd: Optional[List[Output]] = None
+        timer_adv_cmds: Dict[TimerModes, Sequence[Output]] = {}
+        timer_blue_cmd: Optional[List[Output]] = None
+        timer_oran_cmd: Optional[List[Output]] = None
+        timer_basic_start_cmd: Optional[List[Output]] = None
+        timer_basic_stop_cmd: Optional[List[Output]] = None
+        check_switching = PanelSwitchingStyle.CUSTOM
+        timer_switching = PanelSwitchingStyle.CUSTOM
+
+        check_kv = kv.find_block('check', or_blank=True)
+        has_check = bool(check_kv)
+        if has_check:
+            check_inst = check_kv['inst']
+            try:
+                check_switching = PanelSwitchingStyle(check_kv['switching'])
+            except (LookupError, ValueError):
+                check_switching = PanelSwitchingStyle.CUSTOM  #  Assume no optimisations
+            check_cmd = get_outputs(check_kv, desc, 'check_cmd')
+            cross_cmd = get_outputs(check_kv, desc, 'cross_cmd')
+
+        timer_kv = kv.find_block('timer', or_blank=True)
+        has_timer = bool(timer_kv)
+        if has_timer:
+            timer_inst = timer_kv['inst']
+            try:
+                timer_switching = PanelSwitchingStyle(timer_kv['switching'])
+            except (LookupError, ValueError):
+                timer_switching = PanelSwitchingStyle.CUSTOM  #  Assume no optimisations
+            timer_blue_cmd = get_outputs(timer_kv, desc, 'blue_cmd')
+            timer_oran_cmd = get_outputs(timer_kv, desc, 'oran_cmd')
+            timer_basic_start_cmd = get_outputs(timer_kv, desc, 'basic_start_cmd')
+            timer_basic_stop_cmd = get_outputs(timer_kv, desc, 'basic_stop_cmd')
+            for mode in TimerModes:
+                outs = get_outputs(timer_kv, desc, f'adv_{mode.value}_cmd')
+                if outs:
+                    timer_adv_cmds[mode] = outs
+
+        def build(parent: IndicatorStyle) -> IndicatorStyle:
+            """Build the config, using parent params if not specified."""
+            conf = attrs.evolve(
+                parent,
+                wall=wall or parent.wall,
+                floor=floor or parent.floor,
+            )
+            if has_check:
+                conf = attrs.evolve(
+                    conf,
+                    check_inst=check_inst,
+                    check_switching=check_switching,
+                    check_cmd=check_cmd,
+                    cross_cmd=cross_cmd,
+                )
+            if has_timer:
+                conf = attrs.evolve(
+                    conf,
+                    timer_inst=timer_inst,
+                    timer_switching=timer_switching,
+                    timer_adv_cmds=timer_adv_cmds or EmptyMapping,
+                    timer_blue_cmd=timer_blue_cmd or (),
+                    timer_oran_cmd=timer_oran_cmd or (),
+                    timer_basic_start_cmd=timer_basic_start_cmd or (),
+                    timer_basic_stop_cmd=timer_basic_stop_cmd or (),
+                )
+            return conf
+        return build
+
+    @classmethod
+    def from_legacy(cls, id_to_item: dict[str, editoritems.Item]) -> IndicatorStyle:
+        """Produce the original legacy configs by reading from editoritems."""
+        check_item = id_to_item['item_indicator_panel']
+        timer_item = id_to_item['item_indicator_panel_timer']
+
+        return cls(
+            wall=AntType.default(),
+            floor=AntType.default(),
+            check_inst=str(check_item.instances[0].inst) if check_item.instances else '',
+            check_switching=options.get(PanelSwitchingStyle, 'ind_pan_check_switching'),
+            check_cmd=check_item.conn_config.enable_cmd if check_item.conn_config is not None else (),
+            cross_cmd=check_item.conn_config.disable_cmd if check_item.conn_config is not None else (),
+
+            timer_inst=str(timer_item.instances[0].inst) if timer_item.instances else '',
+            timer_switching=options.get(PanelSwitchingStyle, 'ind_pan_timer_switching'),
+            timer_basic_start_cmd=timer_item.conn_config.enable_cmd if timer_item.conn_config is not None else (),
+            timer_basic_stop_cmd=timer_item.conn_config.disable_cmd if timer_item.conn_config is not None else (),
+            # No advanced configs
+            timer_adv_cmds=EmptyMapping,
+            timer_blue_cmd=(),
+            timer_oran_cmd=(),
+        )
+
+    def has_advanced_timer(self) -> bool:
+        """Check if this has advanced timer options."""
+        return bool(self.timer_adv_cmds)
 
 
 @attrs.define(eq=False)
@@ -158,12 +328,12 @@ class Segment:
         Neighbouring sections will be merged when they have the same
         type.
         """
-        rng = rand.seed(b'ant_broken', self.start, self.end, chance)
+        rng = rand.seed(b'ant_broken', self.start, self.end, float(chance))
         offset = self.end - self.start
         dist = offset.mag() // 16
         norm = 16 * offset.norm()
 
-        if dist < 3 or chance == 0:
+        if dist < 3 or chance == 0.0:
             # Short antlines always are either on/off.
             yield self.start, self.end, (rng.randrange(100) < chance)
         else:
@@ -184,7 +354,7 @@ class Antline:
     name: str
     line: list[Segment]
 
-    def export(self, vmf: VMF, *, wall_conf: AntType, floor_conf: AntType) -> None:
+    def export(self, vmf: VMF, style: IndicatorStyle) -> None:
         """Add the antlines into the map."""
 
         # First, do some optimisation. If corners aren't defined, try and
@@ -192,12 +362,12 @@ class Antline:
         # before/after it into the corners.
 
         collapse_line: list[Segment | None]
-        if not wall_conf.tex_corner or not floor_conf.tex_corner:
+        if not style.wall.tex_corner or not style.floor.tex_corner:
             collapse_line = list(self.line)
             for i, seg in enumerate(collapse_line):
                 if seg is None or seg.type is not SegType.STRAIGHT:
                     continue
-                if (floor_conf if seg.on_floor else wall_conf).tex_corner:
+                if (style.floor if seg.on_floor else style.wall).tex_corner:
                     continue
                 for corner_ind in [i-1, i+1]:
                     if i == -1:
@@ -234,7 +404,7 @@ class Antline:
             LOGGER.info('Collapsed {} antline corners', collapse_line.count(None))
 
         for seg in self.line:
-            conf = floor_conf if seg.on_floor else wall_conf
+            conf = style.floor if seg.on_floor else style.wall
             # Check tiledefs in the voxels, and assign just in case.
             # antline corner items don't have them defined, and some embed-faces don't work
             # properly. But we keep any segments actually defined also.

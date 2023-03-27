@@ -90,7 +90,7 @@ PRESET_CLUMPS = []  # Additional clumps set by conditions, for certain areas.
 
 
 async def load_settings() -> Tuple[
-    antlines.AntType, antlines.AntType,
+    antlines.IndicatorStyle,
     Dict[str, editoritems.Item],
     corridor.ExportedConf,
 ]:
@@ -128,24 +128,9 @@ async def load_settings() -> Tuple[
         sys.exit(1)
 
     conf = res_conf()
+    tex_block = Keyvalues('Textures', list(conf.find_children('textures')))
 
-    texturing.load_config(conf.find_block('textures', or_blank=True))
-
-    # Antline texturing settings.
-    # We optionally allow different ones for floors.
-    ant_wall = ant_floor = None
-    for kv in conf.find_all('Textures', 'Antlines'):
-        if 'floor' in kv:
-            ant_floor = antlines.AntType.parse(kv.find_key('floor'))
-        if 'wall' in kv:
-            ant_wall = antlines.AntType.parse(kv.find_key('wall'))
-        # If both are not there, allow omitting the subkey.
-        if ant_wall is ant_floor is None:
-            ant_wall = ant_floor = antlines.AntType.parse(kv)
-    if ant_wall is None:
-        ant_wall = antlines.AntType.default()
-    if ant_floor is None:
-        ant_floor = ant_wall
+    texturing.load_config(tex_block)
 
     # Load in our main configs...
     options.load(conf.find_all('Options'))
@@ -168,6 +153,14 @@ async def load_settings() -> Tuple[
     # Send that data to the relevant modules.
     instanceLocs.load_conf(id_to_item.values())
     connections.read_configs(id_to_item.values())
+
+    # Antline texturing settings.
+    indicators = antlines.IndicatorStyle.parse(
+        # Collect all blocks, since they may be in separate blocks for antlines/checkmarks/timers.
+        Keyvalues('Antlines', list(tex_block.find_children('antlines'))),
+        'the main antline configuration',
+        antlines.IndicatorStyle.from_legacy(id_to_item),
+    )
 
     # Parse packlist data.
     packing.parse_packlists(res_packlist())
@@ -232,7 +225,7 @@ async def load_settings() -> Tuple[
     })
 
     LOGGER.info("Settings Loaded!")
-    return ant_floor, ant_wall, id_to_item, corridor_conf
+    return indicators, id_to_item, corridor_conf
 
 
 async def load_map(map_path: str) -> VMF:
@@ -1609,7 +1602,7 @@ async def main() -> None:
             res_settings = utils.Result(nursery, load_settings)
             vmf_res = utils.Result(nursery, load_map, path)
 
-        ant_floor, ant_wall, id_to_item, corridor_conf = res_settings()
+        ind_style, id_to_item, corridor_conf = res_settings()
         vmf: VMF = vmf_res()
 
         coll = Collisions()
@@ -1635,8 +1628,7 @@ async def main() -> None:
             ant,
             texturing.OVERLAYS.get_all('shapeframe'),
             settings['style_vars']['enableshapesignageframe'],
-            antline_wall=ant_wall,
-            antline_floor=ant_floor,
+            ind_style,
         )
         change_ents(vmf)
 

@@ -3,23 +3,21 @@
 This allows checking which items are connected to what, and also regenerates
 the outputs with optimisations and custom settings.
 """
-from enum import Enum
 from collections import defaultdict
 
+from typing_extensions import assert_never
+
 from connections import InputType, FeatureMode, Config, ConnType, OutNames
-from srctools import VMF, Entity, Output, conv_bool, Vec, Angle
-from precomp.antlines import Antline, AntType
-from precomp import (
-    instance_traits, instanceLocs,
-    options,
-    packing,
-    conditions,
-)
+from srctools import conv_bool
+from srctools.math import Vec, Angle, format_float
+from srctools.vmf import VMF, EntityFixup, Entity, Output
+from precomp.antlines import Antline, AntType, IndicatorStyle, PanelSwitchingStyle
+from precomp import instance_traits, options, packing, conditions
 import editoritems
 import consts
 import srctools.logger
 
-from typing import Optional, Iterable, Dict, List, Set, Tuple, Iterator, Union
+from typing import Optional, Iterable, Dict, List, Sequence, Set, Tuple, Iterator, Union
 import user_errors
 
 
@@ -52,14 +50,6 @@ function snd() {{
     self.EmitSound("{snd}");
 }}
 '''
-
-
-class PanelSwitchingStyle(Enum):
-    """How the panel instance does its switching."""
-    CUSTOM = 'custom'      # Some logic, we don't do anything.
-    EXTERNAL = 'external'  # Provide a toggle to the instance.
-    INTERNAL = 'internal'  # The inst has a toggle or panel, so we can reuse it.
-
 
 CONN_NAMES = {
     ConnType.DEFAULT: 'DEF',
@@ -140,7 +130,7 @@ class Item:
         'inst', 'config', '_kv_setters',
         'ind_panels',
         'antlines', 'shape_signs',
-        'ant_wall_style', 'ant_floor_style',
+        'ind_style',
         'timer',
         'inputs', 'outputs',
         'enable_cmd', 'disable_cmd',
@@ -153,8 +143,7 @@ class Item:
         inst: Entity,
         item_type: Config,
         *,  # Don't mix up antlines!
-        ant_floor_style: AntType,
-        ant_wall_style: AntType,
+        ind_style: IndicatorStyle,
         panels: Iterable[Entity]=(),
         antlines: Iterable[Antline]=(),
         shape_signs: Iterable[ShapeSignage]=(),
@@ -170,8 +159,7 @@ class Item:
         self.shape_signs = list(shape_signs)
 
         # And the style to use for the antlines.
-        self.ant_floor_style = ant_floor_style
-        self.ant_wall_style = ant_wall_style
+        self.ind_style = ind_style
 
         # If set, the item has special antlines. This is a fixup var,
         # which gets the antline name filled in for us.
@@ -198,6 +186,14 @@ class Item:
         self._kv_setters: Dict[str, Entity] = {}
 
         assert self.name, 'Blank name!'
+
+    @property
+    def ant_floor_style(self) -> AntType:
+        return self.ind_style.floor
+
+    @property
+    def ant_wall_style(self) -> AntType:
+        return self.ind_style.wall
 
     def __repr__(self) -> str:
         return '<Item {}: "{}">'.format(self.config.id, self.name)
@@ -251,20 +247,6 @@ class Item:
             return None, consts.COUNTER_OR_OFF
 
         return self.config.output_deact
-
-    def timer_output_start(self) -> List[Tuple[Optional[str], str]]:
-        """Return the output to use for starting timers."""
-        if self.config.timer_start is None:
-            out = self.output_act()
-            return [] if out is None else [out]
-        return self.config.timer_start
-
-    def timer_output_stop(self) -> List[Tuple[Optional[str], str]]:
-        """Return the output to use for stopping timers."""
-        if self.config.timer_stop is None:
-            out = self.output_deact()
-            return [] if out is None else [out]
-        return self.config.timer_stop
 
     def delete_antlines(self) -> None:
         """Delete the antlines and checkmarks outputting from this item."""
@@ -448,9 +430,7 @@ def calc_connections(
     antlines: Dict[str, List[Antline]],
     shape_frame_tex: List[str],
     enable_shape_frame: bool,
-    *,  # Don't mix up antlines!
-    antline_wall: AntType,
-    antline_floor: AntType,
+    ind_style: IndicatorStyle,
 ) -> None:
     """Compute item connections from the map file.
 
@@ -479,8 +459,8 @@ def calc_connections(
 
     for inst in vmf.by_class['func_instance']:
         inst_name = inst['targetname']
-        # No connections, so nothing to worry about.
-        if not inst_name:
+        # Ignore to-be-removed instances, or those which won't have I/O...
+        if not inst_name or not inst['file']:
             continue
 
         traits = instance_traits.get(inst)
@@ -513,8 +493,7 @@ def calc_connections(
             # Pass in the defaults for antline styles.
             ITEMS[inst_name] = Item(
                 inst, item_type,
-                ant_floor_style=antline_floor,
-                ant_wall_style=antline_wall,
+                ind_style=ind_style,
             )
 
             # Strip off the original connection count variables, these are
@@ -729,12 +708,6 @@ def gen_item_outputs(vmf: VMF) -> None:
     """
     LOGGER.info('Generating item IO...')
 
-    pan_switching_check = options.get(PanelSwitchingStyle, 'ind_pan_check_switching')
-    pan_switching_timer = options.get(PanelSwitchingStyle, 'ind_pan_timer_switching')
-
-    pan_check_type = ITEM_TYPES['item_indicator_panel']
-    pan_timer_type = ITEM_TYPES['item_indicator_panel_timer']
-
     # For logic items without inputs, collect the instances to fix up later.
     dummy_logic_ents: list[Entity] = []
 
@@ -777,10 +750,7 @@ def gen_item_outputs(vmf: VMF) -> None:
 
         # Add outputs for antlines.
         if item.antlines or item.ind_panels:
-            if item.timer is None:
-                add_item_indicators(item, pan_switching_check, pan_check_type)
-            else:
-                add_item_indicators(item, pan_switching_timer, pan_timer_type)
+            add_item_indicators(item, item.ind_style)
 
         if item.config.input_type is InputType.DUAL:
             prim_inputs = [
@@ -830,21 +800,6 @@ def gen_item_outputs(vmf: VMF) -> None:
                 item.config.spawn_fire,
                 '_inv_rl',
             )
-
-    # Check/cross instances sometimes don't match the kind of timer delay.
-    # We also might want to swap them out.
-
-    panel_timer = instanceLocs.resolve_one('[indPanTimer]', error=True)
-    panel_check = instanceLocs.resolve_one('[indPanCheck]', error=True)
-
-    for item in ITEMS.values():
-        desired_panel_inst = panel_check if item.timer is None else panel_timer
-
-        for pan in item.ind_panels:
-            pan['file'] = desired_panel_inst
-            pan.fixup[consts.FixupVars.TIM_ENABLED] = item.timer is not None
-        if item.ind_panels:
-            conditions.ALL_INST.add(desired_panel_inst.casefold())
 
     logic_auto = vmf.create_ent(
         'logic_auto',
@@ -1013,12 +968,18 @@ def add_timer_relay(item: Item, has_sounds: bool) -> None:
                     delay=delay,
                 ))
 
-    for outputs, cmd in [
-        (item.timer_output_start(), 'Trigger'),
-        (item.timer_output_stop(), 'CancelPending')
-    ]:
-        for output in outputs:
-            item.add_io_command(output, rl_name, cmd)
+    if item.config.timer_outputs:
+        for tim_cmd in item.config.timer_outputs:
+            if tim_cmd.mode.is_count:
+                inp_cmd = 'Trigger'
+            elif tim_cmd.mode.is_reset:
+                inp_cmd = 'CancelPending'
+            else:
+                continue
+            item.add_io_command(tim_cmd.output, rl_name, inp_cmd)
+    else:  # Just regular I/O.
+        item.add_io_command(item.output_act(), rl_name, 'Trigger')
+        item.add_io_command(item.output_deact(), rl_name, 'CancelPending')
 
 
 def add_item_inputs(
@@ -1309,18 +1270,18 @@ def add_item_inputs(
 
 def add_item_indicators(
     item: Item,
-    inst_type: PanelSwitchingStyle,
-    pan_item: Config,
+    style: IndicatorStyle,
 ) -> None:
     """Generate the commands for antlines and the overlays themselves."""
     ant_name = '@{}_overlay'.format(item.name)
     has_sign = len(item.ind_panels) > 0
     has_ant = len(item.antlines) > 0
+    timer_delay = item.timer
 
     for ant in item.antlines:
         ant.name = ant_name
 
-        ant.export(item.inst.map, wall_conf=item.ant_wall_style, floor_conf=item.ant_floor_style)
+        ant.export(item.inst.map, item.ind_style)
 
     # Special case - the item wants full control over its antlines.
     if has_ant and item.ant_toggle_var:
@@ -1328,23 +1289,87 @@ def add_item_indicators(
         # We don't have antlines to control.
         has_ant = False
 
+    # If either is defined, the item wants to do custom control over the timer.
+    independent_timer = bool(item.config.timer_outputs)
+    # If that is defined, use advanced/custom timer logic if the style supports it.
+    adv_timer = independent_timer and style.has_advanced_timer()
+
+    conn_pairs: List[Tuple[Tuple[Optional[str], str], float, Sequence[Output]]]
+    panel_fixup = EntityFixup(item.inst.fixup.copy_values())
+    if timer_delay is not None:  # We have a timer.
+        inst_type = style.timer_switching
+        pan_filename = style.timer_inst
+        if adv_timer:
+            conn_pairs = [
+                (item.output_act(), 0.0, style.timer_oran_cmd),
+                (item.output_deact(), 0.0, style.timer_blue_cmd),
+            ]
+            for timer_cmd in item.config.timer_outputs:
+                delay = timer_cmd.delay
+                fade_time = timer_cmd.fadetime
+                if timer_cmd.delay_add_timer:
+                    delay += item.timer
+                if timer_cmd.fadetime_add_timer:
+                    fade_time += item.timer
+                panel_fixup['$time'] = format_float(fade_time)
+                # This gives the appropriate SetPlaybackRate input for a 30s timer dial.
+                panel_fixup['$playback'] = format_float(30.0 / fade_time) if fade_time != 0.0 else '0'
+                conn_pairs.append((timer_cmd.output, delay, [
+                    Output(
+                        '', out.target, out.input,
+                        panel_fixup.substitute(out.params, allow_invert=True),
+                        out.delay,
+                        times=out.times,
+                        inst_in=out.inst_in,
+                        inst_out=out.inst_out,
+                    )
+                    for out in style.timer_adv_cmds.get(timer_cmd.mode, ())
+                ]))
+        elif independent_timer:
+            # Item wants independent timer, but there's no advanced version.
+            # Use basic start/stop to approximate.
+            conn_pairs = []
+            for timer_cmd in item.config.timer_outputs:
+                delay = timer_cmd.delay
+                if timer_cmd.delay_add_timer:
+                    delay += item.timer
+                if timer_cmd.mode.is_count:
+                    conn_pairs.append((timer_cmd.output, delay, style.timer_basic_start_cmd))
+                elif timer_cmd.mode.is_reset:
+                    conn_pairs.append((timer_cmd.output, delay, style.timer_basic_stop_cmd))
+        else:
+            # Regular timer.
+            conn_pairs = [
+                (item.output_act(), 0.0, style.timer_basic_start_cmd),
+                (item.output_deact(), 0.0, style.timer_basic_stop_cmd),
+            ]
+    else:
+        inst_type = style.check_switching
+        pan_filename = style.check_inst
+        conn_pairs = [
+            (item.output_act(), 0.0, style.check_cmd),
+            (item.output_deact(), 0.0, style.cross_cmd),
+        ]
+    if pan_filename and item.ind_panels:
+        conditions.ALL_INST.add(pan_filename.casefold())
+
+    if timer_delay is not None:
+        panel_fixup['$time'] = format_float(timer_delay)
+        panel_fixup['$playback'] = format_float(30.0 / timer_delay) if timer_delay != 0.0 else '0'
+
     if inst_type is PanelSwitchingStyle.CUSTOM:
         needs_toggle = has_ant
     elif inst_type is PanelSwitchingStyle.EXTERNAL:
         needs_toggle = has_ant or has_sign
     elif inst_type is PanelSwitchingStyle.INTERNAL:
-        if (
-            item.config.timer_start is not None or
-            item.config.timer_stop is not None
-        ):
-            # The item is doing custom control over the timer, so
-            # don't tie antline control to the timer.
+        if independent_timer:
+            # We need to not tie antline control to the timer.
             needs_toggle = has_ant
             inst_type = PanelSwitchingStyle.CUSTOM
         else:
             needs_toggle = has_ant and not has_sign
     else:
-        raise ValueError(f'Bad switch style "{inst_type}" in item {item.config.id}!')
+        raise assert_never(inst_type)
 
     first_inst = True
 
@@ -1360,32 +1385,33 @@ def add_item_indicators(
             # instance var, so give it a blank name.
             pan.fixup[consts.FixupVars.TOGGLE_OVERLAY] = '-'
 
+        if pan_filename:
+            pan['file'] = pan_filename
+
         # Overwrite the timer delay value, in case a sign changed ownership.
-        if item.timer is not None:
-            pan.fixup[consts.FixupVars.TIM_DELAY] = item.timer
+        if timer_delay is not None:
+            pan.fixup[consts.FixupVars.TIM_DELAY] = timer_delay
             pan.fixup[consts.FixupVars.TIM_ENABLED] = '1'
+            # Set a var to tell the instance whether it needs this logic.
+            pan.fixup['$advanced'] = adv_timer
         else:
             pan.fixup[consts.FixupVars.TIM_DELAY] = '99999999999'
             pan.fixup[consts.FixupVars.TIM_ENABLED] = '0'
 
-        for outputs, input_cmds in [
-            (item.timer_output_start(), pan_item.enable_cmd),
-            (item.timer_output_stop(), pan_item.disable_cmd)
-        ]:
-            for output in outputs:
-                for cmd in input_cmds:
-                    item.add_io_command(
-                        output,
-                        conditions.local_name(
-                            pan,
-                            item.inst.fixup.substitute(cmd.target),
-                        ) or pan,
-                        item.inst.fixup.substitute(cmd.input),
-                        item.inst.fixup.substitute(cmd.params, allow_invert=True),
-                        delay=cmd.delay,
-                        inst_in=cmd.inst_in,
-                        times=cmd.times,
-                    )
+        for output, delay, input_cmds in conn_pairs:
+            for cmd in input_cmds:
+                item.add_io_command(
+                    output,
+                    conditions.local_name(
+                        pan,
+                        item.inst.fixup.substitute(cmd.target),
+                    ) or pan,
+                    item.inst.fixup.substitute(cmd.input),
+                    panel_fixup.substitute(cmd.params, allow_invert=True),
+                    delay=delay + cmd.delay,
+                    inst_in=cmd.inst_in,
+                    times=cmd.times,
+                )
 
     if needs_toggle:
         toggle = item.inst.map.create_ent(
