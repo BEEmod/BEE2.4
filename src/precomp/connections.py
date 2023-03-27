@@ -131,7 +131,6 @@ class Item:
         'ind_panels',
         'antlines', 'shape_signs',
         'ind_style',
-        'timer',
         'inputs', 'outputs',
         'enable_cmd', 'disable_cmd',
         'sec_enable_cmd', 'sec_disable_cmd',
@@ -217,6 +216,30 @@ class Item:
     def name(self, value: str) -> None:
         """Set the targetname of the item."""
         self.inst['targetname'] = value
+
+    @property
+    def timer(self) -> Optional[int]:
+        """Return the current $timer_delay value for this item, or None if it is not timed."""
+        if consts.FixupVars.TIM_DELAY in self.inst.fixup:
+            timer_delay = self.inst.fixup.int(consts.FixupVars.TIM_DELAY)
+            if 1 <= timer_delay <= 30:
+                return timer_delay
+            # else, it's an infinite timer.
+        return None
+
+    @timer.setter
+    def timer(self, value: Optional[int]) -> None:
+        """Set the current timer delay value for this item."""
+        if value is not None and 1 <= value <= 30:
+            self.inst.fixup[consts.FixupVars.TIM_DELAY] = value
+        # Don't add a timer delay fixup value if value is None.
+        elif consts.FixupVars.TIM_DELAY in self.inst.fixup:
+            self.inst.fixup[consts.FixupVars.TIM_DELAY] = consts.TIMER_INFINITE
+
+    @timer.deleter
+    def timer(self) -> None:
+        """Remove the timer delay fixup value."""
+        del self.inst.fixup[consts.FixupVars.TIM_DELAY]
 
     def output_act(self) -> Optional[Tuple[Optional[str], str]]:
         """Return the output used when this is activated."""
@@ -542,14 +565,6 @@ def calc_connections(
         # Remove the original outputs, we've consumed those already.
         item.inst.outputs.clear()
 
-        # Pre-set the timer value, for items without antlines but with an output.
-        if consts.FixupVars.TIM_DELAY in item.inst.fixup:
-            if item.config.output_act or item.config.output_deact:
-                item.timer = tim = item.inst.fixup.int(consts.FixupVars.TIM_DELAY)
-                if not (1 <= tim <= 30):
-                    # These would be infinite.
-                    item.timer = None
-
         for out_name in inputs:
             # Fizzler base -> model/brush outputs, ignore these (discard).
             # fizzler.py will regenerate as needed.
@@ -567,6 +582,7 @@ def calc_connections(
             elif out_name in panels:
                 pan = panels[out_name]
                 item.ind_panels.add(pan)
+                # If items have indicator panels, copy over the timer delay.
                 if pan.fixup.bool(consts.FixupVars.TIM_ENABLED):
                     item.timer = tim = pan.fixup.int(consts.FixupVars.TIM_DELAY)
                     if not (1 <= tim <= 30):
@@ -734,7 +750,7 @@ def gen_item_outputs(vmf: VMF) -> None:
     # We go 'backwards', creating all the inputs for each item.
     # That way we can change behaviour based on item counts.
     for item in ITEMS.values():
-        if item.config is None:
+        if item.config is None:  # Has no I/O.
             continue
 
         # Try to add the locking IO.
@@ -900,7 +916,8 @@ def localise_output(
 
 def add_timer_relay(item: Item, has_sounds: bool) -> None:
     """Make a relay to play timer sounds, or fire once the outputs are done."""
-    assert item.timer is not None
+    timer_delay = item.timer
+    assert timer_delay is not None
 
     rl_name = item.name + '_timer_rl'
 
@@ -923,7 +940,7 @@ def add_timer_relay(item: Item, has_sounds: bool) -> None:
 
     for cmd in item.config.timer_done_cmd:
         if cmd:
-            relay.add_out(localise_output(cmd, 'OnTrigger', item.inst, delay=item.timer))
+            relay.add_out(localise_output(cmd, 'OnTrigger', item.inst, delay=timer_delay))
 
     if item.config.timer_sound_pos is not None and has_sounds:
         timer_sound = options.get(str, 'timer_sound')
@@ -951,7 +968,7 @@ def add_timer_relay(item: Item, has_sounds: bool) -> None:
         )
         packing.pack_files(item.inst.map, timer_sound, file_type='sound')
 
-        for delay in range(item.timer):
+        for delay in range(timer_delay):
             relay.add_out(Output(
                 'OnTrigger',
                 '!self',
@@ -1308,9 +1325,9 @@ def add_item_indicators(
                 delay = timer_cmd.delay
                 fade_time = timer_cmd.fadetime
                 if timer_cmd.delay_add_timer:
-                    delay += item.timer
+                    delay += timer_delay
                 if timer_cmd.fadetime_add_timer:
-                    fade_time += item.timer
+                    fade_time += timer_delay
                 panel_fixup['$time'] = format_float(fade_time)
                 # This gives the appropriate SetPlaybackRate input for a 30s timer dial.
                 panel_fixup['$playback'] = format_float(30.0 / fade_time) if fade_time != 0.0 else '0'
@@ -1332,7 +1349,7 @@ def add_item_indicators(
             for timer_cmd in item.config.timer_outputs:
                 delay = timer_cmd.delay
                 if timer_cmd.delay_add_timer:
-                    delay += item.timer
+                    delay += timer_delay
                 if timer_cmd.mode.is_count:
                     conn_pairs.append((timer_cmd.output, delay, style.timer_basic_start_cmd))
                 elif timer_cmd.mode.is_reset:
@@ -1395,7 +1412,7 @@ def add_item_indicators(
             # Set a var to tell the instance whether it needs this logic.
             pan.fixup['$advanced'] = adv_timer
         else:
-            pan.fixup[consts.FixupVars.TIM_DELAY] = '99999999999'
+            pan.fixup[consts.FixupVars.TIM_DELAY] = consts.TIMER_INFINITE
             pan.fixup[consts.FixupVars.TIM_ENABLED] = '0'
 
         for output, delay, input_cmds in conn_pairs:
