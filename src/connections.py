@@ -438,16 +438,6 @@ class Config:
         out_lock = get_input('out_lock', desc, conf['out_lock', ''])
         out_unlock = get_input('out_unlock', desc, conf['out_unlock', ''])
 
-        def get_inputs(block: Keyvalues, kv_name: str) -> list[tuple[str | None, str]] | None:
-            """Get a list of inputs for timers."""
-            if kv_name in block:
-                return [
-                    param
-                    for kv in block.find_all(kv_name)
-                    if (param := get_input(kv_name, desc,kv.value)) is not None
-                ]
-            return None
-
         timer_outputs = [
             TimerCommand.parse(cmd, desc)
             for cmd in conf.find_all('TimerCommand')
