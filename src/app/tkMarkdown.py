@@ -341,10 +341,11 @@ def _merge(*blocks: SingleMarkdown) -> SingleMarkdown:
 def _convert(text: str, package: str | None) -> SingleMarkdown:
     """Actually convert markdown data."""
     tok = state.set(RenderState(package))
-    try:
-        return _RENDERER.render(mistletoe.Document(text))
-    finally:
-        state.reset(tok)
+    with _RENDERER:
+        try:
+            return _RENDERER.render(mistletoe.Document(text))
+        finally:
+            state.reset(tok)
 
 
 def convert(text: TransToken, package: str | None) -> MarkdownData:
@@ -361,7 +362,7 @@ def convert(text: TransToken, package: str | None) -> MarkdownData:
 
 def join(*args: MarkdownData) -> MarkdownData:
     """Merge several mardown blocks together."""
-    # This preserves the originals so they can be translated separately.
+    # This preserves the originals, so they can be translated separately.
     return JoinedMarkdown(list(args))
 
 
