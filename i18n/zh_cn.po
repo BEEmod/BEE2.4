@@ -3,16 +3,16 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: https://github.com/BEEmod/BEE2.4/issues\n"
-"POT-Creation-Date: 2023-01-29 10:53+1000\n"
+"POT-Creation-Date: 2023-03-29 13:09+1000\n"
 "PO-Revision-Date: 2019-11-22 10:47+1000\n"
 "Last-Translator: Antecer <antecer@outlook.com>\n"
 "Language: zh\n"
 "Language-Team: zh <LL@li.org>\n"
-"Plural-Forms: nplurals=1; plural=0\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.9.1\n"
+"Generated-By: Babel 2.12.1\n"
 
 #: loadScreen.py
 msgid "Skipped!"
@@ -290,6 +290,34 @@ msgstr ""
 #. This uses HTML syntax.
 #: user_errors.py
 msgid ""
+"A chain of items has multiple inputs to a single item. The chain should "
+"form a single path, not have branches."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"A chain of items has multiple outputs from a single item. The chain "
+"should form a single path, not have branches."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"A chain of items has been constructed with a loop, but this type of item "
+"does not support a loop. Break the connection at some point."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"The highlighted items in this chain do not support being linked together "
+"in this fashion. Check the order of connections."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
 "A Sendificator was connected to an item which is not a Discouragement "
 "Beam Emitter (<var>{out_item}</var>). The output connection is used to "
 "specify the emitter that cubes will teleport to, so it cannot be an "
@@ -376,7 +404,7 @@ msgstr "编译设置"
 #. i18n: Tooltip format for compiler limit bars.
 #: app/CompilerPane.py
 msgid ""
-"{count}/{max} ({frac:.2%}):\n"
+"{count}/{max} ({frac:0.##%}):\n"
 "{blurb}"
 msgstr ""
 
@@ -449,11 +477,11 @@ msgstr "光影渲染模式"
 msgid "None"
 msgstr "无！"
 
-#: app/CompilerPane.py app/CompilerPane.py app/CompilerPane.py
+#: app/CompilerPane.py
 msgid "Fast"
 msgstr "最快速度"
 
-#: app/CompilerPane.py app/CompilerPane.py
+#: app/CompilerPane.py
 msgid "Full"
 msgstr "最佳画质"
 
@@ -1078,7 +1106,7 @@ msgstr "请选择要备份的地图！"
 msgid "Load Backup"
 msgstr "载入备份"
 
-#: app/backup.py app/backup.py
+#: app/backup.py
 msgid "Save Backup As"
 msgstr "将备份另存为"
 
@@ -1111,15 +1139,15 @@ msgstr ""
 msgid "BEEMOD {version} - Backup / Restore Puzzles"
 msgstr "BEEMOD {version} - 备份/恢复 谜题"
 
-#: app/backup.py app/backup.py
+#: app/backup.py
 msgid "New Backup"
 msgstr "新建备份"
 
-#: app/backup.py app/backup.py
+#: app/backup.py
 msgid "Open Backup"
 msgstr "打开备份"
 
-#: app/backup.py app/backup.py
+#: app/backup.py
 msgid "Save Backup"
 msgstr "保存备份"
 
@@ -1304,6 +1332,20 @@ msgstr "更改默认值..."
 msgid "Change the default settings for this item when placed."
 msgstr "修改该物品在放置时的默认设置。"
 
+#: app/corridor_selector.py app/selector_win.py
+#, fuzzy
+msgid "Author: {authors}"
+msgid_plural "Authors: {authors}"
+msgstr[0] "作者: {authors}"
+
+#: app/corridor_selector.py app/selector_win.py
+msgid "Authors: Unknown"
+msgstr ""
+
+#: app/corridor_selector.py
+msgid "BEEmod - Select Corridor"
+msgstr ""
+
 #: app/corridor_selector.py app/helpMenu.py app/item_properties.py
 msgid "Close"
 msgstr "关闭"
@@ -1318,6 +1360,13 @@ msgstr ""
 
 #: app/corridor_selector.py
 msgid "Downward"
+msgstr ""
+
+#: app/corridor_selector.py
+msgid ""
+"Drag corridors to the 'selected' and 'unused' areas to specify which are "
+"used. Ingame, a random corridor from the 'selected' group will be picked "
+"for each map."
 msgstr ""
 
 #: app/corridor_selector.py
@@ -1369,7 +1418,7 @@ msgstr "导出到 \"{game}\"..."
 msgid "Export to \"{game}\"*..."
 msgstr "导出到 \"{game}\"*..."
 
-#: app/gameMan.py app/gameMan.py
+#: app/gameMan.py
 msgid "BEE2 - Export Failed!"
 msgstr "BEE2 - 导出失败！"
 
@@ -1522,7 +1571,7 @@ msgstr "反馈物品Bug..."
 msgid "Submit Music Bugs..."
 msgstr "反馈物品Bug..."
 
-#: app/helpMenu.py app/helpMenu.py
+#: app/helpMenu.py
 msgid "BEEMOD2 - Failed to open URL"
 msgstr ""
 
@@ -1569,11 +1618,17 @@ msgstr ""
 #: app/item_properties.py
 msgid ""
 "Timer Delay:\n"
-"        ({tim})"
+"        ({tim:00})"
 msgstr ""
 
 #: app/item_properties.py
 msgid "When Oscillating mode is disabled, Start Active has no effect."
+msgstr ""
+
+#: app/item_properties.py
+msgid ""
+"This option picks which sub-item is used. Put a different item on the "
+"palette to change the default instead."
 msgstr ""
 
 #: app/item_properties.py
@@ -1692,7 +1747,7 @@ msgstr "斥力凝胶的音效"
 msgid "Excursion Funnel Music"
 msgstr "牵引光束的音效"
 
-#: app/music_conf.py app/music_conf.py
+#: app/music_conf.py
 msgid "Synced Funnel Music"
 msgstr "同步牵引光束的音效"
 
@@ -2095,7 +2150,7 @@ msgstr "传送门2"
 msgid "Aperture Tag"
 msgstr "Aperture Tag"
 
-#: app/paletteUI.py app/paletteUI.py
+#: app/paletteUI.py
 msgid "Delete Palette"
 msgstr "删除选中模板"
 
@@ -2131,7 +2186,7 @@ msgstr "保存模板..."
 msgid "Fill Palette"
 msgstr "重置模板"
 
-#: app/paletteUI.py app/paletteUI.py
+#: app/paletteUI.py
 msgid "Save Settings in Palettes"
 msgstr "在模板中保存配置"
 
@@ -2154,11 +2209,11 @@ msgstr "删除模板 \"{name}\""
 msgid "BEE2 - Delete Palette"
 msgstr "删除选中模板"
 
-#: app/paletteUI.py app/paletteUI.py
+#: app/paletteUI.py
 msgid "BEE2 - Save Palette"
 msgstr "BEE2 - 保存模板"
 
-#: app/paletteUI.py app/paletteUI.py
+#: app/paletteUI.py
 msgid "Enter a name:"
 msgstr "键入模板名称："
 
@@ -2198,16 +2253,6 @@ msgstr "建议"
 msgid "Other"
 msgstr "其它"
 
-#: app/selector_win.py
-#, fuzzy
-msgid "Author: {authors}"
-msgid_plural "Authors: {authors}"
-msgstr[0] "作者: {authors}"
-
-#: app/selector_win.py
-msgid "Authors: Unknown"
-msgstr ""
-
 #. i18n: 'None' item description
 #: app/selector_win.py
 msgid "Do not add anything."
@@ -2232,7 +2277,7 @@ msgstr "建议"
 msgid "Signage: {name}"
 msgstr "指示标志: {name}"
 
-#: app/signage_ui.py app/signage_ui.py
+#: app/signage_ui.py
 msgid "Configure Signage"
 msgstr "设置指示标志"
 
@@ -2293,7 +2338,7 @@ msgstr ""
 msgid "Camera Gesture - Generic"
 msgstr ""
 
-#: app/voiceEditor.py app/voiceEditor.py
+#: app/voiceEditor.py
 msgid "No Name!"
 msgstr "没有名称！"
 
@@ -2332,6 +2377,11 @@ msgstr "回应"
 #: app/voiceEditor.py
 msgid "Lines played in response to certain events in Coop."
 msgstr "在合作模式中触发特定事件后播放的台词。"
+
+#. i18n: The format for timer numerals.
+#: app/itemconfig/__init__.py
+msgid "{timer_num:00}"
+msgstr ""
 
 #: app/itemconfig/__init__.py
 msgid "{name} ({page}/{count})"

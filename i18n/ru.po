@@ -3,17 +3,17 @@ msgid ""
 msgstr ""
 "Project-Id-Version:  BEEMOD2\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2023-01-29 10:53+1000\n"
+"POT-Creation-Date: 2023-03-29 13:09+1000\n"
 "PO-Revision-Date: 2021-11-18 17:18+0300\n"
 "Last-Translator: \n"
 "Language: ru\n"
 "Language-Team: Russian\n"
 "Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10 >= 2 &&"
-" n%10<=4 &&(n%100<10||n%100 >= 20)? 1 : 2)\n"
+" n%10<=4 &&(n%100<10||n%100 >= 20)? 1 : 2);\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.9.1\n"
+"Generated-By: Babel 2.12.1\n"
 
 #: loadScreen.py
 msgid "Skipped!"
@@ -291,6 +291,34 @@ msgstr ""
 #. This uses HTML syntax.
 #: user_errors.py
 msgid ""
+"A chain of items has multiple inputs to a single item. The chain should "
+"form a single path, not have branches."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"A chain of items has multiple outputs from a single item. The chain "
+"should form a single path, not have branches."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"A chain of items has been constructed with a loop, but this type of item "
+"does not support a loop. Break the connection at some point."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"The highlighted items in this chain do not support being linked together "
+"in this fashion. Check the order of connections."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
 "A Sendificator was connected to an item which is not a Discouragement "
 "Beam Emitter (<var>{out_item}</var>). The output connection is used to "
 "specify the emitter that cubes will teleport to, so it cannot be an "
@@ -377,7 +405,7 @@ msgstr "Настройки компиляции"
 #. i18n: Tooltip format for compiler limit bars.
 #: app/CompilerPane.py
 msgid ""
-"{count}/{max} ({frac:.2%}):\n"
+"{count}/{max} ({frac:0.##%}):\n"
 "{blurb}"
 msgstr ""
 
@@ -455,11 +483,11 @@ msgstr "Освещение:"
 msgid "None"
 msgstr "Нету!"
 
-#: app/CompilerPane.py app/CompilerPane.py app/CompilerPane.py
+#: app/CompilerPane.py
 msgid "Fast"
 msgstr "Быстрое"
 
-#: app/CompilerPane.py app/CompilerPane.py
+#: app/CompilerPane.py
 msgid "Full"
 msgstr "Полное"
 
@@ -1125,7 +1153,7 @@ msgstr "Не выбраны карты для резервирования!"
 msgid "Load Backup"
 msgstr "Загрузить бекап"
 
-#: app/backup.py app/backup.py
+#: app/backup.py
 msgid "Save Backup As"
 msgstr "Сохранить бекап как"
 
@@ -1158,18 +1186,18 @@ msgstr ""
 msgid "BEEMOD {version} - Backup / Restore Puzzles"
 msgstr "BEEMOD {} - Бэкап/Восстановление головоломок"
 
-#: app/backup.py app/backup.py
+#: app/backup.py
 msgid "New Backup"
 msgstr "Новый бэкап"
 
 # "Открыть бэкап" is too long for the button, so it should be just "Открыть"
-#: app/backup.py app/backup.py
+#: app/backup.py
 msgid "Open Backup"
 msgstr "Открыть"
 
 # "Сохранить бэкап" is too long for the button, so it should be just
 # "Сохранить"
-#: app/backup.py app/backup.py
+#: app/backup.py
 msgid "Save Backup"
 msgstr "Сохранить"
 
@@ -1360,6 +1388,22 @@ msgstr "Изменить значения по умолчанию..."
 msgid "Change the default settings for this item when placed."
 msgstr "Изменить стандартные настройки объекта при размещении."
 
+#: app/corridor_selector.py app/selector_win.py
+#, fuzzy
+msgid "Author: {authors}"
+msgid_plural "Authors: {authors}"
+msgstr[0] "Автор: {}"
+msgstr[1] "Авторы: {}"
+msgstr[2] "Авторы: {}"
+
+#: app/corridor_selector.py app/selector_win.py
+msgid "Authors: Unknown"
+msgstr ""
+
+#: app/corridor_selector.py
+msgid "BEEmod - Select Corridor"
+msgstr ""
+
 #: app/corridor_selector.py app/helpMenu.py app/item_properties.py
 msgid "Close"
 msgstr "Закрыть"
@@ -1374,6 +1418,13 @@ msgstr ""
 
 #: app/corridor_selector.py
 msgid "Downward"
+msgstr ""
+
+#: app/corridor_selector.py
+msgid ""
+"Drag corridors to the 'selected' and 'unused' areas to specify which are "
+"used. Ingame, a random corridor from the 'selected' group will be picked "
+"for each map."
 msgstr ""
 
 #: app/corridor_selector.py
@@ -1425,7 +1476,7 @@ msgstr "Экспортировать в \"{}\"..."
 msgid "Export to \"{game}\"*..."
 msgstr "Экспортировать в \"{}\"..."
 
-#: app/gameMan.py app/gameMan.py
+#: app/gameMan.py
 msgid "BEE2 - Export Failed!"
 msgstr "BEE2 - Экспорт не удался!"
 
@@ -1582,7 +1633,7 @@ msgstr "Сообщить о баге с предметами..."
 msgid "Submit Music Bugs..."
 msgstr "Сообщить о баге с предметами..."
 
-#: app/helpMenu.py app/helpMenu.py
+#: app/helpMenu.py
 msgid "BEEMOD2 - Failed to open URL"
 msgstr ""
 
@@ -1630,11 +1681,17 @@ msgstr "Настройки для \"{}\""
 #: app/item_properties.py
 msgid ""
 "Timer Delay:\n"
-"        ({tim})"
+"        ({tim:00})"
 msgstr ""
 
 #: app/item_properties.py
 msgid "When Oscillating mode is disabled, Start Active has no effect."
+msgstr ""
+
+#: app/item_properties.py
+msgid ""
+"This option picks which sub-item is used. Put a different item on the "
+"palette to change the default instead."
 msgstr ""
 
 #: app/item_properties.py
@@ -1755,7 +1812,7 @@ msgstr "Звук отталкивающего геля"
 msgid "Excursion Funnel Music"
 msgstr "Музыка экскурсионной воронки"
 
-#: app/music_conf.py app/music_conf.py
+#: app/music_conf.py
 msgid "Synced Funnel Music"
 msgstr "Синхронная музыка воронки"
 
@@ -2187,7 +2244,7 @@ msgstr "Portal 2"
 msgid "Aperture Tag"
 msgstr "Aperture Tag"
 
-#: app/paletteUI.py app/paletteUI.py
+#: app/paletteUI.py
 msgid "Delete Palette"
 msgstr "Удалить палитру"
 
@@ -2221,7 +2278,7 @@ msgstr "Переименовать палитру..."
 msgid "Fill Palette"
 msgstr "Заполнить набор"
 
-#: app/paletteUI.py app/paletteUI.py
+#: app/paletteUI.py
 msgid "Save Settings in Palettes"
 msgstr "Сохранить настройки в палитре"
 
@@ -2244,11 +2301,11 @@ msgstr "Удалить палитру \"{}\""
 msgid "BEE2 - Delete Palette"
 msgstr "Удалить палитру"
 
-#: app/paletteUI.py app/paletteUI.py
+#: app/paletteUI.py
 msgid "BEE2 - Save Palette"
 msgstr "BEE2 - Сохранить Палитру"
 
-#: app/paletteUI.py app/paletteUI.py
+#: app/paletteUI.py
 msgid "Enter a name:"
 msgstr "Введите название:"
 
@@ -2288,18 +2345,6 @@ msgstr "Предложенное"
 msgid "Other"
 msgstr "Другое"
 
-#: app/selector_win.py
-#, fuzzy
-msgid "Author: {authors}"
-msgid_plural "Authors: {authors}"
-msgstr[0] "Автор: {}"
-msgstr[1] "Авторы: {}"
-msgstr[2] "Авторы: {}"
-
-#: app/selector_win.py
-msgid "Authors: Unknown"
-msgstr ""
-
 #. i18n: 'None' item description
 #: app/selector_win.py
 msgid "Do not add anything."
@@ -2323,7 +2368,7 @@ msgstr "Выбрать предложенное"
 msgid "Signage: {name}"
 msgstr "Знак: {}"
 
-#: app/signage_ui.py app/signage_ui.py
+#: app/signage_ui.py
 msgid "Configure Signage"
 msgstr "Настроить обозначения"
 
@@ -2384,7 +2429,7 @@ msgstr ""
 msgid "Camera Gesture - Generic"
 msgstr ""
 
-#: app/voiceEditor.py app/voiceEditor.py
+#: app/voiceEditor.py
 msgid "No Name!"
 msgstr "Нет имени!"
 
@@ -2425,6 +2470,11 @@ msgstr "Реакции"
 #: app/voiceEditor.py
 msgid "Lines played in response to certain events in Coop."
 msgstr "Реплики для реакций на события в кооперативе."
+
+#. i18n: The format for timer numerals.
+#: app/itemconfig/__init__.py
+msgid "{timer_num:00}"
+msgstr ""
 
 #: app/itemconfig/__init__.py
 msgid "{name} ({page}/{count})"
