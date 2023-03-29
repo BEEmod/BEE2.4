@@ -539,16 +539,15 @@ class Handle:
     def reload(self) -> bool:
         """Reload this handle if permitted to, returning whether it was queued.
 
-        Reloading will not occur if the handle was forced loaded or already loading.
+        Reloading will not occur if the handle was forced loaded, already loading.
         """
         # If force-loaded it's builtin UI etc we shouldn't reload.
         # If already loading, no point.
         if self._force_loaded or self._loading:
             return False
 
-        _discard_tk_img(self._cached_tk)
-        self._cached_tk = self._cached_pil = None
-        loading = self._request_load()
+        self._cached_pil = None
+        loading = self._request_load(force=True)
         for label_ref in self._users:
             if isinstance(label_ref, WeakRef):
                 label: tkImgWidgets | None = label_ref()
@@ -577,7 +576,7 @@ class Handle:
         if not self.allow_raw:
             raise ValueError(f'Cannot use get_tk() on non-builtin type {self!r}!')
         self._force_loaded = True
-        return self._load_tk()
+        return self._load_tk(force=False)
 
     def _load_pil(self) -> Image.Image:
         """Load the PIL image if required, then return it."""
@@ -585,9 +584,9 @@ class Handle:
             self._cached_pil = self._make_image()
         return self._cached_pil
 
-    def _load_tk(self) -> ImageTk.PhotoImage:
+    def _load_tk(self, force: bool) -> ImageTk.PhotoImage:
         """Load the TK image if required, then return it."""
-        if self._cached_tk is None:
+        if self._cached_tk is None or force:
             # LOGGER.debug('Loading {}', self)
             res = self._load_pil()
             # Except for builtin types (icons), composite onto the PeTI BG.
@@ -596,7 +595,8 @@ class Handle:
                 bg.alpha_composite(res)
                 res = bg.convert('RGB')
                 self._bg_composited = True
-            self._cached_tk = _get_tk_img(res.width, res.height)
+            if self._cached_tk is None:
+                self._cached_tk = _get_tk_img(res.width, res.height)
             self._cached_tk.paste(res)
         return self._cached_tk
 
@@ -625,29 +625,30 @@ class Handle:
         for child in self._children():
             child._incref(self)
 
-    def _request_load(self) -> ImageTk.PhotoImage:
+    def _request_load(self, force=False) -> ImageTk.PhotoImage:
         """Request a reload of this image.
 
         If this can be done synchronously, the result is returned.
         Otherwise, this returns the loading icon.
+        If force is True, the image will be remade even if cached.
         """
         if self._loading is True:
             return Handle.ico_loading(self.width, self.height).get_tk()
-        if self._cached_tk is not None:
+        if self._cached_tk is not None and not force:
             return self._cached_tk
         if self._loading is False:
             self._loading = True
             if _load_nursery is None:
                 _early_loads.add(self)
             else:
-                _load_nursery.start_soon(self._load_task)
+                _load_nursery.start_soon(self._load_task, force)
         return Handle.ico_loading(self.width, self.height).get_tk()
 
-    async def _load_task(self) -> None:
+    async def _load_task(self, force: bool) -> None:
         """Scheduled to load images then apply to the labels."""
         await trio.to_thread.run_sync(self._load_pil)
         self._loading = False
-        tk_ico = self._load_tk()
+        tk_ico = self._load_tk(force)
         for label_ref in self._users:
             if isinstance(label_ref, WeakRef):
                 label: tkImgWidgets | None = label_ref()
@@ -1023,7 +1024,7 @@ async def init(filesystems: Mapping[str, FileSystem]) -> None:
         while _early_loads:
             handle = _early_loads.pop()
             if handle._users:
-                _load_nursery.start_soon(Handle._load_task, handle)
+                _load_nursery.start_soon(Handle._load_task, handle, False)
         _load_nursery.start_soon(_spin_load_icons)
         await trio.sleep_forever()
 
@@ -1051,7 +1052,7 @@ def refresh_all() -> None:
     LOGGER.info('Forcing all images to reload!')
     done = 0
     for handle in list(_handles.values()):
-        if handle.reload():
+        if handle.has_users() and handle.reload():
             done += 1
     LOGGER.info('Queued {} images to reload.', done)
 
