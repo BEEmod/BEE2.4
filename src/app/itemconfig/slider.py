@@ -1,12 +1,31 @@
 from __future__ import annotations
 
+import attr
 import math
 
 import tkinter as tk
 from srctools import Keyvalues
 from tkinter import ttk
+from typing_extensions import Self
 
 from app.itemconfig import UpdateFunc, WidgetLookup, widget_sfx
+
+
+@attr.frozen
+class SliderOptions:
+    """Options for a slider widget."""
+    min: float
+    max: float
+    step: float
+
+    @classmethod
+    def parse(cls, conf: Keyvalues) -> Self:
+        """Parse from keyvalues options."""
+        return cls(
+            min=conf.float('min', 0),
+            max=conf.float('max', 100),
+            step=conf.float('step', 1),
+        )
 
 
 def decimal_points(num: float) -> int:
@@ -20,40 +39,38 @@ def decimal_points(num: float) -> int:
 
 
 @WidgetLookup('range', 'slider', wide=True)
-async def widget_slider(parent: tk.Widget, var: tk.StringVar, conf: Keyvalues) -> tuple[tk.Widget, UpdateFunc]:
+async def widget_slider(parent: tk.Widget, var: tk.StringVar, kv: Keyvalues) -> tuple[tk.Widget, UpdateFunc]:
     """Provides a slider for setting a number in a range."""
-    limit_min = conf.float('min', 0)
-    limit_max = conf.float('max', 100)
-    step = conf.float('step', 1)
+    conf = SliderOptions.parse(kv)
 
     # We have to manually translate the UI position to a value.
     ui_min = 0
-    ui_max = abs(math.ceil((limit_max - limit_min) / step))
+    ui_max = abs(math.ceil((conf.max - conf.min) / conf.step))
     ui_var = tk.DoubleVar()
 
     # The formatting of the text display is a little complex.
     # We want to keep the same number of decimal points for all values.
     points = max(
-        decimal_points(limit_min + step * offset)
+        decimal_points(conf.min + conf.step * offset)
         for offset in range(0, int(ui_max) + 1)
     )
     txt_format = f'.{points}f'
     # Then we want to figure out the longest value with this format to set
     # the widget width
     widget_width = max(
-        len(format(limit_min + step * offset, txt_format))
+        len(format(conf.min + conf.step * offset, txt_format))
         for offset in range(0, int(ui_max) + 1)
     )
 
     def change_cmd(*args) -> None:
-        new_pos = format(limit_min + step * round(scale.get(), points), txt_format)
+        new_pos = format(conf.min + conf.step * round(scale.get(), points), txt_format)
         if var.get() != new_pos:
             widget_sfx()
             var.set(new_pos)
 
     async def update_ui(new_value: str) -> None:
         """Apply the configured value to the UI."""
-        off = (float(new_value) - limit_min) / step
+        off = (float(new_value) - conf.min) / conf.step
         ui_var.set(round(off, points))
 
     await update_ui(var.get())
