@@ -1,16 +1,32 @@
-from __future__ import annotations
-
+import attrs
 from functools import lru_cache
 from typing import AsyncIterator, List, Tuple
 
 import tkinter as tk
 from srctools import Keyvalues, conv_int, logger
+from typing_extensions import Self
 
 from app.itemconfig import UpdateFunc, WidgetLookup, WidgetLookupMulti, multi_grid
 from app.tooltip import add_tooltip
 
 
 LOGGER = logger.get_logger('itemconfig.timer')
+
+
+@attrs.frozen
+class TimerOptions:
+    """Options for minute-second timers."""
+    min: int
+    max: int
+
+    @classmethod
+    def parse(cls, conf: Keyvalues) -> Self:
+        """Parse from config options."""
+        max_value = conf.int('max', 60)
+        min_value = conf.int('min', 0)
+        if min_value > max_value:
+            raise ValueError('Bad min and max values!')
+        return cls(min_value, max_value)
 
 
 @lru_cache(maxsize=20)
@@ -24,8 +40,9 @@ def timer_values(min_value: int, max_value: int) -> List[str]:
 
 @WidgetLookupMulti('Timer', 'MinuteSeconds')
 async def widget_minute_seconds_multi(
-        parent: tk.Widget,
-        values: List[Tuple[str, tk.StringVar]], conf: Keyvalues
+    parent: tk.Widget,
+    values: List[Tuple[str, tk.StringVar]],
+    conf: Keyvalues,
 ) -> AsyncIterator[Tuple[str, UpdateFunc]]:
     """For timers, display in a more compact form."""
     for row, column, tim_val, tim_text, var in multi_grid(values, columns=5):
@@ -36,18 +53,14 @@ async def widget_minute_seconds_multi(
 
 
 @WidgetLookup('Timer', 'MinuteSeconds')
-async def widget_minute_seconds(parent: tk.Widget, var: tk.StringVar, conf: Keyvalues) -> Tuple[tk.Widget, UpdateFunc]:
+async def widget_minute_seconds(parent: tk.Widget, var: tk.StringVar, kv: Keyvalues) -> Tuple[tk.Widget, UpdateFunc]:
     """A widget for specifying times - minutes and seconds.
 
     The value is saved as seconds.
     Max specifies the largest amount.
     """
-    max_value = conf.int('max', 60)
-    min_value = conf.int('min', 0)
-    if min_value > max_value:
-        raise ValueError('Bad min and max values!')
-
-    values = timer_values(min_value, max_value)
+    conf = TimerOptions.parse(kv)
+    values = timer_values(conf.min, conf.max)
 
     # Stores the 'pretty' value in the actual textbox.
     disp_var = tk.StringVar()
@@ -57,10 +70,10 @@ async def widget_minute_seconds(parent: tk.Widget, var: tk.StringVar, conf: Keyv
     async def update_disp(new_val: str) -> None:
         """Whenever the string changes, update the displayed text."""
         seconds = conv_int(new_val, -1)
-        if min_value <= seconds <= max_value:
-            disp_var.set('{}:{:02}'.format(seconds // 60, seconds % 60))
+        if conf.min <= seconds <= conf.max:
+            disp_var.set(f'{seconds // 60}:{seconds % 60:02}')
         else:
-            LOGGER.warning('Bad timer value "{}" for "{}"!', new_val, conf['id'])
+            LOGGER.warning('Bad timer value "{}"!')
             # Recurse, with a known safe value.
             var.set(values[0])
 
@@ -72,7 +85,7 @@ async def widget_minute_seconds(parent: tk.Widget, var: tk.StringVar, conf: Keyv
         except (ValueError, TypeError):
             pass
 
-    def validate(reason: str, operation_type: str, cur_value: str, new_char: str, new_value: str):
+    def validate(reason: str, operation_type: str, cur_value: str, new_char: str, new_value: str) -> bool:
         """Validate the values for the text.
 
         This is called when the textbox is modified, to allow cancelling bad
@@ -107,12 +120,12 @@ async def widget_minute_seconds(parent: tk.Widget, var: tk.StringVar, conf: Keyv
                 str_min, str_sec = new_value.split(':')
                 seconds = int(str_min) * 60 + int(str_sec)
             except (ValueError, TypeError):
-                seconds = min_value
+                seconds = conf.min
             else:
-                if seconds < min_value:
-                    seconds = min_value
-                if seconds > max_value:
-                    seconds = max_value
+                if seconds < conf.min:
+                    seconds = conf.min
+                if seconds > conf.max:
+                    seconds = conf.max
             var.set(str(seconds))  # This then re-writes the textbox.
         return True
 
