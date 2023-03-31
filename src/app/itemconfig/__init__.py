@@ -1,5 +1,8 @@
 """Customizable configuration for specific items or groups of them."""
-from typing import Iterable, Optional, Callable, List, Tuple, Dict, Set, Iterator, AsyncIterator, Awaitable
+from typing import (
+    Iterable, Optional, Callable, List, Tuple, Dict, Set, Iterator, AsyncIterator,
+    Awaitable, TypeVar,
+)
 from typing_extensions import TypeAlias
 from tkinter import ttk
 import tkinter as tk
@@ -26,6 +29,8 @@ from ..SubPane import SubPane
 
 LOGGER = logger.get_logger(__name__)
 
+ConfT = TypeVar('ConfT')  # Type of the config object for a widget.
+
 # Called when the var is changed, to update UI if required.
 UpdateFunc: TypeAlias = Callable[[str], Awaitable[None]]
 
@@ -34,19 +39,19 @@ UpdateFunc: TypeAlias = Callable[[str], Awaitable[None]]
 # The widget to be installed should be returned, and a callback to refresh the UI.
 # If wide is set, the widget is put into a labelframe, instead of having a label to the side.
 SingleCreateFunc: TypeAlias = Callable[
-    [tk.Widget, tk.StringVar, Keyvalues],
+    [tk.Widget, tk.StringVar, ConfT],
     Awaitable[Tuple[tk.Widget, UpdateFunc]]
 ]
-WidgetLookup: utils.FuncLookup[SingleCreateFunc] = utils.FuncLookup('Widgets', attrs=['wide'])
+WidgetLookup: utils.FuncLookup[SingleCreateFunc[Keyvalues]] = utils.FuncLookup('Widgets', attrs=['wide'])
 
 # Override for timer-type widgets to be more compact - passed a num:var dict of StringVars
 # instead. The widgets should insert themselves into the parent frame.
 # It then yields timer_val, update-func pairs.
 MultiCreateFunc: TypeAlias = Callable[
-    [tk.Widget, List[Tuple[str, tk.StringVar]], Keyvalues],
+    [tk.Widget, List[Tuple[str, tk.StringVar]], ConfT],
     AsyncIterator[Tuple[str, UpdateFunc]]
 ]
-WidgetLookupMulti: utils.FuncLookup[MultiCreateFunc] = utils.FuncLookup('Multi-Widgets')
+WidgetLookupMulti: utils.FuncLookup[MultiCreateFunc[Keyvalues]] = utils.FuncLookup('Multi-Widgets')
 
 CONFIG = BEE2_config.ConfigFile('item_cust_configs.cfg')
 
@@ -97,7 +102,7 @@ class Widget:
     name: TransToken
     tooltip: TransToken
     config: Keyvalues
-    create_func: SingleCreateFunc
+    create_func: SingleCreateFunc[Keyvalues]
 
     @property
     def has_values(self) -> bool:
@@ -642,12 +647,12 @@ async def make_pane(tool_frame: tk.Frame, menu_bar: tk.Menu, update_item_vis: Ca
     await display_group(cur_group)
 
 
-def widget_timer_generic(widget_func: SingleCreateFunc) -> MultiCreateFunc:
+def widget_timer_generic(widget_func: SingleCreateFunc[ConfT]) -> MultiCreateFunc[ConfT]:
     """For widgets without a multi version, do it generically."""
     async def generic_func(
         parent: tk.Widget,
         values: List[Tuple[str, tk.StringVar]],
-        conf: Keyvalues,
+        conf: ConfT,
     ) -> AsyncIterator[Tuple[str, UpdateFunc]]:
         """Generically make a set of labels."""
         for row, (tim_val, var) in enumerate(values):
