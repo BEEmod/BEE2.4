@@ -37,6 +37,7 @@ class ConfigProto(Protocol):
 
 
 ConfT = TypeVar('ConfT', bound=ConfigProto)  # Type of the config object for a widget.
+OptConfT = TypeVar('OptConfT', bound=Optional[ConfigProto])
 
 
 @attrs.frozen
@@ -62,11 +63,7 @@ UpdateFunc: TypeAlias = Callable[[str], Awaitable[None]]
 # The widget to be installed should be returned, and a callback to refresh the UI.
 # If wide is set, the widget is put into a labelframe, instead of having a label to the side.
 SingleCreateFunc: TypeAlias = Callable[
-    [tk.Widget, tk.StringVar, ConfT],
-    Awaitable[Tuple[tk.Widget, UpdateFunc]]
-]
-SingleCreateNoConfFunc: TypeAlias = Callable[
-    [tk.Widget, tk.StringVar],
+    [tk.Widget, tk.StringVar, OptConfT],
     Awaitable[Tuple[tk.Widget, UpdateFunc]]
 ]
 WidgetLookup: utils.FuncLookup[SingleCreateFunc[Keyvalues]] = utils.FuncLookup('Widgets', attrs=['wide'])
@@ -75,18 +72,14 @@ WidgetLookup: utils.FuncLookup[SingleCreateFunc[Keyvalues]] = utils.FuncLookup('
 # instead. The widgets should insert themselves into the parent frame.
 # It then yields timer_val, update-func pairs.
 MultiCreateFunc: TypeAlias = Callable[
-    [tk.Widget, List[Tuple[str, tk.StringVar]], ConfT],
-    AsyncIterator[Tuple[str, UpdateFunc]]
-]
-MultiCreateNoConfFunc: TypeAlias = Callable[
-    [tk.Widget, List[Tuple[str, tk.StringVar]]],
+    [tk.Widget, List[Tuple[str, tk.StringVar]], OptConfT],
     AsyncIterator[Tuple[str, UpdateFunc]]
 ]
 WidgetLookupMulti: utils.FuncLookup[MultiCreateFunc[Keyvalues]] = utils.FuncLookup('Multi-Widgets')
 
 # The functions registered for each.
-_UI_IMPL_SINGLE: dict[WidgetType, Union[SingleCreateFunc, SingleCreateNoConfFunc]] = {}
-_UI_IMPL_MULTI: dict[WidgetType, Union[MultiCreateFunc, MultiCreateNoConfFunc]] = {}
+_UI_IMPL_SINGLE: dict[WidgetType, SingleCreateFunc] = {}
+_UI_IMPL_MULTI: dict[WidgetType, MultiCreateFunc] = {}
 
 CONFIG = BEE2_config.ConfigFile('item_cust_configs.cfg')
 
@@ -157,9 +150,9 @@ def ui_single_wconf(
     return deco
 
 
-def ui_single_no_conf(kind: WidgetType) -> Callable[[SingleCreateNoConfFunc], SingleCreateNoConfFunc]:
+def ui_single_no_conf(kind: WidgetType) -> Callable[[SingleCreateFunc[None]], SingleCreateFunc[None]]:
     """Register the UI function used for singular widgets without configs."""
-    def deco(func: SingleCreateNoConfFunc) -> SingleCreateNoConfFunc:
+    def deco(func: SingleCreateFunc[None]) -> SingleCreateFunc[None]:
         """Do the registration."""
         if isinstance(kind, WidgetTypeWithConf):
             raise TypeError('Widget type has config, but singular function does not!')
@@ -181,9 +174,9 @@ def ui_multi_wconf(
     return deco
 
 
-def ui_multi_no_conf(kind: WidgetType) -> Callable[[MultiCreateNoConfFunc], MultiCreateNoConfFunc]:
+def ui_multi_no_conf(kind: WidgetType) -> Callable[[MultiCreateFunc[None]], MultiCreateFunc[None]]:
     """Register the UI function used for multi widgets without configs."""
-    def deco(func: MultiCreateNoConfFunc) -> MultiCreateNoConfFunc:
+    def deco(func: MultiCreateFunc[None]) -> MultiCreateFunc[None]:
         """Do the registration."""
         if isinstance(kind, WidgetTypeWithConf):
             raise TypeError('Widget type has config, but multi function does not!')
