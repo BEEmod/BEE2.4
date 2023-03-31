@@ -3,17 +3,18 @@ from typing import AsyncIterator, List, Tuple
 from tkinter import ttk
 import tkinter as tk
 
-from srctools import Keyvalues, conv_bool
+from srctools import conv_bool
 
-from app.itemconfig import (
-    UpdateFunc, WidgetLookup, WidgetLookupMulti,
-    multi_grid, widget_sfx, nop_update,
-)
+from app import itemconfig
 from app.tooltip import add_tooltip
 
 
-@WidgetLookup('boolean', 'bool', 'checkbox')
-async def widget_checkmark(parent: tk.Widget, var: tk.StringVar, conf: Keyvalues) -> Tuple[tk.Widget, UpdateFunc]:
+TYPE = itemconfig.register_no_conf('boolean', 'bool', 'checkbox')
+
+
+@itemconfig.ui_single_no_conf(TYPE)
+@itemconfig.WidgetLookup('boolean', 'bool', 'checkbox')
+async def widget_checkmark(parent: tk.Widget, var: tk.StringVar, *conf) -> Tuple[tk.Widget, itemconfig.UpdateFunc]:
     """Allows ticking a box."""
     # Ensure it's a bool value.
     if conv_bool(var.get()):
@@ -27,21 +28,22 @@ async def widget_checkmark(parent: tk.Widget, var: tk.StringVar, conf: Keyvalues
         variable=var,
         onvalue='1',
         offvalue='0',
-        command=widget_sfx,
-    ), nop_update
+        command=itemconfig.widget_sfx,
+    ), itemconfig.nop_update
 
 
-@WidgetLookupMulti('boolean', 'bool', 'checkbox')
+@itemconfig.ui_multi_no_conf(TYPE)
+@itemconfig.WidgetLookupMulti('boolean', 'bool', 'checkbox')
 async def widget_checkmark_multi(
     parent: tk.Widget,
     values: List[Tuple[str, tk.StringVar]],
-    conf: Keyvalues,
-) -> AsyncIterator[Tuple[str, UpdateFunc]]:
+    *conf,  # TODO
+) -> AsyncIterator[Tuple[str, itemconfig.UpdateFunc]]:
     """For checkmarks, display in a more compact form."""
-    for row, column, _, tim_text, var in multi_grid(values):
-        checkbox, _ = await widget_checkmark(parent, var, conf)
+    for row, column, _, tim_text, var in itemconfig.multi_grid(values):
+        checkbox, _ = await widget_checkmark(parent, var)
         checkbox.grid(row=row, column=column)
         add_tooltip(checkbox, tim_text, delay=0)
     # noinspection PyUnreachableCode
-    if False:
+    if False:  # Make this a generator.
         yield ('', nop_update)
