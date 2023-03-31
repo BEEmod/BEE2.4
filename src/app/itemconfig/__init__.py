@@ -211,13 +211,13 @@ class Widget:
     id: str
     name: TransToken
     tooltip: TransToken
-    config: Keyvalues
-    create_func: SingleCreateFunc[Keyvalues]
+    config: object
+    kind: WidgetType
 
     @property
     def has_values(self) -> bool:
         """Item variant widgets don't have configuration, all others do."""
-        return self.create_func is not widget_item_variant
+        return self.kind is not KIND_ITEM_VARIANT
 
 
 @attrs.define
@@ -250,7 +250,6 @@ class SingleWidget(Widget):
 @attrs.define
 class MultiWidget(Widget):
     """Represents a group of multiple widgets for all the timer values."""
-    multi_func: MultiCreateFunc  # Function to create and arrange the block of widgets.
     use_inf: bool  # For timer, is infinite valid?
     values: List[Tuple[str, tk.StringVar]]
     ui_cbacks: Dict[str, UpdateFunc] = attrs.Factory(dict)
@@ -332,7 +331,7 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
         for wid in props.find_all('Widget'):
             await trio.sleep(0)
             try:
-                create_func = WidgetLookup[wid['type']]
+                kind = WIDGET_KINDS[wid['type'].casefold()]
             except KeyError:
                 LOGGER.warning(
                     'Unknown widget type "{}" in <{}:{}>!',
@@ -341,10 +340,6 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
                     data.id,
                 )
                 continue
-            try:
-                timer_func = WidgetLookupMulti[wid['type']]
-            except KeyError:
-                timer_func = widget_timer_generic(create_func)
 
             is_timer = wid.bool('UseTimer')
             use_inf = is_timer and wid.bool('HasInf')
@@ -360,10 +355,15 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
             conf = config.APP.get_cur_conf(WidgetConfig, f'{data.id}:{wid_id}', default=WidgetConfig())
 
             # Special case - can't be timer, and no values.
-            if create_func is widget_item_variant:
+            if kind is KIND_ITEM_VARIANT:
                 if is_timer:
                     LOGGER.warning("Item Variants can't be timers! ({}.{})", data.id, wid_id)
                     is_timer = use_inf = False
+
+            if isinstance(kind, WidgetTypeWithConf):
+                wid_conf: object = kind.conf_type.parse(wid)
+            else:
+                wid_conf = None
 
             if is_timer:
                 if default_prop.has_children():
@@ -394,9 +394,8 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
                     id=wid_id,
                     name=name,
                     tooltip=tooltip,
-                    config=wid,
-                    create_func=create_func,
-                    multi_func=timer_func,
+                    config=wid_conf,
+                    kind=kind,
                     values=values,
                     use_inf=use_inf,
                 ))
@@ -407,7 +406,7 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
                         f'{data.id}:{wid_id}: Can only have multiple defaults for timer-ed widgets!'
                     )
 
-                if create_func is widget_item_variant:
+                if kind is KIND_ITEM_VARIANT:
                     cur_value = ''  # Not used.
                 elif conf.values is EmptyMapping:
                     # No new conf, check the old conf.
@@ -423,8 +422,8 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
                     id=wid_id,
                     name=name,
                     tooltip=tooltip,
-                    config=wid,
-                    create_func=create_func,
+                    kind=kind,
+                    config=wid_conf,
                     value=tk.StringVar(
                         value=cur_value,
                         name=f'itemconf_{data.id}_{wid_id}',
@@ -500,7 +499,7 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
 
                 label: Optional[ttk.Label] = None
                 if s_wid.name:
-                    if getattr(s_wid.create_func, 'wide', False):
+                    if s_wid.kind.is_wide:
                         wid_frame = localisation.set_text(
                             ttk.LabelFrame(wid_frame),
                             TRANS_COLON.format(text=s_wid.name),
@@ -511,8 +510,10 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
                         label = ttk.Label(wid_frame)
                         localisation.set_text(label, TRANS_COLON.format(text=s_wid.name))
                         label.grid(row=0, column=0)
+                create_func = _UI_IMPL_SINGLE[s_wid.kind]
                 try:
-                    widget, s_wid.ui_cback = await s_wid.create_func(wid_frame, s_wid.value, s_wid.config)
+                    with logger.context(f'{self.id}:{s_wid.id}'):
+                        widget, s_wid.ui_cback = await create_func(wid_frame, s_wid.value, s_wid.config)
                 except Exception:
                     LOGGER.exception('Could not construct widget {}.{}', self.id, s_wid.id)
                     continue
@@ -545,15 +546,20 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
                     TRANS_COLON.format(text=m_wid.name),
                 )
 
-            wid_frame.grid(row=row, column=0, sticky='ew', pady=5)
-            assert isinstance(m_wid.values, list)
             try:
-                async for tim_val, value in m_wid.multi_func(
-                    wid_frame,
-                    m_wid.values,
-                    m_wid.config,
-                ):
-                    m_wid.ui_cbacks[tim_val] = value
+                multi_func = _UI_IMPL_MULTI[m_wid.kind]
+            except KeyError:
+                multi_func = widget_timer_generic(_UI_IMPL_SINGLE[m_wid.kind])
+
+            wid_frame.grid(row=row, column=0, sticky='ew', pady=5)
+            try:
+                with logger.context(f'{self.id}:{m_wid.id}'):
+                    async for tim_val, value in multi_func(
+                        wid_frame,
+                        m_wid.values,
+                        m_wid.config,
+                    ):
+                        m_wid.ui_cbacks[tim_val] = value
             except Exception:
                 LOGGER.exception('Could not construct widget {}.{}', self.id, m_wid.id)
                 continue
@@ -800,20 +806,33 @@ def widget_sfx(*args) -> None:
     sound.fx_blockable('config')
 
 
+@register('itemvariant', 'variant')
+@attrs.frozen
+class ItemVariantConf:
+    """Configuration for the special widget."""
+    item_id: str
+
+    @classmethod
+    def parse(cls, conf: Keyvalues) -> Self:
+        """Parse from configs."""
+        return cls(conf['ItemID'])
+
+
 @WidgetLookup('itemvariant', 'variant')
-async def widget_item_variant(parent: tk.Widget, var: tk.StringVar, conf: Keyvalues) -> Tuple[tk.Widget, UpdateFunc]:
+async def widget_item_variant(parent: tk.Widget, var: tk.StringVar, kv: Keyvalues) -> Tuple[tk.Widget, UpdateFunc]:
     """Special widget - chooses item variants.
 
     This replicates the box on the right-click menu for items.
     It's special-cased in the above code.
     """
     from app import contextWin
-    # We don't use the variable passed to us.
+    conf = ItemVariantConf.parse(kv)
+    # We don't use the TK variable passed to us.
 
     try:
-        item = UI.item_list[conf['ItemID']]
+        item = UI.item_list[conf.item_id]
     except KeyError:
-        raise ValueError('Unknown item "{}"!'.format(conf['ItemID']))
+        raise ValueError('Unknown item "{}"!'.format(conf.item_id))
 
     if item.id == 'ITEM_BEE2_SIGNAGE':
         # Even more special case, display the "configure signage" button.
@@ -841,6 +860,9 @@ async def widget_item_variant(parent: tk.Widget, var: tk.StringVar, conf: Keyval
     ITEM_VARIANT_LOAD.append((item.id, update_data))
     update_data()
     return combobox, nop_update
+
+
+KIND_ITEM_VARIANT = WIDGET_KINDS['itemvariant']
 
 
 # Load all the widgets.
