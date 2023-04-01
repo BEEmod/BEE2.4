@@ -13,7 +13,7 @@ from srctools import EmptyMapping, Keyvalues, logger
 import BEE2_config
 import config
 import packages
-from app import background_run, tkMarkdown
+from app import tkMarkdown
 
 from config.widgets import (
     TIMER_NUM as TIMER_NUM, TIMER_NUM_INF as TIMER_NUM_INF,
@@ -121,7 +121,7 @@ class SingleWidget(Widget):
                 self.on_changed(data.values)
                 # Don't bother scheduling a no-op task.
                 if self.ui_cback is not nop_update:
-                    background_run(self.ui_cback, self.value)
+                    await self.ui_cback(self.value)
         else:
             LOGGER.warning('{}:{}: Saved config is timer-based, but widget is singular.', self.group_id, self.id)
 
@@ -151,8 +151,9 @@ class MultiWidget(Widget):
                 except KeyError:
                     continue
         if self.values != old:
-            for tim_val, cback in self.ui_cbacks.items():
-                background_run(cback, self.values[tim_val])
+            async with trio.open_nursery() as nursery:
+                for tim_val, cback in self.ui_cbacks.items():
+                    nursery.start_soon(cback, self.values[tim_val])
             config.APP.store_conf(
                 WidgetConfig(self.values.copy()),
                 f'{self.group_id}:{self.id}',
