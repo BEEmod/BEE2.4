@@ -54,6 +54,7 @@ class WidgetTypeWithConf(WidgetType, Generic[ConfT]):
 
 # Maps widget type names to the type info.
 WIDGET_KINDS: Dict[str, WidgetType] = {}
+CLS_TO_KIND: Dict[Type[ConfigProto], WidgetTypeWithConf] = {}
 
 # Called when the var is changed, to update UI if required.
 UpdateFunc: TypeAlias = Callable[[str], Awaitable[None]]
@@ -114,10 +115,11 @@ def register(*names: str, wide: bool=False) -> Callable[[Type[ConfT]], Type[Conf
     def deco(cls: Type[ConfT]) -> Type[ConfT]:
         """Do the registration."""
         kind = WidgetTypeWithConf(names[0], wide, cls)
+        assert cls not in CLS_TO_KIND, cls
+        CLS_TO_KIND[cls] = kind
         for name in names:
             name = name.casefold()
-            if name in WIDGET_KINDS:
-                raise ValueError('Duplicate widget type!', name)
+            assert name not in WIDGET_KINDS, name
             WIDGET_KINDS[name] = kind
         return cls
     return deco
@@ -131,20 +133,16 @@ def register_no_conf(*names: str, wide: bool=False) -> WidgetType:
     kind = WidgetType(names[0], wide)
     for name in names:
         name = name.casefold()
-        if name in WIDGET_KINDS:
-            raise ValueError('Duplicate widget type!', name)
+        assert name not in WIDGET_KINDS, name
         WIDGET_KINDS[name] = kind
     return kind
 
 
-def ui_single_wconf(
-    kind: WidgetTypeWithConf[ConfT]
-) -> Callable[[SingleCreateFunc[ConfT]], SingleCreateFunc[ConfT]]:
+def ui_single_wconf(cls: Type[ConfT]) -> Callable[[SingleCreateFunc[ConfT]], SingleCreateFunc[ConfT]]:
     """Register the UI function used for singular widgets with configs."""
+    kind = CLS_TO_KIND[cls]
     def deco(func: SingleCreateFunc[ConfT]) -> SingleCreateFunc[ConfT]:
         """Do the registration."""
-        if not isinstance(kind, WidgetTypeWithConf):
-            raise TypeError('Widget type has no config, but singular function does!')
         _UI_IMPL_SINGLE[kind] = func
         return func
     return deco
@@ -161,14 +159,11 @@ def ui_single_no_conf(kind: WidgetType) -> Callable[[SingleCreateFunc[None]], Si
     return deco
 
 
-def ui_multi_wconf(
-    kind: WidgetTypeWithConf[ConfT]
-) -> Callable[[MultiCreateFunc[ConfT]], MultiCreateFunc[ConfT]]:
+def ui_multi_wconf(cls: Type[ConfT]) -> Callable[[MultiCreateFunc[ConfT]], MultiCreateFunc[ConfT]]:
     """Register the UI function used for multi widgets with configs."""
+    kind = CLS_TO_KIND[cls]
     def deco(func: MultiCreateFunc[ConfT]) -> MultiCreateFunc[ConfT]:
         """Do the registration."""
-        if not isinstance(kind, WidgetTypeWithConf):
-            raise TypeError('Widget type has no config, but multi function does!')
         _UI_IMPL_MULTI[kind] = func
         return func
     return deco
@@ -818,15 +813,14 @@ class ItemVariantConf:
         return cls(conf['ItemID'])
 
 
-@WidgetLookup('itemvariant', 'variant')
-async def widget_item_variant(parent: tk.Widget, var: tk.StringVar, kv: Keyvalues) -> Tuple[tk.Widget, UpdateFunc]:
+@ui_single_wconf(ItemVariantConf)
+async def widget_item_variant(parent: tk.Widget, var: tk.StringVar, conf: ItemVariantConf) -> Tuple[tk.Widget, UpdateFunc]:
     """Special widget - chooses item variants.
 
     This replicates the box on the right-click menu for items.
     It's special-cased in the above code.
     """
     from app import contextWin
-    conf = ItemVariantConf.parse(kv)
     # We don't use the TK variable passed to us.
 
     try:
