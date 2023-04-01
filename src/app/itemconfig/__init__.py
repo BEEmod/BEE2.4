@@ -301,10 +301,6 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
         self.widgets = widgets
         self.multi_widgets = multi_widgets
 
-        self.ui_frame: Optional[ttk.Frame] = None
-        # If true, the create_widgets method has been called.
-        self.creating = False
-
     @classmethod
     async def parse(cls, data: packages.ParseData) -> 'ConfigGroup':
         """Parse the config group from info.txt."""
@@ -472,100 +468,101 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
                 del CONFIG[conf.id]
         CONFIG.save_check()
 
-    async def create_widgets(self, master: ttk.Frame) -> None:
-        """Create the widgets for this config."""
-        frame = ttk.Frame(master)
-        frame.columnconfigure(0, weight=1)
-        row = 0
 
-        widget_count = len(self.widgets) + len(self.multi_widgets)
-        wid_frame: tk.Widget
-        widget: tk.Widget
+async def create_group( master: ttk.Frame, group: ConfigGroup) -> ttk.Frame:
+    """Create the widgets for a group."""
+    frame = ttk.Frame(master)
+    frame.columnconfigure(0, weight=1)
+    row = 0
 
-        # Now make the widgets.
-        if self.widgets:
-            for row, s_wid in enumerate(self.widgets):
-                wid_frame = ttk.Frame(frame)
-                wid_frame.grid(row=row, column=0, sticky='ew')
-                wid_frame.columnconfigure(1, weight=1)
-                await trio.sleep(0)
+    widget_count = len(group.widgets) + len(group.multi_widgets)
+    wid_frame: tk.Widget
+    widget: tk.Widget
 
-                label: Optional[ttk.Label] = None
-                if s_wid.name:
-                    if s_wid.kind.is_wide:
-                        wid_frame = localisation.set_text(
-                            ttk.LabelFrame(wid_frame),
-                            TRANS_COLON.format(text=s_wid.name),
-                        )
-                        wid_frame.grid(row=0, column=0, columnspan=2, sticky='ew', pady=5)
-                        wid_frame.columnconfigure(0, weight=1)
-                    else:
-                        label = ttk.Label(wid_frame)
-                        localisation.set_text(label, TRANS_COLON.format(text=s_wid.name))
-                        label.grid(row=0, column=0)
-                create_func = _UI_IMPL_SINGLE[s_wid.kind]
-                try:
-                    with logger.context(f'{self.id}:{s_wid.id}'):
-                        widget, s_wid.ui_cback = await create_func(wid_frame, s_wid.value, s_wid.config)
-                except Exception:
-                    LOGGER.exception('Could not construct widget {}.{}', self.id, s_wid.id)
-                    continue
-
-                if label is not None:
-                    widget.grid(row=0, column=1, sticky='e')
-                else:
-                    widget.grid(row=0, column=0, columnspan=2, sticky='ew')
-                if s_wid.has_values:
-                    await config.APP.set_and_run_ui_callback(
-                        WidgetConfig, s_wid.apply_conf, f'{s_wid.group_id}:{s_wid.id}',
-                    )
-                if s_wid.tooltip:
-                    add_tooltip(widget, s_wid.tooltip)
-                    if label is not None:
-                        add_tooltip(label, s_wid.tooltip)
-                    add_tooltip(wid_frame, s_wid.tooltip)
-
-        if self.widgets and self.multi_widgets:
-            ttk.Separator(orient='horizontal').grid(row=1, column=0, sticky='ew')
-
-        # Continue from wherever we were.
-        for row, m_wid in enumerate(self.multi_widgets, start=row + 1):
-            # If we only have 1 widget, don't add a redundant title.
-            if widget_count == 1 or not m_wid.name:
-                wid_frame = ttk.Frame(frame)
-            else:
-                wid_frame = localisation.set_text(
-                    ttk.LabelFrame(frame),
-                    TRANS_COLON.format(text=m_wid.name),
-                )
-
-            try:
-                multi_func = _UI_IMPL_MULTI[m_wid.kind]
-            except KeyError:
-                multi_func = widget_timer_generic(_UI_IMPL_SINGLE[m_wid.kind])
-
-            wid_frame.grid(row=row, column=0, sticky='ew', pady=5)
-            try:
-                with logger.context(f'{self.id}:{m_wid.id}'):
-                    async for tim_val, update_cback in multi_func(
-                        wid_frame,
-                        m_wid.values,
-                        m_wid.config,
-                    ):
-                        # Don't bother calling the nop function.
-                        if update_cback is not nop_update:
-                            m_wid.ui_cbacks[tim_val] = update_cback
-            except Exception:
-                LOGGER.exception('Could not construct widget {}.{}', self.id, m_wid.id)
-                continue
-            await config.APP.set_and_run_ui_callback(
-                WidgetConfig, m_wid.apply_conf, f'{m_wid.group_id}:{m_wid.id}',
-            )
+    # Now make the widgets.
+    if group.widgets:
+        for row, s_wid in enumerate(group.widgets):
+            wid_frame = ttk.Frame(frame)
+            wid_frame.grid(row=row, column=0, sticky='ew')
+            wid_frame.columnconfigure(1, weight=1)
             await trio.sleep(0)
 
-            if m_wid.tooltip:
-                add_tooltip(wid_frame, m_wid.tooltip)
-        self.ui_frame = frame
+            label: Optional[ttk.Label] = None
+            if s_wid.name:
+                if s_wid.kind.is_wide:
+                    wid_frame = localisation.set_text(
+                        ttk.LabelFrame(wid_frame),
+                        TRANS_COLON.format(text=s_wid.name),
+                    )
+                    wid_frame.grid(row=0, column=0, columnspan=2, sticky='ew', pady=5)
+                    wid_frame.columnconfigure(0, weight=1)
+                else:
+                    label = ttk.Label(wid_frame)
+                    localisation.set_text(label, TRANS_COLON.format(text=s_wid.name))
+                    label.grid(row=0, column=0)
+            create_func = _UI_IMPL_SINGLE[s_wid.kind]
+            try:
+                with logger.context(f'{group.id}:{s_wid.id}'):
+                    widget, s_wid.ui_cback = await create_func(wid_frame, s_wid.value, s_wid.config)
+            except Exception:
+                LOGGER.exception('Could not construct widget {}.{}', group.id, s_wid.id)
+                continue
+
+            if label is not None:
+                widget.grid(row=0, column=1, sticky='e')
+            else:
+                widget.grid(row=0, column=0, columnspan=2, sticky='ew')
+            if s_wid.has_values:
+                await config.APP.set_and_run_ui_callback(
+                    WidgetConfig, s_wid.apply_conf, f'{s_wid.group_id}:{s_wid.id}',
+                )
+            if s_wid.tooltip:
+                add_tooltip(widget, s_wid.tooltip)
+                if label is not None:
+                    add_tooltip(label, s_wid.tooltip)
+                add_tooltip(wid_frame, s_wid.tooltip)
+
+    if group.widgets and group.multi_widgets:
+        ttk.Separator(orient='horizontal').grid(row=1, column=0, sticky='ew')
+
+    # Continue from wherever we were.
+    for row, m_wid in enumerate(group.multi_widgets, start=row + 1):
+        # If we only have 1 widget, don't add a redundant title.
+        if widget_count == 1 or not m_wid.name:
+            wid_frame = ttk.Frame(frame)
+        else:
+            wid_frame = localisation.set_text(
+                ttk.LabelFrame(frame),
+                TRANS_COLON.format(text=m_wid.name),
+            )
+
+        try:
+            multi_func = _UI_IMPL_MULTI[m_wid.kind]
+        except KeyError:
+            multi_func = widget_timer_generic(_UI_IMPL_SINGLE[m_wid.kind])
+
+        wid_frame.grid(row=row, column=0, sticky='ew', pady=5)
+        try:
+            with logger.context(f'{group.id}:{m_wid.id}'):
+                async for tim_val, update_cback in multi_func(
+                    wid_frame,
+                    m_wid.values,
+                    m_wid.config,
+                ):
+                    # Don't bother calling the nop function.
+                    if update_cback is not nop_update:
+                        m_wid.ui_cbacks[tim_val] = update_cback
+        except Exception:
+            LOGGER.exception('Could not construct widget {}.{}', group.id, m_wid.id)
+            continue
+        await config.APP.set_and_run_ui_callback(
+            WidgetConfig, m_wid.apply_conf, f'{m_wid.group_id}:{m_wid.id}',
+        )
+        await trio.sleep(0)
+
+        if m_wid.tooltip:
+            add_tooltip(wid_frame, m_wid.tooltip)
+    return frame
 
 
 # Special group injected for the stylevar display.
@@ -658,30 +655,35 @@ async def make_pane(tool_frame: tk.Frame, menu_bar: tk.Menu, update_item_vis: Ca
     loading_text.grid(row=0, column=0, sticky='ew')
     loading_text.grid_forget()
 
-    STYLEVAR_GROUP.ui_frame = stylevar_frame
+    group_to_frame: dict[ConfigGroup, ttk.Frame] = {
+        STYLEVAR_GROUP: stylevar_frame,
+    }
+    groups_being_created: set[ConfigGroup] = set()
     cur_group = STYLEVAR_GROUP
     win_max_width = 0
 
     async def display_group(group: ConfigGroup) -> None:
         """Callback to display the group in the UI, once constructed."""
         nonlocal win_max_width
-        if cur_group is group:
-            if loading_text.winfo_ismapped():
-                loading_text.grid_forget()
-            group.ui_frame.grid(row=1, column=0, sticky='ew')
-            await tk_tools.wait_eventloop()
-            width = group.ui_frame.winfo_reqwidth()
-            canvas['scrollregion'] = (
-                0, 0,
-                width,
-                group.ui_frame.winfo_reqheight()
-            )
-            if width > win_max_width:
-                canvas['width'] = width
-                win_max_width = width
-                scroll_width = scrollbar.winfo_width() + 10
-                window.geometry(f'{width + scroll_width}x{window.winfo_height()}')
-            canvas.itemconfigure(frame_winid, width=win_max_width)
+        if cur_group is not group:
+            return
+        if loading_text.winfo_ismapped():
+            loading_text.grid_forget()
+        ui_frame = group_to_frame[group]
+        ui_frame.grid(row=1, column=0, sticky='ew')
+        await tk_tools.wait_eventloop()
+        width = ui_frame.winfo_reqwidth()
+        canvas['scrollregion'] = (
+            0, 0,
+            width,
+            ui_frame.winfo_reqheight()
+        )
+        if width > win_max_width:
+            canvas['width'] = width
+            win_max_width = width
+            scroll_width = scrollbar.winfo_width() + 10
+            window.geometry(f'{width + scroll_width}x{window.winfo_height()}')
+        canvas.itemconfigure(frame_winid, width=win_max_width)
 
     def select_group(group: ConfigGroup) -> None:
         """Callback when the combobox is changed."""
@@ -689,23 +691,24 @@ async def make_pane(tool_frame: tk.Frame, menu_bar: tk.Menu, update_item_vis: Ca
         new_group = group
         if new_group is cur_group:  # Pointless to reselect.
             return
-        if cur_group.ui_frame is not None:
-            cur_group.ui_frame.grid_forget()
+        if cur_group in group_to_frame:
+            group_to_frame[cur_group].grid_forget()
         cur_group = new_group
         update_disp()
-        if new_group.ui_frame is not None:
+        if new_group in group_to_frame:
             # Ready, add.
             background_run(display_group, new_group)
         else:  # Begin creating, or loading.
             loading_text.grid(row=0, column=0, sticky='ew')
-            if not new_group.creating:
+            if new_group not in groups_being_created:
                 async def task() -> None:
                     """Create the widgets, then display."""
-                    await new_group.create_widgets(canvas_frame)
+                    group_to_frame[new_group] = await create_group(canvas_frame, new_group)
+                    groups_being_created.discard(new_group)
                     await display_group(new_group)
 
                 background_run(task)
-                new_group.creating = True
+                groups_being_created.add(new_group)
 
     def select_directional(direction: int) -> None:
         """Change the selection in some direction."""
