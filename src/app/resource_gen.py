@@ -40,8 +40,8 @@ def make_cube_colourizer_legend(packset: PackagesSet, bee2_loc: Path) -> None:
         LOGGER.debug('No COLOR widget in {}', config.multi_widgets)
         return
     colors = {
-        int(tim): parse_color(var.get())
-        for tim, var in wid.values
+        int(tim): parse_color(value)
+        for tim, value in wid.values.items()
     }
 
     legend = Image.new('RGB', (LEGEND_SIZE, LEGEND_SIZE), color=(255, 255, 255))

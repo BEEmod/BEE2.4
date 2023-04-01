@@ -197,7 +197,7 @@ class tkRichText(tkinter.Text):
                     super().insert('end', '\n')
                     # TODO: Setup apply to handle this?
                     block.handle._force_loaded = True
-                    self.image_create('end', image=block.handle._load_tk())
+                    self.image_create('end', image=block.handle._load_tk(force=False))
                     super().insert('end', '\n')
                 else:
                     raise ValueError('Unknown block {!r}?'.format(block))
