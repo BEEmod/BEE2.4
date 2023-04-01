@@ -40,7 +40,9 @@ def decimal_points(num: float) -> int:
 
 
 @itemconfig.ui_single_wconf(SliderOptions)
-async def widget_slider(parent: tk.Widget, var: tk.StringVar, conf: SliderOptions) -> tuple[tk.Widget, itemconfig.UpdateFunc]:
+async def widget_slider(
+    parent: tk.Widget, on_changed: itemconfig.SingleChangeFunc, conf: SliderOptions,
+) -> tuple[tk.Widget, itemconfig.UpdateFunc]:
     """Provides a slider for setting a number in a range."""
 
     # We have to manually translate the UI position to a value.
@@ -62,26 +64,30 @@ async def widget_slider(parent: tk.Widget, var: tk.StringVar, conf: SliderOption
         for offset in range(0, int(ui_max) + 1)
     )
 
+    last_value = ''
+
     def change_cmd(*args) -> None:
         """Called when the slider is changed."""
+        nonlocal last_value
         new_pos = format(conf.min + conf.step * round(scale.get(), points), txt_format)
-        if var.get() != new_pos:
+        # Only trigger sounds when moving each step.
+        if last_value != new_pos:
             itemconfig.widget_sfx()
-            var.set(new_pos)
+            disp['text'] = new_pos
+            last_value = new_pos
+            on_changed(new_pos)
 
     async def update_ui(new_value: str) -> None:
         """Apply the configured value to the UI."""
         off = (float(new_value) - conf.min) / conf.step
+        disp['text'] = format(float(new_value), txt_format)
         ui_var.set(round(off, points))
-
-    await update_ui(var.get())
 
     frame = ttk.Frame(parent)
     frame.columnconfigure(1, weight=1)
 
     disp = ttk.Label(
         frame,
-        textvariable=var,
         width=widget_width,
         justify='right'
     )

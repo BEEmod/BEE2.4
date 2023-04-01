@@ -1,7 +1,7 @@
 """Customizable configuration for specific items or groups of them."""
 from typing import (
     Generic, Iterable, Optional, Callable, List, Tuple, Dict, Set, Iterator, AsyncIterator,
-    Awaitable, Type, TypeVar, Protocol
+    Awaitable, Type, TypeVar, Protocol,
 )
 from typing_extensions import Self, TypeAlias
 from tkinter import ttk
@@ -18,7 +18,11 @@ from app import (
     StyleVarPane,
 )
 from app.tooltip import add_tooltip
-from config.widgets import WidgetConfig
+# Re-export.
+from config.widgets import (
+    WidgetConfig, TimerNum as TimerNum, TIMER_NUM as TIMER_NUM,
+    TIMER_NUM_INF as TIMER_NUM_INF, TIMER_STR_INF as TIMER_STR_INF,
+)
 from app.localisation import TransToken, TransTokenSource
 import BEE2_config
 import config
@@ -58,14 +62,16 @@ CLS_TO_KIND: Dict[Type[ConfigProto], WidgetTypeWithConf] = {}
 # This is called when a new value is loaded, to update the UI contents.
 UpdateFunc: TypeAlias = Callable[[str], Awaitable[None]]
 # This should be called when the value changes.
-ValueChangeFunc: TypeAlias = Callable[[str], object]
+SingleChangeFunc: TypeAlias = Callable[[str], object]
+# This takes the timer value + new value.
+MultiChangeFunc: TypeAlias = Callable[[TimerNum, str], object]
 
 # Functions for each widget.
 # The function is passed a parent frame, the configuration object, and a function to call when the value changes.
 # The widget to be installed should be returned, and a callback to refresh the UI (which is called immediately).
 # If wide is set, the widget is put into a labelframe, instead of having a label to the side.
 SingleCreateFunc: TypeAlias = Callable[
-    [tk.Widget, ValueChangeFunc, OptConfT],
+    [tk.Widget, SingleChangeFunc, OptConfT],
     Awaitable[Tuple[tk.Widget, UpdateFunc]]
 ]
 
@@ -73,8 +79,8 @@ SingleCreateFunc: TypeAlias = Callable[
 # The widgets should insert themselves into the parent frame.
 # It then yields timer_val, update-func pairs.
 MultiCreateFunc: TypeAlias = Callable[
-    [tk.Widget, Iterable[str], ValueChangeFunc, OptConfT],
-    AsyncIterator[Tuple[str, UpdateFunc]]
+    [tk.Widget, Iterable[TimerNum], MultiChangeFunc, OptConfT],
+    AsyncIterator[Tuple[TimerNum, UpdateFunc]]
 ]
 
 # The functions registered for each.
@@ -83,18 +89,15 @@ _UI_IMPL_MULTI: dict[WidgetType, MultiCreateFunc] = {}
 
 CONFIG = BEE2_config.ConfigFile('item_cust_configs.cfg')
 
-TIMER_NUM = list(map(str, range(3, 31)))
-TIMER_NUM_INF = ['inf', *TIMER_NUM]
-
 INF = TransToken.untranslated('∞')
 # i18n: The format for timer numerals.
 _TIMER_TRANS = TransToken.ui('{timer_num:00}')
-TIMER_NUM_TRANS = {
+TIMER_NUM_TRANS: Dict[TimerNum, TransToken] = {
     num: _TIMER_TRANS.format(timer_num=num)
     for num in TIMER_NUM
 }
 del _TIMER_TRANS
-TIMER_NUM_TRANS['inf'] = INF
+TIMER_NUM_TRANS[TIMER_STR_INF] = INF
 TRANS_COLON = TransToken.untranslated('{text}: ')
 TRANS_GROUP_HEADER = TransToken.ui('{name} ({page}/{count})')  # i18n: Header layout for Item Properties pane.
 # For the item-variant widget, we need to refresh on style changes.
@@ -226,29 +229,25 @@ class SingleWidget(Widget):
         """Apply the configuration to the UI."""
         if isinstance(data.values, str):
             if data.values != self.value:
-                self.value = data.values
-                self.on_changed()
-                self.update_ui()
+                self.on_changed(data.values)
+                # Don't bother scheduling a no-op task.
+                if self.ui_cback is not nop_update:
+                    background_run(self.ui_cback, self.value)
         else:
             LOGGER.warning('{}:{}: Saved config is timer-based, but widget is singular.', self.group_id, self.id)
 
-    def on_changed(self) -> None:
+    def on_changed(self, value: str) -> None:
         """Recompute state and UI when changed."""
-        config.APP.store_conf(WidgetConfig(self.value), f'{self.group_id}:{self.id}')
-
-    def update_ui(self) -> None:
-        """Update the UI."""
-        # Don't bother scheduling a no-op task.
-        if self.ui_cback is not nop_update:
-            background_run(self.ui_cback, self.value)
+        self.value = value
+        config.APP.store_conf(WidgetConfig(value), f'{self.group_id}:{self.id}')
 
 
 @attrs.define
 class MultiWidget(Widget):
     """Represents a group of multiple widgets for all the timer values."""
     use_inf: bool  # For timer, is infinite valid?
-    values: Dict[str, str]
-    ui_cbacks: Dict[str, UpdateFunc] = attrs.Factory(dict)
+    values: Dict[TimerNum, str]
+    ui_cbacks: Dict[TimerNum, UpdateFunc] = attrs.Factory(dict)
 
     async def apply_conf(self, data: WidgetConfig) -> None:
         """Apply the configuration to the UI."""
@@ -263,19 +262,20 @@ class MultiWidget(Widget):
                 except KeyError:
                     continue
         if self.values != old:
-            self.on_changed()
+            for tim_val, cback in self.ui_cbacks.items():
+                background_run(cback, self.values[tim_val])
+            config.APP.store_conf(
+                WidgetConfig(self.values.copy()),
+                f'{self.group_id}:{self.id}',
+            )
 
-    def on_changed(self) -> None:
+    def on_changed(self, num: TimerNum, value: str) -> None:
         """Recompute state and UI when changed."""
+        self.values[num] = value
         config.APP.store_conf(
             WidgetConfig(self.values.copy()),
             f'{self.group_id}:{self.id}',
         )
-
-    def update_ui(self) -> None:
-        """Update the UI."""
-        for tim_val, cback in self.ui_cbacks.values():
-            background_run(cback, self.values[tim_val])
 
 
 class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
@@ -332,7 +332,6 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
                 name = TransToken.untranslated(wid_id)
             tooltip = TransToken.parse(data.pak_id, wid['Tooltip', ''])
             default_prop = wid.find_key('Default', '')
-            values: dict[str, str]
 
             conf = config.APP.get_cur_conf(WidgetConfig, f'{data.id}:{wid_id}', default=WidgetConfig())
 
@@ -357,7 +356,7 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
                     # All the same.
                     defaults = dict.fromkeys(TIMER_NUM_INF if use_inf else TIMER_NUM, default_prop.value)
 
-                values = {}
+                values: dict[TimerNum, str] = {}
                 for num in (TIMER_NUM_INF if use_inf else TIMER_NUM):
                     if conf.values is EmptyMapping:
                         # No new conf, check the old conf.
@@ -449,8 +448,8 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
                 if s_wid.has_values:
                     config_section[s_wid.id] = s_wid.value
             for m_wid in conf.multi_widgets:
-                for num, var in m_wid.values:
-                    config_section[f'{m_wid.id}_{num}'] = var.get()
+                for num, value in m_wid.values:
+                    config_section[f'{m_wid.id}_{num}'] = value
             if not config_section:
                 del CONFIG[conf.id]
         CONFIG.save_check()
@@ -754,10 +753,10 @@ def widget_timer_generic(widget_func: SingleCreateFunc[ConfT]) -> MultiCreateFun
     """For widgets without a multi version, do it generically."""
     async def generic_func(
         parent: tk.Widget,
-        timers: Iterable[str],
-        on_changed: ValueChangeFunc,
+        timers: Iterable[TimerNum],
+        on_changed: MultiChangeFunc,
         conf: ConfT,
-    ) -> AsyncIterator[Tuple[str, UpdateFunc]]:
+    ) -> AsyncIterator[Tuple[TimerNum, UpdateFunc]]:
         """Generically make a set of labels."""
         for row, tim_val in enumerate(timers):
             timer_disp = TIMER_NUM_TRANS[tim_val]
@@ -766,7 +765,7 @@ def widget_timer_generic(widget_func: SingleCreateFunc[ConfT]) -> MultiCreateFun
             label = ttk.Label(parent)
             localisation.set_text(label, TRANS_COLON.format(text=timer_disp))
             label.grid(row=row, column=0)
-            widget, update = await widget_func(parent, on_changed, conf)
+            widget, update = await widget_func(parent, functools.partial(on_changed, tim_val), conf)
             yield tim_val, update
             widget.grid(row=row, column=1, sticky='ew')
 
@@ -774,9 +773,9 @@ def widget_timer_generic(widget_func: SingleCreateFunc[ConfT]) -> MultiCreateFun
 
 
 def multi_grid(
-    timers: Iterable[str],
+    timers: Iterable[TimerNum],
     columns: int = 10,
-) -> Iterator[Tuple[int, int, str, TransToken]]:
+) -> Iterator[Tuple[int, int, TimerNum, TransToken]]:
     """Generate the row and columns needed for a nice layout of widgets."""
     for tim in timers:
         if tim == 'inf':
@@ -807,7 +806,7 @@ class ItemVariantConf:
 
 
 @ui_single_wconf(ItemVariantConf)
-async def widget_item_variant(parent: tk.Widget, conf: ItemVariantConf) -> Tuple[tk.Widget, UpdateFunc]:
+async def widget_item_variant(parent: tk.Widget, _: SingleChangeFunc, conf: ItemVariantConf) -> Tuple[tk.Widget, UpdateFunc]:
     """Special widget - chooses item variants.
 
     This replicates the box on the right-click menu for items.

@@ -1,5 +1,8 @@
 from __future__ import annotations
-from typing import AsyncIterator, List, Tuple
+
+from functools import partial
+
+from typing import AsyncIterator, Iterable, List, Tuple
 from tkinter import ttk
 import tkinter as tk
 
@@ -13,33 +16,44 @@ TYPE = itemconfig.register_no_conf('boolean', 'bool', 'checkbox')
 
 
 @itemconfig.ui_single_no_conf(TYPE)
-async def widget_checkmark(parent: tk.Widget, var: tk.StringVar, _: None) -> Tuple[tk.Widget, itemconfig.UpdateFunc]:
+async def widget_checkmark(
+    parent: tk.Widget, on_changed: itemconfig.SingleChangeFunc,
+    conf: None,
+) -> Tuple[tk.Widget, itemconfig.UpdateFunc]:
     """Allows ticking a box."""
-    # Ensure it's a bool value.
-    if conv_bool(var.get()):
-        var.set('1')
-    else:
-        var.set('0')
+    var = tk.BooleanVar(parent)
 
-    return ttk.Checkbutton(
+    def command() -> None:
+        """Called when the checkmark is edited."""
+        itemconfig.widget_sfx()
+        on_changed('1' if var.get() else '0')
+
+    async def update(value: str) -> None:
+        """Update the checkmark from stored values."""
+        var.set(conv_bool(value))
+
+    check = ttk.Checkbutton(
         parent,
         text='',
         variable=var,
         onvalue='1',
         offvalue='0',
-        command=itemconfig.widget_sfx,
-    ), itemconfig.nop_update
+        command=command,
+    )
+
+    return check, update
 
 
 @itemconfig.ui_multi_no_conf(TYPE)
 async def widget_checkmark_multi(
     parent: tk.Widget,
-    values: List[Tuple[str, tk.StringVar]],
+    values: Iterable[itemconfig.TimerNum],
+    on_changed: itemconfig.MultiChangeFunc,
     _: None,
-) -> AsyncIterator[Tuple[str, itemconfig.UpdateFunc]]:
+) -> AsyncIterator[Tuple[itemconfig.TimerNum, itemconfig.UpdateFunc]]:
     """For checkmarks, display in a more compact form."""
-    for row, column, tim_val, tim_text, var in itemconfig.multi_grid(values):
-        checkbox, update = await widget_checkmark(parent, var, None)
+    for row, column, tim_val, tim_text in itemconfig.multi_grid(values):
+        checkbox, update = await widget_checkmark(parent, partial(on_changed, tim_val), None)
         checkbox.grid(row=row, column=column)
         add_tooltip(checkbox, tim_text, delay=0)
         yield tim_val, update

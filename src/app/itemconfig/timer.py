@@ -1,10 +1,11 @@
-import attrs
-from functools import lru_cache
-from typing import AsyncIterator, List, Tuple
 
-import tkinter as tk
-from srctools import Keyvalues, conv_int, logger
+from typing import AsyncIterator, Iterable, Tuple
 from typing_extensions import Self
+from functools import lru_cache, partial
+import tkinter as tk
+
+from srctools import Keyvalues, conv_int, logger
+import attrs
 
 from app import itemconfig
 from app.tooltip import add_tooltip
@@ -31,30 +32,33 @@ class TimerOptions:
 
 
 @lru_cache(maxsize=20)
-def timer_values(min_value: int, max_value: int) -> List[str]:
+def timer_values(min_value: int, max_value: int) -> Tuple[str, ...]:
     """Return 0:38-like strings up to the max value."""
-    return [
-        '{}:{:02}'.format(i//60, i % 60)
+    return tuple([
+        f'{i // 60}:{i % 60:02}'
         for i in range(min_value, max_value + 1)
-    ]
+    ])
 
 
 @itemconfig.ui_multi_wconf(TimerOptions)
 async def widget_minute_seconds_multi(
     parent: tk.Widget,
-    values: List[Tuple[str, tk.StringVar]],
+    timers: Iterable[itemconfig.TimerNum],
+    on_changed: itemconfig.MultiChangeFunc,
     conf: TimerOptions,
-) -> AsyncIterator[Tuple[str, itemconfig.UpdateFunc]]:
+) -> AsyncIterator[Tuple[itemconfig.TimerNum, itemconfig.UpdateFunc]]:
     """For timers, display in a more compact form."""
-    for row, column, tim_val, tim_text, var in itemconfig.multi_grid(values, columns=5):
-        timer, update = await widget_minute_seconds(parent, var, conf)
+    for row, column, tim_val, tim_text in itemconfig.multi_grid(timers, columns=5):
+        timer, update = await widget_minute_seconds(parent, partial(on_changed, tim_val), conf)
         timer.grid(row=row, column=column)
         add_tooltip(timer, tim_text, delay=0)
         yield tim_val, update
 
 
 @itemconfig.ui_single_wconf(TimerOptions)
-async def widget_minute_seconds(parent: tk.Widget, var: tk.StringVar, conf: TimerOptions) -> Tuple[tk.Widget, itemconfig.UpdateFunc]:
+async def widget_minute_seconds(
+    parent: tk.Widget, on_changed: itemconfig.SingleChangeFunc, conf: TimerOptions,
+) -> Tuple[tk.Widget, itemconfig.UpdateFunc]:
     """A widget for specifying times - minutes and seconds.
 
     The value is saved as seconds.
@@ -62,10 +66,10 @@ async def widget_minute_seconds(parent: tk.Widget, var: tk.StringVar, conf: Time
     """
     values = timer_values(conf.min, conf.max)
 
+    # For the spinbox.
+    var = tk.StringVar()
     # Stores the 'pretty' value in the actual textbox.
     disp_var = tk.StringVar()
-
-    existing_value = var.get()
 
     async def update_disp(new_val: str) -> None:
         """Whenever the string changes, update the displayed text."""
@@ -75,15 +79,18 @@ async def widget_minute_seconds(parent: tk.Widget, var: tk.StringVar, conf: Time
         else:
             LOGGER.warning('Bad timer value "{}"!')
             # Recurse, with a known safe value.
-            var.set(values[0])
+            disp_var.set(values[0])
+            set_var()
 
     def set_var() -> None:
         """Set the variable to the current value."""
         try:
             minutes, seconds = disp_var.get().split(':')
-            var.set(str(int(minutes) * 60 + int(seconds)))
+            total = int(minutes) * 60 + int(seconds)
         except (ValueError, TypeError):
-            pass
+            pass  # Don't store, incomplete value.
+        else:
+            on_changed(str(total))
 
     def validate(reason: str, operation_type: str, cur_value: str, new_char: str, new_value: str) -> bool:
         """Validate the values for the text.
@@ -149,6 +156,4 @@ async def widget_minute_seconds(parent: tk.Widget, var: tk.StringVar, conf: Time
         validatecommand=(validate_cmd, '%V', '%d', '%s', '%S', '%P'),
     )
     # We need to set this after, it gets reset to the first one.
-    var.set(existing_value)
-    await update_disp(existing_value)
     return spinbox, update_disp

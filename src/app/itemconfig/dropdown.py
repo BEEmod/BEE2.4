@@ -34,7 +34,9 @@ class DropdownOptions:
 
 
 @itemconfig.ui_single_wconf(DropdownOptions)
-async def dropdown(parent: tk.Widget, var: tk.StringVar, conf: DropdownOptions) -> Tuple[tk.Widget, itemconfig.UpdateFunc]:
+async def dropdown(
+    parent: tk.Widget, on_changed: itemconfig.SingleChangeFunc, conf: DropdownOptions,
+) -> Tuple[tk.Widget, itemconfig.UpdateFunc]:
     """Dropdowns allow selecting from a few options."""
     async def update_ui(new_value: str) -> None:
         """Update when new values are picked."""
@@ -45,9 +47,9 @@ async def dropdown(parent: tk.Widget, var: tk.StringVar, conf: DropdownOptions) 
             return
         combobox.current(index)
 
-    def on_changed(_: tk.Event) -> None:
+    def changed(_: tk.Event) -> None:
         """Called when the combobox changes."""
-        var.set(conf.options[combobox.current()])
+        on_changed(conf.options[combobox.current()])
 
     combobox = ttk.Combobox(
         parent,
@@ -55,6 +57,5 @@ async def dropdown(parent: tk.Widget, var: tk.StringVar, conf: DropdownOptions) 
         state='readonly',
         values=conf.display,
     )
-    combobox.bind('<<ComboboxSelected>>', on_changed)
-    await update_ui(var.get())
+    combobox.bind('<<ComboboxSelected>>', changed)
     return combobox, update_ui
