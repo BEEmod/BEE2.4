@@ -8,9 +8,10 @@ from srctools import Keyvalues
 from tkinter import ttk
 from typing_extensions import Self
 
-from app.itemconfig import UpdateFunc, WidgetLookup, widget_sfx
+from app import itemconfig
 
 
+@itemconfig.register('range', 'slider', wide=True)
 @attr.frozen
 class SliderOptions:
     """Options for a slider widget."""
@@ -38,10 +39,9 @@ def decimal_points(num: float) -> int:
         return 0
 
 
-@WidgetLookup('range', 'slider', wide=True)
-async def widget_slider(parent: tk.Widget, var: tk.StringVar, kv: Keyvalues) -> tuple[tk.Widget, UpdateFunc]:
+@itemconfig.ui_single_wconf(SliderOptions)
+async def widget_slider(parent: tk.Widget, var: tk.StringVar, conf: SliderOptions) -> tuple[tk.Widget, itemconfig.UpdateFunc]:
     """Provides a slider for setting a number in a range."""
-    conf = SliderOptions.parse(kv)
 
     # We have to manually translate the UI position to a value.
     ui_min = 0
@@ -63,9 +63,10 @@ async def widget_slider(parent: tk.Widget, var: tk.StringVar, kv: Keyvalues) -> 
     )
 
     def change_cmd(*args) -> None:
+        """Called when the slider is changed."""
         new_pos = format(conf.min + conf.step * round(scale.get(), points), txt_format)
         if var.get() != new_pos:
-            widget_sfx()
+            itemconfig.widget_sfx()
             var.set(new_pos)
 
     async def update_ui(new_value: str) -> None:

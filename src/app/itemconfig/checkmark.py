@@ -13,8 +13,7 @@ TYPE = itemconfig.register_no_conf('boolean', 'bool', 'checkbox')
 
 
 @itemconfig.ui_single_no_conf(TYPE)
-@itemconfig.WidgetLookup('boolean', 'bool', 'checkbox')
-async def widget_checkmark(parent: tk.Widget, var: tk.StringVar, *conf) -> Tuple[tk.Widget, itemconfig.UpdateFunc]:
+async def widget_checkmark(parent: tk.Widget, var: tk.StringVar, _: None) -> Tuple[tk.Widget, itemconfig.UpdateFunc]:
     """Allows ticking a box."""
     # Ensure it's a bool value.
     if conv_bool(var.get()):
@@ -33,7 +32,6 @@ async def widget_checkmark(parent: tk.Widget, var: tk.StringVar, *conf) -> Tuple
 
 
 @itemconfig.ui_multi_no_conf(TYPE)
-@itemconfig.WidgetLookupMulti('boolean', 'bool', 'checkbox')
 async def widget_checkmark_multi(
     parent: tk.Widget,
     values: List[Tuple[str, tk.StringVar]],

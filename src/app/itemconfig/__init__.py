@@ -1,7 +1,7 @@
 """Customizable configuration for specific items or groups of them."""
 from typing import (
     Generic, Iterable, Optional, Callable, List, Tuple, Dict, Set, Iterator, AsyncIterator,
-    Awaitable, Type, TypeVar, Protocol, Union
+    Awaitable, Type, TypeVar, Protocol
 )
 from typing_extensions import Self, TypeAlias
 from tkinter import ttk
@@ -22,7 +22,6 @@ from config.widgets import WidgetConfig
 from app.localisation import TransToken, TransTokenSource
 import BEE2_config
 import config
-import utils
 import packages
 from ..SubPane import SubPane
 
@@ -67,7 +66,6 @@ SingleCreateFunc: TypeAlias = Callable[
     [tk.Widget, tk.StringVar, OptConfT],
     Awaitable[Tuple[tk.Widget, UpdateFunc]]
 ]
-WidgetLookup: utils.FuncLookup[SingleCreateFunc[Keyvalues]] = utils.FuncLookup('Widgets', attrs=['wide'])
 
 # Override for timer-type widgets to be more compact - passed a num:var dict of StringVars
 # instead. The widgets should insert themselves into the parent frame.
@@ -76,7 +74,6 @@ MultiCreateFunc: TypeAlias = Callable[
     [tk.Widget, List[Tuple[str, tk.StringVar]], OptConfT],
     AsyncIterator[Tuple[str, UpdateFunc]]
 ]
-WidgetLookupMulti: utils.FuncLookup[MultiCreateFunc[Keyvalues]] = utils.FuncLookup('Multi-Widgets')
 
 # The functions registered for each.
 _UI_IMPL_SINGLE: dict[WidgetType, SingleCreateFunc] = {}

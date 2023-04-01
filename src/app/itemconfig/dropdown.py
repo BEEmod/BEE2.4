@@ -14,6 +14,7 @@ from app import itemconfig
 LOGGER = srctools.logger.get_logger(__name__)
 
 
+@itemconfig.register('dropdown')
 @attrs.define
 class DropdownOptions:
     """Options defined for a widget."""
@@ -32,11 +33,9 @@ class DropdownOptions:
         return result
 
 
-@itemconfig.WidgetLookup('dropdown')
-async def dropdown(parent: tk.Widget, var: tk.StringVar, kv: Keyvalues) -> Tuple[tk.Widget, itemconfig.UpdateFunc]:
+@itemconfig.ui_single_wconf(DropdownOptions)
+async def dropdown(parent: tk.Widget, var: tk.StringVar, conf: DropdownOptions) -> Tuple[tk.Widget, itemconfig.UpdateFunc]:
     """Dropdowns allow selecting from a few options."""
-    conf = DropdownOptions.parse(kv)
-
     async def update_ui(new_value: str) -> None:
         """Update when new values are picked."""
         try:

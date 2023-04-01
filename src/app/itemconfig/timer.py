@@ -6,13 +6,14 @@ import tkinter as tk
 from srctools import Keyvalues, conv_int, logger
 from typing_extensions import Self
 
-from app.itemconfig import UpdateFunc, WidgetLookup, WidgetLookupMulti, multi_grid
+from app import itemconfig
 from app.tooltip import add_tooltip
 
 
 LOGGER = logger.get_logger('itemconfig.timer')
 
 
+@itemconfig.register('Timer', 'MinuteSeconds')
 @attrs.frozen
 class TimerOptions:
     """Options for minute-second timers."""
@@ -38,28 +39,27 @@ def timer_values(min_value: int, max_value: int) -> List[str]:
     ]
 
 
-@WidgetLookupMulti('Timer', 'MinuteSeconds')
+@itemconfig.ui_multi_wconf(TimerOptions)
 async def widget_minute_seconds_multi(
     parent: tk.Widget,
     values: List[Tuple[str, tk.StringVar]],
-    conf: Keyvalues,
-) -> AsyncIterator[Tuple[str, UpdateFunc]]:
+    conf: TimerOptions,
+) -> AsyncIterator[Tuple[str, itemconfig.UpdateFunc]]:
     """For timers, display in a more compact form."""
-    for row, column, tim_val, tim_text, var in multi_grid(values, columns=5):
+    for row, column, tim_val, tim_text, var in itemconfig.multi_grid(values, columns=5):
         timer, update = await widget_minute_seconds(parent, var, conf)
         timer.grid(row=row, column=column)
         add_tooltip(timer, tim_text, delay=0)
         yield tim_val, update
 
 
-@WidgetLookup('Timer', 'MinuteSeconds')
-async def widget_minute_seconds(parent: tk.Widget, var: tk.StringVar, kv: Keyvalues) -> Tuple[tk.Widget, UpdateFunc]:
+@itemconfig.ui_single_wconf(TimerOptions)
+async def widget_minute_seconds(parent: tk.Widget, var: tk.StringVar, conf: TimerOptions) -> Tuple[tk.Widget, itemconfig.UpdateFunc]:
     """A widget for specifying times - minutes and seconds.
 
     The value is saved as seconds.
     Max specifies the largest amount.
     """
-    conf = TimerOptions.parse(kv)
     values = timer_values(conf.min, conf.max)
 
     # Stores the 'pretty' value in the actual textbox.

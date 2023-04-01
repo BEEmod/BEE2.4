@@ -15,11 +15,10 @@ TYPE = itemconfig.register_no_conf('color', 'colour', 'rgb')
 
 
 @itemconfig.ui_single_no_conf(TYPE)
-@itemconfig.WidgetLookup('color', 'colour', 'rgb')
 async def widget_color_single(
     parent: tk.Widget,
     var: tk.StringVar,
-    *conf,
+    _: None,
 ) -> tuple[tk.Widget, itemconfig.UpdateFunc]:
     """Provides a colour swatch for specifying colours.
 
@@ -33,8 +32,7 @@ async def widget_color_single(
 
 
 @itemconfig.ui_multi_no_conf(TYPE)
-@itemconfig.WidgetLookupMulti('color', 'colour', 'rgb')
-async def widget_color_multi(parent: tk.Widget, values: list[tuple[str, tk.StringVar]], *conf):
+async def widget_color_multi(parent: tk.Widget, values: list[tuple[str, tk.StringVar]], _: None):
     """For color swatches, display in a more compact form."""
     for row, column, tim_val, tim_text, var in itemconfig.multi_grid(values):
         swatch, update = make_color_swatch(parent, var, 16)
