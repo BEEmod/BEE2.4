@@ -223,7 +223,11 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
             tooltip = TransToken.parse(data.pak_id, wid['Tooltip', ''])
             default_prop = wid.find_key('Default', '')
 
-            conf = config.APP.get_cur_conf(WidgetConfig, f'{data.id}:{wid_id}', default=WidgetConfig())
+            prev_conf = config.APP.get_cur_conf(
+                WidgetConfig,
+                f'{data.id}:{wid_id}',
+                default=WidgetConfig(),
+            ).values
 
             # Special case - can't be timer, and no values.
             if kind is KIND_ITEM_VARIANT:
@@ -248,13 +252,13 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
 
                 values: dict[TimerNum, str] = {}
                 for num in (TIMER_NUM_INF if use_inf else TIMER_NUM):
-                    if conf.values is EmptyMapping:
+                    if prev_conf is EmptyMapping:
                         # No new conf, check the old conf.
                         cur_value = CONFIG.get_val(data.id, f'{wid_id}_{num}', defaults[num])
-                    elif isinstance(conf.values, str):
-                        cur_value = conf.values
+                    elif isinstance(prev_conf, str):
+                        cur_value = prev_conf
                     else:
-                        cur_value = conf.values[num]
+                        cur_value = prev_conf[num]
                     values[num] = cur_value
 
                 multi_widgets.append(MultiWidget(
@@ -276,11 +280,11 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
 
                 if kind is KIND_ITEM_VARIANT:
                     cur_value = ''  # Not used.
-                elif conf.values is EmptyMapping:
+                elif prev_conf is EmptyMapping:
                     # No new conf, check the old conf.
                     cur_value = CONFIG.get_val(data.id, wid_id, default_prop.value)
-                elif isinstance(conf.values, str):
-                    cur_value = conf.values
+                elif isinstance(prev_conf, str):
+                    cur_value = prev_conf
                 else:
                     LOGGER.warning('Widget {}:{} had timer defaults, but widget is singular!', data.id, wid_id)
                     cur_value = default_prop.value
