@@ -1,7 +1,7 @@
 mypy>=1.0.0
 mypy-extensions>=1.0.0
 pytest>=6.2.2
-pytest-trio>=0.7.0
+pytest-trio>=0.8.0
 types-Pillow>=9.4.0.5
 types-atomicwrites>=1.4.0
 trio-typing>=0.7.0
