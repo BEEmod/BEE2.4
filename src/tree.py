@@ -3,7 +3,7 @@ from srctools.math import Vec
 from typing import Generic, TypeVar, Iterator, List, Tuple
 
 import attrs
-from rtree import index  # type: ignore
+from rtree import index
 
 ValueT = TypeVar('ValueT')
 PROPS = index.Property()

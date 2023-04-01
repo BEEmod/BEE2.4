@@ -12,7 +12,7 @@ from srctools import EmptyMapping, Vec, Matrix, Keyvalues, conv_float, logger
 from srctools.vmf import Output, VMF, overlay_bounds, make_overlay
 
 from precomp import options, tiling, rand
-from connections import TimerCommand, get_outputs, TimerModes
+from connections import get_outputs, TimerModes
 import consts
 import editoritems
 
