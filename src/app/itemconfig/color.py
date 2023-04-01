@@ -7,6 +7,7 @@ from tkinter import ttk
 from tkinter.colorchooser import askcolor
 import tkinter as tk
 
+from packages.widgets import UpdateFunc, KIND_COLOR
 from app import img, tk_tools
 from app import itemconfig
 from app.tooltip import add_tooltip
@@ -14,15 +15,14 @@ from app.localisation import TransToken
 
 
 TRANS_SELECT_TITLE = TransToken.ui('Choose a Color')
-TYPE = itemconfig.register_no_conf('color', 'colour', 'rgb')
 
 
-@itemconfig.ui_single_no_conf(TYPE)
+@itemconfig.ui_single_no_conf(KIND_COLOR)
 async def widget_color_single(
     parent: tk.Widget,
     on_changed: itemconfig.SingleChangeFunc,
     _: None,
-) -> tuple[tk.Widget, itemconfig.UpdateFunc]:
+) -> tuple[tk.Widget, UpdateFunc]:
     """Provides a colour swatch for specifying colours.
 
     Values can be provided as #RRGGBB, but will be written as 3 0-255 values.
@@ -34,7 +34,7 @@ async def widget_color_single(
     return frame, update
 
 
-@itemconfig.ui_multi_no_conf(TYPE)
+@itemconfig.ui_multi_no_conf(KIND_COLOR)
 async def widget_color_multi(
     parent: tk.Widget, timers: Iterable[itemconfig.TimerNum], on_changed: itemconfig.MultiChangeFunc, _: None,
 ):
@@ -46,9 +46,11 @@ async def widget_color_multi(
         yield tim_val, update
 
 
-def make_color_swatch(parent: tk.Widget, on_changed: itemconfig.SingleChangeFunc, size: int) -> tuple[tk.Widget, itemconfig.UpdateFunc]:
+def make_color_swatch(parent: tk.Widget, on_changed: itemconfig.SingleChangeFunc, size: int) -> tuple[tk.Widget, UpdateFunc]:
     """Make a single swatch."""
     r = g = b = 128
+
+    swatch = ttk.Label(parent)
 
     # Note: tkinter requires RGB as ints, not float!
     def open_win(e: tk.Event) -> None:
@@ -67,7 +69,6 @@ def make_color_swatch(parent: tk.Widget, on_changed: itemconfig.SingleChangeFunc
             img.apply(swatch, img.Handle.color(parsed, size, size))
             on_changed(f'{r} {g} {b}')
 
-    swatch = ttk.Label(parent)
     tk_tools.bind_leftclick(swatch, open_win)
 
     async def update_image(value: str) -> None:

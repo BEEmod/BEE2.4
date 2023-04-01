@@ -1,42 +1,22 @@
 """A widget for picking from a specific list of options."""
 import attrs
-from typing import Tuple, List, Dict
+from typing import Tuple
 from tkinter import ttk
 import tkinter as tk
 
 import srctools.logger
-from srctools import Keyvalues
-from typing_extensions import Self
 
+from packages.widgets import DropdownOptions, UpdateFunc
 from app import itemconfig
 
 
 LOGGER = srctools.logger.get_logger(__name__)
 
 
-@itemconfig.register('dropdown')
-@attrs.define
-class DropdownOptions:
-    """Options defined for a widget."""
-    options: List[str]
-    display: List[str]
-    key_to_index: Dict[str, int]
-
-    @classmethod
-    def parse(cls, conf: Keyvalues) -> Self:
-        """Parse configuration."""
-        result = cls([], [], {})
-        for ind, prop in enumerate(conf.find_children('Options')):
-            result.options.append(prop.real_name)
-            result.display.append(prop.value)
-            result.key_to_index[prop.name] = ind
-        return result
-
-
 @itemconfig.ui_single_wconf(DropdownOptions)
 async def dropdown(
     parent: tk.Widget, on_changed: itemconfig.SingleChangeFunc, conf: DropdownOptions,
-) -> Tuple[tk.Widget, itemconfig.UpdateFunc]:
+) -> Tuple[tk.Widget, UpdateFunc]:
     """Dropdowns allow selecting from a few options."""
     async def update_ui(new_value: str) -> None:
         """Update when new values are picked."""

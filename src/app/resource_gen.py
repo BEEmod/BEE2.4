@@ -9,7 +9,8 @@ from srctools.vtf import VTF, ImageFormats
 import srctools.logger
 
 from packages import PackagesSet
-from app.itemconfig import ConfigGroup, parse_color
+from app.itemconfig import parse_color
+from packages.widgets import ConfigGroup
 from app import img
 
 LOGGER = srctools.logger.get_logger(__name__)

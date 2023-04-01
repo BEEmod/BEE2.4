@@ -1104,3 +1104,4 @@ from packages.music import Music
 from packages.quote_pack import QuotePack
 from packages.pack_list import PackList
 from packages.corridor import CorridorGroup
+from packages.widgets import ConfigGroup

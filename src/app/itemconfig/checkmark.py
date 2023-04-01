@@ -8,18 +8,17 @@ import tkinter as tk
 
 from srctools import conv_bool
 
+import packages.widgets
 from app import itemconfig
 from app.tooltip import add_tooltip
+from packages.widgets import KIND_CHECKMARK
 
 
-TYPE = itemconfig.register_no_conf('boolean', 'bool', 'checkbox')
-
-
-@itemconfig.ui_single_no_conf(TYPE)
+@itemconfig.ui_single_no_conf(KIND_CHECKMARK)
 async def widget_checkmark(
     parent: tk.Widget, on_changed: itemconfig.SingleChangeFunc,
     conf: None,
-) -> Tuple[tk.Widget, itemconfig.UpdateFunc]:
+) -> Tuple[tk.Widget, packages.widgets.UpdateFunc]:
     """Allows ticking a box."""
     var = tk.BooleanVar(parent)
 
@@ -44,13 +43,13 @@ async def widget_checkmark(
     return check, update
 
 
-@itemconfig.ui_multi_no_conf(TYPE)
+@itemconfig.ui_multi_no_conf(KIND_CHECKMARK)
 async def widget_checkmark_multi(
     parent: tk.Widget,
     values: Iterable[itemconfig.TimerNum],
     on_changed: itemconfig.MultiChangeFunc,
     _: None,
-) -> AsyncIterator[Tuple[itemconfig.TimerNum, itemconfig.UpdateFunc]]:
+) -> AsyncIterator[Tuple[itemconfig.TimerNum, packages.widgets.UpdateFunc]]:
     """For checkmarks, display in a more compact form."""
     for row, column, tim_val, tim_text in itemconfig.multi_grid(values):
         checkbox, update = await widget_checkmark(parent, partial(on_changed, tim_val), None)

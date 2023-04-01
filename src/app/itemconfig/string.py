@@ -3,16 +3,14 @@ from __future__ import annotations
 import tkinter as tk
 from tkinter import ttk
 
+from packages.widgets import KIND_STRING, UpdateFunc
 from app import itemconfig
 
 
-TYPE = itemconfig.register_no_conf('string', 'str')
-
-
-@itemconfig.ui_single_no_conf(TYPE)
+@itemconfig.ui_single_no_conf(KIND_STRING)
 async def widget_string(
     parent: tk.Widget, on_changed: itemconfig.SingleChangeFunc, _: None,
-) -> tuple[tk.Widget, itemconfig.UpdateFunc]:
+) -> tuple[tk.Widget, UpdateFunc]:
     """Simple textbox for entering text."""
     var = tk.StringVar()
     entry = ttk.Entry(

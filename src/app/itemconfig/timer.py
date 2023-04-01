@@ -1,35 +1,16 @@
 
 from typing import AsyncIterator, Iterable, Tuple
-from typing_extensions import Self
 from functools import lru_cache, partial
 import tkinter as tk
 
-from srctools import Keyvalues, conv_int, logger
-import attrs
+from srctools import conv_int, logger
 
+from packages.widgets import TimerOptions, UpdateFunc
 from app import itemconfig
 from app.tooltip import add_tooltip
 
 
 LOGGER = logger.get_logger('itemconfig.timer')
-
-
-@itemconfig.register('Timer', 'MinuteSeconds')
-@attrs.frozen
-class TimerOptions:
-    """Options for minute-second timers."""
-    min: int
-    max: int
-
-    @classmethod
-    def parse(cls, conf: Keyvalues) -> Self:
-        """Parse from config options."""
-        max_value = conf.int('max', 60)
-        min_value = conf.int('min', 0)
-        if min_value > max_value:
-            raise ValueError('Bad min and max values!')
-        return cls(min_value, max_value)
-
 
 @lru_cache(maxsize=20)
 def timer_values(min_value: int, max_value: int) -> Tuple[str, ...]:
@@ -46,7 +27,7 @@ async def widget_minute_seconds_multi(
     timers: Iterable[itemconfig.TimerNum],
     on_changed: itemconfig.MultiChangeFunc,
     conf: TimerOptions,
-) -> AsyncIterator[Tuple[itemconfig.TimerNum, itemconfig.UpdateFunc]]:
+) -> AsyncIterator[Tuple[itemconfig.TimerNum, UpdateFunc]]:
     """For timers, display in a more compact form."""
     for row, column, tim_val, tim_text in itemconfig.multi_grid(timers, columns=5):
         timer, update = await widget_minute_seconds(parent, partial(on_changed, tim_val), conf)
@@ -58,7 +39,7 @@ async def widget_minute_seconds_multi(
 @itemconfig.ui_single_wconf(TimerOptions)
 async def widget_minute_seconds(
     parent: tk.Widget, on_changed: itemconfig.SingleChangeFunc, conf: TimerOptions,
-) -> Tuple[tk.Widget, itemconfig.UpdateFunc]:
+) -> Tuple[tk.Widget, UpdateFunc]:
     """A widget for specifying times - minutes and seconds.
 
     The value is saved as seconds.
