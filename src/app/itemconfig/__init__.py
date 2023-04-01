@@ -219,7 +219,7 @@ class Widget:
 class SingleWidget(Widget):
     """Represents a single widget with no timer value."""
     value: tk.StringVar
-    ui_cback: Optional[UpdateFunc] = None
+    ui_cback: UpdateFunc = nop_update
 
     async def apply_conf(self, data: WidgetConfig) -> None:
         """Apply the configuration to the UI."""
@@ -236,7 +236,8 @@ class SingleWidget(Widget):
             """Recompute state and UI when changed."""
             val = self.value.get()
             config.APP.store_conf(WidgetConfig(val), save_id)
-            if self.ui_cback is not None:
+            # Don't bother scheduling a no-op task.
+            if self.ui_cback is not nop_update:
                 background_run(self.ui_cback, val)
 
         self.value.trace_add('write', on_changed)
@@ -549,12 +550,14 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
             wid_frame.grid(row=row, column=0, sticky='ew', pady=5)
             try:
                 with logger.context(f'{self.id}:{m_wid.id}'):
-                    async for tim_val, value in multi_func(
+                    async for tim_val, update_cback in multi_func(
                         wid_frame,
                         m_wid.values,
                         m_wid.config,
                     ):
-                        m_wid.ui_cbacks[tim_val] = value
+                        # Don't bother calling the nop function.
+                        if update_cback is not nop_update:
+                            m_wid.ui_cbacks[tim_val] = update_cback
             except Exception:
                 LOGGER.exception('Could not construct widget {}.{}', self.id, m_wid.id)
                 continue

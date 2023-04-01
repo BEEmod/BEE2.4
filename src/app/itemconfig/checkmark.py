@@ -37,13 +37,11 @@ async def widget_checkmark(parent: tk.Widget, var: tk.StringVar, *conf) -> Tuple
 async def widget_checkmark_multi(
     parent: tk.Widget,
     values: List[Tuple[str, tk.StringVar]],
-    *conf,  # TODO
+    _: None,
 ) -> AsyncIterator[Tuple[str, itemconfig.UpdateFunc]]:
     """For checkmarks, display in a more compact form."""
-    for row, column, _, tim_text, var in itemconfig.multi_grid(values):
-        checkbox, _ = await widget_checkmark(parent, var)
+    for row, column, tim_val, tim_text, var in itemconfig.multi_grid(values):
+        checkbox, update = await widget_checkmark(parent, var, None)
         checkbox.grid(row=row, column=column)
         add_tooltip(checkbox, tim_text, delay=0)
-    # noinspection PyUnreachableCode
-    if False:  # Make this a generator.
-        yield ('', nop_update)
+        yield tim_val, update
