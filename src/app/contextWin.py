@@ -233,7 +233,11 @@ def set_version_combobox(box: ttk.Combobox, item: 'UI.Item') -> list[str]:
     return ver_lookup
 
 
-def get_description(global_last, glob_desc, style_desc) -> tkMarkdown.MarkdownData:
+def get_description(
+    global_last: bool,
+    glob_desc: tkMarkdown.MarkdownData,
+    style_desc: tkMarkdown.MarkdownData,
+) -> tkMarkdown.MarkdownData:
     """Join together the general and style description for an item."""
     if glob_desc and style_desc:
         if global_last:
