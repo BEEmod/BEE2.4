@@ -7,7 +7,7 @@ from tkinter import ttk
 from tkinter.colorchooser import askcolor
 import tkinter as tk
 
-from packages.widgets import UpdateFunc, KIND_COLOR
+from packages.widgets import UpdateFunc, KIND_COLOR, parse_color
 from app import img, tk_tools
 from app import itemconfig
 from app.tooltip import add_tooltip
@@ -74,7 +74,7 @@ def make_color_swatch(parent: tk.Widget, on_changed: itemconfig.SingleChangeFunc
     async def update_image(value: str) -> None:
         """Update the image when changed."""
         nonlocal r, g, b
-        r, g, b = parsed = itemconfig.parse_color(value)
+        r, g, b = parsed = parse_color(value)
         img.apply(swatch, img.Handle.color(parsed, size, size))
 
     return swatch, update_image

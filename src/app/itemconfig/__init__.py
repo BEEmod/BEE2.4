@@ -8,7 +8,7 @@ from tkinter import ttk
 import tkinter as tk
 import functools
 
-from srctools import Vec, logger
+from srctools import logger
 import trio
 
 from app import (
@@ -122,21 +122,6 @@ def ui_multi_no_conf(kind: WidgetType) -> Callable[[MultiCreateFunc[None]], Mult
         _UI_IMPL_MULTI[kind] = func
         return func
     return deco
-
-
-def parse_color(color: str) -> Tuple[int, int, int]:
-    """Parse a string into a color."""
-    if color.startswith('#'):
-        try:
-            r = int(color[1:3], base=16)
-            g = int(color[3:5], base=16)
-            b = int(color[5:], base=16)
-        except ValueError:
-            LOGGER.warning('Invalid RGB value: "{}"!', color)
-            r = g = b = 128
-    else:
-        r, g, b = map(int, Vec.from_str(color, 128, 128, 128))
-    return r, g, b
 
 
 async def create_group(master: ttk.Frame, group: ConfigGroup) -> ttk.Frame:

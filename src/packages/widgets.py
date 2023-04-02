@@ -1,14 +1,14 @@
 """Customizable configuration for specific items or groups of them."""
 from typing import (
     Awaitable, Callable, Dict, Generic, Iterable, Iterator, List, Optional, Protocol, Set,
-    Type, TypeVar,
+    Tuple, Type, TypeVar,
 )
 from typing_extensions import Self, TypeAlias
 import itertools
 
 import attrs
 import trio
-from srctools import EmptyMapping, Keyvalues, logger
+from srctools import EmptyMapping, Keyvalues, Vec, logger
 
 import BEE2_config
 import config
@@ -347,6 +347,21 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
             if not config_section:
                 del CONFIG[conf.id]
         CONFIG.save_check()
+
+
+def parse_color(color: str) -> Tuple[int, int, int]:
+    """Parse a string into a color."""
+    if color.startswith('#'):
+        try:
+            r = int(color[1:3], base=16)
+            g = int(color[3:5], base=16)
+            b = int(color[5:], base=16)
+        except ValueError:
+            LOGGER.warning('Invalid RGB value: "{}"!', color)
+            r = g = b = 128
+    else:
+        r, g, b = map(int, Vec.from_str(color, 128, 128, 128))
+    return r, g, b
 
 
 @register('itemvariant', 'variant')
