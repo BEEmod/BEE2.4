@@ -1,14 +1,11 @@
 from __future__ import annotations
 
-import attr
 import math
 
 import tkinter as tk
-from srctools import Keyvalues
 from tkinter import ttk
-from typing_extensions import Self
 
-from packages.widgets import  SliderOptions, UpdateFunc
+from packages.widgets import SliderOptions, UpdateFunc
 from app import itemconfig
 
 
@@ -49,10 +46,10 @@ async def widget_slider(
 
     last_value = ''
 
-    def change_cmd(*args) -> None:
+    def change_cmd(value: str) -> None:
         """Called when the slider is changed."""
         nonlocal last_value
-        new_pos = format(conf.min + conf.step * round(scale.get(), points), txt_format)
+        new_pos = format(conf.min + conf.step * round(float(value), points), txt_format)
         # Only trigger sounds when moving each step.
         if last_value != new_pos:
             itemconfig.widget_sfx()

@@ -1,5 +1,4 @@
 """A widget for picking from a specific list of options."""
-import attrs
 from typing import Tuple
 from tkinter import ttk
 import tkinter as tk

@@ -1,4 +1,4 @@
-
+"""Adds a widget for specifying minute-second durations."""
 from typing import AsyncIterator, Iterable, Tuple
 from functools import lru_cache
 import tkinter as tk
@@ -12,9 +12,11 @@ from app.tooltip import add_tooltip
 
 LOGGER = logger.get_logger('itemconfig.timer')
 
+
 @lru_cache(maxsize=20)
 def timer_values(min_value: int, max_value: int) -> Tuple[str, ...]:
     """Return 0:38-like strings up to the max value."""
+    # Put a cache on this, since we can share it.
     return tuple([
         f'{i // 60}:{i % 60:02}'
         for i in range(min_value, max_value + 1)
