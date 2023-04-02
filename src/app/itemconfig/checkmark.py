@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-from functools import partial
-
-from typing import AsyncIterator, Iterable, List, Tuple
+from typing import AsyncIterator, Iterable, Tuple
 from tkinter import ttk
 import tkinter as tk
 
@@ -46,11 +44,11 @@ async def widget_checkmark(
 async def widget_checkmark_multi(
     parent: tk.Widget,
     values: Iterable[itemconfig.TimerNum],
-    on_changed: itemconfig.MultiChangeFunc,
+    get_on_changed: itemconfig.MultiChangeFunc,
 ) -> AsyncIterator[Tuple[itemconfig.TimerNum, packages.widgets.UpdateFunc]]:
     """For checkmarks, display in a more compact form."""
     for row, column, tim_val, tim_text in itemconfig.multi_grid(values):
-        checkbox, update = await widget_checkmark(parent, partial(on_changed, tim_val))
+        checkbox, update = await widget_checkmark(parent, get_on_changed(tim_val))
         checkbox.grid(row=row, column=column)
         add_tooltip(checkbox, tim_text, delay=0)
         yield tim_val, update

@@ -1,7 +1,6 @@
 """A Widget for allowing selecting a colour."""
 from __future__ import annotations
 from typing import Iterable
-from functools import partial
 
 from tkinter import ttk
 from tkinter.colorchooser import askcolor
@@ -35,11 +34,11 @@ async def widget_color_single(
 
 @itemconfig.ui_multi_no_conf(KIND_COLOR)
 async def widget_color_multi(
-    parent: tk.Widget, timers: Iterable[itemconfig.TimerNum], on_changed: itemconfig.MultiChangeFunc,
+    parent: tk.Widget, timers: Iterable[itemconfig.TimerNum], get_on_changed: itemconfig.MultiChangeFunc,
 ):
     """For color swatches, display in a more compact form."""
     for row, column, tim_val, tim_text in itemconfig.multi_grid(timers):
-        swatch, update = make_color_swatch(parent, partial(on_changed, tim_val), 16)
+        swatch, update = make_color_swatch(parent, get_on_changed(tim_val), 16)
         swatch.grid(row=row, column=column)
         add_tooltip(swatch, tim_text, delay=0)
         yield tim_val, update

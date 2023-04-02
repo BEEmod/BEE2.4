@@ -38,8 +38,8 @@ LOGGER = logger.get_logger(__name__)
 # This is called when a new value is loaded, to update the UI contents.
 # This should be called when the value changes.
 SingleChangeFunc: TypeAlias = Callable[[str], object]
-# This takes the timer value + new value.
-MultiChangeFunc: TypeAlias = Callable[[TimerNum, str], object]
+# This variant is for multi-widget overrides.
+MultiChangeFunc: TypeAlias = Callable[[TimerNum], SingleChangeFunc]
 
 # Functions for each widget.
 # The function is passed a parent frame, the configuration object, and a function to call when the value changes.
@@ -227,7 +227,7 @@ async def create_group(master: ttk.Frame, group: ConfigGroup) -> ttk.Frame:
                 async for tim_val, update_cback in multi_func(
                     wid_frame,
                     m_wid.values.keys(),
-                    m_wid.on_changed,
+                    m_wid.get_on_changed,
                     m_wid.config,
                 ):
                     m_wid.ui_cbacks[tim_val] = update_cback
@@ -446,7 +446,7 @@ def widget_timer_generic(widget_func: SingleCreateFunc[ConfT]) -> MultiCreateFun
     async def generic_func(
         parent: tk.Widget,
         timers: Iterable[TimerNum],
-        on_changed: MultiChangeFunc,
+        get_on_changed: MultiChangeFunc,
         conf: ConfT,
     ) -> AsyncIterator[Tuple[TimerNum, UpdateFunc]]:
         """Generically make a set of labels."""
@@ -457,7 +457,7 @@ def widget_timer_generic(widget_func: SingleCreateFunc[ConfT]) -> MultiCreateFun
             label = ttk.Label(parent)
             localisation.set_text(label, TRANS_COLON.format(text=timer_disp))
             label.grid(row=row, column=0)
-            widget, update = await widget_func(parent, functools.partial(on_changed, tim_val), conf)
+            widget, update = await widget_func(parent, get_on_changed(tim_val), conf)
             yield tim_val, update
             widget.grid(row=row, column=1, sticky='ew')
 

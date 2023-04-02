@@ -1,6 +1,6 @@
 
 from typing import AsyncIterator, Iterable, Tuple
-from functools import lru_cache, partial
+from functools import lru_cache
 import tkinter as tk
 
 from srctools import conv_int, logger
@@ -25,12 +25,12 @@ def timer_values(min_value: int, max_value: int) -> Tuple[str, ...]:
 async def widget_minute_seconds_multi(
     parent: tk.Widget,
     timers: Iterable[itemconfig.TimerNum],
-    on_changed: itemconfig.MultiChangeFunc,
+    get_on_changed: itemconfig.MultiChangeFunc,
     conf: TimerOptions,
 ) -> AsyncIterator[Tuple[itemconfig.TimerNum, UpdateFunc]]:
     """For timers, display in a more compact form."""
     for row, column, tim_val, tim_text in itemconfig.multi_grid(timers, columns=5):
-        timer, update = await widget_minute_seconds(parent, partial(on_changed, tim_val), conf)
+        timer, update = await widget_minute_seconds(parent, get_on_changed(tim_val), conf)
         timer.grid(row=row, column=column)
         add_tooltip(timer, tim_text, delay=0)
         yield tim_val, update

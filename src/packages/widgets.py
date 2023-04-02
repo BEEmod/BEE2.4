@@ -159,13 +159,16 @@ class MultiWidget(Widget):
                 f'{self.group_id}:{self.id}',
             )
 
-    def on_changed(self, num: TimerNum, value: str) -> None:
-        """Recompute state and UI when changed."""
-        self.values[num] = value
-        config.APP.store_conf(
-            WidgetConfig(self.values.copy()),
-            f'{self.group_id}:{self.id}',
-        )
+    def get_on_changed(self, num: TimerNum) -> Callable[[str], object]:
+        """Returns a function to recompute state and UI when changed."""
+        def on_changed(value: str) -> None:
+            """Should be called when this timer has changed."""
+            self.values[num] = value
+            config.APP.store_conf(
+                WidgetConfig(self.values.copy()),
+                f'{self.group_id}:{self.id}',
+            )
+        return on_changed
 
 
 class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
