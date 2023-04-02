@@ -9,7 +9,7 @@ from app import itemconfig
 
 @itemconfig.ui_single_no_conf(KIND_STRING)
 async def widget_string(
-    parent: tk.Widget, on_changed: itemconfig.SingleChangeFunc, _: None,
+    parent: tk.Widget, on_changed: itemconfig.SingleChangeFunc,
 ) -> tuple[tk.Widget, UpdateFunc]:
     """Simple textbox for entering text."""
     var = tk.StringVar()

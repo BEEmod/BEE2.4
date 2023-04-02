@@ -21,7 +21,6 @@ TRANS_SELECT_TITLE = TransToken.ui('Choose a Color')
 async def widget_color_single(
     parent: tk.Widget,
     on_changed: itemconfig.SingleChangeFunc,
-    _: None,
 ) -> tuple[tk.Widget, UpdateFunc]:
     """Provides a colour swatch for specifying colours.
 
@@ -36,7 +35,7 @@ async def widget_color_single(
 
 @itemconfig.ui_multi_no_conf(KIND_COLOR)
 async def widget_color_multi(
-    parent: tk.Widget, timers: Iterable[itemconfig.TimerNum], on_changed: itemconfig.MultiChangeFunc, _: None,
+    parent: tk.Widget, timers: Iterable[itemconfig.TimerNum], on_changed: itemconfig.MultiChangeFunc,
 ):
     """For color swatches, display in a more compact form."""
     for row, column, tim_val, tim_text in itemconfig.multi_grid(timers):

@@ -49,12 +49,20 @@ SingleCreateFunc: TypeAlias = Callable[
     [tk.Widget, SingleChangeFunc, OptConfT],
     Awaitable[Tuple[tk.Widget, UpdateFunc]]
 ]
+SingleCreateNoConfFunc: TypeAlias = Callable[
+    [tk.Widget, SingleChangeFunc],
+    Awaitable[Tuple[tk.Widget, UpdateFunc]]
+]
 
 # Override for timer-type widgets to be more compact - passed a list of timer numbers instead.
 # The widgets should insert themselves into the parent frame.
 # It then yields timer_val, update-func pairs.
 MultiCreateFunc: TypeAlias = Callable[
     [tk.Widget, Iterable[TimerNum], MultiChangeFunc, OptConfT],
+    AsyncIterator[Tuple[TimerNum, UpdateFunc]]
+]
+MultiCreateNoConfFunc: TypeAlias = Callable[
+    [tk.Widget, Iterable[TimerNum], MultiChangeFunc],
     AsyncIterator[Tuple[TimerNum, UpdateFunc]]
 ]
 
@@ -91,13 +99,20 @@ def ui_single_wconf(cls: Type[ConfT]) -> Callable[[SingleCreateFunc[ConfT]], Sin
     return deco
 
 
-def ui_single_no_conf(kind: WidgetType) -> Callable[[SingleCreateFunc[None]], SingleCreateFunc[None]]:
+def ui_single_no_conf(kind: WidgetType) -> Callable[[SingleCreateNoConfFunc], SingleCreateNoConfFunc]:
     """Register the UI function used for singular widgets without configs."""
-    def deco(func: SingleCreateFunc[None]) -> SingleCreateFunc[None]:
+    def deco(func: SingleCreateNoConfFunc) -> SingleCreateNoConfFunc:
         """Do the registration."""
+        def wrapper(
+            parent: tk.Widget, on_changed: SingleChangeFunc, conf: None,
+        ) -> Awaitable[Tuple[tk.Widget, UpdateFunc]]:
+            """Don't pass the config through to the UI function."""
+            assert conf is None
+            return func(parent, on_changed)
+
         if isinstance(kind, WidgetTypeWithConf):
             raise TypeError('Widget type has config, but singular function does not!')
-        _UI_IMPL_SINGLE[kind] = func
+        _UI_IMPL_SINGLE[kind] = wrapper
         return func
     return deco
 
@@ -113,13 +128,21 @@ def ui_multi_wconf(cls: Type[ConfT]) -> Callable[[MultiCreateFunc[ConfT]], Multi
     return deco
 
 
-def ui_multi_no_conf(kind: WidgetType) -> Callable[[MultiCreateFunc[None]], MultiCreateFunc[None]]:
+def ui_multi_no_conf(kind: WidgetType) -> Callable[[MultiCreateNoConfFunc], MultiCreateNoConfFunc]:
     """Register the UI function used for multi widgets without configs."""
-    def deco(func: MultiCreateFunc[None]) -> MultiCreateFunc[None]:
+    def deco(func: MultiCreateNoConfFunc) -> MultiCreateNoConfFunc:
         """Do the registration."""
+        def wrapper(
+            parent: tk.Widget, timer: Iterable[TimerNum],
+            on_changed: MultiChangeFunc, conf: None,
+        ) -> AsyncIterator[Tuple[TimerNum, UpdateFunc]]:
+            """Don't pass the config through to the UI function."""
+            assert conf is None
+            return func(parent, timer, on_changed)
+
         if isinstance(kind, WidgetTypeWithConf):
             raise TypeError('Widget type has config, but multi function does not!')
-        _UI_IMPL_MULTI[kind] = func
+        _UI_IMPL_MULTI[kind] = wrapper
         return func
     return deco
 
