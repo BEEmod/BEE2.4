@@ -43,7 +43,7 @@ AFTER_EXPORT_TEXT: Dict[Tuple[AfterExport, bool], TransToken] = {
 # The checkbox variables, along with the GenOptions attribute they control.
 VARS: List[Tuple[str, tk.Variable]] = []
 
-win = tk.Toplevel(TK_ROOT)
+win = tk.Toplevel(TK_ROOT, name='optionsWin')
 win.transient(master=TK_ROOT)
 tk_tools.set_window_icon(win)
 localisation.set_win_title(win, TransToken.ui('BEE2 Options'))
@@ -152,7 +152,7 @@ def make_checkbox(
     assert name in GenOptions.__annotations__, list(GenOptions.__annotations__)
 
     VARS.append((name, var))
-    widget = ttk.Checkbutton(frame, variable=var)
+    widget = ttk.Checkbutton(frame, variable=var, name='check_' + name)
     localisation.set_text(widget, desc)
 
     if callback is not None:

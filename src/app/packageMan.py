@@ -12,7 +12,7 @@ from transtoken import TransToken
 import packages
 import utils
 
-window = tk.Toplevel(TK_ROOT)
+window = tk.Toplevel(TK_ROOT, name='packagesWin')
 window.withdraw()
 
 list_widget: CheckDetails

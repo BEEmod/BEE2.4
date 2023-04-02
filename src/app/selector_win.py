@@ -414,7 +414,7 @@ class Item:
 class PreviewWindow:
     """Displays images previewing the selected item."""
     def __init__(self) -> None:
-        self.win = tk.Toplevel(TK_ROOT)
+        self.win = tk.Toplevel(TK_ROOT, name='selectorPreview')
         self.win.withdraw()
         self.win.resizable(False, False)
 

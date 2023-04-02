@@ -89,7 +89,7 @@ class Selector:
         self.sel_count = 0
         self.sel_handle_moving = False
 
-        self.win = tk.Toplevel(TK_ROOT)
+        self.win = tk.Toplevel(TK_ROOT, name='corridor')
         self.win.withdraw()
         self.win.wm_protocol("WM_DELETE_WINDOW", self.hide)
         localisation.set_win_title(self.win, TransToken.ui('BEEmod - Select Corridor'))
@@ -97,19 +97,19 @@ class Selector:
         self.win.rowconfigure(0, weight=1)
         self.win.columnconfigure(0, weight=1)
 
-        frm_left = ttk.Frame(self.win)
+        frm_left = ttk.Frame(self.win, name='frm_left')
         frm_left.grid(row=0, column=0, sticky='nsew')
 
-        frm_right = ttk.Frame(self.win)
+        frm_right = ttk.Frame(self.win, name='frm_right')
         frm_right.columnconfigure(0, weight=1)
         frm_right.grid(row=0, column=1, sticky='ns')
         frm_img = ttk.Frame(frm_right, relief='raised', width=2)
         frm_img.grid(row=0, column=0, sticky='ew')
 
         sel_img = self._sel_img
-        self.wid_image_left = ttk.Button(frm_img, command=lambda: sel_img(-1))
-        self.wid_image = ttk.Label(frm_img)
-        self.wid_image_right = ttk.Button(frm_img, command=lambda: sel_img(1))
+        self.wid_image_left = ttk.Button(frm_img, name='imgLeft', command=lambda: sel_img(-1))
+        self.wid_image = ttk.Label(frm_img, name='img')
+        self.wid_image_right = ttk.Button(frm_img, name='imgRight', command=lambda: sel_img(1))
 
         self.wid_image_left.grid(row=0, column=0, sticky='ns')
         self.wid_image.grid(row=0, column=1, sticky='nsew')
@@ -123,6 +123,7 @@ class Selector:
 
         self.wid_title = ttk.Label(
             frm_right,
+            name='title',
             justify='center',
             anchor='center',
             font=("Helvetica", 12, "bold"),
@@ -131,6 +132,7 @@ class Selector:
         self.wid_title.grid(row=1, column=0, sticky='ew')
         self.wid_authors = ttk.Label(
             frm_right,
+            name='authors',
             justify='center',
             anchor='center',
             text='',
@@ -142,7 +144,7 @@ class Selector:
         frm_right.rowconfigure(3, weight=1)
 
         localisation.set_text(
-            ttk.Button(frm_right, command=self.hide),
+            ttk.Button(frm_right, name='closer', command=self.hide),
             TransToken.ui('Close'),
         ).grid(row=4, column=0)
 
@@ -178,7 +180,7 @@ class Selector:
         self.event_bus.register(self.btn_direction, Direction, refresh)
         self.event_bus.register(self.btn_orient, Orient, refresh)
 
-        canv_frame = ttk.Frame(frm_left, relief="sunken")
+        canv_frame = ttk.Frame(frm_left, name='canv_frame', relief="sunken")
         canv_frame.grid(row=1, column=0, columnspan=3, sticky='nsew', ipadx=8, ipady=8)
         canv_frame.rowconfigure(0, weight=1)
         canv_frame.columnconfigure(0, weight=1)

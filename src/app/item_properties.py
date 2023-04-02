@@ -558,7 +558,7 @@ class PropertyWindow:
         # For each PROP_GROUP, the actually constructed group.
         self.groups: List[Optional[PropGroup]] = [None] * len(PROP_GROUPS)
 
-        self.win = tk.Toplevel(TK_ROOT)
+        self.win = tk.Toplevel(TK_ROOT, name='itemPropsWin')
 
         self.win.withdraw()
         self.win.transient(TK_ROOT)

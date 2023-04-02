@@ -15,7 +15,7 @@ import config
 
 LOGGER = srctools.logger.get_logger(__name__)
 
-window = tk.Toplevel(TK_ROOT)
+window = tk.Toplevel(TK_ROOT, name='signageChooser')
 window.withdraw()
 
 drag_man: dragdrop.Manager[Signage] = dragdrop.Manager(window)

@@ -73,7 +73,7 @@ class BaseLoadScreen:
         self.scr_id = scr_id
         self.title_text = title_text
 
-        self.win = tk.Toplevel(TK_ROOT)
+        self.win = tk.Toplevel(TK_ROOT, name=f'loadscreen_{scr_id}')
         self.win.withdraw()
         self.win.wm_overrideredirect(True)
         self.win.attributes('-topmost', int(force_ontop))
@@ -622,7 +622,7 @@ class LogWindow:
     """Implements the logging window."""
     def __init__(self, pipe: multiprocessing.connection.Connection) -> None:
         """Initialise the window."""
-        self.win = window = tk.Toplevel(TK_ROOT)
+        self.win = window = tk.Toplevel(TK_ROOT, name='logWin')
         self.pipe = pipe
         window.columnconfigure(0, weight=1)
         window.rowconfigure(0, weight=1)

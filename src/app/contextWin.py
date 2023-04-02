@@ -40,7 +40,7 @@ selected_sub_item: UI.PalItem
 
 version_lookup: list[str] = []
 
-window = tk.Toplevel(TK_ROOT)
+window = tk.Toplevel(TK_ROOT, name='contextWin')
 window.overrideredirect(True)
 window.resizable(False, False)
 window.transient(master=TK_ROOT)

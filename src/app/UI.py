@@ -1338,7 +1338,7 @@ def flow_picker(e=None) -> None:
 
 def init_drag_icon() -> None:
     """Create the window for rendering held items."""
-    drag_win = tk.Toplevel(TK_ROOT)
+    drag_win = tk.Toplevel(TK_ROOT, name='pal_drag')
     # this prevents stuff like the title bar, normal borders etc from
     # appearing in this window.
     drag_win.overrideredirect(True)

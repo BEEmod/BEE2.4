@@ -202,7 +202,7 @@ class Manager(Generic[ItemT]):
 
         self.event_bus = event.EventBus()
 
-        self._drag_win = drag_win = tkinter.Toplevel(master)
+        self._drag_win = drag_win = tkinter.Toplevel(master, name='drag_icon')
         drag_win.withdraw()
         drag_win.transient(master=master)
         drag_win.wm_overrideredirect(True)

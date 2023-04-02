@@ -23,7 +23,7 @@ PADDING = 0  # Space around the target widget
 CENT_DIST = 50  # Distance around center where we align centered.
 
 # Create the widgets we use.
-window = tk.Toplevel(TK_ROOT)
+window = tk.Toplevel(TK_ROOT, name='tooltipWin')
 window.withdraw()
 window.transient(master=TK_ROOT)
 window.overrideredirect(True)
@@ -31,6 +31,7 @@ window.resizable(False, False)
 
 context_label = tk.Label(
     window,
+    name='label',
     text='',
     font="TkSmallCaptionFont",
 

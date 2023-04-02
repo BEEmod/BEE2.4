@@ -956,7 +956,7 @@ def init_backup_settings() -> None:
 def init_toplevel() -> None:
     """Initialise the window as part of the BEE2."""
     global window
-    window = tk.Toplevel(TK_ROOT)
+    window = tk.Toplevel(TK_ROOT, name='backupWin')
     window.transient(TK_ROOT)
     window.withdraw()
     set_win_title(window, TransToken.ui('Backup/Restore Puzzles'))
