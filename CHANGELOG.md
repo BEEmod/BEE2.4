@@ -15,6 +15,9 @@
   corridors to be copied from that other style.
 * Make `addOverlay` properly permit options to use `$fixup` variables.
 * `properties.txt` for items is now optional, since most of these options can be set elsewhere.
+* `PosIsSolid` and `ReadSurfType` now have a `debug` option. When "Developer Mode" is enabled,
+  `info_target`s are generated to mark the locations being sampled, and the contents of this field
+  is copied into those as a comment to help identify them.
 
 ### Bugfixes:
 * Properly pick free port for error server.

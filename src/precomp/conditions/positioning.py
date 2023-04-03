@@ -115,6 +115,7 @@ def brush_at_loc(
 
     # Place info_targets to mark where we're checking.
     # These are hidden in a visgroup.
+    debug_info = kv['debug', '']
     if utils.DEV_MODE:
         try:
             [visgroup] = [vis for vis in inst.map.vis_tree if vis.name == 'TileAtLoc']
@@ -123,6 +124,7 @@ def brush_at_loc(
         first_trace = inst.map.create_ent('info_target', origin=pos, targetname=inst['targetname'])
         first_trace.vis_shown = False
         first_trace.hidden = True
+        first_trace.comments = debug_info
         first_trace.visgroup_ids.add(visgroup.id)
     else:
         visgroup = first_trace = None
@@ -137,6 +139,7 @@ def brush_at_loc(
             second_trace = inst.map.create_ent('info_target', origin=pos2, targetname=inst['targetname'])
             second_trace.vis_shown = False
             second_trace.hidden = True
+            second_trace.comments = debug_info
             second_trace.visgroup_ids.add(visgroup.id)
             group = EntityGroup(inst.map)
             inst.map.groups[group.id] = group
@@ -187,7 +190,7 @@ def brush_at_loc(
 
     LOGGER.debug('PosIsSolid check {} - {} @ {} = {}', pos, pos2, norm, tile_types)
     if first_trace is not None:
-        first_trace.comments = 'Tiles: ' + ' '.join([t.name for t in tile_types])
+        first_trace.comments += ' Tiles: ' + ' '.join([t.name for t in tile_types])
 
     if result_var:
         if tile_type.is_tile:
@@ -230,6 +233,9 @@ def flag_brush_at_loc(inst: Entity, flag: Keyvalues) -> bool:
     - If `gridPos` is true, the position will be snapped, so it aligns with
       the 128 grid (Useful with fizzler/light strip items).
     - `RemoveTile`: If set to `1`, the tile will be removed if found.
+    - `Debug`: If "Developer Mode" is enabled in BEE options, the location sampled will be marked
+      in the VMF. This key will be written into the comment field to assist with identifying the
+      relevant condition.
     """
     avg_type, both_colors, tile_types = brush_at_loc(inst, flag)
 
@@ -342,6 +348,9 @@ def res_brush_at_loc(inst: Entity, res: Keyvalues) -> None:
     - If `gridPos` is true, the position will be snapped so it aligns with
       the 128 grid (Useful with fizzler/light strip items).
     - `RemoveTile`: If set to `1`, the tile will be removed if found.
+    - `Debug`: If "Developer Mode" is enabled in BEE options, the location sampled will be marked
+      in the VMF. This key will be written into the comment field to assist with identifying the
+      relevant condition.
     """
     # Alias PosIsSolid to also be a result, for using the variable mode by itself.
     res['setVar'] = res['resultVar']
