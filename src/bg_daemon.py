@@ -11,6 +11,8 @@ from typing import Callable, Optional, Dict, Tuple, List
 
 from tkinter import ttk
 from tkinter.font import Font, families as tk_font_families
+
+from PIL import ImageTk
 from app import img, TK_ROOT, tk_tools
 import tkinter as tk
 import multiprocessing.connection
@@ -364,18 +366,19 @@ class SplashScreen(BaseLoadScreen):
         )
 
         # Now add shadows behind the text, and draw to the canvas.
-        splash, lrg_width, lrg_height = img.make_splash_screen(
+        splash_img = img.make_splash_screen(
             max(self.win.winfo_screenwidth() * 0.6, 500),
             max(self.win.winfo_screenheight() * 0.6, 500),
             base_height=len(self.stages) * 20,
             text1_bbox=self.lrg_canvas.bbox(text1),
             text2_bbox=self.lrg_canvas.bbox(text2),
         )
-        self.splash_img = splash  # Keep this alive
+        lrg_width, lrg_height = splash_img.size
+        self.splash_img = ImageTk.PhotoImage(image=splash_img)  # Keep this alive
         self.lrg_canvas.tag_lower(self.lrg_canvas.create_image(
             0, 0,
             anchor='nw',
-            image=splash,
+            image=self.splash_img,
         ))
 
         self.canvas = [

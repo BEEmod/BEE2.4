@@ -1161,7 +1161,7 @@ def make_splash_screen(
     base_height: int,
     text1_bbox: tuple[int, int, int, int],
     text2_bbox: tuple[int, int, int, int],
-) -> tuple[ImageTk.PhotoImage, int, int]:
+) -> Image.Image:
     """Create the splash screen image.
 
     This uses a random screenshot from the splash_screens directory.
@@ -1240,5 +1240,4 @@ def make_splash_screen(
     logo_img = Image.open(utils.install_path('images/BEE2/splash_logo.png'))
     draw.bitmap((10, 10), logo_img)
 
-    tk_img = ImageTk.PhotoImage(image=image)
-    return tk_img, image.width, image.height
+    return image
