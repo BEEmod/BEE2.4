@@ -558,22 +558,6 @@ class Handle:
             self._cached_pil = self._make_image()
         return self._cached_pil
 
-    def _load_tk(self, force: bool) -> ImageTk.PhotoImage:
-        """Load the TK image if required, then return it."""
-        if self._cached_tk is None or force:
-            # LOGGER.debug('Loading {}', self)
-            res = self._load_pil()
-            # Except for builtin types (icons), composite onto the PeTI BG.
-            if not self.alpha_result and res.mode == 'RGBA':
-                bg = Image.new('RGBA', res.size, BACKGROUNDS[_current_theme])
-                bg.alpha_composite(res)
-                res = bg.convert('RGB')
-                self._bg_composited = True
-            if self._cached_tk is None:
-                self._cached_tk = TK_BACKEND._get_img(res.width, res.height)
-            self._cached_tk.paste(res)
-        return self._cached_tk
-
     def _decref(self, ref: 'WidgetWeakRef | Handle') -> None:
         """A label was no longer set to this handle."""
         if self._force_loaded:
@@ -622,7 +606,7 @@ class Handle:
         """Scheduled to load images then apply to the labels."""
         await trio.to_thread.run_sync(self._load_pil)
         self._loading = False
-        tk_ico = self._load_tk(force)
+        tk_ico = TK_BACKEND._load_tk(self, force)
         for label_ref in self._users:
             if isinstance(label_ref, WeakRef):
                 label: tkImgWidgets | None = label_ref()
@@ -1004,7 +988,24 @@ class TKImages(UIImage):
         reloaded.
         """
         handle.force_load()
-        return handle._load_tk(force=False)
+        return self._load_tk(handle, force=False)
+
+    def _load_tk(self, handle: Handle, force: bool) -> ImageTk.PhotoImage:
+        """Load the TK image if required, then return it."""
+        image = self.tk_img.get(handle)
+        if image is None or force:
+            # LOGGER.debug('Loading {}', self)
+            res = handle._load_pil()
+            # Except for builtin types (icons), composite onto the PeTI BG.
+            if not handle.alpha_result and res.mode == 'RGBA':
+                bg = Image.new('RGBA', res.size, BACKGROUNDS[_current_theme])
+                bg.alpha_composite(res)
+                res = bg.convert('RGB')
+                self._bg_composited = True
+            if image is None:
+                image = self.tk_img[handle] =  TK_BACKEND._get_img(res.width, res.height)
+            image.paste(res)
+        return image
 
 
 # Todo: add actual initialisation of this.

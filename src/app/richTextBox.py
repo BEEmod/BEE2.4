@@ -6,6 +6,7 @@ from typing import Iterable, Iterator, TypeVar, Union, Tuple, Dict, Callable
 import webbrowser
 
 from app import tkMarkdown
+from app.img import TK_BACKEND
 from app.tkMarkdown import TextTag, TAG_HEADINGS
 from app.tk_tools import Cursors
 from transtoken import TransToken
@@ -195,9 +196,9 @@ class tkRichText(tkinter.Text):
                     super().insert('end', text, tags)
                 elif isinstance(block, tkMarkdown.Image):
                     super().insert('end', '\n')
-                    # TODO: Setup apply to handle this?
+                    # TODO: Setup apply to handle this properly, this breaks everything.
                     block.handle._force_loaded = True
-                    self.image_create('end', image=block.handle._load_tk(force=False))
+                    self.image_create('end', image=TK_BACKEND._load_tk(block.handle, False))
                     super().insert('end', '\n')
                 else:
                     raise ValueError('Unknown block {!r}?'.format(block))
