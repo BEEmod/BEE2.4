@@ -6,7 +6,6 @@ filename/options, so are cheap to create. Once applied to a UI widget,
 they are loaded in the background, then unloaded if removed from all widgets.
 """
 from __future__ import annotations
-
 from pathlib import Path
 from typing import Any, ClassVar, Dict, Iterator, Tuple, TypeVar, Union, Type
 from typing_extensions import Self, TypeAlias, Final
@@ -14,6 +13,7 @@ from collections.abc import Sequence, Mapping
 from weakref import ref as WeakRef
 from tkinter import ttk
 import tkinter as tk
+import abc
 import itertools
 import logging
 import functools
@@ -54,9 +54,6 @@ _handles: dict[tuple[Type[Handle], tuple, int, int], Handle] = {}
 # Matches widgets to the handle they use.
 _wid_tk: dict[WidgetWeakRef, Handle] = {}
 
-# TK images have unique IDs, so preserve discarded image objects.
-_unused_tk_img: dict[tuple[int, int], list[ImageTk.PhotoImage]] = {}
-
 LOGGER = srctools.logger.get_logger('img')
 FSYS_BUILTIN = RawFileSystem(str(utils.install_path('images')))
 PACK_SYSTEMS: dict[str, FileSystem] = {}
@@ -66,6 +63,9 @@ logging.getLogger('PIL').setLevel(logging.INFO)
 
 # The currently selected theme for images.
 _current_theme: Theme = Theme.LIGHT
+
+# The UIs we have active. Should only be one.
+_UIS: list[UIImage] = []
 
 # Colour of the palette item background
 PETI_ITEM_BG: Final = (229, 233, 233)
@@ -132,30 +132,6 @@ def tuple_size(size: tuple[int, int] | int) -> tuple[int, int]:
     if isinstance(size, tuple):
         return size
     return size, size
-
-
-def _get_tk_img(width: int, height: int) -> ImageTk.PhotoImage:
-    """Recycle an old image, or construct a new one."""
-    if not width:
-        width = 16
-    if not height:
-        height = 16
-
-    # Use setdefault and pop so each step is atomic.
-    img_list = _unused_tk_img.setdefault((width, height), [])
-    try:
-        img = img_list.pop()
-    except IndexError:
-        img = ImageTk.PhotoImage('RGBA', (width, height))
-    return img
-
-
-def _discard_tk_img(img: ImageTk.PhotoImage | None) -> None:
-    """Store an unused image so it can be reused."""
-    if img is not None:
-        # Use setdefault and append so each step is atomic.
-        img_list = _unused_tk_img.setdefault((img.width(), img.height()), [])
-        img_list.append(img)
 
 
 # Special paths which map to various images.
@@ -596,7 +572,7 @@ class Handle:
                 res = bg.convert('RGB')
                 self._bg_composited = True
             if self._cached_tk is None:
-                self._cached_tk = _get_tk_img(res.width, res.height)
+                self._cached_tk = _TK_BACKEND._get_img(res.width, res.height)
             self._cached_tk.paste(res)
         return self._cached_tk
 
@@ -667,7 +643,7 @@ class Handle:
             await trio.sleep(5)
         # We weren't cancelled and are empty, cleanup.
         if not scope.cancel_called and self._loading is not None and not self._users:
-            _discard_tk_img(self._cached_tk)
+            _TK_BACKEND._discard_img(self._cached_tk)
             self._cached_tk = self._cached_pil = None
 
 
@@ -974,6 +950,51 @@ class ImgTextOverlay(Handle):
     def _is_themed(self) -> bool:
         """This includes the background."""
         return True
+
+
+class UIImage(abc.ABC):
+    """Interface for the image code specific to a UI library."""
+
+
+class TKImages(UIImage):
+    """Tk-specific image code."""
+    # TK images have unique IDs, so preserve discarded image objects.
+    unused_img: dict[tuple[int, int], list[ImageTk.PhotoImage]]
+
+    # Maps a handle to the current image used for it.
+    tk_img: dict[Handle, ImageTk.PhotoImage]
+
+    def __init__(self) -> None:
+        """Set up the TK code."""
+        self.unused_img = {}
+        self.tk_img = {}
+
+    def _get_img(self, width: int, height: int) -> ImageTk.PhotoImage:
+        """Recycle an old image, or construct a new one."""
+        if not width:
+            width = 16
+        if not height:
+            height = 16
+
+        # Use setdefault and pop so each step is atomic.
+        img_list = self.unused_img.setdefault((width, height), [])
+        try:
+            img = img_list.pop()
+        except IndexError:
+            img = ImageTk.PhotoImage('RGBA', (width, height))
+        return img
+
+    def _discard_img(self, img: ImageTk.PhotoImage | None) -> None:
+        """Store an unused image so it can be reused."""
+        if img is not None:
+            # Use setdefault and append so each step is atomic.
+            img_list = self.unused_img.setdefault((img.width(), img.height()), [])
+            img_list.append(img)
+
+
+# Todo: add actual initialisation of this.
+_TK_BACKEND = TKImages()
+_UIS.append(_TK_BACKEND)
 
 
 def _label_destroyed(ref: WeakRef[tkImgWidgetsT]) -> None:
