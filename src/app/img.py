@@ -643,8 +643,9 @@ class Handle:
             await trio.sleep(5)
         # We weren't cancelled and are empty, cleanup.
         if not scope.cancel_called and self._loading is not None and not self._users:
-            _TK_BACKEND._discard_img(self._cached_tk)
-            self._cached_tk = self._cached_pil = None
+            for ui in _UIS:
+                ui.ui_clear_handle(self)
+            self._cached_pil = None
 
 
 @attrs.define(eq=False)
@@ -954,6 +955,9 @@ class ImgTextOverlay(Handle):
 
 class UIImage(abc.ABC):
     """Interface for the image code specific to a UI library."""
+    def ui_clear_handle(self, handle: Handle) -> None:
+        """Clear cached images for this handle."""
+        raise NotImplementedError
 
 
 class TKImages(UIImage):
@@ -991,6 +995,9 @@ class TKImages(UIImage):
             img_list = self.unused_img.setdefault((img.width(), img.height()), [])
             img_list.append(img)
 
+    def ui_clear_handle(self, handle: Handle) -> None:
+        """Clear cached TK images for this handle."""
+        self._discard_img(self.tk_img.pop(handle, None))
 
 # Todo: add actual initialisation of this.
 _TK_BACKEND = TKImages()
