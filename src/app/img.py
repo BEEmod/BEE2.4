@@ -64,8 +64,8 @@ logging.getLogger('PIL').setLevel(logging.INFO)
 # The currently selected theme for images.
 _current_theme: Theme = Theme.LIGHT
 
-# The UIs we have active. Should only be one.
-_UIS: list[UIImage] = []
+# The implementation for the UI. This allows this module to be library-independent.
+_UI_IMPL: UIImage | None = None
 
 # Colour of the palette item background
 PETI_ITEM_BG: Final = (229, 233, 233)
@@ -142,6 +142,11 @@ PATH_NONE = utils.PackagePath('<special>', 'none')
 PATH_BG = utils.PackagePath('<special>', 'bg')
 PATH_BLACK = utils.PackagePath('<color>', '000')
 PATH_WHITE = utils.PackagePath('<color>', 'fff')
+
+
+def current_theme() -> Theme:
+    """Retrieve the currently selected theme."""
+    return _current_theme
 
 
 def _load_file(
@@ -625,8 +630,8 @@ class Handle:
             await trio.sleep(5)
         # We weren't cancelled and are empty, cleanup.
         if not scope.cancel_called and self._loading is not None and not self._users:
-            for ui in _UIS:
-                ui.ui_clear_handle(self)
+            if _UI_IMPL is not None:
+                _UI_IMPL.ui_clear_handle(self)
             self._cached_pil = None
 
 
@@ -937,80 +942,18 @@ class ImgTextOverlay(Handle):
 
 class UIImage(abc.ABC):
     """Interface for the image code specific to a UI library."""
+    def ui_load_handle(self, handle: Handle) -> None:
+        """This handle is being loaded, create the image."""
+        raise NotImplementedError
+
     def ui_clear_handle(self, handle: Handle) -> None:
         """Clear cached images for this handle."""
         raise NotImplementedError
 
 
-class TKImages(UIImage):
-    """Tk-specific image code."""
-    # TK images have unique IDs, so preserve discarded image objects.
-    unused_img: dict[tuple[int, int], list[ImageTk.PhotoImage]]
-
-    # Maps a handle to the current image used for it.
-    tk_img: dict[Handle, ImageTk.PhotoImage]
-
-    def __init__(self) -> None:
-        """Set up the TK code."""
-        self.unused_img = {}
-        self.tk_img = {}
-
-    def _get_img(self, width: int, height: int) -> ImageTk.PhotoImage:
-        """Recycle an old image, or construct a new one."""
-        if not width:
-            width = 16
-        if not height:
-            height = 16
-
-        # Use setdefault and pop so each step is atomic.
-        img_list = self.unused_img.setdefault((width, height), [])
-        try:
-            img = img_list.pop()
-        except IndexError:
-            img = ImageTk.PhotoImage('RGBA', (width, height))
-        return img
-
-    def _discard_img(self, img: ImageTk.PhotoImage | None) -> None:
-        """Store an unused image so it can be reused."""
-        if img is not None:
-            # Use setdefault and append so each step is atomic.
-            img_list = self.unused_img.setdefault((img.width(), img.height()), [])
-            img_list.append(img)
-
-    def ui_clear_handle(self, handle: Handle) -> None:
-        """Clear cached TK images for this handle."""
-        self._discard_img(self.tk_img.pop(handle, None))
-
-    def sync_load(self, handle: Handle) -> ImageTk.PhotoImage:
-        """Load the TK image if required immediately, then return it.
-
-        Only available on BUILTIN type images since they cannot then be
-        reloaded.
-        """
-        handle.force_load()
-        return self._load_tk(handle, force=False)
-
-    def _load_tk(self, handle: Handle, force: bool) -> ImageTk.PhotoImage:
-        """Load the TK image if required, then return it."""
-        image = self.tk_img.get(handle)
-        if image is None or force:
-            # LOGGER.debug('Loading {}', self)
-            res = handle._load_pil()
-            # Except for builtin types (icons), composite onto the PeTI BG.
-            if not handle.alpha_result and res.mode == 'RGBA':
-                bg = Image.new('RGBA', res.size, BACKGROUNDS[_current_theme])
-                bg.alpha_composite(res)
-                res = bg.convert('RGB')
-                self._bg_composited = True
-            if image is None:
-                image = self.tk_img[handle] =  TK_BACKEND._get_img(res.width, res.height)
-            image.paste(res)
-        return image
-
-
 # Todo: add actual initialisation of this.
-TK_BACKEND = TKImages()
-_UIS.append(TK_BACKEND)
+from ui_tk.img import TKImages
+_UI_IMPL = TK_BACKEND = TKImages()
 
 
 def _label_destroyed(ref: WeakRef[tkImgWidgetsT]) -> None:
