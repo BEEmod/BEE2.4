@@ -154,7 +154,7 @@ class TKImages(img.UIImage):
                 bg = Image.new('RGBA', res.size, img.BACKGROUNDS[img.current_theme()])
                 bg.alpha_composite(res)
                 res = bg.convert('RGB')
-                self._bg_composited = True
+                handle._bg_composited = True
             if image is None:
                 image = self.tk_img[handle] = self._get_img(res.width, res.height)
             image.paste(res)
