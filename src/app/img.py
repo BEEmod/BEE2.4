@@ -7,7 +7,7 @@ they are loaded in the background, then unloaded if removed from all widgets.
 """
 from __future__ import annotations
 from pathlib import Path
-from typing import Any, ClassVar, Dict, Iterator, Tuple, TypeVar, Union, Type
+from typing import Any, ClassVar, Dict, Iterable, Iterator, Tuple, TypeVar, Union, Type
 from typing_extensions import Self, TypeAlias, Final
 from collections.abc import Sequence, Mapping
 from weakref import ref as WeakRef
@@ -950,46 +950,20 @@ class UIImage(abc.ABC):
         """Called when this handle is reloading, and should update all its widgets."""
         raise NotImplementedError
 
+    async def ui_anim_task(self, load_handles: Iterable[tuple[Handle, list[Handle]]]) -> None:
+        """Cycle loading icons."""
+        raise NotImplementedError
+
 
 # Todo: add actual initialisation of this.
 from ui_tk.img import TKImages
 _UI_IMPL = TK_BACKEND = TKImages()
 
 
-def _label_destroyed(ref: WeakRef[tkImgWidgetsT]) -> None:
-    """Finaliser for _wid_tk keys.
-
-    Removes them from the dict, and decreases the usage count on the handle.
-    """
-    try:
-        handle = _wid_tk.pop(ref)
-    except (KeyError, TypeError, NameError):
-        # Interpreter could be shutting down and deleted globals, or we were
-        # called twice, etc. Just ignore.
-        pass
-    else:
-        # noinspection PyProtectedMember
-        handle._decref(ref)
-
-
 # noinspection PyProtectedMember
-async def _spin_load_icons() -> None:
-    """Cycle loading icons."""
-    for i in itertools.cycle(LOAD_FRAME_IND):
-        await trio.sleep(0.125)
-        for handle, frames in _load_handles.values():
-            # This will keep the frame loaded, so next time it's cheap.
-            handle._cached_pil = frames[i].get_pil()
-            if handle._cached_tk is not None:
-                # This updates the TK widget directly.
-                handle._cached_tk.paste(handle._load_pil())
-            # Otherwise, this isn't being used.
-
-
-# noinspection PyProtectedMember
-async def init(filesystems: Mapping[str, FileSystem]) -> None:
+async def init(filesystems: Mapping[str, FileSystem], implementation: UIImage) -> None:
     """Load in the filesystems used in package and start the background loading."""
-    global _load_nursery
+    global _load_nursery, _UI_IMPL
 
     PACK_SYSTEMS.clear()
     for pak_id, sys in filesystems.items():
@@ -999,13 +973,15 @@ async def init(filesystems: Mapping[str, FileSystem]) -> None:
             (sys, 'resources/materials/models/props_map_editor/'),
         )
 
+    _UI_IMPL = implementation
+
     async with trio.open_nursery() as _load_nursery:
         LOGGER.debug('Early loads: {}', _early_loads)
         while _early_loads:
             handle = _early_loads.pop()
             if handle._users:
                 _load_nursery.start_soon(Handle._load_task, handle, False)
-        _load_nursery.start_soon(_spin_load_icons)
+        _load_nursery.start_soon(_UI_IMPL.anim_task, _load_handles)
         await trio.sleep_forever()
 
 

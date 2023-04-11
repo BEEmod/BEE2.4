@@ -1,15 +1,19 @@
 """Image integrations for TKinter."""
 from __future__ import annotations
 
+import itertools
+
 import attrs
-from typing import TypeAlias, Union
+import trio
+from typing import Iterable, TypeVar, Union
+from typing_extensions import TypeAlias
 from tkinter import ttk
 import tkinter as tk
 
 from PIL import Image, ImageTk
 from srctools.logger import get_logger
 
-from app import img
+from app import TK_ROOT, img
 
 # Widgets with an image attribute that can be set.
 tkImgWidgets: TypeAlias = Union[tk.Label, ttk.Label, tk.Button, ttk.Button]
@@ -109,6 +113,21 @@ class TKImages(img.UIImage):
                 image = self.tk_img[handle] = self._get_img(res.width, res.height)
             image.paste(res)
         return image
+
+    async def ui_anim_task(self, load_handles: Iterable[tuple[img.Handle, list[img.Handle]]]) -> None:
+        """Cycle loading icons."""
+        for i in itertools.cycle(img.LOAD_FRAME_IND):
+            await trio.sleep(0.125)
+            for handle, frames in load_handles:
+                # This will keep the frame loaded, so next time it's cheap.
+                handle._cached_pil = frames[i].get_pil()
+                try:
+                    tk_img = self.tk_img[handle]
+                except KeyError:
+                    pass  # This isn't being used.
+                else:
+                    # This updates the TK widget directly.
+                    tk_img.paste(handle._load_pil())
 
     def ui_load_users(self, handle: img.Handle, force: bool) -> None:
         """Load this handle into the widgets using it."""

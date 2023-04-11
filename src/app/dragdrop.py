@@ -822,7 +822,8 @@ async def test() -> None:
                 packages.LOADED,
                 loc,
             )
-    background_run(img.init, packages.PACKAGE_SYS)
+    from ui_tk.img import TKImages
+    background_run(img.init, packages.PACKAGE_SYS,  img.TK_BACKEND)
     background_run(sound.sound_task)
     print('Done.')
 
