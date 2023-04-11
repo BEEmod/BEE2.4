@@ -7,6 +7,7 @@ from tkinter import ttk
 
 from packages.widgets import SliderOptions, UpdateFunc
 from app import itemconfig
+from ui_tk.img import TKImages
 
 
 def decimal_points(num: float) -> int:
@@ -21,7 +22,8 @@ def decimal_points(num: float) -> int:
 
 @itemconfig.ui_single_wconf(SliderOptions)
 async def widget_slider(
-    parent: tk.Widget, on_changed: itemconfig.SingleChangeFunc, conf: SliderOptions,
+    parent: tk.Widget, tk_img: TKImages,
+    on_changed: itemconfig.SingleChangeFunc, conf: SliderOptions,
 ) -> tuple[tk.Widget, UpdateFunc]:
     """Provides a slider for setting a number in a range."""
 

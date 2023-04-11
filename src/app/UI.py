@@ -19,7 +19,6 @@ from loadScreen import main_loader as loader
 import packages
 from packages.item import ItemVariant, InheritKind
 import utils
-import consts
 from config.gen_opts import GenOptions, AfterExport
 from config.last_sel import LastSelected
 from config.windows import WindowState
@@ -274,7 +273,7 @@ class Item:
 
 class PalItem:
     """The icon and associated data for a single subitem."""
-    def __init__(self, frame, item: Item, sub: int, is_pre: bool) -> None:
+    def __init__(self, frame: tk.Misc, item: Item, sub: int, is_pre: bool) -> None:
         """Create a label to show an item onscreen."""
         self.item = item
         self.subKey = sub
@@ -1383,6 +1382,7 @@ async def init_windows(tk_img: TKImages) -> None:
 
     menu_bar = MenuBar(
         TK_ROOT,
+        tk_img=tk_img,
         quit_app=quit_application,
         export=export,
     )
@@ -1499,6 +1499,7 @@ async def init_windows(tk_img: TKImages) -> None:
 
     pal_ui = paletteUI.PaletteUI(
         pal_frame, menu_bar.pal_menu,
+        tk_img=tk_img,
         cmd_clear=pal_clear,
         cmd_shuffle=pal_shuffle,
         get_items=lambda: {
@@ -1539,7 +1540,7 @@ async def init_windows(tk_img: TKImages) -> None:
     loader.step('UI', 'options')
 
     async with trio.open_nursery() as nurs:
-        nurs.start_soon(itemconfig.make_pane, frames['toolMenu'], menu_bar.view_menu, flow_picker)
+        nurs.start_soon(itemconfig.make_pane, frames['toolMenu'], menu_bar.view_menu, tk_img, flow_picker)
     loader.step('UI', 'itemvar')
 
     async with trio.open_nursery() as nurs:
@@ -1579,7 +1580,7 @@ async def init_windows(tk_img: TKImages) -> None:
     voiceEditor.init_widgets()
     await trio.sleep(0)
     loader.step('UI', 'voiceline')
-    contextWin.init_widgets()
+    contextWin.init_widgets(tk_img)
     loader.step('UI', 'contextwin')
     await optionWindow.init_widgets(
         unhide_palettes=pal_ui.reset_hidden_palettes,

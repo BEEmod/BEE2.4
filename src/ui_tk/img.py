@@ -109,7 +109,7 @@ class TKImages(img.UIImage):
             if user.cur_handle is image:
                 # Unchanged.
                 return widget
-            elif user.cur_handle is not None:
+            if user.cur_handle is not None:
                 user.cur_handle._decref(user)
         image._incref(user)
         try:

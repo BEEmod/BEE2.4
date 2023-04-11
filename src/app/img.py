@@ -7,10 +7,9 @@ they are loaded in the background, then unloaded if removed from all widgets.
 """
 from __future__ import annotations
 from pathlib import Path
-from typing import Any, ClassVar, Dict, Iterable, Iterator, Tuple, TypeVar, Union, Type
-from typing_extensions import Self, TypeAlias, Final
+from typing import Any, ClassVar, Dict, Iterable, Iterator, Tuple, Type
+from typing_extensions import Self, Final
 from collections.abc import Sequence, Mapping
-from tkinter import ttk
 import tkinter as tk
 import abc
 import logging
@@ -29,15 +28,6 @@ from app import TK_ROOT
 from consts import Theme
 import utils
 
-# Widgets with an image attribute that can be set.
-tkImgWidgets: TypeAlias = Union[tk.Label, ttk.Label, tk.Button, ttk.Button]
-tkImgWidgetsT = TypeVar(
-    'tkImgWidgetsT',
-    tk.Label, ttk.Label,
-    Union[tk.Label, ttk.Label],
-    tk.Button, ttk.Button,
-    Union[tk.Button, ttk.Button],
-)
 
 # Used to keep track of the used handles, so we can deduplicate them.
 _handles: dict[tuple[Type[Handle], tuple, int, int], Handle] = {}
@@ -557,7 +547,7 @@ class Handle(User):
             self._cached_pil = self._make_image()
         return self._cached_pil
 
-    def _decref(self, ref: 'WidgetWeakRef | Handle') -> None:
+    def _decref(self, ref: User) -> None:
         """A label was no longer set to this handle."""
         if self._force_loaded:
             return
@@ -572,7 +562,7 @@ class Handle(User):
             self._cancel_cleanup = trio.CancelScope()
             _load_nursery.start_soon(self._cleanup_task, self._cancel_cleanup)
 
-    def _incref(self, ref: 'WidgetWeakRef | Handle') -> None:
+    def _incref(self, ref: User) -> None:
         """Add a label to the list of those controlled by us."""
         if self._force_loaded:
             return
@@ -941,9 +931,8 @@ class UIImage(abc.ABC):
         raise NotImplementedError
 
 
-# Todo: add actual initialisation of this.
-from ui_tk.img import TKImages
-TK_BACKEND = TKImages()
+# Todo: remove this import
+from ui_tk.img import TK_IMG as _TK_BACKEND
 
 
 # noinspection PyProtectedMember
@@ -1000,13 +989,13 @@ def refresh_all() -> None:
 
 
 # noinspection PyProtectedMember
-def apply(widget: tkImgWidgetsT, img: Handle | None) -> tkImgWidgetsT:
+def apply(widget, img: Handle | None):
     """Set the image in a widget.
 
     This tracks the widget, so later reloads will affect the widget.
     If the image is None, it is instead unset.
     """
-    TK_BACKEND.apply(widget, img)
+    _TK_BACKEND.apply(widget, img)
     return widget
 
 

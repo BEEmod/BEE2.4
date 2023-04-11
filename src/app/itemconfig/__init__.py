@@ -29,7 +29,7 @@ from packages.widgets import (
     WidgetType,
     WidgetTypeWithConf, nop_update,
 )
-from ui_tk.img import TK_IMG
+from ui_tk.img import TKImages
 from ..SubPane import SubPane
 
 
@@ -47,11 +47,11 @@ MultiChangeFunc: TypeAlias = Callable[[TimerNum], SingleChangeFunc]
 # The widget to be installed should be returned, and a callback to refresh the UI (which is called immediately).
 # If wide is set, the widget is put into a labelframe, instead of having a label to the side.
 SingleCreateFunc: TypeAlias = Callable[
-    [tk.Widget, SingleChangeFunc, OptConfT],
+    [tk.Widget, TKImages, SingleChangeFunc, OptConfT],
     Awaitable[Tuple[tk.Widget, UpdateFunc]]
 ]
 SingleCreateNoConfFunc: TypeAlias = Callable[
-    [tk.Widget, SingleChangeFunc],
+    [tk.Widget, TKImages, SingleChangeFunc],
     Awaitable[Tuple[tk.Widget, UpdateFunc]]
 ]
 
@@ -59,11 +59,11 @@ SingleCreateNoConfFunc: TypeAlias = Callable[
 # The widgets should insert themselves into the parent frame.
 # It then yields timer_val, update-func pairs.
 MultiCreateFunc: TypeAlias = Callable[
-    [tk.Widget, Iterable[TimerNum], MultiChangeFunc, OptConfT],
+    [tk.Widget, TKImages, Iterable[TimerNum], MultiChangeFunc, OptConfT],
     AsyncIterator[Tuple[TimerNum, UpdateFunc]]
 ]
 MultiCreateNoConfFunc: TypeAlias = Callable[
-    [tk.Widget, Iterable[TimerNum], MultiChangeFunc],
+    [tk.Widget, TKImages, Iterable[TimerNum], MultiChangeFunc],
     AsyncIterator[Tuple[TimerNum, UpdateFunc]]
 ]
 
@@ -105,11 +105,11 @@ def ui_single_no_conf(kind: WidgetType) -> Callable[[SingleCreateNoConfFunc], Si
     def deco(func: SingleCreateNoConfFunc) -> SingleCreateNoConfFunc:
         """Do the registration."""
         def wrapper(
-            parent: tk.Widget, on_changed: SingleChangeFunc, conf: None,
+            parent: tk.Widget, tk_img: TKImages, on_changed: SingleChangeFunc, conf: None,
         ) -> Awaitable[Tuple[tk.Widget, UpdateFunc]]:
             """Don't pass the config through to the UI function."""
             assert conf is None
-            return func(parent, on_changed)
+            return func(parent, tk_img, on_changed)
 
         if isinstance(kind, WidgetTypeWithConf):
             raise TypeError('Widget type has config, but singular function does not!')
@@ -134,12 +134,12 @@ def ui_multi_no_conf(kind: WidgetType) -> Callable[[MultiCreateNoConfFunc], Mult
     def deco(func: MultiCreateNoConfFunc) -> MultiCreateNoConfFunc:
         """Do the registration."""
         def wrapper(
-            parent: tk.Widget, timer: Iterable[TimerNum],
+            parent: tk.Widget, tk_img: TKImages, timer: Iterable[TimerNum],
             on_changed: MultiChangeFunc, conf: None,
         ) -> AsyncIterator[Tuple[TimerNum, UpdateFunc]]:
             """Don't pass the config through to the UI function."""
             assert conf is None
-            return func(parent, timer, on_changed)
+            return func(parent, tk_img, timer, on_changed)
 
         if isinstance(kind, WidgetTypeWithConf):
             raise TypeError('Widget type has config, but multi function does not!')
@@ -148,7 +148,7 @@ def ui_multi_no_conf(kind: WidgetType) -> Callable[[MultiCreateNoConfFunc], Mult
     return deco
 
 
-async def create_group(master: ttk.Frame, group: ConfigGroup) -> ttk.Frame:
+async def create_group(master: ttk.Frame, tk_img: TKImages, group: ConfigGroup) -> ttk.Frame:
     """Create the widgets for a group."""
     frame = ttk.Frame(master)
     frame.columnconfigure(0, weight=1)
@@ -182,7 +182,7 @@ async def create_group(master: ttk.Frame, group: ConfigGroup) -> ttk.Frame:
             create_func = _UI_IMPL_SINGLE[s_wid.kind]
             try:
                 with logger.context(f'{group.id}:{s_wid.id}'):
-                    widget, s_wid.ui_cback = await create_func(wid_frame, s_wid.on_changed, s_wid.config)
+                    widget, s_wid.ui_cback = await create_func(wid_frame, tk_img, s_wid.on_changed, s_wid.config)
             except Exception:
                 LOGGER.exception('Could not construct widget {}.{}', group.id, s_wid.id)
                 continue
@@ -226,7 +226,7 @@ async def create_group(master: ttk.Frame, group: ConfigGroup) -> ttk.Frame:
         try:
             with logger.context(f'{group.id}:{m_wid.id}'):
                 async for tim_val, update_cback in multi_func(
-                    wid_frame,
+                    wid_frame, tk_img,
                     m_wid.values.keys(),
                     m_wid.get_on_changed,
                     m_wid.config,
@@ -250,7 +250,12 @@ async def create_group(master: ttk.Frame, group: ConfigGroup) -> ttk.Frame:
 STYLEVAR_GROUP = ConfigGroup('_STYLEVAR', TransToken.ui('Style Properties'), '', [], [])
 
 
-async def make_pane(tool_frame: tk.Frame, menu_bar: tk.Menu, update_item_vis: Callable[[], None]) -> None:
+async def make_pane(
+    tool_frame: tk.Frame,
+    menu_bar: tk.Menu,
+    tk_img: TKImages,
+    update_item_vis: Callable[[], None],
+) -> None:
     """Create the item properties pane, with the widgets it uses.
 
     update_item_vis is passed through to the stylevar pane.
@@ -384,7 +389,7 @@ async def make_pane(tool_frame: tk.Frame, menu_bar: tk.Menu, update_item_vis: Ca
             if new_group not in groups_being_created:
                 async def task() -> None:
                     """Create the widgets, then display."""
-                    group_to_frame[new_group] = await create_group(canvas_frame, new_group)
+                    group_to_frame[new_group] = await create_group(canvas_frame, tk_img,new_group)
                     groups_being_created.discard(new_group)
                     await display_group(new_group)
 
@@ -446,6 +451,7 @@ def widget_timer_generic(widget_func: SingleCreateFunc[ConfT]) -> MultiCreateFun
     """For widgets without a multi version, do it generically."""
     async def generic_func(
         parent: tk.Widget,
+        tk_img: TKImages,
         timers: Iterable[TimerNum],
         get_on_changed: MultiChangeFunc,
         conf: ConfT,
@@ -458,7 +464,9 @@ def widget_timer_generic(widget_func: SingleCreateFunc[ConfT]) -> MultiCreateFun
             label = ttk.Label(parent)
             localisation.set_text(label, TRANS_COLON.format(text=timer_disp))
             label.grid(row=row, column=0)
-            widget, update = await widget_func(parent, get_on_changed(tim_val), conf)
+            widget, update = await widget_func(
+                parent, tk_img, get_on_changed(tim_val), conf,
+            )
             yield tim_val, update
             widget.grid(row=row, column=1, sticky='ew')
 
@@ -487,7 +495,11 @@ def widget_sfx(*args) -> None:
 
 
 @ui_single_wconf(ItemVariantConf)
-async def widget_item_variant(parent: tk.Widget, _: SingleChangeFunc, conf: ItemVariantConf) -> Tuple[tk.Widget, UpdateFunc]:
+async def widget_item_variant(
+    parent: tk.Widget, tk_img: TKImages,
+    _: SingleChangeFunc,
+    conf: ItemVariantConf,
+) -> Tuple[tk.Widget, UpdateFunc]:
     """Special widget - chooses item variants.
 
     This replicates the box on the right-click menu for items.
@@ -501,7 +513,7 @@ async def widget_item_variant(parent: tk.Widget, _: SingleChangeFunc, conf: Item
 
     if item.id == 'ITEM_BEE2_SIGNAGE':
         # Even more special case, display the "configure signage" button.
-        return await signage_ui.init_widgets(parent, TK_IMG), nop_update
+        return await signage_ui.init_widgets(parent, tk_img), nop_update
 
     version_lookup: Optional[List[str]] = None
 

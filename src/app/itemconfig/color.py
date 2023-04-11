@@ -11,6 +11,7 @@ from app import img, tk_tools
 from app import itemconfig
 from app.tooltip import add_tooltip
 from app.localisation import TransToken
+from ui_tk.img import TKImages
 
 
 TRANS_SELECT_TITLE = TransToken.ui('Choose a Color')
@@ -18,7 +19,7 @@ TRANS_SELECT_TITLE = TransToken.ui('Choose a Color')
 
 @itemconfig.ui_single_no_conf(KIND_COLOR)
 async def widget_color_single(
-    parent: tk.Widget,
+    parent: tk.Widget, tk_img: TKImages,
     on_changed: itemconfig.SingleChangeFunc,
 ) -> tuple[tk.Widget, UpdateFunc]:
     """Provides a colour swatch for specifying colours.
@@ -27,24 +28,29 @@ async def widget_color_single(
     """
     # Isolates the swatch so it doesn't resize.
     frame = ttk.Frame(parent)
-    swatch, update = make_color_swatch(frame, on_changed, 24)
+    swatch, update = make_color_swatch(frame, tk_img, on_changed, 24)
     swatch.grid(row=0, column=0, sticky='w')
     return frame, update
 
 
 @itemconfig.ui_multi_no_conf(KIND_COLOR)
 async def widget_color_multi(
-    parent: tk.Widget, timers: Iterable[itemconfig.TimerNum], get_on_changed: itemconfig.MultiChangeFunc,
+    parent: tk.Widget, tk_img: TKImages,
+    timers: Iterable[itemconfig.TimerNum],
+    get_on_changed: itemconfig.MultiChangeFunc,
 ):
     """For color swatches, display in a more compact form."""
     for row, column, tim_val, tim_text in itemconfig.multi_grid(timers):
-        swatch, update = make_color_swatch(parent, get_on_changed(tim_val), 16)
+        swatch, update = make_color_swatch(parent, tk_img,get_on_changed(tim_val), 16)
         swatch.grid(row=row, column=column)
         add_tooltip(swatch, tim_text, delay=0)
         yield tim_val, update
 
 
-def make_color_swatch(parent: tk.Widget, on_changed: itemconfig.SingleChangeFunc, size: int) -> tuple[tk.Widget, UpdateFunc]:
+def make_color_swatch(
+    parent: tk.Widget, tk_img: TKImages,
+    on_changed: itemconfig.SingleChangeFunc, size: int,
+) -> tuple[tk.Widget, UpdateFunc]:
     """Make a single swatch."""
     r = g = b = 128
 
@@ -64,7 +70,7 @@ def make_color_swatch(parent: tk.Widget, on_changed: itemconfig.SingleChangeFunc
             # On 3.8, these are floats.
             rf, gf, bf = new_color
             r, g, b = parsed = int(rf), int(gf), int(bf)
-            img.apply(swatch, img.Handle.color(parsed, size, size))
+            tk_img.apply(swatch, img.Handle.color(parsed, size, size))
             on_changed(f'{r} {g} {b}')
 
     tk_tools.bind_leftclick(swatch, open_win)
@@ -73,6 +79,6 @@ def make_color_swatch(parent: tk.Widget, on_changed: itemconfig.SingleChangeFunc
         """Update the image when changed."""
         nonlocal r, g, b
         r, g, b = parsed = parse_color(value)
-        img.apply(swatch, img.Handle.color(parsed, size, size))
+        tk_img.apply(swatch, img.Handle.color(parsed, size, size))
 
     return swatch, update_image

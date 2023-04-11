@@ -81,7 +81,7 @@ async def init_app() -> None:
 
     LOGGER.info('Initialising UI...')
     async with trio.open_nursery() as nurs:
-        nurs.start_soon(UI.init_windows)  # create all windows
+        nurs.start_soon(UI.init_windows, TK_IMG)  # create all windows
     LOGGER.info('UI initialised!')
 
     if Tracer.slow:

@@ -19,6 +19,7 @@ from transtoken import TransToken
 from app.tooltip import add_tooltip
 from app import img, TK_ROOT, localisation
 from app import tk_tools
+from ui_tk.img import TK_IMG
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -207,13 +208,13 @@ def add_tabs() -> None:
             notebook.tab(
                 tab,
                 compound='image',
-                image=img.TK_BACKEND.sync_load(IMG_MID),
+                image=TK_IMG.sync_load(IMG_MID),
                 )
         if tab.nb_type is TabTypes.RESPONSE:
             notebook.tab(
                 tab,
                 compound=RIGHT,
-                image=img.TK_BACKEND.sync_load(IMG_RESP),
+                image=TK_IMG.sync_load(IMG_RESP),
                 # i18n: 'response' tab name, should be short.
                 text=str(TransToken.ui('Resp')),
             )

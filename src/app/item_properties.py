@@ -13,6 +13,7 @@ import srctools.logger
 
 from config.item_defaults import ItemDefault
 from app import img, localisation, tk_tools, sound, TK_ROOT, tooltip
+from ui_tk.img import TKImages
 from editoritems import ItemPropKind, Item
 import editoritems_props as all_props
 from transtoken import TransToken
@@ -21,6 +22,8 @@ import config
 
 
 __all__ = ['PropertyWindow']
+
+
 LOGGER = srctools.logger.get_logger(__name__)
 TRANS_TITLE = TransToken.ui('BEE2 - {item}')
 TRANS_SUBTITLE = TransToken.ui('Settings for "{item}"')
@@ -42,7 +45,7 @@ class PropGroup:
     """A group of widgets for modifying one or more props."""
     LARGE: ClassVar[bool] = False
     label: ttk.Label
-    def __init__(self, parent: ttk.Frame, label_text: TransToken) -> None:
+    def __init__(self, parent: ttk.Frame, tk_img: TKImages, label_text: TransToken) -> None:
         self.frame = tk.Frame(parent)
         self.label = ttk.Label(parent)
         localisation.set_text(self.label, label_text)
@@ -63,13 +66,13 @@ class PropGroup:
         """Set a user tooltip on this group."""
 
 # The prop kinds that require this group, then a function to create it.
-PropGroupFactory: TypeAlias = Tuple[List[ItemPropKind], Callable[[ttk.Frame], PropGroup]]
+PropGroupFactory: TypeAlias = Tuple[List[ItemPropKind], Callable[[ttk.Frame, TKImages], PropGroup]]
 
 
 class BoolPropGroup(PropGroup):
     """A property controlling a regular boolean."""
-    def __init__(self, parent: ttk.Frame, prop: ItemPropKind[bool]) -> None:
-        super().__init__(parent, TRANS_LABEL.format(name=prop.name))
+    def __init__(self, parent: ttk.Frame, tk_img: TKImages, prop: ItemPropKind[bool]) -> None:
+        super().__init__(parent, tk_img, TRANS_LABEL.format(name=prop.name))
         self.prop = prop
         if set(prop.subtype_values) != {False, True}:
             raise ValueError(f'Non-boolean property {prop}!')
@@ -81,7 +84,7 @@ class BoolPropGroup(PropGroup):
     @classmethod
     def factory(cls, prop: ItemPropKind[bool]) -> PropGroupFactory:
         """Make the tuple used in PROP_GROUPS."""
-        return ([prop], lambda frame: cls(frame, prop))
+        return ([prop], lambda frame, tk_img: cls(frame, tk_img, prop))
 
     def set_tooltip(self, tok: TransToken) -> None:
         """Set a user tooltip on this group."""
@@ -107,8 +110,8 @@ class ComboPropGroup(PropGroup, Generic[EnumT]):
     """A prop group which uses a combobox to select specific options."""
     LARGE: ClassVar[bool] = True
 
-    def __init__(self, parent: ttk.Frame, prop: ItemPropKind[EnumT], values: Dict[EnumT, TransToken]) -> None:
-        super().__init__(parent, TRANS_LABEL.format(name=prop.name))
+    def __init__(self, parent: ttk.Frame, tk_img: TKImages, prop: ItemPropKind[EnumT], values: Dict[EnumT, TransToken]) -> None:
+        super().__init__(parent, tk_img, TRANS_LABEL.format(name=prop.name))
         self.prop = prop
         self.translated = values
         self.value_order = list(values)
@@ -127,7 +130,7 @@ class ComboPropGroup(PropGroup, Generic[EnumT]):
     @classmethod
     def factory(cls, prop: ItemPropKind[EnumT], values: Dict[EnumT, TransToken]) -> PropGroupFactory:
         """Make the factory used in PROP_GROUPS."""
-        return ([prop], lambda parent: cls(parent, prop, values))
+        return ([prop], lambda parent, tk_img: cls(parent, tk_img, prop, values))
 
     def set_tooltip(self, tok: TransToken) -> None:
         """Set a user tooltip on this group."""
@@ -158,8 +161,8 @@ class ComboPropGroup(PropGroup, Generic[EnumT]):
 
 class TimerPropGroup(PropGroup):
     """Special property group for timer delays."""
-    def __init__(self, parent: ttk.Frame) -> None:
-        super().__init__(parent, TRANS_TIMER_DELAY.format(tim=0))
+    def __init__(self, parent: ttk.Frame, tk_img: TKImages) -> None:
+        super().__init__(parent, tk_img, TRANS_TIMER_DELAY.format(tim=0))
 
         self.scale = ttk.Scale(
             self.frame,
@@ -218,8 +221,8 @@ class TimerPropGroup(PropGroup):
 
 class TrackStartActivePropGroup(BoolPropGroup):
     """The start active boolean is only useable if oscillating mode is enabled."""
-    def __init__(self, parent: ttk.Frame, prop: ItemPropKind[bool]) -> None:
-        super().__init__(parent, prop)
+    def __init__(self, parent: ttk.Frame, tk_img: TKImages, prop: ItemPropKind[bool]) -> None:
+        super().__init__(parent, tk_img, prop)
         self.osc_prop: Optional[BoolPropGroup] = None
         self.has_osc = False
         self.user_tooltip = TransToken.BLANK
@@ -286,8 +289,8 @@ class PistonPropGroup(PropGroup):
     IMG_DEST = img.Handle.builtin('BEE2/piston_dest', 4, 64)
     IMG_DEST_SEL = img.Handle.builtin('BEE2/piston_dest_sel', 4, 64)
 
-    def __init__(self, parent: ttk.Frame):
-        super().__init__(parent, TransToken.ui('Position: '))
+    def __init__(self, parent: ttk.Frame, tk_img: TKImages) -> None:
+        super().__init__(parent, tk_img, TransToken.ui('Position: '))
         self.platform = 0
         self.destination = 1
         self.cur_drag: Literal['plat', 'dest', None] = None
@@ -298,17 +301,18 @@ class PistonPropGroup(PropGroup):
         # Base grating visual.
         self.canv_base = self.canvas.create_image(
             0, 2, anchor='nw',
-            image=img.TK_BACKEND.sync_load(img.Handle.builtin('BEE2/piston_base', 16, 64)),
+            image=tk_img.sync_load(img.Handle.builtin('BEE2/piston_base', 16, 64)),
         )
         # The two movable ends.
         self.canv_plat = self.canvas.create_image(
             32, 2, anchor='n',
-            image=img.TK_BACKEND.sync_load(self.IMG_PIST),
+            image=tk_img.sync_load(self.IMG_PIST),
         )
         self.canv_dest = self.canvas.create_image(
             48, 2, anchor='n',
-            image=img.TK_BACKEND.sync_load(self.IMG_DEST)
+            image=tk_img.sync_load(self.IMG_DEST)
         )
+        self.tk_img = tk_img
         # Line representing the piston itself.
         self.canv_pist = self.canvas.create_line(7, 34, 28, 34, width=4, fill='#CEC9C6')
         # Line between top and selection.
@@ -403,8 +407,8 @@ class PistonPropGroup(PropGroup):
     def evt_mouse_leave(self, event: tk.Event) -> None:
         """Failsafe, when the mouse fully leaves reset them all."""
         self.cur_drag = None
-        self.canvas.itemconfigure(self.canv_plat, image=img.TK_BACKEND.sync_load(self.IMG_PIST))
-        self.canvas.itemconfigure(self.canv_dest, image=img.TK_BACKEND.sync_load(self.IMG_DEST))
+        self.canvas.itemconfigure(self.canv_plat, image=self.tk_img.sync_load(self.IMG_PIST))
+        self.canvas.itemconfigure(self.canv_dest, image=self.tk_img.sync_load(self.IMG_DEST))
 
     def evt_mouse_hover(self, event: tk.Event) -> None:
         """Update mouseover effects depending on position."""
@@ -413,11 +417,11 @@ class PistonPropGroup(PropGroup):
             hover = self.cur_drag or self.get_hit(event.x)
             self.canvas.itemconfigure(
                 self.canv_plat,
-                image=img.TK_BACKEND.sync_load(self.IMG_PIST_SEL if hover == 'plat' else self.IMG_PIST)
+                image=self.tk_img.sync_load(self.IMG_PIST_SEL if hover == 'plat' else self.IMG_PIST)
             )
             self.canvas.itemconfigure(
                 self.canv_dest,
-                image=img.TK_BACKEND.sync_load(self.IMG_DEST_SEL if hover == 'dest' else self.IMG_DEST)
+                image=self.tk_img.sync_load(self.IMG_DEST_SEL if hover == 'dest' else self.IMG_DEST)
             )
 
     def evt_mouse_drag(self, event: tk.Event) -> None:
@@ -557,7 +561,7 @@ def matching_props(item: Item, props: List[ItemPropKind]) -> List[Tuple[all_prop
 
 class PropertyWindow:
     """The window used for configuring properties."""
-    def __init__(self, close_callback: Callable[[], object]) -> None:
+    def __init__(self, tk_img: TKImages, close_callback: Callable[[], object]) -> None:
         """Build the window."""
         self.callback = close_callback
         self.cur_item: Optional[Item] = None
@@ -570,6 +574,7 @@ class PropertyWindow:
         self.win.transient(TK_ROOT)
         self.win.wm_attributes('-topmost', True)
         self.win.resizable(False, False)
+        self.tk_img = tk_img
         tk_tools.set_window_icon(self.win)
         self.win.protocol("WM_DELETE_WINDOW", self.evt_exit)
         if utils.MAC:
@@ -666,7 +671,7 @@ class PropertyWindow:
                 if maybe_group is not None:
                     group = maybe_group
                 else:
-                    self.groups[i] = group = factory(self.frame)
+                    self.groups[i] = group = factory(self.frame, self.tk_img)
                 (large_groups if group.LARGE else small_groups).append(group)
                 group.apply_conf(group_options)
                 # Identify these two groups.

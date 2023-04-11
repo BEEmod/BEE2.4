@@ -10,11 +10,13 @@ import packages.widgets
 from app import itemconfig
 from app.tooltip import add_tooltip
 from packages.widgets import KIND_CHECKMARK
+from ui_tk.img import TKImages
 
 
 @itemconfig.ui_single_no_conf(KIND_CHECKMARK)
 async def widget_checkmark(
-    parent: tk.Widget, on_changed: itemconfig.SingleChangeFunc,
+    parent: tk.Widget, tk_img: TKImages,
+    on_changed: itemconfig.SingleChangeFunc,
 ) -> Tuple[tk.Widget, packages.widgets.UpdateFunc]:
     """Allows ticking a box."""
     var = tk.BooleanVar(parent)
@@ -42,13 +44,13 @@ async def widget_checkmark(
 
 @itemconfig.ui_multi_no_conf(KIND_CHECKMARK)
 async def widget_checkmark_multi(
-    parent: tk.Widget,
+    parent: tk.Widget, tk_img: TKImages,
     values: Iterable[itemconfig.TimerNum],
     get_on_changed: itemconfig.MultiChangeFunc,
 ) -> AsyncIterator[Tuple[itemconfig.TimerNum, packages.widgets.UpdateFunc]]:
     """For checkmarks, display in a more compact form."""
     for row, column, tim_val, tim_text in itemconfig.multi_grid(values):
-        checkbox, update = await widget_checkmark(parent, get_on_changed(tim_val))
+        checkbox, update = await widget_checkmark(parent, tk_img, get_on_changed(tim_val))
         checkbox.grid(row=row, column=column)
         add_tooltip(checkbox, tim_text, delay=0)
         yield tim_val, update

@@ -13,6 +13,7 @@ from app import background_run, localisation, tk_tools, paletteLoader, TK_ROOT, 
 from consts import PALETTE_FORCE_SHOWN, UUID_BLANK, UUID_EXPORT, UUID_PORTAL2
 from config.palette import PaletteState
 from transtoken import TransToken
+from ui_tk.img import tkImg, TKImages
 import config
 
 
@@ -32,11 +33,13 @@ TRANS_HIDE = TransToken.ui("Hide Palette")
 TRANS_SHOULD_DELETE = TransToken.ui('Are you sure you want to delete "{palette}"?')
 TRANS_BUILTIN = TransToken.ui('Builtin / Readonly')  # i18n: Palette group title.
 
+
 class PaletteUI:
     """UI for selecting palettes."""
     def __init__(
         self, f: ttk.Frame, menu: tk.Menu,
         *,
+        tk_img: TKImages,
         cmd_clear: Callable[[], None],
         cmd_shuffle: Callable[[], None],
         get_items: Callable[[], ItemPos],
@@ -78,6 +81,7 @@ class PaletteUI:
             TREE_TAG_PALETTES, '<ButtonPress>',
             lambda e: background_run(self.event_select_tree),
         )
+        self.tk_img = tk_img
 
         # Avoid re-registering the double-lambda, just do it here.
         # This makes clicking the groups return selection to the palette.
@@ -215,7 +219,7 @@ class PaletteUI:
                 grp_menu = self.ui_menu
                 grp_tree = ''  # Root.
             for pal in sorted(palettes, key=lambda p: str(p.name)):
-                gear_img: img.tkImg | str = img.TK_BACKEND.sync_load(ICO_GEAR) if pal.settings is not None else ''
+                gear_img: tkImg | str = self.tk_img.sync_load(ICO_GEAR) if pal.settings is not None else ''
                 grp_menu.add_radiobutton(
                     label=str(pal.name),
                     value=pal.uuid.hex,

@@ -8,6 +8,7 @@ from srctools import conv_int, logger
 from packages.widgets import TimerOptions, UpdateFunc
 from app import itemconfig
 from app.tooltip import add_tooltip
+from ui_tk.img import TKImages
 
 
 LOGGER = logger.get_logger('itemconfig.timer')
@@ -25,14 +26,14 @@ def timer_values(min_value: int, max_value: int) -> Tuple[str, ...]:
 
 @itemconfig.ui_multi_wconf(TimerOptions)
 async def widget_minute_seconds_multi(
-    parent: tk.Widget,
+    parent: tk.Widget, tk_img: TKImages,
     timers: Iterable[itemconfig.TimerNum],
     get_on_changed: itemconfig.MultiChangeFunc,
     conf: TimerOptions,
 ) -> AsyncIterator[Tuple[itemconfig.TimerNum, UpdateFunc]]:
     """For timers, display in a more compact form."""
     for row, column, tim_val, tim_text in itemconfig.multi_grid(timers, columns=5):
-        timer, update = await widget_minute_seconds(parent, get_on_changed(tim_val), conf)
+        timer, update = await widget_minute_seconds(parent, tk_img, get_on_changed(tim_val), conf)
         timer.grid(row=row, column=column)
         add_tooltip(timer, tim_text, delay=0)
         yield tim_val, update
@@ -40,7 +41,8 @@ async def widget_minute_seconds_multi(
 
 @itemconfig.ui_single_wconf(TimerOptions)
 async def widget_minute_seconds(
-    parent: tk.Widget, on_changed: itemconfig.SingleChangeFunc, conf: TimerOptions,
+    parent: tk.Widget, tk_img: TKImages,
+    on_changed: itemconfig.SingleChangeFunc, conf: TimerOptions,
 ) -> Tuple[tk.Widget, UpdateFunc]:
     """A widget for specifying times - minutes and seconds.
 

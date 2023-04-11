@@ -8,7 +8,7 @@ various item properties.
   clicked widget from the event
 """
 from __future__ import annotations
-from typing import Any
+from typing import Any, Callable
 from enum import Enum
 import functools
 import webbrowser
@@ -16,6 +16,7 @@ import webbrowser
 import tkinter as tk
 from tkinter import ttk
 
+from ui_tk.img import TKImages, TK_IMG
 from .richTextBox import tkRichText
 from . import (
     itemconfig, localisation, tkMarkdown, tooltip, tk_tools, sound, img, UI,
@@ -117,10 +118,10 @@ TRANS_TOOL_CUBE = TransToken.ui(
 TRANS_NO_VERSIONS = TransToken.ui('No Alternate Versions')
 
 
-def set_sprite(pos: SPR, sprite: str) -> None:
+def set_sprite(tk_img: TKImages, pos: SPR, sprite: str) -> None:
     """Set one of the property sprites to a value."""
     widget = wid_sprite[pos]
-    img.apply(widget, img.Handle.sprite('icons/' + sprite, 32, 32))
+    tk_img.apply(widget, img.Handle.sprite('icons/' + sprite, 32, 32))
     tooltip.set_tooltip(widget, SPRITE_TOOL[sprite])
 
 
@@ -162,12 +163,13 @@ def sub_open(pos, e=None):
         selected_sub_item.open_menu_at_sub(ind)
 
 
-def open_event(item):
+def open_event(item) -> Callable[[tk.Event], object]:
     """Show the window for a particular PalItem."""
-    def func(e):
+    def func(e: tk.Event) -> None:
         sound.fx('expand')
         show_prop(item)
     return func
+
 
 def is_visible() -> bool:
     """Checks if the window is visible."""
@@ -199,14 +201,14 @@ def show_prop(widget, warp_cursor=False):
         # move the mouse cursor
         window.event_generate('<Motion>', warp=True, x=off_x, y=off_y)
 
-    load_item_data()
+    load_item_data(TK_IMG)
 
 
-def set_item_version(e=None):
+def set_item_version(tk_img: TKImages) -> None:
     """Callback for the version combobox. Set the item variant."""
     selected_item.change_version(version_lookup[wid['variant'].current()])
     # Refresh our data.
-    load_item_data()
+    load_item_data(tk_img)
 
     # Refresh itemconfig comboboxes to match us.
     for item_id, func in itemconfig.ITEM_VARIANT_LOAD:
@@ -252,7 +254,7 @@ def get_description(
         return tkMarkdown.MarkdownData()  # No description
 
 
-def load_item_data() -> None:
+def load_item_data(tk_img: TKImages) -> None:
     """Refresh the window to use the selected item's data."""
     item_data = selected_item.data
 
@@ -261,7 +263,7 @@ def load_item_data() -> None:
             icon = IMG_ALPHA
         else:
             icon = selected_item.get_icon(selected_item.visual_subtypes[pos])
-        img.apply(wid_subitem[ind], icon)
+        tk_img.apply(wid_subitem[ind], icon)
         wid_subitem[ind]['relief'] = 'flat'
 
     wid_subitem[pos_for_item(selected_sub_item.subKey)]['relief'] = 'raised'
@@ -329,29 +331,29 @@ def load_item_data() -> None:
 
     if editor.has_prim_input():
         if editor.has_sec_input():
-            set_sprite(SPR.INPUT, 'in_dual')
+            set_sprite(tk_img, SPR.INPUT, 'in_dual')
             # Real funnels work slightly differently.
             if selected_item.id.casefold() == 'item_tbeam':
                 tooltip.set_tooltip(wid_sprite[SPR.INPUT], TRANS_TOOL_TBEAM)
         else:
-            set_sprite(SPR.INPUT, 'in_norm')
+            set_sprite(tk_img, SPR.INPUT, 'in_norm')
     else:
-        set_sprite(SPR.INPUT, 'in_none')
+        set_sprite(tk_img, SPR.INPUT, 'in_none')
 
     if editor.has_output():
         if has_timer:
-            set_sprite(SPR.OUTPUT, 'out_tim')
+            set_sprite(tk_img, SPR.OUTPUT, 'out_tim')
         else:
-            set_sprite(SPR.OUTPUT, 'out_norm')
+            set_sprite(tk_img, SPR.OUTPUT, 'out_norm')
     else:
-        set_sprite(SPR.OUTPUT, 'out_none')
+        set_sprite(tk_img, SPR.OUTPUT, 'out_none')
 
-    set_sprite(SPR.ROTATION, ROT_TYPES[editor.handle])
+    set_sprite(tk_img, SPR.ROTATION, ROT_TYPES[editor.handle])
 
     if editor.embed_voxels:
-        set_sprite(SPR.COLLISION, 'space_embed')
+        set_sprite(tk_img, SPR.COLLISION, 'space_embed')
     else:
-        set_sprite(SPR.COLLISION, 'space_none')
+        set_sprite(tk_img, SPR.COLLISION, 'space_none')
 
     face_spr = "surf"
     if Surface.WALL not in editor.invalid_surf:
@@ -368,15 +370,15 @@ def load_item_data() -> None:
         )
         face_spr += "_none"
 
-    set_sprite(SPR.FACING, face_spr)
+    set_sprite(tk_img, SPR.FACING, face_spr)
 
     # Now some special overrides for certain classes.
     if selected_item.id == "ITEM_CUBE":
         # Cubes - they should show info for the dropper.
-        set_sprite(SPR.FACING, 'surf_ceil')
-        set_sprite(SPR.INPUT, 'in_norm')
-        set_sprite(SPR.COLLISION, 'space_embed')
-        set_sprite(SPR.OUTPUT, 'out_none')
+        set_sprite(tk_img, SPR.FACING, 'surf_ceil')
+        set_sprite(tk_img, SPR.INPUT, 'in_norm')
+        set_sprite(tk_img, SPR.COLLISION, 'space_embed')
+        set_sprite(tk_img, SPR.OUTPUT, 'out_none')
         # This can have 2 handles - the specified one, overridden to 36 on reflection cubes.
         # Concatenate the two definitions.
         tooltip.set_tooltip(wid_sprite[SPR.ROTATION], TRANS_TOOL_CUBE.format(
@@ -385,14 +387,14 @@ def load_item_data() -> None:
 
     if editor.cls is ItemClass.GEL:
         # Reflection or normal gel...
-        set_sprite(SPR.FACING, 'surf_wall_ceil')
-        set_sprite(SPR.INPUT, 'in_norm')
-        set_sprite(SPR.COLLISION, 'space_none')
-        set_sprite(SPR.OUTPUT, 'out_none')
-        set_sprite(SPR.ROTATION, 'rot_paint')
+        set_sprite(tk_img, SPR.FACING, 'surf_wall_ceil')
+        set_sprite(tk_img, SPR.INPUT, 'in_norm')
+        set_sprite(tk_img, SPR.COLLISION, 'space_none')
+        set_sprite(tk_img, SPR.OUTPUT, 'out_none')
+        set_sprite(tk_img, SPR.ROTATION, 'rot_paint')
     elif editor.cls is ItemClass.TRACK_PLATFORM:
         # Track platform - always embeds into the floor.
-        set_sprite(SPR.COLLISION, 'space_embed')
+        set_sprite(tk_img, SPR.COLLISION, 'space_embed')
 
     real_conn_item = editor
     if selected_item.id in ["ITEM_CUBE", "ITEM_PAINT_SPLAT"]:
@@ -460,7 +462,7 @@ def hide_context(e=None):
         selected_item = selected_sub_item = None
 
 
-def init_widgets() -> None:
+def init_widgets(tk_img: TKImages) -> None:
     """Initiallise all the window components."""
     f = ttk.Frame(window, relief="raised", borderwidth="4")
     f.grid(row=0, column=0)
@@ -485,7 +487,7 @@ def init_widgets() -> None:
         anchor="e",
         compound="left",
     )
-    img.apply(wid['ent_count'], img.Handle.sprite('icons/gear_ent', 32, 32))
+    tk_img.apply(wid['ent_count'], img.Handle.sprite('icons/gear_ent', 32, 32))
     wid['ent_count'].grid(row=0, column=2, rowspan=2, sticky='e')
     tooltip.add_tooltip(
         wid['ent_count'],
@@ -503,7 +505,7 @@ def init_widgets() -> None:
     sub_frame.grid(column=0, columnspan=3, row=4)
     for i in range(5):
         wid_subitem[i] = ttk.Label(sub_frame)
-        img.apply(wid_subitem[i], IMG_ALPHA)
+        tk_img.apply(wid_subitem[i], IMG_ALPHA)
         wid_subitem[i].grid(row=0, column=i)
         tk_tools.bind_leftclick(wid_subitem[i], functools.partial(sub_sel, i))
         tk_tools.bind_rightclick(wid_subitem[i], functools.partial(sub_open, i))
@@ -519,7 +521,7 @@ def init_widgets() -> None:
     # desiredFacing
     for spr_id in SPR:
         wid_sprite[spr_id] = sprite = ttk.Label(spr_frame, relief="raised")
-        img.apply(sprite, img.Handle.sprite('icons/ap_grey', 32, 32))
+        tk_img.apply(sprite, img.Handle.sprite('icons/ap_grey', 32, 32))
         sprite.grid(row=0, column=spr_id.value)
         tooltip.add_tooltip(sprite)
 
@@ -591,7 +593,7 @@ def init_widgets() -> None:
             # Temporarily hide the context window while we're open.
             window.withdraw()
 
-    prop_window = PropertyWindow(hide_item_props)
+    prop_window = PropertyWindow(tk_img, hide_item_props)
 
     wid['changedefaults'] = ttk.Button(f, command=lambda: background_run(show_item_props))
     localisation.set_text(wid['changedefaults'], TransToken.ui("Change Defaults..."))
@@ -609,6 +611,6 @@ def init_widgets() -> None:
         width=7 if utils.MAC else None,
     )
     wid['variant'].state(['readonly'])  # Prevent directly typing in values
-    wid['variant'].bind('<<ComboboxSelected>>', set_item_version)
+    wid['variant'].bind('<<ComboboxSelected>>', lambda e: set_item_version(tk_img))
     wid['variant'].current(0)
     wid['variant'].grid(row=7, column=0, sticky='w')

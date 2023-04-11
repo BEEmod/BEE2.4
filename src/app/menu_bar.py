@@ -12,6 +12,7 @@ from app import (
     gameMan, helpMenu, localisation, optionWindow, packageMan, tk_tools,
     backup as backup_win, background_run,
 )
+from ui_tk.img import TKImages
 
 
 EXPORT_BTN_POS: Final = 0  # Position of the export button.
@@ -28,6 +29,7 @@ class MenuBar:
     def __init__(
         self,
         parent: tk.Tk,
+        tk_img: TKImages,
         quit_app: Callable[[], object],
         export: Callable[[], object],
     ) -> None:
@@ -106,7 +108,7 @@ class MenuBar:
         bar.add_cascade(menu=self.view_menu)
         localisation.set_menu_text(bar, TransToken.ui("View"))
 
-        helpMenu.make_help_menu(bar)
+        helpMenu.make_help_menu(bar, tk_img)
         gameMan.EVENT_BUS.register(None, gameMan.Game, self._game_changed)
 
     def set_export_allowed(self, allowed: bool) -> None:

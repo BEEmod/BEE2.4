@@ -21,6 +21,7 @@ import trio.to_thread
 
 from app.richTextBox import tkRichText
 from app import localisation, tkMarkdown, tk_tools, sound, img, TK_ROOT, background_run
+from ui_tk.img import TKImages
 from transtoken import TransToken
 
 # For version info
@@ -28,6 +29,7 @@ import PIL
 import platform
 import mistletoe
 import pygtrie
+
 
 
 class ResIcon(Enum):
@@ -532,7 +534,7 @@ async def open_url(url_key: str) -> None:
             webbrowser.open(url)
 
 
-def make_help_menu(parent: tk.Menu) -> None:
+def make_help_menu(parent: tk.Menu, tk_img: TKImages) -> None:
     """Create the application 'Help' menu."""
     # Using this name displays this correctly in OS X
     help_menu = tk.Menu(parent, name='help')
@@ -556,7 +558,7 @@ def make_help_menu(parent: tk.Menu) -> None:
             help_menu.add_command(
                 command=functools.partial(background_run, open_url, res.url_key),
                 compound='left',
-                image=img.TK_BACKEND.sync_load(icons[res.icon]),
+                image=tk_img.sync_load(icons[res.icon]),
             )
             localisation.set_menu_text(help_menu, res.name)
 

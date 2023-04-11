@@ -5,11 +5,13 @@ from tkinter import ttk
 
 from packages.widgets import KIND_STRING, UpdateFunc
 from app import itemconfig
+from ui_tk.img import TKImages
 
 
 @itemconfig.ui_single_no_conf(KIND_STRING)
 async def widget_string(
-    parent: tk.Widget, on_changed: itemconfig.SingleChangeFunc,
+    parent: tk.Widget, tk_img: TKImages,
+    on_changed: itemconfig.SingleChangeFunc,
 ) -> tuple[tk.Widget, UpdateFunc]:
     """Simple textbox for entering text."""
     var = tk.StringVar()

@@ -872,7 +872,7 @@ def init_application(tk_img: TKImages) -> None:
 
     from app import helpMenu
     # Add the 'Help' menu here too.
-    helpMenu.make_help_menu(bar)
+    helpMenu.make_help_menu(bar, tk_img)
 
     window['menu'] = bar
 

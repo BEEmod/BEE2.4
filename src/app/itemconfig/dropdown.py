@@ -7,6 +7,7 @@ import srctools.logger
 
 from packages.widgets import DropdownOptions, UpdateFunc
 from app import itemconfig
+from ui_tk.img import TKImages
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -14,7 +15,8 @@ LOGGER = srctools.logger.get_logger(__name__)
 
 @itemconfig.ui_single_wconf(DropdownOptions)
 async def dropdown(
-    parent: tk.Widget, on_changed: itemconfig.SingleChangeFunc, conf: DropdownOptions,
+    parent: tk.Widget, tk_img: TKImages,
+    on_changed: itemconfig.SingleChangeFunc, conf: DropdownOptions,
 ) -> Tuple[tk.Widget, UpdateFunc]:
     """Dropdowns allow selecting from a few options."""
     async def update_ui(new_value: str) -> None:
