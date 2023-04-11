@@ -1570,7 +1570,7 @@ async def init_windows(tk_img: TKImages) -> None:
     loader.step('UI', 'itemvar')
 
     async with trio.open_nursery() as nurs:
-        nurs.start_soon(CompilerPane.make_pane, frames['toolMenu'], menu_bar.view_menu)
+        nurs.start_soon(CompilerPane.make_pane, frames['toolMenu'], tk_img, menu_bar.view_menu)
     loader.step('UI', 'compiler')
 
     UI['shuffle_pal'] = SubPane.make_tool_button(
