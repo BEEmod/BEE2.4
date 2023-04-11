@@ -10,7 +10,6 @@ from pathlib import Path
 from typing import Any, ClassVar, Dict, Iterable, Iterator, Tuple, Type
 from typing_extensions import Self, Final
 from collections.abc import Sequence, Mapping
-import tkinter as tk
 import abc
 import logging
 import functools
@@ -24,7 +23,6 @@ from srctools.vtf import VTFFlags, VTF
 from srctools.filesys import FileSystem, RawFileSystem, FileSystemChain
 import srctools.logger
 
-from app import TK_ROOT
 from consts import Theme
 import utils
 
@@ -389,14 +387,9 @@ class Handle(User):
                     else:
                         raise ValueError
                 except (ValueError, TypeError, OverflowError):
-                    # Try to grab from TK's colour list.
                     try:
-                        r, g, b = TK_ROOT.winfo_rgb(color)
-                        # They're full 16-bit colors, we don't want that.
-                        r >>= 8
-                        g >>= 8
-                        b >>= 8
-                    except tk.TclError:
+                        r, g, b = _UI_IMPL.ui_get_color(color)
+                    except ValueError:
                         raise ValueError(f'Colors must be RGB, RRGGBB hex values, or R,G,B decimal!, not {uri}') from None
                 typ = ImgColor
                 args = [r, g, b]
@@ -925,6 +918,10 @@ class UIImage(abc.ABC):
     def ui_force_load(self, handle: Handle) -> None:
         """Called when this handle is reloading, and should update all its widgets."""
         raise NotImplementedError
+
+    def ui_get_color(self, text: str) -> Tuple[int, int, int]:
+        """Look up colours in the UI library's database, or raise ValueError if not found."""
+        raise ValueError
 
     async def ui_anim_task(self, load_handles: Iterable[tuple[Handle, list[Handle]]]) -> None:
         """Cycle loading icons."""

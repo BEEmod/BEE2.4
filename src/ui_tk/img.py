@@ -1,17 +1,15 @@
 """Image integrations for TKinter."""
 from __future__ import annotations
-
-import itertools
-
-import attrs
-import trio
-from typing import Iterable, TypeVar, Union
+from typing import Iterable, Tuple, TypeVar, Union
 from typing_extensions import TypeAlias
 from tkinter import ttk
 import tkinter as tk
+import itertools
 
 from PIL import Image, ImageTk
 from srctools.logger import get_logger
+import attrs
+import trio
 
 from app import TK_ROOT, img
 
@@ -161,6 +159,18 @@ class TKImages(img.UIImage):
                 image = self.tk_img[handle] = self._get_img(res.width, res.height)
             image.paste(res)
         return image
+
+    def ui_get_color(self, text: str) -> Tuple[int, int, int]:
+        """Look up a colour in TK's colour list."""
+        try:
+            r, g, b = TK_ROOT.winfo_rgb(text)
+        except tk.TclError:
+            raise ValueError
+        # They're full 16-bit colors, we don't want that.
+        r >>= 8
+        g >>= 8
+        b >>= 8
+        return r, g, b
 
     async def ui_anim_task(self, load_handles: Iterable[tuple[img.Handle, list[img.Handle]]]) -> None:
         """Cycle loading icons."""
