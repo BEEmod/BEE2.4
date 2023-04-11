@@ -49,6 +49,7 @@ from app import (
 )
 from app.selector_win import SelectorWin, Item as selWinItem, AttrDef as SelAttr
 from app.menu_bar import MenuBar
+from ui_tk.img import TKImages
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -1372,7 +1373,7 @@ def refresh_palette_icons() -> None:
         pal_item.load_data()
 
 
-async def init_windows() -> None:
+async def init_windows(tk_img: TKImages) -> None:
     """Initialise all windows and panes.
 
     """
@@ -1531,7 +1532,7 @@ async def init_windows() -> None:
     )
 
     async with trio.open_nursery() as nurs:
-        corridor = corridor_selector.Selector(packages.LOADED)
+        corridor = corridor_selector.Selector(packages.LOADED, tk_img)
         nurs.start_soon(init_option, windows['opt'], pal_ui, export, corridor)
     async with trio.open_nursery() as nurs:
         nurs.start_soon(corridor.refresh)
@@ -1572,7 +1573,7 @@ async def init_windows() -> None:
     tk_tools.bind_leftclick(windows['pal'], contextWin.hide_context)
 
     await trio.sleep(0)
-    backup_win.init_toplevel()
+    backup_win.init_toplevel(tk_img)
     await trio.sleep(0)
     loader.step('UI', 'backup')
     voiceEditor.init_widgets()

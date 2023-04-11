@@ -29,6 +29,7 @@ from packages.widgets import (
     WidgetType,
     WidgetTypeWithConf, nop_update,
 )
+from ui_tk.img import TK_IMG
 from ..SubPane import SubPane
 
 
@@ -500,7 +501,7 @@ async def widget_item_variant(parent: tk.Widget, _: SingleChangeFunc, conf: Item
 
     if item.id == 'ITEM_BEE2_SIGNAGE':
         # Even more special case, display the "configure signage" button.
-        return await signage_ui.init_widgets(parent), nop_update
+        return await signage_ui.init_widgets(parent, TK_IMG), nop_update
 
     version_lookup: Optional[List[str]] = None
 

@@ -22,6 +22,9 @@ from FakeZip import FakeZip, zip_names, zip_open_bin
 from srctools import Keyvalues, KeyValError
 from app.tooltip import add_tooltip
 from app.localisation import TransToken, set_text, set_menu_text, set_win_title
+from ui_tk.img import TKImages
+
+
 if TYPE_CHECKING:
     from app import gameMan
 
@@ -744,7 +747,7 @@ def ui_delete_game() -> None:
     refresh_game_details()
 
 
-def init() -> None:
+def init(tk_img: TKImages) -> None:
     """Initialise all widgets in the given window."""
     for cat, btn_text in [
         ('back_', TransToken.ui('Restore:')),
@@ -798,7 +801,7 @@ def init() -> None:
     )
     game_refresh.grid(row=0, column=1, sticky='E')
     add_tooltip(game_refresh, TransToken.ui("Reload the map list."))
-    img.apply(game_refresh, img.Handle.builtin('icons/tool_sub', 16, 16))
+    tk_img.apply(game_refresh, img.Handle.builtin('icons/tool_sub', 16, 16))
 
     UI['game_title']['textvariable'] = game_name
     UI['back_title']['textvariable'] = backup_name
@@ -823,7 +826,7 @@ def init() -> None:
     window.columnconfigure(2, weight=1)
 
 
-def init_application() -> None:
+def init_application(tk_img: TKImages) -> None:
     """Initialise the standalone application."""
     from app import gameMan
     global window
@@ -832,7 +835,7 @@ def init_application() -> None:
         'BEEMOD {version} - Backup / Restore Puzzles',
     ).format(version=utils.BEE_VERSION))
 
-    init()
+    init(tk_img)
 
     UI['bar'] = bar = tk.Menu(TK_ROOT)
     window.option_add('*tearOff', False)
@@ -953,7 +956,7 @@ def init_backup_settings() -> None:
     count.value = count_value
 
 
-def init_toplevel() -> None:
+def init_toplevel(tk_img: TKImages) -> None:
     """Initialise the window as part of the BEE2."""
     global window
     window = tk.Toplevel(TK_ROOT, name='backupWin')
@@ -969,7 +972,7 @@ def init_toplevel() -> None:
 
     window.protocol("WM_DELETE_WINDOW", quit_command)
 
-    init()
+    init(tk_img)
     init_backup_settings()
 
     # When embedded in the BEE2, use regular buttons and a dropdown!

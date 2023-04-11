@@ -6,12 +6,14 @@ from tkinter import ttk
 
 import srctools.logger
 
+from ui_tk.img import TKImages
 from app import dragdrop, img, localisation, tk_tools, TK_ROOT
 from config.signage import DEFAULT_IDS, Layout
 from packages import Signage, Style
 import packages
 from transtoken import TransToken
 import config
+
 
 LOGGER = srctools.logger.get_logger(__name__)
 
@@ -91,7 +93,7 @@ def style_changed(new_style: Style) -> None:
         drag_man.load_icons()
 
 
-async def init_widgets(master: tk.Widget) -> Optional[tk.Widget]:
+async def init_widgets(master: tk.Widget, tk_img: TKImages) -> Optional[tk.Widget]:
     """Construct the widgets, returning the configuration button.
     """
     window.resizable(True, True)
@@ -121,8 +123,8 @@ async def init_widgets(master: tk.Widget) -> Optional[tk.Widget]:
 
     preview_left = ttk.Label(frame_preview, anchor='e')
     preview_right = ttk.Label(frame_preview, anchor='w')
-    img.apply(preview_left, IMG_BLANK)
-    img.apply(preview_right, IMG_BLANK)
+    tk_img.apply(preview_left, IMG_BLANK)
+    tk_img.apply(preview_right, IMG_BLANK)
     preview_left.grid(row=0, column=0)
     preview_right.grid(row=0, column=1)
 
@@ -158,11 +160,11 @@ async def init_widgets(master: tk.Widget) -> Optional[tk.Widget]:
 
         with trio.CancelScope() as hover_scope:
             while True:
-                img.apply(preview_left, sng_left)
-                img.apply(preview_right, sng_right)
+                tk_img.apply(preview_left, sng_left)
+                tk_img.apply(preview_right, sng_right)
                 await trio.sleep(1.0)
-                img.apply(preview_left, dbl_left)
-                img.apply(preview_right, dbl_right)
+                tk_img.apply(preview_left, dbl_left)
+                tk_img.apply(preview_right, dbl_right)
                 await trio.sleep(1.0)
 
     async def on_leave(hovered: dragdrop.Slot[Signage]) -> None:
@@ -170,8 +172,8 @@ async def init_widgets(master: tk.Widget) -> Optional[tk.Widget]:
         nonlocal hover_scope
         name_label['text'] = ''
         hover_scope.cancel()
-        img.apply(preview_left, IMG_BLANK)
-        img.apply(preview_right, IMG_BLANK)
+        tk_img.apply(preview_left, IMG_BLANK)
+        tk_img.apply(preview_right, IMG_BLANK)
 
     drag_man.event_bus.register(dragdrop.Event.HOVER_ENTER, dragdrop.Slot[Signage], on_hover)
     drag_man.event_bus.register(dragdrop.Event.HOVER_EXIT, dragdrop.Slot[Signage], on_leave)
@@ -209,8 +211,8 @@ async def init_widgets(master: tk.Widget) -> Optional[tk.Widget]:
         }))
         window.withdraw()
         drag_man.unload_icons()
-        img.apply(preview_left, IMG_BLANK)
-        img.apply(preview_right, IMG_BLANK)
+        tk_img.apply(preview_left, IMG_BLANK)
+        tk_img.apply(preview_right, IMG_BLANK)
 
     def show_window() -> None:
         """Show the window."""

@@ -13,6 +13,7 @@ import tkinter as tk
 import attr
 
 from app import TK_ROOT, img
+from ui_tk.img import TK_IMG
 # Give a private name, could get confused with tooltip setter.
 from app.localisation import TransToken, set_text as _apply_token
 
@@ -66,7 +67,7 @@ def _show(widget: tk.Misc, mouse_x: int, mouse_y: int) -> None:
         return
 
     _apply_token(context_label, data.text)
-    img.apply(context_label, data.img)
+    TK_IMG.apply(context_label, data.img)
 
     window.deiconify()
     window.update_idletasks()

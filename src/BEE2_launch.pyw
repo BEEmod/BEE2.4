@@ -93,7 +93,8 @@ if __name__ == '__main__':
         BEE2.start_main()
     elif app_name == 'backup':
         from app import backup
-        backup.init_application()
+        from ui_tk.img import TK_IMG
+        backup.init_application(TK_IMG)
         TK_ROOT.mainloop()
     elif app_name == 'compilepane':
         from app import CompilerPane
