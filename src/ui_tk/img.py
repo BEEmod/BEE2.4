@@ -17,6 +17,14 @@ from app import TK_ROOT, img
 
 # Widgets with an image attribute that can be set.
 tkImgWidgets: TypeAlias = Union[tk.Label, ttk.Label, tk.Button, ttk.Button]
+tkImgWidgetsT = TypeVar(
+    'tkImgWidgetsT',
+    tk.Label, ttk.Label,
+    Union[tk.Label, ttk.Label],
+    tk.Button, ttk.Button,
+    Union[tk.Button, ttk.Button],
+)
+tkImg: TypeAlias = Union[ImageTk.PhotoImage, tk.PhotoImage]
 
 LOGGER = get_logger(__name__)
 label_to_user: dict[tkImgWidgets, LabelStyleUser] = {}
@@ -42,11 +50,14 @@ def on_label_destroyed(e: tk.Event) -> None:
         del user.label  # Clear this, to make GC easier.
 
 
+label_destroy_cmd = TK_ROOT.register(on_label_destroyed, needcleanup=False)
+
+
 @attrs.define(eq=False)
 class LabelStyleUser(img.User):
     """A user for widgets with an 'image' attribute."""
     label: tkImgWidgets
-    cur_handle: img.Handle
+    cur_handle: img.Handle | None
 
 
 class TKImages(img.UIImage):
@@ -62,7 +73,7 @@ class TKImages(img.UIImage):
         self.unused_img = {}
         self.tk_img = {}
 
-    def sync_load(self, handle: img.Handle) -> ImageTk.PhotoImage:
+    def sync_load(self, handle: img.Handle) -> tkImg:
         """Load the TK image if required immediately, then return it.
 
         Only available on BUILTIN type images since they cannot then be
@@ -70,6 +81,43 @@ class TKImages(img.UIImage):
         """
         handle.force_load()
         return self._load_tk(handle, force=False)
+
+    # noinspection PyProtectedMember
+    def apply(self, widget: tkImgWidgetsT, image: img.Handle | None, /) -> tkImgWidgetsT:
+        """Set the image in a label-style widget.
+
+        This tracks the widget, so later reloads will affect the widget.
+        If the image is None, it is instead unset.
+        """
+        if image is None:
+            widget['image'] = None
+            try:
+                user = label_to_user[widget]
+            except KeyError:
+                pass
+            else:
+                if user.cur_handle is not None:
+                    user.cur_handle._decref(user)
+                    user.cur_handle = None
+            return widget
+        try:
+            user = label_to_user[widget]
+        except KeyError:
+            # No user yet, create + bind.
+            user = label_to_user[widget] = LabelStyleUser(widget, None)
+        else:
+            if user.cur_handle is image:
+                # Unchanged.
+                return widget
+            elif user.cur_handle is not None:
+                user.cur_handle._decref(user)
+        image._incref(user)
+        try:
+            widget['image'] = self.tk_img[image]
+        except KeyError:  # Need to load.
+            loading = image._request_load()
+            widget['image'] = self._load_tk(loading, False)
+        return widget
 
     def _get_img(self, width: int, height: int) -> ImageTk.PhotoImage:
         """Recycle an old image, or construct a new one."""

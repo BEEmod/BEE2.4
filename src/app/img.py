@@ -40,19 +40,9 @@ tkImgWidgetsT = TypeVar(
     tk.Button, ttk.Button,
     Union[tk.Button, ttk.Button],
 )
-tkImg: TypeAlias = Union[ImageTk.PhotoImage, tk.PhotoImage]
-# WeakRef is only generic in stubs!
-WidgetWeakRef: TypeAlias = Union[
-    'WeakRef[tk.Label]', 'WeakRef[ttk.Label]',
-    'WeakRef[tk.Label | ttk.Label]',
-    'WeakRef[tk.Button]', 'WeakRef[ttk.Button]',
-    'WeakRef[tk.Button | ttk.Button]',
-]
 
 # Used to keep track of the used handles, so we can deduplicate them.
 _handles: dict[tuple[Type[Handle], tuple, int, int], Handle] = {}
-# Matches widgets to the handle they use.
-_wid_tk: dict[WidgetWeakRef, Handle] = {}
 
 LOGGER = srctools.logger.get_logger('img')
 FSYS_BUILTIN = RawFileSystem(str(utils.install_path('images')))
@@ -594,7 +584,7 @@ class Handle(User):
         for child in self._children():
             child._incref(self)
 
-    def _request_load(self, force=False) -> ImageTk.PhotoImage:
+    def _request_load(self, force=False) -> Handle:
         """Request a reload of this image.
 
         If this can be done synchronously, the result is returned.
@@ -602,16 +592,14 @@ class Handle(User):
         If force is True, the image will be remade even if cached.
         """
         if self._loading is True:
-            return TK_BACKEND.sync_load(Handle.ico_loading(self.width, self.height))
-        if self._cached_tk is not None and not force:
-            return self._cached_tk
+            return Handle.ico_loading(self.width, self.height)
         if self._loading is False:
             self._loading = True
             if _load_nursery is None:
                 _early_loads.add(self)
             else:
                 _load_nursery.start_soon(self._load_task, force)
-        return TK_BACKEND.sync_load(Handle.ico_loading(self.width, self.height))
+        return Handle.ico_loading(self.width, self.height)
 
     async def _load_task(self, force: bool) -> None:
         """Scheduled to load images then apply to the widgets."""
@@ -957,7 +945,7 @@ class UIImage(abc.ABC):
 
 # Todo: add actual initialisation of this.
 from ui_tk.img import TKImages
-_UI_IMPL = TK_BACKEND = TKImages()
+TK_BACKEND = TKImages()
 
 
 # noinspection PyProtectedMember
@@ -981,7 +969,7 @@ async def init(filesystems: Mapping[str, FileSystem], implementation: UIImage) -
             handle = _early_loads.pop()
             if handle._users:
                 _load_nursery.start_soon(Handle._load_task, handle, False)
-        _load_nursery.start_soon(_UI_IMPL.anim_task, _load_handles)
+        _load_nursery.start_soon(_UI_IMPL.ui_anim_task, _load_handles.values())
         await trio.sleep_forever()
 
 
@@ -1020,32 +1008,7 @@ def apply(widget: tkImgWidgetsT, img: Handle | None) -> tkImgWidgetsT:
     This tracks the widget, so later reloads will affect the widget.
     If the image is None, it is instead unset.
     """
-    ref = WeakRef(widget, _label_destroyed)
-    if img is None:
-        widget['image'] = None
-        try:
-            old = _wid_tk.pop(ref)
-        except KeyError:
-            pass
-        else:
-            old._decref(ref)
-        return widget
-    try:
-        old = _wid_tk[ref]
-    except KeyError:
-        pass
-    else:
-        if old is img:
-            # Unchanged.
-            return widget
-        old._decref(ref)
-    img._incref(ref)
-    _wid_tk[ref] = img
-    cached_img = img._cached_tk
-    if cached_img is not None:
-        widget['image'] = cached_img
-    else:  # Need to load.
-        widget['image'] = img._request_load()
+    TK_BACKEND.apply(widget, img)
     return widget
 
 
@@ -1067,13 +1030,6 @@ def get_pil_font(size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
     else:
         LOGGER.warning('Failed to find font, add more OS fonts!')
         return ImageFont.load_default()
-
-
-def get_app_icon(path: str) -> ImageTk.PhotoImage:
-    """On non-Windows, retrieve the application icon."""
-    with open(path, 'rb') as f:
-        return ImageTk.PhotoImage(Image.open(f))
-
 
 def make_splash_screen(
     max_width: float,
