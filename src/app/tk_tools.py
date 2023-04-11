@@ -74,8 +74,8 @@ elif utils.MAC:
     LISTBOX_BG_COLOR = 'white'
 else:  # Linux
     # Get the tk image object.
-    from app import img
-    app_icon = img.get_app_icon(ICO_PATH)
+    from ui_tk.img import get_app_icon
+    app_icon = get_app_icon(ICO_PATH)
 
     def set_window_icon(window: Union[tk.Toplevel, tk.Tk]) -> None:
         """Set the window icon."""
