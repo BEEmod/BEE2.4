@@ -31,6 +31,8 @@ TABS: Dict[str, ttk.Frame] = {}
 QUOTE_FONT = font.nametofont('TkHeadingFont').copy()
 QUOTE_FONT['weight'] = 'bold'
 
+IMG_MID = img.Handle.builtin('icons/mid_quote', 32, 16)
+IMG_RESP = img.Handle.builtin('icons/resp_quote', 16, 16)
 
 IMG: Dict[str, Tuple[img.Handle, TransToken]] = {
     spr: (img.Handle.builtin('icons/quote_' + spr), ctx)
@@ -205,13 +207,13 @@ def add_tabs() -> None:
             notebook.tab(
                 tab,
                 compound='image',
-                image=img.Handle.builtin('icons/mid_quote', 32, 16).get_tk(),
+                image=img.TK_BACKEND.sync_load(IMG_MID),
                 )
         if tab.nb_type is TabTypes.RESPONSE:
             notebook.tab(
                 tab,
                 compound=RIGHT,
-                image=img.Handle.builtin('icons/resp_quote', 16, 16),
+                image=img.TK_BACKEND.sync_load(IMG_RESP),
                 # i18n: 'response' tab name, should be short.
                 text=str(TransToken.ui('Resp')),
             )

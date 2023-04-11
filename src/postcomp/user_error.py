@@ -140,6 +140,7 @@ async def load_server() -> Tuple[int, str]:
                 assert isinstance(coop_text, str), data
                 # Successfully booted. Hack: set the return code of the subprocess.Process object,
                 # so it thinks the server has already quit and doesn't try killing it when we exit.
+                # TODO: Move upstream?
                 proc._proc.returncode = 0
                 return port, coop_text
     raise ValueError('Failed to start error server!')

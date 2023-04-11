@@ -298,11 +298,17 @@ class PistonPropGroup(PropGroup):
         # Base grating visual.
         self.canv_base = self.canvas.create_image(
             0, 2, anchor='nw',
-            image=img.Handle.builtin('BEE2/piston_base', 16, 64).get_tk(),
+            image=img.TK_BACKEND.sync_load(img.Handle.builtin('BEE2/piston_base', 16, 64)),
         )
         # The two movable ends.
-        self.canv_plat = self.canvas.create_image(32, 2, anchor='n', image=self.IMG_PIST.get_tk())
-        self.canv_dest = self.canvas.create_image(48, 2, anchor='n', image=self.IMG_DEST.get_tk())
+        self.canv_plat = self.canvas.create_image(
+            32, 2, anchor='n',
+            image=img.TK_BACKEND.sync_load(self.IMG_PIST),
+        )
+        self.canv_dest = self.canvas.create_image(
+            48, 2, anchor='n',
+            image=img.TK_BACKEND.sync_load(self.IMG_DEST)
+        )
         # Line representing the piston itself.
         self.canv_pist = self.canvas.create_line(7, 34, 28, 34, width=4, fill='#CEC9C6')
         # Line between top and selection.
@@ -397,8 +403,8 @@ class PistonPropGroup(PropGroup):
     def evt_mouse_leave(self, event: tk.Event) -> None:
         """Failsafe, when the mouse fully leaves reset them all."""
         self.cur_drag = None
-        self.canvas.itemconfigure(self.canv_plat, image=self.IMG_PIST.get_tk())
-        self.canvas.itemconfigure(self.canv_dest, image=self.IMG_DEST.get_tk())
+        self.canvas.itemconfigure(self.canv_plat, image=img.TK_BACKEND.sync_load(self.IMG_PIST))
+        self.canvas.itemconfigure(self.canv_dest, image=img.TK_BACKEND.sync_load(self.IMG_DEST))
 
     def evt_mouse_hover(self, event: tk.Event) -> None:
         """Update mouseover effects depending on position."""
@@ -407,11 +413,11 @@ class PistonPropGroup(PropGroup):
             hover = self.cur_drag or self.get_hit(event.x)
             self.canvas.itemconfigure(
                 self.canv_plat,
-                image=(self.IMG_PIST_SEL if hover == 'plat' else self.IMG_PIST).get_tk()
+                image=img.TK_BACKEND.sync_load(self.IMG_PIST_SEL if hover == 'plat' else self.IMG_PIST)
             )
             self.canvas.itemconfigure(
                 self.canv_dest,
-                image=(self.IMG_DEST_SEL if hover == 'dest' else self.IMG_DEST).get_tk()
+                image=img.TK_BACKEND.sync_load(self.IMG_DEST_SEL if hover == 'dest' else self.IMG_DEST)
             )
 
     def evt_mouse_drag(self, event: tk.Event) -> None:

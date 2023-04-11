@@ -215,7 +215,7 @@ class PaletteUI:
                 grp_menu = self.ui_menu
                 grp_tree = ''  # Root.
             for pal in sorted(palettes, key=lambda p: str(p.name)):
-                gear_img: img.tkImg | str = ICO_GEAR.get_tk() if pal.settings is not None else ''
+                gear_img: img.tkImg | str = img.TK_BACKEND.sync_load(ICO_GEAR) if pal.settings is not None else ''
                 grp_menu.add_radiobutton(
                     label=str(pal.name),
                     value=pal.uuid.hex,

@@ -556,7 +556,7 @@ def make_help_menu(parent: tk.Menu) -> None:
             help_menu.add_command(
                 command=functools.partial(background_run, open_url, res.url_key),
                 compound='left',
-                image=icons[res.icon].get_tk(),
+                image=img.TK_BACKEND.sync_load(icons[res.icon]),
             )
             localisation.set_menu_text(help_menu, res.name)
 

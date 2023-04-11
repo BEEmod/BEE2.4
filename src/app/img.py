@@ -543,16 +543,14 @@ class Handle:
             _load_nursery.start_soon(self._cleanup_task, self._cancel_cleanup)
         return self._load_pil()
 
-    def get_tk(self) -> ImageTk.PhotoImage:
-        """Load the TK image if required, then return it.
+    def force_load(self) -> None:
+        """Set this image as force-loaded.
 
-        Only available on BUILTIN type images since they cannot then be
-        reloaded.
+        This is only allowed on BUILTIN images, that don't come from packages.
         """
         if not self.allow_raw:
-            raise ValueError(f'Cannot use get_tk() on non-builtin type {self!r}!')
+            raise ValueError(f'Cannot force-load handle with non-builtin type {self!r}!')
         self._force_loaded = True
-        return self._load_tk(force=False)
 
     def _load_pil(self) -> Image.Image:
         """Load the PIL image if required, then return it."""
@@ -572,7 +570,7 @@ class Handle:
                 res = bg.convert('RGB')
                 self._bg_composited = True
             if self._cached_tk is None:
-                self._cached_tk = _TK_BACKEND._get_img(res.width, res.height)
+                self._cached_tk = TK_BACKEND._get_img(res.width, res.height)
             self._cached_tk.paste(res)
         return self._cached_tk
 
@@ -609,7 +607,7 @@ class Handle:
         If force is True, the image will be remade even if cached.
         """
         if self._loading is True:
-            return Handle.ico_loading(self.width, self.height).get_tk()
+            return TK_BACKEND.sync_load(Handle.ico_loading(self.width, self.height))
         if self._cached_tk is not None and not force:
             return self._cached_tk
         if self._loading is False:
@@ -618,7 +616,7 @@ class Handle:
                 _early_loads.add(self)
             else:
                 _load_nursery.start_soon(self._load_task, force)
-        return Handle.ico_loading(self.width, self.height).get_tk()
+        return TK_BACKEND.sync_load(Handle.ico_loading(self.width, self.height))
 
     async def _load_task(self, force: bool) -> None:
         """Scheduled to load images then apply to the labels."""
@@ -999,9 +997,19 @@ class TKImages(UIImage):
         """Clear cached TK images for this handle."""
         self._discard_img(self.tk_img.pop(handle, None))
 
+    def sync_load(self, handle: Handle) -> ImageTk.PhotoImage:
+        """Load the TK image if required immediately, then return it.
+
+        Only available on BUILTIN type images since they cannot then be
+        reloaded.
+        """
+        handle.force_load()
+        return handle._load_tk(force=False)
+
+
 # Todo: add actual initialisation of this.
-_TK_BACKEND = TKImages()
-_UIS.append(_TK_BACKEND)
+TK_BACKEND = TKImages()
+_UIS.append(TK_BACKEND)
 
 
 def _label_destroyed(ref: WeakRef[tkImgWidgetsT]) -> None:
