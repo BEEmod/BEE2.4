@@ -110,6 +110,7 @@ class TKImages(img.UIImage):
             if user.cur_handle is not None:
                 user.cur_handle._decref(user)
         image._incref(user)
+        user.cur_handle = image
         try:
             widget['image'] = self.tk_img[image]
         except KeyError:  # Need to load.
