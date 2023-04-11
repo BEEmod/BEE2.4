@@ -226,8 +226,17 @@ def _load_file(
     return image, uses_theme
 
 
+class User:
+    """A user is something that can contain an image, like a widget.
+
+    These are UI-library specific, except for handles themselves.
+    """
+    def show_loading(self) -> None:
+        """Change this user to temporarily show the loading icon."""
+
+
 @attrs.define(eq=False)
-class Handle:
+class Handle(User):
     """Represents an image that may be reloaded as required.
 
     The args are dependent on the type, and are used to create the image
@@ -239,7 +248,7 @@ class Handle:
     _cached_pil: Image.Image | None = attrs.field(init=False, default=None, repr=False)
     _cached_tk: ImageTk.PhotoImage | None = attrs.field(init=False, default=None, repr=False)
 
-    _users: set[WidgetWeakRef | Handle] = attrs.field(init=False, factory=set, repr=False)
+    _users: set[User] = attrs.field(init=False, factory=set, repr=False)
     # If set, get_tk()/get_pil() was used.
     _force_loaded: bool = attrs.field(init=False, default=False)
     # If true, this is in the queue to load.
@@ -528,12 +537,9 @@ class Handle:
             return False
 
         self._cached_pil = None
-        loading = self._request_load(force=True)
-        for label_ref in self._users:
-            if isinstance(label_ref, WeakRef):
-                label: tkImgWidgets | None = label_ref()
-                if label is not None:
-                    label['image'] = loading
+        self._request_load(force=True)
+        if _UI_IMPL is not None:
+            _UI_IMPL.ui_force_load(self)
         return True
 
     def get_pil(self) -> Image.Image:
@@ -608,21 +614,11 @@ class Handle:
         return TK_BACKEND.sync_load(Handle.ico_loading(self.width, self.height))
 
     async def _load_task(self, force: bool) -> None:
-        """Scheduled to load images then apply to the labels."""
+        """Scheduled to load images then apply to the widgets."""
         await trio.to_thread.run_sync(self._load_pil)
         self._loading = False
-        tk_ico = TK_BACKEND._load_tk(self, force)
-        for label_ref in self._users:
-            if isinstance(label_ref, WeakRef):
-                label: tkImgWidgets | None = label_ref()
-                if label is not None:
-                    try:
-                        label['image'] = tk_ico
-                    except tk.TclError:
-                        # Can occur if the image has been removed/destroyed, but
-                        # the Python object still exists. Ignore, should be
-                        # cleaned up shortly.
-                        pass
+        if _UI_IMPL is not None:
+            _UI_IMPL.ui_load_users(self, force)
 
     async def _cleanup_task(self, scope: trio.CancelScope) -> None:
         """Wait for the time to elapse, then clear the contents."""
@@ -942,12 +938,16 @@ class ImgTextOverlay(Handle):
 
 class UIImage(abc.ABC):
     """Interface for the image code specific to a UI library."""
-    def ui_load_handle(self, handle: Handle) -> None:
-        """This handle is being loaded, create the image."""
+    def ui_clear_handle(self, handle: Handle) -> None:
+        """The handle is no longer used, release resources it uses."""
         raise NotImplementedError
 
-    def ui_clear_handle(self, handle: Handle) -> None:
-        """Clear cached images for this handle."""
+    def ui_load_users(self, handle: Handle, force: bool) -> None:
+        """The PIL image is ready, apply it to the widgets using this handle."""
+        raise NotImplementedError
+
+    def ui_force_load(self, handle: Handle) -> None:
+        """Called when this handle is reloading, and should update all its widgets."""
         raise NotImplementedError
 
 

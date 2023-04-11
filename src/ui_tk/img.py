@@ -1,19 +1,48 @@
 """Image integrations for TKinter."""
 from __future__ import annotations
 
-from PIL import Image, ImageDraw, ImageTk
+import attrs
+from typing import TypeAlias, Union
+from tkinter import ttk
+import tkinter as tk
+
+from PIL import Image, ImageTk
 from srctools.logger import get_logger
 
 from app import img
 
+# Widgets with an image attribute that can be set.
+tkImgWidgets: TypeAlias = Union[tk.Label, ttk.Label, tk.Button, ttk.Button]
 
 LOGGER = get_logger(__name__)
+label_to_user: dict[tkImgWidgets, LabelStyleUser] = {}
 
 
 def get_app_icon(path: str) -> ImageTk.PhotoImage:
     """On non-Windows, retrieve the application icon."""
     with open(path, 'rb') as f:
         return ImageTk.PhotoImage(Image.open(f))
+
+
+def on_label_destroyed(e: tk.Event) -> None:
+    """When labels are destroyed, clean up their user."""
+    try:
+        user = label_to_user.pop(e.widget)
+    except (KeyError, TypeError, NameError):
+        # Interpreter could be shutting down and deleted globals, or we were
+        # called twice, etc. Just ignore.
+        pass
+    else:
+        if user.cur_handle is not None:
+            user.cur_handle._decref(user)
+        del user.label  # Clear this, to make GC easier.
+
+
+@attrs.define(eq=False)
+class LabelStyleUser(img.User):
+    """A user for widgets with an 'image' attribute."""
+    label: tkImgWidgets
+    cur_handle: img.Handle
 
 
 class TKImages(img.UIImage):
@@ -28,6 +57,15 @@ class TKImages(img.UIImage):
         """Set up the TK code."""
         self.unused_img = {}
         self.tk_img = {}
+
+    def sync_load(self, handle: img.Handle) -> ImageTk.PhotoImage:
+        """Load the TK image if required immediately, then return it.
+
+        Only available on BUILTIN type images since they cannot then be
+        reloaded.
+        """
+        handle.force_load()
+        return self._load_tk(handle, force=False)
 
     def _get_img(self, width: int, height: int) -> ImageTk.PhotoImage:
         """Recycle an old image, or construct a new one."""
@@ -55,15 +93,6 @@ class TKImages(img.UIImage):
         """Clear cached TK images for this handle."""
         self._discard_img(self.tk_img.pop(handle, None))
 
-    def sync_load(self, handle: img.Handle) -> ImageTk.PhotoImage:
-        """Load the TK image if required immediately, then return it.
-
-        Only available on BUILTIN type images since they cannot then be
-        reloaded.
-        """
-        handle.force_load()
-        return self._load_tk(handle, force=False)
-
     def _load_tk(self, handle: img.Handle, force: bool) -> ImageTk.PhotoImage:
         """Load the TK image if required, then return it."""
         image = self.tk_img.get(handle)
@@ -80,3 +109,26 @@ class TKImages(img.UIImage):
                 image = self.tk_img[handle] = self._get_img(res.width, res.height)
             image.paste(res)
         return image
+
+    def ui_load_users(self, handle: img.Handle, force: bool) -> None:
+        """Load this handle into the widgets using it."""
+        tk_img = self._load_tk(handle, force)
+        for user in handle._users:
+            if isinstance(user, LabelStyleUser):
+                try:
+                    user.label['image'] = tk_img
+                except tk.TclError:
+                    # Can occur if the image has been removed/destroyed, but
+                    # the Python object still exists. Ignore, should be
+                    # cleaned up shortly.
+                    pass
+
+    def ui_force_load(self, handle: img.Handle) -> None:
+        """Called when this handle is reloading, and should update all its widgets."""
+        loading = self._load_tk(
+            img.Handle.ico_loading(handle.width, handle.height),
+            False,
+        )
+        for user in handle._users:
+            if isinstance(user, LabelStyleUser):
+                user.label['image'] = loading
