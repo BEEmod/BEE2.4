@@ -22,6 +22,7 @@ import app
 from app import SubPane, localisation, tk_tools, TK_ROOT
 from app.tooltip import add_tooltip, set_tooltip
 from app.localisation import TransToken
+from ui_tk.img import TKImages
 from config.compile_pane import CompilePaneState, PLAYER_MODEL_ORDER
 import config
 import BEE2_config
@@ -315,7 +316,7 @@ def make_setter(section: str, config: str, variable: tk.Variable) -> None:
     variable.trace_add('write', callback)
 
 
-async def make_widgets() -> None:
+async def make_widgets(tk_img: TKImages) -> None:
     """Create the compiler options pane.
 
     """
@@ -351,7 +352,7 @@ async def make_widgets() -> None:
 
     async with trio.open_nursery() as nursery:
         nursery.start_soon(make_map_widgets, map_frame)
-        nursery.start_soon(make_comp_widgets, comp_frame)
+        nursery.start_soon(make_comp_widgets, comp_frame, tk_img)
 
     def update_label(e) -> None:
         """Force the top label to wrap."""
@@ -360,7 +361,7 @@ async def make_widgets() -> None:
     window.bind('<Configure>', update_label, add='+')
 
 
-async def make_comp_widgets(frame: ttk.Frame) -> None:
+async def make_comp_widgets(frame: ttk.Frame, tk_img: TKImages) -> None:
     """Create widgets for the compiler settings pane.
 
     These are generally things that are aesthetic, and to do with the file and
@@ -582,7 +583,7 @@ async def make_comp_widgets(frame: ttk.Frame) -> None:
     count_overlay.bar.grid(row=3, column=0, sticky='ew', padx=5)
 
     UI['refresh_counts'] = SubPane.make_tool_button(
-        count_frame,
+        count_frame, tk_img,
         'icons/tool_sub',
         lambda: refresh_counts(count_brush, count_entity, count_overlay),
     )
@@ -727,11 +728,11 @@ async def make_map_widgets(frame: ttk.Frame) -> None:
     model_frame.columnconfigure(0, weight=1)
 
 
-async def make_pane(tool_frame: tk.Frame, menu_bar: tk.Menu) -> None:
+async def make_pane(tool_frame: tk.Frame, tk_img: TKImages, menu_bar: tk.Menu) -> None:
     """Initialise when part of the BEE2."""
     global window
     window = SubPane.SubPane(
-        TK_ROOT,
+        TK_ROOT, tk_img,
         title=TransToken.ui('Compile Options'),
         name='compiler',
         menu_bar=menu_bar,
@@ -743,13 +744,14 @@ async def make_pane(tool_frame: tk.Frame, menu_bar: tk.Menu) -> None:
     )
     window.columnconfigure(0, weight=1)
     window.rowconfigure(0, weight=1)
-    await make_widgets()
+    await make_widgets(tk_img)
     await config.APP.set_and_run_ui_callback(CompilePaneState, apply_state)
 
 
 def init_application() -> None:
     """Initialise when standalone."""
     global window
+    from ui_tk.img import TK_IMG
     window = cast(SubPane.SubPane, TK_ROOT)
     localisation.set_win_title(window, TransToken.ui(
         'Compiler Options - {ver}',
@@ -758,6 +760,6 @@ def init_application() -> None:
 
     # TODO load async properly.
     import trio
-    trio.run(make_widgets)
+    trio.run(make_widgets, TK_IMG)
 
     TK_ROOT.deiconify()

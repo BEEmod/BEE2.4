@@ -4,7 +4,8 @@ import tkinter as tk
 from tkinter import ttk
 
 from app import localisation, tooltip, tk_tools, sound
-from app.img import Handle as ImgHandle, apply as apply_img
+from app.img import Handle as ImgHandle
+from ui_tk.img import TKImages
 from transtoken import TransToken
 from config.windows import WindowState
 import utils
@@ -21,14 +22,18 @@ style.configure('Toolbar.TButton', padding='-20',)
 TOOL_BTN_TOOLTIP = TransToken.ui('Hide/Show the "{window}" window.')
 
 
-def make_tool_button(frame: tk.Misc, img: str, command: Callable[[], Any]) -> ttk.Button:
+def make_tool_button(
+    frame: tk.Misc, tk_img: TKImages,
+    img: str,
+    command: Callable[[], Any],
+) -> ttk.Button:
     """Make a toolbar icon."""
     button = ttk.Button(
         frame,
         style=('Toolbar.TButton' if utils.MAC else 'BG.TButton'),
         command=command,
     )
-    apply_img(button, ImgHandle.builtin(img, 16, 16))
+    tk_img.apply(button, ImgHandle.builtin(img, 16, 16))
 
     return button
 
@@ -41,6 +46,7 @@ class SubPane(tk.Toplevel):
     def __init__(
         self,
         parent: Union[tk.Toplevel, tk.Tk],
+        tk_img: TKImages,
         *,
         tool_frame: Union[tk.Frame, ttk.Frame],
         tool_img: str,
@@ -66,7 +72,7 @@ class SubPane(tk.Toplevel):
         self.withdraw()  # Hide by default
 
         self.tool_button = make_tool_button(
-            frame=tool_frame,
+            tool_frame, tk_img,
             img=tool_img,
             command=self._toggle_win,
         )

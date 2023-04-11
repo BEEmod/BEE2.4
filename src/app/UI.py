@@ -48,7 +48,7 @@ from app import (
 )
 from app.selector_win import SelectorWin, Item as selWinItem, AttrDef as SelAttr
 from app.menu_bar import MenuBar
-from ui_tk.img import TKImages
+from ui_tk.img import TKImages, TK_IMG
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -298,7 +298,7 @@ class PalItem:
             width=12,
             height=12,
         )
-        img.apply(self.info_btn, ICO_GEAR)
+        TK_IMG.apply(self.info_btn, ICO_GEAR)
 
         click_func = contextWin.open_event(self)
         tk_tools.bind_rightclick(lbl, click_func)
@@ -375,7 +375,7 @@ class PalItem:
 
         Call whenever the style changes, so the icons update.
         """
-        img.apply(self.label, self.item.get_icon(self.subKey, self.is_pre))
+        TK_IMG.apply(self.label, self.item.get_icon(self.subKey, self.is_pre))
 
     def clear(self) -> bool:
         """Remove any items matching ourselves from the palette.
@@ -454,7 +454,7 @@ def quit_application() -> None:
 gameMan.quit_application = quit_application
 
 
-async def load_packages(packset: packages.PackagesSet) -> None:
+async def load_packages(packset: packages.PackagesSet, tk_img: TKImages) -> None:
     """Import in the list of items and styles from the packages.
 
     A lot of our other data is initialised here too.
@@ -522,10 +522,10 @@ async def load_packages(packset: packages.PackagesSet) -> None:
         try:
             if voice_id is None:
                 UI['conf_voice'].state(['disabled'])
-                img.apply(UI['conf_voice'], ICO_GEAR_DIS)
+                tk_img.apply(UI['conf_voice'], ICO_GEAR_DIS)
             else:
                 UI['conf_voice'].state(['!disabled'])
-                img.apply(UI['conf_voice'], ICO_GEAR)
+                tk_img.apply(UI['conf_voice'], ICO_GEAR)
         except KeyError:
             # When first initialising, conf_voice won't exist!
             pass
@@ -627,6 +627,29 @@ async def load_packages(packset: packages.PackagesSet) -> None:
 def current_style() -> packages.Style:
     """Return the currently selected style."""
     return packages.LOADED.obj_by_id(packages.Style, selected_style)
+
+
+def _debug_dump() -> None:
+    from ui_tk.img import label_to_user
+
+    def dump_widgets(widget: tk.Misc, indent: str) -> None:
+        """Dump em."""
+        f.write(f'{indent}{widget} ({type(widget).__qualname__})')
+        if widget in label_to_user:
+            f.write(f'.img = {label_to_user[widget].cur_handle!r}')  # type: ignore
+        children = widget.winfo_children()
+        if children:
+            indent += '\t'
+            f.write(': [\n')
+            for child in children:
+                dump_widgets(child, indent)
+            f.write(indent + ']\n')
+        else:
+            f.write('\n')
+
+    with open('F:/Git/BEE2.4/dev/widget_tree.txt', 'w') as f:
+        dump_widgets(TK_ROOT, '')
+    LOGGER.info('Dump done!')
 
 
 def reposition_panes() -> None:
@@ -838,13 +861,13 @@ def drag_start(drag_item: PalItem, e: tk.Event) -> None:
                 item.load_data()
 
         # When dragging off, switch to the single-only icon
-        img.apply(UI['drag_lbl'], drag_item.item.get_icon(
+        TK_IMG.apply(UI['drag_lbl'], drag_item.item.get_icon(
             drag_item.subKey,
             allow_single=False,
         ))
     else:
         drag_win.from_pal = False
-        img.apply(UI['drag_lbl'], drag_item.item.get_icon(
+        TK_IMG.apply(UI['drag_lbl'], drag_item.item.get_icon(
             drag_item.subKey,
             allow_single=True,
             single_num=0,
@@ -928,7 +951,7 @@ def drag_move(e: tk.Event) -> None:
                     # special label for this.
                     # The group item refresh will return this if nothing
                     # changes.
-                    img.apply(item.label, ICO_MOVING)
+                    TK_IMG.apply(item.label, ICO_MOVING)
                     break
 
         drag_win.passed_over_pal = True
@@ -1045,6 +1068,7 @@ def pal_shuffle() -> None:
 async def init_option(
     pane: SubPane.SubPane,
     pal_ui: paletteUI.PaletteUI,
+    tk_img: TKImages,
     export: Callable[[], object],
     corridor: corridor_selector.Selector,
 ) -> None:
@@ -1126,7 +1150,7 @@ async def init_option(
         except KeyError:
             pass
         else:
-            voiceEditor.show(chosen_voice)
+            voiceEditor.show(tk_img, chosen_voice)
     for ind, name in enumerate([
             TransToken.ui("Style: "),
             None,
@@ -1148,7 +1172,7 @@ async def init_option(
         width=8,
     )
     UI['conf_voice'].grid(row=0, column=0, sticky='NS')
-    img.apply(UI['conf_voice'], ICO_GEAR_DIS)
+    tk_img.apply(UI['conf_voice'], ICO_GEAR_DIS)
     tooltip.add_tooltip(
         UI['conf_voice'],
         TransToken.ui('Enable or disable particular voice lines, to prevent them from being added.'),
@@ -1203,14 +1227,14 @@ def flow_preview() -> None:
     UI['pre_sel_line'].lift()
 
 
-def init_preview(f: Union[tk.Frame, ttk.Frame]) -> None:
+def init_preview(tk_img: TKImages, f: Union[tk.Frame, ttk.Frame]) -> None:
     """Generate the preview pane.
 
      This shows the items that will export to the palette.
     """
     UI['pre_bg_img'] = tk.Label(f, bg=ItemsBG)
     UI['pre_bg_img'].grid(row=0, column=0)
-    img.apply(UI['pre_bg_img'], img.Handle.builtin('BEE2/menu', 271, 573))
+    tk_img.apply(UI['pre_bg_img'], img.Handle.builtin('BEE2/menu', 271, 573))
 
     UI['pre_disp_name'] = ttk.Label(
         f,
@@ -1225,14 +1249,14 @@ def init_preview(f: Union[tk.Frame, ttk.Frame]) -> None:
         borderwidth=0,
         relief="solid",
         )
-    img.apply(UI['pre_sel_line'], img.Handle.builtin('BEE2/sel_bar', 4, 64))
+    tk_img.apply(UI['pre_sel_line'], img.Handle.builtin('BEE2/sel_bar', 4, 64))
     pal_picked_fake.extend([
-        img.apply(ttk.Label(frames['preview']), IMG_BLANK)
+        tk_img.apply(ttk.Label(frames['preview']), IMG_BLANK)
         for _ in range(32)
     ])
 
     UI['pre_moving'] = ttk.Label(f)
-    img.apply(UI['pre_moving'], ICO_MOVING)
+    tk_img.apply(UI['pre_moving'], ICO_MOVING)
 
     flow_preview()
 
@@ -1329,7 +1353,7 @@ def flow_picker(e=None) -> None:
     y = (num_items // width)*65 + 1
     for i in range(extra_items):
         if i not in pal_items_fake:
-            pal_items_fake.append(img.apply(ttk.Label(frmScroll), IMG_BLANK))
+            pal_items_fake.append(TK_IMG.apply(ttk.Label(frmScroll), IMG_BLANK))
         pal_items_fake[i].place(x=((i + last_row) % width)*65 + 1, y=y)
 
     for item in pal_items_fake[extra_items:]:
@@ -1348,7 +1372,7 @@ def init_drag_icon() -> None:
     drag_win.withdraw()  # starts hidden
     drag_win.bind(tk_tools.EVENTS['LEFT_RELEASE'], drag_stop)
     UI['drag_lbl'] = ttk.Label(drag_win)
-    img.apply(UI['drag_lbl'], IMG_BLANK)
+    TK_IMG.apply(UI['drag_lbl'], IMG_BLANK)
     UI['drag_lbl'].grid(row=0, column=0)
     windows['drag_win'] = drag_win
 
@@ -1395,6 +1419,9 @@ async def init_windows(tk_img: TKImages) -> None:
     # Initialise the above and the menu bar.
     await gameMan.EVENT_BUS(None, gameMan.Game)
 
+    if not utils.FROZEN:
+        menu_bar.bar.add_command(label='Dump widgets', command=_debug_dump)
+
     ui_bg = tk.Frame(TK_ROOT, bg=ItemsBG, name='bg')
     ui_bg.grid(row=0, column=0, sticky='NSEW')
     TK_ROOT.columnconfigure(0, weight=1)
@@ -1413,7 +1440,7 @@ async def init_windows(tk_img: TKImages) -> None:
         sticky="NW",
         padx=(2, 5), pady=5,
     )
-    init_preview(frames['preview'])
+    init_preview(tk_img, frames['preview'])
     frames['preview'].update_idletasks()
     TK_ROOT.minsize(
         width=frames['preview'].winfo_reqwidth()+200,
@@ -1481,7 +1508,7 @@ async def init_windows(tk_img: TKImages) -> None:
     frames['toolMenu'].place(x=73, y=2)
 
     windows['pal'] = SubPane.SubPane(
-        TK_ROOT,
+        TK_ROOT, tk_img,
         title=TransToken.ui('Palettes'),
         name='pal',
         menu_bar=menu_bar.view_menu,
@@ -1522,7 +1549,7 @@ async def init_windows(tk_img: TKImages) -> None:
     loader.step('UI', 'packageman')
 
     windows['opt'] = SubPane.SubPane(
-        TK_ROOT,
+        TK_ROOT, tk_img,
         title=TransToken.ui('Export Options'),
         name='opt',
         menu_bar=menu_bar.view_menu,
@@ -1531,10 +1558,9 @@ async def init_windows(tk_img: TKImages) -> None:
         tool_img='icons/win_options',
         tool_col=2,
     )
-
     async with trio.open_nursery() as nurs:
         corridor = corridor_selector.Selector(packages.LOADED, tk_img)
-        nurs.start_soon(init_option, windows['opt'], pal_ui, export, corridor)
+        nurs.start_soon(init_option, windows['opt'], pal_ui, tk_img, export, corridor)
     async with trio.open_nursery() as nurs:
         nurs.start_soon(corridor.refresh)
     loader.step('UI', 'options')
@@ -1548,7 +1574,7 @@ async def init_windows(tk_img: TKImages) -> None:
     loader.step('UI', 'compiler')
 
     UI['shuffle_pal'] = SubPane.make_tool_button(
-        frame=frames['toolMenu'],
+        frames['toolMenu'], tk_img,
         img='icons/shuffle_pal',
         command=pal_shuffle,
     )

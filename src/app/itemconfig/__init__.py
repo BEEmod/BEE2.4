@@ -263,7 +263,7 @@ async def make_pane(
     global window
 
     window = SubPane(
-        TK_ROOT,
+        TK_ROOT, tk_img,
         title=TransToken.ui('Style/Item Properties'),
         name='item',
         legacy_name='style',

@@ -19,7 +19,7 @@ from transtoken import TransToken
 from app.tooltip import add_tooltip
 from app import img, TK_ROOT, localisation
 from app import tk_tools
-from ui_tk.img import TK_IMG
+from ui_tk.img import TKImages, TK_IMG
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -190,10 +190,10 @@ def save():
         win.withdraw()
 
 
-def add_tabs() -> None:
+def add_tabs(tk_img: TKImages) -> None:
     """Add the tabs to the notebook."""
     notebook = UI['tabs']
-    # Save the current tab index so we can restore it after.
+    # Save the current tab index, so we can restore it after.
     try:
         current_tab = notebook.index(notebook.select())
     except TclError:  # .index() will fail if the voice is empty,
@@ -208,13 +208,13 @@ def add_tabs() -> None:
             notebook.tab(
                 tab,
                 compound='image',
-                image=TK_IMG.sync_load(IMG_MID),
+                image=tk_img.sync_load(IMG_MID),
                 )
         if tab.nb_type is TabTypes.RESPONSE:
             notebook.tab(
                 tab,
                 compound=RIGHT,
-                image=TK_IMG.sync_load(IMG_RESP),
+                image=tk_img.sync_load(IMG_RESP),
                 # i18n: 'response' tab name, should be short.
                 text=str(TransToken.ui('Resp')),
             )
@@ -225,7 +225,7 @@ def add_tabs() -> None:
         notebook.select(current_tab)
 
 
-def show(quote_pack: QuotePack):
+def show(tk_img: TKImages, quote_pack: QuotePack) -> None:
     """Display the editing window."""
     global voice_item, config, config_mid, config_resp
     if voice_item is not None:
@@ -263,6 +263,7 @@ def show(quote_pack: QuotePack):
 
     for group in quote_data.find_all('quotes', 'group'):
         make_tab(
+            tk_img,
             quote_pack.pak_id,
             group,
             config,
@@ -279,6 +280,7 @@ def show(quote_pack: QuotePack):
 
     if len(mid_quotes):
         make_tab(
+            tk_img,
             quote_pack.pak_id,
             mid_quotes,
             config_mid,
@@ -294,6 +296,7 @@ def show(quote_pack: QuotePack):
 
     if len(responses):
         make_tab(
+            tk_img,
             quote_pack.pak_id,
             responses,
             config_resp,
@@ -304,14 +307,17 @@ def show(quote_pack: QuotePack):
     config_mid.save()
     config_resp.save()
 
-    add_tabs()
+    add_tabs(tk_img)
 
     win.deiconify()
     tk_tools.center_win(win)  # Center inside the parent
     win.lift()
 
 
-def make_tab(pak_id: str, group: Keyvalues, config: ConfigFile, tab_type: TabTypes) -> None:
+def make_tab(
+    tk_img: TKImages,
+    pak_id: str, group: Keyvalues, config: ConfigFile, tab_type: TabTypes,
+) -> None:
     """Create all the widgets for a tab."""
     if tab_type is TabTypes.MIDCHAMBER:
         # Mid-chamber voice lines have predefined values.
@@ -434,7 +440,7 @@ def make_tab(pak_id: str, group: Keyvalues, config: ConfigFile, tab_type: TabTyp
             )
             for x, (img_handle, ctx) in enumerate(badges):
                 label = ttk.Label(line_frame, padding=0)
-                img.apply(label, img_handle)
+                tk_img.apply(label, img_handle)
                 label.grid(row=0, column=x)
                 add_tooltip(label, ctx)
 

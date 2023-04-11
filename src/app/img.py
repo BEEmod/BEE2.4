@@ -931,10 +931,6 @@ class UIImage(abc.ABC):
         raise NotImplementedError
 
 
-# Todo: remove this import
-from ui_tk.img import TK_IMG as _TK_BACKEND
-
-
 # noinspection PyProtectedMember
 async def init(filesystems: Mapping[str, FileSystem], implementation: UIImage) -> None:
     """Load in the filesystems used in package and start the background loading."""
@@ -988,17 +984,6 @@ def refresh_all() -> None:
     LOGGER.info('Queued {} images to reload.', done)
 
 
-# noinspection PyProtectedMember
-def apply(widget, img: Handle | None):
-    """Set the image in a widget.
-
-    This tracks the widget, so later reloads will affect the widget.
-    If the image is None, it is instead unset.
-    """
-    _TK_BACKEND.apply(widget, img)
-    return widget
-
-
 @functools.lru_cache
 def get_pil_font(size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
     """Find a nice font for drawing into images."""
@@ -1017,6 +1002,7 @@ def get_pil_font(size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
     else:
         LOGGER.warning('Failed to find font, add more OS fonts!')
         return ImageFont.load_default()
+
 
 def make_splash_screen(
     max_width: float,

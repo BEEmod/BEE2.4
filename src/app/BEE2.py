@@ -75,7 +75,7 @@ async def init_app() -> None:
     music_conf.load_filesystems(package_sys.values())
     gameMan.load_filesystems(package_sys.values())
     async with trio.open_nursery() as nurs:
-        nurs.start_soon(UI.load_packages, packages.LOADED)
+        nurs.start_soon(UI.load_packages, packages.LOADED, TK_IMG)
     loadScreen.main_loader.step('UI', 'package_load')
     LOGGER.info('Done!')
 
