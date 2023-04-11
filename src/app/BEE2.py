@@ -66,8 +66,8 @@ async def init_app() -> None:
         ))
     package_sys = packages.PACKAGE_SYS
     loadScreen.main_loader.step('UI', 'pre_ui')
-    from ui_tk.img import TKImages
-    app.background_run(img.init, package_sys, img.TK_BACKEND)
+    from ui_tk.img import TK_IMG
+    app.background_run(img.init, package_sys, TK_IMG)
     app.background_run(sound.sound_task)
     app.background_run(localisation.load_aux_langs, gameMan.all_games, packages.LOADED)
 

@@ -199,3 +199,5 @@ class TKImages(img.UIImage):
         for user in handle._users:
             if isinstance(user, LabelStyleUser):
                 user.label['image'] = loading
+
+TK_IMG = TKImages()

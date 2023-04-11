@@ -10,11 +10,9 @@ from pathlib import Path
 from typing import Any, ClassVar, Dict, Iterable, Iterator, Tuple, TypeVar, Union, Type
 from typing_extensions import Self, TypeAlias, Final
 from collections.abc import Sequence, Mapping
-from weakref import ref as WeakRef
 from tkinter import ttk
 import tkinter as tk
 import abc
-import itertools
 import logging
 import functools
 

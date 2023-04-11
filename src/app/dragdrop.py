@@ -14,6 +14,7 @@ import tkinter
 from srctools.logger import get_logger
 
 from app import sound, img, TK_ROOT, tk_tools, background_run
+from ui_tk.img import TK_IMG
 import utils
 import event
 
@@ -306,8 +307,8 @@ class Manager(Generic[ItemT]):
     def unload_icons(self) -> None:
         """Reset all icons to blank. This way they can be destroyed."""
         for slot in self._slots:
-            img.apply(slot._lbl, self._img_blank)
-        img.apply(self._drag_lbl, self._img_blank)
+            TK_IMG.apply(slot._lbl, self._img_blank)
+        TK_IMG.apply(self._drag_lbl, self._img_blank)
 
     def sources(self) -> Iterator[Slot[ItemT]]:
         """Yield all source slots."""
@@ -383,7 +384,7 @@ class Manager(Generic[ItemT]):
                 image = item.dnd_icon
         else:
             image = item.dnd_icon
-        img.apply(lbl, image)
+        TK_IMG.apply(lbl, image)
 
     def _group_update(self, group: Optional[str]) -> None:
         """Update all target items with this group."""
@@ -559,7 +560,7 @@ class Slot(Generic[ItemT]):
 
         self.flexi_group = ''
 
-        img.apply(self._lbl, man._img_blank)
+        TK_IMG.apply(self._lbl, man._img_blank)
         tk_tools.bind_leftclick(self._lbl, self._evt_start)
         self._lbl.bind(tk_tools.EVENTS['LEFT_SHIFT'], self._evt_fastdrag)
         self._lbl.bind('<Enter>', self._evt_hover_enter)
@@ -584,7 +585,7 @@ class Slot(Generic[ItemT]):
                 self._lbl,
                 relief='ridge',
             )
-            img.apply(self._info_btn, img.Handle.builtin('icons/gear', 10, 10))
+            TK_IMG.apply(self._info_btn, img.Handle.builtin('icons/gear', 10, 10))
 
             @tk_tools.bind_leftclick(self._info_btn)
             def info_button_click(e: tkinter.Event) -> object:
@@ -822,8 +823,7 @@ async def test() -> None:
                 packages.LOADED,
                 loc,
             )
-    from ui_tk.img import TKImages
-    background_run(img.init, packages.PACKAGE_SYS,  img.TK_BACKEND)
+    background_run(img.init, packages.PACKAGE_SYS,  TK_IMG)
     background_run(sound.sound_task)
     print('Done.')
 

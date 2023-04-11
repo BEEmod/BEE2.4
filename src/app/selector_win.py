@@ -28,6 +28,7 @@ import srctools.logger
 from app.richTextBox import tkRichText
 from app.tooltip import add_tooltip, set_tooltip
 from app import localisation, tkMarkdown, tk_tools, sound, img, TK_ROOT, DEV_MODE
+from ui_tk.img import TK_IMG
 from packages import SelitemData
 from consts import (
     SEL_ICON_SIZE as ICON_SIZE,
@@ -445,7 +446,7 @@ class PreviewWindow:
         self.parent = parent
         self.index = 0
         self.img = item.previews
-        img.apply(self.display, self.img[0])
+        TK_IMG.apply(self.display, self.img[0])
 
         if len(self.img) > 1:
             self.prev_btn.grid(row=0, column=0, sticky='ns')
@@ -471,7 +472,7 @@ class PreviewWindow:
     def cycle(self, off: int) -> None:
         """Switch to a new image."""
         self.index = (self.index + off) % len(self.img)
-        img.apply(self.display, self.img[self.index])
+        TK_IMG.apply(self.display, self.img[self.index])
 
 
 _PREVIEW = PreviewWindow()
@@ -1089,7 +1090,7 @@ class SelectorWin(Generic[CallbackT]):
             if item.button is not None:
                 # Unpress everything.
                 item.button.state(('!alternate', '!pressed', '!active'))
-                img.apply(item.button, None)
+                TK_IMG.apply(item.button, None)
 
         if not self.first_open:  # We've got state to store.
             state = SelectorState(
@@ -1163,7 +1164,7 @@ class SelectorWin(Generic[CallbackT]):
 
         for item in self.item_list:
             if item.button is not None:
-                img.apply(item.button, item.icon)
+                TK_IMG.apply(item.button, item.icon)
 
         # Restore configured states.
         if self.first_open:
@@ -1269,7 +1270,7 @@ class SelectorWin(Generic[CallbackT]):
 
         # We have a large icon, use it.
         icon = item.large_icon if item.large_icon is not None else item.icon
-        img.apply(self.prop_icon, icon)
+        TK_IMG.apply(self.prop_icon, icon)
         self.prop_icon_frm.configure(width=icon.width, height=icon.height)
 
         if item.previews and not self.sampler:
@@ -1323,10 +1324,10 @@ class SelectorWin(Generic[CallbackT]):
             val = item.attrs.get(attr.id, attr.default)
 
             if attr.type is AttrTypes.BOOL:
-                img.apply(attr.label, ICON_CHECK if val else ICON_CROSS)
+                TK_IMG.apply(attr.label, ICON_CHECK if val else ICON_CROSS)
             elif attr.type is AttrTypes.COLOR:
                 assert isinstance(val, Vec)
-                img.apply(attr.label, img.Handle.color(val, 16, 16))
+                TK_IMG.apply(attr.label, img.Handle.color(val, 16, 16))
                 # Display the full color when hovering...
                 set_tooltip(attr.label, TRANS_ATTR_COLOR.format(
                     r=int(val.x), g=int(val.y), b=int(val.z),

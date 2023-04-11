@@ -22,6 +22,7 @@ from transtoken import TransToken
 import event
 import config
 import packages
+from ui_tk.img import TKImages
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -82,7 +83,7 @@ class Selector:
     corr_group: corridor.CorridorGroup
     conf_id: str
 
-    def __init__(self, packset: packages.PackagesSet) -> None:
+    def __init__(self, packset: packages.PackagesSet, tk_img: TKImages) -> None:
         self.sticky_corr = None
         self.img_ind = 0
         self.slots = []
@@ -117,9 +118,10 @@ class Selector:
 
         tk_tools.bind_mousewheel(self.wid_image, sel_img)
 
-        img.apply(self.wid_image_left, IMG_ARROW_LEFT)
-        img.apply(self.wid_image, IMG_CORR_BLANK)
-        img.apply(self.wid_image_right, IMG_ARROW_RIGHT)
+        tk_img.apply(self.wid_image_left, IMG_ARROW_LEFT)
+        tk_img.apply(self.wid_image, IMG_CORR_BLANK)
+        tk_img.apply(self.wid_image_right, IMG_ARROW_RIGHT)
+        self.tk_img = tk_img
 
         self.wid_title = ttk.Label(
             frm_right,
@@ -478,7 +480,7 @@ class Selector:
             localisation.set_text(self.wid_title, TransToken.BLANK)
             self.wid_desc.set_text(corridor.EMPTY_DESC)
             localisation.set_text(self.wid_authors, TransToken.BLANK)
-            img.apply(self.wid_image, IMG_CORR_BLANK)
+            self.tk_img.apply(self.wid_image, IMG_CORR_BLANK)
             self.wid_image_left.state(('disabled', ))
             self.wid_image_right.state(('disabled', ))
 
@@ -496,9 +498,9 @@ class Selector:
             self.img_ind = 0
 
         if self.cur_images:
-            img.apply(self.wid_image, self.cur_images[self.img_ind])
+            self.tk_img.apply(self.wid_image, self.cur_images[self.img_ind])
         else:
-            img.apply(self.wid_image, corridor.ICON_GENERIC_LRG)
+            self.tk_img.apply(self.wid_image, corridor.ICON_GENERIC_LRG)
         self.wid_image_left.state(('!disabled', ) if self.img_ind > 0 else ('disabled', ))
         self.wid_image_right.state(('!disabled', ) if self.img_ind < max_ind else ('disabled', ))
 
@@ -506,10 +508,11 @@ class Selector:
 async def test() -> None:
     from app import background_run
     from typing import Dict
-    background_run(img.init, Dict[str, srctools.FileSystem]())
+    from ui_tk.img import TK_IMG
+    background_run(img.init, Dict[str, srctools.FileSystem](), TK_IMG)
     background_run(sound.sound_task)
 
-    test_sel = Selector(packages.LOADED)
+    test_sel = Selector(packages.LOADED, TK_IMG)
     config.APP.read_file()
     test_sel.show()
     with trio.CancelScope() as scope:
