@@ -842,19 +842,25 @@ class Package:
             LOGGER.info('Need to extract resources - {} is unzipped!', self.id)
             return True
 
-        zip_modtime = int(self.path.stat().st_mtime)
+        if self.enabled:
+            zip_modtime = int(self.path.stat().st_mtime)
 
-        # If zero, it's never extracted...
-        if zip_modtime != mod_time or mod_time == 0:
-            LOGGER.info('Need to extract resources - {} is stale!', self.id)
-            return True
+            # If zero, it's never extracted...
+            if zip_modtime != mod_time or mod_time == 0:
+                LOGGER.info('Need to extract resources - {} is stale!', self.id)
+                return True
+        else:
+            # For disabled packages, need to refresh if we were extracted.
+            if mod_time != 0:
+                LOGGER.info('Need to extract resources - {} was previously enabled.', self.id)
+                return True
         return False
 
     def get_modtime(self) -> int:
         """After the cache has been extracted, set the modification dates
          in the config."""
-        if isinstance(self.fsys, RawFileSystem):
-            # No modification time
+        # Raw filesystems have no mod time. Do the same for disabled ones.
+        if isinstance(self.fsys, RawFileSystem) or not self.enabled:
             return 0
         else:
             return int(self.path.stat().st_mtime)

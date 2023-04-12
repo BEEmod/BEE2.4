@@ -9,6 +9,7 @@
 * Display the authors of corridors.
 * Add some informative errors if Unstationary Scaffolds (or similar UCP items) are connected in an
   invalid manner.
+* Skip disabled packages when extracting resources.
 
 ### UCP-Relevant Enhancements:
 * Added an `Inherit` option to Corridor Groups. This specifies the ID of another style, causing all

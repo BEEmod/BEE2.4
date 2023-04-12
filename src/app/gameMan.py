@@ -567,8 +567,10 @@ class Game:
         """
         screen_func = export_screen.step
 
-        with res_system:
-            for file in res_system.walk_folder_repeat():
+        for pack in packages.LOADED.packages.values():
+            if not pack.enabled:
+                continue
+            for file in pack.fsys.walk_folder('resources'):
                 try:
                     start_folder, path = file.path.split('/', 1)
                 except ValueError:
