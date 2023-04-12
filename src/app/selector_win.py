@@ -1107,6 +1107,7 @@ class SelectorWin(Generic[CallbackT]):
             self.win.grab_release()
         self.win.withdraw()
         self.set_disp()
+        self.prop_desc.set_text('')  # Free resources used.
         self.do_callback()
 
     def set_disp(self, _: tk.Event = None) -> str:

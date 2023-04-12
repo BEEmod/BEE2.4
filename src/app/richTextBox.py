@@ -154,7 +154,6 @@ class tkRichText(tkinter.Text):
         text_data should either be a string, or the data returned from
         tkMarkdown.convert().
         """
-
         # Remove all previous link commands
         for cmd_tag, cmd_id in self._link_commands.values():
             self.tag_unbind(cmd_tag, '<Button-1>', funcid=cmd_id)
@@ -162,6 +161,7 @@ class tkRichText(tkinter.Text):
 
         self['state'] = "normal"
         try:
+            TK_IMG.textwid_clear(self)
             self.delete(1.0, 'end')
 
             # Basic mode, insert just blocks of text.
@@ -196,9 +196,7 @@ class tkRichText(tkinter.Text):
                     super().insert('end', text, tags)
                 elif isinstance(block, tkMarkdown.Image):
                     super().insert('end', '\n')
-                    # TODO: Setup apply to handle this properly, this breaks everything.
-                    block.handle._force_loaded = True
-                    self.image_create('end', image=TK_IMG._load_tk(block.handle, False))
+                    TK_IMG.textwid_add(self, 'end', block.handle)
                     super().insert('end', '\n')
                 else:
                     raise ValueError('Unknown block {!r}?'.format(block))

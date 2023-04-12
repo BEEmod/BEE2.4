@@ -460,6 +460,8 @@ def hide_context(e=None):
         window.withdraw()
         sound.fx('contract')
         selected_item = selected_sub_item = None
+        # Clear the description, to free images.
+        wid['desc'].set_text('')
 
 
 def init_widgets(tk_img: TKImages) -> None:

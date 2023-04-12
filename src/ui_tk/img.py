@@ -26,6 +26,7 @@ tkImg: TypeAlias = Union[ImageTk.PhotoImage, tk.PhotoImage]
 
 LOGGER = get_logger(__name__)
 label_to_user: dict[tkImgWidgets, LabelStyleUser] = {}
+textwid_to_user: dict[tk.Text, TextWidUser] = {}
 
 
 def get_app_icon(path: str) -> ImageTk.PhotoImage:
@@ -36,6 +37,9 @@ def get_app_icon(path: str) -> ImageTk.PhotoImage:
 
 def _on_destroyed(e: tk.Event) -> None:
     """When widgets are destroyed, clear their associated images."""
+    if isinstance(e.widget, tk.Text):
+        _on_textwid_destroyed(e.widget)
+        return
     user = label_to_user.pop(e.widget, None)
     if user is None:
         # It's not got an image.
@@ -44,14 +48,37 @@ def _on_destroyed(e: tk.Event) -> None:
         user.cur_handle._decref(user)
     del user.label  # Remove a GC cycle for easier cleanup.
 
+
+def _on_textwid_destroyed(textwid: tk.Text) -> None:
+    """When text widgets are destroyed, clean up their user."""
+    try:
+        user = textwid_to_user.pop(textwid)
+    except (KeyError, TypeError, NameError):
+        # Interpreter could be shutting down and deleted globals, or we were
+        # called twice, etc. Just ignore.
+        pass
+    else:
+        for handle in user.handle_to_ids:
+            handle._decref(user)
+        user.handle_to_ids.clear()
+        del user.text  # Remove a GC cycle for easier cleanup.
+
 # When any widget is destroyed, notify us to allow clean-up.
 TK_ROOT.bind_class('all', '<Destroy>', _on_destroyed, add='+')
+
 
 @attrs.define(eq=False)
 class LabelStyleUser(img.User):
     """A user for widgets with an 'image' attribute."""
     label: tkImgWidgets
     cur_handle: img.Handle | None
+
+
+@attrs.define(eq=False)
+class TextWidUser(img.User):
+    """A user for Text widgets, which may have multiple images inserted."""
+    text: tk.Text
+    handle_to_ids: dict[img.Handle, list[str]]
 
 
 class TKImages(img.UIImage):
@@ -97,7 +124,6 @@ class TKImages(img.UIImage):
         try:
             user = label_to_user[widget]
         except KeyError:
-            # No user yet, create + bind.
             user = label_to_user[widget] = LabelStyleUser(widget, None)
         else:
             if user.cur_handle is image:
@@ -113,6 +139,36 @@ class TKImages(img.UIImage):
             loading = image._request_load()
             widget['image'] = self._load_tk(loading, False)
         return widget
+
+    def textwid_add(self, textwid: tk.Text, index: str, image: img.Handle) -> None:
+        """Add an image to a tkinter.Text widget, at the specified location."""
+        try:
+            user = textwid_to_user[textwid]
+        except KeyError:
+            # No user yet, create + bind.
+            user = textwid_to_user[textwid] = TextWidUser(textwid, {})
+        try:
+            ids_list = user.handle_to_ids[image]
+        except KeyError:  # First time this is added to this widget.
+            ids_list = user.handle_to_ids[image] = []
+            image._incref(user)
+        try:
+            tk_img = self.tk_img[image]
+        except KeyError:  # Need to load.
+            loading = image._request_load()
+            tk_img = self._load_tk(loading, False)
+        ids_list.append(textwid.image_create(index, image=tk_img))
+
+    def textwid_clear(self, textwid: tk.Text) -> None:
+        """Remove all added images from this text widget, freeing resources."""
+        try:
+            user = textwid_to_user.pop(textwid)
+        except KeyError:
+            return  # Not used at all, don't care.
+        for handle, ids_list in user.handle_to_ids.items():
+            handle._decref(user)
+            for img_id in ids_list:
+                textwid.delete(img_id)
 
     def _get_img(self, width: int, height: int) -> ImageTk.PhotoImage:
         """Recycle an old image, or construct a new one."""
@@ -196,6 +252,16 @@ class TKImages(img.UIImage):
                     # the Python object still exists. Ignore, should be
                     # cleaned up shortly.
                     pass
+            elif isinstance(user, TextWidUser):
+                try:
+                    img_ids = user.handle_to_ids[handle]
+                except KeyError:
+                    continue
+                for img_id in img_ids:
+                    try:
+                        user.text.image_configure(img_id, image=tk_img)
+                    except tk.TclError:
+                        pass
 
     def ui_force_load(self, handle: img.Handle) -> None:
         """Called when this handle is reloading, and should update all its widgets."""
