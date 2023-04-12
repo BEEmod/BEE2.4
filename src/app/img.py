@@ -31,6 +31,8 @@ import utils
 _handles: dict[tuple[Type[Handle], tuple, int, int], Handle] = {}
 
 LOGGER = srctools.logger.get_logger('img')
+LOGGER.setLevel('INFO')
+
 FSYS_BUILTIN = RawFileSystem(str(utils.install_path('images')))
 PACK_SYSTEMS: dict[str, FileSystem] = {}
 
@@ -597,6 +599,7 @@ class Handle(User):
         if not scope.cancel_called and self._loading is not None and not self._users:
             if _UI_IMPL is not None:
                 _UI_IMPL.ui_clear_handle(self)
+            LOGGER.debug('Clear handle: {}', self)
             self._cached_pil = None
 
 
