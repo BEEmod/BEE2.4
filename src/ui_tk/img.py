@@ -34,22 +34,18 @@ def get_app_icon(path: str) -> ImageTk.PhotoImage:
         return ImageTk.PhotoImage(Image.open(f))
 
 
-def on_label_destroyed(e: tk.Event) -> None:
-    """When labels are destroyed, clean up their user."""
-    try:
-        user = label_to_user.pop(e.widget)
-    except (KeyError, TypeError, NameError):
-        # Interpreter could be shutting down and deleted globals, or we were
-        # called twice, etc. Just ignore.
-        pass
-    else:
-        if user.cur_handle is not None:
-            user.cur_handle._decref(user)
-        del user.label  # Clear this, to make GC easier.
+def _on_destroyed(e: tk.Event) -> None:
+    """When widgets are destroyed, clear their associated images."""
+    user = label_to_user.pop(e.widget, None)
+    if user is None:
+        # It's not got an image.
+        return
+    if user.cur_handle is not None:
+        user.cur_handle._decref(user)
+    del user.label  # Remove a GC cycle for easier cleanup.
 
-
-label_destroy_cmd = TK_ROOT.register(on_label_destroyed, needcleanup=False)
-
+# When any widget is destroyed, notify us to allow clean-up.
+TK_ROOT.bind_class('all', '<Destroy>', _on_destroyed, add='+')
 
 @attrs.define(eq=False)
 class LabelStyleUser(img.User):
