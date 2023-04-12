@@ -71,7 +71,7 @@ class Selector:
     # moused over. Reset on style/group swap.
     sticky_corr: Optional[corridor.CorridorUI]
     # The currently selected images.
-    cur_images: Sequence[img.Handle]
+    cur_images: Optional[Sequence[img.Handle]]
     img_ind: int
 
     # The slots items are on.
@@ -86,6 +86,7 @@ class Selector:
     def __init__(self, packset: packages.PackagesSet, tk_img: TKImages) -> None:
         self.sticky_corr = None
         self.img_ind = 0
+        self.cur_images = None
         self.slots = []
         self.sel_count = 0
         self.sel_handle_moving = False
@@ -477,6 +478,7 @@ class Selector:
             else:
                 self.wid_desc.set_text(corr.desc)
         else:  # Reset.
+            self.cur_images = None
             localisation.set_text(self.wid_title, TransToken.BLANK)
             self.wid_desc.set_text(corridor.EMPTY_DESC)
             localisation.set_text(self.wid_authors, TransToken.BLANK)
@@ -486,12 +488,17 @@ class Selector:
 
     def _sel_img(self, direction: int) -> None:
         """Go forward or backwards in the preview images."""
+        if self.cur_images is None:
+            # Not selected, hide entirely.
+            self.img_ind = 0
+            self.tk_img.apply(self.wid_image, IMG_CORR_BLANK)
+            return
+
         direction = min(1, max(-1, direction))  # Clamp
 
         max_ind = len(self.cur_images) - 1
         self.img_ind += direction
-        # Order this and the comparisons so size = 0 means index is forced to 0 with both
-        # hidden.
+        # These comparisons are ordered so that img_ind is forced to 0 if cur_images is empty.
         if self.img_ind > max_ind:
             self.img_ind = max_ind
         if self.img_ind < 0:
@@ -499,7 +506,7 @@ class Selector:
 
         if self.cur_images:
             self.tk_img.apply(self.wid_image, self.cur_images[self.img_ind])
-        else:
+        else:  # No icons, use a generic one.
             self.tk_img.apply(self.wid_image, corridor.ICON_GENERIC_LRG)
         self.wid_image_left.state(('!disabled', ) if self.img_ind > 0 else ('disabled', ))
         self.wid_image_right.state(('!disabled', ) if self.img_ind < max_ind else ('disabled', ))
