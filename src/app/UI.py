@@ -304,14 +304,22 @@ class PalItem:
         tk_tools.bind_rightclick(lbl, click_func)
 
         @tk_tools.bind_leftclick(self.info_btn)
-        def info_button_click(e):
+        def info_button_click(e) -> str:
+            """When clicked, show the context window."""
             click_func(e)
             # Cancel the event sequence, so it doesn't travel up to the main
             # window and hide the window again.
             return 'break'
 
-        # Rightclick does the same as the icon.
+        # Right-click does the same as the icon.
         tk_tools.bind_rightclick(self.info_btn, click_func)
+
+    def __del__(self) -> None:
+        """When destroyed, clean up the label."""
+        try:
+            self.label.destroy()
+        except AttributeError:
+            pass
 
     @property
     def name(self) -> TransToken:
