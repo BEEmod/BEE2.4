@@ -31,7 +31,7 @@ from babel.messages.pofile import read_po, write_po
 from babel.messages.mofile import write_mo
 from babel.messages import Catalog
 from babel.numbers import format_decimal
-from babel.dates import format_date, format_datetime, format_skeleton, format_timedelta
+from babel.dates import format_date, format_datetime, format_skeleton
 from babel.localedata import load as load_cldr
 from babel.lists import format_list
 import babel
