@@ -7,7 +7,7 @@ import trio
 from tkinter import ttk, messagebox
 from typing import (
     Callable, Union, Generic, TypeVar, Protocol, Optional,
-    List, Tuple, Dict, Iterator, Iterable,
+    List, Tuple, Dict, Iterator, Iterable, runtime_checkable,
 )
 import tkinter
 
@@ -22,6 +22,7 @@ __all__ = ['Manager', 'Slot', 'ItemProto', 'ItemGroupProto']
 LOGGER = get_logger(__name__)
 
 
+@runtime_checkable
 class ItemProto(Protocol):
     """Protocol draggable items satisfy."""
     @property
@@ -30,6 +31,7 @@ class ItemProto(Protocol):
         return img.Handle.error(0, 0)
 
 
+@runtime_checkable
 class ItemGroupProto(ItemProto, Protocol):
     """Additional values required when grouping."""
     @property
@@ -286,7 +288,7 @@ class Manager(Generic[ItemT]):
         groups: Dict[Optional[str], int] = defaultdict(int)
         for slot in self._slots:
             if not slot.is_source:
-                groups[getattr(slot.contents, 'dnd_group', None)] += 1
+                groups[slot.contents_group] += 1
 
         groups[None] = 2  # This must always be ungrouped.
 
@@ -298,7 +300,7 @@ class Manager(Generic[ItemT]):
                 self._display_item(
                     slot._lbl,
                     slot.contents,
-                    groups[getattr(slot.contents, 'dnd_group', None)] == 1
+                    groups[slot.contents_group] == 1
                 )
 
         if self._cur_drag is not None:
@@ -394,7 +396,7 @@ class Manager(Generic[ItemT]):
         group_slots = [
             slot for slot in self._slots
             if not slot.is_source
-            if getattr(slot.contents, 'dnd_group', None) == group
+            if slot.contents_group == group
         ]
 
         has_group = len(group_slots) == 1
@@ -413,7 +415,7 @@ class Manager(Generic[ItemT]):
         if not slot.is_source:
             slot.contents = None
 
-            # If none of this group are present in the targets and we're
+            # If none of this group are present in the targets, and we're
             # pulling from the items, we hold a group icon.
             try:
                 group = self._cur_drag.dnd_group  # type: ignore
@@ -422,7 +424,7 @@ class Manager(Generic[ItemT]):
             else:
                 if group is not None:
                     for other_slot in self._slots:
-                        if other_slot.is_target and getattr(other_slot.contents, 'dnd_group', None) == group:
+                        if other_slot.is_target and other_slot.contents_group == group:
                             break
                     else:
                         # None present.
@@ -670,6 +672,13 @@ class Slot(Generic[ItemT]):
         else:
             # Just update myself.
             self.man._display_item(self._lbl, value)
+            
+    @property
+    def contents_group(self) -> Optional[str]:
+        """If the item in this slot has a group, return it."""
+        if self._contents is not None:
+            return getattr(self._contents, 'dnd_group', None)
+        return None
 
     def __repr__(self) -> str:
         return f'<{self.kind.name} Slot @ {id(self):016x}: {self._contents!r}>'
