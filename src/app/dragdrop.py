@@ -226,9 +226,8 @@ class Manager(Generic[ItemT]):
     ) -> Slot[ItemT]:
         """Add a slot to this group, which can have items added/removed.
 
-        Parameters:
-            - parent: Parent widget for the slot.
-            - label: Set to a short string to be displayed in the lower-left.
+        :param parent: Parent widget for the slot.
+        :param label: Set to a short string to be displayed in the lower-left.
               Intended for numbers.
         """
         slot: Slot[ItemT] = Slot(self, parent, SlotType.TARGET, label)
@@ -242,9 +241,8 @@ class Manager(Generic[ItemT]):
     ) -> Slot[ItemT]:
         """Add a readonly slot to this group which the user can fetch copies from.
 
-        Parameters:
-            - parent: Parent widget for the slot.
-            - label: Set to a short string to be displayed in the lower-left.
+        :param parent: Parent widget for the slot.
+        :param label: Set to a short string to be displayed in the lower-left.
               Intended for numbers.
         """
         slot: Slot[ItemT] = Slot(self, parent, SlotType.SOURCE, label)
@@ -262,11 +260,9 @@ class Manager(Generic[ItemT]):
         These slots can have items dragged into/out of them, but when present any destroyed items
         get put into a spare flexi slot. The total number of these should match the number of
         sources.
-        Parameters:
-            - parent: Parent widget for the slot.
-            - group: The group it's categorised in, should match that returned by the
-              pick_flexi_group() callback.
-            - label: Set to a short string to be displayed in the lower-left.
+
+        :param parent: Parent widget for the slot.
+        :param label: Set to a short string to be displayed in the lower-left.
               Intended for numbers.
         """
         if self._pick_flexi_group is None:
