@@ -1,9 +1,11 @@
 """Configures which signs are defined for the Signage item."""
 from typing import Optional, Sequence, Tuple, List, Dict
 import tkinter as tk
-import trio
+from datetime import timedelta
+
 from tkinter import ttk
 
+import trio
 import srctools.logger
 
 from ui_tk.img import TKImages
@@ -181,7 +183,7 @@ async def init_widgets(master: tk.Widget, tk_img: TKImages) -> Optional[tk.Widge
     for i in SIGN_IND:
         SLOTS_SELECTED[i] = slot = drag_man.slot_target(
             frame_selected,
-            label=f'00:{i:02g}'
+            label=TransToken.untranslated('{delta:ms}').format(delta=timedelta(seconds=i)),
         )
         row, col = divmod(i-3, 4)
         slot.grid(row=row, column=col, padx=1, pady=1)

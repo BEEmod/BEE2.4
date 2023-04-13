@@ -13,7 +13,8 @@ import tkinter
 
 from srctools.logger import get_logger
 
-from app import sound, img, TK_ROOT, tk_tools, background_run
+from app import localisation, sound, img, TK_ROOT, tk_tools, background_run
+from transtoken import TransToken
 from ui_tk.img import TK_IMG
 import utils
 import event
@@ -222,7 +223,7 @@ class Manager(Generic[ItemT]):
     def slot_target(
         self,
         parent: tkinter.Misc,
-        label: str='',
+        label: TransToken = TransToken.BLANK,
     ) -> Slot[ItemT]:
         """Add a slot to this group, which can have items added/removed.
 
@@ -237,7 +238,7 @@ class Manager(Generic[ItemT]):
     def slot_source(
         self,
         parent: tkinter.Misc,
-        label: str='',
+        label: TransToken = TransToken.BLANK,
     ) -> Slot[ItemT]:
         """Add a readonly slot to this group which the user can fetch copies from.
 
@@ -253,7 +254,7 @@ class Manager(Generic[ItemT]):
         self,
         parent: tkinter.Misc,
         *,
-        label: str='',
+        label: TransToken = TransToken.BLANK,
     ) -> Slot[ItemT]:
         """Add a 'flexible' slot to this group.
 
@@ -545,7 +546,7 @@ class Slot(Generic[ItemT]):
         man: Manager,
         parent: tkinter.Misc,
         kind: SlotType,
-        label: str,
+        label: TransToken,
     ) -> None:
         """Internal only, use Manager.slot()."""
         self.man = man
@@ -570,11 +571,11 @@ class Slot(Generic[ItemT]):
         if label:
             self._text_lbl = tkinter.Label(
                 self._lbl,
-                text=label,
                 font=('Helvetica', -12),
                 relief='ridge',
                 bg=img.PETI_ITEM_BG_HEX,
             )
+            localisation.set_text(self._text_lbl, label)
         else:
             self._text_lbl = None
 
@@ -895,14 +896,18 @@ async def test() -> None:
 
     for y in range(8):
         for x in range(4):
-            slot = manager.slot_target(left_frm, label=(format(x + 4*y, '02') if y < 3 else ''))
+            slot = manager.slot_target(
+                left_frm,
+                label=TransToken.untranslated('{n:00}').format(n=x + 4*y)
+                if y < 3 else TransToken.BLANK
+            )
             slot.grid(column=x, row=y, padx=1, pady=1)
             slot_dest.append(slot)
 
-    FLEXI = True
+    FLEXI = False
     right_kind = manager.slot_flexi if FLEXI else manager.slot_source
     for i, item in enumerate(items):
-        slot = right_kind(right_canv, label=format(i+1, '02'))
+        slot = right_kind(right_canv, label=TransToken.untranslated('{n:00}').format(n=i+1))
         slot_src.append(slot)
         slot.contents = item
 
