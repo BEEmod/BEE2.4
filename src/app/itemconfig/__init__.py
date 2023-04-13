@@ -4,6 +4,7 @@ from typing import (
     Awaitable, Type,
 )
 from typing_extensions import TypeAlias
+from datetime import timedelta
 from tkinter import ttk
 import tkinter as tk
 import functools
@@ -72,13 +73,10 @@ _UI_IMPL_SINGLE: dict[WidgetType, SingleCreateFunc] = {}
 _UI_IMPL_MULTI: dict[WidgetType, MultiCreateFunc] = {}
 
 INF = TransToken.untranslated('∞')
-# i18n: The format for timer numerals.
-_TIMER_TRANS = TransToken.ui('{timer_num:00}')
 TIMER_NUM_TRANS: Dict[TimerNum, TransToken] = {
-    num: _TIMER_TRANS.format(timer_num=num)
+    num: TransToken.untranslated('{delta:ms}').format(delta=timedelta(seconds=float(num)))
     for num in TIMER_NUM
 }
-del _TIMER_TRANS
 TIMER_NUM_TRANS[TIMER_STR_INF] = INF
 TRANS_COLON = TransToken.untranslated('{text}: ')
 TRANS_GROUP_HEADER = TransToken.ui('{name} ({page}/{count})')  # i18n: Header layout for Item Properties pane.
