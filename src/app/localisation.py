@@ -31,7 +31,7 @@ from babel.messages.pofile import read_po, write_po
 from babel.messages.mofile import write_mo
 from babel.messages import Catalog
 from babel.numbers import format_decimal
-from babel.dates import format_date, format_datetime
+from babel.dates import format_date, format_datetime, format_skeleton, format_timedelta
 from babel.localedata import load as load_cldr
 from babel.lists import format_list
 import babel
@@ -144,6 +144,24 @@ class UIFormatter(string.Formatter):
             return format_datetime(value, format_spec or 'medium', locale=self.locale)
         if isinstance(value, datetime.date):
             return format_date(value, format_spec or 'medium', self.locale)
+        if isinstance(value, datetime.timedelta):
+            # format_skeleton gives access to useful HH:mm:ss layouts, but it accepts a datetime.
+            # So convert our delta to a datetime - the format string should just ignore the date
+            # part.
+            if value.days > 0:
+                raise ValueError("This doesn't work for durations over a day.")
+            sec = float(value.seconds)
+            mins, sec = divmod(sec, 60.0)
+            hours, mins = divmod(mins, 60.0)
+            return format_skeleton(
+                format_spec or 'Hms',
+                datetime.time(
+                    hour=round(hours), minute=round(mins), second=round(sec),
+                    microsecond=value.microseconds,
+                    tzinfo=datetime.timezone.utc,
+                ),
+                locale=self.locale,
+            )
         return format(value, format_spec)
 
 
