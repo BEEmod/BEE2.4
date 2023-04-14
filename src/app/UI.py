@@ -637,29 +637,6 @@ def current_style() -> packages.Style:
     return packages.LOADED.obj_by_id(packages.Style, selected_style)
 
 
-def _debug_dump() -> None:
-    from ui_tk.img import label_to_user
-
-    def dump_widgets(widget: tk.Misc, indent: str) -> None:
-        """Dump em."""
-        f.write(f'{indent}{widget} ({type(widget).__qualname__})')
-        if widget in label_to_user:
-            f.write(f'.img = {label_to_user[widget].cur_handle!r}')  # type: ignore
-        children = widget.winfo_children()
-        if children:
-            indent += '\t'
-            f.write(': [\n')
-            for child in children:
-                dump_widgets(child, indent)
-            f.write(indent + ']\n')
-        else:
-            f.write('\n')
-
-    with open('F:/Git/BEE2.4/dev/widget_tree.txt', 'w') as f:
-        dump_widgets(TK_ROOT, '')
-    LOGGER.info('Dump done!')
-
-
 def reposition_panes() -> None:
     """Position all the panes in the default places around the main window."""
     comp_win = CompilerPane.window
@@ -1426,9 +1403,6 @@ async def init_windows(tk_img: TKImages) -> None:
     gameMan.EVENT_BUS.register(None, gameMan.Game, set_game)
     # Initialise the above and the menu bar.
     await gameMan.EVENT_BUS(None, gameMan.Game)
-
-    if not utils.FROZEN:
-        menu_bar.bar.add_command(label='Dump widgets', command=_debug_dump)
 
     ui_bg = tk.Frame(TK_ROOT, bg=ItemsBG, name='bg')
     ui_bg.grid(row=0, column=0, sticky='NSEW')

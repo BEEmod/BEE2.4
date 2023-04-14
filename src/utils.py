@@ -120,6 +120,8 @@ else:
     # Check if this was produced by above
     DEV_MODE = '#' in BEE_VERSION
 
+# Regular dev mode is enable-able by users, this is only for people editing code.
+CODE_DEV_MODE = DEV_MODE
 BITNESS = '64' if sys.maxsize > (2 << 48) else '32'
 BEE_VERSION += f' {BITNESS}-bit'
 

@@ -111,6 +111,13 @@ class MenuBar:
         helpMenu.make_help_menu(bar, tk_img)
         gameMan.EVENT_BUS.register(None, gameMan.Game, self._game_changed)
 
+        if utils.CODE_DEV_MODE:
+            self.dev_menu = tk.Menu(parent)  # Don't bother translating.
+            bar.add_cascade(menu=self.dev_menu, label='Dev')
+
+            from ui_tk import devmenu
+            devmenu.make_menu(self.dev_menu)
+
     def set_export_allowed(self, allowed: bool) -> None:
         """Configure if exporting is allowed from the UI."""
         self._can_export = allowed

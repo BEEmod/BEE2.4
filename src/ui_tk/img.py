@@ -170,6 +170,17 @@ class TKImages(img.UIImage):
             for img_id in ids_list:
                 textwid.delete(img_id)
 
+    def stats(self) -> str:
+        """Return some debugging stats."""
+        info = [
+            img.stats(),
+            'TK images:\n'
+            f' - Used = {len(self.tk_img)}\n',
+        ]
+        for (x, y), unused in self.unused_img.items():
+            info.append(f' - {x}x{y} = {len(unused)}\n')
+        return ''.join(info)
+
     def _get_img(self, width: int, height: int) -> ImageTk.PhotoImage:
         """Recycle an old image, or construct a new one."""
         if not width:

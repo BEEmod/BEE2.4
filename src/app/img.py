@@ -13,6 +13,7 @@ from collections.abc import Sequence, Mapping
 import abc
 import logging
 import functools
+import weakref
 
 from PIL import ImageFont, ImageTk, Image, ImageDraw
 import attrs
@@ -29,12 +30,15 @@ import utils
 
 # Used to keep track of the used handles, so we can deduplicate them.
 _handles: dict[tuple[Type[Handle], tuple, int, int], Handle] = {}
+# _handles: weakref.WeakValueDictionary[tuple[Type[Handle], tuple, int, int], Handle] = weakref.WeakValueDictionary()
 
 LOGGER = srctools.logger.get_logger('img')
 LOGGER.setLevel('INFO')
 
 FSYS_BUILTIN = RawFileSystem(str(utils.install_path('images')))
 PACK_SYSTEMS: dict[str, FileSystem] = {}
+# Force-loaded handles must be kept alive.
+_force_loaded_handles: list[Handle] = []
 
 # Silence DEBUG messages from Pillow, they don't help.
 logging.getLogger('PIL').setLevel(logging.INFO)
@@ -519,7 +523,7 @@ class Handle(User):
         """Load the PIL image if required, then return it."""
         if self.allow_raw:
             # Force load, so it's always ready.
-            self._force_loaded = True
+            self.force_load()
         elif not self._users and _load_nursery is not None:
             # Loading something unused, schedule it to be cleaned soon.
             self._cancel_cleanup.cancel()
@@ -534,7 +538,9 @@ class Handle(User):
         """
         if not self.allow_raw:
             raise ValueError(f'Cannot force-load handle with non-builtin type {self!r}!')
-        self._force_loaded = True
+        if not self._force_loaded:
+            _force_loaded_handles.append(self)
+            self._force_loaded = True
 
     def _load_pil(self) -> Image.Image:
         """Load the PIL image if required, then return it."""
@@ -997,6 +1003,16 @@ def refresh_all() -> None:
         if handle.has_users() and handle.reload():
             done += 1
     LOGGER.info('Queued {} images to reload.', done)
+
+
+def stats() -> str:
+    """Fetch various debugging stats."""
+    return f'''
+Handles: {len(_handles)}
+Theme: {_current_theme}
+Force-loaded: {len(_force_loaded_handles)}
+Tasks: {len(_load_nursery.child_tasks) if _load_nursery is not None else '<N/A>'}
+'''
 
 
 @functools.lru_cache
