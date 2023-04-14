@@ -932,8 +932,12 @@ class UIImage(abc.ABC):
 
 
 # noinspection PyProtectedMember
-async def init(filesystems: Mapping[str, FileSystem], implementation: UIImage) -> None:
-    """Load in the filesystems used in package and start the background loading."""
+async def init(
+    filesystems: Mapping[str, FileSystem], implementation: UIImage,
+    *, task_status: 'trio.TaskStatus' = trio.TASK_STATUS_IGNORED,
+) -> None:
+    """Start the background loading of images, using the specified filesystem and implementation.
+    """
     global _load_nursery, _UI_IMPL
 
     PACK_SYSTEMS.clear()
@@ -944,16 +948,27 @@ async def init(filesystems: Mapping[str, FileSystem], implementation: UIImage) -
             (sys, 'resources/materials/models/props_map_editor/'),
         )
 
-    _UI_IMPL = implementation
+    try:
+        _UI_IMPL = implementation
 
-    async with trio.open_nursery() as _load_nursery:
-        LOGGER.debug('Early loads: {}', _early_loads)
-        while _early_loads:
-            handle = _early_loads.pop()
-            if handle._users:
-                _load_nursery.start_soon(Handle._load_task, handle, False)
-        _load_nursery.start_soon(_UI_IMPL.ui_anim_task, _load_handles.values())
-        await trio.sleep_forever()
+        async with trio.open_nursery() as _load_nursery:
+            LOGGER.debug('Early loads: {}', _early_loads)
+            while _early_loads:
+                handle = _early_loads.pop()
+                if handle._users:
+                    _load_nursery.start_soon(Handle._load_task, handle, False)
+            _load_nursery.start_soon(_UI_IMPL.ui_anim_task, _load_handles.values())
+            task_status.started()
+            # Sleep, until init() is potentially cancelled.
+            await trio.sleep_forever()
+    finally:
+        # Unset and clear everything, for the benefit of test code.
+        _UI_IMPL = None
+        _load_nursery = None
+        _current_theme = Theme.LIGHT
+        PACK_SYSTEMS.clear()
+        _load_handles.clear()
+        _early_loads.clear()
 
 
 def set_theme(new_theme: Theme) -> None:
