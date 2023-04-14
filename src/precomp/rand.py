@@ -53,7 +53,7 @@ def parse_weights(count: int, weights: str) -> list[int]:
     return weight
 
 
-def init_seed(vmf: VMF) -> str:
+def init_seed(vmf: VMF) -> None:
     """Seed with the map layout.
 
     We use the position of the ambient light instances, which is unique to any
@@ -61,7 +61,7 @@ def init_seed(vmf: VMF) -> str:
     is relevant.
     """
     amb_light = instanceLocs.resolve_one('<ITEM_POINT_LIGHT>', error=True)
-    light_names = []
+    light_names: list[bytes] = []
     for inst in vmf.by_class['func_instance']:
         if inst['file'].casefold() == amb_light:
             pos = Vec.from_str(inst['origin']) / 64
@@ -70,8 +70,6 @@ def init_seed(vmf: VMF) -> str:
     for name in light_names:
         MAP_HASH.update(name)
     LOGGER.debug('Map random seed: {}', MAP_HASH.hexdigest())
-
-    return b'|'.join(light_names).decode()  # TODO Remove
 
 
 def seed(
