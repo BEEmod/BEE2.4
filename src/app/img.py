@@ -28,9 +28,11 @@ from consts import Theme
 import utils
 
 
-# Used to keep track of the used handles, so we can deduplicate them.
-_handles: dict[tuple[Type[Handle], tuple, int, int], Handle] = {}
-# _handles: weakref.WeakValueDictionary[tuple[Type[Handle], tuple, int, int], Handle] = weakref.WeakValueDictionary()
+# Used to deduplicate handles with existing ones. But if they're totally unused, let them die.
+_handles: weakref.WeakValueDictionary[
+    tuple[Type[Handle], tuple, int, int],
+    Handle,
+] = weakref.WeakValueDictionary()
 
 LOGGER = srctools.logger.get_logger('img')
 LOGGER.setLevel('INFO')
