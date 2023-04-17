@@ -39,6 +39,7 @@ from precomp import (
     template_brush,
     texturing,
     tiling,
+    tiling_gen,
     barriers,
     connections,
     options,
@@ -945,13 +946,13 @@ def change_brush(vmf: VMF) -> None:
                 # Use fancy goo on the level with the
                 # highest number of blocks.
                 # All plane z are the same.
-                face.mat = texturing.SPECIAL.get(
+                texturing.SPECIAL.get(
                     face.get_origin(), (
                         'goo' if
                         face.planes[0].z == best_goo
                         else 'goo_cheap'
                     ),
-                )
+                ).apply(face)
 
     if make_bottomless:
         LOGGER.info('Creating Bottomless Pits...')
@@ -1145,7 +1146,7 @@ def change_overlays(vmf: VMF) -> None:
         del over['targetname']
         del over['bee_noframe']  # Not needed anymore.
 
-        over['material'] = mat = texturing.OVERLAYS.get(over.get_origin(), sign_type)
+        over['material'] = mat = texturing.OVERLAYS.get(over.get_origin(), sign_type).mat
         if not mat:
             over.remove()
         if sign_size != 16:
@@ -1649,7 +1650,7 @@ async def main() -> None:
         conditions.check_all(vmf, coll, info)
         add_extra_ents(vmf, info)
 
-        tiling.generate_brushes(vmf)
+        tiling_gen.generate_brushes(vmf)
         faithplate.gen_faithplates(vmf, info.has_attr('superposition'))
         change_overlays(vmf)
         fix_worldspawn(vmf)

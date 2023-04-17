@@ -12,6 +12,7 @@ from srctools import FrozenAngle, FrozenMatrix, FrozenVec, VMF, Vec, Angle, Enti
 # This should be copied to use for specific purposes, never modified.
 MAP_HASH = hashlib.sha256()
 ONE_FLOAT = Struct('f')
+ONE_INT = Struct('<i')
 THREE_FLOATS = Struct('<3f')
 NINE_FLOATS = Struct('<9e')  # Half-precision float, don't need the accuracy.
 THREE_INTS = Struct('<3i')
@@ -74,7 +75,7 @@ def init_seed(vmf: VMF) -> None:
 
 def seed(
     name: bytes,
-    *values: str | Entity | float | bytes | bytearray | Vec | FrozenVec | Angle | FrozenAngle | Matrix | FrozenMatrix,
+    *values: str | Entity | int | bool | float | bytes | bytearray | Vec | FrozenVec | Angle | FrozenAngle | Matrix | FrozenMatrix,
 ) -> Random:
     """Initialise a random number generator with these starting arguments.
 
@@ -91,6 +92,11 @@ def seed(
             algo.update(THREE_FLOATS.pack(round(a, 6), round(b, 6), round(c, 6)))
         elif isinstance(val, float):
             algo.update(ONE_FLOAT.pack(val))
+        elif isinstance(val, bool):
+            algo.update(b'\xff' if val else b'\x00')
+        elif isinstance(val, int):
+            # If multi-digit, cycle back in.
+            algo.update(ONE_INT.pack(hash(val)))
         elif isinstance(val, (Matrix, FrozenMatrix)):
             algo.update(NINE_FLOATS.pack(
                 val[0, 0], val[0, 1], val[0, 2],
@@ -107,5 +113,5 @@ def seed(
             try:
                 algo.update(val)
             except TypeError:
-                raise TypeError(values)
+                raise TypeError(val, values)
     return Random(int.from_bytes(algo.digest(), 'little'))

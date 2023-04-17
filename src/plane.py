@@ -223,11 +223,23 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
         y += self._yoff
         try:
             x += self._xoffs[y]
-            if self._data[y][x] is not _UNSET:
-                self._used -= 1
-                self._data[y][x] = _UNSET
-        except IndexError:  # Already deleted.
-            pass
+            row = self._data[y]
+            if not row or row[x] is _UNSET:
+                return  # Already deleted.
+        except IndexError:  # Slot not present, exit.
+            return
+        self._used -= 1
+        row[x] = _UNSET
+        # If we're the last cell, trim off UNSET from the end.
+        # This way the grid shrinks itself.
+        if x + 1 == len(row):
+            while row and row[-1] is _UNSET:
+                row.pop()
+            if not row:
+                self._data[y] = None
+                # Pop rows themselves too.
+                while self._data and not self._data[-1]:
+                    self._data.pop()
 
     def clear(self) -> None:
         """Remove all data from the plane."""
@@ -235,6 +247,26 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
         self._yoff = self._used = 0
         self._xoffs.clear()
         self._data.clear()
+
+    def largest_index(self) -> Tuple[int, int, ValT]:
+        """Find a high index position, then return it plus the value.
+
+        For iterating through the grid in an arbitary order, this is the cheapest to pop.
+        """
+        # Items we don't match are able to be popped since they're useless.
+        while self._data:
+            if not (row := self._data[-1]):
+                self._data.pop()
+                self._xoffs.pop()
+                continue
+            if (value := row[-1]) is _UNSET:
+                row.pop()
+                continue
+            y_ind = len(self._data) - 1
+            x = len(row) - 1 - self._xoffs[y_ind]
+            y = y_ind - self._yoff
+            return x, y, value
+        raise KeyError('Empty grid!')
 
     def values(self) -> ValuesView[ValT]:
         """D.values() -> a set-like object providing a view on D's values"""
