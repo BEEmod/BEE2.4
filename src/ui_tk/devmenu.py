@@ -1,13 +1,15 @@
 """Options specifically for app development."""
 from typing import Callable
-
 from tkinter import ttk
 import tkinter as tk
-import trio
+import pprint
+
 
 from srctools import logger
+import attrs
+import trio
 
-from app import TK_ROOT, background_run, img, tk_tools
+from app import TK_ROOT, background_run, tk_tools
 from ui_tk.img import label_to_user, TK_IMG
 
 
@@ -50,7 +52,7 @@ def make_stats_window() -> Callable[[], object]:
     window.withdraw()
     window.protocol("WM_DELETE_WINDOW", lambda: cancel_scope.cancel())  # Late binding.
 
-    label = ttk.Label(window, name='info', text='...')
+    label = ttk.Label(window, name='info', text='...', font='TkFixedFont')
     window.grid_columnconfigure(0, weight=1)
     window.grid_rowconfigure(0, weight=1)
     label.grid(row=0, column=0, sticky='NSEW')
@@ -67,7 +69,12 @@ def make_stats_window() -> Callable[[], object]:
             tk_tools.center_win(window, TK_ROOT)
             ticker = False
             while not cancel_scope.cancel_called:
-                label['text'] = TK_IMG.stats()
+                label['text'] = '\n'.join([
+                    TK_IMG.stats(),
+                    'Trio = ' + pprint.pformat(
+                        attrs.asdict(trio.lowlevel.current_statistics(), recurse=True)
+                    ),
+                ])
                 ticker = not ticker
                 ticker_lbl['text'] = '|' if ticker else '-'
                 await trio.sleep(1.0)
