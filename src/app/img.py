@@ -604,7 +604,10 @@ class Handle(User):
         with scope:
             await trio.sleep(5)
         # We weren't cancelled and are empty, cleanup.
-        if not scope.cancel_called and self._loading is not None and not self._users:
+        if (
+            not scope.cancel_called and not self._users and
+            not self._force_loaded and self._loading is not None
+        ):
             if _UI_IMPL is not None:
                 _UI_IMPL.ui_clear_handle(self)
             LOGGER.debug('Clear handle: {}', self)
