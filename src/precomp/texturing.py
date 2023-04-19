@@ -151,11 +151,11 @@ class QuarterRot(Enum):
     @property
     def mat_y(self) -> Matrix:
         """Return the matrix performing this rotation, around the Y axis."""
-        return Matrix.from_yaw(self.value)
+        return Matrix.from_pitch(self.value)
 
     @property
     def mat_z(self) -> Matrix:
-        """Return the matrix performing this rotation, around the X axis."""
+        """Return the matrix performing this rotation, around the Z axis."""
         return Matrix.from_yaw(self.value)
 
 
