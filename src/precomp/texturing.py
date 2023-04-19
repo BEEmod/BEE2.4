@@ -203,12 +203,12 @@ class TileSize(str, Enum):
 
     @property
     def width(self) -> int:
-        """Return the number of 32-size tiles this takes up horizontally."""
+        """Return the number of 32-size tiles this takes up, horizontally."""
         return self.size[0]
 
     @property
     def height(self) -> int:
-        """Return the number of 32-size tiles this takes up horizontally."""
+        """Return the number of 32-size tiles this takes up, vertically."""
         return self.size[1]
 
     @property
@@ -246,7 +246,7 @@ class MaterialConf:
     def parse(cls, kv: Keyvalues, tile_size: TileSize = TileSize.TILE_4x4) -> MaterialConf:
         """Parse a property block."""
         if not kv.has_children():
-            return MaterialConf(kv.value)
+            return cls(kv.value,  tile_size=tile_size)
         try:
             material = kv['material']
         except LookupError:
@@ -757,8 +757,12 @@ def load_config(conf: Keyvalues) -> None:
             # If not provided, use defaults. Otherwise, ignore them entirely.
             if not any(textures.values()):
                 for tex_name, tex_default in tex_defaults.items():
+                    assert isinstance(tex_name, TileSize), f'{tex_name}: {tex_default}'
                     # Use default scale/rotation.
-                    textures[tex_name] = [MaterialConf(tex_default) if isinstance(tex_default, str) else MaterialConf]
+                    textures[tex_name] = [
+                        MaterialConf(tex_default, tile_size=tex_name)
+                        if isinstance(tex_default, str) else tex_default
+                    ]
             for subprop in gen_conf.find_children('weights'):
                 try:
                     size = TileSize(subprop.name)
