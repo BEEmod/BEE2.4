@@ -38,10 +38,8 @@ class TexDef:
 
 # We're making huge numbers of these, cache them.
 make_subtile = functools.lru_cache(maxsize=None)(SubTile)
-make_texdef = functools.lru_cache(maxsize=32)(TexDef)
+make_texdef = functools.lru_cache(maxsize=64)(TexDef)
 TEXDEF_NODRAW = TexDef(MaterialConf(consts.Tools.NODRAW))
-# We know we don't modify the tiledefs while generating.
-_cached_bevel = functools.lru_cache(maxsize=32)(TileDef.should_bevel)
 
 
 @attrs.define
@@ -72,14 +70,17 @@ ALLOWED_SIZES: dict[TileType, list[TileSize]] = {
 def _compute_bevel(tile: TileDef, u: int, v: int, neighbour: SubTile | None) -> bool:
     if neighbour is None:
         # We know we don't modify the tiledefs while generating.
-        return tile.should_bevel(u, v)
+        return _cached_bevel(tile, u, v)
     if neighbour.type is TileType.VOID:  # Always bevel towards instances.
         return True
     if neighbour.type.is_tile:  # If there's a tile, no need to bevel since it's never visible.
         return False
     # We know we don't modify the tiledefs while generating.
-    return tile.should_bevel(u, v)
+    return _cached_bevel(tile, u, v)
 
+# We know we don't modify the tiledefs while generating.
+_cached_bevel = functools.lru_cache(maxsize=64)(TileDef.should_bevel)
+compute_bevel = functools.lru_cache(maxsize=64)(_compute_bevel)
 
 def bevel_split(
     texture_plane: Plane[TexDef],
@@ -94,19 +95,19 @@ def bevel_split(
         # These are sort of reversed around, which is a little confusing.
         # Bevel U is facing in the U direction, running across the V.
         bevel_umins: list[bool] = [
-            _compute_bevel(tile_pos[min_u, v], -1, 0, orig_tiles[min_u-1, v])
+            compute_bevel(tile_pos[min_u, v], -1, 0, orig_tiles[min_u-1, v])
             for v in v_range
         ]
         bevel_umaxes: list[bool] = [
-            _compute_bevel(tile_pos[max_u, v], 1, 0, orig_tiles[max_u+1, v])
+            compute_bevel(tile_pos[max_u, v], 1, 0, orig_tiles[max_u+1, v])
             for v in v_range
         ]
         bevel_vmins: list[bool] = [
-            _compute_bevel(tile_pos[u, min_v], 0, -1, orig_tiles[u, min_v-1])
+            compute_bevel(tile_pos[u, min_v], 0, -1, orig_tiles[u, min_v-1])
             for u in u_range
         ]
         bevel_vmaxes: list[bool] = [
-            _compute_bevel(tile_pos[u, max_v], 0, 1, orig_tiles[u, min_v+1])
+            compute_bevel(tile_pos[u, max_v], 0, 1, orig_tiles[u, min_v+1])
             for u in u_range
         ]
 
@@ -127,6 +128,12 @@ def bevel_split(
 
 def generate_brushes(vmf: VMF) -> None:
     """Generate all the brushes in the map, then set overlay sides."""
+    # Clear just in case.
+    make_subtile.cache_clear()
+    make_texdef.cache_clear()
+    compute_bevel.cache_clear()
+    _cached_bevel.cache_clear()
+
     LOGGER.info('Generating tiles...')
     # The key is (normal, plane distance)
     full_tiles: dict[
@@ -178,7 +185,10 @@ def generate_brushes(vmf: VMF) -> None:
 
     for (norm_x, norm_y, norm_z, plane_dist), tiles in full_tiles.items():
         generate_plane(vmf, search_dists, Vec(norm_x, norm_y, norm_z), plane_dist, tiles)
-    LOGGER.info('Caches: subtile={}, texdef={}', make_subtile.cache_info(), make_texdef.cache_info())
+    LOGGER.info(
+        'Caches: subtile={}, texdef={}, compute_bevel={}',
+        make_subtile.cache_info(), make_texdef.cache_info(), compute_bevel.cache_info(),
+    )
 
     LOGGER.info('Generating goop...')
     generate_goo(vmf)
