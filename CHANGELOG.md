@@ -25,6 +25,7 @@
 * Set a title for the corridor selector window.
 * Always pack generated resources even if packing is disabled in options.
 * Parse game translation files in an even more lenient way, to handle some Portal 2 files correctly.
+* Fix potential z-fighting near the hinge of static angled panels.
 
 ------------------------------------------
 

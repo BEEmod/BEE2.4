@@ -682,11 +682,11 @@ class Panel:
                     # Figure out the appropriate face info. We don't really
                     # care about texture scaling etc.
                     clip_face.uaxis = UVAxis(*orient.left())
-                    clip_face.vaxis = UVAxis(*orient.up())
+                    clip_face.vaxis = UVAxis(*orient.forward())
                     clip_face.planes = [
-                        panel_offset + Vec(0, 64, -64) @ orient,
-                        panel_offset + Vec(0, 64, 64) @ orient,
-                        panel_offset + Vec(0, -64, 64) @ orient,
+                        panel_offset + Vec(64, 64, 0) @ orient,
+                        panel_offset + Vec(0, 64, 0) @ orient,
+                        panel_offset + Vec(0, -64, 0) @ orient,
                     ]
                     clip_face.mat = consts.Tools.NODRAW
 
