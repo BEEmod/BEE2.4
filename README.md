@@ -43,14 +43,15 @@ As of version 4.37 we have stopped supporting BEE2.4 on Mac. See [this wiki arti
 ### Compilation ###
 
 * You'll need Python 3.8 or later, for 32-bit / Windows 7 you need 3.8 specifically.
-* First, grab the 3 git repositories you need:
+* First, grab the repo and then clone the HammerAddons submodule:
 
-	    git clone https://github.com/TeamSpen210/HammerAddons.git
-	    git clone https://github.com/BEEmod/BEE2.4.git
+	    git clone --recurse-submodules https://github.com/BEEmod/BEE2.4.git
+        cd BEE2.4
+	    git submodules update --init
 
 * Run `python -m pip install -r requirements.txt` to install the required packages. On Linux, 
-Pillow might need to be installed via the system package manager with the TK component: 
-`python-pillow`, `python-pillow.imagetk`.
+Pillow, TK and IDLE might need to be installed via the system package manager:
+`python-pillow`, `python-pillow.imagetk`, `python-tkinter`, `python-idle`, etc.
 
 * To allow sound effects in the app, you need a copy of FFmpeg:
 	* In the `BEE2.4` folder, add `lib-32` and/or `lib-64/` folders.
