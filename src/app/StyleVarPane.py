@@ -241,16 +241,19 @@ async def make_stylevar_pane(
         var_id: str,
         tk_var: IntVar,
         *checks: ttk.Checkbutton,
+        cback: Callable[[], object] = lambda: None,
     ) -> None:
         """Makes functions for syncing stylevar state. """
         async def apply_state(state: State) -> None:
             """Applies the given state."""
             tk_var.set(state.value)
+            cback()
         await config.APP.set_and_run_ui_callback(State, apply_state, var_id)
 
         def cmd_func() -> None:
             """When clicked, store configuration."""
             config.APP.store_conf(State(tk_var.get() != 0), var_id)
+            cback()
 
         for check in checks:
             check['command'] = cmd_func
@@ -267,19 +270,7 @@ async def make_stylevar_pane(
         # Special case - this needs to refresh the filter when swapping,
         # so the items disappear or reappear.
         if var.id == 'UnlockDefault':
-            def on_unlock_default_set() -> None:
-                """Update item filters when this is changed by the user."""
-                config.APP.store_conf(State(unlock_def_var.get() != 0), 'UnlockDefault')
-                update_item_vis()
-
-            async def apply_unlock_default(state: State) -> None:
-                """Update item filters when this is changed by config."""
-                unlock_def_var.set(state.value)
-                update_item_vis()
-
-            unlock_def_var = int_var
-            chk['command'] = on_unlock_default_set
-            await config.APP.set_and_run_ui_callback(State, apply_unlock_default, var.id)
+            await add_state_syncers(var.id, int_var, chk, cback=update_item_vis)
         else:
             await add_state_syncers(var.id, int_var, chk)
 
