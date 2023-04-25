@@ -172,10 +172,10 @@ async def main() -> None:
             if len(binds):
                 url, port = binds[0].rsplit(':', 1)
                 with srctools.AtomicWriter(SERVER_INFO_FILE) as f:
-                    json.dump(ServerInfo({
-                        'port': int(port),
-                        'coop_text': str(TOK_COOP_SHOWURL),
-                    }), f)
+                    json.dump(ServerInfo(
+                        port=int(port),
+                        coop_text=str(TOK_COOP_SHOWURL),
+                    ), f)
             else:
                 return  # No connection?
             with stop_sleeping:
