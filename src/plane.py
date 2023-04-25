@@ -58,10 +58,10 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
 
     @classmethod
     def fromkeys(
-        cls: Type['Plane[ValT]'],
+        cls: Type[Plane[ValT]],
         source: Union[Plane, Iterable[Tuple[int, int]]],
         value: ValT,
-    ) -> 'Plane[ValT]':
+    ) -> Plane[ValT]:
         """Create a plane from an existing set of keys, setting all values to a specific value."""
         if isinstance(source, Plane):
             res: Plane[ValT] = cls.__new__(cls)
@@ -78,7 +78,7 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
                 res[xy] = value
             return res
 
-    def copy(self) -> 'Plane[ValT]':
+    def copy(self) -> Plane[ValT]:
         """Shallow-copy the plane."""
         cpy = Plane.__new__(Plane)
         cpy.__dict__.update(self.__dict__)  # Immutables
@@ -91,7 +91,7 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
 
     __copy__ = copy
 
-    def __deepcopy__(self, memodict: dict={}) -> 'Plane[ValT]':
+    def __deepcopy__(self, memodict: dict[int, Any] | None = None) -> Plane[ValT]:
         """Deep-copy the plane."""
         cpy = Plane.__new__(Plane)
         cpy.__dict__.update(self.__dict__) # Immutables

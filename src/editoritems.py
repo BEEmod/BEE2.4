@@ -153,7 +153,7 @@ class OccuType(Flag):
     DEFAULT = SOLID | GRATE | GLASS | BRIDGE | FIZZLER | PHYSICS | ANTLINES
 
     @classmethod
-    def parse(cls, tok: Tokenizer) -> 'OccuType':
+    def parse(cls, tok: Tokenizer) -> OccuType:
         """Parse the collision type value."""
         coll = cls.NOTHING
         for part in tok.expect(Token.STRING).split():
@@ -329,7 +329,7 @@ class Coord:
         yield self.z
 
     @classmethod
-    def from_vec(cls, vec: Vec) -> 'Coord':
+    def from_vec(cls, vec: Vec) -> Coord:
         """Round a vector to grid coordinates."""
         x = round(vec.x)
         y = round(vec.y)
@@ -342,7 +342,7 @@ class Coord:
             return result
 
     @classmethod
-    def parse(cls, value: str, error_func: Callable[..., BaseException]) -> 'Coord':
+    def parse(cls, value: str, error_func: Callable[..., BaseException]) -> Coord:
         """Parse from a string, using the function to raise errors."""
         parts = value.split()
         if len(parts) != 3:
@@ -366,7 +366,7 @@ class Coord:
             _coord_cache[x, y, z] = result
             return result
 
-    def bbox(self, other: 'Coord') -> Iterator['Coord']:
+    def bbox(self, other: Coord) -> Iterator[Coord]:
         """Iterate through the points inside this bounding box."""
         range_x = range(min(self.x, other.x), max(self.x, other.x) + 1)
         range_y = range(min(self.y, other.y), max(self.y, other.y) + 1)
@@ -469,7 +469,7 @@ class ConnSide(Enum):
     DOWN = Coord(0, -1, 0)
 
     @classmethod
-    def from_yaw(cls, value: int) -> 'ConnSide':
+    def from_yaw(cls, value: int) -> ConnSide:
         """Return the the side pointing in this yaw direction."""
         value %= 360
         if value == 0:
@@ -483,7 +483,7 @@ class ConnSide(Enum):
         raise ValueError(f'Invalid yaw {value}!')
 
     @classmethod
-    def parse(cls, value: str, error_func: Callable[..., BaseException]) -> 'ConnSide':
+    def parse(cls, value: str, error_func: Callable[..., BaseException]) -> ConnSide:
         """Parse a connection side."""
         try:
             return cls[value.upper()]

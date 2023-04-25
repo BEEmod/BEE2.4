@@ -38,10 +38,10 @@ class ItemPropKind(Generic[ValueT]):
     export: Callable[[ValueT], str] = attrs.field(kw_only=True, default=str)
 
     @classmethod
-    def unknown(cls, id: str) -> 'ItemPropKind[str]':
+    def unknown(cls, prop_id: str) -> ItemPropKind[str]:
         """Create a kind for an unknown property."""
         return ItemPropKind[str](
-            id=id,
+            id=prop_id,
             name=TransToken.BLANK,
             instvar='',
             parse=_unknown_parse,

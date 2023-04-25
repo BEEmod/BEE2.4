@@ -216,7 +216,7 @@ def set_item_version(tk_img: TKImages) -> None:
             func()
 
 
-def set_version_combobox(box: ttk.Combobox, item: 'UI.Item') -> list[str]:
+def set_version_combobox(box: ttk.Combobox, item: UI.Item) -> list[str]:
     """Set values on the variant combobox.
 
     This is in a function so itemconfig can reuse it.

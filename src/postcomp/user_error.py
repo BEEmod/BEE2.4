@@ -1,7 +1,7 @@
 """Inject VScript if a user error occurs."""
 import json
 
-from typing import List, Tuple
+from typing import Tuple
 
 import subprocess
 

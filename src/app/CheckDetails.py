@@ -75,7 +75,7 @@ class Item(Generic[UserT]):
     user: UserT
     @overload
     def __init__(
-        self: 'Item[None]',
+        self: Item[None],
         *values: TransToken,
         hover_text: TransToken = TransToken.BLANK,
         lock_check: bool=False,
@@ -83,7 +83,7 @@ class Item(Generic[UserT]):
     ) -> None: ...
     @overload
     def __init__(
-        self: 'Item[UserT]',
+        self: Item[UserT],
         *values: TransToken,
         hover_text: TransToken = TransToken.BLANK,
         lock_check: bool=False,
