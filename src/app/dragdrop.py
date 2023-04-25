@@ -854,10 +854,16 @@ async def test() -> None:
             group_icon: str=None,
         ) -> None:
             self.name = name
-            self.dnd_icon = img.Handle.parse_uri(utils.PackagePath(pak_id, ('items/clean/{}.png'.format(icon))), 64, 64)
+            self.dnd_icon = img.Handle.parse_uri(
+                utils.PackagePath(pak_id, f'items/clean/{icon}.png'),
+                64, 64,
+            )
             self.dnd_group = group
             if group_icon:
-                self.dnd_group_icon = img.Handle.parse_uri(utils.PackagePath(pak_id, 'items/clean/{}.png'.format(group_icon)), 64, 64)
+                self.dnd_group_icon = img.Handle.parse_uri(
+                    utils.PackagePath(pak_id,f'items/clean/{group_icon}.png'),
+                    64, 64,
+                )
 
         def __repr__(self) -> str:
             return '<Item {}>'.format(self.name)

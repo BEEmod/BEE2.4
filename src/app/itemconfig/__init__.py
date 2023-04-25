@@ -507,7 +507,7 @@ async def widget_item_variant(
     try:
         item = UI.item_list[conf.item_id]
     except KeyError:
-        raise ValueError('Unknown item "{}"!'.format(conf.item_id))
+        raise ValueError(f'Unknown item "{conf.item_id}"!')
 
     if item.id == 'ITEM_BEE2_SIGNAGE':
         # Even more special case, display the "configure signage" button.

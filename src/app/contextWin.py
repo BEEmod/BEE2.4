@@ -447,7 +447,7 @@ def adjust_position(e=None) -> None:
         win=window,
     )
 
-    window.geometry('+{x!s}+{y!s}'.format(x=loc_x, y=loc_y))
+    window.geometry(f'+{loc_x!s}+{loc_y!s}')
 
 # When the main window moves, move the context window also.
 TK_ROOT.bind("<Configure>", adjust_position, add='+')

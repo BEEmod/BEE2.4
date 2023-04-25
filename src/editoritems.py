@@ -1695,15 +1695,15 @@ class Item:
             f.write(f'\t\t"InvalidSurface" "{invalid}"\n')
 
         if self.anchor_goo:
-            f.write(f'\t\t"CanAnchorOnGoo"      "1"\n')
+            f.write('\t\t"CanAnchorOnGoo"      "1"\n')
         if self.anchor_barriers:
-            f.write(f'\t\t"CanAnchorOnBarriers" "1"\n')
+            f.write('\t\t"CanAnchorOnBarriers" "1"\n')
         if not self.copiable:
-            f.write(f'\t\t"Copyable"  "0"\n')
+            f.write('\t\t"Copyable"  "0"\n')
         if not self.deletable:
-            f.write(f'\t\t"Deletable" "0"\n')
+            f.write('\t\t"Deletable" "0"\n')
         if self.pseudo_handle:
-            f.write(f'\t\t"PseudoHandle" "1"\n')
+            f.write('\t\t"PseudoHandle" "1"\n')
         f.write('\t\t}\n')
 
         if self.properties:

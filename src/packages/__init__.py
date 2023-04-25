@@ -586,7 +586,7 @@ async def load_packages(
     ))
 
     LOGGER.info('Object counts:\n{}', '\n'.join(
-        '{:<15}: {}'.format(obj_type.__name__, len(objs))
+        f'{obj_type.__name__:<15}: {len(objs)}'
         for obj_type, objs in
         sorted(packset.unparsed.items(), key=lambda t: len(t[1]), reverse=True)
     ))
@@ -686,7 +686,7 @@ async def parse_package(
                 try:
                     obj_id = over_prop['id']
                 except LookupError:
-                    raise ValueError('No ID for "{}" object type!'.format(obj_type)) from None
+                    raise ValueError(f'No ID for "{obj_type}" object type!') from None
                 packset.overrides[obj_type, obj_id.casefold()].append(
                     ParseData(pack.fsys, obj_id, over_prop, pack.id, True)
                 )
@@ -699,7 +699,7 @@ async def parse_package(
             try:
                 obj_id = obj['id']
             except LookupError:
-                raise ValueError('No ID for "{}" object type in "{}" package!'.format(obj_type, pack.id)) from None
+                raise ValueError(f'No ID for "{obj_type}" object type in "{pack.id}" package!') from None
             if obj_id in packset.unparsed[obj_type]:
                 if obj_type.allow_mult:
                     # Pretend this is an override
@@ -709,7 +709,7 @@ async def parse_package(
                     # Don't continue to parse and overwrite
                     continue
                 else:
-                    raise Exception('ERROR! "' + obj_id + '" defined twice!')
+                    raise Exception(f'ERROR! "{obj_id}" defined twice!')
             packset.unparsed[obj_type][obj_id] = ObjData(
                 pack.fsys,
                 obj,
@@ -761,9 +761,7 @@ async def parse_object(
         ) from e
 
     if not hasattr(object_, 'id'):
-        raise ValueError(
-            '"{}" object {} has no ID!'.format(obj_class.__name__, object_)
-        )
+        raise ValueError(f'"{obj_class.__name__}" object {object_} has no ID!')
     assert object_.id == obj_id, f'{object_!r} -> {object_.id} != "{obj_id}"!'
 
     object_.pak_id = obj_data.pak_id
@@ -946,7 +944,7 @@ class Style(PakObject, needs_foreground=True):
                 kv = group_kv.find_key(str(i), '')
 
                 if icon_folder:
-                    icon = utils.PackagePath(data.pak_id, 'corr/{}/{}/{}.jpg'.format(icon_folder, group, i))
+                    icon = utils.PackagePath(data.pak_id, f'corr/{icon_folder}/{group}/{i}.jpg')
                 else:
                     icon = img.PATH_BLANK
 
@@ -975,7 +973,7 @@ class Style(PakObject, needs_foreground=True):
                 renderables = {}
                 vbsp = lazy_conf.BLANK
             else:
-                raise ValueError(f'Style "{data.id}" missing configuration folder!')
+                raise ValueError(f'Style "{data.id}" missing configuration folder!') from None
         else:
             with data.fsys[folder + '/items.txt'].open_str() as f:
                 items, renderables = await trio.to_thread.run_sync(EditorItem.parse, f)

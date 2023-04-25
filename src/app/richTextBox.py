@@ -169,7 +169,6 @@ class tkRichText(tkinter.Text):
                 super().insert("end", text_data)
                 return
 
-            segment: tkMarkdown.TextSegment
             for is_first, block, is_last in iter_firstlast(text_data):
                 if isinstance(block, tkMarkdown.TextSegment):
                     tags: tuple[str, ...]
@@ -199,7 +198,7 @@ class tkRichText(tkinter.Text):
                     TK_IMG.textwid_add(self, 'end', block.handle)
                     super().insert('end', '\n')
                 else:
-                    raise ValueError('Unknown block {!r}?'.format(block))
+                    raise ValueError(f'Unknown block {block!r}?')
         finally:
             self['state'] = "disabled"
 
