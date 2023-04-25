@@ -538,4 +538,4 @@ async def widget_item_variant(
 
 
 # Load all the widgets.
-from . import checkmark, color, dropdown, slider, string, timer
+from . import checkmark, color, dropdown, slider, string, timer  # noqa: F401

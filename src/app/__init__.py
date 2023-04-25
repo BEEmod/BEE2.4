@@ -1,8 +1,7 @@
 """The package containg all UI code."""
 import tkinter as tk
 from types import TracebackType
-from typing import Any, Awaitable, Callable, Optional, Type, TypeVar, overload
-from typing_extensions import TypeVarTuple, Unpack
+from typing import Awaitable, Callable, Optional, Type, TypeVar, overload
 
 import utils
 import trio  # Import first, so it monkeypatches traceback before us.
@@ -25,7 +24,7 @@ def _run_main_loop(*args, **kwargs) -> None:
 
 _main_loop_running = False
 _orig_mainloop = TK_ROOT.mainloop
-setattr(TK_ROOT, 'mainloop', _run_main_loop)
+TK_ROOT.mainloop = _run_main_loop
 del _run_main_loop
 
 
