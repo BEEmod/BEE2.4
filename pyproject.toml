@@ -1,7 +1,7 @@
 [tool.pyright]
 include = [
 	"src/",
-    "hammeraddons/src/",
+	"hammeraddons/src/",
 	]
 exclude = [
 	"**/__pycache__"
@@ -29,3 +29,62 @@ include_trailing_comma = true
 from_first = true
 combine_as_imports = true
 src_paths = ["src"]
+
+
+[tool.ruff]
+line-length = 127
+target-version = "py38"
+select = ["E", "UP", "F", "C4", "B", "PIE"]
+extend-ignore = [
+	# Allow module level import later in the file.
+	"E402",
+	# Allow *-imports.
+	"F403",
+	# name may be undefined, or defined from star imports: module
+	"F405",
+	# Flake8-annotations.
+	# Type annotations for self & cls are not important.
+	"ANN101",
+	"ANN102",
+	# Allow typing.Any
+	"ANN401",
+
+	# Flake8-bugbear:
+	# Loop control var not used, triggers on unpackings.
+	"B007",
+	# Stacklevel parameter required for warnings.warn() - doesn't detect positional args.
+	"B028",
+
+	# Flake8-pie:
+	# Prefer to use pass in empty functions, even if docstring is present
+	"PIE790",
+	# Allow aliases for enum values, used often.
+	"PIE796",
+	]
+
+[tool.ruff.flake8-bugbear]
+extend-immutable-calls = [
+	# Objects which are immutable, or close enough that it's fine to be in func defaults.
+	"srctools.math.FrozenVec", "srctools.math.FrozenAngle", "srctools.math.FrozenMatrix",
+	# Image handle variants, all publically frozen.
+	"app.img.Handle.background", "app.img.Handle.blank", "app.img.Handle.builtin",
+	"app.img.Handle.color", "app.img.Handle.composite", "app.img.Handle.crop",
+	"app.img.Handle.error", "app.img.Handle.file", "app.img.Handle.ico_loading",
+	"app.img.Handle.ico_none", "app.img.Handle.overlay_text", "app.img.Handle.parse",
+	"app.img.Handle.parse_uri", "app.img.Handle.resize", "app.img.Handle.sprite", "app.img.Handle.with_alpha_stripped",
+
+	# Translation token variants.
+	"transtoken.TransToken.parse", "transtoken.TransToken.ui", "transtoken.TransToken.ui_plural",
+	"transtoken.TransToken.join", "transtoken.TransToken.from_valve",
+	"transtoken.TransToken.untranslated",
+	"transtoken.TransToken.list_and", "transtoken.TransToken.list_or",
+
+	"tkMarkdown.MarkdownData.text",
+	# Cast is not really a function call, just returns the arg.
+	"typing.cast",
+	"srctools.logger.get_logger",
+]
+
+[tool.ruff.pyupgrade]
+# Still use typing types even with `from __future__ import annotations`.
+keep-runtime-typing = true
