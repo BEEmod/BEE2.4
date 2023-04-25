@@ -203,5 +203,6 @@ def start_main(init: Callable[[], Awaitable[Any]]=init_app) -> None:
         run_sync_soon_not_threadsafe=run_sync_soon_not_threadsafe,
         done_callback=done_callback,
         instruments=[Tracer()] if utils.DEV_MODE else [],
+        strict_exception_groups=True,
     )
     TK_ROOT.mainloop()

@@ -20,10 +20,16 @@ if app_name in ('vbsp.exe', 'vbsp_osx', 'vbsp_linux'):
 elif app_name in ('vrad.exe', 'vrad_osx', 'vrad_linux'):
     if '--errorserver' in sys.argv:
         import error_server
-        trio.run(error_server.main)
+        trio.run(
+            error_server.main,
+            strict_exception_groups=True,  # Opt into 3.11-style semantics.
+        )
     else:
         import vrad
-        trio.run(vrad.main, sys.argv)
+        trio.run(
+            vrad.main, sys.argv,
+            strict_exception_groups=True,
+        )
 elif 'original' in app_name:
     sys.exit('Original compilers replaced, verify game cache!')
 else:
