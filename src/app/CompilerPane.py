@@ -291,10 +291,10 @@ def set_screenshot(image: Image.Image=None) -> None:
     if image is None:
         try:
             image = Image.open(SCREENSHOT_LOC)
-        except IOError:  # Image doesn't exist!
+        except OSError:  # Image doesn't exist!
             # In that case, use a black image
             image = Image.new('RGB', (1, 1), color=(0, 0, 0))
-    # Make a smaller image for showing in the UI..
+    # Make a smaller image for showing in the UI...
     tk_img = image.resize(
         (
             int(PETI_WIDTH // 3.5),

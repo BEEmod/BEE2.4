@@ -76,9 +76,9 @@ class ConfigFile(ConfigParser):
             return
 
         try:
-            with self._file_lock, open(self.filename, 'r', encoding='utf8') as conf:
+            with self._file_lock, open(self.filename, encoding='utf8') as conf:
                 self.read_file(conf)
-                # We're not different to the file on disk..
+                # We're no longer different to the file on disk...
                 self.has_changed.clear()
         # If missing, just use default values.
         except FileNotFoundError:
@@ -87,7 +87,7 @@ class ConfigFile(ConfigParser):
                 self.filename,
             )
         # But if we fail to read entirely, fall back to defaults.
-        except (IOError, ParsingError, UnicodeDecodeError):
+        except (OSError, ParsingError, UnicodeDecodeError):
             LOGGER.warning(
                 'Config "{}" cannot be read! Using defaults...',
                 self.filename,
@@ -97,7 +97,7 @@ class ConfigFile(ConfigParser):
             # but if it doesn't work don't worry about it.
             try:
                 self.filename.replace(self.filename.with_suffix('.err.cfg'))
-            except IOError:
+            except OSError:
                 pass
 
     def save(self) -> None:
