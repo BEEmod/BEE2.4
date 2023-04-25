@@ -598,8 +598,10 @@ def add_glass_floorbeams(vmf: VMF, temp_name: str):
     beam_template: Solid
     try:
         [beam_template] = template.visgrouped_solids()
-    except ValueError:
-        raise user_errors.UserError(user_errors.TOK_GLASS_FLOORBEAM_TEMPLATE)
+    except ValueError as exc:
+        raise user_errors.UserError(user_errors.TOK_GLASS_FLOORBEAM_TEMPLATE) from ValueError(
+            f'Floorbeam template {temp_name} has multiple/zero solids!'
+        ).with_traceback(exc.__traceback__)
 
     # Grab the 'end' side, which we move around.
     for side in beam_template.sides:

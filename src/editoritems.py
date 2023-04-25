@@ -160,7 +160,7 @@ class OccuType(Flag):
             try:
                 coll |= OCCU_TYPES[part.upper()]
             except KeyError:
-                raise tok.error('Unknown Occupied Voxels collision type "{}"!', part)
+                raise tok.error('Unknown Occupied Voxels collision type "{}"!', part) from None
         return coll
 
     def __str__(self) -> str:
@@ -350,15 +350,15 @@ class Coord:
         try:
             x = int(parts[0])
         except ValueError:
-            raise error_func('Invalid coordinate value "{}"!', parts[0])
+            raise error_func('Invalid coordinate value "{}"!', parts[0]) from None
         try:
             y = int(parts[1])
         except ValueError:
-            raise error_func('Invalid coordinate value "{}"!', parts[1])
+            raise error_func('Invalid coordinate value "{}"!', parts[1]) from None
         try:
             z = int(parts[2])
         except ValueError:
-            raise error_func('Invalid coordinate value "{}"!', parts[2])
+            raise error_func('Invalid coordinate value "{}"!', parts[2]) from None
         try:
             return _coord_cache[x, y, z]
         except KeyError:
@@ -495,7 +495,7 @@ class ConnSide(Enum):
         try:
             x, y, z = map(int, parts)
         except ValueError:
-            raise error_func('Invalid connection side!')
+            raise error_func('Invalid connection side "{}"!', value) from None
         if z != 0:
             raise error_func('Connection side must be flat!')
         if x == 0:
@@ -638,7 +638,7 @@ class Renderable:
                 try:
                     kind = cls._types[render_id.casefold()]
                 except KeyError:
-                    raise tok.error('Unknown Renderable "{}"!', render_id)
+                    raise tok.error('Unknown Renderable "{}"!', render_id) from None
             elif key.casefold() == "animations":
                 Anim.parse_block(anims, tok)
             elif key.casefold() == "model":
@@ -674,7 +674,7 @@ class SubType:
     # The path to the icon VTF, in 'models/props_map_editor'.
     pal_icon: FSPath | None = None
 
-    def copy(self) -> 'SubType':
+    def copy(self) -> SubType:
         """Duplicate this subtype."""
         return SubType(
             self.name,
@@ -802,7 +802,7 @@ class SubType:
                     try:
                         sound = Sound(sound_kind.upper())
                     except ValueError:
-                        raise tok.error('Unknown sound type "{}"!', sound_kind)
+                        raise tok.error('Unknown sound type "{}"!', sound_kind) from None
                     subtype.sounds[sound] = tok.expect(Token.STRING)
             elif folded_key == 'animations':
                 Anim.parse_block(subtype.anims, tok)
@@ -1136,7 +1136,7 @@ class Item:
                 try:
                     conf_attr = self._BOOL_ATTRS[folded_key]
                 except KeyError:
-                    raise tok.error('Unknown editor option {}', key)
+                    raise tok.error('Unknown editor option {}', key) from None
                 else:
                     setattr(self, conf_attr, conv_bool(tok.expect(Token.STRING)))
 
