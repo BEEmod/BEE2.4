@@ -1,7 +1,7 @@
 """Customizable configuration for specific items or groups of them."""
 from typing import (
     Iterable, Optional, Callable, List, Tuple, Dict, Iterator, AsyncIterator,
-    Awaitable, Type,
+    Awaitable, Type, Union,
 )
 from typing_extensions import TypeAlias
 from datetime import timedelta
@@ -249,7 +249,7 @@ STYLEVAR_GROUP = ConfigGroup('_STYLEVAR', TransToken.ui('Style Properties'), '',
 
 
 async def make_pane(
-    tool_frame: tk.Frame,
+    tool_frame: Union[tk.Frame, ttk.Frame],
     menu_bar: tk.Menu,
     tk_img: TKImages,
     update_item_vis: Callable[[], None],

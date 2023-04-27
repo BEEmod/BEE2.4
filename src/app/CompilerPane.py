@@ -728,7 +728,11 @@ async def make_map_widgets(frame: ttk.Frame) -> None:
     model_frame.columnconfigure(0, weight=1)
 
 
-async def make_pane(tool_frame: tk.Frame, tk_img: TKImages, menu_bar: tk.Menu) -> None:
+async def make_pane(
+    tool_frame: Union[tk.Frame, ttk.Frame],
+    tk_img: TKImages,
+    menu_bar: tk.Menu,
+) -> None:
     """Initialise when part of the BEE2."""
     global window
     window = SubPane.SubPane(
