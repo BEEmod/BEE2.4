@@ -416,7 +416,11 @@ class PackagesSet:
 
     def can_export(self) -> bool:
         """Check if we're currently able to export."""
-        return all(self._type_ready[cls].is_set() for cls in OBJ_TYPES.values())
+        try:
+            return all(self._type_ready[cls].is_set() for cls in OBJ_TYPES.values())
+        except KeyError:
+            # ready() was never called on at least one class, so it can't possibly be done yet!
+            return False
 
     def all_obj(self, cls: Type[PakT]) -> Collection[PakT]:
         """Get the list of objects parsed."""
