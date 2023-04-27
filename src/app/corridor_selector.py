@@ -132,7 +132,7 @@ class Selector:
             font=("Helvetica", 12, "bold"),
             text='',
         )
-        self.wid_title.grid(row=1, column=0, sticky='ew')
+        self.wid_title.grid(row=1, column=0, columnspan=2, sticky='ew')
         self.wid_authors = ttk.Label(
             frm_right,
             name='authors',
@@ -140,16 +140,19 @@ class Selector:
             anchor='center',
             text='',
         )
-        self.wid_authors.grid(row=2, column=0, sticky='ew')
+        self.wid_authors.grid(row=2, column=0, columnspan=2, sticky='ew')
 
         self.wid_desc = tkRichText(frm_right)
+        desc_scroll = tk_tools.HidingScroll(frm_right, orient='vertical', command=self.wid_desc.yview)
+        self.wid_desc['yscrollcommand'] = desc_scroll.set
         self.wid_desc.grid(row=3, column=0, sticky='nsew')
+        desc_scroll.grid(row=3, column=1, sticky='ns')
         frm_right.rowconfigure(3, weight=1)
 
         localisation.set_text(
             ttk.Button(frm_right, name='closer', command=self.hide),
             TransToken.ui('Close'),
-        ).grid(row=4, column=0)
+        ).grid(row=4, column=0, columnspan=2)
 
         self.event_bus = event.EventBus()
 
