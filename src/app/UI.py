@@ -499,7 +499,7 @@ async def load_packages(packset: packages.PackagesSet, tk_img: TKImages) -> None
         }),
     ]
 
-    for sel_list, obj_type, attrs in obj_types:
+    for sel_list, obj_type, sel_attrs in obj_types:
         # Extract the display properties out of the object, and create
         # a SelectorWin item to display with.
         for obj in sorted(packset.all_obj(obj_type), key=operator.attrgetter('selitem_data.name.token')):
@@ -509,7 +509,7 @@ async def load_packages(packset: packages.PackagesSet, tk_img: TKImages) -> None
                 attrs={
                     key: getattr(obj, attr_name)
                     for key, attr_name in
-                    attrs.items()
+                    sel_attrs.items()
                 }
             ))
 
@@ -1663,6 +1663,9 @@ async def init_windows(tk_img: TKImages) -> None:
         for item in item_list.values():
             item.load_data()
         refresh_palette_icons()
+
+        if contextWin.is_visible():
+            contextWin.show_prop(contextWin.selected_sub_item)
 
         # Update variant selectors on the itemconfig pane
         for item_id, func in itemconfig.ITEM_VARIANT_LOAD:
