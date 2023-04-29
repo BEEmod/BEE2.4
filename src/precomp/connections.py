@@ -146,7 +146,6 @@ class Item:
         panels: Iterable[Entity]=(),
         antlines: Iterable[Antline]=(),
         shape_signs: Iterable[ShapeSignage]=(),
-        timer_count: int=None,
         ant_toggle_var: str='',
     ):
         self.inst = inst
@@ -163,9 +162,6 @@ class Item:
         # If set, the item has special antlines. This is a fixup var,
         # which gets the antline name filled in for us.
         self.ant_toggle_var = ant_toggle_var
-
-        # None = Infinite/normal.
-        self.timer = timer_count
 
         # From this item
         self.outputs: Set[Connection] = set()
@@ -582,14 +578,14 @@ def calc_connections(
             elif out_name in panels:
                 pan = panels[out_name]
                 item.ind_panels.add(pan)
-                # If items have indicator panels, copy over the timer delay.
-                if pan.fixup.bool(consts.FixupVars.TIM_ENABLED):
-                    item.timer = tim = pan.fixup.int(consts.FixupVars.TIM_DELAY)
-                    if not (1 <= tim <= 30):
-                        # These would be infinite.
-                        item.timer = None
-                else:
-                    item.timer = None
+                # If items have indicator panels, copy over the timer delay if the item doesn't
+                # have it set already. If the item does, it overrides the timer.
+                if item.timer is None:
+                    if pan.fixup.bool(consts.FixupVars.TIM_ENABLED):
+                        item.timer = tim = pan.fixup.int(consts.FixupVars.TIM_DELAY)
+                        if not (1 <= tim <= 30):
+                            # These would be infinite.
+                            item.timer = None
             else:
                 try:
                     inp_item = ITEMS[out_name]
