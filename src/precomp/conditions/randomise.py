@@ -113,14 +113,14 @@ def res_add_variant(res: Keyvalues) -> Callable[[Entity], None]:
         try:
             count = int(count_val)
         except (TypeError, ValueError):
-            raise ValueError(f'Invalid variant count {count_val}!')
+            raise ValueError(f'Invalid variant count {count_val}!') from None
         weighting = rand.parse_weights(count, res['weights', ''])
         seed = res['seed', '']
     else:
         try:
             count = int(res.value)
         except (TypeError, ValueError):
-            raise ValueError(f'Invalid variant count {res.value!r}!')
+            raise ValueError(f'Invalid variant count {res.value!r}!') from None
         else:
             weighting = list(range(count))
         seed = res.value

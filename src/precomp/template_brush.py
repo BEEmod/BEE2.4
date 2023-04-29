@@ -592,7 +592,7 @@ def _parse_template(loc: UnparsedTemplate) -> Template:
                 value=ent['remove_brush'],
                 kind='Template ColorPicker',
                 id=f'{loc.id}:{ent["targetname"]}',
-            ))
+            )) from None
 
         try:
             remove_after = AfterPickMode(ent['remove_brush', '0'])
@@ -602,7 +602,7 @@ def _parse_template(loc: UnparsedTemplate) -> Template:
                 value=ent['remove_brush'],
                 kind='Template ColorPicker',
                 id=f'{loc.id}:{ent["targetname"]}',
-            ))
+            )) from None
 
         color_pickers.append(ColorPicker(
             priority=priority,

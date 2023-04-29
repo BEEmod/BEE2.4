@@ -92,7 +92,7 @@ def res_change_io_type(kv: Keyvalues) -> Callable[[Entity], None]:
         try:
             item = connections.ITEMS[inst['targetname']]
         except KeyError:
-            raise ValueError(f'No item with name "{inst["targetname"]}"!')
+            raise ValueError(f'No item with name "{inst["targetname"]}"!') from None
 
         item.config = conf
 
@@ -142,7 +142,7 @@ def res_append_io_type(res: Keyvalues) -> Callable[[Entity], None]:
         try:
             item = connections.ITEMS[inst['targetname']]
         except KeyError:
-            raise ValueError('No item with name "{}"!'.format(inst['targetname']))
+            raise ValueError('No item with name "{}"!'.format(inst['targetname'])) from None
         # Assign item.enable_cmd += out_tup, for all of them.
         for name, out_tup in prop_tups:
             setattr(item, name, getattr(item, name) + out_tup)

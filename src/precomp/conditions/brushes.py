@@ -1122,7 +1122,7 @@ def edit_panel(vmf: VMF, inst: Entity, props: Keyvalues, create: bool) -> None:
         except LookupError:
             pass
         except ValueError:
-            raise ValueError(f'Unknown panel type "{pan_type}"!')
+            raise ValueError(f'Unknown panel type "{pan_type}"!') from None
 
         if 'thickness' in props:
             panel.thickness = srctools.conv_int(

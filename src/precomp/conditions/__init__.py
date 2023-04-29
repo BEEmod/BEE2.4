@@ -48,7 +48,6 @@ import srctools.logger
 from srctools import (
     Keyvalues, FrozenVec, Vec, VMF, Entity, Output, Solid, Angle, Matrix,
 )
-from typing_extensions import Literal
 
 from precomp import instanceLocs, rand, collisions
 from precomp.corridor import Info as MapInfo
@@ -388,7 +387,7 @@ def annotation_caller(
             if type_to_parm[ann] is not None:
                 raise ValueError(f'Parameter {ann} used twice!')
         except KeyError:
-            raise ValueError(f'Unknown potential type {ann!r}!')
+            raise ValueError(f'Unknown potential type {ann!r}!') from None
         type_to_parm[ann] = parm.name
         ann_order.append(ann)
     inputs = []

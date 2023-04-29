@@ -627,11 +627,11 @@ def _parse_angled_panel_anim(value: str) -> PanelAnimation:
     if value.startswith('ramp_') and value.endswith('_deg_open'):
         value = value[5:-9]
     ind = int(value)
-    if ind < 30: # If 0-3 use index, if 30/45/60/90 use that
+    if ind < 30:  # If 0-3 use index, if 30/45/60/90 use that
         try:
             return prop_angled_panel_anim.subtype_values[ind]
         except IndexError:
-            raise ValueError(f'Unknown animation {orig_value}')
+            raise ValueError(f'Unknown animation {orig_value}') from None
     else:
         return PanelAnimation(int(value))
 

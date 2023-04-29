@@ -55,7 +55,7 @@ def res_sendificator(vmf: VMF, inst: Entity) -> None:
                 user_errors.TOK_SENDTOR_BAD_OUTPUT.format(out_item=las_item.name),
                 voxels=[Vec.from_str(sendtor.inst['origin'])],
                 points=[Vec.from_str(las_item.inst['origin'])],
-            )
+            ) from None
 
         orient = Matrix.from_angstr(las_item.inst['angles'])
 

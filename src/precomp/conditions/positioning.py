@@ -417,7 +417,7 @@ def flag_blockpos_type(inst: Entity, flag: Keyvalues) -> bool:
             try:
                 allowed = brushLoc.BLOCK_LOOKUP[block_type.casefold()]
             except KeyError:
-                raise ValueError(f'"{block_type}" is not a valid block type!')
+                raise ValueError(f'"{block_type}" is not a valid block type!') from None
             if block in allowed:
                 break  # To next position
         else:
@@ -449,16 +449,15 @@ def res_set_block(inst: Entity, res: Keyvalues) -> None:
     try:
         new_vals = brushLoc.BLOCK_LOOKUP[res['type'].casefold()]
     except KeyError:
-        raise ValueError('"{}" is not a valid block type!'.format(res['type']))
+        raise ValueError(f'"{res["type"]}" is not a valid block type!') from None
 
     try:
         [new_val] = new_vals
     except ValueError:
         # TODO: This could spread top/mid/bottom through the bbox...
         raise ValueError(
-            f'Can\'t use compound block type "{res["type"]}", specify '
-            "_SINGLE/TOP/MID/BOTTOM"
-        )
+            f'Can\'t use compound block type "{res["type"]}", specify _SINGLE/TOP/MID/BOTTOM'
+        ) from None
 
     pos1 = resolve_offset(inst, res['offset', '0 0 0'], scale=128, zoff=-128)
 

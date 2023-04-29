@@ -33,12 +33,12 @@ def res_change_fizzler_type(inst: Entity, res: Keyvalues) -> None:
             item=fizz_name,
             kind='Fizzler',
             inst=inst['file'],
-        ))
+        )) from None
 
     try:
         fizz.fizz_type = fizzler.FIZZ_TYPES[res.value]
     except KeyError:
-        raise user_errors.UserError(user_errors.TOK_UNKNOWN_ID.format(kind='Fizzler', id=res.value))
+        raise user_errors.UserError(user_errors.TOK_UNKNOWN_ID.format(kind='Fizzler', id=res.value)) from None
 
 
 @conditions.make_result('ReshapeFizzler')

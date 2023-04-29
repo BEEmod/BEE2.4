@@ -74,7 +74,7 @@ def flag_check_marker(inst: Entity, flag: Keyvalues) -> bool:
         try:
             prefix, suffix = name.split('*')
         except ValueError:
-            raise ValueError(f'Name "{name}" must only have 1 *!')
+            raise ValueError(f'Name "{name}" must only have 1 *!') from None
 
         def match(val: str) -> bool:
             """Match a prefix or suffix."""

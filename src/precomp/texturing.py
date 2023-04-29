@@ -601,7 +601,7 @@ def load_config(conf: Keyvalues) -> None:
             try:
                 generator = GEN_CLASSES[algo]
             except KeyError:
-                raise ValueError(f'Invalid algorithm "{algo}" for {gen_key}!')
+                raise ValueError(f'Invalid algorithm "{algo}" for {gen_key}!') from None
         else:
             # Signage, Overlays always use the Random generator.
             generator = GenRandom

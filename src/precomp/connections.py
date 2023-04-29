@@ -407,7 +407,7 @@ def collapse_item(item: Item) -> None:
         [input_conn] = item.inputs
         input_item = input_conn.from_item
     except ValueError:
-        raise ValueError(f'Too many inputs for "{item.name}"!')
+        raise ValueError(f'Too many inputs for "{item.name}"!') from None
 
     LOGGER.debug('Merging "{}" into "{}"...', item.name, input_item.name)
 
@@ -596,7 +596,7 @@ def calc_connections(
                 except KeyError:
                     raise user_errors.UserError(
                         user_errors.TOK_CONNECTIONS_UNKNOWN_INSTANCE.format(item=out_name)
-                    )
+                    ) from None
                 else:
                     input_items.append(inp_item)
                     if inp_item.config is None:

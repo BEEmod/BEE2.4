@@ -251,7 +251,8 @@ class CubeAddon:
             self.outputs[out_type] = list(outputs.get(out_type, ()))
 
     @classmethod
-    def parse(cls, kv: Keyvalues) -> 'CubeAddon':
+    def parse(cls, kv: Keyvalues) -> CubeAddon:
+        """Parse a cube addon from configs."""
         addon = cls(
             kv['id'],
             kv['instance', ''],
@@ -786,7 +787,7 @@ def parse_filter_types(
             try:
                 cube = CUBE_TYPES[cube_id]
             except KeyError:
-                raise KeyError(f'Unknown cube type "{cube_id}"!')
+                raise KeyError(f'Unknown cube type "{cube_id}"!') from None
             targ_set.add(cube)
 
     if not inclusions and exclusions:
@@ -1040,7 +1041,7 @@ def res_dropper_addon(inst: Entity, res: Keyvalues) -> None:
         raise user_errors.UserError(user_errors.TOK_UNKNOWN_ID.format(
             kind='CubeAddon',
             id=res.value,
-        ))
+        )) from None
 
     try:
         pair = INST_TO_PAIR[inst]
@@ -1082,7 +1083,7 @@ def res_change_cube_type(inst: Entity, res: Keyvalues) -> None:
         raise user_errors.UserError(user_errors.TOK_UNKNOWN_ID.format(
             kind='CubeType',
             id=res.value,
-        ))
+        )) from None
 
 
 @conditions.make_result('CubeFilter')
@@ -1419,7 +1420,7 @@ def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
                 raise user_errors.UserError(
                     user_errors.TOK_CUBE_SUPERPOS_BAD_REAL,
                     voxels=[Vec.from_str(inst['origin'])],
-                )
+                ) from None
             try:
                 [conn] = superpos_item.outputs
                 ghost_pair = INST_TO_PAIR[conn.to_item.inst]
@@ -1429,7 +1430,7 @@ def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
                 raise user_errors.UserError(
                     user_errors.TOK_CUBE_SUPERPOS_BAD_GHOST,
                     voxels=[Vec.from_str(inst['origin'])],
-                )
+                ) from None
             conn.remove()
             superpos_item.delete_antlines()
             if real_pair.superpos is not None:

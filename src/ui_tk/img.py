@@ -228,8 +228,8 @@ class TKImages(img.UIImage):
         """Look up a colour in TK's colour list."""
         try:
             r, g, b = TK_ROOT.winfo_rgb(text)
-        except tk.TclError:
-            raise ValueError
+        except tk.TclError as exc:
+            raise ValueError(text) from exc
         # They're full 16-bit colors, we don't want that.
         r >>= 8
         g >>= 8

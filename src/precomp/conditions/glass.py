@@ -1,7 +1,7 @@
 """Adds breakable glass."""
 from typing import Iterator, Any, Tuple, Dict, List, Optional
 
-from srctools import FrozenVec, Keyvalues, Vec, VMF, Side, Entity, Output, Angle
+from srctools import FrozenVec, Keyvalues, Vec, VMF, Entity, Output, Angle
 import srctools.logger
 
 from precomp import template_brush, conditions
@@ -243,7 +243,7 @@ def res_breakable_glass(inst: Entity, res: Keyvalues) -> object:
 
     glass_items = find_glass_items(BREAKABLE_GLASS_CONF, vmf)
 
-    damage_filter = None  # type: Optional[Entity]
+    damage_filter: Optional[Entity] = None
 
     for targ, bbox_min, bbox_max, norm, conf in glass_items:
         LOGGER.info('Making glass "{}"', targ)
@@ -262,7 +262,7 @@ def res_breakable_glass(inst: Entity, res: Keyvalues) -> object:
         solid_max += (conf['offset'] + 1) * norm
 
         surf_solid = vmf.make_prism(solid_min, solid_max).solid
-        for face in surf_solid:  # type: Side
+        for face in surf_solid:
             if face.normal() == norm:
                 conf['template'].apply(face, change_mat=True)
 
