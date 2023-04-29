@@ -6,7 +6,7 @@ import srctools.logger
 from consts import FixupVars
 from precomp.connections import ITEMS
 from precomp.instanceLocs import resolve_one as resolve_single
-from srctools import Entity, Matrix, VMF, Keyvalues, Output, Vec
+from srctools import Entity, Matrix, VMF, Keyvalues, Output, Vec, conv_float
 from precomp.texturing import GenCat
 from precomp.tiling import TILES, Panel
 
@@ -72,12 +72,14 @@ def res_piston_plat(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
     snd_start = res['snd_start', '']
     snd_loop = res['snd_loop', '']
     snd_stop = res['snd_stop', '']
+    speed_var = res['speed', '150']
 
     def modify_platform(inst: Entity) -> None:
         """Modify each platform."""
         min_pos = inst.fixup.int(FixupVars.PIST_BTM)
         max_pos = inst.fixup.int(FixupVars.PIST_TOP)
         start_up = inst.fixup.bool(FixupVars.PIST_IS_UP)
+        speed = inst.fixup.substitute(speed_var)
 
         # Allow doing variable lookups here.
         visgroup_names = [
@@ -183,7 +185,7 @@ def res_piston_plat(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
                         movedir=move_ang,
                         startposition=start_up,
                         movedistance=128,
-                        speed=150,
+                        speed=speed,
                     )
                     if pist_ind - 1 in pistons:
                         pistons[pist_ind]['parentname'] = conditions.local_name(
