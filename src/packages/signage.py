@@ -105,7 +105,7 @@ class Signage(PakObject, allow_mult=True, needs_foreground=True):
                 try:
                     prop = next(data.info.find_all('styles', prop.value))
                 except StopIteration:
-                    raise ValueError('No style <{}>!'.format(prop.value))
+                    raise ValueError(f'No style <{prop.value}>!')
 
             world_tex = prop['world', '']
             overlay_tex = prop['overlay', '']

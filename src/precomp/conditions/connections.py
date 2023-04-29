@@ -85,7 +85,7 @@ def res_change_io_type(kv: Keyvalues) -> Callable[[Entity], None]:
     The contents are the same as that allowed in the input BEE2 block in
     editoritems.
     """
-    conf = connections.Config.parse('<ChangeIOType: {:X}>'.format(id(kv)), kv)
+    conf = connections.Config.parse(f'<ChangeIOType: {id(kv):X}>', kv)
 
     def change_item(inst: Entity) -> None:
         """Alter the type of each item passed in."""

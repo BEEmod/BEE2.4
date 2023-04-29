@@ -6,7 +6,7 @@ import srctools.logger
 from consts import FixupVars
 from precomp.connections import ITEMS
 from precomp.instanceLocs import resolve_one as resolve_single
-from srctools import Entity, Matrix, VMF, Keyvalues, Output, Vec, conv_float
+from srctools import Entity, Matrix, VMF, Keyvalues, Output, Vec
 from precomp.texturing import GenCat
 from precomp.tiling import TILES, Panel
 
@@ -103,17 +103,17 @@ def res_piston_plat(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
                 conditions.ALL_INST.add(fname)
                 return
 
-        init_script = 'SPAWN_UP <- {}'.format('true' if start_up else 'false')
+        init_script = f'SPAWN_UP <- {"true" if start_up else "false"}'
 
         if snd_start and snd_stop:
             packing.pack_files(vmf, snd_start, snd_stop, file_type='sound')
-            init_script += '; START_SND <- `{}`; STOP_SND <- `{}`'.format(snd_start, snd_stop)
+            init_script += f'; START_SND <- `{snd_start}`; STOP_SND <- `{snd_stop}`'
         elif snd_start:
             packing.pack_files(vmf, snd_start, file_type='sound')
-            init_script += '; START_SND <- `{}`'.format(snd_start)
+            init_script += f'; START_SND <- `{snd_start}`'
         elif snd_stop:
             packing.pack_files(vmf, snd_stop, file_type='sound')
-            init_script += '; STOP_SND <- `{}`'.format(snd_stop)
+            init_script += f'; STOP_SND <- `{snd_stop}`'
 
         script_ent = vmf.create_ent(
             classname='info_target',

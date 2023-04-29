@@ -638,7 +638,7 @@ def parse_antlines(vmf: VMF) -> tuple[
 
         antlines.setdefault(over_name, []).append(Antline(over_name, segments))
 
-    LOGGER.info('Done! ({} antlines)'.format(sum(map(len, antlines.values()))))
+    LOGGER.info(f'Done! ({sum(map(len, antlines.values()))} antlines)')
     return antlines, side_to_seg
 
 

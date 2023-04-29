@@ -58,7 +58,7 @@ class StyleVPK(PakObject):
         # At least one exists?
         if not any(data.fsys.walk_folder(source_folder)):
             raise Exception(
-                'VPK object "{}" has no associated files!'.format(data.id)
+                f'VPK object "{data.id}" has no associated files!'
             )
 
         return cls(data.id, data.fsys, source_folder)

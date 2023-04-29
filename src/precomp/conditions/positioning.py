@@ -417,7 +417,7 @@ def flag_blockpos_type(inst: Entity, flag: Keyvalues) -> bool:
             try:
                 allowed = brushLoc.BLOCK_LOOKUP[block_type.casefold()]
             except KeyError:
-                raise ValueError('"{}" is not a valid block type!'.format(block_type))
+                raise ValueError(f'"{block_type}" is not a valid block type!')
             if block in allowed:
                 break  # To next position
         else:
@@ -481,7 +481,7 @@ def res_force_upright(inst: Entity):
     if abs(normal.z) > 0.1:
         return
     ang = math.degrees(math.atan2(normal.y, normal.x))
-    inst['angles'] = '0 {:g} 0'.format(ang % 360)  # Don't use negatives
+    inst['angles'] = f'0 {ang % 360:g} 0'  # Don't use negatives
 
 
 @make_result('switchOrientation')

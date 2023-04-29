@@ -578,7 +578,7 @@ def add_meta(func: Callable[..., object], priority: Decimal | int, only_once=Tru
     cond = Condition(
         results=[Keyvalues(name, '')],
         priority=dec_priority,
-        source='MetaCondition {}'.format(name)
+        source=f'MetaCondition {name}'
     )
 
     if only_once:
@@ -778,7 +778,7 @@ def check_flag(
     try:
         func = FLAG_LOOKUP[name]
     except KeyError:
-        err_msg = '"{}" is not a valid condition flag!'.format(name)
+        err_msg = f'"{name}" is not a valid condition flag!'
         if utils.DEV_MODE:
             # Crash here.
             raise ValueError(err_msg) from None
@@ -1006,7 +1006,7 @@ def local_name(inst: Entity, name: str | Entity) -> str:
         # Postfix
         return name + '-' + targ_name
     else:
-        raise ValueError('Unknown fixup style {}!'.format(fixup))
+        raise ValueError(f'Unknown fixup style {fixup}!')
 
 
 def widen_fizz_brush(brush: Solid, thickness: float, bounds: tuple[Vec, Vec]=None):
@@ -1358,10 +1358,8 @@ def make_static_pist(vmf: srctools.VMF, res: Keyvalues) -> Callable[[Entity], No
             from_item = res.value
             prefix = ''
         instances = {
-            name: instanceLocs.resolve_one(
-                '<{}:bee2_{}{}>'.format(from_item, prefix, name),
-                error=False,
-            ) for name in inst_keys
+            name: instanceLocs.resolve_one(f'<{from_item}:bee2_{prefix}{name}>', error=False)
+            for name in inst_keys
         }
 
     def make_static(ent: Entity) -> None:

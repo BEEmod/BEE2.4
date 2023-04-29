@@ -2088,7 +2088,7 @@ def generate_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
                     dropperless_temp_count = 0
                 dropperless_temp_count += 1
                 dropperless_temp[
-                    'Template{:02g}'.format(dropperless_temp_count)
+                    f'Template{dropperless_temp_count:02g}'
                 ] = cube_name
                 cube_temp = dropperless_temp
 

@@ -29,9 +29,10 @@ TRANSITION_ENTS = 'instances/bee2/transition_ents_tag.vmf'
 def res_make_tag_coop_spawn(vmf: VMF, info: conditions.MapInfo, inst: Entity, res: Keyvalues) -> object:
     """Create the spawn point for ATLAS in the entry corridor.
 
-    It produces either an instance or the normal spawn entity. This is required since ATLAS may need to have the paint gun logic.
-    The two parameters `origin` and `angles` must be set to determine the required position, or `facing` can be set for older files.
-    If `global` is set, the spawn point will be absolute instead of relative to the current instance.
+    It produces either an instance or the normal spawn entity. This is required since ATLAS may
+    need to have the paint gun logic. The two parameters `origin` and `angles` must be set to
+    determine the required position, or `facing` can be set for older files. If `global` is set,
+    the spawn point will be absolute instead of relative to the current instance.
     """
     if not info.is_coop:
         return conditions.RES_EXHAUSTED

@@ -270,4 +270,4 @@ def link_item(vmf: VMF, group: list[item_chain.Node[Config]]) -> None:
                         link_ang = (link_ang + 45) // 90 * 90
                     node.inst['file'] = conf.scaff_endcap
                     conditions.ALL_INST.add(conf.scaff_endcap.casefold())
-                    node.inst['angles'] = '0 {:.0f} 0'.format(link_ang)
+                    node.inst['angles'] = f'0 {link_ang:.0f} 0'

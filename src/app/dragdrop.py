@@ -866,7 +866,7 @@ async def test() -> None:
                 )
 
         def __repr__(self) -> str:
-            return '<Item {}>'.format(self.name)
+            return f'<Item {self.name}>'
 
     manager: Manager[TestItem] = Manager(TK_ROOT, config_icon=True)
 

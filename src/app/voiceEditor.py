@@ -517,7 +517,7 @@ def find_resp_lines(quote_block: Keyvalues) -> Iterator[Tuple[
 ]]:
     """Find the line blocks in response items."""
     for index, prop in enumerate(quote_block):
-        yield [], prop, 'line_{}'.format(index)
+        yield [], prop, f'line_{index}'
 
 
 def get_trans_lines(trans_block):

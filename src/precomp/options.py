@@ -67,7 +67,7 @@ class Opt:
         self.doc = inspect.cleandoc(doc).rstrip().splitlines()
         if fallback is not None:
             self.doc.append(
-                'If unset, the default is read from `{}`.'.format(default)
+                f'If unset, the default is read from `{default}`.'
             )
 
 
@@ -120,7 +120,7 @@ def load(opt_blocks: Iterator[Keyvalues]) -> None:
         try:
             SETTINGS[opt.id] = SETTINGS[opt.fallback]
         except KeyError:
-            raise Exception('Bad fallback for "{}"!'.format(opt.id))
+            raise Exception(f'Bad fallback for "{opt.id}"!')
         # Check they have the same type.
         assert opt.type is options[opt.fallback].type
 
@@ -169,7 +169,7 @@ def get(expected_type: Union[Type[OptionT], Type[EnumT]], name: str) -> Union[Op
     try:
         val = SETTINGS[name.casefold()]
     except KeyError:
-        raise TypeError('Option "{}" does not exist!'.format(name)) from None
+        raise TypeError(f'Option "{name}" does not exist!') from None
 
     if val is None:
         return None
@@ -235,7 +235,7 @@ def get_itemconf(
         if timer_delay < 3 or timer_delay > 30:
             wid_id += '_inf'
         else:
-            wid_id += '_{}'.format(timer_delay)
+            wid_id += f'_{timer_delay}'
 
     value = ITEM_CONFIG.get_val(group_id, wid_id, '')
     if not value:

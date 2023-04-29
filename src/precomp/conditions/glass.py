@@ -60,10 +60,10 @@ CORNER_POINTS: Dict[FrozenVec, List[Tuple[Any, Any, Any]]] = {
 
 def glass_item_setup(conf: dict, item_id, config_dict):
     """Build the config dictionary for a custom glass item."""
-    [base_inst] = resolve_inst('<{}:0>'.format(item_id))
+    [base_inst] = resolve_inst(f'<{item_id}:0>')
 
     conf.update({
-        'frame_' + name: resolve_inst('<{}:bee2_frame_{}>'.format(item_id, name))[0]
+        'frame_' + name: resolve_inst(f'<{item_id}:bee2_frame_{name}>')[0]
         for name in ['edge', 'single', 'ubend', 'corner']
     })
     config_dict[base_inst.casefold()] = conf
@@ -94,8 +94,8 @@ def find_glass_items(config, vmf: VMF) -> Iterator[Tuple[str, Vec, Vec, Vec, dic
         else:
             bbox_min.min(origin)
             bbox_max.max(origin)
-            assert group_norm == norm, '"{}" is inconsistently rotated!'.format(targ)
-            assert group_conf is conf, '"{}" has multiple configs!'.format(targ)
+            assert group_norm == norm, f'"{targ}" is inconsistently rotated!'
+            assert group_conf is conf, f'"{targ}" has multiple configs!'
         inst.remove()
 
     for targ, (bbox_min, bbox_max, norm, conf) in glass_items.items():

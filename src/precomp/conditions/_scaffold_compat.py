@@ -240,7 +240,7 @@ def legacy_scaffold_link(vmf: VMF) -> None:
                             targetname=node.inst['targetname'],
                             file=conf['inst_end'],
                             origin=offset,
-                            angles='0 {:.0f} 0'.format(link_ang),
+                            angles=f'0 {link_ang:.0f} 0',
                         )
                         # Don't place the offset instance, this replaces that!
                         placed_endcap = True

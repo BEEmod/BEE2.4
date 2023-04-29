@@ -1026,7 +1026,7 @@ class Style(PakObject, needs_foreground=True):
                 # Recursively find all the base styles for this one.
                 if b_style in base:
                     # Already hit this!
-                    raise Exception('Loop in bases for "{}"!'.format(b_style.id))
+                    raise Exception(f'Loop in bases for "{b_style.id}"!')
                 # Just append the style.base_style to the list,
                 # until the style with that ID isn't found any more.
                 base.append(b_style)

@@ -246,13 +246,13 @@ def mon_camera_link(vmf: VMF) -> None:
             '',
             '@camera',
             'RunScriptCode',
-            'CamEnable({})'.format(index),
+            f'CamEnable({index})',
         ), )
         conn_item.disable_cmd = (Output(
             '',
             '@camera',
             'RunScriptCode',
-            'CamDisable({})'.format(index),
+            f'CamDisable({index})',
         ), )
 
     for is_act, cam in zip(active_counts, ALL_CAMERAS):

@@ -232,7 +232,7 @@ def res_antlaser(vmf: VMF, res: Keyvalues) -> object:
             # we're done.
             item = connections.ITEMS.pop(name)
         except KeyError:
-            raise ValueError('No item for "{}"?'.format(name)) from None
+            raise ValueError(f'No item for "{name}"?') from None
         pos = Vec.from_str(inst['origin'])
         orient = Matrix.from_angstr(inst['angles'])
         if node_type is NodeType.CORNER:

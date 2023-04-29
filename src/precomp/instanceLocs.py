@@ -465,7 +465,7 @@ def get_special_inst(name: str):
     try:
         inst = INST_SPECIAL[name.casefold()]
     except KeyError:
-        raise KeyError("Invalid special instance name! ({})".format(name))
+        raise KeyError(f"Invalid special instance name! ({name})")
 
     # The number you'll get is fixed, so it's fine if we return different
     # types.

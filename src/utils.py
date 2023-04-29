@@ -331,7 +331,7 @@ class FuncLookup(Generic[LookupT], Mapping[str, LookupT]):
             """Decorator to do the work of adding the function."""
             # Set the name to <dict['name']>
             if isinstance(func, types.FunctionType):
-                func.__name__ = '<{}[{!r}]>'.format(self.__name__, names[0])
+                func.__name__ = f'<{self.__name__}[{names[0]!r}]>'
             for name, value in kwargs.items():
                 setattr(func, name, value)
             self.__setitem__(names, func)

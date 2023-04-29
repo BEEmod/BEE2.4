@@ -575,7 +575,7 @@ def gen_rotated_squarebeams(vmf: VMF, p1: Vec, p2: Vec, skin, max_rot: int):
         # Squarebeams are offset 5 units from their real center
         offset = Vec(0, 0, 5).rotate(rand_x, 0, rand_z)
         prop = _make_squarebeam(vmf, Vec(x + 32, y + 32, z) + offset, skin=skin)
-        prop['angles'] = '{} 0 {}'.format(rand_x, rand_z)
+        prop['angles'] = f'{rand_x} 0 {rand_z}'
 
 
 def gen_squarebeams(vmf: VMF, p1: Vec, p2: Vec, skin, gen_collision=True):

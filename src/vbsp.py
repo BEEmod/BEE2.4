@@ -537,7 +537,7 @@ def set_player_portalgun(vmf: VMF, info: corridor.Info) -> None:
 
         for port_id in port_ids:
             trigger_portal = vmf.create_ent(
-                targetname='__pgun_port_detect_{}'.format(port_id),
+                targetname=f'__pgun_port_detect_{port_id}',
                 classname='func_portal_detector',
                 origin=ent_pos,
                 CheckAllIDs=0,

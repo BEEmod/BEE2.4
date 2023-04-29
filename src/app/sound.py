@@ -106,7 +106,7 @@ class PygletSound(NullSound):
         """Load the given UI sound into a source."""
         global sounds
         fname = SOUNDS[name]
-        path = str(utils.install_path('sounds/{}.ogg'.format(fname)))
+        path = str(utils.install_path(f'sounds/{fname}.ogg'))
         LOGGER.info('Loading sound "{}" -> {}', name, path)
         try:
             src: pyglet.media.Source = await trio.to_thread.run_sync(functools.partial(

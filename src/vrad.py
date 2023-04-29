@@ -143,9 +143,9 @@ async def main(argv: List[str]) -> None:
         path += ".bsp"
 
     if not os.path.exists(path):
-        raise ValueError('"{}" does not exist!'.format(path))
+        raise ValueError(f'"{path}" does not exist!')
     if not os.path.isfile(path):
-        raise ValueError('"{}" is not a file!'.format(path))
+        raise ValueError(f'"{path}" is not a file!')
 
     LOGGER.info('Reading BSP')
     bsp_file = BSP(path)

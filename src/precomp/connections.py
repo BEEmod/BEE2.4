@@ -195,7 +195,7 @@ class Item:
         return self.ind_style.wall
 
     def __repr__(self) -> str:
-        return '<Item {}: "{}">'.format(self.config.id, self.name)
+        return f'<Item {self.config.id}: "{self.name}">'
 
     @property
     def traits(self) -> Set[str]:
@@ -407,7 +407,7 @@ def collapse_item(item: Item) -> None:
         [input_conn] = item.inputs
         input_item = input_conn.from_item
     except ValueError:
-        raise ValueError('Too many inputs for "{}"!'.format(item.name))
+        raise ValueError(f'Too many inputs for "{item.name}"!')
 
     LOGGER.debug('Merging "{}" into "{}"...', item.name, input_item.name)
 
@@ -432,7 +432,7 @@ def read_configs(all_items: Iterable[editoritems.Item]) -> None:
     """Load our connection configuration from the config files."""
     for item in all_items:
         if item.id.casefold() in ITEM_TYPES:
-            raise ValueError('Duplicate item type "{}"'.format(item.id))
+            raise ValueError(f'Duplicate item type "{item.id}"')
         if item.conn_config is None and (item.force_input or item.force_output):
             # The item has no config, but it does force input/output.
             # Generate a blank config so the Item is created.
@@ -1290,7 +1290,7 @@ def add_item_indicators(
     style: IndicatorStyle,
 ) -> None:
     """Generate the commands for antlines and the overlays themselves."""
-    ant_name = '@{}_overlay'.format(item.name)
+    ant_name = f'@{item.name}_overlay'
     has_sign = len(item.ind_panels) > 0
     has_ant = len(item.antlines) > 0
     timer_delay = item.timer

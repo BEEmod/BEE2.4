@@ -47,12 +47,12 @@ class Checker(ast.NodeVisitor):
 
     def generic_visit(self, node: ast.AST):
         """All other nodes are invalid."""
-        raise ValueError('A {} is not permitted!'.format(type(node).__name__))
+        raise ValueError(f'A {type(node).__name__} is not permitted!')
 
     def visit_Name(self, node: ast.Name):
         """A variable name."""
         if node.id not in self.var_names:
-            raise NameError('Invalid variable name "{}"'.format(node.id))
+            raise NameError(f'Invalid variable name "{node.id}"')
         if not isinstance(node.ctx, ast.Load):
             raise ValueError('Only reading variables is supported!')
 
@@ -116,7 +116,7 @@ def res_python_setup(res: Keyvalues) -> conditions.ResultCallable:
     for child in res:
         if child.name.startswith('$'):
             if child.value.casefold() not in FUNC_GLOBALS:
-                raise Exception('Invalid variable type! ({})'.format(child.value))
+                raise Exception(f'Invalid variable type! ({child.value})')
             variables[child.name[1:]] = child.value.casefold()
             variable_order.append(child.name[1:])
         elif child.name == 'op':
@@ -124,7 +124,7 @@ def res_python_setup(res: Keyvalues) -> conditions.ResultCallable:
         elif child.name == 'resultvar':
             result_var = child.value
         else:
-            raise Exception('Invalid key "{}"'.format(child.real_name))
+            raise Exception(f'Invalid key "{child.real_name}"')
     if not code:
         raise Exception('No operation specified!')
     if not result_var:
@@ -132,7 +132,7 @@ def res_python_setup(res: Keyvalues) -> conditions.ResultCallable:
 
     for name in variables:
         if name.startswith('_'):
-            raise Exception('"{}" is not permitted as a variable name!'.format(name))
+            raise Exception(f'"{name}" is not permitted as a variable name!')
 
     # Allow $ in the variable names..
     code = code.replace('$', '')

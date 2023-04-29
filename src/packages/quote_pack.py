@@ -32,7 +32,7 @@ class QuotePack(PakObject, needs_foreground=True, style_suggest_key='quote'):
         self.selitem_data = selitem_data
         self.cave_skin = skin
         self.config = config
-        set_cond_source(config, 'QuotePack <{}>'.format(quote_id))
+        set_cond_source(config, f'QuotePack <{quote_id}>')
         self.chars = chars or {'??'}
         self.studio = studio
         self.studio_actor = studio_actor
@@ -168,7 +168,7 @@ class QuotePack(PakObject, needs_foreground=True, style_suggest_key='quote'):
                 shutil.copy(
                     str(path),
                     exp_data.game.abs_path(
-                        'bin/bee2/{}voice.cfg'.format(prefix)
+                        f'bin/bee2/{prefix}voice.cfg'
                     )
                 )
                 LOGGER.info('Written "{}voice.cfg"', prefix)

@@ -1553,7 +1553,7 @@ def make_tile(
 
     assert width >= 8 and height >= 8, 'Tile is too small!' \
                                        ' ({}x{})'.format(width, height)
-    assert thickness in (2, 4, 8), 'Bad thickness {}'.format(thickness)
+    assert thickness in (2, 4, 8), f'Bad thickness {thickness}'
 
     axis_u, axis_v = Vec.INV_AXIS[normal.axis()]
 
@@ -1711,7 +1711,7 @@ def analyse_map(vmf_file: VMF, side_to_ant_seg: dict[int, list[antlines.Segment]
                 break
         else:
             # Has no 4-unit side - not a PeTI brush?
-            LOGGER.warning('Unrecognised brush from {} to {}'.format(bbox_min, bbox_max))
+            LOGGER.warning(f'Unrecognised brush from {bbox_min} to {bbox_max}')
             continue
 
         tile_size = dim.other_axes(norm.axis())
@@ -1986,7 +1986,7 @@ def find_front_face(
             LOGGER.warning('Unknown panel texture "{}"!', face.mat)
             return TileType.BLACK, face
     else:
-        raise Exception('Malformed wall brush at {}, {}'.format(grid_pos, norm))
+        raise Exception(f'Malformed wall brush at {grid_pos}, {norm}')
 
 
 def inset_flip_panel(panel: list[Solid], pos: Vec, normal: Vec) -> None:
