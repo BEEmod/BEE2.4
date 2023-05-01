@@ -369,7 +369,7 @@ def res_add_brush(vmf: VMF, inst: Entity, res: Keyvalues) -> None:
         vmf.add_brush(solids.solid)
 
 
-@conditions.make_result('TemplateBrush')
+@conditions.make_result('TemplateBrush', 'BrushTemplate')
 def res_import_template(
     vmf: VMF,
     coll: collisions.Collisions,
