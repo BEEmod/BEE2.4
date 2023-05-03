@@ -945,7 +945,7 @@ class UIImage(abc.ABC):
 # noinspection PyProtectedMember
 async def init(
     filesystems: Mapping[str, FileSystem], implementation: UIImage,
-    *, task_status: 'trio.TaskStatus' = trio.TASK_STATUS_IGNORED,
+    *, task_status: utils.TaskStatus[None] = trio.TASK_STATUS_IGNORED,
 ) -> None:
     """Start the background loading of images, using the specified filesystem and implementation.
     """

@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections import deque
 import copyreg
 from typing import (
-    Awaitable, TypeVar, Any, NoReturn, Generic, Optional, TYPE_CHECKING, Tuple,
+    Awaitable, Protocol, TypeVar, Any, NoReturn, Generic, Optional, TYPE_CHECKING, Tuple,
     SupportsInt, Callable, Sequence, Iterator, Iterable, Mapping, Generator, Type,
     KeysView, ValuesView, ItemsView, overload,
 )
@@ -468,6 +468,7 @@ class PackagePath:
 
 ResultT = TypeVar('ResultT')
 SyncResultT = TypeVar('SyncResultT')
+T_contra = TypeVar('T_contra', contravariant=True)
 # ArgsT = TypeVarTuple('ArgsT')
 _NO_RESULT: Any = object()
 
@@ -636,6 +637,12 @@ class Result(Generic[ResultT]):
             raise ValueError(f'Result cannot be fetched before nursery has closed! ({self._nursery.cancel_scope!r})')
         self._nursery = None  # The check passed, no need to keep this alive.
         return self._result
+
+
+class TaskStatus(Protocol[T_contra]):
+    """Type of the status object passed to functions by trio.Nursery.start()."""
+    # TODO: import from trio once this is present there.
+    def started(self, value: T_contra = ...) -> None: ...
 
 
 def get_indent(line: str) -> str:
