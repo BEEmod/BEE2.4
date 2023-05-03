@@ -6,10 +6,10 @@ We take care not to directly import gettext and babel, so the compiler can omit 
 """
 from enum import Enum
 from typing import (
-    Any, Callable, ClassVar, List, Dict, Iterable, Mapping, NoReturn, Optional, Protocol, Sequence,
-    Tuple, cast,
+    Any, Callable, ClassVar, Final, List, Dict, Iterable, Mapping, NoReturn, Optional, Protocol,
+    Sequence, Tuple, cast,
 )
-from typing_extensions import Final, LiteralString, TypeAlias
+from typing_extensions import LiteralString, TypeAlias
 from html import escape as html_escape
 from pathlib import Path
 import string

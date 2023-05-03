@@ -3,13 +3,13 @@ from __future__ import annotations
 
 import operator
 from enum import Flag, auto as enum_auto
-from typing import Callable, Iterable, Iterator, Sequence, overload
+from typing import Iterable, Iterator, Sequence, overload
 
 import attrs
 import functools
 
 from srctools import Entity, Side, VMF, conv_bool, logger
-from srctools.math import AnyAngle, AnyMatrix, FrozenVec, Vec, Angle, Matrix, to_matrix
+from srctools.math import AnyAngle, AnyMatrix, FrozenVec, Vec, to_matrix
 
 import consts
 

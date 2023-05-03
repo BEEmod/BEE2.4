@@ -2,8 +2,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing_extensions import Final, Literal
-from typing import Iterable, Mapping, Tuple
+from typing import Iterable, Mapping, Final, Literal
 import pickle
 
 from srctools import FrozenVec, Vec, VMF, AtomicWriter, logger

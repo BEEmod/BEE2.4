@@ -19,7 +19,7 @@ from transtoken import TransToken
 from app.tooltip import add_tooltip
 from app import img, TK_ROOT, localisation
 from app import tk_tools
-from ui_tk.img import TKImages, TK_IMG
+from ui_tk.img import TKImages
 
 
 LOGGER = srctools.logger.get_logger(__name__)

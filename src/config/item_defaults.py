@@ -1,6 +1,5 @@
 """Store overridden defaults for items, and also the selected version."""
-from typing import Dict
-from typing_extensions import Final
+from typing import Dict, Final
 
 import attrs
 from srctools import Keyvalues, logger
