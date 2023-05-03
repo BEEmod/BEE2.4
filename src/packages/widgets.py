@@ -177,7 +177,7 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
         self,
         conf_id: str,
         group_name: TransToken,
-        desc,
+        desc: tkMarkdown.MarkdownData,
         widgets: List[SingleWidget],
         multi_widgets: List[MultiWidget],
     ) -> None:
@@ -193,7 +193,7 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
         props = data.info
 
         if data.is_override:
-            # Override doesn't have a name
+            # Override doesn't need to have a name.
             group_name = TransToken.BLANK
         else:
             group_name = TransToken.parse(data.pak_id, props['Name'])
@@ -326,6 +326,9 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
         conficts = self.widget_ids() & override.widget_ids()
         if conficts:
             raise ValueError('Duplicate IDs in "{}" override - {}', self.id, conficts)
+
+        if self.name is TransToken.BLANK:
+            self.name = override.name
 
         self.widgets.extend(override.widgets)
         self.multi_widgets.extend(override.multi_widgets)

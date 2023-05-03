@@ -706,9 +706,9 @@ async def parse_package(
                 raise ValueError(f'No ID for "{obj_type}" object type in "{pack.id}" package!') from None
             if obj_id in packset.unparsed[obj_type]:
                 if obj_type.allow_mult:
-                    # Pretend this is an override
+                    # Pretend this is an override, but don't actually set the bool.
                     packset.overrides[obj_type, obj_id.casefold()].append(
-                        ParseData(pack.fsys, obj_id, obj, pack.id, True)
+                        ParseData(pack.fsys, obj_id, obj, pack.id, False)
                     )
                     # Don't continue to parse and overwrite
                     continue
@@ -785,7 +785,7 @@ async def parse_object(
             raise
         except Exception as e:
             raise ValueError(
-                f'Error occured parsing {obj_id} override'
+                f'Error occured parsing {obj_id} override '
                 f'from package {override_data.pak_id}!'
             ) from e
 
