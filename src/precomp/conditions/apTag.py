@@ -263,25 +263,25 @@ def res_make_tag_fizzler(vmf: VMF, info: conditions.MapInfo, res: Keyvalues) -> 
             sign_floor_loc = sign_loc.copy()
             sign_floor_loc.z = 0  # We don't care about z-positions.
 
-            s, l = Vec.bbox(itertools.chain.from_iterable(fizzler.emitters))
+            pos1, pos2 = Vec.bbox(itertools.chain.from_iterable(fizzler.emitters))
 
             if fizz_norm_axis == 'z':
                 # For z-axis, just compare to the center point of the emitters.
-                sign_dir = ((s.x + l.x) / 2, (s.y + l.y) / 2, 0) - sign_floor_loc
+                sign_dir = ((pos1.x + pos2.x) / 2, (pos1.y + pos2.y) / 2, 0) - sign_floor_loc
             else:
                 # For the other two, we compare to the line,
                 # or compare to the closest side (in line with the fizz)
 
                 if fizz_norm_axis == 'x':  #  Extends in Y direction
                     other_axis = 'y'
-                    side_min = s.y
-                    side_max = l.y
-                    normal = s.x
+                    side_min = pos1.y
+                    side_max = pos2.y
+                    normal = pos1.x
                 else:  # Extends in X direction
                     other_axis = 'x'
-                    side_min = s.x
-                    side_max = l.x
-                    normal = s.y
+                    side_min = pos1.x
+                    side_max = pos2.x
+                    normal = pos1.y
 
                 # Right in line with the fizzler. Point at the closest emitter.
                 if abs(sign_floor_loc[other_axis] - normal) < 32:
