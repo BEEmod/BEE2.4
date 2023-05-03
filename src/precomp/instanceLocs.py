@@ -416,16 +416,9 @@ def get_subitems(comma_list: str, item_inst: List[str], item_id: str) -> List[st
                 ind = int(folded_value)
             except ValueError:
                 LOGGER.info('--------\nValid subitems:')
-                LOGGER.info('\n'.join(
-                    ('> ' + k + ' = ' + str(v))
-                    for k, v in
-                    SUBITEMS.items()
-                ))
+                LOGGER.info('\n'.join([f'> {k} = {v}' for k, v in SUBITEMS.items()]))
                 LOGGER.info('--------')
-                raise Exception(
-                    '"' + val + '" is not a valid instance'
-                                ' subtype or index!'
-                )
+                raise Exception(f'"{val}" is not a valid instance subtype or index!') from None
         # SUBITEMS has tuple values, which represent multiple sub-items.
         if isinstance(ind, tuple):
             output.extend(ind)

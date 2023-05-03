@@ -81,15 +81,11 @@ class Checker(ast.NodeVisitor):
             ops = node.ops
         except AttributeError:
             if isinstance(node.op, tuple(BANNED_COMPS)):  # type: ignore
-                raise Exception("The {} operator is not allowed!".format(
-                    BANNED_COMPS[type(node.op)]  # type: ignore
-                ))
+                raise Exception(f"The {BANNED_COMPS[type(node.op)]} operator is not allowed!")
         else:
             for op in ops:
                 if isinstance(op, tuple(BANNED_COMPS)):
-                    raise Exception("The {} operator is not allowed!".format(
-                        BANNED_COMPS[type(op)]
-                    ))
+                    raise Exception(f"The {BANNED_COMPS[type(op)]} operator is not allowed!")
 
         self.visit(node.left)
         for right in node.comparators:

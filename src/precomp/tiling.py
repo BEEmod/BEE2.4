@@ -218,10 +218,7 @@ class TileType(Enum):
             return TileSize.TILE_1x1
 
     @staticmethod
-    def with_color_and_size(
-        size: TileSize,
-        color: texturing.Portalable
-    ) -> 'TileType':
+    def with_color_and_size(size: TileSize, color: texturing.Portalable) -> TileType:
         """Return the TileType with a size and color."""
         return _tiletype_tiles[size, color]
 
@@ -325,7 +322,7 @@ class Pattern:
         tile_u, tile_v = tex.size
         # Do some sanity checks on values...
         for umin, vmin, umax, vmax in tiles:
-            tile_tex = '{} -> {} {} {} {}'.format(tex, umin, vmin, umax, vmax)
+            tile_tex = f'{tex} -> {umin} {vmin} {umax} {vmax}'
             assert 0 <= umin < umax <= 4, tile_tex
             assert 0 <= vmin < vmax <= 4, tile_tex
             assert (umax - umin) % tile_u == 0, tile_tex
@@ -1359,7 +1356,7 @@ class TileDef:
             elif tile_type is TileType.VOID:
                 continue
             else:
-                raise AssertionError("Can't gen {} yet.".format(tile_type))
+                raise AssertionError(f"Can't gen {tile_type} yet.")
 
             if face_output is not None:
                 for u in u_range:
@@ -1642,8 +1639,8 @@ def gen_tile_temp() -> None:
         # Grab the single world brush for each visgroup.
         for (key, name) in cat_names.items():
             [categories[key]] = template.visgrouped_solids(name)
-    except (KeyError, ValueError):
-        raise Exception('Bad Tiling Template!')
+    except (KeyError, ValueError) as exc:
+        raise Exception('Bad Tiling Template!') from exc
 
     for norm, orient in zip(NORMALS, NORMAL_ANGLES):
         axis_norm = norm.axis()
