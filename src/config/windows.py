@@ -22,7 +22,7 @@ class WindowState(config.Data, conf_name='PaneState', uses_id=True, palette_stor
     visible: bool = True
 
     @classmethod
-    def parse_legacy(cls, conf: Keyvalues) -> Dict[str, 'WindowState']:
+    def parse_legacy(cls, conf: Keyvalues) -> Dict[str, WindowState]:
         """Convert old GEN_OPTS configuration."""
         opt_block = LEGACY_CONF['win_state']
         names: set[str] = set()
@@ -44,7 +44,7 @@ class WindowState(config.Data, conf_name='PaneState', uses_id=True, palette_stor
         }
 
     @classmethod
-    def parse_kv1(cls, data: Keyvalues, version: int) -> 'WindowState':
+    def parse_kv1(cls, data: Keyvalues, version: int) -> WindowState:
         """Parse keyvalues1 data."""
         assert version == 1, version
         return WindowState(
@@ -69,7 +69,7 @@ class WindowState(config.Data, conf_name='PaneState', uses_id=True, palette_stor
         return kv
 
     @classmethod
-    def parse_dmx(cls, data: Element, version: int) -> 'WindowState':
+    def parse_dmx(cls, data: Element, version: int) -> WindowState:
         """Parse DMX configuation."""
         assert version == 1, version
         pos = data['pos'].val_vec2 if 'pos' in data else Vec2(-1, -1)

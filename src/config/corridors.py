@@ -123,7 +123,7 @@ class UIState(config.Data, conf_name='CorridorUIState', palette_stores=False):
         ])
 
     @classmethod
-    def parse_dmx(cls, data: Element, version: int) -> 'UIState':
+    def parse_dmx(cls, data: Element, version: int) -> UIState:
         """Parse Keyvalues 2 configuration."""
         assert version == 1, version
         try:
