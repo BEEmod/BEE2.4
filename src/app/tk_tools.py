@@ -368,7 +368,10 @@ class _Binder(Protocol):
     @overload
     def __call__(self, wid: tk.Misc, func: EventFunc, *, add: bool=False) -> str:
         pass
-    def __call__(self, wid: tk.Misc, func: Optional[EventFunc]=None, *, add: bool=False) -> Union[Callable[[EventFuncT], EventFuncT], str]:
+    def __call__(
+        self, wid: tk.Misc,
+        func: Optional[EventFunc]=None, *, add: bool=False,
+    ) -> Union[Callable[[EventFuncT], EventFuncT], str]:
         pass
 
 
@@ -628,8 +631,8 @@ class ReadOnlyEntry(ttk.Entry):
         self.redirector = redir = WidgetRedirector(self)
         # These two TK commands are used for all text operations,
         # so cancelling them stops anything from happening.
-        setattr(self, 'insert', redir.register('insert', event_cancel))
-        setattr(self, 'delete', redir.register('delete', event_cancel))
+        self.insert = redir.register('insert', event_cancel)
+        self.delete = redir.register('delete', event_cancel)
 
 
 # Widget and Spinbox have conflicting identify() definitions, not important.
@@ -700,7 +703,7 @@ class FileField(ttk.Frame):
         """
         from app.tooltip import add_tooltip
 
-        super(FileField, self).__init__(master)
+        super().__init__(master)
 
         self._location = loc
         self.is_dir = is_dir
