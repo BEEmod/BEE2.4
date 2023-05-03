@@ -307,7 +307,7 @@ class PluralTransToken(TransToken):
         try:
             n = int(cast(str, self.parameters['n']))
         except KeyError:
-            raise ValueError('Plural token requires "n" parameter!')
+            raise ValueError('Plural token requires "n" parameter!') from None
 
         # If in the untranslated namespace or blank, don't translate.
         if self.namespace == NS_UNTRANSLATED or not self.token:
@@ -395,7 +395,7 @@ class ListTransToken(JoinTransToken):
         """Translate the token."""
         if self.parameters:
             raise ValueError(f'Cannot format list token: {vars(self)}')
-        sep = self._convert_token()
+
         items = [str(child) for child in self.children]
         if self.sort:
             items.sort()
