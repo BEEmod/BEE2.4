@@ -572,10 +572,11 @@ class Game:
                 continue
             for file in pack.fsys.walk_folder('resources'):
                 try:
-                    start_folder, path = file.path.split('/', 1)
+                    res, start_folder, path = file.path.split('/', 2)
                 except ValueError:
                     LOGGER.warning('File in resources root: "{}"!', file.path)
                     continue
+                assert res.casefold() == 'resources', file.path
 
                 start_folder = start_folder.casefold()
 
@@ -586,7 +587,7 @@ class Game:
                     continue  # Skip app icons and music samples.
                 else:
                     # Preserve original casing.
-                    dest = self.abs_path(os.path.join('bee2', file.path))
+                    dest = self.abs_path(os.path.join('bee2', start_folder, path))
 
                 # Already copied from another package.
                 if dest.casefold() in already_copied:
