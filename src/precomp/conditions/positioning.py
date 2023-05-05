@@ -9,6 +9,7 @@ from precomp.conditions import (
     make_flag, make_result, resolve_offset,
     DIRECTIONS,
 )
+from editoritems_props import prop_angled_panel_anim
 from precomp import tiling, brushLoc
 from srctools import Vec, FrozenVec, Angle, Matrix, conv_float, Keyvalues, Entity
 from srctools.logger import get_logger
@@ -581,17 +582,26 @@ def res_rotate_inst(inst: Entity, res: Keyvalues) -> None:
     Otherwise, `angle` is a pitch-yaw-roll angle which is applied.
     `around` can be a point (local, pre-rotation) which is used as the origin.
 
+    As a convenience, the `ramp_open_XX_deg` animations are also permitted in axis mode.
+
     Tip: If you want to match angled panels, rotate with an axis of `0 -1 0`
     and an around value of `0 -64 -64`.
     """
     angles = Matrix.from_angstr(inst['angles'])
+    angle_str = inst.fixup.substitute(res['angle'])
     if 'axis' in res:
+        try:
+            anim = prop_angled_panel_anim.parse(angle_str)
+        except ValueError:
+            angle = conv_float(angle_str)
+        else:
+            angle = float(anim.value)
         orient = Matrix.axis_angle(
             Vec.from_str(inst.fixup.substitute(res['axis'])),
-            conv_float(inst.fixup.substitute(res['angle'])),
+            angle,
         )
     else:
-        orient = Matrix.from_angstr(inst.fixup.substitute(res['angle']))
+        orient = Matrix.from_angstr(angle_str)
 
     try:
         offset = Vec.from_str(inst.fixup.substitute(res['around']))
