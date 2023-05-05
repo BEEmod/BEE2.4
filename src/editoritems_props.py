@@ -173,7 +173,7 @@ class PanelAnimation(Enum):
     ANGLE_30 = 30
     ANGLE_45 = 45
     ANGLE_60 = 60
-    AMGLE_90 = 90
+    ANGLE_90 = 90
 
 
 class PaintTypes(Enum):
