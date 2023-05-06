@@ -35,7 +35,6 @@ FALLBACKS: Final[Mapping[Tuple[GameMode, Direction], str]] = {
     (GameMode.COOP, Direction.EXIT): 'coop',
 }
 TRANS_CORRIDOR_GENERIC = TransToken.ui('Corridor')
-EMPTY_DESC: Final = tkMarkdown.MarkdownData.text('')
 
 IMG_WIDTH_SML: Final = 144
 IMG_HEIGHT_SML: Final = 96
@@ -244,7 +243,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                                 images=[ICON_GENERIC_LRG],
                                 dnd_icon=ICON_GENERIC_SML,
                                 authors=list(map(TransToken.untranslated, style.selitem_data.auth)),
-                                desc=EMPTY_DESC,
+                                desc=tkMarkdown.MarkdownData.BLANK,
                                 config=lazy_conf.BLANK,
                                 orig_index=ind + 1,
                                 fixups={},

@@ -279,7 +279,7 @@ class Item:
         large_icon: img.Handle | None = None,
         previews: Iterable[img.Handle] = (),
         authors: Iterable[str] = (),
-        desc: tkMarkdown.MarkdownData = tkMarkdown.MarkdownData.text(''),
+        desc: tkMarkdown.MarkdownData = tkMarkdown.MarkdownData.BLANK,
         group: TransToken = TransToken.BLANK,
         sort_key: str | None = None,
         attributes: Mapping[str, AttrValues] = EmptyMapping,

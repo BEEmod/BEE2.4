@@ -483,7 +483,7 @@ class Selector:
         else:  # Reset.
             self.cur_images = None
             localisation.set_text(self.wid_title, TransToken.BLANK)
-            self.wid_desc.set_text(corridor.EMPTY_DESC)
+            self.wid_desc.set_text(tkMarkdown.MarkdownData.BLANK)
             localisation.set_text(self.wid_authors, TransToken.BLANK)
             self.tk_img.apply(self.wid_image, IMG_CORR_BLANK)
             self.wid_image_left.state(('disabled', ))

@@ -4,7 +4,7 @@ This produces a stream of values, which are fed into richTextBox to display.
 """
 from __future__ import annotations
 
-from typing import Iterator, Mapping, Sequence
+from typing import Final, Iterator, Mapping, Sequence, cast
 from contextvars import ContextVar
 import urllib.parse
 import itertools
@@ -103,6 +103,12 @@ class MarkdownData:
     def text(text: str, *tags: TextTag, url: str | None = None) -> SingleMarkdown:
         """Construct data with a single text segment."""
         return SingleMarkdown([TextSegment(text, tags, url)])
+
+    # An empty set of data.
+    BLANK: Final[MarkdownData] = cast('MarkdownData', ...)
+
+
+MarkdownData.BLANK = MarkdownData()  # type: ignore
 
 
 @attrs.define

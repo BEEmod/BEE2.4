@@ -12,13 +12,22 @@ from precomp import (
     conditions, tiling, texturing, rand, corridor, collisions,
     instance_traits, brushLoc, faithplate, template_brush,
 )
+from editoritems_props import prop_angled_panel_anim, PanelAnimation
 import utils
 import consts
 
 
 COND_MOD_NAME = 'Brushes'
 LOGGER = srctools.logger.get_logger(__name__)
-
+PANEL_TYPES: dict[str, tiling.PanelType] = {
+    typ.value.casefold(): typ
+    for typ in tiling.PanelType
+}
+PANEL_TYPES.update({
+    prop_angled_panel_anim.export(PanelAnimation[ang]): tiling.PanelType[ang]
+    for ang in ['ANGLE_30', 'ANGLE_45', 'ANGLE_60']
+})
+PANEL_TYPES[prop_angled_panel_anim.export(PanelAnimation.ANGLE_90)] = tiling.PanelType.NORMAL
 
 # The spawnflags that we need to toggle for each classname
 FLAG_ROTATING = {
@@ -959,8 +968,9 @@ def res_set_panel_options(vmf: VMF, inst: Entity, kv: Keyvalues) -> None:
           doubling it in thickness.
         - `ANGLED_30`, `ANGLED_45`, `ANGLED_60`: Rotate the panel to match
           an extended panel of these angles.
+        As a convenience, the `ramp_open_XX_deg` animation values will also be accepted.
     - `thickness`: The thickness of the surface. Must be 2, 4 or 8.
-    - `bevel`: If true, angle the sides. Otherwise leave them straight.
+    - `bevel`: If true, angle the sides. Otherwise, leave them straight.
     - `nodraw_sides`: If true, apply nodraw to the sides and back instead of
       squarebeams/backpanels materials.
     - `seal`: If enabled, nodraw tiles will be generated at the original
@@ -1008,8 +1018,9 @@ def res_create_panel(vmf: VMF, inst: Entity, kv: Keyvalues) -> None:
           doubling it in thickness.
         - `ANGLED_30`, `ANGLED_45`, `ANGLED_60`: Rotate the panel to match
           an extended panel of these angles.
+        As a convenience, the `ramp_open_XX_deg` animation values will also be accepted.
     - `thickness`: The thickness of the surface. Must be 2, 4 or 8.
-    - `bevel`: If true, angle the sides. Otherwise leave them straight.
+    - `bevel`: If true, angle the sides. Otherwise, leave them straight.
     - `nodraw_sides`: If true, apply nodraw to the sides and back instead of
       squarebeams/backpanels materials.
     - `seal`: If enabled, nodraw tiles will be generated at the original
@@ -1115,14 +1126,12 @@ def edit_panel(vmf: VMF, inst: Entity, props: Keyvalues, create: bool) -> None:
                 continue
         panels.append(panel)
 
-        pan_type = '<nothing?>'
-        try:
-            pan_type = conditions.resolve_value(inst, props['type'])
-            panel.pan_type = tiling.PanelType(pan_type.lower())
-        except LookupError:
-            pass
-        except ValueError:
-            raise ValueError(f'Unknown panel type "{pan_type}"!') from None
+        if 'type' in props:
+            pan_type = props['type']
+            try:
+                panel.pan_type = PANEL_TYPES[conditions.resolve_value(inst, pan_type).lower()]
+            except (KeyError, ValueError):
+                raise ValueError(f'Unknown panel type "{pan_type}"!') from None
 
         if 'thickness' in props:
             panel.thickness = srctools.conv_int(

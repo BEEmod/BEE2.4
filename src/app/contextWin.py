@@ -259,7 +259,8 @@ def get_description(
     elif style_desc:
         return style_desc
     else:
-        return tkMarkdown.MarkdownData()  # No description
+        return tkMarkdown.MarkdownData.BLANK  # No description
+
 
 
 def load_item_data(tk_img: TKImages) -> None:
