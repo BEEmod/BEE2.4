@@ -3,9 +3,10 @@ from typing import List, MutableMapping, Optional, Dict, Set, Union
 from weakref import WeakKeyDictionary
 
 import attrs
-from srctools import Entity, VMF
+from srctools import Entity, VMF, Vec
 import srctools.logger
 
+from precomp import options
 from precomp.instanceLocs import ITEM_FOR_FILE
 from precomp.collisions import Collisions
 from editoritems import Item, ItemClass
@@ -184,8 +185,13 @@ def get_item_id(inst: Entity) -> Optional[str]:
         return None
 
 
-def set_traits(vmf: VMF, id_to_item: Dict[str, Item], coll: Collisions) -> None:
-    """Scan through the map, apply traits to instances, and set initial collisions."""
+def set_traits(vmf: VMF, id_to_item: Dict[str, Item], coll: Collisions) -> Set[str]:
+    """Scan through the map, apply traits to instances, and set initial collisions.
+
+    This returns a set of strings listing the used instances, for debugging purposes.
+    """
+    used_inst: set[str] = set()
+
     for inst in vmf.by_class['func_instance']:
         inst_file = inst['file'].casefold()
         if not inst_file:
@@ -203,6 +209,8 @@ def set_traits(vmf: VMF, id_to_item: Dict[str, Item], coll: Collisions) -> None:
             except KeyError:
                 LOGGER.warning('Unknown instance "{}"!', inst['file'])
                 continue
+
+        used_inst.add(f'{item_id}:{item_ind} = {inst_file}')
 
         # BEE2_xxx special instance, shouldn't be in the original map...
         if isinstance(item_ind, str):
@@ -236,3 +244,5 @@ def set_traits(vmf: VMF, id_to_item: Dict[str, Item], coll: Collisions) -> None:
             # Also skip if no name is set.
         elif item is not None and inst['targetname'] != '':
             coll.add_item_coll(item, inst)
+
+    return used_inst

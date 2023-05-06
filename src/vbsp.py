@@ -1243,6 +1243,23 @@ def change_ents(vmf: VMF) -> None:
                 vmf.remove_ent(auto)
 
 
+def write_itemid_list(vmf: VMF, used_items: Iterable[str]) -> None:
+    """To aid debugging, include info about the items in the map."""
+    # Number of keyvalues per ent to add.
+    per_ent = 16
+
+    used_item_list = sorted(used_items)
+    LOGGER.debug('Used items: \n{}', '\n'.join(used_item_list))
+    global_ents_loc = options.get(Vec, 'global_ents_loc')
+    for offset in range(0, len(used_item_list), per_ent):
+        lst_ent = vmf.create_ent(
+            'bee2_item_list',
+            origin=global_ents_loc,
+        )
+        for j, item_id in enumerate(used_item_list[offset:offset+per_ent]):
+            lst_ent[f'itemid{j:02}'] = item_id
+
+
 def fix_worldspawn(vmf: VMF) -> None:
     """Adjust some properties on WorldSpawn."""
     LOGGER.info("Editing WorldSpawn")
@@ -1607,7 +1624,7 @@ async def main() -> None:
 
         coll = Collisions()
 
-        instance_traits.set_traits(vmf, id_to_item, coll)
+        used_inst = instance_traits.set_traits(vmf, id_to_item, coll)
         # Must be before corridors!
         brushLoc.POS.read_from_map(vmf, settings['has_attr'], id_to_item)
 
@@ -1621,6 +1638,8 @@ async def main() -> None:
         is_publishing = info.is_publishing
 
         ant, side_to_antline = antlines.parse_antlines(vmf)
+
+        write_itemid_list(vmf, used_inst)
 
         # Requires instance traits!
         connections.calc_connections(

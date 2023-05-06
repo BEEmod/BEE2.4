@@ -30,9 +30,6 @@ import trio
 
 from BEE2_config import ConfigFile
 from postcomp import music, screenshot
-# Load our BSP transforms.
-# noinspection PyUnresolvedReferences
-from postcomp import coop_responses, filter, user_error
 import utils
 
 
@@ -61,6 +58,10 @@ def load_transforms() -> None:
         sys.meta_path.append(finder)
         LOGGER.debug('Loading transforms from source: {}', transform_loc)
         finder.load_all()
+
+    # Load our additional BSP transforms.
+    # noinspection PyUnresolvedReferences
+    from postcomp import coop_responses, filter, user_error, debug_info
 
 
 def run_vrad(args: List[str]) -> None:
