@@ -32,6 +32,7 @@ from packages.widgets import (
 )
 from ui_tk.img import TKImages
 from ..SubPane import SubPane
+from ..tkMarkdown import MarkdownData
 
 
 LOGGER = logger.get_logger(__name__)
@@ -245,7 +246,12 @@ async def create_group(master: ttk.Frame, tk_img: TKImages, group: ConfigGroup) 
 
 
 # Special group injected for the stylevar display.
-STYLEVAR_GROUP = ConfigGroup('_STYLEVAR', TransToken.ui('Style Properties'), '', [], [])
+STYLEVAR_GROUP = ConfigGroup(
+    '_STYLEVAR',
+    TransToken.ui('Style Properties'),
+    MarkdownData.BLANK,
+    [], [],
+)
 
 
 async def make_pane(
