@@ -1,7 +1,8 @@
 """Image integrations for TKinter."""
 from __future__ import annotations
-from typing import Iterable, Tuple, TypeVar, Union
+from typing import Tuple, TypeVar, Union
 from typing_extensions import TypeAlias
+from collections.abc import Iterable, Sequence
 from tkinter import ttk
 import tkinter as tk
 import itertools
@@ -236,7 +237,7 @@ class TKImages(img.UIImage):
         b >>= 8
         return r, g, b
 
-    async def ui_anim_task(self, load_handles: Iterable[tuple[img.Handle, list[img.Handle]]]) -> None:
+    async def ui_anim_task(self, load_handles: Iterable[tuple[img.Handle, Sequence[img.Handle]]]) -> None:
         """Cycle loading icons."""
         for i in itertools.cycle(img.LOAD_FRAME_IND):
             await trio.sleep(0.125)

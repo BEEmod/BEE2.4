@@ -937,7 +937,7 @@ class UIImage(abc.ABC):
         """Look up colours in the UI library's database, or raise ValueError if not found."""
         raise ValueError
 
-    async def ui_anim_task(self, load_handles: Iterable[tuple[Handle, list[Handle]]]) -> None:
+    async def ui_anim_task(self, load_handles: Iterable[tuple[Handle, Sequence[Handle]]]) -> None:
         """Cycle loading icons."""
         raise NotImplementedError
 
