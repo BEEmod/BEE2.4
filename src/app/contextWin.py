@@ -115,6 +115,14 @@ TRANS_TOOL_CUBE = TransToken.ui(
     '{generic_rot} However when this is set to Reflection Cube, this item can instead rotated on '
     'the floor to face 360 degrees.'
 )
+TRANS_TOOL_FIZZOUT = TransToken.ui(
+    'This fizzler has an output. Due to an editor bug, this cannot be used directly. Instead '
+    'the Fizzler Output Relay item should be placed on top of this fizzler.'
+)
+TRANS_TOOL_FIZZOUT_TIMED = TransToken.ui(
+    'This fizzler has a timed output. Due to an editor bug, this cannot be used directly. Instead '
+    'the Fizzler Output Relay item should be placed on top of this fizzler.'
+)
 TRANS_NO_VERSIONS = TransToken.ui('No Alternate Versions')
 
 
@@ -343,8 +351,13 @@ def load_item_data(tk_img: TKImages) -> None:
     if editor.has_output():
         if has_timer:
             set_sprite(tk_img, SPR.OUTPUT, 'out_tim')
+            # Mention the Fizzler Output Relay here.
+            if editor.cls is ItemClass.FIZZLER:
+                tooltip.set_tooltip(wid_sprite[SPR.OUTPUT], TRANS_TOOL_FIZZOUT_TIMED)
         else:
             set_sprite(tk_img, SPR.OUTPUT, 'out_norm')
+            if editor.cls is ItemClass.FIZZLER:
+                tooltip.set_tooltip(wid_sprite[SPR.OUTPUT], TRANS_TOOL_FIZZOUT)
     else:
         set_sprite(tk_img, SPR.OUTPUT, 'out_none')
 
