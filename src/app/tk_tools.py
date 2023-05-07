@@ -631,8 +631,8 @@ class ReadOnlyEntry(ttk.Entry):
         self.redirector = redir = WidgetRedirector(self)
         # These two TK commands are used for all text operations,
         # so cancelling them stops anything from happening.
-        self.insert = redir.register('insert', event_cancel)
-        self.delete = redir.register('delete', event_cancel)
+        self.insert = redir.register('insert', event_cancel)  # type: ignore[method-assign]
+        self.delete = redir.register('delete', event_cancel)  # type: ignore[method-assign]
 
 
 # Widget and Spinbox have conflicting identify() definitions, not important.
