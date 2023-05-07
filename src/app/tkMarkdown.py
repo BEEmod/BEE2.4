@@ -97,7 +97,7 @@ BULLETS = [
 class MarkdownData:
     """Protocol for objects holding Markdown data."""
     def __iter__(self) -> Iterator[Block]:
-        pass
+        return iter(())
 
     @staticmethod
     def text(text: str, *tags: TextTag, url: str | None = None) -> SingleMarkdown:
