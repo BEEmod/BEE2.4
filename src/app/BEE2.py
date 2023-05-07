@@ -55,27 +55,28 @@ async def init_app() -> None:
     gameMan.scan_music_locs()
 
     LOGGER.info('Loading Packages...')
+    packset = packages.LOADED
+    packset.has_mel_music = gameMan.MUSIC_MEL_VPK is not None
+    packset.has_tag_music = gameMan.MUSIC_TAG_LOC is not None
     async with trio.open_nursery() as nurs:
-        nurs.start_soon(functools.partial(
+        nurs.start_soon(
             packages.load_packages,
             packages.LOADED,
             list(BEE2_config.get_package_locs()),
-            loader=loadScreen.main_loader,
-            has_mel_music=gameMan.MUSIC_MEL_VPK is not None,
-            has_tag_music=gameMan.MUSIC_TAG_LOC is not None,
-        ))
+            loadScreen.main_loader,
+        )
     package_sys = packages.PACKAGE_SYS
     loadScreen.main_loader.step('UI', 'pre_ui')
     from ui_tk.img import TK_IMG
     app.background_run(img.init, package_sys, TK_IMG)
     app.background_run(sound.sound_task)
-    app.background_run(localisation.load_aux_langs, gameMan.all_games, packages.LOADED)
+    app.background_run(localisation.load_aux_langs, gameMan.all_games, packset)
 
     # Load filesystems into various modules
     music_conf.load_filesystems(package_sys.values())
     gameMan.load_filesystems(package_sys.values())
     async with trio.open_nursery() as nurs:
-        nurs.start_soon(UI.load_packages, packages.LOADED, TK_IMG)
+        nurs.start_soon(UI.load_packages, packset, TK_IMG)
     loadScreen.main_loader.step('UI', 'package_load')
     LOGGER.info('Done!')
 

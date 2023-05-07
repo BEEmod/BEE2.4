@@ -406,6 +406,10 @@ class PackagesSet:
     # Internal, indicates if all parse() calls were complete (but maybe not post_parse).
     _parsed: set[Type[PakObject]] = attrs.field(init=False, factory=set)
 
+    # Whether these music files have been detected.
+    has_mel_music: bool = False
+    has_tag_music: bool = False
+
     def ready(self, cls: Type[PakObject]) -> trio.Event:
         """Return a Trio Event which is set when a specific object type is fully parsed."""
         try:
@@ -544,8 +548,6 @@ async def load_packages(
     packset: PackagesSet,
     pak_dirs: list[Path],
     loader: LoadScreen,
-    has_mel_music: bool=False,
-    has_tag_music: bool=False,
 ) -> None:
     """Scan and read in all packages."""
     async with trio.open_nursery() as find_nurs:
@@ -577,7 +579,7 @@ async def load_packages(
                 loader.set_length("PAK", pack_count)
                 continue
 
-            nursery.start_soon(parse_package, nursery, packset, pack, loader, has_tag_music, has_mel_music)
+            nursery.start_soon(parse_package, nursery, packset, pack, loader)
         LOGGER.debug('Submitted packages.')
 
     LOGGER.debug('Parsed packages, now parsing objects.')
@@ -631,19 +633,17 @@ async def parse_package(
     nursery: trio.Nursery,
     packset: PackagesSet,
     pack: Package,
-    loader: Optional[LoadScreen],
-    has_tag: bool=False,
-    has_mel: bool=False,
+    loader: LoadScreen,
 ) -> None:
     """Parse through the given package to find all the components."""
     from packages import template_brush  # Avoid circular imports
     for pre in pack.info.find_children('Prerequisites'):
         # Special case - disable these packages when the music isn't copied.
         if pre.value == '<TAG_MUSIC>':
-            if not has_tag:
+            if not packset.has_tag_music:
                 return
         elif pre.value == '<MEL_MUSIC>':
-            if not has_mel:
+            if not packset.has_mel_music:
                 return
         elif pre.value.casefold() not in packset.packages:
             LOGGER.warning(
