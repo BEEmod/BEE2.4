@@ -949,16 +949,18 @@ def res_set_panel_options(vmf: VMF, inst: Entity, kv: Keyvalues) -> None:
     This is used for panel-type items, allowing them to generate the correct
     brushwork regardless of the kind of tiles used on the surface.
     It can also be used to generate some flat "slabs" protruding from a surface.
-    All parameters are optional, using existing values if not set.
+    This first finds panels, then applies the various options below if specified.
+
+    Search parameters:
+    - `normal`: The direction facing out of the surface. This defaults to "up".
+    - `pos1`, `pos2`: Search for a panel covering the rectangle covering two
+       diagnonally opposite corners. These default to a full tile.
+    - `point`: Alternatively, individually specify each point to search for panels
+       with irregular shapes.
+    - `exact`: If true, only panels exactly matching the points will be found. If
+      false, any panel overlapping these will be modified.
 
     Options:
-
-    - `normal`: The direction facing out of the surface. This defaults to "up".
-    - `pos1`, `pos2`: The position of the tile on two diagnonally opposite
-       corners. This allows only modifying some of the tiles. These default to
-        a full tile.
-    - `point`: Alternatively, individually specify each point to to produce
-       irregular shapes.
     - `type`: Change the specially handled behaviours set for the panel.
        Available options:
         - `NORMAL`: No special behaviour.
@@ -1105,6 +1107,9 @@ def edit_panel(vmf: VMF, inst: Entity, props: Keyvalues, create: bool) -> None:
         # else: No bevels.
     panels: list[tiling.Panel] = []
 
+    # If editing, allow specifying a subset of points to mean the same panel.
+    exact = props.bool('exact', True)
+
     for tile, uvs in tiles_to_uv.items():
         if create:
             panel = tiling.Panel(
@@ -1116,13 +1121,14 @@ def edit_panel(vmf: VMF, inst: Entity, props: Keyvalues, create: bool) -> None:
             tile.panels.append(panel)
         else:
             for panel in tile.panels:
-                if panel.same_item(inst) and panel.points == uvs:
+                if panel.same_item(inst) and (
+                    panel.points == uvs
+                    if exact else
+                    not panel.points.isdisjoint(uvs)
+                ):
                     break
             else:
-                LOGGER.warning(
-                    'No panel to modify found for "{}"!',
-                    inst['targetname']
-                )
+                LOGGER.warning('No panel to modify found for "{}"!',inst['targetname'])
                 continue
         panels.append(panel)
 
