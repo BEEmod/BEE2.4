@@ -1114,8 +1114,6 @@ def edit_panel(vmf: VMF, inst: Entity, props: Keyvalues, create: bool) -> None:
         if create:
             panel = tiling.Panel(
                 None, inst, tiling.PanelType.NORMAL,
-                thickness=4,
-                bevels=set(),
             )
             panel.points = uvs
             tile.panels.append(panel)

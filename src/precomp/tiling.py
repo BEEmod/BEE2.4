@@ -435,7 +435,7 @@ class Panel:
     """Represents a potentially dynamic specially positioned part of a tile.
 
     This is used for angled/flip panel items, and things like those.
-    The U/V bbox is removed from the original tile, and transferred to this.
+    The points are removed from the original tile, and transferred to this.
 
     Attributes:
         brush_ent: The brush entity the panel will be added to,
@@ -457,8 +457,8 @@ class Panel:
     brush_ent: Entity | None
     inst: Entity
     pan_type: PanelType
-    thickness: int
-    bevels: set[tuple[int, int]] = attrs.field(converter=_panel_bevel_conv)
+    thickness: int = 4
+    bevels: set[tuple[int, int]] = attrs.field(converter=_panel_bevel_conv, factory=set)
 
     points: set[tuple[int, int]] = attrs.Factory({
         (x, y)
@@ -474,7 +474,7 @@ class Panel:
     def same_item(self, inst: Entity) -> bool:
         """Check if the two instances come from the same item.
 
-        If they have names, they must match. Otherwise, they must be the same.
+        If they have names, those can just match. Otherwise, the instances must actually be the same.
         """
         if inst is self.inst:
             return True
@@ -1926,8 +1926,6 @@ def tiledef_from_flip_panel(brush_ent: Entity, panel_ent: Entity) -> None:
         brush_ent,
         panel_ent,
         PanelType.FLIP_BLACK,
-        thickness=4,
-        bevels=set(),
     ))
 
 
