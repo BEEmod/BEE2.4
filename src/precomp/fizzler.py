@@ -237,7 +237,11 @@ class FizzlerType:
             inst_type_name = inst_type.value + ('_static' if is_static else '')
             instances: list[str] = []
             inst[inst_type, is_static] = instances
-            for prop in conf.find_all(inst_type_name):
+            for prop in itertools.chain(
+                conf.find_all(inst_type_name),
+                # Allow ModelLeft too.
+                conf.find_all(inst_type_name.replace('_', '')),
+            ):
                 resolved = instanceLocs.resolve(prop.value)
                 if prop.value and not resolved:
                     LOGGER.warning('No instances found using specifier "{}"!', prop.value)
@@ -245,6 +249,10 @@ class FizzlerType:
 
             # Allow specifying weights to bias model locations
             weights = conf[inst_type_name + '_weight', '']
+            if not weights:
+                # Allow ModelLeftWeight as an alternative.
+                weights = conf[inst_type_name.replace('_', '') + 'weight', '']
+
             if weights:
                 # Produce the weights, then process through the original
                 # list to build a new one with repeated elements.
