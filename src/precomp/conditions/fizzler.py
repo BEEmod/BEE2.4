@@ -91,10 +91,10 @@ def res_reshape_fizzler(vmf: VMF, shape_inst: Entity, res: Keyvalues) -> None:
         )
         base_inst.fixup.update(shape_inst.fixup)
         fizz = fizzler.FIZZLERS[shape_name] = fizzler.Fizzler(
-            fizzler.FIZZ_TYPES['VALVE_MATERIAL_EMANCIPATION_GRID'],
-            up_axis,
-            base_inst,
-            [],
+            fizz_type=fizzler.FIZZ_TYPES['VALVE_MATERIAL_EMANCIPATION_GRID'],
+            up_axis=up_axis,
+            base_inst=base_inst,
+            emitters=[],
         )
         fizz_item = connections.Item(
             base_inst,

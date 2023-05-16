@@ -156,72 +156,60 @@ def read_configs(conf: Keyvalues) -> None:
         ))
 
 
+@attrs.define(eq=False, kw_only=True)
 class FizzlerType:
     """Implements a specific fizzler type."""
-    def __init__(
-        self,
-        fizz_id: str,
-        item_ids: list[str],
-        voice_attrs: list[str],
-        pack_lists: set[str],
-        pack_lists_static: set[str],
-        model_local_name: str,
-        model_name_type: ModelName,
-        nodraw_behind: bool,
-        brushes: list[FizzlerBrush],
-        beams: list[FizzBeam],
-        inst: dict[tuple[FizzInst, bool], list[str]],
+    # Name for the item.
+    id: str
 
-        temp_brush_keys: Keyvalues,
-        temp_min: str | None,
-        temp_max: str | None,
-        temp_single: str | None,
-    ):
-        self.id = fizz_id
+    # The item ID(s) this fizzler is produced from, optionally
+    # with a :laserfield or :fizzler suffix to choose a specific
+    # type.
+    item_ids: list[str]
 
-        # The item ID(s) this fizzler is produced from, optionally
-        # with a :laserfield or :fizzler suffix to choose a specific
-        # type.
-        self.item_ids = item_ids
+    # The brushes to generate.
+    brushes: list[FizzlerBrush]
 
-        # The brushes to generate.
-        self.brushes = brushes
+    # Beams to generate.
+    beams: list[FizzBeam]
 
-        # Beams to generate.
-        self.beams = beams
+    voice_attrs: list[str]
 
-        self.voice_attrs = voice_attrs
+    # Packfiles to pack if we're in the map.
+    pack_lists: set[str]
+    pack_lists_static: set[str]
 
-        # Packfiles to pack if we're in the map.
-        self.pack_lists = pack_lists
-        self.pack_lists_static = pack_lists_static
+    # The method used to name the models.
+    model_naming: ModelName
+    model_name: str
 
-        # The method used to name the models.
-        self.model_naming = model_name_type
-        self.model_name = model_local_name
-        # Instances to use - FizzInst, is_static -> list of instances.
-        self.inst = inst
+    # Instances to use - FizzInst, is_static -> list of instances.
+    inst: dict[tuple[FizzInst, bool], list[str]]
 
-        # If set, nodraw the 128x32 area behind the fizzler - to allow
-        # the Clean model to stick through.
-        self.nodraw_behind = nodraw_behind
+    # If set, nodraw the 128x32 area behind the fizzler - to allow
+    # the Clean model to stick through.
+    nodraw_behind: bool
 
-        # If set, add a brush ent using templates.
-        self.temp_single = temp_single
-        self.temp_max = temp_max
-        self.temp_min = temp_min
-        self.temp_brush_keys = temp_brush_keys
+    # If set, add a brush ent using templates.
+    temp_brush_keys: Keyvalues
+    temp_single: str | None
+    temp_max: str | None
+    temp_min: str | None
 
+    blocks_portals: bool = attrs.field(init=False, default=False)
+    fizzles_portals: bool = attrs.field(init=False, default=False)
+
+    def __attrs_post_init__(self) -> None:
         self.blocks_portals = False
         self.fizzles_portals = False
         # We want to know which fizzlers block or fizzle portals.
-        for br in brushes:
+        for br in self.brushes:
             if br.keys['classname'].casefold() == 'trigger_portal_cleanser':
                 # Fizzlers always block.
                 self.blocks_portals = True
                 if srctools.conv_int(br.keys.get('spawnflags', 0)) & 1:
                     self.fizzles_portals = True
-        LOGGER.debug('{}: blocks={}, fizzles={}', fizz_id, self.blocks_portals, self.fizzles_portals)
+        LOGGER.debug('{}: blocks={}, fizzles={}', self.id, self.blocks_portals, self.fizzles_portals)
 
     @classmethod
     def parse(cls, conf: Keyvalues):
@@ -330,46 +318,42 @@ class FizzlerType:
             temp_single = temp_conf['Single', None]
 
         return FizzlerType(
-            fizz_id,
-            item_ids,
-            voice_attrs,
-            pack_lists,
-            pack_lists_static,
-            model_local_name,
-            model_name_type,
-            conf.bool('nodraw_behind'),
-            brushes,
-            beams,
-            inst,
-            temp_brush_keys,
-            temp_min,
-            temp_max,
-            temp_single,
+            id=fizz_id,
+            item_ids=item_ids,
+            voice_attrs=voice_attrs,
+            pack_lists=pack_lists,
+            pack_lists_static=pack_lists_static,
+            model_name=model_local_name,
+            model_naming=model_name_type,
+            nodraw_behind=conf.bool('nodraw_behind'),
+            brushes=brushes,
+            beams=beams,
+            inst=inst,
+            temp_brush_keys=temp_brush_keys,
+            temp_min=temp_min,
+            temp_max=temp_max,
+            temp_single=temp_single,
         )
 
 
+@attrs.define(eq=False, kw_only=True)
 class Fizzler:
     """Represents a specific pair of emitters and a field."""
-    def __init__(
-        self,
-        fizz_type: FizzlerType,
-        up_axis: Vec,
-        base_inst: Entity,
-        emitters: list[tuple[Vec, Vec]]
-    ) -> None:
-        self.fizz_type = fizz_type
-        self.base_inst = base_inst
-        self.up_axis = up_axis  # Pointing toward the 'up' side of the field.
-        self.emitters = emitters  # Pairs of left, right positions.
+    fizz_type: FizzlerType
+    base_inst: Entity
+    up_axis: Vec  # Pointing toward the 'up' side of the field.
+    emitters: list[tuple[Vec, Vec]]  # Pairs of left, right positions.
 
-        self.has_cust_position = False  # If the emitters are a custom layout
-        # True if the fizzler is in the original position, and so we need
-        # to adjust tiles for the sides.
-        self.embedded = True
+    # If the emitters are a custom layout
+    has_cust_position: bool = False
+    # True if the fizzler is in the original position, and so we need
+    # to adjust tiles for the sides.
+    embedded: bool = True
 
-        # Special case - for TAG fizzlers, if that side is enabled.
-        # We generate the triggers elsewhere.
-        self.tag_on_pos = self.tag_on_neg = False
+    # Special case - for TAG fizzlers, if that side is enabled.
+    # We generate the triggers elsewhere.
+    tag_on_pos: bool = False
+    tag_on_neg: bool = False
 
     def forward(self) -> Vec:
         """The axis moving from one side to another."""
@@ -1101,7 +1085,12 @@ def parse_map(vmf: VMF, info: conditions.MapInfo) -> None:
             max_pos[length_axis] += 64
             emitters.append((min_pos, max_pos))
 
-        FIZZLERS[name] = Fizzler(fizz_type, up_axis, base_inst, emitters)
+        FIZZLERS[name] = Fizzler(
+            fizz_type=fizz_type,
+            base_inst=base_inst,
+            up_axis=up_axis,
+            emitters=emitters,
+        )
 
     # Delete all the old brushes associated with fizzlers
     for brush in (
