@@ -21,6 +21,7 @@
 * `PosIsSolid` and `ReadSurfType` now have a `debug` option. When "Developer Mode" is enabled,
   `info_target`s are generated to mark the locations being sampled, and the contents of this field
   is copied into those as a comment to help identify them.
+* Behaviour change: in Fizzlers, `model_mid` will now be affected by the `NameType` value.
 
 ### Bugfixes:
 * Properly pick free port for error server.

@@ -1322,7 +1322,7 @@ def generate_fizzlers(vmf: VMF) -> None:
             length = (seg_max - seg_min).mag()
             rng = rand.seed(b'fizz_seg', seg_min, seg_max)
             if length == 128 and fizz_type.inst[FizzInst.PAIR_SINGLE, is_static]:
-                # Assign to 'min' var so we can share some code.
+                # Assign to 'min' var, so we can share some code.
                 min_inst = conditions.add_inst(
                     vmf,
                     targetname=get_model_name(seg_ind),
@@ -1369,7 +1369,7 @@ def generate_fizzlers(vmf: VMF) -> None:
                     mid_pos = seg_min + forward * dist
                     mid_inst = conditions.add_inst(
                         vmf,
-                        targetname=fizz_name,
+                        targetname=get_model_name(seg_ind),
                         angles=min_orient.to_angle(),
                         file=rng.choice(fizz_type.inst[FizzInst.GRID, is_static]),
                         origin=mid_pos,
