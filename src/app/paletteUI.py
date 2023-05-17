@@ -28,8 +28,10 @@ __all__ = [
     'Palette', 'ItemPos', 'VertInd', 'HorizInd', 'VERT', 'HORIZ', 'COORDS',
     'UUID', 'UUID_EXPORT', 'UUID_PORTAL2', 'UUID_BLANK',
 ]
-TRANS_DELETE = TransToken.ui("Delete Palette")
-TRANS_HIDE = TransToken.ui("Hide Palette")
+TRANS_DELETE = TransToken.ui("Delete")
+TRANS_HIDE = TransToken.ui("Hide")
+TRANS_DELETE_NAMED = TransToken.ui('Delete Palette "{name}"')
+TRANS_HIDE_NAMED = TransToken.ui('Hide Palette "{name}"')
 TRANS_SHOULD_DELETE = TransToken.ui('Are you sure you want to delete "{palette}"?')
 TRANS_BUILTIN = TransToken.ui('Builtin / Readonly')  # i18n: Palette group title.
 
@@ -64,23 +66,49 @@ class PaletteUI:
         self.var_pal_select = tk.StringVar(value=self.selected_uuid.hex)
         self.get_items = get_items
         self.set_items = set_items
-        # Overwritten to configure the save state button.
-        self.save_btn_state = lambda s: None
 
-        f.rowconfigure(1, weight=1)
+        f.rowconfigure(2, weight=1)
         f.columnconfigure(0, weight=1)
+
+        btn_bar = ttk.Frame(f)
+        btn_bar.grid(row=0, column=0, columnspan=2, sticky='EW', padx=5)
+        btn_bar.columnconfigure(0, weight=1)
+        btn_bar.columnconfigure(1, weight=1)
+        btn_bar.columnconfigure(2, weight=1)
+
+        self.ui_btn_save = localisation.set_text(
+            ttk.Button(btn_bar, command=self.event_save),
+            TransToken.ui("Save"),
+        )
+        self.ui_btn_save.grid(row=0, column=0, sticky="EW")
+
         localisation.set_text(
-            ttk.Button(f, command=cmd_clear),
-            TransToken.ui('Clear Palette'),
-        ).grid(row=0, sticky="EW")
+            ttk.Button(btn_bar, command=self.event_save_as),
+            TransToken.ui("Save As"),
+        ).grid(row=0, column=1, sticky="EW")
+
+        self.ui_remove = localisation.set_text(
+            ttk.Button(btn_bar, command=self.event_remove),
+            TransToken.ui("Delete"),
+        )
+        self.ui_remove.grid(row=0, column=2, sticky="EW")
 
         self.ui_treeview = treeview = ttk.Treeview(f, show='tree', selectmode='browse')
-        self.ui_treeview.grid(row=1, sticky="NSEW")
+        self.ui_treeview.grid(row=2, column=0, sticky="NSEW")
         # We need to delay this a frame, so the selection completes.
         self.ui_treeview.tag_bind(
             TREE_TAG_PALETTES, '<ButtonPress>',
             lambda e: background_run(self.event_select_tree),
         )
+
+        check_save_settings = ttk.Checkbutton(
+            f,
+            variable=self.var_save_settings,
+            command=self._store_configuration,
+        )
+        localisation.set_text(check_save_settings, TransToken.ui('Save Settings in Palettes'))
+        check_save_settings.grid(row=3, column=0, sticky="EW", padx=5)
+
         self.tk_img = tk_img
 
         # Avoid re-registering the double-lambda, just do it here.
@@ -96,15 +124,11 @@ class PaletteUI:
             orient='vertical',
             command=self.ui_treeview.yview,
         )
-        scrollbar.grid(row=1, column=1, sticky="NS")
+        scrollbar.grid(row=2, column=1, sticky="NS")
         self.ui_treeview['yscrollcommand'] = scrollbar.set
 
-        self.ui_remove = ttk.Button(f, command=self.event_remove)
-        localisation.set_text(self.ui_remove, TransToken.ui("Delete Palette"))
-        self.ui_remove.grid(row=2, sticky="EW")
-
         if tk_tools.USE_SIZEGRIP:
-            ttk.Sizegrip(f).grid(row=2, column=1)
+            ttk.Sizegrip(f).grid(row=3, column=1)
 
         self.ui_menu = menu
         self.ui_group_menus: dict[str, tk.Menu] = {}
@@ -246,21 +270,21 @@ class PaletteUI:
         if self.selected.readonly:
             self.ui_menu.entryconfigure(
                 self.ui_menu_delete_index,
-                label=TransToken.ui('Hide Palette "{name}"').format(name=self.selected.name),
+                label=TRANS_HIDE_NAMED.format(name=self.selected.name),
             )
             localisation.set_text(self.ui_remove, TRANS_HIDE)
 
-            self.save_btn_state(('disabled',))
+            self.ui_btn_save.state(('disabled',))
             for ind in self.ui_readonly_indexes:
                 self.ui_menu.entryconfigure(ind, state='disabled')
         else:
             self.ui_menu.entryconfigure(
                 self.ui_menu_delete_index,
-                label=TransToken.ui('Delete Palette "{name}"').format(name=self.selected.name),
+                label=TRANS_DELETE_NAMED.format(name=self.selected.name),
             )
             localisation.set_text(self.ui_remove, TRANS_DELETE)
 
-            self.save_btn_state(('!disabled',))
+            self.ui_btn_save.state(('!disabled',))
             for ind in self.ui_readonly_indexes:
                 self.ui_menu.entryconfigure(ind, state='normal')
 
@@ -270,16 +294,6 @@ class PaletteUI:
         else:
             self.ui_remove.state(('!disabled',))
             self.ui_menu.entryconfigure(self.ui_menu_delete_index, state='normal')
-
-    def make_option_checkbox(self, frame: tk.Misc) -> ttk.Checkbutton:
-        """Create a checkbutton configured to control the save palette in settings option."""
-        check = ttk.Checkbutton(
-            frame,
-            variable=self.var_save_settings,
-            command=self._store_configuration,
-        )
-        localisation.set_text(check, TransToken.ui('Save Settings in Palettes'))
-        return check
 
     def _store_configuration(self) -> None:
         """Save the state of the palette to the config."""

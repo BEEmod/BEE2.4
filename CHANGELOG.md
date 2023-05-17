@@ -12,6 +12,7 @@
 * Skip disabled packages when extracting resources.
 * Timer-style indicator panels at the end of antlines can now have a custom appearance for some 
   items (Delayers). This allows them to show both count-down and count-up displays.
+* Moved various palette-related buttons, to group them with the other palette options.
 
 ### UCP-Relevant Enhancements:
 * Added an `Inherit` option to Corridor Groups. This specifies the ID of another style, causing all

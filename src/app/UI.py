@@ -1052,32 +1052,17 @@ def pal_shuffle() -> None:
 
 async def init_option(
     pane: SubPane.SubPane,
-    pal_ui: paletteUI.PaletteUI,
     tk_img: TKImages,
     export: Callable[[], object],
     corridor: corridor_selector.Selector,
 ) -> None:
-    """Initialise the options pane."""
+    """Initialise the export options pane."""
     pane.columnconfigure(0, weight=1)
     pane.rowconfigure(0, weight=1)
 
     frame = ttk.Frame(pane)
     frame.grid(row=0, column=0, sticky='nsew')
     frame.columnconfigure(0, weight=1)
-
-    pal_save = ttk.Button(frame, command=pal_ui.event_save)
-    localisation.set_text(pal_save, TransToken.ui("Save Palette..."))
-    pal_save.grid(row=0, sticky="EW", padx=5)
-    pal_ui.save_btn_state = pal_save.state
-
-    localisation.set_text(
-        ttk.Button(frame, command=pal_ui.event_save_as),
-        TransToken.ui("Save Palette As..."),
-    ).grid(row=1, sticky="EW", padx=5)
-
-    pal_ui.make_option_checkbox(frame).grid(row=2, sticky="EW", padx=5)
-
-    ttk.Separator(frame, orient='horizontal').grid(row=3, sticky="EW")
 
     UI['pal_export'] = ttk.Button(frame, command=export)
     UI['pal_export'].state(('disabled',))
@@ -1542,7 +1527,7 @@ async def init_windows(tk_img: TKImages) -> None:
     )
     async with trio.open_nursery() as nurs:
         corridor = corridor_selector.Selector(packages.LOADED, tk_img)
-        nurs.start_soon(init_option, windows['opt'], pal_ui, tk_img, export, corridor)
+        nurs.start_soon(init_option, windows['opt'], tk_img, export, corridor)
     async with trio.open_nursery() as nurs:
         nurs.start_soon(corridor.refresh)
     loader.step('UI', 'options')
