@@ -2,6 +2,7 @@
 from __future__ import annotations
 from collections import defaultdict
 from typing import Iterator, Callable
+from typing_extensions import assert_never
 from enum import Enum
 import itertools
 
@@ -982,6 +983,34 @@ class FizzlerBrush:
         side.vaxis.offset %= tex_size
 
 
+def make_model_namer(fizz_type: FizzlerType, fizz_name: str) -> Callable[[int], str]:
+    """Define a function which applies the model naming."""
+    local_name = fizz_type.model_name
+    if fizz_type.model_naming is ModelName.SAME:
+        def get_model_name(ind: int) -> str:
+            """Give every emitter the base's name."""
+            return fizz_name
+    elif fizz_type.model_naming is ModelName.LOCAL:
+        def get_model_name(ind: int) -> str:
+            """Give every emitter a name local to the base."""
+            return f'{fizz_name}-{local_name}'
+    elif fizz_type.model_naming is ModelName.PAIRED:
+        def get_model_name(ind: int) -> str:
+            """Give each pair of emitters the same unique name."""
+            return f'{fizz_name}-{local_name}{ind:02}'
+    elif fizz_type.model_naming is ModelName.UNIQUE:
+        model_index = 0
+
+        def get_model_name(ind: int) -> str:
+            """Give every model a unique name."""
+            nonlocal model_index
+            model_index += 1
+            return f'{fizz_name}-{local_name}{model_index:02}'
+    else:
+        raise assert_never(fizz_type.model_naming)
+    return get_model_name
+
+
 def parse_map(vmf: VMF, info: conditions.MapInfo) -> None:
     """Analyse fizzler instances to assign fizzler types.
 
@@ -1238,28 +1267,7 @@ def generate_fizzlers(vmf: VMF) -> None:
                 voxels=[pos for minmax in fizz.emitters for pos in minmax],
             )
 
-        # Define a function to do the model names.
-        model_index = 0
-        if fizz_type.model_naming is ModelName.SAME:
-            def get_model_name(ind: int) -> str:
-                """Give every emitter the base's name."""
-                return fizz_name
-        elif fizz_type.model_naming is ModelName.LOCAL:
-            def get_model_name(ind: int) -> str:
-                """Give every emitter a name local to the base."""
-                return f'{fizz_name}-{fizz_type.model_name}'
-        elif fizz_type.model_naming is ModelName.PAIRED:
-            def get_model_name(ind: int) -> str:
-                """Give each pair of emitters the same unique name."""
-                return f'{fizz_name}-{fizz_type.model_name}{ind:02}'
-        elif fizz_type.model_naming is ModelName.UNIQUE:
-            def get_model_name(ind: int) -> str:
-                """Give every model a unique name."""
-                nonlocal model_index
-                model_index += 1
-                return f'{fizz_name}-{fizz_type.model_name}{model_index:02}'
-        else:
-            raise AssertionError(f'No model name {fizz_type.model_name!r}')
+        get_model_name = make_model_namer(fizz_type, fizz_name)
 
         # Generate env_beam pairs.
         for beam in fizz_type.beams:
