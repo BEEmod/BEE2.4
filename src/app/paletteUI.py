@@ -109,56 +109,43 @@ class PaletteUI:
         self.ui_menu = menu
         self.ui_group_menus: dict[str, tk.Menu] = {}
         self.ui_group_treeids: dict[str, str] = {}
+
+        menu.add_command(command=self.event_save, accelerator=tk_tools.ACCEL_SAVE)
+        localisation.set_menu_text(menu, TransToken.ui('Save Palette'))
+        self.ui_readonly_indexes = [menu.index('end')]
+
+        menu.add_command(command=self.event_save_as, accelerator=tk_tools.ACCEL_SAVE_AS,)
+        localisation.set_menu_text(menu, TransToken.ui('Save Palette As...'))
+
         menu.add_command(
-            label=str(TransToken.ui('Clear')),
-            command=cmd_clear,
-        )
-        menu.add_command(
-            # Placeholder..
             label='Delete Palette',  # This name is overwritten later
             command=self.event_remove,
         )
         self.ui_menu_delete_index = menu.index('end')
 
-        menu.add_command(
-            label=str(TransToken.ui('Change Palette Group...')),
-            command=self.event_change_group,
-        )
-        self.ui_readonly_indexes = [menu.index('end')]
-
-        menu.add_command(
-            label=str(TransToken.ui('Rename Palette...')),
-            command=self.event_rename,
-        )
+        menu.add_command(command=self.event_change_group)
+        localisation.set_menu_text(menu, TransToken.ui('Change Palette Group...'))
         self.ui_readonly_indexes.append(menu.index('end'))
 
-        menu.add_command(
-            label=str(TransToken.ui('Fill Palette')),
-            command=cmd_shuffle,
-        )
-
-        menu.add_separator()
-
-        menu.add_checkbutton(
-            label=str(TransToken.ui('Save Settings in Palettes')),
-            variable=self.var_save_settings,
-        )
-
-        menu.add_separator()
-
-        menu.add_command(
-            label=str(TransToken.ui('Save Palette')),
-            command=self.event_save,
-            accelerator=tk_tools.ACCEL_SAVE,
-        )
+        menu.add_command(command=self.event_rename)
+        localisation.set_menu_text(menu, TransToken.ui('Rename Palette...'))
         self.ui_readonly_indexes.append(menu.index('end'))
-        menu.add_command(
-            label=str(TransToken.ui('Save Palette As...')),
-            command=self.event_save_as,
-            accelerator=tk_tools.ACCEL_SAVE_AS,
-        )
 
         menu.add_separator()
+
+        menu.add_checkbutton(variable=self.var_save_settings)
+        localisation.set_menu_text(menu, TransToken.ui('Save Settings in Palettes'))
+
+        menu.add_separator()
+
+        menu.add_command(command=cmd_clear)
+        localisation.set_menu_text(menu, TransToken.ui('Clear'))
+
+        menu.add_command(command=cmd_shuffle)
+        localisation.set_menu_text(menu, TransToken.ui('Fill Palette'))
+
+        menu.add_separator()
+
         self.ui_menu_palettes_index = menu.index('end') + 1
         localisation.add_callback(call=True)(self.update_state)
 
