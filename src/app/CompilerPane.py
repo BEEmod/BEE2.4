@@ -744,7 +744,7 @@ async def make_pane(
         resize_y=False,
         tool_frame=tool_frame,
         tool_img='icons/win_compiler',
-        tool_col=4,
+        tool_col=13,
     )
     window.columnconfigure(0, weight=1)
     window.rowconfigure(0, weight=1)

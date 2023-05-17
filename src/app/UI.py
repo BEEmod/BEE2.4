@@ -1194,7 +1194,7 @@ def flow_preview() -> None:
     Run to refresh if items are moved around.
     """
     for i, item in enumerate(pal_picked):
-        # these can be referred to to figure out where it is
+        # These can be used to figure out where it is
         item.pre_x = i % 4
         item.pre_y = i // 4
         item.label.place(x=(i % 4*65 + 4), y=(i // 4*65 + 32))
@@ -1498,7 +1498,7 @@ async def init_windows(tk_img: TKImages) -> None:
         resize_y=True,
         tool_frame=frames['toolMenu'],
         tool_img='icons/win_palette',
-        tool_col=1,
+        tool_col=10,
     )
 
     pal_frame = ttk.Frame(windows['pal'], name='pal_frame')
@@ -1538,7 +1538,7 @@ async def init_windows(tk_img: TKImages) -> None:
         resize_x=True,
         tool_frame=frames['toolMenu'],
         tool_img='icons/win_options',
-        tool_col=2,
+        tool_col=11,
     )
     async with trio.open_nursery() as nurs:
         corridor = corridor_selector.Selector(packages.LOADED, tk_img)
@@ -1555,18 +1555,29 @@ async def init_windows(tk_img: TKImages) -> None:
         nurs.start_soon(CompilerPane.make_pane, frames['toolMenu'], tk_img, menu_bar.view_menu)
     loader.step('UI', 'compiler')
 
-    UI['shuffle_pal'] = SubPane.make_tool_button(
+    btn_clear = SubPane.make_tool_button(
+        frames['toolMenu'], tk_img,
+        img='icons/clear_pal',
+        command=pal_clear,
+    )
+    btn_clear.grid(row=0, column=0, padx=2)
+    tooltip.add_tooltip(
+        btn_clear,
+        TransToken.ui('Remove all items from the palette.'),
+    )
+
+    btn_shuffle = SubPane.make_tool_button(
         frames['toolMenu'], tk_img,
         img='icons/shuffle_pal',
         command=pal_shuffle,
     )
-    UI['shuffle_pal'].grid(
+    btn_shuffle.grid(
         row=0,
-        column=0,
-        padx=((2, 10) if utils.MAC else (2, 20)),
+        column=1,
+        padx=((2, 5) if utils.MAC else (2, 10)),
     )
     tooltip.add_tooltip(
-        UI['shuffle_pal'],
+        btn_shuffle,
         TransToken.ui('Fill empty spots in the palette with random items.'),
     )
 

@@ -275,7 +275,7 @@ async def make_pane(
         resize_y=True,
         tool_frame=tool_frame,
         tool_img='icons/win_itemvar',
-        tool_col=3,
+        tool_col=12,
     )
 
     ordered_conf: List[ConfigGroup] = sorted(
