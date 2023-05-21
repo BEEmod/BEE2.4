@@ -17,7 +17,7 @@ import utils
 
 class ConnType(Enum):
     """Kind of Input A/B type, or TBeam type."""
-    DEFAULT = 'default'  # Normal / unconfigured input
+    DEFAULT = 'default'  # Normal / un-configured input
     # Becomes one of the others based on item preference.
 
     PRIMARY = TBEAM_IO = 'primary'  # A Type, 'normal'
@@ -196,14 +196,14 @@ class TimerCommand:
     output: tuple[str | None, str]  # Output to use plus the name.
     mode: TimerModes  # Basically the input.
     delay: float  = attrs.field(kw_only=True, default=0.0)  # Output delay.
-    delay_add_timer: bool = attrs.field(kw_only=True) # If set, add $timer_delay to delay.
+    delay_add_timer: bool = attrs.field(kw_only=True)  # If set, add $timer_delay to delay.
     fadetime: float = attrs.field(kw_only=True, default=0.0)  # The time taken to do the fade.
-    fadetime_add_timer: bool = attrs.field(kw_only=True)  # If set, add $timer_delay to fadetime.
+    fadetime_add_timer: bool = attrs.field(kw_only=True)  # If set, add $timer_delay to fade-time.
 
     @classmethod
     def parse(cls, kv: Keyvalues, desc: str) -> Self:
         """Parse a command from keyvalues."""
-        output = get_input('output', desc,kv['output', ''])
+        output = get_input('output', desc, kv['output', ''])
         if output is None:
             raise ValueError(f'Timer command in {desc} must have an output name provided!\n{OUT_NAME_DESC}')
 
@@ -236,7 +236,7 @@ class Config:
 
     def __init__(
         self,
-        id: str,
+        item_id: str,
         default_dual: ConnType=ConnType.DEFAULT,
         input_type: InputType=InputType.DEFAULT,
 
@@ -265,7 +265,7 @@ class Config:
         force_timer_sound: bool=False,
         timer_outputs: Iterable[TimerCommand]=(),
     ):
-        self.id = id
+        self.id = item_id
 
         # How this item uses their inputs.
         self.input_type = input_type
@@ -433,7 +433,7 @@ class Config:
                 f'Valid values: {VALID_CONN_TYPE_NAMES}'
             ) from None
 
-        out_act = get_input('out_activate', desc,conf['out_activate', ''])
+        out_act = get_input('out_activate', desc, conf['out_activate', ''])
         out_deact = get_input('out_deactivate', desc, conf['out_deactivate', ''])
         out_lock = get_input('out_lock', desc, conf['out_lock', ''])
         out_unlock = get_input('out_unlock', desc, conf['out_unlock', ''])
@@ -446,7 +446,7 @@ class Config:
             # The original deprecated commands, which control the regular style timer.
             for kv in conf:
                 if kv.name == 'out_timer_start':
-                    output = get_input(kv.real_name, desc,kv.value)
+                    output = get_input(kv.real_name, desc, kv.value)
                     if output is not None:
                         timer_outputs.append(TimerCommand(
                             output,

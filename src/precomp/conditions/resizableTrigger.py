@@ -1,11 +1,12 @@
 """Logic for trigger items, allowing them to be resized."""
 from contextlib import suppress
+from typing import Optional
+
 from srctools import Keyvalues, Vec, Output, VMF
 import srctools.logger
 
 from precomp import instanceLocs, connections, options, conditions
 import consts
-import vbsp
 
 
 COND_MOD_NAME = None
@@ -63,7 +64,7 @@ def res_resizeable_trigger(vmf: VMF, info: conditions.MapInfo, res: Keyvalues) -
 
     # Synthesise the connection config used for the final trigger.
     conn_conf_sp = connections.Config(
-        id=item_id + ':TRIGGER',
+        item_id=item_id + ':TRIGGER',
         output_act=Output.parse_name(res['triggerActivate', 'OnStartTouchAll']),
         output_deact=Output.parse_name(res['triggerDeactivate', 'OnEndTouchAll']),
     )
@@ -78,17 +79,14 @@ def res_resizeable_trigger(vmf: VMF, info: conditions.MapInfo, res: Keyvalues) -
     else:
         coop_only_once = res.bool('coopOnce')
         conn_conf_coop = connections.Config(
-            id=item_id + ':TRIGGER',
-            output_act=Output.parse_name(
-                res['coopActivate', 'OnChangeToAllTrue']
-            ),
-            output_deact=Output.parse_name(
-                res['coopDeactivate', 'OnChangeToAnyFalse']
-            ),
+            item_id=item_id + ':TRIGGER',
+            output_act=Output.parse_name(res['coopActivate', 'OnChangeToAllTrue']),
+            output_deact=Output.parse_name(res['coopDeactivate', 'OnChangeToAnyFalse']),
         )
 
     # Display preview overlays if it's preview mode, and the config is true
-    pre_act = pre_deact = None
+    pre_act: Optional[Output] = None
+    pre_deact: Optional[Output] = None
     if not info.is_publishing and options.get_itemconf(res['previewConf', ''], False):
         preview_mat = res['previewMat', '']
         preview_inst_file = res['previewInst', '']
