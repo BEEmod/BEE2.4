@@ -572,7 +572,7 @@ def parse_antlines(vmf: VMF) -> tuple[
             start = round(start / 16, 0) * 16
             end = round(end / 16, 0) * 16
 
-            if math.isclose(Vec.dot(end - start, long_axis), 16.0):
+            if math.isclose(abs(Vec.dot(end - start, long_axis)), 16.0):
                 # Special case.
                 # 1-wide antlines don't have the correct
                 # rotation, pointing always in the U axis.

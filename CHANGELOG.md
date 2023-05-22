@@ -31,6 +31,7 @@
 * Parse game translation files in an even more lenient way, to handle some Portal 2 files correctly.
 * Fix potential z-fighting near the hinge of static angled panels.
 * Add a scrollbar if required to the corridor selection window.
+* Fix single-dot antlines sometimes failing to be placed.
 
 ------------------------------------------
 
