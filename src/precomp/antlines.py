@@ -8,7 +8,7 @@ from enum import Enum
 import math
 
 import attrs
-from srctools import EmptyMapping, Vec, Matrix, Keyvalues, conv_float, logger
+from srctools import EmptyMapping, FrozenVec, Vec, Matrix, Keyvalues, conv_float, logger
 from srctools.vmf import Output, VMF, overlay_bounds, make_overlay
 
 from precomp import options, tiling, rand
@@ -532,7 +532,7 @@ def parse_antlines(vmf: VMF) -> tuple[
 
     # Points on antlines where two can connect. For corners that's each side, for straight it's
     # each end. Combine that with the targetname, so we only join related antlines.
-    join_points: dict[tuple[str, float, float, float], Segment] = {}
+    join_points: dict[tuple[str, FrozenVec], Segment] = {}
 
     mat_straight = consts.Antlines.STRAIGHT
     mat_corner = consts.Antlines.CORNER
@@ -600,7 +600,7 @@ def parse_antlines(vmf: VMF) -> tuple[
             # Lookup the point to see if we've already checked it.
             # If not, write us into that spot.
             neighbour = join_points.setdefault(
-                (over_name, ) + point.as_tuple(),
+                (over_name, round(point, 0).freeze()),
                 seg,
             )
             if neighbour is seg:
@@ -645,7 +645,7 @@ def parse_antlines(vmf: VMF) -> tuple[
 def fix_single_straight(
     seg: Segment,
     over_name: str,
-    join_points: dict[tuple[str, float, float, float], Segment],
+    join_points: dict[tuple[str, FrozenVec], Segment],
     overlay_joins: dict[Segment, set[Segment]],
 ) -> None:
     """Figure out the correct rotation for 1-long straight antlines."""
@@ -653,7 +653,7 @@ def fix_single_straight(
     # sides. If there is that's the correct orientation.
     orient = Matrix.from_angle(seg.normal.to_angle())
 
-    center = seg.start.copy()
+    center = seg.start
 
     for off in [
         orient.left(-8.0),
@@ -662,7 +662,7 @@ def fix_single_straight(
         orient.up(+8.0),
     ]:
         try:
-            neigh = join_points[(over_name, ) + (center + off).as_tuple()]
+            neigh = join_points[over_name, round(center + off, 0).freeze()]
         except KeyError:
             continue
 
@@ -682,13 +682,12 @@ def fix_single_straight(
         elif seg.start != off_min or seg.end != off_max:
             # The other side is also present. Only override if we are on both
             # sides.
-            if (over_name, ) + (center - off).as_tuple() in join_points:
+            if (over_name, round(center - off, 0).freeze()) in join_points:
                 seg.start = off_min
                 seg.end = off_max
         # Else: Both equal, we're fine.
     if seg.start == seg.end:
         raise ValueError(
-            'Cannot determine orientation '
-            'for 1-wide straight '
-            'antline at ({})!'.format(seg.start)
+            'Cannot determine orientation for 1-wide straight '
+            f'antline "{over_name}" at ({seg.start})!'
         )
