@@ -221,7 +221,7 @@ TEMP_TILE_PIX_SIZE = {
 
 
 # 'Opposite' values for retexture_template(force_colour)
-ForceColour: TypeAlias = Union[Portalable, Literal[AppliedColour.MATCH, AppliedColour.INVERT]]
+ForceColour: TypeAlias = Literal[AppliedColour.MATCH, AppliedColour.INVERT, Portalable.white, Portalable.black]
 TEMP_COLOUR_INVERT: Dict[ForceColour, ForceColour] = {
     Portalable.white: Portalable.black,
     Portalable.black: Portalable.white,

@@ -133,12 +133,12 @@ def ui_multi_no_conf(kind: WidgetType) -> Callable[[MultiCreateNoConfFunc], Mult
     def deco(func: MultiCreateNoConfFunc) -> MultiCreateNoConfFunc:
         """Do the registration."""
         def wrapper(
-            parent: tk.Widget, tk_img: TKImages, timer: Iterable[TimerNum],
+            parent: tk.Widget, tk_img: TKImages, tim: Iterable[TimerNum],
             on_changed: MultiChangeFunc, conf: None,
         ) -> AsyncIterator[Tuple[TimerNum, UpdateFunc]]:
             """Don't pass the config through to the UI function."""
             assert conf is None
-            return func(parent, tk_img, timer, on_changed)
+            return func(parent, tk_img, tim, on_changed)
 
         if isinstance(kind, WidgetTypeWithConf):
             raise TypeError('Widget type has config, but multi function does not!')
@@ -206,7 +206,7 @@ async def create_group(master: ttk.Frame, tk_img: TKImages, group: ConfigGroup) 
         ttk.Separator(orient='horizontal').grid(row=1, column=0, sticky='ew')
 
     # Continue from wherever we were.
-    for row, m_wid in enumerate(group.multi_widgets, start=row + 1):
+    for row, m_wid in enumerate(group.multi_widgets, start=row + 1):  # noqa: B020
         # If we only have 1 widget, don't add a redundant title.
         if widget_count == 1 or not m_wid.name:
             wid_frame = ttk.Frame(frame)
@@ -513,7 +513,7 @@ async def widget_item_variant(
     try:
         item = UI.item_list[conf.item_id]
     except KeyError:
-        raise ValueError(f'Unknown item "{conf.item_id}"!')
+        raise ValueError(f'Unknown item "{conf.item_id}"!') from None
 
     if item.id == 'ITEM_BEE2_SIGNAGE':
         # Even more special case, display the "configure signage" button.

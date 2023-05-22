@@ -639,10 +639,17 @@ class Result(Generic[ResultT]):
         return self._result
 
 
-class TaskStatus(Protocol[T_contra]):
-    """Type of the status object passed to functions by trio.Nursery.start()."""
-    # TODO: import from trio once this is present there.
-    def started(self, value: T_contra = ...) -> None: ...
+# TODO: import from trio once this is present there.
+# Define this under else for runtime typing.
+if TYPE_CHECKING:
+    from trio_typing import TaskStatus
+else:
+    class TaskStatus(Protocol[T_contra]):
+        """Type of the status object passed to functions by trio.Nursery.start()."""
+        @overload
+        def started(self: TaskStatus[None]) -> None: ...
+        @overload
+        def started(self, value: T_contra) -> None: ...
 
 
 def get_indent(line: str) -> str:

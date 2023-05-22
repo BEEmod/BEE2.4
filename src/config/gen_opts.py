@@ -1,5 +1,9 @@
+"""
+General app configuration options, controlled by the options window.
+"""
 from enum import Enum
 from typing import Any, Dict
+from typing_extensions import TypeGuard
 
 import attrs
 from srctools import Keyvalues
@@ -61,7 +65,7 @@ class GenOptions(config.Data, conf_name='Options', palette_stores=False, version
         except ValueError:
             after_export = AfterExport.NORMAL
 
-        res = {}
+        res: dict[str, bool] = {}
         for field in gen_opts_bool:
             try:
                 section: str = field.metadata['legacy']
@@ -158,9 +162,16 @@ class GenOptions(config.Data, conf_name='Options', palette_stores=False, version
         return elem
 
 
-gen_opts_bool = [
+# Todo: For full type safety, make field = attrs.Attribute[Any], once mypy infers a union for iter(tuple).
+def _is_bool_attr(field: object) -> TypeGuard['attrs.Attribute[bool]']:
+    """Check if this is a boolean-type attribute."""
+    return isinstance(field, attrs.Attribute) and field.type is bool
+
+
+gen_opts_bool: list['attrs.Attribute[bool]'] = [
     field
     for field in attrs.fields(GenOptions)
-    if field.default in (True, False)
+    if _is_bool_attr(field)
     if field.name != 'preserve_fgd'  # Needs special handling
 ]
+del _is_bool_attr

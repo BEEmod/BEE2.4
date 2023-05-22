@@ -110,7 +110,13 @@ class ComboPropGroup(PropGroup, Generic[EnumT]):
     """A prop group which uses a combobox to select specific options."""
     LARGE: ClassVar[bool] = True
 
-    def __init__(self, parent: ttk.Frame, tk_img: TKImages, prop: ItemPropKind[EnumT], values: Dict[EnumT, TransToken]) -> None:
+    def __init__(
+        self,
+        parent: ttk.Frame,
+        tk_img: TKImages,
+        prop: ItemPropKind[EnumT],
+        values: Dict[EnumT, TransToken],
+    ) -> None:
         super().__init__(parent, tk_img, TRANS_LABEL.format(name=prop.name))
         self.prop = prop
         self.translated = values

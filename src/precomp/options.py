@@ -157,7 +157,10 @@ def set_opt(opt_name: str, value: str) -> None:
 def get(expected_type: Type[EnumT], name: str) -> Optional[EnumT]: ...
 @overload
 def get(expected_type: Type[OptionT], name: str) -> Optional[OptionT]: ...
-def get(expected_type: Union[Type[OptionT], Type[EnumT]], name: str) -> Union[OptionT, EnumT, None]:
+def get(  # type: ignore[misc]
+    expected_type: Type[Union[str, int, float, bool, Vec, Enum]],
+    name: str,
+) -> Union[str, int, float, bool, Vec, Enum, None]:
     """Get the given option.
     expected_type should be the class of the value that's expected.
     The value can be None if unset.
@@ -175,22 +178,21 @@ def get(expected_type: Union[Type[OptionT], Type[EnumT]], name: str) -> Union[Op
         return None
 
     if issubclass(expected_type, Enum):
-        enum_type: Type[EnumT] = expected_type  # type: ignore
         if not isinstance(val, str):
             raise ValueError(
                 f'Option "{name}" is {val!r} which is a {type(val)} (expected a string)'
             )
 
         try:
-            return enum_type(val)
+            return expected_type(val)
         except ValueError:
             LOGGER.warning(
                 'Option "{}" is not a valid value. '
                 'Allowed values are:\n{}',
                 name,
-                '\n'.join([mem.value for mem in enum_type])
+                '\n'.join([mem.value for mem in expected_type])
             )
-            return next(iter(enum_type))
+            return next(iter(expected_type))
 
     # Don't allow subclasses (bool/int)
     if type(val) is not expected_type:
@@ -202,7 +204,7 @@ def get(expected_type: Union[Type[OptionT], Type[EnumT]], name: str) -> Union[Op
     # Vec is mutable, don't allow modifying the original.
     if isinstance(val, Vec):
         val = val.copy()
-    return cast(OptionT, val)
+    return val
 
 
 def get_itemconf(

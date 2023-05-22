@@ -7,8 +7,8 @@ they are loaded in the background, then unloaded if removed from all widgets.
 """
 from __future__ import annotations
 from pathlib import Path
-from typing import Any, ClassVar, Dict, Iterable, Iterator, Tuple, Type
-from typing_extensions import Self, Final
+from typing import Any, ClassVar, Dict, Final, Iterable, Iterator, Tuple, Type
+from typing_extensions import Self
 from collections.abc import Sequence, Mapping
 import abc
 import logging
@@ -921,22 +921,27 @@ class ImgTextOverlay(Handle):
 
 class UIImage(abc.ABC):
     """Interface for the image code specific to a UI library."""
+    @abc.abstractmethod
     def ui_clear_handle(self, handle: Handle) -> None:
         """The handle is no longer used, release resources it uses."""
         raise NotImplementedError
 
+    @abc.abstractmethod
     def ui_load_users(self, handle: Handle, force: bool) -> None:
         """The PIL image is ready, apply it to the widgets using this handle."""
         raise NotImplementedError
 
+    @abc.abstractmethod
     def ui_force_load(self, handle: Handle) -> None:
         """Called when this handle is reloading, and should update all its widgets."""
         raise NotImplementedError
 
+    @abc.abstractmethod
     def ui_get_color(self, text: str) -> Tuple[int, int, int]:
         """Look up colours in the UI library's database, or raise ValueError if not found."""
         raise ValueError
 
+    @abc.abstractmethod
     async def ui_anim_task(self, load_handles: Iterable[tuple[Handle, Sequence[Handle]]]) -> None:
         """Cycle loading icons."""
         raise NotImplementedError
@@ -1033,7 +1038,7 @@ def get_pil_font(size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
     ]:
         try:
             return ImageFont.truetype(filename, size)
-        except IOError:
+        except OSError:
             pass
     else:
         LOGGER.warning('Failed to find font, add more OS fonts!')
@@ -1063,7 +1068,7 @@ def make_splash_screen(
         with path.open('rb') as img_file:
             image = Image.open(img_file)
             image.load()
-    except (FileNotFoundError, IndexError, IOError):
+    except (FileNotFoundError, IndexError, OSError):
         # Not found, substitute a gray block.
         LOGGER.warning('No splash screen found (tried "{}")', path)
         image = Image.new(
