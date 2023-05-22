@@ -539,6 +539,8 @@ def parse_antlines(vmf: VMF) -> tuple[
 
     side_to_seg: dict[int, list[Segment]] = {}
     antlines: dict[str, list[Antline]] = {}
+    points: list[Vec]
+    single_straights: list[tuple[Segment, str]] = []
 
     for over in vmf.by_class['info_overlay']:
         mat = over['material']
@@ -581,6 +583,7 @@ def parse_antlines(vmf: VMF) -> tuple[
                 start = end = origin
                 points = []
             else:
+                # These are the endpoints.
                 offset: Vec = round(abs(8 * side_axis), 0)
                 start += offset
                 end -= offset
@@ -592,6 +595,9 @@ def parse_antlines(vmf: VMF) -> tuple[
 
         seg = Segment(seg_type, normal, start, end)
         segment_to_name[seg] = over_name = over['targetname']
+
+        if not points:  # Single-straight
+            single_straights.append((seg, over_name))
 
         for side_id in over['sides'].split():
             side_to_seg.setdefault(int(side_id), []).append(seg)
@@ -613,9 +619,8 @@ def parse_antlines(vmf: VMF) -> tuple[
         over.remove()
 
     # Now fix the square straight segments.
-    for seg, over_name in segment_to_name.items():
-        if seg.type is SegType.STRAIGHT and seg.start == seg.end:
-            fix_single_straight(seg, over_name, join_points, overlay_joins)
+    for seg, over_name in single_straights:
+        fix_single_straight(seg, over_name, join_points, overlay_joins)
 
     # Now, finally compute each continuous section.
     for start_seg, over_name in segment_to_name.items():
