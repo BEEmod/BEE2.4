@@ -49,6 +49,10 @@ extend-ignore = [
 	# Allow typing.Any
 	"ANN401",
 
+	# Pyupgrade:
+	# Keep using typing types even with __future__.annotations.
+	"UP006", "UP007", "UP035",
+
 	# Flake8-bugbear:
 	# Loop control var not used, triggers on unpackings.
 	"B007",
@@ -84,7 +88,3 @@ extend-immutable-calls = [
 	"typing.cast",
 	"srctools.logger.get_logger",
 ]
-
-[tool.ruff.pyupgrade]
-# Still use typing types even with `from __future__ import annotations`.
-keep-runtime-typing = true
