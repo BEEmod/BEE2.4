@@ -60,6 +60,8 @@ TRANS_CACHE_RESET = TransToken.ui(
 TRANS_CACHE_RESET_AND_NO_PRESERVE = TransToken.ui(
     '{cache_reset}\n\n"Preserve Game Resources" has been disabled.'
 ).format(cache_reset=TRANS_CACHE_RESET)
+TRANS_REBUILT_APP_LANG = TransToken.ui('UI translations rebuilt from sources successfully.')
+TRANS_REBUILD_PACK_LANG = TransToken.ui('Package translations rebuilt successfully.')
 
 
 # Callback to load languages when the window opens.
@@ -538,9 +540,12 @@ async def init_dev_tab(f: ttk.Frame) -> None:
     frm_btn2.columnconfigure(0, weight=1)
     frm_btn2.columnconfigure(1, weight=1)
 
-    build_app_trans_btn = ttk.Button(frm_btn2, command=lambda: background_run(
-        localisation.rebuild_app_langs,
-    ))
+    async def rebuild_app_langs() -> None:
+        """Rebuild application languages, then notify the user."""
+        await localisation.rebuild_app_langs()
+        tk_tools.showinfo(message=TRANS_REBUILT_APP_LANG)
+
+    build_app_trans_btn = ttk.Button(frm_btn2, command=lambda: background_run(rebuild_app_langs))
     localisation.set_text(build_app_trans_btn, TransToken.ui('Build UI Translations'))
     add_tooltip(build_app_trans_btn, TransToken.ui(
         "Compile '.po' UI translation files into '.mo'. This requires those to have been "
@@ -548,10 +553,12 @@ async def init_dev_tab(f: ttk.Frame) -> None:
     ))
     build_app_trans_btn.grid(row=0, column=0, sticky='w')
 
-    build_pack_trans_btn = ttk.Button(frm_btn2, command=lambda: background_run(
-        localisation.rebuild_package_langs,
-        packages.LOADED,
-    ))
+    async def rebuild_pack_langs() -> None:
+        """Rebuild package languages, then notify the user."""
+        await localisation.rebuild_package_langs(packages.LOADED)
+        tk_tools.showinfo(message=TRANS_REBUILD_PACK_LANG)
+
+    build_pack_trans_btn = ttk.Button(frm_btn2, command=lambda: background_run(rebuild_pack_langs))
     localisation.set_text(build_pack_trans_btn, TransToken.ui('Build Package Translations'))
     add_tooltip(build_pack_trans_btn, TransToken.ui(
         "Export translation files for all unzipped packages. This will update existing "

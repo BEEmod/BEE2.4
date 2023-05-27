@@ -39,7 +39,6 @@ import trio
 import attrs
 
 from config.gen_opts import GenOptions
-from app import tk_tools
 import config
 import packages
 import utils
@@ -465,7 +464,6 @@ async def rebuild_app_langs() -> None:
         for fname in FOLDER.iterdir():
             if fname.suffix == '.po':
                 nursery.start_soon(build_lang, fname)
-    tk_tools.showinfo(TransToken.ui('BEEMod'), TransToken.ui('UI Translations rebuilt.'))
 
 
 async def load_aux_langs(
