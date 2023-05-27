@@ -668,13 +668,13 @@ async def parse_package(
                 obj.real_name, obj.value,
             )
             continue
+
         if obj.name in ('templatebrush', 'brushtemplate'):
             LOGGER.warning(
                 'TemplateBrush {} no longer needs to be defined in info.txt',
                 obj['id', '<NO ID>'],
             )
-            continue
-        if obj.name == 'overrides':
+        elif obj.name == 'overrides':
             for over_prop in obj:
                 if over_prop.name in ('templatebrush', 'brushtemplate'):
                     LOGGER.warning(
@@ -685,12 +685,15 @@ async def parse_package(
                 try:
                     obj_type = OBJ_TYPES[over_prop.name]
                 except KeyError:
-                    LOGGER.warning('Unknown object type "{}" with ID "{}"!', over_prop.real_name, over_prop['id', '<NO ID>'])
+                    LOGGER.warning(
+                        'Unknown object type "{}" with ID "{}"!',
+                        over_prop.real_name, over_prop['id', '<NO ID>']),
+
                     continue
                 try:
                     obj_id = over_prop['id']
                 except LookupError:
-                    raise ValueError(f'No ID for "{obj_type}" object type!') from None
+                    raise ValueError(f'No ID for "{obj_type}" object type in "{pack.id}" package!') from None
                 packset.overrides[obj_type, obj_id.casefold()].append(
                     ParseData(pack.fsys, obj_id, over_prop, pack.id, True)
                 )
@@ -698,7 +701,10 @@ async def parse_package(
             try:
                 obj_type = OBJ_TYPES[obj.name]
             except KeyError:
-                LOGGER.warning('Unknown object type "{}" with ID "{}"!', obj.real_name, obj['id', '<NO ID>'])
+                LOGGER.warning(
+                    'Unknown object type "{}" with ID "{}"!',
+                    obj.real_name, obj['id', '<NO ID>'],
+                )
                 continue
             try:
                 obj_id = obj['id']
@@ -799,6 +805,13 @@ async def parse_object(
 
 class Package:
     """Represents a package."""
+    id: str
+    fsys: FileSystem
+    info: Keyvalues
+    path: Path
+    disp_name: TransToken
+    desc: TransToken
+
     def __init__(
         self,
         pak_id: str,
@@ -817,7 +830,7 @@ class Package:
         self.info = info
         self.path = path
         self.disp_name = disp_name
-        self.desc = TransToken.ui('No description!')  # Filled in by parse_package.
+        self.desc = TransToken.ui('No description!')  # Filled in by parse_package().
 
     @property
     def enabled(self) -> bool:
