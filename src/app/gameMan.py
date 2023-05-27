@@ -876,6 +876,7 @@ class Game:
                         for tok_id, tok in pack.additional_tokens.items()
                     })
                     for pack in packset.packages.values()
+                    if pack.additional_tokens  # Skip empty packages, saving some space.
                 ], pickle.HIGHEST_PROTOCOL))
                 trans_file.write(pick)
 
