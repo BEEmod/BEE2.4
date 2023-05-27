@@ -1055,6 +1055,32 @@ class Style(PakObject, needs_foreground=True):
         pass
 
 
+def parse_multiline_key(info: Keyvalues, prop_name: str, *, allow_old_format: bool=False) -> str:
+    """Allow several methods for entering multi-line keyvalues.
+
+    Any combination of the following is allowed:
+    "key" "single line"
+    "key" "another line"
+    "key"
+        {
+        "" "blah"
+        "" "Blah blah"
+        }
+    """
+    has_warning = False
+    lines = []
+    for kv in info.find_all(prop_name):
+        if kv.has_children():
+            for line in kv:
+                if line.name and not has_warning:
+                    LOGGER.warning('Old desc format found. Keys inside the block should be ""!')
+                    has_warning = True
+                lines.append(line.value)
+        else:
+            lines.append(kv.value)
+    return '\n'.join(lines)
+
+
 def desc_parse(
     info: Keyvalues,
     source: str,
@@ -1065,18 +1091,8 @@ def desc_parse(
     """Parse the description blocks, to create data which matches richTextBox.
 
     """
-    has_warning = False
-    lines = []
-    for kv in info.find_all(prop_name):
-        if kv.has_children():
-            for line in kv:
-                if line.name and not has_warning:
-                    LOGGER.warning('Old desc format: {}', source)
-                    has_warning = True
-                lines.append(line.value)
-        else:
-            lines.append(kv.value)
-    token = TransToken.parse(pak_id, '\n'.join(lines))
+    with srctools.logger.context(source):
+        token = TransToken.parse(pak_id, parse_multiline_key(info, prop_name))
     return tkMarkdown.convert(token, pak_id)
 
 
