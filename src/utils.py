@@ -797,18 +797,15 @@ def quit_app(status: int=0) -> NoReturn:
     sys.exit(status)
 
 
+_flag_writeable = stat.S_IWUSR | stat.S_IWGRP | stat.S_IWOTH
+
+
 def set_readonly(file: str | bytes | os.PathLike) -> None:
     """Make the given file read-only."""
     # Get the old flags
     flags = os.stat(file).st_mode
     # Make it read-only
-    os.chmod(
-        file,
-        flags & ~
-        stat.S_IWUSR & ~
-        stat.S_IWGRP & ~
-        stat.S_IWOTH
-    )
+    os.chmod(file, flags & ~_flag_writeable)
 
 
 def unset_readonly(file: str | bytes | os.PathLike) -> None:
@@ -816,13 +813,7 @@ def unset_readonly(file: str | bytes | os.PathLike) -> None:
     # Get the old flags
     flags = os.stat(file).st_mode
     # Make it writeable
-    os.chmod(
-        file,
-        flags |
-        stat.S_IWUSR |
-        stat.S_IWGRP |
-        stat.S_IWOTH
-    )
+    os.chmod(file, flags | _flag_writeable)
 
 
 def merge_tree(
