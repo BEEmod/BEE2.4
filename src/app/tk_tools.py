@@ -579,6 +579,8 @@ def prompt(
 
 class _MsgBoxFunc(Generic[T]):
     """Wrap messagebox functions that take TransToken."""
+    _DEFAULT_TITLE = TransToken.ui('BEEmod')
+
     def __init__(self, original: Callable[..., T]) -> None:
         self.orig = original
 
@@ -589,7 +591,7 @@ class _MsgBoxFunc(Generic[T]):
         parent: tk.Misc=TK_ROOT,
         **options: Any,
     ) -> T:
-        disp_title = str(title) if title is not None else None
+        disp_title = str(title) if title is not None else str(self._DEFAULT_TITLE)
         disp_msg = str(message) if message is not None else None
         return self.orig(disp_title, disp_msg, parent=parent, master=TK_ROOT, **options)
 
