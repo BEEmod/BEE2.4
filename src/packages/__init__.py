@@ -674,6 +674,9 @@ async def parse_package(
                 'TemplateBrush {} no longer needs to be defined in info.txt',
                 obj['id', '<NO ID>'],
             )
+        elif obj.name == 'transtoken':
+            # Special case for now, since it's package-specific.
+            parse_pack_transtoken(pack, obj)
         elif obj.name == 'overrides':
             for over_prop in obj:
                 if over_prop.name in ('templatebrush', 'brushtemplate'):
@@ -803,6 +806,20 @@ async def parse_object(
         loader.step("OBJ", obj_id)
 
 
+def parse_pack_transtoken(pack: Package, kv: Keyvalues) -> None:
+    """Define an additional translation token in a package."""
+    try:
+        obj_id = kv['id'].casefold()
+    except LookupError:
+        raise ValueError(f'No ID for "TransToken" object type!') from None
+    if obj_id in pack.additional_tokens:
+        raise ValueError('Duplicate translation token "{}:{}"', pack.id, obj_id)
+    with srctools.logger.context(f'{pack.id}:{obj_id}'):
+        token = TransToken.parse(pack.id, parse_multiline_key(kv, 'text'))
+
+    pack.additional_tokens[obj_id] = token
+
+
 class Package:
     """Represents a package."""
     id: str
@@ -810,6 +827,7 @@ class Package:
     info: Keyvalues
     path: Path
     disp_name: TransToken
+    additional_tokens: dict[str, TransToken]
     desc: TransToken
 
     def __init__(
@@ -830,6 +848,7 @@ class Package:
         self.info = info
         self.path = path
         self.disp_name = disp_name
+        self.additional_tokens = {}
         self.desc = TransToken.ui('No description!')  # Filled in by parse_package().
 
     @property

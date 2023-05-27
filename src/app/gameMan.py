@@ -864,9 +864,20 @@ class Game:
 
             LOGGER.info('Writing Editoritems database...')
             with open(self.abs_path('bin/bee2/editor.bin'), 'wb') as inst_file:
-                pick = pickletools.optimize(pickle.dumps(all_items))
+                pick = pickletools.optimize(pickle.dumps(all_items, pickle.HIGHEST_PROTOCOL))
                 inst_file.write(pick)
             export_screen.step('EXP', 'editoritems_db')
+
+            LOGGER.info('Writing dump of package translations...')
+            with open(self.abs_path('bin/bee2/pack_translation.bin'), 'wb') as trans_file:
+                pick = pickletools.optimize(pickle.dumps([
+                    (pack.id, {
+                        tok_id: str(tok)
+                        for tok_id, tok in pack.additional_tokens.items()
+                    })
+                    for pack in packset.packages.values()
+                ], pickle.HIGHEST_PROTOCOL))
+                trans_file.write(pick)
 
             LOGGER.info('Writing VBSP Config!')
             os.makedirs(self.abs_path('bin/bee2/'), exist_ok=True)
