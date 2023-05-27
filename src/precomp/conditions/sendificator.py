@@ -7,6 +7,7 @@ import srctools.logger
 
 from precomp import connections, conditions
 import user_errors
+from transtoken import TransToken
 
 
 COND_MOD_NAME = None
@@ -16,6 +17,8 @@ LOGGER = srctools.logger.get_logger(__name__, alias='cond.sendtor')
 SENDTOR_TARGETS: dict[str, tuple[Vec, Vec]] = {}
 # Laser name -> relays created.
 SENDTOR_RELAYS: dict[str, list[Entity]] = defaultdict(list)
+
+TOK_SENDTOR_BAD_OUTPUT = TransToken.parse('HMW_SENDIFICATOR', 'BAD_OUTPUT_ITEM')
 
 
 @conditions.make_result('SendificatorLaser')
@@ -52,7 +55,7 @@ def res_sendificator(vmf: VMF, inst: Entity) -> None:
             targ_offset, targ_normal = SENDTOR_TARGETS[las_item.name]
         except KeyError:
             raise user_errors.UserError(
-                user_errors.TOK_SENDTOR_BAD_OUTPUT.format(out_item=las_item.name),
+                TOK_SENDTOR_BAD_OUTPUT.format(out_item=las_item.name),
                 voxels=[Vec.from_str(sendtor.inst['origin'])],
                 points=[Vec.from_str(las_item.inst['origin'])],
             ) from None

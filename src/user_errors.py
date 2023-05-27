@@ -307,12 +307,6 @@ TOK_CHAINING_INVALID_KIND = TransToken.ui(
     'fashion. Check the order of connections.'
 )
 
-TOK_SENDTOR_BAD_OUTPUT = TransToken.ui(
-    'A Sendificator was connected to an item which is not a Discouragement Beam Emitter '
-    '(<var>{out_item}</var>). The output connection is used to specify the emitter that cubes will '
-    'teleport to, so it cannot be an arbitary item.'
-)
-
 TOK_TEMPLATE_MULTI_VISGROUPS = TransToken.ui(
     'The template "{id}" has a {type} with two visgroups: <var>{groups}</var>. Brushes and'
     'overlays in templates may currently only use one visgroup each.'
