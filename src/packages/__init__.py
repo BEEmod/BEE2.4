@@ -690,7 +690,8 @@ async def parse_package(
                 except KeyError:
                     LOGGER.warning(
                         'Unknown object type "{}" with ID "{}"!',
-                        over_prop.real_name, over_prop['id', '<NO ID>']),
+                        over_prop.real_name, over_prop['id', '<NO ID>'],
+                    )
 
                     continue
                 try:
