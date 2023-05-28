@@ -28,7 +28,7 @@ class Config(config.Data, conf_name='Corridor', uses_id=True, version=1):
         return f'{style.casefold()}:{mode.value}_{direction.value}_{orient.value}'
 
     @classmethod
-    def parse_kv1(cls, data: Keyvalues, version: int) -> 'Config':
+    def parse_kv1(cls, data: Keyvalues, version: int) -> Config:
         """Parse from KeyValues1 configs."""
         assert version == 1, version
         selected = []
@@ -52,7 +52,7 @@ class Config(config.Data, conf_name='Corridor', uses_id=True, version=1):
         return Keyvalues('Corridor', [kv])
 
     @classmethod
-    def parse_dmx(cls, data: Element, version: int) -> 'Config':
+    def parse_dmx(cls, data: Element, version: int) -> Config:
         """Parse from DMX configs."""
         assert version == 1, version
         try:
@@ -88,7 +88,7 @@ class UIState(config.Data, conf_name='CorridorUIState', palette_stores=False):
     height: int = -1
 
     @classmethod
-    def parse_kv1(cls, data: Keyvalues, version: int) -> 'UIState':
+    def parse_kv1(cls, data: Keyvalues, version: int) -> UIState:
         """Parse Keyvalues 1 configuration."""
         assert version == 1, version
         try:

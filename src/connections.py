@@ -125,7 +125,7 @@ def format_delay(offset: float, add_timer_delay: bool) -> str:
     """Format a number which may have $timer_delay added to it."""
     if add_timer_delay:
         if offset == 0.0:
-            return f'$timer_delay'
+            return '$timer_delay'
         else:
             return f'$timer_delay{offset:+}'
     else:

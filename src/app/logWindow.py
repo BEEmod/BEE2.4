@@ -67,7 +67,7 @@ class TextHandler(logging.Handler):
         """Set the level of the log window."""
         if isinstance(level, int):
             level = logging.getLevelName(level)
-        super(TextHandler, self).setLevel(level)
+        super().setLevel(level)
         try:
             _LOG_QUEUE.put(('level', level, None), timeout=0.5)
         except queue.Full:

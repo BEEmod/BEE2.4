@@ -848,8 +848,8 @@ def run_background(
                 else:
                     try:
                         func = getattr(SCREENS[scr_id], 'op_' + operation)
-                    except AttributeError:
-                        raise ValueError(f'Bad command "{operation}"!')
+                    except AttributeError as exc:
+                        raise ValueError(f'Bad command "{operation}"!') from exc
                     try:
                         func(*args)
                     except Exception as e:  # Note which function caused the problem.

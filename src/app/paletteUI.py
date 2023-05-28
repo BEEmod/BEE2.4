@@ -114,7 +114,10 @@ class PaletteUI:
         # Avoid re-registering the double-lambda, just do it here.
         # This makes clicking the groups return selection to the palette.
         evtid_reselect = self.ui_treeview.register(self.treeview_reselect)
-        self.ui_treeview.tag_bind(TREE_TAG_GROUPS, '<ButtonPress>', lambda e: treeview.tk.call('after', 'idle', evtid_reselect))
+        self.ui_treeview.tag_bind(
+            TREE_TAG_GROUPS, '<ButtonPress>',
+            lambda e: treeview.tk.call('after', 'idle', evtid_reselect),
+        )
 
         # And ensure when focus returns we reselect, in case it deselects.
         f.winfo_toplevel().bind('<FocusIn>', lambda e: self.treeview_reselect(), add=True)

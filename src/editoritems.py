@@ -1039,7 +1039,7 @@ class Item:
                 try:
                     item.cls = ITEM_CLASSES[item_class.casefold()]
                 except KeyError:
-                    raise tok.error('Unknown item class {}!', item_class)
+                    raise tok.error('Unknown item class {}!', item_class) from None
             elif tok_value == 'editor':
                 item._parse_editor_block(tok, pak_id)
             elif tok_value == 'properties':
@@ -1176,11 +1176,11 @@ class Item:
                 self.properties[prop_type.id.casefold()] = ItemProp(
                     prop_type,default, index, not disable_prop, desc,
                 )
-            except ValueError:
+            except ValueError as exc:
                 raise tok.error(
                     'Default value {} is not valid for {} properties!',
                     default, prop_type.id,
-                )
+                ) from exc
 
     def _parse_export_block(self, tok: Tokenizer, connections: Keyvalues) -> None:
         """Parse the export block of the item definitions. This returns the parsed connection's info.
@@ -1294,7 +1294,7 @@ class Item:
                             kv_block.append(Keyvalues(key, value))
                     continue  # We deal with this after the export block is done.
                 else:
-                    raise tok.error('Unknown connection type "{}"!', conn_name)
+                    raise tok.error('Unknown connection type "{}"!', conn_name) from None
 
             act_name: str | None = None
             activate: str | None = None
@@ -1541,7 +1541,7 @@ class Item:
                     try:
                         grid = FACE_TYPES[grid_str.casefold()]
                     except KeyError:
-                        raise tok.error('Unknown face type "{}"!', grid_str)
+                        raise tok.error('Unknown face type "{}"!', grid_str) from None
                 else:
                     raise tok.error('Unknown Embed Face option "{}"!', opt_key)
             if center is None:
@@ -1570,7 +1570,7 @@ class Item:
                         try:
                             coll_type |= CollideType[name.upper()]
                         except KeyError:
-                            raise tok.error('Unknown collision type "{}"', name)
+                            raise tok.error('Unknown collision type "{}"', name) from None
             if len(points) < 2:
                 raise tok.error('Two points must be provided for a bounding box!')
             bb_min, bb_max = Vec.bbox(points)

@@ -413,7 +413,7 @@ class ConfigSpec:
             # Try and move to a backup name, if not don't worry about it.
             try:
                 self.filename.replace(self.filename.with_suffix('.err.vdf'))
-            except IOError:
+            except OSError:
                 pass
 
         conf, _ = self.parse_kv1(kv)
@@ -466,7 +466,7 @@ PALETTE: ConfigSpec = ConfigSpec(None)
 
 # Import submodules, so they're registered.
 from config import (
-    compile_pane, corridors, gen_opts, item_defaults,
-    last_sel, palette, signage,
-    stylevar, widgets, windows,
+    compile_pane, corridors, gen_opts, item_defaults,  # noqa: F401
+    last_sel, palette, signage,  # noqa: F401
+    stylevar, widgets, windows,  # noqa: F401
 )

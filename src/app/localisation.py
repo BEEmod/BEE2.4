@@ -210,7 +210,7 @@ def set_menu_text(menu: tk.Menu, token: TransToken, index: str | int = 'end') ->
     tok_map[ind] = token
 
 
-def clear_stored_menu(menu: 'tk.Menu') -> None:
+def clear_stored_menu(menu: tk.Menu) -> None:
     """Clear the tokens for the specified menu."""
     _applied_menu_tokens.pop(menu, None)
 
@@ -411,7 +411,7 @@ def get_languages() -> Iterator[Language]:
         try:
             with filename.open('rb') as f:
                 translator = gettext_mod.GNUTranslations(f)
-        except (IOError, OSError):
+        except OSError:
             LOGGER.warning('Could not parse "{}"', filename, exc_info=True)
             continue
         yield Language(
@@ -455,7 +455,7 @@ async def rebuild_app_langs() -> None:
         """Taks run to compile each file simultaneously."""
         try:
             await trio.to_thread.run_sync(build_file, fname)
-        except (IOError, OSError):
+        except OSError:
             LOGGER.warning('Could not convert "{}"', filename, exc_info=True)
         else:
             LOGGER.info('Converted "{}"', filename)

@@ -1,4 +1,3 @@
-# coding=utf-8
 """Display tooltips below a tooltip after a time delay.
 
 Call add_tooltip with a widget to add all the events automatically.
@@ -53,7 +52,7 @@ context_label.grid(row=0, column=0)
 class TooltipData:
     """The current configuration for a widget."""
     text: TransToken
-    img: 'img.Handle | None'
+    img: img.Handle | None
     delay: int
 
 DATA: weakref.WeakKeyDictionary[tk.Misc, TooltipData] = weakref.WeakKeyDictionary()
