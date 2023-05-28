@@ -34,6 +34,25 @@ if TYPE_CHECKING:  # Prevent circular import
     from loadScreen import LoadScreen
 
 
+__all__ = [
+    # Generally global.
+    'OBJ_TYPES', 'PACK_CONFIG',
+    'SelitemData', 'NoVPKExport',
+    'LegacyCorr', 'LEGACY_CORRIDORS',
+    'CLEAN_PACKAGE',
+    'PakObject', 'PackagesSet', 'LOADED',
+    'find_packages', 'no_packages_err', 'load_packages',
+
+    # Package objects.
+    'Item', 'StyleVar', 'Elevator', 'EditorSound', 'StyleVPK', 'Signage',
+    'Skybox', 'Music', 'QuotePack', 'PackList', 'CorridorGroup', 'ConfigGroup',
+
+    # Mainly intended for package object code.
+    'ParseData', 'ExportData',
+    'reraise_keyerror', 'get_config', 'set_cond_source',
+    'parse_multiline_key', 'desc_parse', 'sep_values',
+]
+
 LOGGER = srctools.logger.get_logger(__name__, alias='packages')
 OBJ_TYPES: dict[str, Type[PakObject]] = {}
 # Maps a package ID to the matching filesystem for reading files easily.
@@ -217,7 +236,7 @@ class NoVPKExport(Exception):
 
 T = TypeVar('T')
 PakT = TypeVar('PakT', bound='PakObject')
-style_suggest_keys: dict[str, type['PakObject']] = {}
+style_suggest_keys: dict[str, type[PakObject]] = {}
 
 
 class PakObject:
@@ -495,7 +514,7 @@ async def find_packages(nursery: trio.Nursery, packset: PackagesSet, pak_dir: Pa
         try:
             pak_id = info['ID']
         except LookupError:
-            raise ValueError('No package ID in {}/info.txt!', filesys.path)
+            raise ValueError('No package ID in {}/info.txt!', filesys.path) from None
 
         if pak_id.casefold() in packset.packages:
             duplicate = packset.packages[pak_id.casefold()]
@@ -504,7 +523,7 @@ async def find_packages(nursery: trio.Nursery, packset: PackagesSet, pak_dir: Pa
                 'If you just updated the mod, delete any old files in packages/.\n'
                 f'Package 1: {duplicate.fsys.path}\n'
                 f'Package 2: {filesys.path}'
-            ) from None
+            )
 
         PACKAGE_SYS[pak_id.casefold()] = filesys
 
@@ -812,7 +831,7 @@ def parse_pack_transtoken(pack: Package, kv: Keyvalues) -> None:
     try:
         obj_id = kv['id'].casefold()
     except LookupError:
-        raise ValueError(f'No ID for "TransToken" object type!') from None
+        raise ValueError('No ID for "TransToken" object type!') from None
     if obj_id in pack.additional_tokens:
         raise ValueError('Duplicate translation token "{}:{}"', pack.id, obj_id)
     with srctools.logger.context(f'{pack.id}:{obj_id}'):
