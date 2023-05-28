@@ -7,6 +7,7 @@ from typing import (
     SupportsInt, Callable, Sequence, Iterator, Iterable, Mapping, Generator, Type,
     KeysView, ValuesView, ItemsView, overload,
 )
+from typing_extensions import ParamSpec
 import logging
 import os
 import stat
@@ -470,6 +471,7 @@ ResultT = TypeVar('ResultT')
 SyncResultT = TypeVar('SyncResultT')
 T_contra = TypeVar('T_contra', contravariant=True)
 # ArgsT = TypeVarTuple('ArgsT')
+ParamsT = ParamSpec('ParamsT')
 _NO_RESULT: Any = object()
 
 T1 = TypeVar('T1')
@@ -650,6 +652,18 @@ else:
         def started(self: TaskStatus[None]) -> None: ...
         @overload
         def started(self, value: T_contra) -> None: ...
+
+
+def acompose(
+    func: Callable[ParamsT, Awaitable[ResultT]],
+    on_completed: Callable[[ResultT], object],
+) -> Callable[ParamsT, Awaitable[None]]:
+    """Compose an awaitable function with a sync function that recieves the result."""
+    async def task(*args: ParamsT.args, **kwargs: ParamsT.kwargs) -> None:
+        """Run the func, then call on_completed on the result."""
+        res = await func(*args, **kwargs)
+        on_completed(res)
+    return task
 
 
 def get_indent(line: str) -> str:
