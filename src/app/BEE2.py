@@ -1,5 +1,4 @@
 """Run the BEE2."""
-import functools
 from typing import Awaitable, Callable, Any, Optional, List, Tuple
 import time
 import collections
