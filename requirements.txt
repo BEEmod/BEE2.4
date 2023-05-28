@@ -7,6 +7,7 @@ pygtrie >= 2.4.0
 babel >= 2.12.1
 trio >= 0.22.0
 outcome >= 1.1.0  # Trio dependency
+exceptiongroup >= 1.1.1
 versioningit >= 2.1.0
 srctools >= 2.3.9
 rtree >= 0.9.7

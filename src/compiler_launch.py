@@ -1,7 +1,8 @@
 """Launches the correct compiler."""
 import os
 import sys
-import trio  # Install its import hook
+import exceptiongroup   # noqa - Install its import hook
+
 
 if hasattr(sys, 'frozen'):
     app_name = os.path.basename(sys.executable).casefold()
@@ -14,18 +15,22 @@ else:
     # Sourcecode-launch - check first sys arg.
     app_name = sys.argv.pop(1).casefold()
 
+
 if app_name in ('vbsp.exe', 'vbsp_osx', 'vbsp_linux'):
     import vbsp
+    import trio
     trio.run(vbsp.main)
 elif app_name in ('vrad.exe', 'vrad_osx', 'vrad_linux'):
     if '--errorserver' in sys.argv:
         import error_server
+        import trio
         trio.run(
             error_server.main,
             strict_exception_groups=True,  # Opt into 3.11-style semantics.
         )
     else:
         import vrad
+        import trio
         trio.run(
             vrad.main, sys.argv,
             strict_exception_groups=True,
