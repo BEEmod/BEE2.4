@@ -23,6 +23,7 @@
   `info_target`s are generated to mark the locations being sampled, and the contents of this field
   is copied into those as a comment to help identify them.
 * Behaviour change: in Fizzlers, `model_mid` will now be affected by the `NameType` value.
+* Added the `Error` result, which allows producing a custom error message from a package.
 
 ### Bugfixes:
 * Properly pick free port for error server.

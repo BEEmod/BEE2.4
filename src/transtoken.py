@@ -61,12 +61,13 @@ CURRENT_LANG = Language(lang_code='en', trans={})
 # Special language which replaces all text with ## to easily identify untranslatable text.
 DUMMY: Final = Language(lang_code='dummy', trans={})
 # Set by the localisation module to a function which gets a formatter for UI text, given the lang code.
-ui_format_getter: Callable[[str], Optional[string.Formatter]] = lambda lang: None
+ui_format_getter: Callable[[str], Optional[string.Formatter]]
 # Similarly, joins a list given the language, kind of list and children.
-ui_list_getter: Callable[
-    [str, ListStyle, List[str]],
-    str,
-] = lambda lang, kind, children: ' ,'.join(children)
+ui_list_getter: Callable[[str, ListStyle, List[str]], str]
+
+# Define basic versions, if the localisation module hasn't filled these in yet.
+globals()['ui_format_getter'] = lambda lang, /: None
+globals()['ui_list_getter'] = lambda lang, kind, children, /: ' ,'.join(children)
 
 
 class HTMLFormatter(string.Formatter):
