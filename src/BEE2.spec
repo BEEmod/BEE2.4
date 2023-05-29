@@ -64,7 +64,7 @@ def do_localisation() -> None:
         },
     )
     for filename, lineno, message, comments, context in extracted:
-        if 'test_localisation' in filename:
+        if 'test_localisation' in filename or 'test_transtoken' in filename:
             # Test code for the localisation module, skip these tokens.
             continue
         elif 'user_errors.py' in filename and all('game_text' not in comm for comm in comments):

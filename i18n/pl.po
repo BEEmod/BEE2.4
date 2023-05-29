@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: https://github.com/BEEmod/BEE2.4/issues\n"
-"POT-Creation-Date: 2023-03-29 13:09+1000\n"
+"POT-Creation-Date: 2023-05-29 15:28+1000\n"
 "PO-Revision-Date: 2021-06-07 15:18+0200\n"
 "Last-Translator: \n"
 "Language: pl\n"
@@ -314,15 +314,6 @@ msgstr ""
 msgid ""
 "The highlighted items in this chain do not support being linked together "
 "in this fashion. Check the order of connections."
-msgstr ""
-
-#. This uses HTML syntax.
-#: user_errors.py
-msgid ""
-"A Sendificator was connected to an item which is not a Discouragement "
-"Beam Emitter (<var>{out_item}</var>). The output connection is used to "
-"specify the emitter that cubes will teleport to, so it cannot be an "
-"arbitary item."
 msgstr ""
 
 #. This uses HTML syntax.
@@ -969,14 +960,6 @@ msgid "Multiple Orientations"
 msgstr "Wiele orientacji"
 
 #: app/UI.py
-msgid "Save Palette..."
-msgstr "Zapisz paletę..."
-
-#: app/UI.py app/paletteUI.py
-msgid "Save Palette As..."
-msgstr "Zapisz paletę jako..."
-
-#: app/UI.py
 msgid "Music: "
 msgstr "Muzyka: "
 
@@ -1027,6 +1010,10 @@ msgstr "Palety"
 #: app/UI.py
 msgid "Export Options"
 msgstr "Opcje eksportu"
+
+#: app/UI.py
+msgid "Remove all items from the palette."
+msgstr ""
 
 #: app/UI.py
 msgid "Fill empty spots in the palette with random items."
@@ -1327,6 +1314,20 @@ msgid ""
 msgstr "Ten przedmiot może być obrócony na podłodze o 360 stopni."
 
 #: app/contextWin.py
+msgid ""
+"This fizzler has an output. Due to an editor bug, this cannot be used "
+"directly. Instead the Fizzler Output Relay item should be placed on top "
+"of this fizzler."
+msgstr ""
+
+#: app/contextWin.py
+msgid ""
+"This fizzler has a timed output. Due to an editor bug, this cannot be "
+"used directly. Instead the Fizzler Output Relay item should be placed on "
+"top of this fizzler."
+msgstr ""
+
+#: app/contextWin.py
 msgid "No Alternate Versions"
 msgstr "Brak wersji alteratywnych"
 
@@ -1498,10 +1499,6 @@ msgstr ""
 "Instancja Portal-guna w Kooperacyjnym Aperture Tag nieznaleziona!\n"
 "Portal-gun i Paint-gun nie będą tam działały - zweryfikuj cache, aby to "
 "naprawić."
-
-#: app/gameMan.py
-msgid "BEE2"
-msgstr ""
 
 #: app/gameMan.py
 msgid ""
@@ -1690,15 +1687,6 @@ msgstr "Brak dostępnych właściwości!"
 #: app/item_search.py
 msgid "Search:"
 msgstr "Szukaj:"
-
-#. i18n: BEEmod 1 palette.
-#: app/localisation.py app/paletteLoader.py
-msgid "BEEMod"
-msgstr "BEEMod"
-
-#: app/localisation.py
-msgid "UI Translations rebuilt."
-msgstr ""
 
 #: app/menu_bar.py
 msgid "{game} Puzzle Folder"
@@ -1927,6 +1915,14 @@ msgid ""
 "\n"
 "\"Preserve Game Resources\" has been disabled."
 msgstr "\"Zachowaj zasoby gry\" zostało wyłączone."
+
+#: app/optionWindow.py
+msgid "UI translations rebuilt from sources successfully."
+msgstr ""
+
+#: app/optionWindow.py
+msgid "Package translations rebuilt successfully."
+msgstr ""
 
 #: app/optionWindow.py app/packageMan.py app/selector_win.py
 msgid "OK"
@@ -2210,6 +2206,11 @@ msgstr "<Ostatni Eksport>"
 msgid "Blank"
 msgstr "Puste"
 
+#. i18n: BEEmod 1 palette.
+#: app/paletteLoader.py
+msgid "BEEMod"
+msgstr "BEEMod"
+
 #. i18n: Default items merged together
 #: app/paletteLoader.py
 msgid "Portal 2 Collapsed"
@@ -2226,13 +2227,23 @@ msgid "Aperture Tag"
 msgstr "Aperture Tag"
 
 #: app/paletteUI.py
-msgid "Delete Palette"
-msgstr "Usuń paletę"
+#, fuzzy
+msgid "Delete"
+msgstr "Wybrane"
+
+#: app/paletteUI.py
+msgid "Hide"
+msgstr ""
 
 #: app/paletteUI.py
 #, fuzzy
-msgid "Hide Palette"
-msgstr "Zapisz paletę"
+msgid "Delete Palette \"{name}\""
+msgstr "Usuń paletę \"{name}\""
+
+#: app/paletteUI.py
+#, fuzzy
+msgid "Hide Palette \"{name}\""
+msgstr "Usuń paletę \"{name}\""
 
 #: app/paletteUI.py
 #, fuzzy
@@ -2243,9 +2254,25 @@ msgstr "Na pewno chcesz usunąć \"{palette}\"?"
 msgid "Builtin / Readonly"
 msgstr ""
 
+#: app/paletteUI.py app/voiceEditor.py
+msgid "Save"
+msgstr "Zapisz"
+
 #: app/paletteUI.py
-msgid "Clear Palette"
-msgstr "Wyczyść paletę"
+msgid "Save As"
+msgstr ""
+
+#: app/paletteUI.py
+msgid "Save Settings in Palettes"
+msgstr "Zapisz ustawienia palet"
+
+#: app/paletteUI.py
+msgid "Save Palette"
+msgstr "Zapisz paletę"
+
+#: app/paletteUI.py
+msgid "Save Palette As..."
+msgstr "Zapisz paletę jako..."
 
 #: app/paletteUI.py
 #, fuzzy
@@ -2260,24 +2287,6 @@ msgstr "Zapisz paletę..."
 #: app/paletteUI.py
 msgid "Fill Palette"
 msgstr "Wypełnij paletę"
-
-#: app/paletteUI.py
-msgid "Save Settings in Palettes"
-msgstr "Zapisz ustawienia palet"
-
-#: app/paletteUI.py
-msgid "Save Palette"
-msgstr "Zapisz paletę"
-
-#: app/paletteUI.py
-#, fuzzy
-msgid "Hide Palette \"{name}\""
-msgstr "Usuń paletę \"{name}\""
-
-#: app/paletteUI.py
-#, fuzzy
-msgid "Delete Palette \"{name}\""
-msgstr "Usuń paletę \"{name}\""
 
 #: app/paletteUI.py
 #, fuzzy
@@ -2360,6 +2369,11 @@ msgstr "Konfiguruj symbole"
 msgid "Selected"
 msgstr "Wybrane"
 
+#: app/tk_tools.py
+#, fuzzy
+msgid "BEEmod"
+msgstr "BEEMod"
+
 #: app/voiceEditor.py
 msgid "Singleplayer"
 msgstr "Tryb jednoosobowy"
@@ -2421,10 +2435,6 @@ msgstr "Brak nazwy!"
 msgid "Transcript:"
 msgstr "Transkrypcja:"
 
-#: app/voiceEditor.py
-msgid "Save"
-msgstr "Zapisz"
-
 #. i18n: 'response' tab name, should be short.
 #: app/voiceEditor.py
 msgid "Resp"
@@ -2452,11 +2462,6 @@ msgstr "Odpowiedzi"
 #: app/voiceEditor.py
 msgid "Lines played in response to certain events in Coop."
 msgstr "Ścieżki grane w odpowiedzi na odpowiednie wydarzenia w trybie Kooperacji."
-
-#. i18n: The format for timer numerals.
-#: app/itemconfig/__init__.py
-msgid "{timer_num:00}"
-msgstr ""
 
 #: app/itemconfig/__init__.py
 msgid "{name} ({page}/{count})"
@@ -2516,10 +2521,6 @@ msgstr "Opis:"
 msgid "Corridor"
 msgstr ""
 
-#: test/test_transtoken.py
-msgid "Save As"
-msgstr ""
-
 #~ msgid "Corridor"
 #~ msgstr "Korytarz"
 
@@ -2575,4 +2576,16 @@ msgstr ""
 #~ msgstr ""
 #~ "Opóźnienie\n"
 #~ "(0=nieskończoność)"
+
+#~ msgid "Save Palette..."
+#~ msgstr "Zapisz paletę..."
+
+#~ msgid "Delete Palette"
+#~ msgstr "Usuń paletę"
+
+#~ msgid "Hide Palette"
+#~ msgstr "Zapisz paletę"
+
+#~ msgid "Clear Palette"
+#~ msgstr "Wyczyść paletę"
 
