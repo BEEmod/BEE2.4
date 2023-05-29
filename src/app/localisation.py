@@ -604,8 +604,12 @@ async def rebuild_package_langs(packset: packages.PackagesSet) -> None:
         LOGGER.info('Exporting translations for {}...', pak_id.upper())
         await pack_path.mkdir(parents=True, exist_ok=True)
         catalog.header_comment = PACKAGE_HEADER
-        with open(pack_path / 'en.pot', 'wb') as f:
-            write_po(f, catalog, include_previous=True, sort_output=True, width=120)
+        with io.BytesIO() as buffer:
+            write_po(buffer, catalog, include_previous=True, sort_output=True, width=120)
+            pack_template = Path(pack_path / 'en.pot')
+            if utils.write_lang_pot(pack_template, buffer.getvalue()):
+                LOGGER.info('Written {}', pack_template)
+
         for lang_file in await pack_path.iterdir():
             if lang_file.suffix != '.po':
                 continue
@@ -615,8 +619,9 @@ async def rebuild_package_langs(packset: packages.PackagesSet) -> None:
             catalog.header_comment = PACKAGE_HEADER
             existing.version = utils.BEE_VERSION
             LOGGER.info('- Rewriting {}', lang_file)
-            with open(lang_file, 'wb') as f:
-                write_po(f, existing, sort_output=True, width=120)
+            with io.BytesIO() as buffer:
+                write_po(buffer, existing, sort_output=True, width=120)
+                utils.write_lang_pot(Path(lang_file), buffer.getvalue())
             with open(lang_file.with_suffix('.mo'), 'wb') as f:
                 write_mo(f, existing)
 

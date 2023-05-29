@@ -1,3 +1,4 @@
+import io
 import os
 import sys
 import shutil
@@ -99,8 +100,10 @@ def do_localisation() -> None:
         ]:
             del trans_cat.obsolete[msg_id]
 
-        with trans.open('wb') as dest:
-            write_po(dest, trans_cat, include_lineno=False)
+        with io.BytesIO() as buffer:
+            write_po(buffer, trans_cat, include_lineno=False)
+            if utils.write_lang_pot(trans, buffer.getvalue()):
+                print(f'Written {trans}')
 
         # Compile them all.
         comp = trans.with_suffix('.mo')

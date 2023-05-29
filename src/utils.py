@@ -880,3 +880,39 @@ def merge_tree(
             errors.append((src, dst, str(why)))
     if errors:
         raise shutil.Error(errors)
+
+
+def write_lang_pot(path: Path, new_contents: bytes) -> bool:
+    """Write out a new POT translations template file.
+
+    This first reads the existing file, so we can avoid writing if only the header (dates/version)
+    gets changed.
+
+    It's in this module to allow it to be imported by BEE2.spec.
+    """
+    new_lines = new_contents.splitlines()
+    force_write = False
+
+    try:
+        with path.open('rb') as f:
+            old_lines = f.read().splitlines()
+    except FileNotFoundError:
+        force_write = True
+    else:
+        for lines in [old_lines, new_lines]:
+            # Look for the first line with 'msgid "<something>"'.
+            for i, line in enumerate(lines):
+                if line.startswith(b'msgid') and b'""' not in line:
+                    # Found. Ignore comments directly before also, since that's the location etc.
+                    while i > 0 and lines[i-1].startswith(b'#'):
+                        i -= 1
+                    del lines[:i]
+                    break
+            else:  # Not present? Force it to be written out.
+                force_write = True
+
+    if force_write or old_lines != new_lines:
+        with path.open('wb') as f:
+            f.write(new_contents)
+        return True
+    return False
