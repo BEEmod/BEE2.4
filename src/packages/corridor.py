@@ -396,6 +396,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
 
         # Change out all the instances in items to names following a pattern.
         # This allows the compiler to easily recognise. Also force 64-64-64 offset.
+        # TODO: Need to ensure this happens after Item.export()!
         for item in exp_data.all_items:
             try:
                 (mode, direction) = ID_TO_CORR[item.id]
@@ -421,8 +422,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                 )
                 has_vert = True
             if has_vert:
-                # Add a rotation handle and desired facing.
+                # Add a rotation handle.
                 item.handle = editoritems.Handle.QUAD
-                # Set desired facing so they move upright.
-                # Note unlock default items also does this!
-                item.facing = editoritems.DesiredFacing.UP
+            # Set desired facing to make them face upright, no matter what.
+            item.facing = editoritems.DesiredFacing.UP
