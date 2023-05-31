@@ -185,7 +185,7 @@ TOK_SEEDOCS = TransToken.untranslated('{msg}\n<p><a href="{url}">{docs}</a>.</p>
 
 TOK_BRUSHLOC_LEAK = TransToken.ui(
     'One or more items were placed ouside the map! Move these back inside the map, or delete them. '
-    'Items with no collision (like Half Walls or logic gates) can be left when rooms are moved, '
+    'Items with no collision (like Half Walls or Logic Gates) can be left when rooms are moved, '
     'look for those.',
 )
 
@@ -218,12 +218,12 @@ TOK_CONNECTIONS_UNKNOWN_INSTANCE = TransToken.ui(
 
 TOK_CONNECTIONS_INSTANCE_NO_IO = TransToken.ui(
     'The instance "<var>{inst}</var>" is reciving inputs, but none were configured in the item. '
-    'Check for reuse of the instance in multiple items, or restart Portal 2 '
-    'if you just exported.'
+    'Check for reuse of the instance in multiple items, or restart Portal 2 if you just exported.'
 )
 
 TOK_CORRIDOR_EMPTY_GROUP = TransToken.ui(
-    'No corridors available for the <var>{orient}_{mode}_{dir}</var> group!'
+    'No corridors were defined for the <var>{orient}_{mode}_{dir}</var> group. Try moving '
+    'this door back onto a wall.'
 )
 
 # Format in so it automatically matches the stylevar name.
@@ -239,11 +239,11 @@ TOK_CORRIDOR_NO_CORR_ITEM = TransToken.ui(
 
 TOK_CORRIDOR_BOTH_MODES = TransToken.ui(
     'The map contains both singleplayer and coop entry/exit corridors. This can happen if they are '
-    'manually added using the "{stylevar"} stylevar. In that case delete one of them.'
+    'manually added using the "{stylevar}" stylevar. In that case delete one of them.'
 ).format(stylevar=UNLOCK_DEFAULT)
 
 TOK_CORRIDOR_ENTRY = TransToken.ui('Entry')  # i18n: Entry door
-TOK_CORRIDOR_EXIT = TransToken.ui('Exit')  # i18n: Entry door
+TOK_CORRIDOR_EXIT = TransToken.ui('Exit')  # i18n: Exit door
 
 TOK_CUBE_NO_CUBETYPE_FLAG = TransToken.ui('"CubeType" result used but with no type specified!')
 TOK_CUBE_BAD_SPECIAL_CUBETYPE = TransToken.ui('Unrecognised special cube type "<var>{type}</var>"!')
