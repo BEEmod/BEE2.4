@@ -1652,7 +1652,12 @@ async def init_windows(tk_img: TKImages) -> None:
     def style_select_callback(style_id: Optional[str]) -> None:
         """Callback whenever a new style is chosen."""
         global selected_style
-        assert style_id is not None, "Style ID must be provided"
+        if style_id is None:
+            LOGGER.warning('Style ID is None??')
+            style_win.sel_item(style_win.item_list[0])
+            style_win.set_disp()
+            style_id = style_win.item_list[0].name
+
         selected_style = style_id
 
         style_obj = current_style()
