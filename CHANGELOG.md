@@ -13,6 +13,7 @@
 * Timer-style indicator panels at the end of antlines can now have a custom appearance for some 
   items (Delayers). This allows them to show both count-down and count-up displays.
 * Moved various palette-related buttons, to group them with the other palette options.
+* A VPK file can be now placed into `vpk_override` to have it be combined with the built VPK. 
 
 ### UCP-Relevant Enhancements:
 * Added an `Inherit` option to Corridor Groups. This specifies the ID of another style, causing all

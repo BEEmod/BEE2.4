@@ -3,6 +3,8 @@
 This allows altering the in-editor wall textures, as well as a few others.
 """
 from __future__ import annotations
+
+import re
 from typing import Optional, TYPE_CHECKING
 import os
 import shutil
@@ -21,6 +23,8 @@ LOGGER = srctools.logger.get_logger(__name__, alias='packages.styleVPK')
 VPK_OVERRIDE_README = """\
 Files in this folder will be written to the VPK during every BEE2 export.
 Use to override resources as you please.
+
+Either add regular files, or put VPKs (any name) in the root to have them be repacked.
 """
 
 
@@ -125,8 +129,34 @@ class StyleVPK(PakObject):
             with open(os.path.join(override_folder, 'BEE2_README.txt'), 'w') as f:
                 f.write(VPK_OVERRIDE_README)
 
-            vpk_file.add_folder(override_folder)
-            del vpk_file['BEE2_README.txt']  # Don't add this to the VPK though.
+            # Matches pak01_038.vpk, etc. These shouldn't be opened.
+            numeric_vpk = re.compile(r'_[0-9]+\.vpk')
+
+            for subfolder, _, filenames, in os.walk(override_folder):
+                # Subfolder relative to the folder.
+                # normpath removes '.' and similar values from the beginning
+                vpk_path = os.path.normpath(os.path.relpath(subfolder, override_folder))
+                for filename in filenames:
+                    if filename == 'BEE2_README.txt':
+                        continue  # Don't add this to the VPK though.
+                    file_path = os.path.join(subfolder, filename)
+                    if vpk_path == '.' and filename.endswith('.vpk'):
+                        # If a VPK file is found in vpk_override, copy the contents into ours.
+                        # Skip trying to open pak01_028.vpk files, we just want to find the dir.
+                        if numeric_vpk.search(filename) is not None:
+                            continue
+                        try:
+                            other_vpk = VPK(file_path)
+                        except ValueError:
+                            LOGGER.exception('Could not open VPK file "{}":', file_path)
+                        else:
+                            for entry in other_vpk:
+                                LOGGER.info('Adding "{}:{}" to the VPK', file_path, entry.filename)
+                                vpk_file.add_file(entry.filename, entry.read())
+                    else:
+                        LOGGER.debug('Adding "{}" to the VPK', file_path)
+                        with open(file_path, 'rb') as f:
+                            vpk_file.add_file((vpk_path, filename), f.read())
 
         LOGGER.info('Written {} files to VPK!', len(vpk_file))
 
