@@ -578,9 +578,6 @@ class SelectorWin(Generic[CallbackT]):
         # The '...' button to open our window.
         self.disp_btn: ttk.Button | None = None
 
-        # ID of the currently chosen item
-        self.chosen_id: str | None = None
-
         # Callback function, and positional arguments to pass
         self.callback = callback
         self.callback_params = list(callback_params)
@@ -977,6 +974,14 @@ class SelectorWin(Generic[CallbackT]):
         return self.display
 
     @property
+    def chosen_id(self) -> str | None:
+        """The currently selected item, or None if none is selected."""
+        if self.selected == self.noneItem:
+            return None
+        else:
+            return self.selected.name
+
+    @property
     def readonly(self) -> bool:
         """Setting the readonly property to True makes the option read-only.
 
@@ -1120,11 +1125,6 @@ class SelectorWin(Generic[CallbackT]):
                 self.display['font'] = self.sugg_font
             else:
                 self.display['font'] = self.norm_font
-
-        if self.selected == self.noneItem:
-            self.chosen_id = None
-        else:
-            self.chosen_id = self.selected.name
 
         self._suggested_rollover = None  # Discard the rolled over item.
         self.disp_label.set(str(self.selected.context_lbl))
