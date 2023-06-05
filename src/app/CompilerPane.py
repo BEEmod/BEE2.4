@@ -4,7 +4,7 @@ These can be set and take effect immediately, without needing to export.
 """
 from __future__ import annotations
 
-from typing import Union, cast
+from typing import TypedDict, Union, cast
 from tkinter import filedialog, ttk
 import tkinter as tk
 import functools
@@ -70,10 +70,27 @@ PLAYER_MODELS = {
 }
 assert PLAYER_MODELS.keys() == set(PLAYER_MODEL_ORDER)
 
+
+class _WidgetsDict(TypedDict, total=False):
+    """TODO: Remove."""
+    refresh_counts: ttk.Button
+    packfile_filefield: tk_tools.FileField
+    nbook: ttk.Notebook
+
+    thumb_auto: ttk.Radiobutton
+    thumb_peti: ttk.Radiobutton
+    thumb_custom: ttk.Radiobutton
+    thumb_label: ttk.Label
+    thumb_cleanup: ttk.Checkbutton
+
+    light_none: ttk.Radiobutton
+    light_fast: ttk.Radiobutton
+    light_full: ttk.Radiobutton
+
 COMPILE_CFG = BEE2_config.ConfigFile('compile.cfg')
 COMPILE_CFG.set_defaults(COMPILE_DEFAULTS)
 window: SubPane.SubPane
-UI: dict[str, tk.Widget] = {}
+UI: _WidgetsDict = {}
 
 chosen_thumb = tk.StringVar(
     value=COMPILE_CFG.get_val('Screenshot', 'Type', 'AUTO')

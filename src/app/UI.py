@@ -1,7 +1,7 @@
 """Main UI module, brings everything together."""
 import tkinter as tk
 from tkinter import ttk
-from typing import List, Type, Dict, Tuple, Optional, Set, Iterator, Callable, Any, Union
+from typing import List, Type, Dict, Tuple, Optional, Set, Iterator, Callable, TypedDict, Union
 import itertools
 import operator
 import random
@@ -53,11 +53,6 @@ from ui_tk.img import TKImages, TK_IMG
 
 LOGGER = srctools.logger.get_logger(__name__)
 
-# Holds the TK Toplevels, frames, widgets and menus
-windows: Dict[str, Any] = {}  # Toplevel | SubPane
-frames: Dict[str, Union[tk.Frame, ttk.Frame]] = {}
-UI: Dict[str, Any] = {}  # Various widgets.
-
 # These panes and a dict mapping object type to them.
 skybox_win: 'SelectorWin[[]]'
 voice_win: 'SelectorWin[[]]'
@@ -107,6 +102,46 @@ TRANS_EXPORTED_NO_VPK = TransToken.ui(
 TRANS_EXPORTED_TITLE = TransToken.ui('BEE2 - Export Complete')
 TRANS_MAIN_TITLE = TransToken.ui('BEEMOD {version} - {game}')
 TRANS_ERROR = TransToken.untranslated('???')
+
+
+class DragWin(tk.Toplevel):
+    """Todo: use dragdrop module instead."""
+    passed_over_pal: bool  # Has the cursor passed over the palette
+    from_pal: bool  # Are we dragging a palette item?
+    drag_item: Optional['PalItem']  # The item currently being moved
+
+
+class _WindowsDict(TypedDict, total=False):
+    """TODO: Remove."""
+    drag_win: DragWin
+    opt: SubPane.SubPane
+    pal: SubPane.SubPane
+
+
+class _FramesDict(TypedDict, total=False):
+    """TODO: Remove."""
+    picker: ttk.Frame
+    preview: tk.Frame
+    toolMenu: tk.Frame
+
+
+class _UIDict(TypedDict, total=False):
+    """TODO: Remove."""
+    conf_voice: ttk.Button
+    pal_export: ttk.Button
+    suggested_style: ttk.Button
+    drag_lbl: ttk.Label
+    pre_bg_img: tk.Label
+    pre_disp_name: ttk.Label
+    pre_moving: ttk.Label
+    pre_sel_line: tk.Label
+    picker_frame: ttk.Frame
+
+
+# Holds the TK Toplevels, frames, widgets and menus
+windows: _WindowsDict = {}
+frames: _FramesDict = {}
+UI: _UIDict = {}
 
 
 class Item:
@@ -821,8 +856,8 @@ def clear_disp_name(e=None) -> None:
 def conv_screen_to_grid(x: float, y: float) -> Tuple[int, int]:
     """Returns the location of the item hovered over on the preview pane."""
     return (
-        (x-UI['pre_bg_img'].winfo_rootx()-8) // 65,
-        (y-UI['pre_bg_img'].winfo_rooty()-32) // 65,
+        round(x-UI['pre_bg_img'].winfo_rootx()-8) // 65,
+        round(y-UI['pre_bg_img'].winfo_rooty()-32) // 65,
     )
 
 
@@ -871,7 +906,7 @@ def drag_start(drag_item: PalItem, e: tk.Event) -> None:
 
 def drag_stop(e: tk.Event) -> None:
     """User released the mouse button, complete the drag."""
-    drag_win = windows['drag_win']
+    drag_win: DragWin = windows['drag_win']
 
     if drag_win.drag_item is None:
         # We aren't dragging, ignore the event.
@@ -915,7 +950,7 @@ def drag_stop(e: tk.Event) -> None:
 
 def drag_move(e: tk.Event) -> None:
     """Update the position of dragged items as they move around."""
-    drag_win = windows['drag_win']
+    drag_win: DragWin = windows['drag_win']
 
     if drag_win.drag_item is None:
         # We aren't dragging, ignore the event.
@@ -1332,7 +1367,7 @@ def flow_picker(e=None) -> None:
 
 def init_drag_icon() -> None:
     """Create the window for rendering held items."""
-    drag_win = tk.Toplevel(TK_ROOT, name='pal_drag')
+    drag_win = DragWin(TK_ROOT, name='pal_drag')
     # this prevents stuff like the title bar, normal borders etc from
     # appearing in this window.
     drag_win.overrideredirect(True)
@@ -1346,9 +1381,9 @@ def init_drag_icon() -> None:
     UI['drag_lbl'].grid(row=0, column=0)
     windows['drag_win'] = drag_win
 
-    drag_win.passed_over_pal = False  # type: ignore  # Has the cursor passed over the palette
-    drag_win.from_pal = False  # type: ignore  # Are we dragging a palette item?
-    drag_win.drag_item = None  # type: ignore  # The item currently being moved
+    drag_win.passed_over_pal = False
+    drag_win.from_pal = False
+    drag_win.drag_item = None
 
 
 async def set_game(game: 'gameMan.Game') -> None:

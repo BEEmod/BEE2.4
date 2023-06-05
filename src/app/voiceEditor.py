@@ -3,7 +3,7 @@ import functools
 import itertools
 from decimal import Decimal
 from enum import Enum
-from typing import Iterator, List, Tuple, Dict, Optional, Any
+from typing import Iterator, List, Tuple, TypedDict, Dict, Optional, Any
 from configparser import SectionProxy
 
 from tkinter import *
@@ -27,7 +27,15 @@ LOGGER = srctools.logger.get_logger(__name__)
 
 voice_item = None
 
-UI: Dict[str, Any] = {}
+
+class _WidgetsDict(TypedDict, total=False):
+    """TODO Remove."""
+    pane: PanedWindow
+    tabs: ttk.Notebook
+    trans: Text
+    trans_scroll: tk_tools.HidingScroll
+
+UI: _WidgetsDict = {}
 TABS: List['Tab'] = []
 
 QUOTE_FONT = font.nametofont('TkHeadingFont').copy()
