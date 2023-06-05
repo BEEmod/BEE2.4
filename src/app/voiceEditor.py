@@ -12,6 +12,7 @@ from tkinter import ttk
 
 from srctools import Keyvalues
 import srctools.logger
+import attrs
 
 from BEE2_config import ConfigFile
 from packages import QuotePack
@@ -27,7 +28,7 @@ LOGGER = srctools.logger.get_logger(__name__)
 voice_item = None
 
 UI: Dict[str, Any] = {}
-TABS: Dict[str, ttk.Frame] = {}
+TABS: List['Tab'] = []
 
 QUOTE_FONT = font.nametofont('TkHeadingFont').copy()
 QUOTE_FONT['weight'] = 'bold'
@@ -62,6 +63,8 @@ RESPONSE_NAMES = {
     'camera_generic': TransToken.ui('Camera Gesture - Generic'),
 }
 TRANS_NO_NAME = TransToken.ui('No Name!')
+# i18n: 'response' tab name, should be short.
+TRANS_RESPONSE_TITLE = TransToken.ui('Resp')
 
 config: Optional[ConfigFile] = None
 config_mid: Optional[ConfigFile] = None
@@ -69,9 +72,18 @@ config_resp: Optional[ConfigFile] = None
 
 
 class TabTypes(Enum):
+    """Kinds of tabs."""
     NORM = 0
     MIDCHAMBER = MID = 1
     RESPONSE = RESP = 2
+
+
+@attrs.define(eq=False)
+class Tab:
+    """Information for the tabs that are spawned."""
+    kind: TabTypes
+    frame: ttk.Frame
+    title: TransToken
 
 win = Toplevel(TK_ROOT, name='voiceEditor')
 win.withdraw()
@@ -192,7 +204,7 @@ def save():
 
 def add_tabs(tk_img: TKImages) -> None:
     """Add the tabs to the notebook."""
-    notebook = UI['tabs']
+    notebook: ttk.Notebook = UI['tabs']
     # Save the current tab index, so we can restore it after.
     try:
         current_tab = notebook.index(notebook.select())
@@ -200,26 +212,25 @@ def add_tabs(tk_img: TKImages) -> None:
         current_tab = None  # in that case abandon remembering the tab.
 
     # Add or remove tabs so only the correct mode is visible.
-    for name, tab in sorted(TABS.items()):
-        notebook.add(tab)
+    for tab in TABS:
+        notebook.add(tab.frame)
         # For the special tabs, we use a special image to make
         # sure they are well-distinguished from the other groups
-        if tab.nb_type is TabTypes.MID:
+        if tab.kind is TabTypes.MID:
             notebook.tab(
-                tab,
+                tab.frame,
                 compound='image',
                 image=tk_img.sync_load(IMG_MID),
                 )
-        if tab.nb_type is TabTypes.RESPONSE:
+        if tab.kind is TabTypes.RESPONSE:
             notebook.tab(
-                tab,
+                tab.frame,
                 compound=RIGHT,
                 image=tk_img.sync_load(IMG_RESP),
-                # i18n: 'response' tab name, should be short.
-                text=str(TransToken.ui('Resp')),
+                text=str(TRANS_RESPONSE_TITLE),
             )
         else:
-            notebook.tab(tab, text=str(tab.nb_text))
+            notebook.tab(tab.frame, text=str(tab.title))
 
     if current_tab is not None:
         notebook.select(current_tab)
@@ -252,12 +263,12 @@ def show(tk_img: TKImages, quote_pack: QuotePack) -> None:
     text['state'] = 'disabled'
 
     # Destroy all the old tabs
-    for tab in TABS.values():
+    for tab in TABS:
         try:
-            notebook.forget(tab)
+            notebook.forget(tab.frame)
         except TclError:
             pass
-        tab.destroy()
+        tab.frame.destroy()
 
     TABS.clear()
 
@@ -349,11 +360,7 @@ def make_tab(
     outer_frame.columnconfigure(0, weight=1)
     outer_frame.rowconfigure(0, weight=1)
 
-    TABS[group_name.token] = outer_frame
-    # We add this attribute so the refresh() method knows all the
-    # tab names
-    outer_frame.nb_text = group_name
-    outer_frame.nb_type = tab_type
+    TABS.append(Tab(tab_type, outer_frame,group_name))
 
     # We need a canvas to make the list scrollable.
     canv = Canvas(
