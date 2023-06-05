@@ -1,5 +1,5 @@
 """Generates Bottomless Pits."""
-from srctools import Matrix, Vec, Keyvalues, VMF, Solid, Side, Output, Angle
+from srctools import FrozenVec, Matrix, Vec, Keyvalues, VMF, Solid, Side, Output, Angle
 import srctools.logger
 import utils
 from precomp import brushLoc, options, rand, conditions
@@ -147,7 +147,7 @@ def make_bottomless_pit(vmf: VMF, max_height):
             trig.remove()
 
     # Potential locations of bordering brushes..
-    wall_pos = set()
+    wall_pos: set[FrozenVec] = set()
 
     side_dirs = [
         (0, -128, 0),   # N
@@ -228,11 +228,11 @@ def make_bottomless_pit(vmf: VMF, max_height):
                 _zero_percent_distance='512',
             )
 
-        wall_pos.update([
-            (pos + off).as_tuple()
+        wall_pos |= {
+            (pos + off).freeze()
             for off in
             side_dirs
-        ])
+        }
 
     if hurt_trig is not None:
         hurt_trig.outputs.append(
@@ -261,7 +261,6 @@ def make_bottomless_pit(vmf: VMF, max_height):
     LOGGER.info('Pit instances: {}', side_types)
 
     for pos in wall_pos:
-        pos = Vec(pos)
         if not brushLoc.POS.lookup_world(pos).is_solid:
             # Not actually a wall here!
             continue
