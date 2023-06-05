@@ -83,7 +83,8 @@ class GenOptions(config.Data, conf_name='Options', palette_stores=False, version
             after_export=after_export,
             log_win_level=log_win_level,
             preserve_fgd=res['preserve_resources'],
-            **res,
+            # Mypy#5382
+            **res,  # type: ignore[arg-type]
         )}
 
     @classmethod
