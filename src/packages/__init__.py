@@ -44,7 +44,7 @@ __all__ = [
     'find_packages', 'no_packages_err', 'load_packages',
 
     # Package objects.
-    'Item', 'StyleVar', 'Elevator', 'EditorSound', 'StyleVPK', 'Signage',
+    'Style', 'Item', 'StyleVar', 'Elevator', 'EditorSound', 'StyleVPK', 'Signage',
     'Skybox', 'Music', 'QuotePack', 'PackList', 'CorridorGroup', 'ConfigGroup',
 
     # Mainly intended for package object code.
