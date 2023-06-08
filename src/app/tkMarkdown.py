@@ -4,6 +4,7 @@ This produces a stream of values, which are fed into richTextBox to display.
 """
 from __future__ import annotations
 
+import types
 from typing import Final, Iterator, Mapping, Sequence, cast
 from contextvars import ContextVar
 import urllib.parse
@@ -12,6 +13,7 @@ import enum
 
 import attrs
 from mistletoe import block_token as btok, span_token as stok, base_renderer
+from mistletoe.token import Token
 import mistletoe
 import srctools.logger
 
@@ -170,30 +172,30 @@ class RenderState:
 no_state = RenderState('')
 state = ContextVar('tk_markdown_state', default=no_state)
 
+if not hasattr(base_renderer.BaseRenderer, '__class_getitem__'):
+    # Patch in generic support.
+    base_renderer.BaseRenderer.__class_getitem__ = lambda item: base_renderer.BaseRenderer  # type: ignore
 
-class TKRenderer(base_renderer.BaseRenderer):
+
+class TKRenderer(base_renderer.BaseRenderer[SingleMarkdown]):
     """Extension needed to extract our list from the tree.
     """
-    def render(self, token: btok.BlockToken) -> SingleMarkdown:
-        """Indicate the correct types for this."""
+    def render(self, token: Token) -> SingleMarkdown:
+        """Check that the state has been fetched."""
         assert state.get() is not no_state
         return super().render(token)
 
-    def render_inner(self, token: stok.SpanToken | btok.BlockToken) -> SingleMarkdown:
-        """
-        Recursively renders child tokens. Joins the rendered
-        strings with no space in between.
+    def render_inner(self, token: Token) -> SingleMarkdown:
+        """Recursively renders child tokens.
 
-        If newlines / spaces are needed between tokens, add them
-        in their respective templates, or override this function
-        in the renderer subclass, so that whitespace won't seem to
-        appear magically for anyone reading your program.
-
-        Arguments:
-            token: a branch node who has children attribute.
+        We merge together adjacient segments, to tidy up the block list.
         """
         blocks: list[Block] = []
-        # Merge together adjacent text segments.
+        if not hasattr(token, 'children'):
+            return super().render_inner(token)
+        child: Token
+
+        # Merge together adjacent text segments
         for child in token.children:
             for data in self.render(child):
                 if isinstance(data, TextSegment) and blocks:
@@ -288,12 +290,14 @@ class TKRenderer(base_renderer.BaseRenderer):
         )
 
     def render_paragraph(self, token: btok.Paragraph) -> SingleMarkdown:
+        """Render a text paragraph."""
         if state.get().list_stack:  # Collapse together.
             return _merge(self.render_inner(token), MarkdownData.text('\n'))
         else:
             return _merge(MarkdownData.text('\n'), self.render_inner(token), MarkdownData.text('\n'))
 
     def render_raw_text(self, token: stok.RawText) -> SingleMarkdown:
+        """Render raw text."""
         return MarkdownData.text(token.content)
 
     def render_table(self, token: btok.Table) -> SingleMarkdown:
