@@ -70,8 +70,8 @@ MultiCreateNoConfFunc: TypeAlias = Callable[
 ]
 
 # The functions registered for each.
-_UI_IMPL_SINGLE: dict[WidgetType, SingleCreateFunc] = {}
-_UI_IMPL_MULTI: dict[WidgetType, MultiCreateFunc] = {}
+_UI_IMPL_SINGLE: Dict[WidgetType, SingleCreateFunc] = {}
+_UI_IMPL_MULTI: Dict[WidgetType, MultiCreateFunc] = {}
 
 INF = TransToken.untranslated('∞')
 TIMER_NUM_TRANS: Dict[TimerNum, TransToken] = {

@@ -2,7 +2,7 @@
 General app configuration options, controlled by the options window.
 """
 from enum import Enum
-from typing import Any, Dict
+from typing import Any, Dict, List
 from typing_extensions import TypeGuard
 
 import attrs
@@ -169,7 +169,7 @@ def _is_bool_attr(field: object) -> TypeGuard['attrs.Attribute[bool]']:
     return isinstance(field, attrs.Attribute) and (field.type is bool or field.type == 'bool')
 
 
-gen_opts_bool: list['attrs.Attribute[bool]'] = [
+gen_opts_bool: List['attrs.Attribute[bool]'] = [
     field
     for field in attrs.fields(GenOptions)
     if _is_bool_attr(field)

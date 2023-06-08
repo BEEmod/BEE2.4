@@ -29,9 +29,9 @@ async def parse_template(pak_id: str, file: File) -> None:
         del props
         conf_ents = list(vmf.by_class['bee2_template_conf'])
         if len(conf_ents) > 1:
-            raise KeyValError(f'Multiple configuration entities in template!', path, None)
+            raise KeyValError('Multiple configuration entities in template!', path, None)
         elif not conf_ents:
-            raise KeyValError(f'No configration entity for template!', path, None)
+            raise KeyValError('No configration entity for template!', path, None)
         temp_id = conf_ents[0]['template_id']
         if not temp_id:
             raise KeyValError('No template ID for template!', path, None)

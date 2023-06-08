@@ -381,6 +381,7 @@ def _bind_event_handler(bind_func: Callable[[tk.Misc, EventFunc, bool], None]) -
     This allows calling directly, or decorating a function with just wid and add
     attributes.
     """
+    @functools.wraps(bind_func)
     def deco(wid: tk.Misc, func: Optional[EventFunc]=None, *, add: bool=False) -> Optional[Callable]:
         """Decorator or normal interface, func is optional to be a decorator."""
         if func is None:
@@ -392,7 +393,7 @@ def _bind_event_handler(bind_func: Callable[[tk.Misc, EventFunc, bool], None]) -
         else:
             # Normally, call directly
             return bind_func(wid, func, add)
-    return functools.update_wrapper(cast(_Binder, deco), bind_func)
+    return cast(_Binder, deco)
 
 if utils.MAC:
     # On OSX, make left-clicks switch to a right-click when control is held.

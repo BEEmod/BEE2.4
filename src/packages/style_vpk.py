@@ -4,8 +4,9 @@ This allows altering the in-editor wall textures, as well as a few others.
 """
 from __future__ import annotations
 
-import re
 from typing import Optional, TYPE_CHECKING
+from typing_extensions import Self
+import re
 import os
 import shutil
 
@@ -53,7 +54,7 @@ class StyleVPK(PakObject):
         self.dir = directory
 
     @classmethod
-    async def parse(cls, data: ParseData) -> 'StyleVPK':
+    async def parse(cls, data: ParseData) -> Self:
         """Read the VPK file from the package."""
         vpk_name = data.info['filename']
 
@@ -83,8 +84,8 @@ class StyleVPK(PakObject):
 
         try:
             dest_folder = StyleVPK.clear_vpk_files(exp_data.game)
-        except PermissionError:
-            raise NoVPKExport()  # We can't edit the VPK files - P2 is open..
+        except PermissionError as exc:
+            raise NoVPKExport() from exc  # We can't edit the VPK files - P2 is open..
 
         if exp_data.game.steamID == utils.STEAM_IDS['PORTAL2']:
             # In Portal 2, we make a dlc3 folder - this changes priorities,
