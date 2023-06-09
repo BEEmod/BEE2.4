@@ -5,7 +5,6 @@ If PyGame fails to load, all fx() calls will fail silently.
 (Sounds are not critical to the app, so they just won't play.)
 """
 from __future__ import annotations
-from tkinter import Event
 from typing import IO, Optional, Callable
 import os
 import functools
@@ -29,7 +28,7 @@ __all__ = [
 
 LOGGER = srctools.logger.get_logger(__name__)
 SAMPLE_WRITE_PATH = utils.conf_location('music_sample/music')
-# Nursery to hold sound-related tasks. We can cancel this to shutdown sound logic.
+# Nursery to hold sound-related tasks. We can cancel this to shut down sound logic.
 _nursery: trio.Nursery | None = None
 
 SOUNDS: dict[str, str] = {
@@ -269,7 +268,7 @@ class SamplePlayer:
         """Is the player currently playing sounds?"""
         return self.player is not None
 
-    def play_sample(self, _: Event=None) -> None:
+    def play_sample(self, _: object=None) -> None:
         """Play a sample of music.
 
         If music is being played it will be stopped instead.
