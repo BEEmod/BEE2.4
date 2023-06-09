@@ -239,9 +239,7 @@ def freeze_enum_props(cls: Type[EnumT]) -> Type[EnumT]:
         data = {}
         data_exc: dict[EnumT, tuple[Type[BaseException], tuple]] = {}
 
-        exc: Exception
         enum: EnumT
-        tb: types.TracebackType | None
         for enum in cls:
             # Put the class into the globals, so it can refer to itself.
             try:
