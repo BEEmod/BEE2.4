@@ -67,7 +67,7 @@ class CollideType(Flag):
             try:
                 coll |= cls[word.upper()]
             except KeyError:
-                raise ValueError(f'Unknown collide type "{word}"!')
+                raise ValueError(f'Unknown collide type "{word}"!') from None
         return coll
 
 # The types we want to write into vmfs.
@@ -140,7 +140,7 @@ class BBox:
                 # None of these should be Vec.
                 min_x, min_y, min_z, max_x, max_y, max_z = map(round, args)  # type: ignore
             except (TypeError, ValueError):
-                raise TypeError('6 numbers must be supplied!')
+                raise TypeError(f'6 numbers must be supplied, not {args!r}') from None
         elif len(args) == 2:
             point1, point2 = args
             if isinstance(point1, (Vec, FrozenVec)) and isinstance(point2, (Vec, FrozenVec)):

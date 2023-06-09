@@ -90,8 +90,9 @@ Used software / libraries in the BEE2.4:
 * [pygtrie][pygtrie] `{pygtrie_ver}` by Michal Nazarewicz
 * [TKinter][tcl] /[Tcl][tcl] `{tk_ver}`
 * [Python][python] `{py_ver}`
-* [FFmpeg][ffmpeg] licensed under the [LGPLv2.1](http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html). Binaries are built via [sudo-nautilus][ffmpeg-bin].
+* [FFmpeg][ffmpeg] licensed under the [LGPLv2.1][LGPL]. Binaries are built via [sudo-nautilus][ffmpeg-bin].
 
+[LGPL]: http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html
 [pyglet]: https://pyglet.org/
 [avbin]: https://avbin.github.io/AVbin/Home/Home.html
 [pillow]: http://pillow.readthedocs.io
@@ -510,7 +511,7 @@ async def open_url(url_key: str) -> None:
                 TransToken.ui('Failed to download list of URLs. Help menu links will not function. Check your Internet?'),
             )
             return
-        except (IOError, ValueError) as exc:
+        except (OSError, ValueError) as exc:
             LOGGER.error('Failed to parse help url file:', exc_info=exc)
             tk_tools.showerror(
                 TransToken.ui('BEEMOD2 - Failed to open URL'),

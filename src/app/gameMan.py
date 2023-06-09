@@ -36,6 +36,7 @@ import srctools.logger
 import srctools.fgd
 import trio
 import attrs
+from typing_extensions import Self
 
 from BEE2_config import ConfigFile
 from app import backup, tk_tools, resource_gen, TK_ROOT, DEV_MODE, background_run
@@ -313,7 +314,7 @@ class Game:
     exported_style: Optional[str] = None
 
     @classmethod
-    def parse(cls, gm_id: str, config: ConfigFile) -> 'Game':
+    def parse(cls, gm_id: str, config: ConfigFile) -> Self:
         """Parse out the given game ID from the config file."""
         steam_id = config.get_val(gm_id, 'SteamID', '<none>')
         if not steam_id.isdigit():

@@ -1,10 +1,11 @@
 """Implements a dynamic item allowing placing the various test chamber signages."""
 from __future__ import annotations
-from io import BytesIO
 from typing import NamedTuple, Optional
+from typing_extensions import Self
+
+from io import BytesIO
 
 from PIL import Image
-
 from srctools.vtf import ImageFormats, VTF, VTFFlags
 from srctools import Keyvalues
 import srctools.logger
@@ -50,7 +51,7 @@ class SignageLegend(PakObject):
         self.blank = blank
 
     @classmethod
-    async def parse(cls, data: ParseData) -> 'SignageLegend':
+    async def parse(cls, data: ParseData) -> Self:
         """Parse a signage legend."""
         if 'blank' in data.info:
             blank = ImgHandle.parse(data.info, data.pak_id, CELL_SIZE, CELL_SIZE, subkey='blank')
@@ -105,7 +106,7 @@ class Signage(PakObject, allow_mult=True, needs_foreground=True):
                 try:
                     prop = next(data.info.find_all('styles', prop.value))
                 except StopIteration:
-                    raise ValueError(f'No style <{prop.value}>!')
+                    raise ValueError(f'No style <{prop.value}>!') from None
 
             world_tex = prop['world', '']
             overlay_tex = prop['overlay', '']

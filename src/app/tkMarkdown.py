@@ -4,7 +4,6 @@ This produces a stream of values, which are fed into richTextBox to display.
 """
 from __future__ import annotations
 
-import types
 from typing import Final, Iterator, Mapping, Sequence, cast
 from contextvars import ContextVar
 import urllib.parse

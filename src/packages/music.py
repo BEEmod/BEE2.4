@@ -5,6 +5,7 @@ from typing import Iterator
 
 from srctools import Keyvalues
 import srctools.logger
+from typing_extensions import Self
 
 from consts import MusicChannel
 from app import lazy_conf
@@ -138,7 +139,7 @@ class Music(PakObject, needs_foreground=True, style_suggest_key='music'):
             synch_tbeam=synch_tbeam,
         )
 
-    def add_over(self, override: 'Music') -> None:
+    def add_over(self, override: Self) -> None:
         """Add the additional vbsp_config commands to ourselves."""
         self.config = lazy_conf.concat(self.config, override.config)
         self.selitem_data += override.selitem_data

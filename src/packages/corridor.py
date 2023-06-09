@@ -266,7 +266,10 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                         corr_list.append(corridor)
                         had_legacy = True
                     if had_legacy:
-                        LOGGER.warning('Legacy corridor definition for {}:{}_{}!', style_id, mode.value, direction.value)
+                        LOGGER.warning(
+                            'Legacy corridor definition for {}:{}_{}!',
+                            style_id, mode.value, direction.value,
+                        )
 
         # Apply inheritance.
         for corridor_group in packset.all_obj(cls):
@@ -274,7 +277,10 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                 try:
                     parent_group = packset.obj_by_id(cls, inherit)
                 except KeyError:
-                    LOGGER.warning('Corridor Group "{}" is trying to inherit from nonexistent group "{}"!', corridor_group.id, inherit)
+                    LOGGER.warning(
+                        'Corridor Group "{}" is trying to inherit from nonexistent group "{}"!',
+                        corridor_group.id, inherit,
+                    )
                     continue
                 if parent_group.inherit:
                     # Disable recursive inheritance for simplicity, can add later if it's actually
@@ -343,7 +349,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
         try:
             group = exp_data.packset.obj_by_id(cls, style_id)
         except KeyError:
-            raise AssertionError(f'No corridor group for style "{style_id}"!')
+            raise Exception(f'No corridor group for style "{style_id}"!') from None
 
         export: ExportedConf = {}
         blank = Config()

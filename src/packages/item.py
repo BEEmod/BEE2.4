@@ -15,6 +15,7 @@ import attrs
 import trio
 from srctools import FileSystem, Keyvalues, VMF, logger, EmptyMapping
 from srctools.tokenizer import Tokenizer, Token
+from typing_extensions import Self
 
 import config.gen_opts
 from app import tkMarkdown, img, lazy_conf, DEV_MODE
@@ -300,7 +301,7 @@ class ItemVariant:
                 raise Exception(
                     f'Invalid index "{item.name}" when modifying '
                     f'editoritems for {source}'
-                )
+                ) from None
             subtype_item.subtypes = subtype_item.subtypes.copy()
             subtype_item.subtypes[subtype_ind] = subtype = copy.deepcopy(subtype)
 
@@ -606,7 +607,7 @@ class Item(PakObject, needs_foreground=True):
             }
         )
 
-    def add_over(self, override: 'Item') -> None:
+    def add_over(self, override: Self) -> None:
         """Add the other item data to ourselves."""
         # Copy over all_conf always.
         self.all_conf = lazy_conf.concat(self.all_conf, override.all_conf)
@@ -708,14 +709,14 @@ class Item(PakObject, needs_foreground=True):
                                 InstCount(FSPath(ant_conf.find_block('check')['inst']))
                             ]
                         except LookupError:
-                            raise ValueError('No "inst" defined for checkmarks in antline configuration!')
+                            raise ValueError('No "inst" defined for checkmarks in antline configuration!') from None
                     if 'timer' in ant_conf:
                         try:
                             timer_item.instances = [
                                 InstCount(FSPath(ant_conf.find_block('timer')['inst']))
                             ]
                         except LookupError:
-                            raise ValueError('No "inst" defined for timers in antline configuration!')
+                            raise ValueError('No "inst" defined for timers in antline configuration!') from None
 
     def _get_export_data(
         self,
@@ -855,7 +856,7 @@ async def parse_item_folder(
         try:
             f = filesystem[path].open_str()
         except FileNotFoundError as err:
-            raise IOError(f'"{pak_id}:items/{fold}" not valid! Folder likely missing! ') from err
+            raise OSError(f'"{pak_id}:items/{fold}" not valid! Folder likely missing! ') from err
         with f:
             tok = Tokenizer(f, path)
             for tok_type, tok_value in tok:

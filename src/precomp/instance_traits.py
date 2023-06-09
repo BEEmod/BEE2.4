@@ -3,10 +3,9 @@ from typing import List, MutableMapping, Optional, Dict, Set, Union
 from weakref import WeakKeyDictionary
 
 import attrs
-from srctools import Entity, VMF, Vec
+from srctools import Entity, VMF
 import srctools.logger
 
-from precomp import options
 from precomp.instanceLocs import ITEM_FOR_FILE
 from precomp.collisions import Collisions
 from editoritems import Item, ItemClass

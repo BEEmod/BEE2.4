@@ -8,10 +8,7 @@ from srctools import Keyvalues, Vec, parse_vec_str
 from BEE2_config import ConfigFile
 import srctools.logger
 
-from typing import (
-    Union, Tuple, TypeVar, Type, Optional, Iterator, Any, TextIO, Dict, cast,
-    overload,
-)
+from typing import Union, Tuple, TypeVar, Type, Optional, Iterator, Any, TextIO, Dict, overload
 
 
 LOGGER = srctools.logger.get_logger(__name__)

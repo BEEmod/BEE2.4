@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw
 import colorsys
 
 from srctools.vtf import VTF, ImageFormats

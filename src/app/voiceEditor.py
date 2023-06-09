@@ -3,7 +3,7 @@ import functools
 import itertools
 from decimal import Decimal
 from enum import Enum
-from typing import Iterator, List, Tuple, TypedDict, Dict, Optional, Any
+from typing import Iterator, List, Tuple, TypedDict, Dict, Optional
 from configparser import SectionProxy
 
 from tkinter import *

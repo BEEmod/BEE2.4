@@ -51,7 +51,7 @@ if utils.WIN:
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
             'BEEMOD.application',
         )
-    except (AttributeError, WindowsError, ValueError):
+    except (AttributeError, OSError, ValueError):
         pass  # It's not too bad if it fails.
 
     LISTBOX_BG_SEL_COLOR = '#0078D7'
