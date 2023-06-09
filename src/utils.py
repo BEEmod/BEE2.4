@@ -117,7 +117,8 @@ except ImportError:
 else:
     FROZEN = True
     # This special attribute is set by PyInstaller to our folder.
-    _INSTALL_ROOT = Path(getattr(sys, '_MEIPASS'))
+    # noinspection PyProtectedMember
+    _INSTALL_ROOT = Path(sys._MEIPASS)
     # Check if this was produced by above
     DEV_MODE = '#' in BEE_VERSION
 
@@ -546,7 +547,7 @@ class Result(Generic[ResultT]):
         /, *,
         cancellable: bool = False,
         limiter: trio.CapacityLimiter | None = None,
-    ) -> 'Result[SyncResultT]': ...
+    ) -> Result[SyncResultT]: ...
 
     @classmethod
     @overload
@@ -558,7 +559,7 @@ class Result(Generic[ResultT]):
         /, *,
         cancellable: bool = False,
         limiter: trio.CapacityLimiter | None = None,
-    ) -> 'Result[SyncResultT]': ...
+    ) -> Result[SyncResultT]: ...
 
     @classmethod
     @overload
@@ -570,7 +571,7 @@ class Result(Generic[ResultT]):
         /, *,
         cancellable: bool = False,
         limiter: trio.CapacityLimiter | None = None,
-    ) -> 'Result[SyncResultT]': ...
+    ) -> Result[SyncResultT]: ...
 
     @classmethod
     @overload
@@ -582,7 +583,7 @@ class Result(Generic[ResultT]):
         /, *,
         cancellable: bool = False,
         limiter: trio.CapacityLimiter | None = None,
-    ) -> 'Result[SyncResultT]': ...
+    ) -> Result[SyncResultT]: ...
 
     @classmethod
     @overload
@@ -594,7 +595,7 @@ class Result(Generic[ResultT]):
         /, *,
         cancellable: bool = False,
         limiter: trio.CapacityLimiter | None = None,
-    ) -> 'Result[SyncResultT]': ...
+    ) -> Result[SyncResultT]: ...
 
     @classmethod
     @overload
@@ -606,7 +607,7 @@ class Result(Generic[ResultT]):
         /, *,
         cancellable: bool = False,
         limiter: trio.CapacityLimiter | None = None,
-    ) -> 'Result[SyncResultT]': ...
+    ) -> Result[SyncResultT]: ...
 
     @classmethod
     def sync(
@@ -619,7 +620,7 @@ class Result(Generic[ResultT]):
         /, *args: Any,
         cancellable: bool = False,
         limiter: trio.CapacityLimiter | None = None,
-    ) -> 'Result[SyncResultT]':
+    ) -> Result[SyncResultT]:
         """Wrap a sync task, using to_thread.run_sync()."""
         async def task() -> SyncResultT:
             """Run in a thread."""
