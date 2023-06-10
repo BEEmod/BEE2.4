@@ -2,7 +2,7 @@ attrs >= 22.1.0
 mistletoe >= 1.0.1
 Pillow >= 9.4.0
 pyglet == 1.5.18
-PyInstaller >= 5.2.0
+PyInstaller >= 5.12.0
 pygtrie >= 2.4.0
 babel >= 2.12.1
 trio >= 0.22.0
