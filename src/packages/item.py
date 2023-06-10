@@ -399,11 +399,14 @@ class ItemVariant:
                 editor[0].cust_instances[inst_name] = inst_data.inst
 
         # Override IO commands.
-        try:
-            io_props = kv.find_key('IOConf')
-        except LookupError:
-            pass
-        else:
+        io_props: Keyvalues | None = None
+        for name in ['IOConfig', 'IOConf', 'Inputs', 'Outputs']:
+            try:
+                io_props = kv.find_key(name)
+                break
+            except LookupError:
+                pass
+        if io_props is not None:
             if len(editor) != 1:
                 raise ValueError(
                     'Cannot specify I/O for multiple '
