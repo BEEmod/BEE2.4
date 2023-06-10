@@ -18,7 +18,7 @@
 ### UCP-Relevant Enhancements:
 * Added an `Inherit` option to Corridor Groups. This specifies the ID of another style, causing all
   corridors to be copied from that other style.
-* Make `addOverlay` properly permit options to use `$fixup` variables.
+* Make several results properly permit options to use `$fixup` variables: `addOverlay`, `changeInstance`, `setKey`, `localTarget`.
 * `properties.txt` for items is now optional, since most of these options can be set elsewhere.
 * `PosIsSolid` and `ReadSurfType` now have a `debug` option. When "Developer Mode" is enabled,
   `info_target`s are generated to mark the locations being sampled, and the contents of this field

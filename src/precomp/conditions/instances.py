@@ -205,7 +205,7 @@ def flag_offset_distance(inst: Entity, flag: Keyvalues) -> bool:
 @make_result('rename', 'changeInstance')
 def res_change_instance(inst: Entity, res: Keyvalues) -> None:
     """Set the file to a value."""
-    inst['file'] = filename = instanceLocs.resolve_one(res.value, error=True)
+    inst['file'] = filename = instanceLocs.resolve_one(inst.fixup.substitute(res.value), error=True)
     conditions.ALL_INST.add(filename.casefold())
 
 
@@ -223,7 +223,11 @@ def res_set_key(inst: Entity, res: Keyvalues) -> None:
 
     The name and value should be separated by a space.
     """
-    key, value = inst.fixup.substitute(res.value, allow_invert=True).split(' ', 1)
+    data = inst.fixup.substitute(res.value, allow_invert=True)
+    try:
+        key, value = data.split(' ', 1)
+    except ValueError:
+        raise ValueError(f'setKey requires a space-separated name and value, got {data!r}!') from None
     inst[key] = value
     if key.casefold() == 'file':
         LOGGER.warning('Use changeInstance for setting instance filenames, not setKey.')
@@ -302,12 +306,13 @@ def res_local_targetname(inst: Entity, res: Keyvalues) -> None:
     targetnames in the parameter.
     The result takes the form `<prefix><instance name>[-<local>]<suffix>`.
     """
-    local_name = res['name', '']
+    local_name = inst.fixup.substitute(res['name', ''])
+    prefix = inst.fixup.substitute(res['prefix', ''])
+    suffix = inst.fixup.substitute(res['suffix', ''])
+    name = inst['targetname', '']
     if local_name:
-        name = inst['targetname', ''] + '-' + local_name
-    else:
-        name = inst['targetname', '']
-    inst.fixup[res['resultVar']] = res['prefix', ''] + name + res['suffix', '']
+        name = f'{name}-{local_name}'
+    inst.fixup[res['resultVar']] = f"{prefix}{name}{suffix}"
 
 
 @make_result('replaceInstance')
@@ -323,7 +328,7 @@ def res_replace_instance(vmf: VMF, inst: Entity, res: Keyvalues) -> None:
     origin = Vec.from_str(inst['origin'])
     angles = Angle.from_str(inst['angles'])
 
-    if not res.bool('keep_instance'):
+    if not conv_bool(inst.fixup.substitute(res['keep_instance', '0'], allow_invert=True)):
         inst.remove()  # Do this first to free the ent ID, so the new ent has
         # the same one.
 
