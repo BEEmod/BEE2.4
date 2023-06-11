@@ -54,13 +54,13 @@ async def init_app() -> None:
     gameMan.scan_music_locs()
 
     LOGGER.info('Loading Packages...')
-    packset = packages.LOADED
+    packset = packages.get_loaded_packages()
     packset.has_mel_music = gameMan.MUSIC_MEL_VPK is not None
     packset.has_tag_music = gameMan.MUSIC_TAG_LOC is not None
     async with trio.open_nursery() as nurs:
         nurs.start_soon(
             packages.load_packages,
-            packages.LOADED,
+            packset,
             list(BEE2_config.get_package_locs()),
             loadScreen.main_loader,
         )

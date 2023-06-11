@@ -550,14 +550,15 @@ class Game:
             return False
 
         # Check lengths, to ensure we re-extract if packages were removed.
-        if len(packages.LOADED.packages) != len(self.mod_times):
+        loaded = packages.get_loaded_packages()
+        if len(loaded.packages) != len(self.mod_times):
             LOGGER.info('Need to extract - package counts inconsistent!')
             return True
 
         return any(
             pack.is_stale(self.mod_times.get(pack_id.casefold(), 0))
             for pack_id, pack in
-            packages.LOADED.packages.items()
+            loaded.packages.items()
         )
 
     def refresh_cache(self, already_copied: set[str]) -> None:
@@ -567,8 +568,9 @@ class Game:
         indicate which files should remain. It is the full path to the files.
         """
         screen_func = export_screen.step
+        packset = packages.get_loaded_packages()
 
-        for pack in packages.LOADED.packages.values():
+        for pack in packset.packages.values():
             if not pack.enabled:
                 continue
             for file in pack.fsys.walk_folder('resources'):
@@ -619,7 +621,7 @@ class Game:
 
         # Save the new cache modification date.
         self.mod_times.clear()
-        for pack_id, pack in packages.LOADED.packages.items():
+        for pack_id, pack in packset.packages.items():
             self.mod_times[pack_id.casefold()] = pack.get_modtime()
         self.save()
         CONFIG.save_check()
@@ -639,9 +641,10 @@ class Game:
 
     async def export(
         self,
+        packset: packages.PackagesSet,
         style: packages.Style,
         selected_objects: dict[Type[packages.PakObject], Any],
-        should_refresh=False,
+        should_refresh: bool = False,
     ) -> tuple[bool, bool]:
         """Generate the editoritems.txt and vbsp_config.
 
@@ -721,7 +724,6 @@ class Game:
             all_items = style.items.copy()
             renderables = style.renderables.copy()
             resources: dict[str, bytes] = {}
-            packset = packages.LOADED  # TODO
 
             export_screen.step('EXP', 'style-conf')
 

@@ -669,7 +669,7 @@ async def load_packages(packset: packages.PackagesSet, tk_img: TKImages) -> None
 
 def current_style() -> packages.Style:
     """Return the currently selected style."""
-    return packages.LOADED.obj_by_id(packages.Style, selected_style)
+    return packages.get_loaded_packages().obj_by_id(packages.Style, selected_style)
 
 
 def reposition_panes() -> None:
@@ -758,12 +758,14 @@ async def export_editoritems(pal_ui: paletteUI.PaletteUI, bar: MenuBar) -> None:
             pal_by_item.setdefault(item_id.casefold(), {})[subkey] = pos
 
         conf = config.APP.get_cur_conf(config.gen_opts.GenOptions)
+        packset = packages.get_loaded_packages()
 
         success, vpk_success = await gameMan.selected_game.export(
+            packset,
             style=chosen_style,
             selected_objects={
                 # Specify the 'chosen item' for each object type
-                packages.Music: music_conf.export_data(packages.LOADED),
+                packages.Music: music_conf.export_data(packset),
                 packages.Skybox: skybox_win.chosen_id,
                 packages.QuotePack: voice_win.chosen_id,
                 packages.Elevator: elev_win.chosen_id,
@@ -1117,7 +1119,7 @@ async def init_option(
     localisation.set_text(music_frame, TransToken.ui('Music: '))
 
     async with trio.open_nursery() as nursery:
-        nursery.start_soon(music_conf.make_widgets, packages.LOADED, music_frame, pane)
+        nursery.start_soon(music_conf.make_widgets, packages.get_loaded_packages(), music_frame, pane)
     suggest_windows[packages.Music] = music_conf.WINDOWS[music_conf.MusicChannel.BASE]
 
     def suggested_style_set() -> None:
@@ -1151,7 +1153,7 @@ async def init_option(
     def configure_voice() -> None:
         """Open the voiceEditor window to configure a Quote Pack."""
         try:
-            chosen_voice = packages.LOADED.obj_by_id(packages.QuotePack, voice_win.chosen_id)
+            chosen_voice = packages.get_loaded_packages().obj_by_id(packages.QuotePack, voice_win.chosen_id)
         except KeyError:
             pass
         else:
@@ -1561,7 +1563,7 @@ async def init_windows(tk_img: TKImages) -> None:
         tool_col=11,
     )
     async with trio.open_nursery() as nurs:
-        corridor = corridor_selector.Selector(packages.LOADED, tk_img)
+        corridor = corridor_selector.Selector(packages.get_loaded_packages(), tk_img)
         nurs.start_soon(init_option, windows['opt'], tk_img, export, corridor)
     async with trio.open_nursery() as nurs:
         nurs.start_soon(corridor.refresh)
@@ -1677,8 +1679,9 @@ async def init_windows(tk_img: TKImages) -> None:
 
     async def enable_export() -> None:
         """Enable exporting only after all packages are loaded."""
+        packset = packages.get_loaded_packages()
         for cls in packages.OBJ_TYPES.values():
-            await packages.LOADED.ready(cls).wait()
+            await packset.ready(cls).wait()
         UI['pal_export'].state(('!disabled',))
         menu_bar.set_export_allowed(True)
 
@@ -1717,7 +1720,7 @@ async def init_windows(tk_img: TKImages) -> None:
             win.set_suggested(style_obj.suggested[sugg_cls])
         suggested_refresh()
         StyleVarPane.refresh(style_obj)
-        corridor.load_corridors(packages.LOADED)
+        corridor.load_corridors(packages.get_loaded_packages())
         background_run(corridor.refresh)
 
     style_win.callback = style_select_callback

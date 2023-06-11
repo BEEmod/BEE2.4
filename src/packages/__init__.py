@@ -40,7 +40,7 @@ __all__ = [
     'SelitemData', 'NoVPKExport',
     'LegacyCorr', 'LEGACY_CORRIDORS',
     'CLEAN_PACKAGE',
-    'PakObject', 'PackagesSet', 'LOADED',
+    'PakObject', 'PackagesSet', 'get_loaded_packages',
     'find_packages', 'no_packages_err', 'load_packages',
 
     # Package objects.
@@ -331,13 +331,13 @@ class PakObject:
     def all(cls) -> Collection[Self]:
         """Get the list of objects parsed."""
         warnings.warn('Make this local!', DeprecationWarning, stacklevel=2)
-        return LOADED.all_obj(cls)
+        return get_loaded_packages().all_obj(cls)
 
     @classmethod
     def by_id(cls, object_id: str) -> Self:
         """Return the object with a given ID."""
         warnings.warn('Make this local!', DeprecationWarning, stacklevel=2)
-        return LOADED.obj_by_id(cls, object_id)
+        return get_loaded_packages().obj_by_id(cls, object_id)
 
 
 def reraise_keyerror(err: NoKeyError | IndexError, obj_id: str) -> NoReturn:
@@ -465,8 +465,14 @@ class PackagesSet:
             obj.pak_name = pak_name
 
 
-# Global loaded packages. TODO: This should become local.
-LOADED = PackagesSet()
+def get_loaded_packages() -> PackagesSet:
+    """The current set of loaded packages.
+
+    TODO: Try to make this local wherever possible?
+    """
+    return _LOADED
+
+_LOADED = PackagesSet()
 
 
 async def find_packages(nursery: trio.Nursery, packset: PackagesSet, pak_dir: Path) -> None:

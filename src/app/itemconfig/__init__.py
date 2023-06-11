@@ -279,7 +279,7 @@ async def make_pane(
     )
 
     ordered_conf: List[ConfigGroup] = sorted(
-        packages.LOADED.all_obj(ConfigGroup),
+        packages.get_loaded_packages().all_obj(ConfigGroup),
         key=lambda grp: str(grp.name),
     )
     ordered_conf.insert(0, STYLEVAR_GROUP)
@@ -338,7 +338,7 @@ async def make_pane(
     canvas_frame.rowconfigure(1, weight=1)
 
     stylevar_frame = ttk.Frame(canvas_frame)
-    await StyleVarPane.make_stylevar_pane(stylevar_frame, packages.LOADED, update_item_vis)
+    await StyleVarPane.make_stylevar_pane(stylevar_frame, packages.get_loaded_packages(), update_item_vis)
 
     loading_text = ttk.Label(canvas_frame)
     localisation.set_text(loading_text, TransToken.ui('Loading...'))

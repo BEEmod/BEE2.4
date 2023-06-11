@@ -44,6 +44,7 @@ def export_data() -> List[Tuple[str, str]]:
 
 async def apply_config(data: Layout) -> None:
     """Apply saved signage info to the UI."""
+    packset = packages.get_loaded_packages()
     for timer in SIGN_IND:
         try:
             slot = SLOTS_SELECTED[timer]
@@ -54,7 +55,7 @@ async def apply_config(data: Layout) -> None:
         value = data.signs.get(timer, '')
         if value:
             try:
-                slot.contents = packages.LOADED.obj_by_id(Signage, value)
+                slot.contents = packset.obj_by_id(Signage, value)
             except KeyError:
                 LOGGER.warning('No signage with id "{}"!', value)
         else:
@@ -64,7 +65,8 @@ async def apply_config(data: Layout) -> None:
 def style_changed(new_style: Style) -> None:
     """Update the icons for the selected signage."""
     icon: Optional[img.Handle]
-    for sign in packages.LOADED.all_obj(Signage):
+    packset = packages.get_loaded_packages()
+    for sign in packset.all_obj(Signage):
         for potential_style in new_style.bases:
             try:
                 icon = sign.styles[potential_style.id.upper()].icon
@@ -145,18 +147,20 @@ async def init_widgets(master: tk.Widget, tk_img: TKImages) -> Optional[tk.Widge
 
         localisation.set_text(name_label, TRANS_SIGN_NAME.format(name=hover_sign.name))
 
+        packset = packages.get_loaded_packages()
+
         sng_left = hover_sign.dnd_icon
         try:
-            sng_right = packages.LOADED.obj_by_id(Signage, 'SIGN_ARROW').dnd_icon
+            sng_right = packset.obj_by_id(Signage, 'SIGN_ARROW').dnd_icon
         except KeyError:
             LOGGER.warning('No arrow signage defined!')
             sng_right = IMG_BLANK
         try:
-            dbl_left = packages.LOADED.obj_by_id(Signage, hover_sign.prim_id or '').dnd_icon
+            dbl_left = packset.obj_by_id(Signage, hover_sign.prim_id or '').dnd_icon
         except KeyError:
             dbl_left = hover_sign.dnd_icon
         try:
-            dbl_right = packages.LOADED.obj_by_id(Signage, hover_sign.sec_id or '').dnd_icon
+            dbl_right = packset.obj_by_id(Signage, hover_sign.sec_id or '').dnd_icon
         except KeyError:
             dbl_right = IMG_BLANK
 
@@ -180,6 +184,7 @@ async def init_widgets(master: tk.Widget, tk_img: TKImages) -> Optional[tk.Widge
     drag_man.event_bus.register(dragdrop.Event.HOVER_ENTER, dragdrop.Slot[Signage], on_hover)
     drag_man.event_bus.register(dragdrop.Event.HOVER_EXIT, dragdrop.Slot[Signage], on_leave)
 
+    load_packset = packages.get_loaded_packages()
     for i in SIGN_IND:
         SLOTS_SELECTED[i] = slot = drag_man.slot_target(
             frame_selected,
@@ -191,7 +196,7 @@ async def init_widgets(master: tk.Widget, tk_img: TKImages) -> Optional[tk.Widge
         prev_id = DEFAULT_IDS.get(i, '')
         if prev_id:
             try:
-                slot.contents = packages.LOADED.obj_by_id(Signage, prev_id)
+                slot.contents = load_packset.obj_by_id(Signage, prev_id)
             except KeyError:
                 LOGGER.warning('Missing sign id: {}', prev_id)
 

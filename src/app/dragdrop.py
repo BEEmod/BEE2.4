@@ -826,7 +826,7 @@ async def test() -> None:
             pack_nursery.start_soon(
                 packages.find_packages,
                 pack_nursery,
-                packages.LOADED,
+                packages.get_loaded_packages(),
                 loc,
             )
     background_run(img.init, packages.PACKAGE_SYS,  TK_IMG)

@@ -522,7 +522,7 @@ async def test() -> None:
     background_run(img.init, Dict[str, srctools.FileSystem](), TK_IMG)
     background_run(sound.sound_task)
 
-    test_sel = Selector(packages.LOADED, TK_IMG)
+    test_sel = Selector(packages.get_loaded_packages(), TK_IMG)
     config.APP.read_file()
     test_sel.show()
     with trio.CancelScope() as scope:

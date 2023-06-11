@@ -339,7 +339,7 @@ async def init_gen_tab(
         """Set the language when the combo box is changed"""
         if lang_order:
             new_lang = lang_order[lang_box.current()]
-            await localisation.load_aux_langs(gameMan.all_games, packages.LOADED, new_lang)
+            await localisation.load_aux_langs(gameMan.all_games, packages.get_loaded_packages(), new_lang)
             if lang_box.winfo_viewable():
                 _load_langs()
 
@@ -555,7 +555,7 @@ async def init_dev_tab(f: ttk.Frame) -> None:
 
     async def rebuild_pack_langs() -> None:
         """Rebuild package languages, then notify the user."""
-        await localisation.rebuild_package_langs(packages.LOADED)
+        await localisation.rebuild_package_langs(packages.get_loaded_packages())
         tk_tools.showinfo(message=TRANS_REBUILD_PACK_LANG)
 
     build_pack_trans_btn = ttk.Button(frm_btn2, command=lambda: background_run(rebuild_pack_langs))
@@ -580,19 +580,21 @@ def get_report_file(filename: str) -> Path:
 
 def report_all_obj() -> None:
     """Print a list of every object type and ID."""
-    from packages import OBJ_TYPES, LOADED
+    from packages import OBJ_TYPES, get_loaded_packages
+    packset = get_loaded_packages()
     for type_name, obj_type in OBJ_TYPES.items():
         with get_report_file(f'obj_{type_name}.txt').open('w') as f:
-            f.write(f'{len(LOADED.all_obj(obj_type))} {type_name}:\n')
-            for obj in LOADED.all_obj(obj_type):
+            f.write(f'{len(packset.all_obj(obj_type))} {type_name}:\n')
+            for obj in packset.all_obj(obj_type):
                 f.write(f'- {obj.id}\n')
 
 
 def report_items() -> None:
     """Print out all the item IDs used, with subtypes."""
-    from packages import Item, LOADED
+    from packages import Item, get_loaded_packages
+    packset = get_loaded_packages()
     with get_report_file('items.txt').open('w') as f:
-        for item in sorted(LOADED.all_obj(Item), key=lambda it: it.id):
+        for item in sorted(packset.all_obj(Item), key=lambda it: it.id):
             for vers_name, version in item.versions.items():
                 if len(item.versions) == 1:
                     f.write(f'- `<{item.id}>`\n')
