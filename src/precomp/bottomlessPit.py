@@ -149,13 +149,6 @@ def make_bottomless_pit(vmf: VMF, max_height):
     # Potential locations of bordering brushes..
     wall_pos: set[FrozenVec] = set()
 
-    side_dirs = [
-        (0, -128, 0),   # N
-        (0, +128, 0),  # S
-        (-128, 0, 0),   # E
-        (+128, 0, 0)   # W
-    ]
-
     # Only use 1 entity for the teleport triggers. If multiple are used,
     # cubes can contact two at once and get teleported odd places.
     tele_trig = None
@@ -191,7 +184,7 @@ def make_bottomless_pit(vmf: VMF, max_height):
                 hurt_trig = vmf.create_ent(
                     classname='trigger_hurt',
                     damagetype=32,  # FALL
-                    spawnflags=1,  # CLients
+                    spawnflags=1,  # Clients
                     damage=100000,
                     nodmgforce=1,  # No physics force when hurt..
                     damagemodel=0,  # Always apply full damage.
@@ -230,8 +223,10 @@ def make_bottomless_pit(vmf: VMF, max_height):
 
         wall_pos |= {
             (pos + off).freeze()
-            for off in
-            side_dirs
+            for off in [
+                (0, -128, 0), (0, +128, 0),
+                (-128, 0, 0), (+128, 0, 0),
+            ]
         }
 
     if hurt_trig is not None:
@@ -260,16 +255,17 @@ def make_bottomless_pit(vmf: VMF, max_height):
 
     LOGGER.info('Pit instances: {}', side_types)
 
-    for pos in wall_pos:
+    for pos in map(FrozenVec.thaw, wall_pos):
         if not brushLoc.POS.lookup_world(pos).is_solid:
             # Not actually a wall here!
             continue
 
         # CONN_TYPES has n,s,e,w as keys - whether there's something in that direction.
-        nsew = tuple(
-            brushLoc.POS.lookup_world(pos + off).is_pit
-            for off in
-            side_dirs
+        nsew = (
+            brushLoc.POS.lookup_world(pos + (0, -128, 0)).is_pit,  # N
+            brushLoc.POS.lookup_world(pos + (0, +128, 0)).is_pit,  # S
+            brushLoc.POS.lookup_world(pos + (-128, 0, 0)).is_pit,  # E
+            brushLoc.POS.lookup_world(pos + (+128, 0, 0)).is_pit,  # W
         )
         LOGGER.info('Pos: {}, NSEW: {}, lookup: {}', pos, nsew, utils.CONN_LOOKUP[nsew])
         inst_type, angle = utils.CONN_LOOKUP[nsew]
