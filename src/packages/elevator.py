@@ -2,9 +2,10 @@
 
 We can't pack BIKs, so this is mainly for Valve's existing ones.
 """
-from typing import Iterator
+from typing import Iterator, Optional
 
-from packages import ParseData, ExportData, SelitemData, PakObject, TransTokenSource
+from transtoken import TransTokenSource
+from packages import ParseData, ExportData, SelitemData, PakObject
 
 
 class Elevator(PakObject, needs_foreground=True, style_suggest_key='elev'):
@@ -14,10 +15,10 @@ class Elevator(PakObject, needs_foreground=True, style_suggest_key='elev'):
     """
     def __init__(
         self,
-        elev_id,
+        elev_id: str,
         selitem_data: SelitemData,
-        video,
-        vert_video=None,
+        video: str,
+        vert_video: Optional[str] = None,
     ) -> None:
         self.id = elev_id
 

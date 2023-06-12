@@ -208,7 +208,7 @@ class LoadScreen:
         self.active = False
         self._send_msg('reset')
 
-    def destroy(self):
+    def destroy(self) -> None:
         """Permanently destroy this screen and cleanup."""
         self.active = False
         self._send_msg('destroy')

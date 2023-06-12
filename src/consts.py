@@ -83,7 +83,7 @@ class MaterialGroupMeta(EnumMeta):
             return value.mat.casefold() in cls._value2member_map_
         return super().__contains__(value)
 
-    def __call__(cls: type[_MaterialGroupT], value: str, *args, **kwargs) -> _MaterialGroupT:
+    def __call__(cls: type[_MaterialGroupT], value: str, *args: object, **kwargs: object) -> _MaterialGroupT:
         """Find the existing member with this name."""
         if args or kwargs:  # Constructing the enum itself, keep unchanged.
             return super().__call__(value, *args, **kwargs)  # type: ignore
@@ -104,7 +104,7 @@ class MaterialGroup(str, Enum, metaclass=MaterialGroupMeta):
         if isinstance(other, Side):
             other = other.mat
         if isinstance(other, str):
-            return self.value == other.casefold()
+            return bool(self.value == other.casefold())
         return NotImplemented
 
     def __ne__(self, other: object) -> bool:
@@ -112,7 +112,7 @@ class MaterialGroup(str, Enum, metaclass=MaterialGroupMeta):
         if isinstance(other, Side):
             other = other.mat
         if isinstance(other, str):
-            return self.value != other.casefold()
+            return bool(self.value != other.casefold())
         return NotImplemented
 
     def __str__(self) -> str:

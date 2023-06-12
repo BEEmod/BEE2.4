@@ -83,6 +83,11 @@ class HTMLFormatter(string.Formatter):
 HTML_FORMAT = HTMLFormatter()
 
 
+def _param_convert(params: Mapping[str, object]) -> Mapping[str, object]:
+    """If a blank dict is passed, use EmptyMapping to save memory."""
+    return EmptyMapping if len(params) == 0 else params
+
+
 @attrs.frozen(eq=False)
 class TransToken:
     """A named section of text that can be translated later on."""
@@ -93,8 +98,7 @@ class TransToken:
     # The token to lookup, or the default if undefined.
     token: str
     # Keyword arguments passed when formatting.
-    # If a blank dict is passed, use EmptyMapping to save memory.
-    parameters: Mapping[str, object] = attrs.field(converter=lambda m: m or EmptyMapping)
+    parameters: Mapping[str, object] = attrs.field(converter=_param_convert)
 
     BLANK: ClassVar['TransToken']   # Quick access to blank token.
 
@@ -207,7 +211,7 @@ class TransToken:
         """
         return self.token != '' and not self.token.isspace()
 
-    def __eq__(self, other) -> bool:
+    def __eq__(self, other: object) -> bool:
         if type(other) is TransToken:
             return (
                 self.namespace == other.namespace and
@@ -286,7 +290,7 @@ class PluralTransToken(TransToken):
         """Joining is not allowed."""
         raise NotImplementedError('This is not allowed.')
 
-    def __eq__(self, other) -> bool:
+    def __eq__(self, other: object) -> bool:
         if type(other) is PluralTransToken:
             return (
                 self.namespace == other.namespace and
@@ -341,7 +345,7 @@ class JoinTransToken(TransToken):
     def __hash__(self) -> int:
         return hash((self.namespace, self.token, *self.children))
 
-    def __eq__(self, other) -> bool:
+    def __eq__(self, other: object) -> bool:
         if type(other) is JoinTransToken:
             return (
                 self.namespace == other.namespace and
@@ -383,7 +387,7 @@ class ListTransToken(JoinTransToken):
         """List tokens cannot be formatted."""
         raise NotImplementedError('Cannot format list tokens!')
 
-    def __eq__(self, other) -> bool:
+    def __eq__(self, other: object) -> bool:
         if type(other) is ListTransToken:
             return (
                 self.namespace == other.namespace and

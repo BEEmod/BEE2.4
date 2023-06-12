@@ -1,4 +1,5 @@
 from typing import Iterator
+from typing_extensions import Self
 
 from srctools import Keyvalues
 
@@ -17,11 +18,11 @@ class Skybox(
     """Configures skybox and fog settings."""
     def __init__(
         self,
-        sky_id,
+        sky_id: str,
         selitem_data: SelitemData,
         config: lazy_conf.LazyConf,
         fog_opts: Keyvalues,
-        mat,
+        mat: str,
     ) -> None:
         self.id = sky_id
         self.selitem_data = selitem_data
@@ -33,7 +34,7 @@ class Skybox(
         self.fog_color = fog_opts.vec('primarycolor', 255, 255, 255)
 
     @classmethod
-    async def parse(cls, data: ParseData):
+    async def parse(cls, data: ParseData) -> Self:
         """Parse a skybox definition."""
         selitem_data = SelitemData.parse(data.info, data.pak_id)
         mat = data.info['material', 'sky_black']
@@ -54,7 +55,7 @@ class Skybox(
             mat,
         )
 
-    def add_over(self, override: 'Skybox'):
+    def add_over(self, override: Self) -> None:
         """Add the additional vbsp_config commands to ourselves."""
         self.selitem_data += override.selitem_data
         self.config = lazy_conf.concat(self.config, override.config)
@@ -68,7 +69,7 @@ class Skybox(
         return f'<Skybox {self.id}>'
 
     @staticmethod
-    def export(exp_data: ExportData):
+    def export(exp_data: ExportData) -> None:
         """Export the selected skybox."""
         if exp_data.selected is None:
             return  # No skybox..

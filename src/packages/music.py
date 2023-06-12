@@ -20,7 +20,7 @@ class Music(PakObject, needs_foreground=True, style_suggest_key='music'):
     """Allows specifying background music for the map."""
     def __init__(
         self,
-        music_id,
+        music_id: str,
         selitem_data: SelitemData,
         sound: dict[MusicChannel, list[str]],
         children: dict[MusicChannel, str],
@@ -45,7 +45,7 @@ class Music(PakObject, needs_foreground=True, style_suggest_key='music'):
         self.has_synced_tbeam = synch_tbeam
 
     @classmethod
-    async def parse(cls, data: ParseData):
+    async def parse(cls, data: ParseData) -> Self:
         """Parse a music definition."""
         selitem_data = SelitemData.parse(data.info, data.pak_id)
         inst = data.info['instance', None]
@@ -204,7 +204,7 @@ class Music(PakObject, needs_foreground=True, style_suggest_key='music'):
         return children.sample[channel]
 
     @staticmethod
-    def export(exp_data: ExportData):
+    def export(exp_data: ExportData) -> None:
         """Export the selected music."""
         selected: dict[MusicChannel, Music | None] = exp_data.selected
 

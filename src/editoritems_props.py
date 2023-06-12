@@ -57,7 +57,7 @@ class ItemPropKind(Generic[ValueT]):
         """Allow using as a dict key."""
         return hash(self.id)
 
-    def __eq__(self, other) -> bool:
+    def __eq__(self, other: object) -> bool:
         """Item properties are compared by ID."""
         if isinstance(other, ItemPropKind):
             return self.id == other.id

@@ -12,7 +12,7 @@ import editoritems
 import srctools.logger
 
 from typing import (
-    Callable, Optional, Union,
+    Callable, Optional, Sequence, Union,
     List, Dict, Tuple, TypeVar, Iterable, overload,
 )
 import corridor
@@ -319,10 +319,10 @@ Default_T = TypeVar('Default_T')
 
 
 @overload
-def resolve_one(path, *, error: bool) -> str: ...
+def resolve_one(path: str, *, error: bool) -> str: ...
 @overload
-def resolve_one(path, default: Default_T, *, error: bool) -> Union[str, Default_T]: ...
-def resolve_one(path, default: Union[str, Default_T]='', *, error: bool) -> Union[str, Default_T]:
+def resolve_one(path: str, default: Default_T, *, error: bool) -> Union[str, Default_T]: ...
+def resolve_one(path: str, default: Union[str, Default_T]='', *, error: bool) -> Union[str, Default_T]:
     """Resolve a path into one instance.
 
     If multiple are given, this returns the first.
@@ -453,7 +453,7 @@ def get_cust_inst(item_id: str, inst: str) -> Optional[str]:
     return CUST_INST_FILES[item_id.casefold()].get(inst.casefold(), None)
 
 
-def get_special_inst(name: str):
+def get_special_inst(name: str) -> Union[str, Sequence[str]]:
     """Get the instance associated with a "[special]" instance path."""
     try:
         inst = INST_SPECIAL[name.casefold()]

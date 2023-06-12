@@ -18,8 +18,8 @@ from tkinter import filedialog, commondialog, simpledialog, messagebox
 import tkinter as tk
 import os.path
 
-from idlelib.redirector import WidgetRedirector
-from idlelib.query import Query
+from idlelib.redirector import WidgetRedirector  # type: ignore[import]
+from idlelib.query import Query  # type: ignore[import]
 import trio
 
 from app import TK_ROOT, background_run, localisation

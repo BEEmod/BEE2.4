@@ -966,7 +966,7 @@ class Style(PakObject, needs_foreground=True):
         self.config = config
 
     @classmethod
-    async def parse(cls, data: ParseData):
+    async def parse(cls, data: ParseData) -> None:
         """Parse a style definition."""
         info = data.info
         selitem_data = SelitemData.parse(info, data.pak_id)

@@ -118,7 +118,7 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
             else:
                 return default
 
-        out = _UNSET
+        out: ValT = _UNSET
         y += self._yoff
         # Zero checks ensure we don't do negative indexing.
         if y >= 0:
@@ -286,7 +286,7 @@ class PlaneItems(ItemsView[Tuple[int, int], ValT]):
             return False
         try:
             xy, value = item
-            return self._mapping[xy] == value
+            return bool(self._mapping[xy] == value)
         except ValueError:  # len(tup) != 3
             return False
         except KeyError:  # Not present

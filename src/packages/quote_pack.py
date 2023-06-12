@@ -6,27 +6,30 @@ import utils
 from transtoken import TransTokenSource
 from packages import (
     PackagesSet, PakObject, set_cond_source, ParseData,
-    get_config, ExportData, LOGGER, SelitemData,
+    get_config, ExportData, SelitemData,
 )
-from srctools import Keyvalues, Vec, NoKeyError
+from srctools import Keyvalues, Vec, NoKeyError, logger
+
+
+LOGGER = logger.get_logger('packages.quote_pack')
 
 
 class QuotePack(PakObject, needs_foreground=True, style_suggest_key='quote'):
     """Adds lists of voice lines which are automatically chosen."""
     def __init__(
         self,
-        quote_id,
-        selitem_data: 'SelitemData',
+        quote_id: str,
+        selitem_data: SelitemData,
         config: Keyvalues,
-        chars: Optional[Set[str]]=None,
-        skin: Optional[int]=None,
-        studio: str=None,
-        studio_actor: str='',
-        cam_loc: Vec=None,
-        turret_hate: bool=False,
-        interrupt: float=0.0,
-        cam_pitch: float=0.0,
-        cam_yaw: float=0.0,
+        chars: Optional[Set[str]] = None,
+        skin: Optional[int] = None,
+        studio: str = None,
+        studio_actor: str = '',
+        cam_loc: Vec = None,
+        turret_hate: bool = False,
+        interrupt: float = 0.0,
+        cam_pitch: float = 0.0,
+        cam_yaw: float = 0.0,
     ) -> None:
         self.id = quote_id
         self.selitem_data = selitem_data
@@ -176,7 +179,7 @@ class QuotePack(PakObject, needs_foreground=True, style_suggest_key='quote'):
                 LOGGER.info('No {} voice config!', pretty)
 
     @staticmethod
-    def strip_quote_data(kv: Keyvalues, _depth=0) -> Keyvalues:
+    def strip_quote_data(kv: Keyvalues, _depth: int = 0) -> Keyvalues:
         """Strip unused property blocks from the config files.
 
         This removes data like the captions which the compiler doesn't need.

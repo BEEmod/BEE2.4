@@ -48,7 +48,7 @@ class Data(abc.ABC):
         version: int = 1,
         palette_stores: bool = True,  # TODO remove
         uses_id: bool = False,
-        **kwargs,
+        **kwargs: object,
     ) -> None:
         super().__init_subclass__(**kwargs)
         if not conf_name:

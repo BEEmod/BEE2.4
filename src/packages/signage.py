@@ -62,7 +62,7 @@ class SignageLegend(PakObject):
         else:
             bg = None
 
-        return SignageLegend(
+        return cls(
             data.id,
             ImgHandle.parse(data.info, data.pak_id, *LEGEND_SIZE, subkey='overlay'),
             bg, blank,

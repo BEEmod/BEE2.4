@@ -38,7 +38,7 @@ class TextHandler(logging.Handler):
             style='{',
         ))
 
-    def emit(self, record: logging.LogRecord):
+    def emit(self, record: logging.LogRecord) -> None:
         """Add a logging message. This may be called by any thread!"""
         msg = record.msg
         try:

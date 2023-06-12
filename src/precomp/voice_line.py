@@ -1,9 +1,11 @@
 """Adds voicelines dynamically into the map."""
+from typing import List, Optional, Set, NamedTuple, Iterator, Tuple
+from typing_extensions import TypeAlias
 import itertools
 from decimal import Decimal
-from typing import List, Optional, Set, NamedTuple, Iterator
 
 import srctools.logger
+
 import vbsp
 from precomp import corridor, options as vbsp_options, packing, conditions, rand
 from BEE2_config import ConfigFile
@@ -15,7 +17,9 @@ from precomp.collisions import Collisions
 LOGGER = srctools.logger.get_logger(__name__)
 COND_MOD_NAME = 'Voice Lines'
 
-ADDED_BULLSEYES = set()
+ADDED_BULLSEYES: Set[str] = set()
+
+MidQuote: TypeAlias = Tuple[Keyvalues, bool, str]
 
 # Special quote instances assoicated with an item/style.
 # These are only added if the condition executes.
@@ -120,10 +124,10 @@ def find_group_quotes(
     coll: Collisions,
     info: corridor.Info,
     group: Keyvalues,
-    mid_quotes,
-    allow_mid_voices,
-    use_dings,
-    conf,
+    mid_quotes: List[List[MidQuote]],
+    allow_mid_voices: bool,
+    use_dings: bool,
+    conf: ConfigFile,
     mid_name: str,
     player_flag_set: Set[str],
 ) -> Iterator[PossibleQuote]:
@@ -154,8 +158,8 @@ def find_group_quotes(
 
         valid_quotes += 1
 
-        poss_quotes = []
-        line_mid_quotes = []
+        poss_quotes: List[Keyvalues] = []
+        line_mid_quotes: List[MidQuote] = []
         for line in mode_quotes(quote, player_flag_set):
             line_id = line['id', line['name', '']].casefold()
 
@@ -487,7 +491,7 @@ def add_voice(
 
     allow_mid_voices = not style_vars.get('nomidvoices', False)
 
-    mid_quotes = []
+    mid_quotes: List[List[MidQuote]] = []
 
     # Enable using the beep before and after choreo lines.
     allow_dings = srctools.conv_bool(QUOTE_DATA['use_dings', '0'])

@@ -575,7 +575,7 @@ class Handle(User):
         for child in self._children():
             child._incref(self)
 
-    def _request_load(self, force=False) -> Handle:
+    def _request_load(self, force: bool = False) -> Handle:
         """Request a reload of this image.
 
         If this can be done synchronously, the result is returned.

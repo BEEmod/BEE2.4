@@ -143,7 +143,7 @@ class PygletSound(NullSound):
                 _nursery.cancel_scope.cancel()
                 sounds = NullSound()
                 return 0.1
-            duration = snd.duration
+            duration: Optional[float] = snd.duration
             if duration is not None:
                 return duration
             else:
@@ -182,7 +182,7 @@ async def _load_bg(sound: str) -> None:
         return _nursery.cancel_scope.cancel()
 
 
-def fx(name) -> None:
+def fx(name: str) -> None:
     """Play a sound effect stored in the sounds{} dict."""
     if _nursery is not None and not _nursery.cancel_scope.cancel_called:
         _nursery.start_soon(sounds.fx, name)

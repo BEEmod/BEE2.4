@@ -420,7 +420,7 @@ class Game:
                     f.write(line)
                 f.write('\n')  # Add a little spacing
 
-    def edit_gameinfo(self, add_line=False) -> None:
+    def edit_gameinfo(self, add_line: bool = False) -> None:
         """Modify all gameinfo.txt files to add or remove our line.
 
         Add_line determines if we are adding or removing it.
@@ -1030,7 +1030,7 @@ class Game:
         else:
             LOGGER.warning('No custom editor models!')
 
-    def generate_fizzler_sides(self, conf: Keyvalues):
+    def generate_fizzler_sides(self, conf: Keyvalues) -> None:
         """Create the VMTs used for fizzler sides."""
         fizz_colors: dict[FrozenVec, tuple[float, str]] = {}
         mat_path = self.abs_path('bee2/materials/bee2/fizz_sides/side_color_')
@@ -1056,7 +1056,7 @@ class Game:
                     f.write('$outputintensity {}\n'.format(format(alpha, 'g').replace('0.', '.')))
                 f.write(FIZZLER_EDGE_MAT_PROXY)
 
-    def launch(self):
+    def launch(self) -> None:
         """Try and launch the game."""
         webbrowser.open('steam://rungameid/' + str(self.steamID))
 
@@ -1137,7 +1137,7 @@ class Game:
         ).format(game=self.name)
 
 
-def find_steam_info(game_dir) -> tuple[str | None, str | None]:
+def find_steam_info(game_dir: str) -> tuple[str | None, str | None]:
     """Determine the steam ID and game name of this folder, if it has one.
 
     This only works on Source games!
@@ -1168,7 +1168,7 @@ def find_steam_info(game_dir) -> tuple[str | None, str | None]:
     return game_id, name
 
 
-def scan_music_locs():
+def scan_music_locs() -> None:
     """Try and determine the location of Aperture Tag and PS:Mel.
 
     If successful we can export the music to games.
@@ -1207,7 +1207,7 @@ def scan_music_locs():
             break
 
 
-def make_tag_coop_inst(tag_loc: str):
+def make_tag_coop_inst(tag_loc: str) -> None:
     """Make the coop version of the tag instances.
 
     This needs to be shrunk, so all the logic entities are not spread
@@ -1313,7 +1313,7 @@ def load() -> None:
     selected_game = all_games[0]
 
 
-def add_game(e=None):
+def add_game(e: Event=None) -> bool:
     """Ask for, and load in a game to export to."""
     title = TransToken.ui('BEE2 - Add Game')
     tk_tools.showinfo(

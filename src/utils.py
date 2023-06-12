@@ -117,8 +117,7 @@ except ImportError:
 else:
     FROZEN = True
     # This special attribute is set by PyInstaller to our folder.
-    # noinspection PyProtectedMember
-    _INSTALL_ROOT = Path(sys._MEIPASS)
+    _INSTALL_ROOT = Path(sys._MEIPASS)  # type: ignore[attr-defined] # noqa
     # Check if this was produced by above
     DEV_MODE = '#' in BEE_VERSION
 
@@ -715,7 +714,7 @@ if WIN:
         GetAsyncKeyState.argtypes = [ctypes.c_int]
         VK_SHIFT = 0x10
         # Most significant bit set if currently held.
-        return GetAsyncKeyState(VK_SHIFT) & 0b1000_0000_0000_0000 != 0
+        return int(GetAsyncKeyState(VK_SHIFT)) & 0b1000_0000_0000_0000 != 0
 else:
     def check_shift() -> bool:
         """Check if Shift is currently held."""

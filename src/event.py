@@ -51,7 +51,7 @@ def _get_arg_type(arg_type: object) -> type:
     if arg_type is None:  # Special case.
         return NoneType
     # Allow passing subscripted generics.
-    origin = get_origin(arg_type)
+    origin: Optional[type] = get_origin(arg_type)
     if origin is not None:
         return origin
     if isinstance(arg_type, type):

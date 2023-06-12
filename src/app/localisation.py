@@ -260,6 +260,7 @@ def get_lang_name(lang: Language) -> str:
 
     # Try every combination of country/generic language.
     # First the language in its own language.
+    name_in_lang: str
     for targ, key in itertools.product(targ_langs, targ_langs):
         try:
             name_in_lang = load_cldr(targ)['languages'][targ]
