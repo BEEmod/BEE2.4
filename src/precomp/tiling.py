@@ -1423,7 +1423,11 @@ class TileDef:
             target['origin'] = self.pos + 64 * self.normal
 
 
-def find_tile(origin: Vec, normal: Vec, force: bool=False) -> tuple[TileDef, int, int]:
+def find_tile(
+    origin: Vec | FrozenVec,
+    normal: Vec | FrozenVec,
+    force: bool = False,
+) -> tuple[TileDef, int, int]:
     """Locate the tiledef for a specific tile.
 
     The tiledef and the subtile UV are returned, or KeyError is raised
@@ -1438,7 +1442,7 @@ def find_tile(origin: Vec, normal: Vec, force: bool=False) -> tuple[TileDef, int
         v_axis, origin[v_axis] // 128 * 128 + 64,
     )
     grid_pos: Vec = round(grid_pos, 6)
-    normal: Vec = round(normal, 6)
+    normal: Vec = Vec(round(normal, 6))
     # grid_pos = round_grid(origin - normal)
 
     uv_pos = round(origin - grid_pos + 64 - 16, 6)

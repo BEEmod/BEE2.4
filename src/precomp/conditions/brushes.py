@@ -1051,29 +1051,29 @@ def edit_panel(vmf: VMF, inst: Entity, props: Keyvalues, create: bool) -> None:
     origin = Vec.from_str(inst['origin'])
     uaxis, vaxis = Vec.INV_AXIS[normal.axis()]
 
-    points: set[tuple[float, float, float]] = set()
+    points: set[FrozenVec] = set()
 
     if 'point' in props:
         for prop in props.find_all('point'):
-            points.add(conditions.resolve_offset(inst, prop.value, zoff=-64).as_tuple())
+            points.add(conditions.resolve_offset(inst, prop.value, zoff=-64).freeze())
     elif 'pos1' in props and 'pos2' in props:
         pos1, pos2 = Vec.bbox(
             conditions.resolve_offset(inst, props['pos1', '-48 -48 0'], zoff=-64),
             conditions.resolve_offset(inst, props['pos2', '48 48 0'], zoff=-64),
         )
-        points.update(map(Vec.as_tuple, Vec.iter_grid(pos1, pos2, 32)))
+        points.update(FrozenVec.iter_grid(pos1, pos2, 32))
     else:
         # Default to the full tile.
         points.update({
-            (Vec(u, v, -64.0) @ orient + origin).as_tuple()
+            (FrozenVec(u, v, -64.0) @ orient + origin)
             for u in [-48.0, -16.0, 16.0, 48.0]
             for v in [-48.0, -16.0, 16.0, 48.0]
         })
 
     tiles_to_uv: dict[tiling.TileDef, set[tuple[int, int]]] = defaultdict(set)
-    for pos in map(Vec, points):
+    for fpos in points:
         try:
-            tile, u, v = tiling.find_tile(pos, normal, force=create)
+            tile, u, v = tiling.find_tile(fpos, normal, force=create)
         except KeyError:
             continue
         tiles_to_uv[tile].add((u, v))
@@ -1101,9 +1101,9 @@ def edit_panel(vmf: VMF, inst: Entity, props: Keyvalues, create: bool) -> None:
             off = Vec.with_axes(uaxis, 32, vaxis, 32)
             bbox_min -= off
             bbox_max += off
-            for pos in Vec.iter_grid(bbox_min, bbox_max, 32):
-                if pos.as_tuple() not in points:
-                    bevel_world.add((int(pos[uaxis]), int(pos[vaxis])))
+            for fpos in FrozenVec.iter_grid(bbox_min, bbox_max, 32):
+                if fpos not in points:
+                    bevel_world.add((int(fpos[uaxis]), int(fpos[vaxis])))
         # else: No bevels.
     panels: list[tiling.Panel] = []
 
