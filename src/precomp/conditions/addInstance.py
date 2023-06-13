@@ -90,7 +90,7 @@ def res_add_overlay_inst(vmf: VMF, inst: Entity, res: Keyvalues) -> Optional[Ent
     if not res.has_children():
         # Use all the defaults.
         res = Keyvalues('AddOverlay', [
-            Keyvalues('File', res.value)
+            Keyvalues('file', res.value)
         ])
 
     if 'angles' in res:
@@ -105,8 +105,8 @@ def res_add_overlay_inst(vmf: VMF, inst: Entity, res: Keyvalues) -> Optional[Ent
     filename = instanceLocs.resolve_one(inst.fixup.substitute(orig_name), error=True)
 
     if not filename:
-        # Don't show an error if it's being read from a fixup.
-        if not res.bool('silentLookup') and not orig_name.startswith('$'):
+        # Don't show an error if it's being read from a fixup, or if the original name is blank.
+        if not res.bool('silentLookup') and not orig_name.startswith('$') and orig_name != '':
             LOGGER.warning('Bad filename for "{}" when adding overlay!', orig_name)
         # Don't bother making an overlay instance which will be deleted.
         return None
