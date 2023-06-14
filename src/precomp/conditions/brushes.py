@@ -24,10 +24,10 @@ PANEL_TYPES: dict[str, tiling.PanelType] = {
     for typ in tiling.PanelType
 }
 PANEL_TYPES.update({
-    prop_angled_panel_anim.export(PanelAnimation[ang]): tiling.PanelType[ang]
+    PanelAnimation[ang].animation: tiling.PanelType[ang]
     for ang in ['ANGLE_30', 'ANGLE_45', 'ANGLE_60']
 })
-PANEL_TYPES[prop_angled_panel_anim.export(PanelAnimation.ANGLE_90)] = tiling.PanelType.NORMAL
+PANEL_TYPES[PanelAnimation.ANGLE_90.animation] = tiling.PanelType.NORMAL
 
 # The spawnflags that we need to toggle for each classname
 FLAG_ROTATING = {

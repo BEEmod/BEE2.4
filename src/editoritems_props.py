@@ -5,6 +5,7 @@ from typing import Callable, Generic, Sequence, Type, TypeVar
 
 import attrs
 from srctools import Angle, bool_as_int, conv_bool, conv_float, conv_int
+from typing_extensions import Self
 
 from transtoken import TransToken
 
@@ -174,6 +175,24 @@ class PanelAnimation(Enum):
     ANGLE_45 = 45
     ANGLE_60 = 60
     ANGLE_90 = 90
+
+    @classmethod
+    def from_anim(cls, anim: str) -> Self:
+        """Parse a string matching the ramp_XX_deg_open animation names.
+
+        :raises LookupError: If the string is not a valid animation.
+        """
+        if anim.startswith('ramp_') and anim.endswith('_deg_open'):
+            try:
+                return cls(int(anim[5:-9]))
+            except KeyError:
+                pass
+        raise LookupError(anim)
+
+    @property
+    def animation(self) -> str:
+        """Return the corresponding animation value."""
+        return f'ramp_{self.value}_deg_open'
 
 
 class PaintTypes(Enum):
@@ -624,8 +643,10 @@ def _parse_angled_panel_anim(value: str) -> PanelAnimation:
     orig_value = value
     value = value.casefold()
     # Allow the full anim name or just the degree.
-    if value.startswith('ramp_') and value.endswith('_deg_open'):
-        value = value[5:-9]
+    try:
+        return PanelAnimation.from_anim(value)
+    except ValueError:
+        pass
     ind = int(value)
     if ind < 30:  # If 0-3 use index, if 30/45/60/90 use that
         try:
@@ -642,7 +663,7 @@ prop_angled_panel_anim = ItemPropKind[PanelAnimation](
     name=TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_angled_panel_type'),
     subtype_values=list(PanelAnimation),
     parse=_parse_angled_panel_anim,
-    export=lambda ang: f'ramp_{ang.value}_deg_open',
+    export=PanelAnimation.animation.fget,
 )
 
 prop_cube_type = enum_prop(
