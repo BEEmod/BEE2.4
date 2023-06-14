@@ -9,6 +9,7 @@ from typing import (
     Awaitable, Callable, Union, Generic, TypeVar, Protocol, Optional,
     List, Tuple, Dict, Iterator, Iterable, runtime_checkable,
 )
+from typing_extensions import Literal, ParamSpec, Concatenate
 import tkinter
 
 from srctools.logger import get_logger
@@ -47,6 +48,7 @@ class ItemGroupProto(ItemProto, Protocol):
 
 
 ItemT = TypeVar('ItemT', bound=ItemProto)  # The object the items move around.
+ArgsT = ParamSpec('ArgsT')
 
 # Tag used on canvases for our flowed slots.
 _CANV_TAG = '_BEE2_dragdrop_item'
@@ -102,6 +104,33 @@ def in_bbox(
     if x > left + width or y > top + height:
         return False
     return True
+
+
+def _make_placer(
+    func: Callable[Concatenate[ttk.Label, ArgsT], object],
+    kind: GeoManager,
+) -> Callable[Concatenate[Slot, ArgsT], None]:
+    """Calls the original place/pack/grid method, telling the slot which was used.
+
+    This allows propagating the original method args and types.
+    """
+    def placer(self: Slot, /, *args: ArgsT.args, **kwargs: ArgsT.kwargs) -> None:
+        """Call place/pack/grid on the label."""
+        self._pos_type = kind
+        self._canv_info = None
+        func(self._lbl, *args, **kwargs)
+    return placer
+
+
+# Functions which remove a label from the parent.
+_FORGETTER: Dict[
+    Literal[GeoManager.PACK, GeoManager.PLACE, GeoManager.GRID],
+    Callable[[ttk.Label], object]
+] = {
+    GeoManager.PLACE: ttk.Label.place_forget,
+    GeoManager.GRID: ttk.Label.grid_forget,
+    GeoManager.PACK: ttk.Label.pack_forget,
+}
 
 
 class Positioner:
@@ -680,23 +709,10 @@ class Slot(Generic[ItemT]):
     def __repr__(self) -> str:
         return f'<{self.kind.name} Slot @ {id(self):016x}: {self._contents!r}>'
 
-    def grid(self, *args, **kwargs) -> None:
-        """Grid-position this slot."""
-        self._pos_type = GeoManager.GRID
-        self._canv_info = None
-        self._lbl.grid(*args, **kwargs)
-
-    def place(self, *args, **kwargs) -> None:
-        """Place-position this slot."""
-        self._pos_type = GeoManager.PLACE
-        self._canv_info = None
-        self._lbl.place(*args, **kwargs)
-
-    def pack(self, *args, **kwargs) -> None:
-        """Pack-position this slot."""
-        self._pos_type = GeoManager.PACK
-        self._canv_info = None
-        self._lbl.pack(*args, **kwargs)
+    # These call the method on the label, setting our attrs.
+    grid = _make_placer(ttk.Label.grid, GeoManager.GRID)
+    place = _make_placer(ttk.Label.place, GeoManager.PLACE)
+    pack = _make_placer(ttk.Label.pack, GeoManager.PACK)
 
     def canvas(self, canv: tkinter.Canvas, x: int, y: int, tag: str) -> None:
         """Position this slot on a canvas."""
@@ -732,7 +748,7 @@ class Slot(Generic[ItemT]):
             obj_id, _, _ = self._canv_info
             canv.delete(obj_id)
         else:
-            getattr(self._lbl, self._pos_type.value + '_forget')()
+            _FORGETTER[self._pos_type](self._lbl)
         self._pos_type = None
         self._canv_info = None
 
@@ -920,7 +936,7 @@ async def test() -> None:
         slot_src.append(slot)
         slot.contents = item
 
-    def configure(e: Event | None) -> None:
+    def configure(e: 'tkinter.Event[tkinter.Canvas] | None') -> None:
         """Reflow slots when the window resizes."""
         manager.flow_slots(right_canv, slot_src)
 
