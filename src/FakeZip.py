@@ -2,7 +2,7 @@
 
 This is useful to allow using the same code for reading folders or zips of data.
 """
-from typing import IO, Iterator, Optional, Self, Set, TextIO, Union
+from typing import IO, Iterator, Literal, Optional, Self, Set, TextIO, Union
 from zipfile import ZIP_STORED, ZipFile
 import shutil
 import os
@@ -49,7 +49,7 @@ class FakeZip:
     def __enter__(self) -> Self:
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb) -> bool:
+    def __exit__(self, exc_type, exc_val, exc_tb) -> Literal[False]:
         # Always re-raise exceptions
         return False
 
