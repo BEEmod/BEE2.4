@@ -9,7 +9,7 @@ from precomp.conditions import (
     make_flag, make_result, resolve_offset,
     DIRECTIONS,
 )
-from editoritems_props import prop_angled_panel_anim
+from editoritems_props import PanelAnimation
 from precomp import tiling, brushLoc
 from srctools import Vec, FrozenVec, Angle, Matrix, conv_float, Keyvalues, Entity
 from srctools.logger import get_logger
@@ -591,8 +591,8 @@ def res_rotate_inst(inst: Entity, res: Keyvalues) -> None:
     angle_str = inst.fixup.substitute(res['angle'])
     if 'axis' in res:
         try:
-            anim = prop_angled_panel_anim.parse(angle_str)
-        except ValueError:
+            anim = PanelAnimation.from_anim(angle_str)
+        except LookupError:
             angle = conv_float(angle_str)
         else:
             angle = float(anim.value)
