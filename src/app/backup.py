@@ -1,6 +1,9 @@
 """Backup and restore P2C maps.
 
 """
+from typing import List, TYPE_CHECKING, Dict, Any, Optional, Union, cast
+from typing_extensions import Self, TypeAlias
+
 from tkinter import filedialog, ttk
 import tkinter as tk
 import atexit
@@ -9,8 +12,8 @@ import shutil
 import string
 from datetime import datetime
 from io import BytesIO, TextIOWrapper
-from typing import List, TYPE_CHECKING, Dict, Any, Optional, Union, cast
 from zipfile import ZipFile, ZIP_LZMA
+
 
 import loadScreen
 import srctools.logger
@@ -32,6 +35,7 @@ LOGGER = srctools.logger.get_logger(__name__)
 # The backup window - either a toplevel, or TK_ROOT.
 window: tk.Toplevel
 
+AnyZip: TypeAlias = Union[ZipFile, FakeZip]
 UI: Dict[str, Any] = {}  # Holds all the widgets
 
 menus = {}  # For standalone application, generate menu bars
@@ -113,13 +117,13 @@ class P2C:
     """A PeTI map."""
     def __init__(
         self,
-        filename,
-        zip_file,
+        filename: str,
+        zip_file: AnyZip,
         create_time: 'Date',
         mod_time: 'Date',
-        title='<untitled>',
+        title: str = '<untitled>',
         desc: TransToken = TRANS_NO_DESC,
-        is_coop=False,
+        is_coop: bool = False,
     ) -> None:
         self.filename = filename
         self.zip_file = zip_file
@@ -178,7 +182,7 @@ class P2C:
             mod_time=Date(kv['timestamp_modified', '']),
         )
 
-    def copy(self):
+    def copy(self) -> Self:
         """Copy this item."""
         return self.__class__(
             self.filename,
@@ -202,9 +206,8 @@ class P2C:
 
 
 class Date:
-    """A version of datetime with an invalid value, and read from hex.
-    """
-    def __init__(self, hex_time):
+    """A version of datetime with an invalid value, and read from hex."""
+    def __init__(self, hex_time: str) -> None:
         """Convert the time format in P2C files into a useable value."""
         try:
             val = int(hex_time, 16)
@@ -249,12 +252,12 @@ class Date:
         else:
             return self.date >= other.date
 
-    def __eq__(self, other) -> bool:
+    def __eq__(self, other: object) -> bool:
         if isinstance(other, Date):
             return self.date == other.date
         return NotImplemented
 
-    def __ne__(self, other) -> bool:
+    def __ne__(self, other: object) -> bool:
         if isinstance(other, Date):
             return self.date != other.date
         return NotImplemented
@@ -264,9 +267,9 @@ class Date:
 # directories.
 
 
-def load_backup(zip_file):
+def load_backup(zip_file: AnyZip) -> List[P2C]:
     """Load in a backup file."""
-    maps = []
+    maps: List[P2C] = []
     puzzles = [
         file[:-4]  # Strip extension
         for file in
@@ -296,7 +299,7 @@ def load_backup(zip_file):
     return maps
 
 
-def load_game(game: 'gameMan.Game'):
+def load_game(game: 'gameMan.Game') -> None:
     """Callback for gameMan, load in files for a game."""
     game_name.set(game.name)
 
@@ -529,7 +532,7 @@ def restore_maps(maps: List[P2C]) -> None:
     refresh_game_details()
 
 
-def refresh_game_details():
+def refresh_game_details() -> None:
     """Remake the items in the game maps list."""
     game = UI['game_details']
     game.remove_all()
@@ -540,7 +543,7 @@ def refresh_game_details():
     ))
 
 
-def refresh_back_details():
+def refresh_back_details() -> None:
     """Remake the items in the backup list."""
     backup = UI['back_details']
     backup.remove_all()
@@ -881,8 +884,8 @@ def init_application(tk_img: TKImages) -> None:
     gameMan.load()
     ui_new_backup()
 
-    # UI.py isn't present, so we use this callback
     async def cback(game):
+        """UI.py isn't present, so we use this callback."""
         load_game(game)
     gameMan.EVENT_BUS.register(None, gameMan.Game, cback)
 

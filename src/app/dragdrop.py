@@ -6,7 +6,7 @@ from collections import defaultdict
 import trio
 from tkinter import ttk, messagebox
 from typing import (
-    Callable, Union, Generic, TypeVar, Protocol, Optional,
+    Awaitable, Callable, Union, Generic, TypeVar, Protocol, Optional,
     List, Tuple, Dict, Iterator, Iterable, runtime_checkable,
 )
 import tkinter
@@ -845,6 +845,7 @@ async def test() -> None:
     slot_src = []
 
     class TestItem:
+        """Simple implementation of the DND protocol."""
         def __init__(
             self,
             name: str,
@@ -870,8 +871,10 @@ async def test() -> None:
 
     manager: Manager[TestItem] = Manager(TK_ROOT, config_icon=True)
 
-    def func(ev):
+    def func(ev: Event) -> Callable[[Slot[TestItem]], Awaitable[object]]:
+        """Ensure each callback is bound in a different scope."""
         async def call(slot: Slot[TestItem]) -> None:
+            """Just display when any event is triggered."""
             print('Cback: ', ev, slot)
         return call
 
@@ -917,7 +920,8 @@ async def test() -> None:
         slot_src.append(slot)
         slot.contents = item
 
-    def configure(e):
+    def configure(e: Event | None) -> None:
+        """Reflow slots when the window resizes."""
         manager.flow_slots(right_canv, slot_src)
 
     configure(None)

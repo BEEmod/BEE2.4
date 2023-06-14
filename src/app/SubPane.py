@@ -1,4 +1,4 @@
-from typing import Callable, Any, Union
+from typing import Callable, Any, Optional, Union
 
 import tkinter as tk
 from tkinter import ttk
@@ -159,7 +159,8 @@ class SubPane(tk.Toplevel):
         self.relY = y - self.parent.winfo_y()
         self.save_conf()
 
-    def enable_snap(self, e=None) -> None:
+    def enable_snap(self, e: Optional[tk.Event]=None) -> None:
+        """Allow the window to snap."""
         self.allow_snap = True
 
     def snap_win(self, e=None) -> None:

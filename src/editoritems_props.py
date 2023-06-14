@@ -663,7 +663,7 @@ prop_angled_panel_anim = ItemPropKind[PanelAnimation](
     name=TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_angled_panel_type'),
     subtype_values=list(PanelAnimation),
     parse=_parse_angled_panel_anim,
-    export=PanelAnimation.animation.fget,
+    export=lambda angle: angle.animation,
 )
 
 prop_cube_type = enum_prop(
