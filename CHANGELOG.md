@@ -25,6 +25,7 @@
   is copied into those as a comment to help identify them.
 * Behaviour change: in Fizzlers, `model_mid` will now be affected by the `NameType` value.
 * Added the `Error` result, which allows producing a custom error message from a package.
+* When Dev Mode is on, `SetTile` now dumps the tiles it's trying to set into the final map.
 
 ### Bugfixes:
 * Properly pick free port for error server.

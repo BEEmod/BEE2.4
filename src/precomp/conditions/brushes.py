@@ -801,19 +801,24 @@ def res_set_tile(inst: Entity, res: Keyvalues) -> None:
 
     `Offset` defines the position of the upper-left tile in the grid.
     Each `Tile` section defines a row of the positions to edit like so:
-        "Tile" "bbbb"
-        "Tile" "b..b"
-        "Tile" "b..b"
-        "Tile" "bbbb"
-    If `Force` is true, the specified tiles will override any existing ones
-    and create the tile if necessary.
-    Otherwise they will be merged in - white/black tiles will not replace
-    tiles set to nodraw or void for example.
-    `chance`, if specified allows producing irregular tiles by randomly not
+    ```c
+    "SetTile"
+        {
+        "Offset" "-48 48 0"
+        "Tile" "BBBB"
+        "Tile" "B..B"
+        "Tile" "B..B"
+        "Tile" "BBBB"
+        }
+    ```
+    * `Force`, if true, will make the specified tiles override any existing ones and
+      create the tile if necessary. Otherwise, they will be merged in - `white`/`black`
+      tiles will not replace tiles set to `nodraw` or `void` for example.
+    * `chance`, if specified allows producing irregular tiles by randomly not
     changing the tile.
 
     If you need less regular placement (other orientation, precise positions)
-    use a bee2_template_tilesetter in a template.
+    use a `bee2_template_tilesetter` in a template.
 
     Allowed tile characters:
     - `W`: White tile.
@@ -853,6 +858,14 @@ def res_set_tile(inst: Entity, res: Keyvalues) -> None:
     else:
         rng = None
 
+    if utils.DEV_MODE:
+        try:
+            [visgroup] = [vis for vis in inst.map.vis_tree if vis.name == 'SetTile']
+        except ValueError:
+            visgroup = inst.map.create_visgroup('SetTile')
+    else:
+        visgroup = None
+
     for y, row in enumerate(tiles):
         for x, val in enumerate(row):
             if val in '_ ':
@@ -862,6 +875,24 @@ def res_set_tile(inst: Entity, res: Keyvalues) -> None:
                 continue
 
             pos = Vec(32 * x, -32 * y, 0) @ orient + offset
+
+            if visgroup is not None:
+                try:
+                    skin = template_brush.TILETYPE_TO_SKIN[tiling.TILETYPE_FROM_CHAR[val]]
+                except KeyError:
+                    skin = 0
+                trace = inst.map.create_ent(
+                    'bee2_template_tilesetter',
+                    origin=pos,
+                    angles=orient.to_angle(),
+                    force=force_tile,
+                    targetname=inst['targetname'],
+                    skin=skin,
+                )
+                trace.vis_shown = False
+                trace.hidden = True
+                trace.comments = f'This tile char [{x}, {y}] = {val}.'
+                trace.visgroup_ids.add(visgroup.id)
 
             if val == '4':
                 size = tiling.TileSize.TILE_4x4
@@ -901,7 +932,7 @@ def res_set_tile(inst: Entity, res: Keyvalues) -> None:
                     tile[u, v].color
                 )
             elif force_tile:
-                # If forcing, make it black. Otherwise no need to change.
+                # If forcing, make it black. Otherwise, no need to change.
                 tile[u, v] = tiling.TileType.with_color_and_size(
                     size,
                     tiling.Portalable.BLACK
