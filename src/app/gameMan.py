@@ -1313,7 +1313,7 @@ def load() -> None:
     selected_game = all_games[0]
 
 
-def add_game(e: Event=None) -> bool:
+def add_game(e: Event = None) -> bool:
     """Ask for, and load in a game to export to."""
     title = TransToken.ui('BEE2 - Add Game')
     tk_tools.showinfo(
@@ -1367,6 +1367,7 @@ def add_game(e: Event=None) -> bool:
             add_menu_opts(game_menu)
         save()
         return True
+    return False
 
 
 async def remove_game() -> None:
