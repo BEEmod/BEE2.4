@@ -227,13 +227,13 @@ def analyse_and_modify(
     if not seen_game_modes:
         # Should be caught by above UserError if actually missing.
         raise Exception('Unknown game mode - No corridors??')
-    if len(seen_game_modes) > 2:
+    if len(seen_game_modes) >= 2:
         raise user_errors.UserError(user_errors.TOK_CORRIDOR_BOTH_MODES)
 
     if not seen_no_player_start:
         # Should be caught by above UserError if missing, something else is wrong.
         raise Exception("Can't determine if preview is enabled - no fixups on corridors?")
-    if len(seen_no_player_start) > 2:
+    if len(seen_no_player_start) >= 2:
         # Should be impossible.
         raise Exception("Preview mode is both enabled and disabled! Recompile the map!")
 
