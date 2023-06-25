@@ -77,7 +77,7 @@ class Skybox(
         try:
             skybox = exp_data.packset.obj_by_id(Skybox, exp_data.selected)
         except KeyError:
-            raise Exception(f"Selected skybox ({exp_data.selected}) doesn't exist?")
+            raise Exception(f"Selected skybox ({exp_data.selected}) doesn't exist?") from None
 
         exp_data.vbsp_conf.set_key(('Options', 'Skybox'), skybox.material)
 

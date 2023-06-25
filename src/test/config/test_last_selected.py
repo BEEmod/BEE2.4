@@ -1,7 +1,7 @@
 """Test parsing last-selected configuration."""
 import pytest
 from srctools import Keyvalues
-from srctools.dmx import Element, Attribute, ValueType
+from srctools.dmx import Element, ValueType
 
 from config.last_sel import LastSelected
 

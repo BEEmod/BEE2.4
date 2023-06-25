@@ -1,7 +1,7 @@
 """Test item default configs."""
 import pytest
 from srctools import Keyvalues
-from srctools.dmx import Element, Attribute, ValueType
+from srctools.dmx import Element, ValueType
 
 from config.item_defaults import ItemDefault, LEGACY
 from . import isolate_conf

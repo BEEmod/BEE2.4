@@ -15,7 +15,7 @@ def write_debug_info(ctx: Context) -> None:
     data = [
         f'printl("BEE version: {utils.BEE_VERSION}");',
         f'printl("Dev mode: {utils.DEV_MODE}, compiled={utils.FROZEN}");',
-        f'printl("Map items: ");',
+        'printl("Map items: ");',
     ]
 
     used_ids: list[str] = []

@@ -1019,7 +1019,9 @@ def apply_replacements(conf: Keyvalues, item_id: str) -> Keyvalues:
         try:
             return replace[var.casefold()]
         except KeyError:
-            raise ValueError(f'Unresolved variable in "{item_id}": {var!r}\nValid vars: {replace}')
+            raise ValueError(
+                f'Unresolved variable in "{item_id}": {var!r}\nValid vars: {replace}'
+            ) from None
 
     for kv in new_conf.iter_tree(blocks=True):
         kv.name = RE_PERCENT_VAR.sub(rep_func, kv.real_name)

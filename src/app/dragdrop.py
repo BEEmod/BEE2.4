@@ -936,7 +936,7 @@ async def test() -> None:
         slot_src.append(slot)
         slot.contents = item
 
-    def configure(e: 'tkinter.Event[tkinter.Canvas] | None') -> None:
+    def configure(e: tkinter.Event[tkinter.Canvas] | None) -> None:
         """Reflow slots when the window resizes."""
         manager.flow_slots(right_canv, slot_src)
 

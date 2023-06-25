@@ -12,7 +12,7 @@ from precomp import (
     conditions, tiling, texturing, rand, corridor, collisions,
     instance_traits, brushLoc, faithplate, template_brush,
 )
-from editoritems_props import prop_angled_panel_anim, PanelAnimation
+from editoritems_props import PanelAnimation
 import utils
 import consts
 

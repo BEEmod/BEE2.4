@@ -244,7 +244,7 @@ class ExportedTemplate:
     detail: Optional[Entity]
     overlay: list[Entity]
     orig_ids: dict[int, int]
-    template: 'Template'
+    template: Template
     origin: Vec
     orient: Matrix
     visgroups: set[str]
@@ -348,10 +348,10 @@ class Template:
             try:
                 world, detail, over = self._data[group.casefold()]
             except KeyError:
-                raise ValueError('Unknown visgroup "{}" for "{}"! (valid: {})'.format(
-                    group, self.id,
-                    ', '.join(map(repr, self._data)),
-                ))
+                raise ValueError(
+                    f'Unknown visgroup "{group}" for "{self.id}"! '
+                    f'(valid: {", ".join(map(repr, self._data))})'
+                ) from None
             world_brushes.extend(world)
             detail_brushes.extend(detail)
             overlays.extend(over)
@@ -1213,16 +1213,14 @@ def retexture_template(
                     setter_color = picker_results[tile_setter.picker_name]
                 except KeyError:
                     raise ValueError(
-                        '"{}": Tile Setter specified color picker '
-                        '"{}" which does not exist!'.format(
-                            template.id, tile_setter.picker_name
-                        )
-                    )
+                        f'"{template.id}": Tile Setter specified color picker '
+                        f'"{tile_setter.picker_name}" which does not exist!'
+                    ) from None
                 if setter_color is None:
                     raise ValueError(
-                        '"{}": Color picker "{}" has no tile to pick!'.format(
-                            template.id, tile_setter.picker_name
-                        ))
+                        f'"{template.id}": Color picker "{tile_setter.picker_name}" '
+                        f'has no tile to pick!'
+                    )
             elif isinstance(tile_setter.color, Portalable):
                 # The color was specifically set.
                 setter_color = tile_setter.color
@@ -1233,9 +1231,8 @@ def retexture_template(
             else:
                 # We need a forced color, but none was provided.
                 raise ValueError(
-                    '"{}": Tile Setter set to use colour value from the '
-                    "template's overall color, "
-                    'but not given one!'.format(template.id)
+                    f'"{template.id}": Tile Setter set to use colour value from '
+                    "the template's overall color, but not given one!"
                 )
 
             # Inverting applies to all of these.
