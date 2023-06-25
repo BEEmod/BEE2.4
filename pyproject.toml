@@ -66,6 +66,10 @@ extend-ignore = [
 	"PIE796",
 	]
 
+exclude = [
+	"src/perlin.py",
+]
+
 [tool.ruff.flake8-bugbear]
 extend-immutable-calls = [
 	# Objects which are immutable, or close enough that it's fine to be in func defaults.
