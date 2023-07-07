@@ -1,7 +1,7 @@
 attrs >= 22.1.0
 mistletoe >= 1.0.1
-Pillow >= 9.4.0
-pyglet == 1.5.18
+Pillow == 9.5.0  # 10.0 removes 32-bit wheels.
+pyglet == 1.5.18  # Later versions have some issues on 3.8
 PyInstaller >= 5.12.0
 pygtrie >= 2.4.0
 babel >= 2.12.1
