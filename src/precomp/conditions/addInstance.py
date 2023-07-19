@@ -102,7 +102,7 @@ def res_add_overlay_inst(vmf: VMF, inst: Entity, res: Keyvalues) -> Optional[Ent
         angles @= Angle.from_str(inst['angles', '0 0 0'])
 
     orig_name = res['file', '']
-    filename = instanceLocs.resolve_one(inst.fixup.substitute(orig_name), error=True)
+    filename = instanceLocs.resolve_one(inst.fixup.substitute(orig_name), default='')
 
     if not filename:
         # Don't show an error if it's being read from a fixup, or if the original name is blank.

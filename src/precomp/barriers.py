@@ -17,7 +17,7 @@ from precomp import (
 import consts
 import user_errors
 from precomp.grid_optim import optimise as grid_optimise
-from precomp.instanceLocs import resolve_one, resolve
+from precomp.instanceLocs import resolve_filter, resolve_one, resolve
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -62,7 +62,7 @@ def parse_map(vmf: VMF, info: conditions.MapInfo) -> None:
     This removes the per-tile instances, and all original brushwork.
     The frames are updated with a fixup var, as appropriate.
     """
-    frame_inst = resolve('[glass_frames]', silent=True)
+    frame_inst = resolve_filter('[glass_frames]', silent=True)
     glass_inst = resolve_one('[glass_128]', error=False)
 
     for entities, voice_attr, material, barrier_type in [

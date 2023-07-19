@@ -186,7 +186,7 @@ def res_make_catwalk(vmf: VMF, res: Keyvalues) -> object:
         * `single_wall`: A section connecting to an East wall.
     """
     LOGGER.info("Starting catwalk generator...")
-    marker = instanceLocs.resolve(res['markerInst'])
+    marker = instanceLocs.resolve_filter(res['markerInst'])
 
     instances: Dict[Optional[Instances], str] = {
         inst_name: instanceLocs.resolve_one(res[inst_name.value, ''], error=True)

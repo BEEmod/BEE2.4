@@ -11,10 +11,11 @@ from srctools.vmf import VMF, Entity, EntityFixup, Output
 from srctools import EmptyMapping, FrozenVec, Keyvalues, Vec, Matrix, Angle
 import srctools.logger
 import attrs
+from typing_extensions import Literal, assert_never
 
 from precomp import brushLoc, options, packing, conditions, connections
 from precomp.conditions.globals import precache_model
-from precomp.instanceLocs import resolve as resolve_inst
+from precomp.instanceLocs import resolve as resolve_inst, resolve_filter
 import user_errors
 
 
@@ -1177,14 +1178,16 @@ def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
     """
     # cube or dropper -> cubetype or droppertype value.
     inst_to_cube: dict[str, CubeType] = {
-        fname: cube_type
+        fname.casefold(): cube_type
         for cube_type in CUBE_TYPES.values()
         for fname in cube_type.instances
+        if fname
     }
     inst_to_drop: dict[str, DropperType] = {
-        fname: drop_type
+        fname.casefold(): drop_type
         for drop_type in DROPPER_TYPES.values()
         for fname in drop_type.instances
+        if fname
     }
 
     # Origin -> instances
@@ -1333,9 +1336,10 @@ def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
         PAIRS.append(CubePair(cube_type, drop_type, dropper=dropper))
 
     # Check for colorisers, superpos entanglers and gel splats in the map, and apply those.
-    coloriser_inst = resolve_inst('<ITEM_BEE2_CUBE_COLORISER>', silent=True)
-    superpos_inst = resolve_inst('<ITEM_BEE2_SUPERPOSITION_ENTANGLER>', silent=True)
-    splat_inst = resolve_inst('<ITEM_PAINT_SPLAT>', silent=True)
+    coloriser_inst = resolve_filter('<ITEM_BEE2_CUBE_COLORISER>', silent=True)
+    superpos_inst = resolve_filter('<ITEM_BEE2_SUPERPOSITION_ENTANGLER>', silent=True)
+    splat_inst = resolve_filter('<ITEM_PAINT_SPLAT>', silent=True)
+    kind: Literal['color', 'superpos', 'splat']
 
     LOGGER.info(
         'Looking for special-cased instances for cubes:\n'
@@ -1349,11 +1353,11 @@ def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
         file = inst['file'].casefold()
 
         if file in coloriser_inst:
-            kind = coloriser_inst
+            kind = 'color'
         elif file in superpos_inst:
-            kind = superpos_inst
+            kind = 'superpos'
         elif file in splat_inst:
-            kind = splat_inst
+            kind = 'splat'
         else:
             # Not one we care about.
             continue
@@ -1377,7 +1381,7 @@ def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
             with suppress(KeyError):
                 pairs.append(CUBE_POS[pos.freeze()])
 
-        if kind is coloriser_inst:
+        if kind == 'color':
             # The instance is useless now we know about it.
             inst.remove()
 
@@ -1388,7 +1392,7 @@ def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
             ))
             for pair in pairs:
                 pair.tint = color.copy()
-        elif kind is splat_inst:
+        elif kind == 'splat':
             try:
                 paint_type = CubePaintType(inst.fixup.int('$paint_type'))
             except ValueError:
@@ -1405,7 +1409,7 @@ def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
                     used = True
             if used:
                 inst.remove()
-        elif kind is superpos_inst:
+        elif kind == 'superpos':
             try:
                 superpos_item = connections.ITEMS[inst['targetname']]
             except KeyError:
@@ -1457,7 +1461,7 @@ def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
                 int, 'superposition_ghost_alpha',
             )))
         else:
-            raise AssertionError(f'Unknown kind {kind!r}?')
+            assert_never(kind)
 
     # After that's done, save what cubes are present for filter optimisation,
     # and set Voice 'Has' attrs.

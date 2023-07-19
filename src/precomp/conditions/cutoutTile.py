@@ -80,7 +80,7 @@ def res_cutout_tile(vmf: srctools.VMF, res: Keyvalues):
             (This allows customising the surfaceprop.)
 
     """
-    marker_filenames = instanceLocs.resolve(res['markeritem'])
+    marker_filenames = instanceLocs.resolve_filter(res['markeritem'])
 
     # TODO: Reimplement cutout tiles.
     for inst in vmf.by_class['func_instance']:

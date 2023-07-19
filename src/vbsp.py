@@ -797,7 +797,7 @@ def set_elev_videos(vmf: VMF, info: corridor.Info) -> None:
         LOGGER.warning('Invalid elevator video type!')
         return
 
-    transition_ents = instanceLocs.resolve('[transitionents]')
+    transition_ents = instanceLocs.resolve_filter('[transitionents]')
     for inst in vmf.by_class['func_instance']:
         if inst['file'].casefold() not in transition_ents:
             continue

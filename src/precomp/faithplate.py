@@ -148,9 +148,9 @@ def associate_faith_plates(vmf: VMF) -> None:
     # Loop over instances, recording plates and moving targets into the tiledefs.
     instances: Dict[str, Entity] = {}
 
-    faith_targ_file = instanceLocs.resolve('<ITEM_CATAPULT_TARGET>')
+    faith_targ_files = instanceLocs.resolve_filter('<ITEM_CATAPULT_TARGET>')
     for inst in vmf.by_class['func_instance']:
-        if inst['file'].casefold() in faith_targ_file:
+        if inst['file'].casefold() in faith_targ_files:
             inst.remove()  # Don't keep the targets.
             origin = Vec.from_str(inst['origin'])
             norm = Vec(z=1) @ Angle.from_str(inst['angles'])

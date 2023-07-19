@@ -44,7 +44,7 @@ def res_resizeable_trigger(vmf: VMF, info: conditions.MapInfo, res: Keyvalues) -
     * `localkeys`: The same as above, except values will be changed to use
         instance-local names.
     """
-    marker = instanceLocs.resolve(res['markerInst'])
+    marker = instanceLocs.resolve_filter(res['markerInst'])
 
     marker_names = set()
 

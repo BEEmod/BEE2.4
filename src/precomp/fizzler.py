@@ -244,7 +244,7 @@ class FizzlerType:
                 conf.find_all(inst_type_name.replace('_', '')),
             ):
                 resolved = instanceLocs.resolve(prop.value)
-                if prop.value and not resolved:
+                if prop.value and not any(resolved):
                     LOGGER.warning('No instances found using specifier "{}"!', prop.value)
                 instances.extend(resolved)
 
@@ -257,13 +257,13 @@ class FizzlerType:
             if weights:
                 # Produce the weights, then process through the original
                 # list to build a new one with repeated elements.
-                inst[inst_type, is_static] = instances = list(map(
+                inst[inst_type, is_static] = instances = list(filter(None, map(
                     instances.__getitem__,
                     rand.parse_weights(len(instances), weights)
-                ))
+                )))
             # If static versions aren't given, reuse non-static ones.
             # We did False before True above, so we know it's already been calculated.
-            if not instances and is_static:
+            if not any(instances) and is_static:
                 inst[inst_type, True] = inst[inst_type, False]
 
         voice_attrs = []
@@ -1261,7 +1261,7 @@ def generate_fizzlers(vmf: VMF) -> None:
             or fizz_type.inst[FizzInst.ALL, is_static]
         )
 
-        if not model_min or not model_max:
+        if not any(model_min) or not any(model_max):
             raise user_errors.UserError(
                 user_errors.TOK_FIZZLER_NO_MODEL_SIDE.format(id=fizz_type.id),
                 voxels=[pos for minmax in fizz.emitters for pos in minmax],

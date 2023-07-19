@@ -2,6 +2,16 @@
 
 This way VBSP_config files can generically refer to items, and work in
 multiple styles.
+
+Valid path styles:
+- "<ITEM_ID>" matches all indexes.
+- "<ITEM_ID:>" gives all indexes and custom extra instances.
+- "<ITEM_ID:1,2,5>": matches the given indexes for that item.
+- "<ITEM_ID:cube_black, cube_white>": the same, with strings for indexes
+- "<ITEM_ID:bee2_value>": Custom extra instances defined in editoritems.
+- "<ITEM_ID:bee2_value, 3, 2, cube_black>": Any combination of the above
+- "[spExitCorridor]": Hardcoded shortcuts for specific items
+- "path/to_instance": A single direct instance path.
 """
 import logging
 import re
@@ -12,7 +22,7 @@ import editoritems
 import srctools.logger
 
 from typing import (
-    Callable, Optional, Sequence, Union,
+    Callable, FrozenSet, Optional, Sequence, Union,
     List, Dict, Tuple, TypeVar, Iterable, overload,
 )
 import corridor
@@ -229,19 +239,23 @@ def load_conf(items: Iterable[editoritems.Item]) -> None:
         if item.cust_instances:
             CUST_INST_FILES[item.id.casefold()] = cust_instances = {}
             for name, file in item.cust_instances.items():
-                cust_instances[name] = folded = str(file).casefold()
-                ITEM_FOR_FILE[folded] = (item.id, name)
+                fname = str(file)
+                if fname == '.':
+                    cust_instances[name] = ''
+                else:
+                    cust_instances[name] = fname
+                    ITEM_FOR_FILE[fname.casefold()] = (item.id, name)
 
         # Normal instances: index -> filename
         INSTANCE_FILES[item.id.casefold()] = [
-            '' if inst.inst == EMPTY else str(inst.inst).casefold()
+            '' if inst.inst == EMPTY else str(inst.inst)
             for inst in item.instances
         ]
         for ind, inst in enumerate(item.instances):
-            fname = str(inst.inst).casefold()
+            fname = str(inst.inst)
             # Not real instances.
-            if fname != '.' and not fname.startswith('instances/bee2_corridor/'):
-                ITEM_FOR_FILE[fname] = (item.id, ind)
+            if fname != '.' and not fname.casefold().startswith('instances/bee2_corridor/'):
+                ITEM_FOR_FILE[fname.casefold()] = (item.id, ind)
 
     INST_SPECIAL.clear()
     INST_SPECIAL.update({
@@ -277,22 +291,13 @@ def set_chosen_corridor(
             for i in range(1, count + 1):
                 INST_SPECIAL[f'{prefix}{i}'] = []
             INSTANCE_FILES[item_id.casefold()][:count] = [''] * count
-    # Clear since these were evaluated before.
+    # Clear in case these were evaluated before.
     _resolve.cache_clear()
+    resolve_filter.cache_clear()
 
 
 def resolve(path: str, silent: bool=False) -> List[str]:
     """Resolve an instance path into the values it refers to.
-
-    Valid paths:
-    - "<ITEM_ID>" matches all indexes.
-    - "<ITEM_ID:>" gives all indexes and custom extra instances.
-    - "<ITEM_ID:1,2,5>": matches the given indexes for that item.
-    - "<ITEM_ID:cube_black, cube_white>": the same, with strings for indexes
-    - "<ITEM_ID:bee2_value>": Custom extra instances defined in editoritems.
-    - "<ITEM_ID:bee2_value, 3, 2, cube_black>": Any combination of the above
-    - "[spExitCorridor]": Hardcoded shortcuts for specific items
-    - "path/to_instance": A single direct instance path
 
     This returns a list of instances which match the selector, or an empty list
     if it's invalid. Incorrect [] will raise an exception (since these are
@@ -315,14 +320,28 @@ def resolve(path: str, silent: bool=False) -> List[str]:
     else:
         return _resolve(path)
 
+
+@lru_cache(maxsize=100)
+def resolve_filter(path: str, silent: bool=False) -> FrozenSet[str]:
+    """Resolve an instance path into a list of instances, for filtering.
+
+    This skips empty filenames, and filters them all.
+    """
+    return frozenset({
+        filename.casefold()
+        for filename in resolve(path, silent)
+        if filename
+    })
+
+
 Default_T = TypeVar('Default_T')
 
 
 @overload
 def resolve_one(path: str, *, error: bool) -> str: ...
 @overload
-def resolve_one(path: str, default: Default_T, *, error: bool) -> Union[str, Default_T]: ...
-def resolve_one(path: str, default: Union[str, Default_T]='', *, error: bool) -> Union[str, Default_T]:
+def resolve_one(path: str, default: Default_T) -> Union[str, Default_T]: ...
+def resolve_one(path: str, default: Union[str, Default_T]='', *, error: bool=False) -> Union[str, Default_T]:
     """Resolve a path into one instance.
 
     If multiple are given, this returns the first.
@@ -385,7 +404,7 @@ def _resolve(path: str) -> List[str]:
         # Remove "" from the output.
         return list(filter(None, out))
     else:
-        return [path.casefold()]
+        return [path]
 
 
 def get_subitems(comma_list: str, item_inst: List[str], item_id: str) -> List[str]:

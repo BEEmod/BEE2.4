@@ -153,8 +153,9 @@ def res_vactubes(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
                 size = 0
                 file = prop.value
 
-            for inst_filename in instanceLocs.resolve(file):
-                inst_config[inst_filename] = conf, size
+            inst_config.update(
+                dict.fromkeys(instanceLocs.resolve_filter(file), (conf, size))
+            )
 
     def result(_: Entity) -> object:
         """Create the vactubes."""

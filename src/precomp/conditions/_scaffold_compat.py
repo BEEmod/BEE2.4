@@ -116,8 +116,9 @@ def res_old_unst_scaffold(res: Keyvalues) -> None:
             if conf[logic_type + '_rev'] is None:
                 conf[logic_type + '_rev'] = conf[logic_type]
 
-        for filename in instanceLocs.resolve(block['file']):
-            targ_inst[filename] = conf
+        targ_inst.update(
+            dict.fromkeys(instanceLocs.resolve_filter(block['file']), conf)
+        )
 
     # We need to provide vars to link the tracks and beams.
     for block in res.find_all('LinkEnt'):

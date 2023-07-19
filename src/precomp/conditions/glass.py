@@ -5,7 +5,7 @@ from srctools import FrozenVec, Keyvalues, Vec, VMF, Entity, Output, Angle
 import srctools.logger
 
 from precomp import template_brush, conditions
-from precomp.instanceLocs import resolve as resolve_inst
+from precomp.instanceLocs import resolve_one
 import consts
 
 
@@ -60,10 +60,10 @@ CORNER_POINTS: Dict[FrozenVec, List[Tuple[Any, Any, Any]]] = {
 
 def glass_item_setup(conf: dict, item_id, config_dict):
     """Build the config dictionary for a custom glass item."""
-    [base_inst] = resolve_inst(f'<{item_id}:0>')
+    base_inst = resolve_one(f'<{item_id}:0>', error=True)
 
     conf.update({
-        'frame_' + name: resolve_inst(f'<{item_id}:bee2_frame_{name}>')[0]
+        'frame_' + name: resolve_one(f'<{item_id}:bee2_frame_{name}>', error=True)
         for name in ['edge', 'single', 'ubend', 'corner']
     })
     config_dict[base_inst.casefold()] = conf

@@ -17,7 +17,7 @@ COND_MOD_NAME = 'Instances'
 @make_flag('instance')
 def flag_file_equal(flag: Keyvalues) -> Callable[[Entity], bool]:
     """Evaluates True if the instance matches the given file."""
-    inst_list = set(instanceLocs.resolve(flag.value))
+    inst_list = instanceLocs.resolve_filter(flag.value)
 
     def check_inst(inst: Entity) -> bool:
         """Each time, check if no matching instances exist, so we can skip conditions."""
@@ -36,7 +36,7 @@ def flag_file_cont(inst: Entity, flag: Keyvalues) -> bool:
 @make_flag('hasInst')
 def flag_has_inst(flag: Keyvalues) -> Callable[[Entity], bool]:
     """Checks if the given instance is present anywhere in the map."""
-    flags = set(instanceLocs.resolve(flag.value))
+    flags = instanceLocs.resolve_filter(flag.value)
     return lambda inst: flags.isdisjoint(conditions.ALL_INST)
 
 

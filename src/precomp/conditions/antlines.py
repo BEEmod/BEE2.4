@@ -177,8 +177,8 @@ def res_antlaser(vmf: VMF, res: Keyvalues) -> object:
 
     This is executed once to modify all instances.
     """
-    conf_inst_corner = instanceLocs.resolve('<item_bee2_antline_corner>', silent=True)
-    conf_inst_laser = instanceLocs.resolve(res['instance'])
+    conf_inst_corner = instanceLocs.resolve_filter('<item_bee2_antline_corner>', silent=True)
+    conf_inst_laser = instanceLocs.resolve_filter(res['instance'])
     conf_glow_height = Vec(z=res.float('GlowHeight', 48) - 64)
     conf_las_start = Vec(z=res.float('LasStart') - 64)
     conf_rope_off = res.vec('RopePos')

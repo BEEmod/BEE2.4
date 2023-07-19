@@ -1725,9 +1725,9 @@ def analyse_map(vmf_file: VMF, side_to_ant_seg: dict[int, list[antlines.Segment]
 
     # Look for Angled and Flip Panels, to link the tiledef to the instance.
     # First grab the instances.
-    panel_fname = instanceLocs.resolve('<ITEM_PANEL_ANGLED>, <ITEM_PANEL_FLIP>')
+    panel_fname = instanceLocs.resolve_filter('<ITEM_PANEL_ANGLED>, <ITEM_PANEL_FLIP>')
     # Also find PeTI-placed placement helpers, and move them into the tiledefs.
-    placement_helper_file = instanceLocs.resolve('<ITEM_PLACEMENT_HELPER>')
+    placement_helper_file = instanceLocs.resolve_filter('<ITEM_PLACEMENT_HELPER>')
 
     panels: dict[str, Entity] = {}
     for inst in vmf_file.by_class['func_instance']:
