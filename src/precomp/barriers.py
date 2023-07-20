@@ -63,7 +63,7 @@ def parse_map(vmf: VMF, info: conditions.MapInfo) -> None:
     The frames are updated with a fixup var, as appropriate.
     """
     frame_inst = resolve_filter('[glass_frames]', silent=True)
-    glass_inst = resolve_one('[glass_128]', error=False)
+    glass_inst = resolve_filter('[glass_128]', silent=True)
 
     for entities, voice_attr, material, barrier_type in [
         (vmf.by_class['func_detail'], 'glass', consts.Special.GLASS, BarrierType.GLASS),
@@ -79,7 +79,7 @@ def parse_map(vmf: VMF, info: conditions.MapInfo) -> None:
 
     for inst in vmf.by_class['func_instance']:
         filename = inst['file'].casefold()
-        if filename and filename == glass_inst:
+        if filename and filename in glass_inst:
             inst.remove()
         elif filename in frame_inst:
             # Add a fixup to allow distinguishing the type.

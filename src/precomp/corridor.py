@@ -74,11 +74,11 @@ def analyse_and_modify(
     elev_override indicates if we force the player to spawn in the elevator.
     """
     # The three elevators.
-    file_coop_exit = instanceLocs.get_special_inst('coopExit')
-    file_sp_exit = instanceLocs.get_special_inst('spExit')
-    file_sp_entry = instanceLocs.get_special_inst('spEntry')
+    file_coop_exit = instanceLocs.resolve_filter('[coopExit]')
+    file_sp_exit = instanceLocs.resolve_filter('[spExit]')
+    file_sp_entry = instanceLocs.resolve_filter('[spEntry]')
 
-    file_door_frame = instanceLocs.get_special_inst('door_frame')
+    file_door_frame = instanceLocs.resolve_filter('[door_frame]')
 
     # If shift is held, this is reversed.
     if utils.check_shift():
@@ -185,20 +185,20 @@ def analyse_and_modify(
             # Tiling means this isn't useful, we always use templates.
             item.remove()
             continue
-        elif file_coop_exit == file:
+        elif file in file_coop_exit:
             seen_game_modes.add(GameMode.COOP)
             # Elevator instances don't get named - fix that...
             if elev_override:
                 item.fixup['no_player_start'] = '1'
             item['targetname'] = 'coop_exit'
             inst_elev_exit = item
-        elif file_sp_entry == file:
+        elif file in file_sp_entry:
             seen_game_modes.add(GameMode.SP)
             if elev_override:
                 item.fixup['no_player_start'] = '1'
             item['targetname'] = 'elev_entry'
             inst_elev_entry = item
-        elif file_sp_exit == file:
+        elif file in file_sp_exit:
             seen_game_modes.add(GameMode.SP)
             if elev_override:
                 item.fixup['no_player_start'] = '1'

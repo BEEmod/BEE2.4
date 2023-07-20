@@ -114,7 +114,7 @@ def ap_tag_modifications(vmf: VMF):
     has['spawn_single'] = False
     has['spawn_nogun'] = True
 
-    transition_ents = instanceLocs.get_special_inst('transitionents')
+    transition_ents = instanceLocs.resolve_filter('[transitionents]')
     for inst in vmf.by_class['func_instance']:
         if inst['file'].casefold() in transition_ents:
             inst['file'] = TRANSITION_ENTS

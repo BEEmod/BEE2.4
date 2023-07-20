@@ -470,23 +470,3 @@ def get_cust_inst(item_id: str, inst: str) -> Optional[str]:
     This returns None if the given value is not present.
     """
     return CUST_INST_FILES[item_id.casefold()].get(inst.casefold(), None)
-
-
-def get_special_inst(name: str) -> Union[str, Sequence[str]]:
-    """Get the instance associated with a "[special]" instance path."""
-    try:
-        inst = INST_SPECIAL[name.casefold()]
-    except KeyError:
-        raise KeyError(f"Invalid special instance name! ({name})")
-
-    # The number you'll get is fixed, so it's fine if we return different
-    # types.
-    # Unpack single instances, since that's what you want most of the
-    # time. We only do that if there's no ',' in the <> lookup, so it doesn't
-    # affect
-    if len(inst) == 1 and ',' not in SPECIAL_INST_FOLDED[name.casefold()]:
-        return inst[0]
-    elif len(inst) == 0:
-        return ()
-    else:
-        return inst
