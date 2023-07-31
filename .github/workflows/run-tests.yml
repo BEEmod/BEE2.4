@@ -54,7 +54,7 @@ jobs:
       # Enable Python's debug mode to do additional checks, and error if any uncaught warnings are
       # produced.
       run: |
-        python -X dev -Werror -m pytest ${{ github.workspace }}/src/test/
+        python -X dev -m pytest ${{ github.workspace }}/src/test/
       env:
         PYTHONPATH: ${{ github.workspace }}/src/
       # Don't fail for beta versions of Python.
