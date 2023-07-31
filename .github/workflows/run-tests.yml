@@ -1,0 +1,61 @@
+name: Run tests
+
+on:
+  push:
+    branches: [ master, dev ]
+  pull_request:
+    branches: [ master, dev ]
+  workflow_dispatch:
+    # Allow triggering manually on other branches.
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  run-tests:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # We want 3.8 because it works on Windows 7.
+          - python-version: '3.8.10'
+            arch: 'x86'
+            os: 'windows-latest'
+          - python-version: '3.11'
+            arch: 'x64'
+            os: 'windows-latest'
+          - python-version: '3.12-dev'
+            arch: 'x64'
+            os: 'windows-latest'
+          - python-version: '3.11'
+            arch: 'x64'
+            os: 'ubuntu-latest'
+
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        submodules: true
+    - name: Set up Python ${{ matrix.python-version }}-${{ matrix.arch }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+        architecture: ${{ matrix.arch }}
+        cache: 'pip'
+        cache-dependency-path: |
+          'test-requirements.txt'
+          'requirements.txt'
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip setuptools wheel
+        python -m pip install -r requirements.txt test-requirements.txt
+    - name: Test with pytest
+      # Enable Python's debug mode to do additional checks, and error if any uncaught warnings are
+      # produced.
+      run: |
+        python -X dev -Werror -m pytest src/tests/
+      env:
+        PYTHONPATH: src/
+      # Don't fail for beta versions of Python.
+      continue-on-error: ${{ contains(matrix.python-version, 'dev') }}

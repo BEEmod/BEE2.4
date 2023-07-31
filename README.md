@@ -43,11 +43,11 @@ As of version 4.37 we have stopped supporting BEE2.4 on Mac. See [this wiki arti
 ### Compilation ###
 
 * You'll need Python 3.8 or later, for 32-bit / Windows 7 you need 3.8 specifically.
-* First, grab the repo and then clone HammerAddons:
+* First, grab the repo and then clone the HammerAddons submodule:
 
 	    git clone --recurse-submodules https://github.com/BEEmod/BEE2.4.git
-        cd BEE2.4
-	    git submodules update
+      cd BEE2.4
+	    git submodules update --init
 
 * Run `python -m pip install -r requirements.txt` to install the required packages. On Linux, 
 Pillow, TK and IDLE might need to be installed via the system package manager:
