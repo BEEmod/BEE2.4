@@ -96,7 +96,7 @@ class GenOptions(config.Data, conf_name='Options', palette_stores=False, version
         try:
             after_export = AfterExport(data.int('after_export', 0))
         except ValueError:
-            after_export = AfterExport.NORMAL
+            after_export = attrs.fields(GenOptions).after_export.default
 
         return GenOptions(
             after_export=after_export,
@@ -131,19 +131,19 @@ class GenOptions(config.Data, conf_name='Options', palette_stores=False, version
         try:
             res['preserve_fgd'] = data['preserve_fgd' if version > 1 else 'preserve_resources'].val_bool
         except KeyError:
-            res['preserve_fgd'] = False
+            pass
         try:
             res['after_export'] = AfterExport(data['after_export'].val_int)
         except (KeyError, ValueError):
-            res['after_export'] = AfterExport.NORMAL
+            pass
         try:
             res['log_win_level'] = data['log_win_level'].val_str
         except (KeyError, ValueError):
-            res['log_win_level'] = 'INFO'
+            pass
         try:
             res['language'] = data['language'].val_str
         except KeyError:
-            res['language'] = ''
+            pass
 
         for field in gen_opts_bool:
             try:
