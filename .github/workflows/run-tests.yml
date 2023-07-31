@@ -44,12 +44,12 @@ jobs:
         architecture: ${{ matrix.arch }}
         cache: 'pip'
         cache-dependency-path: |
-          'test-requirements.txt'
+          'dev-requirements.txt'
           'requirements.txt'
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip setuptools wheel
-        python -m pip install -r requirements.txt test-requirements.txt
+        python -m pip install -r requirements.txt -r dev-requirements.txt
     - name: Test with pytest
       # Enable Python's debug mode to do additional checks, and error if any uncaught warnings are
       # produced.
