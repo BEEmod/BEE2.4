@@ -15,7 +15,7 @@ import logging
 import functools
 import weakref
 
-from PIL import ImageFont, ImageTk, Image, ImageDraw
+from PIL import ImageColor, ImageFont, ImageTk, Image, ImageDraw
 import attrs
 import trio
 
@@ -356,7 +356,11 @@ class Handle(User):
         typ: Type[Handle]
         args: list
         if uri.path.casefold() == '<black>':  # Old special case name.
-            LOGGER.warning('Using "{}" for a black icon is deprecated, use "<color>:000" or "<rgb>:000".', uri)
+            LOGGER.warning(
+                'Using "{}" for a black icon is deprecated, use "<color>:black", '
+                '"<color>:#000" or "<rgb>:rgb(0,0,0)".',
+                uri,
+            )
             typ = ImgColor
             args = [0, 0, 0]
         elif uri.package.startswith('<') and uri.package.endswith('>'):  # Special names.
@@ -374,18 +378,15 @@ class Handle(User):
                 else:
                     raise ValueError(f'Unknown special type "{uri.path}"!')
             elif special_name in ('color', 'colour', 'rgb'):
-                # <color>:#RGB, <color>:#RRGGBB, <color>:R,G,B
                 color = uri.path
-                if color.startswith('#'):
-                    color = color[1:]
                 try:
-                    if ',' in color:
+                    if ',' in color:  # <color>:R,G,B
                         r, g, b = map(int, color.split(','))
-                    elif len(color) == 3:
+                    elif len(color) == 3: # RGB
                         r = int(color[0] * 2, 16)
                         g = int(color[1] * 2, 16)
                         b = int(color[2] * 2, 16)
-                    elif len(color) == 6:
+                    elif len(color) == 6: # RRGGBB
                         r = int(color[0:2], 16)
                         g = int(color[2:4], 16)
                         b = int(color[4:6], 16)
@@ -393,9 +394,12 @@ class Handle(User):
                         raise ValueError
                 except (ValueError, TypeError, OverflowError):
                     try:
-                        r, g, b = _UI_IMPL.ui_get_color(color)
+                        # <color>:#RRGGBB, :rgb(RR, GG, BB), :hsv(HH, SS, VV) etc
+                        r, g, b, *a = ImageColor.getrgb(color)
+                        if len(a) not in (0, 1):
+                            raise ValueError
                     except ValueError:
-                        raise ValueError(f'Colors must be RGB, RRGGBB hex values, or R,G,B decimal!, not {uri}') from None
+                        raise ValueError(f'Colors must be #RGB, #RRGGBB hex values, or R,G,B decimal, not {uri}') from None
                 typ = ImgColor
                 args = [r, g, b]
             elif special_name in ('bee', 'bee2'):  # Builtin resources.
@@ -936,11 +940,6 @@ class UIImage(abc.ABC):
     def ui_force_load(self, handle: Handle) -> None:
         """Called when this handle is reloading, and should update all its widgets."""
         raise NotImplementedError
-
-    @abc.abstractmethod
-    def ui_get_color(self, text: str) -> Tuple[int, int, int]:
-        """Look up colours in the UI library's database, or raise ValueError if not found."""
-        raise ValueError
 
     @abc.abstractmethod
     async def ui_anim_task(self, load_handles: Iterable[tuple[Handle, Sequence[Handle]]]) -> None:

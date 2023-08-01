@@ -225,18 +225,6 @@ class TKImages(img.UIImage):
             image.paste(res)
         return image
 
-    def ui_get_color(self, text: str) -> Tuple[int, int, int]:
-        """Look up a colour in TK's colour list."""
-        try:
-            r, g, b = TK_ROOT.winfo_rgb(text)
-        except tk.TclError as exc:
-            raise ValueError(text) from exc
-        # They're full 16-bit colors, we don't want that.
-        r >>= 8
-        g >>= 8
-        b >>= 8
-        return r, g, b
-
     async def ui_anim_task(self, load_handles: Iterable[tuple[img.Handle, Sequence[img.Handle]]]) -> None:
         """Cycle loading icons."""
         for i in itertools.cycle(img.LOAD_FRAME_IND):
