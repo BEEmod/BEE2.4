@@ -353,9 +353,6 @@ class Handle(User):
         If subfolder is specified, files will be relative to this folder.
         The width/height may be zero to indicate it should not be resized.
         """
-        if subfolder:
-            uri = uri.in_folder(subfolder)
-
         typ: Type[Handle]
         args: list
         if uri.path.casefold() == '<black>':  # Old special case name.
@@ -402,11 +399,15 @@ class Handle(User):
                 typ = ImgColor
                 args = [r, g, b]
             elif special_name in ('bee', 'bee2'):  # Builtin resources.
+                if subfolder:
+                    uri = uri.in_folder(subfolder)
                 typ = ImgBuiltin
                 args = [uri]
             else:
                 raise ValueError(f'Unknown special icon type "{uri}"!')
         else:  # File item
+            if subfolder:
+                uri = uri.in_folder(subfolder)
             typ = ImgFile
             args = [uri]
         return typ._deduplicate(width, height, *args)
