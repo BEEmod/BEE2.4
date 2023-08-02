@@ -392,7 +392,7 @@ def get_config(
     if len(path) < 3 or path[-4] != '.':
         # Add extension
         path += extension
-    return lazy_conf.from_file(utils.PackagePath(pak_id, path), source=source)
+    return lazy_conf.from_file(utils.PackagePath(pak_id, path), source=f'{pak_id}:{path}')
 
 
 def set_cond_source(kv: Keyvalues, source: str) -> None:

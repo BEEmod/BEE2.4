@@ -154,6 +154,7 @@ class ItemVariant:
                 kv,
                 'items',
                 pak_id,
+                source=source,
             )
         else:
             vbsp_config = self.vbsp_config
@@ -171,6 +172,7 @@ class ItemVariant:
             'items',
             pak_id,
             prop_name='append',
+            source=source,
         ))
 
         if 'description' in kv:
