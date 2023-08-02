@@ -388,12 +388,13 @@ def res_import_template(
     """Import a template VMF file, retexturing it to match orientation.
 
     It will be placed overlapping the given instance. If no block is used, only
-    ID can be specified.
+    the ID can be specified.
     Options:
 
-    - `ID`: The ID of the template to be inserted. Add visgroups to additionally
-            add after a colon, comma-seperated (`temp_id:vis1,vis2`).
-            Either section, or the whole value can be a `$fixup`.
+    - `ID`: The ID of the template to be inserted. Visgroups can be specified after
+            a colon, comma-seperated (`temp_id:vis1,vis2`).
+            `$fixup` variables can be used for any part. As a convenience, if the
+            ID is totally blank this will do nothing.
     - `angles`: Override the instance rotation, so it is always rotated this much.
     - `rotation`: Apply the specified rotation before the instance's rotation.
     - `offset`: Offset the template from the instance's position.
@@ -404,7 +405,7 @@ def res_import_template(
             be switched to that size (if not a floor/ceiling). If 'world' or
             'detail' is present, the brush will be forced to that type.
     - `replace`: A block of template material -> replacement textures.
-            This is case insensitive - any texture here will not be altered
+            This is case-insensitive - any texture here will not be altered
             otherwise. If the material starts with a `#`, it is instead a
             list of face IDs separated by spaces. If the result evaluates
             to "", no change occurs. Both can be $fixups (parsed first).
@@ -579,9 +580,11 @@ def res_import_template(
 
     def place_template(inst: Entity) -> None:
         """Place a template."""
+        # Special case - if blank, just do nothing silently.
+        if not orig_temp_id:
+            return
         temp_id = inst.fixup.substitute(orig_temp_id)
 
-        # Special case - if blank, just do nothing silently.
         if not temp_id:
             return
 
