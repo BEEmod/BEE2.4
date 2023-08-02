@@ -43,7 +43,7 @@ def res_track_plat(vmf: VMF, res: Keyvalues) -> object:
     (
         inst_bot_grate, inst_bottom, inst_middle,
         inst_top, inst_plat, inst_plat_oscil, inst_single
-    ) = instanceLocs.resolve(res['orig_item'])
+    ) = map(str.casefold, instanceLocs.resolve(res['orig_item']))
     single_plat_inst = instanceLocs.resolve_one(res['single_plat', ''], error=False)
     track_targets = res['track_name', '']
 
