@@ -403,7 +403,8 @@ def set_cond_source(kv: Keyvalues, source: str) -> None:
     to the config file creating it.
     """
     for cond in kv.find_all('Conditions', 'Condition'):
-        cond['__src__'] = source
+        if '__src__' not in cond:
+            cond['__src__'] = source
 
 
 @attrs.define
