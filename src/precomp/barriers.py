@@ -5,7 +5,7 @@ from collections import defaultdict
 from enum import Enum
 from typing import Callable, List, Tuple
 
-from srctools import VMF, Vec, FrozenVec, Solid, Keyvalues, Entity, Angle, Matrix
+from srctools import FrozenMatrix, VMF, Vec, FrozenVec, Solid, Keyvalues, Entity, Angle, Matrix
 import srctools.logger
 from typing_extensions import Literal
 
@@ -17,7 +17,7 @@ from precomp import (
 import consts
 import user_errors
 from precomp.grid_optim import optimise as grid_optimise
-from precomp.instanceLocs import resolve_filter, resolve_one, resolve
+from precomp.instanceLocs import resolve_filter
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -41,12 +41,12 @@ HOLES: dict[tuple[FrozenVec, FrozenVec], HoleType] = {}
 
 
 ORIENTS = {
-    Vec.T: Matrix.from_angle(180, 0, 0),
-    Vec.B: Matrix.from_angle(0, 0, 0),
-    Vec.N: Matrix.from_angle(90, 270, 0),
-    Vec.S: Matrix.from_angle(90, 90, 0),
-    Vec.E: Matrix.from_angle(90, 180, 0),
-    Vec.W: Matrix.from_angle(90, 0, 0),
+    Vec.T: FrozenMatrix.from_angle(180, 0, 0),
+    Vec.B: FrozenMatrix.from_angle(0, 0, 0),
+    Vec.N: FrozenMatrix.from_angle(90, 270, 0),
+    Vec.S: FrozenMatrix.from_angle(90, 90, 0),
+    Vec.E: FrozenMatrix.from_angle(90, 180, 0),
+    Vec.W: FrozenMatrix.from_angle(90, 0, 0),
 }
 
 
@@ -235,10 +235,11 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
     # Valve doesn't implement convex corners, we'll do it ourselves.
     convex_corner_left = instanceLocs.resolve_one('[glass_left_convex_corner]', error=False)
     convex_corner_right = instanceLocs.resolve_one('[glass_right_convex_corner]', error=False)
-    convex_corners: List[Tuple[Matrix, str, float]] = [
+    convex_corners: List[Tuple[FrozenMatrix, str, float]] = [
         (orient, filename, side)
         # We don't include 90 and 270, the other filename covers those.
-        for orient in map(Matrix.from_yaw, [0.0, 180.0])
+        # Freeze to ensure this is constant.
+        for orient in map(FrozenMatrix.from_yaw, [0.0, 180.0])
         for (filename, side) in [
             (convex_corner_left, -128.0),
             (convex_corner_right, +128.0),
@@ -284,12 +285,13 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
                     int((u + u_off) // 32),
                     int((v + v_off) // 32),
                 ] = barr_type
+
+        # Also go place convex corners.
         for orient, filename, corner_side in convex_corners:
-            # Not @=, we want to keep the original orient unaltered.
-            orient = orient @ ORIENTS[normal]
+            orient @= ORIENTS[normal]
             # The convex corner is on the +X side, then +/-Y depending on the filename.
-            # The diagonal corner needs to not match to be a corner.
-            side_1 = orient.forward(128)
+            # If the diagonal neighbour does not match, we need a corner instance.
+            side_1 = orient.forward(128.0)
             side_2 = orient.left(corner_side)
             if (
                 BARRIERS.get((origin + side_1, normal)) is barr_type and
@@ -300,7 +302,7 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
                     vmf,
                     targetname='barrier',
                     file=filename,
-                    origin=origin.thaw(),
+                    origin=origin,
                     angles=orient,
                 ).make_unique()
 

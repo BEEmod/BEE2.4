@@ -45,9 +45,9 @@ from typing import Generic, TypeVar, Any, Callable, TextIO, Tuple, Type, overloa
 
 import attrs
 import srctools.logger
-from srctools import (
-    Keyvalues, FrozenVec, Vec, VMF, Entity, Output, Solid, Angle, Matrix,
-)
+from srctools.math import AnyVec, Vec, FrozenVec, AnyAngle, AnyMatrix, Angle, Matrix
+from srctools.vmf import VMF, Entity, Output, Solid
+from srctools import Keyvalues
 
 from precomp import instanceLocs, rand, collisions
 from precomp.corridor import Info as MapInfo
@@ -922,7 +922,8 @@ def dump_conditions(file: TextIO) -> None:
                 file.write('\n')
 
 
-def dump_func_docs(file: TextIO, func: Callable):
+def dump_func_docs(file: TextIO, func: Callable) -> None:
+    """Write the documentation for this function to the file."""
     import inspect
     docs = inspect.getdoc(func)
     if docs:
@@ -935,8 +936,8 @@ def add_inst(
     vmf: VMF,
     *,
     file: str,
-    origin: Vec | str,
-    angles: Angle | Matrix | str = '0 0 0',
+    origin: Vec | FrozenVec | str,
+    angles: AnyAngle | AnyMatrix | str = '0 0 0',
     targetname: str='',
     fixup_style: int | str = '0',  # Default to Prefix.
     no_fixup: bool = False,
@@ -944,11 +945,13 @@ def add_inst(
     """Create and add a new instance at the specified position.
 
     This provides defaults for parameters, and adds the filename to ALL_INST.
-    Values accept str in addition so they can be copied from existing keyvalues.
+    Values accept str in addition so that they can be copied from existing keyvalues.
 
     If no_fixup is set, it overrides fixup_style to None - this way it's a more clear
     parameter for code.
     """
+    if no_fixup:
+        fixup_style = '2'
     ALL_INST.add(file.casefold())
     return vmf.create_ent(
         'func_instance',
