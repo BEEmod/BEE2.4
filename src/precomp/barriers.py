@@ -296,13 +296,12 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
                 BARRIERS.get((origin + side_2, normal)) is barr_type and
                 BARRIERS.get((origin + side_1 + side_2, normal)) is not barr_type
             ):
-                vmf.create_ent(
-                    'func_instance',
+                conditions.add_inst(
+                    vmf,
                     targetname='barrier',
                     file=filename,
-                    origin=Vec(origin),
+                    origin=origin.thaw(),
                     angles=orient,
-                    fixup_style='0',
                 ).make_unique()
 
     # Compute contiguous sections of any barrier type, then place hint brushes to ensure sorting
