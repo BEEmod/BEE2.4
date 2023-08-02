@@ -401,8 +401,7 @@ def _resolve(path: str) -> List[str]:
                     continue
             else:
                 raise Exception(group)
-        # Remove "" from the output.
-        return list(filter(None, out))
+        return out
     else:
         return [path]
 
