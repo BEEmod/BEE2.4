@@ -1143,7 +1143,7 @@ def parse_map(vmf: VMF, info: conditions.MapInfo) -> None:
             brush.remove()
 
     # Check for fizzler output relays.
-    relay_file = instanceLocs.resolve('<ITEM_BEE2_FIZZLER_OUT_RELAY>', silent=True)
+    relay_file = instanceLocs.resolve_filter('<ITEM_BEE2_FIZZLER_OUT_RELAY>', silent=True)
     if not relay_file:
         # No relay item - deactivated most likely.
         return
