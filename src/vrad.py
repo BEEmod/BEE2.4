@@ -212,7 +212,8 @@ async def main(argv: List[str]) -> None:
     zipfile = ZipFile(zip_data)
 
     # Mount the existing packfile, so the cubemap files are recognised.
-    fsys.add_sys(ZipFileSystem('<BSP pakfile>', zipfile))
+    pakfile_fs = ZipFileSystem('<BSP pakfile>', zipfile)
+    fsys.add_sys(pakfile_fs)
 
     LOGGER.info('Done!')
 
@@ -261,7 +262,7 @@ async def main(argv: List[str]) -> None:
 
     # We need to disallow Valve folders.
     pack_whitelist: set[FileSystem] = set()
-    pack_blacklist: set[FileSystem] = set()
+    pack_blacklist: set[FileSystem] = {pakfile_fs}
 
     # Exclude absolutely everything except our folder.
     for child_sys, _ in fsys.systems:
@@ -283,9 +284,29 @@ async def main(argv: List[str]) -> None:
     else:
         dump_loc = None
 
+    LOGGER.info('Writing BSP...')
+    bsp_file.save()
+    LOGGER.info(' - BSP written!')
+
+    # VRAD only runs if light_args is not set to "NONE"
+    if light_args == 'FAST':
+        LOGGER.info("Running VRAD: forcing cheap lighting.")
+        run_vrad(fast_args)
+    elif light_args == 'FULL':
+        LOGGER.info("Running VRAD: full lighting enabled (publishing, or forced to do so)")
+        run_vrad(full_args)
+    else:
+        LOGGER.info("Running VRAD was skipped!")
+
+    LOGGER.info("VRAD completed. Reopening and packing files.")
+
+    bsp_file = BSP(path)
+
     # Cubemap files packed into the map already.
     existing = set(bsp_file.pakfile.namelist())
 
+    # Pack to the BSP *after* running VRAD, to ensure an extra-large packfile doesn't crash
+    # VRAD.
     LOGGER.info('Writing to BSP...')
     packlist.pack_into_zip(
         bsp_file,
@@ -295,25 +316,15 @@ async def main(argv: List[str]) -> None:
         dump_loc=dump_loc,
     )
 
-    LOGGER.info('Packed files:\n{}', '\n'.join(
-        set(bsp_file.pakfile.namelist()) - existing
-    ))
-
     LOGGER.info('Writing BSP...')
     bsp_file.save()
     LOGGER.info(' - BSP written!')
 
-    screenshot.modify(config, game.path)
+    LOGGER.info('Packed files:\n{}', '\n'.join(
+        set(bsp_file.pakfile.namelist()) - existing
+    ))
 
-    # VRAD only runs if light_args is not set to "NONE"
-    if light_args == 'FAST':
-        LOGGER.info("Forcing Cheap Lighting!")
-        run_vrad(fast_args)
-    elif light_args == 'FULL':
-        LOGGER.info("Publishing - Full lighting enabled! (or forced to do so)")
-        run_vrad(full_args)
-    else:
-        LOGGER.info("Forcing to skip VRAD!")
+    screenshot.modify(config, game.path)
 
     LOGGER.info("BEE2 VRAD hook finished!")
 
