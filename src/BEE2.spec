@@ -251,12 +251,15 @@ if utils.WIN:
 
 # Write this to the temp folder, so it's picked up and included.
 # Don't write it out though if it's the same, so PyInstaller doesn't reparse.
-version_val = 'BEE_VERSION=' + repr(utils.get_git_version(SPECPATH))
+version_val = f'''\
+BEE_VERSION={utils.get_git_version(SPECPATH)!r}
+HA_VERSION={HA_VERSION!r}
+'''
 print(version_val)
 version_filename = os.path.join(workpath, '_compiled_version.py')
 
 with contextlib.suppress(FileNotFoundError), open(version_filename) as f:
-    if f.read().strip() == version_val:
+    if f.read() == version_val:
         version_val = ''
 
 if version_val:

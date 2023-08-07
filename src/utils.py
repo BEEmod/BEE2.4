@@ -105,13 +105,14 @@ def get_git_version(inst_path: Path | str) -> str:
 
 try:
     # This module is generated when the app is compiled.
-    from _compiled_version import BEE_VERSION  # type: ignore
+    from _compiled_version import BEE_VERSION, HA_VERSION  # type: ignore
 except ImportError:
     # We're running from src/, so data is in the folder above that.
     # Go up once from us to its containing folder, then to the parent.
     _INSTALL_ROOT = Path(__file__).resolve().parent.parent
 
     BEE_VERSION = get_git_version(_INSTALL_ROOT)
+    HA_VERSION = get_git_version(_INSTALL_ROOT / 'hammeraddons')
     FROZEN = False
     DEV_MODE = True
 else:

@@ -23,6 +23,7 @@ from app.richTextBox import tkRichText
 from app import localisation, tkMarkdown, tk_tools, sound, img, TK_ROOT, background_run
 from ui_tk.img import TKImages
 from transtoken import TransToken
+import utils
 
 # For version info
 import PIL
@@ -83,6 +84,7 @@ CREDITS_TEXT = '''\
 Used software / libraries in the BEE2.4:
 
 * [srctools][srctools] `v{srctools_ver}` by TeamSpen210
+* [HammerAddons][hammeraddons] `v{ha_ver}` by TeamSpen210
 * [pyglet][pyglet] `{pyglet_ver}` by Alex Holkner and Contributors
 * [Pillow][pillow] `{pil_ver}` by Alex Clark and Contributors
 * [noise][perlin_noise] `(2008-12-15)` by Casey Duncan
@@ -105,6 +107,7 @@ Used software / libraries in the BEE2.4:
 [FFmpeg]: https://ffmpeg.org/
 [ffmpeg-bin]: https://github.com/sudo-nautilus/FFmpeg-Builds-Win32
 [srctools]: https://github.com/TeamSpen210/srctools
+[hammeraddons]: https://github.com/TeamSpen210/HammerAddons
 
 -----
 
@@ -428,6 +431,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
     pygtrie_ver=pygtrie.__version__,
     pil_ver=PIL.__version__,
     srctools_ver=srctools.__version__,
+    ha_ver=utils.HA_VERSION,
 ).replace('\n', '  \n')  # Add two spaces to keep line breaks
 
 
