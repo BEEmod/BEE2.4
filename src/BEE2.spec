@@ -35,6 +35,8 @@ data_files = [
     ('../images/splash_screen/*.jpg', 'images/splash_screen/'),
 ]
 
+HA_VERSION = utils.get_git_version(hammeraddons)
+
 
 def do_localisation() -> None:
     """Build localisation."""
@@ -124,7 +126,7 @@ def build_fgd() -> None:
     """Export out a copy of the srctools-specific FGD data."""
     sys.path.append(str(hammeraddons / 'src'))
     print('Loading FGD database. path=', sys.path)
-    from hammeraddons import unify_fgd, __version__ as version
+    from hammeraddons import unify_fgd
     database, base_ent = unify_fgd.load_database(hammeraddons / 'fgd')
 
     fgd = FGD()
@@ -147,7 +149,7 @@ def build_fgd() -> None:
 
     database.collapse_bases()
     with open('../hammeraddons.fgd', 'w') as file:
-        file.write(f'// Hammer Addons version {version}\n')
+        file.write(f'// Hammer Addons version {HA_VERSION}\n')
         file.write(
             "// These are a minimal copy of HA FGDs for comp_ entities, so they can be collapsed.\n"
             "// If you want to use Hammer Addons, install that manually, don't use these.\n"
