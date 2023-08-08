@@ -158,6 +158,7 @@ class GenOptions(config.Data, conf_name='Options', palette_stores=False, version
         elem['after_export'] = self.after_export.value
         elem['language'] = self.language
         elem['preserve_fgd'] = self.preserve_fgd
+        elem['log_win_level'] = self.log_win_level
         for field in gen_opts_bool:
             elem[field.name] = getattr(self, field.name)
         return elem

@@ -118,12 +118,46 @@ def test_parse_dmx() -> None:
 
 def test_export_kv1() -> None:
     """Test other properties are exported correctly to KV1."""
-    # TODO
+    kv = GenOptions(
+        after_export=AfterExport.NORMAL,
+        log_win_level='WARNING',
+        language='en_UK'
+    ).export_kv1()
+    assert kv['after_export'] == '0'
+    assert kv['log_win_level'] == 'WARNING'
+    assert kv['language'] == 'en_UK'
+
+    kv = GenOptions(
+        after_export=AfterExport.QUIT,
+        log_win_level='DEBUG',
+        language='de',
+    ).export_kv1()
+    assert kv['after_export'] == '2'
+    assert kv['log_win_level'] == 'DEBUG'
+    assert kv['language'] == 'de'
 
 
 def test_export_dmx() -> None:
     """Test other properties are exported correctly to DMX."""
-    # TODO
+    dmx = GenOptions(
+        after_export=AfterExport.NORMAL,
+        log_win_level='WARNING',
+        language='en_UK'
+    ).export_dmx()
+    assert dmx['after_export'].type is ValueType.INT
+    assert dmx['after_export'].val_int == 0
+    assert dmx['log_win_level'].val_str == 'WARNING'
+    assert dmx['language'].val_str == 'en_UK'
+
+    dmx = GenOptions(
+        after_export=AfterExport.QUIT,
+        log_win_level='DEBUG',
+        language='de',
+    ).export_dmx()
+    assert dmx['after_export'].type is ValueType.INT
+    assert dmx['after_export'].val_int == 2
+    assert dmx['log_win_level'].val_str == 'DEBUG'
+    assert dmx['language'].val_str == 'de'
 
 
 def test_v1_preserve_fgd_parse_kv1() -> None:
@@ -183,11 +217,27 @@ def test_v2_preserve_fgd_parse_dmx(preserve_fgd: bool, preserve_res: bool) -> No
     assert conf.preserve_resources is preserve_res
 
 
-def test_preserve_fgd_export_kv1() -> None:
+@pytest.mark.parametrize('preserve_fgd', [False, True])
+@pytest.mark.parametrize('preserve_res', [False, True])
+def test_preserve_fgd_export_kv1(preserve_fgd: bool, preserve_res: bool) -> None:
     """Test these keys are exported correctly for KV1."""
-    # TODO
+    conf = GenOptions(
+        preserve_fgd=preserve_fgd,
+        preserve_resources=preserve_res,
+    ).export_kv1()
+    assert conf['preserve_fgd'] == '1' if preserve_fgd else '0'
+    assert conf['preserve_resources'] == '1' if preserve_res else '0'
 
 
-def test_preserve_fgd_export_dmx() -> None:
+@pytest.mark.parametrize('preserve_fgd', [False, True])
+@pytest.mark.parametrize('preserve_res', [False, True])
+def test_preserve_fgd_export_dmx(preserve_fgd: bool, preserve_res: bool) -> None:
     """Test these keys are exported correctly for DMX."""
-    # TODO
+    conf = GenOptions(
+        preserve_fgd=preserve_fgd,
+        preserve_resources=preserve_res,
+    ).export_dmx()
+    assert conf['preserve_fgd'].type is ValueType.BOOL
+    assert conf['preserve_fgd'].val_bool is preserve_fgd
+    assert conf['preserve_resources'].type is ValueType.BOOL
+    assert conf['preserve_resources'].val_bool is preserve_res
