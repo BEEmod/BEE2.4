@@ -56,12 +56,12 @@ class GenOptions(config.Data, conf_name='Options', palette_stores=False, version
     @classmethod
     def parse_legacy(cls, conf: Keyvalues) -> Dict[str, 'GenOptions']:
         """Parse from the GEN_OPTS config file."""
-        log_win_level = LEGACY_CONF['Debug']['window_log_level']
+        log_win_level = LEGACY_CONF.get(
+            'Debug', 'window_log_level',
+            fallback=attrs.fields(GenOptions).log_win_level.default,
+        )
         try:
-            after_export = AfterExport(LEGACY_CONF.get_int(
-                'General', 'after_export_action',
-                0,
-            ))
+            after_export = AfterExport(LEGACY_CONF.get_int('General', 'after_export_action', -1))
         except ValueError:
             after_export = AfterExport.NORMAL
 

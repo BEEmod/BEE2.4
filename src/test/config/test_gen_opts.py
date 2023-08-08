@@ -1,13 +1,34 @@
 """Test parsing the general options."""
+from typing import NoReturn, cast
+
 from srctools import Keyvalues
 from srctools.dmx import Element, ValueType
 import pytest
 import attrs
 
+from BEE2_config import GEN_OPTS
 from config.gen_opts import GenOptions, AfterExport, gen_opts_bool
+from test.config import isolate_conf
 
 
 BOOL_OPTIONS = {field.name for field in gen_opts_bool}
+
+
+class Landmine:
+    """Errors if you do anything with it."""
+    def __getattribute__(self, attr: str) -> NoReturn:
+        pytest.fail(f"Accessed Landmine.{attr}", pytrace=False)
+
+    def __getitem__(self, item: object) -> NoReturn:
+        pytest.fail(f"Accessed Landmine[{item!r}]", pytrace=False)
+
+
+def parse_from_legacy() -> GenOptions:
+    """Call GenOptions.parse_legacy(), doing some checks."""
+    conf = GenOptions.parse_legacy(Landmine())  # Arg is unused.
+    assert list(conf.keys()) == ['']
+    return conf['']
+
 
 
 @pytest.mark.parametrize('name', BOOL_OPTIONS)
@@ -68,9 +89,101 @@ def test_bool_export_dmx(name: str) -> None:
     assert dmx_true[name].val_bool is True
 
 
-def test_parse_legacy() -> None:
-    """Test upgrading from the INI config file."""
-    # TODO
+def test_parse_legacy_blank() -> None:
+    """Upgrading from a blank INI config will produce the defaults."""
+    with isolate_conf(GEN_OPTS):
+        # Blank = must use defaults.
+        conf = parse_from_legacy()
+    assert conf == GenOptions()
+
+
+@pytest.mark.parametrize('section, name, attr', [
+    ('General', 'launch_game', attrs.fields(GenOptions).launch_after_export),
+    ('General', 'play_sounds', attrs.fields(GenOptions).play_sounds),
+    ('General', 'keep_win_inside', attrs.fields(GenOptions).keep_win_inside),
+    ('General', 'splash_stay_ontop', attrs.fields(GenOptions).force_load_ontop),
+    ('General', 'compact_splash', attrs.fields(GenOptions).compact_splash),
+    ('Last_Selected', 'music_collapsed', attrs.fields(GenOptions).music_collapsed),
+    ('Debug', 'show_log_win', attrs.fields(GenOptions).show_log_win),
+    ('Debug', 'development_mode', attrs.fields(GenOptions).dev_mode),
+    ('Debug', 'log_missing_ent_count', attrs.fields(GenOptions).log_missing_ent_count),
+    ('Debug', 'log_missing_styles', attrs.fields(GenOptions).log_missing_styles),
+    ('Debug', 'log_item_fallbacks', attrs.fields(GenOptions).log_item_fallbacks),
+    ('Debug', 'force_all_editor_models', attrs.fields(GenOptions).force_all_editor_models),
+])
+def test_parse_legacy_bools(section: str, name: str, attr: 'attrs.Attribute[bool]') -> None:
+    """Test upgrading these booleans from the legacy INI config."""
+    with isolate_conf(GEN_OPTS):
+        GEN_OPTS[section][name] = '0'
+        conf = parse_from_legacy()
+    assert getattr(conf, attr.name) is False
+
+    with isolate_conf(GEN_OPTS):
+        GEN_OPTS[section][name] = '1'
+        conf = parse_from_legacy()
+    assert getattr(conf, attr.name) is True
+
+    with isolate_conf(GEN_OPTS):
+        GEN_OPTS[section][name] = 'not_a_bool'
+        conf = parse_from_legacy()
+    assert getattr(conf, attr.name) is attr.default
+
+
+def test_parse_legacy_log_win_level() -> None:
+    """Test upgrading the log win level from the legacy INI config."""
+    with isolate_conf(GEN_OPTS):
+        GEN_OPTS['Debug']['window_log_level'] = 'INFO'
+        conf = parse_from_legacy()
+    assert conf.log_win_level == 'INFO'
+
+    with isolate_conf(GEN_OPTS):
+        GEN_OPTS['Debug']['window_log_level'] = 'DEBUG'
+        conf = parse_from_legacy()
+    assert conf.log_win_level == 'DEBUG'
+
+
+def test_parse_legacy_after_export() -> None:
+    """Test upgrading the after export action from the legacy INI config."""
+    with isolate_conf(GEN_OPTS):
+        GEN_OPTS['General']['after_export_action'] = '0'
+        conf = parse_from_legacy()
+    assert conf.after_export is AfterExport.NORMAL
+
+    with isolate_conf(GEN_OPTS):
+        GEN_OPTS['General']['after_export_action'] = '1'
+        conf = parse_from_legacy()
+    assert conf.after_export is AfterExport.MINIMISE
+
+    with isolate_conf(GEN_OPTS):
+        GEN_OPTS['General']['after_export_action'] = '2'
+        conf = parse_from_legacy()
+    assert conf.after_export is AfterExport.QUIT
+
+    with isolate_conf(GEN_OPTS):
+        GEN_OPTS['General']['after_export_action'] = 'blah'
+        conf = parse_from_legacy()
+    assert conf.after_export is AfterExport.NORMAL
+
+
+def test_parse_legacy_preserve() -> None:
+    """Test upgrading preserve resources/FGD from the legacy INI config."""
+    with isolate_conf(GEN_OPTS):
+        GEN_OPTS['General']['preserve_bee2_resource_dir'] = '0'
+        conf = parse_from_legacy()
+    assert conf.preserve_resources is False
+    assert conf.preserve_fgd is False
+
+    with isolate_conf(GEN_OPTS):
+        GEN_OPTS['General']['preserve_bee2_resource_dir'] = '1'
+        conf = parse_from_legacy()
+    assert conf.preserve_resources is True
+    assert conf.preserve_fgd is True
+
+    with isolate_conf(GEN_OPTS):
+        GEN_OPTS['General']['preserve_bee2_resource_dir'] = 'not_a_bool'
+        conf = parse_from_legacy()
+    assert conf.preserve_resources is False
+    assert conf.preserve_fgd is False
 
 
 def test_parse_kv1() -> None:
