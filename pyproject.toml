@@ -16,7 +16,7 @@ strictParameterNoneValue = false
 [tool.isort]
 sections=["FUTURE", "TYPING", "FRAMEWORK", "STDLIB", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER"]
 known_framework = ["tkinter", "tkinter.ttk", "tkinter.messagebox"]
-extra_standard_library = ["importlib_resources"]
+extra_standard_library = ["importlib_resources", "exceptiongroup"]
 known_typing = ["typing", "typing_extensions"]
 no_lines_before = ["TYPING", "FRAMEWORK", "STDLIB"]
 known_third_party = ["hammeraddons"]
