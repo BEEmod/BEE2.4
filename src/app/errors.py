@@ -1,14 +1,11 @@
 """Handles displaying errors to the user that occur during operations."""
 from __future__ import annotations
-
-import types
-from collections.abc import Iterable
+from typing import Awaitable, ClassVar, Generator, Protocol, final
 from contextlib import contextmanager
-from typing import Awaitable, Callable, ClassVar, Generator, Protocol, final, overload
-from exceptiongroup import ExceptionGroup, BaseExceptionGroup
+from exceptiongroup import BaseExceptionGroup, ExceptionGroup
+import types
 
 import attrs
-import trio
 import srctools.logger
 
 from transtoken import TransToken
@@ -109,21 +106,23 @@ class ErrorUI:
     ) -> bool:
         if isinstance(exc_val, AppError):
             self._errors.append(exc_val)
+            exc_val = None
         elif isinstance(exc_val, BaseExceptionGroup):
             matching, rest = exc_val.split(AppError)
-            if rest is not None:
-                # Another actual exception occurred. Let the exception group
-                # propagate unchanged.
-                return False
-            if matching is not None:
-                self._errors.extend(matching.exceptions)
-        elif exc_val is not None:
+            # We only handle if it's all AppError. If not, re-raise it unchanged.
+            if rest is None:
+                # Swallow.
+                exc_val = None
+                if matching is not None:
+                    self._errors.extend(matching.exceptions)
+
+        if exc_val is not None:
             # Caught something else, don't suppress.
             if self._errors:
                 # Combine both in an exception group.
                 raise BaseExceptionGroup(
                     "ErrorUI block raised",
-                    [exc_val, *self._errors],
+                    [*self._errors, exc_val],
                 )
 
             # Just some other exception, leave it unaltered.
