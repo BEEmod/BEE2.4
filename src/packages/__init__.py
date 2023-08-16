@@ -256,6 +256,8 @@ class PakObject:
     pak_id: str
     # Display name of the package.
     pak_name: str
+    # TODO: new export system.
+    export_priority: int = 0
 
     _id_to_obj: ClassVar[dict[str, PakObject]]
     allow_mult: ClassVar[bool]
@@ -268,6 +270,7 @@ class PakObject:
         needs_foreground: bool = False,
         style_suggest_key: str = '',
         suggest_default: str = '<NONE>',
+        export_priority: int = 0,
     ) -> None:
         super().__init_subclass__()
         OBJ_TYPES[cls.__name__.casefold()] = cls
@@ -276,6 +279,7 @@ class PakObject:
         cls._id_to_obj = {}
         cls.allow_mult = allow_mult
         cls.needs_foreground = needs_foreground
+        cls.export_priority = export_priority
         if style_suggest_key:
             assert style_suggest_key.casefold() not in style_suggest_keys
             style_suggest_keys[style_suggest_key.casefold()] = cls

@@ -730,7 +730,7 @@ class Game:
             vpk_success = True
 
             # Export each object type.
-            for obj_type in packages.OBJ_TYPES.values():
+            for obj_type in sorted(packages.OBJ_TYPES.values(), key=lambda typ: typ.export_priority):
                 if obj_type is packages.Style:
                     continue  # Done above already
 

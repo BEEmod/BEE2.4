@@ -110,7 +110,7 @@ def parse_specifier(specifier: str) -> CorrKind:
 
 
 @attrs.define(slots=False)
-class CorridorGroup(packages.PakObject, allow_mult=True):
+class CorridorGroup(packages.PakObject, allow_mult=True, export_priority=10):
     """A collection of corridors defined for the style with this ID."""
     id: str
     corridors: Dict[CorrKind, List[CorridorUI]]

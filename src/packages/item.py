@@ -432,7 +432,7 @@ class Version:
     inherit_kind: dict[str, InheritKind]
 
 
-class Item(PakObject, needs_foreground=True):
+class Item(PakObject, needs_foreground=True, export_priority=-10):
     """An item in the editor..."""
     __slots__ = [
         'id',
