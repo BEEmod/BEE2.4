@@ -1,6 +1,6 @@
 """Handles displaying errors to the user that occur during operations."""
 from __future__ import annotations
-from typing import Awaitable, ClassVar, Generator, Protocol, final
+from typing import Awaitable, ClassVar, Generator, Iterator, Protocol, final
 from contextlib import contextmanager
 from exceptiongroup import BaseExceptionGroup, ExceptionGroup
 import types
@@ -37,6 +37,18 @@ class Handler(Protocol):
     """The signature of handler functions."""
     def __call__(self, title: TransToken, desc: TransToken, errors: list[AppError]) -> Awaitable[object]:
         ...
+
+
+def _collapse_excgroup(group: BaseExceptionGroup[AppError]) -> Iterator[AppError]:
+    """Extract all the AppErrors from this group.
+
+    BaseExceptionGroup.subgroup() preserves the original structure, but we don't really care.
+    """
+    for exc in group.exceptions:
+        if isinstance(exc, BaseExceptionGroup):
+            yield from _collapse_excgroup(exc)
+        else:
+            yield exc
 
 @final
 class ErrorUI:
@@ -91,7 +103,7 @@ class ErrorUI:
         else:
             matching, rest = error.split(AppError)
             if matching is not None:
-                self._errors.extend(matching.exceptions)
+                self._errors.extend(_collapse_excgroup(matching))
             if rest is not None:
                 raise rest
 
@@ -113,8 +125,9 @@ class ErrorUI:
             if rest is None:
                 # Swallow.
                 exc_val = None
+                # Matching may be recursively nested exceptions, collapse all that.
                 if matching is not None:
-                    self._errors.extend(matching.exceptions)
+                    self._errors.extend(_collapse_excgroup(matching))
 
         if exc_val is not None:
             # Caught something else, don't suppress.
@@ -139,6 +152,12 @@ class ErrorUI:
                     "\n".join(map(str, self._errors)),
                 )
             else:
+                LOGGER.error(
+                    "ErrorUI block failed.\ntitle={}\ndesc={}\n{}",
+                    self.title,
+                    desc,
+                    "\n".join(map(str, self._errors)),
+                )
                 # Do NOT pass self!
                 await ErrorUI._handler(self.title, desc, self._errors)
         return True

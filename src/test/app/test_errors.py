@@ -71,13 +71,14 @@ async def test_nonfatal() -> None:
     async def catch(title: TransToken, desc: TransToken, errors: list[AppError]) -> None:
         """Catch the errors that occur."""
         assert title is orig_title
-        assert str(desc) == "nonfatal description, n=4"
+        assert str(desc) == "nonfatal description, n=5"
         caught_errors.extend(errors)
 
     exc1 = AppError(TransToken.untranslated("Error 1"))
     exc2 = AppError(TransToken.untranslated("Error 2"))
     exc3 = AppError(TransToken.untranslated("Error 3"))
     exc4 = AppError(TransToken.untranslated("Error 4"))
+    exc5 = AppError(TransToken.untranslated("Error 5"))
     unrelated = BufferError("Whatever")
 
     task: list[str] = []
@@ -91,11 +92,18 @@ async def test_nonfatal() -> None:
             assert error_block.failed  # now failed.
             task.append("mid")
 
-            error_block.add(ExceptionGroup("two", [exc2, exc3]))
+            error_block.add(ExceptionGroup("two", [
+                exc2,
+                ExceptionGroup("three", [exc3]),
+            ]))
             # Does not raise.
 
             with pytest.raises(ExceptionGroup) as reraised:
-                error_block.add(ExceptionGroup("stuff", [exc4, unrelated]))
+                error_block.add(ExceptionGroup("stuff", [
+                    exc4,
+                    ExceptionGroup("more", [exc5]),
+                    unrelated,
+                ]))
             # unrelated should have been re-raised.
             assert isinstance(reraised.value, ExceptionGroup)
             assert reraised.value.message == "stuff"
@@ -108,7 +116,7 @@ async def test_nonfatal() -> None:
     assert success
     assert task == ["before", "mid", "after"]
     assert error_block.failed
-    assert caught_errors == [exc1, exc2, exc3, exc4]
+    assert caught_errors == [exc1, exc2, exc3, exc4, exc5]
 
 
 async def test_fatal_only_err() -> None:
