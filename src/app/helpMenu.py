@@ -90,7 +90,7 @@ Used software / libraries in the BEE2.4:
 * [noise][perlin_noise] `(2008-12-15)` by Casey Duncan
 * [mistletoe][mistletoe] `{mstle_ver}` by Mi Yu and Contributors
 * [pygtrie][pygtrie] `{pygtrie_ver}` by Michal Nazarewicz
-* [Tcl][tcl] `{tk_ver}` / [TK][tcl]` {tk_ver}`
+* [Tcl][tcl] `{tk_ver}` / [TK][tcl]` {tcl_ver}`
 * [Python][python] `{py_ver}`
 * [FFmpeg][ffmpeg] licensed under the [LGPLv2.1][LGPL]. Binaries are built via [sudo-nautilus][ffmpeg-bin].
 
