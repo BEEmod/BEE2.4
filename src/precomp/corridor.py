@@ -1,4 +1,4 @@
-"""Modify and anylsyse corridors in the map."""
+"""Modify and analyse corridors in the map."""
 from __future__ import annotations
 from collections import Counter
 from typing import Dict
