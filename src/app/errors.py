@@ -50,6 +50,7 @@ def _collapse_excgroup(group: BaseExceptionGroup[AppError]) -> Iterator[AppError
         else:
             yield exc
 
+
 @final
 class ErrorUI:
     """A context manager which handles processing the errors."""
@@ -149,15 +150,15 @@ class ErrorUI:
                     "ErrorUI block failed, but no handler installed!\ntitle={}\ndesc={}\n{}",
                     self.title,
                     desc,
-                    "\n".join(map(str, self._errors)),
+                    "\n".join([str(err.message) for err in self._errors]),
                 )
             else:
                 LOGGER.error(
                     "ErrorUI block failed.\ntitle={}\ndesc={}\n{}",
                     self.title,
                     desc,
-                    "\n".join(map(str, self._errors)),
+                    "\n".join([str(err.message) for err in self._errors]),
                 )
-                # Do NOT pass self!
+                # Use class, do not pass self!
                 await ErrorUI._handler(self.title, desc, self._errors)
         return True
