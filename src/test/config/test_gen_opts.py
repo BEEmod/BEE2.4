@@ -1,5 +1,5 @@
 """Test parsing the general options."""
-from typing import NoReturn, cast
+from typing import Any, NoReturn, cast
 
 from srctools import Keyvalues
 from srctools.dmx import Element, ValueType
@@ -25,17 +25,16 @@ class Landmine:
 
 def parse_from_legacy() -> GenOptions:
     """Call GenOptions.parse_legacy(), doing some checks."""
-    conf = GenOptions.parse_legacy(Landmine())  # Arg is unused.
+    conf = GenOptions.parse_legacy(cast(Keyvalues, Landmine()))  # Arg is unused.
     assert list(conf.keys()) == ['']
     return conf['']
-
 
 
 @pytest.mark.parametrize('name', BOOL_OPTIONS)
 def test_bool_basics(name: str) -> None:
     """Test that boolean options are in fact booleans."""
-    conf_false = GenOptions(**{name: False})
-    conf_true = GenOptions(**{name: True})
+    conf_false = GenOptions(**{name: cast(Any, False)})
+    conf_true = GenOptions(**{name: cast(Any, True)})
 
     assert getattr(GenOptions(), name) in (False, True)
     assert getattr(conf_false, name) is False
@@ -70,8 +69,8 @@ def test_bool_parse_dmx(name: str) -> None:
 @pytest.mark.parametrize('name', BOOL_OPTIONS)
 def test_bool_export_kv1(name: str) -> None:
     """Test that KV1 export works correctly."""
-    kv1_false = GenOptions(**{name: False}).export_kv1()
-    kv1_true = GenOptions(**{name: True}).export_kv1()
+    kv1_false = GenOptions(**{name: cast(Any, False)}).export_kv1()
+    kv1_true = GenOptions(**{name: cast(Any, True)}).export_kv1()
 
     assert kv1_false[name] == '0'
     assert kv1_true[name] == '1'
@@ -80,8 +79,8 @@ def test_bool_export_kv1(name: str) -> None:
 @pytest.mark.parametrize('name', BOOL_OPTIONS)
 def test_bool_export_dmx(name: str) -> None:
     """Test that DMX export works correctly."""
-    dmx_false = GenOptions(**{name: False}).export_dmx()
-    dmx_true = GenOptions(**{name: True}).export_dmx()
+    dmx_false = GenOptions(**{name: cast(Any, False)}).export_dmx()
+    dmx_true = GenOptions(**{name: cast(Any, True)}).export_dmx()
 
     assert dmx_false[name].type is ValueType.BOOL
     assert dmx_false[name].val_bool is False
