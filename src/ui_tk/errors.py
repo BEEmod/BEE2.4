@@ -23,6 +23,9 @@ async def display_errors(
     receive: trio.abc.ReceiveChannel[ChannelValue]
     send, receive = trio.open_memory_channel(math.inf)
 
+    # Set when the dialog was closed, and the handler can return. Immediately re-assigned.
+    close_event = trio.Event()
+
     async def handler(title: TransToken, desc: TransToken, errors: list[AppError]) -> None:
         """Wait for the error box to display the message."""
         evt = trio.Event()
@@ -51,7 +54,6 @@ async def display_errors(
     wid_close.grid(row=2, column=0)
     localisation.set_text(wid_close, TransToken.ui("Close"))
 
-    close_event = trio.Event()
     with ErrorUI.install_handler(handler):
         # We're now ready for events.
         task_status.started()
