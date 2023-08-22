@@ -270,7 +270,7 @@ def find_screenshot(e=None) -> None:
     if file_name:
         image = Image.open(file_name).convert('RGB')  # Remove alpha channel if present.
         buf = io.BytesIO()
-        image.save(buf, 'png')
+        image.save(buf, format='jpeg', quality=95, subsampling=0)
         with AtomicWriter(SCREENSHOT_LOC, is_bytes=True) as f:
             f.write(buf.getvalue())
 
