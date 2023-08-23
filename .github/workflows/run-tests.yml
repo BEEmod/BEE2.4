@@ -15,6 +15,7 @@ permissions:
 jobs:
   run-tests:
     runs-on: windows-latest
+    name: "${{ matrix.os }} Python ${{ matrix.python-version }}-${{ matrix.arch }}"
     strategy:
       fail-fast: false
       matrix:
