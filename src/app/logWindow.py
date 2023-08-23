@@ -34,7 +34,7 @@ class TextHandler(logging.Handler):
         super().__init__(logging.NOTSET)
         self.setFormatter(logging.Formatter(
             # One letter for level name
-            '[{levelname[0]}] {module}.{funcName}(): {message}',
+            '[{levelname[0]}]{srctools_context} {module}.{funcName}(): {message}',
             style='{',
         ))
 
