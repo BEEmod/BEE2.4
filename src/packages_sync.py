@@ -214,7 +214,7 @@ async def main(files: List[str]) -> int:
 
     package_loc = Path('../', GEN_OPTS['Directories']['package']).resolve()
 
-    file_list: list[Path] = []
+    file_list: List[Path] = []
 
     for file in files:
         file_path = Path(file)

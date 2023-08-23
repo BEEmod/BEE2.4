@@ -48,7 +48,7 @@ class WidgetConfig(config.Data, conf_name='ItemVar', uses_id=True):
         """Parse Keyvalues config values."""
         assert version == 1
         if data.has_children():
-            result: dict[TimerNum, str] = {}
+            result: Dict[TimerNum, str] = {}
             for prop in data:
                 try:
                     result[parse_timer(prop.name)] = prop.value
@@ -75,7 +75,7 @@ class WidgetConfig(config.Data, conf_name='ItemVar', uses_id=True):
         if 'value' in data:
             return WidgetConfig(data['value'].val_string)
         else:
-            result: dict[TimerNum, str] = {}
+            result: Dict[TimerNum, str] = {}
             for attr in data.values():
                 if attr.name.startswith('tim_'):
                     try:

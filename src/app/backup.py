@@ -447,7 +447,7 @@ def save_backup() -> None:
     new_zip_data = BytesIO()
     new_zip = ZipFile(new_zip_data, 'w', compression=ZIP_LZMA)
 
-    maps: list[P2C] = [
+    maps: List[P2C] = [
         item.user
         for item in
         UI['back_details'].items

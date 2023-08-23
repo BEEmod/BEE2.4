@@ -26,7 +26,7 @@ async def display_errors(
     # Set when the dialog was closed, and the handler can return. Immediately re-assigned.
     close_event = trio.Event()
 
-    async def handler(title: TransToken, desc: TransToken, errors: list[AppError]) -> None:
+    async def handler(title: TransToken, desc: TransToken, errors: List[AppError]) -> None:
         """Wait for the error box to display the message."""
         evt = trio.Event()
         await send.send((title, desc, errors, evt))

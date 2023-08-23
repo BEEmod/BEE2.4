@@ -1,3 +1,5 @@
+from typing import List
+
 from exceptiongroup import ExceptionGroup
 
 import pytest
@@ -24,7 +26,7 @@ def test_exception() -> None:
     assert str(err) == "AppError: The message"
 
 
-async def handler_fail(title: TransToken, desc: TransToken, errors: list[AppError]) -> None:
+async def handler_fail(title: TransToken, desc: TransToken, errors: List[AppError]) -> None:
     """Should never be used."""
     pytest.fail("Handler called!")
 
@@ -66,9 +68,9 @@ async def test_nonfatal() -> None:
     """Test the behaviour of non-fatal .add() errors."""
     orig_title = TransToken.untranslated("The title")
     orig_desc = TransToken.untranslated("nonfatal description, n={n}")
-    caught_errors: list[AppError] = []
+    caught_errors: List[AppError] = []
 
-    async def catch(title: TransToken, desc: TransToken, errors: list[AppError]) -> None:
+    async def catch(title: TransToken, desc: TransToken, errors: List[AppError]) -> None:
         """Catch the errors that occur."""
         assert title is orig_title
         assert str(desc) == "nonfatal description, n=5"
@@ -81,7 +83,7 @@ async def test_nonfatal() -> None:
     exc5 = AppError(TransToken.untranslated("Error 5"))
     unrelated = BufferError("Whatever")
 
-    task: list[str] = []
+    task: List[str] = []
     success = False
     with ErrorUI.install_handler(catch):
         async with ErrorUI(orig_title, orig_desc) as error_block:
@@ -123,9 +125,9 @@ async def test_fatal_only_err() -> None:
     """Test raising only an AppError inside the block."""
     orig_title = TransToken.untranslated("The title")
     orig_desc = TransToken.untranslated("fatal_only_error description, n={n}")
-    caught_errors: list[AppError] = []
+    caught_errors: List[AppError] = []
 
-    async def catch(title: TransToken, desc: TransToken, errors: list[AppError]) -> None:
+    async def catch(title: TransToken, desc: TransToken, errors: List[AppError]) -> None:
         """Catch the errors that occur."""
         assert title is orig_title
         assert str(desc) == "fatal_only_error description, n=2"
@@ -134,7 +136,7 @@ async def test_fatal_only_err() -> None:
     exc1 = AppError(TransToken.untranslated("Error 1"))
     exc2 = AppError(TransToken.untranslated("Error 2"))
 
-    task: list[str] = []
+    task: List[str] = []
     with ErrorUI.install_handler(catch):
         async with ErrorUI(orig_title, orig_desc) as error_block:
             assert not error_block.failed
@@ -153,17 +155,16 @@ async def test_fatal_only_err() -> None:
 
 async def test_fatal_exc() -> None:
     """Test raising some exception, after nonfatal errors were added."""
-    exc1 = AppError(TransToken.untranslated("Error 1"))
-    exc2 = AppError(TransToken.untranslated("Error 2"))
+    exc = AppError(TransToken.untranslated("Some Error"))
     unrelated = LookupError("something")
 
-    task: list[str] = []
+    task: List[str] = []
     with pytest.raises(ExceptionGroup) as group_catch, ErrorUI.install_handler(handler_fail):
         async with ErrorUI() as error_block:
             assert not error_block.failed
             task.append("before")
 
-            error_block.add(exc1)
+            error_block.add(exc)
             assert error_block.failed  # now failed.
             task.append("mid")
 
@@ -171,7 +172,7 @@ async def test_fatal_exc() -> None:
 
     assert isinstance(group_catch.value, ExceptionGroup)
     assert group_catch.value.message == "ErrorUI block raised"
-    assert group_catch.value.exceptions == (exc1, unrelated)
+    assert group_catch.value.exceptions == (exc, unrelated)
 
 
 async def test_fatal_group() -> None:
@@ -181,7 +182,7 @@ async def test_fatal_group() -> None:
     unrelated = LookupError("something")
     group = ExceptionGroup("group name", [exc2, unrelated])
 
-    task: list[str] = []
+    task: List[str] = []
     with pytest.raises(ExceptionGroup) as group_catch, ErrorUI.install_handler(handler_fail):
         async with ErrorUI() as error_block:
             assert not error_block.failed
