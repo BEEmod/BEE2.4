@@ -22,7 +22,6 @@ import BEE2_config
 import srctools.logger
 
 LOGGER = srctools.logger.get_logger('BEE2')
-APP_NURSERY: trio.Nursery
 
 
 async def init_app() -> None:
@@ -153,7 +152,6 @@ class Tracer(trio.abc.Instrument):
 
 async def app_main(init: Callable[[], Awaitable[Any]]) -> None:
     """The main loop for Trio."""
-    global APP_NURSERY
     LOGGER.debug('Opening nursery...')
     async with trio.open_nursery() as nursery:
         app._APP_NURSERY = nursery
