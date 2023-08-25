@@ -39,7 +39,53 @@ INST_NAMES = [
 
 @conditions.make_result('PistonPlatform')
 def res_piston_plat(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
-    """Generates piston platforms with optimized logic."""
+    """Generates piston platforms with optimized logic.
+
+    This does assume the item behaves similar to the original platform, and will use that VScript.
+
+    The first thing this result does is determine if the piston is able to move (has inputs, or
+    automatic mode is enabled). If it cannot, the entire piston can use `prop_static` props,
+    so a single  "full static" instance is used. Otherwise, it will need to move, so
+    `func_movelinears` must be generated. In this case, 4 pistons are generated. The ones below
+    the bottom point set for the piston (if any) aren't going to move, so they can still be static.
+    But the moving sections must be dynamic.
+
+    So further user logic can react to the piston being static, in this case `$bottom_level` and
+    `$top_level` are changed to be set to the same value - the height of the piston.
+
+    Quite a number of instances are required. These can either be provided in the result
+    configuration directly, or the "itemid" option can be provided. In that case, instances will
+    be looked up under the `<ITEM_ID:bee2_pist_XXX>` names.
+
+    Instances:
+        * `fullstatic_0` - `fullstatic_4`: A fully assembled piston at the specified height, used
+          when it will not move at all. The template below is not used, so this should be included
+          in the instance.
+        * `static_1` - `static_3`: Single piston section, below the moving ones and therefore
+          doesn't need to move. 4 isn't present since if the piston is able to move, the tip/platform
+          will always be moving.
+        * `dynamic_1` - `dynamic_4`: Single piston section, which can move and is parented to
+           `pistX`. These should probably be identical to the corresponding `static_X` instance, but
+           just movable.
+
+    Parameters:
+        * `itemid`: If set, instances will be looked up on this item, as mentioned above.
+        * `has_dn_fizz`: If true, enable the VScript's Think function to enable/disable fizzler
+          triggers.
+        * `auto_var`: This should be a 0/1 (or fixup variable containing the same) to indicate if
+          the piston has automatic movement, and so cannot use the "full static" instances.
+        * `source_ent`: If sounds are used, set this to the name of an entity which is used as the
+          source location for the sounds.
+        * `snd_start`, `snd_stop`: Soundscript / raw WAV played when the piston starts/stops moving.
+        * `snd_loop`: Looping soundscript / raw WAV played while the piston moves.
+        * `speed`: Speed of the piston in units per second. Defaults to 150.
+        * `template`: Specifies a brush template ID used to generate the `func_movelinear`s. This
+           should contain brushes for collision, each with different visgroups. This is then
+           offset as required to the starting position, and tied to the appropriate entities.
+           Static parts are made `func_detail`.
+        * `visgroup_1`-`visgroup_3`, `visgroup_top`: Names of the visgroups in the template for each
+           piston segment. Defaults to `pist_1`-`pist_4`.
+    """
     # Allow reading instances direct from the ID.
     # But use direct ones first.
     item_id = res['itemid', None]
