@@ -19,24 +19,24 @@ def _unknown_parse(value: str) -> str:
     return value
 
 
-@attrs.define(eq=False, getstate_setstate=False)
+@attrs.define(eq=False, kw_only=True, getstate_setstate=False)
 class ItemPropKind(Generic[ValueT]):
     """A type of property for an item."""
     # Property name for this. This is case-sensitive!
-    id: str = attrs.field(kw_only=True)
-    # The translation keyword for this, if it exists.
-    name: TransToken =  attrs.field(kw_only=True)
+    id: str
+    # The translation keyword for this, or BLANK if it shouldn't be visible.
+    name: TransToken
     # The instance variable this sets, if any.
-    instvar: str = attrs.field(kw_only=True)
+    instvar: str
     # All the possible values this can have, if used as a subtype.
     # If not usable, this is a zero-length sequence.
-    subtype_values: Sequence[ValueT] = attrs.field(kw_only=True, default=())
+    subtype_values: Sequence[ValueT] = ()
     # If false, don't show on the default selection window.
-    allow_user_default: bool =  attrs.field(kw_only=True, default=True)
+    allow_user_default: bool = True
 
     # Functions to parse and export the value.
-    parse: Callable[[str], ValueT] = attrs.field(kw_only=True)
-    export: Callable[[ValueT], str] = attrs.field(kw_only=True, default=str)
+    parse: Callable[[str], ValueT]
+    export: Callable[[ValueT], str]
 
     @classmethod
     def unknown(cls, prop_id: str) -> ItemPropKind[str]:
@@ -46,6 +46,7 @@ class ItemPropKind(Generic[ValueT]):
             name=TransToken.BLANK,
             instvar='',
             parse=_unknown_parse,
+            export=str,
             allow_user_default=False,
         )
 
@@ -325,7 +326,7 @@ prop_cube_fall_straight_Down = bool_prop(
 # Track Platform prop types:
 
 # Starting state for oscillating Track Platforms
-# If non-ocillating, this is disabled.
+# If non-oscillating, this is disabled.
 prop_track_start_active = bool_prop(
     id='StartActive',
     instvar='$start_active',
@@ -344,6 +345,7 @@ prop_track_starting_pos = ItemPropKind[float](
     id='StartingPosition',
     instvar='$starting_position',
     parse=conv_float,
+    export=str,
     name=TransToken.BLANK,  # Hidden
 )
 
@@ -353,6 +355,7 @@ prop_track_move_distance = ItemPropKind[float](
     id='TravelDistance',
     instvar='$travel_distance',
     parse=conv_float,
+    export=str,
     name=TransToken.BLANK,  # Hidden
 )
 
@@ -364,6 +367,7 @@ prop_track_speed = ItemPropKind[float](
     name=TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_paint_type_speed'),
     instvar='$speed',
     parse=conv_float,
+    export=str,
 )
 
 
@@ -372,6 +376,7 @@ prop_track_move_direction = ItemPropKind[Angle](
     instvar='$travel_direction',
     name=TransToken.BLANK,  # Hidden prop
     parse=Angle.from_str,
+    export=str,
 )
 
 
@@ -512,7 +517,7 @@ prop_paint_flow_type = enum_prop(
 # Specifies if the paint can streak across a surface.
 # This actually exports either 0.35 or 0 to the instvar.
 prop_paint_allow_streaks = bool_prop(
-    id = 'AllowStreak',
+    id='AllowStreak',
     instvar='$streak_time',
     name=TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_allow_streak_paint'),
 )
@@ -529,6 +534,7 @@ prop_connection_count = ItemPropKind[int](
     instvar="$connectioncount",
     name=TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_tbeam_activate'),
     parse=_parse_connection_count,
+    export=str,
 )
 # Specific for funnels, tracks the number of polarity-type input items.
 prop_connection_count_polarity = ItemPropKind[int](
@@ -536,6 +542,7 @@ prop_connection_count_polarity = ItemPropKind[int](
     instvar="$connectioncountpolarity",
     name=TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_tbeam_polarity'),
     parse=_parse_connection_count,
+    export=str,
 )
 
 
@@ -550,6 +557,7 @@ prop_timer_delay = ItemPropKind[int](
     name=TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_timer_delay'),
     subtype_values=range(0, 31),
     parse=_parse_timer_delay,
+    export=str,
 )
 
 # Specifies if a pedestal button should play timer sounds.
@@ -573,6 +581,7 @@ prop_faith_speed = ItemPropKind[float](
     instvar='$catapult_speed',
     name=TransToken.BLANK,  # Not visible.
     parse=conv_float,
+    export=str,
 )
 
 
@@ -582,6 +591,7 @@ prop_antline_indicator = ItemPropKind[str](
     instvar='$indicator_name',
     name=TransToken.BLANK,  # Inaccessible to users.
     parse=str,
+    export=str,
 )
 
 
@@ -599,6 +609,7 @@ prop_helper_radius = ItemPropKind[float](
     instvar='$helper_radius',
     name=TransToken.BLANK,  # Not visible.
     parse=conv_float,
+    export=str,
 )
 
 
@@ -624,6 +635,7 @@ prop_faith_targetname = ItemPropKind[str](
     id='TargetName',
     instvar='',
     parse=str,
+    export=str,
     name=TransToken.BLANK,  # Hidden
 )
 
@@ -635,6 +647,7 @@ prop_angled_panel_type = ItemPropKind[str](
     name=TransToken.BLANK,  # Hidden
     instvar='',  # None!
     parse=str,
+    export=str,
 )
 
 
