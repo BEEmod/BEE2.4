@@ -24,6 +24,15 @@ __all__ = ['Manager', 'Slot', 'ItemProto', 'ItemGroupProto']
 LOGGER = get_logger(__name__)
 
 
+@attrs.frozen(init=False)
+class DragInfo:
+    """The information required to display drag/drop items."""
+    icon: img.Handle
+    group: str | None = None
+    # Set to the same as icon if not passed.
+    group_icon: img.Handle = attrs.Factory(lambda self: self.icon, takes_self=True)
+
+
 @runtime_checkable
 class ItemProto(Protocol):
     """Protocol draggable items satisfy."""
@@ -47,7 +56,7 @@ class ItemGroupProto(ItemProto, Protocol):
         return None
 
 
-ItemT = TypeVar('ItemT', bound=ItemProto)  # The object the items move around.
+ItemT = TypeVar('ItemT')  # String etc representing the item being moved around.
 ArgsT = ParamSpec('ArgsT')
 
 # Tag used on canvases for our flowed slots.
@@ -199,6 +208,7 @@ class Positioner:
                 self.advance_row()
 
 
+InfoCB: TypeAlias = Callable[['Slot[ItemT]'], DragInfo]
 # noinspection PyProtectedMember
 class Manager(Generic[ItemT]):
     """Manages a set of drag-drop points."""
@@ -206,12 +216,14 @@ class Manager(Generic[ItemT]):
         self,
         master: Union[tkinter.Tk, tkinter.Toplevel],
         *,
+        info_cb: InfoCB,
         size: Tuple[int, int]=(64, 64),
         config_icon: bool=False,
         pick_flexi_group: Optional[Callable[[int, int], Optional[str]]]=None,
     ):
         """Create a group of drag-drop slots.
 
+        - info_cb: Called on the items to look up the image and group.
         - size: This is the size of each moved image.
         - config_icon: If set, gear icons will be added to each slot to
           configure items. This indicates the right-click option is available,
