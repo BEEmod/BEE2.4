@@ -7,8 +7,9 @@ from enum import Enum
 from tkinter import ttk
 from typing import Callable, Dict, Generic, Optional, Tuple, Union
 
-from typing_extensions import Concatenate, Literal, ParamSpec
+from typing_extensions import Concatenate, Literal, ParamSpec, override
 
+import utils
 from app import img, localisation, tk_tools
 from app.dragdrop import DragWin, FlexiCB, ItemT, ManagerBase, InfoCB, SLOT_DRAG, Slot, in_bbox
 from transtoken import TransToken
@@ -34,11 +35,12 @@ def _make_placer(
 
     This allows propagating the original method args and types.
     """
-    def placer(man: DragDrop, slot: Slot, /, *args: ArgsT.args, **kwargs: ArgsT.kwargs) -> None:
+    def placer(self: DragDrop, slot: Slot, /, *args: ArgsT.args, **kwargs: ArgsT.kwargs) -> None:
         """Call place/pack/grid on the label."""
-        slot._pos_type = kind
-        slot._canv_info = None
-        func(man._slot_ui[slot].lbl, *args, **kwargs)
+        slot_ui = self._slot_ui[slot]
+        slot_ui.pos_type = kind
+        slot_ui.canv_info = None
+        func(slot_ui.lbl, *args, **kwargs)
     return placer
 
 
@@ -61,9 +63,9 @@ class SlotUI:
     lbl: ttk.Label
 
     # The geometry manager used to position this.
-    _pos_type: Optional[GeoManager] = None
+    pos_type: Optional[GeoManager] = None
     # If canvas, the tag and x/y coords.
-    _canv_info: Optional[Tuple[int, int, int]] = None
+    canv_info: Optional[Tuple[int, int, int]] = None
     
 
 class DragDrop(ManagerBase[ItemT, tk.Misc], Generic[ItemT]):
@@ -93,9 +95,11 @@ class DragDrop(ManagerBase[ItemT, tk.Misc], Generic[ItemT]):
         self._drag_lbl = tk.Label(drag_win)
         self._drag_lbl.grid(row=0, column=0)
         drag_win.bind(tk_tools.EVENTS['LEFT_RELEASE'], self._evt_stop)
+        drag_win.bind(tk_tools.EVENTS['LEFT_MOVE'], self._evt_move)
         
         self._slot_ui: dict[Slot[ItemT], SlotUI] = {}
 
+    @override
     def _ui_set_icon(self, slot: Slot[ItemT] | DragWin, icon: img.Handle) -> None:
         """Set the specified slot to use this icon, or the drag/drop window."""
         if slot is SLOT_DRAG:
@@ -103,6 +107,7 @@ class DragDrop(ManagerBase[ItemT, tk.Misc], Generic[ItemT]):
         else:
             TK_IMG.apply(self._slot_ui[slot].lbl, self._img_blank)
 
+    @override
     def _ui_in_bbox(self, slot: Slot[ItemT], x: float, y: float) -> bool:
         """Check if this x/y coordinate is hovering over a slot."""
         lbl = self._slot_ui[slot].lbl
@@ -113,7 +118,8 @@ class DragDrop(ManagerBase[ItemT, tk.Misc], Generic[ItemT]):
             lbl.winfo_width(),
             lbl.winfo_height(),
         )
-            
+
+    @override
     def _ui_create_slot(
         self,
         slot: Slot[ItemT],
@@ -124,13 +130,11 @@ class DragDrop(ManagerBase[ItemT, tk.Misc], Generic[ItemT]):
         wid_label = ttk.Label(parent, anchor='center')
         
         TK_IMG.apply(wid_label, self._img_blank)
-        tk_tools.bind_leftclick(wid_label, self._evt_start)
-        wid_label.bind(tk_tools.EVENTS['LEFT_SHIFT'], self._evt_fastdrag)
-        wid_label.bind('<Enter>', self._evt_hover_enter)
-        wid_label.bind('<Leave>', self._evt_hover_exit)
-        # Bind this not the self variable.
-        config_event = self._on_configured(slot)
-        tk_tools.bind_rightclick(wid_label, config_event)
+        tk_tools.bind_leftclick(wid_label, lambda evt: self._on_start(slot, evt.x_root, evt.y_root))
+        wid_label.bind(tk_tools.EVENTS['LEFT_SHIFT'], lambda evt: self._on_fastdrag(slot))
+        wid_label.bind('<Enter>', lambda evt: self._on_hover_enter(slot))
+        wid_label.bind('<Leave>', lambda evt: self._on_hover_exit(slot))
+        tk_tools.bind_rightclick(wid_label, lambda evt: self._on_configure(slot))
 
         if title:
             text_lbl = tk.Label(
@@ -153,17 +157,59 @@ class DragDrop(ManagerBase[ItemT, tk.Misc], Generic[ItemT]):
             @tk_tools.bind_leftclick(info_btn)
             def info_button_click(e: tk.Event) -> object:
                 """Trigger the callback whenever the gear button was pressed."""
-                config_event(e)
+                self._on_configure(slot)
                 # Cancel the event sequence, so it doesn't travel up to the main
                 # window and hide the window again.
                 return 'break'
 
-            # Rightclick does the same as the main icon.
-            tk_tools.bind_rightclick(info_btn, config_event)
+            # Right-click does the same as the main icon.
+            tk_tools.bind_rightclick(info_btn, lambda evt: self._on_configure(slot))
         else:
             info_btn = None
 
-    def _ui_drag_show(self, x: float, y: float) -> None:
+    @override
+    def _ui_slot_showdeco(self, slot: Slot[ItemT]) -> None:
+        """Fired when a cursor hovers over a slot."""
+        padding = 2 if utils.WIN else 0
+        slot_ui = self._slot_ui[slot]
+        # Add border, but only if either icon exists or we contain an item.
+        if slot_ui.text_lbl or slot.contents is not None:
+            slot_ui.info_btn['relief'] = 'ridge'
+
+        # Show configure icon for items.
+        if slot_ui.info_btn is not None and slot.contents is not None:
+            slot_ui.info_btn.place(
+                x=slot_ui.lbl.winfo_width() - padding,
+                y=slot_ui.lbl.winfo_height() - padding,
+                anchor='se',
+            )
+
+        if slot_ui.text_lbl:
+            slot_ui.text_lbl.place(
+                x=-padding,
+                y=slot_ui.lbl.winfo_height() - padding,
+                anchor='sw',
+            )
+
+    @override
+    def _ui_slot_hidedeco(self, slot: Slot[ItemT]) -> None:
+        """Fired when a cursor leaves a slot."""
+        slot_ui = self._slot_ui[slot]
+        slot_ui.lbl['relief'] = 'flat'
+
+        if slot_ui.info_btn:
+            slot_ui.info_btn.place_forget()
+        if slot_ui.text_lbl:
+            slot_ui.text_lbl.place_forget()
+
+    @override
+    def _ui_slot_set_highlight(self, slot: Slot[ItemT], highlight: bool) -> None:
+        """Apply the highlighted state."""
+        slot_ui = self._slot_ui[slot]
+        slot_ui.lbl['background'] = '#5AD2D2' if highlight else ''
+
+    @override
+    def _ui_dragwin_show(self, x: float, y: float) -> None:
         """Show the drag window."""
         self._drag_win.deiconify()
         self._drag_win.lift()
@@ -175,11 +221,13 @@ class DragDrop(ManagerBase[ItemT, tk.Misc], Generic[ItemT]):
         # Reposition.
         self._ui_dragwin_update(x, y)
 
-    def _ui_drag_hide(self) -> None:
+    @override
+    def _ui_dragwin_hide(self) -> None:
         """Hide the drag window."""
         self._drag_win.grab_release()
         self._drag_win.withdraw()
 
+    @override
     def _ui_dragwin_update(self, x: float, y: float) -> None:
         """Move the drag window to this position."""
         self._drag_win.geometry(f'+{round(x - self.width // 2)}+{round(y - self.height // 2)}')
@@ -202,3 +250,49 @@ class DragDrop(ManagerBase[ItemT, tk.Misc], Generic[ItemT]):
     def _evt_stop(self, evt: tk.Event) -> None:
         """Event fired when dragging should stop."""
         self._on_stop(evt.x_root, evt.y_root)
+
+    # These call the method on the label, setting our attrs.
+    slot_grid = _make_placer(ttk.Label.grid, GeoManager.GRID)
+    slot_place = _make_placer(ttk.Label.place, GeoManager.PLACE)
+    slot_pack = _make_placer(ttk.Label.pack, GeoManager.PACK)
+
+    def slot_canvas(self, slot: Slot[ItemT], canv: tk.Canvas, x: int, y: int, tag: str) -> None:
+        """Position this slot on a canvas."""
+        slot_ui = self._slot_ui[slot]
+        if slot_ui.pos_type is not None and slot_ui.pos_type is not GeoManager.CANVAS:
+            raise ValueError("Can't add already positioned slot!")
+        obj_id = canv.create_window(
+            x, y,
+            width=self.width,
+            height=self.height,
+            anchor='nw',
+            window=slot_ui.lbl,
+            tags=(tag,),
+        )
+        slot_ui.pos_type = GeoManager.CANVAS
+        slot_ui.canv_info = (obj_id, x, y)
+
+    def get_slot_canvas_pos(self, slot: Slot[ItemT], canv: tk.Canvas) -> Tuple[int, int]:
+        """If on a canvas, fetch the current x/y position."""
+        slot_ui = self._slot_ui[slot]
+        if slot_ui.canv_info is not None:
+            _, x, y = slot_ui.canv_info
+            return x, y
+        raise ValueError('Not on a canvas!')
+
+    def slot_hide(self, slot: Slot[ItemT]) -> None:
+        """Remove this slot from the set position manager."""
+        slot_ui = self._slot_ui[slot]
+        if slot_ui.pos_type is None:
+            raise ValueError('Not added to a geometry manager yet!')
+        elif slot_ui.pos_type is GeoManager.CANVAS:
+            # Attached via canvas, with an ID as suffix.
+            canv = slot_ui.lbl.nametowidget(slot_ui.lbl.winfo_parent())
+            assert isinstance(canv, tk.Canvas)
+            assert slot_ui.canv_info is not None
+            obj_id, _, _ = slot_ui.canv_info
+            canv.delete(obj_id)
+        else:
+            _FORGETTER[slot_ui.pos_type](slot_ui.lbl)
+        slot_ui.pos_type = None
+        slot_ui.canv_info = None

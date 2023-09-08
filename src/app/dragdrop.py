@@ -362,16 +362,34 @@ class ManagerBase(Generic[ItemT, ParentT]):
         raise NotImplementedError
 
     @abc.abstractmethod
+    def _ui_slot_showdeco(self, slot: Slot[ItemT]) -> None:
+        """Show the button/title on a slot."""
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def _ui_slot_hidedeco(self, slot: Slot[ItemT]) -> None:
+        """Hide the title/button on a slot."""
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def _ui_slot_set_highlight(self, slot: Slot[ItemT], highlight: bool) -> None:
+        """Apply the highlighted state."""
+        raise NotImplementedError
+
+    @abc.abstractmethod
     def _ui_in_bbox(self, slot: Slot[ItemT], x: float, y: float) -> bool:
         """Check if this x/y coordinate is hovering over a slot."""
         raise NotImplementedError
 
     @abc.abstractmethod
-    def _ui_drag_show(self, x: float, y: float) -> None:
+    def _ui_dragwin_show(self, x: float, y: float) -> None:
         """Show the drag window."""
+        raise NotImplementedError
 
-    def _ui_drag_hide(self) -> None:
+    @abc.abstractmethod
+    def _ui_dragwin_hide(self) -> None:
         """Hide the drag window."""
+        raise NotImplementedError
 
     @abc.abstractmethod
     def _ui_dragwin_update(self, x: float, y: float) -> None:
@@ -448,9 +466,7 @@ class ManagerBase(Generic[ItemT, ParentT]):
         self._cur_slot = slot
 
         sound.fx('config')
-        self._ui_drag_show(x, y)
-
-        self._drag_win.bind(tk_tools.EVENTS['LEFT_MOVE'], self._evt_move)
+        self._ui_dragwin_show(x, y)
 
     def _on_move(self, x: float, y: float) -> None:
         """Reposition the item whenever moving."""
@@ -503,6 +519,52 @@ class ManagerBase(Generic[ItemT, ParentT]):
 
         self._cur_drag = None
         self._cur_slot = None
+
+    def _on_fastdrag(self, slot: Slot[ItemT]) -> None:
+        """Quickly add/remove items by shift-clicking."""
+        if slot.is_flexi:  # TODO: What to do here??
+            return
+
+        if slot.is_source:
+            # Add this item to the first free position.
+            item = slot.contents
+            for free in slot.man._slots:
+                if not free.is_target:
+                    continue
+                if free.contents is None:
+                    free.contents = item
+                    sound.fx('config')
+                    if slot.is_flexi:
+                        slot.contents = None
+                    background_run(self.event_bus, Event.MODIFIED)
+                    return
+                elif free.contents is item:
+                    # It's already on the board, don't change anything.
+                    sound.fx('config')
+                    return
+            # Failed.
+            sound.fx('delete')
+        # Else: target.
+        else:
+            # Fast-delete this.
+            slot.contents = None
+            background_run(self.event_bus, Event.MODIFIED)
+            sound.fx('delete')
+
+    def _on_hover_enter(self, slot: Slot[ItemT]) -> None:
+        """Fired when the cursor starts hovering over the item."""
+        self._ui_slot_showdeco(slot)
+        background_run(self.event_bus, Event.HOVER_ENTER, slot)
+
+    def _on_hover_exit(self, slot: Slot[ItemT]) -> None:
+        """Fired when the cursor stops hovering over the item."""
+        self._ui_slot_hidedeco(slot)
+        background_run(self.event_bus, Event.HOVER_EXIT, slot)
+
+    def _on_configure(self, slot: Slot[ItemT]) -> None:
+        """Configuration event, fired by clicking icon or right-clicking item."""
+        if slot.contents:
+            background_run(self.event_bus, Event.CONFIG, self)
 
 
 # noinspection PyProtectedMember
@@ -565,9 +627,6 @@ class Slot(Generic[ItemT]):
     def highlight(self, value: bool) -> None:
         """Allows setting/getting if the slot has an alternate selection state."""
         self._is_highlighted = bool(value)
-        self._lbl['background'] = (
-            '#5AD2D2' if self._is_highlighted else ''
-        )
 
     @property
     def contents(self) -> Optional[ItemT]:
@@ -590,8 +649,8 @@ class Slot(Generic[ItemT]):
         if self.is_target:
             # Update items in the previous group, so they gain the group icon
             # if only one now exists.
-            self.man._group_update(getattr(old_cont, 'dnd_group', None))
-            new_group = getattr(value, 'dnd_group', None)
+            self.man._group_update(self.man._info_cb(old_cont).group)
+            new_group = self.man._info_cb(value).group
         else:
             # Source pickers never group items.
             new_group = None
@@ -606,8 +665,8 @@ class Slot(Generic[ItemT]):
             self.man._group_update(new_group)
         else:
             # Just update myself.
-            self.man._display_item(self._lbl, value)
-            
+            self.man._display_item(self, value)
+
     @property
     def contents_group(self) -> Optional[str]:
         """If the item in this slot has a group, return it."""
@@ -617,122 +676,6 @@ class Slot(Generic[ItemT]):
 
     def __repr__(self) -> str:
         return f'<{self.kind.name} Slot @ {id(self):016x}: {self._contents!r}>'
-
-    # These call the method on the label, setting our attrs.
-    grid = _make_placer(ttk.Label.grid, GeoManager.GRID)
-    place = _make_placer(ttk.Label.place, GeoManager.PLACE)
-    pack = _make_placer(ttk.Label.pack, GeoManager.PACK)
-
-    def canvas(self, canv: tkinter.Canvas, x: int, y: int, tag: str) -> None:
-        """Position this slot on a canvas."""
-        if self._pos_type is not None and self._pos_type is not GeoManager.CANVAS:
-            raise ValueError("Can't add already positioned slot!")
-        obj_id = canv.create_window(
-            x, y,
-            width=self.man.width,
-            height=self.man.height,
-            anchor='nw',
-            window=self._lbl,
-            tags=(tag,),
-        )
-        self._pos_type = GeoManager.CANVAS
-        self._canv_info = (obj_id, x, y)
-
-    def canvas_pos(self, canv: tkinter.Canvas) -> Tuple[int, int]:
-        """If on a canvas, fetch the current x/y position."""
-        if self._canv_info is not None:
-            _, x, y = self._canv_info
-            return x, y
-        raise ValueError('Not on a canvas!')
-
-    def hide(self) -> None:
-        """Remove this slot from the set position manager."""
-        if self._pos_type is None:
-            raise ValueError('Not added to a geometry manager yet!')
-        elif self._pos_type is GeoManager.CANVAS:
-            # Attached via canvas, with an ID as suffix.
-            canv = self._lbl.nametowidget(self._lbl.winfo_parent())
-            assert isinstance(canv, tkinter.Canvas)
-            assert self._canv_info is not None
-            obj_id, _, _ = self._canv_info
-            canv.delete(obj_id)
-        else:
-            _FORGETTER[self._pos_type](self._lbl)
-        self._pos_type = None
-        self._canv_info = None
-
-    def _evt_start(self, event: tkinter.Event) -> None:
-        """Start dragging."""
-        self.man._start(self, event)
-
-    def _evt_fastdrag(self, event: tkinter.Event) -> None:
-        """Quickly add/remove items by shift-clicking."""
-        if self.is_flexi:  # TODO:
-            return
-
-        if self.is_source:
-            # Add this item to the first free position.
-            item = self.contents
-            for slot in self.man._slots:
-                if not slot.is_target:
-                    continue
-                if slot.contents is None:
-                    slot.contents = item
-                    sound.fx('config')
-                    if self.is_flexi:
-                        self.contents = None
-                    background_run(self.man.event_bus, Event.MODIFIED)
-                    return
-                elif slot.contents is item:
-                    # It's already on the board, don't change anything.
-                    sound.fx('config')
-                    return
-            # Failed.
-            sound.fx('delete')
-        # Else: target.
-        else:
-            # Fast-delete this.
-            self.contents = None
-            background_run(self.man.event_bus, Event.MODIFIED)
-            sound.fx('delete')
-
-    def _evt_hover_enter(self, event: tkinter.Event) -> None:
-        """Fired when the cursor starts hovering over the item."""
-        padding = 2 if utils.WIN else 0
-        # Add border, but only if either icon exists or we contain an item.
-        if self._text_lbl or self._contents is not None:
-            self._lbl['relief'] = 'ridge'
-
-        # Show configure icon for items.
-        if self._info_btn is not None and self._contents is not None:
-            self._info_btn.place(
-                x=self._lbl.winfo_width() - padding,
-                y=self._lbl.winfo_height() - padding,
-                anchor='se',
-            )
-        background_run(self.man.event_bus, Event.HOVER_ENTER, self)
-
-        if self._text_lbl:
-            self._text_lbl.place(
-                x=-padding,
-                y=self._lbl.winfo_height() - padding,
-                anchor='sw',
-            )
-
-    def _evt_hover_exit(self, _: tkinter.Event) -> None:
-        """Fired when the cursor stops hovering over the item."""
-        self._lbl['relief'] = 'flat'
-
-        if self._info_btn:
-            self._info_btn.place_forget()
-        if self._text_lbl:
-            self._text_lbl.place_forget()
-        background_run(self.man.event_bus, Event.HOVER_EXIT, self)
-
-    def _evt_configure(self, _: tkinter.Event) -> None:
-        """Configuration event, fired by clicking icon or right-clicking item."""
-        if self.contents:
-            background_run(self.man.event_bus, Event.CONFIG, self)
 
 
 async def test() -> None:

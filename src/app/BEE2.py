@@ -11,6 +11,7 @@ from app import (
     TK_ROOT, localisation, sound, img, gameMan, music_conf,
     UI, logWindow,
 )
+from ui_tk.errors import display_errors
 from config.gen_opts import GenOptions
 from config.last_sel import LastSelected
 import config
@@ -155,6 +156,7 @@ async def app_main(init: Callable[[], Awaitable[Any]]) -> None:
     LOGGER.debug('Opening nursery...')
     async with trio.open_nursery() as nursery:
         app._APP_NURSERY = nursery
+        await nursery.start(display_errors)
         await init()
 
 
