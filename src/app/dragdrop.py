@@ -245,7 +245,8 @@ class ManagerBase(Generic[ItemT, ParentT]):
         :param label: Set to a short string to be displayed in the lower-left.
               Intended for numbers.
         """
-        slot: Slot[ItemT] = Slot(self, parent, SlotType.TARGET, label)
+        slot: Slot[ItemT] = Slot(self, SlotType.TARGET)
+        self._ui_slot_create(slot, parent, label)
         self._slots.append(slot)
         return slot
 
@@ -260,13 +261,14 @@ class ManagerBase(Generic[ItemT, ParentT]):
         :param label: Set to a short string to be displayed in the lower-left.
               Intended for numbers.
         """
-        slot: Slot[ItemT] = Slot(self, parent, SlotType.SOURCE, label)
+        slot: Slot[ItemT] = Slot(self, SlotType.SOURCE)
+        self._ui_slot_create(slot, parent, label)
         self._slots.append(slot)
         return slot
 
     def slot_flexi(
         self,
-        parent: tkinter.Misc,
+        parent: ParentT,
         *,
         label: TransToken = TransToken.BLANK,
     ) -> Slot[ItemT]:
@@ -282,7 +284,8 @@ class ManagerBase(Generic[ItemT, ParentT]):
         """
         if self._pick_flexi_group is None:
             raise ValueError('Flexi callback missing!')
-        slot: Slot[ItemT] = Slot(self, parent, SlotType.FLEXI, label)
+        slot: Slot[ItemT] = Slot(self, SlotType.FLEXI)
+        self._ui_slot_create(slot, parent, label)
         self._slots.append(slot)
         return slot
 
@@ -341,30 +344,20 @@ class ManagerBase(Generic[ItemT, ParentT]):
         """Yield all slots."""
         return iter(self._slots)
 
-    def flow_slots(
-        self,
-        canv: tkinter.Canvas,
-        slots: Iterable[Slot[ItemT]],
-        spacing: int=16 if utils.MAC else 8,
-        yoff: int=0,
-        tag: str=_CANV_TAG,
-    ) -> int:
-        """Place all the slots in a grid on the provided canvas.
-
-        Any previously added slots with the same tag will be removed.
-        - spacing is the amount added on each side of each slot.
-        - yoff is the offset from the top, the new height is then returned to allow chaining.
-        """
-        canv.delete(tag)
-        pos = Positioner(canv, self.width, self.height, spacing, yoff)
-        pos.place_slots(slots, tag)
-        pos.resize_canvas()
-        return pos.yoff
-
     # Methods subclasses must override:
     @abc.abstractmethod
     def _ui_set_icon(self, slot: Slot[ItemT] | DragWin, icon: img.Handle) -> None:
         """Set the specified slot to use this icon, or the drag/drop window."""
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def _ui_slot_create(
+        self,
+        slot: Slot[ItemT],
+        parent: ParentT,
+        title: TransToken,
+    ) -> None:
+        """Called when a slot is added, to create the UI form."""
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -592,9 +585,7 @@ class Slot(Generic[ItemT]):
     def __init__(
         self,
         man: ManagerBase,
-        parent: tkinter.Misc,
         kind: SlotType,
-        label: TransToken,
     ) -> None:
         """Internal only, use Manager.slot_*()."""
         self.man = man

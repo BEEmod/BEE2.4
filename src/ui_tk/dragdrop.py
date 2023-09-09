@@ -96,13 +96,14 @@ class CanvasPositioner(PositionerBase[ItemT], Generic[ItemT]):
             self.manager.slot_canvas(slot, self.canvas, x, y, tag)
 
 
+@attrs.define
 class SlotUI:
     """Widgets associated with a slot."""
+    # Our main widget.
+    lbl: ttk.Label
     # The two widgets shown at the bottom when moused over.
     text_lbl: Optional[tk.Label]
     info_btn: Optional[tk.Label]
-    # Our main widget.
-    lbl: ttk.Label
 
     # The geometry manager used to position this.
     pos_type: Optional[GeoManager] = None
@@ -162,7 +163,7 @@ class DragDrop(ManagerBase[ItemT, tk.Misc], Generic[ItemT]):
         )
 
     @override
-    def _ui_create_slot(
+    def _ui_slot_create(
         self,
         slot: Slot[ItemT],
         parent: tk.Misc,
@@ -208,6 +209,8 @@ class DragDrop(ManagerBase[ItemT, tk.Misc], Generic[ItemT]):
             tk_tools.bind_rightclick(info_btn, lambda evt: self._on_configure(slot))
         else:
             info_btn = None
+
+        self._slot_ui[slot] = SlotUI(wid_label, text_lbl, info_btn)
 
     @override
     def _ui_slot_showdeco(self, slot: Slot[ItemT]) -> None:
@@ -338,3 +341,23 @@ class DragDrop(ManagerBase[ItemT, tk.Misc], Generic[ItemT]):
             _FORGETTER[slot_ui.pos_type](slot_ui.lbl)
         slot_ui.pos_type = None
         slot_ui.canv_info = None
+
+    def flow_slots(
+        self,
+        canv: tk.Canvas,
+        slots: Iterable[Slot[ItemT]],
+        spacing: int=16 if utils.MAC else 8,
+        yoff: int=0,
+        tag: str=_CANV_TAG,
+    ) -> int:
+        """Place all the slots in a grid on the provided canvas.
+
+        Any previously added slots with the same tag will be removed.
+        - spacing is the amount added on each side of each slot.
+        - yoff is the offset from the top, the new height is then returned to allow chaining.
+        """
+        canv.delete(tag)
+        pos = CanvasPositioner(self, canv, self.width, self.height, spacing, yoff)
+        pos.place_slots(slots, tag)
+        pos.resize_canvas()
+        return pos.yoff

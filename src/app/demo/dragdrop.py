@@ -21,7 +21,6 @@ from ui_tk.img import TK_IMG
 
 async def test() -> None:
     """Test the GUI."""
-
     BEE2_config.GEN_OPTS.load()
     config.APP.read_file()
 
@@ -119,7 +118,7 @@ async def test() -> None:
                 label=TransToken.untranslated('{n:00}').format(n=x + 4*y)
                 if y < 3 else TransToken.BLANK
             )
-            manager.slot_grid(column=x, row=y, padx=1, pady=1)
+            manager.slot_grid(slot, column=x, row=y, padx=1, pady=1)
             slot_dest.append(slot)
 
     FLEXI = False
