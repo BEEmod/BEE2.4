@@ -1,25 +1,23 @@
 """UI implementation for the dragdrop module."""
 from __future__ import annotations
-
+from typing import Callable, Dict, Generic, Optional, Tuple, Union
+from typing_extensions import Concatenate, Literal, ParamSpec, override
+from tkinter import ttk
 import tkinter as tk
 from collections.abc import Iterable
 from enum import Enum
 
 import attrs
-from tkinter import ttk
-from typing import Callable, Dict, Generic, Optional, Tuple, Union
 
-from typing_extensions import Concatenate, Literal, ParamSpec, override
-
-import utils
 from app import img, localisation, tk_tools
 # noinspection PyProtectedMember
 from app.dragdrop import (
-    DragWin, FlexiCB, ItemT, ManagerBase, InfoCB, PositionerBase, SLOT_DRAG,
+    SLOT_DRAG, DragWin, FlexiCB, InfoCB, ItemT, ManagerBase, PositionerBase,
     Slot, in_bbox,
 )
 from transtoken import TransToken
 from ui_tk.img import TK_IMG
+import utils
 
 
 ArgsT = ParamSpec('ArgsT')
@@ -222,8 +220,8 @@ class DragDrop(ManagerBase[ItemT, tk.Misc], Generic[ItemT]):
         padding = 2 if utils.WIN else 0
         slot_ui = self._slot_ui[slot]
         # Add border, but only if either icon exists or we contain an item.
-        if slot_ui.text_lbl or slot.contents is not None:
-            slot_ui.info_btn['relief'] = 'ridge'
+        if slot_ui.text_lbl is not None or slot.contents is not None:
+            slot_ui.lbl['relief'] = 'ridge'
 
         # Show configure icon for items.
         if slot_ui.info_btn is not None and slot.contents is not None:
@@ -246,9 +244,9 @@ class DragDrop(ManagerBase[ItemT, tk.Misc], Generic[ItemT]):
         slot_ui = self._slot_ui[slot]
         slot_ui.lbl['relief'] = 'flat'
 
-        if slot_ui.info_btn:
+        if slot_ui.info_btn is not None:
             slot_ui.info_btn.place_forget()
-        if slot_ui.text_lbl:
+        if slot_ui.text_lbl is not None:
             slot_ui.text_lbl.place_forget()
 
     @override

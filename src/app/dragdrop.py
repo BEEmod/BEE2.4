@@ -1,29 +1,25 @@
 """Implements drag/drop logic."""
 from __future__ import annotations
-
-import abc
-from enum import Enum
-from collections import defaultdict
-
-import attrs
-import trio
-from tkinter import ttk, messagebox
 from typing import (
-    Awaitable, Callable, NewType, Union, Generic, TypeVar, Protocol, Optional,
-    List, Tuple, Dict, Iterator, Iterable, runtime_checkable,
+    Any, Callable, Dict, Final, Generic, Iterable, Iterator, List, Optional,
+    Tuple, TypeVar,
 )
-from typing_extensions import Literal, ParamSpec, Concatenate, TypeAlias
-import tkinter
+from typing_extensions import ParamSpec, TypeAlias
+from collections import defaultdict
+from enum import Enum
+import abc
+import enum
 
 from srctools.logger import get_logger
+import attrs
 
-from app import localisation, sound, img, TK_ROOT, tk_tools, background_run
+from app import background_run, img, sound
 from transtoken import TransToken
-from ui_tk.img import TK_IMG
-import utils
 import event
+import utils
 
-__all__ = ['Manager', 'Slot', 'ItemProto', 'ItemGroupProto', 'DragUIProto', 'ItemT']
+
+__all__ = ['ManagerBase', 'Slot', 'DragInfo', 'ParentT', 'Event', 'SlotType', 'SLOT_DRAG', 'ItemT']
 LOGGER = get_logger(__name__)
 
 
@@ -91,11 +87,11 @@ class PositionerBase(Generic[ItemT]):
     - spacing is the amount added on each side of each slot.
     - yoff is the offset from the top, the new height is then returned to allow chaining.
     """
-    manager: ManagerBase[ItemT]
+    manager: ManagerBase[ItemT, Any]
 
     def __init__(
         self,
-        manager: ManagerBase[ItemT],
+        manager: ManagerBase[ItemT, Any],
         width: int,
         height: int,
         item_width: int,
@@ -162,9 +158,13 @@ class PositionerBase(Generic[ItemT]):
 
 InfoCB: TypeAlias = Callable[[ItemT], DragInfo]
 FlexiCB: TypeAlias = Callable[[float, float], Optional[str]]
-# Constant used instead of a Slot to represent the drag/drop window.
-DragWin = NewType("DragWin", object)
-SLOT_DRAG: DragWin = DragWin("<drag>")
+
+
+class DragWin(enum.Enum):
+    """Constant used instead of a Slot to represent the drag/drop window."""
+    DRAG = "drag"
+
+SLOT_DRAG: Final = DragWin.DRAG
 
 
 # noinspection PyProtectedMember
@@ -213,7 +213,7 @@ class ManagerBase(Generic[ItemT, ParentT]):
 
     def slot_target(
         self,
-        parent: tkinter.Misc,
+        parent: ParentT,
         label: TransToken = TransToken.BLANK,
     ) -> Slot[ItemT]:
         """Add a slot to this group, which can have items added/removed.
@@ -229,7 +229,7 @@ class ManagerBase(Generic[ItemT, ParentT]):
 
     def slot_source(
         self,
-        parent: tkinter.Misc,
+        parent: ParentT,
         label: TransToken = TransToken.BLANK,
     ) -> Slot[ItemT]:
         """Add a readonly slot to this group which the user can fetch copies from.

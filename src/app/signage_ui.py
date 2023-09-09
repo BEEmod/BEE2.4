@@ -8,6 +8,8 @@ from tkinter import ttk
 import trio
 import srctools.logger
 
+from app.dragdrop import DragInfo
+from ui_tk.dragdrop import DragDrop
 from ui_tk.img import TKImages
 from app import dragdrop, img, localisation, tk_tools, TK_ROOT
 from config.signage import DEFAULT_IDS, Layout
@@ -21,8 +23,6 @@ LOGGER = srctools.logger.get_logger(__name__)
 
 window = tk.Toplevel(TK_ROOT, name='signageChooser')
 window.withdraw()
-
-drag_man: dragdrop.Manager[Signage] = dragdrop.Manager(window)
 SLOTS_SELECTED: Dict[int, dragdrop.Slot[Signage]] = {}
 # The valid timer indexes for signs.
 SIGN_IND: Sequence[int] = range(3, 31)
@@ -30,6 +30,7 @@ IMG_ERROR = img.Handle.error(64, 64)
 IMG_BLANK = img.Handle.background(64, 64)
 
 TRANS_SIGN_NAME = TransToken.ui('Signage: {name}')
+_cur_style: Optional[Style] = None
 
 
 def export_data() -> List[Tuple[str, str]]:
@@ -40,6 +41,32 @@ def export_data() -> List[Tuple[str, str]]:
         for ind in SIGN_IND
         if (sign_id := conf.signs.get(ind, '')) != ''
     ]
+
+
+def get_drag_info(sign: Signage) -> DragInfo:
+    """Get the icon for displaying this sign."""
+    style = _cur_style
+    if style is None:
+        return DragInfo(IMG_ERROR)
+
+    for potential_style in style.bases:
+        try:
+            return DragInfo(sign.styles[potential_style.id.upper()].icon)
+        except KeyError:
+            pass
+    else:
+        LOGGER.warning(
+            'No valid <{}> style for "{}" signage!',
+            style.id,
+            sign.id,
+        )
+        try:
+            return DragInfo(sign.styles[packages.CLEAN_PACKAGE].icon)
+        except KeyError:
+            return DragInfo(IMG_ERROR)
+
+
+drag_man: DragDrop[Signage] = DragDrop(window, info_cb=get_drag_info)
 
 
 async def apply_config(data: Layout) -> None:
@@ -64,35 +91,8 @@ async def apply_config(data: Layout) -> None:
 
 def style_changed(new_style: Style) -> None:
     """Update the icons for the selected signage."""
-    icon: Optional[img.Handle]
-    packset = packages.get_loaded_packages()
-    for sign in packset.all_obj(Signage):
-        for potential_style in new_style.bases:
-            try:
-                icon = sign.styles[potential_style.id.upper()].icon
-                break
-            except KeyError:
-                pass
-        else:
-            LOGGER.warning(
-                'No valid <{}> style for "{}" signage!',
-                new_style.id,
-                sign.id,
-            )
-            try:
-                icon = sign.styles['BEE2_CLEAN'].icon
-            except KeyError:
-                sign.dnd_icon = IMG_ERROR
-                continue
-        if icon:
-            sign.dnd_icon = icon
-        else:
-            LOGGER.warning(
-                'No icon for "{}" signage in <{}> style!',
-                sign.id,
-                new_style.id,
-            )
-            sign.dnd_icon = IMG_ERROR
+    global _cur_style
+    _cur_style = new_style
     if window.winfo_ismapped():
         drag_man.load_icons()
 
@@ -149,18 +149,18 @@ async def init_widgets(master: tk.Widget, tk_img: TKImages) -> Optional[tk.Widge
 
         packset = packages.get_loaded_packages()
 
-        sng_left = hover_sign.dnd_icon
+        sng_left = get_drag_info(hover_sign).icon
         try:
-            sng_right = packset.obj_by_id(Signage, 'SIGN_ARROW').dnd_icon
+            sng_right = get_drag_info(packset.obj_by_id(Signage, 'SIGN_ARROW')).icon
         except KeyError:
             LOGGER.warning('No arrow signage defined!')
             sng_right = IMG_BLANK
         try:
-            dbl_left = packset.obj_by_id(Signage, hover_sign.prim_id or '').dnd_icon
+            dbl_left = get_drag_info(packset.obj_by_id(Signage, hover_sign.prim_id or '')).icon
         except KeyError:
-            dbl_left = hover_sign.dnd_icon
+            dbl_left = sng_left
         try:
-            dbl_right = packset.obj_by_id(Signage, hover_sign.sec_id or '').dnd_icon
+            dbl_right = get_drag_info(packset.obj_by_id(Signage, hover_sign.sec_id or '')).icon
         except KeyError:
             dbl_right = IMG_BLANK
 
@@ -191,7 +191,7 @@ async def init_widgets(master: tk.Widget, tk_img: TKImages) -> Optional[tk.Widge
             label=TransToken.untranslated('{delta:ms}').format(delta=timedelta(seconds=i)),
         )
         row, col = divmod(i-3, 4)
-        slot.grid(row=row, column=col, padx=1, pady=1)
+        drag_man.slot_grid(slot, row=row, column=col, padx=1, pady=1)
 
         prev_id = DEFAULT_IDS.get(i, '')
         if prev_id:

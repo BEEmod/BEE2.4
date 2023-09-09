@@ -52,7 +52,7 @@ class CorridorUI(Corridor):
     config: lazy_conf.LazyConf
     desc: tkMarkdown.MarkdownData = attrs.field(repr=False)
     images: Sequence[img.Handle]
-    dnd_icon: img.Handle
+    icon: img.Handle
     authors: Sequence[TransToken]
 
     def strip_ui(self) -> Corridor:
@@ -167,7 +167,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True, export_priority=10):
                 orig_index=kv.int('DefaultIndex', 0),
                 config=packages.get_config(kv, 'items', data.pak_id, source='Corridor ' + kv.name),
                 images=images,
-                dnd_icon=icon,
+                icon=icon,
                 legacy=is_legacy,
                 fixups={
                     subprop.name: subprop.value
@@ -241,7 +241,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True, export_priority=10):
                                 instance=fname,
                                 name=TRANS_CORRIDOR_GENERIC,
                                 images=[ICON_GENERIC_LRG],
-                                dnd_icon=ICON_GENERIC_SML,
+                                icon=ICON_GENERIC_SML,
                                 authors=list(map(TransToken.untranslated, style.selitem_data.auth)),
                                 desc=tkMarkdown.MarkdownData.BLANK,
                                 config=lazy_conf.BLANK,
@@ -255,7 +255,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True, export_priority=10):
                                 instance=fname,
                                 name=TRANS_CORRIDOR_GENERIC,
                                 images=[img.Handle.file(style_info.icon, IMG_WIDTH_LRG, IMG_HEIGHT_LRG)],
-                                dnd_icon=img.Handle.file(style_info.icon, IMG_WIDTH_SML, IMG_HEIGHT_SML),
+                                icon=img.Handle.file(style_info.icon, IMG_WIDTH_SML, IMG_HEIGHT_SML),
                                 authors=list(map(TransToken.untranslated, style.selitem_data.auth)),
                                 desc=tkMarkdown.MarkdownData.text(style_info.desc),
                                 config=lazy_conf.BLANK,

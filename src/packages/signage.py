@@ -93,7 +93,7 @@ class Signage(PakObject, allow_mult=True, needs_foreground=True):
         self.sec_id = secondary_id
 
         # The icon the UI uses.
-        self.dnd_icon: ImgHandle | None = None
+        self.icon: ImgHandle | None = None
 
     @classmethod
     async def parse(cls, data: ParseData) -> Signage:

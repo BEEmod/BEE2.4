@@ -13,6 +13,7 @@ from app import (
     img, localisation, sound, tk_tools,
     tkMarkdown,
 )
+from app.dragdrop import DragInfo
 from app.richTextBox import tkRichText
 from packages import corridor
 from corridor import GameMode, Direction, Orient
@@ -22,6 +23,7 @@ from transtoken import TransToken
 import event
 import config
 import packages
+from ui_tk.dragdrop import CanvasPositioner, DragDrop
 from ui_tk.img import TKImages
 
 
@@ -57,10 +59,15 @@ TRANS_AUTHORS = TransToken.ui_plural('Author: {authors}', 'Authors: {authors}')
 TRANS_NO_AUTHORS = TransToken.ui('Authors: Unknown')
 
 
+def get_drag_info(corr: corridor.CorridorUI) -> DragInfo:
+    """Information for displaying this corridor."""
+    return DragInfo(corr.icon)
+
+
 class Selector:
     """Corridor selection UI."""
     win: tk.Toplevel
-    drag_man: dragdrop.Manager[corridor.CorridorUI]
+    drag_man: DragDrop[corridor.CorridorUI]
 
     # Widgets to display info about the corridor on the right side.
     wid_image: ttk.Label
@@ -227,11 +234,13 @@ class Selector:
             window=self.header_unsel,
         )
 
-        self.drag_man = drop = dragdrop.Manager[corridor.CorridorUI](
+        drop: DragDrop[corridor.CorridorUI] = DragDrop(
             self.win,
+            info_cb=get_drag_info,
             size=(WIDTH, HEIGHT),
             pick_flexi_group=self._get_flexi_group,
         )
+        self.drag_man = drop
         tk_tools.add_mousewheel(self.canvas, self.win)
         drop.event_bus.register(dragdrop.Event.HOVER_ENTER, Slot, self.evt_hover_enter)
         drop.event_bus.register(dragdrop.Event.HOVER_EXIT, Slot, self.evt_hover_exit)
@@ -379,7 +388,7 @@ class Selector:
         ]
         self.canvas.delete('slots')
         self.canvas.delete('sel_bg')
-        pos = dragdrop.Positioner(self.canvas, WIDTH, HEIGHT)
+        pos = CanvasPositioner(self.drag_man, self.canvas, WIDTH, HEIGHT)
 
         self.canvas.itemconfigure(self.help_lbl_win, width=pos.width)
         self.help_lbl['wraplength'] = pos.width
@@ -442,7 +451,7 @@ class Selector:
             self.sticky_corr = slot.contents
             self.disp_corr(self.sticky_corr)
 
-    def _get_flexi_group(self, x: int, y: int) -> Optional[str]:
+    def _get_flexi_group(self, x: float, y: float) -> Optional[str]:
         """Return the group to drop an item into, from a mouse position."""
         # pos, slots, row, col = self._mouse_to_pos(x, y)
         header_y = self.header_unsel.winfo_rooty()

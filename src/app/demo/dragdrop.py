@@ -1,23 +1,20 @@
 from __future__ import annotations
-
 from typing import Awaitable, Callable
-
-import trio
+from tkinter import messagebox, ttk
 import tkinter as tk
 
-from tkinter import messagebox, ttk
+import trio
 
-import utils
-from app import background_run, img, sound
-from app import TK_ROOT
-import app
-import BEE2_config
-import config
-import packages
+from app import TK_ROOT, background_run, img, sound
 from app.dragdrop import DragInfo, Event, Slot
 from transtoken import TransToken
 from ui_tk.dragdrop import DragDrop
 from ui_tk.img import TK_IMG
+import app
+import BEE2_config
+import config
+import packages
+import utils
 
 
 async def test() -> None:
@@ -139,7 +136,7 @@ async def test() -> None:
     def src_debug() -> None:
         print('Source: ')
         for slot in slot_src:
-            info = '<N/A>'
+            info: object = '<N/A>'
             if slot.contents is not None:
                 info = manager._info_cb(slot.contents)
             print('- ', slot, slot.contents, info, manager._slot_ui[slot])
