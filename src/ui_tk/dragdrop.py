@@ -14,12 +14,15 @@ from app import img, localisation, tk_tools
 from app.dragdrop import (
     SLOT_DRAG, DragWin, FlexiCB, InfoCB, ItemT, ManagerBase, PositionerBase,
     Slot, in_bbox,
+    # Re-exports.
+    DragInfo as DragInfo, Event as Event, ItemT as ItemT,
 )
 from transtoken import TransToken
 from ui_tk.img import TK_IMG
 import utils
 
 
+__all__ = ["CanvasPositioner", "DragDrop", "DragInfo", "ItemT", "InfoCB", "Slot", "Event"]
 ArgsT = ParamSpec('ArgsT')
 
 # Tag used on canvases for our flowed slots.

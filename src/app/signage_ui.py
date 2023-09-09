@@ -8,8 +8,7 @@ from tkinter import ttk
 import trio
 import srctools.logger
 
-from app.dragdrop import DragInfo
-from ui_tk.dragdrop import DragDrop
+from ui_tk.dragdrop import DragDrop, DragInfo
 from ui_tk.img import TKImages
 from app import dragdrop, img, localisation, tk_tools, TK_ROOT
 from config.signage import DEFAULT_IDS, Layout

@@ -13,7 +13,6 @@ from app import (
     img, localisation, sound, tk_tools,
     tkMarkdown,
 )
-from app.dragdrop import DragInfo
 from app.richTextBox import tkRichText
 from packages import corridor
 from corridor import GameMode, Direction, Orient
@@ -23,14 +22,14 @@ from transtoken import TransToken
 import event
 import config
 import packages
-from ui_tk.dragdrop import CanvasPositioner, DragDrop
+from ui_tk.dragdrop import CanvasPositioner, DragDrop, DragInfo, Slot as SlotBase, Event as DragEvent
 from ui_tk.img import TKImages
 
 
 LOGGER = srctools.logger.get_logger(__name__)
 WIDTH: Final = corridor.IMG_WIDTH_SML + 16
 HEIGHT: Final = corridor.IMG_HEIGHT_SML + 16
-Slot: TypeAlias = dragdrop.Slot[corridor.CorridorUI]
+Slot: TypeAlias = SlotBase[corridor.CorridorUI]
 
 IMG_CORR_BLANK: Final = img.Handle.blank(corridor.IMG_WIDTH_LRG, corridor.IMG_HEIGHT_LRG)
 IMG_ARROW_LEFT: Final = img.Handle.builtin('BEE2/switcher_arrow', 17, 64)
@@ -242,11 +241,11 @@ class Selector:
         )
         self.drag_man = drop
         tk_tools.add_mousewheel(self.canvas, self.win)
-        drop.event_bus.register(dragdrop.Event.HOVER_ENTER, Slot, self.evt_hover_enter)
-        drop.event_bus.register(dragdrop.Event.HOVER_EXIT, Slot, self.evt_hover_exit)
-        drop.event_bus.register(dragdrop.Event.REDROPPED, Slot, self.evt_redropped)
-        drop.event_bus.register(dragdrop.Event.FLEXI_FLOW, Slot, self.reflow)
-        drop.event_bus.register(dragdrop.Event.MODIFIED, None, self._on_changed)
+        drop.event_bus.register(DragEvent.HOVER_ENTER, Slot, self.evt_hover_enter)
+        drop.event_bus.register(DragEvent.HOVER_EXIT, Slot, self.evt_hover_exit)
+        drop.event_bus.register(DragEvent.REDROPPED, Slot, self.evt_redropped)
+        drop.event_bus.register(DragEvent.FLEXI_FLOW, Slot, self.reflow)
+        drop.event_bus.register(DragEvent.MODIFIED, None, self._on_changed)
         self.load_corridors(packset)
 
     def show(self) -> None:
