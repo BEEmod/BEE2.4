@@ -146,20 +146,22 @@ class DragDrop(ManagerBase[ItemT, tk.Misc], Generic[ItemT]):
     def _ui_set_icon(self, slot: Slot[ItemT] | DragWin, icon: img.Handle) -> None:
         """Set the specified slot to use this icon, or the drag/drop window."""
         if slot is SLOT_DRAG:
-            TK_IMG.apply(self._drag_lbl, self._img_blank)
+            TK_IMG.apply(self._drag_lbl, icon)
         else:
-            TK_IMG.apply(self._slot_ui[slot].lbl, self._img_blank)
+            TK_IMG.apply(self._slot_ui[slot].lbl, icon)
 
     @override
-    def _ui_in_bbox(self, slot: Slot[ItemT], x: float, y: float) -> bool:
+    def _ui_slot_in_bbox(self, slot: Slot[ItemT], x: float, y: float) -> bool:
         """Check if this x/y coordinate is hovering over a slot."""
-        lbl = self._slot_ui[slot].lbl
+        slot_ui = self._slot_ui[slot]
+        if slot_ui.pos_type is None:
+            return False  # Not visible = can't be hovering.
         return in_bbox(
             x, y,
-            lbl.winfo_rootx(),
-            lbl.winfo_rooty(),
-            lbl.winfo_width(),
-            lbl.winfo_height(),
+            slot_ui.lbl.winfo_rootx(),
+            slot_ui.lbl.winfo_rooty(),
+            slot_ui.lbl.winfo_width(),
+            slot_ui.lbl.winfo_height(),
         )
 
     @override
@@ -185,6 +187,7 @@ class DragDrop(ManagerBase[ItemT, tk.Misc], Generic[ItemT]):
                 font=('Helvetica', -12),
                 relief='ridge',
                 bg=img.PETI_ITEM_BG_HEX,
+                name="text",
             )
             localisation.set_text(text_lbl, title)
         else:
@@ -194,6 +197,7 @@ class DragDrop(ManagerBase[ItemT, tk.Misc], Generic[ItemT]):
             info_btn = tk.Label(
                 wid_label,
                 relief='ridge',
+                name="info",
             )
             TK_IMG.apply(info_btn, img.Handle.builtin('icons/gear', 10, 10))
 

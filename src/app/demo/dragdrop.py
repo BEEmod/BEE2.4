@@ -10,6 +10,7 @@ from tkinter import messagebox, ttk
 import utils
 from app import background_run, img, sound
 from app import TK_ROOT
+import app
 import BEE2_config
 import config
 import packages
@@ -25,7 +26,7 @@ async def test() -> None:
     config.APP.read_file()
 
     # Setup images to read from packages.
-    print('Loading packages for images.')
+    print('Loading packages for images...')
     async with trio.open_nursery() as pack_nursery:
         for loc in BEE2_config.get_package_locs():
             pack_nursery.start_soon(
@@ -34,7 +35,7 @@ async def test() -> None:
                 packages.get_loaded_packages(),
                 loc,
             )
-    background_run(img.init, packages.PACKAGE_SYS,  TK_IMG)
+    await app._APP_NURSERY.start(img.init, packages.PACKAGE_SYS,  TK_IMG)
     background_run(sound.sound_task)
     print('Done.')
 
@@ -135,6 +136,15 @@ async def test() -> None:
     configure(None)
     right_canv.bind('<Configure>', configure)
 
+    def src_debug() -> None:
+        print('Source: ')
+        for slot in slot_src:
+            info = '<N/A>'
+            if slot.contents is not None:
+                info = manager._info_cb(slot.contents)
+            print('- ', slot, slot.contents, info, manager._slot_ui[slot])
+        img.refresh_all()
+
     ttk.Button(
         TK_ROOT,
         text='Debug',
@@ -143,7 +153,8 @@ async def test() -> None:
     ttk.Button(
         TK_ROOT,
         text='Debug',
-        command=lambda: print('Source:', [slot.contents for slot in slot_src])
+        command=src_debug,
+        # command=lambda: print('Source:', [slot.contents for slot in slot_src])
     ).grid(row=2, column=1)
 
     name_lbl = ttk.Label(TK_ROOT, text='')
@@ -162,6 +173,8 @@ async def test() -> None:
     manager.event_bus.register(Event.HOVER_ENTER, Slot[str], evt_enter)
     manager.event_bus.register(Event.HOVER_EXIT, Slot[str], evt_exit)
     manager.event_bus.register(Event.CONFIG, Slot[str], evt_config)
+
+    manager.load_icons()
 
     TK_ROOT.deiconify()
     with trio.CancelScope() as scope:

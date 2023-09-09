@@ -36,29 +36,6 @@ class DragInfo:
     group_icon: img.Handle = attrs.Factory(lambda self: self.icon, takes_self=True)
 
 
-@runtime_checkable
-class ItemProto(Protocol):
-    """Protocol draggable items satisfy."""
-    @property
-    def dnd_icon(self) -> img.Handle:
-        """Image for the item."""
-        return img.Handle.error(0, 0)
-
-
-@runtime_checkable
-class ItemGroupProto(ItemProto, Protocol):
-    """Additional values required when grouping."""
-    @property
-    def dnd_group(self) -> Optional[str]:
-        """If set, the group an item belongs to."""
-        return None
-
-    @property
-    def dnd_group_icon(self) -> Optional[img.Handle]:
-        """If only one item is present for a group, it uses this."""
-        return None
-
-
 ItemT = TypeVar('ItemT')  # String etc representing the item being moved around.
 ArgsT = ParamSpec('ArgsT')
 ParentT = TypeVar('ParentT')  # Type indicating the "parent" of slots when being created.
@@ -183,7 +160,7 @@ class PositionerBase(Generic[ItemT]):
                 self.advance_row()
 
 
-InfoCB: TypeAlias = Callable[['Slot[ItemT]'], DragInfo]
+InfoCB: TypeAlias = Callable[[ItemT], DragInfo]
 FlexiCB: TypeAlias = Callable[[float, float], Optional[str]]
 # Constant used instead of a Slot to represent the drag/drop window.
 DragWin = NewType("DragWin", object)
@@ -376,7 +353,7 @@ class ManagerBase(Generic[ItemT, ParentT]):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def _ui_in_bbox(self, slot: Slot[ItemT], x: float, y: float) -> bool:
+    def _ui_slot_in_bbox(self, slot: Slot[ItemT], x: float, y: float) -> bool:
         """Check if this x/y coordinate is hovering over a slot."""
         raise NotImplementedError
 
@@ -398,9 +375,8 @@ class ManagerBase(Generic[ItemT, ParentT]):
     def _pos_slot(self, x: float, y: float) -> Optional[Slot[ItemT]]:
         """Find the slot under this X,Y (if any). Sources are ignored."""
         for slot in self._slots:
-            if not slot.is_source and slot.is_visible:
-                if self._ui_in_bbox(slot, x, y):
-                    return slot
+            if not slot.is_source and self._ui_slot_in_bbox(slot, x, y):
+                return slot
         return None
 
     def _display_item(
@@ -448,18 +424,14 @@ class ManagerBase(Generic[ItemT, ParentT]):
 
             # If none of this group are present in the targets, and we're
             # pulling from the items, we hold a group icon.
-            try:
-                group = self._cur_drag.dnd_group  # type: ignore
-            except AttributeError:
-                pass
-            else:
-                if group is not None:
-                    for other_slot in self._slots:
-                        if other_slot.is_target and other_slot.contents_group == group:
-                            break
-                    else:
-                        # None present.
-                        show_group = True
+            group = self._info_cb(self._cur_drag).group
+            if group is not None:
+                for other_slot in self._slots:
+                    if other_slot.is_target and other_slot.contents_group == group:
+                        break
+                else:
+                    # None present.
+                    show_group = True
 
         self._display_item(SLOT_DRAG, self._cur_drag, show_group)
         self._cur_slot = slot
@@ -480,6 +452,7 @@ class ManagerBase(Generic[ItemT, ParentT]):
             # We weren't dragging?
             return
 
+        self._ui_dragwin_hide()
         dest = self._pos_slot(x, y)
 
         if dest is self._cur_slot:
@@ -562,8 +535,8 @@ class ManagerBase(Generic[ItemT, ParentT]):
 
     def _on_configure(self, slot: Slot[ItemT]) -> None:
         """Configuration event, fired by clicking icon or right-clicking item."""
-        if slot.contents:
-            background_run(self.event_bus, Event.CONFIG, self)
+        if slot.contents is not None:
+            background_run(self.event_bus, Event.CONFIG, slot)
 
 
 # noinspection PyProtectedMember
@@ -611,11 +584,6 @@ class Slot(Generic[ItemT]):
         return self.kind is SlotType.FLEXI
 
     @property
-    def is_visible(self) -> bool:
-        """Check if this slot is currently displayed."""
-        return self._pos_type is not None
-
-    @property
     def highlight(self) -> bool:
         """Allows setting/getting if the slot has an alternate selection state."""
         return self._is_highlighted
@@ -646,8 +614,12 @@ class Slot(Generic[ItemT]):
         if self.is_target:
             # Update items in the previous group, so they gain the group icon
             # if only one now exists.
-            self.man._group_update(self.man._info_cb(old_cont).group)
-            new_group = self.man._info_cb(value).group
+            if old_cont is not None:
+                self.man._group_update(self.man._info_cb(old_cont).group)
+            if value is not None:
+                new_group = self.man._info_cb(value).group
+            else:
+                new_group = None
         else:
             # Source pickers never group items.
             new_group = None
@@ -668,7 +640,7 @@ class Slot(Generic[ItemT]):
     def contents_group(self) -> Optional[str]:
         """If the item in this slot has a group, return it."""
         if self._contents is not None:
-            return getattr(self._contents, 'dnd_group', None)
+            return self.man._info_cb(self._contents).group
         return None
 
     def __repr__(self) -> str:
