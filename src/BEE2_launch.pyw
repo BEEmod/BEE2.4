@@ -103,7 +103,7 @@ if __name__ == '__main__':
     elif app_name.startswith('test_'):
         from app import BEE2
         import importlib
-        mod = importlib.import_module('app.' + sys.argv[1][5:])
+        mod = importlib.import_module('app.demo.' + sys.argv[1][5:])
         BEE2.start_main(getattr(mod, 'test'))
     else:
         raise ValueError(f'Invalid component name "{app_name}"!')
