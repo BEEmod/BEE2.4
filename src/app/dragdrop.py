@@ -63,9 +63,6 @@ ItemT = TypeVar('ItemT')  # String etc representing the item being moved around.
 ArgsT = ParamSpec('ArgsT')
 ParentT = TypeVar('ParentT')  # Type indicating the "parent" of slots when being created.
 
-# Tag used on canvases for our flowed slots.
-_CANV_TAG = '_BEE2_dragdrop_item'
-
 
 class Event(Enum):
     """Context for manager events. They provide either a relevant slot or None as the argument."""
@@ -111,30 +108,37 @@ def in_bbox(
     return True
 
 
-class Positioner:
+class PositionerBase(Generic[ItemT]):
     """Utility for positioning slots in a grid on a canvas.
 
     - spacing is the amount added on each side of each slot.
     - yoff is the offset from the top, the new height is then returned to allow chaining.
     """
+    manager: ManagerBase[ItemT]
+
     def __init__(
         self,
-        canvas: tkinter.Canvas,
+        manager: ManagerBase[ItemT],
         width: int,
         height: int,
-        spacing: int=16 if utils.MAC else 8,
-        yoff: int=0,
+        item_width: int,
+        item_height: int,
+        spacing: int = -1,
+        yoff: int = 0,
     ) -> None:
-        self.canvas = canvas
+        if spacing <= 0:
+            spacing = 16 if utils.MAC else 8
+
+        self.manager = manager
         self.spacing = spacing
         self.current = 0  # Current x index.
         self.yoff = yoff + self.spacing
 
-        self.item_width = width + spacing * 2
-        self.item_height = height + spacing * 2
+        self.item_width = item_width + spacing * 2
+        self.item_height = item_height + spacing * 2
 
-        self.width = canvas.winfo_width()
-        self.height = canvas.winfo_height()
+        self.width = width
+        self.height = height
 
         self.columns = (self.width - spacing) // self.item_width
         if self.columns < 1:
@@ -154,24 +158,26 @@ class Positioner:
         self.current = 0
         self.yoff += self.item_height
 
-    def resize_canvas(self) -> None:
-        """Set the scroll region of the canvas to fit items.
+    def get_size(self) -> Tuple[int, int]:
+        """Calculate the total bounding box.
 
         This advances a row if the last is nonempty.
         """
+        width = self.columns * self.item_width + self.spacing
+        height = self.yoff
         if self.current != 0:
-            self.advance_row()
-        self.canvas['scrollregion'] = (
-            0, 0,
-            self.columns * self.item_width + self.spacing,
-            self.yoff,
-        )
+            height += self.item_height
+        return width, height
 
-    def place_slots(self, slots: Iterable[Slot], tag: str, xoff: int=0) -> None:
+    def _get_positions(
+        self,
+        slots: Iterable[Slot[ItemT]],
+        xoff: int,
+    ) -> Iterator[Tuple[Slot[ItemT], int, int]]:
         """Place these slots gradually."""
         for slot in slots:
-            x = self.xpos(self.current)
-            slot.canvas(self.canvas, x, self.yoff, tag)
+            x = self.xpos(self.current) + xoff
+            yield slot, x, self.yoff
             self.current += 1
             if self.current >= self.columns:
                 self.advance_row()

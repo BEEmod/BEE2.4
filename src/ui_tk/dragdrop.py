@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 import tkinter as tk
+from collections.abc import Iterable
 from enum import Enum
 
+import attrs
 from tkinter import ttk
 from typing import Callable, Dict, Generic, Optional, Tuple, Union
 
@@ -11,12 +13,19 @@ from typing_extensions import Concatenate, Literal, ParamSpec, override
 
 import utils
 from app import img, localisation, tk_tools
-from app.dragdrop import DragWin, FlexiCB, ItemT, ManagerBase, InfoCB, SLOT_DRAG, Slot, in_bbox
+# noinspection PyProtectedMember
+from app.dragdrop import (
+    DragWin, FlexiCB, ItemT, ManagerBase, InfoCB, PositionerBase, SLOT_DRAG,
+    Slot, in_bbox,
+)
 from transtoken import TransToken
 from ui_tk.img import TK_IMG
 
 
 ArgsT = ParamSpec('ArgsT')
+
+# Tag used on canvases for our flowed slots.
+_CANV_TAG = '_BEE2_dragdrop_item'
 
 
 class GeoManager(Enum):
@@ -54,6 +63,39 @@ _FORGETTER: Dict[
     GeoManager.PACK: ttk.Label.pack_forget,
 }
 
+
+class CanvasPositioner(PositionerBase[ItemT], Generic[ItemT]):
+    """Positions slots on a canvas."""
+    canvas: tk.Canvas
+    manager: DragDrop[ItemT]
+
+    def __init__(
+        self,
+        manager: DragDrop[ItemT],
+        canvas: tk.Canvas,
+        item_width: int,
+        item_height: int,
+        spacing: int = -1,
+        yoff: int = 0,
+    ):
+        self.canvas = canvas
+        super().__init__(
+            manager,
+            canvas.winfo_width(), canvas.winfo_height(),
+            item_width, item_height, spacing, yoff
+        )
+
+    def resize_canvas(self) -> None:
+        """Set the scroll region of the canvas to fit items."""
+        width, height = self.get_size()
+        self.canvas['scrollregion'] = (0, 0, width, height)
+
+    def place_slots(self, slots: Iterable[Slot[ItemT]], tag: str, xoff: int = 0) -> None:
+        """Place slots onto the canvas."""
+        for slot, x, y in self._get_positions(slots, xoff):
+            self.manager.slot_canvas(slot, self.canvas, x, y, tag)
+
+
 class SlotUI:
     """Widgets associated with a slot."""
     # The two widgets shown at the bottom when moused over.
@@ -66,7 +108,7 @@ class SlotUI:
     pos_type: Optional[GeoManager] = None
     # If canvas, the tag and x/y coords.
     canv_info: Optional[Tuple[int, int, int]] = None
-    
+
 
 class DragDrop(ManagerBase[ItemT, tk.Misc], Generic[ItemT]):
     """Implements UI functionality for the dragdrop module."""
