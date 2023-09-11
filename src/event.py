@@ -41,9 +41,13 @@ class Event(Generic[ArgT]):
         self.log = False
         # Leave last_result unset as a sentinel.
 
-    def register(self, func: Callable[[ArgT], Awaitable[Any]]) -> None:
-        """Register the given function to be called."""
+    def register(self, func: Callable[[ArgT], Awaitable[Any]]) -> Callable[[ArgT], Awaitable[Any]]:
+        """Register the given function to be called.
+
+        This can be used as a decorator.
+        """
         self.callbacks.append(func)
+        return func
 
     async def register_and_prime(self, func: Callable[[ArgT], Awaitable[Any]]) -> None:
         """Register the given function, then immediately call with the last value if present."""

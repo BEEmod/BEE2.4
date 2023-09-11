@@ -17,7 +17,8 @@ async def test_simple_register() -> None:
     func1 = create_autospec(event_func, name='func1')
     func2 = create_autospec(event_func, name='func2')
 
-    event.register(func1)
+    res = event.register(func1)
+    assert res is func1
 
     func1.assert_not_awaited()
     func2.assert_not_awaited()

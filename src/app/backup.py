@@ -884,10 +884,10 @@ def init_application(tk_img: TKImages) -> None:
     gameMan.load()
     ui_new_backup()
 
-    async def cback(game):
+    @gameMan.ON_GAME_CHANGED.register
+    async def cback(game: gameMan.Game) -> None:
         """UI.py isn't present, so we use this callback."""
         load_game(game)
-    gameMan.ON_GAME_CHANGED.register(cback)
 
     gameMan.add_menu_opts(game_menu)
 

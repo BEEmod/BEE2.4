@@ -159,19 +159,18 @@ async def test() -> None:
     name_lbl = ttk.Label(TK_ROOT, text='')
     name_lbl.grid(row=3, column=0)
 
+    @manager.on_hover_enter.register
     async def evt_enter(evt_slot: Slot[str]) -> None:
         if evt_slot.contents is not None:
             name_lbl['text'] = 'Name: ' + evt_slot.contents
 
+    @manager.on_hover_exit.register
     async def evt_exit(evt_slot: Slot[str]) -> None:
         name_lbl['text'] = ''
 
+    @manager.on_config.register
     async def evt_config(evt_slot: Slot[str]) -> None:
         messagebox.showinfo('Hello World', evt_slot.contents)
-
-    manager.on_hover_enter.register(evt_enter)
-    manager.on_hover_exit.register(evt_exit)
-    manager.on_config.register(evt_config)
 
     manager.load_icons()
 

@@ -135,6 +135,7 @@ async def init_widgets(master: tk.Widget, tk_img: TKImages) -> Optional[tk.Widge
     # leaves.
     hover_scope = trio.CancelScope()
 
+    @drag_man.on_hover_enter.register
     async def on_hover(hovered: dragdrop.Slot[Signage]) -> None:
         """Show the signage when hovered, then toggle."""
         nonlocal hover_scope
@@ -172,6 +173,7 @@ async def init_widgets(master: tk.Widget, tk_img: TKImages) -> Optional[tk.Widge
                 tk_img.apply(preview_right, dbl_right)
                 await trio.sleep(1.0)
 
+    @drag_man.on_hover_exit.register
     async def on_leave(hovered: dragdrop.Slot[Signage]) -> None:
         """Reset the visible sign when left."""
         nonlocal hover_scope
@@ -179,9 +181,6 @@ async def init_widgets(master: tk.Widget, tk_img: TKImages) -> Optional[tk.Widge
         hover_scope.cancel()
         tk_img.apply(preview_left, IMG_BLANK)
         tk_img.apply(preview_right, IMG_BLANK)
-
-    drag_man.on_hover_enter.register(on_hover)
-    drag_man.on_hover_exit.register(on_leave)
 
     load_packset = packages.get_loaded_packages()
     for i in SIGN_IND:
