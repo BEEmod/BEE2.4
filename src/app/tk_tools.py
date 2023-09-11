@@ -34,6 +34,10 @@ from transtoken import TransToken
 
 ICO_PATH = str(utils.install_path('BEE2.ico'))
 T = TypeVar('T')
+WidgetT = TypeVar('WidgetT', bound=tk.Misc)
+EventFunc: TypeAlias = Callable[[tk.Event[WidgetT]], object]
+EventFuncT = TypeVar('EventFuncT', bound=EventFunc[tk.Misc])
+
 
 if utils.WIN:
     # Ensure everything has our icon (including dialogs)
@@ -279,7 +283,7 @@ def bind_mousewheel(
 ) -> None: ...
 def bind_mousewheel(
     widgets: Union[Iterable[tk.Misc], tk.Misc],
-    func: Callable[..., object], args: tuple = (),
+    func: Callable[..., object], args: tuple[object, ...] = (),
 ) -> None:
     """Bind mousewheel events, which function differently on each platform.
 
@@ -293,23 +297,23 @@ def bind_mousewheel(
         widgets = [widgets]
 
     if utils.WIN:
-        def mousewheel_handler(event: tk.Event) -> None:
+        def mousewheel_handler(event: tk.Event[tk.Misc]) -> None:
             """Handle mousewheel events."""
             func(int(event.delta / -120), *args)
         for widget in widgets:
             widget.bind('<MouseWheel>', mousewheel_handler, add=True)
     elif utils.MAC:
-        def mousewheel_handler(event: tk.Event) -> None:
+        def mousewheel_handler(event: tk.Event[tk.Misc]) -> None:
             """Handle mousewheel events."""
             func(-event.delta, *args)
         for widget in widgets:
             widget.bind('<MouseWheel>', mousewheel_handler, add=True)
     elif utils.LINUX:
-        def scroll_up(_: tk.Event) -> None:
+        def scroll_up(_: tk.Event[tk.Misc]) -> None:
             """Handle scrolling up."""
             func(-1, *args)
 
-        def scroll_down(_: tk.Event) -> None:
+        def scroll_down(_: tk.Event[tk.Misc]) -> None:
             """Handle scrolling down."""
             func(1, *args)
 
@@ -338,51 +342,52 @@ def add_mousewheel(target: Union[tk.XView, tk.YView], *frames: tk.Misc, orient: 
 
 def make_handler(func: Union[
     Callable[[], Awaitable[object]],
-    Callable[[tk.Event], Awaitable[object]],
-]) -> Callable[[tk.Event], object]:
+    Callable[[tk.Event[tk.Misc]], Awaitable[object]],
+]) -> Callable[[tk.Event[tk.Misc]], object]:
     """Given an asyncronous event handler, return a sync function which uses background_run().
 
     This checks the signature of the function to decide whether to pass along the event object.
     """
     sig = inspect.signature(func)
     if len(sig.parameters) == 0:
-        def wrapper(e: tk.Event) -> None:
+        def wrapper(e: tk.Event[tk.Misc]) -> None:
             """Discard the event."""
             background_run(func)  # type: ignore
     else:
-        def wrapper(e: tk.Event) -> None:
+        def wrapper(e: tk.Event[tk.Misc]) -> None:
             """Pass along the event."""
             background_run(func, e)  # type: ignore
     functools.update_wrapper(wrapper, func)
     return wrapper
 
 
-EventFunc: TypeAlias = Callable[[tk.Event], object]
-EventFuncT = TypeVar('EventFuncT', bound=EventFunc)
+class _EventDeco(Protocol[WidgetT]):
+    def __call__(self, func: EventFunc[WidgetT]) -> EventFunc[WidgetT]:
+        ...
 
 
 class _Binder(Protocol):
     @overload
-    def __call__(self, wid: tk.Misc, *, add: bool=False) -> Callable[[EventFuncT], EventFuncT]:
+    def __call__(self, wid: WidgetT, *, add: bool=False) -> Callable[[_EventDeco[WidgetT]], _EventDeco[WidgetT]]:
         pass
     @overload
-    def __call__(self, wid: tk.Misc, func: EventFunc, *, add: bool=False) -> str:
+    def __call__(self, wid: WidgetT, func: EventFunc[WidgetT], *, add: bool=False) -> str:
         pass
     def __call__(
-        self, wid: tk.Misc,
-        func: Optional[EventFunc]=None, *, add: bool=False,
-    ) -> Union[Callable[[EventFuncT], EventFuncT], str]:
+        self, wid: WidgetT,
+        func: Optional[EventFunc[WidgetT]]=None, *, add: bool=False,
+    ) -> Union[Callable[[_EventDeco[WidgetT]], _EventDeco[WidgetT]], str]:
         pass
 
 
-def _bind_event_handler(bind_func: Callable[[tk.Misc, EventFunc, bool], None]) -> _Binder:
+def _bind_event_handler(bind_func: Callable[[WidgetT, EventFunc[WidgetT], bool], None]) -> _Binder:
     """Decorator for the bind_click functions.
 
     This allows calling directly, or decorating a function with just wid and add
     attributes.
     """
     @functools.wraps(bind_func)
-    def deco(wid: tk.Misc, func: Optional[EventFunc]=None, *, add: bool=False) -> Optional[Callable]:
+    def deco(wid: WidgetT, func: Optional[EventFunc[WidgetT]]=None, *, add: bool=False) -> Optional[Callable[..., object]]:
         """Decorator or normal interface, func is optional to be a decorator."""
         if func is None:
             def deco_2(func2: EventFuncT) -> EventFuncT:
@@ -398,9 +403,9 @@ def _bind_event_handler(bind_func: Callable[[tk.Misc, EventFunc, bool], None]) -
 if utils.MAC:
     # On OSX, make left-clicks switch to a right-click when control is held.
     @_bind_event_handler
-    def bind_leftclick(wid: tk.Misc, func: EventFunc, add: bool = False) -> None:
+    def bind_leftclick(wid: WidgetT, func: EventFunc[WidgetT], add: bool = False) -> None:
         """On OSX, left-clicks are converted to right-click when control is held."""
-        def event_handler(e: tk.Event) -> None:
+        def event_handler(e: tk.Event[WidgetT]) -> None:
             """Check if this should be treated as rightclick."""
             # e.state is a set of binary flags
             # Don't run the event if control is held!
@@ -409,9 +414,9 @@ if utils.MAC:
         wid.bind(EVENTS['LEFT'], event_handler, add=add)
 
     @_bind_event_handler
-    def bind_leftclick_double(wid: tk.Misc, func: EventFunc, add: bool = False) -> None:
+    def bind_leftclick_double(wid: WidgetT, func: EventFunc[WidgetT], add: bool = False) -> None:
         """On OSX, left-clicks are converted to right-click when control is held."""
-        def event_handler(e: tk.Event) -> None:
+        def event_handler(e: tk.Event[WidgetT]) -> None:
             """Check if this should be treated as rightclick."""
             # e.state is a set of binary flags
             # Don't run the event if control is held!
@@ -420,23 +425,23 @@ if utils.MAC:
         wid.bind(EVENTS['LEFT_DOUBLE'], event_handler, add=add)
 
     @_bind_event_handler
-    def bind_rightclick(wid: tk.Misc, func: EventFunc, add: bool = False) -> None:
+    def bind_rightclick(wid: WidgetT, func: EventFunc[WidgetT], add: bool = False) -> None:
         """On OSX, we need to bind to both rightclick and control-leftclick."""
         wid.bind(EVENTS['RIGHT'], func, add=add)
         wid.bind(EVENTS['LEFT_CTRL'], func, add=add)
 else:
     @_bind_event_handler
-    def bind_leftclick(wid: tk.Misc, func: EventFunc, add: bool = False) -> None:
+    def bind_leftclick(wid: WidgetT, func: EventFunc[WidgetT], add: bool = False) -> None:
         """Other systems just bind directly."""
         wid.bind(EVENTS['LEFT'], func, add=add)
 
     @_bind_event_handler
-    def bind_leftclick_double(wid: tk.Misc, func: EventFunc, add: bool = False) -> None:
+    def bind_leftclick_double(wid: WidgetT, func: EventFunc[WidgetT], add: bool = False) -> None:
         """Other systems just bind directly."""
         wid.bind(EVENTS['LEFT_DOUBLE'], func, add=add)
 
     @_bind_event_handler
-    def bind_rightclick(wid: tk.Misc, func: EventFunc, add: bool = False) -> None:
+    def bind_rightclick(wid: WidgetT, func: EventFunc[WidgetT], add: bool = False) -> None:
         """Other systems just bind directly."""
         wid.bind(EVENTS['RIGHT'], func, add=add)
 
