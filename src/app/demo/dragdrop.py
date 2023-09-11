@@ -85,7 +85,17 @@ async def test() -> None:
             print('Cback: ', ev, slot)
         return call
 
-    for evt in ['config', 'modified', 'redropped', 'flexi_flow', 'hover_enter', 'hover_exit']:
+    @manager.on_modified.register
+    async def on_modified() -> None:
+        """Just display when any event is triggered."""
+        print('On modified')
+
+    @manager.on_flexi_flow.register
+    async def on_flexi_flow() -> None:
+        """Just display when any event is triggered."""
+        print('On Flexi Flow')
+
+    for evt in ['config', 'redropped', 'hover_enter', 'hover_exit']:
         event: Event[Slot[str]] | Event[None] = getattr(manager, 'on_' + evt)
         event.register(func(evt))
 

@@ -59,7 +59,7 @@ all_games: list[Game] = []
 selected_game: Optional[Game] = None
 selectedGame_radio = IntVar(value=0)
 game_menu: Optional[Menu] = None
-ON_GAME_CHANGED = event.Event('game_changed')
+ON_GAME_CHANGED: event.Event[[Game]] = event.Event('game_changed')
 
 CONFIG = ConfigFile('games.cfg')
 

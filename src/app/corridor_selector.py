@@ -258,7 +258,7 @@ class Selector:
         self.win.withdraw()
         self.drag_man.unload_icons()
 
-    async def _on_changed(self, _: None) -> None:
+    async def _on_changed(self) -> None:
         """Store configuration when changed."""
         self.store_conf()
 
@@ -374,7 +374,7 @@ class Selector:
         # Reposition everything.
         await self.reflow()
 
-    async def reflow(self, _=None) -> None:
+    async def reflow(self) -> None:
         """Called to reposition the corridors."""
         # Move empties to the end, if not dragging.
         if not self.drag_man.cur_slot:

@@ -6,16 +6,16 @@ from unittest.mock import AsyncMock, create_autospec, call
 from event import Event, ValueChange, ObsValue
 
 
-async def event_func(arg):
+async def func_unary(arg):
     """Expected signature of event functions."""
     pass
 
 
 async def test_simple_register() -> None:
     """Test registering events."""
-    event = Event[int]()
-    func1 = create_autospec(event_func, name='func1')
-    func2 = create_autospec(event_func, name='func2')
+    event = Event[[int]]()
+    func1 = create_autospec(func_unary, name='func1')
+    func2 = create_autospec(func_unary, name='func2')
 
     res = event.register(func1)
     assert res is func1
@@ -34,13 +34,12 @@ async def test_simple_register() -> None:
     func1.reset_mock()
 
 
-
 async def test_unregister() -> None:
     """Test unregistering events in the bus."""
     event = Event[bool]()
-    func1 = create_autospec(event_func, name='func1')
-    func2 = create_autospec(event_func, name='func2')
-    func3 = create_autospec(event_func, name='func3')
+    func1 = create_autospec(func_unary, name='func1')
+    func2 = create_autospec(func_unary, name='func2')
+    func3 = create_autospec(func_unary, name='func3')
 
     event.register(func1)
     event.register(func2)
@@ -72,8 +71,8 @@ async def test_unregister() -> None:
 async def test_register_priming() -> None:
     """Test the priming version of registering."""
     event = Event[int]('prime_event')
-    func1 = create_autospec(event_func, name='func1')
-    func2 = create_autospec(event_func, name='func2')
+    func1 = create_autospec(func_unary, name='func1')
+    func2 = create_autospec(func_unary, name='func2')
 
     # If not fired, does nothing.
     await event.register_and_prime(func1)
@@ -153,7 +152,7 @@ async def test_obsval_getset() -> None:
 async def test_obsval_fires() -> None:
     """Check an event fires whenever the value changes."""
     holder: ObsValue[object] = ObsValue(0, 'obsval_getset')
-    func1 = create_autospec(event_func)
+    func1 = create_autospec(func_unary)
     holder.on_changed.register(func1)
     func1.assert_not_awaited()
 

@@ -154,13 +154,13 @@ class ManagerBase(Generic[ItemT, ParentT]):
     # Fires when items are right-clicked on. If one is registered, the gear icon appears.
     on_config: Event[Slot[ItemT]]
     # Fired when any slot is modified. This occurs only once if two swap etc. The parameter is None.
-    on_modified: Event[None]
+    on_modified: Event[[]]
 
     # Fired when a slot is dropped on itself - allows detecting a left click.
     on_redropped: Event[Slot[ItemT]]
 
     # When flexi slots are present, called when they're filled/emptied.
-    on_flexi_flow: Event[None]
+    on_flexi_flow: Event[[]]
 
     # Mouse over or out of the items (including drag item).
     on_hover_enter: Event[Slot[ItemT]]
@@ -481,7 +481,7 @@ class ManagerBase(Generic[ItemT, ParentT]):
             else:
                 LOGGER.warning('Ran out of FLEXI slots for "{}", restored item: {}', group, self._cur_drag)
                 self._cur_slot.contents = self._cur_drag
-                background_run(self.on_modified, self._cur_slot)
+                background_run(self.on_modified)
         elif dest:  # We have a target.
             dest.contents = self._cur_drag
             background_run(self.on_modified)
@@ -627,7 +627,7 @@ class Slot(Generic[ItemT]):
 
         if self.is_flexi and (old_cont is None) != (value is None):
             # We're showing/hiding, we need to redraw.
-            background_run(self.man.on_flexi_flow, self)
+            background_run(self.man.on_flexi_flow)
 
         if new_group is not None:
             # Update myself and the entire group to get the group
