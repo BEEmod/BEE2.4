@@ -59,7 +59,7 @@ all_games: list[Game] = []
 selected_game: Optional[Game] = None
 selectedGame_radio = IntVar(value=0)
 game_menu: Optional[Menu] = None
-EVENT_BUS = event.EventBus()
+ON_GAME_CHANGED = event.Event('game_changed')
 
 CONFIG = ConfigFile('games.cfg')
 
@@ -1423,7 +1423,7 @@ def setGame() -> None:
     global selected_game
     selected_game = all_games[selectedGame_radio.get()]
     # TODO: make this function async to eliminate.
-    background_run(EVENT_BUS, None, selected_game)
+    background_run(ON_GAME_CHANGED, selected_game)
 
 
 def set_game_by_name(name: str) -> None:
@@ -1433,7 +1433,7 @@ def set_game_by_name(name: str) -> None:
             selected_game = game
             selectedGame_radio.set(all_games.index(game))
             # TODO: make this function async too to eliminate.
-            background_run(EVENT_BUS, None, selected_game)
+            background_run(ON_GAME_CHANGED, selected_game)
             break
 
 if __name__ == '__main__':

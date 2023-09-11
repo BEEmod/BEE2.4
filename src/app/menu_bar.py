@@ -109,7 +109,7 @@ class MenuBar:
         localisation.set_menu_text(bar, TransToken.ui("View"))
 
         helpMenu.make_help_menu(bar, tk_img)
-        gameMan.EVENT_BUS.register(None, gameMan.Game, self._game_changed)
+        gameMan.ON_GAME_CHANGED.register(self._game_changed)
 
         if utils.CODE_DEV_MODE:
             self.dev_menu = tk.Menu(parent)  # Don't bother translating.

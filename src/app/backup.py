@@ -887,7 +887,7 @@ def init_application(tk_img: TKImages) -> None:
     async def cback(game):
         """UI.py isn't present, so we use this callback."""
         load_game(game)
-    gameMan.EVENT_BUS.register(None, gameMan.Game, cback)
+    gameMan.ON_GAME_CHANGED.register(cback)
 
     gameMan.add_menu_opts(game_menu)
 

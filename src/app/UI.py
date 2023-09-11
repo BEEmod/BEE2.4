@@ -839,7 +839,7 @@ async def export_editoritems(pal_ui: paletteUI.PaletteUI, bar: MenuBar) -> None:
             pal_ui.update_state()
 
         # Re-fire this, so we clear the '*' on buttons if extracting cache.
-        await gameMan.EVENT_BUS(None, gameMan.selected_game)
+        await gameMan.ON_GAME_CHANGED(gameMan.selected_game)
     finally:
         UI['pal_export'].state(('!disabled',))
         bar.set_export_allowed(True)
@@ -1109,7 +1109,7 @@ async def init_option(
         """When the game changes, update this button."""
         localisation.set_text(UI['pal_export'], game.get_export_text())
 
-    await gameMan.EVENT_BUS.register_and_prime(None, gameMan.Game, game_changed)
+    await gameMan.ON_GAME_CHANGED.register_and_prime(game_changed)
 
     props = ttk.Frame(frame, width="50")
     props.columnconfigure(1, weight=1)
@@ -1422,9 +1422,9 @@ async def init_windows(tk_img: TKImages) -> None:
         height=TK_ROOT.winfo_screenheight(),
     )
     TK_ROOT.protocol("WM_DELETE_WINDOW", quit_application)
-    gameMan.EVENT_BUS.register(None, gameMan.Game, set_game)
+    gameMan.ON_GAME_CHANGED.register(set_game)
     # Initialise the above and the menu bar.
-    await gameMan.EVENT_BUS(None, gameMan.Game)
+    await gameMan.ON_GAME_CHANGED(gameMan.selected_game)
 
     ui_bg = tk.Frame(TK_ROOT, bg=ItemsBG, name='bg')
     ui_bg.grid(row=0, column=0, sticky='NSEW')
