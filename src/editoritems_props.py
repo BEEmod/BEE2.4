@@ -1,7 +1,7 @@
 """The different properties defineable for items."""
 from __future__ import annotations
 from enum import Enum
-from typing import Callable, Generic, Sequence, Type, TypeVar
+from typing import Any, Callable, Generic, Sequence, Type, TypeVar
 
 import attrs
 from srctools import Angle, bool_as_int, conv_bool, conv_float, conv_int
@@ -65,7 +65,7 @@ class ItemPropKind(Generic[ValueT]):
             return self.id == other.id
         return NotImplemented
 
-    def __reduce__(self) -> str | tuple:
+    def __reduce__(self) -> str | tuple[object, ...]:
         """Handle pickling specially.
 
         For known props, we fetch the object by ID.
@@ -113,9 +113,9 @@ class ItemProp(Generic[ValueT]):
 
 
 # ID -> class
-PROP_TYPES: dict[str, ItemPropKind] = {}
+PROP_TYPES: dict[str, ItemPropKind[Any]] = {}
 # class to name in this module, for pickling.
-_known_to_attr: dict[ItemPropKind, str] = {}
+_known_to_attr: dict[ItemPropKind[Any], str] = {}
 
 
 def bool_prop(

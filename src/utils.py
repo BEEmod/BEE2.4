@@ -105,7 +105,7 @@ def get_git_version(inst_path: Path | str) -> str:
 
 try:
     # This module is generated when the app is compiled.
-    from _compiled_version import BEE_VERSION, HA_VERSION  # type: ignore
+    from _compiled_version import BEE_VERSION as BEE_VERSION, HA_VERSION as HA_VERSION  # type: ignore
 except ImportError:
     # We're running from src/, so data is in the folder above that.
     # Go up once from us to its containing folder, then to the parent.
@@ -223,6 +223,7 @@ CONN_LOOKUP: Mapping[Tuple[int, int, int, int], Tuple[CONN_TYPES, Angle]] = {
 
 del N, S, E, W
 
+T = TypeVar('T')
 RetT = TypeVar('RetT')
 LookupT = TypeVar('LookupT')
 EnumT = TypeVar('EnumT', bound=Enum)
@@ -237,7 +238,7 @@ def freeze_enum_props(cls: Type[EnumT]) -> Type[EnumT]:
         if not isinstance(value, property) or value.fset is not None or value.fdel is not None:
             continue
         data = {}
-        data_exc: dict[EnumT, tuple[Type[BaseException], tuple]] = {}
+        data_exc: dict[EnumT, tuple[Type[BaseException], tuple[object, ...]]] = {}
 
         enum: EnumT
         for enum in cls:
@@ -267,7 +268,7 @@ def freeze_enum_props(cls: Type[EnumT]) -> Type[EnumT]:
 
 def _exc_freeze(
     data: Mapping[EnumT, RetT],
-    data_exc: Mapping[EnumT, tuple[Type[BaseException], tuple]],
+    data_exc: Mapping[EnumT, tuple[Type[BaseException], tuple[object, ...]]],
 ) -> Callable[[EnumT], RetT]:
     """If the property raises exceptions, we need to reraise them."""
     def getter(value: EnumT) -> RetT:
@@ -628,7 +629,7 @@ class Result(Generic[ResultT]):
 
     # TODO: Enable once TypeVarTuple works.
     # async def _task(self, func: Callable[[Unpack[ArgsT]], Awaitable[ResultT]], args: Tuple[Unpack[ArgsT]]) -> None:
-    async def _task(self, func: Callable[..., Awaitable[ResultT]], args: tuple) -> None:
+    async def _task(self, func: Callable[..., Awaitable[ResultT]], args: tuple[object, ...]) -> None:
         """The task that is run."""
         self._result = await func(*args)
 
@@ -723,7 +724,7 @@ else:
     print('Need implementation of utils.check_shift()!')
 
 
-def _append_bothsides(deq: deque) -> Generator[None, Any, None]:
+def _append_bothsides(deq: deque[T]) -> Generator[None, T, None]:
     """Alternately add to each side of a deque."""
     while True:
         deq.append((yield))
@@ -813,7 +814,7 @@ def quit_app(status: int=0) -> NoReturn:
 _flag_writeable = stat.S_IWUSR | stat.S_IWGRP | stat.S_IWOTH
 
 
-def set_readonly(file: str | bytes | os.PathLike) -> None:
+def set_readonly(file: str | bytes | os.PathLike[str] | os.PathLike[bytes]) -> None:
     """Make the given file read-only."""
     # Get the old flags
     flags = os.stat(file).st_mode
@@ -821,7 +822,7 @@ def set_readonly(file: str | bytes | os.PathLike) -> None:
     os.chmod(file, flags & ~_flag_writeable)
 
 
-def unset_readonly(file: str | bytes | os.PathLike) -> None:
+def unset_readonly(file: str | bytes | os.PathLike[str] | os.PathLike[bytes]) -> None:
     """Set the writeable flag on a file."""
     # Get the old flags
     flags = os.stat(file).st_mode

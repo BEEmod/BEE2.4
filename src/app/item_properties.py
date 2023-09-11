@@ -5,7 +5,7 @@ import attrs
 from enum import Enum
 import tkinter as tk
 from tkinter import ttk
-from typing import Callable, ClassVar, Generic, Iterator, Optional, Tuple, Dict, List, TypeVar
+from typing import Any, Callable, ClassVar, Generic, Iterator, Optional, Tuple, Dict, List, TypeVar
 from typing_extensions import Final, Literal, TypeAlias
 
 import srctools
@@ -50,7 +50,7 @@ class PropGroup:
         self.label = ttk.Label(parent)
         localisation.set_text(self.label, label_text)
 
-    def apply_conf(self, options: Dict[ItemPropKind, Tuple[str, bool]]) -> None:
+    def apply_conf(self, options: Dict[ItemPropKind[Any], Tuple[str, bool]]) -> None:
         """Apply the specified options to the UI.
 
         For each property, this specifies the current value, and a boolean which is set if the option
@@ -58,7 +58,7 @@ class PropGroup:
         """
         raise NotImplementedError
 
-    def get_conf(self) -> Iterator[tuple[ItemPropKind, str]]:
+    def get_conf(self) -> Iterator[tuple[ItemPropKind[Any], str]]:
         """Export options from the UI configuration."""
         raise NotImplementedError
 
@@ -66,7 +66,7 @@ class PropGroup:
         """Set a user tooltip on this group."""
 
 # The prop kinds that require this group, then a function to create it.
-PropGroupFactory: TypeAlias = Tuple[List[ItemPropKind], Callable[[ttk.Frame, TKImages], PropGroup]]
+PropGroupFactory: TypeAlias = Tuple[List[ItemPropKind[Any]], Callable[[ttk.Frame, TKImages], PropGroup]]
 
 
 class BoolPropGroup(PropGroup):
@@ -90,7 +90,7 @@ class BoolPropGroup(PropGroup):
         """Set a user tooltip on this group."""
         tooltip.set_tooltip(self.check, tok)
 
-    def apply_conf(self, options: Dict[ItemPropKind, Tuple[str, bool]]) -> None:
+    def apply_conf(self, options: Dict[ItemPropKind[Any], Tuple[str, bool]]) -> None:
         """Apply the specified options to the UI."""
         try:
             value, readonly = options[self.prop]
@@ -101,7 +101,7 @@ class BoolPropGroup(PropGroup):
             self.var.set(srctools.conv_bool(value, False))
             self.check.state(['disabled' if readonly else '!disabled'])
 
-    def get_conf(self) -> Iterator[tuple[ItemPropKind, str]]:
+    def get_conf(self) -> Iterator[tuple[ItemPropKind[Any], str]]:
         """Return the current UI configuration."""
         yield self.prop, srctools.bool_as_int(self.var.get())
 
@@ -142,7 +142,7 @@ class ComboPropGroup(PropGroup, Generic[EnumT]):
         """Set a user tooltip on this group."""
         tooltip.set_tooltip(self.combo, tok)
 
-    def apply_conf(self, options: Dict[ItemPropKind, Tuple[str, bool]]) -> None:
+    def apply_conf(self, options: Dict[ItemPropKind[Any], Tuple[str, bool]]) -> None:
         """Apply the specified options to the UI."""
         try:
             val_str, readonly = options[self.prop]
@@ -159,7 +159,7 @@ class ComboPropGroup(PropGroup, Generic[EnumT]):
         self.combo.current(self.value_order.index(value))
         self.combo.state(['disabled' if readonly else '!disabled'])
 
-    def get_conf(self) -> Iterator[tuple[ItemPropKind, str]]:
+    def get_conf(self) -> Iterator[tuple[ItemPropKind[Any], str]]:
         """Return the current UI configuration."""
         value = self.value_order[self.combo.current()]
         yield self.prop, self.prop.export(value)
@@ -181,7 +181,7 @@ class TimerPropGroup(PropGroup):
         self.old_val = 3
         self._enable_cback = True
 
-    def apply_conf(self, options: Dict[ItemPropKind, Tuple[str, bool]]) -> None:
+    def apply_conf(self, options: Dict[ItemPropKind[Any], Tuple[str, bool]]) -> None:
         """Apply the timer delay option to the UI."""
         try:
             value, readonly = options[all_props.prop_timer_delay]
@@ -192,7 +192,7 @@ class TimerPropGroup(PropGroup):
         self.scale.set(all_props.prop_timer_delay.parse(value))
         self.scale.state(['disabled' if readonly else '!disabled'])
 
-    def get_conf(self) -> Iterator[tuple[ItemPropKind, str]]:
+    def get_conf(self) -> Iterator[tuple[ItemPropKind[Any], str]]:
         """Get the current UI configuration."""
         cur_value = round(self.scale.get())
         yield all_props.prop_timer_delay, str(cur_value)
@@ -233,13 +233,13 @@ class TrackStartActivePropGroup(BoolPropGroup):
         self.has_osc = False
         self.user_tooltip = TransToken.BLANK
 
-    def apply_conf(self, options: Dict[ItemPropKind, Tuple[str, bool]]) -> None:
+    def apply_conf(self, options: Dict[ItemPropKind[Any], Tuple[str, bool]]) -> None:
         """Apply the configuration to the UI."""
         super().apply_conf(options)
         self.has_osc = all_props.prop_track_is_oscillating in options
         self._update()
 
-    def get_conf(self) -> Iterator[Tuple[ItemPropKind, str]]:
+    def get_conf(self) -> Iterator[Tuple[ItemPropKind[Any], str]]:
         """Get the current configuration."""
         if self.osc_prop is not None and self.has_osc and not self.osc_prop.var.get():
             # Forced off.
@@ -330,7 +330,7 @@ class PistonPropGroup(PropGroup):
         self.canvas.bind(tk_tools.EVENTS['LEFT_RELEASE'], self.evt_mouse_up)
         self.canvas.bind('<Leave>', self.evt_mouse_leave)
 
-    def apply_conf(self, options: Dict[ItemPropKind, Tuple[str, bool]]) -> None:
+    def apply_conf(self, options: Dict[ItemPropKind[Any], Tuple[str, bool]]) -> None:
         """Apply the specified options to the UI."""
         self.readonly = False
         try:
@@ -369,7 +369,7 @@ class PistonPropGroup(PropGroup):
             self.platform = pos[all_props.prop_pist_lower]
         self.reposition()
 
-    def get_conf(self) -> Iterator[Tuple[ItemPropKind, str]]:
+    def get_conf(self) -> Iterator[Tuple[ItemPropKind[Any], str]]:
         """Export options from the UI configuration."""
         if self.destination > self.platform:
             yield all_props.prop_pist_start_up, '0'
@@ -400,23 +400,23 @@ class PistonPropGroup(PropGroup):
         else:
             return None
 
-    def evt_mouse_down(self, event: tk.Event) -> None:
+    def evt_mouse_down(self, event: tk.Event[tk.Canvas]) -> None:
         """Start dragging, when the canvas is clicked."""
         if not self.readonly:
             # Y is irrelevant
             self.cur_drag = self.get_hit(event.x)
 
-    def evt_mouse_up(self, event: tk.Event) -> None:
+    def evt_mouse_up(self, event: tk.Event[tk.Canvas]) -> None:
         """Stop dragging."""
         self.cur_drag = None
 
-    def evt_mouse_leave(self, event: tk.Event) -> None:
+    def evt_mouse_leave(self, event: tk.Event[tk.Canvas]) -> None:
         """Failsafe, when the mouse fully leaves reset them all."""
         self.cur_drag = None
         self.canvas.itemconfigure(self.canv_plat, image=self.tk_img.sync_load(self.IMG_PIST))
         self.canvas.itemconfigure(self.canv_dest, image=self.tk_img.sync_load(self.IMG_DEST))
 
-    def evt_mouse_hover(self, event: tk.Event) -> None:
+    def evt_mouse_hover(self, event: tk.Event[tk.Canvas]) -> None:
         """Update mouseover effects depending on position."""
         if not self.readonly:
             # If currently dragging, always highlight, otherwise highlight those under the cursor.
@@ -430,7 +430,7 @@ class PistonPropGroup(PropGroup):
                 image=self.tk_img.sync_load(self.IMG_DEST_SEL if hover == 'dest' else self.IMG_DEST)
             )
 
-    def evt_mouse_drag(self, event: tk.Event) -> None:
+    def evt_mouse_drag(self, event: tk.Event[tk.Canvas]) -> None:
         """Called when mouse is held and dragged. If we are currently dragging, move items."""
         if self.cur_drag is None or self.readonly:
             return
@@ -549,9 +549,9 @@ PROP_GROUPS: list[PropGroupFactory] = [
 ]
 
 
-def matching_props(item: Item, props: List[ItemPropKind]) -> List[Tuple[all_props.ItemProp, bool]]:
+def matching_props(item: Item, props: List[ItemPropKind[Any]]) -> List[Tuple[all_props.ItemProp[Any], bool]]:
     """Return the properties in this item that match a specific group of properties."""
-    found: List[Tuple[all_props.ItemProp, bool]] = []
+    found: List[Tuple[all_props.ItemProp[Any], bool]] = []
     for kind in props:
         # Subtype properties get their default overridden.
         readonly = kind is item.subtype_prop
@@ -621,7 +621,7 @@ class PropertyWindow:
 
         old_conf = config.APP.get_cur_conf(ItemDefault, self.cur_item.id, ItemDefault())
 
-        out: dict[ItemPropKind, str] = {}
+        out: dict[ItemPropKind[Any], str] = {}
         out.update(old_conf.defaults)  # Keep any extra values, just in case.
         for (props, factory), group in zip(PROP_GROUPS, self.groups):
             if group is None or not matching_props(self.cur_item, props):
@@ -657,7 +657,7 @@ class PropertyWindow:
         sound.block_fx()
 
         # Build the options to pass into each prop group, to update it.
-        group_options: dict[ItemPropKind, tuple[str, bool]] = {}
+        group_options: dict[ItemPropKind[Any], tuple[str, bool]] = {}
         for editor_prop in item.properties.values():
             readonly = editor_prop.kind is item.subtype_prop or not editor_prop.allow_user_default
             if readonly:

@@ -1,5 +1,5 @@
 """Store overridden defaults for items, and also the selected version."""
-from typing import Dict, Final
+from typing import Any, Dict, Final
 
 import attrs
 from srctools import Keyvalues, logger
@@ -20,7 +20,7 @@ LEGACY = ConfigFile('item_configs.cfg')
 class ItemDefault(config.Data, conf_name='ItemDefault', uses_id=True):
     """Overrides the defaults for item properties."""
     version: str = DEFAULT_VERSION
-    defaults: Dict[ItemPropKind, str] = attrs.Factory(dict)
+    defaults: Dict[ItemPropKind[Any], str] = attrs.Factory(dict)
 
     @classmethod
     def parse_legacy(cls, conf: Keyvalues) -> Dict[str, 'ItemDefault']:
@@ -29,7 +29,7 @@ class ItemDefault(config.Data, conf_name='ItemDefault', uses_id=True):
         for item_id, section in LEGACY.items():
             if item_id == LEGACY.default_section:
                 continue  # Section for keys before the [] markers? Not useful.
-            props: Dict[ItemPropKind, str] = {}
+            props: Dict[ItemPropKind[Any], str] = {}
             for prop_name, value in section.items():
                 if not prop_name.startswith('prop_'):
                     continue
@@ -48,7 +48,7 @@ class ItemDefault(config.Data, conf_name='ItemDefault', uses_id=True):
         """Parse keyvalues1 data."""
         if version != 1:
             raise AssertionError(version)
-        props: Dict[ItemPropKind, str] = {}
+        props: Dict[ItemPropKind[Any], str] = {}
         for kv in data.find_children('properties'):
             try:
                 prop_type = PROP_TYPES[kv.name.casefold()]
@@ -77,7 +77,7 @@ class ItemDefault(config.Data, conf_name='ItemDefault', uses_id=True):
             item_version = data['version'].val_string
         except KeyError:
             item_version = DEFAULT_VERSION
-        props: Dict[ItemPropKind, str] = {}
+        props: Dict[ItemPropKind[Any], str] = {}
         for attr in data['properties'].val_elem.values():
             if attr.name == 'name':  # The 'properties' name itself.
                 continue

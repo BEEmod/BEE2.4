@@ -30,7 +30,7 @@ import utils
 
 # Used to deduplicate handles with existing ones. But if they're totally unused, let them die.
 _handles: weakref.WeakValueDictionary[
-    tuple[Type[Handle], tuple, int, int],
+    tuple[Type[Handle], tuple[object, ...], int, int],
     Handle,
 ] = weakref.WeakValueDictionary()
 
@@ -38,7 +38,7 @@ LOGGER = srctools.logger.get_logger('img')
 LOGGER.setLevel('INFO')
 
 FSYS_BUILTIN = RawFileSystem(str(utils.install_path('images')))
-PACK_SYSTEMS: dict[str, FileSystem] = {}
+PACK_SYSTEMS: dict[str, FileSystem[Any]] = {}
 # Force-loaded handles must be kept alive.
 _force_loaded_handles: list[Handle] = []
 
@@ -134,7 +134,7 @@ def current_theme() -> Theme:
 
 
 def _load_file(
-    fsys: FileSystem,
+    fsys: FileSystem[Any],
     uri: utils.PackagePath,
     width: int, height: int,
     resize_algo: Image.Resampling,
@@ -258,7 +258,7 @@ class Handle(User):
         raise NotImplementedError
 
     @classmethod
-    def _to_key(cls, args: tuple) -> tuple:
+    def _to_key(cls, args: tuple[Any, ...]) -> tuple[Any, ...]:
         """Override in subclasses to convert mutable attributes to deduplicate."""
         return args
 
@@ -354,7 +354,7 @@ class Handle(User):
         The width/height may be zero to indicate it should not be resized.
         """
         typ: Type[Handle]
-        args: list
+        args: list[Any]
         if uri.path.casefold() == '<black>':  # Old special case name.
             LOGGER.warning(
                 'Using "{}" for a black icon is deprecated, use "<color>:black", '
@@ -708,7 +708,7 @@ class ImgStripAlpha(Handle):
         return self.original.is_themed()
 
     @classmethod
-    def _to_key(cls, args: tuple) -> tuple:
+    def _to_key(cls, args: tuple[object, ...]) -> tuple[object, ...]:
         """Handles aren't hashable, so we need to use identity."""
         [original] = args
         return (id(original), )
@@ -779,7 +779,7 @@ class ImgComposite(Handle):
     layers: Sequence[Handle]
 
     @classmethod
-    def _to_key(cls, children: tuple[Handle, ...]) -> tuple:
+    def _to_key(cls, children: tuple[Handle, ...]) -> tuple[int, ...]:
         """Handles aren't hashable, so we need to use identity."""
         return tuple(map(id, children))
 
@@ -823,7 +823,10 @@ class ImgCrop(Handle):
         yield self.source
 
     @classmethod
-    def _to_key(cls, args: tuple) -> tuple:
+    def _to_key(
+        cls,
+        args: tuple[Handle, tuple[int, int, int, int] | None, Image.Transpose | None],
+    ) -> tuple[int, tuple[int, int, int, int] | None, Image.Transpose | None]:
         """Handles aren't hashable, so we need to use identity."""
         [child, bounds, transpose] = args
         return (id(child), bounds, transpose)
@@ -949,7 +952,7 @@ class UIImage(abc.ABC):
 
 # noinspection PyProtectedMember
 async def init(
-    filesystems: Mapping[str, FileSystem], implementation: UIImage,
+    filesystems: Mapping[str, FileSystem[Any]], implementation: UIImage,
     *, task_status: utils.TaskStatus[None] = trio.TASK_STATUS_IGNORED,
 ) -> None:
     """Start the background loading of images, using the specified filesystem and implementation.

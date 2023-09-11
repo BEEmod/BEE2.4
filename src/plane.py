@@ -59,7 +59,7 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
     @classmethod
     def fromkeys(
         cls: Type[Plane[ValT]],
-        source: Union[Plane, Iterable[Tuple[int, int]]],
+        source: Union[Plane[Any], Iterable[Tuple[int, int]]],
         value: ValT,
     ) -> Plane[ValT]:
         """Create a plane from an existing set of keys, setting all values to a specific value."""

@@ -1,6 +1,6 @@
 """UI implementation for the dragdrop module."""
 from __future__ import annotations
-from typing import Callable, Dict, Generic, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Generic, Optional, Tuple, Union
 from typing_extensions import Concatenate, Literal, ParamSpec, override
 from tkinter import ttk
 import tkinter as tk
@@ -40,12 +40,15 @@ class GeoManager(Enum):
 def _make_placer(
     func: Callable[Concatenate[ttk.Label, ArgsT], object],
     kind: GeoManager,
-) -> Callable[Concatenate[DragDrop, Slot, ArgsT], None]:
+) -> Callable[Concatenate[DragDrop[ItemT, Any], Slot[ItemT], ArgsT], None]:
     """Calls the original place/pack/grid method, telling the slot which was used.
 
     This allows propagating the original method args and types.
     """
-    def placer(self: DragDrop, slot: Slot, /, *args: ArgsT.args, **kwargs: ArgsT.kwargs) -> None:
+    def placer(
+        self: DragDrop[ItemT, Any], slot: Slot[ItemT], /,
+        *args: ArgsT.args, **kwargs: ArgsT.kwargs,
+    ) -> None:
         """Call place/pack/grid on the label."""
         slot_ui = self._slot_ui[slot]
         slot_ui.pos_type = kind
@@ -302,9 +305,9 @@ class DragDrop(ManagerBase[ItemT, tk.Misc], Generic[ItemT]):
         self._on_stop(evt.x_root, evt.y_root)
 
     # These call the method on the label, setting our attrs.
-    slot_grid = _make_placer(ttk.Label.grid, GeoManager.GRID)
-    slot_place = _make_placer(ttk.Label.place, GeoManager.PLACE)
-    slot_pack = _make_placer(ttk.Label.pack, GeoManager.PACK)
+    slot_grid = _make_placer(ttk.Label.grid_configure, GeoManager.GRID)
+    slot_place = _make_placer(ttk.Label.place_configure, GeoManager.PLACE)
+    slot_pack = _make_placer(ttk.Label.pack_configure, GeoManager.PACK)
 
     def slot_canvas(self, slot: Slot[ItemT], canv: tk.Canvas, x: int, y: int, tag: str) -> None:
         """Position this slot on a canvas."""

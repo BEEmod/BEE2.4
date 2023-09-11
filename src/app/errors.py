@@ -94,7 +94,7 @@ class ErrorUI:
         """Check if the operation has failed."""
         return bool(self._errors)
 
-    def add(self, error: AppError | ExceptionGroup | BaseExceptionGroup) -> None:
+    def add(self, error: AppError | ExceptionGroup[Exception] | BaseExceptionGroup[BaseException]) -> None:
         """Log an error having occurred, while still running code.
 
         If an exception group is passed, this will extract the AppErrors, reraising others.
