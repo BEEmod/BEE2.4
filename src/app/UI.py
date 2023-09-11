@@ -1359,7 +1359,7 @@ def flow_picker(e: Optional[tk.Event[tk.Misc]] = None) -> None:
 
     y = (num_items // width)*65 + 1
     for i in range(extra_items):
-        if i not in pal_items_fake:
+        if i >= len(pal_items_fake):
             pal_items_fake.append(TK_IMG.apply(ttk.Label(frmScroll), IMG_BLANK))
         pal_items_fake[i].place(x=((i + last_row) % width)*65 + 1, y=y)
 
