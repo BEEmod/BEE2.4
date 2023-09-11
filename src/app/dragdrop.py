@@ -15,11 +15,11 @@ import attrs
 
 from app import background_run, img, sound
 from transtoken import TransToken
-import event
+from event import Event
 import utils
 
 
-__all__ = ['ManagerBase', 'Slot', 'DragInfo', 'ParentT', 'Event', 'SlotType', 'SLOT_DRAG', 'ItemT']
+__all__ = ['ManagerBase', 'Slot', 'DragInfo', 'ParentT', 'SlotType', 'SLOT_DRAG', 'ItemT']
 LOGGER = get_logger(__name__)
 
 
@@ -35,27 +35,6 @@ class DragInfo:
 ItemT = TypeVar('ItemT')  # String etc representing the item being moved around.
 ArgsT = ParamSpec('ArgsT')
 ParentT = TypeVar('ParentT')  # Type indicating the "parent" of slots when being created.
-
-
-class Event(Enum):
-    """Context for manager events. They provide either a relevant slot or None as the argument."""
-    # Fires when items are right-clicked on. If one is registered, the gear
-    # icon appears.
-    CONFIG = 'config'
-
-    # Fired when any slot is modified. This occurs only once if two swap etc.
-    # The parameter is None.
-    MODIFIED = 'modified'
-
-    # Fired when a slot is dropped on itself - allows detecting a left click.
-    REDROPPED = 'redropped'
-
-    # When flexi slots are present, called when they're filled/emptied.
-    FLEXI_FLOW = 'flexi_flow'
-
-    # Mouse over or out of the items (including drag item).
-    HOVER_ENTER = 'hover_enter'
-    HOVER_EXIT = 'hover_exit'
 
 
 class SlotType(Enum):
@@ -170,6 +149,23 @@ SLOT_DRAG: Final = DragWin.DRAG
 # noinspection PyProtectedMember
 class ManagerBase(Generic[ItemT, ParentT]):
     """Manages a set of drag-drop points."""
+
+    # The various events that can fire. They provide either a relevant slot or None as the argument."""
+    # Fires when items are right-clicked on. If one is registered, the gear icon appears.
+    on_config: Event[Slot[ItemT]]
+    # Fired when any slot is modified. This occurs only once if two swap etc. The parameter is None.
+    on_modified: Event[None]
+
+    # Fired when a slot is dropped on itself - allows detecting a left click.
+    on_redropped: Event[Slot[ItemT]]
+
+    # When flexi slots are present, called when they're filled/emptied.
+    on_flexi_flow: Event[None]
+
+    # Mouse over or out of the items (including drag item).
+    on_hover_enter: Event[Slot[ItemT]]
+    on_hover_exit: Event[Slot[ItemT]]
+
     def __init__(
         self,
         *,
@@ -204,7 +200,12 @@ class ManagerBase(Generic[ItemT, ParentT]):
         # While dragging, the place we started at.
         self._cur_slot: Optional[Slot[ItemT]] = None
 
-        self.event_bus = event.EventBus()
+        self.on_config = Event('Config')
+        self.on_modified = Event('Modified')
+        self.on_redropped = Event('Redropped')
+        self.on_flexi_flow = Event('Flexi Flow')
+        self.on_hover_enter = Event('Hover Enter')
+        self.on_hover_exit = Event('Hover Exit')
 
     @property
     def cur_slot(self) -> Optional[Slot[ItemT]]:
@@ -459,7 +460,7 @@ class ManagerBase(Generic[ItemT, ParentT]):
             assert dest is not None
             # Dropped on itself, fire special event, put the item back.
             dest.contents = self._cur_drag
-            background_run(self.event_bus, Event.REDROPPED, dest)
+            background_run(self.on_redropped, dest)
             self._cur_drag = None
             self._cur_slot = None
             return
@@ -475,18 +476,18 @@ class ManagerBase(Generic[ItemT, ParentT]):
                 if slot.is_flexi and slot.contents is None and group is not None:
                     slot.contents = self._cur_drag
                     slot.flexi_group = group
-                    background_run(self.event_bus, Event.MODIFIED)
+                    background_run(self.on_modified)
                     break
             else:
                 LOGGER.warning('Ran out of FLEXI slots for "{}", restored item: {}', group, self._cur_drag)
                 self._cur_slot.contents = self._cur_drag
-                background_run(self.event_bus, Event.REDROPPED, self._cur_slot)
+                background_run(self.on_modified, self._cur_slot)
         elif dest:  # We have a target.
             dest.contents = self._cur_drag
-            background_run(self.event_bus, Event.MODIFIED)
+            background_run(self.on_modified)
         # No target, and we dragged off an existing target, delete.
         elif not self._cur_slot.is_source:
-            background_run(self.event_bus, Event.MODIFIED)
+            background_run(self.on_modified)
             sound.fx('delete')
 
         self._cur_drag = None
@@ -508,7 +509,7 @@ class ManagerBase(Generic[ItemT, ParentT]):
                     sound.fx('config')
                     if slot.is_flexi:
                         slot.contents = None
-                    background_run(self.event_bus, Event.MODIFIED)
+                    background_run(self.on_modified)
                     return
                 elif free.contents is item:
                     # It's already on the board, don't change anything.
@@ -520,23 +521,23 @@ class ManagerBase(Generic[ItemT, ParentT]):
         else:
             # Fast-delete this.
             slot.contents = None
-            background_run(self.event_bus, Event.MODIFIED)
+            background_run(self.on_modified)
             sound.fx('delete')
 
     def _on_hover_enter(self, slot: Slot[ItemT]) -> None:
         """Fired when the cursor starts hovering over the item."""
         self._ui_slot_showdeco(slot)
-        background_run(self.event_bus, Event.HOVER_ENTER, slot)
+        background_run(self.on_hover_enter, slot)
 
     def _on_hover_exit(self, slot: Slot[ItemT]) -> None:
         """Fired when the cursor stops hovering over the item."""
         self._ui_slot_hidedeco(slot)
-        background_run(self.event_bus, Event.HOVER_EXIT, slot)
+        background_run(self.on_hover_exit, slot)
 
     def _on_configure(self, slot: Slot[ItemT]) -> None:
         """Configuration event, fired by clicking icon or right-clicking item."""
         if slot.contents is not None:
-            background_run(self.event_bus, Event.CONFIG, slot)
+            background_run(self.on_config, slot)
 
 
 # noinspection PyProtectedMember
@@ -626,7 +627,7 @@ class Slot(Generic[ItemT]):
 
         if self.is_flexi and (old_cont is None) != (value is None):
             # We're showing/hiding, we need to redraw.
-            background_run(self.man.event_bus, Event.FLEXI_FLOW, self)
+            background_run(self.man.on_flexi_flow, self)
 
         if new_group is not None:
             # Update myself and the entire group to get the group

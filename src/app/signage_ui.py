@@ -180,8 +180,8 @@ async def init_widgets(master: tk.Widget, tk_img: TKImages) -> Optional[tk.Widge
         tk_img.apply(preview_left, IMG_BLANK)
         tk_img.apply(preview_right, IMG_BLANK)
 
-    drag_man.event_bus.register(dragdrop.Event.HOVER_ENTER, dragdrop.Slot[Signage], on_hover)
-    drag_man.event_bus.register(dragdrop.Event.HOVER_EXIT, dragdrop.Slot[Signage], on_leave)
+    drag_man.on_hover_enter.register(on_hover)
+    drag_man.on_hover_exit.register(on_leave)
 
     load_packset = packages.get_loaded_packages()
     for i in SIGN_IND:

@@ -22,7 +22,7 @@ from transtoken import TransToken
 import event
 import config
 import packages
-from ui_tk.dragdrop import CanvasPositioner, DragDrop, DragInfo, Slot as SlotBase, Event as DragEvent
+from ui_tk.dragdrop import CanvasPositioner, DragDrop, DragInfo, Slot as SlotBase
 from ui_tk.img import TKImages
 
 
@@ -160,8 +160,6 @@ class Selector:
             TransToken.ui('Close'),
         ).grid(row=4, column=0, columnspan=2)
 
-        self.event_bus = event.EventBus()
-
         conf = config.APP.get_cur_conf(UIState, default=UIState())
         if conf.width > 0 and conf.height > 0:
             self.win.geometry(f'{conf.width}x{conf.height}')
@@ -169,17 +167,17 @@ class Selector:
         button_frm = ttk.Frame(frm_left)
         button_frm.grid(row=0, column=0, columnspan=3)
         self.btn_mode = tk_tools.EnumButton(
-            button_frm, self.event_bus, conf.last_mode,
+            button_frm, conf.last_mode,
             (GameMode.SP, TransToken.ui('SP')),
             (GameMode.COOP, TransToken.ui('Coop')),
         )
         self.btn_direction = tk_tools.EnumButton(
-            button_frm, self.event_bus, conf.last_direction,
+            button_frm, conf.last_direction,
             (Direction.ENTRY, TransToken.ui('Entry')),
             (Direction.EXIT, TransToken.ui('Exit')),
         )
         self.btn_orient = tk_tools.EnumButton(
-            button_frm, self.event_bus, conf.last_orient,
+            button_frm, conf.last_orient,
             (Orient.FLAT, TransToken.ui('Flat')),
             (Orient.UP, TransToken.ui('Upward')),
             (Orient.DN, TransToken.ui('Downward')),
@@ -187,10 +185,11 @@ class Selector:
         self.btn_mode.frame.grid(row=0, column=0, padx=8)
         self.btn_direction.frame.grid(row=0, column=1, padx=8)
         self.btn_orient.frame.grid(row=0, column=2, padx=8)
+
         refresh = self.refresh
-        self.event_bus.register(self.btn_mode, GameMode, refresh)
-        self.event_bus.register(self.btn_direction, Direction, refresh)
-        self.event_bus.register(self.btn_orient, Orient, refresh)
+        self.btn_mode.on_changed.register(refresh)
+        self.btn_direction.on_changed.register(refresh)
+        self.btn_orient.on_changed.register(refresh)
 
         canv_frame = ttk.Frame(frm_left, name='canv_frame', relief="sunken")
         canv_frame.grid(row=1, column=0, columnspan=3, sticky='nsew', ipadx=8, ipady=8)
@@ -241,11 +240,11 @@ class Selector:
         )
         self.drag_man = drop
         tk_tools.add_mousewheel(self.canvas, self.win)
-        drop.event_bus.register(DragEvent.HOVER_ENTER, Slot, self.evt_hover_enter)
-        drop.event_bus.register(DragEvent.HOVER_EXIT, Slot, self.evt_hover_exit)
-        drop.event_bus.register(DragEvent.REDROPPED, Slot, self.evt_redropped)
-        drop.event_bus.register(DragEvent.FLEXI_FLOW, Slot, self.reflow)
-        drop.event_bus.register(DragEvent.MODIFIED, None, self._on_changed)
+        drop.on_hover_enter.register(self.evt_hover_enter)
+        drop.on_hover_exit.register(self.evt_hover_exit)
+        drop.on_redropped.register(self.evt_redropped)
+        drop.on_flexi_flow.register(self.reflow)
+        drop.on_modified.register(self._on_changed)
         self.load_corridors(packset)
 
     def show(self) -> None:

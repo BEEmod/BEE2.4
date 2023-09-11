@@ -6,10 +6,11 @@ import tkinter as tk
 import trio
 
 from app import TK_ROOT, background_run, img, sound
-from app.dragdrop import DragInfo, Event, Slot
+from app.dragdrop import DragInfo, Slot
 from transtoken import TransToken
 from ui_tk.dragdrop import DragDrop
 from ui_tk.img import TK_IMG
+from event import Event
 import app
 import BEE2_config
 import config
@@ -77,15 +78,16 @@ async def test() -> None:
         config_icon=True,
     )
 
-    def func(ev: Event) -> Callable[[Slot[str]], Awaitable[object]]:
+    def func(ev: str) -> Callable[[Slot[str] | None], Awaitable[object]]:
         """Ensure each callback is bound in a different scope."""
-        async def call(slot: Slot[str]) -> None:
+        async def call(slot: Slot[str] | None) -> None:
             """Just display when any event is triggered."""
             print('Cback: ', ev, slot)
         return call
 
-    for evt in Event:
-        manager.event_bus.register(evt, Slot[str], func(evt))
+    for evt in ['config', 'modified', 'redropped', 'flexi_flow', 'hover_enter', 'hover_exit']:
+        event: Event[Slot[str]] | Event[None] = getattr(manager, 'on_' + evt)
+        event.register(func(evt))
 
     PAK_CLEAN = 'BEE2_CLEAN_STYLE'
     PAK_ELEM = 'VALVE_TEST_ELEM'
@@ -167,9 +169,9 @@ async def test() -> None:
     async def evt_config(evt_slot: Slot[str]) -> None:
         messagebox.showinfo('Hello World', evt_slot.contents)
 
-    manager.event_bus.register(Event.HOVER_ENTER, Slot[str], evt_enter)
-    manager.event_bus.register(Event.HOVER_EXIT, Slot[str], evt_exit)
-    manager.event_bus.register(Event.CONFIG, Slot[str], evt_config)
+    manager.on_hover_enter.register(evt_enter)
+    manager.on_hover_exit.register(evt_exit)
+    manager.on_config.register(evt_config)
 
     manager.load_icons()
 
