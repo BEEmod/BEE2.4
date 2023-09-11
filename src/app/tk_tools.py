@@ -807,20 +807,22 @@ EnumT = TypeVar('EnumT')
 class EnumButton(Generic[EnumT]):
     """Provides a set of buttons for toggling between enum values.
 
-    The event manager recives an event with this as the context and the value as the arg when
-    changed.
+    An event is fired with the value as the arg when changed.
     """
+    frame: ttk.Frame
+    _current: EnumT
+    buttons: dict[EnumT, ttk.Button]
+    on_changed: event.Event[EnumT]
     def __init__(
         self,
         master: tk.Misc,
-        event_bus: event.EventBus,
         current: EnumT,
         *values: Tuple[EnumT, TransToken],
     ) -> None:
         self.frame = ttk.Frame(master)
         self._current = current
-        self.buttons: dict[EnumT, ttk.Button] = {}
-        self.event_bus = event_bus
+        self.buttons = {}
+        self.on_changed = event.Event()
 
         for x, (val, label) in enumerate(values):
             btn = ttk.Button(
@@ -846,7 +848,7 @@ class EnumButton(Generic[EnumT]):
             self.buttons[self._current].state(['!pressed'])
             self._current = value
             self.buttons[self._current].state(['pressed'])
-            background_run(self.event_bus, self, value)
+            background_run(self.on_changed, value)
 
     @property
     def current(self) -> EnumT:
