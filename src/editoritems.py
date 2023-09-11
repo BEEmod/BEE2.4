@@ -4,13 +4,14 @@ import sys
 from collections import defaultdict
 from collections.abc import Iterable, Iterator, Mapping
 from enum import Enum, Flag
-from typing import Callable, ClassVar, Protocol, Any
+from typing import Callable, ClassVar, Optional, Protocol, Any
 from pathlib import PurePosixPath as FSPath
 
 import attrs
 
 from srctools import Vec, logger, conv_int, conv_bool, Keyvalues, Output
 from srctools.tokenizer import Tokenizer, Token
+from typing_extensions import TypeAlias
 
 from connections import Config as ConnConfig, InputType, OutNames
 from editoritems_props import ItemProp, ItemPropKind, PROP_TYPES
@@ -18,7 +19,15 @@ from collisions import CollideType, BBox, NonBBoxError
 from transtoken import TransToken, TransTokenSource
 
 
+__all__ = [
+    "ItemProp", "ItemPropKind", "PROP_TYPES",  "ConnConfig", "InputType", "OutNames", # Re-export
+    "ItemClass", "RenderableType", "Handle", "Surface", "DesiredFacing", "FaceType", "OccuType",
+    "Sound", "Anim", "ConnTypes", "Connection", "InstCount", "Coord", "EmbedFace", "Overlay",
+    "ConnSide", "AntlinePoint", "OccupiedVoxel", "Renderable", "SubType", "Item",
+]
 LOGGER = logger.get_logger(__name__)
+# __getstate__ / __setstate__ types.
+_SubTypeState: TypeAlias = tuple[str, list[str], list[str], list[int], TransToken, int, int, Optional[FSPath]]
 
 
 class ItemClass(Enum):
@@ -688,7 +697,7 @@ class SubType:
 
     __copy__ = copy
 
-    def __deepcopy__(self, memodict: dict | None = None) -> SubType:
+    def __deepcopy__(self, memodict: dict[int, Any] | None = None) -> SubType:
         """Duplicate this subtype.
 
         We don't need to deep-copy the contents of the containers,
@@ -725,7 +734,7 @@ class SubType:
             self.pal_icon,
         )
 
-    def __setstate__(self, state: tuple) -> None:
+    def __setstate__(self, state: _SubTypeState) -> None:
         self.name, mdls, snds, anims, self.pal_name, x, y, self.pal_icon = state
         self.models = list(map(FSPath, mdls))
         self.sounds = {
@@ -1143,7 +1152,7 @@ class Item:
     def _parse_properties_block(self, tok: Tokenizer, pak_id: str) -> None:
         """Parse the properties block of the item definitions."""
         for prop_str in tok.block('Properties'):
-            prop_type: ItemPropKind | None
+            prop_type: ItemPropKind[Any] | None
             try:
                 prop_type = PROP_TYPES[prop_str.casefold()]
             except KeyError:
@@ -1911,7 +1920,7 @@ class Item:
         )
 
     def __setstate__(self, state: tuple) -> None:
-        props: list[ItemProp]
+        props: list[ItemProp[Any]]
         antline_points: list[list[AntlinePoint]]
         (
             self.id,
