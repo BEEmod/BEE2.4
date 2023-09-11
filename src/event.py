@@ -11,202 +11,105 @@ A set of observable collections are provided, which fire off events
 whenever they are modified.
 """
 from __future__ import annotations
-from typing import (
-    overload, get_origin, TypeVar, Any, Type,
-    Optional, Generic, Callable, List, Awaitable
-)
+from typing import overload, TypeVar, Any, Type, Generic, Callable, List, Awaitable
 
 import attrs
 import trio
 import srctools.logger
 
-__all__ = ['EventBus', 'APP_BUS', 'ValueChange', 'ObsValue']
+__all__ = ['Event', 'ValueChange', 'ObsValue']
 LOGGER = srctools.logger.get_logger(__name__)
 ArgT = TypeVar('ArgT')
 ValueT = TypeVar('ValueT')
-Value2T = TypeVar('Value2T')
+ValueT_co = TypeVar('ValueT_co', covariant=True)
 NoneType: Type[None] = type(None)
 
 
-class EventSpec(Generic[ArgT], List[Callable[[ArgT], Awaitable[Any]]]):
-    """The data associated with a given event.
-
-    To save a bit of space, combine the list of callbacks with the other
-    args.
-    """
-    __slots__ = ['ctx', 'last_result', 'cur_calls']
-    ctx: object
-    last_result: ArgT
+@attrs.define(init=False)
+class Event(Generic[ArgT]):
+    """Store functions to be called when an event occurs."""
+    callbacks: List[Callable[[ArgT], Awaitable[Any]]]
+    last_result: ArgT = attrs.field(init=False)
     cur_calls: int
+    name: str
+    log: bool = attrs.field(repr=False)
 
-    def __init__(self, ctx: object) -> None:
-        super().__init__()
-        self.ctx = ctx
+    def __init__(self, name: str='') -> None:
+        self.name = name or f'<Unnamed {id(self):x}>'
+        self.callbacks: List[Callable[[ArgT], Awaitable[Any]]] = []
         self.cur_calls = 0
+        self.log = False
         # Leave last_result unset as a sentinel.
 
+    def register(self, func: Callable[[ArgT], Awaitable[Any]]) -> None:
+        """Register the given function to be called."""
+        self.callbacks.append(func)
 
-def _get_arg_type(arg_type: object) -> type:
-    """Given the arg type, pull out the actual type to key with."""
-    if arg_type is None:  # Special case.
-        return NoneType
-    # Allow passing subscripted generics.
-    origin: Optional[type] = get_origin(arg_type)
-    if origin is not None:
-        return origin
-    if isinstance(arg_type, type):
-        return arg_type
-    raise ValueError(f'{arg_type!r} is not an argument type!')
-
-
-class EventBus:
-    """Stores functions to be called for a set of events."""
-    # Type[ArgT] -> EventSpec[ArgT], but can't specify that.
-    _events: dict[tuple[int, Type[Any]], EventSpec[Any]]
-
-    def __init__(self) -> None:
-        self._events = {}
-        self.log = False
-
-    @overload
-    def register(
-        self, ctx: object,
-        arg_type: None,
-        func: Callable[[None], Awaitable[Any]],
-    ) -> None: ...
-    @overload
-    def register(
-        self, ctx: object,
-        arg_type: Type[ArgT],
-        func: Callable[[ArgT], Awaitable[Any]],
-    ) -> None: ...
-    def register(
-        self,
-        ctx: object,
-        arg_type: Optional[Type[ArgT]],
-        func: Callable[[ArgT], Awaitable[Any]],
-    ) -> None:
-        """Register the given function to be called.
-
-        It will recieve the events with the same context object, and
-        with an instance of the argument type (no subclasses).
-
-        As a special case it can be registered with a None argument type
-        instead of type(None).
-        """
-        key = (id(ctx), _get_arg_type(arg_type))
-        try:
-            spec = self._events[key]
-        except KeyError:
-            spec = self._events[key] = EventSpec[ArgT](ctx)
-        spec.append(func)
-
-    @overload
-    async def register_and_prime(
-        self, ctx: object,
-        arg_type: None,
-        func: Callable[[None], Awaitable[Any]],
-    ) -> None: ...
-    @overload
-    async def register_and_prime(
-        self, ctx: object,
-        arg_type: Type[ArgT],
-        func: Callable[[ArgT], Awaitable[Any]],
-    ) -> None: ...
-    async def register_and_prime(
-        self,
-        ctx: object,
-        arg_type: Optional[Type[ArgT]],
-        func: Callable[[ArgT], Awaitable[Any]],
-    ) -> None:
+    async def register_and_prime(self, func: Callable[[ArgT], Awaitable[Any]]) -> None:
         """Register the given function, then immediately call with the last value if present."""
-        key = (id(ctx), _get_arg_type(arg_type))
+        self.callbacks.append(func)
         try:
-            spec = self._events[key]
-        except KeyError:
-            spec = self._events[key] = EventSpec[ArgT](ctx)
-        spec.append(func)
-        try:
-            last_val = spec.last_result
+            last_val = self.last_result
         except AttributeError:
             await trio.sleep(0)  # Checkpoint.
         else:
             await func(last_val)
 
-    async def __call__(self, ctx: object, arg: ArgT=None) -> None:
+    @overload
+    async def __call__(self: Event[None]) -> None: ...
+    @overload
+    async def __call__(self, arg: ArgT) -> None: ...
+
+    async def __call__(self, arg: ArgT=None) -> None:
         """Run the specified event.
 
         This is re-entrant - if called whilst the same event is already being
         run, the second will be ignored.
         """
-        spec: EventSpec[ArgT]
-        try:
-            spec = self._events[id(ctx), type(arg)]
-        except KeyError:
-            if self.log:
-                LOGGER.debug('{:x} -> {!r}({!r}), not found.\nValid: {}', id(self), ctx, arg, self._events)
-            return
         if self.log:
-            LOGGER.debug('{:x} -> {!r}({!r}) = {}', id(self), ctx, arg, spec)
+            LOGGER.debug('{}({!r}) = {}', self.name, arg, self.callbacks)
 
-        if spec.cur_calls:
+        if self.cur_calls:
             try:
-                if spec.last_result == arg:
+                if self.last_result == arg:
                     return
             except AttributeError:
                 pass
 
-        spec.last_result = arg
-        spec.cur_calls += 1
+        self.last_result = arg
+        self.cur_calls += 1
         try:
             async with trio.open_nursery() as nursery:
-                for func in spec:
+                for func in self.callbacks:
                     nursery.start_soon(func, arg)
         finally:
-            spec.cur_calls -= 1
+            self.cur_calls -= 1
 
-    @overload
-    def unregister(
-        self, ctx: object,
-        arg_type: None,
-        func: Callable[[None], Awaitable[Any]],
-    ) -> None: ...
-    @overload
-    def unregister(
-        self, ctx: object,
-        arg_type: Type[ArgT],
-        func: Callable[[ArgT], Awaitable[Any]],
-    ) -> None: ...
-    def unregister(
-        self,
-        ctx: object,
-        arg_type: Optional[Type[ArgT]],
-        func: Callable[[ArgT], Awaitable[Any]],
-    ) -> None:
+    def unregister(self, func: Callable[[ArgT], Awaitable[Any]],) -> None:
         """Remove the given callback.
 
         If it is not registered, raise LookupError.
         """
         try:
-            self._events[id(ctx), _get_arg_type(arg_type)].remove(func)
-        except (KeyError, ValueError):
-            raise LookupError(ctx, arg_type, func) from None
-
-# Global manager for general events.
-APP_BUS = EventBus()
+            self.callbacks.remove(func)
+        except ValueError:
+            raise LookupError(func) from None
 
 
 @attrs.frozen
-class ValueChange(Generic[ValueT]):
-    """The event which is fired when a value changes."""
-    old: ValueT
-    new: ValueT
+class ValueChange(Generic[ValueT_co]):
+    """Holds information about when a value changes."""
+    old: ValueT_co
+    new: ValueT_co
 
 
 class ObsValue(Generic[ValueT]):
     """Holds a single value of any type, firing an event whenever it is altered."""
-    def __init__(self, bus: EventBus, initial: ValueT) -> None:
-        self.bus = bus
+    on_changed: Event[ValueChange[ValueT]]
+    _value: ValueT
+
+    def __init__(self, initial: ValueT, name: str='') -> None:
+        self.on_changed = Event(name)
         self._value = initial
 
     @property
@@ -219,7 +122,7 @@ class ObsValue(Generic[ValueT]):
         # Note: fire the event AFTER we change the contents.
         old = self._value
         self._value = new
-        await self.bus(self, ValueChange(old, new))
+        await self.on_changed(ValueChange(old, new))
 
     def __repr__(self) -> str:
-        return f'ObsValue({self.bus!r}, {self._value!r})'
+        return f'ObsValue({self._value!r}, on_changed={self.on_changed})'
