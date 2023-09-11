@@ -1,7 +1,7 @@
 """The package containg all UI code."""
 import tkinter as tk
-from types import TracebackType
-from typing import Awaitable, Callable, Optional, Type, TypeVar, overload
+from types import TracebackType, new_class
+from typing import Awaitable, Callable, Optional, Type, TypeVar, overload, Generic
 
 import utils
 import trio  # Import first, so it monkeypatches traceback before us.
@@ -14,6 +14,15 @@ TK_ROOT.withdraw()  # Hide the window until everything is loaded.
 # The nursery where UI tasks etc are run in.
 _APP_NURSERY: Optional[trio.Nursery] = None
 
+
+if '__class_getitem__' not in vars(tk.Event):
+    # Patch in it being generic, by replacing it with a copy that subclasses Generic.
+    _W_co = TypeVar("_W_co", covariant=True, bound=tk.Misc)
+    _W_co.__module__ = 'tkinter'
+    tk.Event = new_class(
+        'Event', (Generic[_W_co], ),
+        exec_body=lambda ns: ns.update(vars(tk.Event)),
+    )
 
 def _run_main_loop(*args, **kwargs) -> None:
     """Allow determining if this is running."""
