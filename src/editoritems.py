@@ -27,7 +27,7 @@ __all__ = [
 ]
 LOGGER = logger.get_logger(__name__)
 # __getstate__ / __setstate__ types.
-_SubTypeState: TypeAlias = tuple[str, list[str], list[str], list[int], TransToken, int, int, Optional[FSPath]]
+_SubTypeState: TypeAlias = tuple[TransToken, list[str], list[str], list[int], TransToken, int, int, Optional[FSPath]]
 
 
 class ItemClass(Enum):
@@ -862,7 +862,7 @@ class Item:
     # The C++ class used to instantiate the item in the editor.
     cls: ItemClass = ItemClass.UNCLASSED
     # Type if present.
-    subtype_prop: ItemPropKind | None = None
+    subtype_prop: ItemPropKind[Any] | None = None
     subtypes: list[SubType] = attrs.Factory(list)  # Each subtype in order.
     # Movement handle
     handle: Handle = Handle.NONE
@@ -883,7 +883,7 @@ class Item:
     # is wrong. So just make it the useful default, users can override.
     offset: Vec = attrs.Factory(lambda: Vec(64, 64, 64))
 
-    properties: dict[str, ItemProp] = attrs.Factory(dict)
+    properties: dict[str, ItemProp[Any]] = attrs.Factory(dict)
 
     # The instances used by the editor, then custom slots used by
     # conditions. For the latter we don't care about the counts.

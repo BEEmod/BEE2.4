@@ -10,6 +10,12 @@ import config
 from corridor import Direction, GameMode, Orient
 
 
+__all__ = [
+    'Direction', 'GameMode', 'Orient',  # Re-export
+    'Config', 'UIState',
+]
+
+
 @config.APP.register
 @attrs.frozen(slots=False)
 class Config(config.Data, conf_name='Corridor', uses_id=True, version=1):

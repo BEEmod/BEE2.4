@@ -305,9 +305,10 @@ class DragDrop(ManagerBase[ItemT, tk.Misc], Generic[ItemT]):
         self._on_stop(evt.x_root, evt.y_root)
 
     # These call the method on the label, setting our attrs.
-    slot_grid = _make_placer(ttk.Label.grid_configure, GeoManager.GRID)
-    slot_place = _make_placer(ttk.Label.place_configure, GeoManager.PLACE)
-    slot_pack = _make_placer(ttk.Label.pack_configure, GeoManager.PACK)
+    # Type-ignore because these are defined on Grid/Place/Pack, not Label...
+    slot_grid = _make_placer(ttk.Label.grid_configure, GeoManager.GRID)  # type: ignore[arg-type]
+    slot_place = _make_placer(ttk.Label.place_configure, GeoManager.PLACE)  # type: ignore[arg-type]
+    slot_pack = _make_placer(ttk.Label.pack_configure, GeoManager.PACK)  # type: ignore[arg-type]
 
     def slot_canvas(self, slot: Slot[ItemT], canv: tk.Canvas, x: int, y: int, tag: str) -> None:
         """Position this slot on a canvas."""

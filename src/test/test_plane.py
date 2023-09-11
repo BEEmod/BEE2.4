@@ -10,7 +10,7 @@ import pytest
     (-2, 0), (2, 0), (0, -2), (0, 2),
     (2, 2), (-2, 2), (2, -2), (-2, -2),
 ])
-def test_insertion(dx, dy) -> None:
+def test_insertion(dx: int, dy: int) -> None:
     """Simple tests to ensure resizing works in each direction."""
     plane = Plane[object]()
     for i in range(10):
@@ -38,7 +38,7 @@ def test_insertion(dx, dy) -> None:
                 assert plane.get((x, y), 'hi') == 'hi'
 
 
-def _points(*pattern):
+def _points(*pattern: str) -> List[Tuple[int, int]]:
     """Return each coordinate in order in the string map."""
     points = [
         (x, y)
@@ -75,7 +75,7 @@ def _points(*pattern):
         '54..0',
     ),
 ], ids=['order', 'patA', 'patB', 'patC'])
-def test_insertion_complex(pattern: List[Tuple[int, int]], off_x: int, off_y: int):
+def test_insertion_complex(pattern: List[Tuple[int, int]], off_x: int, off_y: int) -> None:
     """Insert in various patterns, to test the dynamic resizing."""
     plane = Plane[object]()
     backup = {}
@@ -122,9 +122,9 @@ def test_views() -> None:
     }
 
     # Check illegal values don't error.
-    assert "ab" not in plane.keys()
-    assert (1, ) not in plane.keys()
-    assert (3, 4, 5) not in plane.keys()
+    assert "ab" not in plane.keys()  # type: ignore
+    assert (1, ) not in plane.keys()  # type: ignore
+    assert (3, 4, 5) not in plane.keys()  # type: ignore
 
     assert 1 in plane.values()
     assert 45 not in plane.values()
@@ -135,9 +135,9 @@ def test_views() -> None:
     assert ((2, -5), 4) not in plane.items()
     assert ((3, 4), 2) not in plane.items()
     # Check illegal values don't error.
-    assert 45 not in plane.items()
-    assert (1, ) not in plane.items()
-    assert (1, 2, 3, 4) not in plane.items()
+    assert 45 not in plane.items()  # type: ignore
+    assert (1, ) not in plane.items()  # type: ignore
+    assert (1, 2, 3, 4) not in plane.items()  # type: ignore
     assert set(plane.items()) == {
         ((0, 4), 1), ((2, -5), None), ((0, 5), 3), ((0, 7), 2), ((5, 3), 2),
     }

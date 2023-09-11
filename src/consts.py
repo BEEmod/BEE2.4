@@ -99,6 +99,7 @@ class MaterialGroup(str, Enum, metaclass=MaterialGroupMeta):
       to any members.
     * str(member) == member.value
     """
+    value: str
     def __eq__(self, other: object) -> bool:
         """Compare case-insensitively."""
         if isinstance(other, Side):

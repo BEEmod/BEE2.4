@@ -449,7 +449,7 @@ class PalItem:
                 return True
         return False
 
-    def copy(self, frame):
+    def copy(self, frame: tk.Misc) -> 'PalItem':
         return PalItem(frame, self.item, self.subKey, self.is_pre)
 
     def __repr__(self) -> str:
@@ -863,7 +863,7 @@ def conv_screen_to_grid(x: float, y: float) -> Tuple[int, int]:
     )
 
 
-def drag_start(drag_item: PalItem, e: tk.Event) -> None:
+def drag_start(drag_item: PalItem, e: tk.Event[tk.Misc]) -> None:
     """Start dragging a palette item."""
     drag_win = windows['drag_win']
     drag_win.drag_item = drag_item
@@ -906,7 +906,7 @@ def drag_start(drag_item: PalItem, e: tk.Event) -> None:
     UI['pre_sel_line'].lift()
 
 
-def drag_stop(e: tk.Event) -> None:
+def drag_stop(e: tk.Event[tk.Misc]) -> None:
     """User released the mouse button, complete the drag."""
     drag_win: DragWin = windows['drag_win']
 
@@ -950,7 +950,7 @@ def drag_stop(e: tk.Event) -> None:
     drag_win.drag_item = None
 
 
-def drag_move(e: tk.Event) -> None:
+def drag_move(e: tk.Event[tk.Misc]) -> None:
     """Update the position of dragged items as they move around."""
     drag_win: DragWin = windows['drag_win']
 
@@ -985,7 +985,7 @@ def drag_move(e: tk.Event) -> None:
         UI['pre_sel_line'].place_forget()
 
 
-def drag_fast(drag_item: PalItem, e: tk.Event) -> None:
+def drag_fast(drag_item: PalItem, e: tk.Event[tk.Misc]) -> None:
     """Implement shift-clicking.
 
      When shift-clicking, an item will be immediately moved to the
@@ -1131,12 +1131,12 @@ async def init_option(
                 has_suggest = True
         UI['suggested_style'].state(('!disabled', ) if has_suggest else ('disabled', ))
 
-    def suggested_style_mousein(_: tk.Event) -> None:
+    def suggested_style_mousein(_: tk.Event[tk.Misc]) -> None:
         """When mousing over the button, show the suggested items."""
         for win in suggest_windows.values():
             win.rollover_suggest()
 
-    def suggested_style_mouseout(_: tk.Event) -> None:
+    def suggested_style_mouseout(_: tk.Event[tk.Misc]) -> None:
         """Return text to the normal value on mouseout."""
         for win in suggest_windows.values():
             win.set_disp()
@@ -1312,7 +1312,7 @@ def init_picker(f: Union[tk.Frame, ttk.Frame]) -> None:
     f.bind("<Configure>", flow_picker)
 
 
-def flow_picker(e=None) -> None:
+def flow_picker(e: Optional[tk.Event[tk.Misc]] = None) -> None:
     """Update the picker box so all items are positioned corrctly.
 
     Should be run (e arg is ignored) whenever the items change, or the

@@ -462,7 +462,7 @@ class PreviewWindow:
             parent.win.grab_release()
             self.win.grab_set()
 
-    def hide(self, _: tk.Event[tk.Toplevel] | None = None) -> None:
+    def hide(self, _: tk.Event[tk.Misc] | None = None) -> None:
         """Swap grabs if the parent is modal."""
         if self.parent.modal:
             self.win.grab_release()
@@ -1138,7 +1138,7 @@ class SelectorWin(Generic[CallbackT]):
             self.display['font'] = self.mouseover_font
             self._pick_suggested(force=True)
 
-    def _pick_suggested(self, force=False) -> None:
+    def _pick_suggested(self, force: bool = False) -> None:
         """Randomly select a suggested item."""
         if self.suggested and (force or self._suggested_rollover is not None):
             self._suggested_rollover = random.choice(self.suggested)
@@ -1258,7 +1258,7 @@ class SelectorWin(Generic[CallbackT]):
                     return True
             return False
 
-    def sel_item(self, item: Item, _: tk.Event = None) -> None:
+    def sel_item(self, item: Item, _: tk.Event[tk.Misc] = None) -> None:
         """Select the specified item."""
         self.prop_name['text'] = item.longName
         if len(item.authors) == 0:
@@ -1352,7 +1352,7 @@ class SelectorWin(Generic[CallbackT]):
             else:
                 raise ValueError(f'Invalid attribute type: "{attr.type}"')
 
-    def key_navigate(self, event: tk.Event[tk.Toplevel]) -> None:
+    def key_navigate(self, event: tk.Event[tk.Misc]) -> None:
         """Navigate using arrow keys.
 
         Allowed keys are set in NAV_KEYS
@@ -1491,7 +1491,7 @@ class SelectorWin(Generic[CallbackT]):
         else:  # Within this group
             self.sel_item(cur_group[item_ind])
 
-    def flow_items(self, _: tk.Event[tk.Toplevel] = None) -> None:
+    def flow_items(self, _: tk.Event[tk.Misc] = None) -> None:
         """Reposition all the items to fit in the current geometry.
 
         Called on the <Configure> event.

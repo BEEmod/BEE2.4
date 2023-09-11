@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, create_autospec, call
 from event import Event, ValueChange, ObsValue
 
 
-async def func_unary(arg):
+async def func_unary(arg: object) -> None:
     """Expected signature of event functions."""
     pass
 
@@ -123,7 +123,7 @@ def test_valuechange_hash() -> None:
     """Check ValueChange() can be hashed and put in a dict key."""
     key = ValueChange(45, 38)
     assert hash(key) == hash(ValueChange(45.0, 38.0))
-    dct: dict[ValueChange, object] = {
+    dct: dict[ValueChange[object], object] = {
         key: 45,
         ValueChange('text', 12): sum,
     }
@@ -180,7 +180,7 @@ async def test_obsvalue_set_during_event() -> None:
     # No event will fire.
     holder = ObsValue(0, 'set_during')
 
-    async def event(arg: ValueChange) -> None:
+    async def event(arg: ValueChange[int]) -> None:
         """Event fired when registered."""
         assert arg.new == holder.value, f"Wrong new val: {arg} != {holder.value}"
         await holder.set(min(3, arg.new + 1))

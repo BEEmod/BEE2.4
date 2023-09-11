@@ -18,7 +18,7 @@ def assert_bbox(
     maxes: Iterable[int | float],
     contents: CollideType,
     tags: set[str],
-    msg='',
+    msg: str = '',
 ) -> None:
     """Test the bbox matches the given values."""
     # Don't show in pytest tracebacks.
@@ -183,22 +183,25 @@ def test_reorder_helper() -> None:
     assert reorder((-10, 30, 0), 'xyz', 8, 6, 12) == Vec(-2, 36, 12)
 
 
-def get_intersect_testcases() -> Iterable:
+def get_intersect_testcases() -> Iterable[tuple[tuple[tuple3, tuple3] | None, tuple[tuple3, tuple3] | None]]:
     """Use a VMF to make it easier to generate the bounding boxes."""
     with Path(__file__, '../bbox_samples.vmf').open() as f:
         vmf = VMF.parse(Keyvalues.parse(f))
 
-    def process(brush: Solid | None) -> tuple[tuple[int, ...], tuple[int, ...]] | None:
+    def process(brush: Solid | None) -> tuple[tuple3, tuple3] | None:
         """Extract the bounding box from the brush."""
         if brush is None:
             return None
         bb_min, bb_max = brush.get_bbox()
         for vec in [bb_min, bb_max]:
             for ax in 'xyz':
-                # If one thick, make zero thick so we can test planes.
+                # If one thick, make zero thick so that we can test planes.
                 if abs(vec[ax]) == 63:
                     vec[ax] = math.copysign(64, vec[ax])
-        return (tuple(map(int, bb_min)), tuple(map(int, bb_max)))
+        return (
+            (int(bb_min.x), int(bb_min.y), int(bb_min.z)),
+            (int(bb_max.x), int(bb_max.y), int(bb_max.z)),
+        )
 
     for ent in vmf.entities:
         test = expected = None
@@ -209,7 +212,7 @@ def get_intersect_testcases() -> Iterable:
                 test = solid
         if test is None:
             raise ValueError(ent.id)
-        yield (*process(test), process(expected))
+        yield (process(test), process(expected))
 
 
 @pytest.mark.parametrize('mins, maxs, success', list(get_intersect_testcases()))
@@ -224,7 +227,7 @@ def test_bbox_intersection(
 ) -> None:
     """Test intersection founction for bounding boxes.
 
-    We parameterise by swapping all the axes, and offsetting so it's in all the quadrants.
+    We parameterise by swapping all the axes, and offsetting so that it's in all the quadrants.
     """
     bbox1 = BBox(x-64, y-64, z-64, x+64, y+64, z+64, contents=CollideType.EVERYTHING)
     bbox2 = BBox(reorder(mins, axes, x, y, z), reorder(maxs, axes, x, y, z), contents=CollideType.EVERYTHING)

@@ -5,6 +5,7 @@ General code used for tkinter portions.
 import functools
 import inspect
 import sys
+import types
 from enum import Enum
 from typing import (
     Awaitable, Generic, Iterable, overload, cast, Any, TypeVar, Protocol, Union, Callable, Optional,
@@ -34,7 +35,7 @@ from transtoken import TransToken
 
 ICO_PATH = str(utils.install_path('BEE2.ico'))
 T = TypeVar('T')
-WidgetT = TypeVar('WidgetT', bound=tk.Misc)
+WidgetT = TypeVar('WidgetT', bound=tk.Widget)
 EventFunc: TypeAlias = Callable[[tk.Event[WidgetT]], object]
 EventFuncT = TypeVar('EventFuncT', bound=EventFunc[tk.Misc])
 
@@ -372,6 +373,12 @@ class _Binder(Protocol):
         pass
     @overload
     def __call__(self, wid: WidgetT, func: EventFunc[WidgetT], *, add: bool=False) -> str:
+        pass
+    @overload
+    def __call__(self, wid: tk.Misc, *, add: bool=False) -> Callable[[_EventDeco[tk.Misc]], _EventDeco[tk.Misc]]:
+        pass
+    @overload
+    def __call__(self, wid: tk.Misc, func: EventFunc[tk.Misc], *, add: bool=False) -> str:
         pass
     def __call__(
         self, wid: WidgetT,

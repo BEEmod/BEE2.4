@@ -167,7 +167,7 @@ class GenOptions(config.Data, conf_name='Options', palette_stores=False, version
 # Todo: For full type safety, make field = attrs.Attribute[Any], once mypy infers a union for iter(tuple).
 def _is_bool_attr(field: object) -> TypeGuard['attrs.Attribute[bool]']:
     """Check if this is a boolean-type attribute."""
-    return isinstance(field, attrs.Attribute) and (field.type is bool or field.type == 'bool')
+    return isinstance(field, attrs.Attribute) and (field.type is bool or str(field.type) == 'bool')
 
 
 gen_opts_bool: List['attrs.Attribute[bool]'] = [
