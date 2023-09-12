@@ -806,7 +806,7 @@ class Generator(abc.ABC):
     def setup(self, vmf: VMF, tiles: List['TileDef']) -> None:
         """Scan tiles in the map and set up the generator."""
 
-    def _missing_error(self, tex_name: str) -> NoReturn:
+    def _missing_error(self, tex_name: str) -> Exception:
         return ValueError(f'Bad texture name: {tex_name}\n Allowed: {list(self.textures.keys())!r}')
 
     @abc.abstractmethod

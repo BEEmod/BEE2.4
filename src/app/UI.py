@@ -212,7 +212,7 @@ class Item:
                 yield name.token
             yield str(name)
 
-    def get_icon(self, subKey, allow_single=False, single_num=1) -> img.Handle:
+    def get_icon(self, subKey: int, allow_single: bool = False, single_num: int = 1) -> img.Handle:
         """Get an icon for the given subkey.
 
         If allow_single is true, the grouping icon can be returned
@@ -227,7 +227,7 @@ class Item:
             icon = icon.overlay_text(self.inherit_kind.value.title(), 12)
         return icon
 
-    def _get_raw_icon(self, subKey, allow_single: bool, single_num: int) -> img.Handle:
+    def _get_raw_icon(self, subKey: int, allow_single: bool, single_num: int) -> img.Handle:
         """Get the raw icon, which may be overlaid if required."""
         icons = self.data.icons
         num_picked = sum(
@@ -339,7 +339,7 @@ class PalItem:
         tk_tools.bind_rightclick(lbl, click_func)
 
         @tk_tools.bind_leftclick(self.info_btn)
-        def info_button_click(e) -> str:
+        def info_button_click(e: tk.Event[tk.Misc]) -> object:
             """When clicked, show the context window."""
             click_func(e)
             # Cancel the event sequence, so it doesn't travel up to the main
@@ -386,7 +386,7 @@ class PalItem:
         self.label['relief'] = 'flat'
         self.info_btn.place_forget()
 
-    def change_subtype(self, ind) -> None:
+    def change_subtype(self, ind: int) -> None:
         """Change the subtype of this icon.
 
         This removes duplicates from the palette if needed.

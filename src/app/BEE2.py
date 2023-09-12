@@ -163,7 +163,7 @@ async def app_main(init: Callable[[], Awaitable[Any]]) -> None:
         nursery.cancel_scope.cancel()
 
 
-def done_callback(result: Outcome):
+def done_callback(result: Outcome) -> None:
     """The app finished, quit."""
     from app import UI
     if isinstance(result, Error):

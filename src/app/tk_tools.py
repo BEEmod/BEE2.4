@@ -19,8 +19,8 @@ from tkinter import filedialog, commondialog, simpledialog, messagebox
 import tkinter as tk
 import os.path
 
-from idlelib.redirector import WidgetRedirector  # type: ignore[import]
-from idlelib.query import Query  # type: ignore[import]
+from idlelib.redirector import WidgetRedirector  # type: ignore[import-not-found]
+from idlelib.query import Query  # type: ignore[import-not-found]
 import trio
 
 from app import TK_ROOT, background_run, localisation
@@ -363,8 +363,8 @@ def make_handler(func: Union[
     return wrapper
 
 
-class _EventDeco(Protocol[WidgetT]):
-    def __call__(self, func: EventFunc[WidgetT], /) -> EventFunc[WidgetT]:
+class _EventDeco(Protocol[AnyWidT]):
+    def __call__(self, func: EventFunc[AnyWidT], /) -> EventFunc[AnyWidT]:
         ...
 
 

@@ -471,7 +471,7 @@ def res_set_block(inst: Entity, res: Keyvalues) -> None:
 
 
 @make_result('forceUpright')
-def res_force_upright(inst: Entity):
+def res_force_upright(inst: Entity) -> None:
     """Position an instance to orient upwards while keeping the normal.
 
     The result angle will have pitch and roll set to 0. Vertical

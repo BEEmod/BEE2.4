@@ -92,7 +92,7 @@ def res_make_tag_coop_spawn(vmf: VMF, info: conditions.MapInfo, inst: Entity, re
 
 
 @conditions.meta_cond(priority=200, only_once=True)
-def ap_tag_modifications(vmf: VMF):
+def ap_tag_modifications(vmf: VMF) -> None:
     """Perform modifications for Aperture Tag.
 
     * Paint is always present in every map!

@@ -5,6 +5,8 @@ from tkinter.messagebox import askokcancel
 from typing import Iterable, Iterator, TypeVar, Union, Tuple, Dict, Callable
 import webbrowser
 
+from typing_extensions import Never
+
 from app import tkMarkdown
 from app.tkMarkdown import TextTag, TAG_HEADINGS
 from app.tk_tools import Cursors
@@ -142,7 +144,7 @@ class tkRichText(tkinter.Text):
 
         self['state'] = "disabled"
 
-    def insert(self, *args, **kwargs) -> None:
+    def insert(self, *args: Never, **kwargs: Never) -> None:
         """Inserting directly is disallowed."""
         raise TypeError('richTextBox should not have text inserted directly.')
 
@@ -202,9 +204,9 @@ class tkRichText(tkinter.Text):
         finally:
             self['state'] = "disabled"
 
-    def make_link_callback(self, url: str) -> Callable[[tkinter.Event], None]:
+    def make_link_callback(self, url: str) -> Callable[[tkinter.Event[tkinter.Text]], None]:
         """Create a link callback for the given URL."""
-        def callback(e) -> None:
+        def callback(e: tkinter.Event[tkinter.Text]) -> None:
             """The callback function."""
             if askokcancel(
                 title='BEE2 - Open URL?',

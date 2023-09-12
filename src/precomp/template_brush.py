@@ -16,7 +16,10 @@ import attrs
 from srctools import Keyvalues
 from srctools.filesys import FileSystem, ZipFileSystem, RawFileSystem, VPKFileSystem
 from srctools.math import AnyAngle, AnyMatrix, FrozenVec, Vec, Angle, Matrix, to_matrix
-from srctools.vmf import EntityFixup, Entity, EntityGroup, Solid, Side, VMF, UVAxis, VisGroup
+from srctools.vmf import (
+    EntityFixup, Entity, EntityGroup, Solid, Side, VMF, UVAxis, ValidKVs,
+    VisGroup,
+)
 from srctools.dmx import Element as DMElement
 import srctools.logger
 
@@ -448,7 +451,7 @@ class ScalingTemplate(Mapping[
             face.mat = mat
 
 
-def parse_temp_name(name) -> tuple[str, set[str]]:
+def parse_temp_name(name: str) -> tuple[str, set[str]]:
     """Parse the visgroups off the end of an ID."""
     if ':' in name:
         temp_name, visgroups = name.rsplit(':', 1)
@@ -767,7 +770,7 @@ def import_template(
             dbg_visgroup = vmf.create_visgroup('Templates', (113, 113, 0))
         dbg_group = EntityGroup(vmf, color=Vec(113, 113, 0))
 
-        def dbg_add(classname, **kwargs) -> None:
+        def dbg_add(classname: str, **kwargs: ValidKVs) -> None:
             """Add a marker to the map."""
             ent = vmf.create_ent(classname, **kwargs)
             ent.visgroup_ids.add(dbg_visgroup.id)
@@ -957,12 +960,12 @@ def get_scaling_template(temp_id: str) -> ScalingTemplate:
 def retexture_template(
     template_data: ExportedTemplate,
     origin: Vec,
-    fixup: EntityFixup=None,
-    replace_tex: Mapping[str, Union[list[str], str]]=srctools.EmptyMapping,
-    force_colour: ForceColour=AppliedColour.MATCH,
-    force_grid: TileSize=None,
-    generator: GenCat=GenCat.NORMAL,
-    sense_offset: Optional[Vec]=None,
+    fixup: EntityFixup | None = None,
+    replace_tex: Mapping[str, list[str] | str] = srctools.EmptyMapping,
+    force_colour: ForceColour = AppliedColour.MATCH,
+    force_grid: TileSize | None = None,
+    generator: GenCat = GenCat.NORMAL,
+    sense_offset: Vec | None = None,
 ):
     """Retexture a template at the given location.
 

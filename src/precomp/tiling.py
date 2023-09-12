@@ -195,14 +195,18 @@ class TileType(Enum):
         if self is TileType.GOO_SIDE:
             return TileType.WHITE_4x4
         if self.name.startswith('BLACK'):
-            return getattr(TileType, f'WHITE{self.name[5:]}')
+            tile = getattr(TileType, f'WHITE{self.name[5:]}')
+            assert isinstance(tile, TileType)
+            return tile
         return self
 
     @property
     def as_black(self) -> TileType:
         """Force to the black version."""
         if self.is_white:
-            return getattr(TileType, f'BLACK{self.name[5:]}')
+            tile = getattr(TileType, f'BLACK{self.name[5:]}')
+            assert isinstance(tile, TileType)
+            return tile
         return self
 
     @property
@@ -319,7 +323,7 @@ class Pattern:
         self,
         tex: TileSize,
         *tiles: tuple[int, int, int, int],
-        wall_only=False
+        wall_only: bool = False,
     ) -> None:
         self.tex = tex
         self.wall_only = wall_only
@@ -1470,9 +1474,9 @@ def edit_quarter_tile(
     origin: Vec,
     normal: Vec,
     tile_type: TileType,
-    force: bool=False,
-    silent: bool=False,
-):
+    force: bool = False,
+    silent: bool = False,
+) -> None:
     """Alter a 1/4 tile section of a tile.
 
     If force is True, this overwrites any existing tile - by default nodraw
@@ -1832,7 +1836,7 @@ def analyse_map(vmf_file: VMF, side_to_ant_seg: dict[int, list[antlines.Segment]
                         tile[u, v] = TileType.GOO_SIDE
 
 
-def tiledefs_from_cube(face_to_tile: dict[int, TileDef], brush: Solid, grid_pos: Vec):
+def tiledefs_from_cube(face_to_tile: dict[int, TileDef], brush: Solid, grid_pos: Vec) -> None:
     """Generate a tiledef matching a 128^3 block."""
     for face in brush:
         normal = -face.normal()

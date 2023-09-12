@@ -1,6 +1,6 @@
 """The Operation result allows executing math on instvars."""
 import ast
-from typing import Any, Container
+from typing import Any, Container, NoReturn
 
 from precomp import conditions
 from srctools import Keyvalues, Vec, Entity, conv_bool
@@ -45,37 +45,37 @@ class Checker(ast.NodeVisitor):
     def __init__(self, var_names: Container[str]) -> None:
         self.var_names = var_names
 
-    def generic_visit(self, node: ast.AST):
+    def generic_visit(self, node: ast.AST) -> NoReturn:
         """All other nodes are invalid."""
         raise ValueError(f'A {type(node).__name__} is not permitted!')
 
-    def visit_Name(self, node: ast.Name):
+    def visit_Name(self, node: ast.Name) -> None:
         """A variable name."""
         if node.id not in self.var_names:
             raise NameError(f'Invalid variable name "{node.id}"')
         if not isinstance(node.ctx, ast.Load):
             raise ValueError('Only reading variables is supported!')
 
-    def safe_visit(self, node: ast.AST):
+    def safe_visit(self, node: ast.AST) -> None:
         """These are safe, we don't care about them - just contents."""
         super().generic_visit(node)
 
-    def visit_BoolOp(self, node: ast.BoolOp):
+    def visit_BoolOp(self, node: ast.BoolOp) -> None:
         """and, or, etc"""
         for val in node.values:
             self.visit(val)
 
-    def visit_BinOp(self, node: ast.BinOp):
+    def visit_BinOp(self, node: ast.BinOp) -> None:
         """Math operators, etc."""
         # Don't visit the operator.
         self.visit(node.left)
         self.visit(node.right)
 
-    def visit_UnaryOp(self, node: ast.UnaryOp):
+    def visit_UnaryOp(self, node: ast.UnaryOp) -> None:
         """-a, +a, not a, ~a."""
         self.visit(node.operand)
 
-    def visit_Compare(self, node: ast.Compare):
+    def visit_Compare(self, node: ast.Compare) -> None:
         """ < comps etc."""
         try:
             ops = node.ops

@@ -1,11 +1,12 @@
 """A Widget for allowing selecting a colour."""
 from __future__ import annotations
-from typing import Iterable
+from typing import AsyncIterator, Iterable
 
 from tkinter import ttk
 from tkinter.colorchooser import askcolor
 import tkinter as tk
 
+from config.widgets import TimerNum
 from packages.widgets import UpdateFunc, KIND_COLOR, parse_color
 from app import img, tk_tools
 from app import itemconfig
@@ -38,7 +39,7 @@ async def widget_color_multi(
     parent: tk.Widget, tk_img: TKImages,
     timers: Iterable[itemconfig.TimerNum],
     get_on_changed: itemconfig.MultiChangeFunc,
-):
+) -> AsyncIterator[tuple[TimerNum, UpdateFunc]]:
     """For color swatches, display in a more compact form."""
     for row, column, tim_val, tim_text in itemconfig.multi_grid(timers):
         swatch, update = make_color_swatch(parent, tk_img,get_on_changed(tim_val), 16)

@@ -184,7 +184,7 @@ def is_visible() -> bool:
     return window.winfo_ismapped()
 
 
-def show_prop(widget: UI.PalItem, warp_cursor=False):
+def show_prop(widget: UI.PalItem, warp_cursor: bool = False) -> None:
     """Show the properties window for an item.
 
     wid should be the UI.PalItem widget that represents the item.

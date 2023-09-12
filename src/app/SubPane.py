@@ -174,7 +174,7 @@ class SubPane(tk.Toplevel):
             self.relY = self.winfo_y() - self.parent.winfo_y()
             self.save_conf()
 
-    def follow_main(self, e=None) -> None:
+    def follow_main(self, e: object = None) -> None:
         """When the main window moves, sub-windows should move with it."""
         self.allow_snap = False
         x, y = tk_tools.adjust_inside_screen(
@@ -182,7 +182,7 @@ class SubPane(tk.Toplevel):
             y=self.parent.winfo_y()+self.relY,
             win=self,
         )
-        self.geometry('+'+str(x)+'+'+str(y))
+        self.geometry(f'+{x}+{y}')
         self.parent.focus()
 
     def save_conf(self) -> None:

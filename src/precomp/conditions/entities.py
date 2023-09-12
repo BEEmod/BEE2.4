@@ -11,7 +11,7 @@ LOGGER = srctools.logger.get_logger(__name__, alias='cond.entities')
 
 
 @conditions.make_result('TemplateOverlay')
-def res_insert_overlay(vmf: VMF, res: Keyvalues):
+def res_insert_overlay(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
     """Use a template to insert one or more overlays on a surface.
 
     Options:

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from enum import Enum
-from typing import Callable, List, Tuple
+from typing import Callable, Iterator, List, Tuple
 
 from srctools import FrozenMatrix, VMF, Vec, FrozenVec, Solid, Keyvalues, Entity, Angle, Matrix
 import srctools.logger
@@ -529,7 +529,7 @@ def make_glass_grating(
     barr_type: BarrierType,
     front_temp: template_brush.ScalingTemplate,
     solid_func: Callable[[float, float, str], list[Solid]],
-):
+) -> None:
     """Make all the brushes needed for glass/grating.
 
     solid_func() is called with two offsets from the voxel edge, and returns a
@@ -590,7 +590,7 @@ def make_glass_grating(
         phys_clip.solids = solid_func(0, 2, consts.Tools.TRIGGER)
 
 
-def add_glass_floorbeams(vmf: VMF, temp_name: str):
+def add_glass_floorbeams(vmf: VMF, temp_name: str) -> None:
     """Add beams to separate large glass panels.
 
     The texture is assumed to match plasticwall004a's shape.
@@ -617,7 +617,7 @@ def add_glass_floorbeams(vmf: VMF, temp_name: str):
 
     # First we want to find all the groups of contiguous glass sections.
     # This is a mapping from some glass piece to its group list.
-    groups = {}
+    groups: dict[FrozenVec, list[FrozenVec]] = {}
 
     for (origin, normal), barr_type in BARRIERS.items():
         # Grating doesn't use it.
@@ -658,14 +658,14 @@ def add_glass_floorbeams(vmf: VMF, temp_name: str):
                     groups[pos] = large_group
 
     # Remove duplicate objects by using the ID as key..
-    groups = list({
+    group_list = list({
         id(group): group
         for group in groups.values()
     }.values())
 
     # Side -> u, v or None
 
-    for group in groups:
+    for group in group_list:
         bbox_min, bbox_max = Vec.bbox(group)
         dimensions = bbox_max - bbox_min
 
@@ -724,7 +724,7 @@ def add_glass_floorbeams(vmf: VMF, temp_name: str):
                 detail.solids.append(new_beam)
 
 
-def beam_hole_split(axis: str, min_pos: Vec, max_pos: Vec):
+def beam_hole_split(axis: str, min_pos: Vec, max_pos: Vec) -> Iterator[tuple[Vec, Vec]]:
     """Break up floor beams to fit around holes."""
 
     # Go along the shape. For each point, check if a hole is present,

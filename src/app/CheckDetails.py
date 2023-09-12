@@ -408,10 +408,10 @@ class CheckDetails(ttk.Frame, Generic[UserT]):
         else:
             self.event_generate(EVENT_NO_CHECKS)
 
-    def refresh(self, _=None) -> None:
+    def refresh(self, _: tk.Event[tk.Misc] | None = None) -> None:
         """Reposition the widgets.
 
-        Must be called when self.items is changed,
+        Must be called when `self.items` is changed,
         or when window is resized.
         """
         # Don't bother if the window isn't actually visible.

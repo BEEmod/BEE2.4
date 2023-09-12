@@ -21,10 +21,13 @@ from typing import Optional, Iterable, Dict, List, Sequence, Set, Tuple, Iterato
 import user_errors
 
 
+__all__ = [
+    'InputType', 'FeatureMode', 'Config', 'ConnType', 'OutNames',
+    'ITEMS', 'ShapeSignage', 'Item', 'Connection',
+    'read_configs', 'calc_connections', 'gen_item_outputs'
+]
 COND_MOD_NAME = "Item Connections"
-
 LOGGER = srctools.logger.get_logger(__name__)
-
 ITEM_TYPES: Dict[str, Optional[Config]] = {}
 
 # Targetname -> item
@@ -341,15 +344,13 @@ class Item:
 class Connection:
     """Represents a connection between two items."""
 
-    __slots__ = [
-        '_to', '_from', 'type', 'outputs',
-    ]
+    __slots__ = ['_to', '_from', 'type', 'outputs']
     def __init__(
         self,
         to_item: Item,   # Item this is triggering
         from_item: Item,  # Item this comes from
-        conn_type=ConnType.DEFAULT,
-        outputs: Iterable[Output]=(),
+        conn_type: ConnType = ConnType.DEFAULT,
+        outputs: Iterable[Output] = (),
     ) -> None:
         self._to = to_item
         self._from = from_item
@@ -379,7 +380,7 @@ class Connection:
         return self._to
 
     @to_item.setter
-    def to_item(self, item: Item):
+    def to_item(self, item: Item) -> None:
         self._to.inputs.discard(self)
         self._to = item
         item.inputs.add(self)

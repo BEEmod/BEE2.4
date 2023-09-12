@@ -411,7 +411,7 @@ def make_bend(
     origin_b: Vec,
     norm_a: Vec,
     norm_b: Vec,
-    config,
+    config: Config,
     max_size: int,
     is_start: bool = False,
 ) -> None:
@@ -469,10 +469,10 @@ def make_ubend(
     origin_a: Vec,
     origin_b: Vec,
     normal: Vec,
-    config,
+    config: Config,
     max_size: int,
     is_start: bool = False,
-):
+) -> None:
     """Create U-shaped bends."""
     offset = origin_b - origin_a
 

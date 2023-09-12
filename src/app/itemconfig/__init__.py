@@ -443,7 +443,7 @@ async def make_pane(
 
     await tk_tools.wait_eventloop()
 
-    def canvas_reflow(_) -> None:
+    def canvas_reflow(_: tk.Event[tk.Canvas]) -> None:
         """Update canvas when the window resizes."""
         canvas['scrollregion'] = canvas.bbox('all')
 
@@ -493,7 +493,7 @@ def multi_grid(
         yield row, column, tim, tim_disp
 
 
-def widget_sfx(*args) -> None:
+def widget_sfx(*args: object) -> None:
     """Play sounds when interacting."""
     sound.fx_blockable('config')
 
@@ -526,7 +526,7 @@ async def widget_item_variant(
         nonlocal version_lookup
         version_lookup = contextWin.set_version_combobox(combobox, item)
 
-    def change_callback(e: tk.Event=None):
+    def change_callback(e: Optional[tk.Event[tk.Misc]] = None) -> None:
         """Change the item version."""
         item.change_version(version_lookup[combobox.current()])
 

@@ -6,6 +6,7 @@ from enum import Enum
 from typing import Iterator, List, Tuple, TypedDict, Dict, Optional
 from configparser import SectionProxy
 
+import tkinter
 from tkinter import *
 from tkinter import font
 from tkinter import ttk
@@ -97,13 +98,13 @@ win = Toplevel(TK_ROOT, name='voiceEditor')
 win.withdraw()
 
 
-def quit(event=None):
+def quit(event: object = None) -> None:
     """Close the window."""
     win.grab_release()
     win.wm_withdraw()
 
 
-def init_widgets():
+def init_widgets() -> None:
     """Make all the window components."""
     win.columnconfigure(0, weight=1)
     win.transient(master=TK_ROOT)
@@ -198,7 +199,7 @@ def check_toggled(var: BooleanVar, config_section: SectionProxy, quote_id: str) 
     config_section[quote_id] = srctools.bool_as_int(var.get())
 
 
-def save():
+def save() -> None:
     global voice_item
     if voice_item is not None:
         voice_item = None
@@ -535,7 +536,7 @@ def find_resp_lines(quote_block: Keyvalues) -> Iterator[Tuple[
         yield [], prop, f'line_{index}'
 
 
-def get_trans_lines(trans_block):
+def get_trans_lines(trans_block: Keyvalues) -> Iterator[Tuple[str, str]]:
     for prop in trans_block:
         if prop.name == 'trans':
             if ':' in prop.value:
