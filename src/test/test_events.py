@@ -13,7 +13,7 @@ async def func_unary(arg: object) -> None:
 
 async def test_simple_register() -> None:
     """Test registering events."""
-    event = Event[[int]]()
+    event = Event[int]()
     func1 = create_autospec(func_unary, name='func1')
     func2 = create_autospec(func_unary, name='func2')
 

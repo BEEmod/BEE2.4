@@ -212,7 +212,8 @@ def get_intersect_testcases() -> Iterable[tuple[tuple[tuple3, tuple3] | None, tu
                 test = solid
         if test is None:
             raise ValueError(ent.id)
-        yield (process(test), process(expected))
+        # Unpack mins/maxes for test, it's always present.
+        yield (*process(test), process(expected))
 
 
 @pytest.mark.parametrize('mins, maxs, success', list(get_intersect_testcases()))
