@@ -45,6 +45,8 @@ class GenOptions(config.Data, conf_name='Options', palette_stores=False, version
     # Split from preserve_resources, before v2 use that value.
     preserve_fgd: bool = False
     dev_mode: bool = attrs.field(default=False, metadata={'legacy': 'Debug:development_mode'})
+    # If the user has accepted the warning on the developer options page.
+    accepted_dev_warning: bool = False
     log_missing_ent_count: bool = attrs.field(default=False, metadata={'legacy': 'Debug'})
     log_missing_styles: bool = attrs.field(default=False, metadata={'legacy': 'Debug'})
     log_item_fallbacks: bool = attrs.field(default=False, metadata={'legacy': 'Debug'})

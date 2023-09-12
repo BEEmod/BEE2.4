@@ -14,6 +14,7 @@
   items (Delayers). This allows them to show both count-down and count-up displays.
 * Moved various palette-related buttons, to group them with the other palette options.
 * A VPK file can be now placed into `vpk_override` to have it be combined with the built VPK. 
+* Added a warning screen to the developer tab of the options window, indicating that some of these options can temporarily break BEE if changed.
 
 ### UCP-Relevant Enhancements:
 * Added an `Inherit` option to Corridor Groups. This specifies the ID of another style, causing all

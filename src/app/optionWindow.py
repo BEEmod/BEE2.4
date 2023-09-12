@@ -172,6 +172,7 @@ async def init_widgets(
     reset_all_win: Callable[[], object],
 ) -> None:
     """Create all the widgets."""
+    conf: GenOptions = config.APP.get_cur_conf(GenOptions)
     nbook = ttk.Notebook(win)
     nbook.grid(
         row=0,
@@ -192,6 +193,34 @@ async def init_widgets(
     fr_dev = ttk.Frame(nbook)
     nbook.add(fr_dev)
 
+    fr_dev_options = ttk.Frame(fr_dev)
+    fr_dev.grid_columnconfigure(0, weight=1)
+    fr_dev.grid_rowconfigure(1, weight=1)
+    # Add a warning splash to the dev screen.
+    if conf.accepted_dev_warning:
+        fr_dev_options.grid(row=0, column=0, rowspan=2, sticky='NSEW')
+    else:
+        def accept_warning() -> None:
+            """Accept the warning message."""
+            fr_dev_options.grid(row=0, column=0, rowspan=2, sticky='NSEW')
+            config.APP.store_conf(attrs.evolve(
+                config.APP.get_cur_conf(GenOptions),
+                accepted_dev_warning=True,
+            ))
+            warning_btn.destroy()
+            warning_lbl.destroy()
+
+        warning_lbl = ttk.Label(fr_dev, justify="center")
+        warning_btn = ttk.Button(fr_dev, command=accept_warning)
+        localisation.set_text(warning_lbl, TransToken.ui(
+            "Options on the development tab are intended for package authors\n"
+            "and debugging purposes. Changing these may prevent BEEmod\n"
+            "from functioning correctly until reverted to their original settings."
+        ))
+        localisation.set_text(warning_btn, TransToken.ui("Enable development options"))
+        warning_lbl.grid(row=0, column=0)
+        warning_btn.grid(row=1, column=0)
+
     @localisation.add_callback(call=True)
     def set_tab_names() -> None:
         """Set the tab names, when translations refresh."""
@@ -202,7 +231,7 @@ async def init_widgets(
     async with trio.open_nursery() as nursery:
         nursery.start_soon(init_gen_tab, fr_general, unhide_palettes)
         nursery.start_soon(init_win_tab, fr_win, reset_all_win)
-        nursery.start_soon(init_dev_tab, fr_dev)
+        nursery.start_soon(init_dev_tab, fr_dev_options)
 
     ok_cancel = ttk.Frame(win)
     ok_cancel.grid(row=1, column=0, padx=5, pady=5, sticky='E')
