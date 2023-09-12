@@ -35,6 +35,7 @@ import importlib
 import math
 import pkgutil
 import sys
+import types
 import typing
 import warnings
 from collections.abc import Mapping
@@ -78,7 +79,7 @@ ALL_RESULTS: list[tuple[str, tuple[str, ...], CondCall[object]]] = []
 ALL_META: list[tuple[str, Decimal, CondCall[object]]] = []
 
 
-CallableT = TypeVar('CallableT', bound=Callable)
+CallableT = TypeVar('CallableT', bound=Callable[..., object])
 # The return values for 2-stage results and flags.
 FlagCallable = Callable[[Entity], bool]
 ResultCallable = Callable[[Entity], object]
@@ -433,14 +434,16 @@ def annotation_caller(
 
 
 @functools.lru_cache(maxsize=None)
-def _make_reorderer(inputs: str, outputs: str) -> Callable[[Callable], Callable]:
+def _make_reorderer(inputs: str, outputs: str) -> Callable[[Callable[..., object]], Callable[..., None]]:
     """Build a function that does reordering for annotation caller.
 
     This allows the code objects to be cached.
     It's a closure over the function, to allow reference to the function more directly.
     This also means it can be reused for other funcs with the same order.
     """
-    return eval(f'lambda func: lambda {inputs}: func({outputs})')
+    func = eval(f'lambda func: lambda {inputs}: func({outputs})')
+    assert isinstance(func, types.FunctionType)
+    return func
 
 
 CallResultT = TypeVar('CallResultT')
@@ -547,14 +550,14 @@ class CondCall(Generic[CallResultT]):
 def _get_cond_group(func: Any) -> str:
     """Get the condition group hint for a function."""
     try:
-        return func.__globals__['COND_MOD_NAME']
+        return str(func.__globals__['COND_MOD_NAME'])
     except KeyError:
         group = func.__globals__['__name__']
         LOGGER.warning('No name for module "{}"!', group)
-        return group
+        return str(group)
 
 
-def add_meta(func: Callable[..., object], priority: Decimal | int, only_once=True) -> None:
+def add_meta(func: Callable[..., object], priority: Decimal | int, only_once: bool = True) -> None:
     """Add a metacondition, which executes a function at a priority level.
 
     Used to allow users to allow adding conditions before or after a
@@ -871,7 +874,7 @@ def dump_conditions(file: TextIO) -> None:
         dump_func_docs(file, func)
         file.write('\n')
 
-    all_cond_types: list[tuple[list[tuple[str, tuple[str, ...], CondCall]], str]] = [
+    all_cond_types: list[tuple[list[tuple[str, tuple[str, ...], CondCall[Any]]], str]] = [
         (ALL_FLAGS, 'Flags'),
         (ALL_RESULTS, 'Results'),
     ]
@@ -881,7 +884,7 @@ def dump_conditions(file: TextIO) -> None:
         print('<!------->', file=file)
 
         lookup_grouped: dict[str, list[
-            tuple[str, tuple[str, ...], CondCall]
+            tuple[str, tuple[str, ...], CondCall[Any]]
         ]] = defaultdict(list)
 
         for flag_key, aliases, func in lookup:
@@ -922,7 +925,7 @@ def dump_conditions(file: TextIO) -> None:
                 file.write('\n')
 
 
-def dump_func_docs(file: TextIO, func: Callable) -> None:
+def dump_func_docs(file: TextIO, func: Callable[..., object]) -> None:
     """Write the documentation for this function to the file."""
     import inspect
     docs = inspect.getdoc(func)

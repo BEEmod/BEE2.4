@@ -475,7 +475,7 @@ class Item(PakObject, needs_foreground=True, export_priority=-10):
         self.folders = folders
 
     @classmethod
-    async def parse(cls, data: ParseData):
+    async def parse(cls, data: ParseData) -> Self:
         """Parse an item definition."""
         versions: dict[str, UnParsedVersion] = {}
         def_version: UnParsedVersion | None = None
@@ -784,7 +784,7 @@ class ItemConfig(PakObject, allow_mult=True):
     """
     def __init__(
         self,
-        it_id,
+        it_id: str,
         all_conf: lazy_conf.LazyConf,
         version_conf: dict[str, dict[str, lazy_conf.LazyConf]],
     ) -> None:

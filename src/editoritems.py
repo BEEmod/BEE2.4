@@ -20,7 +20,7 @@ from transtoken import TransToken, TransTokenSource
 
 
 __all__ = [
-    "ItemProp", "ItemPropKind", "PROP_TYPES",  "ConnConfig", "InputType", "OutNames", # Re-export
+    "ItemProp", "ItemPropKind", "PROP_TYPES",  "ConnConfig", "InputType", "OutNames", "FSPath",  # Re-export
     "ItemClass", "RenderableType", "Handle", "Surface", "DesiredFacing", "FaceType", "OccuType",
     "Sound", "Anim", "ConnTypes", "Connection", "InstCount", "Coord", "EmbedFace", "Overlay",
     "ConnSide", "AntlinePoint", "OccupiedVoxel", "Renderable", "SubType", "Item",

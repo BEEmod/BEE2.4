@@ -36,6 +36,11 @@ import utils
 import consts
 
 
+__all__ = [
+    'TileSize', 'Portalable',
+    'TILETYPE_FROM_CHAR', 'TILETYPE_TO_CHAR', 'PanelType', 'Panel', 'round_grid', 'TileDef',
+    'analyse_map', 'generate_brushes',
+]
 LOGGER = srctools.logger.get_logger(__name__)
 
 # Face surfaces used to generate tiles.

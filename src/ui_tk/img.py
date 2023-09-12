@@ -36,12 +36,12 @@ def get_app_icon(path: str) -> ImageTk.PhotoImage:
         return ImageTk.PhotoImage(Image.open(f))
 
 
-def _on_destroyed(e: tk.Event) -> None:
+def _on_destroyed(e: tk.Event[tk.Misc]) -> None:
     """When widgets are destroyed, clear their associated images."""
     if isinstance(e.widget, tk.Text):
         _on_textwid_destroyed(e.widget)
         return
-    user = label_to_user.pop(e.widget, None)
+    user = label_to_user.pop(e.widget, None)  # type: ignore
     if user is None:
         # It's not got an image.
         return

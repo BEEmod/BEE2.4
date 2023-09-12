@@ -163,7 +163,7 @@ def track_scan(
     start_track: Entity,
     middle_file: str,
     x_dir: int,
-):
+) -> None:
     """Build a set of track instances extending from a point.
     :param track_inst: A dictionary mapping origins to track instances
     :param start_track: The instance we start on

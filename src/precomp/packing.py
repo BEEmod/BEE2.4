@@ -59,14 +59,14 @@ def pack_files(
 
 
 @conditions.make_result('Pack')
-def res_packlist(vmf: VMF, res: Keyvalues):
+def res_packlist(vmf: VMF, res: Keyvalues) -> object:
     """Pack files from a packing list."""
     pack_list(vmf, res.value)
     return conditions.RES_EXHAUSTED
 
 
 @conditions.make_result('PackFile')
-def pack_file_cond(vmf: VMF, res: Keyvalues):
+def pack_file_cond(vmf: VMF, res: Keyvalues) -> object:
     """Adda single file to the map."""
     pack_files(vmf, res.value)
     return conditions.RES_EXHAUSTED

@@ -19,7 +19,7 @@ if '__class_getitem__' not in vars(tk.Event):
     # Patch in it being generic, by replacing it with a copy that subclasses Generic.
     _W_co = TypeVar("_W_co", covariant=True, bound=tk.Misc)
     _W_co.__module__ = 'tkinter'
-    tk.Event = new_class(
+    tk.Event = new_class(  # type: ignore
         'Event', (Generic[_W_co], ),
         exec_body=lambda ns: ns.update(vars(tk.Event)),
     )

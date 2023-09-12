@@ -845,12 +845,12 @@ async def export_editoritems(pal_ui: paletteUI.PaletteUI, bar: MenuBar) -> None:
         bar.set_export_allowed(True)
 
 
-def set_disp_name(item: PalItem, e=None) -> None:
+def set_disp_name(item: PalItem, e: Optional[tk.Event[tk.Misc]] = None) -> None:
     """Callback to display the name of the item."""
     localisation.set_text(UI['pre_disp_name'], item.name)
 
 
-def clear_disp_name(e=None) -> None:
+def clear_disp_name(e: Optional[tk.Event[tk.Misc]] = None) -> None:
     """Callback to reset the item name."""
     localisation.set_text(UI['pre_disp_name'], TransToken.BLANK)
 

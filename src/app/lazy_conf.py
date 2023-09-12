@@ -1,6 +1,6 @@
 """Implements callables which lazily parses and combines config files."""
 from __future__ import annotations
-from typing import Callable, Pattern
+from typing import Any, Callable, Pattern
 import functools
 
 import trio
@@ -66,7 +66,7 @@ def from_file(path: utils.PackagePath, missing_ok: bool=False, source: str= '') 
 	return loader
 
 
-async def devmod_check(file: File, path: utils.PackagePath) -> None:
+async def devmod_check(file: File[Any], path: utils.PackagePath) -> None:
 	"""In dev mode, parse files in the background to ensure they exist and have valid syntax."""
 	# Parse immediately, to check syntax.
 	try:

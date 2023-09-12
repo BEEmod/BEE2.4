@@ -18,7 +18,7 @@ import math
 import pickle
 import gettext
 import json
-from typing import List
+from typing import Any, List
 
 from hypercorn.config import Config
 from hypercorn.trio import serve
@@ -62,7 +62,7 @@ async def route_display_errors() -> str:
 
 
 @app.route('/displaydata')
-async def route_render_data() -> dict:
+async def route_render_data() -> dict[str, Any]:
     """Return the geometry for rendering the current error."""
     return {
         'tiles': current_error.faces,

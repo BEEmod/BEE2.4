@@ -1,5 +1,10 @@
 """Manages the list of textures used for brushes, and how they are applied."""
-from typing import TYPE_CHECKING, Union, Type, Any, Dict, List, Tuple, Optional, Iterable, Set
+from __future__ import annotations
+
+from typing import (
+    NoReturn, TYPE_CHECKING, Union, Type, Any, Dict, List, Tuple, Optional, Iterable,
+    Set,
+)
 from pathlib import Path
 from enum import Enum
 import itertools
@@ -409,10 +414,10 @@ def apply(
     cat: GenCat,
     face: Side,
     tex_name: str,
-    portalable: Portalable=None,
-    normal: Vec=None,
-    loc: Vec=None
-):
+    portalable: Portalable | None = None,
+    normal: Vec | None = None,
+    loc: Vec | None = None,
+) -> None:
     """Apply directly to a face, optionally using that to retrieve the location."""
     if cat is GenCat.SPECIAL or cat is GenCat.OVERLAYS:
         generator = GENERATORS[cat]
@@ -801,7 +806,7 @@ class Generator(abc.ABC):
     def setup(self, vmf: VMF, tiles: List['TileDef']) -> None:
         """Scan tiles in the map and set up the generator."""
 
-    def _missing_error(self, tex_name: str):
+    def _missing_error(self, tex_name: str) -> NoReturn:
         return ValueError(f'Bad texture name: {tex_name}\n Allowed: {list(self.textures.keys())!r}')
 
     @abc.abstractmethod
@@ -845,7 +850,7 @@ class GenRandom(Generator):
             if type(default) != str:
                 self.enum_data[id(default)] = key
 
-    def _get(self, loc: Vec, tex_name: str):
+    def _get(self, loc: Vec, tex_name: str) -> str:
         if type(tex_name) != str:
             try:
                 tex_name = self.enum_data[id(tex_name)]

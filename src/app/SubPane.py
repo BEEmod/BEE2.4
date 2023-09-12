@@ -159,11 +159,11 @@ class SubPane(tk.Toplevel):
         self.relY = y - self.parent.winfo_y()
         self.save_conf()
 
-    def enable_snap(self, e: Optional[tk.Event]=None) -> None:
+    def enable_snap(self, e: Optional[tk.Event[tk.Misc]] = None) -> None:
         """Allow the window to snap."""
         self.allow_snap = True
 
-    def snap_win(self, e=None) -> None:
+    def snap_win(self, e: Optional[tk.Event[tk.Misc]] = None) -> None:
         """Callback for window movement.
 
         This allows it to snap to the edge of the main window.

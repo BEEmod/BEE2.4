@@ -310,7 +310,7 @@ def make_straight(
     normal: Vec,
     dist: int,
     config: Config,
-    is_start=False,
+    is_start: bool = False,
 ) -> None:
     """Make a straight line of instances from one point to another."""
     angles = round(normal, 6).to_angle()
@@ -413,7 +413,7 @@ def make_bend(
     norm_b: Vec,
     config,
     max_size: int,
-    is_start=False,
+    is_start: bool = False,
 ) -> None:
     """Make a corner and the straight sections leading into it."""
     off = origin_b - origin_a
@@ -471,7 +471,7 @@ def make_ubend(
     normal: Vec,
     config,
     max_size: int,
-    is_start=False,
+    is_start: bool = False,
 ):
     """Create U-shaped bends."""
     offset = origin_b - origin_a

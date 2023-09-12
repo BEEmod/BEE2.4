@@ -1,6 +1,6 @@
 """Customizable configuration for specific items or groups of them."""
 from typing import (
-    Awaitable, Callable, Dict, Generic, Iterable, Iterator, List, Optional, Protocol, Set,
+    Any, Awaitable, Callable, Dict, Generic, Iterable, Iterator, List, Optional, Protocol, Set,
     Tuple, Type, TypeVar,
 )
 from typing_extensions import Self, TypeAlias
@@ -48,7 +48,7 @@ class WidgetTypeWithConf(WidgetType, Generic[ConfT]):
 
 # Maps widget type names to the type info.
 WIDGET_KINDS: Dict[str, WidgetType] = {}
-CLS_TO_KIND: Dict[Type[ConfigProto], WidgetTypeWithConf] = {}
+CLS_TO_KIND: Dict[Type[ConfigProto], WidgetTypeWithConf[Any]] = {}
 UpdateFunc: TypeAlias = Callable[[str], Awaitable[None]]
 
 CONFIG = BEE2_config.ConfigFile('item_cust_configs.cfg')

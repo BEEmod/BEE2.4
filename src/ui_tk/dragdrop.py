@@ -40,13 +40,13 @@ class GeoManager(Enum):
 def _make_placer(
     func: Callable[Concatenate[ttk.Label, ArgsT], object],
     kind: GeoManager,
-) -> Callable[Concatenate[DragDrop[ItemT, Any], Slot[ItemT], ArgsT], None]:
+) -> Callable[Concatenate[DragDrop[ItemT], Slot[ItemT], ArgsT], None]:
     """Calls the original place/pack/grid method, telling the slot which was used.
 
     This allows propagating the original method args and types.
     """
     def placer(
-        self: DragDrop[ItemT, Any], slot: Slot[ItemT], /,
+        self: DragDrop[ItemT], slot: Slot[ItemT], /,
         *args: ArgsT.args, **kwargs: ArgsT.kwargs,
     ) -> None:
         """Call place/pack/grid on the label."""
@@ -121,7 +121,7 @@ class DragDrop(ManagerBase[ItemT, tk.Misc], Generic[ItemT]):
         self,
         parent: Union[tk.Tk, tk.Toplevel],
         *,
-        info_cb: InfoCB,
+        info_cb: InfoCB[ItemT],
         size: Tuple[int, int]=(64, 64),
         config_icon: bool=False,
         pick_flexi_group: Optional[FlexiCB]=None,
@@ -206,7 +206,7 @@ class DragDrop(ManagerBase[ItemT, tk.Misc], Generic[ItemT]):
             TK_IMG.apply(info_btn, img.Handle.builtin('icons/gear', 10, 10))
 
             @tk_tools.bind_leftclick(info_btn)
-            def info_button_click(e: tk.Event) -> object:
+            def info_button_click(e: tk.Event[tk.Label]) -> object:
                 """Trigger the callback whenever the gear button was pressed."""
                 self._on_configure(slot)
                 # Cancel the event sequence, so it doesn't travel up to the main
@@ -296,19 +296,19 @@ class DragDrop(ManagerBase[ItemT, tk.Misc], Generic[ItemT]):
         else:
             self._drag_win['cursor'] = tk_tools.Cursors.DESTROY_ITEM
 
-    def _evt_move(self, evt: tk.Event) -> None:
+    def _evt_move(self, evt: tk.Event[tk.Misc]) -> None:
         """Event fired when the drag window is being moved."""
         self._on_move(evt.x_root, evt.y_root)
 
-    def _evt_stop(self, evt: tk.Event) -> None:
+    def _evt_stop(self, evt: tk.Event[tk.Misc]) -> None:
         """Event fired when dragging should stop."""
         self._on_stop(evt.x_root, evt.y_root)
 
     # These call the method on the label, setting our attrs.
     # Type-ignore because these are defined on Grid/Place/Pack, not Label...
-    slot_grid = _make_placer(ttk.Label.grid_configure, GeoManager.GRID)  # type: ignore[arg-type]
-    slot_place = _make_placer(ttk.Label.place_configure, GeoManager.PLACE)  # type: ignore[arg-type]
-    slot_pack = _make_placer(ttk.Label.pack_configure, GeoManager.PACK)  # type: ignore[arg-type]
+    slot_grid = _make_placer(ttk.Label.grid_configure, GeoManager.GRID)  # type: ignore[arg-type, var-annotated]
+    slot_place = _make_placer(ttk.Label.place_configure, GeoManager.PLACE)  # type: ignore[arg-type, var-annotated]
+    slot_pack = _make_placer(ttk.Label.pack_configure, GeoManager.PACK)  # type: ignore[arg-type, var-annotated]
 
     def slot_canvas(self, slot: Slot[ItemT], canv: tk.Canvas, x: int, y: int, tag: str) -> None:
         """Position this slot on a canvas."""

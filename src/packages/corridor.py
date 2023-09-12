@@ -23,7 +23,7 @@ from corridor import (
     CORRIDOR_COUNTS, ID_TO_CORR,
     Corridor, ExportedConf,
 )
-from transtoken import TransToken
+from transtoken import TransToken, TransTokenSource
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -312,7 +312,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True, export_priority=10):
                             )
                         dup_check.add(folded)
 
-    def iter_trans_tokens(self) -> Iterator[packages.TransTokenSource]:
+    def iter_trans_tokens(self) -> Iterator[TransTokenSource]:
         """Iterate over translation tokens in the corridor."""
         for (mode, direction, orient), corridors in self.corridors.items():
             source = f'corridors/{self.id}.{mode.value}_{direction.value}_{orient.value}'

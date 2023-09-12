@@ -256,7 +256,7 @@ def set_pack_dump_enabled() -> None:
         UI['packfile_filefield'].grid_remove()
 
 
-def find_screenshot(e=None) -> None:
+def find_screenshot(e: tk.Event[ttk.Label] | None = None) -> None:
     """Prompt to browse for a screenshot."""
     file_name = filedialog.askopenfilename(
         title='Find Screenshot',
@@ -371,7 +371,7 @@ async def make_widgets(tk_img: TKImages) -> None:
         nursery.start_soon(make_map_widgets, map_frame)
         nursery.start_soon(make_comp_widgets, comp_frame, tk_img)
 
-    def update_label(e) -> None:
+    def update_label(e: tk.Event[tk.Misc]) -> None:
         """Force the top label to wrap."""
         reload_lbl['wraplength'] = window.winfo_width() - 10
 
@@ -730,7 +730,7 @@ async def make_map_widgets(frame: ttk.Frame) -> None:
         start_ind = PLAYER_MODEL_ORDER.index('PETI')
     player_mdl.current(start_ind)
 
-    def set_model(_: tk.Event) -> None:
+    def set_model(_: tk.Event[ttk.Combobox]) -> None:
         """Save the selected player model."""
         model = PLAYER_MODEL_ORDER[player_mdl.current()]
         config.APP.store_conf(attrs.evolve(

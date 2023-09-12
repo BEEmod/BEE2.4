@@ -3,6 +3,7 @@ import io
 import uuid
 
 from srctools import Keyvalues, bool_as_int
+from pytest_regressions.file_regression import FileRegressionFixture
 import pytest
 
 import config
@@ -101,7 +102,7 @@ def test_parse_kv1_upgrades(value: str, triple: str) -> None:
 
 @pytest.mark.parametrize('triple', ['a', 'b', 'c'])
 @pytest.mark.parametrize('value', ['val1', 'val2'])
-def test_export_kv1_regress(value: str, triple: str, file_regression) -> None:
+def test_export_kv1_regress(value: str, triple: str, file_regression: FileRegressionFixture) -> None:
     """Test exporting KV1 produces the same result."""
     spec = config.ConfigSpec(None)
     spec.register(DataSingle)
@@ -122,7 +123,7 @@ def test_export_kv1_regress(value: str, triple: str, file_regression) -> None:
 
 @pytest.mark.parametrize('triple', ['a', 'b', 'c'])
 @pytest.mark.parametrize('value', ['val1', 'val2'])
-def test_export_dmx_regress(value: str, triple: str, file_regression) -> None:
+def test_export_dmx_regress(value: str, triple: str, file_regression: FileRegressionFixture) -> None:
     """Test exporting DMX produces the same result."""
     spec = config.ConfigSpec(None)
     spec.register(DataSingle)

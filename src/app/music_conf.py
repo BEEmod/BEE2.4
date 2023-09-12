@@ -1,5 +1,5 @@
 """Handles the music configuration UI."""
-from typing import Dict, Iterable, Optional, List
+from typing import Any, Dict, Iterable, Optional, List
 from tkinter import ttk
 import tkinter
 
@@ -24,7 +24,7 @@ BTN_CONTRACT_HOVER = '▲'
 
 LOGGER = srctools.logger.get_logger(__name__)
 
-WINDOWS: Dict[MusicChannel, SelectorWin] = {}
+WINDOWS: Dict[MusicChannel, SelectorWin[...]] = {}
 SEL_ITEMS: Dict[str, SelItem] = {}
 # If the per-channel selector boxes are currently hidden.
 is_collapsed: bool = False
@@ -34,8 +34,9 @@ TRANS_BASE_COLL = TransToken.ui('Music:')
 TRANS_BASE_EXP = TransToken.ui('Base:')
 
 
-def load_filesystems(systems: Iterable[FileSystem]):
+def load_filesystems(systems: Iterable[FileSystem[Any]]) -> None:
     """Record the filesystems used for each package, so we can sample sounds."""
+    filesystem.systems.clear()
     for system in systems:
         filesystem.add_sys(system, prefix='resources/music_samp/')
 
@@ -201,10 +202,10 @@ async def make_widgets(packset: PackagesSet, frame: ttk.LabelFrame, pane: SubPan
     # Widgets we want to remove when collapsing.
     exp_widgets: list[tkinter.Widget] = []
 
-    def toggle_btn_enter(event=None):
+    def toggle_btn_enter(event: Optional[tkinter.Event[ttk.Label]] = None) -> None:
         toggle_btn['text'] = BTN_EXPAND_HOVER if is_collapsed else BTN_CONTRACT_HOVER
 
-    def toggle_btn_exit(event=None):
+    def toggle_btn_exit(event: Optional[tkinter.Event[ttk.Label]] = None) -> None:
         toggle_btn['text'] = BTN_EXPAND if is_collapsed else BTN_CONTRACT
 
     def set_collapsed() -> None:
@@ -235,7 +236,7 @@ async def make_widgets(packset: PackagesSet, frame: ttk.LabelFrame, pane: SubPan
         pane.update_idletasks()
         pane.move()
 
-    def toggle(event: tkinter.Event) -> None:
+    def toggle(event: tkinter.Event[ttk.Label]) -> None:
         if is_collapsed:
             set_expanded()
         else:

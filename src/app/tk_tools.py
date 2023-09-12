@@ -35,8 +35,9 @@ from transtoken import TransToken
 
 ICO_PATH = str(utils.install_path('BEE2.ico'))
 T = TypeVar('T')
+AnyWidT = TypeVar('AnyWidT', bound=tk.Misc)
 WidgetT = TypeVar('WidgetT', bound=tk.Widget)
-EventFunc: TypeAlias = Callable[[tk.Event[WidgetT]], object]
+EventFunc: TypeAlias = Callable[[tk.Event[AnyWidT]], object]
 EventFuncT = TypeVar('EventFuncT', bound=EventFunc[tk.Misc])
 
 
@@ -363,7 +364,7 @@ def make_handler(func: Union[
 
 
 class _EventDeco(Protocol[WidgetT]):
-    def __call__(self, func: EventFunc[WidgetT]) -> EventFunc[WidgetT]:
+    def __call__(self, func: EventFunc[WidgetT], /) -> EventFunc[WidgetT]:
         ...
 
 

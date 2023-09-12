@@ -4,7 +4,7 @@ This allows altering the in-editor wall textures, as well as a few others.
 """
 from __future__ import annotations
 
-from typing import Optional, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 from typing_extensions import Self
 import re
 import os
@@ -47,7 +47,7 @@ class StyleVPK(PakObject):
     These are copied into _dlc3, allowing changing the in-editor wall
     textures.
     """
-    def __init__(self, vpk_id: str, filesys: FileSystem, directory: str) -> None:
+    def __init__(self, vpk_id: str, filesys: FileSystem[Any], directory: str) -> None:
         """Initialise a StyleVPK object."""
         self.id = vpk_id
         self.fsys = filesys

@@ -5,7 +5,7 @@ If PyGame fails to load, all fx() calls will fail silently.
 (Sounds are not critical to the app, so they just won't play.)
 """
 from __future__ import annotations
-from typing import IO, Optional, Callable
+from typing import Any, IO, Optional, Callable
 import os
 import functools
 import shutil
@@ -258,9 +258,9 @@ class SamplePlayer:
         self.start_callback = start_callback
         self.stop_callback = stop_callback
         self.cur_file: Optional[str] = None
-        # The system we need to cleanup.
+        # The system we need to clean up.
         self._handle: Optional[IO[bytes]] = None
-        self._cur_sys: Optional[FileSystem] = None
+        self._cur_sys: Optional[FileSystem[Any]] = None
         self.system: FileSystemChain = system
 
     @property
