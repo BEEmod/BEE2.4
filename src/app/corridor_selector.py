@@ -1,7 +1,7 @@
 """Implements UI for selecting corridors."""
 from tkinter import ttk
 import tkinter as tk
-from typing import Awaitable, Optional, List, Sequence, Callable
+from typing import Any, Optional, List, Sequence
 from typing_extensions import TypeAlias, Final
 
 import srctools.logger
@@ -209,8 +209,8 @@ class Selector:
             fill='black',
         )
 
-        reflow: Callable[[], Awaitable[object]] = self.reflow  # Avoid making self a cell var.
-        self.canvas.bind('<Configure>', lambda e: background_run(reflow))
+        # Avoid making self a cell var.
+        self.canvas.bind('<Configure>', tk_tools.make_handler(self.evt_resized))
 
         self.help_lbl = ttk.Label(self.canvas)
         localisation.set_text(self.help_lbl, TransToken.ui(
@@ -296,7 +296,7 @@ class Selector:
             self.btn_orient.current,
         )
 
-    async def refresh(self, _=None) -> None:
+    async def refresh(self, _: object = None) -> None:
         """Called to update the slots with new items if the corridor set changes."""
         mode = self.btn_mode.current
         direction = self.btn_direction.current
@@ -415,7 +415,7 @@ class Selector:
         ), 'slots')
         pos.resize_canvas()
 
-    def evt_resized(self, _: tk.Event) -> None:
+    async def evt_resized(self) -> None:
         """When the window is resized, save configuration."""
         config.APP.store_conf(UIState(
             self.btn_mode.current,
@@ -424,7 +424,7 @@ class Selector:
             self.win.winfo_width(),
             self.win.winfo_height(),
         ))
-        background_run(self.reflow)
+        await self.reflow()
 
     async def evt_hover_enter(self, slot: Slot) -> None:
         """Display the specified corridor temporarily on hover."""
@@ -526,7 +526,7 @@ async def test() -> None:
     from app import background_run
     from typing import Dict
     from ui_tk.img import TK_IMG
-    background_run(img.init, Dict[str, srctools.FileSystem](), TK_IMG)
+    background_run(img.init, Dict[str, srctools.FileSystem[Any]](), TK_IMG)
     background_run(sound.sound_task)
 
     test_sel = Selector(packages.get_loaded_packages(), TK_IMG)
