@@ -22,16 +22,6 @@ COND_MOD_NAME = None
 LOGGER = srctools.logger.get_logger(__name__, alias='cond._scaffold_compat')
 
 
-def scaff_scan(inst_list, start_ent):
-    """Given the start item and instance list, follow the programmed path."""
-    cur_ent = start_ent
-    while True:
-        yield cur_ent
-        cur_ent = inst_list.get(cur_ent['next'], None)
-        if cur_ent is None:
-            return
-
-
 def get_config(
     node: item_chain.Node,
 ) -> Tuple[str, Vec]:
