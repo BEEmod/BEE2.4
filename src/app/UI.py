@@ -508,10 +508,10 @@ async def load_packages(packset: packages.PackagesSet, tk_img: TKImages) -> None
     for item in packset.all_obj(packages.Item):
         item_list[item.id] = Item(item)
 
-    sky_list: list[selWinItem] = []
-    voice_list: list[selWinItem] = []
-    style_list: list[selWinItem] = []
-    elev_list: list[selWinItem] = []
+    sky_list: List[selWinItem] = []
+    voice_list: List[selWinItem] = []
+    style_list: List[selWinItem] = []
+    elev_list: List[selWinItem] = []
 
     # These don't need special-casing, and act the same.
     # The attrs are a map from selectorWin attributes, to the attribute on
@@ -753,7 +753,7 @@ async def export_editoritems(pal_ui: paletteUI.PaletteUI, bar: MenuBar) -> None:
         }
         # Group palette data by each item ID, so it can easily determine which items are actually
         # on the palette at all.
-        pal_by_item: dict[str, dict[int, tuple[int, int]]] = {}
+        pal_by_item: Dict[str, Dict[int, Tuple[int, int]]] = {}
         for pos, (item_id, subkey) in pal_data.items():
             pal_by_item.setdefault(item_id.casefold(), {})[subkey] = pos
 

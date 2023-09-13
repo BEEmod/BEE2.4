@@ -230,7 +230,7 @@ SPECIAL_INST_FOLDED = {
 
 def load_conf(items: Iterable[editoritems.Item]) -> None:
     """Read the config and build our dictionaries."""
-    cust_instances: dict[str, str]
+    cust_instances: Dict[str, str]
     EMPTY = editoritems.FSPath()
     for item in items:
         # Extra definitions: key -> filename.

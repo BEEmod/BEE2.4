@@ -8,7 +8,8 @@ import sys
 import types
 from enum import Enum
 from typing import (
-    Awaitable, Generic, Iterable, overload, cast, Any, TypeVar, Protocol, Union, Callable, Optional,
+    Awaitable, Dict, Generic, Iterable, overload, cast, Any, TypeVar, Protocol, Union, Callable,
+    Optional,
     Tuple, Literal,
 )
 from typing_extensions import TypeAlias
@@ -285,7 +286,7 @@ def bind_mousewheel(
 ) -> None: ...
 def bind_mousewheel(
     widgets: Union[Iterable[tk.Misc], tk.Misc],
-    func: Callable[..., object], args: tuple[object, ...] = (),
+    func: Callable[..., object], args: Tuple[object, ...] = (),
 ) -> None:
     """Bind mousewheel events, which function differently on each platform.
 
@@ -824,7 +825,7 @@ class EnumButton(Generic[EnumT]):
     """
     frame: ttk.Frame
     _current: EnumT
-    buttons: dict[EnumT, ttk.Button]
+    buttons: Dict[EnumT, ttk.Button]
     on_changed: event.Event[EnumT]
     def __init__(
         self,

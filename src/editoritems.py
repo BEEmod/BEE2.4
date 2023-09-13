@@ -4,7 +4,7 @@ import sys
 from collections import defaultdict
 from collections.abc import Iterable, Iterator, Mapping
 from enum import Enum, Flag
-from typing import Callable, ClassVar, Optional, Protocol, Any
+from typing import Callable, ClassVar, List, Optional, Protocol, Any, Tuple
 from pathlib import PurePosixPath as FSPath
 
 import attrs
@@ -27,7 +27,7 @@ __all__ = [
 ]
 LOGGER = logger.get_logger(__name__)
 # __getstate__ / __setstate__ types.
-_SubTypeState: TypeAlias = tuple[TransToken, list[str], list[str], list[int], TransToken, int, int, Optional[FSPath]]
+_SubTypeState: TypeAlias = Tuple[TransToken, List[str], List[str], List[int], TransToken, int, int, Optional[FSPath]]
 
 
 class ItemClass(Enum):

@@ -459,13 +459,13 @@ def calc_connections(
     It also applies frames to shape signage to distinguish repeats.
     """
     # First we want to match targetnames to item types.
-    toggles: dict[str, Entity] = {}
+    toggles: Dict[str, Entity] = {}
     # Accumulate all the signs into groups, so the list should be 2-long:
     # sign_shapes[name, material][0/1]
-    sign_shape_overlays: dict[tuple[str, str], list[Entity]] = defaultdict(list)
+    sign_shape_overlays: Dict[Tuple[str, str], List[Entity]] = defaultdict(list)
 
     # Indicator panels
-    panels: dict[str, Entity] = {}
+    panels: Dict[str, Entity] = {}
 
     # We only need to pay attention for TBeams, other items we can
     # just detect any output.
@@ -475,7 +475,7 @@ def calc_connections(
 
     # Corridors have a numeric suffix depending on the corridor index.
     # That's no longer valid, so we want to strip it.
-    corridors: list[Entity] = []
+    corridors: List[Entity] = []
 
     for inst in vmf.by_class['func_instance']:
         inst_name = inst['targetname']
@@ -722,7 +722,7 @@ def gen_item_outputs(vmf: VMF) -> None:
     LOGGER.info('Generating item IO...')
 
     # For logic items without inputs, collect the instances to fix up later.
-    dummy_logic_ents: list[Entity] = []
+    dummy_logic_ents: List[Entity] = []
 
     # Apply input A/B types to connections.
     # After here, all connections are primary or secondary only.

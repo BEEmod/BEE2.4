@@ -1,5 +1,5 @@
 """Test the events manager and collections."""
-from typing import no_type_check
+from typing import Dict, no_type_check
 import pytest
 from unittest.mock import AsyncMock, create_autospec, call
 
@@ -123,7 +123,7 @@ def test_valuechange_hash() -> None:
     """Check ValueChange() can be hashed and put in a dict key."""
     key = ValueChange(45, 38)
     assert hash(key) == hash(ValueChange(45.0, 38.0))
-    dct: dict[ValueChange[object], object] = {
+    dct: Dict[ValueChange[object], object] = {
         key: 45,
         ValueChange('text', 12): sum,
     }

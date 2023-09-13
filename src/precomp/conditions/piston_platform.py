@@ -1,5 +1,5 @@
 """Handles generating Piston Platforms with specific logic."""
-from typing import Optional
+from typing import Dict, Optional
 
 from precomp import packing, template_brush, conditions
 import srctools.logger
@@ -188,7 +188,7 @@ def res_piston_plat(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
         move_ang = off.to_angle()
 
         # Index -> func_movelinear.
-        pistons: dict[int, Entity] = {}
+        pistons: Dict[int, Entity] = {}
 
         static_ent = vmf.create_ent('func_brush', origin=origin)
 

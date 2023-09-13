@@ -11,7 +11,7 @@ import os
 import sys
 from io import BytesIO
 from zipfile import ZipFile
-from typing import List
+from typing import List, Set
 from pathlib import Path
 
 
@@ -261,8 +261,8 @@ async def main(argv: List[str]) -> None:
         LOGGER.warning('Packing disabled!')
 
     # We need to disallow Valve folders.
-    pack_whitelist: set[FileSystem] = set()
-    pack_blacklist: set[FileSystem] = {pakfile_fs}
+    pack_whitelist: Set[FileSystem] = set()
+    pack_blacklist: Set[FileSystem] = {pakfile_fs}
 
     # Exclude absolutely everything except our folder.
     for child_sys, _ in fsys.systems:

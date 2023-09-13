@@ -69,7 +69,7 @@ def export_data(packset: PackagesSet) -> Dict[MusicChannel, Optional[Music]]:
         base_track = packset.obj_by_id(Music, base_id)
     else:
         base_track = None
-    data: dict[MusicChannel, Optional[Music]] = {
+    data: Dict[MusicChannel, Optional[Music]] = {
         MusicChannel.BASE: base_track,
     }
     for channel, win in WINDOWS.items():
@@ -200,7 +200,7 @@ async def make_widgets(packset: PackagesSet, frame: ttk.LabelFrame, pane: SubPan
     assert set(WINDOWS.keys()) == set(MusicChannel), "Extra channels?"
 
     # Widgets we want to remove when collapsing.
-    exp_widgets: list[tkinter.Widget] = []
+    exp_widgets: List[tkinter.Widget] = []
 
     def toggle_btn_enter(event: Optional[tkinter.Event[ttk.Label]] = None) -> None:
         toggle_btn['text'] = BTN_EXPAND_HOVER if is_collapsed else BTN_CONTRACT_HOVER

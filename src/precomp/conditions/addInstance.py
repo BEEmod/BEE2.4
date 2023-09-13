@@ -1,7 +1,7 @@
 """Results for generating additional instances.
 
 """
-from typing import Iterable, Optional, Callable
+from typing import Dict, FrozenSet, Iterable, List, Optional, Callable, Tuple
 from srctools import Vec, Entity, Keyvalues, VMF, Angle
 import srctools.logger
 
@@ -159,14 +159,14 @@ def res_add_shuffle_group(
     """
     conf_variable = res['var']
     conf_seed = 'sg' + res['seed', '']
-    conf_pools: dict[str, list[str]] = {}
+    conf_pools: Dict[str, List[str]] = {}
     for prop in res.find_children('pool'):
         if prop.has_children():
             raise ValueError('Instances in pool cannot be a property block!')
         conf_pools.setdefault(prop.name, []).append(prop.value)
 
     # (flag, value, pools)
-    conf_selectors: list[tuple[list[Keyvalues], str, frozenset[str]]] = []
+    conf_selectors: List[Tuple[List[Keyvalues], str, FrozenSet[str]]] = []
     for prop in res.find_all('selector'):
         conf_value = prop['value', '']
         conf_flags = list(prop.find_children('conditions'))

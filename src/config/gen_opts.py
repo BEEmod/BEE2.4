@@ -67,7 +67,7 @@ class GenOptions(config.Data, conf_name='Options', palette_stores=False, version
         except ValueError:
             after_export = AfterExport.NORMAL
 
-        res: dict[str, bool] = {}
+        res: Dict[str, bool] = {}
         for field in gen_opts_bool:
             try:
                 section: str = field.metadata['legacy']
@@ -129,7 +129,7 @@ class GenOptions(config.Data, conf_name='Options', palette_stores=False, version
         if version > 2:
             raise AssertionError('Unknown version!')
 
-        res: dict[str, Any] = {}
+        res: Dict[str, Any] = {}
         try:
             res['preserve_fgd'] = data['preserve_fgd' if version > 1 else 'preserve_resources'].val_bool
         except KeyError:

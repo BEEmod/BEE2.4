@@ -12,13 +12,13 @@ import attrs
 import srctools.logger
 LOGGER = srctools.logger.init_logging('bee2/error_server.log')
 
+from typing import Any, Dict, List, Tuple
 import functools
 import http
 import math
 import pickle
 import gettext
 import json
-from typing import Any, List
 
 from hypercorn.config import Config
 from hypercorn.trio import serve
@@ -62,7 +62,7 @@ async def route_display_errors() -> str:
 
 
 @app.route('/displaydata')
-async def route_render_data() -> dict[str, Any]:
+async def route_render_data() -> Dict[str, Any]:
     """Return the geometry for rendering the current error."""
     return {
         'tiles': current_error.faces,
@@ -122,7 +122,7 @@ def update_deadline() -> None:
 @attrs.define(eq=False)
 class PackageLang(transtoken.GetText):
     """Simple Gettext implementation for tokens loaded by packages."""
-    tokens: dict[str, str]
+    tokens: Dict[str, str]
 
     def gettext(self, token: str, /) -> str:
         """Perform simple translations."""
@@ -148,10 +148,10 @@ def load_info() -> None:
     else:
         current_error = data
 
-    translations: dict[str, transtoken.GetText] = {}
+    translations: Dict[str, transtoken.GetText] = {}
     try:
         with open('bee2/pack_translation.bin', 'rb') as f:
-            package_data: list[tuple[str, dict[str, str]]] = pickle.load(f)
+            package_data: List[Tuple[str, Dict[str, str]]] = pickle.load(f)
     except Exception:
         LOGGER.exception('Failed to load package translations pickle!')
     else:

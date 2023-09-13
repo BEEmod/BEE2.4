@@ -1,4 +1,6 @@
 """Conditions related to specific kinds of entities."""
+from typing import Dict, List
+
 from srctools import Matrix, Keyvalues, Vec, VMF, Entity, Angle
 import srctools.logger
 
@@ -27,7 +29,7 @@ def res_insert_overlay(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
     face_str = res['face_pos', '0 0 -64']
     orig_norm = Vec.from_str(res['normal', '0 0 1'])
 
-    replace_tex: dict[str, list[str]] = {}
+    replace_tex: Dict[str, List[str]] = {}
     for prop in res.find_children('replace'):
         replace_tex.setdefault(prop.name.replace('\\', '/'), []).append(prop.value)
 

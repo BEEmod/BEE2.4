@@ -1,6 +1,5 @@
 """Results relating to item connections."""
-from typing import Callable
-
+from typing import Callable, Dict, List
 
 from precomp import connections, conditions
 from srctools import Keyvalues, Entity, Output, logger
@@ -117,7 +116,7 @@ def res_append_io_type(res: Keyvalues) -> Callable[[Entity], None]:
     - `sec_enable_cmd`
     - `sec_disable_cmd`
     """
-    prop_lists: dict[str, list[Output]] = {
+    prop_lists: Dict[str, List[Output]] = {
         name: []
         for name in ['enable_cmd', 'disable_cmd', 'sec_enable_cmd', 'sec_disable_cmd']
     }

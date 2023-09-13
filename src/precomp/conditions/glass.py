@@ -75,7 +75,7 @@ def find_glass_items(config, vmf: VMF) -> Iterator[Tuple[str, Vec, Vec, Vec, dic
     This yields (targetname, min, max, normal, config) tuples.
     """
     # targetname -> min, max, normal, config
-    glass_items: dict[str, tuple[Vec, Vec, Vec, dict]] = {}
+    glass_items: Dict[str, Tuple[Vec, Vec, Vec, dict]] = {}
     for inst in vmf.by_class['func_instance']:
         try:
             conf = config[inst['file'].casefold()]

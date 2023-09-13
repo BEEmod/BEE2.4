@@ -173,7 +173,7 @@ class tkRichText(tkinter.Text):
 
             for is_first, block, is_last in iter_firstlast(text_data):
                 if isinstance(block, tkMarkdown.TextSegment):
-                    tags: tuple[str, ...]
+                    tags: Tuple[str, ...]
                     if block.url:
                         try:
                             cmd_tag, _ = self._link_commands[block.url]

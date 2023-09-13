@@ -8,10 +8,10 @@ import user_errors
 LOGGER = init_logging('bee2/vbsp.log')
 
 
-from typing import Any, Dict, List, Tuple, Set, Iterable, Optional
+from typing import Any, Dict, List, Tuple, Set, Iterable, Optional, Counter
 from typing_extensions import TypedDict
 from io import StringIO
-from collections import defaultdict, namedtuple, Counter
+from collections import defaultdict, namedtuple
 import os
 import sys
 import shutil
@@ -146,7 +146,7 @@ async def load_settings() -> Tuple[
             settings['style_vars'][var.name.casefold()] = srctools.conv_bool(var.value)
 
     # Load a copy of the item configuration.
-    id_to_item: dict[str, editoritems.Item] = {}
+    id_to_item: Dict[str, editoritems.Item] = {}
     for item in res_editor():
         id_to_item[item.id.casefold()] = item
 

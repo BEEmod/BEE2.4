@@ -200,8 +200,8 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
 
         desc = packages.desc_parse(props, data.id, data.pak_id)
 
-        widgets: list[SingleWidget] = []
-        multi_widgets: list[MultiWidget] = []
+        widgets: List[SingleWidget] = []
+        multi_widgets: List[MultiWidget] = []
 
         for wid in props.find_all('Widget'):
             await trio.sleep(0)
@@ -253,7 +253,7 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
                     # All the same.
                     defaults = dict.fromkeys(TIMER_NUM_INF if use_inf else TIMER_NUM, default_prop.value)
 
-                values: dict[TimerNum, str] = {}
+                values: Dict[TimerNum, str] = {}
                 for num in (TIMER_NUM_INF if use_inf else TIMER_NUM):
                     if prev_conf is EmptyMapping:
                         # No new conf, check the old conf.

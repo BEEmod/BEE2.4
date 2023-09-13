@@ -23,7 +23,7 @@ def init(frm: ttk.Frame, refresh_cback: Callable[[Optional[Set[Tuple[str, int]]]
     """
     global _type_cback
     refresh_tim: Optional[str] = None
-    result: Optional[set[tuple[str, int]]] = None
+    result: Optional[Set[Tuple[str, int]]] = None
 
     def on_type(*args) -> None:
         """Re-search whenever text is typed."""
@@ -34,7 +34,7 @@ def init(frm: ttk.Frame, refresh_cback: Callable[[Optional[Set[Tuple[str, int]]]
             refresh_cback(None)
             return
 
-        found: set[tuple[str, int]] = set()
+        found: Set[Tuple[str, int]] = set()
         *words, last = words
         for word in words:
             try:
@@ -79,7 +79,7 @@ def rebuild_database() -> None:
     """Rebuild the search database."""
     LOGGER.info('Updating search database...')
     # Clear and reset.
-    word_set: set[tuple[str, int]]
+    word_set: Set[Tuple[str, int]]
     word_to_ids.clear()
 
     for item in UI.item_list.values():

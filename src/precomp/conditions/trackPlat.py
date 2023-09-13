@@ -97,7 +97,7 @@ def res_track_plat(vmf: VMF, res: Keyvalues) -> object:
             first_track.remove()
             continue  # Next platform
 
-        track_set: set[Entity] = set()
+        track_set: Set[Entity] = set()
         if track_type == inst_top or track_type == inst_middle:
             # search left
             track_scan(

@@ -483,7 +483,7 @@ def make_ubend(
     if len(offset) == 2:
         # Len counts the non-zero values.
         # If 2, the U-bend is diagonal, and it's ambiguous where to put the bends.
-        return []
+        return
 
     side_norm = offset.norm()
 
@@ -494,7 +494,7 @@ def make_ubend(
     else:
         # The two tube items are on top of another, that's
         # impossible to generate.
-        return []
+        return
 
     # Calculate the size of the various parts.
     # first/second _size = size of the corners.
@@ -543,7 +543,7 @@ def make_ubend(
 
         side_straight = (side_dist // 128 - first_size - second_size) * 128
     else:
-        return []  # Not possible..
+        return  # Not possible...
 
     # We always have a straight segment at the first marker point - move
     # everything up slightly.

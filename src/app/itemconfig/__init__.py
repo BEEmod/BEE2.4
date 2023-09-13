@@ -1,6 +1,6 @@
 """Customizable configuration for specific items or groups of them."""
 from typing import (
-    Iterable, Optional, Callable, List, Tuple, Dict, Iterator, AsyncIterator,
+    Iterable, Optional, Callable, List, Set, Tuple, Dict, Iterator, AsyncIterator,
     Awaitable, Type, Union,
 )
 from typing_extensions import TypeAlias
@@ -345,10 +345,10 @@ async def make_pane(
     loading_text.grid(row=0, column=0, sticky='ew')
     loading_text.grid_forget()
 
-    group_to_frame: dict[ConfigGroup, ttk.Frame] = {
+    group_to_frame: Dict[ConfigGroup, ttk.Frame] = {
         STYLEVAR_GROUP: stylevar_frame,
     }
-    groups_being_created: set[ConfigGroup] = set()
+    groups_being_created: Set[ConfigGroup] = set()
     cur_group = STYLEVAR_GROUP
     win_max_width = 0
 

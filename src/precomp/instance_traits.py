@@ -189,7 +189,7 @@ def set_traits(vmf: VMF, id_to_item: Dict[str, Item], coll: Collisions) -> Set[s
 
     This returns a set of strings listing the used instances, for debugging purposes.
     """
-    used_inst: set[str] = set()
+    used_inst: Set[str] = set()
 
     for inst in vmf.by_class['func_instance']:
         inst_file = inst['file'].casefold()

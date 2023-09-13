@@ -1,4 +1,6 @@
 """Include a VScript that reports the app version and other info."""
+from typing import List
+
 from srctools.const import FileType
 import srctools.logger
 
@@ -18,7 +20,7 @@ def write_debug_info(ctx: Context) -> None:
         'printl("Map items: ");',
     ]
 
-    used_ids: list[str] = []
+    used_ids: List[str] = []
 
     for lst_ent in ctx.vmf.by_class['bee2_item_list']:
         lst_ent.remove()

@@ -326,8 +326,8 @@ async def init_gen_tab(
     lang_frm.columnconfigure(1, weight=1)
     lang_box.grid(row=0, column=1)
 
-    lang_order: list[localisation.Language] = []
-    lang_code_to_ind: dict[str, int] = {}
+    lang_order: List[localisation.Language] = []
+    lang_code_to_ind: Dict[str, int] = {}
 
     def load_langs() -> None:
         """Load languages when the window opens."""

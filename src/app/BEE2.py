@@ -1,5 +1,5 @@
 """Run the BEE2."""
-from typing import Awaitable, Callable, Any, Optional, List, Tuple
+from typing import Awaitable, Callable, Any, Deque, Dict, Optional, List, Tuple
 import time
 import collections
 
@@ -103,9 +103,9 @@ class Tracer(trio.abc.Instrument):
     slow: List[Tuple[float, str]] = []
 
     def __init__(self) -> None:
-        self.elapsed: dict[trio.lowlevel.Task, float] = {}
-        self.start_time: dict[trio.lowlevel.Task, Optional[float]] = {}
-        self.args: dict[trio.lowlevel.Task, dict[str, object]] = {}
+        self.elapsed: Dict[trio.lowlevel.Task, float] = {}
+        self.start_time: Dict[trio.lowlevel.Task, Optional[float]] = {}
+        self.args: Dict[trio.lowlevel.Task, Dict[str, object]] = {}
 
     def task_spawned(self, task: trio.lowlevel.Task) -> None:
         """Setup vars when a task is spawned."""
@@ -196,7 +196,7 @@ def start_main(init: Callable[[], Awaitable[Any]]=init_app) -> None:
         # callbacks is triggered.
         TK_ROOT.call("after", "idle", "after", 0, tk_func_name)
 
-    queue: collections.deque[Callable[[], Any]] = collections.deque()
+    queue: Deque[Callable[[], Any]] = collections.deque()
     tk_func_name = TK_ROOT.register(tk_func)
 
     LOGGER.debug('Starting Trio loop.')

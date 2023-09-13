@@ -1,4 +1,6 @@
 """Generates Bottomless Pits."""
+from typing import Set
+
 from srctools import FrozenVec, Matrix, Vec, Keyvalues, VMF, Solid, Side, Output, Angle
 import srctools.logger
 import utils
@@ -147,7 +149,7 @@ def make_bottomless_pit(vmf: VMF, max_height):
             trig.remove()
 
     # Potential locations of bordering brushes..
-    wall_pos: set[FrozenVec] = set()
+    wall_pos: Set[FrozenVec] = set()
 
     # Only use 1 entity for the teleport triggers. If multiple are used,
     # cubes can contact two at once and get teleported odd places.

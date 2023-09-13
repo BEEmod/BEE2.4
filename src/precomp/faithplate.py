@@ -2,7 +2,7 @@
 
 This also handles Bomb-type Paint Droppers.
 """
-from typing import ClassVar, Dict, Optional, Union
+from typing import ClassVar, Dict, List, Optional, Tuple, Union
 import collections
 
 import attrs
@@ -74,9 +74,9 @@ def associate_faith_plates(vmf: VMF) -> None:
     """
 
     # Find all the triggers and targets first.
-    triggers: dict[str, Optional[Entity]] = {}
-    helper_trigs: dict[str, Entity] = {}
-    paint_trigs: dict[str, Entity] = {}
+    triggers: Dict[str, Optional[Entity]] = {}
+    helper_trigs: Dict[str, Entity] = {}
+    paint_trigs: Dict[str, Entity] = {}
 
     for trig in vmf.by_class['trigger_catapult']:
         name = trig['targetname']
@@ -194,14 +194,14 @@ def associate_faith_plates(vmf: VMF) -> None:
 def gen_faithplates(vmf: VMF, has_superpos: bool) -> None:
     """Place the targets and catapults into the map."""
     # Target positions -> list of triggers wanting to aim there.
-    pos_to_trigs: dict[
-        Union[tuple[float, float, float], tiling.TileDef],
-        list[Entity]
+    pos_to_trigs: Dict[
+        Union[Tuple[float, float, float], tiling.TileDef],
+        List[Entity]
     ] = collections.defaultdict(list)
 
     for plate in PLATES.values():
         if isinstance(plate, (AngledPlate, PaintDropper)):
-            targ_pos: Union[tuple[float, float, float], tiling.TileDef]
+            targ_pos: Union[Tuple[float, float, float], tiling.TileDef]
             if isinstance(plate.target, tiling.TileDef):
                 targ_pos = plate.target  # Use the ID directly.
             else:

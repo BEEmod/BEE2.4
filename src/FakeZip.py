@@ -2,11 +2,13 @@
 
 This is useful to allow using the same code for reading folders or zips of data.
 """
-from typing import IO, Iterator, Literal, Optional, Self, Set, TextIO, Union
+from typing import IO, Iterator, Literal, Optional, Set, TextIO, Union
+from typing_extensions import Self
 from zipfile import ZIP_STORED, ZipFile
 import shutil
 import os
 import io
+
 
 
 class FakeZipInfo:

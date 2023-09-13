@@ -71,7 +71,7 @@ class Opt:
 def load(opt_blocks: Iterator[Keyvalues]) -> None:
     """Read settings from the given property block."""
     SETTINGS.clear()
-    set_vals: dict[str, str] = {}
+    set_vals: Dict[str, str] = {}
     for opt_block in opt_blocks:
         for prop in opt_block:
             set_vals[prop.name] = prop.value

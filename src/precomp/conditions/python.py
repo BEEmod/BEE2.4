@@ -1,6 +1,6 @@
 """The Operation result allows executing math on instvars."""
+from typing import Any, Container, Dict, List, NoReturn
 import ast
-from typing import Any, Container, NoReturn
 
 from precomp import conditions
 from srctools import Keyvalues, Vec, Entity, conv_bool
@@ -144,7 +144,7 @@ def res_python_setup(res: Keyvalues) -> conditions.ResultCallable:
 
     # For each variable, do
     # var = func(_fixup['var'])
-    statements: list[ast.AST] = [
+    statements: List[ast.AST] = [
         ast.Assign(
             targets=[ast.Name(id=var_name, ctx=ast.Store())],
             value=ast.Call(
@@ -194,7 +194,7 @@ def res_python_setup(res: Keyvalues) -> conditions.ResultCallable:
     # Fill in lineno and col_offset
     ast.fix_missing_locations(func)
 
-    ns: dict[str, Any] = {}
+    ns: Dict[str, Any] = {}
     eval(compile(func, '<bee2_op>', mode='exec'), FUNC_GLOBALS, ns)
     compiled_func = ns['_bee2_generated_func']
     compiled_func.__name__ = '<bee2_func>'
