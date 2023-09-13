@@ -559,11 +559,11 @@ def res_import_template(
         for prop in res.find_children('pickerVars')
     ]
     try:
-        ang_override = to_matrix(Angle.from_str(res['angles']))
+        ang_override = Matrix.from_angstr(res['angles'])
     except LookupError:
         ang_override = None
     try:
-        rotation = to_matrix(Angle.from_str(res['rotation']))
+        rotation = Matrix.from_angstr(res['rotation'])
     except LookupError:
         rotation = Matrix()
 
@@ -656,7 +656,7 @@ def res_import_template(
                 list(template.visgroups),
             ))
 
-        LOGGER.debug('Placing template "{}" at {} with visgroups {}', template.id, origin, visgroups)
+        LOGGER.debug('Placing template "{}" at ({} @ {}) with visgroups {}', template.id, origin, orient.to_angle(), visgroups)
 
         temp_data = template_brush.import_template(
             vmf,
