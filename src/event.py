@@ -33,14 +33,14 @@ class Event(Generic[ArgT]):
     """Store functions to be called when an event occurs."""
     callbacks: list[Callable[ArgT, Awaitable[Any]]]
     last_result: tuple[ArgT.args, ArgT.kwargs] | None = attrs.field(init=False)
-    cur_calls: int
+    _cur_calls: int
     name: str
     log: bool = attrs.field(repr=False)
 
     def __init__(self, name: str='') -> None:
         self.name = name or f'<Unnamed {id(self):x}>'
         self.callbacks = []
-        self.cur_calls = 0
+        self._cur_calls = 0
         self.log = False
         self.last_result = None
 
@@ -70,19 +70,19 @@ class Event(Generic[ArgT]):
         if self.log:
             LOGGER.debug('{}(*{}, **{}) = {}', self.name, args, kwargs, self.callbacks)
 
-        if self.cur_calls and self.last_result is not None:
+        if self._cur_calls and self.last_result is not None:
             last_pos, last_kw = self.last_result
             if args == last_pos and kwargs == last_kw:
                 return
 
         self.last_result = (args, kwargs)
-        self.cur_calls += 1
+        self._cur_calls += 1
         try:
             async with trio.open_nursery() as nursery:
                 for func in self.callbacks:
                     nursery.start_soon(partial(func, *args, **kwargs))
         finally:
-            self.cur_calls -= 1
+            self._cur_calls -= 1
 
     def unregister(self, func: Callable[ArgT, Awaitable[Any]],) -> None:
         """Remove the given callback.
