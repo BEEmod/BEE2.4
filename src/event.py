@@ -11,7 +11,7 @@ A set of observable collections are provided, which fire off events
 whenever they are modified.
 """
 from __future__ import annotations
-from typing import Generator, TypeVar, Any, Type, Generic, Callable, Awaitable
+from typing import Generator, TypeVar, Any, Generic, Callable, Awaitable
 from typing_extensions import ParamSpec
 
 from contextlib import contextmanager
@@ -28,7 +28,6 @@ LOGGER = srctools.logger.get_logger(__name__)
 ArgT = ParamSpec('ArgT')
 ValueT = TypeVar('ValueT')
 ValueT_co = TypeVar('ValueT_co', covariant=True)
-NoneType: Type[None] = type(None)
 
 
 @attrs.define(init=False, eq=False)
