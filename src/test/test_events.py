@@ -3,6 +3,8 @@ from typing import Dict, no_type_check
 import pytest
 from unittest.mock import AsyncMock, create_autospec, call
 
+import trio
+
 from event import Event, ValueChange, ObsValue
 
 
@@ -94,15 +96,56 @@ async def test_register_priming() -> None:
     func2.assert_awaited_once_with(10)
 
 
-@no_type_check
+async def test_isolate() -> None:
+    """Test the isolation context manager."""
+    event = Event[int]('isolate')
+    func1 = create_autospec(func_unary, name='func1')
+    func2 = create_autospec(func_unary, name='func2')
+    event.register(func1)
+    await event(4)
+    func1.assert_awaited_once_with(4)
+
+    func1.reset_mock()
+    rec: trio.MemoryReceiveChannel
+    with event.isolate() as rec:
+        with pytest.raises(ValueError):  # No nesting.
+            with event.isolate():
+                pass
+
+        await event(5)
+        func1.assert_not_awaited()
+        assert await rec.receive() == (5, )
+
+        await event.register_and_prime(func2)
+        func1.assert_not_awaited()
+        func2.assert_awaited_once_with(5)  # Still passed through.
+        func2.reset_mock()
+
+        await event(48)
+        await event(36)
+        for i in range(1024):  # Unlimited buffer.
+            await event(i)
+
+    func1.assert_not_awaited()
+    func2.assert_not_awaited()
+
+    assert await rec.receive() == (48, )
+    assert await rec.receive() == (36, )
+    for i in range(1024):
+        assert await rec.receive() == (i, )
+    # Finished here.
+    with pytest.raises(trio.EndOfChannel):
+        await rec.receive()
+
+
 def test_valuechange() -> None:
     """Check ValueChange() produces the right values."""
     with pytest.raises(TypeError):
-        ValueChange()
+        ValueChange()  # type: ignore
     with pytest.raises(TypeError):
-        ValueChange(1)
+        ValueChange(1)  # type: ignore
     with pytest.raises(TypeError):
-        ValueChange(1, 2, 3)
+        ValueChange(1, 2, 3)  # type: ignore
     assert ValueChange(1, 2) == ValueChange(1, 2)
     assert ValueChange(old=2, new=3) == ValueChange(2, 3)
 

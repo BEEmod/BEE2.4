@@ -11,10 +11,12 @@ A set of observable collections are provided, which fire off events
 whenever they are modified.
 """
 from __future__ import annotations
-
-from functools import partial
-from typing import TypeVar, Any, Type, Generic, Callable, Awaitable
+from typing import Generator, TypeVar, Any, Type, Generic, Callable, Awaitable
 from typing_extensions import ParamSpec
+
+from contextlib import contextmanager
+from functools import partial
+import math
 
 import attrs
 import trio
@@ -22,6 +24,7 @@ import srctools.logger
 
 __all__ = ['Event', 'ValueChange', 'ObsValue']
 LOGGER = srctools.logger.get_logger(__name__)
+# TODO: Swap to TypeVarTuple, no kwargs allowed.
 ArgT = ParamSpec('ArgT')
 ValueT = TypeVar('ValueT')
 ValueT_co = TypeVar('ValueT_co', covariant=True)
@@ -33,6 +36,7 @@ class Event(Generic[ArgT]):
     """Store functions to be called when an event occurs."""
     callbacks: list[Callable[ArgT, Awaitable[Any]]]
     last_result: tuple[ArgT.args, ArgT.kwargs] | None = attrs.field(init=False)
+    _override: trio.MemorySendChannel[ArgT.args] | None = attrs.field(repr=False)
     _cur_calls: int
     name: str
     log: bool = attrs.field(repr=False)
@@ -41,6 +45,7 @@ class Event(Generic[ArgT]):
         self.name = name or f'<Unnamed {id(self):x}>'
         self.callbacks = []
         self._cur_calls = 0
+        self._override = None
         self.log = False
         self.last_result = None
 
@@ -67,8 +72,15 @@ class Event(Generic[ArgT]):
         This is re-entrant - if called whilst the same event is already being
         run, the second will be ignored.
         """
+        if kwargs:
+            raise TypeError("No kwargs allowed.")
         if self.log:
-            LOGGER.debug('{}(*{}, **{}) = {}', self.name, args, kwargs, self.callbacks)
+            LOGGER.debug(
+                '{}({}) = {}',
+                self.name,
+                ','.join(map(repr, args)),
+                self.callbacks,
+            )
 
         if self._cur_calls and self.last_result is not None:
             last_pos, last_kw = self.last_result
@@ -78,13 +90,16 @@ class Event(Generic[ArgT]):
         self.last_result = (args, kwargs)
         self._cur_calls += 1
         try:
-            async with trio.open_nursery() as nursery:
-                for func in self.callbacks:
-                    nursery.start_soon(partial(func, *args, **kwargs))
+            if self._override is not None:
+                await self._override.send(args)
+            else:
+                async with trio.open_nursery() as nursery:
+                    for func in self.callbacks:
+                        nursery.start_soon(partial(func, *args, **kwargs))
         finally:
             self._cur_calls -= 1
 
-    def unregister(self, func: Callable[ArgT, Awaitable[Any]],) -> None:
+    def unregister(self, func: Callable[ArgT, Awaitable[Any]]) -> None:
         """Remove the given callback.
 
         If it is not registered, raise LookupError.
@@ -93,6 +108,29 @@ class Event(Generic[ArgT]):
             self.callbacks.remove(func)
         except ValueError:
             raise LookupError(func) from None
+
+    @contextmanager
+    def isolate(self) -> Generator[trio.MemoryReceiveChannel[ArgT.args], None, None]:
+        """Temporarily disable all listening callbacks, and redirect to the supplied channel.
+
+        This is mainly intended for testing code, to prevent it from affecting other things.
+        This cannot currently be nested within itself, but isolating different events is fine.
+        """
+        send: trio.MemorySendChannel[ArgT.args]
+        rec: trio.MemoryReceiveChannel[ArgT.args]
+
+        if self._override is not None:
+            raise ValueError('Event.isolate() does not support nesting with itself!')
+        # Use an infinite buffer. If the user doesn't read from the channel, or only reads after
+        # the with statement has exited we want events to just be stored.
+        send, rec = trio.open_memory_channel(math.inf)
+        self._override = send
+        try:
+            yield rec
+        finally:
+            send.close()
+            assert self._override is send, self._override
+            self._override = None
 
 
 @attrs.frozen
