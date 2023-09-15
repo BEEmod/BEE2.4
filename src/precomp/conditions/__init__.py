@@ -189,7 +189,7 @@ class Condition:
     results: list[Keyvalues] = attrs.Factory(list)
     else_results: list[Keyvalues] = attrs.Factory(list)
     priority: Decimal = Decimal()
-    source: str = None
+    source: str | None = None
 
     @classmethod
     def parse(cls, kv_block: Keyvalues, *, toplevel: bool) -> Condition:

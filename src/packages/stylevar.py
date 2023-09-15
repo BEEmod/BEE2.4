@@ -103,7 +103,7 @@ class StyleVar(PakObject, allow_mult=True, needs_foreground=True):
         """Check to see if this will apply for the given style.
 
         """
-        if self.is_unstyled:
+        if self.styles is None:
             return True
 
         if style.id in self.styles:

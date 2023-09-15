@@ -118,7 +118,8 @@ class PygletSound(NullSound):
             LOGGER.exception("Couldn't load sound {}:", name)
             LOGGER.info('UI sounds disabled.')
             sounds = NullSound()
-            _nursery.cancel_scope.cancel()
+            if _nursery is not None:
+                _nursery.cancel_scope.cancel()
             return None
         else:
             self.sources[name] = src
@@ -140,7 +141,8 @@ class PygletSound(NullSound):
             except Exception:
                 LOGGER.exception("Couldn't play sound {}:", sound)
                 LOGGER.info('UI sounds disabled.')
-                _nursery.cancel_scope.cancel()
+                if _nursery is not None:
+                    _nursery.cancel_scope.cancel()
                 sounds = NullSound()
                 return 0.1
             duration: Optional[float] = snd.duration
@@ -179,7 +181,8 @@ async def _load_bg(sound: str) -> None:
         await sounds.load(sound)
     except Exception:
         LOGGER.exception('Failed to load sound:')
-        return _nursery.cancel_scope.cancel()
+        if _nursery is not None:
+            _nursery.cancel_scope.cancel()
 
 
 def fx(name: str) -> None:

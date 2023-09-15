@@ -119,13 +119,15 @@ class Tracer(trio.abc.Instrument):
 
     def after_task_step(self, task: trio.lowlevel.Task) -> None:
         """Count up the time."""
+        cur_time = time.perf_counter()
         try:
-            diff = time.perf_counter() - self.start_time[task]
+            prev = self.start_time[task]
         except KeyError:
             pass
         else:
-            self.elapsed[task] += diff
-            self.start_time[task] = None
+            if prev is not None:
+                self.elapsed[task] += time.perf_counter() - prev
+                self.start_time[task] = None
 
     def task_exited(self, task: trio.lowlevel.Task) -> None:
         """Log results when exited."""

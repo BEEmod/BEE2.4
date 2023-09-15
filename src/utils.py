@@ -81,9 +81,9 @@ else:
 if _SETTINGS_ROOT is not None:
     _SETTINGS_ROOT /= 'BEEMOD2'
 
-# If testing, redirect to a subdirectory so the real configs aren't touched.
-if 'pytest' in sys.modules:
-    _SETTINGS_ROOT /= 'testing'
+    # If testing, redirect to a subdirectory so the real configs aren't touched.
+    if 'pytest' in sys.modules:
+        _SETTINGS_ROOT /= 'testing'
 
 
 def get_git_version(inst_path: Path | str) -> str:
@@ -235,7 +235,11 @@ def freeze_enum_props(cls: Type[EnumT]) -> Type[EnumT]:
     Call the getter on each member, and then replace it with a dict lookup.
     """
     for name, value in list(vars(cls).items()):
-        if not isinstance(value, property) or value.fset is not None or value.fdel is not None:
+        # Ignore non-properties, those with setters or deleters.
+        if (
+            not isinstance(value, property) or value.fget is None
+            or value.fset is not None or value.fdel is not None
+        ):
             continue
         data = {}
         data_exc: dict[EnumT, tuple[Type[BaseException], tuple[object, ...]]] = {}

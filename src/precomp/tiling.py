@@ -1386,7 +1386,7 @@ class TileDef:
 
         return self.base_type.is_tile
 
-    def add_portal_helper(self, orient: Vec=None) -> None:
+    def add_portal_helper(self, orient: Vec | None = None) -> None:
         """Add a portal placement helper to the tile.
 
         If orient is provided, it should be the direction towards the

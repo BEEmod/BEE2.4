@@ -162,7 +162,7 @@ class RenderState:
 
     Since the TKRenderer is shared, we need this to prevent storing state on that.
     """
-    package: str
+    package: str | None
     # The lists we're currently generating.
     # If none it's bulleted, otherwise it's the current count.
     list_stack: list[int | None] = attrs.Factory(list)
@@ -211,7 +211,12 @@ class TKRenderer(base_renderer.BaseRenderer[SingleMarkdown]):
 
         return SingleMarkdown(blocks)
 
-    def _with_tag(self, token: stok.SpanToken | btok.BlockToken, *tags: TextTag, url: str=None) -> SingleMarkdown:
+    def _with_tag(
+        self,
+        token: stok.SpanToken | btok.BlockToken,
+        *tags: TextTag,
+        url: str | None = None,
+    ) -> SingleMarkdown:
         added_tags = set(tags)
         result = self.render_inner(token)
         for i, data in enumerate(result):
@@ -246,7 +251,10 @@ class TKRenderer(base_renderer.BaseRenderer[SingleMarkdown]):
 
     def render_image(self, token: stok.Image) -> SingleMarkdown:
         """Embed an image into a file."""
-        uri = utils.PackagePath.parse(urllib.parse.unquote(token.src), state.get().package)
+        package = state.get().package
+        if package is None:
+            raise ValueError("Image used, but no package supplied!")
+        uri = utils.PackagePath.parse(urllib.parse.unquote(token.src), package)
         return SingleMarkdown([Image(ImgHandle.parse_uri(uri))])
 
     def render_inline_code(self, token: stok.InlineCode) -> SingleMarkdown:
@@ -285,7 +293,7 @@ class TKRenderer(base_renderer.BaseRenderer[SingleMarkdown]):
             prefix = BULLETS[nesting % len(BULLETS)]
         else:
             prefix = f'{count}. '
-            stack[-1] += 1
+            stack[-1] = count + 1
 
         return _merge(
             MarkdownData.text(prefix, TextTag.LIST_START),
@@ -364,7 +372,8 @@ def _convert(text: str, package: str | None) -> SingleMarkdown:
 def convert(text: TransToken, package: str | None) -> MarkdownData:
     """Convert Markdown syntax into data ready to be passed to richTextBox.
 
-    The package must be passed to allow using images in the document.
+    The package must be passed to allow using images in the document. None should only be
+    used for app-defined strings where we know that can't occur.
     """
     # If untranslated, it'll never change so convert to blocks and discard the source.
     if text.is_untranslated:

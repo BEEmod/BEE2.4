@@ -145,7 +145,7 @@ class ErrorUI:
         if self._errors:
             desc = self.desc.format(n=len(self._errors))
             # We had an error.
-            if self._handler is None:
+            if ErrorUI._handler is None:
                 LOGGER.error(
                     "ErrorUI block failed, but no handler installed!\ntitle={}\ndesc={}\n{}",
                     self.title,

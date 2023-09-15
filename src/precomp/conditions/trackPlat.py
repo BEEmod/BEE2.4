@@ -1,5 +1,5 @@
 """Conditions relating to track platforms."""
-from typing import Set, Dict
+from typing import Optional, Set, Dict
 
 from precomp import instanceLocs, conditions
 from srctools import FrozenVec, Matrix, Vec, Keyvalues, Entity, VMF, logger
@@ -170,7 +170,7 @@ def track_scan(
     :param middle_file: The file for the center track piece
     :param x_dir: The direction to look (-1 or 1)
     """
-    track = start_track
+    track: Optional[Entity] = start_track
     move_dir = Vec(x_dir*128, 0, 0) @ Matrix.from_angstr(track['angles'])
     while track:
         tr_set.add(track)

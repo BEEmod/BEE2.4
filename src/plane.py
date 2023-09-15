@@ -108,7 +108,7 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
     @overload
     def get(self, __key: tuple[float, float], __default: ValT | DefaultT) -> ValT | DefaultT: ...
 
-    def get(self, pos: tuple[float, float], default: DefaultT = None) -> DefaultT | ValT | None:
+    def get(self, pos: tuple[float, float], default: DefaultT | None = None) -> DefaultT | ValT | None:
         """Return the value at a given position, or a default if not present."""
         try:
             x, y = map(int, pos)
@@ -124,8 +124,8 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
         if y >= 0:
             try:
                 x += self._xoffs[y]
-                if x >= 0 and self._data[y]:
-                    out = self._data[y][x]
+                if x >= 0 and (row := self._data[y]) is not None:
+                    out = row[x]
             except IndexError:
                 pass
         if out is _UNSET:
@@ -223,9 +223,9 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
         y += self._yoff
         try:
             x += self._xoffs[y]
-            if self._data[y][x] is not _UNSET:
+            if (row := self._data[y]) is not None and row[x] is not _UNSET:
                 self._used -= 1
-                self._data[y][x] = _UNSET
+                row[x] = _UNSET
         except IndexError:  # Already deleted.
             pass
 

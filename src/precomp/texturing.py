@@ -346,7 +346,11 @@ def parse_options(settings: Dict[str, Any], global_settings: Dict[str, Any]) -> 
     return options
 
 
-def gen(cat: GenCat, normal: Vec=None, portalable: Portalable=None) -> 'Generator':
+def gen(
+    cat: GenCat,
+    normal: Vec | None = None,
+    portalable: Portalable | None = None,
+) -> 'Generator':
     """Given a category, normal, and white/black return the correct generator."""
 
     if cat is GenCat.SPECIAL or cat is GenCat.OVERLAYS:
@@ -780,7 +784,7 @@ class Generator(abc.ABC):
         if antigel is None:
             antigel = grid_loc.freeze() in ANTIGEL_LOCS
         if antigel and self.category is GenCat.BULLSEYE and not self.options['antigel_bullseye']:
-            assert self.orient is not None or self.portal is not None
+            assert self.orient is not None and self.portal is not None
             # We can't use antigel on bullseye materials, so revert to normal
             # surfaces.
             return GENERATORS[GenCat.NORMAL, self.orient, self.portal].get(loc, tex_name, antigel=True)

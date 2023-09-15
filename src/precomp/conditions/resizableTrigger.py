@@ -163,6 +163,7 @@ def res_resizeable_trigger(vmf: VMF, info: conditions.MapInfo, res: Keyvalues) -
         conditions.set_ent_keys(trig_ent, inst1, res)
 
         if is_coop:
+            assert coop_var is not None and conn_conf_coop is not None
             trig_ent['spawnflags'] = '1'  # Clients
             trig_ent['classname'] = 'trigger_playerteam'
 
@@ -239,14 +240,14 @@ def res_resizeable_trigger(vmf: VMF, info: conditions.MapInfo, res: Keyvalues) -
                 origin=inst2['origin'],
             )
 
-            if pre_act is not None:
+            if pre_act is not None and (out_act := item.output_act()) is not None:
                 out = pre_act.copy()
-                out.inst_out, out.output = item.output_act()
+                out.inst_out, out.output = out_act
                 out.target = conditions.local_name(pre_inst, out.target)
                 out_ent.add_out(out)
-            if pre_deact is not None:
+            if pre_deact is not None and (out_deact := item.output_deact()) is not None:
                 out = pre_deact.copy()
-                out.inst_out, out.output = item.output_deact()
+                out.inst_out, out.output = out_deact
                 out.target = conditions.local_name(pre_inst, out.target)
                 out_ent.add_out(out)
 

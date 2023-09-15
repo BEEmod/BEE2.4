@@ -10,12 +10,9 @@ LOGGER = srctools.logger.get_logger(__name__)
 
 def deprecator(func: Callable[..., Callable[[Callable], object]], ret_val: T):
     """Deprecate a flag or result."""
-    def do_dep(name: str, *aliases: str, msg: str = None):
+    def do_dep(name: str, *aliases: str, msg: str):
         used = False
-        if msg:
-            msg = f'{name} is no longer used.\n{msg}'
-        else:
-            msg = f'{name} is no longer used.'
+        msg = f'{name} is no longer used.\n{msg}'
 
         def deprecated() -> T:
             """This result is no longer used."""

@@ -282,7 +282,12 @@ class PluralTransToken(TransToken):
     """
     token_plural: str
 
-    ui = ui_plural = untranslated = from_valve = None  # Cannot construct via these.
+    @classmethod
+    def _not_allowed(cls, *args: NoReturn, **kwargs: NoReturn) -> NoReturn:
+        raise NotImplementedError('This is not allowed.')
+
+    # Also not allowed.
+    ui = ui_plural = untranslated = from_valve = _not_allowed  # type: ignore[assignment]
 
     def join(self, children: Iterable['TransToken'], sort: bool = False) -> 'JoinTransToken':
         """Joining is not allowed."""

@@ -1344,9 +1344,9 @@ class Item:
                 )
             conn = self.conn_inputs.pop(ConnTypes.POLARITY)
             if conn.activate is not None:
-                conf.sec_enable_cmd += (Output('', conn.act_name, conn.activate), )
+                conf.sec_enable_cmd += (Output('', '', conn.activate, inst_in=conn.act_name), )
             if conn.deactivate is not None:
-                conf.sec_disable_cmd += (Output('', conn.deact_name, conn.deactivate), )
+                conf.sec_disable_cmd += (Output('', '', conn.deactivate, inst_out=conn.deact_name), )
 
         if ConnTypes.NORMAL in self.conn_outputs:
             conn = self.conn_outputs.pop(ConnTypes.NORMAL)

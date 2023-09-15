@@ -1308,7 +1308,7 @@ def add_item_indicators(
     # If that is defined, use advanced/custom timer logic if the style supports it.
     adv_timer = independent_timer and style.has_advanced_timer()
 
-    conn_pairs: List[Tuple[Tuple[Optional[str], str], float, Sequence[Output]]]
+    conn_pairs: List[Tuple[Optional[Tuple[Optional[str], str]], float, Sequence[Output]]]
     panel_fixup = EntityFixup(item.inst.fixup.copy_values())
     if timer_delay is not None:  # We have a timer.
         inst_type = style.timer_switching
@@ -1413,6 +1413,8 @@ def add_item_indicators(
             pan.fixup[consts.FixupVars.TIM_ENABLED] = '0'
 
         for output, delay, input_cmds in conn_pairs:
+            if output is None:
+                continue
             for cmd in input_cmds:
                 item.add_io_command(
                     output,

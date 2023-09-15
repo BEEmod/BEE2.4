@@ -80,9 +80,9 @@ class Signage(PakObject, allow_mult=True, needs_foreground=True):
         sign_id: str,
         styles: dict[str, SignStyle],
         disp_name: str,
-        primary_id: str=None,
-        secondary_id: str=None,
-        hidden: bool=False,
+        primary_id: str | None = None,
+        secondary_id: str | None = None,
+        hidden: bool = False,
     ) -> None:
         self.hidden = hidden or sign_id == 'SIGN_ARROW'
         self.id = sign_id

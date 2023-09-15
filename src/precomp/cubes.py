@@ -548,11 +548,11 @@ class CubePair:
     def __init__(
         self,
         cube_type: CubeType,
-        drop_type: DropperType=None,
-        dropper: Entity=None,
-        cube: Entity=None,
-        cube_fixup: EntityFixup=None,
-        tint: Vec=None,
+        drop_type: DropperType | None = None,
+        dropper: Entity | None = None,
+        cube: Entity | None = None,
+        cube_fixup: EntityFixup | None = None,
+        tint: Vec | None = None,
     ):
         self.cube_type = cube_type
         # This may be None if it's a dropper-only pair.
@@ -571,6 +571,7 @@ class CubePair:
                 # This can only be None for Valve's cubes!
                 if not self.cube_type.is_valve_cube:
                     LOGGER.warning('Cube "{}" has no fixup values!')
+                # Create a dummy fixup, so we just discard the values set.
                 cube_fixup = EntityFixup()
 
         self.cube_fixup = cube_fixup

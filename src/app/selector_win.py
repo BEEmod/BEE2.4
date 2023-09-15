@@ -136,31 +136,51 @@ class AttrDef:
     label: ttk.Label = attrs.field(init=False)
 
     @classmethod
-    def string(cls, attr_id: str, desc: TransToken=TransToken.BLANK, default: str='') -> AttrDef:
+    def string(
+        cls, attr_id: str,
+        desc: TransToken = TransToken.BLANK,
+        default: str = '',
+    ) -> AttrDef:
         """Alternative constructor for string-type attrs."""
         return AttrDef(attr_id, desc, default, AttrTypes.STRING)
 
     @classmethod
-    def list_and(cls, attr_id: str, desc: TransToken=TransToken.BLANK, default: Iterable[Union[str, TransToken]]=None) -> AttrDef:
+    def list_and(
+        cls, attr_id: str,
+        desc: TransToken = TransToken.BLANK,
+        default: Iterable[Union[str, TransToken]] | None = None,
+    ) -> AttrDef:
         """Alternative constructor for list-type attrs, which should be joined with AND."""
         if default is None:
             default = []
         return AttrDef(attr_id, desc, default, AttrTypes.LIST_AND)
 
     @classmethod
-    def list_or(cls, attr_id: str, desc: TransToken=TransToken.BLANK, default: Iterable[Union[str, TransToken]]=None) -> AttrDef:
+    def list_or(
+        cls, attr_id: str,
+        desc: TransToken = TransToken.BLANK,
+        default: Iterable[Union[str, TransToken]] | None = None,
+    ) -> AttrDef:
         """Alternative constructor for list-type attrs, which should be joined with OR."""
         if default is None:
             default = []
         return AttrDef(attr_id, desc, default, AttrTypes.LIST_OR)
 
     @classmethod
-    def bool(cls, attr_id: str, desc: TransToken=TransToken.BLANK, default: bool=False) -> AttrDef:
+    def bool(
+        cls, attr_id: str,
+        desc: TransToken = TransToken.BLANK,
+        default: bool = False,
+    ) -> AttrDef:
         """Alternative constructor for bool-type attrs."""
         return AttrDef(attr_id, desc, default, AttrTypes.BOOL)
 
     @classmethod
-    def color(cls, attr_id: str, desc: TransToken=TransToken.BLANK, default: Vec=None) -> AttrDef:
+    def color(
+        cls, attr_id: str,
+        desc: TransToken = TransToken.BLANK,
+        default: Vec | None = None,
+    ) -> AttrDef:
         """Alternative constructor for color-type attrs."""
         if default is None:
             default = Vec(255, 255, 255)
@@ -209,11 +229,11 @@ class GroupHeader(tk_tools.LineHeader):
         self.hover_start()  # Update arrow icon
         self.parent.flow_items()
 
-    def toggle(self, _: tk.Event[tk.Misc] = None) -> None:
+    def toggle(self, _: tk.Event[tk.Misc] | None = None) -> None:
         """Toggle the header on or off."""
         self.visible = not self._visible
 
-    def hover_start(self, _: tk.Event[tk.Misc] = None) -> None:
+    def hover_start(self, _: tk.Event[tk.Misc] | None = None) -> None:
         """When hovered over, fill in the triangle."""
         self.arrow['text'] = (
             GRP_EXP_HOVER
@@ -221,7 +241,7 @@ class GroupHeader(tk_tools.LineHeader):
             GRP_COLL_HOVER
         )
 
-    def hover_end(self, _: tk.Event[tk.Misc] = None) -> None:
+    def hover_end(self, _: tk.Event[tk.Misc] | None = None) -> None:
         """When leaving, hollow the triangle."""
         self.arrow['text'] = (
             GRP_EXP
@@ -353,7 +373,12 @@ class Item:
             )
 
     @classmethod
-    def from_data(cls, obj_id: str, data: SelitemData, attrs: Mapping[str, AttrValues] = None) -> Item:
+    def from_data(
+        cls,
+        obj_id: str,
+        data: SelitemData,
+        attrs: Mapping[str, AttrValues] = EmptyMapping,
+    ) -> Item:
         """Create a selector Item from a SelitemData tuple."""
         return Item(
             name=obj_id,
@@ -375,12 +400,13 @@ class Item:
 
         If it's already selected, save and close the window.
         """
+        assert self._selector is not None
         if self._selector.selected is self:
             self._selector.save()
         else:
             self._selector.sel_item(self)
 
-    def set_pos(self, x: int = None, y: int = None) -> None:
+    def set_pos(self, x: int | None = None, y: int | None = None) -> None:
         """Place the item on the palette."""
         if x is None or y is None:
             # Remove from the window.
@@ -1157,7 +1183,7 @@ class SelectorWin(Generic[CallbackT]):
         elif self.selected.previews:
             _PREVIEW.show(self, self.selected)
 
-    def open_win(self, _: tk.Event[tk.Misc] = None, *, force_open: bool = False) -> object:
+    def open_win(self, _: object = None, *, force_open: bool = False) -> object:
         """Display the window."""
         if self._readonly and not force_open:
             TK_ROOT.bell()
@@ -1205,9 +1231,9 @@ class SelectorWin(Generic[CallbackT]):
         self.win.after(2, self.flow_items)
         return None
 
-    def open_context(self, _: tk.Event[tk.Misc] = None) -> None:
+    def open_context(self, _: object = None) -> None:
         """Dislay the context window at the text widget."""
-        if not self._readonly:
+        if not self._readonly and self.display is not None:
             self.context_menu.post(
                 self.display.winfo_rootx(),
                 self.display.winfo_rooty() + self.display.winfo_height())
@@ -1258,7 +1284,7 @@ class SelectorWin(Generic[CallbackT]):
                     return True
             return False
 
-    def sel_item(self, item: Item, _: tk.Event[tk.Misc] = None) -> None:
+    def sel_item(self, item: Item, _: object = None) -> None:
         """Select the specified item."""
         self.prop_name['text'] = item.longName
         if len(item.authors) == 0:
@@ -1491,7 +1517,7 @@ class SelectorWin(Generic[CallbackT]):
         else:  # Within this group
             self.sel_item(cur_group[item_ind])
 
-    def flow_items(self, _: tk.Event[tk.Misc] = None) -> None:
+    def flow_items(self, _: object = None) -> None:
         """Reposition all the items to fit in the current geometry.
 
         Called on the <Configure> event.
@@ -1540,6 +1566,7 @@ class SelectorWin(Generic[CallbackT]):
 
             # Place each item
             for i, item in enumerate(items):
+                assert item.button is not None
                 if item in self.suggested:
                     # Reuse an existing suggested label.
                     try:
@@ -1587,6 +1614,9 @@ class SelectorWin(Generic[CallbackT]):
 
     def scroll_to(self, item: Item) -> None:
         """Scroll to an item so it's visible."""
+        if item.button is None:
+            return  # Can't scroll to something that doesn't exist.
+
         canvas = self.wid_canvas
 
         height = canvas.bbox('all')[3]  # Returns (x, y, width, height)

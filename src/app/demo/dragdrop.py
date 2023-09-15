@@ -33,6 +33,7 @@ async def test() -> None:
                 packages.get_loaded_packages(),
                 loc,
             )
+    assert app._APP_NURSERY is not None
     await app._APP_NURSERY.start(img.init, packages.PACKAGE_SYS,  TK_IMG)
     background_run(sound.sound_task)
     print('Done.')
@@ -54,8 +55,8 @@ async def test() -> None:
         name: str,
         pak_id: str,
         icon: str,
-        group: str=None,
-        group_icon: str=None,
+        group: str | None = None,
+        group_icon: str | None = None,
     ) -> str:
         """Simple implementation of the DND protocol."""
         icon = img.Handle.parse_uri(

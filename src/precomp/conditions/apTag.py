@@ -186,7 +186,7 @@ def res_make_tag_fizzler(vmf: VMF, info: conditions.MapInfo, res: Keyvalues) -> 
 
         sign_item.delete_antlines()
 
-        if fizzler is None:
+        if fizzler is None or fizzler_item is None:
             # No fizzler - remove this sign
             inst.remove()
             return
