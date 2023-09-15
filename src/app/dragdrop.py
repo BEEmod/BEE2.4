@@ -154,13 +154,13 @@ class ManagerBase(Generic[ItemT, ParentT]):
     # Fires when items are right-clicked on. If one is registered, the gear icon appears.
     on_config: Event[Slot[ItemT]]
     # Fired when any slot is modified. This occurs only once if two swap etc. The parameter is None.
-    on_modified: Event[[]]
+    on_modified: Event[()]
 
     # Fired when a slot is dropped on itself - allows detecting a left click.
     on_redropped: Event[Slot[ItemT]]
 
     # When flexi slots are present, called when they're filled/emptied.
-    on_flexi_flow: Event[[]]
+    on_flexi_flow: Event[()]
 
     # Mouse over or out of the items (including drag item).
     on_hover_enter: Event[Slot[ItemT]]

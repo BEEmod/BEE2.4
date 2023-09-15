@@ -12,7 +12,7 @@ whenever they are modified.
 """
 from __future__ import annotations
 from typing import Generator, TypeVar, Any, Generic, Callable, Awaitable
-from typing_extensions import ParamSpec
+from typing_extensions import TypeVarTuple, Unpack
 
 from contextlib import contextmanager
 from functools import partial
@@ -24,18 +24,17 @@ import srctools.logger
 
 __all__ = ['Event', 'ValueChange', 'ObsValue']
 LOGGER = srctools.logger.get_logger(__name__)
-# TODO: Swap to TypeVarTuple, no kwargs allowed.
-ArgT = ParamSpec('ArgT')
+ArgT = TypeVarTuple('ArgT')
 ValueT = TypeVar('ValueT')
 ValueT_co = TypeVar('ValueT_co', covariant=True)
 
 
 @attrs.define(init=False, eq=False)
-class Event(Generic[ArgT]):
+class Event(Generic[Unpack[ArgT]]):
     """Store functions to be called when an event occurs."""
-    callbacks: list[Callable[ArgT, Awaitable[Any]]]
-    last_result: tuple[ArgT.args, ArgT.kwargs] | None = attrs.field(init=False)
-    _override: trio.MemorySendChannel[ArgT.args] | None = attrs.field(repr=False)
+    callbacks: list[Callable[[Unpack[ArgT]], Awaitable[Any]]]
+    last_result: tuple[Unpack[ArgT]] | None = attrs.field(init=False)
+    _override: trio.MemorySendChannel[tuple[Unpack[ArgT]]] | None = attrs.field(repr=False)
     _cur_calls: int
     name: str
     log: bool = attrs.field(repr=False)
@@ -48,7 +47,7 @@ class Event(Generic[ArgT]):
         self.log = False
         self.last_result = None
 
-    def register(self, func: Callable[ArgT, Awaitable[Any]]) -> Callable[ArgT, Awaitable[Any]]:
+    def register(self, func: Callable[[Unpack[ArgT]], Awaitable[Any]]) -> Callable[[Unpack[ArgT]], Awaitable[Any]]:
         """Register the given function to be called.
 
         This can be used as a decorator.
@@ -56,37 +55,34 @@ class Event(Generic[ArgT]):
         self.callbacks.append(func)
         return func
 
-    async def register_and_prime(self, func: Callable[ArgT, Awaitable[Any]]) -> None:
+    async def register_and_prime(self, func: Callable[[Unpack[ArgT]], Awaitable[Any]]) -> None:
         """Register the given function, then immediately call with the last value if present."""
         self.callbacks.append(func)
         if self.last_result is None:
             await trio.sleep(0)  # Checkpoint.
         else:
-            last_pos, last_kw = self.last_result
-            await func(*last_pos, **last_kw)
+            await func(*self.last_result)
 
-    async def __call__(self, /, *args: ArgT.args, **kwargs: ArgT.kwargs) -> None:
+    async def __call__(self, /, *args: Unpack[ArgT]) -> None:
         """Run the specified event.
 
         This is re-entrant - if called whilst the same event is already being
         run, the second will be ignored.
         """
-        if kwargs:
-            raise TypeError("No kwargs allowed.")
         if self.log:
             LOGGER.debug(
                 '{}({}) = {}',
                 self.name,
-                ','.join(map(repr, args)),
+                ','.join([repr(x) for x in args]),
                 self.callbacks,
             )
 
         if self._cur_calls and self.last_result is not None:
-            last_pos, last_kw = self.last_result
-            if args == last_pos and kwargs == last_kw:
+            last_pos = self.last_result
+            if args == last_pos:
                 return
 
-        self.last_result = (args, kwargs)
+        self.last_result = args
         self._cur_calls += 1
         try:
             if self._override is not None:
@@ -94,11 +90,11 @@ class Event(Generic[ArgT]):
             else:
                 async with trio.open_nursery() as nursery:
                     for func in self.callbacks:
-                        nursery.start_soon(partial(func, *args, **kwargs))
+                        nursery.start_soon(func, *args)
         finally:
             self._cur_calls -= 1
 
-    def unregister(self, func: Callable[ArgT, Awaitable[Any]]) -> None:
+    def unregister(self, func: Callable[[Unpack[ArgT]], Awaitable[Any]]) -> None:
         """Remove the given callback.
 
         If it is not registered, raise LookupError.
@@ -109,14 +105,14 @@ class Event(Generic[ArgT]):
             raise LookupError(func) from None
 
     @contextmanager
-    def isolate(self) -> Generator[trio.MemoryReceiveChannel[ArgT.args], None, None]:
+    def isolate(self) -> Generator[trio.MemoryReceiveChannel[tuple[Unpack[ArgT]]], None, None]:
         """Temporarily disable all listening callbacks, and redirect to the supplied channel.
 
         This is mainly intended for testing code, to prevent it from affecting other things.
         This cannot currently be nested within itself, but isolating different events is fine.
         """
-        send: trio.MemorySendChannel[ArgT.args]
-        rec: trio.MemoryReceiveChannel[ArgT.args]
+        send: trio.MemorySendChannel[tuple[Unpack[ArgT]]]
+        rec: trio.MemoryReceiveChannel[tuple[Unpack[ArgT]]]
 
         if self._override is not None:
             raise ValueError('Event.isolate() does not support nesting with itself!')
@@ -141,7 +137,7 @@ class ValueChange(Generic[ValueT_co]):
 
 class ObsValue(Generic[ValueT]):
     """Holds a single value of any type, firing an event whenever it is altered."""
-    on_changed: Event[[ValueChange[ValueT]]]
+    on_changed: Event[ValueChange[ValueT]]
     _value: ValueT
 
     def __init__(self, initial: ValueT, name: str='') -> None:
