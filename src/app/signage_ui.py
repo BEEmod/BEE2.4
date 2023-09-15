@@ -102,19 +102,19 @@ async def init_widgets(master: tk.Widget, tk_img: TKImages) -> Optional[tk.Widge
     window.resizable(True, True)
     localisation.set_win_title(window, TransToken.ui('Configure Signage'))
 
-    frame_selected = ttk.Labelframe(window, relief='raised', labelanchor='n')
+    frame_selected = ttk.Labelframe(window, relief='raised', labelanchor='n', name='frame_selected')
     localisation.set_text(frame_selected, TransToken.ui('Selected'))
 
-    canv_all = tk.Canvas(window)
+    canv_all = tk.Canvas(window, name='canv_all')
 
-    scroll = tk_tools.HidingScroll(window, orient='vertical', command=canv_all.yview)
+    scroll = tk_tools.HidingScroll(window, orient='vertical', command=canv_all.yview, name='scrollbar')
     canv_all['yscrollcommand'] = scroll.set
 
-    name_label = ttk.Label(window, text='', justify='center')
-    frame_preview = ttk.Frame(window, relief='raised', borderwidth=4)
+    name_label = ttk.Label(window, text='', justify='center', name='lbl_name')
+    frame_preview = ttk.Frame(window, relief='raised', borderwidth=4, name='frame_preview')
 
     frame_selected.grid(row=0, column=0, sticky='nsew')
-    ttk.Separator(orient='horizontal').grid(row=1, column=0, sticky='ew')
+    ttk.Separator(orient='horizontal', name='sep').grid(row=1, column=0, sticky='ew')
     name_label.grid(row=2, column=0)
     frame_preview.grid(row=3, column=0, pady=4)
     canv_all.grid(row=0, column=1, rowspan=4, sticky='nsew')
@@ -124,8 +124,8 @@ async def init_widgets(master: tk.Widget, tk_img: TKImages) -> Optional[tk.Widge
 
     tk_tools.add_mousewheel(canv_all, canv_all, window)
 
-    preview_left = ttk.Label(frame_preview, anchor='e')
-    preview_right = ttk.Label(frame_preview, anchor='w')
+    preview_left = ttk.Label(frame_preview, anchor='e', name='left')
+    preview_right = ttk.Label(frame_preview, anchor='w', name='right')
     tk_img.apply(preview_left, IMG_BLANK)
     tk_img.apply(preview_right, IMG_BLANK)
     preview_left.grid(row=0, column=0)
