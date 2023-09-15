@@ -12,7 +12,7 @@ from typing import (
     Optional,
     Tuple, Literal,
 )
-from typing_extensions import TypeAlias
+from typing_extensions import TypeAlias, TypeVarTuple, Unpack
 
 from tkinter import ttk
 from tkinter import font as _tk_font
@@ -240,53 +240,13 @@ async def wait_eventloop() -> None:
     await _cur_update.wait()
 
 
-# TODO: TypeVarTuple support in mypy
-# PosArgsT = TypeVarTuple('PosArgsT')
-# def bind_mousewheel(
-#     widgets: Union[Iterable[tk.Misc], tk.Misc],
-#     func: Callable[[int, Unpack[PosArgsT]], object],
-#     args: Tuple[Unpack[PosArgsT]] = (),
-# ) -> None:
-T1 = TypeVar('T1')
-T2 = TypeVar('T2')
-T3 = TypeVar('T3')
-T4 = TypeVar('T4')
-T5 = TypeVar('T5')
+PosArgsT = TypeVarTuple('PosArgsT')
 
 
-@overload
 def bind_mousewheel(
     widgets: Union[Iterable[tk.Misc], tk.Misc],
-    func: Callable[[int], object], args: Tuple[()]=...,
-) -> None: ...
-@overload
-def bind_mousewheel(
-    widgets: Union[Iterable[tk.Misc], tk.Misc],
-    func: Callable[[int, T1], object], args: Tuple[T1],
-) -> None: ...
-@overload
-def bind_mousewheel(
-    widgets: Union[Iterable[tk.Misc], tk.Misc],
-    func: Callable[[int, T1, T2], object], args: Tuple[T1, T2],
-) -> None: ...
-@overload
-def bind_mousewheel(
-    widgets: Union[Iterable[tk.Misc], tk.Misc],
-    func: Callable[[int, T1, T2, T3], object], args: Tuple[T1, T2, T3],
-) -> None: ...
-@overload
-def bind_mousewheel(
-    widgets: Union[Iterable[tk.Misc], tk.Misc],
-    func: Callable[[int, T1, T2, T3, T4], object], args: Tuple[T1, T2, T3, T4],
-) -> None: ...
-@overload
-def bind_mousewheel(
-    widgets: Union[Iterable[tk.Misc], tk.Misc],
-    func: Callable[[int, T1, T2, T3, T4, T5], object], args: Tuple[T1, T2, T3, T4, T5],
-) -> None: ...
-def bind_mousewheel(
-    widgets: Union[Iterable[tk.Misc], tk.Misc],
-    func: Callable[..., object], args: Tuple[object, ...] = (),
+    func: Callable[[int, Unpack[PosArgsT]], object],
+    *args: Unpack[PosArgsT],
 ) -> None:
     """Bind mousewheel events, which function differently on each platform.
 
@@ -340,7 +300,7 @@ def add_mousewheel(target: Union[tk.XView, tk.YView], *frames: tk.Misc, orient: 
     """
     scroll_func = getattr(target, orient + 'view_scroll')
     # Call view_scroll(delta, "units").
-    bind_mousewheel(frames, scroll_func, ('units', ))
+    bind_mousewheel(frames, scroll_func, 'units', )
 
 
 def make_handler(func: Union[

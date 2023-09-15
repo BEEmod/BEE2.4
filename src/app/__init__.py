@@ -3,6 +3,8 @@ import tkinter as tk
 from types import TracebackType, new_class
 from typing import Awaitable, Callable, Optional, Type, TypeVar, overload, Generic
 
+from typing_extensions import TypeVarTuple, Unpack
+
 import utils
 import trio  # Import first, so it monkeypatches traceback before us.
 
@@ -131,55 +133,13 @@ def on_error(
         pass
 
 
-# TODO: Remove once mypy supports TypeVarTuple.
-# BGRunArgsT = TypeVarTuple('BGRunArgsT')
-T1 = TypeVar('T1')
-T2 = TypeVar('T2')
-T3 = TypeVar('T3')
-T4 = TypeVar('T4')
-T5 = TypeVar('T5')
+PosArgsT = TypeVarTuple('PosArgsT')
 
-@overload
-def background_run(
-    func: Callable[[], Awaitable[object]],
-    /, *, name: Optional[str] = None,
-) -> None: ...
-@overload
-def background_run(
-    func: Callable[[T1], Awaitable[object]],
-    arg1: T1,
-    /, *, name: Optional[str] = None,
-) -> None: ...
-@overload
-def background_run(
-    func: Callable[[T1, T2], Awaitable[object]],
-    arg1: T1, arg2: T2,
-    /, *, name: Optional[str] = None,
-) -> None: ...
-@overload
-def background_run(
-    func: Callable[[T1, T2, T3], Awaitable[object]],
-    arg1: T1, arg2: T2, arg3: T3,
-    /, *, name: Optional[str] = None,
-) -> None: ...
-@overload
-def background_run(
-    func: Callable[[T1, T2, T3, T4], Awaitable[object]],
-    arg1: T1, arg2: T2, arg3: T3, arg4: T4,
-    /, *, name: Optional[str] = None,
-) -> None: ...
-@overload
-def background_run(
-    func: Callable[[T1, T2, T3, T4, T5], Awaitable[object]],
-    arg1: T1, arg2: T2, arg3: T3, arg4: T4, arg5: T5,
-    /, *, name: Optional[str] = None,
-) -> None: ...
 
 def background_run(
-    # func: Callable[[Unpack[BGRunArgsT]], Awaitable[object]], /,
-    # *args: Unpack[BGRunArgsT],
-    func: Callable[..., Awaitable[object]],
-    /, *args: object, name: Optional[str] = None,
+    func: Callable[[Unpack[PosArgsT]], Awaitable[object]],
+    /, *args: Unpack[PosArgsT],
+    name: Optional[str] = None,
 ) -> None:
     """When the UI is live, begin this specified task."""
     if _APP_NURSERY is None:
