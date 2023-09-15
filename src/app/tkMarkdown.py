@@ -182,7 +182,9 @@ class TKRenderer(base_renderer.BaseRenderer[SingleMarkdown]):
     def render(self, token: Token) -> SingleMarkdown:
         """Check that the state has been fetched."""
         assert state.get() is not no_state
-        return super().render(token)
+        result = super().render(token)
+        assert isinstance(result, SingleMarkdown)
+        return result
 
     def render_inner(self, token: Token) -> SingleMarkdown:
         """Recursively renders child tokens.
@@ -191,7 +193,9 @@ class TKRenderer(base_renderer.BaseRenderer[SingleMarkdown]):
         """
         blocks: list[Block] = []
         if not hasattr(token, 'children'):
-            return super().render_inner(token)
+            result = super().render_inner(token)
+            assert isinstance(result, SingleMarkdown)
+            return result
         child: Token
 
         # Merge together adjacent text segments

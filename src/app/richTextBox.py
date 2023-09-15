@@ -144,7 +144,7 @@ class tkRichText(tkinter.Text):
 
         self['state'] = "disabled"
 
-    def insert(self, *args: Never, **kwargs: Never) -> None:
+    def insert(self, *args: Never, **kwargs: Never) -> None:  # type: ignore[override]
         """Inserting directly is disallowed."""
         raise TypeError('richTextBox should not have text inserted directly.')
 

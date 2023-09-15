@@ -825,7 +825,7 @@ class ImgCrop(Handle):
     @classmethod
     def _to_key(
         cls,
-        args: tuple[Handle, tuple[int, int, int, int] | None, Image.Transpose | None],  # type: ignore[override]
+        args: tuple[Handle, tuple[int, int, int, int] | None, Image.Transpose | None],
     ) -> tuple[int, tuple[int, int, int, int] | None, Image.Transpose | None]:
         """Handles aren't hashable, so we need to use identity."""
         [child, bounds, transpose] = args

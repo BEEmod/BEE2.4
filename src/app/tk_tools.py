@@ -372,21 +372,24 @@ class _EventDeco(Protocol[AnyWidT]):
 class _Binder(Protocol):
     @overload
     def __call__(self, wid: WidgetT, *, add: bool=False) -> Callable[[_EventDeco[WidgetT]], _EventDeco[WidgetT]]:
-        pass
-    @overload
-    def __call__(self, wid: WidgetT, func: EventFunc[WidgetT], *, add: bool=False) -> str:
-        pass
+        ...
     @overload
     def __call__(self, wid: tk.Misc, *, add: bool=False) -> Callable[[_EventDeco[tk.Misc]], _EventDeco[tk.Misc]]:
-        pass
+        ...
     @overload
-    def __call__(self, wid: tk.Misc, func: EventFunc[tk.Misc], *, add: bool=False) -> str:
-        pass
+    def __call__(self, wid: WidgetT, func: EventFunc[WidgetT], *, add: bool=False) -> str:
+        ...
+    @overload
+    def __call__(self, wid: tk.Misc, func: EventFunc[tk.Misc], *, add: bool=False) -> str: ...
     def __call__(
-        self, wid: WidgetT,
-        func: Optional[EventFunc[WidgetT]]=None, *, add: bool=False,
-    ) -> Union[Callable[[_EventDeco[WidgetT]], _EventDeco[WidgetT]], str]:
-        pass
+        self, wid: Union[WidgetT, tk.Misc],
+        func: Union[EventFunc[WidgetT], EventFunc[tk.Misc], None] = None,
+        *, add: bool = False,
+    ) -> Union[
+        Callable[[_EventDeco[WidgetT]], _EventDeco[WidgetT]],
+        Callable[[_EventDeco[tk.Misc]], _EventDeco[tk.Misc]],
+        str,
+    ]: ...
 
 
 def _bind_event_handler(bind_func: Callable[[WidgetT, EventFunc[WidgetT], bool], None]) -> _Binder:

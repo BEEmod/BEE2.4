@@ -2,13 +2,12 @@
 
 This is useful to allow using the same code for reading folders or zips of data.
 """
-from typing import IO, Iterator, Literal, Optional, Set, TextIO, Union
+from typing import IO, Iterator, Literal, Optional, Set, TextIO, Union, overload
 from typing_extensions import Self
 from zipfile import ZIP_STORED, ZipFile
 import shutil
 import os
 import io
-
 
 
 class FakeZipInfo:
@@ -28,7 +27,11 @@ class FakeZipInfo:
     def __str__(self) -> str:
         return self.filename
 
-    def __call__(self, m='r') -> TextIO:
+    @overload
+    def __call__(self, m: Literal['rb']) -> IO[bytes]: ...
+    @overload
+    def __call__(self, m: Literal['r'] = 'r') -> IO[str]: ...
+    def __call__(self, m: str = 'r') -> Union[IO[str], IO[bytes]]:
         return open(self.filename, m)
 
 
@@ -55,6 +58,10 @@ class FakeZip:
         # Always re-raise exceptions
         return False
 
+    @overload
+    def open(self, name: str, mode: Literal['rb'], pwd: object=None) -> IO[bytes]: ...
+    @overload
+    def open(self, name: str, mode: Literal['r'] = 'r', pwd: object=None) -> IO[str]: ...
     def open(self, name: str, mode: str = 'r', pwd: object=None):
         try:
             return open(os.path.join(self.folder, name), mode)

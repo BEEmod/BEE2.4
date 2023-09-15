@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import math
-from typing import Iterable, Tuple, no_type_check
+from typing import Iterable, Tuple
 from pathlib import Path
 import pytest
 
@@ -94,7 +94,6 @@ def test_bbox_construction() -> None:
     ).tags == frozenset({'a', 'b', 'embed'})
 
 
-@no_type_check
 def test_illegal_bbox() -> None:
     """A line or point segement is not allowed."""
     with pytest.raises(ValueError):
@@ -124,30 +123,29 @@ def test_bbox_vecs() -> None:
     assert bb.center is not bb.center
 
 
-@no_type_check
 def test_bbox_is_frozen() -> None:
     """Test modification is not possible."""
     bb = BBox(40, 60, 80, 120, 450, 730, contents=CollideType.PHYSICS)
     with pytest.raises(AttributeError):
-        bb.min_x = 100
+        bb.min_x = 100  # type: ignore
     with pytest.raises(AttributeError):
-        bb.min_y = 100
+        bb.min_y = 100  # type: ignore
     with pytest.raises(AttributeError):
-        bb.min_z = 100
+        bb.min_z = 100  # type: ignore
 
     with pytest.raises(AttributeError):
-        bb.max_x = 100
+        bb.max_x = 100  # type: ignore
     with pytest.raises(AttributeError):
-        bb.max_y = 100
+        bb.max_y = 100  # type: ignore
     with pytest.raises(AttributeError):
-        bb.max_z = 100
+        bb.max_z = 100  # type: ignore
 
     with pytest.raises(AttributeError):
-        bb.contents = CollideType.GRATE
+        bb.contents = CollideType.GRATE  # type: ignore
     with pytest.raises(AttributeError):
-        bb.tags = frozenset({'tag1', 'tag2', 'tag3'})
+        bb.tags = frozenset({'tag1', 'tag2', 'tag3'})  # type: ignore
     with pytest.raises(AttributeError):
-        bb.tags.add('extra')  # noqa
+        bb.tags.add('extra')  # type: ignore
     # Check all these assignments didn't actually do anything.
     assert_bbox(bb, (40, 60, 80), (120, 450, 730), CollideType.PHYSICS, set())
 
@@ -183,15 +181,13 @@ def test_reorder_helper() -> None:
     assert reorder((-10, 30, 0), 'xyz', 8, 6, 12) == Vec(-2, 36, 12)
 
 
-def get_intersect_testcases() -> Iterable[tuple[tuple[tuple3, tuple3] | None, tuple[tuple3, tuple3] | None]]:
+def get_intersect_testcases() -> Iterable[tuple[tuple3, tuple3, tuple[tuple3, tuple3] | None]]:
     """Use a VMF to make it easier to generate the bounding boxes."""
     with Path(__file__, '../bbox_samples.vmf').open() as f:
         vmf = VMF.parse(Keyvalues.parse(f))
 
-    def process(brush: Solid | None) -> tuple[tuple3, tuple3] | None:
+    def process(brush: Solid) -> tuple[tuple3, tuple3]:
         """Extract the bounding box from the brush."""
-        if brush is None:
-            return None
         bb_min, bb_max = brush.get_bbox()
         for vec in [bb_min, bb_max]:
             for ax in 'xyz':
@@ -204,7 +200,8 @@ def get_intersect_testcases() -> Iterable[tuple[tuple[tuple3, tuple3] | None, tu
         )
 
     for ent in vmf.entities:
-        test = expected = None
+        test: Solid | None = None
+        expected: Solid | None = None
         for solid in ent.solids:
             if solid.sides[0].mat.casefold() == 'tools/toolsskip':
                 expected = solid
@@ -213,7 +210,11 @@ def get_intersect_testcases() -> Iterable[tuple[tuple[tuple3, tuple3] | None, tu
         if test is None:
             raise ValueError(ent.id)
         # Unpack mins/maxes for test, it's always present.
-        yield (*process(test), process(expected))
+        mins, maxs = process(test)
+        if expected is not None:
+            yield (mins, maxs, process(expected))
+        else:
+            yield (mins, maxs, None)
 
 
 @pytest.mark.parametrize('mins, maxs, success', list(get_intersect_testcases()))
