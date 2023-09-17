@@ -521,6 +521,91 @@ class SelectorWin(Generic[CallbackT]):
     - wid: The Toplevel window for this selector dialog.
     - suggested: The Item which is suggested by the style.
     """
+    noneItem: Item
+    # The textbox on the parent window.
+    display: tk_tools.ReadOnlyEntry | None
+    # Variable associated with self.display.
+    disp_label: tk.StringVar
+
+    # The '...' button to open our window.
+    disp_btn: ttk.Button | None
+
+    # Callback function, and positional arguments to pass
+    callback: Callable[Concatenate[Optional[str], CallbackT], None] | None
+    callback_params: CallbackT.args
+    callback_kwargs: CallbackT.kwargs
+
+    # Currently suggested item objects. This would be a set, but we want to randomly pick.
+    suggested: list[Item]
+    # While the user hovers over the "suggested" button, cycle through random items. But we
+    # want to apply that specific item when clicked.
+    _suggested_rollover: Item | None
+    _suggest_lbl: list[ttk.Label | ttk.LabelFrame]
+
+    # Should we have the 'reset to default' button?
+    has_def: bool
+    description: TransToken
+    readonly_description: TransToken
+
+    item_list: list[Item]
+    selected: Item
+    orig_selected: Item
+    parent: tk.Tk | tk.Toplevel
+    _readonly: bool
+    modal: bool
+    win: tk.Toplevel
+    attrs: list[AttrDef]
+
+    # A map from group name -> header widget
+    group_widgets: dict[str, GroupHeader]
+    # A map from folded name -> display name
+    group_names: dict[str, TransToken]
+    grouped_items: dict[str, list[Item]]
+    # A list of casefolded group names in the display order.
+    group_order: list[str]
+
+    # The maximum number of items that fits per row (set in flow_items)
+    item_width: int
+
+    # The ID used to persist our window state across sessions.
+    save_id: str
+    store_last_selected: bool
+    # Indicate that flow_items() should restore state.
+    first_open: bool
+
+    desc_label: ttk.Label
+    pane_win: tk.PanedWindow
+    wid_canvas: tk.Canvas
+    pal_frame: ttk.Frame
+    wid_scroll: tk_tools.HidingScroll
+    # Holds all the widgets which provide info for the current item.
+    prop_frm: ttk.Frame
+    # Border around the selected item icon.
+    prop_icon_frm: ttk.Frame
+    prop_icon: ttk.Label
+    prop_name: ttk.Label
+
+    samp_button: ttk.Button | None
+    sampler: sound.SamplePlayer | None
+
+    prop_author: ttk.Label
+    prop_desc_frm: ttk.Frame
+    prop_desc: tkRichText
+    prop_scroll: tk_tools.HidingScroll
+    prop_reset: ttk.Button
+    context_menu: tk.Menu
+    norm_font: tk_font.Font
+    # A font for showing suggested items in the context menu
+    sugg_font: tk_font.Font
+    # A font for previewing the suggested items
+    mouseover_font: tk_font.Font
+
+    # The headers for the context menu
+    context_menus: dict[str, tk.Menu]
+    # The widget used to control which menu option is selected.
+    context_var: tk.StringVar
+
+
     def __init__(
         self,
         parent: tk.Tk | tk.Toplevel,
@@ -530,7 +615,7 @@ class SelectorWin(Generic[CallbackT]):
         store_last_selected: bool = True,
         has_none: bool = True,
         has_def: bool = True,
-        sound_sys: FileSystemChain = None,
+        sound_sys: FileSystemChain | None = None,
         modal: bool = False,
         default_id: str = '<NONE>',
         # i18n: 'None' item description
@@ -542,7 +627,7 @@ class SelectorWin(Generic[CallbackT]):
         title: TransToken = TransToken.untranslated('???'),
         desc: TransToken = TransToken.BLANK,
         readonly_desc: TransToken = TransToken.BLANK,
-        callback: Optional[Callable[Concatenate[Optional[str], CallbackT], None]] = None,
+        callback: Callable[Concatenate[Optional[str], CallbackT], None] | None = None,
         callback_params: CallbackT.args = (),
         callback_keywords: CallbackT.kwargs = EmptyMapping,
         attributes: Iterable[AttrDef] = (),
@@ -596,13 +681,13 @@ class SelectorWin(Generic[CallbackT]):
         self.noneItem.context_lbl = none_name
 
         # The textbox on the parent window.
-        self.display: tk_tools.ReadOnlyEntry | None = None
+        self.display = None
 
         # Variable associated with self.display.
         self.disp_label = tk.StringVar()
 
         # The '...' button to open our window.
-        self.disp_btn: ttk.Button | None = None
+        self.disp_btn = None
 
         # Callback function, and positional arguments to pass
         self.callback = callback
@@ -610,11 +695,11 @@ class SelectorWin(Generic[CallbackT]):
         self.callback_kwargs = dict(callback_keywords)
 
         # Currently suggested item objects. This would be a set, but we want to randomly pick.
-        self.suggested: list[Item] = []
+        self.suggested = []
         # While the user hovers over the "suggested" button, cycle through random items. But we
         # want to apply that specific item when clicked.
-        self._suggested_rollover: Item | None = None
-        self._suggest_lbl: list[ttk.Label | ttk.LabelFrame] = []
+        self._suggested_rollover = None
+        self._suggest_lbl = []
 
         # Should we have the 'reset to default' button?
         self.has_def = has_def
@@ -673,12 +758,12 @@ class SelectorWin(Generic[CallbackT]):
         self.win.bind("<KeyPress>", self.key_navigate)
 
         # A map from group name -> header widget
-        self.group_widgets: dict[str, GroupHeader] = {}
+        self.group_widgets = {}
         # A map from folded name -> display name
-        self.group_names: dict[str, TransToken] = {}
-        self.grouped_items: dict[str, list[Item]] = {}
+        self.group_names = {}
+        self.grouped_items = {}
         # A list of casefolded group names in the display order.
-        self.group_order: list[str] = []
+        self.group_order = []
 
         # The maximum number of items that fits per row (set in flow_items)
         self.item_width = 1
@@ -791,6 +876,7 @@ class SelectorWin(Generic[CallbackT]):
             samp_button['command'] = self.sampler.play_sample
             samp_button.state(('disabled',))
         else:
+            self.samp_button = None
             self.sampler = None
 
         self.prop_author = ttk.Label(self.prop_frm, text="Author: person")
@@ -860,18 +946,18 @@ class SelectorWin(Generic[CallbackT]):
         self.win.option_add('*tearOff', False)
         self.context_menu = tk.Menu(self.win)
 
-        self.norm_font: tk_font.Font = tk_font.nametofont('TkMenuFont')
+        self.norm_font = tk_font.nametofont('TkMenuFont')
 
         # Make a font for showing suggested items in the context menu
-        self.sugg_font: tk_font.Font = self.norm_font.copy()
+        self.sugg_font = self.norm_font.copy()
         self.sugg_font['weight'] = tk_font.BOLD
 
         # Make a font for previewing the suggested items
-        self.mouseover_font: tk_font.Font = self.norm_font.copy()
+        self.mouseover_font = self.norm_font.copy()
         self.mouseover_font['slant'] = tk_font.ITALIC
 
         # The headers for the context menu
-        self.context_menus: dict[str, tk.Menu] = {}
+        self.context_menus = {}
         # The widget used to control which menu option is selected.
         self.context_var = tk.StringVar()
 
