@@ -1,7 +1,5 @@
 """Window for configuring BEE2's options, as well as the home of some options."""
 import itertools
-from collections import defaultdict
-from pathlib import Path
 
 import tkinter as tk
 import trio
@@ -13,6 +11,7 @@ import srctools.logger
 
 import packages
 import utils
+from app.reports import report_all_obj, report_items
 from app.tooltip import add_tooltip
 from app import (
     TK_ROOT, LAUNCH_AFTER_EXPORT, DEV_MODE, background_run,
@@ -594,48 +593,3 @@ async def init_dev_tab(f: ttk.Frame) -> None:
         "localisations, creating them for packages that don't have any."
     ))
     build_pack_trans_btn.grid(row=0, column=1, sticky='e')
-
-# Various "reports" that can be produced.
-
-
-def get_report_file(filename: str) -> Path:
-    """The folder where reports are dumped to."""
-    reports = Path('reports')
-    reports.mkdir(parents=True, exist_ok=True)
-    file = (reports / filename).resolve()
-    LOGGER.info('Producing {}...', file)
-    return file
-
-
-def report_all_obj() -> None:
-    """Print a list of every object type and ID."""
-    from packages import OBJ_TYPES, get_loaded_packages
-    packset = get_loaded_packages()
-    for type_name, obj_type in OBJ_TYPES.items():
-        with get_report_file(f'obj_{type_name}.txt').open('w') as f:
-            f.write(f'{len(packset.all_obj(obj_type))} {type_name}:\n')
-            for obj in packset.all_obj(obj_type):
-                f.write(f'- {obj.id}\n')
-
-
-def report_items() -> None:
-    """Print out all the item IDs used, with subtypes."""
-    from packages import Item, get_loaded_packages
-    packset = get_loaded_packages()
-    with get_report_file('items.txt').open('w') as f:
-        for item in sorted(packset.all_obj(Item), key=lambda it: it.id):
-            for vers_name, version in item.versions.items():
-                if len(item.versions) == 1:
-                    f.write(f'- `<{item.id}>`\n')
-                else:
-                    f.write(f'- `<{item.id}:{vers_name}>`\n')
-
-                variant_to_id = defaultdict(list)
-                for sty_id, variant in version.styles.items():
-                    variant_to_id[variant].append(sty_id)
-
-                for variant, style_ids in variant_to_id.items():
-                    f.write(
-                        f'\t- [ ] {", ".join(sorted(style_ids))}:\n'
-                        f'\t  `{variant.source}`\n'
-                    )
