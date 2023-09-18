@@ -11,7 +11,7 @@ import srctools.logger
 
 import packages
 import utils
-from app.reports import report_all_obj, report_items
+from app.reports import report_all_obj, report_items, report_editor_models
 from app.tooltip import add_tooltip
 from app import (
     TK_ROOT, LAUNCH_AFTER_EXPORT, DEV_MODE, background_run,
@@ -555,6 +555,11 @@ async def init_dev_tab(f: ttk.Frame) -> None:
         ttk.Button(frm_btn1, command=report_items),
         TransToken.ui('Dump Items List'),
     ).grid(row=0, column=1)
+
+    localisation.set_text(
+        ttk.Button(frm_btn1, command=lambda: background_run(report_editor_models)),
+        TransToken.ui('Dump Editor Models'),
+    ).grid(row=1, column=0)
 
     reload_img = ttk.Button(frm_btn1, command=img.refresh_all)
     localisation.set_text(reload_img, TransToken.ui('Reload Images'))
