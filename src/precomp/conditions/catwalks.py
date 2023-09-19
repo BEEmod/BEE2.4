@@ -1,14 +1,14 @@
 """Implement Catwalks."""
 from collections import defaultdict
 from enum import Enum
-from typing import Optional, Dict, Tuple, Mapping
+from typing import Optional, Dict, Tuple, Mapping, Union
 
 import attrs
-from srctools import Angle, Vec, Keyvalues, VMF
+from srctools import Keyvalues, VMF
+from srctools.math import Angle, FrozenVec, Vec, AnyVec, AnyAngle, AnyMatrix, to_matrix
 from srctools.logger import get_logger
-import srctools
 
-from precomp import brushLoc, instanceLocs, conditions
+from precomp import brushLoc, instanceLocs, conditions, tiling
 from precomp.connections import ITEMS
 import utils
 
@@ -27,6 +27,7 @@ class Instances(Enum):
     END = 'end'
     STAIR = 'stair'
     END_WALL = 'end_wall'
+    SUPP_END_WALL = 'support_end_wall'
     SUPP_WALL = 'support_wall'
     SUPP_CEIL = 'support_ceil'
     SUPP_FLOOR = 'support_floor'
@@ -88,6 +89,32 @@ class EmptyLink(Link):
 
 
 EMPTY = EmptyLink()
+
+
+def check_support_locs(
+    origin: AnyVec, orient: Union[AnyMatrix, AnyAngle],
+    debug_add: conditions.DebugAdder,
+    normal: AnyVec,
+    *points: AnyVec,
+) -> bool:
+    """Check if these tile locations are all present for supports."""
+    matrix = to_matrix(orient)
+    normal = Vec(normal) @ matrix
+    for point in points:
+        pos = Vec(point)
+        pos.localise(origin, matrix)
+        debug_add(
+            'info_particle_system',
+            origin=pos,
+            angles=normal.to_angle(),
+        )
+        try:
+            tile, u, v = tiling.find_tile(pos, normal)
+        except KeyError:
+            return False  # Not present at all.
+        if not tile[u, v].is_tile:
+            return False  # Not a tile.
+    return True
 
 
 def place_catwalk_connections(
@@ -178,11 +205,12 @@ def res_make_catwalk(vmf: VMF, res: Keyvalues) -> object:
         * `crossJunction`: A X-piece. Connects on all sides.
         * `end`: An end piece. Connects on the East side.
         * `stair`: A stair. Starts East and goes Up and West.
-        * `end_wall`: Connects a West wall to a East catwalk.
+        * `end_wall`: Connects a West wall to an East catwalk.
         * `support_wall`: A support extending from the East wall.
         * `support_ceil`: A support extending from the ceiling.
         * `support_floor`: A support extending from the floor.
         * `support_goo`: A floor support, designed for goo pits.
+        * `support_end_wall`: A support underneath `end_wall`, attaching it to the wall.
         * `single_wall`: A section connecting to an East wall.
     """
     LOGGER.info("Starting catwalk generator...")
@@ -229,6 +257,8 @@ def res_make_catwalk(vmf: VMF, res: Keyvalues) -> object:
     LOGGER.info('Positions: {}', catwalks)
     LOGGER.info('Markers: {}', markers)
 
+    debug_add = conditions.fetch_debug_visgroup(vmf, 'Catwalks')
+
     # First loop through all the markers, adding connecting sections
     for marker_name, inst in markers.items():
         mark_item = ITEMS[marker_name]
@@ -267,24 +297,42 @@ def res_make_catwalk(vmf: VMF, res: Keyvalues) -> object:
 
     for inst in markers.values():
         # Set the marker instances based on the attached walkways.
-        normal = Vec(0, 0, 1) @ Angle.from_str(inst['angles'])
-        pos_tup = srctools.parse_vec_str(inst['origin'])
+        normal = FrozenVec(0, 0, 1) @ Angle.from_str(inst['angles'])
+        origin = Vec.from_str(inst['origin'])
+        pos_tup = origin.as_tuple()
         dir_mask = catwalks[pos_tup]
+        angle = conditions.INST_ANGLE[normal]
 
         new_type, _ = utils.CONN_LOOKUP[dir_mask.as_tuple()]
         inst.remove()
 
+        supp = ''
+
         if new_type is utils.CONN_TYPES.side:
             # If the end piece is pointing at a wall, switch the instance.
-            if abs(normal.z) < 0.01:
-                if normal == dir_mask.conn_dir():
+            if abs(normal.z) < 0.01 and normal == dir_mask.conn_dir():
+                angle = conditions.INST_ANGLE[-normal]
+                conditions.add_inst(
+                    vmf,
+                    file=instances[Instances.END_WALL],
+                    origin=origin,
+                    angles=angle,
+                )
+                catwalks[pos_tup] = EMPTY
+                # If there's room below, add special supports.
+                if instances[Instances.SUPP_END_WALL] and check_support_locs(
+                    origin, angle, debug_add, (1.0, 0.0, 0.0),
+                    (-64.0, -48.0, -80.0),
+                    (-64.0, -16.0, -80.0),
+                    (-64.0, +16.0, -80.0),
+                    (-64.0, +48.0, -80.0),
+                ):
                     conditions.add_inst(
                         vmf,
-                        file=instances[Instances.END_WALL],
-                        origin=inst['origin'],
-                        angles=inst['angles'],
+                        file=instances[Instances.SUPP_END_WALL],
+                        origin=origin,
+                        angles=angle,
                     )
-                    catwalks[pos_tup] = EMPTY
             continue  # We never have normal supports on end pieces
         elif new_type is utils.CONN_TYPES.none:
             # Unconnected catwalks on the wall switch to a special instance.
@@ -294,7 +342,7 @@ def res_make_catwalk(vmf: VMF, res: Keyvalues) -> object:
                     vmf,
                     file=instances[Instances.SINGLE_WALL],
                     origin=inst['origin'],
-                    angles=conditions.INST_ANGLE[normal.freeze()],
+                    angles=angle,
                 )
                 catwalks[pos_tup] = EMPTY
             continue  # These don't get supports otherwise
@@ -302,22 +350,25 @@ def res_make_catwalk(vmf: VMF, res: Keyvalues) -> object:
         # Add regular supports
         if normal.z > 0.707:
             # If in goo, use different supports!
-            origin = Vec.from_str(inst['origin'])
-            origin.z -= 128
-            if brushLoc.POS.lookup_world(origin).is_goo:
+            if brushLoc.POS.lookup_world(origin - (0, 0, 128)).is_goo:
                 supp = instances[Instances.SUPP_GOO]
             else:
                 supp = instances[Instances.SUPP_FLOOR]
         elif normal.z < -0.707:
             supp = instances[Instances.SUPP_CEIL]
-        else:
+        elif instances[Instances.SUPP_WALL] and check_support_locs(
+            origin, angle, debug_add, (1.0, 0.0, 0.0),
+            # Needs to be attachment space below.
+            (-64.0, -16.0, -80.0),
+            (-64.0, +16.0, -80.0),
+        ):
             supp = instances[Instances.SUPP_WALL]
 
         if supp:
             conditions.add_inst(
                 vmf,
                 origin=inst['origin'],
-                angles=conditions.INST_ANGLE[normal.freeze()],
+                angles=angle,
                 file=supp,
             )
 
@@ -345,7 +396,7 @@ def res_make_catwalk(vmf: VMF, res: Keyvalues) -> object:
             end += direction / 2
             diff = end - start
             direction = diff.norm()
-            LOGGER.info('{} -> ({}) - ({}) = {}', pos_tup, start, end, list(utils.fit(diff.len(), [512, 256, 128])))
+            LOGGER.debug('{} -> ({}) - ({}) = {}', pos_tup, start, end, list(utils.fit(diff.len(), [512, 256, 128])))
             for segment_len in utils.fit(diff.len(), [512, 256, 128]):
                 conditions.add_inst(
                     vmf,
