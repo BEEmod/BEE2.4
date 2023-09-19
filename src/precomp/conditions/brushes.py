@@ -861,13 +861,7 @@ def res_set_tile(inst: Entity, res: Keyvalues) -> None:
     else:
         rng = None
 
-    if utils.DEV_MODE:
-        try:
-            [visgroup] = [vis for vis in inst.map.vis_tree if vis.name == 'SetTile']
-        except ValueError:
-            visgroup = inst.map.create_visgroup('SetTile')
-    else:
-        visgroup = None
+    debug_add = conditions.fetch_debug_visgroup(inst.map, 'SetTile')
 
     for y, row in enumerate(tiles):
         for x, val in enumerate(row):
@@ -879,23 +873,19 @@ def res_set_tile(inst: Entity, res: Keyvalues) -> None:
 
             pos = Vec(32 * x, -32 * y, 0) @ orient + offset
 
-            if visgroup is not None:
-                try:
-                    skin = template_brush.TILETYPE_TO_SKIN[tiling.TILETYPE_FROM_CHAR[val]]
-                except KeyError:
-                    skin = 0
-                trace = inst.map.create_ent(
-                    'bee2_template_tilesetter',
-                    origin=pos,
-                    angles=orient.to_angle(),
-                    force=force_tile,
-                    targetname=inst['targetname'],
-                    skin=skin,
-                )
-                trace.vis_shown = False
-                trace.hidden = True
-                trace.comments = f'This tile char [{x}, {y}] = {val}.'
-                trace.visgroup_ids.add(visgroup.id)
+            try:
+                skin = template_brush.TILETYPE_TO_SKIN[tiling.TILETYPE_FROM_CHAR[val]]
+            except KeyError:
+                skin = 0
+            debug_add(
+                'bee2_template_tilesetter',
+                origin=pos,
+                angles=orient.to_angle(),
+                force=force_tile,
+                targetname=inst['targetname'],
+                skin=skin,
+                comment=f'This tile char [{x}, {y}] = {val}.',
+            )
 
             if val == '4':
                 size = tiling.TileSize.TILE_4x4

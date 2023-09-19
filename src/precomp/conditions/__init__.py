@@ -42,12 +42,12 @@ from collections.abc import Mapping
 from collections import defaultdict
 from decimal import Decimal
 from enum import Enum
-from typing import Generic, TypeVar, Any, Callable, TextIO, Tuple, Type, overload, cast
+from typing import Generic, Protocol, TypeVar, Any, Callable, TextIO, Tuple, Type, overload, cast
 
 import attrs
 import srctools.logger
 from srctools.math import AnyVec, FrozenAngle, Vec, FrozenVec, AnyAngle, AnyMatrix, Angle, Matrix
-from srctools.vmf import VMF, Entity, Output, Solid
+from srctools.vmf import EntityGroup, VMF, Entity, Output, Solid, ValidKVs, VisGroup
 from srctools import Keyvalues
 
 from precomp import instanceLocs, rand, collisions
@@ -1018,7 +1018,80 @@ def local_name(inst: Entity, name: str | Entity) -> str:
         raise ValueError(f'Unknown fixup style {fixup}!')
 
 
-def widen_fizz_brush(brush: Solid, thickness: float, bounds: tuple[Vec, Vec]=None):
+class DebugAdder(Protocol):
+    @overload
+    def __call__(self, ent: Entity, /) -> Entity:
+        """Add this entity to the map, the visgroup and make it hidden."""
+
+    @overload
+    def __call__(self, brush: Solid, /) -> Entity:
+        """Add this brush to the map, the visgroup and make it hidden."""
+
+    @overload
+    def __call__(self, classname: str, /, *, comment: str='', **kwargs: ValidKVs) -> Entity:
+        """Create an entity with the specified keyvalues."""
+
+
+def fetch_debug_visgroup(
+    vmf: VMF,
+    vis_name: str,
+    r: int = 113, g: int = 113, b: int = 0,
+    force: bool = False,
+) -> DebugAdder:
+    """If debugging is enabled, return a function that adds entities to the specified visgroup.
+
+    * vis_name: The name of the visgroup to use. If already present the existing one is used.
+    * r, g, b: Color to use, if creating.
+    * force: If true, always adds. Otherwise, this only adds if Dev Mode is enabled.
+
+    The returned function can either be called with a classname + keyvalues to create an ent,
+    or given an existing ent/brush to add. If given an existing ent/brush, it should not be
+    already added to the VMF - this will skip doing so if debugging is disabled. In that case
+    the ent/brush will just be discarded harmlessly.
+    """
+    if not force and not utils.DEV_MODE:
+        def func(target: str | Entity | Solid, /, **kwargs: ValidKVs) -> Entity | Solid:
+            """Do nothing."""
+            if isinstance(target, str):
+                # Create a dummy entity, which will be discarded.
+                return Entity(vmf, keys={'classname': target})
+            return target
+
+        return func
+
+    for visgroup in vmf.vis_tree:
+        if visgroup.name == vis_name:
+            break
+    else:
+        # Create the visgroup.
+        visgroup = vmf.create_visgroup(vis_name, (r, g, b))
+
+    group = EntityGroup(vmf, color=Vec(r, g, b), shown=False)
+
+    def adder(target: str | Entity | Solid, /, **kwargs: ValidKVs) -> Entity | Solid:
+        """Add a marker to the map."""
+        if isinstance(target, str):
+            comment = kwargs.pop('comment', '')
+            target = vmf.create_ent(target, **kwargs)
+            target.comments = str(comment)
+        elif isinstance(target, Solid):
+            vmf.add_brush(target)
+        elif isinstance(target, Entity):
+            vmf.add_ent(target)
+
+        target.visgroup_ids.add(visgroup.id)
+        if isinstance(target, Solid):
+            target.group_id = group.id
+        else:
+            target.groups.add(group.id)
+        target.vis_shown = False
+        target.hidden = True
+        return target
+
+    return adder
+
+
+def widen_fizz_brush(brush: Solid, thickness: float, bounds: tuple[Vec, Vec] | None = None) -> None:
     """Move the two faces of a fizzler brush outward.
 
     This is good to make fizzlers which are thicker than 2 units.

@@ -2,15 +2,12 @@
 import math
 from typing import Iterable, Tuple, Dict, Set, Callable
 
-from srctools.vmf import EntityGroup
-
-import utils
 from precomp.conditions import (
     make_flag, make_result, resolve_offset,
     DIRECTIONS,
 )
 from editoritems_props import PanelAnimation
-from precomp import tiling, brushLoc
+from precomp import conditions, tiling, brushLoc
 from srctools import Vec, FrozenVec, Angle, Matrix, conv_float, Keyvalues, Entity
 from srctools.logger import get_logger
 
@@ -117,35 +114,29 @@ def brush_at_loc(
     # Place info_targets to mark where we're checking.
     # These are hidden in a visgroup.
     debug_info = kv['debug', '']
-    if utils.DEV_MODE:
-        try:
-            [visgroup] = [vis for vis in inst.map.vis_tree if vis.name == 'TileAtLoc']
-        except ValueError:
-            visgroup = inst.map.create_visgroup('TileAtLoc')
-        first_trace = inst.map.create_ent('info_target', origin=pos, targetname=inst['targetname'])
-        first_trace.vis_shown = False
-        first_trace.hidden = True
-        first_trace.comments = debug_info
-        first_trace.visgroup_ids.add(visgroup.id)
-    else:
-        visgroup = first_trace = None
+
+    # In dev mode, display a visual of this location.
+    debug_adder = conditions.fetch_debug_visgroup(inst.map, 'TileAtLoc')
+
+    first_trace = debug_adder(
+        'info_target',
+        origin=pos,
+        targetname=inst['targetname'],
+        comments=debug_info,
+    )
 
     if 'pos2' in kv:
         pos2 = kv.vec('pos2')
         pos2.z -= 64  # Subtract so origin is the floor-position
         pos2.localise(origin, orient)
 
-        if visgroup is not None and first_trace is not None:
-            # Place a second for the bounding box, grouped with the first.
-            second_trace = inst.map.create_ent('info_target', origin=pos2, targetname=inst['targetname'])
-            second_trace.vis_shown = False
-            second_trace.hidden = True
-            second_trace.comments = debug_info
-            second_trace.visgroup_ids.add(visgroup.id)
-            group = EntityGroup(inst.map)
-            inst.map.groups[group.id] = group
-            first_trace.groups.add(group.id)
-            second_trace.groups.add(group.id)
+        # Place a second for the bounding box, grouped with the first.
+        debug_adder(
+            'info_target',
+            origin=pos2,
+            targetname=inst['targetname'],
+            comments=debug_info,
+        )
 
         bbox_min, bbox_max = Vec.bbox(round(pos, 6), round(pos2, 6))
 
@@ -190,8 +181,7 @@ def brush_at_loc(
         tile_types.add(tile_type)
 
     LOGGER.debug('PosIsSolid check {} - {} @ {} = {}', pos, pos2, norm, tile_types)
-    if first_trace is not None:
-        first_trace.comments += ' Tiles: ' + ' '.join([t.name for t in tile_types])
+    first_trace.comments += ' Tiles: ' + ' '.join([t.name for t in tile_types])
 
     if result_var:
         if tile_type.is_tile:
