@@ -46,7 +46,7 @@ from typing import Generic, TypeVar, Any, Callable, TextIO, Tuple, Type, overloa
 
 import attrs
 import srctools.logger
-from srctools.math import AnyVec, Vec, FrozenVec, AnyAngle, AnyMatrix, Angle, Matrix
+from srctools.math import AnyVec, FrozenAngle, Vec, FrozenVec, AnyAngle, AnyMatrix, Angle, Matrix
 from srctools.vmf import VMF, Entity, Output, Solid
 from srctools import Keyvalues
 
@@ -135,26 +135,26 @@ DIRECTIONS: Mapping[str, FrozenVec] = {
 
 INST_ANGLE = {
     # IE up = zp = floor
-    zp: "0 0 0",
-    zn: "0 0 0",
+    zp: FrozenAngle(0, 0, 0),
+    zn: FrozenAngle(0, 0, 0),
 
-    xn: "0 0 0",
-    yn: "0 90 0",
-    xp: "0 180 0",
-    yp: "0 270 0",
+    xn: FrozenAngle(0, 0, 0),
+    yn: FrozenAngle(0, 90, 0),
+    xp: FrozenAngle(0, 180, 0),
+    yp: FrozenAngle(0, 270, 0),
 
 }
 
 PETI_INST_ANGLE = {
     # The angles needed to point a PeTI instance in this direction
     # IE north = yn
-    zp: "0 0 0",
-    zn: "180 0 0",
+    zp: FrozenAngle(0, 0, 0),
+    zn: FrozenAngle(180, 0, 0),
 
-    yn: "0 0 90",
-    xp: "0 90 90",
-    yp: "0 180 90",
-    xn: "0 270 90",
+    yn: FrozenAngle(0, 0, 90),
+    xp: FrozenAngle(0, 90, 90),
+    yp: FrozenAngle(0, 180, 90),
+    xn: FrozenAngle(0, 270, 90),
 }
 
 del xp, xn, yp, yn, zp, zn

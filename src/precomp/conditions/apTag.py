@@ -5,7 +5,7 @@ import os
 from typing import Optional
 
 from precomp.connections import Item
-from srctools import Vec, Keyvalues, VMF, Entity, Output, Angle, Matrix
+from srctools import FrozenAngle, Vec, Keyvalues, VMF, Entity, Output, Angle, Matrix
 import srctools.logger
 
 from precomp import instanceLocs, options, connections, conditions
@@ -313,10 +313,10 @@ def res_make_tag_fizzler(vmf: VMF, info: conditions.MapInfo, res: Keyvalues) -> 
             sign_yaw = int(sign_yaw - 90) % 360
 
             if inst_normal.z > 0:
-                sign_angle = f'0 {sign_yaw} 0'
+                sign_angle = FrozenAngle(0, sign_yaw, 0)
             elif inst_normal.z < 0:
                 # Flip upside-down for ceilings
-                sign_angle = f'0 {sign_yaw} 180'
+                sign_angle = FrozenAngle(0, sign_yaw, 180)
             else:
                 raise AssertionError('Cannot be zero here!')
         else:
