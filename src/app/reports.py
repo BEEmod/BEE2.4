@@ -1,6 +1,7 @@
 """Various reports that can be triggered from the options menu."""
 from collections import Counter, defaultdict
 from pathlib import Path, PurePosixPath
+from typing import Dict, Set
 
 import srctools.logger
 import trio
@@ -171,7 +172,7 @@ async def report_editor_models() -> None:
     from packages import Item, get_loaded_packages
     packset = get_loaded_packages()
     fsys = FileSystemChain()
-    mat_to_usage: dict[str, set[str]] = defaultdict(set)
+    mat_to_usage: Dict[str, Set[str]] = defaultdict(set)
     usage_counts: Counter[PurePosixPath] = Counter()
 
     LOGGER.info('Checking existing packages...')
@@ -184,8 +185,8 @@ async def report_editor_models() -> None:
         ]:
             for file in pack.fsys.walk_folder(folder):
                 if file.path.endswith('.vmt'):
-                    rel_path = file.path[10:]  # Strip resources/
-                    mat_to_usage[rel_path.casefold()] = set()
+                    rel_path_str = file.path[10:]  # Strip resources/
+                    mat_to_usage[rel_path_str.casefold()] = set()
         for file in pack.fsys.walk_folder(str(mdl_map_editor)):
             if file.path.endswith('.mdl'):
                 rel_path = PurePosixPath(file.path).relative_to(mdl_map_editor)
@@ -220,6 +221,7 @@ async def report_editor_models() -> None:
     ))
 
     send: trio.MemorySendChannel[PurePosixPath]
+    rec: trio.MemoryReceiveChannel[PurePosixPath]
     send, rec = trio.open_memory_channel(0)
     LOGGER.info('{} models in total', len(usage_counts))
     async with trio.open_nursery() as nursery, send:

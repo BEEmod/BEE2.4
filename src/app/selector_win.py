@@ -395,7 +395,7 @@ class Item:
             source=', '.join(sorted(data.packages)),
         )
 
-    def _on_click(self, _: tk.Event[tk.Misc] = None) -> None:
+    def _on_click(self, _: object = None) -> None:
         """Handle clicking on the item.
 
         If it's already selected, save and close the window.
@@ -408,6 +408,7 @@ class Item:
 
     def set_pos(self, x: int | None = None, y: int | None = None) -> None:
         """Place the item on the palette."""
+        assert self.button is not None
         if x is None or y is None:
             # Remove from the window.
             self.button.place_forget()
@@ -1192,12 +1193,12 @@ class SelectorWin(Generic[CallbackT]):
         if self.win.winfo_ismapped():
             self.flow_items()
 
-    def exit(self, _: tk.Event[tk.Misc] = None) -> None:
+    def exit(self, _: object = None) -> None:
         """Quit and cancel, choosing the originally-selected item."""
         self.sel_item(self.orig_selected)
         self.save()
 
-    def save(self, _: tk.Event[tk.Misc] = None) -> None:
+    def save(self, _: object = None) -> None:
         """Save the selected item into the textbox."""
         # Stop sample sounds if they're playing
         if self.sampler is not None:
@@ -1227,7 +1228,7 @@ class SelectorWin(Generic[CallbackT]):
         self.prop_desc.set_text('')  # Free resources used.
         self.do_callback()
 
-    def set_disp(self, _: tk.Event[tk.Misc] = None) -> str:
+    def set_disp(self, _: object = None) -> str:
         """Set the display textbox."""
         # Bold the text if the suggested item is selected (like the
         # context menu). We check for truthiness to ensure it's actually
@@ -1247,7 +1248,8 @@ class SelectorWin(Generic[CallbackT]):
     def rollover_suggest(self) -> None:
         """Pick a suggested item when the button is moused over, and keep cycling."""
         if self.can_suggest():
-            self.display['font'] = self.mouseover_font
+            if self.display is not None:
+                self.display['font'] = self.mouseover_font
             self._pick_suggested(force=True)
 
     def _pick_suggested(self, force: bool = False) -> None:

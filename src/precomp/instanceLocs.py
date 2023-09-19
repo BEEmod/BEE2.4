@@ -374,15 +374,13 @@ def _resolve(path: str) -> List[str]:
         out = []
         for group in groups:
             if group[0] == '<':
-                try:
-                    item_id, subitems = _RE_SUBITEMS.fullmatch(group).groups()
-                except (ValueError, AttributeError):  # None.groups fail
+                subitem_match = _RE_SUBITEMS.fullmatch(group)
+                if subitem_match is None:
                     LOGGER.warning('Could not parse instance lookup "{}"!', group)
                     return []
-
-                item_id = item_id.casefold()
+                item_id, subitems = subitem_match.groups()
                 try:
-                    item_inst = INSTANCE_FILES[item_id]
+                    item_inst = INSTANCE_FILES[item_id.casefold()]
                 except KeyError:
                     LOGGER.warning('"{}" is not a valid item!', item_id)
                     return []
@@ -409,11 +407,12 @@ def _resolve(path: str) -> List[str]:
 def get_subitems(comma_list: str, item_inst: List[str], item_id: str) -> List[str]:
     """Pick out the subitems from a list."""
     output: List[Union[str, int]] = []
+    folded_id = item_id.casefold()
     for val in comma_list.split(','):
         folded_value = val.strip().casefold()
         if folded_value.startswith('bee2_'):
             # A custom value...
-            bee_inst = CUST_INST_FILES[item_id]
+            bee_inst = CUST_INST_FILES[folded_id]
             try:
                 output.append(bee_inst[folded_value[5:]])
                 continue

@@ -301,7 +301,7 @@ async def set_screen_type() -> None:
     COMPILE_CFG.save_check()
 
 
-def set_screenshot(image: Image.Image=None) -> None:
+def set_screenshot(image: Image.Image | None = None) -> None:
     """Show the screenshot on the UI."""
     # Make the visible screenshot small
     global tk_screenshot

@@ -705,17 +705,17 @@ def get_template(temp_name: str) -> Template:
 
 def import_template(
     vmf: VMF,
-    temp_name: Union[str, Template],
+    temp_name: str | Template,
     origin: Vec,
-    angles: Optional[Union[AnyAngle, AnyMatrix]]=None,
-    targetname: str='',
-    force_type: TEMP_TYPES=TEMP_TYPES.default,
-    add_to_map: bool=True,
-    additional_visgroups: Iterable[str]=(),
-    bind_tile_pos: Iterable[Vec]=(),
-    align_bind: bool=False,
-    coll: collisions.Collisions=None,
-    coll_add: Optional[collisions.CollideType] = collisions.CollideType.NOTHING,
+    angles: AnyAngle | AnyMatrix | None = None,
+    targetname: str = '',
+    force_type: TEMP_TYPES = TEMP_TYPES.default,
+    add_to_map: bool = True,
+    additional_visgroups: Iterable[str] = (),
+    bind_tile_pos: Iterable[Vec] = (),
+    align_bind: bool = False,
+    coll: collisions.Collisions | None = None,
+    coll_add: collisions.CollideType = collisions.CollideType.NOTHING,
     coll_mask: collisions.CollideType = collisions.CollideType.EVERYTHING,
 ) -> ExportedTemplate:
     """Import the given template at a location.

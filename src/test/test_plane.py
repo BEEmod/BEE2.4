@@ -122,9 +122,9 @@ def test_views() -> None:
     }
 
     # Check illegal values don't error.
-    assert "ab" not in plane.keys()  # type: ignore
-    assert (1, ) not in plane.keys()  # type: ignore
-    assert (3, 4, 5) not in plane.keys()  # type: ignore
+    assert "ab" not in plane.keys()
+    assert (1, ) not in plane.keys()
+    assert (3, 4, 5) not in plane.keys()
 
     assert 1 in plane.values()
     assert 45 not in plane.values()
@@ -135,9 +135,9 @@ def test_views() -> None:
     assert ((2, -5), 4) not in plane.items()
     assert ((3, 4), 2) not in plane.items()
     # Check illegal values don't error.
-    assert 45 not in plane.items()  # type: ignore
-    assert (1, ) not in plane.items()  # type: ignore
-    assert (1, 2, 3, 4) not in plane.items()  # type: ignore
+    assert 45 not in plane.items()
+    assert (1, ) not in plane.items()
+    assert (1, 2, 3, 4) not in plane.items()
     assert set(plane.items()) == {
         ((0, 4), 1), ((2, -5), None), ((0, 5), 3), ((0, 7), 2), ((5, 3), 2),
     }
