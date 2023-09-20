@@ -41,6 +41,23 @@ VPK_FOLDER = {
 }
 
 
+def clear_files(game: Game, folder: str) -> None:
+    """Remove existing VPK files from the specified game folder.
+
+     We want to leave other files - otherwise users will end up
+     regenerating the sound cache every time they export.
+    """
+    os.makedirs(folder, exist_ok=True)
+    try:
+        for file in os.listdir(folder):
+            if file[:6] == 'pak01_':
+                os.remove(os.path.join(folder, file))
+    except PermissionError:
+        # The player might have Portal 2 open. Abort changing the VPK.
+        LOGGER.warning("Couldn't replace VPK files. Is Portal 2 or Hammer open?")
+        raise
+
+
 class StyleVPK(PakObject):
     """A set of VPK files used for styles.
 
@@ -82,8 +99,9 @@ class StyleVPK(PakObject):
         else:
             sel_vpk = None
 
+        dest_folder = exp_data.game.abs_path(VPK_FOLDER.get(exp_data.game.steamID, 'portal2_dlc3'))
         try:
-            dest_folder = StyleVPK.clear_vpk_files(exp_data.game)
+            clear_files(exp_data.game, dest_folder)
         except PermissionError as exc:
             raise NoVPKExport() from exc  # We can't edit the VPK files - P2 is open..
 
@@ -160,24 +178,3 @@ class StyleVPK(PakObject):
                             vpk_file.add_file((vpk_path, filename), f.read())
 
         LOGGER.info('Written {} files to VPK!', len(vpk_file))
-
-    @staticmethod
-    def clear_vpk_files(game: Game) -> str:
-        """Remove existing VPKs files from a game.
-
-         We want to leave other files - otherwise users will end up
-         regenerating the sound cache every time they export.
-
-        This returns the path to the game folder.
-        """
-        dest_folder = game.abs_path(VPK_FOLDER.get(game.steamID, 'portal2_dlc3'))
-        os.makedirs(dest_folder, exist_ok=True)
-        try:
-            for file in os.listdir(dest_folder):
-                if file[:6] == 'pak01_':
-                    os.remove(os.path.join(dest_folder, file))
-        except PermissionError:
-            # The player might have Portal 2 open. Abort changing the VPK.
-            LOGGER.warning("Couldn't replace VPK files. Is Portal 2 or Hammer open?")
-            raise
-        return dest_folder
