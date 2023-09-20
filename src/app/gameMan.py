@@ -343,7 +343,7 @@ class Game:
             if name.startswith('pack_mod_'):
                 mod_times[name[9:].casefold()] = srctools.conv_int(value)
 
-        return cls(gm_id, steam_id, folder, mod_times, exp_style)
+        return cls(gm_id, steam_id, folder, mod_times, exp_style, unmarked_dlc3)
 
     def save(self) -> None:
         """Write a game into the config page."""
