@@ -69,7 +69,7 @@ class SignageLegend(PakObject):
         )
 
     @staticmethod
-    def export(exp_data: ExportData) -> None:
+    async def export(exp_data: ExportData) -> None:
         """This is all performed in Signage."""
 
 
@@ -173,7 +173,7 @@ class Signage(PakObject, allow_mult=True, needs_foreground=True):
                 )
 
     @staticmethod
-    def export(exp_data: ExportData) -> None:
+    async def export(exp_data: ExportData) -> None:
         """Export the selected signage to the config, and produce the legend."""
         # Timer value -> sign ID.
         sel_ids: list[tuple[str, str]] = exp_data.selected

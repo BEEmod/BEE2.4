@@ -661,7 +661,7 @@ class Item(PakObject, needs_foreground=True, export_priority=-10):
                 nursery.start_soon(assign_styled_items, styles, item_to_style)
 
     @staticmethod
-    def export(exp_data: ExportData) -> None:
+    async def export(exp_data: ExportData) -> None:
         """Export all items into the configs.
 
         For the selected attribute, this is a list of (item, subitem) tuples representing the
@@ -835,7 +835,7 @@ class ItemConfig(PakObject, allow_mult=True):
                     our_styles[sty_id] = lazy_conf.concat(our_styles[sty_id], style)
 
     @staticmethod
-    def export(exp_data: ExportData) -> None:
+    async def export(exp_data: ExportData) -> None:
         """This export is done in Item.export().
 
         Here we don't know the version set for each item.

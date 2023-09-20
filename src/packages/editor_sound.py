@@ -25,7 +25,7 @@ class EditorSound(PakObject):
         )
 
     @staticmethod
-    def export(exp_data: ExportData) -> None:
+    async def export(exp_data: ExportData) -> None:
         """Export EditorSound objects."""
         # Just command the game to do the writing.
         exp_data.game.add_editor_sounds(exp_data.packset.all_obj(EditorSound))

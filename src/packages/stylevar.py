@@ -126,7 +126,7 @@ class StyleVar(PakObject, allow_mult=True, needs_foreground=True):
         return True
 
     @staticmethod
-    def export(exp_data: ExportData) -> None:
+    async def export(exp_data: ExportData) -> None:
         """Export style var selections into the config.
 
         The .selected attribute is a dict mapping ids to the boolean value.

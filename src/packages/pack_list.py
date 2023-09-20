@@ -63,7 +63,7 @@ class PackList(PakObject, allow_mult=True):
                 self.files.append(item)
 
     @staticmethod
-    def export(exp_data: ExportData) -> None:
+    async def export(exp_data: ExportData) -> None:
         """Export all the packlists."""
 
         pack_block = Keyvalues('PackList', [])

@@ -121,7 +121,7 @@ class QuotePack(PakObject, needs_foreground=True, style_suggest_key='quote'):
         return '<Voice:' + self.id + '>'
 
     @staticmethod
-    def export(exp_data: ExportData) -> None:
+    async def export(exp_data: ExportData) -> None:
         """Export the quotepack."""
         if exp_data.selected is None:
             return  # No quote pack selected at all, don't write anything.

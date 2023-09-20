@@ -61,7 +61,7 @@ class Elevator(PakObject, needs_foreground=True, style_suggest_key='elev'):
         return self.selitem_data.iter_trans_tokens('elevators/' + self.id)
 
     @staticmethod
-    def export(exp_data: ExportData) -> None:
+    async def export(exp_data: ExportData) -> None:
         """Export the chosen video into the configs."""
         if exp_data.selected is None:
             elevator = None

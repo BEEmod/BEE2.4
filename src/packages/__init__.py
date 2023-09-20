@@ -307,7 +307,7 @@ class PakObject:
         pass
 
     @staticmethod
-    def export(exp_data: ExportData) -> None:
+    async def export(exp_data: ExportData) -> None:
         """Export the appropriate data into the game.
 
         ExportData is a namedtuple containing various data:

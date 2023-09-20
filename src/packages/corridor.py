@@ -343,7 +343,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True, export_priority=10):
         return output[:CORRIDOR_COUNTS[mode, direction]]
 
     @classmethod
-    def export(cls, exp_data: packages.ExportData) -> None:
+    async def export(cls, exp_data: packages.ExportData) -> None:
         """Override editoritems with the new corridor specifier."""
         style_id = exp_data.selected_style.id
         try:

@@ -70,7 +70,7 @@ class Skybox(
         return f'<Skybox {self.id}>'
 
     @staticmethod
-    def export(exp_data: ExportData) -> None:
+    async def export(exp_data: ExportData) -> None:
         """Export the selected skybox."""
         if exp_data.selected is None:
             return  # No skybox..

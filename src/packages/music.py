@@ -204,7 +204,7 @@ class Music(PakObject, needs_foreground=True, style_suggest_key='music'):
         return children.sample[channel]
 
     @staticmethod
-    def export(exp_data: ExportData) -> None:
+    async def export(exp_data: ExportData) -> None:
         """Export the selected music."""
         selected: dict[MusicChannel, Music | None] = exp_data.selected
 

@@ -340,7 +340,7 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
         return {wid.id for wid_list in widgets for wid in wid_list}
 
     @staticmethod
-    def export(exp_data: packages.ExportData) -> None:
+    async def export(exp_data: packages.ExportData) -> None:
         """Write all our values to the config."""
         for conf in exp_data.packset.all_obj(ConfigGroup):
             config_section = CONFIG[conf.id]

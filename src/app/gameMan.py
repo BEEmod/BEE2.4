@@ -746,7 +746,7 @@ class Game:
                 LOGGER.info('Exporting "{}"', obj_type.__name__)
 
                 try:
-                    obj_type.export(packages.ExportData(
+                    await obj_type.export(packages.ExportData(
                         game=self,
                         selected=selected_objects.get(obj_type, None),
                         all_items=all_items,

@@ -86,7 +86,7 @@ class StyleVPK(PakObject):
         return cls(data.id, data.fsys, source_folder)
 
     @staticmethod
-    def export(exp_data: ExportData) -> None:
+    async def export(exp_data: ExportData) -> None:
         """Generate the VPK file in the game folder."""
         sel_vpk_name = exp_data.selected_style.vpk_name
 
