@@ -313,6 +313,11 @@ class Game:
     # The style last exported to the game.
     exported_style: Optional[str] = None
 
+    # In previous versions, we always wrote our VPK into dlc3. This tracks whether this game was
+    # read in from a previous BEE install, and so has created the DLC3 folder even though it's
+    # not marked with our marker file.
+    unmarked_dlc3_vpk: bool = False
+
     @classmethod
     def parse(cls, gm_id: str, config: ConfigFile) -> Self:
         """Parse out the given game ID from the config file."""
@@ -329,6 +334,9 @@ class Game:
 
         exp_style = config.get_val(gm_id, 'exported_style', '') or None
 
+        # This flag is only set if we parse from a config that doesn't include it.
+        unmarked_dlc3 = config.getboolean(gm_id, 'unmarked_dlc3', True)
+
         mod_times = {}
 
         for name, value in config.items(gm_id):
@@ -343,6 +351,7 @@ class Game:
         CONFIG[self.name] = {}
         CONFIG[self.name]['SteamID'] = self.steamID
         CONFIG[self.name]['Dir'] = self.root
+        CONFIG[self.name]['unmarked_dlc3'] = srctools.bool_as_int(self.unmarked_dlc3_vpk)
         if self.exported_style is not None:
             CONFIG[self.name]['exported_style'] = self.exported_style
         for pack, mod_time in self.mod_times.items():
@@ -381,7 +390,7 @@ class Game:
         self,
         sounds: Iterable[packages.EditorSound],
     ) -> None:
-        """Add soundscript items so they can be used in the editor."""
+        """Add soundscript items so that they can be used in the editor."""
         # PeTI only loads game_sounds_editor, so we must modify that.
         # First find the highest-priority file
         for folder in self.dlc_priority():
