@@ -199,7 +199,16 @@ def flag_offset_distance(inst: Entity, flag: Keyvalues) -> bool:
     except ValueError:
         return False
 
-    return INSTVAR_COMP.get(op, operator.eq)(offset, value)
+    func = INSTVAR_COMP.get(op, operator.eq)
+
+    try:
+        return bool(func(offset, value))
+    except (TypeError, ValueError) as exc:
+        LOGGER.warning(
+            'Distance comparison failed: {} {} {}',
+            offset, op, value, exc_info=exc,
+        )
+        return False
 
 
 @make_result('rename', 'changeInstance')

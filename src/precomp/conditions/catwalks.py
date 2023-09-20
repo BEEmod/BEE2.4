@@ -299,7 +299,7 @@ def res_make_catwalk(vmf: VMF, res: Keyvalues) -> object:
         # Set the marker instances based on the attached walkways.
         normal = FrozenVec(0, 0, 1) @ Angle.from_str(inst['angles'])
         origin = Vec.from_str(inst['origin'])
-        pos_tup = origin.as_tuple()
+        pos_tup: Tuple[float, float, float] = origin.as_tuple()
         dir_mask = catwalks[pos_tup]
         angle = conditions.INST_ANGLE[normal]
 

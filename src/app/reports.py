@@ -1,7 +1,7 @@
 """Various reports that can be triggered from the options menu."""
-from collections import Counter, defaultdict
+from collections import defaultdict
 from pathlib import Path, PurePosixPath
-from typing import Dict, Set
+from typing import Dict, Set, Counter
 
 import srctools.logger
 import trio
@@ -173,7 +173,7 @@ async def report_editor_models() -> None:
     packset = get_loaded_packages()
     fsys = FileSystemChain()
     mat_to_usage: Dict[str, Set[str]] = defaultdict(set)
-    usage_counts: Counter[PurePosixPath] = Counter()
+    usage_counts = Counter[PurePosixPath]()
 
     LOGGER.info('Checking existing packages...')
     mdl_map_editor = PurePosixPath('resources/models/props_map_editor')

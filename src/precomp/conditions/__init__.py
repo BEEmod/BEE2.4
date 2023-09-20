@@ -42,7 +42,10 @@ from collections.abc import Mapping
 from collections import defaultdict
 from decimal import Decimal
 from enum import Enum
-from typing import Generic, Protocol, TypeVar, Any, Callable, TextIO, Tuple, Type, overload, cast
+from typing import (
+    Generic, Protocol, TypeVar, Any, Callable, TextIO, Tuple, Type, Union, overload,
+    cast,
+)
 
 import attrs
 import srctools.logger
@@ -79,10 +82,12 @@ ALL_RESULTS: list[tuple[str, tuple[str, ...], CondCall[object]]] = []
 ALL_META: list[tuple[str, Decimal, CondCall[object]]] = []
 
 
+ResultT = TypeVar('ResultT')
 CallableT = TypeVar('CallableT', bound=Callable[..., object])
 # The return values for 2-stage results and flags.
 FlagCallable = Callable[[Entity], bool]
 ResultCallable = Callable[[Entity], object]
+FlagCallT = TypeVar('FlagCallT', bound=Callable[..., Union[bool, FlagCallable]])
 
 
 class SWITCH_TYPE(Enum):
@@ -599,9 +604,9 @@ def meta_cond(priority: int | Decimal=0, only_once: bool=True) -> Callable[[Call
     return x
 
 
-def make_flag(orig_name: str, *aliases: str) -> Callable[[CallableT], CallableT]:
+def make_flag(orig_name: str, *aliases: str) -> Callable[[FlagCallT], FlagCallT]:
     """Decorator to add flags to the lookup."""
-    def x(func: CallableT) -> CallableT:
+    def x(func: FlagCallT) -> FlagCallT:
         wrapper: CondCall[bool] = CondCall(func, _get_cond_group(func))
         ALL_FLAGS.append((orig_name, aliases, wrapper))
         name = orig_name.casefold()
@@ -625,7 +630,7 @@ def make_result(orig_name: str, *aliases: str) -> Callable[[CallableT], Callable
         if name.casefold() != folded_name
     ])
 
-    def x(result_func: CallableT) -> CallableT:
+    def x(result_func: Callable[..., ResultT]) -> Callable[..., ResultT]:
         """Create the result when the function is supplied."""
         # Legacy setup func support.
         func: Callable[..., Callable[[Entity], object] | object]
@@ -652,7 +657,7 @@ def make_result(orig_name: str, *aliases: str) -> Callable[[CallableT], Callable
                 assert alias_setup is setup_func, alias_setup
         ALL_RESULTS.append((orig_name, aliases, wrapper))
         return result_func
-    return x
+    return x  # type: ignore[return-value]  # Callable[..., T] -> TypeVar(bound=Callable)
 
 
 def make_result_setup(*names: str) -> Callable[[CallableT], CallableT]:
@@ -1057,7 +1062,7 @@ def fetch_debug_visgroup(
                 return Entity(vmf, keys={'classname': target})
             return target
 
-        return func
+        return func  # type: ignore[return-value]
 
     for visgroup in vmf.vis_tree:
         if visgroup.name == vis_name:
@@ -1088,7 +1093,7 @@ def fetch_debug_visgroup(
         target.hidden = True
         return target
 
-    return adder
+    return adder  # type: ignore[return-value]
 
 
 def widen_fizz_brush(brush: Solid, thickness: float, bounds: tuple[Vec, Vec] | None = None) -> None:
