@@ -173,7 +173,7 @@ async def report_editor_models() -> None:
     packset = get_loaded_packages()
     fsys = FileSystemChain()
     mat_to_usage: Dict[str, Set[str]] = defaultdict(set)
-    usage_counts = Counter[PurePosixPath]()
+    usage_counts = Counter[str]()
 
     LOGGER.info('Checking existing packages...')
     mdl_map_editor = PurePosixPath('resources/models/props_map_editor')
@@ -190,7 +190,7 @@ async def report_editor_models() -> None:
         for file in pack.fsys.walk_folder(str(mdl_map_editor)):
             if file.path.endswith('.mdl'):
                 rel_path = PurePosixPath(file.path).relative_to(mdl_map_editor)
-                usage_counts[rel_path] += 1
+                usage_counts[str(rel_path).casefold()] = 0
 
     async def worker(channel: trio.MemoryReceiveChannel[PurePosixPath]) -> None:
         """Evaluates each model."""
@@ -210,7 +210,7 @@ async def report_editor_models() -> None:
                 mat_to_usage[tex.casefold()].add(folded_name)
 
     LOGGER.info('Checking usage...')
-    usage_counts.update(Counter(
+    editor_models = [
         mdl.with_suffix('.mdl')
         for item in packset.all_obj(Item)
         for version in item.versions.values()
@@ -218,7 +218,8 @@ async def report_editor_models() -> None:
         for editor in [style.editor, *style.editor_extra]
         for subtype in editor.subtypes
         for mdl in subtype.models
-    ))
+    ]
+    usage_counts.update(str(path).casefold() for path in editor_models)
 
     send: trio.MemorySendChannel[PurePosixPath]
     rec: trio.MemoryReceiveChannel[PurePosixPath]
@@ -227,7 +228,7 @@ async def report_editor_models() -> None:
     async with trio.open_nursery() as nursery, send:
         for _ in range(10):
             nursery.start_soon(worker, rec)
-        for mdl in usage_counts.keys():
+        for mdl in set(editor_models):
             if mdl.stem not in VALVE_EDITOR_MODELS:
                 await send.send(mdl)
 
@@ -239,5 +240,5 @@ async def report_editor_models() -> None:
         f.write('\nMaterials:\n')
         # Sort by count, then mat name.
         for mat, mdls in sorted(mat_to_usage.items(), key=lambda t: (len(t[1]), t[0])):
-            f.write(f'- {mat} = {len(mdls)}x: [{", ".join(mdls)}]\n')
+            f.write(f'- {len(mdls)}x {mat} = [{", ".join(mdls)}]\n')
     LOGGER.info('Editor model report complete!')
