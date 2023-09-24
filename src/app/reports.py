@@ -140,9 +140,11 @@ def report_all_obj() -> None:
     packset = get_loaded_packages()
     for type_name, obj_type in OBJ_TYPES.items():
         with get_report_file(f'obj_{type_name}.txt').open('w') as f:
-            f.write(f'{len(packset.all_obj(obj_type))} {type_name}:\n')
-            for obj in packset.all_obj(obj_type):
-                f.write(f'- {obj.id}\n')
+            obj_ids = [obj.id for obj in packset.all_obj(obj_type)]
+            obj_ids.sort()
+            f.write(f'{len(obj_ids)} {obj_type.__name__} objects:\n')
+            for obj_id in obj_ids:
+                f.write(f'- {obj_id}\n')
 
 
 def report_items() -> None:
