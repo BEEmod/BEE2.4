@@ -46,6 +46,7 @@ import transtoken
 import loadScreen
 import packages
 import packages.template_brush
+from packages import style_vpk
 import editoritems
 import utils
 import config
@@ -635,15 +636,16 @@ class Game:
         self.save()
         CONFIG.save_check()
 
-    def clear_cache(self) -> None:
+    async def clear_cache(self) -> None:
         """Remove all resources from the game."""
         shutil.rmtree(self.abs_path(INST_PATH), ignore_errors=True)
         shutil.rmtree(self.abs_path('bee2/'), ignore_errors=True)
         shutil.rmtree(self.abs_path('bin/bee2/'), ignore_errors=True)
 
         try:
-            packages.StyleVPK.clear_vpk_files(self)
-        except PermissionError:
+            vpk_folder = await style_vpk.find_folder(self)
+            style_vpk.clear_files(vpk_folder)
+        except (style_vpk.NoVPKExport, PermissionError):
             pass
 
         self.mod_times.clear()
@@ -1396,7 +1398,7 @@ async def remove_game() -> None:
         await terminate_error_server()
         selected_game.edit_gameinfo(add_line=False)
         selected_game.edit_fgd(add_lines=False)
-        selected_game.clear_cache()
+        await selected_game.clear_cache()
 
         all_games.remove(selected_game)
         CONFIG.remove_section(selected_game.name)
