@@ -16,7 +16,8 @@
 * A VPK file can be now placed into `vpk_override` to have it be combined with the built VPK. 
 * Added a warning screen to the developer tab of the options window, indicating that some of these options can temporarily break BEE if changed.
 
-### UCP-Relevant Enhancements:
+### UCP-Relevant Changes:
+* Terminology change: "Condition Flags" have been renamed to "Condition Tests" - I think that sounds a bit better.
 * Added an `Inherit` option to Corridor Groups. This specifies the ID of another style, causing all
   corridors to be copied from that other style.
 * Make several results properly permit options to use `$fixup` variables: `addOverlay`, `changeInstance`, `setKey`, `localTarget`.
