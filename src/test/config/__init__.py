@@ -1,6 +1,6 @@
 """Common code for testing configuration."""
-import contextlib
 from typing import Generator
+import contextlib
 
 import pytest
 

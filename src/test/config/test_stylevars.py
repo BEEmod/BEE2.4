@@ -1,7 +1,7 @@
 """Test parsing behaviour of stylevars."""
-import pytest
 from srctools import Keyvalues
-from srctools.dmx import Element, Attribute
+from srctools.dmx import Attribute, Element
+import pytest
 
 from config.stylevar import State
 

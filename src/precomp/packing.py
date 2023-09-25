@@ -1,9 +1,10 @@
 """Conditions related to packing."""
 from typing import Dict, Set
 
-import srctools.logger
-from precomp import options, conditions
 from srctools import VMF, Keyvalues, Vec
+import srctools.logger
+
+from precomp import conditions, options
 
 
 LOGGER = srctools.logger.get_logger(__name__)

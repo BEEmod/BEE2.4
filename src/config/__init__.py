@@ -3,19 +3,19 @@
 Other modules define an immutable state class, then register it with this.
 They can then fetch the current state and store new state.
 """
-import abc
-from pathlib import Path
-from typing_extensions import Self
 from typing import (
-    ClassVar, Optional, Set, TypeVar, Callable, NewType, Union, cast,
-    Type, Dict, Awaitable, Iterator, Tuple,
+    Awaitable, Callable, ClassVar, Dict, Iterator, NewType, Optional, Set,
+    Tuple, Type, TypeVar, Union, cast,
 )
+from typing_extensions import Self
+from pathlib import Path
+import abc
 import os
 
+from srctools import AtomicWriter, KeyValError, Keyvalues, logger
+from srctools.dmx import Element
 import attrs
 import trio
-from srctools import KeyValError, AtomicWriter, Keyvalues, logger
-from srctools.dmx import Element
 
 import utils
 

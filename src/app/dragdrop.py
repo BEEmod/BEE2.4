@@ -14,8 +14,8 @@ from srctools.logger import get_logger
 import attrs
 
 from app import background_run, img, sound
-from transtoken import TransToken
 from event import Event
+from transtoken import TransToken
 import utils
 
 

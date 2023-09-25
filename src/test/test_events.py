@@ -1,11 +1,11 @@
 """Test the events manager and collections."""
 from typing import Dict, no_type_check
-import pytest
-from unittest.mock import AsyncMock, create_autospec, call
+from unittest.mock import AsyncMock, call, create_autospec
 
+import pytest
 import trio
 
-from event import Event, ValueChange, ObsValue
+from event import Event, ObsValue, ValueChange
 
 
 async def func_unary(arg: object) -> None:

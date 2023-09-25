@@ -4,13 +4,12 @@ from tkinter import ttk
 import tkinter as tk
 import pprint
 
-
 from srctools import logger
 import attrs
 import trio
 
 from app import TK_ROOT, background_run, tk_tools
-from ui_tk.img import label_to_user, TK_IMG
+from ui_tk.img import TK_IMG, label_to_user
 
 
 LOGGER = logger.get_logger(__name__)

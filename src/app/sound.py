@@ -5,19 +5,20 @@ If PyGame fails to load, all fx() calls will fail silently.
 (Sounds are not critical to the app, so they just won't play.)
 """
 from __future__ import annotations
-from typing import Any, IO, Optional, Callable
-import os
+from typing import IO, Any, Callable, Optional
 import functools
+import os
 import shutil
 
-import trio
-from srctools.filesys import FileSystemChain, FileSystem, RawFileSystem
+from srctools.filesys import FileSystem, FileSystemChain, RawFileSystem
 import srctools.logger
+import trio
 
 from app import TK_ROOT
 from config.gen_opts import GenOptions
 import config
 import utils
+
 
 __all__ = [
     'SamplePlayer',
@@ -222,11 +223,11 @@ if utils.WIN and not utils.FROZEN:
 
 sounds: NullSound
 try:
-    import pyglet.media
-    from pyglet.media.codecs import Source
-    from pyglet.media.codecs.ffmpeg import FFmpegDecoder
     from pyglet import version as pyglet_version
     from pyglet.clock import tick
+    from pyglet.media.codecs import Source
+    from pyglet.media.codecs.ffmpeg import FFmpegDecoder
+    import pyglet.media
 
     decoder = FFmpegDecoder()
     sounds = PygletSound()

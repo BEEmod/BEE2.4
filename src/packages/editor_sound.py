@@ -1,6 +1,7 @@
 """Adds sounds useable in the editor."""
-from packages import PakObject, ParseData, ExportData
 from srctools import Keyvalues
+
+from packages import ExportData, PakObject, ParseData
 
 
 class EditorSound(PakObject):

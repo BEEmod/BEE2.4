@@ -1,13 +1,12 @@
 from __future__ import annotations
-
 from uuid import UUID
 
-import attrs
 from srctools import Keyvalues, bool_as_int
 from srctools.dmx import Attribute as DMAttribute, Element, ValueType
+import attrs
 
-from consts import UUID_PORTAL2, PALETTE_FORCE_SHOWN as FORCE_SHOWN
 from BEE2_config import GEN_OPTS as LEGACY_CONF
+from consts import PALETTE_FORCE_SHOWN as FORCE_SHOWN, UUID_PORTAL2
 import config
 
 

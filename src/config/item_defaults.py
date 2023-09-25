@@ -1,13 +1,13 @@
 """Store overridden defaults for items, and also the selected version."""
 from typing import Any, Dict, Final
 
-import attrs
 from srctools import Keyvalues, logger
 from srctools.dmx import Element
+import attrs
 
 from BEE2_config import ConfigFile
+from editoritems_props import PROP_TYPES, ItemPropKind
 import config
-from editoritems_props import ItemPropKind, PROP_TYPES
 
 
 LOGGER = logger.get_logger(__name__)

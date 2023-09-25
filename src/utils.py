@@ -1,25 +1,25 @@
 """Various functions shared among the compiler and application."""
 from __future__ import annotations
-from collections import deque
-import copyreg
 from typing import (
-    Awaitable, Protocol, TypeVar, Any, NoReturn, Generic, Optional, TYPE_CHECKING, Tuple,
-    SupportsInt, Callable, Sequence, Iterator, Iterable, Mapping, Generator, Type,
-    KeysView, ValuesView, ItemsView, overload,
+    TYPE_CHECKING, Any, Awaitable, Callable, Generator, Generic, ItemsView,
+    Iterable, Iterator, KeysView, Mapping, NoReturn, Optional, Protocol,
+    Sequence, SupportsInt, Tuple, Type, TypeVar, ValuesView, overload,
 )
 from typing_extensions import ParamSpec, TypeVarTuple, Unpack
+from collections import deque
+from enum import Enum
+from pathlib import Path
+import copyreg
 import logging
 import os
-import stat
 import shutil
-import types
+import stat
 import sys
+import types
 import zipfile
-from pathlib import Path
-from enum import Enum
 
-import trio
 from srctools import Angle
+import trio
 
 
 WIN = sys.platform.startswith('win')
@@ -598,6 +598,7 @@ if WIN:
     def check_shift() -> bool:
         """Check if Shift is currently held."""
         import ctypes
+
         # https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getasynckeystate
         GetAsyncKeyState = ctypes.windll.User32.GetAsyncKeyState
         GetAsyncKeyState.restype = ctypes.c_short

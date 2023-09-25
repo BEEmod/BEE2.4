@@ -1,13 +1,13 @@
 """
 General app configuration options, controlled by the options window.
 """
-from enum import Enum
 from typing import Any, Dict, List
 from typing_extensions import TypeGuard
+from enum import Enum
 
-import attrs
 from srctools import Keyvalues
 from srctools.dmx import Element
+import attrs
 
 from BEE2_config import GEN_OPTS as LEGACY_CONF
 import config

@@ -3,13 +3,13 @@
 UserError is imported all over, so this needs to have minimal imports to avoid cycles.
 """
 from typing import (
-    ClassVar, Collection, Dict, Iterable, List, Literal, Optional, Tuple, TypedDict,
-    Union,
+    ClassVar, Collection, Dict, Iterable, List, Literal, Optional, Tuple,
+    TypedDict, Union,
 )
 from typing_extensions import TypeAlias
 from pathlib import Path
 
-from srctools import logger, FrozenVec, Vec
+from srctools import FrozenVec, Vec, logger
 import attrs
 
 from transtoken import TransToken

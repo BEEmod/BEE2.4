@@ -1,12 +1,13 @@
 import uuid
 
-import pytest
 from srctools import Keyvalues
 from srctools.dmx import Element
+import pytest
 
-from config.palette import PaletteState
-from consts import UUID_PORTAL2, UUID_EXPORT
 from BEE2_config import GEN_OPTS
+from config.palette import PaletteState
+from consts import UUID_EXPORT, UUID_PORTAL2
+
 from . import isolate_conf
 
 

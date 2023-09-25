@@ -2,8 +2,8 @@
 import io
 import uuid
 
-from srctools import Keyvalues, bool_as_int
 from pytest_regressions.file_regression import FileRegressionFixture
+from srctools import Keyvalues, bool_as_int
 import pytest
 
 import config

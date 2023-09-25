@@ -2,9 +2,9 @@
 from __future__ import annotations
 from typing import Tuple, TypeVar, Union
 from typing_extensions import TypeAlias
-from collections.abc import Iterable, Sequence
 from tkinter import ttk
 import tkinter as tk
+from collections.abc import Iterable, Sequence
 import itertools
 
 from PIL import Image, ImageTk
@@ -13,6 +13,7 @@ import attrs
 import trio
 
 from app import TK_ROOT, img
+
 
 # Widgets with an image attribute that can be set.
 tkImgWidgets: TypeAlias = Union[tk.Label, ttk.Label, tk.Button, ttk.Button]

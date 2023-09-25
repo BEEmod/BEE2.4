@@ -1,16 +1,18 @@
 """Definitions for background music used in the map."""
 from __future__ import annotations
-from collections.abc import Iterable
 from typing import Iterator
+from typing_extensions import Self
+from collections.abc import Iterable
 
 from srctools import Keyvalues
 import srctools.logger
-from typing_extensions import Self
 
-from consts import MusicChannel
 from app import lazy_conf
+from consts import MusicChannel
+from packages import (
+    ExportData, PackagesSet, PakObject, ParseData, SelitemData, get_config,
+)
 from transtoken import TransTokenSource
-from packages import PackagesSet, PakObject, ParseData, SelitemData, get_config, ExportData
 
 
 LOGGER = srctools.logger.get_logger(__name__)

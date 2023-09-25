@@ -1,17 +1,19 @@
 """Implements the parsing required for the app to identify all templates."""
 from __future__ import annotations
-
-import trio
 import os
 
-from srctools import VMF, Keyvalues, KeyValError, AtomicWriter
+from srctools import VMF, AtomicWriter, KeyValError, Keyvalues
+from srctools.dmx import (
+    Attribute as DMXAttr, Element as DMXElement, ValueType as DMXValue,
+)
 from srctools.filesys import File
-from srctools.dmx import Element as DMXElement, ValueType as DMXValue, Attribute as DMXAttr
 import srctools.logger
+import trio
 
-import packages
 from app import gameMan
 from utils import PackagePath
+import packages
+
 
 LOGGER = srctools.logger.get_logger(__name__)
 TEMPLATES: dict[str, PackagePath] = {}

@@ -4,20 +4,19 @@ These need to be used while we are busy doing stuff in the main UI loop.
 We do this in another process to sidestep the GIL, and ensure the screen
 remains responsive. This is a separate module to reduce the required dependencies.
 """
-import sys
-
-import logging
-from typing import Callable, Optional, Dict, Tuple, List
-
+from typing import Callable, Dict, List, Optional, Tuple
 from tkinter import ttk
 from tkinter.font import Font, families as tk_font_families
+import tkinter as tk
+import logging
+import multiprocessing.connection
+import sys
 
 from PIL import ImageTk
-from app import img, TK_ROOT, tk_tools
-import tkinter as tk
-import multiprocessing.connection
 
+from app import TK_ROOT, img, tk_tools
 import utils
+
 
 # ID -> screen.
 SCREENS: Dict[int, 'BaseLoadScreen'] = {}

@@ -1,13 +1,14 @@
 """Test the collisions module."""
 from __future__ import annotations
-
-import math
 from typing import Iterable, Tuple
 from pathlib import Path
+import math
+
+from srctools import VMF, Angle, Keyvalues, Matrix, Solid, Vec
 import pytest
 
-from srctools import Angle, Matrix, VMF, Vec, Keyvalues, Solid
 from collisions import BBox, CollideType
+
 
 tuple3 = Tuple[int, int, int]
 

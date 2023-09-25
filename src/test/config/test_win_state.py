@@ -1,11 +1,12 @@
 """Test parsing window state definitions."""
+from srctools import Keyvalues
+from srctools.dmx import Attribute, Element, Vec2
 import attrs
 import pytest
-from srctools import Keyvalues
-from srctools.dmx import Element, Attribute, Vec2
 
 from BEE2_config import GEN_OPTS
 from config.windows import WindowState
+
 from . import isolate_conf
 
 

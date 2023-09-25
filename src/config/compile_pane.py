@@ -2,9 +2,9 @@ from __future__ import annotations
 from typing import Sequence
 import base64
 
-import attrs
 from srctools import Keyvalues, bool_as_int, logger
 from srctools.dmx import Element
+import attrs
 
 import config
 

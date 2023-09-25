@@ -1,7 +1,7 @@
 """Launches the correct compiler."""
+import exceptiongroup  # noqa - Install its import hook
 import os
 import sys
-import exceptiongroup   # noqa - Install its import hook
 
 
 if hasattr(sys, 'frozen'):
@@ -17,20 +17,23 @@ else:
 
 
 if app_name in ('vbsp.exe', 'vbsp_osx', 'vbsp_linux'):
-    import vbsp
     import trio
+
+    import vbsp
     trio.run(vbsp.main)
 elif app_name in ('vrad.exe', 'vrad_osx', 'vrad_linux'):
     if '--errorserver' in sys.argv:
-        import error_server
         import trio
+
+        import error_server
         trio.run(
             error_server.main,
             strict_exception_groups=True,  # Opt into 3.11-style semantics.
         )
     else:
-        import vrad
         import trio
+
+        import vrad
         trio.run(
             vrad.main, sys.argv,
             strict_exception_groups=True,

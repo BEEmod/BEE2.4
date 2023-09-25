@@ -1,12 +1,13 @@
 """Test item default configs."""
-import pytest
 from srctools import Keyvalues
 from srctools.dmx import Element, ValueType
+import pytest
 
-from config.item_defaults import ItemDefault, LEGACY
-from . import isolate_conf
-import editoritems_props
+from config.item_defaults import LEGACY, ItemDefault
 from editoritems import ItemPropKind
+import editoritems_props
+
+from . import isolate_conf
 
 
 def test_parse_legacy() -> None:

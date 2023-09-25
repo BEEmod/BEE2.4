@@ -2,12 +2,12 @@
 from __future__ import annotations
 from collections import defaultdict
 
-from srctools import Keyvalues, Entity, VMF, Vec, Output, Matrix
+from srctools import VMF, Entity, Keyvalues, Matrix, Output, Vec
 import srctools.logger
 
-from precomp import connections, conditions
-import user_errors
+from precomp import conditions, connections
 from transtoken import TransToken
+import user_errors
 
 
 COND_MOD_NAME = None

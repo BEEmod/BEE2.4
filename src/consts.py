@@ -1,10 +1,10 @@
 """Various constant values (Mainly texture names.)"""
 from __future__ import annotations
-from typing import cast, Any, MutableMapping, Iterator, TypeVar
-from uuid import UUID, uuid5
-
+from typing import Any, Iterator, MutableMapping, TypeVar, cast
 from typing_extensions import Final
 from enum import Enum, EnumMeta
+from uuid import UUID, uuid5
+
 from srctools import Side
 
 

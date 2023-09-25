@@ -1,13 +1,12 @@
 from __future__ import annotations
-
 from typing import List
 
-import attrs
 from srctools import Keyvalues
 from srctools.dmx import Attribute as DMAttr, Element, ValueType as DMXValue
+import attrs
 
-import config
 from corridor import Direction, GameMode, Orient
+import config
 
 
 __all__ = [

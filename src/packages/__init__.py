@@ -165,10 +165,10 @@ class SelitemData:
 
     def iter_trans_tokens(self, source: str) -> Iterator[TransTokenSource]:
         """Yield the tokens in this data."""
-        yield self.name, source + '.long_name'
-        yield self.short_name, source + '.short_name'
-        yield self.group, source + '.group'
-        yield from tkMarkdown.iter_tokens(self.desc, source + '.desc')
+        yield self.name, f'{source}.long_name'
+        yield self.short_name, f'{source}.short_name'
+        yield self.group, f'{source}.group'
+        yield from tkMarkdown.iter_tokens(self.desc, f'{source}.desc')
 
 
 @attrs.define
@@ -357,12 +357,7 @@ def reraise_keyerror(err: NoKeyError | IndexError, obj_id: str) -> NoReturn:
             raise err
     else:
         key_error = err
-    raise Exception(
-        'No "{key}" in {id!s} object!'.format(
-            key=key_error.key,
-            id=obj_id,
-        )
-    ) from err
+    raise Exception(f'No "{key_error.key}" in {obj_id!s} object!') from err
 
 
 def get_config(

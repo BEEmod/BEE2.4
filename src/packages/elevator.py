@@ -4,8 +4,8 @@ We can't pack BIKs, so this is mainly for Valve's existing ones.
 """
 from typing import Iterator, Optional
 
+from packages import ExportData, PakObject, ParseData, SelitemData
 from transtoken import TransTokenSource
-from packages import ParseData, ExportData, SelitemData, PakObject
 
 
 class Elevator(PakObject, needs_foreground=True, style_suggest_key='elev'):

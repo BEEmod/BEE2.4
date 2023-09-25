@@ -7,10 +7,10 @@ import trio
 
 from app import TK_ROOT, background_run, img, sound
 from app.dragdrop import DragInfo, Slot
+from event import Event
 from transtoken import TransToken
 from ui_tk.dragdrop import DragDrop
 from ui_tk.img import TK_IMG
-from event import Event
 import app
 import BEE2_config
 import config

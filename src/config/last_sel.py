@@ -1,8 +1,8 @@
 from typing import Dict, Union
 
-import attrs
 from srctools import Keyvalues
 from srctools.dmx import Element
+import attrs
 
 import config
 

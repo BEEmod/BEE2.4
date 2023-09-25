@@ -3,14 +3,14 @@
 The implementation is in bg_daemon, to ensure it remains responsive.
 """
 from __future__ import annotations
+from typing import Literal, Tuple, Type, Union
 import logging
 import multiprocessing
 import queue
-from typing import Literal, Tuple, Type, Union
 
+import attrs
 import srctools.logger
 import trio
-import attrs
 
 from config.gen_opts import GenOptions
 import config

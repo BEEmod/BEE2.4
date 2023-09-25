@@ -4,8 +4,12 @@ from random import Random
 from struct import Struct
 import hashlib
 
+from srctools import (
+    VMF, Angle, Entity, FrozenAngle, FrozenMatrix, FrozenVec, Matrix, Vec,
+    logger,
+)
+
 from precomp import instanceLocs
-from srctools import FrozenAngle, FrozenMatrix, FrozenVec, VMF, Vec, Angle, Entity, logger, Matrix
 
 
 # A hash object which we seed using the map layout, so it is unique.

@@ -5,9 +5,9 @@ This is useful to allow using the same code for reading folders or zips of data.
 from typing import IO, Iterator, Literal, Optional, Set, TextIO, Union, overload
 from typing_extensions import Self
 from zipfile import ZIP_STORED, ZipFile
-import shutil
-import os
 import io
+import os
+import shutil
 
 
 class FakeZipInfo:

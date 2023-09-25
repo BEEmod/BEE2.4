@@ -1,6 +1,7 @@
 import pytest
+
+from corridor import Direction, GameMode, Orient
 from packages.corridor import parse_specifier
-from corridor import Orient, Direction, GameMode
 
 
 @pytest.mark.parametrize('text, mode, direction, orient', [

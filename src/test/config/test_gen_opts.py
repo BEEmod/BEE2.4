@@ -3,12 +3,13 @@ from typing import Any, NoReturn, cast
 
 from srctools import Keyvalues
 from srctools.dmx import Element, ValueType
-import pytest
 import attrs
+import pytest
 
 from BEE2_config import GEN_OPTS
-from config.gen_opts import GenOptions, AfterExport, gen_opts_bool
-from test.config import isolate_conf
+from config.gen_opts import AfterExport, GenOptions, gen_opts_bool
+
+from . import isolate_conf
 
 
 BOOL_OPTIONS = {field.name for field in gen_opts_bool}

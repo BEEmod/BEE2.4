@@ -1,9 +1,10 @@
 """Test the Plane class."""
+from typing import List, Optional, Tuple, no_type_check
 from collections import Counter
-from typing import List, Tuple, Optional, no_type_check
+
+import pytest
 
 from plane import Plane
-import pytest
 
 
 @pytest.mark.parametrize('dx, dy', [

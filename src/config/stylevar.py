@@ -1,10 +1,9 @@
 from __future__ import annotations
-
 from typing import Dict
 
-import attrs
 from srctools import Keyvalues, bool_as_int, conv_bool
 from srctools.dmx import Element
+import attrs
 
 import config
 

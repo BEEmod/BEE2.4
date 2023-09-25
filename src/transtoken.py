@@ -4,19 +4,19 @@ Translation only occurs in the app, using the localisation module. In the compil
 so that data structures can be shared.
 We take care not to directly import gettext and babel, so the compiler can omit those.
 """
-from enum import Enum
 from typing import (
-    Any, Callable, ClassVar, Final, List, Dict, Iterable, Mapping, NoReturn, Optional, Protocol,
-    Sequence, Tuple, cast,
+    Any, Callable, ClassVar, Dict, Final, Iterable, List, Mapping, NoReturn,
+    Optional, Protocol, Sequence, Tuple, cast,
 )
 from typing_extensions import LiteralString, TypeAlias
+from enum import Enum
 from html import escape as html_escape
 from pathlib import Path
 import string
 
+from srctools import EmptyMapping, logger
 import attrs
 
-from srctools import EmptyMapping, logger
 
 LOGGER = logger.get_logger(__name__)
 del logger

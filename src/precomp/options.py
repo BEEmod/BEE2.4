@@ -1,14 +1,16 @@
 """Manages reading general options from vbsp_config."""
-import math
+from typing import (
+    Any, Dict, Iterator, Optional, TextIO, Tuple, Type, TypeVar, Union,
+    overload,
+)
 from enum import Enum
-
 import inspect
+import math
 
 from srctools import Keyvalues, Vec, parse_vec_str
-from BEE2_config import ConfigFile
 import srctools.logger
 
-from typing import Union, Tuple, TypeVar, Type, Optional, Iterator, Any, TextIO, Dict, overload
+from BEE2_config import ConfigFile
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -79,6 +81,7 @@ def load(opt_blocks: Iterator[Keyvalues]) -> None:
     options = {opt.id: opt for opt in DEFAULTS}
     if len(options) != len(DEFAULTS):
         from collections import Counter
+
         # Find ids used more than once..
         raise Exception('Duplicate option(s)! ({})'.format(', '.join(
             k for k, v in

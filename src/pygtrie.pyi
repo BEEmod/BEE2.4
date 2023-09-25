@@ -1,9 +1,10 @@
 """Implements stubs for pygtrie."""
-import collections as _abc
 from typing import (
-    Any, Set, TypeVar, Iterator, Literal, NoReturn, Union, Type,
-    Generic, MutableMapping, overload, Mapping, Iterable, Callable,
+    Any, Callable, Generic, Iterable, Iterator, Literal, Mapping,
+    MutableMapping, NoReturn, Set, Type, TypeVar, Union, overload,
 )
+import collections as _abc
+
 
 __version__: str
 KeyT = TypeVar('KeyT')

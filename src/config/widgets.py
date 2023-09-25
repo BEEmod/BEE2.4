@@ -1,8 +1,8 @@
 from typing import Dict, List, Mapping, NewType, Union, cast
 
-import attrs
 from srctools import EmptyMapping, Keyvalues, logger
 from srctools.dmx import Element
+import attrs
 
 import config
 

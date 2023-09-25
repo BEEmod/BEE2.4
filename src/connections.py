@@ -5,12 +5,11 @@ This controls how I/O is generated for each item.
 from __future__ import annotations
 from typing import Dict, Final, Iterable
 from typing_extensions import Self
-
-import attrs
-import sys
 from enum import Enum
+import sys
 
-from srctools import Output, Keyvalues, Vec, conv_bool
+from srctools import Keyvalues, Output, Vec, conv_bool
+import attrs
 
 import utils
 

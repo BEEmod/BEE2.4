@@ -1,7 +1,7 @@
 from typing import Dict, Iterable, Mapping, Union
 
-import attrs
 from srctools import Keyvalues, logger
+import attrs
 
 import config
 

@@ -3,21 +3,21 @@
 This allows altering the in-editor wall textures, as well as a few others.
 """
 from __future__ import annotations
-
-from typing import Any, Iterator, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Iterator, Optional
 from typing_extensions import Self
-
 from pathlib import Path
-import re
 import os
+import re
 import shutil
 
-from srctools import FileSystem, VPK
+from srctools import VPK, FileSystem
 import srctools.logger
 import trio
 
+from packages import ExportData, NoVPKExport, PakObject, ParseData
 import utils
-from packages import PakObject, ParseData, ExportData, NoVPKExport
+
+
 if TYPE_CHECKING:
     from app.gameMan import Game
 

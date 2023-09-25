@@ -6,23 +6,22 @@ filename/options, so are cheap to create. Once applied to a UI widget,
 they are loaded in the background, then unloaded if removed from all widgets.
 """
 from __future__ import annotations
-from pathlib import Path
 from typing import Any, ClassVar, Dict, Final, Iterable, Iterator, Tuple, Type
 from typing_extensions import Self
-from collections.abc import Sequence, Mapping
+from collections.abc import Mapping, Sequence
+from pathlib import Path
 import abc
-import logging
 import functools
+import logging
 import weakref
 
-from PIL import ImageColor, ImageFont, ImageTk, Image, ImageDraw
+from PIL import Image, ImageColor, ImageDraw, ImageFont, ImageTk
+from srctools import Keyvalues, Vec
+from srctools.filesys import FileSystem, FileSystemChain, RawFileSystem
+from srctools.vtf import VTF, VTFFlags
 import attrs
-import trio
-
-from srctools import Vec, Keyvalues
-from srctools.vtf import VTFFlags, VTF
-from srctools.filesys import FileSystem, RawFileSystem, FileSystemChain
 import srctools.logger
+import trio
 
 from consts import Theme
 import utils

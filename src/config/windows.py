@@ -1,12 +1,13 @@
 from __future__ import annotations
-
 from typing import Dict, Mapping
-import attrs
-from srctools import Keyvalues, conv_bool, bool_as_int, logger
+
+from srctools import Keyvalues, bool_as_int, conv_bool, logger
 from srctools.dmx import Attribute, Element, ValueType, Vec2
+import attrs
 
 from BEE2_config import GEN_OPTS as LEGACY_CONF
 import config
+
 
 LOGGER = logger.get_logger(__name__, 'conf.win')
 

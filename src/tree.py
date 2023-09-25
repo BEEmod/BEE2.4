@@ -1,9 +1,10 @@
 """Wraps the Rtree package, adding typing and usage of our Vec class."""
-from srctools.math import Vec
-from typing import Dict, Generic, TypeVar, Iterator, List, Tuple
+from typing import Dict, Generic, Iterator, List, Tuple, TypeVar
 
-import attrs
 from rtree import index
+from srctools.math import Vec
+import attrs
+
 
 ValueT = TypeVar('ValueT')
 PROPS = index.Property()
