@@ -49,8 +49,8 @@ from typing import (
 
 import attrs
 import srctools.logger
-from srctools.math import AnyVec, FrozenAngle, Vec, FrozenVec, AnyAngle, AnyMatrix, Angle, Matrix
-from srctools.vmf import EntityGroup, VMF, Entity, Output, Solid, ValidKVs, VisGroup
+from srctools.math import FrozenAngle, Vec, FrozenVec, AnyAngle, AnyMatrix, Angle
+from srctools.vmf import EntityGroup, VMF, Entity, Output, Solid, ValidKVs
 from srctools import Keyvalues
 
 from precomp import instanceLocs, rand, collisions
@@ -552,14 +552,24 @@ class CondCall(Generic[CallResultT]):
             return cback(ent)
 
 
-def _get_cond_group(func: Any) -> str:
-    """Get the condition group hint for a function."""
+def _get_cond_group(func: Any) -> str | None:
+    """Get the condition group hint for a function.
+
+    None means that the condition is "ungrouped".
+    """
     try:
-        return str(func.__globals__['COND_MOD_NAME'])
+        group = func.__globals__['COND_MOD_NAME']
     except KeyError:
         group = func.__globals__['__name__']
         LOGGER.warning('No name for module "{}"!', group)
-        return str(group)
+    if group is None or type(group) is str:
+        return group
+    LOGGER.warning(
+        'Module "{}" defines COND_MOD_NAME = {!r}, which is not Optional[str]!',
+        func.__globals__['__name__'],
+        group,
+    )
+    return str(group)
 
 
 def add_meta(func: Callable[..., object], priority: Decimal | int, only_once: bool = True) -> None:
@@ -1344,9 +1354,10 @@ def res_end_condition() -> None:
 def res_switch(coll: collisions.Collisions, info: MapInfo, res: Keyvalues) -> ResultCallable:
     """Run the same test multiple times with different arguments.
 
-    `method` is the way the search is done - `first`, `last`, `random`, or `all`.
-    `flag` is the name of the test.
-    `seed` sets the randomisation seed for this block, for the random mode.
+    * `method` is the way the search is done - `first`, `last`, `random`, or `all`.
+    * `test` is the name of the test. (`flag` is accepted for backwards compatibility.)
+    * `seed` sets the randomisation seed for this block, for the random mode.
+
     Each keyvalues group is a case to check - the Keyvalues name is the test
     argument, and the contents are the results to execute in that case.
     The special group `"<default>"` is only run if no other test is valid.
@@ -1365,7 +1376,11 @@ def res_switch(coll: collisions.Collisions, info: MapInfo, res: Keyvalues) -> Re
             else:
                 raw_cases.append(kv)
         else:
-            if kv.name == 'flag':  # TODO: deprecate/rename?
+            if kv.name == 'test':
+                test_name = kv.value
+                continue
+            if kv.name == 'flag':
+                LOGGER.warning('Switch uses deprecated field "flag", this has been renamed to "test".')
                 test_name = kv.value
                 continue
             if kv.name == 'method':
