@@ -82,7 +82,7 @@ class Skybox(
 
         exp_data.vbsp_conf.set_key(('Options', 'Skybox'), skybox.material)
 
-        exp_data.vbsp_conf.extend(skybox.config())
+        exp_data.vbsp_conf.extend(await skybox.config())
 
         # Styles or other items shouldn't be able to set fog settings..
         if 'fog' in exp_data.vbsp_conf:

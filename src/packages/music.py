@@ -213,7 +213,7 @@ class Music(PakObject, needs_foreground=True, style_suggest_key='music'):
         vbsp_config = exp_data.vbsp_conf
 
         if base_music is not None:
-            vbsp_config += base_music.config()
+            vbsp_config += await base_music.config()
 
         music_conf = Keyvalues('MusicScript', [])
         vbsp_config.append(music_conf)

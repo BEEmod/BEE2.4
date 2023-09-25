@@ -1,11 +1,12 @@
 """Implements callables which lazily parses and combines config files."""
 from __future__ import annotations
-from typing import Any, Callable, Pattern
+from typing import Any, Awaitable, Callable, Final, Pattern
+from typing_extensions import TypeAlias
 import functools
 
-import trio
-from srctools import Keyvalues, logger, KeyValError
+from srctools import KeyValError, Keyvalues, logger
 from srctools.filesys import File
+import trio
 
 import app
 import packages
@@ -13,23 +14,33 @@ import utils
 
 
 LOGGER = logger.get_logger(__name__)
-LazyConf = Callable[[], Keyvalues]
-# Empty property.
-BLANK: LazyConf = lambda: Keyvalues.root()
+LazyConf: TypeAlias = Callable[[], Awaitable[Keyvalues]]
+
+
+async def _blank_prop() -> Keyvalues:
+	"""An empty config. This is used as a singleton."""
+	return Keyvalues.root()
+
+
+BLANK: Final[LazyConf] = _blank_prop
 
 
 def raw_prop(block: Keyvalues, source: str= '') -> LazyConf:
 	"""Make an existing property conform to the interface."""
 	if block or block.name is not None:
 		if source:
-			def copier() -> Keyvalues:
+			async def copy_with_source() -> Keyvalues:
 				"""Copy the config, then apply the source."""
 				copy = block.copy()
 				packages.set_cond_source(copy, source)
 				return copy
-			return copier
-		else:  # We can just use the bound method.
-			return block.copy
+			return copy_with_source
+		else:
+			async def copy_no_source() -> Keyvalues:
+				"""Just copy the block."""
+				return block.copy()
+
+			return copy_no_source
 	else:  # If empty, source is irrelevant, and we can use the constant.
 		return BLANK
 
@@ -49,16 +60,20 @@ def from_file(path: utils.PackagePath, missing_ok: bool=False, source: str= '') 
 			LOGGER.warning('File does not exist: "{}"', path)
 		return BLANK
 
-	def loader() -> Keyvalues:
+	async def loader() -> Keyvalues:
 		"""Load and parse the specified file when called."""
-		try:
+		def worker() -> Keyvalues:
+			"""Run this in a background thread."""
 			with file.open_str() as f:
 				kv = Keyvalues.parse(f)
+			if source:
+				packages.set_cond_source(kv, source)
+			return kv
+		try:
+			kv = await trio.to_thread.run_sync(worker)
 		except (KeyValError, FileNotFoundError, UnicodeDecodeError):
 			LOGGER.exception('Unable to read "{}"', path)
 			raise
-		if source:
-			packages.set_cond_source(kv, source)
 		return kv
 
 	if app.DEV_MODE.get():
@@ -68,10 +83,13 @@ def from_file(path: utils.PackagePath, missing_ok: bool=False, source: str= '') 
 
 async def devmod_check(file: File[Any], path: utils.PackagePath) -> None:
 	"""In dev mode, parse files in the background to ensure they exist and have valid syntax."""
-	# Parse immediately, to check syntax.
-	try:
+	def worker() -> None:
+		"""Parse immediately, to check the syntax."""
 		with file.open_str() as f:
-			await trio.to_thread.run_sync(Keyvalues.parse, f, cancellable=True)
+			Keyvalues.parse(f)
+
+	try:
+		await trio.to_thread.run_sync(worker, cancellable=True)
 	except (KeyValError, FileNotFoundError, UnicodeDecodeError):
 		LOGGER.exception('Unable to read "{}"', path)
 
@@ -86,11 +104,11 @@ def concat(a: LazyConf, b: LazyConf) -> LazyConf:
 	if b is BLANK:
 		return a
 
-	def concat_inner() -> Keyvalues:
+	async def concat_inner() -> Keyvalues:
 		"""Resolve then merge the configs."""
 		kv = Keyvalues.root()
-		kv.extend(a())
-		kv.extend(b())
+		kv.extend(await a())
+		kv.extend(await b())
 		return kv
 	return concat_inner
 
@@ -102,9 +120,9 @@ def replace(base: LazyConf, replacements: list[tuple[Pattern[str], str]]) -> Laz
 		for pattern, repl in replacements
 	]
 
-	def replacer() -> Keyvalues:
+	async def replacer() -> Keyvalues:
 		"""Replace values."""
-		copy = base()
+		copy = await base()
 		for prop in copy.iter_tree():
 			name = prop.real_name
 			if name is not None:

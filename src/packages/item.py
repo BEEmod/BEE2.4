@@ -679,7 +679,7 @@ class Item(PakObject, needs_foreground=True, export_priority=-10):
             (items, config_part) = item._get_export_data(pal_list, style_id, prop_conf)
 
             exp_data.all_items.extend(items)
-            vbsp_config.extend(apply_replacements(config_part(), item.id))
+            vbsp_config.extend(apply_replacements(await config_part(), item.id))
 
             # Add auxiliary configs as well.
             try:
@@ -687,7 +687,7 @@ class Item(PakObject, needs_foreground=True, export_priority=-10):
             except KeyError:
                 pass
             else:
-                vbsp_config.extend(apply_replacements(aux_conf.all_conf(), item.id + ':aux_all'))
+                vbsp_config.extend(apply_replacements(await aux_conf.all_conf(), item.id + ':aux_all'))
                 try:
                     version_data = aux_conf.versions[prop_conf.version]
                 except KeyError:
@@ -698,7 +698,7 @@ class Item(PakObject, needs_foreground=True, export_priority=-10):
                     for poss_style in exp_data.selected_style.bases:
                         if poss_style.id in version_data:
                             vbsp_config.extend(apply_replacements(
-                                version_data[poss_style.id](),
+                                await version_data[poss_style.id](),
                                 item.id + ':aux'
                             ))
                             break

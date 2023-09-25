@@ -392,7 +392,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True, export_priority=10):
                 chosen = group.defaults(mode, direction, orient)
 
             for corr in chosen:
-                exp_data.vbsp_conf.extend(corr.config())
+                exp_data.vbsp_conf.extend(await corr.config())
             export[mode, direction, orient] = list(map(CorridorUI.strip_ui, chosen))
 
         # Now write out.

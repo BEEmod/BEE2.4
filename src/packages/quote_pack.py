@@ -75,7 +75,7 @@ class QuotePack(PakObject, needs_foreground=True, style_suggest_key='quote'):
             mon_cam_pitch, mon_cam_yaw, _ = monitor_data.vec('Cam_angles')
             turret_hate = monitor_data.bool('TurretShoot')
 
-        config = get_config(
+        config = await get_config(
             data.info,
             'voice',
             pak_id=data.pak_id,
