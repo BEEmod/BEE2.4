@@ -1,11 +1,7 @@
 """Various conditions related to the position/orientation of items."""
+from typing import Iterable, Tuple, Dict, Set
 import math
-from typing import Iterable, Tuple, Dict, Set, Callable
 
-from precomp.conditions import (
-    make_flag, make_result, resolve_offset,
-    DIRECTIONS,
-)
 from editoritems_props import PanelAnimation
 from precomp import conditions, tiling, brushLoc
 from srctools import Vec, FrozenVec, Angle, Matrix, conv_float, Keyvalues, Entity
@@ -20,7 +16,7 @@ LOGGER = get_logger(__name__, alias='cond.positioning')
 TILE_PREDICATES: Dict[str, Set[tiling.TileType]] = {}
 
 
-@make_flag(
+@conditions.make_test(
     'rotation',
     'angle',
     'angles',
@@ -29,8 +25,8 @@ TILE_PREDICATES: Dict[str, Set[tiling.TileType]] = {}
     'dir',
     'direction',
 )
-def flag_angles(flag: Keyvalues) -> Callable[[Entity], bool]:
-    """Check that a instance is pointed in a direction.
+def check_angles(kv: Keyvalues) -> conditions.TestCallable:
+    """Check that an instance is pointed in a direction.
 
     The value should be either just the angle to check, or a block of
     options:
@@ -38,21 +34,21 @@ def flag_angles(flag: Keyvalues) -> Callable[[Entity], bool]:
     - `direction`: A unit vector (XYZ value) pointing in a direction, or some
         keywords: `+z`, `-y`, `N`/`S`/`E`/`W`, `up`/`down`, `floor`/`ceiling`, or `walls` for any wall side.
     - `From_dir`: The direction the unrotated instance is pointed in.
-        This lets the flag check multiple directions.
+        This lets the test check multiple directions.
     - `Allow_inverse`: If true, this also returns True if the instance is
         pointed the opposite direction .
     """
 
-    if flag.has_children():
-        targ_angle = flag['direction', '0 0 0']
-        from_dir_str = flag['from_dir', '0 0 1']
+    if kv.has_children():
+        targ_angle = kv['direction', '0 0 0']
+        from_dir_str = kv['from_dir', '0 0 1']
         try:
-            from_dir = DIRECTIONS[from_dir_str.casefold()]
+            from_dir = conditions.DIRECTIONS[from_dir_str.casefold()]
         except KeyError:
             from_dir = FrozenVec.from_str(from_dir_str, 0, 0, 1)
-        allow_inverse = flag.bool('allow_inverse')
+        allow_inverse = kv.bool('allow_inverse')
     else:
-        targ_angle = flag.value
+        targ_angle = kv.value
         from_dir = FrozenVec(0, 0, 1)
         allow_inverse = False
 
@@ -64,7 +60,7 @@ def flag_angles(flag: Keyvalues) -> Callable[[Entity], bool]:
             return abs(inst_normal.z) < 1e-6
     else:
         try:
-            normal = DIRECTIONS[targ_angle]
+            normal = conditions.DIRECTIONS[targ_angle]
         except KeyError:
             normal = FrozenVec.from_str(targ_angle)
 
@@ -195,8 +191,8 @@ def brush_at_loc(
     return tile_type, both_colors, tile_types
 
 
-@make_flag('posIsSolid')
-def flag_brush_at_loc(inst: Entity, flag: Keyvalues) -> bool:
+@conditions.make_test('posIsSolid')
+def check_brush_at_loc(inst: Entity, kv: Keyvalues) -> bool:
     """Checks to see if a tile is present at the given location.
 
     - `Pos` is the position of the tile, where `0 0 0` is the floor-position
@@ -228,18 +224,18 @@ def flag_brush_at_loc(inst: Entity, flag: Keyvalues) -> bool:
       in the VMF. This key will be written into the comment field to assist with identifying the
       relevant condition.
     """
-    avg_type, both_colors, tile_types = brush_at_loc(inst, flag)
+    avg_type, both_colors, tile_types = brush_at_loc(inst, kv)
 
-    if 'pos2' not in flag:  # Others are useless.
+    if 'pos2' not in kv:  # Others are useless.
         mode = 'avg'
     else:
-        mode = flag['mode', 'avg'].casefold()
+        mode = kv['mode', 'avg'].casefold()
 
     if mode in ('same', 'diff', 'different'):
         # These don't need 'type', force the value to ensure it can't error out.
         des_type = 'any'
     else:
-        des_type = flag['type', 'any'].casefold()
+        des_type = kv['type', 'any'].casefold()
 
     if des_type in ('same', 'diff', 'different'):
         LOGGER.warning(
@@ -247,9 +243,9 @@ def flag_brush_at_loc(inst: Entity, flag: Keyvalues) -> bool:
             des_type,
         )
         # Modify the properties, so it doesn't happen again.
-        mode = flag['mode'] = des_type
+        mode = kv['mode'] = des_type
         des_type = 'any'
-        del flag['type']
+        del kv['type']
 
     try:
         tile_pred = TILE_PREDICATES[des_type]
@@ -324,7 +320,7 @@ _fill_predicates()
 del _fill_predicates
 
 
-@make_result('ReadSurfType')
+@conditions.make_result('ReadSurfType')
 def res_brush_at_loc(inst: Entity, res: Keyvalues) -> None:
     """Read the type of surface at a particular location.
 
@@ -348,18 +344,18 @@ def res_brush_at_loc(inst: Entity, res: Keyvalues) -> None:
     brush_at_loc(inst, res)
 
 
-@make_flag('PosIsGoo')
-def flag_goo_at_loc(inst: Entity, flag: Keyvalues) -> bool:
+@conditions.make_test('PosIsGoo')
+def check_goo_at_loc(inst: Entity, kv: Keyvalues) -> bool:
     """Check to see if a given location is submerged in goo.
 
     `0 0 0` is the origin of the instance, values are in `128` increments.
     """
-    return brushLoc.POS.lookup_world(resolve_offset(inst, flag.value, scale=128)).is_goo
+    return brushLoc.POS.lookup_world(conditions.resolve_offset(inst, kv.value, scale=128)).is_goo
 
 
-@make_flag('BlockType')
-def flag_blockpos_type(inst: Entity, flag: Keyvalues) -> bool:
-    """Determine the type of a grid position.
+@conditions.make_test('BlockType')
+def check_blockpos_type(inst: Entity, kv: Keyvalues) -> bool:
+    """Determine the block type at a grid position.
 
     If the value is single value, that should be the type.
     Otherwise, the value should be a block with 'offset' and 'type' values.
@@ -387,13 +383,13 @@ def flag_blockpos_type(inst: Entity, flag: Keyvalues) -> bool:
     """
     pos2 = None
 
-    if flag.has_children():
-        pos1 = resolve_offset(inst, flag['offset', '0 0 0'], scale=128, zoff=-128)
-        types = flag['type'].split()
-        if 'offset2' in flag:
-            pos2 = resolve_offset(inst, flag['offset2', '0 0 0'], scale=128, zoff=-128)
+    if kv.has_children():
+        pos1 = conditions.resolve_offset(inst, kv['offset', '0 0 0'], scale=128, zoff=-128)
+        types = kv['type'].split()
+        if 'offset2' in kv:
+            pos2 = conditions.resolve_offset(inst, kv['offset2', '0 0 0'], scale=128, zoff=-128)
     else:
-        types = flag.value.split()
+        types = kv.value.split()
         pos1 = Vec()
 
     bbox: Iterable[Vec]
@@ -416,7 +412,7 @@ def flag_blockpos_type(inst: Entity, flag: Keyvalues) -> bool:
     return True  # Matched all positions.
 
 
-@make_result('SetBlock')
+@conditions.make_result('SetBlock')
 def res_set_block(inst: Entity, res: Keyvalues) -> None:
     """Set a block to the given value, overwriting the existing value.
 
@@ -450,17 +446,17 @@ def res_set_block(inst: Entity, res: Keyvalues) -> None:
             f'Can\'t use compound block type "{res["type"]}", specify _SINGLE/TOP/MID/BOTTOM'
         ) from None
 
-    pos1 = resolve_offset(inst, res['offset', '0 0 0'], scale=128, zoff=-128)
+    pos1 = conditions.resolve_offset(inst, res['offset', '0 0 0'], scale=128, zoff=-128)
 
     if 'offset2' in res:
-        pos2 = resolve_offset(inst, res['offset2', '0 0 0'], scale=128, zoff=-128)
+        pos2 = conditions.resolve_offset(inst, res['offset2', '0 0 0'], scale=128, zoff=-128)
         for pos in Vec.iter_grid(*Vec.bbox(pos1, pos2), stride=128):
             brushLoc.POS.set_world(pos, new_val)
     else:
         brushLoc.POS.set_world(pos1, new_val)
 
 
-@make_result('forceUpright')
+@conditions.make_result('forceUpright')
 def res_force_upright(inst: Entity) -> None:
     """Position an instance to orient upwards while keeping the normal.
 
@@ -474,8 +470,8 @@ def res_force_upright(inst: Entity) -> None:
     inst['angles'] = f'0 {ang % 360:g} 0'  # Don't use negatives
 
 
-@make_result('switchOrientation')
-def res_alt_orientation(res: Keyvalues) -> Callable[[Entity], None]:
+@conditions.make_result('switchOrientation')
+def res_alt_orientation(res: Keyvalues) -> conditions.ResultCallable:
     """Apply an alternate orientation.
 
     "wall" makes the attaching surface in the -X direction, making obs rooms,
@@ -497,13 +493,13 @@ def res_alt_orientation(res: Keyvalues) -> Callable[[Entity], None]:
     return swap_orient
 
 
-@make_result('setAngles')
+@conditions.make_result('setAngles')
 def res_set_angles(inst: Entity, res: Keyvalues) -> None:
     """Set the orientation of an instance to a certain angle."""
     inst['angles'] = inst.fixup.substitute(res.value)
 
 
-@make_result('OffsetInst', 'offsetinstance')
+@conditions.make_result('OffsetInst', 'offsetinstance')
 def res_translate_inst(inst: Entity, res: Keyvalues) -> None:
     """Translate the instance locally by the given amount.
 
@@ -511,10 +507,10 @@ def res_translate_inst(inst: Entity, res: Keyvalues) -> None:
     used to offset it based on the starting position, bottom or top position
     of a piston platform.
     """
-    inst['origin'] = resolve_offset(inst, res.value)
+    inst['origin'] = conditions.resolve_offset(inst, res.value)
 
 
-@make_result('OppositeWallDist')
+@conditions.make_result('OppositeWallDist')
 def res_calc_opposite_wall_dist(inst: Entity, res: Keyvalues) -> None:
     """Calculate the distance between this item and the opposing wall.
 
@@ -563,7 +559,7 @@ def res_calc_opposite_wall_dist(inst: Entity, res: Keyvalues) -> None:
     inst.fixup[result_var] = (origin - opposing_pos).mag() + dist_off
 
 
-@make_result('RotateInst', 'RotateInstance')
+@conditions.make_result('RotateInst', 'RotateInstance')
 def res_rotate_inst(inst: Entity, res: Keyvalues) -> None:
     """Rotate the instance around an axis.
 

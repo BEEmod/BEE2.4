@@ -7,8 +7,8 @@ COND_MOD_NAME = 'Faith Plates'
 LOGGER = logger.get_logger(__name__, alias='cond.faithplate')
 
 
-@conditions.make_flag("FaithType")
-def flag_faith_type(inst: Entity, flag: Keyvalues) -> bool:
+@conditions.make_test("FaithType")
+def test_faith_type(inst: Entity, kv: Keyvalues) -> bool:
     """Determine the type of faith plate used.
 
     The value can be set to 'straight', 'straightup', 'angled',
@@ -21,7 +21,7 @@ def flag_faith_type(inst: Entity, flag: Keyvalues) -> bool:
     if isinstance(plate, faithplate.PaintDropper):
         plate = None
 
-    des_type = flag.value.casefold()
+    des_type = kv.value.casefold()
 
     if des_type == 'any':
         return plate is not None

@@ -1541,7 +1541,7 @@ async def main() -> None:
             'No arguments!\n'
             "The BEE2 VBSP takes all the regular VBSP's "
             'arguments, with some extra arguments:\n'
-            '-dump_conditions: Print a list of all condition flags,\n'
+            '-dump_conditions: Print a list of all condition tests,\n'
             '  results, and metaconditions.\n'
             '-bee2_verbose: Print debug messages to the console.\n'
             '-verbose: A default VBSP command, has the same effect as above.\n'

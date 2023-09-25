@@ -30,26 +30,26 @@ def global_bool(val: bool) -> bool:
         raise conditions.Unsatisfiable
 
 
-@conditions.make_flag('styleVar')
-def flag_stylevar(flag: Keyvalues) -> bool:
+@conditions.make_test('styleVar')
+def check_stylevar(kv: Keyvalues) -> bool:
     """Checks if the given Style Var is true.
 
-    Use the NOT flag to invert if needed.
+    Use the NOT test or "!styleVar" to invert if needed.
     """
-    return global_bool(vbsp.settings['style_vars'][flag.value.casefold()])
+    return global_bool(vbsp.settings['style_vars'][kv.value.casefold()])
 
 
-@conditions.make_flag('has')
-def flag_voice_has(info: conditions.MapInfo, flag: Keyvalues) -> bool:
+@conditions.make_test('has')
+def check_voice_has(info: conditions.MapInfo, kv: Keyvalues) -> bool:
     """Checks if the given Voice Attribute is present.
 
-    Use the NOT flag to invert if needed.
+    Use the NOT test or "!has" to invert if needed.
     """
-    return global_bool(info.has_attr(flag.value))
+    return global_bool(info.has_attr(kv.value))
 
 
-@conditions.make_flag('has_music')
-def flag_music() -> NoReturn:
+@conditions.make_test('has_music')
+def check_music() -> NoReturn:
     """Checks the selected music ID.
 
     Use `<NONE>` for no music.
@@ -58,8 +58,8 @@ def flag_music() -> NoReturn:
     raise conditions.Unsatisfiable
 
 
-@conditions.make_flag('Game')
-def flag_game(flag: Keyvalues) -> bool:
+@conditions.make_test('Game')
+def check_game(kv: Keyvalues) -> bool:
     """Checks which game is being modded.
 
     Accepts the following aliases instead of a Steam ID:
@@ -75,20 +75,20 @@ def flag_game(flag: Keyvalues) -> bool:
     - `Destroyed Aperture`
     """
     return global_bool(options.get(str, 'game_id') == utils.STEAM_IDS.get(
-        flag.value.upper(),
-        flag.value,
+        kv.value.upper(),
+        kv.value,
     ))
 
 
-@conditions.make_flag('has_char')
-def flag_voice_char(flag: Keyvalues) -> bool:
+@conditions.make_test('has_char')
+def check_voice_char(kv: Keyvalues) -> bool:
     """Checks to see if the given charcter is present in the voice pack.
 
     `<NONE>` means no voice pack is chosen.
     This is case-insensitive, and allows partial matches - `Cave` matches
     a voice pack with `Cave Johnson`.
     """
-    targ_char = flag.value.casefold()
+    targ_char = kv.value.casefold()
     if targ_char == '<none>':
         return options.get(str, 'voice_id') == '<NONE>'
     for char in options.get(str, 'voice_char').split(','):
@@ -97,40 +97,40 @@ def flag_voice_char(flag: Keyvalues) -> bool:
     raise conditions.Unsatisfiable
 
 
-@conditions.make_flag('HasCavePortrait')
-def res_cave_portrait() -> bool:
+@conditions.make_test('HasCavePortrait')
+def check_cave_portrait() -> bool:
     """Checks to see if the Cave Portrait option is set for the given voice pack.
     """
     return global_bool(options.get(int, 'cave_port_skin') is not None)
 
 
-@conditions.make_flag('entryCorridor')
-def res_check_entry_corridor(info: conditions.MapInfo, flag: Keyvalues) -> bool:
+@conditions.make_test('entryCorridor')
+def check_entry_corridor(info: conditions.MapInfo, kv: Keyvalues) -> bool:
     """Check the selected entry corridor matches this filename."""
-    return global_bool(info.corr_entry.instance.casefold() == flag.value.casefold())
+    return global_bool(info.corr_entry.instance.casefold() == kv.value.casefold())
 
 
-@conditions.make_flag('exitCorridor')
-def res_check_exit_corridor(info: conditions.MapInfo, flag: Keyvalues) -> bool:
+@conditions.make_test('exitCorridor')
+def check_exit_corridor(info: conditions.MapInfo, kv: Keyvalues) -> bool:
     """Check the selected exit corridor matches this filename."""
-    return global_bool(info.corr_exit.instance.casefold() == flag.value.casefold())
+    return global_bool(info.corr_exit.instance.casefold() == kv.value.casefold())
 
 
-@conditions.make_flag('ifMode', 'iscoop', 'gamemode')
-def flag_game_mode(info: conditions.MapInfo, flag: Keyvalues) -> bool:
+@conditions.make_test('ifMode', 'iscoop', 'gamemode')
+def check_game_mode(info: conditions.MapInfo, kv: Keyvalues) -> bool:
     """Checks if the game mode is `SP` or `COOP`.
     """
-    mode = flag.value.casefold()
+    mode = kv.value.casefold()
     if mode == 'sp':
         return global_bool(info.is_sp)
     elif mode == 'coop':
         return global_bool(info.is_coop)
     else:
-        raise ValueError(f'Unknown gamemode "{flag.value}"!')
+        raise ValueError(f'Unknown gamemode "{kv.value}"!')
 
 
-@conditions.make_flag('ifPreview', 'preview')
-def flag_is_preview(info: conditions.MapInfo, flag: Keyvalues) -> bool:
+@conditions.make_test('ifPreview', 'preview')
+def check_is_preview(info: conditions.MapInfo, kv: Keyvalues) -> bool:
     """Checks if the preview mode status equals the given value.
 
     If preview mode is enabled, the player will start before the entry
@@ -139,12 +139,12 @@ def flag_is_preview(info: conditions.MapInfo, flag: Keyvalues) -> bool:
 
     Preview mode is always `False` when publishing.
     """
-    expect_preview = conv_bool(flag.value, False)
+    expect_preview = conv_bool(kv.value, False)
     return global_bool(expect_preview == (not info.start_at_elevator))
 
 
-@conditions.make_flag('hasExitSignage')
-def flag_has_exit_signage(vmf: VMF) -> bool:
+@conditions.make_test('hasExitSignage')
+def check_has_exit_signage(vmf: VMF) -> bool:
     """Check to see if either exit sign is present."""
     for over in vmf.by_class['info_overlay']:
         if over['targetname'] in ('exitdoor_arrow', 'exitdoor_stickman'):
@@ -270,7 +270,7 @@ def get_itemconf(inst: Entity, res: Keyvalues) -> str | None:
     return options.get_itemconf((group_id, wid_name), None, timer_delay)
 
 
-@conditions.make_flag('ItemConfig')
+@conditions.make_test('ItemConfig')
 def res_match_item_config(inst: Entity, res: Keyvalues) -> bool:
     """Check if an Item Config Panel value matches another value.
 

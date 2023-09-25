@@ -141,7 +141,7 @@ class QuotePack(PakObject, needs_foreground=True, style_suggest_key='quote'):
             else:
                 vbsp_config.append(prop.copy())
 
-        # Set values in vbsp_config, so flags can determine which voiceline
+        # Set values in vbsp_config, so tests can determine which voiceline
         # is selected.
         options = vbsp_config.ensure_exists('Options')
 
@@ -187,7 +187,7 @@ class QuotePack(PakObject, needs_foreground=True, style_suggest_key='quote'):
         """
         children = []
         for sub_prop in kv:
-            # Make sure it's in the right nesting depth - flags might
+            # Make sure it's in the right nesting depth - tests might
             # have arbitrary props in lower depths...
             if _depth == 3:  # 'Line' blocks
                 if sub_prop.name == 'trans':

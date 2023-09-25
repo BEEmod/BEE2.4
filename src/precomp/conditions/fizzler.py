@@ -12,14 +12,14 @@ COND_MOD_NAME = 'Fizzlers'
 LOGGER = srctools.logger.get_logger(__name__, alias='cond.fizzler')
 
 
-@conditions.make_flag('FizzlerType')
-def flag_fizz_type(inst: Entity, flag: Keyvalues) -> bool:
+@conditions.make_test('FizzlerType')
+def test_fizz_type(inst: Entity, kv: Keyvalues) -> bool:
     """Check if a fizzler is the specified type name."""
     try:
         fizz = fizzler.FIZZLERS[inst['targetname']]
     except KeyError:
         return False
-    return fizz.fizz_type.id.casefold() == flag.value.casefold()
+    return fizz.fizz_type.id.casefold() == kv.value.casefold()
 
 
 @conditions.make_result('ChangeFizzlerType')

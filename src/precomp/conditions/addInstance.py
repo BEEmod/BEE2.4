@@ -151,7 +151,7 @@ def res_add_shuffle_group(
         - Var: The fixup variable to set on each item. This is used to tweak it
           to match the condition.
         - Conditions: Each value here is the value to produce if this instance
-          is required. The contents of the block is then a condition flag to
+          is required. The contents of the block is then a condition test to
           check.
         - Pool: A list of instances to randomly allocate to the conditions. There
           should be at least as many pool values as there are conditions.
@@ -160,26 +160,26 @@ def res_add_shuffle_group(
     conf_variable = res['var']
     conf_seed = 'sg' + res['seed', '']
     conf_pools: Dict[str, List[str]] = {}
-    for prop in res.find_children('pool'):
-        if prop.has_children():
+    for kv in res.find_children('pool'):
+        if kv.has_children():
             raise ValueError('Instances in pool cannot be a property block!')
-        conf_pools.setdefault(prop.name, []).append(prop.value)
+        conf_pools.setdefault(kv.name, []).append(kv.value)
 
-    # (flag, value, pools)
+    # (tests, value, pools)
     conf_selectors: List[Tuple[List[Keyvalues], str, FrozenSet[str]]] = []
-    for prop in res.find_all('selector'):
-        conf_value = prop['value', '']
-        conf_flags = list(prop.find_children('conditions'))
+    for kv in res.find_all('selector'):
+        conf_value = kv['value', '']
+        conf_tests = list(kv.find_children('conditions'))
         picked_pools: Iterable[str]
         try:
-            picked_pools = prop['pools'].casefold().split()
+            picked_pools = kv['pools'].casefold().split()
         except LookupError:
             picked_pools = frozenset(conf_pools)
         else:
             for pool_name in picked_pools:
                 if pool_name not in conf_pools:
                     raise ValueError(f'Unknown pool name {pool_name}!')
-        conf_selectors.append((conf_flags, conf_value, frozenset(picked_pools)))
+        conf_selectors.append((conf_tests, conf_value, frozenset(picked_pools)))
 
     all_pools = [
         (name, inst)
@@ -192,9 +192,9 @@ def res_add_shuffle_group(
         """Place the group."""
         rng = rand.seed(b'shufflegroup', conf_seed, inst)
         pools = all_pools.copy()
-        for (flags, value, potential_pools) in conf_selectors:
-            for flag in flags:
-                if not conditions.check_flag(flag, coll, info, inst):
+        for (tests, value, potential_pools) in conf_selectors:
+            for test in tests:
+                if not conditions.check_test(test, coll, info, inst):
                     break
             else:  # Succeeded.
                 allowed_inst = [

@@ -6,23 +6,23 @@ every instance.
 In pseudocode:
     for cond in all_conditions:
         for inst in vmf:
-            if all(flag() in cond):
+            if all(test() in cond):
                 apply_results()
 
-Both results and flags recieve configuration keyvalues, the vmf and the
-current instance. Flags return a boolean to indicate if they are successful.
+Both results and tests recieve configuration keyvalues, the vmf and the
+current instance. Tests return a boolean to indicate if they are successful.
 Results return None normally, but can return the special value RES_EXHAUSTED to
 indicate calling the specific result again will have no effect. In this case the
 result will be deleted.
 
 Argument type annotations are used to allow flexibility in defining results and
-flags. Each argument must be typed as one of the following to recieve a specific
+tests. Each argument must be typed as one of the following to recieve a specific
 value:
     * VMF to recieve the overall map.
     * Entity to recieve the current instance.
     * Keyvalues to recieve keyvalues configuration.
 
-If the entity is not provided, the first time the result/flag is called it
+If the entity is not provided, the first time the result/test is called it
 can return a callable which will instead be called with each entity. This allows
 only parsing configuration options once, and is expected to be used with a
 closure.
@@ -70,24 +70,24 @@ GLOBAL_INSTANCES: set[str] = set()
 ALL_INST: set[str] = {''}
 
 conditions: list[Condition] = []
-FLAG_LOOKUP: dict[str, CondCall[bool]] = {}
+TEST_LOOKUP: dict[str, CondCall[bool]] = {}
 RESULT_LOOKUP: dict[str, CondCall[object]] = {}
 
 # For legacy setup functions.
 RESULT_SETUP: dict[str, Callable[..., Any]] = {}
 
-# Used to dump a list of the flags, results, meta-conditions
-ALL_FLAGS: list[tuple[str, tuple[str, ...], CondCall[bool]]] = []
+# Used to dump a list of the tests, results, meta-conditions
+ALL_TESTS: list[tuple[str, tuple[str, ...], CondCall[bool]]] = []
 ALL_RESULTS: list[tuple[str, tuple[str, ...], CondCall[object]]] = []
 ALL_META: list[tuple[str, Decimal, CondCall[object]]] = []
 
 
 ResultT = TypeVar('ResultT')
 CallableT = TypeVar('CallableT', bound=Callable[..., object])
-# The return values for 2-stage results and flags.
-FlagCallable = Callable[[Entity], bool]
+# The return values for 2-stage results and tests.
+TestCallable = Callable[[Entity], bool]
 ResultCallable = Callable[[Entity], object]
-FlagCallT = TypeVar('FlagCallT', bound=Callable[..., Union[bool, FlagCallable]])
+TestCallT = TypeVar('TestCallT', bound=Callable[..., Union[bool, TestCallable]])
 
 
 class SWITCH_TYPE(Enum):
@@ -176,7 +176,7 @@ class EndCondition(Exception):
 
 
 class Unsatisfiable(Exception):
-    """Raised by flags to indicate they currently will always be false with all instances.
+    """Raised by tests to indicate they currently will always be false with all instances.
 
     For example, an instance result when that instance currently isn't present.
     """
@@ -190,7 +190,7 @@ RES_EXHAUSTED = object()
 @attrs.define
 class Condition:
     """A single condition which may be evaluated."""
-    flags: list[Keyvalues] = attrs.Factory(list)
+    tests: list[Keyvalues] = attrs.Factory(list)
     results: list[Keyvalues] = attrs.Factory(list)
     else_results: list[Keyvalues] = attrs.Factory(list)
     priority: Decimal = Decimal()
@@ -199,7 +199,7 @@ class Condition:
     @classmethod
     def parse(cls, kv_block: Keyvalues, *, toplevel: bool) -> Condition:
         """Create a condition from a Keyvalues block."""
-        flags: list[Keyvalues] = []
+        tests: list[Keyvalues] = []
         results: list[Keyvalues] = []
         else_results: list[Keyvalues] = []
         priority = Decimal()
@@ -234,10 +234,10 @@ class Condition:
                 except ArithmeticError:
                     pass
             else:
-                flags.append(kv)
+                tests.append(kv)
 
         return Condition(
-            flags,
+            tests,
             results,
             else_results,
             priority,
@@ -270,11 +270,11 @@ class Condition:
         """
         success = True
         # Only the first one can cause this condition to be skipped.
-        # We could have a situation where the first flag modifies the map
+        # We could have a situation where the first test modifies the map
         # such that it becomes satisfiable later, so this would be premature.
         # If we have else results, we also can't skip because those could modify state.
-        for i, flag in enumerate(self.flags):
-            if not check_flag(flag, coll, info, inst, can_skip=i==0 and not self.else_results):
+        for i, test in enumerate(self.tests):
+            if not check_test(test, coll, info, inst, can_skip=(i == 0) and not self.else_results):
                 success = False
                 break
         results = self.results if success else self.else_results
@@ -488,7 +488,7 @@ def conv_setup_pair(
 
 
 class CondCall(Generic[CallResultT]):
-    """A result or flag callback.
+    """A result or test callback.
 
     This should be called to execute it.
     """
@@ -604,19 +604,19 @@ def meta_cond(priority: int | Decimal=0, only_once: bool=True) -> Callable[[Call
     return x
 
 
-def make_flag(orig_name: str, *aliases: str) -> Callable[[FlagCallT], FlagCallT]:
-    """Decorator to add flags to the lookup."""
-    def x(func: FlagCallT) -> FlagCallT:
+def make_test(orig_name: str, *aliases: str) -> Callable[[TestCallT], TestCallT]:
+    """Decorator to add tests to the lookup."""
+    def x(func: TestCallT) -> TestCallT:
         wrapper: CondCall[bool] = CondCall(func, _get_cond_group(func))
-        ALL_FLAGS.append((orig_name, aliases, wrapper))
+        ALL_TESTS.append((orig_name, aliases, wrapper))
         name = orig_name.casefold()
-        if name in FLAG_LOOKUP:
-            raise ValueError(f'Flag {orig_name} is a duplicate!')
-        FLAG_LOOKUP[orig_name.casefold()] = wrapper
+        if name in TEST_LOOKUP:
+            raise ValueError(f'Test {orig_name} is a duplicate!')
+        TEST_LOOKUP[orig_name.casefold()] = wrapper
         for name in aliases:
-            if name.casefold() in FLAG_LOOKUP:
-                raise ValueError(f'Flag {orig_name} is a duplicate!')
-            FLAG_LOOKUP[name.casefold()] = wrapper
+            if name.casefold() in TEST_LOOKUP:
+                raise ValueError(f'Test {orig_name} is a duplicate!')
+            TEST_LOOKUP[name.casefold()] = wrapper
         return func
     return x
 
@@ -712,7 +712,7 @@ def check_all(vmf: VMF, coll: collisions.Collisions, info: MapInfo) -> None:
                     # this condition, and skip to the next instance.
                     continue
                 except Unsatisfiable:
-                    # Unsatisfiable indicates this condition's flags will
+                    # Unsatisfiable indicates this condition's tests will
                     # never succeed, so just skip.
                     skipped_cond += 1
                     break
@@ -769,16 +769,16 @@ def check_all(vmf: VMF, coll: collisions.Collisions, info: MapInfo) -> None:
     LOGGER.info('Global instances: {}', GLOBAL_INSTANCES)
 
 
-def check_flag(
-    flag: Keyvalues,
+def check_test(
+    test: Keyvalues,
     coll: collisions.Collisions, info: MapInfo,
     inst: Entity, can_skip: bool = False,
 ) -> bool:
-    """Determine the result for a condition flag.
+    """Determine the result for a condition test.
 
-    If can_skip is true, flags raising Unsatifiable will pass the exception through.
+    If can_skip is true, testd raising Unsatifiable will pass the exception through.
     """
-    name = flag.name
+    name = test.name
     # If starting with '!', invert the result.
     if name[:1] == '!':
         desired_result = False
@@ -787,7 +787,7 @@ def check_flag(
     else:
         desired_result = True
     try:
-        func = FLAG_LOOKUP[name]
+        func = TEST_LOOKUP[name]
     except KeyError:
         err_msg = f'"{name}" is not a valid condition flag!'
         if utils.DEV_MODE:
@@ -799,7 +799,7 @@ def check_flag(
             return False
 
     try:
-        res = func(coll, info, inst, flag)
+        res = func(coll, info, inst, test)
     except Unsatisfiable:
         if can_skip:
             raise
@@ -816,7 +816,7 @@ def import_conditions() -> None:
     """
     # Find the modules in the conditions package.
     for module in pkgutil.iter_modules(__path__, 'precomp.conditions.'):
-        # Import the module, then discard it. The module will run add_flag
+        # Import the module, then discard it. The module will run add_test()
         # or add_result() functions, which save the functions into our dicts.
         # We don't need a reference to the modules themselves.
         LOGGER.debug('Importing {} ...', module.name)
@@ -846,7 +846,7 @@ They have limited utility otherwise.
 
 
 def dump_conditions(file: TextIO) -> None:
-    """Dump docs for all the condition flags, results and metaconditions."""
+    """Dump docs for all the condition tests, results and metaconditions."""
 
     LOGGER.info('Dumping conditions...')
 
@@ -874,13 +874,13 @@ def dump_conditions(file: TextIO) -> None:
     file.write(DOC_META_COND)
 
     ALL_META.sort(key=lambda i: i[1])  # Sort by priority
-    for flag_key, priority, func in ALL_META:
-        file.write(f'#### `{flag_key}` ({priority}):\n\n')
+    for test_key, priority, func in ALL_META:
+        file.write(f'#### `{test_key}` ({priority}):\n\n')
         dump_func_docs(file, func)
         file.write('\n')
 
     all_cond_types: list[tuple[list[tuple[str, tuple[str, ...], CondCall[Any]]], str]] = [
-        (ALL_FLAGS, 'Flags'),
+        (ALL_TESTS, 'Tests'),
         (ALL_RESULTS, 'Results'),
     ]
     for lookup, name in all_cond_types:
@@ -892,11 +892,11 @@ def dump_conditions(file: TextIO) -> None:
             tuple[str, tuple[str, ...], CondCall[Any]]
         ]] = defaultdict(list)
 
-        for flag_key, aliases, func in lookup:
+        for test_key, aliases, func in lookup:
             group = getattr(func, 'group', 'ERROR')
             if group is None:
                 group = '00special'
-            lookup_grouped[group].append((flag_key, aliases, func))
+            lookup_grouped[group].append((test_key, aliases, func))
 
         # Collapse 1-large groups into Ungrouped.
         for group in list(lookup_grouped):
@@ -922,8 +922,8 @@ def dump_conditions(file: TextIO) -> None:
 
             LOGGER.info('Doing {} group...', group)
 
-            for flag_key, aliases, func in funcs:
-                print(f'#### `{flag_key}`:\n', file=file)
+            for test_key, aliases, func in funcs:
+                print(f'#### `{test_key}`:\n', file=file)
                 if aliases:
                     print(f'**Aliases:** `{"`, `".join(aliases)}`  \n', file=file)
                 dump_func_docs(file, func)
@@ -1219,13 +1219,13 @@ def resolve_offset(inst, value: str, scale: float=1, zoff: float=0) -> Vec:
     return offset
 
 
-@make_flag('debug')
+@make_test('debug')
 @make_result('debug')
-def debug_flag(inst: Entity, kv: Keyvalues) -> bool:
+def debug_test_result(inst: Entity, kv: Keyvalues) -> bool:
     """Displays text when executed, for debugging conditions.
 
     If the text ends with an '=', the instance will also be displayed.
-    As a flag, this always evaluates as true.
+    As a test, this always evaluates as true.
     """
     # Mark as a warning, so it's more easily seen.
     if kv.has_children():
@@ -1235,7 +1235,7 @@ def debug_flag(inst: Entity, kv: Keyvalues) -> bool:
             inst=inst,
             props=kv.value,
         ))
-    return True  # The flag is always true
+    return True  # The test is always true
 
 
 @make_result('dummy', 'nop', 'do_nothing')
@@ -1342,18 +1342,18 @@ def res_end_condition() -> None:
 
 @make_result('switch')
 def res_switch(coll: collisions.Collisions, info: MapInfo, res: Keyvalues) -> ResultCallable:
-    """Run the same flag multiple times with different arguments.
+    """Run the same test multiple times with different arguments.
 
     `method` is the way the search is done - `first`, `last`, `random`, or `all`.
-    `flag` is the name of the flag.
+    `flag` is the name of the test.
     `seed` sets the randomisation seed for this block, for the random mode.
-    Each keyvalues group is a case to check - the Keyvalues name is the flag
+    Each keyvalues group is a case to check - the Keyvalues name is the test
     argument, and the contents are the results to execute in that case.
-    The special group `"<default>"` is only run if no other flag is valid.
-    For `random` mode, you can omit the flag to choose from all objects. In
-    this case the flag arguments are ignored.
+    The special group `"<default>"` is only run if no other test is valid.
+    For `random` mode, you can omit the test to choose from all objects. In
+    this case the test arguments are ignored.
     """
-    flag_name = ''
+    test_name = ''
     method = SWITCH_TYPE.FIRST
     raw_cases: list[Keyvalues] = []
     default: list[Keyvalues] = []
@@ -1365,8 +1365,8 @@ def res_switch(coll: collisions.Collisions, info: MapInfo, res: Keyvalues) -> Re
             else:
                 raw_cases.append(kv)
         else:
-            if kv.name == 'flag':
-                flag_name = kv.value
+            if kv.name == 'flag':  # TODO: deprecate/rename?
+                test_name = kv.value
                 continue
             if kv.name == 'method':
                 try:
@@ -1380,7 +1380,7 @@ def res_switch(coll: collisions.Collisions, info: MapInfo, res: Keyvalues) -> Re
         raw_cases.reverse()
 
     conf_cases: list[tuple[Keyvalues, list[Keyvalues]]] = [
-        (Keyvalues(flag_name, case.real_name), list(case))
+        (Keyvalues(test_name, case.real_name), list(case))
         for case in raw_cases
     ]
 
@@ -1393,9 +1393,9 @@ def res_switch(coll: collisions.Collisions, info: MapInfo, res: Keyvalues) -> Re
             cases = conf_cases
 
         run_default = True
-        for flag, results in cases:
+        for test, results in cases:
             # If not set, always succeed for the random situation.
-            if flag.real_name and not check_flag(flag, coll, info, inst):
+            if test.real_name and not check_test(test, coll, info, inst):
                 continue
             for sub_res in results:
                 Condition.test_result(coll, info, inst, sub_res)

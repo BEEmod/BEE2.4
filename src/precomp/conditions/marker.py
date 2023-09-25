@@ -5,7 +5,7 @@ import attrs
 from srctools import Keyvalues, Entity, Vec, Matrix
 import srctools.logger
 
-from precomp.conditions import make_flag, make_result
+from precomp.conditions import make_test, make_result
 
 COND_MOD_NAME = 'Markers'
 # TODO: switch to R-tree etc.
@@ -48,8 +48,8 @@ def res_set_marker(inst: Entity, res: Keyvalues) -> None:
     LOGGER.debug('Marker added: {}', mark)
 
 
-@make_flag('CheckMarker')
-def flag_check_marker(inst: Entity, flag: Keyvalues) -> bool:
+@make_test('CheckMarker')
+def check_marker(inst: Entity, kv: Keyvalues) -> bool:
     """Check if markers are present at a position.
 
     Parameters:
@@ -69,7 +69,7 @@ def flag_check_marker(inst: Entity, flag: Keyvalues) -> bool:
     origin = Vec.from_str(inst['origin'])
     orient = Matrix.from_angstr(inst['angles'])
 
-    name = inst.fixup.substitute(flag['name']).casefold()
+    name = inst.fixup.substitute(kv['name']).casefold()
     if '*' in name:
         try:
             prefix, suffix = name.split('*')
@@ -86,26 +86,26 @@ def flag_check_marker(inst: Entity, flag: Keyvalues) -> bool:
             return val.casefold() == name
 
     try:
-        is_global = srctools.conv_bool(inst.fixup.substitute(flag['global'], allow_invert=True))
+        is_global = srctools.conv_bool(inst.fixup.substitute(kv['global'], allow_invert=True))
     except LookupError:
         is_global = False
 
-    pos = Vec.from_str(inst.fixup.substitute(flag['pos']))
+    pos = Vec.from_str(inst.fixup.substitute(kv['pos']))
     if not is_global:
         pos = pos @ orient + origin
 
     radius: float | None
-    if 'pos2' in flag:
-        if 'radius' in flag:
+    if 'pos2' in kv:
+        if 'radius' in kv:
             raise ValueError('Only one of pos2 or radius must be defined.')
-        pos2 = Vec.from_str(inst.fixup.substitute(flag['pos2']))
+        pos2 = Vec.from_str(inst.fixup.substitute(kv['pos2']))
         if not is_global:
             pos2 = pos2 @ orient + origin
         bb_min, bb_max = Vec.bbox(pos, pos2)
         radius = None
         LOGGER.debug('Searching for marker "{}" from ({})-({})', name, bb_min, bb_max)
-    elif 'radius' in flag:
-        radius = abs(srctools.conv_float(inst.fixup.substitute(flag['radius'])))
+    elif 'radius' in kv:
+        radius = abs(srctools.conv_float(inst.fixup.substitute(kv['radius'])))
         bb_min = pos - (radius + 1.0)
         bb_max = pos + (radius + 1.0)
         LOGGER.debug('Searching for marker "{}" at ({}), radius={}', name, pos, radius)
@@ -123,17 +123,17 @@ def flag_check_marker(inst: Entity, flag: Keyvalues) -> bool:
         if not match(marker.name):
             continue
         # Matched.
-        if 'nameVar' in flag:
-            inst.fixup[flag['namevar']] = marker.name
-        if srctools.conv_bool(inst.fixup.substitute(flag['removeFound'], allow_invert=True)):
+        if 'nameVar' in kv:
+            inst.fixup[kv['namevar']] = marker.name
+        if srctools.conv_bool(inst.fixup.substitute(kv['removeFound'], allow_invert=True)):
             LOGGER.debug('Removing found marker {}', marker)
             del MARKERS[i]
 
-        for prop in flag.find_all('copyto'):
-            src, dest = prop.value.split(' ', 1)
+        for child in kv.find_all('copyto'):
+            src, dest = child.value.split(' ', 1)
             marker.inst.fixup[dest] = inst.fixup[src]
-        for prop in flag.find_all('copyfrom'):
-            src, dest = prop.value.split(' ', 1)
+        for child in kv.find_all('copyfrom'):
+            src, dest = child.value.split(' ', 1)
             inst.fixup[dest] = marker.inst.fixup[src]
         return True
     return False

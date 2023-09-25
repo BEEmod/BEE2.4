@@ -1,4 +1,4 @@
-"""Flags and Results relating to instances or instance variables.
+"""Tests and Results relating to instances or instance variables.
 
 """
 from __future__ import annotations
@@ -6,7 +6,6 @@ from typing import Any, Union, Callable
 import operator
 
 import srctools.logger
-from precomp.conditions import make_flag, make_result
 from precomp import instance_traits, instanceLocs, conditions, options
 from srctools import Keyvalues, Angle, Vec, Entity, Output, VMF, conv_bool
 
@@ -14,10 +13,10 @@ LOGGER = srctools.logger.get_logger(__name__, 'cond.instances')
 COND_MOD_NAME = 'Instances'
 
 
-@make_flag('instance')
-def flag_file_equal(flag: Keyvalues) -> Callable[[Entity], bool]:
+@conditions.make_test('instance')
+def check_file_equal(kv: Keyvalues) -> conditions.TestCallable:
     """Evaluates True if the instance matches the given file."""
-    inst_list = instanceLocs.resolve_filter(flag.value)
+    inst_list = instanceLocs.resolve_filter(kv.value)
 
     def check_inst(inst: Entity) -> bool:
         """Each time, check if no matching instances exist, so we can skip conditions."""
@@ -27,21 +26,21 @@ def flag_file_equal(flag: Keyvalues) -> Callable[[Entity], bool]:
     return check_inst
 
 
-@make_flag('instFlag', 'InstPart')
-def flag_file_cont(inst: Entity, flag: Keyvalues) -> bool:
+@conditions.make_test('instFlag', 'InstPart')
+def check_file_cont(inst: Entity, kv: Keyvalues) -> bool:
     """Evaluates True if the instance contains the given portion."""
-    return flag.value in inst['file'].casefold()
+    return kv.value in inst['file'].casefold()
 
 
-@make_flag('hasInst')
-def flag_has_inst(flag: Keyvalues) -> Callable[[Entity], bool]:
+@conditions.make_test('hasInst')
+def check_has_inst(kv: Keyvalues) -> conditions.TestCallable:
     """Checks if the given instance is present anywhere in the map."""
-    flags = instanceLocs.resolve_filter(flag.value)
-    return lambda inst: flags.isdisjoint(conditions.ALL_INST)
+    inst_filter = instanceLocs.resolve_filter(kv.value)
+    return lambda inst: inst_filter.isdisjoint(conditions.ALL_INST)
 
 
-@make_flag('hasTrait')
-def flag_has_trait(inst: Entity, flag: Keyvalues) -> bool:
+@conditions.make_test('hasTrait')
+def check_has_trait(inst: Entity, kv: Keyvalues) -> bool:
     """Check if the instance has a specific 'trait', which is set by code.
 
     Current traits:
@@ -99,7 +98,7 @@ def flag_has_trait(inst: Entity, flag: Keyvalues) -> bool:
     * `tbeam_emitter`: Funnel emitter.
     * `tbeam_frame`: Funnel frame.
     """
-    return flag.value.casefold() in instance_traits.get(inst)
+    return kv.value.casefold() in instance_traits.get(inst)
 
 
 INSTVAR_COMP: dict[str, Callable[[Any, Any], Any]] = {
@@ -120,17 +119,17 @@ INSTVAR_COMP: dict[str, Callable[[Any, Any], Any]] = {
 }
 
 
-@make_flag('instVar')
-def flag_instvar(inst: Entity, flag: Keyvalues) -> bool:
+@conditions.make_test('instVar')
+def test_instvar(inst: Entity, kv: Keyvalues) -> bool:
     """Checks if the $replace value matches the given value.
 
-    The flag value follows the form `A == B`, with any of the three permitted
+    The test value follows the form `A == B`, with any of the three permitted
     to be variables.
     The operator can be any of `=`, `==`, `<`, `>`, `<=`, `>=`, `!=`.
     If omitted, the operation is assumed to be `==`.
-    If only a single value is present, it is tested as a boolean flag.
+    If only a single value is present, it is tested as a boolean.
     """
-    values = flag.value.split(' ', 3)
+    values = kv.value.split(' ', 3)
     if len(values) == 3:
         val_a, op, val_b = values
         op = inst.fixup.substitute(op)
@@ -154,7 +153,7 @@ def flag_instvar(inst: Entity, flag: Keyvalues) -> bool:
         LOGGER.warning(
             'Comparison "{}" has no $var, assuming first value. '
             'Please use $ when referencing vars.',
-            flag.value,
+            kv.value,
         )
         val_a = '$' + val_a
 
@@ -175,8 +174,8 @@ def flag_instvar(inst: Entity, flag: Keyvalues) -> bool:
         return False
 
 
-@make_flag('offsetDist')
-def flag_offset_distance(inst: Entity, flag: Keyvalues) -> bool:
+@conditions.make_test('offsetDist')
+def check_offset_distance(inst: Entity, kv: Keyvalues) -> bool:
     """Check if the given instance is in an offset position.
 
     This computes the distance between the instance location and the center
@@ -188,11 +187,11 @@ def flag_offset_distance(inst: Entity, flag: Keyvalues) -> bool:
     offset = (origin - grid_pos).mag()
 
     try:
-        op, comp_val = flag.value.split()
+        op, comp_val = kv.value.split()
     except ValueError:
         # A single value.
         op = '='
-        comp_val = flag.value
+        comp_val = kv.value
 
     try:
         value = float(conditions.resolve_value(inst, comp_val))
@@ -211,14 +210,14 @@ def flag_offset_distance(inst: Entity, flag: Keyvalues) -> bool:
         return False
 
 
-@make_result('rename', 'changeInstance')
+@conditions.make_result('rename', 'changeInstance')
 def res_change_instance(inst: Entity, res: Keyvalues) -> None:
     """Set the file to a value."""
     inst['file'] = filename = instanceLocs.resolve_one(inst.fixup.substitute(res.value), error=True)
     conditions.ALL_INST.add(filename.casefold())
 
 
-@make_result('suffix', 'instSuffix')
+@conditions.make_result('suffix', 'instSuffix')
 def res_add_suffix(inst: Entity, res: Keyvalues) -> None:
     """Add the specified suffix to the filename."""
     suffix = inst.fixup.substitute(res.value)
@@ -226,7 +225,7 @@ def res_add_suffix(inst: Entity, res: Keyvalues) -> None:
         conditions.add_suffix(inst, '_' + suffix)
 
 
-@make_result('setKey')
+@conditions.make_result('setKey')
 def res_set_key(inst: Entity, res: Keyvalues) -> None:
     """Set a keyvalue to the given value.
 
@@ -243,7 +242,7 @@ def res_set_key(inst: Entity, res: Keyvalues) -> None:
         conditions.ALL_INST.add(value)
 
 
-@make_result('instVar', 'instVarSuffix')
+@conditions.make_result('instVar', 'instVarSuffix')
 def res_add_inst_var(inst: Entity, res: Keyvalues) -> None:
     """Append the value of an instance variable to the filename.
 
@@ -295,19 +294,19 @@ def res_map_inst_var(res: Keyvalues) -> conditions.ResultCallable:
     return modify_inst
 
 
-@make_result('clearOutputs', 'clearOutput')
+@conditions.make_result('clearOutputs', 'clearOutput')
 def res_clear_outputs(inst: Entity) -> None:
     """Remove the outputs from an instance."""
     inst.outputs.clear()
 
 
-@make_result('removeFixup', 'deleteFixup', 'removeInstVar', 'deleteInstVar')
+@conditions.make_result('removeFixup', 'deleteFixup', 'removeInstVar', 'deleteInstVar')
 def res_rem_fixup(inst: Entity, res: Keyvalues) -> None:
     """Remove a fixup from the instance."""
     del inst.fixup[res.value]
 
 
-@make_result('localTarget')
+@conditions.make_result('localTarget')
 def res_local_targetname(inst: Entity, res: Keyvalues) -> None:
     """Generate a instvar with an instance-local name.
 
@@ -324,7 +323,7 @@ def res_local_targetname(inst: Entity, res: Keyvalues) -> None:
     inst.fixup[res['resultVar']] = f"{prefix}{name}{suffix}"
 
 
-@make_result('replaceInstance')
+@conditions.make_result('replaceInstance')
 def res_replace_instance(vmf: VMF, inst: Entity, res: Keyvalues) -> None:
     """Replace an instance with another entity.
 
@@ -471,7 +470,7 @@ def global_input(
     glob_ent.add_out(output)
 
 
-@make_result('ScriptVar')
+@conditions.make_result('ScriptVar')
 def res_script_var(vmf: VMF, inst: Entity, res: Keyvalues) -> None:
     """Set a variable on a script, via a logic_auto.
 

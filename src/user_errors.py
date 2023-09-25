@@ -245,7 +245,7 @@ TOK_CORRIDOR_BOTH_MODES = TransToken.ui(
 TOK_CORRIDOR_ENTRY = TransToken.ui('Entry')  # i18n: Entry door
 TOK_CORRIDOR_EXIT = TransToken.ui('Exit')  # i18n: Exit door
 
-TOK_CUBE_NO_CUBETYPE_FLAG = TransToken.ui('"CubeType" result used but with no type specified!')
+TOK_CUBE_NO_CUBETYPE_TEST = TransToken.ui('"CubeType" test used but with no type specified!')
 TOK_CUBE_BAD_SPECIAL_CUBETYPE = TransToken.ui('Unrecognised special cube type "<var>{type}</var>"!')
 
 TOK_CUBE_TIMERS_DUPLICATE = TransToken.ui(

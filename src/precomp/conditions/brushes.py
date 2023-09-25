@@ -429,8 +429,8 @@ def res_import_template(
             swapped to the opposite of the current force option. This applies
             after colorVar.
     - `visgroup`: Sets how visgrouped parts are handled. Several values are possible:
-            - A property block: Each name should match a visgroup, and the
-              value should be a block of flags that if true enables that group.
+            - A keyvalues block: Each name should match a visgroup, and the
+              value should be a block of condition tests that if true enables that group.
             - 'none' (default): All extra groups are ignored.
             - 'choose': One group is chosen randomly.
             - a number: The percentage chance for each visgroup to be added.
@@ -607,11 +607,11 @@ def res_import_template(
             # We don't want an error, just quit.
             return
 
-        for vis_flag_block in visgroup_instvars:
-            if all(conditions.check_flag(flag, coll, info, inst) for flag in vis_flag_block):
-                visgroups.add(vis_flag_block.real_name)
-            if utils.DEV_MODE and vis_flag_block.real_name not in template.visgroups:
-                LOGGER.warning('"{}" may use missing visgroup "{}"!', template.id, vis_flag_block.real_name)
+        for vis_test_block in visgroup_instvars:
+            if all(conditions.check_test(test, coll, info, inst) for test in vis_test_block):
+                visgroups.add(vis_test_block.real_name)
+            if utils.DEV_MODE and vis_test_block.real_name not in template.visgroups:
+                LOGGER.warning('"{}" may use missing visgroup "{}"!', template.id, vis_test_block.real_name)
 
         force_colour = conf_force_colour
         if color_var == '<editor>':

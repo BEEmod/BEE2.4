@@ -957,8 +957,8 @@ def _make_multi_filter(
     return filter_ent['targetname']
 
 
-@conditions.make_flag('CubeType')
-def flag_cube_type(inst: Entity, res: Keyvalues) -> bool:
+@conditions.make_test('CubeType')
+def test_cube_type(inst: Entity, kv: Keyvalues) -> bool:
     """Check if an instance is/should be a cube.
 
     This is only valid on `ITEM_BOX_DROPPER`, `ITEM_CUBE`, and items marked as
@@ -977,13 +977,13 @@ def flag_cube_type(inst: Entity, res: Keyvalues) -> bool:
         pair = INST_TO_PAIR[inst]
     except KeyError:
         # None checks for if the instance *isn't* a cube.
-        return res.value.casefold() == '<none>'
+        return kv.value.casefold() == '<none>'
 
-    cube_type = res.value
+    cube_type = kv.value
 
     if not cube_type:
         raise user_errors.UserError(
-            user_errors.TOK_CUBE_NO_CUBETYPE_FLAG,
+            user_errors.TOK_CUBE_NO_CUBETYPE_TEST,
             docsurl='https://github.com/BEEmod/BEE2-items/wiki/vbsp_config-conditions#cubetype',
         )
 
@@ -1009,15 +1009,15 @@ def flag_cube_type(inst: Entity, res: Keyvalues) -> bool:
             return inst is pair.cube
         else:
             raise user_errors.UserError(
-                user_errors.TOK_CUBE_BAD_SPECIAL_CUBETYPE.format(type=res.value),
+                user_errors.TOK_CUBE_BAD_SPECIAL_CUBETYPE.format(type=kv.value),
                 docsurl='https://github.com/BEEmod/BEE2-items/wiki/vbsp_config-conditions#cubetype',
             )
 
     return pair.cube_type.id == cube_type.upper()
 
 
-@conditions.make_flag('DropperColor')
-def flag_dropper_color(inst: Entity, res: Keyvalues) -> bool:
+@conditions.make_test('DropperColor')
+def check_dropper_color(inst: Entity, kv: Keyvalues) -> bool:
     """Detect the color of a cube on droppers.
 
     This is `True` if the cube is coloured. The value should be a `$fixup`
@@ -1028,8 +1028,8 @@ def flag_dropper_color(inst: Entity, res: Keyvalues) -> bool:
     except KeyError:
         return False
 
-    if res.value and data.tint is not None:
-        inst.fixup[res.value] = data.tint
+    if kv.value and data.tint is not None:
+        inst.fixup[kv.value] = data.tint
 
     return data.tint is not None
 
@@ -1614,7 +1614,7 @@ def make_cube(
         ent['renderamt'] = ghost_alpha = pair.superpos.swap_inst.fixup['$ghost_alpha']
         # Set response contexts for detection via `filter_activator_context`.
         ent['responsecontext'] = 'nofizzle:1,superpos_ghost:1'
-        ent['spawnflags'] = 1048576 | 256  # Can always pickup, generate output on USE.
+        ent['spawnflags'] = 1048576 | 256  # Can always pick up, generate output on USE.
         ent['vscripts'] = 'BEE2/superpos_ghost.nut'
         ent['thinkfunction'] = 'Think'
         # The VScript needs to know the color, so it can reset after painting.

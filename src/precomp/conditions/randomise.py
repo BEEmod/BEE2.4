@@ -5,13 +5,13 @@ from srctools import Keyvalues, Vec, Entity, Angle
 import srctools
 
 from precomp import collisions, conditions, rand
-from precomp.conditions import Condition, RES_EXHAUSTED, make_flag, make_result, MapInfo
+from precomp.conditions import Condition, RES_EXHAUSTED, make_result, MapInfo
 
 COND_MOD_NAME = 'Randomisation'
 
 
-@make_flag('random')
-def flag_random(res: Keyvalues) -> Callable[[Entity], bool]:
+@conditions.make_test('random')
+def check_random(res: Keyvalues) -> conditions.TestCallable:
     """Randomly is either true or false."""
     if res.has_children():
         chance_str = res['chance', '100']
