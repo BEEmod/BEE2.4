@@ -237,8 +237,8 @@ async def report_editor_models() -> None:
     LOGGER.info('Anaylsed, writing info:')
     with get_report_file('editor_models.txt').open('w') as f:
         f.write('Models:\n')
-        for mdl, count in usage_counts.most_common():
-            f.write(f'- [{count}]: {mdl}\n')
+        for filename, count in usage_counts.most_common():
+            f.write(f'- [{count}]: {filename}\n')
         f.write('\nMaterials:\n')
         # Sort by count, then mat name.
         for mat, mdls in sorted(mat_to_usage.items(), key=lambda t: (len(t[1]), t[0])):

@@ -8,8 +8,7 @@ import srctools.logger
 import trio
 
 from app import (
-    TK_ROOT, DEV_MODE, background_run,
-    dragdrop,
+    TK_ROOT, DEV_MODE,
     img, localisation, sound, tk_tools,
     tkMarkdown,
 )
@@ -19,7 +18,6 @@ from corridor import GameMode, Direction, Orient
 from config.last_sel import LastSelected
 from config.corridors import UIState, Config
 from transtoken import TransToken
-import event
 import config
 import packages
 from ui_tk.dragdrop import CanvasPositioner, DragDrop, DragInfo, Slot as SlotBase

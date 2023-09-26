@@ -1,6 +1,6 @@
 """UI implementation for the dragdrop module."""
 from __future__ import annotations
-from typing import Any, Callable, Dict, Generic, Optional, Tuple, Union
+from typing import Callable, Dict, Generic, Optional, Tuple, Union
 from typing_extensions import Concatenate, Literal, ParamSpec, override
 from tkinter import ttk
 import tkinter as tk
@@ -12,7 +12,7 @@ import attrs
 from app import img, localisation, tk_tools
 # noinspection PyProtectedMember
 from app.dragdrop import (
-    SLOT_DRAG, DragWin, FlexiCB, InfoCB, ItemT, ManagerBase, PositionerBase,
+    SLOT_DRAG, DragWin, FlexiCB, InfoCB, ManagerBase, PositionerBase,
     Slot, in_bbox,
     # Re-exports.
     DragInfo as DragInfo, ItemT as ItemT,

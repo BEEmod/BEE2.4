@@ -30,6 +30,7 @@
 * When Dev Mode is on, `SetTile` now dumps the tiles it's trying to set into the final map.
 
 ### Bugfixes:
+* BEE will detect `portal2_dlc3` being in use and pick another DLC folder for its VPKs.
 * Properly pick free port for error server.
 * Set a title for the corridor selector window.
 * Always pack generated resources even if packing is disabled in options.

@@ -2,8 +2,7 @@
 from __future__ import annotations
 
 from typing import (
-    NoReturn, TYPE_CHECKING, Union, Type, Any, Dict, List, Tuple, Optional, Iterable,
-    Set,
+    ClassVar, TYPE_CHECKING, Union, Type, Any, Dict, List, Tuple, Optional, Iterable, Set,
 )
 from pathlib import Path
 from enum import Enum
@@ -31,11 +30,11 @@ if TYPE_CHECKING:
 LOGGER = srctools.logger.get_logger(__name__)
 
 # Algorithms to use.
-GEN_CLASSES: utils.FuncLookup[Type['Generator']] = utils.FuncLookup('Generators')
+GEN_CLASSES: utils.FuncLookup[Type[Generator]] = utils.FuncLookup('Generators')
 
 # These can just be looked up directly.
-SPECIAL: 'Generator'
-OVERLAYS: 'Generator'
+SPECIAL: Generator
+OVERLAYS: Generator
 
 
 class GenCat(Enum):
@@ -67,7 +66,7 @@ class Portalable(Enum):
     def __str__(self) -> str:
         return self.value
 
-    def __invert__(self) -> 'Portalable':
+    def __invert__(self) -> Portalable:
         if self.value == 'white':
             return Portalable.BLACK
         else:
@@ -181,15 +180,15 @@ class TileSize(str, Enum):
         raise AssertionError(self)
 
 GENERATORS: Dict[
-    Union[GenCat, Tuple[GenCat, Orient, Portalable]],
-    'Generator'
+    GenCat | Tuple[GenCat, Orient, Portalable],
+    Generator,
 ] = {}
 
 # The defaults for each generator.
 # This also defines the texture names allowed, as well
 # as the total number of generators.
 TEX_DEFAULTS: Dict[
-    Union[GenCat, Tuple[GenCat, Orient, Portalable]],
+    GenCat | Tuple[GenCat, Orient, Portalable],
     Dict[str, str],
 ] = {
     # Signage overlays.
@@ -350,7 +349,7 @@ def gen(
     cat: GenCat,
     normal: Vec | None = None,
     portalable: Portalable | None = None,
-) -> 'Generator':
+) -> Generator:
     """Given a category, normal, and white/black return the correct generator."""
 
     if cat is GenCat.SPECIAL or cat is GenCat.OVERLAYS:
@@ -377,7 +376,7 @@ def gen(
     return GENERATORS[cat, orient, portalable]
 
 
-def parse_name(name: str) -> Tuple['Generator', str]:
+def parse_name(name: str) -> Tuple[Generator, str]:
     """Parse a dotted string into a generator and a texture name."""
     split_name = name.lower().split('.')
     try:
@@ -631,7 +630,7 @@ def load_config(conf: Keyvalues) -> None:
     OVERLAYS = GENERATORS[GenCat.OVERLAYS]
 
 
-async def setup(game: Game, vmf: VMF, tiles: List['TileDef']) -> None:
+async def setup(game: Game, vmf: VMF, tiles: List[TileDef]) -> None:
     """Do various setup steps, needed for generating textures.
 
     - Set randomisation seed on all the generators.
@@ -753,7 +752,7 @@ class Generator(abc.ABC):
 
     # The settings which apply to all generators.
     # Since they're here all subclasses and instances can access this.
-    global_settings: Dict[str, Any] = {}
+    global_settings: ClassVar[Dict[str, Any]] = {}
 
     def __init__(
         self,
@@ -762,7 +761,7 @@ class Generator(abc.ABC):
         portal: Optional[Portalable],
         options: Dict[str, Any],
         textures: Dict[str, List[str]],
-    ):
+    ) -> None:
         self.options = options
         self.textures = textures
 
@@ -796,7 +795,7 @@ class Generator(abc.ABC):
         try:
             texture = self._get(loc, tex_name)
         except KeyError as exc:
-            raise self._missing_error(repr(exc.args[0]))
+            raise self._missing_error(repr(exc.args[0])) from None
         if antigel:
             try:
                 return ANTIGEL_MATS[texture.casefold()]
@@ -807,7 +806,7 @@ class Generator(abc.ABC):
 
         return texture
 
-    def setup(self, vmf: VMF, tiles: List['TileDef']) -> None:
+    def setup(self, vmf: VMF, tiles: List[TileDef]) -> None:
         """Scan tiles in the map and set up the generator."""
 
     def _missing_error(self, tex_name: str) -> Exception:
@@ -891,7 +890,7 @@ class GenClump(Generator):
         self.gen_seed = b''
         self._clump_locs: list[Clump] = []
 
-    def setup(self, vmf: VMF, tiles: List['TileDef']) -> None:
+    def setup(self, vmf: VMF, tiles: List[TileDef]) -> None:
         """Build the list of clump locations."""
         assert self.portal is not None
         assert self.orient is not None

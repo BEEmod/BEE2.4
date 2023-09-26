@@ -1,7 +1,7 @@
 """The package containg all UI code."""
 import tkinter as tk
 from types import TracebackType, new_class
-from typing import Awaitable, Callable, Optional, Type, TypeVar, overload, Generic
+from typing import Awaitable, Callable, Optional, Type, TypeVar, Generic
 
 from typing_extensions import TypeVarTuple, Unpack
 
@@ -25,6 +25,7 @@ if '__class_getitem__' not in vars(tk.Event):
         'Event', (Generic[_W_co], ),
         exec_body=lambda ns: ns.update(vars(tk.Event)),
     )
+
 
 def _run_main_loop(*args, **kwargs) -> None:
     """Allow determining if this is running."""

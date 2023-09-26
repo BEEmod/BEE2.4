@@ -386,7 +386,7 @@ class ScalingTemplate(Mapping[
         self,
         temp_id: str,
         axes: dict[FrozenVec, tuple[str, UVAxis, UVAxis, float]],
-    ):
+    ) -> None:
         self.id = temp_id
         self._axes = axes
         missing = {
@@ -966,7 +966,7 @@ def retexture_template(
     force_grid: TileSize | None = None,
     generator: GenCat = GenCat.NORMAL,
     sense_offset: Vec | None = None,
-):
+) -> None:
     """Retexture a template at the given location.
 
     - Only textures in the TEMPLATE_RETEXTURE dict will be replaced.
@@ -999,7 +999,7 @@ def retexture_template(
     # Template faces are randomised per block and side. This means
     # multiple templates in the same block get the same texture, so they
     # can clip into each other without looking bad.
-    rand_prefix = 'TEMPLATE_{0.x}_{0.y}_{0.z}:'.format(origin // 128)
+    rand_prefix = f'TEMPLATE_{(origin // 128).x}_{(origin // 128).y}_{(origin // 128).z}:'
 
     # Reprocess the replace_tex passed in, converting values.
     evalled_replace_tex: dict[str, list[str]] = {}
@@ -1190,24 +1190,22 @@ def retexture_template(
         if tile_setter.color is AppliedColour.COPY:
             if not tile_setter.picker_name:
                 raise ValueError(
-                    '"{}": Tile Setter set to copy mode '
-                    'must have a color picker!'.format(template.id)
+                    f'"{template.id}": Tile Setter set to copy mode '
+                    f'must have a color picker!'
                 )
             # If a color picker is set, it overrides everything else.
             try:
                 picker_res = picker_type_results[tile_setter.picker_name]
             except KeyError:
                 raise ValueError(
-                    '"{}": Tile Setter specified color picker '
-                    '"{}" which does not exist!'.format(
-                        template.id, tile_setter.picker_name
-                    )
-                )
+                    f'"{template.id}": Tile Setter specified color picker '
+                    f'"{tile_setter.picker_name}" which does not exist!'
+                ) from None
             if picker_res is None:
                 raise ValueError(
-                    '"{}": Color picker "{}" has no tile to pick!'.format(
-                        template.id, tile_setter.picker_name
-                    ))
+                    f'"{template.id}": Color picker '
+                    f'"{tile_setter.picker_name}" has no tile to pick!'
+                )
             setter_type = picker_res
         elif setter_type.is_tile:
             if tile_setter.picker_name:

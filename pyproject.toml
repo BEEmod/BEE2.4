@@ -34,20 +34,36 @@ src_paths = ["src"]
 [tool.ruff]
 line-length = 127
 target-version = "py38"
-select = ["E", "UP", "F", "C4", "B", "PIE"]
+select = [
+	"E", "UP", "F", "C4", "ANN", "B", "PIE", "RUF",
+	"PLC", "PLE", "PLW",  # Pylint.
+
+	"TCH005",  # Empty type-checking block.
+]
+allowed-confusables = [
+	"×",  # Multiplication sign
+]
 extend-ignore = [
-	# Allow module level import later in the file.
-	"E402",
-	# Allow *-imports.
-	"F403",
-	# name may be undefined, or defined from star imports: module
-	"F405",
+	"E402",  # Allow module level import later in the file.
+	"E721",  # Allow using type(x) is Class
+	"F403",  # Allow *-imports,
+	"F405",  # name may be undefined, or defined from star imports: module
+
 	# Flake8-annotations.
 	# Type annotations for self & cls are not important.
 	"ANN101",
 	"ANN102",
-	# Allow typing.Any
-	"ANN401",
+	"ANN401",  # Allow typing.Any
+
+	# Ruff:
+	"RUF100",  # Sometimes use # noqa for other linters
+	"RUF005",  # Unpack instead of concat triggers on Vec.
+
+	# PyLint:
+	"PLW0603",  # Allow use of global statement.
+	"PLC0414",  # import x as x is used for type checking.
+	"PLE1205",  # Too many arguments for logging, doesn't handle our format
+	"PLW2901",  # Allow redefining loop var inside the loop.
 
 	# Pyupgrade:
 	# Keep using typing types even with __future__.annotations.

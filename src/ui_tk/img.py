@@ -1,6 +1,6 @@
 """Image integrations for TKinter."""
 from __future__ import annotations
-from typing import Tuple, TypeVar, Union
+from typing import TypeVar, Union
 from typing_extensions import TypeAlias
 from tkinter import ttk
 import tkinter as tk
