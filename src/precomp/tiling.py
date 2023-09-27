@@ -506,8 +506,9 @@ class Panel:
             'info_particle_system',
             origin=tile.pos,
             targetname=self.inst['targetname'],
-            angles=tile.normal,
-            comment=tile.format_tiles().replace('\n', ', ')
+            angles=tile.normal.to_angle(),
+            comment=tile.format_tiles().replace('\n', ', '),
+            antigel=tile.is_antigel(),
         )
         # We need to do the checks to handle multiple panels with shared
         # data.
@@ -808,7 +809,7 @@ class TileDef:
         panels: A list of "panels" for the tiledef, allowing moving or split parts.
           If present, each of these "steals" some UV positions and instead
           generates them (potentially offset) as a brush entity.
-        is_antigel: If this is marked to not accept gel.
+        force_antigel: If this is marked to not accept gel.
     """
     __slots__ = [
         'pos',
@@ -820,7 +821,7 @@ class TileDef:
         'bullseye_count',
         '_portal_helper',
         'panels',
-        'is_antigel',
+        'force_antigel',
     ]
 
     pos: Vec
@@ -852,7 +853,7 @@ class TileDef:
         self.panels = []
         self.bullseye_count = 0
         self._portal_helper = 1 if has_helper else 0
-        self.is_antigel = False
+        self.force_antigel = False
 
     @property
     def has_portal_helper(self) -> bool:
@@ -1066,6 +1067,18 @@ class TileDef:
             if tile_type is not TileType.VOID:
                 yield u, u + 1, v, v + 1, TileSize.TILE_4x4, tile_type
 
+    def is_antigel(self) -> bool:
+        """Check if this tile is at an antigel position."""
+        if self.force_antigel:
+            return True
+        try:
+            plane = texturing.ANTIGEL_BY_NORMAL[self.normal.freeze()]
+        except KeyError:
+            # Should not happen, don't crash.
+            LOGGER.warning('Non-axis-aligned tiledef?: {!r}', self)
+            return False
+        return self.pos.freeze() in plane
+
     def should_bevel(self, u: int, v: int) -> bool:
         """Check if this side of the TileDef should be bevelled.
 
@@ -1244,6 +1257,7 @@ class TileDef:
 
         If face_output is set, it will be filled with (u, v) -> top face.
         """
+        is_antigel = self.is_antigel()  # Cache result.
         brushes = []
         faces = []
 
@@ -1298,7 +1312,7 @@ class TileDef:
                     u_size, v_size = grid_size.size
                     tex = texturing.gen(
                         gen_cat, normal, tile_type.color,
-                    ).get(tile_center, grid_size, antigel=self.is_antigel)
+                    ).get(tile_center, grid_size, antigel=is_antigel)
 
                 template: template_brush.ScalingTemplate | None
                 if self.override is not None:
@@ -1314,12 +1328,12 @@ class TileDef:
                     width=(umax - umin) * 32,
                     height=(vmax - vmin) * 32,
                     bevels=tile_bevels,
-                    back_surf=texturing.SPECIAL.get(tile_center, 'behind', antigel=self.is_antigel),
+                    back_surf=texturing.SPECIAL.get(tile_center, 'behind', antigel=is_antigel),
                     u_align=u_size * 128,
                     v_align=v_size * 128,
                     thickness=thickness,
                     panel_edge=is_panel,
-                    antigel=self.is_antigel,
+                    antigel=is_antigel,
                 )
                 if template is not None:
                     # If the texture isn't supplied, use the one from the
@@ -1348,9 +1362,9 @@ class TileDef:
                     width=(umax - umin) * 32,
                     height=(vmax - vmin) * 32,
                     bevels=tile_bevels,
-                    back_surf=texturing.SPECIAL.get(tile_center, 'behind', antigel=self.is_antigel),
+                    back_surf=texturing.SPECIAL.get(tile_center, 'behind', antigel=is_antigel),
                     panel_edge=is_panel,
-                    antigel=self.is_antigel,
+                    antigel=is_antigel,
                 )
                 faces.append(face)
                 brushes.append(brush)
@@ -2098,6 +2112,7 @@ def generate_brushes(vmf: VMF) -> None:
 
         for tile in tiles:
             pos = tile.pos + 64 * tile.normal
+            is_antigel = tile.is_antigel()
 
             if tile_type is TileType.GOO_SIDE:
                 # This forces a specific size.
@@ -2113,11 +2128,11 @@ def generate_brushes(vmf: VMF) -> None:
                     texturing.GenCat.NORMAL,
                     normal,
                     tile.base_type.color
-                ).get(pos, tile.base_type.tile_size, antigel=tile.is_antigel)
+                ).get(pos, tile.base_type.tile_size, antigel=is_antigel)
 
             u_pos = int((pos[u_axis] - bbox_min[u_axis]) // 128)
             v_pos = int((pos[v_axis] - bbox_min[v_axis]) // 128)
-            grid_pos[tile.base_type, tile.is_antigel, tex][u_pos, v_pos] = True
+            grid_pos[tile.base_type, is_antigel, tex][u_pos, v_pos] = True
             tile_pos[u_pos, v_pos] = tile
 
         for (subtile_type, is_antigel, tex), tex_pos in grid_pos.items():

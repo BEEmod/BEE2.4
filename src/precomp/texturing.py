@@ -134,6 +134,15 @@ ANTIGEL_PATH = 'BEE2/antigel/gen/'
 # The center of each voxel containing an antigel marker.
 # Surfaces inside here that aren't a voxel side will be converted.
 ANTIGEL_LOCS: Set[FrozenVec] = set()
+# And then for each normal direction, if a antigel marker was defined there.
+ANTIGEL_BY_NORMAL: Dict[FrozenVec, Set[FrozenVec]] = {
+    FrozenVec.N: set(),
+    FrozenVec.S: set(),
+    FrozenVec.E: set(),
+    FrozenVec.W: set(),
+    FrozenVec.T: set(),
+    FrozenVec.B: set(),
+}
 
 ANTIGEL_TEMPLATE = '''\
 Patch

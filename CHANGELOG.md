@@ -39,6 +39,7 @@
 * Add a scrollbar if required to the corridor selection window.
 * Fix single-dot antlines sometimes failing to be placed.
 * BEEmod/BEE2-items#4325: Set corridors to force upright even if vertical corridors are not available.
+* Piston Platforms will now correctly accept Surface Lacquer, if placed on their base.
 
 ------------------------------------------
 
