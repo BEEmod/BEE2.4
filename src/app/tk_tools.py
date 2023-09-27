@@ -406,6 +406,48 @@ else:
         wid.bind(EVENTS['RIGHT'], func, add=add)
 
 
+def link_checkmark(check: ttk.Checkbutton, widget: tk.Widget) -> None:
+    """Link up a checkbutton with something else, so it can also be clicked to toggle.
+
+    This replicates the native behaviour - if the mouse is held down and moved off of the widget,
+    that cancels the press.
+    """
+    widget.bind('<Enter>', f'{check} state active', add=True)
+    widget.bind('<Leave>', f'{check} state !active', add=True)
+
+    def hovering(event: tk.Event) -> bool:
+        """Check if the mouse is hovering over the label, or the checkmark."""
+        # identify-element returns the component name under the specified position,
+        # or an empty string if the widget isn't there.
+        return widget.tk.call(
+            widget, 'identify', 'element',
+            event.x, event.y,
+        ) != '' or check.tk.call(
+            check, 'identify', 'element',
+            event.x_root - check.winfo_rootx(),
+            event.y_root - check.winfo_rooty(),
+        ) != ''
+
+    def on_press(event: tk.Event) -> None:
+        """When pressed, highlight the checkmark."""
+        check.state(['pressed'])
+
+    def on_motion(event: tk.Event) -> None:
+        """The checkmark is pressed only while the mouse is over it."""
+        # Check if the mouse is over the label, or the checkmark. Just a bbox check.
+        check.state(['pressed' if hovering(event) else '!pressed'])
+
+    def on_release(event: tk.Event) -> None:
+        """When released, toggle if the mouse is still over the widget."""
+        check.state(['!pressed'])
+        if hovering(event):
+            check.invoke()
+
+    bind_leftclick(widget, on_press, add=True)
+    widget.bind(EVENTS['LEFT_MOVE'], on_motion, add=True)
+    widget.bind(EVENTS['LEFT_RELEASE'], on_release, add=True)
+
+
 def event_cancel(*args: Any, **kwargs: Any) -> str:
     """Bind to an event to cancel it, and prevent it from propagating."""
     return 'break'

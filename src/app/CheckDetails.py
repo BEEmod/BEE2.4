@@ -151,10 +151,7 @@ class Item(Generic[UserT]):
 
             if not self.locked:
                 # Allow clicking on the row to toggle the checkbox
-                wid.bind('<Enter>', self.evt_hover_start, add=True)
-                wid.bind('<Leave>', self.evt_hover_stop, add=True)
-                tk_tools.bind_leftclick(wid, self.evt_row_click, add=True)
-                wid.bind(tk_tools.EVENTS['LEFT_RELEASE'], self.evt_row_unclick, add=True)
+                tk_tools.link_checkmark(self.check, wid)
 
             self.val_widgets.append(wid)
 
@@ -198,23 +195,6 @@ class Item(Generic[UserT]):
     def state(self, value: bool) -> None:
         self.state_var.set(value)
         self.master.update_allcheck()
-
-    def evt_hover_start(self, _: tk.Event) -> None:
-        """Start hovering over the checkbox."""
-        self.check.state(['active'])
-
-    def evt_hover_stop(self, _: tk.Event) -> None:
-        """Stop hovering over the checkbox."""
-        self.check.state(['!active'])
-
-    def evt_row_click(self, _: tk.Event) -> None:
-        """Occurs when the checkbox is clicked."""
-        self.state = not self.state
-        self.check.state(['pressed'])
-
-    def evt_row_unclick(self, _: tk.Event) -> None:
-        """Reset the checkbox when released."""
-        self.check.state(['!pressed'])
 
 
 class CheckDetails(ttk.Frame, Generic[UserT]):
