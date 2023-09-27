@@ -214,5 +214,5 @@ def add_tooltip(
         if event_id is not None:
             TK_ROOT.after_cancel(event_id)
 
-    targ_widget.bind('<Enter>', enter_handler)
-    targ_widget.bind('<Leave>', exit_handler)
+    targ_widget.bind('<Enter>', enter_handler, add=True)
+    targ_widget.bind('<Leave>', exit_handler, add=True)
