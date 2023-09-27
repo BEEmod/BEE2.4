@@ -450,7 +450,7 @@ class Dialog(tk.Toplevel):
         # Hide when the exit button is pressed, or Escape
         # on the keyboard.
         self.protocol("WM_DELETE_WINDOW", self.withdraw)
-        self.bind("<Escape>", lambda e: self.withdraw())
+        self.bind("<Escape>", f"wm withdraw {self}")
 
         frame = tk.Frame(self, background='white')
         frame.grid(row=0, column=0, sticky='nsew')

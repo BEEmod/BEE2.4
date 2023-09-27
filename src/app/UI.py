@@ -1607,12 +1607,13 @@ async def init_windows(tk_img: TKImages) -> None:
     tk_tools.add_mousewheel(pal_canvas, TK_ROOT)
 
     # When clicking on any window hide the context window
-    tk_tools.bind_leftclick(TK_ROOT, contextWin.hide_context)
-    tk_tools.bind_leftclick(itemconfig.window, contextWin.hide_context)
-    tk_tools.bind_leftclick(CompilerPane.window, contextWin.hide_context)
-    tk_tools.bind_leftclick(corridor.win, contextWin.hide_context)
-    tk_tools.bind_leftclick(windows['opt'], contextWin.hide_context)
-    tk_tools.bind_leftclick(windows['pal'], contextWin.hide_context)
+    hide_ctx_win = TK_ROOT.register(contextWin.hide_context)
+    tk_tools.bind_leftclick(TK_ROOT, hide_ctx_win)
+    tk_tools.bind_leftclick(itemconfig.window, hide_ctx_win)
+    tk_tools.bind_leftclick(CompilerPane.window, hide_ctx_win)
+    tk_tools.bind_leftclick(corridor.win, hide_ctx_win)
+    tk_tools.bind_leftclick(windows['opt'], hide_ctx_win)
+    tk_tools.bind_leftclick(windows['pal'], hide_ctx_win)
 
     await trio.sleep(0)
     backup_win.init_toplevel(tk_img)

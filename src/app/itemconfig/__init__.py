@@ -441,16 +441,13 @@ async def make_pane(
     tk_tools.bind_mousewheel([
         selection_frame, arrow_left, arrow_right, group_label,
     ], select_directional)
-    group_label.bind('<Enter>', lambda e: group_label.configure(foreground='#2873FF'))
-    group_label.bind('<Leave>', lambda e: group_label.configure(foreground=''))
+    group_label.bind('<Enter>', f'{group_label} configure -foreground "#2873FF"')
+    group_label.bind('<Leave>', f'{group_label} configure -foreground ""')
 
     await tk_tools.wait_eventloop()
 
-    def canvas_reflow(_: tk.Event[tk.Canvas]) -> None:
-        """Update canvas when the window resizes."""
-        canvas['scrollregion'] = canvas.bbox('all')
-
-    canvas.bind('<Configure>', canvas_reflow)
+    # Update canvas when the window resizes.
+    canvas.bind('<Configure>', f'{canvas} configure -scrollregion [{canvas} bbox all]')
     await display_group(cur_group)
 
 

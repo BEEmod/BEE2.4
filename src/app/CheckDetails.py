@@ -290,12 +290,14 @@ class CheckDetails(ttk.Frame, Generic[UserT]):
         )
         self.wid_canvas.create_window(0, 0, window=self.wid_frame, anchor='nw')
 
-        self.bind('<Configure>', self.refresh)
-        self.bind('<Map>', self.refresh)  # When added to a window, refresh
+        refresh_cmd = self.register(self.refresh)
 
-        self.wid_header.bind('<ButtonRelease-1>', self.refresh)
-        self.wid_header.bind('<B1-Motion>', self.refresh)
-        self.wid_header.bind('<Configure>', self.refresh)
+        self.bind('<Configure>', refresh_cmd)
+        self.bind('<Map>', refresh_cmd)  # When added to a window, refresh
+
+        self.wid_header.bind('<ButtonRelease-1>', refresh_cmd)
+        self.wid_header.bind('<B1-Motion>', refresh_cmd)
+        self.wid_header.bind('<Configure>', refresh_cmd)
 
         self.add_items(*items)
 
