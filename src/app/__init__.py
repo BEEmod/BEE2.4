@@ -23,7 +23,12 @@ if '__class_getitem__' not in vars(tk.Event):
     _W_co.__module__ = 'tkinter'
     tk.Event = new_class(  # type: ignore
         'Event', (Generic[_W_co], ),
-        exec_body=lambda ns: ns.update(vars(tk.Event)),
+        exec_body=lambda ns: ns.update({
+            name: getattr(tk.Event, name)
+            for name in vars(tk.Event)
+            # Specify the vars to assign, so we don't include things like __dict__ descriptors.
+            if name in ['__doc__', '__module__', '__repr__']
+        }),
     )
 
 
