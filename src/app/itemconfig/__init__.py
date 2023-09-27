@@ -318,13 +318,16 @@ async def make_pane(
     group_menu = tk.Menu(group_label, tearoff=False)
     group_var = tk.StringVar(window)
 
-    ttk.Separator(window, orient='horizontal').grid(row=1, column=0, columnspan=2, sticky='EW')
+    ttk.Separator(window, orient='horizontal').grid(
+        row=1, column=0, columnspan=2,
+        sticky='EW', pady=2,
+    )
 
     # Need to use a canvas to allow scrolling.
-    canvas = tk.Canvas(window, highlightthickness=0)
+    canvas = tk.Canvas(window, highlightthickness=0, name='scrollcanv')
     canvas.grid(row=2, column=0, sticky='NSEW', padx=(5, 0))
     window.columnconfigure(0, weight=1)
-    window.rowconfigure(1, weight=1)
+    window.rowconfigure(2, weight=1)
 
     scrollbar = ttk.Scrollbar(
         window,
