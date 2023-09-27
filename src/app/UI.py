@@ -1607,7 +1607,7 @@ async def init_windows(tk_img: TKImages) -> None:
     tk_tools.add_mousewheel(pal_canvas, TK_ROOT)
 
     # When clicking on any window hide the context window
-    hide_ctx_win = TK_ROOT.register(contextWin.hide_context)
+    hide_ctx_win = contextWin.hide_context
     tk_tools.bind_leftclick(TK_ROOT, hide_ctx_win)
     tk_tools.bind_leftclick(itemconfig.window, hide_ctx_win)
     tk_tools.bind_leftclick(CompilerPane.window, hide_ctx_win)
