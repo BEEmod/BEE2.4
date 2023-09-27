@@ -1,5 +1,6 @@
 """Adds breakable glass."""
-from typing import Iterator, Any, Tuple, Dict, List, Optional
+from typing_extensions import Literal, assert_never
+from typing import Iterator, Tuple, Dict, List, Optional
 
 from srctools import FrozenVec, Keyvalues, Vec, VMF, Entity, Output, Angle
 import srctools.logger
@@ -17,43 +18,46 @@ BREAKABLE_GLASS_CONF = {}
 
 # For each direction, whether min/max
 # zero should be the normal axis.
+MIN: Literal[-1] = -1
+MAX: Literal[1] = 1
+Direction = Literal[-1, 0, 1]
 CORNER_NAMES = ['lowerleft', 'lowerright', 'upperleft', 'upperright']
-CORNER_POINTS: Dict[FrozenVec, List[Tuple[Any, Any, Any]]] = {
+CORNER_POINTS: Dict[FrozenVec, List[Tuple[Direction, Direction, Direction]]] = {
     Vec.N: [
-        (min, 0, min),
-        (max, 0, min),
-        (min, 0, max),
-        (max, 0, max),
+        (MIN, 0, MIN),
+        (MAX, 0, MIN),
+        (MIN, 0, MAX),
+        (MAX, 0, MAX),
     ],
     Vec.S: [
-        (max, 0, min),
-        (min, 0, min),
-        (max, 0, max),
-        (min, 0, max),
+        (MAX, 0, MIN),
+        (MIN, 0, MIN),
+        (MAX, 0, MAX),
+        (MIN, 0, MAX),
     ],
     Vec.E: [
-        (0, max, min),
-        (0, min, min),
-        (0, max, max),
-        (0, min, max),
+        (0, MAX, MIN),
+        (0, MIN, MIN),
+        (0, MAX, MAX),
+        (0, MIN, MAX),
     ],
     Vec.W: [
-        (0, min, min),
-        (0, max, min),
-        (0, min, max),
-        (0, max, max),
+        (0, MIN, MIN),
+        (0, MAX, MIN),
+        (0, MIN, MAX),
+        (0, MAX, MAX),
     ],
     Vec.T: [
-        (min, min, 0),
-        (min, max, 0),
-        (max, min, 0),
-        (max, max, 0),
+        (MIN, MIN, 0),
+        (MIN, MAX, 0),
+        (MAX, MIN, 0),
+        (MAX, MAX, 0),
     ],
     Vec.B: [
-        (min, max, 0),
-        (min, min, 0),
-        (max, max, 0),
-        (max, min, 0),
+        (MIN, MAX, 0),
+        (MIN, MIN, 0),
+        (MAX, MAX, 0),
+        (MAX, MIN, 0),
     ]
 }
 
@@ -337,12 +341,14 @@ def res_breakable_glass(inst: Entity, res: Keyvalues) -> object:
         for name, points in zip(CORNER_NAMES, CORNER_POINTS[norm.freeze()]):
             corner = Vec()
             for axis, axis_type in zip('xyz', points):
-                if axis == norm_axis:  # solid_min is aligned to the front.
+                if axis_type == 0:  # solid_min is aligned to the front.
                     corner[axis] = solid_min[axis]
-                elif axis_type is max:
+                elif axis_type == MAX:
                     corner[axis] = solid_max[axis]
-                elif axis_type is min:
+                elif axis_type == MIN:
                     corner[axis] = solid_min[axis]
+                else:
+                    assert_never(axis_type)
             breakable_surf[name] = corner
 
         make_frames(vmf, targ, conf, bbox_min, bbox_max, -norm)
