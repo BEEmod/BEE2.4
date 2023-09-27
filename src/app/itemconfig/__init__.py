@@ -190,6 +190,9 @@ async def create_group(master: ttk.Frame, tk_img: TKImages, group: ConfigGroup) 
 
             if label is not None:
                 widget.grid(row=0, column=1, sticky='e')
+                if isinstance(widget, ttk.Checkbutton):
+                    # Special case - allow clicking on the label to toggle checkbuttons.
+                    tk_tools.link_checkmark(widget, label)
             else:
                 widget.grid(row=0, column=0, columnspan=2, sticky='ew')
             if s_wid.has_values:
