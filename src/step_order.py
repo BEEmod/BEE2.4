@@ -18,6 +18,10 @@ Func = Callable[[CtxT], Awaitable[object]]
 LOGGER = srctools.logger.get_logger(__name__)
 
 
+class CycleError(Exception):
+    """Raised if cyclic dependencies or other deadlocks occur."""
+
+
 @attrs.define(eq=False, hash=False)
 class Step(Generic[CtxT, ResourceT]):
     """Each individual step."""
@@ -92,7 +96,7 @@ class StepOrder(Generic[CtxT, ResourceT]):
                     # A deadlock has occurred if we defer all steps, and there aren't any
                     # currently running. Either there's a dependency loop, or prerequisites
                     # without results to create them.
-                    raise ValueError(f'Deadlock detected. Remaining tasks: {deferred}')
+                    raise CycleError(f'Deadlock detected. Remaining tasks: {deferred}')
                 todo = deferred
 
                 # Wait for a step to complete, and account for its results.

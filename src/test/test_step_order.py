@@ -1,9 +1,10 @@
 """Test the StepOrder system."""
 from enum import Enum
 
+import pytest
 import trio
 
-from step_order import StepOrder
+from step_order import StepOrder, CycleError
 
 
 class Resource(Enum):
@@ -58,3 +59,32 @@ async def test_basic(autojump_clock: trio.abc.Clock) -> None:
         "start 4",
         "end 4",
     ]
+
+
+async def test_direct_cycle(autojump_clock: trio.abc.Clock) -> None:
+    """Test that a direct cycle causes an error."""
+    order = StepOrder(object, Resource)
+    log: list[str] = []
+
+    @order.add_step(prereq=[], results=[Resource.A])
+    async def step_1(ctx: object) -> None:
+        """Prerequisite to everything."""
+        log.append('step 1')
+
+    @order.add_step(prereq=[Resource.A], results=[])
+    async def step_2(ctx: object) -> None:
+        """This is started when the cycle occurs, but is able to run."""
+        log.append('step 2')
+
+    @order.add_step(prereq=[Resource.A, Resource.B], results=[Resource.C])
+    async def step_3(ctx: object) -> None:
+        pytest.fail("Shouldn't run.")
+
+    @order.add_step(prereq=[Resource.C], results=[Resource.B])
+    async def step_4(ctx: object) -> None:
+        pytest.fail("Shouldn't run.")
+
+    with pytest.raises(CycleError):
+        await order.run(None)
+
+    assert log == ['step 1', 'step 2']  # These still ran.
