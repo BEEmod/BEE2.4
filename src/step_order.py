@@ -6,6 +6,7 @@ from collections import Counter
 import math
 
 import attrs
+import srctools.logger
 import trio
 
 
@@ -14,6 +15,7 @@ CtxT = TypeVar("CtxT")
 # An enum which defines the resources passed in/out.
 ResourceT = TypeVar("ResourceT")
 Func = Callable[[CtxT], Awaitable[object]]
+LOGGER = srctools.logger.get_logger(__name__)
 
 
 @attrs.define(eq=False, hash=False)
@@ -74,12 +76,14 @@ class StepOrder(Generic[CtxT, ResourceT]):
         send, rec = trio.open_memory_channel(math.inf)
         completed: set[ResourceT] = set()
         running = 0
+        LOGGER.info('Running {} steps.', len(todo))
         async with trio.open_nursery() as nursery:
             while todo:
                 # Check if any steps have no prerequisites, and if so send them off.
                 deferred: list[Step[CtxT, ResourceT]] = []
                 for step in todo:
                     if step.prereqs <= completed:
+                        LOGGER.debug('Starting step: {!r}', step)
                         nursery.start_soon(step.wrapper, ctx, send)
                         running += 1
                     else:
@@ -100,3 +104,4 @@ class StepOrder(Generic[CtxT, ResourceT]):
                         del awaiting_steps[res]  # Shrink, so values() skips this.
                         completed.add(res)
             # Once here, all steps have been started, so we can just wait for the nursery to close.
+        LOGGER.info('Run complete.', len(todo))
