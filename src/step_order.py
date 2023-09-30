@@ -1,7 +1,7 @@
 """Orders a series of steps, so certain resources are created before the steps that use them.
 
 """
-from typing import Awaitable, Callable, Collection, Generic, List, Set, Type, TypeVar
+from typing import Awaitable, Callable, Collection, Generic, Iterable, List, Set, Type, TypeVar
 from collections import Counter
 import math
 
@@ -39,10 +39,10 @@ class StepOrder(Generic[CtxT, ResourceT]):
     _resources: Collection[ResourceT]
     _locked: bool
 
-    def __init__(self, ctx_type: Type[CtxT], resources: Collection[ResourceT]) -> None:
+    def __init__(self, ctx_type: Type[CtxT], resources: Iterable[ResourceT]) -> None:
         """ctx_type is only defined to allow inferring the typevar."""
         self._steps = []
-        self._resources = resources
+        self._resources = list(resources)
         self._locked = False
 
     def add_step(
