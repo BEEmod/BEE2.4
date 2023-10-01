@@ -656,10 +656,6 @@ class Item(PakObject, needs_foreground=True, export_priority=-10):
             for item_to_style in packset.all_obj(Item):
                 nursery.start_soon(assign_styled_items, styles, item_to_style)
 
-    @staticmethod
-    async def export(exp_data: ExportData) -> None:
-        pass
-
 
 class ItemConfig(PakObject, allow_mult=True):
     """Allows adding additional configuration for items.
@@ -717,14 +713,6 @@ class ItemConfig(PakObject, allow_mult=True):
                     our_styles[sty_id] = style
                 else:
                     our_styles[sty_id] = lazy_conf.concat(our_styles[sty_id], style)
-
-    @staticmethod
-    async def export(exp_data: ExportData) -> None:
-        """This export is done in Item.export().
-
-        Here we don't know the version set for each item.
-        """
-        pass
 
 
 async def parse_item_folder(

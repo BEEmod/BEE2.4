@@ -1107,11 +1107,6 @@ class Style(PakObject, needs_foreground=True):
         """Iterate over translation tokens in the style."""
         return self.selitem_data.iter_trans_tokens('styles/' + self.id)
 
-    @staticmethod
-    def export(exp_data: ExportData) -> None:
-        """This isn't used for Styles, we do them specially."""
-        pass
-
 
 def parse_multiline_key(info: Keyvalues, prop_name: str, *, allow_old_format: bool=False) -> str:
     """Allow several methods for entering multi-line keyvalues.

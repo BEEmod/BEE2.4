@@ -14,6 +14,7 @@ from app import lazy_conf
 from config.item_defaults import ItemDefault
 from editoritems import Item as EditorItem, InstCount
 from connections import INDICATOR_CHECK_ID
+from exporting import STEPS, StepResource
 from packages import ExportData, Item
 from packages.item import ItemConfig
 
@@ -115,6 +116,7 @@ def get_export_data(
     )
 
 
+@STEPS.add_step(prereq=[], results=[StepResource.EI_ITEMS, StepResource.EI_DATA, StepResource.VCONF_DATA])
 async def step_write_items(exp_data: ExportData) -> None:
     """Export all items into the configs.
 
@@ -122,7 +124,7 @@ async def step_write_items(exp_data: ExportData) -> None:
     palette.
     """
     vbsp_config = exp_data.vbsp_conf
-    pal_list: dict[str, dict[int, tuple[int, int]]] = exp_data.selected
+    pal_list: dict[str, dict[int, tuple[int, int]]] = exp_data.selected[Item]
 
     style_id = exp_data.selected_style.id
     item: Item
