@@ -98,4 +98,4 @@ async def step_write_editoritems_db(exp: ExportData) -> None:
 
 
 # Register everything.
-from exporting import compiler, editor_sound, items, music
+from exporting import compiler, editor_sound, items, music, pack_list, stylevar
