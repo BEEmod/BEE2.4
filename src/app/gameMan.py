@@ -775,19 +775,6 @@ class Game:
                     str(transtoken.CURRENT_LANG.ui_filename),
                 )
 
-            # If there are multiple of these blocks, merge them together.
-            # They will end up in this order.
-            vbsp_config.merge_children(
-                'Textures',
-                'Fizzlers',
-                'Options',
-                'StyleVars',
-                'DropperItems',
-                'Conditions',
-                'Quotes',
-                'PackTriggers',
-            )
-
             for name, file, ext in FILES_TO_BACKUP:
                 item_path = self.abs_path(file + ext)
                 backup_path = self.abs_path(file + '_original' + ext)
@@ -893,13 +880,6 @@ class Game:
                     if pack.additional_tokens  # Skip empty packages, saving some space.
                 ], pickle.HIGHEST_PROTOCOL))
                 trans_file.write(pick)
-
-            LOGGER.info('Writing VBSP Config!')
-            os.makedirs(self.abs_path('bin/bee2/'), exist_ok=True)
-            with open(self.abs_path('bin/bee2/vbsp_config.cfg'), 'w', encoding='utf8') as vbsp_file:
-                for line in vbsp_config.export():
-                    vbsp_file.write(line)
-            export_screen.step('EXP', 'vbsp_config')
 
             error_server_running = await terminate_error_server()
 

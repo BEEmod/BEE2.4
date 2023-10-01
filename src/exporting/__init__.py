@@ -1,7 +1,9 @@
 """The code for performing an export to the game folder."""
+import os
 from enum import Enum, auto
 
 import srctools.logger
+import trio.to_thread
 from srctools import AtomicWriter, Keyvalues
 
 import editoritems
@@ -26,4 +28,33 @@ class StepResource(Enum):
     STYLE = auto()  # Items must come after the style.
 
 
-STEP_MANAGER = StepOrder(ExportData, StepResource)
+STEPS = StepOrder(ExportData, StepResource)
+
+
+@STEPS.add_step(prereq=[StepResource.VCONF_DATA], results=[StepResource.VCONF_FILE])
+async def step_write_vbsp_config(exp: ExportData) -> None:
+    """Write the finished vbsp_config to disk."""
+    # If there are multiple of these blocks, merge them together.
+    # They will end up in this order.
+    exp.vbsp_conf.merge_children(
+        'Textures',
+        'Fizzlers',
+        'Options',
+        'StyleVars',
+        'DropperItems',
+        'Conditions',
+        'Quotes',
+        'PackTriggers',
+    )
+    os.makedirs(exp.game.abs_path('bin/bee2/'), exist_ok=True)
+
+    def write_file(conf: Keyvalues, filename: str) -> None:
+        """Write the file."""
+        with AtomicWriter(filename, encoding='utf8') as vbsp_file:
+            for line in conf.export():
+                vbsp_file.write(line)
+
+    await trio.to_thread.run_sync(
+        write_file,
+        exp.vbsp_conf, exp.game.abs_path('bin/bee2/vbsp_config.cfg'),
+    )
