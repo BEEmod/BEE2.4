@@ -4,16 +4,15 @@ A system is provided so configurations can be shared and partially modified
 as required.
 """
 from __future__ import annotations
-import operator
 import re
 import copy
 from enum import Enum
-from typing import Iterable, Iterator, Mapping, Match
+from typing import Iterable, Iterator
 from pathlib import PurePosixPath as FSPath
 
 import attrs
 import trio
-from srctools import FileSystem, Keyvalues, VMF, logger, EmptyMapping
+from srctools import FileSystem, Keyvalues, VMF, logger
 from srctools.tokenizer import Tokenizer, Token
 from typing_extensions import Self
 
@@ -25,18 +24,15 @@ from packages import (
     PackagesSet, PakObject, ParseData, ExportData, Style,
     sep_values, desc_parse, get_config,
 )
-from config.item_defaults import ItemDefault, DEFAULT_VERSION
+from config.item_defaults import DEFAULT_VERSION
 from editoritems import Item as EditorItem, InstCount
-from connections import Config as ConnConfig, INDICATOR_CHECK_ID
+from connections import Config as ConnConfig
 import editoritems_vmf
 import collisions
 import utils
 
 
 LOGGER = logger.get_logger(__name__)
-
-# Finds names surrounded by %s
-RE_PERCENT_VAR = re.compile(r'%(\w*)%')
 
 
 class InheritKind(Enum):
@@ -662,119 +658,7 @@ class Item(PakObject, needs_foreground=True, export_priority=-10):
 
     @staticmethod
     async def export(exp_data: ExportData) -> None:
-        """Export all items into the configs.
-
-        For the selected attribute, this is a list of (item, subitem) tuples representing the
-        palette.
-        """
-        vbsp_config = exp_data.vbsp_conf
-        pal_list: dict[str, dict[int, tuple[int, int]]] = exp_data.selected
-
-        style_id = exp_data.selected_style.id
-        item: Item
-        default_conf = ItemDefault()
-        for item in sorted(exp_data.packset.all_obj(Item), key=operator.attrgetter('id')):
-            prop_conf = config.APP.get_cur_conf(ItemDefault, item.id, default_conf)
-
-            (items, config_part) = item._get_export_data(pal_list, style_id, prop_conf)
-
-            exp_data.all_items.extend(items)
-            vbsp_config.extend(apply_replacements(await config_part(), item.id))
-
-            # Add auxiliary configs as well.
-            try:
-                aux_conf = exp_data.packset.obj_by_id(ItemConfig, item.id)
-            except KeyError:
-                pass
-            else:
-                vbsp_config.extend(apply_replacements(await aux_conf.all_conf(), item.id + ':aux_all'))
-                try:
-                    version_data = aux_conf.versions[prop_conf.version]
-                except KeyError:
-                    pass  # No override.
-                else:
-                    # Find the first style definition for the selected one
-                    # that's defined for this config
-                    for poss_style in exp_data.selected_style.bases:
-                        if poss_style.id in version_data:
-                            vbsp_config.extend(apply_replacements(
-                                await version_data[poss_style.id](),
-                                item.id + ':aux'
-                            ))
-                            break
-
-            # Special case - if this is the indicator panel item, extract and apply the configured
-            # instances.
-            if item.id == INDICATOR_CHECK_ID:
-                [check_item, timer_item] = items
-                for ant_conf in vbsp_config.find_all('Textures', 'Antlines'):
-                    if 'check' in ant_conf:
-                        try:
-                            check_item.instances = [
-                                InstCount(FSPath(ant_conf.find_block('check')['inst']))
-                            ]
-                        except LookupError:
-                            raise ValueError('No "inst" defined for checkmarks in antline configuration!') from None
-                    if 'timer' in ant_conf:
-                        try:
-                            timer_item.instances = [
-                                InstCount(FSPath(ant_conf.find_block('timer')['inst']))
-                            ]
-                        except LookupError:
-                            raise ValueError('No "inst" defined for timers in antline configuration!') from None
-
-    def _get_export_data(
-        self,
-        pal_list: dict[str, dict[int, tuple[int, int]]],
-        style_id: str,
-        prop_conf: ItemDefault,
-    ) -> tuple[list[EditorItem], lazy_conf.LazyConf]:
-        """Get the data for an exported item."""
-
-        # Build a dictionary of this item's palette positions,
-        # if any exist.
-        palette_items: Mapping[int, tuple[int, int]] = pal_list.get(self.id.casefold(), EmptyMapping)
-
-        try:
-            sel_version = self.versions[prop_conf.version]
-        except KeyError:
-            LOGGER.warning('Version ID {} is not valid for item {}', prop_conf.version, self.id)
-            sel_version = self.def_ver
-        item_data = sel_version.styles[style_id]
-
-        new_item = copy.deepcopy(item_data.editor)
-        new_item.id = self.id  # Set the item ID to match our item
-        # This allows the folders to be reused for different items if needed.
-
-        for index, subtype in enumerate(new_item.subtypes):
-            if index in palette_items:
-                if len(palette_items) == 1:
-                    # Switch to the 'Grouped' icon and name
-                    if item_data.all_name is not None:
-                        subtype.pal_name = item_data.all_name
-
-                    if item_data.all_icon is not None:
-                        subtype.pal_icon = item_data.all_icon
-
-                subtype.pal_pos = palette_items[index]
-            else:
-                # This subtype isn't on the palette.
-                subtype.pal_icon = None
-                subtype.pal_name = None
-                subtype.pal_pos = None
-
-        # Apply configured default values to this item
-        for prop in new_item.properties.values():
-            if prop.allow_user_default:
-                try:
-                    prop.default = prop.parse_value(prop_conf.defaults[prop.kind])
-                except KeyError:
-                    pass
-        return (
-            [new_item] + item_data.editor_extra,
-            # Add all_conf first so it's conditions run first by default
-            lazy_conf.concat(self.all_conf, item_data.vbsp_config),
-        )
+        pass
 
 
 class ItemConfig(PakObject, allow_mult=True):
@@ -993,44 +877,6 @@ async def parse_item_folder(
             prop_path,
         )
     return variant
-
-
-def apply_replacements(conf: Keyvalues, item_id: str) -> Keyvalues:
-    """Apply a set of replacement values to a config file, returning a new copy.
-
-    The replacements are found in a 'Replacements' block in the property.
-    These replace %values% starting and ending with percents. A double-percent
-    allows literal percents. Unassigned values are an error.
-    """
-    replace: dict[str, str] = {}
-    new_conf = Keyvalues.root() if conf.is_root() else Keyvalues(conf.real_name, [])
-
-    # Strip the replacement blocks from the config, and save the values.
-    for kv in conf:
-        if kv.name == 'replacements':
-            for rep_prop in kv:
-                replace[rep_prop.name.strip('%')] = rep_prop.value
-        else:
-            new_conf.append(kv)
-
-    def rep_func(match: Match) -> str:
-        """Does the replacement."""
-        var = match.group(1)
-        if not var:  # %% becomes %.
-            return '%'
-        try:
-            return replace[var.casefold()]
-        except KeyError:
-            raise ValueError(
-                f'Unresolved variable in "{item_id}": {var!r}\nValid vars: {replace}'
-            ) from None
-
-    for kv in new_conf.iter_tree(blocks=True):
-        kv.name = RE_PERCENT_VAR.sub(rep_func, kv.real_name)
-        if not kv.has_children():
-            kv.value = RE_PERCENT_VAR.sub(rep_func, kv.value)
-
-    return new_conf
 
 
 # noinspection PyProtectedMember
