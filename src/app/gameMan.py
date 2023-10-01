@@ -856,19 +856,6 @@ class Game:
                 self.edit_fgd(True)
             export_screen.step('EXP', 'fgd')
 
-            # AtomicWriter writes to a temporary file, then renames in one step.
-            # This ensures editoritems won't be half-written.
-            LOGGER.info('Writing Editoritems script...')
-            with AtomicWriter(self.abs_path('portal2_dlc2/scripts/editoritems.txt'), encoding='utf8') as editor_file:
-                editoritems.Item.export(editor_file, all_items, renderables, id_filenames=False)
-            export_screen.step('EXP', 'editoritems')
-
-            LOGGER.info('Writing Editoritems database...')
-            with open(self.abs_path('bin/bee2/editor.bin'), 'wb') as inst_file:
-                pick = pickletools.optimize(pickle.dumps(all_items, pickle.HIGHEST_PROTOCOL))
-                inst_file.write(pick)
-            export_screen.step('EXP', 'editoritems_db')
-
             LOGGER.info('Writing dump of package translations...')
             with open(self.abs_path('bin/bee2/pack_translation.bin'), 'wb') as trans_file:
                 pick = pickletools.optimize(pickle.dumps([
