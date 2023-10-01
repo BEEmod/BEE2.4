@@ -95,3 +95,7 @@ async def step_write_editoritems_db(exp: ExportData) -> None:
     pick = await trio.to_thread.run_sync(pickletools.optimize, pick)
     with open(exp.game.abs_path('bin/bee2/editor.bin'), 'wb') as inst_file:
         inst_file.write(pick)
+
+
+# Register everything.
+from exporting import compiler, editor_sound, items, music
