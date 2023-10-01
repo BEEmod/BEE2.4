@@ -15,7 +15,6 @@ from tkinter import filedialog  # open/save as dialog creator
 
 import copy
 import io
-import json
 import math
 import os
 import pickle
@@ -120,10 +119,6 @@ INST_PATH = 'sdk_content/maps/instances/BEE2'
 # than '|gameinfo_path|.'
 GAMEINFO_LINE = 'Game\t|gameinfo_path|../bee2'
 OLD_GAMEINFO_LINE = 'Game\t"BEE2"'
-
-# We inject this line to recognise where our sounds start, so we can modify
-# them.
-EDITOR_SOUND_LINE = '// BEE2 SOUNDS BELOW'
 
 # The progress bars used when exporting data into a game
 export_screen = loadScreen.LoadScreen(
@@ -352,49 +347,6 @@ class Game:
     def abs_path(self, path: Union[str, Path]) -> str:
         """Return the full path to something relative to this game's folder."""
         return os.path.normcase(os.path.join(self.root, path))
-
-    def add_editor_sounds(
-        self,
-        sounds: Iterable[packages.EditorSound],
-    ) -> None:
-        """Add soundscript items so that they can be used in the editor."""
-        # PeTI only loads game_sounds_editor, so we must modify that.
-        # First find the highest-priority file
-        for folder in self.dlc_priority():
-            file = self.abs_path(os.path.join(
-                folder,
-                'scripts',
-                'game_sounds_editor.txt'
-            ))
-            if os.path.isfile(file):
-                break  # We found it
-        else:
-            # Assume it's in dlc2
-            file = self.abs_path(os.path.join(
-                'portal2_dlc2',
-                'scripts',
-                'game_sounds_editor.txt',
-            ))
-        try:
-            with open(file, encoding='utf8') as f1:
-                file_data = list(f1)
-        except FileNotFoundError:
-            # If the file doesn't exist, we'll just write our stuff in.
-            file_data = []
-        for i, line in enumerate(file_data):
-            if line.strip() == EDITOR_SOUND_LINE:
-                # Delete our marker line and everything after it
-                del file_data[i:]
-                break
-
-        # Then add our stuff!
-        with AtomicWriter(file, encoding='utf8') as f:
-            f.writelines(file_data)
-            f.write(EDITOR_SOUND_LINE + '\n')
-            for sound in sounds:
-                for line in sound.data.export():
-                    f.write(line)
-                f.write('\n')  # Add a little spacing
 
     def edit_gameinfo(self, add_line: bool = False) -> None:
         """Modify all gameinfo.txt files to add or remove our line.
