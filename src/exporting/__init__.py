@@ -35,6 +35,21 @@ class StepResource(Enum):
 STEPS = StepOrder(ExportData, StepResource)
 
 
+@STEPS.add_step(prereq=[], results=[
+    StepResource.STYLE,
+    StepResource.EI_ITEMS,
+    StepResource.EI_DATA,
+    StepResource.VCONF_DATA,
+])
+async def step_style(exp: ExportData) -> None:
+    """The first thing that's added is the style data."""
+    style = exp.selected_style
+    exp.vbsp_conf.extend(await style.config())
+
+    exp.all_items += style.items
+    exp.renderables.update(style.renderables)
+
+
 @STEPS.add_step(prereq=[StepResource.VCONF_DATA], results=[StepResource.VCONF_FILE])
 async def step_write_vbsp_config(exp: ExportData) -> None:
     """Write the finished vbsp_config to disk."""
@@ -65,7 +80,7 @@ async def step_write_vbsp_config(exp: ExportData) -> None:
 
 
 @STEPS.add_step(prereq=[StepResource.EI_DATA, StepResource.STYLE], results=[StepResource.EI_FILE])
-async def write_editoritems_script(exp: ExportData) -> None:
+async def step_write_editoritems_script(exp: ExportData) -> None:
     """Writes the completed editoritems.txt script, for the editor."""
     # AtomicWriter writes to a temporary file, then renames in one step.
     # This ensures editoritems won't be half-written.
@@ -74,7 +89,7 @@ async def write_editoritems_script(exp: ExportData) -> None:
 
 
 @STEPS.add_step(prereq=[StepResource.EI_DATA, StepResource.STYLE], results=[StepResource.EI_FILE])
-async def write_editoritems_db(exp: ExportData) -> None:
+async def step_write_editoritems_db(exp: ExportData) -> None:
     """Write the editoritems database, including all our information ready for the compiler."""
     pick = await trio.to_thread.run_sync(pickle.dumps, exp.all_items, pickle.HIGHEST_PROTOCOL)
     pick = await trio.to_thread.run_sync(pickletools.optimize, pick)

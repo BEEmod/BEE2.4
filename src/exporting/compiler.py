@@ -45,7 +45,7 @@ async def terminate_error_server() -> bool:
     return True  # Hit our timeout.
 
 
-@STEPS.add_step(results=[StepResource.ERROR_SERVER_TERMINATE])
+@STEPS.add_step(prereq=[], results=[StepResource.ERROR_SERVER_TERMINATE])
 async def step_terminate_error() -> None:
     """The error server must be terminated before copying the compiler."""
     maybe_running = await terminate_error_server()
