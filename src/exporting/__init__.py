@@ -27,7 +27,9 @@ class StepResource(Enum):
     VCONF_DATA = auto()  # Anything affecting the file.
     VCONF_FILE = auto()  # The file itself being written.
 
+    # Various things that need to be sequenced.
     STYLE = auto()  # Items must come after the style.
+    ERROR_SERVER_TERMINATE = auto()  # This must be terminated before we can copy compiler files.
 
 
 STEPS = StepOrder(ExportData, StepResource)

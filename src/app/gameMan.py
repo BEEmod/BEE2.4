@@ -22,8 +22,6 @@ import pickle
 import pickletools
 import re
 import shutil
-import urllib.error
-import urllib.request
 import webbrowser
 
 from srctools import (
@@ -34,13 +32,13 @@ from srctools import (
 )
 import srctools.logger
 import srctools.fgd
-import trio
 import attrs
 from typing_extensions import Self
 
 from BEE2_config import ConfigFile
 from app import backup, tk_tools, resource_gen, TK_ROOT, DEV_MODE, background_run
 from config.gen_opts import GenOptions
+from exporting.compiler import terminate_error_server
 from transtoken import TransToken
 import transtoken
 import loadScreen
@@ -50,7 +48,6 @@ from packages import style_vpk
 import editoritems
 import utils
 import config
-import user_errors
 import event
 
 
@@ -271,37 +268,6 @@ def should_backup_app(file: str) -> bool:
         end_data = f.read(SIZE)
         # We also look for BenVlodgi, to catch the BEE 1.06 precompiler.
         return b'BenVlodgi' not in end_data and b'MEI\014\013\012\013\016' not in end_data
-
-
-async def terminate_error_server() -> bool:
-    """If the error server is running, send it a message to get it to terminate.
-
-    :returns: If we think it could be running.
-    """
-    try:
-        data: user_errors.ServerInfo = json.loads(await trio.to_thread.run_sync(
-            user_errors.SERVER_INFO_FILE.read_text
-        ))
-    except FileNotFoundError:
-        LOGGER.info("No error server file, it's not running.")
-        return False
-    with trio.move_on_after(10.0):
-        port = data['port']
-        LOGGER.info('Error server port: {}', port)
-        try:
-            with urllib.request.urlopen(f'http://127.0.0.1:{port}/shutdown') as response:
-                response.read()
-        except urllib.error.URLError as exc:
-            LOGGER.info("No response from error server, assuming it's dead: {}", exc.reason)
-            return False
-        else:
-            # Wait for the file to be deleted.
-            while user_errors.SERVER_INFO_FILE.exists():
-                await trio.sleep(0.125)
-            return False
-    # noinspection PyUnreachableCode
-    LOGGER.warning('Hit error server timeout, may still be running!')
-    return True  # Hit our timeout.
 
 
 @attrs.define(eq=False)
