@@ -582,14 +582,6 @@ class Game:
         - item.
         - Styles are a special case.
         """
-
-        LOGGER.info('-' * 20)
-        LOGGER.info('Exporting Items and Style for "{}"!', self.name)
-
-        LOGGER.info('Style = {}', style.id)
-        for obj_type, selected in selected_objects.items():
-            LOGGER.info('{} = {}', obj_type, selected)
-
         # VBSP, VRAD, editoritems
         export_screen.set_length('BACK', len(FILES_TO_BACKUP))
         # files in compiler/
@@ -607,15 +599,6 @@ class Game:
             export_screen.skip_stage('COMP')
         else:
             export_screen.set_length('COMP', num_compiler_files)
-
-        LOGGER.info('Should refresh: {}', should_refresh)
-        if should_refresh:
-            # Check to ensure the cache needs to be copied over..
-            should_refresh = self.cache_invalid()
-            if should_refresh:
-                LOGGER.info("Cache invalid - copying..")
-            else:
-                LOGGER.info("Skipped copying cache!")
 
         # Each object type
         # Editoritems
@@ -643,41 +626,7 @@ class Game:
                 export_screen.skip_stage('RES')
                 export_screen.skip_stage('MUS')
 
-            # Make the folders we need to copy files to, if desired.
-            os.makedirs(self.abs_path('bin/bee2/'), exist_ok=True)
-
-            vbsp_config = Keyvalues.root()
-            all_items = []
-            renderables = {}
-            resources: dict[str, bytes] = {}
-
-            export_screen.step('EXP', 'style-conf')
-
             vpk_success = True
-
-            # Export each object type.
-            for obj_type in sorted(packages.OBJ_TYPES.values(), key=lambda typ: typ.export_priority):
-                if obj_type is packages.Style:
-                    continue  # Done above already
-
-                LOGGER.info('Exporting "{}"', obj_type.__name__)
-
-                try:
-                    await obj_type.export(packages.ExportData(
-                        game=self,
-                        selected=selected_objects.get(obj_type, None),
-                        all_items=all_items,
-                        renderables=renderables,
-                        vbsp_conf=vbsp_config,
-                        packset=packset,
-                        selected_style=style,
-                        resources=resources,
-                    ))
-                except packages.NoVPKExport:
-                    # Raised by StyleVPK to indicate it failed to copy.
-                    vpk_success = False
-
-                export_screen.step('EXP', obj_type.__name__)
 
             vbsp_config.set_key(('Options', 'Game_ID'), self.steamID)
             vbsp_config.set_key(('Options', 'dev_mode'), srctools.bool_as_int(DEV_MODE.get()))

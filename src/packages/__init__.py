@@ -193,22 +193,25 @@ class ParseData:
     is_override: bool
 
 
-@attrs.define
+@attrs.define(kw_only=True)
 class ExportData:
     """The arguments to pak_object.export()."""
+    packset: PackagesSet  # The entire loaded packages set.
+    game: Game  # The current game.
     # Usually str, but some items pass other things.
     selected: dict[Type[PakObject], Any]
     # Some items need to know which style is selected
     selected_style: Style
-    all_items: list[EditorItem]  # All the items in the map
-    renderables: dict[RenderableType, Renderable]  # The error/connection icons
-    vbsp_conf: Keyvalues  # vbsp_config.cfg file.
-    packset: PackagesSet  # The entire loaded packages set.
-    game: Game  # The current game.
+    # All the items in the map
+    all_items: list[EditorItem] = attrs.Factory(list)
+    # The error/connection icons
+    renderables: dict[RenderableType, Renderable] = attrs.Factory(dict)
+    # vbsp_config.cfg file.
+    vbsp_conf: Keyvalues = attrs.Factory(Keyvalues.root)
     # As objects export, they may fill this to include additional resources
     # to be written to the game folder. This way it can be deferred until
     # after regular resources are copied.
-    resources: dict[str, bytes]
+    resources: dict[str, bytes] = attrs.Factory(dict)
 
 
 @attrs.define
