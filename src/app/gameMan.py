@@ -69,39 +69,6 @@ FILES_TO_BACKUP = [
     ('Linux VRAD',   'bin/linux32/vrad_linux', ''),
 ]
 
-# Material file used for fizzler sides.
-# We use $decal because that ensures it's displayed over brushes,
-# if there's base slabs or the like.
-# We have to use SolidEnergy, so it fades out with fizzlers.
-FIZZLER_EDGE_MAT = '''\
-SolidEnergy
-{{
-$basetexture "sprites/laserbeam"
-$flowmap "effects/fizzler_flow"
-$flowbounds "BEE2/fizz/fizz_side"
-$flow_noise_texture "effects/fizzler_noise"
-$additive 1
-$translucent 1
-$decal 1
-$flow_color "[{}]"
-$flow_vortex_color "[{}]"
-'''
-
-# Non-changing components.
-FIZZLER_EDGE_MAT_PROXY = '''\
-$offset "[0 0]"
-Proxies
-{
-FizzlerVortex
-{
-}
-MaterialModify
-{
-}
-}
-}
-'''
-
 # The location of all the instances in the game directory
 INST_PATH = 'sdk_content/maps/instances/BEE2'
 
@@ -742,14 +709,7 @@ class Game:
                 music_files = self.copy_mod_music()
                 self.refresh_cache(music_files)
 
-            LOGGER.info('Optimizing editor models...')
-            self.clean_editor_models(all_items)
-            export_screen.step('EXP', 'editor_models')
-
-            LOGGER.info('Writing fizzler sides...')
-            self.generate_fizzler_sides(vbsp_config)
             resource_gen.make_cube_colourizer_legend(packset, Path(self.abs_path('bee2')))
-            export_screen.step('EXP', 'fizzler_sides')
 
             self.exported_style = style.id
             save()
@@ -763,32 +723,6 @@ class Game:
             return True, vpk_success
         except loadScreen.Cancelled:
             return False, False
-
-    def generate_fizzler_sides(self, conf: Keyvalues) -> None:
-        """Create the VMTs used for fizzler sides."""
-        fizz_colors: dict[FrozenVec, tuple[float, str]] = {}
-        mat_path = self.abs_path('bee2/materials/bee2/fizz_sides/side_color_')
-        for brush_conf in conf.find_all('Fizzlers', 'Fizzler', 'Brush'):
-            fizz_color = brush_conf['Side_color', '']
-            if fizz_color:
-                fizz_colors[FrozenVec.from_str(fizz_color)] = (
-                    brush_conf.float('side_alpha', 1),
-                    brush_conf['side_vortex', fizz_color]
-                )
-        if fizz_colors:
-            os.makedirs(self.abs_path('bee2/materials/bee2/fizz_sides/'), exist_ok=True)
-        for fizz_color_vec, (alpha, fizz_vortex_color) in fizz_colors.items():
-            file_path = mat_path + '{:02X}{:02X}{:02X}.vmt'.format(
-                round(fizz_color_vec.x * 255),
-                round(fizz_color_vec.y * 255),
-                round(fizz_color_vec.z * 255),
-            )
-            with open(file_path, 'w') as f:
-                f.write(FIZZLER_EDGE_MAT.format(fizz_color_vec, fizz_vortex_color))
-                if alpha != 1:
-                    # Add the alpha value, but replace 0.5 -> .5 to save a char.
-                    f.write('$outputintensity {}\n'.format(format(alpha, 'g').replace('0.', '.')))
-                f.write(FIZZLER_EDGE_MAT_PROXY)
 
     def launch(self) -> None:
         """Try and launch the game."""
