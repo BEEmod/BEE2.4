@@ -13,18 +13,14 @@ from pathlib import Path
 from tkinter import *  # ui library
 from tkinter import filedialog  # open/save as dialog creator
 
-import copy
-import io
 import math
 import os
-import pickle
-import pickletools
 import re
 import shutil
 import webbrowser
 
 from srctools import (
-    Vec, VPK, FrozenVec,
+    Vec, VPK,
     Keyvalues, AtomicWriter,
     VMF, Output,
     FileSystem, FileSystemChain,
@@ -35,15 +31,13 @@ import attrs
 from typing_extensions import Self
 
 from BEE2_config import ConfigFile
-from app import backup, tk_tools, resource_gen, TK_ROOT, DEV_MODE, background_run
+from app import backup, tk_tools, resource_gen, TK_ROOT, background_run
 from config.gen_opts import GenOptions
-from exporting.compiler import terminate_error_server
+from exporting.compiler import terminate_error_server, restore_backup
 from transtoken import TransToken
-import transtoken
 import loadScreen
 import packages
 import packages.template_brush
-import editoritems
 import utils
 import config
 import event
@@ -58,16 +52,6 @@ game_menu: Optional[Menu] = None
 ON_GAME_CHANGED: event.Event[Game] = event.Event('game_changed')
 
 CONFIG = ConfigFile('games.cfg')
-
-FILES_TO_BACKUP = [
-    ('Editoritems', 'portal2_dlc2/scripts/editoritems', '.txt'),
-    ('Windows VBSP', 'bin/vbsp',       '.exe'),
-    ('Windows VRAD', 'bin/vrad',       '.exe'),
-    ('OSX VBSP',     'bin/vbsp_osx',   ''),
-    ('OSX VRAD',     'bin/vrad_osx',   ''),
-    ('Linux VBSP',   'bin/linux32/vbsp_linux', ''),
-    ('Linux VRAD',   'bin/linux32/vrad_linux', ''),
-]
 
 # The location of all the instances in the game directory
 INST_PATH = 'sdk_content/maps/instances/BEE2'
@@ -192,35 +176,6 @@ def quit_application() -> NoReturn:
     """
     import sys
     sys.exit()
-
-
-def should_backup_app(file: str) -> bool:
-    """Check if the given application is Valve's, or ours.
-
-    We do this by checking for the PyInstaller archive.
-    """
-    # We can't import PyInstaller properly while frozen, so copy over
-    # the important code.
-
-    # from PyInstaller.archive.readers import CArchiveReader
-    try:
-        f = open(file, 'rb')
-    except FileNotFoundError:
-        # We don't want to backup missing files.
-        return False
-
-    SIZE = 4096
-
-    with f:
-        f.seek(0, io.SEEK_END)
-        if f.tell() < SIZE:
-            return False  # Too small.
-
-        # Read out the last 4096 bytes, and look for the sig in there.
-        f.seek(-SIZE, io.SEEK_END)
-        end_data = f.read(SIZE)
-        # We also look for BenVlodgi, to catch the BEE 1.06 precompiler.
-        return b'BenVlodgi' not in end_data and b'MEI\014\013\012\013\016' not in end_data
 
 
 @attrs.define(eq=False)
@@ -359,19 +314,6 @@ class Game:
                 with AtomicWriter(info_path, encoding='utf8') as file2:
                     for line in data:
                         file2.write(line)
-        if not add_line:
-            # Restore the original files!
-
-            for name, filename, ext in FILES_TO_BACKUP:
-                item_path = self.abs_path(f"{filename}{ext}")
-                backup_path = self.abs_path(f'{filename}_original{ext}')
-                old_version = self.abs_path(f'{filename}_styles{ext}')
-                if os.path.isfile(old_version):
-                    LOGGER.info('Restoring Stylechanger version of "{}"!', name)
-                    shutil.copy(old_version, item_path)
-                elif os.path.isfile(backup_path):
-                    LOGGER.info('Restoring original "{}"!', name)
-                    shutil.move(backup_path, item_path)
 
     def edit_fgd(self, add_lines: bool=False) -> None:
         """Add our FGD files to the game folder.
@@ -541,8 +483,6 @@ class Game:
         - item.
         - Styles are a special case.
         """
-        # VBSP, VRAD, editoritems
-        export_screen.set_length('BACK', len(FILES_TO_BACKUP))
         # files in compiler/
         try:
             num_compiler_files = sum(1 for file in utils.install_path('compiler').rglob('*'))
@@ -586,63 +526,6 @@ class Game:
                 export_screen.skip_stage('MUS')
 
             vpk_success = True
-
-            vbsp_config.set_key(('Options', 'Game_ID'), self.steamID)
-            vbsp_config.set_key(('Options', 'dev_mode'), srctools.bool_as_int(DEV_MODE.get()))
-
-            for name, file, ext in FILES_TO_BACKUP:
-                item_path = self.abs_path(file + ext)
-                backup_path = self.abs_path(file + '_original' + ext)
-
-                if not os.path.isfile(item_path):
-                    # We can't back up at all.
-                    should_backup = False
-                elif name == 'Editoritems':
-                    should_backup = not os.path.isfile(backup_path)
-                else:
-                    # Always backup the non-_original file, it'd be newer.
-                    # But only if it's Valves - not our own.
-                    should_backup = should_backup_app(item_path)
-                    backup_is_good = should_backup_app(backup_path)
-                    LOGGER.info(
-                        '{}{}: normal={}, backup={}',
-                        file, ext,
-                        'Valve' if should_backup else 'BEE2',
-                        'Valve' if backup_is_good else 'BEE2',
-                    )
-
-                    if not should_backup and not backup_is_good:
-                        # It's a BEE2 application, we have a problem.
-                        # Both the real and backup are bad, we need to get a
-                        # new one.
-                        try:
-                            os.remove(backup_path)
-                        except FileNotFoundError:
-                            pass
-                        try:
-                            os.remove(item_path)
-                        except FileNotFoundError:
-                            pass
-
-                        export_screen.reset()
-                        if tk_tools.askokcancel(
-                            title=TransToken.ui('BEE2 - Export Failed!'),
-                            message=TransToken.ui(
-                                'Compiler file {file} missing. '
-                                'Exit Steam applications, then press OK '
-                                'to verify your game cache. You can then '
-                                'export again.'
-                            ).format(
-                                file=file + ext,
-                            ),
-                        ):
-                            webbrowser.open('steam://validate/' + str(self.steamID))
-                        return False, vpk_success
-
-                if should_backup:
-                    LOGGER.info('Backing up original {}!', name)
-                    shutil.copy(item_path, backup_path)
-                export_screen.step('BACK', name)
 
             # Backup puzzles, if desired
             backup.auto_backup(selected_game, export_screen)
@@ -1055,6 +938,7 @@ async def remove_game() -> None:
         await terminate_error_server()
         selected_game.edit_gameinfo(add_line=False)
         selected_game.edit_fgd(add_lines=False)
+        await restore_backup(selected_game)
         await selected_game.clear_cache()
 
         all_games.remove(selected_game)
