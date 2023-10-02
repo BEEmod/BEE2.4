@@ -31,7 +31,7 @@ import attrs
 from typing_extensions import Self
 
 from BEE2_config import ConfigFile
-from app import backup, tk_tools, resource_gen, TK_ROOT, background_run
+from app import backup, tk_tools, TK_ROOT, background_run
 from config.gen_opts import GenOptions
 from exporting.compiler import terminate_error_server, restore_backup
 from transtoken import TransToken
@@ -82,9 +82,6 @@ EXE_SUFFIX = (
     '_linux' if utils.LINUX else
     ''
 )
-
-# The systems we need to copy to ingame resources
-res_system = FileSystemChain()
 
 # We search for Tag and Mel's music files, and copy them to games on export.
 # That way they can use the files.
@@ -161,12 +158,6 @@ sp_a5_finale02_stage_end.wav\
 # sp_a1_jazz_tramride.wav
 # still_alive_gutair_cover.wav
 # want_you_gone_guitar_cover.wav
-
-
-def load_filesystems(package_sys: Iterable[FileSystem]) -> None:
-    """Load package filesystems into a chain."""
-    for system in package_sys:
-        res_system.add_sys(system, prefix='resources/')
 
 
 def quit_application() -> NoReturn:
@@ -519,7 +510,11 @@ class Game:
                 # Count the files.
                 export_screen.set_length(
                     'RES',
-                    sum(1 for _ in res_system.walk_folder_repeat()),
+                    sum(
+                        1
+                        for pack in packset.packages.values()
+                        for _ in pack.fsys.walk_folder('resources/')
+                    ),
                 )
             else:
                 export_screen.skip_stage('RES')
