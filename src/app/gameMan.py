@@ -43,7 +43,6 @@ import transtoken
 import loadScreen
 import packages
 import packages.template_brush
-from packages import style_vpk
 import editoritems
 import utils
 import config
@@ -560,10 +559,11 @@ class Game:
         shutil.rmtree(self.abs_path('bee2/'), ignore_errors=True)
         shutil.rmtree(self.abs_path('bin/bee2/'), ignore_errors=True)
 
+        from exporting import vpks
         try:
-            vpk_folder = await style_vpk.find_folder(self)
-            style_vpk.clear_files(vpk_folder)
-        except (style_vpk.NoVPKExport, PermissionError):
+            vpk_folder = await vpks.find_folder(self)
+            vpks.clear_files(vpk_folder)
+        except (vpks.NoVPKExport, PermissionError):
             pass
 
         self.mod_times.clear()

@@ -30,6 +30,7 @@ class StepResource(Enum):
     # Various things that need to be sequenced.
     STYLE = auto()  # Items must come after the style.
     ERROR_SERVER_TERMINATE = auto()  # This must be terminated before we can copy compiler files.
+    VPK_WRITTEN = auto()  # The VPK file has been generated for overriding editor textures.
 
 
 STEPS = StepOrder(ExportData, StepResource)
