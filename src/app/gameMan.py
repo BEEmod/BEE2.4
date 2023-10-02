@@ -69,14 +69,6 @@ FILES_TO_BACKUP = [
     ('Linux VRAD',   'bin/linux32/vrad_linux', ''),
 ]
 
-_UNLOCK_ITEMS = [
-    'ITEM_EXIT_DOOR',
-    'ITEM_COOP_EXIT_DOOR',
-    'ITEM_ENTRY_DOOR',
-    'ITEM_COOP_ENTRY_DOOR',
-    'ITEM_OBSERVATION_ROOM'
-    ]
-
 # Material file used for fizzler sides.
 # We use $decal because that ensures it's displayed over brushes,
 # if there's base slabs or the like.
@@ -687,21 +679,6 @@ class Game:
 
             # Backup puzzles, if desired
             backup.auto_backup(selected_game, export_screen)
-
-            # Special-case: implement the UnlockDefault stylevar here, so all items are modified.
-            if selected_objects[packages.StyleVar]['UnlockDefault']:
-                LOGGER.info('Unlocking Items!')
-                for i, item in enumerate(all_items):
-                    # If the Unlock Default Items stylevar is enabled, we
-                    # want to force the corridors and obs room to be
-                    # deletable and copyable
-                    # Also add DESIRES_UP, so they place in the correct orientation.
-                    # That would have already been done for vertical-enabled corridors, but that's
-                    # fine.
-                    if item.id in _UNLOCK_ITEMS:
-                        all_items[i] = item = copy.copy(item)
-                        item.deletable = item.copiable = True
-                        item.facing = editoritems.DesiredFacing.UP
 
             LOGGER.info('Editing Gameinfo...')
             self.edit_gameinfo(True)
