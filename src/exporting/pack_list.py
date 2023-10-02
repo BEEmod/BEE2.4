@@ -10,7 +10,7 @@ from packages import ExportData, PackList
 
 
 @STEPS.add_step(prereq=[], results=[])
-async def export(exp_data: ExportData) -> None:
+async def step_packlist_conf(exp_data: ExportData) -> None:
     """Export all the packlists."""
     pack_block = Keyvalues('PackList', [])
 

@@ -5,7 +5,7 @@ import packages
 
 
 @STEPS.add_step(prereq=[], results=[])
-async def export(exp_data: packages.ExportData) -> None:
+async def step_widget_conf(exp_data: packages.ExportData) -> None:
     """Write all our values to the config."""
     for conf in exp_data.packset.all_obj(ConfigGroup):
         config_section = CONFIG[conf.id]

@@ -25,7 +25,7 @@ LOGGER = srctools.logger.get_logger(__name__)
 
 
 @STEPS.add_step(prereq=[StepResource.EI_ITEMS], results=[StepResource.EI_DATA, StepResource.VCONF_DATA])
-async def export(exp_data: packages.ExportData) -> None:
+async def step_corridor_conf(exp_data: packages.ExportData) -> None:
     """Override editoritems with the new corridor specifier."""
     style_id = exp_data.selected_style.id
     try:

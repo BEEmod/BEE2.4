@@ -44,7 +44,7 @@ def serialise(sign: Signage, parent: Keyvalues, style: Style) -> Optional[SignSt
 
 
 @STEPS.add_step(prereq=[], results=[StepResource.VCONF_DATA, StepResource.RES_DATA])
-async def export(exp_data: ExportData) -> None:
+async def step_signage(exp_data: ExportData) -> None:
     """Export the selected signage to the config, and produce the legend."""
     # Timer value -> sign ID.
     sel_ids: list[tuple[str, str]] = [

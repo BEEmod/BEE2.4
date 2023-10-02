@@ -6,7 +6,7 @@ from packages import ExportData, Skybox
 
 
 @STEPS.add_step(prereq=[], results=[StepResource.VCONF_DATA])
-async def export(exp_data: ExportData) -> None:
+async def step_skybox(exp_data: ExportData) -> None:
     """Export the selected skybox."""
     sel_id: Optional[str] = exp_data.selected[Skybox]
     if sel_id is None:

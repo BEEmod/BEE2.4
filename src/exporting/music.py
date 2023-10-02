@@ -9,7 +9,7 @@ from packages import ExportData, Music
 
 
 @STEPS.add_step(prereq=[], results=[StepResource.VCONF_DATA])
-async def export(exp_data: ExportData) -> None:
+async def step_music_conf(exp_data: ExportData) -> None:
     """Export the selected music."""
     selected: Dict[MusicChannel, Optional[Music]] = exp_data.selected[Music]
 

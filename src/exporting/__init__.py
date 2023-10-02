@@ -100,6 +100,6 @@ async def step_style(exp: packages.ExportData) -> None:
 
 # Register everything.
 from exporting import (
-    compiler, corridors, editor_sound, elevator, files, items,
-    music, pack_list, quote_pack, signage, skybox, stylevar, template_brush, vpks, widgets,
+    compiler, corridors, editor_sound, elevator, files, items, music, pack_list, quote_pack,
+    signage, skybox, stylevar, template_brush, translations, vpks, widgets,
 )

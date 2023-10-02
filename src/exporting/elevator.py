@@ -6,7 +6,7 @@ from packages import ExportData, Elevator
 
 
 @STEPS.add_step(prereq=[], results=[StepResource.VCONF_DATA])
-async def export(exp_data: ExportData) -> None:
+async def step_elevator_video(exp_data: ExportData) -> None:
     """Export the chosen video into the configs."""
     elevator: Optional[Elevator]
     sel_id: Optional[str] = exp_data.selected[Elevator]

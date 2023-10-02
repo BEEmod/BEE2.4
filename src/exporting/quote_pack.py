@@ -13,7 +13,7 @@ LOGGER = srctools.logger.get_logger(__name__)
 
 
 @STEPS.add_step(prereq=[], results=[StepResource.VCONF_DATA])
-async def export(exp_data: ExportData) -> None:
+async def step_quote_pack(exp_data: ExportData) -> None:
     """Export the quotepack."""
     if exp_data.selected is None:
         return  # No quote pack selected at all, don't write anything.
