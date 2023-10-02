@@ -679,9 +679,6 @@ class Game:
 
                 export_screen.step('EXP', obj_type.__name__)
 
-            packages.template_brush.write_templates(self)
-            export_screen.step('EXP', 'template_brush')
-
             vbsp_config.set_key(('Options', 'Game_ID'), self.steamID)
             vbsp_config.set_key(('Options', 'dev_mode'), srctools.bool_as_int(DEV_MODE.get()))
             if transtoken.CURRENT_LANG.ui_filename is not None:

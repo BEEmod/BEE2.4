@@ -8,6 +8,7 @@ import trio
 
 import user_errors
 from exporting import STEPS, StepResource
+from packages import ExportData
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -46,7 +47,7 @@ async def terminate_error_server() -> bool:
 
 
 @STEPS.add_step(prereq=[], results=[StepResource.ERROR_SERVER_TERMINATE])
-async def step_terminate_error() -> None:
+async def step_terminate_error(exp_data: ExportData) -> None:
     """The error server must be terminated before copying the compiler."""
     maybe_running = await terminate_error_server()
     if maybe_running:
