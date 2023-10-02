@@ -6,7 +6,6 @@ from srctools import AtomicWriter
 from srctools.dmx import Attribute as DMXAttr, Element as DMXElement, ValueType as DMXValue
 
 from exporting import STEPS
-from packages.template_brush import TEMPLATES
 import packages
 
 
@@ -16,7 +15,7 @@ async def step_write_templates(exp_data: packages.ExportData) -> None:
     root = DMXElement('Templates', 'DMERoot')
     template_list = root['temp'] = DMXAttr.array('list', DMXValue.ELEMENT)
 
-    for temp_id, path in TEMPLATES.items():
+    for temp_id, path in exp_data.packset.templates.items():
         pack_path = packages.PACKAGE_SYS[path.package].path
         temp_el = DMXElement(temp_id, 'DMETemplate')
         temp_el['package'] = os.path.abspath(pack_path).replace('\\', '/')

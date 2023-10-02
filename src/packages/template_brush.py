@@ -6,14 +6,14 @@ from srctools.filesys import File
 import srctools.logger
 import trio
 
+from packages import PackagesSet
 from utils import PackagePath
 
 
 LOGGER = srctools.logger.get_logger(__name__)
-TEMPLATES: dict[str, PackagePath] = {}
 
 
-async def parse_template(pak_id: str, file: File) -> None:
+async def parse_template(packset: PackagesSet, pak_id: str, file: File) -> None:
     """Parse the specified template file, extracting its ID."""
     path = f'{pak_id}:{file.path}'
     temp_id = await trio.to_thread.run_sync(parse_template_fast, file, path, cancellable=True)
@@ -31,7 +31,7 @@ async def parse_template(pak_id: str, file: File) -> None:
         temp_id = conf_ents[0]['template_id']
         if not temp_id:
             raise KeyValError('No template ID for template!', path, None)
-    TEMPLATES[temp_id.casefold()] = PackagePath(pak_id, file.path)
+    packset.templates[temp_id.casefold()] = PackagePath(pak_id, file.path)
 
 
 def parse_template_fast(file: File, path: str) -> str:

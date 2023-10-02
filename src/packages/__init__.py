@@ -407,6 +407,9 @@ class PackagesSet:
     # For overrides, a type/ID pair to the list of overrides.
     overrides: dict[tuple[Type[PakObject], str], list[ParseData]] = attrs.Factory(lambda: defaultdict(list))
 
+    # The templates found in the packages. This maps an ID to the file.
+    templates: dict[str, utils.PackagePath] = attrs.field(init=False, factory=dict)
+
     # Indicates if an object type has been fully parsed.
     _type_ready: dict[Type[PakObject], trio.Event] = attrs.field(init=False, factory=dict)
     # Internal, indicates if all parse() calls were complete (but maybe not post_parse).
@@ -749,7 +752,7 @@ async def parse_package(
     for template in pack.fsys.walk_folder('templates'):
         await trio.sleep(0)
         if template.path.casefold().endswith('.vmf'):
-            nursery.start_soon(template_brush.parse_template, pack.id, template)
+            nursery.start_soon(template_brush.parse_template, packset, pack.id, template)
     loader.step('PAK', pack.id)
 
 
@@ -774,7 +777,6 @@ async def parse_object(
             await trio.sleep(0)
     except (NoKeyError, IndexError) as e:
         reraise_keyerror(e, obj_id)
-        raise  # Never reached.
     except TokenSyntaxError as e:
         # Add the relevant package to the filename.
         if e.file:
