@@ -197,7 +197,7 @@ class ParseData:
 class ExportData:
     """The arguments to pak_object.export()."""
     # Usually str, but some items pass other things.
-    selected: Any
+    selected: dict[Type[PakObject], Any]
     # Some items need to know which style is selected
     selected_style: Style
     all_items: list[EditorItem]  # All the items in the map
@@ -305,19 +305,6 @@ class PakObject:
         to copy values from.
         """
         pass
-
-    @staticmethod
-    async def export(exp_data: ExportData) -> None:
-        """Export the appropriate data into the game.
-
-        ExportData is a namedtuple containing various data:
-        - selected: The ID of the selected item (or None)
-        - selected_style: The selected style object
-        - editoritems: The Keyvalues block for editoritems.txt
-        - vbsp_conf: The Keyvalues block for vbsp_config
-        - game: The game we're exporting to.
-        """
-        raise NotImplementedError
 
     def iter_trans_tokens(self) -> Iterator[TransTokenSource]:
         """Yields translation tokens in this object.
