@@ -681,11 +681,6 @@ class Game:
 
             vbsp_config.set_key(('Options', 'Game_ID'), self.steamID)
             vbsp_config.set_key(('Options', 'dev_mode'), srctools.bool_as_int(DEV_MODE.get()))
-            if transtoken.CURRENT_LANG.ui_filename is not None:
-                vbsp_config.set_key(
-                    ('Options', 'error_translations'),
-                    str(transtoken.CURRENT_LANG.ui_filename),
-                )
 
             for name, file, ext in FILES_TO_BACKUP:
                 item_path = self.abs_path(file + ext)
@@ -767,18 +762,6 @@ class Game:
                 LOGGER.info('Adding ents to FGD.')
                 self.edit_fgd(True)
             export_screen.step('EXP', 'fgd')
-
-            LOGGER.info('Writing dump of package translations...')
-            with open(self.abs_path('bin/bee2/pack_translation.bin'), 'wb') as trans_file:
-                pick = pickletools.optimize(pickle.dumps([
-                    (pack.id, {
-                        tok_id: str(tok)
-                        for tok_id, tok in pack.additional_tokens.items()
-                    })
-                    for pack in packset.packages.values()
-                    if pack.additional_tokens  # Skip empty packages, saving some space.
-                ], pickle.HIGHEST_PROTOCOL))
-                trans_file.write(pick)
 
             error_server_running = await terminate_error_server()
 
