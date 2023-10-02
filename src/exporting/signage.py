@@ -43,14 +43,15 @@ def serialise(sign: Signage, parent: Keyvalues, style: Style) -> Optional[SignSt
     return data
 
 
-@STEPS.add_step(prereq=[], results=[StepResource.VCONF_DATA])
+@STEPS.add_step(prereq=[], results=[StepResource.VCONF_DATA, StepResource.RES_DATA])
 async def export(exp_data: ExportData) -> None:
     """Export the selected signage to the config, and produce the legend."""
     # Timer value -> sign ID.
-    sel_ids: list[tuple[str, str]] = exp_data.selected[Signage]
-
-    # Special case, arrow is never selectable.
-    sel_ids.append(('arrow', 'SIGN_ARROW'))
+    sel_ids: list[tuple[str, str]] = [
+        *exp_data.selected[Signage],
+        # Special case, arrow is never selectable, but must always be exported.
+        ('arrow', 'SIGN_ARROW'),
+    ]
 
     sel_icons: dict[int, ImgHandle] = {}
 

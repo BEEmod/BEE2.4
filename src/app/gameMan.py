@@ -751,13 +751,7 @@ class Game:
             resource_gen.make_cube_colourizer_legend(packset, Path(self.abs_path('bee2')))
             export_screen.step('EXP', 'fizzler_sides')
 
-            # Write generated resources, after the regular ones have been copied.
-            for filename, data in resources.items():
-                LOGGER.info('Writing {}...', filename)
-                loc = Path(self.abs_path(filename))
-                loc.parent.mkdir(parents=True, exist_ok=True)
-                with loc.open('wb') as f1:
-                    f1.write(data)
+
 
             self.exported_style = style.id
             save()

@@ -28,6 +28,11 @@ class StepResource(Enum):
     VCONF_DATA = auto()  # Anything affecting the file.
     VCONF_FILE = auto()  # The file itself being written.
 
+    # Resources in the bee2/ folder.
+    CACHE = auto()  # Copying all the actual resources.
+    RES_DATA = auto()  # Assigning to exp_data.resources
+    RES_FILES = auto()  # exp_data.resources have been copied.
+
     # Various things that need to be sequenced.
     STYLE = auto()  # Items must come after the style.
     BACKUP = auto()  # The original compiler executables and editoritems have been backed up.
