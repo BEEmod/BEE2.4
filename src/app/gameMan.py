@@ -751,8 +751,6 @@ class Game:
             resource_gen.make_cube_colourizer_legend(packset, Path(self.abs_path('bee2')))
             export_screen.step('EXP', 'fizzler_sides')
 
-
-
             self.exported_style = style.id
             save()
 
@@ -765,63 +763,6 @@ class Game:
             return True, vpk_success
         except loadScreen.Cancelled:
             return False, False
-
-    def clean_editor_models(self, items: Iterable[editoritems.Item]) -> None:
-        """The game is limited to having 1024 models loaded at once.
-
-        Editor models are always being loaded, so we need to keep the number
-        small. Go through editoritems, and disable (by renaming to .mdl_dis)
-        unused ones.
-        """
-        # If set, force them all to be present.
-        force_on = config.APP.get_cur_conf(GenOptions).force_all_editor_models
-
-        used_models = {
-            str(mdl.with_suffix('')).casefold()
-            for item in items
-            for subtype in item.subtypes
-            for mdl in subtype.models
-        }
-
-        mdl_count = 0
-
-        for mdl_folder in [
-            self.abs_path('bee2/models/props_map_editor/'),
-            self.abs_path('bee2_dev/models/props_map_editor/'),
-        ]:
-            if not os.path.exists(mdl_folder):
-                continue
-            for file in os.listdir(mdl_folder):
-                if not file.endswith(('.mdl', '.mdl_dis')):
-                    continue
-
-                mdl_count += 1
-
-                file_no_ext, ext = os.path.splitext(file)
-                if force_on or file_no_ext.casefold() in used_models:
-                    new_ext = '.mdl'
-                else:
-                    new_ext = '.mdl_dis'
-
-                if new_ext != ext:
-                    try:
-                        os.remove(os.path.join(mdl_folder, file_no_ext + new_ext))
-                    except FileNotFoundError:
-                        pass
-                    os.rename(
-                        os.path.join(mdl_folder, file_no_ext + ext),
-                        os.path.join(mdl_folder, file_no_ext + new_ext),
-                    )
-
-        if mdl_count != 0:
-            LOGGER.info(
-                '{}/{} ({:.0%}) editor models used.',
-                len(used_models),
-                mdl_count,
-                len(used_models) / mdl_count,
-            )
-        else:
-            LOGGER.warning('No custom editor models!')
 
     def generate_fizzler_sides(self, conf: Keyvalues) -> None:
         """Create the VMTs used for fizzler sides."""

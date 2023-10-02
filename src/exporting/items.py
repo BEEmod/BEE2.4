@@ -6,17 +6,19 @@ import re
 from typing import Mapping
 from pathlib import PurePosixPath as FSPath
 
-import srctools.logger
 from srctools import EmptyMapping, Keyvalues
+import srctools.logger
+import trio
 
 import config
 from app import lazy_conf
+from config.gen_opts import GenOptions
 from config.item_defaults import ItemDefault
 from editoritems import Item as EditorItem, InstCount
 from connections import INDICATOR_CHECK_ID
 from exporting import STEPS, StepResource
-from packages import ExportData, Item
-from packages.item import ItemConfig
+from packages import ExportData
+from packages.item import Item, ItemConfig
 
 
 # Finds names surrounded by %s
@@ -180,3 +182,60 @@ async def step_write_items(exp_data: ExportData) -> None:
                     except LookupError:
                         raise ValueError(
                             'No "inst" defined for timers in antline configuration!') from None
+
+
+@STEPS.add_step(prereq=[StepResource.EI_FILE, StepResource.CACHE], results=[])
+async def step_clean_editor_models(exp_data: ExportData) -> None:
+    """The game is limited to having 1024 models loaded at once.
+
+    Editor models are always being loaded, so we need to keep the number
+    small. Go through editoritems, and disable (by renaming to .mdl_dis)
+    unused ones.
+    """
+    # If set, force them all to be present.
+    force_on = config.APP.get_cur_conf(GenOptions).force_all_editor_models
+
+    used_models = {
+        str(mdl.with_suffix('')).casefold()
+        for item in exp_data.all_items
+        for subtype in item.subtypes
+        for mdl in subtype.models
+    }
+
+    mdl_count = 0
+
+    async def check_folder(folder: str) -> None:
+        """Check a folder."""
+        nonlocal mdl_count
+        mdl_folder = trio.Path(exp_data.game.abs_path(f'{folder}/models/props_map_editor/'),)
+
+        if not await mdl_folder.exists():
+            return
+        for file in await mdl_folder.iterdir():
+            ext = ''.join(file.suffixes)
+            if ext not in ('.mdl', '.mdl_dis'):
+                continue
+
+            mdl_count += 1
+
+            if force_on or file.stem in used_models:
+                new_ext = '.mdl'
+            else:
+                new_ext = '.mdl_dis'
+
+            if new_ext != ext:
+                await file.replace(file.with_suffix(new_ext))
+
+    async with trio.open_nursery() as nursery:
+        nursery.start_soon(check_folder, 'bee2')
+        nursery.start_soon(check_folder, 'bee2_dev')
+
+    if mdl_count != 0:
+        LOGGER.info(
+            '{}/{} ({:.0%}) editor models used.',
+            len(used_models),
+            mdl_count,
+            len(used_models) / mdl_count,
+        )
+    else:
+        LOGGER.warning('No custom editor models!')
