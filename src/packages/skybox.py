@@ -68,27 +68,3 @@ class Skybox(
 
     def __repr__(self) -> str:
         return f'<Skybox {self.id}>'
-
-    @staticmethod
-    async def export(exp_data: ExportData) -> None:
-        """Export the selected skybox."""
-        if exp_data.selected is None:
-            return  # No skybox..
-
-        try:
-            skybox = exp_data.packset.obj_by_id(Skybox, exp_data.selected)
-        except KeyError:
-            raise Exception(f"Selected skybox ({exp_data.selected}) doesn't exist?") from None
-
-        exp_data.vbsp_conf.set_key(('Options', 'Skybox'), skybox.material)
-
-        exp_data.vbsp_conf.extend(await skybox.config())
-
-        # Styles or other items shouldn't be able to set fog settings..
-        if 'fog' in exp_data.vbsp_conf:
-            del exp_data.vbsp_conf['fog']
-
-        fog_opts = skybox.fog_opts.copy()
-        fog_opts.name = 'Fog'
-
-        exp_data.vbsp_conf.append(fog_opts)
