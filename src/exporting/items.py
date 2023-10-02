@@ -118,7 +118,10 @@ def get_export_data(
     )
 
 
-@STEPS.add_step(prereq=[], results=[StepResource.EI_ITEMS, StepResource.EI_DATA, StepResource.VCONF_DATA])
+@STEPS.add_step(
+    prereq=[StepResource.STYLE],
+    results=[StepResource.EI_ITEMS, StepResource.EI_DATA, StepResource.VCONF_DATA],
+)
 async def step_write_items(exp_data: ExportData) -> None:
     """Export all items into the configs.
 
