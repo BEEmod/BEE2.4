@@ -592,8 +592,6 @@ class Game:
                 music_files = self.copy_mod_music()
                 self.refresh_cache(music_files)
 
-            resource_gen.make_cube_colourizer_legend(packset, Path(self.abs_path('bee2')))
-
             self.exported_style = style.id
             save()
 
