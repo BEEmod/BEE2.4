@@ -37,7 +37,7 @@ if TYPE_CHECKING:
     from app.gameMan import Game
 
 
-def should_backup_app(file: str) -> bool:
+async def is_original_executable(file: trio.Path) -> bool:
     """Check if the given application is Valve's, or ours.
 
     We do this by checking for the PyInstaller archive.
@@ -47,21 +47,21 @@ def should_backup_app(file: str) -> bool:
 
     # from PyInstaller.archive.readers import CArchiveReader
     try:
-        f = open(file, 'rb')
+        f = await file.open('rb')
     except FileNotFoundError:
         # We don't want to back up missing files.
         return False
 
     SIZE = 4096
 
-    with f:
-        f.seek(0, io.SEEK_END)
-        if f.tell() < SIZE:
+    async with f:
+        await f.seek(0, io.SEEK_END)
+        if await f.tell() < SIZE:
             return False  # Too small.
 
         # Read out the last 4096 bytes, and look for the sig in there.
-        f.seek(-SIZE, io.SEEK_END)
-        end_data = f.read(SIZE)
+        await f.seek(-SIZE, io.SEEK_END)
+        end_data = await f.read(SIZE)
         # We also look for BenVlodgi, to catch the BEE 1.06 precompiler.
         return b'BenVlodgi' not in end_data and b'MEI\014\013\012\013\016' not in end_data
 
@@ -128,16 +128,19 @@ async def backup(description: str, item_path: trio.Path, backup_path: trio.Path)
     else:
         # Always backup the non-_original file, it'd be newer.
         # But only if it's Valves - not our own.
-        should_backup = should_backup_app(str(item_path))  # TODO async
-        backup_is_good = should_backup_app(str(backup_path))
+        async with trio.open_nursery() as nursery:
+            should_backup_res = utils.Result(nursery, is_original_executable, item_path)
+            backup_is_good = utils.Result(nursery, is_original_executable, backup_path)
+
+        should_backup = should_backup_res()
         LOGGER.info(
             ': normal={}, backup={}',
             item_path.name,
             'Valve' if should_backup else 'BEE2',
-            'Valve' if backup_is_good else 'BEE2',
+            'Valve' if backup_is_good() else 'BEE2',
         )
 
-        if not should_backup and not backup_is_good:
+        if not should_backup and not backup_is_good():
             # It's a BEE2 application, we have a problem.
             # Both the real and backup are bad, we need to get a
             # new one.
