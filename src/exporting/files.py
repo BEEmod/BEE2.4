@@ -65,17 +65,3 @@ async def step_write_editoritems_db(exp: ExportData) -> None:
     pick = await trio.to_thread.run_sync(pickle.dumps, exp.all_items, pickle.HIGHEST_PROTOCOL)
     pick = await trio.to_thread.run_sync(pickletools.optimize, pick)
     await trio.Path(exp.game.abs_path('bin/bee2/editor.bin')).write_bytes(pick)
-
-
-@STEPS.add_step(prereq=[StepResource.RES_DATA, StepResource.CACHE], results=[StepResource.RES_FILES])
-async def step_write_resources(exp: ExportData) -> None:
-    """Write out ExportData.resources files."""
-    async def write_res(filename: str, data: bytes) -> None:
-        """Write a resource."""
-        loc = trio.Path(filename)
-        await loc.parent.mkdir(parents=True, exist_ok=True)
-        await loc.write_bytes(data)
-
-    async with trio.open_nursery() as nursery:
-        for filename, data in exp.resources.items():
-            nursery.start_soon(write_res, exp.game.abs_path(filename), data)

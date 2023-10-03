@@ -1,4 +1,6 @@
 """Generate fizzler side materials."""
+from pathlib import Path
+
 from srctools.math import FrozenVec, format_float
 import trio
 
@@ -41,8 +43,8 @@ MaterialModify
 
 
 @STEPS.add_step(
-    prereq=[StepResource.VCONF_DATA, StepResource.CACHE],
-    results=StepResource.RES_FILES,
+    prereq=[StepResource.VCONF_DATA],
+    results=[StepResource.RES_SPECIAL],
 )
 async def generate_fizzler_sides(exp_data: ExportData) -> None:
     """Create the VMTs used for fizzler sides."""
@@ -64,8 +66,10 @@ async def generate_fizzler_sides(exp_data: ExportData) -> None:
         r = round(color.x * 255)
         g = round(color.y * 255)
         b = round(color.z * 255)
+        dest = mat_path / f'side_color_{r:02X}{g:02X}{b:02X}.vmt'
+        exp_data.resources.add(Path(dest))
 
-        async with await (mat_path / f'side_color_{r:02X}{g:02X}{b:02X}.vmt').open('w') as f:
+        async with await dest.open('w') as f:
             await f.write(FIZZLER_EDGE_MAT.format(color, vortex_color))
             if alpha != 1:
                 # Add the alpha value, but replace 0.5 -> .5 to save a char.

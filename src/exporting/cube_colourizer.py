@@ -9,6 +9,7 @@ import colorsys
 from srctools.vtf import VTF, ImageFormats
 import srctools.logger
 
+from exporting import STEPS, StepResource
 from packages import ExportData
 from packages.widgets import ConfigGroup, parse_color
 from app import img
@@ -24,6 +25,7 @@ CELL_SIZE = 96
 LEGEND_SIZE = 512
 
 
+@STEPS.add_step(prereq=[], results=[StepResource.RES_SPECIAL])
 def make_cube_colourizer_legend(exp_data: ExportData) -> None:
     """Create a cube colourizer legend, showing the colours."""
     # Find the colourizer group, and grab its values. If not currently present,
@@ -93,6 +95,7 @@ def make_cube_colourizer_legend(exp_data: ExportData) -> None:
     vtf_loc = Path(exp_data.game.abs_path(
         'bee2/materials/BEE2/models/props_map_editor/cube_coloriser_legend.vtf'
     ))
+    exp_data.resources.add(vtf_loc)
     vtf_loc.parent.mkdir(parents=True, exist_ok=True)
     with vtf_loc.open('wb') as f:
         LOGGER.info('Exporting "{}"...', f.name)

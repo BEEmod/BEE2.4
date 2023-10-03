@@ -208,10 +208,10 @@ class ExportData:
     renderables: dict[RenderableType, Renderable] = attrs.Factory(dict)
     # vbsp_config.cfg file.
     vbsp_conf: Keyvalues = attrs.Factory(Keyvalues.root)
-    # As objects export, they may fill this to include additional resources
-    # to be written to the game folder. This way it can be deferred until
-    # after regular resources are copied.
-    resources: dict[str, bytes] = attrs.Factory(dict)
+    # As steps export, they may fill this to include additional resources that
+    # are written to the game folder. If updating the cache, these files won't
+    # be deleted. This should be an absolute path.
+    resources: set[Path] = attrs.Factory(set)
 
 
 @attrs.define

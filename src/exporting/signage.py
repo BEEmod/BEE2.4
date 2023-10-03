@@ -1,6 +1,7 @@
 """Export signage configuration, and write the legend."""
 
 from io import BytesIO
+from pathlib import Path
 from typing import Final, Optional
 
 import trio.to_thread
@@ -43,7 +44,7 @@ def serialise(sign: Signage, parent: Keyvalues, style: Style) -> Optional[SignSt
     return data
 
 
-@STEPS.add_step(prereq=[], results=[StepResource.VCONF_DATA, StepResource.RES_DATA])
+@STEPS.add_step(prereq=[], results=[StepResource.VCONF_DATA, StepResource.RES_SPECIAL])
 async def step_signage(exp_data: ExportData) -> None:
     """Export the selected signage to the config, and produce the legend."""
     # Timer value -> sign ID.
@@ -92,17 +93,21 @@ async def step_signage(exp_data: ExportData) -> None:
             sel_icons[int(tim_id)] = sty_sign.icon
 
     exp_data.vbsp_conf.append(conf)
-    exp_data.resources[SIGN_LOC] = await trio.to_thread.run_sync(
-        build_texture,
-        exp_data.packset, exp_data.selected_style, sel_icons,
+    sign_path = Path(exp_data.game.abs_path(SIGN_LOC))
+
+    exp_data.resources.add(sign_path)
+    await trio.to_thread.run_sync(
+        make_legend,
+        sign_path, exp_data.packset, exp_data.selected_style, sel_icons,
     )
 
 
-def build_texture(
+def make_legend(
+    sign_path: Path,
     packset: PackagesSet,
     sel_style: Style,
     icons: dict[int, ImgHandle],
-) -> bytes:
+) -> None:
     """Construct the legend texture for the signage."""
     legend = Image.new('RGBA', LEGEND_SIZE, (0, 0, 0, 0))
 
@@ -146,15 +151,15 @@ def build_texture(
     vtf.clear_mipmaps()
     vtf.flags |= VTFFlags.ANISOTROPIC
 
-    buf = BytesIO()
-    try:
-        vtf.save(buf)
-    except NotImplementedError:
-        LOGGER.warning('No DXT compressor, using BGRA8888.')
-        # No libsquish, so DXT compression doesn't work.
-        vtf.format = vtf.low_format = ImageFormats.BGRA4444
+    sign_path.parent.mkdir(parents=True, exist_ok=True)
+    with sign_path.open('rb') as f:
+        try:
+            vtf.save(f)
+        except NotImplementedError:
+            LOGGER.warning('No DXT compressor, using BGRA8888.')
+            # No libsquish, so DXT compression doesn't work.
+            vtf.format = vtf.low_format = ImageFormats.BGRA4444
 
-        buf = BytesIO()
-        vtf.save(buf)
-
-    return buf.getvalue()
+            f.truncate(0)
+            f.seek(0)
+            vtf.save(f)

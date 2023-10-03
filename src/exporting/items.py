@@ -187,7 +187,7 @@ async def step_write_items(exp_data: ExportData) -> None:
                             'No "inst" defined for timers in antline configuration!') from None
 
 
-@STEPS.add_step(prereq=[StepResource.EI_FILE, StepResource.CACHE], results=[])
+@STEPS.add_step(prereq=[StepResource.EI_FILE, StepResource.RES_SPECIAL, StepResource.RES_PACKAGE], results=[])
 async def step_clean_editor_models(exp_data: ExportData) -> None:
     """The game is limited to having 1024 models loaded at once.
 
