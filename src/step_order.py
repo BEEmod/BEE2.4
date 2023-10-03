@@ -40,7 +40,12 @@ class Step(Generic[CtxT, ResourceT]):
 
 
 class StepOrder(Generic[CtxT, ResourceT]):
-    """Orders a series of steps."""
+    """Orders a series of steps.
+
+    The CtxT parameter is passed to all the steps, allowing them to exchange data between themselves.
+    ResourceT should be an enum type, and represents the kinds of dependencies between steps. A
+    resource is 'produced' once all steps with that as a result have completed.
+    """
     _steps: List[Step[CtxT, ResourceT]]
     _resources: Collection[ResourceT]
     _locked: bool
@@ -56,7 +61,11 @@ class StepOrder(Generic[CtxT, ResourceT]):
         prereq: Collection[ResourceT],
         results: Collection[ResourceT],
     ) -> Callable[[Func[CtxT]], Func[CtxT]]:
-        """Add a step."""
+        """Add a step.
+
+        For each step to run, all prerequisite resources must have been produced. Once it has run,
+        it contributes to producing all the specified resources.
+        """
         if self._locked:
             raise RuntimeError("Cannot add steps after running has started.")
 
