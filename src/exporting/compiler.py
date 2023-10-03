@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import TYPE_CHECKING
 import io
 import json
@@ -13,6 +14,7 @@ import srctools.logger
 import trio
 
 import user_errors
+import utils
 from app.errors import AppError
 from exporting import STEPS, StepResource
 from packages import ExportData
@@ -114,9 +116,7 @@ async def restore_backup(game: Game) -> None:
 @STEPS.add_step(prereq=[], results=[StepResource.ERROR_SERVER_TERMINATE])
 async def step_terminate_error(exp_data: ExportData) -> None:
     """The error server must be terminated before copying the compiler."""
-    maybe_running = await terminate_error_server()
-    if maybe_running:
-        pass   # TODO: Add warning message here.
+    exp_data.maybe_error_server_running = await terminate_error_server()
 
 
 async def backup(description: str, item_path: trio.Path, backup_path: trio.Path) -> None:
@@ -155,12 +155,8 @@ async def backup(description: str, item_path: trio.Path, backup_path: trio.Path)
                 "You will need to verify the game's cache in Steam to get these files back. "
                 "You can then export again."
             ).format(file=item_path.name))
-
-            # if tk_tools.askokcancel(
-            #     title=TransToken.ui('BEE2 - Export Failed!'),
-            #     message=
-            # ):
-            #     webbrowser.open('steam://validate/' + str(self.steamID))
+            # TODO: Trigger the messagebox for automatically validating.
+            #       webbrowser.open('steam://validate/' + str(self.steamID))
 
     if should_backup:
         LOGGER.info('Backing up original {}!', item_path.name)
@@ -177,3 +173,49 @@ async def step_do_backup(exp_data: ExportData) -> None:
                 trio.Path(exp_data.game.abs_path(path + ext)),
                 trio.Path(exp_data.game.abs_path(f'{path}_original{ext}')),
             )
+
+
+@STEPS.add_step(prereq=[StepResource.BACKUP, StepResource.ERROR_SERVER_TERMINATE], results=[])
+async def step_copy_compiler(exp_data: ExportData) -> None:
+    """Copy the custom compiler tools."""
+    LOGGER.info('Copying Custom Compiler!')
+    compiler_src = utils.install_path('compiler')
+    comp_dest = 'bin/linux32' if utils.LINUX else 'bin'
+    game = exp_data.game
+
+    def perform_copy(src: Path, dest: Path) -> None:
+        """Copy a file."""
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            if dest.exists():
+                # First try and give ourselves write-permission,
+                # if it's set read-only.
+                utils.unset_readonly(dest)
+            shutil.copy(comp_file, dest)
+        except PermissionError as exc:
+            # We might not have permissions, if the compiler is currently
+            # running.
+            if exp_data.maybe_error_server_running:
+                # Use a different error if this might be running.
+                msg = TransToken.ui(
+                    'Copying compiler file {file} failed. '
+                    'Ensure {game} is not running. The webserver for the error display '
+                    'may also be running, quit the vrad process or wait a few minutes.'
+                )
+            else:
+                msg = TransToken.ui(
+                    'Copying compiler file {file} failed. '
+                    'Ensure {game} is not running.'
+                )
+
+            raise AppError(msg.format(file=dest, game=exp_data.game.name)) from exc
+
+    async with trio.open_nursery() as nursery:
+        for comp_file in compiler_src.rglob('*'):
+            # Ignore folders.
+            if comp_file.is_dir():
+                continue
+
+            dest = Path(game.abs_path(comp_dest / comp_file.relative_to(compiler_src)))
+            LOGGER.info('\t* {} -> {}', comp_file, dest)
+            nursery.start_soon(trio.to_thread.run_sync, perform_copy, comp_file, dest)

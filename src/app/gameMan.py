@@ -462,51 +462,6 @@ class Game:
 
             error_server_running = await terminate_error_server()
 
-            if num_compiler_files > 0:
-                LOGGER.info('Copying Custom Compiler!')
-                compiler_src = utils.install_path('compiler')
-                comp_dest = 'bin/linux32' if utils.LINUX else 'bin'
-                for comp_file in compiler_src.rglob('*'):
-                    # Ignore folders.
-                    if comp_file.is_dir():
-                        continue
-
-                    dest = self.abs_path(comp_dest / comp_file.relative_to(compiler_src))
-
-                    LOGGER.info('\t* {} -> {}', comp_file, dest)
-
-                    folder = Path(dest).parent
-                    if not folder.exists():
-                        folder.mkdir(parents=True, exist_ok=True)
-
-                    try:
-                        if os.path.isfile(dest):
-                            # First try and give ourselves write-permission,
-                            # if it's set read-only.
-                            utils.unset_readonly(dest)
-                        shutil.copy(comp_file, dest)
-                    except PermissionError:
-                        # We might not have permissions, if the compiler is currently
-                        # running.
-                        if error_server_running:
-                            # Use a different error if this might be running.
-                            msg = TransToken.ui(
-                                'Copying compiler file {file} failed. '
-                                'Ensure {game} is not running. The webserver for the error display '
-                                'may also be running, quit the vrad process or wait a few minutes.'
-                            )
-                        else:
-                            msg = TransToken.ui(
-                                'Copying compiler file {file} failed. '
-                                'Ensure {game} is not running.'
-                            )
-                        export_screen.reset()
-                        tk_tools.showerror(
-                            title=TransToken.ui('BEE2 - Export Failed!'),
-                            message=msg.format(file=comp_file, game=self.name),
-                        )
-                        return False, vpk_success
-                    export_screen.step('COMP', str(comp_file))
 
             if should_refresh:
                 LOGGER.info('Copying Resources!')

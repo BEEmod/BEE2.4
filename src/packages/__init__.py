@@ -212,6 +212,8 @@ class ExportData:
     # are written to the game folder. If updating the cache, these files won't
     # be deleted. This should be an absolute path.
     resources: set[Path] = attrs.Factory(set)
+    # Flag set to indicate that the error server may be running.
+    maybe_error_server_running: bool = True
 
 
 @attrs.define
