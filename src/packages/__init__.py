@@ -418,9 +418,19 @@ class PackagesSet:
     # Internal, indicates if all parse() calls were complete (but maybe not post_parse).
     _parsed: set[Type[PakObject]] = attrs.field(init=False, factory=set)
 
-    # Whether these music files have been detected.
-    has_mel_music: bool = False
-    has_tag_music: bool = False
+    # If found, the folders where the music is present.
+    mel_music_fsys: FileSystem | None = None
+    tag_music_fsys: FileSystem | None = None
+
+    @property
+    def has_mel_music(self) -> bool:
+        """Have we found Portal Stories:Mel?"""
+        return self.mel_music_fsys is not None
+
+    @property
+    def has_tag_music(self) -> bool:
+        """Have we found Aperture Tag?"""
+        return self.tag_music_fsys is not None
 
     def ready(self, cls: Type[PakObject]) -> trio.Event:
         """Return a Trio Event which is set when a specific object type is fully parsed."""

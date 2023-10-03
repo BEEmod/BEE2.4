@@ -7,7 +7,7 @@ Does stuff related to the actual games.
 """
 from __future__ import annotations
 
-from typing import NoReturn, Optional, Union, Any, Type, IO, Iterable, Iterator
+from typing import NoReturn, Optional, Union, Any, Type, IO, Iterator
 from pathlib import Path
 
 from tkinter import *  # ui library
@@ -19,12 +19,7 @@ import re
 import shutil
 import webbrowser
 
-from srctools import (
-    Vec, VPK,
-    Keyvalues, AtomicWriter,
-    VMF, Output,
-    FileSystem, FileSystemChain,
-)
+from srctools import Vec, VPK, Keyvalues, AtomicWriter, VMF, Output
 import srctools.logger
 import srctools.fgd
 import attrs
@@ -89,75 +84,6 @@ MUSIC_MEL_VPK: Optional[VPK] = None
 MUSIC_TAG_LOC: Optional[str] = None
 TAG_COOP_INST_VMF: Optional[VMF] = None
 
-# The folder with the file...
-MUSIC_MEL_DIR = 'Portal Stories Mel/portal_stories/pak01_dir.vpk'
-MUSIC_TAG_DIR = 'aperture tag/aperturetag/sound/music'
-
-# Location of coop instance for Tag gun
-TAG_GUN_COOP_INST = ('aperture tag/sdk_content/maps/'
-                     'instances/alatag/lp_paintgun_instance_coop.vmf')
-
-# All the PS:Mel track names - all the resources are in the VPK,
-# this allows us to skip looking through all the other files..
-MEL_MUSIC_NAMES = """\
-portal2_background01.wav
-sp_a1_garden.wav
-sp_a1_lift.wav
-sp_a1_mel_intro.wav
-sp_a1_tramride.wav
-sp_a2_dont_meet_virgil.wav
-sp_a2_firestorm_exploration.wav
-sp_a2_firestorm_explosion.wav
-sp_a2_firestorm_openvault.wav
-sp_a2_garden_destroyed_01.wav
-sp_a2_garden_destroyed_02.wav
-sp_a2_garden_destroyed_portalgun.wav
-sp_a2_garden_destroyed_vault.wav
-sp_a2_once_upon.wav
-sp_a2_past_power_01.wav
-sp_a2_past_power_02.wav
-sp_a2_underbounce.wav
-sp_a3_concepts.wav
-sp_a3_concepts_funnel.wav
-sp_a3_faith_plate.wav
-sp_a3_faith_plate_funnel.wav
-sp_a3_junkyard.wav
-sp_a3_junkyard_offices.wav
-sp_a3_paint_fling.wav
-sp_a3_paint_fling_funnel.wav
-sp_a3_transition.wav
-sp_a3_transition_funnel.wav
-sp_a4_destroyed.wav
-sp_a4_destroyed_funnel.wav
-sp_a4_factory.wav
-sp_a4_factory_radio.wav
-sp_a4_overgrown.wav
-sp_a4_overgrown_funnel.wav
-sp_a4_tb_over_goo.wav
-sp_a4_tb_over_goo_funnel.wav
-sp_a4_two_of_a_kind.wav
-sp_a4_two_of_a_kind_funnel.wav
-sp_a5_finale01_01.wav
-sp_a5_finale01_02.wav
-sp_a5_finale01_03.wav
-sp_a5_finale01_funnel.wav
-sp_a5_finale02_aegis_revealed.wav
-sp_a5_finale02_lastserver.wav
-sp_a5_finale02_room01.wav
-sp_a5_finale02_room02.wav
-sp_a5_finale02_room02_serious.wav
-sp_a5_finale02_stage_00.wav
-sp_a5_finale02_stage_01.wav
-sp_a5_finale02_stage_02.wav
-sp_a5_finale02_stage_end.wav\
-""".split()
-# Not used...
-# sp_a1_garden_jukebox01.wav
-# sp_a1_jazz.wav
-# sp_a1_jazz_enterstation.wav
-# sp_a1_jazz_tramride.wav
-# still_alive_gutair_cover.wav
-# want_you_gone_guitar_cover.wav
 
 
 def quit_application() -> NoReturn:
@@ -590,11 +516,6 @@ class Game:
             self.exported_style = style.id
             save()
 
-            if self.steamID == utils.STEAM_IDS['APERTURE TAG']:
-                os.makedirs(self.abs_path('sdk_content/maps/instances/bee2/'), exist_ok=True)
-                with open(self.abs_path('sdk_content/maps/instances/bee2/tag_coop_gun.vmf'), 'w') as f2:
-                    TAG_COOP_INST_VMF.export(f2)
-
             export_screen.reset()  # Hide loading screen, we're done
             return True, vpk_success
         except loadScreen.Cancelled:
@@ -603,60 +524,6 @@ class Game:
     def launch(self) -> None:
         """Try and launch the game."""
         webbrowser.open('steam://rungameid/' + str(self.steamID))
-
-    def copy_mod_music(self) -> set[str]:
-        """Copy music files from Tag and PS:Mel.
-
-        This returns a list of all the paths it copied to.
-        """
-        tag_dest = self.abs_path('bee2/sound/music/')
-        # Mel's music has similar names to P2's, so put it in a subdir
-        # to avoid confusion.
-        mel_dest = self.abs_path('bee2/sound/music/mel/')
-        # Obviously Tag has its music already...
-        copy_tag = (
-            self.steamID != utils.STEAM_IDS['APERTURE TAG'] and
-            MUSIC_TAG_LOC is not None
-        )
-
-        copied_files = set()
-
-        file_count = 0
-        if copy_tag:
-            file_count += len(os.listdir(MUSIC_TAG_LOC))
-        if MUSIC_MEL_VPK is not None:
-            file_count += len(MEL_MUSIC_NAMES)
-
-        export_screen.set_length('MUS', file_count)
-
-        # We know that it's very unlikely Tag or Mel's going to update
-        # the music files. So we can check to see if they already exist,
-        # and if so skip copying - that'll speed up any exports after the
-        # first.
-        # We'll still go through the list though, just in case one was
-        # deleted.
-
-        if copy_tag:
-            os.makedirs(tag_dest, exist_ok=True)
-            for filename in os.listdir(MUSIC_TAG_LOC):
-                src_loc = os.path.join(MUSIC_TAG_LOC, filename)
-                dest_loc = os.path.join(tag_dest, filename)
-                if os.path.isfile(src_loc) and not os.path.exists(dest_loc):
-                    shutil.copy(src_loc, dest_loc)
-                copied_files.add(dest_loc.casefold())
-                export_screen.step('MUS')
-
-        if MUSIC_MEL_VPK is not None:
-            os.makedirs(mel_dest, exist_ok=True)
-            for filename in MEL_MUSIC_NAMES:
-                dest_loc = os.path.join(mel_dest, filename)
-                if not os.path.exists(dest_loc):
-                    with open(dest_loc, 'wb') as dest:
-                        dest.write(MUSIC_MEL_VPK['sound/music', filename].read())
-                copied_files.add(dest_loc.casefold())
-                export_screen.step('MUS')
-
-        return copied_files
 
     def get_game_lang(self) -> str:
         """Load the app manifest file to determine Portal 2's language."""
@@ -712,108 +579,6 @@ def find_steam_info(game_dir: str) -> tuple[str | None, str | None]:
     return game_id, name
 
 
-def scan_music_locs() -> None:
-    """Try and determine the location of Aperture Tag and PS:Mel.
-
-    If successful we can export the music to games.
-    """
-    global MUSIC_TAG_LOC, MUSIC_MEL_VPK
-    found_tag = False
-    steamapp_locs = set()
-    for gm in all_games:
-        steamapp_locs.add(os.path.normpath(gm.abs_path('../')))
-
-    for loc in steamapp_locs:
-        tag_loc = os.path.join(loc, MUSIC_TAG_DIR)
-        mel_loc = os.path.join(loc, MUSIC_MEL_DIR)
-        if os.path.exists(tag_loc) and not found_tag:
-            found_tag = True
-            try:
-                make_tag_coop_inst(loc)
-            except FileNotFoundError:
-                tk_tools.showerror(
-                    TransToken.ui('BEE2 - Aperture Tag Files Missing'),
-                    TransToken.ui(
-                        'Ap-Tag Coop gun instance not found!\n'
-                        'Coop guns will not work - verify cache to fix.'
-                    ),
-                )
-                MUSIC_TAG_LOC = None
-            else:
-                MUSIC_TAG_LOC = tag_loc
-                LOGGER.info('Ap-Tag dir: {}', tag_loc)
-
-        if os.path.exists(mel_loc) and MUSIC_MEL_VPK is None:
-            MUSIC_MEL_VPK = VPK(mel_loc)
-            LOGGER.info('PS-Mel dir: {}', mel_loc)
-
-        if MUSIC_MEL_VPK is not None and found_tag:
-            break
-
-
-def make_tag_coop_inst(tag_loc: str) -> None:
-    """Make the coop version of the tag instances.
-
-    This needs to be shrunk, so all the logic entities are not spread
-    out so much (coop tubes are small).
-
-    This way we avoid distributing the logic.
-    """
-    global TAG_COOP_INST_VMF
-    TAG_COOP_INST_VMF = vmf = VMF.parse(
-        os.path.join(tag_loc, TAG_GUN_COOP_INST)
-    )
-
-    ent_count = len(vmf.entities)
-
-    def logic_pos() -> Iterator[Vec]:
-        """Put the entities in a nice circle..."""
-        while True:
-            ang: float
-            for ang in range(0, ent_count):
-                ang *= 360/ent_count
-                yield Vec(16*math.sin(ang), 16*math.cos(ang), 32)
-    pos = logic_pos()
-    # Move all entities that don't care about position to the base of the player
-    for ent in vmf.entities:
-        if ent['classname'] == 'info_coop_spawn':
-            # Remove the original spawn point from the instance.
-            # That way it can overlay over other dropper instances.
-            ent.remove()
-        elif ent['classname'] in ('info_target', 'info_paint_sprayer'):
-            pass
-        else:
-            ent['origin'] = next(pos)
-
-            # These originally use the coop spawn point, but this doesn't
-            # always work. Switch to the name of the player, which is much
-            # more reliable.
-            if ent['classname'] == 'logic_measure_movement':
-                ent['measuretarget'] = '!player_blue'
-
-    # Add in a trigger to start the gel gun, and reset the activated
-    # gel whenever the player spawns.
-    trig_brush = vmf.make_prism(
-        Vec(-32, -32, 0),
-        Vec(32, 32, 16),
-        mat='tools/toolstrigger',
-    ).solid
-    start_trig = vmf.create_ent(
-        classname='trigger_playerteam',
-        target_team=3,  # ATLAS
-        spawnflags=1,  # Clients only
-        origin='0 0 8',
-    )
-    start_trig.solids = [trig_brush]
-    start_trig.add_out(
-        # This uses the !activator as the target player so it must be via trigger.
-        Output('OnStartTouchBluePlayer', '@gel_ui', 'Activate', delay=0, only_once=True),
-        # Reset the gun to fire nothing.
-        Output('OnStartTouchBluePlayer', '@blueisenabled', 'SetValue', 0, delay=0.1),
-        Output('OnStartTouchBluePlayer', '@orangeisenabled', 'SetValue', 0, delay=0.1),
-    )
-
-
 def app_in_game_error() -> None:
     """Display a message warning about the issues with placing the BEE folder directly in P2."""
     tk_tools.showerror(
@@ -823,7 +588,6 @@ def app_in_game_error() -> None:
             "Move the application folder elsewhere, then re-run."
         ),
     )
-    return None
 
 
 def save() -> None:

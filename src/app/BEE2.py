@@ -11,6 +11,7 @@ from app import (
     TK_ROOT, localisation, sound, img, gameMan, music_conf,
     UI, logWindow,
 )
+from exporting import mod_support
 from ui_tk.errors import display_errors
 from config.gen_opts import GenOptions
 from config.last_sel import LastSelected
@@ -51,12 +52,10 @@ async def init_app() -> None:
         pass
     else:
         gameMan.set_game_by_name(last_game.id)
-    gameMan.scan_music_locs()
 
     LOGGER.info('Loading Packages...')
     packset = packages.get_loaded_packages()
-    packset.has_mel_music = gameMan.MUSIC_MEL_VPK is not None
-    packset.has_tag_music = gameMan.MUSIC_TAG_LOC is not None
+    mod_support.scan_music_locs(packset, gameMan.all_games)
     async with trio.open_nursery() as nurs:
         nurs.start_soon(
             packages.load_packages,
