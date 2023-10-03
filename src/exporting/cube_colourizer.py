@@ -9,8 +9,7 @@ import colorsys
 from srctools.vtf import VTF, ImageFormats
 import srctools.logger
 
-from exporting import STEPS, StepResource
-from packages import ExportData
+from . import ExportData, STEPS, StepResource
 from packages.widgets import ConfigGroup, parse_color
 from app import img
 

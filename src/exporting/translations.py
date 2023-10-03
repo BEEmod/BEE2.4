@@ -4,9 +4,8 @@ import pickletools
 
 import trio.to_thread
 
+from . import ExportData, STEPS, StepResource
 import packages
-from exporting import STEPS, StepResource
-from packages import ExportData
 import transtoken
 
 

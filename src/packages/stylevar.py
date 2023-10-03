@@ -2,9 +2,7 @@
 from __future__ import annotations
 from typing import Iterator
 
-from srctools import Keyvalues, bool_as_int
-
-from packages import ExportData, PakObject, ParseData, Style
+from packages import PakObject, ParseData, Style
 from transtoken import TransToken, TransTokenSource
 
 

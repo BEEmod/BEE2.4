@@ -16,8 +16,7 @@ from config.gen_opts import GenOptions
 from config.item_defaults import ItemDefault
 from editoritems import Item as EditorItem, InstCount
 from connections import INDICATOR_CHECK_ID
-from exporting import STEPS, StepResource
-from packages import ExportData
+from . import ExportData, STEPS, StepResource
 from packages.item import Item, ItemConfig
 
 

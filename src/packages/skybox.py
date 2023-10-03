@@ -4,10 +4,7 @@ from typing_extensions import Self
 from srctools import Keyvalues
 
 from transtoken import TransTokenSource
-from packages import (
-    PakObject, ExportData, ParseData, SelitemData,
-    get_config
-)
+from packages import PakObject, ParseData, SelitemData, get_config
 from app import lazy_conf
 
 

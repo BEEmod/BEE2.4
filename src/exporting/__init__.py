@@ -3,13 +3,18 @@ from __future__ import annotations
 
 import os
 from enum import Enum, auto
+from pathlib import Path
 from typing import Any, TYPE_CHECKING, Tuple, Type
 
+import attrs
 import srctools.logger
+from srctools import Keyvalues
 
 import loadScreen
 import packages
 from app.errors import ErrorUI
+from editoritems import Item as EditorItem, Renderable, RenderableType
+from packages import PackagesSet, PakObject, Style
 from step_order import StepOrder
 from transtoken import TransToken
 
@@ -60,7 +65,31 @@ load_screen = loadScreen.LoadScreen(
     title_text=TransToken.ui('Exporting'),
 )
 
-STEPS = StepOrder(packages.ExportData, StepResource)
+
+@attrs.define(kw_only=True)
+class ExportData:
+    """The arguments to pak_object.export()."""
+    packset: PackagesSet  # The entire loaded packages set.
+    game: Game  # The current game.
+    # Usually str, but some items pass other things.
+    selected: dict[Type[PakObject], Any]
+    # Some items need to know which style is selected
+    selected_style: Style
+    # All the items in the map
+    all_items: list[EditorItem] = attrs.Factory(list)
+    # The error/connection icons
+    renderables: dict[RenderableType, Renderable] = attrs.Factory(dict)
+    # vbsp_config.cfg file.
+    vbsp_conf: Keyvalues = attrs.Factory(Keyvalues.root)
+    # As steps export, they may fill this to include additional resources that
+    # are written to the game folder. If updating the cache, these files won't
+    # be deleted. This should be an absolute path.
+    resources: set[Path] = attrs.Factory(set)
+    # Flag set to indicate that the error server may be running.
+    maybe_error_server_running: bool = True
+
+
+STEPS = StepOrder(ExportData, StepResource)
 
 
 async def export(
@@ -97,7 +126,7 @@ async def export(
         # Make the folders we need to copy files to, if desired.
         os.makedirs(game.abs_path('bin/bee2/'), exist_ok=True)
 
-        exp_data = packages.ExportData(
+        exp_data = ExportData(
             game=game,
             selected=selected_objects,
             packset=packset,
@@ -114,7 +143,7 @@ async def export(
     StepResource.EI_DATA,
     StepResource.VCONF_DATA,
 ])
-async def step_style(exp: packages.ExportData) -> None:
+async def step_style(exp: ExportData) -> None:
     """The first thing that's added is the style data."""
     style = exp.selected_style
     exp.vbsp_conf.extend(await style.config())
@@ -124,7 +153,7 @@ async def step_style(exp: packages.ExportData) -> None:
 
 
 @STEPS.add_step(prereq=[], results=[StepResource.VCONF_DATA])
-async def step_add_core_info(exp: packages.ExportData) -> None:
+async def step_add_core_info(exp: ExportData) -> None:
     """Add some core options to the config."""
     from app import DEV_MODE  # TODO: Pass into export(), maybe?
     exp.vbsp_conf.set_key(('Options', 'Game_ID'), exp.game.steamID)

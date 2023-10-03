@@ -4,8 +4,7 @@ from pathlib import Path
 from srctools.math import FrozenVec, format_float
 import trio
 
-from exporting import STEPS, StepResource
-from packages import ExportData
+from . import ExportData, STEPS, StepResource
 
 
 # Material file used for fizzler sides.

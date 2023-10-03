@@ -5,8 +5,8 @@ import srctools
 from srctools import Keyvalues
 
 import editoritems
-from exporting import STEPS, StepResource
-from packages import ExportData, StyleVar
+from . import ExportData, STEPS, StepResource
+from packages import StyleVar
 
 
 _UNLOCK_ITEMS = [

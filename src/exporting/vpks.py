@@ -9,9 +9,9 @@ from typing import Dict, Iterator, Optional, TYPE_CHECKING
 import trio
 from srctools import VPK, logger
 
+from . import ExportData, STEPS, StepResource
+from packages import NoVPKExport, StyleVPK
 import utils
-from exporting import STEPS, StepResource
-from packages import NoVPKExport, StyleVPK, ExportData
 
 
 LOGGER = logger.get_logger(__name__)

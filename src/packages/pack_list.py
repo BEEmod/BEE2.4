@@ -1,9 +1,8 @@
 from typing import List
 
-from srctools import Keyvalues
 import srctools.logger
 
-from packages import ExportData, PakObject, ParseData
+from packages import PakObject, ParseData
 
 
 LOGGER = srctools.logger.get_logger(__name__)

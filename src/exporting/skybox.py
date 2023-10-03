@@ -1,8 +1,8 @@
 """Export the selected skybox/fog configuration."""
 from typing import Optional
 
-from exporting import STEPS, StepResource
-from packages import ExportData, Skybox
+from . import ExportData, STEPS, StepResource
+from packages import Skybox
 
 
 @STEPS.add_step(prereq=[], results=[StepResource.VCONF_DATA])

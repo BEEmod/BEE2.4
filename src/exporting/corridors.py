@@ -14,10 +14,9 @@ from corridor import (
     CORRIDOR_COUNTS, ID_TO_CORR,
     ExportedConf,
 )
-from exporting import STEPS, StepResource
+from . import ExportData, STEPS, StepResource
 from packages.corridor import CorridorUI, CorridorGroup
 import config
-import packages
 import editoritems
 
 
@@ -25,7 +24,7 @@ LOGGER = srctools.logger.get_logger(__name__)
 
 
 @STEPS.add_step(prereq=[StepResource.EI_ITEMS], results=[StepResource.EI_DATA, StepResource.VCONF_DATA])
-async def step_corridor_conf(exp_data: packages.ExportData) -> None:
+async def step_corridor_conf(exp_data: ExportData) -> None:
     """Override editoritems with the new corridor specifier."""
     style_id = exp_data.selected_style.id
     try:

@@ -10,8 +10,8 @@ from srctools import Keyvalues, Output, VMF, Vec
 from srctools.filesys import File, RawFileSystem, VPKFileSystem
 
 import utils
-from exporting import STEPS, StepResource
-from packages import ExportData, PackagesSet
+from . import ExportData, STEPS, StepResource
+from packages import PackagesSet
 
 if TYPE_CHECKING:
     from app.gameMan import Game

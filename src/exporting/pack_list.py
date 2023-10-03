@@ -1,12 +1,9 @@
 """Export the deprecated packlist system."""
-from typing import Dict, Optional
-
-import srctools
 import trio
 from srctools import Keyvalues
 
-from exporting import STEPS, StepResource
-from packages import ExportData, PackList
+from exporting import ExportData, STEPS
+from packages import PackList
 
 
 @STEPS.add_step(prereq=[], results=[])

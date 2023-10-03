@@ -5,9 +5,8 @@ import pickletools
 import trio
 from srctools import AtomicWriter, Keyvalues
 
+from . import ExportData, STEPS, StepResource
 import editoritems
-from exporting import STEPS, StepResource
-from packages import ExportData
 
 
 @STEPS.add_step(prereq=[StepResource.VCONF_DATA], results=[StepResource.VCONF_FILE])

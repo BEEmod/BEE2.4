@@ -5,12 +5,12 @@ import trio.to_thread
 from srctools import AtomicWriter
 from srctools.dmx import Attribute as DMXAttr, Element as DMXElement, ValueType as DMXValue
 
-from exporting import STEPS
+from . import STEPS, ExportData
 import packages
 
 
 @STEPS.add_step(prereq=[], results=[])
-async def step_write_templates(exp_data: packages.ExportData) -> None:
+async def step_write_templates(exp_data: ExportData) -> None:
     """Write out the location of all templates for the compiler to use."""
     root = DMXElement('Templates', 'DMERoot')
     template_list = root['temp'] = DMXAttr.array('list', DMXValue.ELEMENT)

@@ -4,7 +4,7 @@ We can't pack BIKs, so this is mainly for Valve's existing ones.
 """
 from typing import Iterator, Optional
 
-from packages import ExportData, PakObject, ParseData, SelitemData
+from packages import PakObject, ParseData, SelitemData
 from transtoken import TransTokenSource
 
 

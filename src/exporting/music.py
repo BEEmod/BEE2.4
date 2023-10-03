@@ -4,8 +4,8 @@ import srctools
 from srctools import Keyvalues
 
 from consts import MusicChannel
-from exporting import STEPS, StepResource
-from packages import ExportData, Music
+from . import ExportData, STEPS, StepResource
+from packages import Music
 
 
 @STEPS.add_step(prereq=[], results=[StepResource.VCONF_DATA])

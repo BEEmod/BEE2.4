@@ -2,7 +2,7 @@
 Handles scanning through the zip packages to find all items, styles, etc.
 """
 from __future__ import annotations
-from typing import Iterator, NoReturn, ClassVar, Optional, Any, TYPE_CHECKING, TypeVar, Type, cast
+from typing import Iterator, NoReturn, ClassVar, Optional, TYPE_CHECKING, TypeVar, Type, cast
 from typing_extensions import Self
 
 import os
@@ -30,7 +30,6 @@ from transtoken import TransToken, TransTokenSource
 
 
 if TYPE_CHECKING:  # Prevent circular import
-    from app.gameMan import Game
     from loadScreen import LoadScreen
 
 
@@ -48,8 +47,7 @@ __all__ = [
     'Skybox', 'Music', 'QuotePack', 'PackList', 'CorridorGroup', 'ConfigGroup',
 
     # Mainly intended for package object code.
-    'ParseData', 'ExportData',
-    'reraise_keyerror', 'get_config', 'set_cond_source',
+    'ParseData', 'reraise_keyerror', 'get_config', 'set_cond_source',
     'parse_multiline_key', 'desc_parse', 'sep_values',
 ]
 
@@ -191,29 +189,6 @@ class ParseData:
     info: Keyvalues = attrs.field(repr=False)
     pak_id: str
     is_override: bool
-
-
-@attrs.define(kw_only=True)
-class ExportData:
-    """The arguments to pak_object.export()."""
-    packset: PackagesSet  # The entire loaded packages set.
-    game: Game  # The current game.
-    # Usually str, but some items pass other things.
-    selected: dict[Type[PakObject], Any]
-    # Some items need to know which style is selected
-    selected_style: Style
-    # All the items in the map
-    all_items: list[EditorItem] = attrs.Factory(list)
-    # The error/connection icons
-    renderables: dict[RenderableType, Renderable] = attrs.Factory(dict)
-    # vbsp_config.cfg file.
-    vbsp_conf: Keyvalues = attrs.Factory(Keyvalues.root)
-    # As steps export, they may fill this to include additional resources that
-    # are written to the game folder. If updating the cache, these files won't
-    # be deleted. This should be an absolute path.
-    resources: set[Path] = attrs.Factory(set)
-    # Flag set to indicate that the error server may be running.
-    maybe_error_server_running: bool = True
 
 
 @attrs.define

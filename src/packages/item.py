@@ -20,10 +20,7 @@ import config.gen_opts
 from app import tkMarkdown, img, lazy_conf, DEV_MODE
 import config
 from transtoken import TransToken, TransTokenSource
-from packages import (
-    PackagesSet, PakObject, ParseData, ExportData, Style,
-    sep_values, desc_parse, get_config,
-)
+from packages import PackagesSet, PakObject, ParseData, Style, sep_values, desc_parse, get_config
 from config.item_defaults import DEFAULT_VERSION
 from editoritems import Item as EditorItem, InstCount
 from connections import Config as ConnConfig

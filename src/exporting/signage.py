@@ -1,6 +1,4 @@
 """Export signage configuration, and write the legend."""
-
-from io import BytesIO
 from pathlib import Path
 from typing import Final, Optional
 
@@ -10,10 +8,10 @@ from srctools.vtf import ImageFormats, VTF, VTFFlags
 from srctools import Keyvalues
 import srctools.logger
 
-from exporting import STEPS, StepResource
-from packages import PackagesSet, ExportData, Style
 from app.img import Handle as ImgHandle
+from packages import PackagesSet, Style
 from packages.signage import CELL_SIZE, LEGEND_SIZE, Signage, SignStyle, SignageLegend
+from . import ExportData, STEPS, StepResource
 
 
 LOGGER = srctools.logger.get_logger(__name__)

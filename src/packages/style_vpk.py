@@ -3,23 +3,14 @@
 This allows altering the in-editor wall textures, as well as a few others.
 """
 from __future__ import annotations
-from typing import TYPE_CHECKING, Any, Iterator, Optional
+from typing import Any
 from typing_extensions import Self
-from pathlib import Path
 import os
-import re
-import shutil
 
-from srctools import VPK, FileSystem
+from srctools import FileSystem
 import srctools.logger
-import trio
 
-from packages import ExportData, NoVPKExport, PakObject, ParseData
-import utils
-
-
-if TYPE_CHECKING:
-    from app.gameMan import Game
+from packages import PakObject, ParseData
 
 LOGGER = srctools.logger.get_logger(__name__, alias='packages.styleVPK')
 

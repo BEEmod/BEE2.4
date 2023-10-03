@@ -3,9 +3,8 @@ import os
 import trio
 from srctools import AtomicWriter
 
-from exporting import STEPS
+from . import ExportData, STEPS
 from packages.editor_sound import EditorSound
-from packages import ExportData
 
 
 # We inject this line to recognise where our sounds start, so we can modify them.
