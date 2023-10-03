@@ -13,13 +13,12 @@ from pathlib import Path
 from tkinter import *  # ui library
 from tkinter import filedialog  # open/save as dialog creator
 
-import math
 import os
 import re
 import shutil
 import webbrowser
 
-from srctools import Vec, VPK, Keyvalues, AtomicWriter, VMF, Output
+from srctools import VPK, Keyvalues, AtomicWriter, VMF
 import srctools.logger
 import srctools.fgd
 import attrs
@@ -28,6 +27,7 @@ from typing_extensions import Self
 from BEE2_config import ConfigFile
 from app import backup, tk_tools, TK_ROOT, background_run
 from config.gen_opts import GenOptions
+from exporting import load_screen as export_screen
 from exporting.compiler import terminate_error_server, restore_backup
 from transtoken import TransToken
 import loadScreen
@@ -56,17 +56,6 @@ INST_PATH = 'sdk_content/maps/instances/BEE2'
 # than '|gameinfo_path|.'
 GAMEINFO_LINE = 'Game\t|gameinfo_path|../bee2'
 OLD_GAMEINFO_LINE = 'Game\t"BEE2"'
-
-# The progress bars used when exporting data into a game
-export_screen = loadScreen.LoadScreen(
-    ('BACK', TransToken.ui('Backup Original Files')),
-    (backup.AUTO_BACKUP_STAGE, TransToken.ui('Backup Puzzles')),
-    ('EXP', TransToken.ui('Export Configuration')),
-    ('COMP', TransToken.ui('Copy Compiler')),
-    ('RES', TransToken.ui('Copy Resources')),
-    ('MUS', TransToken.ui('Copy Music')),
-    title_text=TransToken.ui('Exporting'),
-)
 
 TRANS_EXPORT_BTN = TransToken.ui('Export to "{game}"...')
 TRANS_EXPORT_BTN_DIRTY = TransToken.ui('Export to "{game}"*...')
@@ -461,7 +450,6 @@ class Game:
             export_screen.step('EXP', 'fgd')
 
             error_server_running = await terminate_error_server()
-
 
             if should_refresh:
                 LOGGER.info('Copying Resources!')

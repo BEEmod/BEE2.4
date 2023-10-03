@@ -41,7 +41,7 @@ UI: Dict[str, Any] = {}  # Holds all the widgets
 menus = {}  # For standalone application, generate menu bars
 
 # Stage name for the exporting screen
-AUTO_BACKUP_STAGE = 'BACKUP_ZIP'
+AUTO_BACKUP_STAGE = 'PUZZLE_BACKUP'
 
 # Characters allowed in the backup filename
 BACKUP_CHARS = set(string.ascii_letters + string.digits + '_-.')

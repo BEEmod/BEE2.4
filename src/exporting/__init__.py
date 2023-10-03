@@ -1,10 +1,13 @@
 """The code for performing an export to the game folder."""
+from __future__ import annotations
+
 import os
 from enum import Enum, auto
 from typing import Any, TYPE_CHECKING, Tuple, Type
 
 import srctools.logger
 
+import loadScreen
 import packages
 from app.errors import ErrorUI
 from step_order import StepOrder
@@ -39,6 +42,23 @@ class StepResource(Enum):
     ERROR_SERVER_TERMINATE = auto()  # This must be terminated before we can copy compiler files.
     VPK_WRITTEN = auto()  # The VPK file has been generated for overriding editor textures.
 
+
+# The progress bars used when exporting data into a game
+STAGE_COMP_BACKUP = 'BACK'
+STAGE_PUZZ_BACKUP = 'PUZZLE_BACKUP'
+STAGE_EXPORT = 'EXP'
+STAGE_COMPILER = 'COMP'
+STAGE_RESOURCES = 'RES'
+STAGE_MUSIC = 'MUS'
+load_screen = loadScreen.LoadScreen(
+    (STAGE_COMP_BACKUP, TransToken.ui('Backup Original Files')),
+    (STAGE_PUZZ_BACKUP, TransToken.ui('Backup Puzzles')),
+    (STAGE_EXPORT, TransToken.ui('Export Configuration')),
+    (STAGE_COMPILER, TransToken.ui('Copy Compiler')),
+    (STAGE_RESOURCES, TransToken.ui('Copy Resources')),
+    (STAGE_MUSIC, TransToken.ui('Copy Music')),
+    title_text=TransToken.ui('Exporting'),
+)
 
 STEPS = StepOrder(packages.ExportData, StepResource)
 
