@@ -151,10 +151,9 @@ async def backup(description: str, item_path: trio.Path, backup_path: trio.Path)
             except FileNotFoundError:
                 pass
             raise AppError(TransToken.ui(
-                'Compiler file {file} missing. '
-                'Exit Steam applications, then press OK '
-                'to verify your game cache. You can then '
-                'export again.'
+                "Compiler file {file} missing. "
+                "You will need to verify the game's cache in Steam to get these files back. "
+                "You can then export again."
             ).format(file=item_path.name))
 
             # if tk_tools.askokcancel(

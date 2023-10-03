@@ -4,10 +4,11 @@ from enum import Enum, auto
 from typing import Any, TYPE_CHECKING, Tuple, Type
 
 import srctools.logger
-from srctools import Keyvalues
 
 import packages
+from app.errors import ErrorUI
 from step_order import StepOrder
+from transtoken import TransToken
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -61,26 +62,31 @@ async def export(
     for obj_type, selected in selected_objects.items():
         LOGGER.info('{} = {}', obj_type, selected)
 
-    LOGGER.info('Should refresh: {}', should_refresh)
-    if should_refresh:
-        # Check to ensure the cache needs to be copied over..
-        should_refresh = game.cache_invalid()
+    async with ErrorUI(
+        title=TransToken.ui("BEE2 Export - {game}").format(game=game.name),
+        desc=TransToken.ui("Exporting failed. The following errors occurred:")
+    ) as error_ui:
+        LOGGER.info('Should refresh: {}', should_refresh)
         if should_refresh:
-            LOGGER.info("Cache invalid - copying..")
-        else:
-            LOGGER.info("Skipped copying cache!")
+            # Check to ensure the cache needs to be copied over..
+            should_refresh = game.cache_invalid()
+            if should_refresh:
+                LOGGER.info("Cache invalid - copying..")
+            else:
+                LOGGER.info("Skipped copying cache!")
 
-    # Make the folders we need to copy files to, if desired.
-    os.makedirs(game.abs_path('bin/bee2/'), exist_ok=True)
+        # Make the folders we need to copy files to, if desired.
+        os.makedirs(game.abs_path('bin/bee2/'), exist_ok=True)
 
-    exp_data = packages.ExportData(
-        game=game,
-        selected=selected_objects,
-        packset=packset,
-        selected_style=style,
-    )
+        exp_data = packages.ExportData(
+            game=game,
+            selected=selected_objects,
+            packset=packset,
+            selected_style=style,
+        )
 
-    await STEPS.run(exp_data)
+        await STEPS.run(exp_data)
+    return (not error_ui.failed, False)
 
 
 @STEPS.add_step(prereq=[], results=[
@@ -98,8 +104,17 @@ async def step_style(exp: packages.ExportData) -> None:
     exp.renderables.update(style.renderables)
 
 
+@STEPS.add_step(prereq=[], results=[StepResource.VCONF_DATA])
+async def step_add_core_info(exp: packages.ExportData) -> None:
+    """Add some core options to the config."""
+    from app import DEV_MODE  # TODO: Pass into export(), maybe?
+    exp.vbsp_conf.set_key(('Options', 'Game_ID'), exp.game.steamID)
+    exp.vbsp_conf.set_key(('Options', 'dev_mode'), srctools.bool_as_int(DEV_MODE.get()))
+
+
 # Register everything.
 from exporting import (
-    compiler, corridors, editor_sound, elevator, files, items, music, pack_list, quote_pack,
-    signage, skybox, stylevar, template_brush, translations, vpks, widgets,
+    compiler, corridors, cube_colourizer, editor_sound, elevator, files, fizzler, items, music,
+    pack_list, quote_pack, signage, skybox, stylevar, template_brush, translations, vpks,
+    widgets,
 )
