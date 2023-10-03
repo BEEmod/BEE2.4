@@ -16,7 +16,7 @@ import trio
 import user_errors
 import utils
 from app.errors import AppError
-from . import ExportData, STEPS, StepResource
+from . import ExportData, STAGE_COMPILER, STEPS, StepResource, load_screen
 from transtoken import TransToken
 
 
@@ -182,8 +182,8 @@ async def step_copy_compiler(exp_data: ExportData) -> None:
     """Copy the custom compiler tools."""
     LOGGER.info('Copying Custom Compiler!')
     compiler_src = utils.install_path('compiler')
-    comp_dest = 'bin/linux32' if utils.LINUX else 'bin'
     game = exp_data.game
+    comp_dest = game.abs_path('bin/linux32' if utils.LINUX else 'bin')
 
     def perform_copy(src: Path, dest: Path) -> None:
         """Copy a file."""
@@ -213,11 +213,11 @@ async def step_copy_compiler(exp_data: ExportData) -> None:
             raise AppError(msg.format(file=dest, game=exp_data.game.name)) from exc
 
     async with trio.open_nursery() as nursery:
-        for comp_file in compiler_src.rglob('*'):
+        for comp_file in load_screen.stage_iterate(STAGE_COMPILER, list(compiler_src.rglob('*'))):
             # Ignore folders.
             if comp_file.is_dir():
                 continue
 
-            dest = Path(game.abs_path(comp_dest / comp_file.relative_to(compiler_src)))
+            dest = Path(comp_dest, comp_file.relative_to(compiler_src))
             LOGGER.info('\t* {} -> {}', comp_file, dest)
             nursery.start_soon(trio.to_thread.run_sync, perform_copy, comp_file, dest)
