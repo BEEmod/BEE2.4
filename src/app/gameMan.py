@@ -303,7 +303,7 @@ class Game:
         try:
             vpk_folder = await vpks.find_folder(self)
             vpks.clear_files(vpk_folder)
-        except (vpks.NoVPKExport, PermissionError):
+        except (FileNotFoundError, PermissionError):
             pass
 
         self.mod_times.clear()
@@ -314,7 +314,7 @@ class Game:
         style: packages.Style,
         selected_objects: dict[Type[packages.PakObject], Any],
         should_refresh: bool = False,
-    ) -> tuple[bool, bool]:
+    ) -> bool:
         """Generate the editoritems.txt and vbsp_config.
 
         - If no backup is present, the original editoritems is backed up.
@@ -352,8 +352,6 @@ class Game:
                 export_screen.skip_stage('RES')
                 export_screen.skip_stage('MUS')
 
-            vpk_success = True
-
             # Backup puzzles, if desired
             backup.auto_backup(selected_game, export_screen)
 
@@ -370,9 +368,9 @@ class Game:
             save()
 
             export_screen.reset()  # Hide loading screen, we're done
-            return True, vpk_success
+            return True
         except loadScreen.Cancelled:
-            return False, False
+            return False
 
     def launch(self) -> None:
         """Try and launch the game."""

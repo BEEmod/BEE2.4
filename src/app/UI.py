@@ -94,11 +94,6 @@ pal_canvas: tk.Canvas  # Canvas for the item list to scroll.
 
 
 TRANS_EXPORTED = TransToken.ui('Selected Items and Style successfully exported!')
-TRANS_EXPORTED_NO_VPK = TransToken.ui(
-    'Selected Items and Style successfully exported!\n\n'
-    'Warning: VPK files were not exported, quit Portal 2 and '
-    'Hammer to ensure editor wall previews are changed.'
-)
 TRANS_EXPORTED_TITLE = TransToken.ui('BEE2 - Export Complete')
 TRANS_MAIN_TITLE = TransToken.ui('BEEMOD {version} - {game}')
 TRANS_ERROR = TransToken.untranslated('???')
@@ -760,7 +755,7 @@ async def export_editoritems(pal_ui: paletteUI.PaletteUI, bar: MenuBar) -> None:
         conf = config.APP.get_cur_conf(config.gen_opts.GenOptions)
         packset = packages.get_loaded_packages()
 
-        success, vpk_success = await gameMan.selected_game.export(
+        success = await gameMan.selected_game.export(
             packset,
             style=chosen_style,
             selected_objects={
@@ -803,17 +798,15 @@ async def export_editoritems(pal_ui: paletteUI.PaletteUI, bar: MenuBar) -> None:
         item_opts.save_check()
         config.APP.write_file()
 
-        message = TRANS_EXPORTED if vpk_success else TRANS_EXPORTED_NO_VPK
-
         if conf.launch_after_export or conf.after_export is not config.gen_opts.AfterExport.NORMAL:
             do_action = tk_tools.askyesno(
                 TRANS_EXPORTED_TITLE,
                 optionWindow.AFTER_EXPORT_TEXT[
                     conf.after_export, conf.launch_after_export,
-                ].format(msg=message),
+                ].format(msg=TRANS_EXPORTED),
             )
         else:  # No action to do, so just show an OK.
-            tk_tools.showinfo(TRANS_EXPORTED_TITLE, message)
+            tk_tools.showinfo(TRANS_EXPORTED_TITLE, TRANS_EXPORTED)
             do_action = False
 
         # Do the desired action - if quit, we don't bother to update UI.

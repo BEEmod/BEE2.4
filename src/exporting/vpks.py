@@ -9,8 +9,10 @@ from typing import Dict, Iterator, Optional, TYPE_CHECKING
 import trio
 from srctools import VPK, logger
 
+from app.errors import AppError
+from transtoken import TransToken
 from . import ExportData, STEPS, StepResource
-from packages import NoVPKExport, StyleVPK
+from packages import StyleVPK
 import utils
 
 
@@ -27,6 +29,13 @@ Use to override resources as you please.
 
 Either add regular files, or put VPKs (any name) in the root to have them be repacked.
 """
+
+
+TRANS_NO_PERMS = TransToken.ui(
+    'VPK files were not exported, quit Portal 2 and Hammer to ensure '
+    'editor wall previews are changed.'
+)
+
 
 if TYPE_CHECKING:
     from app.gameMan import Game
@@ -70,7 +79,7 @@ async def find_folder(game: Game) -> Path:
             break
     else:
         LOGGER.warning('Ran out of DLC folders??')
-        raise NoVPKExport()
+        raise FileNotFoundError
 
     # What we want to do is find the lowest-priority/first VPK that is a BEE one.
     # But parsing is quite slow, and we expect the first three (p2, dlc1, dlc2) to all be fails.
@@ -135,7 +144,9 @@ async def step_gen_vpk(exp_data: ExportData) -> None:
     try:
         clear_files(vpk_filename.parent)
     except PermissionError as exc:
-        raise NoVPKExport() from exc  # We can't edit the VPK files - P2 is open..
+        # We can't edit the VPK files - P2 is open...
+        exp_data.warn(AppError(TRANS_NO_PERMS))
+        return
 
     # When we make a DLC folder, this changes priorities,
     # so the soundcache will be regenerated. Just copy the old one over.
@@ -155,7 +166,13 @@ async def step_gen_vpk(exp_data: ExportData) -> None:
             pass
 
     # Generate the VPK.
-    vpk_file = VPK(vpk_filename, mode='w')
+    try:
+        vpk_file = VPK(vpk_filename, mode='w')
+    except PermissionError:
+        # Failed to open?
+        exp_data.warn(AppError(TRANS_NO_PERMS))
+        return
+
     with vpk_file:
         # Write the marker, so we can identify this later. Always put it in the _dir.vpk.
         vpk_file.add_file(MARKER_FILENAME, MARKER_CONTENTS, arch_index=None)

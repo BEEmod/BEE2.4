@@ -36,9 +36,8 @@ if TYPE_CHECKING:  # Prevent circular import
 __all__ = [
     # Generally global.
     'OBJ_TYPES', 'PACK_CONFIG',
-    'SelitemData', 'NoVPKExport',
     'LegacyCorr', 'LEGACY_CORRIDORS',
-    'CLEAN_PACKAGE',
+    'CLEAN_PACKAGE', 'SelitemData',
     'PakObject', 'PackagesSet', 'get_loaded_packages',
     'find_packages', 'no_packages_err', 'load_packages',
 
@@ -208,10 +207,6 @@ LEGACY_CORRIDORS = {
 
 # This package contains necessary components, and must be available.
 CLEAN_PACKAGE = 'BEE2_CLEAN_STYLE'.casefold()
-
-
-class NoVPKExport(Exception):
-    """Raised to indicate that VPK files weren't copied."""
 
 
 T = TypeVar('T')
