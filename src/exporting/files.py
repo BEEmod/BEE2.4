@@ -10,7 +10,7 @@ from srctools import AtomicWriter, Keyvalues, logger
 from srctools.filesys import File
 import trio
 
-from . import ExportData, STEPS, StepResource, load_screen as export_screen
+from . import ExportData, STEPS, StepResource, load_screen as export_screen, STAGE_RESOURCES
 import editoritems
 
 
@@ -85,10 +85,9 @@ async def step_copy_resources(exp: ExportData) -> None:
     indicate which files should remain. It is the full path to the files.
     """
     if not exp.copy_resources:
+        export_screen.skip_stage(STAGE_RESOURCES)
         return
 
-    screen_func = export_screen.step
-    packset = exp.packset
     already_copied = exp.resources
 
     def copy_file(file: File, dest: Path) -> None:
@@ -96,10 +95,12 @@ async def step_copy_resources(exp: ExportData) -> None:
         dest.parent.mkdir(parents=True, exist_ok=True)
         with file.open_bin() as fsrc, open(dest, 'wb') as fdest:
             shutil.copyfileobj(fsrc, fdest)
-        screen_func('RES', file.path)
+        export_screen.step(STAGE_RESOURCES, dest)
+
+    count = 0
 
     async with trio.open_nursery() as nursery:
-        for pack in packset.packages.values():
+        for pack in exp.packset.packages.values():
             if not pack.enabled:
                 continue
             for file in pack.fsys.walk_folder('resources'):
@@ -115,7 +116,6 @@ async def step_copy_resources(exp: ExportData) -> None:
                 if start_folder == 'instances':
                     dest = Path(exp.game.abs_path(INST_PATH), path.casefold())
                 elif start_folder in ('bee2', 'music_samp'):
-                    screen_func('RES', start_folder)
                     continue  # Skip app icons and music samples.
                 else:
                     # Preserve original casing.
@@ -123,16 +123,17 @@ async def step_copy_resources(exp: ExportData) -> None:
 
                 # Already copied from another package.
                 if dest in already_copied:
-                    screen_func('RES', dest)
                     continue
                 already_copied.add(dest)
                 nursery.start_soon(trio.to_thread.run_sync, copy_file, file, dest)
+                count += 1
+        export_screen.set_length(STAGE_RESOURCES, count)
 
     LOGGER.info('Cache copied.')
 
     async with trio.open_nursery() as nursery:
-        for path in [INST_PATH, 'bee2']:
-            abs_path = exp.game.abs_path(path)
+        for folder in [INST_PATH, 'bee2']:
+            abs_path = exp.game.abs_path(folder)
             for dirpath, dirnames, filenames in os.walk(abs_path):
                 for filename in filenames:
                     # Keep VMX backups, disabled editor models, and the coop
@@ -144,9 +145,11 @@ async def step_copy_resources(exp: ExportData) -> None:
                     if path not in already_copied:
                         LOGGER.info('Deleting: {}', path)
                         nursery.start_soon(trio.Path(path).unlink)
+                        count += 1
+        export_screen.set_length(STAGE_RESOURCES, count)
 
     # Save the new cache modification date.
     exp.game.mod_times.clear()
-    for pack_id, pack in packset.packages.items():
+    for pack_id, pack in exp.packset.packages.items():
         exp.game.mod_times[pack_id.casefold()] = pack.get_modtime()
     exp.game.save()

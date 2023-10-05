@@ -125,12 +125,12 @@ async def export(
     for obj_type, selected in selected_objects.items():
         LOGGER.info('{} = {}', obj_type, selected)
 
-    async with ErrorUI(
-        title=TRANS_EXP_TITLE.format(game=game.name),
-        error_desc=TRANS_ERROR,
-        warn_desc=TRANS_WARN,
-    ) as error_ui:
-        with load_screen:
+    with load_screen:
+        async with ErrorUI(
+            title=TRANS_EXP_TITLE.format(game=game.name),
+            error_desc=TRANS_ERROR,
+            warn_desc=TRANS_WARN,
+        ) as error_ui:
             LOGGER.info('Should refresh: {}', should_refresh)
             if should_refresh:
                 # Check to ensure the cache needs to be copied over..
@@ -139,7 +139,6 @@ async def export(
                     LOGGER.info("Cache invalid - copying..")
                 else:
                     LOGGER.info("Skipped copying cache!")
-                    load_screen.skip_stage(STAGE_RESOURCES)
 
             # Make the folders we need to copy files to, if desired.
             os.makedirs(game.abs_path('bin/bee2/'), exist_ok=True)
