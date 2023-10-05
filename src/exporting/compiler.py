@@ -16,7 +16,7 @@ import trio
 import user_errors
 import utils
 from app.errors import AppError
-from . import ExportData, STAGE_COMPILER, STEPS, StepResource, load_screen
+from . import ExportData, STAGE_COMPILER, STAGE_COMP_BACKUP, STEPS, StepResource, load_screen
 from transtoken import TransToken
 
 
@@ -163,11 +163,13 @@ async def backup(description: str, item_path: trio.Path, backup_path: trio.Path)
     if should_backup:
         LOGGER.info('Backing up original {}!', item_path.name)
         await trio.to_thread.run_sync(shutil.copy, item_path, backup_path)
+    load_screen.step(STAGE_COMP_BACKUP, item_path.name)
 
 
 @STEPS.add_step(prereq=[], results=[StepResource.BACKUP])
 async def step_do_backup(exp_data: ExportData) -> None:
     """Backup existing Valve compilers and editoritems."""
+    load_screen.set_length(STAGE_COMP_BACKUP, len(FILES_TO_BACKUP))
     async with trio.open_nursery() as nursery:
         for name, path, ext in FILES_TO_BACKUP:
             nursery.start_soon(
