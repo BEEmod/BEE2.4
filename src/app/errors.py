@@ -50,6 +50,9 @@ class AppError(Exception):
         return f"AppError: {self.message}"
 
 
+WarningExc: TypeAlias = Union[AppError, ExceptionGroup[Exception], BaseExceptionGroup[BaseException]]
+
+
 class Handler(Protocol):
     """The signature of handler functions."""
     def __call__(self, title: TransToken, desc: TransToken, errors: list[AppError]) -> Awaitable[object]:
@@ -119,7 +122,7 @@ class ErrorUI:
             return Result.PARTIAL
         return Result.SUCCEEDED
 
-    def add(self, error: AppError | ExceptionGroup[Exception] | BaseExceptionGroup[BaseException]) -> None:
+    def add(self, error: WarningExc) -> None:
         """Log an error having occurred, while still running code.
 
         If an exception group is passed, this will extract the AppErrors, reraising others.

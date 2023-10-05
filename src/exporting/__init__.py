@@ -4,7 +4,7 @@ from __future__ import annotations
 import os
 from enum import Enum, auto
 from pathlib import Path
-from typing import Any, TYPE_CHECKING, Tuple, Type
+from typing import Any, Callable, TYPE_CHECKING, Tuple, Type
 
 import attrs
 import srctools.logger
@@ -12,7 +12,7 @@ from srctools import Keyvalues
 
 import loadScreen
 import packages
-from app.errors import ErrorUI, Result as ErrorResult
+from app.errors import ErrorUI, Result as ErrorResult, WarningExc
 from editoritems import Item as EditorItem, Renderable, RenderableType
 from packages import PackagesSet, PakObject, Style
 from step_order import StepOrder
@@ -89,6 +89,8 @@ class ExportData:
     resources: set[Path] = attrs.Factory(set)
     # Flag set to indicate that the error server may be running.
     maybe_error_server_running: bool = True
+    # Can be called to indicate a non-fatal error.
+    warn: Callable[[WarningExc], None]
 
 
 STEPS = StepOrder(ExportData, StepResource)
@@ -136,6 +138,7 @@ async def export(
                 packset=packset,
                 selected_style=style,
                 copy_resources=should_refresh,
+                warn=error_ui.add,
             )
 
             await STEPS.run(exp_data)
