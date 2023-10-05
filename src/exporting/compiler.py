@@ -193,7 +193,7 @@ async def step_copy_compiler(exp_data: ExportData) -> None:
                 # First try and give ourselves write-permission,
                 # if it's set read-only.
                 utils.unset_readonly(dest)
-            shutil.copy(comp_file, dest)
+            shutil.copy(src, dest)
         except PermissionError as exc:
             # We might not have permissions, if the compiler is currently
             # running.
