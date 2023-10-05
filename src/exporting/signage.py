@@ -150,7 +150,7 @@ def make_legend(
     vtf.flags |= VTFFlags.ANISOTROPIC
 
     sign_path.parent.mkdir(parents=True, exist_ok=True)
-    with sign_path.open('rb') as f:
+    with sign_path.open('wb') as f:
         try:
             vtf.save(f)
         except NotImplementedError:

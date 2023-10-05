@@ -25,7 +25,7 @@ LEGEND_SIZE = 512
 
 
 @STEPS.add_step(prereq=[], results=[StepResource.RES_SPECIAL])
-def make_cube_colourizer_legend(exp_data: ExportData) -> None:
+async def make_cube_colourizer_legend(exp_data: ExportData) -> None:
     """Create a cube colourizer legend, showing the colours."""
     # Find the colourizer group, and grab its values. If not currently present,
     # we don't need to generate.
