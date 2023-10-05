@@ -532,9 +532,13 @@ class Handle(User):
             self.force_load()
         elif not self._users and _load_nursery is not None:
             # Loading something unused, schedule it to be cleaned soon.
-            self._cancel_cleanup.cancel()
-            self._cancel_cleanup = trio.CancelScope()
-            _load_nursery.start_soon(self._cleanup_task, self._cancel_cleanup)
+            try:
+                trio.lowlevel.current_task()
+            except Exception:
+                # We're in a thread, do this back on the main thread.
+                trio.from_thread.run_sync(self._schedule_cleanup)
+            else:
+                self._schedule_cleanup()
         return self._load_pil()
 
     def force_load(self) -> None:
@@ -564,10 +568,8 @@ class Handle(User):
         if _load_nursery is None:
             return  # Not loaded, can't unload.
         if not self._users and (self._cached_tk is not None or self._cached_pil is not None):
-            # Schedule this handle to be cleaned up, and store a cancel scope so that
-            # can be aborted.
-            self._cancel_cleanup = trio.CancelScope()
-            _load_nursery.start_soon(self._cleanup_task, self._cancel_cleanup)
+            # Schedule this handle to be cleaned up.
+            self._schedule_cleanup()
 
     def _incref(self, ref: User) -> None:
         """Add a label to the list of those controlled by us."""
@@ -578,6 +580,15 @@ class Handle(User):
         self._cancel_cleanup.cancel()
         for child in self._children():
             child._incref(self)
+
+    def _schedule_cleanup(self) -> None:
+        """Schedule this handle to be cleaned up."""
+        if self._users:
+            return  # We do have users.
+        self._cancel_cleanup.cancel()
+        self._cancel_cleanup = trio.CancelScope()
+        if _load_nursery is not None:
+            _load_nursery.start_soon(self._cleanup_task, self._cancel_cleanup)
 
     def _request_load(self, force: bool = False) -> Handle:
         """Request a reload of this image.
