@@ -1,12 +1,22 @@
 """Export the core files."""
+from typing import Final
+from pathlib import Path
+import os
 import pickle
 import pickletools
+import shutil
 
+from srctools import AtomicWriter, Keyvalues, logger
 import trio
-from srctools import AtomicWriter, Keyvalues
 
-from . import ExportData, STEPS, StepResource
+from . import ExportData, STEPS, StepResource, load_screen as export_screen
 import editoritems
+
+
+LOGGER = logger.get_logger(__name__)
+
+# The location of all the instances in the game directory
+INST_PATH: Final = 'sdk_content/maps/instances/BEE2'
 
 
 @STEPS.add_step(prereq=[StepResource.VCONF_DATA], results=[StepResource.VCONF_FILE])
@@ -64,3 +74,73 @@ async def step_write_editoritems_db(exp: ExportData) -> None:
     pick = await trio.to_thread.run_sync(pickle.dumps, exp.all_items, pickle.HIGHEST_PROTOCOL)
     pick = await trio.to_thread.run_sync(pickletools.optimize, pick)
     await trio.Path(exp.game.abs_path('bin/bee2/editor.bin')).write_bytes(pick)
+
+
+@STEPS.add_step(prereq=[StepResource.RES_SPECIAL], results=[StepResource.RES_PACKAGE])
+async def step_copy_resources(exp: ExportData) -> None:
+    """Copy over the resource files into this game.
+
+    already_copied is passed from copy_mod_music(), to
+    indicate which files should remain. It is the full path to the files.
+    """
+    if not exp.copy_resources:
+        return
+
+    screen_func = export_screen.step
+    packset = exp.packset
+    already_copied = exp.resources
+
+    for pack in packset.packages.values():
+        if not pack.enabled:
+            continue
+        for file in pack.fsys.walk_folder('resources'):
+            try:
+                res, start_folder, path = file.path.split('/', 2)
+            except ValueError:
+                LOGGER.warning('File in resources root: "{}"!', file.path)
+                continue
+            assert res.casefold() == 'resources', file.path
+
+            start_folder = start_folder.casefold()
+
+            if start_folder == 'instances':
+                dest = Path(exp.game.abs_path(INST_PATH + '/' + path.casefold()))
+            elif start_folder in ('bee2', 'music_samp'):
+                screen_func('RES', start_folder)
+                continue  # Skip app icons and music samples.
+            else:
+                # Preserve original casing.
+                dest = Path(exp.game.abs_path(os.path.join('bee2', start_folder, path)))
+
+            # Already copied from another package.
+            if dest in already_copied:
+                screen_func('RES', dest)
+                continue
+            already_copied.add(dest)
+
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            with file.open_bin() as fsrc, open(dest, 'wb') as fdest:
+                shutil.copyfileobj(fsrc, fdest)
+            screen_func('RES', file.path)
+
+    LOGGER.info('Cache copied.')
+
+    for path in [INST_PATH, 'bee2']:
+        abs_path = exp.game.abs_path(path)
+        for dirpath, dirnames, filenames in os.walk(abs_path):
+            for filename in filenames:
+                # Keep VMX backups, disabled editor models, and the coop
+                # gun instance.
+                if filename.endswith(('.vmx', '.mdl_dis', 'tag_coop_gun.vmf')):
+                    continue
+                path = os.path.join(dirpath, filename)
+
+                if path.casefold() not in already_copied:
+                    LOGGER.info('Deleting: {}', path)
+                    os.remove(path)
+
+    # Save the new cache modification date.
+    exp.game.mod_times.clear()
+    for pack_id, pack in packset.packages.items():
+        exp.game.mod_times[pack_id.casefold()] = pack.get_modtime()
+    exp.game.save()

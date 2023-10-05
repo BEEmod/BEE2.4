@@ -75,6 +75,8 @@ class ExportData:
     selected: dict[Type[PakObject], Any]
     # Some items need to know which style is selected
     selected_style: Style
+    # If refreshing resources is enabled.
+    copy_resources: bool
     # All the items in the map
     all_items: list[EditorItem] = attrs.Factory(list)
     # The error/connection icons
@@ -114,26 +116,29 @@ async def export(
         title=TransToken.ui("BEE2 Export - {game}").format(game=game.name),
         desc=TransToken.ui("Exporting failed. The following errors occurred:")
     ) as error_ui:
-        LOGGER.info('Should refresh: {}', should_refresh)
-        if should_refresh:
-            # Check to ensure the cache needs to be copied over..
-            should_refresh = game.cache_invalid()
+        with load_screen:
+            LOGGER.info('Should refresh: {}', should_refresh)
             if should_refresh:
-                LOGGER.info("Cache invalid - copying..")
-            else:
-                LOGGER.info("Skipped copying cache!")
+                # Check to ensure the cache needs to be copied over..
+                should_refresh = game.cache_invalid()
+                if should_refresh:
+                    LOGGER.info("Cache invalid - copying..")
+                else:
+                    LOGGER.info("Skipped copying cache!")
+                    load_screen.skip_stage(STAGE_RESOURCES)
 
-        # Make the folders we need to copy files to, if desired.
-        os.makedirs(game.abs_path('bin/bee2/'), exist_ok=True)
+            # Make the folders we need to copy files to, if desired.
+            os.makedirs(game.abs_path('bin/bee2/'), exist_ok=True)
 
-        exp_data = ExportData(
-            game=game,
-            selected=selected_objects,
-            packset=packset,
-            selected_style=style,
-        )
+            exp_data = ExportData(
+                game=game,
+                selected=selected_objects,
+                packset=packset,
+                selected_style=style,
+                copy_resources=should_refresh,
+            )
 
-        await STEPS.run(exp_data)
+            await STEPS.run(exp_data)
     return (not error_ui.failed, False)
 
 

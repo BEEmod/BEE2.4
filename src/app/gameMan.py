@@ -7,7 +7,7 @@ Does stuff related to the actual games.
 """
 from __future__ import annotations
 
-from typing import NoReturn, Optional, Union, Any, Type, IO, Iterator
+from typing import Dict, NoReturn, Optional, Union, Any, Type, IO, Iterator
 from pathlib import Path
 
 from tkinter import *  # ui library
@@ -29,6 +29,7 @@ from app import backup, tk_tools, TK_ROOT, background_run
 from config.gen_opts import GenOptions
 from exporting import load_screen as export_screen
 from exporting.compiler import terminate_error_server, restore_backup
+from exporting.files import INST_PATH
 from transtoken import TransToken
 import loadScreen
 import packages
@@ -47,9 +48,6 @@ game_menu: Optional[Menu] = None
 ON_GAME_CHANGED: event.Event[Game] = event.Event('game_changed')
 
 CONFIG = ConfigFile('games.cfg')
-
-# The location of all the instances in the game directory
-INST_PATH = 'sdk_content/maps/instances/BEE2'
 
 # The line we inject to add our BEE2 folder into the game search path.
 # We always add ours such that it's the highest priority, other
@@ -118,7 +116,7 @@ class Game:
         # This flag is only set if we parse from a config that doesn't include it.
         unmarked_dlc3 = config.getboolean(gm_id, 'unmarked_dlc3', True)
 
-        mod_times = {}
+        mod_times: Dict[str, int] = {}
 
         for name, value in config.items(gm_id):
             if name.startswith('pack_mod_'):
@@ -295,71 +293,6 @@ class Game:
             loaded.packages.items()
         )
 
-    def refresh_cache(self, already_copied: set[str]) -> None:
-        """Copy over the resource files into this game.
-
-        already_copied is passed from copy_mod_music(), to
-        indicate which files should remain. It is the full path to the files.
-        """
-        screen_func = export_screen.step
-        packset = packages.get_loaded_packages()
-
-        for pack in packset.packages.values():
-            if not pack.enabled:
-                continue
-            for file in pack.fsys.walk_folder('resources'):
-                try:
-                    res, start_folder, path = file.path.split('/', 2)
-                except ValueError:
-                    LOGGER.warning('File in resources root: "{}"!', file.path)
-                    continue
-                assert res.casefold() == 'resources', file.path
-
-                start_folder = start_folder.casefold()
-
-                if start_folder == 'instances':
-                    dest = self.abs_path(INST_PATH + '/' + path.casefold())
-                elif start_folder in ('bee2', 'music_samp'):
-                    screen_func('RES', start_folder)
-                    continue  # Skip app icons and music samples.
-                else:
-                    # Preserve original casing.
-                    dest = self.abs_path(os.path.join('bee2', start_folder, path))
-
-                # Already copied from another package.
-                if dest.casefold() in already_copied:
-                    screen_func('RES', dest)
-                    continue
-                already_copied.add(dest.casefold())
-
-                os.makedirs(os.path.dirname(dest), exist_ok=True)
-                with file.open_bin() as fsrc, open(dest, 'wb') as fdest:
-                    shutil.copyfileobj(fsrc, fdest)
-                screen_func('RES', file.path)
-
-        LOGGER.info('Cache copied.')
-
-        for path in [INST_PATH, 'bee2']:
-            abs_path = self.abs_path(path)
-            for dirpath, dirnames, filenames in os.walk(abs_path):
-                for filename in filenames:
-                    # Keep VMX backups, disabled editor models, and the coop
-                    # gun instance.
-                    if filename.endswith(('.vmx', '.mdl_dis', 'tag_coop_gun.vmf')):
-                        continue
-                    path = os.path.join(dirpath, filename)
-
-                    if path.casefold() not in already_copied:
-                        LOGGER.info('Deleting: {}', path)
-                        os.remove(path)
-
-        # Save the new cache modification date.
-        self.mod_times.clear()
-        for pack_id, pack in packset.packages.items():
-            self.mod_times[pack_id.casefold()] = pack.get_modtime()
-        self.save()
-        CONFIG.save_check()
-
     async def clear_cache(self) -> None:
         """Remove all resources from the game."""
         shutil.rmtree(self.abs_path(INST_PATH), ignore_errors=True)
@@ -389,22 +322,6 @@ class Game:
         - item.
         - Styles are a special case.
         """
-        # files in compiler/
-        try:
-            num_compiler_files = sum(1 for file in utils.install_path('compiler').rglob('*'))
-        except FileNotFoundError:
-            num_compiler_files = 0
-
-        if self.steamID == utils.STEAM_IDS['APERTURE TAG']:
-            # Coop paint gun instance
-            num_compiler_files += 1
-
-        if num_compiler_files == 0:
-            LOGGER.warning('No compiler files!')
-            export_screen.skip_stage('COMP')
-        else:
-            export_screen.set_length('COMP', num_compiler_files)
-
         # Each object type
         # Editoritems
         # VBSP_config
@@ -448,13 +365,6 @@ class Game:
                 LOGGER.info('Adding ents to FGD.')
                 self.edit_fgd(True)
             export_screen.step('EXP', 'fgd')
-
-            error_server_running = await terminate_error_server()
-
-            if should_refresh:
-                LOGGER.info('Copying Resources!')
-                music_files = self.copy_mod_music()
-                self.refresh_cache(music_files)
 
             self.exported_style = style.id
             save()
