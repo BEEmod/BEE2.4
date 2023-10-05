@@ -7,6 +7,7 @@ import pickletools
 import shutil
 
 from srctools import AtomicWriter, Keyvalues, logger
+from srctools.filesys import File
 import trio
 
 from . import ExportData, STEPS, StepResource, load_screen as export_screen
@@ -90,54 +91,59 @@ async def step_copy_resources(exp: ExportData) -> None:
     packset = exp.packset
     already_copied = exp.resources
 
-    for pack in packset.packages.values():
-        if not pack.enabled:
-            continue
-        for file in pack.fsys.walk_folder('resources'):
-            try:
-                res, start_folder, path = file.path.split('/', 2)
-            except ValueError:
-                LOGGER.warning('File in resources root: "{}"!', file.path)
+    def copy_file(file: File, dest: Path) -> None:
+        """Copy a single resource."""
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        with file.open_bin() as fsrc, open(dest, 'wb') as fdest:
+            shutil.copyfileobj(fsrc, fdest)
+        screen_func('RES', file.path)
+
+    async with trio.open_nursery() as nursery:
+        for pack in packset.packages.values():
+            if not pack.enabled:
                 continue
-            assert res.casefold() == 'resources', file.path
+            for file in pack.fsys.walk_folder('resources'):
+                try:
+                    res, start_folder, path = file.path.split('/', 2)
+                except ValueError:
+                    LOGGER.warning('File in resources root: "{}"!', file.path)
+                    continue
+                assert res.casefold() == 'resources', file.path
 
-            start_folder = start_folder.casefold()
+                start_folder = start_folder.casefold()
 
-            if start_folder == 'instances':
-                dest = Path(exp.game.abs_path(INST_PATH + '/' + path.casefold()))
-            elif start_folder in ('bee2', 'music_samp'):
-                screen_func('RES', start_folder)
-                continue  # Skip app icons and music samples.
-            else:
-                # Preserve original casing.
-                dest = Path(exp.game.abs_path(os.path.join('bee2', start_folder, path)))
+                if start_folder == 'instances':
+                    dest = Path(exp.game.abs_path(INST_PATH), path.casefold())
+                elif start_folder in ('bee2', 'music_samp'):
+                    screen_func('RES', start_folder)
+                    continue  # Skip app icons and music samples.
+                else:
+                    # Preserve original casing.
+                    dest = Path(exp.game.abs_path('bee2'), start_folder, path)
 
-            # Already copied from another package.
-            if dest in already_copied:
-                screen_func('RES', dest)
-                continue
-            already_copied.add(dest)
-
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            with file.open_bin() as fsrc, open(dest, 'wb') as fdest:
-                shutil.copyfileobj(fsrc, fdest)
-            screen_func('RES', file.path)
+                # Already copied from another package.
+                if dest in already_copied:
+                    screen_func('RES', dest)
+                    continue
+                already_copied.add(dest)
+                nursery.start_soon(trio.to_thread.run_sync, copy_file, file, dest)
 
     LOGGER.info('Cache copied.')
 
-    for path in [INST_PATH, 'bee2']:
-        abs_path = exp.game.abs_path(path)
-        for dirpath, dirnames, filenames in os.walk(abs_path):
-            for filename in filenames:
-                # Keep VMX backups, disabled editor models, and the coop
-                # gun instance.
-                if filename.endswith(('.vmx', '.mdl_dis', 'tag_coop_gun.vmf')):
-                    continue
-                path = os.path.join(dirpath, filename)
+    async with trio.open_nursery() as nursery:
+        for path in [INST_PATH, 'bee2']:
+            abs_path = exp.game.abs_path(path)
+            for dirpath, dirnames, filenames in os.walk(abs_path):
+                for filename in filenames:
+                    # Keep VMX backups, disabled editor models, and the coop
+                    # gun instance.
+                    if filename.endswith(('.vmx', '.mdl_dis', 'tag_coop_gun.vmf')):
+                        continue
+                    path = Path(dirpath, filename)
 
-                if path.casefold() not in already_copied:
-                    LOGGER.info('Deleting: {}', path)
-                    os.remove(path)
+                    if path not in already_copied:
+                        LOGGER.info('Deleting: {}', path)
+                        nursery.start_soon(trio.Path(path).unlink)
 
     # Save the new cache modification date.
     exp.game.mod_times.clear()
