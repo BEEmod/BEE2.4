@@ -4,7 +4,7 @@ from __future__ import annotations
 import os
 from enum import Enum, auto
 from pathlib import Path
-from typing import Any, Callable, TYPE_CHECKING, Tuple, Type
+from typing import Any, Callable, Dict, List, Set, TYPE_CHECKING, Type
 
 import attrs
 import srctools.logger
@@ -49,6 +49,7 @@ class StepResource(Enum):
 
 
 # The progress bars used when exporting data into a game
+STAGE_STEPS = 'STEPS'
 STAGE_COMP_BACKUP = 'BACK'
 STAGE_PUZZ_BACKUP = 'PUZZLE_BACKUP'
 STAGE_EXPORT = 'EXP'
@@ -56,6 +57,7 @@ STAGE_COMPILER = 'COMP'
 STAGE_RESOURCES = 'RES'
 STAGE_MUSIC = 'MUS'
 load_screen = loadScreen.LoadScreen(
+    (STAGE_STEPS, TransToken.ui('Overall Progress')),
     (STAGE_COMP_BACKUP, TransToken.ui('Backup Original Files')),
     (STAGE_PUZZ_BACKUP, TransToken.ui('Backup Puzzles')),
     (STAGE_EXPORT, TransToken.ui('Export Configuration')),
@@ -72,21 +74,21 @@ class ExportData:
     packset: PackagesSet  # The entire loaded packages set.
     game: Game  # The current game.
     # Usually str, but some items pass other things.
-    selected: dict[Type[PakObject], Any]
+    selected: Dict[Type[PakObject], Any]
     # Some items need to know which style is selected
     selected_style: Style
     # If refreshing resources is enabled.
     copy_resources: bool
     # All the items in the map
-    all_items: list[EditorItem] = attrs.Factory(list)
+    all_items: List[EditorItem] = attrs.Factory(list)
     # The error/connection icons
-    renderables: dict[RenderableType, Renderable] = attrs.Factory(dict)
+    renderables: Dict[RenderableType, Renderable] = attrs.Factory(dict)
     # vbsp_config.cfg file.
     vbsp_conf: Keyvalues = attrs.Factory(Keyvalues.root)
     # As steps export, they may fill this to include additional resources that
     # are written to the game folder. If updating the cache, these files won't
     # be deleted. This should be an absolute path.
-    resources: set[Path] = attrs.Factory(set)
+    resources: Set[Path] = attrs.Factory(set)
     # Flag set to indicate that the error server may be running.
     maybe_error_server_running: bool = True
     # Can be called to indicate a non-fatal error.
@@ -104,11 +106,12 @@ TRANS_WARN = TransToken.ui_plural(
     "Exporting was partially successful, but the following issues occurred:",
 )
 
+
 async def export(
     game: 'Game',
     packset: packages.PackagesSet,
     style: packages.Style,
-    selected_objects: dict[Type[packages.PakObject], Any],
+    selected_objects: Dict[Type[packages.PakObject], Any],
     should_refresh: bool = False,
 ) -> ErrorResult:
     """Export configuration to the specified game.
@@ -150,7 +153,7 @@ async def export(
                 warn=error_ui.add,
             )
 
-            await STEPS.run(exp_data)
+            await STEPS.run(exp_data, load_screen, STAGE_STEPS)
     return error_ui.result
 
 
