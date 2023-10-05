@@ -153,6 +153,9 @@ async def export(
             )
 
             await STEPS.run(exp_data, load_screen, STAGE_STEPS)
+
+            game.exported_style = style.id
+            game.save()
     return error_ui.result
 
 

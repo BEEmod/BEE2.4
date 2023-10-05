@@ -338,20 +338,6 @@ class Game:
         export_screen.show()
         try:
 
-            if should_refresh:
-                # Count the files.
-                export_screen.set_length(
-                    'RES',
-                    sum(
-                        1
-                        for pack in packset.packages.values()
-                        for _ in pack.fsys.walk_folder('resources/')
-                    ),
-                )
-            else:
-                export_screen.skip_stage('RES')
-                export_screen.skip_stage('MUS')
-
             # Backup puzzles, if desired
             backup.auto_backup(selected_game, export_screen)
 
@@ -363,9 +349,6 @@ class Game:
                 LOGGER.info('Adding ents to FGD.')
                 self.edit_fgd(True)
             export_screen.step('EXP', 'fgd')
-
-            self.exported_style = style.id
-            save()
 
             export_screen.reset()  # Hide loading screen, we're done
             return True
