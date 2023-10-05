@@ -10,7 +10,7 @@ from srctools import Keyvalues, Output, VMF, Vec
 from srctools.filesys import File, RawFileSystem, VPKFileSystem
 
 import utils
-from . import ExportData, STEPS, StepResource
+from . import ExportData, STEPS, StepResource, STAGE_MUSIC, load_screen as export_screen
 from packages import PackagesSet
 
 if TYPE_CHECKING:
@@ -196,6 +196,9 @@ async def step_copy_mod_music(exp: ExportData) -> None:
     # Mel's music has similar names to P2's, so put it in a subdir to avoid confusion.
     mel_dest = trio.Path(exp.game.abs_path('bee2/sound/music/mel/'))
 
+    # Ensure the folders exist, so we can copy there.
+    await mel_dest.mkdir(parents=True, exist_ok=True)
+
     fsys_tag = exp.packset.tag_music_fsys
     fsys_mel = exp.packset.mel_music_fsys
 
@@ -215,17 +218,21 @@ async def step_copy_mod_music(exp: ExportData) -> None:
         if not await dest.exists():
             with file.open_bin() as f:
                 await dest.write_bytes(await trio.to_thread.run_sync(f.read))
+        export_screen.step(STAGE_MUSIC, name)
 
     async with trio.open_nursery() as nursery:
         # Obviously Tag has its music already, skip copying to itself.
+        count = 0
         if fsys_tag is not None and exp.game.steamID != utils.STEAM_IDS['APERTURE TAG']:
-            await mel_dest.mkdir(parents=True, exist_ok=True)
             for file in fsys_tag.walk_folder():
                 nursery.start_soon(copy_music, tag_dest, file)
+                count += 1
 
         if fsys_mel is not None:
-            await tag_dest.mkdir(parents=True, exist_ok=True)
             for filename in MEL_MUSIC_NAMES:
                 nursery.start_soon(copy_music, mel_dest, fsys_mel['sound/music/' + filename])
+                count += 1
+
+        export_screen.set_length(STAGE_MUSIC, count)
 
     exp.resources |= copied_files
