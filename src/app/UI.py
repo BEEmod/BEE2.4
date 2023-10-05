@@ -11,7 +11,9 @@ import math
 import srctools.logger
 import attrs
 import trio
+from typing_extensions import assert_never
 
+import exporting
 import loadScreen
 from app import TK_ROOT, background_run, localisation
 from BEE2_config import ConfigFile, GEN_OPTS
@@ -736,8 +738,8 @@ async def export_editoritems(pal_ui: paletteUI.PaletteUI, bar: MenuBar) -> None:
     # Disable, so you can't double-export.
     UI['pal_export'].state(('disabled',))
     bar.set_export_allowed(False)
-    await tk_tools.wait_eventloop()
     try:
+        await tk_tools.wait_eventloop()
         # Convert IntVar to boolean, and only export values in the selected style
         chosen_style = current_style()
 
@@ -755,7 +757,8 @@ async def export_editoritems(pal_ui: paletteUI.PaletteUI, bar: MenuBar) -> None:
         conf = config.APP.get_cur_conf(config.gen_opts.GenOptions)
         packset = packages.get_loaded_packages()
 
-        success = await gameMan.selected_game.export(
+        result = await exporting.export(
+            gameMan.selected_game,
             packset,
             style=chosen_style,
             selected_objects={
@@ -768,13 +771,11 @@ async def export_editoritems(pal_ui: paletteUI.PaletteUI, bar: MenuBar) -> None:
                 packages.Item: pal_by_item,
                 packages.StyleVar: StyleVarPane.export_data(chosen_style),
                 packages.Signage: signage_ui.export_data(),
-
-                # The others don't have one, so it defaults to None.
             },
             should_refresh=not conf.preserve_resources,
         )
 
-        if not success:
+        if result is result.FAILED:
             return
 
         try:
@@ -823,7 +824,7 @@ async def export_editoritems(pal_ui: paletteUI.PaletteUI, bar: MenuBar) -> None:
                 quit_application()
                 # We never return from this.
             else:
-                raise ValueError(f'Unknown action "{conf.after_export}"')
+                assert_never(conf.after_export)
 
         # Select the last_export palette, so reloading loads this item selection.
         # But leave it at the current palette, if it's unmodified.
