@@ -39,8 +39,9 @@ _PIPE_DAEMON_REC, _PIPE_MAIN_SEND = multiprocessing.Pipe(duplex=False)
 T = TypeVar('T')
 
 
-class Cancelled(SystemExit):
+class Cancelled(BaseException):
     """Raised when the user cancels the loadscreen."""
+    # TODO: Replace with Trio's cancellation.
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -145,10 +146,11 @@ class LoadScreen:
         exc_type: Type[BaseException],
         exc_val: BaseException,
         exc_tb: TracebackType,
-    ) -> None:
-        """Hide the loading screen, and passthrough execptions.
+    ) -> bool:
+        """Hide the loading screen. If the Cancelled exception was raised, swallow that.
         """
         self.reset()
+        return exc_type is Cancelled
 
     def _send_msg(self, command: str, *args: Any) -> None:
         """Send a message to the daemon."""
