@@ -12,7 +12,7 @@ from srctools import Keyvalues
 
 import loadScreen
 import packages
-from app.errors import ErrorUI
+from app.errors import ErrorUI, Result as ErrorResult
 from editoritems import Item as EditorItem, Renderable, RenderableType
 from packages import PackagesSet, PakObject, Style
 from step_order import StepOrder
@@ -139,7 +139,7 @@ async def export(
             )
 
             await STEPS.run(exp_data)
-    return (not error_ui.failed, False)
+    return (error_ui.result is ErrorResult.SUCCEEDED, False)
 
 
 @STEPS.add_step(prereq=[], results=[

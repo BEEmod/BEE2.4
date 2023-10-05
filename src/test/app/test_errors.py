@@ -3,7 +3,7 @@ from exceptiongroup import ExceptionGroup
 
 import pytest
 
-from app.errors import AppError, ErrorUI
+from app.errors import AppError, ErrorUI, Result
 from transtoken import TransToken
 
 
@@ -59,7 +59,7 @@ async def test_success() -> None:
     with ErrorUI.install_handler(handler_fail):
         async with ErrorUI() as error_block:
             pass
-        assert not error_block.failed
+        assert error_block.result is Result.SUCCEEDED
     assert ErrorUI._handler is None
 
 
@@ -86,11 +86,11 @@ async def test_nonfatal() -> None:
     success = False
     with ErrorUI.install_handler(catch):
         async with ErrorUI(orig_title, orig_desc) as error_block:
-            assert not error_block.failed
+            assert error_block.result is Result.SUCCEEDED
             task.append("before")
 
             error_block.add(exc1)
-            assert error_block.failed  # now failed.
+            assert error_block.result is Result.PARTIAL
             task.append("mid")
 
             error_block.add(ExceptionGroup("two", [
@@ -111,12 +111,12 @@ async def test_nonfatal() -> None:
             assert reraised.value.exceptions == (unrelated, )
 
             task.append("after")
-            assert error_block.failed  # still failed.
+            assert error_block.result is Result.PARTIAL  # We caught the rest, not fatal.
         success = True  # The async-with did not raise.
 
     assert success
     assert task == ["before", "mid", "after"]
-    assert error_block.failed
+    assert error_block.result is Result.PARTIAL
     assert caught_errors == [exc1, exc2, exc3, exc4, exc5]
 
 
@@ -138,17 +138,17 @@ async def test_fatal_only_err() -> None:
     task: List[str] = []
     with ErrorUI.install_handler(catch):
         async with ErrorUI(orig_title, orig_desc) as error_block:
-            assert not error_block.failed
+            assert error_block.result is Result.SUCCEEDED
             task.append("before")
 
             error_block.add(exc1)
-            assert error_block.failed  # now failed.
+            assert error_block.result is Result.PARTIAL
             task.append("mid")
 
             raise exc2
 
     assert task == ["before", "mid"]
-    assert error_block.failed
+    assert error_block.result is Result.FAILED
     assert caught_errors == [exc1, exc2]
 
 
@@ -160,16 +160,17 @@ async def test_fatal_exc() -> None:
     task: List[str] = []
     with pytest.raises(ExceptionGroup) as group_catch, ErrorUI.install_handler(handler_fail):
         async with ErrorUI() as error_block:
-            assert not error_block.failed
+            assert error_block.result is Result.SUCCEEDED
             task.append("before")
 
             error_block.add(exc)
-            assert error_block.failed  # now failed.
+            assert error_block.result is Result.PARTIAL
             task.append("mid")
 
             raise unrelated
 
     assert isinstance(group_catch.value, ExceptionGroup)
+    assert error_block.result is Result.FAILED
     assert group_catch.value.message == "ErrorUI block raised"
     assert group_catch.value.exceptions == (exc, unrelated)
 
@@ -184,16 +185,17 @@ async def test_fatal_group() -> None:
     task: List[str] = []
     with pytest.raises(ExceptionGroup) as group_catch, ErrorUI.install_handler(handler_fail):
         async with ErrorUI() as error_block:
-            assert not error_block.failed
+            assert error_block.result is Result.SUCCEEDED
             task.append("before")
 
             error_block.add(exc1)
-            assert error_block.failed  # now failed.
+            assert error_block.result is Result.PARTIAL
             task.append("mid")
 
             raise group
 
     assert isinstance(group_catch.value, ExceptionGroup)
+    assert error_block.result is Result.FAILED
     assert group_catch.value.message == "ErrorUI block raised"
     assert group_catch.value.exceptions == (exc1, group)
     # No special handling, exc2 doesn't make it in.
