@@ -94,7 +94,15 @@ class ExportData:
 
 
 STEPS = StepOrder(ExportData, StepResource)
-
+TRANS_EXP_TITLE = TransToken.ui("BEE2 Export - {game}")
+TRANS_ERROR = TransToken.ui_plural(
+    "Exporting failed. The following error occurred:",
+    "Exporting failed. The following errors occurred:",
+)
+TRANS_WARN = TransToken.ui_plural(
+    "Exporting was partially successful, but the following issue occurred:",
+    "Exporting was partially successful, but the following issues occurred:",
+)
 
 async def export(
     game: 'Game',
@@ -102,7 +110,7 @@ async def export(
     style: packages.Style,
     selected_objects: dict[Type[packages.PakObject], Any],
     should_refresh: bool = False,
-) -> Tuple[bool, bool]:
+) -> ErrorResult:
     """Export configuration to the specified game.
 
     - If no backup is present, the original editoritems is backed up.
@@ -115,8 +123,9 @@ async def export(
         LOGGER.info('{} = {}', obj_type, selected)
 
     async with ErrorUI(
-        title=TransToken.ui("BEE2 Export - {game}").format(game=game.name),
-        desc=TransToken.ui("Exporting failed. The following errors occurred:")
+        title=TRANS_EXP_TITLE.format(game=game.name),
+        error_desc=TRANS_ERROR,
+        warn_desc=TRANS_WARN,
     ) as error_ui:
         with load_screen:
             LOGGER.info('Should refresh: {}', should_refresh)
@@ -142,7 +151,7 @@ async def export(
             )
 
             await STEPS.run(exp_data)
-    return (error_ui.result is ErrorResult.SUCCEEDED, False)
+    return error_ui.result
 
 
 @STEPS.add_step(prereq=[], results=[

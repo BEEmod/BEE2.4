@@ -16,9 +16,13 @@ from transtoken import TransToken
 
 LOGGER = srctools.logger.get_logger(__name__)
 DEFAULT_TITLE = TransToken.ui("BEEmod Error")
-DEFAULT_DESC = TransToken.ui_plural(
+DEFAULT_ERROR_DESC = TransToken.ui_plural(
     "An error occurred while performing this task:",
     "Multiple errors occurred while performing this task:",
+)
+DEFAULT_WARN_DESC = TransToken.ui_plural(
+    "An error occurred while performing this task, but it was partially successful:",
+    "Multiple errors occurred while performing this task, but it was partially successful:",
 )
 
 
@@ -77,7 +81,8 @@ def _collapse_excgroup(group: BaseExceptionGroup[AppError], fatal: bool) -> Iter
 class ErrorUI:
     """A context manager which handles processing the errors."""
     title: TransToken
-    desc: TransToken
+    error_desc: TransToken
+    warn_desc: TransToken
     _errors: list[AppError]
     _fatal_error: bool  # If set, error was caught in __aexit__
 
@@ -98,15 +103,17 @@ class ErrorUI:
             cls._handler = None
 
     def __init__(
-        self,
+        self, *,
         title: TransToken = DEFAULT_TITLE,
-        desc: TransToken = DEFAULT_DESC,
+        error_desc: TransToken = DEFAULT_ERROR_DESC,
+        warn_desc: TransToken = DEFAULT_WARN_DESC,
     ) -> None:
         """Create a UI handler. install_handler() must already be running."""
         if self._handler is None:
             LOGGER.warning("ErrorUI initialised with no handler running!")
         self.title = title
-        self.desc = desc
+        self.error_desc = error_desc
+        self.warn_desc = warn_desc
         self._errors = []
         self._fatal_error = False
 
@@ -175,7 +182,8 @@ class ErrorUI:
             return False
 
         if self._errors:
-            desc = self.desc.format(n=len(self._errors))
+            desc = self.error_desc if self._fatal_error else self.warn_desc
+            desc = desc.format(n=len(self._errors))
             # We had an error.
             if ErrorUI._handler is None:
                 LOGGER.error(

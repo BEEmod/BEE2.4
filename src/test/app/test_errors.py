@@ -66,13 +66,14 @@ async def test_success() -> None:
 async def test_nonfatal() -> None:
     """Test the behaviour of non-fatal .add() errors."""
     orig_title = TransToken.untranslated("The title")
-    orig_desc = TransToken.untranslated("nonfatal description, n={n}")
+    orig_error = TransToken.untranslated("nonfatal error, n={n}")
+    orig_warn = TransToken.untranslated("nonfatal warn, n={n}")
     caught_errors: List[AppError] = []
 
     async def catch(title: TransToken, desc: TransToken, errors: List[AppError]) -> None:
         """Catch the errors that occur."""
         assert title is orig_title
-        assert str(desc) == "nonfatal description, n=5"
+        assert str(desc) == "nonfatal warn, n=5"
         caught_errors.extend(errors)
 
     exc1 = AppError(TransToken.untranslated("Error 1"))
@@ -85,7 +86,7 @@ async def test_nonfatal() -> None:
     task: List[str] = []
     success = False
     with ErrorUI.install_handler(catch):
-        async with ErrorUI(orig_title, orig_desc) as error_block:
+        async with ErrorUI(title=orig_title, error_desc=orig_error, warn_desc=orig_warn) as error_block:
             assert error_block.result is Result.SUCCEEDED
             task.append("before")
 
@@ -123,13 +124,14 @@ async def test_nonfatal() -> None:
 async def test_fatal_only_err() -> None:
     """Test raising only an AppError inside the block."""
     orig_title = TransToken.untranslated("The title")
-    orig_desc = TransToken.untranslated("fatal_only_error description, n={n}")
+    orig_error = TransToken.untranslated("fatal_only_error error, n={n}")
+    orig_warn = TransToken.untranslated("fatal_only_error warn, n={n}")
     caught_errors: List[AppError] = []
 
     async def catch(title: TransToken, desc: TransToken, errors: List[AppError]) -> None:
         """Catch the errors that occur."""
         assert title is orig_title
-        assert str(desc) == "fatal_only_error description, n=2"
+        assert str(desc) == "fatal_only_error error, n=2"
         caught_errors.extend(errors)
 
     exc1 = AppError(TransToken.untranslated("Error 1"))
@@ -137,7 +139,7 @@ async def test_fatal_only_err() -> None:
 
     task: List[str] = []
     with ErrorUI.install_handler(catch):
-        async with ErrorUI(orig_title, orig_desc) as error_block:
+        async with ErrorUI(title=orig_title, error_desc=orig_error, warn_desc=orig_warn) as error_block:
             assert error_block.result is Result.SUCCEEDED
             task.append("before")
 
