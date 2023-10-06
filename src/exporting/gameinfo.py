@@ -1,6 +1,7 @@
 """Modify gameinfo to add our game folder."""
-import os
+from __future__ import annotations
 from typing import Final, TYPE_CHECKING
+import os
 
 import srctools
 import trio

@@ -1,4 +1,5 @@
 """Modify the game's FGD to allow instance collapsing to work."""
+from __future__ import annotations
 from typing import IO, TYPE_CHECKING
 import re
 import shutil
