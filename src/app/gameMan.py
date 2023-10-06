@@ -7,7 +7,7 @@ Does stuff related to the actual games.
 """
 from __future__ import annotations
 
-from typing import Dict, NoReturn, Optional, Union, Any, Type, IO, Iterator
+from typing import Dict, NoReturn, Optional, Union, Any, Type, Iterator
 from pathlib import Path
 
 from tkinter import *  # ui library
@@ -18,7 +18,7 @@ import re
 import shutil
 import webbrowser
 
-from srctools import VPK, Keyvalues, AtomicWriter, VMF
+from srctools import VPK, Keyvalues, VMF
 import srctools.logger
 import srctools.fgd
 import attrs
@@ -30,6 +30,7 @@ from config.gen_opts import GenOptions
 from exporting import load_screen as export_screen
 from exporting.compiler import terminate_error_server, restore_backup
 from exporting.files import INST_PATH
+from exporting.gameinfo import edit_gameinfos
 from transtoken import TransToken
 import loadScreen
 import packages
@@ -48,12 +49,6 @@ game_menu: Optional[Menu] = None
 ON_GAME_CHANGED: event.Event[Game] = event.Event('game_changed')
 
 CONFIG = ConfigFile('games.cfg')
-
-# The line we inject to add our BEE2 folder into the game search path.
-# We always add ours such that it's the highest priority, other
-# than '|gameinfo_path|.'
-GAMEINFO_LINE = 'Game\t|gameinfo_path|../bee2'
-OLD_GAMEINFO_LINE = 'Game\t"BEE2"'
 
 TRANS_EXPORT_BTN = TransToken.ui('Export to "{game}"...')
 TRANS_EXPORT_BTN_DIRTY = TransToken.ui('Export to "{game}"*...')
@@ -164,60 +159,6 @@ class Game:
     def abs_path(self, path: Union[str, Path]) -> str:
         """Return the full path to something relative to this game's folder."""
         return os.path.normcase(os.path.join(self.root, path))
-
-    def edit_gameinfo(self, add_line: bool = False) -> None:
-        """Modify all gameinfo.txt files to add or remove our line.
-
-        Add_line determines if we are adding or removing it.
-        """
-
-        for folder in self.dlc_priority():
-            info_path = os.path.join(self.root, folder, 'gameinfo.txt')
-            if os.path.isfile(info_path):
-                with open(info_path, encoding='utf8') as file:
-                    data = list(file)
-
-                for line_num, line in reversed(list(enumerate(data))):
-                    clean_line = srctools.clean_line(line)
-                    if add_line:
-                        if clean_line == GAMEINFO_LINE:
-                            break  # Already added!
-                        elif clean_line == OLD_GAMEINFO_LINE:
-                            LOGGER.debug(
-                                "Updating gameinfo hook to {}",
-                                info_path,
-                            )
-                            data[line_num] = utils.get_indent(line) + GAMEINFO_LINE + '\n'
-                            break
-                        elif '|gameinfo_path|' in clean_line and GAMEINFO_LINE not in line:
-                            LOGGER.debug(
-                                "Adding gameinfo hook to {}",
-                                info_path,
-                            )
-                            # Match the line's indentation
-                            data.insert(
-                                line_num+1,
-                                utils.get_indent(line) + GAMEINFO_LINE + '\n',
-                                )
-                            break
-                    else:
-                        if clean_line == GAMEINFO_LINE or clean_line == OLD_GAMEINFO_LINE:
-                            LOGGER.debug(
-                                "Removing gameinfo hook from {}", info_path
-                            )
-                            data.pop(line_num)
-                            break
-                else:
-                    if add_line:
-                        LOGGER.warning(
-                            'Failed editing "{}" to add our special folder!',
-                            info_path,
-                        )
-                    continue
-
-                with AtomicWriter(info_path, encoding='utf8') as file2:
-                    for line in data:
-                        file2.write(line)
 
     def cache_invalid(self) -> bool:
         """Check to see if the cache is valid."""
@@ -467,7 +408,7 @@ async def remove_game() -> None:
         message=lastgame_mess.format(game=selected_game.name),
     ):
         await terminate_error_server()
-        selected_game.edit_gameinfo(add_line=False)
+        await edit_gameinfos(selected_game, add_line=False)
         edit_fgd(selected_game, add_lines=False)
         await restore_backup(selected_game)
         await selected_game.clear_cache()
