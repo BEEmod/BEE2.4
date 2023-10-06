@@ -11,6 +11,7 @@ EX_SIZE_MAX = Vec(8832, 8832, 8832)
 EX_SIZE_MIN = Vec(5632, 5632, 5632)
 
 def make_skybox(vmf : VMF, coll):
+    """Generate the map skybox"""
     if not precomp.options.get(bool, 'extend_chamber'):
         return None
 
@@ -24,6 +25,7 @@ def make_skybox(vmf : VMF, coll):
     # Add exterior decoration
 
 def make_skybox_shell(vmf : VMF):
+    """Make the shell around the map"""
     # Generate our walls
     size_pad = Vec(2048, 2048, 128)
 
