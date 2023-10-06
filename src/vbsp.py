@@ -1668,7 +1668,7 @@ async def main() -> None:
         conditions.check_all(vmf, coll, info)
         add_extra_ents(vmf, info)
 
-        skybox.generate(vmf, coll)
+        skybox.make_skybox(vmf, coll)
 
         tiling.generate_brushes(vmf)
         faithplate.gen_faithplates(vmf, info.has_attr('superposition'))
