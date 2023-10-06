@@ -7,34 +7,31 @@ Does stuff related to the actual games.
 """
 from __future__ import annotations
 
-from typing import Dict, NoReturn, Optional, Union, Any, Type, Iterator
+from typing import Dict, NoReturn, Optional, Union, Iterator
 from pathlib import Path
 
 from tkinter import *  # ui library
 from tkinter import filedialog  # open/save as dialog creator
 
 import os
-import re
 import shutil
 import webbrowser
 
-from srctools import VPK, Keyvalues, VMF
+from srctools import Keyvalues
 import srctools.logger
 import srctools.fgd
 import attrs
 from typing_extensions import Self
 
 from BEE2_config import ConfigFile
-from app import backup, tk_tools, TK_ROOT, background_run
+from app import tk_tools, TK_ROOT, background_run
 from config.gen_opts import GenOptions
-from exporting import load_screen as export_screen
 from exporting.compiler import terminate_error_server, restore_backup
 from exporting.files import INST_PATH
 from exporting.gameinfo import edit_gameinfos
 from transtoken import TransToken
 import loadScreen
 import packages
-import packages.template_brush
 import utils
 import config
 import event
@@ -59,13 +56,6 @@ EXE_SUFFIX = (
     '_linux' if utils.LINUX else
     ''
 )
-
-# We search for Tag and Mel's music files, and copy them to games on export.
-# That way they can use the files.
-MUSIC_MEL_VPK: Optional[VPK] = None
-MUSIC_TAG_LOC: Optional[str] = None
-TAG_COOP_INST_VMF: Optional[VMF] = None
-
 
 
 def quit_application() -> NoReturn:
@@ -193,48 +183,6 @@ class Game:
 
         self.mod_times.clear()
 
-    async def export(
-        self,
-        packset: packages.PackagesSet,
-        style: packages.Style,
-        selected_objects: dict[Type[packages.PakObject], Any],
-        should_refresh: bool = False,
-    ) -> bool:
-        """Generate the editoritems.txt and vbsp_config.
-
-        - If no backup is present, the original editoritems is backed up.
-        - For each object type, run its .export() function with the given
-        - item.
-        - Styles are a special case.
-        """
-        # Each object type
-        # Editoritems
-        # VBSP_config
-        # Instance list
-        # Editor models
-        # Template file
-        # FGD file
-        # Gameinfo
-        # Misc resources
-        export_screen.set_length('EXP', len(packages.OBJ_TYPES) + 8)
-
-        # Do this before setting music and resources,
-        # those can take time to compute.
-        export_screen.show()
-        try:
-
-            # Backup puzzles, if desired
-            backup.auto_backup(selected_game, export_screen)
-
-            LOGGER.info('Editing Gameinfo...')
-            self.edit_gameinfo(True)
-            export_screen.step('EXP', 'gameinfo')
-
-            export_screen.reset()  # Hide loading screen, we're done
-            return True
-        except loadScreen.Cancelled:
-            return False
-
     def launch(self) -> None:
         """Try and launch the game."""
         webbrowser.open('steam://rungameid/' + str(self.steamID))
@@ -335,7 +283,7 @@ def load() -> None:
     selected_game = all_games[0]
 
 
-def add_game(e: Event = None) -> bool:
+def add_game(e: object = None) -> bool:
     """Ask for, and load in a game to export to."""
     title = TransToken.ui('BEE2 - Add Game')
     tk_tools.showinfo(
@@ -459,6 +407,7 @@ def set_game_by_name(name: str) -> None:
             # TODO: make this function async too to eliminate.
             background_run(ON_GAME_CHANGED, selected_game)
             break
+
 
 if __name__ == '__main__':
     Button(TK_ROOT, text='Add', command=add_game).grid(row=0, column=0)
