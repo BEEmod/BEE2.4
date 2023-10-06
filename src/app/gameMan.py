@@ -219,62 +219,6 @@ class Game:
                     for line in data:
                         file2.write(line)
 
-    def edit_fgd(self, add_lines: bool=False) -> None:
-        """Add our FGD files to the game folder.
-
-        This is necessary so that VBSP offsets the entities properly,
-        if they're in instances.
-        Add_line determines if we are adding or removing it.
-        """
-        file: IO[bytes]
-        # We do this in binary to ensure non-ASCII characters pass though
-        # untouched.
-
-        fgd_path = self.abs_path('bin/portal2.fgd')
-        try:
-            with open(fgd_path, 'rb') as file:
-                data = file.readlines()
-        except FileNotFoundError:
-            LOGGER.warning('No FGD file? ("{}")', fgd_path)
-            return
-
-        for i, line in enumerate(data):
-            match = re.match(
-                br'// BEE\W*2 EDIT FLAG\W*=\W*([01])',
-                line,
-                re.IGNORECASE,
-            )
-            if match:
-                if match.group(1) == b'0':
-                    LOGGER.info('FGD editing disabled by file.')
-                    return  # User specifically disabled us.
-                # Delete all data after this line.
-                del data[i:]
-                break
-
-        with AtomicWriter(fgd_path, is_bytes=True) as file:
-            for line in data:
-                file.write(line)
-            if add_lines:
-                file.write(
-                    b'// BEE 2 EDIT FLAG = 1 \n'
-                    b'// Added automatically by BEE2. Set above to "0" to '
-                    b'allow editing below text without being overwritten.\n'
-                    b'// You\'ll want to do that if installing Hammer Addons.'
-                    b'\n\n'
-                )
-                with utils.install_path('BEE2.fgd').open('rb') as bee2_fgd:
-                    shutil.copyfileobj(bee2_fgd, file)
-                file.write(b'\n')
-                try:
-                    with utils.install_path('hammeraddons.fgd').open('rb') as ha_fgd:
-                        shutil.copyfileobj(ha_fgd, file)
-                except FileNotFoundError:
-                    if utils.FROZEN:
-                        raise  # Should be here!
-                    else:
-                        LOGGER.warning('Missing hammeraddons.fgd, build the app at least once!')
-
     def cache_invalid(self) -> bool:
         """Check to see if the cache is valid."""
         if config.APP.get_cur_conf(GenOptions).preserve_resources:
@@ -344,11 +288,6 @@ class Game:
             LOGGER.info('Editing Gameinfo...')
             self.edit_gameinfo(True)
             export_screen.step('EXP', 'gameinfo')
-
-            if not config.APP.get_cur_conf(GenOptions).preserve_fgd:
-                LOGGER.info('Adding ents to FGD.')
-                self.edit_fgd(True)
-            export_screen.step('EXP', 'fgd')
 
             export_screen.reset()  # Hide loading screen, we're done
             return True
@@ -514,6 +453,7 @@ def add_game(e: Event = None) -> bool:
 
 async def remove_game() -> None:
     """Remove the currently-chosen game from the game list."""
+    from exporting.fgd import edit_fgd
     global selected_game
     lastgame_mess = (
         TransToken.ui(
@@ -528,7 +468,7 @@ async def remove_game() -> None:
     ):
         await terminate_error_server()
         selected_game.edit_gameinfo(add_line=False)
-        selected_game.edit_fgd(add_lines=False)
+        edit_fgd(selected_game, add_lines=False)
         await restore_backup(selected_game)
         await selected_game.clear_cache()
 

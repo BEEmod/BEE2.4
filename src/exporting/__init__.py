@@ -184,7 +184,7 @@ async def step_add_core_info(exp: ExportData) -> None:
 
 # Register everything.
 from exporting import (
-    compiler, corridors, cube_colourizer, editor_sound, elevator, files, fizzler, items, music,
-    pack_list, quote_pack, signage, skybox, stylevar, template_brush, translations, vpks,
-    widgets,
+    compiler, corridors, cube_colourizer, editor_sound, elevator, fgd, files, fizzler,
+    items, music, pack_list, quote_pack, signage, skybox, stylevar, template_brush, translations,
+    vpks, widgets,
 )
