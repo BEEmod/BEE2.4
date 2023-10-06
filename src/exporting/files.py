@@ -10,6 +10,7 @@ from srctools import AtomicWriter, Keyvalues, logger
 from srctools.filesys import File
 import trio
 
+from app import backup
 from . import ExportData, STEPS, StepResource, load_screen as export_screen, STAGE_RESOURCES
 import editoritems
 
@@ -75,6 +76,12 @@ async def step_write_editoritems_db(exp: ExportData) -> None:
     pick = await trio.to_thread.run_sync(pickle.dumps, exp.all_items, pickle.HIGHEST_PROTOCOL)
     pick = await trio.to_thread.run_sync(pickletools.optimize, pick)
     await trio.Path(exp.game.abs_path('bin/bee2/editor.bin')).write_bytes(pick)
+
+
+@STEPS.add_step(prereq=[], results=[StepResource.EI_FILE])
+async def step_auto_backup(exp: ExportData) -> None:
+    """Run an auto-backup, if requested to."""
+    backup.auto_backup(exp.game, export_screen)
 
 
 @STEPS.add_step(prereq=[StepResource.RES_SPECIAL], results=[StepResource.RES_PACKAGE])
