@@ -588,6 +588,12 @@ DEFAULTS = [
         A 128x128 room is added there, and logic ents are added inside.
         """),
 
+    Opt('extend_chamber', False,
+        """Do the thing with the skybox
+
+        and don't fuck it up
+        """),
+
     ######
     # The following are set by the BEE2.4 app automatically:
 

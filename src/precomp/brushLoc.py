@@ -174,6 +174,8 @@ class Grid(MutableMapping[_grid_keys, Block]):
     """
     def __init__(self) -> None:
         self._grid: dict[tuple[float, float, float], Block] = {}
+        self.min = Vec()
+        self.max = Vec()
 
     def raycast(
         self,
@@ -323,6 +325,8 @@ class Grid(MutableMapping[_grid_keys, Block]):
             tex = {face.mat.casefold() for face in brush.sides}
 
             bbox_min, bbox_max = brush.get_bbox()
+            self.min.min(bbox_min)
+            self.max.max(bbox_max)
 
             if (
                 'nature/toxicslime_a2_bridge_intro' in tex or

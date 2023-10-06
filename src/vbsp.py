@@ -51,7 +51,7 @@ from precomp import (
     music,
     rand,
     cubes,
-    errors,
+    errors, skybox,
 )
 import consts
 import editoritems
@@ -1668,6 +1668,8 @@ async def main() -> None:
         conditions.check_all(vmf, coll, info)
         add_extra_ents(vmf, info)
 
+        skybox.generate(vmf, coll)
+
         tiling.generate_brushes(vmf)
         faithplate.gen_faithplates(vmf, info.has_attr('superposition'))
         change_overlays(vmf)
@@ -1686,9 +1688,11 @@ async def main() -> None:
         # from parameters.
         vmf.spawn['BEE2_is_peti'] = True
 
+        save(vmf, new_path)
+
         # Save and run VBSP. If this leaks, this will raise UserError, and we'll compile again.
         if not skip_vbsp:
-            save(vmf, new_path)
+
             run_vbsp(
                 vbsp_args=new_args,
                 path=path,
