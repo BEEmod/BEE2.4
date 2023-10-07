@@ -112,7 +112,7 @@ async def step_copy_resources(exp: ExportData) -> None:
                 continue
             for file in pack.fsys.walk_folder('resources'):
                 try:
-                    res, start_folder, path = file.path.split('/', 2)
+                    res, start_folder, pathstr = file.path.split('/', 2)
                 except ValueError:
                     LOGGER.warning('File in resources root: "{}"!', file.path)
                     continue
@@ -121,12 +121,12 @@ async def step_copy_resources(exp: ExportData) -> None:
                 start_folder = start_folder.casefold()
 
                 if start_folder == 'instances':
-                    dest = Path(exp.game.abs_path(INST_PATH), path.casefold())
+                    dest = Path(exp.game.abs_path(INST_PATH), pathstr.casefold())
                 elif start_folder in ('bee2', 'music_samp'):
                     continue  # Skip app icons and music samples.
                 else:
                     # Preserve original casing.
-                    dest = Path(exp.game.abs_path('bee2'), start_folder, path)
+                    dest = Path(exp.game.abs_path('bee2'), start_folder, pathstr)
 
                 # Already copied from another package.
                 if dest in already_copied:
