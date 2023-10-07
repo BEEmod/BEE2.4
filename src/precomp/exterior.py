@@ -10,13 +10,13 @@ LOGGER = srctools.logger.get_logger(__name__)
 EX_SIZE_MAX = Vec(8832, 8832, 8832)
 EX_SIZE_MIN = Vec(5632, 5632, 5632)
 
-def make_skybox(vmf : VMF, coll):
-    """Generate the map skybox"""
+def make_exterior(vmf : VMF, coll):
+    """Generate the exterior of the map: pits, catwalks, tubes, etc."""
     if not precomp.options.get(bool, 'extend_chamber'):
         return None
 
     # Make the box that contains the map
-    make_skybox_shell(vmf)
+    make_exterior_shell(vmf)
 
     # Move Elevators to valid location if possible and then generate elevator shell
 
@@ -24,10 +24,11 @@ def make_skybox(vmf : VMF, coll):
 
     # Add exterior decoration
 
-def make_skybox_shell(vmf : VMF):
+def make_exterior_shell(vmf : VMF):
     """Make the shell around the map"""
     # Generate our walls
-    size_pad = Vec(2048, 2048, 128)
+    # All these variables should be controlled by the style package
+    size_pad = Vec(2048, 2048, 2048)
 
     pos_min,pos_max = Vec.bbox(POS.min, POS.max)
     bbox_origin = (POS.min + POS.max) / 2
