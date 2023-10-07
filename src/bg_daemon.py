@@ -189,8 +189,14 @@ class BaseLoadScreen:
 class LoadScreen(BaseLoadScreen):
     """Normal loading screens."""
 
-    def __init__(self, *args) -> None:
-        super().__init__(*args)
+    def __init__(
+        self,
+        scr_id: int,
+        title_text: str,
+        force_ontop: bool,
+        stages: List[Tuple[str, str]],
+    ) -> None:
+        super().__init__(scr_id, title_text, force_ontop, stages)
 
         self.frame = ttk.Frame(self.win, cursor=tk_tools.Cursors.WAIT)
         self.frame.grid(row=0, column=0)
@@ -295,8 +301,14 @@ class SplashScreen(BaseLoadScreen):
     about reloading translations.
     """
 
-    def __init__(self, *args) -> None:
-        super().__init__(*args)
+    def __init__(
+        self,
+        scr_id: int,
+        title_text: str,
+        force_ontop: bool,
+        stages: List[Tuple[str, str]],
+    ) -> None:
+        super().__init__(scr_id, title_text, force_ontop, stages)
 
         self.is_compact = True
 
