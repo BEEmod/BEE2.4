@@ -1,11 +1,11 @@
 """Handler for app.errors."""
+from __future__ import annotations
 from typing import List, Tuple
 from tkinter import ttk
 import tkinter as tk
 import math
 
 import trio
-import trio_typing
 
 from app import TK_ROOT, localisation
 from app.errors import AppError, ErrorUI
@@ -16,7 +16,7 @@ ChannelValue = Tuple[TransToken, TransToken, List[AppError], trio.Event]
 
 
 async def display_errors(
-    *, task_status: trio_typing.TaskStatus[None] = trio.TASK_STATUS_IGNORED,
+    *, task_status: trio.TaskStatus[None] = trio.TASK_STATUS_IGNORED,
 ) -> None:
     """Always-running task that displays errors."""
     send: trio.abc.SendChannel[ChannelValue]
