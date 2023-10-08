@@ -91,6 +91,7 @@ class tkRichText(tkinter.Text):
         self.tag_config(TextTag.BOLD, font=self.bold_font)
         self.tag_config(TextTag.ITALIC, font=self.italic_font)
         self.tag_config(TextTag.STRIKETHROUGH, overstrike=True)
+        self.tag_config(TextTag.IMAGE, justify='center')
         self.tag_config(
             TextTag.INVERT,
             background='black',
@@ -197,8 +198,10 @@ class tkRichText(tkinter.Text):
                     super().insert('end', text, tags)
                 elif isinstance(block, tkMarkdown.Image):
                     super().insert('end', '\n')
-                    TK_IMG.textwid_add(self, 'end', block.handle)
+                    img_pos = TK_IMG.textwid_add(self, 'end', block.handle)
+                    super().tag_add(TextTag.IMAGE, img_pos)
                     super().insert('end', '\n')
+
                 else:
                     raise ValueError(f'Unknown block {block!r}?')
         finally:
