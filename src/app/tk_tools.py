@@ -5,7 +5,6 @@ General code used for tkinter portions.
 import functools
 import inspect
 import sys
-import types
 from enum import Enum
 from typing import (
     Awaitable, Dict, Generic, Iterable, overload, cast, Any, TypeVar, Protocol, Union, Callable,
@@ -419,14 +418,14 @@ def link_checkmark(check: ttk.Checkbutton, widget: tk.Widget) -> None:
         """Check if the mouse is hovering over the label, or the checkmark."""
         # identify-element returns the component name under the specified position,
         # or an empty string if the widget isn't there.
-        return widget.tk.call(
+        return str(widget.tk.call(
             widget, 'identify', 'element',
             event.x, event.y,
-        ) != '' or check.tk.call(
+        )) != '' or str(check.tk.call(
             check, 'identify', 'element',
             event.x_root - check.winfo_rootx(),
             event.y_root - check.winfo_rooty(),
-        ) != ''
+        )) != ''
 
     def on_press(event: tk.Event) -> None:
         """When pressed, highlight the checkmark."""
