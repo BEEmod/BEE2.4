@@ -22,6 +22,15 @@ from srctools import Angle
 import trio
 
 
+__all__ = [
+    'WIN', 'MAC','LINUX', 'STEAM_IDS', 'DEV_MODE', 'CODE_DEV_MODE', 'BITNESS',
+    'get_git_version', 'install_path', 'conf_location', 'fix_cur_directory', 'run_bg_daemon',
+    'CONN_LOOKUP', 'CONN_TYPES', 'freeze_enum_props', 'FuncLookup', 'PackagePath',
+    'Result', 'acompose', 'get_indent', 'iter_grid', 'check_cython', 'check_shift',
+    'fit', 'group_runs', 'restart_app', 'quit_app', 'set_readonly', 'unset_readonly',
+    'merge_tree', 'write_lang_pot',
+]
+
 WIN = sys.platform.startswith('win')
 MAC = sys.platform.startswith('darwin')
 LINUX = sys.platform.startswith('linux')
