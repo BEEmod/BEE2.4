@@ -142,7 +142,7 @@ class TKImages(img.UIImage):
             widget['image'] = self._load_tk(loading, False)
         return widget
 
-    def textwid_add(self, textwid: tk.Text, index: str, image: img.Handle) -> None:
+    def textwid_add(self, textwid: tk.Text, index: str, image: img.Handle) -> str:
         """Add an image to a tkinter.Text widget, at the specified location."""
         try:
             user = textwid_to_user[textwid]
@@ -159,7 +159,9 @@ class TKImages(img.UIImage):
         except KeyError:  # Need to load.
             loading = image._request_load()
             tk_img = self._load_tk(loading, False)
-        ids_list.append(textwid.image_create(index, image=tk_img))
+        new_id = textwid.image_create(index, image=tk_img)
+        ids_list.append(new_id)
+        return new_id
 
     def textwid_clear(self, textwid: tk.Text) -> None:
         """Remove all added images from this text widget, freeing resources."""
