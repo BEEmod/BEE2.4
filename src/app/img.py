@@ -6,12 +6,14 @@ filename/options, so are cheap to create. Once applied to a UI widget,
 they are loaded in the background, then unloaded if removed from all widgets.
 """
 from __future__ import annotations
-from typing import Any, ClassVar, Dict, Final, Iterable, Iterator, Tuple, Type
+
+from typing import Any, ClassVar, Dict, Final, Iterator, Tuple, Type
 from typing_extensions import Self
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 import abc
 import functools
+import itertools
 import logging
 import weakref
 
@@ -99,9 +101,6 @@ for _theme in Theme:
 LOAD_FRAME_IND = range(8)
 
 del _load_icon, _load_icon_flip, _theme
-# Loader handles, which we want to cycle animate.
-# The first icon is the one users use, the others are each frame (manually loaded).
-_load_handles: dict[tuple[int, int], tuple[ImgIcon, list[ImgIcon]]] = {}
 
 # Once initialised, schedule here.
 _load_nursery: trio.Nursery | None = None
@@ -214,8 +213,6 @@ class User:
 
     These are UI-library specific, except for handles themselves.
     """
-    def show_loading(self) -> None:
-        """Change this user to temporarily show the loading icon."""
 
 
 @attrs.define(eq=False)
@@ -246,6 +243,8 @@ class Handle(User):
     # If set, assigning this handle to a widget preserves the alpha. This is only set on UI icons
     # and the like, not packages.
     alpha_result: ClassVar[bool] = False
+    # Track how many are loading.
+    _currently_loading: ClassVar[int] = 0
 
     # Subclass methods
     def _children(self) -> Iterator[Handle]:
@@ -466,15 +465,15 @@ class Handle(User):
         return ImgIcon._deduplicate(width, height, 'none')
 
     @classmethod
-    def ico_loading(cls, width: int, height: int) -> ImgIcon:
-        """Shortcut for getting a handle to a 'loading' icon."""
+    def ico_loading(cls, width: int, height: int) -> ImgLoading:
+        """Retrieve a handle to a 'loading' icon."""
         try:
-            return _load_handles[width, height][0]
+            return ImgLoading.load_anims[width, height][0]
         except KeyError:
-            main_ico = ImgIcon._deduplicate(width, height, 'load')
+            main_ico = ImgLoading._deduplicate(width, height, 'load')
             # Build an additional load icon for each frame, so that can be cached.
-            _load_handles[width, height] = main_ico, [
-                ImgIcon._deduplicate(width, height, f'load_{i}')
+            ImgLoading.load_anims[width, height] = main_ico, [
+                ImgLoading._deduplicate(width, height, f'load_{i}')
                 for i in LOAD_FRAME_IND
             ]
             return main_ico
@@ -555,7 +554,7 @@ class Handle(User):
         return self._cached_pil
 
     def _decref(self, ref: User) -> None:
-        """A label was no longer set to this handle."""
+        """A user no longer requires this handle."""
         if self._force_loaded:
             return
         self._users.discard(ref)
@@ -570,7 +569,7 @@ class Handle(User):
             _load_nursery.start_soon(self._cleanup_task, self._cancel_cleanup)
 
     def _incref(self, ref: User) -> None:
-        """Add a label to the list of those controlled by us."""
+        """Add some user to the list of those controlled by us."""
         if self._force_loaded:
             return
         self._users.add(ref)
@@ -598,7 +597,14 @@ class Handle(User):
 
     async def _load_task(self, force: bool) -> None:
         """Scheduled to load images then apply to the widgets."""
-        await trio.to_thread.run_sync(self._load_pil)
+        Handle._currently_loading += 1
+        try:
+            if Handle._currently_loading == 1:
+                # First to load, so wake up the anim.
+                ImgLoading.trigger_wakeup()
+            await trio.to_thread.run_sync(self._load_pil)
+        finally:
+            Handle._currently_loading -= 1
         self._loading = False
         if _UI_IMPL is not None:
             _UI_IMPL.ui_load_users(self, force)
@@ -889,6 +895,34 @@ class ImgIcon(Handle):
         return True
 
 
+class ImgLoading(ImgIcon):
+    """Special behaviour for the animated loading icon."""
+    # Loader handles, which we want to cycle animate.
+    # The first icon is the one users use, the others are each frame (manually loaded).
+    load_anims: dict[tuple[int, int], tuple[ImgLoading, list[ImgLoading]]] = {}
+
+    # If all loading images stop, the animation task sleeps forever. This event wakes it up.
+    _wakeup: trio.Event() = trio.Event()
+
+    @classmethod
+    def trigger_wakeup(cls) -> None:
+        """Begin the animation."""
+        cls._wakeup.set()
+        cls._wakeup = trio.Event()
+
+    @classmethod
+    async def anim_task(cls, ui: UIImage) -> None:
+        """Cycle loading icons."""
+        for i in itertools.cycle(LOAD_FRAME_IND):
+            await trio.sleep(0.125)
+            for handle, frames in cls.load_anims.values():
+                # This will keep the frame loaded, so next time it's cheap.
+                handle._cached_pil = pil_img = frames[i].get_pil()
+                ui.ui_apply_load(handle, pil_img)
+            if Handle._currently_loading == 0:
+                await cls._wakeup.wait()
+
+
 @attrs.define(eq=False)
 class ImgTextOverlay(Handle):
     """A transparent image containing text in a corner, for overlaying."""
@@ -943,9 +977,8 @@ class UIImage(abc.ABC):
         """Called when this handle is reloading, and should update all its widgets."""
         raise NotImplementedError
 
-    @abc.abstractmethod
-    async def ui_anim_task(self, load_handles: Iterable[tuple[Handle, Sequence[Handle]]]) -> None:
-        """Cycle loading icons."""
+    def ui_apply_load(self, handle: Handle, frame: Image) -> None:
+        """Copy the loading icon to all users of the main image."""
         raise NotImplementedError
 
 
@@ -975,7 +1008,7 @@ async def init(
                 handle = _early_loads.pop()
                 if handle._users:
                     _load_nursery.start_soon(Handle._load_task, handle, False)
-            _load_nursery.start_soon(_UI_IMPL.ui_anim_task, _load_handles.values())
+            _load_nursery.start_soon(ImgLoading.anim_task, implementation)
             task_status.started()
             # Sleep, until init() is potentially cancelled.
             await trio.sleep_forever()
@@ -985,7 +1018,7 @@ async def init(
         _load_nursery = None
         _current_theme = Theme.LIGHT
         PACK_SYSTEMS.clear()
-        _load_handles.clear()
+        ImgLoading.load_anims.clear()
         _early_loads.clear()
 
 
@@ -1001,7 +1034,7 @@ def set_theme(new_theme: Theme) -> None:
             if (handle._bg_composited or handle.is_themed()) and handle.reload():
                 done += 1
         # Invalidate all loading images, these need to be redone.
-        for load, load_frames in _load_handles.values():
+        for load, load_frames in ImgLoading.load_anims.values():
             for handle in load_frames:
                 handle._cached_pil = None
         LOGGER.info('Queued {} images to reload for new theme "{}".', done, new_theme)
@@ -1019,8 +1052,9 @@ def refresh_all() -> None:
 
 def stats() -> str:
     """Fetch various debugging stats."""
+    # noinspection PyProtectedMember
     return f'''
-Handles: {len(_handles)}
+Handles: {len(_handles)}, loading={Handle._currently_loading}
 Theme: {_current_theme}
 Force-loaded: {len(_force_loaded_handles)}
 Tasks: {len(_load_nursery.child_tasks) if _load_nursery is not None else '<N/A>'}

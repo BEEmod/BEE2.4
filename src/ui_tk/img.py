@@ -4,13 +4,10 @@ from typing import TypeVar, Union
 from typing_extensions import TypeAlias
 from tkinter import ttk
 import tkinter as tk
-from collections.abc import Iterable, Sequence
-import itertools
 
 from PIL import Image, ImageTk
 from srctools.logger import get_logger
 import attrs
-import trio
 
 from app import TK_ROOT, img
 
@@ -228,20 +225,15 @@ class TKImages(img.UIImage):
             image.paste(res)
         return image
 
-    async def ui_anim_task(self, load_handles: Iterable[tuple[img.Handle, Sequence[img.Handle]]]) -> None:
-        """Cycle loading icons."""
-        for i in itertools.cycle(img.LOAD_FRAME_IND):
-            await trio.sleep(0.125)
-            for handle, frames in load_handles:
-                # This will keep the frame loaded, so next time it's cheap.
-                handle._cached_pil = frames[i].get_pil()
-                try:
-                    tk_img = self.tk_img[handle]
-                except KeyError:
-                    pass  # This isn't being used.
-                else:
-                    # This updates the TK widget directly.
-                    tk_img.paste(handle._load_pil())
+    def ui_apply_load(self, handle: img.Handle, frame: Image.Image) -> None:
+        """Copy the loading icon to all users of the main image."""
+        try:
+            tk_img = self.tk_img[handle]
+        except KeyError:
+            pass  # This isn't being used.
+        else:
+            # This updates the TK widget directly.
+            tk_img.paste(frame)
 
     def ui_load_users(self, handle: img.Handle, force: bool) -> None:
         """Load this handle into the widgets using it."""
