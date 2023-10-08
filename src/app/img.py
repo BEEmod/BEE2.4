@@ -585,9 +585,9 @@ class Handle(User):
         Otherwise, this returns the loading icon.
         If force is True, the image will be remade even if cached.
         """
-        if self._loading is True:
+        if self._loading:
             return Handle.ico_loading(self.width, self.height)
-        if self._loading is False:
+        else:
             self._loading = True
             if _load_nursery is None:
                 _early_loads.add(self)
@@ -614,10 +614,7 @@ class Handle(User):
         with scope:
             await trio.sleep(5)
         # We weren't cancelled and are empty, cleanup.
-        if (
-            not scope.cancel_called and not self._users and
-            not self._force_loaded and self._loading is not None
-        ):
+        if not scope.cancel_called and not self.has_users():
             if _UI_IMPL is not None:
                 _UI_IMPL.ui_clear_handle(self)
             LOGGER.debug('Clear handle: {}', self)
