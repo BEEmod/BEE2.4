@@ -899,7 +899,7 @@ class ImgLoading(ImgIcon):
     load_anims: dict[tuple[int, int], tuple[ImgLoading, list[ImgLoading]]] = {}
 
     # If all loading images stop, the animation task sleeps forever. This event wakes it up.
-    _wakeup: trio.Event() = trio.Event()
+    _wakeup: trio.Event = trio.Event()
 
     @classmethod
     def trigger_wakeup(cls) -> None:
@@ -974,7 +974,7 @@ class UIImage(abc.ABC):
         """Called when this handle is reloading, and should update all its widgets."""
         raise NotImplementedError
 
-    def ui_apply_load(self, handle: Handle, frame: Image) -> None:
+    def ui_apply_load(self, handle: Handle, frame: Image.Image) -> None:
         """Copy the loading icon to all users of the main image."""
         raise NotImplementedError
 

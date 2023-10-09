@@ -156,7 +156,7 @@ class TKImages(img.UIImage):
         except KeyError:  # Need to load.
             loading = image._request_load()
             tk_img = self._load_tk(loading, False)
-        new_id = textwid.image_create(index, image=tk_img)
+        new_id: str = textwid.image_create(index, image=tk_img)
         ids_list.append(new_id)
         return new_id
 
