@@ -241,8 +241,8 @@ class Selector:
         drop.on_hover_enter.register(self.evt_hover_enter)
         drop.on_hover_exit.register(self.evt_hover_exit)
         drop.on_redropped.register(self.evt_redropped)
-        drop.on_flexi_flow.register(self.reflow)  # type: ignore[arg-type]  # Mypy TVT bug
-        drop.on_modified.register(self._on_changed)  # type: ignore[arg-type]  # ^^
+        drop.on_flexi_flow.register(self.reflow)
+        drop.on_modified.register(self._on_changed)
         self.load_corridors(packset)
 
     def show(self) -> None:

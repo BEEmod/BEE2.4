@@ -86,12 +86,12 @@ async def test() -> None:
             print('Cback: ', ev, slot)
         return call
 
-    @manager.on_modified.register  # type: ignore[arg-type]  # Mypy TVT bug
+    @manager.on_modified.register
     async def on_modified() -> None:
         """Just display when any event is triggered."""
         print('On modified')
 
-    @manager.on_flexi_flow.register  # type: ignore[arg-type]  # Mypy TVT bug
+    @manager.on_flexi_flow.register
     async def on_flexi_flow() -> None:
         """Just display when any event is triggered."""
         print('On Flexi Flow')
