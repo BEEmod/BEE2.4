@@ -318,7 +318,7 @@ class Selector(Generic[IconT]):
         if self.cur_images is None:
             # Not selected, hide entirely.
             self.img_ind = 0
-            self.tk_img.apply(self.wid_image, IMG_CORR_BLANK)
+            self.ui_desc_set_img_state(IMG_CORR_BLANK, False, False)
             return
 
         direction = min(1, max(-1, direction))  # Clamp
@@ -332,14 +332,21 @@ class Selector(Generic[IconT]):
             self.img_ind = 0
 
         if self.cur_images:
-            self.tk_img.apply(self.wid_image, self.cur_images[self.img_ind])
+            icon = self.cur_images[self.img_ind]
         else:  # No icons, use a generic one.
-            self.tk_img.apply(self.wid_image, corridor.ICON_GENERIC_LRG)
-        self.wid_image_left.state(('!disabled', ) if self.img_ind > 0 else ('disabled', ))
-        self.wid_image_right.state(('!disabled', ) if self.img_ind < max_ind else ('disabled', ))
+            icon = corridor.ICON_GENERIC_LRG
+        self.ui_desc_set_img_state(
+            icon,
+            self.img_ind > 0,
+            self.img_ind < max_ind,
+        )
 
     def ui_icon_set_img(self, icon: IconT, handle: Optional[img.Handle]) -> None:
         """Set the image for the specified corridor icon."""
+        raise NotImplementedError
+
+    def ui_desc_set_img_state(self, handle: Optional[img.Handle], left: bool, right: bool) -> None:
+        """Set the widget state for the large preview image in the description sidebar."""
         raise NotImplementedError
 
 

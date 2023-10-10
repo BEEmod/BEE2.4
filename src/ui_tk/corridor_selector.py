@@ -218,3 +218,9 @@ class TkSelector(Selector):
     def ui_icon_set_img(self, icon: IconUI, handle: Optional[img.Handle]) -> None:
         """Set the image used."""
         self.tk_img.apply(icon.label, handle)
+
+    def ui_desc_set_img_state(self, handle: Optional[img.Handle], left: bool, right: bool) -> None:
+        """Set the widget state for the large preview image in the description sidebar."""
+        self.tk_img.apply(self.wid_image, handle)
+        self.wid_image_left.state(('!disabled', ) if left else ('disabled', ))
+        self.wid_image_right.state(('!disabled', ) if right else ('disabled', ))
