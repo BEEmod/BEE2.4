@@ -1,20 +1,13 @@
 """Implements UI for selecting corridors."""
 import itertools
 
-from tkinter import ttk
-import tkinter as tk
 from typing import Any, Generic, Optional, List, Protocol, Sequence, TypeVar
 from typing_extensions import Final
 
 import srctools.logger
 import trio
 
-from app import (
-    TK_ROOT, DEV_MODE,
-    img, localisation, sound, tk_tools,
-    tkMarkdown,
-)
-from app.richTextBox import tkRichText
+from app import DEV_MODE, img, localisation, sound, tkMarkdown
 from packages import corridor
 from corridor import GameMode, Direction, Orient
 from config.last_sel import LastSelected
@@ -22,7 +15,6 @@ from config.corridors import UIState, Config
 from transtoken import TransToken
 import config
 import packages
-from ui_tk.img import TKImages
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -63,6 +55,7 @@ class Icon(Protocol):
     def selected(self) -> bool:
         """If the icon is currently selected."""
         raise NotImplementedError
+
     @selected.setter
     def selected(self, value: bool) -> None:
         raise NotImplementedError
@@ -94,23 +87,22 @@ class Selector(Generic[IconT]):
     corr_group: corridor.CorridorGroup
     conf_id: str
 
-    def __init__(self, packset: packages.PackagesSet, tk_img: TKImages) -> None:
-        super().__init__(packset)
+    def __init__(self) -> None:
         self.sticky_corr = None
         self.img_ind = 0
         self.cur_images = None
         self.icons = []
         self.corr_list = []
 
-    def show(self) -> None:
+    async def show(self) -> None:
         """Display the window."""
-        self.refresh()
-        self.win.deiconify()
-        tk_tools.center_win(self.win, TK_ROOT)
+        await self.refresh()
+        self.ui_win_show()
 
     def hide(self) -> None:
         """Hide the window."""
-        self.win.withdraw()
+        self.store_conf()
+        self.ui_win_hide()
         for icon in self.icons:
             self.ui_icon_set_img(icon, None)
 
@@ -125,14 +117,9 @@ class Selector(Generic[IconT]):
 
         for icon, corr in itertools.zip_longest(self.icons, self.corr_list):
             if icon is not None and corr is not None:
-                (selected if corr.is_selected() else unselected).append(corr.instance.casefold())
+                (selected if icon.selected else unselected).append(corr.instance.casefold())
 
         config.APP.store_conf(Config(selected=selected, unselected=unselected), self.conf_id)
-
-        # Fix up the highlight, if it was moved.
-        for icon, corr in itertools.zip_longest(self.icons, self.corr_list):
-            if icon is not None:
-                icon.set_highlight(corr is self.sticky_corr)
 
     def load_corridors(self, packset: packages.PackagesSet) -> None:
         """Fetch the current set of corridors from this style."""
@@ -145,29 +132,20 @@ class Selector(Generic[IconT]):
         except KeyError:
             LOGGER.warning('No corridors defined for style "{}"', style_id)
             self.corr_group = FALLBACK
-        self.conf_id = Config.get_id(
-            style_id,
-            self.btn_mode.current,
-            self.btn_direction.current,
-            self.btn_orient.current,
-        )
+        mode, direction, orient = self.ui_get_buttons()
+        self.conf_id = Config.get_id(style_id, mode, direction, orient)
 
     async def refresh(self, _: object = None) -> None:
         """Called to update the slots with new items if the corridor set changes."""
-        mode = self.btn_mode.current
-        direction = self.btn_direction.current
-        orient = self.btn_orient.current
+
+        mode, direction, orient = self.ui_get_buttons()
         self.conf_id = Config.get_id(self.corr_group.id, mode, direction, orient)
         conf = config.APP.get_cur_conf(Config, self.conf_id, Config())
 
-        config.APP.store_conf(UIState(
-            mode, direction, orient,
-            self.win.winfo_width(),
-            self.win.winfo_height(),
-        ))
+        config.APP.store_conf(UIState(mode, direction, orient, *self.ui_win_getsize()))
 
         try:
-            corr_list = self.corr_group.corridors[mode, direction, orient]
+            self.corr_list = self.corr_group.corridors[mode, direction, orient]
         except KeyError:
             # Up/down can have missing ones.
             if orient is Orient.HORIZONTAL:
@@ -175,73 +153,56 @@ class Selector(Generic[IconT]):
                     'No flat corridor for {}:{}_{}!',
                     self.corr_group.id, mode.value, direction.value,
                 )
-            corr_list = []
+            self.corr_list = []
 
-        # Ensure enough slots exist to hold all of them, and clear em all.
-        for slot in self.slots:
-            slot.highlight = False
-            slot.contents = None
-            slot.flexi_group = GRP_UNSELECTED
-        for _ in range(len(corr_list) + 1 - len(self.slots)):
-            self.slots.append(self.drag_man.slot_flexi(self.canvas))
-
-        inst_to_corr = {corr.instance.casefold(): corr for corr in corr_list}
-        next_slot = 0
+        inst_enabled: dict[str, bool] = {corr.instance.casefold(): False for corr in self.corr_list}
         if conf.selected:
             for sel_id in conf.selected:
                 try:
-                    self.slots[next_slot].contents = inst_to_corr.pop(sel_id.casefold())
-                    self.slots[next_slot].flexi_group = GRP_SELECTED
+                    inst_enabled[sel_id.casefold()] = True
                 except KeyError:
-                    LOGGER.warning('Unknown corridor instance "{}" in config!')
-                else:
-                    next_slot += 1
+                    LOGGER.warning('Unknown corridor instance "{}" in config!', sel_id)
         else:
             # No configuration, populate with the defaults.
-            defaults = self.corr_group.defaults(mode, direction, orient)
-            for slot, corr in zip(self.slots, defaults):
-                slot.contents = corr
-                slot.flexi_group = GRP_SELECTED
-                del inst_to_corr[corr.instance.casefold()]
-            next_slot = len(defaults)
+            for corr in self.corr_group.defaults(mode, direction, orient):
+                inst_enabled[corr.instance.casefold()] = True
 
         for sel_id in conf.unselected:
             try:
-                self.slots[next_slot].contents = inst_to_corr.pop(sel_id.casefold())
-                self.slots[next_slot].flexi_group = GRP_UNSELECTED
+                inst_enabled[sel_id.casefold()] = False
             except KeyError:
                 LOGGER.warning('Unknown corridor instance "{}" in config!', sel_id)
-            else:
-                next_slot += 1
 
-        # Put all remaining in a spare slot.
-        for slot, corr in zip(
-            self.slots[next_slot:],
-            sorted(inst_to_corr.values(), key=lambda corr: corr.name.token),
-        ):
-            slot.contents = corr
-            slot.flexi_group = GRP_UNSELECTED
+        for _ in range(len(self.corr_list) - len(self.icons)):
+            self.ui_icon_create()
 
-        self.drag_man.load_icons()
+        for icon, corr in itertools.zip_longest(self.icons, self.corr_list):
+            if icon is not None:
+                icon.set_highlight(False)
+                if corr is not None:
+                    self.ui_icon_set_img(icon, corr.icon)
+                    icon.selected = inst_enabled[corr.instance.casefold()]
+                else:
+                    self.ui_icon_set_img(icon, None)
+                    icon.selected = False
 
         # Reset item display, it's invalid.
         self.sticky_corr = None
         self.disp_corr(None)
         # Reposition everything.
-        await self.reflow()
+        await self.ui_win_reflow()
+
+    async def evt_mode_switch(self, _: object) -> None:
+        """We must save the current state before switching."""
+        self.store_conf()
+        await self.refresh()
 
     async def evt_resized(self) -> None:
         """When the window is resized, save configuration."""
-        config.APP.store_conf(UIState(
-            self.btn_mode.current,
-            self.btn_direction.current,
-            self.btn_orient.current,
-            self.win.winfo_width(),
-            self.win.winfo_height(),
-        ))
-        await self.reflow()
+        config.APP.store_conf(UIState(*self.ui_get_buttons(), *self.ui_win_getsize()))
+        await self.ui_win_reflow()
 
-    async def evt_hover_enter(self, index: int) -> None:
+    def evt_hover_enter(self, index: int) -> None:
         """Display the specified corridor temporarily on hover."""
         try:
             corr = self.corr_list[index]
@@ -250,14 +211,14 @@ class Selector(Generic[IconT]):
             return
         self.disp_corr(corr)
 
-    async def evt_hover_exit(self) -> None:
+    def evt_hover_exit(self) -> None:
         """When leaving, reset to the sticky corridor."""
         if self.sticky_corr is not None:
             self.disp_corr(self.sticky_corr)
         else:
             self.disp_corr(None)
 
-    async def evt_selected(self, index: int) -> None:
+    def evt_selected(self, index: int) -> None:
         """Fires when a corridor icon is clicked."""
         try:
             icon = self.icons[index]
@@ -281,19 +242,20 @@ class Selector(Generic[IconT]):
             self.img_ind = 0
             self.cur_images = corr.images
             self._sel_img(0)  # Updates the buttons.
-            localisation.set_text(self.wid_title, corr.name)
+
+            text_title = corr.name
 
             if len(corr.authors) == 0:
-                localisation.set_text(self.wid_authors, TRANS_NO_AUTHORS)
+                author = TRANS_NO_AUTHORS
             else:
-                localisation.set_text(self.wid_authors, TRANS_AUTHORS.format(
+                author = TRANS_AUTHORS.format(
                     authors=TransToken.list_and(corr.authors),
                     n=len(corr.authors),
-                ))
+                )
 
             if DEV_MODE.get():
                 # Show the instance in the description, plus fixups that are assigned.
-                self.wid_desc.set_text(tkMarkdown.join(
+                description = tkMarkdown.join(
                     tkMarkdown.MarkdownData.text(corr.instance + '\n', tkMarkdown.TextTag.CODE),
                     corr.desc,
                     tkMarkdown.MarkdownData.text('\nFixups:\n', tkMarkdown.TextTag.BOLD),
@@ -301,17 +263,18 @@ class Selector(Generic[IconT]):
                         f'* `{var}`: `{value}`'
                         for var, value in corr.fixups.items()
                     ])), None)
-                ))
+                )
             else:
-                self.wid_desc.set_text(corr.desc)
+                description = corr.desc
+            self.ui_desc_display(
+                corr.name,
+                author,
+                description,
+            )
         else:  # Reset.
             self.cur_images = None
-            localisation.set_text(self.wid_title, TransToken.BLANK)
-            self.wid_desc.set_text(tkMarkdown.MarkdownData.BLANK)
-            localisation.set_text(self.wid_authors, TransToken.BLANK)
-            self.tk_img.apply(self.wid_image, IMG_CORR_BLANK)
-            self.wid_image_left.state(('disabled', ))
-            self.wid_image_right.state(('disabled', ))
+            self._sel_img(0)  # Update buttons.
+            self.ui_desc_display(TransToken.BLANK, TransToken.BLANK, tkMarkdown.MarkdownData.BLANK)
 
     def _sel_img(self, direction: int) -> None:
         """Go forward or backwards in the preview images."""
@@ -341,8 +304,36 @@ class Selector(Generic[IconT]):
             self.img_ind < max_ind,
         )
 
+    def ui_win_hide(self) -> None:
+        """Hide the window."""
+        raise NotImplementedError
+
+    def ui_win_show(self) -> None:
+        """Show the window."""
+        raise NotImplementedError
+
+    def ui_win_getsize(self) -> tuple[int, int]:
+        """Fetch the current dimensions, for saving."""
+        raise NotImplementedError
+
+    async def ui_win_reflow(self) -> None:
+        """Reposition everything after the window has resized."""
+        raise NotImplementedError
+
+    def ui_get_buttons(self) -> tuple[GameMode, Direction, Orient]:
+        """Get the current button positions."""
+        raise NotImplementedError
+
+    def ui_icon_create(self) -> None:
+        """Create a new icon widget, and append it to the list."""
+        raise NotImplementedError
+
     def ui_icon_set_img(self, icon: IconT, handle: Optional[img.Handle]) -> None:
         """Set the image for the specified corridor icon."""
+        raise NotImplementedError
+
+    def ui_desc_display(self, title: TransToken, authors: TransToken, desc: tkMarkdown.MarkdownData) -> None:
+        """Display information for a corridor."""
         raise NotImplementedError
 
     def ui_desc_set_img_state(self, handle: Optional[img.Handle], left: bool, right: bool) -> None:

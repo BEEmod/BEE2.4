@@ -6,7 +6,7 @@ from tkinter import ttk
 
 import config
 import utils
-from app import TK_ROOT, img, localisation, tk_tools
+from app import TK_ROOT, img, localisation, tkMarkdown, tk_tools
 from app.corridor_selector import (
     HEIGHT, IMG_ARROW_LEFT, IMG_ARROW_RIGHT, IMG_CORR_BLANK, Icon,
     Selector, WIDTH,
@@ -25,16 +25,20 @@ ICON_CHECK_PADDING: Final = 2 if utils.WIN else 0
 
 class IconUI(Icon):
     """An icon for a corridor."""
-    def __init__(self, parent: tk.Canvas) -> None:
+    def __init__(self, selector: 'TkSelector', index: int) -> None:
         """Create the widgets."""
-        self.label = ttk.Label(parent, anchor='center')
-        self.var = tk.BooleanVar(parent)
-        self.check = ttk.Checkbutton(self.label, variable=self.var)
+        self.label = ttk.Label(selector.canvas, anchor='center')
+        self.var = tk.BooleanVar(selector.win)
+        self.check = ttk.Checkbutton(self.label, variable=self.var, width=0)
         self.check.place(
-            x=-ICON_CHECK_PADDING,
-            y=WIDTH - ICON_CHECK_PADDING,
+            x=ICON_CHECK_PADDING,
+            y=HEIGHT - ICON_CHECK_PADDING,
             anchor='sw',
         )
+
+        self.label.bind('<Enter>', lambda e: selector.evt_hover_enter(index))
+        self.label.bind('<Leave>', lambda e: selector.evt_hover_exit())
+        tk_tools.bind_leftclick(self.label, lambda e: selector.evt_selected(index))
 
     @property
     def selected(self) -> bool:
@@ -73,7 +77,7 @@ class TkSelector(Selector):
     wid_desc: tkRichText
 
     def __init__(self, packset: packages.PackagesSet, tk_img: TKImages) -> None:
-        super().__init__(packset, tk_img)
+        super().__init__()
         self.tk_img = tk_img
         self.sel_count = 0
         self.sel_handle_moving = False
@@ -168,10 +172,10 @@ class TkSelector(Selector):
         self.btn_direction.frame.grid(row=0, column=1, padx=8)
         self.btn_orient.frame.grid(row=0, column=2, padx=8)
 
-        refresh = self.refresh
-        self.btn_mode.on_changed.register(refresh)
-        self.btn_direction.on_changed.register(refresh)
-        self.btn_orient.on_changed.register(refresh)
+        mode_switch = self.evt_mode_switch
+        self.btn_mode.on_changed.register(mode_switch)
+        self.btn_direction.on_changed.register(mode_switch)
+        self.btn_orient.on_changed.register(mode_switch)
 
         canv_frame = ttk.Frame(frm_left, name='canv_frame', relief="sunken")
         canv_frame.grid(row=1, column=0, columnspan=3, sticky='nsew', ipadx=8, ipady=8)
@@ -199,9 +203,9 @@ class TkSelector(Selector):
         tk_tools.add_mousewheel(self.canvas, self.win)
         self.load_corridors(packset)
 
-    async def reflow(self) -> None:
+    async def ui_win_reflow(self) -> None:
         """Called to reposition the corridors."""
-        self.canvas.delete('slots')
+        self.canvas.delete('icons')
 
         pos = CanvasPositioner(place_icon, self.canvas, WIDTH, HEIGHT)
 
@@ -212,12 +216,40 @@ class TkSelector(Selector):
         (x1, y1, x2, y2) = self.canvas.bbox(self.help_lbl_win)
         pos.yoff += y2 - y1
 
-        pos.place_slots(self.icons, 'slots')
+        pos.place_slots(self.icons[:len(self.corr_list)], 'icons')
         pos.resize_canvas()
+
+    def ui_win_hide(self) -> None:
+        """Hide the window."""
+        self.win.wm_withdraw()
+
+    def ui_win_show(self) -> None:
+        """Show the window."""
+        self.win.deiconify()
+        tk_tools.center_win(self.win, TK_ROOT)
+
+    def ui_win_getsize(self) -> tuple[int, int]:
+        """Fetch the current dimensions, for saving."""
+        return self.win.winfo_width(), self.win.winfo_height()
+
+    def ui_get_buttons(self) -> tuple[GameMode, Direction, Orient]:
+        """Get the current button state."""
+        return self.btn_mode.current, self.btn_direction.current, self.btn_orient.current
+
+    def ui_icon_create(self) -> None:
+        """Create a new icon widget, and append it to the list."""
+        index = len(self.icons)
+        self.icons.append(IconUI(self, len(self.icons)))
 
     def ui_icon_set_img(self, icon: IconUI, handle: Optional[img.Handle]) -> None:
         """Set the image used."""
         self.tk_img.apply(icon.label, handle)
+
+    def ui_desc_display(self, title: TransToken, authors: TransToken, desc: tkMarkdown.MarkdownData) -> None:
+        """Display information for a corridor."""
+        localisation.set_text(self.wid_title, title)
+        localisation.set_text(self.wid_authors, authors)
+        self.wid_desc.set_text(desc)
 
     def ui_desc_set_img_state(self, handle: Optional[img.Handle], left: bool, right: bool) -> None:
         """Set the widget state for the large preview image in the description sidebar."""
