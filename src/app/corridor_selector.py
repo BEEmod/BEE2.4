@@ -227,14 +227,16 @@ class Selector(Generic[IconT]):
             LOGGER.warning("No corridor with index {}!", index)
             return
         if self.sticky_corr is corr:
-            return  # Already selected.
-        if self.sticky_corr is not None:
-            # Clear the old one.
-            for old_icon in self.icons:
-                old_icon.set_highlight(False)
-        icon.set_highlight(True)
-        self.sticky_corr = corr
-        self.disp_corr(corr)
+            # Already selected, toggle the checkbox.
+            icon.selected = not icon.selected
+        else:
+            if self.sticky_corr is not None:
+                # Clear the old one.
+                for old_icon in self.icons:
+                    old_icon.set_highlight(False)
+            icon.set_highlight(True)
+            self.sticky_corr = corr
+            self.disp_corr(corr)
 
     def disp_corr(self, corr: Optional[corridor.CorridorUI]) -> None:
         """Display the specified corridor, or reset if None."""
