@@ -1,6 +1,6 @@
 """UI implementation for the dragdrop module."""
 from __future__ import annotations
-from typing import Callable, Dict, Generic, Optional, Tuple, Union
+from typing import Callable, Dict, Generic, Optional, Tuple, TypeVar, Union
 from typing_extensions import Concatenate, Literal, ParamSpec, override
 from tkinter import ttk
 import tkinter as tk
@@ -24,6 +24,7 @@ import utils
 
 __all__ = ["CanvasPositioner", "DragDrop", "DragInfo", "ItemT", "InfoCB", "Slot"]
 ArgsT = ParamSpec('ArgsT')
+T = TypeVar('T')
 
 # Tag used on canvases for our flowed slots.
 _CANV_TAG = '_BEE2_dragdrop_item'
@@ -68,14 +69,16 @@ _FORGETTER: Dict[
 }
 
 
-class CanvasPositioner(PositionerBase[ItemT], Generic[ItemT]):
-    """Positions slots on a canvas."""
+class CanvasPositioner(PositionerBase, Generic[T]):
+    """Positions slots on a canvas.
+
+    T is the slot object, but it can be anything as long as the place_func matches.
+    """
     canvas: tk.Canvas
-    manager: DragDrop[ItemT]
 
     def __init__(
         self,
-        manager: DragDrop[ItemT],
+        place_func: Callable[[tk.Canvas, T, int, int, str], object],
         canvas: tk.Canvas,
         item_width: int,
         item_height: int,
@@ -83,8 +86,8 @@ class CanvasPositioner(PositionerBase[ItemT], Generic[ItemT]):
         yoff: int = 0,
     ):
         self.canvas = canvas
+        self._place_func = place_func
         super().__init__(
-            manager,
             canvas.winfo_width(), canvas.winfo_height(),
             item_width, item_height, spacing, yoff
         )
@@ -94,10 +97,10 @@ class CanvasPositioner(PositionerBase[ItemT], Generic[ItemT]):
         width, height = self.get_size()
         self.canvas['scrollregion'] = (0, 0, width, height)
 
-    def place_slots(self, slots: Iterable[Slot[ItemT]], tag: str, xoff: int = 0) -> None:
+    def place_slots(self, slots: Iterable[T], tag: str, xoff: int = 0) -> None:
         """Place slots onto the canvas."""
         for slot, x, y in self._get_positions(slots, xoff):
-            self.manager.slot_canvas(slot, self.canvas, x, y, tag)
+            self._place_func(self.canvas, slot, x, y, tag)
 
 
 @attrs.define
@@ -259,7 +262,7 @@ class DragDrop(ManagerBase[ItemT, tk.Misc], Generic[ItemT]):
     def _ui_slot_set_highlight(self, slot: Slot[ItemT], highlight: bool) -> None:
         """Apply the highlighted state."""
         slot_ui = self._slot_ui[slot]
-        slot_ui.lbl['background'] = '#5AD2D2' if highlight else ''
+        slot_ui.lbl['background'] = tk_tools.LABEL_HIGHLIGHT_BG if highlight else ''
 
     @override
     def _ui_dragwin_show(self, x: float, y: float) -> None:
@@ -310,7 +313,7 @@ class DragDrop(ManagerBase[ItemT, tk.Misc], Generic[ItemT]):
     slot_place = _make_placer(ttk.Label.place_configure, GeoManager.PLACE)
     slot_pack = _make_placer(ttk.Label.pack_configure, GeoManager.PACK)
 
-    def slot_canvas(self, slot: Slot[ItemT], canv: tk.Canvas, x: int, y: int, tag: str) -> None:
+    def slot_canvas(self, canv: tk.Canvas, slot: Slot[ItemT], x: int, y: int, tag: str) -> None:
         """Position this slot on a canvas."""
         slot_ui = self._slot_ui[slot]
         if slot_ui.pos_type is not None and slot_ui.pos_type is not GeoManager.CANVAS:
@@ -366,7 +369,7 @@ class DragDrop(ManagerBase[ItemT, tk.Misc], Generic[ItemT]):
         - yoff is the offset from the top, the new height is then returned to allow chaining.
         """
         canv.delete(tag)
-        pos = CanvasPositioner(self, canv, self.width, self.height, spacing, yoff)
+        pos = CanvasPositioner(self.slot_canvas, canv, self.width, self.height, spacing, yoff)
         pos.place_slots(slots, tag)
         pos.resize_canvas()
         return pos.yoff
