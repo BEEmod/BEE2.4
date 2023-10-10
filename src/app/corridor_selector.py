@@ -2,7 +2,7 @@
 import itertools
 import random
 
-from typing import Generic, Optional, List, Protocol, Sequence, TypeVar
+from typing import Generic, Iterator, Optional, List, Protocol, Sequence, TypeVar
 from typing_extensions import Final
 
 import srctools.logger
@@ -111,7 +111,7 @@ class Selector(Generic[IconT]):
 
     def prevent_deselection(self) -> None:
         """Ensure at least one widget is selected."""
-        icons = self.icons[:len(self.corr_list)]
+        icons = list(self.visible_icons())
         if not icons:
             return  # No icons, nothing to do.
         count = sum(icon.selected for icon in icons)
@@ -128,6 +128,10 @@ class Selector(Generic[IconT]):
             # Multiple, allow deselection.
             for icon in icons:
                 icon.set_readonly(False)
+
+    def visible_icons(self) -> Iterator[IconT]:
+        """Iterate over the icons which should currently be visible."""
+        return itertools.islice(self.icons, len(self.corr_list))
 
     def store_conf(self) -> None:
         """Store the configuration for the current corridor."""
@@ -192,18 +196,19 @@ class Selector(Generic[IconT]):
             except KeyError:
                 LOGGER.warning('Unknown corridor instance "{}" in config!', sel_id)
 
+        # Create enough icons for the current corridor list.
         for _ in range(len(self.corr_list) - len(self.icons)):
             self.ui_icon_create()
 
         for icon, corr in itertools.zip_longest(self.icons, self.corr_list):
-            if icon is not None:
-                icon.set_highlight(False)
-                if corr is not None:
-                    self.ui_icon_set_img(icon, corr.icon)
-                    icon.selected = inst_enabled[corr.instance.casefold()]
-                else:
-                    self.ui_icon_set_img(icon, None)
-                    icon.selected = False
+            assert icon is not None
+            icon.set_highlight(False)
+            if corr is not None:
+                self.ui_icon_set_img(icon, corr.icon)
+                icon.selected = inst_enabled[corr.instance.casefold()]
+            else:
+                self.ui_icon_set_img(icon, None)
+                icon.selected = False
 
         self.prevent_deselection()
 
@@ -255,7 +260,7 @@ class Selector(Generic[IconT]):
         if self.sticky_corr is corr:
             # Already selected, toggle the checkbox. But only deselect if another is selected.
             if icon.selected:
-                for other_icon in self.icons[:len(self.corr_list)]:
+                for other_icon in self.visible_icons():
                     if other_icon is not icon and other_icon.selected:
                         icon.selected = False
                         self.prevent_deselection()

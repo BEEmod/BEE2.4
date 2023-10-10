@@ -222,7 +222,7 @@ class TkSelector(Selector):
         (x1, y1, x2, y2) = self.canvas.bbox(self.help_lbl_win)
         pos.yoff += y2 - y1
 
-        pos.place_slots(self.icons[:len(self.corr_list)], 'icons')
+        pos.place_slots(self.visible_icons(), 'icons')
         pos.resize_canvas()
 
     def ui_win_hide(self) -> None:
