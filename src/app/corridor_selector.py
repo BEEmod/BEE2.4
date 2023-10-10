@@ -1,8 +1,10 @@
 """Implements UI for selecting corridors."""
+import itertools
+
 from tkinter import ttk
 import tkinter as tk
-from typing import Any, Optional, List, Sequence
-from typing_extensions import TypeAlias, Final
+from typing import Any, Generic, Optional, List, Protocol, Sequence, TypeVar
+from typing_extensions import Final
 
 import srctools.logger
 import trio
@@ -20,14 +22,12 @@ from config.corridors import UIState, Config
 from transtoken import TransToken
 import config
 import packages
-from ui_tk.dragdrop import CanvasPositioner, DragDrop, DragInfo, Slot as SlotBase
 from ui_tk.img import TKImages
 
 
 LOGGER = srctools.logger.get_logger(__name__)
 WIDTH: Final = corridor.IMG_WIDTH_SML + 16
 HEIGHT: Final = corridor.IMG_HEIGHT_SML + 16
-Slot: TypeAlias = SlotBase[corridor.CorridorUI]
 
 IMG_CORR_BLANK: Final = img.Handle.blank(corridor.IMG_WIDTH_LRG, corridor.IMG_HEIGHT_LRG)
 IMG_ARROW_LEFT: Final = img.Handle.builtin('BEE2/switcher_arrow', 17, 64)
@@ -56,15 +56,28 @@ TRANS_AUTHORS = TransToken.ui_plural('Author: {authors}', 'Authors: {authors}')
 TRANS_NO_AUTHORS = TransToken.ui('Authors: Unknown')
 
 
-def get_drag_info(corr: corridor.CorridorUI) -> DragInfo:
-    """Information for displaying this corridor."""
-    return DragInfo(corr.icon)
+class Icon(Protocol):
+    """API for corridor icons."""
+
+    @property
+    def selected(self) -> bool:
+        """If the icon is currently selected."""
+        raise NotImplementedError
+    @selected.setter
+    def selected(self, value: bool) -> None:
+        raise NotImplementedError
+
+    def set_highlight(self, enabled: bool) -> None:
+        """Set whether a highlight background is enabled."""
+        raise NotImplementedError
 
 
-class Selector:
+IconT = TypeVar('IconT', bound=Icon)
+
+
+class Selector(Generic[IconT]):
     """Corridor selection UI."""
     win: tk.Toplevel
-    drag_man: DragDrop[corridor.CorridorUI]
 
     # Widgets to display info about the corridor on the right side.
     wid_image: ttk.Label
@@ -78,9 +91,10 @@ class Selector:
     cur_images: Optional[Sequence[img.Handle]]
     img_ind: int
 
-    # The slots items are on.
-    slots: List[Slot]
-    sel_count: int  # Number which are being used.
+    # The widgets for each corridor.
+    icons: List[IconT]
+    # The corresponding items for each slot.
+    corr_list: List[corridor.CorridorUI]
 
     # The current corridor group for the selected style, and the config ID to save/load.
     # These are updated by load_corridors().
@@ -217,44 +231,20 @@ class Selector:
         ))
         self.help_lbl_win = self.canvas.create_window(0, 0, anchor='nw', window=self.help_lbl)
 
-        self.header_sel = tk_tools.LineHeader(self.canvas, TransToken.ui('Selected:'))
-        self.header_unsel = tk_tools.LineHeader(self.canvas, TransToken.ui('Unused:'))
-        self.header_sel_win = self.canvas.create_window(
-            0, 128,
-            anchor='nw',
-            window=self.header_sel,
-        )
-        self.header_unsel_win = self.canvas.create_window(
-            0, 384,
-            anchor='nw',
-            window=self.header_unsel,
-        )
-
-        drop: DragDrop[corridor.CorridorUI] = DragDrop(
-            self.win,
-            info_cb=get_drag_info,
-            size=(WIDTH, HEIGHT),
-            pick_flexi_group=self._get_flexi_group,
-        )
-        self.drag_man = drop
         tk_tools.add_mousewheel(self.canvas, self.win)
-        drop.on_hover_enter.register(self.evt_hover_enter)
-        drop.on_hover_exit.register(self.evt_hover_exit)
-        drop.on_redropped.register(self.evt_redropped)
-        drop.on_flexi_flow.register(self.reflow)
-        drop.on_modified.register(self._on_changed)
         self.load_corridors(packset)
 
     def show(self) -> None:
         """Display the window."""
-        self.drag_man.load_icons()
+        self.refresh()
         self.win.deiconify()
         tk_tools.center_win(self.win, TK_ROOT)
 
     def hide(self) -> None:
         """Hide the window."""
         self.win.withdraw()
-        self.drag_man.unload_icons()
+        for icon in self.icons:
+            self.ui_icon_set_img(icon, None)
 
     async def _on_changed(self) -> None:
         """Store configuration when changed."""
@@ -265,16 +255,16 @@ class Selector:
         selected: List[str] = []
         unselected: List[str] = []
 
-        for slot in self.slots:
-            if slot.contents is not None:
-                (selected if slot.flexi_group == GRP_SELECTED
-                 else unselected).append(slot.contents.instance.casefold())
+        for icon, corr in itertools.zip_longest(self.icons, self.corr_list):
+            if icon is not None and corr is not None:
+                (selected if corr.is_selected() else unselected).append(corr.instance.casefold())
 
         config.APP.store_conf(Config(selected=selected, unselected=unselected), self.conf_id)
 
         # Fix up the highlight, if it was moved.
-        for slot in self.drag_man.all_slots():
-            slot.highlight = slot.contents is not None and slot.contents is self.sticky_corr
+        for icon, corr in itertools.zip_longest(self.icons, self.corr_list):
+            if icon is not None:
+                icon.set_highlight(corr is self.sticky_corr)
 
     def load_corridors(self, packset: packages.PackagesSet) -> None:
         """Fetch the current set of corridors from this style."""
@@ -372,47 +362,6 @@ class Selector:
         # Reposition everything.
         await self.reflow()
 
-    async def reflow(self) -> None:
-        """Called to reposition the corridors."""
-        # Move empties to the end, if not dragging.
-        if not self.drag_man.cur_slot:
-            self.slots.sort(key=lambda slt: 1 if slt.contents is not None else 2)
-        corr_order = [
-            slot for slot in self.slots
-            # Even though empty, include the slot we're dragging off of.
-            if slot.contents is not None or slot is self.drag_man.cur_slot
-        ]
-        self.canvas.delete('slots')
-        self.canvas.delete('sel_bg')
-        pos = CanvasPositioner(self.drag_man, self.canvas, WIDTH, HEIGHT)
-
-        self.canvas.itemconfigure(self.help_lbl_win, width=pos.width)
-        self.help_lbl['wraplength'] = pos.width
-        self.canvas.itemconfigure(self.header_sel_win, width=pos.width - 2 * HEADER_PAD)
-        self.canvas.itemconfigure(self.header_unsel_win, width=pos.width - 2 * HEADER_PAD)
-
-        await tk_tools.wait_eventloop()
-        (x1, y1, x2, y2) = self.canvas.bbox(self.help_lbl_win)
-        pos.yoff += y2 - y1
-
-        self.canvas.coords(self.header_sel_win, HEADER_PAD, pos.yoff)
-        pos.yoff += HEADER_HEIGHT + 10
-        pos.place_slots((
-            slot for slot in corr_order
-            if slot.flexi_group == GRP_SELECTED
-        ), 'slots')
-        if pos.current:
-            pos.advance_row()
-
-        self.canvas.coords(self.header_unsel_win, HEADER_PAD, pos.yoff)
-        pos.yoff += HEADER_HEIGHT + 10
-
-        pos.place_slots((
-            slot for slot in corr_order
-            if slot.flexi_group != GRP_SELECTED
-        ), 'slots')
-        pos.resize_canvas()
-
     async def evt_resized(self) -> None:
         """When the window is resized, save configuration."""
         config.APP.store_conf(UIState(
@@ -424,37 +373,39 @@ class Selector:
         ))
         await self.reflow()
 
-    async def evt_hover_enter(self, slot: Slot) -> None:
+    async def evt_hover_enter(self, index: int) -> None:
         """Display the specified corridor temporarily on hover."""
-        if slot.contents is not None:
-            self.disp_corr(slot.contents)
+        try:
+            corr = self.corr_list[index]
+        except IndexError:
+            LOGGER.warning("No corridor with index {}!", index)
+            return
+        self.disp_corr(corr)
 
-    async def evt_hover_exit(self, slot: Slot) -> None:
+    async def evt_hover_exit(self) -> None:
         """When leaving, reset to the sticky corridor."""
         if self.sticky_corr is not None:
             self.disp_corr(self.sticky_corr)
         else:
             self.disp_corr(None)
 
-    async def evt_redropped(self, slot: Slot) -> None:
-        """Fires when a slot is dropped back on itself. This is effectively a left-click."""
-        if slot.contents is not None and self.sticky_corr is not slot.contents:
-            if self.sticky_corr is not None:
-                # Clear the old one.
-                for old_slot in self.drag_man.all_slots():
-                    old_slot.highlight = False
-            slot.highlight = True
-            self.sticky_corr = slot.contents
-            self.disp_corr(self.sticky_corr)
-
-    def _get_flexi_group(self, x: float, y: float) -> Optional[str]:
-        """Return the group to drop an item into, from a mouse position."""
-        # pos, slots, row, col = self._mouse_to_pos(x, y)
-        header_y = self.header_unsel.winfo_rooty()
-        if y > header_y + HEADER_HEIGHT / 2:
-            return GRP_UNSELECTED
-        else:
-            return GRP_SELECTED
+    async def evt_selected(self, index: int) -> None:
+        """Fires when a corridor icon is clicked."""
+        try:
+            icon = self.icons[index]
+            corr = self.corr_list[index]
+        except IndexError:
+            LOGGER.warning("No corridor with index {}!", index)
+            return
+        if self.sticky_corr is corr:
+            return  # Already selected.
+        if self.sticky_corr is not None:
+            # Clear the old one.
+            for old_icon in self.icons:
+                old_icon.set_highlight(False)
+        icon.set_highlight(True)
+        self.sticky_corr = corr
+        self.disp_corr(corr)
 
     def disp_corr(self, corr: Optional[corridor.CorridorUI]) -> None:
         """Display the specified corridor, or reset if None."""
@@ -518,6 +469,10 @@ class Selector:
             self.tk_img.apply(self.wid_image, corridor.ICON_GENERIC_LRG)
         self.wid_image_left.state(('!disabled', ) if self.img_ind > 0 else ('disabled', ))
         self.wid_image_right.state(('!disabled', ) if self.img_ind < max_ind else ('disabled', ))
+
+    def ui_icon_set_img(self, icon: IconT, handle: Optional[img.Handle]) -> None:
+        """Set the image for the specified corridor icon."""
+        raise NotImplementedError
 
 
 async def test() -> None:
