@@ -62,6 +62,7 @@ if utils.WIN:
 
     LISTBOX_BG_SEL_COLOR = '#0078D7'
     LISTBOX_BG_COLOR = 'white'
+    LABEL_HIGHLIGHT_BG = '#5AD2D2'
 elif utils.MAC:
     def set_window_icon(window: Union[tk.Toplevel, tk.Tk]) -> None:
         """ Call OS-X's specific api for setting the window icon."""
@@ -78,6 +79,7 @@ elif utils.MAC:
 
     LISTBOX_BG_SEL_COLOR = '#C2DDFF'
     LISTBOX_BG_COLOR = 'white'
+    LABEL_HIGHLIGHT_BG = '#5AD2D2'
 else:  # Linux
     # Get the tk image object.
     from ui_tk.img import get_app_icon
