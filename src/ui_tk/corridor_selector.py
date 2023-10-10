@@ -6,10 +6,10 @@ from tkinter import ttk
 
 import config
 import utils
-from app import TK_ROOT, img, localisation, tkMarkdown, tk_tools
+from app import TK_ROOT, background_run, img, localisation, tkMarkdown, tk_tools
 from app.corridor_selector import (
     HEIGHT, IMG_ARROW_LEFT, IMG_ARROW_RIGHT, IMG_CORR_BLANK, Icon,
-    Selector, WIDTH,
+    Selector, TRANS_HELP, WIDTH,
 )
 from app.richTextBox import tkRichText
 from config.corridors import UIState
@@ -29,7 +29,12 @@ class IconUI(Icon):
         """Create the widgets."""
         self.label = ttk.Label(selector.canvas, anchor='center')
         self.var = tk.BooleanVar(selector.win)
-        self.check = ttk.Checkbutton(self.label, variable=self.var, width=0)
+        self.check = ttk.Checkbutton(
+            self.label,
+            name='check',
+            variable=self.var,
+            command=lambda: background_run(selector.evt_check_changed),
+        )
         self.check.place(
             x=ICON_CHECK_PADDING,
             y=HEIGHT - ICON_CHECK_PADDING,
@@ -48,6 +53,10 @@ class IconUI(Icon):
     @selected.setter
     def selected(self, value: bool) -> None:
         self.var.set(value)
+
+    def set_readonly(self, enabled: bool) -> None:
+        """Set the checkbox to be readonly."""
+        self.check.state(('disabled', ) if enabled else ('!disabled', ))
 
     def set_highlight(self, enabled: bool) -> None:
         """Change the highlight state."""
@@ -194,10 +203,7 @@ class TkSelector(Selector):
         self.canvas.bind('<Configure>', tk_tools.make_handler(self.evt_resized))
 
         self.help_lbl = ttk.Label(self.canvas)
-        localisation.set_text(self.help_lbl, TransToken.ui(
-            "Drag corridors to the 'selected' and 'unused' areas to specify which are used. "
-            "Ingame, a random corridor from the 'selected' group will be picked for each map."
-        ))
+        localisation.set_text(self.help_lbl, TRANS_HELP)
         self.help_lbl_win = self.canvas.create_window(0, 0, anchor='nw', window=self.help_lbl)
 
         tk_tools.add_mousewheel(self.canvas, self.win)

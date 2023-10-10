@@ -1,13 +1,13 @@
 """Implements UI for selecting corridors."""
 import itertools
+import random
 
-from typing import Any, Generic, Optional, List, Protocol, Sequence, TypeVar
+from typing import Generic, Optional, List, Protocol, Sequence, TypeVar
 from typing_extensions import Final
 
 import srctools.logger
-import trio
 
-from app import DEV_MODE, img, localisation, sound, tkMarkdown
+from app import DEV_MODE, img, tkMarkdown
 from packages import corridor
 from corridor import GameMode, Direction, Orient
 from config.last_sel import LastSelected
@@ -24,12 +24,7 @@ HEIGHT: Final = corridor.IMG_HEIGHT_SML + 16
 IMG_CORR_BLANK: Final = img.Handle.blank(corridor.IMG_WIDTH_LRG, corridor.IMG_HEIGHT_LRG)
 IMG_ARROW_LEFT: Final = img.Handle.builtin('BEE2/switcher_arrow', 17, 64)
 IMG_ARROW_RIGHT: Final = IMG_ARROW_LEFT.crop(transpose=img.FLIP_LEFT_RIGHT)
-SELECTED_COLOR: Final = '#14B0FF'
 
-GRP_SELECTED: Final = 'selected'
-GRP_UNSELECTED: Final = 'unselected'
-HEADER_HEIGHT: Final = 20
-HEADER_PAD: Final = 10
 
 # If no groups are defined for a style, use this.
 FALLBACK = corridor.CorridorGroup(
@@ -46,6 +41,10 @@ FALLBACK.pak_name = '???'
 
 TRANS_AUTHORS = TransToken.ui_plural('Author: {authors}', 'Authors: {authors}')
 TRANS_NO_AUTHORS = TransToken.ui('Authors: Unknown')
+TRANS_HELP = TransToken.ui(
+    "Check the boxes to specify which corridors may be used. Ingame, a random corridor will "
+    "be picked for each map."
+)
 
 
 class Icon(Protocol):
@@ -58,6 +57,10 @@ class Icon(Protocol):
 
     @selected.setter
     def selected(self, value: bool) -> None:
+        raise NotImplementedError
+
+    def set_readonly(self, enabled: bool) -> None:
+        """Set the checkbox to be readonly."""
         raise NotImplementedError
 
     def set_highlight(self, enabled: bool) -> None:
@@ -106,9 +109,25 @@ class Selector(Generic[IconT]):
         for icon in self.icons:
             self.ui_icon_set_img(icon, None)
 
-    async def _on_changed(self) -> None:
-        """Store configuration when changed."""
-        self.store_conf()
+    def prevent_deselection(self) -> None:
+        """Ensure at least one widget is selected."""
+        icons = self.icons[:len(self.corr_list)]
+        if not icons:
+            return  # No icons, nothing to do.
+        count = sum(icon.selected for icon in icons)
+        if count == 0:
+            # If all are deselected, select a random one.
+            random.choice(icons).selected = True
+            count = 1
+
+        if count == 1:
+            # If only one is selected, don't allow deselecting that one.
+            for icon in icons:
+                icon.set_readonly(icon.selected)
+        else:
+            # Multiple, allow deselection.
+            for icon in icons:
+                icon.set_readonly(False)
 
     def store_conf(self) -> None:
         """Store the configuration for the current corridor."""
@@ -186,11 +205,18 @@ class Selector(Generic[IconT]):
                     self.ui_icon_set_img(icon, None)
                     icon.selected = False
 
+        self.prevent_deselection()
+
         # Reset item display, it's invalid.
         self.sticky_corr = None
         self.disp_corr(None)
         # Reposition everything.
         await self.ui_win_reflow()
+
+    async def evt_check_changed(self) -> None:
+        """Handle a checkbox changing."""
+        self.prevent_deselection()
+        self.store_conf()
 
     async def evt_mode_switch(self, _: object) -> None:
         """We must save the current state before switching."""
@@ -227,13 +253,21 @@ class Selector(Generic[IconT]):
             LOGGER.warning("No corridor with index {}!", index)
             return
         if self.sticky_corr is corr:
-            # Already selected, toggle the checkbox.
-            icon.selected = not icon.selected
+            # Already selected, toggle the checkbox. But only deselect if another is selected.
+            if icon.selected:
+                for other_icon in self.icons[:len(self.corr_list)]:
+                    if other_icon is not icon and other_icon.selected:
+                        icon.selected = False
+                        self.prevent_deselection()
+                        break
+            else:
+                icon.selected = True
+                self.prevent_deselection()
         else:
             if self.sticky_corr is not None:
                 # Clear the old one.
-                for old_icon in self.icons:
-                    old_icon.set_highlight(False)
+                for other_icon in self.icons:
+                    other_icon.set_highlight(False)
             icon.set_highlight(True)
             self.sticky_corr = corr
             self.disp_corr(corr)
