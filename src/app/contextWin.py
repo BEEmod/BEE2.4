@@ -16,6 +16,7 @@ import webbrowser
 import tkinter as tk
 from tkinter import ttk
 
+from ui_tk.dialogs import TkDialogs
 from ui_tk.img import TKImages, TK_IMG
 from .richTextBox import tkRichText
 from . import (
@@ -556,32 +557,33 @@ def init_widgets(tk_img: TKImages) -> None:
     wid['desc']['yscrollcommand'] = desc_scroll.set
     desc_scroll.grid(row=0, column=1, sticky="NS")
 
-    def show_more_info() -> None:
+    dialog = TkDialogs(window)
+
+    async def show_more_info() -> None:
         """Show the 'more info' URL."""
         url = selected_item.data.url
         if url is not None:
             try:
                 webbrowser.open_new_tab(url)
             except webbrowser.Error:
-                if tk_tools.askyesno(
-                    icon="error",
+                if await dialog.ask_yes_no(
                     title=TransToken.ui("BEE2 - Error"),
                     message=TransToken.ui(
                         'Failed to open a web browser. Do you wish for the URL '
                         'to be copied to the clipboard instead?'
                     ),
+                    icon=dialog.ERROR,
                     detail=f'"{url!s}"',
-                    parent=window,
                 ):
                     LOGGER.info("Saving {} to clipboard!", url)
                     TK_ROOT.clipboard_clear()
                     TK_ROOT.clipboard_append(url)
             # Either the webbrowser or the messagebox could cause the
             # properties to move behind the main window, so hide it
-            # so it doesn't appear there.
+            # so that it doesn't appear there.
             hide_context(None)
 
-    wid['moreinfo'] = ttk.Button(f, command=show_more_info)
+    wid['moreinfo'] = ttk.Button(f, command=lambda: background_run(show_more_info))
     localisation.set_text(wid['moreinfo'], TransToken.ui("More Info>>"))
     wid['moreinfo'].grid(row=7, column=2, sticky='e')
     tooltip.add_tooltip(wid['moreinfo'])

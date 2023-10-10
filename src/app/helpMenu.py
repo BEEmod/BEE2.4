@@ -536,9 +536,10 @@ async def open_url(url_key: str) -> None:
     except KeyError:
         LOGGER.warning('Invalid URL key "{}"!', url_key)
     else:
-        if tk_tools.askyesno(
+        if await DIALOG.ask_yes_no(
             TransToken.ui('BEEMOD 2 - Open URL'),
-            TransToken.ui('Do you wish to open the following URL?\n{url}').format(url=url),
+            TransToken.ui('Do you wish to open the following URL?'),
+            detail=f'"{url}"',
         ):
             webbrowser.open(url)
 
