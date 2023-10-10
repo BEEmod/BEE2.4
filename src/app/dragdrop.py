@@ -66,11 +66,9 @@ class PositionerBase(Generic[ItemT]):
     - spacing is the amount added on each side of each slot.
     - yoff is the offset from the top, the new height is then returned to allow chaining.
     """
-    manager: ManagerBase[ItemT, Any]
 
     def __init__(
         self,
-        manager: ManagerBase[ItemT, Any],
         width: int,
         height: int,
         item_width: int,
@@ -81,7 +79,6 @@ class PositionerBase(Generic[ItemT]):
         if spacing <= 0:
             spacing = 16 if utils.MAC else 8
 
-        self.manager = manager
         self.spacing = spacing
         self.current = 0  # Current x index.
         self.yoff = yoff + self.spacing
