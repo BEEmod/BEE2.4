@@ -11,6 +11,7 @@ from app import (
     TK_ROOT, localisation, sound, img, gameMan, music_conf,
     UI, logWindow,
 )
+from ui_tk.dialogs import DIALOG
 from ui_tk.errors import display_errors
 from config.gen_opts import GenOptions
 from config.last_sel import LastSelected
@@ -63,6 +64,7 @@ async def init_app() -> None:
             packset,
             list(BEE2_config.get_package_locs()),
             loadScreen.main_loader,
+            DIALOG,
         )
     package_sys = packages.PACKAGE_SYS
     loadScreen.main_loader.step('UI', 'pre_ui')

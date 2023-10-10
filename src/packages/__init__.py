@@ -22,6 +22,8 @@ import consts
 from srctools import Keyvalues, NoKeyError
 from srctools.tokenizer import TokenSyntaxError
 from srctools.filesys import FileSystem, RawFileSystem, ZipFileSystem, VPKFileSystem
+
+from app.dialogs import Dialogs
 from editoritems import Item as EditorItem, Renderable, RenderableType
 from corridor import CORRIDOR_COUNTS, GameMode, Direction
 import srctools.logger
@@ -41,7 +43,7 @@ __all__ = [
     'LegacyCorr', 'LEGACY_CORRIDORS',
     'CLEAN_PACKAGE',
     'PakObject', 'PackagesSet', 'get_loaded_packages',
-    'find_packages', 'no_packages_err', 'load_packages',
+    'find_packages', 'load_packages',
 
     # Package objects.
     'Style', 'Item', 'StyleVar', 'Elevator', 'EditorSound', 'StyleVPK', 'Signage',
@@ -545,9 +547,8 @@ async def find_packages(nursery: trio.Nursery, packset: PackagesSet, pak_dir: Pa
         LOGGER.info('No packages in folder {}!', pak_dir)
 
 
-def no_packages_err(pak_dirs: list[Path], msg: TransToken) -> NoReturn:
+async def no_packages_err(dialog: Dialogs, pak_dirs: list[Path], msg: TransToken) -> NoReturn:
     """Show an error message indicating no packages are present."""
-    from app import tk_tools
     import sys
     # We don't have a package directory!
     if len(pak_dirs) == 1:
@@ -565,7 +566,11 @@ def no_packages_err(pak_dirs: list[Path], msg: TransToken) -> NoReturn:
     ).format(msg=msg, trailer=trailer)
 
     LOGGER.error(message)
-    tk_tools.showerror(TransToken.ui('BEE2 - Invalid Packages Directory!'), message=message)
+    await dialog.show_info(
+        title=TransToken.ui('BEE2 - Invalid Packages Directory!'),
+        message=message,
+        icon=dialog.ERROR,
+    )
     sys.exit()
 
 
@@ -573,6 +578,7 @@ async def load_packages(
     packset: PackagesSet,
     pak_dirs: list[Path],
     loader: LoadScreen,
+    dialog: Dialogs,
 ) -> None:
     """Scan and read in all packages."""
     async with trio.open_nursery() as find_nurs:
@@ -583,11 +589,11 @@ async def load_packages(
     loader.set_length("PAK", pack_count)
 
     if pack_count == 0:
-        no_packages_err(pak_dirs, TransToken.ui('No packages found!'))
+        await no_packages_err(dialog, pak_dirs, TransToken.ui('No packages found!'))
 
     # We must have the clean style package.
     if CLEAN_PACKAGE not in packset.packages:
-        no_packages_err(pak_dirs, TransToken.ui(
+        await no_packages_err(dialog, pak_dirs, TransToken.ui(
             'No Clean Style package! This is required for some essential resources and objects.'
         ))
 
