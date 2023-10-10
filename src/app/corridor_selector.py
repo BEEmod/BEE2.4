@@ -339,18 +339,3 @@ class Selector(Generic[IconT]):
     def ui_desc_set_img_state(self, handle: Optional[img.Handle], left: bool, right: bool) -> None:
         """Set the widget state for the large preview image in the description sidebar."""
         raise NotImplementedError
-
-
-async def test() -> None:
-    from app import background_run
-    from typing import Dict
-    from ui_tk.img import TK_IMG
-    background_run(img.init, Dict[str, srctools.FileSystem[Any]](), TK_IMG)
-    background_run(sound.sound_task)
-
-    test_sel = Selector(packages.get_loaded_packages(), TK_IMG)
-    config.APP.read_file()
-    test_sel.show()
-    with trio.CancelScope() as scope:
-        test_sel.win.wm_protocol('WM_DELETE_WINDOW', scope.cancel)
-        await trio.sleep_forever()
