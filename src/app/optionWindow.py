@@ -17,6 +17,7 @@ from app import (
     TK_ROOT, LAUNCH_AFTER_EXPORT, DEV_MODE, background_run,
     contextWin, gameMan, localisation, tk_tools, sound, logWindow, img, UI,
 )
+from ui_tk.dialogs import DIALOG
 from config.gen_opts import GenOptions, AfterExport
 from consts import Theme
 from transtoken import TransToken
@@ -576,7 +577,7 @@ async def init_dev_tab(f: ttk.Frame) -> None:
     async def rebuild_app_langs() -> None:
         """Rebuild application languages, then notify the user."""
         await localisation.rebuild_app_langs()
-        tk_tools.showinfo(message=TRANS_REBUILT_APP_LANG)
+        await DIALOG.show_info(TRANS_REBUILT_APP_LANG)
 
     build_app_trans_btn = ttk.Button(frm_btn2, command=lambda: background_run(rebuild_app_langs))
     localisation.set_text(build_app_trans_btn, TransToken.ui('Build UI Translations'))
@@ -589,7 +590,7 @@ async def init_dev_tab(f: ttk.Frame) -> None:
     async def rebuild_pack_langs() -> None:
         """Rebuild package languages, then notify the user."""
         await localisation.rebuild_package_langs(packages.get_loaded_packages())
-        tk_tools.showinfo(message=TRANS_REBUILD_PACK_LANG)
+        await DIALOG.show_info(TRANS_REBUILD_PACK_LANG)
 
     build_pack_trans_btn = ttk.Button(frm_btn2, command=lambda: background_run(rebuild_pack_langs))
     localisation.set_text(build_pack_trans_btn, TransToken.ui('Build Package Translations'))

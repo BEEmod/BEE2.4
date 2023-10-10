@@ -124,11 +124,13 @@ warn_no_return = true
 
 [[tool.mypy.overrides]]
 module = [
+	'app.dialogs',
 	'bg_daemon',
 	'compiler_launch',
 	'connections',
 	'consts',
 	'utils',
+	'ui_tk.dialogs',
 ]
 # Enable strict options
 strict_optional = true

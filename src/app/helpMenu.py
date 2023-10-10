@@ -21,6 +21,7 @@ import trio.to_thread
 
 from app.richTextBox import tkRichText
 from app import localisation, tkMarkdown, tk_tools, sound, img, TK_ROOT, background_run
+from ui_tk.dialogs import DIALOG
 from ui_tk.img import TKImages
 from transtoken import TransToken
 import utils
@@ -511,16 +512,18 @@ async def open_url(url_key: str) -> None:
             url_data = await trio.to_thread.run_sync(load_database)
         except urllib.error.URLError as exc:
             LOGGER.error('Failed to download help url file:', exc_info=exc)
-            tk_tools.showerror(
+            await DIALOG.show_info(
                 TransToken.ui('BEEMOD2 - Failed to open URL'),
                 TransToken.ui('Failed to download list of URLs. Help menu links will not function. Check your Internet?'),
+                icon=DIALOG.ERROR,
             )
             return
         except (OSError, ValueError) as exc:
             LOGGER.error('Failed to parse help url file:', exc_info=exc)
-            tk_tools.showerror(
+            await DIALOG.show_info(
                 TransToken.ui('BEEMOD2 - Failed to open URL'),
                 TransToken.ui('Failed to parse help menu URLs file. Help menu links will not function.'),
+                icon=DIALOG.ERROR,
             )
             return
         LOGGER.debug('Help URLs:\n{}', '\n'.join([

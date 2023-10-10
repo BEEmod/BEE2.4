@@ -606,13 +606,9 @@ class _MsgBoxFunc(Generic[T]):
 
 
 showinfo       = _MsgBoxFunc(messagebox.showinfo)
-showwarning    = _MsgBoxFunc(messagebox.showwarning)
 showerror      = _MsgBoxFunc(messagebox.showerror)
-askquestion    = _MsgBoxFunc(messagebox.askquestion)
 askokcancel    = _MsgBoxFunc(messagebox.askokcancel)
 askyesno       = _MsgBoxFunc(messagebox.askyesno)
-askyesnocancel = _MsgBoxFunc(messagebox.askyesnocancel)
-askretrycancel = _MsgBoxFunc(messagebox.askretrycancel)
 
 
 class HidingScroll(ttk.Scrollbar):
