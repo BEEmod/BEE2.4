@@ -50,6 +50,7 @@ class TextTag(str, enum.Enum):
     LIST = 'list'
     HRULE = 'hrule'
     LINK = 'link'
+    IMAGE = 'image'
 
     def __str__(self) -> str:
         """Pass to tkinter as the value."""

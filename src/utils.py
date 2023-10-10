@@ -2,8 +2,8 @@
 from __future__ import annotations
 from typing import (
     TYPE_CHECKING, Any, Awaitable, Callable, Generator, Generic, ItemsView,
-    Iterable, Iterator, KeysView, Mapping, NoReturn, Optional, Protocol,
-    Sequence, SupportsInt, Tuple, Type, TypeVar, ValuesView, overload,
+    Iterable, Iterator, KeysView, Mapping, NoReturn, Optional,
+    Sequence, SupportsInt, Tuple, Type, TypeVar, ValuesView,
 )
 from typing_extensions import ParamSpec, TypeVarTuple, Unpack
 from collections import deque
@@ -21,6 +21,15 @@ import zipfile
 from srctools import Angle
 import trio
 
+
+__all__ = [
+    'WIN', 'MAC','LINUX', 'STEAM_IDS', 'DEV_MODE', 'CODE_DEV_MODE', 'BITNESS',
+    'get_git_version', 'install_path', 'conf_location', 'fix_cur_directory', 'run_bg_daemon',
+    'CONN_LOOKUP', 'CONN_TYPES', 'freeze_enum_props', 'FuncLookup', 'PackagePath',
+    'Result', 'acompose', 'get_indent', 'iter_grid', 'check_cython', 'check_shift',
+    'fit', 'group_runs', 'restart_app', 'quit_app', 'set_readonly', 'unset_readonly',
+    'merge_tree', 'write_lang_pot',
+]
 
 WIN = sys.platform.startswith('win')
 MAC = sys.platform.startswith('darwin')
@@ -473,7 +482,6 @@ class PackagePath:
 
 ResultT = TypeVar('ResultT')
 SyncResultT = TypeVar('SyncResultT')
-T_contra = TypeVar('T_contra', contravariant=True)
 PosArgsT = TypeVarTuple('PosArgsT')
 ParamsT = ParamSpec('ParamsT')
 _NO_RESULT: Any = object()
@@ -527,19 +535,6 @@ class Result(Generic[ResultT]):
             raise ValueError(f'Result cannot be fetched before nursery has closed! ({self._nursery.cancel_scope!r})')
         self._nursery = None  # The check passed, no need to keep this alive.
         return self._result
-
-
-# TODO: import from trio once this is present there.
-# Define this under else for runtime typing.
-if TYPE_CHECKING:
-    from trio_typing import TaskStatus
-else:
-    class TaskStatus(Protocol[T_contra]):
-        """Type of the status object passed to functions by trio.Nursery.start()."""
-        @overload
-        def started(self: TaskStatus[None]) -> None: ...
-        @overload
-        def started(self, value: T_contra) -> None: ...
 
 
 def acompose(

@@ -40,7 +40,6 @@ from app import (
     StyleVarPane,
     CompilerPane,
     item_search,
-    corridor_selector,
     optionWindow,
     backup as backup_win,
     tooltip,
@@ -50,6 +49,7 @@ from app import (
 )
 from app.selector_win import SelectorWin, Item as selWinItem, AttrDef as SelAttr
 from app.menu_bar import MenuBar
+from ui_tk.corridor_selector import TkSelector
 from ui_tk.img import TKImages, TK_IMG
 
 
@@ -1085,7 +1085,7 @@ async def init_option(
     pane: SubPane.SubPane,
     tk_img: TKImages,
     export: Callable[[], object],
-    corridor: corridor_selector.Selector,
+    corridor: TkSelector,
 ) -> None:
     """Initialise the export options pane."""
     pane.columnconfigure(0, weight=1)
@@ -1193,7 +1193,7 @@ async def init_option(
     (await skybox_win.widget(props)).grid(row=3, column=1, sticky='EW', padx=left_pad)
     (await elev_win.widget(props)).grid(row=4, column=1, sticky='EW', padx=left_pad)
     localisation.set_text(
-        ttk.Button(props, command=corridor.show),
+        ttk.Button(props, command=lambda: background_run(corridor.show)),
         TransToken.ui('Select'),
     ).grid(row=5, column=1, sticky='EW')
     music_frame.grid(row=6, column=0, sticky='EW', columnspan=2)
@@ -1557,7 +1557,7 @@ async def init_windows(tk_img: TKImages) -> None:
         tool_col=11,
     )
     async with trio.open_nursery() as nurs:
-        corridor = corridor_selector.Selector(packages.get_loaded_packages(), tk_img)
+        corridor = TkSelector(packages.get_loaded_packages(), tk_img)
         nurs.start_soon(init_option, windows['opt'], tk_img, export, corridor)
     async with trio.open_nursery() as nurs:
         nurs.start_soon(corridor.refresh)

@@ -33,12 +33,11 @@ async def step_corridor_conf(exp_data: ExportData) -> None:
         raise Exception(f'No corridor group for style "{style_id}"!') from None
 
     export: ExportedConf = {}
-    blank = Config()
     for mode, direction, orient in itertools.product(GameMode, Direction, Orient):
         conf = config.APP.get_cur_conf(
             Config,
             Config.get_id(style_id, mode, direction, orient),
-            blank,
+            Config(),
         )
         try:
             inst_to_corr = {
@@ -54,11 +53,11 @@ async def step_corridor_conf(exp_data: ExportData) -> None:
             export[mode, direction, orient] = []
             continue
 
-        if conf.selected:
+        if conf.enabled:
             chosen = [
                 corr
-                for corr_id in conf.selected
-                if (corr := inst_to_corr.get(corr_id.casefold())) is not None
+                for corr_id, enabled in conf.enabled.items()
+                if enabled and (corr := inst_to_corr.get(corr_id.casefold())) is not None
             ]
 
             if not chosen:

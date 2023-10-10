@@ -5,7 +5,6 @@ General code used for tkinter portions.
 import functools
 import inspect
 import sys
-import types
 from enum import Enum
 from typing import (
     Awaitable, Dict, Generic, Iterable, overload, cast, Any, TypeVar, Protocol, Union, Callable,
@@ -63,6 +62,7 @@ if utils.WIN:
 
     LISTBOX_BG_SEL_COLOR = '#0078D7'
     LISTBOX_BG_COLOR = 'white'
+    LABEL_HIGHLIGHT_BG = '#5AD2D2'
 elif utils.MAC:
     def set_window_icon(window: Union[tk.Toplevel, tk.Tk]) -> None:
         """ Call OS-X's specific api for setting the window icon."""
@@ -79,6 +79,7 @@ elif utils.MAC:
 
     LISTBOX_BG_SEL_COLOR = '#C2DDFF'
     LISTBOX_BG_COLOR = 'white'
+    LABEL_HIGHLIGHT_BG = '#5AD2D2'
 else:  # Linux
     # Get the tk image object.
     from ui_tk.img import get_app_icon
@@ -419,14 +420,14 @@ def link_checkmark(check: ttk.Checkbutton, widget: tk.Widget) -> None:
         """Check if the mouse is hovering over the label, or the checkmark."""
         # identify-element returns the component name under the specified position,
         # or an empty string if the widget isn't there.
-        return widget.tk.call(
+        return str(widget.tk.call(
             widget, 'identify', 'element',
             event.x, event.y,
-        ) != '' or check.tk.call(
+        )) != '' or str(check.tk.call(
             check, 'identify', 'element',
             event.x_root - check.winfo_rootx(),
             event.y_root - check.winfo_rooty(),
-        ) != ''
+        )) != ''
 
     def on_press(event: tk.Event) -> None:
         """When pressed, highlight the checkmark."""

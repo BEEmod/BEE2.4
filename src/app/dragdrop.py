@@ -1,8 +1,7 @@
 """Implements drag/drop logic."""
 from __future__ import annotations
 from typing import (
-    Any, Callable, Dict, Final, Generic, Iterable, Iterator, List, Optional,
-    Tuple, TypeVar,
+    Callable, Dict, Final, Generic, Iterable, Iterator, List, Optional, Tuple, TypeVar,
 )
 from typing_extensions import ParamSpec, TypeAlias
 from collections import defaultdict
@@ -34,6 +33,7 @@ class DragInfo:
 
 ItemT = TypeVar('ItemT')  # String etc representing the item being moved around.
 ArgsT = ParamSpec('ArgsT')
+T = TypeVar('T')
 ParentT = TypeVar('ParentT')  # Type indicating the "parent" of slots when being created.
 
 
@@ -60,17 +60,15 @@ def in_bbox(
     return True
 
 
-class PositionerBase(Generic[ItemT]):
+class PositionerBase:
     """Utility for positioning slots in a grid on a canvas.
 
     - spacing is the amount added on each side of each slot.
     - yoff is the offset from the top, the new height is then returned to allow chaining.
     """
-    manager: ManagerBase[ItemT, Any]
 
     def __init__(
         self,
-        manager: ManagerBase[ItemT, Any],
         width: int,
         height: int,
         item_width: int,
@@ -81,7 +79,6 @@ class PositionerBase(Generic[ItemT]):
         if spacing <= 0:
             spacing = 16 if utils.MAC else 8
 
-        self.manager = manager
         self.spacing = spacing
         self.current = 0  # Current x index.
         self.yoff = yoff + self.spacing
@@ -123,9 +120,9 @@ class PositionerBase(Generic[ItemT]):
 
     def _get_positions(
         self,
-        slots: Iterable[Slot[ItemT]],
+        slots: Iterable[T],
         xoff: int,
-    ) -> Iterator[Tuple[Slot[ItemT], int, int]]:
+    ) -> Iterator[Tuple[T, int, int]]:
         """Place these slots gradually."""
         for slot in slots:
             x = self.xpos(self.current) + xoff
