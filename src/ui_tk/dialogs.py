@@ -17,11 +17,10 @@ async def _messagebox(
     message: TransToken,
     title: TransToken,
     icon: Icon,
+    detail: str,
 ) -> List[str]:
     """Don't bother with `tkinter.messagebox`, it just calls this which is more flexible anyway."""
-    # Seems to work, not sure if safe...
-    return await trio.to_thread.run_sync(
-        TK_ROOT.tk.call,
+    args = (
         "tk_messageBox",
         "-type", kind,
         "-icon", icon.value,
@@ -29,6 +28,11 @@ async def _messagebox(
         "-title", str(title),
         "-message", str(message),
     )
+    if detail:
+        args += ('-detail', detail)
+
+    # Threading seems to work, not sure if safe...
+    return await trio.to_thread.run_sync(TK_ROOT.tk.call,*args)
 
 
 class TkDialogs(Dialogs):
@@ -47,18 +51,20 @@ class TkDialogs(Dialogs):
         message: TransToken,
         title: TransToken = DEFAULT_TITLE,
         icon: Icon = Icon.INFO,
+        detail: str = '',
     ) -> None:
         """Show a message box with some information."""
-        await _messagebox("ok", self.parent, message, title, icon)
+        await _messagebox("ok", self.parent, message, title, icon, detail)
 
     async def ask_ok_cancel(
         self,
         message: TransToken,
         title: TransToken = DEFAULT_TITLE,
         icon: Icon = Icon.INFO,
+        detail: str = '',
     ) -> bool:
         """Show a message box with "OK" and "Cancel" buttons."""
-        res = await _messagebox("okcancel", self.parent, message, title, icon)
+        res = await _messagebox("okcancel", self.parent, message, title, icon, detail)
         if res == "ok":
             return True
         elif res == "cancel":
@@ -71,9 +77,10 @@ class TkDialogs(Dialogs):
         message: TransToken,
         title: TransToken = DEFAULT_TITLE,
         icon: Icon = Icon.QUESTION,
+        detail: str = '',
     ) -> bool:
         """Show a message box with "Yes" and "No" buttons."""
-        res = await _messagebox("yesno", self.parent, message, title, icon)
+        res = await _messagebox("yesno", self.parent, message, title, icon, detail)
         if res == "yes":
             return True
         elif res == "no":
@@ -86,9 +93,10 @@ class TkDialogs(Dialogs):
         message: TransToken,
         title: TransToken = DEFAULT_TITLE,
         icon: Icon = Icon.QUESTION,
+        detail: str = '',
     ) -> Optional[bool]:
         """Show a message box with "Yes", "No" and "Cancel" buttons."""
-        res = await _messagebox("yesnocancel", self.parent, message, title, icon)
+        res = await _messagebox("yesnocancel", self.parent, message, title, icon, detail)
         if res == "yes":
             return True
         elif res == "no":
