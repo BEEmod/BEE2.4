@@ -3,13 +3,15 @@ from typing import List, Optional, Union
 
 import tkinter as tk
 
+import trio
+
 from app.dialogs import DEFAULT_TITLE, Dialogs, Icon
 from transtoken import TransToken
 
 from app import TK_ROOT
 
 
-def _messagebox(
+async def _messagebox(
     kind: str,
     parent: Union[tk.Toplevel, tk.Tk],
     message: TransToken,
@@ -17,7 +19,9 @@ def _messagebox(
     icon: Icon,
 ) -> List[str]:
     """Don't bother with `tkinter.messagebox`, it just calls this which is more flexible anyway."""
-    return TK_ROOT.tk.call(
+    # Seems to work, not sure if safe...
+    return await trio.to_thread.run_sync(
+        TK_ROOT.tk.call,
         "tk_messageBox",
         "-type", kind,
         "-icon", icon.value,
@@ -45,7 +49,7 @@ class TkDialogs(Dialogs):
         icon: Icon = Icon.INFO,
     ) -> None:
         """Show a message box with some information."""
-        _messagebox("ok", self.parent, message, title, icon)
+        await _messagebox("ok", self.parent, message, title, icon)
 
     async def ask_ok_cancel(
         self,
@@ -54,7 +58,7 @@ class TkDialogs(Dialogs):
         icon: Icon = Icon.INFO,
     ) -> bool:
         """Show a message box with "OK" and "Cancel" buttons."""
-        res = _messagebox("okcancel", self.parent, message, title, icon)
+        res = await _messagebox("okcancel", self.parent, message, title, icon)
         if res == "ok":
             return True
         elif res == "cancel":
@@ -69,7 +73,7 @@ class TkDialogs(Dialogs):
         icon: Icon = Icon.QUESTION,
     ) -> bool:
         """Show a message box with "Yes" and "No" buttons."""
-        res = _messagebox("yesno", self.parent, message, title, icon)
+        res = await _messagebox("yesno", self.parent, message, title, icon)
         if res == "yes":
             return True
         elif res == "no":
@@ -84,7 +88,7 @@ class TkDialogs(Dialogs):
         icon: Icon = Icon.QUESTION,
     ) -> Optional[bool]:
         """Show a message box with "Yes", "No" and "Cancel" buttons."""
-        res = _messagebox("yesnocancel", self.parent, message, title, icon)
+        res = await _messagebox("yesnocancel", self.parent, message, title, icon)
         if res == "yes":
             return True
         elif res == "no":
