@@ -135,14 +135,19 @@ class Selector(Generic[IconT]):
 
     def store_conf(self) -> None:
         """Store the configuration for the current corridor."""
-        selected: List[str] = []
-        unselected: List[str] = []
+        cur_conf = config.APP.get_cur_conf(
+            Config,
+            self.conf_id,
+            default=Config(),
+        )
+        # Start with the existing config, so we preserve unknown instances.
+        enabled = dict(cur_conf.enabled)
 
         for icon, corr in itertools.zip_longest(self.icons, self.corr_list):
             if icon is not None and corr is not None:
-                (selected if icon.selected else unselected).append(corr.instance.casefold())
+                enabled[corr.instance.casefold()] = icon.selected
 
-        config.APP.store_conf(Config(selected=selected, unselected=unselected), self.conf_id)
+        config.APP.store_conf(Config(enabled), self.conf_id)
 
     def load_corridors(self, packset: packages.PackagesSet) -> None:
         """Fetch the current set of corridors from this style."""
@@ -179,22 +184,16 @@ class Selector(Generic[IconT]):
             self.corr_list = []
 
         inst_enabled: dict[str, bool] = {corr.instance.casefold(): False for corr in self.corr_list}
-        if conf.selected:
-            for sel_id in conf.selected:
+        if conf.enabled:
+            for sel_id, enabled in conf.enabled.items():
                 try:
-                    inst_enabled[sel_id.casefold()] = True
+                    inst_enabled[sel_id.casefold()] = enabled
                 except KeyError:
                     LOGGER.warning('Unknown corridor instance "{}" in config!', sel_id)
         else:
             # No configuration, populate with the defaults.
             for corr in self.corr_group.defaults(mode, direction, orient):
                 inst_enabled[corr.instance.casefold()] = True
-
-        for sel_id in conf.unselected:
-            try:
-                inst_enabled[sel_id.casefold()] = False
-            except KeyError:
-                LOGGER.warning('Unknown corridor instance "{}" in config!', sel_id)
 
         # Create enough icons for the current corridor list.
         for _ in range(len(self.corr_list) - len(self.icons)):

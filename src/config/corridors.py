@@ -1,9 +1,11 @@
 from __future__ import annotations
-from typing import List
 
-from srctools import Keyvalues
-from srctools.dmx import Attribute as DMAttr, Element, ValueType as DMXValue
+from typing import Mapping
+
+from srctools import EmptyMapping, Keyvalues, conv_bool, bool_as_int
+from srctools.dmx import Element, ValueType as DMXValue
 import attrs
+
 
 from corridor import Direction, GameMode, Orient
 import config
@@ -17,10 +19,9 @@ __all__ = [
 
 @config.APP.register
 @attrs.frozen(slots=False)
-class Config(config.Data, conf_name='Corridor', uses_id=True, version=1):
+class Config(config.Data, conf_name='Corridor', uses_id=True, version=2):
     """The current configuration for a corridor."""
-    selected: List[str] = attrs.field(factory=list, kw_only=True)
-    unselected: List[str] = attrs.field(factory=list, kw_only=True)
+    enabled: Mapping[str, bool] = EmptyMapping
 
     @staticmethod
     def get_id(
@@ -35,49 +36,61 @@ class Config(config.Data, conf_name='Corridor', uses_id=True, version=1):
     @classmethod
     def parse_kv1(cls, data: Keyvalues, version: int) -> Config:
         """Parse from KeyValues1 configs."""
-        assert version == 1, version
-        selected = []
-        unselected = []
-        for child in data.find_children('Corridors'):
-            if child.name == 'selected' and not child.has_children():
-                selected.append(child.value)
-            elif child.name == 'unselected' and not child.has_children():
-                unselected.append(child.value)
+        enabled: dict[str, bool] = {}
+        if version == 2:
+            for child in data:
+                enabled[child.name] = conv_bool(child.value)
+        elif version == 1:
+            for child in data.find_children('Corridors'):
+                if child.name == 'selected' and not child.has_children():
+                    enabled[child.value.casefold()] = True
+                elif child.name == 'unselected' and not child.has_children():
+                    enabled[child.value.casefold()] = False
+        else:
+            raise ValueError(f'Unknown version {version}!')
 
-        return Config(selected=selected, unselected=unselected)
+        return Config(enabled)
 
     def export_kv1(self) -> Keyvalues:
         """Serialise to a Keyvalues1 config."""
-        kv = Keyvalues('Corridors', [])
-        for corr in self.selected:
-            kv.append(Keyvalues('selected', corr))
-        for corr in self.unselected:
-            kv.append(Keyvalues('unselected', corr))
-
-        return Keyvalues('Corridor', [kv])
+        return Keyvalues('Corridor', [
+            Keyvalues(corr, bool_as_int(enabled))
+            for corr, enabled in self.enabled.items()
+        ])
 
     @classmethod
     def parse_dmx(cls, data: Element, version: int) -> Config:
         """Parse from DMX configs."""
-        assert version == 1, version
-        try:
-            selected = list(data['selected'].iter_str())
-        except KeyError:
-            selected = []
-        try:
-            unselected = list(data['unselected'].iter_str())
-        except KeyError:
-            unselected = []
+        enabled: dict[str, bool] = {}
+        if version == 2:
+            for key, attr in data.items():
+                if attr.type is DMXValue.BOOL:
+                    enabled[attr.name.casefold()] = attr.val_bool
+        elif version == 1:
+            try:
+                selected = data['selected']
+            except KeyError:
+                pass
+            else:
+                for inst in selected.iter_str():
+                    enabled[inst.casefold()] = True
+            try:
+                unselected = data['unselected']
+            except KeyError:
+                pass
+            else:
+                for inst in unselected.iter_str():
+                    enabled[inst.casefold()] = False
+        else:
+            raise ValueError(f'Unknown version {version}!')
 
-        return Config(selected=selected, unselected=unselected)
+        return Config(enabled)
 
     def export_dmx(self) -> Element:
         """Serialise to DMX configs."""
         elem = Element('Corridor', 'DMEConfig')
-        elem['selected'] = selected = DMAttr.array('selected', DMXValue.STR)
-        selected.extend(self.selected)
-        elem['unselected'] = unselected = DMAttr.array('unselected', DMXValue.STR)
-        unselected.extend(self.unselected)
+        for inst, enabled in self.enabled.items():
+            elem[inst] = enabled
 
         return elem
 
