@@ -40,6 +40,15 @@ class Kind(Enum):
     STAIR_UP = auto()
     STAIR_DN = auto()
 
+    @property
+    def is_stair(self) -> bool:
+        return self.name.startswith('STAIR')
+
+    @property
+    def is_corner(self) -> bool:
+        return self.name.startswith('CORNER')
+
+
 PROPS = {
     Kind.STRAIGHT: ('models/props_bts/hanging_walkway_128a.mdl', FrozenVec(0, 0, -64), 90),
     Kind.CORNER_LEFT: ('models/props_bts/hanging_walkway_l.mdl', FrozenVec(0, 0, -64), 0),
@@ -61,7 +70,7 @@ class CatwalkNode:
         return self.yaw.orient
 
     def local(self, x: int, y: int, z: int) -> FrozenVec:
-        return FrozenVec(x, y, z) @ self.yaw.orient + self.pos
+        return round(FrozenVec(x, y, z) @ self.yaw.orient + self.pos)
 
 
 def test(vmf: VMF, info: CorrInfo):
@@ -93,27 +102,32 @@ def test(vmf: VMF, info: CorrInfo):
             yield CatwalkNode(forward, node.yaw, Kind.STRAIGHT)
             yield CatwalkNode(forward, node.yaw.left, Kind.CORNER_LEFT)
             yield CatwalkNode(forward, node.yaw.right, Kind.CORNER_RIGHT)
-            if POS[node.local(2, 0, 0)] is Block.VOID:
-                if POS[node.local(2, 0, 1)] is Block.VOID:
-                    yield CatwalkNode(node.local(2, 0, 1), node.yaw, Kind.STAIR_UP)
-                if POS[node.local(2, 0, -1)] is Block.VOID:
-                    yield CatwalkNode(node.local(2, 0, -1), node.yaw, Kind.STAIR_DN)
+            if POS[node.local(2, 0, 0)] is Block.VOID and POS[node.local(2, 0, 1)] is Block.VOID:
+                yield CatwalkNode(node.local(2, 0, 1), node.yaw, Kind.STAIR_UP)
+            if POS[node.local(1, 0, -1)] is Block.VOID and POS[node.local(2, 0, -1)] is Block.VOID:
+                yield CatwalkNode(node.local(2, 0, -1), node.yaw, Kind.STAIR_DN)
 
     def distance(node1: CatwalkNode, node2: CatwalkNode) -> float:
-        return (node1.pos - node2.pos).mag_sq()
+        return 8 * (node1.pos - node2.pos).mag()
+
+    def cost(node1: CatwalkNode, node2: CatwalkNode) -> float:
+        dist = (node1.pos - node2.pos).mag()
+        if node1.trace.is_stair and node2.trace.is_stair and node1.trace is not node2.trace:
+            return dist * 4
+        if node2.trace.is_stair:
+            return dist * 2
+        return dist
 
     start_node = CatwalkNode(start.freeze(), yaw, Kind.STRAIGHT)
-    end_node = CatwalkNode(FrozenVec(40, 4, 12), Yaw.EAST, Kind.STRAIGHT)
-    path = [start_node, *neighbours(start_node), end_node]
-    
-    path = astar.find_path(
+    end_node = CatwalkNode(FrozenVec(20, 20, 6), Yaw.EAST, Kind.STRAIGHT)
+
+    for node in astar.find_path(
         start_node, end_node,
         neighbors_fnct=neighbours,
         distance_between_fnct=distance,
         heuristic_cost_estimate_fnct=distance,
         is_goal_reached_fnct=reached_goal,
-    )
-    for node in path:
+    ):
         mdl, off, yaw_val = PROPS[node.trace]
         ang = node.yaw.orient.to_angle()
         ang.yaw += yaw_val
