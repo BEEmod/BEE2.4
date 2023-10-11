@@ -24,6 +24,7 @@ from FakeZip import FakeZip, zip_names, zip_open_bin
 from srctools import Keyvalues, KeyValError
 from app.tooltip import add_tooltip
 from app.localisation import TransToken, set_text, set_menu_text, set_win_title
+from ui_tk.dialogs import DIALOG
 from ui_tk.img import TKImages
 
 
@@ -863,9 +864,9 @@ async def init_application() -> None:
 
     game_menu = menus['game'] = tk.Menu(bar)
 
-    game_menu.add_command(command=lambda: background_run(gameMan.add_game))
+    game_menu.add_command(command=lambda: background_run(gameMan.add_game, DIALOG))
     set_menu_text(game_menu, TransToken.ui('Add Game'))
-    game_menu.add_command(command=lambda: background_run(gameMan.remove_game))
+    game_menu.add_command(command=lambda: background_run(gameMan.remove_game, DIALOG))
     set_menu_text(game_menu, TransToken.ui('Remove Game'))
     game_menu.add_separator()
 
@@ -882,7 +883,7 @@ async def init_application() -> None:
     window.deiconify()
     window.update()
 
-    await gameMan.load()
+    await gameMan.load(DIALOG)
     ui_new_backup()
 
     @gameMan.ON_GAME_CHANGED.register

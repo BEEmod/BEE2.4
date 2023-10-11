@@ -20,11 +20,9 @@ import tkinter as tk
 import os.path
 
 from idlelib.redirector import WidgetRedirector  # type: ignore[import-not-found]
-from idlelib.query import Query  # type: ignore[import-not-found]
 import trio
 
 from app import TK_ROOT, background_run, localisation
-from app.errors import AppError
 from config.gen_opts import GenOptions
 import event
 import config
@@ -503,90 +501,13 @@ def _default_validator(value: str) -> str:
     return value
 
 
-class BasicQueryValidator(simpledialog.Dialog):
-    """Implement the dialog with the simpledialog code."""
-    result: Optional[str]
-    def __init__(
-        self,
-        parent: tk.Misc,
-        title: str, message: str, initial: str,
-        validator: Callable[[str], str] = _default_validator,
-    ) -> None:
-        self.__validator = validator
-        self.__title = title
-        self.__message = message
-        self.__initial = initial
-        self.result = None
-        super().__init__(parent, title)
-
-    def body(self, master: tk.Frame) -> ttk.Entry:
-        """Ensure the window icon is changed, and copy code from askstring's internals."""
-        super().body(master)
-        set_window_icon(self)
-        w = ttk.Label(master, text=self.__message, justify='left')
-        w.grid(row=0, padx=5, sticky='w')
-
-        self.entry = ttk.Entry(master, name="entry")
-        self.entry.grid(row=1, padx=5, sticky='we')
-
-        if self.__initial:
-            self.entry.insert(0, self.__initial)
-            self.entry.select_range(0, 'end')
-
-        return self.entry
-
-    def validate(self) -> bool:
-        try:
-            self.result = self.__validator(self.entry.get())
-        except AppError as exc:
-            messagebox.showwarning(self.__title, str(exc.message), parent=self)
-            return False
-        else:
-            return True
-
-if Query is not None:
-    class QueryValidator(Query):
-        """Implement using IDLE's better code for this."""
-        def __init__(
-            self,
-            parent: tk.Misc,
-            title: str, message: str, initial: str,
-            validator: Callable[[str], str] = _default_validator,
-        ) -> None:
-            self.__validator = validator
-            super().__init__(parent, title, message, text0=initial)
-
-        def entry_ok(self) -> Optional[str]:
-            """Return non-blank entry or None."""
-            try:
-                return self.__validator(self.entry.get())
-            except AppError as exc:
-                self.showerror(str(exc.message))
-                return None
-else:
-    QueryValidator = BasicQueryValidator  # type: ignore
-
-
 def prompt(
     title: TransToken, message: TransToken,
     initialvalue: str = '',
     parent: tk.Misc = TK_ROOT,
     validator: Callable[[str], str] = _default_validator,
 ) -> Optional[str]:
-    """Ask the user to enter a string."""
-    from loadScreen import suppress_screens
-    from app import _main_loop_running
-    with suppress_screens():
-        # If the main loop isn't running, this doesn't work correctly.
-        # Probably also if it's not visible. So swap back to the old style.
-        # It's also only a problem on Windows.
-        if Query is None or (utils.WIN and (
-            not _main_loop_running or not TK_ROOT.winfo_viewable()
-        )):
-            query_cls = BasicQueryValidator
-        else:
-            query_cls = QueryValidator
-        return query_cls(parent, str(title), str(message), initialvalue, validator).result
+    """"""
 
 
 class _MsgBoxFunc(Generic[T]):

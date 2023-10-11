@@ -1,7 +1,8 @@
 """API for dialog boxes."""
 from enum import Enum
-from typing import ClassVar, Optional, Protocol, Literal
+from typing import Callable, ClassVar, Optional, Protocol, Literal
 
+from app.errors import AppError
 from transtoken import TransToken
 
 
@@ -17,6 +18,13 @@ class Icon(Enum):
 
 # Also can be exposed from TK: abort/retry/ignore, retry/cancel.
 # Messageboxes have a default button.
+
+
+def validate_non_empty(value: str) -> str:
+    """Check that the prompt has a value."""
+    if not value.strip():
+        raise AppError(TransToken.ui("A value must be provided!"))
+    return value
 
 
 class Dialogs(Protocol):
@@ -68,3 +76,12 @@ class Dialogs(Protocol):
     ) -> Optional[bool]:
         """Show a message box with "Yes", "No" and "Cancel" buttons."""
         raise NotImplementedError
+
+    async def prompt(
+        self,
+        message: TransToken,
+        title: TransToken = DEFAULT_TITLE,
+        initial_value: TransToken = TransToken.BLANK,
+        validator: Callable[[str], str] = validate_non_empty,
+    ) -> Optional[str]:
+        """Ask the user to enter a string."""

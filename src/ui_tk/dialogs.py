@@ -1,14 +1,18 @@
 """A consistent interface for dialog boxes."""
-from typing import List, Optional, Union
+from typing import Callable, List, Optional, Tuple, Union
 
+from tkinter import simpledialog, ttk
 import tkinter as tk
 
 import trio
 
-from app.dialogs import DEFAULT_TITLE, Dialogs, Icon
+from loadScreen import suppress_screens
+from app.dialogs import DEFAULT_TITLE, Dialogs, Icon, validate_non_empty
+from app.errors import AppError
+from app.tk_tools import set_window_icon
 from transtoken import TransToken
 
-from app import TK_ROOT
+from app import TK_ROOT, localisation
 
 
 async def _messagebox(
@@ -20,7 +24,7 @@ async def _messagebox(
     detail: str,
 ) -> List[str]:
     """Don't bother with `tkinter.messagebox`, it just calls this which is more flexible anyway."""
-    args = (
+    args: Tuple[str, ...] = (
         "tk_messageBox",
         "-type", kind,
         "-icon", icon.value,
@@ -33,6 +37,110 @@ async def _messagebox(
 
     # Threading seems to work, not sure if safe...
     return await trio.to_thread.run_sync(TK_ROOT.tk.call,*args)
+
+
+class BasicQueryValidator(simpledialog.Dialog):
+    """Implement the dialog with the simpledialog code."""
+    result: Optional[str]
+    def __init__(
+        self,
+        parent: tk.Misc,
+        title: TransToken,
+        message: TransToken,
+        initial: TransToken,
+        validator: Callable[[str], str],
+    ) -> None:
+        self.__validator = validator
+        self.__title = title
+        self.__message = message
+        self.__initial = initial
+        self.result = None
+        self.__has_closed = trio.Event()
+        super().__init__(parent, str(title))
+
+    def wait_window(self, window: object = None) -> None:
+        """Block this method call, to prevent the Tk loop from being frozen."""
+
+    def destroy(self) -> None:
+        """Called when the window is either canceled or submitted."""
+        self.__has_closed.set()
+        super().destroy()
+
+    async def wait(self) -> None:
+        """Wait for the query to close."""
+        await self.__has_closed.wait()
+
+    def body(self, master: tk.Frame) -> ttk.Entry:
+        """Ensure the window icon is changed, and copy code from askstring's internals."""
+        super().body(master)
+        set_window_icon(self)
+        w = ttk.Label(master, justify='left')
+        localisation.set_text(w, self.__message)
+        w.grid(row=0, padx=5, sticky='w')
+
+        self.entry = ttk.Entry(master, name="entry")
+        self.entry.grid(row=1, padx=5, sticky='we')
+
+        if self.__initial:
+            self.entry.insert(0, str(self.__initial))
+            self.entry.select_range(0, 'end')
+
+        return self.entry
+
+    def validate(self) -> bool:
+        """Check if the parameter is valid."""
+        try:
+            self.result = self.__validator(self.entry.get())
+        except AppError as exc:
+            self.tk.call(
+                "tk_messageBox",
+                "-type", "ok",
+                "-icon", "warning",
+                "-parent", str(self),
+                "-title", str(self.__title),
+                "-message", str(exc.message),
+            )
+            return False
+        else:
+            return True
+
+
+try:
+    from idlelib.query import Query  # type: ignore[import-not-found]
+except ImportError:
+    QueryValidator = BasicQueryValidator
+else:
+    class QueryValidator(Query):  # type: ignore[no-redef]
+        """Implement using IDLE's better code for this."""
+        def __init__(
+            self,
+            parent: tk.Misc,
+            title: str, message: str, initial: str,
+            validator: Callable[[str], str],
+        ) -> None:
+            self.__validator = validator
+            super().__init__(parent, title, message, text0=initial)
+            self.__has_closed = trio.Event()
+
+        def wait_window(self, window: object = None) -> None:
+            """Block this method call, to prevent the Tk loop from being frozen."""
+
+        def destroy(self) -> None:
+            """Called when the window is either canceled or submitted."""
+            self.__has_closed.set()
+            super().destroy()
+
+        async def wait(self) -> None:
+            """Wait for the query to close."""
+            await self.__has_closed.wait()
+
+        def entry_ok(self) -> Optional[str]:
+            """Return non-blank entry or None."""
+            try:
+                return self.__validator(self.entry.get())
+            except AppError as exc:
+                self.showerror(str(exc.message))
+                return None
 
 
 class TkDialogs(Dialogs):
@@ -105,6 +213,26 @@ class TkDialogs(Dialogs):
             return None
         else:
             raise ValueError(res)
+
+    async def prompt(
+        self,
+        message: TransToken,
+        title: TransToken = DEFAULT_TITLE,
+        initial_value: TransToken = TransToken.BLANK,
+        validator: Callable[[str], str] = validate_non_empty,
+    ) -> Optional[str]:
+        """Ask the user to enter a string."""
+        with suppress_screens():
+            # If the main loop isn't running, this doesn't work correctly.
+            # Probably also if it's not visible. So swap back to the old style.
+            # It's also only a problem on Windows.
+            if Query is None:  # or (utils.WIN and (not _main_loop_running or not TK_ROOT.winfo_viewable())):
+                query_cls = BasicQueryValidator
+            else:
+                query_cls = QueryValidator
+            win = query_cls(self.parent, title, message, initial_value, validator)
+            await win.wait()
+            return win.result
 
 
 DIALOG = TkDialogs(TK_ROOT)
