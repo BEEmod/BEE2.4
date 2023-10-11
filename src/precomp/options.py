@@ -570,7 +570,7 @@ DEFAULTS = [
         This shouldn't need to be changed.
         """),
 
-    Opt('global_pti_ents_loc', Vec(-2400, -2800, 0),
+    Opt('global_pti_ents_loc', Vec(-4800, -2800, 0),
         """Location of global_pti_ents.
 
         The default pos is next to `arrival_departure_ents`.
@@ -578,20 +578,38 @@ DEFAULTS = [
         sealed from the void.
         """),
 
-    Opt('model_changer_loc', Vec(-2400, -2800, -256),
+    Opt('model_changer_loc', Vec(-4800, -2800, -256),
         """Location of the model changer instance (if used).
         """),
 
-    Opt('global_ents_loc', Vec(-2400, 0, 0),
+    Opt('global_ents_loc', Vec(-4800, 0, 0),
         """Location of global entities.
 
         A 128x128 room is added there, and logic ents are added inside.
         """),
 
-    Opt('extend_chamber', False,
-        """Do the thing with the skybox
+    Opt('arrival_departure_ents_loc', Vec(-4500, -2500, 0),
+        """Location of the arrival departure entities
+        
+        Original PTI location is (-2500 -2500 0)
+        """),
 
-        and don't fuck it up
+    Opt('entrance_elevator_loc', Vec(-4000, 2000, 0),
+        """Location of the entrance elevator
+        
+        Original PTI location is (-2000 2000 0)
+        """),
+
+    Opt('exit_elevator_loc', Vec(-4000, -2000, 0),
+        """Location of the exit elevator
+        
+        Original PTI location is (-2000 -2000 0)
+        """),
+
+    Opt('extend_chamber', False,
+        """Whether or not we want to generate the map exterior 
+
+        WIP
         """),
 
     ######

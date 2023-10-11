@@ -9,6 +9,7 @@ from srctools.vmf import VMF, Entity
 import srctools.logger
 
 import consts
+import precomp.options
 import utils
 from . import instanceLocs, rand
 from corridor import (  # noqa
@@ -78,6 +79,9 @@ def analyse_and_modify(
     file_sp_exit = instanceLocs.resolve_filter('[spExit]')
     file_sp_entry = instanceLocs.resolve_filter('[spEntry]')
 
+    # Transition entities
+    file_transition = instanceLocs.resolve_filter('[transitionents]')
+
     file_door_frame = instanceLocs.resolve_filter('[door_frame]')
 
     # If shift is held, this is reversed.
@@ -99,6 +103,7 @@ def analyse_and_modify(
 
     inst_elev_entry: Entity | None = None
     inst_elev_exit: Entity | None = None
+    inst_transition: Entity | None = None
 
     for item in vmf.by_class['func_instance']:
         # Loop through all the instances in the map, looking for the entry/exit
@@ -204,6 +209,9 @@ def analyse_and_modify(
                 item.fixup['no_player_start'] = '1'
             item['targetname'] = 'elev_exit'
             inst_elev_exit = item
+        elif file in file_transition:
+            inst_transition = item
+
         # Skip frames and include the chosen corridor
         filenames[file] += 1
 
@@ -240,8 +248,13 @@ def analyse_and_modify(
     # Apply selected fixups to the elevator also.
     if inst_elev_entry is not None:
         inst_elev_entry.fixup.update(chosen_entry.fixups)
+        inst_elev_entry['origin'] = precomp.options.get(Vec, 'entrance_elevator_loc')
     if inst_elev_exit is not None:
         inst_elev_exit.fixup.update(chosen_exit.fixups)
+        inst_elev_exit['origin'] = precomp.options.get(Vec, 'exit_elevator_loc')
+
+    if inst_transition is not None:
+        inst_transition['origin'] = precomp.options.get(Vec, "arrival_departure_ents_loc")
 
     [is_publishing] = seen_no_player_start
     [game_mode] = seen_game_modes
