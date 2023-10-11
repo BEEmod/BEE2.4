@@ -24,6 +24,7 @@ from idlelib.query import Query  # type: ignore[import-not-found]
 import trio
 
 from app import TK_ROOT, background_run, localisation
+from app.errors import AppError
 from config.gen_opts import GenOptions
 import event
 import config
@@ -504,6 +505,7 @@ def _default_validator(value: str) -> str:
 
 class BasicQueryValidator(simpledialog.Dialog):
     """Implement the dialog with the simpledialog code."""
+    result: Optional[str]
     def __init__(
         self,
         parent: tk.Misc,
@@ -514,6 +516,7 @@ class BasicQueryValidator(simpledialog.Dialog):
         self.__title = title
         self.__message = message
         self.__initial = initial
+        self.result = None
         super().__init__(parent, title)
 
     def body(self, master: tk.Frame) -> ttk.Entry:
@@ -535,8 +538,8 @@ class BasicQueryValidator(simpledialog.Dialog):
     def validate(self) -> bool:
         try:
             self.result = self.__validator(self.entry.get())
-        except ValueError as exc:
-            messagebox.showwarning(self.__title, exc.args[0], parent=self)
+        except AppError as exc:
+            messagebox.showwarning(self.__title, str(exc.message), parent=self)
             return False
         else:
             return True
@@ -557,8 +560,8 @@ if Query is not None:
             """Return non-blank entry or None."""
             try:
                 return self.__validator(self.entry.get())
-            except ValueError as exc:
-                self.showerror(exc.args[0])
+            except AppError as exc:
+                self.showerror(str(exc.message))
                 return None
 else:
     QueryValidator = BasicQueryValidator  # type: ignore
