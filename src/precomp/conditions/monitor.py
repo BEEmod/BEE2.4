@@ -1,5 +1,6 @@
 import math
 
+import precomp.options
 from precomp import instanceLocs, connections, conditions, options, faithplate, voice_line
 from srctools import Matrix, Keyvalues, Vec, Entity, VMF, Output, Angle
 import srctools.logger
@@ -275,7 +276,7 @@ def mon_camera_link(vmf: VMF) -> None:
                 relation['StartActive'] = '1'
         else:
             # Start in arrival_departure_transition_ents...
-            start_pos = Vec(-2500, -2500, 0)
+            start_pos = precomp.options.get(Vec, "arrival_departure_ents_loc")
             start_angles = Angle(0, 90, 0)
 
     cam_ent = vmf.create_ent(
