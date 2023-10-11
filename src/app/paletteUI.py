@@ -340,7 +340,7 @@ class PaletteUI:
         ):
             pal.delete_from_disk()
             del self.palettes[pal.uuid]
-        self.select_palette(UUID_PORTAL2)
+        self.select_palette(UUID_PORTAL2, False)
         self.update_state()
         background_run(self.set_items, self.selected)
 
@@ -373,7 +373,7 @@ class PaletteUI:
 
         pal.save()
         self.palettes[pal.uuid] = pal
-        self.select_palette(pal.uuid)
+        self.select_palette(pal.uuid, False)
         self.update_state()
 
     async def event_rename(self, dialogs: Dialogs) -> None:
@@ -387,13 +387,22 @@ class PaletteUI:
         self.selected.name = TransToken.untranslated(name)
         self.update_state()
 
-    def select_palette(self, uuid: UUID) -> None:
-        """Select a new palette. This does not update items/settings!"""
-        if uuid in self.palettes:
-            self.selected_uuid = uuid
-            self._store_configuration()
-        else:
+    def select_palette(self, uuid: UUID, set_save_settings: bool) -> None:
+        """Select a new palette.
+
+        This does not update items/settings! It does override the "save settings" checkbox
+        to match the palette optionally, though.
+        """
+        try:
+            pal = self.palettes[uuid]
+        except KeyError:
             LOGGER.warning('Unknown UUID {}!', uuid.hex)
+        else:
+            self.selected_uuid = uuid
+            if set_save_settings and not pal.readonly:
+                # Propagate the save-settings option to the palette, so saving does the same thing.
+                self.var_save_settings.set(pal.settings is not None)
+            self._store_configuration()
 
     async def event_change_group(self, dialogs: Dialogs) -> None:
         """Change the group of a palette."""
@@ -412,7 +421,7 @@ class PaletteUI:
     async def event_select_menu(self) -> None:
         """Called when the menu buttons are clicked."""
         uuid_hex = self.var_pal_select.get()
-        self.select_palette(UUID(hex=uuid_hex))
+        self.select_palette(UUID(hex=uuid_hex), True)
         await self.set_items(self.selected)
         self.update_state()
 
@@ -423,7 +432,7 @@ class PaletteUI:
         except IndexError:  # No selection, exit.
             return
         self.var_pal_select.set(uuid_hex)
-        self.select_palette(UUID(hex=uuid_hex))
+        self.select_palette(UUID(hex=uuid_hex), True)
         await self.set_items(self.selected)
         self.update_state()
 
