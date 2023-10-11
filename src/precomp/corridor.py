@@ -34,6 +34,10 @@ class Info:
     corr_entry: Corridor
     corr_exit: Corridor
 
+    # The door instances.
+    inst_entry: Entity
+    inst_exit: Entity
+
     @property
     def is_sp(self) -> bool:
         """Check if the map is in singleplayer mode."""
@@ -103,6 +107,8 @@ def analyse_and_modify(
 
     inst_elev_entry: Entity | None = None
     inst_elev_exit: Entity | None = None
+    inst_entry_door: Entity | None = None
+    inst_exit_door: Entity | None = None
     inst_transition: Entity | None = None
 
     for item in vmf.by_class['func_instance']:
@@ -164,8 +170,10 @@ def analyse_and_modify(
 
             if corr_dir is Direction.ENTRY:
                 chosen_entry = chosen
+                inst_entry_door = item
             else:
                 chosen_exit = chosen
+                inst_exit_door = item
 
             item.fixup['$type'] = corr_dir.value
             item.fixup['$direction'] = corr_orient.value
@@ -223,11 +231,11 @@ def analyse_and_modify(
     LOGGER.info("Game Mode: {}", seen_game_modes)
     LOGGER.info("Player Start: {}", seen_no_player_start)
 
-    if chosen_entry is None:
+    if chosen_entry is None or inst_entry_door is None:
         raise user_errors.UserError(
             user_errors.TOK_CORRIDOR_NO_CORR_ITEM.format(kind=user_errors.TOK_CORRIDOR_ENTRY)
         )
-    if chosen_exit is None:
+    if chosen_exit is None or inst_exit_door is None:
         raise user_errors.UserError(
             user_errors.TOK_CORRIDOR_NO_CORR_ITEM.format(kind=user_errors.TOK_CORRIDOR_EXIT)
         )
@@ -265,6 +273,8 @@ def analyse_and_modify(
         attrs=voice_attrs,  # Todo: remove from settings.
         corr_entry=chosen_entry,
         corr_exit=chosen_exit,
+        inst_entry=inst_entry_door,
+        inst_exit=inst_exit_door,
     )
     instanceLocs.set_chosen_corridor(game_mode, {
         Direction.ENTRY: chosen_entry,
