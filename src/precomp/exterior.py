@@ -3,14 +3,18 @@ from srctools import VMF, Vec
 
 import consts
 import precomp.options
+import precomp.pathing
 from precomp.brushLoc import POS
+from precomp.corridor import Info as CorrInfo
+
 
 LOGGER = srctools.logger.get_logger(__name__)
 
 EX_SIZE_MAX = Vec(8832, 8832, 8832)
 EX_SIZE_MIN = Vec(5632, 5632, 5632)
 
-def make_exterior(vmf : VMF, coll):
+
+def make_exterior(vmf: VMF, coll, info: CorrInfo) -> None:
     """Generate the exterior of the map: pits, catwalks, tubes, etc."""
     if not precomp.options.get(bool, 'extend_chamber'):
         return None
@@ -19,6 +23,7 @@ def make_exterior(vmf : VMF, coll):
     make_exterior_shell(vmf)
 
     # Move Elevators to valid location if possible and then generate elevator shell
+    place_entrance_exit(vmf, info)
 
     # Open Walls and add square beams
 
@@ -41,3 +46,7 @@ def make_exterior_shell(vmf : VMF):
         vmf.add_brush(solid)
 
     # vmf.add_brush(vmf.make_prism(pos_min, pos_max, consts.Tools.SKIP).solid)
+
+def place_entrance_exit(vmf: VMF, info: CorrInfo):
+    """Place the map entrance and exit"""
+    precomp.pathing.test(vmf, info)
