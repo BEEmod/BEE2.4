@@ -65,7 +65,7 @@ class MenuBar:
         self.export_btn_pos = self.file_menu.index('end')
         self.file_menu.entryconfigure(self.export_btn_pos, state='disabled')
 
-        self.file_menu.add_command(command=gameMan.add_game)
+        self.file_menu.add_command(command=lambda: background_run(gameMan.add_game))
         localisation.set_menu_text(self.file_menu, TransToken.ui("Add Game"))
 
         self.file_menu.add_command(command=lambda: background_run(gameMan.remove_game))

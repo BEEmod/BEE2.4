@@ -828,8 +828,9 @@ def init(tk_img: TKImages) -> None:
     window.columnconfigure(2, weight=1)
 
 
-def init_application(tk_img: TKImages) -> None:
+async def init_application() -> None:
     """Initialise the standalone application."""
+    from ui_tk.img import TK_IMG
     from app import gameMan
     global window
     window = cast(tk.Toplevel, TK_ROOT)
@@ -837,7 +838,7 @@ def init_application(tk_img: TKImages) -> None:
         'BEEMOD {version} - Backup / Restore Puzzles',
     ).format(version=utils.BEE_VERSION))
 
-    init(tk_img)
+    init(TK_IMG)
 
     UI['bar'] = bar = tk.Menu(TK_ROOT)
     window.option_add('*tearOff', False)
@@ -862,7 +863,7 @@ def init_application(tk_img: TKImages) -> None:
 
     game_menu = menus['game'] = tk.Menu(bar)
 
-    game_menu.add_command(command=gameMan.add_game)
+    game_menu.add_command(command=lambda: background_run(gameMan.add_game))
     set_menu_text(game_menu, TransToken.ui('Add Game'))
     game_menu.add_command(command=lambda: background_run(gameMan.remove_game))
     set_menu_text(game_menu, TransToken.ui('Remove Game'))
@@ -874,14 +875,14 @@ def init_application(tk_img: TKImages) -> None:
 
     from app import helpMenu
     # Add the 'Help' menu here too.
-    helpMenu.make_help_menu(bar, tk_img)
+    helpMenu.make_help_menu(bar, TK_IMG)
 
     window['menu'] = bar
 
     window.deiconify()
     window.update()
 
-    gameMan.load()
+    await gameMan.load()
     ui_new_backup()
 
     @gameMan.ON_GAME_CHANGED.register

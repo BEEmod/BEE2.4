@@ -1299,7 +1299,7 @@ def save() -> None:
     CONFIG.save_check()
 
 
-def load() -> None:
+async def load() -> None:
     global selected_game
     all_games.clear()
     for gm in CONFIG:
@@ -1317,14 +1317,14 @@ def load() -> None:
         loadScreen.main_loader.suppress()
 
         # Ask the user for Portal 2's location...
-        if not add_game():
+        if not await add_game():
             # they cancelled, quit
             quit_application()
         loadScreen.main_loader.unsuppress()  # Show it again
     selected_game = all_games[0]
 
 
-def add_game(e: Event = None) -> bool:
+async def add_game(e: Event = None) -> bool:
     """Ask for, and load in a game to export to."""
     title = TransToken.ui('BEE2 - Add Game')
     tk_tools.showinfo(
@@ -1446,14 +1446,3 @@ def set_game_by_name(name: str) -> None:
             # TODO: make this function async too to eliminate.
             background_run(ON_GAME_CHANGED, selected_game)
             break
-
-if __name__ == '__main__':
-    Button(TK_ROOT, text='Add', command=add_game).grid(row=0, column=0)
-    Button(TK_ROOT, text='Remove', command=lambda: background_run(remove_game)).grid(row=0, column=1)
-    test_menu = Menu(TK_ROOT)
-    dropdown = Menu(test_menu)
-    test_menu.add_cascade(menu=dropdown, label='Game')
-    TK_ROOT['menu'] = test_menu
-
-    load()
-    add_menu_opts(dropdown)

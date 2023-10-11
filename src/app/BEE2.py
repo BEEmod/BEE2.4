@@ -45,7 +45,7 @@ async def init_app() -> None:
 
     LOGGER.debug('Loading settings...')
 
-    gameMan.load()
+    await gameMan.load()
     try:
         last_game = config.APP.get_cur_conf(LastSelected, 'game')
     except KeyError:
