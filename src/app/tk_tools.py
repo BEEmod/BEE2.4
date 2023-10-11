@@ -501,15 +501,6 @@ def _default_validator(value: str) -> str:
     return value
 
 
-def prompt(
-    title: TransToken, message: TransToken,
-    initialvalue: str = '',
-    parent: tk.Misc = TK_ROOT,
-    validator: Callable[[str], str] = _default_validator,
-) -> Optional[str]:
-    """"""
-
-
 class _MsgBoxFunc(Generic[T]):
     """Wrap messagebox functions that take TransToken."""
     _DEFAULT_TITLE = TransToken.ui('BEEmod')

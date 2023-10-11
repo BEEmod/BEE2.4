@@ -30,6 +30,7 @@ def validate_non_empty(value: str) -> str:
 class Dialogs(Protocol):
     """Interface exposed by ui_*.dialogs.
 
+    This is passed in to processing code, allowing it to do some basic UI interaction.
     These block in Tkinter, but they're still async in case other libs can avoid that.
     """
     INFO: ClassVar[Literal[Icon.INFO]]

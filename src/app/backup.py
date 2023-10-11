@@ -22,9 +22,10 @@ import utils
 from app.CheckDetails import CheckDetails, Item as CheckItem
 from FakeZip import FakeZip, zip_names, zip_open_bin
 from srctools import Keyvalues, KeyValError
+
 from app.tooltip import add_tooltip
 from app.localisation import TransToken, set_text, set_menu_text, set_win_title
-from ui_tk.dialogs import DIALOG
+from ui_tk.dialogs import Dialogs, DIALOG, TkDialogs
 from ui_tk.img import TKImages
 
 
@@ -54,8 +55,8 @@ HEADERS = [TransToken.ui('Name'), TransToken.ui('Mode'), TransToken.ui('Date')]
 TRANS_SP = TransToken.ui('SP')
 TRANS_COOP = TransToken.ui('Coop')
 TRANS_DELETE_DESC = TransToken.ui_plural(
-    'Do you wish to delete {n} map?\n{maps}',
-    'Do you wish to delete {n} maps?\n{maps}',
+    'Do you wish to delete {n} map?',
+    'Do you wish to delete {n} maps?',
 )
 TRANS_OVERWRITE_GAME = TransToken.ui(
     'This map is already in the game directory. Do you wish to overwrite it? ({mapname})'
@@ -337,7 +338,7 @@ def find_puzzles(game: 'gameMan.Game') -> Optional[str]:
     return None
 
 
-def backup_maps(maps: List[P2C]) -> None:
+async def backup_maps(dialogs: Dialogs, maps: List[P2C]) -> None:
     """Copy the given maps to the backup."""
     back_zip: ZipFile = BACKUPS['backup_zip']
 
@@ -355,10 +356,9 @@ def backup_maps(maps: List[P2C]) -> None:
         scr_path = p2c.filename + '.jpg'
         map_path = p2c.filename + '.p2c'
         if map_path in zip_names(back_zip) or scr_path in zip_names(back_zip):
-            if not tk_tools.askyesno(
+            if not await dialogs.ask_yes_no(
                 title=TRANS_OVERWRITE_TITLE,
                 message=TRANS_OVERWRITE_BACKUP.format(mapname=p2c.title),
-                parent=window,
             ):
                 continue
         new_item = p2c.copy()
@@ -441,7 +441,7 @@ def auto_backup(game: 'gameMan.Game', loader: loadScreen.LoadScreen) -> None:
                 loader.step(AUTO_BACKUP_STAGE)
 
 
-def save_backup() -> None:
+async def save_backup(dialogs: Dialogs) -> None:
     """Save the backup file."""
     # We generate it from scratch, since that's the only way to remove
     # files.
@@ -455,7 +455,11 @@ def save_backup() -> None:
     ]
 
     if not maps:
-        tk_tools.showerror(TransToken.ui('BEE2 Backup'), TransToken.ui('No maps were chosen to backup!'))
+        await dialogs.show_info(
+            title=TransToken.ui('BEE2 Backup'),
+            message=TransToken.ui('No maps were chosen to backup!'),
+            icon=dialogs.ERROR
+        )
         return
 
     copy_loader.set_length('COPY', len(maps))
@@ -493,7 +497,7 @@ def save_backup() -> None:
         p2c.zip_file = new_zip
 
 
-def restore_maps(maps: List[P2C]) -> None:
+async def restore_maps(dialogs: Dialogs, maps: List[P2C]) -> None:
     """Copy the given maps to the game."""
     game_dir = BACKUPS['game_path']
     if game_dir is None:
@@ -509,10 +513,9 @@ def restore_maps(maps: List[P2C]) -> None:
             abs_scr = os.path.join(game_dir, scr_path)
             abs_map = os.path.join(game_dir, map_path)
             if os.path.isfile(abs_scr) or os.path.isfile(abs_map):
-                if not tk_tools.askyesno(
+                if not await dialogs.ask_yes_no(
                     title=TRANS_OVERWRITE_TITLE,
                     message=TRANS_OVERWRITE_GAME.format(mapname=p2c.title),
-                    parent=window,
                 ):
                     copy_loader.step('COPY')
                     continue
@@ -612,20 +615,19 @@ def ui_new_backup() -> None:
     )
 
 
-def ui_save_backup() -> None:
+async def ui_save_backup(dialogs: Dialogs) -> None:
     """Save a backup."""
     if BACKUPS['backup_path'] is None:
         # No backup path, prompt first
-        ui_save_backup_as()
-        return
+        await ui_save_backup_as(dialogs)
+    else:
+        try:
+            await save_backup(dialogs)
+        except loadScreen.Cancelled:
+            pass
 
-    try:
-        save_backup()
-    except loadScreen.Cancelled:
-        pass
 
-
-def ui_save_backup_as() -> None:
+async def ui_save_backup_as(dialogs: Dialogs) -> None:
     """Prompt for a name, and then save a backup."""
     path = filedialog.asksaveasfilename(
         title=str(TransToken.ui('Save Backup As')),
@@ -639,7 +641,7 @@ def ui_save_backup_as() -> None:
     BACKUPS['backup_path'] = path
     BACKUPS['backup_name'] = os.path.basename(path)
     backup_name.set(BACKUPS['backup_name'])
-    ui_save_backup()
+    await ui_save_backup(dialogs)
 
 
 def ui_refresh_game() -> None:
@@ -649,9 +651,9 @@ def ui_refresh_game() -> None:
         load_game(gameMan.selected_game)
 
 
-def ui_backup_sel() -> None:
+async def ui_backup_sel(dialogs: Dialogs) -> None:
     """Backup selected maps."""
-    backup_maps([
+    await backup_maps(dialogs, [
         item.user
         for item in
         UI['game_details'].items
@@ -659,18 +661,18 @@ def ui_backup_sel() -> None:
     ])
 
 
-def ui_backup_all() -> None:
+async def ui_backup_all(dialogs: Dialogs) -> None:
     """Backup all maps."""
-    backup_maps([
+    await backup_maps(dialogs, [
         item.user
         for item in
         UI['game_details'].items
     ])
 
 
-def ui_restore_sel() -> None:
+async def ui_restore_sel(dialogs: Dialogs) -> None:
     """Restore selected maps."""
-    restore_maps([
+    await restore_maps(dialogs, [
         item.user
         for item in
         UI['back_details'].items
@@ -678,9 +680,9 @@ def ui_restore_sel() -> None:
     ])
 
 
-def ui_restore_all() -> None:
+async def ui_restore_all(dialogs: Dialogs) -> None:
     """Backup all maps."""
-    restore_maps([
+    await restore_maps(dialogs, [
         item.user
         for item in UI['back_details'].items
     ])
@@ -697,7 +699,7 @@ def ui_delete_backup() -> None:
     refresh_back_details()
 
 
-def ui_delete_game() -> None:
+async def ui_delete_game(dialog: Dialogs) -> None:
     """Delete selected items in the game list."""
     game_dir = BACKUPS['game_path']
     if game_dir is None:
@@ -721,10 +723,11 @@ def ui_delete_game() -> None:
 
     if not to_delete:
         return
-    if not tk_tools.askyesno(TransToken.ui('Confirm Deletion'), TRANS_DELETE_DESC.format(
-        n=len(to_delete),
-        maps='\n'.join([f'- "{p2c.title}" ({p2c.filename}.p2c)' for p2c in to_delete]),
-    )):
+    if not dialog.ask_yes_no(
+        title=TransToken.ui('Confirm Deletion'),
+        message=TRANS_DELETE_DESC.format(n=len(to_delete)),
+        detail='\n'.join([f'- "{p2c.title}" ({p2c.filename}.p2c)' for p2c in to_delete]),
+    ):
         return
 
     deleting_loader.set_length('DELETE', len(to_delete))
@@ -752,6 +755,7 @@ def ui_delete_game() -> None:
 
 def init(tk_img: TKImages) -> None:
     """Initialise all widgets in the given window."""
+    dialog = TkDialogs(window)
     for cat, btn_text in [
         ('back_', TransToken.ui('Restore:')),
         ('game_', TransToken.ui('Backup:')),
@@ -809,12 +813,12 @@ def init(tk_img: TKImages) -> None:
     UI['game_title']['textvariable'] = game_name
     UI['back_title']['textvariable'] = backup_name
 
-    UI['game_btn_all']['command'] = ui_backup_all
-    UI['game_btn_sel']['command'] = ui_backup_sel
-    UI['game_btn_del']['command'] = ui_delete_game
+    UI['game_btn_all']['command'] = lambda: background_run(ui_backup_all, dialog)
+    UI['game_btn_sel']['command'] = lambda: background_run(ui_backup_sel, dialog)
+    UI['game_btn_del']['command'] = lambda: background_run(ui_delete_game, dialog)
 
-    UI['back_btn_all']['command'] = ui_restore_all
-    UI['back_btn_sel']['command'] = ui_restore_sel
+    UI['back_btn_all']['command'] = lambda: background_run(ui_restore_all, dialog)
+    UI['back_btn_sel']['command'] = lambda: background_run(ui_restore_sel, dialog)
     UI['back_btn_del']['command'] = ui_delete_backup
 
 
@@ -854,9 +858,9 @@ async def init_application() -> None:
     set_menu_text(file_menu, TransToken.ui('New Backup'))
     file_menu.add_command(command=ui_load_backup)
     set_menu_text(file_menu, TransToken.ui('Open Backup'))
-    file_menu.add_command(command=ui_save_backup)
+    file_menu.add_command(command=lambda: background_run(ui_save_backup, DIALOG))
     set_menu_text(file_menu, TransToken.ui('Save Backup'))
-    file_menu.add_command(command=ui_save_backup_as)
+    file_menu.add_command(command=lambda: background_run(ui_save_backup_as, DIALOG))
     set_menu_text(file_menu, TransToken.ui('Save Backup As'))
 
     bar.add_cascade(menu=file_menu)
@@ -967,6 +971,7 @@ def init_toplevel(tk_img: TKImages) -> None:
     window.transient(TK_ROOT)
     window.withdraw()
     set_win_title(window, TransToken.ui('Backup/Restore Puzzles'))
+    dialog = TkDialogs(window)
 
     def quit_command() -> None:
         """Close the window."""
@@ -992,12 +997,12 @@ def init_toplevel(tk_img: TKImages) -> None:
     ).grid(row=0, column=1)
 
     set_text(
-        ttk.Button(toolbar_frame, command=ui_save_backup),
+        ttk.Button(toolbar_frame, command=lambda: background_run(ui_save_backup, dialog)),
         TransToken.ui('Save Backup'),
     ).grid(row=0, column=2)
 
     set_text(
-        ttk.Button(toolbar_frame, command=ui_save_backup_as),
+        ttk.Button(toolbar_frame, command=lambda: background_run(ui_save_backup_as, dialog)),
         TransToken.ui('.. As'),
     ).grid(row=0, column=3)
 

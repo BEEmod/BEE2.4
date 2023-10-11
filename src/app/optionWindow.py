@@ -17,7 +17,7 @@ from app import (
     TK_ROOT, LAUNCH_AFTER_EXPORT, DEV_MODE, background_run,
     contextWin, gameMan, localisation, tk_tools, sound, logWindow, img, UI,
 )
-from ui_tk.dialogs import DIALOG
+from ui_tk.dialogs import Dialogs, DIALOG, TkDialogs
 from config.gen_opts import GenOptions, AfterExport
 from consts import Theme
 from transtoken import TransToken
@@ -105,7 +105,7 @@ async def apply_config(conf: GenOptions) -> None:
     UI.refresh_palette_icons()
 
 
-def clear_caches() -> None:
+async def clear_caches(dialogs: Dialogs) -> None:
     """Wipe the cache times in configs.
 
      This will force package resources to be extracted again.
@@ -129,7 +129,7 @@ def clear_caches() -> None:
     # Since we've saved, dismiss this window.
     win.withdraw()
 
-    tk_tools.showinfo(TRANS_CACHE_RESET_TITLE, message)
+    await dialogs.show_info(title=TRANS_CACHE_RESET_TITLE, message=message)
 
 
 def make_checkbox(
@@ -269,6 +269,8 @@ async def init_gen_tab(
 ) -> None:
     """Make widgets in the 'General' tab."""
     global _load_langs
+    dialogs = TkDialogs(f.winfo_toplevel())
+
     after_export_frame = ttk.LabelFrame(f)
     localisation.set_text(after_export_frame, TransToken.ui('After Export:'))
     after_export_frame.grid(
@@ -394,7 +396,7 @@ async def init_gen_tab(
         TransToken.ui('Show all builtin palettes that you may have hidden.'),
     )
 
-    reset_cache = ttk.Button(f, command=clear_caches)
+    reset_cache = ttk.Button(f, command=lambda: background_run(clear_caches,  dialogs))
     localisation.set_text(reset_cache, TransToken.ui('Reset Package Caches'))
     reset_cache.grid(row=3, column=1, sticky='W')
     add_tooltip(

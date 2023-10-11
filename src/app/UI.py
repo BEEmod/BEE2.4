@@ -48,6 +48,7 @@ from app import (
 from app.selector_win import SelectorWin, Item as selWinItem, AttrDef as SelAttr
 from app.menu_bar import MenuBar
 from ui_tk.corridor_selector import TkSelector
+from ui_tk.dialogs import DIALOG
 from ui_tk.img import TKImages, TK_IMG
 
 
@@ -1540,8 +1541,8 @@ async def init_windows(tk_img: TKImages) -> None:
         set_items=set_palette,
     )
 
-    TK_ROOT.bind_all(tk_tools.KEY_SAVE, lambda e: pal_ui.event_save())
-    TK_ROOT.bind_all(tk_tools.KEY_SAVE_AS, lambda e: pal_ui.event_save_as())
+    TK_ROOT.bind_all(tk_tools.KEY_SAVE, lambda e: pal_ui.event_save(DIALOG))
+    TK_ROOT.bind_all(tk_tools.KEY_SAVE_AS, lambda e: pal_ui.event_save_as(DIALOG))
     TK_ROOT.bind_all(tk_tools.KEY_EXPORT, lambda e: background_run(export_editoritems, pal_ui, menu_bar))
 
     await trio.sleep(0)
