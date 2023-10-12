@@ -6,16 +6,18 @@ from typing import Callable, Generic, Optional, TypeVar
 
 from srctools import Entity, conv_int, conv_float, conv_bool, Vec, Angle, Matrix
 
-U = TypeVar("U", covariant=True)
-V = TypeVar("V", covariant=True)
+U_co = TypeVar("U_co", covariant=True)
+V_co = TypeVar("V_co", covariant=True)
+U = TypeVar("U")
+V = TypeVar("V")
 W = TypeVar("W")
 
 MutTypes = (Vec, Angle, Matrix)
 
 
-class Value(abc.ABC, Generic[U]):
+class Value(abc.ABC, Generic[U_co]):
     """A base value."""
-    def __call__(self, inst: Entity) -> U:
+    def __call__(self, inst: Entity) -> U_co:
         """Resolve the value by substituting from the instance, if required."""
         result = self._resolve(inst)
         if isinstance(result, MutTypes):
@@ -73,28 +75,28 @@ class Value(abc.ABC, Generic[U]):
         return self.map(Matrix.from_angstr, 'Matrix')
 
 
-class ConstValue(Value[U], Generic[U]):
+class ConstValue(Value[U_co], Generic[U_co]):
     """A value which is known."""
-    value: U
+    value: U_co
 
-    def __init__(self, value: U) -> None:
+    def __init__(self, value: U_co) -> None:
         self.value = value
 
     def _repr_val(self) -> str:
         return repr(self.value)
 
-    def _resolve(self, inst: Entity) -> U:
+    def _resolve(self, inst: Entity) -> U_co:
         """No resolution is required."""
         return self.value
 
-    def map(self, func: Callable[[U], V], name: str) -> Value[V]:
+    def map(self, func: Callable[[U_co], V], name: str) -> Value[V]:
         """Apply a function."""
         return ConstValue(func(self.value))
 
 
-class UnaryMapValue(Value[V], Generic[U, V]):
+class UnaryMapValue(Value[V_co], Generic[U_co, V_co]):
     """Maps an existing value to another."""
-    def __init__(self, parent: Value[U], func: Callable[[U], V], name: str) -> None:
+    def __init__(self, parent: Value[U_co], func: Callable[[U_co], V_co], name: str) -> None:
         self.parent = parent
         self.func = func
         self.name = name
@@ -102,11 +104,11 @@ class UnaryMapValue(Value[V], Generic[U, V]):
     def _repr_val(self) -> str:
         return f'{self.name}({self.parent._repr_val()})'
 
-    def _resolve(self, inst: Entity) -> V:
+    def _resolve(self, inst: Entity) -> V_co:
         """Resolve the parent, then call the function."""
         return self.func(self.parent._resolve(inst))
 
-    def map(self, func: Callable[[V], W], name: str) -> Value[W]:
+    def map(self, func: Callable[[V_co], W], name: str) -> Value[W]:
         """Map this map."""
         return UnaryMapValue(self, func, name)
 
