@@ -25,18 +25,26 @@ class Value(abc.ABC, Generic[U]):
     def __repr__(self) -> str:
         return f'<Value: {self._repr_val()}>'
 
+    @classmethod
+    def parse(cls, value: str) -> Value[str]:
+        """Starting point, read a config value."""
+        if '$' in value:
+            return InstValue(value)
+        else:
+            return ConstValue(value)
+
     @abc.abstractmethod
     def _repr_val(self) -> str:
         """Return the repr() for the computation, for the overall repr()."""
         raise NotImplementedError
 
     @abc.abstractmethod
-    def _resolve(self, inst: Entity) -> U:
+    def _resolve(self, inst: Entity) -> U_co:
         """Resolve the value by substituting from the instance, if required."""
         raise NotImplementedError
 
     @abc.abstractmethod
-    def map(self, func: Callable[[U], V], name: str) -> Value[V]:
+    def map(self, func: Callable[[U_co], V], name: str) -> Value[V]:
         """Apply a function."""
         raise NotImplementedError
 
