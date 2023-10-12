@@ -629,7 +629,7 @@ def res_import_template(
                     inst['file'],
                 )
         elif color_var:
-            color_val = conditions.resolve_value(inst, color_var).casefold()
+            color_val = inst.fixup.substitute(color_var).casefold()
 
             if color_val == 'white':
                 force_colour = texturing.Portalable.white
@@ -637,7 +637,7 @@ def res_import_template(
                 force_colour = texturing.Portalable.black
         # else: no color var
 
-        if srctools.conv_bool(conditions.resolve_value(inst, invert_var)):
+        if srctools.conv_bool(inst.fixup.substitute(invert_var, allow_invert=True)):
             force_colour = template_brush.TEMP_COLOUR_INVERT[conf_force_colour]
         # else: False value, no invert.
 
@@ -648,7 +648,7 @@ def res_import_template(
         origin = conditions.resolve_offset(inst, offset)
 
         # If this var is set, it forces all to be included.
-        if srctools.conv_bool(conditions.resolve_value(inst, visgroup_force_var)):
+        if srctools.conv_bool(inst.fixup.substitute(visgroup_force_var, allow_invert=True)):
             visgroups.update(template.visgroups)
         elif visgroup_func is not None:
             visgroups.update(visgroup_func(
