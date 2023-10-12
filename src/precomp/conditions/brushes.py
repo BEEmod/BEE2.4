@@ -576,7 +576,7 @@ def res_import_template(
     # If true, force visgroups to all be used.
     visgroup_force_var = res['forceVisVar', '']
 
-    sense_offset = res.vec('senseOffset')
+    conf_sense_offset = res['senseOffset', '']
 
     def place_template(inst: Entity) -> None:
         """Place a template."""
@@ -695,7 +695,7 @@ def res_import_template(
             force_colour,
             force_grid,
             surf_cat,
-            sense_offset,
+            Vec.from_str(inst.fixup.substitute(conf_sense_offset)),
         )
 
         for picker_name, picker_var in picker_vars:
