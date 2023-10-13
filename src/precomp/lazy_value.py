@@ -36,6 +36,17 @@ class LazyValue(abc.ABC, Generic[U_co]):
         else:
             return ConstValue(value)
 
+    @classmethod
+    def make(cls, value: U | LazyValue[U]) -> LazyValue[U]:
+        """Make a value lazy. If it's already a LazyValue, just return it.
+
+        Otherwise, treat as a constant and wrap it.
+        """
+        if isinstance(value, LazyValue):
+            return value
+        else:
+            return ConstValue(value)
+
     @abc.abstractmethod
     def _repr_val(self) -> str:
         """Return the repr() for the computation, for the overall repr()."""
