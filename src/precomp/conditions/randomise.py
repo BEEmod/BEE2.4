@@ -6,21 +6,21 @@ import srctools
 
 from precomp import collisions, conditions, rand
 from precomp.conditions import Condition, RES_EXHAUSTED, make_result, MapInfo
-from precomp.lazy_value import Value
+from precomp.lazy_value import LazyValue
 
 
 COND_MOD_NAME = 'Randomisation'
-VAL_BLANK = Value.parse('')
+VAL_BLANK = LazyValue.parse('')
 
 
 @conditions.make_test('random')
 def check_random(res: Keyvalues) -> conditions.TestCallable:
     """Randomly is either true or false."""
     if res.has_children():
-        chance_str = Value.parse(res['chance', '100'])
-        seed = Value.parse(res['seed', ''])
+        chance_str = LazyValue.parse(res['chance', '100'])
+        seed = LazyValue.parse(res['seed', ''])
     else:
-        chance_str = Value.parse(res.value)
+        chance_str = LazyValue.parse(res.value)
         seed = VAL_BLANK
 
     # Allow ending with '%' sign
@@ -210,12 +210,12 @@ def res_rand_inst_shift(res: Keyvalues) -> Callable[[Entity], None]:
 
     The positions are local to the instance.
     """
-    min_x = Value.parse(res['min_x', '']).as_float()
-    max_x = Value.parse(res['max_x', '']).as_float()
-    min_y = Value.parse(res['min_y', '']).as_float()
-    max_y = Value.parse(res['max_y', '']).as_float()
-    min_z = Value.parse(res['min_z', '']).as_float()
-    max_z = Value.parse(res['max_z', '']).as_float()
+    min_x = LazyValue.parse(res['min_x', '']).as_float()
+    max_x = LazyValue.parse(res['max_x', '']).as_float()
+    min_y = LazyValue.parse(res['min_y', '']).as_float()
+    max_y = LazyValue.parse(res['max_y', '']).as_float()
+    min_z = LazyValue.parse(res['min_z', '']).as_float()
+    max_z = LazyValue.parse(res['max_z', '']).as_float()
 
     seed = 'f' + res['seed', 'randomshift']
 

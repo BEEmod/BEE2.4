@@ -6,7 +6,7 @@ import srctools.logger
 
 from precomp import tiling, texturing, template_brush, conditions, rand
 from precomp.brushLoc import POS as BLOCK_POS
-from precomp.lazy_value import Value
+from precomp.lazy_value import LazyValue
 from precomp.template_brush import TEMP_TYPES
 
 COND_MOD_NAME = 'Entities'
@@ -25,15 +25,15 @@ def res_insert_overlay(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
     - Normal: The direction of the brush face.
     - Offset: An offset to move the overlays by.
     """
-    conf_temp_id = Value.parse(res['id']).casefold()
+    conf_temp_id = LazyValue.parse(res['id']).casefold()
     face_str = res['face_pos', '0 0 -64']
-    conf_norm = Value.parse(res['normal', '0 0 1']).as_vec(0, 0, 1)
+    conf_norm = LazyValue.parse(res['normal', '0 0 1']).as_vec(0, 0, 1)
 
     replace_tex: Dict[str, List[str]] = {}
     for prop in res.find_children('replace'):
         replace_tex.setdefault(prop.name.replace('\\', '/'), []).append(prop.value)
 
-    conf_offset = Value.parse(res['offset', '0 0 0']).as_vec()
+    conf_offset = LazyValue.parse(res['offset', '0 0 0']).as_vec()
 
     def insert_over(inst: Entity) -> None:
         """Apply the result."""

@@ -16,7 +16,7 @@ W = TypeVar("W")
 MutTypes = (Vec, Angle, Matrix)
 
 
-class Value(abc.ABC, Generic[U_co]):
+class LazyValue(abc.ABC, Generic[U_co]):
     """A base value."""
     def __call__(self, inst: Entity) -> U_co:
         """Resolve the value by substituting from the instance, if required."""
@@ -29,7 +29,7 @@ class Value(abc.ABC, Generic[U_co]):
         return f'<Value: {self._repr_val()}>'
 
     @classmethod
-    def parse(cls, value: str, default: Optional[str] = None, allow_invert: bool = True) -> Value[str]:
+    def parse(cls, value: str, default: Optional[str] = None, allow_invert: bool = True) -> LazyValue[str]:
         """Starting point, read a config value."""
         if '$' in value:
             return InstValue(value, default, allow_invert)
@@ -47,44 +47,44 @@ class Value(abc.ABC, Generic[U_co]):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def map(self, func: Callable[[U_co], V], name: str = '') -> Value[V]:
+    def map(self, func: Callable[[U_co], V], name: str = '') -> LazyValue[V]:
         """Apply a function."""
         raise NotImplementedError
 
-    def as_int(self: Value[str], default: int = 0) -> Value[int]:
+    def as_int(self: LazyValue[str], default: int = 0) -> LazyValue[int]:
         """Call conv_int()."""
         return self.map(lambda x: conv_int(x, default), 'conv_int')
 
-    def as_float(self: Value[str], default: float = 0.0) -> Value[float]:
+    def as_float(self: LazyValue[str], default: float = 0.0) -> LazyValue[float]:
         """Call conv_float()."""
         return self.map(lambda x: conv_float(x, default), 'conv_float')
 
-    def as_bool(self: Value[str], default: bool = False) -> Value[bool]:
+    def as_bool(self: LazyValue[str], default: bool = False) -> LazyValue[bool]:
         """Call conv_bool()."""
         return self.map(lambda x: conv_bool(x, default), 'conv_bool')
 
-    def as_vec(self: Value[str], x: float = 0.0, y: float = 0.0, z: float = 0.0) -> Value[Vec]:
+    def as_vec(self: LazyValue[str], x: float = 0.0, y: float = 0.0, z: float = 0.0) -> LazyValue[Vec]:
         """Call Vec.from_str()."""
         return self.map(lambda val: Vec.from_str(val, x, y, z), 'Vec')
 
-    def as_angle(self: Value[str], pitch: float = 0.0, yaw: float = 0.0, roll: float = 0.0) -> Value[Angle]:
+    def as_angle(self: LazyValue[str], pitch: float = 0.0, yaw: float = 0.0, roll: float = 0.0) -> LazyValue[Angle]:
         """Call Angle.from_str()."""
         return self.map(lambda val: Angle.from_str(val, pitch, yaw, roll), 'Angle')
 
-    def as_matrix(self: Value[str]) -> Value[Matrix]:
+    def as_matrix(self: LazyValue[str]) -> LazyValue[Matrix]:
         """Call Matrix.from_angstr()."""
         return self.map(Matrix.from_angstr, 'Matrix')
 
-    def casefold(self: Value[str]) -> Value[str]:
+    def casefold(self: LazyValue[str]) -> LazyValue[str]:
         """Call str.casefold()."""
         return self.map(str.casefold, 'str.casefold')
 
-    def invert(self: Value[bool]) -> Value[bool]:
+    def invert(self: LazyValue[bool]) -> LazyValue[bool]:
         """Invert a boolean."""
         return self.map(operator.not_, 'not')
 
 
-class ConstValue(Value[U_co], Generic[U_co]):
+class ConstValue(LazyValue[U_co], Generic[U_co]):
     """A value which is known."""
     value: U_co
 
@@ -98,14 +98,14 @@ class ConstValue(Value[U_co], Generic[U_co]):
         """No resolution is required."""
         return self.value
 
-    def map(self, func: Callable[[U_co], V], name: str = '') -> Value[V]:
+    def map(self, func: Callable[[U_co], V], name: str = '') -> LazyValue[V]:
         """Apply a function."""
         return ConstValue(func(self.value))
 
 
-class UnaryMapValue(Value[V_co], Generic[U_co, V_co]):
+class UnaryMapValue(LazyValue[V_co], Generic[U_co, V_co]):
     """Maps an existing value to another."""
-    def __init__(self, parent: Value[U_co], func: Callable[[U_co], V_co], name: str) -> None:
+    def __init__(self, parent: LazyValue[U_co], func: Callable[[U_co], V_co], name: str) -> None:
         self.parent = parent
         self.func = func
         self.name = name or getattr(func, '__name__', repr(func))
@@ -117,12 +117,12 @@ class UnaryMapValue(Value[V_co], Generic[U_co, V_co]):
         """Resolve the parent, then call the function."""
         return self.func(self.parent._resolve(inst))
 
-    def map(self, func: Callable[[V_co], W], name: str = '') -> Value[W]:
+    def map(self, func: Callable[[V_co], W], name: str = '') -> LazyValue[W]:
         """Map this map."""
         return UnaryMapValue(self, func, name)
 
 
-class InstValue(Value[str]):
+class InstValue(LazyValue[str]):
     """A value which will be resolved from an instance."""
     variable: str
     default: Optional[str]
@@ -146,6 +146,6 @@ class InstValue(Value[str]):
         """Resolve the parent, then call the function."""
         return inst.fixup.substitute(self.variable, self.default, allow_invert=self.allow_invert)
 
-    def map(self, func: Callable[[str], V], name: str = '') -> Value[V]:
+    def map(self, func: Callable[[str], V], name: str = '') -> LazyValue[V]:
         """Resolve then map."""
         return UnaryMapValue(self, func, name)

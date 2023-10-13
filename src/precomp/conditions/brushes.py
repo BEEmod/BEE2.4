@@ -15,7 +15,7 @@ from precomp import (
 from editoritems_props import PanelAnimation
 import utils
 import consts
-from precomp.lazy_value import Value
+from precomp.lazy_value import LazyValue
 
 
 COND_MOD_NAME = 'Brushes'
@@ -569,7 +569,7 @@ def res_import_template(
         rotation = Matrix()
 
     offset = res['offset', '0 0 0']
-    invert_var = Value.parse(res['invertVar', '']).as_bool()
+    invert_var = LazyValue.parse(res['invertVar', '']).as_bool()
     color_var = res['colorVar', '']
     if color_var.casefold() == '<editor>':
         color_var = '<editor>'

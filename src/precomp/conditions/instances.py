@@ -9,7 +9,7 @@ import srctools.logger
 from precomp import instance_traits, instanceLocs, conditions, options
 from srctools import Keyvalues, Angle, Vec, Entity, Output, VMF, conv_bool
 
-from precomp.lazy_value import Value
+from precomp.lazy_value import LazyValue
 
 
 LOGGER = srctools.logger.get_logger(__name__, 'cond.instances')
@@ -19,7 +19,7 @@ COND_MOD_NAME = 'Instances'
 @conditions.make_test('instance')
 def check_file_equal(kv: Keyvalues) -> conditions.TestCallable:
     """Evaluates True if the instance matches the given file."""
-    conf_inst_list = Value.parse(kv.value).map(instanceLocs.resolve_filter)
+    conf_inst_list = LazyValue.parse(kv.value).map(instanceLocs.resolve_filter)
 
     def check_inst(inst: Entity) -> bool:
         """Each time, check if no matching instances exist, so we can skip conditions."""
@@ -39,7 +39,7 @@ def check_file_cont(inst: Entity, kv: Keyvalues) -> bool:
 @conditions.make_test('hasInst')
 def check_has_inst(kv: Keyvalues) -> conditions.TestCallable:
     """Checks if the given instance is present anywhere in the map."""
-    inst_filter = Value.parse(kv.value).map(instanceLocs.resolve_filter)
+    inst_filter = LazyValue.parse(kv.value).map(instanceLocs.resolve_filter)
 
     return lambda inst: inst_filter(inst).isdisjoint(conditions.ALL_INST)
 
