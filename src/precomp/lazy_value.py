@@ -89,7 +89,7 @@ class LazyValue(abc.ABC, Generic[U_co]):
         """Call str.casefold()."""
         return self.map(str.casefold, 'str.casefold')
 
-    def invert(self: LazyValue[bool]) -> LazyValue[bool]:
+    def __invert__(self: LazyValue[bool]) -> LazyValue[bool]:
         """Invert a boolean."""
         return self.map(operator.not_, 'not')
 
