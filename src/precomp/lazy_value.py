@@ -28,10 +28,10 @@ class Value(abc.ABC, Generic[U_co]):
         return f'<Value: {self._repr_val()}>'
 
     @classmethod
-    def parse(cls, value: str) -> Value[str]:
+    def parse(cls, value: str, default: Optional[str] = None, allow_invert: bool = True) -> Value[str]:
         """Starting point, read a config value."""
         if '$' in value:
-            return InstValue(value)
+            return InstValue(value, default, allow_invert)
         else:
             return ConstValue(value)
 
