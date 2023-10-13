@@ -1167,21 +1167,20 @@ def edit_panel(vmf: VMF, inst: Entity, props: Keyvalues, create: bool) -> None:
         if 'type' in props:
             pan_type = props['type']
             try:
-                panel.pan_type = PANEL_TYPES[conditions.resolve_value(inst, pan_type).lower()]
+                panel.pan_type = PANEL_TYPES[inst.fixup.substitute(pan_type).casefold()]
             except (KeyError, ValueError):
                 raise ValueError(f'Unknown panel type "{pan_type}"!') from None
 
         if 'thickness' in props:
-            panel.thickness = srctools.conv_int(
-                conditions.resolve_value(inst, props['thickness'])
-            )
-            if panel.thickness not in (2, 4, 8):
+            thickness = srctools.conv_int(inst.fixup.substitute(props['thickness']))
+            if thickness not in (2, 4, 8):
                 raise ValueError(
                     '"{}": Invalid panel thickess {}!\n'
                     'Must be 2, 4 or 8.',
                     inst['targetname'],
-                    panel.thickness,
+                    thickness,
                 )
+            panel.thickness = thickness
 
         if bevel_world is not None:
             panel.bevels.clear()

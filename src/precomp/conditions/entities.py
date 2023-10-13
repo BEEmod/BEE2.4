@@ -181,7 +181,7 @@ def res_water_splash(vmf: VMF,  res: Keyvalues) -> conditions.ResultCallable:
             LOGGER.info('Bottom: {}, top: {}', bottom_pos, top_pos)
         else:
             # Directly from the given value.
-            pos2 = Vec.from_str(conditions.resolve_value(inst, conf_pos2))
+            pos2 = Vec.from_str(inst.fixup.substitute(conf_pos2))
 
         origin = Vec.from_str(inst['origin'])
         orient = Matrix.from_angstr(inst['angles'])

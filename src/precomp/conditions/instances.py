@@ -199,7 +199,7 @@ def check_offset_distance(inst: Entity, kv: Keyvalues) -> bool:
         comp_val = kv.value
 
     try:
-        value = float(conditions.resolve_value(inst, comp_val))
+        value = float(inst.fixup.substitute(comp_val))
     except ValueError:
         return False
 

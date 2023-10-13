@@ -7,6 +7,8 @@ from consts import FixupVars
 from precomp.connections import ITEMS
 from precomp.instanceLocs import resolve_one as resolve_single
 from srctools import Entity, Matrix, VMF, Keyvalues, Output, Vec
+
+from precomp.lazy_value import LazyValue
 from precomp.texturing import GenCat
 from precomp.tiling import TILES, Panel
 
@@ -105,11 +107,11 @@ def res_piston_plat(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
 
     template = template_brush.get_template(res['template'])
 
-    conf_visgroup_names = [
-        res['visgroup_1', 'pist_1'],
-        res['visgroup_2', 'pist_2'],
-        res['visgroup_3', 'pist_3'],
-        res['visgroup_top', 'pist_4'],
+    visgroup_names = [
+        LazyValue.parse(res['visgroup_1', 'pist_1']),
+        LazyValue.parse(res['visgroup_2', 'pist_2']),
+        LazyValue.parse(res['visgroup_3', 'pist_3']),
+        LazyValue.parse(res['visgroup_top', 'pist_4']),
     ]
 
     has_dn_fizz = res.bool('has_dn_fizz')
@@ -126,12 +128,6 @@ def res_piston_plat(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
         max_pos = inst.fixup.int(FixupVars.PIST_TOP)
         start_up = inst.fixup.bool(FixupVars.PIST_IS_UP)
         speed = inst.fixup.substitute(speed_var)
-
-        # Allow doing variable lookups here.
-        visgroup_names = [
-            conditions.resolve_value(inst, fname)
-            for fname in conf_visgroup_names
-        ]
 
         if len(ITEMS[inst['targetname']].inputs) == 0:
             # No inputs. Check for the 'auto' var if applicable.
@@ -251,7 +247,7 @@ def res_piston_plat(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
                 orient,
                 force_type=template_brush.TEMP_TYPES.world,
                 add_to_map=False,
-                additional_visgroups={visgroup_names[pist_ind - 1]},
+                additional_visgroups={visgroup_names[pist_ind - 1](inst)},
             )
             temp_targ.solids.extend(temp_result.world)
 

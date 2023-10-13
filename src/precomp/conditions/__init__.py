@@ -1157,30 +1157,11 @@ def set_ent_keys(
     ent can be any mapping.
     """
     for kv in kv_block.find_block(block_name, or_blank=True):
-        ent[kv.real_name] = resolve_value(inst, kv.value)
+        ent[kv.real_name] = inst.fixup.substitute(kv.value)
     for kv in kv_block.find_block('Local' + block_name, or_blank=True):
-        if kv.value.startswith('$'):
-            val = inst.fixup[kv.value]
-        else:
-            val = kv.value
-        if val.startswith('@'):
-            ent[kv.real_name] = val
-        else:
-            ent[kv.real_name] = local_name(inst, val)
+        ent[kv.real_name] = local_name(inst, inst.fixup.substitute(kv.value))
 
 T = TypeVar('T')
-
-
-def resolve_value(inst: Entity, value: str | T) -> str | T:
-    """If a value contains '$', lookup the associated var.
-
-    Non-string values are passed through unchanged.
-    If it starts with '!$', invert boolean values.
-    """
-    if not isinstance(value, str):
-        return value
-
-    return inst.fixup.substitute(value, allow_invert=True)
 
 
 def resolve_offset(inst, value: str, scale: float=1, zoff: float=0) -> Vec:
