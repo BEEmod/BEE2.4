@@ -836,7 +836,7 @@ async def export_editoritems(pal_ui: paletteUI.PaletteUI, bar: MenuBar) -> None:
         # Select the last_export palette, so reloading loads this item selection.
         # But leave it at the current palette, if it's unmodified.
         if pal_ui.selected.items != pal_data:
-            pal_ui.select_palette(paletteUI.UUID_EXPORT)
+            pal_ui.select_palette(paletteUI.UUID_EXPORT, False)
             pal_ui.update_state()
 
         # Re-fire this, so we clear the '*' on buttons if extracting cache.
@@ -846,12 +846,12 @@ async def export_editoritems(pal_ui: paletteUI.PaletteUI, bar: MenuBar) -> None:
         bar.set_export_allowed(True)
 
 
-def set_disp_name(item: PalItem, e: Optional[tk.Event[tk.Misc]] = None) -> None:
+def set_disp_name(item: PalItem, e: object = None) -> None:
     """Callback to display the name of the item."""
     localisation.set_text(UI['pre_disp_name'], item.name)
 
 
-def clear_disp_name(e: Optional[tk.Event[tk.Misc]] = None) -> None:
+def clear_disp_name(e: object = None) -> None:
     """Callback to reset the item name."""
     localisation.set_text(UI['pre_disp_name'], TransToken.BLANK)
 
