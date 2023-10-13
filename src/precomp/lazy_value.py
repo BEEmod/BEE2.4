@@ -3,9 +3,11 @@ from __future__ import annotations
 
 import abc
 import operator
-from typing import Callable, Generic, Optional, TypeVar
+from typing import Callable, ClassVar, Generic, Optional, TypeVar
 
 from srctools import Entity, conv_int, conv_float, conv_bool, Vec, Angle, Matrix
+
+__all__ = ['LazyValue']
 
 U_co = TypeVar("U_co", covariant=True)
 V_co = TypeVar("V_co", covariant=True)
@@ -18,6 +20,9 @@ MutTypes = (Vec, Angle, Matrix)
 
 class LazyValue(abc.ABC, Generic[U_co]):
     """A base value."""
+    # If true, this may depend on inst.
+    has_fixups: ClassVar[bool] = True
+
     def __call__(self, inst: Entity) -> U_co:
         """Resolve the value by substituting from the instance, if required."""
         result = self._resolve(inst)
@@ -96,6 +101,8 @@ class LazyValue(abc.ABC, Generic[U_co]):
 
 class ConstValue(LazyValue[U_co], Generic[U_co]):
     """A value which is known."""
+    has_fixups: ClassVar[bool] = False
+
     value: U_co
 
     def __init__(self, value: U_co) -> None:

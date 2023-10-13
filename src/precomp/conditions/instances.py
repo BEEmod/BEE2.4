@@ -24,7 +24,7 @@ def check_file_equal(kv: Keyvalues) -> conditions.TestCallable:
     def check_inst(inst: Entity) -> bool:
         """Each time, check if no matching instances exist, so we can skip conditions."""
         inst_list = conf_inst_list(inst)
-        if conditions.ALL_INST.isdisjoint(inst_list):
+        if not conf_inst_list.has_fixups and conditions.ALL_INST.isdisjoint(inst_list):
             raise conditions.Unsatisfiable
         return inst['file'].casefold() in inst_list
     return check_inst
