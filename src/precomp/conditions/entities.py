@@ -6,6 +6,7 @@ import srctools.logger
 
 from precomp import tiling, texturing, template_brush, conditions, rand
 from precomp.brushLoc import POS as BLOCK_POS
+from precomp.lazy_value import Value
 from precomp.template_brush import TEMP_TYPES
 
 COND_MOD_NAME = 'Entities'
@@ -24,29 +25,28 @@ def res_insert_overlay(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
     - Normal: The direction of the brush face.
     - Offset: An offset to move the overlays by.
     """
-    orig_temp_id = res['id'].casefold()
-
+    conf_temp_id = Value.parse(res['id']).casefold()
     face_str = res['face_pos', '0 0 -64']
-    orig_norm = Vec.from_str(res['normal', '0 0 1'])
+    conf_norm = Value.parse(res['normal', '0 0 1']).as_vec(0, 0, 1)
 
     replace_tex: Dict[str, List[str]] = {}
     for prop in res.find_children('replace'):
         replace_tex.setdefault(prop.name.replace('\\', '/'), []).append(prop.value)
 
-    offset = Vec.from_str(res['offset', '0 0 0'])
+    conf_offset = Value.parse(res['offset', '0 0 0']).as_vec()
 
     def insert_over(inst: Entity) -> None:
         """Apply the result."""
-        temp_id = inst.fixup.substitute(orig_temp_id)
+        temp_id = conf_temp_id(inst)
 
         origin = Vec.from_str(inst['origin'])
         angles = Angle.from_str(inst['angles', '0 0 0'])
 
         face_pos = conditions.resolve_offset(inst, face_str)
-        normal = orig_norm @ angles
+        normal = conf_norm(inst) @ angles
 
         # Don't make offset change the face_pos value..
-        origin += offset @ angles
+        origin += conf_offset(inst) @ angles
 
         for axis, norm in enumerate(normal):
             # Align to the center of the block grid. The normal direction is

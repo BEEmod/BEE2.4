@@ -17,6 +17,7 @@ from precomp import brushLoc, options, packing, conditions, connections
 from precomp.conditions.globals import precache_model
 from precomp.instanceLocs import resolve as resolve_inst, resolve_filter
 import user_errors
+from precomp.lazy_value import Value
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -1055,15 +1056,19 @@ def res_dropper_addon(inst: Entity, res: Keyvalues) -> None:
 
 
 @conditions.make_result('SetDropperOffset')
-def res_set_dropper_off(inst: Entity, res: Keyvalues) -> None:
+def res_set_dropper_off(res: Keyvalues) -> conditions.ResultCallable:
     """Update the position cubes will be spawned at for a dropper."""
-    try:
-        pair = INST_TO_PAIR[inst]
-    except KeyError:
-        LOGGER.warning('SetDropperOffset applied to non cube ("{}")', res.value)
-    else:
-        pair.spawn_offset = Vec.from_str(
-            conditions.resolve_value(inst, res.value))
+    offset = Value.parse(res.value).as_vec()
+
+    def apply_offset(inst: Entity) -> None:
+        """Change the position."""
+        try:
+            pair = INST_TO_PAIR[inst]
+        except KeyError:
+            LOGGER.warning('SetDropperOffset applied to non cube: {!r}', offset)
+        else:
+            pair.spawn_offset = offset(inst)
+    return apply_offset
 
 
 @conditions.make_result('ChangeCubeType', 'SetCubeType')

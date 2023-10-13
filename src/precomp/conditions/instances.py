@@ -9,6 +9,9 @@ import srctools.logger
 from precomp import instance_traits, instanceLocs, conditions, options
 from srctools import Keyvalues, Angle, Vec, Entity, Output, VMF, conv_bool
 
+from precomp.lazy_value import Value
+
+
 LOGGER = srctools.logger.get_logger(__name__, 'cond.instances')
 COND_MOD_NAME = 'Instances'
 
@@ -16,10 +19,11 @@ COND_MOD_NAME = 'Instances'
 @conditions.make_test('instance')
 def check_file_equal(kv: Keyvalues) -> conditions.TestCallable:
     """Evaluates True if the instance matches the given file."""
-    inst_list = instanceLocs.resolve_filter(kv.value)
+    conf_inst_list = Value.parse(kv.value).map(instanceLocs.resolve_filter)
 
     def check_inst(inst: Entity) -> bool:
         """Each time, check if no matching instances exist, so we can skip conditions."""
+        inst_list = conf_inst_list(inst)
         if conditions.ALL_INST.isdisjoint(inst_list):
             raise conditions.Unsatisfiable
         return inst['file'].casefold() in inst_list
@@ -35,8 +39,9 @@ def check_file_cont(inst: Entity, kv: Keyvalues) -> bool:
 @conditions.make_test('hasInst')
 def check_has_inst(kv: Keyvalues) -> conditions.TestCallable:
     """Checks if the given instance is present anywhere in the map."""
-    inst_filter = instanceLocs.resolve_filter(kv.value)
-    return lambda inst: inst_filter.isdisjoint(conditions.ALL_INST)
+    inst_filter = Value.parse(kv.value).map(instanceLocs.resolve_filter)
+
+    return lambda inst: inst_filter(inst).isdisjoint(conditions.ALL_INST)
 
 
 @conditions.make_test('hasTrait')

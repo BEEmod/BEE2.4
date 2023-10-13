@@ -6,26 +6,29 @@ import srctools
 
 from precomp import collisions, conditions, rand
 from precomp.conditions import Condition, RES_EXHAUSTED, make_result, MapInfo
+from precomp.lazy_value import Value
+
 
 COND_MOD_NAME = 'Randomisation'
+VAL_BLANK = Value.parse('')
 
 
 @conditions.make_test('random')
 def check_random(res: Keyvalues) -> conditions.TestCallable:
     """Randomly is either true or false."""
     if res.has_children():
-        chance_str = res['chance', '100']
-        seed = res['seed', '']
+        chance_str = Value.parse(res['chance', '100'])
+        seed = Value.parse(res['seed', ''])
     else:
-        chance_str = res.value
-        seed = ''
+        chance_str = Value.parse(res.value)
+        seed = VAL_BLANK
 
     # Allow ending with '%' sign
-    chance = srctools.conv_int(chance_str.rstrip('%'), 100)
+    chance = chance_str.map(lambda s: s.rstrip('%'), 'rstrip').as_int(100)
 
     def rand_func(inst: Entity) -> bool:
         """Apply the random chance."""
-        return rand.seed(b'rand_flag', inst, seed).randrange(100) < chance
+        return rand.seed(b'rand_flag', inst, seed(inst)).randrange(100) < chance(inst)
     return rand_func
 
 
@@ -207,12 +210,12 @@ def res_rand_inst_shift(res: Keyvalues) -> Callable[[Entity], None]:
 
     The positions are local to the instance.
     """
-    min_x = res.float('min_x')
-    max_x = res.float('max_x')
-    min_y = res.float('min_y')
-    max_y = res.float('max_y')
-    min_z = res.float('min_z')
-    max_z = res.float('max_z')
+    min_x = Value.parse(res['min_x', '']).as_float()
+    max_x = Value.parse(res['max_x', '']).as_float()
+    min_y = Value.parse(res['min_y', '']).as_float()
+    max_y = Value.parse(res['max_y', '']).as_float()
+    min_z = Value.parse(res['min_z', '']).as_float()
+    max_z = Value.parse(res['max_z', '']).as_float()
 
     seed = 'f' + res['seed', 'randomshift']
 
@@ -220,9 +223,9 @@ def res_rand_inst_shift(res: Keyvalues) -> Callable[[Entity], None]:
         """Randomly shift the instance."""
         rng = rand.seed(b'rand_shift', inst, seed)
         pos = Vec(
-            rng.uniform(min_x, max_x),
-            rng.uniform(min_y, max_y),
-            rng.uniform(min_z, max_z),
+            rng.uniform(min_x(inst), max_x(inst)),
+            rng.uniform(min_y(inst), max_y(inst)),
+            rng.uniform(min_z(inst), max_z(inst)),
         )
         pos.localise(Vec.from_str(inst['origin']), Angle.from_str(inst['angles']))
         inst['origin'] = pos

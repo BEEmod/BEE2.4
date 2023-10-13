@@ -5,7 +5,7 @@ from collections import defaultdict
 from random import Random
 
 from srctools import Keyvalues, NoKeyError, Output, Entity, VMF
-from srctools.math import Vec, Angle, Matrix, FrozenVec, to_matrix
+from srctools.math import Vec, Angle, Matrix, FrozenVec
 import srctools.logger
 
 from precomp import (
@@ -15,6 +15,7 @@ from precomp import (
 from editoritems_props import PanelAnimation
 import utils
 import consts
+from precomp.lazy_value import Value
 
 
 COND_MOD_NAME = 'Brushes'
@@ -568,7 +569,7 @@ def res_import_template(
         rotation = Matrix()
 
     offset = res['offset', '0 0 0']
-    invert_var = res['invertVar', '']
+    invert_var = Value.parse(res['invertVar', '']).as_bool()
     color_var = res['colorVar', '']
     if color_var.casefold() == '<editor>':
         color_var = '<editor>'
@@ -637,7 +638,7 @@ def res_import_template(
                 force_colour = texturing.Portalable.black
         # else: no color var
 
-        if srctools.conv_bool(inst.fixup.substitute(invert_var, allow_invert=True)):
+        if invert_var(inst):
             force_colour = template_brush.TEMP_COLOUR_INVERT[conf_force_colour]
         # else: False value, no invert.
 

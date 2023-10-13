@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import abc
+import operator
 from typing import Callable, Generic, Optional, TypeVar
 
 from srctools import Entity, conv_int, conv_float, conv_bool, Vec, Angle, Matrix
@@ -46,7 +47,7 @@ class Value(abc.ABC, Generic[U_co]):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def map(self, func: Callable[[U_co], V], name: str) -> Value[V]:
+    def map(self, func: Callable[[U_co], V], name: str = '') -> Value[V]:
         """Apply a function."""
         raise NotImplementedError
 
@@ -74,6 +75,14 @@ class Value(abc.ABC, Generic[U_co]):
         """Call Matrix.from_angstr()."""
         return self.map(Matrix.from_angstr, 'Matrix')
 
+    def casefold(self: Value[str]) -> Value[str]:
+        """Call str.casefold()."""
+        return self.map(str.casefold, 'str.casefold')
+
+    def invert(self: Value[bool]) -> Value[bool]:
+        """Invert a boolean."""
+        return self.map(operator.not_, 'not')
+
 
 class ConstValue(Value[U_co], Generic[U_co]):
     """A value which is known."""
@@ -89,7 +98,7 @@ class ConstValue(Value[U_co], Generic[U_co]):
         """No resolution is required."""
         return self.value
 
-    def map(self, func: Callable[[U_co], V], name: str) -> Value[V]:
+    def map(self, func: Callable[[U_co], V], name: str = '') -> Value[V]:
         """Apply a function."""
         return ConstValue(func(self.value))
 
@@ -99,7 +108,7 @@ class UnaryMapValue(Value[V_co], Generic[U_co, V_co]):
     def __init__(self, parent: Value[U_co], func: Callable[[U_co], V_co], name: str) -> None:
         self.parent = parent
         self.func = func
-        self.name = name
+        self.name = name or getattr(func, '__name__', repr(func))
 
     def _repr_val(self) -> str:
         return f'{self.name}({self.parent._repr_val()})'
@@ -108,7 +117,7 @@ class UnaryMapValue(Value[V_co], Generic[U_co, V_co]):
         """Resolve the parent, then call the function."""
         return self.func(self.parent._resolve(inst))
 
-    def map(self, func: Callable[[V_co], W], name: str) -> Value[W]:
+    def map(self, func: Callable[[V_co], W], name: str = '') -> Value[W]:
         """Map this map."""
         return UnaryMapValue(self, func, name)
 
@@ -137,6 +146,6 @@ class InstValue(Value[str]):
         """Resolve the parent, then call the function."""
         return inst.fixup.substitute(self.variable, self.default, allow_invert=self.allow_invert)
 
-    def map(self, func: Callable[[str], V], name: str) -> Value[V]:
+    def map(self, func: Callable[[str], V], name: str = '') -> Value[V]:
         """Resolve then map."""
         return UnaryMapValue(self, func, name)
