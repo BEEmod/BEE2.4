@@ -26,7 +26,7 @@ def res_insert_overlay(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
     - Offset: An offset to move the overlays by.
     """
     conf_temp_id = LazyValue.parse(res['id']).casefold()
-    face_str = res['face_pos', '0 0 -64']
+    face_str = LazyValue.parse(res['face_pos', '0 0 -64']).as_offset()
     conf_norm = LazyValue.parse(res['normal', '0 0 1']).as_vec(0, 0, 1)
 
     replace_tex: Dict[str, List[str]] = {}
@@ -42,7 +42,7 @@ def res_insert_overlay(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
         origin = Vec.from_str(inst['origin'])
         angles = Angle.from_str(inst['angles', '0 0 0'])
 
-        face_pos = conditions.resolve_offset(inst, face_str)
+        face_pos = face_str(inst)
         normal = conf_norm(inst) @ angles
 
         # Don't make offset change the face_pos value..

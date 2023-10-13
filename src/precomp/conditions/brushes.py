@@ -29,6 +29,7 @@ PANEL_TYPES.update({
     for ang in ['ANGLE_30', 'ANGLE_45', 'ANGLE_60']
 })
 PANEL_TYPES[PanelAnimation.ANGLE_90.animation] = tiling.PanelType.NORMAL
+LAZY_MATRIX_IDENTITY = LazyValue.make(Matrix())
 
 # The spawnflags that we need to toggle for each classname
 FLAG_ROTATING = {
@@ -560,15 +561,15 @@ def res_import_template(
         for prop in res.find_children('pickerVars')
     ]
     try:
-        ang_override = Matrix.from_angstr(res['angles'])
+        ang_override = LazyValue.parse(res['angles']).as_matrix()
     except LookupError:
         ang_override = None
     try:
-        rotation = Matrix.from_angstr(res['rotation'])
+        rotation = LazyValue.parse(res['rotation']).as_matrix()
     except LookupError:
-        rotation = Matrix()
+        rotation = LAZY_MATRIX_IDENTITY
 
-    offset = res['offset', '0 0 0']
+    offset = LazyValue.parse(res['offset', '0 0 0']).as_offset()
     invert_var = LazyValue.parse(res['invertVar', '']).as_bool()
     color_var = res['colorVar', '']
     if color_var.casefold() == '<editor>':
@@ -643,10 +644,10 @@ def res_import_template(
         # else: False value, no invert.
 
         if ang_override is not None:
-            orient = ang_override
+            orient = ang_override(inst)
         else:
-            orient = rotation @ Angle.from_str(inst['angles', '0 0 0'])
-        origin = conditions.resolve_offset(inst, offset)
+            orient = rotation(inst) @ Angle.from_str(inst['angles', '0 0 0'])
+        origin = offset(inst)
 
         # If this var is set, it forces all to be included.
         if srctools.conv_bool(inst.fixup.substitute(visgroup_force_var, allow_invert=True)):

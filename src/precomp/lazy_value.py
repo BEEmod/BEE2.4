@@ -11,9 +11,9 @@ __all__ = ['LazyValue']
 
 U_co = TypeVar("U_co", covariant=True)
 V_co = TypeVar("V_co", covariant=True)
+W_co = TypeVar("W_co", covariant=True)
 U = TypeVar("U")
 V = TypeVar("V")
-W = TypeVar("W")
 
 MutTypes = (Vec, Angle, Matrix)
 
@@ -98,6 +98,21 @@ class LazyValue(abc.ABC, Generic[U_co]):
         """Invert a boolean."""
         return self.map(operator.not_, 'not')
 
+    def __matmul__(
+        self: LazyValue[Vec],
+        other: LazyValue[Angle] | LazyValue[Matrix] | Angle | Matrix,
+    ) -> LazyValue[Vec]:
+        """Rotate a vector by an angle."""
+        return BinaryMapValue(self, LazyValue.make(other), operator.matmul, '@')
+
+    def as_offset(
+        self: LazyValue[str],
+        scale: float | LazyValue[float] = 1,
+        zoff: float | LazyValue[float] = 0,
+    ) -> LazyValue[Vec]:
+        """Call resolve_offset()."""
+        return OffsetValue(self, scale, zoff)
+
 
 class ConstValue(LazyValue[U_co], Generic[U_co]):
     """A value which is known."""
@@ -135,6 +150,26 @@ class UnaryMapValue(LazyValue[V_co], Generic[U_co, V_co]):
         return self.func(self.parent._resolve(inst))
 
 
+class BinaryMapValue(LazyValue[W_co], Generic[U_co, V_co, W_co]):
+    """Maps two existing values to another."""
+    def __init__(
+        self,
+        a: LazyValue[U_co], b: LazyValue[V_co],
+        func: Callable[[U_co, V_co], W_co], name: str,
+    ) -> None:
+        self.a = a
+        self.b = b
+        self.func = func
+        self.name = name or getattr(func, '__name__', repr(func))
+
+    def _repr_val(self) -> str:
+        return f'{self.name}({self.a._repr_val(), self.b._repr_val()})'
+
+    def _resolve(self, inst: Entity) -> W_co:
+        """Resolve the parents, then call the function."""
+        return self.func(self.a._resolve(inst), self.b._resolve(inst))
+
+
 class InstValue(LazyValue[str]):
     """A value which will be resolved from an instance."""
     variable: str
@@ -158,3 +193,28 @@ class InstValue(LazyValue[str]):
     def _resolve(self, inst: Entity) -> str:
         """Resolve the parent, then call the function."""
         return inst.fixup.substitute(self.variable, self.default, allow_invert=self.allow_invert)
+
+
+class OffsetValue(LazyValue[Vec]):
+    """A wrapper around resolve_offset()."""
+    parent: LazyValue[str]
+    scale: LazyValue[float]
+    zoff: LazyValue[float]
+
+    def __init__(
+        self,
+        parent: LazyValue[str],
+        scale: float | LazyValue[float],
+        zoff: float | LazyValue[float],
+    ) -> None:
+        self.parent = parent
+        self.scale = LazyValue.make(scale)
+        self.zoff = LazyValue.make(zoff)
+
+    def _repr_val(self) -> str:
+        return f'resolve_offset({self.parent._repr_val()})'
+
+    def _resolve(self, inst: Entity) -> Vec:
+        """Localise this offset."""
+        from .conditions import resolve_offset
+        return resolve_offset(inst, self.parent(inst), self.scale(inst), self.zoff(inst))

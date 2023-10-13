@@ -42,40 +42,40 @@ def res_random(coll: collisions.Collisions, info: MapInfo, res: Keyvalues) -> co
     results in a `group` property block to treat them as a single result to be
     executed in order.
     """
-    weight_str = ''
+    weight_str = LazyValue.make('')
     results = []
-    chance = 100
-    seed = ''
-    for prop in res:
-        if prop.name == 'chance':
+    chance = LazyValue.make(100)
+    seed = LazyValue.make('')
+    for kv in res:
+        if kv.name == 'chance':
             # Allow ending with '%' sign
-            chance = srctools.conv_int(
-                prop.value.rstrip('%'),
-                chance,
-            )
-        elif prop.name == 'weights':
-            weight_str = prop.value
-        elif prop.name == 'seed':
-            seed = 'b' + prop.value
+            chance = LazyValue.parse(kv.value).map(lambda s: s.rstrip('%'), 'rstrip').as_int()
+        elif kv.name == 'weights':
+            weight_str = LazyValue.parse(kv.value)
+        elif kv.name == 'seed':
+            seed = LazyValue.parse('b' + kv.value)
         else:
-            results.append(prop)
+            results.append(kv)
 
     if not results:
         # Does nothing
         return lambda e: None
 
-    weights_list = rand.parse_weights(len(results), weight_str)
+    weights_list = weight_str.map(
+        lambda weight: rand.parse_weights(len(results), weight),
+        'rand.parse_weights',
+    )
 
     # Note: We can't delete 'global' results, instead replace by 'dummy'
     # results that don't execute.
-    # Otherwise the chances would be messed up.
+    # Otherwise, the chances would be messed up.
     def apply_random(inst: Entity) -> None:
         """Pick a random result and run it."""
-        rng = rand.seed(b'rand_res', inst, seed)
-        if rng.randrange(100) > chance:
+        rng = rand.seed(b'rand_res', inst, seed(inst))
+        if rng.randrange(100) > chance(inst):
             return
 
-        ind = rng.choice(weights_list)
+        ind = rng.choice(weights_list(inst))
         choice = results[ind]
         if choice.name == 'nop':
             pass
