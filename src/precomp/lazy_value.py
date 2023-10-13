@@ -57,10 +57,9 @@ class LazyValue(abc.ABC, Generic[U_co]):
         """Resolve the value by substituting from the instance, if required."""
         raise NotImplementedError
 
-    @abc.abstractmethod
     def map(self, func: Callable[[U_co], V], name: str = '') -> LazyValue[V]:
-        """Apply a function."""
-        raise NotImplementedError
+        """Map this map."""
+        return UnaryMapValue(self, func, name)
 
     def as_int(self: LazyValue[str], default: int = 0) -> LazyValue[int]:
         """Call conv_int()."""
@@ -128,10 +127,6 @@ class UnaryMapValue(LazyValue[V_co], Generic[U_co, V_co]):
         """Resolve the parent, then call the function."""
         return self.func(self.parent._resolve(inst))
 
-    def map(self, func: Callable[[V_co], W], name: str = '') -> LazyValue[W]:
-        """Map this map."""
-        return UnaryMapValue(self, func, name)
-
 
 class InstValue(LazyValue[str]):
     """A value which will be resolved from an instance."""
@@ -156,7 +151,3 @@ class InstValue(LazyValue[str]):
     def _resolve(self, inst: Entity) -> str:
         """Resolve the parent, then call the function."""
         return inst.fixup.substitute(self.variable, self.default, allow_invert=self.allow_invert)
-
-    def map(self, func: Callable[[str], V], name: str = '') -> LazyValue[V]:
-        """Resolve then map."""
-        return UnaryMapValue(self, func, name)
