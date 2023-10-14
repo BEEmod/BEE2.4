@@ -1334,3 +1334,56 @@ def res_transfer_bullseye(inst: Entity, kv: Keyvalues) -> None:
         for plate in faithplate.PLATES.values():
             if not isinstance(plate, faithplate.StraightPlate) and plate.target is start_tile:
                 plate.target = end_tile
+
+
+@conditions.make_result("RotateToPanel")
+def res_rotate_to_panel(vmf: VMF, kv: Keyvalues) -> conditions.ResultCallable:
+    """Find a panel on the specified surface, then rotate the instance if required to match."""
+    conf_pos = LazyValue.parse(kv['pos', '0 0 0']).as_offset(zoff=-64)
+    conf_norm = LazyValue.parse(kv['normal', '0 0 1']).as_vec(0, 0, 1)
+    ignore_missing = LazyValue.parse(kv['ignoreMissing', '0']).as_bool()
+
+    def rotate_inst(inst: Entity) -> None:
+        """Rotate the item."""
+        orient = Matrix.from_angstr(inst['angles'])
+
+        tile_pos = conf_pos(inst)
+        tile_norm = conf_norm(inst) @ orient
+        try:
+            tile = tiling.TILES[(tile_pos - 64 * tile_norm).as_tuple(), tile_norm.as_tuple()]
+        except KeyError:
+            if not ignore_missing(inst):
+                LOGGER.warning('"{}": Cannot find tile at {}, {}!'.format(
+                    inst['targetname'], tile_pos, tile_norm,
+                ))
+            return
+        if len(tile.panels) == 0:
+            if not ignore_missing(inst):
+                LOGGER.warning('"{}": Cannot find panel at {}, {}!'.format(
+                    inst['targetname'], tile_pos, tile_norm,
+                ))
+            return
+        origin = Vec.from_str(inst['origin'])
+        panel = tile.panels[0]
+
+        if panel.pan_type.is_angled:
+            panel_orient = Matrix.from_angstr(panel.inst['angles'])
+            panel_pos = Vec.from_str(panel.inst['origin'])
+            rotation = Matrix.axis_angle(
+                -panel_orient.left(),
+                panel.pan_type.angle,
+            )
+
+            panel_anchor = panel_pos + Vec(-64, 0, -64) @ panel_orient
+
+            # Shift so the rotation anchor is 0 0 0, then shift back to rotate correctly.
+            origin -= panel_anchor
+            orient @= rotation
+            origin @= rotation
+            origin += panel_anchor
+            inst['angles'] = orient
+
+        origin += panel.offset
+        inst['origin'] = origin
+
+    return rotate_inst
