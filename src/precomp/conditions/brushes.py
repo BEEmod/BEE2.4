@@ -1337,7 +1337,7 @@ def res_transfer_bullseye(inst: Entity, kv: Keyvalues) -> None:
 
 
 @conditions.make_result("RotateToPanel")
-def res_rotate_to_panel(vmf: VMF, kv: Keyvalues) -> conditions.ResultCallable:
+def res_rotate_to_panel(kv: Keyvalues) -> conditions.ResultCallable:
     """Find a panel on the specified surface, then rotate the instance if required to match."""
     conf_pos = LazyValue.parse(kv['pos', '0 0 0']).as_offset(zoff=-64)
     conf_norm = LazyValue.parse(kv['normal', '0 0 1']).as_vec(0, 0, 1)
