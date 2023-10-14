@@ -776,8 +776,12 @@ class LogWindow:
 
     def evt_close(self) -> None:
         """Called when the window close button is pressed."""
-        self.pipe.send(('visible', False))
-        self.win.withdraw()
+        try:
+            self.pipe.send(('visible', False))
+        except BrokenPipeError: # Lost connection, completely quit.
+            TK_ROOT.quit()
+        else:
+            self.win.withdraw()
 
     def evt_copy(self) -> None:
         """Copy the selected text, or the whole console."""
