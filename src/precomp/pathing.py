@@ -92,6 +92,13 @@ def test(vmf: VMF, info: CorrInfo, bounds: Vec.bbox):
                 return False
         return True
 
+    @functools.cache
+    def in_inner_bounds(vec: Vec) -> bool:
+        size_pad = Vec(3, 3, 3)*128
+        pos_min, pos_max = (Vec.bbox(POS.min - size_pad, POS.max + size_pad))
+        if Vec(vec.x, vec.y, 0).in_bbox(pos_min, pos_max):
+            return True
+
     def reached_goal(node: CatwalkNode, goal: CatwalkNode) -> bool:
         # point = Vec(1, 0, 0) @ node.yaw.orient + node.pos(x, y - 1), (x, y + 1), (x - 1, y), (x + 1, y)]if 0 <= nx < self.width and 0 <= ny < self.height and self.lines[ny][nx] == ' ']
         # debug_block(grid_to_world(point), checked_blocks)
@@ -138,12 +145,15 @@ def test(vmf: VMF, info: CorrInfo, bounds: Vec.bbox):
         cost = dist
         if n1.trace.is_stair and n2.trace.is_stair and n1.trace is not n2.trace:
             cost += 40
-        elif n1.trace.is_stair and n2.trace == Kind.CORNER_RIGHT or n1.trace == Kind.CORNER_RIGHT and n2.trace.is_stair:
-            cost += 5
+        # keeps making unnecessary stairs
+        # elif n1.trace.is_stair and n2.trace == Kind.CORNER_RIGHT or n1.trace == Kind.CORNER_RIGHT and n2.trace.is_stair:
+        #     cost += 5
         elif n2.trace.is_stair:
             cost += 20
         elif n2.trace.is_corner:
             cost += 100
+        if in_inner_bounds(grid_to_world(n2.pos)):
+            cost += cost*2
         return cost
 
     def distance_between(n1: CatwalkNode, n2: CatwalkNode) -> float:
@@ -151,7 +161,7 @@ def test(vmf: VMF, info: CorrInfo, bounds: Vec.bbox):
         return 8 * (n1.pos - n2.pos).mag()
 
     start_node = CatwalkNode(start.freeze(), yaw, Kind.STRAIGHT)
-    end_node = CatwalkNode(FrozenVec(27, 20, 20), Yaw.EAST, Kind.STRAIGHT)
+    end_node = CatwalkNode(FrozenVec(0, 20, start_node.pos.z), Yaw.EAST, Kind.STRAIGHT)
 
     vmf.create_ent(
         'info_particle_system',

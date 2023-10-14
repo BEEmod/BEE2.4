@@ -10,8 +10,8 @@ from precomp.corridor import Info as CorrInfo
 
 LOGGER = srctools.logger.get_logger(__name__)
 
-EX_SIZE_MAX = Vec(8832, 8832, 8832)
-EX_SIZE_MIN = Vec(5632, 5632, 5632)
+EX_SIZE_MAX = Vec(69, 69, 69)*128
+EX_SIZE_MIN = Vec(32, 32, 32)*128
 
 def make_exterior(vmf: VMF, coll, info: CorrInfo) -> None:
     """Generate the exterior of the map: pits, catwalks, tubes, etc."""
@@ -19,10 +19,10 @@ def make_exterior(vmf: VMF, coll, info: CorrInfo) -> None:
         return None
 
     # Make the box that contains the map
-    bounds = make_exterior_shell(vmf)
+    outer_bounds = make_exterior_shell(vmf)
 
     # Move Elevators to valid location if possible and then generate elevator shell
-    place_entrance_exit(vmf, info, bounds)
+    place_entrance_exit(vmf, info, outer_bounds)
 
     # Open Walls and add square beams
 
@@ -32,7 +32,7 @@ def make_exterior_shell(vmf : VMF):
     """Make the shell around the map"""
     # Generate our walls
     # All these variables should be controlled by the style package
-    size_pad = Vec(2048, 2048, 2048)
+    size_pad = Vec(16, 16, 16)*128
 
     pos_min,pos_max = Vec.bbox(POS.min, POS.max)
     bbox_origin = (POS.min + POS.max) / 2
@@ -41,12 +41,12 @@ def make_exterior_shell(vmf : VMF):
         max(EX_SIZE_MIN / 2, min(EX_SIZE_MAX / 2, (pos_max - bbox_origin) + size_pad))
     )
 
-    bounds = Vec.bbox(bbox_lower + bbox_origin, bbox_upper + bbox_origin)
+    outer_bounds = Vec.bbox(bbox_lower + bbox_origin, bbox_upper + bbox_origin)
 
-    for solid in vmf.make_hollow(*bounds, 16, consts.Tools.NODRAW, consts.Tools.BLACK):
+    for solid in vmf.make_hollow(*outer_bounds, 16, consts.Tools.NODRAW, consts.Tools.BLACK):
         vmf.add_brush(solid)
 
-    return bounds
+    return outer_bounds
 
     # vmf.add_brush(vmf.make_prism(pos_min, pos_max, consts.Tools.SKIP).solid)
 
