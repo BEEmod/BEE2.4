@@ -30,17 +30,6 @@ styleOptions = [
     ),
 
     StyleVar.unstyled(
-        id='FixFizzlerBump',
-        name=TransToken.ui('Prevent Portal Bump (fizzler)'),
-        default=False,
-        desc=TransToken.ui(
-            'Add portal bumpers to make it more difficult to portal across '
-            'fizzler edges. This can prevent placing portals in tight spaces '
-            'near fizzlers, or fizzle portals on activation.'
-        ),
-    ),
-
-    StyleVar.unstyled(
         id='NoMidVoices',
         name=TransToken.ui('Suppress Mid-Chamber Dialogue'),
         default=False,
