@@ -652,6 +652,8 @@ async def load_packages(packset: packages.PackagesSet, tk_img: TKImages) -> None
             'map is played, like in the default PeTI.'
         ),
         readonly_desc=TransToken.ui('This style does not have a elevator video screen.'),
+        # i18n: Text when elevators are not present in the style.
+        readonly_override=TransToken.ui('<Not Present>'),
         has_none=True,
         has_def=True,
         none_icon=img.Handle.builtin('BEE2/random', 96, 96),
