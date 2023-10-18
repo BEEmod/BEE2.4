@@ -35,12 +35,12 @@ LOGGER = logger.get_logger(__name__)
 #         return Yaw((self.value + 90) % 360)
 
 class NodeKind:
-    def __init__(self, name: str, end_pos: Union[Vec, FrozenVec], instance =  None, angle = None, bbox = None, cost = None):
+    def __init__(self, name: str, end_pos: FrozenVec, instance =  None, angle = None, bbox = None, cost = None):
         self.name = name
         self.end_pos = end_pos
         self.instance = instance if instance is not None else ""
-        self.angle = angle if angle is not None else Angle(0, 0, 0)
-        self.bbox = Vec.iter_grid(bbox.bbox_min, bbox.bbox_max).append(end_pos) if bbox is not None else end_pos
+        self.angle = angle if angle is not None else FrozenAngle(0, 0, 0)
+        self.bbox = Vec.iter_grid(bbox.bbox_min, bbox.bbox_max).append(end_pos) if bbox is not None else Vec.iter_grid(end_pos, end_pos)
         self.cost = cost if cost is not None else 0
 
     @property
@@ -73,8 +73,8 @@ class NodeKind:
 
 @attrs.frozen
 class GenericNode:
-    pos: Union[Vec, FrozenVec]
-    ang: Union[Angle, FrozenAngle]
+    pos: FrozenVec
+    ang: FrozenAngle
     trace: NodeKind
 
     @property
@@ -82,7 +82,7 @@ class GenericNode:
         """Rotate around this yaw."""
         return FrozenMatrix.from_angle(self.ang)
 
-    def local(self, p: Union[Vec, FrozenVec]) -> FrozenVec:
+    def local(self, p: FrozenVec) -> FrozenVec:
         return round(p @ self.orient + self.pos)
 
 # checked_blocks = []
@@ -92,7 +92,7 @@ class GenericNode:
 #     if not vec in group:
 #         group.append(vec)
 
-def test(start_node: GenericNode, end_node: GenericNode, node_types: list, info: CorrInfo, bounds: Vec.bbox, blockers: list):
+def test(start_node: GenericNode, end_node: GenericNode, node_types: list, info: CorrInfo, bounds: Vec.bbox, valid_blocks: list):
     @functools.cache
     def is_empty(x: int, y: int) -> bool:
         for z in range(26):
@@ -124,11 +124,13 @@ def test(start_node: GenericNode, end_node: GenericNode, node_types: list, info:
         # return True
 
     def neighbours(cur_node: GenericNode) -> Iterable[GenericNode]:
-        next_pos = cur_node.trace.end_pos @ cur_node.orient + cur_node.pos
-        if not POS[next_pos] in blockers:
+        forward = cur_node.trace.end_pos @ cur_node.orient + cur_node.pos
+
+        if POS[forward] in valid_blocks:
             for node_type in node_types:
                 for pos in node_type.bbox:
-                    if not POS[pos] in blockers:
+                    next_pos = pos @ node_type.orient + forward
+                    if POS[next_pos] in valid_blocks:
                         yield GenericNode(cur_node.local(node_type.end_pos), cur_node.ang, node_type)
 
 

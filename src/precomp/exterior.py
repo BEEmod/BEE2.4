@@ -1,5 +1,5 @@
 import srctools.logger
-from srctools import VMF, Vec, FrozenVec, Angle, Matrix
+from srctools import VMF, Vec, FrozenVec, Angle, FrozenAngle, Matrix
 
 import consts
 import precomp.options
@@ -16,8 +16,8 @@ EX_SIZE_MIN = Vec(32, 32, 32)*128
 
 CATWALKS = [
     NodeKind(name= 'STRAIGHT', end_pos= FrozenVec(1, 0, 0)),
-    NodeKind(name='CORNER_LEFT', end_pos= FrozenVec(1, 0, 0), angle= Angle(0, -90, 0)),
-    NodeKind(name='CORNER_RIGHT', end_pos= FrozenVec(1, 0, 0), angle= Angle(0, 90, 0)),
+    NodeKind(name='CORNER_LEFT', end_pos= FrozenVec(1, 0, 0), angle= FrozenAngle(0, -90, 0)),
+    NodeKind(name='CORNER_RIGHT', end_pos= FrozenVec(1, 0, 0), angle= FrozenAngle(0, 90, 0)),
     NodeKind(name='STAIR_UP', end_pos= FrozenVec(2, 0, 1)),
     NodeKind(name='STAIR_DN', end_pos= FrozenVec(2, 0, -1)),
 ]
@@ -64,30 +64,31 @@ def place_entrance_exit(info: CorrInfo, map_bounds):
     entry_pos = Vec.from_str(info.inst_entry['origin'])
     entry_orient = Matrix.from_angstr(info.inst_entry['angles'])
 
-    start_pos = world_to_grid(Vec(-640, 0, 0) @ entry_orient + entry_pos)
-    start_angle = Angle(0, round(entry_orient.to_angle().yaw + 180) % 360, 0)
+    start_pos = world_to_grid(Vec(-640, 0, 0) @ entry_orient + entry_pos).freeze()
+    start_angle = FrozenAngle(0, round(entry_orient.to_angle().yaw + 180) % 360, 0)
 
     end_pos = FrozenVec(0, 27, start_pos.z)
-    end_angle = Angle(0, 0, 0)
+    end_angle = FrozenAngle(0, 0, 0)
 
     start_node = GenericNode( start_pos, start_angle, CATWALKS[0])
     end_node = GenericNode( end_pos, end_angle, CATWALKS[0])
 
-    blockers = [
+    valid_blocks = [
         Block.VOID
     ]
 
     """Place the map entrance and exit"""
-    path = precomp.pathing.test(start_node, end_node, CATWALKS, info, map_bounds, blockers)
-    for node in path:
-        # mdl, off, yaw_val = CATWALKS[node.trace]
-        # ang = node.yaw.orient.to_angle()
-        # ang.yaw += yaw_val
-        VMF.create_ent(
-            'info_particle_system',
-            origin=grid_to_world(node.pos.thaw()),
-            angles=node.orient.to_angle(),
-            targetname = str(node.trace.name)
-        )
+    path = precomp.pathing.test(start_node, end_node, CATWALKS, info, map_bounds, valid_blocks)
+    if path is not None:
+        for node in path:
+            # mdl, off, yaw_val = CATWALKS[node.trace]
+            # ang = node.yaw.orient.to_angle()
+            # ang.yaw += yaw_val
+            VMF.create_ent(
+                'info_particle_system',
+                origin=grid_to_world(node.pos.thaw()),
+                angles=node.orient.to_angle(),
+                targetname = str(node.trace.name)
+            )
 
     return
