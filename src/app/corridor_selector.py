@@ -276,14 +276,20 @@ class Selector(Generic[IconT]):
             self.sticky_corr = corr
             self.disp_corr(corr)
 
+    def evt_select_one(self) -> None:
+        """Select just the sticky corridor."""
+        if self.sticky_corr is None:
+            return
+        for icon, corr in itertools.zip_longest(self.icons, self.corr_list):
+            if icon is not None:
+                icon.selected = corr is self.sticky_corr
+
     def disp_corr(self, corr: Optional[corridor.CorridorUI]) -> None:
         """Display the specified corridor, or reset if None."""
         if corr is not None:
             self.img_ind = 0
             self.cur_images = corr.images
             self._sel_img(0)  # Updates the buttons.
-
-            text_title = corr.name
 
             if len(corr.authors) == 0:
                 author = TRANS_NO_AUTHORS
@@ -310,11 +316,12 @@ class Selector(Generic[IconT]):
                 corr.name,
                 author,
                 description,
+                corr is self.sticky_corr,
             )
         else:  # Reset.
             self.cur_images = None
             self._sel_img(0)  # Update buttons.
-            self.ui_desc_display(TransToken.BLANK, TransToken.BLANK, tkMarkdown.MarkdownData.BLANK)
+            self.ui_desc_display(TransToken.BLANK, TransToken.BLANK, tkMarkdown.MarkdownData.BLANK, False)
 
     def _sel_img(self, direction: int) -> None:
         """Go forward or backwards in the preview images."""
@@ -372,7 +379,13 @@ class Selector(Generic[IconT]):
         """Set the image for the specified corridor icon."""
         raise NotImplementedError
 
-    def ui_desc_display(self, title: TransToken, authors: TransToken, desc: tkMarkdown.MarkdownData) -> None:
+    def ui_desc_display(
+        self,
+        title: TransToken,
+        authors: TransToken,
+        desc: tkMarkdown.MarkdownData,
+        enable_just_this: bool,
+    ) -> None:
         """Display information for a corridor."""
         raise NotImplementedError
 

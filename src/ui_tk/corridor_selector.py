@@ -143,17 +143,23 @@ class TkSelector(Selector):
         self.wid_authors.grid(row=2, column=0, columnspan=2, sticky='ew')
 
         self.wid_desc = tkRichText(frm_right)
-        desc_scroll = tk_tools.HidingScroll(frm_right, orient='vertical',
-                                            command=self.wid_desc.yview)
+        desc_scroll = tk_tools.HidingScroll(frm_right, orient='vertical', command=self.wid_desc.yview)
         self.wid_desc['yscrollcommand'] = desc_scroll.set
         self.wid_desc.grid(row=3, column=0, sticky='nsew')
         desc_scroll.grid(row=3, column=1, sticky='ns')
         frm_right.rowconfigure(3, weight=1)
 
+        frm_lower_btn = ttk.Frame(frm_right)
+        frm_lower_btn.grid(row=4, column=0, columnspan=2)
+
+        self.btn_just_this = ttk.Button(frm_lower_btn, name='just_this', command=self.evt_select_one)
+        localisation.set_text(self.btn_just_this, TransToken.ui('Use Only This'))
+        self.btn_just_this.grid(row=0, column=0)
+
         localisation.set_text(
-            ttk.Button(frm_right, name='closer', command=self.hide),
+            ttk.Button(frm_lower_btn, name='closer', command=self.hide),
             TransToken.ui('Close'),
-        ).grid(row=4, column=0, columnspan=2)
+        ).grid(row=0, column=1)
 
         conf = config.APP.get_cur_conf(UIState, default=UIState())
         if conf.width > 0 and conf.height > 0:
@@ -251,11 +257,18 @@ class TkSelector(Selector):
         """Set the image used."""
         self.tk_img.apply(icon.label, handle)
 
-    def ui_desc_display(self, title: TransToken, authors: TransToken, desc: tkMarkdown.MarkdownData) -> None:
+    def ui_desc_display(
+        self,
+        title: TransToken,
+        authors: TransToken,
+        desc: tkMarkdown.MarkdownData,
+        enable_just_this: bool,
+    ) -> None:
         """Display information for a corridor."""
         localisation.set_text(self.wid_title, title)
         localisation.set_text(self.wid_authors, authors)
         self.wid_desc.set_text(desc)
+        self.btn_just_this.state(('!disabled', ) if enable_just_this else ('disabled', ))
 
     def ui_desc_set_img_state(self, handle: Optional[img.Handle], left: bool, right: bool) -> None:
         """Set the widget state for the large preview image in the description sidebar."""
