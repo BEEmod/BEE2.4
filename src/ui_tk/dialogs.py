@@ -5,6 +5,7 @@ from tkinter import simpledialog, ttk
 import tkinter as tk
 
 import trio
+from typing_extensions import override
 
 from loadScreen import suppress_screens
 from app.dialogs import DEFAULT_TITLE, Dialogs, Icon, validate_non_empty
@@ -58,9 +59,11 @@ class BasicQueryValidator(simpledialog.Dialog):
         self.__has_closed = trio.Event()
         super().__init__(parent, str(title))
 
+    @override
     def wait_window(self, window: object = None) -> None:
         """Block this method call, to prevent the Tk loop from being frozen."""
 
+    @override
     def destroy(self) -> None:
         """Called when the window is either canceled or submitted."""
         self.__has_closed.set()
@@ -154,6 +157,7 @@ class TkDialogs(Dialogs):
         """Create with the specified parent."""
         self.parent = parent
 
+    @override
     async def show_info(
         self,
         message: TransToken,
@@ -164,6 +168,7 @@ class TkDialogs(Dialogs):
         """Show a message box with some information."""
         await _messagebox("ok", self.parent, message, title, icon, detail)
 
+    @override
     async def ask_ok_cancel(
         self,
         message: TransToken,
@@ -180,6 +185,7 @@ class TkDialogs(Dialogs):
         else:
             raise ValueError(res)
 
+    @override
     async def ask_yes_no(
         self,
         message: TransToken,
@@ -196,6 +202,7 @@ class TkDialogs(Dialogs):
         else:
             raise ValueError(res)
 
+    @override
     async def ask_yes_no_cancel(
         self,
         message: TransToken,
@@ -214,6 +221,7 @@ class TkDialogs(Dialogs):
         else:
             raise ValueError(res)
 
+    @override
     async def prompt(
         self,
         message: TransToken,

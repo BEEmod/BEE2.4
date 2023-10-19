@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 from typing import Mapping
+from typing_extensions import override
 
 from srctools import EmptyMapping, Keyvalues, conv_bool, bool_as_int
 from srctools.dmx import Element, ValueType as DMXValue
 import attrs
-
 
 from corridor import Direction, GameMode, Orient
 import config
@@ -34,6 +34,7 @@ class Config(config.Data, conf_name='Corridor', uses_id=True, version=2):
         return f'{style.casefold()}:{mode.value}_{direction.value}_{orient.value}'
 
     @classmethod
+    @override
     def parse_kv1(cls, data: Keyvalues, version: int) -> Config:
         """Parse from KeyValues1 configs."""
         enabled: dict[str, bool] = {}
@@ -51,6 +52,7 @@ class Config(config.Data, conf_name='Corridor', uses_id=True, version=2):
 
         return Config(enabled)
 
+    @override
     def export_kv1(self) -> Keyvalues:
         """Serialise to a Keyvalues1 config."""
         return Keyvalues('Corridor', [
@@ -59,6 +61,7 @@ class Config(config.Data, conf_name='Corridor', uses_id=True, version=2):
         ])
 
     @classmethod
+    @override
     def parse_dmx(cls, data: Element, version: int) -> Config:
         """Parse from DMX configs."""
         enabled: dict[str, bool] = {}
@@ -86,6 +89,7 @@ class Config(config.Data, conf_name='Corridor', uses_id=True, version=2):
 
         return Config(enabled)
 
+    @override
     def export_dmx(self) -> Element:
         """Serialise to DMX configs."""
         elem = Element('Corridor', 'DMEConfig')
@@ -106,6 +110,7 @@ class UIState(config.Data, conf_name='CorridorUIState', palette_stores=False):
     height: int = -1
 
     @classmethod
+    @override
     def parse_kv1(cls, data: Keyvalues, version: int) -> UIState:
         """Parse Keyvalues 1 configuration."""
         assert version == 1, version
@@ -130,6 +135,7 @@ class UIState(config.Data, conf_name='CorridorUIState', palette_stores=False):
             data.int('height', -1),
         )
 
+    @override
     def export_kv1(self) -> Keyvalues:
         """Export Keyvalues 1 configuration."""
         return Keyvalues('', [
@@ -141,6 +147,7 @@ class UIState(config.Data, conf_name='CorridorUIState', palette_stores=False):
         ])
 
     @classmethod
+    @override
     def parse_dmx(cls, data: Element, version: int) -> UIState:
         """Parse Keyvalues 2 configuration."""
         assert version == 1, version
@@ -173,6 +180,7 @@ class UIState(config.Data, conf_name='CorridorUIState', palette_stores=False):
             width, height,
         )
 
+    @override
     def export_dmx(self) -> Element:
         """Export Keyvalues 2 configuration."""
         element = Element('UIState', 'DMElement')

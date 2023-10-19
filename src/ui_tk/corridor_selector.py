@@ -1,6 +1,7 @@
 """Tk implementation of the corridor selector."""
 import tkinter as tk
 from typing import Final, Optional
+from typing_extensions import override
 
 from tkinter import ttk
 
@@ -46,6 +47,7 @@ class IconUI(Icon):
         tk_tools.bind_leftclick(self.label, lambda e: selector.evt_selected(index))
 
     @property
+    @override
     def selected(self) -> bool:
         """If the icon is currently selected."""
         return self.var.get()
@@ -54,10 +56,12 @@ class IconUI(Icon):
     def selected(self, value: bool) -> None:
         self.var.set(value)
 
+    @override
     def set_readonly(self, enabled: bool) -> None:
         """Set the checkbox to be readonly."""
         self.check.state(('disabled', ) if enabled else ('!disabled', ))
 
+    @override
     def set_highlight(self, enabled: bool) -> None:
         """Change the highlight state."""
         self.label['background'] = tk_tools.LABEL_HIGHLIGHT_BG if enabled else ''
@@ -215,6 +219,7 @@ class TkSelector(Selector):
         tk_tools.add_mousewheel(self.canvas, self.win)
         self.load_corridors(packset)
 
+    @override
     async def ui_win_reflow(self) -> None:
         """Called to reposition the corridors."""
         self.canvas.delete('icons')
@@ -231,32 +236,39 @@ class TkSelector(Selector):
         pos.place_slots(self.visible_icons(), 'icons')
         pos.resize_canvas()
 
+    @override
     def ui_win_hide(self) -> None:
         """Hide the window."""
         self.win.wm_withdraw()
 
+    @override
     def ui_win_show(self) -> None:
         """Show the window."""
         self.win.deiconify()
         tk_tools.center_win(self.win, TK_ROOT)
 
+    @override
     def ui_win_getsize(self) -> tuple[int, int]:
         """Fetch the current dimensions, for saving."""
         return self.win.winfo_width(), self.win.winfo_height()
 
+    @override
     def ui_get_buttons(self) -> tuple[GameMode, Direction, Orient]:
         """Get the current button state."""
         return self.btn_mode.current, self.btn_direction.current, self.btn_orient.current
 
+    @override
     def ui_icon_create(self) -> None:
         """Create a new icon widget, and append it to the list."""
         index = len(self.icons)
         self.icons.append(IconUI(self, len(self.icons)))
 
+    @override
     def ui_icon_set_img(self, icon: IconUI, handle: Optional[img.Handle]) -> None:
         """Set the image used."""
         self.tk_img.apply(icon.label, handle)
 
+    @override
     def ui_desc_display(
         self,
         title: TransToken,
@@ -270,6 +282,7 @@ class TkSelector(Selector):
         self.wid_desc.set_text(desc)
         self.btn_just_this.state(('!disabled', ) if enable_just_this else ('disabled', ))
 
+    @override
     def ui_desc_set_img_state(self, handle: Optional[img.Handle], left: bool, right: bool) -> None:
         """Set the widget state for the large preview image in the description sidebar."""
         self.tk_img.apply(self.wid_image, handle)

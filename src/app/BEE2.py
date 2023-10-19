@@ -6,6 +6,7 @@ import collections
 from outcome import Outcome, Error
 from srctools import Keyvalues
 import trio
+from typing_extensions import override
 
 from app import (
     TK_ROOT, localisation, sound, img, gameMan, music_conf,
@@ -109,16 +110,19 @@ class Tracer(trio.abc.Instrument):
         self.start_time: Dict[trio.lowlevel.Task, Optional[float]] = {}
         self.args: Dict[trio.lowlevel.Task, Dict[str, object]] = {}
 
+    @override
     def task_spawned(self, task: trio.lowlevel.Task) -> None:
         """Setup vars when a task is spawned."""
         self.elapsed[task] = 0.0
         self.start_time[task] = None
         self.args[task] = task.coro.cr_frame.f_locals.copy()
 
+    @override
     def before_task_step(self, task: trio.lowlevel.Task) -> None:
         """Begin timing this task."""
         self.start_time[task] = time.perf_counter()
 
+    @override
     def after_task_step(self, task: trio.lowlevel.Task) -> None:
         """Count up the time."""
         cur_time = time.perf_counter()
@@ -131,6 +135,7 @@ class Tracer(trio.abc.Instrument):
                 self.elapsed[task] += time.perf_counter() - prev
                 self.start_time[task] = None
 
+    @override
     def task_exited(self, task: trio.lowlevel.Task) -> None:
         """Log results when exited."""
         elapsed = self.elapsed.pop(task, 0.0)

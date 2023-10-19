@@ -1,5 +1,6 @@
 """Store overridden defaults for items, and also the selected version."""
 from typing import Any, Dict, Final
+from typing_extensions import override
 
 from srctools import Keyvalues, logger
 from srctools.dmx import Element
@@ -23,6 +24,7 @@ class ItemDefault(config.Data, conf_name='ItemDefault', uses_id=True):
     defaults: Dict[ItemPropKind[Any], str] = attrs.Factory(dict)
 
     @classmethod
+    @override
     def parse_legacy(cls, conf: Keyvalues) -> Dict[str, 'ItemDefault']:
         """Parse the data in the legacy item_configs.cfg file."""
         result: Dict[str, ItemDefault] = {}
@@ -44,6 +46,7 @@ class ItemDefault(config.Data, conf_name='ItemDefault', uses_id=True):
         return result
 
     @classmethod
+    @override
     def parse_kv1(cls, data: Keyvalues, version: int) -> 'ItemDefault':
         """Parse keyvalues1 data."""
         if version != 1:
@@ -58,6 +61,7 @@ class ItemDefault(config.Data, conf_name='ItemDefault', uses_id=True):
             props[prop_type] = kv.value
         return cls(data['version', DEFAULT_VERSION], props)
 
+    @override
     def export_kv1(self) -> Keyvalues:
         """Export as keyvalues1 data."""
         return Keyvalues('', [
@@ -69,6 +73,7 @@ class ItemDefault(config.Data, conf_name='ItemDefault', uses_id=True):
         ])
 
     @classmethod
+    @override
     def parse_dmx(cls, data: Element, version: int) -> 'ItemDefault':
         """Parse DMX configuration."""
         if version != 1:
@@ -90,6 +95,7 @@ class ItemDefault(config.Data, conf_name='ItemDefault', uses_id=True):
 
         return cls(item_version, props)
 
+    @override
     def export_dmx(self) -> Element:
         """Export as DMX data."""
         elem = Element('ItemDefault', 'DMElement')

@@ -9,7 +9,7 @@ from typing import (
     Any, AsyncIterator, Callable, Iterable, Iterator, List, TypeVar, Union,
     TYPE_CHECKING,
 )
-from typing_extensions import ParamSpec, TypeAlias
+from typing_extensions import ParamSpec, TypeAlias, override
 from tkinter import ttk
 from collections import defaultdict
 import tkinter as tk
@@ -132,6 +132,7 @@ class UIFormatter(string.Formatter):
     def __init__(self, lang_code: str) -> None:
         self.locale = _get_locale(lang_code)
 
+    @override
     def format_field(self, value: Any, format_spec: str) -> Any:
         """Format a field."""
         if isinstance(value, (int, float)):

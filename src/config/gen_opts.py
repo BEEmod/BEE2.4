@@ -2,7 +2,7 @@
 General app configuration options, controlled by the options window.
 """
 from typing import Any, Dict, List
-from typing_extensions import TypeGuard
+from typing_extensions import TypeGuard, override
 from enum import Enum
 
 from srctools import Keyvalues
@@ -56,6 +56,7 @@ class GenOptions(config.Data, conf_name='Options', palette_stores=False, version
     language: str = ''
 
     @classmethod
+    @override
     def parse_legacy(cls, conf: Keyvalues) -> Dict[str, 'GenOptions']:
         """Parse from the GEN_OPTS config file."""
         log_win_level = LEGACY_CONF.get(
@@ -90,6 +91,7 @@ class GenOptions(config.Data, conf_name='Options', palette_stores=False, version
         )}
 
     @classmethod
+    @override
     def parse_kv1(cls, data: Keyvalues, version: int) -> 'GenOptions':
         """Parse KV1 values."""
         if version > 2:
@@ -111,6 +113,7 @@ class GenOptions(config.Data, conf_name='Options', palette_stores=False, version
             },
         )
 
+    @override
     def export_kv1(self) -> Keyvalues:
         """Produce KV1 values."""
         kv = Keyvalues('', [
@@ -124,6 +127,7 @@ class GenOptions(config.Data, conf_name='Options', palette_stores=False, version
         return kv
 
     @classmethod
+    @override
     def parse_dmx(cls, data: Element, version: int) -> 'GenOptions':
         """Parse DMX configuration."""
         if version > 2:
@@ -154,6 +158,7 @@ class GenOptions(config.Data, conf_name='Options', palette_stores=False, version
                 res[field.name] = field.default
         return GenOptions(**res)
 
+    @override
     def export_dmx(self) -> Element:
         """Produce DMX configuration."""
         elem = Element('Options', 'DMElement')

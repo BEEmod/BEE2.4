@@ -1,4 +1,5 @@
 from typing import Dict, List, Mapping, NewType, Union, cast
+from typing_extensions import override
 
 from srctools import EmptyMapping, Keyvalues, logger
 from srctools.dmx import Element
@@ -33,6 +34,7 @@ class WidgetConfig(config.Data, conf_name='ItemVar', uses_id=True):
     values: Union[str, Mapping[TimerNum, str]] = EmptyMapping
 
     @classmethod
+    @override
     def parse_legacy(cls, props: Keyvalues) -> Dict[str, 'WidgetConfig']:
         """Parse from the old legacy config."""
         data = {}
@@ -44,6 +46,7 @@ class WidgetConfig(config.Data, conf_name='ItemVar', uses_id=True):
         return data
 
     @classmethod
+    @override
     def parse_kv1(cls, data: Keyvalues, version: int) -> 'WidgetConfig':
         """Parse Keyvalues config values."""
         assert version == 1
@@ -58,6 +61,7 @@ class WidgetConfig(config.Data, conf_name='ItemVar', uses_id=True):
         else:
             return WidgetConfig(data.value)
 
+    @override
     def export_kv1(self) -> Keyvalues:
         """Generate keyvalues for saving configuration."""
         if isinstance(self.values, str):
@@ -69,6 +73,7 @@ class WidgetConfig(config.Data, conf_name='ItemVar', uses_id=True):
             ])
 
     @classmethod
+    @override
     def parse_dmx(cls, data: Element, version: int) -> 'WidgetConfig':
         """Parse DMX format configuration."""
         assert version == 1
@@ -84,6 +89,7 @@ class WidgetConfig(config.Data, conf_name='ItemVar', uses_id=True):
                         LOGGER.warning('Invalid timer value "{}" in ItemVar config', attr.name)
             return WidgetConfig(result)
 
+    @override
     def export_dmx(self) -> Element:
         """Generate DMX format configuration."""
         elem = Element('ItemVar', 'DMElement')

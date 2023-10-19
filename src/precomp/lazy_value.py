@@ -1,13 +1,16 @@
 """A value read from configs, which defers applying fixups until later."""
 from __future__ import annotations
 
+from typing import Callable, ClassVar, Generic, Optional, TypeVar
+from typing_extensions import override
+
 import abc
 import operator
-from typing import Callable, ClassVar, Generic, Optional, TypeVar
 
 from srctools import Entity, conv_int, conv_float, conv_bool, Vec, Angle, Matrix
 
 __all__ = ['LazyValue']
+
 
 U_co = TypeVar("U_co", covariant=True)
 V_co = TypeVar("V_co", covariant=True)
@@ -123,13 +126,16 @@ class ConstValue(LazyValue[U_co], Generic[U_co]):
     def __init__(self, value: U_co) -> None:
         self.value = value
 
+    @override
     def _repr_val(self) -> str:
         return repr(self.value)
 
+    @override
     def _resolve(self, inst: Entity) -> U_co:
         """No resolution is required."""
         return self.value
 
+    @override
     def map(self, func: Callable[[U_co], V], name: str = '') -> LazyValue[V]:
         """Apply a function."""
         return ConstValue(func(self.value))
@@ -142,9 +148,11 @@ class UnaryMapValue(LazyValue[V_co], Generic[U_co, V_co]):
         self.func = func
         self.name = name or getattr(func, '__name__', repr(func))
 
+    @override
     def _repr_val(self) -> str:
         return f'{self.name}({self.parent._repr_val()})'
 
+    @override
     def _resolve(self, inst: Entity) -> V_co:
         """Resolve the parent, then call the function."""
         return self.func(self.parent._resolve(inst))
@@ -162,9 +170,11 @@ class BinaryMapValue(LazyValue[W_co], Generic[U_co, V_co, W_co]):
         self.func = func
         self.name = name or getattr(func, '__name__', repr(func))
 
+    @override
     def _repr_val(self) -> str:
         return f'{self.name}({self.a._repr_val(), self.b._repr_val()})'
 
+    @override
     def _resolve(self, inst: Entity) -> W_co:
         """Resolve the parents, then call the function."""
         return self.func(self.a._resolve(inst), self.b._resolve(inst))
@@ -186,10 +196,12 @@ class InstValue(LazyValue[str]):
         self.default = default
         self.allow_invert = allow_invert
 
+    @override
     def _repr_val(self) -> str:
         """The operation to perform."""
         return f'${self.variable!r}'
 
+    @override
     def _resolve(self, inst: Entity) -> str:
         """Resolve the parent, then call the function."""
         return inst.fixup.substitute(self.variable, self.default, allow_invert=self.allow_invert)
@@ -211,9 +223,11 @@ class OffsetValue(LazyValue[Vec]):
         self.scale = LazyValue.make(scale)
         self.zoff = LazyValue.make(zoff)
 
+    @override
     def _repr_val(self) -> str:
         return f'resolve_offset({self.parent._repr_val()})'
 
+    @override
     def _resolve(self, inst: Entity) -> Vec:
         """Localise this offset."""
         from .conditions import resolve_offset
