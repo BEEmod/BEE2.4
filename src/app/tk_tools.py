@@ -32,7 +32,7 @@ from transtoken import TransToken
 
 # Set icons for the application.
 
-ICO_PATH = str(utils.install_path('BEE2.ico'))
+ICO_PATH = str(utils.bins_path('BEE2.ico'))
 T = TypeVar('T')
 AnyWidT = TypeVar('AnyWidT', bound=tk.Misc)
 WidgetT = TypeVar('WidgetT', bound=tk.Widget)

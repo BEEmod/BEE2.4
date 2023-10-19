@@ -24,11 +24,11 @@ import trio
 
 __all__ = [
     'WIN', 'MAC','LINUX', 'STEAM_IDS', 'DEV_MODE', 'CODE_DEV_MODE', 'BITNESS',
-    'get_git_version', 'install_path', 'conf_location', 'fix_cur_directory', 'run_bg_daemon',
-    'CONN_LOOKUP', 'CONN_TYPES', 'freeze_enum_props', 'FuncLookup', 'PackagePath',
-    'Result', 'acompose', 'get_indent', 'iter_grid', 'check_cython', 'check_shift',
-    'fit', 'group_runs', 'restart_app', 'quit_app', 'set_readonly', 'unset_readonly',
-    'merge_tree', 'write_lang_pot',
+    'get_git_version', 'install_path', 'bins_path', 'conf_location', 'fix_cur_directory',
+    'run_bg_daemon', 'CONN_LOOKUP', 'CONN_TYPES', 'freeze_enum_props', 'FuncLookup',
+    'PackagePath', 'Result', 'acompose', 'get_indent', 'iter_grid', 'check_cython',
+    'check_shift', 'fit', 'group_runs', 'restart_app', 'quit_app', 'set_readonly',
+    'unset_readonly', 'merge_tree', 'write_lang_pot',
 ]
 
 WIN = sys.platform.startswith('win')
@@ -118,7 +118,8 @@ try:
 except ImportError:
     # We're running from src/, so data is in the folder above that.
     # Go up once from us to its containing folder, then to the parent.
-    _INSTALL_ROOT = Path(__file__).resolve().parent.parent
+    _INSTALL_ROOT = Path(__file__, '..', '..').resolve()
+    _BINS_ROOT = _INSTALL_ROOT
 
     BEE_VERSION = get_git_version(_INSTALL_ROOT)
     HA_VERSION = get_git_version(_INSTALL_ROOT / 'hammeraddons')
@@ -127,7 +128,8 @@ except ImportError:
 else:
     FROZEN = True
     # This special attribute is set by PyInstaller to our folder.
-    _INSTALL_ROOT = Path(sys._MEIPASS)  # type: ignore[attr-defined] # noqa
+    _BINS_ROOT = Path(sys._MEIPASS)  # type: ignore[attr-defined] # noqa
+    _INSTALL_ROOT = _BINS_ROOT  #.parent  # With PyInstaller 6.0+
     # Check if this was produced by above
     DEV_MODE = '#' in BEE_VERSION
 
@@ -140,6 +142,14 @@ BEE_VERSION += f' {BITNESS}-bit'
 def install_path(path: str) -> Path:
     """Return the path to a file inside our installation folder."""
     return _INSTALL_ROOT / path
+
+
+def bins_path(path: str) -> Path:
+    """Return the path to a file inside our binaries folder.
+
+    This is the same as install_path() when unfrozen, but different when frozen.
+    """
+    return _BINS_ROOT / path
 
 
 def conf_location(path: str) -> Path:

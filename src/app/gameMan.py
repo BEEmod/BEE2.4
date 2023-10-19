@@ -542,11 +542,11 @@ class Game:
                     b'// You\'ll want to do that if installing Hammer Addons.'
                     b'\n\n'
                 )
-                with utils.install_path('BEE2.fgd').open('rb') as bee2_fgd:
+                with utils.bins_path('BEE2.fgd').open('rb') as bee2_fgd:
                     shutil.copyfileobj(bee2_fgd, file)
                 file.write(b'\n')
                 try:
-                    with utils.install_path('hammeraddons.fgd').open('rb') as ha_fgd:
+                    with utils.bins_path('hammeraddons.fgd').open('rb') as ha_fgd:
                         shutil.copyfileobj(ha_fgd, file)
                 except FileNotFoundError:
                     if utils.FROZEN:

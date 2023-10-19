@@ -33,7 +33,7 @@ from user_errors import (
 )
 import transtoken
 
-root_path = utils.install_path('error_display').absolute()
+root_path = utils.bins_path('error_display').absolute()
 LOGGER.info('Root path: ', root_path)
 
 app = QuartTrio(

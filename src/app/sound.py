@@ -219,7 +219,7 @@ def play_fx() -> bool:
 
 if utils.WIN and not utils.FROZEN:
     # Add a libs folder for FFmpeg dlls.
-    os.environ['PATH'] = f'{utils.install_path("lib-" + utils.BITNESS).absolute()};{os.environ["PATH"]}'
+    os.environ['PATH'] = f'{utils.bins_path("lib-" + utils.BITNESS).absolute()};{os.environ["PATH"]}'
 
 sounds: NullSound
 try:
