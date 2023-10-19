@@ -5,7 +5,7 @@ import shutil
 import zipfile
 from pathlib import Path
 import contextlib
-from typing import Any, Iterable, List, Optional, Tuple, Union, cast
+from typing import Iterable, List, Optional, Tuple, Union
 
 from babel.messages import Catalog
 import babel.messages.frontend
@@ -15,9 +15,11 @@ from babel.messages.mofile import write_mo
 from srctools.fgd import FGD
 
 ico_path = os.path.realpath(os.path.join(os.getcwd(), "../bee2.ico"))
+
 # Injected by PyInstaller.
-workpath: str
-SPECPATH: str
+workpath: str = globals()['workpath']
+SPECPATH: str = globals()['SPECPATH']
+DISTPATH: str = globals()['DISTPATH']
 
 hammeraddons = Path.joinpath(Path(SPECPATH).parent, 'hammeraddons')
 
@@ -25,14 +27,18 @@ hammeraddons = Path.joinpath(Path(SPECPATH).parent, 'hammeraddons')
 sys.path.append(SPECPATH)
 import utils
 
-# src -> build subfolder.
-data_files = [
+# src -> binaries subfolder.
+data_bin_files = [
     ('../BEE2.ico', '.'),
     ('../BEE2.fgd', '.'),
     ('../hammeraddons.fgd', '.'),
+]
+# src -> app subfolder, in 6.0+
+data_files = [
     ('../images/BEE2/*.png', 'images/BEE2/'),
     ('../images/icons/*.png', 'images/icons/'),
     ('../images/splash_screen/*.jpg', 'images/splash_screen/'),
+    ('../sounds/*.ogg', 'sounds'),
 ]
 
 HA_VERSION = utils.get_git_version(hammeraddons)
@@ -254,6 +260,7 @@ if utils.WIN:
 version_val = f'''\
 BEE_VERSION={utils.get_git_version(SPECPATH)!r}
 HA_VERSION={HA_VERSION!r}
+HAS_BIN_DIR=False
 '''
 print(version_val)
 version_filename = os.path.join(workpath, '_compiled_version.py')
@@ -266,11 +273,6 @@ if version_val:
     with open(version_filename, 'w') as f:
         f.write(version_val)
 
-for snd in os.listdir('../sounds/'):
-    if snd == 'music_samp':
-        continue
-    data_files.append(('../sounds/' + snd, 'sounds'))
-
 # Include the compiler, picking the right architecture.
 bitness = 64 if sys.maxsize > (2**33) else 32
 data_files.append((f'../dist/{bitness}bit/compiler/', 'compiler'))
@@ -280,7 +282,7 @@ data_files.append((f'../dist/{bitness}bit/compiler/', 'compiler'))
 bee2_a = Analysis(
     ['BEE2_launch.pyw'],
     pathex=[workpath],
-    datas=data_files,
+    datas=data_files + data_bin_files,
     hiddenimports=[
         'PIL._tkinter_finder',
         # Needed to unpickle the CLDR.
@@ -318,6 +320,7 @@ exe = EXE(
     strip=False,
     upx=False,
     console=False,
+    contents_directory='.',  # TODO
     windowed=True,
     icon='../BEE2.ico'
 )

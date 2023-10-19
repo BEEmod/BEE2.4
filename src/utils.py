@@ -114,7 +114,11 @@ def get_git_version(inst_path: Path | str) -> str:
 
 try:
     # This module is generated when the app is compiled.
-    from _compiled_version import BEE_VERSION as BEE_VERSION, HA_VERSION as HA_VERSION  # type: ignore
+    from _compiled_version import (  # type: ignore
+        BEE_VERSION as BEE_VERSION,
+        HA_VERSION as HA_VERSION,
+        HAS_BIN_DIR as _HAS_BIN_DIR,
+    )
 except ImportError:
     # We're running from src/, so data is in the folder above that.
     # Go up once from us to its containing folder, then to the parent.
@@ -129,9 +133,11 @@ else:
     FROZEN = True
     # This special attribute is set by PyInstaller to our folder.
     _BINS_ROOT = Path(sys._MEIPASS)  # type: ignore[attr-defined] # noqa
-    _INSTALL_ROOT = _BINS_ROOT  #.parent  # With PyInstaller 6.0+
+    _INSTALL_ROOT = _BINS_ROOT
     # Check if this was produced by above
     DEV_MODE = '#' in BEE_VERSION
+    if _HAS_BIN_DIR:  # On PyInstaller 6.0+, we are in a bee2_bin/ subfolder.
+        _INSTALL_ROOT = _INSTALL_ROOT.parent
 
 # Regular dev mode is enable-able by users, this is only for people editing code.
 CODE_DEV_MODE = DEV_MODE
