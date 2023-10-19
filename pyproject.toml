@@ -122,6 +122,12 @@ warn_redundant_casts = true
 warn_return_any = true
 warn_no_return = true
 
+enable_error_code = [
+	'unreachable',
+	'redundant-expr',
+	'unused-awaitable',
+]
+
 [[tool.mypy.overrides]]
 module = [
 	'app.dialogs',
