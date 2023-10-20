@@ -96,7 +96,7 @@ def style_changed(new_style: Style) -> None:
         drag_man.load_icons()
 
 
-async def init_widgets(master: tk.Widget, tk_img: TKImages) -> Optional[tk.Widget]:
+async def init_widgets(master: tk.Widget, tk_img: TKImages) -> tk.Widget:
     """Construct the widgets, returning the configuration button.
     """
     window.resizable(True, True)

@@ -69,7 +69,7 @@ async def test() -> None:
                 64, 64,
             )
         else:
-            group_handle = None
+            group_handle = icon
         infos[name] = DragInfo(icon, group, group_handle)
         return name
 

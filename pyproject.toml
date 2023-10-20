@@ -130,8 +130,27 @@ enable_error_code = [
 
 [[tool.mypy.overrides]]
 module = [
+	'app.demo.*',
+	'app.itemconfig.*',
 	'app.dialogs',
+	'app.dragdrop',
+	'app.errors',
+#	'app.gameMan',
+	'app.helpMenu',
+	'app.img',
+	'app.item_properties',
+	'app.item_search',
+	'app.lazy_conf',
+#	'app.localisation',
+	'app.logWindow',
+#	'app.menu_bar',
+#	'app.music_conf',
 	'config.*',
+#	'packages.*',
+#	'precomp.*',
+#	'test.*',
+	'postcomp.*',
+	'ui_tk.*',
 	'bg_daemon',
 	'collisions',
 	'compiler_launch',
@@ -152,6 +171,8 @@ module = [
 	'tree',
 	'user_errors',
 	'utils',
+#	'vbsp',
+	'vrad',
 	'ui_tk.dialogs',
 ]
 # Enable strict options
