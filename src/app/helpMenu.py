@@ -8,7 +8,7 @@ import io
 import urllib.request
 import urllib.error
 from enum import Enum
-from typing import Any, Callable, Dict, cast
+from typing import Any, Callable, Dict, Optional, cast
 from tkinter import ttk
 import tkinter as tk
 import webbrowser
@@ -439,6 +439,8 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 class Dialog(tk.Toplevel):
     """Show a dialog with a message."""
+    text: Optional[str]
+
     def __init__(self, name: str, title: TransToken, text: str):
         super().__init__(TK_ROOT, name=name)
         self.withdraw()

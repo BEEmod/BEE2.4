@@ -47,6 +47,7 @@ def parse_template_fast(file: File, path: str) -> str:
     So first try naively parsing - if we don't find it, fall
     back to full parsing.
     """
+    lnum: int | None
     in_entity = False
     nest_counter = 0
     has_classname = False

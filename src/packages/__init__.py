@@ -2,7 +2,10 @@
 Handles scanning through the zip packages to find all items, styles, etc.
 """
 from __future__ import annotations
-from typing import Iterator, NoReturn, ClassVar, Optional, Any, TYPE_CHECKING, TypeVar, Type, cast
+from typing import (
+    Iterator, Mapping, NoReturn, ClassVar, Optional, Any, TYPE_CHECKING, TypeVar,
+    Type, cast,
+)
 from typing_extensions import Self
 
 import os
@@ -101,6 +104,7 @@ class SelitemData:
             )
         except LookupError:
             icon = None
+        large_key: Keyvalues | None
         try:
             large_key = info.find_key('iconLarge')
         except LookupError:
@@ -942,10 +946,10 @@ class Style(PakObject, needs_foreground=True):
         renderables: dict[RenderableType, Renderable],
         suggested: dict[type[PakObject], set[str]],
         config: lazy_conf.LazyConf = lazy_conf.BLANK,
-        base_style: Optional[str]=None,
-        has_video: bool=True,
-        vpk_name: str='',
-        legacy_corridors: dict[tuple[GameMode, Direction, int], LegacyCorr]=None,
+        base_style: Optional[str] = None,
+        has_video: bool = True,
+        vpk_name: str = '',
+        legacy_corridors: Mapping[tuple[GameMode, Direction, int], LegacyCorr] = srctools.EmptyMapping,
     ) -> None:
         self.id = style_id
         self.selitem_data = selitem_data
@@ -976,7 +980,7 @@ class Style(PakObject, needs_foreground=True):
         """Parse a style definition."""
         info = data.info
         selitem_data = SelitemData.parse(info, data.pak_id)
-        base = info['base', '']
+        base = info['base', ''] or None
         has_video = srctools.conv_bool(
             info['has_video', ''],
             not data.is_override,  # Assume no video for override
@@ -1028,9 +1032,6 @@ class Style(PakObject, needs_foreground=True):
                         icon=icon,
                         desc='',
                     )
-
-        if base == '':
-            base = None
         try:
             folder = 'styles/' + info['folder']
         except LookupError:
@@ -1114,7 +1115,7 @@ class Style(PakObject, needs_foreground=True):
         return self.selitem_data.iter_trans_tokens('styles/' + self.id)
 
     @staticmethod
-    def export(exp_data: ExportData) -> None:
+    async def export(exp_data: ExportData) -> None:
         """This isn't used for Styles, we do them specially."""
         pass
 

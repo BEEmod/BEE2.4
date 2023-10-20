@@ -155,7 +155,6 @@ module = [
 	'app.contextWin',
 	'app.UI',
 	'app.paletteLoader',
-	'packages.*',
 	'precomp.*',
 	'test.*',
 	'BEE2_config',

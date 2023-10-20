@@ -1,6 +1,6 @@
 """Definitions for background music used in the map."""
 from __future__ import annotations
-from typing import Iterator
+from typing import Iterator, Mapping
 from typing_extensions import Self
 from collections.abc import Iterable
 
@@ -24,11 +24,12 @@ class Music(PakObject, needs_foreground=True, style_suggest_key='music'):
         self,
         music_id: str,
         selitem_data: SelitemData,
-        sound: dict[MusicChannel, list[str]],
-        children: dict[MusicChannel, str],
+        sound: Mapping[MusicChannel, list[str]],
+        *,
+        children: Mapping[MusicChannel, str],
+        sample: Mapping[MusicChannel, str | None],
         config: lazy_conf.LazyConf = lazy_conf.BLANK,
         inst: str | None = None,
-        sample: dict[MusicChannel, str | None] = None,
         pack: Iterable[str] = (),
         loop_len: int = 0,
         synch_tbeam: bool = False,

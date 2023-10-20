@@ -58,7 +58,7 @@ class QuotePack(PakObject, needs_foreground=True, style_suggest_key='quote'):
 
         # For Cave Johnson voicelines, this indicates what skin to use on the
         # portrait.
-        port_skin = srctools.conv_int(data.info['caveSkin', None], None)
+        port_skin = srctools.conv_int(data.info['caveSkin', ''], None)
 
         try:
             monitor_data = data.info.find_key('monitor')
@@ -155,7 +155,8 @@ class QuotePack(PakObject, needs_foreground=True, style_suggest_key='quote'):
             options['voice_studio_inst'] = voice.studio
             options['voice_studio_actor'] = voice.studio_actor
             options['voice_studio_inter_chance'] = str(voice.inter_chance)
-            options['voice_studio_cam_loc'] = voice.cam_loc.join(' ')
+            if voice.cam_loc is not None:
+                options['voice_studio_cam_loc'] = voice.cam_loc.join(' ')
             options['voice_studio_cam_pitch'] = str(voice.cam_pitch)
             options['voice_studio_cam_yaw'] = str(voice.cam_yaw)
             options['voice_studio_should_shoot'] = srctools.bool_as_int(voice.turret_hate)
