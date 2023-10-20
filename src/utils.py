@@ -23,9 +23,9 @@ import trio
 
 
 __all__ = [
-    'WIN', 'MAC','LINUX', 'STEAM_IDS', 'DEV_MODE', 'CODE_DEV_MODE', 'BITNESS',
+    'WIN', 'MAC', 'LINUX', 'STEAM_IDS', 'DEV_MODE', 'CODE_DEV_MODE', 'BITNESS',
     'get_git_version', 'install_path', 'bins_path', 'conf_location', 'fix_cur_directory',
-    'run_bg_daemon', 'CONN_LOOKUP', 'CONN_TYPES', 'freeze_enum_props', 'FuncLookup',
+    'run_bg_daemon', 'not_none', 'CONN_LOOKUP', 'CONN_TYPES', 'freeze_enum_props', 'FuncLookup',
     'PackagePath', 'Result', 'acompose', 'get_indent', 'iter_grid', 'check_cython',
     'check_shift', 'fit', 'group_runs', 'restart_app', 'quit_app', 'set_readonly',
     'unset_readonly', 'merge_tree', 'write_lang_pot',
@@ -563,6 +563,13 @@ def acompose(
         res = await func(*args, **kwargs)
         on_completed(res)
     return task
+
+
+def not_none(value: T | None) -> T:
+    """Assert that the value is not None, inline."""
+    if value is None:
+        raise AssertionError('Value was none!')
+    return value
 
 
 def get_indent(line: str) -> str:
