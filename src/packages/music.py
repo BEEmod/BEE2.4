@@ -186,22 +186,22 @@ class Music(PakObject, needs_foreground=True, style_suggest_key='music'):
         attrs['TBEAM_SYNC'] = self.has_synced_tbeam
         return attrs
 
-    def get_suggestion(self, channel: MusicChannel) -> str | None:
+    def get_suggestion(self, packset: PackagesSet, channel: MusicChannel) -> str | None:
         """Get the ID we want to suggest for a channel."""
         try:
-            child = Music.by_id(self.children[channel])
+            child = packset.obj_by_id(Music, self.children[channel])
         except KeyError:
             child = self
         if child.sound[channel]:
             return child.id
         return None
 
-    def get_sample(self, channel: MusicChannel) -> str | None:
+    def get_sample(self, packset: PackagesSet, channel: MusicChannel) -> str | None:
         """Get the path to the sample file, if present."""
         if self.sample[channel]:
             return self.sample[channel]
         try:
-            children = Music.by_id(self.children[channel])
+            children = packset.obj_by_id(Music, self.children[channel])
         except KeyError:
             return None
         return children.sample[channel]

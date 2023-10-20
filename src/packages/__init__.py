@@ -337,18 +337,6 @@ class PakObject:
         """Do processing after all objects of this type have been fully parsed (but others may not)."""
         pass
 
-    @classmethod
-    def all(cls) -> Collection[Self]:
-        """Get the list of objects parsed."""
-        warnings.warn('Make this local!', DeprecationWarning, stacklevel=2)
-        return get_loaded_packages().all_obj(cls)
-
-    @classmethod
-    def by_id(cls, object_id: str) -> Self:
-        """Return the object with a given ID."""
-        warnings.warn('Make this local!', DeprecationWarning, stacklevel=2)
-        return get_loaded_packages().obj_by_id(cls, object_id)
-
 
 def reraise_keyerror(err: NoKeyError | IndexError, obj_id: str) -> NoReturn:
     """Replace NoKeyErrors with a nicer one, giving the item that failed."""
@@ -797,7 +785,6 @@ async def parse_object(
             await trio.sleep(0)
     except (NoKeyError, IndexError) as e:
         reraise_keyerror(e, obj_id)
-        raise  # Never reached.
     except TokenSyntaxError as e:
         # Add the relevant package to the filename.
         if e.file:
@@ -822,7 +809,6 @@ async def parse_object(
                 override = await obj_class.parse(override_data)
         except (NoKeyError, IndexError) as e:
             reraise_keyerror(e, f'{override_data.pak_id}:{obj_id}')
-            raise  # Never reached.
         except TokenSyntaxError as e:
             # Add the relevant package to the filename.
             if e.file:

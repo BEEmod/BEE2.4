@@ -199,7 +199,7 @@ async def init_widgets(master: tk.Widget, tk_img: TKImages) -> tk.Widget:
                 LOGGER.warning('Missing sign id: {}', prev_id)
 
     # TODO: Dynamically refresh this.
-    for sign in sorted(Signage.all(), key=lambda s: s.name):
+    for sign in sorted(load_packset.all_obj(Signage), key=lambda s: s.name):
         if not sign.hidden:
             slot = drag_man.slot_source(canv_all)
             slot.contents = sign

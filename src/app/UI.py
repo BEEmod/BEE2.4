@@ -1693,6 +1693,7 @@ async def init_windows(tk_img: TKImages) -> None:
 
     def style_select_callback(style_id: Optional[str]) -> None:
         """Callback whenever a new style is chosen."""
+        packset = packages.get_loaded_packages()
         global selected_style
         if style_id is None:
             LOGGER.warning('Style ID is None??')
@@ -1723,8 +1724,8 @@ async def init_windows(tk_img: TKImages) -> None:
         for sugg_cls, win in suggest_windows.items():
             win.set_suggested(style_obj.suggested[sugg_cls])
         suggested_refresh()
-        StyleVarPane.refresh(style_obj)
-        corridor.load_corridors(packages.get_loaded_packages())
+        StyleVarPane.refresh(packset, style_obj)
+        corridor.load_corridors(packset)
         background_run(corridor.refresh)
 
     style_win.callback = style_select_callback

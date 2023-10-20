@@ -4,7 +4,7 @@ from typing import Iterator
 
 from srctools import Keyvalues, bool_as_int
 
-from packages import ExportData, PakObject, ParseData, Style
+from packages import ExportData, PackagesSet, PakObject, ParseData, Style
 from transtoken import TransToken, TransTokenSource
 
 
@@ -115,12 +115,12 @@ class StyleVar(PakObject, allow_mult=True, needs_foreground=True):
             style.bases
         )
 
-    def applies_to_all(self) -> bool:
+    def applies_to_all(self, packset: PackagesSet) -> bool:
         """Check if this applies to all styles."""
         if self.is_unstyled:
             return True
 
-        for style in Style.all():
+        for style in packset.all_obj(Style):
             if not self.applies_to_style(style):
                 return False
         return True
