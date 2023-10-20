@@ -482,7 +482,7 @@ def adjust_inside_screen(
     return x, y
 
 
-def center_win(window: Union[tk.Tk, tk.Toplevel], parent: Union[tk.Tk, tk.Toplevel] = None) -> None:
+def center_win(window: Union[tk.Tk, tk.Toplevel], parent: Union[tk.Tk, tk.Toplevel, None] = None) -> None:
     """Center a subwindow to be inside a parent window."""
     if parent is None:
         parent = window.nametowidget(window.winfo_parent())
@@ -560,7 +560,7 @@ class ReadOnlyEntry(ttk.Entry):
 # Widget and Spinbox have conflicting identify() definitions, not important.
 class ttk_Spinbox(ttk.Widget, tk.Spinbox):  # type: ignore[misc]
     """This is missing from ttk, but still exists."""
-    def __init__(self, master: tk.Misc, range: Union[range, slice] = None, **kw: Any) -> None:
+    def __init__(self, master: tk.Misc, range: Union[range, slice, None] = None, **kw: Any) -> None:
         """Initialise a spinbox.
         Arguments:
             range: The range buttons will run in
@@ -674,7 +674,7 @@ class FileField(ttk.Frame):
 
         self._text_var.set(self._truncate(loc))
 
-    def browse(self, event: tk.Event = None) -> None:
+    def browse(self, event: object = None) -> None:
         """Browse for a file."""
         path = self.browser.show()
         if path:

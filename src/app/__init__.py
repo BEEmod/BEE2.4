@@ -1,7 +1,7 @@
 """The package containg all UI code."""
 import tkinter as tk
 from types import TracebackType, new_class
-from typing import Awaitable, Callable, Optional, Type, TypeVar, Generic
+from typing import Any, Awaitable, Callable, Optional, Type, TypeVar, Generic
 
 from typing_extensions import TypeVarTuple, Unpack
 
@@ -32,7 +32,7 @@ if '__class_getitem__' not in vars(tk.Event):
     )
 
 
-def _run_main_loop(*args, **kwargs) -> None:
+def _run_main_loop(*args: Any, **kwargs: Any) -> None:
     """Allow determining if this is running."""
     global _main_loop_running
     _main_loop_running = True
@@ -82,7 +82,7 @@ TK_ROOT.report_callback_exception = tk_error
 def on_error(
     exc_type: Type[BaseException],
     exc_value: BaseException,
-    exc_tb: TracebackType,
+    exc_tb: Optional[TracebackType],
 ) -> None:
     """Run when the application crashes. Display to the user, log it, and quit."""
     # We don't want this to fail, so import everything here, and wrap in

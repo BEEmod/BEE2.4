@@ -52,7 +52,8 @@ async def init_app() -> None:
     except KeyError:
         pass
     else:
-        gameMan.set_game_by_name(last_game.id)
+        if last_game.id is not None:
+            gameMan.set_game_by_name(last_game.id)
     gameMan.scan_music_locs()
 
     LOGGER.info('Loading Packages...')
