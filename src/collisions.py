@@ -293,6 +293,7 @@ class BBox:
         )
         # Exclude the aliases.
         for coll in EXPORT_KVALUES:
+            assert coll.name is not None
             ent[f'coll_{coll.name.lower()}'] = (coll & self.contents) is not CollideType.NOTHING
         ent.solids.append(prism.solid)
         return ent

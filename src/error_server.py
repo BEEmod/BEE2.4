@@ -96,6 +96,7 @@ async def route_reload() -> quart.ResponseReturnValue:
 @app.route('/static/<path:filename>.js')
 async def route_static_js(filename: str) -> quart.ResponseReturnValue:
     """Ensure javascript is returned with the right MIME type."""
+    assert app.static_folder is not None
     return await quart.send_from_directory(
         directory=app.static_folder,
         file_name=filename + '.js',
