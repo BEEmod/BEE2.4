@@ -217,7 +217,7 @@ EXCLUDES = [
 
     'bz2',  # We aren't using this compression format (shutil, zipfile etc handle ImportError)..
 
-    # Imported by logging handlers which we don't use..
+    # Imported by logging handlers which we don't use...
     'win32evtlog',
     'win32evtlogutil',
     'smtplib',

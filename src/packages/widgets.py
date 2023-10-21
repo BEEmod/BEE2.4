@@ -408,6 +408,7 @@ class SliderOptions:
     min: float
     max: float
     step: float
+    zero_off: bool
 
     @classmethod
     def parse(cls, conf: Keyvalues) -> Self:
@@ -416,6 +417,7 @@ class SliderOptions:
             min=conf.float('min', 0),
             max=conf.float('max', 100),
             step=conf.float('step', 1),
+            zero_off=conf.bool('zeroOff', False),
         )
 
 
