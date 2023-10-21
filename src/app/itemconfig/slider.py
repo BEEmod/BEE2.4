@@ -51,7 +51,7 @@ async def widget_slider(
     def change_cmd(value: str) -> None:
         """Called when the slider is changed."""
         nonlocal last_value
-        new_pos = format(conf.min + conf.step * round(float(value), points), txt_format)
+        new_pos = format(conf.min + conf.step * round(float(value)), txt_format)
         # Only trigger sounds when moving each step.
         if last_value != new_pos:
             itemconfig.widget_sfx()
