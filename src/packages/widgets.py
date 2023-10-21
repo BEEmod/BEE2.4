@@ -387,7 +387,7 @@ class ItemVariantConf:
 class DropdownOptions:
     """Options defined for a widget."""
     options: List[str]
-    display: List[str]
+    display: List[TransToken]
     key_to_index: Dict[str, int]
 
     @classmethod
@@ -396,7 +396,7 @@ class DropdownOptions:
         result = cls([], [], {})
         for ind, prop in enumerate(conf.find_children('Options')):
             result.options.append(prop.real_name)
-            result.display.append(prop.value)
+            result.display.append(TransToken.parse(data.pak_id, prop.value))
             result.key_to_index[prop.name] = ind
         return result
 
