@@ -168,6 +168,8 @@ class UIFormatter(string.Formatter):
 @functools.lru_cache(maxsize=1)  # Cache until it has changed.
 def _get_locale(lang_code: str) -> babel.Locale:
     """Fetch the current locale."""
+    if lang_code == DUMMY.lang_code:
+        return babel.Locale.parse('en_US')
     try:
         return babel.Locale.parse(lang_code)
     except (babel.UnknownLocaleError, ValueError) as exc:
@@ -532,6 +534,7 @@ async def load_aux_langs(
             await trio.to_thread.run_sync(parse_basemodui, game_dict, data)
         except FileNotFoundError:
             LOGGER.warning('BaseModUI file "{}" does not exist!', basemod_loc)
+        # Several times we've failed to parse this file. If so, don't crash, just display directly.
         except (OSError, UnicodeDecodeError, ValueError) as exc:
             LOGGER.warning('Invalid BaseModUI file "{}"', basemod_loc, exc_info=exc)
 
