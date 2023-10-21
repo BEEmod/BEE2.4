@@ -1272,8 +1272,11 @@ class SelectorWin(Generic[CallbackT]):
 
     def _update_translations(self) -> None:
         """Update translations."""
-        # We don't care about updating to the rollover item, it'll swap soon anyway.
-        self.disp_label.set(str(self.selected.context_lbl))
+        if self._readonly and self.readonly_override is not None:
+            self.disp_label.set(str(self.readonly_override))
+        else:
+            # We don't care about updating to the rollover item, it'll swap soon anyway.
+            self.disp_label.set(str(self.selected.context_lbl))
 
     def _icon_clicked(self, _: tk.Event[tk.Misc]) -> None:
         """When the large image is clicked, either show the previews or play sounds."""
