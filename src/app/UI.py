@@ -17,6 +17,7 @@ import exporting
 import loadScreen
 from app import TK_ROOT, background_run, localisation
 from BEE2_config import ConfigFile, GEN_OPTS
+from app.dialogs import Dialogs
 from loadScreen import main_loader as loader
 import packages
 from packages.item import ItemVariant, InheritKind
@@ -736,7 +737,7 @@ def suggested_refresh() -> None:
             UI['suggested_style'].state(['!disabled'])
 
 
-async def export_editoritems(pal_ui: paletteUI.PaletteUI, bar: MenuBar) -> None:
+async def export_editoritems(pal_ui: paletteUI.PaletteUI, bar: MenuBar, dialog: Dialogs) -> None:
     """Export the selected Items and Style into the chosen game."""
     # Disable, so you can't double-export.
     UI['pal_export'].state(('disabled',))
@@ -803,14 +804,14 @@ async def export_editoritems(pal_ui: paletteUI.PaletteUI, bar: MenuBar) -> None:
         config.APP.write_file()
 
         if conf.launch_after_export or conf.after_export is not config.gen_opts.AfterExport.NORMAL:
-            do_action = tk_tools.askyesno(
-                TRANS_EXPORTED_TITLE,
+            do_action = await dialog.ask_yes_no(
                 optionWindow.AFTER_EXPORT_TEXT[
                     conf.after_export, conf.launch_after_export,
                 ].format(msg=TRANS_EXPORTED),
+                title=TRANS_EXPORTED_TITLE,
             )
         else:  # No action to do, so just show an OK.
-            tk_tools.showinfo(TRANS_EXPORTED_TITLE, TRANS_EXPORTED)
+            await dialog.show_info(TRANS_EXPORTED, title=TRANS_EXPORTED_TITLE)
             do_action = False
 
         # Do the desired action - if quit, we don't bother to update UI.
@@ -1406,7 +1407,7 @@ async def init_windows(tk_img: TKImages) -> None:
     """
     def export() -> None:
         """Export the palette, passing the required UI objects."""
-        background_run(export_editoritems, pal_ui, menu_bar)
+        background_run(export_editoritems, pal_ui, menu_bar, DIALOG)
 
     menu_bar = MenuBar(
         TK_ROOT,
@@ -1539,7 +1540,7 @@ async def init_windows(tk_img: TKImages) -> None:
 
     TK_ROOT.bind_all(tk_tools.KEY_SAVE, lambda e: pal_ui.event_save(DIALOG))
     TK_ROOT.bind_all(tk_tools.KEY_SAVE_AS, lambda e: pal_ui.event_save_as(DIALOG))
-    TK_ROOT.bind_all(tk_tools.KEY_EXPORT, lambda e: background_run(export_editoritems, pal_ui, menu_bar))
+    TK_ROOT.bind_all(tk_tools.KEY_EXPORT, lambda e: background_run(export_editoritems, pal_ui, menu_bar, DIALOG))
 
     await trio.sleep(0)
     loader.step('UI', 'palette')

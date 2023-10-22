@@ -15,7 +15,7 @@ from typing_extensions import TypeAlias, TypeVarTuple, Unpack
 
 from tkinter import ttk
 from tkinter import font as _tk_font
-from tkinter import filedialog, commondialog, simpledialog, messagebox
+from tkinter import filedialog, commondialog, messagebox
 import tkinter as tk
 import os.path
 
@@ -520,10 +520,7 @@ class _MsgBoxFunc(Generic[T]):
         return self.orig(disp_title, disp_msg, parent=parent, master=TK_ROOT, **options)
 
 
-showinfo       = _MsgBoxFunc(messagebox.showinfo)
-showerror      = _MsgBoxFunc(messagebox.showerror)
-askokcancel    = _MsgBoxFunc(messagebox.askokcancel)
-askyesno       = _MsgBoxFunc(messagebox.askyesno)
+showerror = _MsgBoxFunc(messagebox.showerror)
 
 
 class HidingScroll(ttk.Scrollbar):
