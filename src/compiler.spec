@@ -125,7 +125,6 @@ print('DATA:', data_files)
 version_val = f'''\
 BEE_VERSION={utils.get_git_version(SPECPATH)!r}
 HA_VERSION={HA_VERSION!r}
-HAS_BIN_DIR=True
 '''
 print(version_val)
 version_filename = os.path.join(workpath, '_compiled_version.py')
