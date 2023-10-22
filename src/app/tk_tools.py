@@ -8,14 +8,13 @@ import sys
 from enum import Enum
 from typing import (
     Awaitable, Dict, Generic, Iterable, overload, cast, Any, TypeVar, Protocol, Union, Callable,
-    Optional,
-    Tuple, Literal,
+    Optional, Tuple, Literal,
 )
 from typing_extensions import TypeAlias, TypeVarTuple, Unpack
 
 from tkinter import ttk
 from tkinter import font as _tk_font
-from tkinter import filedialog, commondialog, messagebox
+from tkinter import filedialog, commondialog
 import tkinter as tk
 import os.path
 
@@ -499,28 +498,6 @@ def _default_validator(value: str) -> str:
     if not value.strip():
         raise ValueError("A value must be provided!")
     return value
-
-
-class _MsgBoxFunc(Generic[T]):
-    """Wrap messagebox functions that take TransToken."""
-    _DEFAULT_TITLE = TransToken.ui('BEEmod')
-
-    def __init__(self, original: Callable[..., T]) -> None:
-        self.orig = original
-
-    def __call__(
-        self,
-        title: Optional[TransToken]=None,
-        message: Optional[TransToken]=None,
-        parent: tk.Misc=TK_ROOT,
-        **options: Any,
-    ) -> T:
-        disp_title = str(title) if title is not None else str(self._DEFAULT_TITLE)
-        disp_msg = str(message) if message is not None else None
-        return self.orig(disp_title, disp_msg, parent=parent, master=TK_ROOT, **options)
-
-
-showerror = _MsgBoxFunc(messagebox.showerror)
 
 
 class HidingScroll(ttk.Scrollbar):

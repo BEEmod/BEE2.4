@@ -165,6 +165,7 @@ async def app_main(init: Callable[[], Awaitable[Any]]) -> None:
     async with trio.open_nursery() as nursery:
         app._APP_NURSERY = nursery
         await nursery.start(display_errors)
+        await gameMan.check_app_in_game(DIALOG)
 
         # Run main app, then cancel this nursery to quit all other tasks.
         await init()

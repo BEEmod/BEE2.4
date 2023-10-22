@@ -7,9 +7,11 @@ Does stuff related to the actual games.
 """
 from __future__ import annotations
 
+import sys
 from typing import Dict, NoReturn, Optional, Union, Iterator
 from pathlib import Path
 
+import trio
 from tkinter import *  # ui library
 from tkinter import filedialog  # open/save as dialog creator
 
@@ -24,7 +26,7 @@ import attrs
 from typing_extensions import Self
 
 from BEE2_config import ConfigFile
-from app import tk_tools, TK_ROOT, background_run
+from app import background_run
 from app.dialogs import Dialogs
 from config.gen_opts import GenOptions
 from exporting.compiler import terminate_error_server, restore_backup
@@ -242,15 +244,22 @@ def find_steam_info(game_dir: str) -> tuple[str | None, str | None]:
     return game_id, name
 
 
-def app_in_game_error() -> None:
-    """Display a message warning about the issues with placing the BEE folder directly in P2."""
-    tk_tools.showerror(
-        message=TransToken.ui(
-            "It appears that the BEE2 application was installed directly in a game directory. "
-            "The bee2/ folder name is used for exported resources, so this will cause issues.\n\n"
-            "Move the application folder elsewhere, then re-run."
-        ),
-    )
+async def check_app_in_game(dialog: Dialogs) -> None:
+    """Check proactively for the user placing the BEE folder directly in P2."""
+    # Check early on for a common mistake - putting the BEE2 folder directly in Portal 2 means
+    # when we export we'll try and overwrite ourselves. Use Steam's appid file as a marker.
+    if utils.install_path('../steam_appid.txt').exists() and utils.install_path('.').name.casefold() == 'bee2':
+        await dialog.show_info(
+            message=TransToken.ui(
+                "It appears that the BEE2 application was installed directly in a game directory. "
+                "The bee2/ folder name is used for exported resources, so this will cause issues.\n\n"
+                "Move the application folder elsewhere, then re-run."
+            ),
+            icon=dialog.ERROR,
+        )
+        sys.exit()
+    else:
+        await trio.sleep(0)
 
 
 def save() -> None:
