@@ -30,17 +30,6 @@ styleOptions = [
     ),
 
     StyleVar.unstyled(
-        id='FixFizzlerBump',
-        name=TransToken.ui('Prevent Portal Bump (fizzler)'),
-        default=False,
-        desc=TransToken.ui(
-            'Add portal bumpers to make it more difficult to portal across '
-            'fizzler edges. This can prevent placing portals in tight spaces '
-            'near fizzlers, or fizzle portals on activation.'
-        ),
-    ),
-
-    StyleVar.unstyled(
         id='NoMidVoices',
         name=TransToken.ui('Suppress Mid-Chamber Dialogue'),
         default=False,
@@ -173,7 +162,7 @@ def make_desc(packset: PackagesSet, var: StyleVar) -> TransToken:
     return res
 
 
-def refresh(selected_style: Style) -> None:
+def refresh(packset: PackagesSet, selected_style: Style) -> None:
     """Move the stylevars to the correct position.
 
     This depends on which apply to the current style.
@@ -181,7 +170,7 @@ def refresh(selected_style: Style) -> None:
     en_row = 0
     dis_row = 0
     for var in VAR_LIST:
-        if var.applies_to_all():
+        if var.applies_to_all(packset):
             continue  # Always visible!
         if var.applies_to_style(selected_style):
             checkbox_chosen[var.id].grid(
@@ -286,7 +275,7 @@ async def make_stylevar_pane(
         for var in VAR_LIST:
             tk_vars[var.id] = int_var = IntVar(value=var.enabled)
             desc = make_desc(packset, var)
-            if var.applies_to_all():
+            if var.applies_to_all(packset):
                 # Available in all styles - put with the hardcoded variables.
                 all_pos += 1
                 checkbox_all[var.id] = chk = ttk.Checkbutton(frame_all, variable=tk_vars[var.id])

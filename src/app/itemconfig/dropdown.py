@@ -6,7 +6,7 @@ import tkinter as tk
 import srctools.logger
 
 from packages.widgets import DropdownOptions, UpdateFunc
-from app import itemconfig
+from app import itemconfig, localisation
 from ui_tk.img import TKImages
 
 
@@ -36,7 +36,15 @@ async def dropdown(
         parent,
         exportselection=False,
         state='readonly',
-        values=conf.display,
     )
+
+    @localisation.add_callback(call=True)
+    def update_combo_values() -> None:
+        """Update the combo box when translations change."""
+        index = combobox.current()
+        combobox['values'] = [str(token) for token in conf.display]
+        if index >= 0:  # -1 if empty.
+            combobox.current(index)  # Update display.
+
     combobox.bind('<<ComboboxSelected>>', changed)
     return combobox, update_ui

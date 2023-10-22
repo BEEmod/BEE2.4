@@ -1,7 +1,7 @@
 """Image integrations for TKinter."""
 from __future__ import annotations
 from typing import TypeVar, Union
-from typing_extensions import TypeAlias
+from typing_extensions import TypeAlias, override
 from tkinter import ttk
 import tkinter as tk
 
@@ -204,6 +204,7 @@ class TKImages(img.UIImage):
             img_list = self.unused_img.setdefault((img.width(), img.height()), [])
             img_list.append(img)
 
+    @override
     def ui_clear_handle(self, handle: img.Handle) -> None:
         """Clear cached TK images for this handle."""
         self._discard_img(self.tk_img.pop(handle, None))
@@ -225,6 +226,7 @@ class TKImages(img.UIImage):
             image.paste(res)
         return image
 
+    @override
     def ui_apply_load(self, handle: img.Handle, frame: Image.Image) -> None:
         """Copy the loading icon to all users of the main image."""
         try:
@@ -235,6 +237,7 @@ class TKImages(img.UIImage):
             # This updates the TK widget directly.
             tk_img.paste(frame)
 
+    @override
     def ui_load_users(self, handle: img.Handle, force: bool) -> None:
         """Load this handle into the widgets using it."""
         tk_img = self._load_tk(handle, force)
@@ -258,6 +261,7 @@ class TKImages(img.UIImage):
                     except tk.TclError:
                         pass
 
+    @override
     def ui_force_load(self, handle: img.Handle) -> None:
         """Called when this handle is reloading, and should update all its widgets."""
         loading = self._load_tk(

@@ -2,7 +2,7 @@
 General app configuration options, controlled by the options window.
 """
 from typing import Any, Dict, List
-from typing_extensions import TypeGuard
+from typing_extensions import TypeGuard, override
 from enum import Enum
 
 from srctools import Keyvalues
@@ -11,6 +11,7 @@ import attrs
 
 from BEE2_config import GEN_OPTS as LEGACY_CONF
 import config
+from utils import not_none
 
 
 class AfterExport(Enum):
@@ -56,11 +57,12 @@ class GenOptions(config.Data, conf_name='Options', palette_stores=False, version
     language: str = ''
 
     @classmethod
+    @override
     def parse_legacy(cls, conf: Keyvalues) -> Dict[str, 'GenOptions']:
         """Parse from the GEN_OPTS config file."""
         log_win_level = LEGACY_CONF.get(
             'Debug', 'window_log_level',
-            fallback=attrs.fields(GenOptions).log_win_level.default,
+            fallback=not_none(attrs.fields(GenOptions).log_win_level.default),
         )
         try:
             after_export = AfterExport(LEGACY_CONF.get_int('General', 'after_export_action', -1))
@@ -69,6 +71,7 @@ class GenOptions(config.Data, conf_name='Options', palette_stores=False, version
 
         res: Dict[str, bool] = {}
         for field in gen_opts_bool:
+            assert field.default is not None, field
             try:
                 section: str = field.metadata['legacy']
             except KeyError:
@@ -90,6 +93,7 @@ class GenOptions(config.Data, conf_name='Options', palette_stores=False, version
         )}
 
     @classmethod
+    @override
     def parse_kv1(cls, data: Keyvalues, version: int) -> 'GenOptions':
         """Parse KV1 values."""
         if version > 2:
@@ -98,7 +102,7 @@ class GenOptions(config.Data, conf_name='Options', palette_stores=False, version
         try:
             after_export = AfterExport(data.int('after_export', 0))
         except ValueError:
-            after_export = attrs.fields(GenOptions).after_export.default
+            after_export = not_none(attrs.fields(GenOptions).after_export.default)
 
         return GenOptions(
             after_export=after_export,
@@ -106,11 +110,12 @@ class GenOptions(config.Data, conf_name='Options', palette_stores=False, version
             language=data['language', ''],
             preserve_fgd=preserve_fgd,
             **{
-                field.name: data.bool(field.name, field.default)
+                field.name: data.bool(field.name, not_none(field.default))
                 for field in gen_opts_bool
             },
         )
 
+    @override
     def export_kv1(self) -> Keyvalues:
         """Produce KV1 values."""
         kv = Keyvalues('', [
@@ -124,6 +129,7 @@ class GenOptions(config.Data, conf_name='Options', palette_stores=False, version
         return kv
 
     @classmethod
+    @override
     def parse_dmx(cls, data: Element, version: int) -> 'GenOptions':
         """Parse DMX configuration."""
         if version > 2:
@@ -154,6 +160,7 @@ class GenOptions(config.Data, conf_name='Options', palette_stores=False, version
                 res[field.name] = field.default
         return GenOptions(**res)
 
+    @override
     def export_dmx(self) -> Element:
         """Produce DMX configuration."""
         elem = Element('Options', 'DMElement')

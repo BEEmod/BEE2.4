@@ -25,6 +25,7 @@ from typing_extensions import Self
 
 from BEE2_config import ConfigFile
 from app import tk_tools, TK_ROOT, background_run
+from app.dialogs import Dialogs
 from config.gen_opts import GenOptions
 from exporting.compiler import terminate_error_server, restore_backup
 from exporting.files import INST_PATH
@@ -258,7 +259,7 @@ def save() -> None:
     CONFIG.save_check()
 
 
-def load() -> None:
+async def load(dialogs: Dialogs) -> None:
     global selected_game
     all_games.clear()
     for gm in CONFIG:
@@ -276,21 +277,21 @@ def load() -> None:
         loadScreen.main_loader.suppress()
 
         # Ask the user for Portal 2's location...
-        if not add_game():
+        if not await add_game(dialogs):
             # they cancelled, quit
             quit_application()
         loadScreen.main_loader.unsuppress()  # Show it again
     selected_game = all_games[0]
 
 
-def add_game(e: object = None) -> bool:
+async def add_game(dialogs: Dialogs) -> bool:
     """Ask for, and load in a game to export to."""
     title = TransToken.ui('BEE2 - Add Game')
-    tk_tools.showinfo(
-        title,
+    await dialogs.show_info(
         TransToken.ui(
             'Select the folder where the game executable is located ({appname})...'
         ).format(appname='portal2' + EXE_SUFFIX),
+        title,
     )
     if utils.WIN:
         exe_loc = filedialog.askopenfilename(
@@ -303,31 +304,43 @@ def add_game(e: object = None) -> bool:
         folder = os.path.dirname(exe_loc)
         gm_id, name = find_steam_info(folder)
         if name is None or gm_id is None:
-            tk_tools.showerror(title, TransToken.ui(
-                'This does not appear to be a valid game folder!'
-            ))
+            await dialogs.show_info(
+                TransToken.ui('This does not appear to be a valid game folder!'),
+                title=title,
+                icon=dialogs.ERROR,
+            )
             return False
 
         # Mel doesn't use PeTI, so that won't make much sense...
         if gm_id == utils.STEAM_IDS['MEL']:
-            tk_tools.showerror(title, TransToken.ui(
-                "Portal Stories: Mel doesn't have an editor!"
-            ))
+            await dialogs.show_info(
+                TransToken.ui("Portal Stories: Mel doesn't have an editor!"),
+                title=title,
+                icon=dialogs.ERROR,
+            )
             return False
 
         invalid_names = [gm.name for gm in all_games]
         while True:
-            name = tk_tools.prompt(
-                title,
+            name = await dialogs.prompt(
                 TransToken.ui("Enter the name of this game:"),
-                initialvalue=name,
+                title=title,
+                initial_value=TransToken.untranslated(name),
             )
             if name in invalid_names:
-                tk_tools.showerror(title, TransToken.ui('This name is already taken!'))
+                await dialogs.show_info(
+                    TransToken.ui('This name is already taken!'),
+                    title=title,
+                    icon=dialogs.ERROR,
+                )
             elif name is None:
                 return False
             elif name == '':
-                tk_tools.showerror(title, TransToken.ui('Please enter a name for this game!'))
+                await dialogs.show_info(
+                    TransToken.ui('Please enter a name for this game!'),
+                    title=title,
+                    icon=dialogs.ERROR,
+                )
             else:
                 break
 
@@ -340,7 +353,7 @@ def add_game(e: object = None) -> bool:
     return False
 
 
-async def remove_game() -> None:
+async def remove_game(dialogs: Dialogs) -> None:
     """Remove the currently-chosen game from the game list."""
     from exporting.fgd import edit_fgd
     global selected_game
@@ -351,7 +364,7 @@ async def remove_game() -> None:
         ) if len(all_games) == 1 else
         TransToken.ui('Are you sure you want to delete "{game}"?')
     )
-    if tk_tools.askyesno(
+    if await dialogs.ask_yes_no(
         title=TransToken.ui('BEE2 - Remove Game'),
         message=lastgame_mess.format(game=selected_game.name),
     ):
@@ -407,15 +420,3 @@ def set_game_by_name(name: str) -> None:
             # TODO: make this function async too to eliminate.
             background_run(ON_GAME_CHANGED, selected_game)
             break
-
-
-if __name__ == '__main__':
-    Button(TK_ROOT, text='Add', command=add_game).grid(row=0, column=0)
-    Button(TK_ROOT, text='Remove', command=lambda: background_run(remove_game)).grid(row=0, column=1)
-    test_menu = Menu(TK_ROOT)
-    dropdown = Menu(test_menu)
-    test_menu.add_cascade(menu=dropdown, label='Game')
-    TK_ROOT['menu'] = test_menu
-
-    load()
-    add_menu_opts(dropdown)

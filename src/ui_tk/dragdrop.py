@@ -286,6 +286,8 @@ class DragDrop(ManagerBase[ItemT, tk.Misc], Generic[ItemT]):
     @override
     def _ui_dragwin_update(self, x: float, y: float) -> None:
         """Move the drag window to this position."""
+        if self._cur_slot is None:
+            return
         self._drag_win.geometry(f'+{round(x - self.width // 2)}+{round(y - self.height // 2)}')
 
         dest = self._pos_slot(x, y)

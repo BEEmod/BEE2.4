@@ -203,13 +203,14 @@ async def step_copy_compiler(exp_data: ExportData) -> None:
                 # Use a different error if this might be running.
                 msg = TransToken.ui(
                     'Copying compiler file {file} failed. '
-                    'Ensure {game} is not running. The webserver for the error display '
-                    'may also be running, quit the vrad process or wait a few minutes.'
+                    "Ensure {game}'s map compiler is not running. "
+                    'The webserver for the error display may also be running, '
+                    'quit the vrad process or wait a few minutes.'
                 )
             else:
                 msg = TransToken.ui(
                     'Copying compiler file {file} failed. '
-                    'Ensure {game} is not running.'
+                    "Ensure {game}'s map compiler is not running."
                 )
 
             raise AppError(msg.format(file=dest, game=exp_data.game.name)) from exc

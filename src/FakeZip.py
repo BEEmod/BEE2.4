@@ -2,7 +2,7 @@
 
 This is useful to allow using the same code for reading folders or zips of data.
 """
-from typing import IO, Iterator, Literal, Optional, Set, TextIO, Union, overload
+from typing import Any, IO, Iterator, Literal, Optional, Set, TextIO, Union, overload
 from typing_extensions import Self
 from zipfile import ZIP_STORED, ZipFile
 import io
@@ -54,7 +54,7 @@ class FakeZip:
     def __enter__(self) -> Self:
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb) -> Literal[False]:
+    def __exit__(self, *args: object) -> Literal[False]:
         # Always re-raise exceptions
         return False
 
@@ -62,7 +62,7 @@ class FakeZip:
     def open(self, name: str, mode: Literal['rb'], pwd: object=None) -> IO[bytes]: ...
     @overload
     def open(self, name: str, mode: Literal['r'] = 'r', pwd: object=None) -> IO[str]: ...
-    def open(self, name: str, mode: str = 'r', pwd: object=None):
+    def open(self, name: str, mode: str = 'r', pwd: object=None) -> IO[Any]:
         try:
             return open(os.path.join(self.folder, name), mode)
         except FileNotFoundError as err:
@@ -84,7 +84,7 @@ class FakeZip:
     def infolist(self) -> Iterator[FakeZipInfo]:
         return map(FakeZipInfo, self.names())
 
-    def getinfo(self, file) -> FakeZipInfo:
+    def getinfo(self, file: str) -> FakeZipInfo:
         return FakeZipInfo(file)
 
     def extract(self, member: str, path: Optional[str] = None, pwd: object=None) -> None:

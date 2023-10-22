@@ -8,7 +8,7 @@ from typing import (
     Any, Callable, ClassVar, Dict, Final, Iterable, List, Mapping, NoReturn,
     Optional, Protocol, Sequence, Tuple, cast,
 )
-from typing_extensions import LiteralString, TypeAlias
+from typing_extensions import LiteralString, TypeAlias, override
 from enum import Enum
 from html import escape as html_escape
 from pathlib import Path
@@ -70,6 +70,7 @@ ui_list_getter: Callable[[str, ListStyle, List[str]], str] = lambda lang, kind, 
 
 class HTMLFormatter(string.Formatter):
     """Custom format variant which escapes fields for HTML."""
+    @override
     def format_field(self, value: Any, format_spec: str) -> str:
         """Called to convert a field in the format string."""
         if isinstance(value, TransToken):
@@ -289,10 +290,12 @@ class PluralTransToken(TransToken):
     # Also not allowed.
     ui = ui_plural = untranslated = from_valve = _not_allowed  # type: ignore[assignment]
 
+    @override
     def join(self, children: Iterable['TransToken'], sort: bool = False) -> 'JoinTransToken':
         """Joining is not allowed."""
         raise NotImplementedError('This is not allowed.')
 
+    @override
     def __eq__(self, other: object) -> bool:
         if type(other) is PluralTransToken:
             return (
@@ -303,6 +306,7 @@ class PluralTransToken(TransToken):
             )
         return NotImplemented
 
+    @override
     def __hash__(self) -> int:
         """Allow hashing the token."""
         return hash((
@@ -310,6 +314,7 @@ class PluralTransToken(TransToken):
             frozenset(self.parameters.items()),
         ))
 
+    @override
     def _convert_token(self) -> str:
         """Return the translated version of our token, handling plurals."""
         try:
@@ -341,13 +346,16 @@ class JoinTransToken(TransToken):
     children: Sequence[TransToken]
     sort: bool
 
+    @override
     def format(self, /, **kwargs: object) -> NoReturn:
         """Joined tokens cannot be formatted."""
         raise NotImplementedError('Cannot format joined tokens!')
 
+    @override
     def __hash__(self) -> int:
         return hash((self.namespace, self.token, *self.children))
 
+    @override
     def __eq__(self, other: object) -> bool:
         if type(other) is JoinTransToken:
             return (
@@ -357,6 +365,7 @@ class JoinTransToken(TransToken):
             )
         return NotImplemented
 
+    @override
     def __str__(self) -> str:
         """Translate the token."""
         if self.parameters:
@@ -367,6 +376,7 @@ class JoinTransToken(TransToken):
             items.sort()
         return sep.join(items)
 
+    @override
     def translate_html(self) -> str:
         """Translate to text, escaping parameters for HTML.
 
@@ -386,10 +396,12 @@ class ListTransToken(JoinTransToken):
     """A special variant of JoinTransToken which uses language-specific joiners."""
     kind: ListStyle
 
+    @override
     def format(self, /, **kwargs: object) -> NoReturn:
         """List tokens cannot be formatted."""
         raise NotImplementedError('Cannot format list tokens!')
 
+    @override
     def __eq__(self, other: object) -> bool:
         if type(other) is ListTransToken:
             return (
@@ -399,6 +411,7 @@ class ListTransToken(JoinTransToken):
             )
         return NotImplemented
 
+    @override
     def __str__(self) -> str:
         """Translate the token."""
         if self.parameters:

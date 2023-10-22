@@ -199,6 +199,7 @@ class OccuType(Flag):
         for occu_type in OccuType:
             if occu_type is OccuType.EVERYTHING:
                 continue
+            assert occu_type.name is not None, occu_type
             if occu_type.value & self.value:
                 result |= CollideType[occu_type.name]
         _occu_to_collide[self] = result

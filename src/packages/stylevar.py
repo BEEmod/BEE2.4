@@ -2,7 +2,7 @@
 from __future__ import annotations
 from typing import Iterator
 
-from packages import PakObject, ParseData, Style
+from packages import PackagesSet, PakObject, ParseData, Style
 from transtoken import TransToken, TransTokenSource
 
 
@@ -113,12 +113,12 @@ class StyleVar(PakObject, allow_mult=True, needs_foreground=True):
             style.bases
         )
 
-    def applies_to_all(self) -> bool:
+    def applies_to_all(self, packset: PackagesSet) -> bool:
         """Check if this applies to all styles."""
         if self.is_unstyled:
             return True
 
-        for style in Style.all():
+        for style in packset.all_obj(Style):
             if not self.applies_to_style(style):
                 return False
         return True

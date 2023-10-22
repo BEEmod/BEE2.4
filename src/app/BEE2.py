@@ -6,15 +6,17 @@ import collections
 from outcome import Outcome, Error
 from srctools import Keyvalues
 import trio
+from typing_extensions import override
 
 from app import (
     TK_ROOT, localisation, sound, img, gameMan, music_conf,
     UI, logWindow,
 )
-from exporting import mod_support
+from ui_tk.dialogs import DIALOG
 from ui_tk.errors import display_errors
 from config.gen_opts import GenOptions
 from config.last_sel import LastSelected
+from exporting import mod_support
 import config
 import app
 import loadScreen
@@ -45,13 +47,14 @@ async def init_app() -> None:
 
     LOGGER.debug('Loading settings...')
 
-    gameMan.load()
+    await gameMan.load(DIALOG)
     try:
         last_game = config.APP.get_cur_conf(LastSelected, 'game')
     except KeyError:
         pass
     else:
-        gameMan.set_game_by_name(last_game.id)
+        if last_game.id is not None:
+            gameMan.set_game_by_name(last_game.id)
 
     LOGGER.info('Loading Packages...')
     packset = packages.get_loaded_packages()
@@ -62,6 +65,7 @@ async def init_app() -> None:
             packset,
             list(BEE2_config.get_package_locs()),
             loadScreen.main_loader,
+            DIALOG,
         )
     package_sys = packages.PACKAGE_SYS
     loadScreen.main_loader.step('UI', 'pre_ui')
@@ -105,16 +109,19 @@ class Tracer(trio.abc.Instrument):
         self.start_time: Dict[trio.lowlevel.Task, Optional[float]] = {}
         self.args: Dict[trio.lowlevel.Task, Dict[str, object]] = {}
 
+    @override
     def task_spawned(self, task: trio.lowlevel.Task) -> None:
         """Setup vars when a task is spawned."""
         self.elapsed[task] = 0.0
         self.start_time[task] = None
         self.args[task] = task.coro.cr_frame.f_locals.copy()
 
+    @override
     def before_task_step(self, task: trio.lowlevel.Task) -> None:
         """Begin timing this task."""
         self.start_time[task] = time.perf_counter()
 
+    @override
     def after_task_step(self, task: trio.lowlevel.Task) -> None:
         """Count up the time."""
         cur_time = time.perf_counter()
@@ -127,6 +134,7 @@ class Tracer(trio.abc.Instrument):
                 self.elapsed[task] += time.perf_counter() - prev
                 self.start_time[task] = None
 
+    @override
     def task_exited(self, task: trio.lowlevel.Task) -> None:
         """Log results when exited."""
         elapsed = self.elapsed.pop(task, 0.0)

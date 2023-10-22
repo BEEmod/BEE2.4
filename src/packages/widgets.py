@@ -25,7 +25,7 @@ from transtoken import TransToken, TransTokenSource
 class ConfigProto(Protocol):
     """Protocol widget configuration classes must match."""
     @classmethod
-    def parse(cls, conf: Keyvalues, /) -> Self: ...
+    def parse(cls, data: packages.ParseData, conf: Keyvalues, /) -> Self: ...
 
 
 ConfT = TypeVar('ConfT', bound=ConfigProto)  # Type of the config object for a widget.
@@ -239,7 +239,7 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
                     is_timer = use_inf = False
 
             if isinstance(kind, WidgetTypeWithConf):
-                wid_conf: object = kind.conf_type.parse(wid)
+                wid_conf: object = kind.conf_type.parse(data, wid)
             else:
                 wid_conf = None
 
@@ -362,7 +362,7 @@ class ItemVariantConf:
     item_id: str
 
     @classmethod
-    def parse(cls, conf: Keyvalues) -> Self:
+    def parse(cls, data: packages.ParseData, conf: Keyvalues) -> Self:
         """Parse from configs."""
         return cls(conf['ItemID'])
 
@@ -372,16 +372,16 @@ class ItemVariantConf:
 class DropdownOptions:
     """Options defined for a widget."""
     options: List[str]
-    display: List[str]
+    display: List[TransToken]
     key_to_index: Dict[str, int]
 
     @classmethod
-    def parse(cls, conf: Keyvalues) -> Self:
+    def parse(cls, data: packages.ParseData, conf: Keyvalues) -> Self:
         """Parse configuration."""
         result = cls([], [], {})
         for ind, prop in enumerate(conf.find_children('Options')):
             result.options.append(prop.real_name)
-            result.display.append(prop.value)
+            result.display.append(TransToken.parse(data.pak_id, prop.value))
             result.key_to_index[prop.name] = ind
         return result
 
@@ -393,14 +393,16 @@ class SliderOptions:
     min: float
     max: float
     step: float
+    zero_off: bool
 
     @classmethod
-    def parse(cls, conf: Keyvalues) -> Self:
+    def parse(cls, data: packages.ParseData, conf: Keyvalues) -> Self:
         """Parse from keyvalues options."""
         return cls(
             min=conf.float('min', 0),
             max=conf.float('max', 100),
             step=conf.float('step', 1),
+            zero_off=conf.bool('zeroOff', False),
         )
 
 
@@ -412,7 +414,7 @@ class TimerOptions:
     max: int
 
     @classmethod
-    def parse(cls, conf: Keyvalues) -> Self:
+    def parse(cls, data: packages.ParseData, conf: Keyvalues) -> Self:
         """Parse from config options."""
         max_value = conf.int('max', 60)
         min_value = conf.int('min', 0)

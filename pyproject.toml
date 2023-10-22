@@ -114,30 +114,60 @@ mypy_path = "$MYPY_CONFIG_FILE_DIR/hammeraddons/src/"
 #plugins = "trio_typing.plugin"
 allow_redefinition = true
 check_untyped_defs = true
-strict_optional = false
-# strict = true
+strict_optional = true
+# strict = true  # Only when overrides is gone.
 
 warn_unused_ignores = true
 warn_redundant_casts = true
 warn_return_any = true
 warn_no_return = true
 
-[[tool.mypy.overrides]]
-module = [
-	'bg_daemon',
-	'compiler_launch',
-	'connections',
-	'consts',
-	'utils',
-]
-# Enable strict options
-strict_optional = true
-
 disallow_incomplete_defs = true
 disallow_untyped_defs = true
 disallow_untyped_decorators = true
 disallow_untyped_calls = true
 disallow_any_generics = false
+
+enable_error_code = [
+	'unreachable',
+	'redundant-expr',
+	'unused-awaitable',
+]
+
+[[tool.mypy.overrides]]
+# TODO
+module = [
+	'app.gameMan',
+	'app.localisation',
+	'app.menu_bar',
+	'app.music_conf',
+	'app.selector_win',
+	'app.tooltip',
+	'app.tk_tools',
+	'app.richTextBox',
+	'app.CheckDetails',
+	'app.backup',
+	'app.voiceEditor',
+	'app.SubPane',
+	'app.paletteUI',
+	'app.CompilerPane',
+	'app.optionWindow',
+	'app.contextWin',
+	'app.UI',
+	'app.paletteLoader',
+	'precomp.*',
+	'test.*',
+	'BEE2_config',
+	'FakeZip',
+	'pygtrie',
+	'vbsp',
+]
+strict_optional = false
+
+disallow_incomplete_defs = false
+disallow_untyped_defs = false
+disallow_untyped_decorators = false
+disallow_untyped_calls = false
 
 [[tool.mypy.overrides]]
 # No stubs yet.

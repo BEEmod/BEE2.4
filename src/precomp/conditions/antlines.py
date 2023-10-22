@@ -465,7 +465,7 @@ def res_antlaser(vmf: VMF, res: Keyvalues) -> object:
                     # First add the sprite at the right height.
                     sprite = vmf.create_ent('env_sprite')
                     for kv in glow_conf:
-                        sprite[kv.name] = conditions.resolve_value(node.inst, kv.value)
+                        sprite[kv.name] = node.inst.fixup.substitute(kv.value)
 
                     sprite['origin'] = sprite_pos
                     sprite['targetname'] = NAME_SPR(base_name, i)
@@ -482,7 +482,7 @@ def res_antlaser(vmf: VMF, res: Keyvalues) -> object:
                     beam_pos = node.pos + conf_las_start @ node.orient
                     beam = vmf.create_ent('env_beam')
                     for kv in beam_conf:
-                        beam[kv.name] = conditions.resolve_value(node.inst, kv.value)
+                        beam[kv.name] = node.inst.fixup.substitute(kv.value)
 
                     beam['origin'] = beam['targetpoint'] = beam_pos
                     beam['targetname'] = NAME_BEAM_LOW(base_name, i)

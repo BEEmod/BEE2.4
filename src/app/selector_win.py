@@ -547,6 +547,8 @@ class SelectorWin(Generic[CallbackT]):
     has_def: bool
     description: TransToken
     readonly_description: TransToken
+    # If set, force textbox to display this when readonly.
+    readonly_override: TransToken | None
 
     item_list: list[Item]
     selected: Item
@@ -628,6 +630,7 @@ class SelectorWin(Generic[CallbackT]):
         title: TransToken = TransToken.untranslated('???'),
         desc: TransToken = TransToken.BLANK,
         readonly_desc: TransToken = TransToken.BLANK,
+        readonly_override: TransToken | None = None,
         callback: Callable[Concatenate[Optional[str], CallbackT], None] | None = None,
         callback_params: CallbackT.args = (),
         callback_keywords: CallbackT.kwargs = EmptyMapping,
@@ -670,6 +673,7 @@ class SelectorWin(Generic[CallbackT]):
         - desc is descriptive text to display on the window, and in the widget
           tooltip.
         - readonly_desc will be displayed on the widget tooltip when readonly.
+        - readonly_override, if set will override the textbox when readonly.
         - modal: If True, the window will block others while open.
         """
         self.noneItem = Item(
@@ -706,6 +710,7 @@ class SelectorWin(Generic[CallbackT]):
         self.has_def = has_def
         self.description = desc
         self.readonly_description = readonly_desc
+        self.readonly_override = readonly_override
 
         if has_none:
             self.item_list = [self.noneItem] + lst
@@ -1113,9 +1118,12 @@ class SelectorWin(Generic[CallbackT]):
         if value:
             new_st = ['disabled']
             set_tooltip(self.display, self.readonly_description)
+            if self.readonly_override is not None:
+                self.disp_label.set(str(self.readonly_override))
         else:
             new_st = ['!disabled']
             set_tooltip(self.display, self.description)
+            self.disp_label.set(str(self.selected.context_lbl))
 
         self.disp_btn.state(new_st)
         self.display.state(new_st)
@@ -1240,7 +1248,10 @@ class SelectorWin(Generic[CallbackT]):
                 self.display['font'] = self.norm_font
 
         self._suggested_rollover = None  # Discard the rolled over item.
-        self.disp_label.set(str(self.selected.context_lbl))
+        if self._readonly and self.readonly_override is not None:
+            self.disp_label.set(str(self.readonly_override))
+        else:
+            self.disp_label.set(str(self.selected.context_lbl))
         self.orig_selected = self.selected
         self.context_var.set(self.selected.name)
         return "break"  # stop the entry widget from continuing with this event
@@ -1261,8 +1272,11 @@ class SelectorWin(Generic[CallbackT]):
 
     def _update_translations(self) -> None:
         """Update translations."""
-        # We don't care about updating to the rollover item, it'll swap soon anyway.
-        self.disp_label.set(str(self.selected.context_lbl))
+        if self._readonly and self.readonly_override is not None:
+            self.disp_label.set(str(self.readonly_override))
+        else:
+            # We don't care about updating to the rollover item, it'll swap soon anyway.
+            self.disp_label.set(str(self.selected.context_lbl))
 
     def _icon_clicked(self, _: tk.Event[tk.Misc]) -> None:
         """When the large image is clicked, either show the previews or play sounds."""

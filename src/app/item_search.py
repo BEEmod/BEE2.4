@@ -25,7 +25,7 @@ def init(frm: ttk.Frame, refresh_cback: Callable[[Optional[Set[Tuple[str, int]]]
     refresh_tim: Optional[str] = None
     result: Optional[Set[Tuple[str, int]]] = None
 
-    def on_type(*args) -> None:
+    def on_type(*args: object) -> None:
         """Re-search whenever text is typed."""
         nonlocal refresh_tim, result
         text = search_var.get().casefold()

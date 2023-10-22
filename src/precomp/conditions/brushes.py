@@ -5,7 +5,7 @@ from collections import defaultdict
 from random import Random
 
 from srctools import Keyvalues, NoKeyError, Output, Entity, VMF
-from srctools.math import Vec, Angle, Matrix, FrozenVec, to_matrix
+from srctools.math import Vec, Angle, Matrix, FrozenVec
 import srctools.logger
 
 from precomp import (
@@ -15,6 +15,7 @@ from precomp import (
 from editoritems_props import PanelAnimation
 import utils
 import consts
+from precomp.lazy_value import LazyValue
 
 
 COND_MOD_NAME = 'Brushes'
@@ -28,6 +29,7 @@ PANEL_TYPES.update({
     for ang in ['ANGLE_30', 'ANGLE_45', 'ANGLE_60']
 })
 PANEL_TYPES[PanelAnimation.ANGLE_90.animation] = tiling.PanelType.NORMAL
+LAZY_MATRIX_IDENTITY = LazyValue.make(Matrix())
 
 # The spawnflags that we need to toggle for each classname
 FLAG_ROTATING = {
@@ -559,16 +561,16 @@ def res_import_template(
         for prop in res.find_children('pickerVars')
     ]
     try:
-        ang_override = Matrix.from_angstr(res['angles'])
+        ang_override = LazyValue.parse(res['angles']).as_matrix()
     except LookupError:
         ang_override = None
     try:
-        rotation = Matrix.from_angstr(res['rotation'])
+        rotation = LazyValue.parse(res['rotation']).as_matrix()
     except LookupError:
-        rotation = Matrix()
+        rotation = LAZY_MATRIX_IDENTITY
 
-    offset = res['offset', '0 0 0']
-    invert_var = res['invertVar', '']
+    offset = LazyValue.parse(res['offset', '0 0 0']).as_offset()
+    invert_var = LazyValue.parse(res['invertVar', '']).as_bool()
     color_var = res['colorVar', '']
     if color_var.casefold() == '<editor>':
         color_var = '<editor>'
@@ -576,7 +578,7 @@ def res_import_template(
     # If true, force visgroups to all be used.
     visgroup_force_var = res['forceVisVar', '']
 
-    sense_offset = res.vec('senseOffset')
+    conf_sense_offset = res['senseOffset', '']
 
     def place_template(inst: Entity) -> None:
         """Place a template."""
@@ -629,7 +631,7 @@ def res_import_template(
                     inst['file'],
                 )
         elif color_var:
-            color_val = conditions.resolve_value(inst, color_var).casefold()
+            color_val = inst.fixup.substitute(color_var).casefold()
 
             if color_val == 'white':
                 force_colour = texturing.Portalable.white
@@ -637,18 +639,18 @@ def res_import_template(
                 force_colour = texturing.Portalable.black
         # else: no color var
 
-        if srctools.conv_bool(conditions.resolve_value(inst, invert_var)):
+        if invert_var(inst):
             force_colour = template_brush.TEMP_COLOUR_INVERT[conf_force_colour]
         # else: False value, no invert.
 
         if ang_override is not None:
-            orient = ang_override
+            orient = ang_override(inst)
         else:
-            orient = rotation @ Angle.from_str(inst['angles', '0 0 0'])
-        origin = conditions.resolve_offset(inst, offset)
+            orient = rotation(inst) @ Angle.from_str(inst['angles', '0 0 0'])
+        origin = offset(inst)
 
         # If this var is set, it forces all to be included.
-        if srctools.conv_bool(conditions.resolve_value(inst, visgroup_force_var)):
+        if srctools.conv_bool(inst.fixup.substitute(visgroup_force_var, allow_invert=True)):
             visgroups.update(template.visgroups)
         elif visgroup_func is not None:
             visgroups.update(visgroup_func(
@@ -695,7 +697,7 @@ def res_import_template(
             force_colour,
             force_grid,
             surf_cat,
-            sense_offset,
+            Vec.from_str(inst.fixup.substitute(conf_sense_offset)),
         )
 
         for picker_name, picker_var in picker_vars:
@@ -1166,21 +1168,20 @@ def edit_panel(vmf: VMF, inst: Entity, props: Keyvalues, create: bool) -> None:
         if 'type' in props:
             pan_type = props['type']
             try:
-                panel.pan_type = PANEL_TYPES[conditions.resolve_value(inst, pan_type).lower()]
+                panel.pan_type = PANEL_TYPES[inst.fixup.substitute(pan_type).casefold()]
             except (KeyError, ValueError):
                 raise ValueError(f'Unknown panel type "{pan_type}"!') from None
 
         if 'thickness' in props:
-            panel.thickness = srctools.conv_int(
-                conditions.resolve_value(inst, props['thickness'])
-            )
-            if panel.thickness not in (2, 4, 8):
+            thickness = srctools.conv_int(inst.fixup.substitute(props['thickness']))
+            if thickness not in (2, 4, 8):
                 raise ValueError(
                     '"{}": Invalid panel thickess {}!\n'
                     'Must be 2, 4 or 8.',
                     inst['targetname'],
-                    panel.thickness,
+                    thickness,
                 )
+            panel.thickness = thickness
 
         if bevel_world is not None:
             panel.bevels.clear()
@@ -1333,3 +1334,56 @@ def res_transfer_bullseye(inst: Entity, kv: Keyvalues) -> None:
         for plate in faithplate.PLATES.values():
             if not isinstance(plate, faithplate.StraightPlate) and plate.target is start_tile:
                 plate.target = end_tile
+
+
+@conditions.make_result("RotateToPanel")
+def res_rotate_to_panel(kv: Keyvalues) -> conditions.ResultCallable:
+    """Find a panel on the specified surface, then rotate the instance if required to match."""
+    conf_pos = LazyValue.parse(kv['pos', '0 0 0']).as_offset(zoff=-64)
+    conf_norm = LazyValue.parse(kv['normal', '0 0 1']).as_vec(0, 0, 1)
+    ignore_missing = LazyValue.parse(kv['ignoreMissing', '0']).as_bool()
+
+    def rotate_inst(inst: Entity) -> None:
+        """Rotate the item."""
+        orient = Matrix.from_angstr(inst['angles'])
+
+        tile_pos = conf_pos(inst)
+        tile_norm = conf_norm(inst) @ orient
+        try:
+            tile = tiling.TILES[(tile_pos - 64 * tile_norm).as_tuple(), tile_norm.as_tuple()]
+        except KeyError:
+            if not ignore_missing(inst):
+                LOGGER.warning('"{}": Cannot find tile at {}, {}!'.format(
+                    inst['targetname'], tile_pos, tile_norm,
+                ))
+            return
+        if len(tile.panels) == 0:
+            if not ignore_missing(inst):
+                LOGGER.warning('"{}": Cannot find panel at {}, {}!'.format(
+                    inst['targetname'], tile_pos, tile_norm,
+                ))
+            return
+        origin = Vec.from_str(inst['origin'])
+        panel = tile.panels[0]
+
+        if panel.pan_type.is_angled:
+            panel_orient = Matrix.from_angstr(panel.inst['angles'])
+            panel_pos = Vec.from_str(panel.inst['origin'])
+            rotation = Matrix.axis_angle(
+                -panel_orient.left(),
+                panel.pan_type.angle,
+            )
+
+            panel_anchor = panel_pos + Vec(-64, 0, -64) @ panel_orient
+
+            # Shift so the rotation anchor is 0 0 0, then shift back to rotate correctly.
+            origin -= panel_anchor
+            orient @= rotation
+            origin @= rotation
+            origin += panel_anchor
+            inst['angles'] = orient
+
+        origin += panel.offset
+        inst['origin'] = origin
+
+    return rotate_inst

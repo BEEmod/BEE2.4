@@ -97,7 +97,7 @@ async def devmod_check(file: File[Any], path: utils.PackagePath) -> None:
 def concat(a: LazyConf, b: LazyConf) -> LazyConf:
 	"""Concatenate the two configs together."""
 	# Catch a raw property being passed in.
-	assert callable(a) and callable(b), (a, b)
+	assert callable(a) and callable(b), (a, b)  # type: ignore[redundant-expr]
 	# If either is blank, this is a no-op, so avoid a pointless layer.
 	if a is BLANK:
 		return b

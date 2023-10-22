@@ -6,7 +6,7 @@ from enum import Enum
 import tkinter as tk
 from tkinter import ttk
 from typing import Any, Callable, ClassVar, Generic, Iterator, Optional, Tuple, Dict, List, TypeVar
-from typing_extensions import Final, Literal, TypeAlias
+from typing_extensions import Final, Literal, TypeAlias, override
 
 import srctools
 import srctools.logger
@@ -86,10 +86,12 @@ class BoolPropGroup(PropGroup):
         """Make the tuple used in PROP_GROUPS."""
         return ([prop], lambda frame, tk_img: cls(frame, tk_img, prop))
 
+    @override
     def set_tooltip(self, tok: TransToken) -> None:
         """Set a user tooltip on this group."""
         tooltip.set_tooltip(self.check, tok)
 
+    @override
     def apply_conf(self, options: Dict[ItemPropKind[Any], Tuple[str, bool]]) -> None:
         """Apply the specified options to the UI."""
         try:
@@ -101,6 +103,7 @@ class BoolPropGroup(PropGroup):
             self.var.set(srctools.conv_bool(value, False))
             self.check.state(['disabled' if readonly else '!disabled'])
 
+    @override
     def get_conf(self) -> Iterator[tuple[ItemPropKind[Any], str]]:
         """Return the current UI configuration."""
         yield self.prop, srctools.bool_as_int(self.var.get())
@@ -138,10 +141,12 @@ class ComboPropGroup(PropGroup, Generic[EnumT]):
         """Make the factory used in PROP_GROUPS."""
         return ([prop], lambda parent, tk_img: cls(parent, tk_img, prop, values))
 
+    @override
     def set_tooltip(self, tok: TransToken) -> None:
         """Set a user tooltip on this group."""
         tooltip.set_tooltip(self.combo, tok)
 
+    @override
     def apply_conf(self, options: Dict[ItemPropKind[Any], Tuple[str, bool]]) -> None:
         """Apply the specified options to the UI."""
         try:
@@ -159,6 +164,7 @@ class ComboPropGroup(PropGroup, Generic[EnumT]):
         self.combo.current(self.value_order.index(value))
         self.combo.state(['disabled' if readonly else '!disabled'])
 
+    @override
     def get_conf(self) -> Iterator[tuple[ItemPropKind[Any], str]]:
         """Return the current UI configuration."""
         value = self.value_order[self.combo.current()]
@@ -181,6 +187,7 @@ class TimerPropGroup(PropGroup):
         self.old_val = 3
         self._enable_cback = True
 
+    @override
     def apply_conf(self, options: Dict[ItemPropKind[Any], Tuple[str, bool]]) -> None:
         """Apply the timer delay option to the UI."""
         try:
@@ -192,11 +199,13 @@ class TimerPropGroup(PropGroup):
         self.scale.set(all_props.prop_timer_delay.parse(value))
         self.scale.state(['disabled' if readonly else '!disabled'])
 
+    @override
     def get_conf(self) -> Iterator[tuple[ItemPropKind[Any], str]]:
         """Get the current UI configuration."""
         cur_value = round(self.scale.get())
         yield all_props.prop_timer_delay, str(cur_value)
 
+    @override
     def set_tooltip(self, tok: TransToken) -> None:
         """Set a user tooltip on this group."""
         tooltip.set_tooltip(self.scale, tok)
@@ -233,12 +242,14 @@ class TrackStartActivePropGroup(BoolPropGroup):
         self.has_osc = False
         self.user_tooltip = TransToken.BLANK
 
+    @override
     def apply_conf(self, options: Dict[ItemPropKind[Any], Tuple[str, bool]]) -> None:
         """Apply the configuration to the UI."""
         super().apply_conf(options)
         self.has_osc = all_props.prop_track_is_oscillating in options
         self._update()
 
+    @override
     def get_conf(self) -> Iterator[Tuple[ItemPropKind[Any], str]]:
         """Get the current configuration."""
         if self.osc_prop is not None and self.has_osc and not self.osc_prop.var.get():
@@ -278,6 +289,7 @@ class TrackStartActivePropGroup(BoolPropGroup):
             self.check.state(('!disabled', ))
             tooltip.set_tooltip(self.check, self.user_tooltip, delay=500)
 
+    @override
     def set_tooltip(self, tok: TransToken) -> None:
         """Set a user tooltip on this group."""
         self.user_tooltip = tok
@@ -330,6 +342,7 @@ class PistonPropGroup(PropGroup):
         self.canvas.bind(tk_tools.EVENTS['LEFT_RELEASE'], self.evt_mouse_up)
         self.canvas.bind('<Leave>', self.evt_mouse_leave)
 
+    @override
     def apply_conf(self, options: Dict[ItemPropKind[Any], Tuple[str, bool]]) -> None:
         """Apply the specified options to the UI."""
         self.readonly = False
@@ -369,6 +382,7 @@ class PistonPropGroup(PropGroup):
             self.platform = pos[all_props.prop_pist_lower]
         self.reposition()
 
+    @override
     def get_conf(self) -> Iterator[Tuple[ItemPropKind[Any], str]]:
         """Export options from the UI configuration."""
         if self.destination > self.platform:

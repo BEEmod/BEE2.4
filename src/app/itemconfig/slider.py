@@ -6,8 +6,14 @@ import tkinter as tk
 from tkinter import ttk
 
 from packages.widgets import SliderOptions, UpdateFunc
-from app import itemconfig
+from app import itemconfig, localisation
+from transtoken import TransToken
 from ui_tk.img import TKImages
+
+
+# If enabled, optionally override text to this when set to 0. This is for options where zero turns
+# it off.
+TRANS_OFF = TransToken.ui('Off')
 
 
 def decimal_points(num: float) -> int:
@@ -51,18 +57,27 @@ async def widget_slider(
     def change_cmd(value: str) -> None:
         """Called when the slider is changed."""
         nonlocal last_value
-        new_pos = format(conf.min + conf.step * round(float(value), points), txt_format)
+        value_num = float(value)
+        new_pos = format(conf.min + conf.step * round(value_num), txt_format)
         # Only trigger sounds when moving each step.
         if last_value != new_pos:
             itemconfig.widget_sfx()
-            disp['text'] = new_pos
+            if conf.zero_off and math.isclose(value_num, 0.0):
+                localisation.set_text(disp, TRANS_OFF)
+            else:
+                localisation.set_text(disp, TransToken.untranslated(new_pos))
             last_value = new_pos
             on_changed(new_pos)
 
     async def update_ui(new_value: str) -> None:
         """Apply the configured value to the UI."""
-        off = (float(new_value) - conf.min) / conf.step
-        disp['text'] = format(float(new_value), txt_format)
+        value_num = float(new_value)
+        if conf.zero_off and math.isclose(value_num, 0.0):
+            localisation.set_text(disp, TRANS_OFF)
+        else:
+            localisation.set_text(disp, TransToken.untranslated(format(value_num, txt_format)))
+
+        off = (value_num - conf.min) / conf.step
         ui_var.set(round(off, points))
 
     frame = ttk.Frame(parent)

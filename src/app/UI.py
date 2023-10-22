@@ -50,6 +50,7 @@ from app import (
 from app.selector_win import SelectorWin, Item as selWinItem, AttrDef as SelAttr
 from app.menu_bar import MenuBar
 from ui_tk.corridor_selector import TkSelector
+from ui_tk.dialogs import DIALOG
 from ui_tk.img import TKImages, TK_IMG
 
 
@@ -648,6 +649,8 @@ async def load_packages(packset: packages.PackagesSet, tk_img: TKImages) -> None
             'map is played, like in the default PeTI.'
         ),
         readonly_desc=TransToken.ui('This style does not have a elevator video screen.'),
+        # i18n: Text when elevators are not present in the style.
+        readonly_override=TransToken.ui('<Not Present>'),
         has_none=True,
         has_def=True,
         none_icon=img.Handle.builtin('BEE2/random', 96, 96),
@@ -829,7 +832,7 @@ async def export_editoritems(pal_ui: paletteUI.PaletteUI, bar: MenuBar) -> None:
         # Select the last_export palette, so reloading loads this item selection.
         # But leave it at the current palette, if it's unmodified.
         if pal_ui.selected.items != pal_data:
-            pal_ui.select_palette(paletteUI.UUID_EXPORT)
+            pal_ui.select_palette(paletteUI.UUID_EXPORT, False)
             pal_ui.update_state()
 
         # Re-fire this, so we clear the '*' on buttons if extracting cache.
@@ -839,12 +842,12 @@ async def export_editoritems(pal_ui: paletteUI.PaletteUI, bar: MenuBar) -> None:
         bar.set_export_allowed(True)
 
 
-def set_disp_name(item: PalItem, e: Optional[tk.Event[tk.Misc]] = None) -> None:
+def set_disp_name(item: PalItem, e: object = None) -> None:
     """Callback to display the name of the item."""
     localisation.set_text(UI['pre_disp_name'], item.name)
 
 
-def clear_disp_name(e: Optional[tk.Event[tk.Misc]] = None) -> None:
+def clear_disp_name(e: object = None) -> None:
     """Callback to reset the item name."""
     localisation.set_text(UI['pre_disp_name'], TransToken.BLANK)
 
@@ -1534,8 +1537,8 @@ async def init_windows(tk_img: TKImages) -> None:
         set_items=set_palette,
     )
 
-    TK_ROOT.bind_all(tk_tools.KEY_SAVE, lambda e: pal_ui.event_save())
-    TK_ROOT.bind_all(tk_tools.KEY_SAVE_AS, lambda e: pal_ui.event_save_as())
+    TK_ROOT.bind_all(tk_tools.KEY_SAVE, lambda e: pal_ui.event_save(DIALOG))
+    TK_ROOT.bind_all(tk_tools.KEY_SAVE_AS, lambda e: pal_ui.event_save_as(DIALOG))
     TK_ROOT.bind_all(tk_tools.KEY_EXPORT, lambda e: background_run(export_editoritems, pal_ui, menu_bar))
 
     await trio.sleep(0)
@@ -1684,6 +1687,7 @@ async def init_windows(tk_img: TKImages) -> None:
 
     def style_select_callback(style_id: Optional[str]) -> None:
         """Callback whenever a new style is chosen."""
+        packset = packages.get_loaded_packages()
         global selected_style
         if style_id is None:
             LOGGER.warning('Style ID is None??')
@@ -1714,8 +1718,8 @@ async def init_windows(tk_img: TKImages) -> None:
         for sugg_cls, win in suggest_windows.items():
             win.set_suggested(style_obj.suggested[sugg_cls])
         suggested_refresh()
-        StyleVarPane.refresh(style_obj)
-        corridor.load_corridors(packages.get_loaded_packages())
+        StyleVarPane.refresh(packset, style_obj)
+        corridor.load_corridors(packset)
         background_run(corridor.refresh)
 
     style_win.callback = style_select_callback

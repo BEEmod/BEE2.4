@@ -522,16 +522,17 @@ async def widget_item_variant(
         # Even more special case, display the "configure signage" button.
         return await signage_ui.init_widgets(parent, tk_img), nop_update
 
-    version_lookup: Optional[List[str]] = None
+    version_lookup: List[str] = []
 
     def update_data() -> None:
         """Refresh the data in the list."""
         nonlocal version_lookup
         version_lookup = contextWin.set_version_combobox(combobox, item)
 
-    def change_callback(e: Optional[tk.Event[tk.Misc]] = None) -> None:
+    def change_callback(e: object = None) -> None:
         """Change the item version."""
-        item.change_version(version_lookup[combobox.current()])
+        if version_lookup is not None:
+            item.change_version(version_lookup[combobox.current()])
 
     combobox = ttk.Combobox(
         parent,

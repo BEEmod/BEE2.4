@@ -79,10 +79,10 @@ class ItemVariant:
         tags: list[str],
         desc: tkMarkdown.MarkdownData,
         icons: dict[str, img.Handle],
-        ent_count: str='',
-        url: str = None,
-        all_name: TransToken=None,
-        all_icon: FSPath=None,
+        ent_count: str = '',
+        url: str | None = None,
+        all_name: TransToken = TransToken.BLANK,
+        all_icon: FSPath | None = None,
         source: str='',
     ) -> None:
         self.editor = editoritems
@@ -494,7 +494,7 @@ class Item(PakObject, needs_foreground=True, export_priority=-10):
             styles: dict[str, UnParsedItemVariant | ItemVariant] = {}
             inherit_kind: dict[str, InheritKind] = {}
             ver_isolate = ver.bool('isolated')
-            def_style = None
+            def_style: str | None = None
 
             for style in ver.find_children('styles'):
                 if style.has_children():
@@ -544,6 +544,8 @@ class Item(PakObject, needs_foreground=True, export_priority=-10):
                         f'Item "{data.id}"\'s "{style.real_name}" style '
                         "can't inherit from itself!"
                     )
+            if def_style is None:
+                raise ValueError(f'Item "{data.id}" has version section with no styles defined!')
             versions[ver_id] = version = UnParsedVersion(
                 id=ver_id,
                 name=ver_name,
@@ -763,7 +765,7 @@ async def parse_item_folder(
     async with trio.open_nursery() as nursery:
         props_res = utils.Result.sync(nursery, parse_props, prop_path, cancellable=True)
         all_items = utils.Result.sync(nursery, parse_items, editor_path, cancellable=True)
-        editor_vmf = utils.Result.sync(nursery, parse_vmf, vmf_path, cancellable=True)
+        editor_vmf_res = utils.Result.sync(nursery, parse_vmf, vmf_path, cancellable=True)
     props = props_res()
 
     try:
@@ -781,9 +783,11 @@ async def parse_item_folder(
             item_id, first_item.id, pak_id, fold,
         )
 
-    if editor_vmf() is not None:
-        editoritems_vmf.load(first_item, editor_vmf())
-        del editor_vmf
+    editor_vmf = editor_vmf_res()
+    if editor_vmf is not None:
+        editoritems_vmf.load(first_item, editor_vmf)
+    del editor_vmf, editor_vmf_res
+
     first_item.generate_collisions()
 
     # extra_items is any extra blocks (offset catchers, extent items).
@@ -797,9 +801,10 @@ async def parse_item_folder(
                     f'"{pak_id}:items/{fold}/editoritems.txt has '
                     f'palette set for extra item blocks. Deleting.'
                 )
-                subtype.pal_icon = subtype.pal_pos = subtype.pal_name = None
+                subtype.pal_icon = subtype.pal_pos = None
+                subtype.pal_name = TransToken.BLANK
 
-    # In files this is specified as PNG, but it's always really VTF.
+                # In files this is specified as PNG, but it's always really VTF.
     try:
         all_icon = FSPath(props['all_icon']).with_suffix('.vtf')
     except LookupError:
@@ -808,7 +813,7 @@ async def parse_item_folder(
     try:
         all_name = TransToken.parse(pak_id, props['all_name'])
     except LookupError:
-        all_name = None
+        all_name = TransToken.BLANK
 
     # Add the folder the item definition comes from,
     # so we can trace it later for debug messages.
@@ -852,7 +857,7 @@ async def parse_item_folder(
 
     # If we have one of the grouping icon definitions but not both required
     # ones then notify the author.
-    has_name = variant.all_name is not None
+    has_name = bool(variant.all_name)
     has_icon = variant.all_icon is not None
     if (has_name or has_icon or 'all' in variant.icons) and (not has_name or not has_icon):
         LOGGER.warning(
@@ -891,7 +896,7 @@ async def assign_styled_items(all_styles: Iterable[Style], item: Item) -> None:
         # dependencies. This is a list of (style_id, UnParsed).
         to_change: list[tuple[str, UnParsedItemVariant]] = []
         # The finished styles.
-        styles: dict[str, ItemVariant | None] = {}
+        styles: dict[str, ItemVariant] = {}
         for sty_id, conf in vers.styles.items():
             if isinstance(conf, UnParsedItemVariant):
                 to_change.append((sty_id, conf))

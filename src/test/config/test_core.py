@@ -1,4 +1,5 @@
 """Test the main config logic."""
+from typing_extensions import override
 import io
 import uuid
 
@@ -21,6 +22,7 @@ class DataSingle(config.Data, conf_name='TestName', version=2, uses_id=False):
         return NotImplemented
 
     @classmethod
+    @override
     def parse_kv1(cls, data: Keyvalues, version: int) -> 'DataSingle':
         """Parse keyvalues."""
         if version == 2:
@@ -35,6 +37,7 @@ class DataSingle(config.Data, conf_name='TestName', version=2, uses_id=False):
             raise ValueError('Unknown version', version)
         return DataSingle(data['value'], triple)
 
+    @override
     def export_kv1(self) -> Keyvalues:
         """Write out KV1 data."""
         return Keyvalues('TestData', [

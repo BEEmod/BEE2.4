@@ -96,7 +96,7 @@ def style_changed(new_style: Style) -> None:
         drag_man.load_icons()
 
 
-async def init_widgets(master: tk.Widget, tk_img: TKImages) -> Optional[tk.Widget]:
+async def init_widgets(master: tk.Widget, tk_img: TKImages) -> tk.Widget:
     """Construct the widgets, returning the configuration button.
     """
     window.resizable(True, True)
@@ -199,7 +199,7 @@ async def init_widgets(master: tk.Widget, tk_img: TKImages) -> Optional[tk.Widge
                 LOGGER.warning('Missing sign id: {}', prev_id)
 
     # TODO: Dynamically refresh this.
-    for sign in sorted(Signage.all(), key=lambda s: s.name):
+    for sign in sorted(load_packset.all_obj(Signage), key=lambda s: s.name):
         if not sign.hidden:
             slot = drag_man.slot_source(canv_all)
             slot.contents = sign

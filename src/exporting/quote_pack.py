@@ -47,7 +47,8 @@ async def step_quote_pack(exp_data: ExportData) -> None:
         options['voice_studio_inst'] = voice.studio
         options['voice_studio_actor'] = voice.studio_actor
         options['voice_studio_inter_chance'] = str(voice.inter_chance)
-        options['voice_studio_cam_loc'] = voice.cam_loc.join(' ')
+        if voice.cam_loc is not None:
+            options['voice_studio_cam_loc'] = voice.cam_loc.join(' ')
         options['voice_studio_cam_pitch'] = str(voice.cam_pitch)
         options['voice_studio_cam_yaw'] = str(voice.cam_yaw)
         options['voice_studio_should_shoot'] = srctools.bool_as_int(voice.turret_hate)

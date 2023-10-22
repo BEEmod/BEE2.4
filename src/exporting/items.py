@@ -16,6 +16,7 @@ from config.gen_opts import GenOptions
 from config.item_defaults import ItemDefault
 from editoritems import Item as EditorItem, InstCount
 from connections import INDICATOR_CHECK_ID
+from transtoken import TransToken
 from . import ExportData, STEPS, StepResource
 from packages.item import Item, ItemConfig
 
@@ -100,7 +101,7 @@ def get_export_data(
         else:
             # This subtype isn't on the palette.
             subtype.pal_icon = None
-            subtype.pal_name = None
+            subtype.pal_name = TransToken.BLANK
             subtype.pal_pos = None
 
     # Apply configured default values to this item

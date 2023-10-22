@@ -20,7 +20,6 @@ import tkinter as tk
 import os.path
 
 from idlelib.redirector import WidgetRedirector  # type: ignore[import-not-found]
-from idlelib.query import Query  # type: ignore[import-not-found]
 import trio
 
 from app import TK_ROOT, background_run, localisation
@@ -33,7 +32,7 @@ from transtoken import TransToken
 
 # Set icons for the application.
 
-ICO_PATH = str(utils.install_path('BEE2.ico'))
+ICO_PATH = str(utils.bins_path('BEE2.ico'))
 T = TypeVar('T')
 AnyWidT = TypeVar('AnyWidT', bound=tk.Misc)
 WidgetT = TypeVar('WidgetT', bound=tk.Widget)
@@ -483,7 +482,7 @@ def adjust_inside_screen(
     return x, y
 
 
-def center_win(window: Union[tk.Tk, tk.Toplevel], parent: Union[tk.Tk, tk.Toplevel] = None) -> None:
+def center_win(window: Union[tk.Tk, tk.Toplevel], parent: Union[tk.Tk, tk.Toplevel, None] = None) -> None:
     """Center a subwindow to be inside a parent window."""
     if parent is None:
         parent = window.nametowidget(window.winfo_parent())
@@ -500,90 +499,6 @@ def _default_validator(value: str) -> str:
     if not value.strip():
         raise ValueError("A value must be provided!")
     return value
-
-
-class BasicQueryValidator(simpledialog.Dialog):
-    """Implement the dialog with the simpledialog code."""
-    def __init__(
-        self,
-        parent: tk.Misc,
-        title: str, message: str, initial: str,
-        validator: Callable[[str], str] = _default_validator,
-    ) -> None:
-        self.__validator = validator
-        self.__title = title
-        self.__message = message
-        self.__initial = initial
-        super().__init__(parent, title)
-
-    def body(self, master: tk.Frame) -> ttk.Entry:
-        """Ensure the window icon is changed, and copy code from askstring's internals."""
-        super().body(master)
-        set_window_icon(self)
-        w = ttk.Label(master, text=self.__message, justify='left')
-        w.grid(row=0, padx=5, sticky='w')
-
-        self.entry = ttk.Entry(master, name="entry")
-        self.entry.grid(row=1, padx=5, sticky='we')
-
-        if self.__initial:
-            self.entry.insert(0, self.__initial)
-            self.entry.select_range(0, 'end')
-
-        return self.entry
-
-    def validate(self) -> bool:
-        try:
-            self.result = self.__validator(self.entry.get())
-        except ValueError as exc:
-            messagebox.showwarning(self.__title, exc.args[0], parent=self)
-            return False
-        else:
-            return True
-
-if Query is not None:
-    class QueryValidator(Query):
-        """Implement using IDLE's better code for this."""
-        def __init__(
-            self,
-            parent: tk.Misc,
-            title: str, message: str, initial: str,
-            validator: Callable[[str], str] = _default_validator,
-        ) -> None:
-            self.__validator = validator
-            super().__init__(parent, title, message, text0=initial)
-
-        def entry_ok(self) -> Optional[str]:
-            """Return non-blank entry or None."""
-            try:
-                return self.__validator(self.entry.get())
-            except ValueError as exc:
-                self.showerror(exc.args[0])
-                return None
-else:
-    QueryValidator = BasicQueryValidator  # type: ignore
-
-
-def prompt(
-    title: TransToken, message: TransToken,
-    initialvalue: str = '',
-    parent: tk.Misc = TK_ROOT,
-    validator: Callable[[str], str] = _default_validator,
-) -> Optional[str]:
-    """Ask the user to enter a string."""
-    from loadScreen import suppress_screens
-    from app import _main_loop_running
-    with suppress_screens():
-        # If the main loop isn't running, this doesn't work correctly.
-        # Probably also if it's not visible. So swap back to the old style.
-        # It's also only a problem on Windows.
-        if Query is None or (utils.WIN and (
-            not _main_loop_running or not TK_ROOT.winfo_viewable()
-        )):
-            query_cls = BasicQueryValidator
-        else:
-            query_cls = QueryValidator
-        return query_cls(parent, str(title), str(message), initialvalue, validator).result
 
 
 class _MsgBoxFunc(Generic[T]):
@@ -606,13 +521,9 @@ class _MsgBoxFunc(Generic[T]):
 
 
 showinfo       = _MsgBoxFunc(messagebox.showinfo)
-showwarning    = _MsgBoxFunc(messagebox.showwarning)
 showerror      = _MsgBoxFunc(messagebox.showerror)
-askquestion    = _MsgBoxFunc(messagebox.askquestion)
 askokcancel    = _MsgBoxFunc(messagebox.askokcancel)
 askyesno       = _MsgBoxFunc(messagebox.askyesno)
-askyesnocancel = _MsgBoxFunc(messagebox.askyesnocancel)
-askretrycancel = _MsgBoxFunc(messagebox.askretrycancel)
 
 
 class HidingScroll(ttk.Scrollbar):
@@ -649,7 +560,7 @@ class ReadOnlyEntry(ttk.Entry):
 # Widget and Spinbox have conflicting identify() definitions, not important.
 class ttk_Spinbox(ttk.Widget, tk.Spinbox):  # type: ignore[misc]
     """This is missing from ttk, but still exists."""
-    def __init__(self, master: tk.Misc, range: Union[range, slice] = None, **kw: Any) -> None:
+    def __init__(self, master: tk.Misc, range: Union[range, slice, None] = None, **kw: Any) -> None:
         """Initialise a spinbox.
         Arguments:
             range: The range buttons will run in
@@ -763,7 +674,7 @@ class FileField(ttk.Frame):
 
         self._text_var.set(self._truncate(loc))
 
-    def browse(self, event: tk.Event = None) -> None:
+    def browse(self, event: object = None) -> None:
         """Browse for a file."""
         path = self.browser.show()
         if path:

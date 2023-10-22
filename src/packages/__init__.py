@@ -2,7 +2,9 @@
 Handles scanning through the zip packages to find all items, styles, etc.
 """
 from __future__ import annotations
-from typing import Iterator, NoReturn, ClassVar, Optional, TYPE_CHECKING, TypeVar, Type, cast
+from typing import (
+    Iterator, Mapping, NoReturn, ClassVar, Optional, TYPE_CHECKING, TypeVar, Type, cast,
+)
 from typing_extensions import Self
 
 import os
@@ -22,6 +24,8 @@ import consts
 from srctools import Keyvalues, NoKeyError
 from srctools.tokenizer import TokenSyntaxError
 from srctools.filesys import FileSystem, RawFileSystem, ZipFileSystem, VPKFileSystem
+
+from app.dialogs import Dialogs
 from editoritems import Item as EditorItem, Renderable, RenderableType
 from corridor import CORRIDOR_COUNTS, GameMode, Direction
 import srctools.logger
@@ -39,7 +43,7 @@ __all__ = [
     'LegacyCorr', 'LEGACY_CORRIDORS',
     'CLEAN_PACKAGE', 'SelitemData',
     'PakObject', 'PackagesSet', 'get_loaded_packages',
-    'find_packages', 'no_packages_err', 'load_packages',
+    'find_packages', 'load_packages',
 
     # Package objects.
     'Style', 'Item', 'StyleVar', 'Elevator', 'EditorSound', 'StyleVPK', 'Signage',
@@ -96,6 +100,7 @@ class SelitemData:
             )
         except LookupError:
             icon = None
+        large_key: Keyvalues | None
         try:
             large_key = info.find_key('iconLarge')
         except LookupError:
@@ -292,18 +297,6 @@ class PakObject:
     async def post_parse(cls, packset: PackagesSet) -> None:
         """Do processing after all objects of this type have been fully parsed (but others may not)."""
         pass
-
-    @classmethod
-    def all(cls) -> Collection[Self]:
-        """Get the list of objects parsed."""
-        warnings.warn('Make this local!', DeprecationWarning, stacklevel=2)
-        return get_loaded_packages().all_obj(cls)
-
-    @classmethod
-    def by_id(cls, object_id: str) -> Self:
-        """Return the object with a given ID."""
-        warnings.warn('Make this local!', DeprecationWarning, stacklevel=2)
-        return get_loaded_packages().obj_by_id(cls, object_id)
 
 
 def reraise_keyerror(err: NoKeyError | IndexError, obj_id: str) -> NoReturn:
@@ -520,9 +513,8 @@ async def find_packages(nursery: trio.Nursery, packset: PackagesSet, pak_dir: Pa
         LOGGER.info('No packages in folder {}!', pak_dir)
 
 
-def no_packages_err(pak_dirs: list[Path], msg: TransToken) -> NoReturn:
+async def no_packages_err(dialog: Dialogs, pak_dirs: list[Path], msg: TransToken) -> NoReturn:
     """Show an error message indicating no packages are present."""
-    from app import tk_tools
     import sys
     # We don't have a package directory!
     if len(pak_dirs) == 1:
@@ -540,7 +532,11 @@ def no_packages_err(pak_dirs: list[Path], msg: TransToken) -> NoReturn:
     ).format(msg=msg, trailer=trailer)
 
     LOGGER.error(message)
-    tk_tools.showerror(TransToken.ui('BEE2 - Invalid Packages Directory!'), message=message)
+    await dialog.show_info(
+        title=TransToken.ui('BEE2 - Invalid Packages Directory!'),
+        message=message,
+        icon=dialog.ERROR,
+    )
     sys.exit()
 
 
@@ -548,6 +544,7 @@ async def load_packages(
     packset: PackagesSet,
     pak_dirs: list[Path],
     loader: LoadScreen,
+    dialog: Dialogs,
 ) -> None:
     """Scan and read in all packages."""
     async with trio.open_nursery() as find_nurs:
@@ -558,11 +555,11 @@ async def load_packages(
     loader.set_length("PAK", pack_count)
 
     if pack_count == 0:
-        no_packages_err(pak_dirs, TransToken.ui('No packages found!'))
+        await no_packages_err(dialog, pak_dirs, TransToken.ui('No packages found!'))
 
     # We must have the clean style package.
     if CLEAN_PACKAGE not in packset.packages:
-        no_packages_err(pak_dirs, TransToken.ui(
+        await no_packages_err(dialog, pak_dirs, TransToken.ui(
             'No Clean Style package! This is required for some essential resources and objects.'
         ))
 
@@ -786,7 +783,6 @@ async def parse_object(
                 override = await obj_class.parse(override_data)
         except (NoKeyError, IndexError) as e:
             reraise_keyerror(e, f'{override_data.pak_id}:{obj_id}')
-            raise  # Never reached.
         except TokenSyntaxError as e:
             # Add the relevant package to the filename.
             if e.file:
@@ -910,10 +906,10 @@ class Style(PakObject, needs_foreground=True):
         renderables: dict[RenderableType, Renderable],
         suggested: dict[type[PakObject], set[str]],
         config: lazy_conf.LazyConf = lazy_conf.BLANK,
-        base_style: Optional[str]=None,
-        has_video: bool=True,
-        vpk_name: str='',
-        legacy_corridors: dict[tuple[GameMode, Direction, int], LegacyCorr]=None,
+        base_style: Optional[str] = None,
+        has_video: bool = True,
+        vpk_name: str = '',
+        legacy_corridors: Mapping[tuple[GameMode, Direction, int], LegacyCorr] = srctools.EmptyMapping,
     ) -> None:
         self.id = style_id
         self.selitem_data = selitem_data
@@ -944,7 +940,7 @@ class Style(PakObject, needs_foreground=True):
         """Parse a style definition."""
         info = data.info
         selitem_data = SelitemData.parse(info, data.pak_id)
-        base = info['base', '']
+        base = info['base', ''] or None
         has_video = srctools.conv_bool(
             info['has_video', ''],
             not data.is_override,  # Assume no video for override
@@ -996,9 +992,6 @@ class Style(PakObject, needs_foreground=True):
                         icon=icon,
                         desc='',
                     )
-
-        if base == '':
-            base = None
         try:
             folder = 'styles/' + info['folder']
         except LookupError:

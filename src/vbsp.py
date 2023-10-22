@@ -1687,8 +1687,8 @@ async def main() -> None:
         vmf.spawn['BEE2_is_peti'] = True
 
         # Save and run VBSP. If this leaks, this will raise UserError, and we'll compile again.
+        save(vmf, new_path)
         if not skip_vbsp:
-            save(vmf, new_path)
             run_vbsp(
                 vbsp_args=new_args,
                 path=path,

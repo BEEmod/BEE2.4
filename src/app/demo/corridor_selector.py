@@ -7,6 +7,7 @@ import packages
 from app import background_run, img, sound
 
 from ui_tk.corridor_selector import TkSelector
+from ui_tk.dialogs import DIALOG
 from ui_tk.img import TK_IMG
 
 
@@ -16,6 +17,7 @@ async def test() -> None:
         packages.get_loaded_packages(),
         list(BEE2_config.get_package_locs()),
         loadScreen.main_loader,
+        DIALOG,
     )
     background_run(img.init, packages.PACKAGE_SYS, TK_IMG)
     background_run(sound.sound_task)

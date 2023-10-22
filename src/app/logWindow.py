@@ -11,6 +11,7 @@ import queue
 import attrs
 import srctools.logger
 import trio
+from typing_extensions import override
 
 from config.gen_opts import GenOptions
 import config
@@ -38,6 +39,7 @@ class TextHandler(logging.Handler):
             style='{',
         ))
 
+    @override
     def emit(self, record: logging.LogRecord) -> None:
         """Add a logging message. This may be called by any thread!"""
         msg = record.msg
@@ -63,6 +65,7 @@ class TextHandler(logging.Handler):
         except queue.Full:
             pass
 
+    @override
     def setLevel(self, level: Union[int, str]) -> None:
         """Set the level of the log window."""
         if isinstance(level, int):

@@ -53,7 +53,7 @@ class QuotePack(PakObject, needs_foreground=True, style_suggest_key='quote'):
 
         # For Cave Johnson voicelines, this indicates what skin to use on the
         # portrait.
-        port_skin = srctools.conv_int(data.info['caveSkin', None], None)
+        port_skin = srctools.conv_int(data.info['caveSkin', ''], None)
 
         try:
             monitor_data = data.info.find_key('monitor')

@@ -15,6 +15,7 @@
 * Moved various palette-related buttons, to group them with the other palette options.
 * A VPK file can be now placed into `vpk_override` to have it be combined with the built VPK. 
 * Added a warning screen to the developer tab of the options window, indicating that some of these options can temporarily break BEE if changed.
+* #1984: The "save settings to palette" will now change to match the selected palette. This means clicking "save" won't accidentally delete saved settings.
 
 ### UCP-Relevant Changes:
 * Terminology change: "Condition Flags" have been renamed to "Condition Tests" - I think that sounds a bit better.
@@ -40,6 +41,8 @@
 * Fix single-dot antlines sometimes failing to be placed.
 * BEEmod/BEE2-items#4325: Set corridors to force upright even if vertical corridors are not available.
 * Piston Platforms will now correctly accept Surface Lacquer, if placed on their base.
+* Paint Splats will correctly rotate to aint Angled Panels they are placed on top of.
+* Removed the "Prevent Portal Bump (fizzler)" stylevar. It is useless and never worked.
 
 ------------------------------------------
 

@@ -8,7 +8,7 @@ import io
 import urllib.request
 import urllib.error
 from enum import Enum
-from typing import Any, Callable, Dict, cast
+from typing import Any, Callable, Dict, Optional, cast
 from tkinter import ttk
 import tkinter as tk
 import webbrowser
@@ -21,6 +21,7 @@ import trio.to_thread
 
 from app.richTextBox import tkRichText
 from app import localisation, tkMarkdown, tk_tools, sound, img, TK_ROOT, background_run
+from ui_tk.dialogs import DIALOG
 from ui_tk.img import TKImages
 from transtoken import TransToken
 import utils
@@ -438,6 +439,8 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 class Dialog(tk.Toplevel):
     """Show a dialog with a message."""
+    text: Optional[str]
+
     def __init__(self, name: str, title: TransToken, text: str):
         super().__init__(TK_ROOT, name=name)
         self.withdraw()
@@ -511,16 +514,18 @@ async def open_url(url_key: str) -> None:
             url_data = await trio.to_thread.run_sync(load_database)
         except urllib.error.URLError as exc:
             LOGGER.error('Failed to download help url file:', exc_info=exc)
-            tk_tools.showerror(
+            await DIALOG.show_info(
                 TransToken.ui('BEEMOD2 - Failed to open URL'),
                 TransToken.ui('Failed to download list of URLs. Help menu links will not function. Check your Internet?'),
+                icon=DIALOG.ERROR,
             )
             return
         except (OSError, ValueError) as exc:
             LOGGER.error('Failed to parse help url file:', exc_info=exc)
-            tk_tools.showerror(
+            await DIALOG.show_info(
                 TransToken.ui('BEEMOD2 - Failed to open URL'),
                 TransToken.ui('Failed to parse help menu URLs file. Help menu links will not function.'),
+                icon=DIALOG.ERROR,
             )
             return
         LOGGER.debug('Help URLs:\n{}', '\n'.join([
@@ -533,9 +538,10 @@ async def open_url(url_key: str) -> None:
     except KeyError:
         LOGGER.warning('Invalid URL key "{}"!', url_key)
     else:
-        if tk_tools.askyesno(
+        if await DIALOG.ask_yes_no(
             TransToken.ui('BEEMOD 2 - Open URL'),
-            TransToken.ui('Do you wish to open the following URL?\n{url}').format(url=url),
+            TransToken.ui('Do you wish to open the following URL?'),
+            detail=f'"{url}"',
         ):
             webbrowser.open(url)
 

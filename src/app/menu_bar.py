@@ -12,6 +12,7 @@ from app import (
     gameMan, helpMenu, localisation, optionWindow, packageMan, tk_tools,
     backup as backup_win, background_run,
 )
+from ui_tk.dialogs import DIALOG
 from ui_tk.img import TKImages
 
 
@@ -65,10 +66,10 @@ class MenuBar:
         self.export_btn_pos = self.file_menu.index('end')
         self.file_menu.entryconfigure(self.export_btn_pos, state='disabled')
 
-        self.file_menu.add_command(command=gameMan.add_game)
+        self.file_menu.add_command(command=lambda: background_run(gameMan.add_game, DIALOG))
         localisation.set_menu_text(self.file_menu, TransToken.ui("Add Game"))
 
-        self.file_menu.add_command(command=lambda: background_run(gameMan.remove_game))
+        self.file_menu.add_command(command=lambda: background_run(gameMan.remove_game, DIALOG))
         localisation.set_menu_text(self.file_menu, TransToken.ui("Uninstall from Selected Game"))
 
         self.file_menu.add_command(command=backup_win.show_window)

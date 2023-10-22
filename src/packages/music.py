@@ -1,6 +1,6 @@
 """Definitions for background music used in the map."""
 from __future__ import annotations
-from typing import Iterator
+from typing import Iterator, Mapping
 from typing_extensions import Self
 from collections.abc import Iterable
 
@@ -21,11 +21,12 @@ class Music(PakObject, needs_foreground=True, style_suggest_key='music'):
         self,
         music_id: str,
         selitem_data: SelitemData,
-        sound: dict[MusicChannel, list[str]],
-        children: dict[MusicChannel, str],
+        sound: Mapping[MusicChannel, list[str]],
+        *,
+        children: Mapping[MusicChannel, str],
+        sample: Mapping[MusicChannel, str | None],
         config: lazy_conf.LazyConf = lazy_conf.BLANK,
         inst: str | None = None,
-        sample: dict[MusicChannel, str | None] = None,
         pack: Iterable[str] = (),
         loop_len: int = 0,
         synch_tbeam: bool = False,
@@ -182,22 +183,22 @@ class Music(PakObject, needs_foreground=True, style_suggest_key='music'):
         attrs['TBEAM_SYNC'] = self.has_synced_tbeam
         return attrs
 
-    def get_suggestion(self, channel: MusicChannel) -> str | None:
+    def get_suggestion(self, packset: PackagesSet, channel: MusicChannel) -> str | None:
         """Get the ID we want to suggest for a channel."""
         try:
-            child = Music.by_id(self.children[channel])
+            child = packset.obj_by_id(Music, self.children[channel])
         except KeyError:
             child = self
         if child.sound[channel]:
             return child.id
         return None
 
-    def get_sample(self, channel: MusicChannel) -> str | None:
+    def get_sample(self, packset: PackagesSet, channel: MusicChannel) -> str | None:
         """Get the path to the sample file, if present."""
         if self.sample[channel]:
             return self.sample[channel]
         try:
-            children = Music.by_id(self.children[channel])
+            children = packset.obj_by_id(Music, self.children[channel])
         except KeyError:
             return None
         return children.sample[channel]

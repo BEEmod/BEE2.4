@@ -198,6 +198,7 @@ vbsp_exe = EXE(
     strip=False,
     upx=True,
     console=True,
+    contents_directory="bee2_bin",
     icon='../BEE2.ico'
 )
 
@@ -212,6 +213,7 @@ vrad_exe = EXE(
     strip=False,
     upx=True,
     console=True,
+    contents_directory="bee2_bin",
     icon='../BEE2.ico'
 )
 
