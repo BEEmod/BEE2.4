@@ -1,13 +1,19 @@
 """Data structures for quote packs."""
 import enum
-from typing import List
+from collections.abc import Iterator
+from typing import Iterable, List, Set
 
 import attrs
-from srctools import Keyvalues, Vec
-from typing_extensions import assert_never
+from srctools import Keyvalues, Vec, logger
+from typing_extensions import Self, assert_never
 
 import utils
 from transtoken import TransToken
+
+
+LOGGER = logger.get_logger(__name__)
+TRANS_QUOTE = TransToken.untranslated('"{line}"')
+TRANS_QUOTE_ACT = TransToken.untranslated(': "{line}"')
 
 
 @utils.freeze_enum_props
@@ -71,20 +77,85 @@ class QuoteEvent:
     file: str
 
 
-@attrs.frozen
+@attrs.frozen(kw_only=True)
 class Line:
     """A single group of lines that can be played."""
     id: str
+    kind: CharKind
     name: TransToken
-    transcript: TransToken
+    transcript: List[tuple[str, str]]
 
     only_once: bool
     atomic: bool
 
     choreo_name: str
-    choreo_bullseyes: List[str]
-    wave: str
+    bullseyes: List[str]
+    sounds: List[str]
     scenes: List[str]
+    set_stylevars: Set[str]
+
+    @classmethod
+    def parse(cls, kv: Keyvalues, pak_id: str) -> Self:
+        """Parse from the keyvalues data."""
+        try:
+            kind = line_kinds[kv.name]
+        except KeyError:
+            LOGGER.warning('Invalid Quote Pack line kind "{}"', kv.real_name)
+            kind = CharKind.ANY
+
+        try:
+            quote_id = kv['id']
+        except LookupError:
+            quote_id = kv['name', '']
+            LOGGER.warning(
+                'Quote Pack has no specific ID for "{}"!',
+                quote_id,
+            )
+        disp_name = TransToken.parse(pak_id, kv['name', ''])
+        transcript = list(cls._parse_transcript(pak_id, kv.find_all('trans')))
+        only_once = kv.bool('onlyonce')
+        atomic = kv.bool('atomic')
+        caption_name = kv['cc_emit', '']
+        # todo: Old EndCommand syntax, defined for the whole line.
+        stylevars = {
+            child.value.casefold()
+            for child in kv.find_all('setstylevar')
+        }
+        # Files have these double-nested, but that's rather pointless.
+        scenes = [
+            filename
+            for child in kv.find_all('choreo')
+            for filename in child.as_array()
+        ]
+        sounds = [child.value for child in kv.find_all('snd')]
+        bullseyes = [child.value for child in kv.find_all('bullseye')]
+
+        return cls(
+            id=quote_id,
+            kind=kind,
+            name=disp_name,
+            transcript=transcript,
+            only_once=kv.bool('onlyonce'),
+            atomic=atomic,
+            choreo_name=kv['choreo_name', ''],
+            set_stylevars=stylevars,
+            scenes=scenes,
+            sounds=sounds,
+            bullseyes=bullseyes,
+        )
+
+    @classmethod
+    def _parse_transcript(cls, pak_id: str, kvs: Iterable[Keyvalues]) -> Iterator[tuple[str, str]]:
+        for child in kvs:
+            if ':' in child.value:
+                name, trans = child.value.split(':', 1)
+                yield name.rstrip(), TRANS_QUOTE_ACT.format(
+                    line=TransToken.parse(pak_id, trans.lstrip())
+                )
+            else:
+                yield '', TRANS_QUOTE.format(
+                    line=TransToken.parse(pak_id, child.value)
+                )
 
 
 @attrs.frozen
@@ -93,6 +164,7 @@ class MidChamber:
     name: str
     flags: List[Keyvalues]
     lines: List[Line]
+
 
 @attrs.frozen
 class Quote:
@@ -103,12 +175,13 @@ class Quote:
     lines: List[str]
 
 
-@attrs.frozen
+@attrs.frozen(kw_only=True)
 class Group:
     """The set of quotes for either Singleplayer or Coop."""
     name: TransToken
     desc: TransToken
     choreo_name: str
     choreo_loc: Vec
+    choreo_use_dings: bool
 
     quotes: List[Quote]
