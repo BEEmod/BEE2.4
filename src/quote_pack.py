@@ -1,10 +1,10 @@
 """Data structures for quote packs."""
 import enum
 from collections.abc import Iterator
-from typing import Iterable, List, Set
+from typing import Iterable, List, Optional, Set
 
 import attrs
-from srctools import Keyvalues, Vec, logger
+from srctools import Keyvalues, Vec, conv_int, logger
 from typing_extensions import Self, assert_never
 
 import utils
@@ -14,6 +14,7 @@ from transtoken import TransToken
 LOGGER = logger.get_logger(__name__)
 TRANS_QUOTE = TransToken.untranslated('"{line}"')
 TRANS_QUOTE_ACT = TransToken.untranslated(': "{line}"')
+TRANS_NO_NAME = TransToken.ui('No Name!')
 
 
 @utils.freeze_enum_props
@@ -95,7 +96,7 @@ class Line:
     set_stylevars: Set[str]
 
     @classmethod
-    def parse(cls, kv: Keyvalues, pak_id: str) -> Self:
+    def parse(cls, pak_id: str, kv: Keyvalues) -> Self:
         """Parse from the keyvalues data."""
         try:
             kind = line_kinds[kv.name]
@@ -159,29 +160,75 @@ class Line:
 
 
 @attrs.frozen
-class MidChamber:
-    """Midchamber voicelines."""
-    name: str
-    flags: List[Keyvalues]
-    lines: List[Line]
-
-
-@attrs.frozen
 class Quote:
     """A category of quotes that may be enabled or disabled."""
-    attrs: set[str]
+    tests: list[Keyvalues]
     priority: int
-    name: str
-    lines: List[str]
+    name: TransToken
+    lines: List[Line]
+
+    @classmethod
+    def parse(cls, pak_id: str, kv: Keyvalues) -> Self:
+        """Parse from the keyvalues data."""
+        lines: List[Line] = []
+        tests: List[Keyvalues] = []
+        priority = 0
+        name: TransToken = TransToken.BLANK
+        for child in kv:
+            if child.name.startswith('line'):
+                lines.append(Line.parse(pak_id, child))
+            elif child.name == 'priority':
+                priority = conv_int(child.value)
+            elif child.name == 'name':
+                name = TransToken.parse(pak_id, child.value)
+            else:
+                tests.append(child)
+        return cls(tests, priority, name, lines)
 
 
 @attrs.frozen(kw_only=True)
 class Group:
     """The set of quotes for either Singleplayer or Coop."""
+    id: str
     name: TransToken
     desc: TransToken
     choreo_name: str
-    choreo_loc: Vec
+    choreo_loc: Optional[Vec]
     choreo_use_dings: bool
 
     quotes: List[Quote]
+
+    @classmethod
+    def parse(cls, pak_id: str, kv: Keyvalues) -> Self:
+        """Parse from the keyvalues data."""
+        choreo_name = kv['Choreo_Name', '@choreo']
+        use_dings = kv.bool('use_dings', True)
+
+        name_raw = kv['name']
+        try:
+            name = TransToken.parse(pak_id, name_raw)
+        except LookupError:
+            name = TRANS_NO_NAME
+
+        group_id = kv['id', name_raw].upper()
+        desc = TransToken.parse(pak_id, kv['desc', ''])
+
+        try:
+            choreo_loc = Vec.from_str(kv['choreo_loc'])
+        except LookupError:
+            choreo_loc = None
+
+        quotes = [
+            Quote.parse(pak_id, child)
+            for child in kv.find_all('Quote')
+        ]
+
+        return cls(
+            id=group_id,
+            name=name,
+            desc=desc,
+            choreo_name=choreo_name,
+            choreo_use_dings=use_dings,
+            choreo_loc=choreo_loc,
+            quotes=quotes,
+        )
