@@ -1,9 +1,9 @@
-from typing import Optional, Set, Iterator
+from typing import Dict, List, Optional, Set, Iterator
 
 import attrs
 
 from app.errors import AppError
-from quote_pack import CharKind, Quote, QuoteEvent, Group
+from quote_pack import Quote, QuoteEvent, Group
 from transtoken import TransToken, TransTokenSource
 from packages import PackagesSet, PakObject, set_cond_source, ParseData, get_config, SelitemData
 from srctools import Angle, Keyvalues, Vec, NoKeyError, logger
@@ -33,8 +33,9 @@ class QuotePack(PakObject, needs_foreground=True, style_suggest_key='quote'):
         config: Keyvalues,
         *,
         base_inst: str,
-        groups: dict[str, Group],
-        events: dict[str, QuoteEvent],
+        groups: Dict[str, Group],
+        events: Dict[str, QuoteEvent],
+        midchamber: List[Quote],
         position: Vec,
 
         chars: Optional[Set[str]] = None,
@@ -49,6 +50,7 @@ class QuotePack(PakObject, needs_foreground=True, style_suggest_key='quote'):
         self.base_inst = base_inst
         self.position = position
         self.groups = groups
+        self.midchamber = midchamber
         self.events = events
         self.chars = chars or {'??'}
         self.monitor = monitor
@@ -106,6 +108,7 @@ class QuotePack(PakObject, needs_foreground=True, style_suggest_key='quote'):
         position = quotes_kv.vec('quote_loc', -10_000.0, 0.0, 0.0)
         groups: dict[str, Group] = {}
         events: dict[str, QuoteEvent] = {}
+        midchamber: list[Quote] = []
 
         for group_kv in quotes_kv.find_all('Group'):
             group = Group.parse(data.pak_id, group_kv)
@@ -113,6 +116,9 @@ class QuotePack(PakObject, needs_foreground=True, style_suggest_key='quote'):
                 groups[group.id] += group
             else:
                 groups[group.id] = group
+
+        for mid_kv in quotes_kv.find_all('Midchamber', 'Quote'):
+            midchamber.append(Quote.parse(data.pak_id, mid_kv))
 
         for event_kv in quotes_kv.find_all('QuoteEvents', 'Event'):
             event = QuoteEvent.parse(event_kv)
@@ -131,6 +137,7 @@ class QuotePack(PakObject, needs_foreground=True, style_suggest_key='quote'):
             position=position,
             groups=groups,
             events=events,
+            midchamber=midchamber,
 
             chars=chars,
             cave_skin=port_skin,
@@ -141,10 +148,7 @@ class QuotePack(PakObject, needs_foreground=True, style_suggest_key='quote'):
         """Add the additional lines to ourselves."""
         self.selitem_data += override.selitem_data
         self.config += override.config
-        self.config.merge_children(
-            'quotes_sp',
-            'quotes_coop',
-        )
+        self.midchamber += override.midchamber
         for group in override.groups.values():
             if group.id in self.groups:
                 self.groups[group.id] += group
@@ -156,6 +160,13 @@ class QuotePack(PakObject, needs_foreground=True, style_suggest_key='quote'):
 
         if self.monitor is None:
             self.monitor = override.monitor
+
+        if overlap := self.events.keys() & override.events.keys():
+            LOGGER.warning(
+                'Duplicate event IDs for quote pack {}: {}',
+                self.id, sorted(overlap),
+            )
+        self.events |= override.events
 
     def __repr__(self) -> str:
         return '<Voice:' + self.id + '>'
