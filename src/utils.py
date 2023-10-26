@@ -5,7 +5,7 @@ from typing import (
     ClassVar, Collection, Final, NewType, TYPE_CHECKING, Any, Awaitable, Callable, Generator,
     Generic,
     ItemsView, Iterable, Iterator, KeysView, Mapping, NoReturn, Optional, Sequence, SupportsInt,
-    Tuple, Type, TypeVar, ValuesView,
+    Tuple, Type, TypeVar, ValuesView, final
 )
 
 from typing_extensions import ParamSpec, TypeVarTuple, Unpack
@@ -27,16 +27,21 @@ import math
 from srctools.math import AnyVec, Angle, FrozenMatrix, FrozenVec, Vec
 import attrs
 import trio
+import attrs
+
+
+from transtoken import TransToken
 
 
 __all__ = [
     'WIN', 'MAC', 'LINUX', 'STEAM_IDS', 'DEV_MODE', 'CODE_DEV_MODE', 'BITNESS',
     'get_git_version', 'install_path', 'bins_path', 'conf_location', 'fix_cur_directory',
     'run_bg_daemon', 'not_none', 'CONN_LOOKUP', 'CONN_TYPES', 'freeze_enum_props', 'FuncLookup',
-    'PackagePath', 'Result', 'SliceKey', 'acompose', 'get_indent', 'iter_grid', 'check_cython',
+    'PackagePath', 'Result', 'SliceKey', 'AppError', 'acompose', 'get_indent', 'iter_grid', 'check_cython',
     'check_shift', 'fit', 'group_runs', 'restart_app', 'quit_app', 'set_readonly',
     'unset_readonly', 'merge_tree', 'write_lang_pot',
 ]
+
 
 WIN = sys.platform.startswith('win')
 MAC = sys.platform.startswith('darwin')
@@ -621,6 +626,23 @@ class SliceKey:
         """Take a world position and return the location relative to this plane."""
         orient = self._inv_orients[self.normal]
         return (Vec(pos) - self.normal * self.distance) @ orient
+
+
+# TODO: Move this back to app.errors when that can be imported in compiler safely.
+@final
+@attrs.define(init=False)
+class AppError(Exception):
+    """An error that occurs when using the app, that should be displayed to the user."""
+    message: TransToken
+    fatal: bool
+
+    def __init__(self, message: TransToken) -> None:
+        super().__init__(message)
+        self.message = message
+        self.fatal = False
+
+    def __str__(self) -> str:
+        return f"AppError: {self.message}"
 
 
 ResultT = TypeVar('ResultT')

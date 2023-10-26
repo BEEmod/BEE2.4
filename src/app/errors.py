@@ -8,10 +8,11 @@ from contextlib import contextmanager
 from exceptiongroup import BaseExceptionGroup, ExceptionGroup
 import types
 
-import attrs
+
 import srctools.logger
 
 from transtoken import TransToken
+from utils import AppError as AppError  # TODO: Move back to this module, once app no longer imports tk.
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -36,22 +37,6 @@ class Result(Enum):
     def failed(self) -> bool:
         """Check if it failed."""
         return self.name in ['PARTIAL', 'FAILED']
-
-
-@final
-@attrs.define(init=False)
-class AppError(Exception):
-    """An error that occurs when using the app, that should be displayed to the user."""
-    message: TransToken
-    fatal: bool
-
-    def __init__(self, message: TransToken) -> None:
-        super().__init__(message)
-        self.message = message
-        self.fatal = False
-
-    def __str__(self) -> str:
-        return f"AppError: {self.message}"
 
 
 WarningExc: TypeAlias = Union[AppError, ExceptionGroup[Exception], BaseExceptionGroup[BaseException]]
