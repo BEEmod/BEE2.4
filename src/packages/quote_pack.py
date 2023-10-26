@@ -3,7 +3,7 @@ from typing import Dict, List, Optional, Set, Iterator
 import attrs
 
 from app.errors import AppError
-from quote_pack import Quote, QuoteEvent, Group
+from quote_pack import Line, Quote, QuoteEvent, Group, Response, RESPONSE_NAMES
 from transtoken import TransToken, TransTokenSource
 from packages import PackagesSet, PakObject, set_cond_source, ParseData, get_config, SelitemData
 from srctools import Angle, Keyvalues, Vec, NoKeyError, logger
@@ -35,6 +35,7 @@ class QuotePack(PakObject, needs_foreground=True, style_suggest_key='quote'):
         base_inst: str,
         groups: Dict[str, Group],
         events: Dict[str, QuoteEvent],
+        responses: Dict[Response, List[Line]],
         midchamber: List[Quote],
         position: Vec,
 
@@ -51,6 +52,7 @@ class QuotePack(PakObject, needs_foreground=True, style_suggest_key='quote'):
         self.position = position
         self.groups = groups
         self.midchamber = midchamber
+        self.responses = responses
         self.events = events
         self.chars = chars or {'??'}
         self.monitor = monitor
@@ -108,6 +110,7 @@ class QuotePack(PakObject, needs_foreground=True, style_suggest_key='quote'):
         position = quotes_kv.vec('quote_loc', -10_000.0, 0.0, 0.0)
         groups: dict[str, Group] = {}
         events: dict[str, QuoteEvent] = {}
+        responses: dict[Response, List[Line]] = {}
         midchamber: list[Quote] = []
 
         for group_kv in quotes_kv.find_all('Group'):
@@ -129,6 +132,17 @@ class QuotePack(PakObject, needs_foreground=True, style_suggest_key='quote'):
                 )
             events[event.id] = event
 
+        for resp_kv in quotes_kv.find_children('CoopResponses'):
+            try:
+                resp = RESPONSE_NAMES[resp_kv.name]
+            except KeyError:
+                raise AppError(TransToken.ui(
+                    'Invalid response kind "{name}" in config for quote pack {id}!'
+                ).format(name=resp_kv.real_name, id=data.id)) from None
+            lines = responses.setdefault(resp, [])
+            for line_kv in resp_kv:
+                lines.append(Line.parse(data.pak_id, line_kv))
+
         return cls(
             data.id,
             selitem_data,
@@ -138,6 +152,7 @@ class QuotePack(PakObject, needs_foreground=True, style_suggest_key='quote'):
             groups=groups,
             events=events,
             midchamber=midchamber,
+            responses=responses,
 
             chars=chars,
             cave_skin=port_skin,
@@ -154,6 +169,12 @@ class QuotePack(PakObject, needs_foreground=True, style_suggest_key='quote'):
                 self.groups[group.id] += group
             else:
                 self.groups[group.id] = group
+
+        for resp, lines in override.responses.items():
+            try:
+                self.responses[resp] += lines
+            except KeyError:
+                self.responses[resp] = lines
 
         if self.cave_skin is None:
             self.cave_skin = override.cave_skin

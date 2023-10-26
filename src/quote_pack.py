@@ -1,7 +1,7 @@
 """Data structures for quote packs."""
 import enum
 from collections.abc import Iterator
-from typing import Iterable, List, Optional, Set
+from typing import Iterable, List, Mapping, Optional, Set
 
 import attrs
 from srctools import Keyvalues, Vec, conv_int, logger
@@ -56,6 +56,58 @@ class CharKind(enum.Flag):
             return TransToken.ui('Always applicable')
         else:
             assert_never(self)
+
+
+@utils.freeze_enum_props
+class Response(enum.Enum):
+    """Kinds of coop response."""
+    DEATH_GENERIC = enum.auto()
+    DEATH_GOO = enum.auto()
+    DEATH_TURRET = enum.auto()
+    DEATH_CRUSH = enum.auto()
+    DEATH_LASERFIELD = enum.auto()
+
+    # TODO: Fill in other "animations" for these.
+    GESTURE_GENERIC = enum.auto()
+    GESTURE_CAMERA = enum.auto()
+
+    @property
+    def is_death(self) -> bool:
+        return self.name.startswith('DEATH')
+
+    @property
+    def is_gesture(self) -> bool:
+        """Is this a response to doing a gesture"""
+        return self.name.startswith('GESTURE')
+
+    @property
+    def title(self) -> TransToken:
+        """Return the title text for the group."""
+        if self is Response.DEATH_GENERIC:
+            return TransToken.ui('Death - Generic')
+        elif self is Response.DEATH_GOO:
+            return TransToken.ui('Death - Toxic Goo')
+        elif self is Response.DEATH_TURRET:
+            return TransToken.ui('Death - Turrets')
+        elif self is Response.DEATH_CRUSH:
+            return TransToken.ui('Death - Crusher')
+        elif self is Response.DEATH_LASERFIELD:
+            return TransToken.ui('Death - LaserField')
+        elif self is Response.GESTURE_GENERIC:
+            return TransToken.ui('Gesture - Generic')
+        elif self is Response.GESTURE_CAMERA:
+            return TransToken.ui('Gesture - Camera')
+        else:
+            assert_never(self)
+
+RESPONSE_NAMES: Mapping[str, Response] = {
+    resp.name.lower(): resp
+    for resp in Response
+} | {
+    # Legacy names accepted in earlier versions. Only maybe used in UCPs?
+    'taunt_generic': Response.GESTURE_GENERIC,
+    'camera_generic': Response.GESTURE_CAMERA,
+}
 
 
 line_kinds = {
