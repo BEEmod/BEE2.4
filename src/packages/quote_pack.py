@@ -1,12 +1,25 @@
 from typing import Optional, Set, Iterator
 
+import attrs
+
 from transtoken import TransTokenSource
 from packages import PackagesSet, PakObject, set_cond_source, ParseData, get_config, SelitemData
-from srctools import Keyvalues, Vec, NoKeyError, logger
+from srctools import Angle, Keyvalues, Vec, NoKeyError, logger
 import srctools
 
 
 LOGGER = logger.get_logger('packages.quote_pack')
+
+
+@attrs.frozen(kw_only=True)
+class Monitor:
+    """Options required for displaying the character in the monitor screen."""
+    studio: str
+    studio_actor: str
+    cam_loc: Vec
+    turret_hate: bool
+    interrupt: float
+    cam_angle: Angle
 
 
 class QuotePack(PakObject, needs_foreground=True, style_suggest_key='quote'):
@@ -16,29 +29,18 @@ class QuotePack(PakObject, needs_foreground=True, style_suggest_key='quote'):
         quote_id: str,
         selitem_data: SelitemData,
         config: Keyvalues,
+        *,
         chars: Optional[Set[str]] = None,
-        skin: Optional[int] = None,
-        studio: Optional[str] = None,
-        studio_actor: str = '',
-        cam_loc: Optional[Vec] = None,
-        turret_hate: bool = False,
-        interrupt: float = 0.0,
-        cam_pitch: float = 0.0,
-        cam_yaw: float = 0.0,
+        cave_skin: Optional[int] = None,
+        monitor: Optional[Monitor] = None,
     ) -> None:
         self.id = quote_id
         self.selitem_data = selitem_data
-        self.cave_skin = skin
+        self.cave_skin = cave_skin
         self.config = config
         set_cond_source(config, f'QuotePack <{quote_id}>')
         self.chars = chars or {'??'}
-        self.studio = studio
-        self.studio_actor = studio_actor
-        self.cam_loc = cam_loc
-        self.inter_chance = interrupt
-        self.cam_pitch = cam_pitch
-        self.cam_yaw = cam_yaw
-        self.turret_hate = turret_hate
+        self.monitor = monitor
 
     @classmethod
     async def parse(cls, data: ParseData) -> 'QuotePack':
@@ -58,17 +60,16 @@ class QuotePack(PakObject, needs_foreground=True, style_suggest_key='quote'):
         try:
             monitor_data = data.info.find_key('monitor')
         except NoKeyError:
-            mon_studio = mon_cam_loc = None
-            mon_interrupt = mon_cam_pitch = mon_cam_yaw = 0.0
-            mon_studio_actor = ''
-            turret_hate = False
+            monitor = None
         else:
-            mon_studio = monitor_data['studio']
-            mon_studio_actor = monitor_data['studio_actor', '']
-            mon_interrupt = monitor_data.float('interrupt_chance', 0)
-            mon_cam_loc = monitor_data.vec('Cam_loc')
-            mon_cam_pitch, mon_cam_yaw, _ = monitor_data.vec('Cam_angles')
-            turret_hate = monitor_data.bool('TurretShoot')
+            monitor = Monitor(
+                studio=monitor_data['studio'],
+                studio_actor=monitor_data['studio_actor', ''],
+                interrupt=monitor_data.float('interrupt_chance', 0),
+                cam_loc=monitor_data.vec('Cam_loc'),
+                cam_angle=Angle(data.info.vec('cam_angles')),
+                turret_hate=monitor_data.bool('TurretShoot'),
+            )
 
         config = await get_config(
             data.info,
@@ -82,14 +83,8 @@ class QuotePack(PakObject, needs_foreground=True, style_suggest_key='quote'):
             selitem_data,
             config,
             chars=chars,
-            skin=port_skin,
-            studio=mon_studio,
-            studio_actor=mon_studio_actor,
-            interrupt=mon_interrupt,
-            cam_loc=mon_cam_loc,
-            cam_pitch=mon_cam_pitch,
-            cam_yaw=mon_cam_yaw,
-            turret_hate=turret_hate,
+            cave_skin=port_skin,
+            monitor=monitor,
             )
 
     def add_over(self, override: 'QuotePack') -> None:
@@ -103,14 +98,8 @@ class QuotePack(PakObject, needs_foreground=True, style_suggest_key='quote'):
         if self.cave_skin is None:
             self.cave_skin = override.cave_skin
 
-        if self.studio is None:
-            self.studio = override.studio
-            self.studio_actor = override.studio_actor
-            self.cam_loc = override.cam_loc
-            self.inter_chance = override.inter_chance
-            self.cam_pitch = override.cam_pitch
-            self.cam_yaw = override.cam_yaw
-            self.turret_hate = override.turret_hate
+        if self.monitor is None:
+            self.monitor = override.monitor
 
     def __repr__(self) -> str:
         return '<Voice:' + self.id + '>'

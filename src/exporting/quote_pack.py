@@ -45,17 +45,17 @@ async def step_quote_pack(exp_data: ExportData) -> None:
     if voice.cave_skin is not None:
         options['cave_port_skin'] = str(voice.cave_skin)
 
-    if voice.studio is not None:
-        options['voice_studio_inst'] = voice.studio
-        options['voice_studio_actor'] = voice.studio_actor
-        options['voice_studio_inter_chance'] = str(voice.inter_chance)
-        if voice.cam_loc is not None:
-            options['voice_studio_cam_loc'] = voice.cam_loc.join(' ')
-        options['voice_studio_cam_pitch'] = str(voice.cam_pitch)
-        options['voice_studio_cam_yaw'] = str(voice.cam_yaw)
-        options['voice_studio_should_shoot'] = srctools.bool_as_int(voice.turret_hate)
+    if voice.monitor is not None:
+        monitor = voice.monitor
+        options['voice_studio_inst'] = monitor.studio
+        options['voice_studio_actor'] = monitor.studio_actor
+        options['voice_studio_inter_chance'] = str(monitor.interrupt)
+        options['voice_studio_cam_loc'] = monitor.cam_loc.join(' ')
+        options['voice_studio_cam_pitch'] = str(monitor.cam_angle.pitch)
+        options['voice_studio_cam_yaw'] = str(monitor.cam_angle.yaw)
+        options['voice_studio_should_shoot'] = srctools.bool_as_int(monitor.turret_hate)
 
-    # Copy the config files for this voiceline..
+    # Copy the config files for this voice line...
     for prefix, pretty in [
         ('', 'normal'),
         ('mid_', 'MidChamber'),
