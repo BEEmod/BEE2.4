@@ -2,7 +2,9 @@ from typing import Optional, Set, Iterator
 
 import attrs
 
-from transtoken import TransTokenSource
+from app.errors import AppError
+from quote_pack import CharKind, Quote, QuoteEvent, Group
+from transtoken import TransToken, TransTokenSource
 from packages import PackagesSet, PakObject, set_cond_source, ParseData, get_config, SelitemData
 from srctools import Angle, Keyvalues, Vec, NoKeyError, logger
 import srctools
@@ -30,6 +32,11 @@ class QuotePack(PakObject, needs_foreground=True, style_suggest_key='quote'):
         selitem_data: SelitemData,
         config: Keyvalues,
         *,
+        base_inst: str,
+        groups: dict[str, Group],
+        events: dict[str, QuoteEvent],
+        position: Vec,
+
         chars: Optional[Set[str]] = None,
         cave_skin: Optional[int] = None,
         monitor: Optional[Monitor] = None,
@@ -39,6 +46,10 @@ class QuotePack(PakObject, needs_foreground=True, style_suggest_key='quote'):
         self.cave_skin = cave_skin
         self.config = config
         set_cond_source(config, f'QuotePack <{quote_id}>')
+        self.base_inst = base_inst
+        self.position = position
+        self.groups = groups
+        self.events = events
         self.chars = chars or {'??'}
         self.monitor = monitor
 
@@ -67,7 +78,7 @@ class QuotePack(PakObject, needs_foreground=True, style_suggest_key='quote'):
                 studio_actor=monitor_data['studio_actor', ''],
                 interrupt=monitor_data.float('interrupt_chance', 0),
                 cam_loc=monitor_data.vec('Cam_loc'),
-                cam_angle=Angle(data.info.vec('cam_angles')),
+                cam_angle=Angle(monitor_data.vec('cam_angles')),
                 turret_hate=monitor_data.bool('TurretShoot'),
             )
 
@@ -78,10 +89,49 @@ class QuotePack(PakObject, needs_foreground=True, style_suggest_key='quote'):
             prop_name='file',
         )()
 
+        try:
+            quotes_kv = config.find_key('Quotes')
+        except NoKeyError:
+            raise AppError(TransToken.ui(
+                'No "Quotes" key in config for quote pack {id}!'
+            ).format(id=data.id)) from None
+        else:
+            del config['Quotes']
+        if 'Quotes' in config:
+            raise AppError(TransToken.ui(
+                'Multiple "Quotes" keys found in config for quote pack {id}!'
+            ).format(id=data.id))
+
+        base_inst = quotes_kv['base', '']
+        position = quotes_kv.vec('quote_loc', -10_000.0, 0.0, 0.0)
+        groups: dict[str, Group] = {}
+        events: dict[str, QuoteEvent] = {}
+
+        for group_kv in quotes_kv.find_all('Group'):
+            group = Group.parse(data.pak_id, group_kv)
+            if group.id in groups:
+                groups[group.id] += group
+            else:
+                groups[group.id] = group
+
+        for event_kv in quotes_kv.find_all('QuoteEvents', 'Event'):
+            event = QuoteEvent.parse(event_kv)
+            if event.id in events:
+                LOGGER.warning(
+                    'Duplicate QuoteEvent "{}" for quote pack {}',
+                    event.id, data.id
+                )
+            events[event.id] = event
+
         return cls(
             data.id,
             selitem_data,
             config,
+            base_inst=base_inst,
+            position=position,
+            groups=groups,
+            events=events,
+
             chars=chars,
             cave_skin=port_skin,
             monitor=monitor,
@@ -95,6 +145,12 @@ class QuotePack(PakObject, needs_foreground=True, style_suggest_key='quote'):
             'quotes_sp',
             'quotes_coop',
         )
+        for group in override.groups.values():
+            if group.id in self.groups:
+                self.groups[group.id] += group
+            else:
+                self.groups[group.id] = group
+
         if self.cave_skin is None:
             self.cave_skin = override.cave_skin
 

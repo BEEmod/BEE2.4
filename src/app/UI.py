@@ -485,11 +485,6 @@ async def load_packages(packset: packages.PackagesSet, tk_img: TKImages) -> None
             '3D': 'config',  # Check if it has a config
             'COLOR': 'fog_color',
         }),
-        (voice_list, packages.QuotePack, {
-            'CHAR': 'chars',
-            'MONITOR': 'studio',
-            'TURRET': 'turret_hate',
-        }),
         (style_list, packages.Style, {
             'VID': 'has_video',
         }),
@@ -511,6 +506,18 @@ async def load_packages(packset: packages.PackagesSet, tk_img: TKImages) -> None
                     sel_attrs.items()
                 }
             ))
+
+    voice: packages.QuotePack
+    for voice in sorted(packset.all_obj(packages.QuotePack), key=operator.attrgetter('selitem_data.name.token')):
+        voice_list.append(selWinItem.from_data(
+            voice.id,
+            voice.selitem_data,
+            attrs={
+                'CHAR': voice.chars or {'???'},
+                'MONITOR': voice.monitor is not None,
+                'TURRET': voice.monitor is not None and voice.monitor.turret_hate,
+            }
+        ))
 
     def win_callback(sel_id: Optional[str]) -> None:
         """Callback for the selector windows.

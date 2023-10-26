@@ -77,6 +77,14 @@ class QuoteEvent:
     id: str
     file: str
 
+    @classmethod
+    def parse(cls, kv: Keyvalues) -> Self:
+        """Parse from the keyvalues data."""
+        return cls(
+            id=kv['id'],
+            file=kv['file'],
+        )
+
 
 @attrs.frozen(kw_only=True)
 class Line:
@@ -84,7 +92,7 @@ class Line:
     id: str
     kind: CharKind
     name: TransToken
-    transcript: List[tuple[str, str]]
+    transcript: List[tuple[str, TransToken]]
 
     only_once: bool
     atomic: bool
@@ -146,7 +154,7 @@ class Line:
         )
 
     @classmethod
-    def _parse_transcript(cls, pak_id: str, kvs: Iterable[Keyvalues]) -> Iterator[tuple[str, str]]:
+    def _parse_transcript(cls, pak_id: str, kvs: Iterable[Keyvalues]) -> Iterator[tuple[str, TransToken]]:
         for child in kvs:
             if ':' in child.value:
                 name, trans = child.value.split(':', 1)
@@ -232,3 +240,7 @@ class Group:
             choreo_loc=choreo_loc,
             quotes=quotes,
         )
+
+    def __iadd__(self, other: Self) -> Self:
+        """Merge two group definitions into one."""
+        return attrs.evolve(self, quotes=self.quotes + other.quotes)
