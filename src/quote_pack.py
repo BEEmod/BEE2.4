@@ -135,7 +135,9 @@ class Line:
     atomic: bool
 
     choreo_name: str
+    caption_name: str
     bullseyes: List[str]
+    instances: List[str]
     sounds: List[str]
     scenes: List[str]
     set_stylevars: Set[str]
@@ -181,6 +183,7 @@ class Line:
         ]
         sounds = [child.value for child in kv.find_all('snd')]
         bullseyes = [child.value for child in kv.find_all('bullseye')]
+        instances = [child.value for child in kv.find_all('file')]
 
         return cls(
             id=quote_id,
@@ -194,6 +197,8 @@ class Line:
             scenes=scenes,
             sounds=sounds,
             bullseyes=bullseyes,
+            instances=instances,
+            caption_name=caption_name,
         )
 
     @classmethod

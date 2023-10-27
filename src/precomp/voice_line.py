@@ -14,7 +14,7 @@ from BEE2_config import ConfigFile
 from srctools import Keyvalues, Vec, VMF, Output, Entity
 
 from precomp.collisions import Collisions
-from quote_pack import QuoteInfo, LineCriteria
+from quote_pack import Line, QuoteInfo, LineCriteria
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -265,19 +265,17 @@ def add_choreo(
     return choreo
 
 
-def add_quote(
+def add_line(
     vmf: VMF,
-    quote: Keyvalues,
+    line: Line,
     targetname: str,
     quote_loc: Vec,
     style_vars: dict,
     use_dings: bool,
 ) -> None:
-    """Add a quote to the map."""
-    LOGGER.info('Adding quote: {}', quote)
+    """Add a line to the map."""
+    LOGGER.info('Adding quote: {}', line)
 
-    only_once = atomic = False
-    cc_emit_name: Optional[str] = None
     start_ents: List[Entity] = []
     end_commands: List[Output] = []
     start_names: List[str] = []
@@ -285,157 +283,123 @@ def add_quote(
     # The OnUser1 outputs always play the quote (PlaySound/Start), so you can
     # mix ent types in the same pack.
 
-    for kv in quote:
-        name = kv.name.casefold()
+    for bullsye in line.bullseyes:
+        add_bullseye(vmf, quote_loc, bullsye)
+    for inst in line.instances:
+        conditions.add_inst(
+            vmf,
+            file=INST_PREFIX + inst,
+            origin=quote_loc,
+            no_fixup=True,
+        )
 
-        if name == 'file':
-            conditions.add_inst(
-                vmf,
-                file=INST_PREFIX + kv.value,
-                origin=quote_loc,
-                no_fixup=True,
+    for scene_list in line.scenes:
+        # If the property has children, the children are a set of sequential
+        # voice lines.
+        # If the name is set to '@glados_line', the ents will be named
+        # ('@glados_line', 'glados_line_2', 'glados_line_3', ...)
+        start_names.append(targetname)
+        secondary_name = targetname.lstrip('@') + '_'
+        # Evenly distribute the choreo ents across the width of the
+        # voice-line room.
+        off = Vec(y=120 / (len(scene_list) + 1))
+        start = quote_loc - (0, 60, 0) + off
+        for ind, choreo_line in enumerate(scene_list, start=1):
+            is_first = (ind == 1)
+            is_last = (ind == len(scene_list))
+            name = (
+                targetname
+                if is_first else
+                secondary_name + str(ind)
             )
-        elif name == 'choreo':
-            # If the property has children, the children are a set of sequential
-            # voice lines.
-            # If the name is set to '@glados_line', the ents will be named
-            # ('@glados_line', 'glados_line_2', 'glados_line_3', ...)
-            start_names.append(targetname)
-            if kv.has_children():
-                secondary_name = targetname.lstrip('@') + '_'
-                # Evenly distribute the choreo ents across the width of the
-                # voice-line room.
-                off = Vec(y=120 / (len(kv) + 1))
-                start = quote_loc - (0, 60, 0) + off
-                for ind, choreo_line in enumerate(kv, start=1):
-                    is_first = (ind == 1)
-                    is_last = (ind == len(kv))
-                    name = (
-                        targetname
-                        if is_first else
-                        secondary_name + str(ind)
-                    )
-                    choreo = add_choreo(
-                        vmf,
-                        choreo_line.value,
-                        targetname=name,
-                        loc=start + off * (ind - 1),
-                        use_dings=use_dings,
-                        is_first=is_first,
-                        is_last=is_last,
-                        only_once=only_once,
-                    )
-                    # Add a IO command to start the next one.
-                    if not is_last:
-                        choreo.add_out(Output(
-                            'OnCompletion',
-                            secondary_name + str(ind + 1),
-                            'Start',
-                            delay=0.1,
-                        ))
-                    if is_first:  # Ensure this works with cc_emit
-                        start_ents.append(choreo)
-                    if is_last:
-                        for out in end_commands:
-                            choreo.add_out(out.copy())
-                        end_commands.clear()
-            else:
-                # Add a single choreo command.
-                choreo = add_choreo(
-                    vmf,
-                    kv.value,
-                    targetname,
-                    quote_loc,
-                    use_dings=use_dings,
-                    only_once=only_once,
-                )
+            choreo = add_choreo(
+                vmf,
+                choreo_line.value,
+                targetname=name,
+                loc=start + off * (ind - 1),
+                use_dings=use_dings,
+                is_first=is_first,
+                is_last=is_last,
+                only_once=line.only_once,
+            )
+            # Add a IO command to start the next one.
+            if not is_last:
+                choreo.add_out(Output(
+                    'OnCompletion',
+                    secondary_name + str(ind + 1),
+                    'Start',
+                    delay=0.1,
+                ))
+            if is_first:  # Ensure this works with cc_emit
                 start_ents.append(choreo)
+            if is_last:
                 for out in end_commands:
                     choreo.add_out(out.copy())
                 end_commands.clear()
-        elif name == 'snd':
-            start_names.append(targetname)
 
-            snd = vmf.create_ent(
-                classname='ambient_generic',
-                spawnflags='49',  # Infinite Range, Starts Silent
-                targetname=targetname,
-                origin=quote_loc,
-                message=kv.value,
-                health='10',  # Volume
-            )
-            snd.add_out(
-                Output(
-                    'OnUser1',
-                    targetname,
-                    'PlaySound',
-                    only_once=only_once,
-                )
-            )
-            start_ents.append(snd)
-        elif name == 'bullseye':
-            add_bullseye(vmf, quote_loc, kv.value)
-        elif name == 'cc_emit':
-            # In Aperture Tag, this additional console command is used
-            # to add the closed captions.
-            # Store in a variable, so we can be sure to add the output
-            # regardless of the property order.
-            cc_emit_name = kv.value
-        elif name == 'setstylevar':
-            # Set this stylevar to True
-            # This is useful so some styles can react to which line was
-            # chosen.
-            style_vars[kv.value.casefold()] = True
-        elif name == 'packlist':
-            packing.pack_list(vmf, kv.value)
-        elif name == 'pack':
-            if kv.has_children():
-                packing.pack_files(vmf, *[
-                    subprop.value
-                    for subprop in
-                    kv
-                ])
-            else:
-                packing.pack_files(vmf, kv.value)
-        elif name == 'choreo_name':
-            # Change the targetname used for subsequent entities
-            targetname = kv.value
-        elif name == 'onlyonce':
-            only_once = srctools.conv_bool(kv.value)
-        elif name == 'atomic':
-            atomic = srctools.conv_bool(kv.value)
-        elif name == 'endcommand':
-            if kv.bool('only_once'):
-                end_commands.append(Output(
-                    'OnCompletion',
-                    kv['target'],
-                    kv['input'],
-                    kv['parm', ''],
-                    kv.float('delay'),
-                    only_once=True,
-                ))
-            else:
-                end_commands.append(Output(
-                    'OnCompletion',
-                    kv['target'],
-                    kv['input'],
-                    kv['parm', ''],
-                    kv.float('delay'),
-                    times=kv.int('times', -1),
-                ))
+    for snd_name in line.sounds:
+        start_names.append(targetname)
 
-    if cc_emit_name:
+        snd = vmf.create_ent(
+            classname='ambient_generic',
+            spawnflags='49',  # Infinite Range, Starts Silent
+            targetname=targetname,
+            origin=quote_loc,
+            message=snd_name,
+            health='10',  # Volume
+        )
+        snd.add_out(
+            Output(
+                'OnUser1',
+                targetname,
+                'PlaySound',
+                only_once=line.only_once,
+            )
+        )
+        start_ents.append(snd)
+    for var_name in line.set_stylevars:
+        # Set this stylevar to True
+        # This is useful so some styles can react to which line was
+        # chosen.
+        style_vars[var_name] = True
+
+    # elif name == 'packlist':
+    # elif name == 'pack':
+
+    # if name == 'endcommand':
+    #     if kv.bool('only_once'):
+    #         end_commands.append(Output(
+    #             'OnCompletion',
+    #             kv['target'],
+    #             kv['input'],
+    #             kv['parm', ''],
+    #             kv.float('delay'),
+    #             only_once=True,
+    #         ))
+    #     else:
+    #         end_commands.append(Output(
+    #             'OnCompletion',
+    #             kv['target'],
+    #             kv['input'],
+    #             kv['parm', ''],
+    #             kv.float('delay'),
+    #             times=kv.int('times', -1),
+    #         ))
+
+    # In Aperture Tag, this additional console command is used
+    # to add the closed captions.
+    if line.caption_name:
         for ent in start_ents:
             ent.add_out(Output(
                 'OnUser1',
                 '@command',
                 'Command',
-                param='cc_emit ' + cc_emit_name,
+                param=f'cc_emit {line.caption_name}',
             ))
 
     # If Atomic is true, after a line is started all variants
     # are blocked from playing.
-    if atomic:
+    if line.atomic:
         for ent in start_ents:
             for name in start_names:
                 if ent['targetname'] == name:
@@ -612,14 +576,7 @@ def add_voice(
             ])
 
             # Add one of the associated quotes
-            add_quote(
-                vmf,
-                rng.choice(chosen),
-                quote_targetname,
-                choreo_loc,
-                style_vars,
-                use_dings,
-            )
+            add_line(vmf, rng.choice(chosen), quote_targetname, choreo_loc, style_vars, use_dings)
 
     if ADDED_BULLSEYES or QUOTE_DATA.bool('UseMicrophones'):
         # Add microphones that broadcast audio directly at players.
@@ -654,6 +611,6 @@ def add_voice(
     for mid_lines in mid_quotes:
         line = rand.seed(b'mid_quote', *[name for item, ding, name in mid_lines]).choice(mid_lines)
         mid_item, use_ding, mid_name = line
-        add_quote(vmf, mid_item, mid_name, quote_loc, style_vars, use_ding)
+        add_line(vmf, mid_item, mid_name, quote_loc, style_vars, use_ding)
 
     LOGGER.info('Done!')
