@@ -1,15 +1,13 @@
 """Allows enabling and disabling specific voicelines."""
 import functools
-import itertools
 from decimal import Decimal
 from enum import Enum
-from typing import Iterator, List, Tuple, TypedDict, Dict, Optional
+from typing import Iterable, List, Tuple, TypedDict, Dict, Optional
 from configparser import SectionProxy
 
 from tkinter import *
 from tkinter import font
 from tkinter import ttk
-import tkinter
 
 from srctools import Keyvalues
 import srctools.logger
@@ -17,6 +15,7 @@ import attrs
 
 from BEE2_config import ConfigFile
 from packages import QuotePack
+from quote_pack import Line, LineCriteria
 from transtoken import TransToken
 from app.tooltip import add_tooltip
 from app import img, TK_ROOT
@@ -46,35 +45,24 @@ QUOTE_FONT['weight'] = 'bold'
 IMG_MID = img.Handle.builtin('icons/mid_quote', 32, 16)
 IMG_RESP = img.Handle.builtin('icons/resp_quote', 16, 16)
 
-IMG: Dict[str, Tuple[img.Handle, TransToken]] = {
-    spr: (img.Handle.builtin('icons/quote_' + spr), ctx)
-    for spr, ctx in [
-        ('sp', TransToken.ui('Singleplayer')),
-        ('coop', TransToken.ui('Cooperative')),
-        ('atlas', TransToken.ui('ATLAS (SP/Coop)')),
-        ('pbody', TransToken.ui('P-Body (SP/Coop)')),
-        ('bendy', TransToken.ui('Bendy')),
-        ('chell', TransToken.ui('Chell')),
-        ('human', TransToken.ui('Human characters (Bendy and Chell)')),
-        ('robot', TransToken.ui('AI characters (ATLAS, P-Body, or Coop)')),
-    ]
+IMG: Dict[LineCriteria, img.Handle] = {
+    criteria: img.Handle.builtin('icons/quote_' + criteria.name.lower())
+    for criteria in LineCriteria
 }
 
-
-RESPONSE_NAMES = {
-    'death_generic': TransToken.ui('Death - Generic'),
-    'death_goo': TransToken.ui('Death - Toxic Goo'),
-    'death_turret': TransToken.ui('Death - Turrets'),
-    'death_crush': TransToken.ui('Death - Crusher'),
-    'death_laserfield': TransToken.ui('Death - LaserField'),
-
-    # TODO: Fill in the other "animations" for these.
-    'taunt_generic': TransToken.ui('Taunts - Generic'),
-    'camera_generic': TransToken.ui('Camera Gesture - Generic'),
-}
-TRANS_NO_NAME = TransToken.ui('No Name!')
+ID_MIDCHAMBER = 'MIDCHAMBER'
 # i18n: 'response' tab name, should be short.
-TRANS_RESPONSE_TITLE = TransToken.ui('Resp')
+TRANS_RESPONSE_SHORT = TransToken.ui('Resp')
+# i18n: 'Response' tab header.
+TRANS_RESPONSE_TITLE = TransToken.ui('Responses')
+TRANS_RESPONSE_DESC = TransToken.ui(
+    'Lines played in response to certain events in Coop.'
+)
+TRANS_MIDCHAMBER_TITLE = TransToken.ui('Mid - Chamber')
+TRANS_MIDCHAMBER_DESC = TransToken.ui(
+    'Lines played during the actual chamber, '
+    'after specific events have occurred.'
+)
 
 config: Optional[ConfigFile] = None
 config_mid: Optional[ConfigFile] = None
@@ -182,14 +170,14 @@ def quote_sort_func(quote: Keyvalues) -> Decimal:
         return Decimal('0')
 
 
-def show_trans(transcript: List[Tuple[str, str]], e: Event) -> None:
+def show_trans(transcript: List[Tuple[str, TransToken]], e: Event) -> None:
     """Add the transcript to the list."""
     text = UI['trans']
     text['state'] = 'normal'
     text.delete(1.0, END)
     for actor, line in transcript:
         text.insert('end', actor, ('bold',))
-        text.insert('end', line + '\n\n')
+        text.insert('end', str(line) + '\n\n')
     # Remove the trailing newlines
     text.delete('end-2char', 'end')
     text['state'] = 'disabled'
@@ -237,7 +225,7 @@ def add_tabs(tk_img: TKImages) -> None:
                 tab.frame,
                 compound=RIGHT,
                 image=tk_img.sync_load(IMG_RESP),
-                text=str(TRANS_RESPONSE_TITLE),
+                text=str(TRANS_RESPONSE_SHORT),
             )
         else:
             notebook.tab(tab.frame, text=str(tab.title))
@@ -260,8 +248,6 @@ def show(tk_img: TKImages, quote_pack: QuotePack) -> None:
     win.grab_set()
     notebook = UI['tabs']
 
-    quote_data = quote_pack.config
-
     config = ConfigFile('voice/' + quote_pack.id + '.cfg')
     config_mid = ConfigFile('voice/MID_' + quote_pack.id + '.cfg')
     config_resp = ConfigFile('voice/RESP_' + quote_pack.id + '.cfg')
@@ -282,46 +268,43 @@ def show(tk_img: TKImages, quote_pack: QuotePack) -> None:
 
     TABS.clear()
 
-    for group in quote_data.find_all('quotes', 'group'):
+    for group in quote_pack.groups.values():
         make_tab(
             tk_img,
-            quote_pack.pak_id,
-            group,
-            config,
-            TabTypes.NORM
+            TabTypes.NORM,
+            name=group.name,
+            desc=group.desc,
+            config=config,
+            contents=(
+                (quote.name, group.id, quote.lines)
+                for quote in sorted(group.quotes, key=lambda quote: quote.priority)
+            )
         )
 
-    # Merge all blocks into one
-    mid_quotes = Keyvalues(
-        'midChamber',
-        list(itertools.chain.from_iterable(
-            quote_data.find_all('quotes', 'midChamber')
-        ))
-    )
-
-    if len(mid_quotes):
+    if quote_pack.midchamber:
         make_tab(
             tk_img,
-            quote_pack.pak_id,
-            mid_quotes,
-            config_mid,
             TabTypes.MIDCHAMBER,
+            name=TRANS_MIDCHAMBER_TITLE,
+            desc=TRANS_MIDCHAMBER_DESC,
+            config=config_mid,
+            contents=(
+                (quote.name, ID_MIDCHAMBER, quote.lines)
+                for quote in sorted(quote_pack.midchamber, key=lambda quote: quote.name.token)
+            )
         )
 
-    responses = Keyvalues(
-        'CoopResponses',
-        list(itertools.chain.from_iterable(
-            quote_data.find_all('quotes', 'CoopResponses')
-        )),
-    )
-
-    if len(responses):
+    if any(quote_pack.responses.values()):
         make_tab(
             tk_img,
-            quote_pack.pak_id,
-            responses,
-            config_resp,
             TabTypes.RESPONSE,
+            name=TRANS_RESPONSE_TITLE,
+            desc=TRANS_RESPONSE_DESC,
+            config=config_resp,
+            contents=(
+                (resp.title, resp.name.lower(), lines)
+                for resp, lines in quote_pack.responses.items()
+            )
         )
 
     config.save()
@@ -337,40 +320,19 @@ def show(tk_img: TKImages, quote_pack: QuotePack) -> None:
 
 def make_tab(
     tk_img: TKImages,
-    pak_id: str, group: Keyvalues, config: ConfigFile, tab_type: TabTypes,
+    tab_type: TabTypes,
+    name: TransToken,
+    desc: TransToken,
+    config: ConfigFile,
+    contents: Iterable[Tuple[TransToken, str, Iterable[Line]]],
 ) -> None:
     """Create all the widgets for a tab."""
-    if tab_type is TabTypes.MIDCHAMBER:
-        # Mid-chamber voice lines have predefined values.
-        group_name = TransToken.ui('Mid - Chamber')
-        group_id = 'MIDCHAMBER'
-        group_desc = TransToken.ui(
-            'Lines played during the actual chamber, '
-            'after specific events have occurred.'
-        )
-    elif tab_type is TabTypes.RESPONSE:
-        # Note: 'Response' tab header, and description
-        group_name = TransToken.ui('Responses')
-        group_id = None
-        group_desc = TransToken.ui(
-            'Lines played in response to certain events in Coop.'
-        )
-    elif tab_type is TabTypes.NORM:
-        try:
-            group_name = TransToken.parse(pak_id, group['name'])
-        except LookupError:
-            group_name = TransToken.ui('No Name!')
-        group_id = group_name.token.upper()
-        group_desc = TransToken.parse(pak_id, group['desc', ''])
-    else:
-        raise ValueError('Invalid tab type!')
-
     # This is just to hold the canvas and scrollbar
     outer_frame = ttk.Frame(UI['tabs'])
     outer_frame.columnconfigure(0, weight=1)
     outer_frame.rowconfigure(0, weight=1)
 
-    TABS.append(Tab(tab_type, outer_frame,group_name))
+    TABS.append(Tab(tab_type, outer_frame, name))
 
     # We need a canvas to make the list scrollable.
     canv = Canvas(
@@ -397,10 +359,10 @@ def make_tab(
 
     set_text(
         ttk.Label(frame, anchor='center', font='tkHeadingFont'),
-        group_name,
+        name,
     ).grid(row=0,column=0, sticky='EW')
 
-    set_text(ttk.Label(frame), group_desc).grid(row=1, column=0, sticky='EW')
+    set_text(ttk.Label(frame), desc).grid(row=1, column=0, sticky='EW')
 
     ttk.Separator(frame, orient=HORIZONTAL).grid(
         row=2,
@@ -408,81 +370,40 @@ def make_tab(
         sticky='EW',
     )
 
-    if tab_type is TabTypes.RESPONSE:
-        sorted_quotes = sorted(
-            group,
-            key=lambda prop: prop.real_name
-        )
-    else:
-        sorted_quotes = sorted(
-            group.find_all('Quote'),
-            key=quote_sort_func,
-            reverse=True,
-        )
-
-    for quote in sorted_quotes:
-        if not quote.has_children():
-            continue  # Skip over config commands..
-
-        if tab_type is TabTypes.RESPONSE:
-            try:
-                name = RESPONSE_NAMES[quote.name]
-            except KeyError:
-                LOGGER.warning('No name for response: "{}"', quote.real_name)
-                name = TransToken.untranslated(quote.real_name)
-
-            group_id = quote.name
-        else:
-            # note: default for quote names
-            try:
-                name = TransToken.parse(pak_id, quote['name'])
-            except LookupError:
-                name = TRANS_NO_NAME
-
+    for name, conf_id, lines in contents:
         set_text(ttk.Label(frame, font=QUOTE_FONT), name).grid(column=0, sticky=W)
 
-        if tab_type is TabTypes.RESPONSE:
-            line_iter = find_resp_lines(quote)
-        else:
-            line_iter = find_lines(quote)
-
-        for badges, line, line_id in line_iter:
-            line_frame = ttk.Frame(
-                frame,
-            )
+        for line in lines:
+            line_frame = ttk.Frame(frame,)
             line_frame.grid(
                 column=0,
                 padx=(10, 0),
                 sticky=W,
             )
-            for x, (img_handle, ctx) in enumerate(badges):
+            x = 0
+            for x, criteria in enumerate(line.criterion):
                 label = ttk.Label(line_frame, padding=0)
-                tk_img.apply(label, img_handle)
+                tk_img.apply(label, IMG[criteria])
                 label.grid(row=0, column=x)
-                add_tooltip(label, ctx)
+                add_tooltip(label, criteria.tooltip)
 
-            line_frame.columnconfigure(len(badges), weight=1)
+            x += 1  # Position after the badges
+            line_frame.columnconfigure(x, weight=1)
 
-            check = ttk.Checkbutton(line_frame)
-            quote_var = IntVar(value=config.get_bool(group_id, line_id, True))
-            try:
-                check['text'] = line['name']
-            except LookupError:
-                check['text'] = ''
-
-            check['variable'] = quote_var
-
-            check['command'] = functools.partial(
-                check_toggled,
-                var=quote_var,
-                config_section=config[group_id],
-                quote_id=line_id,
+            quote_var = IntVar(value=config.get_bool(conf_id, line.id, True))
+            check = ttk.Checkbutton(
+                line_frame,
+                variable=quote_var,
+                command=functools.partial(
+                    check_toggled,
+                    var=quote_var,
+                    config_section=config[conf_id],
+                    quote_id=line.id,
+                )
             )
-            check.grid(
-                row=0,
-                column=len(badges),
-            )
-            check.bind("<Enter>", functools.partial(show_trans, list(get_trans_lines(line))))
+            set_text(check, line.name)
+            check.grid(row=0, column=x)
+            check.bind("<Enter>", functools.partial(show_trans, line.transcript))
 
     def configure_canv(e: Event) -> None:
         """Allow resizing the windows."""
@@ -495,53 +416,3 @@ def make_tab(
         frame['width'] = canv.winfo_reqwidth()
 
     canv.bind('<Configure>', configure_canv)
-
-
-def find_lines(quote_block: Keyvalues) -> Iterator[Tuple[
-    List[Tuple[img.Handle, TransToken]],
-    Keyvalues,
-    str,
-]]:
-    """Find the line property blocks in a quote."""
-    for prop in quote_block:
-        if not prop.name.startswith('line'):
-            continue
-
-        line_id = prop['id', prop['name']]
-
-        if prop.name == 'line':
-            yield [], prop, line_id
-        elif prop.name.startswith('line_'):
-            try:
-                images = [
-                    IMG[img]
-                    for img in
-                    prop.name.split('_')[1:]
-                ]
-            except KeyError as exc:
-                LOGGER.warning('Invalid line type in "{}" {!r}!',
-                    prop.name,
-                    exc.args,
-                )
-                images = []
-            yield images, prop, line_id
-
-
-def find_resp_lines(quote_block: Keyvalues) -> Iterator[Tuple[
-    List[Tuple[img.Handle, TransToken]],
-    Keyvalues,
-    str,
-]]:
-    """Find the line blocks in response items."""
-    for index, prop in enumerate(quote_block):
-        yield [], prop, f'line_{index}'
-
-
-def get_trans_lines(trans_block: Keyvalues) -> Iterator[Tuple[str, str]]:
-    for prop in trans_block:
-        if prop.name == 'trans':
-            if ':' in prop.value:
-                name, trans = prop.value.split(':', 1)
-                yield name.rstrip(), ': "' + trans.lstrip() + '"'
-            else:
-                yield '', '"' + prop.value + '"'
