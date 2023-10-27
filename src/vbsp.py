@@ -1608,6 +1608,7 @@ async def main() -> None:
         async with trio.open_nursery() as nursery:
             res_settings = utils.Result(nursery, load_settings)
             vmf_res = utils.Result(nursery, load_map, path)
+            voice_data_res = utils.Result(nursery, voice_line.load)
 
         ind_style, id_to_item, corridor_conf = res_settings()
         vmf: VMF = vmf_res()

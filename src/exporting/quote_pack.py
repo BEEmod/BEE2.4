@@ -1,5 +1,6 @@
 """Export quote pack configurations."""
 from typing import Optional
+import pickle
 import shutil
 
 import srctools
@@ -8,6 +9,7 @@ import trio
 import utils
 from exporting import ExportData, STEPS, StepResource
 from packages import QuotePack
+from quote_pack import ExportedQuote
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -25,35 +27,23 @@ async def step_quote_pack(exp_data: ExportData) -> None:
     except KeyError:
         raise Exception(f"Selected voice ({sel_id}) doesn't exist?") from None
 
-    vbsp_config = exp_data.vbsp_conf
+    exp_data.vbsp_conf += voice.config
 
-    # We want to strip 'trans' sections from the voice pack, since
-    # they're not useful.
-    for prop in voice.config:
-        if prop.name == 'quotes':
-            vbsp_config.append(QuotePack.strip_quote_data(prop))
-        else:
-            vbsp_config.append(prop.copy())
-
-    # Set values in vbsp_config, so tests can determine which voiceline
-    # is selected.
-    options = vbsp_config.ensure_exists('Options')
-
-    options['voice_pack'] = voice.id
-    options['voice_char'] = ','.join(voice.chars)
-
-    if voice.cave_skin is not None:
-        options['cave_port_skin'] = str(voice.cave_skin)
-
-    if voice.monitor is not None:
-        monitor = voice.monitor
-        options['voice_studio_inst'] = monitor.studio
-        options['voice_studio_actor'] = monitor.studio_actor
-        options['voice_studio_inter_chance'] = str(monitor.interrupt)
-        options['voice_studio_cam_loc'] = monitor.cam_loc.join(' ')
-        options['voice_studio_cam_pitch'] = str(monitor.cam_angle.pitch)
-        options['voice_studio_cam_yaw'] = str(monitor.cam_angle.yaw)
-        options['voice_studio_should_shoot'] = srctools.bool_as_int(monitor.turret_hate)
+    data = ExportedQuote(
+        id=voice.id,
+        chars=voice.chars,
+        cave_skin=voice.cave_skin,
+        base_inst=voice.base_inst,
+        position=voice.position,
+        groups=voice.groups,
+        events=voice.events,
+        responses=voice.responses,
+        midchamber=voice.midchamber,
+        monitor=voice.monitor,
+    )
+    pickle_data = await trio.to_thread.run_sync(pickle.dumps, data, pickle.HIGHEST_PROTOCOL)
+    await trio.Path(exp_data.game.abs_path('bin/bee2/voice.bin')).write_bytes(pickle_data)
+    del pickle_data
 
     # Copy the config files for this voice line...
     for prefix, pretty in [

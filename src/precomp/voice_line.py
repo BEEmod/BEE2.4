@@ -1,10 +1,12 @@
 """Adds voicelines dynamically into the map."""
 from typing import Dict, List, Optional, Set, NamedTuple, Iterator, Tuple
 from typing_extensions import TypeAlias
-import itertools
 from decimal import Decimal
+import itertools
+import pickle
 
 import srctools.logger
+import trio
 
 import vbsp
 from precomp import corridor, options as vbsp_options, packing, conditions, rand
@@ -12,6 +14,7 @@ from BEE2_config import ConfigFile
 from srctools import Keyvalues, Vec, VMF, Output, Entity
 
 from precomp.collisions import Collisions
+from quote_pack import ExportedQuote
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -56,6 +59,14 @@ fake_inst = VMF().create_ent(
 def has_responses(info: corridor.Info) -> bool:
     """Check if we have any valid 'response' data for Coop."""
     return info.is_coop and 'CoopResponses' in QUOTE_DATA
+
+
+async def load() -> ExportedQuote:
+    """Load the data from disk."""
+    return await trio.to_thread.run_sync(
+        pickle.loads,
+        await trio.Path('bee2/voice.bin').read_bytes(),
+    )
 
 
 def encode_coop_responses(vmf: VMF, pos: Vec, allow_dings: bool, info: corridor.Info) -> None:

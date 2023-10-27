@@ -310,3 +310,19 @@ class Monitor:
     turret_hate: bool
     interrupt: float
     cam_angle: Angle
+
+
+@attrs.frozen(kw_only=True)
+class ExportedQuote:
+    """The data that is saved for the compiler to use."""
+    id: str
+    cave_skin: Optional[int]
+    chars: Set[str]
+    base_inst: str
+    position: Vec
+
+    groups: Dict[str, Group]
+    events: Dict[str, QuoteEvent]
+    responses: Dict[Response, List[Line]]
+    midchamber: List[Quote]
+    monitor: Optional[Monitor]
