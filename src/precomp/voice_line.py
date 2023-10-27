@@ -480,14 +480,13 @@ def add_voice(
     norm_config = ConfigFile('bee2/voice.cfg', in_conf_folder=False)
     mid_config = ConfigFile('bee2/mid_voice.cfg', in_conf_folder=False)
 
-    quote_base = QUOTE_DATA['base', '']
-    quote_loc = get_studio_loc()
-    if quote_base:
+    quote_loc = voice.position
+    if voice.base_inst:
         LOGGER.info('Adding Base instance!')
         conditions.add_inst(
             vmf,
             targetname='voice',
-            file=INST_PREFIX + quote_base,
+            file=INST_PREFIX + voice.base_inst,
             origin=quote_loc,
         )
 
@@ -498,16 +497,15 @@ def add_voice(
     if bullsye_actor and has_studio:
         ADDED_BULLSEYES.add(bullsye_actor)
 
-    global_bullseye = QUOTE_DATA['bullseye', '']
-    if global_bullseye:
-        add_bullseye(vmf, quote_loc, global_bullseye)
+    if voice.global_bullseye:
+        add_bullseye(vmf, quote_loc, voice.global_bullseye)
 
     allow_mid_voices = not style_vars.get('nomidvoices', False)
 
     mid_quotes: List[List[MidQuote]] = []
 
     # Enable using the beep before and after choreo lines.
-    allow_dings = srctools.conv_bool(QUOTE_DATA['use_dings', '0'])
+    allow_dings = voice.use_dings
     if allow_dings:
         vmf.create_ent(
             classname='logic_choreographed_scene',
@@ -526,32 +524,26 @@ def add_voice(
             onplayerdeath='0',
         )
 
-    # QuoteEvents allows specifying an instance for particular items,
-    # so a voice line can be played at a certain time. It's only active
-    # in certain styles, but uses the default if not set.
-    for event in QUOTE_DATA.find_all('QuoteEvents', 'Event'):
-        event_id = event['id', ''].casefold()
-        # We ignore the config if no result was executed.
-        if event_id and event_id in QUOTE_EVENTS:
-            # Instances from the voiceline config are in this subfolder,
-            # but not the default item - that's set from the conditions
-            QUOTE_EVENTS[event_id] = INST_PREFIX + event['file']
-
-    LOGGER.info('Quote events: {}', list(QUOTE_EVENTS.keys()))
-
     if has_responses(info):
         LOGGER.info('Generating responses data..')
         encode_coop_responses(vmf, quote_loc, allow_dings, info)
 
-    for ind, file in enumerate(QUOTE_EVENTS.values()):
-        if not file:
-            continue
-        conditions.add_inst(
-            vmf,
-            targetname='voice_event_' + str(ind),
-            file=file,
-            origin=quote_loc,
-        )
+    # QuoteEvents allows specifying an instance for particular items,
+    # so a voice line can be played at a certain time. It's only active
+    # in certain styles, but uses the default if not set.
+    ind = 1
+    for event in voice.events.values():
+        # We ignore the config if no result was executed.
+        if event.id in QUOTE_EVENTS:
+            # Instances from the voiceline config are in this subfolder,
+            # but not the default item - that's set from the conditions.
+            conditions.add_inst(
+                vmf,
+                targetname=f'voice_event_{ind}',
+                file=INST_PREFIX + event.file,
+                origin=quote_loc,
+            )
+            ind += 1
 
     # Determine the flags that enable/disable specific lines based on which
     # players are used.
@@ -560,14 +552,14 @@ def add_voice(
     ).casefold()
 
     player_flags = {
-        'sp': info.is_sp,
-        'coop': info.is_coop,
-        'atlas': info.is_coop or player_model == 'atlas',
-        'pbody': info.is_coop or player_model == 'pbody',
-        'bendy': info.is_sp and player_model == 'peti',
-        'chell': info.is_sp and player_model == 'sp',
-        'human': info.is_sp and player_model in ('peti', 'sp'),
-        'robot': info.is_coop or player_model in ('atlas', 'pbody'),
+        LineCriteria.SP: info.is_sp,
+        LineCriteria.COOP: info.is_coop,
+        LineCriteria.ATLAS: info.is_coop or player_model == 'atlas',
+        LineCriteria.PBODY: info.is_coop or player_model == 'pbody',
+        LineCriteria.BENDY: info.is_sp and player_model == 'peti',
+        LineCriteria.CHELL: info.is_sp and player_model == 'sp',
+        LineCriteria.HUMAN: info.is_sp and player_model in ('peti', 'sp'),
+        LineCriteria.ROBOT: info.is_coop or player_model in ('atlas', 'pbody'),
     }
     # All which are True.
     player_flag_set = {val for val, flag in player_flags.items() if flag}
