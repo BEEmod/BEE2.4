@@ -3,7 +3,7 @@ from typing import Dict, List, Optional, Set, Iterator
 import attrs
 
 from app.errors import AppError
-from quote_pack import Line, Quote, QuoteEvent, Group, Response, RESPONSE_NAMES
+from quote_pack import Line, Quote, QuoteEvent, Group, Response, Monitor, RESPONSE_NAMES
 from transtoken import TransToken, TransTokenSource
 from packages import PackagesSet, PakObject, set_cond_source, ParseData, get_config, SelitemData
 from srctools import Angle, Keyvalues, Vec, NoKeyError, logger
@@ -11,17 +11,6 @@ import srctools
 
 
 LOGGER = logger.get_logger('packages.quote_pack')
-
-
-@attrs.frozen(kw_only=True)
-class Monitor:
-    """Options required for displaying the character in the monitor screen."""
-    studio: str
-    studio_actor: str
-    cam_loc: Vec
-    turret_hate: bool
-    interrupt: float
-    cam_angle: Angle
 
 
 class QuotePack(PakObject, needs_foreground=True, style_suggest_key='quote'):

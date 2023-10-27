@@ -1,10 +1,10 @@
 """Data structures for quote packs."""
 import enum
 from collections.abc import Iterator
-from typing import Iterable, List, Mapping, Optional, Set
+from typing import Dict, Iterable, List, Mapping, Optional, Set
 
 import attrs
-from srctools import Keyvalues, Vec, conv_int, logger
+from srctools import Angle, Keyvalues, Vec, conv_int, logger
 from typing_extensions import Self, assert_never
 
 import utils
@@ -299,3 +299,14 @@ class Group:
     def __iadd__(self, other: Self) -> Self:
         """Merge two group definitions into one."""
         return attrs.evolve(self, quotes=self.quotes + other.quotes)
+
+
+@attrs.frozen(kw_only=True)
+class Monitor:
+    """Options required for displaying the character in the monitor screen."""
+    studio: str
+    studio_actor: str
+    cam_loc: Vec
+    turret_hate: bool
+    interrupt: float
+    cam_angle: Angle
