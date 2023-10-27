@@ -18,42 +18,40 @@ TRANS_NO_NAME = TransToken.ui('No Name!')
 
 
 @utils.freeze_enum_props
-class CharKind(enum.Flag):
-    """The categories lines can be applicable to."""
-    # These 4 are exclusive, the other 4 are not.
+class LineCriteria(enum.Enum):
+    """Criteria to determine if a line is applicable."""
+    # Which player model is selected.
     CHELL = enum.auto()
     BENDY = enum.auto()
     ATLAS = enum.auto()
     PBODY = enum.auto()
 
+    # The current game mode
     SP = enum.auto()
     COOP = enum.auto()
-    HUMAN = CHELL | BENDY
-    ROBOT = ATLAS | PBODY | COOP
-
-    ANY = CHELL | BENDY | ATLAS | PBODY | SP | COOP | HUMAN | ROBOT
+    # Combinations of the above.
+    HUMAN = enum.auto()  # Chell | Bendy
+    ROBOT = enum.auto()  # Coop | ATLAS | P-Body
 
     @property
     def tooltip(self) -> TransToken:
         """Tooltip to display for this character."""
-        if self is CharKind.SP:
+        if self is LineCriteria.SP:
             return TransToken.ui('Singleplayer')
-        elif self is CharKind.COOP:
+        elif self is LineCriteria.COOP:
             return TransToken.ui('Cooperative')
-        elif self is CharKind.ATLAS:
+        elif self is LineCriteria.ATLAS:
             return TransToken.ui('ATLAS (SP/Coop)')
-        elif self is CharKind.PBODY:
+        elif self is LineCriteria.PBODY:
             return TransToken.ui('P-Body (SP/Coop)')
-        elif self is CharKind.BENDY:
+        elif self is LineCriteria.BENDY:
             return TransToken.ui('Bendy')
-        elif self is CharKind.CHELL:
+        elif self is LineCriteria.CHELL:
             return TransToken.ui('Chell')
-        elif self is CharKind.HUMAN:
+        elif self is LineCriteria.HUMAN:
             return TransToken.ui('Human characters (Bendy and Chell)')
-        elif self is CharKind.ROBOT:
+        elif self is LineCriteria.ROBOT:
             return TransToken.ui('AI characters (ATLAS, P-Body, or Coop)')
-        elif self is CharKind.ANY:
-            return TransToken.ui('Always applicable')
         else:
             assert_never(self)
 
@@ -110,19 +108,6 @@ RESPONSE_NAMES: Mapping[str, Response] = {
 }
 
 
-line_kinds = {
-    'line': CharKind.ANY,
-    'line_sp': CharKind.SP,
-    'line_coop': CharKind.COOP,
-    'line_atlas': CharKind.ATLAS,
-    'line_pbody': CharKind.PBODY,
-    'line_bendy': CharKind.BENDY,
-    'line_chell': CharKind.CHELL,
-    'line_human': CharKind.HUMAN,
-    'line_robot': CharKind.ROBOT,
-}
-
-
 @attrs.frozen
 class QuoteEvent:
     """Defines instances that should be placed if prerequisites """
@@ -142,7 +127,7 @@ class QuoteEvent:
 class Line:
     """A single group of lines that can be played."""
     id: str
-    kind: CharKind
+    criterion: Set[LineCriteria]
     name: TransToken
     transcript: List[tuple[str, TransToken]]
 
@@ -157,12 +142,18 @@ class Line:
 
     @classmethod
     def parse(cls, pak_id: str, kv: Keyvalues) -> Self:
-        """Parse from the keyvalues data."""
-        try:
-            kind = line_kinds[kv.name]
-        except KeyError:
-            LOGGER.warning('Invalid Quote Pack line kind "{}"', kv.real_name)
-            kind = CharKind.ANY
+        """Parse from the keyvalues data.
+
+        The keyvalue should have its name start with "line".
+        """
+        criterion: Set[LineCriteria] = set()
+        criteria_parts = kv.name.split('_')
+        assert criteria_parts[0] == 'line'
+        for part in criteria_parts[1:]:
+            try:
+                criterion.add(LineCriteria[part.upper()])
+            except KeyError:
+                LOGGER.warning('Invalid Quote Pack line criteria name "{}"', part)
 
         try:
             quote_id = kv['id']
@@ -193,7 +184,7 @@ class Line:
 
         return cls(
             id=quote_id,
-            kind=kind,
+            criterion=criterion,
             name=disp_name,
             transcript=transcript,
             only_once=kv.bool('onlyonce'),
