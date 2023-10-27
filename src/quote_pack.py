@@ -8,7 +8,7 @@ from srctools import Keyvalues, Vec, conv_int, logger
 from typing_extensions import Self, assert_never
 
 import utils
-from transtoken import TransToken
+from transtoken import TransToken, TransTokenSource
 
 
 LOGGER = logger.get_logger(__name__)
@@ -209,6 +209,12 @@ class Line:
                     line=TransToken.parse(pak_id, child.value)
                 )
 
+    def iter_trans_tokens(self, path: str) -> Iterator[TransTokenSource]:
+        """Yield all translatable tokens for this line."""
+        yield self.name, path + '.name'
+        for i, (actor, line) in enumerate(self.transcript, 1):
+            yield line, f'{path}.transcript_{i}'
+
 
 @attrs.frozen
 class Quote:
@@ -235,6 +241,12 @@ class Quote:
             else:
                 tests.append(child)
         return cls(tests, priority, name, lines)
+
+    def iter_trans_tokens(self, path: str) -> Iterator[TransTokenSource]:
+        """Yield all translatable tokens for this quote."""
+        yield self.name, path + '.name'
+        for i, line in enumerate(self.lines, 1):
+            yield from line.iter_trans_tokens(f'{path}/{line.id}')
 
 
 @attrs.frozen(kw_only=True)

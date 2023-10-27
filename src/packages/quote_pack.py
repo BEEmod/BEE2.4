@@ -251,8 +251,15 @@ class QuotePack(PakObject, needs_foreground=True, style_suggest_key='quote'):
                 used.add(quote_id)
 
     def iter_trans_tokens(self) -> Iterator[TransTokenSource]:
-        """Yield all translation tokens in this voice pack.
-
-        TODO: Parse out translations in the pack itself.
-        """
-        return self.selitem_data.iter_trans_tokens(f'voiceline/{self.id}')
+        """Yield all translation tokens in this voice pack."""
+        yield from self.selitem_data.iter_trans_tokens(f'voiceline/{self.id}')
+        for group in self.groups.values():
+            yield group.name, f'voiceline/{self.id}/{group.id}.name'
+            yield group.desc, f'voiceline/{self.id}/{group.id}.desc'
+            for quote in group.quotes:
+                yield from quote.iter_trans_tokens(f'voiceline/{self.id}/{group.id}')
+        for resp, lines in self.responses.items():
+            for line in lines:
+                yield from line.iter_trans_tokens(f'voiceline/{self.id}/responses')
+        for quote in self.midchamber:
+            yield from quote.iter_trans_tokens(f'voiceline/{self.id}/midchamber/{quote.name.token}')
