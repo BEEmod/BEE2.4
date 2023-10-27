@@ -16,7 +16,7 @@ from editoritems_props import PanelAnimation
 import utils
 import consts
 from precomp.lazy_value import LazyValue
-from quote_pack import ExportedQuote
+from quote_pack import QuoteInfo
 
 
 COND_MOD_NAME = 'Brushes'
@@ -386,7 +386,7 @@ def res_import_template(
     vmf: VMF,
     coll: collisions.Collisions,
     info: corridor.Info,
-    voice: ExportedQuote,
+    voice: QuoteInfo,
     res: Keyvalues,
 ) -> conditions.ResultCallable:
     """Import a template VMF file, retexturing it to match orientation.

@@ -54,7 +54,7 @@ from srctools import Keyvalues
 from precomp import instanceLocs, rand
 from precomp.collisions import Collisions
 from precomp.corridor import Info as MapInfo
-from quote_pack import ExportedQuote
+from quote_pack import QuoteInfo
 import consts
 import utils
 
@@ -269,7 +269,7 @@ class Condition:
 
     @staticmethod
     def test_result(
-        coll: Collisions, info: MapInfo, voice_data: ExportedQuote,
+        coll: Collisions, info: MapInfo, voice_data: QuoteInfo,
         inst: Entity,
         res: Keyvalues,
     ) -> bool | object:
@@ -288,7 +288,7 @@ class Condition:
         else:
             return cond_call(coll, info, voice_data, inst, res)
 
-    def test(self, coll: Collisions, info: MapInfo, voice_data: ExportedQuote, inst: Entity) -> None:
+    def test(self, coll: Collisions, info: MapInfo, voice_data: QuoteInfo, inst: Entity) -> None:
         """Try to satisfy this condition on the given instance.
 
         If we find that no instance will succeed, raise Unsatisfiable.
@@ -557,14 +557,14 @@ class CondCall(Generic[CallResultT]):
 
     _setup_data: dict[int, Callable[[Entity], CallResultT]] | None = attrs.field(init=False)
     _cback: Callable[
-        [srctools.VMF, Collisions, MapInfo, ExportedQuote, Entity, Keyvalues],
+        [srctools.VMF, Collisions, MapInfo, QuoteInfo, Entity, Keyvalues],
         CallResultT | Callable[[Entity], CallResultT],
     ] = attrs.field(init=False)
 
     def __attrs_post_init__(self) -> None:
         cback, arg_order = annotation_caller(
             self.func,
-            srctools.VMF, Collisions, MapInfo, ExportedQuote,
+            srctools.VMF, Collisions, MapInfo, QuoteInfo,
             Entity, Keyvalues,
         )
         self._cback = cback
@@ -585,7 +585,7 @@ class CondCall(Generic[CallResultT]):
 
     def __call__(
         self,
-        coll: Collisions, info: MapInfo, voice: ExportedQuote,
+        coll: Collisions, info: MapInfo, voice: QuoteInfo,
         ent: Entity,
         conf: Keyvalues,
     ) -> CallResultT:
@@ -762,7 +762,7 @@ def check_all(
     vmf: VMF,
     coll: Collisions,
     info: MapInfo,
-    voice_data: ExportedQuote,
+    voice_data: QuoteInfo,
 ) -> None:
     """Check all conditions."""
     ALL_INST.update({
@@ -860,7 +860,7 @@ def check_all(
 
 def check_test(
     test: Keyvalues,
-    coll: Collisions, info: MapInfo, voice: ExportedQuote,
+    coll: Collisions, info: MapInfo, voice: QuoteInfo,
     inst: Entity, can_skip: bool = False,
 ) -> bool:
     """Determine the result for a condition test.
@@ -1387,7 +1387,7 @@ def res_timed_relay(vmf: VMF, res: Keyvalues) -> Callable[[Entity], None]:
 
 @make_result('condition')
 def res_sub_condition(
-    coll: Collisions, info: MapInfo, voice: ExportedQuote,
+    coll: Collisions, info: MapInfo, voice: QuoteInfo,
     res: Keyvalues,
 ) -> ResultCallable:
     """Check a different condition if the outer block is true."""
@@ -1422,7 +1422,7 @@ def res_end_condition() -> None:
 
 @make_result('switch')
 def res_switch(
-    coll: Collisions, info: MapInfo, voice: ExportedQuote,
+    coll: Collisions, info: MapInfo, voice: QuoteInfo,
     res: Keyvalues,
 ) -> ResultCallable:
     """Run the same test multiple times with different arguments.

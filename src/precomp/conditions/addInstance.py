@@ -6,7 +6,7 @@ from srctools import Vec, Entity, Keyvalues, VMF, Angle
 import srctools.logger
 
 from precomp import instanceLocs, options, collisions, conditions, rand, corridor
-from quote_pack import ExportedQuote
+from quote_pack import QuoteInfo
 
 
 COND_MOD_NAME = 'Instance Generation'
@@ -141,7 +141,7 @@ def res_add_overlay_inst(vmf: VMF, inst: Entity, res: Keyvalues) -> Optional[Ent
 
 @conditions.make_result('addShuffleGroup')
 def res_add_shuffle_group(
-    coll: collisions.Collisions, info: corridor.Info, voice: ExportedQuote,
+    coll: collisions.Collisions, info: corridor.Info, voice: QuoteInfo,
     vmf: VMF, res: Keyvalues,
 ) -> Callable[[Entity], None]:
     """Pick from a pool of instances to randomise decoration.

@@ -7,7 +7,7 @@ import srctools
 from precomp import collisions, conditions, rand
 from precomp.conditions import Condition, RES_EXHAUSTED, make_result, MapInfo
 from precomp.lazy_value import LazyValue
-from quote_pack import ExportedQuote
+from quote_pack import QuoteInfo
 
 
 COND_MOD_NAME = 'Randomisation'
@@ -35,7 +35,7 @@ def check_random(res: Keyvalues) -> conditions.TestCallable:
 
 @make_result('random')
 def res_random(
-    coll: collisions.Collisions, info: MapInfo, voice: ExportedQuote,
+    coll: collisions.Collisions, info: MapInfo, voice: QuoteInfo,
     res: Keyvalues,
 ) -> conditions.ResultCallable:
     """Randomly choose one of the sub-results to execute.

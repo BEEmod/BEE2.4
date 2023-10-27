@@ -313,7 +313,7 @@ class Monitor:
 
 
 @attrs.frozen(kw_only=True)
-class ExportedQuote:
+class QuoteInfo:
     """The data that is saved for the compiler to use."""
     id: str
     cave_skin: Optional[int]

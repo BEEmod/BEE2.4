@@ -28,7 +28,7 @@ import trio
 from BEE2_config import ConfigFile
 import utils
 from precomp.collisions import Collisions
-from quote_pack import ExportedQuote
+from quote_pack import QuoteInfo
 from precomp import (
     instance_traits,
     brushLoc,
@@ -236,7 +236,7 @@ async def load_map(map_path: str) -> VMF:
 
 
 @conditions.MetaCond.VoiceLine.register
-def add_voice(vmf: VMF, coll: Collisions, info: corridor.Info, voice: ExportedQuote) -> None:
+def add_voice(vmf: VMF, coll: Collisions, info: corridor.Info, voice: QuoteInfo) -> None:
     """Add voice lines to the map."""
     voice_line.add_voice(
         style_vars=settings['style_vars'],

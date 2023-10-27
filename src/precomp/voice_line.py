@@ -14,7 +14,7 @@ from BEE2_config import ConfigFile
 from srctools import Keyvalues, Vec, VMF, Output, Entity
 
 from precomp.collisions import Collisions
-from quote_pack import ExportedQuote
+from quote_pack import QuoteInfo, LineCriteria
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -61,7 +61,7 @@ def has_responses(info: corridor.Info) -> bool:
     return info.is_coop and 'CoopResponses' in QUOTE_DATA
 
 
-async def load() -> ExportedQuote:
+async def load() -> QuoteInfo:
     """Load the data from disk."""
     return await trio.to_thread.run_sync(
         pickle.loads,
@@ -134,7 +134,7 @@ def res_quote_event(res: Keyvalues):
 def find_group_quotes(
     coll: Collisions,
     info: corridor.Info,
-    voice: ExportedQuote,
+    voice: QuoteInfo,
     group: Keyvalues,
     mid_quotes: List[List[MidQuote]],
     allow_mid_voices: bool,
@@ -470,7 +470,7 @@ def add_voice(
     vmf: VMF,
     coll: Collisions,
     info: corridor.Info,
-    voice: ExportedQuote,
+    voice: QuoteInfo,
     use_priority=True,
 ) -> None:
     """Add a voice line to the map."""

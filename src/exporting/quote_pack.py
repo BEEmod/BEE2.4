@@ -9,7 +9,7 @@ import trio
 import utils
 from exporting import ExportData, STEPS, StepResource
 from packages import QuotePack
-from quote_pack import ExportedQuote
+from quote_pack import QuoteInfo
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -29,7 +29,7 @@ async def step_quote_pack(exp_data: ExportData) -> None:
 
     exp_data.vbsp_conf += voice.config
 
-    data = ExportedQuote(
+    data = QuoteInfo(
         id=voice.id,
         chars=voice.chars,
         cave_skin=voice.cave_skin,
