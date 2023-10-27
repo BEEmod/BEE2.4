@@ -9,7 +9,6 @@ import trio
 import utils
 from exporting import ExportData, STEPS, StepResource
 from packages import QuotePack
-from quote_pack import QuoteInfo
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -29,22 +28,7 @@ async def step_quote_pack(exp_data: ExportData) -> None:
 
     exp_data.vbsp_conf += voice.config
 
-    data = QuoteInfo(
-        id=voice.id,
-        chars=voice.chars,
-        cave_skin=voice.cave_skin,
-        base_inst=voice.base_inst,
-        position=voice.position,
-        use_dings=voice.use_dings,
-        use_microphone=voice.use_microphone,
-        global_bullseye=voice.global_bullseye,
-        groups=voice.groups,
-        events=voice.events,
-        responses=voice.responses,
-        midchamber=voice.midchamber,
-        monitor=voice.monitor,
-    )
-    pickle_data = await trio.to_thread.run_sync(pickle.dumps, data, pickle.HIGHEST_PROTOCOL)
+    pickle_data = await trio.to_thread.run_sync(pickle.dumps, voice.data, pickle.HIGHEST_PROTOCOL)
     await trio.Path(exp_data.game.abs_path('bin/bee2/voice.bin')).write_bytes(pickle_data)
     del pickle_data
 

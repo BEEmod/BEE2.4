@@ -312,13 +312,13 @@ class Monitor:
     cam_angle: Angle
 
 
-@attrs.frozen(kw_only=True)
+@attrs.define(kw_only=True)
 class QuoteInfo:
     """The data that is saved for the compiler to use."""
     id: str
     cave_skin: Optional[int]
     use_dings: bool
-    use_microphone: bool
+    use_microphones: bool
     global_bullseye: str
     chars: Set[str]
     base_inst: str

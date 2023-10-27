@@ -513,9 +513,9 @@ async def load_packages(packset: packages.PackagesSet, tk_img: TKImages) -> None
             voice.id,
             voice.selitem_data,
             attrs={
-                'CHAR': voice.chars or {'???'},
-                'MONITOR': voice.monitor is not None,
-                'TURRET': voice.monitor is not None and voice.monitor.turret_hate,
+                'CHAR': voice.data.chars or {'???'},
+                'MONITOR': voice.data.monitor is not None,
+                'TURRET': voice.data.monitor is not None and voice.data.monitor.turret_hate,
             }
         ))
 

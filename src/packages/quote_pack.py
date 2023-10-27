@@ -1,12 +1,10 @@
-from typing import Dict, List, Optional, Set, Iterator
-
-import attrs
+from typing import List, Set, Iterator
 
 from app.errors import AppError
-from quote_pack import Line, Quote, QuoteEvent, Group, Response, Monitor, RESPONSE_NAMES
+from quote_pack import Line, Quote, QuoteEvent, Group, QuoteInfo, Response, Monitor, RESPONSE_NAMES
 from transtoken import TransToken, TransTokenSource
 from packages import PackagesSet, PakObject, set_cond_source, ParseData, get_config, SelitemData
-from srctools import Angle, Keyvalues, Vec, NoKeyError, logger
+from srctools import Angle, Keyvalues, NoKeyError, logger
 import srctools
 
 
@@ -21,36 +19,13 @@ class QuotePack(PakObject, needs_foreground=True, style_suggest_key='quote'):
         selitem_data: SelitemData,
         config: Keyvalues,
         *,
-        base_inst: str,
-        groups: Dict[str, Group],
-        events: Dict[str, QuoteEvent],
-        responses: Dict[Response, List[Line]],
-        midchamber: List[Quote],
-        position: Vec,
-        use_dings: bool,
-        use_microphone: bool,
-        global_bullseye: str,
-
-        chars: Optional[Set[str]] = None,
-        cave_skin: Optional[int] = None,
-        monitor: Optional[Monitor] = None,
+        data: QuoteInfo,
     ) -> None:
         self.id = quote_id
         self.selitem_data = selitem_data
-        self.cave_skin = cave_skin
         self.config = config
         set_cond_source(config, f'QuotePack <{quote_id}>')
-        self.base_inst = base_inst
-        self.position = position
-        self.global_bullseye = global_bullseye
-        self.use_microphone = use_microphone
-        self.use_dings = use_dings
-        self.groups = groups
-        self.midchamber = midchamber
-        self.responses = responses
-        self.events = events
-        self.chars = chars or {'??'}
-        self.monitor = monitor
+        self.data = data
 
     @classmethod
     async def parse(cls, data: ParseData) -> 'QuotePack':
@@ -145,50 +120,53 @@ class QuotePack(PakObject, needs_foreground=True, style_suggest_key='quote'):
             data.id,
             selitem_data,
             config,
-            base_inst=base_inst,
-            position=position,
-            use_dings=use_dings,
-            use_microphones=use_microphones,
-            global_bullseye=global_bullseye,
-            groups=groups,
-            events=events,
-            midchamber=midchamber,
-            responses=responses,
+            data=QuoteInfo(
+                id=data.id,
+                base_inst=base_inst,
+                position=position,
+                use_dings=use_dings,
+                use_microphones=use_microphones,
+                global_bullseye=global_bullseye,
+                groups=groups,
+                events=events,
+                midchamber=midchamber,
+                responses=responses,
 
-            chars=chars,
-            cave_skin=port_skin,
-            monitor=monitor,
-            )
+                chars=chars,
+                cave_skin=port_skin,
+                monitor=monitor,
+            ),
+        )
 
     def add_over(self, override: 'QuotePack') -> None:
         """Add the additional lines to ourselves."""
         self.selitem_data += override.selitem_data
         self.config += override.config
-        self.midchamber += override.midchamber
-        for group in override.groups.values():
-            if group.id in self.groups:
-                self.groups[group.id] += group
+        self.data.midchamber += override.data.midchamber
+        for group in override.data.groups.values():
+            if group.id in self.data.groups:
+                self.data.groups[group.id] += group
             else:
-                self.groups[group.id] = group
+                self.data.groups[group.id] = group
 
-        for resp, lines in override.responses.items():
+        for resp, lines in override.data.responses.items():
             try:
-                self.responses[resp] += lines
+                self.data.responses[resp] += lines
             except KeyError:
-                self.responses[resp] = lines
+                self.data.responses[resp] = lines
 
-        if self.cave_skin is None:
-            self.cave_skin = override.cave_skin
+        if self.data.cave_skin is None:
+            self.data.cave_skin = override.data.cave_skin
 
-        if self.monitor is None:
-            self.monitor = override.monitor
+        if self.data.monitor is None:
+            self.data.monitor = override.data.monitor
 
-        if overlap := self.events.keys() & override.events.keys():
+        if overlap := self.data.events.keys() & override.data.events.keys():
             LOGGER.warning(
                 'Duplicate event IDs for quote pack {}: {}',
                 self.id, sorted(overlap),
             )
-        self.events |= override.events
+        self.data.events |= override.data.events
 
     def __repr__(self) -> str:
         return '<Voice:' + self.id + '>'
@@ -255,13 +233,13 @@ class QuotePack(PakObject, needs_foreground=True, style_suggest_key='quote'):
     def iter_trans_tokens(self) -> Iterator[TransTokenSource]:
         """Yield all translation tokens in this voice pack."""
         yield from self.selitem_data.iter_trans_tokens(f'voiceline/{self.id}')
-        for group in self.groups.values():
+        for group in self.data.groups.values():
             yield group.name, f'voiceline/{self.id}/{group.id}.name'
             yield group.desc, f'voiceline/{self.id}/{group.id}.desc'
             for quote in group.quotes:
                 yield from quote.iter_trans_tokens(f'voiceline/{self.id}/{group.id}')
-        for resp, lines in self.responses.items():
+        for resp, lines in self.data.responses.items():
             for line in lines:
                 yield from line.iter_trans_tokens(f'voiceline/{self.id}/responses')
-        for quote in self.midchamber:
+        for quote in self.data.midchamber:
             yield from quote.iter_trans_tokens(f'voiceline/{self.id}/midchamber/{quote.name.token}')

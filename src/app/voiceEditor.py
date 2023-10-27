@@ -268,7 +268,7 @@ def show(tk_img: TKImages, quote_pack: QuotePack) -> None:
 
     TABS.clear()
 
-    for group in quote_pack.groups.values():
+    for group in quote_pack.data.groups.values():
         make_tab(
             tk_img,
             TabTypes.NORM,
@@ -281,7 +281,7 @@ def show(tk_img: TKImages, quote_pack: QuotePack) -> None:
             )
         )
 
-    if quote_pack.midchamber:
+    if quote_pack.data.midchamber:
         make_tab(
             tk_img,
             TabTypes.MIDCHAMBER,
@@ -290,11 +290,11 @@ def show(tk_img: TKImages, quote_pack: QuotePack) -> None:
             config=config_mid,
             contents=(
                 (quote.name, ID_MIDCHAMBER, quote.lines)
-                for quote in sorted(quote_pack.midchamber, key=lambda quote: quote.name.token)
+                for quote in sorted(quote_pack.data.midchamber, key=lambda quote: quote.name.token)
             )
         )
 
-    if any(quote_pack.responses.values()):
+    if any(quote_pack.data.responses.values()):
         make_tab(
             tk_img,
             TabTypes.RESPONSE,
@@ -303,7 +303,7 @@ def show(tk_img: TKImages, quote_pack: QuotePack) -> None:
             config=config_resp,
             contents=(
                 (resp.title, resp.name.lower(), lines)
-                for resp, lines in quote_pack.responses.items()
+                for resp, lines in quote_pack.data.responses.items()
             )
         )
 
