@@ -317,6 +317,9 @@ class ExportedQuote:
     """The data that is saved for the compiler to use."""
     id: str
     cave_skin: Optional[int]
+    use_dings: bool
+    use_microphone: bool
+    global_bullseye: str
     chars: Set[str]
     base_inst: str
     position: Vec

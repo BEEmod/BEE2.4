@@ -27,6 +27,9 @@ class QuotePack(PakObject, needs_foreground=True, style_suggest_key='quote'):
         responses: Dict[Response, List[Line]],
         midchamber: List[Quote],
         position: Vec,
+        use_dings: bool,
+        use_microphone: bool,
+        global_bullseye: str,
 
         chars: Optional[Set[str]] = None,
         cave_skin: Optional[int] = None,
@@ -39,6 +42,9 @@ class QuotePack(PakObject, needs_foreground=True, style_suggest_key='quote'):
         set_cond_source(config, f'QuotePack <{quote_id}>')
         self.base_inst = base_inst
         self.position = position
+        self.global_bullseye = global_bullseye
+        self.use_microphone = use_microphone
+        self.use_dings = use_dings
         self.groups = groups
         self.midchamber = midchamber
         self.responses = responses
@@ -97,6 +103,9 @@ class QuotePack(PakObject, needs_foreground=True, style_suggest_key='quote'):
 
         base_inst = quotes_kv['base', '']
         position = quotes_kv.vec('quote_loc', -10_000.0, 0.0, 0.0)
+        use_dings = quotes_kv.bool('use_dings')
+        use_microphones = quotes_kv.bool('UseMicrophones')
+        global_bullseye = quotes_kv['bullseye', '']
         groups: dict[str, Group] = {}
         events: dict[str, QuoteEvent] = {}
         responses: dict[Response, List[Line]] = {}
@@ -138,6 +147,9 @@ class QuotePack(PakObject, needs_foreground=True, style_suggest_key='quote'):
             config,
             base_inst=base_inst,
             position=position,
+            use_dings=use_dings,
+            use_microphones=use_microphones,
+            global_bullseye=global_bullseye,
             groups=groups,
             events=events,
             midchamber=midchamber,
@@ -210,6 +222,7 @@ class QuotePack(PakObject, needs_foreground=True, style_suggest_key='quote'):
     @classmethod
     async def post_parse(cls, packset: PackagesSet) -> None:
         """Verify no quote packs have duplicate IDs."""
+        # TODO rewrite!
 
         def iter_lines(conf: Keyvalues) -> Iterator[Keyvalues]:
             """Iterate over the varios line blocks."""
