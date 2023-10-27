@@ -134,6 +134,7 @@ def res_quote_event(res: Keyvalues):
 def find_group_quotes(
     coll: Collisions,
     info: corridor.Info,
+    voice: ExportedQuote,
     group: Keyvalues,
     mid_quotes: List[List[MidQuote]],
     allow_mid_voices: bool,
@@ -160,7 +161,7 @@ def find_group_quotes(
             if name in ('priority', 'name', 'id', 'line') or name.startswith('line_'):
                 # Not flags!
                 continue
-            if not conditions.check_test(flag, coll, info, fake_inst):
+            if not conditions.check_test(flag, coll, info, voice, fake_inst):
                 valid_quote = False
                 break
 
@@ -469,6 +470,7 @@ def add_voice(
     vmf: VMF,
     coll: Collisions,
     info: corridor.Info,
+    voice: ExportedQuote,
     use_priority=True,
 ) -> None:
     """Add a voice line to the map."""
@@ -581,8 +583,7 @@ def add_voice(
 
         possible_quotes = sorted(
             find_group_quotes(
-                coll,
-                info,
+                coll, info, voice,
                 group,
                 mid_quotes,
                 use_dings=use_dings,

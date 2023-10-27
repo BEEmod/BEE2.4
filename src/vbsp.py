@@ -17,7 +17,7 @@ import logging
 import pickle
 import contextlib
 
-from srctools import AtomicWriter, Keyvalues, Vec, FrozenVec, Angle, Matrix
+from srctools import AtomicWriter, Keyvalues, Vec, FrozenVec, Angle
 from srctools.vmf import VMF, Entity, Output
 from srctools.game import Game
 import srctools
@@ -28,6 +28,7 @@ import trio
 from BEE2_config import ConfigFile
 import utils
 from precomp.collisions import Collisions
+from quote_pack import ExportedQuote
 from precomp import (
     instance_traits,
     brushLoc,
@@ -235,13 +236,14 @@ async def load_map(map_path: str) -> VMF:
 
 
 @conditions.MetaCond.VoiceLine.register
-def add_voice(vmf: VMF, coll: Collisions, info: corridor.Info) -> None:
+def add_voice(vmf: VMF, coll: Collisions, info: corridor.Info, voice: ExportedQuote) -> None:
     """Add voice lines to the map."""
     voice_line.add_voice(
         style_vars=settings['style_vars'],
         coll=coll,
         vmf=vmf,
         info=info,
+        voice=voice,
         use_priority=BEE2_config.get_bool('General', 'voiceline_priority', False),
     )
 
@@ -1656,7 +1658,7 @@ async def main() -> None:
 
         await texturing.setup(game, vmf, list(tiling.TILES.values()))
 
-        conditions.check_all(vmf, coll, info)
+        conditions.check_all(vmf, coll, info, voice_data_res())
         add_extra_ents(vmf, info)
 
         tiling.generate_brushes(vmf)

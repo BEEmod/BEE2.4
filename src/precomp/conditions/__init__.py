@@ -54,6 +54,7 @@ from srctools import Keyvalues
 from precomp import instanceLocs, rand
 from precomp.collisions import Collisions
 from precomp.corridor import Info as MapInfo
+from quote_pack import ExportedQuote
 import consts
 import utils
 
@@ -267,7 +268,11 @@ class Condition:
         )
 
     @staticmethod
-    def test_result(coll: Collisions, info: MapInfo, inst: Entity, res: Keyvalues) -> bool | object:
+    def test_result(
+        coll: Collisions, info: MapInfo, voice_data: ExportedQuote,
+        inst: Entity,
+        res: Keyvalues,
+    ) -> bool | object:
         """Execute the given result."""
         try:
             cond_call = RESULT_LOOKUP[res.name]
@@ -278,18 +283,18 @@ class Condition:
                 raise ValueError(err_msg) from None
             else:
                 LOGGER.warning(err_msg)
-                # Delete this so it doesn't re-fire..
+                # Delete this so it doesn't re-fire...
                 return RES_EXHAUSTED
         else:
-            return cond_call(coll, info, inst, res)
+            return cond_call(coll, info, voice_data, inst, res)
 
-    def test(self, coll: Collisions, info: MapInfo, inst: Entity) -> None:
+    def test(self, coll: Collisions, info: MapInfo, voice_data: ExportedQuote, inst: Entity) -> None:
         """Try to satisfy this condition on the given instance.
 
         If we find that no instance will succeed, raise Unsatisfiable.
         """
         if self.meta_func is not None:
-            self.meta_func(coll, info, inst, Keyvalues.root())
+            self.meta_func(coll, info, voice_data, inst, Keyvalues.root())
             raise EndCondition
 
         success = True
@@ -298,12 +303,17 @@ class Condition:
         # such that it becomes satisfiable later, so this would be premature.
         # If we have else results, we also can't skip because those could modify state.
         for i, test in enumerate(self.tests):
-            if not check_test(test, coll, info, inst, can_skip=(i == 0) and not self.else_results):
+            if not check_test(
+                test,
+                coll, info, voice_data,
+                inst,
+                can_skip=(i == 0) and not self.else_results,
+            ):
                 success = False
                 break
         results = self.results if success else self.else_results
         for res in results[:]:
-            should_del = self.test_result(coll, info, inst, res)
+            should_del = self.test_result(coll, info, voice_data, inst, res)
             if should_del is RES_EXHAUSTED:
                 results.remove(res)
 
@@ -315,6 +325,7 @@ AnnArg2T = TypeVar('AnnArg2T')
 AnnArg3T = TypeVar('AnnArg3T')
 AnnArg4T = TypeVar('AnnArg4T')
 AnnArg5T = TypeVar('AnnArg5T')
+AnnArg6T = TypeVar('AnnArg6T')
 
 
 @overload
@@ -357,6 +368,15 @@ def annotation_caller(
 ) -> tuple[
     Callable[[AnnArg1T, AnnArg2T, AnnArg3T, AnnArg4T, AnnArg5T], AnnResT],
     tuple[Type[AnnArg1T], Type[AnnArg2T], Type[AnnArg3T], Type[AnnArg4T], Type[AnnArg5T]],
+]: ...
+@overload
+def annotation_caller(
+    func: Callable[..., AnnResT],
+    parm1: Type[AnnArg1T], parm2: Type[AnnArg2T], parm3: Type[AnnArg3T],
+    parm4: Type[AnnArg4T], parm5: Type[AnnArg5T], param6: Type[AnnArg6T], /,
+) -> tuple[
+    Callable[[AnnArg1T, AnnArg2T, AnnArg3T, AnnArg4T, AnnArg5T, AnnArg6T], AnnResT],
+    tuple[Type[AnnArg1T], Type[AnnArg2T], Type[AnnArg3T], Type[AnnArg4T], Type[AnnArg5T], Type[AnnArg6T]],
 ]: ...
 def annotation_caller(
     func: Callable[..., AnnResT], /,
@@ -537,14 +557,15 @@ class CondCall(Generic[CallResultT]):
 
     _setup_data: dict[int, Callable[[Entity], CallResultT]] | None = attrs.field(init=False)
     _cback: Callable[
-        [srctools.VMF, Collisions, MapInfo, Entity, Keyvalues],
+        [srctools.VMF, Collisions, MapInfo, ExportedQuote, Entity, Keyvalues],
         CallResultT | Callable[[Entity], CallResultT],
     ] = attrs.field(init=False)
 
     def __attrs_post_init__(self) -> None:
         cback, arg_order = annotation_caller(
             self.func,
-            srctools.VMF, Collisions, MapInfo, Entity, Keyvalues,
+            srctools.VMF, Collisions, MapInfo, ExportedQuote,
+            Entity, Keyvalues,
         )
         self._cback = cback
         if Entity not in arg_order:
@@ -562,10 +583,15 @@ class CondCall(Generic[CallResultT]):
     def __doc__(self, value: str) -> None:
         self.func.__doc__ = value
 
-    def __call__(self, coll: Collisions, info: MapInfo, ent: Entity, conf: Keyvalues) -> CallResultT:
+    def __call__(
+        self,
+        coll: Collisions, info: MapInfo, voice: ExportedQuote,
+        ent: Entity,
+        conf: Keyvalues,
+    ) -> CallResultT:
         """Execute the callback."""
         if self._setup_data is None:
-            return self._cback(ent.map, coll, info, ent, conf)  # type: ignore
+            return self._cback(ent.map, coll, info, voice, ent, conf)  # type: ignore
         else:
             # Execute setup functions if required.
             if id(conf) in self._setup_data:
@@ -574,7 +600,7 @@ class CondCall(Generic[CallResultT]):
                 # The entity should never be used in setup functions. Pass a dummy object
                 # so errors occur if it's used.
                 cback = self._setup_data[id(conf)] = self._cback(  # type: ignore
-                    ent.map, coll, info,
+                    ent.map, coll, info, voice,
                     cast(Entity, object()),
                     conf,
                 )
@@ -732,7 +758,12 @@ def add(kv_block: Keyvalues) -> None:
         conditions.append(con)
 
 
-def check_all(vmf: VMF, coll: Collisions, info: MapInfo) -> None:
+def check_all(
+    vmf: VMF,
+    coll: Collisions,
+    info: MapInfo,
+    voice_data: ExportedQuote,
+) -> None:
     """Check all conditions."""
     ALL_INST.update({
         inst['file'].casefold()
@@ -756,7 +787,7 @@ def check_all(vmf: VMF, coll: Collisions, info: MapInfo) -> None:
         with srctools.logger.context(condition.source or ''):
             for inst in vmf.by_class['func_instance']:
                 try:
-                    condition.test(coll, info, inst)
+                    condition.test(coll, info, voice_data, inst)
                 except NextInstance:
                     # NextInstance is raised to immediately stop running
                     # this condition, and skip to the next instance.
@@ -829,7 +860,7 @@ def check_all(vmf: VMF, coll: Collisions, info: MapInfo) -> None:
 
 def check_test(
     test: Keyvalues,
-    coll: Collisions, info: MapInfo,
+    coll: Collisions, info: MapInfo, voice: ExportedQuote,
     inst: Entity, can_skip: bool = False,
 ) -> bool:
     """Determine the result for a condition test.
@@ -853,11 +884,11 @@ def check_test(
             raise ValueError(err_msg) from None
         else:
             LOGGER.warning(err_msg)
-            # Skip these conditions..
+            # Skip these conditions...
             return False
 
     try:
-        res = func(coll, info, inst, test)
+        res = func(coll, info, voice, inst, test)
     except Unsatisfiable:
         if can_skip:
             raise
@@ -1355,14 +1386,17 @@ def res_timed_relay(vmf: VMF, res: Keyvalues) -> Callable[[Entity], None]:
 
 
 @make_result('condition')
-def res_sub_condition(coll: Collisions, info: MapInfo, res: Keyvalues) -> ResultCallable:
+def res_sub_condition(
+    coll: Collisions, info: MapInfo, voice: ExportedQuote,
+    res: Keyvalues,
+) -> ResultCallable:
     """Check a different condition if the outer block is true."""
     cond = Condition.parse(res, toplevel=False)
 
     def test_cond(inst: Entity) -> None:
         """For child conditions, we need to check every time."""
         try:
-            cond.test(coll, info, inst)
+            cond.test(coll, info, voice, inst)
         except Unsatisfiable:
             pass
     return test_cond
@@ -1387,7 +1421,10 @@ def res_end_condition() -> None:
 
 
 @make_result('switch')
-def res_switch(coll: Collisions, info: MapInfo, res: Keyvalues) -> ResultCallable:
+def res_switch(
+    coll: Collisions, info: MapInfo, voice: ExportedQuote,
+    res: Keyvalues,
+) -> ResultCallable:
     """Run the same test multiple times with different arguments.
 
     * `method` is the way the search is done - `first`, `last`, `random`, or `all`.
@@ -1446,17 +1483,17 @@ def res_switch(coll: Collisions, info: MapInfo, res: Keyvalues) -> ResultCallabl
         run_default = True
         for test, results in cases:
             # If not set, always succeed for the random situation.
-            if test.real_name and not check_test(test, coll, info, inst):
+            if test.real_name and not check_test(test, coll, info, voice, inst):
                 continue
             for sub_res in results:
-                Condition.test_result(coll, info, inst, sub_res)
+                Condition.test_result(coll, info, voice, inst, sub_res)
             run_default = False
             if method is not SWITCH_TYPE.ALL:
                 # All does them all, otherwise we quit now.
                 break
         if run_default:
             for sub_res in default:
-                Condition.test_result(coll, info, inst, sub_res)
+                Condition.test_result(coll, info, voice, inst, sub_res)
     return apply_switch
 
 
