@@ -54,6 +54,8 @@ def set_menu_text(menu: tk.Menu, token: TransToken, index: str | int = 'end') ->
     except KeyError:
         tok_map = _applied_menu_tokens[menu] = {}
     ind = menu.index(index)
+    if ind is None:
+        raise ValueError(f'Invalid index "{index}" for menu "{menu}"!')
     menu.entryconfigure(ind, label=str(token))
     tok_map[ind] = token
 
