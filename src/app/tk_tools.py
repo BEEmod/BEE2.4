@@ -530,7 +530,7 @@ class HidingScroll(ttk.Scrollbar):
     """A scrollbar variant which auto-hides when not needed.
 
     """
-    def set(self, low: float, high: float) -> None:
+    def set(self, low: Union[float, str], high: Union[float, str]) -> None:
         """Set the size needed for the scrollbar, and hide/show if needed."""
         if float(low) <= 0.0 and float(high) >= 1.0:
             # Remove this, but remember gridding options
