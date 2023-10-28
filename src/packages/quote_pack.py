@@ -171,32 +171,6 @@ class QuotePack(PakObject, needs_foreground=True, style_suggest_key='quote'):
     def __repr__(self) -> str:
         return '<Voice:' + self.id + '>'
 
-    @staticmethod
-    def strip_quote_data(kv: Keyvalues, _depth: int = 0) -> Keyvalues:
-        """Strip unused property blocks from the config files.
-
-        This removes data like the captions which the compiler doesn't need.
-        The returned property tree is a deep-copy of the original.
-        """
-        children = []
-        for sub_prop in kv:
-            # Make sure it's in the right nesting depth - tests might
-            # have arbitrary props in lower depths...
-            if _depth == 3:  # 'Line' blocks
-                if sub_prop.name == 'trans':
-                    continue
-                elif sub_prop.name == 'name' and 'id' in kv:
-                    continue  # The name isn't needed if an ID is available
-            elif _depth == 2 and sub_prop.name == 'name':
-                # In the "quote" section, the name isn't used in the compiler.
-                continue
-
-            if sub_prop.has_children():
-                children.append(QuotePack.strip_quote_data(sub_prop, _depth + 1))
-            else:
-                children.append(Keyvalues(sub_prop.real_name, sub_prop.value))
-        return Keyvalues(kv.real_name, children)
-
     @classmethod
     async def post_parse(cls, packset: PackagesSet) -> None:
         """Verify no quote packs have duplicate IDs."""
