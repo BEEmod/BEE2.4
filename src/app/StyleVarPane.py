@@ -10,9 +10,10 @@ from srctools.logger import get_logger
 import trio
 
 from packages import Style, StyleVar, PackagesSet
-from app import localisation, tooltip
+from app import tooltip
 from transtoken import TransToken
 from config.stylevar import State
+from ui_tk.wid_transtoken import set_text
 import config
 
 
@@ -206,26 +207,26 @@ async def make_stylevar_pane(
 ) -> None:
     """Construct the stylevar pane."""
     frame_all = ttk.Labelframe(frame)
-    localisation.set_text(frame_all, TransToken.ui("All:"))
+    set_text(frame_all, TransToken.ui("All:"))
     frame_all.grid(row=0, sticky='EW')
 
     frm_chosen = ttk.Labelframe(frame)
-    localisation.set_text(frm_chosen, TransToken.ui("Selected Style:"))
+    set_text(frm_chosen, TransToken.ui("Selected Style:"))
     frm_chosen.grid(row=1, sticky='EW')
 
     ttk.Separator(frame, orient='horizontal').grid(row=2, sticky='EW', pady=(10, 5))
 
     frm_other = ttk.Labelframe(frame)
-    localisation.set_text(frm_other, TransToken.ui("Other Styles:"))
+    set_text(frm_other, TransToken.ui("Other Styles:"))
     frm_other.grid(row=3, sticky='EW')
 
-    UI['stylevar_chosen_none'] = localisation.set_text(ttk.Label(
+    UI['stylevar_chosen_none'] = set_text(ttk.Label(
         frm_chosen,
         font='TkMenuFont',
         justify='center',
     ), TransToken.ui('No Options!'))
 
-    UI['stylevar_other_none'] = localisation.set_text(ttk.Label(
+    UI['stylevar_other_none'] = set_text(ttk.Label(
         frm_other,
         font='TkMenuFont',
         justify='center',
@@ -258,7 +259,7 @@ async def make_stylevar_pane(
         # Add the special stylevars which apply to all styles
         tk_vars[var.id] = int_var = IntVar(value=var.default)
         checkbox_all[var.id] = chk = ttk.Checkbutton(frame_all, variable=int_var)
-        localisation.set_text(chk, var.name)
+        set_text(chk, var.name)
         chk.grid(row=all_pos, column=0, sticky="W", padx=3)
         tooltip.add_tooltip(chk, make_desc(packset, var))
 
@@ -279,7 +280,7 @@ async def make_stylevar_pane(
                 # Available in all styles - put with the hardcoded variables.
                 all_pos += 1
                 checkbox_all[var.id] = chk = ttk.Checkbutton(frame_all, variable=tk_vars[var.id])
-                localisation.set_text(chk, var.name)
+                set_text(chk, var.name)
                 chk.grid(row=all_pos, column=0, sticky="W", padx=3)
                 tooltip.add_tooltip(chk, desc)
                 nursery.start_soon(add_state_syncers, var.id, int_var, chk)
@@ -288,8 +289,8 @@ async def make_stylevar_pane(
                 checkbox_chosen[var.id] = chk_chose = ttk.Checkbutton(frm_chosen, variable=tk_vars[var.id])
                 checkbox_other[var.id] = chk_other = ttk.Checkbutton(frm_other, variable=tk_vars[var.id])
 
-                localisation.set_text(chk_chose, var.name)
-                localisation.set_text(chk_other, var.name)
+                set_text(chk_chose, var.name)
+                set_text(chk_other, var.name)
                 tooltip.add_tooltip(checkbox_chosen[var.id], desc)
                 tooltip.add_tooltip(checkbox_other[var.id], desc)
                 nursery.start_soon(add_state_syncers, var.id, int_var, chk_chose, chk_other)

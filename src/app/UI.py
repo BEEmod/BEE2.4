@@ -13,7 +13,7 @@ import attrs
 import trio
 
 import loadScreen
-from app import TK_ROOT, background_run, localisation
+from app import TK_ROOT, background_run
 from BEE2_config import ConfigFile, GEN_OPTS
 from loadScreen import main_loader as loader
 import packages
@@ -50,6 +50,7 @@ from app.menu_bar import MenuBar
 from ui_tk.corridor_selector import TkSelector
 from ui_tk.dialogs import DIALOG
 from ui_tk.img import TKImages, TK_IMG
+from ui_tk import wid_transtoken
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -850,12 +851,12 @@ async def export_editoritems(pal_ui: paletteUI.PaletteUI, bar: MenuBar) -> None:
 
 def set_disp_name(item: PalItem, e: object = None) -> None:
     """Callback to display the name of the item."""
-    localisation.set_text(UI['pre_disp_name'], item.name)
+    wid_transtoken.set_text(UI['pre_disp_name'], item.name)
 
 
 def clear_disp_name(e: object = None) -> None:
     """Callback to reset the item name."""
-    localisation.set_text(UI['pre_disp_name'], TransToken.BLANK)
+    wid_transtoken.set_text(UI['pre_disp_name'], TransToken.BLANK)
 
 
 def conv_screen_to_grid(x: float, y: float) -> Tuple[int, int]:
@@ -1110,7 +1111,7 @@ async def init_option(
 
     async def game_changed(game: gameMan.Game) -> None:
         """When the game changes, update this button."""
-        localisation.set_text(UI['pal_export'], game.get_export_text())
+        wid_transtoken.set_text(UI['pal_export'], game.get_export_text())
 
     await gameMan.ON_GAME_CHANGED.register_and_prime(game_changed)
 
@@ -1119,7 +1120,7 @@ async def init_option(
     props.grid(row=5, sticky="EW")
 
     music_frame = ttk.Labelframe(props)
-    localisation.set_text(music_frame, TransToken.ui('Music: '))
+    wid_transtoken.set_text(music_frame, TransToken.ui('Music: '))
 
     async with trio.open_nursery() as nursery:
         nursery.start_soon(music_conf.make_widgets, packages.get_loaded_packages(), music_frame, pane)
@@ -1146,7 +1147,7 @@ async def init_option(
 
     UI['suggested_style'] = sugg_btn =  ttk.Button(props, command=suggested_style_set)
     # '\u2193' is the downward arrow symbol.
-    localisation.set_text(sugg_btn, TransToken.ui(
+    wid_transtoken.set_text(sugg_btn, TransToken.ui(
         "{down_arrow} Use Suggested {down_arrow}"
     ).format(down_arrow='\u2193'))
     sugg_btn.grid(row=1, column=1, columnspan=2, sticky="EW", padx=0)
@@ -1172,7 +1173,7 @@ async def init_option(
         if name is None:
             # This is the "Suggested" button!
             continue
-        localisation.set_text(ttk.Label(props), name).grid(row=ind)
+        wid_transtoken.set_text(ttk.Label(props), name).grid(row=ind)
 
     voice_frame = ttk.Frame(props)
     voice_frame.columnconfigure(1, weight=1)
@@ -1201,7 +1202,7 @@ async def init_option(
     voice_frame.grid(row=2, column=1, sticky='EW')
     (await skybox_win.widget(props)).grid(row=3, column=1, sticky='EW', padx=left_pad)
     (await elev_win.widget(props)).grid(row=4, column=1, sticky='EW', padx=left_pad)
-    localisation.set_text(
+    wid_transtoken.set_text(
         ttk.Button(props, command=lambda: background_run(corridor.show)),
         TransToken.ui('Select'),
     ).grid(row=5, column=1, sticky='EW')
@@ -1274,7 +1275,7 @@ def init_preview(tk_img: TKImages, f: Union[tk.Frame, ttk.Frame]) -> None:
 def init_picker(f: Union[tk.Frame, ttk.Frame]) -> None:
     """Construct the frame holding all the items."""
     global frmScroll, pal_canvas
-    localisation.set_text(
+    wid_transtoken.set_text(
         ttk.Label(f, anchor="center"),
         TransToken.ui("All Items: "),
     ).grid(row=0, column=0, sticky="EW")
@@ -1396,7 +1397,7 @@ async def set_game(game: 'gameMan.Game') -> None:
 
     This updates the title bar to match, and saves it into the config.
     """
-    localisation.set_win_title(TK_ROOT, TRANS_MAIN_TITLE.format(version=utils.BEE_VERSION, game=game.name))
+    wid_transtoken.set_win_title(TK_ROOT, TRANS_MAIN_TITLE.format(version=utils.BEE_VERSION, game=game.name))
     config.APP.store_conf(LastSelected(game.name), 'game')
 
 

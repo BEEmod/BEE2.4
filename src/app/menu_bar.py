@@ -9,11 +9,12 @@ import BEE2_config
 import utils
 from transtoken import TransToken
 from app import (
-    gameMan, helpMenu, localisation, optionWindow, packageMan, tk_tools,
+    gameMan, helpMenu, optionWindow, packageMan, tk_tools,
     backup as backup_win, background_run,
 )
 from ui_tk.dialogs import DIALOG
 from ui_tk.img import TKImages
+from ui_tk.wid_transtoken import set_menu_text
 
 
 EXPORT_BTN_POS: Final = 0  # Position of the export button.
@@ -55,45 +56,45 @@ class MenuBar:
             self.file_menu = tk.Menu(bar, name='file')
 
         bar.add_cascade(menu=self.file_menu)
-        localisation.set_menu_text(bar, TransToken.ui('File'))
+        set_menu_text(bar, TransToken.ui('File'))
 
         # Assign the bar as the main window's menu.
         # Must be done after creating the apple menu.
         parent['menu'] = bar
 
         self.file_menu.add_command(command=export, accelerator=tk_tools.ACCEL_EXPORT)
-        localisation.set_menu_text(self.file_menu, TransToken.ui('Export'))
+        set_menu_text(self.file_menu, TransToken.ui('Export'))
         self.export_btn_pos = self.file_menu.index('end')
         self.file_menu.entryconfigure(self.export_btn_pos, state='disabled')
 
         self.file_menu.add_command(command=lambda: background_run(gameMan.add_game, DIALOG))
-        localisation.set_menu_text(self.file_menu, TransToken.ui("Add Game"))
+        set_menu_text(self.file_menu, TransToken.ui("Add Game"))
 
         self.file_menu.add_command(command=lambda: background_run(gameMan.remove_game, DIALOG))
-        localisation.set_menu_text(self.file_menu, TransToken.ui("Uninstall from Selected Game"))
+        set_menu_text(self.file_menu, TransToken.ui("Uninstall from Selected Game"))
 
         self.file_menu.add_command(command=backup_win.show_window)
-        localisation.set_menu_text(self.file_menu, TransToken.ui("Backup/Restore Puzzles..."))
+        set_menu_text(self.file_menu, TransToken.ui("Backup/Restore Puzzles..."))
 
         self.folder_menu = tk.Menu(bar, name='folders')
         self.file_menu.add_cascade(menu=self.folder_menu)
-        localisation.set_menu_text(self.file_menu, TransToken.ui("Open Folder..."))
+        set_menu_text(self.file_menu, TransToken.ui("Open Folder..."))
 
         for label, path_getter in FOLDER_OPTIONS:
             self.folder_menu.add_command(command=self._evt_open_dir(path_getter))
-            localisation.set_menu_text(self.folder_menu, label)
+            set_menu_text(self.folder_menu, label)
 
         self.file_menu.add_separator()
 
         self.file_menu.add_command(command=packageMan.show,)
-        localisation.set_menu_text(self.file_menu, TransToken.ui("Manage Packages..."))
+        set_menu_text(self.file_menu, TransToken.ui("Manage Packages..."))
 
         self.file_menu.add_command(command=optionWindow.show)
-        localisation.set_menu_text(self.file_menu, TransToken.ui("Options"))
+        set_menu_text(self.file_menu, TransToken.ui("Options"))
 
         if not utils.MAC:
             self.file_menu.add_command(command=quit_app)
-            localisation.set_menu_text(self.file_menu, TransToken.ui("Quit"))
+            set_menu_text(self.file_menu, TransToken.ui("Quit"))
 
         self.file_menu.add_separator()
 
@@ -103,11 +104,11 @@ class MenuBar:
 
         self.pal_menu = tk.Menu(bar, name='palette')
         bar.add_cascade(menu=self.pal_menu)
-        localisation.set_menu_text(bar, TransToken.ui("Palette"))
+        set_menu_text(bar, TransToken.ui("Palette"))
 
         self.view_menu = tk.Menu(bar, name='view')
         bar.add_cascade(menu=self.view_menu)
-        localisation.set_menu_text(bar, TransToken.ui("View"))
+        set_menu_text(bar, TransToken.ui("View"))
 
         helpMenu.make_help_menu(bar, tk_img)
         gameMan.ON_GAME_CHANGED.register(self._game_changed)
@@ -137,6 +138,6 @@ class MenuBar:
 
     async def _game_changed(self, game: 'gameMan.Game') -> None:
         """Callback for when games are changed."""
-        localisation.set_menu_text(self.file_menu, game.get_export_text(), self.export_btn_pos)
+        set_menu_text(self.file_menu, game.get_export_text(), self.export_btn_pos)
         for i, (label, path_getter) in enumerate(FOLDER_OPTIONS):
-            localisation.set_menu_text(self.folder_menu, label.format(game=game.name), i)
+            set_menu_text(self.folder_menu, label.format(game=game.name), i)

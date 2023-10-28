@@ -17,6 +17,7 @@ from transtoken import TransToken
 from ui_tk.dialogs import TkDialogs
 from ui_tk.img import tkImg, TKImages
 import config
+from ui_tk.wid_transtoken import set_menu_text, set_text
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -83,18 +84,18 @@ class PaletteUI:
         btn_bar.columnconfigure(1, weight=1)
         btn_bar.columnconfigure(2, weight=1)
 
-        self.ui_btn_save = localisation.set_text(
+        self.ui_btn_save = set_text(
             ttk.Button(btn_bar, command=lambda: background_run(self.event_save, dialog_window)),
             TransToken.ui("Save"),
         )
         self.ui_btn_save.grid(row=0, column=0, sticky="EW")
 
-        localisation.set_text(
+        set_text(
             ttk.Button(btn_bar, command=lambda: background_run(self.event_save_as, dialog_window)),
             TransToken.ui("Save As"),
         ).grid(row=0, column=1, sticky="EW")
 
-        self.ui_remove = localisation.set_text(
+        self.ui_remove = set_text(
             ttk.Button(btn_bar, command=lambda: background_run(self.event_remove, dialog_window)),
             TransToken.ui("Delete"),
         )
@@ -113,7 +114,7 @@ class PaletteUI:
             variable=self.var_save_settings,
             command=self._store_configuration,
         )
-        localisation.set_text(check_save_settings, TransToken.ui('Save Settings in Palettes'))
+        set_text(check_save_settings, TransToken.ui('Save Settings in Palettes'))
         check_save_settings.grid(row=3, column=0, sticky="EW", padx=5)
 
         self.tk_img = tk_img
@@ -150,14 +151,14 @@ class PaletteUI:
             command=lambda: background_run(self.event_save, dialog_menu),
             accelerator=tk_tools.ACCEL_SAVE,
         )
-        localisation.set_menu_text(menu, TransToken.ui('Save Palette'))
+        set_menu_text(menu, TransToken.ui('Save Palette'))
         self.ui_readonly_indexes = [menu.index('end')]
 
         menu.add_command(
             command=lambda: background_run(self.event_save_as, dialog_menu),
             accelerator=tk_tools.ACCEL_SAVE_AS,
         )
-        localisation.set_menu_text(menu, TransToken.ui('Save Palette As...'))
+        set_menu_text(menu, TransToken.ui('Save Palette As...'))
 
         menu.add_command(
             label='Delete Palette',  # This name is overwritten later
@@ -166,25 +167,25 @@ class PaletteUI:
         self.ui_menu_delete_index = menu.index('end')
 
         menu.add_command(command=lambda: background_run(self.event_change_group, dialog_menu))
-        localisation.set_menu_text(menu, TransToken.ui('Change Palette Group...'))
+        set_menu_text(menu, TransToken.ui('Change Palette Group...'))
         self.ui_readonly_indexes.append(menu.index('end'))
 
         menu.add_command(command=lambda: background_run(self.event_rename, dialog_menu))
-        localisation.set_menu_text(menu, TransToken.ui('Rename Palette...'))
+        set_menu_text(menu, TransToken.ui('Rename Palette...'))
         self.ui_readonly_indexes.append(menu.index('end'))
 
         menu.add_separator()
 
         menu.add_checkbutton(variable=self.var_save_settings)
-        localisation.set_menu_text(menu, TransToken.ui('Save Settings in Palettes'))
+        set_menu_text(menu, TransToken.ui('Save Settings in Palettes'))
 
         menu.add_separator()
 
         menu.add_command(command=cmd_clear)
-        localisation.set_menu_text(menu, TransToken.ui('Clear'))
+        set_menu_text(menu, TransToken.ui('Clear'))
 
         menu.add_command(command=cmd_shuffle)
-        localisation.set_menu_text(menu, TransToken.ui('Fill Palette'))
+        set_menu_text(menu, TransToken.ui('Fill Palette'))
 
         menu.add_separator()
 
@@ -290,7 +291,7 @@ class PaletteUI:
                 self.ui_menu_delete_index,
                 label=TRANS_HIDE_NAMED.format(name=self.selected.name),
             )
-            localisation.set_text(self.ui_remove, TRANS_HIDE)
+            set_text(self.ui_remove, TRANS_HIDE)
 
             self.ui_btn_save.state(('disabled',))
             for ind in self.ui_readonly_indexes:
@@ -300,7 +301,7 @@ class PaletteUI:
                 self.ui_menu_delete_index,
                 label=TRANS_DELETE_NAMED.format(name=self.selected.name),
             )
-            localisation.set_text(self.ui_remove, TRANS_DELETE)
+            set_text(self.ui_remove, TRANS_DELETE)
 
             self.ui_btn_save.state(('!disabled',))
             for ind in self.ui_readonly_indexes:

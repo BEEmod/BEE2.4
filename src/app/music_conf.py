@@ -7,13 +7,14 @@ from srctools import FileSystemChain, FileSystem
 import srctools.logger
 import attrs
 
-from app import TK_ROOT, localisation
+from app import TK_ROOT
 from app.SubPane import SubPane
 from app.selector_win import Item as SelItem, SelectorWin, AttrDef as SelAttr
 from config.gen_opts import GenOptions
 from consts import MusicChannel
 from packages import PackagesSet, Music
 from transtoken import TransToken
+from ui_tk.wid_transtoken import set_text
 import config
 import packages
 
@@ -216,7 +217,7 @@ async def make_widgets(packset: PackagesSet, frame: ttk.LabelFrame, pane: SubPan
         is_collapsed = True
         conf = config.APP.get_cur_conf(GenOptions)
         config.APP.store_conf(attrs.evolve(conf, music_collapsed=True))
-        localisation.set_text(base_lbl, TRANS_BASE_COLL)
+        set_text(base_lbl, TRANS_BASE_COLL)
         toggle_btn_exit()
 
         # Set all music to the children - so those are used.
@@ -234,7 +235,7 @@ async def make_widgets(packset: PackagesSet, frame: ttk.LabelFrame, pane: SubPan
         is_collapsed = False
         conf = config.APP.get_cur_conf(GenOptions)
         config.APP.store_conf(attrs.evolve(conf, music_collapsed=False))
-        localisation.set_text(base_lbl, TRANS_BASE_EXP)
+        set_text(base_lbl, TRANS_BASE_EXP)
         toggle_btn_exit()
         for wid in exp_widgets:
             wid.grid()
@@ -272,7 +273,7 @@ async def make_widgets(packset: PackagesSet, frame: ttk.LabelFrame, pane: SubPan
         TransToken.ui('Speed:'),
     ], start=1):
         label = ttk.Label(frame)
-        localisation.set_text(label, text)
+        set_text(label, text)
         exp_widgets.append(label)
         label.grid(row=row, column=1, sticky='EW')
 

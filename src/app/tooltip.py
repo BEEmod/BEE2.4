@@ -11,9 +11,10 @@ import weakref
 import attr
 
 from app import TK_ROOT, img
-# Give a private name, could get confused with tooltip setter.
-from app.localisation import TransToken, set_text as _apply_token
+from transtoken import TransToken
 from ui_tk.img import TK_IMG
+# Don't import set_text directly, could be confused with tooltip setter.
+from ui_tk import wid_transtoken
 
 
 __all__ = ['set_tooltip', 'add_tooltip']
@@ -65,7 +66,7 @@ def _show(widget: tk.Misc, mouse_x: int, mouse_y: int) -> None:
     except KeyError:
         return
 
-    _apply_token(context_label, data.text)
+    wid_transtoken.set_text(context_label, data.text)
     TK_IMG.apply(context_label, data.img)
 
     window.deiconify()

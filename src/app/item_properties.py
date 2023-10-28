@@ -15,10 +15,11 @@ from config.item_defaults import ItemDefault
 from app import img, localisation, tk_tools, sound, TK_ROOT, tooltip
 from ui_tk.img import TKImages
 from editoritems import ItemPropKind, Item
-import editoritems_props as all_props
 from transtoken import TransToken
+from ui_tk.wid_transtoken import set_text, set_win_title
 import utils
 import config
+import editoritems_props as all_props
 
 
 __all__ = ['PropertyWindow']
@@ -48,7 +49,7 @@ class PropGroup:
     def __init__(self, parent: ttk.Frame, tk_img: TKImages, label_text: TransToken) -> None:
         self.frame = tk.Frame(parent)
         self.label = ttk.Label(parent)
-        localisation.set_text(self.label, label_text)
+        set_text(self.label, label_text)
 
     def apply_conf(self, options: Dict[ItemPropKind[Any], Tuple[str, bool]]) -> None:
         """Apply the specified options to the UI.
@@ -222,7 +223,7 @@ class TimerPropGroup(PropGroup):
         self.scale.set(new_val)
         self._enable_cback = True
 
-        localisation.set_text(self.label, TRANS_TIMER_DELAY.format(
+        set_text(self.label, TRANS_TIMER_DELAY.format(
             # Babel formats infinity with the right symbol.
             tim=float('inf') if new_val == 0 else str(new_val),
         ))
@@ -611,9 +612,9 @@ class PropertyWindow:
         self.div_horiz = ttk.Separator(frame, orient="horizontal")
 
         self.lbl_no_options = ttk.Label(frame)
-        localisation.set_text(self.lbl_no_options, TransToken.ui('No Properties available!'))
+        set_text(self.lbl_no_options, TransToken.ui('No Properties available!'))
         self.btn_save = ttk.Button(frame, command=self.evt_exit)
-        localisation.set_text(self.btn_save, TransToken.ui('Close'))
+        set_text(self.btn_save, TransToken.ui('Close'))
         self.lbl_title = ttk.Label(frame, text='')
         self.lbl_title.grid(columnspan=9)
 
@@ -794,8 +795,8 @@ class PropertyWindow:
             sticky="EW",
         )
 
-        localisation.set_win_title(self.win, TRANS_TITLE.format(item=sub_name))
-        localisation.set_text(self.lbl_title, TRANS_SUBTITLE.format(item=sub_name))
+        set_win_title(self.win, TRANS_TITLE.format(item=sub_name))
+        set_text(self.lbl_title, TRANS_SUBTITLE.format(item=sub_name))
         self.win.wm_deiconify()
         await tk_tools.wait_eventloop()
         self.win.lift(parent)

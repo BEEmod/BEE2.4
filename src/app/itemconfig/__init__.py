@@ -22,18 +22,19 @@ from config.widgets import (
     WidgetConfig, TimerNum as TimerNum, TIMER_NUM as TIMER_NUM,
     TIMER_STR_INF as TIMER_STR_INF,
 )
-from app.localisation import TransToken
-import config
-import packages
 from packages.widgets import (
     CLS_TO_KIND, ConfT, ConfigGroup, ItemVariantConf, OptConfT, UpdateFunc,
     WidgetType,
     WidgetTypeWithConf, nop_update,
 )
-from ui_tk.img import TKImages
-from ..SubPane import SubPane
-from ..tkMarkdown import MarkdownData
+from transtoken import TransToken
 
+from app.SubPane import SubPane
+from app.tkMarkdown import MarkdownData
+from ui_tk.img import TKImages
+from ui_tk.wid_transtoken import set_text
+import config
+import packages
 
 LOGGER = logger.get_logger(__name__)
 
@@ -168,7 +169,7 @@ async def create_group(master: ttk.Frame, tk_img: TKImages, group: ConfigGroup) 
             label: Optional[ttk.Label] = None
             if s_wid.name:
                 if s_wid.kind.is_wide:
-                    wid_frame = localisation.set_text(
+                    wid_frame = set_text(
                         ttk.LabelFrame(wid_frame),
                         TRANS_COLON.format(text=s_wid.name),
                     )
@@ -176,7 +177,7 @@ async def create_group(master: ttk.Frame, tk_img: TKImages, group: ConfigGroup) 
                     wid_frame.columnconfigure(0, weight=1)
                 else:
                     label = ttk.Label(wid_frame)
-                    localisation.set_text(label, TRANS_COLON.format(text=s_wid.name))
+                    set_text(label, TRANS_COLON.format(text=s_wid.name))
                     label.grid(row=0, column=0)
             create_func = _UI_IMPL_SINGLE[s_wid.kind]
             try:
@@ -214,7 +215,7 @@ async def create_group(master: ttk.Frame, tk_img: TKImages, group: ConfigGroup) 
         if widget_count == 1 or not m_wid.name:
             wid_frame = ttk.Frame(frame)
         else:
-            wid_frame = localisation.set_text(
+            wid_frame = set_text(
                 ttk.LabelFrame(frame),
                 TRANS_COLON.format(text=m_wid.name),
             )
@@ -347,7 +348,7 @@ async def make_pane(
     await StyleVarPane.make_stylevar_pane(stylevar_frame, packages.get_loaded_packages(), update_item_vis)
 
     loading_text = ttk.Label(canvas_frame)
-    localisation.set_text(loading_text, TransToken.ui('Loading...'))
+    set_text(loading_text, TransToken.ui('Loading...'))
     loading_text.grid(row=0, column=0, sticky='ew')
     loading_text.grid_forget()
 
@@ -415,7 +416,7 @@ async def make_pane(
 
     def update_disp() -> None:
         """Update widgets if the group has changed."""
-        localisation.set_text(group_label, TRANS_GROUP_HEADER.format(
+        set_text(group_label, TRANS_GROUP_HEADER.format(
             name=cur_group.name,
             page=ordered_conf.index(cur_group) + 1,
             count=len(ordered_conf),
@@ -469,7 +470,7 @@ def widget_timer_generic(widget_func: SingleCreateFunc[ConfT]) -> MultiCreateFun
             parent.columnconfigure(1, weight=1)
 
             label = ttk.Label(parent)
-            localisation.set_text(label, TRANS_COLON.format(text=timer_disp))
+            set_text(label, TRANS_COLON.format(text=timer_disp))
             label.grid(row=row, column=0)
             widget, update = await widget_func(
                 parent, tk_img, get_on_changed(tim_val), conf,

@@ -22,12 +22,13 @@ import os.path
 from idlelib.redirector import WidgetRedirector  # type: ignore[import-not-found]
 import trio
 
-from app import TK_ROOT, background_run, localisation
+from app import TK_ROOT, background_run
 from config.gen_opts import GenOptions
 import event
 import config
 import utils
 from transtoken import TransToken
+from ui_tk.wid_transtoken import set_text
 
 
 # Set icons for the application.
@@ -749,7 +750,7 @@ class EnumButton(Generic[EnumT]):
                 # Make partial do the method binding.
                 command=functools.partial(EnumButton._select, self, val),
             )
-            localisation.set_text(btn, label)
+            set_text(btn, label)
             btn.grid(row=0, column=x)
             self.buttons[val] = btn
             if val is current:
@@ -793,7 +794,7 @@ class LineHeader(ttk.Frame):
             font='TkMenuFont',
             anchor='center',
         )
-        localisation.set_text(self.title, title)
+        set_text(self.title, title)
         self.title.grid(row=0, column=1)
 
         sep_right = ttk.Separator(self)

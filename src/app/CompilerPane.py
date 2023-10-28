@@ -21,8 +21,9 @@ from srctools.logger import get_logger
 import app
 from app import SubPane, localisation, tk_tools, TK_ROOT
 from app.tooltip import add_tooltip, set_tooltip
-from app.localisation import TransToken
+from transtoken import TransToken
 from ui_tk.img import TKImages
+from ui_tk import wid_transtoken
 from config.compile_pane import CompilePaneState, PLAYER_MODEL_ORDER
 import config
 import BEE2_config
@@ -341,7 +342,7 @@ async def make_widgets(tk_img: TKImages) -> None:
     make_setter('General', 'vrad_compile_type', vrad_compile_type)
 
     reload_lbl = ttk.Label(window, justify='center')
-    localisation.set_text(reload_lbl, TransToken.ui(
+    wid_transtoken.set_text(reload_lbl, TransToken.ui(
         "Options on this panel can be changed \n"
         "without exporting or restarting the game."
     ))
@@ -388,7 +389,7 @@ async def make_comp_widgets(frame: ttk.Frame, tk_img: TKImages) -> None:
     frame.columnconfigure(0, weight=1)
 
     thumb_frame = ttk.LabelFrame(frame, labelanchor=tk.N)
-    localisation.set_text(thumb_frame, TransToken.ui('Thumbnail'))
+    wid_transtoken.set_text(thumb_frame, TransToken.ui('Thumbnail'))
     thumb_frame.grid(row=0, column=0, sticky=tk.EW)
     thumb_frame.columnconfigure(0, weight=1)
 
@@ -396,21 +397,21 @@ async def make_comp_widgets(frame: ttk.Frame, tk_img: TKImages) -> None:
         """Event handler when radio buttons are clicked."""
         app.background_run(set_screen_type)
 
-    UI['thumb_auto'] = localisation.set_text(ttk.Radiobutton(
+    UI['thumb_auto'] = wid_transtoken.set_text(ttk.Radiobutton(
         thumb_frame,
         value='AUTO',
         variable=chosen_thumb,
         command=set_screen,
     ), TransToken.ui('Screenshot'))
 
-    UI['thumb_peti'] = localisation.set_text(ttk.Radiobutton(
+    UI['thumb_peti'] = wid_transtoken.set_text(ttk.Radiobutton(
         thumb_frame,
         value='PETI',
         variable=chosen_thumb,
         command=set_screen,
     ), TransToken.ui('Editor View'))
 
-    UI['thumb_custom'] = localisation.set_text(ttk.Radiobutton(
+    UI['thumb_custom'] = wid_transtoken.set_text(ttk.Radiobutton(
         thumb_frame,
         value='CUST',
         variable=chosen_thumb,
@@ -424,7 +425,7 @@ async def make_comp_widgets(frame: ttk.Frame, tk_img: TKImages) -> None:
     )
     UI['thumb_label'].bind(tk_tools.EVENTS['LEFT'], find_screenshot)
 
-    UI['thumb_cleanup'] = localisation.set_text(
+    UI['thumb_cleanup'] = wid_transtoken.set_text(
         ttk.Checkbutton(thumb_frame, variable=cleanup_screenshot),
         TransToken.ui('Cleanup old screenshots'),
     )
@@ -459,22 +460,22 @@ async def make_comp_widgets(frame: ttk.Frame, tk_img: TKImages) -> None:
     set_screenshot()  # Load the last saved screenshot
 
     vrad_frame = ttk.LabelFrame(frame, labelanchor='n')
-    localisation.set_text(vrad_frame, TransToken.ui('Lighting:'))
+    wid_transtoken.set_text(vrad_frame, TransToken.ui('Lighting:'))
     vrad_frame.grid(row=1, column=0, sticky='ew')
 
-    UI['light_none'] = localisation.set_text(ttk.Radiobutton(
+    UI['light_none'] = wid_transtoken.set_text(ttk.Radiobutton(
         vrad_frame,
         value='NONE',
         variable=vrad_compile_type,
     ), TransToken.ui('None'))
     UI['light_none'].grid(row=0, column=0)
-    UI['light_fast'] = localisation.set_text(ttk.Radiobutton(
+    UI['light_fast'] = wid_transtoken.set_text(ttk.Radiobutton(
         vrad_frame,
         value='FAST',
         variable=vrad_compile_type,
     ), TransToken.ui('Fast'))
     UI['light_fast'].grid(row=0, column=1)
-    UI['light_full'] = localisation.set_text(ttk.Radiobutton(
+    UI['light_full'] = wid_transtoken.set_text(ttk.Radiobutton(
         vrad_frame,
         value='FULL',
         variable=vrad_compile_type,
@@ -509,7 +510,7 @@ async def make_comp_widgets(frame: ttk.Frame, tk_img: TKImages) -> None:
         ), keymode=TransToken.ui("Fast"),
     ))
 
-    packfile_enable = localisation.set_text(ttk.Checkbutton(
+    packfile_enable = wid_transtoken.set_text(ttk.Checkbutton(
         frame,
         variable=packfile_auto_enable,
     ), TransToken.ui('Enable packing'))
@@ -520,7 +521,7 @@ async def make_comp_widgets(frame: ttk.Frame, tk_img: TKImages) -> None:
         "correctly. Regardless of this setting, packing is enabled when publishing. "
     ))
 
-    packfile_dump_enable_chk = localisation.set_text(ttk.Checkbutton(
+    packfile_dump_enable_chk = wid_transtoken.set_text(ttk.Checkbutton(
         frame,
         variable=packfile_dump_enable,
         command=set_pack_dump_enabled,
@@ -547,13 +548,13 @@ async def make_comp_widgets(frame: ttk.Frame, tk_img: TKImages) -> None:
     ))
 
     count_frame = ttk.LabelFrame(frame, labelanchor='n')
-    localisation.set_text(count_frame, TransToken.ui('Last Compile:'))
+    wid_transtoken.set_text(count_frame, TransToken.ui('Last Compile:'))
 
     count_frame.grid(row=7, column=0, sticky='ew')
     count_frame.columnconfigure(0, weight=1)
     count_frame.columnconfigure(2, weight=1)
 
-    localisation.set_text(
+    wid_transtoken.set_text(
         ttk.Label(count_frame, anchor='n'),
         TransToken.ui('Entity'),
     ).grid(row=0, column=0, columnspan=3, sticky='ew')
@@ -581,7 +582,7 @@ async def make_comp_widgets(frame: ttk.Frame, tk_img: TKImages) -> None:
         padx=5,
     )
 
-    localisation.set_text(
+    wid_transtoken.set_text(
         ttk.Label(count_frame, anchor='center'),
         TransToken.ui('Overlay'),
     ).grid(row=2, column=0, sticky='ew')
@@ -610,7 +611,7 @@ async def make_comp_widgets(frame: ttk.Frame, tk_img: TKImages) -> None:
         "performed to show the new values."
     ))
 
-    localisation.set_text(
+    wid_transtoken.set_text(
         ttk.Label(count_frame, anchor='center'),
         TransToken.ui('Brush'),
     ).grid(row=2, column=2, sticky=tk.EW)
@@ -639,7 +640,7 @@ async def make_map_widgets(frame: ttk.Frame) -> None:
     frame.columnconfigure(0, weight=1)
 
     voice_frame = ttk.LabelFrame(frame, labelanchor='nw')
-    localisation.set_text(voice_frame, TransToken.ui('Voicelines:'))
+    wid_transtoken.set_text(voice_frame, TransToken.ui('Voicelines:'))
     voice_frame.grid(row=1, column=0, sticky='ew')
 
     def set_voice_priority() -> None:
@@ -656,7 +657,7 @@ async def make_map_widgets(frame: ttk.Frame) -> None:
         variable=VOICE_PRIORITY_VAR,
         command=set_voice_priority,
     )
-    localisation.set_text(voice_priority, TransToken.ui("Use voiceline priorities"))
+    wid_transtoken.set_text(voice_priority, TransToken.ui("Use voiceline priorities"))
     voice_priority.grid(row=0, column=0)
     add_tooltip(voice_priority, TransToken.ui(
         "Only choose the highest-priority voicelines. This means more generic "
@@ -665,7 +666,7 @@ async def make_map_widgets(frame: ttk.Frame) -> None:
     ))
 
     elev_frame = ttk.LabelFrame(frame, labelanchor='n')
-    localisation.set_text(elev_frame, TransToken.ui('Spawn at:'))
+    wid_transtoken.set_text(elev_frame, TransToken.ui('Spawn at:'))
     elev_frame.grid(row=2, column=0, sticky='ew')
     elev_frame.columnconfigure(0, weight=1)
     elev_frame.columnconfigure(1, weight=1)
@@ -692,8 +693,8 @@ async def make_map_widgets(frame: ttk.Frame) -> None:
         command=functools.partial(elev_changed, True),
     )
 
-    localisation.set_text(elev_preview, TransToken.ui('Entry Door'))
-    localisation.set_text(elev_elevator, TransToken.ui('Elevator'))
+    wid_transtoken.set_text(elev_preview, TransToken.ui('Entry Door'))
+    wid_transtoken.set_text(elev_elevator, TransToken.ui('Elevator'))
     elev_preview.grid(row=0, column=0, sticky='w')
     elev_elevator.grid(row=0, column=1, sticky='w')
 
@@ -710,7 +711,7 @@ async def make_map_widgets(frame: ttk.Frame) -> None:
     ))
 
     model_frame = ttk.LabelFrame(frame, labelanchor='n')
-    localisation.set_text(model_frame, TransToken.ui('Player Model (SP):'))
+    wid_transtoken.set_text(model_frame, TransToken.ui('Player Model (SP):'))
     model_frame.grid(row=4, column=0, sticky='ew')
 
     player_model_combo = player_mdl = ttk.Combobox(model_frame, exportselection=False, width=20)
@@ -774,7 +775,7 @@ def init_application() -> None:
     global window
     from ui_tk.img import TK_IMG
     window = cast(SubPane.SubPane, TK_ROOT)
-    localisation.set_win_title(window, TransToken.ui(
+    wid_transtoken.set_win_title(window, TransToken.ui(
         'Compiler Options - {ver}',
     ).format(ver=utils.BEE_VERSION))
     window.resizable(True, False)

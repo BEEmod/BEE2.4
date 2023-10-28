@@ -23,6 +23,7 @@ from consts import Theme
 from transtoken import TransToken
 import loadScreen
 import config
+from ui_tk.wid_transtoken import set_text, set_win_title
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -46,7 +47,7 @@ VARS: List[Tuple[str, tk.Variable]] = []
 win = tk.Toplevel(TK_ROOT, name='optionsWin')
 win.transient(master=TK_ROOT)
 tk_tools.set_window_icon(win)
-localisation.set_win_title(win, TransToken.ui('BEE2 Options'))
+set_win_title(win, TransToken.ui('BEE2 Options'))
 win.withdraw()
 
 TRANS_TAB_GEN = TransToken.ui('General')
@@ -155,7 +156,7 @@ def make_checkbox(
 
     VARS.append((name, var))
     widget = ttk.Checkbutton(frame, variable=var, name='check_' + name)
-    localisation.set_text(widget, desc)
+    set_text(widget, desc)
 
     if callback is not None:
         widget['command'] = callback
@@ -212,12 +213,12 @@ async def init_widgets(
 
         warning_lbl = ttk.Label(fr_dev, justify="center")
         warning_btn = ttk.Button(fr_dev, command=accept_warning)
-        localisation.set_text(warning_lbl, TransToken.ui(
+        set_text(warning_lbl, TransToken.ui(
             "Options on the development tab are intended for package authors\n"
             "and debugging purposes. Changing these may prevent BEEmod\n"
             "from functioning correctly until reverted to their original settings."
         ))
-        localisation.set_text(warning_btn, TransToken.ui("Enable development options"))
+        set_text(warning_btn, TransToken.ui("Enable development options"))
         warning_lbl.grid(row=0, column=0)
         warning_btn.grid(row=1, column=0)
 
@@ -247,11 +248,11 @@ async def init_widgets(
         win.withdraw()
         load()
 
-    localisation.set_text(
+    set_text(
         ttk.Button(ok_cancel, command=ok),
         TransToken.ui('OK'),
     ).grid(row=0, column=0)
-    localisation.set_text(
+    set_text(
         ttk.Button(ok_cancel, command=cancel),
         TransToken.ui('Cancel'),
     ).grid(row=0, column=1)
@@ -272,7 +273,7 @@ async def init_gen_tab(
     dialogs = TkDialogs(f.winfo_toplevel())
 
     after_export_frame = ttk.LabelFrame(f)
-    localisation.set_text(after_export_frame, TransToken.ui('After Export:'))
+    set_text(after_export_frame, TransToken.ui('After Export:'))
     after_export_frame.grid(
         row=0,
         rowspan=4,
@@ -298,9 +299,9 @@ async def init_gen_tab(
         value=AfterExport.QUIT.value,
     )
 
-    localisation.set_text(exp_nothing, TransToken.ui('Do Nothing'))
-    localisation.set_text(exp_minimise, TransToken.ui('Minimise BEE2'))
-    localisation.set_text(exp_quit, TransToken.ui('Quit BEE2'))
+    set_text(exp_nothing, TransToken.ui('Do Nothing'))
+    set_text(exp_minimise, TransToken.ui('Minimise BEE2'))
+    set_text(exp_quit, TransToken.ui('Quit BEE2'))
 
     exp_nothing.grid(row=0, column=0, sticky='w')
     exp_minimise.grid(row=1, column=0, sticky='w')
@@ -321,7 +322,7 @@ async def init_gen_tab(
     lang_frm = ttk.Frame(f, name='lang_frm')
     lang_frm.grid(row=0, column=1, sticky='EW')
 
-    localisation.set_text(ttk.Label(lang_frm), TransToken.ui('Language:')).grid(row=0, column=0)
+    set_text(ttk.Label(lang_frm), TransToken.ui('Language:')).grid(row=0, column=0)
 
     lang_box = ttk.Combobox(lang_frm, name='language')
     lang_box.state(['readonly'])
@@ -381,7 +382,7 @@ async def init_gen_tab(
         mute = make_checkbox(f, name='play_sounds', desc=mute_desc)
     else:
         mute = ttk.Checkbutton(f, name='play_sounds', state='disabled')
-        localisation.set_text(mute, mute_desc)
+        set_text(mute, mute_desc)
         add_tooltip(
             mute,
             TransToken.ui('Pyglet is either not installed or broken.\nSound effects have been disabled.')
@@ -389,7 +390,7 @@ async def init_gen_tab(
     mute.grid(row=1, column=1, sticky='W')
 
     reset_palette = ttk.Button(f, command=unhide_palettes)
-    localisation.set_text(reset_palette, TransToken.ui('Show Hidden Palettes'))
+    set_text(reset_palette, TransToken.ui('Show Hidden Palettes'))
     reset_palette.grid(row=2, column=1, sticky='W')
     add_tooltip(
         reset_palette,
@@ -397,7 +398,7 @@ async def init_gen_tab(
     )
 
     reset_cache = ttk.Button(f, command=lambda: background_run(clear_caches,  dialogs))
-    localisation.set_text(reset_cache, TransToken.ui('Reset Package Caches'))
+    set_text(reset_cache, TransToken.ui('Reset Package Caches'))
     reset_cache.grid(row=3, column=1, sticky='W')
     add_tooltip(
         reset_cache,
@@ -437,7 +438,7 @@ async def init_win_tab(
         ),
     ).grid(row=1, column=0, sticky='W')
 
-    localisation.set_text(
+    set_text(
         ttk.Button(f, command=reset_all_win),
         TransToken.ui('Reset All Window Positions'),
     ).grid(row=1, column=1, sticky='E')
@@ -549,23 +550,23 @@ async def init_dev_tab(f: ttk.Frame) -> None:
     frm_btn1.columnconfigure(0, weight=1)
     frm_btn1.columnconfigure(2, weight=1)
 
-    localisation.set_text(
+    set_text(
         ttk.Button(frm_btn1,  command=report_all_obj),
         TransToken.ui('Dump All Objects'),
     ).grid(row=0, column=0)
 
-    localisation.set_text(
+    set_text(
         ttk.Button(frm_btn1, command=report_items),
         TransToken.ui('Dump Items List'),
     ).grid(row=0, column=1)
 
-    localisation.set_text(
+    set_text(
         ttk.Button(frm_btn1, command=lambda: background_run(report_editor_models)),
         TransToken.ui('Dump Editor Models'),
     ).grid(row=1, column=0)
 
     reload_img = ttk.Button(frm_btn1, command=img.refresh_all)
-    localisation.set_text(reload_img, TransToken.ui('Reload Images'))
+    set_text(reload_img, TransToken.ui('Reload Images'))
     add_tooltip(reload_img, TransToken.ui(
         'Reload all images in the app. Expect the app to freeze momentarily.'
     ))
@@ -582,7 +583,7 @@ async def init_dev_tab(f: ttk.Frame) -> None:
         await DIALOG.show_info(TRANS_REBUILT_APP_LANG)
 
     build_app_trans_btn = ttk.Button(frm_btn2, command=lambda: background_run(rebuild_app_langs))
-    localisation.set_text(build_app_trans_btn, TransToken.ui('Build UI Translations'))
+    set_text(build_app_trans_btn, TransToken.ui('Build UI Translations'))
     add_tooltip(build_app_trans_btn, TransToken.ui(
         "Compile '.po' UI translation files into '.mo'. This requires those to have been "
         "downloaded from the source repo."
@@ -595,7 +596,7 @@ async def init_dev_tab(f: ttk.Frame) -> None:
         await DIALOG.show_info(TRANS_REBUILD_PACK_LANG)
 
     build_pack_trans_btn = ttk.Button(frm_btn2, command=lambda: background_run(rebuild_pack_langs))
-    localisation.set_text(build_pack_trans_btn, TransToken.ui('Build Package Translations'))
+    set_text(build_pack_trans_btn, TransToken.ui('Build Package Translations'))
     add_tooltip(build_pack_trans_btn, TransToken.ui(
         "Export translation files for all unzipped packages. This will update existing "
         "localisations, creating them for packages that don't have any."

@@ -6,9 +6,10 @@ import tkinter as tk
 from tkinter import ttk
 
 from packages.widgets import SliderOptions, UpdateFunc
-from app import itemconfig, localisation
+from app import itemconfig
 from transtoken import TransToken
 from ui_tk.img import TKImages
+from ui_tk.wid_transtoken import set_text
 
 
 # If enabled, optionally override text to this when set to 0. This is for options where zero turns
@@ -63,9 +64,9 @@ async def widget_slider(
         if last_value != new_pos:
             itemconfig.widget_sfx()
             if conf.zero_off and math.isclose(value_num, 0.0):
-                localisation.set_text(disp, TRANS_OFF)
+                set_text(disp, TRANS_OFF)
             else:
-                localisation.set_text(disp, TransToken.untranslated(new_pos))
+                set_text(disp, TransToken.untranslated(new_pos))
             last_value = new_pos
             on_changed(new_pos)
 
@@ -73,9 +74,9 @@ async def widget_slider(
         """Apply the configured value to the UI."""
         value_num = float(new_value)
         if conf.zero_off and math.isclose(value_num, 0.0):
-            localisation.set_text(disp, TRANS_OFF)
+            set_text(disp, TRANS_OFF)
         else:
-            localisation.set_text(disp, TransToken.untranslated(format(value_num, txt_format)))
+            set_text(disp, TransToken.untranslated(format(value_num, txt_format)))
 
         off = (value_num - conf.min) / conf.step
         ui_var.set(round(off, points))

@@ -9,7 +9,7 @@ from enum import Enum
 
 import attrs
 
-from app import img, localisation, tk_tools
+from app import img, tk_tools
 # noinspection PyProtectedMember
 from app.dragdrop import (
     SLOT_DRAG, DragWin, FlexiCB, InfoCB, ManagerBase, PositionerBase,
@@ -19,6 +19,7 @@ from app.dragdrop import (
 )
 from transtoken import TransToken
 from ui_tk.img import TK_IMG
+from ui_tk.wid_transtoken import set_text
 import utils
 
 
@@ -196,7 +197,7 @@ class DragDrop(ManagerBase[ItemT, tk.Misc], Generic[ItemT]):
                 bg=img.PETI_ITEM_BG_HEX,
                 name="text",
             )
-            localisation.set_text(text_lbl, title)
+            set_text(text_lbl, title)
         else:
             text_lbl = None
 

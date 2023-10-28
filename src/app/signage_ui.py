@@ -10,12 +10,14 @@ import srctools.logger
 
 from ui_tk.dragdrop import DragDrop, DragInfo
 from ui_tk.img import TKImages
-from app import dragdrop, img, localisation, tk_tools, TK_ROOT
+from ui_tk.wid_transtoken import set_text, set_win_title
+from app import dragdrop, img, tk_tools, TK_ROOT
 from config.signage import DEFAULT_IDS, Layout
 from packages import Signage, Style
 import packages
 from transtoken import TransToken
 import config
+
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -100,10 +102,10 @@ async def init_widgets(master: tk.Widget, tk_img: TKImages) -> tk.Widget:
     """Construct the widgets, returning the configuration button.
     """
     window.resizable(True, True)
-    localisation.set_win_title(window, TransToken.ui('Configure Signage'))
+    set_win_title(window, TransToken.ui('Configure Signage'))
 
     frame_selected = ttk.Labelframe(window, relief='raised', labelanchor='n', name='frame_selected')
-    localisation.set_text(frame_selected, TransToken.ui('Selected'))
+    set_text(frame_selected, TransToken.ui('Selected'))
 
     canv_all = tk.Canvas(window, name='canv_all')
 
@@ -145,7 +147,7 @@ async def init_widgets(master: tk.Widget, tk_img: TKImages) -> tk.Widget:
             return
         hover_scope.cancel()
 
-        localisation.set_text(name_label, TRANS_SIGN_NAME.format(name=hover_sign.name))
+        set_text(name_label, TRANS_SIGN_NAME.format(name=hover_sign.name))
 
         packset = packages.get_loaded_packages()
 
@@ -229,5 +231,5 @@ async def init_widgets(master: tk.Widget, tk_img: TKImages) -> tk.Widget:
     await config.APP.set_and_run_ui_callback(Layout, apply_config)
 
     show_btn = ttk.Button(master, command=show_window)
-    localisation.set_text(show_btn, TransToken.ui('Configure Signage'))
+    set_text(show_btn, TransToken.ui('Configure Signage'))
     return show_btn

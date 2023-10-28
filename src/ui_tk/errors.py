@@ -7,9 +7,10 @@ import math
 
 import trio
 
-from app import TK_ROOT, localisation
+from app import TK_ROOT
 from app.errors import AppError, ErrorUI
 from transtoken import TransToken
+from ui_tk.wid_transtoken import set_text, set_win_title
 
 
 ChannelValue = Tuple[TransToken, TransToken, List[AppError], trio.Event]
@@ -52,7 +53,7 @@ async def display_errors(
 
     wid_close = ttk.Button(bg, command=lambda: close_event.set(), name='close_btn')
     wid_close.grid(row=2, column=0)
-    localisation.set_text(wid_close, TransToken.ui("Close"))
+    set_text(wid_close, TransToken.ui("Close"))
 
     with ErrorUI.install_handler(handler):
         # We're now ready for events.
@@ -60,9 +61,9 @@ async def display_errors(
         while True:
             # Alternate between waiting for an error, displaying, then waiting for it to close.
             title, desc, errors, close_event = await receive.receive()
-            localisation.set_win_title(window, title)
-            localisation.set_text(wid_desc, desc)
-            localisation.set_text(wid_errors, TransToken.untranslated("\n").join([
+            set_win_title(window, title)
+            set_text(wid_desc, desc)
+            set_text(wid_errors, TransToken.untranslated("\n").join([
                 exc.message for exc in errors
             ]))
 
