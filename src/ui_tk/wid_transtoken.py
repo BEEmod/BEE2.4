@@ -25,7 +25,7 @@ TextWidget: TypeAlias = Union[
 ]
 TextWidgetT = TypeVar('TextWidgetT', bound=TextWidget)
 # Assigns to widget['text'].
-_applied_tokens: WeakKeyDictionary[TextWidget, TransToken] = WeakKeyDictionary()
+_applied_text_tokens: WeakKeyDictionary[TextWidget, TransToken] = WeakKeyDictionary()
 # menu -> index -> token.
 _applied_menu_tokens: WeakKeyDictionary[tk.Menu, dict[int, TransToken]] = WeakKeyDictionary()
 _window_titles: WeakKeyDictionary[tk.Wm, TransToken] = WeakKeyDictionary()
@@ -34,7 +34,7 @@ _window_titles: WeakKeyDictionary[tk.Wm, TransToken] = WeakKeyDictionary()
 def set_text(widget: TextWidgetT, token: TransToken) -> TextWidgetT:
     """Apply a token to the specified label/button/etc."""
     widget['text'] = str(token)
-    _applied_tokens[widget] = token
+    _applied_text_tokens[widget] = token
     return widget
 
 
@@ -68,10 +68,20 @@ def clear_stored_menu(menu: tk.Menu) -> None:
 @add_callback(call=False)
 def _apply_changes() -> None:
     """Apply new languages to all stored widgets."""
-    for text_widget, token in _applied_tokens.items():
+    for text_widget, token in _applied_text_tokens.items():
         text_widget['text'] = str(token)
     for menu, menu_map in _applied_menu_tokens.items():
         for index, token in menu_map.items():
             menu.entryconfigure(index, label=str(token))
     for window, token in _window_titles.items():
         window.wm_title(str(token))
+
+
+def stats() -> str:
+    """Output debingging statistics."""
+    return (
+        f'TransTokens:\n'
+        f'- label["text"]: {len(_applied_text_tokens)}\n'
+        f'- Menus: {len(_applied_menu_tokens)}\n'
+        f'- Windows: {len(_window_titles)}\n'
+    )
