@@ -28,7 +28,7 @@ __all__ = [
 ]
 COND_MOD_NAME = "Item Connections"
 LOGGER = srctools.logger.get_logger(__name__)
-ITEM_TYPES: Dict[str, Optional[Config]] = {}
+ITEM_TYPES: Dict[str, Config] = {}
 
 # Targetname -> item
 ITEMS: Dict[str, 'Item'] = {}
@@ -439,7 +439,7 @@ def read_configs(all_items: Iterable[editoritems.Item]) -> None:
 
     # These must exist.
     for item_id in ['item_indicator_panel', 'item_indicator_panel_timer']:
-        if ITEM_TYPES.get(item_id) is None:
+        if item_id not in ITEM_TYPES:
             raise user_errors.UserError(
                 user_errors.TOK_CONNECTION_REQUIRED_ITEM.format(item=item_id.upper())
             )
@@ -505,9 +505,6 @@ def calc_connections(
                 item_type = ITEM_TYPES[item_id.casefold()]
             except KeyError:
                 LOGGER.warning('No item type for "{}"!', item_id)
-                continue
-            if item_type is None:
-                # It exists, but has no I/O.
                 continue
 
             # Pass in the defaults for antline styles.
