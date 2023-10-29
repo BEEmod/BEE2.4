@@ -136,13 +136,19 @@ class SubPane(tk.Toplevel):
         else:
             self.hide_win()
 
-    def move(self, x: int=None, y: int=None, width: int=None, height: int=None) -> None:
+    def move(
+        self,
+        x: Optional[int] = None,
+        y: Optional[int] = None,
+        width: Optional[int] = None,
+        height: Optional[int] = None,
+    ) -> None:
         """Move the window to the specified position.
 
         Effectively an easier-to-use form of Toplevel.geometry(), that
-        also updates relX and relY.
+        also updates `relX` and `relY`.
         """
-        # If we're resizable, keep the current size. Otherwise autosize to
+        # If we're resizable, keep the current size. Otherwise, autosize to
         # contents.
         if width is None:
             width = self.winfo_width() if self.can_resize_x else self.winfo_reqwidth()

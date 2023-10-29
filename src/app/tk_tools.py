@@ -615,7 +615,7 @@ class FileField(ttk.Frame):
         master: tk.Misc,
         is_dir: bool = False,
         loc: str = '',
-        callback: Callable[[str], None] = None,
+        callback: Callable[[str], None] = lambda path: None,
     ) -> None:
         """Initialise the field.
 
@@ -642,9 +642,6 @@ class FileField(ttk.Frame):
                 self,
                 initialdir=loc,
             )
-
-        if callback is None:
-            callback = self._nop_callback
 
         self.callback = callback
 
@@ -680,11 +677,6 @@ class FileField(ttk.Frame):
         path = self.browser.show()
         if path:
             self.value = path
-
-    @staticmethod  # No need to bind to a method.
-    def _nop_callback(path: str) -> None:
-        """Callback function, called whenever the value changes."""
-        pass
 
     @property
     def value(self) -> str:

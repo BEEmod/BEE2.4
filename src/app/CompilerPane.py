@@ -324,7 +324,7 @@ def set_screenshot(image: Image.Image | None = None) -> None:
     UI['thumb_label']['image'] = tk_screenshot
 
 
-def make_setter(section: str, config: str, variable: tk.Variable) -> None:
+def make_setter(section: str, config: str, variable: tk.IntVar | tk. StringVar) -> None:
     """Create a callback which sets the given config from a variable."""
     def callback(var_name: str, var_ind: str, cback_name: str) -> None:
         """Automatically called when the variable is written to."""
