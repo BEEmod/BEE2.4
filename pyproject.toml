@@ -147,7 +147,6 @@ module = [
 	'app.backup',
 	'app.voiceEditor',
 	'app.SubPane',
-	'app.paletteUI',
 	'app.CompilerPane',
 	'app.optionWindow',
 	'app.contextWin',

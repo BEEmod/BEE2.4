@@ -18,6 +18,7 @@ from ui_tk.dialogs import TkDialogs
 from ui_tk.img import tkImg, TKImages
 import config
 from ui_tk.wid_transtoken import set_menu_text, set_text
+from utils import not_none
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -42,8 +43,27 @@ TRANS_TITLE_SAVE = TransToken.ui("BEE2 - Save Palette")
 TRANS_TITLE_DELETE = TransToken.ui('BEE2 - Delete Palette')
 TRANS_TITLE_CHANGE_GROUP = TransToken.ui("BEE2 - Change Palette Group")
 
+
 class PaletteUI:
     """UI for selecting palettes."""
+    palettes: dict[UUID, Palette]
+    selected_uuid: UUID
+    hidden_defaults: set[UUID]
+    var_save_settings: tk.BooleanVar
+    var_pal_select: tk.StringVar
+    get_items: Callable[[], ItemPos]
+    set_items: Callable[[Palette], Awaitable[None]]
+
+    ui_btn_save: ttk.Button
+    ui_remove: ttk.Button
+    ui_treeview: ttk.Treeview
+    tk_img: TKImages
+    ui_menu: tk.Menu
+    ui_group_menus: dict[str, tk.Menu]
+    ui_group_treeids: dict[str, str]
+    ui_readonly_indexes: list[int]
+    ui_menu_palettes_index: int
+
     def __init__(
         self, f: ttk.Frame, menu: tk.Menu,
         *,
@@ -142,8 +162,8 @@ class PaletteUI:
             ttk.Sizegrip(f).grid(row=3, column=1)
 
         self.ui_menu = menu
-        self.ui_group_menus: dict[str, tk.Menu] = {}
-        self.ui_group_treeids: dict[str, str] = {}
+        self.ui_group_menus = {}
+        self.ui_group_treeids = {}
 
         dialog_menu = TkDialogs(menu.winfo_toplevel())
 
@@ -152,7 +172,7 @@ class PaletteUI:
             accelerator=tk_tools.ACCEL_SAVE,
         )
         set_menu_text(menu, TransToken.ui('Save Palette'))
-        self.ui_readonly_indexes = [menu.index('end')]
+        self.ui_readonly_indexes = [not_none(menu.index('end'))]
 
         menu.add_command(
             command=lambda: background_run(self.event_save_as, dialog_menu),
@@ -164,15 +184,15 @@ class PaletteUI:
             label='Delete Palette',  # This name is overwritten later
             command=lambda: background_run(self.event_remove, dialog_menu),
         )
-        self.ui_menu_delete_index = menu.index('end')
+        self.ui_menu_delete_index = not_none(menu.index('end'))
 
         menu.add_command(command=lambda: background_run(self.event_change_group, dialog_menu))
         set_menu_text(menu, TransToken.ui('Change Palette Group...'))
-        self.ui_readonly_indexes.append(menu.index('end'))
+        self.ui_readonly_indexes.append(not_none(menu.index('end')))
 
         menu.add_command(command=lambda: background_run(self.event_rename, dialog_menu))
         set_menu_text(menu, TransToken.ui('Rename Palette...'))
-        self.ui_readonly_indexes.append(menu.index('end'))
+        self.ui_readonly_indexes.append(not_none(menu.index('end')))
 
         menu.add_separator()
 
@@ -189,7 +209,7 @@ class PaletteUI:
 
         menu.add_separator()
 
-        self.ui_menu_palettes_index = menu.index('end') + 1
+        self.ui_menu_palettes_index = not_none(menu.index('end')) + 1
         localisation.add_callback(call=True)(self.update_state)
 
     @property
