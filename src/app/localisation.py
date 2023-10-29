@@ -420,7 +420,7 @@ async def rebuild_app_langs() -> None:
 async def load_aux_langs(
     games: Iterable[gameMan.Game],
     packset: packages.PackagesSet,
-    lang: Language = None,
+    lang: Language | None = None,
 ) -> None:
     """Load all our non-UI translation files in the background.
 

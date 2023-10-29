@@ -1,6 +1,6 @@
 """Adds breakable glass."""
 from typing_extensions import Literal, assert_never
-from typing import Iterator, Tuple, Dict, List, Optional
+from typing import Any, Iterator, Tuple, Dict, List, Optional
 
 from srctools import FrozenVec, Keyvalues, Vec, VMF, Entity, Output, Angle
 import srctools.logger
@@ -14,7 +14,8 @@ COND_MOD_NAME = 'Breakable Glass'
 
 LOGGER = srctools.logger.get_logger(__name__)
 
-BREAKABLE_GLASS_CONF = {}
+Conf = Dict[str, Any]  # TODO: Replace with class.
+BREAKABLE_GLASS_CONF: Dict[str, Conf] = {}
 
 # For each direction, whether min/max
 # zero should be the normal axis.
@@ -62,7 +63,7 @@ CORNER_POINTS: Dict[FrozenVec, List[Tuple[Direction, Direction, Direction]]] = {
 }
 
 
-def glass_item_setup(conf: dict, item_id, config_dict):
+def glass_item_setup(conf: dict, item_id, config_dict: Dict[str, Dict[str, Any]]):
     """Build the config dictionary for a custom glass item."""
     base_inst = resolve_one(f'<{item_id}:0>', error=True)
 
@@ -73,7 +74,7 @@ def glass_item_setup(conf: dict, item_id, config_dict):
     config_dict[base_inst.casefold()] = conf
 
 
-def find_glass_items(config, vmf: VMF) -> Iterator[Tuple[str, Vec, Vec, Vec, dict]]:
+def find_glass_items(config: Dict[str, Conf], vmf: VMF) -> Iterator[Tuple[str, Vec, Vec, Vec, Conf]]:
     """Find the bounding boxes for all the glass items matching a config.
 
     This yields (targetname, min, max, normal, config) tuples.

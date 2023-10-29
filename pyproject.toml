@@ -138,7 +138,6 @@ enable_error_code = [
 # TODO
 module = [
 	'app.gameMan',
-	'app.localisation',
 	'app.menu_bar',
 	'app.music_conf',
 	'app.selector_win',
@@ -156,7 +155,6 @@ module = [
 	'app.UI',
 	'app.paletteLoader',
 	'precomp.*',
-	'test.*',
 	'BEE2_config',
 	'FakeZip',
 	'pygtrie',
@@ -171,7 +169,7 @@ disallow_untyped_calls = false
 
 [[tool.mypy.overrides]]
 # No stubs yet.
-module = ['pyglet.*']
+module = ['pyglet.*', 'mistletoe.*']
 ignore_missing_imports = true
 
 # Dead code, needs to be rewritten.
