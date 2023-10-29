@@ -47,7 +47,7 @@ class MenuBar:
         parent.option_add('*tearOff', '0')
         if utils.MAC:
             # OS X has a special quit menu item.
-            parent.createcommand('tk::mac::Quit', quit_app)
+            parent.createcommand('tk::mac::Quit', quit_app)  # type: ignore[no-untyped-call]
 
         if utils.MAC:
             # Name is used to make this the special 'BEE2' menu item
@@ -64,7 +64,7 @@ class MenuBar:
 
         self.file_menu.add_command(command=export, accelerator=tk_tools.ACCEL_EXPORT)
         set_menu_text(self.file_menu, TransToken.ui('Export'))
-        self.export_btn_pos = self.file_menu.index('end')
+        self.export_btn_pos = utils.not_none(self.file_menu.index('end'))
         self.file_menu.entryconfigure(self.export_btn_pos, state='disabled')
 
         self.file_menu.add_command(command=lambda: background_run(gameMan.add_game, DIALOG))
@@ -129,6 +129,8 @@ class MenuBar:
         """Get an event function which opens the specified folder."""
         def handler() -> None:
             """When called opens the path."""
+            if gameMan.selected_game is None:
+                return
             paths = path_getter(gameMan.selected_game)
             if utils.WIN:
                 for path in paths:
