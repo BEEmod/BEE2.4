@@ -67,6 +67,8 @@ class Marker:
         """Follow the provided vactube path, yielding each pair of nodes."""
         vac_node = self
         while True:
+            if vac_node.next is None:
+                return
             try:
                 next_ent = vac_list[vac_node.next]
             except KeyError:

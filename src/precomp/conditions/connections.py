@@ -29,8 +29,8 @@ def res_add_output(res: Keyvalues) -> Callable[[Entity], None]:
     inst_in = res['inst_in', '']
     conf_inst_out = res['inst_out', '']
     targ = res['target', '']
-    only_once = srctools.conv_bool(res['only_once', None])
-    times = 1 if only_once else srctools.conv_int(res['times', None], -1)
+    only_once = res.bool('only_once')
+    times = 1 if only_once else res.int('times', -1)
     delay = res['delay', '0.0']
     parm = res['parm', '']
 
@@ -70,8 +70,8 @@ def res_add_output(res: Keyvalues) -> Callable[[Entity], None]:
             inst.fixup.substitute(parm),
             srctools.conv_float(inst.fixup.substitute(delay)),
             times=times,
-            inst_out=inst.fixup.substitute(inst_out) or None,
-            inst_in=inst.fixup.substitute(inst_in) or None,
+            inst_out=inst.fixup.substitute(inst_out) if inst_out else None,
+            inst_in=inst.fixup.substitute(inst_in) if inst_in else None,
         ))
     return add_output
 

@@ -446,7 +446,7 @@ def global_input(
     vmf: VMF,
     pos: Union[Vec, str],
     output: Output,
-    relay_name: str=None,
+    relay_name: str | None = None,
 ) -> None:
     """Create a global input, either from a relay or logic_auto.
 

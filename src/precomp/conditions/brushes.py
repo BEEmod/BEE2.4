@@ -674,7 +674,7 @@ def res_import_template(
             align_bind=align_bind_overlay,
         )
 
-        if key_block is not None:
+        if key_block is not None and temp_data.detail is not None:
             conditions.set_ent_keys(temp_data.detail, inst, key_block)
             br_origin = Vec.from_str(key_block.find_key('keys')['origin'])
             br_origin.localise(origin, orient)

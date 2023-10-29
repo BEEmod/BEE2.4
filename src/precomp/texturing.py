@@ -850,8 +850,15 @@ class GenRandom(Generator):
     Each texture will be randomly chosen whenever asked.
     This is used for Overlay and Signage as well.
     """
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
+    def __init__(
+        self,
+        category: GenCat,
+        orient: Optional[Orient],
+        portal: Optional[Portalable],
+        options: Dict[str, Any],
+        textures: Dict[str, List[str]],
+    ) -> None:
+        super().__init__(category, orient, portal, options, textures)
         # For enum constants, use the id() to lookup - this
         # way we're effectively comparing by identity.
         self.enum_data: Dict[int, str] = {}
@@ -891,9 +898,15 @@ class GenClump(Generator):
 
     This creates groups of the same texture in roughly rectangular sections.
     """
-
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
+    def __init__(
+        self,
+        category: GenCat,
+        orient: Optional[Orient],
+        portal: Optional[Portalable],
+        options: Dict[str, Any],
+        textures: Dict[str, List[str]],
+    ) -> None:
+        super().__init__(category, orient, portal, options, textures)
 
         # A seed only unique to this generator.
         self.gen_seed = b''
