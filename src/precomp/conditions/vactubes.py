@@ -88,6 +88,30 @@ def res_vactubes(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
 
     Only runs once, and then quits the condition list. After priority 400,
     the ents will actually be placed.
+
+    Options:
+    * `group`: Specifies the group this belongs to. Items with the same group can be connected
+      together.
+    * `Instances`: Configuration for a set of instances.
+        * `trig_size`: The width of the automatically generated `trigger_vphysics_motion` and
+          `trigger_push`es.
+        * `straight_inst`: Instance to use for straight segments. This can itself be a block to
+           specify different length variants - the key should be the length in units (128, 256, 192, etc).
+        * `corner_small_inst`, `corner_medium_inst`, `corner_large_inst`: The instance for each size
+          of corner turn.
+        * `temp_corner_small`, `temp_corner_medium`, `temp_corner_large`: Template IDs
+          (and optionally `:visgroups`) corresponding to these corner instances. These produce a
+          `trigger_vphysics_motion` for the corner.
+        * `support_inst`: For straight segments, up to 4 of these are placed to attach the segment
+          to any walls, if adjacient tiles are present.
+        * `support_ring_inst`: Placed over a straight instance, if any `support_inst` are placed in
+           that voxel.
+        * `entry_floor_inst`: Placed on the start of the tube, if the tube points downward into
+          the floor.
+        * `entry_ceil_inst`: Placed on the start of the tube, if the tube points upward into the
+          ceiling.
+        * `entry_inst`: Placed on the start of the tube, if it faces horizontally.
+        * `exit_inst`: Placed on the end of the tube.
     """
     group = res['group', 'DEFAULT_GROUP']
 
