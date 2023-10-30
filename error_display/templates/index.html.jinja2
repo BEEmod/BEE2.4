@@ -16,7 +16,22 @@
 			<aside>{{ context }}</aside>
 		{% endif %}
 	</article>
-	<section id="render"></section>
+	<details{{ " open" if start_render_open else "" }}>
+		<summary>Chamber Preview</summary>
+		<section id="render"></section>
+	</details>
+	{% if log_vbsp %}
+	<details>
+		<summary>Geometry Compile Log</summary>
+		<pre>{{ log_vbsp }}</pre>
+	</details>
+	{% endif %}
+	{% if log_vrad %}
+	<details>
+		<summary>Lighting / Packing Compile Log</summary>
+		<pre>{{ log_vrad }}</pre>
+	</details>
+	{% endif %}
 </main>
 </body>
 </html>
