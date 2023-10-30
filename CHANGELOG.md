@@ -7,6 +7,7 @@
 * Change palette item format to permit "holes" in the position of items. This isn't exposed in the UI yet.
 * Redo the selector on the Item Properties pane to make it more clear that it swaps pages.
 * Display the authors of corridors.
+* Rearranged the UI on the corridor picker display.
 * Add some informative errors if Unstationary Scaffolds (or similar UCP items) are connected in an
   invalid manner.
 * Skip disabled packages when extracting resources.
@@ -16,6 +17,9 @@
 * A VPK file can be now placed into `vpk_override` to have it be combined with the built VPK. 
 * Added a warning screen to the developer tab of the options window, indicating that some of these options can temporarily break BEE if changed.
 * #1984: The "save settings to palette" will now change to match the selected palette. This means clicking "save" won't accidentally delete saved settings.
+* #1893: Add compile logs to error display windows.
+* Internal files are now placed in a `bin/` subfolder, instead of cluttering
+  the folder containing `BEE2.exe`, `vbsp.exe` and `vrad.exe`.
 
 ### UCP-Relevant Changes:
 * Terminology change: "Condition Flags" have been renamed to "Condition Tests" - I think that sounds a bit better.
@@ -28,7 +32,9 @@
   is copied into those as a comment to help identify them.
 * Behaviour change: in Fizzlers, `model_mid` will now be affected by the `NameType` value.
 * Added the `Error` result, which allows producing a custom error message from a package.
+* #1313: Allow disabling the triggers produced by `CustVactube`.
 * When Dev Mode is on, `SetTile` now dumps the tiles it's trying to set into the final map.
+* `ConfigGroup` slider widgets can now be set to display "Off" when set to zero, also fixed them not snapping to values.
 
 ### Bugfixes:
 * BEE will detect `portal2_dlc3` being in use and pick another DLC folder for its VPKs.
@@ -43,6 +49,7 @@
 * Piston Platforms will now correctly accept Surface Lacquer, if placed on their base.
 * Paint Splats will correctly rotate to aint Angled Panels they are placed on top of.
 * Removed the "Prevent Portal Bump (fizzler)" stylevar. It is useless and never worked.
+* #1955: Fix some situations causing incorrect catwalk placement.
 
 ------------------------------------------
 
