@@ -430,9 +430,8 @@ def read_configs(all_items: Iterable[editoritems.Item]) -> None:
     for item in all_items:
         if item.id.casefold() in ITEM_TYPES:
             raise ValueError(f'Duplicate item type "{item.id}"')
-        if item.conn_config is None and (item.force_input or item.force_output):
-            # The item has no config, but it does force input/output.
-            # Generate a blank config so the Item is created.
+        if item.conn_config is None:
+            # Generate a blank config.
             ITEM_TYPES[item.id.casefold()] = Config(item.id)
         else:
             ITEM_TYPES[item.id.casefold()] = item.conn_config
