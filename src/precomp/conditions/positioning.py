@@ -7,6 +7,8 @@ from precomp import conditions, tiling, brushLoc
 from srctools import Vec, FrozenVec, Angle, Matrix, conv_float, Keyvalues, Entity
 from srctools.logger import get_logger
 
+from precomp.lazy_value import LazyValue
+
 
 COND_MOD_NAME = 'Positioning'
 LOGGER = get_logger(__name__, alias='cond.positioning')
@@ -14,6 +16,14 @@ LOGGER = get_logger(__name__, alias='cond.positioning')
 # Predicates for tiles.
 # We optimise to a lookup table.
 TILE_PREDICATES: Dict[str, Set[tiling.TileType]] = {}
+
+
+def parse_orient(direction: str) -> FrozenVec:
+    """Parse a FrozenVec, allowing DIRECTIONS constants also."""
+    try:
+        return conditions.DIRECTIONS[direction.casefold()]
+    except KeyError:
+        return FrozenVec.from_str(direction, 0, 0, 1)
 
 
 @conditions.make_test(
@@ -41,22 +51,21 @@ def check_angles(kv: Keyvalues) -> conditions.TestCallable:
 
     if kv.has_children():
         targ_angle = kv['direction', '0 0 0']
-        from_dir_str = kv['from_dir', '0 0 1']
-        try:
-            from_dir = conditions.DIRECTIONS[from_dir_str.casefold()]
-        except KeyError:
-            from_dir = FrozenVec.from_str(from_dir_str, 0, 0, 1)
-        allow_inverse = kv.bool('allow_inverse')
+        from_dir = LazyValue.parse(kv['from_dir', '0 0 1']).map(parse_orient)
+        allow_inverse = LazyValue.parse(kv['allow_inverse', '']).as_bool()
     else:
         targ_angle = kv.value
-        from_dir = FrozenVec(0, 0, 1)
-        allow_inverse = False
+        from_dir = LazyValue.make(FrozenVec(0, 0, 1))
+        allow_inverse = LazyValue.make(False)
+
+    if '$' in targ_angle:
+        raise ValueError('Cannot use $var in "direction" key for Angles/Orient/Dir test!')
 
     targ_angle = targ_angle.casefold()
     if targ_angle in ('wall', 'walls'):
         def check_orient(inst: Entity) -> bool:
             """Check if the instance is facing any wall."""
-            inst_normal = from_dir @ Matrix.from_angstr(inst['angles'])
+            inst_normal = from_dir(inst) @ Matrix.from_angstr(inst['angles'])
             return abs(inst_normal.z) < 1e-6
     else:
         try:
@@ -66,10 +75,10 @@ def check_angles(kv: Keyvalues) -> conditions.TestCallable:
 
         def check_orient(inst: Entity) -> bool:
             """Check the orientation against the instance."""
-            inst_normal = from_dir @ Matrix.from_angstr(inst['angles'])
+            inst_normal = from_dir(inst) @ Matrix.from_angstr(inst['angles'])
 
             dot = inst_normal.dot(normal)
-            return dot > 0.99 or (allow_inverse and dot < -0.99)
+            return dot > 0.99 or (allow_inverse(inst) and dot < -0.99)
     return check_orient
 
 

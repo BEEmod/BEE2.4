@@ -92,7 +92,7 @@ def res_random(coll: collisions.Collisions, info: MapInfo, res: Keyvalues) -> co
 
 
 @make_result('variant')
-def res_add_variant(res: Keyvalues) -> Callable[[Entity], None]:
+def res_add_variant(res: Keyvalues) -> conditions.ResultCallable:
     """This allows using a random instance from a weighted group.
 
     A suffix will be added in the form `_var4`.
@@ -136,7 +136,7 @@ def res_add_variant(res: Keyvalues) -> Callable[[Entity], None]:
 
 
 @make_result('RandomNum')
-def res_rand_num(inst: Entity, res: Keyvalues) -> None:
+def res_rand_num(res: Keyvalues) -> conditions.ResultCallable:
     """Generate a random number and save in a fixup value.
 
     Parameters:
@@ -145,26 +145,39 @@ def res_rand_num(inst: Entity, res: Keyvalues) -> None:
     - `ResultVar` is the `$fixup` variable the result will be saved in.
     - `seed`: If this is set, it will be used to keep the value constant across map recompiles.
        This should be unique to this use of `RandomVec`.
-    - `min`, `max` etc: These are used to define the range to generate (inclusive). If the min
+    - `min`, `max`: These are used to define the range to generate (inclusive). If the min
        and max are equal that number will always be used instead.
     """
     var = res['resultvar', '$random']
-    rng = rand.seed(b'rand_num', inst, res['seed', ''])
+    seed = LazyValue.parse(res['seed', ''])
 
     if res.bool('decimal'):
-        max_float = res.float('max', 1.0)
-        min_float = res.float('min', 0.0)
-        if min_float == max_float:
-            inst.fixup[var] = min_float
-        else:
-            inst.fixup[var] = rng.uniform(min_float, max_float)
+        min_float = LazyValue.parse(res['min', '']).as_float(0.0)
+        max_float = LazyValue.parse(res['max', '']).as_float(1.0)
+
+        def apply_floats(inst: Entity) -> None:
+            """Compute a random float."""
+            rng = rand.seed(b'rand_num', inst, seed(inst))
+            mins, maxs = min_float(inst), max_float(inst)
+            if mins == maxs:
+                inst.fixup[var] = mins
+            else:
+                inst.fixup[var] = rng.uniform(mins, maxs)
+
+        return apply_floats
     else:
-        max_int = res.int('max', 1)
-        min_int = res.int('min', 0)
-        if min_int == max_int:
-            inst.fixup[var] = min_int
-        else:
-            inst.fixup[var] = rng.randint(min_int, max_int)
+        min_int = LazyValue.parse(res['min', '']).as_int(0)
+        max_int = LazyValue.parse(res['max', '']).as_int(1).map(lambda x: x + 1, 'inc')
+
+        def apply_ints(inst: Entity) -> None:
+            """Compute a random integer."""
+            rng = rand.seed(b'rand_num', inst, seed(inst))
+            mins, maxs = min_int(inst), max_int(inst)
+            if mins == maxs:
+                inst.fixup[var] = mins
+            else:
+                inst.fixup[var] = rng.randint(mins, maxs)
+        return apply_ints
 
 
 @make_result('RandomVec')
