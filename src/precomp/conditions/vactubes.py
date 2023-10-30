@@ -94,7 +94,7 @@ def res_vactubes(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
       together.
     * `Instances`: Configuration for a set of instances.
         * `trig_size`: The width of the automatically generated `trigger_vphysics_motion` and
-          `trigger_push`es.
+          `trigger_push`es. If zero, no triggers will be produced.
         * `straight_inst`: Instance to use for straight segments. This can itself be a block to
            specify different length variants - the key should be the length in units (128, 256, 192, etc).
         * `corner_small_inst`, `corner_medium_inst`, `corner_large_inst`: The instance for each size
@@ -346,16 +346,17 @@ def make_straight(
     # point_push entity.
     start_off = -96 if is_start else -64
 
-    p1, p2 = Vec.bbox(
-        origin + Vec(start_off, -config.trig_radius, -config.trig_radius) @ orient,
-        origin + Vec(dist - 64, config.trig_radius, config.trig_radius) @ orient,
-    )
+    if config.trig_radius > 0.0:
+        p1, p2 = Vec.bbox(
+            origin + Vec(start_off, -config.trig_radius, -config.trig_radius) @ orient,
+            origin + Vec(dist - 64, config.trig_radius, config.trig_radius) @ orient,
+        )
 
-    solid = vmf.make_prism(p1, p2, mat='tools/toolstrigger').solid
+        solid = vmf.make_prism(p1, p2, mat='tools/toolstrigger').solid
 
-    motion_trigger(vmf, solid.copy())
+        motion_trigger(vmf, solid.copy())
 
-    push_trigger(vmf, origin, normal, [solid])
+        push_trigger(vmf, origin, normal, [solid])
 
     off = 0
     for seg_dist in utils.fit(dist, config.inst_straight_sizes):
@@ -418,7 +419,7 @@ def make_corner(
     )
 
     temp, visgroups = config.temp_corner[int(size)]
-    if temp is not None:
+    if temp is not None and config.trig_radius > 0.0:
         temp_solids = template_brush.import_template(
             vmf,
             temp,
