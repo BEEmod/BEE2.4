@@ -71,6 +71,8 @@ class SubPane(tk.Toplevel):
         self.can_resize_y = resize_y
         super().__init__(parent, name='pane_' + name)
         self.withdraw()  # Hide by default
+        if utils.LINUX:
+            self.wm_attributes('-type', 'utility')
 
         self.tool_button = make_tool_button(
             tool_frame, tk_img,

@@ -47,6 +47,8 @@ window = tk.Toplevel(TK_ROOT, name='contextWin')
 window.overrideredirect(True)
 window.resizable(False, False)
 window.transient(master=TK_ROOT)
+if utils.LINUX:
+    window.wm_attributes('-type', 'popup_menu')
 window.withdraw()  # starts hidden
 
 SUBITEM_POS = {

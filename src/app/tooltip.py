@@ -15,6 +15,7 @@ from transtoken import TransToken
 from ui_tk.img import TK_IMG
 # Don't import set_text directly, could be confused with tooltip setter.
 from ui_tk import wid_transtoken
+import utils
 
 
 __all__ = ['set_tooltip', 'add_tooltip']
@@ -27,8 +28,10 @@ CENT_DIST = 50  # Distance around center where we align centered.
 window = tk.Toplevel(TK_ROOT, name='tooltipWin')
 window.withdraw()
 window.transient(master=TK_ROOT)
-window.overrideredirect(True)
-window.resizable(False, False)
+window.wm_overrideredirect(True)
+window.wm_resizable(False, False)
+if utils.LINUX:
+    window.wm_attributes('-type', 'tooltip')
 
 context_label = tk.Label(
     window,

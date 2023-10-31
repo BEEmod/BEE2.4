@@ -1378,7 +1378,8 @@ def init_drag_icon() -> None:
     # appearing in this window.
     drag_win.overrideredirect(True)
     drag_win.resizable(False, False)
-    drag_win.withdraw()
+    if utils.LINUX:
+        drag_win.wm_attributes('-type', 'dnd')
     drag_win.transient(master=TK_ROOT)
     drag_win.withdraw()  # starts hidden
     drag_win.bind(tk_tools.EVENTS['LEFT_RELEASE'], drag_stop)

@@ -141,6 +141,8 @@ class DragDrop(ManagerBase[ItemT, tk.Misc], Generic[ItemT]):
         self._drag_win = drag_win = tk.Toplevel(parent, name='drag_icon')
         drag_win.withdraw()
         drag_win.transient(master=parent)
+        if utils.LINUX:
+            drag_win.wm_attributes('-type', 'dnd')
         drag_win.wm_overrideredirect(True)
 
         self._drag_lbl = tk.Label(drag_win)

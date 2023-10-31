@@ -448,12 +448,14 @@ class Dialog(tk.Toplevel):
         set_win_title(self, title)
         self.transient(master=TK_ROOT)
         self.resizable(width=True, height=True)
+        if utils.LINUX:
+            self.wm_attributes('-type', 'dialog')
         self.text = text
         tk_tools.set_window_icon(self)
 
         # Hide when the exit button is pressed, or Escape
         # on the keyboard.
-        self.protocol("WM_DELETE_WINDOW", self.withdraw)
+        self.wm_protocol("WM_DELETE_WINDOW", self.withdraw)
         self.bind("<Escape>", f"wm withdraw {self}")
 
         frame = tk.Frame(self, background='white')
