@@ -1,7 +1,7 @@
 """Use pseudo-entities to make creating editoritems data more easily."""
 from __future__ import annotations
 
-from typing import Callable
+from typing import Callable, TypeAlias, TypeVar
 from srctools import FrozenVec, Matrix, Angle, Vec, logger, conv_int
 from srctools.vmf import VMF, Entity
 
@@ -10,24 +10,29 @@ from editoritems import Item, ConnSide, OccuType, AntlinePoint, Coord, OccupiedV
 
 
 LOGGER = logger.get_logger(__name__)
-LOAD_FUNCS: dict[str, Callable[[Item, Entity], None]] = {}
-SAVE_FUNCS: list[Callable[[Item, VMF], None]] = []
+LoadFunc: TypeAlias = Callable[[Item, Entity], None]
+SaveFunc: TypeAlias = Callable[[Item, VMF], None]
+LOAD_FUNCS: dict[str, LoadFunc] = {}
+SAVE_FUNCS: list[SaveFunc] = []
+LoadFuncT = TypeVar("LoadFuncT", bound=LoadFunc)
+SaveFuncT = TypeVar("SaveFuncT", bound=SaveFunc)
 
 
 def load(item: Item, vmf: VMF) -> None:
     """Search the map for important entities, and apply it to the item."""
     with logger.context(item.id):
-        for ent in vmf.entities:
-            classname = ent['classname'].casefold()
-            if ent.hidden:
-                continue
+        for classname, ents in vmf.by_class.items():
+            classname = classname.casefold()
             try:
                 func = LOAD_FUNCS[classname]
             except KeyError:
                 if classname.startswith('bee2_editor_'):
                     LOGGER.warning('Unknown item configuration entity "{}"!', classname)
             else:
-                func(item, ent)
+                for ent in ents:
+                    if ent.hidden:
+                        continue
+                    func(item, ent)
 
 
 def save(item: Item) -> VMF:
@@ -37,6 +42,24 @@ def save(item: Item) -> VMF:
         for func in SAVE_FUNCS:
             func(item, vmf)
     return vmf
+
+
+def _saver(func: SaveFuncT) -> SaveFuncT:
+    """Define a saving function."""
+    SAVE_FUNCS.append(func)
+    return func
+
+
+def _loader(name: str) -> Callable[[LoadFunc], LoadFunc]:
+    """Define a loading function."""
+    if name.casefold() in LOAD_FUNCS:
+        raise ValueError(f"Duplicate name: {name}")
+
+    def deco(func: LoadFuncT) -> LoadFuncT:
+        """Used as a decorator."""
+        LOAD_FUNCS[name.casefold()] = func
+        return func
+    return deco
 
 
 SKIN_TO_CONN_OFFSETS: dict[str, FrozenVec] = {
@@ -67,7 +90,8 @@ def parse_occutype(value: str) -> OccuType:
     return val
 
 
-def load_editor_connectionpoint(item: Item, ent: Entity) -> None:
+@_loader('bee2_editor_connectionpoint')
+def load_connectionpoint(item: Item, ent: Entity) -> None:
     """Allow more conveniently defining connectionpoints."""
     origin = Vec.from_str(ent['origin'])
     angles = Angle.from_str(ent['angles'])
@@ -109,7 +133,8 @@ def load_editor_connectionpoint(item: Item, ent: Entity) -> None:
     ))
 
 
-def save_editor_connectionpoint(item: Item, vmf: VMF) -> None:
+@_saver
+def save_connectionpoint(item: Item, vmf: VMF) -> None:
     """Write connectionpoints to a VMF."""
     for side, points in item.antline_points.items():
         yaw = side.yaw
@@ -139,7 +164,8 @@ def save_editor_connectionpoint(item: Item, vmf: VMF) -> None:
             )
 
 
-def load_editor_embeddedvoxel(item: Item, ent: Entity) -> None:
+@_loader('bee2_editor_embeddedvoxel')
+def load_embeddedvoxel(item: Item, ent: Entity) -> None:
     """Parse embed definitions contained in the VMF."""
     bbox_min, bbox_max = ent.get_bbox()
     bbox_min = round(bbox_min, 0)
@@ -158,7 +184,8 @@ def load_editor_embeddedvoxel(item: Item, ent: Entity) -> None:
     )))
 
 
-def save_editor_embeddedvoxel(item: Item, vmf: VMF) -> None:
+@_saver
+def save_embeddedvoxel(item: Item, vmf: VMF) -> None:
     """Save embedded voxel volumes."""
     for bbox_min, bbox_max in bounding_boxes(item.embed_voxels):
         vmf.create_ent('bee2_editor_embeddedvoxel').solids.append(vmf.make_prism(
@@ -169,6 +196,7 @@ def save_editor_embeddedvoxel(item: Item, vmf: VMF) -> None:
         ).solid)
 
 
+@_loader('bee2_editor_occupiedvoxel')
 def load_editor_occupiedvoxel(item: Item, ent: Entity) -> None:
     """Parse voxel collisions contained in the VMF."""
     bbox_min, bbox_max = ent.get_bbox()
@@ -247,7 +275,8 @@ def load_editor_occupiedvoxel(item: Item, ent: Entity) -> None:
     )
 
 
-def save_editor_occupiedvoxel(item: Item, vmf: VMF) -> None:
+@_saver
+def save_occupiedvoxel(item: Item, vmf: VMF) -> None:
     """Save occupied voxel volumes."""
     for voxel in item.occupy_voxels:
         pos = Vec(voxel.pos) * 128
@@ -287,24 +316,14 @@ def save_editor_occupiedvoxel(item: Item, vmf: VMF) -> None:
         ).solid)
 
 
+@_loader('bee2_collision_bbox')
 def load_collision_bbox(item: Item, ent: Entity) -> None:
     """Load precise BEE collisions."""
     item.collisions.extend(BBox.from_ent(ent))
 
 
+@_saver
 def save_collision_bbox(item: Item, vmf: VMF) -> None:
     """Export precise BEE collisions."""
     for coll in item.collisions:
         coll.as_ent(vmf)
-
-
-LOAD_FUNCS.update({
-    'bee2' + name[4:]: func
-    for name, func in globals().items()
-    if name.startswith('load_')
-})
-SAVE_FUNCS.extend([
-    func
-    for name, func in globals().items()
-    if name.startswith('save_')
-])
