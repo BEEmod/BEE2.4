@@ -111,7 +111,7 @@
 
 
 // --------
-// Entities used with editoritems_gen.py to make editoritems configs.
+// Entities used with editoritems_vmf to make editoritems configs.
 // These should not appear in any maps.
 
 @PointClass 
@@ -119,6 +119,7 @@
 	studioprop("models/BEE2/editor/connection_point.mdl")
 	= bee2_editor_connectionpoint: "Defines a connection point for antlines."
 	[
+	sortkey(string) : "Sort Key" : "This allows specifying the order for connection points in the final script. The value is sorted in ascending order."
 	skin(choices) : "Orientation" : 1 : "The position of the antline relative to the signage." =
 		[
 		// 0 = useless, needed to distinguish materials in the model.
