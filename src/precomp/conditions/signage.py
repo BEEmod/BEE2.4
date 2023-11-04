@@ -170,10 +170,10 @@ def res_signage(vmf: VMF, inst: Entity, res: Keyvalues) -> None:
             force_type=template_brush.TEMP_TYPES.detail,
             additional_visgroups=visgroup,
         )
-
-        for face in template.detail.sides():
-            if face.normal() == normal:
-                brush_faces.append(face)
+        if template.detail is not None:
+            for face in template.detail.sides():
+                if face.normal() == normal:
+                    brush_faces.append(face)
     else:
         # Direct on the surface.
         # Find the grid pos first.

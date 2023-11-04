@@ -132,9 +132,9 @@ def _show(widget: tk.Misc, mouse_x: int, mouse_y: int) -> None:
 
 def set_tooltip(
     widget: tk.Misc,
-    text: TransToken=TransToken.BLANK,
-    image: img.Handle=None,
+    text: TransToken = TransToken.BLANK,
     *,
+    image: img.Handle | None = None,
     delay: int=-1,
 ) -> None:
     """Change the tooltip for a widget.
@@ -159,7 +159,7 @@ def add_tooltip(
     targ_widget: tk.Misc,
     text: TransToken = TransToken.BLANK,
     *,
-    image: img.Handle=None,
+    image: img.Handle | None = None,
     delay: int=500,
     show_when_disabled: bool=False,
 ) -> None:
