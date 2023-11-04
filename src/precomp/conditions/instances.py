@@ -2,7 +2,9 @@
 
 """
 from __future__ import annotations
-from typing import Any, Union, Callable
+
+from decimal import Decimal
+from typing import Protocol, TypeVar, Union
 import operator
 
 import srctools.logger
@@ -14,6 +16,7 @@ from precomp.lazy_value import LazyValue
 
 LOGGER = srctools.logger.get_logger(__name__, 'cond.instances')
 COND_MOD_NAME = 'Instances'
+CompNumT_contra = TypeVar("CompNumT_contra", float, Decimal, str, contravariant=True)
 
 
 @conditions.make_test('instance')
@@ -106,7 +109,12 @@ def check_has_trait(inst: Entity, kv: Keyvalues) -> bool:
     return kv.value.casefold() in instance_traits.get(inst)
 
 
-INSTVAR_COMP: dict[str, Callable[[Any, Any], Any]] = {
+class CompareProto(Protocol):
+    """Operator functions are Any, define a valid signature for how we use them."""
+    def __call__(self, a: CompNumT_contra, b: CompNumT_contra, /) -> bool: ...
+
+
+INSTVAR_COMP: dict[str, CompareProto] = {
     '=': operator.eq,
     '==': operator.eq,
 
@@ -122,6 +130,7 @@ INSTVAR_COMP: dict[str, Callable[[Any, Any], Any]] = {
     '<=': operator.le,
     '=<': operator.le,
 }
+INSTVAR_COMP_DEFAULT: CompareProto = operator.eq
 
 
 @conditions.make_test('instVar')
@@ -135,10 +144,11 @@ def test_instvar(inst: Entity, kv: Keyvalues) -> bool:
     If only a single value is present, it is tested as a boolean.
     """
     values = kv.value.split(' ', 3)
+    comp_func: CompareProto
     if len(values) == 3:
         val_a, op, val_b = values
         op = inst.fixup.substitute(op)
-        comp_func = INSTVAR_COMP.get(op, operator.eq)
+        comp_func = INSTVAR_COMP.get(op, INSTVAR_COMP_DEFAULT)
     elif len(values) == 2:
         val_a, val_b = values
         if val_b in INSTVAR_COMP:
@@ -149,10 +159,11 @@ def test_instvar(inst: Entity, kv: Keyvalues) -> bool:
         else:
             # With just two vars, assume equality.
             op = '=='
-            comp_func = operator.eq
+            comp_func = INSTVAR_COMP_DEFAULT
     else:
         # For just a name.
         return conv_bool(inst.fixup.substitute(values[0]))
+
     if '$' not in val_a and '$' not in val_b:
         # Handle pre-substitute behaviour, where val_a is always a var.
         LOGGER.warning(
@@ -164,19 +175,22 @@ def test_instvar(inst: Entity, kv: Keyvalues) -> bool:
 
     val_a = inst.fixup.substitute(val_a, default='')
     val_b = inst.fixup.substitute(val_b, default='')
-    comp_a: str | float
-    comp_b: str | float
     try:
         # Convert to floats if possible, otherwise handle both as strings.
         # That ensures we normalise different number formats (1 vs 1.0)
-        comp_a, comp_b = float(val_a), float(val_b)
+        comp_a, comp_b = Decimal(val_a), Decimal(val_b)
     except ValueError:
-        comp_a, comp_b = val_a, val_b
-    try:
-        return bool(comp_func(comp_a, comp_b))
-    except (TypeError, ValueError) as e:
-        LOGGER.warning('InstVar comparison failed: {} {} {}', val_a, op, val_b, exc_info=e)
-        return False
+        try:
+            return comp_func(val_a, val_b)
+        except (TypeError, ValueError) as e:
+            LOGGER.warning('InstVar comparison failed: {} {} {}', val_a, op, val_b, exc_info=e)
+            return False
+    else:
+        try:
+            return comp_func(comp_a, comp_b)
+        except (TypeError, ValueError) as e:
+            LOGGER.warning('InstVar comparison failed: {} {} {}', val_a, op, val_b, exc_info=e)
+            return False
 
 
 @conditions.make_test('offsetDist')
