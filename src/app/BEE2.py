@@ -173,7 +173,7 @@ async def app_main(init: Callable[[], Awaitable[Any]]) -> None:
         nursery.cancel_scope.cancel()
 
 
-def done_callback(result: Outcome) -> None:
+def done_callback(result: Outcome[None]) -> None:
     """The app finished, quit."""
     from app import UI
     if isinstance(result, Error):
@@ -185,7 +185,7 @@ def done_callback(result: Outcome) -> None:
     TK_ROOT.quit()
 
 
-def start_main(init: Callable[[], Awaitable[Any]]=init_app) -> None:
+def start_main(init: Callable[[], Awaitable[object]] = init_app) -> None:
     """Starts the TK and Trio loops.
 
     See https://github.com/richardsheridan/trio-guest/.
