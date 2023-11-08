@@ -167,7 +167,7 @@ def res_rand_num(res: Keyvalues) -> conditions.ResultCallable:
         return apply_floats
     else:
         min_int = LazyValue.parse(res['min', '']).as_int(0)
-        max_int = LazyValue.parse(res['max', '']).as_int(1).map(lambda x: x + 1, 'inc')
+        max_int = LazyValue.parse(res['max', '']).as_int(1)
 
         def apply_ints(inst: Entity) -> None:
             """Compute a random integer."""
