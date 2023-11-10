@@ -841,8 +841,8 @@ class TileDef:
         pos: Vec,
         normal: Vec,
         base_type: TileType,
-        subtiles: dict[tuple[int, int], TileType]=None,
-        has_helper: bool=False,
+        subtiles: dict[tuple[int, int], TileType] | None = None,
+        has_helper: bool = False,
     ) -> None:
         self.pos = pos
         self.normal = normal
@@ -878,11 +878,8 @@ class TileDef:
             return Vec(1, 0, 0)
 
     def __repr__(self) -> str:
-        return '<{} TileDef @ {} of {}>'.format(
-            self.base_type.name,
-            NORMAL_NAMES.get(self.normal.freeze(), self.normal),
-            self.pos,
-        )
+        norm_name = NORMAL_NAMES.get(self.normal.freeze(), self.normal)
+        return f'<{self.base_type.name} TileDef @ {norm_name} of {self.pos}>'
 
     def format_tiles(self) -> str:
         """Debug utility, log the subtile shape."""
@@ -898,8 +895,8 @@ class TileDef:
         cls,
         grid_pos: Vec,
         norm: Vec,
-        tile_type: TileType=TileType.VOID,
-    ) -> 'TileDef':
+        tile_type: TileType = TileType.VOID,
+    ) -> TileDef:
         """Return a tiledef at a position, creating it with a type if not present."""
         try:
             tile = TILES[grid_pos.as_tuple(), norm.as_tuple()]
@@ -1001,8 +998,8 @@ class TileDef:
     def calc_patterns(
         self,
         tiles: dict[tuple[int, int], TileType],
-        is_wall: bool=False,
-        _pattern: str=None,
+        is_wall: bool = False,
+        _pattern: str | None = None,
     ) -> Iterator[tuple[float, float, float, float, TileSize, TileType]]:
         """Figure out the brushes needed for a complex pattern.
 
@@ -1567,8 +1564,7 @@ def make_tile(
     assert TILE_TEMP, "make_tile called without data loaded!"
     template = TILE_TEMP[normal.as_tuple()]
 
-    assert width >= 8 and height >= 8, 'Tile is too small!' \
-                                       ' ({}x{})'.format(width, height)
+    assert width >= 8 and height >= 8, f'Tile is too small! ({width}x{height})'
     assert thickness in (2, 4, 8), f'Bad thickness {thickness}'
 
     axis_u, axis_v = Vec.INV_AXIS[normal.axis()]
@@ -1999,8 +1995,7 @@ def find_front_face(
         else:
             LOGGER.warning('Unknown panel texture "{}"!', face.mat)
             return TileType.BLACK, face
-    else:
-        raise Exception(f'Malformed wall brush at {grid_pos}, {norm}')
+    raise Exception(f'Malformed wall brush at {grid_pos}, {norm}')
 
 
 def inset_flip_panel(panel: list[Solid], pos: Vec, normal: Vec) -> None:

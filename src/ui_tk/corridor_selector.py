@@ -261,7 +261,6 @@ class TkSelector(Selector):
     @override
     def ui_icon_create(self) -> None:
         """Create a new icon widget, and append it to the list."""
-        index = len(self.icons)
         self.icons.append(IconUI(self, len(self.icons)))
 
     @override

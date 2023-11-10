@@ -85,7 +85,7 @@ class CanvasPositioner(PositionerBase, Generic[T]):
         item_height: int,
         spacing: int = -1,
         yoff: int = 0,
-    ):
+    ) -> None:
         self.canvas = canvas
         self._place_func = place_func
         super().__init__(

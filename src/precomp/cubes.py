@@ -1885,13 +1885,11 @@ def generate_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
                 else:
                     spawn_paint = pair.paint_type
 
+                spawn_skin = CUBE_SKINS[pair.cube_type.type].spawn_skin(spawn_paint)
                 pair.outputs[CubeOutputs.SPAWN].append(Output(
                     '', '!self', 'RunScriptCode',
-                    'self.SetModel(`{}`); '
-                    'self.__KeyValueFromInt(`skin`, {});'.format(
-                        cust_model,
-                        CUBE_SKINS[pair.cube_type.type].spawn_skin(spawn_paint),
-                    ),
+                    f'self.SetModel(`{cust_model}`); '
+                    f'self.__KeyValueFromInt(`skin`, {spawn_skin});',
                 ))
 
         drop_cube = cube = should_respawn = None

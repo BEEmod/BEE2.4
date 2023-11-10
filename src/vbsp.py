@@ -550,16 +550,16 @@ def set_player_portalgun(vmf: VMF, info: corridor.Info) -> None:
                     '!activator',
                     'RunScriptCode',
                     '__pgun_is_oran <- 0; '
-                    '__pgun_port_id <- {}; '
-                    '__pgun_active <- 1'.format(port_id),
+                    f'__pgun_port_id <- {port_id}; '
+                    '__pgun_active <- 1'
                 ),
                 Output(
                     'OnStartTouchPortal2',
                     '!activator',
                     'RunScriptCode',
                     '__pgun_is_oran <- 1; '
-                    '__pgun_port_id <- {}; '
-                    '__pgun_active <- 1'.format(port_id),
+                    f'__pgun_port_id <- {port_id}; '
+                    '__pgun_active <- 1'
                 ),
                 Output(
                     'OnEndTouchPortal',
@@ -1532,7 +1532,6 @@ async def main() -> None:
     args = " ".join(sys.argv)
     new_args = sys.argv[1:]
     old_args = sys.argv[1:]
-    folded_args = [arg.casefold() for arg in old_args]
     path = sys.argv[-1]  # The path is the last argument to vbsp
 
     if not old_args:

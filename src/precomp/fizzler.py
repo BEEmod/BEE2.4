@@ -2,7 +2,7 @@
 from __future__ import annotations
 from collections import defaultdict
 from typing import Iterator, Callable
-from typing_extensions import assert_never
+from typing_extensions import Self, assert_never
 from enum import Enum
 import itertools
 
@@ -213,7 +213,7 @@ class FizzlerType:
         LOGGER.debug('{}: blocks={}, fizzles={}', self.id, self.blocks_portals, self.fizzles_portals)
 
     @classmethod
-    def parse(cls, conf: Keyvalues):
+    def parse(cls, conf: Keyvalues) -> Self:
         """Read in a fizzler from a config."""
         fizz_id = conf['id']
         item_ids = [
@@ -635,13 +635,13 @@ class FizzlerBrush:
         keys: dict[str, str],
         local_keys: dict[str, str],
         outputs: list[Output],
-        thickness: float=2.0,
-        stretch_center: bool=True,
-        side_color: Vec=None,
-        singular: bool=False,
-        set_axis_var: bool=False,
-        mat_mod_name: str=None,
-        mat_mod_var: str=None,
+        thickness: float = 2.0,
+        stretch_center: bool = True,
+        side_color: Vec | None = None,
+        singular: bool = False,
+        set_axis_var: bool = False,
+        mat_mod_name: str | None = None,
+        mat_mod_var: str | None = None,
     ) -> None:
         self.keys = keys
         self.local_keys = local_keys
@@ -1450,11 +1450,7 @@ def generate_fizzlers(vmf: VMF) -> None:
                         trigger_hurt_start_disabled = brush_ent['startdisabled']
 
                     if brush_type.set_axis_var:
-                        brush_ent['vscript_init_code'] = (
-                            'axis <- `{}`;'.format(
-                                fizz.normal().axis(),
-                            )
-                        )
+                        brush_ent['vscript_init_code'] = f'axis <- `{fizz.normal().axis()}`;'
 
                     for out in brush_type.outputs:
                         new_out = out.copy()
@@ -1475,7 +1471,7 @@ def generate_fizzlers(vmf: VMF) -> None:
                 if brush_type.mat_mod_var is not None:
                     used_tex_func = mat_mod_tex[brush_type].add
                 else:
-                    def used_tex_func(val):
+                    def used_tex_func(texture: str, /) -> None:
                         """If not, ignore those calls."""
                         return None
 
