@@ -221,9 +221,6 @@ async def main(argv: List[str]) -> None:
     for child_sys in fsys.systems[:]:
         LOGGER.debug('- {}: {!r}', child_sys[1], child_sys[0])
 
-    LOGGER.info('Reading our FGD files...')
-    fgd = FGD.engine_dbase()
-
     packlist = PackList(fsys)
     LOGGER.info('Reading soundscripts...')
     packlist.load_soundscript_manifest(root_folder / 'bin/bee2/sndscript_cache.dmx')
