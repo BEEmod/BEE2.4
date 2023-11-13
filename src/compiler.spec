@@ -58,12 +58,13 @@ INCLUDES = [
 
     # Might not be found?
     'rtree',
-    # Ensure all of Hammeraddons is loaded.
-    'hammeraddons', 'hammeraddons.acache', 'hammeraddons.config', 'hammeraddons.mdl_compiler',
-    'hammeraddons.postcompiler', 'hammeraddons.plugin', 'hammeraddons.propcombine',
-    'hammeraddons.plugin',
+
+    # Ensure all of Hammeraddons and srctools is loaded.
+    *collect_submodules('srctools', filter=lambda name: 'pyinstaller' not in name and 'scripts' not in name),
+    *collect_submodules('attr'),
+    *collect_submodules('attrs'),
+    *collect_submodules('hammeraddons'),
 ]
-INCLUDES += collect_submodules('srctools', lambda name: 'pyinstaller' not in name and 'script' not in name)
 
 # These also aren't required by logging really, but by default
 # they're imported unconditionally. Check to see if it's modified first.
