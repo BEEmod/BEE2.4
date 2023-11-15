@@ -140,7 +140,6 @@ module = [
 	'app.gameMan',
 	'app.music_conf',
 	'app.selector_win',
-	'app.richTextBox',
 	'app.CheckDetails',
 	'app.backup',
 	'app.voiceEditor',

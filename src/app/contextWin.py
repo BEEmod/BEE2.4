@@ -549,7 +549,7 @@ def init_widgets(tk_img: TKImages) -> None:
     desc_frame.grid(row=6, column=0, columnspan=3, sticky="EW")
     desc_frame.columnconfigure(0, weight=1)
 
-    wid['desc'] = tkRichText(desc_frame, width=40, height=16)
+    wid['desc'] = tkRichText(desc_frame, name='desc', width=40, height=16)
     wid['desc'].grid(row=0, column=0, sticky="EW")
 
     desc_scroll = tk_tools.HidingScroll(

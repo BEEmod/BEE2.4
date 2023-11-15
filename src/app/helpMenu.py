@@ -463,7 +463,7 @@ class Dialog(tk.Toplevel):
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(0, weight=1)
 
-        self.textbox = tkRichText(frame, width=80, height=24)
+        self.textbox = tkRichText(frame, name='message', width=80, height=24)
         self.textbox.configure(background='white', relief='flat')
         self.textbox.grid(row=0, column=0, sticky='nsew')
         frame.grid_columnconfigure(0, weight=1)

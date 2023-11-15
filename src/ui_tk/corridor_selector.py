@@ -147,8 +147,13 @@ class TkSelector(Selector):
         )
         self.wid_authors.grid(row=2, column=0, columnspan=2, sticky='ew')
 
-        self.wid_desc = tkRichText(frm_right)
-        desc_scroll = tk_tools.HidingScroll(frm_right, orient='vertical', command=self.wid_desc.yview)
+        self.wid_desc = tkRichText(frm_right, name='desc')
+        desc_scroll = tk_tools.HidingScroll(
+            frm_right,
+            orient='vertical',
+            name='desc_scroll',
+            command=self.wid_desc.yview,
+        )
         self.wid_desc['yscrollcommand'] = desc_scroll.set
         self.wid_desc.grid(row=3, column=0, sticky='nsew')
         desc_scroll.grid(row=3, column=1, sticky='ns')
