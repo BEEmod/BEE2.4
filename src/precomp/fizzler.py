@@ -1,7 +1,7 @@
 """Implements fizzler/laserfield generation and customisation."""
 from __future__ import annotations
 from collections import defaultdict
-from typing import Iterator, Callable
+from typing import Iterator, Callable, final
 from typing_extensions import Self, assert_never
 from enum import Enum
 import itertools
@@ -88,6 +88,7 @@ class FizzInst(Enum):
     BASE = 'base_inst'  # If set, swap the instance to this.
 
 
+@final
 @attrs.frozen
 class MatModify:
     """Data for injected material modify controls."""
@@ -95,6 +96,7 @@ class MatModify:
     mat_var: str
 
 
+@final
 @attrs.frozen
 class FizzBeam:
     """Configuration for env_beams added across fizzlers."""
@@ -157,6 +159,7 @@ def read_configs(conf: Keyvalues) -> None:
         ))
 
 
+@final
 @attrs.define(eq=False, kw_only=True)
 class FizzlerType:
     """Implements a specific fizzler type."""
@@ -349,6 +352,7 @@ class FizzlerType:
         )
 
 
+@final
 @attrs.define(eq=False, kw_only=True)
 class Fizzler:
     """Represents a specific pair of emitters and a field."""
