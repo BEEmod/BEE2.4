@@ -693,7 +693,7 @@ class FileField(ttk.Frame):
         from app import tooltip
         self.callback(path)
         self._location = path
-        tooltip.set_tooltip(self, TransToken.untranslated(path))
+        tooltip.set_tooltip(self.textbox, TransToken.untranslated(path))
         self._text_var.set(self._truncate(path))
 
     def _truncate(self, path: str) -> str:
