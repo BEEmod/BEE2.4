@@ -605,6 +605,10 @@ class ttk_Spinbox(ttk.Widget, tk.Spinbox):  # type: ignore[misc]
 _file_field_font = _tk_font.nametofont('TkFixedFont')  # Monospaced font
 _file_field_char_len = _file_field_font.measure('x')
 
+if utils.WIN:
+    # Temporary fix for #1993: tk_chooseDirectory seems to just freeze. Not sure why.
+    filedialog.Directory.command = '::tk::dialog::file::chooseDir::'
+
 
 class FileField(ttk.Frame):
     """A text box which allows searching for a file or directory.
