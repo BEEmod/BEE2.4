@@ -15,10 +15,11 @@ from typing_extensions import TypeAlias, TypeVarTuple, Unpack
 
 from tkinter import ttk
 from tkinter import font as _tk_font
-from tkinter import filedialog, commondialog, simpledialog, messagebox
+from tkinter import filedialog, commondialog, messagebox
 import tkinter as tk
 import os.path
 
+from srctools import logger
 from idlelib.redirector import WidgetRedirector  # type: ignore[import-not-found]
 import trio
 
@@ -31,8 +32,7 @@ from transtoken import TransToken
 from ui_tk.wid_transtoken import set_text
 
 
-# Set icons for the application.
-
+LOGGER = logger.get_logger(__name__)
 ICO_PATH = str(utils.bins_path('BEE2.ico'))
 T = TypeVar('T')
 AnyWidT = TypeVar('AnyWidT', bound=tk.Misc)
@@ -610,6 +610,37 @@ if utils.WIN:
     filedialog.Directory.command = '::tk::dialog::file::chooseDir::'
 
 
+async def _folderbrowse_powershell() -> Optional[str]:
+    """For Windows, the TK bindings don't work properly. Use Powershell to call this one API."""
+    result = await trio.run_process(
+        [
+            "powershell", "-NoProfile",
+            "-command", "-",  # Run from stdin.
+        ],
+        shell=True,
+        capture_stdout=True,
+        capture_stderr=True,
+        stdin=BROWSE_DIR_PS,
+    )
+    # An Ok or Cancel from ShowDialog, then the path.
+    [btn, poss_path] = result.stdout.splitlines()
+    if btn == b'Cancel':
+        return None
+    # Anything non-ASCII seems to just be dropped, or replaced by ?.
+    if b'?' in poss_path:
+        raise ValueError(poss_path)
+    return os.fsdecode(poss_path)
+
+
+BROWSE_DIR_PS = b'''\
+Add-Type -AssemblyName System.Windows.Forms
+$Dialog = New-Object -TypeName System.Windows.Forms.FolderBrowserDialog
+$Dialog.ShowNewFolderButton = true
+$Dialog.ShowDialog()
+Write-Output $Dialog.SelectedPath
+'''
+
+
 class FileField(ttk.Frame):
     """A text box which allows searching for a file or directory.
     """
@@ -657,7 +688,7 @@ class FileField(ttk.Frame):
         )
         self.textbox.grid(row=0, column=0, sticky='ew')
         self.columnconfigure(0, weight=1)
-        bind_leftclick(self.textbox, self.browse)
+        bind_leftclick(self.textbox, lambda e: background_run(self.browse))
         # The full location is displayed in a tooltip.
         add_tooltip(self.textbox, TransToken.untranslated(self._location))
         self.textbox.bind('<Configure>', self._text_configure)
@@ -665,7 +696,7 @@ class FileField(ttk.Frame):
         self.browse_btn = ttk.Button(
             self,
             text="...",
-            command=self.browse,
+            command=lambda: background_run(self.browse),
         )
         self.browse_btn.grid(row=0, column=1)
         # It should be this narrow, but perhaps this doesn't accept floats?
@@ -676,9 +707,17 @@ class FileField(ttk.Frame):
 
         self._text_var.set(self._truncate(loc))
 
-    def browse(self, event: object = None) -> None:
+    async def browse(self) -> None:
         """Browse for a file."""
-        path = self.browser.show()
+        if utils.WIN and self.is_dir:
+            try:
+                path = await _folderbrowse_powershell()
+            except Exception as exc:
+                LOGGER.warning('Failed to browse for a directory:', exc_info=exc)
+                path = self.browser.show()  # Fallback to generic widget.
+        else:
+            path = self.browser.show()
+
         if path:
             self.value = path
 
