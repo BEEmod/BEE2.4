@@ -44,6 +44,7 @@ class CollideType(Flag):
     FIZZLER = enum_auto()
     TEMPORARY = enum_auto()  # Collision is only sometimes present here.
     ANTLINES = enum_auto()  # Antlines should not pass here.
+    OOB = enum_auto()  # Areas outside the puzzle, don't allow things to be placed here.
 
     GRATE = GRATING
     DECO = DECORATION
@@ -70,14 +71,15 @@ class CollideType(Flag):
 
 # The types we want to write into vmfs.
 EXPORT_KVALUES: Sequence[CollideType] = [
-    CollideType.SOLID,
-    CollideType.DECORATION,
-    CollideType.GRATING,
-    CollideType.GLASS,
-    CollideType.BRIDGE,
-    CollideType.FIZZLER,
-    CollideType.TEMPORARY,
     CollideType.ANTLINES,
+    CollideType.BRIDGE,
+    CollideType.DECORATION,
+    CollideType.FIZZLER,
+    CollideType.GLASS,
+    CollideType.GRATING,
+    CollideType.OOB,
+    CollideType.SOLID,
+    CollideType.TEMPORARY,
 ]
 
 

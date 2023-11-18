@@ -163,7 +163,7 @@
 @SolidClass = bee2_collision_bbox: "Defines a region of item collision for the compiler."
 	[
 	tags(string): "Tags" : : "Space-seperated list of tags to associate with the collision volume."
-	item_name(string) readonly: "Item Name" : : "In exports of the full map collisions, this is the item name this collision is for."
+	item_id(string) readonly: "Item ID" : : "In exports of the full map collisions, this is the item ID this collision is for."
 	coll_solid(boolean):      "Collide: Solid"      : 0 : "General collisions, should be used for solid walls, props and the like that do not pass anything through."
 	coll_grating(boolean):    "Collide: Grating"    : 0 : "Grating blocks movement, but does not block 'energy' effects."
 	coll_glass(boolean):      "Collide: Glass"      : 0 : "Glass blocks everything, except for line of sight and Discouragement Beams."
@@ -172,6 +172,7 @@
 	coll_temporary(boolean):  "Collide: Temporary"  : 0 : "Indicates a region which will only sometimes be solid. This should be used for the movement region of things like platforms and panels."
 	coll_decoration(boolean): "Collide: Decoration" : 0 : "Prohibits additional decoration from being placed in this area."
 	coll_antlines(boolean):   "Collide: Antlines"   : 0 : "Prohibits antlines from being placed in this area."
+	coll_oob(boolean):     "Collide: Out Of Bounds" : 0 : "Indicates a region which might be air, but is outside the puzzle. Objects will be prevented from spawning here."
 	]
 
 // Entities added to the finished map to pass information to VRAD.
