@@ -3,8 +3,8 @@
 """
 from __future__ import annotations
 
-from decimal import Decimal
 from typing import Protocol, TypeVar, Union
+import decimal
 import operator
 
 import srctools.logger
@@ -16,7 +16,7 @@ from precomp.lazy_value import LazyValue
 
 LOGGER = srctools.logger.get_logger(__name__, 'cond.instances')
 COND_MOD_NAME = 'Instances'
-CompNumT_contra = TypeVar("CompNumT_contra", float, Decimal, str, contravariant=True)
+CompNumT_contra = TypeVar("CompNumT_contra", float, decimal.Decimal, str, contravariant=True)
 
 
 @conditions.make_test('instance')
@@ -176,10 +176,10 @@ def test_instvar(inst: Entity, kv: Keyvalues) -> bool:
     val_a = inst.fixup.substitute(val_a, default='')
     val_b = inst.fixup.substitute(val_b, default='')
     try:
-        # Convert to floats if possible, otherwise handle both as strings.
+        # Convert to numbers if possible, otherwise handle both as strings.
         # That ensures we normalise different number formats (1 vs 1.0)
-        comp_a, comp_b = Decimal(val_a), Decimal(val_b)
-    except ValueError:
+        comp_a, comp_b = decimal.Decimal(val_a), decimal.Decimal(val_b)
+    except decimal.InvalidOperation:
         try:
             return comp_func(val_a, val_b)
         except (TypeError, ValueError) as e:
@@ -188,7 +188,7 @@ def test_instvar(inst: Entity, kv: Keyvalues) -> bool:
     else:
         try:
             return comp_func(comp_a, comp_b)
-        except (TypeError, ValueError) as e:
+        except (TypeError, ValueError, decimal.DecimalException) as e:
             LOGGER.warning('InstVar comparison failed: {} {} {}', val_a, op, val_b, exc_info=e)
             return False
 
