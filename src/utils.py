@@ -1,7 +1,7 @@
 """Various functions shared among the compiler and application."""
 from __future__ import annotations
 from typing import (
-    TYPE_CHECKING, Any, Awaitable, Callable, Generator, Generic, ItemsView,
+    Final, TYPE_CHECKING, Any, Awaitable, Callable, Generator, Generic, ItemsView,
     Iterable, Iterator, KeysView, Mapping, NoReturn, Optional,
     Sequence, SupportsInt, Tuple, Type, TypeVar, ValuesView,
 )
@@ -455,9 +455,11 @@ class PackagePath:
     reserved for app-specific usages (internal or generated paths)
     """
     __slots__ = ['package', 'path']
+    package: Final[str]
+    path: Final[str]
     def __init__(self, pack_id: str, path: str) -> None:
         self.package = pack_id.casefold()
-        self.path = path.replace('\\', '/')
+        self.path = path.replace('\\', '/').lstrip("/")
 
     @classmethod
     def parse(cls, uri: str | PackagePath, def_package: str) -> PackagePath:
@@ -487,11 +489,13 @@ class PackagePath:
 
     def in_folder(self, folder: str) -> PackagePath:
         """Return the package, but inside this subfolder."""
+        folder = folder.rstrip('\\/')
         return PackagePath(self.package, f'{folder}/{self.path}')
 
     def child(self, child: str) -> PackagePath:
         """Return a child file of this package."""
-        return PackagePath(self.package, f'{self.path}/{child}')
+        child = child.rstrip('\\/')
+        return PackagePath(self.package, f'{self.path.rstrip("/")}/{child}')
 
 
 ResultT = TypeVar('ResultT')

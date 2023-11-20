@@ -30,7 +30,7 @@ def test_parse() -> None:
 
 def test_methods() -> None:
     """Test some methods."""
-    path = PackagePath("some_package", "folder/subfolder").child("value.txt")
+    path = PackagePath("some_package", "folder/subfolder\\/").child("value.txt")
     assert path == PackagePath("some_package", "folder/subfolder/value.txt")
-    path = PackagePath("some_package", "folder/value.txt").in_folder("parent")
+    path = PackagePath("some_package", "folder/value.txt").in_folder("parent\\/")
     assert path == PackagePath("some_package", "parent/folder/value.txt")
