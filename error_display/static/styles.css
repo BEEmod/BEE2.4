@@ -23,7 +23,6 @@ main {
     background-origin: border-box;
     background-repeat: repeat;
     color: rgb(201, 211, 207);
-    overflow-y: scroll;
     /* Compile dialog uses FriendsListStatusLine:
     Univers Std Condensed, weight=&00, tall=14
     */
