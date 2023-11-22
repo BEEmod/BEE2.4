@@ -525,13 +525,17 @@ class Result(Generic[ResultT]):
         nursery: trio.Nursery,
         func: Callable[[Unpack[PosArgsT]], SyncResultT],
         /, *args: Unpack[PosArgsT],
-        cancellable: bool = False,
+        abandon_on_cancel: bool = False,
         limiter: trio.CapacityLimiter | None = None,
     ) -> Result[SyncResultT]:
         """Wrap a sync task, using to_thread.run_sync()."""
         async def task() -> SyncResultT:
             """Run in a thread."""
-            return await trio.to_thread.run_sync(func, *args, cancellable=cancellable, limiter=limiter)
+            return await trio.to_thread.run_sync(
+                func, *args,
+                abandon_on_cancel=abandon_on_cancel,
+                limiter=limiter,
+            )
 
         return Result(nursery, task, name=func)
 

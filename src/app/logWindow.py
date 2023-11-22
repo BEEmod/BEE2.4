@@ -112,7 +112,7 @@ async def setting_apply() -> None:
         # is potentially lost. But this should only be cancelled if the app's quitting, so that's
         # fine.
         try:
-            cmd, param = await trio.to_thread.run_sync(_PIPE_MAIN_REC.recv, cancellable=True)
+            cmd, param = await trio.to_thread.run_sync(_PIPE_MAIN_REC.recv, abandon_on_cancel=True)
         except BrokenPipeError:
             # Pipe failed, we're useless.
             return
