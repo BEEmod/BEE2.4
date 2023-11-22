@@ -84,7 +84,7 @@ async def find_folder(game: Game) -> Path:
     # will be ready.
     async def worker(filename: Path, event: trio.Event) -> None:
         """Parsing VPKs are expensive, do multiple concurrently."""
-        vpk = await trio.to_thread.run_sync(VPK, filename, cancellable=True)
+        vpk = await trio.to_thread.run_sync(VPK, filename, abandon_on_cancel=True)
         results[filename] = MARKER_FILENAME in vpk
         event.set()
 

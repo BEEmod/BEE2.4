@@ -894,9 +894,9 @@ async def parse_item_folder(
             return prop.find_key('Properties', or_blank=True)
 
     async with trio.open_nursery() as nursery:
-        props_res = utils.Result.sync(nursery, parse_props, prop_path, cancellable=True)
-        all_items = utils.Result.sync(nursery, parse_items, editor_path, cancellable=True)
-        editor_vmf_res = utils.Result.sync(nursery, parse_vmf, vmf_path, cancellable=True)
+        props_res = utils.Result.sync(nursery, parse_props, prop_path, abandon_on_cancel=True)
+        all_items = utils.Result.sync(nursery, parse_items, editor_path, abandon_on_cancel=True)
+        editor_vmf_res = utils.Result.sync(nursery, parse_vmf, vmf_path, abandon_on_cancel=True)
     props = props_res()
 
     try:

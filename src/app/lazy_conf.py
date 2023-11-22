@@ -89,7 +89,7 @@ async def devmod_check(file: File[Any], path: utils.PackagePath) -> None:
 			Keyvalues.parse(f)
 
 	try:
-		await trio.to_thread.run_sync(worker, cancellable=True)
+		await trio.to_thread.run_sync(worker, abandon_on_cancel=True)
 	except (KeyValError, FileNotFoundError, UnicodeDecodeError):
 		LOGGER.exception('Unable to read "{}"', path)
 

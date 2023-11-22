@@ -490,9 +490,9 @@ async def find_packages(nursery: trio.Nursery, packset: PackagesSet, pak_dir: Pa
         else:
             ext = name.suffix.casefold()
             if ext in ('.bee_pack', '.zip'):
-                filesys = await trio.to_thread.run_sync(ZipFileSystem, name, cancellable=True)
+                filesys = await trio.to_thread.run_sync(ZipFileSystem, name, abandon_on_cancel=True)
             elif ext == '.vpk':
-                filesys = await trio.to_thread.run_sync(VPKFileSystem, name, cancellable=True)
+                filesys = await trio.to_thread.run_sync(VPKFileSystem, name, abandon_on_cancel=True)
             else:
                 LOGGER.info('Extra file: {}', name)
                 continue
@@ -501,7 +501,7 @@ async def find_packages(nursery: trio.Nursery, packset: PackagesSet, pak_dir: Pa
 
         # Valid packages must have an info.txt file!
         try:
-            info = await trio.to_thread.run_sync(filesys.read_kv1, 'info.txt', cancellable=True)
+            info = await trio.to_thread.run_sync(filesys.read_kv1, 'info.txt', abandon_on_cancel=True)
         except FileNotFoundError:
             if name.is_dir():
                 # This isn't a package, so check the subfolders too...

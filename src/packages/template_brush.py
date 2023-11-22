@@ -22,12 +22,12 @@ TEMPLATES: dict[str, PackagePath] = {}
 async def parse_template(pak_id: str, file: File) -> None:
     """Parse the specified template file, extracting its ID."""
     path = f'{pak_id}:{file.path}'
-    temp_id = await trio.to_thread.run_sync(parse_template_fast, file, path, cancellable=True)
+    temp_id = await trio.to_thread.run_sync(parse_template_fast, file, path, abandon_on_cancel=True)
     if not temp_id:
         LOGGER.warning('Fast-parse failure on {}!', path)
         with file.open_str() as f:
-            props = await trio.to_thread.run_sync(Keyvalues.parse, f, cancellable=True)
-        vmf = await trio.to_thread.run_sync(VMF.parse, props, cancellable=True)
+            props = await trio.to_thread.run_sync(Keyvalues.parse, f, abandon_on_cancel=True)
+        vmf = await trio.to_thread.run_sync(VMF.parse, props, abandon_on_cancel=True)
         del props
         conf_ents = list(vmf.by_class['bee2_template_conf'])
         if len(conf_ents) > 1:
