@@ -246,9 +246,13 @@ class FizzlerType:
                 # Allow ModelLeft as well as model_left.
                 kvs = itertools.chain(kvs, conf.find_all(inst_type_name.replace('_', '')))
             for prop in kvs:
+                if not prop.value:  # Explicitly empty, add that to the list.
+                    instances.append('')
+                    continue
                 resolved = instanceLocs.resolve(prop.value)
                 found = False
                 for inst_name in resolved:
+                    # Skip blank instances, if done via lookup.
                     if inst_name:
                         instances.append(inst_name)
                         found = True
@@ -264,14 +268,14 @@ class FizzlerType:
             if weights:
                 # Produce the weights, then process through the original
                 # list to build a new one with repeated elements.
-                inst[inst_type, is_static] = instances = list(filter(None, map(
+                inst[inst_type, is_static] = instances = list(map(
                     instances.__getitem__,
                     rand.parse_weights(len(instances), weights)
-                )))
+                ))
             # If static versions aren't given, reuse non-static ones.
             # We did False before True above, so we know it's already been calculated.
-            if not any(instances) and is_static:
-                inst[inst_type, True] = inst[inst_type, False]
+            if not instances and is_static:
+                inst[inst_type, True] = inst[inst_type, False].copy()
 
         voice_attrs = []
         for prop in conf.find_all('Has'):
