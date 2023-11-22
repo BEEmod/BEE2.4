@@ -26,7 +26,8 @@ BTN_CONTRACT_HOVER = '▲'
 
 LOGGER = srctools.logger.get_logger(__name__)
 
-WINDOWS: Dict[MusicChannel, SelectorWin[...]] = {}
+# On 3.8 the ... is invalid syntax
+WINDOWS: Dict[MusicChannel, 'SelectorWin[...]'] = {}
 SEL_ITEMS: Dict[str, SelItem] = {}
 # If the per-channel selector boxes are currently hidden.
 is_collapsed: bool = False

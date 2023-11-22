@@ -1,6 +1,6 @@
 """Tk implementation of the corridor selector."""
 import tkinter as tk
-from typing import Final, Optional
+from typing import Final, Optional, Tuple
 from typing_extensions import override
 
 from tkinter import ttk
@@ -254,12 +254,12 @@ class TkSelector(Selector):
         tk_tools.center_win(self.win, TK_ROOT)
 
     @override
-    def ui_win_getsize(self) -> tuple[int, int]:
+    def ui_win_getsize(self) -> Tuple[int, int]:
         """Fetch the current dimensions, for saving."""
         return self.win.winfo_width(), self.win.winfo_height()
 
     @override
-    def ui_get_buttons(self) -> tuple[GameMode, Direction, Orient]:
+    def ui_get_buttons(self) -> Tuple[GameMode, Direction, Orient]:
         """Get the current button state."""
         return self.btn_mode.current, self.btn_direction.current, self.btn_orient.current
 
