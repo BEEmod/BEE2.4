@@ -131,7 +131,7 @@ class ItemVariant:
         """Does this variant have the data needed to group?"""
         return (
             self.all_icon is not None and
-            self.all_name is not None
+            bool(self.all_name)
         )
 
     def override_from_folder(self, other: ItemVariant) -> None:
@@ -233,7 +233,7 @@ class ItemVariant:
     def iter_trans_tokens(self, source: str) -> Iterator[TransTokenSource]:
         """Iterate over the tokens in this item variant."""
         yield from self.editor.iter_trans_tokens(source)
-        if self.all_name is not None:
+        if self.all_name:
             yield self.all_name, source + '.all_name'
         yield from tkMarkdown.iter_tokens(self.desc, source + '.desc')
         for item in self.editor_extra:
@@ -752,7 +752,7 @@ class Item(PakObject, needs_foreground=True, export_priority=-10):
             if index in palette_items:
                 if len(palette_items) == 1:
                     # Switch to the 'Grouped' icon and name
-                    if item_data.all_name is not None:
+                    if item_data.all_name:
                         subtype.pal_name = item_data.all_name
 
                     if item_data.all_icon is not None:
