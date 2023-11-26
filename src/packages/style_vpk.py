@@ -45,8 +45,8 @@ def iter_dlcs(root: Path) -> Iterator[Path]:
         yield root / f'portal2_dlc{dlc}'
 
 
-async def find_folder(game: Game) -> Path:
-    """Figure out which folder to use for this game."""
+async def find_vpk(game: Game) -> Path:
+    """Figure out which VPK filename to use for this game."""
     if game.unmarked_dlc3_vpk:
         # Special case. This game had the old BEE behaviour, where it blindly wrote to DLC3
         # and didn't mark the VPK. Just get rid of the folder, let our logic continue.
@@ -163,7 +163,7 @@ class StyleVPK(PakObject):
         else:
             sel_vpk = None
 
-        vpk_filename = await find_folder(exp_data.game)
+        vpk_filename = await find_vpk(exp_data.game)
         LOGGER.info('VPK to write: {}', vpk_filename)
         try:
             clear_files(vpk_filename.parent)

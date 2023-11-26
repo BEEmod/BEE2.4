@@ -644,8 +644,9 @@ class Game:
         shutil.rmtree(self.abs_path('bin/bee2/'), ignore_errors=True)
 
         try:
-            vpk_folder = await style_vpk.find_folder(self)
-            style_vpk.clear_files(vpk_folder)
+            vpk_filename = await style_vpk.find_vpk(self)
+            LOGGER.info('VPK filename to remove: {}', vpk_filename)
+            style_vpk.clear_files(vpk_filename.parent)
         except (style_vpk.NoVPKExport, PermissionError):
             pass
 
