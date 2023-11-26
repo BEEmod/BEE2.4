@@ -676,8 +676,9 @@ class Game:
         # VBSP, VRAD, editoritems
         export_screen.set_length('BACK', len(FILES_TO_BACKUP))
         # files in compiler/
+        compiler_src = utils.bins_path('compiler')
         try:
-            num_compiler_files = sum(1 for file in utils.install_path('compiler').rglob('*'))
+            num_compiler_files = sum(1 for file in compiler_src.rglob('*'))
         except FileNotFoundError:
             num_compiler_files = 0
 
@@ -906,8 +907,8 @@ class Game:
 
             if num_compiler_files > 0:
                 LOGGER.info('Copying Custom Compiler!')
-                compiler_src = utils.install_path('compiler')
                 comp_dest = 'bin/linux32' if utils.LINUX else 'bin'
+                LOGGER.info('Compiler folder: {}', compiler_src)
                 for comp_file in compiler_src.rglob('*'):
                     # Ignore folders.
                     if comp_file.is_dir():
