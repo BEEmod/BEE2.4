@@ -85,13 +85,6 @@ if utils.MAC or utils.LINUX:
     # The only hash algorithm that's used is sha512 - random.seed()
     EXCLUDES += ['_sha1', '_sha256', '_md5']
 
-# Include the condition sub-modules that are dynamically imported.
-INCLUDES += [
-    'precomp.conditions.' + module
-    for loader, module, is_package in
-    pkgutil.iter_modules(['precomp/conditions'])
-]
-
 # Find and add libspatialindex DLLs.
 if utils.WIN and utils.BITNESS == '32':
     # On 32-bit windows, we have to manually copy our versions -

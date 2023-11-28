@@ -31,7 +31,6 @@ from __future__ import annotations
 import functools
 import inspect
 import io
-import importlib
 import math
 import pkgutil
 import sys
@@ -824,13 +823,22 @@ def import_conditions() -> None:
 
     This ensures everything gets registered.
     """
-    # Find the modules in the conditions package.
-    for module in pkgutil.iter_modules(__path__, 'precomp.conditions.'):
-        # Import the module, then discard it. The module will run add_test()
-        # or add_result() functions, which save the functions into our dicts.
-        # We don't need a reference to the modules themselves.
-        LOGGER.debug('Importing {} ...', module.name)
-        importlib.import_module(module.name)
+    # Import all the condition modules. The module will run add_test()
+    # or add_result() functions, which save the functions into our dicts.
+    from . import ( # noqa
+        _scaffold_compat, addInstance, antlines, apTag, brushes, catwalks, collisions, connections,
+        conveyorBelt, custItems, cutoutTile, entities, errors, faithplate, fizzler, glass, globals,
+        instances, linked_items, logical, marker, monitor, piston_platform, positioning, python,
+        randomise, removed, resizableTrigger, sendificator, signage, trackPlat, vactubes,
+    )
+
+    # If not frozen, check none are missing.
+    if not utils.FROZEN:
+        ns = set(locals())
+        # Verify none are missing.
+        for module in pkgutil.iter_modules(__path__, 'precomp.conditions.'):
+            stem = module.name.rsplit('.', 1)[-1]
+            assert stem in ns, module
     LOGGER.info('Imported all conditions modules!')
 
 DOC_MARKER = '''<!-- Only edit above this line. This is generated from text in the compiler code. -->'''
