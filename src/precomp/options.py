@@ -1,6 +1,6 @@
 """Manages reading general options from vbsp_config."""
 from typing import (
-    Any, Dict, Iterator, Optional, TextIO, Tuple, Type, TypeVar, Union,
+    Any, Dict, Generic, Iterator, Optional, TextIO, Tuple, Type, TypeVar, Union,
     overload,
 )
 from enum import Enum
@@ -31,33 +31,28 @@ class TYPE(Enum):
         return self.value(value)
 
 TYPE_NAMES = {
-    TYPE.STR: 'Text',
-    TYPE.INT: 'Whole Number',
-    TYPE.FLOAT: 'Decimal Number',
-    TYPE.BOOL: 'True/False',
-    TYPE.VEC: 'Vector',
+    str: 'Text',
+    int: 'Whole Number',
+    float: 'Decimal Number',
+    bool: 'True/False',
+    Vec: 'Vector',
 }
 
 EnumT = TypeVar('EnumT', bound=Enum)
 OptionT = TypeVar('OptionT', bound=Union[str, int, float, bool, Vec])
 
 
-class Opt:
-    """A type of option that can be chosen."""
+class Opt(Generic[OptionT]):
+    """A type of option that can be chosen, which may also be unset."""
     def __init__(
         self,
         opt_id: str,
-        default: Union[TYPE, OptionT],
+        kind: Type[OptionT],
         doc: str,
-        fallback: str=None,
-        hidden: bool=False,
+        fallback: Optional[str] =None,
+        hidden: bool = False,
     ) -> None:
-        if isinstance(default, TYPE):
-            self.type = default
-            self.default = None
-        else:
-            self.type = TYPE(type(default))
-            self.default = default
+        self.type = kind
         self.id = opt_id.casefold()
         self.name = opt_id
         self.fallback = fallback
@@ -65,9 +60,121 @@ class Opt:
         # Remove indentation, and trailing carriage return
         self.doc = inspect.cleandoc(doc).rstrip().splitlines()
         if fallback is not None:
-            self.doc.append(
-                f'If unset, the default is read from `{default}`.'
-            )
+            self.doc.append(f'If unset, the default is read from `{fallback}`.')
+
+    @classmethod
+    def string_or_none(
+        cls, opt_id: str, doc: str,
+        *,
+        fallback: Optional[str] = None,
+        hidden: bool = False,
+    ) -> 'Opt[str]':
+        """A string option, which can be unset."""
+        return Opt(opt_id, str, doc, fallback, hidden)
+
+    @classmethod
+    def int_or_none(
+        cls, opt_id: str, doc: str,
+        *,
+        fallback: Optional[str] = None,
+        hidden: bool = False,
+    ) -> 'Opt[int]':
+        """An integer option, which can be unset."""
+        return Opt(opt_id, int, doc, fallback, hidden)
+
+    @classmethod
+    def float_or_none(
+        cls, opt_id: str, doc: str,
+        *,
+        fallback: Optional[str] = None,
+        hidden: bool = False,
+    ) -> 'Opt[float]':
+        """A float option, which can be unset."""
+        return Opt(opt_id, float, doc, fallback, hidden)
+
+    @classmethod
+    def bool_or_none(
+        cls, opt_id: str, doc: str,
+        *,
+        fallback: Optional[str] = None,
+        hidden: bool = False,
+    ) -> 'Opt[bool]':
+        """A boolean option, which can be unset."""
+        return Opt(opt_id, bool, doc, fallback, hidden)
+
+    @classmethod
+    def vec_or_none(
+        cls, opt_id: str, doc: str,
+        *,
+        fallback: Optional[str] = None,
+        hidden: bool = False,
+    ) -> 'Opt[Vec]':
+        """A boolean option, which can be unset."""
+        return Opt(opt_id, Vec, doc, fallback, hidden)
+
+    @classmethod
+    def string(
+        cls, opt_id: str, default: str, doc: str,
+        *,
+        fallback: Optional[str] = None,
+        hidden: bool = False,
+    ) -> 'OptWithDefault[str]':
+        """A string option, with a default value."""
+        return OptWithDefault(opt_id, default, doc, fallback, hidden)
+
+    @classmethod
+    def integer(
+        cls, opt_id: str, default: int, doc: str,
+        *,
+        fallback: Optional[str] = None,
+        hidden: bool = False,
+    ) -> 'OptWithDefault[int]':
+        """An integer option, with a default value."""
+        return OptWithDefault(opt_id, default, doc, fallback, hidden)
+
+    @classmethod
+    def float_num(
+        cls, opt_id: str, default: float, doc: str,
+        *,
+        fallback: Optional[str] = None,
+        hidden: bool = False,
+    ) -> 'OptWithDefault[int]':
+        """A float option, with a default value."""
+        return OptWithDefault(opt_id, default, doc, fallback, hidden)
+
+    @classmethod
+    def boolean(
+        cls, opt_id: str, default: bool, doc: str,
+        *,
+        fallback: Optional[str] = None,
+        hidden: bool = False,
+    ) -> 'OptWithDefault[bool]':
+        """A bool option, with a default value."""
+        return OptWithDefault(opt_id, default, doc, fallback, hidden)
+
+    @classmethod
+    def vector(
+        cls, opt_id: str, default: Vec, doc: str,
+        *,
+        fallback: Optional[str] = None,
+        hidden: bool = False,
+    ) -> 'OptWithDefault[Vec]':
+        """A vector option, with a default value."""
+        return OptWithDefault(opt_id, default, doc, fallback, hidden)
+
+
+class OptWithDefault(Opt[OptionT], Generic[OptionT]):
+    """A type of option that can be chosen, which has a default (and so cannot be None)."""
+    def __init__(
+        self,
+        opt_id: str,
+        default: OptionT,
+        doc: str,
+        fallback: Optional[str] =None,
+        hidden: bool = False,
+    ) -> None:
+        super().__init__(opt_id, type(default), doc, fallback, hidden)
+        self.default = default
 
 
 def load(opt_blocks: Iterator[Keyvalues]) -> None:
@@ -152,59 +259,51 @@ def set_opt(opt_name: str, value: str) -> None:
         except (ValueError, TypeError):
             pass
 
+@overload
+def get(option: OptWithDefault[OptionT]) -> OptionT: ...
+@overload
+def get(option: Opt[OptionT]) -> Optional[OptionT]: ...
 
-@overload
-def get(expected_type: Type[EnumT], name: str) -> Optional[EnumT]: ...
-@overload
-def get(expected_type: Type[OptionT], name: str) -> Optional[OptionT]: ...
-def get(  # type: ignore[misc]
-    expected_type: Type[Union[str, int, float, bool, Vec, Enum]],
-    name: str,
-) -> Union[str, int, float, bool, Vec, Enum, None]:
+def get(option: Opt[OptionT]) -> Union[str, int, float, bool, Vec, Enum, None]:
     """Get the given option.
     expected_type should be the class of the value that's expected.
     The value can be None if unset.
 
-    If expected_type is an Enum, this will be used to convert the output.
-    If it fails, a warning is produced and the first value in the enum is
     returned.
     """
     try:
-        val = SETTINGS[name.casefold()]
+        val = SETTINGS[option.id]
     except KeyError:
-        raise TypeError(f'Option "{name}" does not exist!') from None
+        raise TypeError(f'Option "{option.name}" does not exist!') from None
 
     if val is None:
-        return None
-
-    if issubclass(expected_type, Enum):
-        if not isinstance(val, str):
-            raise ValueError(
-                f'Option "{name}" is {val!r} which is a {type(val)} (expected a string)'
-            )
-
-        try:
-            return expected_type(val)
-        except ValueError:
-            LOGGER.warning(
-                'Option "{}" is not a valid value. '
-                'Allowed values are:\n{}',
-                name,
-                '\n'.join([mem.value for mem in expected_type])
-            )
-            return next(iter(expected_type))
-
-    # Don't allow subclasses (bool/int)
-    if type(val) is not expected_type:
-        raise ValueError(
-            f'Option "{name}" is {val!r} which is a '
-            f'{type(val)} (expected {expected_type})'
-        )
+        if isinstance(option, OptWithDefault):
+            val = option.default
+        else:
+            return None
 
     # Vec is mutable, don't allow modifying the original.
     if isinstance(val, Vec):
         val = val.copy()
     return val
+
+
+def get_enum(option: Opt[str], enum: Type[EnumT]) -> EnumT:
+    """Get an option, constraining it to an enumeration.
+
+    If it fails, a warning is produced and the first value in the enum is returned.
+    """
+    value = get(option)
+    try:
+        return enum(value)
+    except ValueError:
+        LOGGER.warning(
+            'Option "{}" was set to an invalid value "{}". '
+            'Allowed values are:\n{}',
+            option.name, value,
+            '\n'.join([mem.value for mem in enum])
+        )
+        return next(iter(enum))
 
 
 def get_itemconf(
