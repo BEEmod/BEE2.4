@@ -896,7 +896,7 @@ class ImgLoading(ImgIcon):
     """Special behaviour for the animated loading icon."""
     # Loader handles, which we want to cycle animate.
     # The first icon is the one users use, the others are each frame (manually loaded).
-    load_anims: dict[tuple[int, int], tuple[ImgLoading, list[ImgLoading]]] = {}
+    load_anims: ClassVar[dict[tuple[int, int], tuple[ImgLoading, list[ImgLoading]]]] = {}
 
     # If all loading images stop, the animation task sleeps forever. This event wakes it up.
     _wakeup: trio.Event = trio.Event()
@@ -1073,9 +1073,8 @@ def get_pil_font(size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
             return ImageFont.truetype(filename, size)
         except OSError:
             pass
-    else:
-        LOGGER.warning('Failed to find font, add more OS fonts!')
-        return ImageFont.load_default()
+    LOGGER.warning('Failed to find font, add more OS fonts!')
+    return ImageFont.load_default()
 
 
 def make_splash_screen(

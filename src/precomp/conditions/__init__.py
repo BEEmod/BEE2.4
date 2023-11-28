@@ -249,9 +249,7 @@ class Condition:
         try:
             cond_call = RESULT_LOOKUP[res.name]
         except KeyError:
-            err_msg = '"{name}" is not a valid condition result!'.format(
-                name=res.real_name,
-            )
+            err_msg = f'"{res.real_name}" is not a valid condition result!'
             if utils.DEV_MODE:
                 # Crash here.
                 raise ValueError(err_msg) from None
@@ -1230,15 +1228,12 @@ def debug_test_result(inst: Entity, kv: Keyvalues) -> bool:
     if kv.has_children():
         LOGGER.warning('Debug:\n{!s}\n{!s}', kv, inst)
     else:
-        LOGGER.warning('Debug: {props}{inst!s}'.format(
-            inst=inst,
-            props=kv.value,
-        ))
+        LOGGER.warning('Debug: {}\n{inst!s}', kv.value, inst)
     return True  # The test is always true
 
 
 @make_result('dummy', 'nop', 'do_nothing')
-def dummy_result(inst: Entity, kv: Keyvalues):
+def dummy_result() -> None:
     """Dummy result that doesn't do anything."""
     pass
 

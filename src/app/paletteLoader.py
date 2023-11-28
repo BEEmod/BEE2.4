@@ -246,9 +246,9 @@ class Palette:
         trans_name: str = '',
         readonly: bool = False,
         group: str = '',
-        filename: str = None,
+        filename: str | None = None,
         settings: config.Config | None = None,
-        uuid: UUID = None,
+        uuid: UUID | None = None,
     ) -> None:
         # Name of the palette
         self.trans_name = trans_name

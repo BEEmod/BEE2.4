@@ -138,7 +138,7 @@ def make_checkbox(
     name: str,
     *,
     desc: TransToken,
-    var: tk.BooleanVar = None,
+    var: Optional[tk.BooleanVar] = None,
     tooltip: TransToken = None,
     callback: Optional[Callable[[], object]] = None,
 ) -> ttk.Checkbutton:
