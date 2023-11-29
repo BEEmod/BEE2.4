@@ -90,9 +90,6 @@ def parse_map(vmf: VMF, info: conditions.MapInfo) -> None:
             except KeyError:
                 LOGGER.warning('No glass/grating for frame at {}, {}?', pos, norm)
 
-    if options.GLASS_PACK() and info.has_attr('glass'):
-        packing.pack_list(vmf, options.GLASS_PACK())
-
 
 def test_hole_spot(origin: FrozenVec, normal: FrozenVec, hole_type: HoleType) -> Literal['noglass', 'valid', 'nospace']:
     """Check if the given position is valid for holes.

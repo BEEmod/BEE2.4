@@ -409,38 +409,6 @@ TILING_TEMPLATE = Opt.string(
     DO NOT change brush shapes or positions!
     """)
 
-ROTATE_EDGE = Opt.boolean(
-    'rotate_edge', False,
-    """Rotate squarebeams textures 90 degrees.
-    """)
-RESET_EDGE_OFF = Opt.boolean(
-    'reset_edge_off', False,
-    """Set the offset of squarebeams to 0.
-    """)
-EDGE_SCALE = Opt.float_num(
-    'edge_scale', 0.15,
-    """The scale on squarebeams textures.
-    """)
-ROTATE_EDGE_SPECIAL = Opt.bool_or_none(
-    'rotate_edge_special',
-    """Rotate squarebeams textures on angled/flip panels 90 degrees.
-    """, fallback='rotate_edge')
-RESET_EDGE_OFF_SPECIAL = Opt.bool_or_none(
-    'reset_edge_off_special',
-    """Set the offset of squarebeams on angled/flip panels to 0.
-    """, fallback='reset_edge_off')
-EDGE_SCALE_SPECIAL = Opt.float_or_none(
-    'edge_scale_special',
-    """The scale on angled/flip panel squarebeams textures.
-    """, fallback='edge_scale')
-
-TILE_TEXTURE_LOCK = Opt.boolean(
-    'tile_texture_lock', True,
-    """If disabled, reset offsets for all white/black brushes.
-
-    This makes EmbedFace textures contiguous, for irregular textures.
-    """)
-
 FIZZ_BORDER_VERTICAL = Opt.boolean(
     'fizz_border_vertical', False,
     """For fizzler borders, indicate that the texture is vertical.
@@ -470,35 +438,11 @@ FLIP_SOUND_STOP = Opt.string(
     """Set the stopping sound for Flip Panel brushes.
     """)
 
-STATIC_PAN_THICKNESS = Opt.integer(
-    'static_pan_thickness', 2,
-    """Thickness of static angled panel brushes. 
-    
-    Must be either 2, 4 or 8.
-    """)
-# If set this is used.
-DYNAMIC_PAN_TEMP = Opt.string_or_none(
-    'dynamic_pan_temp',
-    """If set, replace panel func_brushes with this.
-
-    The top texture should be set to `black_wall_metal_002c`.
-    """)
 DYNAMIC_PAN_PARENT = Opt.string(
     'dynamic_pan_parent', "model_arms,panel_attach",
     """The local name that the panel func_brush should parent to.
     Adding the attachment name to the parent after a comma
     automatically sets the attachment point for the brush.
-    """)
-DYNAMIC_PAN_THICKNESS = Opt.integer(
-    'dynamic_pan_thickness', 2,
-    """Thickness of moveable angled panel brushes. 
-    
-    Must be either 2, 4 or 8.
-    """)
-DYNAMIC_PAN_NODRAW = Opt.boolean(
-    'dynamic_pan_nodraw', False,
-    """If set, apply nodraw to the side and bottom of dynamic 
-    angled panels.
     """)
 
 IND_PAN_CHECK_SWITCHING = Opt.string(
@@ -576,17 +520,6 @@ REMOVE_EXIT_SIGNS_DUAL = Opt.boolean('remove_exit_signs_dual', True,
     next to each other.
     """)
 
-BROKEN_ANTLINE_CHANCE = Opt.float_num(
-    'broken_antline_chance', 0.0,
-    """The chance an antline will be 'broken'.
-
-    For each antline, this is checked. If true, `broken_antline_distance`
-    at most become broken.
-    """)
-BROKEN_ANTLINE_DISTANCE = Opt.integer(
-    'broken_antline_distance', 3,
-    """The maximum distance of a single broken section.
-    """)
 GOO_SCALE = Opt.float_num(
     'goo_scale', 1.0,
     """Scale of the goo textures.
@@ -613,19 +546,6 @@ GLASS_HOLE_TEMP = Opt.string_or_none(
     'large' and 'small' visgroup sections. It should range from x=60-64.
     """)
 
-# Packlists for glass and gratings
-GLASS_PACK = Opt.string(
-    'glass_pack', "PACK_PLAYER_CLIP_GLASS",
-    """Packlist for glass clips.
-
-    This is used for `glass_clip`.
-    """)
-GRATING_PACK = Opt.string(
-    'grating_pack', "PACK_PLAYER_CLIP_GRATE",
-    """Packlist for grating clips.
-
-    This is used for `grating_clip`.
-    """)
 GLASS_TEMPLATE = Opt.string(
     'glass_template', 'BEE2_GLASS_TEMPLATE',
     """A template for rotation and scaling of glass.""")
@@ -633,13 +553,15 @@ GRATING_TEMPLATE= Opt.string(
     'grating_template', 'BEE2_GRATING_TEMPLATE',
     """A template for rotation and scaling of grates.""")
 
-GOO_WALL_SCALE_TEMP = Opt.string_or_none('goo_wall_scale_temp',
+GOO_WALL_SCALE_TEMP = Opt.string_or_none(
+    'goo_wall_scale_temp',
     """A template for rotation and scaling for `goo_wall` textures.
 
     It should be a single brush cube - the wall is set to the same
     rotation as the matching side. (The bottom is ignored).
     """)
-GENERATE_TIDELINES = Opt.boolean('generate_tidelines', False,
+GENERATE_TIDELINES = Opt.boolean(
+    'generate_tidelines', False,
     """Generate tideline overlays around the outside of goo pits.
     
     The material used is configured by `overlays.tideline`.
@@ -668,41 +590,6 @@ GLASS_HOLE_SIZE_LARGE = Opt.float_num(
     This is used for glass floor beams.
     """)
 
-CLUMP_WALL_TEX = Opt.boolean(
-    'clump_wall_tex', False,
-    """Use the clumping wall algorithm.
-
-    This creates groups of the same texture.
-    `clump_size`, `clump_width`, and `clump_number` must be set.
-    """)
-CLUMP_SIZE = Opt.integer(
-    'clump_size', 4,
-    """The maximum length of a clump.
-
-    Clumps are rectangular, and this indicates the long dimension.
-    """)
-CLUMP_WIDTH = Opt.integer(
-    'clump_width', 2,
-    """The maximum width of a clump.
-
-    Clumps are rectangular, and this indicates the short dimensions.
-    """)
-CLUMP_NUMBER = Opt.integer(
-    'clump_number', 6,
-    """The amount of clumps created.
-
-    The actual number of clumps is equal to
-    `surfaces / clump_max_area * clump_number`.
-    """)
-CLUMP_CEIL = Opt.boolean(
-    'clump_ceil', False,
-    """Apply clumping to ceilings as well.
-    """)
-CLUMP_FLOOR = Opt.boolean(
-    'clump_floor', False,
-    """Apply clumping to floors as well.
-    """)
-
 # Instance used for pti_ents
 GLOBAL_PTI_ENTS = Opt.string(
     'global_pti_ents', "instances/bee2/global_pti_ents.vmf",
@@ -718,11 +605,6 @@ GLOBAL_PTI_ENTS_LOC = Opt.vector(
     The default pos is next to `arrival_departure_ents`.
     Note that many other entities are added at this point, since it's
     sealed from the void.
-    """)
-
-MODEL_CHANGER_LOC = Opt.vector(
-    'model_changer_loc', Vec(-2400, -2800, -256),
-    """Location of the model changer instance (if used).
     """)
 
 GLOBAL_ENTS_LOC = Opt.vector(
@@ -764,20 +646,6 @@ MUSIC_SYNC_TBEAM = Opt.boolean(
 SKYBOX = Opt.string(
     'skybox', 'sky_black',
     """(Automatic) The skybox name to use for the map.
-    """)
-ELEV_TYPE = Opt.string(
-    'elev_type', "RAND",
-    """(Automatic) What type of elevator script to use:
-
-    This should be set to one of `RAND`, `FORCE`, `NONE` or `BSOD`
-    """)
-ELEV_HORIZ = Opt.string_or_none(
-    'elev_horiz',
-    """(Automatic) The horizontal elevator video to use.
-    """)
-ELEV_VERT = Opt.string_or_none(
-    'elev_vert',
-    """(Automatic) The vertical elevator video to use.
     """)
 VOICE_ID = Opt.string(
     'voice_id', "<NONE>",
