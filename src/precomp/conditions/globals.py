@@ -4,7 +4,7 @@ from __future__ import annotations
 import re
 from typing import Collection, NoReturn
 
-from srctools import Vec, Keyvalues, Entity, conv_bool, VMF
+from srctools import Keyvalues, Entity, conv_bool, VMF
 import srctools.logger
 
 from precomp import options, conditions
@@ -74,7 +74,7 @@ def check_game(kv: Keyvalues) -> bool:
     - `DEST_AP`
     - `Destroyed Aperture`
     """
-    return global_bool(options.get(str, 'game_id') == utils.STEAM_IDS.get(
+    return global_bool(options.GAME_ID() == utils.STEAM_IDS.get(
         kv.value.upper(),
         kv.value,
     ))
@@ -90,8 +90,8 @@ def check_voice_char(kv: Keyvalues) -> bool:
     """
     targ_char = kv.value.casefold()
     if targ_char == '<none>':
-        return options.get(str, 'voice_id') == '<NONE>'
-    for char in options.get(str, 'voice_char').split(','):
+        return options.VOICE_ID() == '<NONE>'
+    for char in options.VOICE_CHAR().split(','):
         if targ_char in char.casefold():
             return True
     raise conditions.Unsatisfiable
@@ -101,7 +101,7 @@ def check_voice_char(kv: Keyvalues) -> bool:
 def check_cave_portrait() -> bool:
     """Checks to see if the Cave Portrait option is set for the given voice pack.
     """
-    return global_bool(options.get(int, 'cave_port_skin') is not None)
+    return global_bool(options.CAVE_PORT_SKIN() is not None)
 
 
 @conditions.make_test('entryCorridor')
@@ -229,7 +229,7 @@ def precache_model(vmf: VMF, mdl_name: str, skinset: Collection[int]=()) -> None
     except KeyError:
         ent = vmf.create_ent(
             classname='comp_precache_model',
-            origin=options.get(Vec, 'global_ents_loc'),
+            origin=options.GLOBAL_ENTS_LOC(),
             model=mdl_name,
         )
         skins = set(skinset)

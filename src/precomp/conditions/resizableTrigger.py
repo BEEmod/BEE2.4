@@ -7,7 +7,6 @@ import srctools.logger
 
 from precomp import instanceLocs, connections, options, conditions
 import consts
-from utils import not_none
 
 
 COND_MOD_NAME = None
@@ -150,7 +149,7 @@ def res_resizeable_trigger(vmf: VMF, info: conditions.MapInfo, res: Keyvalues) -
         out_ent = trig_ent = vmf.create_ent(
             classname='trigger_multiple',  # Default
             targetname=targ,
-            origin=not_none(options.get(Vec, "global_ents_loc")),
+            origin=options.GLOBAL_ENTS_LOC(),
             angles='0 0 0',
         )
         trig_ent.solids = [

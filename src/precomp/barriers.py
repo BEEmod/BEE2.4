@@ -90,8 +90,8 @@ def parse_map(vmf: VMF, info: conditions.MapInfo) -> None:
             except KeyError:
                 LOGGER.warning('No glass/grating for frame at {}, {}?', pos, norm)
 
-    if options.get(str, 'glass_pack') and info.has_attr('glass'):
-        packing.pack_list(vmf, options.get(str, 'glass_pack'))
+    if options.GLASS_PACK() and info.has_attr('glass'):
+        packing.pack_list(vmf, options.GLASS_PACK())
 
 
 def test_hole_spot(origin: FrozenVec, normal: FrozenVec, hole_type: HoleType) -> Literal['noglass', 'valid', 'nospace']:
@@ -208,20 +208,14 @@ def template_solids_and_coll(
 @conditions.meta_cond(150)
 def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
     """Make barrier entities. get_tex is vbsp.get_tex."""
-    glass_temp = template_brush.get_scaling_template(
-        options.get(str, "glass_template")
-    )
-    grate_temp = template_brush.get_scaling_template(
-        options.get(str, "grating_template")
-    )
+    glass_temp = template_brush.get_scaling_template(options.GLASS_TEMPLATE())
+    grate_temp = template_brush.get_scaling_template(options.GRATING_TEMPLATE())
     barr_type: BarrierType | None
 
     # Avoid error without this package.
     if HOLES:
         # Grab the template solids we need.
-        hole_combined_temp = template_brush.get_template(
-            options.get(str, 'glass_hole_temp')
-        )
+        hole_combined_temp = template_brush.get_template(options.GLASS_HOLE_TEMP())
     else:
         hole_combined_temp = None
 
@@ -230,7 +224,7 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
     hole_temp_lrg_cutout = template_solids_and_coll(hole_combined_temp, 'large_cutout')
     hole_temp_lrg_square = template_solids_and_coll(hole_combined_temp, 'large_square')
 
-    floorbeam_temp = options.get(str, 'glass_floorbeam_temp')
+    floorbeam_temp = options.GLASS_FLOORBEAM_TEMP()
 
     # Valve doesn't implement convex corners, we'll do it ourselves.
     convex_corner_left = instanceLocs.resolve_one('[glass_left_convex_corner]', error=False)
@@ -250,7 +244,7 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
     if options.get_itemconf('BEE_PELLET:PelletGrating', False):
         # Merge together these existing filters in global_pti_ents
         vmf.create_ent(
-            origin=options.get(Vec, 'global_pti_ents_loc'),
+            origin=options.GLOBAL_PTI_ENTS_LOC(),
             targetname='@grating_filter',
             classname='filter_multi',
             filtertype=0,
@@ -261,7 +255,7 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
     else:
         # Just skip paint bombs.
         vmf.create_ent(
-            origin=options.get(Vec, 'global_pti_ents_loc'),
+            origin=options.GLOBAL_PTI_ENTS_LOC(),
             targetname='@grating_filter',
             classname='filter_activator_class',
             negated=1,
@@ -612,7 +606,7 @@ def add_glass_floorbeams(vmf: VMF, temp_name: str) -> None:
     else:
         raise user_errors.UserError(user_errors.TOK_GLASS_FLOORBEAM_TEMPLATE)
 
-    separation = options.get(int, 'glass_floorbeam_sep') + 1
+    separation = options.GLASS_FLOORBEAM_SEP() + 1
     separation *= 128
 
     # First we want to find all the groups of contiguous glass sections.
@@ -734,8 +728,8 @@ def beam_hole_split(axis: str, min_pos: Vec, max_pos: Vec) -> Iterator[tuple[Vec
     # Inset in 4 units from each end to not overlap with the frames.
     start_pos = min_pos - Vec.with_axes(axis, 60)
     if HOLES:
-        hole_size_large = options.get(float, 'glass_hole_size_large') / 2
-        hole_size_small = options.get(float, 'glass_hole_size_small') / 2
+        hole_size_large = options.GLASS_HOLE_SIZE_LARGE() / 2
+        hole_size_small = options.GLASS_HOLE_SIZE_SMALL() / 2
 
         # Extract normal from the z-axis.
         grid_height = min_pos.z // 128 * 128 + 64

@@ -443,7 +443,7 @@ def res_global_input(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
             except KeyError:
                 ent = GLOBAL_INPUT_ENTS[ON_LOAD] = vmf.create_ent(
                     'logic_auto',
-                    origin=options.get(Vec, 'global_ents_loc'),
+                    origin=options.GLOBAL_ENTS_LOC(),
                     spawnflags='0',  # Don't remove on fire.
                 )
             load_out = output.copy()
@@ -474,7 +474,7 @@ def global_input(
             glob_ent = GLOBAL_INPUT_ENTS[''] = vmf.create_ent(
                 classname='logic_auto',
                 spawnflags='1',  # Remove on fire
-                origin=options.get(Vec, 'global_ents_loc'),
+                origin=options.GLOBAL_ENTS_LOC()
             )
         else:
             glob_ent = GLOBAL_INPUT_ENTS[relay_name] = vmf.create_ent(

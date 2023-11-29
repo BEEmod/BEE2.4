@@ -1649,8 +1649,7 @@ def gen_tile_temp() -> None:
     }
 
     try:
-        template = template_brush.get_template(
-            options.get(str, '_tiling_template_'))
+        template = template_brush.get_template(options.TILING_TEMPLATE())
         # Grab the single world brush for each visgroup.
         for (key, name) in cat_names.items():
             [categories[key]] = template.visgrouped_solids(name)
@@ -1758,7 +1757,7 @@ def analyse_map(vmf_file: VMF, side_to_ant_seg: dict[int, list[antlines.Segment]
                 tile.add_portal_helper()
             inst.remove()
 
-    dynamic_pan_parent = options.get(str, "dynamic_pan_parent")
+    dynamic_pan_parent = options.DYNAMIC_PAN_PARENT()
 
     # Find Angled Panel brushes.
     for brush_ent in vmf_file.by_class['func_brush']:
@@ -2234,7 +2233,7 @@ def generate_goo(vmf: VMF) -> None:
     goo_heights: dict[float, int] = Counter()
 
     # If enabled, generate tideline overlays.
-    use_tidelines = options.get(bool, 'generate_tidelines')
+    use_tidelines = options.GENERATE_TIDELINES()
     # Z, x-cell, y-cell, x-norm, y-norm = overlay ent.
     tideline_over: dict[tuple[float, float, float, int, int], Tideline] = {}
 
@@ -2336,7 +2335,7 @@ def generate_goo(vmf: VMF) -> None:
         damagetype=(1 << 18),  # Radiation
     )
 
-    goo_scale = options.get(float, 'goo_scale')
+    goo_scale = options.GOO_SCALE()
 
     # Find key with the highest value - that gives the largest z-level.
     [best_goo, _] = max(goo_heights.items(), key=lambda x: x[1])

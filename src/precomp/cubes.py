@@ -1463,9 +1463,7 @@ def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
                 real_pair, ghost_pair, inst,
             )
             LOGGER.info('Found superposition link:\n* real = {}\n* ghost = {}', real_pair, ghost_pair)
-            inst.fixup['$ghost_alpha'] = min(255, max(0, options.get(
-                int, 'superposition_ghost_alpha',
-            )))
+            inst.fixup['$ghost_alpha'] = min(255, max(0, options.SUPERPOSITION_GHOST_ALPHA()))
         else:
             assert_never(kind)
 

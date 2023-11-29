@@ -1,5 +1,5 @@
 """Manages reading general options from vbsp_config."""
-from typing import Dict, Generic, Iterator, Optional, TextIO, Tuple, Type, TypeVar, Union, overload
+from typing import Dict, Generic, Iterator, Optional, TextIO, Tuple, Type, TypeVar, Union
 from enum import Enum
 import inspect
 import math
@@ -148,14 +148,28 @@ class Opt(Generic[OptionT]):
         return OptWithDefault(opt_id, default, doc, fallback, hidden)
 
     def __call__(self) -> Optional[OptionT]:
-        return get(self)
+        """Get the value of the option. The value can be none if it was never set."""
+        try:
+            val = SETTINGS[self.id]
+        except KeyError:
+            raise TypeError(f'Option "{self.name}" does not exist!') from None
 
-    def as_enum(self: Opt[str], enum: Type[EnumT]) -> EnumT:
+        if val is None:
+            return None
+
+        # Vec is mutable, don't allow modifying the original.
+        if isinstance(val, Vec):
+            val = val.copy()
+
+        assert self.type is type(val)
+        return val
+
+    def as_enum(self: 'Opt[str]', enum: Type[EnumT]) -> EnumT:
         """Get an option, constraining it to an enumeration.
 
         If it fails, a warning is produced and the first value in the enum is returned.
         """
-        value = get(self)
+        value = self()
         try:
             return enum(value)
         except ValueError:
@@ -182,7 +196,15 @@ class OptWithDefault(Opt[OptionT], Generic[OptionT]):
         self.default = default
 
     def __call__(self) -> OptionT:
-        return get(self)
+        """Get the value of the option. This returns the default if not set"""
+        result = super().__call__()
+        if result is not None:
+            return result
+        elif isinstance(self.default, Vec):
+            # self.default == Vec & OptionT
+            return self.default.copy()  # type: ignore[return-value]
+        else:
+            return self.default
 
 
 def load(opt_blocks: Iterator[Keyvalues]) -> None:
@@ -272,34 +294,6 @@ def set_opt(opt_name: str, value: str) -> None:
             SETTINGS[opt.id] = opt.type(value)
         except (ValueError, TypeError):
             pass
-
-@overload
-def get(option: OptWithDefault[OptionT]) -> OptionT: ...
-@overload
-def get(option: Opt[OptionT]) -> Optional[OptionT]: ...
-
-def get(option: Opt[OptionT]) -> Union[str, int, float, bool, Vec, Enum, None]:
-    """Get the given option.
-    expected_type should be the class of the value that's expected.
-    The value can be None if unset.
-
-    returned.
-    """
-    try:
-        val = SETTINGS[option.id]
-    except KeyError:
-        raise TypeError(f'Option "{option.name}" does not exist!') from None
-
-    if val is None:
-        if isinstance(option, OptWithDefault):
-            val = option.default
-        else:
-            return None
-
-    # Vec is mutable, don't allow modifying the original.
-    if isinstance(val, Vec):
-        val = val.copy()
-    return val
 
 
 def get_itemconf(
@@ -594,7 +588,7 @@ BROKEN_ANTLINE_DISTANCE = Opt.integer(
     """The maximum distance of a single broken section.
     """)
 GOO_SCALE = Opt.float_num(
-    'goo_scale', 1.00,
+    'goo_scale', 1.0,
     """Scale of the goo textures.
     """)
 
@@ -758,7 +752,7 @@ MUSIC_INSTANCE = Opt.string_or_none(
 ERROR_TRANSLATIONS = Opt.string(
     'error_translations', '',
     """(Automatic) Set to the `.mo` translation to use for error text."""
-    ),
+    )
 MUSIC_LOOPLEN = Opt.integer(
     'music_looplen', 0,
     """(Automatic) If set, re-trigger music after this number of seconds.

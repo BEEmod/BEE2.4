@@ -481,7 +481,7 @@ def add_voice(
     # Either box in with nodraw, or place the voiceline studio.
     has_studio = make_voice_studio(vmf)
 
-    bullsye_actor = vbsp_options.get(str, 'voice_studio_actor')
+    bullsye_actor = vbsp_options.VOICE_STUDIO_ACTOR()
     if bullsye_actor and has_studio:
         ADDED_BULLSEYES.add(bullsye_actor)
 
