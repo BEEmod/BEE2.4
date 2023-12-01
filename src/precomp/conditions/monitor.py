@@ -4,7 +4,7 @@ from precomp import instanceLocs, connections, conditions, options, faithplate, 
 from srctools import Matrix, Keyvalues, Vec, Entity, VMF, Output, Angle
 import srctools.logger
 
-from typing import List, NamedTuple, Literal
+from typing import List, NamedTuple, Literal, Optional
 
 
 COND_MOD_NAME = 'Monitors'
@@ -42,7 +42,7 @@ def scriptvar_set(
         'const', 'string', 'bool', 'inv_bool', 'name', 'handle', 'keyvalue',
         'pos', 'ang', 'off', 'dist', 'x', 'y', 'z', 'pos_x', 'pos_y', 'pos_z',
     ]='const',
-    index: int=None,
+    index: Optional[int] = None,
     angles: object='0 0 0',
 ) -> None:
     """Add in a comp_scriptvar_setter entity."""

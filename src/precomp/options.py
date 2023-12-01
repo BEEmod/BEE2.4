@@ -652,8 +652,8 @@ VOICE_ID = Opt.string(
     'voice_id', "<NONE>",
     """(Automatic) The ID of the selected voice pack.
     """)
-VOICE_CHAR = Opt.string_or_none(
-    'voice_char',
+VOICE_CHAR = Opt.string(
+    'voice_char', "",
     """(Automatic) Comma-separated list of characters in the pack.
     """)
 CAVE_PORT_SKIN = Opt.int_or_none(
