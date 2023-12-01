@@ -149,7 +149,6 @@ module = [
 	'app.paletteLoader',
 	'precomp.conditions._scaffold_compat',
 	'precomp.conditions.addInstance',
-	'precomp.conditions.antlines',
 	'precomp.conditions.fizzler',
 	'precomp.conditions.glass',
 	'precomp.conditions.instances',

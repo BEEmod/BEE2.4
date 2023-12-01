@@ -265,7 +265,8 @@ def res_antlaser(vmf: VMF, res: Keyvalues) -> object:
             for conn in list(node.item.outputs):
                 neighbour = conn.to_item
                 neigh_node = nodes.get(neighbour.name, None)
-                todo.discard(neigh_node)
+                if neigh_node is not None:
+                    todo.discard(neigh_node)
                 if neigh_node is None or neigh_node.type is not node.type:
                     # Not a node or different item type, it must therefore
                     # be a target of our logic.
@@ -292,7 +293,8 @@ def res_antlaser(vmf: VMF, res: Keyvalues) -> object:
             for conn in list(node.item.inputs):
                 neighbour = conn.from_item
                 neigh_node = nodes.get(neighbour.name, None)
-                todo.discard(neigh_node)
+                if neigh_node is not None:
+                    todo.discard(neigh_node)
                 if neigh_node is None or neigh_node.type is not node.type:
                     # Not a node or different item type, it must therefore
                     # be a target of our logic.
