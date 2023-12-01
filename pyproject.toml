@@ -152,7 +152,6 @@ module = [
 	'precomp.conditions.glass',
 	'precomp.conditions.removed',
 	'precomp.antlines',
-	'precomp.barriers',
 	'precomp.bottomlessPit',
 	'precomp.connections',
 	'precomp.cubes',

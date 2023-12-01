@@ -1,23 +1,20 @@
 """Implements Glass and Grating."""
 from __future__ import annotations
 
+from typing import Callable, Iterator, List, Tuple
+from typing_extensions import Literal
+
 from collections import defaultdict
 from enum import Enum
-from typing import Callable, Iterator, List, Tuple
 
 from srctools import FrozenMatrix, VMF, Vec, FrozenVec, Solid, Keyvalues, Entity, Angle, Matrix
 import srctools.logger
-from typing_extensions import Literal
 
 from plane import Plane
-from precomp import (
-    instanceLocs, texturing, options, packing,
-    template_brush, conditions, collisions,
-)
+from precomp import instanceLocs, texturing, options, template_brush, conditions, collisions
+from precomp.grid_optim import optimise as grid_optimise
 import consts
 import user_errors
-from precomp.grid_optim import optimise as grid_optimise
-from precomp.instanceLocs import resolve_filter
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -62,8 +59,8 @@ def parse_map(vmf: VMF, info: conditions.MapInfo) -> None:
     This removes the per-tile instances, and all original brushwork.
     The frames are updated with a fixup var, as appropriate.
     """
-    frame_inst = resolve_filter('[glass_frames]', silent=True)
-    glass_inst = resolve_filter('[glass_128]', silent=True)
+    frame_inst = instanceLocs.resolve_filter('[glass_frames]', silent=True)
+    glass_inst = instanceLocs.resolve_filter('[glass_128]', silent=True)
 
     for entities, voice_attr, material, barrier_type in [
         (vmf.by_class['func_detail'], 'glass', consts.Special.GLASS, BarrierType.GLASS),
@@ -210,9 +207,10 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
     barr_type: BarrierType | None
 
     # Avoid error without this package.
-    if HOLES:
+    hole_temp_id = options.GLASS_HOLE_TEMP()
+    if HOLES and hole_temp_id is not None:
         # Grab the template solids we need.
-        hole_combined_temp = template_brush.get_template(options.GLASS_HOLE_TEMP())
+        hole_combined_temp = template_brush.get_template(hole_temp_id)
     else:
         hole_combined_temp = None
 
