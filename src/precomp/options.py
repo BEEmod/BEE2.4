@@ -260,6 +260,7 @@ def load(opt_blocks: Iterator[Keyvalues]) -> None:
                 SETTINGS[opt.id] = default
 
     for opt in fallback_opts:
+        assert opt.fallback is not None
         try:
             SETTINGS[opt.id] = SETTINGS[opt.fallback]
         except KeyError:
@@ -282,11 +283,10 @@ def set_opt(opt_name: str, value: str) -> None:
         return
 
     if opt.type is Vec:
-        # Pass nones so we can check if it failed..
-        parsed_vals = parse_vec_str(value, x=None)
-        if parsed_vals[0] is None:
-            return
-        SETTINGS[opt.id] = Vec(*parsed_vals)
+        # Pass NaN, so we can check if it failed...
+        parsed_vals = parse_vec_str(value, math.nan)
+        if not math.isnan(parsed_vals[0]):
+            SETTINGS[opt.id] = Vec(*parsed_vals)
     elif opt.type is bool:
         SETTINGS[opt.id] = srctools.conv_bool(value, SETTINGS[opt.id])
     else:  # int, float, str - no special handling...
@@ -299,7 +299,7 @@ def set_opt(opt_name: str, value: str) -> None:
 def get_itemconf(
     name: Union[str, Tuple[str, str]],
     default: Optional[OptionT],
-    timer_delay: int=None,
+    timer_delay: Optional[int] = None,
 ) -> Optional[OptionT]:
     """Get an itemconfig value.
 
