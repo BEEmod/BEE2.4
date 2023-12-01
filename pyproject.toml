@@ -154,7 +154,6 @@ module = [
 	'precomp.antlines',
 	'precomp.barriers',
 	'precomp.bottomlessPit',
-	'precomp.conditions',
 	'precomp.connections',
 	'precomp.cubes',
 	'precomp.fizzler',

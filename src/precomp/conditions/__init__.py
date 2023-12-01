@@ -436,7 +436,7 @@ def annotation_caller(
 
 
 @functools.lru_cache(maxsize=None)
-def _make_reorderer(inputs: str, outputs: str) -> Callable[[Callable[..., object]], Callable[..., None]]:
+def _make_reorderer(inputs: str, outputs: str) -> Callable[[Callable[..., object]], Callable[..., Any]]:
     """Build a function that does reordering for annotation caller.
 
     This allows the code objects to be cached.
@@ -495,7 +495,7 @@ class CondCall(Generic[CallResultT]):
     def __init__(
         self,
         func: Callable[..., CallResultT | Callable[[Entity], CallResultT]],
-        group: str,
+        group: str | None,
     ):
         self.func = func
         self.group = group
@@ -514,7 +514,7 @@ class CondCall(Generic[CallResultT]):
             self._setup_data = None
 
     @property
-    def __doc__(self) -> str:
+    def __doc__(self) -> str | None:
         return self.func.__doc__
 
     @__doc__.setter
@@ -648,6 +648,7 @@ def make_result(orig_name: str, *aliases: str) -> Callable[[CallableT], Callable
             setup_func = None
         else:
             # Combine the legacy functions into one using a closure.
+            assert setup_func is not None
             func = conv_setup_pair(setup_func, result_func)
 
         wrapper: CondCall[object] = CondCall(func, _get_cond_group(result_func))
@@ -1170,7 +1171,7 @@ def set_ent_keys(
 T = TypeVar('T')
 
 
-def resolve_offset(inst, value: str, scale: float=1, zoff: float=0) -> Vec:
+def resolve_offset(inst: Entity, value: str, scale: float = 1.0, zoff: float = 0.0) -> Vec:
     """Retrieve an offset from an instance var. This allows several special values:
 
     * Any $replace variables
