@@ -163,7 +163,6 @@ module = [
 	'BEE2_config',
 	'FakeZip',
 	'pygtrie',
-	'vbsp',
 ]
 strict_optional = false
 

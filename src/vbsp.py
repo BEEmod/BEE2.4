@@ -63,7 +63,7 @@ class _Settings(TypedDict):
     options: Dict[str, Any]
     fog: Dict[str, Any]
     elevator: Dict[str, str]
-    music_conf: Optional[Keyvalues]
+    music_conf: Keyvalues
 
     style_vars: Dict[str, bool]
     has_attr: Dict[str, bool]
@@ -73,7 +73,7 @@ settings: _Settings = {
     "options":        {},
     "fog":            {},
     "elevator":       {},
-    'music_conf':     None,
+    'music_conf':     Keyvalues('', []),
 
     "style_vars":     defaultdict(bool),
     "has_attr":       defaultdict(bool),
@@ -815,7 +815,7 @@ def set_elev_videos(vmf: VMF, info: corridor.Info) -> None:
         )
 
 
-def add_goo_mist(vmf, sides: Iterable[FrozenVec]):
+def add_goo_mist(vmf: VMF, sides: Iterable[FrozenVec]) -> None:
     """Add water_mist* particle systems to goo.
 
     This uses larger particles when needed to save ents.
@@ -1338,12 +1338,11 @@ def run_vbsp(
     If new_path is passed VBSP will be run on the map in styled/, and we'll
     read through the output to find the entity counts.
     """
-
     is_peti = new_path is not None
 
     # We can't overwrite the original vmf, so we run VBSP from a separate
     # location.
-    if is_peti:
+    if new_path is not None:
         # Copy the original log file
         if os.path.isfile(path.replace(".vmf", ".log")):
             shutil.copy(
@@ -1394,7 +1393,7 @@ def run_vbsp(
     # Print output
     LOGGER.info("VBSP Done!")
 
-    if is_peti:  # Ignore Hammer maps
+    if new_path is not None:  # Ignore Hammer maps
         process_vbsp_log(buff.getvalue())
 
     # Copy over the real files so vvis/vrad can read them
