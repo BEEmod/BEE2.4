@@ -6,12 +6,14 @@ import math
 
 from srctools import Keyvalues, Vec, parse_vec_str
 import srctools.logger
+from typing_extensions import TypeAlias
 
 from BEE2_config import ConfigFile
 
 
 LOGGER = srctools.logger.get_logger(__name__)
-SETTINGS: Dict[str, Union[str, int, float, bool, Vec, None]] = {}
+OptionType: TypeAlias = Union[str, int, float, bool, Vec]
+SETTINGS: Dict[str, Optional[OptionType]] = {}
 ITEM_CONFIG = ConfigFile('item_cust_configs.cfg')
 
 
@@ -24,7 +26,7 @@ TYPE_NAMES = {
 }
 
 EnumT = TypeVar('EnumT', bound=Enum)
-OptionT = TypeVar('OptionT', bound=Union[str, int, float, bool, Vec])
+OptionT = TypeVar('OptionT', bound=OptionType)
 
 
 class Opt(Generic[OptionT]):
@@ -181,6 +183,25 @@ class Opt(Generic[OptionT]):
             )
             return next(iter(enum))
 
+    def parse(self, value: str) -> Optional[OptionT]:
+        """Parse a value to the type specified by this config."""
+        # self.type -> OptionT doesn't work for type checking, so cast.
+        if self.type is Vec:
+            # Pass NaN, so we can check if it failed...
+            parsed_vals = parse_vec_str(value, math.nan)
+            if math.isnan(parsed_vals[0]):
+                return None
+            else:
+                return Vec(*parsed_vals)  # type: ignore
+        elif self.type is bool:
+            parsed: Optional[bool] = srctools.conv_bool(value, None)
+            return parsed  # type: ignore
+        else:  # int, float, str - no special handling...
+            try:
+                return self.type(value)  # type: ignore
+            except (ValueError, TypeError):
+                return None
+
 
 class OptWithDefault(Opt[OptionT], Generic[OptionT]):
     """A type of option that can be chosen, which has a default (and so cannot be None)."""
@@ -235,7 +256,7 @@ def load(opt_blocks: Iterator[Keyvalues]) -> None:
             default = None
 
         try:
-            val = set_vals.pop(opt.id)
+            value = set_vals.pop(opt.id)
         except KeyError:
             if opt.fallback is not None:
                 fallback_opts.append(opt)
@@ -244,20 +265,10 @@ def load(opt_blocks: Iterator[Keyvalues]) -> None:
                 SETTINGS[opt.id] = default
             continue
 
-        if opt.type is Vec:
-            # Pass NaN, so we can check if it failed...
-            parsed_vals = parse_vec_str(val, math.nan)
-            if math.isnan(parsed_vals[0]):
-                SETTINGS[opt.id] = default
-            else:
-                SETTINGS[opt.id] = Vec(*parsed_vals)
-        elif opt.type is bool:
-            SETTINGS[opt.id] = srctools.conv_bool(val, default)
-        else:  # int, float, str - no special handling...
-            try:
-                SETTINGS[opt.id] = opt.type(val)
-            except (ValueError, TypeError):
-                SETTINGS[opt.id] = default
+        if (parsed := opt.parse(value)) is not None:
+            SETTINGS[opt.id] = parsed
+        else:
+            SETTINGS[opt.id] = default
 
     for opt in fallback_opts:
         assert opt.fallback is not None
@@ -282,18 +293,8 @@ def set_opt(opt_name: str, value: str) -> None:
         LOGGER.warning('Invalid option name "{}"!', opt_name)
         return
 
-    if opt.type is Vec:
-        # Pass NaN, so we can check if it failed...
-        parsed_vals = parse_vec_str(value, math.nan)
-        if not math.isnan(parsed_vals[0]):
-            SETTINGS[opt.id] = Vec(*parsed_vals)
-    elif opt.type is bool:
-        SETTINGS[opt.id] = srctools.conv_bool(value, SETTINGS[opt.id])
-    else:  # int, float, str - no special handling...
-        try:
-            SETTINGS[opt.id] = opt.type(value)
-        except (ValueError, TypeError):
-            pass
+    if (parsed := opt.parse(value)) is not None:
+        SETTINGS[opt.id] = parsed
 
 
 def get_itemconf(
