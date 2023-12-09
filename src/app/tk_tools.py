@@ -92,6 +92,7 @@ else:  # Linux
 
     LISTBOX_BG_SEL_COLOR = 'blue'
     LISTBOX_BG_COLOR = 'white'
+    LABEL_HIGHLIGHT_BG = '#5AD2D2'
 
 # Some events differ on different systems, so define them here.
 if utils.MAC:
