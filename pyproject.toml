@@ -72,8 +72,6 @@ extend-ignore = [
 	# Flake8-bugbear:
 	# Loop control var not used, triggers on unpackings.
 	"B007",
-	# Stacklevel parameter required for warnings.warn() - doesn't detect positional args.
-	"B028",
 
 	# Flake8-pie:
 	# Prefer to use pass in empty functions, even if docstring is present
@@ -143,7 +141,6 @@ module = [
 	'app.CheckDetails',
 	'app.backup',
 	'app.voiceEditor',
-	'app.optionWindow',
 	'app.contextWin',
 	'app.UI',
 	'app.paletteLoader',

@@ -471,7 +471,7 @@ def adjust_position(e=None) -> None:
 TK_ROOT.bind("<Configure>", adjust_position, add='+')
 
 
-def hide_context(e=None):
+def hide_context(e: object=None) -> None:
     """Hide the properties window, if it's open."""
     global selected_item, selected_sub_item
     if is_visible():

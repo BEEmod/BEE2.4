@@ -42,7 +42,7 @@ AFTER_EXPORT_TEXT: Dict[Tuple[AfterExport, bool], TransToken] = {
 }
 
 # The checkbox variables, along with the GenOptions attribute they control.
-VARS: List[Tuple[str, tk.Variable]] = []
+VARS: List[Tuple[str, tk.BooleanVar]] = []
 
 win = tk.Toplevel(TK_ROOT, name='optionsWin')
 win.transient(master=TK_ROOT)
@@ -92,13 +92,16 @@ def save() -> None:
     # Preserve options set elsewhere.
     existing = config.APP.get_cur_conf(GenOptions)
 
+    bool_options: Dict[str, bool] = {
+        name: var.get()
+        for name, var in VARS
+    }
+
     config.APP.store_conf(attrs.evolve(
         existing,
         after_export=AfterExport(AFTER_EXPORT_ACTION.get()),
-        **{
-            name: var.get()
-            for name, var in VARS
-        },
+        # Type checker can't know these keys are all valid.
+        **bool_options,  # type: ignore[arg-type]
     ))
 
 
@@ -144,7 +147,7 @@ def make_checkbox(
     *,
     desc: TransToken,
     var: Optional[tk.BooleanVar] = None,
-    tooltip: TransToken = None,
+    tooltip: TransToken = TransToken.BLANK,
     callback: Optional[Callable[[], object]] = None,
 ) -> ttk.Checkbutton:
     """Add a checkbox to the given frame which toggles an option.
@@ -166,7 +169,7 @@ def make_checkbox(
     if callback is not None:
         widget['command'] = callback
 
-    if tooltip is not None:
+    if tooltip:
         add_tooltip(widget, tooltip)
 
     return widget
