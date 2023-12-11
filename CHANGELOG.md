@@ -10,6 +10,7 @@
 * Rearranged the UI on the corridor picker display.
 * Add some informative errors if Unstationary Scaffolds (or similar UCP items) are connected in an
   invalid manner.
+* Added "Compress Items" option, which hides all but one of each on the item list.
 * Skip disabled packages when extracting resources.
 * Timer-style indicator panels at the end of antlines can now have a custom appearance for some 
   items (Delayers). This allows them to show both count-down and count-up displays.

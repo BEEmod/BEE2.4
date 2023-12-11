@@ -90,12 +90,16 @@ def load() -> None:
 def save() -> None:
     """Save settings into the config and apply them to other windows."""
     # Preserve options set elsewhere.
-    res = attrs.asdict(config.APP.get_cur_conf(GenOptions), recurse=False)
+    existing = config.APP.get_cur_conf(GenOptions)
 
-    res['after_export'] = AfterExport(AFTER_EXPORT_ACTION.get())
-    for name, var in VARS:
-        res[name] = var.get()
-    config.APP.store_conf(GenOptions(**res))
+    config.APP.store_conf(attrs.evolve(
+        existing,
+        after_export=AfterExport(AFTER_EXPORT_ACTION.get()),
+        **{
+            name: var.get()
+            for name, var in VARS
+        },
+    ))
 
 
 async def apply_config(conf: GenOptions) -> None:
@@ -104,6 +108,7 @@ async def apply_config(conf: GenOptions) -> None:
     loadScreen.set_force_ontop(conf.force_load_ontop)
     # We don't propagate compact splash, that isn't important after the UI loads.
     UI.refresh_palette_icons()
+    UI.flow_picker()
 
 
 async def clear_caches(dialogs: Dialogs) -> None:
@@ -276,12 +281,12 @@ async def init_gen_tab(
     set_text(after_export_frame, TransToken.ui('After Export:'))
     after_export_frame.grid(
         row=0,
-        rowspan=4,
+        rowspan=6,
         column=0,
         sticky='NS',
         padx=(0, 10),
     )
-    f.rowconfigure(3, weight=1)  # Stretch underneath the right column, so it's all aligned to top.
+    f.rowconfigure(5, weight=1)  # Stretch underneath the right column, so it's all aligned to top.
 
     exp_nothing = ttk.Radiobutton(
         after_export_frame,
@@ -389,9 +394,19 @@ async def init_gen_tab(
         )
     mute.grid(row=1, column=1, sticky='W')
 
+    compress_items = make_checkbox(
+        f, name='compress_items',
+        desc=TransToken.ui('Compress Items'),
+        tooltip=TransToken.ui(
+            'If enabled, hide all but one item for those that can be swapped with a X Type option. '
+            'This helps to shrink the item list, if you have a lot of items installed.'
+        ),
+    )
+    compress_items.grid(row=2, column=1, sticky='W')
+
     reset_palette = ttk.Button(f, command=unhide_palettes)
     set_text(reset_palette, TransToken.ui('Show Hidden Palettes'))
-    reset_palette.grid(row=2, column=1, sticky='W')
+    reset_palette.grid(row=3, column=1, sticky='W')
     add_tooltip(
         reset_palette,
         TransToken.ui('Show all builtin palettes that you may have hidden.'),
@@ -399,7 +414,7 @@ async def init_gen_tab(
 
     reset_cache = ttk.Button(f, command=lambda: background_run(clear_caches,  dialogs))
     set_text(reset_cache, TransToken.ui('Reset Package Caches'))
-    reset_cache.grid(row=3, column=1, sticky='W')
+    reset_cache.grid(row=4, column=1, sticky='W')
     add_tooltip(
         reset_cache,
         TransToken.ui('Force re-extracting all package resources.'),

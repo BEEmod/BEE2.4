@@ -222,21 +222,25 @@ class Item:
         Drag-icons have different rules for what counts as 'single', so
         they use the single_num parameter to control the output.
         """
-        icon = self._get_raw_icon(subKey, allow_single, single_num)
+        num_picked = sum(
+            item.id == self.id
+            for item in pal_picked
+        )
+        return self.get_raw_icon(subKey, allow_single and num_picked <= single_num)
+
+    def get_raw_icon(self, sub_key: int, use_grouping: bool) -> img.Handle:
+        """Get an icon for the given subkey, directly indicating if it should be grouped."""
+        icon = self._get_raw_icon(sub_key, use_grouping)
         if self.item.unstyled or not config.APP.get_cur_conf(GenOptions).visualise_inheritance:
             return icon
         if self.inherit_kind is not InheritKind.DEFINED:
             icon = icon.overlay_text(self.inherit_kind.value.title(), 12)
         return icon
 
-    def _get_raw_icon(self, subKey: int, allow_single: bool, single_num: int) -> img.Handle:
+    def _get_raw_icon(self, subKey: int, use_grouping: bool) -> img.Handle:
         """Get the raw icon, which may be overlaid if required."""
         icons = self.data.icons
-        num_picked = sum(
-            item.id == self.id
-            for item in pal_picked
-        )
-        if allow_single and self.data.can_group() and num_picked <= single_num:
+        if use_grouping and self.data.can_group():
             # If only 1 copy of this item is on the palette, use the
             # special icon
             try:
@@ -420,7 +424,13 @@ class PalItem:
 
         Call whenever the style changes, so the icons update.
         """
-        TK_IMG.apply(self.label, self.item.get_icon(self.subKey, self.is_pre))
+        if self.is_pre:
+            TK_IMG.apply(self.label, self.item.get_icon(self.subKey, True))
+        else:
+            TK_IMG.apply(self.label, self.item.get_raw_icon(
+                self.subKey,
+                config.APP.get_cur_conf(GenOptions).compress_items,
+            ))
 
     def clear(self) -> bool:
         """Remove any items matching ourselves from the palette.
@@ -1075,6 +1085,7 @@ def pal_shuffle() -> None:
         if item.id not in palette_set
         if mandatory_unlocked or not item.needs_unlock
         if cur_filter is None or (item.id, item.subKey) in cur_filter
+        if item_list[item.id].visual_subtypes  # Check there's actually sub-items to show.
     })
 
     random.shuffle(shuff_items)
@@ -1316,7 +1327,7 @@ def init_picker(f: Union[tk.Frame, ttk.Frame]) -> None:
     f.bind("<Configure>", flow_picker)
 
 
-def flow_picker(e: Optional[tk.Event[tk.Misc]] = None) -> None:
+def flow_picker(e: object = None) -> None:
     """Update the picker box so all items are positioned corrctly.
 
     Should be run (e arg is ignored) whenever the items change, or the
@@ -1325,22 +1336,34 @@ def flow_picker(e: Optional[tk.Event[tk.Misc]] = None) -> None:
     frmScroll.update_idletasks()
     frmScroll['width'] = pal_canvas.winfo_width()
     mandatory_unlocked = StyleVarPane.mandatory_unlocked()
+    compress_items = config.APP.get_cur_conf(GenOptions).compress_items
 
     width = (pal_canvas.winfo_width() - 10) // 65
     if width < 1:
         width = 1  # we got way too small, prevent division by zero
 
     i = 0
+    # If cur_filter is None, it's blank and so show all of them.
     for item in pal_items:
         if item.needs_unlock and not mandatory_unlocked:
             visible = False
-        elif cur_filter is None:
-            visible = True
+        elif compress_items:
+            # Show if this is the first, and any in this item are visible.
+            # Visual subtypes should not be empty if we're here, but if so just hide.
+            if item.item.visual_subtypes and item.subKey == item.item.visual_subtypes[0]:
+                visible = any(
+                    (item.item.id, subKey) in cur_filter
+                    for subKey in item.item.visual_subtypes
+                ) if cur_filter is not None else True
+            else:
+                visible = False
         else:
-            visible = (item.item.id, item.subKey) in cur_filter
+            # Uncompressed, check each individually.
+            visible = cur_filter is None or (item.item.id, item.subKey) in cur_filter
 
         if visible:
             item.is_pre = False
+            item.load_data()
             item.label.place(
                 x=((i % width) * 65 + 1),
                 y=((i // width) * 65 + 1),
