@@ -17,6 +17,7 @@ from app import (
     StyleVarPane,
 )
 from app.tooltip import add_tooltip
+from config.filters import FilterConf
 # Re-export.
 from config.widgets import (
     WidgetConfig, TimerNum as TimerNum, TIMER_NUM as TIMER_NUM,
@@ -262,7 +263,6 @@ async def make_pane(
     tool_frame: Union[tk.Frame, ttk.Frame],
     menu_bar: tk.Menu,
     tk_img: TKImages,
-    update_item_vis: Callable[[], None],
 ) -> None:
     """Create the item properties pane, with the widgets it uses.
 
@@ -345,7 +345,7 @@ async def make_pane(
     canvas_frame.rowconfigure(1, weight=1)
 
     stylevar_frame = ttk.Frame(canvas_frame)
-    await StyleVarPane.make_stylevar_pane(stylevar_frame, packages.get_loaded_packages(), update_item_vis)
+    await StyleVarPane.make_stylevar_pane(stylevar_frame, packages.get_loaded_packages())
 
     loading_text = ttk.Label(canvas_frame)
     set_text(loading_text, TransToken.ui('Loading...'))

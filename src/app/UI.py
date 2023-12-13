@@ -15,6 +15,7 @@ import trio
 import loadScreen
 from app import TK_ROOT, background_run
 from BEE2_config import ConfigFile, GEN_OPTS
+from config.filters import FilterConf
 from loadScreen import main_loader as loader
 import packages
 from packages.item import ItemVariant, InheritKind
@@ -283,7 +284,7 @@ class Item:
         for item in pal_items:
             if item.id == self.id:
                 item.load_data()
-        flow_picker()
+        background_run(flow_picker, config.APP.get_cur_conf(FilterConf))
 
     def change_version(self, version: str) -> None:
         """Set the version of this item."""
@@ -429,7 +430,7 @@ class PalItem:
         else:
             TK_IMG.apply(self.label, self.item.get_raw_icon(
                 self.subKey,
-                config.APP.get_cur_conf(GenOptions).compress_items,
+                config.APP.get_cur_conf(FilterConf, default=FilterConf()).compress,
             ))
 
     def clear(self) -> bool:
@@ -1010,7 +1011,6 @@ def drag_fast(drag_item: PalItem, e: tk.Event[tk.Misc]) -> None:
     # Is the cursor over the preview pane?
     if 0 <= pos_x < 4:
         snd.fx('delete')
-        flow_picker()
     else:  # over the picker
         if len(pal_picked) < 32:  # can't copy if there isn't room
             snd.fx('config')
@@ -1283,7 +1283,7 @@ def init_preview(tk_img: TKImages, f: Union[tk.Frame, ttk.Frame]) -> None:
     flow_preview()
 
 
-def init_picker(f: Union[tk.Frame, ttk.Frame]) -> None:
+async def init_picker(f: Union[tk.Frame, ttk.Frame]) -> None:
     """Construct the frame holding all the items."""
     global frmScroll, pal_canvas
     wid_transtoken.set_text(
@@ -1324,10 +1324,14 @@ def init_picker(f: Union[tk.Frame, ttk.Frame]) -> None:
             if subtype.pal_icon or subtype.pal_name:
                 pal_items.append(PalItem(frmScroll, item, sub=i, is_pre=False))
 
-    f.bind("<Configure>", flow_picker)
+    f.bind("<Configure>", lambda e: background_run(
+        flow_picker,
+        config.APP.get_cur_conf(FilterConf, default=FilterConf()),
+    ))
+    await config.APP.set_and_run_ui_callback(FilterConf, flow_picker)
 
 
-def flow_picker(e: object = None) -> None:
+async def flow_picker(filter_conf: FilterConf) -> None:
     """Update the picker box so all items are positioned corrctly.
 
     Should be run (e arg is ignored) whenever the items change, or the
@@ -1336,7 +1340,6 @@ def flow_picker(e: object = None) -> None:
     frmScroll.update_idletasks()
     frmScroll['width'] = pal_canvas.winfo_width()
     mandatory_unlocked = StyleVarPane.mandatory_unlocked()
-    compress_items = config.APP.get_cur_conf(GenOptions).compress_items
 
     width = (pal_canvas.winfo_width() - 10) // 65
     if width < 1:
@@ -1347,7 +1350,7 @@ def flow_picker(e: object = None) -> None:
     for item in pal_items:
         if item.needs_unlock and not mandatory_unlocked:
             visible = False
-        elif compress_items:
+        elif filter_conf.compress:
             # Show if this is the first, and any in this item are visible.
             # Visual subtypes should not be empty if we're here, but if so just hide.
             if item.item.visual_subtypes and item.subKey == item.item.visual_subtypes[0]:
@@ -1507,7 +1510,7 @@ async def init_windows(tk_img: TKImages) -> None:
         """Refresh filtered items whenever it's changed."""
         global cur_filter
         cur_filter = new_filter
-        flow_picker()
+        background_run(flow_picker, config.APP.get_cur_conf(FilterConf))
 
     item_search.init(search_frame, update_filter)
 
@@ -1524,7 +1527,7 @@ async def init_windows(tk_img: TKImages) -> None:
     frames['picker'].grid(row=1, column=0, sticky="NSEW")
     picker_split_frame.rowconfigure(1, weight=1)
     picker_split_frame.columnconfigure(0, weight=1)
-    init_picker(frames['picker'])
+    await init_picker(frames['picker'])
 
     await trio.sleep(0)
     loader.step('UI', 'picker')
@@ -1598,7 +1601,7 @@ async def init_windows(tk_img: TKImages) -> None:
     loader.step('UI', 'options')
 
     async with trio.open_nursery() as nurs:
-        nurs.start_soon(itemconfig.make_pane, frames['toolMenu'], menu_bar.view_menu, tk_img, flow_picker)
+        nurs.start_soon(itemconfig.make_pane, frames['toolMenu'], menu_bar.view_menu, tk_img)
     loader.step('UI', 'itemvar')
 
     async with trio.open_nursery() as nurs:

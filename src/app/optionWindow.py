@@ -17,6 +17,7 @@ from app import (
     TK_ROOT, LAUNCH_AFTER_EXPORT, DEV_MODE, background_run,
     contextWin, gameMan, localisation, tk_tools, sound, logWindow, img, UI,
 )
+from config.filters import FilterConf
 from ui_tk.dialogs import Dialogs, DIALOG, TkDialogs
 from config.gen_opts import GenOptions, AfterExport
 from consts import Theme
@@ -43,6 +44,7 @@ AFTER_EXPORT_TEXT: Dict[Tuple[AfterExport, bool], TransToken] = {
 
 # The checkbox variables, along with the GenOptions attribute they control.
 VARS: List[Tuple[str, tk.BooleanVar]] = []
+VAR_COMPRESS_ITEMS = tk.BooleanVar(name='opt_compress_items')
 
 win = tk.Toplevel(TK_ROOT, name='optionsWin')
 win.transient(master=TK_ROOT)
@@ -85,6 +87,7 @@ def load() -> None:
     AFTER_EXPORT_ACTION.set(conf.after_export.value)
     for name, var in VARS:
         var.set(getattr(conf, name))
+    VAR_COMPRESS_ITEMS.set(config.APP.get_cur_conf(FilterConf, default=FilterConf()).compress)
 
 
 def save() -> None:
@@ -103,6 +106,8 @@ def save() -> None:
         # Type checker can't know these keys are all valid.
         **bool_options,  # type: ignore[arg-type]
     ))
+    config.APP.store_conf(FilterConf(compress=VAR_COMPRESS_ITEMS.get()))
+    background_run(config.APP.apply_conf, FilterConf)
 
 
 async def apply_config(conf: GenOptions) -> None:
@@ -111,7 +116,6 @@ async def apply_config(conf: GenOptions) -> None:
     loadScreen.set_force_ontop(conf.force_load_ontop)
     # We don't propagate compact splash, that isn't important after the UI loads.
     UI.refresh_palette_icons()
-    UI.flow_picker()
 
 
 async def clear_caches(dialogs: Dialogs) -> None:
@@ -397,14 +401,12 @@ async def init_gen_tab(
         )
     mute.grid(row=1, column=1, sticky='W')
 
-    compress_items = make_checkbox(
-        f, name='compress_items',
-        desc=TransToken.ui('Compress Items'),
-        tooltip=TransToken.ui(
-            'If enabled, hide all but one item for those that can be swapped with a X Type option. '
-            'This helps to shrink the item list, if you have a lot of items installed.'
-        ),
-    )
+    compress_items = ttk.Checkbutton(f, variable=VAR_COMPRESS_ITEMS, name='check_compress_items')
+    set_text(compress_items, TransToken.ui('Compress Items'))
+    add_tooltip(compress_items, TransToken.ui(
+        'If enabled, hide all but one item for those that can be swapped with a X Type option. '
+        'This helps to shrink the item list, if you have a lot of items installed.'
+    ))
     compress_items.grid(row=2, column=1, sticky='W')
 
     reset_palette = ttk.Button(f, command=unhide_palettes)

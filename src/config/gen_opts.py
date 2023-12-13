@@ -36,7 +36,6 @@ class GenOptions(config.Data, conf_name='Options', palette_stores=False, version
     force_load_ontop: bool = attrs.field(default=True, metadata={'legacy': 'General:splash_stay_ontop'})
     compact_splash: bool = attrs.field(default=True, metadata={'legacy': 'General'})
     music_collapsed: bool = attrs.field(default=True, metadata={'legacy': 'Last_Selected'})
-    compress_items: bool = False
 
     # Log window.
     show_log_win: bool = attrs.field(default=False, metadata={'legacy': 'Debug'})
