@@ -14,7 +14,7 @@ PLAYER_MODEL_ORDER: Sequence[str] = ['PETI', 'SP', 'ATLAS', 'PBODY']
 
 
 @config.APP.register
-@attrs.frozen(slots=False)
+@attrs.frozen
 class CompilePaneState(config.Data, conf_name='CompilerPane'):
     """State saved in palettes.
 

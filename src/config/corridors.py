@@ -18,7 +18,7 @@ __all__ = [
 
 
 @config.APP.register
-@attrs.frozen(slots=False)
+@attrs.frozen
 class Config(config.Data, conf_name='Corridor', uses_id=True, version=2):
     """The current configuration for a corridor."""
     enabled: Mapping[str, bool] = EmptyMapping

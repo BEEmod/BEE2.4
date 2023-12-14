@@ -9,7 +9,7 @@ import config
 
 
 @config.APP.register
-@attrs.frozen(slots=False, kw_only=True)
+@attrs.frozen(kw_only=True)
 class FilterConf(config.Data, conf_name='ItemFilter', palette_stores=False, uses_id=False, version=1):
     """Filter configuration."""
     compress: bool = False

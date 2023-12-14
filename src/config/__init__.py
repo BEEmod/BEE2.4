@@ -51,6 +51,11 @@ class Data(abc.ABC):
         **kwargs: object,
     ) -> None:
         super().__init_subclass__(**kwargs)
+        if hasattr(cls, '_Data__info'):
+            # Attrs __slots__ classes remakes the class, but it'll already have the info included.
+            # Just keep the existing info, no kwargs are given here.
+            return
+
         if not conf_name:
             raise ValueError('Config name must be specified!')
         if conf_name.casefold() in {'version', 'name'}:

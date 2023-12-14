@@ -13,7 +13,7 @@ LOGGER = logger.get_logger(__name__, 'conf.win')
 
 
 @config.APP.register
-@attrs.frozen(slots=False)
+@attrs.frozen
 class WindowState(config.Data, conf_name='PaneState', uses_id=True, palette_stores=False):
     """Holds the position and size of windows."""
     x: int

@@ -11,7 +11,7 @@ import config
 
 
 @config.APP.register
-@attrs.frozen(slots=False)
+@attrs.frozen
 class PaletteState(config.Data, conf_name='Palette', palette_stores=False):
     """Data related to palettes which is restored next run.
 

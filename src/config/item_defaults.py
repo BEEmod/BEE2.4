@@ -17,7 +17,7 @@ LEGACY = ConfigFile('item_configs.cfg')
 
 
 @config.APP.register
-@attrs.frozen(slots=False)
+@attrs.frozen
 class ItemDefault(config.Data, conf_name='ItemDefault', uses_id=True):
     """Overrides the defaults for item properties."""
     version: str = DEFAULT_VERSION

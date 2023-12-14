@@ -27,7 +27,7 @@ def parse_timer(value: str) -> TimerNum:
 
 
 @config.APP.register
-@attrs.frozen(slots=False)
+@attrs.frozen
 class WidgetConfig(config.Data, conf_name='ItemVar', uses_id=True):
     """Saved values for package-customisable widgets in the Item/Style Properties Pane."""
     # A single non-timer value, or timer name -> value.
