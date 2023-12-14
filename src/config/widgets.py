@@ -26,6 +26,7 @@ def parse_timer(value: str) -> TimerNum:
     raise ValueError('Invalid timer value!')
 
 
+@config.PALETTE.register
 @config.APP.register
 @attrs.frozen
 class WidgetConfig(config.Data, conf_name='ItemVar', uses_id=True):

@@ -7,6 +7,7 @@ import attrs
 import config
 
 
+@config.PALETTE.register
 @config.APP.register
 @attrs.frozen
 class LastSelected(config.Data, conf_name='LastSelected', uses_id=True):

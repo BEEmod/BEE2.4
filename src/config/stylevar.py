@@ -8,6 +8,7 @@ import attrs
 import config
 
 
+@config.PALETTE.register
 @config.APP.register
 @attrs.frozen
 class State(config.Data, conf_name='StyleVar', uses_id=True):

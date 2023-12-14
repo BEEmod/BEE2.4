@@ -13,6 +13,7 @@ LOGGER = logger.get_logger(__name__, 'conf.comp_pane')
 PLAYER_MODEL_ORDER: Sequence[str] = ['PETI', 'SP', 'ATLAS', 'PBODY']
 
 
+@config.PALETTE.register
 @config.APP.register
 @attrs.frozen
 class CompilePaneState(config.Data, conf_name='CompilerPane'):

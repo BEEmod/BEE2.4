@@ -41,6 +41,7 @@ def _sign_converter(value: Mapping[int, str]) -> Mapping[int, str]:
     }
 
 
+@config.PALETTE.register
 @config.APP.register
 @attrs.frozen
 class Layout(config.Data, conf_name='Signage'):

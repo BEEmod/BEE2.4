@@ -16,6 +16,7 @@ DEFAULT_VERSION: Final = 'VER_DEFAULT'
 LEGACY = ConfigFile('item_configs.cfg')
 
 
+@config.PALETTE.register
 @config.APP.register
 @attrs.frozen
 class ItemDefault(config.Data, conf_name='ItemDefault', uses_id=True):

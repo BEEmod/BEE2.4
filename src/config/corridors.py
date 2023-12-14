@@ -17,6 +17,7 @@ __all__ = [
 ]
 
 
+@config.PALETTE.register
 @config.APP.register
 @attrs.frozen
 class Config(config.Data, conf_name='Corridor', uses_id=True, version=2):
