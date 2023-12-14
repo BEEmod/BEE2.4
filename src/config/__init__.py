@@ -185,6 +185,18 @@ class ConfigSpec:
                     else:
                         nursery.start_soon(cb, data)
 
+    def get_full_conf(self, filter_to: Optional['ConfigSpec'] = None) -> Config:
+        """Get the config stored by this spec, filtering to another if requested."""
+        if filter_to is None:
+            filter_to = self
+
+        # Fully copy the Config structure so these don't interact with each other.
+        return Config({
+            cls: conf_map.copy()
+            for cls, conf_map in self._current.items()
+            if cls in filter_to._registered
+        })
+
     def merge_conf(self, config: Config) -> None:
         """Re-store values in the specified config.
 
@@ -441,27 +453,6 @@ class ConfigSpec:
             for prop in kv:
                 for line in prop.export():
                     file.write(line)
-
-
-def get_pal_conf() -> Config:
-    """Return a copy of the current settings for the palette."""
-    return Config({
-        cls: opt_map.copy()
-        for cls, opt_map in APP._current.items()
-        if cls.get_conf_info().palette_stores
-    })
-
-
-async def apply_pal_conf(conf: Config) -> None:
-    """Apply a config provided from the palette."""
-    # First replace all the configs to be atomic, then apply.
-    for cls, opt_map in conf.items():
-        if cls.get_conf_info().palette_stores:  # Double-check, in case it's added to the file.
-            APP._current[cls] = opt_map.copy()
-    async with trio.open_nursery() as nursery:
-        for cls in conf:
-            if cls.get_conf_info().palette_stores:
-                nursery.start_soon(APP.apply_conf, cls)
 
 
 # Main application configs.

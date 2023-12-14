@@ -344,7 +344,7 @@ class Palette:
         except NoKeyError:
             settings = None
         else:
-            settings, upgraded_settings = config.APP.parse_kv1(settings_conf)
+            settings, upgraded_settings = config.PALETTE.parse_kv1(settings_conf)
             if upgraded_settings:
                 needs_save = True
 
@@ -408,7 +408,7 @@ class Palette:
 
         if self.settings is not None:
             settings_prop = Keyvalues('settings', [])
-            settings_prop.extend(config.APP.build_kv1(self.settings))
+            settings_prop.extend(config.PALETTE.build_kv1(self.settings))
             kv.append(settings_prop)
 
         # We need to write a new file, determine a valid path.

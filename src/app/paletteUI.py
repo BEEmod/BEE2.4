@@ -373,7 +373,7 @@ class PaletteUI:
         else:
             self.selected.items = self.get_items()
             if self.var_save_settings.get():
-                self.selected.settings = config.get_pal_conf()
+                self.selected.settings = config.APP.get_full_conf(config.PALETTE)
             else:
                 self.selected.settings = None
             self.selected.save(ignore_readonly=True)
@@ -390,7 +390,7 @@ class PaletteUI:
             pal.uuid = paletteLoader.uuid4()
 
         if self.var_save_settings.get():
-            pal.settings = config.get_pal_conf()
+            pal.settings = config.APP.get_full_conf(config.PALETTE)
 
         pal.save()
         self.palettes[pal.uuid] = pal
