@@ -442,7 +442,7 @@ class Dialog(tk.Toplevel):
     """Show a dialog with a message."""
     text: Optional[str]
 
-    def __init__(self, name: str, title: TransToken, text: str):
+    def __init__(self, name: str, title: TransToken, text: str) -> None:
         super().__init__(TK_ROOT, name=name)
         self.withdraw()
         set_win_title(self, title)

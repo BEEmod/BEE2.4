@@ -92,7 +92,7 @@ class ShapeSignage:
         'overlay_frames',
     )
 
-    def __init__(self, overlays: List[Entity]):
+    def __init__(self, overlays: List[Entity]) -> None:
         if not overlays:
             raise ValueError('No overlays')
         self.overlays = list(overlays)
@@ -146,11 +146,11 @@ class Item:
         item_type: Config,
         *,  # Don't mix up antlines!
         ind_style: IndicatorStyle,
-        panels: Iterable[Entity]=(),
-        antlines: Iterable[Antline]=(),
-        shape_signs: Iterable[ShapeSignage]=(),
-        ant_toggle_var: str='',
-    ):
+        panels: Iterable[Entity] = (),
+        antlines: Iterable[Antline] = (),
+        shape_signs: Iterable[ShapeSignage] = (),
+        ant_toggle_var: str = '',
+    ) -> None:
         self.inst = inst
         self.config = item_type
 
@@ -358,11 +358,7 @@ class Connection:
         self.outputs = list(outputs)
 
     def __repr__(self) -> str:
-        return '<Connection {} {} -> {}>'.format(
-            CONN_NAMES[self.type],
-            self._from.name,
-            self._to.name,
-        )
+        return f'<Connection {CONN_NAMES[self.type]} {self._from.name} -> {self._to.name}>'
 
     def add(self) -> None:
         """Add this to the directories."""
@@ -546,10 +542,8 @@ def calc_connections(
 
         if item.inst.outputs and item.config is None:
             raise ValueError(
-                'No connections for item "{}", '
-                'but outputs in the map!'.format(
-                    instance_traits.get_item_id(item.inst)
-                )
+                f'No connections for item "{instance_traits.get_item_id(item.inst)}", '
+                f'but outputs in the map!'
             )
 
         for out in item.inst.outputs:
