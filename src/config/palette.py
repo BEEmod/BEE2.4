@@ -12,7 +12,7 @@ import config
 
 @config.APP.register
 @attrs.frozen
-class PaletteState(config.Data, conf_name='Palette', palette_stores=False):
+class PaletteState(config.Data, conf_name='Palette'):
     """Data related to palettes which is restored next run.
 
     Since we don't store in the palette, we don't need to register the UI callback.

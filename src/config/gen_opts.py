@@ -23,7 +23,7 @@ class AfterExport(Enum):
 
 @config.APP.register
 @attrs.frozen
-class GenOptions(config.Data, conf_name='Options', palette_stores=False, version=2):
+class GenOptions(config.Data, conf_name='Options', version=2):
     """General app config options, mainly booleans. These are all changed in the options window."""
     # The boolean values are handled the same way, using the metadata to record the old legacy names.
     # If the name has a :, the first is the section and the second is the name.

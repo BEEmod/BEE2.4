@@ -33,7 +33,6 @@ class ConfInfo:
     """Holds information about a type of configuration data."""
     name: str
     version: int
-    palette_stores: bool  # If this is saved/loaded by palettes.
     uses_id: bool  # If we manage individual configs for each of these IDs.
 
 
@@ -46,7 +45,6 @@ class Data(abc.ABC):
         cls, *,
         conf_name: str = '',
         version: int = 1,
-        palette_stores: bool = True,  # TODO remove
         uses_id: bool = False,
         **kwargs: object,
     ) -> None:
@@ -60,7 +58,7 @@ class Data(abc.ABC):
             raise ValueError('Config name must be specified!')
         if conf_name.casefold() in {'version', 'name'}:
             raise ValueError(f'Illegal name: "{conf_name}"')
-        cls.__info = ConfInfo(conf_name, version, palette_stores, uses_id)
+        cls.__info = ConfInfo(conf_name, version, uses_id)
 
     @classmethod
     def get_conf_info(cls) -> ConfInfo:

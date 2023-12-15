@@ -102,7 +102,7 @@ class Config(config.Data, conf_name='Corridor', uses_id=True, version=2):
 
 @config.APP.register
 @attrs.frozen(slots=False)
-class UIState(config.Data, conf_name='CorridorUIState', palette_stores=False):
+class UIState(config.Data, conf_name='CorridorUIState'):
     """The current window state for saving and restoring."""
     last_mode: GameMode = GameMode.SP
     last_direction: Direction = Direction.ENTRY
