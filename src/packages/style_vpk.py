@@ -3,9 +3,11 @@
 This allows altering the in-editor wall textures, as well as a few others.
 """
 from __future__ import annotations
+
 from typing import TYPE_CHECKING, Any, Iterator, Optional
 from typing_extensions import Self
 from pathlib import Path
+import itertools
 import os
 import re
 import shutil
@@ -59,6 +61,16 @@ async def find_vpk(game: Game) -> Path:
                     old_vpk.rename(old_vpk.with_name(f'bee_backup_{old_vpk.stem}.vpk'))
                 except FileNotFoundError:
                     pass  # Never exported, very good.
+                except FileExistsError:
+                    # Somehow the backup already exists, find a free name.
+                    for i in itertools.count(1):
+                        try:
+                            old_vpk.rename(old_vpk.with_name(f'bee_backup_{old_vpk.stem}_{i}.vpk'))
+                        except FileNotFoundError:
+                            break
+                        except FileExistsError:
+                            pass
+
         game.unmarked_dlc3_vpk = False
         game.save()
 
