@@ -15,12 +15,12 @@
 * Timer-style indicator panels at the end of antlines can now have a custom appearance for some 
   items (Delayers). This allows them to show both count-down and count-up displays.
 * Moved various palette-related buttons, to group them with the other palette options.
-* A VPK file can be now placed into `vpk_override` to have it be combined with the built VPK. 
+* VPK files can be now placed into `vpk_override` to have them be combined with the built VPK. 
 * Added a warning screen to the developer tab of the options window, indicating that some of these options can temporarily break BEE if changed.
 * #1984: The "save settings to palette" will now change to match the selected palette. This means clicking "save" won't accidentally delete saved settings.
 * #1893: Add compile logs to error display windows.
 * Internal files are now placed in a `bin/` subfolder, instead of cluttering
-  the folder containing `BEE2.exe`, `vbsp.exe` and `vrad.exe`.
+  the folders containing `BEE2.exe`, `vbsp.exe` and `vrad.exe`.
 
 ### UCP-Relevant Changes:
 * Terminology change: "Condition Flags" have been renamed to "Condition Tests" - I think that sounds a bit better.
