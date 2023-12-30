@@ -15,7 +15,7 @@ import attrs
 
 from app.tooltip import add_tooltip, set_tooltip
 from app import tk_tools
-from app.localisation import TransToken, set_text
+from ui_tk.wid_transtoken import TransToken, set_text
 
 
 UP_ARROW = '\u25B3'
@@ -75,7 +75,7 @@ class Item(Generic[UserT]):
     user: UserT
     @overload
     def __init__(
-        self: 'Item[None]',
+        self: Item[None],
         *values: TransToken,
         hover_text: TransToken = TransToken.BLANK,
         lock_check: bool=False,
@@ -83,7 +83,7 @@ class Item(Generic[UserT]):
     ) -> None: ...
     @overload
     def __init__(
-        self: 'Item[UserT]',
+        self: Item[UserT],
         *values: TransToken,
         hover_text: TransToken = TransToken.BLANK,
         lock_check: bool=False,
@@ -151,10 +151,7 @@ class Item(Generic[UserT]):
 
             if not self.locked:
                 # Allow clicking on the row to toggle the checkbox
-                wid.bind('<Enter>', self.evt_hover_start, add=True)
-                wid.bind('<Leave>', self.evt_hover_stop, add=True)
-                tk_tools.bind_leftclick(wid, self.evt_row_click, add=True)
-                wid.bind(tk_tools.EVENTS['LEFT_RELEASE'], self.evt_row_unclick, add=True)
+                tk_tools.link_checkmark(self.check, wid)
 
             self.val_widgets.append(wid)
 
@@ -198,23 +195,6 @@ class Item(Generic[UserT]):
     def state(self, value: bool) -> None:
         self.state_var.set(value)
         self.master.update_allcheck()
-
-    def evt_hover_start(self, _: tk.Event) -> None:
-        """Start hovering over the checkbox."""
-        self.check.state(['active'])
-
-    def evt_hover_stop(self, _: tk.Event) -> None:
-        """Stop hovering over the checkbox."""
-        self.check.state(['!active'])
-
-    def evt_row_click(self, _: tk.Event) -> None:
-        """Occurs when the checkbox is clicked."""
-        self.state = not self.state
-        self.check.state(['pressed'])
-
-    def evt_row_unclick(self, _: tk.Event) -> None:
-        """Reset the checkbox when released."""
-        self.check.state(['!pressed'])
 
 
 class CheckDetails(ttk.Frame, Generic[UserT]):
@@ -310,12 +290,14 @@ class CheckDetails(ttk.Frame, Generic[UserT]):
         )
         self.wid_canvas.create_window(0, 0, window=self.wid_frame, anchor='nw')
 
-        self.bind('<Configure>', self.refresh)
-        self.bind('<Map>', self.refresh)  # When added to a window, refresh
+        refresh_cmd = self.register(self.refresh)
 
-        self.wid_header.bind('<ButtonRelease-1>', self.refresh)
-        self.wid_header.bind('<B1-Motion>', self.refresh)
-        self.wid_header.bind('<Configure>', self.refresh)
+        self.bind('<Configure>', refresh_cmd)
+        self.bind('<Map>', refresh_cmd)  # When added to a window, refresh
+
+        self.wid_header.bind('<ButtonRelease-1>', refresh_cmd)
+        self.wid_header.bind('<B1-Motion>', refresh_cmd)
+        self.wid_header.bind('<Configure>', refresh_cmd)
 
         self.add_items(*items)
 
@@ -408,10 +390,10 @@ class CheckDetails(ttk.Frame, Generic[UserT]):
         else:
             self.event_generate(EVENT_NO_CHECKS)
 
-    def refresh(self, _=None) -> None:
+    def refresh(self, _: tk.Event[tk.Misc] | None = None) -> None:
         """Reposition the widgets.
 
-        Must be called when self.items is changed,
+        Must be called when `self.items` is changed,
         or when window is resized.
         """
         # Don't bother if the window isn't actually visible.

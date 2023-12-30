@@ -1,8 +1,11 @@
 """Use pseudo-entities to make creating editoritems data more easily."""
 from __future__ import annotations
 
-from typing import Callable
-from srctools import Matrix, Angle, Vec, logger, conv_int
+from typing import Callable, TypeVar
+from typing_extensions import TypeAlias
+import re
+
+from srctools import FrozenVec, Matrix, Angle, Vec, logger, conv_int
 from srctools.vmf import VMF, Entity
 
 from collisions import BBox
@@ -10,24 +13,38 @@ from editoritems import Item, ConnSide, OccuType, AntlinePoint, Coord, OccupiedV
 
 
 LOGGER = logger.get_logger(__name__)
-LOAD_FUNCS: dict[str, Callable[[Item, Entity], None]] = {}
-SAVE_FUNCS: list[Callable[[Item, VMF], None]] = []
+LoadFunc: TypeAlias = Callable[[Item, Entity], None]
+SaveFunc: TypeAlias = Callable[[Item, VMF], None]
+LOAD_FUNCS: dict[str, LoadFunc] = {}
+SAVE_FUNCS: list[SaveFunc] = []
+LoadFuncT = TypeVar("LoadFuncT", bound=LoadFunc)
+SaveFuncT = TypeVar("SaveFuncT", bound=SaveFunc)
+RE_NUMBER = re.compile('[0-9]+|[^0-9]+')
+
+
+def numeric_sort(text: str) -> list[str | int]:
+    """Split up text so that numbers inside can be sorted correctly."""
+    return [
+        int(res) if res.isdigit() else res
+        for res in RE_NUMBER.findall(text)
+    ]
 
 
 def load(item: Item, vmf: VMF) -> None:
     """Search the map for important entities, and apply it to the item."""
     with logger.context(item.id):
-        for ent in vmf.entities:
-            classname = ent['classname'].casefold()
-            if ent.hidden:
-                continue
+        for classname, ents in vmf.by_class.items():
+            classname = classname.casefold()
             try:
                 func = LOAD_FUNCS[classname]
             except KeyError:
                 if classname.startswith('bee2_editor_'):
                     LOGGER.warning('Unknown item configuration entity "{}"!', classname)
             else:
-                func(item, ent)
+                for ent in sorted(ents, key=lambda ent: numeric_sort(ent['sortkey'])):
+                    if ent.hidden:
+                        continue
+                    func(item, ent)
 
 
 def save(item: Item) -> VMF:
@@ -39,16 +56,34 @@ def save(item: Item) -> VMF:
     return vmf
 
 
-SKIN_TO_CONN_OFFSETS = {
+def _saver(func: SaveFuncT) -> SaveFuncT:
+    """Define a saving function."""
+    SAVE_FUNCS.append(func)
+    return func
+
+
+def _loader(name: str) -> Callable[[LoadFunc], LoadFunc]:
+    """Define a loading function."""
+    if name.casefold() in LOAD_FUNCS:
+        raise ValueError(f"Duplicate name: {name}")
+
+    def deco(func: LoadFuncT) -> LoadFuncT:
+        """Used as a decorator."""
+        LOAD_FUNCS[name.casefold()] = func
+        return func
+    return deco
+
+
+SKIN_TO_CONN_OFFSETS: dict[str, FrozenVec] = {
     # Skin -> antline offset.
-    '1': Vec(-0.5, +0.5),
-    '2': Vec(-0.5, -0.5),
-    '3': Vec(+0.5, +0.5),
-    '4': Vec(+0.5, -0.5),
+    '1': FrozenVec(-0.5, +0.5),
+    '2': FrozenVec(-0.5, -0.5),
+    '3': FrozenVec(+0.5, +0.5),
+    '4': FrozenVec(+0.5, -0.5),
 }
 # Opposite transform.
-CONN_OFFSET_TO_SKIN = {
-    (2 * vec).as_tuple(): skin
+CONN_OFFSET_TO_SKIN: dict[FrozenVec, str] = {
+    (2 * vec): skin
     for skin, vec in SKIN_TO_CONN_OFFSETS.items()
 }
 
@@ -67,7 +102,8 @@ def parse_occutype(value: str) -> OccuType:
     return val
 
 
-def load_editor_connectionpoint(item: Item, ent: Entity) -> None:
+@_loader('bee2_editor_connectionpoint')
+def load_connectionpoint(item: Item, ent: Entity) -> None:
     """Allow more conveniently defining connectionpoints."""
     origin = Vec.from_str(ent['origin'])
     angles = Angle.from_str(ent['angles'])
@@ -94,7 +130,10 @@ def load_editor_connectionpoint(item: Item, ent: Entity) -> None:
     try:
         offset = SKIN_TO_CONN_OFFSETS[ent['skin']] @ orient
     except KeyError:
-        LOGGER.warning('Connection Point at {} has invalid skin "{}"!', origin)
+        LOGGER.warning(
+            'Connection Point at {} has invalid skin "{}"!',
+            origin, ent['skin'],
+        )
         return
     ant_pos = Coord(round(center.x + offset.x), round(center.y - offset.y), 0)
     sign_pos = Coord(round(center.x - offset.x), round(center.y + offset.y), 0)
@@ -109,25 +148,30 @@ def load_editor_connectionpoint(item: Item, ent: Entity) -> None:
     ))
 
 
-def save_editor_connectionpoint(item: Item, vmf: VMF) -> None:
+@_saver
+def save_connectionpoint(item: Item, vmf: VMF) -> None:
     """Write connectionpoints to a VMF."""
     for side, points in item.antline_points.items():
         yaw = side.yaw
         inv_orient = Matrix.from_yaw(-yaw)
-        for point in points:
+        for i, point in enumerate(points):
             ant_pos = Vec(point.pos.x, -point.pos.y, -64)
             sign_pos = Vec(point.sign_off.x, -point.sign_off.y, -64)
 
-            offset = (ant_pos - sign_pos) @ inv_orient
+            offset: Vec = (ant_pos - sign_pos) @ inv_orient
             try:
-                skin = CONN_OFFSET_TO_SKIN[offset.as_tuple()]
+                skin = CONN_OFFSET_TO_SKIN[offset.freeze()]
             except KeyError:
-                LOGGER.warning('Pos=({}), Sign=({}) -> ({}) is not a valid offset for signs!', point.pos, point.sign_off, offset)
+                LOGGER.warning(
+                    'Pos=({}), Sign=({}) -> ({}) is not a valid offset for signs!',
+                    point.pos, point.sign_off, offset,
+                )
                 continue
             pos: Vec = round((ant_pos + sign_pos) / 2.0 * 16.0, 0)
 
             vmf.create_ent(
                 'bee2_editor_connectionpoint',
+                sortkey=f'connpoint_{side.name.lower()}_{i:02}',
                 origin=Vec(pos.x - 56, pos.y + 56, -64),
                 angles=f'0 {yaw} 0',
                 skin=skin,
@@ -136,7 +180,8 @@ def save_editor_connectionpoint(item: Item, vmf: VMF) -> None:
             )
 
 
-def load_editor_embeddedvoxel(item: Item, ent: Entity) -> None:
+@_loader('bee2_editor_embeddedvoxel')
+def load_embeddedvoxel(item: Item, ent: Entity) -> None:
     """Parse embed definitions contained in the VMF."""
     bbox_min, bbox_max = ent.get_bbox()
     bbox_min = round(bbox_min, 0)
@@ -150,22 +195,24 @@ def load_editor_embeddedvoxel(item: Item, ent: Entity) -> None:
         return
 
     item.embed_voxels.update(map(Coord.from_vec, Vec.iter_grid(
-        (bbox_min + (64, 64, 64 + 128)) / 128,
+        (bbox_min + (+64, +64, +64 + 128)) / 128,
         (bbox_max + (-64, -64, -64 + 128)) / 128,
     )))
 
 
-def save_editor_embeddedvoxel(item: Item, vmf: VMF) -> None:
+@_saver
+def save_embeddedvoxel(item: Item, vmf: VMF) -> None:
     """Save embedded voxel volumes."""
     for bbox_min, bbox_max in bounding_boxes(item.embed_voxels):
         vmf.create_ent('bee2_editor_embeddedvoxel').solids.append(vmf.make_prism(
-            Vec(bbox_min) * 128 + (-64.0, -64.0, -192.0),
-            Vec(bbox_max) * 128 + (+64.0, +64.0, -64.0),
+            Vec(bbox_min) * 128 + (-64.0, -64.0, -64.0 - 128.0),
+            Vec(bbox_max) * 128 + (+64.0, +64.0, +64.0 - 128.0),
             # Entirely ignored, but makes it easier to distinguish.
             'tools/toolshint',
         ).solid)
 
 
+@_loader('bee2_editor_occupiedvoxel')
 def load_editor_occupiedvoxel(item: Item, ent: Entity) -> None:
     """Parse voxel collisions contained in the VMF."""
     bbox_min, bbox_max = ent.get_bbox()
@@ -244,7 +291,8 @@ def load_editor_occupiedvoxel(item: Item, ent: Entity) -> None:
     )
 
 
-def save_editor_occupiedvoxel(item: Item, vmf: VMF) -> None:
+@_saver
+def save_occupiedvoxel(item: Item, vmf: VMF) -> None:
     """Save occupied voxel volumes."""
     for voxel in item.occupy_voxels:
         pos = Vec(voxel.pos) * 128
@@ -284,24 +332,14 @@ def save_editor_occupiedvoxel(item: Item, vmf: VMF) -> None:
         ).solid)
 
 
+@_loader('bee2_collision_bbox')
 def load_collision_bbox(item: Item, ent: Entity) -> None:
     """Load precise BEE collisions."""
     item.collisions.extend(BBox.from_ent(ent))
 
 
+@_saver
 def save_collision_bbox(item: Item, vmf: VMF) -> None:
     """Export precise BEE collisions."""
     for coll in item.collisions:
         coll.as_ent(vmf)
-
-
-LOAD_FUNCS.update({
-    'bee2' + name[4:]: func
-    for name, func in globals().items()
-    if name.startswith('load_')
-})
-SAVE_FUNCS.extend([
-    func
-    for name, func in globals().items()
-    if name.startswith('save_')
-])

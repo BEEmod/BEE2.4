@@ -1,27 +1,30 @@
 """Templates are sets of brushes which can be copied into the map."""
 from __future__ import annotations
 
+from typing import AbstractSet, Callable, Union, Optional, Dict, Tuple, Mapping, Iterable, Iterator
+from typing_extensions import Literal, TypeAlias, assert_never
 import itertools
 import os
 from collections import defaultdict
-from typing import AbstractSet, Callable, Union, Optional, Dict, Tuple, Mapping, Iterable, Iterator
-
-import trio
-from typing_extensions import Literal, TypeAlias
-
 from decimal import Decimal
 from enum import Enum
 from operator import attrgetter
 
+import trio
 import attrs
-from srctools import Property
+
+from srctools import Keyvalues
 from srctools.filesys import FileSystem, ZipFileSystem, RawFileSystem, VPKFileSystem
-from srctools.math import Vec, Angle, Matrix, to_matrix
-from srctools.vmf import EntityFixup, Entity, EntityGroup, Solid, Side, VMF, UVAxis, VisGroup
+from srctools.math import AnyAngle, AnyMatrix, FrozenVec, Vec, Angle, Matrix, to_matrix
+from srctools.vmf import (
+    EntityFixup, Entity, EntityGroup, Solid, Side, VMF, UVAxis, ValidKVs,
+    VisGroup,
+)
 from srctools.dmx import Element as DMElement
 import srctools.logger
 
 import user_errors
+import utils
 from .texturing import Portalable, GenCat, TileSize
 from .tiling import TileType
 from . import tiling, texturing, options, rand, collisions
@@ -70,6 +73,28 @@ class AfterPickMode(Enum):
     NODRAW = '2'  # Convert to nodraw.
 
 
+@utils.freeze_enum_props
+class AppliedColour(Enum):
+    """Different behaviours for tilesetters, other than forcing a specific colour.
+
+    "tile" is also allowed, but that gets converted to Portalable instead.
+    """
+    MATCH = 'match'
+    INVERT = 'invert'
+    COPY = 'copy'
+
+    @property
+    def inverted(self) -> AppliedColour:
+        """Invert this operation."""
+        if self is AppliedColour.MATCH:
+            return AppliedColour.INVERT
+        if self is AppliedColour.INVERT:
+            return AppliedColour.MATCH
+        if self is AppliedColour.COPY:
+            return self
+        assert_never(self)
+
+
 @attrs.define
 class UnparsedTemplate:
     """Holds the location of a template that hasn't been parsed yet."""
@@ -115,7 +140,7 @@ class VoxelSetter(TemplateEntity):
 @attrs.define
 class TileSetter(VoxelSetter):
     """Set tiles in a particular position."""
-    color: Union[Portalable, str, None]  # Portalable value, 'INVERT' or None
+    color: AppliedColour | Portalable
     picker_name: str  # Name of colorpicker to use for the color.
 
 
@@ -199,12 +224,12 @@ TEMP_TILE_PIX_SIZE = {
 
 
 # 'Opposite' values for retexture_template(force_colour)
-ForceColour: TypeAlias = Union[texturing.Portalable, Literal['INVERT'], None]
+ForceColour: TypeAlias = Literal[AppliedColour.MATCH, AppliedColour.INVERT, Portalable.white, Portalable.black]
 TEMP_COLOUR_INVERT: Dict[ForceColour, ForceColour] = {
     Portalable.white: Portalable.black,
     Portalable.black: Portalable.white,
-    None: 'INVERT',
-    'INVERT': None,
+    AppliedColour.MATCH: AppliedColour.INVERT,
+    AppliedColour.INVERT: AppliedColour.MATCH,
 }
 
 
@@ -222,7 +247,7 @@ class ExportedTemplate:
     detail: Optional[Entity]
     overlay: list[Entity]
     orig_ids: dict[int, int]
-    template: 'Template'
+    template: Template
     origin: Vec
     orient: Matrix
     visgroups: set[str]
@@ -233,8 +258,8 @@ class ExportedTemplate:
 
 # Make_prism() generates faces aligned to world, copy the required UVs.
 realign_solid: Solid = VMF().make_prism(Vec(-16, -16, -16), Vec(16, 16, 16)).solid
-REALIGN_UVS = {
-    face.normal().as_tuple(): (face.uaxis, face.vaxis)
+REALIGN_UVS: Dict[FrozenVec, Tuple[UVAxis, UVAxis]] = {
+    face.normal().freeze(): (face.uaxis, face.vaxis)
     for face in realign_solid
 }
 del realign_solid
@@ -326,10 +351,10 @@ class Template:
             try:
                 world, detail, over = self._data[group.casefold()]
             except KeyError:
-                raise ValueError('Unknown visgroup "{}" for "{}"! (valid: {})'.format(
-                    group, self.id,
-                    ', '.join(map(repr, self._data)),
-                ))
+                raise ValueError(
+                    f'Unknown visgroup "{group}" for "{self.id}"! '
+                    f'(valid: {", ".join(map(repr, self._data))})'
+                ) from None
             world_brushes.extend(world)
             detail_brushes.extend(detail)
             overlays.extend(over)
@@ -360,14 +385,14 @@ class ScalingTemplate(Mapping[
     def __init__(
         self,
         temp_id: str,
-        axes: dict[tuple[float, float, float], tuple[str, UVAxis, UVAxis, float]],
-    ):
+        axes: dict[FrozenVec, tuple[str, UVAxis, UVAxis, float]],
+    ) -> None:
         self.id = temp_id
         self._axes = axes
         missing = {
-            (0, 0, 1), (0, 0, -1),
-            (1, 0, 0), (-1, 0, 0),
-            (0, -1, 0), (0, 1, 0),
+            FrozenVec(0, 0, 1), FrozenVec(0, 0, -1),
+            FrozenVec(1, 0, 0), FrozenVec(-1, 0, 0),
+            FrozenVec(0, -1, 0), FrozenVec(0, 1, 0),
         } - axes.keys()
         if missing:
             raise ValueError(f'Missing axes for scaling template {temp_id}: {missing}')
@@ -400,35 +425,33 @@ class ScalingTemplate(Mapping[
 
     def __getitem__(
         self,
-        normal: Union[Vec, tuple[float, float, float]],
+        normal: Union[Vec, FrozenVec, tuple[float, float, float]],
     ) -> tuple[str, UVAxis, UVAxis, float]:
-        if isinstance(normal, Vec):
-            normal = normal.as_tuple()
-        mat, axis_u, axis_v, rotation = self._axes[normal]
+        mat, axis_u, axis_v, rotation = self._axes[FrozenVec(normal)]
         return mat, axis_u.copy(), axis_v.copy(), rotation
 
     def rotate(self, angles: Union[Angle, Matrix], origin: Optional[Vec]=None) -> ScalingTemplate:
         """Rotate this template, and return a new template with those angles."""
-        new_axis: dict[tuple[float, float, float], tuple[str, UVAxis, UVAxis, float]] = {}
+        new_axis: dict[FrozenVec, tuple[str, UVAxis, UVAxis, float]] = {}
         if origin is None:
             origin = Vec()
 
+        orient = to_matrix(angles)
         for norm, (mat, axis_u, axis_v, rot) in self._axes.items():
-            axis_u = axis_u.localise(origin, angles)
-            axis_v = axis_v.localise(origin, angles)
-            v_norm = Vec(norm) @ angles
-            new_axis[v_norm.as_tuple()] = mat, axis_u, axis_v, rot
+            axis_u = axis_u.localise(origin, orient)
+            axis_v = axis_v.localise(origin, orient)
+            new_axis[norm @ orient] = mat, axis_u, axis_v, rot
 
         return ScalingTemplate(self.id, new_axis)
 
     def apply(self, face: Side, *, change_mat: bool=True) -> None:
         """Apply the template to a face."""
-        mat, face.uaxis, face.vaxis, face.ham_rot = self[face.normal().as_tuple()]
+        mat, face.uaxis, face.vaxis, face.ham_rot = self[face.normal()]
         if change_mat:
             face.mat = mat
 
 
-def parse_temp_name(name) -> tuple[str, set[str]]:
+def parse_temp_name(name: str) -> tuple[str, set[str]]:
     """Parse the visgroups off the end of an ID."""
     if ':' in name:
         temp_name, visgroups = name.rsplit(':', 1)
@@ -470,9 +493,9 @@ def _parse_template(loc: UnparsedTemplate) -> Template:
             raise ValueError(f'Unknown filesystem type for "{loc.pak_path}"!')
 
     with filesys[loc.path].open_str() as f:
-        props = Property.parse(f, f'{loc.pak_path}:{loc.path}')
-    vmf = srctools.VMF.parse(props, preserve_ids=True)
-    del props, filesys, f  # Discard all this data.
+        kv = Keyvalues.parse(f, f'{loc.pak_path}:{loc.path}')
+    vmf = srctools.VMF.parse(kv, preserve_ids=True)
+    del kv, filesys, f  # Discard all this data.
 
     # visgroup -> list of brushes/overlays
     detail_ents: dict[str, list[Solid]] = defaultdict(list)
@@ -496,7 +519,7 @@ def _parse_template(loc: UnparsedTemplate) -> Template:
     if conf['template_id'].upper() != loc.id:
         raise ValueError(f'Mismatch in template IDs: "{conf["template_id"]}" != "{loc.id}"!')
 
-    def yield_world_detail() -> Iterator[tuple[list[Solid], bool, set[str]]]:
+    def yield_world_detail() -> Iterator[tuple[list[Solid], bool, set[int]]]:
         """Yield all world/detail solids in the map.
 
         This also indicates if it's a func_detail, and the visgroup IDs.
@@ -572,7 +595,7 @@ def _parse_template(loc: UnparsedTemplate) -> Template:
                 value=ent['remove_brush'],
                 kind='Template ColorPicker',
                 id=f'{loc.id}:{ent["targetname"]}',
-            ))
+            )) from None
 
         try:
             remove_after = AfterPickMode(ent['remove_brush', '0'])
@@ -582,7 +605,7 @@ def _parse_template(loc: UnparsedTemplate) -> Template:
                 value=ent['remove_brush'],
                 kind='Template ColorPicker',
                 id=f'{loc.id}:{ent["targetname"]}',
-            ))
+            )) from None
 
         color_pickers.append(ColorPicker(
             priority=priority,
@@ -611,24 +634,24 @@ def _parse_template(loc: UnparsedTemplate) -> Template:
 
     for ent in vmf.by_class['bee2_template_tilesetter']:
         tile_type = SKIN_TO_TILETYPE[srctools.conv_int(ent['skin'])]
-        color = ent['color']
-        if color == 'tile':
+        color_str = ent['color']
+        color: Portalable | AppliedColour
+        if color_str == 'tile':
             try:
                 color = tile_type.color
             except ValueError:
                 # Non-tile types.
-                color = None
-        elif color == 'invert':
-            color = 'INVERT'
-        elif color == 'match':
-            color = None
-        elif color != 'copy':
-            raise user_errors.UserError(user_errors.TOK_INVALID_PARAM.format(
-                option='color',
-                value=color,
-                kind='Template TileSetter',
-                id=loc.id,
-            ))
+                color = AppliedColour.MATCH
+        else:
+            try:
+                color = AppliedColour(color_str)
+            except ValueError:
+                raise user_errors.UserError(user_errors.TOK_INVALID_PARAM.format(
+                    option='color',
+                    value=color_str,
+                    kind='Template TileSetter',
+                    id=loc.id,
+                )) from None
 
         tile_setters.append(TileSetter(
             offset=Vec.from_str(ent['origin']),
@@ -682,17 +705,17 @@ def get_template(temp_name: str) -> Template:
 
 def import_template(
     vmf: VMF,
-    temp_name: Union[str, Template],
+    temp_name: str | Template,
     origin: Vec,
-    angles: Optional[Union[Angle, Matrix]]=None,
-    targetname: str='',
-    force_type: TEMP_TYPES=TEMP_TYPES.default,
-    add_to_map: bool=True,
-    additional_visgroups: Iterable[str]=(),
-    bind_tile_pos: Iterable[Vec]=(),
-    align_bind: bool=False,
-    coll: collisions.Collisions=None,
-    coll_add: Optional[collisions.CollideType] = collisions.CollideType.NOTHING,
+    angles: AnyAngle | AnyMatrix | None = None,
+    targetname: str = '',
+    force_type: TEMP_TYPES = TEMP_TYPES.default,
+    add_to_map: bool = True,
+    additional_visgroups: Iterable[str] = (),
+    bind_tile_pos: Iterable[Vec] = (),
+    align_bind: bool = False,
+    coll: collisions.Collisions | None = None,
+    coll_add: collisions.CollideType = collisions.CollideType.NOTHING,
     coll_mask: collisions.CollideType = collisions.CollideType.EVERYTHING,
 ) -> ExportedTemplate:
     """Import the given template at a location.
@@ -747,7 +770,7 @@ def import_template(
             dbg_visgroup = vmf.create_visgroup('Templates', (113, 113, 0))
         dbg_group = EntityGroup(vmf, color=Vec(113, 113, 0))
 
-        def dbg_add(classname, **kwargs) -> None:
+        def dbg_add(classname: str, **kwargs: ValidKVs) -> None:
             """Add a marker to the map."""
             ent = vmf.create_ent(classname, **kwargs)
             ent.visgroup_ids.add(dbg_visgroup.id)
@@ -898,7 +921,7 @@ def import_template(
         orig_ids=id_mapping,
         template=template,
         origin=origin,
-        orient=orient,
+        orient=Matrix(orient),
         visgroups=chosen_groups,
         picker_results={},  # Filled by retexture_template.
         picker_type_results={},
@@ -919,11 +942,11 @@ def get_scaling_template(temp_id: str) -> ScalingTemplate:
     except KeyError:
         pass
     temp = get_template(temp_name)
-    uvs: dict[tuple[float, float, float], tuple[str, UVAxis, UVAxis, float]] = {}
+    uvs: dict[FrozenVec, tuple[str, UVAxis, UVAxis, float]] = {}
 
     for brush in temp.visgrouped_solids(over_names):
         for side in brush.sides:
-            uvs[side.normal().as_tuple()] = (
+            uvs[side.normal().freeze()] = (
                 side.mat,
                 side.uaxis.copy(),
                 side.vaxis.copy(),
@@ -937,13 +960,13 @@ def get_scaling_template(temp_id: str) -> ScalingTemplate:
 def retexture_template(
     template_data: ExportedTemplate,
     origin: Vec,
-    fixup: EntityFixup=None,
-    replace_tex: Mapping[str, Union[list[str], str]]=srctools.EmptyMapping,
-    force_colour: ForceColour=None,
-    force_grid: TileSize=None,
-    generator: GenCat=GenCat.NORMAL,
-    sense_offset: Optional[Vec]=None,
-):
+    fixup: EntityFixup | None = None,
+    replace_tex: Mapping[str, list[str] | str] = srctools.EmptyMapping,
+    force_colour: ForceColour = AppliedColour.MATCH,
+    force_grid: TileSize | None = None,
+    generator: GenCat = GenCat.NORMAL,
+    sense_offset: Vec | None = None,
+) -> None:
     """Retexture a template at the given location.
 
     - Only textures in the TEMPLATE_RETEXTURE dict will be replaced.
@@ -953,8 +976,7 @@ def retexture_template(
       same type.
     - replace_tex is a replacement table. This overrides everything else.
       The values should either be a list (random), or a single value.
-    - If force_colour is set, all tile textures will be switched accordingly.
-      If set to 'INVERT', white and black textures will be swapped.
+    - force_colour controls how textures are overridden.
     - If force_grid is set, all tile textures will be that size.
     - generator defines the generator category to use for surfaces.
     - Fixup is the inst.fixup value, used to allow $replace in replace_tex.
@@ -977,7 +999,7 @@ def retexture_template(
     # Template faces are randomised per block and side. This means
     # multiple templates in the same block get the same texture, so they
     # can clip into each other without looking bad.
-    rand_prefix = 'TEMPLATE_{0.x}_{0.y}_{0.z}:'.format(origin // 128)
+    rand_prefix = f'TEMPLATE_{(origin // 128).x}_{(origin // 128).y}_{(origin // 128).z}:'
 
     # Reprocess the replace_tex passed in, converting values.
     evalled_replace_tex: dict[str, list[str]] = {}
@@ -1162,29 +1184,28 @@ def retexture_template(
                 skin=TILETYPE_TO_SKIN[setter_type],
                 force=tile_setter.force,
                 picker_name=tile_setter.picker_name,
+                color=repr(tile_setter.color),
             )
 
-        if tile_setter.color == 'copy':
+        if tile_setter.color is AppliedColour.COPY:
             if not tile_setter.picker_name:
                 raise ValueError(
-                    '"{}": Tile Setter set to copy mode '
-                    'must have a color picker!'.format(template.id)
+                    f'"{template.id}": Tile Setter set to copy mode '
+                    f'must have a color picker!'
                 )
             # If a color picker is set, it overrides everything else.
             try:
                 picker_res = picker_type_results[tile_setter.picker_name]
             except KeyError:
                 raise ValueError(
-                    '"{}": Tile Setter specified color picker '
-                    '"{}" which does not exist!'.format(
-                        template.id, tile_setter.picker_name
-                    )
-                )
+                    f'"{template.id}": Tile Setter specified color picker '
+                    f'"{tile_setter.picker_name}" which does not exist!'
+                ) from None
             if picker_res is None:
                 raise ValueError(
-                    '"{}": Color picker "{}" has no tile to pick!'.format(
-                        template.id, tile_setter.picker_name
-                    ))
+                    f'"{template.id}": Color picker '
+                    f'"{tile_setter.picker_name}" has no tile to pick!'
+                )
             setter_type = picker_res
         elif setter_type.is_tile:
             if tile_setter.picker_name:
@@ -1193,16 +1214,14 @@ def retexture_template(
                     setter_color = picker_results[tile_setter.picker_name]
                 except KeyError:
                     raise ValueError(
-                        '"{}": Tile Setter specified color picker '
-                        '"{}" which does not exist!'.format(
-                            template.id, tile_setter.picker_name
-                        )
-                    )
+                        f'"{template.id}": Tile Setter specified color picker '
+                        f'"{tile_setter.picker_name}" which does not exist!'
+                    ) from None
                 if setter_color is None:
                     raise ValueError(
-                        '"{}": Color picker "{}" has no tile to pick!'.format(
-                            template.id, tile_setter.picker_name
-                        ))
+                        f'"{template.id}": Color picker "{tile_setter.picker_name}" '
+                        f'has no tile to pick!'
+                    )
             elif isinstance(tile_setter.color, Portalable):
                 # The color was specifically set.
                 setter_color = tile_setter.color
@@ -1213,13 +1232,12 @@ def retexture_template(
             else:
                 # We need a forced color, but none was provided.
                 raise ValueError(
-                    '"{}": Tile Setter set to use colour value from the '
-                    "template's overall color, "
-                    'but not given one!'.format(template.id)
+                    f'"{template.id}": Tile Setter set to use colour value from '
+                    "the template's overall color, but not given one!"
                 )
 
             # Inverting applies to all of these.
-            if force_colour == 'INVERT':
+            if force_colour is AppliedColour.INVERT:
                 setter_color = ~setter_color
 
             setter_type = TileType.with_color_and_size(
@@ -1251,11 +1269,11 @@ def retexture_template(
 
             folded_mat = face.mat.casefold()
 
-            norm = face.normal()
+            norm = face.normal().freeze()
 
             if orig_id in template.realign_faces:
                 try:
-                    uaxis, vaxis = REALIGN_UVS[norm.as_tuple()]
+                    uaxis, vaxis = REALIGN_UVS[norm]
                 except KeyError:
                     LOGGER.warning(
                         'Realign face in template "{}" ({} in final) is '
@@ -1327,7 +1345,7 @@ def retexture_template(
                 texturing.apply(gen_type, face, tex_name)
 
                 if tex_name in ('goo', 'goo_cheap'):
-                    if norm != (0, 0, -1):
+                    if norm.z > -0.9:
                         # Goo must be facing upright!
                         # Retexture to nodraw, so a template can be made with
                         # all faces goo to work in multiple orientations.
@@ -1358,10 +1376,10 @@ def retexture_template(
                     face.mat = force_colour_face
                     continue
                 tex_colour = force_colour_face
-            elif force_colour == 'INVERT':
+            elif force_colour is AppliedColour.INVERT:
                 # Invert the texture
                 tex_colour = ~tex_colour
-            elif force_colour is not None:
+            elif force_colour is not AppliedColour.MATCH:
                 tex_colour = force_colour
 
             if force_grid is not None:

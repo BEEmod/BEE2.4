@@ -29,8 +29,7 @@ import trio
 
 from BEE2_config import GEN_OPTS, get_package_locs
 from packages import (
-    LOADED as PACKSET,
-    find_packages,
+    get_loaded_packages, find_packages,
     LOGGER as packages_logger
 )
 import utils
@@ -39,6 +38,10 @@ import utils
 PACKAGE_REPEAT: Optional[RawFileSystem] = None
 SKIPPED_FILES: List[str] = []
 CONF = utils.conf_location('last_package_sync.txt')
+
+
+class SkipPackage(Exception):
+    """Raised to skip a package."""
 
 
 def get_package(file: Path) -> RawFileSystem:
@@ -54,9 +57,9 @@ def get_package(file: Path) -> RawFileSystem:
         if PACKAGE_REPEAT is not None:
             return PACKAGE_REPEAT
 
-        message = f'Choose package ID for "{file}", or blank to assume {last_package}: '
+        message = f'Choose package ID for "{file}", blank to assume {last_package}, * to repeat last for all, or X to skip: '
     else:
-        message = f'Choose package ID for "{file}": '
+        message = f'Choose package ID for "{file}", or X to skip: '
 
     error_message = 'Invalid package!\n' + message
 
@@ -66,9 +69,12 @@ def get_package(file: Path) -> RawFileSystem:
         # After first time, always use the 'invalid package' warning.
         message = error_message
 
+        if pack_id == 'X':
+            raise SkipPackage
+
         if pack_id == '*' and last_package:
             try:
-                fsys = PACKSET.packages[last_package].fsys
+                fsys = get_loaded_packages().packages[last_package].fsys
             except KeyError:
                 continue
             if isinstance(fsys, RawFileSystem):
@@ -80,7 +86,7 @@ def get_package(file: Path) -> RawFileSystem:
             pack_id = last_package
 
         try:
-            fsys = PACKSET.packages[pack_id.casefold()].fsys
+            fsys = get_loaded_packages().packages[pack_id.casefold()].fsys
         except KeyError:
             continue
         if isinstance(fsys, RawFileSystem):
@@ -141,7 +147,7 @@ def check_file(file: Path, portal2: Path, packages: Path) -> None:
 
         target_systems = []
 
-        for package in PACKSET.packages.values():
+        for package in get_loaded_packages().packages.values():
             if not isinstance(package.fsys, RawFileSystem):
                 # In a zip or the like.
                 continue
@@ -152,7 +158,7 @@ def check_file(file: Path, portal2: Path, packages: Path) -> None:
             # This file is totally new.
             try:
                 target_systems.append(get_package(rel_loc))
-            except KeyboardInterrupt:
+            except SkipPackage:
                 return
 
         for fsys in target_systems:
@@ -164,9 +170,10 @@ def check_file(file: Path, portal2: Path, packages: Path) -> None:
 
 def print_package_ids() -> None:
     """Print all the packages out."""
-    id_len = max(len(pack.id) for pack in PACKSET.packages.values())
+    packages = get_loaded_packages().packages.values()
+    id_len = max(len(pack.id) for pack in packages)
     row_count = 128 // (id_len + 2)
-    for i, pack in enumerate(sorted(pack.id for pack in PACKSET.packages.values()), start=1):
+    for i, pack in enumerate(sorted(pack.id for pack in packages), start=1):
         print(' {0:<{1}} '.format(pack, id_len), end='')
         if i % row_count == 0:
             print()
@@ -198,7 +205,7 @@ async def main(files: List[str]) -> int:
     packages_logger.setLevel(logging.ERROR)
     async with trio.open_nursery() as nursery:
         for loc in get_package_locs():
-            await find_packages(nursery, PACKSET, loc)
+            await find_packages(nursery, get_loaded_packages(), loc)
     packages_logger.setLevel(logging.INFO)
 
     LOGGER.info('Done!')
@@ -207,7 +214,7 @@ async def main(files: List[str]) -> int:
 
     package_loc = Path('../', GEN_OPTS['Directories']['package']).resolve()
 
-    file_list: list[Path] = []
+    file_list: List[Path] = []
 
     for file in files:
         file_path = Path(file)

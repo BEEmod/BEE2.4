@@ -1,5 +1,9 @@
 """Manages the list of textures used for brushes, and how they are applied."""
-from typing import TYPE_CHECKING, Union, Type, Any, Dict, List, Tuple, Optional, Iterable, Set
+from __future__ import annotations
+
+from typing import (
+    ClassVar, TYPE_CHECKING, Union, Type, Any, Dict, List, Tuple, Optional, Iterable, Set,
+)
 from pathlib import Path
 from enum import Enum
 import itertools
@@ -8,7 +12,7 @@ import abc
 import attrs
 import trio
 
-from srctools import Property, Vec, conv_bool
+from srctools import FrozenVec, Keyvalues, Vec, conv_bool
 from srctools.game import Game
 from srctools.tokenizer import TokenSyntaxError
 from srctools.vmf import VisGroup, VMF, Side, Solid
@@ -26,11 +30,11 @@ if TYPE_CHECKING:
 LOGGER = srctools.logger.get_logger(__name__)
 
 # Algorithms to use.
-GEN_CLASSES: utils.FuncLookup[Type['Generator']] = utils.FuncLookup('Generators')
+GEN_CLASSES: utils.FuncLookup[Type[Generator]] = utils.FuncLookup('Generators')
 
 # These can just be looked up directly.
-SPECIAL: 'Generator'
-OVERLAYS: 'Generator'
+SPECIAL: Generator
+OVERLAYS: Generator
 
 
 class GenCat(Enum):
@@ -62,7 +66,7 @@ class Portalable(Enum):
     def __str__(self) -> str:
         return self.value
 
-    def __invert__(self) -> 'Portalable':
+    def __invert__(self) -> Portalable:
         if self.value == 'white':
             return Portalable.BLACK
         else:
@@ -129,7 +133,16 @@ ANTIGEL_MATS: Dict[str, str] = {}
 ANTIGEL_PATH = 'BEE2/antigel/gen/'
 # The center of each voxel containing an antigel marker.
 # Surfaces inside here that aren't a voxel side will be converted.
-ANTIGEL_LOCS: Set[Tuple[float, float, float]] = set()
+ANTIGEL_LOCS: Set[FrozenVec] = set()
+# And then for each normal direction, if a antigel marker was defined there.
+ANTIGEL_BY_NORMAL: Dict[FrozenVec, Set[FrozenVec]] = {
+    FrozenVec.N: set(),
+    FrozenVec.S: set(),
+    FrozenVec.E: set(),
+    FrozenVec.W: set(),
+    FrozenVec.T: set(),
+    FrozenVec.B: set(),
+}
 
 ANTIGEL_TEMPLATE = '''\
 Patch
@@ -176,15 +189,15 @@ class TileSize(str, Enum):
         raise AssertionError(self)
 
 GENERATORS: Dict[
-    Union[GenCat, Tuple[GenCat, Orient, Portalable]],
-    'Generator'
+    GenCat | Tuple[GenCat, Orient, Portalable],
+    Generator,
 ] = {}
 
 # The defaults for each generator.
 # This also defines the texture names allowed, as well
 # as the total number of generators.
 TEX_DEFAULTS: Dict[
-    Union[GenCat, Tuple[GenCat, Orient, Portalable]],
+    GenCat | Tuple[GenCat, Orient, Portalable],
     Dict[str, str],
 ] = {
     # Signage overlays.
@@ -341,7 +354,11 @@ def parse_options(settings: Dict[str, Any], global_settings: Dict[str, Any]) -> 
     return options
 
 
-def gen(cat: GenCat, normal: Vec=None, portalable: Portalable=None) -> 'Generator':
+def gen(
+    cat: GenCat,
+    normal: Vec | None = None,
+    portalable: Portalable | None = None,
+) -> Generator:
     """Given a category, normal, and white/black return the correct generator."""
 
     if cat is GenCat.SPECIAL or cat is GenCat.OVERLAYS:
@@ -368,7 +385,7 @@ def gen(cat: GenCat, normal: Vec=None, portalable: Portalable=None) -> 'Generato
     return GENERATORS[cat, orient, portalable]
 
 
-def parse_name(name: str) -> Tuple['Generator', str]:
+def parse_name(name: str) -> Tuple[Generator, str]:
     """Parse a dotted string into a generator and a texture name."""
     split_name = name.lower().split('.')
     try:
@@ -409,10 +426,10 @@ def apply(
     cat: GenCat,
     face: Side,
     tex_name: str,
-    portalable: Portalable=None,
-    normal: Vec=None,
-    loc: Vec=None
-):
+    portalable: Portalable | None = None,
+    normal: Vec | None = None,
+    loc: Vec | None = None,
+) -> None:
     """Apply directly to a face, optionally using that to retrieve the location."""
     if cat is GenCat.SPECIAL or cat is GenCat.OVERLAYS:
         generator = GENERATORS[cat]
@@ -428,7 +445,7 @@ def apply(
     face.mat = generator.get(loc + face.normal(), tex_name)
 
 
-def load_config(conf: Property):
+def load_config(conf: Keyvalues) -> None:
     """Setup all the generators from the config data."""
     global SPECIAL, OVERLAYS
     global_options = {
@@ -451,7 +468,7 @@ def load_config(conf: Property):
     # Use this to allow alternate names for generators.
     conf_for_gen: Dict[
         Tuple[GenCat, Optional[Orient], Optional[Portalable]],
-        Property,
+        Keyvalues,
     ] = {}
 
     for prop in conf:
@@ -482,23 +499,23 @@ def load_config(conf: Property):
             try:
                 gen_conf = conf_for_gen[gen_key, None, None]
             except KeyError:
-                gen_conf = Property(gen_key.value, [])
+                gen_conf = Keyvalues(gen_key.value, [])
         else:
             # Tile-type generator
             is_tile = True
             try:
                 gen_conf = conf_for_gen[gen_key]
             except KeyError:
-                gen_conf = Property('', [])
+                gen_conf = Keyvalues('', [])
 
             if not gen_conf.has_children():
                 # Special case - using a single value to indicate that all
                 # textures are the same.
-                gen_conf = Property(gen_conf.real_name, [
-                    Property('4x4', gen_conf.value),
-                    Property('Options', [
+                gen_conf = Keyvalues(gen_conf.real_name, [
+                    Keyvalues('4x4', gen_conf.value),
+                    Keyvalues('Options', [
                         # Clumping isn't useful since it's all the same.
-                        Property('Algorithm', 'RAND'),
+                        Keyvalues('Algorithm', 'RAND'),
                     ])
                 ])
         textures: Dict[str, List[str]] = {}
@@ -601,7 +618,7 @@ def load_config(conf: Property):
             try:
                 generator = GEN_CLASSES[algo]
             except KeyError:
-                raise ValueError(f'Invalid algorithm "{algo}" for {gen_key}!')
+                raise ValueError(f'Invalid algorithm "{algo}" for {gen_key}!') from None
         else:
             # Signage, Overlays always use the Random generator.
             generator = GenRandom
@@ -622,7 +639,7 @@ def load_config(conf: Property):
     OVERLAYS = GENERATORS[GenCat.OVERLAYS]
 
 
-async def setup(game: Game, vmf: VMF, tiles: List['TileDef']) -> None:
+async def setup(game: Game, vmf: VMF, tiles: List[TileDef]) -> None:
     """Do various setup steps, needed for generating textures.
 
     - Set randomisation seed on all the generators.
@@ -744,7 +761,7 @@ class Generator(abc.ABC):
 
     # The settings which apply to all generators.
     # Since they're here all subclasses and instances can access this.
-    global_settings: Dict[str, Any] = {}
+    global_settings: ClassVar[Dict[str, Any]] = {}
 
     def __init__(
         self,
@@ -753,7 +770,7 @@ class Generator(abc.ABC):
         portal: Optional[Portalable],
         options: Dict[str, Any],
         textures: Dict[str, List[str]],
-    ):
+    ) -> None:
         self.options = options
         self.textures = textures
 
@@ -773,9 +790,9 @@ class Generator(abc.ABC):
         grid_loc = loc // 128
 
         if antigel is None:
-            antigel = grid_loc.as_tuple() in ANTIGEL_LOCS
+            antigel = grid_loc.freeze() in ANTIGEL_LOCS
         if antigel and self.category is GenCat.BULLSEYE and not self.options['antigel_bullseye']:
-            assert self.orient is not None or self.portal is not None
+            assert self.orient is not None and self.portal is not None
             # We can't use antigel on bullseye materials, so revert to normal
             # surfaces.
             return GENERATORS[GenCat.NORMAL, self.orient, self.portal].get(loc, tex_name, antigel=True)
@@ -787,7 +804,7 @@ class Generator(abc.ABC):
         try:
             texture = self._get(loc, tex_name)
         except KeyError as exc:
-            raise self._missing_error(repr(exc.args[0]))
+            raise self._missing_error(repr(exc.args[0])) from None
         if antigel:
             try:
                 return ANTIGEL_MATS[texture.casefold()]
@@ -798,10 +815,10 @@ class Generator(abc.ABC):
 
         return texture
 
-    def setup(self, vmf: VMF, tiles: List['TileDef']) -> None:
+    def setup(self, vmf: VMF, tiles: List[TileDef]) -> None:
         """Scan tiles in the map and set up the generator."""
 
-    def _missing_error(self, tex_name: str):
+    def _missing_error(self, tex_name: str) -> Exception:
         return ValueError(f'Bad texture name: {tex_name}\n Allowed: {list(self.textures.keys())!r}')
 
     @abc.abstractmethod
@@ -833,8 +850,15 @@ class GenRandom(Generator):
     Each texture will be randomly chosen whenever asked.
     This is used for Overlay and Signage as well.
     """
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
+    def __init__(
+        self,
+        category: GenCat,
+        orient: Optional[Orient],
+        portal: Optional[Portalable],
+        options: Dict[str, Any],
+        textures: Dict[str, List[str]],
+    ) -> None:
+        super().__init__(category, orient, portal, options, textures)
         # For enum constants, use the id() to lookup - this
         # way we're effectively comparing by identity.
         self.enum_data: Dict[int, str] = {}
@@ -845,7 +869,7 @@ class GenRandom(Generator):
             if type(default) != str:
                 self.enum_data[id(default)] = key
 
-    def _get(self, loc: Vec, tex_name: str):
+    def _get(self, loc: Vec, tex_name: str) -> str:
         if type(tex_name) != str:
             try:
                 tex_name = self.enum_data[id(tex_name)]
@@ -874,15 +898,21 @@ class GenClump(Generator):
 
     This creates groups of the same texture in roughly rectangular sections.
     """
-
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
+    def __init__(
+        self,
+        category: GenCat,
+        orient: Optional[Orient],
+        portal: Optional[Portalable],
+        options: Dict[str, Any],
+        textures: Dict[str, List[str]],
+    ) -> None:
+        super().__init__(category, orient, portal, options, textures)
 
         # A seed only unique to this generator.
         self.gen_seed = b''
         self._clump_locs: list[Clump] = []
 
-    def setup(self, vmf: VMF, tiles: List['TileDef']) -> None:
+    def setup(self, vmf: VMF, tiles: List[TileDef]) -> None:
         """Build the list of clump locations."""
         assert self.portal is not None
         assert self.orient is not None
@@ -903,8 +933,8 @@ class GenClump(Generator):
 
         # The tiles currently present in the map.
         orient_z = self.orient.z
-        remaining_tiles: Set[Tuple[float, float, float]] = {
-            (tile.pos + 64 * tile.normal // 128 * 128).as_tuple() for tile in tiles
+        remaining_tiles: Set[FrozenVec] = {
+            (tile.pos + 64 * tile.normal // 128 * 128).freeze() for tile in tiles
             if tile.normal.z == orient_z
         }
 
@@ -928,7 +958,7 @@ class GenClump(Generator):
             tile_pos = next(itertools.islice(
                 remaining_tiles,
                 clump_rand.randrange(0, len(remaining_tiles)),
-                len(remaining_tiles),
+                None,
             ))
             remaining_tiles.remove(tile_pos)
 
@@ -945,10 +975,7 @@ class GenClump(Generator):
                 pos_min[axis] = pos[axis] - clump_rand.randint(0, dist) * 128
                 pos_max[axis] = pos[axis] + clump_rand.randint(0, dist) * 128
 
-            remaining_tiles.difference_update(map(
-                Vec.as_tuple,
-                Vec.iter_grid(pos_min, pos_max, 128)
-            ))
+            remaining_tiles.difference_update(FrozenVec.iter_grid(pos_min, pos_max, 128))
 
             self._clump_locs.append(Clump(
                 pos_min.x, pos_min.y, pos_min.z,

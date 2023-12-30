@@ -1,17 +1,19 @@
 """Run the BEE2."""
-import functools
-from typing import Awaitable, Callable, Any, Optional, List, Tuple
+from typing import Awaitable, Callable, Any, ClassVar, Deque, Dict, Optional, List, Tuple
 import time
 import collections
 
 from outcome import Outcome, Error
-from srctools import Property
+from srctools import Keyvalues
 import trio
+from typing_extensions import override
 
 from app import (
     TK_ROOT, localisation, sound, img, gameMan, music_conf,
     UI, logWindow,
 )
+from ui_tk.dialogs import DIALOG
+from ui_tk.errors import display_errors
 from config.gen_opts import GenOptions
 from config.last_sel import LastSelected
 import config
@@ -23,7 +25,6 @@ import BEE2_config
 import srctools.logger
 
 LOGGER = srctools.logger.get_logger('BEE2')
-APP_NURSERY: trio.Nursery
 
 
 async def init_app() -> None:
@@ -45,42 +46,46 @@ async def init_app() -> None:
 
     LOGGER.debug('Loading settings...')
 
-    gameMan.load()
+    await gameMan.load(DIALOG)
     try:
         last_game = config.APP.get_cur_conf(LastSelected, 'game')
     except KeyError:
         pass
     else:
-        gameMan.set_game_by_name(last_game.id)
+        if last_game.id is not None:
+            gameMan.set_game_by_name(last_game.id)
     gameMan.scan_music_locs()
 
     LOGGER.info('Loading Packages...')
+    packset = packages.get_loaded_packages()
+    packset.has_mel_music = gameMan.MUSIC_MEL_VPK is not None
+    packset.has_tag_music = gameMan.MUSIC_TAG_LOC is not None
     async with trio.open_nursery() as nurs:
-        nurs.start_soon(functools.partial(
+        nurs.start_soon(
             packages.load_packages,
-            packages.LOADED,
+            packset,
             list(BEE2_config.get_package_locs()),
-            loader=loadScreen.main_loader,
-            has_mel_music=gameMan.MUSIC_MEL_VPK is not None,
-            has_tag_music=gameMan.MUSIC_TAG_LOC is not None,
-        ))
+            loadScreen.main_loader,
+            DIALOG,
+        )
     package_sys = packages.PACKAGE_SYS
     loadScreen.main_loader.step('UI', 'pre_ui')
-    app.background_run(img.init, package_sys)
+    from ui_tk.img import TK_IMG
+    app.background_run(img.init, package_sys, TK_IMG)
     app.background_run(sound.sound_task)
-    app.background_run(localisation.load_aux_langs, gameMan.all_games, packages.LOADED)
+    app.background_run(localisation.load_aux_langs, gameMan.all_games, packset)
 
     # Load filesystems into various modules
     music_conf.load_filesystems(package_sys.values())
     gameMan.load_filesystems(package_sys.values())
     async with trio.open_nursery() as nurs:
-        nurs.start_soon(UI.load_packages, packages.LOADED)
+        nurs.start_soon(UI.load_packages, packset, TK_IMG)
     loadScreen.main_loader.step('UI', 'package_load')
     LOGGER.info('Done!')
 
     LOGGER.info('Initialising UI...')
     async with trio.open_nursery() as nurs:
-        nurs.start_soon(UI.init_windows)  # create all windows
+        nurs.start_soon(UI.init_windows, TK_IMG)  # create all windows
     LOGGER.info('UI initialised!')
 
     if Tracer.slow:
@@ -99,63 +104,77 @@ async def init_app() -> None:
 
 class Tracer(trio.abc.Instrument):
     """Track tasks to detect slow ones."""
-    slow: List[Tuple[float, str]] = []
+    slow: ClassVar[List[Tuple[float, str]]] = []
 
     def __init__(self) -> None:
-        self.elapsed: dict[trio.lowlevel.Task, float] = {}
-        self.start_time: dict[trio.lowlevel.Task, Optional[float]] = {}
-        self.args: dict[trio.lowlevel.Task, dict[str, object]] = {}
+        self.elapsed: Dict[trio.lowlevel.Task, float] = {}
+        self.start_time: Dict[trio.lowlevel.Task, Optional[float]] = {}
+        self.args: Dict[trio.lowlevel.Task, Dict[str, object]] = {}
 
+    @override
     def task_spawned(self, task: trio.lowlevel.Task) -> None:
         """Setup vars when a task is spawned."""
         self.elapsed[task] = 0.0
         self.start_time[task] = None
         self.args[task] = task.coro.cr_frame.f_locals.copy()
 
+    @override
     def before_task_step(self, task: trio.lowlevel.Task) -> None:
         """Begin timing this task."""
         self.start_time[task] = time.perf_counter()
 
+    @override
     def after_task_step(self, task: trio.lowlevel.Task) -> None:
         """Count up the time."""
+        cur_time = time.perf_counter()
         try:
-            diff = time.perf_counter() - self.start_time[task]
+            prev = self.start_time[task]
         except KeyError:
             pass
         else:
-            self.elapsed[task] += diff
-            self.start_time[task] = None
+            if prev is not None:
+                self.elapsed[task] += cur_time - prev
+                self.start_time[task] = None
 
+    @override
     def task_exited(self, task: trio.lowlevel.Task) -> None:
         """Log results when exited."""
+        cur_time = time.perf_counter()
         elapsed = self.elapsed.pop(task, 0.0)
         start = self.start_time.pop(task, None)
         args = self.args.pop(task, srctools.EmptyMapping)
         if start is not None:
-            elapsed += time.perf_counter() - start
+            elapsed += cur_time - start
 
         if elapsed > 0.1:
             args = {
                 name: val
                 for name, val in args.items()
-                if not isinstance(val, (dict, Property, packages.PackagesSet)) and (
-                    type(val).__repr__ is not object.__repr__ or  # Objects with no useful info.
+                # Hide objects with really massive reprs.
+                if not isinstance(val, (dict, Keyvalues, packages.PackagesSet))
+                # Objects with no useful info.
+                if (
+                    type(val).__repr__ is not object.__repr__ or
                     type(val).__str__ is not object.__str__
-                ) and 'KI_PROTECTION' not in name   # Trio flag.
+                )
+                if 'KI_PROTECTION' not in name   # Trio flag.
             }
             self.slow.append((elapsed, f'Task time={elapsed:.06}: {task!r}, args={args}'))
 
 
 async def app_main(init: Callable[[], Awaitable[Any]]) -> None:
     """The main loop for Trio."""
-    global APP_NURSERY
     LOGGER.debug('Opening nursery...')
     async with trio.open_nursery() as nursery:
         app._APP_NURSERY = nursery
+        await nursery.start(display_errors)
+
+        # Run main app, then cancel this nursery to quit all other tasks.
         await init()
+        nursery.cancel_scope.cancel()
 
 
-def done_callback(result: Outcome):
+def done_callback(result: Outcome[None]) -> None:
     """The app finished, quit."""
     from app import UI
     if isinstance(result, Error):
@@ -167,7 +186,7 @@ def done_callback(result: Outcome):
     TK_ROOT.quit()
 
 
-def start_main(init: Callable[[], Awaitable[Any]]=init_app) -> None:
+def start_main(init: Callable[[], Awaitable[object]] = init_app) -> None:
     """Starts the TK and Trio loops.
 
     See https://github.com/richardsheridan/trio-guest/.
@@ -188,7 +207,7 @@ def start_main(init: Callable[[], Awaitable[Any]]=init_app) -> None:
         # callbacks is triggered.
         TK_ROOT.call("after", "idle", "after", 0, tk_func_name)
 
-    queue: collections.deque[Callable[[], Any]] = collections.deque()
+    queue: Deque[Callable[[], Any]] = collections.deque()
     tk_func_name = TK_ROOT.register(tk_func)
 
     LOGGER.debug('Starting Trio loop.')
@@ -198,5 +217,6 @@ def start_main(init: Callable[[], Awaitable[Any]]=init_app) -> None:
         run_sync_soon_not_threadsafe=run_sync_soon_not_threadsafe,
         done_callback=done_callback,
         instruments=[Tracer()] if utils.DEV_MODE else [],
+        strict_exception_groups=True,
     )
     TK_ROOT.mainloop()

@@ -1,9 +1,8 @@
 """Results relating to item connections."""
-from typing import Callable
-
+from typing import Callable, Dict, List
 
 from precomp import connections, conditions
-from srctools import Property, Entity, Output, logger
+from srctools import Keyvalues, Entity, Output, logger
 import srctools
 
 COND_MOD_NAME = 'I/O'
@@ -11,7 +10,7 @@ LOGGER = logger.get_logger(__name__, alias='cond.connections')
 
 
 @conditions.make_result('AddOutput')
-def res_add_output(res: Property) -> Callable[[Entity], None]:
+def res_add_output(res: Keyvalues) -> Callable[[Entity], None]:
     """Add an output from an instance to a global or local name.
 
     Values:
@@ -30,8 +29,8 @@ def res_add_output(res: Property) -> Callable[[Entity], None]:
     inst_in = res['inst_in', '']
     conf_inst_out = res['inst_out', '']
     targ = res['target', '']
-    only_once = srctools.conv_bool(res['only_once', None])
-    times = 1 if only_once else srctools.conv_int(res['times', None], -1)
+    only_once = res.bool('only_once')
+    times = 1 if only_once else res.int('times', -1)
     delay = res['delay', '0.0']
     parm = res['parm', '']
 
@@ -71,28 +70,28 @@ def res_add_output(res: Property) -> Callable[[Entity], None]:
             inst.fixup.substitute(parm),
             srctools.conv_float(inst.fixup.substitute(delay)),
             times=times,
-            inst_out=inst.fixup.substitute(inst_out) or None,
-            inst_in=inst.fixup.substitute(inst_in) or None,
+            inst_out=inst.fixup.substitute(inst_out) if inst_out else None,
+            inst_in=inst.fixup.substitute(inst_in) if inst_in else None,
         ))
     return add_output
 
 
 @conditions.make_result('ChangeIOType')
-def res_change_io_type(props: Property) -> Callable[[Entity], None]:
+def res_change_io_type(kv: Keyvalues) -> Callable[[Entity], None]:
     """Switch an item to use different inputs or outputs.
 
     Must be done before priority level -250.
     The contents are the same as that allowed in the input BEE2 block in
     editoritems.
     """
-    conf = connections.Config.parse('<ChangeIOType: {:X}>'.format(id(props)), props)
+    conf = connections.Config.parse(f'<ChangeIOType: {id(kv):X}>', kv)
 
     def change_item(inst: Entity) -> None:
         """Alter the type of each item passed in."""
         try:
             item = connections.ITEMS[inst['targetname']]
         except KeyError:
-            raise ValueError(f'No item with name "{inst["targetname"]}"!')
+            raise ValueError(f'No item with name "{inst["targetname"]}"!') from None
 
         item.config = conf
 
@@ -107,7 +106,7 @@ def res_change_io_type(props: Property) -> Callable[[Entity], None]:
 
 
 @conditions.make_result('AppendConnInputs')
-def res_append_io_type(res: Property) -> Callable[[Entity], None]:
+def res_append_io_type(res: Keyvalues) -> Callable[[Entity], None]:
     """Append additional outputs to an item's connections, which are fired when inputs change.
 
     Must be done before priority level -250. This has the same format of the editoritems BEE2 block,
@@ -117,7 +116,7 @@ def res_append_io_type(res: Property) -> Callable[[Entity], None]:
     - `sec_enable_cmd`
     - `sec_disable_cmd`
     """
-    prop_lists: dict[str, list[Output]] = {
+    prop_lists: Dict[str, List[Output]] = {
         name: []
         for name in ['enable_cmd', 'disable_cmd', 'sec_enable_cmd', 'sec_disable_cmd']
     }
@@ -142,7 +141,7 @@ def res_append_io_type(res: Property) -> Callable[[Entity], None]:
         try:
             item = connections.ITEMS[inst['targetname']]
         except KeyError:
-            raise ValueError('No item with name "{}"!'.format(inst['targetname']))
+            raise ValueError('No item with name "{}"!'.format(inst['targetname'])) from None
         # Assign item.enable_cmd += out_tup, for all of them.
         for name, out_tup in prop_tups:
             setattr(item, name, getattr(item, name) + out_tup)

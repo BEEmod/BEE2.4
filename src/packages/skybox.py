@@ -1,23 +1,29 @@
 from typing import Iterator
+from typing_extensions import Self
 
-from srctools import Property
+from srctools import Keyvalues
 
 from transtoken import TransTokenSource
 from packages import (
     PakObject, ExportData, ParseData, SelitemData,
-    get_config, lazy_conf
+    get_config
 )
+from app import lazy_conf
 
 
-class Skybox(PakObject, needs_foreground=True):
+class Skybox(
+    PakObject,
+    needs_foreground=True,
+    style_suggest_key='skybox', suggest_default='SKY_BLACK',
+):
     """Configures skybox and fog settings."""
     def __init__(
         self,
-        sky_id,
+        sky_id: str,
         selitem_data: SelitemData,
         config: lazy_conf.LazyConf,
-        fog_opts: Property,
-        mat,
+        fog_opts: Keyvalues,
+        mat: str,
     ) -> None:
         self.id = sky_id
         self.selitem_data = selitem_data
@@ -29,7 +35,7 @@ class Skybox(PakObject, needs_foreground=True):
         self.fog_color = fog_opts.vec('primarycolor', 255, 255, 255)
 
     @classmethod
-    async def parse(cls, data: ParseData):
+    async def parse(cls, data: ParseData) -> Self:
         """Parse a skybox definition."""
         selitem_data = SelitemData.parse(data.info, data.pak_id)
         mat = data.info['material', 'sky_black']
@@ -50,7 +56,7 @@ class Skybox(PakObject, needs_foreground=True):
             mat,
         )
 
-    def add_over(self, override: 'Skybox'):
+    def add_over(self, override: Self) -> None:
         """Add the additional vbsp_config commands to ourselves."""
         self.selitem_data += override.selitem_data
         self.config = lazy_conf.concat(self.config, override.config)
@@ -64,7 +70,7 @@ class Skybox(PakObject, needs_foreground=True):
         return f'<Skybox {self.id}>'
 
     @staticmethod
-    def export(exp_data: ExportData):
+    async def export(exp_data: ExportData) -> None:
         """Export the selected skybox."""
         if exp_data.selected is None:
             return  # No skybox..
@@ -72,11 +78,11 @@ class Skybox(PakObject, needs_foreground=True):
         try:
             skybox = exp_data.packset.obj_by_id(Skybox, exp_data.selected)
         except KeyError:
-            raise Exception(f"Selected skybox ({exp_data.selected}) doesn't exist?")
+            raise Exception(f"Selected skybox ({exp_data.selected}) doesn't exist?") from None
 
         exp_data.vbsp_conf.set_key(('Options', 'Skybox'), skybox.material)
 
-        exp_data.vbsp_conf.extend(skybox.config())
+        exp_data.vbsp_conf.extend(await skybox.config())
 
         # Styles or other items shouldn't be able to set fog settings..
         if 'fog' in exp_data.vbsp_conf:

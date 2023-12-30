@@ -2,13 +2,14 @@
 from __future__ import annotations
 
 from pathlib import Path
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw
 import colorsys
 
 from srctools.vtf import VTF, ImageFormats
 import srctools.logger
 
-from app.itemconfig import ConfigGroup, parse_color
+from packages import PackagesSet
+from packages.widgets import ConfigGroup, parse_color
 from app import img
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -22,12 +23,12 @@ CELL_SIZE = 96
 LEGEND_SIZE = 512
 
 
-def make_cube_colourizer_legend(bee2_loc: Path) -> None:
+def make_cube_colourizer_legend(packset: PackagesSet, bee2_loc: Path) -> None:
     """Create a cube colourizer legend, showing the colours."""
     # Find the colourizer group, and grab its values. If not currently present,
     # we don't need to generate.
     try:
-        config = ConfigGroup.by_id('BEE2_CUBE_COLORISER')
+        config = packset.obj_by_id(ConfigGroup, 'BEE2_CUBE_COLORISER')
     except KeyError:
         LOGGER.debug('No cube colorizer config group!')
         return
@@ -38,8 +39,8 @@ def make_cube_colourizer_legend(bee2_loc: Path) -> None:
         LOGGER.debug('No COLOR widget in {}', config.multi_widgets)
         return
     colors = {
-        int(tim): parse_color(var.get())
-        for tim, var in wid.values
+        int(tim): parse_color(value)
+        for tim, value in wid.values.items()
     }
 
     legend = Image.new('RGB', (LEGEND_SIZE, LEGEND_SIZE), color=(255, 255, 255))

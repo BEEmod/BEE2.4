@@ -7,34 +7,39 @@ import inspect
 import sys
 from enum import Enum
 from typing import (
-    Awaitable, Generic, Iterable, overload, cast, Any, TypeVar, Protocol, Union, Callable, Optional,
+    Awaitable, Dict, Generic, Iterable, overload, cast, Any, TypeVar, Protocol, Union, Callable,
+    Optional,
     Tuple, Literal,
 )
-from typing_extensions import TypeAlias, Unpack, TypeVarTuple
+from typing_extensions import TypeAlias, TypeVarTuple, Unpack
 
 from tkinter import ttk
 from tkinter import font as _tk_font
-from tkinter import filedialog, commondialog, simpledialog, messagebox
+from tkinter import filedialog, commondialog, messagebox
 import tkinter as tk
 import os.path
 
-from idlelib.redirector import WidgetRedirector
-from idlelib.query import Query
+from srctools import logger
+from idlelib.redirector import WidgetRedirector  # type: ignore[import-not-found]
 import trio
 
-from app import TK_ROOT, background_run, localisation
+from app import TK_ROOT, background_run
 from config.gen_opts import GenOptions
 import event
 import config
 import utils
 from transtoken import TransToken
+from ui_tk.wid_transtoken import set_text
 
 
-# Set icons for the application.
-
-ICO_PATH = str(utils.install_path('BEE2.ico'))
-PosArgsT = TypeVarTuple('PosArgsT')
+LOGGER = logger.get_logger(__name__)
+ICO_PATH = str(utils.bins_path('BEE2.ico'))
 T = TypeVar('T')
+AnyWidT = TypeVar('AnyWidT', bound=tk.Misc)
+WidgetT = TypeVar('WidgetT', bound=tk.Widget)
+EventFunc: TypeAlias = Callable[[tk.Event[AnyWidT]], object]
+EventFuncT = TypeVar('EventFuncT', bound=EventFunc[tk.Misc])
+
 
 if utils.WIN:
     # Ensure everything has our icon (including dialogs)
@@ -52,11 +57,12 @@ if utils.WIN:
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
             'BEEMOD.application',
         )
-    except (AttributeError, WindowsError, ValueError):
+    except (AttributeError, OSError, ValueError):
         pass  # It's not too bad if it fails.
 
     LISTBOX_BG_SEL_COLOR = '#0078D7'
     LISTBOX_BG_COLOR = 'white'
+    LABEL_HIGHLIGHT_BG = '#5AD2D2'
 elif utils.MAC:
     def set_window_icon(window: Union[tk.Toplevel, tk.Tk]) -> None:
         """ Call OS-X's specific api for setting the window icon."""
@@ -73,10 +79,11 @@ elif utils.MAC:
 
     LISTBOX_BG_SEL_COLOR = '#C2DDFF'
     LISTBOX_BG_COLOR = 'white'
+    LABEL_HIGHLIGHT_BG = '#5AD2D2'
 else:  # Linux
     # Get the tk image object.
-    from app import img
-    app_icon = img.get_app_icon(ICO_PATH)
+    from ui_tk.img import get_app_icon
+    app_icon = get_app_icon(ICO_PATH)
 
     def set_window_icon(window: Union[tk.Toplevel, tk.Tk]) -> None:
         """Set the window icon."""
@@ -85,6 +92,7 @@ else:  # Linux
 
     LISTBOX_BG_SEL_COLOR = 'blue'
     LISTBOX_BG_COLOR = 'white'
+    LABEL_HIGHLIGHT_BG = '#5AD2D2'
 
 # Some events differ on different systems, so define them here.
 if utils.MAC:
@@ -234,10 +242,13 @@ async def wait_eventloop() -> None:
     await _cur_update.wait()
 
 
+PosArgsT = TypeVarTuple('PosArgsT')
+
+
 def bind_mousewheel(
     widgets: Union[Iterable[tk.Misc], tk.Misc],
     func: Callable[[int, Unpack[PosArgsT]], object],
-    args: Tuple[Unpack[PosArgsT]] = (),
+    *args: Unpack[PosArgsT],
 ) -> None:
     """Bind mousewheel events, which function differently on each platform.
 
@@ -251,23 +262,23 @@ def bind_mousewheel(
         widgets = [widgets]
 
     if utils.WIN:
-        def mousewheel_handler(event: tk.Event) -> None:
+        def mousewheel_handler(event: tk.Event[tk.Misc]) -> None:
             """Handle mousewheel events."""
             func(int(event.delta / -120), *args)
         for widget in widgets:
             widget.bind('<MouseWheel>', mousewheel_handler, add=True)
     elif utils.MAC:
-        def mousewheel_handler(event: tk.Event) -> None:
+        def mousewheel_handler(event: tk.Event[tk.Misc]) -> None:
             """Handle mousewheel events."""
             func(-event.delta, *args)
         for widget in widgets:
             widget.bind('<MouseWheel>', mousewheel_handler, add=True)
     elif utils.LINUX:
-        def scroll_up(_: tk.Event) -> None:
+        def scroll_up(_: tk.Event[tk.Misc]) -> None:
             """Handle scrolling up."""
             func(-1, *args)
 
-        def scroll_down(_: tk.Event) -> None:
+        def scroll_down(_: tk.Event[tk.Misc]) -> None:
             """Handle scrolling down."""
             func(1, *args)
 
@@ -291,52 +302,54 @@ def add_mousewheel(target: Union[tk.XView, tk.YView], *frames: tk.Misc, orient: 
     """
     scroll_func = getattr(target, orient + 'view_scroll')
     # Call view_scroll(delta, "units").
-    bind_mousewheel(frames, scroll_func, ('units', ))
+    bind_mousewheel(frames, scroll_func, 'units', )
 
 
 def make_handler(func: Union[
     Callable[[], Awaitable[object]],
-    Callable[[tk.Event], Awaitable[object]],
-]) -> Callable[[tk.Event], object]:
+    Callable[[tk.Event[tk.Misc]], Awaitable[object]],
+]) -> Callable[[tk.Event[tk.Misc]], object]:
     """Given an asyncronous event handler, return a sync function which uses background_run().
 
     This checks the signature of the function to decide whether to pass along the event object.
     """
     sig = inspect.signature(func)
     if len(sig.parameters) == 0:
-        def wrapper(e: tk.Event) -> None:
+        def wrapper(e: tk.Event[tk.Misc]) -> None:
             """Discard the event."""
             background_run(func)  # type: ignore
     else:
-        def wrapper(e: tk.Event) -> None:
+        def wrapper(e: tk.Event[tk.Misc]) -> None:
             """Pass along the event."""
             background_run(func, e)  # type: ignore
     functools.update_wrapper(wrapper, func)
     return wrapper
 
 
-EventFunc: TypeAlias = Callable[[tk.Event], object]
-EventFuncT = TypeVar('EventFuncT', bound=EventFunc)
+class _EventDeco(Protocol[AnyWidT]):
+    def __call__(self, func: EventFunc[AnyWidT], /) -> EventFunc[AnyWidT]:
+        ...
 
 
 class _Binder(Protocol):
     @overload
-    def __call__(self, wid: tk.Misc, *, add: bool=False) -> Callable[[EventFuncT], EventFuncT]:
-        pass
+    def __call__(self, wid: WidgetT, *, add: bool=False) -> _EventDeco[WidgetT]: ...  # type: ignore[overload-overlap]
     @overload
-    def __call__(self, wid: tk.Misc, func: EventFunc, *, add: bool=False) -> str:
-        pass
-    def __call__(self, wid: tk.Misc, func: Optional[EventFunc]=None, *, add: bool=False) -> Union[Callable[[EventFuncT], EventFuncT], str]:
-        pass
+    def __call__(self, wid: tk.Misc, *, add: bool=False) -> _EventDeco[tk.Misc]: ...
+    @overload
+    def __call__(self, wid: WidgetT, func: EventFunc[WidgetT], *, add: bool=False) -> str: ...
+    @overload
+    def __call__(self, wid: tk.Misc, func: EventFunc[tk.Misc], *, add: bool=False) -> str: ...
 
 
-def _bind_event_handler(bind_func: Callable[[tk.Misc, EventFunc, bool], None]) -> _Binder:
+def _bind_event_handler(bind_func: Callable[[WidgetT, EventFunc[WidgetT], bool], None]) -> _Binder:
     """Decorator for the bind_click functions.
 
     This allows calling directly, or decorating a function with just wid and add
     attributes.
     """
-    def deco(wid: tk.Misc, func: Optional[EventFunc]=None, *, add: bool=False) -> Optional[Callable]:
+    @functools.wraps(bind_func)
+    def deco(wid: WidgetT, func: Optional[EventFunc[WidgetT]]=None, *, add: bool=False) -> Optional[Callable[..., object]]:
         """Decorator or normal interface, func is optional to be a decorator."""
         if func is None:
             def deco_2(func2: EventFuncT) -> EventFuncT:
@@ -347,14 +360,14 @@ def _bind_event_handler(bind_func: Callable[[tk.Misc, EventFunc, bool], None]) -
         else:
             # Normally, call directly
             return bind_func(wid, func, add)
-    return functools.update_wrapper(cast(_Binder, deco), bind_func)
+    return cast(_Binder, deco)
 
 if utils.MAC:
     # On OSX, make left-clicks switch to a right-click when control is held.
     @_bind_event_handler
-    def bind_leftclick(wid: tk.Misc, func: EventFunc, add: bool = False) -> None:
+    def bind_leftclick(wid: WidgetT, func: EventFunc[WidgetT], add: bool = False) -> None:
         """On OSX, left-clicks are converted to right-click when control is held."""
-        def event_handler(e: tk.Event) -> None:
+        def event_handler(e: tk.Event[WidgetT]) -> None:
             """Check if this should be treated as rightclick."""
             # e.state is a set of binary flags
             # Don't run the event if control is held!
@@ -363,9 +376,9 @@ if utils.MAC:
         wid.bind(EVENTS['LEFT'], event_handler, add=add)
 
     @_bind_event_handler
-    def bind_leftclick_double(wid: tk.Misc, func: EventFunc, add: bool = False) -> None:
+    def bind_leftclick_double(wid: WidgetT, func: EventFunc[WidgetT], add: bool = False) -> None:
         """On OSX, left-clicks are converted to right-click when control is held."""
-        def event_handler(e: tk.Event) -> None:
+        def event_handler(e: tk.Event[WidgetT]) -> None:
             """Check if this should be treated as rightclick."""
             # e.state is a set of binary flags
             # Don't run the event if control is held!
@@ -374,25 +387,67 @@ if utils.MAC:
         wid.bind(EVENTS['LEFT_DOUBLE'], event_handler, add=add)
 
     @_bind_event_handler
-    def bind_rightclick(wid: tk.Misc, func: EventFunc, add: bool = False) -> None:
+    def bind_rightclick(wid: WidgetT, func: EventFunc[WidgetT], add: bool = False) -> None:
         """On OSX, we need to bind to both rightclick and control-leftclick."""
         wid.bind(EVENTS['RIGHT'], func, add=add)
         wid.bind(EVENTS['LEFT_CTRL'], func, add=add)
 else:
     @_bind_event_handler
-    def bind_leftclick(wid: tk.Misc, func: EventFunc, add: bool = False) -> None:
+    def bind_leftclick(wid: WidgetT, func: EventFunc[WidgetT], add: bool = False) -> None:
         """Other systems just bind directly."""
         wid.bind(EVENTS['LEFT'], func, add=add)
 
     @_bind_event_handler
-    def bind_leftclick_double(wid: tk.Misc, func: EventFunc, add: bool = False) -> None:
+    def bind_leftclick_double(wid: WidgetT, func: EventFunc[WidgetT], add: bool = False) -> None:
         """Other systems just bind directly."""
         wid.bind(EVENTS['LEFT_DOUBLE'], func, add=add)
 
     @_bind_event_handler
-    def bind_rightclick(wid: tk.Misc, func: EventFunc, add: bool = False) -> None:
+    def bind_rightclick(wid: WidgetT, func: EventFunc[WidgetT], add: bool = False) -> None:
         """Other systems just bind directly."""
         wid.bind(EVENTS['RIGHT'], func, add=add)
+
+
+def link_checkmark(check: ttk.Checkbutton, widget: tk.Widget) -> None:
+    """Link up a checkbutton with something else, so it can also be clicked to toggle.
+
+    This replicates the native behaviour - if the mouse is held down and moved off of the widget,
+    that cancels the press.
+    """
+    widget.bind('<Enter>', f'{check} state active', add=True)
+    widget.bind('<Leave>', f'{check} state !active', add=True)
+
+    def hovering(event: tk.Event) -> bool:
+        """Check if the mouse is hovering over the label, or the checkmark."""
+        # identify-element returns the component name under the specified position,
+        # or an empty string if the widget isn't there.
+        return str(widget.tk.call(
+            widget, 'identify', 'element',
+            event.x, event.y,
+        )) != '' or str(check.tk.call(
+            check, 'identify', 'element',
+            event.x_root - check.winfo_rootx(),
+            event.y_root - check.winfo_rooty(),
+        )) != ''
+
+    def on_press(event: tk.Event) -> None:
+        """When pressed, highlight the checkmark."""
+        check.state(['pressed'])
+
+    def on_motion(event: tk.Event) -> None:
+        """The checkmark is pressed only while the mouse is over it."""
+        # Check if the mouse is over the label, or the checkmark. Just a bbox check.
+        check.state(['pressed' if hovering(event) else '!pressed'])
+
+    def on_release(event: tk.Event) -> None:
+        """When released, toggle if the mouse is still over the widget."""
+        check.state(['!pressed'])
+        if hovering(event):
+            check.invoke()
+
+    bind_leftclick(widget, on_press, add=True)
+    widget.bind(EVENTS['LEFT_MOVE'], on_motion, add=True)
+    widget.bind(EVENTS['LEFT_RELEASE'], on_release, add=True)
 
 
 def event_cancel(*args: Any, **kwargs: Any) -> str:
@@ -429,7 +484,7 @@ def adjust_inside_screen(
     return x, y
 
 
-def center_win(window: Union[tk.Tk, tk.Toplevel], parent: Union[tk.Tk, tk.Toplevel] = None) -> None:
+def center_win(window: Union[tk.Tk, tk.Toplevel], parent: Union[tk.Tk, tk.Toplevel, None] = None) -> None:
     """Center a subwindow to be inside a parent window."""
     if parent is None:
         parent = window.nametowidget(window.winfo_parent())
@@ -448,92 +503,10 @@ def _default_validator(value: str) -> str:
     return value
 
 
-class BasicQueryValidator(simpledialog.Dialog):
-    """Implement the dialog with the simpledialog code."""
-    def __init__(
-        self,
-        parent: tk.Misc,
-        title: str, message: str, initial: str,
-        validator: Callable[[str], str] = _default_validator,
-    ) -> None:
-        self.__validator = validator
-        self.__title = title
-        self.__message = message
-        self.__initial = initial
-        super().__init__(parent, title)
-
-    def body(self, master: tk.Frame) -> ttk.Entry:
-        """Ensure the window icon is changed, and copy code from askstring's internals."""
-        super().body(master)
-        set_window_icon(self)
-        w = ttk.Label(master, text=self.__message, justify='left')
-        w.grid(row=0, padx=5, sticky='w')
-
-        self.entry = ttk.Entry(master, name="entry")
-        self.entry.grid(row=1, padx=5, sticky='we')
-
-        if self.__initial:
-            self.entry.insert(0, self.__initial)
-            self.entry.select_range(0, 'end')
-
-        return self.entry
-
-    def validate(self) -> bool:
-        try:
-            self.result = self.__validator(self.entry.get())
-        except ValueError as exc:
-            messagebox.showwarning(self.__title, exc.args[0], parent=self)
-            return False
-        else:
-            return True
-
-if Query is not None:
-    class QueryValidator(Query):
-        """Implement using IDLE's better code for this."""
-        def __init__(
-            self,
-            parent: tk.Misc,
-            title: str, message: str, initial: str,
-            validator: Callable[[str], str] = _default_validator,
-        ) -> None:
-            self.__validator = validator
-            super().__init__(parent, title, message, text0=initial)
-
-        def entry_ok(self) -> Optional[str]:
-            """Return non-blank entry or None."""
-            try:
-                return self.__validator(self.entry.get())
-            except ValueError as exc:
-                self.showerror(exc.args[0])
-                return None
-else:
-    QueryValidator = BasicQueryValidator  # type: ignore
-
-
-def prompt(
-    title: TransToken, message: TransToken,
-    initialvalue: str = '',
-    parent: tk.Misc = TK_ROOT,
-    validator: Callable[[str], str] = _default_validator,
-) -> Optional[str]:
-    """Ask the user to enter a string."""
-    from loadScreen import suppress_screens
-    from app import _main_loop_running
-    with suppress_screens():
-        # If the main loop isn't running, this doesn't work correctly.
-        # Probably also if it's not visible. So swap back to the old style.
-        # It's also only a problem on Windows.
-        if Query is None or (utils.WIN and (
-            not _main_loop_running or not TK_ROOT.winfo_viewable()
-        )):
-            query_cls = BasicQueryValidator
-        else:
-            query_cls = QueryValidator
-        return query_cls(parent, str(title), str(message), initialvalue, validator).result
-
-
 class _MsgBoxFunc(Generic[T]):
     """Wrap messagebox functions that take TransToken."""
+    _DEFAULT_TITLE = TransToken.ui('BEEmod')
+
     def __init__(self, original: Callable[..., T]) -> None:
         self.orig = original
 
@@ -544,26 +517,22 @@ class _MsgBoxFunc(Generic[T]):
         parent: tk.Misc=TK_ROOT,
         **options: Any,
     ) -> T:
-        disp_title = str(title) if title is not None else None
+        disp_title = str(title) if title is not None else str(self._DEFAULT_TITLE)
         disp_msg = str(message) if message is not None else None
         return self.orig(disp_title, disp_msg, parent=parent, master=TK_ROOT, **options)
 
 
 showinfo       = _MsgBoxFunc(messagebox.showinfo)
-showwarning    = _MsgBoxFunc(messagebox.showwarning)
 showerror      = _MsgBoxFunc(messagebox.showerror)
-askquestion    = _MsgBoxFunc(messagebox.askquestion)
 askokcancel    = _MsgBoxFunc(messagebox.askokcancel)
 askyesno       = _MsgBoxFunc(messagebox.askyesno)
-askyesnocancel = _MsgBoxFunc(messagebox.askyesnocancel)
-askretrycancel = _MsgBoxFunc(messagebox.askretrycancel)
 
 
 class HidingScroll(ttk.Scrollbar):
     """A scrollbar variant which auto-hides when not needed.
 
     """
-    def set(self, low: float, high: float) -> None:
+    def set(self, low: Union[float, str], high: Union[float, str]) -> None:
         """Set the size needed for the scrollbar, and hide/show if needed."""
         if float(low) <= 0.0 and float(high) >= 1.0:
             # Remove this, but remember gridding options
@@ -586,14 +555,14 @@ class ReadOnlyEntry(ttk.Entry):
         self.redirector = redir = WidgetRedirector(self)
         # These two TK commands are used for all text operations,
         # so cancelling them stops anything from happening.
-        setattr(self, 'insert', redir.register('insert', event_cancel))
-        setattr(self, 'delete', redir.register('delete', event_cancel))
+        self.insert = redir.register('insert', event_cancel)  # type: ignore[method-assign]
+        self.delete = redir.register('delete', event_cancel)  # type: ignore[method-assign]
 
 
 # Widget and Spinbox have conflicting identify() definitions, not important.
 class ttk_Spinbox(ttk.Widget, tk.Spinbox):  # type: ignore[misc]
     """This is missing from ttk, but still exists."""
-    def __init__(self, master: tk.Misc, range: Union[range, slice] = None, **kw: Any) -> None:
+    def __init__(self, master: tk.Misc, range: Union[range, slice, None] = None, **kw: Any) -> None:
         """Initialise a spinbox.
         Arguments:
             range: The range buttons will run in
@@ -637,6 +606,41 @@ class ttk_Spinbox(ttk.Widget, tk.Spinbox):  # type: ignore[misc]
 _file_field_font = _tk_font.nametofont('TkFixedFont')  # Monospaced font
 _file_field_char_len = _file_field_font.measure('x')
 
+if utils.WIN:
+    # Temporary fix for #1993: tk_chooseDirectory seems to just freeze. Not sure why.
+    filedialog.Directory.command = '::tk::dialog::file::chooseDir::'
+
+
+async def _folderbrowse_powershell() -> Optional[str]:
+    """For Windows, the TK bindings don't work properly. Use Powershell to call this one API."""
+    result = await trio.run_process(
+        [
+            "powershell", "-NoProfile",
+            "-command", "-",  # Run from stdin.
+        ],
+        shell=True,
+        capture_stdout=True,
+        capture_stderr=True,
+        stdin=BROWSE_DIR_PS,
+    )
+    # An Ok or Cancel from ShowDialog, then the path.
+    [btn, poss_path] = result.stdout.splitlines()
+    if btn == b'Cancel':
+        return None
+    # Anything non-ASCII seems to just be dropped, or replaced by ?.
+    if b'?' in poss_path:
+        raise ValueError(poss_path)
+    return os.fsdecode(poss_path)
+
+
+BROWSE_DIR_PS = b'''\
+Add-Type -AssemblyName System.Windows.Forms
+$Dialog = New-Object -TypeName System.Windows.Forms.FolderBrowserDialog
+$Dialog.ShowNewFolderButton = true
+$Dialog.ShowDialog()
+Write-Output $Dialog.SelectedPath
+'''
+
 
 class FileField(ttk.Frame):
     """A text box which allows searching for a file or directory.
@@ -647,7 +651,7 @@ class FileField(ttk.Frame):
         master: tk.Misc,
         is_dir: bool = False,
         loc: str = '',
-        callback: Callable[[str], None] = None,
+        callback: Callable[[str], None] = lambda path: None,
     ) -> None:
         """Initialise the field.
 
@@ -658,7 +662,7 @@ class FileField(ttk.Frame):
         """
         from app.tooltip import add_tooltip
 
-        super(FileField, self).__init__(master)
+        super().__init__(master)
 
         self._location = loc
         self.is_dir = is_dir
@@ -675,9 +679,6 @@ class FileField(ttk.Frame):
                 initialdir=loc,
             )
 
-        if callback is None:
-            callback = self._nop_callback
-
         self.callback = callback
 
         self.textbox = ReadOnlyEntry(
@@ -688,7 +689,7 @@ class FileField(ttk.Frame):
         )
         self.textbox.grid(row=0, column=0, sticky='ew')
         self.columnconfigure(0, weight=1)
-        bind_leftclick(self.textbox, self.browse)
+        bind_leftclick(self.textbox, lambda e: background_run(self.browse))
         # The full location is displayed in a tooltip.
         add_tooltip(self.textbox, TransToken.untranslated(self._location))
         self.textbox.bind('<Configure>', self._text_configure)
@@ -696,7 +697,7 @@ class FileField(ttk.Frame):
         self.browse_btn = ttk.Button(
             self,
             text="...",
-            command=self.browse,
+            command=lambda: background_run(self.browse),
         )
         self.browse_btn.grid(row=0, column=1)
         # It should be this narrow, but perhaps this doesn't accept floats?
@@ -707,16 +708,19 @@ class FileField(ttk.Frame):
 
         self._text_var.set(self._truncate(loc))
 
-    def browse(self, event: tk.Event = None) -> None:
+    async def browse(self) -> None:
         """Browse for a file."""
-        path = self.browser.show()
+        if utils.WIN and self.is_dir:
+            try:
+                path = await _folderbrowse_powershell()
+            except Exception as exc:
+                LOGGER.warning('Failed to browse for a directory:', exc_info=exc)
+                path = self.browser.show()  # Fallback to generic widget.
+        else:
+            path = self.browser.show()
+
         if path:
             self.value = path
-
-    @staticmethod  # No need to bind to a method.
-    def _nop_callback(path: str) -> None:
-        """Callback function, called whenever the value changes."""
-        pass
 
     @property
     def value(self) -> str:
@@ -729,7 +733,7 @@ class FileField(ttk.Frame):
         from app import tooltip
         self.callback(path)
         self._location = path
-        tooltip.set_tooltip(self, TransToken.untranslated(path))
+        tooltip.set_tooltip(self.textbox, TransToken.untranslated(path))
         self._text_var.set(self._truncate(path))
 
     def _truncate(self, path: str) -> str:
@@ -759,20 +763,22 @@ EnumT = TypeVar('EnumT')
 class EnumButton(Generic[EnumT]):
     """Provides a set of buttons for toggling between enum values.
 
-    The event manager recives an event with this as the context and the value as the arg when
-    changed.
+    An event is fired with the value as the arg when changed.
     """
+    frame: ttk.Frame
+    _current: EnumT
+    buttons: Dict[EnumT, ttk.Button]
+    on_changed: event.Event[EnumT]
     def __init__(
         self,
         master: tk.Misc,
-        event_bus: event.EventBus,
         current: EnumT,
         *values: Tuple[EnumT, TransToken],
     ) -> None:
         self.frame = ttk.Frame(master)
         self._current = current
-        self.buttons: dict[EnumT, ttk.Button] = {}
-        self.event_bus = event_bus
+        self.buttons = {}
+        self.on_changed = event.Event()
 
         for x, (val, label) in enumerate(values):
             btn = ttk.Button(
@@ -780,7 +786,7 @@ class EnumButton(Generic[EnumT]):
                 # Make partial do the method binding.
                 command=functools.partial(EnumButton._select, self, val),
             )
-            localisation.set_text(btn, label)
+            set_text(btn, label)
             btn.grid(row=0, column=x)
             self.buttons[val] = btn
             if val is current:
@@ -798,7 +804,7 @@ class EnumButton(Generic[EnumT]):
             self.buttons[self._current].state(['!pressed'])
             self._current = value
             self.buttons[self._current].state(['pressed'])
-            background_run(self.event_bus, self, value)
+            background_run(self.on_changed, value)
 
     @property
     def current(self) -> EnumT:
@@ -824,7 +830,7 @@ class LineHeader(ttk.Frame):
             font='TkMenuFont',
             anchor='center',
         )
-        localisation.set_text(self.title, title)
+        set_text(self.title, title)
         self.title.grid(row=0, column=1)
 
         sep_right = ttk.Separator(self)

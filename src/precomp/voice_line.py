@@ -1,13 +1,15 @@
 """Adds voicelines dynamically into the map."""
+from typing import List, Optional, Set, NamedTuple, Iterator, Tuple
+from typing_extensions import TypeAlias
 import itertools
 from decimal import Decimal
-from typing import List, Optional, Set, NamedTuple, Iterator
 
 import srctools.logger
+
 import vbsp
 from precomp import corridor, options as vbsp_options, packing, conditions, rand
 from BEE2_config import ConfigFile
-from srctools import Property, Vec, VMF, Output, Entity
+from srctools import Keyvalues, Vec, VMF, Output, Entity
 
 from precomp.collisions import Collisions
 
@@ -15,14 +17,16 @@ from precomp.collisions import Collisions
 LOGGER = srctools.logger.get_logger(__name__)
 COND_MOD_NAME = 'Voice Lines'
 
-ADDED_BULLSEYES = set()
+ADDED_BULLSEYES: Set[str] = set()
+
+MidQuote: TypeAlias = Tuple[Keyvalues, bool, str]
 
 # Special quote instances assoicated with an item/style.
 # These are only added if the condition executes.
 QUOTE_EVENTS = {}  # id -> instance mapping
 
 # The block of SP and coop voice data
-QUOTE_DATA = Property('Quotes', [])
+QUOTE_DATA = Keyvalues('Quotes', [])
 
 # The prefix for all voiceline instances.
 INST_PREFIX = 'instances/bee2/voice/'
@@ -36,7 +40,7 @@ RESP_HAS_NAMES = {
 
 class PossibleQuote(NamedTuple):
     priority: int
-    lines: List[Property]
+    lines: List[Keyvalues]
 
 
 # Create a fake instance to pass to condition flags. This way we can
@@ -94,22 +98,22 @@ def encode_coop_responses(vmf: VMF, pos: Vec, allow_dings: bool, info: corridor.
             ent[f'choreo{index:02}'] = line['choreo']
 
 
-def mode_quotes(prop_block: Property, flag_set: Set[str]):
+def mode_quotes(kv_block: Keyvalues, flag_set: Set[str]):
     """Get the quotes from a block which match the game mode."""
 
-    for prop in prop_block:
-        if prop.name == 'line':
+    for kv in kv_block:
+        if kv.name == 'line':
             # Ones that apply to both modes
-            yield prop
-        elif prop.name.startswith('line_'):
+            yield kv
+        elif kv.name.startswith('line_'):
             # Conditions applied to the name.
             # Check all are in the flags set.
-            if flag_set.issuperset(prop.name.split('_')[1:]):
-                yield prop
+            if flag_set.issuperset(kv.name.split('_')[1:]):
+                yield kv
 
 
 @conditions.make_result('QuoteEvent')
-def res_quote_event(res: Property):
+def res_quote_event(res: Keyvalues):
     """Enable a quote event. The given file is the default instance."""
     QUOTE_EVENTS[res['id'].casefold()] = res['file']
 
@@ -119,11 +123,11 @@ def res_quote_event(res: Property):
 def find_group_quotes(
     coll: Collisions,
     info: corridor.Info,
-    group: Property,
-    mid_quotes,
-    allow_mid_voices,
-    use_dings,
-    conf,
+    group: Keyvalues,
+    mid_quotes: List[List[MidQuote]],
+    allow_mid_voices: bool,
+    use_dings: bool,
+    conf: ConfigFile,
     mid_name: str,
     player_flag_set: Set[str],
 ) -> Iterator[PossibleQuote]:
@@ -145,7 +149,7 @@ def find_group_quotes(
             if name in ('priority', 'name', 'id', 'line') or name.startswith('line_'):
                 # Not flags!
                 continue
-            if not conditions.check_flag(flag, coll, info, fake_inst):
+            if not conditions.check_test(flag, coll, info, fake_inst):
                 valid_quote = False
                 break
 
@@ -154,8 +158,8 @@ def find_group_quotes(
 
         valid_quotes += 1
 
-        poss_quotes = []
-        line_mid_quotes = []
+        poss_quotes: List[Keyvalues] = []
+        line_mid_quotes: List[MidQuote] = []
         for line in mode_quotes(quote, player_flag_set):
             line_id = line['id', line['name', '']].casefold()
 
@@ -251,7 +255,7 @@ def add_choreo(
 
 def add_quote(
     vmf: VMF,
-    quote: Property,
+    quote: Keyvalues,
     targetname: str,
     quote_loc: Vec,
     style_vars: dict,
@@ -269,13 +273,13 @@ def add_quote(
     # The OnUser1 outputs always play the quote (PlaySound/Start), so you can
     # mix ent types in the same pack.
 
-    for prop in quote:
-        name = prop.name.casefold()
+    for kv in quote:
+        name = kv.name.casefold()
 
         if name == 'file':
             conditions.add_inst(
                 vmf,
-                file=INST_PREFIX + prop.value,
+                file=INST_PREFIX + kv.value,
                 origin=quote_loc,
                 no_fixup=True,
             )
@@ -285,15 +289,15 @@ def add_quote(
             # If the name is set to '@glados_line', the ents will be named
             # ('@glados_line', 'glados_line_2', 'glados_line_3', ...)
             start_names.append(targetname)
-            if prop.has_children():
+            if kv.has_children():
                 secondary_name = targetname.lstrip('@') + '_'
                 # Evenly distribute the choreo ents across the width of the
                 # voice-line room.
-                off = Vec(y=120 / (len(prop) + 1))
+                off = Vec(y=120 / (len(kv) + 1))
                 start = quote_loc - (0, 60, 0) + off
-                for ind, choreo_line in enumerate(prop, start=1):  # type: int, Property
+                for ind, choreo_line in enumerate(kv, start=1):
                     is_first = (ind == 1)
-                    is_last = (ind == len(prop))
+                    is_last = (ind == len(kv))
                     name = (
                         targetname
                         if is_first else
@@ -327,7 +331,7 @@ def add_quote(
                 # Add a single choreo command.
                 choreo = add_choreo(
                     vmf,
-                    prop.value,
+                    kv.value,
                     targetname,
                     quote_loc,
                     use_dings=use_dings,
@@ -345,7 +349,7 @@ def add_quote(
                 spawnflags='49',  # Infinite Range, Starts Silent
                 targetname=targetname,
                 origin=quote_loc,
-                message=prop.value,
+                message=kv.value,
                 health='10',  # Volume
             )
             snd.add_out(
@@ -358,54 +362,54 @@ def add_quote(
             )
             start_ents.append(snd)
         elif name == 'bullseye':
-            add_bullseye(vmf, quote_loc, prop.value)
+            add_bullseye(vmf, quote_loc, kv.value)
         elif name == 'cc_emit':
             # In Aperture Tag, this additional console command is used
             # to add the closed captions.
             # Store in a variable, so we can be sure to add the output
             # regardless of the property order.
-            cc_emit_name = prop.value
+            cc_emit_name = kv.value
         elif name == 'setstylevar':
             # Set this stylevar to True
             # This is useful so some styles can react to which line was
             # chosen.
-            style_vars[prop.value.casefold()] = True
+            style_vars[kv.value.casefold()] = True
         elif name == 'packlist':
-            packing.pack_list(vmf, prop.value)
+            packing.pack_list(vmf, kv.value)
         elif name == 'pack':
-            if prop.has_children():
+            if kv.has_children():
                 packing.pack_files(vmf, *[
                     subprop.value
                     for subprop in
-                    prop
+                    kv
                 ])
             else:
-                packing.pack_files(vmf, prop.value)
+                packing.pack_files(vmf, kv.value)
         elif name == 'choreo_name':
             # Change the targetname used for subsequent entities
-            targetname = prop.value
+            targetname = kv.value
         elif name == 'onlyonce':
-            only_once = srctools.conv_bool(prop.value)
+            only_once = srctools.conv_bool(kv.value)
         elif name == 'atomic':
-            atomic = srctools.conv_bool(prop.value)
+            atomic = srctools.conv_bool(kv.value)
         elif name == 'endcommand':
-            if prop.bool('only_once'):
+            if kv.bool('only_once'):
                 end_commands.append(Output(
                     'OnCompletion',
-                    prop['target'],
-                    prop['input'],
-                    prop['parm', ''],
-                    prop.float('delay'),
+                    kv['target'],
+                    kv['input'],
+                    kv['parm', ''],
+                    kv.float('delay'),
                     only_once=True,
                 ))
             else:
                 end_commands.append(Output(
                     'OnCompletion',
-                    prop['target'],
-                    prop['input'],
-                    prop['parm', ''],
-                    prop.float('delay'),
-                    times=prop.int('times', -1),
+                    kv['target'],
+                    kv['input'],
+                    kv['parm', ''],
+                    kv.float('delay'),
+                    times=kv.int('times', -1),
                 ))
 
     if cc_emit_name:
@@ -487,7 +491,7 @@ def add_voice(
 
     allow_mid_voices = not style_vars.get('nomidvoices', False)
 
-    mid_quotes = []
+    mid_quotes: List[List[MidQuote]] = []
 
     # Enable using the beep before and after choreo lines.
     allow_dings = srctools.conv_bool(QUOTE_DATA['use_dings', '0'])
@@ -559,7 +563,7 @@ def add_voice(
     for group in itertools.chain(
         QUOTE_DATA.find_all('group'),
         QUOTE_DATA.find_all('midchamber'),
-    ):  # type: Property
+    ):
 
         quote_targetname = group['Choreo_Name', '@choreo']
         use_dings = group.bool('use_dings', allow_dings)

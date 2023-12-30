@@ -27,8 +27,8 @@ import urllib.request
 import webbrowser
 
 from srctools import (
-    Vec, VPK, Vec_tuple,
-    Property, AtomicWriter,
+    Vec, VPK, FrozenVec,
+    Keyvalues, AtomicWriter,
     VMF, Output,
     FileSystem, FileSystemChain,
 )
@@ -36,15 +36,18 @@ import srctools.logger
 import srctools.fgd
 import trio
 import attrs
+from typing_extensions import Self
 
 from BEE2_config import ConfigFile
-from app import backup, tk_tools, resource_gen, TK_ROOT, DEV_MODE, background_run
+from app import backup, tk_tools, resource_gen, DEV_MODE, background_run
+from app.dialogs import Dialogs
 from config.gen_opts import GenOptions
 from transtoken import TransToken
 import transtoken
 import loadScreen
 import packages
 import packages.template_brush
+from packages import style_vpk
 import editoritems
 import utils
 import config
@@ -58,7 +61,7 @@ all_games: list[Game] = []
 selected_game: Optional[Game] = None
 selectedGame_radio = IntVar(value=0)
 game_menu: Optional[Menu] = None
-EVENT_BUS = event.EventBus()
+ON_GAME_CHANGED: event.Event[Game] = event.Event('game_changed')
 
 CONFIG = ConfigFile('games.cfg')
 
@@ -119,7 +122,8 @@ INST_PATH = 'sdk_content/maps/instances/BEE2'
 # The line we inject to add our BEE2 folder into the game search path.
 # We always add ours such that it's the highest priority, other
 # than '|gameinfo_path|.'
-GAMEINFO_LINE = 'Game\t"BEE2"'
+GAMEINFO_LINE = 'Game\t|gameinfo_path|../bee2'
+OLD_GAMEINFO_LINE = 'Game\t"BEE2"'
 
 # We inject this line to recognise where our sounds start, so we can modify
 # them.
@@ -311,8 +315,13 @@ class Game:
     # The style last exported to the game.
     exported_style: Optional[str] = None
 
+    # In previous versions, we always wrote our VPK into dlc3. This tracks whether this game was
+    # read in from a previous BEE install, and so has created the DLC3 folder even though it's
+    # not marked with our marker file.
+    unmarked_dlc3_vpk: bool = False
+
     @classmethod
-    def parse(cls, gm_id: str, config: ConfigFile) -> 'Game':
+    def parse(cls, gm_id: str, config: ConfigFile) -> Self:
         """Parse out the given game ID from the config file."""
         steam_id = config.get_val(gm_id, 'SteamID', '<none>')
         if not steam_id.isdigit():
@@ -327,13 +336,16 @@ class Game:
 
         exp_style = config.get_val(gm_id, 'exported_style', '') or None
 
+        # This flag is only set if we parse from a config that doesn't include it.
+        unmarked_dlc3 = config.getboolean(gm_id, 'unmarked_dlc3', True)
+
         mod_times = {}
 
         for name, value in config.items(gm_id):
             if name.startswith('pack_mod_'):
                 mod_times[name[9:].casefold()] = srctools.conv_int(value)
 
-        return cls(gm_id, steam_id, folder, mod_times, exp_style)
+        return cls(gm_id, steam_id, folder, mod_times, exp_style, unmarked_dlc3)
 
     def save(self) -> None:
         """Write a game into the config page."""
@@ -341,6 +353,7 @@ class Game:
         CONFIG[self.name] = {}
         CONFIG[self.name]['SteamID'] = self.steamID
         CONFIG[self.name]['Dir'] = self.root
+        CONFIG[self.name]['unmarked_dlc3'] = srctools.bool_as_int(self.unmarked_dlc3_vpk)
         if self.exported_style is not None:
             CONFIG[self.name]['exported_style'] = self.exported_style
         for pack, mod_time in self.mod_times.items():
@@ -379,7 +392,7 @@ class Game:
         self,
         sounds: Iterable[packages.EditorSound],
     ) -> None:
-        """Add soundscript items so they can be used in the editor."""
+        """Add soundscript items so that they can be used in the editor."""
         # PeTI only loads game_sounds_editor, so we must modify that.
         # First find the highest-priority file
         for folder in self.dlc_priority():
@@ -418,7 +431,7 @@ class Game:
                     f.write(line)
                 f.write('\n')  # Add a little spacing
 
-    def edit_gameinfo(self, add_line=False) -> None:
+    def edit_gameinfo(self, add_line: bool = False) -> None:
         """Modify all gameinfo.txt files to add or remove our line.
 
         Add_line determines if we are adding or removing it.
@@ -435,7 +448,14 @@ class Game:
                     if add_line:
                         if clean_line == GAMEINFO_LINE:
                             break  # Already added!
-                        elif '|gameinfo_path|' in clean_line:
+                        elif clean_line == OLD_GAMEINFO_LINE:
+                            LOGGER.debug(
+                                "Updating gameinfo hook to {}",
+                                info_path,
+                            )
+                            data[line_num] = utils.get_indent(line) + GAMEINFO_LINE + '\n'
+                            break
+                        elif '|gameinfo_path|' in clean_line and GAMEINFO_LINE not in line:
                             LOGGER.debug(
                                 "Adding gameinfo hook to {}",
                                 info_path,
@@ -447,7 +467,7 @@ class Game:
                                 )
                             break
                     else:
-                        if clean_line == GAMEINFO_LINE:
+                        if clean_line == GAMEINFO_LINE or clean_line == OLD_GAMEINFO_LINE:
                             LOGGER.debug(
                                 "Removing gameinfo hook from {}", info_path
                             )
@@ -477,7 +497,6 @@ class Game:
                 elif os.path.isfile(backup_path):
                     LOGGER.info('Restoring original "{}"!', name)
                     shutil.move(backup_path, item_path)
-            self.clear_cache()
 
     def edit_fgd(self, add_lines: bool=False) -> None:
         """Add our FGD files to the game folder.
@@ -523,11 +542,11 @@ class Game:
                     b'// You\'ll want to do that if installing Hammer Addons.'
                     b'\n\n'
                 )
-                with utils.install_path('BEE2.fgd').open('rb') as bee2_fgd:
+                with utils.bins_path('BEE2.fgd').open('rb') as bee2_fgd:
                     shutil.copyfileobj(bee2_fgd, file)
                 file.write(b'\n')
                 try:
-                    with utils.install_path('hammeraddons.fgd').open('rb') as ha_fgd:
+                    with utils.bins_path('hammeraddons.fgd').open('rb') as ha_fgd:
                         shutil.copyfileobj(ha_fgd, file)
                 except FileNotFoundError:
                     if utils.FROZEN:
@@ -542,14 +561,15 @@ class Game:
             return False
 
         # Check lengths, to ensure we re-extract if packages were removed.
-        if len(packages.LOADED.packages) != len(self.mod_times):
+        loaded = packages.get_loaded_packages()
+        if len(loaded.packages) != len(self.mod_times):
             LOGGER.info('Need to extract - package counts inconsistent!')
             return True
 
         return any(
             pack.is_stale(self.mod_times.get(pack_id.casefold(), 0))
             for pack_id, pack in
-            packages.LOADED.packages.items()
+            loaded.packages.items()
         )
 
     def refresh_cache(self, already_copied: set[str]) -> None:
@@ -559,14 +579,18 @@ class Game:
         indicate which files should remain. It is the full path to the files.
         """
         screen_func = export_screen.step
+        packset = packages.get_loaded_packages()
 
-        with res_system:
-            for file in res_system.walk_folder_repeat():
+        for pack in packset.packages.values():
+            if not pack.enabled:
+                continue
+            for file in pack.fsys.walk_folder('resources'):
                 try:
-                    start_folder, path = file.path.split('/', 1)
+                    res, start_folder, path = file.path.split('/', 2)
                 except ValueError:
                     LOGGER.warning('File in resources root: "{}"!', file.path)
                     continue
+                assert res.casefold() == 'resources', file.path
 
                 start_folder = start_folder.casefold()
 
@@ -577,7 +601,7 @@ class Game:
                     continue  # Skip app icons and music samples.
                 else:
                     # Preserve original casing.
-                    dest = self.abs_path(os.path.join('bee2', file.path))
+                    dest = self.abs_path(os.path.join('bee2', start_folder, path))
 
                 # Already copied from another package.
                 if dest.casefold() in already_copied:
@@ -608,29 +632,32 @@ class Game:
 
         # Save the new cache modification date.
         self.mod_times.clear()
-        for pack_id, pack in packages.LOADED.packages.items():
+        for pack_id, pack in packset.packages.items():
             self.mod_times[pack_id.casefold()] = pack.get_modtime()
         self.save()
         CONFIG.save_check()
 
-    def clear_cache(self) -> None:
+    async def clear_cache(self) -> None:
         """Remove all resources from the game."""
         shutil.rmtree(self.abs_path(INST_PATH), ignore_errors=True)
         shutil.rmtree(self.abs_path('bee2/'), ignore_errors=True)
         shutil.rmtree(self.abs_path('bin/bee2/'), ignore_errors=True)
 
         try:
-            packages.StyleVPK.clear_vpk_files(self)
-        except PermissionError:
+            vpk_filename = await style_vpk.find_vpk(self)
+            LOGGER.info('VPK filename to remove: {}', vpk_filename)
+            style_vpk.clear_files(vpk_filename.parent)
+        except (style_vpk.NoVPKExport, PermissionError):
             pass
 
         self.mod_times.clear()
 
     async def export(
         self,
+        packset: packages.PackagesSet,
         style: packages.Style,
         selected_objects: dict[Type[packages.PakObject], Any],
-        should_refresh=False,
+        should_refresh: bool = False,
     ) -> tuple[bool, bool]:
         """Generate the editoritems.txt and vbsp_config.
 
@@ -645,16 +672,14 @@ class Game:
 
         LOGGER.info('Style = {}', style.id)
         for obj_type, selected in selected_objects.items():
-            # Skip the massive dict in items
-            if obj_type is packages.Item:
-                selected = selected[0]
             LOGGER.info('{} = {}', obj_type, selected)
 
         # VBSP, VRAD, editoritems
         export_screen.set_length('BACK', len(FILES_TO_BACKUP))
         # files in compiler/
+        compiler_src = utils.bins_path('compiler')
         try:
-            num_compiler_files = sum(1 for file in utils.install_path('compiler').rglob('*'))
+            num_compiler_files = sum(1 for file in compiler_src.rglob('*'))
         except FileNotFoundError:
             num_compiler_files = 0
 
@@ -707,8 +732,8 @@ class Game:
             os.makedirs(self.abs_path('bin/bee2/'), exist_ok=True)
 
             # Start off with the style's data.
-            vbsp_config = Property.root()
-            vbsp_config += style.config().copy()
+            vbsp_config = Keyvalues.root()
+            vbsp_config.extend(await style.config())
 
             all_items = style.items.copy()
             renderables = style.renderables.copy()
@@ -719,20 +744,20 @@ class Game:
             vpk_success = True
 
             # Export each object type.
-            for obj_type in packages.OBJ_TYPES.values():
+            for obj_type in sorted(packages.OBJ_TYPES.values(), key=lambda typ: typ.export_priority):
                 if obj_type is packages.Style:
                     continue  # Done above already
 
                 LOGGER.info('Exporting "{}"', obj_type.__name__)
 
                 try:
-                    obj_type.export(packages.ExportData(
+                    await obj_type.export(packages.ExportData(
                         game=self,
                         selected=selected_objects.get(obj_type, None),
                         all_items=all_items,
                         renderables=renderables,
                         vbsp_conf=vbsp_config,
-                        packset=packages.LOADED,  # TODO
+                        packset=packset,
                         selected_style=style,
                         resources=resources,
                     ))
@@ -856,9 +881,21 @@ class Game:
 
             LOGGER.info('Writing Editoritems database...')
             with open(self.abs_path('bin/bee2/editor.bin'), 'wb') as inst_file:
-                pick = pickletools.optimize(pickle.dumps(all_items))
+                pick = pickletools.optimize(pickle.dumps(all_items, pickle.HIGHEST_PROTOCOL))
                 inst_file.write(pick)
             export_screen.step('EXP', 'editoritems_db')
+
+            LOGGER.info('Writing dump of package translations...')
+            with open(self.abs_path('bin/bee2/pack_translation.bin'), 'wb') as trans_file:
+                pick = pickletools.optimize(pickle.dumps([
+                    (pack.id, {
+                        tok_id: str(tok)
+                        for tok_id, tok in pack.additional_tokens.items()
+                    })
+                    for pack in packset.packages.values()
+                    if pack.additional_tokens  # Skip empty packages, saving some space.
+                ], pickle.HIGHEST_PROTOCOL))
+                trans_file.write(pick)
 
             LOGGER.info('Writing VBSP Config!')
             os.makedirs(self.abs_path('bin/bee2/'), exist_ok=True)
@@ -871,8 +908,8 @@ class Game:
 
             if num_compiler_files > 0:
                 LOGGER.info('Copying Custom Compiler!')
-                compiler_src = utils.install_path('compiler')
                 comp_dest = 'bin/linux32' if utils.LINUX else 'bin'
+                LOGGER.info('Compiler folder: {}', compiler_src)
                 for comp_file in compiler_src.rglob('*'):
                     # Ignore folders.
                     if comp_file.is_dir():
@@ -899,13 +936,13 @@ class Game:
                             # Use a different error if this might be running.
                             msg = TransToken.ui(
                                 'Copying compiler file {file} failed. '
-                                'Ensure {game} is not running. The webserver for the error display '
+                                "Ensure {game}'s map compiler is not running. The webserver for the error display "
                                 'may also be running, quit the vrad process or wait a few minutes.'
                             )
                         else:
                             msg = TransToken.ui(
                                 'Copying compiler file {file} failed. '
-                                'Ensure {game} is not running.'
+                                "Ensure {game}'s map compiler is not running."
                             )
                         export_screen.reset()
                         tk_tools.showerror(
@@ -926,7 +963,7 @@ class Game:
 
             LOGGER.info('Writing fizzler sides...')
             self.generate_fizzler_sides(vbsp_config)
-            resource_gen.make_cube_colourizer_legend(Path(self.abs_path('bee2')))
+            resource_gen.make_cube_colourizer_legend(packset, Path(self.abs_path('bee2')))
             export_screen.step('EXP', 'fizzler_sides')
 
             # Write generated resources, after the regular ones have been copied.
@@ -1007,14 +1044,14 @@ class Game:
         else:
             LOGGER.warning('No custom editor models!')
 
-    def generate_fizzler_sides(self, conf: Property):
+    def generate_fizzler_sides(self, conf: Keyvalues) -> None:
         """Create the VMTs used for fizzler sides."""
-        fizz_colors: dict[Vec_tuple, tuple[float, str]] = {}
+        fizz_colors: dict[FrozenVec, tuple[float, str]] = {}
         mat_path = self.abs_path('bee2/materials/bee2/fizz_sides/side_color_')
         for brush_conf in conf.find_all('Fizzlers', 'Fizzler', 'Brush'):
             fizz_color = brush_conf['Side_color', '']
             if fizz_color:
-                fizz_colors[Vec.from_str(fizz_color).as_tuple()] = (
+                fizz_colors[FrozenVec.from_str(fizz_color)] = (
                     brush_conf.float('side_alpha', 1),
                     brush_conf['side_vortex', fizz_color]
                 )
@@ -1027,13 +1064,13 @@ class Game:
                 round(fizz_color_vec.z * 255),
             )
             with open(file_path, 'w') as f:
-                f.write(FIZZLER_EDGE_MAT.format(Vec(fizz_color_vec), fizz_vortex_color))
+                f.write(FIZZLER_EDGE_MAT.format(fizz_color_vec, fizz_vortex_color))
                 if alpha != 1:
                     # Add the alpha value, but replace 0.5 -> .5 to save a char.
                     f.write('$outputintensity {}\n'.format(format(alpha, 'g').replace('0.', '.')))
                 f.write(FIZZLER_EDGE_MAT_PROXY)
 
-    def launch(self):
+    def launch(self) -> None:
         """Try and launch the game."""
         webbrowser.open('steam://rungameid/' + str(self.steamID))
 
@@ -1101,7 +1138,7 @@ class Game:
             # Portal 2 isn't here...
             return 'en'
         with appman_file:
-            appman = Property.parse(appman_file, 'appmanifest_620.acf')
+            appman = Keyvalues.parse(appman_file, 'appmanifest_620.acf')
         try:
             return appman.find_key('AppState').find_key('UserConfig')['language']
         except LookupError:
@@ -1114,7 +1151,7 @@ class Game:
         ).format(game=self.name)
 
 
-def find_steam_info(game_dir) -> tuple[str | None, str | None]:
+def find_steam_info(game_dir: str) -> tuple[str | None, str | None]:
     """Determine the steam ID and game name of this folder, if it has one.
 
     This only works on Source games!
@@ -1145,7 +1182,7 @@ def find_steam_info(game_dir) -> tuple[str | None, str | None]:
     return game_id, name
 
 
-def scan_music_locs():
+def scan_music_locs() -> None:
     """Try and determine the location of Aperture Tag and PS:Mel.
 
     If successful we can export the music to games.
@@ -1184,7 +1221,7 @@ def scan_music_locs():
             break
 
 
-def make_tag_coop_inst(tag_loc: str):
+def make_tag_coop_inst(tag_loc: str) -> None:
     """Make the coop version of the tag instances.
 
     This needs to be shrunk, so all the logic entities are not spread
@@ -1250,8 +1287,7 @@ def make_tag_coop_inst(tag_loc: str):
 def app_in_game_error() -> None:
     """Display a message warning about the issues with placing the BEE folder directly in P2."""
     tk_tools.showerror(
-        TransToken.ui('BEE2'),
-        TransToken.ui(
+        message=TransToken.ui(
             "It appears that the BEE2 application was installed directly in a game directory. "
             "The bee2/ folder name is used for exported resources, so this will cause issues.\n\n"
             "Move the application folder elsewhere, then re-run."
@@ -1266,38 +1302,39 @@ def save() -> None:
     CONFIG.save_check()
 
 
-def load() -> None:
+async def load(dialogs: Dialogs) -> None:
     global selected_game
     all_games.clear()
     for gm in CONFIG:
-        if gm != CONFIG.default_section:
-            try:
-                new_game = Game.parse(gm, CONFIG)
-            except ValueError:
-                LOGGER.warning("Can't parse game: ", exc_info=True)
-                continue
-            all_games.append(new_game)
-            LOGGER.info('Load game: {}', new_game)
+        if gm == CONFIG.default_section:
+            continue
+        try:
+            new_game = Game.parse(gm, CONFIG)
+        except ValueError:
+            LOGGER.warning("Can't parse game: ", exc_info=True)
+            continue
+        all_games.append(new_game)
+        LOGGER.info('Load game: {}', new_game)
     if len(all_games) == 0:
         # Hide the loading screen, since it appears on top
         loadScreen.main_loader.suppress()
 
         # Ask the user for Portal 2's location...
-        if not add_game():
+        if not await add_game(dialogs):
             # they cancelled, quit
             quit_application()
         loadScreen.main_loader.unsuppress()  # Show it again
     selected_game = all_games[0]
 
 
-def add_game(e=None):
+async def add_game(dialogs: Dialogs) -> bool:
     """Ask for, and load in a game to export to."""
     title = TransToken.ui('BEE2 - Add Game')
-    tk_tools.showinfo(
-        title,
+    await dialogs.show_info(
         TransToken.ui(
             'Select the folder where the game executable is located ({appname})...'
         ).format(appname='portal2' + EXE_SUFFIX),
+        title,
     )
     if utils.WIN:
         exe_loc = filedialog.askopenfilename(
@@ -1310,31 +1347,43 @@ def add_game(e=None):
         folder = os.path.dirname(exe_loc)
         gm_id, name = find_steam_info(folder)
         if name is None or gm_id is None:
-            tk_tools.showerror(title, TransToken.ui(
-                'This does not appear to be a valid game folder!'
-            ))
+            await dialogs.show_info(
+                TransToken.ui('This does not appear to be a valid game folder!'),
+                title=title,
+                icon=dialogs.ERROR,
+            )
             return False
 
         # Mel doesn't use PeTI, so that won't make much sense...
         if gm_id == utils.STEAM_IDS['MEL']:
-            tk_tools.showerror(title, TransToken.ui(
-                "Portal Stories: Mel doesn't have an editor!"
-            ))
+            await dialogs.show_info(
+                TransToken.ui("Portal Stories: Mel doesn't have an editor!"),
+                title=title,
+                icon=dialogs.ERROR,
+            )
             return False
 
         invalid_names = [gm.name for gm in all_games]
         while True:
-            name = tk_tools.prompt(
-                title,
+            name = await dialogs.prompt(
                 TransToken.ui("Enter the name of this game:"),
-                initialvalue=name,
+                title=title,
+                initial_value=TransToken.untranslated(name),
             )
             if name in invalid_names:
-                tk_tools.showerror(title, TransToken.ui('This name is already taken!'))
+                await dialogs.show_info(
+                    TransToken.ui('This name is already taken!'),
+                    title=title,
+                    icon=dialogs.ERROR,
+                )
             elif name is None:
                 return False
             elif name == '':
-                tk_tools.showerror(title, TransToken.ui('Please enter a name for this game!'))
+                await dialogs.show_info(
+                    TransToken.ui('Please enter a name for this game!'),
+                    title=title,
+                    icon=dialogs.ERROR,
+                )
             else:
                 break
 
@@ -1344,9 +1393,10 @@ def add_game(e=None):
             add_menu_opts(game_menu)
         save()
         return True
+    return False
 
 
-def remove_game(e=None):
+async def remove_game(dialogs: Dialogs) -> None:
     """Remove the currently-chosen game from the game list."""
     global selected_game
     lastgame_mess = (
@@ -1356,12 +1406,14 @@ def remove_game(e=None):
         ) if len(all_games) == 1 else
         TransToken.ui('Are you sure you want to delete "{game}"?')
     )
-    if tk_tools.askyesno(
+    if await dialogs.ask_yes_no(
         title=TransToken.ui('BEE2 - Remove Game'),
         message=lastgame_mess.format(game=selected_game.name),
     ):
+        await terminate_error_server()
         selected_game.edit_gameinfo(add_line=False)
         selected_game.edit_fgd(add_lines=False)
+        await selected_game.clear_cache()
 
         all_games.remove(selected_game)
         CONFIG.remove_section(selected_game.name)
@@ -1397,7 +1449,7 @@ def setGame() -> None:
     global selected_game
     selected_game = all_games[selectedGame_radio.get()]
     # TODO: make this function async to eliminate.
-    background_run(EVENT_BUS, None, selected_game)
+    background_run(ON_GAME_CHANGED, selected_game)
 
 
 def set_game_by_name(name: str) -> None:
@@ -1407,16 +1459,5 @@ def set_game_by_name(name: str) -> None:
             selected_game = game
             selectedGame_radio.set(all_games.index(game))
             # TODO: make this function async too to eliminate.
-            background_run(EVENT_BUS, None, selected_game)
+            background_run(ON_GAME_CHANGED, selected_game)
             break
-
-if __name__ == '__main__':
-    Button(TK_ROOT, text='Add', command=add_game).grid(row=0, column=0)
-    Button(TK_ROOT, text='Remove', command=remove_game).grid(row=0, column=1)
-    test_menu = Menu(TK_ROOT)
-    dropdown = Menu(test_menu)
-    test_menu.add_cascade(menu=dropdown, label='Game')
-    TK_ROOT['menu'] = test_menu
-
-    load()
-    add_menu_opts(dropdown)

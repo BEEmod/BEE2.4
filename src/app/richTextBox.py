@@ -5,10 +5,13 @@ from tkinter.messagebox import askokcancel
 from typing import Iterable, Iterator, TypeVar, Union, Tuple, Dict, Callable
 import webbrowser
 
+from typing_extensions import Never
+
 from app import tkMarkdown
 from app.tkMarkdown import TextTag, TAG_HEADINGS
 from app.tk_tools import Cursors
 from transtoken import TransToken
+from ui_tk.img import TK_IMG
 import srctools.logger
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -48,9 +51,10 @@ class tkRichText(tkinter.Text):
     def __init__(
         self,
         parent: tkinter.Misc,
+        *,
+        name: str,
         width: int = 10, height: int = 4,
         font: Union[str, tkFont] = "TkDefaultFont",
-        **kargs,
     ) -> None:
         # Setup all our configuration for inserting text.
         if isinstance(font, str):
@@ -67,13 +71,14 @@ class tkRichText(tkinter.Text):
 
         super().__init__(
             parent,
+            name=name,
             width=width,
             height=height,
             wrap="word",
             font=self.font,
             # We only want the I-beam cursor over text.
             cursor=Cursors.REGULAR,
-            **kargs,
+            # If required, add more keyword arguments here.
         )
 
         self.heading_font = {}
@@ -88,6 +93,7 @@ class tkRichText(tkinter.Text):
         self.tag_config(TextTag.BOLD, font=self.bold_font)
         self.tag_config(TextTag.ITALIC, font=self.italic_font)
         self.tag_config(TextTag.STRIKETHROUGH, overstrike=True)
+        self.tag_config(TextTag.IMAGE, justify='center')
         self.tag_config(
             TextTag.INVERT,
             background='black',
@@ -141,7 +147,7 @@ class tkRichText(tkinter.Text):
 
         self['state'] = "disabled"
 
-    def insert(self, *args, **kwargs) -> None:
+    def insert(self, *args: Never, **kwargs: Never) -> None:  # type: ignore[override]
         """Inserting directly is disallowed."""
         raise TypeError('richTextBox should not have text inserted directly.')
 
@@ -153,7 +159,6 @@ class tkRichText(tkinter.Text):
         text_data should either be a string, or the data returned from
         tkMarkdown.convert().
         """
-
         # Remove all previous link commands
         for cmd_tag, cmd_id in self._link_commands.values():
             self.tag_unbind(cmd_tag, '<Button-1>', funcid=cmd_id)
@@ -161,6 +166,7 @@ class tkRichText(tkinter.Text):
 
         self['state'] = "normal"
         try:
+            TK_IMG.textwid_clear(self)
             self.delete(1.0, 'end')
 
             # Basic mode, insert just blocks of text.
@@ -168,10 +174,9 @@ class tkRichText(tkinter.Text):
                 super().insert("end", text_data)
                 return
 
-            segment: tkMarkdown.TextSegment
             for is_first, block, is_last in iter_firstlast(text_data):
                 if isinstance(block, tkMarkdown.TextSegment):
-                    tags: tuple[str, ...]
+                    tags: Tuple[str, ...]
                     if block.url:
                         try:
                             cmd_tag, _ = self._link_commands[block.url]
@@ -195,18 +200,18 @@ class tkRichText(tkinter.Text):
                     super().insert('end', text, tags)
                 elif isinstance(block, tkMarkdown.Image):
                     super().insert('end', '\n')
-                    # TODO: Setup apply to handle this?
-                    block.handle._force_loaded = True
-                    self.image_create('end', image=block.handle._load_tk())
+                    img_pos = TK_IMG.textwid_add(self, 'end', block.handle)
+                    super().tag_add(TextTag.IMAGE, img_pos)
                     super().insert('end', '\n')
+
                 else:
-                    raise ValueError('Unknown block {!r}?'.format(block))
+                    raise ValueError(f'Unknown block {block!r}?')
         finally:
             self['state'] = "disabled"
 
-    def make_link_callback(self, url: str) -> Callable[[tkinter.Event], None]:
+    def make_link_callback(self, url: str) -> Callable[[tkinter.Event[tkinter.Text]], None]:
         """Create a link callback for the given URL."""
-        def callback(e) -> None:
+        def callback(e: tkinter.Event[tkinter.Text]) -> None:
             """The callback function."""
             if askokcancel(
                 title='BEE2 - Open URL?',

@@ -1,13 +1,14 @@
 """Test the collisions module."""
 from __future__ import annotations
-
-import math
-from typing import Iterable, Tuple, no_type_check
+from typing import Iterable, Tuple
 from pathlib import Path
+import math
+
+from srctools import VMF, Angle, Keyvalues, Matrix, Solid, Vec
 import pytest
 
-from srctools import Angle, Matrix, VMF, Vec, Property, Solid
 from collisions import BBox, CollideType
+
 
 tuple3 = Tuple[int, int, int]
 
@@ -18,7 +19,7 @@ def assert_bbox(
     maxes: Iterable[int | float],
     contents: CollideType,
     tags: set[str],
-    msg='',
+    msg: str = '',
 ) -> None:
     """Test the bbox matches the given values."""
     # Don't show in pytest tracebacks.
@@ -94,7 +95,6 @@ def test_bbox_construction() -> None:
     ).tags == frozenset({'a', 'b', 'embed'})
 
 
-@no_type_check
 def test_illegal_bbox() -> None:
     """A line or point segement is not allowed."""
     with pytest.raises(ValueError):
@@ -124,30 +124,29 @@ def test_bbox_vecs() -> None:
     assert bb.center is not bb.center
 
 
-@no_type_check
 def test_bbox_is_frozen() -> None:
     """Test modification is not possible."""
     bb = BBox(40, 60, 80, 120, 450, 730, contents=CollideType.PHYSICS)
     with pytest.raises(AttributeError):
-        bb.min_x = 100
+        bb.min_x = 100  # type: ignore
     with pytest.raises(AttributeError):
-        bb.min_y = 100
+        bb.min_y = 100  # type: ignore
     with pytest.raises(AttributeError):
-        bb.min_z = 100
+        bb.min_z = 100  # type: ignore
 
     with pytest.raises(AttributeError):
-        bb.max_x = 100
+        bb.max_x = 100  # type: ignore
     with pytest.raises(AttributeError):
-        bb.max_y = 100
+        bb.max_y = 100  # type: ignore
     with pytest.raises(AttributeError):
-        bb.max_z = 100
+        bb.max_z = 100  # type: ignore
 
     with pytest.raises(AttributeError):
-        bb.contents = CollideType.GRATE
+        bb.contents = CollideType.GRATE  # type: ignore
     with pytest.raises(AttributeError):
-        bb.tags = frozenset({'tag1', 'tag2', 'tag3'})
+        bb.tags = frozenset({'tag1', 'tag2', 'tag3'})  # type: ignore
     with pytest.raises(AttributeError):
-        bb.tags.add('extra')
+        bb.tags.add('extra')  # type: ignore
     # Check all these assignments didn't actually do anything.
     assert_bbox(bb, (40, 60, 80), (120, 450, 730), CollideType.PHYSICS, set())
 
@@ -183,25 +182,27 @@ def test_reorder_helper() -> None:
     assert reorder((-10, 30, 0), 'xyz', 8, 6, 12) == Vec(-2, 36, 12)
 
 
-def get_intersect_testcases() -> Iterable:
+def get_intersect_testcases() -> Iterable[tuple[tuple3, tuple3, tuple[tuple3, tuple3] | None]]:
     """Use a VMF to make it easier to generate the bounding boxes."""
     with Path(__file__, '../bbox_samples.vmf').open() as f:
-        vmf = VMF.parse(Property.parse(f))
+        vmf = VMF.parse(Keyvalues.parse(f))
 
-    def process(brush: Solid | None) -> tuple[tuple[int, ...], tuple[int, ...]] | None:
+    def process(brush: Solid) -> tuple[tuple3, tuple3]:
         """Extract the bounding box from the brush."""
-        if brush is None:
-            return None
         bb_min, bb_max = brush.get_bbox()
         for vec in [bb_min, bb_max]:
             for ax in 'xyz':
-                # If one thick, make zero thick so we can test planes.
+                # If one thick, make zero thick so that we can test planes.
                 if abs(vec[ax]) == 63:
                     vec[ax] = math.copysign(64, vec[ax])
-        return (tuple(map(int, bb_min)), tuple(map(int, bb_max)))
+        return (
+            (int(bb_min.x), int(bb_min.y), int(bb_min.z)),
+            (int(bb_max.x), int(bb_max.y), int(bb_max.z)),
+        )
 
     for ent in vmf.entities:
-        test = expected = None
+        test: Solid | None = None
+        expected: Solid | None = None
         for solid in ent.solids:
             if solid.sides[0].mat.casefold() == 'tools/toolsskip':
                 expected = solid
@@ -209,7 +210,12 @@ def get_intersect_testcases() -> Iterable:
                 test = solid
         if test is None:
             raise ValueError(ent.id)
-        yield (*process(test), process(expected))
+        # Unpack mins/maxes for test, it's always present.
+        mins, maxs = process(test)
+        if expected is not None:
+            yield (mins, maxs, process(expected))
+        else:
+            yield (mins, maxs, None)
 
 
 @pytest.mark.parametrize('mins, maxs, success', list(get_intersect_testcases()))
@@ -224,7 +230,7 @@ def test_bbox_intersection(
 ) -> None:
     """Test intersection founction for bounding boxes.
 
-    We parameterise by swapping all the axes, and offsetting so it's in all the quadrants.
+    We parameterise by swapping all the axes, and offsetting so that it's in all the quadrants.
     """
     bbox1 = BBox(x-64, y-64, z-64, x+64, y+64, z+64, contents=CollideType.EVERYTHING)
     bbox2 = BBox(reorder(mins, axes, x, y, z), reorder(maxs, axes, x, y, z), contents=CollideType.EVERYTHING)

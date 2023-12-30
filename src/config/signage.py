@@ -1,7 +1,7 @@
 from typing import Dict, Iterable, Mapping, Union
 
+from srctools import Keyvalues, logger
 import attrs
-from srctools import Property, logger
 
 import config
 
@@ -41,21 +41,22 @@ def _sign_converter(value: Mapping[int, str]) -> Mapping[int, str]:
     }
 
 
+@config.PALETTE.register
 @config.APP.register
-@attrs.frozen(slots=False)
+@attrs.frozen
 class Layout(config.Data, conf_name='Signage'):
     """A layout of selected signs."""
     signs: Mapping[int, str] = attrs.field(default=DEFAULT_IDS, converter=_sign_converter)
 
     @classmethod
-    def parse_legacy(cls, props: Property) -> Dict[str, 'Layout']:
+    def parse_legacy(cls, kv: Keyvalues) -> Dict[str, 'Layout']:
         """Parse the old config format."""
         # Simply call the new parse, it's unchanged.
-        sign = Layout.parse_kv1(props.find_children('Signage'), 1)
+        sign = Layout.parse_kv1(kv.find_children('Signage'), 1)
         return {'': sign}
 
     @classmethod
-    def parse_kv1(cls, data: Union[Property, Iterable[Property]], version: int) -> 'Layout':
+    def parse_kv1(cls, data: Union[Keyvalues, Iterable[Keyvalues]], version: int) -> 'Layout':
         """Parse Keyvalues1 config values."""
         if not data:  # No config, use defaults.
             return cls(DEFAULT_IDS)
@@ -74,9 +75,9 @@ class Layout(config.Data, conf_name='Signage'):
             sign[timer] = child.value
         return cls(sign)
 
-    def export_kv1(self) -> Property:
+    def export_kv1(self) -> Keyvalues:
         """Generate keyvalues for saving signages."""
-        props = Property('Signage', [])
+        kv = Keyvalues('Signage', [])
         for timer, sign in self.signs.items():
-            props.append(Property(str(timer), sign))
-        return props
+            kv.append(Keyvalues(str(timer), sign))
+        return kv

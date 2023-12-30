@@ -1,33 +1,36 @@
 """Test parsing window state definitions."""
+from srctools import Keyvalues
+from srctools.dmx import Attribute, Element, Vec2
 import attrs
 import pytest
-from srctools import Property as Keyvalues
-from srctools.dmx import Element, Attribute, Vec2
 
+from BEE2_config import GEN_OPTS
 from config.windows import WindowState
-from . import isolate_gen_opts, GEN_OPTS
+
+from . import isolate_conf
 
 
-def test_parse_legacy(isolate_gen_opts) -> None:
+def test_parse_legacy() -> None:
     """Test parsing data from the legacy GEN_OPTS."""
-    GEN_OPTS['win_state'] = {
-        'style_x': '45',
-        'pal_x': '-265',
-        'pal_y': '18',
-        'pal_width': '160',
-        'pal_height': '265',
-        'pal_visible': '0',
-        'compiler_x': '-266',
-        'compiler_y': '297',
-        'compiler_width': '263',
-        'compiler_height': '-1',
-    }
-    res = WindowState.parse_legacy(Keyvalues.root())
-    assert res == {
-        'style': WindowState(x=45, y=-1, width=-1, height=-1, visible=True),
-        'pal': WindowState(x=-265, y=18, width=160, height=265, visible=False),
-        'compiler': WindowState(x=-266, y=297, width=263, height=-1),
-    }
+    with isolate_conf(GEN_OPTS):
+        GEN_OPTS['win_state'] = {
+            'style_x': '45',
+            'pal_x': '-265',
+            'pal_y': '18',
+            'pal_width': '160',
+            'pal_height': '265',
+            'pal_visible': '0',
+            'compiler_x': '-266',
+            'compiler_y': '297',
+            'compiler_width': '263',
+            'compiler_height': '-1',
+        }
+        res = WindowState.parse_legacy(Keyvalues.root())
+        assert res == {
+            'style': WindowState(x=45, y=-1, width=-1, height=-1, visible=True),
+            'pal': WindowState(x=-265, y=18, width=160, height=265, visible=False),
+            'compiler': WindowState(x=-266, y=297, width=263, height=-1),
+        }
 
 
 def test_parse_kv1() -> None:
@@ -83,7 +86,6 @@ def test_parse_dmx() -> None:
     state = WindowState.parse_dmx(elem, 1)
     assert state == WindowState(x=-1, y=-1, width=-1, height=-1, visible=True)
 
-    assert len(elem) == 0
     elem['pos'] = Attribute.vec2('pos', (450, 320))
     elem['visible'] = Attribute.bool('visible', False)
     elem['width'] = Attribute.int('width', 1283)
@@ -112,7 +114,7 @@ def test_export_dmx() -> None:
     )
 
     elem = state.export_dmx()
-    assert len(elem) == 4
+    assert len(elem) == 5
     assert elem['pos'].val_vec2 == Vec2(289, 371)
     assert elem['width'].val_int == 289
     assert elem['height'].val_int == 189

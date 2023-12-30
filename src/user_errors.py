@@ -2,28 +2,33 @@
 
 UserError is imported all over, so this needs to have minimal imports to avoid cycles.
 """
-from typing import ClassVar, Collection, Dict, Iterable, List, Literal, Optional, Tuple, TypedDict
+from typing import (
+    ClassVar, Collection, Dict, Iterable, List, Literal, Optional, Tuple,
+    TypedDict, Union,
+)
+from typing_extensions import TypeAlias
 from pathlib import Path
 
-from srctools import Vec, logger
+from srctools import FrozenVec, Vec, logger
 import attrs
 
 from transtoken import TransToken
 import utils
 
 
-Kind = Literal["white", "black", "goo", "goopartial", "goofull", "back", "glass", "grating"]
+Kind: TypeAlias = Literal["white", "black", "goo", "goopartial", "goofull", "back", "glass", "grating"]
+TuplePos: TypeAlias = Tuple[float, float, float]
 
 
 class SimpleTile(TypedDict):
     """A super simplified version of tiledef data for the error window. This can be converted right to JSON."""
-    position: Tuple[float, float, float]
+    position: TuplePos
     orient: Literal["n", "s", "e", "w", "u", "d"]
 
 
 class BarrierHole(TypedDict):
     """Information for improperly placed glass/grating hole items."""
-    pos: Tuple[float, float, float]
+    pos: TuplePos
     axis: Literal["x", "y", "z"]
     large: bool
     small: bool
@@ -39,11 +44,13 @@ class ErrorInfo:
     context: str = ''
     faces: Dict[Kind, List[SimpleTile]] = attrs.Factory(dict)
     # Voxels of interest in the map.
-    voxels: List[Tuple[float, float, float]] = attrs.Factory(list)
+    voxels: List[TuplePos] = attrs.Factory(list)
     # Points of interest in the map.
-    points: List[Tuple[float, float, float]] = attrs.Factory(list)
+    points: List[TuplePos] = attrs.Factory(list)
     # Special list of locations forming a pointfile line.
-    leakpoints: List[Tuple[float, float, float]] = attrs.Factory(list)
+    leakpoints: List[TuplePos] = attrs.Factory(list)
+    # A list of point pairs which get lines drawn.
+    lines: List[Tuple[TuplePos, TuplePos]] = attrs.Factory(list)
     # If a glass/grating hole is misplaced, show its location.
     barrier_hole: Optional[BarrierHole] = None
 
@@ -59,7 +66,7 @@ DATA_LOC = utils.conf_location('compile_error.pickle')
 SERVER_INFO_FILE = utils.conf_location('error_server_info.json')
 
 
-def to_threespace(vec: Vec) -> Tuple[float, float, float]:
+def to_threespace(vec: Union[Vec, FrozenVec]) -> TuplePos:
     """Convert a vector to the conventions THREE.js uses."""
     return (
         vec.x / 128.0,
@@ -81,10 +88,11 @@ class UserError(BaseException):
         message: TransToken,
         *,
         docsurl: str='',
-        voxels: Iterable[Vec]=(),
-        points: Iterable[Vec]=(),
+        voxels: Iterable[Union[Vec, FrozenVec]]=(),
+        points: Iterable[Union[Vec, FrozenVec]]=(),
         textlist: Collection[str]=(),
-        leakpoints: Collection[Vec]=(),
+        leakpoints: Collection[Union[Vec, FrozenVec]]=(),
+        lines: Iterable[Tuple[Union[Vec, FrozenVec], Union[Vec, FrozenVec]]]=(),
         barrier_hole: Optional[BarrierHole]=None,
     ) -> None:
         """Specify the info to show to the user.
@@ -97,6 +105,7 @@ class UserError(BaseException):
         :param docsurl: If specified, adds a link to relevant documentation.
         :param textlist: If specified, adds the specified strings as a bulleted list.
         :param leakpoints: Specifies pointfile locations to display a leak.
+        :param lines: A list of point pairs which get lines drawn.
         :param barrier_hole: If set, an errored glass/grating hole to place.
         """
         if utils.DEV_MODE:
@@ -135,6 +144,7 @@ class UserError(BaseException):
             voxels=list(map(to_threespace, voxels)),
             points=list(map(to_threespace, points)),
             leakpoints=list(map(to_threespace, leakpoints)),
+            lines=[(to_threespace(a), to_threespace(b)) for a, b in lines],
             barrier_hole=barrier_hole,
         )
 
@@ -175,7 +185,7 @@ TOK_SEEDOCS = TransToken.untranslated('{msg}\n<p><a href="{url}">{docs}</a>.</p>
 
 TOK_BRUSHLOC_LEAK = TransToken.ui(
     'One or more items were placed ouside the map! Move these back inside the map, or delete them. '
-    'Items with no collision (like Half Walls or logic gates) can be left when rooms are moved, '
+    'Items with no collision (like Half Walls or Logic Gates) can be left when rooms are moved, '
     'look for those.',
 )
 
@@ -208,12 +218,12 @@ TOK_CONNECTIONS_UNKNOWN_INSTANCE = TransToken.ui(
 
 TOK_CONNECTIONS_INSTANCE_NO_IO = TransToken.ui(
     'The instance "<var>{inst}</var>" is reciving inputs, but none were configured in the item. '
-    'Check for reuse of the instance in multiple items, or restart Portal 2 '
-    'if you just exported.'
+    'Check for reuse of the instance in multiple items, or restart Portal 2 if you just exported.'
 )
 
 TOK_CORRIDOR_EMPTY_GROUP = TransToken.ui(
-    'No corridors available for the <var>{orient}_{mode}_{dir}</var> group!'
+    'No corridors were defined for the <var>{orient}_{mode}_{dir}</var> group. Try moving '
+    'this door back onto a wall.'
 )
 
 # Format in so it automatically matches the stylevar name.
@@ -229,13 +239,13 @@ TOK_CORRIDOR_NO_CORR_ITEM = TransToken.ui(
 
 TOK_CORRIDOR_BOTH_MODES = TransToken.ui(
     'The map contains both singleplayer and coop entry/exit corridors. This can happen if they are '
-    'manually added using the "{stylevar"} stylevar. In that case delete one of them.'
+    'manually added using the "{stylevar}" stylevar. In that case delete one of them.'
 ).format(stylevar=UNLOCK_DEFAULT)
 
 TOK_CORRIDOR_ENTRY = TransToken.ui('Entry')  # i18n: Entry door
-TOK_CORRIDOR_EXIT = TransToken.ui('Exit')  # i18n: Entry door
+TOK_CORRIDOR_EXIT = TransToken.ui('Exit')  # i18n: Exit door
 
-TOK_CUBE_NO_CUBETYPE_FLAG = TransToken.ui('"CubeType" result used but with no type specified!')
+TOK_CUBE_NO_CUBETYPE_TEST = TransToken.ui('"CubeType" test used but with no type specified!')
 TOK_CUBE_BAD_SPECIAL_CUBETYPE = TransToken.ui('Unrecognised special cube type "<var>{type}</var>"!')
 
 TOK_CUBE_TIMERS_DUPLICATE = TransToken.ui(
@@ -251,6 +261,15 @@ TOK_CUBE_TIMERS_INVALID_CUBEVAL = TransToken.ui(
 TOK_CUBE_DROPPER_LINKED = TransToken.ui(
     'Dropper above custom cube of type <var>{type}</var> is already linked! Custom cubes convert'
     'droppers above them into their type, to allow having droppers.',
+)
+TOK_CUBE_SUPERPOS_BAD_REAL = TransToken.ui(
+    'Superposition Entanglers must be placed on top of a single dropper.'
+)
+TOK_CUBE_SUPERPOS_BAD_GHOST = TransToken.ui(
+    'Superposition Entanglers must be connected to a single dropper, not any other items.'
+)
+TOK_CUBE_SUPERPOS_MULTILINK = TransToken.ui(
+    'Two Superposition Entanglers cannot be connected to a single dropper!'
 )
 
 TOK_BARRIER_HOLE_FOOTPRINT = TransToken.ui(
@@ -268,10 +287,24 @@ TOK_BARRIER_HOLE_MISPLACED = TransToken.ui(
     'it while keeping the hole in the same position.'
 )
 
-TOK_SENDTOR_BAD_OUTPUT = TransToken.ui(
-    'A Sendificator was connected to an item which is not a Discouragement Beam Emitter '
-    '(<var>{out_item}</var>). The output connection is used to specify the emitter that cubes will '
-    'teleport to, so it cannot be an arbitary item.'
+TOK_CHAINING_MULTI_INPUT = TransToken.ui(
+    'A chain of items has multiple inputs to a single item. The chain should form a single '
+    'path, not have branches.'
+)
+
+TOK_CHAINING_MULTI_OUTPUT = TransToken.ui(
+    'A chain of items has multiple outputs from a single item. The chain should form a '
+    'single path, not have branches.'
+)
+
+TOK_CHAINING_LOOP = TransToken.ui(
+    'A chain of items has been constructed with a loop, but this type of item does not '
+    'support a loop. Break the connection at some point.'
+)
+
+TOK_CHAINING_INVALID_KIND = TransToken.ui(
+    'The highlighted items in this chain do not support being linked together in this '
+    'fashion. Check the order of connections.'
 )
 
 TOK_TEMPLATE_MULTI_VISGROUPS = TransToken.ui(

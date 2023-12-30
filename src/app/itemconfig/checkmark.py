@@ -1,47 +1,56 @@
 from __future__ import annotations
-from typing import AsyncIterator, List, Tuple
+
+from typing import AsyncIterator, Iterable, Tuple
 from tkinter import ttk
 import tkinter as tk
 
-from srctools import Property, conv_bool
+from srctools import conv_bool
 
-from app.itemconfig import (
-    UpdateFunc, WidgetLookup, WidgetLookupMulti,
-    multi_grid, widget_sfx, nop_update,
-)
+import packages.widgets
+from app import itemconfig
 from app.tooltip import add_tooltip
+from packages.widgets import KIND_CHECKMARK
+from ui_tk.img import TKImages
 
 
-@WidgetLookup('boolean', 'bool', 'checkbox')
-async def widget_checkmark(parent: tk.Widget, var: tk.StringVar, conf: Property) -> Tuple[tk.Widget, UpdateFunc]:
+@itemconfig.ui_single_no_conf(KIND_CHECKMARK)
+async def widget_checkmark(
+    parent: tk.Widget, tk_img: TKImages,
+    on_changed: itemconfig.SingleChangeFunc,
+) -> Tuple[tk.Widget, packages.widgets.UpdateFunc]:
     """Allows ticking a box."""
-    # Ensure it's a bool value.
-    if conv_bool(var.get()):
-        var.set('1')
-    else:
-        var.set('0')
+    var = tk.BooleanVar(parent)
 
-    return ttk.Checkbutton(
+    def command() -> None:
+        """Called when the checkmark is edited."""
+        itemconfig.widget_sfx()
+        on_changed('1' if var.get() else '0')
+
+    async def update(value: str) -> None:
+        """Update the checkmark from stored values."""
+        var.set(conv_bool(value))
+
+    check = ttk.Checkbutton(
         parent,
         text='',
         variable=var,
         onvalue='1',
         offvalue='0',
-        command=widget_sfx,
-    ), nop_update
+        command=command,
+    )
+
+    return check, update
 
 
-@WidgetLookupMulti('boolean', 'bool', 'checkbox')
+@itemconfig.ui_multi_no_conf(KIND_CHECKMARK)
 async def widget_checkmark_multi(
-    parent: tk.Widget,
-    values: List[Tuple[str, tk.StringVar]],
-    conf: Property,
-) -> AsyncIterator[Tuple[str, UpdateFunc]]:
+    parent: tk.Widget, tk_img: TKImages,
+    values: Iterable[itemconfig.TimerNum],
+    get_on_changed: itemconfig.MultiChangeFunc,
+) -> AsyncIterator[Tuple[itemconfig.TimerNum, packages.widgets.UpdateFunc]]:
     """For checkmarks, display in a more compact form."""
-    for row, column, _, tim_text, var in multi_grid(values):
-        checkbox, _ = await widget_checkmark(parent, var, conf)
+    for row, column, tim_val, tim_text in itemconfig.multi_grid(values):
+        checkbox, update = await widget_checkmark(parent, tk_img, get_on_changed(tim_val))
         checkbox.grid(row=row, column=column)
         add_tooltip(checkbox, tim_text, delay=0)
-    # noinspection PyUnreachableCode
-    if False:
-        yield ('', nop_update)
+        yield tim_val, update

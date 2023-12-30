@@ -1,9 +1,10 @@
 """Wraps the Rtree package, adding typing and usage of our Vec class."""
-from srctools.math import Vec
-from typing import Generic, TypeVar, Iterator, List, Tuple
+from typing import Dict, Generic, Iterator, List, Tuple, TypeVar
 
+from rtree import index
+from srctools.math import Vec
 import attrs
-from rtree import index  # type: ignore
+
 
 ValueT = TypeVar('ValueT')
 PROPS = index.Property()
@@ -24,15 +25,18 @@ class ValueHolder(Generic[ValueT]):
 
 class RTree(Generic[ValueT]):
     """A 3-dimensional R-Tree. Multiple values with the same bbox are allowed."""
+    tree: index.Index
+    # id(holder) -> holder.
+    # We can't store the object directly in the tree.
+    _by_id: Dict[int, ValueHolder[ValueT]]
+    _by_coord: Dict[
+        Tuple[float, float, float, float, float, float],
+        ValueHolder[ValueT]
+    ]
     def __init__(self) -> None:
         self.tree = index.Index(properties=PROPS)
-        # id(holder) -> holder.
-        # We can't store the object directly in the tree.
-        self._by_id: dict[int, ValueHolder[ValueT]] = {}
-        self._by_coord: dict[
-            tuple[float, float, float, float, float, float],
-            ValueHolder[ValueT]
-        ] = {}
+        self._by_id = {}
+        self._by_coord = {}
 
     def __len__(self) -> int:
         return sum(len(holder.values) for holder in self._by_id.values())

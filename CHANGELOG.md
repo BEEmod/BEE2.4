@@ -1,6 +1,56 @@
 # Changelog
 
-# Version `<dev>`
+# Version 4.44.0
+
+### Enhancements:
+* If a duplicate package is present, include the paths of both in the error message.
+* Change palette item format to permit "holes" in the position of items. This isn't exposed in the UI yet.
+* Redo the selector on the Item Properties pane to make it more clear that it swaps pages.
+* Display the authors of corridors.
+* Rearranged the UI on the corridor picker display.
+* Add some informative errors if Unstationary Scaffolds (or similar UCP items) are connected in an
+  invalid manner.
+* Added "Compress Items" option, which hides all but one of each on the item list.
+* Skip disabled packages when extracting resources.
+* Timer-style indicator panels at the end of antlines can now have a custom appearance for some 
+  items (Delayers). This allows them to show both count-down and count-up displays.
+* Moved various palette-related buttons, to group them with the other palette options.
+* VPK files can be now placed into `vpk_override` to have them be combined with the built VPK. 
+* Added a warning screen to the developer tab of the options window, indicating that some of these options can temporarily break BEE if changed.
+* #1984: The "save settings to palette" will now change to match the selected palette. This means clicking "save" won't accidentally delete saved settings.
+* #1893: Add compile logs to error display windows.
+* Internal files are now placed in a `bin/` subfolder, instead of cluttering
+  the folders containing `BEE2.exe`, `vbsp.exe` and `vrad.exe`.
+
+### UCP-Relevant Changes:
+* Terminology change: "Condition Flags" have been renamed to "Condition Tests" - I think that sounds a bit better.
+* Added an `Inherit` option to Corridor Groups. This specifies the ID of another style, causing all
+  corridors to be copied from that other style.
+* Make several results properly permit options to use `$fixup` variables: `addOverlay`, `changeInstance`, `setKey`, `localTarget`.
+* `properties.txt` for items is now optional, since most of these options can be set elsewhere.
+* `PosIsSolid` and `ReadSurfType` now have a `debug` option. When "Developer Mode" is enabled,
+  `info_target`s are generated to mark the locations being sampled, and the contents of this field
+  is copied into those as a comment to help identify them.
+* Behaviour change: in Fizzlers, `model_mid` will now be affected by the `NameType` value.
+* Added the `Error` result, which allows producing a custom error message from a package.
+* #1313: Allow disabling the triggers produced by `CustVactube`.
+* When Dev Mode is on, `SetTile` now dumps the tiles it's trying to set into the final map.
+* `ConfigGroup` slider widgets can now be set to display "Off" when set to zero, also fixed them not snapping to values.
+
+### Bugfixes:
+* BEE will detect `portal2_dlc3` being in use and pick another DLC folder for its VPKs.
+* Properly pick free port for error server.
+* Set a title for the corridor selector window.
+* Always pack generated resources even if packing is disabled in options.
+* Parse game translation files in an even more lenient way, to handle some Portal 2 files correctly.
+* Fix potential z-fighting near the hinge of static angled panels.
+* Add a scrollbar if required to the corridor selection window.
+* Fix single-dot antlines sometimes failing to be placed.
+* BEEmod/BEE2-items#4325: Set corridors to force upright even if vertical corridors are not available.
+* Piston Platforms will now correctly accept Surface Lacquer, if placed on their base.
+* Paint Splats will correctly rotate to aint Angled Panels they are placed on top of.
+* Removed the "Prevent Portal Bump (fizzler)" stylevar. It is useless and never worked.
+* #1955: Fix some situations causing incorrect catwalk placement.
 
 ------------------------------------------
 

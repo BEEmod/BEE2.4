@@ -1,28 +1,28 @@
-"""Logical flags used to combine others (AND, OR, NOT, etc)."""
+"""Logical tests used to combine others (AND, OR, NOT, etc)."""
 from precomp.collisions import Collisions
-from precomp.conditions import make_flag, check_flag, MapInfo, Unsatisfiable
-from srctools import Entity, Property
+from precomp.conditions import make_test, check_test, MapInfo, Unsatisfiable
+from srctools import Entity, Keyvalues
 
 
 COND_MOD_NAME = 'Logic'
 
 
-@make_flag('AND')
-def flag_and(inst: Entity, coll: Collisions, info: MapInfo, flag: Property):
-    """The AND group evaluates True if all sub-flags are True."""
-    for i, sub_flag in enumerate(flag):
-        if not check_flag(sub_flag, coll, info, inst, can_skip=i == 0):
+@make_test('AND')
+def check_and(inst: Entity, coll: Collisions, info: MapInfo, kv: Keyvalues) -> bool:
+    """The AND group evaluates True if all subtests are True."""
+    for i, sub_test in enumerate(kv):
+        if not check_test(sub_test, coll, info, inst, can_skip=i == 0):
             return False
     return True
 
 
-@make_flag('OR')
-def flag_or(inst: Entity, coll: Collisions, info: MapInfo, flag: Property):
-    """The OR group evaluates True if any sub-flags are True."""
+@make_test('OR')
+def check_or(inst: Entity, coll: Collisions, info: MapInfo, kv: Keyvalues) -> bool:
+    """The OR group evaluates True if any subtests are True."""
     satisfiable = False
-    for sub_flag in flag:
+    for sub_test in kv:
         try:
-            res = check_flag(sub_flag, coll, info, inst, can_skip=True)
+            res = check_test(sub_test, coll, info, inst, can_skip=True)
         except Unsatisfiable:
             pass
         else:
@@ -35,35 +35,38 @@ def flag_or(inst: Entity, coll: Collisions, info: MapInfo, flag: Property):
     return False
 
 
-@make_flag('NOT')
-def flag_not(inst: Entity, coll: Collisions, info: MapInfo, flag: Property) -> bool:
-    """The NOT group inverts the value of it's one sub-flag."""
+@make_test('NOT')
+def check_not(inst: Entity, coll: Collisions, info: MapInfo, kv: Keyvalues) -> bool:
+    """The NOT group inverts the value of it's one subtest.
+
+    Alternatively, simply prefix any test with `!` (`"!instance"`).
+    """
     try:
-        [subflag] = flag
+        [subtest] = kv
     except ValueError:
         return False
-    return not check_flag(subflag, coll, info, inst)
+    return not check_test(subtest, coll, info, inst)
 
 
-@make_flag('XOR')
-def flag_xor(inst: Entity, coll: Collisions, info: MapInfo, flag: Property) -> bool:
-    """The XOR group returns True if the number of true sub-flags is odd."""
-    return sum([check_flag(sub_flag, coll, info, inst) for sub_flag in flag]) % 2 == 1
+@make_test('XOR')
+def check_xor(inst: Entity, coll: Collisions, info: MapInfo, kv: Keyvalues) -> bool:
+    """The XOR group returns True if the number of true subtests is odd."""
+    return sum([check_test(sub_test, coll, info, inst) for sub_test in kv]) % 2 == 1
 
 
-@make_flag('NOR')
-def flag_nor(inst: Entity, coll: Collisions, info: MapInfo, flag: Property) -> bool:
-    """The NOR group evaluates True if any sub-flags are False."""
-    for sub_flag in flag:
-        if check_flag(sub_flag, coll, info, inst):
+@make_test('NOR')
+def check_nor(inst: Entity, coll: Collisions, info: MapInfo, kv: Keyvalues) -> bool:
+    """The NOR group evaluates True if any subtests are False."""
+    for sub_test in kv:
+        if check_test(sub_test, coll, info, inst):
             return True
     return False
 
 
-@make_flag('NAND')
-def flag_nand(inst: Entity, coll: Collisions, info: MapInfo, flag: Property) -> bool:
-    """The NAND group evaluates True if all sub-flags are False."""
-    for sub_flag in flag:
-        if not check_flag(sub_flag, coll, info, inst):
+@make_test('NAND')
+def chec_nand(inst: Entity, coll: Collisions, info: MapInfo, kv: Keyvalues) -> bool:
+    """The NAND group evaluates True if all subtests are False."""
+    for sub_test in kv:
+        if not check_test(sub_test, coll, info, inst):
             return True
     return False

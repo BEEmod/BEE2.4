@@ -1,15 +1,13 @@
 """Defines the region of space items occupy and computes collisions."""
 from __future__ import annotations
-
-import operator
+from typing import Iterable, Iterator, Sequence, overload
 from enum import Flag, auto as enum_auto
-from typing import Callable, Iterable, Iterator, Sequence, overload
-
-import attrs
 import functools
+import operator
 
-from srctools import Entity, Side, VMF, conv_bool, logger
-from srctools.math import Vec, Angle, Matrix, to_matrix
+from srctools import VMF, Entity, Side, conv_bool, logger
+from srctools.math import AnyAngle, AnyMatrix, FrozenVec, Vec, to_matrix
+import attrs
 
 import consts
 
@@ -46,6 +44,7 @@ class CollideType(Flag):
     FIZZLER = enum_auto()
     TEMPORARY = enum_auto()  # Collision is only sometimes present here.
     ANTLINES = enum_auto()  # Antlines should not pass here.
+    OOB = enum_auto()  # Areas outside the puzzle, don't allow things to be placed here.
 
     GRATE = GRATING
     DECO = DECORATION
@@ -67,19 +66,20 @@ class CollideType(Flag):
             try:
                 coll |= cls[word.upper()]
             except KeyError:
-                raise ValueError(f'Unknown collide type "{word}"!')
+                raise ValueError(f'Unknown collide type "{word}"!') from None
         return coll
 
 # The types we want to write into vmfs.
 EXPORT_KVALUES: Sequence[CollideType] = [
-    CollideType.SOLID,
-    CollideType.DECORATION,
-    CollideType.GRATING,
-    CollideType.GLASS,
-    CollideType.BRIDGE,
-    CollideType.FIZZLER,
-    CollideType.TEMPORARY,
     CollideType.ANTLINES,
+    CollideType.BRIDGE,
+    CollideType.DECORATION,
+    CollideType.FIZZLER,
+    CollideType.GLASS,
+    CollideType.GRATING,
+    CollideType.OOB,
+    CollideType.SOLID,
+    CollideType.TEMPORARY,
 ]
 
 
@@ -113,7 +113,7 @@ class BBox:
     @overload
     def __init__(
         self,
-        point1: Vec, point2: Vec,
+        point1: Vec | FrozenVec, point2: Vec | FrozenVec,
         /, *,
         contents: CollideType = CollideType.SOLID,
         tags: Iterable[str] | str = frozenset(),
@@ -123,7 +123,7 @@ class BBox:
     def __init__(
         self,
         /,
-        *args: Vec | int | float,
+        *args: Vec | FrozenVec | int | float,
         contents: CollideType = CollideType.SOLID,
         tags: Iterable[str] | str = frozenset(),
         name: str = '',
@@ -140,10 +140,10 @@ class BBox:
                 # None of these should be Vec.
                 min_x, min_y, min_z, max_x, max_y, max_z = map(round, args)  # type: ignore
             except (TypeError, ValueError):
-                raise TypeError('6 numbers must be supplied!')
+                raise TypeError(f'6 numbers must be supplied, not {args!r}') from None
         elif len(args) == 2:
             point1, point2 = args
-            if isinstance(point1, Vec) and isinstance(point2, Vec):
+            if isinstance(point1, (Vec, FrozenVec)) and isinstance(point2, (Vec, FrozenVec)):
                 min_x, min_y, min_z = round(point1.x), round(point1.y), round(point1.z)
                 max_x, max_y, max_z = round(point2.x), round(point2.y), round(point2.z)
             else:
@@ -216,7 +216,7 @@ class BBox:
             return Vec(0.0, 0.0, 1.0)
         return None
 
-    def with_points(self, point1: Vec, point2: Vec) -> BBox:
+    def with_points(self, point1: Vec | FrozenVec, point2: Vec | FrozenVec) -> BBox:
         """Return a new bounding box with the specified points, but this collision and tags."""
         return BBox(point1, point2, contents=self.contents, tags=self.tags, name=self.name)
 
@@ -295,6 +295,7 @@ class BBox:
         )
         # Exclude the aliases.
         for coll in EXPORT_KVALUES:
+            assert coll.name is not None
             ent[f'coll_{coll.name.lower()}'] = (coll & self.contents) is not CollideType.NOTHING
         ent.solids.append(prism.solid)
         return ent
@@ -345,7 +346,7 @@ class BBox:
         except NonBBoxError:  # Edge or corner, don't count those.
             return None
 
-    def __matmul__(self, other: Angle | Matrix) -> BBox:
+    def __matmul__(self, other: AnyAngle | AnyMatrix) -> BBox:
         """Rotate the bounding box by an angle. This should be multiples of 90 degrees."""
         # https://gamemath.com/book/geomprims.html#transforming_aabbs
         m = to_matrix(other)
@@ -419,13 +420,13 @@ class BBox:
             name=self.name,
         )
 
-    def __add__(self, other: Vec | tuple[float, float, float]) -> BBox:
+    def __add__(self, other: Vec | FrozenVec | tuple[float, float, float]) -> BBox:
         """Add a vector to the mins and maxes."""
         if isinstance(other, BBox):  # Special-case error.
             raise TypeError('Two bounding boxes cannot be added!')
         return self.with_points(self.mins + other, self.maxes + other)
 
-    def __sub__(self, other: Vec | tuple[float, float, float]) -> BBox:
+    def __sub__(self, other: Vec | FrozenVec | tuple[float, float, float]) -> BBox:
         """Add a vector to the mins and maxes."""
         return self.with_points(self.mins - other, self.maxes - other)
 

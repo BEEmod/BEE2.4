@@ -4,13 +4,14 @@ import sys
 from collections import defaultdict
 from collections.abc import Iterable, Iterator, Mapping
 from enum import Enum, Flag
-from typing import Callable, ClassVar, Protocol, Any
+from typing import Callable, ClassVar, List, Optional, Protocol, Any, Tuple
 from pathlib import PurePosixPath as FSPath
 
 import attrs
 
-from srctools import Vec, logger, conv_int, conv_bool, Property, Output
+from srctools import Vec, logger, conv_int, conv_bool, Keyvalues, Output
 from srctools.tokenizer import Tokenizer, Token
+from typing_extensions import TypeAlias
 
 from connections import Config as ConnConfig, InputType, OutNames
 from editoritems_props import ItemProp, ItemPropKind, PROP_TYPES
@@ -18,7 +19,16 @@ from collisions import CollideType, BBox, NonBBoxError
 from transtoken import TransToken, TransTokenSource
 
 
+__all__ = [
+    "ItemProp", "ItemPropKind", "PROP_TYPES",  "ConnConfig", "InputType", "OutNames", "FSPath",  # Re-export
+    "ItemClass", "RenderableType", "Handle", "Surface", "DesiredFacing", "FaceType", "OccuType",
+    "Sound", "Anim", "ConnTypes", "Connection", "InstCount", "Coord", "EmbedFace", "Overlay",
+    "ConnSide", "AntlinePoint", "OccupiedVoxel", "Renderable", "SubType", "Item",
+    "bounding_boxes",
+]
 LOGGER = logger.get_logger(__name__)
+# __getstate__ / __setstate__ types.
+_SubTypeState: TypeAlias = Tuple[TransToken, List[str], List[str], List[int], TransToken, int, int, Optional[FSPath]]
 
 
 class ItemClass(Enum):
@@ -153,14 +163,14 @@ class OccuType(Flag):
     DEFAULT = SOLID | GRATE | GLASS | BRIDGE | FIZZLER | PHYSICS | ANTLINES
 
     @classmethod
-    def parse(cls, tok: Tokenizer) -> 'OccuType':
+    def parse(cls, tok: Tokenizer) -> OccuType:
         """Parse the collision type value."""
         coll = cls.NOTHING
         for part in tok.expect(Token.STRING).split():
             try:
                 coll |= OCCU_TYPES[part.upper()]
             except KeyError:
-                raise tok.error('Unknown Occupied Voxels collision type "{}"!', part)
+                raise tok.error('Unknown Occupied Voxels collision type "{}"!', part) from None
         return coll
 
     def __str__(self) -> str:
@@ -190,6 +200,7 @@ class OccuType(Flag):
         for occu_type in OccuType:
             if occu_type is OccuType.EVERYTHING:
                 continue
+            assert occu_type.name is not None, occu_type
             if occu_type.value & self.value:
                 result |= CollideType[occu_type.name]
         _occu_to_collide[self] = result
@@ -329,7 +340,7 @@ class Coord:
         yield self.z
 
     @classmethod
-    def from_vec(cls, vec: Vec) -> 'Coord':
+    def from_vec(cls, vec: Vec) -> Coord:
         """Round a vector to grid coordinates."""
         x = round(vec.x)
         y = round(vec.y)
@@ -342,7 +353,7 @@ class Coord:
             return result
 
     @classmethod
-    def parse(cls, value: str, error_func: Callable[..., BaseException]) -> 'Coord':
+    def parse(cls, value: str, error_func: Callable[..., BaseException]) -> Coord:
         """Parse from a string, using the function to raise errors."""
         parts = value.split()
         if len(parts) != 3:
@@ -350,15 +361,15 @@ class Coord:
         try:
             x = int(parts[0])
         except ValueError:
-            raise error_func('Invalid coordinate value "{}"!', parts[0])
+            raise error_func('Invalid coordinate value "{}"!', parts[0]) from None
         try:
             y = int(parts[1])
         except ValueError:
-            raise error_func('Invalid coordinate value "{}"!', parts[1])
+            raise error_func('Invalid coordinate value "{}"!', parts[1]) from None
         try:
             z = int(parts[2])
         except ValueError:
-            raise error_func('Invalid coordinate value "{}"!', parts[2])
+            raise error_func('Invalid coordinate value "{}"!', parts[2]) from None
         try:
             return _coord_cache[x, y, z]
         except KeyError:
@@ -366,7 +377,7 @@ class Coord:
             _coord_cache[x, y, z] = result
             return result
 
-    def bbox(self, other: 'Coord') -> Iterator['Coord']:
+    def bbox(self, other: Coord) -> Iterator[Coord]:
         """Iterate through the points inside this bounding box."""
         range_x = range(min(self.x, other.x), max(self.x, other.x) + 1)
         range_y = range(min(self.y, other.y), max(self.y, other.y) + 1)
@@ -469,7 +480,7 @@ class ConnSide(Enum):
     DOWN = Coord(0, -1, 0)
 
     @classmethod
-    def from_yaw(cls, value: int) -> 'ConnSide':
+    def from_yaw(cls, value: int) -> ConnSide:
         """Return the the side pointing in this yaw direction."""
         value %= 360
         if value == 0:
@@ -483,7 +494,7 @@ class ConnSide(Enum):
         raise ValueError(f'Invalid yaw {value}!')
 
     @classmethod
-    def parse(cls, value: str, error_func: Callable[..., BaseException]) -> 'ConnSide':
+    def parse(cls, value: str, error_func: Callable[..., BaseException]) -> ConnSide:
         """Parse a connection side."""
         try:
             return cls[value.upper()]
@@ -495,7 +506,7 @@ class ConnSide(Enum):
         try:
             x, y, z = map(int, parts)
         except ValueError:
-            raise error_func('Invalid connection side!')
+            raise error_func('Invalid connection side "{}"!', value) from None
         if z != 0:
             raise error_func('Connection side must be flat!')
         if x == 0:
@@ -638,7 +649,7 @@ class Renderable:
                 try:
                     kind = cls._types[render_id.casefold()]
                 except KeyError:
-                    raise tok.error('Unknown Renderable "{}"!', render_id)
+                    raise tok.error('Unknown Renderable "{}"!', render_id) from None
             elif key.casefold() == "animations":
                 Anim.parse_block(anims, tok)
             elif key.casefold() == "model":
@@ -674,7 +685,7 @@ class SubType:
     # The path to the icon VTF, in 'models/props_map_editor'.
     pal_icon: FSPath | None = None
 
-    def copy(self) -> 'SubType':
+    def copy(self) -> SubType:
         """Duplicate this subtype."""
         return SubType(
             self.name,
@@ -688,7 +699,7 @@ class SubType:
 
     __copy__ = copy
 
-    def __deepcopy__(self, memodict: dict | None = None) -> SubType:
+    def __deepcopy__(self, memodict: dict[int, Any] | None = None) -> SubType:
         """Duplicate this subtype.
 
         We don't need to deep-copy the contents of the containers,
@@ -725,7 +736,7 @@ class SubType:
             self.pal_icon,
         )
 
-    def __setstate__(self, state: tuple) -> None:
+    def __setstate__(self, state: _SubTypeState) -> None:
         self.name, mdls, snds, anims, self.pal_name, x, y, self.pal_icon = state
         self.models = list(map(FSPath, mdls))
         self.sounds = {
@@ -802,7 +813,7 @@ class SubType:
                     try:
                         sound = Sound(sound_kind.upper())
                     except ValueError:
-                        raise tok.error('Unknown sound type "{}"!', sound_kind)
+                        raise tok.error('Unknown sound type "{}"!', sound_kind) from None
                     subtype.sounds[sound] = tok.expect(Token.STRING)
             elif folded_key == 'animations':
                 Anim.parse_block(subtype.anims, tok)
@@ -853,7 +864,7 @@ class Item:
     # The C++ class used to instantiate the item in the editor.
     cls: ItemClass = ItemClass.UNCLASSED
     # Type if present.
-    subtype_prop: ItemPropKind | None = None
+    subtype_prop: ItemPropKind[Any] | None = None
     subtypes: list[SubType] = attrs.Factory(list)  # Each subtype in order.
     # Movement handle
     handle: Handle = Handle.NONE
@@ -874,7 +885,7 @@ class Item:
     # is wrong. So just make it the useful default, users can override.
     offset: Vec = attrs.Factory(lambda: Vec(64, 64, 64))
 
-    properties: dict[str, ItemProp] = attrs.Factory(dict)
+    properties: dict[str, ItemProp[Any]] = attrs.Factory(dict)
 
     # The instances used by the editor, then custom slots used by
     # conditions. For the latter we don't care about the counts.
@@ -1008,7 +1019,7 @@ class Item:
 
         This expects the "Item" token to have been read already.
         """
-        connections = Property('Connections', [])
+        connections = Keyvalues('Connections', [])
         tok.expect(Token.BRACE_OPEN)
         item = Item('')
 
@@ -1039,11 +1050,11 @@ class Item:
                 try:
                     item.cls = ITEM_CLASSES[item_class.casefold()]
                 except KeyError:
-                    raise tok.error('Unknown item class {}!', item_class)
+                    raise tok.error('Unknown item class {}!', item_class) from None
             elif tok_value == 'editor':
                 item._parse_editor_block(tok, pak_id)
             elif tok_value == 'properties':
-                item._parse_properties_block(tok)
+                item._parse_properties_block(tok, pak_id)
             elif tok_value == 'exporting':
                 item._parse_export_block(tok, connections)
             elif tok_value in ('author', 'description', 'filter'):
@@ -1066,7 +1077,7 @@ class Item:
             except KeyError:
                 LOGGER.warning('Subtype property of "{}" set, but property not present!', prop_name)
 
-        # Parse the connections info, if it exists.
+        # Parse the connection info, if it exists.
         if connections or item.conn_inputs or item.conn_outputs:
             item.conn_config = ConnConfig.parse(item.id, connections)
             item._finalise_connections()
@@ -1136,14 +1147,14 @@ class Item:
                 try:
                     conf_attr = self._BOOL_ATTRS[folded_key]
                 except KeyError:
-                    raise tok.error('Unknown editor option {}', key)
+                    raise tok.error('Unknown editor option {}', key) from None
                 else:
                     setattr(self, conf_attr, conv_bool(tok.expect(Token.STRING)))
 
-    def _parse_properties_block(self, tok: Tokenizer) -> None:
+    def _parse_properties_block(self, tok: Tokenizer, pak_id: str) -> None:
         """Parse the properties block of the item definitions."""
         for prop_str in tok.block('Properties'):
-            prop_type: ItemPropKind | None
+            prop_type: ItemPropKind[Any] | None
             try:
                 prop_type = PROP_TYPES[prop_str.casefold()]
             except KeyError:
@@ -1152,7 +1163,8 @@ class Item:
 
             default = ''
             index = 0
-            user_default = True
+            disable_prop = False
+            desc = TransToken.BLANK
             for prop_value in tok.block(prop_str + ' options'):
                 prop_value = prop_value.casefold()
                 if prop_value == 'defaultvalue':
@@ -1160,27 +1172,32 @@ class Item:
                 elif prop_value == 'index':
                     index = conv_int(tok.expect(Token.STRING))
                 elif prop_value == 'bee2_ignore':
-                    user_default = conv_bool(tok.expect(Token.STRING), user_default)
+                    disable_prop = conv_bool(tok.expect(Token.STRING), disable_prop)
                     if prop_type.is_unknown:
-                        LOGGER.warning('Unknown properties cannot have defaults set!')
+                        LOGGER.warning(
+                            'Disabling setting defaults for property "{}" is not useful, '
+                            'the property is unknown and so will not have UI!',
+                            prop_str,
+                        )
+                elif prop_value in ('desc', 'description'):
+                    desc = TransToken.parse(pak_id, tok.expect(Token.STRING))
                 else:
                     raise tok.error('Unknown property option "{}"!', prop_value)
             try:
                 self.properties[prop_type.id.casefold()] = ItemProp(
-                    prop_type, default,
-                    index, user_default,
+                    prop_type,default, index, not disable_prop, desc,
                 )
-            except ValueError:
+            except ValueError as exc:
                 raise tok.error(
                     'Default value {} is not valid for {} properties!',
                     default, prop_type.id,
-                )
+                ) from exc
 
-    def _parse_export_block(self, tok: Tokenizer, connections: Property) -> None:
+    def _parse_export_block(self, tok: Tokenizer, connections: Keyvalues) -> None:
         """Parse the export block of the item definitions. This returns the parsed connection's info.
 
         Since the standard input/output blocks must be parsed in one group, we collect those in the
-        passed-in property block for later parsing.
+        passed-in keyvalues block for later parsing.
         """
         for key in tok.block('Exporting'):
             folded_key = key.casefold()
@@ -1260,14 +1277,14 @@ class Item:
     def _parse_connections(
         self,
         tok: Tokenizer,
-        prop_block: Property,
+        kv_block: Keyvalues,
         target: dict[ConnTypes, Connection],
     ) -> None:
         """Parse either an inputs or outputs block.
 
         This is either a regular PeTI block with Activate/Deactivate options,
         or the BEE2 block with custom options. In the latter case it's stored
-        in a property block for later parsing (since inputs/outputs need to
+        in a keyvalues block for later parsing (since inputs/outputs need to
         be combined).
         """
         for conn_name in tok.block('Connection'):
@@ -1285,10 +1302,10 @@ class Item:
                             if 'out' in value:
                                 self.force_output = True
                         else:
-                            prop_block.append(Property(key, value))
+                            kv_block.append(Keyvalues(key, value))
                     continue  # We deal with this after the export block is done.
                 else:
-                    raise tok.error('Unknown connection type "{}"!', conn_name)
+                    raise tok.error('Unknown connection type "{}"!', conn_name) from None
 
             act_name: str | None = None
             activate: str | None = None
@@ -1329,9 +1346,9 @@ class Item:
                 )
             conn = self.conn_inputs.pop(ConnTypes.POLARITY)
             if conn.activate is not None:
-                conf.sec_enable_cmd += (Output('', conn.act_name, conn.activate), )
+                conf.sec_enable_cmd += (Output('', '', conn.activate, inst_in=conn.act_name), )
             if conn.deactivate is not None:
-                conf.sec_disable_cmd += (Output('', conn.deact_name, conn.deactivate), )
+                conf.sec_disable_cmd += (Output('', '', conn.deactivate, inst_out=conn.deact_name), )
 
         if ConnTypes.NORMAL in self.conn_outputs:
             conn = self.conn_outputs.pop(ConnTypes.NORMAL)
@@ -1535,7 +1552,7 @@ class Item:
                     try:
                         grid = FACE_TYPES[grid_str.casefold()]
                     except KeyError:
-                        raise tok.error('Unknown face type "{}"!', grid_str)
+                        raise tok.error('Unknown face type "{}"!', grid_str) from None
                 else:
                     raise tok.error('Unknown Embed Face option "{}"!', opt_key)
             if center is None:
@@ -1564,7 +1581,7 @@ class Item:
                         try:
                             coll_type |= CollideType[name.upper()]
                         except KeyError:
-                            raise tok.error('Unknown collision type "{}"', name)
+                            raise tok.error('Unknown collision type "{}"', name) from None
             if len(points) < 2:
                 raise tok.error('Two points must be provided for a bounding box!')
             bb_min, bb_max = Vec.bbox(points)
@@ -1689,15 +1706,15 @@ class Item:
             f.write(f'\t\t"InvalidSurface" "{invalid}"\n')
 
         if self.anchor_goo:
-            f.write(f'\t\t"CanAnchorOnGoo"      "1"\n')
+            f.write('\t\t"CanAnchorOnGoo"      "1"\n')
         if self.anchor_barriers:
-            f.write(f'\t\t"CanAnchorOnBarriers" "1"\n')
+            f.write('\t\t"CanAnchorOnBarriers" "1"\n')
         if not self.copiable:
-            f.write(f'\t\t"Copyable"  "0"\n')
+            f.write('\t\t"Copyable"  "0"\n')
         if not self.deletable:
-            f.write(f'\t\t"Deletable" "0"\n')
+            f.write('\t\t"Deletable" "0"\n')
         if self.pseudo_handle:
-            f.write(f'\t\t"PseudoHandle" "1"\n')
+            f.write('\t\t"PseudoHandle" "1"\n')
         f.write('\t\t}\n')
 
         if self.properties:
@@ -1905,7 +1922,7 @@ class Item:
         )
 
     def __setstate__(self, state: tuple) -> None:
-        props: list[ItemProp]
+        props: list[ItemProp[Any]]
         antline_points: list[list[AntlinePoint]]
         (
             self.id,
@@ -1940,10 +1957,7 @@ class Item:
             self.force_output,
         ) = state
 
-        self.properties = {
-            prop.kind.id.casefold(): prop
-            for prop in props
-        }
+        self.properties = {prop.kind.id.casefold(): prop for prop in props}
         self.antline_points = dict(zip(ConnSide, antline_points))
 
     def validate(self) -> None:
@@ -1964,7 +1978,10 @@ class Item:
                 'The ButtonType property does nothing if the '
                 'item class is not ItemButtonFloor, only instance 0 is shown.'
             )
-        if self.has_prim_input() and 'connectioncount' not in self.properties:
+        # The indicator items are special, they always have just one input...
+        if self.has_prim_input() and 'connectioncount' not in self.properties and self.id not in [
+            'ITEM_INDICATOR_TOGGLE', 'ITEM_INDICATOR_PANEL', 'ITEM_INDICATOR_PANEL_TIMER',
+        ]:
             LOGGER.warning(
                 'Items with inputs must have ConnectionCount to work!'
             )
@@ -1982,3 +1999,5 @@ class Item:
         for subtype in self.subtypes:
             yield subtype.name, source + '.name'
             yield subtype.pal_name, source + '.pal_name'
+        for prop in self.properties.values():
+            yield prop.desc, f'{source}.property.{prop.kind.id}'

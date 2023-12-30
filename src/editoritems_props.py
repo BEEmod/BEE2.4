@@ -1,10 +1,11 @@
 """The different properties defineable for items."""
 from __future__ import annotations
 from enum import Enum
-from typing import Callable, Generic, Sequence, Type, TypeVar
+from typing import Any, Callable, Generic, Sequence, Type, TypeVar
 
 import attrs
 from srctools import Angle, bool_as_int, conv_bool, conv_float, conv_int
+from typing_extensions import Self
 
 from transtoken import TransToken
 
@@ -18,33 +19,34 @@ def _unknown_parse(value: str) -> str:
     return value
 
 
-@attrs.define(eq=False, getstate_setstate=False)
+@attrs.define(eq=False, kw_only=True, getstate_setstate=False)
 class ItemPropKind(Generic[ValueT]):
     """A type of property for an item."""
     # Property name for this. This is case-sensitive!
-    id: str = attrs.field(kw_only=True)
-    # The translation keyword for this, if it exists.
-    name: TransToken =  attrs.field(kw_only=True)
+    id: str
+    # The translation keyword for this, or BLANK if it shouldn't be visible.
+    name: TransToken
     # The instance variable this sets, if any.
-    instvar: str = attrs.field(kw_only=True)
+    instvar: str
     # All the possible values this can have, if used as a subtype.
     # If not usable, this is a zero-length sequence.
-    subtype_values: Sequence[ValueT] = attrs.field(kw_only=True, default=())
+    subtype_values: Sequence[ValueT] = ()
     # If false, don't show on the default selection window.
-    allow_user_default: bool =  attrs.field(kw_only=True, default=True)
+    allow_user_default: bool = True
 
     # Functions to parse and export the value.
-    parse: Callable[[str], ValueT] = attrs.field(kw_only=True)
-    export: Callable[[ValueT], str] = attrs.field(kw_only=True, default=str)
+    parse: Callable[[str], ValueT]
+    export: Callable[[ValueT], str]
 
     @classmethod
-    def unknown(cls, id: str) -> 'ItemPropKind[str]':
+    def unknown(cls, prop_id: str) -> ItemPropKind[str]:
         """Create a kind for an unknown property."""
         return ItemPropKind[str](
-            id=id,
+            id=prop_id,
             name=TransToken.BLANK,
             instvar='',
             parse=_unknown_parse,
+            export=str,
             allow_user_default=False,
         )
 
@@ -53,7 +55,17 @@ class ItemPropKind(Generic[ValueT]):
         """Check if this is an unknown property."""
         return self.parse is _unknown_parse
 
-    def __reduce__(self) -> str | tuple:
+    def __hash__(self) -> int:
+        """Allow using as a dict key."""
+        return hash(self.id)
+
+    def __eq__(self, other: object) -> bool:
+        """Item properties are compared by ID."""
+        if isinstance(other, ItemPropKind):
+            return self.id == other.id
+        return NotImplemented
+
+    def __reduce__(self) -> str | tuple[object, ...]:
         """Handle pickling specially.
 
         For known props, we fetch the object by ID.
@@ -68,12 +80,21 @@ class ItemPropKind(Generic[ValueT]):
 
 class ItemProp(Generic[ValueT]):
     """A property for an item."""
-    def __init__(self, kind: ItemPropKind[ValueT], default: str, index: int, allow_user_default: bool) -> None:
+    def __init__(
+        self,
+        kind: ItemPropKind[ValueT],
+        default: str,
+        index: int,
+        allow_user_default: bool,
+        desc: TransToken,
+    ) -> None:
         self.kind = kind
         self.default = kind.parse(default)
         self.index = index
-        # Is overridden for subtypes.
+        # The item author and kind must both allow alteration, and it also must not be the
+        # SubtypeProperty.
         self.allow_user_default = kind.allow_user_default and allow_user_default
+        self.desc = desc
 
     def __repr__(self) -> str:
         """Generic repr() for properties."""
@@ -92,9 +113,9 @@ class ItemProp(Generic[ValueT]):
 
 
 # ID -> class
-PROP_TYPES: dict[str, ItemPropKind] = {}
+PROP_TYPES: dict[str, ItemPropKind[Any]] = {}
 # class to name in this module, for pickling.
-_known_to_attr: dict[ItemPropKind, str] = {}
+_known_to_attr: dict[ItemPropKind[Any], str] = {}
 
 
 def bool_prop(
@@ -154,7 +175,25 @@ class PanelAnimation(Enum):
     ANGLE_30 = 30
     ANGLE_45 = 45
     ANGLE_60 = 60
-    AMGLE_90 = 90
+    ANGLE_90 = 90
+
+    @classmethod
+    def from_anim(cls, anim: str) -> Self:
+        """Parse a string matching the ramp_XX_deg_open animation names.
+
+        :raises LookupError: If the string is not a valid animation.
+        """
+        if anim.startswith('ramp_') and anim.endswith('_deg_open'):
+            try:
+                return cls(int(anim[5:-9]))
+            except KeyError:
+                pass
+        raise LookupError(anim)
+
+    @property
+    def animation(self) -> str:
+        """Return the corresponding animation value."""
+        return f'ramp_{self.value}_deg_open'
 
 
 class PaintTypes(Enum):
@@ -186,9 +225,9 @@ class CubeTypes(Enum):
 
 class ButtonTypes(Enum):
     """The different types of floor buttons."""
-    FLOOR = WEIGHTED = 0
-    BOX = CUBE = 1
-    BALL = SPHERE = 2
+    WEIGHTED = FLOOR = 0
+    CUBE = BOX = 1
+    SPHERE = BALL = 2
 
 
 class FizzlerTypes(Enum):
@@ -200,7 +239,7 @@ class FizzlerTypes(Enum):
 class GlassTypes(Enum):
     """The different types of glass."""
     GLASS = 0
-    GRATE = GRATING = 1
+    GRATING = GRATE = 1
 
 
 # First all the generic bools.
@@ -249,7 +288,7 @@ prop_portalable = bool_prop(
 
 # For doors, specifies the map mode and therefore which door is used.
 prop_is_coop = bool_prop(
-    id='coopmode',
+    id='CoopDoor',
     instvar='',  # Controls which item is used.
     name=TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_coop_puzzle'),
 )
@@ -287,7 +326,7 @@ prop_cube_fall_straight_Down = bool_prop(
 # Track Platform prop types:
 
 # Starting state for oscillating Track Platforms
-# If non-ocillating, this is disabled.
+# If non-oscillating, this is disabled.
 prop_track_start_active = bool_prop(
     id='StartActive',
     instvar='$start_active',
@@ -295,7 +334,7 @@ prop_track_start_active = bool_prop(
 )
 
 # The mode for Track Platforms.
-prop_track_is_ocillating = bool_prop(
+prop_track_is_oscillating = bool_prop(
     id='Oscillate',
     instvar='',  # Picks instance
     name=TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_rail_oscillate'),
@@ -306,6 +345,7 @@ prop_track_starting_pos = ItemPropKind[float](
     id='StartingPosition',
     instvar='$starting_position',
     parse=conv_float,
+    export=str,
     name=TransToken.BLANK,  # Hidden
 )
 
@@ -315,6 +355,7 @@ prop_track_move_distance = ItemPropKind[float](
     id='TravelDistance',
     instvar='$travel_distance',
     parse=conv_float,
+    export=str,
     name=TransToken.BLANK,  # Hidden
 )
 
@@ -326,6 +367,7 @@ prop_track_speed = ItemPropKind[float](
     name=TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_paint_type_speed'),
     instvar='$speed',
     parse=conv_float,
+    export=str,
 )
 
 
@@ -334,6 +376,7 @@ prop_track_move_direction = ItemPropKind[Angle](
     instvar='$travel_direction',
     name=TransToken.BLANK,  # Hidden prop
     parse=Angle.from_str,
+    export=str,
 )
 
 
@@ -467,14 +510,14 @@ prop_paint_flow_type = enum_prop(
     PaintFlows,
     id='PaintFlowType',
     instvar='$blobs_per_second',
-    name=TransToken.from_valve('$PORTAL2_PuzzleEditor_ContextMenu_paint_flow_type'),
+    name=TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_paint_flow_type'),
 )
 
 
 # Specifies if the paint can streak across a surface.
 # This actually exports either 0.35 or 0 to the instvar.
 prop_paint_allow_streaks = bool_prop(
-    id = 'AllowStreak',
+    id='AllowStreak',
     instvar='$streak_time',
     name=TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_allow_streak_paint'),
 )
@@ -491,6 +534,7 @@ prop_connection_count = ItemPropKind[int](
     instvar="$connectioncount",
     name=TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_tbeam_activate'),
     parse=_parse_connection_count,
+    export=str,
 )
 # Specific for funnels, tracks the number of polarity-type input items.
 prop_connection_count_polarity = ItemPropKind[int](
@@ -498,6 +542,7 @@ prop_connection_count_polarity = ItemPropKind[int](
     instvar="$connectioncountpolarity",
     name=TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_tbeam_polarity'),
     parse=_parse_connection_count,
+    export=str,
 )
 
 
@@ -512,6 +557,7 @@ prop_timer_delay = ItemPropKind[int](
     name=TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_timer_delay'),
     subtype_values=range(0, 31),
     parse=_parse_timer_delay,
+    export=str,
 )
 
 # Specifies if a pedestal button should play timer sounds.
@@ -535,13 +581,7 @@ prop_faith_speed = ItemPropKind[float](
     instvar='$catapult_speed',
     name=TransToken.BLANK,  # Not visible.
     parse=conv_float,
-)
-
-# Set on the entry/exit doors, to indicate their type.
-prop_door_is_coop = bool_prop(
-    id='CoopDoor',
-    instvar='PORTAL2_PuzzleEditor_ContextMenu_coop_puzzle',
-    name=TransToken.BLANK,  # Not visible.
+    export=str,
 )
 
 
@@ -551,6 +591,7 @@ prop_antline_indicator = ItemPropKind[str](
     instvar='$indicator_name',
     name=TransToken.BLANK,  # Inaccessible to users.
     parse=str,
+    export=str,
 )
 
 
@@ -568,6 +609,7 @@ prop_helper_radius = ItemPropKind[float](
     instvar='$helper_radius',
     name=TransToken.BLANK,  # Not visible.
     parse=conv_float,
+    export=str,
 )
 
 
@@ -593,6 +635,7 @@ prop_faith_targetname = ItemPropKind[str](
     id='TargetName',
     instvar='',
     parse=str,
+    export=str,
     name=TransToken.BLANK,  # Hidden
 )
 
@@ -604,6 +647,7 @@ prop_angled_panel_type = ItemPropKind[str](
     name=TransToken.BLANK,  # Hidden
     instvar='',  # None!
     parse=str,
+    export=str,
 )
 
 
@@ -612,14 +656,16 @@ def _parse_angled_panel_anim(value: str) -> PanelAnimation:
     orig_value = value
     value = value.casefold()
     # Allow the full anim name or just the degree.
-    if value.startswith('ramp_') and value.endswith('_deg_open'):
-        value = value[5:-9]
+    try:
+        return PanelAnimation.from_anim(value)
+    except ValueError:
+        pass
     ind = int(value)
-    if ind < 30: # If 0-3 use index, if 30/45/60/90 use that
+    if ind < 30:  # If 0-3 use index, if 30/45/60/90 use that
         try:
             return prop_angled_panel_anim.subtype_values[ind]
         except IndexError:
-            raise ValueError(f'Unknown animation {orig_value}')
+            raise ValueError(f'Unknown animation {orig_value}') from None
     else:
         return PanelAnimation(int(value))
 
@@ -630,7 +676,7 @@ prop_angled_panel_anim = ItemPropKind[PanelAnimation](
     name=TransToken.from_valve('PORTAL2_PuzzleEditor_ContextMenu_angled_panel_type'),
     subtype_values=list(PanelAnimation),
     parse=_parse_angled_panel_anim,
-    export=lambda ang: f'ramp_{ang.value}_deg_open',
+    export=lambda angle: angle.animation,
 )
 
 prop_cube_type = enum_prop(

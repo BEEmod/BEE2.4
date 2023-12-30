@@ -4,7 +4,7 @@ This produces a stream of values, which are fed into richTextBox to display.
 """
 from __future__ import annotations
 
-from typing import Iterator, Mapping, Sequence
+from typing import Final, Iterator, Mapping, Sequence, cast
 from contextvars import ContextVar
 import urllib.parse
 import itertools
@@ -12,6 +12,7 @@ import enum
 
 import attrs
 from mistletoe import block_token as btok, span_token as stok, base_renderer
+from mistletoe.token import Token
 import mistletoe
 import srctools.logger
 
@@ -49,6 +50,7 @@ class TextTag(str, enum.Enum):
     LIST = 'list'
     HRULE = 'hrule'
     LINK = 'link'
+    IMAGE = 'image'
 
     def __str__(self) -> str:
         """Pass to tkinter as the value."""
@@ -97,12 +99,18 @@ BULLETS = [
 class MarkdownData:
     """Protocol for objects holding Markdown data."""
     def __iter__(self) -> Iterator[Block]:
-        pass
+        return iter(())
 
     @staticmethod
     def text(text: str, *tags: TextTag, url: str | None = None) -> SingleMarkdown:
         """Construct data with a single text segment."""
         return SingleMarkdown([TextSegment(text, tags, url)])
+
+    # An empty set of data.
+    BLANK: Final[MarkdownData] = cast('MarkdownData', ...)
+
+
+MarkdownData.BLANK = MarkdownData()  # type: ignore
 
 
 @attrs.define
@@ -155,7 +163,7 @@ class RenderState:
 
     Since the TKRenderer is shared, we need this to prevent storing state on that.
     """
-    package: str
+    package: str | None
     # The lists we're currently generating.
     # If none it's bulleted, otherwise it's the current count.
     list_stack: list[int | None] = attrs.Factory(list)
@@ -164,30 +172,34 @@ class RenderState:
 no_state = RenderState('')
 state = ContextVar('tk_markdown_state', default=no_state)
 
+if not hasattr(base_renderer.BaseRenderer, '__class_getitem__'):
+    # Patch in generic support.
+    base_renderer.BaseRenderer.__class_getitem__ = lambda item: base_renderer.BaseRenderer
 
-class TKRenderer(base_renderer.BaseRenderer):
+
+class TKRenderer(base_renderer.BaseRenderer[SingleMarkdown]):
     """Extension needed to extract our list from the tree.
     """
-    def render(self, token: btok.BlockToken) -> SingleMarkdown:
-        """Indicate the correct types for this."""
+    def render(self, token: Token) -> SingleMarkdown:
+        """Check that the state has been fetched."""
         assert state.get() is not no_state
-        return super().render(token)
+        result = super().render(token)
+        assert isinstance(result, SingleMarkdown)
+        return result
 
-    def render_inner(self, token: stok.SpanToken | btok.BlockToken) -> SingleMarkdown:
-        """
-        Recursively renders child tokens. Joins the rendered
-        strings with no space in between.
+    def render_inner(self, token: Token) -> SingleMarkdown:
+        """Recursively renders child tokens.
 
-        If newlines / spaces are needed between tokens, add them
-        in their respective templates, or override this function
-        in the renderer subclass, so that whitespace won't seem to
-        appear magically for anyone reading your program.
-
-        Arguments:
-            token: a branch node who has children attribute.
+        We merge together adjacient segments, to tidy up the block list.
         """
         blocks: list[Block] = []
-        # Merge together adjacent text segments.
+        if not hasattr(token, 'children'):
+            result = super().render_inner(token)
+            assert isinstance(result, SingleMarkdown)
+            return result
+        child: Token
+
+        # Merge together adjacent text segments
         for child in token.children:
             for data in self.render(child):
                 if isinstance(data, TextSegment) and blocks:
@@ -200,7 +212,12 @@ class TKRenderer(base_renderer.BaseRenderer):
 
         return SingleMarkdown(blocks)
 
-    def _with_tag(self, token: stok.SpanToken | btok.BlockToken, *tags: TextTag, url: str=None) -> SingleMarkdown:
+    def _with_tag(
+        self,
+        token: stok.SpanToken | btok.BlockToken,
+        *tags: TextTag,
+        url: str | None = None,
+    ) -> SingleMarkdown:
         added_tags = set(tags)
         result = self.render_inner(token)
         for i, data in enumerate(result):
@@ -235,7 +252,10 @@ class TKRenderer(base_renderer.BaseRenderer):
 
     def render_image(self, token: stok.Image) -> SingleMarkdown:
         """Embed an image into a file."""
-        uri = utils.PackagePath.parse(urllib.parse.unquote(token.src), state.get().package)
+        package = state.get().package
+        if package is None:
+            raise ValueError("Image used, but no package supplied!")
+        uri = utils.PackagePath.parse(urllib.parse.unquote(token.src), package)
         return SingleMarkdown([Image(ImgHandle.parse_uri(uri))])
 
     def render_inline_code(self, token: stok.InlineCode) -> SingleMarkdown:
@@ -274,7 +294,7 @@ class TKRenderer(base_renderer.BaseRenderer):
             prefix = BULLETS[nesting % len(BULLETS)]
         else:
             prefix = f'{count}. '
-            stack[-1] += 1
+            stack[-1] = count + 1
 
         return _merge(
             MarkdownData.text(prefix, TextTag.LIST_START),
@@ -282,12 +302,14 @@ class TKRenderer(base_renderer.BaseRenderer):
         )
 
     def render_paragraph(self, token: btok.Paragraph) -> SingleMarkdown:
+        """Render a text paragraph."""
         if state.get().list_stack:  # Collapse together.
             return _merge(self.render_inner(token), MarkdownData.text('\n'))
         else:
             return _merge(MarkdownData.text('\n'), self.render_inner(token), MarkdownData.text('\n'))
 
     def render_raw_text(self, token: stok.RawText) -> SingleMarkdown:
+        """Render raw text."""
         return MarkdownData.text(token.content)
 
     def render_table(self, token: btok.Table) -> SingleMarkdown:
@@ -341,16 +363,18 @@ def _merge(*blocks: SingleMarkdown) -> SingleMarkdown:
 def _convert(text: str, package: str | None) -> SingleMarkdown:
     """Actually convert markdown data."""
     tok = state.set(RenderState(package))
-    try:
-        return _RENDERER.render(mistletoe.Document(text))
-    finally:
-        state.reset(tok)
+    with _RENDERER:
+        try:
+            return _RENDERER.render(mistletoe.Document(text))
+        finally:
+            state.reset(tok)
 
 
 def convert(text: TransToken, package: str | None) -> MarkdownData:
     """Convert Markdown syntax into data ready to be passed to richTextBox.
 
-    The package must be passed to allow using images in the document.
+    The package must be passed to allow using images in the document. None should only be
+    used for app-defined strings where we know that can't occur.
     """
     # If untranslated, it'll never change so convert to blocks and discard the source.
     if text.is_untranslated:
@@ -361,7 +385,7 @@ def convert(text: TransToken, package: str | None) -> MarkdownData:
 
 def join(*args: MarkdownData) -> MarkdownData:
     """Merge several mardown blocks together."""
-    # This preserves the originals so they can be translated separately.
+    # This preserves the originals, so they can be translated separately.
     return JoinedMarkdown(list(args))
 
 

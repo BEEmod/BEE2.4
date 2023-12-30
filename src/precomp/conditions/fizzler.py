@@ -1,5 +1,5 @@
 """Results for custom fizzlers."""
-from srctools import Property, Entity, Vec, VMF, Matrix
+from srctools import Keyvalues, Entity, Vec, VMF, Matrix
 import srctools.logger
 
 import user_errors
@@ -12,18 +12,18 @@ COND_MOD_NAME = 'Fizzlers'
 LOGGER = srctools.logger.get_logger(__name__, alias='cond.fizzler')
 
 
-@conditions.make_flag('FizzlerType')
-def flag_fizz_type(inst: Entity, flag: Property):
+@conditions.make_test('FizzlerType')
+def test_fizz_type(inst: Entity, kv: Keyvalues) -> bool:
     """Check if a fizzler is the specified type name."""
     try:
         fizz = fizzler.FIZZLERS[inst['targetname']]
     except KeyError:
         return False
-    return fizz.fizz_type.id.casefold() == flag.value.casefold()
+    return fizz.fizz_type.id.casefold() == kv.value.casefold()
 
 
 @conditions.make_result('ChangeFizzlerType')
-def res_change_fizzler_type(inst: Entity, res: Property):
+def res_change_fizzler_type(inst: Entity, res: Keyvalues) -> None:
     """Change the type of the fizzler. Only valid when run on the base instance."""
     fizz_name = inst['targetname']
     try:
@@ -33,16 +33,16 @@ def res_change_fizzler_type(inst: Entity, res: Property):
             item=fizz_name,
             kind='Fizzler',
             inst=inst['file'],
-        ))
+        )) from None
 
     try:
         fizz.fizz_type = fizzler.FIZZ_TYPES[res.value]
     except KeyError:
-        raise user_errors.UserError(user_errors.TOK_UNKNOWN_ID.format(kind='Fizzler', id=res.value))
+        raise user_errors.UserError(user_errors.TOK_UNKNOWN_ID.format(kind='Fizzler', id=res.value)) from None
 
 
 @conditions.make_result('ReshapeFizzler')
-def res_reshape_fizzler(vmf: VMF, shape_inst: Entity, res: Property):
+def res_reshape_fizzler(vmf: VMF, shape_inst: Entity, res: Keyvalues) -> None:
     """Convert a fizzler connected via the output to a new shape.
 
     This allows for different placing of fizzler items.
@@ -91,16 +91,15 @@ def res_reshape_fizzler(vmf: VMF, shape_inst: Entity, res: Property):
         )
         base_inst.fixup.update(shape_inst.fixup)
         fizz = fizzler.FIZZLERS[shape_name] = fizzler.Fizzler(
-            fizzler.FIZZ_TYPES['VALVE_MATERIAL_EMANCIPATION_GRID'],
-            up_axis,
-            base_inst,
-            [],
+            fizz_type=fizzler.FIZZ_TYPES['VALVE_MATERIAL_EMANCIPATION_GRID'],
+            up_axis=up_axis,
+            base_inst=base_inst,
+            emitters=[],
         )
         fizz_item = connections.Item(
             base_inst,
             connections.ITEM_TYPES['item_barrier_hazard'],
-            ant_floor_style=shape_item.ant_floor_style,
-            ant_wall_style=shape_item.ant_wall_style,
+            ind_style=shape_item.ind_style,
         )
         connections.ITEMS[shape_name] = fizz_item
 

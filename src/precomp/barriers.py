@@ -3,9 +3,9 @@ from __future__ import annotations
 
 from collections import defaultdict
 from enum import Enum
-from typing import Callable, List, Tuple
+from typing import Callable, Iterator, List, Tuple
 
-from srctools import VMF, Vec, Solid, Property, Entity, Angle, Matrix
+from srctools import FrozenMatrix, VMF, Vec, FrozenVec, Solid, Keyvalues, Entity, Angle, Matrix
 import srctools.logger
 from typing_extensions import Literal
 
@@ -17,7 +17,7 @@ from precomp import (
 import consts
 import user_errors
 from precomp.grid_optim import optimise as grid_optimise
-from precomp.instanceLocs import resolve_one, resolve
+from precomp.instanceLocs import resolve_filter
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -36,30 +36,24 @@ class HoleType(Enum):
     LARGE = 'large'  # 3x3 hole (funnel)
 
 # (origin, normal) -> BarrierType
-BARRIERS: dict[
-    tuple[tuple[float, float, float], tuple[float, float, float]],
-    BarrierType,
-] = {}
-HOLES: dict[
-    tuple[tuple[float, float, float], tuple[float, float, float]],
-    HoleType,
-] = {}
+BARRIERS: dict[tuple[FrozenVec, FrozenVec], BarrierType] = {}
+HOLES: dict[tuple[FrozenVec, FrozenVec], HoleType] = {}
 
 
 ORIENTS = {
-    Vec.T: Matrix.from_angle(180, 0, 0),
-    Vec.B: Matrix.from_angle(0, 0, 0),
-    Vec.N: Matrix.from_angle(90, 270, 0),
-    Vec.S: Matrix.from_angle(90, 90, 0),
-    Vec.E: Matrix.from_angle(90, 180, 0),
-    Vec.W: Matrix.from_angle(90, 0, 0),
+    Vec.T: FrozenMatrix.from_angle(180, 0, 0),
+    Vec.B: FrozenMatrix.from_angle(0, 0, 0),
+    Vec.N: FrozenMatrix.from_angle(90, 270, 0),
+    Vec.S: FrozenMatrix.from_angle(90, 90, 0),
+    Vec.E: FrozenMatrix.from_angle(90, 180, 0),
+    Vec.W: FrozenMatrix.from_angle(90, 0, 0),
 }
 
 
-def get_pos_norm(origin: Vec) -> tuple[tuple[float, float, float], tuple[float, float, float]]:
+def get_pos_norm(origin: Vec) -> tuple[FrozenVec, FrozenVec]:
     """From the origin, get the grid position and normal."""
     grid_pos = origin // 128 * 128 + (64, 64, 64)
-    return grid_pos.as_tuple(), (origin - grid_pos).norm().as_tuple()
+    return grid_pos.freeze(), (origin - grid_pos).norm().freeze()
 
 
 def parse_map(vmf: VMF, info: conditions.MapInfo) -> None:
@@ -68,8 +62,8 @@ def parse_map(vmf: VMF, info: conditions.MapInfo) -> None:
     This removes the per-tile instances, and all original brushwork.
     The frames are updated with a fixup var, as appropriate.
     """
-    frame_inst = resolve('[glass_frames]', silent=True)
-    glass_inst = resolve_one('[glass_128]', error=False)
+    frame_inst = resolve_filter('[glass_frames]', silent=True)
+    glass_inst = resolve_filter('[glass_128]', silent=True)
 
     for entities, voice_attr, material, barrier_type in [
         (vmf.by_class['func_detail'], 'glass', consts.Special.GLASS, BarrierType.GLASS),
@@ -85,14 +79,14 @@ def parse_map(vmf: VMF, info: conditions.MapInfo) -> None:
 
     for inst in vmf.by_class['func_instance']:
         filename = inst['file'].casefold()
-        if filename and filename == glass_inst:
+        if filename and filename in glass_inst:
             inst.remove()
         elif filename in frame_inst:
             # Add a fixup to allow distinguishing the type.
-            pos = Vec.from_str(inst['origin']) // 128 * 128 + (64, 64, 64)
-            norm = Vec(z=-1) @ Angle.from_str(inst['angles'])
+            pos: FrozenVec = FrozenVec.from_str(inst['origin']) // 128 * 128 + (64, 64, 64)
+            norm: FrozenVec = FrozenVec(z=-1) @ Angle.from_str(inst['angles'])
             try:
-                inst.fixup[consts.FixupVars.BEE_GLS_TYPE] = BARRIERS[pos.as_tuple(), norm.as_tuple()].value
+                inst.fixup[consts.FixupVars.BEE_GLS_TYPE] = BARRIERS[pos, norm].value
             except KeyError:
                 LOGGER.warning('No glass/grating for frame at {}, {}?', pos, norm)
 
@@ -100,7 +94,7 @@ def parse_map(vmf: VMF, info: conditions.MapInfo) -> None:
         packing.pack_list(vmf, options.get(str, 'glass_pack'))
 
 
-def test_hole_spot(origin: Vec, normal: Vec, hole_type: HoleType) -> Literal['noglass', 'valid', 'nospace']:
+def test_hole_spot(origin: FrozenVec, normal: FrozenVec, hole_type: HoleType) -> Literal['noglass', 'valid', 'nospace']:
     """Check if the given position is valid for holes.
 
     We need to check that it's actually placed on glass/grating, and that
@@ -111,7 +105,7 @@ def test_hole_spot(origin: Vec, normal: Vec, hole_type: HoleType) -> Literal['no
     * 'nospace' if no adjacient panel is present.
     """
     try:
-        center_type = BARRIERS[origin.as_tuple(), normal.as_tuple()]
+        center_type = BARRIERS[origin, normal]
     except KeyError:
         return 'noglass'
 
@@ -126,9 +120,9 @@ def test_hole_spot(origin: Vec, normal: Vec, hole_type: HoleType) -> Literal['no
         (128, 0),
         (0, 128),
     ]:
-        pos = origin + Vec.with_axes(u, u_off, v, v_off)
+        pos = origin + FrozenVec.with_axes(u, u_off, v, v_off)
         try:
-            off_type = BARRIERS[pos.as_tuple(), normal.as_tuple()]
+            off_type = BARRIERS[pos, normal]
         except KeyError:
             # No side
             LOGGER.warning('No offset barrier at {}, {}', pos, normal)
@@ -138,19 +132,19 @@ def test_hole_spot(origin: Vec, normal: Vec, hole_type: HoleType) -> Literal['no
             LOGGER.warning('Wrong barrier type at {}, {}', pos, normal)
             return 'nospace'
         # Also check if a large hole is here, we'll collide.
-        if HOLES.get((pos.as_tuple(), normal.as_tuple())) is HoleType.LARGE:
+        if HOLES.get((pos, normal)) is HoleType.LARGE:
             # TODO: Draw this other hole as well?
             return 'nospace'
     return 'valid'
 
 
 @conditions.make_result('GlassHole')
-def res_glass_hole(inst: Entity, res: Property):
+def res_glass_hole(inst: Entity, res: Keyvalues) -> None:
     """Add Glass/grating holes. The value should be 'large' or 'small'."""
     hole_type = HoleType(res.value)
 
-    normal: Vec = round(Vec(z=-1) @ Angle.from_str(inst['angles']), 6)
-    origin: Vec = Vec.from_str(inst['origin']) // 128 * 128 + 64
+    normal: FrozenVec = round(FrozenVec(z=-1) @ Angle.from_str(inst['angles']), 6)
+    origin: FrozenVec = FrozenVec.from_str(inst['origin']) // 128 * 128 + 64
 
     first_placement = test_hole_spot(origin, normal, hole_type)
     if first_placement == 'valid':
@@ -179,7 +173,7 @@ def res_glass_hole(inst: Entity, res: Property):
                 )
             )
     # Place it, or error if there's already one here.
-    key = (sel_origin.as_tuple(), sel_normal.as_tuple())
+    key = (sel_origin, sel_normal)
     if key in HOLES:
         raise user_errors.UserError(
             user_errors.TOK_BARRIER_HOLE_FOOTPRINT,
@@ -241,10 +235,11 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
     # Valve doesn't implement convex corners, we'll do it ourselves.
     convex_corner_left = instanceLocs.resolve_one('[glass_left_convex_corner]', error=False)
     convex_corner_right = instanceLocs.resolve_one('[glass_right_convex_corner]', error=False)
-    convex_corners: List[Tuple[Matrix, str, float]] = [
+    convex_corners: List[Tuple[FrozenMatrix, str, float]] = [
         (orient, filename, side)
         # We don't include 90 and 270, the other filename covers those.
-        for orient in map(Matrix.from_yaw, [0.0, 180.0])
+        # Freeze to ensure this is constant.
+        for orient in map(FrozenMatrix.from_yaw, [0.0, 180.0])
         for (filename, side) in [
             (convex_corner_left, -128.0),
             (convex_corner_right, +128.0),
@@ -276,54 +271,46 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
     # Group the positions by planes in each orientation.
     # This makes them 2D grids which we can optimise.
     # (normal_dist, positive_axis, type) -> Plane(type)
-    slices: dict[
-        tuple[tuple[float, float, float], bool],
-        Plane[BarrierType | None]
-    ] = defaultdict(Plane)
+    slices: dict[tuple[FrozenVec, bool], Plane[BarrierType | None]] = defaultdict(Plane)
     # We have this on the 32-grid to allow us to cut squares for holes.
-    for (origin_tup, normal_tup), barr_type in BARRIERS.items():
-        origin = Vec(origin_tup)
-        normal = Vec(normal_tup)
+    for (origin, normal), barr_type in BARRIERS.items():
         norm_axis = normal.axis()
         u, v = origin.other_axes(norm_axis)
-        norm_pos = Vec.with_axes(norm_axis, origin)
-        slice_plane = slices[
-            norm_pos.as_tuple(),  # distance from origin to this plane.
-            normal[norm_axis] > 0,
-        ]
+        # Distance from origin to this plane.
+        norm_pos = FrozenVec.with_axes(norm_axis, origin)
+        slice_plane = slices[norm_pos, normal[norm_axis] > 0]
         for u_off in [-48, -16, 16, 48]:
             for v_off in [-48, -16, 16, 48]:
                 slice_plane[
                     int((u + u_off) // 32),
                     int((v + v_off) // 32),
                 ] = barr_type
+
+        # Also go place convex corners.
         for orient, filename, corner_side in convex_corners:
-            # Not @=, we want to keep the original orient unaltered.
-            orient = orient @ ORIENTS[normal_tup]
+            orient @= ORIENTS[normal]
             # The convex corner is on the +X side, then +/-Y depending on the filename.
-            # The diagonal corner needs to not match to be a corner.
-            side_1 = orient.forward(128)
+            # If the diagonal neighbour does not match, we need a corner instance.
+            side_1 = orient.forward(128.0)
             side_2 = orient.left(corner_side)
             if (
-                BARRIERS.get(((origin + side_1).as_tuple(), normal_tup)) is barr_type and
-                BARRIERS.get(((origin + side_2).as_tuple(), normal_tup)) is barr_type and
-                BARRIERS.get(((origin + side_1 + side_2).as_tuple(), normal_tup)) is not barr_type
+                BARRIERS.get((origin + side_1, normal)) is barr_type and
+                BARRIERS.get((origin + side_2, normal)) is barr_type and
+                BARRIERS.get((origin + side_1 + side_2, normal)) is not barr_type
             ):
-                vmf.create_ent(
-                    'func_instance',
+                conditions.add_inst(
+                    vmf,
                     targetname='barrier',
                     file=filename,
                     origin=origin,
                     angles=orient,
-                    fixup_style='0',
                 ).make_unique()
 
     # Compute contiguous sections of any barrier type, then place hint brushes to ensure sorting
     # is done correctly.
-    for (plane_pos_tup, is_pos), pos_slice in slices.items():
-        plane_pos = Vec(plane_pos_tup)
+    for (plane_pos, is_pos), pos_slice in slices.items():
         norm_axis = plane_pos.axis()
-        normal = Vec.with_axes(norm_axis, 1 if is_pos else -1)
+        normal = FrozenVec.with_axes(norm_axis, 1 if is_pos else -1)
 
         u_axis, v_axis = Vec.INV_AXIS[norm_axis]
         is_present = Plane.fromkeys(pos_slice, True)
@@ -351,17 +338,12 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
 
     # Remove pane sections where the holes are. We then generate those with
     # templates for slanted parts.
-    for (origin_tup, norm_tup), hole_type in HOLES.items():
-        barr_type = BARRIERS[origin_tup, norm_tup]
-        origin = Vec(origin_tup)
-        normal = Vec(norm_tup)
+    for (origin, normal), hole_type in HOLES.items():
+        barr_type = BARRIERS[origin, normal]
         norm_axis = normal.axis()
         u, v = origin.other_axes(norm_axis)
-        norm_pos = Vec.with_axes(norm_axis, origin)
-        slice_plane = slices[
-            norm_pos.as_tuple(),
-            normal[norm_axis] > 0,
-        ]
+        norm_pos = FrozenVec.with_axes(norm_axis, origin)
+        slice_plane = slices[norm_pos, normal[norm_axis] > 0]
         offsets: tuple[int, ...]
         if hole_type is HoleType.LARGE:
             offsets = (-80, -48, -16, 16, 48, 80)
@@ -421,12 +403,9 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
             for corn_angles.roll in (0, 90, 180, 270):
                 corn_mat = Matrix.from_angle(corn_angles)
 
-                corn_dir = Vec(y=1, z=1) @ corn_angles
+                corn_dir = FrozenVec(y=1, z=1) @ corn_angles
                 hole_off = origin + 128 * corn_dir
-                diag_type = HOLES.get(
-                    (hole_off.as_tuple(), normal.as_tuple()),
-                    None,
-                )
+                diag_type = HOLES.get((hole_off, normal), None)
                 corner_pos = origin + 80 * corn_dir
                 corn_u, corn_v = corner_pos.other_axes(norm_axis)
                 corn_u = int(corn_u // 32)
@@ -485,10 +464,9 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
             solid_pane_func,
         )
 
-    for (plane_pos_tup, is_pos), pos_slice in slices.items():
-        plane_pos = Vec(plane_pos_tup)
+    for (plane_pos, is_pos), pos_slice in slices.items():
         norm_axis = plane_pos.axis()
-        normal = Vec.with_axes(norm_axis, 1 if is_pos else -1)
+        normal = FrozenVec.with_axes(norm_axis, 1 if is_pos else -1)
 
         u_axis, v_axis = Vec.INV_AXIS[norm_axis]
 
@@ -546,12 +524,12 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
 
 def make_glass_grating(
     vmf: VMF,
-    ent_pos: Vec,
-    normal: Vec,
+    ent_pos: Vec | FrozenVec,
+    normal: Vec | FrozenVec,
     barr_type: BarrierType,
     front_temp: template_brush.ScalingTemplate,
     solid_func: Callable[[float, float, str], list[Solid]],
-):
+) -> None:
     """Make all the brushes needed for glass/grating.
 
     solid_func() is called with two offsets from the voxel edge, and returns a
@@ -581,7 +559,7 @@ def make_glass_grating(
             texturing.apply(texturing.GenCat.SPECIAL, face, tex_cat)
             front_temp.apply(face, change_mat=False)
 
-    if normal.z == 0:
+    if abs(normal.z) < 0.125:
         # If vertical, we don't care about footsteps.
         # So just use 'normal' clips.
         player_clip = vmf.create_ent('func_detail')
@@ -612,7 +590,7 @@ def make_glass_grating(
         phys_clip.solids = solid_func(0, 2, consts.Tools.TRIGGER)
 
 
-def add_glass_floorbeams(vmf: VMF, temp_name: str):
+def add_glass_floorbeams(vmf: VMF, temp_name: str) -> None:
     """Add beams to separate large glass panels.
 
     The texture is assumed to match plasticwall004a's shape.
@@ -621,8 +599,10 @@ def add_glass_floorbeams(vmf: VMF, temp_name: str):
     beam_template: Solid
     try:
         [beam_template] = template.visgrouped_solids()
-    except ValueError:
-        raise user_errors.UserError(user_errors.TOK_GLASS_FLOORBEAM_TEMPLATE)
+    except ValueError as exc:
+        raise user_errors.UserError(user_errors.TOK_GLASS_FLOORBEAM_TEMPLATE) from ValueError(
+            f'Floorbeam template {temp_name} has multiple/zero solids!'
+        ).with_traceback(exc.__traceback__)
 
     # Grab the 'end' side, which we move around.
     for side in beam_template.sides:
@@ -637,41 +617,37 @@ def add_glass_floorbeams(vmf: VMF, temp_name: str):
 
     # First we want to find all the groups of contiguous glass sections.
     # This is a mapping from some glass piece to its group list.
-    groups = {}
+    groups: dict[FrozenVec, list[FrozenVec]] = {}
 
-    for (origin, normal_tup), barr_type in BARRIERS.items():
+    for (origin, normal), barr_type in BARRIERS.items():
         # Grating doesn't use it.
         if barr_type is not BarrierType.GLASS:
             continue
 
-        normal = Vec(normal_tup)
-
-        if not normal.z:
+        if abs(normal.z) < 0.125:
             # Not walls.
             continue
 
-        pos = Vec(origin) + normal * 62
+        pos = FrozenVec(origin) + normal * 62
 
-        groups[pos.as_tuple()] = [pos]
+        groups[pos] = [pos]
 
     # Loop over every pos and check in the +x/y directions for another glass
     # piece. If there, merge the two lists and set every pos in the group to
     # point to the new list.
     # Once done, every unique list = a group.
 
-    for pos_tup in groups.keys():
-        pos = Vec(pos_tup)
+    for pos in groups.keys():
         for off in ((128, 0, 0), (0, 128, 0)):
-            neighbour = (pos + off).as_tuple()
+            neighbour = pos + off
             if neighbour in groups:
-                our_group = groups[pos_tup]
+                our_group = groups[pos]
                 neigh_group = groups[neighbour]
                 if our_group is neigh_group:
                     continue
 
                 # Now merge the two lists. We then need to update all dict
                 # locations to point to the new list.
-
                 if len(neigh_group) > len(our_group):
                     small_group, large_group = our_group, neigh_group
                 else:
@@ -679,17 +655,17 @@ def add_glass_floorbeams(vmf: VMF, temp_name: str):
 
                 large_group.extend(small_group)
                 for pos in small_group:
-                    groups[pos.as_tuple()] = large_group
+                    groups[pos] = large_group
 
-    # Remove duplicates objects by using the ID as key..
-    groups = list({
+    # Remove duplicate objects by using the ID as key..
+    group_list = list({
         id(group): group
         for group in groups.values()
     }.values())
 
     # Side -> u, v or None
 
-    for group in groups:
+    for group in group_list:
         bbox_min, bbox_max = Vec.bbox(group)
         dimensions = bbox_max - bbox_min
 
@@ -748,7 +724,7 @@ def add_glass_floorbeams(vmf: VMF, temp_name: str):
                 detail.solids.append(new_beam)
 
 
-def beam_hole_split(axis: str, min_pos: Vec, max_pos: Vec):
+def beam_hole_split(axis: str, min_pos: Vec, max_pos: Vec) -> Iterator[tuple[Vec, Vec]]:
     """Break up floor beams to fit around holes."""
 
     # Go along the shape. For each point, check if a hole is present,
@@ -764,12 +740,12 @@ def beam_hole_split(axis: str, min_pos: Vec, max_pos: Vec):
         # Extract normal from the z-axis.
         grid_height = min_pos.z // 128 * 128 + 64
         if grid_height < min_pos.z:
-            normal = (0, 0, 1)
+            normal = FrozenVec(z=+1)
         else:
-            normal = (0, 0, -1)
+            normal = FrozenVec(z=-1)
         for pos in min_pos.iter_line(max_pos, 128):
             try:
-                hole_type = HOLES[(pos.x, pos.y, grid_height), normal]
+                hole_type = HOLES[FrozenVec(pos.x, pos.y, grid_height), normal]
             except KeyError:
                 continue
             else:

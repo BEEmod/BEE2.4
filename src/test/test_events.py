@@ -1,185 +1,151 @@
 """Test the events manager and collections."""
-from typing import no_type_check
+from typing import Dict
+from unittest.mock import AsyncMock, call, create_autospec
+
 import pytest
-from unittest.mock import AsyncMock, create_autospec, call
+import trio
 
-from event import EventBus, ValueChange, ObsValue
+from event import Event, ObsValue, ValueChange
 
 
-async def event_func(arg):
+async def func_unary(arg: object) -> None:
     """Expected signature of event functions."""
     pass
 
 
 async def test_simple_register() -> None:
-    """Test registering events in the bus."""
-    bus = EventBus()
-    func1 = create_autospec(event_func)
-    func2 = create_autospec(event_func)
-    ctx1 = object()
-    ctx2 = object()
+    """Test registering events."""
+    event = Event[int]()
+    func1 = create_autospec(func_unary, name='func1')
+    func2 = create_autospec(func_unary, name='func2')
 
-    bus.register(ctx1, int, func1)
+    res = event.register(func1)
+    assert res is func1
 
     func1.assert_not_awaited()
     func2.assert_not_awaited()
 
-    await bus(ctx1, 5)
+    await event(5)
 
     func1.assert_awaited_once_with(5)
-    func2.assert_not_awaited()
     func1.reset_mock()
 
-    # Different context, not fired.
-    await bus(ctx2, 12)
+    await event(12)
 
-    func1.assert_not_awaited()
-    func2.assert_not_awaited()
-
-    bus.register(ctx2, int, func2)
-
-    func1.assert_not_awaited()
-    func2.assert_not_awaited()
-
-    await bus(ctx2, 34)
-    func1.assert_not_awaited()
-    func2.assert_awaited_once_with(34)
-    func2.reset_mock()
+    func1.assert_awaited_once_with(12)
+    func1.reset_mock()
 
 
 async def test_unregister() -> None:
     """Test unregistering events in the bus."""
-    bus = EventBus()
-    func1 = create_autospec(event_func)
-    func2 = create_autospec(event_func)
-    ctx = object()
+    event = Event[bool]()
+    func1 = create_autospec(func_unary, name='func1')
+    func2 = create_autospec(func_unary, name='func2')
+    func3 = create_autospec(func_unary, name='func3')
 
-    bus.register(ctx, bool, func1)
-    bus.register(ctx, bool, func2)
-    await bus(ctx, True)
+    event.register(func1)
+    event.register(func2)
+    await event(True)
 
     func1.assert_awaited_once_with(True)
     func2.assert_awaited_once_with(True)
+    func3.assert_not_awaited()
     func1.reset_mock()
     func2.reset_mock()
 
     with pytest.raises(LookupError):
-        bus.unregister(ctx, int, func1)
+        event.unregister(func3)
+    event.unregister(func1)
     with pytest.raises(LookupError):
-        bus.unregister(45, bool, func1)
-    bus.unregister(ctx, bool, func1)
+        event.unregister(func1)  # No repeats.
 
     func1.assert_not_awaited()
     func2.assert_not_awaited()
+    func3.assert_not_awaited()
 
-    await bus(ctx, False)
+    await event(False)
 
     func1.assert_not_awaited()
     func2.assert_awaited_once_with(False)
-
-
-async def test_register_nonearg() -> None:
-    """Test registering events with no arg in the bus."""
-    bus = EventBus()
-    func1 = create_autospec(event_func, name='func1')
-    func2 = create_autospec(event_func, name='func2')
-    ctx1 = object()
-    ctx2 = object()
-
-    bus.register(ctx1, None, func1)
-
-    func1.assert_not_awaited()
-    func2.assert_not_awaited()
-
-    await bus(ctx1)
-
-    func1.assert_awaited_once_with(None)
-    func2.assert_not_awaited()
-    func1.reset_mock()
-
-    # Different context, not fired.
-    await bus(ctx2)
-
-    func1.assert_not_awaited()
-    func2.assert_not_awaited()
-
-    bus.register(ctx2, None, func2)
-
-    func1.assert_not_awaited()
-    func2.assert_not_awaited()
-
-    await bus(ctx2, None)
-    func1.assert_not_awaited()
-    func2.assert_awaited_once_with(None)
-    func2.reset_mock()
-
-
-async def test_unregister_nonearg() -> None:
-    """Test unregistering events in the bus."""
-    bus = EventBus()
-    func1 = create_autospec(event_func, name='func1')
-    func2 = create_autospec(event_func, name='func2')
-    ctx = object()
-
-    bus.register(ctx, None, func1)
-    bus.register(ctx, None, func2)
-    await bus(ctx)
-
-    func1.assert_awaited_once_with(None)
-    func2.assert_awaited_once_with(None)
-    func1.reset_mock()
-    func2.reset_mock()
-
-    with pytest.raises(LookupError):
-        bus.unregister(ctx, int, func1)
-    with pytest.raises(LookupError):
-        bus.unregister(45, None, func1)
-    bus.unregister(ctx, None, func1)
-
-    func1.assert_not_awaited()
-    func2.assert_not_awaited()
-
-    await bus(ctx)
-
-    func1.assert_not_awaited()
-    func2.assert_awaited_once_with(None)
+    func3.assert_not_awaited()
 
 
 async def test_register_priming() -> None:
     """Test the priming version of registering."""
-    bus = EventBus()
-    func1 = create_autospec(event_func, name='func1')
-    func2 = create_autospec(event_func, name='func2')
+    event = Event[int]('prime_event')
+    func1 = create_autospec(func_unary, name='func1')
+    func2 = create_autospec(func_unary, name='func2')
 
     # If not fired, does nothing.
-    await bus.register_and_prime(None, int, func1)
+    await event.register_and_prime(func1)
     func1.assert_not_awaited()
-    await bus(None, 5)
+    await event(5)
     func1.assert_awaited_once_with(5)
 
     func1.reset_mock()
     # Now it's been fired already, the late registry can be sent it.
-    await bus.register_and_prime(None, int, func2)
+    await event.register_and_prime(func2)
     func1.assert_not_awaited()  # This is unaffected.
     func2.assert_awaited_once_with(5)
 
     func1.reset_mock()
     func2.reset_mock()
 
-    await bus(None, 10)
+    await event(10)
     func1.assert_awaited_once_with(10)
     func2.assert_awaited_once_with(10)
 
 
-@no_type_check
+async def test_isolate() -> None:
+    """Test the isolation context manager."""
+    event = Event[int]('isolate')
+    func1 = create_autospec(func_unary, name='func1')
+    func2 = create_autospec(func_unary, name='func2')
+    event.register(func1)
+    await event(4)
+    func1.assert_awaited_once_with(4)
+
+    func1.reset_mock()
+    rec: trio.MemoryReceiveChannel
+    with event.isolate() as rec:
+        with pytest.raises(ValueError):  # No nesting.
+            with event.isolate():
+                pass
+
+        await event(5)
+        func1.assert_not_awaited()
+        assert await rec.receive() == (5, )
+
+        await event.register_and_prime(func2)
+        func1.assert_not_awaited()
+        func2.assert_awaited_once_with(5)  # Still passed through.
+        func2.reset_mock()
+
+        await event(48)
+        await event(36)
+        for i in range(1024):  # Unlimited buffer.
+            await event(i)
+
+    func1.assert_not_awaited()
+    func2.assert_not_awaited()
+
+    assert await rec.receive() == (48, )
+    assert await rec.receive() == (36, )
+    for i in range(1024):
+        assert await rec.receive() == (i, )
+    # Finished here.
+    with pytest.raises(trio.EndOfChannel):
+        await rec.receive()
+
+
 def test_valuechange() -> None:
     """Check ValueChange() produces the right values."""
     with pytest.raises(TypeError):
-        ValueChange()
+        ValueChange()  # type: ignore
     with pytest.raises(TypeError):
-        ValueChange(1)
+        ValueChange(1)  # type: ignore
     with pytest.raises(TypeError):
-        ValueChange(1, 2, 3)
+        ValueChange(1, 2, 3)  # type: ignore
     assert ValueChange(1, 2) == ValueChange(1, 2)
     assert ValueChange(old=2, new=3) == ValueChange(2, 3)
 
@@ -200,7 +166,7 @@ def test_valuechange_hash() -> None:
     """Check ValueChange() can be hashed and put in a dict key."""
     key = ValueChange(45, 38)
     assert hash(key) == hash(ValueChange(45.0, 38.0))
-    dct: dict[ValueChange, object] = {
+    dct: Dict[ValueChange[object], object] = {
         key: 45,
         ValueChange('text', 12): sum,
     }
@@ -212,8 +178,7 @@ def test_valuechange_hash() -> None:
 
 async def test_obsval_getset() -> None:
     """Check getting/setting functions normally, unrelated to events."""
-    bus = EventBus()
-    holder: ObsValue[object] = ObsValue(bus, 45)
+    holder: ObsValue[object] = ObsValue(45, 'obsval_getset')
     assert holder.value == 45
 
     await holder.set(32)
@@ -229,10 +194,9 @@ async def test_obsval_getset() -> None:
 
 async def test_obsval_fires() -> None:
     """Check an event fires whenever the value changes."""
-    bus = EventBus()
-    holder: ObsValue[object] = ObsValue(bus, 0)
-    func1 = create_autospec(event_func)
-    bus.register(holder, ValueChange, func1)
+    holder: ObsValue[object] = ObsValue(0, 'obsval_getset')
+    func1 = create_autospec(func_unary)
+    holder.on_changed.register(func1)
     func1.assert_not_awaited()
 
     assert holder.value == 0
@@ -257,17 +221,16 @@ async def test_obsvalue_set_during_event() -> None:
     # The third will cause it to set it to 3.
     # A new event will then fire, setting it to 3 again.
     # No event will fire.
-    bus = EventBus()
-    holder = ObsValue(bus, 0)
+    holder = ObsValue(0, 'set_during')
 
-    async def event(arg: ValueChange):
+    async def event(arg: ValueChange[int]) -> None:
         """Event fired when registered."""
         assert arg.new == holder.value, f"Wrong new val: {arg} != {holder.value}"
         await holder.set(min(3, arg.new + 1))
 
     mock = AsyncMock(side_effect=event)
     mock.assert_not_awaited()
-    bus.register(holder, ValueChange, mock)
+    holder.on_changed.register(mock)
     await holder.set(1)
     assert holder.value == 3
     assert mock.call_count == 4
@@ -281,12 +244,11 @@ async def test_obsvalue_set_during_event() -> None:
 
 async def test_obsval_repr() -> None:
     """Test the repr() of ObsValue."""
-    bus = EventBus()
-    holder: ObsValue[object] = ObsValue(bus, 0)
-    assert repr(holder) == f'ObsValue({bus!r}, 0)'
+    holder: ObsValue[object] = ObsValue(0)
+    assert repr(holder) == f'ObsValue(0, on_changed={holder.on_changed!r})'
 
     await holder.set([1, 2, 3])
-    assert repr(holder) == f'ObsValue({bus!r}, [1, 2, 3])'
+    assert repr(holder) == f'ObsValue([1, 2, 3], on_changed={holder.on_changed!r})'
 
     await holder.set(None)
-    assert repr(holder) == f'ObsValue({bus!r}, None)'
+    assert repr(holder) == f'ObsValue(None, on_changed={holder.on_changed!r})'

@@ -1,10 +1,12 @@
-from typing import Callable, Any, Union
+from typing import Callable, Any, Optional, Union
 
 import tkinter as tk
 from tkinter import ttk
 
-from app import localisation, tooltip, tk_tools, sound
-from app.img import Handle as ImgHandle, apply as apply_img
+from app import tooltip, tk_tools, sound
+from app.img import Handle as ImgHandle
+from ui_tk.img import TKImages
+from ui_tk import wid_transtoken
 from transtoken import TransToken
 from config.windows import WindowState
 import utils
@@ -21,14 +23,18 @@ style.configure('Toolbar.TButton', padding='-20',)
 TOOL_BTN_TOOLTIP = TransToken.ui('Hide/Show the "{window}" window.')
 
 
-def make_tool_button(frame: tk.Misc, img: str, command: Callable[[], Any]) -> ttk.Button:
+def make_tool_button(
+    frame: tk.Misc, tk_img: TKImages,
+    img: str,
+    command: Callable[[], Any],
+) -> ttk.Button:
     """Make a toolbar icon."""
     button = ttk.Button(
         frame,
         style=('Toolbar.TButton' if utils.MAC else 'BG.TButton'),
         command=command,
     )
-    apply_img(button, ImgHandle.builtin(img, 16, 16))
+    tk_img.apply(button, ImgHandle.builtin(img, 16, 16))
 
     return button
 
@@ -41,6 +47,7 @@ class SubPane(tk.Toplevel):
     def __init__(
         self,
         parent: Union[tk.Toplevel, tk.Tk],
+        tk_img: TKImages,
         *,
         tool_frame: Union[tk.Frame, ttk.Frame],
         tool_img: str,
@@ -64,9 +71,11 @@ class SubPane(tk.Toplevel):
         self.can_resize_y = resize_y
         super().__init__(parent, name='pane_' + name)
         self.withdraw()  # Hide by default
+        if utils.LINUX:
+            self.wm_attributes('-type', 'utility')
 
         self.tool_button = make_tool_button(
-            frame=tool_frame,
+            tool_frame, tk_img,
             img=tool_img,
             command=self._toggle_win,
         )
@@ -80,11 +89,11 @@ class SubPane(tk.Toplevel):
         tooltip.add_tooltip(self.tool_button, text=TOOL_BTN_TOOLTIP.format(window=title))
 
         menu_bar.add_checkbutton(variable=self.visible, command=self._set_state_from_menu)
-        localisation.set_menu_text(menu_bar, title)
+        wid_transtoken.set_menu_text(menu_bar, title)
 
         self.transient(master=parent)
         self.resizable(resize_x, resize_y)
-        localisation.set_win_title(self, title)
+        wid_transtoken.set_win_title(self, title)
         tk_tools.set_window_icon(self)
 
         self.protocol("WM_DELETE_WINDOW", self.hide_win)
@@ -129,13 +138,19 @@ class SubPane(tk.Toplevel):
         else:
             self.hide_win()
 
-    def move(self, x: int=None, y: int=None, width: int=None, height: int=None) -> None:
+    def move(
+        self,
+        x: Optional[int] = None,
+        y: Optional[int] = None,
+        width: Optional[int] = None,
+        height: Optional[int] = None,
+    ) -> None:
         """Move the window to the specified position.
 
         Effectively an easier-to-use form of Toplevel.geometry(), that
-        also updates relX and relY.
+        also updates `relX` and `relY`.
         """
-        # If we're resizable, keep the current size. Otherwise autosize to
+        # If we're resizable, keep the current size. Otherwise, autosize to
         # contents.
         if width is None:
             width = self.winfo_width() if self.can_resize_x else self.winfo_reqwidth()
@@ -153,10 +168,11 @@ class SubPane(tk.Toplevel):
         self.relY = y - self.parent.winfo_y()
         self.save_conf()
 
-    def enable_snap(self, e=None) -> None:
+    def enable_snap(self, e: Optional[tk.Event[tk.Misc]] = None) -> None:
+        """Allow the window to snap."""
         self.allow_snap = True
 
-    def snap_win(self, e=None) -> None:
+    def snap_win(self, e: Optional[tk.Event[tk.Misc]] = None) -> None:
         """Callback for window movement.
 
         This allows it to snap to the edge of the main window.
@@ -167,7 +183,7 @@ class SubPane(tk.Toplevel):
             self.relY = self.winfo_y() - self.parent.winfo_y()
             self.save_conf()
 
-    def follow_main(self, e=None) -> None:
+    def follow_main(self, e: object = None) -> None:
         """When the main window moves, sub-windows should move with it."""
         self.allow_snap = False
         x, y = tk_tools.adjust_inside_screen(
@@ -175,7 +191,7 @@ class SubPane(tk.Toplevel):
             y=self.parent.winfo_y()+self.relY,
             win=self,
         )
-        self.geometry('+'+str(x)+'+'+str(y))
+        self.geometry(f'+{x}+{y}')
         self.parent.focus()
 
     def save_conf(self) -> None:

@@ -4,7 +4,7 @@ from __future__ import annotations
 from collections.abc import Iterator, Iterable
 
 import attrs
-from srctools import Vec, Property, Entity, VMF, Solid, Matrix
+from srctools import Vec, Keyvalues, Entity, VMF, Solid, Matrix
 import srctools.logger
 
 from precomp import tiling, instanceLocs, conditions, connections, template_brush
@@ -67,6 +67,8 @@ class Marker:
         """Follow the provided vactube path, yielding each pair of nodes."""
         vac_node = self
         while True:
+            if vac_node.next is None:
+                return
             try:
                 next_ent = vac_list[vac_node.next]
             except KeyError:
@@ -81,11 +83,35 @@ VAC_CONFIGS: dict[str, dict[str, tuple[Config, int]]] = {}
 
 
 @conditions.make_result('CustVactube')
-def res_vactubes(vmf: VMF, res: Property) -> conditions.ResultCallable:
+def res_vactubes(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
     """Specialised result to parse vactubes from markers.
 
     Only runs once, and then quits the condition list. After priority 400,
     the ents will actually be placed.
+
+    Options:
+    * `group`: Specifies the group this belongs to. Items with the same group can be connected
+      together.
+    * `Instances`: Configuration for a set of instances.
+        * `trig_size`: The width of the automatically generated `trigger_vphysics_motion` and
+          `trigger_push`es. If zero, no triggers will be produced.
+        * `straight_inst`: Instance to use for straight segments. This can itself be a block to
+           specify different length variants - the key should be the length in units (128, 256, 192, etc).
+        * `corner_small_inst`, `corner_medium_inst`, `corner_large_inst`: The instance for each size
+          of corner turn.
+        * `temp_corner_small`, `temp_corner_medium`, `temp_corner_large`: Template IDs
+          (and optionally `:visgroups`) corresponding to these corner instances. These produce a
+          `trigger_vphysics_motion` for the corner.
+        * `support_inst`: For straight segments, up to 4 of these are placed to attach the segment
+          to any walls, if adjacient tiles are present.
+        * `support_ring_inst`: Placed over a straight instance, if any `support_inst` are placed in
+           that voxel.
+        * `entry_floor_inst`: Placed on the start of the tube, if the tube points downward into
+          the floor.
+        * `entry_ceil_inst`: Placed on the start of the tube, if the tube points upward into the
+          ceiling.
+        * `entry_inst`: Placed on the start of the tube, if it faces horizontally.
+        * `exit_inst`: Placed on the end of the tube.
     """
     group = res['group', 'DEFAULT_GROUP']
 
@@ -153,8 +179,9 @@ def res_vactubes(vmf: VMF, res: Property) -> conditions.ResultCallable:
                 size = 0
                 file = prop.value
 
-            for inst_filename in instanceLocs.resolve(file):
-                inst_config[inst_filename] = conf, size
+            inst_config.update(
+                dict.fromkeys(instanceLocs.resolve_filter(file), (conf, size))
+            )
 
     def result(_: Entity) -> object:
         """Create the vactubes."""
@@ -309,7 +336,7 @@ def make_straight(
     normal: Vec,
     dist: int,
     config: Config,
-    is_start=False,
+    is_start: bool = False,
 ) -> None:
     """Make a straight line of instances from one point to another."""
     angles = round(normal, 6).to_angle()
@@ -319,16 +346,17 @@ def make_straight(
     # point_push entity.
     start_off = -96 if is_start else -64
 
-    p1, p2 = Vec.bbox(
-        origin + Vec(start_off, -config.trig_radius, -config.trig_radius) @ orient,
-        origin + Vec(dist - 64, config.trig_radius, config.trig_radius) @ orient,
-    )
+    if config.trig_radius > 0.0:
+        p1, p2 = Vec.bbox(
+            origin + Vec(start_off, -config.trig_radius, -config.trig_radius) @ orient,
+            origin + Vec(dist - 64, config.trig_radius, config.trig_radius) @ orient,
+        )
 
-    solid = vmf.make_prism(p1, p2, mat='tools/toolstrigger').solid
+        solid = vmf.make_prism(p1, p2, mat='tools/toolstrigger').solid
 
-    motion_trigger(vmf, solid.copy())
+        motion_trigger(vmf, solid.copy())
 
-    push_trigger(vmf, origin, normal, [solid])
+        push_trigger(vmf, origin, normal, [solid])
 
     off = 0
     for seg_dist in utils.fit(dist, config.inst_straight_sizes):
@@ -391,7 +419,7 @@ def make_corner(
     )
 
     temp, visgroups = config.temp_corner[int(size)]
-    if temp is not None:
+    if temp is not None and config.trig_radius > 0.0:
         temp_solids = template_brush.import_template(
             vmf,
             temp,
@@ -410,9 +438,9 @@ def make_bend(
     origin_b: Vec,
     norm_a: Vec,
     norm_b: Vec,
-    config,
+    config: Config,
     max_size: int,
-    is_start=False,
+    is_start: bool = False,
 ) -> None:
     """Make a corner and the straight sections leading into it."""
     off = origin_b - origin_a
@@ -468,10 +496,10 @@ def make_ubend(
     origin_a: Vec,
     origin_b: Vec,
     normal: Vec,
-    config,
+    config: Config,
     max_size: int,
-    is_start=False,
-):
+    is_start: bool = False,
+) -> None:
     """Create U-shaped bends."""
     offset = origin_b - origin_a
 
@@ -482,7 +510,7 @@ def make_ubend(
     if len(offset) == 2:
         # Len counts the non-zero values.
         # If 2, the U-bend is diagonal, and it's ambiguous where to put the bends.
-        return []
+        return
 
     side_norm = offset.norm()
 
@@ -493,7 +521,7 @@ def make_ubend(
     else:
         # The two tube items are on top of another, that's
         # impossible to generate.
-        return []
+        return
 
     # Calculate the size of the various parts.
     # first/second _size = size of the corners.
@@ -524,7 +552,7 @@ def make_ubend(
         first_straight = (out_off + 128) - 128 * second_size
         second_straight = (first_size - second_size) * 128
 
-        side_straight = (side_dist / 128 - first_size - second_size) * 128
+        side_straight = (side_dist // 128 - first_size - second_size) * 128
 
     elif out_off < 0:
         # The first tube is further away than the second - the second bend
@@ -540,9 +568,9 @@ def make_ubend(
         first_straight = (second_size - first_size) * 128
         second_straight = (-out_off + 128) - 128 * second_size
 
-        side_straight = (side_dist / 128 - first_size - second_size) * 128
+        side_straight = (side_dist // 128 - first_size - second_size) * 128
     else:
-        return []  # Not possible..
+        return  # Not possible...
 
     # We always have a straight segment at the first marker point - move
     # everything up slightly.

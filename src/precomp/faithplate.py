@@ -2,7 +2,7 @@
 
 This also handles Bomb-type Paint Droppers.
 """
-from typing import ClassVar, Dict, Optional, Union
+from typing import ClassVar, Dict, List, Optional, Tuple, Union
 import collections
 
 import attrs
@@ -74,9 +74,9 @@ def associate_faith_plates(vmf: VMF) -> None:
     """
 
     # Find all the triggers and targets first.
-    triggers: dict[str, Optional[Entity]] = {}
-    helper_trigs: dict[str, Entity] = {}
-    paint_trigs: dict[str, Entity] = {}
+    triggers: Dict[str, Optional[Entity]] = {}
+    helper_trigs: Dict[str, Entity] = {}
+    paint_trigs: Dict[str, Entity] = {}
 
     for trig in vmf.by_class['trigger_catapult']:
         name = trig['targetname']
@@ -122,7 +122,7 @@ def associate_faith_plates(vmf: VMF) -> None:
         tile_pos = Vec.from_str(targ['origin'])
 
         grid_pos: Vec = origin // 128 * 128 + 64
-        norm = (origin - grid_pos).norm()
+        abs_norm = (origin - grid_pos).norm()
 
         # If we're on the floor above the top of goo, move down to the surface.
         block_type = brushLoc.POS.lookup_world(tile_pos - (0, 0, 64))
@@ -130,7 +130,7 @@ def associate_faith_plates(vmf: VMF) -> None:
             tile_pos.z -= 32
 
         tile_or_pos: Union[Vec, tiling.TileDef] = tile_pos
-        for norm in [norm, -norm]:
+        for norm in [abs_norm, -abs_norm]:
             # Try both directions.
             try:
                 tile_or_pos = tiling.TILES[
@@ -148,9 +148,9 @@ def associate_faith_plates(vmf: VMF) -> None:
     # Loop over instances, recording plates and moving targets into the tiledefs.
     instances: Dict[str, Entity] = {}
 
-    faith_targ_file = instanceLocs.resolve('<ITEM_CATAPULT_TARGET>')
+    faith_targ_files = instanceLocs.resolve_filter('<ITEM_CATAPULT_TARGET>')
     for inst in vmf.by_class['func_instance']:
-        if inst['file'].casefold() in faith_targ_file:
+        if inst['file'].casefold() in faith_targ_files:
             inst.remove()  # Don't keep the targets.
             origin = Vec.from_str(inst['origin'])
             norm = Vec(z=1) @ Angle.from_str(inst['angles'])
@@ -191,17 +191,17 @@ def associate_faith_plates(vmf: VMF) -> None:
         PLATES[name] = PaintDropper(instances[name], trig, pos)
 
 
-def gen_faithplates(vmf: VMF) -> None:
+def gen_faithplates(vmf: VMF, has_superpos: bool) -> None:
     """Place the targets and catapults into the map."""
     # Target positions -> list of triggers wanting to aim there.
-    pos_to_trigs: dict[
-        Union[tuple[float, float, float], tiling.TileDef],
-        list[Entity]
+    pos_to_trigs: Dict[
+        Union[Tuple[float, float, float], tiling.TileDef],
+        List[Entity]
     ] = collections.defaultdict(list)
 
     for plate in PLATES.values():
         if isinstance(plate, (AngledPlate, PaintDropper)):
-            targ_pos: Union[tuple[float, float, float], tiling.TileDef]
+            targ_pos: Union[Tuple[float, float, float], tiling.TileDef]
             if isinstance(plate.target, tiling.TileDef):
                 targ_pos = plate.target  # Use the ID directly.
             else:
@@ -227,6 +227,8 @@ def gen_faithplates(vmf: VMF) -> None:
             elif plate.trig_offset:
                 for solid in trig.solids:
                     solid.translate(plate.trig_offset)
+            if has_superpos:
+                trig['filtername'] = '@not_superpos_ghost_filter'
 
     # Now, generate each target needed.
     for pos_or_tile, trigs in pos_to_trigs.items():

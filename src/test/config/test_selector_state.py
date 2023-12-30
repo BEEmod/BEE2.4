@@ -1,7 +1,7 @@
 """Test selectorwin UI state configuration."""
-import pytest
-from srctools import Property as Keyvalues
+from srctools import Keyvalues
 from srctools.dmx import Element
+import pytest
 
 from config.windows import SelectorState
 
@@ -143,7 +143,7 @@ def test_export_dmx() -> None:
         }
     )
     elem = state.export_dmx()
-    assert len(elem) == 4
+    assert len(elem) == 5
     assert elem['width'].val_int == 198
     assert elem['height'].val_int == 1685
     assert set(elem['opened'].iter_string()) == {'', 'open group', 'anothergroup'}

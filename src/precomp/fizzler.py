@@ -1,14 +1,15 @@
 """Implements fizzler/laserfield generation and customisation."""
 from __future__ import annotations
 from collections import defaultdict
-from typing import Iterator, Callable
+from typing import Iterator, Callable, final
+from typing_extensions import Self, assert_never
 from enum import Enum
 import itertools
 
 import attrs
 import srctools.vmf
 from srctools.vmf import VMF, Solid, Entity, Side, Output
-from srctools import Property, NoKeyError, Vec, Matrix, Angle, logger
+from srctools import Keyvalues, NoKeyError, Vec, Matrix, Angle, logger
 
 import utils
 from precomp import (
@@ -87,6 +88,7 @@ class FizzInst(Enum):
     BASE = 'base_inst'  # If set, swap the instance to this.
 
 
+@final
 @attrs.frozen
 class MatModify:
     """Data for injected material modify controls."""
@@ -94,16 +96,17 @@ class MatModify:
     mat_var: str
 
 
+@final
 @attrs.frozen
 class FizzBeam:
     """Configuration for env_beams added across fizzlers."""
     offset: list[Vec]
-    keys: Property
+    keys: Keyvalues
     speed_min: int
     speed_max: int
 
 
-def read_configs(conf: Property) -> None:
+def read_configs(conf: Keyvalues) -> None:
     """Read in the fizzler data."""
     for fizz_conf in conf.find_all('Fizzlers', 'Fizzler'):
         with logger.context(fizz_conf['id', '??']):
@@ -156,75 +159,64 @@ def read_configs(conf: Property) -> None:
         ))
 
 
+@final
+@attrs.define(eq=False, kw_only=True)
 class FizzlerType:
     """Implements a specific fizzler type."""
-    def __init__(
-        self,
-        fizz_id: str,
-        item_ids: list[str],
-        voice_attrs: list[str],
-        pack_lists: set[str],
-        pack_lists_static: set[str],
-        model_local_name: str,
-        model_name_type: ModelName,
-        nodraw_behind: bool,
-        brushes: list[FizzlerBrush],
-        beams: list[FizzBeam],
-        inst: dict[tuple[FizzInst, bool], list[str]],
+    # Name for the item.
+    id: str
 
-        temp_brush_keys: Property,
-        temp_min: str | None,
-        temp_max: str | None,
-        temp_single: str | None,
-    ):
-        self.id = fizz_id
+    # The item ID(s) this fizzler is produced from, optionally
+    # with a :laserfield or :fizzler suffix to choose a specific
+    # type.
+    item_ids: list[str]
 
-        # The item ID(s) this fizzler is produced from, optionally
-        # with a :laserfield or :fizzler suffix to choose a specific
-        # type.
-        self.item_ids = item_ids
+    # The brushes to generate.
+    brushes: list[FizzlerBrush]
 
-        # The brushes to generate.
-        self.brushes = brushes
+    # Beams to generate.
+    beams: list[FizzBeam]
 
-        # Beams to generate.
-        self.beams = beams
+    voice_attrs: list[str]
 
-        self.voice_attrs = voice_attrs
+    # Packfiles to pack if we're in the map.
+    pack_lists: set[str]
+    pack_lists_static: set[str]
 
-        # Packfiles to pack if we're in the map.
-        self.pack_lists = pack_lists
-        self.pack_lists_static = pack_lists_static
+    # The method used to name the models.
+    model_naming: ModelName
+    model_name: str
 
-        # The method used to name the models.
-        self.model_naming = model_name_type
-        self.model_name = model_local_name
-        # Instances to use - FizzInst, is_static -> list of instances.
-        self.inst = inst
+    # Instances to use - FizzInst, is_static -> list of instances.
+    inst: dict[tuple[FizzInst, bool], list[str]]
 
-        # If set, nodraw the 128x32 area behind the fizzler - to allow
-        # the Clean model to stick through.
-        self.nodraw_behind = nodraw_behind
+    # If set, nodraw the 128x32 area behind the fizzler - to allow
+    # the Clean model to stick through.
+    nodraw_behind: bool
 
-        # If set, add a brush ent using templates.
-        self.temp_single = temp_single
-        self.temp_max = temp_max
-        self.temp_min = temp_min
-        self.temp_brush_keys = temp_brush_keys
+    # If set, add a brush ent using templates.
+    temp_brush_keys: Keyvalues
+    temp_single: str | None
+    temp_max: str | None
+    temp_min: str | None
 
+    blocks_portals: bool = attrs.field(init=False, default=False)
+    fizzles_portals: bool = attrs.field(init=False, default=False)
+
+    def __attrs_post_init__(self) -> None:
         self.blocks_portals = False
         self.fizzles_portals = False
         # We want to know which fizzlers block or fizzle portals.
-        for br in brushes:
+        for br in self.brushes:
             if br.keys['classname'].casefold() == 'trigger_portal_cleanser':
                 # Fizzlers always block.
                 self.blocks_portals = True
                 if srctools.conv_int(br.keys.get('spawnflags', 0)) & 1:
                     self.fizzles_portals = True
-        LOGGER.debug('{}: blocks={}, fizzles={}', fizz_id, self.blocks_portals, self.fizzles_portals)
+        LOGGER.debug('{}: blocks={}, fizzles={}', self.id, self.blocks_portals, self.fizzles_portals)
 
     @classmethod
-    def parse(cls, conf: Property):
+    def parse(cls, conf: Keyvalues) -> Self:
         """Read in a fizzler from a config."""
         fizz_id = conf['id']
         item_ids = [
@@ -249,14 +241,30 @@ class FizzlerType:
             inst_type_name = inst_type.value + ('_static' if is_static else '')
             instances: list[str] = []
             inst[inst_type, is_static] = instances
-            for prop in conf.find_all(inst_type_name):
+            kvs = conf.find_all(inst_type_name)
+            if '_' in inst_type_name:
+                # Allow ModelLeft as well as model_left.
+                kvs = itertools.chain(kvs, conf.find_all(inst_type_name.replace('_', '')))
+            for prop in kvs:
+                if not prop.value:  # Explicitly empty, add that to the list.
+                    instances.append('')
+                    continue
                 resolved = instanceLocs.resolve(prop.value)
-                if prop.value and not resolved:
+                found = False
+                for inst_name in resolved:
+                    # Skip blank instances, if done via lookup.
+                    if inst_name:
+                        instances.append(inst_name)
+                        found = True
+                if prop.value and not found:
                     LOGGER.warning('No instances found using specifier "{}"!', prop.value)
-                instances.extend(resolved)
 
             # Allow specifying weights to bias model locations
             weights = conf[inst_type_name + '_weight', '']
+            if not weights:
+                # Allow ModelLeftWeight as an alternative.
+                weights = conf[inst_type_name.replace('_', '') + 'weight', '']
+
             if weights:
                 # Produce the weights, then process through the original
                 # list to build a new one with repeated elements.
@@ -267,7 +275,7 @@ class FizzlerType:
             # If static versions aren't given, reuse non-static ones.
             # We did False before True above, so we know it's already been calculated.
             if not instances and is_static:
-                inst[inst_type, True] = inst[inst_type, False]
+                inst[inst_type, True] = inst[inst_type, False].copy()
 
         voice_attrs = []
         for prop in conf.find_all('Has'):
@@ -303,7 +311,7 @@ class FizzlerType:
                 for off in
                 beam_prop.find_all('pos')
             ]
-            keys = Property('', [
+            keys = Keyvalues('', [
                 beam_prop.find_key('Keys', or_blank=True),
                 beam_prop.find_key('LocalKeys', or_blank=True)
             ])
@@ -319,7 +327,7 @@ class FizzlerType:
         except NoKeyError:
             temp_brush_keys = temp_min = temp_max = temp_single = None
         else:
-            temp_brush_keys = Property('--', [
+            temp_brush_keys = Keyvalues('--', [
                 temp_conf.find_key('Keys'),
                 temp_conf.find_key('LocalKeys', or_blank=True),
             ])
@@ -330,46 +338,43 @@ class FizzlerType:
             temp_single = temp_conf['Single', None]
 
         return FizzlerType(
-            fizz_id,
-            item_ids,
-            voice_attrs,
-            pack_lists,
-            pack_lists_static,
-            model_local_name,
-            model_name_type,
-            conf.bool('nodraw_behind'),
-            brushes,
-            beams,
-            inst,
-            temp_brush_keys,
-            temp_min,
-            temp_max,
-            temp_single,
+            id=fizz_id,
+            item_ids=item_ids,
+            voice_attrs=voice_attrs,
+            pack_lists=pack_lists,
+            pack_lists_static=pack_lists_static,
+            model_name=model_local_name,
+            model_naming=model_name_type,
+            nodraw_behind=conf.bool('nodraw_behind'),
+            brushes=brushes,
+            beams=beams,
+            inst=inst,
+            temp_brush_keys=temp_brush_keys,
+            temp_min=temp_min,
+            temp_max=temp_max,
+            temp_single=temp_single,
         )
 
 
+@final
+@attrs.define(eq=False, kw_only=True)
 class Fizzler:
     """Represents a specific pair of emitters and a field."""
-    def __init__(
-        self,
-        fizz_type: FizzlerType,
-        up_axis: Vec,
-        base_inst: Entity,
-        emitters: list[tuple[Vec, Vec]]
-    ) -> None:
-        self.fizz_type = fizz_type
-        self.base_inst = base_inst
-        self.up_axis = up_axis  # Pointing toward the 'up' side of the field.
-        self.emitters = emitters  # Pairs of left, right positions.
+    fizz_type: FizzlerType
+    base_inst: Entity
+    up_axis: Vec  # Pointing toward the 'up' side of the field.
+    emitters: list[tuple[Vec, Vec]]  # Pairs of left, right positions.
 
-        self.has_cust_position = False  # If the emitters are a custom layout
-        # True if the fizzler is in the original position, and so we need
-        # to adjust tiles for the sides.
-        self.embedded = True
+    # If the emitters are a custom layout
+    has_cust_position: bool = False
+    # True if the fizzler is in the original position, and so we need
+    # to adjust tiles for the sides.
+    embedded: bool = True
 
-        # Special case - for TAG fizzlers, if that side is enabled.
-        # We generate the triggers elsewhere.
-        self.tag_on_pos = self.tag_on_neg = False
+    # Special case - for TAG fizzlers, if that side is enabled.
+    # We generate the triggers elsewhere.
+    tag_on_pos: bool = False
+    tag_on_neg: bool = False
 
     def forward(self) -> Vec:
         """The axis moving from one side to another."""
@@ -638,13 +643,13 @@ class FizzlerBrush:
         keys: dict[str, str],
         local_keys: dict[str, str],
         outputs: list[Output],
-        thickness: float=2.0,
-        stretch_center: bool=True,
-        side_color: Vec=None,
-        singular: bool=False,
-        set_axis_var: bool=False,
-        mat_mod_name: str=None,
-        mat_mod_var: str=None,
+        thickness: float = 2.0,
+        stretch_center: bool = True,
+        side_color: Vec | None = None,
+        singular: bool = False,
+        set_axis_var: bool = False,
+        mat_mod_name: str | None = None,
+        mat_mod_var: str | None = None,
     ) -> None:
         self.keys = keys
         self.local_keys = local_keys
@@ -681,7 +686,7 @@ class FizzlerBrush:
             self.textures[group] = textures.get(group, None)
 
     @classmethod
-    def parse(cls, conf: Property, fizz_id: str) -> FizzlerBrush:
+    def parse(cls, conf: Keyvalues, fizz_id: str) -> FizzlerBrush:
         """Parse from a config file."""
         if 'side_color' in conf:
             side_color = conf.vec('side_color')
@@ -990,6 +995,34 @@ class FizzlerBrush:
         side.vaxis.offset %= tex_size
 
 
+def make_model_namer(fizz_type: FizzlerType, fizz_name: str) -> Callable[[int], str]:
+    """Define a function which applies the model naming."""
+    local_name = fizz_type.model_name
+    if fizz_type.model_naming is ModelName.SAME:
+        def get_model_name(ind: int) -> str:
+            """Give every emitter the base's name."""
+            return fizz_name
+    elif fizz_type.model_naming is ModelName.LOCAL:
+        def get_model_name(ind: int) -> str:
+            """Give every emitter a name local to the base."""
+            return f'{fizz_name}-{local_name}'
+    elif fizz_type.model_naming is ModelName.PAIRED:
+        def get_model_name(ind: int) -> str:
+            """Give each pair of emitters the same unique name."""
+            return f'{fizz_name}-{local_name}{ind:02}'
+    elif fizz_type.model_naming is ModelName.UNIQUE:
+        model_index = 0
+
+        def get_model_name(ind: int) -> str:
+            """Give every model a unique name."""
+            nonlocal model_index
+            model_index += 1
+            return f'{fizz_name}-{local_name}{model_index:02}'
+    else:
+        raise assert_never(fizz_type.model_naming)
+    return get_model_name
+
+
 def parse_map(vmf: VMF, info: conditions.MapInfo) -> None:
     """Analyse fizzler instances to assign fizzler types.
 
@@ -1101,7 +1134,12 @@ def parse_map(vmf: VMF, info: conditions.MapInfo) -> None:
             max_pos[length_axis] += 64
             emitters.append((min_pos, max_pos))
 
-        FIZZLERS[name] = Fizzler(fizz_type, up_axis, base_inst, emitters)
+        FIZZLERS[name] = Fizzler(
+            fizz_type=fizz_type,
+            base_inst=base_inst,
+            up_axis=up_axis,
+            emitters=emitters,
+        )
 
     # Delete all the old brushes associated with fizzlers
     for brush in (
@@ -1117,7 +1155,7 @@ def parse_map(vmf: VMF, info: conditions.MapInfo) -> None:
             brush.remove()
 
     # Check for fizzler output relays.
-    relay_file = instanceLocs.resolve('<ITEM_BEE2_FIZZLER_OUT_RELAY>', silent=True)
+    relay_file = instanceLocs.resolve_filter('<ITEM_BEE2_FIZZLER_OUT_RELAY>', silent=True)
     if not relay_file:
         # No relay item - deactivated most likely.
         return
@@ -1216,11 +1254,7 @@ def generate_fizzlers(vmf: VMF) -> None:
                 classname='func_brush',
                 origin=fizz.base_inst['origin'],
             )
-            conditions.set_ent_keys(
-                template_brush_ent,
-                fizz.base_inst,
-                fizz_type.temp_brush_keys,
-            )
+            conditions.set_ent_keys(template_brush_ent, fizz.base_inst, fizz_type.temp_brush_keys)
         else:
             template_brush_ent = None
 
@@ -1239,34 +1273,13 @@ def generate_fizzlers(vmf: VMF) -> None:
             or fizz_type.inst[FizzInst.ALL, is_static]
         )
 
-        if not model_min or not model_max:
+        if not any(model_min) or not any(model_max):
             raise user_errors.UserError(
                 user_errors.TOK_FIZZLER_NO_MODEL_SIDE.format(id=fizz_type.id),
                 voxels=[pos for minmax in fizz.emitters for pos in minmax],
             )
 
-        # Define a function to do the model names.
-        model_index = 0
-        if fizz_type.model_naming is ModelName.SAME:
-            def get_model_name(ind: int) -> str:
-                """Give every emitter the base's name."""
-                return fizz_name
-        elif fizz_type.model_naming is ModelName.LOCAL:
-            def get_model_name(ind: int) -> str:
-                """Give every emitter a name local to the base."""
-                return f'{fizz_name}-{fizz_type.model_name}'
-        elif fizz_type.model_naming is ModelName.PAIRED:
-            def get_model_name(ind: int) -> str:
-                """Give each pair of emitters the same unique name."""
-                return f'{fizz_name}-{fizz_type.model_name}{ind:02}'
-        elif fizz_type.model_naming is ModelName.UNIQUE:
-            def get_model_name(ind: int) -> str:
-                """Give every model a unique name."""
-                nonlocal model_index
-                model_index += 1
-                return f'{fizz_name}-{fizz_type.model_name}{model_index:02}'
-        else:
-            raise AssertionError(f'No model name {fizz_type.model_name!r}')
+        get_model_name = make_model_namer(fizz_type, fizz_name)
 
         # Generate env_beam pairs.
         for beam in fizz_type.beams:
@@ -1321,7 +1334,7 @@ def generate_fizzlers(vmf: VMF) -> None:
             length = (seg_max - seg_min).mag()
             rng = rand.seed(b'fizz_seg', seg_min, seg_max)
             if length == 128 and fizz_type.inst[FizzInst.PAIR_SINGLE, is_static]:
-                # Assign to 'min' var so we can share some code.
+                # Assign to 'min' var, so we can share some code.
                 min_inst = conditions.add_inst(
                     vmf,
                     targetname=get_model_name(seg_ind),
@@ -1368,7 +1381,7 @@ def generate_fizzlers(vmf: VMF) -> None:
                     mid_pos = seg_min + forward * dist
                     mid_inst = conditions.add_inst(
                         vmf,
-                        targetname=fizz_name,
+                        targetname=get_model_name(seg_ind),
                         angles=min_orient.to_angle(),
                         file=rng.choice(fizz_type.inst[FizzInst.GRID, is_static]),
                         origin=mid_pos,
@@ -1445,11 +1458,7 @@ def generate_fizzlers(vmf: VMF) -> None:
                         trigger_hurt_start_disabled = brush_ent['startdisabled']
 
                     if brush_type.set_axis_var:
-                        brush_ent['vscript_init_code'] = (
-                            'axis <- `{}`;'.format(
-                                fizz.normal().axis(),
-                            )
-                        )
+                        brush_ent['vscript_init_code'] = f'axis <- `{fizz.normal().axis()}`;'
 
                     for out in brush_type.outputs:
                         new_out = out.copy()
@@ -1470,7 +1479,7 @@ def generate_fizzlers(vmf: VMF) -> None:
                 if brush_type.mat_mod_var is not None:
                     used_tex_func = mat_mod_tex[brush_type].add
                 else:
-                    def used_tex_func(val):
+                    def used_tex_func(texture: str, /) -> None:
                         """If not, ignore those calls."""
                         return None
 

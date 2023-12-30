@@ -11,6 +11,7 @@ from enum import Enum
 from srctools import Vec, Matrix, VMF
 
 import srctools.logger
+from typing_extensions import Self
 
 import user_errors
 import utils
@@ -57,7 +58,7 @@ class Block(Enum):
     PIT_BOTTOM = 23  # Base of a bottomless pit
 
     @classmethod
-    def from_pitgoo_attr(cls, is_pit: bool, is_top: bool, is_bottom: bool):
+    def from_pitgoo_attr(cls, is_pit: bool, is_top: bool, is_bottom: bool) -> Self:
         """Return the appropriate enum, based on bool parameters."""
         off = 20 if is_pit else 10
         if is_top:
@@ -131,14 +132,16 @@ _grid_keys = Union[Vec, Tuple[float, float, float], slice]
 
 
 def _conv_key(pos: _grid_keys) -> tuple[float, float, float]:
-    """Convert the key given in [] to a grid-position, as a x,y,z tuple."""
+    """Convert the key given in [] to a grid-position, as an x,y,z tuple."""
     # TODO: Slices are assumed to be int by typeshed.
+    system: str
+    slice_pos: Vec
     if isinstance(pos, slice):
         system, slice_pos = pos.start, pos.stop
         if system == 'world':
             return world_to_grid(Vec(slice_pos)).as_tuple()
         else:
-            return slice_pos.as_tuple()
+            return Vec(slice_pos).as_tuple()
     x, y, z = pos
     return x, y, z
 
@@ -175,7 +178,7 @@ class Grid(MutableMapping[_grid_keys, Block]):
     def raycast(
         self,
         pos: _grid_keys,
-        direction: Vec,
+        direction: Vec | Tuple[int, int, int],
         collide: Iterable[Block]=frozenset({
             Block.SOLID, Block.EMBED,
             Block.PIT_BOTTOM, Block.PIT_SINGLE,
@@ -194,19 +197,17 @@ class Grid(MutableMapping[_grid_keys, Block]):
         map.
         """
         start_pos = pos = Vec(*_conv_key(pos))
-        direction = Vec(direction)
+        direction_v = Vec(direction)
         collide_set = frozenset(collide)
         # 50x50x50 diagonal = 86, so that's the largest distance
         # you could possibly move.
         for i in range(90):
-            next_pos = pos + direction
+            next_pos = pos + direction_v
             block = super().get(next_pos.as_tuple(), Block.VOID)
             if block is Block.VOID:
                 raise ValueError(
-                    'Reached VOID at ({}) when '
-                    'raycasting from {} with direction {}!'.format(
-                        next_pos, start_pos, direction
-                    )
+                    f'Reached VOID at ({next_pos}) when raycasting from {start_pos} with '
+                    f'direction {direction_v}!'
                 )
             if block in collide_set:
                 return pos
@@ -217,7 +218,7 @@ class Grid(MutableMapping[_grid_keys, Block]):
     def raycast_world(
         self,
         pos: Vec,
-        direction: Vec,
+        direction: Vec | Tuple[int, int, int],
         collide: Iterable[Block]=frozenset({
             Block.SOLID, Block.EMBED,
             Block.PIT_BOTTOM, Block.PIT_SINGLE,

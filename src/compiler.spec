@@ -22,6 +22,8 @@ elif utils.LINUX:
 else:
     suffix = ''
 
+HA_VERSION = utils.get_git_version(hammeraddons)
+
 # Unneeded packages that cx_freeze detects:
 EXCLUDES = [
     'bz2',  # We aren't using this compression format (shutil, zipfile etc handle ImportError)..
@@ -56,12 +58,13 @@ INCLUDES = [
 
     # Might not be found?
     'rtree',
-    # Ensure all of Hammeraddons is loaded.
-    'hammeraddons', 'hammeraddons.acache', 'hammeraddons.config', 'hammeraddons.mdl_compiler',
-    'hammeraddons.postcompiler', 'hammeraddons.plugin', 'hammeraddons.propcombine',
-    'hammeraddons.plugin',
+
+    # Ensure all of Hammeraddons and srctools is loaded.
+    *collect_submodules('srctools', filter=lambda name: 'pyinstaller' not in name and 'scripts' not in name),
+    *collect_submodules('attr'),
+    *collect_submodules('attrs'),
+    *collect_submodules('hammeraddons'),
 ]
-INCLUDES += collect_submodules('srctools', lambda name: 'pyinstaller' not in name and 'script' not in name)
 
 # These also aren't required by logging really, but by default
 # they're imported unconditionally. Check to see if it's modified first.
@@ -81,13 +84,6 @@ if utils.MAC or utils.LINUX:
 
     # The only hash algorithm that's used is sha512 - random.seed()
     EXCLUDES += ['_sha1', '_sha256', '_md5']
-
-# Include the condition sub-modules that are dynamically imported.
-INCLUDES += [
-    'precomp.conditions.' + module
-    for loader, module, is_package in
-    pkgutil.iter_modules(['precomp/conditions'])
-]
 
 # Find and add libspatialindex DLLs.
 if utils.WIN and utils.BITNESS == '32':
@@ -120,7 +116,10 @@ print('DATA:', data_files)
 
 # Write this to the temp folder, so it's picked up and included.
 # Don't write it out though if it's the same, so PyInstaller doesn't reparse.
-version_val = 'BEE_VERSION=' + repr(utils.get_git_version(SPECPATH))
+version_val = f'''\
+BEE_VERSION={utils.get_git_version(SPECPATH)!r}
+HA_VERSION={HA_VERSION!r}
+'''
 print(version_val)
 version_filename = os.path.join(workpath, '_compiled_version.py')
 
@@ -193,6 +192,7 @@ vbsp_exe = EXE(
     strip=False,
     upx=True,
     console=True,
+    contents_directory="bee2_bin",
     icon='../BEE2.ico'
 )
 
@@ -207,6 +207,7 @@ vrad_exe = EXE(
     strip=False,
     upx=True,
     console=True,
+    contents_directory="bee2_bin",
     icon='../BEE2.ico'
 )
 

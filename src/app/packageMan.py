@@ -5,14 +5,16 @@ from typing import Iterable
 from tkinter import ttk
 import tkinter as tk
 
-from app import TK_ROOT, localisation, tk_tools
+from app import TK_ROOT, tk_tools
 
 from app.CheckDetails import CheckDetails, Item as CheckItem
 from transtoken import TransToken
+from ui_tk.wid_transtoken import set_text, set_win_title
 import packages
 import utils
 
-window = tk.Toplevel(TK_ROOT)
+
+window = tk.Toplevel(TK_ROOT, name='packagesWin')
 window.withdraw()
 
 list_widget: CheckDetails
@@ -32,7 +34,7 @@ def show() -> None:
 def make_packitems() -> Iterable[CheckItem]:
     """Make the checkitems used in the details view."""
     pack_items.clear()
-    for pack in packages.LOADED.packages.values():
+    for pack in packages.get_loaded_packages().packages.values():
         item = CheckItem(
             pack.disp_name,
             hover_text=pack.desc,
@@ -83,7 +85,7 @@ def make_window() -> None:
     """Initialise the window."""
     global list_widget
     window.transient(TK_ROOT)
-    localisation.set_win_title(window, TransToken.ui('BEE2 - Manage Packages'))
+    set_win_title(window, TransToken.ui('BEE2 - Manage Packages'))
 
     # Don't destroy window when quit!
     window.protocol("WM_DELETE_WINDOW", cancel)
@@ -103,12 +105,12 @@ def make_window() -> None:
     frame.columnconfigure(0, weight=1)
     frame.rowconfigure(0, weight=1)
 
-    localisation.set_text(
+    set_text(
         ttk.Button(frame, command=apply_changes),
         TransToken.ui('OK'),
     ).grid(row=1, column=0, sticky='W')
 
-    localisation.set_text(
+    set_text(
         ttk.Button(frame, command=cancel),
         TransToken.ui('Cancel'),
     ).grid(row=1, column=1, sticky='E')

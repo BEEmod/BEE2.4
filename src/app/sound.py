@@ -5,20 +5,20 @@ If PyGame fails to load, all fx() calls will fail silently.
 (Sounds are not critical to the app, so they just won't play.)
 """
 from __future__ import annotations
-from tkinter import Event
-from typing import IO, Optional, Callable
-import os
+from typing import IO, Any, Callable, Optional
 import functools
+import os
 import shutil
 
-import trio
-from srctools.filesys import FileSystemChain, FileSystem, RawFileSystem
+from srctools.filesys import FileSystem, FileSystemChain, RawFileSystem
 import srctools.logger
+import trio
 
 from app import TK_ROOT
 from config.gen_opts import GenOptions
 import config
 import utils
+
 
 __all__ = [
     'SamplePlayer',
@@ -29,7 +29,7 @@ __all__ = [
 
 LOGGER = srctools.logger.get_logger(__name__)
 SAMPLE_WRITE_PATH = utils.conf_location('music_sample/music')
-# Nursery to hold sound-related tasks. We can cancel this to shutdown sound logic.
+# Nursery to hold sound-related tasks. We can cancel this to shut down sound logic.
 _nursery: trio.Nursery | None = None
 
 SOUNDS: dict[str, str] = {
@@ -106,7 +106,7 @@ class PygletSound(NullSound):
         """Load the given UI sound into a source."""
         global sounds
         fname = SOUNDS[name]
-        path = str(utils.install_path('sounds/{}.ogg'.format(fname)))
+        path = str(utils.install_path(f'sounds/{fname}.ogg'))
         LOGGER.info('Loading sound "{}" -> {}', name, path)
         try:
             src: pyglet.media.Source = await trio.to_thread.run_sync(functools.partial(
@@ -119,7 +119,8 @@ class PygletSound(NullSound):
             LOGGER.exception("Couldn't load sound {}:", name)
             LOGGER.info('UI sounds disabled.')
             sounds = NullSound()
-            _nursery.cancel_scope.cancel()
+            if _nursery is not None:
+                _nursery.cancel_scope.cancel()
             return None
         else:
             self.sources[name] = src
@@ -141,15 +142,17 @@ class PygletSound(NullSound):
             except Exception:
                 LOGGER.exception("Couldn't play sound {}:", sound)
                 LOGGER.info('UI sounds disabled.')
-                _nursery.cancel_scope.cancel()
+                if _nursery is not None:
+                    _nursery.cancel_scope.cancel()
                 sounds = NullSound()
                 return 0.1
-            duration = snd.duration
+            duration: Optional[float] = snd.duration
             if duration is not None:
                 return duration
             else:
                 LOGGER.warning('No duration: {}', sound)
                 return 0.75  # Should be long enough.
+        return 0.0
 
 
 async def sound_task() -> None:
@@ -179,10 +182,11 @@ async def _load_bg(sound: str) -> None:
         await sounds.load(sound)
     except Exception:
         LOGGER.exception('Failed to load sound:')
-        return _nursery.cancel_scope.cancel()
+        if _nursery is not None:
+            _nursery.cancel_scope.cancel()
 
 
-def fx(name) -> None:
+def fx(name: str) -> None:
     """Play a sound effect stored in the sounds{} dict."""
     if _nursery is not None and not _nursery.cancel_scope.cancel_called:
         _nursery.start_soon(sounds.fx, name)
@@ -213,17 +217,22 @@ def play_fx() -> bool:
     """Return if sounds should play."""
     return config.APP.get_cur_conf(GenOptions).play_sounds
 
-if utils.WIN and not utils.FROZEN:
+if utils.WIN:
+    if utils.FROZEN:
+        _libs_folder = utils.bins_path(".")
+    else:
+        _libs_folder = utils.bins_path("lib-" + utils.BITNESS)
     # Add a libs folder for FFmpeg dlls.
-    os.environ['PATH'] = f'{utils.install_path("lib-" + utils.BITNESS).absolute()};{os.environ["PATH"]}'
+    os.environ['PATH'] = f'{_libs_folder.absolute()};{os.environ["PATH"]}'
+    LOGGER.debug('Appending "{}" to $PATH.', _libs_folder)
 
 sounds: NullSound
 try:
-    import pyglet.media
-    from pyglet.media.codecs import Source
-    from pyglet.media.codecs.ffmpeg import FFmpegDecoder
     from pyglet import version as pyglet_version
     from pyglet.clock import tick
+    from pyglet.media.codecs import Source
+    from pyglet.media.codecs.ffmpeg import FFmpegDecoder
+    import pyglet.media
 
     decoder = FFmpegDecoder()
     sounds = PygletSound()
@@ -258,9 +267,9 @@ class SamplePlayer:
         self.start_callback = start_callback
         self.stop_callback = stop_callback
         self.cur_file: Optional[str] = None
-        # The system we need to cleanup.
+        # The system we need to clean up.
         self._handle: Optional[IO[bytes]] = None
-        self._cur_sys: Optional[FileSystem] = None
+        self._cur_sys: Optional[FileSystem[Any]] = None
         self.system: FileSystemChain = system
 
     @property
@@ -268,7 +277,7 @@ class SamplePlayer:
         """Is the player currently playing sounds?"""
         return self.player is not None
 
-    def play_sample(self, _: Event=None) -> None:
+    def play_sample(self, _: object=None) -> None:
         """Play a sample of music.
 
         If music is being played it will be stopped instead.

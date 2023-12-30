@@ -1,8 +1,11 @@
+import io
 import os
 import sys
+import shutil
+import zipfile
 from pathlib import Path
 import contextlib
-from typing import Any, Iterable, List, Optional, Tuple, Union, cast
+from typing import Iterable, List, Optional, Tuple, Union
 
 from babel.messages import Catalog
 import babel.messages.frontend
@@ -12,9 +15,11 @@ from babel.messages.mofile import write_mo
 from srctools.fgd import FGD
 
 ico_path = os.path.realpath(os.path.join(os.getcwd(), "../bee2.ico"))
+
 # Injected by PyInstaller.
-workpath: str
-SPECPATH: str
+workpath: str = globals()['workpath']
+SPECPATH: str = globals()['SPECPATH']
+DISTPATH: str = globals()['DISTPATH']
 
 hammeraddons = Path.joinpath(Path(SPECPATH).parent, 'hammeraddons')
 
@@ -22,15 +27,44 @@ hammeraddons = Path.joinpath(Path(SPECPATH).parent, 'hammeraddons')
 sys.path.append(SPECPATH)
 import utils
 
-# src -> build subfolder.
-data_files = [
+# src -> binaries subfolder.
+data_bin_files = [
     ('../BEE2.ico', '.'),
     ('../BEE2.fgd', '.'),
     ('../hammeraddons.fgd', '.'),
+]
+# src -> app subfolder, in 6.0+
+data_files = [
     ('../images/BEE2/*.png', 'images/BEE2/'),
     ('../images/icons/*.png', 'images/icons/'),
     ('../images/splash_screen/*.jpg', 'images/splash_screen/'),
+    ('../sounds/*.ogg', 'sounds'),
+    ('../INSTALL_GUIDE.txt', '.'),
 ]
+
+HA_VERSION = utils.get_git_version(hammeraddons)
+
+
+def copy_datas(appfolder: Path, compiler_loc: str) -> None:
+    """Copy `datas_files` files to the root of the app folder."""
+    for gl_src, dest in data_files:
+        for filename in Path().glob(gl_src):
+            name = filename.name
+            if name == 'INSTALL_GUIDE.txt':
+                # Special case, use a different name.
+                name = 'README.txt'
+
+            p_dest = Path(appfolder, dest, name)
+
+            print(filename, '->', p_dest)
+            p_dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy(filename, p_dest)
+
+    (appfolder / 'packages').mkdir(exist_ok=True)
+
+    compiler_dest = Path(appfolder, 'bin', 'compiler')
+    print(compiler_loc, '->', compiler_dest)
+    shutil.copytree(compiler_loc, compiler_dest)
 
 
 def do_localisation() -> None:
@@ -61,7 +95,7 @@ def do_localisation() -> None:
         },
     )
     for filename, lineno, message, comments, context in extracted:
-        if 'test_localisation' in filename:
+        if 'test_localisation' in filename or 'test_transtoken' in filename:
             # Test code for the localisation module, skip these tokens.
             continue
         elif 'user_errors.py' in filename and all('game_text' not in comm for comm in comments):
@@ -97,8 +131,10 @@ def do_localisation() -> None:
         ]:
             del trans_cat.obsolete[msg_id]
 
-        with trans.open('wb') as dest:
-            write_po(dest, trans_cat, include_lineno=False)
+        with io.BytesIO() as buffer:
+            write_po(buffer, trans_cat, include_lineno=False)
+            if utils.write_lang_pot(trans, buffer.getvalue()):
+                print(f'Written {trans}')
 
         # Compile them all.
         comp = trans.with_suffix('.mo')
@@ -117,9 +153,9 @@ def do_localisation() -> None:
 
 def build_fgd() -> None:
     """Export out a copy of the srctools-specific FGD data."""
-    sys.path.append(str(hammeraddons))
-    print('Loading FGD database...')
-    from hammeraddons import unify_fgd, __version__ as version
+    sys.path.append(str(hammeraddons / 'src'))
+    print('Loading FGD database. path=', sys.path)
+    from hammeraddons import unify_fgd
     database, base_ent = unify_fgd.load_database(hammeraddons / 'fgd')
 
     fgd = FGD()
@@ -142,7 +178,7 @@ def build_fgd() -> None:
 
     database.collapse_bases()
     with open('../hammeraddons.fgd', 'w') as file:
-        file.write(f'// Hammer Addons version {version}\n')
+        file.write(f'// Hammer Addons version {HA_VERSION}\n')
         file.write(
             "// These are a minimal copy of HA FGDs for comp_ entities, so they can be collapsed.\n"
             "// If you want to use Hammer Addons, install that manually, don't use these.\n"
@@ -204,7 +240,7 @@ EXCLUDES = [
 
     'bz2',  # We aren't using this compression format (shutil, zipfile etc handle ImportError)..
 
-    # Imported by logging handlers which we don't use..
+    # Imported by logging handlers which we don't use...
     'win32evtlog',
     'win32evtlogutil',
     'smtplib',
@@ -217,49 +253,62 @@ EXCLUDES = [
 
 binaries = []
 if utils.WIN:
-    lib_path = Path(SPECPATH, '..', 'lib-' + utils.BITNESS).absolute()
-    try:
-        for dll in lib_path.iterdir():
-            if dll.suffix == '.dll' and dll.stem.startswith(('av', 'swscale', 'swresample')):
-                binaries.append((str(dll), '.'))
-    except FileNotFoundError:
-        lib_path.mkdir(exist_ok=True)
-        pass
+    lib_path = Path(SPECPATH, '..', 'lib-' + utils.BITNESS).resolve()
+    ci_folder = Path(SPECPATH, '..', 'libs').resolve()
+    ci_zip = list(ci_folder.glob('*.zip'))
+    if ci_zip:
+        # Downloaded from releases, unpack.
+        with zipfile.ZipFile(ci_zip[0]) as zipf:
+            for info in zipf.infolist():
+                if info.filename.endswith('.dll'):
+                    dest = Path(ci_folder, Path(info.filename).name).resolve()
+                    with zipf.open(info) as srcf, dest.open('wb') as destf:
+                        shutil.copyfileobj(srcf, destf)
+                    binaries.append((str(dest), '.'))
+    else:
+        try:
+            for dll in lib_path.iterdir():
+                if dll.suffix == '.dll' and dll.stem.startswith(('av', 'swscale', 'swresample')):
+                    binaries.append((str(dll), '.'))
+        except FileNotFoundError:  # Make the directory for the user to copy to.
+            lib_path.mkdir(exist_ok=True)
+            pass
+
     if not binaries:  # Not found.
         raise ValueError(f'FFmpeg dlls should be downloaded into "{lib_path}".')
 
 
 # Write this to the temp folder, so it's picked up and included.
 # Don't write it out though if it's the same, so PyInstaller doesn't reparse.
-version_val = 'BEE_VERSION=' + repr(utils.get_git_version(SPECPATH))
+version_val = f'''\
+BEE_VERSION={utils.get_git_version(SPECPATH)!r}
+HA_VERSION={HA_VERSION!r}
+'''
 print(version_val)
 version_filename = os.path.join(workpath, '_compiled_version.py')
 
 with contextlib.suppress(FileNotFoundError), open(version_filename) as f:
-    if f.read().strip() == version_val:
+    if f.read() == version_val:
         version_val = ''
 
 if version_val:
     with open(version_filename, 'w') as f:
         f.write(version_val)
 
-for snd in os.listdir('../sounds/'):
-    if snd == 'music_samp':
-        continue
-    data_files.append(('../sounds/' + snd, 'sounds'))
-
 # Include the compiler, picking the right architecture.
 bitness = 64 if sys.maxsize > (2**33) else 32
-data_files.append((f'../dist/{bitness}bit/compiler/', 'compiler'))
+COMPILER_LOC = f'../dist/{bitness}bit/compiler/'
 
 # Finally, run the PyInstaller analysis process.
 
 bee2_a = Analysis(
     ['BEE2_launch.pyw'],
     pathex=[workpath],
-    datas=data_files,
+    datas=data_files + data_bin_files,
     hiddenimports=[
         'PIL._tkinter_finder',
+        # Needed to unpickle the CLDR.
+        'babel.numbers',
     ],
     binaries=binaries,
     hookspath=[],
@@ -269,13 +318,6 @@ bee2_a = Analysis(
     win_private_assemblies=False,
     noarchive=False
 )
-
-# Need to add this manually, so it can have a different name.
-bee2_a.datas.append((
-    'README.txt',
-    os.path.join(os.getcwd(), '../INSTALL_GUIDE.txt'),
-    'DATA',
-))
 
 pyz = PYZ(
     bee2_a.pure,
@@ -293,6 +335,7 @@ exe = EXE(
     strip=False,
     upx=False,
     console=False,
+    contents_directory='bin',
     windowed=True,
     icon='../BEE2.ico'
 )
@@ -306,3 +349,5 @@ coll = COLLECT(
     upx=True,
     name='BEE2',
 )
+
+copy_datas(Path(coll.name), COMPILER_LOC)

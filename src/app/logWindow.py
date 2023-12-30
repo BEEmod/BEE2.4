@@ -3,14 +3,15 @@
 The implementation is in bg_daemon, to ensure it remains responsive.
 """
 from __future__ import annotations
+from typing import Literal, Tuple, Type, Union
 import logging
 import multiprocessing
 import queue
-from typing import Literal, Tuple, Type, Union
 
+import attrs
 import srctools.logger
 import trio
-import attrs
+from typing_extensions import override
 
 from config.gen_opts import GenOptions
 import config
@@ -34,11 +35,12 @@ class TextHandler(logging.Handler):
         super().__init__(logging.NOTSET)
         self.setFormatter(logging.Formatter(
             # One letter for level name
-            '[{levelname[0]}] {module}.{funcName}(): {message}',
+            '[{levelname[0]}]{srctools_context} {module}.{funcName}(): {message}',
             style='{',
         ))
 
-    def emit(self, record: logging.LogRecord):
+    @override
+    def emit(self, record: logging.LogRecord) -> None:
         """Add a logging message. This may be called by any thread!"""
         msg = record.msg
         try:
@@ -63,11 +65,12 @@ class TextHandler(logging.Handler):
         except queue.Full:
             pass
 
+    @override
     def setLevel(self, level: Union[int, str]) -> None:
         """Set the level of the log window."""
         if isinstance(level, int):
             level = logging.getLevelName(level)
-        super(TextHandler, self).setLevel(level)
+        super().setLevel(level)
         try:
             _LOG_QUEUE.put(('level', level, None), timeout=0.5)
         except queue.Full:
@@ -109,7 +112,7 @@ async def setting_apply() -> None:
         # is potentially lost. But this should only be cancelled if the app's quitting, so that's
         # fine.
         try:
-            cmd, param = await trio.to_thread.run_sync(_PIPE_MAIN_REC.recv, cancellable=True)
+            cmd, param = await trio.to_thread.run_sync(_PIPE_MAIN_REC.recv, abandon_on_cancel=True)
         except BrokenPipeError:
             # Pipe failed, we're useless.
             return

@@ -1,12 +1,13 @@
 """Implements a dynamic item allowing placing the various test chamber signages."""
 from __future__ import annotations
-from io import BytesIO
 from typing import NamedTuple, Optional
+from typing_extensions import Self
+
+from io import BytesIO
 
 from PIL import Image
-
 from srctools.vtf import ImageFormats, VTF, VTFFlags
-from srctools import Property
+from srctools import Keyvalues
 import srctools.logger
 
 from packages import PackagesSet, PakObject, ParseData, ExportData, Style
@@ -50,7 +51,7 @@ class SignageLegend(PakObject):
         self.blank = blank
 
     @classmethod
-    async def parse(cls, data: ParseData) -> 'SignageLegend':
+    async def parse(cls, data: ParseData) -> Self:
         """Parse a signage legend."""
         if 'blank' in data.info:
             blank = ImgHandle.parse(data.info, data.pak_id, CELL_SIZE, CELL_SIZE, subkey='blank')
@@ -61,14 +62,14 @@ class SignageLegend(PakObject):
         else:
             bg = None
 
-        return SignageLegend(
+        return cls(
             data.id,
             ImgHandle.parse(data.info, data.pak_id, *LEGEND_SIZE, subkey='overlay'),
             bg, blank,
         )
 
     @staticmethod
-    def export(exp_data: ExportData) -> None:
+    async def export(exp_data: ExportData) -> None:
         """This is all performed in Signage."""
 
 
@@ -79,9 +80,9 @@ class Signage(PakObject, allow_mult=True, needs_foreground=True):
         sign_id: str,
         styles: dict[str, SignStyle],
         disp_name: str,
-        primary_id: str=None,
-        secondary_id: str=None,
-        hidden: bool=False,
+        primary_id: str | None = None,
+        secondary_id: str | None = None,
+        hidden: bool = False,
     ) -> None:
         self.hidden = hidden or sign_id == 'SIGN_ARROW'
         self.id = sign_id
@@ -92,7 +93,7 @@ class Signage(PakObject, allow_mult=True, needs_foreground=True):
         self.sec_id = secondary_id
 
         # The icon the UI uses.
-        self.dnd_icon: ImgHandle | None = None
+        self.icon: ImgHandle | None = None
 
     @classmethod
     async def parse(cls, data: ParseData) -> Signage:
@@ -105,7 +106,7 @@ class Signage(PakObject, allow_mult=True, needs_foreground=True):
                 try:
                     prop = next(data.info.find_all('styles', prop.value))
                 except StopIteration:
-                    raise ValueError('No style <{}>!'.format(prop.value))
+                    raise ValueError(f'No style <{prop.value}>!') from None
 
             world_tex = prop['world', '']
             overlay_tex = prop['overlay', '']
@@ -172,7 +173,7 @@ class Signage(PakObject, allow_mult=True, needs_foreground=True):
                 )
 
     @staticmethod
-    def export(exp_data: ExportData) -> None:
+    async def export(exp_data: ExportData) -> None:
         """Export the selected signage to the config, and produce the legend."""
         # Timer value -> sign ID.
         sel_ids: list[tuple[str, str]] = exp_data.selected
@@ -182,7 +183,7 @@ class Signage(PakObject, allow_mult=True, needs_foreground=True):
 
         sel_icons: dict[int, ImgHandle] = {}
 
-        conf = Property('Signage', [])
+        conf = Keyvalues('Signage', [])
 
         for tim_id, sign_id in sel_ids:
             try:
@@ -190,7 +191,7 @@ class Signage(PakObject, allow_mult=True, needs_foreground=True):
             except KeyError:
                 LOGGER.warning('Signage "{}" does not exist!', sign_id)
                 continue
-            prop_block = Property(str(tim_id), [])
+            prop_block = Keyvalues(str(tim_id), [])
 
             sty_sign = sign._serialise(prop_block, exp_data.selected_style)
 
@@ -206,7 +207,7 @@ class Signage(PakObject, allow_mult=True, needs_foreground=True):
                             'Signage "{}"\'s {} "{}" '
                             'does not exist!', sign_id, sub_name, sub_id)
                     else:
-                        sub_block = Property(sub_name, [])
+                        sub_block = Keyvalues(sub_name, [])
                         sub_sign._serialise(sub_block, exp_data.selected_style)
                         if sub_block:
                             prop_block.append(sub_block)
@@ -223,7 +224,7 @@ class Signage(PakObject, allow_mult=True, needs_foreground=True):
             exp_data.packset, exp_data.selected_style, sel_icons,
         )
 
-    def _serialise(self, parent: Property, style: Style) -> Optional[SignStyle]:
+    def _serialise(self, parent: Keyvalues, style: Style) -> Optional[SignStyle]:
         """Write this sign's data for the style to the provided property."""
         for potential_style in style.bases:
             try:
@@ -241,9 +242,9 @@ class Signage(PakObject, allow_mult=True, needs_foreground=True):
                 data = self.styles['BEE2_CLEAN']
             except KeyError:
                 return None
-        parent.append(Property('world', data.world))
-        parent.append(Property('overlay', data.overlay))
-        parent.append(Property('type', data.type))
+        parent.append(Keyvalues('world', data.world))
+        parent.append(Keyvalues('overlay', data.overlay))
+        parent.append(Keyvalues('type', data.type))
         return data
 
 
@@ -277,7 +278,7 @@ def build_texture(
         if y == 5:  # Last row is shifted over to center.
             x += 1
         try:
-            ico = icons[i + 3].get_pil().resize((CELL_SIZE, CELL_SIZE), Image.ANTIALIAS).convert('RGB')
+            ico = icons[i + 3].get_pil().resize((CELL_SIZE, CELL_SIZE), Image.Resampling.LANCZOS).convert('RGB')
         except KeyError:
             if blank_img is None:
                 continue

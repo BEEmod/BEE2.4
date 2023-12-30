@@ -1,8 +1,11 @@
 """Generates Bottomless Pits."""
-from srctools import Vec, Property, VMF, Solid, Side, Output, Angle
+from typing import Set
+
+from srctools import FrozenVec, Matrix, Vec, Keyvalues, VMF, Solid, Side, Output, Angle
 import srctools.logger
 import utils
 from precomp import brushLoc, options, rand, conditions
+import consts
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -12,11 +15,11 @@ LOGGER = srctools.logger.get_logger(__name__)
 BOTTOMLESS_PIT_MIN = 192
 
 # The set config options for pits. If SETTINGS is empty, no pits are used.
-SETTINGS = {}
+SETTINGS: dict = {}  # TODO: Type correctly
 PIT_INST = {}
 
 
-def pits_allowed():
+def pits_allowed() -> bool:
     """Are bottomless pits allowed in the configs?"""
     return bool(SETTINGS)
 
@@ -26,7 +29,7 @@ def is_pit(bbox_min: Vec, bbox_max: Vec):
     return BOTTOMLESS_PIT_MIN >= bbox_min.z
 
 
-def load_settings(pit: Property):
+def load_settings(pit: Keyvalues) -> None:
     if not pit:
         SETTINGS.clear()
         # No pits are permitted..
@@ -146,21 +149,14 @@ def make_bottomless_pit(vmf: VMF, max_height):
             trig.remove()
 
     # Potential locations of bordering brushes..
-    wall_pos = set()
-
-    side_dirs = [
-        (0, -128, 0),   # N
-        (0, +128, 0),  # S
-        (-128, 0, 0),   # E
-        (+128, 0, 0)   # W
-    ]
+    wall_pos: Set[FrozenVec] = set()
 
     # Only use 1 entity for the teleport triggers. If multiple are used,
     # cubes can contact two at once and get teleported odd places.
     tele_trig = None
     hurt_trig = None
 
-    for grid_pos, block_type in brushLoc.POS.items():  # type: Vec, brushLoc.Block
+    for grid_pos, block_type in brushLoc.POS.items():
         pos = brushLoc.grid_to_world(grid_pos)
         if not block_type.is_pit:
             continue
@@ -190,7 +186,7 @@ def make_bottomless_pit(vmf: VMF, max_height):
                 hurt_trig = vmf.create_ent(
                     classname='trigger_hurt',
                     damagetype=32,  # FALL
-                    spawnflags=1,  # CLients
+                    spawnflags=1,  # Clients
                     damage=100000,
                     nodmgforce=1,  # No physics force when hurt..
                     damagemodel=0,  # Always apply full damage.
@@ -227,11 +223,13 @@ def make_bottomless_pit(vmf: VMF, max_height):
                 _zero_percent_distance='512',
             )
 
-        wall_pos.update([
-            (pos + off).as_tuple()
-            for off in
-            side_dirs
-        ])
+        wall_pos |= {
+            (pos + off).freeze()
+            for off in [
+                (0, -128, 0), (0, +128, 0),
+                (-128, 0, 0), (+128, 0, 0),
+            ]
+        }
 
     if hurt_trig is not None:
         hurt_trig.outputs.append(
@@ -259,17 +257,17 @@ def make_bottomless_pit(vmf: VMF, max_height):
 
     LOGGER.info('Pit instances: {}', side_types)
 
-    for pos in wall_pos:
-        pos = Vec(pos)
+    for pos in map(FrozenVec.thaw, wall_pos):
         if not brushLoc.POS.lookup_world(pos).is_solid:
             # Not actually a wall here!
             continue
 
         # CONN_TYPES has n,s,e,w as keys - whether there's something in that direction.
-        nsew = tuple(
-            brushLoc.POS.lookup_world(pos + off).is_pit
-            for off in
-            side_dirs
+        nsew = (
+            brushLoc.POS.lookup_world(pos + (0, -128, 0)).is_pit,  # N
+            brushLoc.POS.lookup_world(pos + (0, +128, 0)).is_pit,  # S
+            brushLoc.POS.lookup_world(pos + (-128, 0, 0)).is_pit,  # E
+            brushLoc.POS.lookup_world(pos + (+128, 0, 0)).is_pit,  # W
         )
         LOGGER.info('Pos: {}, NSEW: {}, lookup: {}', pos, nsew, utils.CONN_LOOKUP[nsew])
         inst_type, angle = utils.CONN_LOOKUP[nsew]
@@ -299,8 +297,7 @@ def make_bottomless_pit(vmf: VMF, max_height):
                     file=file,
                     targetname='goo_side',
                     origin=tele_off + pos,
-                    # Reverse direction
-                    angles=Angle.from_str(angle) + (0, 180, 0),
+                    angles=Angle.from_str(angle) @ Matrix.from_yaw(180.0),
                 ).make_unique()
 
 

@@ -2,32 +2,34 @@
 Handles scanning through the zip packages to find all items, styles, etc.
 """
 from __future__ import annotations
+from typing import (
+    Iterator, Mapping, NoReturn, ClassVar, Optional, Any, TYPE_CHECKING, TypeVar,
+    Type, cast,
+)
+from typing_extensions import Self
 
 import os
 import warnings
+from collections.abc import Collection, Iterable
 from collections import defaultdict
 from pathlib import Path
 
 import attrs
 import trio
-
 import srctools
 
 from BEE2_config import ConfigFile
 from app import tkMarkdown, img, lazy_conf, background_run
 import utils
 import consts
-from srctools import Property, NoKeyError
+from srctools import Keyvalues, NoKeyError
 from srctools.tokenizer import TokenSyntaxError
 from srctools.filesys import FileSystem, RawFileSystem, ZipFileSystem, VPKFileSystem
+
+from app.dialogs import Dialogs
 from editoritems import Item as EditorItem, Renderable, RenderableType
 from corridor import CORRIDOR_COUNTS, GameMode, Direction
 import srctools.logger
-
-from typing import (
-    Iterator, NoReturn, ClassVar, Optional, Any, TYPE_CHECKING, TypeVar, Type,
-    Collection, Iterable, cast,
-)
 
 from transtoken import TransToken, TransTokenSource
 
@@ -36,6 +38,25 @@ if TYPE_CHECKING:  # Prevent circular import
     from app.gameMan import Game
     from loadScreen import LoadScreen
 
+
+__all__ = [
+    # Generally global.
+    'OBJ_TYPES', 'PACK_CONFIG',
+    'SelitemData', 'NoVPKExport',
+    'LegacyCorr', 'LEGACY_CORRIDORS',
+    'CLEAN_PACKAGE',
+    'PakObject', 'PackagesSet', 'get_loaded_packages',
+    'find_packages', 'load_packages',
+
+    # Package objects.
+    'Style', 'Item', 'StyleVar', 'Elevator', 'EditorSound', 'StyleVPK', 'Signage',
+    'Skybox', 'Music', 'QuotePack', 'PackList', 'CorridorGroup', 'ConfigGroup',
+
+    # Mainly intended for package object code.
+    'ParseData', 'ExportData',
+    'reraise_keyerror', 'get_config', 'set_cond_source',
+    'parse_multiline_key', 'desc_parse', 'sep_values',
+]
 
 LOGGER = srctools.logger.get_logger(__name__, alias='packages')
 OBJ_TYPES: dict[str, Type[PakObject]] = {}
@@ -49,7 +70,7 @@ class SelitemData:
     """Options which are displayed on the selector window."""
     name: TransToken  # Longer full name.
     short_name: TransToken  # Shorter name for the icon.
-    auth: list[str]  # List of authors.
+    auth: set[str]  # List of authors.
     icon: img.Handle | None  # Small square icon.
     large_icon: img.Handle | None  # Larger, landscape icon.
     previews: list[img.Handle]  # Full size images used for previews.
@@ -60,9 +81,9 @@ class SelitemData:
     packages: frozenset[str] = attrs.Factory(frozenset)
 
     @classmethod
-    def parse(cls, info: Property, pack_id: str) -> SelitemData:
-        """Parse from a property block."""
-        auth = sep_values(info['authors', ''])
+    def parse(cls, info: Keyvalues, pack_id: str) -> SelitemData:
+        """Parse from a keyvalues block."""
+        auth = set(sep_values(info['authors', '']))
         name = TransToken.parse(pack_id, info['name'])
         sort_key = info['sort_key', '']
         desc = desc_parse(info, info['id'], pack_id)
@@ -83,6 +104,7 @@ class SelitemData:
             )
         except LookupError:
             icon = None
+        large_key: Keyvalues | None
         try:
             large_key = info.find_key('iconLarge')
         except LookupError:
@@ -107,10 +129,10 @@ class SelitemData:
                 previews = []
         else:
             previews = [img.Handle.parse(
-                prop,
+                kv,
                 pack_id,
                 0, 0,
-            ) for prop in preview_block]
+            ) for kv in preview_block]
 
         return cls(
             name,
@@ -137,7 +159,7 @@ class SelitemData:
         return SelitemData(
             self.name,
             self.short_name,
-            self.auth + other.auth,
+            self.auth | other.auth,
             other.icon or self.icon,
             other.large_icon or self.large_icon,
             self.previews + other.previews,
@@ -149,10 +171,10 @@ class SelitemData:
 
     def iter_trans_tokens(self, source: str) -> Iterator[TransTokenSource]:
         """Yield the tokens in this data."""
-        yield self.name, source + '.long_name'
-        yield self.short_name, source + '.short_name'
-        yield self.group, source + '.group'
-        yield from tkMarkdown.iter_tokens(self.desc, source + '.desc')
+        yield self.name, f'{source}.long_name'
+        yield self.short_name, f'{source}.short_name'
+        yield self.group, f'{source}.group'
+        yield from tkMarkdown.iter_tokens(self.desc, f'{source}.desc')
 
 
 @attrs.define
@@ -162,7 +184,7 @@ class ObjData:
     This allows us to parse all packages before loading objects.
     """
     fsys: FileSystem
-    info_block: Property = attrs.field(repr=False)
+    info_block: Keyvalues = attrs.field(repr=False)
     pak_id: str
     disp_name: TransToken
 
@@ -172,7 +194,7 @@ class ParseData:
     """The arguments for pak_object.parse()."""
     fsys: FileSystem
     id: str
-    info: Property = attrs.field(repr=False)
+    info: Keyvalues = attrs.field(repr=False)
     pak_id: str
     is_override: bool
 
@@ -186,7 +208,7 @@ class ExportData:
     selected_style: Style
     all_items: list[EditorItem]  # All the items in the map
     renderables: dict[RenderableType, Renderable]  # The error/connection icons
-    vbsp_conf: Property  # vbsp_config.cfg file.
+    vbsp_conf: Keyvalues  # vbsp_config.cfg file.
     packset: PackagesSet  # The entire loaded packages set.
     game: Game  # The current game.
     # As objects export, they may fill this to include additional resources
@@ -220,6 +242,7 @@ class NoVPKExport(Exception):
 
 T = TypeVar('T')
 PakT = TypeVar('PakT', bound='PakObject')
+style_suggest_keys: dict[str, type[PakObject]] = {}
 
 
 class PakObject:
@@ -230,6 +253,8 @@ class PakObject:
     Set 'has_img' to control whether the object will count towards the images
     loading bar - this should be stepped in the UI.load_packages() method.
     Setting `needs_foreground` indicates that it is unable to load after the main UI.
+    If `style_suggest_key` is set, this is the keyvalue in Style definitions containing IDs to suggest.
+    `suggest_default` is then the default item to provide if none are specified.
     """
     # ID of the object
     id: str
@@ -237,38 +262,50 @@ class PakObject:
     pak_id: str
     # Display name of the package.
     pak_name: str
+    # TODO: new export system.
+    export_priority: int = 0
 
     _id_to_obj: ClassVar[dict[str, PakObject]]
     allow_mult: ClassVar[bool]
     needs_foreground: ClassVar[bool]
+    suggest_default: ClassVar[str]
 
     def __init_subclass__(
         cls,
         allow_mult: bool = False,
         needs_foreground: bool = False,
-        **kwargs,
+        style_suggest_key: str = '',
+        suggest_default: str = '<NONE>',
+        export_priority: int = 0,
     ) -> None:
-        super().__init_subclass__(**kwargs)
+        super().__init_subclass__()
         OBJ_TYPES[cls.__name__.casefold()] = cls
 
         # Maps object IDs to the object.
         cls._id_to_obj = {}
         cls.allow_mult = allow_mult
         cls.needs_foreground = needs_foreground
+        cls.export_priority = export_priority
+        if style_suggest_key:
+            assert style_suggest_key.casefold() not in style_suggest_keys
+            style_suggest_keys[style_suggest_key.casefold()] = cls
+            cls.suggest_default = suggest_default
+        else:
+            cls.suggest_default = ''
 
     @classmethod
-    async def parse(cls: Type[PakT], data: ParseData) -> PakT:
+    async def parse(cls, data: ParseData) -> Self:
         """Parse the package object from the info.txt block.
 
         ParseData is a namedtuple containing relevant info:
         - fsys, the package's FileSystem
         - id, the ID of the item
-        - info, the Property block in info.txt
+        - info, the Keyvalues block in info.txt
         - pak_id, the ID of the package
         """
         raise NotImplementedError
 
-    def add_over(self: PakT, override: PakT):
+    def add_over(self, override: Self) -> None:
         """Called to override values.
         self is the originally defined item, and override is the override item
         to copy values from.
@@ -276,14 +313,14 @@ class PakObject:
         pass
 
     @staticmethod
-    def export(exp_data: ExportData) -> None:
+    async def export(exp_data: ExportData) -> None:
         """Export the appropriate data into the game.
 
         ExportData is a namedtuple containing various data:
         - selected: The ID of the selected item (or None)
         - selected_style: The selected style object
-        - editoritems: The Property block for editoritems.txt
-        - vbsp_conf: The Property block for vbsp_config
+        - editoritems: The Keyvalues block for editoritems.txt
+        - vbsp_conf: The Keyvalues block for vbsp_config
         - game: The game we're exporting to.
         """
         raise NotImplementedError
@@ -300,25 +337,13 @@ class PakObject:
         """Do processing after all objects of this type have been fully parsed (but others may not)."""
         pass
 
-    @classmethod
-    def all(cls: Type[PakT]) -> Collection[PakT]:
-        """Get the list of objects parsed."""
-        warnings.warn('Make this local!', DeprecationWarning, stacklevel=2)
-        return LOADED.all_obj(cls)
-
-    @classmethod
-    def by_id(cls: Type[PakT], object_id: str) -> PakT:
-        """Return the object with a given ID."""
-        warnings.warn('Make this local!', DeprecationWarning, stacklevel=2)
-        return LOADED.obj_by_id(cls, object_id)
-
 
 def reraise_keyerror(err: NoKeyError | IndexError, obj_id: str) -> NoReturn:
     """Replace NoKeyErrors with a nicer one, giving the item that failed."""
     key_error: NoKeyError
     if isinstance(err, IndexError):
         if isinstance(err.__cause__, NoKeyError):
-            # Property.__getitem__ raises IndexError from
+            # Keyvalues.__getitem__ raises IndexError from
             # NoKeyError, so read from the original
             key_error = err.__cause__
         else:
@@ -326,16 +351,11 @@ def reraise_keyerror(err: NoKeyError | IndexError, obj_id: str) -> NoReturn:
             raise err
     else:
         key_error = err
-    raise Exception(
-        'No "{key}" in {id!s} object!'.format(
-            key=key_error.key,
-            id=obj_id,
-        )
-    ) from err
+    raise Exception(f'No "{key_error.key}" in {obj_id!s} object!') from err
 
 
 def get_config(
-    prop_block: Property,
+    prop_block: Keyvalues,
     folder: str,
     pak_id: str,
     prop_name: str='config',
@@ -365,18 +385,19 @@ def get_config(
     if len(path) < 3 or path[-4] != '.':
         # Add extension
         path += extension
-    return lazy_conf.from_file(utils.PackagePath(pak_id, path), source=source)
+    return lazy_conf.from_file(utils.PackagePath(pak_id, path), source=f'{pak_id}:{path}')
 
 
-def set_cond_source(props: Property, source: str) -> None:
+def set_cond_source(kv: Keyvalues, source: str) -> None:
     """Set metadata for Conditions in the given config blocks.
 
     This generates '__src__' keyvalues in Condition blocks with info like
     the source object ID and originating file, so errors can be traced back
     to the config file creating it.
     """
-    for cond in props.find_all('Conditions', 'Condition'):
-        cond['__src__'] = source
+    for cond in kv.find_all('Conditions', 'Condition'):
+        if '__src__' not in cond:
+            cond['__src__'] = source
 
 
 @attrs.define
@@ -398,6 +419,10 @@ class PackagesSet:
     # Internal, indicates if all parse() calls were complete (but maybe not post_parse).
     _parsed: set[Type[PakObject]] = attrs.field(init=False, factory=set)
 
+    # Whether these music files have been detected.
+    has_mel_music: bool = False
+    has_tag_music: bool = False
+
     def ready(self, cls: Type[PakObject]) -> trio.Event:
         """Return a Trio Event which is set when a specific object type is fully parsed."""
         try:
@@ -408,19 +433,23 @@ class PackagesSet:
 
     def can_export(self) -> bool:
         """Check if we're currently able to export."""
-        return all(self._type_ready[cls].is_set() for cls in OBJ_TYPES.values())
+        try:
+            return all(self._type_ready[cls].is_set() for cls in OBJ_TYPES.values())
+        except KeyError:
+            # ready() was never called on at least one class, so it can't possibly be done yet!
+            return False
 
     def all_obj(self, cls: Type[PakT]) -> Collection[PakT]:
         """Get the list of objects parsed."""
         if cls not in self._parsed:
             raise ValueError(cls.__name__ + ' has not been parsed yet!')
-        return cast('Collection[PakT]', self.objects[cls].values())
+        return cast('dict[str, PakT]', self.objects[cls]).values()
 
     def obj_by_id(self, cls: Type[PakT], object_id: str) -> PakT:
         """Return the object with a given ID."""
         if cls not in self._parsed:
             raise ValueError(cls.__name__ + ' has not been parsed yet!')
-        return cast(PakT, self.objects[cls][object_id.casefold()])
+        return cast('dict[str, PakT]', self.objects[cls])[object_id.casefold()]
 
     def add(self, obj: PakT, pak_id: str, pak_name: str) -> None:
         """Add an object to our dataset later, with the given package name."""
@@ -430,8 +459,14 @@ class PackagesSet:
             obj.pak_name = pak_name
 
 
-# Global loaded packages. TODO: This should become local.
-LOADED = PackagesSet()
+def get_loaded_packages() -> PackagesSet:
+    """The current set of loaded packages.
+
+    TODO: Try to make this local wherever possible?
+    """
+    return _LOADED
+
+_LOADED = PackagesSet()
 
 
 async def find_packages(nursery: trio.Nursery, packset: PackagesSet, pak_dir: Path) -> None:
@@ -455,9 +490,9 @@ async def find_packages(nursery: trio.Nursery, packset: PackagesSet, pak_dir: Pa
         else:
             ext = name.suffix.casefold()
             if ext in ('.bee_pack', '.zip'):
-                filesys = await trio.to_thread.run_sync(ZipFileSystem, name, cancellable=True)
+                filesys = await trio.to_thread.run_sync(ZipFileSystem, name, abandon_on_cancel=True)
             elif ext == '.vpk':
-                filesys = await trio.to_thread.run_sync(VPKFileSystem, name, cancellable=True)
+                filesys = await trio.to_thread.run_sync(VPKFileSystem, name, abandon_on_cancel=True)
             else:
                 LOGGER.info('Extra file: {}', name)
                 continue
@@ -466,7 +501,7 @@ async def find_packages(nursery: trio.Nursery, packset: PackagesSet, pak_dir: Pa
 
         # Valid packages must have an info.txt file!
         try:
-            info = await trio.to_thread.run_sync(filesys.read_prop, 'info.txt', cancellable=True)
+            info = await trio.to_thread.run_sync(filesys.read_kv1, 'info.txt', abandon_on_cancel=True)
         except FileNotFoundError:
             if name.is_dir():
                 # This isn't a package, so check the subfolders too...
@@ -476,13 +511,19 @@ async def find_packages(nursery: trio.Nursery, packset: PackagesSet, pak_dir: Pa
                 LOGGER.warning('ERROR: package "{}" has no info.txt!', name)
             # Don't continue to parse this "package"
             continue
-        pak_id = info['ID']
+        try:
+            pak_id = info['ID']
+        except LookupError:
+            raise ValueError('No package ID in {}/info.txt!', filesys.path) from None
 
         if pak_id.casefold() in packset.packages:
+            duplicate = packset.packages[pak_id.casefold()]
             raise ValueError(
                 f'Duplicate package with id "{pak_id}"!\n'
-                'If you just updated the mod, delete any old files in packages/.'
-            ) from None
+                'If you just updated the mod, delete any old files in packages/.\n'
+                f'Package 1: {duplicate.fsys.path}\n'
+                f'Package 2: {filesys.path}'
+            )
 
         PACKAGE_SYS[pak_id.casefold()] = filesys
 
@@ -498,9 +539,8 @@ async def find_packages(nursery: trio.Nursery, packset: PackagesSet, pak_dir: Pa
         LOGGER.info('No packages in folder {}!', pak_dir)
 
 
-def no_packages_err(pak_dirs: list[Path], msg: TransToken) -> NoReturn:
+async def no_packages_err(dialog: Dialogs, pak_dirs: list[Path], msg: TransToken) -> NoReturn:
     """Show an error message indicating no packages are present."""
-    from app import tk_tools
     import sys
     # We don't have a package directory!
     if len(pak_dirs) == 1:
@@ -518,7 +558,11 @@ def no_packages_err(pak_dirs: list[Path], msg: TransToken) -> NoReturn:
     ).format(msg=msg, trailer=trailer)
 
     LOGGER.error(message)
-    tk_tools.showerror(TransToken.ui('BEE2 - Invalid Packages Directory!'), message=message)
+    await dialog.show_info(
+        title=TransToken.ui('BEE2 - Invalid Packages Directory!'),
+        message=message,
+        icon=dialog.ERROR,
+    )
     sys.exit()
 
 
@@ -526,8 +570,7 @@ async def load_packages(
     packset: PackagesSet,
     pak_dirs: list[Path],
     loader: LoadScreen,
-    has_mel_music: bool=False,
-    has_tag_music: bool=False,
+    dialog: Dialogs,
 ) -> None:
     """Scan and read in all packages."""
     async with trio.open_nursery() as find_nurs:
@@ -538,11 +581,11 @@ async def load_packages(
     loader.set_length("PAK", pack_count)
 
     if pack_count == 0:
-        no_packages_err(pak_dirs, TransToken.ui('No packages found!'))
+        await no_packages_err(dialog, pak_dirs, TransToken.ui('No packages found!'))
 
     # We must have the clean style package.
     if CLEAN_PACKAGE not in packset.packages:
-        no_packages_err(pak_dirs, TransToken.ui(
+        await no_packages_err(dialog, pak_dirs, TransToken.ui(
             'No Clean Style package! This is required for some essential resources and objects.'
         ))
 
@@ -559,7 +602,7 @@ async def load_packages(
                 loader.set_length("PAK", pack_count)
                 continue
 
-            nursery.start_soon(parse_package, nursery, packset, pack, loader, has_tag_music, has_mel_music)
+            nursery.start_soon(parse_package, nursery, packset, pack, loader)
         LOGGER.debug('Submitted packages.')
 
     LOGGER.debug('Parsed packages, now parsing objects.')
@@ -572,7 +615,7 @@ async def load_packages(
     ))
 
     LOGGER.info('Object counts:\n{}', '\n'.join(
-        '{:<15}: {}'.format(obj_type.__name__, len(objs))
+        f'{obj_type.__name__:<15}: {len(objs)}'
         for obj_type, objs in
         sorted(packset.unparsed.items(), key=lambda t: len(t[1]), reverse=True)
     ))
@@ -613,19 +656,17 @@ async def parse_package(
     nursery: trio.Nursery,
     packset: PackagesSet,
     pack: Package,
-    loader: Optional[LoadScreen],
-    has_tag: bool=False,
-    has_mel: bool=False,
+    loader: LoadScreen,
 ) -> None:
     """Parse through the given package to find all the components."""
     from packages import template_brush  # Avoid circular imports
     for pre in pack.info.find_children('Prerequisites'):
         # Special case - disable these packages when the music isn't copied.
         if pre.value == '<TAG_MUSIC>':
-            if not has_tag:
+            if not packset.has_tag_music:
                 return
         elif pre.value == '<MEL_MUSIC>':
-            if not has_mel:
+            if not packset.has_mel_music:
                 return
         elif pre.value.casefold() not in packset.packages:
             LOGGER.warning(
@@ -650,13 +691,16 @@ async def parse_package(
                 obj.real_name, obj.value,
             )
             continue
+
         if obj.name in ('templatebrush', 'brushtemplate'):
             LOGGER.warning(
                 'TemplateBrush {} no longer needs to be defined in info.txt',
                 obj['id', '<NO ID>'],
             )
-            continue
-        if obj.name == 'overrides':
+        elif obj.name == 'transtoken':
+            # Special case for now, since it's package-specific.
+            parse_pack_transtoken(pack, obj)
+        elif obj.name == 'overrides':
             for over_prop in obj:
                 if over_prop.name in ('templatebrush', 'brushtemplate'):
                     LOGGER.warning(
@@ -667,12 +711,16 @@ async def parse_package(
                 try:
                     obj_type = OBJ_TYPES[over_prop.name]
                 except KeyError:
-                    LOGGER.warning('Unknown object type "{}" with ID "{}"!', over_prop.real_name, over_prop['id', '<NO ID>'])
+                    LOGGER.warning(
+                        'Unknown object type "{}" with ID "{}"!',
+                        over_prop.real_name, over_prop['id', '<NO ID>'],
+                    )
+
                     continue
                 try:
                     obj_id = over_prop['id']
                 except LookupError:
-                    raise ValueError('No ID for "{}" object type!'.format(obj_type)) from None
+                    raise ValueError(f'No ID for "{obj_type}" object type in "{pack.id}" package!') from None
                 packset.overrides[obj_type, obj_id.casefold()].append(
                     ParseData(pack.fsys, obj_id, over_prop, pack.id, True)
                 )
@@ -680,22 +728,25 @@ async def parse_package(
             try:
                 obj_type = OBJ_TYPES[obj.name]
             except KeyError:
-                LOGGER.warning('Unknown object type "{}" with ID "{}"!', obj.real_name, obj['id', '<NO ID>'])
+                LOGGER.warning(
+                    'Unknown object type "{}" with ID "{}"!',
+                    obj.real_name, obj['id', '<NO ID>'],
+                )
                 continue
             try:
                 obj_id = obj['id']
             except LookupError:
-                raise ValueError('No ID for "{}" object type in "{}" package!'.format(obj_type, pack.id)) from None
+                raise ValueError(f'No ID for "{obj_type}" object type in "{pack.id}" package!') from None
             if obj_id in packset.unparsed[obj_type]:
                 if obj_type.allow_mult:
-                    # Pretend this is an override
+                    # Pretend this is an override, but don't actually set the bool.
                     packset.overrides[obj_type, obj_id.casefold()].append(
-                        ParseData(pack.fsys, obj_id, obj, pack.id, True)
+                        ParseData(pack.fsys, obj_id, obj, pack.id, False)
                     )
                     # Don't continue to parse and overwrite
                     continue
                 else:
-                    raise Exception('ERROR! "' + obj_id + '" defined twice!')
+                    raise Exception(f'ERROR! "{obj_id}" defined twice!')
             packset.unparsed[obj_type][obj_id] = ObjData(
                 pack.fsys,
                 obj,
@@ -716,7 +767,7 @@ async def parse_package(
 async def parse_object(
     packset: PackagesSet,
     obj_class: Type[PakObject], obj_id: str,
-    loader: LoadScreen,
+    loader: Optional[LoadScreen],
 ) -> None:
     """Parse through the object and store the resultant class."""
     obj_data = packset.unparsed[obj_class][obj_id]
@@ -734,7 +785,6 @@ async def parse_object(
             await trio.sleep(0)
     except (NoKeyError, IndexError) as e:
         reraise_keyerror(e, obj_id)
-        raise  # Never reached.
     except TokenSyntaxError as e:
         # Add the relevant package to the filename.
         if e.file:
@@ -747,9 +797,7 @@ async def parse_object(
         ) from e
 
     if not hasattr(object_, 'id'):
-        raise ValueError(
-            '"{}" object {} has no ID!'.format(obj_class.__name__, object_)
-        )
+        raise ValueError(f'"{obj_class.__name__}" object {object_} has no ID!')
     assert object_.id == obj_id, f'{object_!r} -> {object_.id} != "{obj_id}"!'
 
     object_.pak_id = obj_data.pak_id
@@ -761,7 +809,6 @@ async def parse_object(
                 override = await obj_class.parse(override_data)
         except (NoKeyError, IndexError) as e:
             reraise_keyerror(e, f'{override_data.pak_id}:{obj_id}')
-            raise  # Never reached.
         except TokenSyntaxError as e:
             # Add the relevant package to the filename.
             if e.file:
@@ -769,7 +816,7 @@ async def parse_object(
             raise
         except Exception as e:
             raise ValueError(
-                f'Error occured parsing {obj_id} override'
+                f'Error occured parsing {obj_id} override '
                 f'from package {override_data.pak_id}!'
             ) from e
 
@@ -781,13 +828,35 @@ async def parse_object(
         loader.step("OBJ", obj_id)
 
 
+def parse_pack_transtoken(pack: Package, kv: Keyvalues) -> None:
+    """Define an additional translation token in a package."""
+    try:
+        obj_id = kv['id'].casefold()
+    except LookupError:
+        raise ValueError('No ID for "TransToken" object type!') from None
+    if obj_id in pack.additional_tokens:
+        raise ValueError('Duplicate translation token "{}:{}"', pack.id, obj_id)
+    with srctools.logger.context(f'{pack.id}:{obj_id}'):
+        token = TransToken.parse(pack.id, parse_multiline_key(kv, 'text'))
+
+    pack.additional_tokens[obj_id] = token
+
+
 class Package:
     """Represents a package."""
+    id: str
+    fsys: FileSystem
+    info: Keyvalues
+    path: Path
+    disp_name: TransToken
+    additional_tokens: dict[str, TransToken]
+    desc: TransToken
+
     def __init__(
         self,
         pak_id: str,
         filesystem: FileSystem,
-        info: Property,
+        info: Keyvalues,
         path: Path,
     ) -> None:
         try:
@@ -801,7 +870,8 @@ class Package:
         self.info = info
         self.path = path
         self.disp_name = disp_name
-        self.desc = TransToken.ui('No description!')  # Filled in by parse_package.
+        self.additional_tokens = {}
+        self.desc = TransToken.ui('No description!')  # Filled in by parse_package().
 
     @property
     def enabled(self) -> bool:
@@ -828,19 +898,25 @@ class Package:
             LOGGER.info('Need to extract resources - {} is unzipped!', self.id)
             return True
 
-        zip_modtime = int(self.path.stat().st_mtime)
+        if self.enabled:
+            zip_modtime = int(self.path.stat().st_mtime)
 
-        # If zero, it's never extracted...
-        if zip_modtime != mod_time or mod_time == 0:
-            LOGGER.info('Need to extract resources - {} is stale!', self.id)
-            return True
+            # If zero, it's never extracted...
+            if zip_modtime != mod_time or mod_time == 0:
+                LOGGER.info('Need to extract resources - {} is stale!', self.id)
+                return True
+        else:
+            # For disabled packages, need to refresh if we were extracted.
+            if mod_time != 0:
+                LOGGER.info('Need to extract resources - {} was previously enabled.', self.id)
+                return True
         return False
 
     def get_modtime(self) -> int:
         """After the cache has been extracted, set the modification dates
          in the config."""
-        if isinstance(self.fsys, RawFileSystem):
-            # No modification time
+        # Raw filesystems have no mod time. Do the same for disabled ones.
+        if isinstance(self.fsys, RawFileSystem) or not self.enabled:
             return 0
         else:
             return int(self.path.stat().st_mtime)
@@ -854,12 +930,12 @@ class Style(PakObject, needs_foreground=True):
         selitem_data: SelitemData,
         items: list[EditorItem],
         renderables: dict[RenderableType, Renderable],
-        suggested: tuple[set[str], set[str], set[str], set[str]],
+        suggested: dict[type[PakObject], set[str]],
         config: lazy_conf.LazyConf = lazy_conf.BLANK,
-        base_style: Optional[str]=None,
-        has_video: bool=True,
-        vpk_name: str='',
-        legacy_corridors: dict[tuple[GameMode, Direction, int], LegacyCorr]=None,
+        base_style: Optional[str] = None,
+        has_video: bool = True,
+        vpk_name: str = '',
+        legacy_corridors: Mapping[tuple[GameMode, Direction, int], LegacyCorr] = srctools.EmptyMapping,
     ) -> None:
         self.id = style_id
         self.selitem_data = selitem_data
@@ -886,11 +962,11 @@ class Style(PakObject, needs_foreground=True):
         self.config = config
 
     @classmethod
-    async def parse(cls, data: ParseData):
+    async def parse(cls, data: ParseData) -> Self:
         """Parse a style definition."""
         info = data.info
         selitem_data = SelitemData.parse(info, data.pak_id)
-        base = info['base', '']
+        base = info['base', ''] or None
         has_video = srctools.conv_bool(
             info['has_video', ''],
             not data.is_override,  # Assume no video for override
@@ -899,24 +975,17 @@ class Style(PakObject, needs_foreground=True):
         items: list[EditorItem]
         renderables: dict[RenderableType, Renderable]
 
-        sugg: dict[str, set[str]] = {
-            'quote': set(),
-            'music': set(),
-            'skybox': set(),
-            'elev': set(),
+        suggested: dict[type[PakObject], set[str]] = {
+            pak_type: set()
+            for pak_type in style_suggest_keys.values()
         }
-        for prop in info.find_children('suggested'):
+        for kv in info.find_children('suggested'):
             try:
-                sugg[prop.name].add(prop.value)
+                sugg_cls = style_suggest_keys[kv.name]
             except KeyError:
-                LOGGER.warning('Unknown suggestion types for style {}: {}', data.id, prop.name)
-
-        sugg_tup = (
-            sugg['quote'],
-            sugg['music'],
-            sugg['skybox'],
-            sugg['elev'],
-        )
+                LOGGER.warning('Unknown suggestion types for style {}: {}', data.id, kv.name)
+            else:
+                suggested[sugg_cls].add(kv.value)
 
         corr_conf = info.find_key('corridors', or_blank=True)
         legacy_corridors: dict[tuple[GameMode, Direction, int], LegacyCorr] = {}
@@ -928,30 +997,27 @@ class Style(PakObject, needs_foreground=True):
                 group = LEGACY_CORRIDORS[mode, direction]
             except KeyError:  # Coop entry
                 continue
-            group_prop = corr_conf.find_key(group, or_blank=True)
+            group_kv = corr_conf.find_key(group, or_blank=True)
             for i in range(1, length + 1):
-                prop = group_prop.find_key(str(i), '')
+                kv = group_kv.find_key(str(i), '')
 
                 if icon_folder:
-                    icon = utils.PackagePath(data.pak_id, 'corr/{}/{}/{}.jpg'.format(icon_folder, group, i))
+                    icon = utils.PackagePath(data.pak_id, f'corr/{icon_folder}/{group}/{i}.jpg')
                 else:
                     icon = img.PATH_BLANK
 
-                if prop.has_children():
+                if kv.has_children():
                     legacy_corridors[mode, direction, i] = LegacyCorr(
-                        name=prop['name', ''],
-                        icon=utils.PackagePath.parse(prop['icon', icon], data.pak_id),
-                        desc=prop['Desc', ''],
+                        name=kv['name', ''],
+                        icon=utils.PackagePath.parse(kv['icon', icon], data.pak_id),
+                        desc=kv['Desc', ''],
                     )
                 else:
                     legacy_corridors[mode, direction, i] = LegacyCorr(
-                        name=prop.value,
+                        name=kv.value,
                         icon=icon,
                         desc='',
                     )
-
-        if base == '':
-            base = None
         try:
             folder = 'styles/' + info['folder']
         except LookupError:
@@ -962,7 +1028,7 @@ class Style(PakObject, needs_foreground=True):
                 renderables = {}
                 vbsp = lazy_conf.BLANK
             else:
-                raise ValueError(f'Style "{data.id}" missing configuration folder!')
+                raise ValueError(f'Style "{data.id}" missing configuration folder!') from None
         else:
             with data.fsys[folder + '/items.txt'].open_str() as f:
                 items, renderables = await trio.to_thread.run_sync(EditorItem.parse, f)
@@ -979,7 +1045,7 @@ class Style(PakObject, needs_foreground=True):
             renderables=renderables,
             config=vbsp,
             base_style=base,
-            suggested=sugg_tup,
+            suggested=suggested,
             has_video=has_video,
             legacy_corridors=legacy_corridors,
             vpk_name=vpk_name,
@@ -994,21 +1060,16 @@ class Style(PakObject, needs_foreground=True):
 
         self.has_video = self.has_video or override.has_video
         # If overrides have suggested IDs, add those.
-        self.suggested = tuple(
-            over_sugg | self_sugg
-            for self_sugg, over_sugg in
-            zip(self.suggested, override.suggested)
-        )
+        for sugg_cls, sugg in override.suggested.items():
+            self.suggested[sugg_cls].update(sugg)
 
     @classmethod
     async def post_parse(cls, packset: PackagesSet) -> None:
         """Assign the bases lists for all styles, and set default suggested items."""
-        defaults = ['<NONE>', '<NONE>', 'SKY_BLACK', '<NONE>']
-
         for style in packset.all_obj(Style):
-            for default, sugg_set in zip(defaults, style.suggested):
+            for sugg_cls, sugg_set in style.suggested.items():
                 if not sugg_set:
-                    sugg_set.add(default)
+                    sugg_set.add(sugg_cls.suggest_default)
 
             base = []
             b_style = style
@@ -1016,7 +1077,7 @@ class Style(PakObject, needs_foreground=True):
                 # Recursively find all the base styles for this one.
                 if b_style in base:
                     # Already hit this!
-                    raise Exception('Loop in bases for "{}"!'.format(b_style.id))
+                    raise Exception(f'Loop in bases for "{b_style.id}"!')
                 # Just append the style.base_style to the list,
                 # until the style with that ID isn't found any more.
                 base.append(b_style)
@@ -1040,13 +1101,39 @@ class Style(PakObject, needs_foreground=True):
         return self.selitem_data.iter_trans_tokens('styles/' + self.id)
 
     @staticmethod
-    def export(exp_data: ExportData) -> None:
+    async def export(exp_data: ExportData) -> None:
         """This isn't used for Styles, we do them specially."""
         pass
 
 
+def parse_multiline_key(info: Keyvalues, prop_name: str, *, allow_old_format: bool=False) -> str:
+    """Allow several methods for entering multi-line keyvalues.
+
+    Any combination of the following is allowed:
+    "key" "single line"
+    "key" "another line"
+    "key"
+        {
+        "" "blah"
+        "" "Blah blah"
+        }
+    """
+    has_warning = False
+    lines = []
+    for kv in info.find_all(prop_name):
+        if kv.has_children():
+            for line in kv:
+                if line.name and not has_warning:
+                    LOGGER.warning('Old desc format found. Keys inside the block should be ""!')
+                    has_warning = True
+                lines.append(line.value)
+        else:
+            lines.append(kv.value)
+    return '\n'.join(lines)
+
+
 def desc_parse(
-    info: Property,
+    info: Keyvalues,
     source: str,
     pak_id: str,
     *,
@@ -1055,18 +1142,8 @@ def desc_parse(
     """Parse the description blocks, to create data which matches richTextBox.
 
     """
-    has_warning = False
-    lines = []
-    for prop in info.find_all(prop_name):
-        if prop.has_children():
-            for line in prop:
-                if line.name and not has_warning:
-                    LOGGER.warning('Old desc format: {}', source)
-                    has_warning = True
-                lines.append(line.value)
-        else:
-            lines.append(prop.value)
-    token = TransToken.parse(pak_id, '\n'.join(lines))
+    with srctools.logger.context(source):
+        token = TransToken.parse(pak_id, parse_multiline_key(info, prop_name))
     return tkMarkdown.convert(token, pak_id)
 
 
@@ -1102,3 +1179,4 @@ from packages.music import Music
 from packages.quote_pack import QuotePack
 from packages.pack_list import PackList
 from packages.corridor import CorridorGroup
+from packages.widgets import ConfigGroup

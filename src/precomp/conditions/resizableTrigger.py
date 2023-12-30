@@ -1,11 +1,13 @@
 """Logic for trigger items, allowing them to be resized."""
 from contextlib import suppress
-from srctools import Property, Vec, Output, VMF
+from typing import Optional
+
+from srctools import Keyvalues, Vec, Output, VMF
 import srctools.logger
 
 from precomp import instanceLocs, connections, options, conditions
 import consts
-import vbsp
+from utils import not_none
 
 
 COND_MOD_NAME = None
@@ -14,7 +16,7 @@ LOGGER = srctools.logger.get_logger(__name__, alias='cond.resizeTrig')
 
 
 @conditions.make_result('ResizeableTrigger')
-def res_resizeable_trigger(vmf: VMF, info: conditions.MapInfo, res: Property) -> object:
+def res_resizeable_trigger(vmf: VMF, info: conditions.MapInfo, res: Keyvalues) -> object:
     """Replace two markers with a trigger brush.
 
     This is run once to affect all of an item.
@@ -43,7 +45,7 @@ def res_resizeable_trigger(vmf: VMF, info: conditions.MapInfo, res: Property) ->
     * `localkeys`: The same as above, except values will be changed to use
         instance-local names.
     """
-    marker = instanceLocs.resolve(res['markerInst'])
+    marker = instanceLocs.resolve_filter(res['markerInst'])
 
     marker_names = set()
 
@@ -63,13 +65,14 @@ def res_resizeable_trigger(vmf: VMF, info: conditions.MapInfo, res: Property) ->
 
     # Synthesise the connection config used for the final trigger.
     conn_conf_sp = connections.Config(
-        id=item_id + ':TRIGGER',
+        item_id=item_id + ':TRIGGER',
         output_act=Output.parse_name(res['triggerActivate', 'OnStartTouchAll']),
         output_deact=Output.parse_name(res['triggerDeactivate', 'OnEndTouchAll']),
     )
 
     # For Coop, we add a logic_coop_manager in the mix so both players can
     # be handled.
+    coop_var: Optional[str]
     try:
         coop_var = res['coopVar']
     except LookupError:
@@ -78,17 +81,14 @@ def res_resizeable_trigger(vmf: VMF, info: conditions.MapInfo, res: Property) ->
     else:
         coop_only_once = res.bool('coopOnce')
         conn_conf_coop = connections.Config(
-            id=item_id + ':TRIGGER',
-            output_act=Output.parse_name(
-                res['coopActivate', 'OnChangeToAllTrue']
-            ),
-            output_deact=Output.parse_name(
-                res['coopDeactivate', 'OnChangeToAnyFalse']
-            ),
+            item_id=item_id + ':TRIGGER',
+            output_act=Output.parse_name(res['coopActivate', 'OnChangeToAllTrue']),
+            output_deact=Output.parse_name(res['coopDeactivate', 'OnChangeToAnyFalse']),
         )
 
     # Display preview overlays if it's preview mode, and the config is true
-    pre_act = pre_deact = None
+    pre_act: Optional[Output] = None
+    pre_deact: Optional[Output] = None
     if not info.is_publishing and options.get_itemconf(res['previewConf', ''], False):
         preview_mat = res['previewMat', '']
         preview_inst_file = res['previewInst', '']
@@ -150,7 +150,7 @@ def res_resizeable_trigger(vmf: VMF, info: conditions.MapInfo, res: Property) ->
         out_ent = trig_ent = vmf.create_ent(
             classname='trigger_multiple',  # Default
             targetname=targ,
-            origin=options.get(Vec, "global_ents_loc"),
+            origin=not_none(options.get(Vec, "global_ents_loc")),
             angles='0 0 0',
         )
         trig_ent.solids = [
@@ -165,6 +165,7 @@ def res_resizeable_trigger(vmf: VMF, info: conditions.MapInfo, res: Property) ->
         conditions.set_ent_keys(trig_ent, inst1, res)
 
         if is_coop:
+            assert coop_var is not None and conn_conf_coop is not None
             trig_ent['spawnflags'] = '1'  # Clients
             trig_ent['classname'] = 'trigger_playerteam'
 
@@ -177,8 +178,7 @@ def res_resizeable_trigger(vmf: VMF, info: conditions.MapInfo, res: Property) ->
             item = connections.Item(
                 out_ent,
                 conn_conf_coop,
-                ant_floor_style=mark1.ant_floor_style,
-                ant_wall_style=mark1.ant_wall_style,
+                ind_style=mark1.ind_style,
             )
 
             if coop_only_once:
@@ -197,8 +197,7 @@ def res_resizeable_trigger(vmf: VMF, info: conditions.MapInfo, res: Property) ->
             item = connections.Item(
                 trig_ent,
                 conn_conf_sp,
-                ant_floor_style=mark1.ant_floor_style,
-                ant_wall_style=mark1.ant_wall_style,
+                ind_style=mark1.ind_style,
             )
 
         # Register, and copy over all the antlines.
@@ -243,14 +242,14 @@ def res_resizeable_trigger(vmf: VMF, info: conditions.MapInfo, res: Property) ->
                 origin=inst2['origin'],
             )
 
-            if pre_act is not None:
+            if pre_act is not None and (out_act := item.output_act()) is not None:
                 out = pre_act.copy()
-                out.inst_out, out.output = item.output_act()
+                out.inst_out, out.output = out_act
                 out.target = conditions.local_name(pre_inst, out.target)
                 out_ent.add_out(out)
-            if pre_deact is not None:
+            if pre_deact is not None and (out_deact := item.output_deact()) is not None:
                 out = pre_deact.copy()
-                out.inst_out, out.output = item.output_deact()
+                out.inst_out, out.output = out_deact
                 out.target = conditions.local_name(pre_inst, out.target)
                 out_ent.add_out(out)
 

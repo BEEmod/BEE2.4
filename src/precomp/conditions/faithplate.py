@@ -1,14 +1,15 @@
 """Modify and inspect faith plates."""
-from srctools import Angle, Property, Entity, logger
+from srctools import Angle, Keyvalues, Entity, logger
 from precomp import faithplate, template_brush, conditions
+from precomp.lazy_value import LazyValue
 
 
 COND_MOD_NAME = 'Faith Plates'
 LOGGER = logger.get_logger(__name__, alias='cond.faithplate')
 
 
-@conditions.make_flag("FaithType")
-def flag_faith_type(inst: Entity, flag: Property) -> bool:
+@conditions.make_test("FaithType")
+def test_faith_type(inst: Entity, kv: Keyvalues) -> bool:
     """Determine the type of faith plate used.
 
     The value can be set to 'straight', 'straightup', 'angled',
@@ -21,7 +22,7 @@ def flag_faith_type(inst: Entity, flag: Property) -> bool:
     if isinstance(plate, faithplate.PaintDropper):
         plate = None
 
-    des_type = flag.value.casefold()
+    des_type = kv.value.casefold()
 
     if des_type == 'any':
         return plate is not None
@@ -39,7 +40,7 @@ def flag_faith_type(inst: Entity, flag: Property) -> bool:
 
 
 @conditions.make_result('setFaithAttrs', 'setFaith', 'setFaithAttr')
-def res_set_faith(res: Property) -> conditions.ResultCallable:
+def res_set_faith(res: Keyvalues) -> conditions.ResultCallable:
     """Modify the `trigger_catapult`s used for `ItemFaithPlate` items.
 
     This can also be used to modify the catapult for bomb-type Gel Droppers.
@@ -54,7 +55,7 @@ def res_set_faith(res: Property) -> conditions.ResultCallable:
         template = template_brush.get_template(temp_name)
     else:
         template = None
-    offset = res.vec('offset')
+    offset = LazyValue.parse(res['offset', '']).as_vec()
 
     def apply_attrs(inst: Entity) -> None:
         """Apply the modification."""
@@ -70,7 +71,7 @@ def res_set_faith(res: Property) -> conditions.ResultCallable:
                 plate.template = template
 
             if offset is not None:
-                plate.trig_offset = offset @ Angle.from_str(inst['angles'])
+                plate.trig_offset = offset(inst) @ Angle.from_str(inst['angles'])
     return apply_attrs
 
 

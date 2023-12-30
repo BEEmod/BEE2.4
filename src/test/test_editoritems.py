@@ -1,11 +1,11 @@
 """Test Editoritems syntax."""
 from srctools import Vec
-from editoritems import (
-    Item, ItemClass,
-    OccupiedVoxel, Coord, OccuType, DesiredFacing, FSPath, Sound, Handle, ConnSide, InstCount,
-)
 
 from app.localisation import TransToken
+from editoritems import (
+    ConnSide, Coord, DesiredFacing, FSPath, Handle, InstCount, Item, ItemClass,
+    OccupiedVoxel, OccuType, Sound,
+)
 
 
 # Definition for a simple item, with 'exporting' open.

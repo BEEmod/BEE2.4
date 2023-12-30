@@ -4,11 +4,15 @@ from random import Random
 from struct import Struct
 import hashlib
 
+from srctools import (
+    VMF, Angle, Entity, FrozenAngle, FrozenMatrix, FrozenVec, Matrix, Vec,
+    logger,
+)
+
 from precomp import instanceLocs
-from srctools import VMF, Vec, Angle, Entity, logger, Matrix
 
 
-# A hash object which we seed using the map layout, so it is somewhat unique.
+# A hash object which we seed using the map layout, so it is unique.
 # This should be copied to use for specific purposes, never modified.
 MAP_HASH = hashlib.sha256()
 ONE_FLOAT = Struct('f')
@@ -46,14 +50,14 @@ def parse_weights(count: int, weights: str) -> list[int]:
                 # Abandon parsing
                 break
     if len(weight) == 0:
-        LOGGER.warning('Failed parsing weight! ({!s})',weight)
+        LOGGER.warning('Failed parsing weight: {!r} for {} items',weights, count)
         weight = list(range(count))
     # random.choice(weight) will now give an index with the correct
     # probabilities.
     return weight
 
 
-def init_seed(vmf: VMF) -> str:
+def init_seed(vmf: VMF) -> None:
     """Seed with the map layout.
 
     We use the position of the ambient light instances, which is unique to any
@@ -61,7 +65,7 @@ def init_seed(vmf: VMF) -> str:
     is relevant.
     """
     amb_light = instanceLocs.resolve_one('<ITEM_POINT_LIGHT>', error=True)
-    light_names = []
+    light_names: list[bytes] = []
     for inst in vmf.by_class['func_instance']:
         if inst['file'].casefold() == amb_light:
             pos = Vec.from_str(inst['origin']) / 64
@@ -71,10 +75,11 @@ def init_seed(vmf: VMF) -> str:
         MAP_HASH.update(name)
     LOGGER.debug('Map random seed: {}', MAP_HASH.hexdigest())
 
-    return b'|'.join(light_names).decode()  # TODO Remove
 
-
-def seed(name: bytes, *values: str | Entity | Vec | Angle | Matrix | float | bytes | bytearray) -> Random:
+def seed(
+    name: bytes,
+    *values: str | Entity | float | bytes | bytearray | Vec | FrozenVec | Angle | FrozenAngle | Matrix | FrozenMatrix,
+) -> Random:
     """Initialise a random number generator with these starting arguments.
 
     The name is used to make this unique among other calls, then the arguments
@@ -85,12 +90,12 @@ def seed(name: bytes, *values: str | Entity | Vec | Angle | Matrix | float | byt
     for val in values:
         if isinstance(val, str):
             algo.update(val.encode('utf8'))
-        elif isinstance(val, (Vec, Angle)):
+        elif isinstance(val, (Vec, FrozenVec, Angle, FrozenAngle)):
             a, b, c = val
             algo.update(THREE_FLOATS.pack(round(a, 6), round(b, 6), round(c, 6)))
         elif isinstance(val, float):
             algo.update(ONE_FLOAT.pack(val))
-        elif isinstance(val, Matrix):
+        elif isinstance(val, (Matrix, FrozenMatrix)):
             algo.update(NINE_FLOATS.pack(
                 val[0, 0], val[0, 1], val[0, 2],
                 val[1, 0], val[1, 1], val[1, 2],

@@ -3,19 +3,19 @@
 Other modules define an immutable state class, then register it with this.
 They can then fetch the current state and store new state.
 """
-import abc
-from pathlib import Path
-from typing_extensions import Self
 from typing import (
-    ClassVar, Optional, Set, TypeVar, Callable, NewType, Union, cast,
-    Type, Dict, Awaitable, Iterator, Tuple,
+    Awaitable, Callable, ClassVar, Dict, Iterator, NewType, Optional, Set,
+    Tuple, Type, TypeVar, Union, cast,
 )
+from typing_extensions import Self
+from pathlib import Path
+import abc
 import os
 
+from srctools import AtomicWriter, KeyValError, Keyvalues, logger
+from srctools.dmx import Element
 import attrs
 import trio
-from srctools import KeyValError, AtomicWriter, Property, logger
-from srctools.dmx import Element
 
 import utils
 
@@ -33,7 +33,6 @@ class ConfInfo:
     """Holds information about a type of configuration data."""
     name: str
     version: int
-    palette_stores: bool  # If this is saved/loaded by palettes.
     uses_id: bool  # If we manage individual configs for each of these IDs.
 
 
@@ -46,16 +45,20 @@ class Data(abc.ABC):
         cls, *,
         conf_name: str = '',
         version: int = 1,
-        palette_stores: bool = True,  # TODO remove
         uses_id: bool = False,
-        **kwargs,
+        **kwargs: object,
     ) -> None:
         super().__init_subclass__(**kwargs)
+        if hasattr(cls, '_Data__info'):
+            # Attrs __slots__ classes remakes the class, but it'll already have the info included.
+            # Just keep the existing info, no kwargs are given here.
+            return
+
         if not conf_name:
             raise ValueError('Config name must be specified!')
         if conf_name.casefold() in {'version', 'name'}:
             raise ValueError(f'Illegal name: "{conf_name}"')
-        cls.__info = ConfInfo(conf_name, version, palette_stores, uses_id)
+        cls.__info = ConfInfo(conf_name, version, uses_id)
 
     @classmethod
     def get_conf_info(cls) -> ConfInfo:
@@ -63,18 +66,18 @@ class Data(abc.ABC):
         return cls.__info
 
     @classmethod
-    def parse_legacy(cls, conf: Property) -> Dict[str, Self]:
+    def parse_legacy(cls, conf: Keyvalues) -> Dict[str, Self]:
         """Parse from the old legacy config. The user has to handle the uses_id style."""
         return {}
 
     @classmethod
     @abc.abstractmethod
-    def parse_kv1(cls, data: Property, version: int) -> Self:
+    def parse_kv1(cls, data: Keyvalues, version: int) -> Self:
         """Parse keyvalues config values."""
         raise NotImplementedError
 
     @abc.abstractmethod
-    def export_kv1(self) -> Property:
+    def export_kv1(self) -> Keyvalues:
         """Generate keyvalues for saving configuration."""
         raise NotImplementedError
 
@@ -180,6 +183,18 @@ class ConfigSpec:
                     else:
                         nursery.start_soon(cb, data)
 
+    def get_full_conf(self, filter_to: Optional['ConfigSpec'] = None) -> Config:
+        """Get the config stored by this spec, filtering to another if requested."""
+        if filter_to is None:
+            filter_to = self
+
+        # Fully copy the Config structure so these don't interact with each other.
+        return Config({
+            cls: conf_map.copy()
+            for cls, conf_map in self._current.items()
+            if cls in filter_to._registered
+        })
+
     def merge_conf(self, config: Config) -> None:
         """Re-store values in the specified config.
 
@@ -255,22 +270,22 @@ class ConfigSpec:
         except KeyError:
             self._current[cls] = {data_id: data}
 
-    def parse_kv1(self, props: Property) -> Tuple[Config, bool]:
+    def parse_kv1(self, kv: Keyvalues) -> Tuple[Config, bool]:
         """Parse a configuration file into individual data.
 
         The data is in the form {conf_type: {id: data}}, and a bool indicating if it was upgraded
         and so should be resaved.
         """
-        if 'version' not in props:  # New conf format
-            return self._parse_legacy(props), True
+        if 'version' not in kv:  # New conf format
+            return self._parse_legacy(kv), True
 
-        version = props.int('version')
+        version = kv.int('version')
         if version != 1:
             raise ValueError(f'Unknown config version {version}!')
 
         conf = Config({})
         upgraded = False
-        for child in props:
+        for child in kv:
             if child.name == 'version':
                 continue
             try:
@@ -321,39 +336,39 @@ class ConfigSpec:
                     )
         return conf, upgraded
 
-    def _parse_legacy(self, props: Property) -> Config:
+    def _parse_legacy(self, kv: Keyvalues) -> Config:
         """Parse the old config format."""
         conf = Config({})
         # Convert legacy configs.
         for cls in self._name_to_type.values():
             info = cls.get_conf_info()
             if hasattr(cls, 'parse_legacy'):
-                conf[cls] = new = cls.parse_legacy(props)
+                conf[cls] = new = cls.parse_legacy(kv)
                 LOGGER.info('Converted legacy {} to {}', info.name, new)
             else:
                 LOGGER.warning('No legacy conf for "{}"!', info.name)
                 conf[cls] = {}
         return conf
 
-    def build_kv1(self, conf: Config) -> Iterator[Property]:
+    def build_kv1(self, conf: Config) -> Iterator[Keyvalues]:
         """Build out a configuration file from some data.
 
         The data is in the form {conf_type: {id: data}}.
         """
-        yield Property('version', '1')
+        yield Keyvalues('version', '1')
         for cls, data_map in conf.items():
             if not data_map or cls not in self._registered:
                 # Blank or not in our definition, don't save.
                 continue
             info = cls.get_conf_info()
-            prop = Property(info.name, [
-                Property('_version', str(info.version)),
+            kv = Keyvalues(info.name, [
+                Keyvalues('_version', str(info.version)),
             ])
             if info.uses_id:
                 for data_id, data in data_map.items():
                     sub_prop = data.export_kv1()
                     sub_prop.name = data_id
-                    prop.append(sub_prop)
+                    kv.append(sub_prop)
             else:
                 # Must be a single '' key.
                 if list(data_map.keys()) != ['']:
@@ -362,8 +377,8 @@ class ConfigSpec:
                         f'"{info.name}", got:\n{data_map}'
                     )
                 [data] = data_map.values()
-                prop.extend(data.export_kv1())
-            yield prop
+                kv.extend(data.export_kv1())
+            yield kv
 
     def build_dmx(self, conf: Config) -> Element:
         """Build out a configuration file from some data.
@@ -407,16 +422,16 @@ class ConfigSpec:
             return
         try:
             with file:
-                props = Property.parse(file)
+                kv = Keyvalues.parse(file)
         except KeyValError:
             LOGGER.warning('Cannot parse {}!', self.filename.name, exc_info=True)
             # Try and move to a backup name, if not don't worry about it.
             try:
                 self.filename.replace(self.filename.with_suffix('.err.vdf'))
-            except IOError:
+            except OSError:
                 pass
 
-        conf, _ = self.parse_kv1(props)
+        conf, _ = self.parse_kv1(kv)
         self._current.clear()
         self._current.update(conf)
 
@@ -430,33 +445,12 @@ class ConfigSpec:
             # This could happen while parsing, for example.
             return
 
-        props = Property.root()
-        props.extend(self.build_kv1(self._current))
+        kv = Keyvalues.root()
+        kv.extend(self.build_kv1(self._current))
         with AtomicWriter(self.filename) as file:
-            for prop in props:
+            for prop in kv:
                 for line in prop.export():
                     file.write(line)
-
-
-def get_pal_conf() -> Config:
-    """Return a copy of the current settings for the palette."""
-    return Config({
-        cls: opt_map.copy()
-        for cls, opt_map in APP._current.items()
-        if cls.get_conf_info().palette_stores
-    })
-
-
-async def apply_pal_conf(conf: Config) -> None:
-    """Apply a config provided from the palette."""
-    # First replace all the configs to be atomic, then apply.
-    for cls, opt_map in conf.items():
-        if cls.get_conf_info().palette_stores:  # Double-check, in case it's added to the file.
-            APP._current[cls] = opt_map.copy()
-    async with trio.open_nursery() as nursery:
-        for cls in conf:
-            if cls.get_conf_info().palette_stores:
-                nursery.start_soon(APP.apply_conf, cls)
 
 
 # Main application configs.
@@ -466,7 +460,6 @@ PALETTE: ConfigSpec = ConfigSpec(None)
 
 # Import submodules, so they're registered.
 from config import (
-    compile_pane, corridors, gen_opts,
-    last_sel, palette, signage,
-    stylevar, widgets, windows,
+    compile_pane, corridors, filters, gen_opts, item_defaults,  last_sel, palette,   # noqa: F401
+    signage,  stylevar, widgets, windows,  # noqa: F401
 )

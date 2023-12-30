@@ -3,16 +3,16 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: https://github.com/BEEmod/BEE2.4/issues\n"
-"POT-Creation-Date: 2022-12-21 13:14+1000\n"
+"POT-Creation-Date: 2023-12-30 10:20+1000\n"
 "PO-Revision-Date: 2019-11-22 10:47+1000\n"
 "Last-Translator: Antecer <antecer@outlook.com>\n"
 "Language: zh\n"
 "Language-Team: zh <LL@li.org>\n"
-"Plural-Forms: nplurals=1; plural=0\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.9.1\n"
+"Generated-By: Babel 2.12.1\n"
 
 #: loadScreen.py
 msgid "Skipped!"
@@ -118,8 +118,8 @@ msgstr ""
 #: user_errors.py
 msgid ""
 "One or more items were placed ouside the map! Move these back inside the "
-"map, or delete them. Items with no collision (like Half Walls or logic "
-"gates) can be left when rooms are moved, look for those."
+"map, or delete them. Items with no collision (like Half Walls or Logic "
+"Gates) can be left when rooms are moved, look for those."
 msgstr ""
 
 #. This uses HTML syntax.
@@ -173,7 +173,9 @@ msgstr ""
 
 #. This uses HTML syntax.
 #: user_errors.py
-msgid "No corridors available for the <var>{orient}_{mode}_{dir}</var> group!"
+msgid ""
+"No corridors were defined for the <var>{orient}_{mode}_{dir}</var> group."
+" Try moving this door back onto a wall."
 msgstr ""
 
 #. i18n: Reference to the stylevar
@@ -197,25 +199,25 @@ msgstr ""
 #: user_errors.py
 msgid ""
 "The map contains both singleplayer and coop entry/exit corridors. This "
-"can happen if they are manually added using the \"{stylevar\"} stylevar. "
+"can happen if they are manually added using the \"{stylevar}\" stylevar. "
 "In that case delete one of them."
 msgstr ""
 
 #. This uses HTML syntax.
-#: app/corridor_selector.py user_errors.py
+#: ui_tk/corridor_selector.py user_errors.py
 #, fuzzy
 msgid "Entry"
 msgstr "Bendy（纸片人小黑）"
 
 #. i18n: Entry door
 #. This uses HTML syntax.
-#: app/corridor_selector.py user_errors.py
+#: ui_tk/corridor_selector.py user_errors.py
 msgid "Exit"
 msgstr ""
 
 #. This uses HTML syntax.
 #: user_errors.py
-msgid "\"CubeType\" result used but with no type specified!"
+msgid "\"CubeType\" test used but with no type specified!"
 msgstr ""
 
 #. This uses HTML syntax.
@@ -250,6 +252,23 @@ msgstr ""
 
 #. This uses HTML syntax.
 #: user_errors.py
+msgid "Superposition Entanglers must be placed on top of a single dropper."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"Superposition Entanglers must be connected to a single dropper, not any "
+"other items."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid "Two Superposition Entanglers cannot be connected to a single dropper!"
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
 msgid ""
 "A glass/grating Hole does not have sufficent space. The entire "
 "highlighted yellow area should be occupied by continous glass or grating."
@@ -273,10 +292,29 @@ msgstr ""
 #. This uses HTML syntax.
 #: user_errors.py
 msgid ""
-"A Sendificator was connected to an item which is not a Discouragement "
-"Beam Emitter (<var>{out_item}</var>). The output connection is used to "
-"specify the emitter that cubes will teleport to, so it cannot be an "
-"arbitary item."
+"A chain of items has multiple inputs to a single item. The chain should "
+"form a single path, not have branches."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"A chain of items has multiple outputs from a single item. The chain "
+"should form a single path, not have branches."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"A chain of items has been constructed with a loop, but this type of item "
+"does not support a loop. Break the connection at some point."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"The highlighted items in this chain do not support being linked together "
+"in this fashion. Check the order of connections."
 msgstr ""
 
 #. This uses HTML syntax.
@@ -359,7 +397,7 @@ msgstr "编译设置"
 #. i18n: Tooltip format for compiler limit bars.
 #: app/CompilerPane.py
 msgid ""
-"{count}/{max} ({frac:.2%}):\n"
+"{count}/{max} ({frac:0.##%}):\n"
 "{blurb}"
 msgstr ""
 
@@ -432,11 +470,11 @@ msgstr "光影渲染模式"
 msgid "None"
 msgstr "无！"
 
-#: app/CompilerPane.py app/CompilerPane.py app/CompilerPane.py
+#: app/CompilerPane.py
 msgid "Fast"
 msgstr "最快速度"
 
-#: app/CompilerPane.py app/CompilerPane.py
+#: app/CompilerPane.py
 msgid "Full"
 msgstr "最佳画质"
 
@@ -590,18 +628,13 @@ msgid "Elevator"
 msgstr "电梯"
 
 #: app/CompilerPane.py
-msgid ""
-"{desc}\n"
-"\n"
-"You can hold down Shift during the start of the Geometry stage to quickly"
-" swap whichlocation you spawn at on the fly."
-msgstr ""
-
-#: app/CompilerPane.py
 #, fuzzy
 msgid ""
 "When previewing in SP, spawn inside the entry elevator. Use this to "
-"examine the entry and exit corridors."
+"examine the entry and exit corridors.\n"
+"\n"
+"You can hold down Shift during the start of the Geometry stage to quickly"
+" swap which location you spawn at on the fly."
 msgstr ""
 "单人模式预览地图时，在电梯内出生。\n"
 "这会禁用到达出口后地图重新开始。\n"
@@ -609,14 +642,15 @@ msgstr ""
 
 #: app/CompilerPane.py
 #, fuzzy
-msgid "When previewing in SP, spawn just before the entry door."
+msgid ""
+"When previewing in SP, spawn just before the entry door.\n"
+"\n"
+"You can hold down Shift during the start of the Geometry stage to quickly"
+" swap which location you spawn at on the fly."
 msgstr ""
-"单人模式预览地图时，在入口前出生（跳过入口走廊）。\n"
-"当你到达出口时，地图将重新开始。（以便快速检查地图的谜题）"
-
-#: app/CompilerPane.py
-msgid "Select Corridors"
-msgstr ""
+"单人模式预览地图时，在电梯内出生。\n"
+"这会禁用到达出口后地图重新开始。\n"
+"使用此选项来检查入口走廊和出口走廊是否令人满意。"
 
 #: app/CompilerPane.py
 msgid "Player Model (SP):"
@@ -638,20 +672,6 @@ msgstr "启用Cave谈论平行宇宙的语音"
 #: app/StyleVarPane.py
 msgid "Play the Workshop Cave Johnson lines on map start."
 msgstr "进入地图后播放Cave谈论平行宇宙的语音"
-
-#: app/StyleVarPane.py
-msgid "Prevent Portal Bump (fizzler)"
-msgstr "阻止传送门跃过消散力场"
-
-#: app/StyleVarPane.py
-msgid ""
-"Add portal bumpers to make it more difficult to portal across fizzler "
-"edges. This can prevent placing portals in tight spaces near fizzlers, or"
-" fizzle portals on activation."
-msgstr ""
-"给传送门添加缓冲区，使传送门更难以跨域消散立场的边缘创建。\n"
-"这可以防止将传送门放置在消散立场与墙壁之间的夹缝中，\n"
-"同时也阻止通过挤门的方式把传送门开启到消散立场的另一边。"
 
 #: app/StyleVarPane.py
 msgid "Suppress Mid-Chamber Dialogue"
@@ -778,12 +798,12 @@ msgstr "所选物品和风格已成功导出！"
 #: app/UI.py
 #, fuzzy
 msgid ""
-"{exported}\n"
+"Selected Items and Style successfully exported!\n"
 "\n"
 "Warning: VPK files were not exported, quit Portal 2 and Hammer to ensure "
 "editor wall previews are changed."
 msgstr ""
-"\n"
+"所选物品和风格已成功导出！\n"
 "\n"
 "警告：VPK文件未导出，退出 Portal 2 和 Hammer 以应用地图编辑器的物品栏更改。"
 
@@ -883,6 +903,11 @@ msgstr ""
 msgid "This style does not have a elevator video screen."
 msgstr "这种风格的电梯间没有影像屏幕。"
 
+#. i18n: Text when elevators are not present in the style.
+#: app/UI.py
+msgid "<Not Present>"
+msgstr ""
+
 #: app/UI.py
 msgid "Random"
 msgstr "随机"
@@ -894,14 +919,6 @@ msgstr "随机选择一个影像。"
 #: app/UI.py
 msgid "Multiple Orientations"
 msgstr "多种方向"
-
-#: app/UI.py
-msgid "Save Palette..."
-msgstr "保存模板..."
-
-#: app/UI.py app/paletteUI.py
-msgid "Save Palette As..."
-msgstr "另存为模板..."
 
 #: app/UI.py
 msgid "Music: "
@@ -929,10 +946,19 @@ msgid "Elev Vid: "
 msgstr "电梯视频"
 
 #: app/UI.py
+msgid "Corridor: "
+msgstr ""
+
+#: app/UI.py
 msgid ""
 "Enable or disable particular voice lines, to prevent them from being "
 "added."
 msgstr "启用或禁用特定的台词，以防止添加它们。"
+
+#: app/UI.py
+#, fuzzy
+msgid "Select"
+msgstr "所选风格"
 
 #: app/UI.py
 msgid "All Items: "
@@ -945,6 +971,10 @@ msgstr "模板列表"
 #: app/UI.py
 msgid "Export Options"
 msgstr "导出设置"
+
+#: app/UI.py
+msgid "Remove all items from the palette."
+msgstr ""
 
 #: app/UI.py
 msgid "Fill empty spots in the palette with random items."
@@ -975,22 +1005,18 @@ msgstr ""
 msgid "Date"
 msgstr ""
 
-#: app/backup.py app/corridor_selector.py
+#: app/backup.py ui_tk/corridor_selector.py
 msgid "SP"
 msgstr "单人模式"
 
-#: app/backup.py app/corridor_selector.py
+#: app/backup.py ui_tk/corridor_selector.py
 msgid "Coop"
 msgstr "合作模式"
 
 #: app/backup.py
 #, fuzzy
-msgid ""
-"Do you wish to delete {n} map?\n"
-"{maps}"
-msgid_plural ""
-"Do you wish to delete {n} maps?\n"
-"{maps}"
+msgid "Do you wish to delete {n} map?"
+msgid_plural "Do you wish to delete {n} maps?"
 msgstr[0] "确定要删除 {n} 张地图？\n"
 
 #: app/backup.py
@@ -1056,7 +1082,7 @@ msgstr "请选择要备份的地图！"
 msgid "Load Backup"
 msgstr "载入备份"
 
-#: app/backup.py app/backup.py
+#: app/backup.py
 msgid "Save Backup As"
 msgstr "将备份另存为"
 
@@ -1089,15 +1115,15 @@ msgstr ""
 msgid "BEEMOD {version} - Backup / Restore Puzzles"
 msgstr "BEEMOD {version} - 备份/恢复 谜题"
 
-#: app/backup.py app/backup.py
+#: app/backup.py
 msgid "New Backup"
 msgstr "新建备份"
 
-#: app/backup.py app/backup.py
+#: app/backup.py
 msgid "Open Backup"
 msgstr "打开备份"
 
-#: app/backup.py app/backup.py
+#: app/backup.py
 msgid "Save Backup"
 msgstr "保存备份"
 
@@ -1241,6 +1267,20 @@ msgid ""
 msgstr "该物品可以在地面上360°旋转。"
 
 #: app/contextWin.py
+msgid ""
+"This fizzler has an output. Due to an editor bug, this cannot be used "
+"directly. Instead the Fizzler Output Relay item should be placed on top "
+"of this fizzler."
+msgstr ""
+
+#: app/contextWin.py
+msgid ""
+"This fizzler has a timed output. Due to an editor bug, this cannot be "
+"used directly. Instead the Fizzler Output Relay item should be placed on "
+"top of this fizzler."
+msgstr ""
+
+#: app/contextWin.py
 #, fuzzy
 msgid "No Alternate Versions"
 msgstr "无替代版本！"
@@ -1282,30 +1322,40 @@ msgstr "更改默认值..."
 msgid "Change the default settings for this item when placed."
 msgstr "修改该物品在放置时的默认设置。"
 
-#: app/corridor_selector.py app/helpMenu.py app/itemPropWin.py
-msgid "Close"
-msgstr "关闭"
-
-#: app/corridor_selector.py
-msgid "Flat"
-msgstr ""
-
-#: app/corridor_selector.py
-msgid "Upward"
-msgstr ""
-
-#: app/corridor_selector.py
-msgid "Downward"
-msgstr ""
-
-#: app/corridor_selector.py
+#: app/corridor_selector.py app/selector_win.py
 #, fuzzy
-msgid "Selected:"
-msgstr "所选风格"
+msgid "Author: {authors}"
+msgid_plural "Authors: {authors}"
+msgstr[0] "作者: {authors}"
+
+#: app/corridor_selector.py app/selector_win.py
+msgid "Authors: Unknown"
+msgstr ""
 
 #: app/corridor_selector.py
-msgid "Unused:"
+msgid ""
+"Check the boxes to specify which corridors may be used. Ingame, a random "
+"corridor will be picked for each map."
 msgstr ""
+
+#: app/dialogs.py app/tk_tools.py
+#, fuzzy
+msgid "BEEmod"
+msgstr "BEE模组物品"
+
+#: app/dialogs.py
+msgid "A value must be provided!"
+msgstr ""
+
+#: app/errors.py
+#, fuzzy
+msgid "BEEmod Error"
+msgstr "BEE模组物品"
+
+#: app/errors.py
+msgid "An error occurred while performing this task:"
+msgid_plural "Multiple errors occurred while performing this task:"
+msgstr[0] ""
 
 #: app/gameMan.py
 msgid "Backup Original Files"
@@ -1347,7 +1397,7 @@ msgstr "导出到 \"{game}\"..."
 msgid "Export to \"{game}\"*..."
 msgstr "导出到 \"{game}\"*..."
 
-#: app/gameMan.py app/gameMan.py
+#: app/gameMan.py
 msgid "BEE2 - Export Failed!"
 msgstr "BEE2 - 导出失败！"
 
@@ -1359,14 +1409,16 @@ msgstr "编译器文件 {file} 丢失。退出Steam程序，然后点击OK以校
 
 #: app/gameMan.py
 msgid ""
-"Copying compiler file {file} failed. Ensure {game} is not running. The "
-"webserver for the error display may also be running, quit the vrad "
-"process or wait a few minutes."
+"Copying compiler file {file} failed. Ensure {game}'s map compiler is not "
+"running. The webserver for the error display may also be running, quit "
+"the vrad process or wait a few minutes."
 msgstr ""
 
 #: app/gameMan.py
 #, fuzzy
-msgid "Copying compiler file {file} failed. Ensure {game} is not running."
+msgid ""
+"Copying compiler file {file} failed. Ensure {game}'s map compiler is not "
+"running."
 msgstr "复制编译器文件 {file} 失败。确保 {game} 未运行"
 
 #: app/gameMan.py
@@ -1380,10 +1432,6 @@ msgid ""
 msgstr ""
 "找不到光圈科技附加传送枪的实例！\n"
 "传送器将不起作用 - 校验缓存以修复此问题。"
-
-#: app/gameMan.py
-msgid "BEE2"
-msgstr ""
 
 #: app/gameMan.py
 msgid ""
@@ -1500,7 +1548,12 @@ msgstr "反馈物品Bug..."
 msgid "Submit Music Bugs..."
 msgstr "反馈物品Bug..."
 
-#: app/helpMenu.py app/helpMenu.py
+#: app/helpMenu.py app/item_properties.py ui_tk/corridor_selector.py
+#: ui_tk/errors.py
+msgid "Close"
+msgstr "关闭"
+
+#: app/helpMenu.py
 msgid "BEEMOD2 - Failed to open URL"
 msgstr ""
 
@@ -1519,9 +1572,7 @@ msgid "BEEMOD 2 - Open URL"
 msgstr ""
 
 #: app/helpMenu.py
-msgid ""
-"Do you wish to open the following URL?\n"
-"{url}"
+msgid "Do you wish to open the following URL?"
 msgstr ""
 
 #: app/helpMenu.py
@@ -1536,124 +1587,41 @@ msgstr "BEE2 声明"
 msgid "Credits..."
 msgstr "声明..."
 
-#: app/itemPropWin.py
-msgid "Start Position"
-msgstr "开始位置"
-
-#: app/itemPropWin.py
-msgid "End Position"
-msgstr "结束位置"
-
-#: app/itemPropWin.py
-msgid ""
-"Delay \n"
-"(0=infinite)"
-msgstr ""
-"延时\n"
-"（0=无限）"
-
-#: app/itemPropWin.py
-msgid "Timer Sound"
-msgstr ""
-
-#: app/itemPropWin.py
-msgid "Angled Panel Type"
-msgstr ""
-
-#: app/itemPropWin.py
-msgid "Disable Cube Dropper Clips"
-msgstr ""
-
-#: app/itemPropWin.py
-msgid "Gel Export Type"
-msgstr ""
-
-#: app/itemPropWin.py
-msgid "Automatically Move"
-msgstr ""
-
-#: app/itemPropWin.py
-msgid "Connection Count"
-msgstr ""
-
-#: app/itemPropWin.py
-msgid "Polarity Connection Count"
-msgstr ""
-
-#: app/itemPropWin.py
-msgid "Is Coop?"
-msgstr ""
-
-#: app/itemPropWin.py
-msgid "Flip Panel Portalability"
-msgstr ""
-
-#: app/itemPropWin.py
-msgid "Track Platform Speed"
-msgstr ""
-
-#: app/itemPropWin.py
-msgid "Initial Track Platform Position"
-msgstr ""
-
-#: app/itemPropWin.py
-msgid "Track Platform Direction"
-msgstr ""
-
-#: app/itemPropWin.py
-msgid "Track Platform Distance"
-msgstr ""
-
-#: app/itemPropWin.py
-msgid "Start Up"
-msgstr ""
-
-#: app/itemPropWin.py
-msgid "Vertical Alignment"
-msgstr ""
-
-#: app/itemPropWin.py
-msgid "Faith Plate Speed"
-msgstr ""
-
-#: app/itemPropWin.py
-msgid "Faith Target Name"
-msgstr ""
-
-#: app/itemPropWin.py
+#: app/item_properties.py
 msgid "BEE2 - {item}"
 msgstr ""
 
-#: app/itemPropWin.py
+#: app/item_properties.py
 msgid "Settings for \"{item}\""
 msgstr ""
 
-#: app/itemPropWin.py
+#: app/item_properties.py
 msgid ""
 "Timer Delay:\n"
-"        ({tim})"
+"        ({tim:00})"
 msgstr ""
 
-#: app/itemPropWin.py
+#: app/item_properties.py
+msgid "When Oscillating mode is disabled, Start Active has no effect."
+msgstr ""
+
+#: app/item_properties.py
+msgid ""
+"This option picks which sub-item is used. Put a different item on the "
+"palette to change the default instead."
+msgstr ""
+
+#: app/item_properties.py
+#, fuzzy
+msgid "Position: "
+msgstr "结束位置"
+
+#: app/item_properties.py
 msgid "No Properties available!"
 msgstr "没有可用的属性！"
 
 #: app/item_search.py
 msgid "Search:"
-msgstr ""
-
-#. i18n: This is displayed in the options menu to switch to this language.
-#: app/localisation.py app/localisation.py
-msgid "__LanguageName"
-msgstr "Chinese"
-
-#. i18n: BEEmod 1 palette.
-#: app/localisation.py app/paletteLoader.py
-msgid "BEEMod"
-msgstr "BEE模组物品"
-
-#: app/localisation.py
-msgid "UI Translations rebuilt."
 msgstr ""
 
 #: app/menu_bar.py
@@ -1750,7 +1718,7 @@ msgstr "斥力凝胶的音效"
 msgid "Excursion Funnel Music"
 msgstr "牵引光束的音效"
 
-#: app/music_conf.py app/music_conf.py
+#: app/music_conf.py
 msgid "Synced Funnel Music"
 msgstr "同步牵引光束的音效"
 
@@ -1869,6 +1837,26 @@ msgid ""
 "\"Preserve Game Resources\" has been disabled."
 msgstr ""
 
+#: app/optionWindow.py
+msgid "UI translations rebuilt from sources successfully."
+msgstr ""
+
+#: app/optionWindow.py
+msgid "Package translations rebuilt successfully."
+msgstr ""
+
+#: app/optionWindow.py
+msgid ""
+"Options on the development tab are intended for package authors\n"
+"and debugging purposes. Changing these may prevent BEEmod\n"
+"from functioning correctly until reverted to their original settings."
+msgstr ""
+
+#: app/optionWindow.py
+#, fuzzy
+msgid "Enable development options"
+msgstr "开发者选项"
+
 #: app/optionWindow.py app/packageMan.py app/selector_win.py
 msgid "OK"
 msgstr "确定"
@@ -1925,6 +1913,17 @@ msgid ""
 msgstr ""
 "Pyglet未安装或损坏。\n"
 "音效已被禁用。"
+
+#: app/optionWindow.py
+msgid "Compress Items"
+msgstr ""
+
+#: app/optionWindow.py
+msgid ""
+"If enabled, hide all but one item for those that can be swapped with a X "
+"Type option. This helps to shrink the item list, if you have a lot of "
+"items installed."
+msgstr ""
 
 #: app/optionWindow.py
 msgid "Show Hidden Palettes"
@@ -2085,6 +2084,11 @@ msgid "Dump Items List"
 msgstr ""
 
 #: app/optionWindow.py
+#, fuzzy
+msgid "Dump Editor Models"
+msgstr "强制使用编辑器模型"
+
+#: app/optionWindow.py
 msgid "Reload Images"
 msgstr ""
 
@@ -2138,6 +2142,11 @@ msgstr "<上次导出的模板>"
 msgid "Blank"
 msgstr "空白"
 
+#. i18n: BEEmod 1 palette.
+#: app/paletteLoader.py
+msgid "BEEMod"
+msgstr "BEE模组物品"
+
 #. i18n: Default items merged together
 #: app/paletteLoader.py
 msgid "Portal 2 Collapsed"
@@ -2153,14 +2162,28 @@ msgstr "传送门2"
 msgid "Aperture Tag"
 msgstr "Aperture Tag"
 
-#: app/paletteUI.py app/paletteUI.py
-msgid "Delete Palette"
-msgstr "删除选中模板"
+#: app/paletteUI.py
+#, fuzzy
+msgid "Delete"
+msgstr "所选风格"
+
+#: app/paletteUI.py
+msgid "Hide"
+msgstr ""
 
 #: app/paletteUI.py
 #, fuzzy
-msgid "Hide Palette"
-msgstr "保存模板"
+msgid "Delete Palette \"{name}\""
+msgstr "删除模板 \"{name}\""
+
+#: app/paletteUI.py
+#, fuzzy
+msgid "Hide Palette \"{name}\""
+msgstr "删除模板 \"{name}\""
+
+#: app/paletteUI.py
+msgid "Enter a name:"
+msgstr "键入模板名称："
 
 #: app/paletteUI.py
 #, fuzzy
@@ -2171,9 +2194,39 @@ msgstr "你确定要删除 \"{palette}\" 吗？"
 msgid "Builtin / Readonly"
 msgstr ""
 
+#. i18n: Palette group title.
 #: app/paletteUI.py
-msgid "Clear Palette"
-msgstr "清空模板内容"
+msgid "BEE2 - Save Palette"
+msgstr "BEE2 - 保存模板"
+
+#: app/paletteUI.py
+#, fuzzy
+msgid "BEE2 - Delete Palette"
+msgstr "删除选中模板"
+
+#: app/paletteUI.py
+msgid "BEE2 - Change Palette Group"
+msgstr ""
+
+#: app/paletteUI.py app/voiceEditor.py
+msgid "Save"
+msgstr "保存"
+
+#: app/paletteUI.py
+msgid "Save As"
+msgstr ""
+
+#: app/paletteUI.py
+msgid "Save Settings in Palettes"
+msgstr "在模板中保存配置"
+
+#: app/paletteUI.py
+msgid "Save Palette"
+msgstr "保存模板"
+
+#: app/paletteUI.py
+msgid "Save Palette As..."
+msgstr "另存为模板..."
 
 #: app/paletteUI.py
 #, fuzzy
@@ -2188,41 +2241,6 @@ msgstr "保存模板..."
 #: app/paletteUI.py
 msgid "Fill Palette"
 msgstr "重置模板"
-
-#: app/paletteUI.py app/paletteUI.py
-msgid "Save Settings in Palettes"
-msgstr "在模板中保存配置"
-
-#: app/paletteUI.py
-msgid "Save Palette"
-msgstr "保存模板"
-
-#: app/paletteUI.py
-#, fuzzy
-msgid "Hide Palette \"{name}\""
-msgstr "删除模板 \"{name}\""
-
-#: app/paletteUI.py
-#, fuzzy
-msgid "Delete Palette \"{name}\""
-msgstr "删除模板 \"{name}\""
-
-#: app/paletteUI.py
-#, fuzzy
-msgid "BEE2 - Delete Palette"
-msgstr "删除选中模板"
-
-#: app/paletteUI.py app/paletteUI.py
-msgid "BEE2 - Save Palette"
-msgstr "BEE2 - 保存模板"
-
-#: app/paletteUI.py app/paletteUI.py
-msgid "Enter a name:"
-msgstr "键入模板名称："
-
-#: app/paletteUI.py
-msgid "BEE2 - Change Palette Group"
-msgstr ""
 
 #: app/paletteUI.py
 msgid "Enter the name of the group for this palette, or \"\" to ungroup."
@@ -2256,16 +2274,6 @@ msgstr "建议"
 msgid "Other"
 msgstr "其它"
 
-#: app/selector_win.py
-#, fuzzy
-msgid "Author: {authors}"
-msgid_plural "Authors: {authors}"
-msgstr[0] "作者: {authors}"
-
-#: app/selector_win.py
-msgid "Authors: Unknown"
-msgstr ""
-
 #. i18n: 'None' item description
 #: app/selector_win.py
 msgid "Do not add anything."
@@ -2290,7 +2298,7 @@ msgstr "建议"
 msgid "Signage: {name}"
 msgstr "指示标志: {name}"
 
-#: app/signage_ui.py app/signage_ui.py
+#: app/signage_ui.py
 msgid "Configure Signage"
 msgstr "设置指示标志"
 
@@ -2351,22 +2359,18 @@ msgstr ""
 msgid "Camera Gesture - Generic"
 msgstr ""
 
-#: app/voiceEditor.py app/voiceEditor.py
+#: app/voiceEditor.py
 msgid "No Name!"
 msgstr "没有名称！"
-
-#: app/voiceEditor.py
-msgid "Transcript:"
-msgstr "台词："
-
-#: app/voiceEditor.py
-msgid "Save"
-msgstr "保存"
 
 #. i18n: 'response' tab name, should be short.
 #: app/voiceEditor.py
 msgid "Resp"
 msgstr "响应"
+
+#: app/voiceEditor.py
+msgid "Transcript:"
+msgstr "台词："
 
 #: app/voiceEditor.py
 #, fuzzy
@@ -2392,6 +2396,10 @@ msgid "Lines played in response to certain events in Coop."
 msgstr "在合作模式中触发特定事件后播放的台词。"
 
 #: app/itemconfig/__init__.py
+msgid "{name} ({page}/{count})"
+msgstr ""
+
+#: app/itemconfig/__init__.py
 #, fuzzy
 msgid "Style Properties"
 msgstr "风格/物品 属性"
@@ -2407,6 +2415,10 @@ msgstr ""
 #: app/itemconfig/color.py
 msgid "Choose a Color"
 msgstr "选择一种颜色"
+
+#: app/itemconfig/slider.py
+msgid "Off"
+msgstr ""
 
 #: packages/__init__.py
 msgid ""
@@ -2445,8 +2457,24 @@ msgstr "描述："
 msgid "Corridor"
 msgstr ""
 
-#: test/test_transtoken.py
-msgid "Save As"
+#: ui_tk/corridor_selector.py
+msgid "BEEmod - Select Corridor"
+msgstr ""
+
+#: ui_tk/corridor_selector.py
+msgid "Use Only This"
+msgstr ""
+
+#: ui_tk/corridor_selector.py
+msgid "Flat"
+msgstr ""
+
+#: ui_tk/corridor_selector.py
+msgid "Upward"
+msgstr ""
+
+#: ui_tk/corridor_selector.py
+msgid "Downward"
 msgstr ""
 
 #~ msgid "Door Cameras"
@@ -2509,4 +2537,48 @@ msgstr ""
 
 #~ msgid "Gel Type"
 #~ msgstr "选择风格"
+
+#~ msgid "When previewing in SP, spawn just before the entry door."
+#~ msgstr ""
+#~ "单人模式预览地图时，在入口前出生（跳过入口走廊）。\n"
+#~ "当你到达出口时，地图将重新开始。（以便快速检查地图的谜题）"
+
+#~ msgid "Start Position"
+#~ msgstr "开始位置"
+
+#~ msgid ""
+#~ "Delay \n"
+#~ "(0=infinite)"
+#~ msgstr ""
+#~ "延时\n"
+#~ "（0=无限）"
+
+#~ msgid "Save Palette..."
+#~ msgstr "保存模板..."
+
+#~ msgid "Delete Palette"
+#~ msgstr "删除选中模板"
+
+#~ msgid "Hide Palette"
+#~ msgstr "保存模板"
+
+#~ msgid "Clear Palette"
+#~ msgstr "清空模板内容"
+
+#~ msgid "Prevent Portal Bump (fizzler)"
+#~ msgstr "阻止传送门跃过消散力场"
+
+#~ msgid ""
+#~ "Add portal bumpers to make it more"
+#~ " difficult to portal across fizzler "
+#~ "edges. This can prevent placing portals"
+#~ " in tight spaces near fizzlers, or"
+#~ " fizzle portals on activation."
+#~ msgstr ""
+#~ "给传送门添加缓冲区，使传送门更难以跨域消散立场的边缘创建。\n"
+#~ "这可以防止将传送门放置在消散立场与墙壁之间的夹缝中，\n"
+#~ "同时也阻止通过挤门的方式把传送门开启到消散立场的另一边。"
+
+#~ msgid "Selected:"
+#~ msgstr "所选风格"
 

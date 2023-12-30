@@ -6,23 +6,23 @@ every instance.
 In pseudocode:
     for cond in all_conditions:
         for inst in vmf:
-            if all(flag() in cond):
+            if all(test() in cond):
                 apply_results()
 
-Both results and flags recieve configuration keyvalues, the vmf and the
-current instance. Flags return a boolean to indicate if they are successful.
+Both results and tests recieve configuration keyvalues, the vmf and the
+current instance. Tests return a boolean to indicate if they are successful.
 Results return None normally, but can return the special value RES_EXHAUSTED to
 indicate calling the specific result again will have no effect. In this case the
 result will be deleted.
 
 Argument type annotations are used to allow flexibility in defining results and
-flags. Each argument must be typed as one of the following to recieve a specific
+tests. Each argument must be typed as one of the following to recieve a specific
 value:
     * VMF to recieve the overall map.
     * Entity to recieve the current instance.
-    * Property to recieve keyvalues configuration.
+    * Keyvalues to recieve keyvalues configuration.
 
-If the entity is not provided, the first time the result/flag is called it
+If the entity is not provided, the first time the result/test is called it
 can return a callable which will instead be called with each entity. This allows
 only parsing configuration options once, and is expected to be used with a
 closure.
@@ -31,24 +31,26 @@ from __future__ import annotations
 import functools
 import inspect
 import io
-import importlib
 import math
 import pkgutil
 import sys
+import types
 import typing
 import warnings
+from collections.abc import Mapping
 from collections import defaultdict
 from decimal import Decimal
 from enum import Enum
-from typing import Generic, TypeVar, Any, Callable, TextIO, Tuple, Type, overload, cast
+from typing import (
+    Generic, Protocol, TypeVar, Any, Callable, TextIO, Tuple, Type, Union, overload,
+    cast,
+)
 
 import attrs
 import srctools.logger
-from srctools import (
-    Property,
-    Vec_tuple, Vec,
-    VMF, Entity, Output, Solid, Angle, Matrix,
-)
+from srctools.math import FrozenAngle, Vec, FrozenVec, AnyAngle, AnyMatrix, Angle
+from srctools.vmf import EntityGroup, VMF, Entity, Output, Solid, ValidKVs
+from srctools import Keyvalues
 
 from precomp import instanceLocs, rand, collisions
 from precomp.corridor import Info as MapInfo
@@ -67,22 +69,24 @@ GLOBAL_INSTANCES: set[str] = set()
 ALL_INST: set[str] = {''}
 
 conditions: list[Condition] = []
-FLAG_LOOKUP: dict[str, CondCall[bool]] = {}
+TEST_LOOKUP: dict[str, CondCall[bool]] = {}
 RESULT_LOOKUP: dict[str, CondCall[object]] = {}
 
 # For legacy setup functions.
 RESULT_SETUP: dict[str, Callable[..., Any]] = {}
 
-# Used to dump a list of the flags, results, meta-conditions
-ALL_FLAGS: list[tuple[str, tuple[str, ...], CondCall[bool]]] = []
+# Used to dump a list of the tests, results, meta-conditions
+ALL_TESTS: list[tuple[str, tuple[str, ...], CondCall[bool]]] = []
 ALL_RESULTS: list[tuple[str, tuple[str, ...], CondCall[object]]] = []
 ALL_META: list[tuple[str, Decimal, CondCall[object]]] = []
 
 
-CallableT = TypeVar('CallableT', bound=Callable)
-# The return values for 2-stage results and flags.
-FlagCallable = Callable[[Entity], bool]
+ResultT = TypeVar('ResultT')
+CallableT = TypeVar('CallableT', bound=Callable[..., object])
+# The return values for 2-stage results and tests.
+TestCallable = Callable[[Entity], bool]
 ResultCallable = Callable[[Entity], object]
+TestCallT = TypeVar('TestCallT', bound=Callable[..., Union[bool, TestCallable]])
 
 
 class SWITCH_TYPE(Enum):
@@ -93,14 +97,14 @@ class SWITCH_TYPE(Enum):
     ALL = 'all'  # Run all matching commands
 
 
-xp = Vec_tuple(1, 0, 0)
-xn = Vec_tuple(-1, 0, 0)
-yp = Vec_tuple(0, 1, 0)
-yn = Vec_tuple(0, -1, 0)
-zp = Vec_tuple(0, 0, 1)
-zn = Vec_tuple(0, 0, -1)
+xp = FrozenVec(1, 0, 0)
+xn = FrozenVec(-1, 0, 0)
+yp = FrozenVec(0, 1, 0)
+yn = FrozenVec(0, -1, 0)
+zp = FrozenVec(0, 0, 1)
+zn = FrozenVec(0, 0, -1)
 
-DIRECTIONS = {
+DIRECTIONS: Mapping[str, FrozenVec] = {
     # Translate these words into a normal vector
     '+x': xp,
     '-x': xn,
@@ -131,33 +135,30 @@ DIRECTIONS = {
     'east': xp,
     'w': xn,
     'west': xn,
-
-    'wall': 'WALL',  # Special case, not floor/ceiling
-    'walls': 'WALL',
 }
 
 INST_ANGLE = {
     # IE up = zp = floor
-    zp: "0 0 0",
-    zn: "0 0 0",
+    zp: FrozenAngle(0, 0, 0),
+    zn: FrozenAngle(0, 0, 0),
 
-    xn: "0 0 0",
-    yn: "0 90 0",
-    xp: "0 180 0",
-    yp: "0 270 0",
+    xn: FrozenAngle(0, 0, 0),
+    yn: FrozenAngle(0, 90, 0),
+    xp: FrozenAngle(0, 180, 0),
+    yp: FrozenAngle(0, 270, 0),
 
 }
 
 PETI_INST_ANGLE = {
     # The angles needed to point a PeTI instance in this direction
     # IE north = yn
-    zp: "0 0 0",
-    zn: "180 0 0",
+    zp: FrozenAngle(0, 0, 0),
+    zn: FrozenAngle(180, 0, 0),
 
-    yn: "0 0 90",
-    xp: "0 90 90",
-    yp: "0 180 90",
-    xn: "0 270 90",
+    yn: FrozenAngle(0, 0, 90),
+    xp: FrozenAngle(0, 90, 90),
+    yp: FrozenAngle(0, 180, 90),
+    xn: FrozenAngle(0, 270, 90),
 }
 
 del xp, xn, yp, yn, zp, zn
@@ -174,7 +175,7 @@ class EndCondition(Exception):
 
 
 class Unsatisfiable(Exception):
-    """Raised by flags to indicate they currently will always be false with all instances.
+    """Raised by tests to indicate they currently will always be false with all instances.
 
     For example, an instance result when that instance currently isn't present.
     """
@@ -188,54 +189,54 @@ RES_EXHAUSTED = object()
 @attrs.define
 class Condition:
     """A single condition which may be evaluated."""
-    flags: list[Property] = attrs.Factory(list)
-    results: list[Property] = attrs.Factory(list)
-    else_results: list[Property] = attrs.Factory(list)
+    tests: list[Keyvalues] = attrs.Factory(list)
+    results: list[Keyvalues] = attrs.Factory(list)
+    else_results: list[Keyvalues] = attrs.Factory(list)
     priority: Decimal = Decimal()
-    source: str = None
+    source: str | None = None
 
     @classmethod
-    def parse(cls, prop_block: Property, *, toplevel: bool) -> Condition:
-        """Create a condition from a Property block."""
-        flags: list[Property] = []
-        results: list[Property] = []
-        else_results: list[Property] = []
+    def parse(cls, kv_block: Keyvalues, *, toplevel: bool) -> Condition:
+        """Create a condition from a Keyvalues block."""
+        tests: list[Keyvalues] = []
+        results: list[Keyvalues] = []
+        else_results: list[Keyvalues] = []
         priority = Decimal()
         source = None
-        for prop in prop_block:
-            if prop.name == 'result':
-                results.extend(prop)  # join multiple ones together
-            elif prop.name == 'else':
-                else_results.extend(prop)
-            elif prop.name == '__src__':
+        for kv in kv_block:
+            if kv.name == 'result':
+                results.extend(kv)  # join multiple ones together
+            elif kv.name == 'else':
+                else_results.extend(kv)
+            elif kv.name == '__src__':
                 # Value injected by the BEE2 export, this specifies
                 # the original source of the config.
-                source = prop.value
+                source = kv.value
 
-            elif prop.name in ('condition', 'switch'):
+            elif kv.name in ('condition', 'switch'):
                 # Shortcut to eliminate lots of Result - Condition pairs
-                results.append(prop)
-            elif prop.name == 'elsecondition':
-                prop.name = 'condition'
-                else_results.append(prop)
-            elif prop.name == 'elseswitch':
-                prop.name = 'switch'
-                else_results.append(prop)
-            elif prop.name == 'priority':
+                results.append(kv)
+            elif kv.name == 'elsecondition':
+                kv.name = 'condition'
+                else_results.append(kv)
+            elif kv.name == 'elseswitch':
+                kv.name = 'switch'
+                else_results.append(kv)
+            elif kv.name == 'priority':
                 if not toplevel:
                     LOGGER.warning(
                         'Condition has priority definition, but is not at the toplevel! '
-                        'This will not function:\n{}', prop_block
+                        'This will not function:\n{}', kv_block
                     )
                 try:
-                    priority = Decimal(prop.value)
+                    priority = Decimal(kv.value)
                 except ArithmeticError:
                     pass
             else:
-                flags.append(prop)
+                tests.append(kv)
 
         return Condition(
-            flags,
+            tests,
             results,
             else_results,
             priority,
@@ -243,14 +244,12 @@ class Condition:
         )
 
     @staticmethod
-    def test_result(coll: collisions.Collisions, info: MapInfo, inst: Entity, res: Property) -> bool | object:
+    def test_result(coll: collisions.Collisions, info: MapInfo, inst: Entity, res: Keyvalues) -> bool | object:
         """Execute the given result."""
         try:
             cond_call = RESULT_LOOKUP[res.name]
         except KeyError:
-            err_msg = '"{name}" is not a valid condition result!'.format(
-                name=res.real_name,
-            )
+            err_msg = f'"{res.real_name}" is not a valid condition result!'
             if utils.DEV_MODE:
                 # Crash here.
                 raise ValueError(err_msg) from None
@@ -268,11 +267,11 @@ class Condition:
         """
         success = True
         # Only the first one can cause this condition to be skipped.
-        # We could have a situation where the first flag modifies the map
+        # We could have a situation where the first test modifies the map
         # such that it becomes satisfiable later, so this would be premature.
         # If we have else results, we also can't skip because those could modify state.
-        for i, flag in enumerate(self.flags):
-            if not check_flag(flag, coll, info, inst, can_skip=i==0 and not self.else_results):
+        for i, test in enumerate(self.tests):
+            if not check_test(test, coll, info, inst, can_skip=(i == 0) and not self.else_results):
                 success = False
                 break
         results = self.results if success else self.else_results
@@ -391,7 +390,7 @@ def annotation_caller(
             if type_to_parm[ann] is not None:
                 raise ValueError(f'Parameter {ann} used twice!')
         except KeyError:
-            raise ValueError(f'Unknown potential type {ann!r}!')
+            raise ValueError(f'Unknown potential type {ann!r}!') from None
         type_to_parm[ann] = parm.name
         ann_order.append(ann)
     inputs = []
@@ -437,14 +436,16 @@ def annotation_caller(
 
 
 @functools.lru_cache(maxsize=None)
-def _make_reorderer(inputs: str, outputs: str) -> Callable[[Callable], Callable]:
+def _make_reorderer(inputs: str, outputs: str) -> Callable[[Callable[..., object]], Callable[..., None]]:
     """Build a function that does reordering for annotation caller.
 
     This allows the code objects to be cached.
     It's a closure over the function, to allow reference to the function more directly.
     This also means it can be reused for other funcs with the same order.
     """
-    return eval(f'lambda func: lambda {inputs}: func({outputs})')
+    func = eval(f'lambda func: lambda {inputs}: func({outputs})')
+    assert isinstance(func, types.FunctionType)
+    return func
 
 
 CallResultT = TypeVar('CallResultT')
@@ -454,24 +455,24 @@ def conv_setup_pair(
     setup: Callable[..., Any],
     result: Callable[..., CallResultT],
 ) -> Callable[
-    [srctools.VMF, Property],
+    [srctools.VMF, Keyvalues],
     Callable[[Entity], CallResultT]
 ]:
     """Convert the old explict setup function into a new closure."""
     setup_wrap, _ = annotation_caller(
         setup,
-        srctools.VMF, Property,
+        srctools.VMF, Keyvalues,
     )
     result_wrap, _ = annotation_caller(
         result,
-        srctools.VMF, Entity, Property,
+        srctools.VMF, Entity, Keyvalues,
     )
 
-    def func(vmf: srctools.VMF, prop: Property) -> Callable[[Entity], CallResultT]:
+    def func(vmf: srctools.VMF, kv: Keyvalues) -> Callable[[Entity], CallResultT]:
         """Replacement function which performs the legacy behaviour."""
         # The old system for setup functions - smuggle them in by
-        # setting Property.value to an arbitrary object.
-        smuggle = Property(prop.real_name, setup_wrap(vmf, prop))
+        # setting Keyvalues.value to an arbitrary object.
+        smuggle = Keyvalues(kv.real_name, setup_wrap(vmf, kv))
 
         def closure(ent: Entity) -> CallResultT:
             """Use the closure to store the smuggled setup data."""
@@ -484,7 +485,7 @@ def conv_setup_pair(
 
 
 class CondCall(Generic[CallResultT]):
-    """A result or flag callback.
+    """A result or test callback.
 
     This should be called to execute it.
     """
@@ -500,10 +501,10 @@ class CondCall(Generic[CallResultT]):
         self.group = group
         cback, arg_order = annotation_caller(
             func,
-            srctools.VMF, collisions.Collisions, MapInfo, Entity, Property,
+            srctools.VMF, collisions.Collisions, MapInfo, Entity, Keyvalues,
         )
         self._cback: Callable[
-            [srctools.VMF, collisions.Collisions, MapInfo, Entity, Property],
+            [srctools.VMF, collisions.Collisions, MapInfo, Entity, Keyvalues],
             CallResultT | Callable[[Entity], CallResultT],
         ] = cback
         if Entity not in arg_order:
@@ -513,10 +514,14 @@ class CondCall(Generic[CallResultT]):
             self._setup_data = None
 
     @property
-    def __doc__(self) -> str:  # type: ignore  # object.__doc__ is not a property.
+    def __doc__(self) -> str:
         return self.func.__doc__
 
-    def __call__(self, coll: collisions.Collisions, info: MapInfo, ent: Entity, conf: Property) -> CallResultT:
+    @__doc__.setter
+    def __doc__(self, value: str) -> None:
+        self.func.__doc__ = value
+
+    def __call__(self, coll: collisions.Collisions, info: MapInfo, ent: Entity, conf: Keyvalues) -> CallResultT:
         """Execute the callback."""
         if self._setup_data is None:
             return self._cback(ent.map, coll, info, ent, conf)  # type: ignore
@@ -527,7 +532,7 @@ class CondCall(Generic[CallResultT]):
             except KeyError:
                 # The entity should never be used in setup functions. Pass a dummy object
                 # so errors occur if it's used.
-                cback = self._setup_data[id(conf)] = self._cback(
+                cback = self._setup_data[id(conf)] = self._cback(  # type: ignore
                     ent.map, coll, info,
                     cast(Entity, object()),
                     conf,
@@ -544,17 +549,27 @@ class CondCall(Generic[CallResultT]):
             return cback(ent)
 
 
-def _get_cond_group(func: Any) -> str:
-    """Get the condition group hint for a function."""
+def _get_cond_group(func: Any) -> str | None:
+    """Get the condition group hint for a function.
+
+    None means that the condition is "ungrouped".
+    """
     try:
-        return func.__globals__['COND_MOD_NAME']
+        group = func.__globals__['COND_MOD_NAME']
     except KeyError:
         group = func.__globals__['__name__']
         LOGGER.warning('No name for module "{}"!', group)
+    if group is None or type(group) is str:
         return group
+    LOGGER.warning(
+        'Module "{}" defines COND_MOD_NAME = {!r}, which is not Optional[str]!',
+        func.__globals__['__name__'],
+        group,
+    )
+    return str(group)
 
 
-def add_meta(func: Callable[..., object], priority: Decimal | int, only_once=True) -> None:
+def add_meta(func: Callable[..., object], priority: Decimal | int, only_once: bool = True) -> None:
     """Add a metacondition, which executes a function at a priority level.
 
     Used to allow users to allow adding conditions before or after a
@@ -562,7 +577,7 @@ def add_meta(func: Callable[..., object], priority: Decimal | int, only_once=Tru
     """
     dec_priority = Decimal(priority)
     # This adds a condition result like "func" (with quotes), which cannot
-    # be entered into property files.
+    # be entered into keyvalues files.
     # The qualified name will be unique across modules.
     name = f'"{func.__qualname__}"'
     LOGGER.debug(
@@ -575,14 +590,14 @@ def add_meta(func: Callable[..., object], priority: Decimal | int, only_once=Tru
     RESULT_LOOKUP[name] = wrapper = CondCall(func, _get_cond_group(func))
 
     cond = Condition(
-        results=[Property(name, '')],
+        results=[Keyvalues(name, '')],
         priority=dec_priority,
-        source='MetaCondition {}'.format(name)
+        source=f'MetaCondition {name}'
     )
 
     if only_once:
         cond.results.append(
-            Property('endCondition', '')
+            Keyvalues('endCondition', '')
         )
     conditions.append(cond)
     ALL_META.append((name, dec_priority, wrapper))
@@ -596,19 +611,19 @@ def meta_cond(priority: int | Decimal=0, only_once: bool=True) -> Callable[[Call
     return x
 
 
-def make_flag(orig_name: str, *aliases: str) -> Callable[[CallableT], CallableT]:
-    """Decorator to add flags to the lookup."""
-    def x(func: CallableT) -> CallableT:
+def make_test(orig_name: str, *aliases: str) -> Callable[[TestCallT], TestCallT]:
+    """Decorator to add tests to the lookup."""
+    def x(func: TestCallT) -> TestCallT:
         wrapper: CondCall[bool] = CondCall(func, _get_cond_group(func))
-        ALL_FLAGS.append((orig_name, aliases, wrapper))
+        ALL_TESTS.append((orig_name, aliases, wrapper))
         name = orig_name.casefold()
-        if name in FLAG_LOOKUP:
-            raise ValueError(f'Flag {orig_name} is a duplicate!')
-        FLAG_LOOKUP[orig_name.casefold()] = wrapper
+        if name in TEST_LOOKUP:
+            raise ValueError(f'Test {orig_name} is a duplicate!')
+        TEST_LOOKUP[orig_name.casefold()] = wrapper
         for name in aliases:
-            if name.casefold() in FLAG_LOOKUP:
-                raise ValueError(f'Flag {orig_name} is a duplicate!')
-            FLAG_LOOKUP[name.casefold()] = wrapper
+            if name.casefold() in TEST_LOOKUP:
+                raise ValueError(f'Test {orig_name} is a duplicate!')
+            TEST_LOOKUP[name.casefold()] = wrapper
         return func
     return x
 
@@ -622,9 +637,10 @@ def make_result(orig_name: str, *aliases: str) -> Callable[[CallableT], Callable
         if name.casefold() != folded_name
     ])
 
-    def x(result_func: CallableT) -> CallableT:
+    def x(result_func: Callable[..., ResultT]) -> Callable[..., ResultT]:
         """Create the result when the function is supplied."""
         # Legacy setup func support.
+        func: Callable[..., Callable[[Entity], object] | object]
         try:
             setup_func = RESULT_SETUP.pop(orig_name.casefold())
         except KeyError:
@@ -647,8 +663,8 @@ def make_result(orig_name: str, *aliases: str) -> Callable[[CallableT], Callable
                 alias_setup = RESULT_SETUP.pop(name.casefold())
                 assert alias_setup is setup_func, alias_setup
         ALL_RESULTS.append((orig_name, aliases, wrapper))
-        return func
-    return x
+        return result_func
+    return x  # type: ignore[return-value]  # Callable[..., T] -> TypeVar(bound=Callable)
 
 
 def make_result_setup(*names: str) -> Callable[[CallableT], CallableT]:
@@ -666,9 +682,9 @@ def make_result_setup(*names: str) -> Callable[[CallableT], CallableT]:
     return x
 
 
-def add(prop_block: Property) -> None:
+def add(kv_block: Keyvalues) -> None:
     """Parse and add a condition to the list."""
-    con = Condition.parse(prop_block, toplevel=True)
+    con = Condition.parse(kv_block, toplevel=True)
     if con.results or con.else_results:
         conditions.append(con)
 
@@ -703,7 +719,7 @@ def check_all(vmf: VMF, coll: collisions.Collisions, info: MapInfo) -> None:
                     # this condition, and skip to the next instance.
                     continue
                 except Unsatisfiable:
-                    # Unsatisfiable indicates this condition's flags will
+                    # Unsatisfiable indicates this condition's tests will
                     # never succeed, so just skip.
                     skipped_cond += 1
                     break
@@ -751,23 +767,25 @@ def check_all(vmf: VMF, coll: collisions.Collisions, info: MapInfo) -> None:
     ])
     # '' is always present, which sorts first, conveniently adding a \n at the start.
     LOGGER.debug('All instances referenced:{}', '\n'.join(sorted(ALL_INST)))
-    # Dynamically added by lru_cache()
-    # noinspection PyUnresolvedReferences
-    LOGGER.info('instanceLocs cache: {}', instanceLocs.resolve_cache_info())
+    LOGGER.info(
+        'instanceLocs cache: {} & {}',
+        instanceLocs.resolve_cache_info(),
+        instanceLocs.resolve_filter.cache_info(),
+    )
     LOGGER.info('Style Vars: {}', dict(vbsp.settings['style_vars']))
     LOGGER.info('Global instances: {}', GLOBAL_INSTANCES)
 
 
-def check_flag(
-    flag: Property,
+def check_test(
+    test: Keyvalues,
     coll: collisions.Collisions, info: MapInfo,
     inst: Entity, can_skip: bool = False,
 ) -> bool:
-    """Determine the result for a condition flag.
+    """Determine the result for a condition test.
 
-    If can_skip is true, flags raising Unsatifiable will pass the exception through.
+    If can_skip is true, testd raising Unsatifiable will pass the exception through.
     """
-    name = flag.name
+    name = test.name
     # If starting with '!', invert the result.
     if name[:1] == '!':
         desired_result = False
@@ -776,9 +794,9 @@ def check_flag(
     else:
         desired_result = True
     try:
-        func = FLAG_LOOKUP[name]
+        func = TEST_LOOKUP[name]
     except KeyError:
-        err_msg = '"{}" is not a valid condition flag!'.format(name)
+        err_msg = f'"{name}" is not a valid condition flag!'
         if utils.DEV_MODE:
             # Crash here.
             raise ValueError(err_msg) from None
@@ -788,7 +806,7 @@ def check_flag(
             return False
 
     try:
-        res = func(coll, info, inst, flag)
+        res = func(coll, info, inst, test)
     except Unsatisfiable:
         if can_skip:
             raise
@@ -803,13 +821,22 @@ def import_conditions() -> None:
 
     This ensures everything gets registered.
     """
-    # Find the modules in the conditions package.
-    for module in pkgutil.iter_modules(__path__, 'precomp.conditions.'):
-        # Import the module, then discard it. The module will run add_flag
-        # or add_result() functions, which save the functions into our dicts.
-        # We don't need a reference to the modules themselves.
-        LOGGER.debug('Importing {} ...', module.name)
-        importlib.import_module(module.name)
+    # Import all the condition modules. The module will run add_test()
+    # or add_result() functions, which save the functions into our dicts.
+    from . import ( # noqa
+        _scaffold_compat, addInstance, antlines, apTag, brushes, catwalks, collisions, connections,
+        conveyorBelt, custItems, cutoutTile, entities, errors, faithplate, fizzler, glass, globals,
+        instances, linked_items, logical, marker, monitor, piston_platform, positioning, python,
+        randomise, removed, resizableTrigger, sendificator, signage, trackPlat, vactubes,
+    )
+
+    # If not frozen, check none are missing.
+    if not utils.FROZEN:
+        ns = set(locals())
+        # Verify none are missing.
+        for module in pkgutil.iter_modules(__path__, 'precomp.conditions.'):
+            stem = module.name.rsplit('.', 1)[-1]
+            assert stem in ns, module
     LOGGER.info('Imported all conditions modules!')
 
 DOC_MARKER = '''<!-- Only edit above this line. This is generated from text in the compiler code. -->'''
@@ -835,7 +862,7 @@ They have limited utility otherwise.
 
 
 def dump_conditions(file: TextIO) -> None:
-    """Dump docs for all the condition flags, results and metaconditions."""
+    """Dump docs for all the condition tests, results and metaconditions."""
 
     LOGGER.info('Dumping conditions...')
 
@@ -863,29 +890,29 @@ def dump_conditions(file: TextIO) -> None:
     file.write(DOC_META_COND)
 
     ALL_META.sort(key=lambda i: i[1])  # Sort by priority
-    for flag_key, priority, func in ALL_META:
-        file.write(f'#### `{flag_key}` ({priority}):\n\n')
+    for test_key, priority, func in ALL_META:
+        file.write(f'#### `{test_key}` ({priority}):\n\n')
         dump_func_docs(file, func)
         file.write('\n')
 
-    lookup: list[tuple[str, tuple[str, ...], CondCall]]
-    for lookup, name in [
-        (ALL_FLAGS, 'Flags'),
+    all_cond_types: list[tuple[list[tuple[str, tuple[str, ...], CondCall[Any]]], str]] = [
+        (ALL_TESTS, 'Tests'),
         (ALL_RESULTS, 'Results'),
-    ]:
+    ]
+    for lookup, name in all_cond_types:
         print('<!------->', file=file)
         print(f'# {name}', file=file)
         print('<!------->', file=file)
 
         lookup_grouped: dict[str, list[
-            tuple[str, tuple[str, ...], CondCall]
+            tuple[str, tuple[str, ...], CondCall[Any]]
         ]] = defaultdict(list)
 
-        for flag_key, aliases, func in lookup:
+        for test_key, aliases, func in lookup:
             group = getattr(func, 'group', 'ERROR')
             if group is None:
                 group = '00special'
-            lookup_grouped[group].append((flag_key, aliases, func))
+            lookup_grouped[group].append((test_key, aliases, func))
 
         # Collapse 1-large groups into Ungrouped.
         for group in list(lookup_grouped):
@@ -911,15 +938,16 @@ def dump_conditions(file: TextIO) -> None:
 
             LOGGER.info('Doing {} group...', group)
 
-            for flag_key, aliases, func in funcs:
-                print(f'#### `{flag_key}`:\n', file=file)
+            for test_key, aliases, func in funcs:
+                print(f'#### `{test_key}`:\n', file=file)
                 if aliases:
                     print(f'**Aliases:** `{"`, `".join(aliases)}`  \n', file=file)
                 dump_func_docs(file, func)
                 file.write('\n')
 
 
-def dump_func_docs(file: TextIO, func: Callable):
+def dump_func_docs(file: TextIO, func: Callable[..., object]) -> None:
+    """Write the documentation for this function to the file."""
     import inspect
     docs = inspect.getdoc(func)
     if docs:
@@ -932,8 +960,8 @@ def add_inst(
     vmf: VMF,
     *,
     file: str,
-    origin: Vec | str,
-    angles: Angle | Matrix | str = '0 0 0',
+    origin: Vec | FrozenVec | str,
+    angles: AnyAngle | AnyMatrix | str = '0 0 0',
     targetname: str='',
     fixup_style: int | str = '0',  # Default to Prefix.
     no_fixup: bool = False,
@@ -941,11 +969,13 @@ def add_inst(
     """Create and add a new instance at the specified position.
 
     This provides defaults for parameters, and adds the filename to ALL_INST.
-    Values accept str in addition so they can be copied from existing keyvalues.
+    Values accept str in addition so that they can be copied from existing keyvalues.
 
     If no_fixup is set, it overrides fixup_style to None - this way it's a more clear
     parameter for code.
     """
+    if no_fixup:
+        fixup_style = '2'
     ALL_INST.add(file.casefold())
     return vmf.create_ent(
         'func_instance',
@@ -957,15 +987,14 @@ def add_inst(
     )
 
 
-
-def add_output(inst: Entity, prop: Property, target: str) -> None:
+def add_output(inst: Entity, kv: Keyvalues, target: str) -> None:
     """Add a customisable output to an instance."""
     inst.add_out(Output(
-        prop['output', ''],
+        kv['output', ''],
         target,
-        prop['input', ''],
-        inst_in=prop['targ_in', ''],
-        inst_out=prop['targ_out', ''],
+        kv['input', ''],
+        inst_in=kv['targ_in', ''],
+        inst_out=kv['targ_out', ''],
         ))
 
 
@@ -1007,10 +1036,83 @@ def local_name(inst: Entity, name: str | Entity) -> str:
         # Postfix
         return name + '-' + targ_name
     else:
-        raise ValueError('Unknown fixup style {}!'.format(fixup))
+        raise ValueError(f'Unknown fixup style {fixup}!')
 
 
-def widen_fizz_brush(brush: Solid, thickness: float, bounds: tuple[Vec, Vec]=None):
+class DebugAdder(Protocol):
+    @overload
+    def __call__(self, ent: Entity, /) -> Entity:
+        """Add this entity to the map, the visgroup and make it hidden."""
+
+    @overload
+    def __call__(self, brush: Solid, /) -> Entity:
+        """Add this brush to the map, the visgroup and make it hidden."""
+
+    @overload
+    def __call__(self, classname: str, /, *, comment: str='', **kwargs: ValidKVs) -> Entity:
+        """Create an entity with the specified keyvalues."""
+
+
+def fetch_debug_visgroup(
+    vmf: VMF,
+    vis_name: str,
+    r: int = 113, g: int = 113, b: int = 0,
+    force: bool = False,
+) -> DebugAdder:
+    """If debugging is enabled, return a function that adds entities to the specified visgroup.
+
+    * vis_name: The name of the visgroup to use. If already present the existing one is used.
+    * r, g, b: Color to use, if creating.
+    * force: If true, always adds. Otherwise, this only adds if Dev Mode is enabled.
+
+    The returned function can either be called with a classname + keyvalues to create an ent,
+    or given an existing ent/brush to add. If given an existing ent/brush, it should not be
+    already added to the VMF - this will skip doing so if debugging is disabled. In that case
+    the ent/brush will just be discarded harmlessly.
+    """
+    if not force and not utils.DEV_MODE:
+        def func(target: str | Entity | Solid, /, **kwargs: ValidKVs) -> Entity | Solid:
+            """Do nothing."""
+            if isinstance(target, str):
+                # Create a dummy entity, which will be discarded.
+                return Entity(vmf, keys={'classname': target})
+            return target
+
+        return func  # type: ignore[return-value]
+
+    for visgroup in vmf.vis_tree:
+        if visgroup.name == vis_name:
+            break
+    else:
+        # Create the visgroup.
+        visgroup = vmf.create_visgroup(vis_name, (r, g, b))
+
+    group = EntityGroup(vmf, color=Vec(r, g, b), shown=False)
+
+    def adder(target: str | Entity | Solid, /, **kwargs: ValidKVs) -> Entity | Solid:
+        """Add a marker to the map."""
+        if isinstance(target, str):
+            comment = kwargs.pop('comment', '')
+            target = vmf.create_ent(target, **kwargs)
+            target.comments = str(comment)
+        elif isinstance(target, Solid):
+            vmf.add_brush(target)
+        elif isinstance(target, Entity):
+            vmf.add_ent(target)
+
+        target.visgroup_ids.add(visgroup.id)
+        if isinstance(target, Solid):
+            target.group_id = group.id
+        else:
+            target.groups.add(group.id)
+        target.vis_shown = False
+        target.hidden = True
+        return target
+
+    return adder  # type: ignore[return-value]
+
+
+def widen_fizz_brush(brush: Solid, thickness: float, bounds: tuple[Vec, Vec] | None = None) -> None:
     """Move the two faces of a fizzler brush outward.
 
     This is good to make fizzlers which are thicker than 2 units.
@@ -1049,42 +1151,23 @@ def widen_fizz_brush(brush: Solid, thickness: float, bounds: tuple[Vec, Vec]=Non
 def set_ent_keys(
     ent: typing.MutableMapping[str, str],
     inst: Entity,
-    prop_block: Property,
+    kv_block: Keyvalues,
     block_name: str='Keys',
 ) -> None:
     """Copy the given key prop block to an entity.
 
-    This uses the keys and 'localkeys' properties on the prop_block.
+    This uses the keys and 'localkeys' properties on the kv_block.
     Values with $fixup variables will be treated appropriately.
     LocalKeys keys will be changed to use instance-local names, where needed.
-    block_name lets you change the 'keys' suffix on the prop_block name.
+    block_name lets you change the 'keys' suffix on the kv_block name.
     ent can be any mapping.
     """
-    for prop in prop_block.find_block(block_name, or_blank=True):
-        ent[prop.real_name] = resolve_value(inst, prop.value)
-    for prop in prop_block.find_block('Local' + block_name, or_blank=True):
-        if prop.value.startswith('$'):
-            val = inst.fixup[prop.value]
-        else:
-            val = prop.value
-        if val.startswith('@'):
-            ent[prop.real_name] = val
-        else:
-            ent[prop.real_name] = local_name(inst, val)
+    for kv in kv_block.find_block(block_name, or_blank=True):
+        ent[kv.real_name] = inst.fixup.substitute(kv.value)
+    for kv in kv_block.find_block('Local' + block_name, or_blank=True):
+        ent[kv.real_name] = local_name(inst, inst.fixup.substitute(kv.value))
 
 T = TypeVar('T')
-
-
-def resolve_value(inst: Entity, value: str | T) -> str | T:
-    """If a value contains '$', lookup the associated var.
-
-    Non-string values are passed through unchanged.
-    If it starts with '!$', invert boolean values.
-    """
-    if not isinstance(value, str):
-        return value
-
-    return inst.fixup.substitute(value, allow_invert=True)
 
 
 def resolve_offset(inst, value: str, scale: float=1, zoff: float=0) -> Vec:
@@ -1133,27 +1216,24 @@ def resolve_offset(inst, value: str, scale: float=1, zoff: float=0) -> Vec:
     return offset
 
 
-@make_flag('debug')
+@make_test('debug')
 @make_result('debug')
-def debug_flag(inst: Entity, props: Property):
+def debug_test_result(inst: Entity, kv: Keyvalues) -> bool:
     """Displays text when executed, for debugging conditions.
 
     If the text ends with an '=', the instance will also be displayed.
-    As a flag, this always evaluates as true.
+    As a test, this always evaluates as true.
     """
-    # Mark as a warning so it's more easily seen.
-    if props.has_children():
-        LOGGER.warning('Debug:\n{!s}\n{!s}', props, inst)
+    # Mark as a warning, so it's more easily seen.
+    if kv.has_children():
+        LOGGER.warning('Debug:\n{!s}\n{!s}', kv, inst)
     else:
-        LOGGER.warning('Debug: {props}{inst!s}'.format(
-            inst=inst,
-            props=props.value,
-        ))
-    return True  # The flag is always true
+        LOGGER.warning('Debug: {}\n{inst!s}', kv.value, inst)
+    return True  # The test is always true
 
 
 @make_result('dummy', 'nop', 'do_nothing')
-def dummy_result(inst: Entity, props: Property):
+def dummy_result() -> None:
     """Dummy result that doesn't do anything."""
     pass
 
@@ -1171,7 +1251,7 @@ def remove_blank_inst(inst: Entity) -> None:
 
 
 @make_result('timedRelay')
-def res_timed_relay(vmf: VMF, res: Property) -> Callable[[Entity], None]:
+def res_timed_relay(vmf: VMF, res: Keyvalues) -> Callable[[Entity], None]:
     """Generate a logic_relay with outputs delayed by a certain amount.
 
     This allows triggering outputs based $timer_delay values.
@@ -1223,7 +1303,7 @@ def res_timed_relay(vmf: VMF, res: Property) -> Callable[[Entity], None]:
 
 
 @make_result('condition')
-def res_sub_condition(coll: collisions.Collisions, info: MapInfo, res: Property) -> ResultCallable:
+def res_sub_condition(coll: collisions.Collisions, info: MapInfo, res: Keyvalues) -> ResultCallable:
     """Check a different condition if the outer block is true."""
     cond = Condition.parse(res, toplevel=False)
 
@@ -1255,46 +1335,51 @@ def res_end_condition() -> None:
 
 
 @make_result('switch')
-def res_switch(coll: collisions.Collisions, info: MapInfo, res: Property) -> ResultCallable:
-    """Run the same flag multiple times with different arguments.
+def res_switch(coll: collisions.Collisions, info: MapInfo, res: Keyvalues) -> ResultCallable:
+    """Run the same test multiple times with different arguments.
 
-    `method` is the way the search is done - `first`, `last`, `random`, or `all`.
-    `flag` is the name of the flag.
-    `seed` sets the randomisation seed for this block, for the random mode.
-    Each property group is a case to check - the property name is the flag
+    * `method` is the way the search is done - `first`, `last`, `random`, or `all`.
+    * `test` is the name of the test. (`flag` is accepted for backwards compatibility.)
+    * `seed` sets the randomisation seed for this block, for the random mode.
+
+    Each keyvalues group is a case to check - the Keyvalues name is the test
     argument, and the contents are the results to execute in that case.
-    The special group `"<default>"` is only run if no other flag is valid.
-    For `random` mode, you can omit the flag to choose from all objects. In
-    this case the flag arguments are ignored.
+    The special group `"<default>"` is only run if no other test is valid.
+    For `random` mode, you can omit the test to choose from all objects. In
+    this case the test arguments are ignored.
     """
-    flag_name = ''
+    test_name = ''
     method = SWITCH_TYPE.FIRST
-    raw_cases: list[Property] = []
-    default: list[Property] = []
+    raw_cases: list[Keyvalues] = []
+    default: list[Keyvalues] = []
     rand_seed = ''
-    for prop in res:
-        if prop.has_children():
-            if prop.name == '<default>':
-                default.extend(prop)
+    for kv in res:
+        if kv.has_children():
+            if kv.name == '<default>':
+                default.extend(kv)
             else:
-                raw_cases.append(prop)
+                raw_cases.append(kv)
         else:
-            if prop.name == 'flag':
-                flag_name = prop.value
+            if kv.name == 'test':
+                test_name = kv.value
                 continue
-            if prop.name == 'method':
+            if kv.name == 'flag':
+                LOGGER.warning('Switch uses deprecated field "flag", this has been renamed to "test".')
+                test_name = kv.value
+                continue
+            if kv.name == 'method':
                 try:
-                    method = SWITCH_TYPE(prop.value.casefold())
+                    method = SWITCH_TYPE(kv.value.casefold())
                 except ValueError:
                     pass
-            elif prop.name == 'seed':
-                rand_seed = prop.value
+            elif kv.name == 'seed':
+                rand_seed = kv.value
 
     if method is SWITCH_TYPE.LAST:
         raw_cases.reverse()
 
-    conf_cases: list[tuple[Property, list[Property]]] = [
-        (Property(flag_name, case.real_name), list(case))
+    conf_cases: list[tuple[Keyvalues, list[Keyvalues]]] = [
+        (Keyvalues(test_name, case.real_name), list(case))
         for case in raw_cases
     ]
 
@@ -1307,9 +1392,9 @@ def res_switch(coll: collisions.Collisions, info: MapInfo, res: Property) -> Res
             cases = conf_cases
 
         run_default = True
-        for flag, results in cases:
+        for test, results in cases:
             # If not set, always succeed for the random situation.
-            if flag.real_name and not check_flag(flag, coll, info, inst):
+            if test.real_name and not check_test(test, coll, info, inst):
                 continue
             for sub_res in results:
                 Condition.test_result(coll, info, inst, sub_res)
@@ -1324,7 +1409,7 @@ def res_switch(coll: collisions.Collisions, info: MapInfo, res: Property) -> Res
 
 
 @make_result('staticPiston')
-def make_static_pist(vmf: srctools.VMF, res: Property) -> Callable[[Entity], None]:
+def make_static_pist(vmf: srctools.VMF, res: Keyvalues) -> Callable[[Entity], None]:
     """Convert a regular piston into a static version.
 
     This is done to save entities and improve lighting.
@@ -1359,10 +1444,8 @@ def make_static_pist(vmf: srctools.VMF, res: Property) -> Callable[[Entity], Non
             from_item = res.value
             prefix = ''
         instances = {
-            name: instanceLocs.resolve_one(
-                '<{}:bee2_{}{}>'.format(from_item, prefix, name),
-                error=False,
-            ) for name in inst_keys
+            name: instanceLocs.resolve_one(f'<{from_item}:bee2_{prefix}{name}>', error=False)
+            for name in inst_keys
         }
 
     def make_static(ent: Entity) -> None:
@@ -1424,7 +1507,7 @@ def make_static_pist(vmf: srctools.VMF, res: Property) -> Callable[[Entity], Non
 
 
 @make_result('GooDebris')
-def res_goo_debris(vmf: VMF, res: Property) -> object:
+def res_goo_debris(vmf: VMF, res: Keyvalues) -> object:
     """Add random instances to goo squares.
 
     Options:

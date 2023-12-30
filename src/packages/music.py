@@ -1,31 +1,35 @@
 """Definitions for background music used in the map."""
 from __future__ import annotations
+from typing import Iterator, Mapping
+from typing_extensions import Self
 from collections.abc import Iterable
-from typing import Iterator
 
-from srctools import Property
+from srctools import Keyvalues
 import srctools.logger
 
-from consts import MusicChannel
 from app import lazy_conf
+from consts import MusicChannel
+from packages import (
+    ExportData, PackagesSet, PakObject, ParseData, SelitemData, get_config,
+)
 from transtoken import TransTokenSource
-from packages import PackagesSet, PakObject, ParseData, SelitemData, get_config, ExportData
 
 
 LOGGER = srctools.logger.get_logger(__name__)
 
 
-class Music(PakObject, needs_foreground=True):
+class Music(PakObject, needs_foreground=True, style_suggest_key='music'):
     """Allows specifying background music for the map."""
     def __init__(
         self,
-        music_id,
+        music_id: str,
         selitem_data: SelitemData,
-        sound: dict[MusicChannel, list[str]],
-        children: dict[MusicChannel, str],
+        sound: Mapping[MusicChannel, list[str]],
+        *,
+        children: Mapping[MusicChannel, str],
+        sample: Mapping[MusicChannel, str | None],
         config: lazy_conf.LazyConf = lazy_conf.BLANK,
         inst: str | None = None,
-        sample: dict[MusicChannel, str | None] = None,
         pack: Iterable[str] = (),
         loop_len: int = 0,
         synch_tbeam: bool = False,
@@ -44,7 +48,7 @@ class Music(PakObject, needs_foreground=True):
         self.has_synced_tbeam = synch_tbeam
 
     @classmethod
-    async def parse(cls, data: ParseData):
+    async def parse(cls, data: ParseData) -> Self:
         """Parse a music definition."""
         selitem_data = SelitemData.parse(data.info, data.pak_id)
         inst = data.info['instance', None]
@@ -138,7 +142,7 @@ class Music(PakObject, needs_foreground=True):
             synch_tbeam=synch_tbeam,
         )
 
-    def add_over(self, override: 'Music') -> None:
+    def add_over(self, override: Self) -> None:
         """Add the additional vbsp_config commands to ourselves."""
         self.config = lazy_conf.concat(self.config, override.config)
         self.selitem_data += override.selitem_data
@@ -182,28 +186,28 @@ class Music(PakObject, needs_foreground=True):
         attrs['TBEAM_SYNC'] = self.has_synced_tbeam
         return attrs
 
-    def get_suggestion(self, channel: MusicChannel) -> str | None:
+    def get_suggestion(self, packset: PackagesSet, channel: MusicChannel) -> str | None:
         """Get the ID we want to suggest for a channel."""
         try:
-            child = Music.by_id(self.children[channel])
+            child = packset.obj_by_id(Music, self.children[channel])
         except KeyError:
             child = self
         if child.sound[channel]:
             return child.id
         return None
 
-    def get_sample(self, channel: MusicChannel) -> str | None:
+    def get_sample(self, packset: PackagesSet, channel: MusicChannel) -> str | None:
         """Get the path to the sample file, if present."""
         if self.sample[channel]:
             return self.sample[channel]
         try:
-            children = Music.by_id(self.children[channel])
+            children = packset.obj_by_id(Music, self.children[channel])
         except KeyError:
             return None
         return children.sample[channel]
 
     @staticmethod
-    def export(exp_data: ExportData):
+    async def export(exp_data: ExportData) -> None:
         """Export the selected music."""
         selected: dict[MusicChannel, Music | None] = exp_data.selected
 
@@ -212,9 +216,9 @@ class Music(PakObject, needs_foreground=True):
         vbsp_config = exp_data.vbsp_conf
 
         if base_music is not None:
-            vbsp_config += base_music.config()
+            vbsp_config += await base_music.config()
 
-        music_conf = Property('MusicScript', [])
+        music_conf = Keyvalues('MusicScript', [])
         vbsp_config.append(music_conf)
         to_pack = set()
 
@@ -224,10 +228,10 @@ class Music(PakObject, needs_foreground=True):
 
             sounds = music.sound[channel]
             if len(sounds) == 1:
-                music_conf.append(Property(channel.value, sounds[0]))
+                music_conf.append(Keyvalues(channel.value, sounds[0]))
             else:
-                music_conf.append(Property(channel.value, [
-                    Property('snd', snd)
+                music_conf.append(Keyvalues(channel.value, [
+                    Keyvalues('snd', snd)
                     for snd in sounds
                 ]))
 
@@ -236,8 +240,8 @@ class Music(PakObject, needs_foreground=True):
         # If we need to pack, add the files to be unconditionally
         # packed.
         if to_pack:
-            music_conf.append(Property('pack', [
-                Property('file', filename)
+            music_conf.append(Keyvalues('pack', [
+                Keyvalues('file', filename)
                 for filename in to_pack
             ]))
 

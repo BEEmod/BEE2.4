@@ -1,20 +1,20 @@
 """Test parsing behaviour of stylevars."""
+from srctools import Keyvalues
+from srctools.dmx import Attribute, Element
 import pytest
-from srctools import Property
-from srctools.dmx import Element, Attribute
 
 from config.stylevar import State
 
 
 def test_parse_legacy() -> None:
     """Test parsing the older config version."""
-    kv = Property('Config', [
-        Property('Stylevar', [
-            Property('EnabledVar', '1'),
-            Property('DisabledVar', '0'),
+    kv = Keyvalues('Config', [
+        Keyvalues('Stylevar', [
+            Keyvalues('EnabledVar', '1'),
+            Keyvalues('DisabledVar', '0'),
         ]),
-        Property('SomethingElse', [
-            Property('bool', '0')
+        Keyvalues('SomethingElse', [
+            Keyvalues('bool', '0')
         ]),
     ])
     res = State.parse_legacy(kv)
@@ -26,11 +26,11 @@ def test_parse_legacy() -> None:
 
 def test_parse_kv1() -> None:
     """Test parsing keyvalues1 data."""
-    assert State.parse_kv1(Property('StyleState', '0'), 1) == State(False)
-    assert State.parse_kv1(Property('StyleState', '1'), 1) == State(True)
+    assert State.parse_kv1(Keyvalues('StyleState', '0'), 1) == State(False)
+    assert State.parse_kv1(Keyvalues('StyleState', '1'), 1) == State(True)
 
     with pytest.raises(AssertionError):  # No future versions allowed.
-        State.parse_kv1(Property('StyleState', '0'), 2)
+        State.parse_kv1(Keyvalues('StyleState', '0'), 2)
 
 
 def test_export_kv1() -> None:
@@ -57,5 +57,5 @@ def test_parse_dmx(value: bool) -> None:
 def test_export_dmx(value: bool) -> None:
     """Test constructing DMX configs."""
     elem = State(value).export_dmx()
-    assert len(elem) == 1
+    assert len(elem) == 2
     assert elem['value'].val_bool is value

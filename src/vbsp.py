@@ -8,10 +8,10 @@ import user_errors
 LOGGER = init_logging('bee2/vbsp.log')
 
 
-from typing import Any, Dict, List, Tuple, Set, Iterable, Optional
+from typing import Any, Dict, List, Tuple, Set, Iterable, Optional, Counter
 from typing_extensions import TypedDict
 from io import StringIO
-from collections import defaultdict, namedtuple, Counter
+from collections import defaultdict, namedtuple
 import os
 import sys
 import shutil
@@ -19,7 +19,7 @@ import logging
 import pickle
 import contextlib
 
-from srctools import AtomicWriter, Property, Vec, Vec_tuple, Angle, Matrix
+from srctools import AtomicWriter, Keyvalues, Vec, FrozenVec, Angle, Matrix
 from srctools.vmf import VMF, Entity, Output
 from srctools.game import Game
 import srctools
@@ -63,7 +63,7 @@ class _Settings(TypedDict):
     options: Dict[str, Any]
     fog: Dict[str, Any]
     elevator: Dict[str, str]
-    music_conf: Optional[Property]
+    music_conf: Optional[Keyvalues]
 
     style_vars: Dict[str, bool]
     has_attr: Dict[str, bool]
@@ -90,7 +90,7 @@ PRESET_CLUMPS = []  # Additional clumps set by conditions, for certain areas.
 
 
 async def load_settings() -> Tuple[
-    antlines.AntType, antlines.AntType,
+    antlines.IndicatorStyle,
     Dict[str, editoritems.Item],
     corridor.ExportedConf,
 ]:
@@ -104,7 +104,7 @@ async def load_settings() -> Tuple[
             file_packlist = file_stack.enter_context(open('bee2/pack_list.cfg'))
 
             async with trio.open_nursery() as nursery:
-                res_conf = utils.Result.sync(nursery, Property.parse, file_config)
+                res_conf = utils.Result.sync(nursery, Keyvalues.parse, file_config)
                 res_editor: utils.Result[
                     Iterable[editoritems.Item]
                 ] = utils.Result.sync(nursery, pickle.load, file_editor)
@@ -114,7 +114,7 @@ async def load_settings() -> Tuple[
                 )
                 res_packlist = utils.Result.sync(
                     nursery,
-                    Property.parse, file_packlist, 'bee2/pack_list.cfg',
+                    Keyvalues.parse, file_packlist, 'bee2/pack_list.cfg',
                 )
                 # Load in templates locations.
                 nursery.start_soon(template_brush.load_templates, 'bee2/templates.lst')
@@ -128,30 +128,15 @@ async def load_settings() -> Tuple[
         sys.exit(1)
 
     conf = res_conf()
+    tex_block = Keyvalues('Textures', list(conf.find_children('textures')))
 
-    texturing.load_config(conf.find_block('textures', or_blank=True))
-
-    # Antline texturing settings.
-    # We optionally allow different ones for floors.
-    ant_wall = ant_floor = None
-    for prop in conf.find_all('Textures', 'Antlines'):
-        if 'floor' in prop:
-            ant_floor = antlines.AntType.parse(prop.find_key('floor'))
-        if 'wall' in prop:
-            ant_wall = antlines.AntType.parse(prop.find_key('wall'))
-        # If both are not there, allow omitting the subkey.
-        if ant_wall is ant_floor is None:
-            ant_wall = ant_floor = antlines.AntType.parse(prop)
-    if ant_wall is None:
-        ant_wall = antlines.AntType.default()
-    if ant_floor is None:
-        ant_floor = ant_wall
+    texturing.load_config(tex_block)
 
     # Load in our main configs...
     options.load(conf.find_all('Options'))
     utils.DEV_MODE = options.get(bool, 'dev_mode')
 
-    # The voice line property block
+    # The voice line keyvalues block
     for quote_block in conf.find_all("quotes"):
         voice_line.QUOTE_DATA.extend(quote_block)
 
@@ -161,13 +146,21 @@ async def load_settings() -> Tuple[
             settings['style_vars'][var.name.casefold()] = srctools.conv_bool(var.value)
 
     # Load a copy of the item configuration.
-    id_to_item: dict[str, editoritems.Item] = {}
+    id_to_item: Dict[str, editoritems.Item] = {}
     for item in res_editor():
         id_to_item[item.id.casefold()] = item
 
     # Send that data to the relevant modules.
     instanceLocs.load_conf(id_to_item.values())
     connections.read_configs(id_to_item.values())
+
+    # Antline texturing settings.
+    indicators = antlines.IndicatorStyle.parse(
+        # Collect all blocks, since they may be in separate blocks for antlines/checkmarks/timers.
+        Keyvalues('Antlines', list(tex_block.find_children('antlines'))),
+        'the main antline configuration',
+        antlines.IndicatorStyle.from_legacy(id_to_item),
+    )
 
     # Parse packlist data.
     packing.parse_packlists(res_packlist())
@@ -232,16 +225,16 @@ async def load_settings() -> Tuple[
     })
 
     LOGGER.info("Settings Loaded!")
-    return ant_floor, ant_wall, id_to_item, corridor_conf
+    return indicators, id_to_item, corridor_conf
 
 
 async def load_map(map_path: str) -> VMF:
     """Load in the VMF file."""
     with open(map_path) as file:
         LOGGER.info("Parsing Map...")
-        props = await trio.to_thread.run_sync(Property.parse, file, map_path)
+        kv = await trio.to_thread.run_sync(Keyvalues.parse, file, map_path)
     LOGGER.info('Reading Map...')
-    vmf = await trio.to_thread.run_sync(VMF.parse, props)
+    vmf = await trio.to_thread.run_sync(VMF.parse, kv)
     LOGGER.info("Loading complete!")
     return vmf
 
@@ -536,6 +529,7 @@ def set_player_portalgun(vmf: VMF, info: corridor.Info) -> None:
 
         # Detect the group ID of portals placed in the map, and write to
         # the entities what we determine.
+        port_ids: Iterable[int]
         if info.is_coop:
             port_ids = (0, 1, 2)
         else:
@@ -543,7 +537,7 @@ def set_player_portalgun(vmf: VMF, info: corridor.Info) -> None:
 
         for port_id in port_ids:
             trigger_portal = vmf.create_ent(
-                targetname='__pgun_port_detect_{}'.format(port_id),
+                targetname=f'__pgun_port_detect_{port_id}',
                 classname='func_portal_detector',
                 origin=ent_pos,
                 CheckAllIDs=0,
@@ -556,16 +550,16 @@ def set_player_portalgun(vmf: VMF, info: corridor.Info) -> None:
                     '!activator',
                     'RunScriptCode',
                     '__pgun_is_oran <- 0; '
-                    '__pgun_port_id <- {}; '
-                    '__pgun_active <- 1'.format(port_id),
+                    f'__pgun_port_id <- {port_id}; '
+                    '__pgun_active <- 1'
                 ),
                 Output(
                     'OnStartTouchPortal2',
                     '!activator',
                     'RunScriptCode',
                     '__pgun_is_oran <- 1; '
-                    '__pgun_port_id <- {}; '
-                    '__pgun_active <- 1'.format(port_id),
+                    f'__pgun_port_id <- {port_id}; '
+                    '__pgun_active <- 1'
                 ),
                 Output(
                     'OnEndTouchPortal',
@@ -803,7 +797,7 @@ def set_elev_videos(vmf: VMF, info: corridor.Info) -> None:
         LOGGER.warning('Invalid elevator video type!')
         return
 
-    transition_ents = instanceLocs.resolve('[transitionents]')
+    transition_ents = instanceLocs.resolve_filter('[transitionents]')
     for inst in vmf.by_class['func_instance']:
         if inst['file'].casefold() not in transition_ents:
             continue
@@ -821,7 +815,7 @@ def set_elev_videos(vmf: VMF, info: corridor.Info) -> None:
         )
 
 
-def add_goo_mist(vmf, sides: Iterable[Vec_tuple]):
+def add_goo_mist(vmf, sides: Iterable[FrozenVec]):
     """Add water_mist* particle systems to goo.
 
     This uses larger particles when needed to save ents.
@@ -868,8 +862,8 @@ def add_goo_mist(vmf, sides: Iterable[Vec_tuple]):
 
 def fit_goo_mist(
     vmf: VMF,
-    sides: Iterable[Vec_tuple],
-    needs_mist: Set[Tuple[float, float, float]],
+    sides: Iterable[FrozenVec],
+    needs_mist: Set[FrozenVec],
     grid_x: int,
     grid_y: int,
     particle: str,
@@ -885,7 +879,7 @@ def fit_goo_mist(
         if pos not in needs_mist:
             continue  # We filled this space already
         for x, y in utils.iter_grid(grid_x, grid_y, stride=128):
-            if (pos.x+x, pos.y+y, pos.z) not in needs_mist:
+            if (pos + (x, y, 0.0)) not in needs_mist:
                 break  # Doesn't match
         else:
             vmf.create_ent(
@@ -893,15 +887,11 @@ def fit_goo_mist(
                 targetname='@goo_mist',
                 start_active='1',
                 effect_name=particle,
-                origin='{x!s} {y!s} {z!s}'.format(
-                    x=pos.x + (grid_x/2 - 64),
-                    y=pos.y + (grid_y/2 - 64),
-                    z=pos.z + 48,
-                ),
+                origin=pos.thaw() + (grid_x/2 - 64, grid_y/2 - 64, 48.0),
                 angles=angles,
             )
             for (x, y) in utils.iter_grid(grid_x, grid_y, stride=128):
-                needs_mist.remove((pos.x+x, pos.y+y, pos.z))
+                needs_mist.remove(pos + (x, y, 0.0))
 
 
 def change_brush(vmf: VMF) -> None:
@@ -914,17 +904,17 @@ def change_brush(vmf: VMF) -> None:
     make_goo_mist = options.get(bool, 'goo_mist') and srctools.conv_bool(
         settings['style_vars'].get('AllowGooMist', '1')
     )
-    mist_solids = set()
+    mist_solids: Set[FrozenVec] = set()
 
     make_bottomless = bottomlessPit.pits_allowed()
     LOGGER.info('Make Bottomless Pit: {}', make_bottomless)
 
-    highest_brush = 0
+    highest_brush = 0.0
 
     # Calculate the z-level with the largest number of goo brushes,
     # so we can ensure the 'fancy' pit is the largest one.
     # Valve just does it semi-randomly.
-    goo_heights = Counter()
+    goo_heights: Counter[float] = Counter()
     for pos, block in brushLoc.POS.items():
         if block.is_goo and block.is_top:
             # Block position is the center,
@@ -949,9 +939,7 @@ def change_brush(vmf: VMF) -> None:
             )
             if face.mat in consts.Goo:
                 if make_goo_mist:
-                    mist_solids.add(
-                        solid.get_origin().as_tuple()
-                    )
+                    mist_solids.add(solid.get_origin().freeze())
                 # Apply goo scaling
                 face.scale = goo_scale
                 # Use fancy goo on the level with the
@@ -984,7 +972,7 @@ Clump = namedtuple('Clump', [
 
 
 @conditions.make_result('SetAreaTex')
-def cond_force_clump(res: Property) -> conditions.ResultCallable:
+def cond_force_clump(res: Keyvalues) -> conditions.ResultCallable:
     """Force an area to use certain textures.
 
     This only works in styles using the clumping texture algorithm.
@@ -1164,11 +1152,11 @@ def change_overlays(vmf: VMF) -> None:
             # Resize the signage overlays
             # These are the 4 vertex locations
             # Each axis is set to -16, 16 or 0 by default
-            for prop in ('uv0', 'uv1', 'uv2', 'uv3'):
-                val = Vec.from_str(over[prop])
+            for key in ('uv0', 'uv1', 'uv2', 'uv3'):
+                val = Vec.from_str(over[key])
                 val /= 16
                 val *= sign_size
-                over[prop] = val.join(' ')
+                over[key] = val.join(' ')
 
 
 def add_extra_ents(vmf: VMF, info: corridor.Info) -> None:
@@ -1253,6 +1241,23 @@ def change_ents(vmf: VMF) -> None:
         for out in auto.outputs:
             if 'panel_top' in out.target:
                 vmf.remove_ent(auto)
+
+
+def write_itemid_list(vmf: VMF, used_items: Iterable[str]) -> None:
+    """To aid debugging, include info about the items in the map."""
+    # Number of keyvalues per ent to add.
+    per_ent = 16
+
+    used_item_list = sorted(used_items)
+    LOGGER.debug('Used items: \n{}', '\n'.join(used_item_list))
+    global_ents_loc = options.get(Vec, 'global_ents_loc')
+    for offset in range(0, len(used_item_list), per_ent):
+        lst_ent = vmf.create_ent(
+            'bee2_item_list',
+            origin=global_ents_loc,
+        )
+        for j, item_id in enumerate(used_item_list[offset:offset+per_ent]):
+            lst_ent[f'itemid{j:02}'] = item_id
 
 
 def fix_worldspawn(vmf: VMF) -> None:
@@ -1527,7 +1532,6 @@ async def main() -> None:
     args = " ".join(sys.argv)
     new_args = sys.argv[1:]
     old_args = sys.argv[1:]
-    folded_args = [arg.casefold() for arg in old_args]
     path = sys.argv[-1]  # The path is the last argument to vbsp
 
     if not old_args:
@@ -1536,7 +1540,7 @@ async def main() -> None:
             'No arguments!\n'
             "The BEE2 VBSP takes all the regular VBSP's "
             'arguments, with some extra arguments:\n'
-            '-dump_conditions: Print a list of all condition flags,\n'
+            '-dump_conditions: Print a list of all condition tests,\n'
             '  results, and metaconditions.\n'
             '-bee2_verbose: Print debug messages to the console.\n'
             '-verbose: A default VBSP command, has the same effect as above.\n'
@@ -1614,12 +1618,12 @@ async def main() -> None:
             res_settings = utils.Result(nursery, load_settings)
             vmf_res = utils.Result(nursery, load_map, path)
 
-        ant_floor, ant_wall, id_to_item, corridor_conf = res_settings()
+        ind_style, id_to_item, corridor_conf = res_settings()
         vmf: VMF = vmf_res()
 
         coll = Collisions()
 
-        instance_traits.set_traits(vmf, id_to_item, coll)
+        used_inst = instance_traits.set_traits(vmf, id_to_item, coll)
         # Must be before corridors!
         brushLoc.POS.read_from_map(vmf, settings['has_attr'], id_to_item)
 
@@ -1634,14 +1638,15 @@ async def main() -> None:
 
         ant, side_to_antline = antlines.parse_antlines(vmf)
 
+        write_itemid_list(vmf, used_inst)
+
         # Requires instance traits!
         connections.calc_connections(
             vmf,
             ant,
             texturing.OVERLAYS.get_all('shapeframe'),
             settings['style_vars']['enableshapesignageframe'],
-            antline_wall=ant_wall,
-            antline_floor=ant_floor,
+            ind_style,
         )
         change_ents(vmf)
 
@@ -1663,7 +1668,7 @@ async def main() -> None:
         add_extra_ents(vmf, info)
 
         tiling.generate_brushes(vmf)
-        faithplate.gen_faithplates(vmf)
+        faithplate.gen_faithplates(vmf, info.has_attr('superposition'))
         change_overlays(vmf)
         fix_worldspawn(vmf)
 
@@ -1681,8 +1686,8 @@ async def main() -> None:
         vmf.spawn['BEE2_is_peti'] = True
 
         # Save and run VBSP. If this leaks, this will raise UserError, and we'll compile again.
+        save(vmf, new_path)
         if not skip_vbsp:
-            save(vmf, new_path)
             run_vbsp(
                 vbsp_args=new_args,
                 path=path,

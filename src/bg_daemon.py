@@ -4,16 +4,19 @@ These need to be used while we are busy doing stuff in the main UI loop.
 We do this in another process to sidestep the GIL, and ensure the screen
 remains responsive. This is a separate module to reduce the required dependencies.
 """
-import logging
-from typing import Callable, Optional, Dict, Tuple, List
-
+from typing import Callable, Dict, List, Optional, Tuple
 from tkinter import ttk
 from tkinter.font import Font, families as tk_font_families
-from app import img, TK_ROOT, tk_tools
 import tkinter as tk
+import logging
 import multiprocessing.connection
+import sys
 
+from PIL import ImageTk
+
+from app import TK_ROOT, img, tk_tools
 import utils
+
 
 # ID -> screen.
 SCREENS: Dict[int, 'BaseLoadScreen'] = {}
@@ -71,10 +74,12 @@ class BaseLoadScreen:
         self.scr_id = scr_id
         self.title_text = title_text
 
-        self.win = tk.Toplevel(TK_ROOT)
+        self.win = tk.Toplevel(TK_ROOT, name=f'loadscreen_{scr_id}')
         self.win.withdraw()
         self.win.wm_overrideredirect(True)
-        self.win.attributes('-topmost', int(force_ontop))
+        self.win.wm_attributes('-topmost', int(force_ontop))
+        if utils.LINUX:
+            self.win.wm_attributes('-type', 'splash')
         self.win['cursor'] = tk_tools.Cursors.WAIT
         self.win.grid_columnconfigure(0, weight=1)
         self.win.grid_rowconfigure(0, weight=1)
@@ -186,8 +191,14 @@ class BaseLoadScreen:
 class LoadScreen(BaseLoadScreen):
     """Normal loading screens."""
 
-    def __init__(self, *args) -> None:
-        super().__init__(*args)
+    def __init__(
+        self,
+        scr_id: int,
+        title_text: str,
+        force_ontop: bool,
+        stages: List[Tuple[str, str]],
+    ) -> None:
+        super().__init__(scr_id, title_text, force_ontop, stages)
 
         self.frame = ttk.Frame(self.win, cursor=tk_tools.Cursors.WAIT)
         self.frame.grid(row=0, column=0)
@@ -292,8 +303,14 @@ class SplashScreen(BaseLoadScreen):
     about reloading translations.
     """
 
-    def __init__(self, *args) -> None:
-        super().__init__(*args)
+    def __init__(
+        self,
+        scr_id: int,
+        title_text: str,
+        force_ontop: bool,
+        stages: List[Tuple[str, str]],
+    ) -> None:
+        super().__init__(scr_id, title_text, force_ontop, stages)
 
         self.is_compact = True
 
@@ -362,18 +379,19 @@ class SplashScreen(BaseLoadScreen):
         )
 
         # Now add shadows behind the text, and draw to the canvas.
-        splash, lrg_width, lrg_height = img.make_splash_screen(
+        splash_img = img.make_splash_screen(
             max(self.win.winfo_screenwidth() * 0.6, 500),
             max(self.win.winfo_screenheight() * 0.6, 500),
             base_height=len(self.stages) * 20,
             text1_bbox=self.lrg_canvas.bbox(text1),
             text2_bbox=self.lrg_canvas.bbox(text2),
         )
-        self.splash_img = splash  # Keep this alive
+        lrg_width, lrg_height = splash_img.size
+        self.splash_img = ImageTk.PhotoImage(image=splash_img)  # Keep this alive
         self.lrg_canvas.tag_lower(self.lrg_canvas.create_image(
             0, 0,
             anchor='nw',
-            image=splash,
+            image=self.splash_img,
         ))
 
         self.canvas = [
@@ -620,7 +638,7 @@ class LogWindow:
     """Implements the logging window."""
     def __init__(self, pipe: multiprocessing.connection.Connection) -> None:
         """Initialise the window."""
-        self.win = window = tk.Toplevel(TK_ROOT)
+        self.win = window = tk.Toplevel(TK_ROOT, name='logWin')
         self.pipe = pipe
         window.columnconfigure(0, weight=1)
         window.rowconfigure(0, weight=1)
@@ -760,8 +778,12 @@ class LogWindow:
 
     def evt_close(self) -> None:
         """Called when the window close button is pressed."""
-        self.pipe.send(('visible', False))
-        self.win.withdraw()
+        try:
+            self.pipe.send(('visible', False))
+        except BrokenPipeError: # Lost connection, completely quit.
+            TK_ROOT.quit()
+        else:
+            self.win.withdraw()
 
     def evt_copy(self) -> None:
         """Copy the selected text, or the whole console."""
@@ -843,17 +865,16 @@ def run_background(
                 else:
                     try:
                         func = getattr(SCREENS[scr_id], 'op_' + operation)
-                    except AttributeError:
-                        raise ValueError(f'Bad command "{operation}"!')
+                    except AttributeError as exc:
+                        raise ValueError(f'Bad command "{operation}"!') from exc
                     try:
                         func(*args)
                     except Exception as e:  # Note which function caused the problem.
-                        try:
+                        if sys.version_info >= (3, 11):
                             e.add_note(f'Function: {func!r}')  # noqa
                             raise
-                        except AttributeError:  # < 3.10
-                            pass
-                        raise TypeError(func) from e
+                        else:
+                            raise TypeError(func) from e
             while log_pipe_rec.poll():
                 log_window.handle(log_pipe_rec.recv())
         except BrokenPipeError:

@@ -1,10 +1,10 @@
 """Original result used to generate unstationary scaffolds, kept for backwards compatibility."""
 from decimal import Decimal
-from typing import Dict, Tuple, Optional, Any, Union
+from typing import Dict, List, Tuple, Optional, Any, Union
 from enum import Enum
 import math
 
-from srctools import Vec, Property, VMF
+from srctools import Vec, Keyvalues, VMF
 import srctools.logger
 
 from precomp import instanceLocs, item_chain, conditions
@@ -20,16 +20,6 @@ class LinkType(Enum):
 COND_MOD_NAME = None
 
 LOGGER = srctools.logger.get_logger(__name__, alias='cond._scaffold_compat')
-
-
-def scaff_scan(inst_list, start_ent):
-    """Given the start item and instance list, follow the programmed path."""
-    cur_ent = start_ent
-    while True:
-        yield cur_ent
-        cur_ent = inst_list.get(cur_ent['next'], None)
-        if cur_ent is None:
-            return
 
 
 def get_config(
@@ -53,10 +43,10 @@ def get_config(
     return orient, offset
 
 
-def resolve_optional(prop: Property, key: str) -> Optional[str]:
+def resolve_optional(kv: Keyvalues, key: str) -> Optional[str]:
     """Resolve the given instance, or return None if not defined."""
     try:
-        file = prop[key]
+        file = kv[key]
     except LookupError:
         return None
     return instanceLocs.resolve_one(file, error=False)
@@ -73,7 +63,7 @@ SCAFFOLD_CONFIGS: Dict[str, Tuple[
 
 
 @conditions.make_result('UnstScaffold')
-def res_old_unst_scaffold(res: Property) -> None:
+def res_old_unst_scaffold(res: Keyvalues) -> None:
     """The pre-2.4.40 version of the condition used to generate Unstationary Scaffolds.
 
     This has since been swapped to use the LinkedItems result, but this is kept for package
@@ -116,8 +106,9 @@ def res_old_unst_scaffold(res: Property) -> None:
             if conf[logic_type + '_rev'] is None:
                 conf[logic_type + '_rev'] = conf[logic_type]
 
-        for filename in instanceLocs.resolve(block['file']):
-            targ_inst[filename] = conf
+        targ_inst.update(
+            dict.fromkeys(instanceLocs.resolve_filter(block['file']), conf)
+        )
 
     # We need to provide vars to link the tracks and beams.
     for block in res.find_all('LinkEnt'):
@@ -148,7 +139,7 @@ def legacy_scaffold_link(vmf: VMF) -> None:
 
     for inst_to_config, LINKS in SCAFFOLD_CONFIGS.values():
         # Don't bother typechecking this dict, legacy code.
-        nodes: list[item_chain.Node[dict[str, Any]]] = []
+        nodes: List[item_chain.Node[Dict[str, Any]]] = []
         for inst in vmf.by_class['func_instance']:
             try:
                 conf = inst_to_config[inst['file'].casefold()]
@@ -240,7 +231,7 @@ def legacy_scaffold_link(vmf: VMF) -> None:
                             targetname=node.inst['targetname'],
                             file=conf['inst_end'],
                             origin=offset,
-                            angles='0 {:.0f} 0'.format(link_ang),
+                            angles=f'0 {link_ang:.0f} 0',
                         )
                         # Don't place the offset instance, this replaces that!
                         placed_endcap = True

@@ -4,7 +4,7 @@ These can be set and take effect immediately, without needing to export.
 """
 from __future__ import annotations
 
-from typing import Union, cast
+from typing import TypedDict, Union, cast
 from tkinter import filedialog, ttk
 import tkinter as tk
 import functools
@@ -19,9 +19,11 @@ from srctools import AtomicWriter, bool_as_int
 from srctools.logger import get_logger
 
 import app
-from app import SubPane, localisation, tk_tools, TK_ROOT, corridor_selector
+from app import SubPane, localisation, tk_tools, TK_ROOT
 from app.tooltip import add_tooltip, set_tooltip
-from app.localisation import TransToken
+from transtoken import TransToken
+from ui_tk.img import TKImages
+from ui_tk import wid_transtoken
 from config.compile_pane import CompilePaneState, PLAYER_MODEL_ORDER
 import config
 import BEE2_config
@@ -69,10 +71,27 @@ PLAYER_MODELS = {
 }
 assert PLAYER_MODELS.keys() == set(PLAYER_MODEL_ORDER)
 
+
+class _WidgetsDict(TypedDict, total=False):
+    """TODO: Remove."""
+    refresh_counts: ttk.Button
+    packfile_filefield: tk_tools.FileField
+    nbook: ttk.Notebook
+
+    thumb_auto: ttk.Radiobutton
+    thumb_peti: ttk.Radiobutton
+    thumb_custom: ttk.Radiobutton
+    thumb_label: ttk.Label
+    thumb_cleanup: ttk.Checkbutton
+
+    light_none: ttk.Radiobutton
+    light_fast: ttk.Radiobutton
+    light_full: ttk.Radiobutton
+
 COMPILE_CFG = BEE2_config.ConfigFile('compile.cfg')
 COMPILE_CFG.set_defaults(COMPILE_DEFAULTS)
 window: SubPane.SubPane
-UI: dict[str, tk.Widget] = {}
+UI: _WidgetsDict = {}
 
 chosen_thumb = tk.StringVar(
     value=COMPILE_CFG.get_val('Screenshot', 'Type', 'AUTO')
@@ -144,7 +163,7 @@ async def apply_state(state: CompilePaneState) -> None:
 class LimitCounter:
     """Displays the current status of various compiler limits."""
     # i18n: Tooltip format for compiler limit bars.
-    TOOLTIP = TransToken.ui('{count}/{max} ({frac:.2%}):\n{blurb}')
+    TOOLTIP = TransToken.ui('{count}/{max} ({frac:0.##%}):\n{blurb}')
     def __init__(
         self,
         master: ttk.LabelFrame,
@@ -238,7 +257,7 @@ def set_pack_dump_enabled() -> None:
         UI['packfile_filefield'].grid_remove()
 
 
-def find_screenshot(e=None) -> None:
+def find_screenshot(e: tk.Event[ttk.Label] | None = None) -> None:
     """Prompt to browse for a screenshot."""
     file_name = filedialog.askopenfilename(
         title='Find Screenshot',
@@ -252,7 +271,7 @@ def find_screenshot(e=None) -> None:
     if file_name:
         image = Image.open(file_name).convert('RGB')  # Remove alpha channel if present.
         buf = io.BytesIO()
-        image.save(buf, 'png')
+        image.save(buf, format='jpeg', quality=95, subsampling=0)
         with AtomicWriter(SCREENSHOT_LOC, is_bytes=True) as f:
             f.write(buf.getvalue())
 
@@ -283,17 +302,17 @@ async def set_screen_type() -> None:
     COMPILE_CFG.save_check()
 
 
-def set_screenshot(image: Image.Image=None) -> None:
+def set_screenshot(image: Image.Image | None = None) -> None:
     """Show the screenshot on the UI."""
     # Make the visible screenshot small
     global tk_screenshot
     if image is None:
         try:
             image = Image.open(SCREENSHOT_LOC)
-        except IOError:  # Image doesn't exist!
+        except OSError:  # Image doesn't exist!
             # In that case, use a black image
             image = Image.new('RGB', (1, 1), color=(0, 0, 0))
-    # Make a smaller image for showing in the UI..
+    # Make a smaller image for showing in the UI...
     tk_img = image.resize(
         (
             int(PETI_WIDTH // 3.5),
@@ -305,7 +324,7 @@ def set_screenshot(image: Image.Image=None) -> None:
     UI['thumb_label']['image'] = tk_screenshot
 
 
-def make_setter(section: str, config: str, variable: tk.Variable) -> None:
+def make_setter(section: str, config: str, variable: tk.IntVar | tk. StringVar) -> None:
     """Create a callback which sets the given config from a variable."""
     def callback(var_name: str, var_ind: str, cback_name: str) -> None:
         """Automatically called when the variable is written to."""
@@ -315,7 +334,7 @@ def make_setter(section: str, config: str, variable: tk.Variable) -> None:
     variable.trace_add('write', callback)
 
 
-async def make_widgets(corr: corridor_selector.Selector) -> None:
+async def make_widgets(tk_img: TKImages) -> None:
     """Create the compiler options pane.
 
     """
@@ -323,7 +342,7 @@ async def make_widgets(corr: corridor_selector.Selector) -> None:
     make_setter('General', 'vrad_compile_type', vrad_compile_type)
 
     reload_lbl = ttk.Label(window, justify='center')
-    localisation.set_text(reload_lbl, TransToken.ui(
+    wid_transtoken.set_text(reload_lbl, TransToken.ui(
         "Options on this panel can be changed \n"
         "without exporting or restarting the game."
     ))
@@ -350,17 +369,17 @@ async def make_widgets(corr: corridor_selector.Selector) -> None:
         nbook.tab(1, text=str(TRANS_TAB_COMPILE))
 
     async with trio.open_nursery() as nursery:
-        nursery.start_soon(make_map_widgets, map_frame, corr)
-        nursery.start_soon(make_comp_widgets, comp_frame)
+        nursery.start_soon(make_map_widgets, map_frame)
+        nursery.start_soon(make_comp_widgets, comp_frame, tk_img)
 
-    def update_label(e) -> None:
+    def update_label(e: tk.Event[tk.Misc]) -> None:
         """Force the top label to wrap."""
         reload_lbl['wraplength'] = window.winfo_width() - 10
 
     window.bind('<Configure>', update_label, add='+')
 
 
-async def make_comp_widgets(frame: ttk.Frame) -> None:
+async def make_comp_widgets(frame: ttk.Frame, tk_img: TKImages) -> None:
     """Create widgets for the compiler settings pane.
 
     These are generally things that are aesthetic, and to do with the file and
@@ -370,7 +389,7 @@ async def make_comp_widgets(frame: ttk.Frame) -> None:
     frame.columnconfigure(0, weight=1)
 
     thumb_frame = ttk.LabelFrame(frame, labelanchor=tk.N)
-    localisation.set_text(thumb_frame, TransToken.ui('Thumbnail'))
+    wid_transtoken.set_text(thumb_frame, TransToken.ui('Thumbnail'))
     thumb_frame.grid(row=0, column=0, sticky=tk.EW)
     thumb_frame.columnconfigure(0, weight=1)
 
@@ -378,21 +397,21 @@ async def make_comp_widgets(frame: ttk.Frame) -> None:
         """Event handler when radio buttons are clicked."""
         app.background_run(set_screen_type)
 
-    UI['thumb_auto'] = localisation.set_text(ttk.Radiobutton(
+    UI['thumb_auto'] = wid_transtoken.set_text(ttk.Radiobutton(
         thumb_frame,
         value='AUTO',
         variable=chosen_thumb,
         command=set_screen,
     ), TransToken.ui('Screenshot'))
 
-    UI['thumb_peti'] = localisation.set_text(ttk.Radiobutton(
+    UI['thumb_peti'] = wid_transtoken.set_text(ttk.Radiobutton(
         thumb_frame,
         value='PETI',
         variable=chosen_thumb,
         command=set_screen,
     ), TransToken.ui('Editor View'))
 
-    UI['thumb_custom'] = localisation.set_text(ttk.Radiobutton(
+    UI['thumb_custom'] = wid_transtoken.set_text(ttk.Radiobutton(
         thumb_frame,
         value='CUST',
         variable=chosen_thumb,
@@ -406,7 +425,7 @@ async def make_comp_widgets(frame: ttk.Frame) -> None:
     )
     UI['thumb_label'].bind(tk_tools.EVENTS['LEFT'], find_screenshot)
 
-    UI['thumb_cleanup'] = localisation.set_text(
+    UI['thumb_cleanup'] = wid_transtoken.set_text(
         ttk.Checkbutton(thumb_frame, variable=cleanup_screenshot),
         TransToken.ui('Cleanup old screenshots'),
     )
@@ -441,22 +460,22 @@ async def make_comp_widgets(frame: ttk.Frame) -> None:
     set_screenshot()  # Load the last saved screenshot
 
     vrad_frame = ttk.LabelFrame(frame, labelanchor='n')
-    localisation.set_text(vrad_frame, TransToken.ui('Lighting:'))
+    wid_transtoken.set_text(vrad_frame, TransToken.ui('Lighting:'))
     vrad_frame.grid(row=1, column=0, sticky='ew')
 
-    UI['light_none'] = localisation.set_text(ttk.Radiobutton(
+    UI['light_none'] = wid_transtoken.set_text(ttk.Radiobutton(
         vrad_frame,
         value='NONE',
         variable=vrad_compile_type,
     ), TransToken.ui('None'))
     UI['light_none'].grid(row=0, column=0)
-    UI['light_fast'] = localisation.set_text(ttk.Radiobutton(
+    UI['light_fast'] = wid_transtoken.set_text(ttk.Radiobutton(
         vrad_frame,
         value='FAST',
         variable=vrad_compile_type,
     ), TransToken.ui('Fast'))
     UI['light_fast'].grid(row=0, column=1)
-    UI['light_full'] = localisation.set_text(ttk.Radiobutton(
+    UI['light_full'] = wid_transtoken.set_text(ttk.Radiobutton(
         vrad_frame,
         value='FULL',
         variable=vrad_compile_type,
@@ -491,7 +510,7 @@ async def make_comp_widgets(frame: ttk.Frame) -> None:
         ), keymode=TransToken.ui("Fast"),
     ))
 
-    packfile_enable = localisation.set_text(ttk.Checkbutton(
+    packfile_enable = wid_transtoken.set_text(ttk.Checkbutton(
         frame,
         variable=packfile_auto_enable,
     ), TransToken.ui('Enable packing'))
@@ -502,7 +521,7 @@ async def make_comp_widgets(frame: ttk.Frame) -> None:
         "correctly. Regardless of this setting, packing is enabled when publishing. "
     ))
 
-    packfile_dump_enable_chk = localisation.set_text(ttk.Checkbutton(
+    packfile_dump_enable_chk = wid_transtoken.set_text(ttk.Checkbutton(
         frame,
         variable=packfile_dump_enable,
         command=set_pack_dump_enabled,
@@ -529,13 +548,13 @@ async def make_comp_widgets(frame: ttk.Frame) -> None:
     ))
 
     count_frame = ttk.LabelFrame(frame, labelanchor='n')
-    localisation.set_text(count_frame, TransToken.ui('Last Compile:'))
+    wid_transtoken.set_text(count_frame, TransToken.ui('Last Compile:'))
 
     count_frame.grid(row=7, column=0, sticky='ew')
     count_frame.columnconfigure(0, weight=1)
     count_frame.columnconfigure(2, weight=1)
 
-    localisation.set_text(
+    wid_transtoken.set_text(
         ttk.Label(count_frame, anchor='n'),
         TransToken.ui('Entity'),
     ).grid(row=0, column=0, columnspan=3, sticky='ew')
@@ -563,7 +582,7 @@ async def make_comp_widgets(frame: ttk.Frame) -> None:
         padx=5,
     )
 
-    localisation.set_text(
+    wid_transtoken.set_text(
         ttk.Label(count_frame, anchor='center'),
         TransToken.ui('Overlay'),
     ).grid(row=2, column=0, sticky='ew')
@@ -582,7 +601,7 @@ async def make_comp_widgets(frame: ttk.Frame) -> None:
     count_overlay.bar.grid(row=3, column=0, sticky='ew', padx=5)
 
     UI['refresh_counts'] = SubPane.make_tool_button(
-        count_frame,
+        count_frame, tk_img,
         'icons/tool_sub',
         lambda: refresh_counts(count_brush, count_entity, count_overlay),
     )
@@ -592,7 +611,7 @@ async def make_comp_widgets(frame: ttk.Frame) -> None:
         "performed to show the new values."
     ))
 
-    localisation.set_text(
+    wid_transtoken.set_text(
         ttk.Label(count_frame, anchor='center'),
         TransToken.ui('Brush'),
     ).grid(row=2, column=2, sticky=tk.EW)
@@ -612,7 +631,7 @@ async def make_comp_widgets(frame: ttk.Frame) -> None:
     refresh_counts(count_brush, count_entity, count_overlay)
 
 
-async def make_map_widgets(frame: ttk.Frame, corr: corridor_selector.Selector) -> None:
+async def make_map_widgets(frame: ttk.Frame) -> None:
     """Create widgets for the map settings pane.
 
     These are things which mainly affect the geometry or gameplay of the map.
@@ -621,7 +640,7 @@ async def make_map_widgets(frame: ttk.Frame, corr: corridor_selector.Selector) -
     frame.columnconfigure(0, weight=1)
 
     voice_frame = ttk.LabelFrame(frame, labelanchor='nw')
-    localisation.set_text(voice_frame, TransToken.ui('Voicelines:'))
+    wid_transtoken.set_text(voice_frame, TransToken.ui('Voicelines:'))
     voice_frame.grid(row=1, column=0, sticky='ew')
 
     def set_voice_priority() -> None:
@@ -638,7 +657,7 @@ async def make_map_widgets(frame: ttk.Frame, corr: corridor_selector.Selector) -
         variable=VOICE_PRIORITY_VAR,
         command=set_voice_priority,
     )
-    localisation.set_text(voice_priority, TransToken.ui("Use voiceline priorities"))
+    wid_transtoken.set_text(voice_priority, TransToken.ui("Use voiceline priorities"))
     voice_priority.grid(row=0, column=0)
     add_tooltip(voice_priority, TransToken.ui(
         "Only choose the highest-priority voicelines. This means more generic "
@@ -647,7 +666,7 @@ async def make_map_widgets(frame: ttk.Frame, corr: corridor_selector.Selector) -
     ))
 
     elev_frame = ttk.LabelFrame(frame, labelanchor='n')
-    localisation.set_text(elev_frame, TransToken.ui('Spawn at:'))
+    wid_transtoken.set_text(elev_frame, TransToken.ui('Spawn at:'))
     elev_frame.grid(row=2, column=0, sticky='ew')
     elev_frame.columnconfigure(0, weight=1)
     elev_frame.columnconfigure(1, weight=1)
@@ -674,31 +693,25 @@ async def make_map_widgets(frame: ttk.Frame, corr: corridor_selector.Selector) -
         command=functools.partial(elev_changed, True),
     )
 
-    localisation.set_text(elev_preview, TransToken.ui('Entry Door'))
-    localisation.set_text(elev_elevator, TransToken.ui('Elevator'))
+    wid_transtoken.set_text(elev_preview, TransToken.ui('Entry Door'))
+    wid_transtoken.set_text(elev_elevator, TransToken.ui('Elevator'))
     elev_preview.grid(row=0, column=0, sticky='w')
     elev_elevator.grid(row=0, column=1, sticky='w')
 
-    elev_conf_swap = TransToken.ui(
-        "{desc}\n\n"
-        "You can hold down Shift during the start of the Geometry stage to quickly swap which"
-        "location you spawn at on the fly."
-    )
-    add_tooltip(elev_elevator, elev_conf_swap.format(desc=TransToken.ui(
+    add_tooltip(elev_elevator, TransToken.ui(
         "When previewing in SP, spawn inside the entry elevator. Use this to "
-        "examine the entry and exit corridors."
-    )))
-    add_tooltip(elev_preview, elev_conf_swap.format(desc=TransToken.ui(
-        "When previewing in SP, spawn just before the entry door."
-    )))
-
-    localisation.set_text(
-        ttk.Button(frame, command=corr.show),
-        TransToken.ui('Select Corridors'),
-    ).grid(row=3, column=0, sticky='ew')
+        "examine the entry and exit corridors.\n\n"
+        "You can hold down Shift during the start of the Geometry stage to quickly swap which "
+        "location you spawn at on the fly."
+    ))
+    add_tooltip(elev_preview, TransToken.ui(
+        "When previewing in SP, spawn just before the entry door.\n\n"
+        "You can hold down Shift during the start of the Geometry stage to quickly swap which "
+        "location you spawn at on the fly."
+    ))
 
     model_frame = ttk.LabelFrame(frame, labelanchor='n')
-    localisation.set_text(model_frame, TransToken.ui('Player Model (SP):'))
+    wid_transtoken.set_text(model_frame, TransToken.ui('Player Model (SP):'))
     model_frame.grid(row=4, column=0, sticky='ew')
 
     player_model_combo = player_mdl = ttk.Combobox(model_frame, exportselection=False, width=20)
@@ -718,7 +731,7 @@ async def make_map_widgets(frame: ttk.Frame, corr: corridor_selector.Selector) -
         start_ind = PLAYER_MODEL_ORDER.index('PETI')
     player_mdl.current(start_ind)
 
-    def set_model(_: tk.Event) -> None:
+    def set_model(_: tk.Event[ttk.Combobox]) -> None:
         """Save the selected player model."""
         model = PLAYER_MODEL_ORDER[player_mdl.current()]
         config.APP.store_conf(attrs.evolve(
@@ -733,11 +746,15 @@ async def make_map_widgets(frame: ttk.Frame, corr: corridor_selector.Selector) -
     model_frame.columnconfigure(0, weight=1)
 
 
-async def make_pane(tool_frame: tk.Frame, menu_bar: tk.Menu, corr: corridor_selector.Selector) -> None:
+async def make_pane(
+    tool_frame: Union[tk.Frame, ttk.Frame],
+    tk_img: TKImages,
+    menu_bar: tk.Menu,
+) -> None:
     """Initialise when part of the BEE2."""
     global window
     window = SubPane.SubPane(
-        TK_ROOT,
+        TK_ROOT, tk_img,
         title=TransToken.ui('Compile Options'),
         name='compiler',
         menu_bar=menu_bar,
@@ -745,25 +762,26 @@ async def make_pane(tool_frame: tk.Frame, menu_bar: tk.Menu, corr: corridor_sele
         resize_y=False,
         tool_frame=tool_frame,
         tool_img='icons/win_compiler',
-        tool_col=4,
+        tool_col=13,
     )
     window.columnconfigure(0, weight=1)
     window.rowconfigure(0, weight=1)
-    await make_widgets(corr)
+    await make_widgets(tk_img)
     await config.APP.set_and_run_ui_callback(CompilePaneState, apply_state)
 
 
 def init_application() -> None:
     """Initialise when standalone."""
     global window
+    from ui_tk.img import TK_IMG
     window = cast(SubPane.SubPane, TK_ROOT)
-    localisation.set_win_title(window, TransToken.ui(
+    wid_transtoken.set_win_title(window, TransToken.ui(
         'Compiler Options - {ver}',
     ).format(ver=utils.BEE_VERSION))
     window.resizable(True, False)
 
     # TODO load async properly.
     import trio
-    trio.run(make_widgets)
+    trio.run(make_widgets, TK_IMG)
 
     TK_ROOT.deiconify()

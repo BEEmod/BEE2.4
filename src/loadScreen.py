@@ -83,11 +83,11 @@ def suppress_screens() -> Any:
             continue
         screen.suppress()
         active.append(screen)
-
-    yield
-
-    for screen in active:
-        screen.unsuppress()
+    try:
+        yield
+    finally:
+        for screen in active:
+            screen.unsuppress()
 
 
 # Patch various tk windows to hide loading screens while they're are open.
@@ -208,7 +208,7 @@ class LoadScreen:
         self.active = False
         self._send_msg('reset')
 
-    def destroy(self):
+    def destroy(self) -> None:
         """Permanently destroy this screen and cleanup."""
         self.active = False
         self._send_msg('destroy')

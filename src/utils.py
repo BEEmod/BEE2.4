@@ -1,26 +1,35 @@
 """Various functions shared among the compiler and application."""
 from __future__ import annotations
-from collections import deque
-import copyreg
 from typing import (
-    Awaitable, TypeVar, Any, NoReturn, Generic, Optional, TYPE_CHECKING, Tuple,
-    SupportsInt, Callable, Sequence, Iterator, Iterable, Mapping, Generator, Type,
-    KeysView, ValuesView, ItemsView,
+    Final, TYPE_CHECKING, Any, Awaitable, Callable, Generator, Generic, ItemsView,
+    Iterable, Iterator, KeysView, Mapping, NoReturn, Optional,
+    Sequence, SupportsInt, Tuple, Type, TypeVar, ValuesView,
 )
-from typing_extensions import TypeVarTuple, Unpack
+from typing_extensions import ParamSpec, TypeVarTuple, Unpack
+from collections import deque
+from enum import Enum
+from pathlib import Path
+import copyreg
 import logging
 import os
-import stat
 import shutil
-import types
+import stat
 import sys
+import types
 import zipfile
-from pathlib import Path
-from enum import Enum
 
-import trio
 from srctools import Angle
+import trio
 
+
+__all__ = [
+    'WIN', 'MAC', 'LINUX', 'STEAM_IDS', 'DEV_MODE', 'CODE_DEV_MODE', 'BITNESS',
+    'get_git_version', 'install_path', 'bins_path', 'conf_location', 'fix_cur_directory',
+    'run_bg_daemon', 'not_none', 'CONN_LOOKUP', 'CONN_TYPES', 'freeze_enum_props', 'FuncLookup',
+    'PackagePath', 'Result', 'acompose', 'get_indent', 'iter_grid', 'check_cython',
+    'check_shift', 'fit', 'group_runs', 'restart_app', 'quit_app', 'set_readonly',
+    'unset_readonly', 'merge_tree', 'write_lang_pot',
+]
 
 WIN = sys.platform.startswith('win')
 MAC = sys.platform.startswith('darwin')
@@ -58,8 +67,10 @@ STEAM_IDS = {
 copyreg.add_extension('srctools.math', '_mk_vec', 240)
 copyreg.add_extension('srctools.math', '_mk_ang', 241)
 copyreg.add_extension('srctools.math', '_mk_mat', 242)
-copyreg.add_extension('srctools.math', 'Vec_tuple', 243)
-copyreg.add_extension('srctools.property_parser', 'Property', 244)
+copyreg.add_extension('srctools.math', '_mk_fvec', 243)
+copyreg.add_extension('srctools.math', '_mk_fang', 244)
+copyreg.add_extension('srctools.math', '_mk_fmat', 245)
+copyreg.add_extension('srctools.keyvalues', 'Keyvalues', 246)
 
 
 # Appropriate locations to store config options for each OS.
@@ -79,9 +90,9 @@ else:
 if _SETTINGS_ROOT is not None:
     _SETTINGS_ROOT /= 'BEEMOD2'
 
-# If testing, redirect to a subdirectory so the real configs aren't touched.
-if 'pytest' in sys.modules:
-    _SETTINGS_ROOT /= 'testing'
+    # If testing, redirect to a subdirectory so the real configs aren't touched.
+    if 'pytest' in sys.modules:
+        _SETTINGS_ROOT /= 'testing'
 
 
 def get_git_version(inst_path: Path | str) -> str:
@@ -103,22 +114,31 @@ def get_git_version(inst_path: Path | str) -> str:
 
 try:
     # This module is generated when the app is compiled.
-    from _compiled_version import BEE_VERSION  # type: ignore
+    from _compiled_version import (  # type: ignore
+        BEE_VERSION as BEE_VERSION,
+        HA_VERSION as HA_VERSION,
+    )
 except ImportError:
     # We're running from src/, so data is in the folder above that.
     # Go up once from us to its containing folder, then to the parent.
-    _INSTALL_ROOT = Path(__file__).resolve().parent.parent
+    _INSTALL_ROOT = Path(__file__, '..', '..').resolve()
+    _BINS_ROOT = _INSTALL_ROOT
 
     BEE_VERSION = get_git_version(_INSTALL_ROOT)
+    HA_VERSION = get_git_version(_INSTALL_ROOT / 'hammeraddons')
     FROZEN = False
     DEV_MODE = True
 else:
     FROZEN = True
     # This special attribute is set by PyInstaller to our folder.
-    _INSTALL_ROOT = Path(getattr(sys, '_MEIPASS'))
+    _BINS_ROOT = Path(sys._MEIPASS)  # type: ignore[attr-defined] # noqa
+    # We are in a bin/ subfolder.
+    _INSTALL_ROOT = _BINS_ROOT.parent
     # Check if this was produced by above
     DEV_MODE = '#' in BEE_VERSION
 
+# Regular dev mode is enable-able by users, this is only for people editing code.
+CODE_DEV_MODE = DEV_MODE
 BITNESS = '64' if sys.maxsize > (2 << 48) else '32'
 BEE_VERSION += f' {BITNESS}-bit'
 
@@ -126,6 +146,14 @@ BEE_VERSION += f' {BITNESS}-bit'
 def install_path(path: str) -> Path:
     """Return the path to a file inside our installation folder."""
     return _INSTALL_ROOT / path
+
+
+def bins_path(path: str) -> Path:
+    """Return the path to a file inside our binaries folder.
+
+    This is the same as install_path() when unfrozen, but different when frozen.
+    """
+    return _BINS_ROOT / path
 
 
 def conf_location(path: str) -> Path:
@@ -218,6 +246,7 @@ CONN_LOOKUP: Mapping[Tuple[int, int, int, int], Tuple[CONN_TYPES, Angle]] = {
 
 del N, S, E, W
 
+T = TypeVar('T')
 RetT = TypeVar('RetT')
 LookupT = TypeVar('LookupT')
 EnumT = TypeVar('EnumT', bound=Enum)
@@ -228,16 +257,17 @@ def freeze_enum_props(cls: Type[EnumT]) -> Type[EnumT]:
 
     Call the getter on each member, and then replace it with a dict lookup.
     """
-    ns = vars(cls)
-    for name, value in list(ns.items()):
-        if not isinstance(value, property) or value.fset is not None or value.fdel is not None:
+    for name, value in list(vars(cls).items()):
+        # Ignore non-properties, those with setters or deleters.
+        if (
+            not isinstance(value, property) or value.fget is None
+            or value.fset is not None or value.fdel is not None
+        ):
             continue
         data = {}
-        data_exc: dict[EnumT, tuple[Type[BaseException], tuple]] = {}
+        data_exc: dict[EnumT, tuple[Type[BaseException], tuple[object, ...]]] = {}
 
-        exc: Exception
         enum: EnumT
-        tb: types.TracebackType | None
         for enum in cls:
             # Put the class into the globals, so it can refer to itself.
             try:
@@ -265,7 +295,7 @@ def freeze_enum_props(cls: Type[EnumT]) -> Type[EnumT]:
 
 def _exc_freeze(
     data: Mapping[EnumT, RetT],
-    data_exc: Mapping[EnumT, tuple[Type[BaseException], tuple]],
+    data_exc: Mapping[EnumT, tuple[Type[BaseException], tuple[object, ...]]],
 ) -> Callable[[EnumT], RetT]:
     """If the property raises exceptions, we need to reraise them."""
     def getter(value: EnumT) -> RetT:
@@ -280,16 +310,16 @@ def _exc_freeze(
 
 # Patch zipfile to fix an issue with it not being threadsafe.
 # See https://bugs.python.org/issue42369
-if hasattr(zipfile, '_SharedFile'):
+if sys.version_info < (3, 9) and hasattr(zipfile, '_SharedFile'):
     # noinspection PyProtectedMember
-    class _SharedZipFile(zipfile._SharedFile):  # type: ignore
+    class _SharedZipFile(zipfile._SharedFile):  # type: ignore[name-defined]
         def __init__(self, *args, **kwargs) -> None:
             super().__init__(*args, **kwargs)
             # tell() reads the actual file position, but that may have been
             # changed by another thread - instead keep our own private value.
             self.tell = lambda: self._pos
 
-    zipfile._SharedFile = _SharedZipFile  # type: ignore
+    zipfile._SharedFile = _SharedZipFile
 
 
 class FuncLookup(Generic[LookupT], Mapping[str, LookupT]):
@@ -298,7 +328,7 @@ class FuncLookup(Generic[LookupT], Mapping[str, LookupT]):
     Functions are added by using this as a decorator. Positional arguments
     are aliases, keyword arguments will set attributes on the functions.
     If casefold is True, this will casefold keys to be case-insensitive.
-    Additionally overwriting names is not allowed.
+    Additionally, overwriting names is not allowed.
     Iteration yields all functions.
     """
     def __init__(
@@ -329,7 +359,7 @@ class FuncLookup(Generic[LookupT], Mapping[str, LookupT]):
             """Decorator to do the work of adding the function."""
             # Set the name to <dict['name']>
             if isinstance(func, types.FunctionType):
-                func.__name__ = '<{}[{!r}]>'.format(self.__name__, names[0])
+                func.__name__ = f'<{self.__name__}[{names[0]!r}]>'
             for name, value in kwargs.items():
                 setattr(func, name, value)
             self.__setitem__(names, func)
@@ -425,9 +455,11 @@ class PackagePath:
     reserved for app-specific usages (internal or generated paths)
     """
     __slots__ = ['package', 'path']
+    package: Final[str]
+    path: Final[str]
     def __init__(self, pack_id: str, path: str) -> None:
         self.package = pack_id.casefold()
-        self.path = path.replace('\\', '/')
+        self.path = path.replace('\\', '/').lstrip("/")
 
     @classmethod
     def parse(cls, uri: str | PackagePath, def_package: str) -> PackagePath:
@@ -457,16 +489,19 @@ class PackagePath:
 
     def in_folder(self, folder: str) -> PackagePath:
         """Return the package, but inside this subfolder."""
+        folder = folder.rstrip('\\/')
         return PackagePath(self.package, f'{folder}/{self.path}')
 
     def child(self, child: str) -> PackagePath:
         """Return a child file of this package."""
-        return PackagePath(self.package, f'{self.path}/{child}')
+        child = child.rstrip('\\/')
+        return PackagePath(self.package, f'{self.path.rstrip("/")}/{child}')
 
 
 ResultT = TypeVar('ResultT')
 SyncResultT = TypeVar('SyncResultT')
-ArgsT = TypeVarTuple('ArgsT')
+PosArgsT = TypeVarTuple('PosArgsT')
+ParamsT = ParamSpec('ParamsT')
 _NO_RESULT: Any = object()
 
 
@@ -478,8 +513,8 @@ class Result(Generic[ResultT]):
     def __init__(
         self,
         nursery: trio.Nursery,
-        func: Callable[[Unpack[ArgsT]], Awaitable[ResultT]],
-        /, *args: Unpack[ArgsT],
+        func: Callable[[Unpack[PosArgsT]], Awaitable[ResultT]],
+        /, *args: Unpack[PosArgsT],
         name: object = None,
     ) -> None:
         self._nursery: Optional[trio.Nursery] = nursery
@@ -492,19 +527,27 @@ class Result(Generic[ResultT]):
     def sync(
         cls,
         nursery: trio.Nursery,
-        func: Callable[[Unpack[ArgsT]], SyncResultT],
-        /, *args: Unpack[ArgsT],
-        cancellable: bool = False,
+        func: Callable[[Unpack[PosArgsT]], SyncResultT],
+        /, *args: Unpack[PosArgsT],
+        abandon_on_cancel: bool = False,
         limiter: trio.CapacityLimiter | None = None,
-    ) -> 'Result[SyncResultT]':
+    ) -> Result[SyncResultT]:
         """Wrap a sync task, using to_thread.run_sync()."""
         async def task() -> SyncResultT:
             """Run in a thread."""
-            return await trio.to_thread.run_sync(func, *args, cancellable=cancellable, limiter=limiter)
+            return await trio.to_thread.run_sync(
+                func, *args,
+                abandon_on_cancel=abandon_on_cancel,
+                limiter=limiter,
+            )
 
         return Result(nursery, task, name=func)
 
-    async def _task(self, func: Callable[[Unpack[ArgsT]], Awaitable[ResultT]], args: Tuple[Unpack[ArgsT]]) -> None:
+    async def _task(
+        self,
+        func: Callable[[Unpack[PosArgsT]], Awaitable[ResultT]],
+        args: Tuple[Unpack[PosArgsT]],
+    ) -> None:
         """The task that is run."""
         self._result = await func(*args)
 
@@ -514,6 +557,25 @@ class Result(Generic[ResultT]):
             raise ValueError(f'Result cannot be fetched before nursery has closed! ({self._nursery.cancel_scope!r})')
         self._nursery = None  # The check passed, no need to keep this alive.
         return self._result
+
+
+def acompose(
+    func: Callable[ParamsT, Awaitable[ResultT]],
+    on_completed: Callable[[ResultT], object],
+) -> Callable[ParamsT, Awaitable[None]]:
+    """Compose an awaitable function with a sync function that recieves the result."""
+    async def task(*args: ParamsT.args, **kwargs: ParamsT.kwargs) -> None:
+        """Run the func, then call on_completed on the result."""
+        res = await func(*args, **kwargs)
+        on_completed(res)
+    return task
+
+
+def not_none(value: T | None) -> T:
+    """Assert that the value is not None, inline."""
+    if value is None:
+        raise AssertionError('Value was none!')
+    return value
 
 
 def get_indent(line: str) -> str:
@@ -560,13 +622,14 @@ if WIN:
     def check_shift() -> bool:
         """Check if Shift is currently held."""
         import ctypes
+
         # https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getasynckeystate
         GetAsyncKeyState = ctypes.windll.User32.GetAsyncKeyState
         GetAsyncKeyState.restype = ctypes.c_short
         GetAsyncKeyState.argtypes = [ctypes.c_int]
         VK_SHIFT = 0x10
         # Most significant bit set if currently held.
-        return GetAsyncKeyState(VK_SHIFT) & 0b1000_0000_0000_0000 != 0
+        return int(GetAsyncKeyState(VK_SHIFT)) & 0b1000_0000_0000_0000 != 0
 else:
     def check_shift() -> bool:
         """Check if Shift is currently held."""
@@ -574,7 +637,7 @@ else:
     print('Need implementation of utils.check_shift()!')
 
 
-def _append_bothsides(deq: deque) -> Generator[None, Any, None]:
+def _append_bothsides(deq: deque[T]) -> Generator[None, T, None]:
     """Alternately add to each side of a deque."""
     while True:
         deq.append((yield))
@@ -661,32 +724,23 @@ def quit_app(status: int=0) -> NoReturn:
     sys.exit(status)
 
 
-def set_readonly(file: str | bytes | os.PathLike) -> None:
+_flag_writeable = stat.S_IWUSR | stat.S_IWGRP | stat.S_IWOTH
+
+
+def set_readonly(file: str | bytes | os.PathLike[str] | os.PathLike[bytes]) -> None:
     """Make the given file read-only."""
     # Get the old flags
     flags = os.stat(file).st_mode
     # Make it read-only
-    os.chmod(
-        file,
-        flags & ~
-        stat.S_IWUSR & ~
-        stat.S_IWGRP & ~
-        stat.S_IWOTH
-    )
+    os.chmod(file, flags & ~_flag_writeable)
 
 
-def unset_readonly(file: str | bytes | os.PathLike) -> None:
+def unset_readonly(file: str | bytes | os.PathLike[str] | os.PathLike[bytes]) -> None:
     """Set the writeable flag on a file."""
     # Get the old flags
     flags = os.stat(file).st_mode
     # Make it writeable
-    os.chmod(
-        file,
-        flags |
-        stat.S_IWUSR |
-        stat.S_IWGRP |
-        stat.S_IWOTH
-    )
+    os.chmod(file, flags | _flag_writeable)
 
 
 def merge_tree(
@@ -739,3 +793,39 @@ def merge_tree(
             errors.append((src, dst, str(why)))
     if errors:
         raise shutil.Error(errors)
+
+
+def write_lang_pot(path: Path, new_contents: bytes) -> bool:
+    """Write out a new POT translations template file.
+
+    This first reads the existing file, so we can avoid writing if only the header (dates/version)
+    gets changed.
+
+    It's in this module to allow it to be imported by BEE2.spec.
+    """
+    new_lines = new_contents.splitlines()
+    force_write = False
+
+    try:
+        with path.open('rb') as f:
+            old_lines = f.read().splitlines()
+    except FileNotFoundError:
+        force_write = True
+    else:
+        for lines in [old_lines, new_lines]:
+            # Look for the first line with 'msgid "<something>"'.
+            for i, line in enumerate(lines):
+                if line.startswith(b'msgid') and b'""' not in line:
+                    # Found. Ignore comments directly before also, since that's the location etc.
+                    while i > 0 and lines[i-1].startswith(b'#'):
+                        i -= 1
+                    del lines[:i]
+                    break
+            else:  # Not present? Force it to be written out.
+                force_write = True
+
+    if force_write or old_lines != new_lines:
+        with path.open('wb') as f:
+            f.write(new_contents)
+        return True
+    return False

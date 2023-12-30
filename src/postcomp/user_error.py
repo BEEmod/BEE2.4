@@ -1,7 +1,7 @@
 """Inject VScript if a user error occurs."""
 import json
 
-from typing import List, Tuple
+from typing import Tuple
 
 import subprocess
 
@@ -140,6 +140,7 @@ async def load_server() -> Tuple[int, str]:
                 assert isinstance(coop_text, str), data
                 # Successfully booted. Hack: set the return code of the subprocess.Process object,
                 # so it thinks the server has already quit and doesn't try killing it when we exit.
-                proc._proc.returncode = 0
+                # TODO: Move upstream?
+                proc._proc.returncode = 0  # noqa
                 return port, coop_text
     raise ValueError('Failed to start error server!')

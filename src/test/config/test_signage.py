@@ -1,7 +1,7 @@
 """Test the signage configuration."""
 from random import Random
 
-from srctools import Property as Keyvalues
+from srctools import Keyvalues
 
 from config.signage import DEFAULT_IDS, Layout
 

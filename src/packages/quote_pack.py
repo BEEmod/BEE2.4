@@ -6,33 +6,36 @@ import utils
 from transtoken import TransTokenSource
 from packages import (
     PackagesSet, PakObject, set_cond_source, ParseData,
-    get_config, ExportData, LOGGER, SelitemData,
+    get_config, ExportData, SelitemData,
 )
-from srctools import Property, Vec, NoKeyError
+from srctools import Keyvalues, Vec, NoKeyError, logger
 
 
-class QuotePack(PakObject, needs_foreground=True):
+LOGGER = logger.get_logger('packages.quote_pack')
+
+
+class QuotePack(PakObject, needs_foreground=True, style_suggest_key='quote'):
     """Adds lists of voice lines which are automatically chosen."""
     def __init__(
         self,
-        quote_id,
-        selitem_data: 'SelitemData',
-        config: Property,
-        chars: Optional[Set[str]]=None,
-        skin: Optional[int]=None,
-        studio: str=None,
-        studio_actor: str='',
-        cam_loc: Vec=None,
-        turret_hate: bool=False,
-        interrupt: float=0.0,
-        cam_pitch: float=0.0,
-        cam_yaw: float=0.0,
+        quote_id: str,
+        selitem_data: SelitemData,
+        config: Keyvalues,
+        chars: Optional[Set[str]] = None,
+        skin: Optional[int] = None,
+        studio: Optional[str] = None,
+        studio_actor: str = '',
+        cam_loc: Optional[Vec] = None,
+        turret_hate: bool = False,
+        interrupt: float = 0.0,
+        cam_pitch: float = 0.0,
+        cam_yaw: float = 0.0,
     ) -> None:
         self.id = quote_id
         self.selitem_data = selitem_data
         self.cave_skin = skin
         self.config = config
-        set_cond_source(config, 'QuotePack <{}>'.format(quote_id))
+        set_cond_source(config, f'QuotePack <{quote_id}>')
         self.chars = chars or {'??'}
         self.studio = studio
         self.studio_actor = studio_actor
@@ -55,7 +58,7 @@ class QuotePack(PakObject, needs_foreground=True):
 
         # For Cave Johnson voicelines, this indicates what skin to use on the
         # portrait.
-        port_skin = srctools.conv_int(data.info['caveSkin', None], None)
+        port_skin = srctools.conv_int(data.info['caveSkin', ''], None)
 
         try:
             monitor_data = data.info.find_key('monitor')
@@ -72,7 +75,7 @@ class QuotePack(PakObject, needs_foreground=True):
             mon_cam_pitch, mon_cam_yaw, _ = monitor_data.vec('Cam_angles')
             turret_hate = monitor_data.bool('TurretShoot')
 
-        config = get_config(
+        config = await get_config(
             data.info,
             'voice',
             pak_id=data.pak_id,
@@ -94,7 +97,7 @@ class QuotePack(PakObject, needs_foreground=True):
             turret_hate=turret_hate,
             )
 
-    def add_over(self, override: 'QuotePack'):
+    def add_over(self, override: 'QuotePack') -> None:
         """Add the additional lines to ourselves."""
         self.selitem_data += override.selitem_data
         self.config += override.config
@@ -118,19 +121,17 @@ class QuotePack(PakObject, needs_foreground=True):
         return '<Voice:' + self.id + '>'
 
     @staticmethod
-    def export(exp_data: ExportData) -> None:
+    async def export(exp_data: ExportData) -> None:
         """Export the quotepack."""
         if exp_data.selected is None:
-            return  # No quote pack!
+            return  # No quote pack selected at all, don't write anything.
 
         try:
-            voice = QuotePack.by_id(exp_data.selected)  # type: QuotePack
+            voice = exp_data.packset.obj_by_id(QuotePack, exp_data.selected)
         except KeyError:
-            raise Exception(
-                "Selected voice ({}) doesn't exist?".format(exp_data.selected)
-            ) from None
+            raise Exception(f"Selected voice ({exp_data.selected}) doesn't exist?") from None
 
-        vbsp_config = exp_data.vbsp_conf  # type: Property
+        vbsp_config = exp_data.vbsp_conf
 
         # We want to strip 'trans' sections from the voice pack, since
         # they're not useful.
@@ -140,7 +141,7 @@ class QuotePack(PakObject, needs_foreground=True):
             else:
                 vbsp_config.append(prop.copy())
 
-        # Set values in vbsp_config, so flags can determine which voiceline
+        # Set values in vbsp_config, so tests can determine which voiceline
         # is selected.
         options = vbsp_config.ensure_exists('Options')
 
@@ -154,7 +155,8 @@ class QuotePack(PakObject, needs_foreground=True):
             options['voice_studio_inst'] = voice.studio
             options['voice_studio_actor'] = voice.studio_actor
             options['voice_studio_inter_chance'] = str(voice.inter_chance)
-            options['voice_studio_cam_loc'] = voice.cam_loc.join(' ')
+            if voice.cam_loc is not None:
+                options['voice_studio_cam_loc'] = voice.cam_loc.join(' ')
             options['voice_studio_cam_pitch'] = str(voice.cam_pitch)
             options['voice_studio_cam_yaw'] = str(voice.cam_yaw)
             options['voice_studio_should_shoot'] = srctools.bool_as_int(voice.turret_hate)
@@ -170,7 +172,7 @@ class QuotePack(PakObject, needs_foreground=True):
                 shutil.copy(
                     str(path),
                     exp_data.game.abs_path(
-                        'bin/bee2/{}voice.cfg'.format(prefix)
+                        f'bin/bee2/{prefix}voice.cfg'
                     )
                 )
                 LOGGER.info('Written "{}voice.cfg"', prefix)
@@ -178,20 +180,20 @@ class QuotePack(PakObject, needs_foreground=True):
                 LOGGER.info('No {} voice config!', pretty)
 
     @staticmethod
-    def strip_quote_data(prop: Property, _depth=0) -> Property:
+    def strip_quote_data(kv: Keyvalues, _depth: int = 0) -> Keyvalues:
         """Strip unused property blocks from the config files.
 
         This removes data like the captions which the compiler doesn't need.
         The returned property tree is a deep-copy of the original.
         """
         children = []
-        for sub_prop in prop:
-            # Make sure it's in the right nesting depth - flags might
-            # have arbitrary props in lower depths..
+        for sub_prop in kv:
+            # Make sure it's in the right nesting depth - tests might
+            # have arbitrary props in lower depths...
             if _depth == 3:  # 'Line' blocks
                 if sub_prop.name == 'trans':
                     continue
-                elif sub_prop.name == 'name' and 'id' in prop:
+                elif sub_prop.name == 'name' and 'id' in kv:
                     continue  # The name isn't needed if an ID is available
             elif _depth == 2 and sub_prop.name == 'name':
                 # In the "quote" section, the name isn't used in the compiler.
@@ -200,14 +202,14 @@ class QuotePack(PakObject, needs_foreground=True):
             if sub_prop.has_children():
                 children.append(QuotePack.strip_quote_data(sub_prop, _depth + 1))
             else:
-                children.append(Property(sub_prop.real_name, sub_prop.value))
-        return Property(prop.real_name, children)
+                children.append(Keyvalues(sub_prop.real_name, sub_prop.value))
+        return Keyvalues(kv.real_name, children)
 
     @classmethod
     async def post_parse(cls, packset: PackagesSet) -> None:
         """Verify no quote packs have duplicate IDs."""
 
-        def iter_lines(conf: Property) -> Iterator[Property]:
+        def iter_lines(conf: Keyvalues) -> Iterator[Keyvalues]:
             """Iterate over the varios line blocks."""
             yield from conf.find_all("Quotes", "Group", "Quote", "Line")
 

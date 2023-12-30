@@ -1,5 +1,5 @@
 """Handles the music configuration UI."""
-from typing import Dict, Iterable, Optional, List
+from typing import Any, Dict, Iterable, Optional, List
 from tkinter import ttk
 import tkinter
 
@@ -7,14 +7,16 @@ from srctools import FileSystemChain, FileSystem
 import srctools.logger
 import attrs
 
-from app.selector_win import Item as SelItem, SelectorWin, AttrDef as SelAttr
+from app import TK_ROOT
 from app.SubPane import SubPane
-from app import TK_ROOT, localisation
+from app.selector_win import Item as SelItem, SelectorWin, AttrDef as SelAttr
 from config.gen_opts import GenOptions
-import config
 from consts import MusicChannel
 from packages import PackagesSet, Music
 from transtoken import TransToken
+from ui_tk.wid_transtoken import set_text
+import config
+import packages
 
 
 BTN_EXPAND = '▽'
@@ -24,7 +26,8 @@ BTN_CONTRACT_HOVER = '▲'
 
 LOGGER = srctools.logger.get_logger(__name__)
 
-WINDOWS: Dict[MusicChannel, SelectorWin] = {}
+# On 3.8 the ... is invalid syntax
+WINDOWS: Dict[MusicChannel, 'SelectorWin[...]'] = {}
 SEL_ITEMS: Dict[str, SelItem] = {}
 # If the per-channel selector boxes are currently hidden.
 is_collapsed: bool = False
@@ -34,13 +37,14 @@ TRANS_BASE_COLL = TransToken.ui('Music:')
 TRANS_BASE_EXP = TransToken.ui('Base:')
 
 
-def load_filesystems(systems: Iterable[FileSystem]):
+def load_filesystems(systems: Iterable[FileSystem[Any]]) -> None:
     """Record the filesystems used for each package, so we can sample sounds."""
+    filesystem.systems.clear()
     for system in systems:
         filesystem.add_sys(system, prefix='resources/music_samp/')
 
 
-def set_suggested(music_id: str) -> None:
+def set_suggested(packset: PackagesSet, music_id: str) -> None:
     """Set the music ID that is suggested for the base.
 
     If sel_item is true, select the suggested item as well.
@@ -52,12 +56,12 @@ def set_suggested(music_id: str) -> None:
                 continue
             WINDOWS[channel].set_suggested()
     else:
-        music = Music.by_id(music_id)
+        music = packset.obj_by_id(Music, music_id)
         for channel in MusicChannel:
             if channel is MusicChannel.BASE:
                 continue
 
-            sugg = music.get_suggestion(channel)
+            sugg = music.get_suggestion(packset, channel)
             WINDOWS[channel].set_suggested({sugg} if sugg else set())
 
 
@@ -68,7 +72,7 @@ def export_data(packset: PackagesSet) -> Dict[MusicChannel, Optional[Music]]:
         base_track = packset.obj_by_id(Music, base_id)
     else:
         base_track = None
-    data: dict[MusicChannel, Optional[Music]] = {
+    data: Dict[MusicChannel, Optional[Music]] = {
         MusicChannel.BASE: base_track,
     }
     for channel, win in WINDOWS.items():
@@ -77,7 +81,7 @@ def export_data(packset: PackagesSet) -> Dict[MusicChannel, Optional[Music]]:
         # If collapsed, use the suggested track. Otherwise, use the chosen one.
         if is_collapsed:
             if base_track is not None:
-                mus_id = base_track.get_suggestion(channel)
+                mus_id = base_track.get_suggestion(packset, channel)
             else:
                 mus_id = None
         else:
@@ -94,16 +98,17 @@ def selwin_callback(music_id: Optional[str], channel: MusicChannel) -> None:
 
     This saves into the config file the last selected item.
     """
+    packset = packages.get_loaded_packages()
     if music_id is None:
         music_id = '<NONE>'
     # If collapsed, the hidden ones follow the base always.
     if channel is channel.BASE:
-        set_suggested(music_id)
+        set_suggested(packset, music_id)
 
-        # If we have an instance, it's "custom" behaviour, and so disable
+        # If we have an instance, it's "custom" behaviour, so disable
         # all the subparts.
         try:
-            has_inst = bool(Music.by_id(music_id).inst)
+            has_inst = bool(packset.obj_by_id(Music, music_id).inst)
         except KeyError:  # <none>
             has_inst = False
 
@@ -115,7 +120,7 @@ def selwin_callback(music_id: Optional[str], channel: MusicChannel) -> None:
 async def make_widgets(packset: PackagesSet, frame: ttk.LabelFrame, pane: SubPane) -> None:
     """Generate the UI components, and return the base window."""
 
-    def for_channel(channel: MusicChannel) -> List[SelItem]:
+    def for_channel(packset: PackagesSet, channel: MusicChannel) -> List[SelItem]:
         """Get the items needed for a specific channel."""
         music_list = []
         for music in packset.all_obj(Music):
@@ -125,13 +130,13 @@ async def make_widgets(packset: PackagesSet, frame: ttk.LabelFrame, pane: SubPan
                     music.selitem_data,
                     music.get_attrs(packset),
                 )
-                selitem.snd_sample = music.get_sample(channel)
+                selitem.snd_sample = music.get_sample(packset, channel)
                 music_list.append(selitem)
         return music_list
 
     WINDOWS[MusicChannel.BASE] = SelectorWin(
         TK_ROOT,
-        for_channel(MusicChannel.BASE),
+        for_channel(packset, MusicChannel.BASE),
         save_id='music_base',
         title=TransToken.ui('Select Background Music - Base'),
         desc=TransToken.ui(
@@ -156,7 +161,7 @@ async def make_widgets(packset: PackagesSet, frame: ttk.LabelFrame, pane: SubPan
 
     WINDOWS[MusicChannel.TBEAM] = SelectorWin(
         TK_ROOT,
-        for_channel(MusicChannel.TBEAM),
+        for_channel(packset, MusicChannel.TBEAM),
         save_id='music_tbeam',
         title=TransToken.ui('Select Excursion Funnel Music'),
         desc=TransToken.ui('Set the music used while inside Excursion Funnels.'),
@@ -172,7 +177,7 @@ async def make_widgets(packset: PackagesSet, frame: ttk.LabelFrame, pane: SubPan
 
     WINDOWS[MusicChannel.BOUNCE] = SelectorWin(
         TK_ROOT,
-        for_channel(MusicChannel.BOUNCE),
+        for_channel(packset, MusicChannel.BOUNCE),
         save_id='music_bounce',
         title=TransToken.ui('Select Repulsion Gel Music'),
         desc=TransToken.ui('Select the music played when players jump on Repulsion Gel.'),
@@ -185,7 +190,7 @@ async def make_widgets(packset: PackagesSet, frame: ttk.LabelFrame, pane: SubPan
 
     WINDOWS[MusicChannel.SPEED] = SelectorWin(
         TK_ROOT,
-        for_channel(MusicChannel.SPEED),
+        for_channel(packset, MusicChannel.SPEED),
         save_id='music_speed',
         title=TransToken.ui('Select Propulsion Gel Music'),
         desc=TransToken.ui('Select music played when players have large amounts of horizontal velocity.'),
@@ -199,12 +204,12 @@ async def make_widgets(packset: PackagesSet, frame: ttk.LabelFrame, pane: SubPan
     assert set(WINDOWS.keys()) == set(MusicChannel), "Extra channels?"
 
     # Widgets we want to remove when collapsing.
-    exp_widgets: list[tkinter.Widget] = []
+    exp_widgets: List[tkinter.Widget] = []
 
-    def toggle_btn_enter(event=None):
+    def toggle_btn_enter(event: Optional[tkinter.Event[ttk.Label]] = None) -> None:
         toggle_btn['text'] = BTN_EXPAND_HOVER if is_collapsed else BTN_CONTRACT_HOVER
 
-    def toggle_btn_exit(event=None):
+    def toggle_btn_exit(event: Optional[tkinter.Event[ttk.Label]] = None) -> None:
         toggle_btn['text'] = BTN_EXPAND if is_collapsed else BTN_CONTRACT
 
     def set_collapsed() -> None:
@@ -213,11 +218,14 @@ async def make_widgets(packset: PackagesSet, frame: ttk.LabelFrame, pane: SubPan
         is_collapsed = True
         conf = config.APP.get_cur_conf(GenOptions)
         config.APP.store_conf(attrs.evolve(conf, music_collapsed=True))
-        localisation.set_text(base_lbl, TRANS_BASE_COLL)
+        set_text(base_lbl, TRANS_BASE_COLL)
         toggle_btn_exit()
 
         # Set all music to the children - so those are used.
-        set_suggested(WINDOWS[MusicChannel.BASE].chosen_id)
+        set_suggested(
+            packages.get_loaded_packages(),
+            WINDOWS[MusicChannel.BASE].chosen_id,
+        )
 
         for wid in exp_widgets:
             wid.grid_remove()
@@ -228,14 +236,14 @@ async def make_widgets(packset: PackagesSet, frame: ttk.LabelFrame, pane: SubPan
         is_collapsed = False
         conf = config.APP.get_cur_conf(GenOptions)
         config.APP.store_conf(attrs.evolve(conf, music_collapsed=False))
-        localisation.set_text(base_lbl, TRANS_BASE_EXP)
+        set_text(base_lbl, TRANS_BASE_EXP)
         toggle_btn_exit()
         for wid in exp_widgets:
             wid.grid()
         pane.update_idletasks()
         pane.move()
 
-    def toggle(event: tkinter.Event) -> None:
+    def toggle(event: tkinter.Event[ttk.Label]) -> None:
         if is_collapsed:
             set_expanded()
         else:
@@ -266,7 +274,7 @@ async def make_widgets(packset: PackagesSet, frame: ttk.LabelFrame, pane: SubPan
         TransToken.ui('Speed:'),
     ], start=1):
         label = ttk.Label(frame)
-        localisation.set_text(label, text)
+        set_text(label, text)
         exp_widgets.append(label)
         label.grid(row=row, column=1, sticky='EW')
 

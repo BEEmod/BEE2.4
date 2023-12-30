@@ -43,7 +43,7 @@ def cube_filter(ctx: Context) -> None:
             buffer.write(VSCRIPT_CLOSURE)
 
         buffer.write(ent['function'].encode() + b' <- __BEE2_CUBE_FUNC__({\n')
-        for key, value in ent.keys.items():
+        for key, value in ent.items():
             if key.startswith('mdl'):
                 buffer.write(b' ["%s"]=1,\n' % value.encode())
         buffer.write(b'});\n')

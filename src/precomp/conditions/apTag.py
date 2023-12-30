@@ -5,7 +5,7 @@ import os
 from typing import Optional
 
 from precomp.connections import Item
-from srctools import Vec, Property, VMF, Entity, Output, Angle, Matrix
+from srctools import FrozenAngle, Vec, Keyvalues, VMF, Entity, Output, Angle, Matrix
 import srctools.logger
 
 from precomp import instanceLocs, options, connections, conditions
@@ -26,12 +26,13 @@ TRANSITION_ENTS = 'instances/bee2/transition_ents_tag.vmf'
 
 
 @conditions.make_result('ATLAS_SpawnPoint')
-def res_make_tag_coop_spawn(vmf: VMF, info: conditions.MapInfo, inst: Entity, res: Property) -> object:
+def res_make_tag_coop_spawn(vmf: VMF, info: conditions.MapInfo, inst: Entity, res: Keyvalues) -> object:
     """Create the spawn point for ATLAS in the entry corridor.
 
-    It produces either an instance or the normal spawn entity. This is required since ATLAS may need to have the paint gun logic.
-    The two parameters `origin` and `angles` must be set to determine the required position, or `facing` can be set for older files.
-    If `global` is set, the spawn point will be absolute instead of relative to the current instance.
+    It produces either an instance or the normal spawn entity. This is required since ATLAS may
+    need to have the paint gun logic. The two parameters `origin` and `angles` must be set to
+    determine the required position, or `facing` can be set for older files. If `global` is set,
+    the spawn point will be absolute instead of relative to the current instance.
     """
     if not info.is_coop:
         return conditions.RES_EXHAUSTED
@@ -91,7 +92,7 @@ def res_make_tag_coop_spawn(vmf: VMF, info: conditions.MapInfo, inst: Entity, re
 
 
 @conditions.meta_cond(priority=200, only_once=True)
-def ap_tag_modifications(vmf: VMF):
+def ap_tag_modifications(vmf: VMF) -> None:
     """Perform modifications for Aperture Tag.
 
     * Paint is always present in every map!
@@ -105,7 +106,7 @@ def ap_tag_modifications(vmf: VMF):
     LOGGER.info('Performing Aperture Tag modifications...')
 
     has = vbsp.settings['has_attr']
-    # This will enable the PaintInMap property.
+    # This will enable the PaintInMap keyvalue.
     has['Gel'] = True
 
     # Set as if the player spawned with no pgun
@@ -113,7 +114,7 @@ def ap_tag_modifications(vmf: VMF):
     has['spawn_single'] = False
     has['spawn_nogun'] = True
 
-    transition_ents = instanceLocs.get_special_inst('transitionents')
+    transition_ents = instanceLocs.resolve_filter('[transitionents]')
     for inst in vmf.by_class['func_instance']:
         if inst['file'].casefold() in transition_ents:
             inst['file'] = TRANSITION_ENTS
@@ -139,7 +140,7 @@ def ap_tag_modifications(vmf: VMF):
 
 
 @conditions.make_result('TagFizzler')
-def res_make_tag_fizzler(vmf: VMF, info: conditions.MapInfo, res: Property) -> conditions.ResultCallable:
+def res_make_tag_fizzler(vmf: VMF, info: conditions.MapInfo, res: Keyvalues) -> conditions.ResultCallable:
     """Add an Aperture Tag Paint Gun activation fizzler.
 
     These fizzlers are created via signs, and work very specially.
@@ -185,7 +186,7 @@ def res_make_tag_fizzler(vmf: VMF, info: conditions.MapInfo, res: Property) -> c
 
         sign_item.delete_antlines()
 
-        if fizzler is None:
+        if fizzler is None or fizzler_item is None:
             # No fizzler - remove this sign
             inst.remove()
             return
@@ -262,25 +263,25 @@ def res_make_tag_fizzler(vmf: VMF, info: conditions.MapInfo, res: Property) -> c
             sign_floor_loc = sign_loc.copy()
             sign_floor_loc.z = 0  # We don't care about z-positions.
 
-            s, l = Vec.bbox(itertools.chain.from_iterable(fizzler.emitters))
+            pos1, pos2 = Vec.bbox(itertools.chain.from_iterable(fizzler.emitters))
 
             if fizz_norm_axis == 'z':
                 # For z-axis, just compare to the center point of the emitters.
-                sign_dir = ((s.x + l.x) / 2, (s.y + l.y) / 2, 0) - sign_floor_loc
+                sign_dir = ((pos1.x + pos2.x) / 2, (pos1.y + pos2.y) / 2, 0) - sign_floor_loc
             else:
                 # For the other two, we compare to the line,
                 # or compare to the closest side (in line with the fizz)
 
                 if fizz_norm_axis == 'x':  #  Extends in Y direction
                     other_axis = 'y'
-                    side_min = s.y
-                    side_max = l.y
-                    normal = s.x
+                    side_min = pos1.y
+                    side_max = pos2.y
+                    normal = pos1.x
                 else:  # Extends in X direction
                     other_axis = 'x'
-                    side_min = s.x
-                    side_max = l.x
-                    normal = s.y
+                    side_min = pos1.x
+                    side_max = pos2.x
+                    normal = pos1.y
 
                 # Right in line with the fizzler. Point at the closest emitter.
                 if abs(sign_floor_loc[other_axis] - normal) < 32:
@@ -312,17 +313,17 @@ def res_make_tag_fizzler(vmf: VMF, info: conditions.MapInfo, res: Property) -> c
             sign_yaw = int(sign_yaw - 90) % 360
 
             if inst_normal.z > 0:
-                sign_angle = '0 {} 0'.format(sign_yaw)
+                sign_angle = FrozenAngle(0, sign_yaw, 0)
             elif inst_normal.z < 0:
                 # Flip upside-down for ceilings
-                sign_angle = '0 {} 180'.format(sign_yaw)
+                sign_angle = FrozenAngle(0, sign_yaw, 180)
             else:
                 raise AssertionError('Cannot be zero here!')
         else:
             # On a wall, face upright
-            sign_angle = conditions.PETI_INST_ANGLE[inst_normal.as_tuple()]
+            sign_angle = conditions.PETI_INST_ANGLE[inst_normal.freeze()]
 
-        # If disable_other, we show off signs. Otherwise we don't use that sign.
+        # If disable_other, we show off signs. Otherwise, we don't use that sign.
         blue_sign = blue_sign_on if blue_enabled else blue_sign_off if disable_other else None
         oran_sign = oran_sign_on if oran_enabled else oran_sign_off if disable_other else None
 

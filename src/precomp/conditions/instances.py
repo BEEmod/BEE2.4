@@ -1,47 +1,54 @@
-"""Flags and Results relating to instances or instance variables.
+"""Tests and Results relating to instances or instance variables.
 
 """
 from __future__ import annotations
-from typing import Any, Union, Callable
+
+from typing import Protocol, TypeVar, Union
+import decimal
 import operator
 
 import srctools.logger
-from precomp.conditions import make_flag, make_result
 from precomp import instance_traits, instanceLocs, conditions, options
-from srctools import Property, Angle, Vec, Entity, Output, VMF, conv_bool
+from srctools import Keyvalues, Angle, Vec, Entity, Output, VMF, conv_bool
+
+from precomp.lazy_value import LazyValue
+
 
 LOGGER = srctools.logger.get_logger(__name__, 'cond.instances')
 COND_MOD_NAME = 'Instances'
+CompNumT_contra = TypeVar("CompNumT_contra", float, decimal.Decimal, str, contravariant=True)
 
 
-@make_flag('instance')
-def flag_file_equal(flag: Property) -> Callable[[Entity], bool]:
+@conditions.make_test('instance')
+def check_file_equal(kv: Keyvalues) -> conditions.TestCallable:
     """Evaluates True if the instance matches the given file."""
-    inst_list = set(instanceLocs.resolve(flag.value))
+    conf_inst_list = LazyValue.parse(kv.value).map(instanceLocs.resolve_filter)
 
     def check_inst(inst: Entity) -> bool:
         """Each time, check if no matching instances exist, so we can skip conditions."""
-        if conditions.ALL_INST.isdisjoint(inst_list):
+        inst_list = conf_inst_list(inst)
+        if not conf_inst_list.has_fixups and conditions.ALL_INST.isdisjoint(inst_list):
             raise conditions.Unsatisfiable
         return inst['file'].casefold() in inst_list
     return check_inst
 
 
-@make_flag('instFlag', 'InstPart')
-def flag_file_cont(inst: Entity, flag: Property) -> bool:
+@conditions.make_test('instFlag', 'InstPart')
+def check_file_cont(inst: Entity, kv: Keyvalues) -> bool:
     """Evaluates True if the instance contains the given portion."""
-    return flag.value in inst['file'].casefold()
+    return kv.value in inst['file'].casefold()
 
 
-@make_flag('hasInst')
-def flag_has_inst(flag: Property) -> Callable[[Entity], bool]:
+@conditions.make_test('hasInst')
+def check_has_inst(kv: Keyvalues) -> conditions.TestCallable:
     """Checks if the given instance is present anywhere in the map."""
-    flags = set(instanceLocs.resolve(flag.value))
-    return lambda inst: flags.isdisjoint(conditions.ALL_INST)
+    inst_filter = LazyValue.parse(kv.value).map(instanceLocs.resolve_filter)
+
+    return lambda inst: inst_filter(inst).isdisjoint(conditions.ALL_INST)
 
 
-@make_flag('hasTrait')
-def flag_has_trait(inst: Entity, flag: Property) -> bool:
+@conditions.make_test('hasTrait')
+def check_has_trait(inst: Entity, kv: Keyvalues) -> bool:
     """Check if the instance has a specific 'trait', which is set by code.
 
     Current traits:
@@ -99,10 +106,15 @@ def flag_has_trait(inst: Entity, flag: Property) -> bool:
     * `tbeam_emitter`: Funnel emitter.
     * `tbeam_frame`: Funnel frame.
     """
-    return flag.value.casefold() in instance_traits.get(inst)
+    return kv.value.casefold() in instance_traits.get(inst)
 
 
-INSTVAR_COMP: dict[str, Callable[[Any, Any], Any]] = {
+class CompareProto(Protocol):
+    """Operator functions are Any, define a valid signature for how we use them."""
+    def __call__(self, a: CompNumT_contra, b: CompNumT_contra, /) -> bool: ...
+
+
+INSTVAR_COMP: dict[str, CompareProto] = {
     '=': operator.eq,
     '==': operator.eq,
 
@@ -118,64 +130,71 @@ INSTVAR_COMP: dict[str, Callable[[Any, Any], Any]] = {
     '<=': operator.le,
     '=<': operator.le,
 }
+INSTVAR_COMP_DEFAULT: CompareProto = operator.eq
 
 
-@make_flag('instVar')
-def flag_instvar(inst: Entity, flag: Property) -> bool:
+@conditions.make_test('instVar')
+def test_instvar(inst: Entity, kv: Keyvalues) -> bool:
     """Checks if the $replace value matches the given value.
 
-    The flag value follows the form `A == B`, with any of the three permitted
+    The test value follows the form `A == B`, with any of the three permitted
     to be variables.
     The operator can be any of `=`, `==`, `<`, `>`, `<=`, `>=`, `!=`.
     If omitted, the operation is assumed to be `==`.
-    If only a single value is present, it is tested as a boolean flag.
+    If only a single value is present, it is tested as a boolean.
     """
-    values = flag.value.split(' ', 3)
+    values = kv.value.split(' ', 3)
+    comp_func: CompareProto
     if len(values) == 3:
         val_a, op, val_b = values
         op = inst.fixup.substitute(op)
-        comp_func = INSTVAR_COMP.get(op, operator.eq)
+        comp_func = INSTVAR_COMP.get(op, INSTVAR_COMP_DEFAULT)
     elif len(values) == 2:
         val_a, val_b = values
         if val_b in INSTVAR_COMP:
             # User did "$var ==", treat as comparing against an empty string.
             comp_func = INSTVAR_COMP[val_b]
+            op = val_b
             val_b = ""
         else:
             # With just two vars, assume equality.
             op = '=='
-            comp_func = operator.eq
+            comp_func = INSTVAR_COMP_DEFAULT
     else:
         # For just a name.
         return conv_bool(inst.fixup.substitute(values[0]))
+
     if '$' not in val_a and '$' not in val_b:
         # Handle pre-substitute behaviour, where val_a is always a var.
         LOGGER.warning(
             'Comparison "{}" has no $var, assuming first value. '
             'Please use $ when referencing vars.',
-            flag.value,
+            kv.value,
         )
         val_a = '$' + val_a
 
     val_a = inst.fixup.substitute(val_a, default='')
     val_b = inst.fixup.substitute(val_b, default='')
-    comp_a: str | float
-    comp_b: str | float
     try:
-        # Convert to floats if possible, otherwise handle both as strings.
+        # Convert to numbers if possible, otherwise handle both as strings.
         # That ensures we normalise different number formats (1 vs 1.0)
-        comp_a, comp_b = float(val_a), float(val_b)
-    except ValueError:
-        comp_a, comp_b = val_a, val_b
-    try:
-        return bool(comp_func(comp_a, comp_b))
-    except (TypeError, ValueError) as e:
-        LOGGER.warning('InstVar comparison failed: {} {} {}', val_a, op, val_b, exc_info=e)
-        return False
+        comp_a, comp_b = decimal.Decimal(val_a), decimal.Decimal(val_b)
+    except decimal.InvalidOperation:
+        try:
+            return comp_func(val_a, val_b)
+        except (TypeError, ValueError) as e:
+            LOGGER.warning('InstVar comparison failed: {} {} {}', val_a, op, val_b, exc_info=e)
+            return False
+    else:
+        try:
+            return comp_func(comp_a, comp_b)
+        except (TypeError, ValueError, decimal.DecimalException) as e:
+            LOGGER.warning('InstVar comparison failed: {} {} {}', val_a, op, val_b, exc_info=e)
+            return False
 
 
-@make_flag('offsetDist')
-def flag_offset_distance(inst: Entity, flag: Property) -> bool:
+@conditions.make_test('offsetDist')
+def check_offset_distance(inst: Entity, kv: Keyvalues) -> bool:
     """Check if the given instance is in an offset position.
 
     This computes the distance between the instance location and the center
@@ -187,50 +206,63 @@ def flag_offset_distance(inst: Entity, flag: Property) -> bool:
     offset = (origin - grid_pos).mag()
 
     try:
-        op, comp_val = flag.value.split()
+        op, comp_val = kv.value.split()
     except ValueError:
         # A single value.
         op = '='
-        comp_val = flag.value
+        comp_val = kv.value
 
     try:
-        value = float(conditions.resolve_value(inst, comp_val))
+        value = float(inst.fixup.substitute(comp_val))
     except ValueError:
         return False
 
-    return INSTVAR_COMP.get(op, operator.eq)(offset, value)
+    func = INSTVAR_COMP.get(op, operator.eq)
+
+    try:
+        return bool(func(offset, value))
+    except (TypeError, ValueError) as exc:
+        LOGGER.warning(
+            'Distance comparison failed: {} {} {}',
+            offset, op, value, exc_info=exc,
+        )
+        return False
 
 
-@make_result('rename', 'changeInstance')
-def res_change_instance(inst: Entity, res: Property):
+@conditions.make_result('rename', 'changeInstance')
+def res_change_instance(inst: Entity, res: Keyvalues) -> None:
     """Set the file to a value."""
-    inst['file'] = filename = instanceLocs.resolve_one(res.value, error=True)
+    inst['file'] = filename = instanceLocs.resolve_one(inst.fixup.substitute(res.value), error=True)
     conditions.ALL_INST.add(filename.casefold())
 
 
-@make_result('suffix', 'instSuffix')
-def res_add_suffix(inst: Entity, res: Property):
+@conditions.make_result('suffix', 'instSuffix')
+def res_add_suffix(inst: Entity, res: Keyvalues) -> None:
     """Add the specified suffix to the filename."""
     suffix = inst.fixup.substitute(res.value)
     if suffix:
         conditions.add_suffix(inst, '_' + suffix)
 
 
-@make_result('setKey')
-def res_set_key(inst: Entity, res: Property):
+@conditions.make_result('setKey')
+def res_set_key(inst: Entity, res: Keyvalues) -> None:
     """Set a keyvalue to the given value.
 
     The name and value should be separated by a space.
     """
-    key, value = inst.fixup.substitute(res.value, allow_invert=True).split(' ', 1)
+    data = inst.fixup.substitute(res.value, allow_invert=True)
+    try:
+        key, value = data.split(' ', 1)
+    except ValueError:
+        raise ValueError(f'setKey requires a space-separated name and value, got {data!r}!') from None
     inst[key] = value
     if key.casefold() == 'file':
         LOGGER.warning('Use changeInstance for setting instance filenames, not setKey.')
         conditions.ALL_INST.add(value)
 
 
-@make_result('instVar', 'instVarSuffix')
-def res_add_inst_var(inst: Entity, res: Property):
+@conditions.make_result('instVar', 'instVarSuffix')
+def res_add_inst_var(inst: Entity, res: Keyvalues) -> None:
     """Append the value of an instance variable to the filename.
 
     Pass either the variable name, or a set of value->suffix pairs for a
@@ -249,7 +281,7 @@ def res_add_inst_var(inst: Entity, res: Property):
 
 
 @conditions.make_result('setInstVar', 'assign', 'setFixupVar')
-def res_set_inst_var(inst: Entity, res: Property) -> None:
+def res_set_inst_var(inst: Entity, res: Keyvalues) -> None:
     """Set an instance variable to the given value.
 
     Values follow the format `$start_enabled 1`, with or without the `$`.
@@ -260,7 +292,7 @@ def res_set_inst_var(inst: Entity, res: Property) -> None:
 
 
 @conditions.make_result('mapInstVar')
-def res_map_inst_var(res: Property) -> conditions.ResultCallable:
+def res_map_inst_var(res: Keyvalues) -> conditions.ResultCallable:
     """Set one instance var based on the value of another.
 
     The first value is the in -> out var, and all following are values to map.
@@ -281,36 +313,37 @@ def res_map_inst_var(res: Property) -> conditions.ResultCallable:
     return modify_inst
 
 
-@make_result('clearOutputs', 'clearOutput')
+@conditions.make_result('clearOutputs', 'clearOutput')
 def res_clear_outputs(inst: Entity) -> None:
     """Remove the outputs from an instance."""
     inst.outputs.clear()
 
 
-@make_result('removeFixup', 'deleteFixup', 'removeInstVar', 'deleteInstVar')
-def res_rem_fixup(inst: Entity, res: Property) -> None:
+@conditions.make_result('removeFixup', 'deleteFixup', 'removeInstVar', 'deleteInstVar')
+def res_rem_fixup(inst: Entity, res: Keyvalues) -> None:
     """Remove a fixup from the instance."""
     del inst.fixup[res.value]
 
 
-@make_result('localTarget')
-def res_local_targetname(inst: Entity, res: Property) -> None:
+@conditions.make_result('localTarget')
+def res_local_targetname(inst: Entity, res: Keyvalues) -> None:
     """Generate a instvar with an instance-local name.
 
     Useful with AddOutput commands, or other values which use
     targetnames in the parameter.
     The result takes the form `<prefix><instance name>[-<local>]<suffix>`.
     """
-    local_name = res['name', '']
+    local_name = inst.fixup.substitute(res['name', ''])
+    prefix = inst.fixup.substitute(res['prefix', ''])
+    suffix = inst.fixup.substitute(res['suffix', ''])
+    name = inst['targetname', '']
     if local_name:
-        name = inst['targetname', ''] + '-' + local_name
-    else:
-        name = inst['targetname', '']
-    inst.fixup[res['resultVar']] = res['prefix', ''] + name + res['suffix', '']
+        name = f'{name}-{local_name}'
+    inst.fixup[res['resultVar']] = f"{prefix}{name}{suffix}"
 
 
-@make_result('replaceInstance')
-def res_replace_instance(vmf: VMF, inst: Entity, res: Property):
+@conditions.make_result('replaceInstance')
+def res_replace_instance(vmf: VMF, inst: Entity, res: Keyvalues) -> None:
     """Replace an instance with another entity.
 
     `keys` and `localkeys` defines the new keyvalues used.
@@ -322,7 +355,7 @@ def res_replace_instance(vmf: VMF, inst: Entity, res: Property):
     origin = Vec.from_str(inst['origin'])
     angles = Angle.from_str(inst['angles'])
 
-    if not res.bool('keep_instance'):
+    if not conv_bool(inst.fixup.substitute(res['keep_instance', '0'], allow_invert=True)):
         inst.remove()  # Do this first to free the ent ID, so the new ent has
         # the same one.
 
@@ -346,7 +379,7 @@ ON_LOAD = object()
 
 
 @conditions.make_result('GlobalInput')
-def res_global_input(vmf: VMF, res: Property) -> conditions.ResultCallable:
+def res_global_input(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
     """Trigger an input either on map spawn, or when a relay is triggered.
 
     Arguments:
@@ -427,7 +460,7 @@ def global_input(
     vmf: VMF,
     pos: Union[Vec, str],
     output: Output,
-    relay_name: str=None,
+    relay_name: str | None = None,
 ) -> None:
     """Create a global input, either from a relay or logic_auto.
 
@@ -456,8 +489,8 @@ def global_input(
     glob_ent.add_out(output)
 
 
-@make_result('ScriptVar')
-def res_script_var(vmf: VMF, inst: Entity, res: Property):
+@conditions.make_result('ScriptVar')
+def res_script_var(vmf: VMF, inst: Entity, res: Keyvalues) -> None:
     """Set a variable on a script, via a logic_auto.
 
     Name is the local name for the script entity.

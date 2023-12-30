@@ -1,19 +1,22 @@
-# coding=utf-8
 """Display tooltips below a tooltip after a time delay.
 
 Call add_tooltip with a widget to add all the events automatically.
 """
 from __future__ import annotations
-
-import warnings
-import weakref
 from typing import Callable
 import tkinter as tk
+import warnings
+import weakref
 
 import attr
 
 from app import TK_ROOT, img
-from app.localisation import TransToken, set_text
+from transtoken import TransToken
+from ui_tk.img import TK_IMG
+# Don't import set_text directly, could be confused with tooltip setter.
+from ui_tk import wid_transtoken
+import utils
+
 
 __all__ = ['set_tooltip', 'add_tooltip']
 
@@ -22,14 +25,17 @@ PADDING = 0  # Space around the target widget
 CENT_DIST = 50  # Distance around center where we align centered.
 
 # Create the widgets we use.
-window = tk.Toplevel(TK_ROOT)
+window = tk.Toplevel(TK_ROOT, name='tooltipWin')
 window.withdraw()
 window.transient(master=TK_ROOT)
-window.overrideredirect(True)
-window.resizable(False, False)
+window.wm_overrideredirect(True)
+window.wm_resizable(False, False)
+if utils.LINUX:
+    window.wm_attributes('-type', 'tooltip')
 
 context_label = tk.Label(
     window,
+    name='label',
     text='',
     font="TkSmallCaptionFont",
 
@@ -48,9 +54,10 @@ context_label.grid(row=0, column=0)
 
 @attr.frozen
 class TooltipData:
-    """The current text for a widget."""
+    """The current configuration for a widget."""
     text: TransToken
-    img: 'img.Handle | None'
+    img: img.Handle | None
+    delay: int
 
 DATA: weakref.WeakKeyDictionary[tk.Misc, TooltipData] = weakref.WeakKeyDictionary()
 
@@ -62,8 +69,8 @@ def _show(widget: tk.Misc, mouse_x: int, mouse_y: int) -> None:
     except KeyError:
         return
 
-    set_text(context_label, data.text)
-    img.apply(context_label, data.img)
+    wid_transtoken.set_text(context_label, data.text)
+    TK_IMG.apply(context_label, data.img)
 
     window.deiconify()
     window.update_idletasks()
@@ -125,20 +132,34 @@ def _show(widget: tk.Misc, mouse_x: int, mouse_y: int) -> None:
 
 def set_tooltip(
     widget: tk.Misc,
-    text: TransToken=TransToken.BLANK,
-    image: img.Handle=None,
+    text: TransToken = TransToken.BLANK,
+    *,
+    image: img.Handle | None = None,
+    delay: int=-1,
 ) -> None:
-    """Change the tooltip for a widget."""
+    """Change the tooltip for a widget.
+
+    Keyword arguments will not change settings if unset.
+    """
     if isinstance(text, str):
         warnings.warn(f'Untranslated text {text!r}!', DeprecationWarning, stacklevel=2)
         text = TransToken.untranslated(text)
-    DATA[widget] = TooltipData(text, image)
+    try:
+        old = DATA[widget]
+    except KeyError:
+        raise ValueError('add_tooltip() must be called before set_tooltip()!') from None
+
+    DATA[widget] = TooltipData(
+        text, image,
+        delay if delay >= 0 else old.delay,
+    )
 
 
 def add_tooltip(
     targ_widget: tk.Misc,
     text: TransToken = TransToken.BLANK,
-    image: img.Handle=None,
+    *,
+    image: img.Handle | None = None,
     delay: int=500,
     show_when_disabled: bool=False,
 ) -> None:
@@ -155,7 +176,7 @@ def add_tooltip(
         warnings.warn(f'Untranslated text {text!r}!', DeprecationWarning, stacklevel=2)
         text = TransToken.untranslated(text)
 
-    set_tooltip(targ_widget, text, image)
+    DATA[targ_widget] = TooltipData(text, image, delay)
 
     event_id = None  # The id of the enter event, so we can cancel it.
 
@@ -184,7 +205,7 @@ def add_tooltip(
             if disabled_check is not None and not disabled_check(('!disabled',)):
                 return
             event_id = TK_ROOT.after(
-                delay,
+                data.delay,
                 after_complete,
                 event.x_root, event.y_root,
             )
@@ -197,5 +218,5 @@ def add_tooltip(
         if event_id is not None:
             TK_ROOT.after_cancel(event_id)
 
-    targ_widget.bind('<Enter>', enter_handler)
-    targ_widget.bind('<Leave>', exit_handler)
+    targ_widget.bind('<Enter>', enter_handler, add=True)
+    targ_widget.bind('<Leave>', exit_handler, add=True)

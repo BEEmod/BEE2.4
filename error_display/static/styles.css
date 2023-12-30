@@ -27,3 +27,9 @@ main {
     Univers Std Condensed, weight=&00, tall=14
     */
 }
+
+details pre {
+    background: #d7d7d7;
+    color: black;
+    white-space: pre-wrap;
+}

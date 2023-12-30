@@ -3,14 +3,15 @@
 It only saves if the values are modified.
 Most functions are also altered to allow defaults instead of erroring.
 """
-from configparser import ConfigParser, NoOptionError, SectionProxy, ParsingError
+from typing import Any, Iterator, Mapping, Optional
+from configparser import ConfigParser, NoOptionError, ParsingError, SectionProxy
 from pathlib import Path
-from typing import Any, Optional, Iterator, Mapping
-from threading import Lock, Event
+from threading import Event, Lock
 
-import utils
 from srctools import AtomicWriter
 import srctools.logger
+
+import utils
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -54,7 +55,8 @@ class ConfigFile(ConfigParser):
         If in_conf_folder is set, The folder is relative to the 'config/'
         folder in the BEE2 folder.
         """
-        super().__init__()
+        # Special section holding names outside braces, we never use this.
+        super().__init__(default_section='__XXX_DEFAULT_SECTION')
 
         self.has_changed = Event()
         self._file_lock = Lock()
@@ -75,9 +77,9 @@ class ConfigFile(ConfigParser):
             return
 
         try:
-            with self._file_lock, open(self.filename, 'r', encoding='utf8') as conf:
+            with self._file_lock, open(self.filename, encoding='utf8') as conf:
                 self.read_file(conf)
-                # We're not different to the file on disk..
+                # We're no longer different to the file on disk...
                 self.has_changed.clear()
         # If missing, just use default values.
         except FileNotFoundError:
@@ -86,7 +88,7 @@ class ConfigFile(ConfigParser):
                 self.filename,
             )
         # But if we fail to read entirely, fall back to defaults.
-        except (IOError, ParsingError, UnicodeDecodeError):
+        except (OSError, ParsingError, UnicodeDecodeError):
             LOGGER.warning(
                 'Config "{}" cannot be read! Using defaults...',
                 self.filename,
@@ -96,7 +98,7 @@ class ConfigFile(ConfigParser):
             # but if it doesn't work don't worry about it.
             try:
                 self.filename.replace(self.filename.with_suffix('.err.cfg'))
-            except IOError:
+            except OSError:
                 pass
 
     def save(self) -> None:

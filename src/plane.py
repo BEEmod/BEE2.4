@@ -3,10 +3,11 @@
 """
 from __future__ import annotations
 from typing import (
-    Type, TypeVar, Generic, Optional, Tuple, Any, Union, overload,
-    Iterable, Iterator, Mapping, MutableMapping, ValuesView, ItemsView,
+    Any, Generic, ItemsView, Iterable, Iterator, Mapping, MutableMapping,
+    Optional, Tuple, Type, TypeVar, Union, ValuesView, overload,
 )
 import copy
+
 
 ValT = TypeVar('ValT')
 DefaultT = TypeVar('DefaultT')
@@ -58,10 +59,10 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
 
     @classmethod
     def fromkeys(
-        cls: Type['Plane[ValT]'],
-        source: Union[Plane, Iterable[Tuple[int, int]]],
+        cls: Type[Plane[ValT]],
+        source: Union[Plane[Any], Iterable[Tuple[int, int]]],
         value: ValT,
-    ) -> 'Plane[ValT]':
+    ) -> Plane[ValT]:
         """Create a plane from an existing set of keys, setting all values to a specific value."""
         if isinstance(source, Plane):
             res: Plane[ValT] = cls.__new__(cls)
@@ -78,7 +79,7 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
                 res[xy] = value
             return res
 
-    def copy(self) -> 'Plane[ValT]':
+    def copy(self) -> Plane[ValT]:
         """Shallow-copy the plane."""
         cpy = Plane.__new__(Plane)
         cpy.__dict__.update(self.__dict__)  # Immutables
@@ -91,7 +92,7 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
 
     __copy__ = copy
 
-    def __deepcopy__(self, memodict: dict={}) -> 'Plane[ValT]':
+    def __deepcopy__(self, memodict: dict[int, Any] | None = None) -> Plane[ValT]:
         """Deep-copy the plane."""
         cpy = Plane.__new__(Plane)
         cpy.__dict__.update(self.__dict__) # Immutables
@@ -108,7 +109,7 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
     @overload
     def get(self, __key: tuple[float, float], __default: ValT | DefaultT) -> ValT | DefaultT: ...
 
-    def get(self, pos: tuple[float, float], default: DefaultT = None) -> DefaultT | ValT | None:
+    def get(self, pos: tuple[float, float], default: DefaultT | None = None) -> DefaultT | ValT | None:
         """Return the value at a given position, or a default if not present."""
         try:
             x, y = map(int, pos)
@@ -118,14 +119,14 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
             else:
                 return default
 
-        out = _UNSET
+        out: ValT = _UNSET
         y += self._yoff
         # Zero checks ensure we don't do negative indexing.
         if y >= 0:
             try:
                 x += self._xoffs[y]
-                if x >= 0 and self._data[y]:
-                    out = self._data[y][x]
+                if x >= 0 and (row := self._data[y]) is not None:
+                    out = row[x]
             except IndexError:
                 pass
         if out is _UNSET:
@@ -223,9 +224,9 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
         y += self._yoff
         try:
             x += self._xoffs[y]
-            if self._data[y][x] is not _UNSET:
+            if (row := self._data[y]) is not None and row[x] is not _UNSET:
                 self._used -= 1
-                self._data[y][x] = _UNSET
+                row[x] = _UNSET
         except IndexError:  # Already deleted.
             pass
 
@@ -286,7 +287,7 @@ class PlaneItems(ItemsView[Tuple[int, int], ValT]):
             return False
         try:
             xy, value = item
-            return self._mapping[xy] == value
+            return bool(self._mapping[xy] == value)
         except ValueError:  # len(tup) != 3
             return False
         except KeyError:  # Not present

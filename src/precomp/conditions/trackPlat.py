@@ -1,8 +1,8 @@
 """Conditions relating to track platforms."""
-from typing import Set, Dict, Tuple
+from typing import Optional, Set, Dict
 
 from precomp import instanceLocs, conditions
-from srctools import Matrix, Vec, Property, Entity, VMF, logger
+from srctools import FrozenVec, Matrix, Vec, Keyvalues, Entity, VMF, logger
 
 
 COND_MOD_NAME = 'Track Platforms'
@@ -16,7 +16,7 @@ FACINGS = {
 
 
 @conditions.make_result('trackPlatform')
-def res_track_plat(vmf: VMF, res: Property) -> object:
+def res_track_plat(vmf: VMF, res: Keyvalues) -> object:
     """Logic specific to Track Platforms.
 
     This allows switching the instances used depending on if the track
@@ -43,7 +43,7 @@ def res_track_plat(vmf: VMF, res: Property) -> object:
     (
         inst_bot_grate, inst_bottom, inst_middle,
         inst_top, inst_plat, inst_plat_oscil, inst_single
-    ) = instanceLocs.resolve(res['orig_item'])
+    ) = map(str.casefold, instanceLocs.resolve(res['orig_item']))
     single_plat_inst = instanceLocs.resolve_one(res['single_plat', ''], error=False)
     track_targets = res['track_name', '']
 
@@ -51,8 +51,8 @@ def res_track_plat(vmf: VMF, res: Property) -> object:
     platforms = [inst_plat, inst_plat_oscil]
 
     # All the track_set in the map, indexed by origin
-    track_instances = {
-        Vec.from_str(inst['origin']).as_tuple(): inst
+    track_instances: Dict[FrozenVec, Entity] = {
+        FrozenVec.from_str(inst['origin']): inst
         for inst in
         vmf.by_class['func_instance']
         if inst['file'].casefold() in track_files
@@ -97,7 +97,7 @@ def res_track_plat(vmf: VMF, res: Property) -> object:
             first_track.remove()
             continue  # Next platform
 
-        track_set: set[Entity] = set()
+        track_set: Set[Entity] = set()
         if track_type == inst_top or track_type == inst_middle:
             # search left
             track_scan(
@@ -159,24 +159,24 @@ def res_track_plat(vmf: VMF, res: Property) -> object:
 
 def track_scan(
     tr_set: Set[Entity],
-    track_inst: Dict[Tuple[float, float, float], Entity],
+    track_inst: Dict[FrozenVec, Entity],
     start_track: Entity,
     middle_file: str,
     x_dir: int,
-):
+) -> None:
     """Build a set of track instances extending from a point.
     :param track_inst: A dictionary mapping origins to track instances
     :param start_track: The instance we start on
     :param middle_file: The file for the center track piece
     :param x_dir: The direction to look (-1 or 1)
     """
-    track = start_track
+    track: Optional[Entity] = start_track
     move_dir = Vec(x_dir*128, 0, 0) @ Matrix.from_angstr(track['angles'])
     while track:
         tr_set.add(track)
 
-        next_pos = Vec.from_str(track['origin']) + move_dir
-        track = track_inst.get(next_pos.as_tuple(), None)
+        next_pos = FrozenVec.from_str(track['origin']) + move_dir
+        track = track_inst.get(next_pos, None)
         if track is None:
             return
         if track['file'].casefold() != middle_file:

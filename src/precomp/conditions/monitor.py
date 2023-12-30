@@ -1,7 +1,7 @@
 import math
 
 from precomp import instanceLocs, connections, conditions, options, faithplate, voice_line
-from srctools import Matrix, Property, Vec, Entity, VMF, Output, Angle
+from srctools import Matrix, Keyvalues, Vec, Entity, VMF, Output, Angle
 import srctools.logger
 
 from typing import List, NamedTuple, Literal
@@ -60,7 +60,7 @@ def scriptvar_set(
 
 
 @conditions.make_result('Monitor')
-def res_monitor(info: conditions.MapInfo, res: Property) -> conditions.ResultCallable:
+def res_monitor(info: conditions.MapInfo, res: Keyvalues) -> conditions.ResultCallable:
     """Result for the monitor component.
 
     Options:
@@ -118,7 +118,7 @@ def res_monitor(info: conditions.MapInfo, res: Property) -> conditions.ResultCal
 
 
 @conditions.make_result('Camera')
-def res_camera(vmf: VMF, res: Property) -> conditions.ResultCallable:
+def res_camera(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
     """Result for the camera item.
 
     Options:
@@ -246,13 +246,13 @@ def mon_camera_link(vmf: VMF) -> None:
             '',
             '@camera',
             'RunScriptCode',
-            'CamEnable({})'.format(index),
+            f'CamEnable({index})',
         ), )
         conn_item.disable_cmd = (Output(
             '',
             '@camera',
             'RunScriptCode',
-            'CamDisable({})'.format(index),
+            f'CamDisable({index})',
         ), )
 
     for is_act, cam in zip(active_counts, ALL_CAMERAS):
@@ -276,7 +276,7 @@ def mon_camera_link(vmf: VMF) -> None:
         else:
             # Start in arrival_departure_transition_ents...
             start_pos = Vec(-2500, -2500, 0)
-            start_angles = '0 90 0'
+            start_angles = Angle(0, 90, 0)
 
     cam_ent = vmf.create_ent(
         classname='point_camera',

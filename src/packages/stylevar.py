@@ -1,11 +1,11 @@
 """Style specific features which can be enabled or disabled."""
 from __future__ import annotations
-
 from typing import Iterator
 
+from srctools import Keyvalues, bool_as_int
+
+from packages import ExportData, PackagesSet, PakObject, ParseData, Style
 from transtoken import TransToken, TransTokenSource
-from packages import PakObject, Style, ParseData, ExportData
-from srctools import Property, bool_as_int
 
 
 class StyleVar(PakObject, allow_mult=True, needs_foreground=True):
@@ -103,7 +103,7 @@ class StyleVar(PakObject, allow_mult=True, needs_foreground=True):
         """Check to see if this will apply for the given style.
 
         """
-        if self.is_unstyled:
+        if self.styles is None:
             return True
 
         if style.id in self.styles:
@@ -115,25 +115,25 @@ class StyleVar(PakObject, allow_mult=True, needs_foreground=True):
             style.bases
         )
 
-    def applies_to_all(self) -> bool:
+    def applies_to_all(self, packset: PackagesSet) -> bool:
         """Check if this applies to all styles."""
         if self.is_unstyled:
             return True
 
-        for style in Style.all():
+        for style in packset.all_obj(Style):
             if not self.applies_to_style(style):
                 return False
         return True
 
     @staticmethod
-    def export(exp_data: ExportData) -> None:
+    async def export(exp_data: ExportData) -> None:
         """Export style var selections into the config.
 
         The .selected attribute is a dict mapping ids to the boolean value.
         """
         # Add the StyleVars block, containing each style_var.
-        exp_data.vbsp_conf.append(Property('StyleVars', [
-            Property(key, bool_as_int(val))
+        exp_data.vbsp_conf.append(Keyvalues('StyleVars', [
+            Keyvalues(key, bool_as_int(val))
             for key, val in
             exp_data.selected.items()
         ]))

@@ -1,7 +1,7 @@
 [tool.pyright]
 include = [
 	"src/",
-    "hammeraddons/src/",
+	"hammeraddons/src/",
 	]
 exclude = [
 	"**/__pycache__"
@@ -16,7 +16,7 @@ strictParameterNoneValue = false
 [tool.isort]
 sections=["FUTURE", "TYPING", "FRAMEWORK", "STDLIB", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER"]
 known_framework = ["tkinter", "tkinter.ttk", "tkinter.messagebox"]
-extra_standard_library = ["importlib_resources"]
+extra_standard_library = ["importlib_resources", "exceptiongroup"]
 known_typing = ["typing", "typing_extensions"]
 no_lines_before = ["TYPING", "FRAMEWORK", "STDLIB"]
 known_third_party = ["hammeraddons"]
@@ -29,3 +29,161 @@ include_trailing_comma = true
 from_first = true
 combine_as_imports = true
 src_paths = ["src"]
+
+
+[tool.ruff]
+line-length = 127
+target-version = "py38"
+select = [
+	"E", "UP", "F", "C4", "ANN", "B", "PIE", "RUF",
+	"PLC", "PLE", "PLW",  # Pylint.
+
+	"TCH005",  # Empty type-checking block.
+]
+allowed-confusables = [
+	"×",  # Multiplication sign
+]
+extend-ignore = [
+	"E402",  # Allow module level import later in the file.
+	"E721",  # Allow using type(x) is Class
+	"F403",  # Allow *-imports,
+	"F405",  # name may be undefined, or defined from star imports: module
+
+	# Flake8-annotations.
+	# Type annotations for self & cls are not important.
+	"ANN101",
+	"ANN102",
+	"ANN401",  # Allow typing.Any
+
+	# Ruff:
+	"RUF100",  # Sometimes use # noqa for other linters
+	"RUF005",  # Unpack instead of concat triggers on Vec.
+
+	# PyLint:
+	"PLW0603",  # Allow use of global statement.
+	"PLC0414",  # import x as x is used for type checking.
+	"PLE1205",  # Too many arguments for logging, doesn't handle our format
+	"PLW2901",  # Allow redefining loop var inside the loop.
+
+	# Pyupgrade:
+	# Keep using typing types even with __future__.annotations.
+	"UP006", "UP007", "UP035",
+
+	# Flake8-bugbear:
+	# Loop control var not used, triggers on unpackings.
+	"B007",
+
+	# Flake8-pie:
+	# Prefer to use pass in empty functions, even if docstring is present
+	"PIE790",
+	# Allow aliases for enum values, used often.
+	"PIE796",
+	]
+
+exclude = [
+	"src/perlin.py",
+]
+
+[tool.ruff.flake8-bugbear]
+extend-immutable-calls = [
+	# Objects which are immutable, or close enough that it's fine to be in func defaults.
+	"srctools.math.FrozenVec", "srctools.math.FrozenAngle", "srctools.math.FrozenMatrix",
+	# Image handle variants, all publically frozen.
+	"app.img.Handle.background", "app.img.Handle.blank", "app.img.Handle.builtin",
+	"app.img.Handle.color", "app.img.Handle.composite", "app.img.Handle.crop",
+	"app.img.Handle.error", "app.img.Handle.file", "app.img.Handle.ico_loading",
+	"app.img.Handle.ico_none", "app.img.Handle.overlay_text", "app.img.Handle.parse",
+	"app.img.Handle.parse_uri", "app.img.Handle.resize", "app.img.Handle.sprite", "app.img.Handle.with_alpha_stripped",
+
+	# Translation token variants.
+	"transtoken.TransToken.parse", "transtoken.TransToken.ui", "transtoken.TransToken.ui_plural",
+	"transtoken.TransToken.join", "transtoken.TransToken.from_valve",
+	"transtoken.TransToken.untranslated",
+	"transtoken.TransToken.list_and", "transtoken.TransToken.list_or",
+
+	"tkMarkdown.MarkdownData.text",
+	# Cast is not really a function call, just returns the arg.
+	"typing.cast",
+	"srctools.logger.get_logger",
+]
+
+[tool.mypy]
+mypy_path = "$MYPY_CONFIG_FILE_DIR/hammeraddons/src/"
+#plugins = "trio_typing.plugin"
+allow_redefinition = true
+check_untyped_defs = true
+strict_optional = true
+# strict = true  # Only when overrides is gone.
+
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_return_any = true
+warn_no_return = true
+
+disallow_incomplete_defs = true
+disallow_untyped_defs = true
+disallow_untyped_decorators = true
+disallow_untyped_calls = true
+disallow_any_generics = false
+
+enable_error_code = [
+	'unreachable',
+	'redundant-expr',
+	'unused-awaitable',
+]
+
+[[tool.mypy.overrides]]
+# TODO
+module = [
+	'app.gameMan',
+	'app.music_conf',
+	'app.selector_win',
+	'app.CheckDetails',
+	'app.backup',
+	'app.voiceEditor',
+	'app.contextWin',
+	'app.UI',
+	'app.paletteLoader',
+	'precomp.conditions._scaffold_compat',
+	'precomp.conditions.addInstance',
+	'precomp.conditions.antlines',
+	'precomp.conditions.fizzler',
+	'precomp.conditions.glass',
+	'precomp.conditions.globals',
+	'precomp.conditions.instances',
+	'precomp.conditions.monitor',
+	'precomp.conditions.removed',
+	'precomp.conditions.trackPlat',
+	'precomp.antlines',
+	'precomp.barriers',
+	'precomp.bottomlessPit',
+	'precomp.conditions',
+	'precomp.connections',
+	'precomp.cubes',
+	'precomp.fizzler',
+	'precomp.music',
+	'precomp.options',
+	'precomp.packing',
+	'precomp.tiling',
+	'precomp.voice_line',
+	'BEE2_config',
+	'FakeZip',
+	'pygtrie',
+	'vbsp',
+]
+strict_optional = false
+
+disallow_incomplete_defs = false
+disallow_untyped_defs = false
+disallow_untyped_decorators = false
+disallow_untyped_calls = false
+
+[[tool.mypy.overrides]]
+# No stubs yet.
+module = ['pyglet.*', 'mistletoe.*']
+ignore_missing_imports = true
+
+# Dead code, needs to be rewritten.
+[[tool.mypy.overrides]]
+module = 'precomp.conditions.cutoutTile'
+ignore_errors = true

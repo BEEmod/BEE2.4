@@ -1,14 +1,16 @@
 """Manages reading general options from vbsp_config."""
-import math
-from enum import Enum, EnumMeta
-
+from typing import (
+    Any, Dict, Iterator, Optional, TextIO, Tuple, Type, TypeVar, Union,
+    overload,
+)
+from enum import Enum
 import inspect
+import math
 
-from srctools import Property, Vec, parse_vec_str
-from BEE2_config import ConfigFile
+from srctools import Keyvalues, Vec, parse_vec_str
 import srctools.logger
 
-from typing import Union, Tuple, TypeVar, Type, Optional, Iterator, Any, TextIO, Dict, cast
+from BEE2_config import ConfigFile
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -36,7 +38,8 @@ TYPE_NAMES = {
     TYPE.VEC: 'Vector',
 }
 
-OptionT = TypeVar('OptionT')
+EnumT = TypeVar('EnumT', bound=Enum)
+OptionT = TypeVar('OptionT', bound=Union[str, int, float, bool, Vec])
 
 
 class Opt:
@@ -47,6 +50,7 @@ class Opt:
         default: Union[TYPE, OptionT],
         doc: str,
         fallback: str=None,
+        hidden: bool=False,
     ) -> None:
         if isinstance(default, TYPE):
             self.type = default
@@ -57,18 +61,19 @@ class Opt:
         self.id = opt_id.casefold()
         self.name = opt_id
         self.fallback = fallback
+        self.hidden = hidden
         # Remove indentation, and trailing carriage return
         self.doc = inspect.cleandoc(doc).rstrip().splitlines()
         if fallback is not None:
             self.doc.append(
-                'If unset, the default is read from `{}`.'.format(default)
+                f'If unset, the default is read from `{default}`.'
             )
 
 
-def load(opt_blocks: Iterator[Property]) -> None:
+def load(opt_blocks: Iterator[Keyvalues]) -> None:
     """Read settings from the given property block."""
     SETTINGS.clear()
-    set_vals = {}
+    set_vals: Dict[str, str] = {}
     for opt_block in opt_blocks:
         for prop in opt_block:
             set_vals[prop.name] = prop.value
@@ -76,6 +81,7 @@ def load(opt_blocks: Iterator[Property]) -> None:
     options = {opt.id: opt for opt in DEFAULTS}
     if len(options) != len(DEFAULTS):
         from collections import Counter
+
         # Find ids used more than once..
         raise Exception('Duplicate option(s)! ({})'.format(', '.join(
             k for k, v in
@@ -93,13 +99,13 @@ def load(opt_blocks: Iterator[Property]) -> None:
                 fallback_opts.append(opt)
                 assert opt.fallback in options, 'Invalid fallback in ' + opt.id
             else:
-                SETTINGS[opt.id] = opt.default  # type: ignore
+                SETTINGS[opt.id] = opt.default
             continue
         if opt.type is TYPE.VEC:
-            # Pass NaN so we can check if it failed..
+            # Pass NaN, so we can check if it failed..
             parsed_vals = parse_vec_str(val, math.nan)
             if math.isnan(parsed_vals[0]):
-                SETTINGS[opt.id] = opt.default  # type: ignore
+                SETTINGS[opt.id] = opt.default
             else:
                 SETTINGS[opt.id] = Vec(*parsed_vals)
         elif opt.type is TYPE.BOOL:
@@ -114,7 +120,7 @@ def load(opt_blocks: Iterator[Property]) -> None:
         try:
             SETTINGS[opt.id] = SETTINGS[opt.fallback]
         except KeyError:
-            raise Exception('Bad fallback for "{}"!'.format(opt.id))
+            raise Exception(f'Bad fallback for "{opt.id}"!')
         # Check they have the same type.
         assert opt.type is options[opt.fallback].type
 
@@ -147,7 +153,14 @@ def set_opt(opt_name: str, value: str) -> None:
             pass
 
 
-def get(expected_type: Type[OptionT], name: str) -> Optional[OptionT]:
+@overload
+def get(expected_type: Type[EnumT], name: str) -> Optional[EnumT]: ...
+@overload
+def get(expected_type: Type[OptionT], name: str) -> Optional[OptionT]: ...
+def get(  # type: ignore[misc]
+    expected_type: Type[Union[str, int, float, bool, Vec, Enum]],
+    name: str,
+) -> Union[str, int, float, bool, Vec, Enum, None]:
     """Get the given option.
     expected_type should be the class of the value that's expected.
     The value can be None if unset.
@@ -159,42 +172,39 @@ def get(expected_type: Type[OptionT], name: str) -> Optional[OptionT]:
     try:
         val = SETTINGS[name.casefold()]
     except KeyError:
-        raise TypeError('Option "{}" does not exist!'.format(name)) from None
+        raise TypeError(f'Option "{name}" does not exist!') from None
 
     if val is None:
         return None
 
-    if isinstance(expected_type, EnumMeta):
-        enum_type = expected_type
-        expected_type = str
-    else:
-        enum_type = None
+    if issubclass(expected_type, Enum):
+        if not isinstance(val, str):
+            raise ValueError(
+                f'Option "{name}" is {val!r} which is a {type(val)} (expected a string)'
+            )
 
-    # Don't allow subclasses (bool/int)
-    if type(val) is not expected_type:
-        raise ValueError('Option "{}" is {} (expected {})'.format(
-            name,
-            type(val),
-            expected_type,
-        ))
-
-    if enum_type is not None:
         try:
-            return enum_type(val)
+            return expected_type(val)
         except ValueError:
             LOGGER.warning(
                 'Option "{}" is not a valid value. '
                 'Allowed values are:\n{}',
                 name,
-                '\n'.join([mem.value for mem in enum_type])
+                '\n'.join([mem.value for mem in expected_type])
             )
-            return next(iter(enum_type))
+            return next(iter(expected_type))
+
+    # Don't allow subclasses (bool/int)
+    if type(val) is not expected_type:
+        raise ValueError(
+            f'Option "{name}" is {val!r} which is a '
+            f'{type(val)} (expected {expected_type})'
+        )
 
     # Vec is mutable, don't allow modifying the original.
-    if expected_type is Vec:
-        return cast(Vec, val).copy()
-    else:
-        return cast(OptionT, val)
+    if isinstance(val, Vec):
+        val = val.copy()
+    return val
 
 
 def get_itemconf(
@@ -227,24 +237,29 @@ def get_itemconf(
         if timer_delay < 3 or timer_delay > 30:
             wid_id += '_inf'
         else:
-            wid_id += '_{}'.format(timer_delay)
+            wid_id += f'_{timer_delay}'
 
     value = ITEM_CONFIG.get_val(group_id, wid_id, '')
     if not value:
         return default
 
+    result: Union[str, Vec, bool, float, None]
     if isinstance(default, str) or default is None:
-        return value
-    elif isinstance(default, Vec):
-        return Vec.from_str(value, default.x, default.y, default.z)
+        return value  # type: ignore
+
+    if isinstance(default, Vec):
+        result = Vec.from_str(value, default.x, default.y, default.z)
     elif isinstance(default, bool):
-        return srctools.conv_bool(value, default)
+        result = srctools.conv_bool(value, default)
     elif isinstance(default, float):
-        return srctools.conv_float(value, default)
+        result = srctools.conv_float(value, default)
     elif isinstance(default, int):
-        return srctools.conv_int(value, default)
+        result = srctools.conv_int(value, default)
     else:
-        raise TypeError('Invalid default type "{}"!'.format(type(default).__name__))
+        raise TypeError(f'Invalid default type "{type(default).__name__}"!')
+
+    assert type(result) is type(default), f'{default!r} -> {result!r}'
+    return result  # type: ignore
 
 
 INFO_DUMP_FORMAT = """\
@@ -267,6 +282,8 @@ def dump_info(file: TextIO) -> None:
     print(DOC_HEADER, file=file)
 
     for opt in DEFAULTS:
+        if opt.hidden:
+            continue
         if opt.default is None:
             default = ''
         elif type(opt.default) is Vec:
@@ -457,6 +474,12 @@ DEFAULTS = [
 
         These are added at in the skybox and in the map, to blend together the
         lighting. It should be set to the ambient light color.
+        """),
+
+    Opt('superposition_ghost_alpha', 50,
+        """The amount of transparency to give Quantum Superposition Ghost Cubes.
+        
+        Ranges from 0-255.
         """),
 
     Opt('glass_hole_temp', TYPE.STR,

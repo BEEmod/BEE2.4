@@ -2,12 +2,10 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing_extensions import Final, Literal
-from typing import Iterable, Mapping, Tuple
-import os.path
+from typing import Iterable, Mapping, Final, Literal
 import pickle
 
-from srctools import Vec, VMF, AtomicWriter, logger
+from srctools import FrozenVec, Vec, VMF, AtomicWriter, logger
 import attrs
 
 from user_errors import DATA_LOC, UserError, TOK_VBSP_LEAK
@@ -21,17 +19,19 @@ import consts
 __all__ = ['UserError', 'TOK_VBSP_LEAK', 'load_tiledefs']
 
 LOGGER = logger.get_logger(__name__)
-NORM_2_ORIENT: Final[Mapping[
-    Tuple[float, float, float],
-    Literal['u', 'd', 'n', 's', 'e', 'w']
-]] = {
-    (0.0, 0.0, +1.0): 'u',
-    (0.0, 0.0, -1.0): 'd',
-    (0.0, +1.0, 0.0): 'n',
-    (0.0, -1.0, 0.0): 's',
-    (+1.0, 0.0, 0.0): 'e',
-    (-1.0, 0.0, 0.0): 'w',
+NORM_2_ORIENT: Final[Mapping[FrozenVec, Literal['u', 'd', 'n', 's', 'e', 'w']]] = {
+    FrozenVec(0.0, 0.0, +1.0): 'u',
+    FrozenVec(0.0, 0.0, -1.0): 'd',
+    FrozenVec(0.0, +1.0, 0.0): 'n',
+    FrozenVec(0.0, -1.0, 0.0): 's',
+    FrozenVec(+1.0, 0.0, 0.0): 'e',
+    FrozenVec(-1.0, 0.0, 0.0): 'w',
 }
+
+
+def _vec2tup(vec: Vec | FrozenVec) -> tuple[float, float, float]:
+    """Convert a vector to a tuple for putting in the error JSON."""
+    return (round(vec.x, 12), round(vec.y, 12), round(vec.z, 12))
 
 
 def load_tiledefs(tiles: Iterable[TileDef], grid: Grid) -> None:
@@ -46,7 +46,7 @@ def load_tiledefs(tiles: Iterable[TileDef], grid: Grid) -> None:
     for tile in tiles:
         if not tile.base_type.is_tile:
             continue
-        block_type = grid['world': (tile.pos + 128 * tile.normal)]
+        block_type = grid.lookup_world(tile.pos + 128 * tile.normal)
         if not block_type.inside_map:
             continue
         # Tint the area underneath goo, by just using two textures with the appropriate tints.
@@ -60,22 +60,19 @@ def load_tiledefs(tiles: Iterable[TileDef], grid: Grid) -> None:
         else:
             tile_list = tiles_black
         tile_list.append({
-            'orient': NORM_2_ORIENT[tile.normal.as_tuple()],
-            'position': tuple((tile.pos + 64 * tile.normal) / 128),
+            'orient': NORM_2_ORIENT[tile.normal.freeze()],
+            'position': _vec2tup((tile.pos + 64 * tile.normal) / 128),
         })
     goo_tiles = simple_tiles["goo"] = []
     for pos, block in grid.items():
         if block.is_top:  # Both goo and bottomless pits.
             goo_tiles.append({
                 'orient': 'd',
-                'position': tuple((pos + (0.5, 0.5, 0.75)).as_tuple()),
+                'position': _vec2tup(pos + (0.5, 0.5, 0.75)),
             })
 
 
-def load_barriers(barriers: dict[
-    tuple[tuple[float, float, float], tuple[float, float, float]],
-    BarrierType,
-]) -> None:
+def load_barriers(barriers: dict[tuple[FrozenVec, FrozenVec], BarrierType]) -> None:
     """Load barrier data for display in errors."""
     # noinspection PyProtectedMember
     glass_list = UserError._simple_tiles["glass"] = []
@@ -85,11 +82,11 @@ def load_barriers(barriers: dict[
         BarrierType.GLASS: glass_list,
         BarrierType.GRATING: grate_list,
     }
-    for (pos_tup, normal_tup), kind in barriers.items():
-        pos = Vec(pos_tup) + 56.0 * Vec(normal_tup)
+    for (pos, normal), kind in barriers.items():
+        pos = pos + 56.0 * normal
         kind_to_list[kind].append({
-            'orient': NORM_2_ORIENT[normal_tup],
-            'position': tuple((pos / 128.0).as_tuple()),
+            'orient': NORM_2_ORIENT[normal],
+            'position': _vec2tup(pos / 128.0),
         })
 
 

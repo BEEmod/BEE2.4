@@ -1,7 +1,8 @@
 """The package containg all UI code."""
 import tkinter as tk
-from types import TracebackType
-from typing import Any, Awaitable, Callable, Optional, Type
+from types import TracebackType, new_class
+from typing import Any, Awaitable, Callable, Optional, Type, TypeVar, Generic
+
 from typing_extensions import TypeVarTuple, Unpack
 
 import utils
@@ -16,7 +17,22 @@ TK_ROOT.withdraw()  # Hide the window until everything is loaded.
 _APP_NURSERY: Optional[trio.Nursery] = None
 
 
-def _run_main_loop(*args, **kwargs) -> None:
+if '__class_getitem__' not in vars(tk.Event):
+    # Patch in it being generic, by replacing it with a copy that subclasses Generic.
+    _W_co = TypeVar("_W_co", covariant=True, bound=tk.Misc)
+    _W_co.__module__ = 'tkinter'
+    tk.Event = new_class(  # type: ignore
+        'Event', (Generic[_W_co], ),
+        exec_body=lambda ns: ns.update({
+            name: getattr(tk.Event, name)
+            for name in vars(tk.Event)
+            # Specify the vars to assign, so we don't include things like __dict__ descriptors.
+            if name in ['__doc__', '__module__', '__repr__']
+        }),
+    )
+
+
+def _run_main_loop(*args: Any, **kwargs: Any) -> None:
     """Allow determining if this is running."""
     global _main_loop_running
     _main_loop_running = True
@@ -25,7 +41,7 @@ def _run_main_loop(*args, **kwargs) -> None:
 
 _main_loop_running = False
 _orig_mainloop = TK_ROOT.mainloop
-setattr(TK_ROOT, 'mainloop', _run_main_loop)
+TK_ROOT.mainloop = _run_main_loop  # type: ignore[method-assign]
 del _run_main_loop
 
 
@@ -66,7 +82,7 @@ TK_ROOT.report_callback_exception = tk_error
 def on_error(
     exc_type: Type[BaseException],
     exc_value: BaseException,
-    exc_tb: TracebackType,
+    exc_tb: Optional[TracebackType],
 ) -> None:
     """Run when the application crashes. Display to the user, log it, and quit."""
     # We don't want this to fail, so import everything here, and wrap in
@@ -123,12 +139,12 @@ def on_error(
         pass
 
 
-BGRunArgsT = TypeVarTuple('BGRunArgsT')
+PosArgsT = TypeVarTuple('PosArgsT')
 
 
 def background_run(
-    func: Callable[[Unpack[BGRunArgsT]], Awaitable[Any]], /,
-    *args: Unpack[BGRunArgsT],
+    func: Callable[[Unpack[PosArgsT]], Awaitable[object]],
+    /, *args: Unpack[PosArgsT],
     name: Optional[str] = None,
 ) -> None:
     """When the UI is live, begin this specified task."""

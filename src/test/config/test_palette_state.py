@@ -1,33 +1,36 @@
 import uuid
 
-import pytest
-from srctools import Property as Keyvalues
+from srctools import Keyvalues
 from srctools.dmx import Element
+import pytest
 
+from BEE2_config import GEN_OPTS
 from config.palette import PaletteState
-from consts import UUID_PORTAL2, UUID_EXPORT
-from . import isolate_gen_opts, GEN_OPTS
+from consts import UUID_EXPORT, UUID_PORTAL2
+
+from . import isolate_conf
 
 
-def test_parse_legacy(isolate_gen_opts) -> None:
+def test_parse_legacy() -> None:
     """Test parsing out palette state from the legacy config."""
-    state_dict = PaletteState.parse_legacy(Keyvalues('Config', []))
-    assert len(state_dict) == 1
-    state = state_dict['']
-    assert state.selected == UUID_PORTAL2
-    assert state.save_settings is False
-    assert state.hidden_defaults == frozenset()
+    with isolate_conf(GEN_OPTS):
+        state_dict = PaletteState.parse_legacy(Keyvalues('Config', []))
+        assert len(state_dict) == 1
+        state = state_dict['']
+        assert state.selected == UUID_PORTAL2
+        assert state.save_settings is False
+        assert state.hidden_defaults == frozenset()
 
-    some_uuid = uuid.uuid4()
-    GEN_OPTS['Last_Selected']['palette_uuid'] = some_uuid.hex
-    GEN_OPTS['General']['palette_save_settings'] = '1'
+        some_uuid = uuid.uuid4()
+        GEN_OPTS['Last_Selected']['palette_uuid'] = some_uuid.hex
+        GEN_OPTS['General']['palette_save_settings'] = '1'
 
-    state_dict = PaletteState.parse_legacy(Keyvalues('Config', []))
-    assert len(state_dict) == 1
-    state = state_dict['']
-    assert state.selected == some_uuid
-    assert state.save_settings is True
-    assert state.hidden_defaults == frozenset()
+        state_dict = PaletteState.parse_legacy(Keyvalues('Config', []))
+        assert len(state_dict) == 1
+        state = state_dict['']
+        assert state.selected == some_uuid
+        assert state.save_settings is True
+        assert state.hidden_defaults == frozenset()
 
 
 @pytest.mark.parametrize('save', [0, 1])
@@ -113,7 +116,7 @@ def test_export_dmx(save: bool) -> None:
         save_settings=bool(save),
     )
     elem = state.export_dmx()
-    assert len(elem) == 3
+    assert len(elem) == 4
     assert elem['selected'].val_bytes == some_uuid.bytes
     assert elem['save_settings'].val_bool is save
     hiddens = set(elem['hidden'].iter_binary())

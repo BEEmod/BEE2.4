@@ -8,16 +8,17 @@ This has 3 endpoints:
 - /refresh causes it to reload the error from a text file on disk, if a new compile runs.
 - /ping is triggered by the webpage repeatedly while open, to ensure the server stays alive.
 """
+import attrs
 import srctools.logger
 LOGGER = srctools.logger.init_logging('bee2/error_server.log')
 
+from typing import Any, Dict, List, Tuple
 import functools
 import http
 import math
 import pickle
 import gettext
 import json
-from typing import List
 
 from hypercorn.config import Config
 from hypercorn.trio import serve
@@ -32,16 +33,17 @@ from user_errors import (
 )
 import transtoken
 
-root_path = utils.install_path('error_display').absolute()
+root_path = utils.bins_path('error_display').absolute()
 LOGGER.info('Root path: ', root_path)
 
 app = QuartTrio(
     __name__,
     root_path=str(root_path),
 )
+# Compile logs.
+LOGS = {'vbsp': '', 'vrad': ''}
 config = Config()
-config.debug = True
-config.bind = ["localhost:8080"]  # Use localhost, request any free port.
+config.bind = ["localhost:0"]  # Use localhost, request any free port.
 DELAY = 5 * 60  # After 5 minutes of no response, quit.
 # This cancel scope is cancelled after no response from the client, to shut us down.
 # It starts with an infinite deadline, to ensure there's time to boot the server.
@@ -57,18 +59,28 @@ async def route_display_errors() -> str:
     return await quart.render_template(
         'index.html.jinja2',
         error_text=current_error.message.translate_html(),
-        log_context=current_error.context,
+        context=current_error.context,
+        log_vbsp=LOGS['vbsp'],
+        log_vrad=LOGS['vrad'],
+        # Start the render visible if it has annotations.
+        start_render_open=bool(
+            current_error.points
+            or current_error.leakpoints
+            or current_error.lines
+            or current_error.barrier_hole
+        ),
     )
 
 
 @app.route('/displaydata')
-async def route_render_data() -> dict:
+async def route_render_data() -> Dict[str, Any]:
     """Return the geometry for rendering the current error."""
     return {
         'tiles': current_error.faces,
         'voxels': current_error.voxels,
         'points': current_error.points,
         'leak': current_error.leakpoints,
+        'lines': current_error.lines,
         'barrier_hole': current_error.barrier_hole,
     }
 
@@ -86,7 +98,7 @@ async def route_heartbeat() -> quart.ResponseReturnValue:
 async def route_reload() -> quart.ResponseReturnValue:
     """Called by our VRAD, to make existing servers reload their data."""
     update_deadline()
-    load_info()
+    await load_info()
     resp = await app.make_response(('', http.HTTPStatus.NO_CONTENT))
     resp.mimetype = 'text/plain'
     return resp
@@ -95,6 +107,7 @@ async def route_reload() -> quart.ResponseReturnValue:
 @app.route('/static/<path:filename>.js')
 async def route_static_js(filename: str) -> quart.ResponseReturnValue:
     """Ensure javascript is returned with the right MIME type."""
+    assert app.static_folder is not None
     return await quart.send_from_directory(
         directory=app.static_folder,
         file_name=filename + '.js',
@@ -118,12 +131,26 @@ def update_deadline() -> None:
     LOGGER.info('Reset deadline!')
 
 
-def load_info() -> None:
+@attrs.define(eq=False)
+class PackageLang(transtoken.GetText):
+    """Simple Gettext implementation for tokens loaded by packages."""
+    tokens: Dict[str, str]
+
+    def gettext(self, token: str, /) -> str:
+        """Perform simple translations."""
+        # In this context, the tokens must be IDs not the actual string.
+        return self.tokens.get(token.casefold(), token)
+
+    def ngettext(self, single: str, plural: str, n: int, /) -> str:
+        """We don't support plural translations yet, not required."""
+        return self.tokens.get(single.casefold(), single)
+
+
+async def load_info() -> None:
     """Load the error info from disk."""
     global current_error
     try:
-        with open(DATA_LOC, 'rb') as f:
-            data = pickle.load(f)
+        data = pickle.loads(await trio.Path(DATA_LOC).read_bytes())
         if not isinstance(data, ErrorInfo):
             raise ValueError
     except Exception:
@@ -131,17 +158,29 @@ def load_info() -> None:
         current_error = ErrorInfo(message=TOK_ERR_FAIL_LOAD)
     else:
         current_error = data
+
+    translations: Dict[str, transtoken.GetText] = {}
+    try:
+        package_data: List[Tuple[str, Dict[str, str]]] = pickle.loads(
+            await trio.Path('bee2/pack_translation.bin').read_bytes()
+        )
+    except Exception:
+        LOGGER.exception('Failed to load package translations pickle!')
+    else:
+        for pack_id, tokens in package_data:
+            translations[pack_id] = PackageLang(tokens)
+
     if current_error.language_file is not None:
         try:
             with open(current_error.language_file, 'rb') as f:
-                lang = gettext.GNUTranslations(f)
+                translations[transtoken.NS_UI] = gettext.GNUTranslations(f)
         except OSError:
+            LOGGER.exception('Could not load UI translations file!')
             return
         transtoken.CURRENT_LANG = transtoken.Language(
-            display_name='??',
             lang_code='',
             ui_filename=current_error.language_file,
-            trans={transtoken.NS_UI: lang},
+            trans=translations,
         )
 
 
@@ -158,7 +197,18 @@ async def main() -> None:
         # Allow nursery to exit.
         stop_sleeping.cancel()
 
-    load_info()
+    async def load_compiler(name: str) -> None:
+        """Load a compiler log file."""
+        try:
+            LOGS[name] = await trio.Path(f'bee2/{name}.log').read_text('utf8')
+        except OSError:
+            LOGGER.warning('Could not read bee2/{}.log', name)
+
+    async with trio.open_nursery() as nursery:
+        nursery.start_soon(load_compiler, 'vbsp')
+        nursery.start_soon(load_compiler, 'vrad')
+        nursery.start_soon(load_info)
+
     SERVER_INFO_FILE.unlink(missing_ok=True)
     try:
         async with trio.open_nursery() as nursery:
@@ -173,10 +223,10 @@ async def main() -> None:
             if len(binds):
                 url, port = binds[0].rsplit(':', 1)
                 with srctools.AtomicWriter(SERVER_INFO_FILE) as f:
-                    json.dump(ServerInfo({
-                        'port': int(port),
-                        'coop_text': str(TOK_COOP_SHOWURL),
-                    }), f)
+                    json.dump(ServerInfo(
+                        port=int(port),
+                        coop_text=str(TOK_COOP_SHOWURL),
+                    ), f)
             else:
                 return  # No connection?
             with stop_sleeping:

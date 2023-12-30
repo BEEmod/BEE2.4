@@ -15,7 +15,7 @@ from enum import Enum
 from weakref import WeakKeyDictionary
 
 import attrs
-from srctools import Vec, Angle, Matrix
+from srctools import FrozenMatrix, FrozenVec, Vec, Angle, Matrix
 from srctools.vmf import VMF, Entity, Side, Solid, Output, UVAxis
 import srctools.logger
 import srctools.vmf
@@ -36,6 +36,11 @@ import utils
 import consts
 
 
+__all__ = [
+    'TileSize', 'Portalable',
+    'TILETYPE_FROM_CHAR', 'TILETYPE_TO_CHAR', 'PanelType', 'Panel', 'round_grid', 'TileDef',
+    'analyse_map', 'generate_brushes',
+]
 LOGGER = srctools.logger.get_logger(__name__)
 
 # Face surfaces used to generate tiles.
@@ -48,19 +53,26 @@ TILE_TEMP: dict[
     dict[str | tuple[int, int, int, bool], Side]
 ] = {}
 
-NORMALS = [Vec(x=+1), Vec(x=-1), Vec(y=+1), Vec(y=-1), Vec(z=+1), Vec(z=-1)]
+NORMALS = [
+    FrozenVec(x=+1),
+    FrozenVec(x=-1),
+    FrozenVec(y=+1),
+    FrozenVec(y=-1),
+    FrozenVec(z=+1),
+    FrozenVec(z=-1),
+]
 # Specific corresponding, these ensure the textures align to world once done.
 # IE upright on walls, up=north for floor and ceilings.
 NORMAL_ANGLES = [
-    Matrix.from_angle(0.0, 0.0, 0.0),
-    Matrix.from_angle(0.0, 180, 0.0),
-    Matrix.from_angle(0.0, 90., 0.0),
-    Matrix.from_angle(0.0, 270, 0.0),
-    Matrix.from_angle(270, 270, 0.0),
-    Matrix.from_angle(90., 90., 0.0),
+    FrozenMatrix.from_angle(0.0, 0.0, 0.0),
+    FrozenMatrix.from_angle(0.0, 180, 0.0),
+    FrozenMatrix.from_angle(0.0, 90., 0.0),
+    FrozenMatrix.from_angle(0.0, 270, 0.0),
+    FrozenMatrix.from_angle(270, 270, 0.0),
+    FrozenMatrix.from_angle(90., 90., 0.0),
 ]
 NORMAL_NAMES = dict(zip(
-    map(Vec.as_tuple, NORMALS),
+    NORMALS,
     ['east', 'west', 'north', 'south', 'up', 'down'],
 ))
 # All the tiledefs in the map.
@@ -183,14 +195,18 @@ class TileType(Enum):
         if self is TileType.GOO_SIDE:
             return TileType.WHITE_4x4
         if self.name.startswith('BLACK'):
-            return getattr(TileType, f'WHITE{self.name[5:]}')
+            tile = getattr(TileType, f'WHITE{self.name[5:]}')
+            assert isinstance(tile, TileType)
+            return tile
         return self
 
     @property
     def as_black(self) -> TileType:
         """Force to the black version."""
         if self.is_white:
-            return getattr(TileType, f'BLACK{self.name[5:]}')
+            tile = getattr(TileType, f'BLACK{self.name[5:]}')
+            assert isinstance(tile, TileType)
+            return tile
         return self
 
     @property
@@ -211,10 +227,7 @@ class TileType(Enum):
             return TileSize.TILE_1x1
 
     @staticmethod
-    def with_color_and_size(
-        size: TileSize,
-        color: texturing.Portalable
-    ) -> 'TileType':
+    def with_color_and_size(size: TileSize, color: texturing.Portalable) -> TileType:
         """Return the TileType with a size and color."""
         return _tiletype_tiles[size, color]
 
@@ -310,7 +323,7 @@ class Pattern:
         self,
         tex: TileSize,
         *tiles: tuple[int, int, int, int],
-        wall_only=False
+        wall_only: bool = False,
     ) -> None:
         self.tex = tex
         self.wall_only = wall_only
@@ -318,7 +331,7 @@ class Pattern:
         tile_u, tile_v = tex.size
         # Do some sanity checks on values...
         for umin, vmin, umax, vmax in tiles:
-            tile_tex = '{} -> {} {} {} {}'.format(tex, umin, vmin, umax, vmax)
+            tile_tex = f'{tex} -> {umin} {vmin} {umax} {vmax}'
             assert 0 <= umin < umax <= 4, tile_tex
             assert 0 <= vmin < vmax <= 4, tile_tex
             assert (umax - umin) % tile_u == 0, tile_tex
@@ -431,7 +444,7 @@ class Panel:
     """Represents a potentially dynamic specially positioned part of a tile.
 
     This is used for angled/flip panel items, and things like those.
-    The U/V bbox is removed from the original tile, and transferred to this.
+    The points are removed from the original tile, and transferred to this.
 
     Attributes:
         brush_ent: The brush entity the panel will be added to,
@@ -453,8 +466,8 @@ class Panel:
     brush_ent: Entity | None
     inst: Entity
     pan_type: PanelType
-    thickness: int
-    bevels: set[tuple[int, int]] = attrs.field(converter=_panel_bevel_conv)
+    thickness: int = 4
+    bevels: set[tuple[int, int]] = attrs.field(converter=_panel_bevel_conv, factory=set)
 
     points: set[tuple[int, int]] = attrs.Factory({
         (x, y)
@@ -470,7 +483,7 @@ class Panel:
     def same_item(self, inst: Entity) -> bool:
         """Check if the two instances come from the same item.
 
-        If they have names, they must match. Otherwise, they must be the same.
+        If they have names, those can just match. Otherwise, the instances must actually be the same.
         """
         if inst is self.inst:
             return True
@@ -488,6 +501,15 @@ class Panel:
         force_helper: bool,
     ) -> None:
         """Generate the panel brushes."""
+        # In dev mode, display a visual of this location.
+        conditions.fetch_debug_visgroup(vmf, 'TilePanels')(
+            'info_particle_system',
+            origin=tile.pos,
+            targetname=self.inst['targetname'],
+            angles=tile.normal.to_angle(),
+            comment=tile.format_tiles().replace('\n', ', '),
+            antigel=tile.is_antigel(),
+        )
         # We need to do the checks to handle multiple panels with shared
         # data.
         if all(subtile is TileType.VOID for subtile in sub_tiles.values()):
@@ -495,22 +517,6 @@ class Panel:
             # The brush entity isn't used.
             if self.brush_ent in vmf.entities:
                 self.brush_ent.remove()
-            # In dev mode, display a visual of this location.
-            if utils.DEV_MODE:
-                try:
-                    [visgroup] = [vis for vis in vmf.vis_tree if vis.name == 'TilePanels']
-                except ValueError:
-                    visgroup = vmf.create_visgroup('TilePanels')
-                panel_trace = vmf.create_ent(
-                    'info_particle_system',
-                    origin=tile.pos,
-                    targetname=self.inst['targetname'],
-                    angles=tile.normal.to_angle(),
-                )
-                panel_trace.comments = tile.format_tiles().replace('\n', ', ')
-                panel_trace.vis_shown = False
-                panel_trace.hidden = True
-                panel_trace.visgroup_ids.add(visgroup.id)
             return
         else:
             # We do use it.
@@ -529,9 +535,7 @@ class Panel:
         if orient.up() != tile.normal:
             # It's not aligned to ourselves, so dump the rotation for our
             # logic.
-            orient = Matrix.from_angstr(
-                conditions.PETI_INST_ANGLE[tile.normal.as_tuple()]
-            )
+            orient = Matrix.from_angle(conditions.PETI_INST_ANGLE[tile.normal.freeze()])
         front_pos = Vec(0, 0, 64) @ orient + tile.pos
 
         offset = self.offset.copy()
@@ -677,11 +681,11 @@ class Panel:
                     # Figure out the appropriate face info. We don't really
                     # care about texture scaling etc.
                     clip_face.uaxis = UVAxis(*orient.left())
-                    clip_face.vaxis = UVAxis(*orient.up())
+                    clip_face.vaxis = UVAxis(*orient.forward())
                     clip_face.planes = [
-                        panel_offset + Vec(0, 64, -64) @ orient,
-                        panel_offset + Vec(0, 64, 64) @ orient,
-                        panel_offset + Vec(0, -64, 64) @ orient,
+                        panel_offset + Vec(64, 64, 0) @ orient,
+                        panel_offset + Vec(0, 64, 0) @ orient,
+                        panel_offset + Vec(0, -64, 0) @ orient,
                     ]
                     clip_face.mat = consts.Tools.NODRAW
 
@@ -805,7 +809,7 @@ class TileDef:
         panels: A list of "panels" for the tiledef, allowing moving or split parts.
           If present, each of these "steals" some UV positions and instead
           generates them (potentially offset) as a brush entity.
-        is_antigel: If this is marked to not accept gel.
+        force_antigel: If this is marked to not accept gel.
     """
     __slots__ = [
         'pos',
@@ -817,7 +821,7 @@ class TileDef:
         'bullseye_count',
         '_portal_helper',
         'panels',
-        'is_antigel',
+        'force_antigel',
     ]
 
     pos: Vec
@@ -837,8 +841,8 @@ class TileDef:
         pos: Vec,
         normal: Vec,
         base_type: TileType,
-        subtiles: dict[tuple[int, int], TileType]=None,
-        has_helper: bool=False,
+        subtiles: dict[tuple[int, int], TileType] | None = None,
+        has_helper: bool = False,
     ) -> None:
         self.pos = pos
         self.normal = normal
@@ -849,7 +853,7 @@ class TileDef:
         self.panels = []
         self.bullseye_count = 0
         self._portal_helper = 1 if has_helper else 0
-        self.is_antigel = False
+        self.force_antigel = False
 
     @property
     def has_portal_helper(self) -> bool:
@@ -874,11 +878,8 @@ class TileDef:
             return Vec(1, 0, 0)
 
     def __repr__(self) -> str:
-        return '<{} TileDef @ {} of {}>'.format(
-            self.base_type.name,
-            NORMAL_NAMES.get(self.normal.as_tuple(), self.normal),
-            self.pos,
-        )
+        norm_name = NORMAL_NAMES.get(self.normal.freeze(), self.normal)
+        return f'<{self.base_type.name} TileDef @ {norm_name} of {self.pos}>'
 
     def format_tiles(self) -> str:
         """Debug utility, log the subtile shape."""
@@ -894,8 +895,8 @@ class TileDef:
         cls,
         grid_pos: Vec,
         norm: Vec,
-        tile_type: TileType=TileType.VOID,
-    ) -> 'TileDef':
+        tile_type: TileType = TileType.VOID,
+    ) -> TileDef:
         """Return a tiledef at a position, creating it with a type if not present."""
         try:
             tile = TILES[grid_pos.as_tuple(), norm.as_tuple()]
@@ -997,8 +998,8 @@ class TileDef:
     def calc_patterns(
         self,
         tiles: dict[tuple[int, int], TileType],
-        is_wall: bool=False,
-        _pattern: str=None,
+        is_wall: bool = False,
+        _pattern: str | None = None,
     ) -> Iterator[tuple[float, float, float, float, TileSize, TileType]]:
         """Figure out the brushes needed for a complex pattern.
 
@@ -1062,6 +1063,18 @@ class TileDef:
         for (u, v), tile_type in tiles.items():
             if tile_type is not TileType.VOID:
                 yield u, u + 1, v, v + 1, TileSize.TILE_4x4, tile_type
+
+    def is_antigel(self) -> bool:
+        """Check if this tile is at an antigel position."""
+        if self.force_antigel:
+            return True
+        try:
+            plane = texturing.ANTIGEL_BY_NORMAL[self.normal.freeze()]
+        except KeyError:
+            # Should not happen, don't crash.
+            LOGGER.warning('Non-axis-aligned tiledef?: {!r}', self)
+            return False
+        return self.pos.freeze() in plane
 
     def should_bevel(self, u: int, v: int) -> bool:
         """Check if this side of the TileDef should be bevelled.
@@ -1241,6 +1254,7 @@ class TileDef:
 
         If face_output is set, it will be filled with (u, v) -> top face.
         """
+        is_antigel = self.is_antigel()  # Cache result.
         brushes = []
         faces = []
 
@@ -1295,7 +1309,7 @@ class TileDef:
                     u_size, v_size = grid_size.size
                     tex = texturing.gen(
                         gen_cat, normal, tile_type.color,
-                    ).get(tile_center, grid_size, antigel=self.is_antigel)
+                    ).get(tile_center, grid_size, antigel=is_antigel)
 
                 template: template_brush.ScalingTemplate | None
                 if self.override is not None:
@@ -1311,12 +1325,12 @@ class TileDef:
                     width=(umax - umin) * 32,
                     height=(vmax - vmin) * 32,
                     bevels=tile_bevels,
-                    back_surf=texturing.SPECIAL.get(tile_center, 'behind', antigel=self.is_antigel),
+                    back_surf=texturing.SPECIAL.get(tile_center, 'behind', antigel=is_antigel),
                     u_align=u_size * 128,
                     v_align=v_size * 128,
                     thickness=thickness,
                     panel_edge=is_panel,
-                    antigel=self.is_antigel,
+                    antigel=is_antigel,
                 )
                 if template is not None:
                     # If the texture isn't supplied, use the one from the
@@ -1345,16 +1359,16 @@ class TileDef:
                     width=(umax - umin) * 32,
                     height=(vmax - vmin) * 32,
                     bevels=tile_bevels,
-                    back_surf=texturing.SPECIAL.get(tile_center, 'behind', antigel=self.is_antigel),
+                    back_surf=texturing.SPECIAL.get(tile_center, 'behind', antigel=is_antigel),
                     panel_edge=is_panel,
-                    antigel=self.is_antigel,
+                    antigel=is_antigel,
                 )
                 faces.append(face)
                 brushes.append(brush)
             elif tile_type is TileType.VOID:
                 continue
             else:
-                raise AssertionError("Can't gen {} yet.".format(tile_type))
+                raise AssertionError(f"Can't gen {tile_type} yet.")
 
             if face_output is not None:
                 for u in u_range:
@@ -1375,7 +1389,7 @@ class TileDef:
 
         return self.base_type.is_tile
 
-    def add_portal_helper(self, orient: Vec=None) -> None:
+    def add_portal_helper(self, orient: Vec | None = None) -> None:
         """Add a portal placement helper to the tile.
 
         If orient is provided, it should be the direction towards the
@@ -1421,7 +1435,11 @@ class TileDef:
             target['origin'] = self.pos + 64 * self.normal
 
 
-def find_tile(origin: Vec, normal: Vec, force: bool=False) -> tuple[TileDef, int, int]:
+def find_tile(
+    origin: Vec | FrozenVec,
+    normal: Vec | FrozenVec,
+    force: bool = False,
+) -> tuple[TileDef, int, int]:
     """Locate the tiledef for a specific tile.
 
     The tiledef and the subtile UV are returned, or KeyError is raised
@@ -1436,7 +1454,7 @@ def find_tile(origin: Vec, normal: Vec, force: bool=False) -> tuple[TileDef, int
         v_axis, origin[v_axis] // 128 * 128 + 64,
     )
     grid_pos: Vec = round(grid_pos, 6)
-    normal: Vec = round(normal, 6)
+    normal: Vec = Vec(round(normal, 6))
     # grid_pos = round_grid(origin - normal)
 
     uv_pos = round(origin - grid_pos + 64 - 16, 6)
@@ -1459,9 +1477,9 @@ def edit_quarter_tile(
     origin: Vec,
     normal: Vec,
     tile_type: TileType,
-    force: bool=False,
-    silent: bool=False,
-):
+    force: bool = False,
+    silent: bool = False,
+) -> None:
     """Alter a 1/4 tile section of a tile.
 
     If force is True, this overwrites any existing tile - by default nodraw
@@ -1546,9 +1564,8 @@ def make_tile(
     assert TILE_TEMP, "make_tile called without data loaded!"
     template = TILE_TEMP[normal.as_tuple()]
 
-    assert width >= 8 and height >= 8, 'Tile is too small!' \
-                                       ' ({}x{})'.format(width, height)
-    assert thickness in (2, 4, 8), 'Bad thickness {}'.format(thickness)
+    assert width >= 8 and height >= 8, f'Tile is too small! ({width}x{height})'
+    assert thickness in (2, 4, 8), f'Bad thickness {thickness}'
 
     axis_u, axis_v = Vec.INV_AXIS[normal.axis()]
 
@@ -1637,8 +1654,8 @@ def gen_tile_temp() -> None:
         # Grab the single world brush for each visgroup.
         for (key, name) in cat_names.items():
             [categories[key]] = template.visgrouped_solids(name)
-    except (KeyError, ValueError):
-        raise Exception('Bad Tiling Template!')
+    except (KeyError, ValueError) as exc:
+        raise Exception('Bad Tiling Template!') from exc
 
     for norm, orient in zip(NORMALS, NORMAL_ANGLES):
         axis_norm = norm.axis()
@@ -1655,14 +1672,14 @@ def gen_tile_temp() -> None:
                     # Only copy the front and back from the normal template.
                     if thickness == 4 and not bevel:
                         temp_part['back'] = face
-                        face.translate(2 * norm)
+                        face.translate(+2.0 * norm)
                         # Set it to zero here, so we don't need to reset
                         # it in make_tile.
                         face.offset = 0
                 elif face.mat in consts.BlackPan or face.mat in consts.WhitePan:
                     if thickness == 4 and not bevel:
                         temp_part['front'] = face
-                        face.translate(-2 * norm)
+                        face.translate(-2.0 * norm)
                 else:
                     # Squarebeams.
                     # Rounding the position of the face gives us the direction
@@ -1706,7 +1723,7 @@ def analyse_map(vmf_file: VMF, side_to_ant_seg: dict[int, list[antlines.Segment]
                 break
         else:
             # Has no 4-unit side - not a PeTI brush?
-            LOGGER.warning('Unrecognised brush from {} to {}'.format(bbox_min, bbox_max))
+            LOGGER.warning(f'Unrecognised brush from {bbox_min} to {bbox_max}')
             continue
 
         tile_size = dim.other_axes(norm.axis())
@@ -1719,9 +1736,9 @@ def analyse_map(vmf_file: VMF, side_to_ant_seg: dict[int, list[antlines.Segment]
 
     # Look for Angled and Flip Panels, to link the tiledef to the instance.
     # First grab the instances.
-    panel_fname = instanceLocs.resolve('<ITEM_PANEL_ANGLED>, <ITEM_PANEL_FLIP>')
+    panel_fname = instanceLocs.resolve_filter('<ITEM_PANEL_ANGLED>, <ITEM_PANEL_FLIP>')
     # Also find PeTI-placed placement helpers, and move them into the tiledefs.
-    placement_helper_file = instanceLocs.resolve('<ITEM_PLACEMENT_HELPER>')
+    placement_helper_file = instanceLocs.resolve_filter('<ITEM_PLACEMENT_HELPER>')
 
     panels: dict[str, Entity] = {}
     for inst in vmf_file.by_class['func_instance']:
@@ -1809,10 +1826,10 @@ def analyse_map(vmf_file: VMF, side_to_ant_seg: dict[int, list[antlines.Segment]
     goo_replaceable = [TileType.BLACK, TileType.BLACK_4x4]
     for pos, block in BLOCK_POS.items():
         if block.is_goo:
-            for norm in NORMALS:
-                grid_pos = grid_to_world(pos) - 128 * norm
+            for fnorm in NORMALS:
+                grid_pos = grid_to_world(pos) - 128 * fnorm
                 try:
-                    tile = TILES[grid_pos.as_tuple(), norm.as_tuple()]
+                    tile = TILES[grid_pos.as_tuple(), fnorm.as_tuple()]
                 except KeyError:
                     continue
 
@@ -1821,7 +1838,7 @@ def analyse_map(vmf_file: VMF, side_to_ant_seg: dict[int, list[antlines.Segment]
                         tile[u, v] = TileType.GOO_SIDE
 
 
-def tiledefs_from_cube(face_to_tile: dict[int, TileDef], brush: Solid, grid_pos: Vec):
+def tiledefs_from_cube(face_to_tile: dict[int, TileDef], brush: Solid, grid_pos: Vec) -> None:
     """Generate a tiledef matching a 128^3 block."""
     for face in brush:
         normal = -face.normal()
@@ -1924,8 +1941,6 @@ def tiledef_from_flip_panel(brush_ent: Entity, panel_ent: Entity) -> None:
         brush_ent,
         panel_ent,
         PanelType.FLIP_BLACK,
-        thickness=4,
-        bevels=set(),
     ))
 
 
@@ -1980,8 +1995,7 @@ def find_front_face(
         else:
             LOGGER.warning('Unknown panel texture "{}"!', face.mat)
             return TileType.BLACK, face
-    else:
-        raise Exception('Malformed wall brush at {}, {}'.format(grid_pos, norm))
+    raise Exception(f'Malformed wall brush at {grid_pos}, {norm}')
 
 
 def inset_flip_panel(panel: list[Solid], pos: Vec, normal: Vec) -> None:
@@ -2093,6 +2107,7 @@ def generate_brushes(vmf: VMF) -> None:
 
         for tile in tiles:
             pos = tile.pos + 64 * tile.normal
+            is_antigel = tile.is_antigel()
 
             if tile_type is TileType.GOO_SIDE:
                 # This forces a specific size.
@@ -2108,11 +2123,11 @@ def generate_brushes(vmf: VMF) -> None:
                     texturing.GenCat.NORMAL,
                     normal,
                     tile.base_type.color
-                ).get(pos, tile.base_type.tile_size, antigel=tile.is_antigel)
+                ).get(pos, tile.base_type.tile_size, antigel=is_antigel)
 
             u_pos = int((pos[u_axis] - bbox_min[u_axis]) // 128)
             v_pos = int((pos[v_axis] - bbox_min[v_axis]) // 128)
-            grid_pos[tile.base_type, tile.is_antigel, tex][u_pos, v_pos] = True
+            grid_pos[tile.base_type, is_antigel, tex][u_pos, v_pos] = True
             tile_pos[u_pos, v_pos] = tile
 
         for (subtile_type, is_antigel, tex), tex_pos in grid_pos.items():
@@ -2309,6 +2324,7 @@ def generate_goo(vmf: VMF) -> None:
     )
     trig_phys.add_out(
         Output('OnStartTouch', '!activator', 'SilentDissolve'),
+        Output('OnStartTouch', '!activator', 'CallScriptFunction', 'FellInGoo', delay=0.01),
         Output('OnStartTouch', '!activator', 'Kill', delay=0.1),
     )
 

@@ -8,6 +8,7 @@ import srctools.logger
 from pygtrie import CharTrie
 
 from app import UI, TK_ROOT, localisation
+from ui_tk.wid_transtoken import set_text
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -23,9 +24,9 @@ def init(frm: ttk.Frame, refresh_cback: Callable[[Optional[Set[Tuple[str, int]]]
     """
     global _type_cback
     refresh_tim: Optional[str] = None
-    result: Optional[set[tuple[str, int]]] = None
+    result: Optional[Set[Tuple[str, int]]] = None
 
-    def on_type(*args) -> None:
+    def on_type(*args: object) -> None:
         """Re-search whenever text is typed."""
         nonlocal refresh_tim, result
         text = search_var.get().casefold()
@@ -34,7 +35,7 @@ def init(frm: ttk.Frame, refresh_cback: Callable[[Optional[Set[Tuple[str, int]]]
             refresh_cback(None)
             return
 
-        found: set[tuple[str, int]] = set()
+        found: Set[Tuple[str, int]] = set()
         *words, last = words
         for word in words:
             try:
@@ -64,7 +65,7 @@ def init(frm: ttk.Frame, refresh_cback: Callable[[Optional[Set[Tuple[str, int]]]
 
     frm.columnconfigure(1, weight=1)
 
-    localisation.set_text(ttk.Label(frm), localisation.TransToken.ui('Search:')).grid(row=0, column=0)
+    set_text(ttk.Label(frm), localisation.TransToken.ui('Search:')).grid(row=0, column=0)
 
     search_var = tk.StringVar()
     search_var.trace_add('write', on_type)
@@ -79,7 +80,7 @@ def rebuild_database() -> None:
     """Rebuild the search database."""
     LOGGER.info('Updating search database...')
     # Clear and reset.
-    word_set: set[tuple[str, int]]
+    word_set: Set[Tuple[str, int]]
     word_to_ids.clear()
 
     for item in UI.item_list.values():

@@ -1,11 +1,12 @@
 """Adds breakable glass."""
-from typing import Iterator, Any, Tuple, Dict, List, Optional
+from typing_extensions import Literal, assert_never
+from typing import Any, Iterator, Tuple, Dict, List, Optional
 
-from srctools import Property, Vec, VMF, Side, Entity, Output, Angle
+from srctools import FrozenVec, Keyvalues, Vec, VMF, Entity, Output, Angle
 import srctools.logger
 
 from precomp import template_brush, conditions
-from precomp.instanceLocs import resolve as resolve_inst
+from precomp.instanceLocs import resolve_one
 import consts
 
 
@@ -13,76 +14,80 @@ COND_MOD_NAME = 'Breakable Glass'
 
 LOGGER = srctools.logger.get_logger(__name__)
 
-BREAKABLE_GLASS_CONF = {}
+Conf = Dict[str, Any]  # TODO: Replace with class.
+BREAKABLE_GLASS_CONF: Dict[str, Conf] = {}
 
 # For each direction, whether min/max
 # zero should be the normal axis.
+MIN: Literal[-1] = -1
+MAX: Literal[1] = 1
+Direction = Literal[-1, 0, 1]
 CORNER_NAMES = ['lowerleft', 'lowerright', 'upperleft', 'upperright']
-CORNER_POINTS = {
+CORNER_POINTS: Dict[FrozenVec, List[Tuple[Direction, Direction, Direction]]] = {
     Vec.N: [
-        (min, 0, min),
-        (max, 0, min),
-        (min, 0, max),
-        (max, 0, max),
+        (MIN, 0, MIN),
+        (MAX, 0, MIN),
+        (MIN, 0, MAX),
+        (MAX, 0, MAX),
     ],
     Vec.S: [
-        (max, 0, min),
-        (min, 0, min),
-        (max, 0, max),
-        (min, 0, max),
+        (MAX, 0, MIN),
+        (MIN, 0, MIN),
+        (MAX, 0, MAX),
+        (MIN, 0, MAX),
     ],
     Vec.E: [
-        (0, max, min),
-        (0, min, min),
-        (0, max, max),
-        (0, min, max),
+        (0, MAX, MIN),
+        (0, MIN, MIN),
+        (0, MAX, MAX),
+        (0, MIN, MAX),
     ],
     Vec.W: [
-        (0, min, min),
-        (0, max, min),
-        (0, min, max),
-        (0, max, max),
+        (0, MIN, MIN),
+        (0, MAX, MIN),
+        (0, MIN, MAX),
+        (0, MAX, MAX),
     ],
     Vec.T: [
-        (min, min, 0),
-        (min, max, 0),
-        (max, min, 0),
-        (max, max, 0),
+        (MIN, MIN, 0),
+        (MIN, MAX, 0),
+        (MAX, MIN, 0),
+        (MAX, MAX, 0),
     ],
     Vec.B: [
-        (min, max, 0),
-        (min, min, 0),
-        (max, max, 0),
-        (max, min, 0),
+        (MIN, MAX, 0),
+        (MIN, MIN, 0),
+        (MAX, MAX, 0),
+        (MAX, MIN, 0),
     ]
-}  # type: Dict[Tuple[float, float, float], List[Tuple[Any, Any, Any]]]
+}
 
 
-def glass_item_setup(conf: dict, item_id, config_dict):
+def glass_item_setup(conf: dict, item_id, config_dict: Dict[str, Dict[str, Any]]):
     """Build the config dictionary for a custom glass item."""
-    [base_inst] = resolve_inst('<{}:0>'.format(item_id))
+    base_inst = resolve_one(f'<{item_id}:0>', error=True)
 
     conf.update({
-        'frame_' + name: resolve_inst('<{}:bee2_frame_{}>'.format(item_id, name))[0]
+        'frame_' + name: resolve_one(f'<{item_id}:bee2_frame_{name}>', error=True)
         for name in ['edge', 'single', 'ubend', 'corner']
     })
     config_dict[base_inst.casefold()] = conf
 
 
-def find_glass_items(config, vmf: VMF) -> Iterator[Tuple[str, Vec, Vec, Vec, dict]]:
+def find_glass_items(config: Dict[str, Conf], vmf: VMF) -> Iterator[Tuple[str, Vec, Vec, Vec, Conf]]:
     """Find the bounding boxes for all the glass items matching a config.
 
     This yields (targetname, min, max, normal, config) tuples.
     """
     # targetname -> min, max, normal, config
-    glass_items: dict[str, tuple[Vec, Vec, Vec, dict]] = {}
+    glass_items: Dict[str, Tuple[Vec, Vec, Vec, dict]] = {}
     for inst in vmf.by_class['func_instance']:
         try:
             conf = config[inst['file'].casefold()]
         except KeyError:
             continue
         targ = inst['targetname']
-        norm = Vec(x=1).rotate_by_str(inst['angles'])
+        norm = Vec(x=1) @ Angle.from_str(inst['angles'])
         origin = Vec.from_str(inst['origin']) - 64 * norm
         try:
             bbox_min, bbox_max, group_norm, group_conf = glass_items[targ]
@@ -94,8 +99,8 @@ def find_glass_items(config, vmf: VMF) -> Iterator[Tuple[str, Vec, Vec, Vec, dic
         else:
             bbox_min.min(origin)
             bbox_max.max(origin)
-            assert group_norm == norm, '"{}" is inconsistently rotated!'.format(targ)
-            assert group_conf is conf, '"{}" has multiple configs!'.format(targ)
+            assert group_norm == norm, f'"{targ}" is inconsistently rotated!'
+            assert group_conf is conf, f'"{targ}" has multiple configs!'
         inst.remove()
 
     for targ, (bbox_min, bbox_max, norm, conf) in glass_items.items():
@@ -160,8 +165,8 @@ def make_frames(
             angles = norm.to_angle(roll)
             # The two directions with a border in the corner instance.
             # We want to put it on those sides.
-            corner_a = Vec(y=-1).rotate(*angles)
-            corner_b = Vec(z=-1).rotate(*angles)
+            corner_a = Vec(y=-1) @ angles
+            corner_b = Vec(z=-1) @ angles
 
             # If the normal is positive, we want to be bbox_max in that axis,
             # otherwise bbox_min.
@@ -211,9 +216,8 @@ def make_frames(
         )
 
 
-
 @conditions.make_result_setup('BreakableGlass')
-def res_breakable_glass_setup(res: Property):
+def res_breakable_glass_setup(res: Keyvalues):
     item_id = res['item']
     conf = {
         'template': template_brush.get_scaling_template(res['template']),
@@ -229,7 +233,7 @@ def res_breakable_glass_setup(res: Property):
 
 
 @conditions.make_result('BreakableGlass')
-def res_breakable_glass(inst: Entity, res: Property):
+def res_breakable_glass(inst: Entity, res: Keyvalues) -> object:
     """Adds breakable glass to the map.
 
     Parameters:
@@ -244,7 +248,7 @@ def res_breakable_glass(inst: Entity, res: Property):
 
     glass_items = find_glass_items(BREAKABLE_GLASS_CONF, vmf)
 
-    damage_filter = None  # type: Optional[Entity]
+    damage_filter: Optional[Entity] = None
 
     for targ, bbox_min, bbox_max, norm, conf in glass_items:
         LOGGER.info('Making glass "{}"', targ)
@@ -263,7 +267,7 @@ def res_breakable_glass(inst: Entity, res: Property):
         solid_max += (conf['offset'] + 1) * norm
 
         surf_solid = vmf.make_prism(solid_min, solid_max).solid
-        for face in surf_solid:  # type: Side
+        for face in surf_solid:
             if face.normal() == norm:
                 conf['template'].apply(face, change_mat=True)
 
@@ -335,15 +339,17 @@ def res_breakable_glass(inst: Entity, res: Property):
         # We need to set "lowerleft", "upperright" etc keyvalues to the corner
         # locations.
         # These are used to place the shattered glass, when it breaks.
-        for name, points in zip(CORNER_NAMES, CORNER_POINTS[norm.as_tuple()]):
+        for name, points in zip(CORNER_NAMES, CORNER_POINTS[norm.freeze()]):
             corner = Vec()
             for axis, axis_type in zip('xyz', points):
-                if axis == norm_axis:  # solid_min is aligned to the front.
+                if axis_type == 0:  # solid_min is aligned to the front.
                     corner[axis] = solid_min[axis]
-                elif axis_type is max:
+                elif axis_type == MAX:
                     corner[axis] = solid_max[axis]
-                elif axis_type is min:
+                elif axis_type == MIN:
                     corner[axis] = solid_min[axis]
+                else:
+                    assert_never(axis_type)
             breakable_surf[name] = corner
 
         make_frames(vmf, targ, conf, bbox_min, bbox_max, -norm)

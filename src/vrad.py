@@ -11,7 +11,7 @@ import os
 import sys
 from io import BytesIO
 from zipfile import ZipFile
-from typing import List
+from typing import List, Set
 from pathlib import Path
 
 
@@ -30,9 +30,6 @@ import trio
 
 from BEE2_config import ConfigFile
 from postcomp import music, screenshot
-# Load our BSP transforms.
-# noinspection PyUnresolvedReferences
-from postcomp import coop_responses, filter, user_error
 import utils
 
 
@@ -61,6 +58,10 @@ def load_transforms() -> None:
         sys.meta_path.append(finder)
         LOGGER.debug('Loading transforms from source: {}', transform_loc)
         finder.load_all()
+
+    # Load our additional BSP transforms.
+    # noinspection PyUnresolvedReferences
+    from postcomp import coop_responses, filter, user_error, debug_info  # noqa: F401
 
 
 def run_vrad(args: List[str]) -> None:
@@ -143,9 +144,9 @@ async def main(argv: List[str]) -> None:
         path += ".bsp"
 
     if not os.path.exists(path):
-        raise ValueError('"{}" does not exist!'.format(path))
+        raise ValueError(f'"{path}" does not exist!')
     if not os.path.isfile(path):
-        raise ValueError('"{}" is not a file!'.format(path))
+        raise ValueError(f'"{path}" is not a file!')
 
     LOGGER.info('Reading BSP')
     bsp_file = BSP(path)
@@ -211,16 +212,14 @@ async def main(argv: List[str]) -> None:
     zipfile = ZipFile(zip_data)
 
     # Mount the existing packfile, so the cubemap files are recognised.
-    fsys.add_sys(ZipFileSystem('<BSP pakfile>', zipfile))
+    pakfile_fs = ZipFileSystem('<BSP pakfile>', zipfile)
+    fsys.add_sys(pakfile_fs)
 
     LOGGER.info('Done!')
 
     LOGGER.debug('Filesystems:')
     for child_sys in fsys.systems[:]:
         LOGGER.debug('- {}: {!r}', child_sys[1], child_sys[0])
-
-    LOGGER.info('Reading our FGD files...')
-    fgd = FGD.engine_dbase()
 
     packlist = PackList(fsys)
     LOGGER.info('Reading soundscripts...')
@@ -244,11 +243,12 @@ async def main(argv: List[str]) -> None:
     LOGGER.info('Run transformations...')
     await run_transformations(bsp_file.ents, fsys, packlist, bsp_file, game)
 
-    enable_packing = not is_preview or config.getboolean("General", "packfile_auto_enable", True)
-    if enable_packing:
+    if '-no_pack' not in args and (
+        not is_preview or config.getboolean("General", "packfile_auto_enable", True)
+    ):
         LOGGER.info('Scanning map for files to pack:')
         packlist.pack_from_bsp(bsp_file)
-        packlist.pack_fgd(bsp_file.ents, fgd)
+        packlist.pack_from_ents(bsp_file.ents, Path(path).stem, ['P2'])
         packlist.eval_dependencies()
         LOGGER.info('Done!')
 
@@ -258,8 +258,8 @@ async def main(argv: List[str]) -> None:
         LOGGER.warning('Packing disabled!')
 
     # We need to disallow Valve folders.
-    pack_whitelist: set[FileSystem] = set()
-    pack_blacklist: set[FileSystem] = set()
+    pack_whitelist: Set[FileSystem] = set()
+    pack_blacklist: Set[FileSystem] = {pakfile_fs}
 
     # Exclude absolutely everything except our folder.
     for child_sys, _ in fsys.systems:
@@ -281,38 +281,47 @@ async def main(argv: List[str]) -> None:
     else:
         dump_loc = None
 
-    if '-no_pack' not in args and enable_packing:
-        # Cubemap files packed into the map already.
-        existing = set(bsp_file.pakfile.namelist())
+    LOGGER.info('Writing BSP...')
+    bsp_file.save()
+    LOGGER.info(' - BSP written!')
 
-        LOGGER.info('Writing to BSP...')
-        packlist.pack_into_zip(
-            bsp_file,
-            ignore_vpk=True,
-            whitelist=pack_whitelist,
-            blacklist=pack_blacklist,
-            dump_loc=dump_loc,
-        )
+    # VRAD only runs if light_args is not set to "NONE"
+    if light_args == 'FAST':
+        LOGGER.info("Running VRAD: forcing cheap lighting.")
+        run_vrad(fast_args)
+    elif light_args == 'FULL':
+        LOGGER.info("Running VRAD: full lighting enabled (publishing, or forced to do so)")
+        run_vrad(full_args)
+    else:
+        LOGGER.info("Running VRAD was skipped!")
 
-        LOGGER.info('Packed files:\n{}', '\n'.join(
-            set(bsp_file.pakfile.namelist()) - existing
-        ))
+    LOGGER.info("VRAD completed. Reopening and packing files.")
+
+    bsp_file = BSP(path)
+
+    # Cubemap files packed into the map already.
+    existing = set(bsp_file.pakfile.namelist())
+
+    # Pack to the BSP *after* running VRAD, to ensure an extra-large packfile doesn't crash
+    # VRAD.
+    LOGGER.info('Writing to BSP...')
+    packlist.pack_into_zip(
+        bsp_file,
+        ignore_vpk=True,
+        whitelist=pack_whitelist,
+        blacklist=pack_blacklist,
+        dump_loc=dump_loc,
+    )
 
     LOGGER.info('Writing BSP...')
     bsp_file.save()
     LOGGER.info(' - BSP written!')
 
-    screenshot.modify(config, game.path)
+    LOGGER.info('Packed files:\n{}', '\n'.join(
+        set(bsp_file.pakfile.namelist()) - existing
+    ))
 
-    # VRAD only runs if light_args is not set to "NONE"
-    if light_args == 'FAST':
-        LOGGER.info("Forcing Cheap Lighting!")
-        run_vrad(fast_args)
-    elif light_args == 'FULL':
-        LOGGER.info("Publishing - Full lighting enabled! (or forced to do so)")
-        run_vrad(full_args)
-    else:
-        LOGGER.info("Forcing to skip VRAD!")
+    screenshot.modify(config, game.path)
 
     LOGGER.info("BEE2 VRAD hook finished!")
 

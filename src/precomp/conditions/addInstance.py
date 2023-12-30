@@ -1,8 +1,8 @@
 """Results for generating additional instances.
 
 """
-from typing import Iterable, Optional, Callable
-from srctools import Vec, Entity, Property, VMF, Angle
+from typing import Dict, FrozenSet, Iterable, List, Optional, Callable, Tuple
+from srctools import Vec, Entity, Keyvalues, VMF, Angle
 import srctools.logger
 
 from precomp import instanceLocs, options, collisions, conditions, rand, corridor
@@ -14,7 +14,7 @@ LOGGER = srctools.logger.get_logger(__name__, 'cond.addInstance')
 
 
 @conditions.make_result('addGlobal')
-def res_add_global_inst(vmf: VMF, inst: Entity, res: Property) -> object:
+def res_add_global_inst(vmf: VMF, inst: Entity, res: Keyvalues) -> object:
     """Add one instance in a specific location.
 
     Options:
@@ -32,7 +32,7 @@ def res_add_global_inst(vmf: VMF, inst: Entity, res: Property) -> object:
         interact with nearby object should not be placed there.
     """
     if not res.has_children():
-        res = Property('AddGlobal', [Property('File', res.value)])
+        res = Keyvalues('AddGlobal', [Keyvalues('File', res.value)])
     file = instanceLocs.resolve_one(inst.fixup.substitute(res['file']), error=True)
 
     if res.bool('allow_multiple') or file.casefold() not in conditions.GLOBAL_INSTANCES:
@@ -61,7 +61,7 @@ def res_add_global_inst(vmf: VMF, inst: Entity, res: Property) -> object:
 
 
 @conditions.make_result('addOverlay', 'overlayinst')
-def res_add_overlay_inst(vmf: VMF, inst: Entity, res: Property) -> Optional[Entity]:
+def res_add_overlay_inst(vmf: VMF, inst: Entity, res: Keyvalues) -> Optional[Entity]:
     """Add another instance on top of this one.
 
     If a single value, this sets only the filename.
@@ -89,25 +89,26 @@ def res_add_overlay_inst(vmf: VMF, inst: Entity, res: Property) -> Optional[Enti
 
     if not res.has_children():
         # Use all the defaults.
-        res = Property('AddOverlay', [
-            Property('File', res.value)
+        res = Keyvalues('AddOverlay', [
+            Keyvalues('file', res.value)
         ])
 
     if 'angles' in res:
-        angles = Angle.from_str(res['angles'])
+        angles = Angle.from_str(inst.fixup.substitute(res['angles']))
         if 'rotation' in res:
             LOGGER.warning('"angles" option overrides "rotation"!')
     else:
-        angles = Angle.from_str(res['rotation', '0 0 0'])
+        angles = Angle.from_str(inst.fixup.substitute(res['rotation', '0 0 0']))
         angles @= Angle.from_str(inst['angles', '0 0 0'])
 
-    orig_name = conditions.resolve_value(inst, res['file', ''])
-    filename = instanceLocs.resolve_one(orig_name, error=True)
+    orig_name = res['file', '']
+    filename = instanceLocs.resolve_one(inst.fixup.substitute(orig_name), default='')
 
     if not filename:
-        if not res.bool('silentLookup'):
+        # Don't show an error if it's being read from a fixup, or if the original name is blank.
+        if not res.bool('silentLookup') and not orig_name.startswith(('$', '<')) and orig_name != '':
             LOGGER.warning('Bad filename for "{}" when adding overlay!', orig_name)
-        # Don't bother making a overlay which will be deleted.
+        # Don't bother making an overlay instance which will be deleted.
         return None
 
     overlay_inst = conditions.add_inst(
@@ -119,7 +120,7 @@ def res_add_overlay_inst(vmf: VMF, inst: Entity, res: Property) -> Optional[Enti
         fixup_style=res.int('fixup_style'),
     )
     # Don't run if the fixup block exists..
-    if srctools.conv_bool(res['copy_fixup', '1']):
+    if srctools.conv_bool(inst.fixup.substitute(res['copy_fixup', '1'])):
         if 'fixup' not in res and 'localfixup' not in res:
             # Copy the fixup values across from the original instance
             for fixup, value in inst.fixup.items():
@@ -139,7 +140,7 @@ def res_add_overlay_inst(vmf: VMF, inst: Entity, res: Property) -> Optional[Enti
 
 @conditions.make_result('addShuffleGroup')
 def res_add_shuffle_group(
-    vmf: VMF, coll: collisions.Collisions, info: corridor.Info, res: Property,
+    vmf: VMF, coll: collisions.Collisions, info: corridor.Info, res: Keyvalues,
 ) -> Callable[[Entity], None]:
     """Pick from a pool of instances to randomise decoration.
 
@@ -150,7 +151,7 @@ def res_add_shuffle_group(
         - Var: The fixup variable to set on each item. This is used to tweak it
           to match the condition.
         - Conditions: Each value here is the value to produce if this instance
-          is required. The contents of the block is then a condition flag to
+          is required. The contents of the block is then a condition test to
           check.
         - Pool: A list of instances to randomly allocate to the conditions. There
           should be at least as many pool values as there are conditions.
@@ -158,27 +159,27 @@ def res_add_shuffle_group(
     """
     conf_variable = res['var']
     conf_seed = 'sg' + res['seed', '']
-    conf_pools: dict[str, list[str]] = {}
-    for prop in res.find_children('pool'):
-        if prop.has_children():
+    conf_pools: Dict[str, List[str]] = {}
+    for kv in res.find_children('pool'):
+        if kv.has_children():
             raise ValueError('Instances in pool cannot be a property block!')
-        conf_pools.setdefault(prop.name, []).append(prop.value)
+        conf_pools.setdefault(kv.name, []).append(kv.value)
 
-    # (flag, value, pools)
-    conf_selectors: list[tuple[list[Property], str, frozenset[str]]] = []
-    for prop in res.find_all('selector'):
-        conf_value = prop['value', '']
-        conf_flags = list(prop.find_children('conditions'))
+    # (tests, value, pools)
+    conf_selectors: List[Tuple[List[Keyvalues], str, FrozenSet[str]]] = []
+    for kv in res.find_all('selector'):
+        conf_value = kv['value', '']
+        conf_tests = list(kv.find_children('conditions'))
         picked_pools: Iterable[str]
         try:
-            picked_pools = prop['pools'].casefold().split()
+            picked_pools = kv['pools'].casefold().split()
         except LookupError:
             picked_pools = frozenset(conf_pools)
         else:
             for pool_name in picked_pools:
                 if pool_name not in conf_pools:
                     raise ValueError(f'Unknown pool name {pool_name}!')
-        conf_selectors.append((conf_flags, conf_value, frozenset(picked_pools)))
+        conf_selectors.append((conf_tests, conf_value, frozenset(picked_pools)))
 
     all_pools = [
         (name, inst)
@@ -191,9 +192,9 @@ def res_add_shuffle_group(
         """Place the group."""
         rng = rand.seed(b'shufflegroup', conf_seed, inst)
         pools = all_pools.copy()
-        for (flags, value, potential_pools) in conf_selectors:
-            for flag in flags:
-                if not conditions.check_flag(flag, coll, info, inst):
+        for (tests, value, potential_pools) in conf_selectors:
+            for test in tests:
+                if not conditions.check_test(test, coll, info, inst):
                     break
             else:  # Succeeded.
                 allowed_inst = [
@@ -214,7 +215,7 @@ def res_add_shuffle_group(
 
 
 @conditions.make_result('addCavePortrait')
-def res_cave_portrait(vmf: VMF, inst: Entity, res: Property) -> None:
+def res_cave_portrait(vmf: VMF, inst: Entity, res: Keyvalues) -> None:
     """A variant of AddOverlay for adding Cave Portraits.
 
     If the set quote pack is not Cave Johnson, this does nothing.

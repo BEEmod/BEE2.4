@@ -1,17 +1,17 @@
 """Various constant values (Mainly texture names.)"""
 from __future__ import annotations
-from typing import cast, Any, MutableMapping, Iterator, TypeVar
-from uuid import UUID, uuid5
-
+from typing import Any, Iterator, MutableMapping, TypeVar, cast
 from typing_extensions import Final
 from enum import Enum, EnumMeta
+from uuid import UUID, uuid5
+
 from srctools import Side
 
 
 __all__ = [
     'MaterialGroup',
 
-    'MusicChannel',
+    'MusicChannel', 'Theme',
 
     'WhitePan', 'BlackPan',
     'Signage', 'Antlines',
@@ -83,7 +83,7 @@ class MaterialGroupMeta(EnumMeta):
             return value.mat.casefold() in cls._value2member_map_
         return super().__contains__(value)
 
-    def __call__(cls: type[_MaterialGroupT], value: str, *args, **kwargs) -> _MaterialGroupT:
+    def __call__(cls: type[_MaterialGroupT], value: str, *args: object, **kwargs: object) -> _MaterialGroupT:
         """Find the existing member with this name."""
         if args or kwargs:  # Constructing the enum itself, keep unchanged.
             return super().__call__(value, *args, **kwargs)  # type: ignore
@@ -99,12 +99,13 @@ class MaterialGroup(str, Enum, metaclass=MaterialGroupMeta):
       to any members.
     * str(member) == member.value
     """
+    value: str
     def __eq__(self, other: object) -> bool:
         """Compare case-insensitively."""
         if isinstance(other, Side):
             other = other.mat
         if isinstance(other, str):
-            return self.value == other.casefold()
+            return bool(self.value == other.casefold())
         return NotImplemented
 
     def __ne__(self, other: object) -> bool:
@@ -112,7 +113,7 @@ class MaterialGroup(str, Enum, metaclass=MaterialGroupMeta):
         if isinstance(other, Side):
             other = other.mat
         if isinstance(other, str):
-            return self.value != other.casefold()
+            return bool(self.value != other.casefold())
         return NotImplemented
 
     def __str__(self) -> str:
@@ -267,6 +268,12 @@ class MusicChannel(Enum):
     SPEED = 'speedgel'  # Moving fast horizontally
 
 
+class Theme(Enum):
+    """Different themes for the UI."""
+    LIGHT = 'light'
+    DARK = 'dark'
+
+
 # Outputs we need to use to make a math_counter act like
 # the specified logic gate.
 COUNTER_AND_ON: Final = 'OnHitMax'
@@ -274,6 +281,9 @@ COUNTER_AND_OFF: Final = 'OnChangedFromMax'
 
 COUNTER_OR_ON: Final = 'OnChangedFromMin'
 COUNTER_OR_OFF: Final = 'OnHitMin'
+
+# The "infinite" time set on buttons.
+TIMER_INFINITE: Final = '99999999999'
 
 SEL_ICON_SIZE: Final = 96  # Size of the selector win icons
 SEL_ICON_SIZE_LRG: Final = (256, 192)  # Size of the larger icon shown in description.

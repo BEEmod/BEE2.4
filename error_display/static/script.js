@@ -87,6 +87,7 @@ window.addEventListener("load", () => {
 			color: 0xFAFA28, transparent: true, opacity: 0.5, side: THREE.DoubleSide,
 		});
 		const pointfile_mat = new THREE.LineBasicMaterial({color: 0xFF0000});
+		const lines_mat = new THREE.LineBasicMaterial({color: 0x00FFFF});
 
 		scene.add( new THREE.AmbientLight( 0x888888 ) );
 		const lighting = new THREE.DirectionalLight( 0xffffff, 0.5 );
@@ -163,6 +164,16 @@ window.addEventListener("load", () => {
 			scene.add(new THREE.Line(geo, pointfile_mat));
 		}
 
+		if (data.lines) {
+			const geo = new THREE.BufferGeometry().setFromPoints(data.lines.flatMap(
+				pair => [
+					new THREE.Vector3(pair[0][0], pair[0][1], pair[0][2]),
+					new THREE.Vector3(pair[1][0], pair[1][1], pair[1][2]),
+				]
+			));
+			scene.add(new THREE.LineSegments(geo, lines_mat));
+		}
+
 		if (data.barrier_hole) {
 			await loader_obj.loadAsync('static/barrier_hole.obj').then((hole_geo) => {
 				console.log("Hole: ", hole_geo);
@@ -205,20 +216,22 @@ window.addEventListener("load", () => {
 		.then(updateScene)
 		.catch((reason) => {
 			console.error(reason);
-			content_box.innerText = 'Could not fetch display: ' + reason;
+			container.innerText = 'Could not fetch display: ' + reason;
 	});
 
-	// Lock the article to use multiples of the tile size.
 	const update = () => {
 		const screen_width = document.documentElement.clientWidth - PADDING;
 		const screen_height = document.documentElement.clientHeight - PADDING;
-		const box_height = Math.floor(screen_height / TILE_SIZE) * TILE_SIZE;
+		let height = Math.floor(screen_height / TILE_SIZE);
+		if (height > 8) {
+			height = 8;
+		}
+		height *= TILE_SIZE;
 
-		content_box.style.width = `${Math.floor(screen_width / TILE_SIZE) * TILE_SIZE}px`;
-		content_box.style.height = `${box_height}px`;
+		container.style.width = `${Math.floor(screen_width / TILE_SIZE) * TILE_SIZE}px`;
+		container.style.height = `${height}px`;
 
 		const render_bbox = container.getBoundingClientRect();
-		const height = box_height - render_bbox.y + 16;
 		camera.aspect = render_bbox.width / height;
 		camera.updateProjectionMatrix();
 		renderer.setSize( render_bbox.width, height );

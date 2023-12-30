@@ -1,16 +1,29 @@
 from __future__ import annotations
 
 import tkinter as tk
-from srctools import Property
 from tkinter import ttk
 
-from app.itemconfig import UpdateFunc, WidgetLookup, nop_update
+from packages.widgets import KIND_STRING, UpdateFunc
+from app import itemconfig
+from ui_tk.img import TKImages
 
 
-@WidgetLookup('string', 'str')
-async def widget_string(parent: tk.Widget, var: tk.StringVar, conf: Property) -> tuple[tk.Widget, UpdateFunc]:
+@itemconfig.ui_single_no_conf(KIND_STRING)
+async def widget_string(
+    parent: tk.Widget, tk_img: TKImages,
+    on_changed: itemconfig.SingleChangeFunc,
+) -> tuple[tk.Widget, UpdateFunc]:
     """Simple textbox for entering text."""
-    return ttk.Entry(
+    var = tk.StringVar()
+    entry = ttk.Entry(
         parent,
         textvariable=var,
-    ), nop_update
+    )
+    # When changed, fire the callback.
+    var.trace_add('write', lambda *args: on_changed(var.get()))
+
+    async def update_ui(value: str) -> None:
+        """Called to update the UI."""
+        var.set(value)
+
+    return entry, update_ui

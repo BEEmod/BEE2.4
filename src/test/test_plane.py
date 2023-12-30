@@ -1,16 +1,17 @@
 """Test the Plane class."""
+from typing import List, Optional, Tuple, no_type_check
 from collections import Counter
-from typing import List, Tuple, Optional, no_type_check
+
+import pytest
 
 from plane import Plane
-import pytest
 
 
 @pytest.mark.parametrize('dx, dy', [
     (-2, 0), (2, 0), (0, -2), (0, 2),
     (2, 2), (-2, 2), (2, -2), (-2, -2),
 ])
-def test_insertion(dx, dy) -> None:
+def test_insertion(dx: int, dy: int) -> None:
     """Simple tests to ensure resizing works in each direction."""
     plane = Plane[object]()
     for i in range(10):
@@ -38,7 +39,7 @@ def test_insertion(dx, dy) -> None:
                 assert plane.get((x, y), 'hi') == 'hi'
 
 
-def _points(*pattern):
+def _points(*pattern: str) -> List[Tuple[int, int]]:
     """Return each coordinate in order in the string map."""
     points = [
         (x, y)
@@ -75,7 +76,7 @@ def _points(*pattern):
         '54..0',
     ),
 ], ids=['order', 'patA', 'patB', 'patC'])
-def test_insertion_complex(pattern: List[Tuple[int, int]], off_x: int, off_y: int):
+def test_insertion_complex(pattern: List[Tuple[int, int]], off_x: int, off_y: int) -> None:
     """Insert in various patterns, to test the dynamic resizing."""
     plane = Plane[object]()
     backup = {}
