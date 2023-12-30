@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: https://github.com/BEEmod/BEE2.4/issues\n"
-"POT-Creation-Date: 2023-05-29 15:28+1000\n"
+"POT-Creation-Date: 2023-12-30 10:20+1000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -115,8 +115,8 @@ msgstr ""
 #: user_errors.py
 msgid ""
 "One or more items were placed ouside the map! Move these back inside the "
-"map, or delete them. Items with no collision (like Half Walls or logic "
-"gates) can be left when rooms are moved, look for those."
+"map, or delete them. Items with no collision (like Half Walls or Logic "
+"Gates) can be left when rooms are moved, look for those."
 msgstr ""
 
 #. This uses HTML syntax.
@@ -170,7 +170,9 @@ msgstr ""
 
 #. This uses HTML syntax.
 #: user_errors.py
-msgid "No corridors available for the <var>{orient}_{mode}_{dir}</var> group!"
+msgid ""
+"No corridors were defined for the <var>{orient}_{mode}_{dir}</var> group."
+" Try moving this door back onto a wall."
 msgstr ""
 
 #. i18n: Reference to the stylevar
@@ -194,24 +196,24 @@ msgstr ""
 #: user_errors.py
 msgid ""
 "The map contains both singleplayer and coop entry/exit corridors. This "
-"can happen if they are manually added using the \"{stylevar\"} stylevar. "
+"can happen if they are manually added using the \"{stylevar}\" stylevar. "
 "In that case delete one of them."
 msgstr ""
 
 #. This uses HTML syntax.
-#: app/corridor_selector.py user_errors.py
+#: ui_tk/corridor_selector.py user_errors.py
 msgid "Entry"
 msgstr ""
 
 #. i18n: Entry door
 #. This uses HTML syntax.
-#: app/corridor_selector.py user_errors.py
+#: ui_tk/corridor_selector.py user_errors.py
 msgid "Exit"
 msgstr ""
 
 #. This uses HTML syntax.
 #: user_errors.py
-msgid "\"CubeType\" result used but with no type specified!"
+msgid "\"CubeType\" test used but with no type specified!"
 msgstr ""
 
 #. This uses HTML syntax.
@@ -628,17 +630,6 @@ msgid "Play the Workshop Cave Johnson lines on map start."
 msgstr ""
 
 #: app/StyleVarPane.py
-msgid "Prevent Portal Bump (fizzler)"
-msgstr ""
-
-#: app/StyleVarPane.py
-msgid ""
-"Add portal bumpers to make it more difficult to portal across fizzler "
-"edges. This can prevent placing portals in tight spaces near fizzlers, or"
-" fizzle portals on activation."
-msgstr ""
-
-#: app/StyleVarPane.py
 msgid "Suppress Mid-Chamber Dialogue"
 msgstr ""
 
@@ -850,6 +841,11 @@ msgstr ""
 msgid "This style does not have a elevator video screen."
 msgstr ""
 
+#. i18n: Text when elevators are not present in the style.
+#: app/UI.py
+msgid "<Not Present>"
+msgstr ""
+
 #: app/UI.py
 msgid "Random"
 msgstr ""
@@ -944,21 +940,17 @@ msgstr ""
 msgid "Date"
 msgstr ""
 
-#: app/backup.py app/corridor_selector.py
+#: app/backup.py ui_tk/corridor_selector.py
 msgid "SP"
 msgstr ""
 
-#: app/backup.py app/corridor_selector.py
+#: app/backup.py ui_tk/corridor_selector.py
 msgid "Coop"
 msgstr ""
 
 #: app/backup.py
-msgid ""
-"Do you wish to delete {n} map?\n"
-"{maps}"
-msgid_plural ""
-"Do you wish to delete {n} maps?\n"
-"{maps}"
+msgid "Do you wish to delete {n} map?"
+msgid_plural "Do you wish to delete {n} maps?"
 msgstr[0] ""
 msgstr[1] ""
 
@@ -1266,39 +1258,28 @@ msgid "Authors: Unknown"
 msgstr ""
 
 #: app/corridor_selector.py
-msgid "BEEmod - Select Corridor"
-msgstr ""
-
-#: app/corridor_selector.py app/helpMenu.py app/item_properties.py
-msgid "Close"
-msgstr ""
-
-#: app/corridor_selector.py
-msgid "Flat"
-msgstr ""
-
-#: app/corridor_selector.py
-msgid "Upward"
-msgstr ""
-
-#: app/corridor_selector.py
-msgid "Downward"
-msgstr ""
-
-#: app/corridor_selector.py
 msgid ""
-"Drag corridors to the 'selected' and 'unused' areas to specify which are "
-"used. Ingame, a random corridor from the 'selected' group will be picked "
-"for each map."
+"Check the boxes to specify which corridors may be used. Ingame, a random "
+"corridor will be picked for each map."
 msgstr ""
 
-#: app/corridor_selector.py
-msgid "Selected:"
+#: app/dialogs.py app/tk_tools.py
+msgid "BEEmod"
 msgstr ""
 
-#: app/corridor_selector.py
-msgid "Unused:"
+#: app/dialogs.py
+msgid "A value must be provided!"
 msgstr ""
+
+#: app/errors.py
+msgid "BEEmod Error"
+msgstr ""
+
+#: app/errors.py
+msgid "An error occurred while performing this task:"
+msgid_plural "Multiple errors occurred while performing this task:"
+msgstr[0] ""
+msgstr[1] ""
 
 #: app/gameMan.py
 msgid "Backup Original Files"
@@ -1348,13 +1329,15 @@ msgstr ""
 
 #: app/gameMan.py
 msgid ""
-"Copying compiler file {file} failed. Ensure {game} is not running. The "
-"webserver for the error display may also be running, quit the vrad "
-"process or wait a few minutes."
+"Copying compiler file {file} failed. Ensure {game}'s map compiler is not "
+"running. The webserver for the error display may also be running, quit "
+"the vrad process or wait a few minutes."
 msgstr ""
 
 #: app/gameMan.py
-msgid "Copying compiler file {file} failed. Ensure {game} is not running."
+msgid ""
+"Copying compiler file {file} failed. Ensure {game}'s map compiler is not "
+"running."
 msgstr ""
 
 #: app/gameMan.py
@@ -1475,6 +1458,11 @@ msgstr ""
 msgid "Submit Music Bugs..."
 msgstr ""
 
+#: app/helpMenu.py app/item_properties.py ui_tk/corridor_selector.py
+#: ui_tk/errors.py
+msgid "Close"
+msgstr ""
+
 #: app/helpMenu.py
 msgid "BEEMOD2 - Failed to open URL"
 msgstr ""
@@ -1494,9 +1482,7 @@ msgid "BEEMOD 2 - Open URL"
 msgstr ""
 
 #: app/helpMenu.py
-msgid ""
-"Do you wish to open the following URL?\n"
-"{url}"
+msgid "Do you wish to open the following URL?"
 msgstr ""
 
 #: app/helpMenu.py
@@ -1760,6 +1746,17 @@ msgstr ""
 msgid "Package translations rebuilt successfully."
 msgstr ""
 
+#: app/optionWindow.py
+msgid ""
+"Options on the development tab are intended for package authors\n"
+"and debugging purposes. Changing these may prevent BEEmod\n"
+"from functioning correctly until reverted to their original settings."
+msgstr ""
+
+#: app/optionWindow.py
+msgid "Enable development options"
+msgstr ""
+
 #: app/optionWindow.py app/packageMan.py app/selector_win.py
 msgid "OK"
 msgstr ""
@@ -1812,6 +1809,17 @@ msgstr ""
 msgid ""
 "Pyglet is either not installed or broken.\n"
 "Sound effects have been disabled."
+msgstr ""
+
+#: app/optionWindow.py
+msgid "Compress Items"
+msgstr ""
+
+#: app/optionWindow.py
+msgid ""
+"If enabled, hide all but one item for those that can be swapped with a X "
+"Type option. This helps to shrink the item list, if you have a lot of "
+"items installed."
 msgstr ""
 
 #: app/optionWindow.py
@@ -1964,6 +1972,10 @@ msgid "Dump Items List"
 msgstr ""
 
 #: app/optionWindow.py
+msgid "Dump Editor Models"
+msgstr ""
+
+#: app/optionWindow.py
 msgid "Reload Images"
 msgstr ""
 
@@ -2052,11 +2064,28 @@ msgid "Hide Palette \"{name}\""
 msgstr ""
 
 #: app/paletteUI.py
+msgid "Enter a name:"
+msgstr ""
+
+#: app/paletteUI.py
 msgid "Are you sure you want to delete \"{palette}\"?"
 msgstr ""
 
 #: app/paletteUI.py
 msgid "Builtin / Readonly"
+msgstr ""
+
+#. i18n: Palette group title.
+#: app/paletteUI.py
+msgid "BEE2 - Save Palette"
+msgstr ""
+
+#: app/paletteUI.py
+msgid "BEE2 - Delete Palette"
+msgstr ""
+
+#: app/paletteUI.py
+msgid "BEE2 - Change Palette Group"
 msgstr ""
 
 #: app/paletteUI.py app/voiceEditor.py
@@ -2089,22 +2118,6 @@ msgstr ""
 
 #: app/paletteUI.py
 msgid "Fill Palette"
-msgstr ""
-
-#: app/paletteUI.py
-msgid "BEE2 - Delete Palette"
-msgstr ""
-
-#: app/paletteUI.py
-msgid "BEE2 - Save Palette"
-msgstr ""
-
-#: app/paletteUI.py
-msgid "Enter a name:"
-msgstr ""
-
-#: app/paletteUI.py
-msgid "BEE2 - Change Palette Group"
 msgstr ""
 
 #: app/paletteUI.py
@@ -2168,10 +2181,6 @@ msgstr ""
 msgid "Selected"
 msgstr ""
 
-#: app/tk_tools.py
-msgid "BEEmod"
-msgstr ""
-
 #: app/voiceEditor.py
 msgid "Singleplayer"
 msgstr ""
@@ -2228,13 +2237,13 @@ msgstr ""
 msgid "No Name!"
 msgstr ""
 
-#: app/voiceEditor.py
-msgid "Transcript:"
-msgstr ""
-
 #. i18n: 'response' tab name, should be short.
 #: app/voiceEditor.py
 msgid "Resp"
+msgstr ""
+
+#: app/voiceEditor.py
+msgid "Transcript:"
 msgstr ""
 
 #: app/voiceEditor.py
@@ -2279,6 +2288,10 @@ msgstr ""
 msgid "Choose a Color"
 msgstr ""
 
+#: app/itemconfig/slider.py
+msgid "Off"
+msgstr ""
+
 #: packages/__init__.py
 msgid ""
 "one of the following locations:\n"
@@ -2312,5 +2325,25 @@ msgstr ""
 
 #: packages/corridor.py
 msgid "Corridor"
+msgstr ""
+
+#: ui_tk/corridor_selector.py
+msgid "BEEmod - Select Corridor"
+msgstr ""
+
+#: ui_tk/corridor_selector.py
+msgid "Use Only This"
+msgstr ""
+
+#: ui_tk/corridor_selector.py
+msgid "Flat"
+msgstr ""
+
+#: ui_tk/corridor_selector.py
+msgid "Upward"
+msgstr ""
+
+#: ui_tk/corridor_selector.py
+msgid "Downward"
 msgstr ""
 

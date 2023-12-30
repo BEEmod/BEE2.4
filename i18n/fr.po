@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version:  BEEMOD2\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2023-05-29 15:28+1000\n"
+"POT-Creation-Date: 2023-12-30 10:20+1000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: fr\n"
@@ -117,8 +117,8 @@ msgstr ""
 #: user_errors.py
 msgid ""
 "One or more items were placed ouside the map! Move these back inside the "
-"map, or delete them. Items with no collision (like Half Walls or logic "
-"gates) can be left when rooms are moved, look for those."
+"map, or delete them. Items with no collision (like Half Walls or Logic "
+"Gates) can be left when rooms are moved, look for those."
 msgstr ""
 
 #. This uses HTML syntax.
@@ -172,7 +172,9 @@ msgstr ""
 
 #. This uses HTML syntax.
 #: user_errors.py
-msgid "No corridors available for the <var>{orient}_{mode}_{dir}</var> group!"
+msgid ""
+"No corridors were defined for the <var>{orient}_{mode}_{dir}</var> group."
+" Try moving this door back onto a wall."
 msgstr ""
 
 #. i18n: Reference to the stylevar
@@ -196,25 +198,25 @@ msgstr ""
 #: user_errors.py
 msgid ""
 "The map contains both singleplayer and coop entry/exit corridors. This "
-"can happen if they are manually added using the \"{stylevar\"} stylevar. "
+"can happen if they are manually added using the \"{stylevar}\" stylevar. "
 "In that case delete one of them."
 msgstr ""
 
 #. This uses HTML syntax.
-#: app/corridor_selector.py user_errors.py
+#: ui_tk/corridor_selector.py user_errors.py
 #, fuzzy
 msgid "Entry"
 msgstr "Bendy"
 
 #. i18n: Entry door
 #. This uses HTML syntax.
-#: app/corridor_selector.py user_errors.py
+#: ui_tk/corridor_selector.py user_errors.py
 msgid "Exit"
 msgstr ""
 
 #. This uses HTML syntax.
 #: user_errors.py
-msgid "\"CubeType\" result used but with no type specified!"
+msgid "\"CubeType\" test used but with no type specified!"
 msgstr ""
 
 #. This uses HTML syntax.
@@ -686,21 +688,6 @@ msgid "Play the Workshop Cave Johnson lines on map start."
 msgstr "Joue les répliques de Cave Johnson du Workshop au début de la carte."
 
 #: app/StyleVarPane.py
-msgid "Prevent Portal Bump (fizzler)"
-msgstr "Empêcher le Portal Bump (Grilles d'Émancipation)"
-
-#: app/StyleVarPane.py
-msgid ""
-"Add portal bumpers to make it more difficult to portal across fizzler "
-"edges. This can prevent placing portals in tight spaces near fizzlers, or"
-" fizzle portals on activation."
-msgstr ""
-"Ajoute des bloqueurs invisibles pour rendre le placement de portails plus"
-" compliqué par dessus les bords des Grilles d'Émancipation. Cela peut "
-"empêcher le placement de portails dans des endroits serrés proches de "
-"Grilles ou dissoudre les portails lors de leur placement."
-
-#: app/StyleVarPane.py
 msgid "Suppress Mid-Chamber Dialogue"
 msgstr "Retirer les répliques se déclenchant en cours de salle"
 
@@ -947,6 +934,11 @@ msgstr ""
 msgid "This style does not have a elevator video screen."
 msgstr "Ce style n'a aucune vidéo d'ascenseur."
 
+#. i18n: Text when elevators are not present in the style.
+#: app/UI.py
+msgid "<Not Present>"
+msgstr ""
+
 #: app/UI.py
 msgid "Random"
 msgstr "Aléatoire"
@@ -1051,22 +1043,18 @@ msgstr ""
 msgid "Date"
 msgstr ""
 
-#: app/backup.py app/corridor_selector.py
+#: app/backup.py ui_tk/corridor_selector.py
 msgid "SP"
 msgstr "Solo"
 
-#: app/backup.py app/corridor_selector.py
+#: app/backup.py ui_tk/corridor_selector.py
 msgid "Coop"
 msgstr "Coop"
 
 #: app/backup.py
 #, fuzzy
-msgid ""
-"Do you wish to delete {n} map?\n"
-"{maps}"
-msgid_plural ""
-"Do you wish to delete {n} maps?\n"
-"{maps}"
+msgid "Do you wish to delete {n} map?"
+msgid_plural "Do you wish to delete {n} maps?"
 msgstr[0] ""
 "Voulez-vous supprimer {n} carte ?\n"
 "{maps}"
@@ -1400,40 +1388,30 @@ msgid "Authors: Unknown"
 msgstr ""
 
 #: app/corridor_selector.py
-msgid "BEEmod - Select Corridor"
-msgstr ""
-
-#: app/corridor_selector.py app/helpMenu.py app/item_properties.py
-msgid "Close"
-msgstr "Fermer"
-
-#: app/corridor_selector.py
-msgid "Flat"
-msgstr ""
-
-#: app/corridor_selector.py
-msgid "Upward"
-msgstr ""
-
-#: app/corridor_selector.py
-msgid "Downward"
-msgstr ""
-
-#: app/corridor_selector.py
 msgid ""
-"Drag corridors to the 'selected' and 'unused' areas to specify which are "
-"used. Ingame, a random corridor from the 'selected' group will be picked "
-"for each map."
+"Check the boxes to specify which corridors may be used. Ingame, a random "
+"corridor will be picked for each map."
 msgstr ""
 
-#: app/corridor_selector.py
+#: app/dialogs.py app/tk_tools.py
 #, fuzzy
-msgid "Selected:"
-msgstr "Style choisi:"
+msgid "BEEmod"
+msgstr "BEEMod"
 
-#: app/corridor_selector.py
-msgid "Unused:"
+#: app/dialogs.py
+msgid "A value must be provided!"
 msgstr ""
+
+#: app/errors.py
+#, fuzzy
+msgid "BEEmod Error"
+msgstr "BEEMod"
+
+#: app/errors.py
+msgid "An error occurred while performing this task:"
+msgid_plural "Multiple errors occurred while performing this task:"
+msgstr[0] ""
+msgstr[1] ""
 
 #: app/gameMan.py
 msgid "Backup Original Files"
@@ -1489,14 +1467,16 @@ msgstr ""
 
 #: app/gameMan.py
 msgid ""
-"Copying compiler file {file} failed. Ensure {game} is not running. The "
-"webserver for the error display may also be running, quit the vrad "
-"process or wait a few minutes."
+"Copying compiler file {file} failed. Ensure {game}'s map compiler is not "
+"running. The webserver for the error display may also be running, quit "
+"the vrad process or wait a few minutes."
 msgstr ""
 
 #: app/gameMan.py
 #, fuzzy
-msgid "Copying compiler file {file} failed. Ensure {game} is not running."
+msgid ""
+"Copying compiler file {file} failed. Ensure {game}'s map compiler is not "
+"running."
 msgstr ""
 "Copie du fichier {file} échouée. Veuillez vous assurer que {game} n'est "
 "pas en cours d'exécution."
@@ -1629,6 +1609,11 @@ msgstr "Soumettre un bug des objets..."
 msgid "Submit Music Bugs..."
 msgstr "Soumettre un bug des objets..."
 
+#: app/helpMenu.py app/item_properties.py ui_tk/corridor_selector.py
+#: ui_tk/errors.py
+msgid "Close"
+msgstr "Fermer"
+
 #: app/helpMenu.py
 msgid "BEEMOD2 - Failed to open URL"
 msgstr ""
@@ -1648,9 +1633,7 @@ msgid "BEEMOD 2 - Open URL"
 msgstr ""
 
 #: app/helpMenu.py
-msgid ""
-"Do you wish to open the following URL?\n"
-"{url}"
+msgid "Do you wish to open the following URL?"
 msgstr ""
 
 #: app/helpMenu.py
@@ -1942,6 +1925,18 @@ msgstr ""
 msgid "Package translations rebuilt successfully."
 msgstr ""
 
+#: app/optionWindow.py
+msgid ""
+"Options on the development tab are intended for package authors\n"
+"and debugging purposes. Changing these may prevent BEEmod\n"
+"from functioning correctly until reverted to their original settings."
+msgstr ""
+
+#: app/optionWindow.py
+#, fuzzy
+msgid "Enable development options"
+msgstr "Développement"
+
 #: app/optionWindow.py app/packageMan.py app/selector_win.py
 msgid "OK"
 msgstr "OK"
@@ -1998,6 +1993,17 @@ msgid ""
 msgstr ""
 "Pyglet est soit désinstallé soit endommagé.\n"
 "Les effets sonores ont été désactivés."
+
+#: app/optionWindow.py
+msgid "Compress Items"
+msgstr ""
+
+#: app/optionWindow.py
+msgid ""
+"If enabled, hide all but one item for those that can be swapped with a X "
+"Type option. This helps to shrink the item list, if you have a lot of "
+"items installed."
+msgstr ""
 
 #: app/optionWindow.py
 msgid "Show Hidden Palettes"
@@ -2181,6 +2187,11 @@ msgid "Dump Items List"
 msgstr "Supprimer la liste d'objets"
 
 #: app/optionWindow.py
+#, fuzzy
+msgid "Dump Editor Models"
+msgstr "Forcer les modèles de l'éditeur"
+
+#: app/optionWindow.py
 msgid "Reload Images"
 msgstr "Reloader les images"
 
@@ -2276,6 +2287,10 @@ msgid "Hide Palette \"{name}\""
 msgstr "Supprimer la palette \"{name}\""
 
 #: app/paletteUI.py
+msgid "Enter a name:"
+msgstr "Entrer un nom:"
+
+#: app/paletteUI.py
 #, fuzzy
 msgid "Are you sure you want to delete \"{palette}\"?"
 msgstr "Êtes-vous sûr de vouloir supprimer cette palette ?"
@@ -2283,6 +2298,20 @@ msgstr "Êtes-vous sûr de vouloir supprimer cette palette ?"
 #: app/paletteUI.py
 msgid "Builtin / Readonly"
 msgstr ""
+
+#. i18n: Palette group title.
+#: app/paletteUI.py
+msgid "BEE2 - Save Palette"
+msgstr "BEE2 - Enregistrer la palette"
+
+#: app/paletteUI.py
+#, fuzzy
+msgid "BEE2 - Delete Palette"
+msgstr "Supprimer la palette"
+
+#: app/paletteUI.py
+msgid "BEE2 - Change Palette Group"
+msgstr "BEE2 - Changer le groupe de palettes"
 
 #: app/paletteUI.py app/voiceEditor.py
 msgid "Save"
@@ -2317,23 +2346,6 @@ msgstr "Enregistrer la palette..."
 #: app/paletteUI.py
 msgid "Fill Palette"
 msgstr "Remplir la palette"
-
-#: app/paletteUI.py
-#, fuzzy
-msgid "BEE2 - Delete Palette"
-msgstr "Supprimer la palette"
-
-#: app/paletteUI.py
-msgid "BEE2 - Save Palette"
-msgstr "BEE2 - Enregistrer la palette"
-
-#: app/paletteUI.py
-msgid "Enter a name:"
-msgstr "Entrer un nom:"
-
-#: app/paletteUI.py
-msgid "BEE2 - Change Palette Group"
-msgstr "BEE2 - Changer le groupe de palettes"
 
 #: app/paletteUI.py
 msgid "Enter the name of the group for this palette, or \"\" to ungroup."
@@ -2400,11 +2412,6 @@ msgstr "Configurer la signalisation"
 msgid "Selected"
 msgstr "Style choisi:"
 
-#: app/tk_tools.py
-#, fuzzy
-msgid "BEEmod"
-msgstr "BEEMod"
-
 #: app/voiceEditor.py
 msgid "Singleplayer"
 msgstr "Solo"
@@ -2463,14 +2470,14 @@ msgstr ""
 msgid "No Name!"
 msgstr "Sans nom !"
 
-#: app/voiceEditor.py
-msgid "Transcript:"
-msgstr "Transcript:"
-
 #. i18n: 'response' tab name, should be short.
 #: app/voiceEditor.py
 msgid "Resp"
 msgstr "Rép."
+
+#: app/voiceEditor.py
+msgid "Transcript:"
+msgstr "Transcript:"
 
 #: app/voiceEditor.py
 #, fuzzy
@@ -2516,6 +2523,10 @@ msgstr ""
 msgid "Choose a Color"
 msgstr "Choisissez une couleur"
 
+#: app/itemconfig/slider.py
+msgid "Off"
+msgstr ""
+
 #: packages/__init__.py
 msgid ""
 "one of the following locations:\n"
@@ -2551,6 +2562,26 @@ msgstr "Description:"
 
 #: packages/corridor.py
 msgid "Corridor"
+msgstr ""
+
+#: ui_tk/corridor_selector.py
+msgid "BEEmod - Select Corridor"
+msgstr ""
+
+#: ui_tk/corridor_selector.py
+msgid "Use Only This"
+msgstr ""
+
+#: ui_tk/corridor_selector.py
+msgid "Flat"
+msgstr ""
+
+#: ui_tk/corridor_selector.py
+msgid "Upward"
+msgstr ""
+
+#: ui_tk/corridor_selector.py
+msgid "Downward"
 msgstr ""
 
 #~ msgid ""
@@ -2665,4 +2696,26 @@ msgstr ""
 
 #~ msgid "Clear Palette"
 #~ msgstr "Vider la palette"
+
+#~ msgid "Prevent Portal Bump (fizzler)"
+#~ msgstr "Empêcher le Portal Bump (Grilles d'Émancipation)"
+
+#~ msgid ""
+#~ "Add portal bumpers to make it more"
+#~ " difficult to portal across fizzler "
+#~ "edges. This can prevent placing portals"
+#~ " in tight spaces near fizzlers, or"
+#~ " fizzle portals on activation."
+#~ msgstr ""
+#~ "Ajoute des bloqueurs invisibles pour "
+#~ "rendre le placement de portails plus "
+#~ "compliqué par dessus les bords des "
+#~ "Grilles d'Émancipation. Cela peut empêcher "
+#~ "le placement de portails dans des "
+#~ "endroits serrés proches de Grilles ou"
+#~ " dissoudre les portails lors de leur"
+#~ " placement."
+
+#~ msgid "Selected:"
+#~ msgstr "Style choisi:"
 
