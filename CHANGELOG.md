@@ -1,5 +1,11 @@
 # Changelog
 
+# Version `<dev>`
+
+* Fix add-game prompt failing to appear if installed fresh.
+
+------------------------------------------
+
 # Version 4.44.0
 
 ### Enhancements:

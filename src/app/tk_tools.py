@@ -497,6 +497,14 @@ def center_win(window: Union[tk.Tk, tk.Toplevel], parent: Union[tk.Tk, tk.Toplev
     window.geometry(f'+{x}+{y}')
 
 
+def center_onscreen(window: Union[tk.Tk, tk.Toplevel]) -> None:
+    """Center a window onscreen."""
+    x = (window.winfo_screenwidth() - window.winfo_width()) // 2
+    y = (window.winfo_screenheight() - window.winfo_height()) // 2
+
+    window.geometry(f'+{x}+{y}')
+
+
 def _default_validator(value: str) -> str:
     if not value.strip():
         raise ValueError("A value must be provided!")
