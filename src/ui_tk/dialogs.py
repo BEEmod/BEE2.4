@@ -10,7 +10,7 @@ from typing_extensions import override
 from loadScreen import suppress_screens
 from app.dialogs import DEFAULT_TITLE, Dialogs, Icon, validate_non_empty
 from app.errors import AppError
-from app.tk_tools import set_window_icon
+from app.tk_tools import set_window_icon, center_onscreen
 from transtoken import TransToken
 
 from app import TK_ROOT
@@ -240,6 +240,12 @@ class TkDialogs(Dialogs):
             else:
                 query_cls = QueryValidator
             win = query_cls(self.parent, title, message, initial_value, validator)
+
+            if self.parent is TK_ROOT:
+                # Force to be centered and visible - the root might be hidden if doing an early add-game.
+                TK_ROOT.deiconify()
+                center_onscreen(win)
+
             await win.wait()
             return win.result
 

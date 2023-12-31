@@ -1,5 +1,12 @@
 # Changelog
 
+# Version 4.44.1
+
+* Fix add-game prompt failing to appear if installed fresh.
+* Remove some now-outdated splash screens.
+
+------------------------------------------
+
 # Version 4.44.0
 
 ### Enhancements:
