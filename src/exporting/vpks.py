@@ -1,10 +1,12 @@
 """Generate a VPK, to override editor resources."""
 from __future__ import annotations
+from typing import Dict, Iterator, Optional, TYPE_CHECKING
+
+from pathlib import Path
+import itertools
 import os
 import re
 import shutil
-from pathlib import Path
-from typing import Dict, Iterator, Optional, TYPE_CHECKING
 
 import trio
 from srctools import VPK, logger
@@ -62,6 +64,16 @@ async def find_folder(game: Game) -> Path:
                     old_vpk.rename(old_vpk.with_name(f'bee_backup_{old_vpk.stem}.vpk'))
                 except FileNotFoundError:
                     pass  # Never exported, very good.
+                except FileExistsError:
+                    # Somehow the backup already exists, find a free name.
+                    for i in itertools.count(1):
+                        try:
+                            old_vpk.rename(old_vpk.with_name(f'bee_backup_{old_vpk.stem}_{i}.vpk'))
+                        except FileNotFoundError:
+                            break
+                        except FileExistsError:
+                            pass
+
         game.unmarked_dlc3_vpk = False
         game.save()
 
