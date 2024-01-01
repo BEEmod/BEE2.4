@@ -191,7 +191,7 @@ def fix_cur_directory() -> None:
 if TYPE_CHECKING:
     from bg_daemon import run_background as run_bg_daemon
 else:
-    def run_bg_daemon(*args) -> None:
+    def run_bg_daemon(*args: Any) -> None:
         """Helper to make loadScreen not need to import bg_daemon.
 
         Instead, we can redirect the import through here, which is a module
@@ -313,7 +313,7 @@ def _exc_freeze(
 if sys.version_info < (3, 9) and hasattr(zipfile, '_SharedFile'):
     # noinspection PyProtectedMember
     class _SharedZipFile(zipfile._SharedFile):  # type: ignore[name-defined]
-        def __init__(self, *args, **kwargs) -> None:
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
             super().__init__(*args, **kwargs)
             # tell() reads the actual file position, but that may have been
             # changed by another thread - instead keep our own private value.
@@ -711,10 +711,7 @@ def restart_app() -> NoReturn:
     # We need to add the program to the arguments list, since python
     # strips that off.
     args = [sys.executable] + sys.argv
-    logging.root.info('Restarting using "{}", with args {!r}'.format(
-        sys.executable,
-        args,
-    ))
+    logging.root.info(f'Restarting using "{sys.executable}", with args {args!r}')
     logging.shutdown()
     os.execv(sys.executable, args)
 
