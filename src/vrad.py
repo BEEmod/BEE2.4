@@ -16,7 +16,6 @@ from pathlib import Path
 
 
 import srctools.run
-from srctools import FGD
 from srctools.bsp import BSP, BSP_LUMPS
 from srctools.filesys import RawFileSystem, ZipFileSystem, FileSystem
 from srctools.packlist import PackList

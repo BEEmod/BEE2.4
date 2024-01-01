@@ -1504,7 +1504,6 @@ async def main() -> None:
     """Main program code.
 
     """
-    global MAP_RAND_SEED
     LOGGER.info("BEE{} VBSP hook initiallised, srctools v{}.", utils.BEE_VERSION, srctools.__version__)
 
     # Warn if srctools Cython code isn't installed.
