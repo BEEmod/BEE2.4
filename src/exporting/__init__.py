@@ -52,7 +52,6 @@ class StepResource(Enum):
 STAGE_STEPS = 'STEPS'
 STAGE_COMP_BACKUP = 'BACK'
 STAGE_PUZZ_BACKUP = 'PUZZLE_BACKUP'
-STAGE_EXPORT = 'EXP'
 STAGE_COMPILER = 'COMP'
 STAGE_RESOURCES = 'RES'
 STAGE_MUSIC = 'MUS'
@@ -60,7 +59,6 @@ load_screen = loadScreen.LoadScreen(
     (STAGE_STEPS, TransToken.ui('Overall Progress')),
     (STAGE_COMP_BACKUP, TransToken.ui('Backup Original Files')),
     (STAGE_PUZZ_BACKUP, TransToken.ui('Backup Puzzles')),
-    (STAGE_EXPORT, TransToken.ui('Export Configuration')),
     (STAGE_COMPILER, TransToken.ui('Copy Compiler')),
     (STAGE_RESOURCES, TransToken.ui('Copy Resources')),
     (STAGE_MUSIC, TransToken.ui('Copy Music')),
