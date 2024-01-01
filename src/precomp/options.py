@@ -1,5 +1,5 @@
 """Manages reading general options from vbsp_config."""
-from typing import Dict, Generic, Iterator, Optional, TextIO, Tuple, Type, TypeVar, Union
+from typing import Dict, Generic, Iterator, Optional, TextIO, Tuple, Type, TypeVar, Union, overload
 from enum import Enum
 import inspect
 import math
@@ -295,6 +295,20 @@ def set_opt(opt_name: str, value: str) -> None:
 
     if (parsed := opt.parse(value)) is not None:
         SETTINGS[opt.id] = parsed
+
+
+@overload
+def get_itemconf(
+    name: Union[str, Tuple[str, str]],
+    default: OptionT,
+    timer_delay: Optional[int] = None,
+) -> OptionT: ...
+@overload
+def get_itemconf(
+    name: Union[str, Tuple[str, str]],
+    default: None,
+    timer_delay: Optional[int] = None,
+) -> Optional[str]: ...
 
 
 def get_itemconf(
