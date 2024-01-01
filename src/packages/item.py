@@ -122,10 +122,7 @@ class ItemVariant:
 
     def can_group(self) -> bool:
         """Does this variant have the data needed to group?"""
-        return (
-            self.all_icon is not None and
-            self.all_name is not None
-        )
+        return self.all_icon is not None and bool(self.all_name)
 
     def override_from_folder(self, other: ItemVariant) -> None:
         """Perform the override from another item folder."""
@@ -226,7 +223,7 @@ class ItemVariant:
     def iter_trans_tokens(self, source: str) -> Iterator[TransTokenSource]:
         """Iterate over the tokens in this item variant."""
         yield from self.editor.iter_trans_tokens(source)
-        if self.all_name is not None:
+        if self.all_name:
             yield self.all_name, source + '.all_name'
         yield from tkMarkdown.iter_tokens(self.desc, source + '.desc')
         for item in self.editor_extra:

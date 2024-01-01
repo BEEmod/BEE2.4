@@ -91,7 +91,7 @@ def get_export_data(
         if index in palette_items:
             if len(palette_items) == 1:
                 # Switch to the 'Grouped' icon and name
-                if item_data.all_name is not None:
+                if item_data.all_name:
                     subtype.pal_name = item_data.all_name
 
                 if item_data.all_icon is not None:
