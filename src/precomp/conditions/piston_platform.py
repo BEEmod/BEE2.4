@@ -142,7 +142,7 @@ def res_piston_plat(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
                 static_inst = inst.copy()
                 vmf.add_ent(static_inst)
                 static_inst['file'] = fname = inst_filenames['fullstatic_' + str(position)]
-                conditions.ALL_INST.add(fname)
+                conditions.ALL_INST.add(fname.casefold())
                 return
 
         init_script = f'SPAWN_UP <- {"true" if start_up else "false"}'

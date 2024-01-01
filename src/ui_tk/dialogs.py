@@ -10,10 +10,11 @@ from typing_extensions import override
 from loadScreen import suppress_screens
 from app.dialogs import DEFAULT_TITLE, Dialogs, Icon, validate_non_empty
 from app.errors import AppError
-from app.tk_tools import set_window_icon
+from app.tk_tools import set_window_icon, center_onscreen
 from transtoken import TransToken
 
-from app import TK_ROOT, localisation
+from app import TK_ROOT
+from ui_tk.wid_transtoken import set_text
 
 
 async def _messagebox(
@@ -78,7 +79,7 @@ class BasicQueryValidator(simpledialog.Dialog):
         super().body(master)
         set_window_icon(self)
         w = ttk.Label(master, justify='left')
-        localisation.set_text(w, self.__message)
+        set_text(w, self.__message)
         w.grid(row=0, padx=5, sticky='w')
 
         self.entry = ttk.Entry(master, name="entry")
@@ -239,6 +240,12 @@ class TkDialogs(Dialogs):
             else:
                 query_cls = QueryValidator
             win = query_cls(self.parent, title, message, initial_value, validator)
+
+            if self.parent is TK_ROOT:
+                # Force to be centered and visible - the root might be hidden if doing an early add-game.
+                TK_ROOT.deiconify()
+                center_onscreen(win)
+
             await win.wait()
             return win.result
 

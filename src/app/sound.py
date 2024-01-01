@@ -217,9 +217,14 @@ def play_fx() -> bool:
     """Return if sounds should play."""
     return config.APP.get_cur_conf(GenOptions).play_sounds
 
-if utils.WIN and not utils.FROZEN:
+if utils.WIN:
+    if utils.FROZEN:
+        _libs_folder = utils.bins_path(".")
+    else:
+        _libs_folder = utils.bins_path("lib-" + utils.BITNESS)
     # Add a libs folder for FFmpeg dlls.
-    os.environ['PATH'] = f'{utils.bins_path("lib-" + utils.BITNESS).absolute()};{os.environ["PATH"]}'
+    os.environ['PATH'] = f'{_libs_folder.absolute()};{os.environ["PATH"]}'
+    LOGGER.debug('Appending "{}" to $PATH.', _libs_folder)
 
 sounds: NullSound
 try:

@@ -1,6 +1,6 @@
 """Manages parsing and regenerating antlines."""
 from __future__ import annotations
-from typing import Callable, Dict, Mapping, final, List, Optional, Sequence
+from typing import Callable, Dict, Mapping, Tuple, final, List, Optional, Sequence
 
 from collections import defaultdict
 from collections.abc import Iterator, Container
@@ -202,10 +202,8 @@ class IndicatorStyle:
         elif floor is None and wall is not None:
             floor = wall
 
-        check_inst: Optional[str] = None
         timer_inst: Optional[str] = None
-        check_cmd: Optional[List[Output]] = None
-        cross_cmd: Optional[List[Output]] = None
+        check: Optional[Tuple[str, List[Output], List[Output]]] = None
         timer_adv_cmds: Dict[TimerModes, Sequence[Output]] = {}
         timer_blue_cmd: Optional[List[Output]] = None
         timer_oran_cmd: Optional[List[Output]] = None
@@ -215,8 +213,7 @@ class IndicatorStyle:
         timer_switching = PanelSwitchingStyle.CUSTOM
 
         check_kv = kv.find_block('check', or_blank=True)
-        has_check = bool(check_kv)
-        if has_check:
+        if bool(check_kv):
             check_inst = check_kv['inst']
             try:
                 check_switching = PanelSwitchingStyle(check_kv['switching'])
@@ -224,10 +221,10 @@ class IndicatorStyle:
                 check_switching = PanelSwitchingStyle.CUSTOM  #  Assume no optimisations
             check_cmd = get_outputs(check_kv, desc, 'check_cmd')
             cross_cmd = get_outputs(check_kv, desc, 'cross_cmd')
+            check = check_inst, check_cmd, cross_cmd
 
         timer_kv = kv.find_block('timer', or_blank=True)
-        has_timer = bool(timer_kv)
-        if has_timer:
+        if bool(timer_kv):
             timer_inst = timer_kv['inst']
             try:
                 timer_switching = PanelSwitchingStyle(timer_kv['switching'])
@@ -249,7 +246,8 @@ class IndicatorStyle:
                 wall=wall or parent.wall,
                 floor=floor or parent.floor,
             )
-            if has_check:
+            if check is not None:
+                check_inst, check_cmd, cross_cmd = check
                 conf = attrs.evolve(
                     conf,
                     check_inst=check_inst,
@@ -257,7 +255,7 @@ class IndicatorStyle:
                     check_cmd=check_cmd,
                     cross_cmd=cross_cmd,
                 )
-            if has_timer:
+            if timer_inst is not None:
                 conf = attrs.evolve(
                     conf,
                     timer_inst=timer_inst,
@@ -281,12 +279,12 @@ class IndicatorStyle:
             wall=AntType.default(),
             floor=AntType.default(),
             check_inst=str(check_item.instances[0].inst) if check_item.instances else '',
-            check_switching=options.get(PanelSwitchingStyle, 'ind_pan_check_switching'),
+            check_switching=options.IND_PAN_CHECK_SWITCHING.as_enum(PanelSwitchingStyle),
             check_cmd=check_item.conn_config.enable_cmd if check_item.conn_config is not None else (),
             cross_cmd=check_item.conn_config.disable_cmd if check_item.conn_config is not None else (),
 
             timer_inst=str(timer_item.instances[0].inst) if timer_item.instances else '',
-            timer_switching=options.get(PanelSwitchingStyle, 'ind_pan_timer_switching'),
+            timer_switching=options.IND_PAN_TIMER_SWITCHING.as_enum(PanelSwitchingStyle),
             timer_basic_start_cmd=timer_item.conn_config.enable_cmd if timer_item.conn_config is not None else (),
             timer_basic_stop_cmd=timer_item.conn_config.disable_cmd if timer_item.conn_config is not None else (),
             # No advanced configs

@@ -28,7 +28,7 @@ __all__ = [
 ]
 COND_MOD_NAME = "Item Connections"
 LOGGER = srctools.logger.get_logger(__name__)
-ITEM_TYPES: Dict[str, Optional[Config]] = {}
+ITEM_TYPES: Dict[str, Config] = {}
 
 # Targetname -> item
 ITEMS: Dict[str, 'Item'] = {}
@@ -92,7 +92,7 @@ class ShapeSignage:
         'overlay_frames',
     )
 
-    def __init__(self, overlays: List[Entity]):
+    def __init__(self, overlays: List[Entity]) -> None:
         if not overlays:
             raise ValueError('No overlays')
         self.overlays = list(overlays)
@@ -146,11 +146,11 @@ class Item:
         item_type: Config,
         *,  # Don't mix up antlines!
         ind_style: IndicatorStyle,
-        panels: Iterable[Entity]=(),
-        antlines: Iterable[Antline]=(),
-        shape_signs: Iterable[ShapeSignage]=(),
-        ant_toggle_var: str='',
-    ):
+        panels: Iterable[Entity] = (),
+        antlines: Iterable[Antline] = (),
+        shape_signs: Iterable[ShapeSignage] = (),
+        ant_toggle_var: str = '',
+    ) -> None:
         self.inst = inst
         self.config = item_type
 
@@ -358,11 +358,7 @@ class Connection:
         self.outputs = list(outputs)
 
     def __repr__(self) -> str:
-        return '<Connection {} {} -> {}>'.format(
-            CONN_NAMES[self.type],
-            self._from.name,
-            self._to.name,
-        )
+        return f'<Connection {CONN_NAMES[self.type]} {self._from.name} -> {self._to.name}>'
 
     def add(self) -> None:
         """Add this to the directories."""
@@ -430,16 +426,15 @@ def read_configs(all_items: Iterable[editoritems.Item]) -> None:
     for item in all_items:
         if item.id.casefold() in ITEM_TYPES:
             raise ValueError(f'Duplicate item type "{item.id}"')
-        if item.conn_config is None and (item.force_input or item.force_output):
-            # The item has no config, but it does force input/output.
-            # Generate a blank config so the Item is created.
+        if item.conn_config is None:
+            # Generate a blank config.
             ITEM_TYPES[item.id.casefold()] = Config(item.id)
         else:
             ITEM_TYPES[item.id.casefold()] = item.conn_config
 
     # These must exist.
     for item_id in ['item_indicator_panel', 'item_indicator_panel_timer']:
-        if ITEM_TYPES.get(item_id) is None:
+        if item_id not in ITEM_TYPES:
             raise user_errors.UserError(
                 user_errors.TOK_CONNECTION_REQUIRED_ITEM.format(item=item_id.upper())
             )
@@ -506,9 +501,6 @@ def calc_connections(
             except KeyError:
                 LOGGER.warning('No item type for "{}"!', item_id)
                 continue
-            if item_type is None:
-                # It exists, but has no I/O.
-                continue
 
             # Pass in the defaults for antline styles.
             ITEMS[inst_name] = Item(
@@ -550,10 +542,8 @@ def calc_connections(
 
         if item.inst.outputs and item.config is None:
             raise ValueError(
-                'No connections for item "{}", '
-                'but outputs in the map!'.format(
-                    instance_traits.get_item_id(item.inst)
-                )
+                f'No connections for item "{instance_traits.get_item_id(item.inst)}", '
+                f'but outputs in the map!'
             )
 
         for out in item.inst.outputs:
@@ -704,7 +694,7 @@ def do_item_optimisation(vmf: VMF) -> None:
     if needs_global_toggle:
         vmf.create_ent(
             classname='env_texturetoggle',
-            origin=options.get(Vec, 'global_ents_loc'),
+            origin=options.GLOBAL_ENTS_LOC(),
             targetname='_static_ind_tog',
             target='_static_ind',
         )
@@ -814,10 +804,7 @@ def gen_item_outputs(vmf: VMF) -> None:
                 '_inv_rl',
             )
 
-    logic_auto = vmf.create_ent(
-        'logic_auto',
-        origin=options.get(Vec, 'global_ents_loc')
-    )
+    logic_auto = vmf.create_ent('logic_auto', origin=options.GLOBAL_ENTS_LOC())
 
     for ent in dummy_logic_ents:
         # Condense all these together now.
@@ -940,8 +927,8 @@ def add_timer_relay(item: Item, has_sounds: bool) -> None:
             relay.add_out(localise_output(cmd, 'OnTrigger', item.inst, delay=timer_delay))
 
     if item.config.timer_sound_pos is not None and has_sounds:
-        timer_sound = options.get(str, 'timer_sound')
-        timer_cc = options.get(str, 'timer_sound_cc')
+        timer_sound = options.TIMER_SOUND()
+        timer_cc = options.TIMER_SOUND_CC()
 
         # The default sound has 'ticking' closed captions.
         # So reuse that if the style doesn't specify a different noise.

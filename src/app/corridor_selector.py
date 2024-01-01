@@ -2,7 +2,7 @@
 import itertools
 import random
 
-from typing import Generic, Iterator, Optional, List, Protocol, Sequence, TypeVar
+from typing import Dict, Generic, Iterator, Optional, List, Protocol, Sequence, Tuple, TypeVar
 from typing_extensions import Final
 
 import srctools.logger
@@ -183,7 +183,7 @@ class Selector(Generic[IconT]):
                 )
             self.corr_list = []
 
-        inst_enabled: dict[str, bool] = {corr.instance.casefold(): False for corr in self.corr_list}
+        inst_enabled: Dict[str, bool] = {corr.instance.casefold(): False for corr in self.corr_list}
         if conf.enabled:
             for sel_id, enabled in conf.enabled.items():
                 try:
@@ -359,7 +359,7 @@ class Selector(Generic[IconT]):
         """Show the window."""
         raise NotImplementedError
 
-    def ui_win_getsize(self) -> tuple[int, int]:
+    def ui_win_getsize(self) -> Tuple[int, int]:
         """Fetch the current dimensions, for saving."""
         raise NotImplementedError
 
@@ -367,7 +367,7 @@ class Selector(Generic[IconT]):
         """Reposition everything after the window has resized."""
         raise NotImplementedError
 
-    def ui_get_buttons(self) -> tuple[GameMode, Direction, Orient]:
+    def ui_get_buttons(self) -> Tuple[GameMode, Direction, Orient]:
         """Get the current button positions."""
         raise NotImplementedError
 

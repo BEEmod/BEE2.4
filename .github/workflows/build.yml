@@ -95,12 +95,16 @@ jobs:
         run: python -m PyInstaller --distpath "../dist/${{ matrix.bitness }}bit/" -y BEE2.spec
         working-directory: ./src/
 
+      - name: Compress Artifact
+        run: python -m zipfile --create "../../bee2_${{ matrix.bitness }}.zip" .
+        working-directory: ./dist/${{ matrix.bitness }}bit/BEE2/
+
       - name: Artifact upload (tag)
         uses: actions/upload-artifact@v3
         if: github.event_name == 'create'
         with:
           name: beemod2_${{ github.event.ref }}_${{ matrix.artifact-name }}
-          path: ./dist/${{ matrix.bitness }}bit/BEE2/
+          path: ./dist/bee2_${{ matrix.bitness }}.zip
           if-no-files-found: error
 
       - name: Artifact upload (hash)
@@ -108,5 +112,5 @@ jobs:
         if: github.event_name != 'create'
         with:
           name: beemod2_${{ github.sha }}_${{ matrix.artifact-name }}
-          path: ./dist/${{ matrix.bitness }}bit/BEE2/
+          path: ./dist/bee2_${{ matrix.bitness }}.zip
           if-no-files-found: error

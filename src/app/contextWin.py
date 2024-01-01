@@ -18,9 +18,10 @@ from tkinter import ttk
 
 from ui_tk.dialogs import TkDialogs
 from ui_tk.img import TKImages, TK_IMG
+from ui_tk.wid_transtoken import set_text
 from .richTextBox import tkRichText
 from . import (
-    itemconfig, localisation, tkMarkdown, tooltip, tk_tools, sound, img, UI,
+    itemconfig, tkMarkdown, tooltip, tk_tools, sound, img, UI,
     TK_ROOT, DEV_MODE, background_run
 )
 from .item_properties import PropertyWindow
@@ -28,7 +29,7 @@ import utils
 import srctools.logger
 from editoritems import Handle as RotHandle, Surface, ItemClass, FSPath
 from editoritems_props import prop_timer_delay
-from app.localisation import TransToken
+from transtoken import TransToken
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -46,6 +47,8 @@ window = tk.Toplevel(TK_ROOT, name='contextWin')
 window.overrideredirect(True)
 window.resizable(False, False)
 window.transient(master=TK_ROOT)
+if utils.LINUX:
+    window.wm_attributes('-type', 'popup_menu')
 window.withdraw()  # starts hidden
 
 SUBITEM_POS = {
@@ -278,10 +281,10 @@ def load_item_data(tk_img: TKImages) -> None:
 
     wid_subitem[pos_for_item(selected_sub_item.subKey)]['relief'] = 'raised'
 
-    localisation.set_text(wid['author'], TransToken.list_and(
+    set_text(wid['author'], TransToken.list_and(
         map(TransToken.untranslated, item_data.authors), sort=True,
     ))
-    localisation.set_text(wid['name'], selected_sub_item.name)
+    set_text(wid['name'], selected_sub_item.name)
     wid['ent_count']['text'] = item_data.ent_count or '??'
 
     desc = get_description(
@@ -468,7 +471,7 @@ def adjust_position(e=None) -> None:
 TK_ROOT.bind("<Configure>", adjust_position, add='+')
 
 
-def hide_context(e=None):
+def hide_context(e: object=None) -> None:
     """Hide the properties window, if it's open."""
     global selected_item, selected_sub_item
     if is_visible():
@@ -484,7 +487,7 @@ def init_widgets(tk_img: TKImages) -> None:
     f = ttk.Frame(window, relief="raised", borderwidth="4")
     f.grid(row=0, column=0)
 
-    localisation.set_text(ttk.Label(f, anchor="center"), TransToken.ui("Properties:")).grid(
+    set_text(ttk.Label(f, anchor="center"), TransToken.ui("Properties:")).grid(
         row=0,
         column=0,
         columnspan=3,
@@ -527,7 +530,7 @@ def init_widgets(tk_img: TKImages) -> None:
         tk_tools.bind_leftclick(wid_subitem[i], functools.partial(sub_sel, i))
         tk_tools.bind_rightclick(wid_subitem[i], functools.partial(sub_open, i))
 
-    localisation.set_text(
+    set_text(
         ttk.Label(f, anchor="sw"),
         TransToken.ui("Description:")
     ).grid(row=5, column=0, sticky="SW")
@@ -546,7 +549,7 @@ def init_widgets(tk_img: TKImages) -> None:
     desc_frame.grid(row=6, column=0, columnspan=3, sticky="EW")
     desc_frame.columnconfigure(0, weight=1)
 
-    wid['desc'] = tkRichText(desc_frame, width=40, height=16)
+    wid['desc'] = tkRichText(desc_frame, name='desc', width=40, height=16)
     wid['desc'].grid(row=0, column=0, sticky="EW")
 
     desc_scroll = tk_tools.HidingScroll(
@@ -584,7 +587,7 @@ def init_widgets(tk_img: TKImages) -> None:
             hide_context(None)
 
     wid['moreinfo'] = ttk.Button(f, command=lambda: background_run(show_more_info))
-    localisation.set_text(wid['moreinfo'], TransToken.ui("More Info>>"))
+    set_text(wid['moreinfo'], TransToken.ui("More Info>>"))
     wid['moreinfo'].grid(row=7, column=2, sticky='e')
     tooltip.add_tooltip(wid['moreinfo'])
 
@@ -614,7 +617,7 @@ def init_widgets(tk_img: TKImages) -> None:
     prop_window = PropertyWindow(tk_img, hide_item_props)
 
     wid['changedefaults'] = ttk.Button(f, command=lambda: background_run(show_item_props))
-    localisation.set_text(wid['changedefaults'], TransToken.ui("Change Defaults..."))
+    set_text(wid['changedefaults'], TransToken.ui("Change Defaults..."))
     wid['changedefaults'].grid(row=7, column=1)
     tooltip.add_tooltip(
         wid['changedefaults'],

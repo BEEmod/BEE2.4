@@ -13,8 +13,8 @@ LOGGER = logger.get_logger(__name__, 'conf.win')
 
 
 @config.APP.register
-@attrs.frozen(slots=False)
-class WindowState(config.Data, conf_name='PaneState', uses_id=True, palette_stores=False):
+@attrs.frozen
+class WindowState(config.Data, conf_name='PaneState', uses_id=True):
     """Holds the position and size of windows."""
     x: int
     y: int
@@ -96,7 +96,7 @@ class WindowState(config.Data, conf_name='PaneState', uses_id=True, palette_stor
 
 @config.APP.register
 @attrs.frozen(slots=False)
-class SelectorState(config.Data, conf_name='SelectorWindow', palette_stores=False, uses_id=True):
+class SelectorState(config.Data, conf_name='SelectorWindow', uses_id=True):
     """The state for selector windows for restoration next launch."""
     open_groups: Mapping[str, bool] = attrs.Factory(dict)
     width: int = 0

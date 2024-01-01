@@ -1,4 +1,5 @@
 """Test the main config logic."""
+import attrs
 from typing_extensions import override
 import io
 import uuid
@@ -44,6 +45,22 @@ class DataSingle(config.Data, conf_name='TestName', version=2, uses_id=False):
             Keyvalues('value', self.value),
             Keyvalues('triple', self.triple),
         ])
+
+
+def test_get_info() -> None:
+    # noinspection PyAbstractClass
+    class Test(config.Data, conf_name='SomeTest', version=46, uses_id=True):
+        pass
+
+    info = Test.get_conf_info()
+    assert info.name == 'SomeTest'
+    assert info.version == 46
+    assert info.uses_id is True
+
+    # Run attrs on the class, which needs to remake it.
+    Test2 = attrs.frozen(Test)
+    assert Test is not Test2
+    assert Test2.get_conf_info() is info
 
 
 def test_basic_store() -> None:

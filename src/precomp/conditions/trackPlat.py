@@ -171,7 +171,7 @@ def track_scan(
     :param x_dir: The direction to look (-1 or 1)
     """
     track: Optional[Entity] = start_track
-    move_dir = Vec(x_dir*128, 0, 0) @ Matrix.from_angstr(track['angles'])
+    move_dir = Vec(x_dir*128, 0, 0) @ Matrix.from_angstr(start_track['angles'])
     while track:
         tr_set.add(track)
 

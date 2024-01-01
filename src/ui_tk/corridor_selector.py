@@ -1,13 +1,13 @@
 """Tk implementation of the corridor selector."""
 import tkinter as tk
-from typing import Final, Optional
+from typing import Final, Optional, Tuple
 from typing_extensions import override
 
 from tkinter import ttk
 
 import config
 import utils
-from app import TK_ROOT, background_run, img, localisation, tkMarkdown, tk_tools
+from app import TK_ROOT, background_run, img, tkMarkdown, tk_tools
 from app.corridor_selector import (
     HEIGHT, IMG_ARROW_LEFT, IMG_ARROW_RIGHT, IMG_CORR_BLANK, Icon,
     Selector, TRANS_HELP, WIDTH,
@@ -19,6 +19,7 @@ from transtoken import TransToken
 from ui_tk.dragdrop import CanvasPositioner
 from ui_tk.img import TKImages
 import packages
+from ui_tk.wid_transtoken import set_text, set_win_title
 
 
 ICON_CHECK_PADDING: Final = 2 if utils.WIN else 0
@@ -98,7 +99,7 @@ class TkSelector(Selector):
         self.win = tk.Toplevel(TK_ROOT, name='corridor')
         self.win.withdraw()
         self.win.wm_protocol("WM_DELETE_WINDOW", self.hide)
-        localisation.set_win_title(self.win, TransToken.ui('BEEmod - Select Corridor'))
+        set_win_title(self.win, TransToken.ui('BEEmod - Select Corridor'))
 
         self.win.rowconfigure(0, weight=1)
         self.win.columnconfigure(0, weight=1)
@@ -146,8 +147,13 @@ class TkSelector(Selector):
         )
         self.wid_authors.grid(row=2, column=0, columnspan=2, sticky='ew')
 
-        self.wid_desc = tkRichText(frm_right)
-        desc_scroll = tk_tools.HidingScroll(frm_right, orient='vertical', command=self.wid_desc.yview)
+        self.wid_desc = tkRichText(frm_right, name='desc')
+        desc_scroll = tk_tools.HidingScroll(
+            frm_right,
+            orient='vertical',
+            name='desc_scroll',
+            command=self.wid_desc.yview,
+        )
         self.wid_desc['yscrollcommand'] = desc_scroll.set
         self.wid_desc.grid(row=3, column=0, sticky='nsew')
         desc_scroll.grid(row=3, column=1, sticky='ns')
@@ -157,10 +163,10 @@ class TkSelector(Selector):
         frm_lower_btn.grid(row=4, column=0, columnspan=2)
 
         self.btn_just_this = ttk.Button(frm_lower_btn, name='just_this', command=self.evt_select_one)
-        localisation.set_text(self.btn_just_this, TransToken.ui('Use Only This'))
+        set_text(self.btn_just_this, TransToken.ui('Use Only This'))
         self.btn_just_this.grid(row=0, column=0)
 
-        localisation.set_text(
+        set_text(
             ttk.Button(frm_lower_btn, name='closer', command=self.hide),
             TransToken.ui('Close'),
         ).grid(row=0, column=1)
@@ -213,7 +219,7 @@ class TkSelector(Selector):
         self.canvas.bind('<Configure>', tk_tools.make_handler(self.evt_resized))
 
         self.help_lbl = ttk.Label(self.canvas)
-        localisation.set_text(self.help_lbl, TRANS_HELP)
+        set_text(self.help_lbl, TRANS_HELP)
         self.help_lbl_win = self.canvas.create_window(0, 0, anchor='nw', window=self.help_lbl)
 
         tk_tools.add_mousewheel(self.canvas, self.win)
@@ -248,19 +254,18 @@ class TkSelector(Selector):
         tk_tools.center_win(self.win, TK_ROOT)
 
     @override
-    def ui_win_getsize(self) -> tuple[int, int]:
+    def ui_win_getsize(self) -> Tuple[int, int]:
         """Fetch the current dimensions, for saving."""
         return self.win.winfo_width(), self.win.winfo_height()
 
     @override
-    def ui_get_buttons(self) -> tuple[GameMode, Direction, Orient]:
+    def ui_get_buttons(self) -> Tuple[GameMode, Direction, Orient]:
         """Get the current button state."""
         return self.btn_mode.current, self.btn_direction.current, self.btn_orient.current
 
     @override
     def ui_icon_create(self) -> None:
         """Create a new icon widget, and append it to the list."""
-        index = len(self.icons)
         self.icons.append(IconUI(self, len(self.icons)))
 
     @override
@@ -277,8 +282,8 @@ class TkSelector(Selector):
         enable_just_this: bool,
     ) -> None:
         """Display information for a corridor."""
-        localisation.set_text(self.wid_title, title)
-        localisation.set_text(self.wid_authors, authors)
+        set_text(self.wid_title, title)
+        set_text(self.wid_authors, authors)
         self.wid_desc.set_text(desc)
         self.btn_just_this.state(('!disabled', ) if enable_just_this else ('disabled', ))
 

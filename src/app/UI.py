@@ -15,13 +15,14 @@ from typing_extensions import assert_never
 
 import exporting
 import loadScreen
-from app import TK_ROOT, background_run, localisation
+from app import TK_ROOT, background_run
 from BEE2_config import ConfigFile, GEN_OPTS
 from app.dialogs import Dialogs
 from loadScreen import main_loader as loader
 import packages
 from packages.item import ItemVariant, InheritKind
 import utils
+from config.filters import FilterConf
 from config.gen_opts import GenOptions, AfterExport
 from config.last_sel import LastSelected
 from config.windows import WindowState
@@ -53,6 +54,7 @@ from app.menu_bar import MenuBar
 from ui_tk.corridor_selector import TkSelector
 from ui_tk.dialogs import DIALOG
 from ui_tk.img import TKImages, TK_IMG
+from ui_tk import wid_transtoken
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -219,21 +221,25 @@ class Item:
         Drag-icons have different rules for what counts as 'single', so
         they use the single_num parameter to control the output.
         """
-        icon = self._get_raw_icon(subKey, allow_single, single_num)
+        num_picked = sum(
+            item.id == self.id
+            for item in pal_picked
+        )
+        return self.get_raw_icon(subKey, allow_single and num_picked <= single_num)
+
+    def get_raw_icon(self, sub_key: int, use_grouping: bool) -> img.Handle:
+        """Get an icon for the given subkey, directly indicating if it should be grouped."""
+        icon = self._get_raw_icon(sub_key, use_grouping)
         if self.item.unstyled or not config.APP.get_cur_conf(GenOptions).visualise_inheritance:
             return icon
         if self.inherit_kind is not InheritKind.DEFINED:
             icon = icon.overlay_text(self.inherit_kind.value.title(), 12)
         return icon
 
-    def _get_raw_icon(self, subKey: int, allow_single: bool, single_num: int) -> img.Handle:
+    def _get_raw_icon(self, subKey: int, use_grouping: bool) -> img.Handle:
         """Get the raw icon, which may be overlaid if required."""
         icons = self.data.icons
-        num_picked = sum(
-            item.id == self.id
-            for item in pal_picked
-        )
-        if allow_single and self.data.can_group() and num_picked <= single_num:
+        if use_grouping and self.data.can_group():
             # If only 1 copy of this item is on the palette, use the
             # special icon
             try:
@@ -276,7 +282,7 @@ class Item:
         for item in pal_items:
             if item.id == self.id:
                 item.load_data()
-        flow_picker()
+        background_run(flow_picker, config.APP.get_cur_conf(FilterConf))
 
     def change_version(self, version: str) -> None:
         """Set the version of this item."""
@@ -417,7 +423,13 @@ class PalItem:
 
         Call whenever the style changes, so the icons update.
         """
-        TK_IMG.apply(self.label, self.item.get_icon(self.subKey, self.is_pre))
+        if self.is_pre:
+            TK_IMG.apply(self.label, self.item.get_icon(self.subKey, True))
+        else:
+            TK_IMG.apply(self.label, self.item.get_raw_icon(
+                self.subKey,
+                config.APP.get_cur_conf(FilterConf, default=FilterConf()).compress,
+            ))
 
     def clear(self) -> bool:
         """Remove any items matching ourselves from the palette.
@@ -845,12 +857,12 @@ async def export_editoritems(pal_ui: paletteUI.PaletteUI, bar: MenuBar, dialog: 
 
 def set_disp_name(item: PalItem, e: object = None) -> None:
     """Callback to display the name of the item."""
-    localisation.set_text(UI['pre_disp_name'], item.name)
+    wid_transtoken.set_text(UI['pre_disp_name'], item.name)
 
 
 def clear_disp_name(e: object = None) -> None:
     """Callback to reset the item name."""
-    localisation.set_text(UI['pre_disp_name'], TransToken.BLANK)
+    wid_transtoken.set_text(UI['pre_disp_name'], TransToken.BLANK)
 
 
 def conv_screen_to_grid(x: float, y: float) -> Tuple[int, int]:
@@ -994,7 +1006,6 @@ def drag_fast(drag_item: PalItem, e: tk.Event[tk.Misc]) -> None:
     # Is the cursor over the preview pane?
     if 0 <= pos_x < 4:
         snd.fx('delete')
-        flow_picker()
     else:  # over the picker
         if len(pal_picked) < 32:  # can't copy if there isn't room
             snd.fx('config')
@@ -1036,7 +1047,7 @@ async def set_palette(chosen_pal: paletteUI.Palette) -> None:
 
     if chosen_pal.settings is not None:
         LOGGER.info('Settings: {}', chosen_pal.settings)
-        await config.apply_pal_conf(chosen_pal.settings)
+        await config.APP.apply_multi(chosen_pal.settings)
 
     flow_preview()
 
@@ -1069,6 +1080,7 @@ def pal_shuffle() -> None:
         if item.id not in palette_set
         if mandatory_unlocked or not item.needs_unlock
         if cur_filter is None or (item.id, item.subKey) in cur_filter
+        if item_list[item.id].visual_subtypes  # Check there's actually sub-items to show.
     })
 
     random.shuffle(shuff_items)
@@ -1105,7 +1117,7 @@ async def init_option(
 
     async def game_changed(game: gameMan.Game) -> None:
         """When the game changes, update this button."""
-        localisation.set_text(UI['pal_export'], game.get_export_text())
+        wid_transtoken.set_text(UI['pal_export'], game.get_export_text())
 
     await gameMan.ON_GAME_CHANGED.register_and_prime(game_changed)
 
@@ -1114,7 +1126,7 @@ async def init_option(
     props.grid(row=5, sticky="EW")
 
     music_frame = ttk.Labelframe(props)
-    localisation.set_text(music_frame, TransToken.ui('Music: '))
+    wid_transtoken.set_text(music_frame, TransToken.ui('Music: '))
 
     async with trio.open_nursery() as nursery:
         nursery.start_soon(music_conf.make_widgets, packages.get_loaded_packages(), music_frame, pane)
@@ -1141,7 +1153,7 @@ async def init_option(
 
     UI['suggested_style'] = sugg_btn =  ttk.Button(props, command=suggested_style_set)
     # '\u2193' is the downward arrow symbol.
-    localisation.set_text(sugg_btn, TransToken.ui(
+    wid_transtoken.set_text(sugg_btn, TransToken.ui(
         "{down_arrow} Use Suggested {down_arrow}"
     ).format(down_arrow='\u2193'))
     sugg_btn.grid(row=1, column=1, columnspan=2, sticky="EW", padx=0)
@@ -1167,7 +1179,7 @@ async def init_option(
         if name is None:
             # This is the "Suggested" button!
             continue
-        localisation.set_text(ttk.Label(props), name).grid(row=ind)
+        wid_transtoken.set_text(ttk.Label(props), name).grid(row=ind)
 
     voice_frame = ttk.Frame(props)
     voice_frame.columnconfigure(1, weight=1)
@@ -1196,7 +1208,7 @@ async def init_option(
     voice_frame.grid(row=2, column=1, sticky='EW')
     (await skybox_win.widget(props)).grid(row=3, column=1, sticky='EW', padx=left_pad)
     (await elev_win.widget(props)).grid(row=4, column=1, sticky='EW', padx=left_pad)
-    localisation.set_text(
+    wid_transtoken.set_text(
         ttk.Button(props, command=lambda: background_run(corridor.show)),
         TransToken.ui('Select'),
     ).grid(row=5, column=1, sticky='EW')
@@ -1266,10 +1278,10 @@ def init_preview(tk_img: TKImages, f: Union[tk.Frame, ttk.Frame]) -> None:
     flow_preview()
 
 
-def init_picker(f: Union[tk.Frame, ttk.Frame]) -> None:
+async def init_picker(f: Union[tk.Frame, ttk.Frame]) -> None:
     """Construct the frame holding all the items."""
     global frmScroll, pal_canvas
-    localisation.set_text(
+    wid_transtoken.set_text(
         ttk.Label(f, anchor="center"),
         TransToken.ui("All Items: "),
     ).grid(row=0, column=0, sticky="EW")
@@ -1307,10 +1319,14 @@ def init_picker(f: Union[tk.Frame, ttk.Frame]) -> None:
             if subtype.pal_icon or subtype.pal_name:
                 pal_items.append(PalItem(frmScroll, item, sub=i, is_pre=False))
 
-    f.bind("<Configure>", flow_picker)
+    f.bind("<Configure>", lambda e: background_run(
+        flow_picker,
+        config.APP.get_cur_conf(FilterConf, default=FilterConf()),
+    ))
+    await config.APP.set_and_run_ui_callback(FilterConf, flow_picker)
 
 
-def flow_picker(e: Optional[tk.Event[tk.Misc]] = None) -> None:
+async def flow_picker(filter_conf: FilterConf) -> None:
     """Update the picker box so all items are positioned corrctly.
 
     Should be run (e arg is ignored) whenever the items change, or the
@@ -1325,16 +1341,27 @@ def flow_picker(e: Optional[tk.Event[tk.Misc]] = None) -> None:
         width = 1  # we got way too small, prevent division by zero
 
     i = 0
+    # If cur_filter is None, it's blank and so show all of them.
     for item in pal_items:
         if item.needs_unlock and not mandatory_unlocked:
             visible = False
-        elif cur_filter is None:
-            visible = True
+        elif filter_conf.compress:
+            # Show if this is the first, and any in this item are visible.
+            # Visual subtypes should not be empty if we're here, but if so just hide.
+            if item.item.visual_subtypes and item.subKey == item.item.visual_subtypes[0]:
+                visible = any(
+                    (item.item.id, subKey) in cur_filter
+                    for subKey in item.item.visual_subtypes
+                ) if cur_filter is not None else True
+            else:
+                visible = False
         else:
-            visible = (item.item.id, item.subKey) in cur_filter
+            # Uncompressed, check each individually.
+            visible = cur_filter is None or (item.item.id, item.subKey) in cur_filter
 
         if visible:
             item.is_pre = False
+            item.load_data()
             item.label.place(
                 x=((i % width) * 65 + 1),
                 y=((i // width) * 65 + 1),
@@ -1372,7 +1399,8 @@ def init_drag_icon() -> None:
     # appearing in this window.
     drag_win.overrideredirect(True)
     drag_win.resizable(False, False)
-    drag_win.withdraw()
+    if utils.LINUX:
+        drag_win.wm_attributes('-type', 'dnd')
     drag_win.transient(master=TK_ROOT)
     drag_win.withdraw()  # starts hidden
     drag_win.bind(tk_tools.EVENTS['LEFT_RELEASE'], drag_stop)
@@ -1391,7 +1419,7 @@ async def set_game(game: 'gameMan.Game') -> None:
 
     This updates the title bar to match, and saves it into the config.
     """
-    localisation.set_win_title(TK_ROOT, TRANS_MAIN_TITLE.format(version=utils.BEE_VERSION, game=game.name))
+    wid_transtoken.set_win_title(TK_ROOT, TRANS_MAIN_TITLE.format(version=utils.BEE_VERSION, game=game.name))
     config.APP.store_conf(LastSelected(game.name), 'game')
 
 
@@ -1477,7 +1505,7 @@ async def init_windows(tk_img: TKImages) -> None:
         """Refresh filtered items whenever it's changed."""
         global cur_filter
         cur_filter = new_filter
-        flow_picker()
+        background_run(flow_picker, config.APP.get_cur_conf(FilterConf))
 
     item_search.init(search_frame, update_filter)
 
@@ -1494,7 +1522,7 @@ async def init_windows(tk_img: TKImages) -> None:
     frames['picker'].grid(row=1, column=0, sticky="NSEW")
     picker_split_frame.rowconfigure(1, weight=1)
     picker_split_frame.columnconfigure(0, weight=1)
-    init_picker(frames['picker'])
+    await init_picker(frames['picker'])
 
     await trio.sleep(0)
     loader.step('UI', 'picker')
@@ -1568,7 +1596,7 @@ async def init_windows(tk_img: TKImages) -> None:
     loader.step('UI', 'options')
 
     async with trio.open_nursery() as nurs:
-        nurs.start_soon(itemconfig.make_pane, frames['toolMenu'], menu_bar.view_menu, tk_img, flow_picker)
+        nurs.start_soon(itemconfig.make_pane, frames['toolMenu'], menu_bar.view_menu, tk_img)
     loader.step('UI', 'itemvar')
 
     async with trio.open_nursery() as nurs:

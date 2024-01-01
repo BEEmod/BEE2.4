@@ -1,5 +1,5 @@
 """Test the events manager and collections."""
-from typing import Dict, no_type_check
+from typing import Dict
 from unittest.mock import AsyncMock, call, create_autospec
 
 import pytest

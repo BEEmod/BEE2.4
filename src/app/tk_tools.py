@@ -18,19 +18,20 @@ from tkinter import filedialog, commondialog
 import tkinter as tk
 import os.path
 
+from srctools import logger
 from idlelib.redirector import WidgetRedirector  # type: ignore[import-not-found]
 import trio
 
-from app import TK_ROOT, background_run, localisation
+from app import TK_ROOT, background_run
 from config.gen_opts import GenOptions
 import event
 import config
 import utils
 from transtoken import TransToken
+from ui_tk.wid_transtoken import set_text
 
 
-# Set icons for the application.
-
+LOGGER = logger.get_logger(__name__)
 ICO_PATH = str(utils.bins_path('BEE2.ico'))
 T = TypeVar('T')
 AnyWidT = TypeVar('AnyWidT', bound=tk.Misc)
@@ -90,6 +91,7 @@ else:  # Linux
 
     LISTBOX_BG_SEL_COLOR = 'blue'
     LISTBOX_BG_COLOR = 'white'
+    LABEL_HIGHLIGHT_BG = '#5AD2D2'
 
 # Some events differ on different systems, so define them here.
 if utils.MAC:
@@ -494,6 +496,14 @@ def center_win(window: Union[tk.Tk, tk.Toplevel], parent: Union[tk.Tk, tk.Toplev
     window.geometry(f'+{x}+{y}')
 
 
+def center_onscreen(window: Union[tk.Tk, tk.Toplevel]) -> None:
+    """Center a window onscreen."""
+    x = (window.winfo_screenwidth() - window.winfo_width()) // 2
+    y = (window.winfo_screenheight() - window.winfo_height()) // 2
+
+    window.geometry(f'+{x}+{y}')
+
+
 def _default_validator(value: str) -> str:
     if not value.strip():
         raise ValueError("A value must be provided!")
@@ -504,7 +514,7 @@ class HidingScroll(ttk.Scrollbar):
     """A scrollbar variant which auto-hides when not needed.
 
     """
-    def set(self, low: float, high: float) -> None:
+    def set(self, low: Union[float, str], high: Union[float, str]) -> None:
         """Set the size needed for the scrollbar, and hide/show if needed."""
         if float(low) <= 0.0 and float(high) >= 1.0:
             # Remove this, but remember gridding options
@@ -578,6 +588,41 @@ class ttk_Spinbox(ttk.Widget, tk.Spinbox):  # type: ignore[misc]
 _file_field_font = _tk_font.nametofont('TkFixedFont')  # Monospaced font
 _file_field_char_len = _file_field_font.measure('x')
 
+if utils.WIN:
+    # Temporary fix for #1993: tk_chooseDirectory seems to just freeze. Not sure why.
+    filedialog.Directory.command = '::tk::dialog::file::chooseDir::'
+
+
+async def _folderbrowse_powershell() -> Optional[str]:
+    """For Windows, the TK bindings don't work properly. Use Powershell to call this one API."""
+    result = await trio.run_process(
+        [
+            "powershell", "-NoProfile",
+            "-command", "-",  # Run from stdin.
+        ],
+        shell=True,
+        capture_stdout=True,
+        capture_stderr=True,
+        stdin=BROWSE_DIR_PS,
+    )
+    # An Ok or Cancel from ShowDialog, then the path.
+    [btn, poss_path] = result.stdout.splitlines()
+    if btn == b'Cancel':
+        return None
+    # Anything non-ASCII seems to just be dropped, or replaced by ?.
+    if b'?' in poss_path:
+        raise ValueError(poss_path)
+    return os.fsdecode(poss_path)
+
+
+BROWSE_DIR_PS = b'''\
+Add-Type -AssemblyName System.Windows.Forms
+$Dialog = New-Object -TypeName System.Windows.Forms.FolderBrowserDialog
+$Dialog.ShowNewFolderButton = true
+$Dialog.ShowDialog()
+Write-Output $Dialog.SelectedPath
+'''
+
 
 class FileField(ttk.Frame):
     """A text box which allows searching for a file or directory.
@@ -588,7 +633,7 @@ class FileField(ttk.Frame):
         master: tk.Misc,
         is_dir: bool = False,
         loc: str = '',
-        callback: Callable[[str], None] = None,
+        callback: Callable[[str], None] = lambda path: None,
     ) -> None:
         """Initialise the field.
 
@@ -616,9 +661,6 @@ class FileField(ttk.Frame):
                 initialdir=loc,
             )
 
-        if callback is None:
-            callback = self._nop_callback
-
         self.callback = callback
 
         self.textbox = ReadOnlyEntry(
@@ -629,7 +671,7 @@ class FileField(ttk.Frame):
         )
         self.textbox.grid(row=0, column=0, sticky='ew')
         self.columnconfigure(0, weight=1)
-        bind_leftclick(self.textbox, self.browse)
+        bind_leftclick(self.textbox, lambda e: background_run(self.browse))
         # The full location is displayed in a tooltip.
         add_tooltip(self.textbox, TransToken.untranslated(self._location))
         self.textbox.bind('<Configure>', self._text_configure)
@@ -637,7 +679,7 @@ class FileField(ttk.Frame):
         self.browse_btn = ttk.Button(
             self,
             text="...",
-            command=self.browse,
+            command=lambda: background_run(self.browse),
         )
         self.browse_btn.grid(row=0, column=1)
         # It should be this narrow, but perhaps this doesn't accept floats?
@@ -648,16 +690,19 @@ class FileField(ttk.Frame):
 
         self._text_var.set(self._truncate(loc))
 
-    def browse(self, event: object = None) -> None:
+    async def browse(self) -> None:
         """Browse for a file."""
-        path = self.browser.show()
+        if utils.WIN and self.is_dir:
+            try:
+                path = await _folderbrowse_powershell()
+            except Exception as exc:
+                LOGGER.warning('Failed to browse for a directory:', exc_info=exc)
+                path = self.browser.show()  # Fallback to generic widget.
+        else:
+            path = self.browser.show()
+
         if path:
             self.value = path
-
-    @staticmethod  # No need to bind to a method.
-    def _nop_callback(path: str) -> None:
-        """Callback function, called whenever the value changes."""
-        pass
 
     @property
     def value(self) -> str:
@@ -670,7 +715,7 @@ class FileField(ttk.Frame):
         from app import tooltip
         self.callback(path)
         self._location = path
-        tooltip.set_tooltip(self, TransToken.untranslated(path))
+        tooltip.set_tooltip(self.textbox, TransToken.untranslated(path))
         self._text_var.set(self._truncate(path))
 
     def _truncate(self, path: str) -> str:
@@ -723,7 +768,7 @@ class EnumButton(Generic[EnumT]):
                 # Make partial do the method binding.
                 command=functools.partial(EnumButton._select, self, val),
             )
-            localisation.set_text(btn, label)
+            set_text(btn, label)
             btn.grid(row=0, column=x)
             self.buttons[val] = btn
             if val is current:
@@ -767,7 +812,7 @@ class LineHeader(ttk.Frame):
             font='TkMenuFont',
             anchor='center',
         )
-        localisation.set_text(self.title, title)
+        set_text(self.title, title)
         self.title.grid(row=0, column=1)
 
         sep_right = ttk.Separator(self)

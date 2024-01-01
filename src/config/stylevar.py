@@ -8,8 +8,9 @@ import attrs
 import config
 
 
+@config.PALETTE.register
 @config.APP.register
-@attrs.frozen(slots=False)
+@attrs.frozen
 class State(config.Data, conf_name='StyleVar', uses_id=True):
     """Holds style var state stored in configs."""
     value: bool = False

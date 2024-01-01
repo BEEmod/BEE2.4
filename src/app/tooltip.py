@@ -11,9 +11,11 @@ import weakref
 import attr
 
 from app import TK_ROOT, img
-# Give a private name, could get confused with tooltip setter.
-from app.localisation import TransToken, set_text as _apply_token
+from transtoken import TransToken
 from ui_tk.img import TK_IMG
+# Don't import set_text directly, could be confused with tooltip setter.
+from ui_tk import wid_transtoken
+import utils
 
 
 __all__ = ['set_tooltip', 'add_tooltip']
@@ -26,8 +28,10 @@ CENT_DIST = 50  # Distance around center where we align centered.
 window = tk.Toplevel(TK_ROOT, name='tooltipWin')
 window.withdraw()
 window.transient(master=TK_ROOT)
-window.overrideredirect(True)
-window.resizable(False, False)
+window.wm_overrideredirect(True)
+window.wm_resizable(False, False)
+if utils.LINUX:
+    window.wm_attributes('-type', 'tooltip')
 
 context_label = tk.Label(
     window,
@@ -65,7 +69,7 @@ def _show(widget: tk.Misc, mouse_x: int, mouse_y: int) -> None:
     except KeyError:
         return
 
-    _apply_token(context_label, data.text)
+    wid_transtoken.set_text(context_label, data.text)
     TK_IMG.apply(context_label, data.img)
 
     window.deiconify()
@@ -128,9 +132,9 @@ def _show(widget: tk.Misc, mouse_x: int, mouse_y: int) -> None:
 
 def set_tooltip(
     widget: tk.Misc,
-    text: TransToken=TransToken.BLANK,
-    image: img.Handle=None,
+    text: TransToken = TransToken.BLANK,
     *,
+    image: img.Handle | None = None,
     delay: int=-1,
 ) -> None:
     """Change the tooltip for a widget.
@@ -155,7 +159,7 @@ def add_tooltip(
     targ_widget: tk.Misc,
     text: TransToken = TransToken.BLANK,
     *,
-    image: img.Handle=None,
+    image: img.Handle | None = None,
     delay: int=500,
     show_when_disabled: bool=False,
 ) -> None:

@@ -67,6 +67,8 @@ class Marker:
         """Follow the provided vactube path, yielding each pair of nodes."""
         vac_node = self
         while True:
+            if vac_node.next is None:
+                return
             try:
                 next_ent = vac_list[vac_node.next]
             except KeyError:
@@ -86,6 +88,30 @@ def res_vactubes(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
 
     Only runs once, and then quits the condition list. After priority 400,
     the ents will actually be placed.
+
+    Options:
+    * `group`: Specifies the group this belongs to. Items with the same group can be connected
+      together.
+    * `Instances`: Configuration for a set of instances.
+        * `trig_size`: The width of the automatically generated `trigger_vphysics_motion` and
+          `trigger_push`es. If zero, no triggers will be produced.
+        * `straight_inst`: Instance to use for straight segments. This can itself be a block to
+           specify different length variants - the key should be the length in units (128, 256, 192, etc).
+        * `corner_small_inst`, `corner_medium_inst`, `corner_large_inst`: The instance for each size
+          of corner turn.
+        * `temp_corner_small`, `temp_corner_medium`, `temp_corner_large`: Template IDs
+          (and optionally `:visgroups`) corresponding to these corner instances. These produce a
+          `trigger_vphysics_motion` for the corner.
+        * `support_inst`: For straight segments, up to 4 of these are placed to attach the segment
+          to any walls, if adjacient tiles are present.
+        * `support_ring_inst`: Placed over a straight instance, if any `support_inst` are placed in
+           that voxel.
+        * `entry_floor_inst`: Placed on the start of the tube, if the tube points downward into
+          the floor.
+        * `entry_ceil_inst`: Placed on the start of the tube, if the tube points upward into the
+          ceiling.
+        * `entry_inst`: Placed on the start of the tube, if it faces horizontally.
+        * `exit_inst`: Placed on the end of the tube.
     """
     group = res['group', 'DEFAULT_GROUP']
 
@@ -320,16 +346,17 @@ def make_straight(
     # point_push entity.
     start_off = -96 if is_start else -64
 
-    p1, p2 = Vec.bbox(
-        origin + Vec(start_off, -config.trig_radius, -config.trig_radius) @ orient,
-        origin + Vec(dist - 64, config.trig_radius, config.trig_radius) @ orient,
-    )
+    if config.trig_radius > 0.0:
+        p1, p2 = Vec.bbox(
+            origin + Vec(start_off, -config.trig_radius, -config.trig_radius) @ orient,
+            origin + Vec(dist - 64, config.trig_radius, config.trig_radius) @ orient,
+        )
 
-    solid = vmf.make_prism(p1, p2, mat='tools/toolstrigger').solid
+        solid = vmf.make_prism(p1, p2, mat='tools/toolstrigger').solid
 
-    motion_trigger(vmf, solid.copy())
+        motion_trigger(vmf, solid.copy())
 
-    push_trigger(vmf, origin, normal, [solid])
+        push_trigger(vmf, origin, normal, [solid])
 
     off = 0
     for seg_dist in utils.fit(dist, config.inst_straight_sizes):
@@ -392,7 +419,7 @@ def make_corner(
     )
 
     temp, visgroups = config.temp_corner[int(size)]
-    if temp is not None:
+    if temp is not None and config.trig_radius > 0.0:
         temp_solids = template_brush.import_template(
             vmf,
             temp,

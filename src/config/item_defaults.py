@@ -16,8 +16,9 @@ DEFAULT_VERSION: Final = 'VER_DEFAULT'
 LEGACY = ConfigFile('item_configs.cfg')
 
 
+@config.PALETTE.register
 @config.APP.register
-@attrs.frozen(slots=False)
+@attrs.frozen
 class ItemDefault(config.Data, conf_name='ItemDefault', uses_id=True):
     """Overrides the defaults for item properties."""
     version: str = DEFAULT_VERSION

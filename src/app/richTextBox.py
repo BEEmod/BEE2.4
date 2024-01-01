@@ -51,9 +51,10 @@ class tkRichText(tkinter.Text):
     def __init__(
         self,
         parent: tkinter.Misc,
+        *,
+        name: str,
         width: int = 10, height: int = 4,
         font: Union[str, tkFont] = "TkDefaultFont",
-        **kargs,
     ) -> None:
         # Setup all our configuration for inserting text.
         if isinstance(font, str):
@@ -70,13 +71,14 @@ class tkRichText(tkinter.Text):
 
         super().__init__(
             parent,
+            name=name,
             width=width,
             height=height,
             wrap="word",
             font=self.font,
             # We only want the I-beam cursor over text.
             cursor=Cursors.REGULAR,
-            **kargs,
+            # If required, add more keyword arguments here.
         )
 
         self.heading_font = {}

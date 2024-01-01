@@ -24,6 +24,7 @@ __all__ = [
     "ItemClass", "RenderableType", "Handle", "Surface", "DesiredFacing", "FaceType", "OccuType",
     "Sound", "Anim", "ConnTypes", "Connection", "InstCount", "Coord", "EmbedFace", "Overlay",
     "ConnSide", "AntlinePoint", "OccupiedVoxel", "Renderable", "SubType", "Item",
+    "bounding_boxes",
 ]
 LOGGER = logger.get_logger(__name__)
 # __getstate__ / __setstate__ types.

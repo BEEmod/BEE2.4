@@ -71,6 +71,7 @@ def res_resizeable_trigger(vmf: VMF, info: conditions.MapInfo, res: Keyvalues) -
 
     # For Coop, we add a logic_coop_manager in the mix so both players can
     # be handled.
+    coop_var: Optional[str]
     try:
         coop_var = res['coopVar']
     except LookupError:
@@ -148,7 +149,7 @@ def res_resizeable_trigger(vmf: VMF, info: conditions.MapInfo, res: Keyvalues) -
         out_ent = trig_ent = vmf.create_ent(
             classname='trigger_multiple',  # Default
             targetname=targ,
-            origin=options.get(Vec, "global_ents_loc"),
+            origin=options.GLOBAL_ENTS_LOC(),
             angles='0 0 0',
         )
         trig_ent.solids = [

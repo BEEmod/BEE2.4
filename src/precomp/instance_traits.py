@@ -216,6 +216,7 @@ def set_traits(vmf: VMF, id_to_item: Dict[str, Item], coll: Collisions) -> Set[s
             LOGGER.warning('<{}:bee2_{}> found in original map?', item_id, item_ind)
             continue
 
+        item: Optional[Item]
         try:
             item = id_to_item[item_id.casefold()]
         except KeyError:  # dict fail

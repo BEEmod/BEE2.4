@@ -1,5 +1,5 @@
 """Run the BEE2."""
-from typing import Awaitable, Callable, Any, Deque, Dict, Optional, List, Tuple
+from typing import Awaitable, Callable, Any, ClassVar, Deque, Dict, Optional, List, Tuple
 import time
 import collections
 
@@ -102,7 +102,7 @@ async def init_app() -> None:
 
 class Tracer(trio.abc.Instrument):
     """Track tasks to detect slow ones."""
-    slow: List[Tuple[float, str]] = []
+    slow: ClassVar[List[Tuple[float, str]]] = []
 
     def __init__(self) -> None:
         self.elapsed: Dict[trio.lowlevel.Task, float] = {}
@@ -131,17 +131,18 @@ class Tracer(trio.abc.Instrument):
             pass
         else:
             if prev is not None:
-                self.elapsed[task] += time.perf_counter() - prev
+                self.elapsed[task] += cur_time - prev
                 self.start_time[task] = None
 
     @override
     def task_exited(self, task: trio.lowlevel.Task) -> None:
         """Log results when exited."""
+        cur_time = time.perf_counter()
         elapsed = self.elapsed.pop(task, 0.0)
         start = self.start_time.pop(task, None)
         args = self.args.pop(task, srctools.EmptyMapping)
         if start is not None:
-            elapsed += time.perf_counter() - start
+            elapsed += cur_time - start
 
         if elapsed > 0.1:
             args = {
@@ -172,7 +173,7 @@ async def app_main(init: Callable[[], Awaitable[Any]]) -> None:
         nursery.cancel_scope.cancel()
 
 
-def done_callback(result: Outcome) -> None:
+def done_callback(result: Outcome[None]) -> None:
     """The app finished, quit."""
     from app import UI
     if isinstance(result, Error):
@@ -184,7 +185,7 @@ def done_callback(result: Outcome) -> None:
     TK_ROOT.quit()
 
 
-def start_main(init: Callable[[], Awaitable[Any]]=init_app) -> None:
+def start_main(init: Callable[[], Awaitable[object]] = init_app) -> None:
     """Starts the TK and Trio loops.
 
     See https://github.com/richardsheridan/trio-guest/.

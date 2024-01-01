@@ -41,8 +41,9 @@ def _sign_converter(value: Mapping[int, str]) -> Mapping[int, str]:
     }
 
 
+@config.PALETTE.register
 @config.APP.register
-@attrs.frozen(slots=False)
+@attrs.frozen
 class Layout(config.Data, conf_name='Signage'):
     """A layout of selected signs."""
     signs: Mapping[int, str] = attrs.field(default=DEFAULT_IDS, converter=_sign_converter)

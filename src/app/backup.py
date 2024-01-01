@@ -24,7 +24,8 @@ from FakeZip import FakeZip, zip_names, zip_open_bin
 from srctools import Keyvalues, KeyValError
 
 from app.tooltip import add_tooltip
-from app.localisation import TransToken, set_text, set_menu_text, set_win_title
+from transtoken import TransToken
+from ui_tk.wid_transtoken import set_menu_text, set_text, set_win_title
 from ui_tk.dialogs import Dialogs, DIALOG, TkDialogs
 from ui_tk.img import TKImages
 

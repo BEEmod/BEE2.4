@@ -96,7 +96,7 @@ def make_map(error: UserError) -> VMF:
     This map is as simple as possible to make compile time quick.
     The content loc is the location of the web resources.
     """
-    lang_filename = options.get(str, 'error_translations')
+    lang_filename = options.ERROR_TRANSLATIONS()
     if lang_filename and (lang_path := Path(lang_filename)).is_file():
         info = attrs.evolve(error.info, language_file=lang_path)
     else:

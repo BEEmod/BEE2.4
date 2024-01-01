@@ -35,7 +35,7 @@ class Instances(Enum):
     SINGLE_WALL = 'single_wall'
     MARKER = 'markerInst'
 
-CATWALK_TYPES: Mapping[utils.CONN_TYPES, Instances] = {
+CATWALK_TYPES: Mapping[utils.CONN_TYPES, Optional[Instances]] = {
     utils.CONN_TYPES.straight: Instances.STRAIGHT_1,
     utils.CONN_TYPES.corner: Instances.CORNER,
     utils.CONN_TYPES.all: Instances.XJUNCT,
@@ -120,7 +120,7 @@ def check_support_locs(
 def place_catwalk_connections(
     catwalks: Dict[Tuple[float, float, float], Link],
     vmf: VMF,
-    instances: Mapping[Instances, str],
+    instances: Mapping[Optional[Instances], str],
     point_a: Vec, point_b: Vec,
 ) -> None:
     """Place catwalk sections to connect two straight points."""

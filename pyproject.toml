@@ -72,8 +72,6 @@ extend-ignore = [
 	# Flake8-bugbear:
 	# Loop control var not used, triggers on unpackings.
 	"B007",
-	# Stacklevel parameter required for warnings.warn() - doesn't detect positional args.
-	"B028",
 
 	# Flake8-pie:
 	# Prefer to use pass in empty functions, even if docstring is present
@@ -138,29 +136,24 @@ enable_error_code = [
 # TODO
 module = [
 	'app.gameMan',
-	'app.localisation',
-	'app.menu_bar',
 	'app.music_conf',
 	'app.selector_win',
-	'app.tooltip',
-	'app.tk_tools',
-	'app.richTextBox',
 	'app.CheckDetails',
 	'app.backup',
 	'app.voiceEditor',
-	'app.SubPane',
-	'app.paletteUI',
-	'app.CompilerPane',
-	'app.optionWindow',
 	'app.contextWin',
 	'app.UI',
 	'app.paletteLoader',
-	'precomp.*',
-	'test.*',
+	'precomp.conditions._scaffold_compat',
+	'precomp.conditions.glass',
+	'precomp.bottomlessPit',
+	'precomp.connections',
+	'precomp.fizzler',
+	'precomp.tiling',
+	'precomp.voice_line',
 	'BEE2_config',
 	'FakeZip',
 	'pygtrie',
-	'vbsp',
 ]
 strict_optional = false
 
@@ -171,7 +164,7 @@ disallow_untyped_calls = false
 
 [[tool.mypy.overrides]]
 # No stubs yet.
-module = ['pyglet.*']
+module = ['pyglet.*', 'mistletoe.*']
 ignore_missing_imports = true
 
 # Dead code, needs to be rewritten.

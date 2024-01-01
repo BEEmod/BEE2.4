@@ -37,7 +37,7 @@ def res_make_tag_coop_spawn(vmf: VMF, info: conditions.MapInfo, inst: Entity, re
     if not info.is_coop:
         return conditions.RES_EXHAUSTED
 
-    is_tag = options.get(str, 'game_id') == utils.STEAM_IDS['TAG']
+    is_tag = options.GAME_ID() == utils.STEAM_IDS['TAG']
 
     origin = Vec.from_str(inst.fixup.substitute(res['origin', '0 0 0']))
     if 'angles' in res:
@@ -100,7 +100,7 @@ def ap_tag_modifications(vmf: VMF) -> None:
     * In singleplayer, override the transition ent instance to have the Gel Gun.
     * Create subdirectories with the user's steam ID to fix a workshop compile bug.
     """
-    if options.get(str, 'game_id') != utils.STEAM_IDS['APTAG']:
+    if options.GAME_ID() != utils.STEAM_IDS['APTAG']:
         return  # Wrong game!
 
     LOGGER.info('Performing Aperture Tag modifications...')
@@ -162,7 +162,7 @@ def res_make_tag_fizzler(vmf: VMF, info: conditions.MapInfo, res: Keyvalues) -> 
     oran_sign_off = res['oran_off_sign', '']
 
     import vbsp
-    if options.get(str, 'game_id') != utils.STEAM_IDS['TAG']:
+    if options.GAME_ID() != utils.STEAM_IDS['TAG']:
         # Abort - TAG fizzlers shouldn't appear in any other game!
         # So simply remove the fizzler when called.
         return Entity.remove

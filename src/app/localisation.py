@@ -6,13 +6,10 @@ from __future__ import annotations
 
 import string
 from typing import (
-    Any, AsyncIterator, Callable, Iterable, Iterator, List, TypeVar, Union,
-    TYPE_CHECKING,
+    Any, AsyncIterator, Callable, Iterable, Iterator, List, TypeVar, TYPE_CHECKING,
 )
-from typing_extensions import ParamSpec, TypeAlias, override
-from tkinter import ttk
+from typing_extensions import ParamSpec, override
 from collections import defaultdict
-import tkinter as tk
 import io
 import itertools
 import os.path
@@ -20,7 +17,6 @@ import functools
 import datetime
 
 from pathlib import Path
-from weakref import WeakKeyDictionary
 import gettext as gettext_mod
 import locale
 import sys
@@ -49,13 +45,14 @@ from transtoken import (
 )
 import transtoken
 
+
 # Circular import issues.
 if TYPE_CHECKING:
     from app import gameMan
 
 __all__ = [
     'TransToken',
-    'set_text', 'set_menu_text', 'clear_stored_menu', 'set_win_title', 'add_callback',
+    'add_callback',
     'DUMMY', 'Language', 'set_language', 'load_aux_langs',
     'setup', 'expand_langcode',
     'TransTokenSource', 'rebuild_app_langs', 'rebuild_package_langs',
@@ -67,18 +64,7 @@ P = ParamSpec('P')
 # Location of basemodui, relative to Portal 2
 BASEMODUI_PATH = 'portal2_dlc2/resource/basemodui_{}.txt'
 
-# Widgets that have a 'text' property.
-TextWidget: TypeAlias = Union[
-    tk.Label, tk.LabelFrame, tk.Button, tk.Radiobutton, tk.Checkbutton,
-    ttk.Label, ttk.LabelFrame, ttk.Button, ttk.Radiobutton, ttk.Checkbutton,
-]
-TextWidgetT = TypeVar('TextWidgetT', bound=TextWidget)
 CBackT = TypeVar('CBackT', bound=Callable[[], object])
-# Assigns to widget['text'].
-_applied_tokens: WeakKeyDictionary[TextWidget, TransToken] = WeakKeyDictionary()
-# menu -> index -> token.
-_applied_menu_tokens: WeakKeyDictionary[tk.Menu, dict[int, TransToken]] = WeakKeyDictionary()
-_window_titles: WeakKeyDictionary[tk.Wm, TransToken] = WeakKeyDictionary()
 # For anything else, this is called which will apply tokens.
 _langchange_callback: list[Callable[[], object]] = []
 
@@ -184,38 +170,6 @@ def _format_list(lang_code: str, list_kind: transtoken.ListStyle, items: List[st
 
 transtoken.ui_format_getter = UIFormatter
 transtoken.ui_list_getter = _format_list
-
-
-def set_text(widget: TextWidgetT, token: TransToken) -> TextWidgetT:
-    """Apply a token to the specified label/button/etc."""
-    widget['text'] = str(token)
-    _applied_tokens[widget] = token
-    return widget
-
-
-def set_win_title(win: tk.Wm, token: TransToken) -> None:
-    """Set the title of a window to this token."""
-    win.wm_title(str(token))
-    _window_titles[win] = token
-
-
-def set_menu_text(menu: tk.Menu, token: TransToken, index: str | int = 'end') -> None:
-    """Apply this text to the item on the specified menu.
-
-    By default, it is applied to the last item.
-    """
-    try:
-        tok_map = _applied_menu_tokens[menu]
-    except KeyError:
-        tok_map = _applied_menu_tokens[menu] = {}
-    ind = menu.index(index)
-    menu.entryconfigure(ind, label=str(token))
-    tok_map[ind] = token
-
-
-def clear_stored_menu(menu: tk.Menu) -> None:
-    """Clear the tokens for the specified menu."""
-    _applied_menu_tokens.pop(menu, None)
 
 
 def add_callback(*, call: bool) -> Callable[[CBackT], CBackT]:
@@ -435,13 +389,6 @@ def set_language(lang: Language) -> None:
     config.APP.store_conf(attrs.evolve(conf, language=lang.lang_code))
 
     # Reload all our localisations.
-    for text_widget, token in _applied_tokens.items():
-        text_widget['text'] = str(token)
-    for menu, menu_map in _applied_menu_tokens.items():
-        for index, token in menu_map.items():
-            menu.entryconfigure(index, label=str(token))
-    for window, token in _window_titles.items():
-        window.wm_title(str(token))
     for func in _langchange_callback:
         func()
 
@@ -473,7 +420,7 @@ async def rebuild_app_langs() -> None:
 async def load_aux_langs(
     games: Iterable[gameMan.Game],
     packset: packages.PackagesSet,
-    lang: Language = None,
+    lang: Language | None = None,
 ) -> None:
     """Load all our non-UI translation files in the background.
 

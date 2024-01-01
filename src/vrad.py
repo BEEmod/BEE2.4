@@ -16,7 +16,6 @@ from pathlib import Path
 
 
 import srctools.run
-from srctools import FGD
 from srctools.bsp import BSP, BSP_LUMPS
 from srctools.filesys import RawFileSystem, ZipFileSystem, FileSystem
 from srctools.packlist import PackList
@@ -220,9 +219,6 @@ async def main(argv: List[str]) -> None:
     LOGGER.debug('Filesystems:')
     for child_sys in fsys.systems[:]:
         LOGGER.debug('- {}: {!r}', child_sys[1], child_sys[0])
-
-    LOGGER.info('Reading our FGD files...')
-    fgd = FGD.engine_dbase()
 
     packlist = PackList(fsys)
     LOGGER.info('Reading soundscripts...')

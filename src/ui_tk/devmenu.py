@@ -10,6 +10,7 @@ import trio
 
 from app import TK_ROOT, background_run, tk_tools
 from ui_tk.img import TK_IMG, label_to_user
+from ui_tk import wid_transtoken
 
 
 LOGGER = logger.get_logger(__name__)
@@ -70,6 +71,7 @@ def make_stats_window() -> Callable[[], object]:
             while not cancel_scope.cancel_called:
                 label['text'] = '\n'.join([
                     TK_IMG.stats(),
+                    wid_transtoken.stats(),
                     'Trio = ' + pprint.pformat(
                         attrs.asdict(trio.lowlevel.current_statistics(), recurse=True)
                     ),

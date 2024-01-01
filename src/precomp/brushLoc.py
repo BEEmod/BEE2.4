@@ -150,7 +150,7 @@ class _GridItemsView(ItemsView[Vec, Block]):
     """Implements the Grid.items() view, providing a view over the pos, block pairs."""
     # Initialised by superclass.
     _mapping: dict[tuple[float, float, float], Block]
-    def __init__(self, grid: dict[tuple[float, float, float], Block]):
+    def __init__(self, grid: dict[tuple[float, float, float], Block]) -> None:
         # Superclass typehints as expecting Mapping[Vec, Block], but we override everything.
         super().__init__(grid)  # type: ignore
 
@@ -236,9 +236,7 @@ class Grid(MutableMapping[_grid_keys, Block]):
 
     def __setitem__(self, pos: _grid_keys, value: Block) -> None:
         if type(value) is not Block:
-            raise ValueError('Must be set to a Block item, not "{}"!'.format(
-                type(value).__name__,
-            ))
+            raise ValueError(f'Must be set to a Block item, not "{type(value).__name__}"!')
 
         self._grid[_conv_key(pos)] = value
 

@@ -216,20 +216,22 @@ window.addEventListener("load", () => {
 		.then(updateScene)
 		.catch((reason) => {
 			console.error(reason);
-			content_box.innerText = 'Could not fetch display: ' + reason;
+			container.innerText = 'Could not fetch display: ' + reason;
 	});
 
-	// Lock the article to use multiples of the tile size.
 	const update = () => {
 		const screen_width = document.documentElement.clientWidth - PADDING;
 		const screen_height = document.documentElement.clientHeight - PADDING;
-		const box_height = Math.floor(screen_height / TILE_SIZE) * TILE_SIZE;
+		let height = Math.floor(screen_height / TILE_SIZE);
+		if (height > 8) {
+			height = 8;
+		}
+		height *= TILE_SIZE;
 
-		content_box.style.width = `${Math.floor(screen_width / TILE_SIZE) * TILE_SIZE}px`;
-		content_box.style.height = `${box_height}px`;
+		container.style.width = `${Math.floor(screen_width / TILE_SIZE) * TILE_SIZE}px`;
+		container.style.height = `${height}px`;
 
 		const render_bbox = container.getBoundingClientRect();
-		const height = box_height - render_bbox.y + 16;
 		camera.aspect = render_bbox.width / height;
 		camera.updateProjectionMatrix();
 		renderer.setSize( render_bbox.width, height );

@@ -58,12 +58,13 @@ INCLUDES = [
 
     # Might not be found?
     'rtree',
-    # Ensure all of Hammeraddons is loaded.
-    'hammeraddons', 'hammeraddons.acache', 'hammeraddons.config', 'hammeraddons.mdl_compiler',
-    'hammeraddons.postcompiler', 'hammeraddons.plugin', 'hammeraddons.propcombine',
-    'hammeraddons.plugin',
+
+    # Ensure all of Hammeraddons and srctools is loaded.
+    *collect_submodules('srctools', filter=lambda name: 'pyinstaller' not in name and 'scripts' not in name),
+    *collect_submodules('attr'),
+    *collect_submodules('attrs'),
+    *collect_submodules('hammeraddons'),
 ]
-INCLUDES += collect_submodules('srctools', lambda name: 'pyinstaller' not in name and 'script' not in name)
 
 # These also aren't required by logging really, but by default
 # they're imported unconditionally. Check to see if it's modified first.
@@ -83,13 +84,6 @@ if utils.MAC or utils.LINUX:
 
     # The only hash algorithm that's used is sha512 - random.seed()
     EXCLUDES += ['_sha1', '_sha256', '_md5']
-
-# Include the condition sub-modules that are dynamically imported.
-INCLUDES += [
-    'precomp.conditions.' + module
-    for loader, module, is_package in
-    pkgutil.iter_modules(['precomp/conditions'])
-]
 
 # Find and add libspatialindex DLLs.
 if utils.WIN and utils.BITNESS == '32':

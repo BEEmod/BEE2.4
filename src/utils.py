@@ -1,7 +1,7 @@
 """Various functions shared among the compiler and application."""
 from __future__ import annotations
 from typing import (
-    TYPE_CHECKING, Any, Awaitable, Callable, Generator, Generic, ItemsView,
+    Final, NewType, TYPE_CHECKING, Any, Awaitable, Callable, Generator, Generic, ItemsView,
     Iterable, Iterator, KeysView, Mapping, NoReturn, Optional,
     Sequence, SupportsInt, Tuple, Type, TypeVar, ValuesView,
 )
@@ -191,7 +191,7 @@ def fix_cur_directory() -> None:
 if TYPE_CHECKING:
     from bg_daemon import run_background as run_bg_daemon
 else:
-    def run_bg_daemon(*args) -> None:
+    def run_bg_daemon(*args: Any) -> None:
         """Helper to make loadScreen not need to import bg_daemon.
 
         Instead, we can redirect the import through here, which is a module
@@ -313,7 +313,7 @@ def _exc_freeze(
 if sys.version_info < (3, 9) and hasattr(zipfile, '_SharedFile'):
     # noinspection PyProtectedMember
     class _SharedZipFile(zipfile._SharedFile):  # type: ignore[name-defined]
-        def __init__(self, *args, **kwargs) -> None:
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
             super().__init__(*args, **kwargs)
             # tell() reads the actual file position, but that may have been
             # changed by another thread - instead keep our own private value.
@@ -447,6 +447,27 @@ class FuncLookup(Generic[LookupT], Mapping[str, LookupT]):
         self._registry.clear()
 
 
+# An object ID, which has been made uppercase. This excludes <> and [] names.
+ObjectID = NewType("ObjectID", str)
+# Special ID includes <>/[] names
+SpecialID = NewType("SpecialID", str)
+
+
+def parse_obj_id(value: str) -> ObjectID:
+    """Parse an object ID."""
+    if value.startswith(('(', '<', '[')) or value.endswith((')', '>', ']')):
+        raise ValueError(f'Invalid object ID "{value}". IDs may not start/end with brackets.')
+    return ObjectID(value.casefold().upper())
+
+
+def parse_obj_special_id(value: str) -> ObjectID | SpecialID:
+    """Parse an object ID or a special name."""
+    if value.startswith(('(', '<', '[')) or value.endswith((')', '>', ']')):
+        return SpecialID(value.casefold())
+    else:
+        return ObjectID(value.casefold().upper())
+
+
 class PackagePath:
     """Represents a file located inside a specific package.
 
@@ -455,9 +476,11 @@ class PackagePath:
     reserved for app-specific usages (internal or generated paths)
     """
     __slots__ = ['package', 'path']
+    package: Final[str]
+    path: Final[str]
     def __init__(self, pack_id: str, path: str) -> None:
         self.package = pack_id.casefold()
-        self.path = path.replace('\\', '/')
+        self.path = path.replace('\\', '/').lstrip("/")
 
     @classmethod
     def parse(cls, uri: str | PackagePath, def_package: str) -> PackagePath:
@@ -487,11 +510,13 @@ class PackagePath:
 
     def in_folder(self, folder: str) -> PackagePath:
         """Return the package, but inside this subfolder."""
+        folder = folder.rstrip('\\/')
         return PackagePath(self.package, f'{folder}/{self.path}')
 
     def child(self, child: str) -> PackagePath:
         """Return a child file of this package."""
-        return PackagePath(self.package, f'{self.path}/{child}')
+        child = child.rstrip('\\/')
+        return PackagePath(self.package, f'{self.path.rstrip("/")}/{child}')
 
 
 ResultT = TypeVar('ResultT')
@@ -707,10 +732,7 @@ def restart_app() -> NoReturn:
     # We need to add the program to the arguments list, since python
     # strips that off.
     args = [sys.executable] + sys.argv
-    logging.root.info('Restarting using "{}", with args {!r}'.format(
-        sys.executable,
-        args,
-    ))
+    logging.root.info(f'Restarting using "{sys.executable}", with args {args!r}')
     logging.shutdown()
     os.execv(sys.executable, args)
 

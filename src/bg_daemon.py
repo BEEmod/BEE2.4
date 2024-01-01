@@ -77,7 +77,9 @@ class BaseLoadScreen:
         self.win = tk.Toplevel(TK_ROOT, name=f'loadscreen_{scr_id}')
         self.win.withdraw()
         self.win.wm_overrideredirect(True)
-        self.win.attributes('-topmost', int(force_ontop))
+        self.win.wm_attributes('-topmost', int(force_ontop))
+        if utils.LINUX:
+            self.win.wm_attributes('-type', 'splash')
         self.win['cursor'] = tk_tools.Cursors.WAIT
         self.win.grid_columnconfigure(0, weight=1)
         self.win.grid_rowconfigure(0, weight=1)

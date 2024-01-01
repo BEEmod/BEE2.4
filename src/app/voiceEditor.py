@@ -6,10 +6,10 @@ from enum import Enum
 from typing import Iterator, List, Tuple, TypedDict, Dict, Optional
 from configparser import SectionProxy
 
-import tkinter
 from tkinter import *
 from tkinter import font
 from tkinter import ttk
+import tkinter
 
 from srctools import Keyvalues
 import srctools.logger
@@ -19,9 +19,10 @@ from BEE2_config import ConfigFile
 from packages import QuotePack
 from transtoken import TransToken
 from app.tooltip import add_tooltip
-from app import img, TK_ROOT, localisation
+from app import img, TK_ROOT
 from app import tk_tools
 from ui_tk.img import TKImages
+from ui_tk.wid_transtoken import set_text, set_win_title
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -132,7 +133,7 @@ def init_widgets() -> None:
     trans_frame.rowconfigure(1, weight=1)
     trans_frame.columnconfigure(0, weight=1)
 
-    localisation.set_text(ttk.Label(trans_frame), TransToken.ui('Transcript:')).grid(row=0, column=0, sticky=W)
+    set_text(ttk.Label(trans_frame), TransToken.ui('Transcript:')).grid(row=0, column=0, sticky=W)
 
     trans_inner_frame = ttk.Frame(trans_frame, borderwidth=2, relief='sunken')
     trans_inner_frame.grid(row=1, column=0, sticky='NSEW')
@@ -164,7 +165,7 @@ def init_widgets() -> None:
     UI['trans_scroll'].grid(row=0, column=1, sticky='NS')
     UI['trans'].grid(row=0, column=0, sticky='NSEW')
 
-    localisation.set_text(ttk.Button(win, command=save), TransToken.ui('Save')).grid(row=2, column=0)
+    set_text(ttk.Button(win, command=save), TransToken.ui('Save')).grid(row=2, column=0)
 
     # Don't allow resizing the transcript box to be smaller than the
     # original size.
@@ -253,7 +254,7 @@ def show(tk_img: TKImages, quote_pack: QuotePack) -> None:
 
     voice_item = quote_pack
 
-    localisation.set_win_title(win, TransToken.ui(
+    set_win_title(win, TransToken.ui(
         'BEE2 - Configure "{item}"',
     ).format(item=voice_item.selitem_data.name))
     win.grab_set()
@@ -394,12 +395,12 @@ def make_tab(
     frame.columnconfigure(0, weight=1)
     canv.create_window(0, 0, window=frame, anchor="nw")
 
-    localisation.set_text(
+    set_text(
         ttk.Label(frame, anchor='center', font='tkHeadingFont'),
         group_name,
     ).grid(row=0,column=0, sticky='EW')
 
-    localisation.set_text(ttk.Label(frame), group_desc).grid(row=1, column=0, sticky='EW')
+    set_text(ttk.Label(frame), group_desc).grid(row=1, column=0, sticky='EW')
 
     ttk.Separator(frame, orient=HORIZONTAL).grid(
         row=2,
@@ -438,7 +439,7 @@ def make_tab(
             except LookupError:
                 name = TRANS_NO_NAME
 
-        localisation.set_text(ttk.Label(frame, font=QUOTE_FONT), name).grid(column=0, sticky=W)
+        set_text(ttk.Label(frame, font=QUOTE_FONT), name).grid(column=0, sticky=W)
 
         if tab_type is TabTypes.RESPONSE:
             line_iter = find_resp_lines(quote)

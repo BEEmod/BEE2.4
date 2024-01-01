@@ -50,7 +50,7 @@ def res_add_global_inst(vmf: VMF, inst: Entity, res: Keyvalues) -> object:
         try:
             new_inst['origin'] = inst.fixup.substitute(res['position'])
         except IndexError:
-            new_inst['origin'] = options.get(Vec, 'global_ents_loc')
+            new_inst['origin'] = options.GLOBAL_ENTS_LOC()
 
         conditions.GLOBAL_INSTANCES.add(file.casefold())
         conditions.ALL_INST.add(file.casefold())
@@ -106,7 +106,7 @@ def res_add_overlay_inst(vmf: VMF, inst: Entity, res: Keyvalues) -> Optional[Ent
 
     if not filename:
         # Don't show an error if it's being read from a fixup, or if the original name is blank.
-        if not res.bool('silentLookup') and not orig_name.startswith('$') and orig_name != '':
+        if not res.bool('silentLookup') and not orig_name.startswith(('$', '<')) and orig_name != '':
             LOGGER.warning('Bad filename for "{}" when adding overlay!', orig_name)
         # Don't bother making an overlay instance which will be deleted.
         return None
@@ -222,7 +222,7 @@ def res_cave_portrait(vmf: VMF, inst: Entity, res: Keyvalues) -> None:
     Otherwise, this overlays an instance, setting the $skin variable
     appropriately. Config values match that of addOverlay.
     """
-    skin = options.get(int, 'cave_port_skin')
+    skin = options.CAVE_PORT_SKIN()
     if skin is not None:
         new_inst = res_add_overlay_inst(vmf, inst, res)
         if new_inst is not None:

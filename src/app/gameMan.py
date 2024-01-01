@@ -180,6 +180,7 @@ class Game:
         from exporting import vpks
         try:
             vpk_folder = await vpks.find_folder(self)
+            LOGGER.info('VPK filename to remove: {}', vpk_folder)
             vpks.clear_files(vpk_folder)
         except (FileNotFoundError, PermissionError):
             pass

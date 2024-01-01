@@ -6,6 +6,7 @@ from srctools import VMF, Entity, Keyvalues, Matrix, Output, Vec
 import srctools.logger
 
 from precomp import conditions, connections
+from precomp.lazy_value import LazyValue
 from transtoken import TransToken
 import user_errors
 
@@ -13,9 +14,9 @@ import user_errors
 COND_MOD_NAME = None
 LOGGER = srctools.logger.get_logger(__name__, alias='cond.sendtor')
 
-# Laser name -> offset, normal
+# Laser instance -> offset, normal
 SENDTOR_TARGETS: dict[str, tuple[Vec, Vec]] = {}
-# Laser name -> relays created.
+# Laser instance -> relays created.
 SENDTOR_RELAYS: dict[str, list[Entity]] = defaultdict(list)
 
 TOK_SENDTOR_BAD_OUTPUT = TransToken.parse('HMW_SENDIFICATOR', 'BAD_OUTPUT_ITEM')
@@ -24,11 +25,12 @@ TOK_SENDTOR_BAD_OUTPUT = TransToken.parse('HMW_SENDIFICATOR', 'BAD_OUTPUT_ITEM')
 @conditions.make_result('SendificatorLaser')
 def res_sendificator_laser(res: Keyvalues) -> conditions.ResultCallable:
     """Record the position of the target for Sendificator Lasers."""
-    target = res.vec('offset'), res.vec('direction', 0, 0, 1)
+    offset = LazyValue.parse(res['offset', '']).as_vec()
+    normal = LazyValue.parse(res['direction', '']).as_vec(0, 0, 1)
 
     def set_laser(inst: Entity) -> None:
         """Store off the target position."""
-        SENDTOR_TARGETS[inst['targetname']] = target
+        SENDTOR_TARGETS[inst['targetname']] = offset(inst), normal(inst)
     return set_laser
 
 

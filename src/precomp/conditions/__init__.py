@@ -31,7 +31,6 @@ from __future__ import annotations
 import functools
 import inspect
 import io
-import importlib
 import math
 import pkgutil
 import sys
@@ -250,9 +249,7 @@ class Condition:
         try:
             cond_call = RESULT_LOOKUP[res.name]
         except KeyError:
-            err_msg = '"{name}" is not a valid condition result!'.format(
-                name=res.real_name,
-            )
+            err_msg = f'"{res.real_name}" is not a valid condition result!'
             if utils.DEV_MODE:
                 # Crash here.
                 raise ValueError(err_msg) from None
@@ -439,7 +436,7 @@ def annotation_caller(
 
 
 @functools.lru_cache(maxsize=None)
-def _make_reorderer(inputs: str, outputs: str) -> Callable[[Callable[..., object]], Callable[..., None]]:
+def _make_reorderer(inputs: str, outputs: str) -> Callable[[Callable[..., object]], Callable[..., Any]]:
     """Build a function that does reordering for annotation caller.
 
     This allows the code objects to be cached.
@@ -498,8 +495,8 @@ class CondCall(Generic[CallResultT]):
     def __init__(
         self,
         func: Callable[..., CallResultT | Callable[[Entity], CallResultT]],
-        group: str,
-    ):
+        group: str | None,
+    ) -> None:
         self.func = func
         self.group = group
         cback, arg_order = annotation_caller(
@@ -517,7 +514,7 @@ class CondCall(Generic[CallResultT]):
             self._setup_data = None
 
     @property
-    def __doc__(self) -> str:
+    def __doc__(self) -> str | None:
         return self.func.__doc__
 
     @__doc__.setter
@@ -651,6 +648,7 @@ def make_result(orig_name: str, *aliases: str) -> Callable[[CallableT], Callable
             setup_func = None
         else:
             # Combine the legacy functions into one using a closure.
+            assert setup_func is not None
             func = conv_setup_pair(setup_func, result_func)
 
         wrapper: CondCall[object] = CondCall(func, _get_cond_group(result_func))
@@ -824,13 +822,22 @@ def import_conditions() -> None:
 
     This ensures everything gets registered.
     """
-    # Find the modules in the conditions package.
-    for module in pkgutil.iter_modules(__path__, 'precomp.conditions.'):
-        # Import the module, then discard it. The module will run add_test()
-        # or add_result() functions, which save the functions into our dicts.
-        # We don't need a reference to the modules themselves.
-        LOGGER.debug('Importing {} ...', module.name)
-        importlib.import_module(module.name)
+    # Import all the condition modules. The module will run add_test()
+    # or add_result() functions, which save the functions into our dicts.
+    from . import ( # noqa
+        _scaffold_compat, addInstance, antlines, apTag, brushes, catwalks, collisions, connections,
+        conveyorBelt, custItems, cutoutTile, entities, errors, faithplate, fizzler, glass, globals,
+        instances, linked_items, logical, marker, monitor, piston_platform, positioning, python,
+        randomise, removed, resizableTrigger, sendificator, signage, trackPlat, vactubes,
+    )
+
+    # If not frozen, check none are missing.
+    if not utils.FROZEN:
+        ns = set(locals())
+        # Verify none are missing.
+        for module in pkgutil.iter_modules(__path__, 'precomp.conditions.'):
+            stem = module.name.rsplit('.', 1)[-1]
+            assert stem in ns, module
     LOGGER.info('Imported all conditions modules!')
 
 DOC_MARKER = '''<!-- Only edit above this line. This is generated from text in the compiler code. -->'''
@@ -1001,24 +1008,28 @@ def add_suffix(inst: Entity, suff: str) -> None:
     ALL_INST.add(new_filename.casefold())
 
 
-def local_name(inst: Entity, name: str | Entity) -> str:
+def local_name(inst: Entity, name: str | Entity | None) -> str:
     """Fixup the given name for inside an instance.
 
     This handles @names, !activator, and obeys the fixup_style option.
 
     If the name is an entity, that entity's name is passed through unchanged.
+    If the name is blank or None, the instance's name is returned.
     """
     # Don't translate direct entity names - it's already the entity's full
     # name.
     if isinstance(name, Entity):
         return name['targetname']
 
+    targ_name = inst['targetname', '']
+
     # If blank, keep it blank, and don't fix special or global names
+    if name is None:
+        return targ_name
     if not name or name.startswith(('!', '@')):
         return name
 
     fixup = inst['fixup_style', '0']
-    targ_name = inst['targetname', '']
 
     if fixup == '2' or not targ_name:
         # We can't do fixup..
@@ -1164,7 +1175,7 @@ def set_ent_keys(
 T = TypeVar('T')
 
 
-def resolve_offset(inst, value: str, scale: float=1, zoff: float=0) -> Vec:
+def resolve_offset(inst: Entity, value: str, scale: float = 1.0, zoff: float = 0.0) -> Vec:
     """Retrieve an offset from an instance var. This allows several special values:
 
     * Any $replace variables
@@ -1222,15 +1233,12 @@ def debug_test_result(inst: Entity, kv: Keyvalues) -> bool:
     if kv.has_children():
         LOGGER.warning('Debug:\n{!s}\n{!s}', kv, inst)
     else:
-        LOGGER.warning('Debug: {props}{inst!s}'.format(
-            inst=inst,
-            props=kv.value,
-        ))
+        LOGGER.warning('Debug: {}\n{inst!s}', kv.value, inst)
     return True  # The test is always true
 
 
 @make_result('dummy', 'nop', 'do_nothing')
-def dummy_result(inst: Entity, kv: Keyvalues):
+def dummy_result() -> None:
     """Dummy result that doesn't do anything."""
     pass
 

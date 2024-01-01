@@ -33,7 +33,6 @@ class ConfInfo:
     """Holds information about a type of configuration data."""
     name: str
     version: int
-    palette_stores: bool  # If this is saved/loaded by palettes.
     uses_id: bool  # If we manage individual configs for each of these IDs.
 
 
@@ -46,16 +45,20 @@ class Data(abc.ABC):
         cls, *,
         conf_name: str = '',
         version: int = 1,
-        palette_stores: bool = True,  # TODO remove
         uses_id: bool = False,
         **kwargs: object,
     ) -> None:
         super().__init_subclass__(**kwargs)
+        if hasattr(cls, '_Data__info'):
+            # Attrs __slots__ classes remakes the class, but it'll already have the info included.
+            # Just keep the existing info, no kwargs are given here.
+            return
+
         if not conf_name:
             raise ValueError('Config name must be specified!')
         if conf_name.casefold() in {'version', 'name'}:
             raise ValueError(f'Illegal name: "{conf_name}"')
-        cls.__info = ConfInfo(conf_name, version, palette_stores, uses_id)
+        cls.__info = ConfInfo(conf_name, version, uses_id)
 
     @classmethod
     def get_conf_info(cls) -> ConfInfo:
@@ -179,6 +182,18 @@ class ConfigSpec:
                         LOGGER.warning('{}[{!r}] has no UI callback!', info.name, dat_id)
                     else:
                         nursery.start_soon(cb, data)
+
+    def get_full_conf(self, filter_to: Optional['ConfigSpec'] = None) -> Config:
+        """Get the config stored by this spec, filtering to another if requested."""
+        if filter_to is None:
+            filter_to = self
+
+        # Fully copy the Config structure so these don't interact with each other.
+        return Config({
+            cls: conf_map.copy()
+            for cls, conf_map in self._current.items()
+            if cls in filter_to._registered
+        })
 
     def merge_conf(self, config: Config) -> None:
         """Re-store values in the specified config.
@@ -438,27 +453,6 @@ class ConfigSpec:
                     file.write(line)
 
 
-def get_pal_conf() -> Config:
-    """Return a copy of the current settings for the palette."""
-    return Config({
-        cls: opt_map.copy()
-        for cls, opt_map in APP._current.items()
-        if cls.get_conf_info().palette_stores
-    })
-
-
-async def apply_pal_conf(conf: Config) -> None:
-    """Apply a config provided from the palette."""
-    # First replace all the configs to be atomic, then apply.
-    for cls, opt_map in conf.items():
-        if cls.get_conf_info().palette_stores:  # Double-check, in case it's added to the file.
-            APP._current[cls] = opt_map.copy()
-    async with trio.open_nursery() as nursery:
-        for cls in conf:
-            if cls.get_conf_info().palette_stores:
-                nursery.start_soon(APP.apply_conf, cls)
-
-
 # Main application configs.
 APP: ConfigSpec = ConfigSpec(utils.conf_location('config/config.vdf'))
 PALETTE: ConfigSpec = ConfigSpec(None)
@@ -466,7 +460,6 @@ PALETTE: ConfigSpec = ConfigSpec(None)
 
 # Import submodules, so they're registered.
 from config import (
-    compile_pane, corridors, gen_opts, item_defaults,  # noqa: F401
-    last_sel, palette, signage,  # noqa: F401
-    stylevar, widgets, windows,  # noqa: F401
+    compile_pane, corridors, filters, gen_opts, item_defaults,  last_sel, palette,   # noqa: F401
+    signage,  stylevar, widgets, windows,  # noqa: F401
 )

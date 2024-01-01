@@ -167,10 +167,10 @@ class ManagerBase(Generic[ItemT, ParentT]):
         self,
         *,
         info_cb: InfoCB,
-        size: Tuple[int, int]=(64, 64),
-        config_icon: bool=False,
-        pick_flexi_group: Optional[FlexiCB]=None,
-    ):
+        size: Tuple[int, int] = (64, 64),
+        config_icon: bool = False,
+        pick_flexi_group: Optional[FlexiCB] = None,
+    ) -> None:
         """Create a group of drag-drop slots.
 
         - ui: The implementation of the UI logic that will be used.

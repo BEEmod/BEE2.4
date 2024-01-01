@@ -741,7 +741,7 @@ async def parse_package(
 async def parse_object(
     packset: PackagesSet,
     obj_class: Type[PakObject], obj_id: str,
-    loader: LoadScreen,
+    loader: Optional[LoadScreen],
 ) -> None:
     """Parse through the object and store the resultant class."""
     obj_data = packset.unparsed[obj_class][obj_id]

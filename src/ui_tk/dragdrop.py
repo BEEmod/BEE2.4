@@ -9,7 +9,7 @@ from enum import Enum
 
 import attrs
 
-from app import img, localisation, tk_tools
+from app import img, tk_tools
 # noinspection PyProtectedMember
 from app.dragdrop import (
     SLOT_DRAG, DragWin, FlexiCB, InfoCB, ManagerBase, PositionerBase,
@@ -19,6 +19,7 @@ from app.dragdrop import (
 )
 from transtoken import TransToken
 from ui_tk.img import TK_IMG
+from ui_tk.wid_transtoken import set_text
 import utils
 
 
@@ -84,7 +85,7 @@ class CanvasPositioner(PositionerBase, Generic[T]):
         item_height: int,
         spacing: int = -1,
         yoff: int = 0,
-    ):
+    ) -> None:
         self.canvas = canvas
         self._place_func = place_func
         super().__init__(
@@ -140,6 +141,8 @@ class DragDrop(ManagerBase[ItemT, tk.Misc], Generic[ItemT]):
         self._drag_win = drag_win = tk.Toplevel(parent, name='drag_icon')
         drag_win.withdraw()
         drag_win.transient(master=parent)
+        if utils.LINUX:
+            drag_win.wm_attributes('-type', 'dnd')
         drag_win.wm_overrideredirect(True)
 
         self._drag_lbl = tk.Label(drag_win)
@@ -196,7 +199,7 @@ class DragDrop(ManagerBase[ItemT, tk.Misc], Generic[ItemT]):
                 bg=img.PETI_ITEM_BG_HEX,
                 name="text",
             )
-            localisation.set_text(text_lbl, title)
+            set_text(text_lbl, title)
         else:
             text_lbl = None
 

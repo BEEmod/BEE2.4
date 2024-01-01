@@ -20,9 +20,10 @@ import srctools.logger
 import trio.to_thread
 
 from app.richTextBox import tkRichText
-from app import localisation, tkMarkdown, tk_tools, sound, img, TK_ROOT, background_run
+from app import tkMarkdown, tk_tools, sound, img, TK_ROOT, background_run
 from ui_tk.dialogs import DIALOG
 from ui_tk.img import TKImages
+from ui_tk.wid_transtoken import set_text, set_win_title, set_menu_text
 from transtoken import TransToken
 import utils
 
@@ -93,7 +94,7 @@ Used software / libraries in the BEE2.4:
 * [pygtrie][pygtrie] `{pygtrie_ver}` by Michal Nazarewicz
 * [Tcl][tcl] `{tk_ver}` / [TK][tcl]` {tcl_ver}`
 * [Python][python] `{py_ver}`
-* [FFmpeg][ffmpeg] licensed under the [LGPLv2.1][LGPL]. Binaries are built via [sudo-nautilus][ffmpeg-bin].
+* [FFmpeg][FFmpeg] licensed under the [LGPLv2.1][LGPL]. Binaries are built via [sudo-nautilus][FFmpeg-bin].
 
 [LGPL]: http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html
 [pyglet]: https://pyglet.org/
@@ -106,7 +107,7 @@ Used software / libraries in the BEE2.4:
 [tcl]: https://tcl.tk/
 [python]: https://www.python.org/
 [FFmpeg]: https://ffmpeg.org/
-[ffmpeg-bin]: https://github.com/sudo-nautilus/FFmpeg-Builds-Win32
+[FFmpeg-bin]: https://github.com/sudo-nautilus/FFmpeg-Builds-Win32
 [srctools]: https://github.com/TeamSpen210/srctools
 [hammeraddons]: https://github.com/TeamSpen210/HammerAddons
 
@@ -384,7 +385,7 @@ SOFTWARE.
       same "printed page" as the copyright notice for easier
       identification within third-party archives.
 
-   Copyright [yyyy] [name of copyright owner]
+   Copyright \\[yyyy] \\[name of copyright owner]
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -441,18 +442,20 @@ class Dialog(tk.Toplevel):
     """Show a dialog with a message."""
     text: Optional[str]
 
-    def __init__(self, name: str, title: TransToken, text: str):
+    def __init__(self, name: str, title: TransToken, text: str) -> None:
         super().__init__(TK_ROOT, name=name)
         self.withdraw()
-        localisation.set_win_title(self, title)
+        set_win_title(self, title)
         self.transient(master=TK_ROOT)
         self.resizable(width=True, height=True)
+        if utils.LINUX:
+            self.wm_attributes('-type', 'dialog')
         self.text = text
         tk_tools.set_window_icon(self)
 
         # Hide when the exit button is pressed, or Escape
         # on the keyboard.
-        self.protocol("WM_DELETE_WINDOW", self.withdraw)
+        self.wm_protocol("WM_DELETE_WINDOW", self.withdraw)
         self.bind("<Escape>", f"wm withdraw {self}")
 
         frame = tk.Frame(self, background='white')
@@ -460,7 +463,7 @@ class Dialog(tk.Toplevel):
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(0, weight=1)
 
-        self.textbox = tkRichText(frame, width=80, height=24)
+        self.textbox = tkRichText(frame, name='message', width=80, height=24)
         self.textbox.configure(background='white', relief='flat')
         self.textbox.grid(row=0, column=0, sticky='nsew')
         frame.grid_columnconfigure(0, weight=1)
@@ -474,7 +477,7 @@ class Dialog(tk.Toplevel):
         scrollbox.grid(row=0, column=1, sticky='ns')
         self.textbox['yscrollcommand'] = scrollbox.set
 
-        localisation.set_text(
+        set_text(
             ttk.Button(frame, command=self.withdraw),
             TransToken.ui('Close'),
         ).grid(row=1, column=0)
@@ -552,7 +555,7 @@ def make_help_menu(parent: tk.Menu, tk_img: TKImages) -> None:
     help_menu = tk.Menu(parent, name='help')
 
     parent.add_cascade(menu=help_menu)
-    localisation.set_menu_text(parent, TransToken.ui('Help'))
+    set_menu_text(parent, TransToken.ui('Help'))
 
     icons: Dict[ResIcon, img.Handle] = {
         icon: img.Handle.sprite('icons/' + icon.value, 16, 16)
@@ -572,8 +575,8 @@ def make_help_menu(parent: tk.Menu, tk_img: TKImages) -> None:
                 compound='left',
                 image=tk_img.sync_load(icons[res.icon]),
             )
-            localisation.set_menu_text(help_menu, res.name)
+            set_menu_text(help_menu, res.name)
 
     help_menu.add_separator()
     help_menu.add_command(command=functools.partial(background_run, credit_window.show))
-    localisation.set_menu_text(help_menu, TransToken.ui('Credits...'))
+    set_menu_text(help_menu, TransToken.ui('Credits...'))

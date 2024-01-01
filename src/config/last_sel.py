@@ -7,8 +7,9 @@ import attrs
 import config
 
 
+@config.PALETTE.register
 @config.APP.register
-@attrs.frozen(slots=False)
+@attrs.frozen
 class LastSelected(config.Data, conf_name='LastSelected', uses_id=True):
     """Used for several general items, specifies the last selected one for restoration."""
     id: Union[str, None] = None

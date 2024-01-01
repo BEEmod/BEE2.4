@@ -841,8 +841,8 @@ class TileDef:
         pos: Vec,
         normal: Vec,
         base_type: TileType,
-        subtiles: dict[tuple[int, int], TileType]=None,
-        has_helper: bool=False,
+        subtiles: dict[tuple[int, int], TileType] | None = None,
+        has_helper: bool = False,
     ) -> None:
         self.pos = pos
         self.normal = normal
@@ -878,11 +878,8 @@ class TileDef:
             return Vec(1, 0, 0)
 
     def __repr__(self) -> str:
-        return '<{} TileDef @ {} of {}>'.format(
-            self.base_type.name,
-            NORMAL_NAMES.get(self.normal.freeze(), self.normal),
-            self.pos,
-        )
+        norm_name = NORMAL_NAMES.get(self.normal.freeze(), self.normal)
+        return f'<{self.base_type.name} TileDef @ {norm_name} of {self.pos}>'
 
     def format_tiles(self) -> str:
         """Debug utility, log the subtile shape."""
@@ -898,8 +895,8 @@ class TileDef:
         cls,
         grid_pos: Vec,
         norm: Vec,
-        tile_type: TileType=TileType.VOID,
-    ) -> 'TileDef':
+        tile_type: TileType = TileType.VOID,
+    ) -> TileDef:
         """Return a tiledef at a position, creating it with a type if not present."""
         try:
             tile = TILES[grid_pos.as_tuple(), norm.as_tuple()]
@@ -1001,8 +998,8 @@ class TileDef:
     def calc_patterns(
         self,
         tiles: dict[tuple[int, int], TileType],
-        is_wall: bool=False,
-        _pattern: str=None,
+        is_wall: bool = False,
+        _pattern: str | None = None,
     ) -> Iterator[tuple[float, float, float, float, TileSize, TileType]]:
         """Figure out the brushes needed for a complex pattern.
 
@@ -1567,8 +1564,7 @@ def make_tile(
     assert TILE_TEMP, "make_tile called without data loaded!"
     template = TILE_TEMP[normal.as_tuple()]
 
-    assert width >= 8 and height >= 8, 'Tile is too small!' \
-                                       ' ({}x{})'.format(width, height)
+    assert width >= 8 and height >= 8, f'Tile is too small! ({width}x{height})'
     assert thickness in (2, 4, 8), f'Bad thickness {thickness}'
 
     axis_u, axis_v = Vec.INV_AXIS[normal.axis()]
@@ -1653,8 +1649,7 @@ def gen_tile_temp() -> None:
     }
 
     try:
-        template = template_brush.get_template(
-            options.get(str, '_tiling_template_'))
+        template = template_brush.get_template(options.TILING_TEMPLATE())
         # Grab the single world brush for each visgroup.
         for (key, name) in cat_names.items():
             [categories[key]] = template.visgrouped_solids(name)
@@ -1762,7 +1757,7 @@ def analyse_map(vmf_file: VMF, side_to_ant_seg: dict[int, list[antlines.Segment]
                 tile.add_portal_helper()
             inst.remove()
 
-    dynamic_pan_parent = options.get(str, "dynamic_pan_parent")
+    dynamic_pan_parent = options.DYNAMIC_PAN_PARENT()
 
     # Find Angled Panel brushes.
     for brush_ent in vmf_file.by_class['func_brush']:
@@ -1999,8 +1994,7 @@ def find_front_face(
         else:
             LOGGER.warning('Unknown panel texture "{}"!', face.mat)
             return TileType.BLACK, face
-    else:
-        raise Exception(f'Malformed wall brush at {grid_pos}, {norm}')
+    raise Exception(f'Malformed wall brush at {grid_pos}, {norm}')
 
 
 def inset_flip_panel(panel: list[Solid], pos: Vec, normal: Vec) -> None:
@@ -2239,7 +2233,7 @@ def generate_goo(vmf: VMF) -> None:
     goo_heights: dict[float, int] = Counter()
 
     # If enabled, generate tideline overlays.
-    use_tidelines = options.get(bool, 'generate_tidelines')
+    use_tidelines = options.GENERATE_TIDELINES()
     # Z, x-cell, y-cell, x-norm, y-norm = overlay ent.
     tideline_over: dict[tuple[float, float, float, int, int], Tideline] = {}
 
@@ -2341,7 +2335,7 @@ def generate_goo(vmf: VMF) -> None:
         damagetype=(1 << 18),  # Radiation
     )
 
-    goo_scale = options.get(float, 'goo_scale')
+    goo_scale = options.GOO_SCALE()
 
     # Find key with the highest value - that gives the largest z-level.
     [best_goo, _] = max(goo_heights.items(), key=lambda x: x[1])

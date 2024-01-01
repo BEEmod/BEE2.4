@@ -5,11 +5,12 @@ from typing import Iterable
 from tkinter import ttk
 import tkinter as tk
 
-from app import TK_ROOT, background_run, localisation, tk_tools
+from app import TK_ROOT, background_run, tk_tools
 
 from app.CheckDetails import CheckDetails, Item as CheckItem
 from app.dialogs import Dialogs
 from transtoken import TransToken
+from ui_tk.wid_transtoken import set_text, set_win_title
 import packages
 import utils
 from ui_tk.dialogs import TkDialogs
@@ -86,7 +87,7 @@ def make_window() -> None:
     global list_widget
     dialog = TkDialogs(window)
     window.transient(TK_ROOT)
-    localisation.set_win_title(window, TransToken.ui('BEE2 - Manage Packages'))
+    set_win_title(window, TransToken.ui('BEE2 - Manage Packages'))
 
     # Don't destroy window when quit!
     window.protocol("WM_DELETE_WINDOW", cancel)
@@ -106,12 +107,12 @@ def make_window() -> None:
     frame.columnconfigure(0, weight=1)
     frame.rowconfigure(0, weight=1)
 
-    localisation.set_text(
+    set_text(
         ttk.Button(frame, command=lambda: background_run(apply_changes, dialog)),
         TransToken.ui('OK'),
     ).grid(row=1, column=0, sticky='W')
 
-    localisation.set_text(
+    set_text(
         ttk.Button(frame, command=cancel),
         TransToken.ui('Cancel'),
     ).grid(row=1, column=1, sticky='E')
