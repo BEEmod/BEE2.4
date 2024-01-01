@@ -63,7 +63,7 @@ class _Settings(TypedDict):
     options: Dict[str, Any]
     fog: Dict[str, Any]
     elevator: Dict[str, str]
-    music_conf: Optional[Keyvalues]
+    music_conf: Keyvalues
 
     style_vars: Dict[str, bool]
     has_attr: Dict[str, bool]
@@ -73,7 +73,7 @@ settings: _Settings = {
     "options":        {},
     "fog":            {},
     "elevator":       {},
-    'music_conf':     None,
+    'music_conf':     Keyvalues('', []),
 
     "style_vars":     defaultdict(bool),
     "has_attr":       defaultdict(bool),
@@ -134,7 +134,7 @@ async def load_settings() -> Tuple[
 
     # Load in our main configs...
     options.load(conf.find_all('Options'))
-    utils.DEV_MODE = options.get(bool, 'dev_mode')
+    utils.DEV_MODE = options.DEV_MODE()
 
     # The voice line keyvalues block
     for quote_block in conf.find_all("quotes"):
@@ -357,7 +357,7 @@ def set_player_model(vmf: VMF, info: corridor.Info) -> None:
     if info.is_coop:  # Not in coop..
         return
 
-    loc = options.get(Vec, 'global_ents_loc')
+    loc = options.GLOBAL_ENTS_LOC()
     assert loc is not None
     chosen_model = BEE2_config.get_val('General', 'player_model', 'PETI').casefold()
 
@@ -399,7 +399,7 @@ def set_player_model(vmf: VMF, info: corridor.Info) -> None:
         delay=0.1,
     ))
 
-    if pgun_skin and options.get(str, 'game_id') == utils.STEAM_IDS['PORTAL2']:
+    if pgun_skin and options.GAME_ID() == utils.STEAM_IDS['PORTAL2']:
         # Only change portalgun skins in Portal 2 - this is the vanilla
         # portalgun weapon/viewmodel.
         auto.add_out(Output(
@@ -441,7 +441,7 @@ def set_player_portalgun(vmf: VMF, info: corridor.Info) -> None:
       `NeedsPortalMan` still works to add this in Coop.
     """
 
-    if options.get(str, 'game_id') == utils.STEAM_IDS['TAG']:
+    if options.GAME_ID() == utils.STEAM_IDS['TAG']:
         return  # Aperture Tag doesn't have Portal Guns!
 
     LOGGER.info('Setting Portalgun:')
@@ -464,7 +464,7 @@ def set_player_portalgun(vmf: VMF, info: corridor.Info) -> None:
     else:
         info.set_attr('spawn_nogun')
 
-    ent_pos = options.get(Vec, 'global_pti_ents_loc')
+    ent_pos = options.GLOBAL_PTI_ENTS_LOC()
     assert ent_pos is not None
 
     logic_auto = vmf.create_ent('logic_auto', origin=ent_pos, flags='1')
@@ -639,7 +639,7 @@ def add_screenshot_logic(vmf: VMF, info: corridor.Info) -> None:
         vmf.create_ent(
             classname='func_instance',
             file=SSHOT_FNAME,
-            origin=options.get(Vec, 'global_ents_loc'),
+            origin=options.GLOBAL_ENTS_LOC(),
             angles='0 0 0',
         )
         conditions.ALL_INST.add(SSHOT_FNAME)
@@ -649,7 +649,7 @@ def add_screenshot_logic(vmf: VMF, info: corridor.Info) -> None:
 @conditions.meta_cond(priority=100, only_once=True)
 def add_fog_ents(vmf: VMF, info: corridor.Info) -> None:
     """Add the tonemap and fog controllers, based on the skybox."""
-    pos = options.get(Vec, 'global_ents_loc')
+    pos = options.GLOBAL_ENTS_LOC()
     vmf.create_ent(
         classname='env_tonemap_controller',
         targetname='@tonemapper',
@@ -815,7 +815,7 @@ def set_elev_videos(vmf: VMF, info: corridor.Info) -> None:
         )
 
 
-def add_goo_mist(vmf, sides: Iterable[FrozenVec]):
+def add_goo_mist(vmf: VMF, sides: Iterable[FrozenVec]) -> None:
     """Add water_mist* particle systems to goo.
 
     This uses larger particles when needed to save ents.
@@ -898,10 +898,10 @@ def change_brush(vmf: VMF) -> None:
     """Alter all world/detail brush textures to use the configured ones."""
     LOGGER.info("Editing Brushes...")
 
-    goo_scale = options.get(float, 'goo_scale')
+    goo_scale = options.GOO_SCALE()
 
     # Goo mist must be enabled by both the style and the user.
-    make_goo_mist = options.get(bool, 'goo_mist') and srctools.conv_bool(
+    make_goo_mist = options.GOO_MIST() and srctools.conv_bool(
         settings['style_vars'].get('AllowGooMist', '1')
     )
     mist_solids: Set[FrozenVec] = set()
@@ -1036,13 +1036,13 @@ def position_exit_signs(vmf: VMF) -> None:
     except ValueError:
         exit_arrow = None
 
-    if options.get(bool, "remove_exit_signs"):
+    if options.REMOVE_EXIT_SIGNS():
         if exit_sign is not None:
             exit_sign.remove()
         if exit_arrow is not None:
             exit_arrow.remove()
 
-    inst_filename = options.get(str, 'signExitInst')
+    inst_filename = options.SIGN_EXIT_INST()
     if inst_filename is None or exit_sign is None or exit_arrow is None:
         return
 
@@ -1094,7 +1094,7 @@ def position_exit_signs(vmf: VMF) -> None:
     conditions.ALL_INST.add(inst_filename.casefold())
     inst.fixup['$arrow'] = sign_dir
     inst.fixup['$orient'] = orient
-    if options.get(bool, "remove_exit_signs_dual"):
+    if options.REMOVE_EXIT_SIGNS_DUAL():
         exit_sign.remove()
         exit_arrow.remove()
     else:
@@ -1107,13 +1107,13 @@ def change_overlays(vmf: VMF) -> None:
     LOGGER.info("Editing Overlays...")
 
     # A frame instance to add around all the 32x32 signs
-    sign_inst = options.get(str, 'signInst')
+    sign_inst = options.SIGN_INST()
     # Resize the signs to this size. 4 vertexes are saved relative
     # to the origin, so we must divide by 2.
-    sign_size = options.get(int, 'signSize') / 2
+    sign_size = options.SIGN_SIZE() / 2
 
     # A packlist associated with the sign_inst.
-    sign_inst_pack = options.get(str, 'signPack')
+    sign_inst_pack = options.SIGN_PACK()
 
     # Grab all the textures we're using...
     for over in vmf.by_class['info_overlay']:
@@ -1161,17 +1161,11 @@ def change_overlays(vmf: VMF) -> None:
 
 def add_extra_ents(vmf: VMF, info: corridor.Info) -> None:
     """Add the various extra instances to the map."""
-    loc = options.get(Vec, 'global_ents_loc')
-
-    music.add(vmf, loc, settings['music_conf'], info)
-
     LOGGER.info('Adding global ents...')
 
-    # Add the global_pti_ents instance automatically, with disable_pti_audio
-    # set.
-    global_ents_pos = options.get(Vec, 'global_ents_loc')
-    pti_file = options.get(str, 'global_pti_ents')
-    pti_loc = options.get(Vec, 'global_pti_ents_loc')
+    global_ents_pos = options.GLOBAL_ENTS_LOC()
+    pti_file = options.GLOBAL_PTI_ENTS()
+    pti_loc = options.GLOBAL_PTI_ENTS_LOC()
 
     # Add a nodraw box around the global entity location, to seal it.
     vmf.add_brushes(vmf.make_hollow(
@@ -1196,6 +1190,8 @@ def add_extra_ents(vmf: VMF, info: corridor.Info) -> None:
         angles='0 0 0',
     )
 
+    music.add(vmf, global_ents_pos, settings['music_conf'], info)
+
     if info.has_attr('bridge') or info.has_attr('lightbridge'):
         # If we have light bridges, make sure we precache the particle.
         vmf.create_ent(
@@ -1206,6 +1202,7 @@ def add_extra_ents(vmf: VMF, info: corridor.Info) -> None:
         )
 
     if pti_file:
+        # Add the global_pti_ents instance automatically, with disable_pti_audio set.
         LOGGER.info('Adding Global PTI Ents')
         global_pti_ents = vmf.create_ent(
             classname='func_instance',
@@ -1230,7 +1227,7 @@ def add_extra_ents(vmf: VMF, info: corridor.Info) -> None:
 def change_ents(vmf: VMF) -> None:
     """Edit misc entities."""
     LOGGER.info("Editing Other Entities...")
-    if options.get(bool, "remove_info_lighting"):
+    if options.REMOVE_INFO_LIGHTING():
         # Styles with brush-based glass edges don't need the info_lighting,
         # delete it to save ents.
         for ent in vmf.by_class['info_lighting']:
@@ -1250,7 +1247,7 @@ def write_itemid_list(vmf: VMF, used_items: Iterable[str]) -> None:
 
     used_item_list = sorted(used_items)
     LOGGER.debug('Used items: \n{}', '\n'.join(used_item_list))
-    global_ents_loc = options.get(Vec, 'global_ents_loc')
+    global_ents_loc = options.GLOBAL_ENTS_LOC()
     for offset in range(0, len(used_item_list), per_ent):
         lst_ent = vmf.create_ent(
             'bee2_item_list',
@@ -1269,9 +1266,9 @@ def fix_worldspawn(vmf: VMF) -> None:
         # If the game is Aperture Tag, it's always forced on
         vmf.spawn['paintinmap'] = srctools.bool_as_int(
             settings['has_attr']['gel'] or
-            options.get(str, 'game_id') == utils.STEAM_IDS['APTAG']
+            options.GAME_ID() == utils.STEAM_IDS['APTAG']
         )
-    vmf.spawn['skyname'] = options.get(str, 'skybox')
+    vmf.spawn['skyname'] = options.SKYBOX()
 
 
 async def find_missing_instances(game: Game, vmf: VMF) -> List[Vec]:
@@ -1341,12 +1338,11 @@ def run_vbsp(
     If new_path is passed VBSP will be run on the map in styled/, and we'll
     read through the output to find the entity counts.
     """
-
     is_peti = new_path is not None
 
     # We can't overwrite the original vmf, so we run VBSP from a separate
     # location.
-    if is_peti:
+    if new_path is not None:
         # Copy the original log file
         if os.path.isfile(path.replace(".vmf", ".log")):
             shutil.copy(
@@ -1397,7 +1393,7 @@ def run_vbsp(
     # Print output
     LOGGER.info("VBSP Done!")
 
-    if is_peti:  # Ignore Hammer maps
+    if new_path is not None:  # Ignore Hammer maps
         process_vbsp_log(buff.getvalue())
 
     # Copy over the real files so vvis/vrad can read them

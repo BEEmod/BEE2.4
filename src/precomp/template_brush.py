@@ -1355,12 +1355,12 @@ def retexture_template(
                         face.uaxis = UVAxis(
                             1, 0, 0,
                             offset=0,
-                            scale=options.get(float, 'goo_scale') or 0.25,
+                            scale=options.GOO_SCALE(),
                         )
                         face.vaxis = UVAxis(
                             0, -1, 0,
                             offset=0,
-                            scale=options.get(float, 'goo_scale') or 0.25,
+                            scale=options.GOO_SCALE(),
                         )
                 continue
             else:

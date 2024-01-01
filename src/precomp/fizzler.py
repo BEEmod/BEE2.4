@@ -119,7 +119,7 @@ def read_configs(conf: Keyvalues) -> None:
 
     LOGGER.info('Loaded {} fizzlers.', len(FIZZ_TYPES))
 
-    if options.get(str, 'game_id') != utils.STEAM_IDS['APTAG']:
+    if options.GAME_ID() != utils.STEAM_IDS['APTAG']:
         return
     # In Aperture Tag, we don't have portals. For fizzler types which block
     # portals (trigger_portal_cleanser), additionally fizzle paint.
@@ -403,7 +403,6 @@ class Fizzler:
 
         # Make global entities if not present.
         if '_fizz_flinch_hurt' not in vmf.by_target:
-            glob_ent_loc = options.get(Vec, 'global_ents_loc')
             vmf.create_ent(
                 classname='point_hurt',
                 targetname='_fizz_flinch_hurt',
@@ -412,7 +411,7 @@ class Fizzler:
                 DamageType=8 | 1024 | 2048,
                 DamageTarget='!activator',  # Hurt the triggering player.
                 DamageRadius=1,  # Target makes this unused.
-                origin=glob_ent_loc,
+                origin=options.GLOBAL_ENTS_LOC(),
             )
 
         # We need two catapults - one for each side.
@@ -588,9 +587,9 @@ class Fizzler:
         if not border or (not tiledefs_up and not tiledefs_dn):
             return
 
-        overlay_thickness = options.get(int, 'fizz_border_thickness')
-        overlay_repeat = options.get(int, 'fizz_border_repeat')
-        flip_uv = options.get(bool, 'fizz_border_vertical')
+        overlay_thickness = options.FIZZ_BORDER_THICKNESS()
+        overlay_repeat = options.FIZZ_BORDER_REPEAT()
+        flip_uv = options.FIZZ_BORDER_VERTICAL()
 
         if flip_uv:
             u_rep = 1.0

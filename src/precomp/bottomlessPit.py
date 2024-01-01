@@ -82,7 +82,7 @@ def make_bottomless_pit(vmf: VMF, max_height):
         tele_off = Vec(0, 0, 0)
 
     # Controlled by the style, not skybox!
-    blend_light = options.get(str, 'pit_blend_light')
+    blend_light = options.PIT_BLEND_LIGHT()
 
     if use_skybox:
         # Add in the actual skybox edges and triggers.
@@ -361,7 +361,7 @@ def make_pit_shell(vmf: VMF):
         classname='trigger_multiple',
         spawnflags=4104,
         wait=0.1,
-        origin=options.get(Vec, 'global_pti_ents_loc'),
+        origin=options.GLOBAL_PTI_ENTS_LOC(),
     )
     diss_trig.solids = [vmf.make_prism(
         Vec(-8 * 128, -8 * 128, -4182),
@@ -378,7 +378,7 @@ def make_pit_shell(vmf: VMF):
     # to stop players from portalling past the hurt trigger.
     diss_trig = vmf.create_ent(
         classname='func_noportal_volume',
-        origin=options.get(Vec, 'global_pti_ents_loc'),
+        origin=options.GLOBAL_PTI_ENTS_LOC(),
     )
     diss_trig.solids = [vmf.make_prism(
         Vec(-8 * 128, -8 * 128, -64),

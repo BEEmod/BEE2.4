@@ -694,7 +694,7 @@ def do_item_optimisation(vmf: VMF) -> None:
     if needs_global_toggle:
         vmf.create_ent(
             classname='env_texturetoggle',
-            origin=options.get(Vec, 'global_ents_loc'),
+            origin=options.GLOBAL_ENTS_LOC(),
             targetname='_static_ind_tog',
             target='_static_ind',
         )
@@ -804,10 +804,7 @@ def gen_item_outputs(vmf: VMF) -> None:
                 '_inv_rl',
             )
 
-    logic_auto = vmf.create_ent(
-        'logic_auto',
-        origin=options.get(Vec, 'global_ents_loc')
-    )
+    logic_auto = vmf.create_ent('logic_auto', origin=options.GLOBAL_ENTS_LOC())
 
     for ent in dummy_logic_ents:
         # Condense all these together now.
@@ -930,8 +927,8 @@ def add_timer_relay(item: Item, has_sounds: bool) -> None:
             relay.add_out(localise_output(cmd, 'OnTrigger', item.inst, delay=timer_delay))
 
     if item.config.timer_sound_pos is not None and has_sounds:
-        timer_sound = options.get(str, 'timer_sound')
-        timer_cc = options.get(str, 'timer_sound_cc')
+        timer_sound = options.TIMER_SOUND()
+        timer_cc = options.TIMER_SOUND_CC()
 
         # The default sound has 'ticking' closed captions.
         # So reuse that if the style doesn't specify a different noise.

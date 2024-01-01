@@ -19,8 +19,8 @@ def add(
     LOGGER.info("Adding Music...")
     # These values are exported by the BEE2 app, indicating the
     # options on the music item.
-    inst = options.get(str, 'music_instance')
-    snd_length = options.get(int, 'music_looplen')
+    inst = options.MUSIC_INSTANCE()
+    snd_length = options.MUSIC_LOOPLEN()
 
     # Don't add our logic if an instance was provided.
     # If this settings is set, we have a music config.

@@ -281,12 +281,12 @@ class IndicatorStyle:
             wall=AntType.default(),
             floor=AntType.default(),
             check_inst=str(check_item.instances[0].inst) if check_item.instances else '',
-            check_switching=options.get(PanelSwitchingStyle, 'ind_pan_check_switching'),
+            check_switching=options.IND_PAN_CHECK_SWITCHING.as_enum(PanelSwitchingStyle),
             check_cmd=check_item.conn_config.enable_cmd if check_item.conn_config is not None else (),
             cross_cmd=check_item.conn_config.disable_cmd if check_item.conn_config is not None else (),
 
             timer_inst=str(timer_item.instances[0].inst) if timer_item.instances else '',
-            timer_switching=options.get(PanelSwitchingStyle, 'ind_pan_timer_switching'),
+            timer_switching=options.IND_PAN_TIMER_SWITCHING.as_enum(PanelSwitchingStyle),
             timer_basic_start_cmd=timer_item.conn_config.enable_cmd if timer_item.conn_config is not None else (),
             timer_basic_stop_cmd=timer_item.conn_config.disable_cmd if timer_item.conn_config is not None else (),
             # No advanced configs

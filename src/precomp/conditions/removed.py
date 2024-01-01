@@ -8,27 +8,36 @@ T = TypeVar('T')
 LOGGER = srctools.logger.get_logger(__name__)
 
 
-def deprecator(func: Callable[..., Callable[[Callable], object]], ret_val: T):
+def make_func(msg: str, ret_val: T) -> Callable[[], T]:
     """Deprecate a test or result."""
-    def do_dep(name: str, *aliases: str, msg: str):
-        used = False
-        msg = f'{name} is no longer used.\n{msg}'
+    used = False
 
-        def deprecated() -> T:
-            """This result is no longer used."""
-            nonlocal used
-            if not used:
-                used = True
-                LOGGER.warning(msg)
+    def deprecated() -> T:
+        """This test/result is no longer used."""
+        nonlocal used
+        if not used:
+            used = True
+            LOGGER.warning(msg)
 
-            return ret_val
+        return ret_val
 
-        func(name, *aliases)(deprecated)
-    return do_dep
+    deprecated.__doc__ = msg
+
+    return deprecated
 
 
-deprecate_result = deprecator(make_result, RES_EXHAUSTED)
-deprecate_test = deprecator(make_test, False)
+def deprecate_test(name: str, *, msg: str) -> None:
+    """Deprecate a result."""
+    msg = f'The {name} test is no longer used.\n{msg}'
+
+    make_test(name)(make_func(msg, False))
+
+
+def deprecate_result(name: str, *, msg: str) -> None:
+    """Deprecate a result."""
+    msg = f'The {name} result is no longer used.\n{msg}'
+
+    make_result(name)(make_func(msg, RES_EXHAUSTED))
 
 
 deprecate_result(

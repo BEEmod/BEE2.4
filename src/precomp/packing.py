@@ -52,7 +52,7 @@ def pack_files(
 
     ent = vmf.create_ent(
         classname='comp_pack',
-        origin=options.get(Vec, 'global_ents_loc'),
+        origin=options.GLOBAL_ENTS_LOC(),
     )
 
     for i, file in enumerate(packlist, start=1):
