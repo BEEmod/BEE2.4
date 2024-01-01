@@ -496,7 +496,7 @@ class CondCall(Generic[CallResultT]):
         self,
         func: Callable[..., CallResultT | Callable[[Entity], CallResultT]],
         group: str | None,
-    ):
+    ) -> None:
         self.func = func
         self.group = group
         cback, arg_order = annotation_caller(
@@ -1008,24 +1008,28 @@ def add_suffix(inst: Entity, suff: str) -> None:
     ALL_INST.add(new_filename.casefold())
 
 
-def local_name(inst: Entity, name: str | Entity) -> str:
+def local_name(inst: Entity, name: str | Entity | None) -> str:
     """Fixup the given name for inside an instance.
 
     This handles @names, !activator, and obeys the fixup_style option.
 
     If the name is an entity, that entity's name is passed through unchanged.
+    If the name is blank or None, the instance's name is returned.
     """
     # Don't translate direct entity names - it's already the entity's full
     # name.
     if isinstance(name, Entity):
         return name['targetname']
 
+    targ_name = inst['targetname', '']
+
     # If blank, keep it blank, and don't fix special or global names
+    if name is None:
+        return targ_name
     if not name or name.startswith(('!', '@')):
         return name
 
     fixup = inst['fixup_style', '0']
-    targ_name = inst['targetname', '']
 
     if fixup == '2' or not targ_name:
         # We can't do fixup..

@@ -169,14 +169,19 @@ class CubeSkins(NamedTuple):
     """Specifies the various skins present for cubes.
 
     Rusty skins are only applicable if the map doesn't contain gels, since
-    all of the cube types have one or more bad gel skins. If None, there's
-    no rusty version.
+    all the cube types have one or more bad gel skins. If no rusty version exists,
+    it's equal to clean.
     For each, the first is the off skin, the second is the on skin.
     """
     clean: tuple[int, int]
-    rusty: tuple[int, int] | None
+    rusty: tuple[int, int]
     bounce: tuple[int, int]
     speed: tuple[int, int]
+
+    @property
+    def has_rusty(self) -> bool:
+        """Check if this has a rusty skin."""
+        return self.clean != self.rusty
 
     def spawn_skin(self, paint: CubePaintType | None) -> int:
         """Return the skin this paint would spawn with."""
@@ -186,7 +191,8 @@ class CubeSkins(NamedTuple):
             return self.bounce[0]
         elif paint is CubePaintType.SPEED:
             return self.speed[0]
-        raise AssertionError(f"Unknown value: {paint}")
+        else:
+            assert_never(paint)
 
 
 # (paint, type and rusty) -> off, on skins.
@@ -199,7 +205,7 @@ CUBE_SKINS: dict[CubeEntType, CubeSkins] = {
     ),
     CubeEntType.comp: CubeSkins(
         clean=(1, 4),
-        rusty=None,
+        rusty=(1, 4),
         # On-painted skins are actually normal!
         # Not really noticeable though, so don't bother
         # fixing.
@@ -215,13 +221,13 @@ CUBE_SKINS: dict[CubeEntType, CubeSkins] = {
     ),
     CubeEntType.sphere: CubeSkins(
         clean=(0, 1),
-        rusty=None,
+        rusty=(0, 1),
         bounce=(2, 2),
         speed=(3, 3),
     ),
     CubeEntType.antique: CubeSkins(
         clean=(0, 0),
-        rusty=None,
+        rusty=(0, 0),
         bounce=(1, 1),
         speed=(2, 2),
     ),
@@ -239,7 +245,7 @@ class CubeAddon:
         vscript: str='',
         outputs: MutableMapping[CubeOutputs, list[Output]]=EmptyMapping,
         fixups: list[tuple[str, str | AddonFixups]] | None = None,
-    ):
+    ) -> None:
         self.id = addon_id
         self.inst = inst
         self.pack = pack
@@ -266,7 +272,7 @@ class CubeAddon:
         return addon
 
     @classmethod
-    def base_parse(cls, cube_id: str, kv: Keyvalues):
+    def base_parse(cls, cube_id: str, kv: Keyvalues) -> CubeAddon | None:
         """Parse from the config for cube types."""
         inst = kv['overlay_inst', '']
         pack = kv['overlay_pack', '']
@@ -398,7 +404,7 @@ class CubeType:
         base_tint: Vec,
         overlay_addon: CubeAddon | None,
         overlay_think: str | None,
-    ):
+    ) -> None:
         self.id = cube_id
         self.instances = resolve_inst(cube_item_id)
 
@@ -554,7 +560,7 @@ class CubePair:
         cube: Entity | None = None,
         cube_fixup: EntityFixup | None = None,
         tint: Vec | None = None,
-    ):
+    ) -> None:
         self.cube_type = cube_type
         # This may be None if it's a dropper-only pair.
         self.cube = cube
@@ -652,11 +658,12 @@ class CubePair:
             self.cube_type.try_rusty and
             self.paint_type is None and
             self.tint is None and
-            CUBE_SKINS[self.cube_type.type].rusty is not None
+            CUBE_SKINS[self.cube_type.type].has_rusty
         )
 
-    def get_kv_setter(self, name: str) -> Entity:
+    def get_kv_setter(self, name: str | None) -> Entity:
         """Get a KV setter setting this dropper-local name, creating if required."""
+        assert self.dropper is not None
         name = conditions.local_name(self.dropper, name)
         try:
             return self._kv_setters[name]
@@ -667,6 +674,15 @@ class CubePair:
                 target=name,
             )
             return kv_setter
+
+    def error_pos(self) -> Vec:
+        """Report a relevant location for error-reporting views."""
+        if self.dropper is not None:
+            return Vec.from_str(self.dropper['origin'])
+        if self.cube is not None:
+            return Vec.from_str(self.cube['origin'])
+        LOGGER.error('Pair {} has no cube and no dropper?', self)
+        return Vec(-192, -192, -192)
 
 
 @attrs.define
@@ -1448,7 +1464,7 @@ def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
                     user_errors.TOK_CUBE_SUPERPOS_MULTILINK,
                     voxels=[
                         Vec.from_str(inst['origin']),
-                        Vec.from_str(real_pair.dropper['origin']),
+                        real_pair.error_pos(),
                     ]
                 )
             if ghost_pair.superpos is not None:
@@ -1456,7 +1472,7 @@ def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
                     user_errors.TOK_CUBE_SUPERPOS_MULTILINK,
                     voxels=[
                         Vec.from_str(inst['origin']),
-                        Vec.from_str(ghost_pair.dropper['origin']),
+                        ghost_pair.error_pos(),
                     ]
                 )
             real_pair.superpos = ghost_pair.superpos = Superposition(
@@ -1525,7 +1541,7 @@ def setup_output(
     inst: Entity,
     output: str,
     self_name: str='!self',
-):
+) -> Output:
     """Modify parts of an output.
 
     inst is the instance to fixup names to fire into.
@@ -1586,6 +1602,7 @@ def make_cube(
         angles = drop_type.cube_orient @ Angle.from_str(pair.dropper['angles'])
         targ_inst = pair.dropper
     else:
+        assert pair.cube is not None
         angles = Angle(0, 180, 0) @ Angle.from_str(pair.cube['angles'])
         targ_inst = pair.cube
 
@@ -1877,6 +1894,7 @@ def generate_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
                 # If we have a bounce cube painter, it needs to be the normal skin.
                 if (
                     pair.paint_type is CubePaintType.BOUNCE and
+                    pair.drop_type is not None and
                     pair.drop_type.bounce_paint_file.casefold() != '<prepaint>'
                 ):
                     spawn_paint = None
@@ -1915,7 +1933,7 @@ def generate_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
             ))
 
         if pair.dropper:
-            assert pair.drop_type is not None
+            assert pair.drop_type is not None, pair
             pos = Vec.from_str(pair.dropper['origin'])
             pos += pair.spawn_offset @ Angle.from_str(pair.dropper['angles'])
             has_addon, drop_cube = make_cube(vmf, pair, pos, True, bounce_in_map, speed_in_map)
@@ -2084,7 +2102,7 @@ def generate_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
                     Template02=conditions.local_name(pair.cube, 'cube_addon_*'),
                 )
             else:
-                if dropperless_temp_count == 16:
+                if dropperless_temp_count == 16 or dropperless_temp is None:
                     dropperless_temp = vmf.create_ent(
                         classname='point_template',
                         targetname='@template_spawn_3',
@@ -2146,6 +2164,9 @@ def generate_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
         if drop_cube is not None and cube is not None:
             # We have both - it's a linked cube and dropper.
             # We need to trigger commands back and forth for this.
+            assert pair.cube is not None, pair
+            assert pair.dropper is not None, pair
+            assert pair.drop_type is not None, pair
 
             # Trigger the dropper when fizzling a cube.
             if should_respawn:

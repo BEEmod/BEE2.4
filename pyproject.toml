@@ -148,7 +148,6 @@ module = [
 	'precomp.conditions.glass',
 	'precomp.bottomlessPit',
 	'precomp.connections',
-	'precomp.cubes',
 	'precomp.fizzler',
 	'precomp.tiling',
 	'precomp.voice_line',
