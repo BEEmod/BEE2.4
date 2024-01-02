@@ -339,21 +339,6 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
         widgets: List[Iterable[Widget]] = [self.widgets, self.multi_widgets]
         return {wid.id for wid_list in widgets for wid in wid_list}
 
-    @staticmethod
-    async def export(exp_data: packages.ExportData) -> None:
-        """Write all our values to the config."""
-        for conf in exp_data.packset.all_obj(ConfigGroup):
-            config_section = CONFIG[conf.id]
-            for s_wid in conf.widgets:
-                if s_wid.has_values:
-                    config_section[s_wid.id] = s_wid.value
-            for m_wid in conf.multi_widgets:
-                for num, value in m_wid.values.items():
-                    config_section[f'{m_wid.id}_{num}'] = value
-            if not config_section:
-                del CONFIG[conf.id]
-        CONFIG.save_check()
-
 
 def parse_color(color: str) -> Tuple[int, int, int]:
     """Parse a string into a color."""

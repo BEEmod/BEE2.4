@@ -16,6 +16,7 @@ from ui_tk.dialogs import DIALOG
 from ui_tk.errors import display_errors
 from config.gen_opts import GenOptions
 from config.last_sel import LastSelected
+from exporting import mod_support
 import config
 import app
 import loadScreen
@@ -54,12 +55,10 @@ async def init_app() -> None:
     else:
         if last_game.id is not None:
             gameMan.set_game_by_name(last_game.id)
-    gameMan.scan_music_locs()
 
     LOGGER.info('Loading Packages...')
     packset = packages.get_loaded_packages()
-    packset.has_mel_music = gameMan.MUSIC_MEL_VPK is not None
-    packset.has_tag_music = gameMan.MUSIC_TAG_LOC is not None
+    mod_support.scan_music_locs(packset, gameMan.all_games)
     async with trio.open_nursery() as nurs:
         nurs.start_soon(
             packages.load_packages,
@@ -77,7 +76,6 @@ async def init_app() -> None:
 
     # Load filesystems into various modules
     music_conf.load_filesystems(package_sys.values())
-    gameMan.load_filesystems(package_sys.values())
     async with trio.open_nursery() as nurs:
         nurs.start_soon(UI.load_packages, packset, TK_IMG)
     loadScreen.main_loader.step('UI', 'package_load')
@@ -168,6 +166,7 @@ async def app_main(init: Callable[[], Awaitable[Any]]) -> None:
     async with trio.open_nursery() as nursery:
         app._APP_NURSERY = nursery
         await nursery.start(display_errors)
+        await gameMan.check_app_in_game(DIALOG)
 
         # Run main app, then cancel this nursery to quit all other tasks.
         await init()

@@ -1,6 +1,9 @@
 """Handles displaying errors to the user that occur during operations."""
 from __future__ import annotations
-from typing import Awaitable, ClassVar, Generator, Iterator, Protocol, final
+
+from enum import Enum, auto
+from typing import Awaitable, ClassVar, Generator, Iterator, Protocol, Union, final
+from typing_extensions import TypeAlias
 from contextlib import contextmanager
 from exceptiongroup import BaseExceptionGroup, ExceptionGroup
 import types
@@ -13,10 +16,26 @@ from transtoken import TransToken
 
 LOGGER = srctools.logger.get_logger(__name__)
 DEFAULT_TITLE = TransToken.ui("BEEmod Error")
-DEFAULT_DESC = TransToken.ui_plural(
+DEFAULT_ERROR_DESC = TransToken.ui_plural(
     "An error occurred while performing this task:",
     "Multiple errors occurred while performing this task:",
 )
+DEFAULT_WARN_DESC = TransToken.ui_plural(
+    "An error occurred while performing this task, but it was partially successful:",
+    "Multiple errors occurred while performing this task, but it was partially successful:",
+)
+
+
+class Result(Enum):
+    """Represents the result of the operation."""
+    SUCCEEDED = auto()  # No errors at all.
+    PARTIAL = auto()  # add() was called, no exceptions = was partially successful.
+    FAILED = auto()  # An exception was raised, complete failure.
+
+    @property
+    def failed(self) -> bool:
+        """Check if it failed."""
+        return self.name in ['PARTIAL', 'FAILED']
 
 
 @final
@@ -24,13 +43,18 @@ DEFAULT_DESC = TransToken.ui_plural(
 class AppError(Exception):
     """An error that occurs when using the app, that should be displayed to the user."""
     message: TransToken
+    fatal: bool
 
     def __init__(self, message: TransToken) -> None:
         super().__init__(message)
         self.message = message
+        self.fatal = False
 
     def __str__(self) -> str:
         return f"AppError: {self.message}"
+
+
+WarningExc: TypeAlias = Union[AppError, ExceptionGroup[Exception], BaseExceptionGroup[BaseException]]
 
 
 class Handler(Protocol):
@@ -39,15 +63,17 @@ class Handler(Protocol):
         ...
 
 
-def _collapse_excgroup(group: BaseExceptionGroup[AppError]) -> Iterator[AppError]:
-    """Extract all the AppErrors from this group.
+def _collapse_excgroup(group: BaseExceptionGroup[AppError], fatal: bool) -> Iterator[AppError]:
+    """Extract all the ``AppError``s from this group.
 
-    BaseExceptionGroup.subgroup() preserves the original structure, but we don't really care.
+    ``BaseExceptionGroup.subgroup()`` preserves the original structure, but we don't really care.
+    ``fatal`` is applied to all yielded ``AppError``s.
     """
     for exc in group.exceptions:
         if isinstance(exc, BaseExceptionGroup):
-            yield from _collapse_excgroup(exc)
+            yield from _collapse_excgroup(exc, fatal)
         else:
+            exc.fatal = fatal
             yield exc
 
 
@@ -55,8 +81,10 @@ def _collapse_excgroup(group: BaseExceptionGroup[AppError]) -> Iterator[AppError
 class ErrorUI:
     """A context manager which handles processing the errors."""
     title: TransToken
-    desc: TransToken
+    error_desc: TransToken
+    warn_desc: TransToken
     _errors: list[AppError]
+    _fatal_error: bool  # If set, error was caught in __aexit__
 
     _handler: ClassVar[Handler | None] = None
 
@@ -75,26 +103,33 @@ class ErrorUI:
             cls._handler = None
 
     def __init__(
-        self,
+        self, *,
         title: TransToken = DEFAULT_TITLE,
-        desc: TransToken = DEFAULT_DESC,
+        error_desc: TransToken = DEFAULT_ERROR_DESC,
+        warn_desc: TransToken = DEFAULT_WARN_DESC,
     ) -> None:
         """Create a UI handler. install_handler() must already be running."""
         if self._handler is None:
             LOGGER.warning("ErrorUI initialised with no handler running!")
         self.title = title
-        self.desc = desc
+        self.error_desc = error_desc
+        self.warn_desc = warn_desc
         self._errors = []
+        self._fatal_error = False
 
     def __repr__(self) -> str:
         return f"<ErrorUI, title={self.title}, {len(self._errors)} errors>"
 
     @property
-    def failed(self) -> bool:
-        """Check if the operation has failed."""
-        return bool(self._errors)
+    def result(self) -> Result:
+        """Check the result of the operation."""
+        if self._fatal_error:
+            return Result.FAILED
+        if self._errors:
+            return Result.PARTIAL
+        return Result.SUCCEEDED
 
-    def add(self, error: AppError | ExceptionGroup[Exception] | BaseExceptionGroup[BaseException]) -> None:
+    def add(self, error: WarningExc) -> None:
         """Log an error having occurred, while still running code.
 
         If an exception group is passed, this will extract the AppErrors, reraising others.
@@ -104,7 +139,7 @@ class ErrorUI:
         else:
             matching, rest = error.split(AppError)
             if matching is not None:
-                self._errors.extend(_collapse_excgroup(matching))
+                self._errors.extend(_collapse_excgroup(matching, False))
             if rest is not None:
                 raise rest
 
@@ -117,6 +152,10 @@ class ErrorUI:
         exc_val: BaseException | None,
         exc_tb: types.TracebackType | None,
     ) -> bool:
+        if exc_val is not None:
+            # Any exception getting here means we failed.
+            self._fatal_error = True
+
         if isinstance(exc_val, AppError):
             self._errors.append(exc_val)
             exc_val = None
@@ -128,7 +167,7 @@ class ErrorUI:
                 exc_val = None
                 # Matching may be recursively nested exceptions, collapse all that.
                 if matching is not None:
-                    self._errors.extend(_collapse_excgroup(matching))
+                    self._errors.extend(_collapse_excgroup(matching, True))
 
         if exc_val is not None:
             # Caught something else, don't suppress.
@@ -143,7 +182,8 @@ class ErrorUI:
             return False
 
         if self._errors:
-            desc = self.desc.format(n=len(self._errors))
+            desc = self.error_desc if self._fatal_error else self.warn_desc
+            desc = desc.format(n=len(self._errors))
             # We had an error.
             if ErrorUI._handler is None:
                 LOGGER.error(

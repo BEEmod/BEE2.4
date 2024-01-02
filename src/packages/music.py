@@ -4,14 +4,11 @@ from typing import Iterator, Mapping
 from typing_extensions import Self
 from collections.abc import Iterable
 
-from srctools import Keyvalues
 import srctools.logger
 
 from app import lazy_conf
 from consts import MusicChannel
-from packages import (
-    ExportData, PackagesSet, PakObject, ParseData, SelitemData, get_config,
-)
+from packages import PackagesSet, PakObject, ParseData, SelitemData, get_config
 from transtoken import TransTokenSource
 
 
@@ -205,60 +202,6 @@ class Music(PakObject, needs_foreground=True, style_suggest_key='music'):
         except KeyError:
             return None
         return children.sample[channel]
-
-    @staticmethod
-    async def export(exp_data: ExportData) -> None:
-        """Export the selected music."""
-        selected: dict[MusicChannel, Music | None] = exp_data.selected
-
-        base_music = selected[MusicChannel.BASE]
-
-        vbsp_config = exp_data.vbsp_conf
-
-        if base_music is not None:
-            vbsp_config += await base_music.config()
-
-        music_conf = Keyvalues('MusicScript', [])
-        vbsp_config.append(music_conf)
-        to_pack = set()
-
-        for channel, music in selected.items():
-            if music is None:
-                continue
-
-            sounds = music.sound[channel]
-            if len(sounds) == 1:
-                music_conf.append(Keyvalues(channel.value, sounds[0]))
-            else:
-                music_conf.append(Keyvalues(channel.value, [
-                    Keyvalues('snd', snd)
-                    for snd in sounds
-                ]))
-
-            to_pack.update(music.packfiles)
-
-        # If we need to pack, add the files to be unconditionally
-        # packed.
-        if to_pack:
-            music_conf.append(Keyvalues('pack', [
-                Keyvalues('file', filename)
-                for filename in to_pack
-            ]))
-
-        if base_music is not None:
-            vbsp_config.set_key(
-                ('Options', 'music_looplen'),
-                str(base_music.len),
-            )
-
-            vbsp_config.set_key(
-                ('Options', 'music_sync_tbeam'),
-                srctools.bool_as_int(base_music.has_synced_tbeam),
-            )
-            vbsp_config.set_key(
-                ('Options', 'music_instance'),
-                base_music.inst or '',
-            )
 
     @classmethod
     async def post_parse(cls, packset: PackagesSet) -> None:

@@ -1,25 +1,19 @@
 """Implements the parsing required for the app to identify all templates."""
 from __future__ import annotations
-import os
 
-from srctools import VMF, AtomicWriter, KeyValError, Keyvalues
-from srctools.dmx import (
-    Attribute as DMXAttr, Element as DMXElement, ValueType as DMXValue,
-)
+from srctools import VMF, KeyValError, Keyvalues
 from srctools.filesys import File
 import srctools.logger
 import trio
 
-from app import gameMan
+from packages import PackagesSet
 from utils import PackagePath
-import packages
 
 
 LOGGER = srctools.logger.get_logger(__name__)
-TEMPLATES: dict[str, PackagePath] = {}
 
 
-async def parse_template(pak_id: str, file: File) -> None:
+async def parse_template(packset: PackagesSet, pak_id: str, file: File) -> None:
     """Parse the specified template file, extracting its ID."""
     path = f'{pak_id}:{file.path}'
     temp_id = await trio.to_thread.run_sync(parse_template_fast, file, path, abandon_on_cancel=True)
@@ -37,7 +31,7 @@ async def parse_template(pak_id: str, file: File) -> None:
         temp_id = conf_ents[0]['template_id']
         if not temp_id:
             raise KeyValError('No template ID for template!', path, None)
-    TEMPLATES[temp_id.casefold()] = PackagePath(pak_id, file.path)
+    packset.templates[temp_id.casefold()] = PackagePath(pak_id, file.path)
 
 
 def parse_template_fast(file: File, path: str) -> str:
@@ -84,19 +78,3 @@ def parse_template_fast(file: File, path: str) -> str:
                 elif line.startswith('"template_id"'):
                     temp_id = line[15:-1]
     return found_id
-
-
-def write_templates(game: gameMan.Game) -> None:
-    """Write out the location of all templates for the compiler to use."""
-    root = DMXElement('Templates', 'DMERoot')
-    template_list = root['temp'] = DMXAttr.array('list', DMXValue.ELEMENT)
-
-    for temp_id, path in TEMPLATES.items():
-        pack_path = packages.PACKAGE_SYS[path.package].path
-        temp_el = DMXElement(temp_id, 'DMETemplate')
-        temp_el['package'] = os.path.abspath(pack_path).replace('\\', '/')
-        temp_el['path'] = path.path
-        template_list.append(temp_el)
-
-    with AtomicWriter(game.abs_path('bin/bee2/templates.lst'), is_bytes=True) as f:
-        root.export_binary(f, fmt_name='bee_templates', unicode='format')

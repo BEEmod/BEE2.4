@@ -81,14 +81,7 @@ if __name__ == '__main__':
 
     localisation.setup(conf.language)
 
-    # Check early on for a common mistake - putting the BEE2 folder directly in Portal 2 means
-    # when we export we'll try and overwrite ourselves. Use Steam's appid file as a marker.
-    if utils.install_path('../steam_appid.txt').exists() and utils.install_path('.').name.casefold() == 'bee2':
-        from app import gameMan
-        gameMan.app_in_game_error()
-        sys.exit()
-
-    elif app_name == 'bee2':
+    if app_name == 'bee2':
         from app import BEE2
         BEE2.start_main()
     elif app_name == 'backup':

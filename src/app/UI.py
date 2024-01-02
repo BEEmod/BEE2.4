@@ -11,15 +11,18 @@ import math
 import srctools.logger
 import attrs
 import trio
+from typing_extensions import assert_never
 
+import exporting
 import loadScreen
 from app import TK_ROOT, background_run
 from BEE2_config import ConfigFile, GEN_OPTS
-from config.filters import FilterConf
+from app.dialogs import Dialogs
 from loadScreen import main_loader as loader
 import packages
 from packages.item import ItemVariant, InheritKind
 import utils
+from config.filters import FilterConf
 from config.gen_opts import GenOptions, AfterExport
 from config.last_sel import LastSelected
 from config.windows import WindowState
@@ -97,11 +100,6 @@ pal_canvas: tk.Canvas  # Canvas for the item list to scroll.
 
 
 TRANS_EXPORTED = TransToken.ui('Selected Items and Style successfully exported!')
-TRANS_EXPORTED_NO_VPK = TransToken.ui(
-    'Selected Items and Style successfully exported!\n\n'
-    'Warning: VPK files were not exported, quit Portal 2 and '
-    'Hammer to ensure editor wall previews are changed.'
-)
 TRANS_EXPORTED_TITLE = TransToken.ui('BEE2 - Export Complete')
 TRANS_MAIN_TITLE = TransToken.ui('BEEMOD {version} - {game}')
 TRANS_ERROR = TransToken.untranslated('???')
@@ -751,13 +749,13 @@ def suggested_refresh() -> None:
             UI['suggested_style'].state(['!disabled'])
 
 
-async def export_editoritems(pal_ui: paletteUI.PaletteUI, bar: MenuBar) -> None:
+async def export_editoritems(pal_ui: paletteUI.PaletteUI, bar: MenuBar, dialog: Dialogs) -> None:
     """Export the selected Items and Style into the chosen game."""
     # Disable, so you can't double-export.
     UI['pal_export'].state(('disabled',))
     bar.set_export_allowed(False)
-    await tk_tools.wait_eventloop()
     try:
+        await tk_tools.wait_eventloop()
         # Convert IntVar to boolean, and only export values in the selected style
         chosen_style = current_style()
 
@@ -775,7 +773,8 @@ async def export_editoritems(pal_ui: paletteUI.PaletteUI, bar: MenuBar) -> None:
         conf = config.APP.get_cur_conf(config.gen_opts.GenOptions)
         packset = packages.get_loaded_packages()
 
-        success, vpk_success = await gameMan.selected_game.export(
+        result = await exporting.export(
+            gameMan.selected_game,
             packset,
             style=chosen_style,
             selected_objects={
@@ -788,13 +787,11 @@ async def export_editoritems(pal_ui: paletteUI.PaletteUI, bar: MenuBar) -> None:
                 packages.Item: pal_by_item,
                 packages.StyleVar: StyleVarPane.export_data(chosen_style),
                 packages.Signage: signage_ui.export_data(),
-
-                # The others don't have one, so it defaults to None.
             },
             should_refresh=not conf.preserve_resources,
         )
 
-        if not success:
+        if result is result.FAILED:
             return
 
         try:
@@ -818,17 +815,15 @@ async def export_editoritems(pal_ui: paletteUI.PaletteUI, bar: MenuBar) -> None:
         item_opts.save_check()
         config.APP.write_file()
 
-        message = TRANS_EXPORTED if vpk_success else TRANS_EXPORTED_NO_VPK
-
         if conf.launch_after_export or conf.after_export is not config.gen_opts.AfterExport.NORMAL:
-            do_action = tk_tools.askyesno(
-                TRANS_EXPORTED_TITLE,
+            do_action = await dialog.ask_yes_no(
                 optionWindow.AFTER_EXPORT_TEXT[
                     conf.after_export, conf.launch_after_export,
-                ].format(msg=message),
+                ].format(msg=TRANS_EXPORTED),
+                title=TRANS_EXPORTED_TITLE,
             )
         else:  # No action to do, so just show an OK.
-            tk_tools.showinfo(TRANS_EXPORTED_TITLE, message)
+            await dialog.show_info(TRANS_EXPORTED, title=TRANS_EXPORTED_TITLE)
             do_action = False
 
         # Do the desired action - if quit, we don't bother to update UI.
@@ -845,7 +840,7 @@ async def export_editoritems(pal_ui: paletteUI.PaletteUI, bar: MenuBar) -> None:
                 quit_application()
                 # We never return from this.
             else:
-                raise ValueError(f'Unknown action "{conf.after_export}"')
+                assert_never(conf.after_export)
 
         # Select the last_export palette, so reloading loads this item selection.
         # But leave it at the current palette, if it's unmodified.
@@ -1440,7 +1435,7 @@ async def init_windows(tk_img: TKImages) -> None:
     """
     def export() -> None:
         """Export the palette, passing the required UI objects."""
-        background_run(export_editoritems, pal_ui, menu_bar)
+        background_run(export_editoritems, pal_ui, menu_bar, DIALOG)
 
     menu_bar = MenuBar(
         TK_ROOT,
@@ -1573,7 +1568,7 @@ async def init_windows(tk_img: TKImages) -> None:
 
     TK_ROOT.bind_all(tk_tools.KEY_SAVE, lambda e: pal_ui.event_save(DIALOG))
     TK_ROOT.bind_all(tk_tools.KEY_SAVE_AS, lambda e: pal_ui.event_save_as(DIALOG))
-    TK_ROOT.bind_all(tk_tools.KEY_EXPORT, lambda e: background_run(export_editoritems, pal_ui, menu_bar))
+    TK_ROOT.bind_all(tk_tools.KEY_EXPORT, lambda e: background_run(export_editoritems, pal_ui, menu_bar, DIALOG))
 
     await trio.sleep(0)
     loader.step('UI', 'palette')

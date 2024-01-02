@@ -2,9 +2,7 @@
 from __future__ import annotations
 from typing import Iterator
 
-from srctools import Keyvalues, bool_as_int
-
-from packages import ExportData, PackagesSet, PakObject, ParseData, Style
+from packages import PackagesSet, PakObject, ParseData, Style
 from transtoken import TransToken, TransTokenSource
 
 
@@ -124,16 +122,3 @@ class StyleVar(PakObject, allow_mult=True, needs_foreground=True):
             if not self.applies_to_style(style):
                 return False
         return True
-
-    @staticmethod
-    async def export(exp_data: ExportData) -> None:
-        """Export style var selections into the config.
-
-        The .selected attribute is a dict mapping ids to the boolean value.
-        """
-        # Add the StyleVars block, containing each style_var.
-        exp_data.vbsp_conf.append(Keyvalues('StyleVars', [
-            Keyvalues(key, bool_as_int(val))
-            for key, val in
-            exp_data.selected.items()
-        ]))

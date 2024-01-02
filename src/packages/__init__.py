@@ -3,8 +3,7 @@ Handles scanning through the zip packages to find all items, styles, etc.
 """
 from __future__ import annotations
 from typing import (
-    Iterator, Mapping, NoReturn, ClassVar, Optional, Any, TYPE_CHECKING, TypeVar,
-    Type, cast,
+    Iterator, Mapping, NoReturn, ClassVar, Optional, TYPE_CHECKING, TypeVar, Type, cast,
 )
 from typing_extensions import Self
 
@@ -35,16 +34,14 @@ from transtoken import TransToken, TransTokenSource
 
 
 if TYPE_CHECKING:  # Prevent circular import
-    from app.gameMan import Game
     from loadScreen import LoadScreen
 
 
 __all__ = [
     # Generally global.
     'OBJ_TYPES', 'PACK_CONFIG',
-    'SelitemData', 'NoVPKExport',
     'LegacyCorr', 'LEGACY_CORRIDORS',
-    'CLEAN_PACKAGE',
+    'CLEAN_PACKAGE', 'SelitemData',
     'PakObject', 'PackagesSet', 'get_loaded_packages',
     'find_packages', 'load_packages',
 
@@ -53,8 +50,7 @@ __all__ = [
     'Skybox', 'Music', 'QuotePack', 'PackList', 'CorridorGroup', 'ConfigGroup',
 
     # Mainly intended for package object code.
-    'ParseData', 'ExportData',
-    'reraise_keyerror', 'get_config', 'set_cond_source',
+    'ParseData', 'reraise_keyerror', 'get_config', 'set_cond_source',
     'parse_multiline_key', 'desc_parse', 'sep_values',
 ]
 
@@ -200,24 +196,6 @@ class ParseData:
 
 
 @attrs.define
-class ExportData:
-    """The arguments to pak_object.export()."""
-    # Usually str, but some items pass other things.
-    selected: Any
-    # Some items need to know which style is selected
-    selected_style: Style
-    all_items: list[EditorItem]  # All the items in the map
-    renderables: dict[RenderableType, Renderable]  # The error/connection icons
-    vbsp_conf: Keyvalues  # vbsp_config.cfg file.
-    packset: PackagesSet  # The entire loaded packages set.
-    game: Game  # The current game.
-    # As objects export, they may fill this to include additional resources
-    # to be written to the game folder. This way it can be deferred until
-    # after regular resources are copied.
-    resources: dict[str, bytes]
-
-
-@attrs.define
 class LegacyCorr:
     """Legacy definitions for each corridor in a style."""
     name: str = ''
@@ -234,10 +212,6 @@ LEGACY_CORRIDORS = {
 
 # This package contains necessary components, and must be available.
 CLEAN_PACKAGE = 'BEE2_CLEAN_STYLE'.casefold()
-
-
-class NoVPKExport(Exception):
-    """Raised to indicate that VPK files weren't copied."""
 
 
 T = TypeVar('T')
@@ -311,19 +285,6 @@ class PakObject:
         to copy values from.
         """
         pass
-
-    @staticmethod
-    async def export(exp_data: ExportData) -> None:
-        """Export the appropriate data into the game.
-
-        ExportData is a namedtuple containing various data:
-        - selected: The ID of the selected item (or None)
-        - selected_style: The selected style object
-        - editoritems: The Keyvalues block for editoritems.txt
-        - vbsp_conf: The Keyvalues block for vbsp_config
-        - game: The game we're exporting to.
-        """
-        raise NotImplementedError
 
     def iter_trans_tokens(self) -> Iterator[TransTokenSource]:
         """Yields translation tokens in this object.
@@ -414,14 +375,27 @@ class PackagesSet:
     # For overrides, a type/ID pair to the list of overrides.
     overrides: dict[tuple[Type[PakObject], str], list[ParseData]] = attrs.Factory(lambda: defaultdict(list))
 
+    # The templates found in the packages. This maps an ID to the file.
+    templates: dict[str, utils.PackagePath] = attrs.field(init=False, factory=dict)
+
     # Indicates if an object type has been fully parsed.
     _type_ready: dict[Type[PakObject], trio.Event] = attrs.field(init=False, factory=dict)
     # Internal, indicates if all parse() calls were complete (but maybe not post_parse).
     _parsed: set[Type[PakObject]] = attrs.field(init=False, factory=set)
 
-    # Whether these music files have been detected.
-    has_mel_music: bool = False
-    has_tag_music: bool = False
+    # If found, the folders where the music is present.
+    mel_music_fsys: FileSystem | None = None
+    tag_music_fsys: FileSystem | None = None
+
+    @property
+    def has_mel_music(self) -> bool:
+        """Have we found Portal Stories:Mel?"""
+        return self.mel_music_fsys is not None
+
+    @property
+    def has_tag_music(self) -> bool:
+        """Have we found Aperture Tag?"""
+        return self.tag_music_fsys is not None
 
     def ready(self, cls: Type[PakObject]) -> trio.Event:
         """Return a Trio Event which is set when a specific object type is fully parsed."""
@@ -760,7 +734,7 @@ async def parse_package(
     for template in pack.fsys.walk_folder('templates'):
         await trio.sleep(0)
         if template.path.casefold().endswith('.vmf'):
-            nursery.start_soon(template_brush.parse_template, pack.id, template)
+            nursery.start_soon(template_brush.parse_template, packset, pack.id, template)
     loader.step('PAK', pack.id)
 
 
@@ -1099,11 +1073,6 @@ class Style(PakObject, needs_foreground=True):
     def iter_trans_tokens(self) -> Iterator[TransTokenSource]:
         """Iterate over translation tokens in the style."""
         return self.selitem_data.iter_trans_tokens('styles/' + self.id)
-
-    @staticmethod
-    async def export(exp_data: ExportData) -> None:
-        """This isn't used for Styles, we do them specially."""
-        pass
 
 
 def parse_multiline_key(info: Keyvalues, prop_name: str, *, allow_old_format: bool=False) -> str:

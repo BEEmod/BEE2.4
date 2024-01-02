@@ -5,6 +5,7 @@ the main process is busy loading.
 
 The id() of the main-process object is used to identify loadscreens.
 """
+from typing import Collection, Iterable, Set, Tuple, List, TypeVar, cast, Any, Type
 from types import TracebackType
 from tkinter import commondialog
 from weakref import WeakSet
@@ -21,7 +22,6 @@ import config
 from transtoken import TransToken
 import utils
 
-from typing import Set, Tuple, List, cast, Any, Type
 
 
 # Keep a reference to all loading screens, so we can close them globally.
@@ -36,9 +36,12 @@ _SCREEN_CANCEL_FLAG: Set[int] = set()
 _PIPE_MAIN_REC, _PIPE_DAEMON_SEND = multiprocessing.Pipe(duplex=False)
 _PIPE_DAEMON_REC, _PIPE_MAIN_SEND = multiprocessing.Pipe(duplex=False)
 
+T = TypeVar('T')
 
-class Cancelled(SystemExit):
+
+class Cancelled(BaseException):
     """Raised when the user cancels the loadscreen."""
+    # TODO: Replace with Trio's cancellation.
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -90,7 +93,7 @@ def suppress_screens() -> Any:
             screen.unsuppress()
 
 
-# Patch various tk windows to hide loading screens while they're are open.
+# Patch various tk windows to hide loading screens while they are open.
 # Messageboxes, file dialogs and colorchooser all inherit from Dialog,
 # so patching .show() will fix them all.
 # contextlib managers can also be used as decorators.
@@ -143,10 +146,11 @@ class LoadScreen:
         exc_type: Type[BaseException],
         exc_val: BaseException,
         exc_tb: TracebackType,
-    ) -> None:
-        """Hide the loading screen, and passthrough execptions.
+    ) -> bool:
+        """Hide the loading screen. If the Cancelled exception was raised, swallow that.
         """
         self.reset()
+        return exc_type is Cancelled
 
     def _send_msg(self, command: str, *args: Any) -> None:
         """Send a message to the daemon."""
@@ -178,14 +182,14 @@ class LoadScreen:
             raise KeyError(f'"{stage}" not valid for {self.stage_ids}!')
         self._send_msg('set_length', stage, num)
 
-    def step(self, stage: str, disp_name: str='') -> None:
+    def step(self, stage: str, disp_name: object = '') -> None:
         """Increment the specified stage."""
         if stage not in self.stage_ids:
             raise KeyError(f'"{stage}" not valid for {self.stage_ids}!')
         cur = time.perf_counter()
         diff = cur - self._time
         if diff > 0.1:
-            LOGGER.debug('{}: "{}" = {:.3}s', stage, disp_name, diff)
+            LOGGER.debug('{}: {!r} = {:.3}s', stage, disp_name, diff)
         self._time = cur
         self._send_msg('step', stage)
 
@@ -195,6 +199,13 @@ class LoadScreen:
             raise KeyError(f'"{stage}" not valid for {self.stage_ids}!')
         self._time = time.perf_counter()
         self._send_msg('skip_stage', stage)
+
+    def stage_iterate(self, stage: str, seq: Collection[T]) -> Iterable[T]:
+        """Tie the progress of a stage to a sequence of some kind."""
+        self.set_length(stage, len(seq))
+        for item in seq:
+            yield item
+            self.step(stage, item)
 
     def show(self) -> None:
         """Display the loading screen."""
@@ -242,7 +253,6 @@ def _update_translations() -> None:
     ))
 
 # Initialise the daemon.
-# noinspection PyProtectedMember
 BG_PROC = multiprocessing.Process(
     target=utils.run_bg_daemon,
     args=(

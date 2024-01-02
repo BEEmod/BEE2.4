@@ -1,13 +1,18 @@
 """Orders a series of steps, so certain resources are created before the steps that use them.
 
 """
-from typing import Awaitable, Callable, Collection, Generic, Iterable, List, Set, Type, TypeVar
+from typing import (
+    Awaitable, Callable, Collection, Generic, Iterable, List, Optional, Set, Type,
+    TypeVar,
+)
 from collections import Counter
 import math
 
 import attrs
 import srctools.logger
 import trio
+
+from loadScreen import LoadScreen
 
 
 # The input parameter for all the steps, which contains all the inputs/outputs.
@@ -33,14 +38,23 @@ class Step(Generic[CtxT, ResourceT]):
         self,
         ctx: CtxT,
         result_chan: trio.abc.SendChannel[Collection[ResourceT]],
+        loadscreen: Optional[LoadScreen],
+        stage: str,
     ) -> None:
         """Wraps the step functionality."""
         await self.func(ctx)
+        if loadscreen is not None:
+            loadscreen.step(stage, self.func)
         await result_chan.send(self.results)
 
 
 class StepOrder(Generic[CtxT, ResourceT]):
-    """Orders a series of steps."""
+    """Orders a series of steps.
+
+    The CtxT parameter is passed to all the steps, allowing them to exchange data between themselves.
+    ResourceT should be an enum type, and represents the kinds of dependencies between steps. A
+    resource is 'produced' once all steps with that as a result have completed.
+    """
     _steps: List[Step[CtxT, ResourceT]]
     _resources: Collection[ResourceT]
     _locked: bool
@@ -56,7 +70,11 @@ class StepOrder(Generic[CtxT, ResourceT]):
         prereq: Collection[ResourceT],
         results: Collection[ResourceT],
     ) -> Callable[[Func[CtxT]], Func[CtxT]]:
-        """Add a step."""
+        """Add a step.
+
+        For each step to run, all prerequisite resources must have been produced. Once it has run,
+        it contributes to producing all the specified resources.
+        """
         if self._locked:
             raise RuntimeError("Cannot add steps after running has started.")
 
@@ -67,13 +85,15 @@ class StepOrder(Generic[CtxT, ResourceT]):
 
         return deco
 
-    async def run(self, ctx: CtxT) -> None:
+    async def run(self, ctx: CtxT, loadscreen: Optional[LoadScreen] = None, stage: str= 'STEPS') -> None:
         """Run the tasks."""
         self._locked = True
         # For each resource, the number of steps producing it that haven't been completed.
         awaiting_steps = Counter(result for step in self._steps for result in step.results)
 
         todo = list(self._steps)
+        if loadscreen is not None:
+            loadscreen.set_length(stage, len(todo))
 
         send: trio.MemorySendChannel[Collection[ResourceT]]
         rec: trio.MemoryReceiveChannel[Collection[ResourceT]]
@@ -88,7 +108,7 @@ class StepOrder(Generic[CtxT, ResourceT]):
                 for step in todo:
                     if step.prereqs <= completed:
                         LOGGER.debug('Starting step: {!r}', step)
-                        nursery.start_soon(step.wrapper, ctx, send)
+                        nursery.start_soon(step.wrapper, ctx, send, loadscreen, stage, name=step.func)
                         running += 1
                     else:
                         deferred.append(step)
