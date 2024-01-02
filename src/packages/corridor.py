@@ -6,6 +6,7 @@ from collections.abc import Sequence, Iterator, Mapping
 from typing import Dict, List, Tuple
 from typing_extensions import Final
 
+from srctools import Keyvalues
 import attrs
 import srctools.logger
 
@@ -41,6 +42,49 @@ ICON_GENERIC_LRG = img.Handle.builtin('BEE2/corr_generic', IMG_WIDTH_LRG, IMG_HE
 
 
 @attrs.frozen
+class Option:
+    """An option that can be swapped between various values."""
+    id: str
+    name: TransToken
+    default: str
+    values: Sequence[Tuple[str, TransToken]]
+
+    @classmethod
+    def parse(cls, pak_id: str, kv: Keyvalues) -> Option:
+        """Parse from KV1 configs."""
+        opt_id = kv['id']
+        name = TransToken.parse(pak_id, kv['name'])
+        valid_ids: set[str] = set()
+        values: List[Tuple[str, TransToken]] = []
+
+        for child in kv.find_children('Values'):
+            if child.name in valid_ids:
+                LOGGER.warning(
+                    'Duplicate value "{}" for option "{}"!',
+                    child.name, opt_id,
+                )
+            valid_ids.add(child.name)
+            values.append((child.real_name, TransToken.parse(pak_id, child.value)))
+
+        if not values:
+            raise ValueError(f'Option "{opt_id}" has no valid values!')
+
+        try:
+            default = kv['default'].casefold()
+        except LookupError:
+            default = values[0][0]
+        else:
+            if default not in valid_ids:
+                LOGGER.warning(
+                    'Default id "{}" is not valid for option "{}"',
+                    default, opt_id,
+                )
+                default = values[0][0]
+
+        return cls(opt_id, name, default, values)
+
+
+@attrs.frozen
 class CorridorUI(Corridor):
     """Additional data only useful for the UI. """
     name: TransToken
@@ -49,6 +93,7 @@ class CorridorUI(Corridor):
     images: Sequence[img.Handle]
     icon: img.Handle
     authors: Sequence[TransToken]
+    options: Sequence[Option]
 
     def strip_ui(self) -> Corridor:
         """Strip these UI attributes for the compiler export."""
@@ -116,6 +161,12 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
         """Parse from the file."""
         corridors: dict[CorrKind, list[CorridorUI]] = defaultdict(list)
         inherits: list[str] = []
+
+        global_options = [
+            Option.parse(data.pak_id, opt_kv)
+            for opt_kv in data.info.find_all('Option')
+        ]
+
         for kv in data.info:
             if kv.name == 'id':
                 continue
@@ -154,6 +205,11 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
             except LookupError:
                 name = TRANS_CORRIDOR_GENERIC
 
+            options = global_options + [
+                Option.parse(data.pak_id, opt_kv)
+                for opt_kv in kv.find_all('Option')
+            ]
+
             corridors[mode, direction, orient].append(CorridorUI(
                 instance=kv['instance'],
                 name=name,
@@ -168,6 +224,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                     subprop.name: subprop.value
                     for subprop in kv.find_children('fixups')
                 },
+                options=options,
             ))
         return CorridorGroup(data.id, dict(corridors), inherits)
 
@@ -243,6 +300,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                                 orig_index=ind + 1,
                                 fixups={},
                                 legacy=True,
+                                options=(),
                             )
                         else:
                             style_info = style.legacy_corridors[mode, direction, ind + 1]
@@ -257,6 +315,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                                 orig_index=ind + 1,
                                 fixups={},
                                 legacy=True,
+                                options=(),
                             )
                         corr_list.append(corridor)
                         had_legacy = True
