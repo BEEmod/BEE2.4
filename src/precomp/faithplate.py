@@ -11,7 +11,7 @@ from srctools import Entity, Vec, VMF, Angle, logger
 from precomp import tiling, brushLoc, instanceLocs, template_brush, conditions
 
 
-COND_MOD_NAME = None
+COND_MOD_NAME: Optional[str] = None
 LOGGER = logger.get_logger(__name__)
 
 # Targetname -> plate.

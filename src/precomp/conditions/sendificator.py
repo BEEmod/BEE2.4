@@ -11,7 +11,7 @@ from transtoken import TransToken
 import user_errors
 
 
-COND_MOD_NAME = None
+COND_MOD_NAME: str | None = None
 LOGGER = srctools.logger.get_logger(__name__, alias='cond.sendtor')
 
 # Laser instance -> offset, normal

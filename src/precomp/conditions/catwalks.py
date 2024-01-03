@@ -1,4 +1,6 @@
 """Implement Catwalks."""
+from __future__ import annotations
+
 from collections import defaultdict
 from enum import Enum
 from typing import Optional, Dict, Tuple, Mapping, Union
@@ -12,7 +14,7 @@ from precomp import brushLoc, instanceLocs, conditions, tiling
 from precomp.connections import ITEMS
 import utils
 
-COND_MOD_NAME = None
+COND_MOD_NAME: str | None = None
 LOGGER = get_logger(__name__, alias='cond.catwalks')
 
 
@@ -35,7 +37,7 @@ class Instances(Enum):
     SINGLE_WALL = 'single_wall'
     MARKER = 'markerInst'
 
-CATWALK_TYPES: Mapping[utils.CONN_TYPES, Optional[Instances]] = {
+CATWALK_TYPES: Mapping[utils.CONN_TYPES, Instances | None] = {
     utils.CONN_TYPES.straight: Instances.STRAIGHT_1,
     utils.CONN_TYPES.corner: Instances.CORNER,
     utils.CONN_TYPES.all: Instances.XJUNCT,

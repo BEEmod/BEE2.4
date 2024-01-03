@@ -27,7 +27,7 @@ from ui_tk.wid_transtoken import set_text, set_win_title
 
 LOGGER = srctools.logger.get_logger(__name__)
 
-voice_item = None
+voice_item: Optional[QuotePack] = None
 
 
 class _WidgetsDict(TypedDict, total=False):

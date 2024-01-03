@@ -113,6 +113,7 @@ mypy_path = "$MYPY_CONFIG_FILE_DIR/hammeraddons/src/"
 allow_redefinition = true
 check_untyped_defs = true
 strict_optional = true
+local_partial_types = true
 # strict = true  # Only when overrides is gone.
 
 warn_unused_ignores = true

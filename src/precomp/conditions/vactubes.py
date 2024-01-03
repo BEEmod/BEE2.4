@@ -11,7 +11,7 @@ from precomp import tiling, instanceLocs, conditions, connections, template_brus
 from precomp.brushLoc import POS as BLOCK_POS
 import utils
 
-COND_MOD_NAME = None
+COND_MOD_NAME: str | None = None
 
 LOGGER = srctools.logger.get_logger(__name__, alias='cond.vactubes')
 

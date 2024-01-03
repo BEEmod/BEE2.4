@@ -96,7 +96,7 @@ UI: _WidgetsDict = {}
 chosen_thumb = tk.StringVar(
     value=COMPILE_CFG.get_val('Screenshot', 'Type', 'AUTO')
 )
-tk_screenshot = None  # The preview image shown
+tk_screenshot: ImageTk.PhotoImage | None = None  # The preview image shown
 
 # Location we copy custom screenshots to
 SCREENSHOT_LOC = str(utils.conf_location('screenshot.jpg'))

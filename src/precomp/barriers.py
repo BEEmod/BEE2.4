@@ -18,7 +18,7 @@ import user_errors
 
 
 LOGGER = srctools.logger.get_logger(__name__)
-COND_MOD_NAME = None
+COND_MOD_NAME: str | None = None
 
 
 class BarrierType(Enum):

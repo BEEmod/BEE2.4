@@ -1,5 +1,5 @@
 """Adds voicelines dynamically into the map."""
-from typing import List, Optional, Set, NamedTuple, Iterator, Tuple
+from typing import Dict, List, Optional, Set, NamedTuple, Iterator, Tuple
 from typing_extensions import TypeAlias
 import itertools
 from decimal import Decimal
@@ -23,7 +23,7 @@ MidQuote: TypeAlias = Tuple[Keyvalues, bool, str]
 
 # Special quote instances assoicated with an item/style.
 # These are only added if the condition executes.
-QUOTE_EVENTS = {}  # id -> instance mapping
+QUOTE_EVENTS: Dict[str, str] = {}  # id -> instance mapping
 
 # The block of SP and coop voice data
 QUOTE_DATA = Keyvalues('Quotes', [])

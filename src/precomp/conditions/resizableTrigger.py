@@ -1,4 +1,6 @@
 """Logic for trigger items, allowing them to be resized."""
+from __future__ import annotations
+
 from contextlib import suppress
 from typing import Optional
 
@@ -9,8 +11,7 @@ from precomp import instanceLocs, connections, options, conditions
 import consts
 
 
-COND_MOD_NAME = None
-
+COND_MOD_NAME: str | None = None
 LOGGER = srctools.logger.get_logger(__name__, alias='cond.resizeTrig')
 
 

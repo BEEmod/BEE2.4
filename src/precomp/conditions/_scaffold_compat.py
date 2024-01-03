@@ -1,4 +1,6 @@
 """Original result used to generate unstationary scaffolds, kept for backwards compatibility."""
+from __future__ import annotations
+
 from decimal import Decimal
 from typing import Dict, List, Tuple, Optional, Any, Union
 from enum import Enum
@@ -17,7 +19,7 @@ class LinkType(Enum):
     END = 'end'
 
 
-COND_MOD_NAME = None
+COND_MOD_NAME: str | None = None
 
 LOGGER = srctools.logger.get_logger(__name__, alias='cond._scaffold_compat')
 

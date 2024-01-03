@@ -2,8 +2,6 @@
 # Do this very early, so we log the startup sequence.
 from srctools.logger import init_logging
 
-import user_errors
-
 
 LOGGER = init_logging('bee2/vbsp.log')
 
@@ -55,6 +53,7 @@ from precomp import (
 )
 import consts
 import editoritems
+import user_errors
 
 
 class _Settings(TypedDict):
@@ -85,8 +84,6 @@ BEE2_config = ConfigFile('compile.cfg')
 # These are overlays which have been modified by
 # conditions, and shouldn't be restyled or modified later.
 IGNORED_OVERLAYS: Set[Entity] = set()
-
-PRESET_CLUMPS = []  # Additional clumps set by conditions, for certain areas.
 
 
 async def load_settings() -> Tuple[
@@ -969,6 +966,7 @@ Clump = namedtuple('Clump', [
     'max_pos',
     'tex',
 ])
+PRESET_CLUMPS: List[Clump] = []  # Additional clumps set by conditions, for certain areas.
 
 
 @conditions.make_result('SetAreaTex')

@@ -41,8 +41,6 @@ window: tk.Toplevel
 AnyZip: TypeAlias = Union[ZipFile, FakeZip]
 UI: Dict[str, Any] = {}  # Holds all the widgets
 
-menus = {}  # For standalone application, generate menu bars
-
 # Stage name for the exporting screen
 AUTO_BACKUP_STAGE = 'PUZZLE_BACKUP'
 
@@ -851,9 +849,9 @@ async def init_application() -> None:
 
     if utils.MAC:
         # Name is used to make this the special 'BEE2' menu item
-        file_menu = menus['file'] = tk.Menu(bar, name='apple')
+        file_menu = tk.Menu(bar, name='apple')
     else:
-        file_menu = menus['file'] = tk.Menu(bar, name='file')
+        file_menu = tk.Menu(bar, name='file')
 
     file_menu.add_command(command=ui_new_backup)
     set_menu_text(file_menu, TransToken.ui('New Backup'))
@@ -867,7 +865,7 @@ async def init_application() -> None:
     bar.add_cascade(menu=file_menu)
     set_menu_text(bar, TransToken.ui('File'))
 
-    game_menu = menus['game'] = tk.Menu(bar)
+    game_menu = tk.Menu(bar)
 
     game_menu.add_command(command=lambda: background_run(gameMan.add_game, DIALOG))
     set_menu_text(game_menu, TransToken.ui('Add Game'))

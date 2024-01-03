@@ -1,5 +1,7 @@
 """Continuously moving belts, like in BTS.
 """
+from __future__ import annotations
+
 from srctools import Keyvalues, Vec, Entity, Output, VMF, Matrix
 
 import srctools.logger
@@ -7,7 +9,7 @@ from precomp import instanceLocs, template_brush, conditions
 import consts
 
 
-COND_MOD_NAME = None
+COND_MOD_NAME: str | None = None
 LOGGER = srctools.logger.get_logger(__name__, alias='cond.conveyorBelt')
 
 

@@ -1,4 +1,6 @@
 """Implements the customisable Signage item."""
+from __future__ import annotations
+
 from typing import Tuple, Dict, Optional, Iterable, List
 from enum import Enum
 
@@ -10,7 +12,7 @@ from srctools.vmf import make_overlay, Side
 import vbsp
 
 
-COND_MOD_NAME = None
+COND_MOD_NAME: str | None = None
 
 LOGGER = srctools.logger.get_logger(__name__, alias='cond.signage')
 

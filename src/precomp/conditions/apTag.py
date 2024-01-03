@@ -1,8 +1,9 @@
 """Handles Aperture Tag modifications in the compiler."""
+from __future__ import annotations
+
 import itertools
 import math
 import os
-from typing import Optional
 
 from precomp.connections import Item
 from srctools import FrozenAngle, Vec, Keyvalues, VMF, Entity, Output, Angle, Matrix
@@ -15,7 +16,7 @@ import utils
 import vbsp
 
 
-COND_MOD_NAME = None
+COND_MOD_NAME: str | None = None
 
 LOGGER = srctools.logger.get_logger(__name__)
 
@@ -169,8 +170,8 @@ def res_make_tag_fizzler(vmf: VMF, info: conditions.MapInfo, res: Keyvalues) -> 
 
     def make_tag_fizz(inst: Entity) -> None:
         """Create the Tag fizzler."""
-        fizzler: Optional[Fizzler] = None
-        fizzler_item: Optional[Item] = None
+        fizzler: Fizzler | None = None
+        fizzler_item: Item | None = None
 
         # Look for the fizzler instance we want to replace.
         sign_item = connections.ITEMS[inst['targetname']]

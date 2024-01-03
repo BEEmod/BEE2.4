@@ -25,7 +25,7 @@ import consts
 import user_errors
 
 
-COND_MOD_NAME = None
+COND_MOD_NAME: str | None = None
 LOGGER = logger.get_logger(__name__)
 
 FIZZ_TYPES: dict[str, FizzlerType] = {}

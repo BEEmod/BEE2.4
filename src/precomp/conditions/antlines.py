@@ -10,7 +10,7 @@ from precomp.conditions import make_result
 from srctools import VMF, Keyvalues, Output, Vec, Entity, Matrix
 
 
-COND_MOD_NAME = None
+COND_MOD_NAME: str | None = None
 
 LOGGER = srctools.logger.get_logger(__name__, alias='cond.antlines')
 
