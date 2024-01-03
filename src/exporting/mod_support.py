@@ -100,7 +100,6 @@ def scan_music_locs(packset: PackagesSet, games: Iterable['Game']) -> None:
         tag_loc = os.path.join(loc, MUSIC_TAG_DIR)
         mel_loc = os.path.join(loc, MUSIC_MEL_DIR)
         if os.path.exists(tag_loc) and packset.tag_music_fsys is None:
-            found_tag = True
             packset.tag_music_fsys = RawFileSystem(tag_loc, constrain_path=False)
             LOGGER.info('Ap-Tag dir: {}', tag_loc)
 
@@ -131,7 +130,7 @@ def make_tag_coop_inst(filename: str) -> VMF:
         """Put the entities in a nice circle..."""
         while True:
             ang: float
-            for ang in range(0, ent_count):
+            for ang in range(ent_count):
                 ang *= 360 / ent_count
                 yield Vec(16 * math.sin(ang), 16 * math.cos(ang), 32)
     pos = logic_pos()

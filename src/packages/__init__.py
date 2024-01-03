@@ -8,7 +8,6 @@ from typing import (
 from typing_extensions import Self
 
 import os
-import warnings
 from collections.abc import Collection, Iterable
 from collections import defaultdict
 from pathlib import Path

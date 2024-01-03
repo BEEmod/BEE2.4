@@ -123,10 +123,9 @@ class BaseLoadScreen:
         """Move the window when moving the mouse."""
         if self.drag_x is None or self.drag_y is None:
             return
-        self.win.geometry('+{x:g}+{y:g}'.format(
-            x=self.win.winfo_x() + (event.x - self.drag_x),
-            y=self.win.winfo_y() + (event.y - self.drag_y),
-        ))
+        x = self.win.winfo_x() + event.x - self.drag_x
+        y = self.win.winfo_y() + event.y - self.drag_y
+        self.win.geometry(f'+{x:g}+{y:g}')
 
     def op_show(self, title: str, labels: List[str]) -> None:
         """Show the window."""
@@ -273,10 +272,7 @@ class LoadScreen(BaseLoadScreen):
             self.bar_var[stage].set(round(
                 1000 * self.values[stage] / max_val
             ))
-        self.labels[stage]['text'] = '{!s}/{!s}'.format(
-            self.values[stage],
-            max_val,
-        )
+        self.labels[stage]['text'] = f'{self.values[stage]!s}/{max_val!s}'
 
     def op_show(self, title: str, labels: List[str]) -> None:
         """Show the window."""
@@ -627,10 +623,7 @@ class SplashScreen(BaseLoadScreen):
             """Event handler."""
             self.op_set_is_compact(compact)
             # Snap to where the button is.
-            self.win.wm_geometry('+{:g}+{:g}'.format(
-                self.win.winfo_x() + offset,
-                self.win.winfo_y(),
-            ))
+            self.win.wm_geometry(f'+{self.win.winfo_x() + offset:g}+{self.win.winfo_y():g}')
         return func
 
 

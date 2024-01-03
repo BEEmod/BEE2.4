@@ -112,8 +112,8 @@ class LoadScreen:
         self,
         *stages: Tuple[str, TransToken],
         title_text: TransToken,
-        is_splash: bool=False,
-    ):
+        is_splash: bool = False,
+    ) -> None:
         # active determines whether the screen is on, and if False stops most
         # functions from doing anything
         self.active = False

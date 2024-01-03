@@ -43,14 +43,14 @@ async def widget_slider(
     # We want to keep the same number of decimal points for all values.
     points = max(
         decimal_points(conf.min + conf.step * offset)
-        for offset in range(0, int(ui_max) + 1)
+        for offset in range(ui_min, int(ui_max) + 1)
     )
     txt_format = f'.{points}f'
     # Then we want to figure out the longest value with this format to set
     # the widget width
     widget_width = max(
         len(format(conf.min + conf.step * offset, txt_format))
-        for offset in range(0, int(ui_max) + 1)
+        for offset in range(ui_min, int(ui_max) + 1)
     )
 
     last_value = ''

@@ -155,7 +155,7 @@ async def step_gen_vpk(exp_data: ExportData) -> None:
     LOGGER.info('VPK to write: {}', vpk_filename)
     try:
         clear_files(vpk_filename.parent)
-    except PermissionError as exc:
+    except PermissionError:
         # We can't edit the VPK files - P2 is open...
         exp_data.warn(AppError(TRANS_NO_PERMS))
         return

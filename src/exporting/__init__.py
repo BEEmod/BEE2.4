@@ -106,7 +106,7 @@ TRANS_WARN = TransToken.ui_plural(
 
 
 async def export(
-    game: 'Game',
+    game: Game,
     packset: packages.PackagesSet,
     style: packages.Style,
     selected_objects: Dict[Type[packages.PakObject], Any],
@@ -182,7 +182,7 @@ async def step_add_core_info(exp: ExportData) -> None:
 
 # Register everything.
 from exporting import (
-    compiler, corridors, cube_colourizer, editor_sound, elevator, fgd, files, fizzler, gameinfo,
-    items, music, pack_list, quote_pack, signage, skybox, stylevar, template_brush, translations,
-    vpks, widgets,
+    compiler, corridors, cube_colourizer, editor_sound, elevator, fgd, files, fizzler,  # noqa: F401
+    gameinfo, items, music, pack_list, quote_pack, signage, skybox, stylevar, template_brush,  # noqa: F401
+    translations, vpks, widgets,  # noqa: F401
 )

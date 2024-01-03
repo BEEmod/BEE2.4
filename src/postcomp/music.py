@@ -343,19 +343,9 @@ def write_sound(
     if len(snds) > 1:
         file.write('"rndwave"\n\t{\n')
         for snd in snds:
-            file.write(
-                '\t"wave" "{sndchar}{file}"\n'.format(
-                    file=snd.lstrip(SND_CHARS),
-                    sndchar=snd_prefix,
-                )
-            )
-            pack_list.pack_file('sound/' + snd.casefold())
+            file.write(f'\t"wave" "{snd_prefix}{snd.lstrip(SND_CHARS)}"\n')
+            pack_list.pack_file(f'sound/{snd.casefold()}')
         file.write('\t}\n')
     else:
-        file.write(
-            '"wave" "{sndchar}{file}"\n'.format(
-                file=snds[0].lstrip(SND_CHARS),
-                sndchar=snd_prefix,
-            )
-        )
-        pack_list.pack_file('sound/' + snds[0].casefold())
+        file.write(f'"wave" "{snd_prefix}{snds[0].lstrip(SND_CHARS)}"\n')
+        pack_list.pack_file(f'sound/{snds[0].casefold()}')

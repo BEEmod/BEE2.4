@@ -906,15 +906,13 @@ def init_backup_settings() -> None:
     count_value = GEN_OPTS.get_int('General', 'auto_backup_count', 0)
     back_dir = GEN_OPTS.get_val('Directories', 'backup_loc', 'backups/')
 
-    def check_callback():
-        GEN_OPTS['General']['enable_auto_backup'] = srctools.bool_as_int(
-            check_var.get()
-        )
+    def check_callback() -> None:
+        GEN_OPTS['General']['enable_auto_backup'] = srctools.bool_as_int(check_var.get())
 
-    def count_callback():
+    def count_callback() -> None:
         GEN_OPTS['General']['auto_backup_count'] = str(count.value)
 
-    def directory_callback(path):
+    def directory_callback(path: str) -> None:
         GEN_OPTS['Directories']['backup_loc'] = path
 
     UI['auto_frame'] = frame = ttk.LabelFrame(
@@ -930,9 +928,7 @@ def init_backup_settings() -> None:
     frame['labelwidget'] = enable_check
     frame.grid(row=2, column=0, columnspan=3)
 
-    dir_frame = ttk.Frame(
-        frame,
-    )
+    dir_frame = ttk.Frame(frame)
     dir_frame.grid(row=0, column=0)
 
     ttk.Label(
@@ -948,9 +944,7 @@ def init_backup_settings() -> None:
     )
     UI['auto_dir'].grid(row=1, column=0)
 
-    count_frame = ttk.Frame(
-        frame,
-    )
+    count_frame = ttk.Frame(frame)
     count_frame.grid(row=0, column=1)
     set_text(ttk.Label(count_frame), TransToken.ui('Keep (Per Game):')).grid(row=0, column=0)
 

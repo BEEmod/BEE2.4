@@ -263,7 +263,7 @@ class Config:
         timer_done_cmd: Iterable[Output]=(),
         force_timer_sound: bool=False,
         timer_outputs: Iterable[TimerCommand]=(),
-    ):
+    ) -> None:
         self.id = item_id
 
         # How this item uses their inputs.

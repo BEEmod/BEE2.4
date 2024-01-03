@@ -4,7 +4,7 @@ import sys
 from collections import defaultdict
 from collections.abc import Iterable, Iterator, Mapping
 from enum import Enum, Flag
-from typing import Callable, ClassVar, List, Optional, Protocol, Any, Tuple
+from typing import Callable, ClassVar, Final, List, Optional, Protocol, Any, Tuple
 from pathlib import PurePosixPath as FSPath
 
 import attrs
@@ -1086,7 +1086,7 @@ class Item:
         return item
 
     # Boolean option in editor -> Item attribute.
-    _BOOL_ATTRS = {
+    _BOOL_ATTRS: ClassVar[Mapping[str, str]] = {
         'cananchoronbarriers': 'anchor_barriers',
         'cananchorongoo': 'anchor_barriers',
         'occupiesvoxel': 'occupies_voxel',

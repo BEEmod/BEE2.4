@@ -15,7 +15,6 @@ from typing import Generator, TypeVar, Any, Generic, Callable, Awaitable
 from typing_extensions import TypeVarTuple, Unpack
 
 from contextlib import contextmanager
-from functools import partial
 import math
 
 import attrs
