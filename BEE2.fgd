@@ -35,7 +35,7 @@
 	= bee2_template_colorpicker:
 	"Applies the color of a surface at a position to template faces. The arrow should point out of the surface."
 	[
-	targetname(target_source): "Name" : "": "Set the name for reference from other entities."
+	targetname(target_source): "Name" : : "Set the name to reference from other entities."
 	faces(sidelist): "Faces" : : "The faces this position is applied to."
 
 	priority(integer): "Priority" : 0 : "Set this higher to make it apply in preference to other pickers. This allows using fallback positions for surfaces."
@@ -119,7 +119,7 @@
 	studioprop("models/BEE2/editor/connection_point.mdl")
 	= bee2_editor_connectionpoint: "Defines a connection point for antlines."
 	[
-	sortkey(string) : "Sort Key" : "This allows specifying the order for connection points in the final script. The value is sorted in ascending order."
+	sortkey(string) : "Sort Key" : : "This allows specifying the order for connection points in the final script. The value is sorted in ascending order."
 	skin(choices) : "Orientation" : 1 : "The position of the antline relative to the signage." =
 		[
 		// 0 = useless, needed to distinguish materials in the model.
