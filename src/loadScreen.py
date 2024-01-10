@@ -7,9 +7,8 @@ The id() of the main-process object is used to identify loadscreens.
 """
 from __future__ import annotations
 
-from typing import Collection, Iterable, Set, Tuple, List, TypeVar, cast, Any, Type
+from typing import Collection, Generator, Iterable, Set, Tuple, List, TypeVar, cast, Any, Type
 from types import TracebackType
-from tkinter import commondialog
 from weakref import WeakSet
 import contextlib
 import multiprocessing
@@ -72,7 +71,7 @@ def set_force_ontop(ontop: bool) -> None:
 
 
 @contextlib.contextmanager
-def suppress_screens() -> Any:
+def suppress_screens() -> Generator[None, None, None]:
     """A context manager to suppress loadscreens while the body is active."""
     active = []
     for screen in _ALL_SCREENS:
@@ -81,17 +80,10 @@ def suppress_screens() -> Any:
         screen.suppress()
         active.append(screen)
     try:
-        yield
+        yield None
     finally:
         for screen in active:
             screen.unsuppress()
-
-
-# Patch various tk windows to hide loading screens while they are open.
-# Messageboxes, file dialogs and colorchooser all inherit from Dialog,
-# so patching .show() will fix them all.
-# contextlib managers can also be used as decorators.
-commondialog.Dialog.show = suppress_screens()(commondialog.Dialog.show)  # type: ignore
 
 
 class ScreenStage:

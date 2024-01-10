@@ -1,7 +1,7 @@
 """A consistent interface for dialog boxes."""
 from typing import Callable, List, Optional, Tuple, Union
 
-from tkinter import simpledialog, ttk
+from tkinter import simpledialog, ttk, commondialog
 import tkinter as tk
 
 import trio
@@ -15,6 +15,13 @@ from transtoken import TransToken
 
 from app import TK_ROOT
 from ui_tk.wid_transtoken import set_text
+
+
+# Patch various tk windows to hide loading screens while they are open.
+# Messageboxes, file dialogs and colorchooser all inherit from Dialog,
+# so patching .show() will fix them all.
+# contextlib managers can also be used as decorators.
+commondialog.Dialog.show = suppress_screens()(commondialog.Dialog.show)  # type: ignore
 
 
 async def _messagebox(
@@ -38,7 +45,8 @@ async def _messagebox(
         args += ('-detail', detail)
 
     # Threading seems to work, not sure if safe...
-    return await trio.to_thread.run_sync(TK_ROOT.tk.call,*args)
+    with suppress_screens():
+        return await trio.to_thread.run_sync(TK_ROOT.tk.call,*args)
 
 
 class BasicQueryValidator(simpledialog.Dialog):
