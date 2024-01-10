@@ -7,7 +7,10 @@ The id() of the main-process object is used to identify loadscreens.
 """
 from __future__ import annotations
 
-from typing import Collection, Generator, Iterable, Set, Tuple, List, TypeVar, cast, Any, Type
+from typing import (
+    AsyncGenerator, Collection, Generator, Set, Tuple, List, TypeVar, cast,
+    Any, Type,
+)
 from types import TracebackType
 from weakref import WeakSet
 import contextlib
@@ -88,8 +91,8 @@ def suppress_screens() -> Generator[None, None, None]:
 
 class ScreenStage:
     """A single stage in a loading screen."""
-    def __init__(self, name: TransToken) -> None:
-        self.name = name
+    def __init__(self, title: TransToken) -> None:
+        self.title = title
         self.id = id(self)
         self._bound: Set[LoadScreen] = set()
         self._current = 0
@@ -99,22 +102,32 @@ class ScreenStage:
     async def set_length(self, num: int) -> None:
         """Change the current length of this stage."""
         self._max = num
-        for screen in self._bound:
+        for screen in list(self._bound):
             screen._send_msg('set_length', self.id, num)
+        await trio.sleep(0)
 
     async def step(self) -> None:
         """Increment one step."""
         self._current += 1
         self._skipped = False
-        for screen in self._bound:
+        for screen in list(self._bound):
             screen._send_msg('step', self.id)
+        await trio.sleep(0)
 
     async def skip(self) -> None:
         """Skip this stage."""
         self._current = 0
         self._skipped = True
-        for screen in self._bound:
+        for screen in list(self._bound):
             screen._send_msg('skip_stage', self.id)
+        await trio.sleep(0)
+
+    async def stage_iterate(self, stage: str, seq: Collection[T]) -> AsyncGenerator[T, None]:
+        """Tie the progress of a stage to a sequence of some kind."""
+        await self.set_length(len(seq))
+        for item in seq:
+            yield item
+            await self.step()
 
 
 class LoadScreen:
@@ -127,7 +140,7 @@ class LoadScreen:
 
     def __init__(
         self,
-        *stages: Tuple[str, TransToken],
+        *stages: ScreenStage,
         title_text: TransToken,
         is_splash: bool = False,
     ) -> None:
@@ -135,16 +148,14 @@ class LoadScreen:
         # functions from doing anything
         self.active = False
         self._time = 0.0
-        self.stage_ids: Set[str] = set()
-        self.stage_labels: List[TransToken] = []
+        self.stages: List[ScreenStage] = list(stages)
         self.title = title_text
         self._scope: trio.CancelScope | None = None
 
-        init: List[Tuple[str, str]] = []
-        for st_id, title in stages:
-            init.append((st_id, str(title)))
-            self.stage_labels.append(title)
-            self.stage_ids.add(st_id)
+        init: List[Tuple[int, str]] = [
+            (stage.id, str(stage.title))
+            for stage in stages
+        ]
 
         # Order the daemon to make this screen. We pass translated text in for the splash screen.
         self._send_msg('init', is_splash, str(title_text), init)
@@ -158,8 +169,7 @@ class LoadScreen:
         """
         if self._scope is not None:
             raise ValueError('Cannot re-enter loading screens!')
-        self._scope = trio.CancelScope()
-        self._scope.__enter__()
+        self._scope = trio.CancelScope().__enter__()
         self.show()
         return self
 
@@ -171,12 +181,14 @@ class LoadScreen:
     ) -> bool:
         """Hide the loading screen. If the Cancelled exception was raised, swallow that.
         """
-        self.reset()
         scope = self._scope
         if scope is None:
             raise ValueError('Already exited?')
         self._scope = None
-        return scope.__exit__(exc_type, exc_val, exc_tb)
+        try:
+            self.reset()
+        finally:
+            return scope.__exit__(exc_type, exc_val, exc_tb)
 
     def _send_msg(self, command: str, *args: Any) -> None:
         """Send a message to the daemon."""
@@ -195,53 +207,28 @@ class LoadScreen:
             else:
                 raise ValueError('Bad command from daemon: ' + repr(command))
 
-    def set_length(self, stage: str, num: int) -> None:
-        """Set the maximum value for the specified stage."""
-        if stage not in self.stage_ids:
-            raise KeyError(f'"{stage}" not valid for {self.stage_ids}!')
-        self._send_msg('set_length', stage, num)
-
-    def step(self, stage: str, disp_name: object = '') -> None:
-        """Increment the specified stage."""
-        if stage not in self.stage_ids:
-            raise KeyError(f'"{stage}" not valid for {self.stage_ids}!')
-        cur = time.perf_counter()
-        diff = cur - self._time
-        if diff > 0.1:
-            LOGGER.debug('{}: {!r} = {:.3}s', stage, disp_name, diff)
-        self._time = cur
-        self._send_msg('step', stage)
-
-    def skip_stage(self, stage: str) -> None:
-        """Skip over this stage of the loading process."""
-        if stage not in self.stage_ids:
-            raise KeyError(f'"{stage}" not valid for {self.stage_ids}!')
-        self._time = time.perf_counter()
-        self._send_msg('skip_stage', stage)
-
-    def stage_iterate(self, stage: str, seq: Collection[T]) -> Iterable[T]:
-        """Tie the progress of a stage to a sequence of some kind."""
-        self.set_length(stage, len(seq))
-        for item in seq:
-            yield item
-            self.step(stage, item)
-
     def show(self) -> None:
         """Display the loading screen."""
         self.active = True
         self._time = time.perf_counter()
         # Translate and send these across now.
-        self._send_msg('show', str(self.title), list(map(str, self.stage_labels)))
+        self._send_msg('show', str(self.title), [str(stage.title) for stage in self.stages])
+        for stage in self.stages:
+            stage._bound.add(self)
 
     def reset(self) -> None:
         """Hide the loading screen and reset all the progress bars."""
         self.active = False
         self._send_msg('reset')
+        for stage in self.stages:
+            stage._bound.discard(self)
 
     def destroy(self) -> None:
         """Permanently destroy this screen and cleanup."""
         self.active = False
         self._send_msg('destroy')
+        for stage in self.stages:
+            stage._bound.discard(self)
         _ALL_SCREENS.remove(self)
 
     def suppress(self) -> None:
@@ -252,7 +239,7 @@ class LoadScreen:
     def unsuppress(self) -> None:
         """Undo temporarily hiding the screen."""
         self.active = True
-        self._send_msg('show', str(self.title), list(map(str, self.stage_labels)))
+        self._send_msg('show', str(self.title), [str(stage.title) for stage in self.stages])
 
 
 def shutdown() -> None:
