@@ -19,7 +19,6 @@ import attrs
 import srctools.logger
 
 import config.gen_opts
-from app import localisation
 import config
 from transtoken import TransToken
 import utils
@@ -247,8 +246,7 @@ def shutdown() -> None:
         pass
 
 
-@localisation.add_callback(call=False)
-def _update_translations() -> None:
+def update_translations() -> None:
     """Update the translations."""
     _PIPE_MAIN_SEND.send((
         'update_translations', 0,
