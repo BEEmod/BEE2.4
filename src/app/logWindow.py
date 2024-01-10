@@ -5,7 +5,6 @@ The implementation is in bg_daemon, to ensure it remains responsive.
 from __future__ import annotations
 from typing import Literal, Tuple, Type, Union
 import logging
-import multiprocessing
 import queue
 
 import attrs
@@ -14,11 +13,10 @@ import trio
 from typing_extensions import override
 
 from config.gen_opts import GenOptions
+from loadScreen import _PIPE_MAIN_SEND, _PIPE_LOG_MAIN_REC
 import config
 
 
-_PIPE_MAIN_REC, PIPE_DAEMON_SEND = multiprocessing.Pipe(duplex=False)
-PIPE_DAEMON_REC, _PIPE_MAIN_SEND = multiprocessing.Pipe(duplex=False)
 # We need a queue because logs could be sent in from another thread.
 _LOG_QUEUE: queue.Queue[
     Type[StopIteration] |
@@ -100,7 +98,7 @@ def emit_logs() -> None:
         msg = _LOG_QUEUE.get()
         if msg is StopIteration or _SHUTDOWN:
             return
-        _PIPE_MAIN_SEND.send(msg)
+        _PIPE_MAIN_SEND.send(('logging', '', msg))
         _LOG_QUEUE.task_done()
 
 
@@ -112,7 +110,7 @@ async def setting_apply() -> None:
         # is potentially lost. But this should only be cancelled if the app's quitting, so that's
         # fine.
         try:
-            cmd, param = await trio.to_thread.run_sync(_PIPE_MAIN_REC.recv, abandon_on_cancel=True)
+            cmd, param = await trio.to_thread.run_sync(_PIPE_LOG_MAIN_REC.recv, abandon_on_cancel=True)
         except BrokenPipeError:
             # Pipe failed, we're useless.
             return

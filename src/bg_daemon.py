@@ -814,7 +814,6 @@ def run_background(
     pipe_send: multiprocessing.connection.Connection,
     pipe_rec: multiprocessing.connection.Connection,
     log_pipe_send: multiprocessing.connection.Connection,
-    log_pipe_rec: multiprocessing.connection.Connection,
     # Pass in various bits of translated text so, we don't need to do it here.
     translations: dict,
 ) -> None:
@@ -855,6 +854,8 @@ def run_background(
                 elif operation == 'set_force_ontop':
                     for screen in SCREENS.values():
                         screen.win.attributes('-topmost', args)
+                elif operation == 'logging':
+                    log_window.handle(args)
                 else:
                     try:
                         func = getattr(SCREENS[scr_id], 'op_' + operation)
@@ -868,8 +869,6 @@ def run_background(
                             raise
                         else:
                             raise TypeError(func) from e
-            while log_pipe_rec.poll():
-                log_window.handle(log_pipe_rec.recv())
         except BrokenPipeError:
             # A pipe failed, means the main app quit. Terminate ourselves.
             print('BG: Lost pipe!')

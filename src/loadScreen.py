@@ -19,7 +19,7 @@ import attrs
 import srctools.logger
 
 import config.gen_opts
-from app import localisation, logWindow
+from app import localisation
 import config
 from transtoken import TransToken
 import utils
@@ -36,6 +36,8 @@ _SCREEN_CANCEL_FLAG: Set[int] = set()
 # DAEMON is sent over to the other process.
 _PIPE_MAIN_REC, _PIPE_DAEMON_SEND = multiprocessing.Pipe(duplex=False)
 _PIPE_DAEMON_REC, _PIPE_MAIN_SEND = multiprocessing.Pipe(duplex=False)
+# Another specifically for the logging window.
+_PIPE_LOG_MAIN_REC, _PIPE_LOG_DAEMON_SEND = multiprocessing.Pipe(duplex=False)
 
 T = TypeVar('T')
 
@@ -269,8 +271,7 @@ def start_daemon() -> None:
         args=(
             _PIPE_DAEMON_SEND,
             _PIPE_DAEMON_REC,
-            logWindow.PIPE_DAEMON_SEND,
-            logWindow.PIPE_DAEMON_REC,
+            _PIPE_LOG_DAEMON_SEND,
             # Convert and pass translation strings.
             {key: str(tok) for key, tok in TRANSLATIONS.items()},
         ),
