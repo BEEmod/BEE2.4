@@ -17,6 +17,7 @@ import time
 
 import attrs
 import srctools.logger
+import trio
 
 import config.gen_opts
 import config
@@ -27,10 +28,6 @@ import utils
 # Keep a reference to all loading screens, so we can close them globally.
 _ALL_SCREENS = cast(Set['LoadScreen'], WeakSet())
 
-# For each loadscreen ID, record if the cancel button was pressed. We then raise
-# Cancelled upon the next interaction with it to stop operation.
-_SCREEN_CANCEL_FLAG: Set[int] = set()
-
 # Pairs of pipe ends we use to send data to the daemon and vice versa.
 # DAEMON is sent over to the other process.
 _PIPE_MAIN_REC, _PIPE_DAEMON_SEND = multiprocessing.Pipe(duplex=False)
@@ -39,11 +36,6 @@ _PIPE_DAEMON_REC, _PIPE_MAIN_SEND = multiprocessing.Pipe(duplex=False)
 _PIPE_LOG_MAIN_REC, _PIPE_LOG_DAEMON_SEND = multiprocessing.Pipe(duplex=False)
 
 T = TypeVar('T')
-
-
-class Cancelled(BaseException):
-    """Raised when the user cancels the loadscreen."""
-    # TODO: Replace with Trio's cancellation.
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -154,6 +146,7 @@ class LoadScreen:
         self.stage_ids: Set[str] = set()
         self.stage_labels: List[TransToken] = []
         self.title = title_text
+        self._scope: trio.CancelScope | None = None
 
         init: List[Tuple[str, str]] = []
         for st_id, title in stages:
@@ -171,19 +164,27 @@ class LoadScreen:
         Inside the block, the screen will be visible. Cancelling will exit
         to the end of the with block.
         """
+        if self._scope is not None:
+            raise ValueError('Cannot re-enter loading screens!')
+        self._scope = trio.CancelScope()
+        self._scope.__enter__()
         self.show()
         return self
 
     def __exit__(
         self,
-        exc_type: Type[BaseException],
-        exc_val: BaseException,
-        exc_tb: TracebackType,
+        exc_type: Type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
     ) -> bool:
         """Hide the loading screen. If the Cancelled exception was raised, swallow that.
         """
         self.reset()
-        return exc_type is Cancelled
+        scope = self._scope
+        if scope is None:
+            raise ValueError('Already exited?')
+        self._scope = None
+        return scope.__exit__(exc_type, exc_val, exc_tb)
 
     def _send_msg(self, command: str, *args: Any) -> None:
         """Send a message to the daemon."""
@@ -197,17 +198,10 @@ class LoadScreen:
                 conf = config.APP.get_cur_conf(config.gen_opts.GenOptions)
                 config.APP.store_conf(attrs.evolve(conf, compact_splash=arg))
             elif command == 'cancel':
-                # Mark this loadscreen as cancelled.
-                _SCREEN_CANCEL_FLAG.add(arg)
+                if self._scope is not None:
+                    self._scope.cancel()
             else:
                 raise ValueError('Bad command from daemon: ' + repr(command))
-
-        # If the flag was set for us, raise an exception - the loading thing
-        # will then stop.
-        if id(self) in _SCREEN_CANCEL_FLAG:
-            _SCREEN_CANCEL_FLAG.discard(id(self))
-            LOGGER.info('User cancelled loading screen.')
-            raise Cancelled
 
     def set_length(self, stage: str, num: int) -> None:
         """Set the maximum value for the specified stage."""

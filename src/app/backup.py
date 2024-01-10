@@ -596,8 +596,9 @@ def ui_load_backup() -> None:
         backup_name.set(BACKUPS['backup_name'])
 
         refresh_back_details()
-    except loadScreen.Cancelled:
+    except Exception:
         zip_file.close()
+        raise
 
 
 def ui_new_backup() -> None:
@@ -620,10 +621,7 @@ async def ui_save_backup(dialogs: Dialogs) -> None:
         # No backup path, prompt first
         await ui_save_backup_as(dialogs)
     else:
-        try:
-            await save_backup(dialogs)
-        except loadScreen.Cancelled:
-            pass
+        await save_backup(dialogs)
 
 
 async def ui_save_backup_as(dialogs: Dialogs) -> None:
@@ -730,25 +728,22 @@ async def ui_delete_game(dialog: Dialogs) -> None:
         return
 
     deleting_loader.set_length('DELETE', len(to_delete))
-    try:
-        with deleting_loader:
-            for p2c in to_delete:
-                scr_path = p2c.filename + '.jpg'
-                map_path = p2c.filename + '.p2c'
-                abs_scr = os.path.join(game_dir, scr_path)
-                abs_map = os.path.join(game_dir, map_path)
-                try:
-                    os.remove(abs_scr)
-                except FileNotFoundError:
-                    LOGGER.info('{} not present!', abs_scr)
-                try:
-                    os.remove(abs_map)
-                except FileNotFoundError:
-                    LOGGER.info('{} not present!', abs_map)
+    with deleting_loader:
+        for p2c in to_delete:
+            scr_path = p2c.filename + '.jpg'
+            map_path = p2c.filename + '.p2c'
+            abs_scr = os.path.join(game_dir, scr_path)
+            abs_map = os.path.join(game_dir, map_path)
+            try:
+                os.remove(abs_scr)
+            except FileNotFoundError:
+                LOGGER.info('{} not present!', abs_scr)
+            try:
+                os.remove(abs_map)
+            except FileNotFoundError:
+                LOGGER.info('{} not present!', abs_map)
 
-        BACKUPS['game'] = to_keep
-    except loadScreen.Cancelled:
-        pass
+    BACKUPS['game'] = to_keep
     refresh_game_details()
 
 
