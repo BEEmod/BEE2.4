@@ -102,6 +102,37 @@ def suppress_screens() -> Any:
 commondialog.Dialog.show = suppress_screens()(commondialog.Dialog.show)  # type: ignore
 
 
+class ScreenStage:
+    """A single stage in a loading screen."""
+    def __init__(self, name: TransToken) -> None:
+        self.name = name
+        self.id = id(self)
+        self._bound: Set[LoadScreen] = set()
+        self._current = 0
+        self._max = 0
+        self._skipped = False
+
+    async def set_length(self, num: int) -> None:
+        """Change the current length of this stage."""
+        self._max = num
+        for screen in self._bound:
+            screen._send_msg('set_length', self.id, num)
+
+    async def step(self) -> None:
+        """Increment one step."""
+        self._current += 1
+        self._skipped = False
+        for screen in self._bound:
+            screen._send_msg('step', self.id)
+
+    async def skip(self) -> None:
+        """Skip this stage."""
+        self._current = 0
+        self._skipped = True
+        for screen in self._bound:
+            screen._send_msg('skip_stage', self.id)
+
+
 class LoadScreen:
     """LoadScreens show a loading screen for items.
 
