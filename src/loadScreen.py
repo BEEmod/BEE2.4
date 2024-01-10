@@ -5,6 +5,8 @@ the main process is busy loading.
 
 The id() of the main-process object is used to identify loadscreens.
 """
+from __future__ import annotations
+
 from typing import Collection, Iterable, Set, Tuple, List, TypeVar, cast, Any, Type
 from types import TracebackType
 from tkinter import commondialog
@@ -21,7 +23,6 @@ from app import localisation, logWindow
 import config
 from transtoken import TransToken
 import utils
-
 
 
 # Keep a reference to all loading screens, so we can close them globally.
@@ -252,21 +253,31 @@ def _update_translations() -> None:
         {key: str(tok) for key, tok in TRANSLATIONS.items()},
     ))
 
-# Initialise the daemon.
-BG_PROC = multiprocessing.Process(
-    target=utils.run_bg_daemon,
-    args=(
-        _PIPE_DAEMON_SEND,
-        _PIPE_DAEMON_REC,
-        logWindow.PIPE_DAEMON_SEND,
-        logWindow.PIPE_DAEMON_REC,
-        # Convert and pass translation strings.
-        {key: str(tok) for key, tok in TRANSLATIONS.items()},
-    ),
-    name='bg_daemon',
-    daemon=True,
-)
-BG_PROC.start()
+
+_BG_PROC: multiprocessing.Process | None = None
+
+
+def start_daemon() -> None:
+    """Spawn the deamon process."""
+    global _BG_PROC
+    if _BG_PROC is not None:
+        raise ValueError('Daemon already started!')
+
+    # Initialise the daemon.
+    _BG_PROC = multiprocessing.Process(
+        target=utils.run_bg_daemon,
+        args=(
+            _PIPE_DAEMON_SEND,
+            _PIPE_DAEMON_REC,
+            logWindow.PIPE_DAEMON_SEND,
+            logWindow.PIPE_DAEMON_REC,
+            # Convert and pass translation strings.
+            {key: str(tok) for key, tok in TRANSLATIONS.items()},
+        ),
+        name='bg_daemon',
+        daemon=True,
+    )
+    _BG_PROC.start()
 
 main_loader = LoadScreen(
     ('PAK', TransToken.ui('Packages')),
