@@ -27,13 +27,10 @@ from srctools.filesys import FileSystem, RawFileSystem, ZipFileSystem, VPKFileSy
 from app.dialogs import Dialogs
 from editoritems import Item as EditorItem, Renderable, RenderableType
 from corridor import CORRIDOR_COUNTS, GameMode, Direction
+from loadScreen import MAIN_PAK as LOAD_PAK, MAIN_OBJ as LOAD_OBJ
 import srctools.logger
 
 from transtoken import TransToken, TransTokenSource
-
-
-if TYPE_CHECKING:  # Prevent circular import
-    from loadScreen import LoadScreen
 
 
 __all__ = [
@@ -542,7 +539,6 @@ async def no_packages_err(dialog: Dialogs, pak_dirs: list[Path], msg: TransToken
 async def load_packages(
     packset: PackagesSet,
     pak_dirs: list[Path],
-    loader: LoadScreen,
     dialog: Dialogs,
 ) -> None:
     """Scan and read in all packages."""
@@ -551,7 +547,7 @@ async def load_packages(
             find_nurs.start_soon(find_packages, find_nurs, packset, pak_dir)
 
     pack_count = len(packset.packages)
-    loader.set_length("PAK", pack_count)
+    await LOAD_PAK.set_length(pack_count)
 
     if pack_count == 0:
         await no_packages_err(dialog, pak_dirs, TransToken.ui('No packages found!'))
@@ -572,15 +568,15 @@ async def load_packages(
             if not pack.enabled:
                 LOGGER.info('Package {} disabled!', pack.id)
                 pack_count -= 1
-                loader.set_length("PAK", pack_count)
+                await LOAD_PAK.set_length(pack_count)
                 continue
 
-            nursery.start_soon(parse_package, nursery, packset, pack, loader)
+            nursery.start_soon(parse_package, nursery, packset, pack)
         LOGGER.debug('Submitted packages.')
 
     LOGGER.debug('Parsed packages, now parsing objects.')
 
-    loader.set_length("OBJ", sum(
+    await LOAD_OBJ.set_length(sum(
         len(obj_map)
         for obj_type, obj_map in
         packset.unparsed.items()
@@ -599,22 +595,22 @@ async def load_packages(
             if obj_class.needs_foreground:
                 nursery.start_soon(
                     parse_type,
-                    packset, obj_class, objs, loader,
+                    packset, obj_class, objs,
                 )
             else:
                 background_run(
                     parse_type,
-                    packset, obj_class, objs, None,
+                    packset, obj_class, objs,
                 )
 
 
-async def parse_type(packset: PackagesSet, obj_class: Type[PakT], objs: Iterable[str], loader: Optional[LoadScreen]) -> None:
+async def parse_type(packset: PackagesSet, obj_class: Type[PakT], objs: Iterable[str]) -> None:
     """Parse all of a specific object type."""
     async with trio.open_nursery() as nursery:
         for obj_id in objs:
             nursery.start_soon(
                 parse_object,
-                packset, obj_class, obj_id, loader,
+                packset, obj_class, obj_id,
             )
     LOGGER.info('Post-process {} objects...', obj_class.__name__)
     # Tricky, we want to let post_parse() call all_obj() etc, but not let other blocked tasks
@@ -629,7 +625,6 @@ async def parse_package(
     nursery: trio.Nursery,
     packset: PackagesSet,
     pack: Package,
-    loader: LoadScreen,
 ) -> None:
     """Parse through the given package to find all the components."""
     from packages import template_brush  # Avoid circular imports
@@ -734,14 +729,10 @@ async def parse_package(
         await trio.sleep(0)
         if template.path.casefold().endswith('.vmf'):
             nursery.start_soon(template_brush.parse_template, packset, pack.id, template)
-    loader.step('PAK', pack.id)
+    await LOAD_PAK.step(pack.id)
 
 
-async def parse_object(
-    packset: PackagesSet,
-    obj_class: Type[PakObject], obj_id: str,
-    loader: Optional[LoadScreen],
-) -> None:
+async def parse_object(packset: PackagesSet, obj_class: Type[PakObject], obj_id: str) -> None:
     """Parse through the object and store the resultant class."""
     obj_data = packset.unparsed[obj_class][obj_id]
     try:
@@ -797,8 +788,8 @@ async def parse_object(
         object_.add_over(override)
     assert obj_id.casefold() not in packset.objects[obj_class], f'{obj_class}("{obj_id}") = {object_}'
     packset.objects[obj_class][obj_id.casefold()] = object_
-    if loader is not None:
-        loader.step("OBJ", obj_id)
+    if obj_class.needs_foreground:
+        await LOAD_OBJ.step(obj_id)
 
 
 def parse_pack_transtoken(pack: Package, kv: Keyvalues) -> None:

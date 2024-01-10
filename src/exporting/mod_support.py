@@ -217,7 +217,7 @@ async def step_copy_mod_music(exp: ExportData) -> None:
         if not await dest.exists():
             with file.open_bin() as f:
                 await dest.write_bytes(await trio.to_thread.run_sync(f.read))
-        export_screen.step(STAGE_MUSIC, name)
+        await STAGE_MUSIC.step(name)
 
     async with trio.open_nursery() as nursery:
         # Obviously Tag has its music already, skip copying to itself.
@@ -232,6 +232,6 @@ async def step_copy_mod_music(exp: ExportData) -> None:
                 nursery.start_soon(copy_music, mel_dest, fsys_mel['sound/music/' + filename])
                 count += 1
 
-        export_screen.set_length(STAGE_MUSIC, count)
+        await STAGE_MUSIC.set_length(count)
 
     exp.resources |= copied_files

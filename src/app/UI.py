@@ -14,11 +14,10 @@ import trio
 from typing_extensions import assert_never
 
 import exporting
-import loadScreen
 from app import TK_ROOT, background_run
 from BEE2_config import ConfigFile, GEN_OPTS
 from app.dialogs import Dialogs
-from loadScreen import main_loader as loader
+from loadScreen import MAIN_UI as LOAD_UI, shutdown as loadscreen_shutdown
 import packages
 from packages.item import ItemVariant, InheritKind
 import utils
@@ -503,7 +502,7 @@ def quit_application() -> None:
     snd.clean_sample_folder()
 
     # Destroy the TK windows, finalise logging, then quit.
-    loadScreen.shutdown()
+    loadscreen_shutdown()
 
 gameMan.quit_application = quit_application
 
@@ -1478,7 +1477,7 @@ async def init_windows(tk_img: TKImages) -> None:
     )  # Prevent making the window smaller than the preview pane
 
     await trio.sleep(0)
-    loader.step('UI', 'preview')
+    await LOAD_UI.step('preview')
 
     ttk.Separator(ui_bg, orient='vertical').grid(
         row=0, column=4,
@@ -1509,8 +1508,7 @@ async def init_windows(tk_img: TKImages) -> None:
 
     item_search.init(search_frame, update_filter)
 
-    await trio.sleep(0)
-    loader.step('UI', 'filter')
+    await LOAD_UI.step('filter')
 
     frames['picker'] = ttk.Frame(
         picker_split_frame,
@@ -1524,8 +1522,7 @@ async def init_windows(tk_img: TKImages) -> None:
     picker_split_frame.columnconfigure(0, weight=1)
     await init_picker(frames['picker'])
 
-    await trio.sleep(0)
-    loader.step('UI', 'picker')
+    await LOAD_UI.step('picker')
 
     frames['toolMenu'] = tk.Frame(
         frames['preview'],
@@ -1570,13 +1567,11 @@ async def init_windows(tk_img: TKImages) -> None:
     TK_ROOT.bind_all(tk_tools.KEY_SAVE_AS, lambda e: pal_ui.event_save_as(DIALOG))
     TK_ROOT.bind_all(tk_tools.KEY_EXPORT, lambda e: background_run(export_editoritems, pal_ui, menu_bar, DIALOG))
 
-    await trio.sleep(0)
-    loader.step('UI', 'palette')
+    await LOAD_UI.step('palette')
 
     packageMan.make_window()
 
-    await trio.sleep(0)
-    loader.step('UI', 'packageman')
+    await LOAD_UI.step('packageman')
 
     windows['opt'] = SubPane.SubPane(
         TK_ROOT, tk_img,
@@ -1593,15 +1588,15 @@ async def init_windows(tk_img: TKImages) -> None:
         nurs.start_soon(init_option, windows['opt'], tk_img, export, corridor)
     async with trio.open_nursery() as nurs:
         nurs.start_soon(corridor.refresh)
-    loader.step('UI', 'options')
+    await LOAD_UI.step('options')
 
     async with trio.open_nursery() as nurs:
         nurs.start_soon(itemconfig.make_pane, frames['toolMenu'], menu_bar.view_menu, tk_img)
-    loader.step('UI', 'itemvar')
+    await LOAD_UI.step('itemvar')
 
     async with trio.open_nursery() as nurs:
         nurs.start_soon(CompilerPane.make_pane, frames['toolMenu'], tk_img, menu_bar.view_menu)
-    loader.step('UI', 'compiler')
+    await LOAD_UI.step('compiler')
 
     btn_clear = SubPane.make_tool_button(
         frames['toolMenu'], tk_img,
@@ -1643,20 +1638,18 @@ async def init_windows(tk_img: TKImages) -> None:
 
     await trio.sleep(0)
     backup_win.init_toplevel(tk_img)
-    await trio.sleep(0)
-    loader.step('UI', 'backup')
+    await LOAD_UI.step('backup')
     voiceEditor.init_widgets()
-    await trio.sleep(0)
-    loader.step('UI', 'voiceline')
+    await LOAD_UI.step('voiceline')
     contextWin.init_widgets(tk_img)
-    loader.step('UI', 'contextwin')
+    await LOAD_UI.step('contextwin')
     await optionWindow.init_widgets(
         unhide_palettes=pal_ui.reset_hidden_palettes,
         reset_all_win=reset_panes,
     )
-    loader.step('UI', 'optionwindow')
+    await LOAD_UI.step('optionwindow')
     init_drag_icon()
-    loader.step('UI', 'drag_icon')
+    await LOAD_UI.step('drag_icon')
     await trio.sleep(0)
 
     # Load to properly apply config settings, then save to ensure

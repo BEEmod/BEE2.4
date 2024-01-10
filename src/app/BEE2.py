@@ -34,7 +34,7 @@ async def init_app() -> None:
 
     LOGGER.debug('Starting loading screen...')
     localisation.add_callback(call=False)(loadScreen.update_translations)
-    loadScreen.main_loader.set_length('UI', 16)
+    await loadScreen.MAIN_UI.set_length(16)
     loadScreen.set_force_ontop(conf.force_load_ontop)
     loadScreen.show_main_loader(conf.compact_splash)
 
@@ -65,11 +65,10 @@ async def init_app() -> None:
             packages.load_packages,
             packset,
             list(BEE2_config.get_package_locs()),
-            loadScreen.main_loader,
             DIALOG,
         )
     package_sys = packages.PACKAGE_SYS
-    loadScreen.main_loader.step('UI', 'pre_ui')
+    await loadScreen.MAIN_UI.step('pre_ui')
     from ui_tk.img import TK_IMG
     app.background_run(img.init, package_sys, TK_IMG)
     app.background_run(sound.sound_task)
@@ -79,7 +78,7 @@ async def init_app() -> None:
     music_conf.load_filesystems(package_sys.values())
     async with trio.open_nursery() as nurs:
         nurs.start_soon(UI.load_packages, packset, TK_IMG)
-    loadScreen.main_loader.step('UI', 'package_load')
+    await loadScreen.MAIN_UI.step('package_load')
     LOGGER.info('Done!')
 
     LOGGER.info('Initialising UI...')

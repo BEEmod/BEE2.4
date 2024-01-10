@@ -16,7 +16,6 @@ async def test() -> None:
     await packages.load_packages(
         packages.get_loaded_packages(),
         list(BEE2_config.get_package_locs()),
-        loadScreen.main_loader,
         DIALOG,
     )
     background_run(img.init, packages.PACKAGE_SYS, TK_IMG)

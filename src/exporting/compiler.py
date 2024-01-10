@@ -163,13 +163,13 @@ async def backup(description: str, item_path: trio.Path, backup_path: trio.Path)
     if should_backup:
         LOGGER.info('Backing up original {}!', item_path.name)
         await trio.to_thread.run_sync(shutil.copy, item_path, backup_path)
-    load_screen.step(STAGE_COMP_BACKUP, item_path.name)
+    await STAGE_COMP_BACKUP.step(item_path.name)
 
 
 @STEPS.add_step(prereq=[], results=[StepResource.BACKUP])
 async def step_do_backup(exp_data: ExportData) -> None:
     """Backup existing Valve compilers and editoritems."""
-    load_screen.set_length(STAGE_COMP_BACKUP, len(FILES_TO_BACKUP))
+    await STAGE_COMP_BACKUP.set_length(len(FILES_TO_BACKUP))
     async with trio.open_nursery() as nursery:
         for name, path, ext in FILES_TO_BACKUP:
             nursery.start_soon(
@@ -216,7 +216,7 @@ async def step_copy_compiler(exp_data: ExportData) -> None:
             raise AppError(msg.format(file=dest, game=exp_data.game.name)) from exc
 
     async with trio.open_nursery() as nursery:
-        for comp_file in load_screen.stage_iterate(STAGE_COMPILER, list(compiler_src.rglob('*'))):
+        async for comp_file in STAGE_COMPILER.iterate(list(compiler_src.rglob('*'))):
             # Ignore folders.
             if comp_file.is_dir():
                 continue

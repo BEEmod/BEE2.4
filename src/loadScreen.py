@@ -106,7 +106,7 @@ class ScreenStage:
             screen._send_msg('set_length', self.id, num)
         await trio.sleep(0)
 
-    async def step(self) -> None:
+    async def step(self, info: object = None) -> None:
         """Increment one step."""
         self._current += 1
         self._skipped = False
@@ -122,7 +122,7 @@ class ScreenStage:
             screen._send_msg('skip_stage', self.id)
         await trio.sleep(0)
 
-    async def stage_iterate(self, stage: str, seq: Collection[T]) -> AsyncGenerator[T, None]:
+    async def iterate(self, seq: Collection[T]) -> AsyncGenerator[T, None]:
         """Tie the progress of a stage to a sequence of some kind."""
         await self.set_length(len(seq))
         for item in seq:
@@ -282,10 +282,13 @@ def start_daemon() -> None:
     )
     _BG_PROC.start()
 
+
+MAIN_PAK = ScreenStage(TransToken.ui('Packages'))
+MAIN_OBJ = ScreenStage(TransToken.ui('Loading Objects'))
+MAIN_UI = ScreenStage(TransToken.ui('Initialising UI'))
+
 main_loader = LoadScreen(
-    ('PAK', TransToken.ui('Packages')),
-    ('OBJ', TransToken.ui('Loading Objects')),
-    ('UI', TransToken.ui('Initialising UI')),
+    MAIN_PAK, MAIN_OBJ, MAIN_UI,
     title_text=TransToken.ui('Better Extended Editor for Portal 2'),
     is_splash=True,
 )

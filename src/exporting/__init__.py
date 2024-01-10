@@ -49,19 +49,19 @@ class StepResource(Enum):
 
 
 # The progress bars used when exporting data into a game
-STAGE_STEPS = 'STEPS'
-STAGE_COMP_BACKUP = 'BACK'
-STAGE_PUZZ_BACKUP = 'PUZZLE_BACKUP'
-STAGE_COMPILER = 'COMP'
-STAGE_RESOURCES = 'RES'
-STAGE_MUSIC = 'MUS'
+STAGE_STEPS = loadScreen.ScreenStage(TransToken.ui('Overall Progress'))
+STAGE_COMP_BACKUP = loadScreen.ScreenStage(TransToken.ui('Backup Original Files'))
+STAGE_PUZZ_BACKUP = loadScreen.ScreenStage(TransToken.ui('Backup Puzzles'))
+STAGE_COMPILER = loadScreen.ScreenStage(TransToken.ui('Copy Compiler'))
+STAGE_RESOURCES = loadScreen.ScreenStage(TransToken.ui('Copy Resources'))
+STAGE_MUSIC = loadScreen.ScreenStage(TransToken.ui('Copy Music'))
 load_screen = loadScreen.LoadScreen(
-    (STAGE_STEPS, TransToken.ui('Overall Progress')),
-    (STAGE_COMP_BACKUP, TransToken.ui('Backup Original Files')),
-    (STAGE_PUZZ_BACKUP, TransToken.ui('Backup Puzzles')),
-    (STAGE_COMPILER, TransToken.ui('Copy Compiler')),
-    (STAGE_RESOURCES, TransToken.ui('Copy Resources')),
-    (STAGE_MUSIC, TransToken.ui('Copy Music')),
+    STAGE_STEPS,
+    STAGE_COMP_BACKUP,
+    STAGE_PUZZ_BACKUP,
+    STAGE_COMPILER,
+    STAGE_RESOURCES,
+    STAGE_MUSIC,
     title_text=TransToken.ui('Exporting'),
 )
 
@@ -150,7 +150,7 @@ async def export(
                 warn=error_ui.add,
             )
 
-            await STEPS.run(exp_data, load_screen, STAGE_STEPS)
+            await STEPS.run(exp_data, STAGE_STEPS)
 
             game.exported_style = style.id
             game.save()

@@ -11,7 +11,7 @@ from srctools.filesys import File
 import trio
 
 from app import backup
-from . import ExportData, STEPS, StepResource, load_screen as export_screen, STAGE_RESOURCES
+from . import ExportData, STEPS, StepResource, STAGE_RESOURCES
 import editoritems
 
 
@@ -81,7 +81,7 @@ async def step_write_editoritems_db(exp: ExportData) -> None:
 @STEPS.add_step(prereq=[], results=[StepResource.EI_FILE])
 async def step_auto_backup(exp: ExportData) -> None:
     """Run an auto-backup, if requested to."""
-    backup.auto_backup(exp.game, export_screen)
+    backup.auto_backup(exp.game)
 
 
 @STEPS.add_step(prereq=[StepResource.RES_SPECIAL], results=[StepResource.RES_PACKAGE])
@@ -92,17 +92,21 @@ async def step_copy_resources(exp: ExportData) -> None:
     indicate which files should remain. It is the full path to the files.
     """
     if not exp.copy_resources:
-        export_screen.skip_stage(STAGE_RESOURCES)
+        await STAGE_RESOURCES.skip()
         return
 
     already_copied = exp.resources
 
-    def copy_file(file: File, dest: Path) -> None:
+    def copy_file_thread(file: File, dest: Path) -> None:
         """Copy a single resource."""
         dest.parent.mkdir(parents=True, exist_ok=True)
         with file.open_bin() as fsrc, open(dest, 'wb') as fdest:
             shutil.copyfileobj(fsrc, fdest)
-        export_screen.step(STAGE_RESOURCES, dest)
+
+    async def copy_file(file: File, dest: Path) -> None:
+        """Copy a single resource."""
+        await trio.to_thread.run_sync(copy_file_thread, file, dest)
+        await STAGE_RESOURCES.step(dest)
 
     count = 0
 
@@ -132,9 +136,9 @@ async def step_copy_resources(exp: ExportData) -> None:
                 if dest in already_copied:
                     continue
                 already_copied.add(dest)
-                nursery.start_soon(trio.to_thread.run_sync, copy_file, file, dest)
+                nursery.start_soon(copy_file, file, dest)
                 count += 1
-        export_screen.set_length(STAGE_RESOURCES, count)
+        await STAGE_RESOURCES.set_length(count)
 
     LOGGER.info('Cache copied.')
 
@@ -153,7 +157,7 @@ async def step_copy_resources(exp: ExportData) -> None:
                         LOGGER.info('Deleting: {}', path)
                         nursery.start_soon(trio.Path(path).unlink)
                         count += 1
-        export_screen.set_length(STAGE_RESOURCES, count)
+        await STAGE_RESOURCES.set_length(count)
 
     # Save the new cache modification date.
     exp.game.mod_times.clear()
