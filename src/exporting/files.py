@@ -81,7 +81,7 @@ async def step_write_editoritems_db(exp: ExportData) -> None:
 @STEPS.add_step(prereq=[], results=[StepResource.EI_FILE])
 async def step_auto_backup(exp: ExportData) -> None:
     """Run an auto-backup, if requested to."""
-    backup.auto_backup(exp.game)
+    await backup.auto_backup(exp.game)
 
 
 @STEPS.add_step(prereq=[StepResource.RES_SPECIAL], results=[StepResource.RES_PACKAGE])

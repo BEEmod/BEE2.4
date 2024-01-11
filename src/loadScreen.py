@@ -8,27 +8,26 @@ The id() of the main-process object is used to identify loadscreens.
 from __future__ import annotations
 
 from typing import (
-    AsyncGenerator, Collection, Generator, Set, Tuple, List, TypeVar, cast,
+    AsyncGenerator, Collection, Generator, MutableSet, Set, Tuple, List, TypeVar,
     Any, Type,
 )
 from types import TracebackType
 from weakref import WeakSet
 import contextlib
 import multiprocessing
-import time
 
 import attrs
 import srctools.logger
 import trio
 
-import config.gen_opts
-import config
+from config.gen_opts import GenOptions
+from config import APP
 from transtoken import TransToken
 import utils
 
 
 # Keep a reference to all loading screens, so we can close them globally.
-_ALL_SCREENS = cast(Set['LoadScreen'], WeakSet())
+_ALL_SCREENS: MutableSet[LoadScreen] = WeakSet()
 
 # Pairs of pipe ends we use to send data to the daemon and vice versa.
 # DAEMON is sent over to the other process.
@@ -93,7 +92,7 @@ class ScreenStage:
     """A single stage in a loading screen."""
     def __init__(self, title: TransToken) -> None:
         self.title = title
-        self.id = id(self)
+        self.id = hex(id(self))
         self._bound: Set[LoadScreen] = set()
         self._current = 0
         self._max = 0
@@ -147,12 +146,11 @@ class LoadScreen:
         # active determines whether the screen is on, and if False stops most
         # functions from doing anything
         self.active = False
-        self._time = 0.0
         self.stages: List[ScreenStage] = list(stages)
         self.title = title_text
         self._scope: trio.CancelScope | None = None
 
-        init: List[Tuple[int, str]] = [
+        init: List[Tuple[str, str]] = [
             (stage.id, str(stage.title))
             for stage in stages
         ]
@@ -161,7 +159,7 @@ class LoadScreen:
         self._send_msg('init', is_splash, str(title_text), init)
         _ALL_SCREENS.add(self)
 
-    def __enter__(self) -> 'LoadScreen':
+    def __enter__(self) -> LoadScreen:
         """LoadScreen can be used as a context manager.
 
         Inside the block, the screen will be visible. Cancelling will exit
@@ -199,8 +197,8 @@ class LoadScreen:
             command, arg = _PIPE_MAIN_REC.recv()
             if command == 'main_set_compact':
                 # Save the compact state to the config.
-                conf = config.APP.get_cur_conf(config.gen_opts.GenOptions)
-                config.APP.store_conf(attrs.evolve(conf, compact_splash=arg))
+                conf = APP.get_cur_conf(GenOptions)
+                APP.store_conf(attrs.evolve(conf, compact_splash=arg))
             elif command == 'cancel':
                 if self._scope is not None:
                     self._scope.cancel()
@@ -210,7 +208,6 @@ class LoadScreen:
     def show(self) -> None:
         """Display the loading screen."""
         self.active = True
-        self._time = time.perf_counter()
         # Translate and send these across now.
         self._send_msg('show', str(self.title), [str(stage.title) for stage in self.stages])
         for stage in self.stages:

@@ -1,33 +1,35 @@
 """Backup and restore P2C maps.
 
 """
-from typing import List, TYPE_CHECKING, Dict, Any, Optional, Union, cast
+from __future__ import annotations
+
+from typing import List, TYPE_CHECKING, Dict, Any, Union, cast
 from typing_extensions import Self, TypeAlias
 
 from tkinter import filedialog, ttk
+from datetime import datetime
+from io import BytesIO, TextIOWrapper
+from zipfile import ZipFile, ZIP_LZMA
 import tkinter as tk
 import atexit
 import os
 import shutil
 import string
-from datetime import datetime
-from io import BytesIO, TextIOWrapper
-from zipfile import ZipFile, ZIP_LZMA
 
-
-import loadScreen
-import srctools.logger
-from app import tk_tools, img, TK_ROOT, background_run
-import utils
-from app.CheckDetails import CheckDetails, Item as CheckItem
-from FakeZip import FakeZip, zip_names, zip_open_bin
 from srctools import Keyvalues, KeyValError
+import srctools.logger
+import trio
 
+from app import tk_tools, img, TK_ROOT, background_run
+from app.CheckDetails import CheckDetails, Item as CheckItem
 from app.tooltip import add_tooltip
+from FakeZip import FakeZip, zip_names, zip_open_bin
 from transtoken import TransToken
 from ui_tk.wid_transtoken import set_menu_text, set_text, set_win_title
 from ui_tk.dialogs import Dialogs, DIALOG, TkDialogs
 from ui_tk.img import TKImages
+import loadScreen
+import utils
 
 
 if TYPE_CHECKING:
@@ -41,8 +43,8 @@ window: tk.Toplevel
 AnyZip: TypeAlias = Union[ZipFile, FakeZip]
 UI: Dict[str, Any] = {}  # Holds all the widgets
 
-# Stage name for the exporting screen
-AUTO_BACKUP_STAGE = 'PUZZLE_BACKUP'
+# Loading stage used during backup.
+AUTO_BACKUP_STAGE = loadScreen.ScreenStage(TransToken.ui('Backup Puzzles'))
 
 # Characters allowed in the backup filename
 BACKUP_CHARS = set(string.ascii_letters + string.digits + '_-.')
@@ -98,18 +100,20 @@ backup_name = tk.StringVar()
 game_name = tk.StringVar()
 
 # Loadscreens used as basic progress bars
+LOAD_STAGE = loadScreen.ScreenStage(TransToken.BLANK)
+
 copy_loader = loadScreen.LoadScreen(
-    ('COPY', TransToken.BLANK),
+    LOAD_STAGE,
     title_text=TransToken.ui('Copying maps'),
 )
 
 reading_loader = loadScreen.LoadScreen(
-    ('READ', TransToken.BLANK),
+    LOAD_STAGE,
     title_text=TransToken.ui('Loading maps'),
 )
 
 deleting_loader = loadScreen.LoadScreen(
-    ('DELETE', TransToken.BLANK),
+    LOAD_STAGE,
     title_text=TransToken.ui('Deleting maps'),
 )
 
@@ -120,8 +124,8 @@ class P2C:
         self,
         filename: str,
         zip_file: AnyZip,
-        create_time: 'Date',
-        mod_time: 'Date',
+        create_time: Date,
+        mod_time: Date,
         title: str = '<untitled>',
         desc: TransToken = TRANS_NO_DESC,
         is_coop: bool = False,
@@ -135,7 +139,7 @@ class P2C:
         self.is_coop = is_coop
 
     @classmethod
-    def from_file(cls, path: str, zip_file: Union[ZipFile, FakeZip]) -> 'P2C':
+    def from_file(cls, path: str, zip_file: AnyZip) -> P2C:
         """Initialise from a file.
 
         path is the file path for the map inside the zip, without extension.
@@ -268,7 +272,7 @@ class Date:
 # directories.
 
 
-def load_backup(zip_file: AnyZip) -> List[P2C]:
+async def load_backup(zip_file: AnyZip) -> List[P2C]:
     """Load in a backup file."""
     maps: List[P2C] = []
     puzzles = [
@@ -279,18 +283,16 @@ def load_backup(zip_file: AnyZip) -> List[P2C]:
     ]
     # Each P2C init requires reading in the properties file, so this may take
     # some time. Use a loading screen.
-    reading_loader.set_length('READ', len(puzzles))
     LOGGER.info('Loading {} maps..', len(puzzles))
     with reading_loader:
-        for file in puzzles:
-            new_map = P2C.from_file(file, zip_file)
+        async for file in LOAD_STAGE.iterate(puzzles):
+            new_map = await trio.to_thread.run_sync(P2C.from_file, file, zip_file)
             maps.append(new_map)
             LOGGER.debug(
                 'Loading {} map "{}"',
                 'coop' if new_map.is_coop else 'sp',
                 new_map.title,
             )
-            reading_loader.step('READ')
     LOGGER.info('Done!')
 
     # It takes a while before the detail headers update positions,
@@ -300,24 +302,20 @@ def load_backup(zip_file: AnyZip) -> List[P2C]:
     return maps
 
 
-def load_game(game: 'gameMan.Game') -> None:
+async def load_game(game: gameMan.Game) -> None:
     """Callback for gameMan, load in files for a game."""
     game_name.set(game.name)
 
     puzz_path = find_puzzles(game)
     if puzz_path:
         zip_file = FakeZip(puzz_path)
-        try:
-            BACKUPS['game'] = load_backup(zip_file)
-        except loadScreen.Cancelled:
-            return
-
+        BACKUPS['game'] = await load_backup(zip_file)
         BACKUPS['game_path'] = puzz_path
         BACKUPS['game_zip'] = zip_file
         refresh_game_details()
 
 
-def find_puzzles(game: 'gameMan.Game') -> Optional[str]:
+def find_puzzles(game: gameMan.Game) -> str | None:
     """Find the path for the p2c files."""
     # The puzzles are located in:
     # <game_folder>/portal2/puzzles/<steam_id>
@@ -367,7 +365,7 @@ async def backup_maps(dialogs: Dialogs, maps: List[P2C]) -> None:
     refresh_back_details()
 
 
-def auto_backup(game: 'gameMan.Game', loader: loadScreen.LoadScreen) -> None:
+async def auto_backup(game: gameMan.Game) -> None:
     """Perform an automatic backup for the given game.
 
     We do this seperately since we don't need to read the property files.
@@ -375,18 +373,18 @@ def auto_backup(game: 'gameMan.Game', loader: loadScreen.LoadScreen) -> None:
     from BEE2_config import GEN_OPTS
     if not GEN_OPTS.get_bool('General', 'enable_auto_backup'):
         # Don't backup!
-        loader.skip_stage(AUTO_BACKUP_STAGE)
+        await AUTO_BACKUP_STAGE.skip()
         return
 
     folder = find_puzzles(game)
     if not folder:
-        loader.skip_stage(AUTO_BACKUP_STAGE)
+        await AUTO_BACKUP_STAGE.skip()
         return
 
     # Keep this many previous
     extra_back_count = GEN_OPTS.get_int('General', 'auto_backup_count', 0)
 
-    to_backup = os.listdir(folder)
+    to_backup = await trio.to_thread.run_sync(os.listdir, folder)
     backup_dir = GEN_OPTS.get_val('Directories', 'backup_loc', 'backups/')
 
     os.makedirs(backup_dir, exist_ok=True)
@@ -398,7 +396,7 @@ def auto_backup(game: 'gameMan.Game', loader: loadScreen.LoadScreen) -> None:
         valid_chars=BACKUP_CHARS,
     )
 
-    loader.set_length(AUTO_BACKUP_STAGE, len(to_backup))
+    await AUTO_BACKUP_STAGE.set_length(len(to_backup))
 
     if extra_back_count:
         back_files = [
@@ -409,18 +407,16 @@ def auto_backup(game: 'gameMan.Game', loader: loadScreen.LoadScreen) -> None:
         ]
         # Move each file over by 1 index, ignoring missing ones
         # We need to reverse to ensure we don't overwrite any zips
-        for old_name, new_name in reversed(
-                list(zip(back_files, back_files[1:]))
-                ):
+        for old_name, new_name in reversed(list(zip(back_files, back_files[1:]))):
             LOGGER.info('Moving: {} -> {}', old_name, new_name)
             old_name = os.path.join(backup_dir, old_name)
             new_name = os.path.join(backup_dir, new_name)
             try:
-                os.remove(new_name)
+                await trio.to_thread.run_sync(os.remove, new_name)
             except FileNotFoundError:
                 pass  # We're overwriting this anyway
             try:
-                os.rename(old_name, new_name)
+                await trio.to_thread.run_sync(os.rename, old_name, new_name)
             except FileNotFoundError:
                 pass
 
@@ -431,13 +427,13 @@ def auto_backup(game: 'gameMan.Game', loader: loadScreen.LoadScreen) -> None:
     LOGGER.info('Writing backup to "{}"', final_backup)
     with open(final_backup, 'wb') as f:
         with ZipFile(f, mode='w', compression=ZIP_LZMA) as zip_file:
-            for file in to_backup:
-                zip_file.write(
+            async for file in AUTO_BACKUP_STAGE.iterate(to_backup):
+                await trio.to_thread.run_sync(
+                    zip_file.write,
                     os.path.join(folder, file),
                     file,
                     ZIP_LZMA,
                 )
-                loader.step(AUTO_BACKUP_STAGE)
 
 
 async def save_backup(dialogs: Dialogs) -> None:
@@ -461,10 +457,8 @@ async def save_backup(dialogs: Dialogs) -> None:
         )
         return
 
-    copy_loader.set_length('COPY', len(maps))
-
     with copy_loader:
-        for p2c in maps:
+        async for p2c in LOAD_STAGE.iterate(maps):
             old_zip = p2c.zip_file
             map_path = p2c.filename + '.p2c'
             scr_path = p2c.filename + '.jpg'
@@ -476,7 +470,6 @@ async def save_backup(dialogs: Dialogs) -> None:
             # unaltered.
             with zip_open_bin(old_zip, map_path) as f:
                 new_zip.writestr(map_path, f.read())
-            copy_loader.step('COPY')
 
     new_zip.close()  # Finalize zip
 
@@ -503,9 +496,8 @@ async def restore_maps(dialogs: Dialogs, maps: List[P2C]) -> None:
         LOGGER.warning('No game selected to restore from?')
         return
 
-    copy_loader.set_length('COPY', len(maps))
     with copy_loader:
-        for p2c in maps:
+        async for p2c in LOAD_STAGE.iterate(maps):
             back_zip = p2c.zip_file
             scr_path = p2c.filename + '.jpg'
             map_path = p2c.filename + '.p2c'
@@ -516,12 +508,11 @@ async def restore_maps(dialogs: Dialogs, maps: List[P2C]) -> None:
                     title=TRANS_OVERWRITE_TITLE,
                     message=TRANS_OVERWRITE_GAME.format(mapname=p2c.title),
                 ):
-                    copy_loader.step('COPY')
                     continue
             if scr_path in zip_names(back_zip):
-                    with zip_open_bin(back_zip, scr_path) as src:
-                        with open(abs_scr, 'wb') as dest:
-                            shutil.copyfileobj(src, dest)
+                with zip_open_bin(back_zip, scr_path) as src:
+                    with open(abs_scr, 'wb') as dest:
+                        shutil.copyfileobj(src, dest)
 
             with zip_open_bin(back_zip, map_path) as src:
                 with open(abs_map, 'wb') as dest:
@@ -530,7 +521,6 @@ async def restore_maps(dialogs: Dialogs, maps: List[P2C]) -> None:
             new_item = p2c.copy()
             new_item.zip_file = FakeZip(game_dir)
             BACKUPS['game'].append(new_item)
-            copy_loader.step('COPY')
 
     refresh_game_details()
 
@@ -562,13 +552,13 @@ def show_window() -> None:
     window.lift()
     tk_tools.center_win(window, TK_ROOT)
     # Load our game data!
-    ui_refresh_game()
+    background_run(ui_refresh_game)
     window.update()
     UI['game_details'].refresh()
     UI['back_details'].refresh()
 
 
-def ui_load_backup() -> None:
+async def ui_load_backup() -> None:
     """Prompt and load in a backup file."""
     file = filedialog.askopenfilename(
         title=str(TransToken.ui('Load Backup')),
@@ -589,7 +579,7 @@ def ui_load_backup() -> None:
         compression=ZIP_LZMA,
     )
     try:
-        BACKUPS['back'] = load_backup(zip_file)
+        BACKUPS['back'] = await load_backup(zip_file)
         BACKUPS['backup_zip'] = zip_file
 
         BACKUPS['backup_name'] = os.path.basename(file)
@@ -641,11 +631,11 @@ async def ui_save_backup_as(dialogs: Dialogs) -> None:
     await ui_save_backup(dialogs)
 
 
-def ui_refresh_game() -> None:
+async def ui_refresh_game() -> None:
     """Reload the game maps list."""
     from app import gameMan
     if gameMan.selected_game is not None:
-        load_game(gameMan.selected_game)
+        await load_game(gameMan.selected_game)
 
 
 async def ui_backup_sel(dialogs: Dialogs) -> None:
@@ -727,19 +717,18 @@ async def ui_delete_game(dialog: Dialogs) -> None:
     ):
         return
 
-    deleting_loader.set_length('DELETE', len(to_delete))
     with deleting_loader:
-        for p2c in to_delete:
+        async for p2c in LOAD_STAGE.iterate(to_delete):
             scr_path = p2c.filename + '.jpg'
             map_path = p2c.filename + '.p2c'
             abs_scr = os.path.join(game_dir, scr_path)
             abs_map = os.path.join(game_dir, map_path)
             try:
-                os.remove(abs_scr)
+                await trio.to_thread.run_sync(os.remove, abs_scr)
             except FileNotFoundError:
                 LOGGER.info('{} not present!', abs_scr)
             try:
-                os.remove(abs_map)
+                await trio.to_thread.run_sync(os.remove, abs_map)
             except FileNotFoundError:
                 LOGGER.info('{} not present!', abs_map)
 
@@ -798,7 +787,7 @@ def init(tk_img: TKImages) -> None:
 
     game_refresh = ttk.Button(
         UI['game_title_frame'],
-        command=ui_refresh_game,
+        command=lambda: background_run(ui_refresh_game),
     )
     game_refresh.grid(row=0, column=1, sticky='E')
     add_tooltip(game_refresh, TransToken.ui("Reload the map list."))
@@ -850,7 +839,7 @@ async def init_application() -> None:
 
     file_menu.add_command(command=ui_new_backup)
     set_menu_text(file_menu, TransToken.ui('New Backup'))
-    file_menu.add_command(command=ui_load_backup)
+    file_menu.add_command(command=lambda: background_run(ui_load_backup))
     set_menu_text(file_menu, TransToken.ui('Open Backup'))
     file_menu.add_command(command=lambda: background_run(ui_save_backup, DIALOG))
     set_menu_text(file_menu, TransToken.ui('Save Backup'))
@@ -887,7 +876,7 @@ async def init_application() -> None:
     @gameMan.ON_GAME_CHANGED.register
     async def cback(game: gameMan.Game) -> None:
         """UI.py isn't present, so we use this callback."""
-        load_game(game)
+        await load_game(game)
 
     gameMan.add_menu_opts(game_menu)
 
@@ -980,7 +969,7 @@ def init_toplevel(tk_img: TKImages) -> None:
     ).grid(row=0, column=0)
 
     set_text(
-        ttk.Button(toolbar_frame, command=ui_load_backup),
+        ttk.Button(toolbar_frame, command=lambda: background_run(ui_load_backup)),
         TransToken.ui('Open Backup'),
     ).grid(row=0, column=1)
 

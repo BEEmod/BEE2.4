@@ -12,7 +12,7 @@ import attrs
 import srctools.logger
 import trio
 
-from loadScreen import LoadScreen, ScreenStage
+from loadScreen import ScreenStage
 
 
 # The input parameter for all the steps, which contains all the inputs/outputs.
