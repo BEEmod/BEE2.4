@@ -199,7 +199,7 @@ class P2C:
             title=self.title,
         )
 
-    def make_item(self) -> CheckItem['P2C']:
+    def make_item(self) -> CheckItem[P2C]:
         """Make a corresponding CheckItem object."""
         return CheckItem(
             TransToken.untranslated(self.title),
@@ -229,7 +229,7 @@ class Date:
             return TransToken.untranslated('{date:medium}').format(date=self.date)
 
     # No date = always earlier
-    def __lt__(self, other: 'Date') -> bool:
+    def __lt__(self, other: Date) -> bool:
         if self.date is None:
             return True
         elif other.date is None:
@@ -237,7 +237,7 @@ class Date:
         else:
             return self.date < other.date
 
-    def __gt__(self, other: 'Date') -> bool:
+    def __gt__(self, other: Date) -> bool:
         if self.date is None:
             return False
         elif other.date is None:
@@ -245,13 +245,13 @@ class Date:
         else:
             return self.date > other.date
 
-    def __le__(self, other: 'Date') -> bool:
+    def __le__(self, other: Date) -> bool:
         if self.date is None:
             return other.date is None
         else:
             return self.date <= other.date
 
-    def __ge__(self, other: 'Date') -> bool:
+    def __ge__(self, other: Date) -> bool:
         if self.date is None:
             return other.date is None
         else:

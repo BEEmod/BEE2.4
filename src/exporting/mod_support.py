@@ -10,7 +10,7 @@ from srctools import Keyvalues, Output, VMF, Vec
 from srctools.filesys import File, RawFileSystem, VPKFileSystem
 
 import utils
-from . import ExportData, STEPS, StepResource, STAGE_MUSIC, load_screen as export_screen
+from . import ExportData, STEPS, StepResource, STAGE_MUSIC
 from packages import PackagesSet
 
 if TYPE_CHECKING:

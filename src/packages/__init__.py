@@ -2,9 +2,7 @@
 Handles scanning through the zip packages to find all items, styles, etc.
 """
 from __future__ import annotations
-from typing import (
-    Iterator, Mapping, NoReturn, ClassVar, Optional, TYPE_CHECKING, TypeVar, Type, cast,
-)
+from typing import Iterator, Mapping, NoReturn, ClassVar, Optional, TypeVar, Type, cast
 from typing_extensions import Self
 
 import os

@@ -55,16 +55,10 @@ TRANSLATIONS = {
 }
 
 
-def close_all() -> None:
-    """Hide all loadscreen windows."""
-    for screen in _ALL_SCREENS:
-        screen.reset()
-
-
 def show_main_loader(is_compact: bool) -> None:
     """Special function, which sets the splash screen compactness."""
     _PIPE_MAIN_SEND.send(('set_is_compact', id(main_loader), (is_compact, )))
-    main_loader.show()
+    main_loader._show()
 
 
 def set_force_ontop(ontop: bool) -> None:
@@ -168,7 +162,7 @@ class LoadScreen:
         if self._scope is not None:
             raise ValueError('Cannot re-enter loading screens!')
         self._scope = trio.CancelScope().__enter__()
-        self.show()
+        self._show()
         return self
 
     def __exit__(
@@ -184,9 +178,14 @@ class LoadScreen:
             raise ValueError('Already exited?')
         self._scope = None
         try:
-            self.reset()
+            self.active = False
+            self._send_msg('reset')
+            for stage in self.stages:
+                stage._bound.discard(self)
         finally:
-            return scope.__exit__(exc_type, exc_val, exc_tb)
+            # Always call __exit__(), but only return if reset() didn't raise.
+            res = scope.__exit__(exc_type, exc_val, exc_tb)
+        return res
 
     def _send_msg(self, command: str, *args: Any) -> None:
         """Send a message to the daemon."""
@@ -205,20 +204,13 @@ class LoadScreen:
             else:
                 raise ValueError('Bad command from daemon: ' + repr(command))
 
-    def show(self) -> None:
+    def _show(self) -> None:
         """Display the loading screen."""
         self.active = True
         # Translate and send these across now.
         self._send_msg('show', str(self.title), [str(stage.title) for stage in self.stages])
         for stage in self.stages:
             stage._bound.add(self)
-
-    def reset(self) -> None:
-        """Hide the loading screen and reset all the progress bars."""
-        self.active = False
-        self._send_msg('reset')
-        for stage in self.stages:
-            stage._bound.discard(self)
 
     def destroy(self) -> None:
         """Permanently destroy this screen and cleanup."""

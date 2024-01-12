@@ -16,7 +16,7 @@ import trio
 import user_errors
 import utils
 from app.errors import AppError
-from . import ExportData, STAGE_COMPILER, STAGE_COMP_BACKUP, STEPS, StepResource, load_screen
+from . import ExportData, STAGE_COMPILER, STAGE_COMP_BACKUP, STEPS, StepResource
 from transtoken import TransToken
 
 
