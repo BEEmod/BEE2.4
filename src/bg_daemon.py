@@ -4,13 +4,16 @@ These need to be used while we are busy doing stuff in the main UI loop.
 We do this in another process to sidestep the GIL, and ensure the screen
 remains responsive. This is a separate module to reduce the required dependencies.
 """
+
 from typing import Callable, Dict, List, Optional, Tuple
 from tkinter import ttk
 from tkinter.font import Font, families as tk_font_families
 import tkinter as tk
 import logging
 import multiprocessing.connection
+import queue
 import sys
+import time
 
 from PIL import ImageTk
 
@@ -21,8 +24,8 @@ import utils
 # ID -> screen.
 SCREENS: Dict[int, 'BaseLoadScreen'] = {}
 
-PIPE_REC: multiprocessing.connection.Connection
-PIPE_SEND: multiprocessing.connection.Connection
+QUEUE_REPLY_LOAD: multiprocessing.Queue
+TIMEOUT = 0.125  # New iteration if we take more than this long.
 
 # Stores translated strings, which are done in the main process.
 TRANSLATION = {
@@ -106,7 +109,7 @@ class BaseLoadScreen:
     def cancel(self, event: Optional[tk.Event]=None) -> None:
         """User pressed the cancel button."""
         self.op_reset()
-        PIPE_SEND.send(('cancel', self.scr_id))
+        QUEUE_REPLY_LOAD.put(('cancel', self.scr_id))
 
     def move_start(self, event: tk.Event) -> None:
         """Record offset of mouse on click."""
@@ -602,7 +605,7 @@ class SplashScreen(BaseLoadScreen):
         else:
             self.sml_canvas.grid_remove()
             self.lrg_canvas.grid(row=0, column=0)
-        PIPE_SEND.send(('main_set_compact', is_compact))
+        QUEUE_REPLY_LOAD.put(('main_set_compact', is_compact))
 
     def toggle_compact(self, event: tk.Event) -> None:
         """Toggle when the splash screen is double-clicked."""
@@ -629,10 +632,10 @@ class SplashScreen(BaseLoadScreen):
 
 class LogWindow:
     """Implements the logging window."""
-    def __init__(self, pipe: multiprocessing.connection.Connection) -> None:
+    def __init__(self, queue: multiprocessing.Queue) -> None:
         """Initialise the window."""
         self.win = window = tk.Toplevel(TK_ROOT, name='logWin')
-        self.pipe = pipe
+        self.queue = queue
         window.columnconfigure(0, weight=1)
         window.rowconfigure(0, weight=1)
         window.protocol('WM_DELETE_WINDOW', self.evt_close)
@@ -669,7 +672,7 @@ class LogWindow:
             background='red',
         )
         # If multi-line messages contain carriage returns, lmargin2 doesn't
-        # work. Add an additional tag for that.
+        # work. Add a tag for that.
         self.text.tag_config(
             'INDENT',
             lmargin1=30,
@@ -767,13 +770,13 @@ class LogWindow:
     def evt_set_level(self, event: tk.Event) -> None:
         """Set the level of the log window."""
         level = BOX_LEVELS[self.level_selector.current()]
-        self.pipe.send(('level', level))
+        self.queue.put(('level', level))
 
     def evt_close(self) -> None:
         """Called when the window close button is pressed."""
         try:
-            self.pipe.send(('visible', False))
-        except BrokenPipeError: # Lost connection, completely quit.
+            self.queue.put(('visible', False))
+        except ValueError:  # Lost connection, completely quit.
             TK_ROOT.quit()
         else:
             self.win.withdraw()
@@ -811,30 +814,40 @@ class LogWindow:
 
 
 def run_background(
-    pipe_send: multiprocessing.connection.Connection,
-    pipe_rec: multiprocessing.connection.Connection,
-    log_pipe_send: multiprocessing.connection.Connection,
+    queue_rec_load: multiprocessing.Queue,
+    queue_reply_load: multiprocessing.Queue,
+    queue_rec_log: multiprocessing.Queue,
+    queue_reply_log: multiprocessing.Queue,
     # Pass in various bits of translated text so, we don't need to do it here.
     translations: dict,
 ) -> None:
     """Runs in the other process, with an end of a pipe for input."""
-    global PIPE_REC, PIPE_SEND
-    PIPE_SEND = pipe_send
-    PIPE_REC = pipe_rec
+    global QUEUE_REPLY_LOAD
+    QUEUE_REPLY_LOAD = queue_reply_load
     TRANSLATION.update(translations)
 
     force_ontop = True
 
-    log_window = LogWindow(log_pipe_send)
+    log_window = LogWindow(queue_reply_log)
 
     def check_queue() -> None:
         """Update stages from the parent process."""
         nonlocal force_ontop
         had_values = False
+        cur_time = time.monotonic()
         try:
-            while PIPE_REC.poll():  # Pop off all the values.
+            while True:  # Pop off all the values.
+                try:
+                    operation, scr_id, args = queue_rec_load.get_nowait()
+                except queue.Empty:
+                    break
+                except ValueError:
+                    raise BrokenPipeError
                 had_values = True
-                operation, scr_id, args = PIPE_REC.recv()
+                if time.monotonic() - cur_time > TIMEOUT:
+                    # ensure we do run the logs too if we timeout, but if we don't share the same timeout.
+                    cur_time = time.monotonic()
+                    break
                 if operation == 'init':
                     # Create a new loadscreen.
                     is_main, title, stages = args
@@ -842,7 +855,6 @@ def run_background(
                     SCREENS[scr_id] = screen
                 elif operation == 'quit_daemon':
                     # Shutdown.
-                    log_pipe_send.send('quit')
                     TK_ROOT.quit()
                     return
                 elif operation == 'update_translations':
@@ -854,8 +866,6 @@ def run_background(
                 elif operation == 'set_force_ontop':
                     for screen in SCREENS.values():
                         screen.win.attributes('-topmost', args)
-                elif operation == 'logging':
-                    log_window.handle(args)
                 else:
                     try:
                         func = getattr(SCREENS[scr_id], 'op_' + operation)
@@ -869,6 +879,19 @@ def run_background(
                             raise
                         else:
                             raise TypeError(func) from e
+            while True:  # Pop off all the values.
+                try:
+                    args = queue_rec_log.get_nowait()
+                except queue.Empty:
+                    break
+                except ValueError:
+                    raise BrokenPipeError
+                if time.monotonic() - cur_time > TIMEOUT:
+                    break
+
+                had_values = True
+                log_window.handle(args)
+
         except BrokenPipeError:
             # A pipe failed, means the main app quit. Terminate ourselves.
             print('BG: Lost pipe!')
@@ -876,7 +899,7 @@ def run_background(
             return
 
         # Continually re-run this function in the TK loop.
-        # If we didn't find anything in the pipe, wait longer.
+        # If we didn't find anything in the queues, wait longer.
         # Otherwise, we hog the CPU.
         TK_ROOT.after(1 if had_values else 200, check_queue)
 

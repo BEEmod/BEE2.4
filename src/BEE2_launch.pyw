@@ -13,6 +13,9 @@ if sys.stdin is None:
     sys.stdin = open(os.devnull, 'r')
 
 freeze_support()
+if __name__ == '__main__':
+    # Forking doesn't really work right, stick to spawning a fresh process.
+    set_start_method('spawn')
 
 if sys.platform == "darwin":
     # Disable here, can't get this to work.
@@ -38,9 +41,6 @@ import loadScreen
 import utils
 
 if __name__ == '__main__':
-    # Forking doesn't really work right, stick to spawning a fresh process.
-    set_start_method('spawn')
-
     if len(sys.argv) > 1:
         log_name = app_name = sys.argv[1].lower()
         if app_name not in ('backup', 'compilepane'):

@@ -7,14 +7,17 @@ The id() of the main-process object is used to identify loadscreens.
 """
 from __future__ import annotations
 
+
 from typing import (
     AsyncGenerator, Collection, Generator, MutableSet, Set, Tuple, List, TypeVar,
     Any, Type,
 )
 from types import TracebackType
+from typing_extensions import Literal
 from weakref import WeakSet
 import contextlib
 import multiprocessing
+import queue
 
 import attrs
 import srctools.logger
@@ -29,12 +32,20 @@ import utils
 # Keep a reference to all loading screens, so we can close them globally.
 _ALL_SCREENS: MutableSet[LoadScreen] = WeakSet()
 
-# Pairs of pipe ends we use to send data to the daemon and vice versa.
-# DAEMON is sent over to the other process.
-_PIPE_MAIN_REC, _PIPE_DAEMON_SEND = multiprocessing.Pipe(duplex=False)
-_PIPE_DAEMON_REC, _PIPE_MAIN_SEND = multiprocessing.Pipe(duplex=False)
-# Another specifically for the logging window.
-_PIPE_LOG_MAIN_REC, _PIPE_LOG_DAEMON_SEND = multiprocessing.Pipe(duplex=False)
+# Queues we use to send data to the daemon and vice versa.
+# DAEMON is used for messages from the daemon.
+_QUEUE_SEND_LOAD = multiprocessing.Queue()  # loadscreen -> daemon
+_QUEUE_REPLY_LOAD = multiprocessing.Queue()  # daemon -> loadscreen
+_QUEUE_SEND_LOGGING: multiprocessing.Queue[
+    Tuple[Literal['log'], str, str] |
+    Tuple[Literal['visible'], bool, None] |
+    Tuple[Literal['level'], str | int, None],
+] = multiprocessing.Queue()  # logging -> daemon
+_QUEUE_REPLY_LOGGING: multiprocessing.Queue[
+    Tuple[Literal['level'], str] |
+    Tuple[Literal['visible'], bool] |
+    Tuple[Literal['quit'], None],
+] = multiprocessing.Queue()  # daemon -> logging
 
 T = TypeVar('T')
 
@@ -57,13 +68,13 @@ TRANSLATIONS = {
 
 def show_main_loader(is_compact: bool) -> None:
     """Special function, which sets the splash screen compactness."""
-    _PIPE_MAIN_SEND.send(('set_is_compact', id(main_loader), (is_compact, )))
+    _QUEUE_SEND_LOAD.put(('set_is_compact', id(main_loader), (is_compact, )))
     main_loader._show()
 
 
 def set_force_ontop(ontop: bool) -> None:
     """Set whether screens will be forced on top."""
-    _PIPE_MAIN_SEND.send(('set_force_ontop', None, ontop))
+    _QUEUE_SEND_LOAD.put(('set_force_ontop', None, ontop))
 
 
 @contextlib.contextmanager
@@ -189,11 +200,14 @@ class LoadScreen:
 
     def _send_msg(self, command: str, *args: Any) -> None:
         """Send a message to the daemon."""
-        _PIPE_MAIN_SEND.send((command, id(self), args))
+        _QUEUE_SEND_LOAD.put((command, id(self), args))
         # Check the messages coming back as well.
-        while _PIPE_MAIN_REC.poll():
+        while True:
             arg: Any
-            command, arg = _PIPE_MAIN_REC.recv()
+            try:
+                command, arg = _QUEUE_REPLY_LOAD.get_nowait()
+            except queue.Empty:
+                break
             if command == 'main_set_compact':
                 # Save the compact state to the config.
                 conf = APP.get_cur_conf(GenOptions)
@@ -234,14 +248,18 @@ class LoadScreen:
 def shutdown() -> None:
     """Instruct the daemon process to shut down."""
     try:
-        _PIPE_MAIN_SEND.send(('quit_daemon', None, None))
-    except BrokenPipeError:  # Already quit, don't care.
+        _QUEUE_SEND_LOAD.put(('quit_daemon', None, None))
+        _QUEUE_SEND_LOAD.close()
+        _QUEUE_REPLY_LOAD.close()
+        _QUEUE_SEND_LOGGING.close()
+        _QUEUE_REPLY_LOGGING.close()
+    except (BrokenPipeError, ValueError):  # Already quit, don't care.
         pass
 
 
 def update_translations() -> None:
     """Update the translations."""
-    _PIPE_MAIN_SEND.send((
+    _QUEUE_SEND_LOAD.put((
         'update_translations', 0,
         {key: str(tok) for key, tok in TRANSLATIONS.items()},
     ))
@@ -260,9 +278,7 @@ def start_daemon() -> None:
     _BG_PROC = multiprocessing.Process(
         target=utils.run_bg_daemon,
         args=(
-            _PIPE_DAEMON_SEND,
-            _PIPE_DAEMON_REC,
-            _PIPE_LOG_DAEMON_SEND,
+            _QUEUE_SEND_LOAD, _QUEUE_REPLY_LOAD, _QUEUE_SEND_LOGGING, _QUEUE_REPLY_LOGGING,
             # Convert and pass translation strings.
             {key: str(tok) for key, tok in TRANSLATIONS.items()},
         ),
