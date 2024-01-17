@@ -87,25 +87,69 @@ def _on_menu_destroyed(menu: tk.Menu) -> None:
 TK_ROOT.bind_class('all', '<Destroy>', _on_destroyed, add='+')
 
 
+class TkUser(img.User):
+    """Common methods."""
+    def set_img(self, handle: img.Handle, img: tk.PhotoImage) -> None:
+        """Apply this Tk image to users of it.
+
+        This needs to catch TclError - that can occur if the image
+        has been removed/destroyed, but  the Python object still exists.
+        Ignore, should be cleaned up shortly.
+        """
+
+
 @attrs.define(eq=False)
-class LabelStyleUser(img.User):
+class LabelStyleUser(TkUser):
     """A user for widgets with an 'image' attribute."""
     label: tkImgWidgets
     cur_handle: img.Handle | None
 
+    @override
+    def set_img(self, handle: img.Handle, img: tk.PhotoImage) -> None:
+        """Set the image on the label."""
+        try:
+            self.label['image'] = img
+        except tk.TclError:
+            pass
+
 
 @attrs.define(eq=False)
-class TextWidUser(img.User):
+class TextWidUser(TkUser):
     """A user for Text widgets, which may have multiple images inserted."""
     text: tk.Text
     handle_to_ids: dict[img.Handle, list[str]]
 
+    @override
+    def set_img(self, handle: img.Handle, img: tk.PhotoImage) -> None:
+        """Set this image for text elements using this handle."""
+        try:
+            img_ids = self.handle_to_ids[handle]
+        except KeyError:
+            return
+        for img_id in img_ids:
+            try:
+                self.text.image_configure(img_id, image=img)
+            except tk.TclError:
+                pass
 
 @attrs.define(eq=False)
-class MenuIconUser(img.User):
+class MenuIconUser(TkUser):
     """A user for menus, which may use images for icons."""
     menu: tk.Menu
     handle_to_pos: dict[img.Handle, set[int]]
+
+    @override
+    def set_img(self, handle: img.Handle, img: tk.PhotoImage) -> None:
+        """Set this image for menu options that use this handle."""
+        try:
+            pos_set = self.handle_to_pos[handle]
+        except KeyError:
+            return
+        for pos in pos_set:
+            try:
+                self.menu.entryconfigure(pos, image=img)
+            except tk.TclError:
+                pass
 
 
 class TKImages(img.UIImage):
@@ -233,12 +277,15 @@ class TKImages(img.UIImage):
     def stats(self) -> str:
         """Return some debugging stats."""
         info = [
-            img.stats(),
+            f'{img.stats()}'
             'TK images:\n'
-            f' - Used = {len(self.tk_img)}\n',
+            f' - Used = {len(self.tk_img)}\n'
+            f' - Labels = {len(label_to_user)}\n'
+            f' - Menus = {sum(len(user.handle_to_pos) for user in menu_to_user.values())}\n'
+            f' - Texts = {sum(len(user.handle_to_ids) for user in textwid_to_user.values())}\n'
         ]
         for (x, y), unused in self.unused_img.items():
-            info.append(f' - {x}x{y} = {len(unused)}\n')
+            info.append(f' - Unused {x}x{y} = {len(unused)}\n')
         return ''.join(info)
 
     def _get_img(self, width: int, height: int) -> ImageTk.PhotoImage:
@@ -301,34 +348,8 @@ class TKImages(img.UIImage):
         """Load this handle into the widgets using it."""
         tk_img = self._load_tk(handle, force)
         for user in handle._users:
-            if isinstance(user, LabelStyleUser):
-                try:
-                    user.label['image'] = tk_img
-                except tk.TclError:
-                    # Can occur if the image has been removed/destroyed, but
-                    # the Python object still exists. Ignore, should be
-                    # cleaned up shortly.
-                    pass
-            elif isinstance(user, TextWidUser):
-                try:
-                    img_ids = user.handle_to_ids[handle]
-                except KeyError:
-                    continue
-                for img_id in img_ids:
-                    try:
-                        user.text.image_configure(img_id, image=tk_img)
-                    except tk.TclError:
-                        pass
-            elif isinstance(user, MenuIconUser):
-                try:
-                    pos_set = user.handle_to_pos[handle]
-                except KeyError:
-                    continue
-                for position in pos_set:
-                    try:
-                        user.menu.entryconfigure(position, image=tk_img)
-                    except tk.TclError:
-                        pass
+            if isinstance(user, TkUser):
+                user.set_img(handle, tk_img)
 
     @override
     def ui_force_load(self, handle: img.Handle) -> None:
@@ -338,27 +359,7 @@ class TKImages(img.UIImage):
             False,
         )
         for user in handle._users:
-            if isinstance(user, LabelStyleUser):
-                user.label['image'] = loading
-            elif isinstance(user, TextWidUser):
-                try:
-                    img_ids = user.handle_to_ids[handle]
-                except KeyError:
-                    continue
-                for img_id in img_ids:
-                    try:
-                        user.text.image_configure(img_id, image=loading)
-                    except tk.TclError:
-                        pass
-            elif isinstance(user, MenuIconUser):
-                try:
-                    pos_set = user.handle_to_pos[handle]
-                except KeyError:
-                    continue
-                for position in pos_set:
-                    try:
-                        user.menu.entryconfigure(position, image=loading)
-                    except tk.TclError:
-                        pass
+            if isinstance(user, TkUser):
+                user.set_img(handle, loading)
 
 TK_IMG = TKImages()
