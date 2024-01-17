@@ -22,7 +22,7 @@ import trio.to_thread
 from app.richTextBox import tkRichText
 from app import tkMarkdown, tk_tools, sound, img, TK_ROOT, background_run
 from ui_tk.dialogs import DIALOG
-from ui_tk.img import TKImages
+from ui_tk.img import TKImages, menu_to_user
 from ui_tk.wid_transtoken import set_text, set_win_title, set_menu_text
 from transtoken import TransToken
 import utils
@@ -32,7 +32,6 @@ import PIL
 import platform
 import mistletoe
 import pygtrie
-
 
 
 class ResIcon(Enum):
@@ -54,6 +53,13 @@ class WebResource:
     url_key: str
     icon: ResIcon
 
+
+ICONS: Dict[ResIcon, img.Handle] = {
+    icon: img.Handle.sprite(f'icons/{icon.value}', 16, 16)
+    for icon in ResIcon
+    if icon is not ResIcon.NONE
+}
+ICONS[ResIcon.NONE] = img.Handle.blank(16, 16)
 
 LOGGER = srctools.logger.get_logger(__name__)
 DB_LOCATION = 'https://raw.githubusercontent.com/BEEmod/BEE2.4/master/help_urls.dmx'
@@ -557,13 +563,6 @@ def make_help_menu(parent: tk.Menu, tk_img: TKImages) -> None:
     parent.add_cascade(menu=help_menu)
     set_menu_text(parent, TransToken.ui('Help'))
 
-    icons: Dict[ResIcon, img.Handle] = {
-        icon: img.Handle.sprite('icons/' + icon.value, 16, 16)
-        for icon in ResIcon
-        if icon is not ResIcon.NONE
-    }
-    icons[ResIcon.NONE] = img.Handle.blank(16, 16)
-
     credit_window = Dialog(name='credits', title=TransToken.ui('BEE2 Credits'), text=CREDITS_TEXT)
 
     for res in WEB_RESOURCES:
@@ -573,8 +572,8 @@ def make_help_menu(parent: tk.Menu, tk_img: TKImages) -> None:
             help_menu.add_command(
                 command=functools.partial(background_run, open_url, res.url_key),
                 compound='left',
-                image=tk_img.sync_load(icons[res.icon]),
             )
+            tk_img.menu_set_icon(help_menu, utils.not_none(help_menu.index('end')), ICONS[res.icon])
             set_menu_text(help_menu, res.name)
 
     help_menu.add_separator()

@@ -26,6 +26,7 @@ tkImg: TypeAlias = Union[ImageTk.PhotoImage, tk.PhotoImage]
 LOGGER = get_logger(__name__)
 label_to_user: dict[tkImgWidgets, LabelStyleUser] = {}
 textwid_to_user: dict[tk.Text, TextWidUser] = {}
+menu_to_user: dict[tk.Menu, MenuIconUser] = {}
 
 
 def get_app_icon(path: str) -> ImageTk.PhotoImage:
@@ -39,6 +40,10 @@ def _on_destroyed(e: tk.Event[tk.Misc]) -> None:
     if isinstance(e.widget, tk.Text):
         _on_textwid_destroyed(e.widget)
         return
+    elif isinstance(e.widget, tk.Menu):
+        _on_menu_destroyed(e.widget)
+        return
+
     user = label_to_user.pop(e.widget, None)  # type: ignore
     if user is None:
         # It's not got an image.
@@ -62,6 +67,22 @@ def _on_textwid_destroyed(textwid: tk.Text) -> None:
         user.handle_to_ids.clear()
         del user.text  # Remove a GC cycle for easier cleanup.
 
+
+def _on_menu_destroyed(menu: tk.Menu) -> None:
+    """When text widgets are destroyed, clean up their user."""
+    try:
+        user = menu_to_user.pop(menu)
+    except (KeyError, TypeError, NameError):
+        # Interpreter could be shutting down and deleted globals, or we were
+        # called twice, etc. Just ignore.
+        pass
+    else:
+        for handle in user.handle_to_pos:
+            handle._decref(user)
+        user.handle_to_pos.clear()
+        del user.menu  # Remove a GC cycle for easier cleanup.
+
+
 # When any widget is destroyed, notify us to allow clean-up.
 TK_ROOT.bind_class('all', '<Destroy>', _on_destroyed, add='+')
 
@@ -78,6 +99,13 @@ class TextWidUser(img.User):
     """A user for Text widgets, which may have multiple images inserted."""
     text: tk.Text
     handle_to_ids: dict[img.Handle, list[str]]
+
+
+@attrs.define(eq=False)
+class MenuIconUser(img.User):
+    """A user for menus, which may use images for icons."""
+    menu: tk.Menu
+    handle_to_pos: dict[img.Handle, set[int]]
 
 
 class TKImages(img.UIImage):
@@ -138,6 +166,37 @@ class TKImages(img.UIImage):
             loading = image._request_load()
             widget['image'] = self._load_tk(loading, False)
         return widget
+
+    def menu_set_icon(self, menu: tk.Menu, index: int, image: img.Handle | None) -> None:
+        """Set the icon used by a menu option at the specified location."""
+        try:
+            user = menu_to_user[menu]
+        except KeyError:
+            # No user yet, create + bind.
+            user = menu_to_user[menu] = MenuIconUser(menu, {})
+        try:
+            pos_set = user.handle_to_pos[image]
+        except KeyError:  # First time this is added to this widget.
+            pos_set = user.handle_to_pos[image] = {index}
+            image._incref(user)
+        else:
+            pos_set.add(index)
+        try:
+            tk_img = self.tk_img[image]
+        except KeyError:  # Need to load.
+            loading = image._request_load()
+            tk_img = self._load_tk(loading, False)
+
+        menu.entryconfigure(index, image=tk_img)
+
+    def menu_clear(self, menu: tk.Menu) -> None:
+        """Remove all added icons from this menu, freeing resources."""
+        try:
+            user = menu_to_user.pop(menu)
+        except KeyError:
+            return  # Not used at all, don't care.
+        for handle in user.handle_to_pos:
+            handle._decref(user)
 
     def textwid_add(self, textwid: tk.Text, index: str, image: img.Handle) -> str:
         """Add an image to a tkinter.Text widget, at the specified location."""
@@ -260,6 +319,16 @@ class TKImages(img.UIImage):
                         user.text.image_configure(img_id, image=tk_img)
                     except tk.TclError:
                         pass
+            elif isinstance(user, MenuIconUser):
+                try:
+                    pos_set = user.handle_to_pos[handle]
+                except KeyError:
+                    continue
+                for position in pos_set:
+                    try:
+                        user.menu.entryconfigure(position, image=tk_img)
+                    except tk.TclError:
+                        pass
 
     @override
     def ui_force_load(self, handle: img.Handle) -> None:
@@ -271,5 +340,25 @@ class TKImages(img.UIImage):
         for user in handle._users:
             if isinstance(user, LabelStyleUser):
                 user.label['image'] = loading
+            elif isinstance(user, TextWidUser):
+                try:
+                    img_ids = user.handle_to_ids[handle]
+                except KeyError:
+                    continue
+                for img_id in img_ids:
+                    try:
+                        user.text.image_configure(img_id, image=loading)
+                    except tk.TclError:
+                        pass
+            elif isinstance(user, MenuIconUser):
+                try:
+                    pos_set = user.handle_to_pos[handle]
+                except KeyError:
+                    continue
+                for position in pos_set:
+                    try:
+                        user.menu.entryconfigure(position, image=loading)
+                    except tk.TclError:
+                        pass
 
 TK_IMG = TKImages()
