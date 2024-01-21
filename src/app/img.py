@@ -17,7 +17,7 @@ import itertools
 import logging
 import weakref
 
-from PIL import Image, ImageColor, ImageDraw, ImageFont, ImageTk
+from PIL import Image, ImageColor, ImageDraw, ImageFont
 from srctools import Keyvalues, Vec
 from srctools.filesys import FileSystem, FileSystemChain, RawFileSystem
 from srctools.vtf import VTF, VTFFlags
@@ -226,7 +226,6 @@ class Handle(User):
     height: int
 
     _cached_pil: Image.Image | None = attrs.field(init=False, default=None, repr=False)
-    _cached_tk: ImageTk.PhotoImage | None = attrs.field(init=False, default=None, repr=False)
 
     _users: set[User] = attrs.field(init=False, factory=set, repr=False)
     # If set, get_tk()/get_pil() was used.
@@ -566,7 +565,7 @@ class Handle(User):
             child._decref(self)
         if _load_nursery is None:
             return  # Not loaded, can't unload.
-        if not self._users and (self._cached_tk is not None or self._cached_pil is not None):
+        if not self._users and self._cached_pil is not None:
             # Schedule this handle to be cleaned up.
             self._schedule_cleanup()
 
