@@ -89,7 +89,7 @@ TK_ROOT.bind_class('all', '<Destroy>', _on_destroyed, add='+')
 
 class TkUser(img.User):
     """Common methods."""
-    def set_img(self, handle: img.Handle, img: tk.PhotoImage) -> None:
+    def set_img(self, handle: img.Handle, image: tkImg) -> None:
         """Apply this Tk image to users of it.
 
         This needs to catch TclError - that can occur if the image
@@ -105,10 +105,10 @@ class LabelStyleUser(TkUser):
     cur_handle: img.Handle | None
 
     @override
-    def set_img(self, handle: img.Handle, img: tk.PhotoImage) -> None:
+    def set_img(self, handle: img.Handle, image: tkImg) -> None:
         """Set the image on the label."""
         try:
-            self.label['image'] = img
+            self.label['image'] = image
         except tk.TclError:
             pass
 
@@ -120,7 +120,7 @@ class TextWidUser(TkUser):
     handle_to_ids: dict[img.Handle, list[str]]
 
     @override
-    def set_img(self, handle: img.Handle, img: tk.PhotoImage) -> None:
+    def set_img(self, handle: img.Handle, image: tkImg) -> None:
         """Set this image for text elements using this handle."""
         try:
             img_ids = self.handle_to_ids[handle]
@@ -128,7 +128,7 @@ class TextWidUser(TkUser):
             return
         for img_id in img_ids:
             try:
-                self.text.image_configure(img_id, image=img)
+                self.text.image_configure(img_id, image=image)
             except tk.TclError:
                 pass
 
@@ -139,7 +139,7 @@ class MenuIconUser(TkUser):
     handle_to_pos: dict[img.Handle, set[int]]
 
     @override
-    def set_img(self, handle: img.Handle, img: tk.PhotoImage) -> None:
+    def set_img(self, handle: img.Handle, image: tkImg) -> None:
         """Set this image for menu options that use this handle."""
         try:
             pos_set = self.handle_to_pos[handle]
@@ -147,7 +147,7 @@ class MenuIconUser(TkUser):
             return
         for pos in pos_set:
             try:
-                self.menu.entryconfigure(pos, image=img)
+                self.menu.entryconfigure(pos, image=image)
             except tk.TclError:
                 pass
 
@@ -211,7 +211,7 @@ class TKImages(img.UIImage):
             widget['image'] = self._load_tk(loading, False)
         return widget
 
-    def menu_set_icon(self, menu: tk.Menu, index: int, image: img.Handle | None) -> None:
+    def menu_set_icon(self, menu: tk.Menu, index: int, image: img.Handle) -> None:
         """Set the icon used by a menu option at the specified location."""
         try:
             user = menu_to_user[menu]
