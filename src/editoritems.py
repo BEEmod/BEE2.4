@@ -1959,6 +1959,7 @@ class Item:
 
         self.properties = {prop.kind.id.casefold(): prop for prop in props}
         self.antline_points = dict(zip(ConnSide, antline_points))
+        self._has_collisions_block = False
 
     def validate(self) -> None:
         """Look through the item and check for potential mistakes in configuration."""
