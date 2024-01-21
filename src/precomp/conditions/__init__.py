@@ -52,7 +52,8 @@ from srctools.math import FrozenAngle, Vec, FrozenVec, AnyAngle, AnyMatrix, Angl
 from srctools.vmf import EntityGroup, VMF, Entity, Output, Solid, ValidKVs
 from srctools import Keyvalues
 
-from precomp import instanceLocs, rand, collisions
+from precomp import instanceLocs, rand
+from precomp.collisions import Collisions
 from precomp.corridor import Info as MapInfo
 import consts
 import utils
@@ -244,7 +245,7 @@ class Condition:
         )
 
     @staticmethod
-    def test_result(coll: collisions.Collisions, info: MapInfo, inst: Entity, res: Keyvalues) -> bool | object:
+    def test_result(coll: Collisions, info: MapInfo, inst: Entity, res: Keyvalues) -> bool | object:
         """Execute the given result."""
         try:
             cond_call = RESULT_LOOKUP[res.name]
@@ -260,7 +261,7 @@ class Condition:
         else:
             return cond_call(coll, info, inst, res)
 
-    def test(self, coll: collisions.Collisions, info: MapInfo, inst: Entity) -> None:
+    def test(self, coll: Collisions, info: MapInfo, inst: Entity) -> None:
         """Try to satisfy this condition on the given instance.
 
         If we find that no instance will succeed, raise Unsatisfiable.
@@ -354,7 +355,7 @@ def annotation_caller(
     ]
 
     # For forward references and 3.7+ stringified arguments.
-    # Remove 'return' temporarily so we don't parse that, since we don't care.
+    # Since we don't care about the return value, temporarily remove it so it isn't parsed.
     ann_dict = getattr(func, '__annotations__', None)
     if ann_dict is not None:
         return_val = ann_dict.pop('return', allowed_kinds)  # Sentinel
@@ -501,10 +502,10 @@ class CondCall(Generic[CallResultT]):
         self.group = group
         cback, arg_order = annotation_caller(
             func,
-            srctools.VMF, collisions.Collisions, MapInfo, Entity, Keyvalues,
+            srctools.VMF, Collisions, MapInfo, Entity, Keyvalues,
         )
         self._cback: Callable[
-            [srctools.VMF, collisions.Collisions, MapInfo, Entity, Keyvalues],
+            [srctools.VMF, Collisions, MapInfo, Entity, Keyvalues],
             CallResultT | Callable[[Entity], CallResultT],
         ] = cback
         if Entity not in arg_order:
@@ -521,7 +522,7 @@ class CondCall(Generic[CallResultT]):
     def __doc__(self, value: str) -> None:
         self.func.__doc__ = value
 
-    def __call__(self, coll: collisions.Collisions, info: MapInfo, ent: Entity, conf: Keyvalues) -> CallResultT:
+    def __call__(self, coll: Collisions, info: MapInfo, ent: Entity, conf: Keyvalues) -> CallResultT:
         """Execute the callback."""
         if self._setup_data is None:
             return self._cback(ent.map, coll, info, ent, conf)  # type: ignore
@@ -690,7 +691,7 @@ def add(kv_block: Keyvalues) -> None:
         conditions.append(con)
 
 
-def check_all(vmf: VMF, coll: collisions.Collisions, info: MapInfo) -> None:
+def check_all(vmf: VMF, coll: Collisions, info: MapInfo) -> None:
     """Check all conditions."""
     ALL_INST.update({
         inst['file'].casefold()
@@ -779,7 +780,7 @@ def check_all(vmf: VMF, coll: collisions.Collisions, info: MapInfo) -> None:
 
 def check_test(
     test: Keyvalues,
-    coll: collisions.Collisions, info: MapInfo,
+    coll: Collisions, info: MapInfo,
     inst: Entity, can_skip: bool = False,
 ) -> bool:
     """Determine the result for a condition test.
@@ -833,11 +834,19 @@ def import_conditions() -> None:
 
     # If not frozen, check none are missing.
     if not utils.FROZEN:
-        ns = set(locals())
+        import builtins
+        from types import ModuleType
+        ns = builtins.globals()
         # Verify none are missing.
-        for module in pkgutil.iter_modules(__path__, 'precomp.conditions.'):
-            stem = module.name.rsplit('.', 1)[-1]
-            assert stem in ns, module
+        for mod_info in pkgutil.iter_modules(__path__, 'precomp.conditions.'):
+            stem = mod_info.name.rsplit('.', 1)[-1]
+            try:
+                found = ns[stem]
+            except KeyError as exc:
+                raise Exception(mod_info) from exc
+            # Verify that we didn't shadow the import by importing in this __init__ module.
+            if not isinstance(found, ModuleType) or found.__name__ != mod_info.name:
+                raise Exception(mod_info, found)
     LOGGER.info('Imported all conditions modules!')
 
 DOC_MARKER = '''<!-- Only edit above this line. This is generated from text in the compiler code. -->'''
@@ -1308,7 +1317,7 @@ def res_timed_relay(vmf: VMF, res: Keyvalues) -> Callable[[Entity], None]:
 
 
 @make_result('condition')
-def res_sub_condition(coll: collisions.Collisions, info: MapInfo, res: Keyvalues) -> ResultCallable:
+def res_sub_condition(coll: Collisions, info: MapInfo, res: Keyvalues) -> ResultCallable:
     """Check a different condition if the outer block is true."""
     cond = Condition.parse(res, toplevel=False)
 
@@ -1340,7 +1349,7 @@ def res_end_condition() -> None:
 
 
 @make_result('switch')
-def res_switch(coll: collisions.Collisions, info: MapInfo, res: Keyvalues) -> ResultCallable:
+def res_switch(coll: Collisions, info: MapInfo, res: Keyvalues) -> ResultCallable:
     """Run the same test multiple times with different arguments.
 
     * `method` is the way the search is done - `first`, `last`, `random`, or `all`.
