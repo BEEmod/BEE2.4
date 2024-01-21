@@ -1,5 +1,6 @@
 """Generate a VPK, to override editor resources."""
 from __future__ import annotations
+
 from typing import Dict, Iterator, Optional, TYPE_CHECKING
 
 from pathlib import Path
@@ -7,6 +8,7 @@ import itertools
 import os
 import re
 import shutil
+import struct
 
 import trio
 from srctools import VPK, logger
@@ -36,6 +38,10 @@ Either add regular files, or put VPKs (any name) in the root to have them be rep
 TRANS_NO_PERMS = TransToken.ui(
     'VPK files were not exported, quit Portal 2 and Hammer to ensure '
     'editor wall previews are changed.'
+)
+TRANS_VPK_IO_ERROR = TransToken.ui(
+    'The VPK "{filename}" could not be parsed. If this was made by BEE, delete it, otherwise check '
+    'if it is corrupt.'
 )
 
 
@@ -99,7 +105,11 @@ async def find_folder(game: Game) -> Path:
     # will be ready.
     async def worker(filename: Path, event: trio.Event) -> None:
         """Parsing VPKs are expensive, do multiple concurrently."""
-        vpk = await trio.to_thread.run_sync(VPK, filename, abandon_on_cancel=True)
+        try:
+            vpk = await trio.to_thread.run_sync(VPK, filename, abandon_on_cancel=True)
+        except (ValueError, struct.error) as exc:
+            LOGGER.exception('Could not parse VPK {}:', filename, exc_info=exc)
+            raise AppError(TRANS_VPK_IO_ERROR.format(filename=str(filename))) from exc
         results[filename] = MARKER_FILENAME in vpk
         event.set()
 
