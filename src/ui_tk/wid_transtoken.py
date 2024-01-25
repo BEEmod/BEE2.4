@@ -34,7 +34,10 @@ _window_titles: WeakKeyDictionary[tk.Wm, TransToken] = WeakKeyDictionary()
 def set_text(widget: TextWidgetT, token: TransToken) -> TextWidgetT:
     """Apply a token to the specified label/button/etc."""
     widget['text'] = str(token)
-    _applied_text_tokens[widget] = token
+    if token.is_untranslated:  # No need to have a callback for this one.
+        _applied_text_tokens.pop(widget, None)
+    else:
+        _applied_text_tokens[widget] = token
     return widget
 
 
