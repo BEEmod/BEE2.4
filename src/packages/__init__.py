@@ -22,7 +22,7 @@ from srctools import Keyvalues, NoKeyError
 from srctools.tokenizer import TokenSyntaxError
 from srctools.filesys import FileSystem, RawFileSystem, ZipFileSystem, VPKFileSystem
 
-from app.dialogs import Dialogs
+from app.errors import AppError, ErrorUI
 from editoritems import Item as EditorItem, Renderable, RenderableType
 from corridor import CORRIDOR_COUNTS, GameMode, Direction
 from loadScreen import MAIN_PAK as LOAD_PAK, MAIN_OBJ as LOAD_OBJ
@@ -507,37 +507,10 @@ async def find_packages(nursery: trio.Nursery, packset: PackagesSet, pak_dir: Pa
         LOGGER.info('No packages in folder {}!', pak_dir)
 
 
-async def no_packages_err(dialog: Dialogs, pak_dirs: list[Path], msg: TransToken) -> NoReturn:
-    """Show an error message indicating no packages are present."""
-    import sys
-    # We don't have a package directory!
-    if len(pak_dirs) == 1:
-        trailer = TransToken.untranslated(str((os.getcwd() / pak_dirs[0]).resolve()))
-    else:
-        trailer = TransToken.ui(
-            'one of the following locations:\n{loc}'
-        ).format(loc='\n'.join(
-            f' - {(os.getcwd() / fold).resolve()}'
-            for fold in pak_dirs
-        ))
-    message = TransToken.ui(
-        '{msg}\nGet the packages from "https://github.com/BEEmod/BEE2-items" '
-        'and place them in {trailer}'
-    ).format(msg=msg, trailer=trailer)
-
-    LOGGER.error(message)
-    await dialog.show_info(
-        title=TransToken.ui('BEE2 - Invalid Packages Directory!'),
-        message=message,
-        icon=dialog.ERROR,
-    )
-    sys.exit()
-
-
 async def load_packages(
     packset: PackagesSet,
     pak_dirs: list[Path],
-    dialog: Dialogs,
+    errors: ErrorUI,
 ) -> None:
     """Scan and read in all packages."""
     async with trio.open_nursery() as find_nurs:
@@ -547,14 +520,30 @@ async def load_packages(
     pack_count = len(packset.packages)
     await LOAD_PAK.set_length(pack_count)
 
-    if pack_count == 0:
-        await no_packages_err(dialog, pak_dirs, TransToken.ui('No packages found!'))
-
     # We must have the clean style package.
     if CLEAN_PACKAGE not in packset.packages:
-        await no_packages_err(dialog, pak_dirs, TransToken.ui(
-            'No Clean Style package! This is required for some essential resources and objects.'
-        ))
+        if pack_count == 0:  # None at all
+            message = TransToken.ui('No packages found!')
+        else:
+            message = TransToken.ui(
+                'No Clean Style package! '
+                'This is required for some essential resources and objects.'
+            )
+
+        if len(pak_dirs) == 1:
+            trailer = TransToken.untranslated(str((os.getcwd() / pak_dirs[0]).resolve()))
+        else:
+            trailer = TransToken.ui(
+                'one of the following locations:\n{loc}'
+            ).format(loc='\n'.join(
+                f' - {(os.getcwd() / fold).resolve()}'
+                for fold in pak_dirs
+            ))
+        raise AppError(TransToken.ui(
+            '{msg}\n'
+            'Get the packages from "https://github.com/BEEmod/BEE2-items" '
+            'and place them in {trailer}'
+        ).format(msg=message, trailer=trailer))
 
     # Ensure all objects are in the dicts.
     for obj_type in OBJ_TYPES.values():

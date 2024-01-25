@@ -5,19 +5,20 @@ import config
 import loadScreen
 import packages
 from app import background_run, img, sound
+from app.errors import ErrorUI
 
 from ui_tk.corridor_selector import TkSelector
-from ui_tk.dialogs import DIALOG
 from ui_tk.img import TK_IMG
 
 
 async def test() -> None:
     config.APP.read_file()
-    await packages.load_packages(
-        packages.get_loaded_packages(),
-        list(BEE2_config.get_package_locs()),
-        DIALOG,
-    )
+    async with ErrorUI() as errors:
+        await packages.load_packages(
+            packages.get_loaded_packages(),
+            list(BEE2_config.get_package_locs()),
+            errors,
+        )
     background_run(img.init, packages.PACKAGE_SYS, TK_IMG)
     background_run(sound.sound_task)
     loadScreen.main_loader.destroy()

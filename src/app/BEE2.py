@@ -12,11 +12,13 @@ from app import (
     TK_ROOT, localisation, sound, img, gameMan, music_conf,
     UI, logWindow,
 )
+from transtoken import TransToken
 from ui_tk.dialogs import DIALOG
 from ui_tk.errors import display_errors
 from config.gen_opts import GenOptions
 from config.last_sel import LastSelected
 from exporting import mod_support
+from app.errors import ErrorUI, Result as ErrorResult
 import config
 import app
 import loadScreen
@@ -60,13 +62,21 @@ async def init_app() -> None:
     LOGGER.info('Loading Packages...')
     packset = packages.get_loaded_packages()
     mod_support.scan_music_locs(packset, gameMan.all_games)
-    async with trio.open_nursery() as nurs:
+    async with ErrorUI(
+        error_desc=TransToken.ui_plural(
+            'An error occurred when loading packages:',
+            'Multiple errors occurred when loading packages:',
+        ),
+        warn_desc=TransToken.ui('Loading packages was partially successful:'),
+    ) as error_ui, trio.open_nursery() as nurs:
         nurs.start_soon(
             packages.load_packages,
             packset,
             list(BEE2_config.get_package_locs()),
-            DIALOG,
+            error_ui,
         )
+    if error_ui.result is ErrorResult.FAILED:
+        return
     package_sys = packages.PACKAGE_SYS
     await loadScreen.MAIN_UI.step('pre_ui')
     from ui_tk.img import TK_IMG
