@@ -250,10 +250,14 @@ class TransToken:
         text = self._convert_token()
         if self.parameters:
             formatter = ui_format_getter(CURRENT_LANG.lang_code)
-            if formatter is not None:
-                return formatter.vformat(text, (), self.parameters)
-            else:
-                return text.format_map(self.parameters)
+            try:
+                if formatter is not None:
+                    return formatter.vformat(text, (), self.parameters)
+                else:
+                    return text.format_map(self.parameters)
+            except KeyError:
+                LOGGER.warning('Could not format {!r} with {}', text, self.parameters)
+                return text
         else:
             return text
 
