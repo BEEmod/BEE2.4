@@ -129,12 +129,16 @@ class ErrorUI:
             return Result.PARTIAL
         return Result.SUCCEEDED
 
-    def add(self, error: WarningExc) -> None:
-        """Log an error having occurred, while still running code.
+    def add(self, error: WarningExc | TransToken) -> None:
+        """Log an error having occurred, while still continuing to run.
 
+        The result will be PARTIAL at best.
         If an exception group is passed, this will extract the AppErrors, reraising others.
+        A TransToken can be supplied for convenience, which is wrapped in an AppError.
         """
-        if isinstance(error, AppError):
+        if isinstance(error, TransToken):
+            self._errors.append(AppError(error))
+        elif isinstance(error, AppError):
             self._errors.append(error)
         else:
             matching, rest = error.split(AppError)
@@ -199,6 +203,6 @@ class ErrorUI:
                     desc,
                     "\n".join([str(err.message) for err in self._errors]),
                 )
-                # Use class, do not pass self!
+                # This is a class-level callable, do not pass self.
                 await ErrorUI._handler(self.title, desc, self._errors)
         return True
