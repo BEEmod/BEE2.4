@@ -7,6 +7,7 @@ import trio
 
 from app import TK_ROOT, background_run, img, sound
 from app.dragdrop import DragInfo, Slot
+from app.errors import ErrorUI
 from event import Event
 from transtoken import TransToken
 from ui_tk.dragdrop import DragDrop
@@ -25,11 +26,12 @@ async def test() -> None:
 
     # Setup images to read from packages.
     print('Loading packages for images...')
-    async with trio.open_nursery() as pack_nursery:
+    async with ErrorUI() as errors, trio.open_nursery() as pack_nursery:
         for loc in BEE2_config.get_package_locs():
             pack_nursery.start_soon(
                 packages.find_packages,
                 pack_nursery,
+                errors,
                 packages.get_loaded_packages(),
                 loc,
             )

@@ -54,6 +54,46 @@ OBJ_TYPES: dict[str, Type[PakObject]] = {}
 PACKAGE_SYS: dict[str, FileSystem] = {}
 PACK_CONFIG = ConfigFile('packages.cfg')
 
+TRANS_AP_TAG = TransToken.ui('Aperture Tag')
+TRANS_MEL = TransToken.ui('Portal Stories: Mel')
+TRANS_MISSING_PAK_DIR = TransToken.ui(
+    'Package directory does not exist: {path}'
+)
+TRANS_EMPTY_PAK_DIR = TransToken.ui(
+    'Package directory did not contain any packages: {path}'
+)
+TRANS_INVALID_PAK_NO_INFO = TransToken.ui(
+    'Potential package file has no info.txt: {path}'
+)
+TRANS_INVALID_PAK_NO_ID = TransToken.ui(
+    'Package has no ID defined: {path}'
+)
+TRANS_MISSING_REQUIRED_GAME = TransToken.ui(
+    'Package "{pak_id}" could not be enabled - {req} is not installed.',
+)
+TRANS_MISSING_REQUIRED_PACK = TransToken.ui(
+    'Package "{pak_id}" could not be enabled - required package "{req}" not installed.',
+)
+TRANS_UNKNOWN_OBJ_TYPE = TransToken.ui(
+    'Unknown object type "{obj_type}" with ID "{obj_id}" in package "{pak_id}"!'
+)
+TRANS_OLD_TEMPLATEBRUSH = TransToken.ui(
+    'TemplateBrush "{id}" in package "{pak_id}" no longer needs to be defined in info.txt. '
+    'Use a bee2_template_conf entity instead.'
+)
+TRANS_NO_OBJ_ID = TransToken.ui(
+    'No ID defined for "{obj_type}" object type in "{pak_id}" package!'
+)
+TRANS_DUPLICATE_PAK_ID = TransToken.ui(
+    'Duplicate package with id "{pak_id}"!\n'
+    'If you just updated the mod, delete any old files in packages/.\n'
+    'Package 1: {path1}\n'
+    'Package 2: {path2}'
+)
+TRANS_DUPLICATE_OBJ_ID = TransToken.ui(
+    'The ID "{obj_id}" was used twice for a {obj_type} in the packages "{pak1}" and "{pak2}"!'
+)
+
 
 @attrs.define
 class SelitemData:
@@ -437,13 +477,16 @@ def get_loaded_packages() -> PackagesSet:
 _LOADED = PackagesSet()
 
 
-async def find_packages(nursery: trio.Nursery, packset: PackagesSet, pak_dir: Path) -> None:
+async def find_packages(
+    nursery: trio.Nursery, errors: ErrorUI, packset: PackagesSet,
+    pak_dir: Path,
+) -> None:
     """Search a folder for packages, recursing if necessary."""
     found_pak = False
     try:
         contents = list(pak_dir.iterdir())
     except FileNotFoundError:
-        LOGGER.warning('Package search location "{}" does not exist!', pak_dir)
+        errors.add(TRANS_MISSING_PAK_DIR.format(path=pak_dir))
         return
 
     for name in contents:  # Both files and dirs
@@ -474,24 +517,24 @@ async def find_packages(nursery: trio.Nursery, packset: PackagesSet, pak_dir: Pa
             if name.is_dir():
                 # This isn't a package, so check the subfolders too...
                 LOGGER.debug('Checking subdir "{}" for packages...', name)
-                nursery.start_soon(find_packages, nursery, packset, name)
+                nursery.start_soon(find_packages, nursery, errors, packset, name)
             else:
-                LOGGER.warning('ERROR: package "{}" has no info.txt!', name)
+                errors.add(TRANS_INVALID_PAK_NO_INFO.format(path=name))
             # Don't continue to parse this "package"
             continue
         try:
             pak_id = info['ID']
         except LookupError:
-            raise ValueError('No package ID in {}/info.txt!', filesys.path) from None
+            errors.add(TRANS_INVALID_PAK_NO_ID.format(path=Path(filesys.path, 'info.txt')))
+            continue  # Skip this.
 
         if pak_id.casefold() in packset.packages:
             duplicate = packset.packages[pak_id.casefold()]
-            raise ValueError(
-                f'Duplicate package with id "{pak_id}"!\n'
-                'If you just updated the mod, delete any old files in packages/.\n'
-                f'Package 1: {duplicate.fsys.path}\n'
-                f'Package 2: {filesys.path}'
-            )
+            raise AppError(TRANS_DUPLICATE_PAK_ID.format(
+                pak_id=pak_id,
+                path1=duplicate.fsys.path,
+                path2=filesys.path,
+            ))
 
         PACKAGE_SYS[pak_id.casefold()] = filesys
 
@@ -504,7 +547,7 @@ async def find_packages(nursery: trio.Nursery, packset: PackagesSet, pak_dir: Pa
         found_pak = True
 
     if not found_pak:
-        LOGGER.info('No packages in folder {}!', pak_dir)
+        errors.add(TRANS_EMPTY_PAK_DIR.format(path=pak_dir))
 
 
 async def load_packages(
@@ -515,7 +558,7 @@ async def load_packages(
     """Scan and read in all packages."""
     async with trio.open_nursery() as find_nurs:
         for pak_dir in pak_dirs:
-            find_nurs.start_soon(find_packages, find_nurs, packset, pak_dir)
+            find_nurs.start_soon(find_packages, find_nurs, errors, packset, pak_dir)
 
     pack_count = len(packset.packages)
     await LOAD_PAK.set_length(pack_count)
@@ -558,7 +601,7 @@ async def load_packages(
                 await LOAD_PAK.set_length(pack_count)
                 continue
 
-            nursery.start_soon(parse_package, nursery, packset, pack)
+            nursery.start_soon(parse_package, nursery, errors, packset, pack)
         LOGGER.debug('Submitted packages.')
 
     LOGGER.debug('Parsed packages, now parsing objects.')
@@ -610,6 +653,7 @@ async def parse_type(packset: PackagesSet, obj_class: Type[PakT], objs: Iterable
 
 async def parse_package(
     nursery: trio.Nursery,
+    errors: ErrorUI,
     packset: PackagesSet,
     pack: Package,
 ) -> None:
@@ -619,15 +663,14 @@ async def parse_package(
         # Special case - disable these packages when the music isn't copied.
         if pre.value == '<TAG_MUSIC>':
             if not packset.has_tag_music:
+                errors.add(TRANS_MISSING_REQUIRED_GAME.format(pak_id=pack.id, req=TRANS_AP_TAG))
                 return
         elif pre.value == '<MEL_MUSIC>':
             if not packset.has_mel_music:
+                errors.add(TRANS_MISSING_REQUIRED_GAME.format(pak_id=pack.id, req=TRANS_MEL))
                 return
         elif pre.value.casefold() not in packset.packages:
-            LOGGER.warning(
-                'Package "{}" required for "{}" - ignoring package!',
-                pre.value,  pack.id,
-            )
+            errors.add(TRANS_MISSING_REQUIRED_PACK.format(pak_id=pack.id, req=pre.value))
             return
 
     desc: list[str] = []
@@ -648,34 +691,34 @@ async def parse_package(
             continue
 
         if obj.name in ('templatebrush', 'brushtemplate'):
-            LOGGER.warning(
-                'TemplateBrush {} no longer needs to be defined in info.txt',
-                obj['id', '<NO ID>'],
-            )
+            errors.add(TRANS_OLD_TEMPLATEBRUSH.format(
+                id=obj['id', '<NO ID>'],
+                pak_id=pack.id,
+            ))
         elif obj.name == 'transtoken':
             # Special case for now, since it's package-specific.
             parse_pack_transtoken(pack, obj)
         elif obj.name == 'overrides':
             for over_prop in obj:
                 if over_prop.name in ('templatebrush', 'brushtemplate'):
-                    LOGGER.warning(
-                        'TemplateBrush {} no longer needs to be defined in info.txt',
-                        over_prop['id', '<NO ID>'],
-                    )
+                    errors.add(TRANS_OLD_TEMPLATEBRUSH.format(
+                        id=over_prop['id', '<NO ID>'],
+                        pak_id=pack.id,
+                    ))
                     continue
                 try:
                     obj_type = OBJ_TYPES[over_prop.name]
                 except KeyError:
-                    LOGGER.warning(
-                        'Unknown object type "{}" with ID "{}"!',
-                        over_prop.real_name, over_prop['id', '<NO ID>'],
-                    )
-
+                    errors.add(TRANS_UNKNOWN_OBJ_TYPE.format(
+                        obj_type=over_prop.real_name,
+                        obj_id=over_prop['id', '<NO ID>'],
+                        pak_id=pack.id,
+                    ))
                     continue
                 try:
                     obj_id = over_prop['id']
                 except LookupError:
-                    raise ValueError(f'No ID for "{obj_type}" object type in "{pack.id}" package!') from None
+                    raise AppError(TRANS_NO_OBJ_ID.format(obj_type=obj_type, pak_id=pack.id)) from None
                 packset.overrides[obj_type, obj_id.casefold()].append(
                     ParseData(pack.fsys, obj_id, over_prop, pack.id, True)
                 )
@@ -683,31 +726,37 @@ async def parse_package(
             try:
                 obj_type = OBJ_TYPES[obj.name]
             except KeyError:
-                LOGGER.warning(
-                    'Unknown object type "{}" with ID "{}"!',
-                    obj.real_name, obj['id', '<NO ID>'],
-                )
+                errors.add(TRANS_UNKNOWN_OBJ_TYPE.format(
+                    obj_type=obj.real_name,
+                    obj_id=obj['id', '<NO ID>'],
+                    pak_id=pack.id,
+                ))
                 continue
             try:
                 obj_id = obj['id']
             except LookupError:
-                raise ValueError(f'No ID for "{obj_type}" object type in "{pack.id}" package!') from None
+                raise AppError(TRANS_NO_OBJ_ID.format(obj_type=obj_type, pak_id=pack.id)) from None
             if obj_id in packset.unparsed[obj_type]:
+                existing = packset.unparsed[obj_type][obj_id]
                 if obj_type.allow_mult:
                     # Pretend this is an override, but don't actually set the bool.
                     packset.overrides[obj_type, obj_id.casefold()].append(
                         ParseData(pack.fsys, obj_id, obj, pack.id, False)
                     )
-                    # Don't continue to parse and overwrite
-                    continue
                 else:
-                    raise Exception(f'ERROR! "{obj_id}" defined twice!')
-            packset.unparsed[obj_type][obj_id] = ObjData(
-                pack.fsys,
-                obj,
-                pack.id,
-                pack.disp_name,
-            )
+                    raise AppError(TRANS_DUPLICATE_OBJ_ID.format(
+                        obj_id=obj_id,
+                        obj_type=obj_type,
+                        pak2=existing.pak_id,
+                        pak1=pack.id,
+                    ))
+            else:
+                packset.unparsed[obj_type][obj_id] = ObjData(
+                    pack.fsys,
+                    obj,
+                    pack.id,
+                    pack.disp_name,
+                )
 
     if desc:
         pack.desc = TransToken.parse(pack.id, '\n'.join(desc))
