@@ -8,7 +8,7 @@ import math
 
 import trio
 
-from app import TK_ROOT
+from app import TK_ROOT, tk_tools
 from app.errors import AppError, ErrorUI
 from transtoken import TransToken
 from ui_tk.wid_transtoken import set_text, set_win_title
@@ -47,16 +47,36 @@ async def display_errors(
     bg.rowconfigure(1, weight=1)
 
     frame = ttk.Frame(window, name='frame')
-    frame.grid(row=0, column=0, sticky="NSEW", padx=16, pady=16)
+    frame.grid(row=0, column=0, sticky='NSEW', padx=16, pady=16)
     frame.columnconfigure(0, weight=1)
     frame.rowconfigure(1, weight=1)
 
     wid_desc = ttk.Label(frame, name='desc')
-    wid_desc.grid(row=0, column=0, sticky="EW", padx=4, pady=2)
+    wid_desc.grid(row=0, column=0, sticky='EW', padx=4, pady=2)
 
-    wid_error_frm = tk.Frame(frame, name='errors', relief='sunken', bg='white', borderwidth=1)
-    wid_error_frm.grid(row=1, column=0, sticky="NSEW", padx=4, pady=2)
+    wid_error_border = tk.Frame(frame, name='border', relief='sunken', bg='white', borderwidth=2)
+    wid_error_border.grid(row=1, column=0, sticky='NSEW', padx=4, pady=2)
+    wid_error_border.columnconfigure(0, weight=1)
+    wid_error_border.rowconfigure(0, weight=1)
+
+    wid_error_canv = tk.Canvas(
+        wid_error_border,
+        name='scroll_canv', bg='white',
+        borderwidth=0, highlightthickness=0,
+    )
+    wid_error_canv.grid(row=0, column=0, sticky='NSEW', padx=(2, 0), pady=2)
+
+    wid_error_frm = tk.Frame(wid_error_canv, name='errors', bg='white')
     wid_error_frm.columnconfigure(0, weight=1)
+    wid_error_canv.create_window(0, 0, anchor='nw', window=wid_error_frm)
+
+    scrollbar = tk_tools.HidingScroll(
+        wid_error_border, orient='vertical',
+        command=wid_error_canv.yview,
+    )
+    scrollbar.grid(row=0, column=1, sticky='NS')
+    wid_error_canv['yscrollcommand'] = scrollbar.set
+    tk_tools.add_mousewheel(wid_error_canv, window)
 
     wid_close = ttk.Button(frame, command=lambda: close_event.set(), name='close_btn')
     wid_close.grid(row=2, column=0, padx=4, pady=2)
@@ -67,10 +87,11 @@ async def display_errors(
 
     def on_resize(e: object) -> None:
         """Resize labels when the window does."""
-        width = window.winfo_width()
-        wid_desc['wraplength'] = width - 10
+        wid_desc['wraplength'] = frame.winfo_width() - 10
+        canv_width = wid_error_canv.winfo_width()
+        wid_error_canv['scrollregion'] = (0, 0, canv_width, wid_error_frm.winfo_reqheight())
         for label, sep in error_widgets:
-            label['wraplength'] = width - 15
+            label['wraplength'] = canv_width - 15
 
     window.bind('<Configure>', on_resize)
 
@@ -103,5 +124,7 @@ async def display_errors(
                 sep.grid_remove()
 
             window.deiconify()
+            window.lift()
+            window.bell()
             await close_event.wait()
             window.withdraw()
