@@ -35,6 +35,7 @@ async def display_errors(
         await evt.wait()
 
     window = tk.Toplevel(TK_ROOT, name='errorWin')
+    window.wm_attributes('-topmost', 1)
     window.withdraw()
     window.columnconfigure(0, weight=1)
     window.rowconfigure(0, weight=1)
@@ -83,7 +84,7 @@ async def display_errors(
     set_text(wid_close, TransToken.ui("Close"))
 
     # Cache the labels and separators.
-    error_widgets: List[Tuple[ttk.Label, ttk.Separator]] = []
+    error_widgets: List[Tuple[tk.Label, ttk.Separator]] = []
 
     def on_resize(e: object) -> None:
         """Resize labels when the window does."""
