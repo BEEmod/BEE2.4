@@ -18,13 +18,14 @@ import time
 from PIL import ImageTk
 
 from app import TK_ROOT, img, tk_tools
+import ipc_types
 import utils
 
 
 # ID -> screen.
 SCREENS: Dict[int, 'BaseLoadScreen'] = {}
 
-QUEUE_REPLY_LOAD: multiprocessing.Queue
+QUEUE_REPLY_LOAD: multiprocessing.Queue[ipc_types.ARGS_REPLY_LOAD]
 TIMEOUT = 0.125  # New iteration if we take more than this long.
 
 # Stores translated strings, which are done in the main process.
@@ -814,10 +815,10 @@ class LogWindow:
 
 
 def run_background(
-    queue_rec_load: multiprocessing.Queue,
-    queue_reply_load: multiprocessing.Queue,
-    queue_rec_log: multiprocessing.Queue,
-    queue_reply_log: multiprocessing.Queue,
+    queue_rec_load: multiprocessing.Queue[ipc_types.ARGS_SEND_LOAD],
+    queue_reply_load: multiprocessing.Queue[ipc_types.ARGS_REPLY_LOAD],
+    queue_rec_log: multiprocessing.Queue[ipc_types.ARGS_SEND_LOGGING],
+    queue_reply_log: multiprocessing.Queue[ipc_types.ARGS_REPLY_LOGGING],
     # Pass in various bits of translated text so, we don't need to do it here.
     translations: dict,
 ) -> None:
@@ -858,6 +859,7 @@ def run_background(
                     TK_ROOT.quit()
                     return
                 elif operation == 'update_translations':
+                    assert isinstance(args, dict)
                     TRANSLATION.update(args)
                     log_window.update_translations()
                     for screen in SCREENS.values():
@@ -867,10 +869,12 @@ def run_background(
                     for screen in SCREENS.values():
                         screen.win.attributes('-topmost', args)
                 else:
+                    if scr_id is None:
+                        raise Exception(f'Bad command "{operation}({args})"')
                     try:
                         func = getattr(SCREENS[scr_id], 'op_' + operation)
                     except AttributeError as exc:
-                        raise ValueError(f'Bad command "{operation}"!') from exc
+                        raise ValueError(f'Bad command "{operation}({args})"') from exc
                     try:
                         func(*args)
                     except Exception as e:  # Note which function caused the problem.
@@ -881,7 +885,7 @@ def run_background(
                             raise TypeError(func) from e
             while True:  # Pop off all the values.
                 try:
-                    args = queue_rec_log.get_nowait()
+                    rec_args = queue_rec_log.get_nowait()
                 except queue.Empty:
                     break
                 except ValueError:
@@ -890,7 +894,7 @@ def run_background(
                     break
 
                 had_values = True
-                log_window.handle(args)
+                log_window.handle(rec_args)
 
         except BrokenPipeError:
             # A pipe failed, means the main app quit. Terminate ourselves.

@@ -13,7 +13,6 @@ from typing import (
     Any, Type,
 )
 from types import TracebackType
-from typing_extensions import Literal
 from weakref import WeakSet
 import contextlib
 import multiprocessing
@@ -26,6 +25,7 @@ import trio
 from config.gen_opts import GenOptions
 from config import APP
 from transtoken import TransToken
+import ipc_types
 import utils
 
 
@@ -33,19 +33,11 @@ import utils
 _ALL_SCREENS: MutableSet[LoadScreen] = WeakSet()
 
 # Queues we use to send data to the daemon and vice versa.
-# DAEMON is used for messages from the daemon.
-_QUEUE_SEND_LOAD = multiprocessing.Queue()  # loadscreen -> daemon
-_QUEUE_REPLY_LOAD = multiprocessing.Queue()  # daemon -> loadscreen
-_QUEUE_SEND_LOGGING: multiprocessing.Queue[
-    Tuple[Literal['log'], str, str] |
-    Tuple[Literal['visible'], bool, None] |
-    Tuple[Literal['level'], str | int, None],
-] = multiprocessing.Queue()  # logging -> daemon
-_QUEUE_REPLY_LOGGING: multiprocessing.Queue[
-    Tuple[Literal['level'], str] |
-    Tuple[Literal['visible'], bool] |
-    Tuple[Literal['quit'], None],
-] = multiprocessing.Queue()  # daemon -> logging
+# SEND goes from app -> daemon, REPLY goes from daemon -> app.
+_QUEUE_SEND_LOAD: multiprocessing.Queue[ipc_types.ARGS_SEND_LOAD] = multiprocessing.Queue()
+_QUEUE_REPLY_LOAD: multiprocessing.Queue[ipc_types.ARGS_REPLY_LOAD] = multiprocessing.Queue()
+_QUEUE_SEND_LOGGING: multiprocessing.Queue[ipc_types.ARGS_SEND_LOGGING] = multiprocessing.Queue()
+_QUEUE_REPLY_LOGGING: multiprocessing.Queue[ipc_types.ARGS_REPLY_LOGGING] = multiprocessing.Queue()
 
 T = TypeVar('T')
 
@@ -200,7 +192,7 @@ class LoadScreen:
 
     def _send_msg(self, command: str, *args: Any) -> None:
         """Send a message to the daemon."""
-        _QUEUE_SEND_LOAD.put((command, id(self), args))
+        _QUEUE_SEND_LOAD.put((command, id(self), args))  # type: ignore # TODO Make safe
         # Check the messages coming back as well.
         while True:
             arg: Any
