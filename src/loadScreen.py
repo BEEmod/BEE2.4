@@ -8,10 +8,8 @@ The id() of the main-process object is used to identify loadscreens.
 from __future__ import annotations
 
 
-from typing import (
-    AsyncGenerator, Collection, Generator, MutableSet, Set, Tuple, List, TypeVar,
-    Any, Type,
-)
+from typing import AsyncGenerator, Collection, Generator, MutableSet, Set, List, TypeVar, Type
+from typing_extensions import assert_never
 from types import TracebackType
 from weakref import WeakSet
 import contextlib
@@ -60,13 +58,13 @@ TRANSLATIONS = {
 
 def show_main_loader(is_compact: bool) -> None:
     """Special function, which sets the splash screen compactness."""
-    _QUEUE_SEND_LOAD.put(('set_is_compact', main_loader.id, (is_compact, )))
+    _QUEUE_SEND_LOAD.put(ipc_types.Load2Daemon_SetIsCompact(main_loader.id, is_compact))
     main_loader._show()
 
 
 def set_force_ontop(ontop: bool) -> None:
     """Set whether screens will be forced on top."""
-    _QUEUE_SEND_LOAD.put(('set_force_ontop', None, ontop))
+    _QUEUE_SEND_LOAD.put(ipc_types.Load2Daemon_SetForceOnTop(ontop))
 
 
 @contextlib.contextmanager
@@ -99,7 +97,7 @@ class ScreenStage:
         """Change the current length of this stage."""
         self._max = num
         for screen in list(self._bound):
-            screen._send_msg('set_length', self.id, num)
+            screen._send_msg(ipc_types.Load2Daemon_SetLength(screen.id, self.id, num))
         await trio.sleep(0)
 
     async def step(self, info: object = None) -> None:
@@ -107,7 +105,7 @@ class ScreenStage:
         self._current += 1
         self._skipped = False
         for screen in list(self._bound):
-            screen._send_msg('step', self.id)
+            screen._send_msg(ipc_types.Load2Daemon_Step(screen.id, self.id))
         await trio.sleep(0)
 
     async def skip(self) -> None:
@@ -115,7 +113,7 @@ class ScreenStage:
         self._current = 0
         self._skipped = True
         for screen in list(self._bound):
-            screen._send_msg('skip_stage', self.id)
+            screen._send_msg(ipc_types.Load2Daemon_Skip(screen.id, self.id))
         await trio.sleep(0)
 
     async def iterate(self, seq: Collection[T]) -> AsyncGenerator[T, None]:
@@ -148,13 +146,16 @@ class LoadScreen:
         self.title = title_text
         self._scope: trio.CancelScope | None = None
 
-        init: List[Tuple[ipc_types.StageID, str]] = [
-            (stage.id, str(stage.title))
-            for stage in stages
-        ]
-
         # Order the daemon to make this screen. We pass translated text in for the splash screen.
-        self._send_msg('init', is_splash, str(title_text), init)
+        self._send_msg(ipc_types.Load2Daemon_Init(
+            scr_id=self.id,
+            is_splash=is_splash,
+            title=str(title_text),
+            stages=[
+                (stage.id, str(stage.title))
+                for stage in stages
+            ],
+        ))
         _ALL_SCREENS.add(self)
 
     def __enter__(self) -> LoadScreen:
@@ -183,7 +184,7 @@ class LoadScreen:
         self._scope = None
         try:
             self.active = False
-            self._send_msg('reset')
+            self._send_msg(ipc_types.Load2Daemon_Reset(self.id))
             for stage in self.stages:
                 stage._bound.discard(self)
         finally:
@@ -191,38 +192,40 @@ class LoadScreen:
             res = scope.__exit__(exc_type, exc_val, exc_tb)
         return res
 
-    def _send_msg(self, command: str, *args: Any) -> None:
+    def _send_msg(self, message: ipc_types.ARGS_SEND_LOAD) -> None:
         """Send a message to the daemon."""
-        _QUEUE_SEND_LOAD.put((command, self.id, args))  # type: ignore # TODO Make safe
+        _QUEUE_SEND_LOAD.put(message)
         # Check the messages coming back as well.
         while True:
-            arg: Any
             try:
-                command, arg = _QUEUE_REPLY_LOAD.get_nowait()
+                op = _QUEUE_REPLY_LOAD.get_nowait()
             except queue.Empty:
                 break
-            if command == 'main_set_compact':
+            if isinstance(op, ipc_types.Daemon2Load_MainSetCompact):
                 # Save the compact state to the config.
                 conf = APP.get_cur_conf(GenOptions)
-                APP.store_conf(attrs.evolve(conf, compact_splash=arg))
-            elif command == 'cancel':
+                APP.store_conf(attrs.evolve(conf, compact_splash=op.compact))
+            elif isinstance(op, ipc_types.Daemon2Load_Cancel):
                 if self._scope is not None:
                     self._scope.cancel()
             else:
-                raise ValueError('Bad command from daemon: ' + repr(command))
+                assert_never(op)
 
     def _show(self) -> None:
         """Display the loading screen."""
         self.active = True
         # Translate and send these across now.
-        self._send_msg('show', str(self.title), [str(stage.title) for stage in self.stages])
+        self._send_msg(ipc_types.Load2Daemon_Show(
+            self.id, str(self.title),
+            [str(stage.title) for stage in self.stages],
+        ))
         for stage in self.stages:
             stage._bound.add(self)
 
     def destroy(self) -> None:
         """Permanently destroy this screen and cleanup."""
         self.active = False
-        self._send_msg('destroy')
+        self._send_msg(ipc_types.Load2Daemon_Destroy(self.id))
         for stage in self.stages:
             stage._bound.discard(self)
         _ALL_SCREENS.remove(self)
@@ -230,18 +233,20 @@ class LoadScreen:
     def suppress(self) -> None:
         """Temporarily hide the screen."""
         self.active = False
-        self._send_msg('hide')
+        self._send_msg(ipc_types.Load2Daemon_Hide(self.id))
 
     def unsuppress(self) -> None:
         """Undo temporarily hiding the screen."""
         self.active = True
-        self._send_msg('show', str(self.title), [str(stage.title) for stage in self.stages])
+        self._send_msg(ipc_types.Load2Daemon_Show(
+            self.id, str(self.title),
+            [str(stage.title) for stage in self.stages],
+        ))
 
 
 def shutdown() -> None:
     """Instruct the daemon process to shut down."""
     try:
-        _QUEUE_SEND_LOAD.put(('quit_daemon', None, None))
         _QUEUE_SEND_LOAD.close()
         _QUEUE_REPLY_LOAD.close()
         _QUEUE_SEND_LOGGING.close()
@@ -252,8 +257,7 @@ def shutdown() -> None:
 
 def update_translations() -> None:
     """Update the translations."""
-    _QUEUE_SEND_LOAD.put((
-        'update_translations', None,
+    _QUEUE_SEND_LOAD.put(ipc_types.Load2Daemon_UpdateTranslations(
         {key: str(tok) for key, tok in TRANSLATIONS.items()},
     ))
 

@@ -4,15 +4,15 @@ These need to be used while we are busy doing stuff in the main UI loop.
 We do this in another process to sidestep the GIL, and ensure the screen
 remains responsive. This is a separate module to reduce the required dependencies.
 """
-
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from __future__ import annotations
+from typing import Callable, Dict, List, Optional, Tuple
+from typing_extensions import assert_never
 from tkinter import ttk
 from tkinter.font import Font, families as tk_font_families
 import tkinter as tk
 import logging
 import multiprocessing.connection
 import queue
-import sys
 import time
 
 from PIL import ImageTk
@@ -22,10 +22,11 @@ from ipc_types import (
     ScreenID, StageID,
     ARGS_SEND_LOAD, ARGS_REPLY_LOAD, ARGS_SEND_LOGGING,  ARGS_REPLY_LOGGING,
 )
+import ipc_types
 import utils
 
 
-SCREENS: Dict[ScreenID, 'BaseLoadScreen'] = {}
+SCREENS: Dict[ScreenID, BaseLoadScreen] = {}
 QUEUE_REPLY_LOAD: multiprocessing.Queue[ARGS_REPLY_LOAD]
 TIMEOUT = 0.125  # New iteration if we take more than this long.
 
@@ -111,7 +112,7 @@ class BaseLoadScreen:
     def cancel(self, event: Optional[tk.Event]=None) -> None:
         """User pressed the cancel button."""
         self.op_reset()
-        QUEUE_REPLY_LOAD.put(('cancel', self.scr_id))
+        QUEUE_REPLY_LOAD.put(ipc_types.Daemon2Load_Cancel(self.scr_id))
 
     def move_start(self, event: tk.Event) -> None:
         """Record offset of mouse on click."""
@@ -607,7 +608,7 @@ class SplashScreen(BaseLoadScreen):
         else:
             self.sml_canvas.grid_remove()
             self.lrg_canvas.grid(row=0, column=0)
-        QUEUE_REPLY_LOAD.put(('main_set_compact', is_compact))
+        QUEUE_REPLY_LOAD.put(ipc_types.Daemon2Load_MainSetCompact(is_compact))
 
     def toggle_compact(self, event: tk.Event) -> None:
         """Toggle when the splash screen is double-clicked."""
@@ -821,7 +822,7 @@ def run_background(
     queue_rec_log: multiprocessing.Queue[ARGS_SEND_LOGGING],
     queue_reply_log: multiprocessing.Queue[ARGS_REPLY_LOGGING],
     # Pass in various bits of translated text so, we don't need to do it here.
-    translations: dict,
+    translations: Dict[str, str],
 ) -> None:
     """Runs in the other process, with an end of a pipe for input."""
     global QUEUE_REPLY_LOAD
@@ -837,11 +838,10 @@ def run_background(
         nonlocal force_ontop
         had_values = False
         cur_time = time.monotonic()
-        args: Any  # TODO
         try:
             while True:  # Pop off all the values.
                 try:
-                    operation, scr_id, args = queue_rec_load.get_nowait()
+                    op = queue_rec_load.get_nowait()
                 except queue.Empty:
                     break
                 except ValueError:
@@ -851,42 +851,48 @@ def run_background(
                     # ensure we do run the logs too if we timeout, but if we don't share the same timeout.
                     cur_time = time.monotonic()
                     break
-                if operation == 'init':
-                    if scr_id is None:
-                        raise Exception(f'Bad command "{operation}({args})"')
+                if isinstance(op, ipc_types.Load2Daemon_Init):
                     # Create a new loadscreen.
-                    is_main, title, stages = args
-                    screen = (SplashScreen if is_main else LoadScreen)(scr_id, title, force_ontop, stages)
-                    SCREENS[scr_id] = screen
-                elif operation == 'quit_daemon':
-                    # Shutdown.
-                    TK_ROOT.quit()
-                    return
-                elif operation == 'update_translations':
-                    assert isinstance(args, dict)
-                    TRANSLATION.update(args)
+                    screen = (SplashScreen if op.is_splash else LoadScreen)(op.scr_id, op.title, force_ontop, op.stages)
+                    SCREENS[op.scr_id] = screen
+                elif isinstance(op, ipc_types.Load2Daemon_UpdateTranslations):
+                    TRANSLATION.update(op.translations)
                     log_window.update_translations()
                     for screen in SCREENS.values():
                         if isinstance(screen, LoadScreen):
                             screen.update_translations()
-                elif operation == 'set_force_ontop':
+                elif isinstance(op, ipc_types.Load2Daemon_SetForceOnTop):
                     for screen in SCREENS.values():
-                        screen.win.attributes('-topmost', args)
-                else:
-                    if scr_id is None:
-                        raise Exception(f'Bad command "{operation}({args})"')
+                        screen.win.attributes('-topmost', op.on_top)
+                elif isinstance(op, ipc_types.ScreenOp):
                     try:
-                        func = getattr(SCREENS[scr_id], 'op_' + operation)
-                    except AttributeError as exc:
-                        raise ValueError(f'Bad command "{operation}({args})"') from exc
-                    try:
-                        func(*args)
-                    except Exception as e:  # Note which function caused the problem.
-                        if sys.version_info >= (3, 11):
-                            e.add_note(f'Function: {func!r}')  # noqa
-                            raise
+                        screen = SCREENS[op.screen]
+                    except KeyError:
+                        continue
+
+                    if isinstance(op, ipc_types.Load2Daemon_Show):
+                        screen.op_show(op.title, op.stage_names)
+                    elif isinstance(op, ipc_types.Load2Daemon_Hide):
+                        screen.op_hide()
+                    elif isinstance(op, ipc_types.Load2Daemon_Reset):
+                        screen.op_reset()
+                    elif isinstance(op, ipc_types.Load2Daemon_Destroy):
+                        screen.op_destroy()
+                    elif isinstance(op, ipc_types.Load2Daemon_SetLength):
+                        screen.op_set_length(op.stage, op.size)
+                    elif isinstance(op, ipc_types.Load2Daemon_Step):
+                        screen.op_step(op.stage)
+                    elif isinstance(op, ipc_types.Load2Daemon_Skip):
+                        screen.op_skip_stage(op.stage)
+                    elif isinstance(op, ipc_types.Load2Daemon_SetIsCompact):
+                        if isinstance(screen, SplashScreen):
+                            screen.op_set_is_compact(op.compact)
                         else:
-                            raise TypeError(func) from e
+                            print('Called set_is_compact() on regular loadscreen?')
+                    else:
+                        assert_never(op)
+                else:
+                    assert_never(op)
             while True:  # Pop off all the values.
                 try:
                     rec_args = queue_rec_log.get_nowait()
