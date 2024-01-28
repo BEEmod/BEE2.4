@@ -37,7 +37,6 @@ DEFAULT_SETTINGS = {
 
 import srctools.logger
 from app import localisation, on_error, TK_ROOT
-import loadScreen
 import utils
 
 if __name__ == '__main__':
@@ -81,7 +80,6 @@ if __name__ == '__main__':
     app.DEV_MODE.set(conf.dev_mode)
 
     localisation.setup(conf.language)
-    loadScreen.start_daemon()
 
     if app_name == 'bee2':
         from app import BEE2

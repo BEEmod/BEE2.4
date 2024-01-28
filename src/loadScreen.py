@@ -8,13 +8,12 @@ The id() of the main-process object is used to identify loadscreens.
 from __future__ import annotations
 
 
-from typing import AsyncGenerator, Collection, Generator, MutableSet, Set, List, TypeVar, Type
+from typing import AsyncGenerator, Collection, Generator, MutableMapping, Set, List, TypeVar, Type
 from typing_extensions import assert_never
 from types import TracebackType
-from weakref import WeakSet
+from weakref import WeakValueDictionary
 import contextlib
 import multiprocessing
-import queue
 
 import attrs
 import srctools.logger
@@ -28,7 +27,7 @@ import utils
 
 
 # Keep a reference to all loading screens, so we can close them globally.
-_ALL_SCREENS: MutableSet[LoadScreen] = WeakSet()
+_ALL_SCREENS: MutableMapping[ipc_types.ScreenID, LoadScreen] = WeakValueDictionary()
 
 # Queues we use to send data to the daemon and vice versa.
 # SEND goes from app -> daemon, REPLY goes from daemon -> app.
@@ -71,7 +70,7 @@ def set_force_ontop(ontop: bool) -> None:
 def suppress_screens() -> Generator[None, None, None]:
     """A context manager to suppress loadscreens while the body is active."""
     active = []
-    for screen in _ALL_SCREENS:
+    for screen in _ALL_SCREENS.values():
         if not screen.active:
             continue
         screen.suppress()
@@ -97,7 +96,7 @@ class ScreenStage:
         """Change the current length of this stage."""
         self._max = num
         for screen in list(self._bound):
-            screen._send_msg(ipc_types.Load2Daemon_SetLength(screen.id, self.id, num))
+            _QUEUE_SEND_LOAD.put(ipc_types.Load2Daemon_SetLength(screen.id, self.id, num))
         await trio.sleep(0)
 
     async def step(self, info: object = None) -> None:
@@ -105,7 +104,7 @@ class ScreenStage:
         self._current += 1
         self._skipped = False
         for screen in list(self._bound):
-            screen._send_msg(ipc_types.Load2Daemon_Step(screen.id, self.id))
+            _QUEUE_SEND_LOAD.put(ipc_types.Load2Daemon_Step(screen.id, self.id))
         await trio.sleep(0)
 
     async def skip(self) -> None:
@@ -113,7 +112,7 @@ class ScreenStage:
         self._current = 0
         self._skipped = True
         for screen in list(self._bound):
-            screen._send_msg(ipc_types.Load2Daemon_Skip(screen.id, self.id))
+            _QUEUE_SEND_LOAD.put(ipc_types.Load2Daemon_Skip(screen.id, self.id))
         await trio.sleep(0)
 
     async def iterate(self, seq: Collection[T]) -> AsyncGenerator[T, None]:
@@ -147,7 +146,7 @@ class LoadScreen:
         self._scope: trio.CancelScope | None = None
 
         # Order the daemon to make this screen. We pass translated text in for the splash screen.
-        self._send_msg(ipc_types.Load2Daemon_Init(
+        _QUEUE_SEND_LOAD.put(ipc_types.Load2Daemon_Init(
             scr_id=self.id,
             is_splash=is_splash,
             title=str(title_text),
@@ -156,7 +155,7 @@ class LoadScreen:
                 for stage in stages
             ],
         ))
-        _ALL_SCREENS.add(self)
+        _ALL_SCREENS[self.id] = self
 
     def __enter__(self) -> LoadScreen:
         """LoadScreen can be used as a context manager.
@@ -184,7 +183,7 @@ class LoadScreen:
         self._scope = None
         try:
             self.active = False
-            self._send_msg(ipc_types.Load2Daemon_Reset(self.id))
+            _QUEUE_SEND_LOAD.put(ipc_types.Load2Daemon_Reset(self.id))
             for stage in self.stages:
                 stage._bound.discard(self)
         finally:
@@ -192,30 +191,11 @@ class LoadScreen:
             res = scope.__exit__(exc_type, exc_val, exc_tb)
         return res
 
-    def _send_msg(self, message: ipc_types.ARGS_SEND_LOAD) -> None:
-        """Send a message to the daemon."""
-        _QUEUE_SEND_LOAD.put(message)
-        # Check the messages coming back as well.
-        while True:
-            try:
-                op = _QUEUE_REPLY_LOAD.get_nowait()
-            except queue.Empty:
-                break
-            if isinstance(op, ipc_types.Daemon2Load_MainSetCompact):
-                # Save the compact state to the config.
-                conf = APP.get_cur_conf(GenOptions)
-                APP.store_conf(attrs.evolve(conf, compact_splash=op.compact))
-            elif isinstance(op, ipc_types.Daemon2Load_Cancel):
-                if self._scope is not None:
-                    self._scope.cancel()
-            else:
-                assert_never(op)
-
     def _show(self) -> None:
         """Display the loading screen."""
         self.active = True
         # Translate and send these across now.
-        self._send_msg(ipc_types.Load2Daemon_Show(
+        _QUEUE_SEND_LOAD.put(ipc_types.Load2Daemon_Show(
             self.id, str(self.title),
             [str(stage.title) for stage in self.stages],
         ))
@@ -225,34 +205,23 @@ class LoadScreen:
     def destroy(self) -> None:
         """Permanently destroy this screen and cleanup."""
         self.active = False
-        self._send_msg(ipc_types.Load2Daemon_Destroy(self.id))
+        _QUEUE_SEND_LOAD.put(ipc_types.Load2Daemon_Destroy(self.id))
         for stage in self.stages:
             stage._bound.discard(self)
-        _ALL_SCREENS.remove(self)
+        del _ALL_SCREENS[self.id]
 
     def suppress(self) -> None:
         """Temporarily hide the screen."""
         self.active = False
-        self._send_msg(ipc_types.Load2Daemon_Hide(self.id))
+        _QUEUE_SEND_LOAD.put(ipc_types.Load2Daemon_Hide(self.id))
 
     def unsuppress(self) -> None:
         """Undo temporarily hiding the screen."""
         self.active = True
-        self._send_msg(ipc_types.Load2Daemon_Show(
+        _QUEUE_SEND_LOAD.put(ipc_types.Load2Daemon_Show(
             self.id, str(self.title),
             [str(stage.title) for stage in self.stages],
         ))
-
-
-def shutdown() -> None:
-    """Instruct the daemon process to shut down."""
-    try:
-        _QUEUE_SEND_LOAD.close()
-        _QUEUE_REPLY_LOAD.close()
-        _QUEUE_SEND_LOGGING.close()
-        _QUEUE_REPLY_LOGGING.close()
-    except (BrokenPipeError, ValueError):  # Already quit, don't care.
-        pass
 
 
 def update_translations() -> None:
@@ -262,17 +231,17 @@ def update_translations() -> None:
     ))
 
 
-_BG_PROC: multiprocessing.Process | None = None
+_bg_started = False
 
 
-def start_daemon() -> None:
-    """Spawn the deamon process."""
-    global _BG_PROC
-    if _BG_PROC is not None:
+async def startup(*, task_status: trio.TaskStatus[None] = trio.TASK_STATUS_IGNORED) -> None:
+    """Spawn the daemon process, then listen to responses."""
+    global _bg_started
+    if _bg_started:
         raise ValueError('Daemon already started!')
 
     # Initialise the daemon.
-    _BG_PROC = multiprocessing.Process(
+    process = multiprocessing.Process(
         target=utils.run_bg_daemon,
         args=(
             _QUEUE_SEND_LOAD, _QUEUE_REPLY_LOAD, _QUEUE_SEND_LOGGING, _QUEUE_REPLY_LOGGING,
@@ -282,7 +251,32 @@ def start_daemon() -> None:
         name='bg_daemon',
         daemon=True,
     )
-    _BG_PROC.start()
+    process.start()
+    try:
+        task_status.started()
+        while True:
+            op = await trio.to_thread.run_sync(_QUEUE_REPLY_LOAD.get, abandon_on_cancel=True)
+            LOGGER.info('Logger response: {}', op)
+            if isinstance(op, ipc_types.Daemon2Load_MainSetCompact):
+                # Save the compact state to the config.
+                conf = APP.get_cur_conf(GenOptions)
+                APP.store_conf(attrs.evolve(conf, compact_splash=op.compact))
+            elif isinstance(op, ipc_types.Daemon2Load_Cancel):
+                try:
+                    screen = _ALL_SCREENS[op.screen]
+                except KeyError:
+                    pass
+                else:
+                    if screen._scope is not None:
+                        screen._scope.cancel()
+            else:
+                assert_never(op)
+    finally:
+        _QUEUE_SEND_LOAD.close()
+        _QUEUE_REPLY_LOAD.close()
+        _QUEUE_SEND_LOGGING.close()
+        _QUEUE_REPLY_LOGGING.close()
+        process.terminate()
 
 
 MAIN_PAK = ScreenStage(TransToken.ui('Packages'))

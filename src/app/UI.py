@@ -17,7 +17,7 @@ import exporting
 from app import TK_ROOT, background_run
 from BEE2_config import ConfigFile, GEN_OPTS
 from app.dialogs import Dialogs
-from loadScreen import MAIN_UI as LOAD_UI, shutdown as loadscreen_shutdown
+from loadScreen import MAIN_UI as LOAD_UI
 import packages
 from packages.item import ItemVariant, InheritKind
 import utils
@@ -500,9 +500,6 @@ def quit_application() -> None:
         pass
     # Clean this out.
     snd.clean_sample_folder()
-
-    # Destroy the TK windows, finalise logging, then quit.
-    loadscreen_shutdown()
 
 gameMan.quit_application = quit_application
 
