@@ -1,22 +1,28 @@
 """Defines types for the messages that can be passed to loadscreen/bg_daemon."""
-from typing import Dict, List, Literal, Tuple, TypeAlias, Union
+from typing import Dict, List, Tuple, Union
+from typing_extensions import Literal, NewType, TypeAlias
+
+StageID = NewType('StageID', str)
+ScreenID = NewType('ScreenID', int)
 
 
 ARGS_SEND_LOAD: TypeAlias = Union[  # loadscreen -> daemon
-    Tuple[Literal['set_is_compact'], int, Tuple[bool]],
     Tuple[Literal['set_force_ontop'], None, bool],
     Tuple[Literal['quit_daemon'], None, None],
-    Tuple[Literal['set_length'], int, int],
-    Tuple[Literal['update_translations'], int, Dict[str, str]],
-    Tuple[Literal['reset'], int, Tuple[()]],
-    Tuple[Literal['destroy'], int, Tuple[()]],
-    Tuple[Literal['hide'], int, Tuple[()]],
-    Tuple[Literal['show'], int, Tuple[str, List[str]]],
+    Tuple[Literal['update_translations'], None, Dict[str, str]],
+    Tuple[Literal['set_is_compact'], ScreenID, Tuple[bool]],
+    Tuple[Literal['init'], ScreenID, Tuple[bool, str, List[Tuple[ScreenID, str]]]],
+    Tuple[Literal['set_length'], ScreenID, Tuple[StageID, int]],
+    Tuple[Literal['step'], ScreenID, Tuple[StageID]],
+    Tuple[Literal['reset'], ScreenID, Tuple[()]],
+    Tuple[Literal['destroy'], ScreenID, Tuple[()]],
+    Tuple[Literal['hide'], ScreenID, Tuple[()]],
+    Tuple[Literal['show'], ScreenID, Tuple[str, List[str]]],
 ]
 ARGS_REPLY_LOAD: TypeAlias = Union[  # daemon -> loadscreen
     Tuple[Literal['main_set_compact'], bool],
     Tuple[Literal['quit'], None],
-    Tuple[Literal['cancel'], int],
+    Tuple[Literal['cancel'], ScreenID],
 ]
 ARGS_SEND_LOGGING: TypeAlias = Union[  # logging -> daemon
     Tuple[Literal['log'], str, str],

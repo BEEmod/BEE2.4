@@ -60,7 +60,7 @@ TRANSLATIONS = {
 
 def show_main_loader(is_compact: bool) -> None:
     """Special function, which sets the splash screen compactness."""
-    _QUEUE_SEND_LOAD.put(('set_is_compact', id(main_loader), (is_compact, )))
+    _QUEUE_SEND_LOAD.put(('set_is_compact', main_loader.id, (is_compact, )))
     main_loader._show()
 
 
@@ -89,7 +89,7 @@ class ScreenStage:
     """A single stage in a loading screen."""
     def __init__(self, title: TransToken) -> None:
         self.title = title
-        self.id = hex(id(self))
+        self.id = ipc_types.StageID(hex(id(self)))
         self._bound: Set[LoadScreen] = set()
         self._current = 0
         self._max = 0
@@ -143,11 +143,12 @@ class LoadScreen:
         # active determines whether the screen is on, and if False stops most
         # functions from doing anything
         self.active = False
+        self.id = ipc_types.ScreenID(id(self))
         self.stages: List[ScreenStage] = list(stages)
         self.title = title_text
         self._scope: trio.CancelScope | None = None
 
-        init: List[Tuple[str, str]] = [
+        init: List[Tuple[ipc_types.StageID, str]] = [
             (stage.id, str(stage.title))
             for stage in stages
         ]
@@ -192,7 +193,7 @@ class LoadScreen:
 
     def _send_msg(self, command: str, *args: Any) -> None:
         """Send a message to the daemon."""
-        _QUEUE_SEND_LOAD.put((command, id(self), args))  # type: ignore # TODO Make safe
+        _QUEUE_SEND_LOAD.put((command, self.id, args))  # type: ignore # TODO Make safe
         # Check the messages coming back as well.
         while True:
             arg: Any
@@ -252,7 +253,7 @@ def shutdown() -> None:
 def update_translations() -> None:
     """Update the translations."""
     _QUEUE_SEND_LOAD.put((
-        'update_translations', 0,
+        'update_translations', None,
         {key: str(tok) for key, tok in TRANSLATIONS.items()},
     ))
 

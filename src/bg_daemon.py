@@ -5,7 +5,7 @@ We do this in another process to sidestep the GIL, and ensure the screen
 remains responsive. This is a separate module to reduce the required dependencies.
 """
 
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 from tkinter import ttk
 from tkinter.font import Font, families as tk_font_families
 import tkinter as tk
@@ -18,14 +18,15 @@ import time
 from PIL import ImageTk
 
 from app import TK_ROOT, img, tk_tools
-import ipc_types
+from ipc_types import (
+    ScreenID, StageID,
+    ARGS_SEND_LOAD, ARGS_REPLY_LOAD, ARGS_SEND_LOGGING,  ARGS_REPLY_LOGGING,
+)
 import utils
 
 
-# ID -> screen.
-SCREENS: Dict[int, 'BaseLoadScreen'] = {}
-
-QUEUE_REPLY_LOAD: multiprocessing.Queue[ipc_types.ARGS_REPLY_LOAD]
+SCREENS: Dict[ScreenID, 'BaseLoadScreen'] = {}
+QUEUE_REPLY_LOAD: multiprocessing.Queue[ARGS_REPLY_LOAD]
 TIMEOUT = 0.125  # New iteration if we take more than this long.
 
 # Stores translated strings, which are done in the main process.
@@ -70,10 +71,10 @@ class BaseLoadScreen:
 
     def __init__(
         self,
-        scr_id: int,
+        scr_id: ScreenID,
         title_text: str,
         force_ontop: bool,
-        stages: List[Tuple[str, str]],
+        stages: List[Tuple[StageID, str]],
     ) -> None:
         self.scr_id = scr_id
         self.title_text = title_text
@@ -88,9 +89,9 @@ class BaseLoadScreen:
         self.win.grid_columnconfigure(0, weight=1)
         self.win.grid_rowconfigure(0, weight=1)
 
-        self.values = {}
-        self.maxes = {}
-        self.names = {}
+        self.values: Dict[StageID, int] = {}
+        self.maxes: Dict[StageID, int] = {}
+        self.names: Dict[StageID, str] = {}
         self.stages = stages
         self.is_shown = False
 
@@ -159,12 +160,12 @@ class BaseLoadScreen:
             self.values[stage] = 0
         self.reset_stages()
 
-    def op_step(self, stage: str) -> None:
+    def op_step(self, stage: StageID) -> None:
         """Increment the specified value."""
         self.values[stage] += 1
         self.update_stage(stage)
 
-    def op_set_length(self, stage: str, num: int) -> None:
+    def op_set_length(self, stage: StageID, num: int) -> None:
         """Set the number of items in a stage."""
         if num == 0:
             self.op_skip_stage(stage)
@@ -172,11 +173,11 @@ class BaseLoadScreen:
             self.maxes[stage] = num
             self.update_stage(stage)
 
-    def op_skip_stage(self, stage: str) -> None:
+    def op_skip_stage(self, stage: StageID) -> None:
         """Skip over this stage of the loading process."""
         raise NotImplementedError
 
-    def update_stage(self, stage: str) -> None:
+    def update_stage(self, stage: StageID) -> None:
         """Update the UI for the given stage."""
         raise NotImplementedError
 
@@ -196,10 +197,10 @@ class LoadScreen(BaseLoadScreen):
 
     def __init__(
         self,
-        scr_id: int,
+        scr_id: ScreenID,
         title_text: str,
         force_ontop: bool,
-        stages: List[Tuple[str, str]],
+        stages: List[Tuple[StageID, str]],
     ) -> None:
         super().__init__(scr_id, title_text, force_ontop, stages)
 
@@ -222,10 +223,10 @@ class LoadScreen(BaseLoadScreen):
         self.cancel_btn = ttk.Button(self.frame, command=self.cancel)
         self.cancel_btn.grid(row=0, column=1)
 
-        self.bar_var = {}
-        self.bars = {}
-        self.titles = {}
-        self.labels = {}
+        self.bar_var: Dict[StageID, tk.IntVar] = {}
+        self.bars: Dict[StageID, ttk.Progressbar] = {}
+        self.titles: Dict[StageID, ttk.Label] = {}
+        self.labels: Dict[StageID, ttk.Label] = {}
 
         for ind, (st_id, stage_name) in enumerate(self.stages):
             if stage_name:
@@ -267,7 +268,7 @@ class LoadScreen(BaseLoadScreen):
             self.bar_var[stage].set(0)
             self.labels[stage]['text'] = '0/??'
 
-    def update_stage(self, stage: str) -> None:
+    def update_stage(self, stage: StageID) -> None:
         """Redraw the given stage."""
         max_val = self.maxes[stage]
         if max_val == 0:  # 0/0 sections are skipped automatically.
@@ -288,7 +289,7 @@ class LoadScreen(BaseLoadScreen):
                 self.titles[st_id]['text'] = name + ':'
         super().op_show(title, labels)
 
-    def op_skip_stage(self, stage: str) -> None:
+    def op_skip_stage(self, stage: StageID) -> None:
         """Skip over this stage of the loading process."""
         self.values[stage] = 0
         self.maxes[stage] = 0
@@ -305,10 +306,10 @@ class SplashScreen(BaseLoadScreen):
 
     def __init__(
         self,
-        scr_id: int,
+        scr_id: ScreenID,
         title_text: str,
         force_ontop: bool,
-        stages: List[Tuple[str, str]],
+        stages: List[Tuple[StageID, str]],
     ) -> None:
         super().__init__(scr_id, title_text, force_ontop, stages)
 
@@ -525,7 +526,7 @@ class SplashScreen(BaseLoadScreen):
                     font=progress_font,
                 )
 
-    def update_stage(self, stage: str) -> None:
+    def update_stage(self, stage: StageID) -> None:
         """Update all the text."""
         if self.maxes[stage] == 0:
             text = f'{self.names[stage]}: (0/0)'
@@ -552,7 +553,7 @@ class SplashScreen(BaseLoadScreen):
                 y2,
             )
 
-    def op_set_length(self, stage: str, num: int) -> None:
+    def op_set_length(self, stage: StageID, num: int) -> None:
         """Set the number of items in a stage."""
         self.maxes[stage] = num
         self.update_stage(stage)
@@ -585,7 +586,7 @@ class SplashScreen(BaseLoadScreen):
         """Reset all stages."""
         pass
 
-    def op_skip_stage(self, stage: str) -> None:
+    def op_skip_stage(self, stage: StageID) -> None:
         """Skip over this stage of the loading process."""
         self.values[stage] = 0
         self.maxes[stage] = 0
@@ -815,10 +816,10 @@ class LogWindow:
 
 
 def run_background(
-    queue_rec_load: multiprocessing.Queue[ipc_types.ARGS_SEND_LOAD],
-    queue_reply_load: multiprocessing.Queue[ipc_types.ARGS_REPLY_LOAD],
-    queue_rec_log: multiprocessing.Queue[ipc_types.ARGS_SEND_LOGGING],
-    queue_reply_log: multiprocessing.Queue[ipc_types.ARGS_REPLY_LOGGING],
+    queue_rec_load: multiprocessing.Queue[ARGS_SEND_LOAD],
+    queue_reply_load: multiprocessing.Queue[ARGS_REPLY_LOAD],
+    queue_rec_log: multiprocessing.Queue[ARGS_SEND_LOGGING],
+    queue_reply_log: multiprocessing.Queue[ARGS_REPLY_LOGGING],
     # Pass in various bits of translated text so, we don't need to do it here.
     translations: dict,
 ) -> None:
@@ -836,6 +837,7 @@ def run_background(
         nonlocal force_ontop
         had_values = False
         cur_time = time.monotonic()
+        args: Any  # TODO
         try:
             while True:  # Pop off all the values.
                 try:
@@ -850,6 +852,8 @@ def run_background(
                     cur_time = time.monotonic()
                     break
                 if operation == 'init':
+                    if scr_id is None:
+                        raise Exception(f'Bad command "{operation}({args})"')
                     # Create a new loadscreen.
                     is_main, title, stages = args
                     screen = (SplashScreen if is_main else LoadScreen)(scr_id, title, force_ontop, stages)
