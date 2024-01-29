@@ -5,10 +5,11 @@ from __future__ import annotations
 from typing import Iterator, Mapping, NoReturn, ClassVar, Optional, TypeVar, Type, cast
 from typing_extensions import Self
 
-import os
 from collections.abc import Collection, Iterable
 from collections import defaultdict
 from pathlib import Path
+import os
+import zipfile
 
 import attrs
 import trio
@@ -61,6 +62,10 @@ TRANS_MISSING_PAK_DIR = TransToken.ui(
 )
 TRANS_EMPTY_PAK_DIR = TransToken.ui(
     'Package directory did not contain any packages: {path}'
+)
+TRANS_INVALID_PAK_BAD_FORMAT = TransToken.ui(
+    'Package file has the incorrect file format: {path}\n'
+    'Valid formats are zip archives (.zip or .bee_pack) and VPKs (.vpk)'
 )
 TRANS_INVALID_PAK_NO_INFO = TransToken.ui(
     'Potential package file has no info.txt: {path}'
@@ -500,12 +505,17 @@ async def find_packages(
             filesys = RawFileSystem(name)
         else:
             ext = name.suffix.casefold()
-            if ext in ('.bee_pack', '.zip'):
-                filesys = await trio.to_thread.run_sync(ZipFileSystem, name, abandon_on_cancel=True)
-            elif ext == '.vpk':
-                filesys = await trio.to_thread.run_sync(VPKFileSystem, name, abandon_on_cancel=True)
-            else:
-                LOGGER.info('Extra file: {}', name)
+            try:
+                if ext in ('.bee_pack', '.zip'):
+                    filesys = await trio.to_thread.run_sync(ZipFileSystem, name, abandon_on_cancel=True)
+                elif ext == '.vpk':
+                    filesys = await trio.to_thread.run_sync(VPKFileSystem, name, abandon_on_cancel=True)
+                else:
+                    LOGGER.info('Extra file: {}', name)
+                    continue
+            except (ValueError, zipfile.BadZipFile) as exc:
+                LOGGER.warning('Failed to parse "{}":', name, exc_info=exc)
+                errors.add(TRANS_INVALID_PAK_BAD_FORMAT.format(path=name))
                 continue
 
         LOGGER.debug('Reading package "{}"', name)
