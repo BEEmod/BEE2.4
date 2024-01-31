@@ -42,6 +42,8 @@ async def display_errors(
     # Late binding, looks up each time.
     window.wm_protocol("WM_DELETE_WINDOW", lambda: close_event.set())
 
+    await trio.sleep(0)
+
     bg = ttk.Frame(window, name='bg')  # Required for correct background.
     bg.grid(row=0, column=0, sticky="NSEW")
     bg.columnconfigure(0, weight=1)
@@ -67,6 +69,8 @@ async def display_errors(
     )
     wid_error_canv.grid(row=0, column=0, sticky='NSEW', padx=(2, 0), pady=2)
 
+    await trio.sleep(0)
+
     wid_error_frm = tk.Frame(wid_error_canv, name='errors', bg='white')
     wid_error_frm.columnconfigure(0, weight=1)
     wid_error_canv.create_window(0, 0, anchor='nw', window=wid_error_frm)
@@ -78,6 +82,8 @@ async def display_errors(
     scrollbar.grid(row=0, column=1, sticky='NS')
     wid_error_canv['yscrollcommand'] = scrollbar.set
     tk_tools.add_mousewheel(wid_error_canv, window)
+
+    await trio.sleep(0)
 
     wid_close = ttk.Button(frame, command=lambda: close_event.set(), name='close_btn')
     wid_close.grid(row=2, column=0, padx=4, pady=2)

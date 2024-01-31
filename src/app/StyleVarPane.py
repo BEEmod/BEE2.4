@@ -269,6 +269,7 @@ async def make_stylevar_pane(
     # then the UI callbacks are done after.
     async with trio.open_nursery() as nursery:
         for var in VAR_LIST:
+            await trio.sleep(0)
             tk_vars[var.id] = int_var = IntVar(value=var.enabled)
             desc = make_desc(packset, var)
             if var.applies_to_all(packset):

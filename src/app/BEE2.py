@@ -169,15 +169,12 @@ class Tracer(trio.abc.Instrument):
         """Get the args for a task."""
         args = self.args.pop(task, srctools.EmptyMapping)
         return {
-            name: val
-            for name, val in args.items()
-            # Hide objects with really massive reprs.
-            if not isinstance(val, (dict, Keyvalues, packages.PackagesSet, ExportData))
-            # Objects with no useful info.
-            if (
-                type(val).__repr__ is not object.__repr__ or
-                type(val).__str__ is not object.__str__
+            name: (
+                # Hide objects with really massive reprs.
+                '...' if isinstance(val, (dict, Keyvalues, packages.PackagesSet, ExportData))
+                else val
             )
+            for name, val in args.items()
             if 'KI_PROTECTION' not in name  # Trio flag.
         }
 

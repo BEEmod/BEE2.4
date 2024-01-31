@@ -251,6 +251,7 @@ async def startup(*, task_status: trio.TaskStatus[None] = trio.TASK_STATUS_IGNOR
         name='bg_daemon',
         daemon=True,
     )
+    await trio.sleep(0)
     process.start()
     try:
         task_status.started()

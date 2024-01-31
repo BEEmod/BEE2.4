@@ -852,6 +852,7 @@ def parse_pack_transtoken(pack: Package, kv: Keyvalues) -> None:
     pack.additional_tokens[obj_id] = token
 
 
+@attrs.define(eq=False, init=False)
 class Package:
     """Represents a package."""
     id: str

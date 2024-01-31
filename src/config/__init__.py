@@ -136,6 +136,7 @@ class ConfigSpec:
         If the configs have been loaded, it will immediately be called. Whenever new configs
         are loaded, it will be re-applied regardless.
         """
+        await trio.sleep(0)  # Always checkpoint!
         if typ not in self._registered:
             raise ValueError(f'Unregistered data type {typ!r}')
         info = typ.get_conf_info()

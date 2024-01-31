@@ -264,10 +264,7 @@ async def make_pane(
     menu_bar: tk.Menu,
     tk_img: TKImages,
 ) -> None:
-    """Create the item properties pane, with the widgets it uses.
-
-    update_item_vis is passed through to the stylevar pane.
-    """
+    """Create the item properties pane, with the widgets it uses."""
     global window
 
     window = SubPane(
@@ -345,7 +342,12 @@ async def make_pane(
     canvas_frame.rowconfigure(1, weight=1)
 
     stylevar_frame = ttk.Frame(canvas_frame)
-    await StyleVarPane.make_stylevar_pane(stylevar_frame, packages.get_loaded_packages())
+    async with trio.open_nursery() as nursery:
+        nursery.start_soon(
+            StyleVarPane.make_stylevar_pane,
+            stylevar_frame,
+            packages.get_loaded_packages(),
+        )
 
     loading_text = ttk.Label(canvas_frame)
     set_text(loading_text, TransToken.ui('Loading...'))
