@@ -1311,6 +1311,7 @@ async def init_picker(f: Union[tk.Frame, ttk.Frame]) -> None:
     items.sort(key=operator.attrgetter('pak_id'), reverse=True)
 
     for item in items:
+        await trio.sleep(0)
         for i, subtype in enumerate(item.data.editor.subtypes):
             if subtype.pal_icon or subtype.pal_name:
                 pal_items.append(PalItem(frmScroll, item, sub=i, is_pre=False))

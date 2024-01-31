@@ -195,17 +195,22 @@ async def step_gen_vpk(exp_data: ExportData) -> None:
         exp_data.warn(AppError(TRANS_NO_PERMS))
         return
 
+    def add_files(vpk: VPK, sel_vpk: StyleVPK) -> None:
+        """Add selected files to the VPK."""
+        for file in sel_vpk.fsys.walk_folder(sel_vpk.dir):
+            with file.open_bin() as open_file:
+                vpk.add_file(
+                    file.path,
+                    open_file.read(),
+                    sel_vpk.dir,
+                )
+
     with vpk_file:
         # Write the marker, so we can identify this later. Always put it in the _dir.vpk.
         vpk_file.add_file(MARKER_FILENAME, MARKER_CONTENTS, arch_index=None)
+
         if sel_vpk is not None:
-            for file in sel_vpk.fsys.walk_folder(sel_vpk.dir):
-                with file.open_bin() as open_file:
-                    vpk_file.add_file(
-                        file.path,
-                        open_file.read(),
-                        sel_vpk.dir,
-                    )
+            await trio.to_thread.run_sync(add_files, vpk_file, sel_vpk)
 
         # Additionally, pack in game/vpk_override/ into the vpk - this allows
         # users to easily override resources in general.
@@ -236,13 +241,16 @@ async def step_gen_vpk(exp_data: ExportData) -> None:
                     if numeric_vpk.search(filename) is not None:
                         continue
                     try:
-                        other_vpk = VPK(file_path)
+                        other_vpk = await trio.to_thread.run_sync(VPK, file_path)
                     except ValueError:
                         LOGGER.exception('Could not open VPK file "{}":', file_path)
                     else:
                         for entry in other_vpk:
                             LOGGER.info('Adding "{}:{}" to the VPK', file_path, entry.filename)
-                            vpk_file.add_file(entry.filename, entry.read())
+                            vpk_file.add_file(
+                                entry.filename,
+                                await trio.to_thread.run_sync(entry.read),
+                            )
                 else:
                     LOGGER.debug('Adding "{}" to the VPK', file_path)
                     vpk_file.add_file(
