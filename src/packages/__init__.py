@@ -3,7 +3,7 @@ Handles scanning through the zip packages to find all items, styles, etc.
 """
 from __future__ import annotations
 from typing import Iterator, Mapping, NoReturn, ClassVar, Optional, TypeVar, Type, cast
-from typing_extensions import Self
+from typing_extensions import Literal, Self, assert_never
 
 from collections.abc import Collection, Iterable
 from collections import defaultdict
@@ -485,6 +485,7 @@ _LOADED = PackagesSet()
 async def find_packages(
     nursery: trio.Nursery, errors: ErrorUI, packset: PackagesSet,
     pak_dir: Path,
+    folder_kind: Literal['source', 'subfolder'],
 ) -> None:
     """Search a folder for packages, recursing if necessary."""
     found_pak = False
@@ -527,7 +528,7 @@ async def find_packages(
             if name.is_dir():
                 # This isn't a package, so check the subfolders too...
                 LOGGER.debug('Checking subdir "{}" for packages...', name)
-                nursery.start_soon(find_packages, nursery, errors, packset, name)
+                nursery.start_soon(find_packages, nursery, errors, packset, name, 'subfolder')
             else:
                 errors.add(TRANS_INVALID_PAK_NO_INFO.format(path=name))
             # Don't continue to parse this "package"
@@ -557,7 +558,14 @@ async def find_packages(
         found_pak = True
 
     if not found_pak:
-        errors.add(TRANS_EMPTY_PAK_DIR.format(path=pak_dir))
+        if folder_kind == 'subfolder':
+            # Don't warn for subfolders of a main package directory.
+            LOGGER.info('Directory {} was empty.', pak_dir)
+        elif folder_kind == 'source':
+            # It's likely a problem if the directory a user specified is completely empty.
+            errors.add(TRANS_EMPTY_PAK_DIR.format(path=pak_dir))
+        else:
+            assert_never(folder_kind)
 
 
 async def load_packages(
@@ -568,7 +576,7 @@ async def load_packages(
     """Scan and read in all packages."""
     async with trio.open_nursery() as find_nurs:
         for pak_dir in pak_dirs:
-            find_nurs.start_soon(find_packages, find_nurs, errors, packset, pak_dir)
+            find_nurs.start_soon(find_packages, find_nurs, errors, packset, pak_dir, 'source')
 
     pack_count = len(packset.packages)
     await LOAD_PAK.set_length(pack_count)

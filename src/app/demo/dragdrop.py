@@ -34,6 +34,7 @@ async def test() -> None:
                 errors,
                 packages.get_loaded_packages(),
                 loc,
+                'source',
             )
     assert app._APP_NURSERY is not None
     await app._APP_NURSERY.start(img.init, packages.PACKAGE_SYS,  TK_IMG)

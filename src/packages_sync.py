@@ -206,7 +206,7 @@ async def main(files: List[str]) -> int:
     packages_logger.setLevel(logging.ERROR)
     async with ErrorUI() as errors, trio.open_nursery() as nursery:
         for loc in get_package_locs():
-            await find_packages(nursery, errors, get_loaded_packages(), loc)
+            nursery.start_soon(find_packages, nursery, errors, get_loaded_packages(), loc, 'source')
     packages_logger.setLevel(logging.INFO)
 
     LOGGER.info('Done!')
