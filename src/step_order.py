@@ -41,7 +41,9 @@ class Step(Generic[CtxT, ResourceT]):
         stage: Optional[ScreenStage],
     ) -> None:
         """Wraps the step functionality."""
-        await self.func(ctx)
+        # Use a nursery, so the func is visible as the yielding task for instrumentation.
+        async with trio.open_nursery() as nursery:
+            nursery.start_soon(self.func, ctx)
         if stage is not None:
             await stage.step()
         await result_chan.send(self.results)
