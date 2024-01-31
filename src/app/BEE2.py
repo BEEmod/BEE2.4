@@ -17,7 +17,7 @@ from ui_tk.dialogs import DIALOG
 from ui_tk.errors import display_errors
 from config.gen_opts import GenOptions
 from config.last_sel import LastSelected
-from exporting import mod_support
+from exporting import mod_support, ExportData
 from app.errors import ErrorUI, Result as ErrorResult
 import config
 import app
@@ -141,8 +141,16 @@ class Tracer(trio.abc.Instrument):
             pass
         else:
             if prev is not None:
-                self.elapsed[task] += cur_time - prev
+                change = cur_time - prev
+                self.elapsed[task] += change
                 self.start_time[task] = None
+                if change > (5/1000):
+                    LOGGER.warning(
+                        'Task didn\'t yield ({:.02f}ms): {!r}:{}, args={}',
+                        change*1000,
+                        task, task.coro.cr_frame.f_lineno,
+                        self.get_args(task),
+                    )
 
     @override
     def task_exited(self, task: trio.lowlevel.Task) -> None:
@@ -150,24 +158,28 @@ class Tracer(trio.abc.Instrument):
         cur_time = time.perf_counter()
         elapsed = self.elapsed.pop(task, 0.0)
         start = self.start_time.pop(task, None)
-        args = self.args.pop(task, srctools.EmptyMapping)
         if start is not None:
             elapsed += cur_time - start
 
         if elapsed > 0.1:
-            args = {
-                name: val
-                for name, val in args.items()
-                # Hide objects with really massive reprs.
-                if not isinstance(val, (dict, Keyvalues, packages.PackagesSet))
-                # Objects with no useful info.
-                if (
-                    type(val).__repr__ is not object.__repr__ or
-                    type(val).__str__ is not object.__str__
-                )
-                if 'KI_PROTECTION' not in name   # Trio flag.
-            }
-            self.slow.append((elapsed, f'Task time={elapsed:.06}: {task!r}, args={args}'))
+            self.slow.append((elapsed, f'Task time={elapsed:.06}: {task!r}, args={self.get_args(task)}'))
+        self.args.pop(task, None)
+
+    def get_args(self, task: trio.lowlevel.Task) -> object:
+        """Get the args for a task."""
+        args = self.args.pop(task, srctools.EmptyMapping)
+        return {
+            name: val
+            for name, val in args.items()
+            # Hide objects with really massive reprs.
+            if not isinstance(val, (dict, Keyvalues, packages.PackagesSet, ExportData))
+            # Objects with no useful info.
+            if (
+                type(val).__repr__ is not object.__repr__ or
+                type(val).__str__ is not object.__str__
+            )
+            if 'KI_PROTECTION' not in name  # Trio flag.
+        }
 
 
 async def app_main(init: Callable[[], Awaitable[Any]]) -> None:
