@@ -69,7 +69,8 @@ load_screen = loadScreen.LoadScreen(
 @attrs.define(kw_only=True)
 class ExportData:
     """The arguments to pak_object.export()."""
-    packset: PackagesSet  # The entire loaded packages set.
+    # The entire loaded packages set. The repr is massive, just show the ID.
+    packset: PackagesSet = attrs.field(repr=lambda pack: f'<PackagesSet @ {id(pack):x}>')
     game: Game  # The current game.
     # Usually str, but some items pass other things.
     selected: Dict[Type[PakObject], Any]
@@ -78,11 +79,11 @@ class ExportData:
     # If refreshing resources is enabled.
     copy_resources: bool
     # All the items in the map
-    all_items: List[EditorItem] = attrs.Factory(list)
+    all_items: List[EditorItem] = attrs.field(factory=list, repr=False)
     # The error/connection icons
     renderables: Dict[RenderableType, Renderable] = attrs.Factory(dict)
     # vbsp_config.cfg file.
-    vbsp_conf: Keyvalues = attrs.Factory(Keyvalues.root)
+    vbsp_conf: Keyvalues = attrs.field(factory=Keyvalues.root, repr=False)
     # As steps export, they may fill this to include additional resources that
     # are written to the game folder. If updating the cache, these files won't
     # be deleted. This should be an absolute path.

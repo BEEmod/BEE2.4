@@ -89,7 +89,7 @@ class StyleVar(PakObject, allow_mult=True, needs_foreground=True):
         return (
             f'<Stylevar "{self.id}", name="{self.name}", '
             f'default={self.default}, '
-            f'styles={self.styles}>:\n{self.desc}'
+            f'styles={self.styles}>'
         )
 
     def iter_trans_tokens(self) -> Iterator[TransTokenSource]:
