@@ -8,7 +8,7 @@ Does stuff related to the actual games.
 from __future__ import annotations
 
 import sys
-from typing import Dict, NoReturn, Optional, Union, Iterator
+from typing import Dict, Optional, Union, Iterator
 from pathlib import Path
 
 import trio
@@ -26,7 +26,7 @@ import attrs
 from typing_extensions import Self
 
 from BEE2_config import ConfigFile
-from app import background_run
+from app import background_run, quit_app
 from app.dialogs import Dialogs
 from config.gen_opts import GenOptions
 from exporting.compiler import terminate_error_server, restore_backup
@@ -38,7 +38,6 @@ import packages
 import utils
 import config
 import event
-
 
 LOGGER = srctools.logger.get_logger(__name__)
 
@@ -59,15 +58,6 @@ EXE_SUFFIX = (
     '_linux' if utils.LINUX else
     ''
 )
-
-
-def quit_application() -> NoReturn:
-    """Command run to quit the application.
-
-    This is overwritten by UI later.
-    """
-    import sys
-    sys.exit()
 
 
 @attrs.define(eq=False)
@@ -270,6 +260,7 @@ def save() -> None:
 
 
 async def load(dialogs: Dialogs) -> None:
+    """Load the game configuration."""
     global selected_game
     all_games.clear()
     for gm in CONFIG:
@@ -289,7 +280,8 @@ async def load(dialogs: Dialogs) -> None:
         # Ask the user for Portal 2's location...
         if not await add_game(dialogs):
             # they cancelled, quit
-            quit_application()
+            quit_app()
+            return
         loadScreen.main_loader.unsuppress()  # Show it again
     selected_game = all_games[0]
 
@@ -389,7 +381,8 @@ async def remove_game(dialogs: Dialogs) -> None:
         CONFIG.save()
 
         if not all_games:
-            quit_application()  # If we have no games, nothing can be done
+            quit_app()  # If we have no games, nothing can be done
+            return
 
         selected_game = all_games[0]
         selectedGame_radio.set(0)

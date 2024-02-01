@@ -14,7 +14,7 @@ import trio
 from typing_extensions import assert_never
 
 import exporting
-from app import TK_ROOT, background_run
+from app import TK_ROOT, background_run, quit_app
 from BEE2_config import ConfigFile, GEN_OPTS
 from app.dialogs import Dialogs
 from loadScreen import MAIN_UI as LOAD_UI
@@ -466,44 +466,6 @@ class PalItem:
         return f'<{self.id}:{self.subKey}>'
 
 
-def quit_application() -> None:
-    """Do a last-minute save of our config files, and quit the app."""
-    import app
-    LOGGER.info('Shutting down application.')
-    # noinspection PyProtectedMember
-    if app._APP_NURSERY is not None:
-        # noinspection PyProtectedMember
-        app._APP_NURSERY.cancel_scope.cancel()
-
-    # If our window isn't actually visible, this is set to nonsense -
-    # ignore those values.
-    if TK_ROOT.winfo_viewable():
-        config.APP.store_conf(WindowState(
-            x=TK_ROOT.winfo_rootx(),
-            y=TK_ROOT.winfo_rooty(),
-        ), 'main_window')
-
-    try:
-        config.APP.write_file()
-    except Exception:
-        LOGGER.exception('Saving main conf:')
-    try:
-        GEN_OPTS.save_check()
-    except Exception:
-        LOGGER.exception('Saving GEN_OPTS:')
-
-    item_opts.save_check()
-    CompilerPane.COMPILE_CFG.save_check()
-    try:
-        gameMan.save()
-    except Exception:
-        pass
-    # Clean this out.
-    snd.clean_sample_folder()
-
-gameMan.quit_application = quit_application
-
-
 async def load_packages(packset: packages.PackagesSet, tk_img: TKImages) -> None:
     """Import in the list of items and styles from the packages.
 
@@ -833,8 +795,8 @@ async def export_editoritems(pal_ui: paletteUI.PaletteUI, bar: MenuBar, dialog: 
             elif conf.after_export is AfterExport.MINIMISE:
                 TK_ROOT.iconify()
             elif conf.after_export is AfterExport.QUIT:
-                quit_application()
-                # We never return from this.
+                quit_app()
+                return
             else:
                 assert_never(conf.after_export)
 
@@ -1434,17 +1396,12 @@ async def init_windows(tk_img: TKImages) -> None:
         """Export the palette, passing the required UI objects."""
         background_run(export_editoritems, pal_ui, menu_bar, DIALOG)
 
-    menu_bar = MenuBar(
-        TK_ROOT,
-        tk_img=tk_img,
-        quit_app=quit_application,
-        export=export,
-    )
+    menu_bar = MenuBar(TK_ROOT, tk_img=tk_img, export=export)
     TK_ROOT.maxsize(
         width=TK_ROOT.winfo_screenwidth(),
         height=TK_ROOT.winfo_screenheight(),
     )
-    TK_ROOT.protocol("WM_DELETE_WINDOW", quit_application)
+    TK_ROOT.protocol("WM_DELETE_WINDOW", quit_app)
     gameMan.ON_GAME_CHANGED.register(set_game)
     # Initialise the above and the menu bar.
     await gameMan.ON_GAME_CHANGED(gameMan.selected_game)

@@ -10,7 +10,7 @@ import utils
 from transtoken import TransToken
 from app import (
     gameMan, helpMenu, optionWindow, packageMan, tk_tools,
-    backup as backup_win, background_run,
+    backup as backup_win, background_run, quit_app,
 )
 from ui_tk.dialogs import DIALOG
 from ui_tk.img import TKImages
@@ -32,7 +32,6 @@ class MenuBar:
         self,
         parent: tk.Tk,
         tk_img: TKImages,
-        quit_app: Callable[[], object],
         export: Callable[[], object],
     ) -> None:
         """Create the top menu bar.

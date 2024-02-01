@@ -9,9 +9,10 @@ import trio
 from typing_extensions import override
 
 from app import (
-    TK_ROOT, localisation, sound, img, gameMan, music_conf,
+    CompilerPane, TK_ROOT, localisation, sound, img, gameMan, music_conf,
     UI, logWindow,
 )
+from config.windows import WindowState
 from transtoken import TransToken
 from ui_tk.dialogs import DIALOG
 from ui_tk.errors import display_errors
@@ -50,64 +51,96 @@ async def init_app() -> None:
 
     LOGGER.debug('Loading settings...')
 
-    await gameMan.load(DIALOG)
+    # This is cancelled when the quit button is pressed.
+    # noinspection PyProtectedMember
+    with app._APP_QUIT_SCOPE:
+        await gameMan.load(DIALOG)
+        try:
+            last_game = config.APP.get_cur_conf(LastSelected, 'game')
+        except KeyError:
+            pass
+        else:
+            if last_game.id is not None:
+                gameMan.set_game_by_name(last_game.id)
+
+        LOGGER.info('Loading Packages...')
+        packset = packages.get_loaded_packages()
+        mod_support.scan_music_locs(packset, gameMan.all_games)
+        async with ErrorUI(
+            error_desc=TransToken.ui_plural(
+                'An error occurred when loading packages:',
+                'Multiple errors occurred when loading packages:',
+            ),
+            warn_desc=TransToken.ui('Loading packages was partially successful:'),
+        ) as error_ui, trio.open_nursery() as nurs:
+            nurs.start_soon(
+                packages.load_packages,
+                packset,
+                list(BEE2_config.get_package_locs()),
+                error_ui,
+            )
+        if error_ui.result is ErrorResult.FAILED:
+            return
+        package_sys = packages.PACKAGE_SYS
+        await loadScreen.MAIN_UI.step('pre_ui')
+        from ui_tk.img import TK_IMG
+        app.background_run(img.init, package_sys, TK_IMG)
+        app.background_run(sound.sound_task)
+        app.background_run(localisation.load_aux_langs, gameMan.all_games, packset)
+
+        # Load filesystems into various modules
+        music_conf.load_filesystems(package_sys.values())
+        async with trio.open_nursery() as nurs:
+            nurs.start_soon(UI.load_packages, packset, TK_IMG)
+        await loadScreen.MAIN_UI.step('package_load')
+        LOGGER.info('Done!')
+
+        LOGGER.info('Initialising UI...')
+        async with trio.open_nursery() as nurs:
+            nurs.start_soon(UI.init_windows, TK_IMG)  # create all windows
+        LOGGER.info('UI initialised!')
+
+        if Tracer.slow:
+            LOGGER.info('Slow tasks\n{}', '\n'.join([
+                msg for _, msg in
+                sorted(Tracer.slow, key=lambda t: t[1], reverse=True)
+            ]))
+
+        loadScreen.main_loader.destroy()
+        # Delay this until the loop has actually run.
+        # Directly run TK_ROOT.lift() in TCL, instead
+        # of building a callable.
+        TK_ROOT.tk.call('after', 10, 'raise', TK_ROOT)
+
+        await trio.sleep_forever()
+
+    LOGGER.info('Shutting down application.')
+
+    # If our window isn't actually visible, this is set to nonsense -
+    # ignore those values.
+    if TK_ROOT.winfo_viewable():
+        config.APP.store_conf(WindowState(
+            x=TK_ROOT.winfo_rootx(),
+            y=TK_ROOT.winfo_rooty(),
+        ), 'main_window')
+
     try:
-        last_game = config.APP.get_cur_conf(LastSelected, 'game')
-    except KeyError:
+        config.APP.write_file()
+    except Exception:
+        LOGGER.exception('Saving main conf:')
+    try:
+        BEE2_config.GEN_OPTS.save_check()
+    except Exception:
+        LOGGER.exception('Saving GEN_OPTS:')
+
+    UI.item_opts.save_check()
+    CompilerPane.COMPILE_CFG.save_check()
+    try:
+        gameMan.save()
+    except Exception:
         pass
-    else:
-        if last_game.id is not None:
-            gameMan.set_game_by_name(last_game.id)
-
-    LOGGER.info('Loading Packages...')
-    packset = packages.get_loaded_packages()
-    mod_support.scan_music_locs(packset, gameMan.all_games)
-    async with ErrorUI(
-        error_desc=TransToken.ui_plural(
-            'An error occurred when loading packages:',
-            'Multiple errors occurred when loading packages:',
-        ),
-        warn_desc=TransToken.ui('Loading packages was partially successful:'),
-    ) as error_ui, trio.open_nursery() as nurs:
-        nurs.start_soon(
-            packages.load_packages,
-            packset,
-            list(BEE2_config.get_package_locs()),
-            error_ui,
-        )
-    if error_ui.result is ErrorResult.FAILED:
-        return
-    package_sys = packages.PACKAGE_SYS
-    await loadScreen.MAIN_UI.step('pre_ui')
-    from ui_tk.img import TK_IMG
-    app.background_run(img.init, package_sys, TK_IMG)
-    app.background_run(sound.sound_task)
-    app.background_run(localisation.load_aux_langs, gameMan.all_games, packset)
-
-    # Load filesystems into various modules
-    music_conf.load_filesystems(package_sys.values())
-    async with trio.open_nursery() as nurs:
-        nurs.start_soon(UI.load_packages, packset, TK_IMG)
-    await loadScreen.MAIN_UI.step('package_load')
-    LOGGER.info('Done!')
-
-    LOGGER.info('Initialising UI...')
-    async with trio.open_nursery() as nurs:
-        nurs.start_soon(UI.init_windows, TK_IMG)  # create all windows
-    LOGGER.info('UI initialised!')
-
-    if Tracer.slow:
-        LOGGER.info('Slow tasks\n{}', '\n'.join([
-            msg for _, msg in
-            sorted(Tracer.slow, key=lambda t: t[1], reverse=True)
-        ]))
-
-    loadScreen.main_loader.destroy()
-    # Delay this until the loop has actually run.
-    # Directly run TK_ROOT.lift() in TCL, instead
-    # of building a callable.
-    TK_ROOT.tk.call('after', 10, 'raise', TK_ROOT)
-    await trio.sleep_forever()
+    # Clean this out.
+    sound.clean_sample_folder()
 
 
 class Tracer(trio.abc.Instrument):
@@ -195,13 +228,11 @@ async def app_main(init: Callable[[], Awaitable[Any]]) -> None:
 
 def done_callback(result: Outcome[None]) -> None:
     """The app finished, quit."""
-    from app import UI
     if isinstance(result, Error):
         LOGGER.error('Trio exited with exception', exc_info=result.error)
         app.tk_error(type(result.error), result.error, result.error.__traceback__)
     else:
         LOGGER.debug('Trio exited normally.')
-    UI.quit_application()
     TK_ROOT.quit()
 
 

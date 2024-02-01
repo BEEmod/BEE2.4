@@ -15,6 +15,13 @@ TK_ROOT.withdraw()  # Hide the window until everything is loaded.
 
 # The nursery where UI tasks etc are run in.
 _APP_NURSERY: Optional[trio.Nursery] = None
+# This is quit to exit the sleep_forever(), beginning the shutdown process.
+_APP_QUIT_SCOPE = trio.CancelScope()
+
+
+def quit_app() -> None:
+    """Quit the application."""
+    _APP_QUIT_SCOPE.cancel()
 
 
 if '__class_getitem__' not in vars(tk.Event):
