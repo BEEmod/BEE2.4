@@ -32,7 +32,7 @@ from packages import (
     get_loaded_packages, find_packages,
     LOGGER as packages_logger
 )
-from app.errors import ErrorUI
+from app.errors import ErrorUI, console_handler
 import utils
 
 # If true, user said * for packages - use last for all.
@@ -204,9 +204,17 @@ async def main(files: List[str]) -> int:
 
     # Disable logging of package info.
     packages_logger.setLevel(logging.ERROR)
-    async with ErrorUI() as errors, trio.open_nursery() as nursery:
-        for loc in get_package_locs():
-            nursery.start_soon(find_packages, nursery, errors, get_loaded_packages(), loc, 'source')
+    with ErrorUI.install_handler(console_handler):
+        async with ErrorUI() as errors, trio.open_nursery() as nursery:
+            for loc in get_package_locs():
+                nursery.start_soon(
+                    find_packages,
+                    nursery,
+                    errors,
+                    get_loaded_packages(),
+                    loc,
+                    'source',
+                )
     packages_logger.setLevel(logging.INFO)
 
     LOGGER.info('Done!')

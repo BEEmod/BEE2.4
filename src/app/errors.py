@@ -77,6 +77,15 @@ def _collapse_excgroup(group: BaseExceptionGroup[AppError], fatal: bool) -> Iter
             yield exc
 
 
+async def console_handler(title: TransToken, desc: TransToken, errors: list[AppError]) -> None:
+    """Implements an error handler which logs to the console. Useful for testing code."""
+    LOGGER.error(
+        '{!s}: {!s}',
+        title, desc,
+        exc_info=ExceptionGroup('', errors),
+    )
+
+
 @final
 class ErrorUI:
     """A context manager which handles processing the errors."""
