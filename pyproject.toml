@@ -30,13 +30,19 @@ from_first = true
 combine_as_imports = true
 src_paths = ["src"]
 
-
 [tool.ruff]
 line-length = 127
 target-version = "py38"
+
+exclude = [
+	"src/perlin.py",
+]
+
+[tool.ruff.lint]
 select = [
 	"E", "UP", "F", "C4", "ANN", "B", "PIE", "RUF",
 	"PLC", "PLE", "PLW",  # Pylint.
+	"TRIO",
 
 	"TCH005",  # Empty type-checking block.
 ]
@@ -65,6 +71,9 @@ extend-ignore = [
 	"PLE1205",  # Too many arguments for logging, doesn't handle our format
 	"PLW2901",  # Allow redefining loop var inside the loop.
 
+	# Flake8-Trio:
+	"TRIO115",  # Stick with sleep(0) instead of lowlevel.checkpoint(), for now?
+
 	# Pyupgrade:
 	# Keep using typing types even with __future__.annotations.
 	"UP006", "UP007", "UP035",
@@ -80,11 +89,7 @@ extend-ignore = [
 	"PIE796",
 	]
 
-exclude = [
-	"src/perlin.py",
-]
-
-[tool.ruff.flake8-bugbear]
+[tool.ruff.lint.flake8-bugbear]
 extend-immutable-calls = [
 	# Objects which are immutable, or close enough that it's fine to be in func defaults.
 	"srctools.math.FrozenVec", "srctools.math.FrozenAngle", "srctools.math.FrozenMatrix",
@@ -109,7 +114,6 @@ extend-immutable-calls = [
 
 [tool.mypy]
 mypy_path = "$MYPY_CONFIG_FILE_DIR/hammeraddons/src/"
-#plugins = "trio_typing.plugin"
 allow_redefinition = true
 check_untyped_defs = true
 strict_optional = true
