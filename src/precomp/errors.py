@@ -10,9 +10,8 @@ import attrs
 
 from user_errors import DATA_LOC, UserError, TOK_VBSP_LEAK
 from precomp.tiling import TileDef, TileType
-from precomp.barriers import BarrierType
 from precomp.brushLoc import Grid
-from precomp import options
+from precomp import options, barriers
 import consts
 
 
@@ -36,13 +35,11 @@ def _vec2tup(vec: Vec | FrozenVec) -> tuple[float, float, float]:
 
 def load_tiledefs(tiles: Iterable[TileDef], grid: Grid) -> None:
     """Load tiledef info into a simplified tiles list."""
-    # noinspection PyProtectedMember
-    simple_tiles = UserError._simple_tiles
 
-    tiles_white = simple_tiles["white"] = []
-    tiles_black = simple_tiles["black"] = []
-    tiles_goo_partial = simple_tiles["goopartial"] = []
-    tiles_goo_full = simple_tiles["goofull"] = []
+    tiles_white = UserError.simple_tiles["white"]
+    tiles_black = UserError.simple_tiles["black"]
+    tiles_goo_partial = UserError.simple_tiles["goopartial"]
+    tiles_goo_full = UserError.simple_tiles["goofull"]
     for tile in tiles:
         if not tile.base_type.is_tile:
             continue
@@ -63,7 +60,7 @@ def load_tiledefs(tiles: Iterable[TileDef], grid: Grid) -> None:
             'orient': NORM_2_ORIENT[tile.normal.freeze()],
             'position': _vec2tup((tile.pos + 64 * tile.normal) / 128),
         })
-    goo_tiles = simple_tiles["goo"] = []
+    goo_tiles = UserError.simple_tiles["goo"]
     for pos, block in grid.items():
         if block.is_top:  # Both goo and bottomless pits.
             goo_tiles.append({
@@ -72,19 +69,17 @@ def load_tiledefs(tiles: Iterable[TileDef], grid: Grid) -> None:
             })
 
 
-def load_barriers(barriers: dict[tuple[FrozenVec, FrozenVec], BarrierType]) -> None:
+def load_barriers(barrier_map: dict[tuple[FrozenVec, FrozenVec], barriers.Barrier]) -> None:
     """Load barrier data for display in errors."""
-    # noinspection PyProtectedMember
-    glass_list = UserError._simple_tiles["glass"] = []
-    # noinspection PyProtectedMember
-    grate_list = UserError._simple_tiles["grating"] = []
-    kind_to_list = {
-        BarrierType.GLASS: glass_list,
-        BarrierType.GRATING: grate_list,
-    }
-    for (pos, normal), kind in barriers.items():
+    for (pos, normal), barrier in barrier_map.items():
+        if barrier.error_disp is None:
+            continue
+        try:
+            tile_list = UserError.simple_tiles[barrier.error_disp]
+        except KeyError:
+            continue
         pos = pos + 56.0 * normal
-        kind_to_list[kind].append({
+        tile_list.append({
             'orient': NORM_2_ORIENT[normal],
             'position': _vec2tup(pos / 128.0),
         })

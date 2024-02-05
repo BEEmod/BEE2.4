@@ -3,7 +3,7 @@
 UserError is imported all over, so this needs to have minimal imports to avoid cycles.
 """
 from typing import (
-    ClassVar, Collection, Dict, Iterable, List, Literal, Optional, Tuple,
+    ClassVar, Collection, Dict, Iterable, List, Literal, Optional, Set, Tuple,
     TypedDict, Union,
 )
 from typing_extensions import TypeAlias
@@ -18,6 +18,14 @@ import utils
 
 Kind: TypeAlias = Literal["white", "black", "goo", "goopartial", "goofull", "back", "glass", "grating"]
 TuplePos: TypeAlias = Tuple[float, float, float]
+# Textures for displaying barrier items.
+BARRIER_TEX_SET: Set[Kind] = {"glass", "grating", "white", "black"}
+TEX_SET: Set[Kind] = {
+    "white", "black",
+    "glass", "grating",
+    "goo", "goopartial", "goofull",
+    "back",
+}
 
 
 class SimpleTile(TypedDict):
@@ -81,7 +89,7 @@ class UserError(BaseException):
     This will result in the compile switching to compile a map which displays
     a HTML page to the user via the Steam Overlay.
     """
-    _simple_tiles: ClassVar[Dict[Kind, List[SimpleTile]]] = {}
+    simple_tiles: ClassVar[Dict[Kind, List[SimpleTile]]] = {kind: [] for kind in TEX_SET}
 
     def __init__(
         self,
@@ -140,7 +148,7 @@ class UserError(BaseException):
             message=message,
             language_file=None,
             context=ctx,
-            faces=self._simple_tiles,
+            faces=self.simple_tiles,
             voxels=list(map(to_threespace, voxels)),
             points=list(map(to_threespace, points)),
             leakpoints=list(map(to_threespace, leakpoints)),
