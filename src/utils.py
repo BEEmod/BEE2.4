@@ -1,10 +1,11 @@
 """Various functions shared among the compiler and application."""
 from __future__ import annotations
 from typing import (
-    Final, NewType, TYPE_CHECKING, Any, Awaitable, Callable, Generator, Generic, ItemsView,
-    Iterable, Iterator, KeysView, Mapping, NoReturn, Optional,
-    Sequence, SupportsInt, Tuple, Type, TypeVar, ValuesView,
+    ClassVar, Final, NewType, TYPE_CHECKING, Any, Awaitable, Callable, Generator, Generic,
+    ItemsView, Iterable, Iterator, KeysView, Mapping, NoReturn, Optional, Sequence, SupportsInt,
+    Tuple, Type, TypeVar, ValuesView,
 )
+
 from typing_extensions import ParamSpec, TypeVarTuple, Unpack
 from collections import deque
 from enum import Enum
@@ -18,7 +19,8 @@ import sys
 import types
 import zipfile
 
-from srctools import Angle
+from srctools.math import AnyVec, Angle, FrozenMatrix, FrozenVec, Vec
+import attrs
 import trio
 
 
@@ -26,7 +28,7 @@ __all__ = [
     'WIN', 'MAC', 'LINUX', 'STEAM_IDS', 'DEV_MODE', 'CODE_DEV_MODE', 'BITNESS',
     'get_git_version', 'install_path', 'bins_path', 'conf_location', 'fix_cur_directory',
     'run_bg_daemon', 'not_none', 'CONN_LOOKUP', 'CONN_TYPES', 'freeze_enum_props', 'FuncLookup',
-    'PackagePath', 'Result', 'acompose', 'get_indent', 'iter_grid', 'check_cython',
+    'PackagePath', 'Result', 'SliceKey', 'acompose', 'get_indent', 'iter_grid', 'check_cython',
     'check_shift', 'fit', 'group_runs', 'restart_app', 'quit_app', 'set_readonly',
     'unset_readonly', 'merge_tree', 'write_lang_pot',
 ]
@@ -520,6 +522,70 @@ class PackagePath:
         """Return a child file of this package."""
         child = child.rstrip('\\/')
         return PackagePath(self.package, f'{self.path.rstrip("/")}/{child}')
+
+
+@attrs.frozen(eq=False, hash=False, init=False)
+class SliceKey:
+    """A hashable key used to identify 2-dimensional plane slices."""
+    # Reuse the same instance for the vector, and precompute the hash.
+    _norm_cache: ClassVar[Mapping[FrozenVec, Tuple[FrozenVec, int]]] = {
+        FrozenVec.N: (FrozenVec.N, hash(b'n')),
+        FrozenVec.S: (FrozenVec.S, hash(b's')),
+        FrozenVec.E: (FrozenVec.E, hash(b'e')),
+        FrozenVec.W: (FrozenVec.W, hash(b'w')),
+        FrozenVec.T: (FrozenVec.T, hash(b't')),
+        FrozenVec.B: (FrozenVec.B, hash(b'b')),
+    }
+    _orients: ClassVar[Mapping[FrozenVec, FrozenMatrix]] = {
+        norm: FrozenMatrix.from_angle(norm.to_angle())
+        for norm in _norm_cache
+    }
+
+    normal: FrozenVec
+    distance: float
+    _hash: int = attrs.field(repr=False)
+
+    def __init__(self, normal: AnyVec, dist: AnyVec | float) -> None:
+        try:
+            norm, norm_hash = self._norm_cache[FrozenVec(normal)]
+        except KeyError:
+            raise ValueError(f'{normal!r} is not an on-axis normal!')
+        if not isinstance(dist, (int, float)):
+            dist = abs(norm).dot(dist)
+
+        self.__attrs_init__(
+            norm,
+            dist,
+            hash(dist) ^ norm_hash,
+        )
+
+    @property
+    def orient(self) -> FrozenMatrix:
+        """Return a matrix with the forward direction facing along the slice."""
+        return self._orients[self.normal]
+
+    def left(self) -> Vec:
+        """Return the +Y axis for this slice orientation, where +X is along the normal."""
+        return self._orients[self.normal].left()
+
+    def up(self) -> Vec:
+        """Return the +Z axis for this slice orientation, where +X is along the normal."""
+        return self._orients[self.normal].up()
+
+    def __hash__(self) -> int:
+        return self._hash
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, SliceKey):
+            return self.normal is other.normal and self.distance == other.distance
+        else:
+            return NotImplemented
+
+    def __ne__(self, other: object) -> bool:
+        if isinstance(other, SliceKey):
+            return self.normal is not other.normal or self.distance != other.distance
+        else:
+            return NotImplemented
 
 
 ResultT = TypeVar('ResultT')
