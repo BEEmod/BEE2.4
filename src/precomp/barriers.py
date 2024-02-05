@@ -2,8 +2,6 @@
 from __future__ import annotations
 
 from typing import Callable, Dict, Iterator, List, Tuple
-
-import attrs
 from typing_extensions import Literal, Self, Sequence
 
 from collections import defaultdict
@@ -11,6 +9,7 @@ from enum import Enum
 
 from srctools import FrozenMatrix, VMF, Vec, FrozenVec, Solid, Keyvalues, Entity, Angle, Matrix
 import srctools.logger
+import attrs
 
 from plane import Plane
 from precomp import instanceLocs, texturing, options, template_brush, conditions, collisions
@@ -34,6 +33,7 @@ class FrameOrient(Enum):
     """The kind of frame orientation."""
     HORIZ = "horizontal"
     VERT = "vertical"
+
 
 # (origin, normal) -> BarrierType
 BARRIERS: dict[tuple[FrozenVec, FrozenVec], Barrier] = {}
@@ -59,7 +59,7 @@ def get_pos_norm(origin: Vec) -> tuple[FrozenVec, FrozenVec]:
     return grid_pos.freeze(), (origin - grid_pos).norm().freeze()
 
 
-@attrs.define(eq=False)
+@attrs.define(eq=False, kw_only=True)
 class Barrier:
     """Type of barrier."""
     id: utils.ObjectID | utils.SpecialID
@@ -70,9 +70,11 @@ class Barrier:
     contents: collisions.CollideType = collisions.CollideType.SOLID
     use_floorbeams: bool = False
 
+    tex_player_clip: str | None = None
+
 
 # Special barrier representing the lack of one.
-BARRIER_EMPTY = Barrier(utils.ID_EMPTY)
+BARRIER_EMPTY = Barrier(id=utils.ID_EMPTY)
 
 
 class FrameType:
@@ -110,14 +112,16 @@ def parse_map(vmf: VMF, info: conditions.MapInfo) -> None:
     glass_inst = instanceLocs.resolve_filter('[glass_128]', silent=True)
 
     glass = Barrier(
-        GLASS_ID,
+        id=GLASS_ID,
         voice_attr='glass',
         face_temp=template_brush.get_scaling_template(options.GLASS_TEMPLATE()),
+        tex_player_clip=consts.Tools.PLAYER_CLIP_GLASS,
     )
     grating = Barrier(
-        GRATE_ID,
+        id=GRATE_ID,
         voice_attr='grating',
         face_temp=template_brush.get_scaling_template(options.GRATING_TEMPLATE()),
+        tex_player_clip=consts.Tools.PLAYER_CLIP_GRATE,
     )
 
     for entities, material, barrier in [
@@ -553,12 +557,10 @@ def make_glass_grating(
     same function.
     """
     # TODO: Make this all configurable
-    if barrier.contents is collisions.CollideType.GLASS:
+    if barrier.id == GLASS_ID:
         main_ent = vmf.create_ent('func_detail')
-        player_clip_mat = consts.Tools.PLAYER_CLIP_GLASS
         tex_cat = 'glass'
     else:
-        player_clip_mat = consts.Tools.PLAYER_CLIP_GRATE
         main_ent = vmf.create_ent(
             'func_brush',
             renderfx=14,  # Constant Glow
@@ -575,27 +577,28 @@ def make_glass_grating(
             texturing.apply(texturing.GenCat.SPECIAL, face, tex_cat)
             barrier.face_temp.apply(face, change_mat=False)
 
-    if abs(normal.z) < 0.125:
-        # If vertical, we don't care about footsteps.
-        # So just use 'normal' clips.
-        player_clip = vmf.create_ent('func_detail')
-        player_clip_mat = consts.Tools.PLAYER_CLIP
-    else:
-        # This needs to be a func_brush, otherwise the clip texture data
-        # will be merged with other clips.
-        player_clip = vmf.create_ent(
-            'func_brush',
-            solidbsp=1,
-            origin=ent_pos,
-        )
-        # We also need a func_detail clip, which functions on portals.
-        # Make it thinner, so it doesn't impact footsteps.
-        player_thin_clip = vmf.create_ent('func_detail')
-        player_thin_clip.solids = solid_func(0.5, 3.5, consts.Tools.PLAYER_CLIP)
+    if barrier.tex_player_clip is not None:
+        if abs(normal.z) < 0.125:
+            # If vertical, we don't care about footsteps.
+            # So just use 'normal' clips.
+            player_clip = vmf.create_ent('func_detail')
+            player_clip_mat = consts.Tools.PLAYER_CLIP
+        else:
+            # This needs to be a func_brush, otherwise the clip texture data
+            # will be merged with other clips.
+            player_clip = vmf.create_ent(
+                'func_brush',
+                solidbsp=1,
+                origin=ent_pos,
+            )
+            # We also need a func_detail clip, which functions on portals.
+            # Make it thinner, so it doesn't impact footsteps.
+            player_thin_clip = vmf.create_ent('func_detail')
+            player_thin_clip.solids = solid_func(0.5, 3.5, consts.Tools.PLAYER_CLIP)
 
-    player_clip.solids = solid_func(0, 4, player_clip_mat)
+        player_clip.solids = solid_func(0, 4, barrier.tex_player_clip)
 
-    if barrier.contents is collisions.CollideType.GRATING:
+    if barrier.id == GRATE_ID:
         # Add the VPhysics clip.
         phys_clip = vmf.create_ent(
             'func_clip_vphysics',
