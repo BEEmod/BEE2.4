@@ -1,8 +1,10 @@
 """Implements Glass and Grating."""
 from __future__ import annotations
 
-from typing import Callable, Iterator, List, Tuple
-from typing_extensions import Literal
+from typing import Callable, Dict, Iterator, List, Tuple
+
+import attrs
+from typing_extensions import Literal, Self, Sequence
 
 from collections import defaultdict
 from enum import Enum
@@ -15,6 +17,7 @@ from precomp import instanceLocs, texturing, options, template_brush, conditions
 from precomp.grid_optim import optimise as grid_optimise
 import consts
 import user_errors
+import utils
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -32,10 +35,15 @@ class HoleType(Enum):
     SMALL = 'small'  # 1x1 hole (portal)
     LARGE = 'large'  # 3x3 hole (funnel)
 
+class FrameOrient(Enum):
+    """The kind of frame orientation."""
+    HORIZ = "horizontal"
+    VERT = "vertical"
+
 # (origin, normal) -> BarrierType
 BARRIERS: dict[tuple[FrozenVec, FrozenVec], BarrierType] = {}
 HOLES: dict[tuple[FrozenVec, FrozenVec], HoleType] = {}
-
+FRAME_TYPES: Dict[utils.ObjectID, Dict[FrameOrient, FrameType]] = {}
 
 ORIENTS = {
     Vec.T: FrozenMatrix.from_angle(180, 0, 0),
@@ -51,6 +59,33 @@ def get_pos_norm(origin: Vec) -> tuple[FrozenVec, FrozenVec]:
     """From the origin, get the grid position and normal."""
     grid_pos = origin // 128 * 128 + (64, 64, 64)
     return grid_pos.freeze(), (origin - grid_pos).norm().freeze()
+
+
+
+
+class FrameType:
+    """Configuration for a type of barrier frame."""
+
+    @classmethod
+    def parse(cls, kv: Keyvalues) -> Self:
+        """Parse from keyvalues configuration."""
+        return cls()
+
+
+def parse_conf(kv: Keyvalues) -> None:
+    """Parse frame configurations."""
+    FRAME_TYPES.clear()
+    for block in kv.find_children('BarrierFrames'):
+        frame_id = utils.parse_obj_id(block.real_name)
+        if 'horiz' in block and 'vert' in block:
+            horiz_conf = FrameType.parse(block.find_key('horiz'))
+            vert_conf = FrameType.parse(block.find_key('vert'))
+        else:
+            horiz_conf = vert_conf = FrameType.parse(block)
+        FRAME_TYPES[frame_id] = {
+            FrameOrient.HORIZ: horiz_conf,
+            FrameOrient.VERT: vert_conf,
+        }
 
 
 def parse_map(vmf: VMF, info: conditions.MapInfo) -> None:
