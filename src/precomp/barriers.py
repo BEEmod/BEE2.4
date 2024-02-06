@@ -5,7 +5,7 @@ from typing import Callable, Dict, Iterator, List, Tuple
 from typing_extensions import Literal, Self, Sequence
 
 from collections import defaultdict
-from enum import Enum
+from enum import Enum, Flag, auto as enum_auto
 
 from srctools import FrozenMatrix, VMF, Vec, FrozenVec, Solid, Keyvalues, Entity, Angle, Matrix
 import srctools.logger
@@ -35,6 +35,21 @@ class FrameOrient(Enum):
     VERT = "vertical"
 
 
+class Border(Flag):
+    """Indicates which sides still need frames generated."""
+    NONE = 0
+    # We need a straight section on this side.
+    STRAIGHT_N = enum_auto()
+    STRAIGHT_S = enum_auto()
+    STRAIGHT_E = enum_auto()
+    STRAIGHT_W = enum_auto()
+    # A convex corner is present, so the straight sections need to be shorter.
+    CORNER_NW = enum_auto()
+    CORNER_NE = enum_auto()
+    CORNER_SW = enum_auto()
+    CORNER_SE = enum_auto()
+
+
 # (origin, normal) -> BarrierType
 BARRIERS: dict[tuple[FrozenVec, FrozenVec], Barrier] = {}
 HOLES: dict[tuple[FrozenVec, FrozenVec], HoleType] = {}
@@ -59,7 +74,7 @@ def get_pos_norm(origin: Vec) -> tuple[FrozenVec, FrozenVec]:
     return grid_pos.freeze(), (origin - grid_pos).norm().freeze()
 
 
-@attrs.define(eq=False, kw_only=True)
+@attrs.frozen(eq=False, kw_only=True)
 class Barrier:
     """Type of barrier."""
     id: utils.ObjectID | utils.SpecialID
@@ -77,8 +92,10 @@ class Barrier:
 BARRIER_EMPTY = Barrier(id=utils.ID_EMPTY)
 
 
+@attrs.frozen(eq=False, kw_only=True)
 class FrameType:
     """Configuration for a type of barrier frame."""
+    convex_corner_inst: str | None = None
 
     @classmethod
     def parse(cls, kv: Keyvalues) -> Self:
@@ -255,7 +272,7 @@ def template_solids_and_coll(
 
 @conditions.meta_cond(150)
 def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
-    """Make barrier entities. get_tex is vbsp.get_tex."""
+    """Make barrier entities."""
     barrier: Barrier
 
     # Avoid error without this package.
