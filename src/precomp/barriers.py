@@ -49,13 +49,6 @@ class Border(Flag):
     CORNER_SW = enum_auto()
     CORNER_SE = enum_auto()
 
-# Planar slice -> plane of barriers.
-# The plane is specified as the edge of the voxel.
-BARRIERS: dict[utils.SliceKey, Plane[Barrier]] = defaultdict(lambda: Plane(default=BARRIER_EMPTY))
-# (origin, normal) -> hole
-HOLES: dict[tuple[FrozenVec, FrozenVec], HoleType] = {}
-FRAME_TYPES: Dict[utils.ObjectID, Dict[FrameOrient, FrameType]] = {}
-
 # IDs for the default barrier definitions. These are detected by the generated brushes, not
 # from the instance (since that's the same for both).
 GLASS_ID: Final = utils.parse_obj_id('VALVE_GLASS')
@@ -117,6 +110,14 @@ class FrameType:
     def parse(cls, kv: Keyvalues) -> Self:
         """Parse from keyvalues configuration."""
         return cls()
+
+
+# Planar slice -> plane of barriers.
+# The plane is specified as the edge of the voxel.
+BARRIERS: dict[utils.SliceKey, Plane[Barrier]] = defaultdict(lambda: Plane(default=BARRIER_EMPTY))
+# (origin, normal) -> hole
+HOLES: dict[tuple[FrozenVec, FrozenVec], HoleType] = {}
+FRAME_TYPES: Dict[utils.ObjectID, Dict[FrameOrient, FrameType]] = {}
 
 
 def parse_conf(kv: Keyvalues) -> None:
