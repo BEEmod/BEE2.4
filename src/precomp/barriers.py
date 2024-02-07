@@ -1,7 +1,7 @@
 """Implements Glass and Grating."""
 from __future__ import annotations
 
-from typing import Callable, Dict, Iterator, List, Tuple
+from typing import Callable, Dict, Final, Iterator, List, Tuple
 from typing_extensions import Literal, Self, Sequence
 
 from collections import defaultdict
@@ -55,8 +55,8 @@ BARRIERS: dict[tuple[FrozenVec, FrozenVec], Barrier] = {}
 HOLES: dict[tuple[FrozenVec, FrozenVec], HoleType] = {}
 FRAME_TYPES: Dict[utils.ObjectID, Dict[FrameOrient, FrameType]] = {}
 
-GLASS_ID = utils.parse_obj_id('VALVE_GLASS')
-GRATE_ID = utils.parse_obj_id('VALVE_GRATING')
+GLASS_ID: Final = utils.parse_obj_id('VALVE_GLASS')
+GRATE_ID: Final = utils.parse_obj_id('VALVE_GRATING')
 
 ORIENTS = {
     Vec.T: FrozenMatrix.from_angle(180, 0, 0),
@@ -72,6 +72,20 @@ def get_pos_norm(origin: Vec) -> tuple[FrozenVec, FrozenVec]:
     """From the origin, get the grid position and normal."""
     grid_pos = origin // 128 * 128 + (64, 64, 64)
     return grid_pos.freeze(), (origin - grid_pos).norm().freeze()
+
+
+BARRIER_FOOTPRINT_SMALL: Final[Sequence[Tuple[int, int]]] = [
+    (u, v)
+    for u in [-16, 16]
+    for v in [-16, 16]
+]
+# The large barrier excludes the corners.
+BARRIER_FOOTPRINT_LARGE: Final[Sequence[Tuple[int, int]]] = [
+    (u, v)
+    for u in [-80, -48, -16, 16, 48, 80]
+    for v in [-80, -48, -16, 16, 48, 80]
+    if abs(u) != 80 or abs(v) != 80
+]
 
 
 @attrs.frozen(eq=False, kw_only=True)
@@ -337,11 +351,10 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
         # Distance from origin to this plane.
         norm_pos = FrozenVec.with_axes(norm_axis, origin)
         slice_plane = slices[norm_pos, normal[norm_axis] > 0]
-        for u_off in [-48, -16, 16, 48]:
-            for v_off in [-48, -16, 16, 48]:
-                slice_plane[
-                    int((u + u_off) // 32),
-                    int((v + v_off) // 32),
+        for u_off, v_off in BARRIER_FOOTPRINT_SMALL:
+            slice_plane[
+                int((u + u_off) // 32),
+                int((v + v_off) // 32),
                 ] = barr_type
 
         # Also go place convex corners.
@@ -402,27 +415,22 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
         u, v = origin.other_axes(norm_axis)
         norm_pos = FrozenVec.with_axes(norm_axis, origin)
         slice_plane = slices[norm_pos, normal[norm_axis] > 0]
-        offsets: tuple[int, ...]
+        offsets: Sequence[Tuple[int, int]]
         if hole_type is HoleType.LARGE:
-            offsets = (-80, -48, -16, 16, 48, 80)
+            offsets = BARRIER_FOOTPRINT_LARGE
         else:
-            offsets = (-16, 16)
+            offsets = BARRIER_FOOTPRINT_SMALL
         bad_locs: List[Vec] = []
-        for u_off in offsets:
-            for v_off in offsets:
-                # Remove these squares, but keep them in the Plane,
-                # so we can check if there was glass there.
-                uv = (
-                    int((u + u_off) // 32),
-                    int((v + v_off) // 32),
-                )
-                if uv in slice_plane:
-                    slice_plane[uv] = BARRIER_EMPTY
-                # These have to be present, except for the corners on the large hole.
-                elif abs(u_off) != 80 or abs(v_off) != 80:
-                    u_ax, v_ax = Vec.INV_AXIS[norm_axis]
-                    bad_locs.append(Vec.with_axes(
-                        norm_axis, norm_pos,
+        for u_off, v_off in offsets:
+            # Remove these squares, but keep them in the Plane,
+            # so we can check if there was glass there.
+            uv = (int((u + u_off) // 32), int((v + v_off) // 32))
+            if uv in slice_plane:
+                slice_plane[uv] = BARRIER_EMPTY
+            else:
+                u_ax, v_ax = Vec.INV_AXIS[norm_axis]
+                bad_locs.append(Vec.with_axes(
+                    norm_axis, norm_pos,
                         u_ax, u + u_off,
                         v_ax, v + v_off,
                     ))
