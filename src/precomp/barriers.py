@@ -49,9 +49,10 @@ class Border(Flag):
     CORNER_SW = enum_auto()
     CORNER_SE = enum_auto()
 
-
-# (origin, normal) -> BarrierType
-BARRIERS: dict[tuple[FrozenVec, FrozenVec], Barrier] = {}
+# Planar slice -> plane of barriers.
+# The plane is specified as the edge of the voxel.
+BARRIERS: dict[utils.SliceKey, Plane[Barrier]] = defaultdict(lambda: Plane(default=BARRIER_EMPTY))
+# (origin, normal) -> hole
 HOLES: dict[tuple[FrozenVec, FrozenVec], HoleType] = {}
 FRAME_TYPES: Dict[utils.ObjectID, Dict[FrameOrient, FrameType]] = {}
 
@@ -68,12 +69,6 @@ ORIENTS = {
     Vec.E: FrozenMatrix.from_angle(90, 180, 0),
     Vec.W: FrozenMatrix.from_angle(90, 0, 0),
 }
-
-
-def get_pos_norm(origin: Vec) -> tuple[FrozenVec, FrozenVec]:
-    """From the origin, get the grid position and normal."""
-    grid_pos = origin // 128 * 128 + (64, 64, 64)
-    return grid_pos.freeze(), (origin - grid_pos).norm().freeze()
 
 
 FULL_SQUARE: Final[Sequence[Tuple[int, int]]] = [
@@ -168,30 +163,58 @@ def parse_map(vmf: VMF, info: conditions.MapInfo) -> None:
     ]:
         for brush_ent in entities:
             for face in brush_ent.sides():
-                if face.mat == material:
-                    info.set_attr(barrier.voice_attr)
-                    brush_ent.remove()
-                    BARRIERS[get_pos_norm(face.get_origin())] = barrier
-                    break
+                if face.mat != material:
+                    continue  # Side face.
+                # We found the face for a barrier brush. This could be either facing
+                # into or out of the voxel - compute the grid center to disambiguate.
+                brush_ent.remove()
+                origin = face.get_origin()
+                center = origin // 128 * 128 + (64, 64, 64)
+                norm = (origin - center).norm()
+
+                # Offset to be the voxel side, not center.
+                center += 64 * norm
+                plane_slice = utils.SliceKey(norm, center)
+                local = plane_slice.world_to_plane(center)
+
+                # Now set each 32-grid cell to be the barrier. Since this is square the orientation
+                # doesn't matter.
+                for u_off, v_off in FULL_SQUARE:
+                    BARRIERS[plane_slice][
+                        (local.x + u_off) // 32,
+                        (local.y + v_off) // 32,
+                    ] = barrier
+                break  # Don't check the remaining faces.
 
     for inst in vmf.by_class['func_instance']:
         filename = inst['file'].casefold()
         if not filename:
             continue
         if filename in segment_inst:
-            # Add a fixup to allow distinguishing the type.
-            pos: FrozenVec = FrozenVec.from_str(inst['origin']) // 128 * 128 + (64, 64, 64)
-            norm: FrozenVec = FrozenVec(z=-1) @ Angle.from_str(inst['angles'])
+            # The vanilla segment instance is the same for glass/grating. Look up the barriers
+            # here, so we can mark them with a fixup. At this point all barrier definitions are
+            # whole voxel, so it doesn't matter which we pick.
+            center = Vec.from_str(inst['origin']) // 128 * 128 + (64, 64, 64)
+            norm = Vec(x=-1) @ Angle.from_str(inst['angles'])
+            center += 64 * norm
+            plane_slice = utils.SliceKey(norm, center)
+            local = plane_slice.world_to_plane(center)
             try:
-                barrier = BARRIERS[pos, norm].id
+                barrier = BARRIERS[plane_slice][local.x // 32, local.y // 32]
             except KeyError:
-                LOGGER.warning('No glass/grating for frame at {}, {}?', pos, norm)
+                LOGGER.warning('No glass/grating for frame at {}, {}?', center, norm)
             else:
                 if barrier is glass:
                     inst.fixup[consts.FixupVars.BEE_GLS_TYPE] = 'glass'
                 elif barrier is grating:
                     inst.fixup[consts.FixupVars.BEE_GLS_TYPE] = 'grate'
-        if filename in frame_inst:
+                else:
+                    # vmf.create_ent('info_particle_system', orign=center, angles=inst['angles'])
+                    LOGGER.warning(
+                        'No glass/grating for frame at {}, {} = {}, {}? - got {}',
+                        center, norm, plane_slice, local / 32, barrier,
+                    )
+        if filename in frame_inst:  # Frames are useless, we'll make our own.
             inst.remove()
 
 

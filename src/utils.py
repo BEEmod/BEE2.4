@@ -536,9 +536,18 @@ class SliceKey:
         FrozenVec.T: (FrozenVec.T, hash(b't')),
         FrozenVec.B: (FrozenVec.B, hash(b'b')),
     }
+    # The orientation points Z = normal, X = sideways, Y = upward.
     _orients: ClassVar[Mapping[FrozenVec, FrozenMatrix]] = {
-        norm: FrozenMatrix.from_angle(norm.to_angle())
-        for norm in _norm_cache
+        FrozenVec.N: FrozenMatrix.from_basis(x=Vec(1, 0, 0), y=Vec(0, 0, 1)),
+        FrozenVec.S: FrozenMatrix.from_basis(x=Vec(-1, 0, 0), y=Vec(0, 0, 1)),
+        FrozenVec.E: FrozenMatrix.from_basis(x=Vec(0, -1, 0), y=Vec(0, 0, 1)),
+        FrozenVec.W: FrozenMatrix.from_basis(x=Vec(0, 1, 0), y=Vec(0, 0, 1)),
+        FrozenVec.T: FrozenMatrix.from_basis(x=Vec(1, 0, 0), y=Vec(0, 1, 0)),
+        FrozenVec.B: FrozenMatrix.from_basis(x=Vec(1, 0, 0), y=Vec(0, -1, 0)),
+    }
+    _inv_orients: ClassVar[Mapping[FrozenVec, FrozenMatrix]] = {
+        norm: orient.transpose()
+        for norm, orient in _orients.items()
     }
 
     normal: FrozenVec
@@ -551,7 +560,7 @@ class SliceKey:
         except KeyError:
             raise ValueError(f'{normal!r} is not an on-axis normal!')
         if not isinstance(dist, (int, float)):
-            dist = abs(norm).dot(dist)
+            dist = norm.dot(dist)
 
         self.__attrs_init__(
             norm,
@@ -586,6 +595,16 @@ class SliceKey:
             return self.normal is not other.normal or self.distance != other.distance
         else:
             return NotImplemented
+
+    def plane_to_world(self, x: float, y: float, z: float = 0.0) -> Vec:
+        """Return a position relative to this plane."""
+        orient = self._orients[self.normal]
+        return Vec(x, y, z) @ orient + self.normal * self.distance
+
+    def world_to_plane(self, pos: AnyVec) -> Vec:
+        """Take a world position and return the location relative to this plane."""
+        orient = self._inv_orients[self.normal]
+        return (Vec(pos) - self.normal * self.distance) @ orient
 
 
 ResultT = TypeVar('ResultT')
