@@ -55,6 +55,8 @@ BARRIERS: dict[tuple[FrozenVec, FrozenVec], Barrier] = {}
 HOLES: dict[tuple[FrozenVec, FrozenVec], HoleType] = {}
 FRAME_TYPES: Dict[utils.ObjectID, Dict[FrameOrient, FrameType]] = {}
 
+# IDs for the default barrier definitions. These are detected by the generated brushes, not
+# from the instance (since that's the same for both).
 GLASS_ID: Final = utils.parse_obj_id('VALVE_GLASS')
 GRATE_ID: Final = utils.parse_obj_id('VALVE_GRATING')
 
@@ -74,16 +76,21 @@ def get_pos_norm(origin: Vec) -> tuple[FrozenVec, FrozenVec]:
     return grid_pos.freeze(), (origin - grid_pos).norm().freeze()
 
 
+FULL_SQUARE: Final[Sequence[Tuple[int, int]]] = [
+    (u, v)
+    for u in [-48, -16, +16, +48]
+    for v in [-48, -16, +16, +48]
+]
 BARRIER_FOOTPRINT_SMALL: Final[Sequence[Tuple[int, int]]] = [
     (u, v)
-    for u in [-16, 16]
-    for v in [-16, 16]
+    for u in [-16, +16]
+    for v in [-16, +16]
 ]
 # The large barrier excludes the corners.
 BARRIER_FOOTPRINT_LARGE: Final[Sequence[Tuple[int, int]]] = [
     (u, v)
-    for u in [-80, -48, -16, 16, 48, 80]
-    for v in [-80, -48, -16, 16, 48, 80]
+    for u in [-80, -48, -16, +16, +48, +80]
+    for v in [-80, -48, -16, +16, +48, +80]
     if abs(u) != 80 or abs(v) != 80
 ]
 
@@ -366,11 +373,8 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
         # Distance from origin to this plane.
         norm_pos = FrozenVec.with_axes(norm_axis, origin)
         slice_plane = slices[norm_pos, normal[norm_axis] > 0]
-        for u_off, v_off in BARRIER_FOOTPRINT_SMALL:
-            slice_plane[
-                int((u + u_off) // 32),
-                int((v + v_off) // 32),
-                ] = barr_type
+        for u_off, v_off in FULL_SQUARE:
+            slice_plane[(u + u_off) // 32, (v + v_off) // 32] = barr_type
 
         # Also go place convex corners.
         for orient, filename, corner_side in convex_corners:
