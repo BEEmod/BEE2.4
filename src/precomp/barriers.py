@@ -140,7 +140,7 @@ def parse_map(vmf: VMF, info: conditions.MapInfo) -> None:
     The frames are updated with a fixup var, as appropriate.
     """
     frame_inst = instanceLocs.resolve_filter('[glass_frames]', silent=True)
-    glass_inst = instanceLocs.resolve_filter('[glass_128]', silent=True)
+    segment_inst = instanceLocs.resolve_filter('[glass_128]', silent=True)
 
     glass = Barrier(
         id=GLASS_ID,
@@ -169,7 +169,22 @@ def parse_map(vmf: VMF, info: conditions.MapInfo) -> None:
 
     for inst in vmf.by_class['func_instance']:
         filename = inst['file'].casefold()
-        if filename and (filename in glass_inst or filename in frame_inst):
+        if not filename:
+            continue
+        if filename in segment_inst:
+            # Add a fixup to allow distinguishing the type.
+            pos: FrozenVec = FrozenVec.from_str(inst['origin']) // 128 * 128 + (64, 64, 64)
+            norm: FrozenVec = FrozenVec(z=-1) @ Angle.from_str(inst['angles'])
+            try:
+                barrier = BARRIERS[pos, norm].id
+            except KeyError:
+                LOGGER.warning('No glass/grating for frame at {}, {}?', pos, norm)
+            else:
+                if barrier is glass:
+                    inst.fixup[consts.FixupVars.BEE_GLS_TYPE] = 'glass'
+                elif barrier is grating:
+                    inst.fixup[consts.FixupVars.BEE_GLS_TYPE] = 'grate'
+        if filename in frame_inst:
             inst.remove()
 
 
