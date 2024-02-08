@@ -509,15 +509,15 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
                     place_straight_run(
                         vmf, barrier, plane_slice, borders, u, v,
                         Border.STRAIGHT_E, ORIENT_N, 0, 1,
-                        Border.CORNER_NE, Border.CORNER_SE,
+                        Border.CORNER_SE, Border.CORNER_NE,
                         0.0, 0.0,
                     )
                 if Border.STRAIGHT_W in border:
                     place_straight_run(
                         vmf, barrier, plane_slice, borders, u, v,
                         Border.STRAIGHT_W, ORIENT_S, 0, 1,
-                        Border.CORNER_NW, Border.CORNER_SW,
-                        0.0, 0.0,
+                        Border.CORNER_SW, Border.CORNER_NW,
+                        32.0, 0.0,
                     )
 
             for (u, v), border in borders.items():
@@ -647,6 +647,7 @@ def place_straight_run(
         frame_length = total_dist
         if corner_start in borders[start_u, start_v]:
             off += frame.corner_size_horiz
+            frame_length -= frame.corner_size_horiz
         if corner_end in borders[end_u, end_v]:
             frame_length -= frame.corner_size_horiz
         for size in utils.fit(frame_length, frame.seg_straight_sizes):
