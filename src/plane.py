@@ -104,6 +104,24 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
         """Return the value at a given position."""
         return self.get(pos, self.default)
 
+    def __contains__(self, pos: tuple[float, float] | object) -> bool:
+        """Check if a value is set at the given location."""
+        try:
+            x, y = map(int, pos)
+        except (ValueError, TypeError):
+            return False
+
+        y += self._yoff
+        if y < 0:
+            return False
+        try:
+            x += self._xoffs[y]
+            if x < 0:
+                return False
+            return (row := self._data[y]) is not None and row[x] is not _UNSET
+        except IndexError:
+            return False
+
     @overload
     def get(self, __key: tuple[float, float]) -> Optional[ValT]: ...
     @overload
@@ -222,8 +240,12 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
             raise KeyError(pos) from None
 
         y += self._yoff
+        if y < 0:
+            return
         try:
             x += self._xoffs[y]
+            if x < 0:
+                return
             if (row := self._data[y]) is not None and row[x] is not _UNSET:
                 self._used -= 1
                 row[x] = _UNSET

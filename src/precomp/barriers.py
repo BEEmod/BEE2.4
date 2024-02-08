@@ -374,8 +374,35 @@ def find_plane_groups(plane: Plane[Barrier]) -> Iterator[Tuple[Barrier, Plane[Ba
                 (x, y - 1),
                 (x, y + 1),
             }
-        LOGGER.info('Group: {} = {}',  cmp_value, list(group))
+
+        borders = calc_borders(group)
         yield cmp_value, group
+
+
+def calc_borders(plane: Plane[Barrier]) -> Plane[Border]:
+    """Calculate which borders are required for each section of this plane."""
+    borders = Plane(default=Border.NONE)
+    for (x, y) in plane:
+        border = Border.NONE
+        if north := (x, y + 1) not in plane:
+            border |= Border.STRAIGHT_N
+        if south := (x, y - 1) not in plane:
+            border |= Border.STRAIGHT_S
+        if east := (x - 1, y) not in plane:
+            border |= Border.STRAIGHT_E
+        if west := (x + 1, y) not in plane:
+            border |= Border.STRAIGHT_W
+        if north and east:
+            border |= Border.CORNER_NE
+        if north and west:
+            border |= Border.CORNER_NW
+        if south and east:
+            border |= Border.CORNER_SE
+        if south and west:
+            border |= Border.CORNER_SW
+        if border is not Border.NONE:
+            borders[x, y] = border
+    return borders
 
 
 def old_generation(vmf: VMF, coll: collisions.Collisions) -> None:
