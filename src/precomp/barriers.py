@@ -1,13 +1,14 @@
 """Implements Glass and Grating."""
 from __future__ import annotations
 
-from typing import Callable, Dict, Final, Iterator, List, Tuple
+from typing import Callable, Dict, Final, Iterator, List, Set, Tuple
 from typing_extensions import Literal, Self, Sequence
 
 from collections import defaultdict
 from enum import Enum, Flag, auto as enum_auto
 
-from srctools import FrozenMatrix, VMF, Vec, FrozenVec, Solid, Keyvalues, Entity, Angle, Matrix
+from srctools import FrozenMatrix, Vec, FrozenVec, Keyvalues, Angle, Matrix
+from srctools.vmf import VMF, Solid, Entity, EntityGroup
 import srctools.logger
 import attrs
 
@@ -333,8 +334,51 @@ def template_solids_and_coll(
 @conditions.meta_cond(150)
 def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
     """Make barrier entities."""
-    barrier: Barrier
+    debug_skin = {
+        GLASS_ID: 5,
+        GRATE_ID: 0,
+    }
+    add_debug = conditions.fetch_debug_visgroup(vmf, 'Barriers')
+    debug_id = 0
+    for plane_slice, plane in BARRIERS.items():
+        for barrier, group_plane in find_plane_groups(plane):
+            debug_id += 1
+            for (u, v) in group_plane:
+                add_debug(
+                    'bee2_template_tilesetter',
+                    origin=plane_slice.plane_to_world(32 * u + 16, 32 * v + 16),
+                    angles=plane_slice.orient,
+                    skin=debug_skin[barrier.id],
+                    targetname=f'barrier_{debug_id}',
+                )
 
+
+def find_plane_groups(plane: Plane[Barrier]) -> Iterator[Tuple[Barrier, Plane[Barrier]]]:
+    """Yield sub-graphs of a barrier plane, containing contiguous barriers."""
+    stack: Set[Tuple[int, int]] = set()
+    completed: Plane[bool] = Plane.fromkeys(plane, False)
+    for start, cmp_value in plane.items():
+        if completed[start] or cmp_value is BARRIER_EMPTY:
+            continue
+        group: Plane[Barrier] = Plane()
+        stack.add(start)
+        while stack:
+            x, y = pos = stack.pop()
+            if completed[pos] or (value := plane[pos]) != cmp_value:
+                continue
+            completed[pos] = True
+            group[pos] = value  # Preserve identity.
+            stack |= {
+                (x - 1, y),
+                (x + 1, y),
+                (x, y - 1),
+                (x, y + 1),
+            }
+        LOGGER.info('Group: {} = {}',  cmp_value, list(group))
+        yield cmp_value, group
+
+
+def old_generation(vmf: VMF, coll: collisions.Collisions) -> None:
     # Avoid error without this package.
     hole_temp_id = options.GLASS_HOLE_TEMP()
     if HOLES and hole_temp_id is not None:
