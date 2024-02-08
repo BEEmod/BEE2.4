@@ -1,14 +1,16 @@
 """Implements Glass and Grating."""
 from __future__ import annotations
 
-from typing import Callable, Dict, Final, Iterator, List, Set, Tuple
+from typing import Callable, Dict, Final, Iterator, List, Mapping, Set, Tuple
+
+from srctools.math import AnyMatrix, to_matrix
 from typing_extensions import Literal, Self, Sequence
 
 from collections import defaultdict
 from enum import Enum, Flag, auto as enum_auto
 
-from srctools import FrozenMatrix, Vec, FrozenVec, Keyvalues, Angle, Matrix
-from srctools.vmf import VMF, Solid, Entity, EntityGroup
+from srctools import EmptyMapping, FrozenMatrix, Vec, FrozenVec, Keyvalues, Angle, Matrix
+from srctools.vmf import VMF, Solid, Entity
 import srctools.logger
 import attrs
 
@@ -102,14 +104,119 @@ BARRIER_EMPTY = Barrier(id=utils.ID_EMPTY)
 
 
 @attrs.frozen(eq=False, kw_only=True)
+class Segment:
+    """Either a model or brush template, placed with an optional offset."""
+    orient: FrozenMatrix = FrozenMatrix()
+    offset: FrozenVec = FrozenVec()
+
+    @classmethod
+    def parse(cls, kv: Keyvalues) -> SegmentBrush | SegmentProp:
+        """Parse from keyvalues configuration."""
+        orient = FrozenMatrix.from_angstr(kv['angles', '0 0 0'])
+        offset = FrozenVec.from_str(kv['offset', '0 0 0'])
+
+        if 'model' in kv:
+            return SegmentProp(
+                model=kv['model'],
+                orient=orient,
+                offset=offset,
+            )
+        else:
+            return SegmentBrush(
+                brush=template_brush.get_template(kv['template']),
+                orient=orient,
+                offset=offset,
+            )
+
+    def place(self, vmf: VMF, slice_key: utils.SliceKey, u: float, v: float, angles: AnyMatrix) -> None:
+        """Place the segment at the specified location."""
+        rotation = to_matrix(angles) @ slice_key.orient.transpose()
+        origin = slice_key.plane_to_world(32 * u, 32 * v) + self.offset @ rotation
+        self._place(
+            vmf, origin, self.orient @ rotation,
+        )
+
+    def _place(self, vmf: VMF, origin: Vec, angles: FrozenMatrix) -> None:
+        """Place the segment at the specified location."""
+
+
+@attrs.frozen(eq=False, kw_only=True)
+class SegmentProp(Segment):
+    """A model, placed with an optional offset."""
+    model: str
+
+    def _place(self, vmf: VMF, origin: Vec, angles: FrozenMatrix) -> None:
+        """Place the segment at the specified location."""
+        vmf.create_ent(
+            'prop_static',
+            origin=origin,
+            angles=angles,
+            model=self.model,
+            skin=0,
+            # TODO lighting origins?
+        )
+
+
+@attrs.frozen(eq=False, kw_only=True)
+class SegmentBrush(Segment):
+    """A template brush, placed with an optional offset."""
+    brush: template_brush.Template
+
+    def _place(self, vmf: VMF, origin: Vec, angles: FrozenMatrix) -> None:
+        """Place the segment at the specified location."""
+        temp = template_brush.import_template(
+            vmf,
+            self.brush,
+            origin, angles,
+        )
+
+
+@attrs.frozen(eq=False, kw_only=True)
 class FrameType:
     """Configuration for a type of barrier frame."""
-    convex_corner_inst: str | None = None
+    # Brushes can be resized, props need to be pieced together.
+    seg_straight_brush: Sequence[SegmentBrush] = ()
+    seg_straight_prop: Mapping[int, Sequence[SegmentProp]] = EmptyMapping
+
+    seg_corner: Sequence[Segment] = ()
+    seg_concave_corner: Sequence[Segment] = ()
+    corner_size_horiz: int = 4
+    corner_size_vert: int = 4
 
     @classmethod
     def parse(cls, kv: Keyvalues) -> Self:
         """Parse from keyvalues configuration."""
-        return cls()
+        seg_straight_brush = []
+        seg_straight_prop: Dict[int, List[SegmentProp]] = defaultdict(list)
+        seg_corner = []
+        seg_concave_corner = []
+
+        for block in kv.find_all('straight'):
+            segment = Segment.parse(block)
+            if isinstance(segment, SegmentProp):
+                size = block.int('length')
+                if size <= 0:
+                    raise ValueError('Straight prop sections must have a size defined!')
+                seg_straight_prop[size].append(segment)
+            else:
+                seg_straight_brush.append(segment)
+
+        corner_size_horiz = kv.int('cornerSize', 4)
+        corner_size_vert = kv.int('cornerVertSize', corner_size_horiz)
+
+        for block in kv.find_all('corner'):
+            seg_corner.append(Segment.parse(block))
+        for block in kv.find_all('concavecorner'):
+            seg_concave_corner.append(Segment.parse(block))
+
+        return cls(
+            seg_straight_brush=seg_straight_brush,
+            seg_straight_prop=dict(seg_straight_prop),
+            seg_corner=seg_corner,
+            seg_concave_corner=seg_concave_corner,
+            corner_size_horiz=corner_size_horiz,
+            corner_size_vert=corner_size_vert,
+        )
 
 
 # Planar slice -> plane of barriers.
@@ -145,15 +252,20 @@ def parse_map(vmf: VMF, info: conditions.MapInfo) -> None:
     frame_inst = instanceLocs.resolve_filter('[glass_frames]', silent=True)
     segment_inst = instanceLocs.resolve_filter('[glass_128]', silent=True)
 
+    # TODO parse this from configs.
+    frame = FRAME_TYPES[utils.parse_obj_id('BEE2_MODERN_PETI')][FrameOrient.HORIZ]
+
     glass = Barrier(
         id=GLASS_ID,
         face_temp=template_brush.get_scaling_template(options.GLASS_TEMPLATE()),
         tex_player_clip=consts.Tools.PLAYER_CLIP_GLASS,
+        frames=[frame],
     )
     grating = Barrier(
         id=GRATE_ID,
         face_temp=template_brush.get_scaling_template(options.GRATING_TEMPLATE()),
         tex_player_clip=consts.Tools.PLAYER_CLIP_GRATE,
+        frames=[frame],
     )
 
     for entities, material, barrier in [
