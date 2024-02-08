@@ -195,7 +195,7 @@ class FrameType:
     # Brushes can be resized, props need to be pieced together.
     seg_straight_brush: Sequence[SegmentBrush] = ()
     seg_straight_prop: Mapping[int, Sequence[SegmentProp]] = EmptyMapping
-    seg_straight_sizes: Sequence[int] = ()
+    seg_straight_fitter: Callable[[int], Sequence[int]] = lambda x: ()
 
     seg_corner: Sequence[Segment] = ()
     seg_concave_corner: Sequence[Segment] = ()
@@ -231,7 +231,7 @@ class FrameType:
         return cls(
             seg_straight_brush=seg_straight_brush,
             seg_straight_prop=dict(seg_straight_prop),
-            seg_straight_sizes=sorted(seg_straight_prop, reverse=True),
+            seg_straight_fitter=utils.get_piece_fitter(list(seg_straight_prop)),
             seg_corner=seg_corner,
             seg_concave_corner=seg_concave_corner,
             corner_size_horiz=corner_size_horiz,
@@ -542,7 +542,6 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
                         u + 1, v, ORIENT_N,
                     )
 
-
 def find_plane_groups(plane: Plane[Barrier]) -> Iterator[Tuple[Barrier, Plane[Barrier]]]:
     """Yield sub-graphs of a barrier plane, containing contiguous barriers."""
     stack: Set[Tuple[int, int]] = set()
@@ -645,13 +644,16 @@ def place_straight_run(
     for frame in barrier.frames:
         off = 0
         frame_length = total_dist
+        # If corners are present, shrink the straight piece inwards to not overlap.
         if corner_start in borders[start_u, start_v]:
             off += frame.corner_size_horiz
             frame_length -= frame.corner_size_horiz
         if corner_end in borders[end_u, end_v]:
             frame_length -= frame.corner_size_horiz
-        for size in utils.fit(frame_length, frame.seg_straight_sizes):
-            for piece in frame.seg_straight_prop[size]:
+
+        for size in frame.seg_straight_fitter(frame_length):
+            pieces = frame.seg_straight_prop[size]
+            for piece in pieces:
                 piece.place(
                     vmf, slice_key,
                     32. * start_u + off_u * off + pos_u,
@@ -674,13 +676,6 @@ def place_convex_corner(
     orient: FrozenMatrix,
 ) -> None:
     """Try to place a convex corner here."""
-    conditions.fetch_debug_visgroup(vmf, 'corners')(
-        'prop_static',
-        origin=slice_key.plane_to_world(32 * u, 32 * v),
-        model='models/editor/axis_helper_thick.mdl',
-        angles=orient @ slice_key.orient,
-        comment=f'{slice_key}, yaw={orient.to_angle().yaw}',
-    )
     for frame in barrier.frames:
         for seg in frame.seg_concave_corner:
             seg.place(vmf, slice_key, 32. * u, 32. * v, orient)

@@ -1,7 +1,9 @@
 """Various functions shared among the compiler and application."""
 from __future__ import annotations
+
 from typing import (
-    ClassVar, Final, NewType, TYPE_CHECKING, Any, Awaitable, Callable, Generator, Generic,
+    ClassVar, Collection, Final, NewType, TYPE_CHECKING, Any, Awaitable, Callable, Generator,
+    Generic,
     ItemsView, Iterable, Iterator, KeysView, Mapping, NoReturn, Optional, Sequence, SupportsInt,
     Tuple, Type, TypeVar, ValuesView,
 )
@@ -10,6 +12,8 @@ from typing_extensions import ParamSpec, TypeVarTuple, Unpack
 from collections import deque
 from enum import Enum
 from pathlib import Path
+import functools
+import itertools
 import copyreg
 import logging
 import os
@@ -18,6 +22,7 @@ import stat
 import sys
 import types
 import zipfile
+import math
 
 from srctools.math import AnyVec, Angle, FrozenMatrix, FrozenVec, Vec
 import attrs
@@ -751,6 +756,74 @@ def _append_bothsides(deq: deque[T]) -> Generator[None, T, None]:
     while True:
         deq.append((yield))
         deq.appendleft((yield))
+
+
+def get_piece_fitter(sizes: Collection[int]) -> Callable[[SupportsInt], Sequence[int]]:
+    """Compute the smallest number of repeated sizes that add up to the specified distance.
+
+    We tend to reuse the set of sizes, so this allows caching some computation.
+    """
+    size_list = sorted(sizes)
+    # First, for each size other than the largest, calculate the lowest common multiple between
+    # it and the next size up.
+    # That tells us how many of the small one we'd need before it can be matched by the next size up,
+    # and more is therefore useless.
+    counters: list[range] = []
+    for small, large in zip(size_list, size_list[1:]):
+        multiple = math.lcm(small, large)
+        counters.append(range(multiple // small))
+
+    *pieces, largest = size_list
+    pieces.reverse()
+    counters.reverse()
+
+    solutions: dict[int, list[int]] = {}
+    largest = size_list[-1]
+    large_count = 0
+
+    def cycler_func() -> Iterator[tuple[int, int]]:
+        """This function iterates through all possible solutions."""
+        nonlocal large_count
+        for large_count in itertools.count():
+            for tup in itertools.product(*counters):
+                count = sum(tup) + large_count
+                result = sum(x * y for x, y in zip(tup, pieces)) + large_count * largest
+                try:
+                    existing = solutions[result]
+                except KeyError:
+                    pass
+                else:
+                    if len(existing) < count:
+                        continue
+                # Else, better, add it.
+                solutions[result] = [
+                    size for size, count in zip(pieces, tup)
+                    for _ in range(count)
+                ] + [largest] * large_count
+                yield result
+
+    cycler = cycler_func()
+
+    @functools.lru_cache()
+    def calculate(size: SupportsInt) -> Sequence[int]:
+        """Compute a solution."""
+        size = int(size)
+        try:
+            return solutions[size]
+        except KeyError:
+            pass
+        cutoff = size / largest
+        while large_count < cutoff:
+            try:
+                return solutions[size]
+            except KeyError:
+                next(cycler)
+        try:
+            return solutions[size]
+        except KeyError:
+            raise ValueError(f'No solution to fit {size} with {size_list}')
+
+    return calculate
 
 
 def fit(dist: SupportsInt, obj: Sequence[int]) -> list[int]:

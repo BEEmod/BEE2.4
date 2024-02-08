@@ -91,6 +91,8 @@ class EmptyLink(Link):
 
 
 EMPTY = EmptyLink()
+# Calculates an optimum number of pieces for a given gap.
+straight_fit = utils.get_piece_fitter([512, 256, 128])
 
 
 def check_support_locs(
@@ -398,8 +400,9 @@ def res_make_catwalk(vmf: VMF, res: Keyvalues) -> object:
             end += direction / 2
             diff = end - start
             direction = diff.norm()
-            LOGGER.debug('{} -> ({}) - ({}) = {}', pos_tup, start, end, list(utils.fit(diff.len(), [512, 256, 128])))
-            for segment_len in utils.fit(diff.len(), [512, 256, 128]):
+            segments = straight_fit(diff.len())
+            LOGGER.debug('{} -> ({}) - ({}) = {}', pos_tup, start, end, segments)
+            for segment_len in segments:
                 conditions.add_inst(
                     vmf,
                     origin=loc,
