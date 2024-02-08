@@ -17,7 +17,7 @@ def test_constructor() -> None:
 
     key = SliceKey((0, -1.00000000001, 0.0), (48.0, 26.8, 192.12))
     assert key.normal is Vec.S
-    assert key.distance == 26.8
+    assert key.distance == -26.8
 
     with pytest.raises(ValueError):
         SliceKey(Vec(), 12)
@@ -48,23 +48,31 @@ def test_equality() -> None:
 def test_orients() -> None:
     """Test the orientations are correct."""
     # We know Matrix.from_angle() is right, just need to check the correct ones are produced.
-    assert SliceKey(Vec.N, 12).orient.forward() == Vec.N
-    assert SliceKey(Vec.S, 12).orient.forward() == Vec.S
-    assert SliceKey(Vec.E, 12).orient.forward() == Vec.E
-    assert SliceKey(Vec.W, 12).orient.forward() == Vec.W
-    assert SliceKey(Vec.T, 12).orient.forward() == Vec.T
-    assert SliceKey(Vec.B, 12).orient.forward() == Vec.B
+    assert SliceKey(Vec.N, 12).orient.up() == Vec.N
+    assert SliceKey(Vec.S, 12).orient.up() == Vec.S
+    assert SliceKey(Vec.E, 12).orient.up() == Vec.E
+    assert SliceKey(Vec.W, 12).orient.up() == Vec.W
+    assert SliceKey(Vec.T, 12).orient.up() == Vec.T
+    assert SliceKey(Vec.B, 12).orient.up() == Vec.B
 
-    assert SliceKey(Vec.N, 12).up() == Vec.T
-    assert SliceKey(Vec.S, 12).up() == Vec.T
-    assert SliceKey(Vec.E, 12).up() == Vec.T
-    assert SliceKey(Vec.W, 12).up() == Vec.T
-    assert SliceKey(Vec.T, 12).up() == Vec.W
-    assert SliceKey(Vec.B, 12).up() == Vec.E
+    assert SliceKey(Vec.N, 12).orient.left() == Vec.T
+    assert SliceKey(Vec.S, 12).orient.left() == Vec.T
+    assert SliceKey(Vec.E, 12).orient.left() == Vec.T
+    assert SliceKey(Vec.W, 12).orient.left() == Vec.T
+    assert SliceKey(Vec.T, 12).orient.left() == Vec.N
+    assert SliceKey(Vec.B, 12).orient.left() == Vec.N
 
-    assert SliceKey(Vec.N, 12).left() == Vec.W
-    assert SliceKey(Vec.S, 12).left() == Vec.E
-    assert SliceKey(Vec.E, 12).left() == Vec.N
-    assert SliceKey(Vec.W, 12).left() == Vec.S
-    assert SliceKey(Vec.T, 12).left() == Vec.N
-    assert SliceKey(Vec.B, 12).left() == Vec.N
+    assert SliceKey(Vec.N, 12).orient.forward() == Vec.W
+    assert SliceKey(Vec.S, 12).orient.forward() == Vec.E
+    assert SliceKey(Vec.E, 12).orient.forward() == Vec.N
+    assert SliceKey(Vec.W, 12).orient.forward() == Vec.S
+    assert SliceKey(Vec.T, 12).orient.forward() == Vec.E
+    assert SliceKey(Vec.B, 12).orient.forward() == Vec.W
+
+
+@pytest.mark.parametrize('normal', [
+    Vec.N, Vec.S, Vec.E, Vec.W, Vec.T, Vec.B
+])
+def test_orient_roundtrip(normal: Vec) -> None:
+    orient = SliceKey(normal, 123).orient
+    assert orient.to_angle() == Matrix.from_angle(orient.to_angle()).to_angle()

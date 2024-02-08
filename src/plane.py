@@ -107,7 +107,7 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
     def __contains__(self, pos: tuple[float, float] | object) -> bool:
         """Check if a value is set at the given location."""
         try:
-            x, y = map(int, pos)
+            x, y = map(int, pos)  # type: ignore
         except (ValueError, TypeError):
             return False
 

@@ -57,6 +57,11 @@ class Border(Flag):
 GLASS_ID: Final = utils.parse_obj_id('VALVE_GLASS')
 GRATE_ID: Final = utils.parse_obj_id('VALVE_GRATING')
 
+ORIENT_E: Final = FrozenMatrix.from_yaw(0)
+ORIENT_N: Final = FrozenMatrix.from_yaw(90)
+ORIENT_W: Final = FrozenMatrix.from_yaw(180)
+ORIENT_S: Final = FrozenMatrix.from_yaw(270)
+
 ORIENTS = {
     Vec.T: FrozenMatrix.from_angle(180, 0, 0),
     Vec.B: FrozenMatrix.from_angle(0, 0, 0),
@@ -64,6 +69,18 @@ ORIENTS = {
     Vec.S: FrozenMatrix.from_angle(90, 90, 0),
     Vec.E: FrozenMatrix.from_angle(90, 180, 0),
     Vec.W: FrozenMatrix.from_angle(90, 0, 0),
+}
+
+# Direction -> border value for that side.
+NORMAL_TO_BORDER: Dict[Tuple[Literal[-1, 0, +1], Literal[-1, 0, +1]], Border] = {
+    (0, +1): Border.STRAIGHT_E,
+    (0, -1): Border.STRAIGHT_S,
+    (+1, 0): Border.STRAIGHT_E,
+    (-1, 0): Border.STRAIGHT_W,
+    (-1, +1): Border.CORNER_NW,
+    (+1, +1): Border.CORNER_NE,
+    (-1, -1): Border.CORNER_SW,
+    (+1, -1): Border.CORNER_SE,
 }
 
 
@@ -130,14 +147,15 @@ class Segment:
 
     def place(self, vmf: VMF, slice_key: utils.SliceKey, u: float, v: float, angles: AnyMatrix) -> None:
         """Place the segment at the specified location."""
-        rotation = to_matrix(angles) @ slice_key.orient.transpose()
-        origin = slice_key.plane_to_world(32 * u, 32 * v) + self.offset @ rotation
+        rotation = to_matrix(angles) @ slice_key.orient
+        origin = slice_key.plane_to_world(u, v) + self.offset @ rotation
         self._place(
             vmf, origin, self.orient @ rotation,
         )
 
     def _place(self, vmf: VMF, origin: Vec, angles: FrozenMatrix) -> None:
         """Place the segment at the specified location."""
+        raise NotImplementedError
 
 
 @attrs.frozen(eq=False, kw_only=True)
@@ -177,6 +195,7 @@ class FrameType:
     # Brushes can be resized, props need to be pieced together.
     seg_straight_brush: Sequence[SegmentBrush] = ()
     seg_straight_prop: Mapping[int, Sequence[SegmentProp]] = EmptyMapping
+    seg_straight_sizes: Sequence[int] = ()
 
     seg_corner: Sequence[Segment] = ()
     seg_concave_corner: Sequence[Segment] = ()
@@ -212,6 +231,7 @@ class FrameType:
         return cls(
             seg_straight_brush=seg_straight_brush,
             seg_straight_prop=dict(seg_straight_prop),
+            seg_straight_sizes=sorted(seg_straight_prop, reverse=True),
             seg_corner=seg_corner,
             seg_concave_corner=seg_concave_corner,
             corner_size_horiz=corner_size_horiz,
@@ -451,6 +471,8 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
     debug_id = 0
     for plane_slice, plane in BARRIERS.items():
         for barrier, group_plane in find_plane_groups(plane):
+            borders = calc_borders(group_plane)
+
             debug_id += 1
             for (u, v) in group_plane:
                 add_debug(
@@ -459,11 +481,66 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
                     angles=plane_slice.orient,
                     skin=debug_skin[barrier.id],
                     targetname=f'barrier_{debug_id}',
+                    comment=borders[u, v],
                 )
 
-            borders = calc_borders(group_plane)
+            for (u, v) in group_plane:
+                place_concave_corner(vmf, barrier, plane_slice, borders, u, v, ORIENT_E, +1, +1)
+                place_concave_corner(vmf, barrier, plane_slice, borders, u, v, ORIENT_N, -1, +1)
+                place_concave_corner(vmf, barrier, plane_slice, borders, u, v, ORIENT_W, -1, -1)
+                place_concave_corner(vmf, barrier, plane_slice, borders, u, v, ORIENT_S, +1, -1)
+
             for (u, v), border in borders.items():
-                place_convex_corner(vmf, barrier, plane_slice, borders, u, v, border)
+                if Border.STRAIGHT_N in border:
+                    place_straight_run(
+                        vmf, barrier, plane_slice, borders, u, v,
+                        Border.STRAIGHT_N, ORIENT_E, 1, 0,
+                        Border.CORNER_NE, Border.CORNER_NW,
+                        0, 32.0,
+                    )
+                if Border.STRAIGHT_S in border:
+                    place_straight_run(
+                        vmf, barrier, plane_slice, borders, u, v,
+                        Border.STRAIGHT_S, ORIENT_W, 1, 0,
+                        Border.CORNER_SE, Border.CORNER_SW,
+                        0.0, 0.0,
+                    )
+                if Border.STRAIGHT_E in border:
+                    place_straight_run(
+                        vmf, barrier, plane_slice, borders, u, v,
+                        Border.STRAIGHT_E, ORIENT_N, 0, 1,
+                        Border.CORNER_NE, Border.CORNER_SE,
+                        0.0, 0.0,
+                    )
+                if Border.STRAIGHT_W in border:
+                    place_straight_run(
+                        vmf, barrier, plane_slice, borders, u, v,
+                        Border.STRAIGHT_W, ORIENT_S, 0, 1,
+                        Border.CORNER_NW, Border.CORNER_SW,
+                        0.0, 0.0,
+                    )
+
+            for (u, v), border in borders.items():
+                if Border.CORNER_NW in border:
+                    place_convex_corner(
+                        vmf, barrier, plane_slice,
+                        u + 1, v + 1, ORIENT_W,
+                    )
+                if Border.CORNER_NE in border:
+                    place_convex_corner(
+                        vmf, barrier, plane_slice,
+                        u, v + 1, ORIENT_S,
+                    )
+                if Border.CORNER_SE in border:
+                    place_convex_corner(
+                        vmf, barrier, plane_slice,
+                        u, v, ORIENT_E,
+                    )
+                if Border.CORNER_SW in border:
+                    place_convex_corner(
+                        vmf, barrier, plane_slice,
+                        u + 1, v, ORIENT_N,
+                    )
 
 
 def find_plane_groups(plane: Plane[Barrier]) -> Iterator[Tuple[Barrier, Plane[Barrier]]]:
@@ -516,22 +593,96 @@ def calc_borders(plane: Plane[Barrier]) -> Plane[Border]:
     return borders
 
 
-def place_convex_corner(
+def place_concave_corner(
     vmf: VMF,
     barrier: Barrier,
     slice_key: utils.SliceKey,
     borders: Plane[Border],
     u: int,
     v: int,
-    border: Border,
+    orient: FrozenMatrix,
+    off_u: Literal[-1, +1],
+    off_v: Literal[-1, +1],
+) -> None:
+    """Check if a concave corner needs to be placed at this offset."""
+    if (
+        NORMAL_TO_BORDER[off_u, 0] not in borders[u, v + off_v] or
+        NORMAL_TO_BORDER[0, off_v] not in borders[u + off_u, v]
+    ):
+        return  # No convex corner required.
+    for frame in barrier.frames:
+        for seg in frame.seg_concave_corner:
+            seg.place(
+                vmf, slice_key,
+                32. * u + 16. * off_u,
+                32. * v + 16. * off_v,
+                orient,
+            )
+
+
+def place_straight_run(
+    vmf: VMF,
+    barrier: Barrier,
+    slice_key: utils.SliceKey,
+    borders: Plane[Border],
+    start_u: int,
+    start_v: int,
+    straight: Border,
+    orient: FrozenMatrix,
+    off_u: Literal[0, 1],
+    off_v: Literal[0, 1],
+    corner_start: Border,
+    corner_end: Border,
+    pos_u: float, pos_v: float,
+) -> None:
+    """Place a straight edge side, going as far as possible."""
+    end_u, end_v = start_u, start_v
+    total_dist = 32
+    while straight in borders[end_u + off_u, end_v + off_v]:
+        total_dist += 32
+        end_u += off_u
+        end_v += off_v
+    for frame in barrier.frames:
+        off = 0
+        frame_length = total_dist
+        if corner_start in borders[start_u, start_v]:
+            off += frame.corner_size_horiz
+        if corner_end in borders[end_u, end_v]:
+            frame_length -= frame.corner_size_horiz
+        for size in utils.fit(frame_length, frame.seg_straight_sizes):
+            for piece in frame.seg_straight_prop[size]:
+                piece.place(
+                    vmf, slice_key,
+                    32. * start_u + off_u * off + pos_u,
+                    32. * start_v + off_v * off + pos_v,
+                    orient,
+                )
+            off += size
+    # Only one of these has an actual length.
+    for u in range(start_u, end_u + 1):
+        for v in range(start_v, end_v + 1):
+            borders[u, v] &= ~straight
+
+
+def place_convex_corner(
+    vmf: VMF,
+    barrier: Barrier,
+    slice_key: utils.SliceKey,
+    u: float,
+    v: float,
+    orient: FrozenMatrix,
 ) -> None:
     """Try to place a convex corner here."""
-    for corner_type, orient, uoff, voff in CORNER_ORIENT:
-        if corner_type & border:
-            angles = orient @ slice_key.orient.transpose()
-            for frame in barrier.frames:
-                for seg in frame.seg_concave_corner:
-                    seg.place(vmf, slice_key, u + uoff, v + voff, angles)
+    conditions.fetch_debug_visgroup(vmf, 'corners')(
+        'prop_static',
+        origin=slice_key.plane_to_world(32 * u, 32 * v),
+        model='models/editor/axis_helper_thick.mdl',
+        angles=orient @ slice_key.orient,
+        comment=f'{slice_key}, yaw={orient.to_angle().yaw}',
+    )
+    for frame in barrier.frames:
+        for seg in frame.seg_concave_corner:
+            seg.place(vmf, slice_key, 32. * u, 32. * v, orient)
 
 
 def old_generation(vmf: VMF, coll: collisions.Collisions) -> None:

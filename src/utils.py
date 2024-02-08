@@ -538,12 +538,12 @@ class SliceKey:
     }
     # The orientation points Z = normal, X = sideways, Y = upward.
     _orients: ClassVar[Mapping[FrozenVec, FrozenMatrix]] = {
-        FrozenVec.N: FrozenMatrix.from_basis(x=Vec(1, 0, 0), y=Vec(0, 0, 1)),
-        FrozenVec.S: FrozenMatrix.from_basis(x=Vec(-1, 0, 0), y=Vec(0, 0, 1)),
-        FrozenVec.E: FrozenMatrix.from_basis(x=Vec(0, -1, 0), y=Vec(0, 0, 1)),
-        FrozenVec.W: FrozenMatrix.from_basis(x=Vec(0, 1, 0), y=Vec(0, 0, 1)),
+        FrozenVec.N: FrozenMatrix.from_basis(x=Vec(-1, 0, 0), y=Vec(0, 0, 1)),
+        FrozenVec.S: FrozenMatrix.from_basis(x=Vec(1, 0, 0), y=Vec(0, 0, 1)),
+        FrozenVec.E: FrozenMatrix.from_basis(x=Vec(0, 1, 0), y=Vec(0, 0, 1)),
+        FrozenVec.W: FrozenMatrix.from_basis(x=Vec(0, -1, 0), y=Vec(0, 0, 1)),
         FrozenVec.T: FrozenMatrix.from_basis(x=Vec(1, 0, 0), y=Vec(0, 1, 0)),
-        FrozenVec.B: FrozenMatrix.from_basis(x=Vec(1, 0, 0), y=Vec(0, -1, 0)),
+        FrozenVec.B: FrozenMatrix.from_basis(x=Vec(-1, 0, 0), y=Vec(0, 1, 0)),
     }
     _inv_orients: ClassVar[Mapping[FrozenVec, FrozenMatrix]] = {
         norm: orient.transpose()
