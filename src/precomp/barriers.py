@@ -73,10 +73,10 @@ ORIENTS = {
 
 # Direction -> border value for that side.
 NORMAL_TO_BORDER: Dict[Tuple[Literal[-1, 0, +1], Literal[-1, 0, +1]], Border] = {
-    (0, +1): Border.STRAIGHT_E,
+    (0, +1): Border.STRAIGHT_N,
     (0, -1): Border.STRAIGHT_S,
-    (+1, 0): Border.STRAIGHT_E,
-    (-1, 0): Border.STRAIGHT_W,
+    (+1, 0): Border.STRAIGHT_W,
+    (-1, 0): Border.STRAIGHT_E,
     (-1, +1): Border.CORNER_NW,
     (+1, +1): Border.CORNER_NE,
     (-1, -1): Border.CORNER_SW,
@@ -477,18 +477,18 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
             for (u, v) in group_plane:
                 add_debug(
                     'bee2_template_tilesetter',
-                    origin=plane_slice.plane_to_world(32 * u + 16, 32 * v + 16),
+                    origin=plane_slice.plane_to_world(32 * u + 16, 32 * v + 16, 2),
                     angles=plane_slice.orient,
                     skin=debug_skin[barrier.id],
                     targetname=f'barrier_{debug_id}',
-                    comment=borders[u, v],
+                    comment=f'Border: {borders[u, v]}, u={u}, v={v}',
                 )
 
             for (u, v) in group_plane:
-                place_concave_corner(vmf, barrier, plane_slice, borders, u, v, ORIENT_E, +1, +1)
-                place_concave_corner(vmf, barrier, plane_slice, borders, u, v, ORIENT_N, -1, +1)
-                place_concave_corner(vmf, barrier, plane_slice, borders, u, v, ORIENT_W, -1, -1)
-                place_concave_corner(vmf, barrier, plane_slice, borders, u, v, ORIENT_S, +1, -1)
+                place_concave_corner(vmf, barrier, plane_slice, borders, u, v, ORIENT_W, +1, +1)
+                place_concave_corner(vmf, barrier, plane_slice, borders, u, v, ORIENT_S, -1, +1)
+                place_concave_corner(vmf, barrier, plane_slice, borders, u, v, ORIENT_E, -1, -1)
+                place_concave_corner(vmf, barrier, plane_slice, borders, u, v, ORIENT_N, +1, -1)
 
             for (u, v), border in borders.items():
                 if Border.STRAIGHT_N in border:
@@ -541,6 +541,7 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
                         vmf, barrier, plane_slice,
                         u + 1, v, ORIENT_N,
                     )
+
 
 def find_plane_groups(plane: Plane[Barrier]) -> Iterator[Tuple[Barrier, Plane[Barrier]]]:
     """Yield sub-graphs of a barrier plane, containing contiguous barriers."""
@@ -613,8 +614,8 @@ def place_concave_corner(
         for seg in frame.seg_concave_corner:
             seg.place(
                 vmf, slice_key,
-                32. * u + 16. * off_u,
-                32. * v + 16. * off_v,
+                32. * u + 16. * off_u + 16.0,
+                32. * v + 16. * off_v + 16.0,
                 orient,
             )
 
