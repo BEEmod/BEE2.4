@@ -305,7 +305,7 @@ def parse_map(vmf: VMF, info: conditions.MapInfo) -> None:
 
                 # Offset to be the voxel side, not center.
                 center += 64 * norm
-                plane_slice = utils.SliceKey(norm, center)
+                plane_slice = utils.SliceKey(-norm, center)
                 local = plane_slice.world_to_plane(center)
 
                 # Now set each 32-grid cell to be the barrier. Since this is square the orientation
@@ -326,8 +326,8 @@ def parse_map(vmf: VMF, info: conditions.MapInfo) -> None:
             # here, so we can mark them with a fixup. At this point all barrier definitions are
             # whole voxel, so it doesn't matter which we pick.
             center = Vec.from_str(inst['origin']) // 128 * 128 + (64, 64, 64)
-            norm = Vec(x=-1) @ Angle.from_str(inst['angles'])
-            center += 64 * norm
+            norm = Vec(x=1) @ Angle.from_str(inst['angles'])
+            center -= 64 * norm
             plane_slice = utils.SliceKey(norm, center)
             local = plane_slice.world_to_plane(center)
             try:
@@ -494,30 +494,30 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
                 if Border.STRAIGHT_N in border:
                     place_straight_run(
                         vmf, barrier, plane_slice, borders, u, v,
-                        Border.STRAIGHT_N, ORIENT_E, 1, 0,
+                        Border.STRAIGHT_N, ORIENT_E, 1, 0, False,
                         Border.CORNER_NE, Border.CORNER_NW,
-                        0, 32.0,
+                        0, 32,
                     )
                 if Border.STRAIGHT_S in border:
                     place_straight_run(
                         vmf, barrier, plane_slice, borders, u, v,
-                        Border.STRAIGHT_S, ORIENT_W, 1, 0,
+                        Border.STRAIGHT_S, ORIENT_W, 1, 0, True,
                         Border.CORNER_SE, Border.CORNER_SW,
-                        0.0, 0.0,
+                        0, 0,
                     )
                 if Border.STRAIGHT_E in border:
                     place_straight_run(
                         vmf, barrier, plane_slice, borders, u, v,
-                        Border.STRAIGHT_E, ORIENT_N, 0, 1,
+                        Border.STRAIGHT_E, ORIENT_N, 0, 1, False,
                         Border.CORNER_SE, Border.CORNER_NE,
-                        0.0, 0.0,
+                        0, 0,
                     )
                 if Border.STRAIGHT_W in border:
                     place_straight_run(
                         vmf, barrier, plane_slice, borders, u, v,
-                        Border.STRAIGHT_W, ORIENT_S, 0, 1,
+                        Border.STRAIGHT_W, ORIENT_S, 0, 1, True,
                         Border.CORNER_SW, Border.CORNER_NW,
-                        32.0, 0.0,
+                        32, 0,
                     )
 
             for (u, v), border in borders.items():
@@ -630,11 +630,33 @@ def place_straight_run(
     orient: FrozenMatrix,
     off_u: Literal[0, 1],
     off_v: Literal[0, 1],
+    backwards: bool,
     corner_start: Border,
     corner_end: Border,
-    pos_u: float, pos_v: float,
+    pos_u: Literal[0, 32],
+    pos_v: Literal[0, 32],
 ) -> None:
-    """Place a straight edge side, going as far as possible."""
+    """Place a straight edge side, going as far as possible.
+
+    Parameters:
+        * vmf: The map.
+        * barrier: The barrier to generate frames for.
+        * slice_key: Orientation of the plane.
+        * borders: Computed border shapes that are yet to be placed.
+        * start_u: Starting cell with this straight type.
+        * start_v: ^^^^
+        * straight: The kind of border we're placing.
+        * orient: Rotation to apply to the straight pieces so that they fit.
+        * off_u: The direction to move to continue this straight piece into another cell.
+        * off_v: ^^^^
+        * backwards: If set, offset each piece to the end of its section instead of the start.
+        * corner_start: The corner which this could connect to on the start cell.
+          If present, offset forwards.
+        * corner_end: The corner which this could connect to on the end cell.
+          If present, offset backwards.
+        * pos_u: Offset the placed straight sections by this many units at the end.
+        * pos_v: ^^^^
+    """
     end_u, end_v = start_u, start_v
     total_dist = 32
     while straight in borders[end_u + off_u, end_v + off_v]:
@@ -652,15 +674,20 @@ def place_straight_run(
             frame_length -= frame.corner_size_horiz
 
         for size in frame.seg_straight_fitter(frame_length):
-            pieces = frame.seg_straight_prop[size]
-            for piece in pieces:
+            # If backwards, advance before placing.
+            if backwards:
+                off += size
+
+            for piece in frame.seg_straight_prop[size]:
                 piece.place(
                     vmf, slice_key,
                     32. * start_u + off_u * off + pos_u,
                     32. * start_v + off_v * off + pos_v,
                     orient,
                 )
-            off += size
+
+            if not backwards:
+                off += size
     # Only one of these has an actual length.
     for u in range(start_u, end_u + 1):
         for v in range(start_v, end_v + 1):
