@@ -88,7 +88,6 @@ BARRIER_FOOTPRINT_LARGE: Final[Sequence[Tuple[int, int]]] = [
 class Barrier:
     """Type of barrier."""
     id: utils.ObjectID | utils.SpecialID
-    voice_attr: str = ''
     frames: Sequence[FrameType] = ()
     error_disp: user_errors.Kind | None = None
     face_temp: template_brush.ScalingTemplate = template_brush.ScalingTemplate.world()
@@ -148,13 +147,11 @@ def parse_map(vmf: VMF, info: conditions.MapInfo) -> None:
 
     glass = Barrier(
         id=GLASS_ID,
-        voice_attr='glass',
         face_temp=template_brush.get_scaling_template(options.GLASS_TEMPLATE()),
         tex_player_clip=consts.Tools.PLAYER_CLIP_GLASS,
     )
     grating = Barrier(
         id=GRATE_ID,
-        voice_attr='grating',
         face_temp=template_brush.get_scaling_template(options.GRATING_TEMPLATE()),
         tex_player_clip=consts.Tools.PLAYER_CLIP_GRATE,
     )
@@ -209,7 +206,7 @@ def parse_map(vmf: VMF, info: conditions.MapInfo) -> None:
                 if barrier is glass:
                     inst.fixup[consts.FixupVars.BEE_GLS_TYPE] = 'glass'
                 elif barrier is grating:
-                    inst.fixup[consts.FixupVars.BEE_GLS_TYPE] = 'grate'
+                    inst.fixup[consts.FixupVars.BEE_GLS_TYPE] = 'grating'
                 else:
                     # vmf.create_ent('info_particle_system', orign=center, angles=inst['angles'])
                     LOGGER.warning(
