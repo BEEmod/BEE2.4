@@ -461,6 +461,10 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
                     targetname=f'barrier_{debug_id}',
                 )
 
+            borders = calc_borders(group_plane)
+            for (u, v), border in borders.items():
+                place_convex_corner(vmf, barrier, plane_slice, borders, u, v, border)
+
 
 def find_plane_groups(plane: Plane[Barrier]) -> Iterator[Tuple[Barrier, Plane[Barrier]]]:
     """Yield sub-graphs of a barrier plane, containing contiguous barriers."""
@@ -483,8 +487,6 @@ def find_plane_groups(plane: Plane[Barrier]) -> Iterator[Tuple[Barrier, Plane[Ba
                 (x, y - 1),
                 (x, y + 1),
             }
-
-        borders = calc_borders(group)
         yield cmp_value, group
 
 
@@ -512,6 +514,24 @@ def calc_borders(plane: Plane[Barrier]) -> Plane[Border]:
         if border is not Border.NONE:
             borders[x, y] = border
     return borders
+
+
+def place_convex_corner(
+    vmf: VMF,
+    barrier: Barrier,
+    slice_key: utils.SliceKey,
+    borders: Plane[Border],
+    u: int,
+    v: int,
+    border: Border,
+) -> None:
+    """Try to place a convex corner here."""
+    for corner_type, orient, uoff, voff in CORNER_ORIENT:
+        if corner_type & border:
+            angles = orient @ slice_key.orient.transpose()
+            for frame in barrier.frames:
+                for seg in frame.seg_concave_corner:
+                    seg.place(vmf, slice_key, u + uoff, v + voff, angles)
 
 
 def old_generation(vmf: VMF, coll: collisions.Collisions) -> None:
