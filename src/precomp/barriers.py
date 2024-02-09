@@ -24,6 +24,7 @@ import utils
 
 LOGGER = srctools.logger.get_logger(__name__)
 COND_MOD_NAME: str | None = None
+STRAIGHT_LEN: Final = 64
 
 
 class HoleType(Enum):
@@ -190,7 +191,31 @@ class SegmentBrush(Segment):
             vmf,
             self.brush,
             origin, angles,
+            force_type=template_brush.TEMP_TYPES.detail,
         )
+
+    def place_sized(
+        self,
+        vmf: VMF, slice_key: utils.SliceKey,
+        u: float, v: float,
+        orient: FrozenMatrix,
+        direction: Vec,
+        length: float,
+    ) -> None:
+        """Place this template, but resize it to match the specified length."""
+        rotation = orient @ slice_key.orient
+        origin = slice_key.plane_to_world(u, v) + self.offset @ rotation
+        temp = template_brush.import_template(
+            vmf,
+            self.brush,
+            origin,
+            self.orient @ rotation,
+            force_type=template_brush.TEMP_TYPES.detail,
+        )
+        diff = direction * (length - STRAIGHT_LEN)
+        for face in temp.detail.sides():
+            if face.normal().dot(direction) < -0.99:
+                face.translate(diff)
 
 
 @attrs.frozen(eq=False, kw_only=True)
@@ -495,28 +520,28 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
                 if Border.STRAIGHT_N in border:
                     place_straight_run(
                         vmf, barrier, plane_slice, borders, u, v,
-                        Border.STRAIGHT_N, ORIENT_E, 1, 0, False,
+                        Border.STRAIGHT_N, ORIENT_E, 'x', False,
                         Border.CORNER_NE, Border.CORNER_NW,
                         0, 32,
                     )
                 if Border.STRAIGHT_S in border:
                     place_straight_run(
                         vmf, barrier, plane_slice, borders, u, v,
-                        Border.STRAIGHT_S, ORIENT_W, 1, 0, True,
+                        Border.STRAIGHT_S, ORIENT_W, 'x', True,
                         Border.CORNER_SE, Border.CORNER_SW,
                         0, 0,
                     )
                 if Border.STRAIGHT_E in border:
                     place_straight_run(
                         vmf, barrier, plane_slice, borders, u, v,
-                        Border.STRAIGHT_E, ORIENT_N, 0, 1, False,
+                        Border.STRAIGHT_E, ORIENT_N, 'y', False,
                         Border.CORNER_SE, Border.CORNER_NE,
                         0, 0,
                     )
                 if Border.STRAIGHT_W in border:
                     place_straight_run(
                         vmf, barrier, plane_slice, borders, u, v,
-                        Border.STRAIGHT_W, ORIENT_S, 0, 1, True,
+                        Border.STRAIGHT_W, ORIENT_S, 'y', True,
                         Border.CORNER_SW, Border.CORNER_NW,
                         32, 0,
                     )
@@ -617,8 +642,7 @@ def place_straight_run(
     start_v: int,
     straight: Border,
     orient: FrozenMatrix,
-    off_u: Literal[0, 1],
-    off_v: Literal[0, 1],
+    axis: Literal['x', 'y'],
     backwards: bool,
     corner_start: Border,
     corner_end: Border,
@@ -636,8 +660,7 @@ def place_straight_run(
         * start_v: ^^^^
         * straight: The kind of border we're placing.
         * orient: Rotation to apply to the straight pieces so that they fit.
-        * off_u: The direction to move to continue this straight piece into another cell.
-        * off_v: ^^^^
+        * axis: The direction to move to continue this straight piece into another cell.
         * backwards: If set, offset each piece to the end of its section instead of the start.
         * corner_start: The corner which this could connect to on the start cell.
           If present, offset forwards.
@@ -648,35 +671,53 @@ def place_straight_run(
     """
     end_u, end_v = start_u, start_v
     total_dist = 32
+    if axis == 'x':
+        off_u, off_v = 1, 0
+    else:
+        off_u, off_v = 0, 1
     while straight in borders[end_u + off_u, end_v + off_v]:
         total_dist += 32
         end_u += off_u
         end_v += off_v
     for frame in barrier.frames:
-        off = 0
+        start_off = 0
         frame_length = total_dist
         # If corners are present, shrink the straight piece inwards to not overlap.
         if corner_start in borders[start_u, start_v]:
-            off += frame.corner_size_horiz
+            start_off += frame.corner_size_horiz
             frame_length -= frame.corner_size_horiz
         if corner_end in borders[end_u, end_v]:
             frame_length -= frame.corner_size_horiz
 
-        for size in frame.seg_straight_fitter(frame_length):
-            # If backwards, advance before placing.
-            if backwards:
-                off += size
+        if frame.seg_straight_prop:
+            off = start_off
+            for size in frame.seg_straight_fitter(frame_length):
+                # If backwards, advance before placing.
+                if backwards:
+                    off += size
 
-            for piece in frame.seg_straight_prop[size]:
-                piece.place(
-                    vmf, slice_key,
-                    32. * start_u + off_u * off + pos_u,
-                    32. * start_v + off_v * off + pos_v,
-                    orient,
-                )
+                for piece in frame.seg_straight_prop[size]:
+                    piece.place(
+                        vmf, slice_key,
+                        32. * start_u + off_u * off + pos_u,
+                        32. * start_v + off_v * off + pos_v,
+                        orient,
+                    )
 
-            if not backwards:
-                off += size
+                if not backwards:
+                    off += size
+
+        direction = Vec(off_u, off_v) @ slice_key.orient
+        if backwards:
+            direction = -direction
+        off = frame_length if backwards else start_off
+        for brush_seg in frame.seg_straight_brush:
+            brush_seg.place_sized(
+                vmf, slice_key,
+                32.0 * start_u + off_u * off + pos_u,
+                32.0 * start_v + off_v * off + pos_v,
+                orient, direction, frame_length,
+            )
     # Only one of these has an actual length.
     for u in range(start_u, end_u + 1):
         for v in range(start_v, end_v + 1):
@@ -687,14 +728,14 @@ def place_convex_corner(
     vmf: VMF,
     barrier: Barrier,
     slice_key: utils.SliceKey,
+    orient: FrozenMatrix,
     u: float,
     v: float,
-    orient: FrozenMatrix,
 ) -> None:
     """Try to place a convex corner here."""
     for frame in barrier.frames:
-        for seg in frame.seg_concave_corner:
-            seg.place(vmf, slice_key, 32. * u, 32. * v, orient)
+        for seg in frame.seg_corner:
+            seg.place(vmf, slice_key, 32.0 * u, 32.0 * v, orient)
 
 
 def old_generation(vmf: VMF, coll: collisions.Collisions) -> None:
@@ -712,21 +753,6 @@ def old_generation(vmf: VMF, coll: collisions.Collisions) -> None:
     hole_temp_lrg_square = template_solids_and_coll(hole_combined_temp, 'large_square')
 
     floorbeam_temp = options.GLASS_FLOORBEAM_TEMP()
-
-    # Valve doesn't implement convex corners, we'll do it ourselves.
-    convex_corner_left = instanceLocs.resolve_one('[glass_left_convex_corner]', error=False)
-    convex_corner_right = instanceLocs.resolve_one('[glass_right_convex_corner]', error=False)
-    convex_corners: List[Tuple[FrozenMatrix, str, float]] = [
-        (orient, filename, side)
-        # We don't include 90 and 270, the other filename covers those.
-        # Freeze to ensure this is constant.
-        for orient in map(FrozenMatrix.from_yaw, [0.0, 180.0])
-        for (filename, side) in [
-            (convex_corner_left, -128.0),
-            (convex_corner_right, +128.0),
-        ]
-        if filename
-    ]
 
     if options.get_itemconf('BEE_PELLET:PelletGrating', False):
         # Merge together these existing filters in global_pti_ents
@@ -753,35 +779,6 @@ def old_generation(vmf: VMF, coll: collisions.Collisions) -> None:
     # This makes them 2D grids which we can optimise.
     # (normal_dist, positive_axis, type) -> Plane(type)
     slices: dict[tuple[FrozenVec, bool], Plane[Barrier]] = defaultdict(lambda: Plane(default=BARRIER_EMPTY))
-    # We have this on the 32-grid to allow us to cut squares for holes.
-    for (origin, normal), barr_type in BARRIERS.items():
-        norm_axis = normal.axis()
-        u, v = origin.other_axes(norm_axis)
-        # Distance from origin to this plane.
-        norm_pos = FrozenVec.with_axes(norm_axis, origin)
-        slice_plane = slices[norm_pos, normal[norm_axis] > 0]
-        for u_off, v_off in FULL_SQUARE:
-            slice_plane[(u + u_off) // 32, (v + v_off) // 32] = barr_type
-
-        # Also go place convex corners.
-        for orient, filename, corner_side in convex_corners:
-            orient @= ORIENTS[normal]
-            # The convex corner is on the +X side, then +/-Y depending on the filename.
-            # If the diagonal neighbour does not match, we need a corner instance.
-            side_1 = orient.forward(128.0)
-            side_2 = orient.left(corner_side)
-            if (
-                BARRIERS.get((origin + side_1, normal)) is barr_type and
-                BARRIERS.get((origin + side_2, normal)) is barr_type and
-                BARRIERS.get((origin + side_1 + side_2, normal)) is not barr_type
-            ):
-                conditions.add_inst(
-                    vmf,
-                    targetname='barrier',
-                    file=filename,
-                    origin=origin,
-                    angles=orient,
-                ).make_unique()
 
     # Compute contiguous sections of any barrier type, then place hint brushes to ensure sorting
     # is done correctly.
@@ -821,13 +818,8 @@ def old_generation(vmf: VMF, coll: collisions.Collisions) -> None:
         u, v = origin.other_axes(norm_axis)
         norm_pos = FrozenVec.with_axes(norm_axis, origin)
         slice_plane = slices[norm_pos, normal[norm_axis] > 0]
-        offsets: Sequence[Tuple[int, int]]
-        if hole_type is HoleType.LARGE:
-            offsets = BARRIER_FOOTPRINT_LARGE
-        else:
-            offsets = BARRIER_FOOTPRINT_SMALL
         bad_locs: List[Vec] = []
-        for u_off, v_off in offsets:
+        for u_off, v_off in FOOTPRINTS[hole_type]:
             # Remove these squares, but keep them in the Plane,
             # so we can check if there was glass there.
             uv = (int((u + u_off) // 32), int((v + v_off) // 32))
