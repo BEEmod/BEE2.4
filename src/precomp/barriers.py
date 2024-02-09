@@ -3,13 +3,13 @@ from __future__ import annotations
 
 from typing import Callable, Dict, Final, Iterator, List, Mapping, Set, Tuple
 
-from srctools.math import AnyMatrix, to_matrix
 from typing_extensions import Literal, Self, Sequence
 
 from collections import defaultdict
 from enum import Enum, Flag, auto as enum_auto
 
-from srctools import EmptyMapping, FrozenMatrix, Vec, FrozenVec, Keyvalues, Angle, Matrix
+from srctools import EmptyMapping, Keyvalues
+from srctools.math import AnyMatrix, to_matrix, FrozenMatrix, Vec, FrozenVec, Angle, Matrix
 from srctools.vmf import VMF, Solid, Entity
 import srctools.logger
 import attrs
@@ -77,10 +77,6 @@ NORMAL_TO_BORDER: Dict[Tuple[Literal[-1, 0, +1], Literal[-1, 0, +1]], Border] = 
     (0, -1): Border.STRAIGHT_S,
     (+1, 0): Border.STRAIGHT_W,
     (-1, 0): Border.STRAIGHT_E,
-    (-1, +1): Border.CORNER_NW,
-    (+1, +1): Border.CORNER_NE,
-    (-1, -1): Border.CORNER_SW,
-    (+1, -1): Border.CORNER_SE,
 }
 
 
@@ -89,17 +85,25 @@ FULL_SQUARE: Final[Sequence[Tuple[int, int]]] = [
     for u in [-48, -16, +16, +48]
     for v in [-48, -16, +16, +48]
 ]
-BARRIER_FOOTPRINT_SMALL: Final[Sequence[Tuple[int, int]]] = [
-    (u, v)
-    for u in [-16, +16]
-    for v in [-16, +16]
-]
-# The large barrier excludes the corners.
-BARRIER_FOOTPRINT_LARGE: Final[Sequence[Tuple[int, int]]] = [
-    (u, v)
-    for u in [-80, -48, -16, +16, +48, +80]
-    for v in [-80, -48, -16, +16, +48, +80]
-    if abs(u) != 80 or abs(v) != 80
+FOOTPRINTS: Final[Mapping[HoleType, Sequence[Tuple[int, int]]]] = {
+    HoleType.SMALL: [
+        (u, v)
+        for u in [-16, +16]
+        for v in [-16, +16]
+    ],
+    # The large barrier excludes the corners.
+    HoleType.LARGE: [
+        (u, v)
+        for u in [-80, -48, -16, +16, +48, +80]
+        for v in [-80, -48, -16, +16, +48, +80]
+        if abs(u) != 80 or abs(v) != 80
+    ]
+}
+LARGE_DISALLOWED: Sequence[FrozenVec] = [
+    FrozenVec(-128, 0, 0),
+    FrozenVec(+128, 0, 0),
+    FrozenVec(0, -128, 0),
+    FrozenVec(0, +128, 0),
 ]
 
 
@@ -359,26 +363,20 @@ def test_hole_spot(origin: FrozenVec, normal: FrozenVec, hole_type: HoleType) ->
     * 'noglass' if the centerpoint isn't glass/grating.
     * 'nospace' if no adjacient panel is present.
     """
-    try:
-        center_type = BARRIERS[origin, normal]
-    except KeyError:
-        return 'noglass'
+    slice_key = utils.SliceKey(normal, origin)
+    center = slice_key.world_to_plane(origin)
+    plane = BARRIERS[slice_key]
 
-    if hole_type is HoleType.SMALL:
-        return 'valid'
+    center_type = plane[center.x // 32, center.y // 32]
+    if center_type is BARRIER_EMPTY:
+        return 'noglass'
 
     u, v = Vec.INV_AXIS[normal.axis()]
     # The corners don't matter, but all 4 neighbours must be there.
-    for u_off, v_off in [
-        (-128, 0),
-        (0, -128),
-        (128, 0),
-        (0, 128),
-    ]:
+    for u_off, v_off in FOOTPRINTS[hole_type]:
         pos = origin + FrozenVec.with_axes(u, u_off, v, v_off)
-        try:
-            off_type = BARRIERS[pos, normal]
-        except KeyError:
+        off_type = plane[(center.x + u_off) // 32, (center.y + v_off) // 32]
+        if off_type is BARRIER_EMPTY:
             # No side
             LOGGER.warning('No offset barrier at {}, {}', pos, normal)
             return 'nospace'
@@ -386,10 +384,14 @@ def test_hole_spot(origin: FrozenVec, normal: FrozenVec, hole_type: HoleType) ->
             # Different type.
             LOGGER.warning('Wrong barrier type at {}, {}', pos, normal)
             return 'nospace'
-        # Also check if a large hole is here, we'll collide.
-        if HOLES.get((pos, normal)) is HoleType.LARGE:
-            # TODO: Draw this other hole as well?
-            return 'nospace'
+
+    # In each direction, make sure a large hole isn't present.
+    if hole_type is HoleType.LARGE:
+        for offset in LARGE_DISALLOWED:
+            side_pos = origin + offset @ slice_key.orient
+            if HOLES.get((side_pos, normal)) is HoleType.LARGE:
+                # TODO: Draw this other hole as well?
+                return 'nospace'
     return 'valid'
 
 
@@ -398,21 +400,19 @@ def res_glass_hole(inst: Entity, res: Keyvalues) -> None:
     """Add Glass/grating holes. The value should be 'large' or 'small'."""
     hole_type = HoleType(res.value)
 
-    normal: FrozenVec = round(FrozenVec(z=-1) @ Angle.from_str(inst['angles']), 6)
+    normal: FrozenVec = FrozenVec(z=-1) @ Angle.from_str(inst['angles'])
     origin: FrozenVec = FrozenVec.from_str(inst['origin']) // 128 * 128 + 64
+    origin += 64 * normal
 
     first_placement = test_hole_spot(origin, normal, hole_type)
     if first_placement == 'valid':
-        sel_origin = origin
         sel_normal = normal
     else:
         # Test the opposite side of the glass too.
-        inv_origin = origin + 128 * normal
         inv_normal = -normal
 
-        sec_placement = test_hole_spot(inv_origin, inv_normal, hole_type)
+        sec_placement = test_hole_spot(origin, inv_normal, hole_type)
         if sec_placement == 'valid':
-            sel_origin = inv_origin
             sel_normal = inv_normal
         else:
             raise user_errors.UserError(
@@ -428,13 +428,13 @@ def res_glass_hole(inst: Entity, res: Keyvalues) -> None:
                 )
             )
     # Place it, or error if there's already one here.
-    key = (sel_origin, sel_normal)
+    key = (origin, sel_normal)
     if key in HOLES:
         raise user_errors.UserError(
             user_errors.TOK_BARRIER_HOLE_FOOTPRINT,
-            points=[sel_origin + 64 * sel_normal],
+            points=[origin],
             barrier_hole=user_errors.BarrierHole(
-                pos=user_errors.to_threespace(sel_origin + 64 * sel_normal),
+                pos=user_errors.to_threespace(origin),
                 axis=sel_normal.axis(),
                 large=hole_type is HoleType.LARGE or HOLES[key] is HoleType.LARGE,
                 small=hole_type is HoleType.SMALL or HOLES[key] is HoleType.SMALL,
@@ -442,7 +442,7 @@ def res_glass_hole(inst: Entity, res: Keyvalues) -> None:
             ),
         )
     HOLES[key] = hole_type
-    inst['origin'] = sel_origin
+    inst['origin'] = origin
     inst['angles'] = sel_normal.to_angle()
 
 
@@ -463,6 +463,7 @@ def template_solids_and_coll(
 @conditions.meta_cond(150)
 def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
     """Make barrier entities."""
+    LOGGER.info('Generating barriers (glass/grating)...')
     debug_skin = {
         GLASS_ID: 5,
         GRATE_ID: 0,
@@ -520,27 +521,14 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
                         32, 0,
                     )
 
-            for (u, v), border in borders.items():
                 if Border.CORNER_NW in border:
-                    place_convex_corner(
-                        vmf, barrier, plane_slice,
-                        u + 1, v + 1, ORIENT_W,
-                    )
+                    place_convex_corner(vmf, barrier, plane_slice, ORIENT_W, u + 1, v + 1)
                 if Border.CORNER_NE in border:
-                    place_convex_corner(
-                        vmf, barrier, plane_slice,
-                        u, v + 1, ORIENT_S,
-                    )
+                    place_convex_corner(vmf, barrier, plane_slice, ORIENT_S, u, v + 1)
                 if Border.CORNER_SE in border:
-                    place_convex_corner(
-                        vmf, barrier, plane_slice,
-                        u, v, ORIENT_E,
-                    )
+                    place_convex_corner(vmf, barrier, plane_slice, ORIENT_E, u, v)
                 if Border.CORNER_SW in border:
-                    place_convex_corner(
-                        vmf, barrier, plane_slice,
-                        u + 1, v, ORIENT_N,
-                    )
+                    place_convex_corner(vmf, barrier, plane_slice, ORIENT_N, u + 1, v)
 
 
 def find_plane_groups(plane: Plane[Barrier]) -> Iterator[Tuple[Barrier, Plane[Barrier]]]:
