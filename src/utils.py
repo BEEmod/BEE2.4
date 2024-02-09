@@ -776,6 +776,13 @@ def get_piece_fitter(sizes: Collection[int]) -> Callable[[SupportsInt], Sequence
     """
     size_list = sorted(sizes)
 
+    if not size_list:
+        def always_fails(size: SupportsInt) -> NoReturn:
+            """No pieces, always fails."""
+            raise ValueError(f'No solution to fit {size}, no pieces provided!')
+
+        return always_fails
+
     # First, for each size other than the largest, calculate the lowest common multiple between
     # it and all larger sizes.
     # That tells us how many of the small one we'd need before it can be matched by the next size up,
