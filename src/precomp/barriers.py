@@ -112,17 +112,137 @@ LARGE_DISALLOWED: Sequence[FrozenVec] = [
 class Barrier:
     """Type of barrier."""
     id: utils.ObjectID | utils.SpecialID
-    frames: Sequence[FrameType] = ()
+    frames: Mapping[FrameOrient, Sequence[FrameType]] = dict.fromkeys(FrameOrient, ())
     error_disp: user_errors.Kind | None = None
-    face_temp: template_brush.ScalingTemplate = template_brush.ScalingTemplate.world()
+    brushes: Sequence[Brush] = ()
     contents: collisions.CollideType = collisions.CollideType.SOLID
-    use_floorbeams: bool = False
+    floorbeam_temp: template_brush.Template | None = None
+    coll_thick: float = 4.0
+    hint_thick: float = 0.0
 
-    tex_player_clip: str | None = None
+    @classmethod
+    def parse(cls, kv: Keyvalues) -> Barrier:
+        """Parse from keyvalues files."""
+        frames: Dict[FrameOrient, List[FrameType]] = {orient: [] for orient in FrameOrient}
+        error_disp: user_errors.Kind | None = None
+        brushes: List[Brush] = []
+
+        for sub_kv in kv.find_all('Frame'):
+            frame_id = utils.parse_obj_id(sub_kv.value)
+            try:
+                frame_map = FRAME_TYPES[frame_id]
+            except KeyError:
+                LOGGER.warning('No barrier frame named "{}"!', frame_id)
+            else:
+                for orient, frame in frame_map.items():
+                    frames[orient].append(frame)
+
+        for sub_kv in kv.find_all('Brush'):
+            brushes.append(Brush.parse(sub_kv))
+
+        if 'error_tex' in kv:
+            error_tex = kv['error_tex'].casefold()
+            if error_tex in user_errors.TEX_SET:
+                error_disp = error_tex
+
+        if floorbeam_temp_id := kv['template_floorbeam', '']:
+            floorbeam_temp = template_brush.get_template(floorbeam_temp_id)
+        else:
+            floorbeam_temp = None
+
+        contents = collisions.CollideType.parse(kv['contents', 'solid'])
+
+        return Barrier(
+            id=utils.parse_obj_id(kv.real_name),
+            frames=frames,
+            error_disp=error_disp,
+            brushes=brushes,
+            contents=contents,
+            floorbeam_temp=floorbeam_temp,
+            hint_thick=kv.float('hint_thick'),
+            coll_thick=kv.float('coll_thick', 4.0),
+        )
 
 
-# Special barrier representing the lack of one.
-BARRIER_EMPTY = Barrier(id=utils.ID_EMPTY)
+@attrs.frozen(eq=False, kw_only=True)
+class Brush:
+    """Configuration for a brush generated for a barrier."""
+    offset: float
+    thickness: float
+
+    face_temp: template_brush.ScalingTemplate
+    material: str = ''  # If set, override face_temp.
+    # Texture the whole thing with the face.
+    is_tool: bool = False
+    # If vertical, use the original player clip and func-detail. Otherwise, add it inside this one.
+    static_player_clip: bool = False
+
+    keyvalues: Mapping[str, str] = EmptyMapping
+
+    @classmethod
+    def parse(cls, kv: Keyvalues) -> Brush:
+        """Parse from keyvalues files."""
+        material = kv['material', '']
+        if face_temp_id := kv['template', '']:
+            face_temp = template_brush.get_scaling_template(face_temp_id)
+        else:
+            face_temp = template_brush.ScalingTemplate.world(material or 'tools/toolsskip')
+
+        thickness = kv.float('thickness', 4.0)
+        if thickness <= 0:
+            raise ValueError('Brushes must have thickness!')
+
+        ent_kvs = {}
+        for child in kv.find_children('keys'):
+            ent_kvs[child.name] = child.value
+
+        return cls(
+            offset=kv.float('offset'),
+            thickness=thickness,
+            face_temp=face_temp,
+            material=material,
+            is_tool=kv.bool('tooltexture'),
+            static_player_clip=kv.bool('staticplayerclip'),
+            keyvalues=ent_kvs,
+        )
+
+    def generate(
+        self, vmf: VMF,
+        plane_slice: utils.SliceKey,
+        solid_func: Callable[[float, float], List[Solid]],
+    ) -> None:
+        """Generate this brush."""
+        ent = vmf.create_ent('func_detail')
+        ent.solids = solid_func(self.offset, self.offset + self.thickness)
+        ent.update(self.keyvalues)
+        if ent['classname'] != 'func_detail':
+            ent['origin'] = ent.get_origin()
+
+        for face in ent.sides():
+            if abs(face.normal().dot(plane_slice.normal)) > 0.99:
+                face.mat = self.material
+                self.face_temp.apply(face, change_mat=not self.material)
+            elif self.is_tool:
+                face.mat = self.material or consts.Tools.NODRAW
+            else:
+                face.mat = consts.Tools.NODRAW
+
+        if self.static_player_clip:
+            if abs(plane_slice.normal.z) > 0.5:
+                ent['classname'] = 'func_brush'
+                ent['solidbsp'] = '1'
+                # Create an additional clip to block through portals.
+                clip_ent = vmf.create_ent('func_detail')
+                # Shrink by a unit, but if this is already smaller, then just halve.
+                shrink = min(self.thickness / 2.0, 1.0) / 2.0
+                clip_ent.solids = solid_func(self.offset + shrink, self.offset + self.thickness - shrink)
+                for face in clip_ent.sides():
+                    face.mat = consts.Tools.PLAYER_CLIP
+            else:
+                # Vertical, just make it a detail brush.
+                ent['classname'] = 'func_detail'
+                for face in ent.sides():
+                    face.mat = consts.Tools.PLAYER_CLIP
 
 
 @attrs.frozen(eq=False, kw_only=True)
@@ -176,6 +296,7 @@ class SegmentProp(Segment):
             angles=angles,
             model=self.model,
             skin=0,
+            solid=6,
             # TODO lighting origins?
         )
 
@@ -268,12 +389,15 @@ class FrameType:
         )
 
 
+# Special barrier representing the lack of one.
+BARRIER_EMPTY = Barrier(id=utils.ID_EMPTY)
 # Planar slice -> plane of barriers.
 # The plane is specified as the edge of the voxel.
 BARRIERS: dict[utils.SliceKey, Plane[Barrier]] = defaultdict(lambda: Plane(default=BARRIER_EMPTY))
 # (origin, normal) -> hole
 HOLES: dict[tuple[FrozenVec, FrozenVec], HoleType] = {}
 FRAME_TYPES: Dict[utils.ObjectID, Dict[FrameOrient, FrameType]] = {}
+BARRIER_TYPES: Dict[utils.ObjectID, Barrier] = {}
 
 
 def parse_conf(kv: Keyvalues) -> None:
@@ -290,6 +414,62 @@ def parse_conf(kv: Keyvalues) -> None:
             FrameOrient.HORIZ: horiz_conf,
             FrameOrient.VERT: vert_conf,
         }
+    for block in kv.find_children('Barriers'):
+        barrier = Barrier.parse(block)
+        BARRIER_TYPES[barrier.id] = barrier
+
+    if GLASS_ID not in BARRIER_TYPES:
+        LOGGER.warning('No definition for {}!', GLASS_ID)
+        # Hardcoded basic definition.
+        BARRIER_TYPES[GLASS_ID] = Barrier(
+            id=GLASS_ID,
+            contents=collisions.CollideType.GLASS,
+            brushes=[
+                Brush(
+                    face_temp=template_brush.ScalingTemplate.world(consts.Special.GLASS),
+                    offset=0.5,
+                    thickness=1.0,
+                    keyvalues={'classname': 'func_detail'},
+                ),
+            ],
+        )
+
+    if GRATE_ID not in BARRIER_TYPES:
+        LOGGER.warning('No definition for {}!', GRATE_ID)
+        # Hardcoded basic definition.
+        BARRIER_TYPES[GRATE_ID] = Barrier(
+            id=GRATE_ID,
+            contents=collisions.CollideType.GRATING,
+            brushes=[
+                Brush(
+                    face_temp=template_brush.ScalingTemplate.world(consts.Special.GRATING),
+                    offset=0.5,
+                    thickness=1.0,
+                    keyvalues={
+                        'classname': 'func_brush',
+                        'renderfx': '14', # Constant Glow
+                        'solidity': '1',  # Never Solid
+                    },
+                ),
+                Brush(
+                    face_temp=template_brush.ScalingTemplate.world(consts.Tools.PLAYER_CLIP),
+                    offset=0,
+                    thickness=4.0,
+                    is_tool=True,
+                    keyvalues={'classname': 'func_detail'},
+                ),
+                Brush(
+                    face_temp=template_brush.ScalingTemplate.world(consts.Tools.TRIGGER),
+                    offset=0,
+                    thickness=4.0,
+                    is_tool=True,
+                    keyvalues={
+                        'classname': 'func_clip_vphysics',
+                        'filtername': '@grating_filter',
+                    },
+                ),
+            ],
+        )
 
 
 def parse_map(vmf: VMF, info: conditions.MapInfo) -> None:
@@ -301,25 +481,9 @@ def parse_map(vmf: VMF, info: conditions.MapInfo) -> None:
     frame_inst = instanceLocs.resolve_filter('[glass_frames]', silent=True)
     segment_inst = instanceLocs.resolve_filter('[glass_128]', silent=True)
 
-    # TODO parse this from configs.
-    frame = FRAME_TYPES[utils.parse_obj_id('BEE2_MODERN_PETI')][FrameOrient.HORIZ]
-
-    glass = Barrier(
-        id=GLASS_ID,
-        face_temp=template_brush.get_scaling_template(options.GLASS_TEMPLATE()),
-        tex_player_clip=consts.Tools.PLAYER_CLIP_GLASS,
-        frames=[frame],
-    )
-    grating = Barrier(
-        id=GRATE_ID,
-        face_temp=template_brush.get_scaling_template(options.GRATING_TEMPLATE()),
-        tex_player_clip=consts.Tools.PLAYER_CLIP_GRATE,
-        frames=[frame],
-    )
-
     for entities, material, barrier in [
-        (vmf.by_class['func_detail'], consts.Special.GLASS, glass),
-        (vmf.by_class['func_brush'], consts.Special.GRATING, grating),
+        (vmf.by_class['func_detail'], consts.Special.GLASS, BARRIER_TYPES[GLASS_ID]),
+        (vmf.by_class['func_brush'], consts.Special.GRATING, BARRIER_TYPES[GRATE_ID]),
     ]:
         for brush_ent in entities:
             for face in brush_ent.sides():
@@ -364,12 +528,11 @@ def parse_map(vmf: VMF, info: conditions.MapInfo) -> None:
             except KeyError:
                 LOGGER.warning('No glass/grating for frame at {}, {}?', center, norm)
             else:
-                if barrier is glass:
+                if barrier.id == GLASS_ID:
                     inst.fixup[consts.FixupVars.BEE_GLS_TYPE] = 'glass'
-                elif barrier is grating:
+                elif barrier.id == GRATE_ID:
                     inst.fixup[consts.FixupVars.BEE_GLS_TYPE] = 'grating'
                 else:
-                    # vmf.create_ent('info_particle_system', orign=center, angles=inst['angles'])
                     LOGGER.warning(
                         'No glass/grating for frame at {}, {} = {}, {}? - got {}',
                         center, norm, plane_slice, local / 32, barrier,
@@ -489,6 +652,28 @@ def template_solids_and_coll(
 def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
     """Make barrier entities."""
     LOGGER.info('Generating barriers (glass/grating)...')
+
+    if options.get_itemconf('BEE_PELLET:PelletGrating', False):
+        # Merge together these existing filters in global_pti_ents
+        vmf.create_ent(
+            origin=options.GLOBAL_PTI_ENTS_LOC(),
+            targetname='@grating_filter',
+            classname='filter_multi',
+            filtertype=0,
+            negated=0,
+            filter01='@not_pellet',
+            filter02='@not_paint_bomb',
+        )
+    else:
+        # Just skip paint bombs.
+        vmf.create_ent(
+            origin=options.GLOBAL_PTI_ENTS_LOC(),
+            targetname='@grating_filter',
+            classname='filter_activator_class',
+            negated=1,
+            filterclass='prop_paint_bomb',
+        )
+
     debug_skin = {
         GLASS_ID: 5,
         GRATE_ID: 0,
@@ -496,6 +681,7 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
     add_debug = conditions.fetch_debug_visgroup(vmf, 'Barriers')
     debug_id = 0
     for plane_slice, plane in BARRIERS.items():
+        frame_orient = FrameOrient.HORIZ if abs(plane_slice.normal.z) < 0.5 else FrameOrient.VERT
         for barrier, group_plane in find_plane_groups(plane):
             borders = calc_borders(group_plane)
 
@@ -510,11 +696,14 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
                     comment=f'Border: {borders[u, v]}, u={u}, v={v}',
                 )
 
+            if barrier.hint_thick > 0:
+                add_hints(vmf, plane_slice, group_plane, barrier.hint_thick)
+
             for (u, v) in group_plane:
-                place_concave_corner(vmf, barrier, plane_slice, borders, u, v, ORIENT_W, +1, +1)
-                place_concave_corner(vmf, barrier, plane_slice, borders, u, v, ORIENT_S, -1, +1)
-                place_concave_corner(vmf, barrier, plane_slice, borders, u, v, ORIENT_E, -1, -1)
-                place_concave_corner(vmf, barrier, plane_slice, borders, u, v, ORIENT_N, +1, -1)
+                place_concave_corner(vmf, barrier, plane_slice, borders, frame_orient, u, v, ORIENT_W, +1, +1)
+                place_concave_corner(vmf, barrier, plane_slice, borders, frame_orient, u, v, ORIENT_S, -1, +1)
+                place_concave_corner(vmf, barrier, plane_slice, borders, frame_orient, u, v, ORIENT_E, -1, -1)
+                place_concave_corner(vmf, barrier, plane_slice, borders, frame_orient, u, v, ORIENT_N, +1, -1)
 
             for (u, v), border in borders.items():
                 if Border.STRAIGHT_N in border:
@@ -554,6 +743,10 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
                     place_convex_corner(vmf, barrier, plane_slice, ORIENT_E, u, v)
                 if Border.CORNER_SW in border:
                     place_convex_corner(vmf, barrier, plane_slice, ORIENT_N, u + 1, v)
+
+            for min_u, min_v, max_u, max_v, _ in grid_optimise(group_plane):
+                place_prism_brushes(vmf, barrier, plane_slice, min_u, min_v, max_u, max_v)
+
 
 
 def find_plane_groups(plane: Plane[Barrier]) -> Iterator[Tuple[Barrier, Plane[Barrier]]]:
@@ -606,11 +799,46 @@ def calc_borders(plane: Plane[Barrier]) -> Plane[Border]:
     return borders
 
 
+def add_hints(vmf: VMF, plane_slice: utils.SliceKey, plane: Plane[Barrier], thick: float) -> None:
+    """Surround the barrier with hints, to assist with translucency sorting.
+
+    This can't be done with Brush{} definitions because this should not be cut by holes.
+    """
+    for min_u, min_v, max_u, max_v, _ in grid_optimise(plane):
+        hint = vmf.make_prism(
+            plane_slice.plane_to_world(32.0 * min_u, 32.0 * min_v),
+            plane_slice.plane_to_world(32.0 * max_u + 32.0, 32.0 * max_v + 32.0, thick),
+            mat=consts.Tools.SKIP,
+        )
+        norm = plane_slice.normal.thaw()
+        hint[norm].mat = consts.Tools.HINT
+        hint[-norm].mat = consts.Tools.HINT
+        vmf.add_brush(hint.solid)
+
+
+def place_prism_brushes(
+    vmf: VMF, barrier: Barrier, plane_slice: utils.SliceKey,
+    min_u: int, min_v: int, max_u: int, max_v: int,
+) -> None:
+    """Place brushes in these coordinates."""
+    def solid_func(z1: float, z2: float) -> List[Solid]:
+        """Generate prism brushes."""
+        prism = vmf.make_prism(
+            plane_slice.plane_to_world(32.0 * min_u, 32.0 * min_v, z1),
+            plane_slice.plane_to_world(32.0 * max_u + 32.0, 32.0 * max_v + 32.0, z2),
+        )
+        return [prism.solid]
+
+    for brush in barrier.brushes:
+        brush.generate(vmf, plane_slice, solid_func)
+
+
 def place_concave_corner(
     vmf: VMF,
     barrier: Barrier,
     slice_key: utils.SliceKey,
     borders: Plane[Border],
+    frame_orient: FrameOrient,
     u: int,
     v: int,
     orient: FrozenMatrix,
@@ -623,7 +851,7 @@ def place_concave_corner(
         NORMAL_TO_BORDER[0, off_v] not in borders[u + off_u, v]
     ):
         return  # No convex corner required.
-    for frame in barrier.frames:
+    for frame in barrier.frames[frame_orient]:
         for seg in frame.seg_concave_corner:
             seg.place(
                 vmf, slice_key,
@@ -675,11 +903,16 @@ def place_straight_run(
         off_u, off_v = 1, 0
     else:
         off_u, off_v = 0, 1
+    direction = Vec(off_u, off_v) @ slice_key.orient
+    if backwards:
+        direction = -direction
+    frame_orient = FrameOrient.HORIZ if abs(direction.z) < 0.5 else FrameOrient.VERT
+
     while straight in borders[end_u + off_u, end_v + off_v]:
         total_dist += 32
         end_u += off_u
         end_v += off_v
-    for frame in barrier.frames:
+    for frame in barrier.frames[frame_orient]:
         start_off = 0
         frame_length = total_dist
         # If corners are present, shrink the straight piece inwards to not overlap.
@@ -707,9 +940,6 @@ def place_straight_run(
                 if not backwards:
                     off += size
 
-        direction = Vec(off_u, off_v) @ slice_key.orient
-        if backwards:
-            direction = -direction
         off = frame_length if backwards else start_off
         for brush_seg in frame.seg_straight_brush:
             brush_seg.place_sized(
@@ -733,7 +963,7 @@ def place_convex_corner(
     v: float,
 ) -> None:
     """Try to place a convex corner here."""
-    for frame in barrier.frames:
+    for frame in barrier.frames[FrameOrient.HORIZ]:
         for seg in frame.seg_corner:
             seg.place(vmf, slice_key, 32.0 * u, 32.0 * v, orient)
 
@@ -753,27 +983,6 @@ def old_generation(vmf: VMF, coll: collisions.Collisions) -> None:
     hole_temp_lrg_square = template_solids_and_coll(hole_combined_temp, 'large_square')
 
     floorbeam_temp = options.GLASS_FLOORBEAM_TEMP()
-
-    if options.get_itemconf('BEE_PELLET:PelletGrating', False):
-        # Merge together these existing filters in global_pti_ents
-        vmf.create_ent(
-            origin=options.GLOBAL_PTI_ENTS_LOC(),
-            targetname='@grating_filter',
-            classname='filter_multi',
-            filtertype=0,
-            negated=0,
-            filter01='@not_pellet',
-            filter02='@not_paint_bomb',
-        )
-    else:
-        # Just skip paint bombs.
-        vmf.create_ent(
-            origin=options.GLOBAL_PTI_ENTS_LOC(),
-            targetname='@grating_filter',
-            classname='filter_activator_class',
-            negated=1,
-            filterclass='prop_paint_bomb',
-        )
 
     # Group the positions by planes in each orientation.
     # This makes them 2D grids which we can optimise.
