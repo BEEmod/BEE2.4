@@ -764,13 +764,14 @@ def get_piece_fitter(sizes: Collection[int]) -> Callable[[SupportsInt], Sequence
     We tend to reuse the set of sizes, so this allows caching some computation.
     """
     size_list = sorted(sizes)
+
     # First, for each size other than the largest, calculate the lowest common multiple between
-    # it and the next size up.
+    # it and all larger sizes.
     # That tells us how many of the small one we'd need before it can be matched by the next size up,
     # and more is therefore useless.
     counters: list[range] = []
-    for small, large in zip(size_list, size_list[1:]):
-        multiple = math.lcm(small, large)
+    for i, small in enumerate(size_list[:-1]):
+        multiple = min(math.lcm(small, large) for large in size_list[i+1:])
         counters.append(range(multiple // small))
 
     *pieces, largest = size_list
@@ -800,7 +801,7 @@ def get_piece_fitter(sizes: Collection[int]) -> Callable[[SupportsInt], Sequence
                     size for size, count in zip(pieces, tup)
                     for _ in range(count)
                 ] + [largest] * large_count
-                yield result
+            yield
 
     cycler = cycler_func()
 
@@ -808,16 +809,9 @@ def get_piece_fitter(sizes: Collection[int]) -> Callable[[SupportsInt], Sequence
     def calculate(size: SupportsInt) -> Sequence[int]:
         """Compute a solution."""
         size = int(size)
-        try:
-            return solutions[size]
-        except KeyError:
-            pass
-        cutoff = size / largest
+        cutoff = math.ceil(size / largest)
         while large_count < cutoff:
-            try:
-                return solutions[size]
-            except KeyError:
-                next(cycler)
+            next(cycler)
         try:
             return solutions[size]
         except KeyError:
