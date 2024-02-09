@@ -630,8 +630,8 @@ def res_glass_hole(inst: Entity, res: Keyvalues) -> None:
             ),
         )
     HOLES[key] = hole_type
-    inst['origin'] = origin
-    inst['angles'] = sel_normal.to_angle()
+    inst['origin'] = origin - 64 * normal
+    inst['angles'] = (-sel_normal).to_angle()
 
 
 def template_solids_and_coll(
