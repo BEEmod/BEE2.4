@@ -8,6 +8,8 @@ import pickle
 from srctools import FrozenVec, Vec, VMF, AtomicWriter, logger
 import attrs
 
+import utils
+from plane import Plane
 from user_errors import DATA_LOC, UserError, TOK_VBSP_LEAK
 from precomp.tiling import TileDef, TileType
 from precomp.brushLoc import Grid
@@ -69,20 +71,22 @@ def load_tiledefs(tiles: Iterable[TileDef], grid: Grid) -> None:
             })
 
 
-def load_barriers(barrier_map: dict[tuple[FrozenVec, FrozenVec], barriers.Barrier]) -> None:
+def load_barriers(barrier_map: dict[utils.SliceKey, Plane[barriers.BarrierType]]) -> None:
     """Load barrier data for display in errors."""
-    for (pos, normal), barrier in barrier_map.items():
-        if barrier.error_disp is None:
-            continue
-        try:
-            tile_list = UserError.simple_tiles[barrier.error_disp]
-        except KeyError:
-            continue
-        pos = pos + 56.0 * normal
-        tile_list.append({
-            'orient': NORM_2_ORIENT[normal],
-            'position': _vec2tup(pos / 128.0),
-        })
+    for slice_key, plane in barrier_map.items():
+        orient = NORM_2_ORIENT[slice_key.normal]
+        for (u, v), barrier in plane.items():
+            if barrier.type.error_disp is None:
+                continue
+            try:
+                tile_list = UserError.simple_tiles[barrier.type.error_disp]
+            except KeyError:
+                continue
+            pos = slice_key.plane_to_world(32 * u, 32 * v, -8.0)
+            tile_list.append({
+                'orient': orient,
+                'position': _vec2tup(pos / 128.0),
+            })
 
 
 def make_map(error: UserError) -> VMF:

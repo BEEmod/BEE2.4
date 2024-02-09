@@ -109,7 +109,7 @@ LARGE_DISALLOWED: Sequence[FrozenVec] = [
 
 
 @attrs.frozen(eq=False, kw_only=True)
-class Barrier:
+class BarrierType:
     """Type of barrier."""
     id: utils.ObjectID | utils.SpecialID
     frames: Mapping[FrameOrient, Sequence[FrameType]] = dict.fromkeys(FrameOrient, ())
@@ -119,9 +119,11 @@ class Barrier:
     floorbeam_temp: template_brush.Template | None = None
     coll_thick: float = 4.0
     hint_thick: float = 0.0
+    # If set, the brushes for this item can be combined with others of the same type.
+    mergeable: bool = False
 
     @classmethod
-    def parse(cls, kv: Keyvalues) -> Barrier:
+    def parse(cls, kv: Keyvalues) -> BarrierType:
         """Parse from keyvalues files."""
         frames: Dict[FrameOrient, List[FrameType]] = {orient: [] for orient in FrameOrient}
         error_disp: user_errors.Kind | None = None
@@ -152,7 +154,7 @@ class Barrier:
 
         contents = collisions.CollideType.parse(kv['contents', 'solid'])
 
-        return Barrier(
+        return BarrierType(
             id=utils.parse_obj_id(kv.real_name),
             frames=frames,
             error_disp=error_disp,
@@ -161,7 +163,16 @@ class Barrier:
             floorbeam_temp=floorbeam_temp,
             hint_thick=kv.float('hint_thick'),
             coll_thick=kv.float('coll_thick', 4.0),
+            mergeable=kv.bool('mergeable'),
         )
+
+
+@attrs.define
+class Barrier:
+    """A glass/grating item."""
+    name: str
+    type: BarrierType
+    instances: List[Entity] = attrs.Factory(list)
 
 
 @attrs.frozen(eq=False, kw_only=True)
@@ -390,14 +401,16 @@ class FrameType:
 
 
 # Special barrier representing the lack of one.
-BARRIER_EMPTY = Barrier(id=utils.ID_EMPTY)
+BARRIER_EMPTY_TYPE = BarrierType(id=utils.ID_EMPTY)
+BARRIER_EMPTY = Barrier('', BARRIER_EMPTY_TYPE)
 # Planar slice -> plane of barriers.
 # The plane is specified as the edge of the voxel.
 BARRIERS: dict[utils.SliceKey, Plane[Barrier]] = defaultdict(lambda: Plane(default=BARRIER_EMPTY))
+BARRIERS_BY_NAME: dict[str, Barrier] = {}
 # (origin, normal) -> hole
 HOLES: dict[tuple[FrozenVec, FrozenVec], HoleType] = {}
 FRAME_TYPES: Dict[utils.ObjectID, Dict[FrameOrient, FrameType]] = {}
-BARRIER_TYPES: Dict[utils.ObjectID, Barrier] = {}
+BARRIER_TYPES: Dict[utils.ObjectID, BarrierType] = {}
 
 
 def parse_conf(kv: Keyvalues) -> None:
@@ -415,13 +428,13 @@ def parse_conf(kv: Keyvalues) -> None:
             FrameOrient.VERT: vert_conf,
         }
     for block in kv.find_children('Barriers'):
-        barrier = Barrier.parse(block)
+        barrier = BarrierType.parse(block)
         BARRIER_TYPES[barrier.id] = barrier
 
     if GLASS_ID not in BARRIER_TYPES:
         LOGGER.warning('No definition for {}!', GLASS_ID)
         # Hardcoded basic definition.
-        BARRIER_TYPES[GLASS_ID] = Barrier(
+        BARRIER_TYPES[GLASS_ID] = BarrierType(
             id=GLASS_ID,
             contents=collisions.CollideType.GLASS,
             brushes=[
@@ -437,7 +450,7 @@ def parse_conf(kv: Keyvalues) -> None:
     if GRATE_ID not in BARRIER_TYPES:
         LOGGER.warning('No definition for {}!', GRATE_ID)
         # Hardcoded basic definition.
-        BARRIER_TYPES[GRATE_ID] = Barrier(
+        BARRIER_TYPES[GRATE_ID] = BarrierType(
             id=GRATE_ID,
             contents=collisions.CollideType.GRATING,
             brushes=[
@@ -481,9 +494,42 @@ def parse_map(vmf: VMF, info: conditions.MapInfo) -> None:
     frame_inst = instanceLocs.resolve_filter('[glass_frames]', silent=True)
     segment_inst = instanceLocs.resolve_filter('[glass_128]', silent=True)
 
-    for entities, material, barrier in [
-        (vmf.by_class['func_detail'], consts.Special.GLASS, BARRIER_TYPES[GLASS_ID]),
-        (vmf.by_class['func_brush'], consts.Special.GRATING, BARRIER_TYPES[GRATE_ID]),
+    for inst in vmf.by_class['func_instance']:
+        filename = inst['file'].casefold()
+        if not filename:
+            continue
+        if filename in segment_inst:
+            # The vanilla segment instance is the same for glass/grating, so we don't know which
+            # is which. Fill in a barrier, but don't give it a type yet.
+            # Look up the barriers
+            center = Vec.from_str(inst['origin']) // 128 * 128 + (64, 64, 64)
+            norm = Vec(x=1) @ Angle.from_str(inst['angles'])
+            center -= 64 * norm
+            plane_slice = utils.SliceKey(norm, center)
+            local = plane_slice.world_to_plane(center)
+
+            inst_name = inst['targetname']
+
+            try:
+                barrier = BARRIERS_BY_NAME[inst_name]
+            except KeyError:
+                barrier = BARRIERS_BY_NAME[inst_name] = Barrier(inst_name, BARRIER_EMPTY_TYPE)
+            barrier.instances.append(inst)
+
+            # Now set each 32-grid cell to be the barrier. Since this is square the orientation
+            # doesn't matter.
+            for u_off, v_off in FULL_SQUARE:
+                BARRIERS[plane_slice][
+                    (local.x + u_off) // 32,
+                    (local.y + v_off) // 32,
+                ] = barrier
+
+        if filename in frame_inst:  # Frames are useless, we'll make our own.
+            inst.remove()
+
+    for entities, material, barrier_type, fixup_value in [
+        (vmf.by_class['func_detail'], consts.Special.GLASS, BARRIER_TYPES[GLASS_ID], 'glass'),
+        (vmf.by_class['func_brush'], consts.Special.GRATING, BARRIER_TYPES[GRATE_ID], 'grating'),
     ]:
         for brush_ent in entities:
             for face in brush_ent.sides():
@@ -501,44 +547,36 @@ def parse_map(vmf: VMF, info: conditions.MapInfo) -> None:
                 plane_slice = utils.SliceKey(-norm, center)
                 local = plane_slice.world_to_plane(center)
 
-                # Now set each 32-grid cell to be the barrier. Since this is square the orientation
-                # doesn't matter.
-                for u_off, v_off in FULL_SQUARE:
-                    BARRIERS[plane_slice][
-                        (local.x + u_off) // 32,
-                        (local.y + v_off) // 32,
-                    ] = barrier
+                # Figure out the instance this matches from above.
+                # At this point all barrier definitions are whole voxel, so it doesn't matter which we pick.
+                try:
+                    barrier = BARRIERS[plane_slice][local.x // 32, local.y // 32]
+                except KeyError:
+                    LOGGER.warning('glass/grating at {}, {} has no corresponding instance?', center, norm)
+                    break  # Don't check remaining faces.
+
+                if barrier.type is BARRIER_EMPTY_TYPE:
+                    # Not yet filled in, now we can set it. Also set a fixup so conditions can
+                    # identify the barrier.
+                    barrier.type = barrier_type
+                    for inst in barrier.instances:
+                        inst.fixup[consts.FixupVars.BEE_GLS_TYPE] = fixup_value
+                elif barrier_type is not barrier_type:
+                    LOGGER.warning(
+                        'Barrier at {}, {} is both glass and grating simultaneously?',
+                        center, norm, plane_slice,
+                    )
+
                 break  # Don't check the remaining faces.
 
-    for inst in vmf.by_class['func_instance']:
-        filename = inst['file'].casefold()
-        if not filename:
-            continue
-        if filename in segment_inst:
-            # The vanilla segment instance is the same for glass/grating. Look up the barriers
-            # here, so we can mark them with a fixup. At this point all barrier definitions are
-            # whole voxel, so it doesn't matter which we pick.
-            center = Vec.from_str(inst['origin']) // 128 * 128 + (64, 64, 64)
-            norm = Vec(x=1) @ Angle.from_str(inst['angles'])
-            center -= 64 * norm
-            plane_slice = utils.SliceKey(norm, center)
-            local = plane_slice.world_to_plane(center)
-            try:
-                barrier = BARRIERS[plane_slice][local.x // 32, local.y // 32]
-            except KeyError:
-                LOGGER.warning('No glass/grating for frame at {}, {}?', center, norm)
-            else:
-                if barrier.id == GLASS_ID:
-                    inst.fixup[consts.FixupVars.BEE_GLS_TYPE] = 'glass'
-                elif barrier.id == GRATE_ID:
-                    inst.fixup[consts.FixupVars.BEE_GLS_TYPE] = 'grating'
-                else:
-                    LOGGER.warning(
-                        'No glass/grating for frame at {}, {} = {}, {}? - got {}',
-                        center, norm, plane_slice, local / 32, barrier,
-                    )
-        if filename in frame_inst:  # Frames are useless, we'll make our own.
-            inst.remove()
+    # Now, go back over the items to check they all have been matched up.
+    for barrier in list(BARRIERS_BY_NAME.values()):
+        if barrier.type is BARRIER_EMPTY_TYPE:
+            LOGGER.warning('Barrier "{}" has no associated brushes??', barrier.name)
+            # Discard.
+            del BARRIERS_BY_NAME[barrier.name]
+            for inst in barrier.instances:
+                inst.remove()
 
 
 def test_hole_spot(origin: FrozenVec, normal: FrozenVec, hole_type: HoleType) -> Literal['noglass', 'valid', 'nospace']:
@@ -691,13 +729,13 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
                     'bee2_template_tilesetter',
                     origin=plane_slice.plane_to_world(32 * u + 16, 32 * v + 16, 2),
                     angles=plane_slice.orient,
-                    skin=debug_skin[barrier.id],
+                    skin=debug_skin[barrier.type.id],
                     targetname=f'barrier_{debug_id}',
                     comment=f'Border: {borders[u, v]}, u={u}, v={v}',
                 )
 
-            if barrier.hint_thick > 0:
-                add_hints(vmf, plane_slice, group_plane, barrier.hint_thick)
+            if barrier.type.hint_thick > 0:
+                add_hints(vmf, plane_slice, group_plane, barrier.type.hint_thick)
 
             for (u, v) in group_plane:
                 place_concave_corner(vmf, barrier, plane_slice, borders, frame_orient, u, v, ORIENT_W, +1, +1)
@@ -748,7 +786,6 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
                 place_prism_brushes(vmf, barrier, plane_slice, min_u, min_v, max_u, max_v)
 
 
-
 def find_plane_groups(plane: Plane[Barrier]) -> Iterator[Tuple[Barrier, Plane[Barrier]]]:
     """Yield sub-graphs of a barrier plane, containing contiguous barriers."""
     stack: Set[Tuple[int, int]] = set()
@@ -758,18 +795,21 @@ def find_plane_groups(plane: Plane[Barrier]) -> Iterator[Tuple[Barrier, Plane[Ba
             continue
         group: Plane[Barrier] = Plane()
         stack.add(start)
+        mergeable = cmp_value.type.mergeable
         while stack:
             x, y = pos = stack.pop()
-            if completed[pos] or (value := plane[pos]) != cmp_value:
+            if completed[pos]:
                 continue
-            completed[pos] = True
-            group[pos] = value  # Preserve identity.
-            stack |= {
-                (x - 1, y),
-                (x + 1, y),
-                (x, y - 1),
-                (x, y + 1),
-            }
+            value = plane[pos]
+            if value == cmp_value or (mergeable and value.type is cmp_value.type):
+                completed[pos] = True
+                group[pos] = value
+                stack |= {
+                    (x - 1, y),
+                    (x + 1, y),
+                    (x, y - 1),
+                    (x, y + 1),
+                }
         yield cmp_value, group
 
 
@@ -829,7 +869,7 @@ def place_prism_brushes(
         )
         return [prism.solid]
 
-    for brush in barrier.brushes:
+    for brush in barrier.type.brushes:
         brush.generate(vmf, plane_slice, solid_func)
 
 
@@ -851,7 +891,7 @@ def place_concave_corner(
         NORMAL_TO_BORDER[0, off_v] not in borders[u + off_u, v]
     ):
         return  # No convex corner required.
-    for frame in barrier.frames[frame_orient]:
+    for frame in barrier.type.frames[frame_orient]:
         for seg in frame.seg_concave_corner:
             seg.place(
                 vmf, slice_key,
@@ -912,7 +952,7 @@ def place_straight_run(
         total_dist += 32
         end_u += off_u
         end_v += off_v
-    for frame in barrier.frames[frame_orient]:
+    for frame in barrier.type.frames[frame_orient]:
         start_off = 0
         frame_length = total_dist
         # If corners are present, shrink the straight piece inwards to not overlap.
@@ -963,7 +1003,7 @@ def place_convex_corner(
     v: float,
 ) -> None:
     """Try to place a convex corner here."""
-    for frame in barrier.frames[FrameOrient.HORIZ]:
+    for frame in barrier.type.frames[FrameOrient.HORIZ]:
         for seg in frame.seg_corner:
             seg.place(vmf, slice_key, 32.0 * u, 32.0 * v, orient)
 
