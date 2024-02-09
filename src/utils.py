@@ -791,41 +791,48 @@ def get_piece_fitter(sizes: Collection[int]) -> Callable[[SupportsInt], Sequence
 
     solutions: dict[int, list[int]] = {}
     largest = size_list[-1]
-    large_count = 0
 
-    def cycler_func() -> Iterator[tuple[int, int]]:
-        """This function iterates through all possible solutions."""
-        nonlocal large_count
-        for large_count in itertools.count():
-            for tup in itertools.product(*counters):
-                count = sum(tup) + large_count
-                result = sum(x * y for x, y in zip(tup, pieces)) + large_count * largest
-                try:
-                    existing = solutions[result]
-                except KeyError:
-                    pass
-                else:
-                    if len(existing) < count:
-                        continue
-                # Else, better, add it.
-                solutions[result] = [
-                    size for size, count in zip(pieces, tup)
-                    for _ in range(count)
-                ] + [largest] * large_count
-            yield
-
-    cycler = cycler_func()
+    # Now, pre-calculate every combination of smaller pieces.
+    # That's the hard part, but there's only a smaller amount of those.
+    for tup in itertools.product(*counters):
+        count = sum(tup)
+        result = sum(x * y for x, y in zip(tup, pieces))
+        try:
+            existing = solutions[result]
+        except KeyError:
+            pass
+        else:
+            if len(existing) < count:
+                continue
+        # Otherwise this solution is better, add it.
+        solutions[result] = [
+            size for size, count in zip(pieces, tup)
+            for _ in range(count)
+        ]
 
     @functools.lru_cache()
     def calculate(size: SupportsInt) -> Sequence[int]:
         """Compute a solution."""
         size = int(size)
+
+        # Figure out how many large pieces are required before we'd overshoot.
         cutoff = math.ceil(size / largest)
-        while large_count < cutoff:
-            next(cycler)
-        try:
-            return solutions[size]
-        except KeyError:
+
+        # Try each potential large piece to see if we have a solution
+        # for the remaining amount. Start with the most large pieces we can, that should
+        # give a more optimal smaller count. If none match, there is no solution.
+        best: list[int] | None = None
+        for large_count in reversed(range(cutoff + 1)):
+            part = size - large_count * largest
+            try:
+                potential = solutions[part] + [largest] * large_count
+            except KeyError:
+                continue
+            if best is None or len(potential) < len(best):
+                best = potential
+        if best is not None:
+            return best
+        else:
             raise ValueError(f'No solution to fit {size} with {size_list}')
 
     return calculate
