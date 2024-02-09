@@ -80,6 +80,17 @@ copyreg.add_extension('srctools.math', '_mk_fmat', 245)
 copyreg.add_extension('srctools.keyvalues', 'Keyvalues', 246)
 
 
+try:
+    from math import lcm
+except ImportError:
+    def lcm(a: int, b: int) -> int:
+        """Calculate the lowest common multiple.
+
+        TODO: Remove once we drop 3.8.
+        """
+        return (a * b) // math.gcd(a, b)
+
+
 # Appropriate locations to store config options for each OS.
 _SETTINGS_ROOT: Optional[Path]
 if WIN:
@@ -771,7 +782,7 @@ def get_piece_fitter(sizes: Collection[int]) -> Callable[[SupportsInt], Sequence
     # and more is therefore useless.
     counters: list[range] = []
     for i, small in enumerate(size_list[:-1]):
-        multiple = min(math.lcm(small, large) for large in size_list[i+1:])
+        multiple = min(lcm(small, large) for large in size_list[i+1:])
         counters.append(range(multiple // small))
 
     *pieces, largest = size_list
