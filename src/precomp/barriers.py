@@ -108,6 +108,17 @@ LARGE_DISALLOWED: Sequence[FrozenVec] = [
 ]
 
 
+@attrs.define(eq=False)
+class Hole:
+    """A hole item placed in the map."""
+    inst: Entity
+    type: HoleType
+    plane: utils.SliceKey
+    origin: Vec
+    # If true, we found a matching barrier this was inserted into.
+    inserted: bool = False
+
+
 @attrs.frozen(eq=False, kw_only=True)
 class BarrierType:
     """Type of barrier."""
@@ -417,8 +428,8 @@ BARRIER_EMPTY = Barrier('', BARRIER_EMPTY_TYPE)
 # The plane is specified as the edge of the voxel.
 BARRIERS: dict[utils.SliceKey, Plane[Barrier]] = defaultdict(lambda: Plane(default=BARRIER_EMPTY))
 BARRIERS_BY_NAME: dict[str, Barrier] = {}
-# (origin, normal) -> hole
-HOLES: dict[tuple[FrozenVec, FrozenVec], HoleType] = {}
+# plane -> {position -> hole}
+HOLES: dict[utils.SliceKey, dict[FrozenVec, Hole]] = defaultdict(dict)
 FRAME_TYPES: Dict[utils.ObjectID, Dict[FrameOrient, FrameType]] = {}
 BARRIER_TYPES: Dict[utils.ObjectID | utils.SpecialID, BarrierType] = {}
 
@@ -591,7 +602,7 @@ def parse_map(vmf: VMF, info: conditions.MapInfo) -> None:
                 inst.remove()
 
 
-def test_hole_spot(origin: FrozenVec, normal: FrozenVec, hole_type: HoleType) -> Literal['noglass', 'valid', 'nospace']:
+def test_hole_spot(origin: FrozenVec, plane: utils.SliceKey, hole_type: HoleType) -> Literal['noglass', 'valid', 'nospace']:
     """Check if the given position is valid for holes.
 
     We need to check that it's actually placed on glass/grating, and that
@@ -601,33 +612,31 @@ def test_hole_spot(origin: FrozenVec, normal: FrozenVec, hole_type: HoleType) ->
     * 'noglass' if the centerpoint isn't glass/grating.
     * 'nospace' if no adjacient panel is present.
     """
-    slice_key = utils.SliceKey(normal, origin)
-    center = slice_key.world_to_plane(origin)
-    plane = BARRIERS[slice_key]
+    center = plane.world_to_plane(origin)
+    barrier_plane = BARRIERS[plane]
 
-    center_type = plane[center.x // 32, center.y // 32]
+    center_type = barrier_plane[center.x // 32, center.y // 32]
     if center_type is BARRIER_EMPTY:
         return 'noglass'
 
-    u, v = Vec.INV_AXIS[normal.axis()]
     # The corners don't matter, but all 4 neighbours must be there.
     for u_off, v_off in FOOTPRINTS[hole_type]:
-        pos = origin + FrozenVec.with_axes(u, u_off, v, v_off)
-        off_type = plane[(center.x + u_off) // 32, (center.y + v_off) // 32]
+        pos = plane.plane_to_world(center.x + u_off, center.y + v_off)
+        off_type = barrier_plane[(center.x + u_off) // 32, (center.y + v_off) // 32]
         if off_type is BARRIER_EMPTY:
             # No side
-            LOGGER.warning('No offset barrier at {}, {}', pos, normal)
+            LOGGER.warning('No offset barrier at {}, {}', pos, plane)
             return 'nospace'
-        if off_type is not center_type:
+        if off_type != center_type:
             # Different type.
-            LOGGER.warning('Wrong barrier type at {}, {}', pos, normal)
+            LOGGER.warning('Wrong barrier type at {}, {}: {} != {}', pos, plane, off_type, center_type)
             return 'nospace'
 
     # In each direction, make sure a large hole isn't present.
     if hole_type is HoleType.LARGE:
         for offset in LARGE_DISALLOWED:
-            side_pos = origin + offset @ slice_key.orient
-            if HOLES.get((side_pos, normal)) is HoleType.LARGE:
+            side_pos = plane.plane_to_world(*offset).freeze()
+            if HOLES[plane].get(side_pos) is HoleType.LARGE:
                 # TODO: Draw this other hole as well?
                 return 'nospace'
     return 'valid'
@@ -641,17 +650,18 @@ def res_glass_hole(inst: Entity, res: Keyvalues) -> None:
     normal: FrozenVec = FrozenVec(z=-1) @ Angle.from_str(inst['angles'])
     origin: FrozenVec = FrozenVec.from_str(inst['origin']) // 128 * 128 + 64
     origin += 64 * normal
+    slice_key = utils.SliceKey(normal, origin)
 
-    first_placement = test_hole_spot(origin, normal, hole_type)
+    first_placement = test_hole_spot(origin, slice_key, hole_type)
     if first_placement == 'valid':
-        sel_normal = normal
+        sel_plane = slice_key
     else:
         # Test the opposite side of the glass too.
-        inv_normal = -normal
+        slice_key = utils.SliceKey(-normal, origin)
 
-        sec_placement = test_hole_spot(origin, inv_normal, hole_type)
+        sec_placement = test_hole_spot(origin, slice_key, hole_type)
         if sec_placement == 'valid':
-            sel_normal = inv_normal
+            sel_plane = slice_key
         else:
             raise user_errors.UserError(
                 user_errors.TOK_BARRIER_HOLE_FOOTPRINT
@@ -666,22 +676,25 @@ def res_glass_hole(inst: Entity, res: Keyvalues) -> None:
                 )
             )
     # Place it, or error if there's already one here.
-    key = (origin, sel_normal)
-    if key in HOLES:
+    try:
+        existing = HOLES[sel_plane][origin]
+    except KeyError:
+        pass
+    else:
         raise user_errors.UserError(
             user_errors.TOK_BARRIER_HOLE_FOOTPRINT,
             points=[origin],
             barrier_hole=user_errors.BarrierHole(
                 pos=user_errors.to_threespace(origin),
-                axis=sel_normal.axis(),
-                large=hole_type is HoleType.LARGE or HOLES[key] is HoleType.LARGE,
-                small=hole_type is HoleType.SMALL or HOLES[key] is HoleType.SMALL,
+                axis=sel_plane.normal.axis(),
+                large=hole_type is HoleType.LARGE or existing is HoleType.LARGE,
+                small=hole_type is HoleType.SMALL or existing is HoleType.SMALL,
                 footprint=False,
             ),
         )
-    HOLES[key] = hole_type
+    HOLES[sel_plane][origin] = Hole(inst, hole_type, sel_plane, origin.thaw())
     inst['origin'] = origin - 64 * normal
-    inst['angles'] = (-sel_normal).to_angle()
+    inst['angles'] = (-sel_plane.normal).to_angle()
 
 
 def template_solids_and_coll(
