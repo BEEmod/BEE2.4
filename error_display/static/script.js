@@ -41,18 +41,25 @@ window.addEventListener("load", () => {
 	async function updateScene(data) {
 		const mats = new Map();
 		const loader_tex = new THREE.TextureLoader();
+		async function load_tex_wrapping(filename) {
+			// Textures don't wrap by default.
+			const tex = await loader_tex.loadAsync(filename);
+			tex.wrapS = THREE.RepeatWrapping;
+			tex.wrapT = THREE.RepeatWrapping;
+			return tex;
+		}
 		const loader_obj = new OBJLoader();
 		mats.set("white", new THREE.MeshToonMaterial({
-			map: await loader_tex.loadAsync('static/grid3.png'),
+			map: await load_tex_wrapping('static/grid3.png'),
 		}));
 		mats.set("black", new THREE.MeshToonMaterial({
-			map: await loader_tex.loadAsync('static/grid3b.png'),
+			map: await load_tex_wrapping('static/grid3b.png'),
 		}));
 		mats.set("goopartial", new THREE.MeshToonMaterial({
-			map: await loader_tex.loadAsync('static/grid_goo_partial.png'),
+			map: await load_tex_wrapping('static/grid_goo_partial.png'),
 		}));
 		mats.set("goofull", new THREE.MeshToonMaterial({
-			map: await loader_tex.loadAsync('static/grid_goo_full.png'),
+			map: await load_tex_wrapping('static/grid_goo_full.png'),
 }		));
 		mats.set("glass", new THREE.MeshToonMaterial({
 			color: 0x3CA1ED,
@@ -61,7 +68,7 @@ window.addEventListener("load", () => {
 			side: THREE.DoubleSide,
 		}));
 		mats.set("grating", new THREE.MeshToonMaterial({
-			map: await loader_tex.loadAsync('static/grating.png'),
+			map: await load_tex_wrapping('static/grating.png'),
 			transparent: true,
 			side: THREE.DoubleSide,
 		}));
@@ -97,8 +104,7 @@ window.addEventListener("load", () => {
 		scene.add(lighting.target);
 		console.log("Scene data:", data);
 
-		const tile_geo = new THREE.PlaneGeometry(1.0, 1.0);
-		const grate_geo = new THREE.PlaneGeometry(1.0, 1.0);
+		const rect_geo = new Map();
 		const orients = new Map();
 		orients.set("n", new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI));
 		orients.set("s", new THREE.Quaternion());
@@ -134,7 +140,36 @@ window.addEventListener("load", () => {
 				} else {
 					mat = mats.get(kind);
 				}
-				const mesh = new THREE.Mesh(kind === "grating" ? grate_geo : tile_geo, mat);
+
+				let geo = rect_geo.get({width: tile.width, height: tile.height})
+				if (geo === undefined) {
+					// Can't use PlaneGeometry because we need to resize the UVs.
+					// Data here copied from that.
+					// geo = new THREE.PlaneGeometry(2, 4);
+					geo = new THREE.BufferGeometry();
+					geo.setIndex([0, 2, 1, 2, 3, 1]);
+					geo.setAttribute("position", new THREE.Float32BufferAttribute([
+						-tile.width/2, tile.height/2, 0,
+						tile.width/2, tile.height/2, 0,
+						-tile.width/2, -tile.height/2, 0,
+						tile.width/2, -tile.height/2, 0,
+					], 3));
+					geo.setAttribute("normal", new THREE.Float32BufferAttribute([
+						0, 0, 1,
+						0, 0, 1,
+						0, 0, 1,
+						0, 0, 1,
+					], 3));
+					geo.setAttribute("uv", new THREE.Float32BufferAttribute([
+						0, tile.height,
+						tile.width, tile.height,
+						0, 0,
+						tile.width, 0,
+					], 2))
+					rect_geo.set({width: tile.width, height: tile.height}, geo);
+
+				}
+				const mesh = new THREE.Mesh(geo, mat);
 				mesh.position.set(tile.position[0], tile.position[2], -tile.position[1]);
 				mesh.applyQuaternion(orients.get(tile.orient));
 				scene.add(mesh);

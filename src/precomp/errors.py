@@ -13,7 +13,7 @@ from plane import Plane
 from user_errors import DATA_LOC, UserError, TOK_VBSP_LEAK
 from precomp.tiling import TileDef, TileType
 from precomp.brushLoc import Grid
-from precomp import options, barriers
+from precomp import options, barriers, grid_optim
 import consts
 
 
@@ -61,6 +61,8 @@ def load_tiledefs(tiles: Iterable[TileDef], grid: Grid) -> None:
         tile_list.append({
             'orient': NORM_2_ORIENT[tile.normal.freeze()],
             'position': _vec2tup((tile.pos + 64 * tile.normal) / 128),
+            'width': 1.0,
+            'height': 1.0,
         })
     goo_tiles = UserError.simple_tiles["goo"]
     for pos, block in grid.items():
@@ -68,24 +70,35 @@ def load_tiledefs(tiles: Iterable[TileDef], grid: Grid) -> None:
             goo_tiles.append({
                 'orient': 'd',
                 'position': _vec2tup(pos + (0.5, 0.5, 0.75)),
+                'width': 1.0,
+                'height': 1.0,
             })
+    LOGGER.info('Stored map geometry for error display.')
 
 
-def load_barriers(barrier_map: dict[utils.SliceKey, Plane[barriers.BarrierType]]) -> None:
+def load_barriers(barrier_map: dict[utils.SliceKey, Plane[barriers.Barrier]]) -> None:
     """Load barrier data for display in errors."""
     for slice_key, plane in barrier_map.items():
         orient = NORM_2_ORIENT[slice_key.normal]
-        for (u, v), barrier in plane.items():
+        for min_u, min_v, max_u, max_v, barrier in grid_optim.optimise(plane):
             if barrier.type.error_disp is None:
                 continue
             try:
                 tile_list = UserError.simple_tiles[barrier.type.error_disp]
             except KeyError:
                 continue
-            pos = slice_key.plane_to_world(32 * u, 32 * v, -8.0)
+            max_u += 1
+            max_v += 1
+            pos = slice_key.plane_to_world(
+                32.0 * (min_u + max_u) / 2.0,
+                32.0 * (min_v + max_v) / 2.0,
+                1.0,
+            )
             tile_list.append({
                 'orient': orient,
                 'position': _vec2tup(pos / 128.0),
+                'width': 0.25 * (max_u - min_u),
+                'height': 0.25 * (max_v - min_v),
             })
 
 

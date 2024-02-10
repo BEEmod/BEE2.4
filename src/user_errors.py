@@ -32,6 +32,8 @@ class SimpleTile(TypedDict):
     """A super simplified version of tiledef data for the error window. This can be converted right to JSON."""
     position: TuplePos
     orient: Literal["n", "s", "e", "w", "u", "d"]
+    width: float
+    height: float
 
 
 class BarrierHole(TypedDict):
