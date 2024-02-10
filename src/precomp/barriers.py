@@ -2,8 +2,7 @@
 from __future__ import annotations
 
 from typing import Callable, Dict, Final, Iterator, List, Mapping, Set, Tuple
-
-from typing_extensions import Literal, Self, Sequence
+from typing_extensions import Literal, Self, Sequence, TypeAlias
 
 from collections import defaultdict
 from enum import Enum, Flag, auto as enum_auto
@@ -15,7 +14,7 @@ import srctools.logger
 import attrs
 
 from plane import Plane
-from precomp import instanceLocs, texturing, options, template_brush, conditions, collisions
+from precomp import instanceLocs, options, template_brush, conditions, collisions
 from precomp.grid_optim import optimise as grid_optimise
 import consts
 import user_errors
@@ -24,13 +23,8 @@ import utils
 
 LOGGER = srctools.logger.get_logger(__name__)
 COND_MOD_NAME: str | None = None
-STRAIGHT_LEN: Final = 64
-
-
-class HoleType(Enum):
-    """Type of hole cut into the barrier."""
-    SMALL = 'small'  # 1x1 hole (portal)
-    LARGE = 'large'  # 3x3 hole (funnel)
+STRAIGHT_LEN: Final = 64  # Length of the brush for straight frame sections.
+HoleTemplate: TypeAlias = Tuple[List[Solid], List[collisions.BBox]]
 
 
 class FrameOrient(Enum):
@@ -86,26 +80,66 @@ FULL_SQUARE: Final[Sequence[Tuple[int, int]]] = [
     for u in [-48, -16, +16, +48]
     for v in [-48, -16, +16, +48]
 ]
-FOOTPRINTS: Final[Mapping[HoleType, Sequence[Tuple[int, int]]]] = {
-    HoleType.SMALL: [
-        (u, v)
-        for u in [-16, +16]
-        for v in [-16, +16]
-    ],
-    # The large barrier excludes the corners.
-    HoleType.LARGE: [
-        (u, v)
-        for u in [-80, -48, -16, +16, +48, +80]
-        for v in [-80, -48, -16, +16, +48, +80]
-        if abs(u) != 80 or abs(v) != 80
-    ]
-}
 LARGE_DISALLOWED: Sequence[FrozenVec] = [
     FrozenVec(-128, 0, 0),
     FrozenVec(+128, 0, 0),
     FrozenVec(0, -128, 0),
     FrozenVec(0, +128, 0),
 ]
+
+
+@attrs.frozen(eq=False, kw_only=True, repr=False)
+class HoleType:
+    """A type of hole."""
+    id: utils.ObjectID
+    footprint: Sequence[Tuple[float, float]]  # Offsets occupied by the hole.
+    size: float  # Used for P1 floor beams.
+
+    # Geo used to create the brush face.
+    template: HoleTemplate
+
+    @classmethod
+    def parse(cls, kv: Keyvalues) -> HoleType:
+        """Parse hole types from keyvalues data."""
+        hole_id = utils.parse_obj_id(kv.real_name)
+        size = kv.float('diameter')
+
+        # Use a template to make it easy to specify these.
+        temp_id, visgroups = template_brush.parse_temp_name(kv['footprint'])
+        footprint = [
+            (tilesetter.offset.x, tilesetter.offset.y)
+            for tilesetter in template_brush.get_template(temp_id).tile_setters
+            if tilesetter.visgroups.issubset(visgroups)
+        ]
+
+        template = template_solids_and_coll(kv['template'])
+        if 'templateDiagonal' in kv:
+            return LargeHoleType(
+                id=hole_id,
+                footprint=footprint,
+                size=size,
+                template=template,
+                template_diagonal=template_solids_and_coll(kv['templatediagonal']),
+                template_square=template_solids_and_coll(kv['templatesquare']),
+            )
+        else:
+            return HoleType(
+                id=hole_id,
+                footprint=footprint,
+                size=size,
+                template=template,
+            )
+
+    def __repr__(self) -> str:
+        return f'<{type(self).__name__} {self.id!r}>'
+
+
+@attrs.frozen(eq=False, kw_only=True, repr=False)
+class LargeHoleType(HoleType):
+    """Large holes are currently rather hardcoded."""
+    template_diagonal: HoleTemplate  # Two holes diagonally overlapping.
+    # If the corner is present, place it as part of the hole to simplify brushwork.
+    template_square: HoleTemplate
 
 
 @attrs.define(eq=False)
@@ -117,6 +151,12 @@ class Hole:
     origin: Vec
     # If true, we found a matching barrier this was inserted into.
     inserted: bool = False
+    # The U/V position in the plane.
+    plane_pos: tuple[float, float] = attrs.field(init=False)
+
+    def __attrs_post_init__(self) -> None:
+        pos = self.plane.world_to_plane(self.origin)
+        self.plane_pos = pos.x, pos.y
 
 
 @attrs.frozen(eq=False, kw_only=True)
@@ -365,6 +405,8 @@ class SegmentBrush(Segment):
             self.orient @ rotation,
             force_type=template_brush.TEMP_TYPES.detail,
         )
+        if temp.detail is None:
+            return  # No brushes?
         diff = direction * (length - STRAIGHT_LEN)
         for face in temp.detail.sides():
             if face.normal().dot(direction) < -0.99:
@@ -430,6 +472,8 @@ BARRIERS: dict[utils.SliceKey, Plane[Barrier]] = defaultdict(lambda: Plane(defau
 BARRIERS_BY_NAME: dict[str, Barrier] = {}
 # plane -> {position -> hole}
 HOLES: dict[utils.SliceKey, dict[FrozenVec, Hole]] = defaultdict(dict)
+
+HOLE_TYPES: Dict[utils.ObjectID, HoleType] = {}
 FRAME_TYPES: Dict[utils.ObjectID, Dict[FrameOrient, FrameType]] = {}
 BARRIER_TYPES: Dict[utils.ObjectID | utils.SpecialID, BarrierType] = {}
 
@@ -452,9 +496,13 @@ def parse_conf(kv: Keyvalues) -> None:
         barrier = BarrierType.parse(block)
         BARRIER_TYPES[barrier.id] = barrier
 
+    for block in kv.find_children('BarrierHoles'):
+        hole = HoleType.parse(block)
+        HOLE_TYPES[hole.id] = hole
+
+    # Make sure a basic map sorta works even without the new configuration.
     if GLASS_ID not in BARRIER_TYPES:
         LOGGER.warning('No definition for {}!', GLASS_ID)
-        # Hardcoded basic definition.
         BARRIER_TYPES[GLASS_ID] = BarrierType(
             id=GLASS_ID,
             contents=collisions.CollideType.GLASS,
@@ -471,7 +519,6 @@ def parse_conf(kv: Keyvalues) -> None:
 
     if GRATE_ID not in BARRIER_TYPES:
         LOGGER.warning('No definition for {}!', GRATE_ID)
-        # Hardcoded basic definition.
         BARRIER_TYPES[GRATE_ID] = BarrierType(
             id=GRATE_ID,
             contents=collisions.CollideType.GRATING,
@@ -620,7 +667,7 @@ def test_hole_spot(origin: FrozenVec, plane: utils.SliceKey, hole_type: HoleType
         return 'noglass'
 
     # The corners don't matter, but all 4 neighbours must be there.
-    for u_off, v_off in FOOTPRINTS[hole_type]:
+    for u_off, v_off in hole_type.footprint:
         pos = plane.plane_to_world(center.x + u_off, center.y + v_off)
         off_type = barrier_plane[(center.x + u_off) // 32, (center.y + v_off) // 32]
         if off_type is BARRIER_EMPTY:
@@ -633,10 +680,10 @@ def test_hole_spot(origin: FrozenVec, plane: utils.SliceKey, hole_type: HoleType
             return 'nospace'
 
     # In each direction, make sure a large hole isn't present.
-    if hole_type is HoleType.LARGE:
+    if isinstance(hole_type, LargeHoleType):
         for offset in LARGE_DISALLOWED:
             side_pos = plane.plane_to_world(*offset).freeze()
-            if HOLES[plane].get(side_pos) is HoleType.LARGE:
+            if isinstance(HOLES[plane].get(side_pos), LargeHoleType):
                 # TODO: Draw this other hole as well?
                 return 'nospace'
     return 'valid'
@@ -645,7 +692,7 @@ def test_hole_spot(origin: FrozenVec, plane: utils.SliceKey, hole_type: HoleType
 @conditions.make_result('GlassHole')
 def res_glass_hole(inst: Entity, res: Keyvalues) -> None:
     """Add Glass/grating holes. The value should be 'large' or 'small'."""
-    hole_type = HoleType(res.value)
+    hole_type = HOLE_TYPES[utils.parse_obj_id(res.value)]
 
     normal: FrozenVec = FrozenVec(z=-1) @ Angle.from_str(inst['angles'])
     origin: FrozenVec = FrozenVec.from_str(inst['origin']) // 128 * 128 + 64
@@ -670,8 +717,9 @@ def res_glass_hole(inst: Entity, res: Keyvalues) -> None:
                 barrier_hole=user_errors.BarrierHole(
                     pos=user_errors.to_threespace(origin + 64 * normal),
                     axis=normal.axis(),
-                    large=hole_type is HoleType.LARGE,
-                    small=hole_type is HoleType.SMALL,
+                    # TODO: Handle hole rendering better, user-specifiable?
+                    large=isinstance(hole_type, LargeHoleType),
+                    small=not isinstance(hole_type, LargeHoleType),
                     footprint=True,
                 )
             )
@@ -687,28 +735,26 @@ def res_glass_hole(inst: Entity, res: Keyvalues) -> None:
             barrier_hole=user_errors.BarrierHole(
                 pos=user_errors.to_threespace(origin),
                 axis=sel_plane.normal.axis(),
-                large=hole_type is HoleType.LARGE or existing is HoleType.LARGE,
-                small=hole_type is HoleType.SMALL or existing is HoleType.SMALL,
+                large=isinstance(hole_type, LargeHoleType) or isinstance(existing, LargeHoleType),
+                small=not isinstance(hole_type, LargeHoleType) or not isinstance(existing, LargeHoleType),
                 footprint=False,
             ),
         )
     HOLES[sel_plane][origin] = Hole(inst, hole_type, sel_plane, origin.thaw())
     inst['origin'] = origin
+    # TODO: We need to preserve the rotation of the hole, for non-symmetrical items.
     inst['angles'] = (-sel_plane.normal).to_angle()
 
 
-def template_solids_and_coll(
-    template: template_brush.Template | None, visgroup: str,
-) -> tuple[list[Solid], list[collisions.BBox]]:
+def template_solids_and_coll(template_id: str) -> HoleTemplate:
     """Retrieve the brushes and collision boxes for the specified visgroup."""
-    if template is None:
-        return [], []
-    else:
-        groups = {visgroup, ''}
-        return template.visgrouped_solids(visgroup), [
-            coll.bbox for coll in template.collisions
-            if coll.visgroups.issubset(groups)
-        ]
+    temp_id, visgroups = template_brush.parse_temp_name(template_id)
+    visgroups.add('')
+    template = template_brush.get_template(temp_id)
+    return template.visgrouped_solids(visgroups), [
+        coll.bbox for coll in template.collisions
+        if coll.visgroups.issubset(visgroups)
+    ]
 
 
 @conditions.meta_cond(150)
@@ -737,7 +783,7 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
             filterclass='prop_paint_bomb',
         )
 
-    debug_skin = {
+    debug_skin: dict[utils.ObjectID | utils.SpecialID, int] = {
         GLASS_ID: 5,
         GRATE_ID: 0,
     }
@@ -745,10 +791,20 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
     debug_id = 0
     for plane_slice, plane in BARRIERS.items():
         frame_orient = FrameOrient.HORIZ if abs(plane_slice.normal.z) < 0.5 else FrameOrient.VERT
+        hole_plane = HOLES[plane_slice]
         for barrier, group_plane in find_plane_groups(plane):
+            debug_id += 1
+
             borders = calc_borders(group_plane)
 
-            debug_id += 1
+            if barrier.type.hint_thick > 0:
+                # Do this before holes, so we cover those with the hint.
+                add_hints(vmf, plane_slice, group_plane, barrier.type.hint_thick)
+
+            for hole in hole_plane.values():
+                if not hole.inserted:
+                    try_place_hole(vmf, group_plane, barrier, hole)
+
             for (u, v) in group_plane:
                 add_debug(
                     'bee2_template_tilesetter',
@@ -758,9 +814,6 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
                     targetname=f'barrier_{debug_id}',
                     comment=f'Border: {borders[u, v]}, u={u}, v={v}',
                 )
-
-            if barrier.type.hint_thick > 0:
-                add_hints(vmf, plane_slice, group_plane, barrier.type.hint_thick)
 
             for (u, v) in group_plane:
                 place_concave_corner(vmf, barrier, plane_slice, borders, frame_orient, u, v, ORIENT_W, +1, +1)
@@ -807,8 +860,25 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
                 if Border.CORNER_SW in border:
                     place_convex_corner(vmf, barrier, plane_slice, ORIENT_N, u + 1, v)
 
-            for min_u, min_v, max_u, max_v, _ in grid_optimise(group_plane):
+            for min_u, min_v, max_u, max_v, sub_barrier in grid_optimise(group_plane):
+                if sub_barrier is BARRIER_EMPTY:
+                    continue
                 place_prism_brushes(vmf, barrier, plane_slice, min_u, min_v, max_u, max_v)
+
+    for hole_plane in HOLES.values():
+        for hole in hole_plane.values():
+            if not hole.inserted:
+                LOGGER.warning('Couldnt place: {}', hole)
+                # raise user_errors.UserError(
+                #     user_errors.TOK_BARRIER_HOLE_FOOTPRINT,
+                #     barrier_hole={
+                #         'pos': user_errors.to_threespace(hole.origin),
+                #         'axis': hole.plane.normal.axis(),
+                #         'large': isinstance(HoleType, LargeHoleType),
+                #         'small': not isinstance(HoleType, LargeHoleType),
+                #         'footprint': True,
+                #     }
+                # )
 
 
 def find_plane_groups(plane: Plane[Barrier]) -> Iterator[Tuple[Barrier, Plane[Barrier]]]:
@@ -926,6 +996,92 @@ def place_concave_corner(
             )
 
 
+def try_place_hole(vmf: VMF, plane: Plane[Barrier], barrier: Barrier, hole: Hole) -> None:
+    """Try and place a hole in the barrier."""
+    # First check if the footprint is present. If not, we're some other piece of glass.
+    hole_u, hole_v = hole.plane_pos
+    for u_off, v_off in hole.type.footprint:
+        if ((hole_u + u_off) // 32, (hole_v + v_off) // 32) not in plane:
+            return
+
+    # Found, we're generating this.
+    hole.inserted = True
+
+    angles = hole.plane.orient.to_angle()
+    hole_temp: list[tuple[list[Solid], list[collisions.BBox], Matrix | FrozenMatrix]] = []
+    hole_plane = HOLES[hole.plane]
+
+    # This is a tricky bit. Two large templates would collide
+    # diagonally, and we allow the corner glass to not be present since
+    # the hole doesn't actually use that 32x32 segment.
+    # So we need to determine which of 3 templates to use.
+    if isinstance(hole.type, LargeHoleType):
+        for yaw in (0, 90, 180, 270):
+            corn_mat = Matrix.from_yaw(yaw) @ hole.plane.orient
+
+            corn_dir = Vec(x=1, y=1) @ corn_mat
+            hole_off = hole.origin + 128 * corn_dir
+            diag_hole = hole_plane.get(hole_off.freeze())
+            corner_pos = hole.plane.world_to_plane(hole.origin + 80 * corn_dir)
+            corn_u = corner_pos.x // 32
+            corn_v = corner_pos.y // 32
+
+            if diag_hole is not None and isinstance(diag_hole.type, LargeHoleType):
+                # There's another large template to this direction.
+                # Just have 1 generate both combined, so the brushes can
+                # be more optimal. To pick, arbitrarily make the upper one
+                # be in charge.
+                if corn_v > (hole_v // 32):
+                    hole_temp.append(hole.type.template_diagonal + (corn_mat, ))
+                continue
+            # This bit of the glass is present, so include it in our brush, then clear.
+            if (corn_u, corn_v) in plane:
+                hole_temp.append(hole.type.template_square + (corn_mat, ))
+                plane[corn_u, corn_v] = BARRIER_EMPTY
+            else:
+                hole_temp.append(hole.type.template + (corn_mat, ))
+
+    else:
+        hole_temp.append(hole.type.template + (hole.plane.orient, ))
+
+    # for _, bbox_list, matrix in hole_temp:
+    #     # Place the collisions.
+    #     for bbox in bbox_list:
+    #         bbox = bbox @ matrix + origin
+    #         coll.add(bbox.with_attrs(name=str(barrier.id), contents=barrier.type.contents))
+
+    for u_off, v_off in hole.type.footprint:
+        # This is in the plane still, but marked as blank. That way diagonally overlapping holes
+        # still work.
+        plane[(hole_u + u_off) // 32, (hole_v + v_off) // 32] = BARRIER_EMPTY
+
+    hole_origin_cell = hole.origin
+
+    def hole_brush_func(off1: float, off2: float) -> list[Solid]:
+        """Given the two thicknesses, produce the curved hole from the template."""
+        off_min = min(off1, off2)
+        off_max = max(off1, off2)
+        new_brushes = []
+        for brushes, _, matrix in hole_temp:
+            for orig_brush in brushes:
+                brush = orig_brush.copy(vmf_file=vmf)
+                new_brushes.append(brush)
+                for face in brush.sides:
+                    for point in face.planes:
+                        if point.z > 0:
+                            point.z = off_max
+                        else:
+                            point.z = off_min
+                    face.localise(hole_origin_cell, matrix)
+                    # Increase precision, these are small detail brushes.
+                    face.lightmap = 8
+        return new_brushes
+
+    for brush in barrier.type.brushes:
+        brush.generate(vmf, hole.plane, hole_brush_func)
+
+
+
 def place_straight_run(
     vmf: VMF,
     barrier: Barrier,
@@ -1031,279 +1187,6 @@ def place_convex_corner(
     for frame in barrier.type.frames[FrameOrient.HORIZ]:
         for seg in frame.seg_corner:
             seg.place(vmf, slice_key, 32.0 * u, 32.0 * v, orient)
-
-
-def old_generation(vmf: VMF, coll: collisions.Collisions) -> None:
-    # Avoid error without this package.
-    hole_temp_id = options.GLASS_HOLE_TEMP()
-    if HOLES and hole_temp_id is not None:
-        # Grab the template solids we need.
-        hole_combined_temp = template_brush.get_template(hole_temp_id)
-    else:
-        hole_combined_temp = None
-
-    hole_temp_small = template_solids_and_coll(hole_combined_temp, 'small')
-    hole_temp_lrg_diag = template_solids_and_coll(hole_combined_temp, 'large_diagonal')
-    hole_temp_lrg_cutout = template_solids_and_coll(hole_combined_temp, 'large_cutout')
-    hole_temp_lrg_square = template_solids_and_coll(hole_combined_temp, 'large_square')
-
-    floorbeam_temp = options.GLASS_FLOORBEAM_TEMP()
-
-    # Group the positions by planes in each orientation.
-    # This makes them 2D grids which we can optimise.
-    # (normal_dist, positive_axis, type) -> Plane(type)
-    slices: dict[tuple[FrozenVec, bool], Plane[Barrier]] = defaultdict(lambda: Plane(default=BARRIER_EMPTY))
-
-    # Compute contiguous sections of any barrier type, then place hint brushes to ensure sorting
-    # is done correctly.
-    for (plane_pos, is_pos), pos_slice in slices.items():
-        norm_axis = plane_pos.axis()
-        normal = FrozenVec.with_axes(norm_axis, 1 if is_pos else -1)
-
-        u_axis, v_axis = Vec.INV_AXIS[norm_axis]
-        is_present = Plane.fromkeys(pos_slice, True)
-        for min_u, min_v, max_u, max_v, _ in grid_optimise(is_present):
-            # These are two points in the origin plane, at the borders.
-            pos_min = Vec.with_axes(
-                norm_axis, plane_pos,
-                u_axis, min_u * 32,
-                v_axis, min_v * 32,
-            )
-            pos_max = Vec.with_axes(
-                norm_axis, plane_pos,
-                u_axis, max_u * 32 + 32,
-                v_axis, max_v * 32 + 32,
-            )
-            hint = vmf.make_prism(
-                pos_min + normal * 64,
-                pos_max + normal * 60,
-                mat=consts.Tools.SKIP,
-            ).solid
-            for side in hint:
-                if abs(Vec.dot(side.normal(), normal)) > 0.99:
-                    side.mat = consts.Tools.HINT
-            vmf.add_brush(hint)
-
-    # Remove pane sections where the holes are. We then generate those with
-    # templates for slanted parts.
-    for (origin, normal), hole_type in HOLES.items():
-        barrier = BARRIERS[origin, normal]
-        norm_axis = normal.axis()
-        u, v = origin.other_axes(norm_axis)
-        norm_pos = FrozenVec.with_axes(norm_axis, origin)
-        slice_plane = slices[norm_pos, normal[norm_axis] > 0]
-        bad_locs: List[Vec] = []
-        for u_off, v_off in FOOTPRINTS[hole_type]:
-            # Remove these squares, but keep them in the Plane,
-            # so we can check if there was glass there.
-            uv = (int((u + u_off) // 32), int((v + v_off) // 32))
-            if uv in slice_plane:
-                slice_plane[uv] = BARRIER_EMPTY
-            else:
-                u_ax, v_ax = Vec.INV_AXIS[norm_axis]
-                bad_locs.append(Vec.with_axes(
-                    norm_axis, norm_pos,
-                        u_ax, u + u_off,
-                        v_ax, v + v_off,
-                    ))
-        if bad_locs:
-            raise user_errors.UserError(
-                user_errors.TOK_BARRIER_HOLE_FOOTPRINT,
-                points=bad_locs,
-                barrier_hole={
-                    'pos': user_errors.to_threespace(origin + 64 * normal),
-                    'axis': norm_axis,
-                    'large': hole_type is HoleType.LARGE,
-                    'small': hole_type is HoleType.SMALL,
-                    'footprint': True,
-                }
-            )
-
-        angles = normal.to_angle()
-        hole_temp: list[tuple[list[Solid], list[collisions.BBox], Matrix]] = []
-
-        # This is a tricky bit. Two large templates would collide
-        # diagonally, and we allow the corner glass to not be present since
-        # the hole doesn't actually use that 32x32 segment.
-        # So we need to determine which of 3 templates to use.
-        corn_angles = angles.copy()
-        if hole_type is HoleType.LARGE:
-            for corn_angles.roll in (0, 90, 180, 270):
-                corn_mat = Matrix.from_angle(corn_angles)
-
-                corn_dir = FrozenVec(y=1, z=1) @ corn_angles
-                hole_off = origin + 128 * corn_dir
-                diag_type = HOLES.get((hole_off, normal), None)
-                corner_pos = origin + 80 * corn_dir
-                corn_u, corn_v = corner_pos.other_axes(norm_axis)
-                corn_u = int(corn_u // 32)
-                corn_v = int(corn_v // 32)
-
-                if diag_type is HoleType.LARGE:
-                    # There's another large template to this direction.
-                    # Just have 1 generate both combined, so the brushes can
-                    # be more optimal. To pick, arbitrarily make the upper one
-                    # be in charge.
-                    if corn_v > v // 32:
-                        hole_temp.append(hole_temp_lrg_diag + (corn_mat, ))
-                    continue
-                # This bit of the glass is present, so include it in our brush, then clear.
-                if (corn_u, corn_v) in slice_plane:
-                    hole_temp.append(hole_temp_lrg_square + (corn_mat, ))
-                else:
-                    hole_temp.append(hole_temp_lrg_cutout + (corn_mat, ))
-
-        else:
-            hole_temp.append(hole_temp_small + (Matrix.from_angle(angles), ))
-
-        for _, bbox_list, matrix in hole_temp:
-            # Place the collisions.
-            for bbox in bbox_list:
-                bbox = bbox @ matrix + origin
-                coll.add(bbox.with_attrs(name=str(barrier.id), contents=barrier.contents))
-
-        def solid_pane_func(off1: float, off2: float, mat: str) -> list[Solid]:
-            """Given the two thicknesses, produce the curved hole from the template."""
-            off_min = 64 - max(off1, off2)
-            off_max = 64 - min(off1, off2)
-            new_brushes = []
-            for brushes, _, matrix in hole_temp:
-                for orig_brush in brushes:
-                    brush = orig_brush.copy(vmf_file=vmf)
-                    new_brushes.append(brush)
-                    for face in brush.sides:
-                        face.mat = mat
-                        for point in face.planes:
-                            if point.x > 64:
-                                point.x = off_max
-                            else:
-                                point.x = off_min
-                        face.localise(origin, matrix)
-                        # Increase precision, these are small detail brushes.
-                        face.lightmap = 8
-            return new_brushes
-
-        make_glass_grating(
-            vmf,
-            origin,
-            normal,
-            barrier,
-            solid_pane_func,
-        )
-
-    for (plane_pos, is_pos), pos_slice in slices.items():
-        norm_axis = plane_pos.axis()
-        normal = FrozenVec.with_axes(norm_axis, 1 if is_pos else -1)
-
-        u_axis, v_axis = Vec.INV_AXIS[norm_axis]
-
-        for min_u, min_v, max_u, max_v, barrier in grid_optimise(pos_slice):
-            if barrier is BARRIER_EMPTY:  # Hole placed here and overwrote the glass/grating.
-                continue
-            # These are two points in the origin plane, at the borders.
-            pos_min = Vec.with_axes(
-                norm_axis, plane_pos,
-                u_axis, min_u * 32,
-                v_axis, min_v * 32,
-            )
-            pos_max = Vec.with_axes(
-                norm_axis, plane_pos,
-                u_axis, max_u * 32 + 32,
-                v_axis, max_v * 32 + 32,
-            )
-            coll.add(collisions.BBox(
-                pos_min + normal * 64.0,
-                pos_max + normal * 60.0,
-                name=barrier.id,
-                contents=barrier.contents,
-            ))
-
-            def solid_pane_func(off1: float, off2: float, mat: str) -> list[Solid]:
-                """Make the solid brush."""
-                return [vmf.make_prism(
-                    pos_min + normal * (64.0 - off1),
-                    pos_max + normal * (64.0 - off2),
-                    mat=mat,
-                ).solid]
-
-            make_glass_grating(
-                vmf,
-                (pos_min + pos_max)/2 + 63 * normal,
-                normal,
-                barrier,
-                solid_pane_func,
-            )
-
-    if floorbeam_temp:
-        LOGGER.info('Adding Glass floor beams...')
-        add_glass_floorbeams(vmf, floorbeam_temp)
-        LOGGER.info('Done!')
-
-
-def make_glass_grating(
-    vmf: VMF,
-    ent_pos: Vec | FrozenVec,
-    normal: Vec | FrozenVec,
-    barrier: Barrier,
-    solid_func: Callable[[float, float, str], list[Solid]],
-) -> None:
-    """Make all the brushes needed for glass/grating.
-
-    solid_func() is called with two offsets from the voxel edge, and returns a
-    matching list of solids. This allows doing holes and normal panes with the
-    same function.
-    """
-    # TODO: Make this all configurable
-    if barrier.id == GLASS_ID:
-        main_ent = vmf.create_ent('func_detail')
-        tex_cat = 'glass'
-    else:
-        main_ent = vmf.create_ent(
-            'func_brush',
-            renderfx=14,  # Constant Glow
-            solidity=1,  # Never solid
-            origin=ent_pos,
-        )
-        tex_cat = 'grating'
-
-    # The actual glass/grating brush - 0.5-1.5 units back from the surface.
-    main_ent.solids = solid_func(0.5, 1.5, consts.Tools.NODRAW)
-
-    for face in main_ent.sides():
-        if abs(Vec.dot(normal, face.normal())) > 0.99:
-            texturing.apply(texturing.GenCat.SPECIAL, face, tex_cat)
-            barrier.face_temp.apply(face, change_mat=False)
-
-    if barrier.tex_player_clip is not None:
-        if abs(normal.z) < 0.125:
-            # If vertical, we don't care about footsteps.
-            # So just use 'normal' clips.
-            player_clip = vmf.create_ent('func_detail')
-            player_clip_mat = consts.Tools.PLAYER_CLIP
-        else:
-            # This needs to be a func_brush, otherwise the clip texture data
-            # will be merged with other clips.
-            player_clip = vmf.create_ent(
-                'func_brush',
-                solidbsp=1,
-                origin=ent_pos,
-            )
-            # We also need a func_detail clip, which functions on portals.
-            # Make it thinner, so it doesn't impact footsteps.
-            player_thin_clip = vmf.create_ent('func_detail')
-            player_thin_clip.solids = solid_func(0.5, 3.5, consts.Tools.PLAYER_CLIP)
-
-        player_clip.solids = solid_func(0, 4, barrier.tex_player_clip)
-
-    if barrier.id == GRATE_ID:
-        # Add the VPhysics clip.
-        phys_clip = vmf.create_ent(
-            'func_clip_vphysics',
-            filtername='@grating_filter',
-            origin=ent_pos,
-            StartDisabled=0,
-        )
-        phys_clip.solids = solid_func(0, 2, consts.Tools.TRIGGER)
 
 
 def add_glass_floorbeams(vmf: VMF, temp_name: str) -> None:
@@ -1462,19 +1345,12 @@ def beam_hole_split(axis: str, min_pos: Vec, max_pos: Vec) -> Iterator[tuple[Vec
             normal = FrozenVec(z=-1)
         for pos in min_pos.iter_line(max_pos, 128):
             try:
-                hole_type = HOLES[FrozenVec(pos.x, pos.y, grid_height), normal]
+                hole: Hole = HOLES[FrozenVec(pos.x, pos.y, grid_height), normal]
             except KeyError:
                 continue
             else:
-                if hole_type is HoleType.SMALL:
-                    size = hole_size_small
-                elif hole_type is HoleType.LARGE:
-                    size = hole_size_large
-                else:
-                    raise AssertionError(hole_type)
-
-                yield start_pos, pos - Vec.with_axes(axis, size)
-                start_pos = pos + Vec.with_axes(axis, size)
+                yield start_pos, pos - Vec.with_axes(axis, hole.type.size)
+                start_pos = pos + Vec.with_axes(axis, hole.type.size)
 
     # Last segment, or all if no holes.
     yield start_pos, max_pos + Vec.with_axes(axis, 60)
