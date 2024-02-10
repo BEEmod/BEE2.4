@@ -112,7 +112,7 @@ LARGE_DISALLOWED: Sequence[FrozenVec] = [
 class BarrierType:
     """Type of barrier."""
     id: utils.ObjectID | utils.SpecialID
-    frames: Mapping[FrameOrient, Sequence[FrameType]] = dict.fromkeys(FrameOrient, ())
+    frames: Mapping[FrameOrient, Sequence[FrameType]] = attrs.field(default=dict.fromkeys(FrameOrient, ()), repr=False)
     error_disp: user_errors.Kind | None = None
     brushes: Sequence[Brush] = ()
     contents: collisions.CollideType = collisions.CollideType.SOLID
@@ -145,7 +145,7 @@ class BarrierType:
         if 'error_tex' in kv:
             error_tex = kv['error_tex'].casefold()
             if error_tex in user_errors.TEX_SET:
-                error_disp = error_tex
+                error_disp = error_tex  # type: ignore
 
         if floorbeam_temp_id := kv['template_floorbeam', '']:
             floorbeam_temp = template_brush.get_template(floorbeam_temp_id)
@@ -410,7 +410,7 @@ BARRIERS_BY_NAME: dict[str, Barrier] = {}
 # (origin, normal) -> hole
 HOLES: dict[tuple[FrozenVec, FrozenVec], HoleType] = {}
 FRAME_TYPES: Dict[utils.ObjectID, Dict[FrameOrient, FrameType]] = {}
-BARRIER_TYPES: Dict[utils.ObjectID, BarrierType] = {}
+BARRIER_TYPES: Dict[utils.ObjectID | utils.SpecialID, BarrierType] = {}
 
 
 def parse_conf(kv: Keyvalues) -> None:
@@ -437,6 +437,7 @@ def parse_conf(kv: Keyvalues) -> None:
         BARRIER_TYPES[GLASS_ID] = BarrierType(
             id=GLASS_ID,
             contents=collisions.CollideType.GLASS,
+            error_disp='glass',
             brushes=[
                 Brush(
                     face_temp=template_brush.ScalingTemplate.world(consts.Special.GLASS),
@@ -453,6 +454,7 @@ def parse_conf(kv: Keyvalues) -> None:
         BARRIER_TYPES[GRATE_ID] = BarrierType(
             id=GRATE_ID,
             contents=collisions.CollideType.GRATING,
+            error_disp='grating',
             brushes=[
                 Brush(
                     face_temp=template_brush.ScalingTemplate.world(consts.Special.GRATING),
