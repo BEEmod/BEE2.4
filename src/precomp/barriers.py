@@ -868,17 +868,16 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
     for hole_plane in HOLES.values():
         for hole in hole_plane.values():
             if not hole.inserted:
-                LOGGER.warning('Couldnt place: {}', hole)
-                # raise user_errors.UserError(
-                #     user_errors.TOK_BARRIER_HOLE_FOOTPRINT,
-                #     barrier_hole={
-                #         'pos': user_errors.to_threespace(hole.origin),
-                #         'axis': hole.plane.normal.axis(),
-                #         'large': isinstance(HoleType, LargeHoleType),
-                #         'small': not isinstance(HoleType, LargeHoleType),
-                #         'footprint': True,
-                #     }
-                # )
+                raise user_errors.UserError(
+                    user_errors.TOK_BARRIER_HOLE_FOOTPRINT,
+                    barrier_hole={
+                        'pos': user_errors.to_threespace(hole.origin),
+                        'axis': hole.plane.normal.axis(),
+                        'large': isinstance(HoleType, LargeHoleType),
+                        'small': not isinstance(HoleType, LargeHoleType),
+                        'footprint': True,
+                    }
+                )
 
 
 def find_plane_groups(plane: Plane[Barrier]) -> Iterator[Tuple[Barrier, Plane[Barrier]]]:
@@ -1334,9 +1333,6 @@ def beam_hole_split(axis: str, min_pos: Vec, max_pos: Vec) -> Iterator[tuple[Vec
     # Inset in 4 units from each end to not overlap with the frames.
     start_pos = min_pos - Vec.with_axes(axis, 60)
     if HOLES:
-        hole_size_large = options.GLASS_HOLE_SIZE_LARGE() / 2
-        hole_size_small = options.GLASS_HOLE_SIZE_SMALL() / 2
-
         # Extract normal from the z-axis.
         grid_height = min_pos.z // 128 * 128 + 64
         if grid_height < min_pos.z:
@@ -1349,8 +1345,8 @@ def beam_hole_split(axis: str, min_pos: Vec, max_pos: Vec) -> Iterator[tuple[Vec
             except KeyError:
                 continue
             else:
-                yield start_pos, pos - Vec.with_axes(axis, hole.type.size)
-                start_pos = pos + Vec.with_axes(axis, hole.type.size)
+                yield start_pos, pos - Vec.with_axes(axis, hole.type.size / 2.0)
+                start_pos = pos + Vec.with_axes(axis, hole.type.size / 2.0)
 
     # Last segment, or all if no holes.
     yield start_pos, max_pos + Vec.with_axes(axis, 60)
