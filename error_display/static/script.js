@@ -5,7 +5,6 @@ import {OBJLoader} from "./OBJLoader.js";
 window.addEventListener("load", () => {
 	const TILE_SIZE = 64;
 	const PADDING = 96;
-	const content_box = document.querySelector("main");
 	const FREQ = 30 * 1000;
 
 	const fireHeartbeat = () => {
@@ -239,4 +238,11 @@ window.addEventListener("load", () => {
 	};
 	window.visualViewport.addEventListener("resize", update);
 	update();
+
+	const render_details = document.getElementById("render-details");
+	render_details.addEventListener("toggle", () => {
+		if (render_details.open) {
+			update();
+		}
+	})
 });
