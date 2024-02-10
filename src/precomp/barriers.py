@@ -167,12 +167,22 @@ class BarrierType:
         )
 
 
-@attrs.define
+@attrs.define(eq=False)
 class Barrier:
     """A glass/grating item."""
     name: str
     type: BarrierType
     instances: List[Entity] = attrs.Factory(list)
+
+    def __eq__(self, other: object) -> bool:
+        """Two barriers are equal if they are the same, or if mergable and share the type."""
+        if isinstance(other, Barrier):
+            if self.name == other.name:
+                return True
+            if self.type is other.type and self.type.mergeable:
+                return True
+            return False
+        return NotImplemented
 
 
 @attrs.frozen(eq=False, kw_only=True)
@@ -401,7 +411,7 @@ class FrameType:
 
 
 # Special barrier representing the lack of one.
-BARRIER_EMPTY_TYPE = BarrierType(id=utils.ID_EMPTY)
+BARRIER_EMPTY_TYPE = BarrierType(id=utils.ID_EMPTY, mergeable=True)
 BARRIER_EMPTY = Barrier('', BARRIER_EMPTY_TYPE)
 # Planar slice -> plane of barriers.
 # The plane is specified as the edge of the voxel.
