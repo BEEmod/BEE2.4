@@ -693,7 +693,7 @@ def res_glass_hole(inst: Entity, res: Keyvalues) -> None:
             ),
         )
     HOLES[sel_plane][origin] = Hole(inst, hole_type, sel_plane, origin.thaw())
-    inst['origin'] = origin - 64 * normal
+    inst['origin'] = origin
     inst['angles'] = (-sel_plane.normal).to_angle()
 
 
