@@ -108,12 +108,21 @@ class TemplateEntity:
     """One of the several entities defined in templates."""
     visgroups: set[str]  # Visgroups applied to this entity.
 
+    def is_applicable(self, visgroups: Iterable[str]) -> bool:
+        """Check if this entity should be used."""
+        return self.visgroups.issubset(visgroups)
+
 
 @attrs.define
-class ColorPicker(TemplateEntity):
-    """Color pickers allow applying the existing colors onto faces."""
+class PlanarTemplateEntity(TemplateEntity):
+    """A template entity that is applied to a specific plane."""
     offset: Vec
     normal: Vec  # Normal of the surface.
+
+
+@attrs.define
+class ColorPicker(PlanarTemplateEntity):
+    """Color pickers allow applying the existing colors onto faces."""
     priority: Decimal  # Decimal order to do them in.
     name: str  # Name to reference from other ents.
     sides: list[str]
@@ -129,10 +138,8 @@ class ColorPicker(TemplateEntity):
 
 
 @attrs.define
-class VoxelSetter(TemplateEntity):
+class VoxelSetter(PlanarTemplateEntity):
     """Set all tiles in a tiledef."""
-    offset: Vec
-    normal: Vec  # Normal of the surface.
     tile_type: TileType  # Type to produce.
     force: bool  # Force overwrite existing values.
 
@@ -1045,7 +1052,7 @@ def retexture_template(
 
     # Already sorted by priority.
     for color_picker in template.color_pickers:
-        if not color_picker.visgroups.issubset(template_data.visgroups):
+        if not color_picker.is_applicable(template_data.visgroups):
             continue
 
         picker_pos: Vec = round(
@@ -1133,7 +1140,7 @@ def retexture_template(
             tiledef[u, v] = TileType.NODRAW
 
     for voxel_setter in template.voxel_setters:
-        if not voxel_setter.visgroups.issubset(template_data.visgroups):
+        if not voxel_setter.is_applicable(template_data.visgroups):
             continue
 
         setter_pos = round(
@@ -1165,7 +1172,7 @@ def retexture_template(
                 )
 
     for tile_setter in template.tile_setters:
-        if not tile_setter.visgroups.issubset(template_data.visgroups):
+        if not tile_setter.is_applicable(template_data.visgroups):
             continue
 
         setter_pos = round(
