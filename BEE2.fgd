@@ -97,6 +97,14 @@
 	barrierid(string) : "Barrier" : : "The ID of the barrier to produce. Leave blank to remove. You can use VALVE_GLASS or VALVE_GRATING for the originals."
 	force(boolean) : "Force Place" : 0 : "If enabled, overwrite existing barriers."
 	]
+
+@PointClass
+	studioprop("models/BEE2/editor/barrier_clearer.mdl")
+	= bee2_template_barrier_voxel_clear:
+	"Remove glass/grating style barriers on all sides of a voxel."
+	[
+	]
+
 @PointClass
 	base(Angles)
 	studioprop("models/BEE2/editor/voxel_setter.mdl")
@@ -322,5 +330,6 @@
 	"Barrier Setter"
 		[
 		"bee2_template_barriersetter"
+		"bee2_template_barrier_voxel_clear"
 		]
 	]

@@ -163,6 +163,11 @@ class BarrierSetter(PlanarTemplateEntity):
     force: bool  # Overwrite an existing barrier if true. Always overwrites if removing.
 
 
+@attrs.define
+class BarrierClearer(PlanarTemplateEntity):
+    """Remove barriers on all sides of the specified sub-voxel."""
+
+
 # We use the skins value on the tilesetter to specify type, allowing visualising it.
 # So this is the type for each index.
 SKIN_TO_TILETYPE = [
@@ -179,6 +184,10 @@ TILETYPE_TO_SKIN = {
     tile_type: skin
     for skin, tile_type in enumerate(SKIN_TO_TILETYPE)
 }
+
+NORMALS = [
+    Vec.N, Vec.S, Vec.E, Vec.W, Vec.T, Vec.B,
+]
 
 B = Portalable.BLACK
 W = Portalable.WHITE
@@ -295,6 +304,7 @@ class Template:
         tile_setters: Iterable[TileSetter]=(),
         voxel_setters: Iterable[VoxelSetter]=(),
         barrier_setters: Iterable[BarrierSetter]=(),
+        barrier_clearers: Iterable[BarrierClearer]=(),
         coll: Iterable[CollisionDef]=(),
         debug: bool = False,
     ) -> None:
@@ -309,7 +319,7 @@ class Template:
         visgroup_names.update(overlays)
         for ent in itertools.chain(
             color_pickers, tile_setters, voxel_setters,
-            barrier_setters, coll,
+            barrier_setters, barrier_clearers, coll,
         ):
             visgroup_names.update(ent.visgroups)
 
@@ -332,7 +342,9 @@ class Template:
         )
         self.tile_setters = list(tile_setters)
         self.voxel_setters = list(voxel_setters)
-        self.barrier_setters = list(barrier_setters)
+        # Ensure those that clear barriers occur first.
+        self.barrier_setters = sorted(barrier_setters, key=lambda setter: setter.id != "")
+        self.barrier_clearers = list(barrier_clearers)
         self.collisions = list(coll)
 
     def __repr__(self) -> str:
@@ -415,11 +427,10 @@ class ScalingTemplate(Mapping[
             raise ValueError(f'Missing axes for scaling template {temp_id}: {missing}')
 
     @classmethod
-    def world(cls) -> ScalingTemplate:
+    def world(cls, mat: str = consts.Tools.NODRAW) -> ScalingTemplate:
         """Return a scaling template that produces world-aligned brushes."""
-        nd = consts.Tools.NODRAW
         return cls('<world>', {
-            norm: (nd, uaxis, vaxis, 0.0)
+            norm: (mat, uaxis, vaxis, 0.0)
             for norm, (uaxis, vaxis) in
             REALIGN_UVS.items()
         })
@@ -472,11 +483,12 @@ def parse_temp_name(name: str) -> tuple[str, set[str]]:
     """Parse the visgroups off the end of an ID."""
     if ':' in name:
         temp_name, visgroups = name.rsplit(':', 1)
-        return temp_name.casefold(), set(
+        return temp_name.casefold(), {
             # Parse comma-seperated visgroups, remove empty, and casefold.
-            map(str.casefold, map(str.strip,
-                itertools.filterfalse(str.isspace, visgroups.split(','))
-        )))
+            visgroup.strip().casefold()
+            for visgroup in visgroups.split(',')
+            if not visgroup.isspace()
+        }
     else:
         return name.casefold(), set()
 
@@ -523,6 +535,7 @@ def _parse_template(loc: UnparsedTemplate) -> Template:
     tile_setters: list[TileSetter] = []
     voxel_setters: list[VoxelSetter] = []
     barrier_setters: list[BarrierSetter] = []
+    barrier_clearers: list[BarrierClearer] = []
 
     # The BEE2 app verified all of this, so it should not normally be possible to get mismatches
     # here. Crash the compiler if that happens.
@@ -630,7 +643,7 @@ def _parse_template(loc: UnparsedTemplate) -> Template:
             name=ent['targetname'],
             visgroups=set(map(visgroup_names.__getitem__, ent.visgroup_ids)),
             offset=Vec.from_str(ent['origin']),
-            normal=Vec(x=1) @ Angle.from_str(ent['angles']),
+            normal=Matrix.from_angstr(ent['angles']).forward(),
             sides=ent['faces'].split(' '),
             grid_snap=srctools.conv_bool(ent['grid_snap']),
             after=remove_after,
@@ -644,7 +657,7 @@ def _parse_template(loc: UnparsedTemplate) -> Template:
 
         voxel_setters.append(VoxelSetter(
             offset=Vec.from_str(ent['origin']),
-            normal=Vec(z=1) @ Angle.from_str(ent['angles']),
+            normal=Matrix.from_angstr(ent['angles']).up(),
             visgroups=set(map(visgroup_names.__getitem__, ent.visgroup_ids)),
             tile_type=tile_type,
             force=srctools.conv_bool(ent['force']),
@@ -673,7 +686,7 @@ def _parse_template(loc: UnparsedTemplate) -> Template:
 
         tile_setters.append(TileSetter(
             offset=Vec.from_str(ent['origin']),
-            normal=Vec(z=1) @ Angle.from_str(ent['angles']),
+            normal=Matrix.from_angstr(ent['angles']).up(),
             visgroups=set(map(visgroup_names.__getitem__, ent.visgroup_ids)),
             color=color,
             tile_type=tile_type,
@@ -688,6 +701,13 @@ def _parse_template(loc: UnparsedTemplate) -> Template:
             visgroups=set(map(visgroup_names.__getitem__, ent.visgroup_ids)),
             id=utils.parse_obj_special_id(ent['barrierid']),
             force=srctools.conv_bool(ent['force']),
+        ))
+
+    for ent in vmf.by_class['bee2_template_barrier_voxel_clear']:
+        barrier_clearers.append(BarrierClearer(
+            offset=Vec.from_str(ent['origin']),
+            visgroups=set(map(visgroup_names.__getitem__, ent.visgroup_ids)),
+            normal=Vec.N.thaw(),
         ))
 
     coll: list[CollisionDef] = []
@@ -710,6 +730,7 @@ def _parse_template(loc: UnparsedTemplate) -> Template:
         tile_setters=tile_setters,
         voxel_setters=voxel_setters,
         barrier_setters=barrier_setters,
+        barrier_clearers=barrier_clearers,
         coll=coll,
         debug=srctools.conv_bool(conf['debug']),
     )
@@ -1277,6 +1298,24 @@ def retexture_template(
             force=tile_setter.force,
         )
 
+    for barrier_clearer in template.barrier_clearers:
+        if not barrier_clearer.is_applicable(template_data.visgroups):
+            continue
+        setter_pos = round(barrier_clearer.offset @ template_data.orient + template_data.origin + sense_offset, 6)
+
+        if template_data.debug_marker is not None:
+            template_data.debug_marker(
+                'bee2_template_barrier_voxel_clear',
+                origin=setter_pos,
+            )
+
+        for normal in NORMALS:
+            # Don't bother rotating, it doesn't make any difference unless the template
+            # is not axis aligned.
+            setter_plane = utils.SliceKey(normal, setter_pos - 16 * normal)
+            local = setter_plane.world_to_plane(setter_pos)
+            del barriers.BARRIERS[setter_plane][local.x // 32, local.y // 32]
+
     # We want multiple barrier-setters to merge their instances.
     type_to_barrier: dict[barriers.BarrierType, barriers.Barrier] = {}
     # If our instance name is in the barriers dict, reuse it across multiple templates.
@@ -1298,9 +1337,16 @@ def retexture_template(
         local = setter_plane.world_to_plane(setter_pos)
         uv = (local.x // 32, local.y // 32)
         barrier_plane = barriers.BARRIERS[setter_plane]
+
+        if template_data.debug_marker is not None:
+            template_data.debug_marker(
+                'bee2_template_barrier_voxel_clear',
+                origin=setter_pos,
+            )
+
         if barrier_setter.id == "":
             # Always replace if we're removing it
-            barrier_plane[uv] = barriers.BARRIER_EMPTY
+            del barrier_plane[uv]
             continue
         # Otherwise, we want to check.
         existing = barrier_plane[uv]
