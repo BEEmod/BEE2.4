@@ -220,19 +220,20 @@ class BarrierType:
 
 @attrs.define(eq=False)
 class Barrier:
-    """A glass/grating item."""
+    """A glass/grating item.
+
+    BARRIER_EMPTY is unique, but others may not be if created dynamically!
+    """
     name: str
     type: BarrierType
     instances: List[Entity] = attrs.Factory(list)
 
     def __eq__(self, other: object) -> bool:
-        """Two barriers are equal if they are the same, or if mergable and share the type."""
+        """Two barriers are equal if are for the same instance or if mergable. The type must always match."""
         if isinstance(other, Barrier):
-            if self.name == other.name:
-                return True
-            if self.type is other.type and self.type.mergeable:
-                return True
-            return False
+            if self.type is not other.type:
+                return False
+            return self.type.mergeable or self.name == other.name
         return NotImplemented
 
 
