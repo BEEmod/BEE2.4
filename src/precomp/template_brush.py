@@ -967,7 +967,7 @@ def get_scaling_template(temp_id: str) -> ScalingTemplate:
 def retexture_template(
     template_data: ExportedTemplate,
     origin: Vec,
-    fixup: EntityFixup | None = None,
+    instance: Entity | None = None,
     replace_tex: Mapping[str, list[str] | str] = srctools.EmptyMapping,
     force_colour: ForceColour = AppliedColour.MATCH,
     force_grid: TileSize | None = None,
@@ -986,7 +986,7 @@ def retexture_template(
     - force_colour controls how textures are overridden.
     - If force_grid is set, all tile textures will be that size.
     - generator defines the generator category to use for surfaces.
-    - Fixup is the inst.fixup value, used to allow $replace in replace_tex.
+    - An instance must be passed to allow $replace in replace_tex, and also to create new barriers.
     - If sense_offset is set, color pickers and tilesetters will be treated
       as if they were locally offset this far in the template.
     """
@@ -1013,13 +1013,10 @@ def retexture_template(
     for key, value in replace_tex.items():
         if isinstance(value, str):
             value = [value]
-        if fixup is not None:
+        if instance is not None:
             # Convert the material and key for fixup names.
-            value = [
-                fixup[mat] if mat.startswith('$') else mat
-                for mat in value
-            ]
-            if key.startswith('$'):
+            key = instance.fixup.substitute(key)
+            value = [instance.fixup.substitute(mat) for mat in value]
                 key = fixup[key]
         # If starting with '#', it's a face id, or a list of those.
         if key.startswith('#'):
@@ -1324,8 +1321,8 @@ def retexture_template(
             if override_mat is not None:
                 # Replace_tex overrides everything.
                 mat =  rand.seed(b'template', norm, face.get_origin()).choice(override_mat)
-                if mat[:1] == '$' and fixup is not None:
-                    mat = fixup[mat]
+                if instance is not None:
+                    mat = instance.fixup.substitute(mat)
                 if mat.startswith('<') and mat.endswith('>'):
                     # Lookup in the style data.
                     gen, mat = texturing.parse_name(mat[1:-1])
@@ -1401,8 +1398,8 @@ def retexture_template(
         if mat in replace_tex:
             rng = rand.seed(b'temp', template_data.template.id, over_pos, mat)
             mat = rng.choice(replace_tex[mat])
-            if mat[:1] == '$' and fixup is not None:
-                mat = fixup[mat]
+            if instance is not None:
+                mat = instance.fixup.substitute(mat)
             if mat.startswith('<') or mat.endswith('>'):
                 mat = mat[1:-1]
                 gen, tex_name = texturing.parse_name(mat[1:-1])

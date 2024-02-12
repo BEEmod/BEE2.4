@@ -692,7 +692,7 @@ def res_import_template(
         template_brush.retexture_template(
             temp_data,
             origin,
-            inst.fixup,
+            inst,
             replace_tex,
             force_colour,
             force_grid,

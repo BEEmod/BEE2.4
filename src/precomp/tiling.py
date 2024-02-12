@@ -37,7 +37,7 @@ import consts
 
 
 __all__ = [
-    'TileSize', 'Portalable',
+    'TileSize', 'Portalable', 'TileType',
     'TILETYPE_FROM_CHAR', 'TILETYPE_TO_CHAR', 'PanelType', 'Panel', 'round_grid', 'TileDef',
     'analyse_map', 'generate_brushes',
 ]
@@ -643,7 +643,7 @@ class Panel:
             template_brush.retexture_template(
                 template,
                 front_pos + offset,
-                self.inst.fixup,
+                self.inst,
             )
             all_brushes += template.world
 
