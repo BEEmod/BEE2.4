@@ -79,7 +79,7 @@ copyreg.add_extension('srctools.math', '_mk_fang', 244)
 copyreg.add_extension('srctools.math', '_mk_fmat', 245)
 copyreg.add_extension('srctools.keyvalues', 'Keyvalues', 246)
 
-
+lcm: Callable[[int, int], int]
 try:
     from math import lcm
 except ImportError:
@@ -817,7 +817,7 @@ def get_piece_fitter(sizes: Collection[int]) -> Callable[[SupportsInt], Sequence
             for _ in range(count)
         ]
 
-    @functools.lru_cache()
+    @functools.lru_cache
     def calculate(size: SupportsInt) -> Sequence[int]:
         """Compute a solution."""
         size = int(size)
@@ -842,7 +842,7 @@ def get_piece_fitter(sizes: Collection[int]) -> Callable[[SupportsInt], Sequence
         else:
             raise ValueError(f'No solution to fit {size} with {size_list}')
 
-    return calculate
+    return calculate  # type: ignore[return-value]  # lru_cache issues
 
 
 def fit(dist: SupportsInt, obj: Sequence[int]) -> list[int]:
