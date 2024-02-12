@@ -90,6 +90,15 @@
 
 @PointClass
 	base(Angles)
+	studioprop("models/BEE2/editor/barrier_setter.mdl")
+	= bee2_template_barriersetter:
+	"Set the type of glass/grating style barrier for a 32x32 voxel."
+	[
+	barrierid(string) : "Barrier" : : "The ID of the barrier to produce. Leave blank to remove. You can use VALVE_GLASS or VALVE_GRATING for the originals."
+	force(boolean) : "Force Place" : 0 : "If enabled, overwrite existing barriers."
+	]
+@PointClass
+	base(Angles)
 	studioprop("models/BEE2/editor/voxel_setter.mdl")
 	= bee2_template_voxelsetter:
 	"Applies a tile type to all the tiles on a voxel side."
@@ -309,5 +318,9 @@
 	"Tile Setter"
 		[
 		"bee2_template_tilesetter"
+		]
+	"Barrier Setter"
+		[
+		"bee2_template_barriersetter"
 		]
 	]

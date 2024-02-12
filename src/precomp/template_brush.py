@@ -16,10 +16,7 @@ import attrs
 from srctools import Keyvalues
 from srctools.filesys import FileSystem, ZipFileSystem, RawFileSystem, VPKFileSystem
 from srctools.math import AnyAngle, AnyMatrix, FrozenVec, Vec, Angle, Matrix, to_matrix
-from srctools.vmf import (
-    EntityFixup, Entity, EntityGroup, Solid, Side, VMF, UVAxis, ValidKVs,
-    VisGroup,
-)
+from srctools.vmf import Entity, EntityGroup, Solid, Side, VMF, UVAxis, ValidKVs, VisGroup
 from srctools.dmx import Element as DMElement
 import srctools.logger
 
@@ -27,7 +24,7 @@ import user_errors
 import utils
 from .texturing import Portalable, GenCat, TileSize
 from .tiling import TileType
-from . import tiling, texturing, options, rand, collisions
+from . import tiling, texturing, options, rand, collisions, barriers
 import consts
 
 
@@ -158,6 +155,14 @@ class CollisionDef(TemplateEntity):
     visgroups: set[str]  # Visgroups required to add this.
 
 
+@attrs.define
+class BarrierSetter(PlanarTemplateEntity):
+    """Alter the glass/grating barrier present in a particlar sub-voxel."""
+    # The ID to use. Blank = remove.
+    id: utils.ObjectID | utils.SpecialID
+    force: bool  # Overwrite an existing barrier if true. Always overwrites if removing.
+
+
 # We use the skins value on the tilesetter to specify type, allowing visualising it.
 # So this is the type for each index.
 SKIN_TO_TILETYPE = [
@@ -240,7 +245,7 @@ TEMP_COLOUR_INVERT: Dict[ForceColour, ForceColour] = {
 }
 
 
-@attrs.define(frozen=True)
+@attrs.define(frozen=True, kw_only=True)
 class ExportedTemplate:
     """The result of importing a template.
 
@@ -289,6 +294,7 @@ class Template:
         color_pickers: Iterable[ColorPicker]=(),
         tile_setters: Iterable[TileSetter]=(),
         voxel_setters: Iterable[VoxelSetter]=(),
+        barrier_setters: Iterable[BarrierSetter]=(),
         coll: Iterable[CollisionDef]=(),
         debug: bool = False,
     ) -> None:
@@ -301,7 +307,10 @@ class Template:
         visgroup_names.update(world)
         visgroup_names.update(detail)
         visgroup_names.update(overlays)
-        for ent in itertools.chain(color_pickers, tile_setters, voxel_setters, coll):
+        for ent in itertools.chain(
+            color_pickers, tile_setters, voxel_setters,
+            barrier_setters, coll,
+        ):
             visgroup_names.update(ent.visgroups)
 
         for group in visgroup_names:
@@ -323,6 +332,7 @@ class Template:
         )
         self.tile_setters = list(tile_setters)
         self.voxel_setters = list(voxel_setters)
+        self.barrier_setters = list(barrier_setters)
         self.collisions = list(coll)
 
     def __repr__(self) -> str:
@@ -512,6 +522,7 @@ def _parse_template(loc: UnparsedTemplate) -> Template:
     color_pickers: list[ColorPicker] = []
     tile_setters: list[TileSetter] = []
     voxel_setters: list[VoxelSetter] = []
+    barrier_setters: list[BarrierSetter] = []
 
     # The BEE2 app verified all of this, so it should not normally be possible to get mismatches
     # here. Crash the compiler if that happens.
@@ -670,6 +681,15 @@ def _parse_template(loc: UnparsedTemplate) -> Template:
             force=srctools.conv_bool(ent['force']),
         ))
 
+    for ent in vmf.by_class['bee2_template_barriersetter']:
+        barrier_setters.append(BarrierSetter(
+            offset=Vec.from_str(ent['origin']),
+            normal=Matrix.from_angstr(ent['angles']).up(),
+            visgroups=set(map(visgroup_names.__getitem__, ent.visgroup_ids)),
+            id=utils.parse_obj_special_id(ent['barrierid']),
+            force=srctools.conv_bool(ent['force']),
+        ))
+
     coll: list[CollisionDef] = []
     for ent in vmf.by_class['bee2_collision_bbox']:
         visgroup_set = set(map(visgroup_names.__getitem__, ent.visgroup_ids))
@@ -689,6 +709,7 @@ def _parse_template(loc: UnparsedTemplate) -> Template:
         color_pickers=color_pickers,
         tile_setters=tile_setters,
         voxel_setters=voxel_setters,
+        barrier_setters=barrier_setters,
         coll=coll,
         debug=srctools.conv_bool(conf['debug']),
     )
@@ -1017,7 +1038,6 @@ def retexture_template(
             # Convert the material and key for fixup names.
             key = instance.fixup.substitute(key)
             value = [instance.fixup.substitute(mat) for mat in value]
-                key = fixup[key]
         # If starting with '#', it's a face id, or a list of those.
         if key.startswith('#'):
             for k in key[1:].split():
@@ -1256,6 +1276,66 @@ def retexture_template(
             silent=True,  # Don't log missing positions.
             force=tile_setter.force,
         )
+
+    # We want multiple barrier-setters to merge their instances.
+    type_to_barrier: dict[barriers.BarrierType, barriers.Barrier] = {}
+    # If our instance name is in the barriers dict, reuse it across multiple templates.
+    targetname = instance['targetname'] if instance is not None else ''
+    if targetname:
+        try:
+            existing = barriers.BARRIERS_BY_NAME[targetname]
+        except KeyError:
+            pass
+        else:
+            type_to_barrier[existing.type] = existing
+
+    for barrier_setter in template.barrier_setters:
+        if not barrier_setter.is_applicable(template_data.visgroups):
+            continue
+
+        setter_pos = round(barrier_setter.offset @ template_data.orient + template_data.origin + sense_offset, 6)
+        setter_plane = utils.SliceKey(barrier_setter.normal @ template_data.orient, setter_pos)
+        local = setter_plane.world_to_plane(setter_pos)
+        uv = (local.x // 32, local.y // 32)
+        barrier_plane = barriers.BARRIERS[setter_plane]
+        if barrier_setter.id == "":
+            # Always replace if we're removing it
+            barrier_plane[uv] = barriers.BARRIER_EMPTY
+            continue
+        # Otherwise, we want to check.
+        existing = barrier_plane[uv]
+
+        # We need an instance and valid barrier type.
+        if instance is None or not targetname:
+            raise ValueError(
+                f'"{template.id}": Barrier setters can only create barriers if '
+                f'a named instance is associated with this template import!'
+            )
+
+        try:
+            new_barrier_type = barriers.BARRIER_TYPES[barrier_setter.id]
+        except KeyError:
+            raise ValueError(
+                f'"{template.id}": Barrier setter is set to invalid ID "{barrier_setter.id}"!\n'
+                f'Known IDs: "", ' + ', '.join(sorted([f'"{barr}"' for barr in barriers.BARRIER_TYPES]))
+            ) from None
+
+        # We replace if "force" is on or the existing barrier is not present.
+        if barrier_setter.force or existing is barriers.BARRIER_EMPTY:
+            try:
+                # Did we already place this barrier?
+                new_barrier = type_to_barrier[new_barrier_type]
+            except KeyError:
+                new_barrier = type_to_barrier[new_barrier_type] = barriers.Barrier(
+                    targetname,
+                    new_barrier_type,
+                    [instance],
+                )
+
+                # This won't preserve identity if multiple types are created for one item.
+                if targetname:
+                    barriers.BARRIERS_BY_NAME.setdefault(targetname, new_barrier)
+            barrier_plane[uv] = new_barrier
 
     for brush in all_brushes:
         for face in brush:
