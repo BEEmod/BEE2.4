@@ -16,6 +16,7 @@ import attrs
 from plane import Plane
 from precomp import instanceLocs, options, template_brush, conditions, collisions
 from precomp.grid_optim import optimise as grid_optimise
+from transtoken import TransToken
 import consts
 import user_errors
 import utils
@@ -25,6 +26,7 @@ LOGGER = srctools.logger.get_logger(__name__)
 COND_MOD_NAME: str | None = None
 STRAIGHT_LEN: Final = 64  # Length of the brush for straight frame sections.
 HoleTemplate: TypeAlias = Tuple[List[Solid], List[collisions.BBox]]
+TRANS_VARIABLE = TransToken.untranslated('"<var>{value}</var>"')
 
 
 class FrameOrient(Enum):
@@ -88,65 +90,93 @@ LARGE_DISALLOWED: Sequence[FrozenVec] = [
 ]
 
 
-@attrs.frozen(eq=False, kw_only=True, repr=False)
-class HoleType:
-    """A type of hole."""
+@attrs.frozen(eq=False, kw_only=True)
+class HoleConfig:
+    """Configuration for how to create a hole for a specific barrier."""
     id: utils.ObjectID
-    footprint: Sequence[Tuple[float, float]]  # Offsets occupied by the hole.
-    size: float  # Used for P1 floor beams.
-
+    radius: float  # Used for P1 floor beams.
     # Geo used to create the brush face.
     template: HoleTemplate
+    instance: str
 
     @classmethod
-    def parse(cls, kv: Keyvalues) -> HoleType:
-        """Parse hole types from keyvalues data."""
-        hole_id = utils.parse_obj_id(kv.real_name)
-        size = kv.float('diameter')
-
-        # Use a template to make it easy to specify these.
-        temp_id, visgroups = template_brush.parse_temp_name(kv['footprint'])
-        footprint = [
-            (tilesetter.offset.x, tilesetter.offset.y)
-            for tilesetter in template_brush.get_template(temp_id).tile_setters
-            if tilesetter.visgroups.issubset(visgroups)
-        ]
+    def parse(cls, kv: Keyvalues) -> HoleConfig:
+        """Parse a configuration from a KV block."""
+        conf_id = utils.parse_obj_id(kv.real_name)
+        radius = kv.float('diameter') / 2
+        instance = kv['instance', '']
 
         template = template_solids_and_coll(kv['template'])
         if 'templateDiagonal' in kv:
-            return LargeHoleType(
-                id=hole_id,
-                footprint=footprint,
-                size=size,
+            return LargeHoleConfig(
+                id=conf_id,
+                instance=instance,
+                radius=radius,
                 template=template,
+
                 template_diagonal=template_solids_and_coll(kv['templatediagonal']),
                 template_square=template_solids_and_coll(kv['templatesquare']),
             )
         else:
-            return HoleType(
-                id=hole_id,
-                footprint=footprint,
-                size=size,
+            return HoleConfig(
+                id=conf_id,
+                instance=instance,
+                radius=radius,
                 template=template,
             )
 
-    def __repr__(self) -> str:
-        return f'<{type(self).__name__} {self.id!r}>'
-
 
 @attrs.frozen(eq=False, kw_only=True, repr=False)
-class LargeHoleType(HoleType):
+class LargeHoleConfig(HoleConfig):
     """Large holes are currently rather hardcoded."""
     template_diagonal: HoleTemplate  # Two holes diagonally overlapping.
     # If the corner is present, place it as part of the hole to simplify brushwork.
     template_square: HoleTemplate
 
 
-@attrs.define(eq=False)
+@attrs.frozen(eq=False, repr=False)
+class HoleType:
+    """A type of hole."""
+    id: utils.ObjectID
+    footprint: Sequence[FrozenVec]  # Offsets occupied by the hole.
+    variants: Mapping[utils.ObjectID, HoleConfig]
+    is_large: bool
+
+    @classmethod
+    def parse(cls, kv: Keyvalues) -> HoleType:
+        """Parse hole types from keyvalues data."""
+        hole_id = utils.parse_obj_id(kv.real_name)
+
+        # Use a template to make it easy to specify these.
+        temp_id, visgroups = template_brush.parse_temp_name(kv['footprint'])
+        footprint = [
+            tilesetter.offset.freeze()
+            for tilesetter in template_brush.get_template(temp_id).tile_setters
+            if tilesetter.visgroups.issubset(visgroups)
+        ]
+
+        variants = {}
+        for var_block in kv.find_children('Variants'):
+            hole_conf = HoleConfig.parse(var_block)
+            variants[hole_conf.id] = hole_conf
+        variant_types = {type(conf) for conf in variants.values()}
+        if len(variant_types) > 1:
+            raise ValueError(
+                f'Hole "{hole_id}" has both small and large variants, this must be consistent!'
+            )
+
+        return cls(hole_id, footprint, variants, LargeHoleConfig in variant_types)
+
+    def __repr__(self) -> str:
+        return f'<{type(self).__name__} {self.id!r}, variants={sorted(self.variants)}>'
+
+
+@attrs.define(eq=False, kw_only=True)
 class Hole:
     """A hole item placed in the map."""
     inst: Entity
     type: HoleType
+    variant: HoleConfig
     plane: utils.SliceKey
     orient: FrozenMatrix
     origin: Vec
@@ -173,6 +203,8 @@ class BarrierType:
     hint_thick: float = 0.0
     # If set, the brushes for this item can be combined with others of the same type.
     mergeable: bool = False
+    # Hole variants valid for this kind of barrier.
+    hole_variants: Sequence[utils.ObjectID] = ()
 
     @classmethod
     def parse(cls, kv: Keyvalues) -> BarrierType:
@@ -194,6 +226,11 @@ class BarrierType:
         for sub_kv in kv.find_all('Brush'):
             brushes.append(Brush.parse(sub_kv))
 
+        hole_variants = [
+            utils.parse_obj_id(sub_kv.value)
+            for sub_kv in kv.find_all('HoleVariant')
+        ]
+
         if 'error_tex' in kv:
             error_tex = kv['error_tex'].casefold()
             if error_tex in user_errors.TEX_SET:
@@ -213,6 +250,7 @@ class BarrierType:
             brushes=brushes,
             contents=contents,
             floorbeam_temp=floorbeam_temp,
+            hole_variants=hole_variants,
             hint_thick=kv.float('hint_thick'),
             coll_thick=kv.float('coll_thick', 4.0),
             mergeable=kv.bool('mergeable'),
@@ -656,44 +694,91 @@ def test_hole_spot(
     plane: utils.SliceKey,
     orient: FrozenMatrix,
     hole_type: HoleType,
-) -> Literal['noglass', 'valid', 'nospace']:
+) -> HoleConfig | None:
     """Check if the given position is valid for holes.
 
     We need to check that it's actually placed on glass/grating, and that
-    all the parts are the same. Otherwise, it'd collide with the borders. This returns:
+    all the parts are the same. Otherwise, it'd collide with the borders.
 
-    * 'valid' if the position is valid.
-    * 'noglass' if the centerpoint isn't glass/grating.
-    * 'nospace' if no adjacient panel is present.
+    This returns the variant located, or None if no barrier was found at all. In that case we want
+    to try the opposite orientation.
     """
     center = plane.world_to_plane(origin)
     barrier_plane = BARRIERS[plane]
 
-    center_type = barrier_plane[center.x // 32, center.y // 32]
-    if center_type is BARRIER_EMPTY:
-        return 'noglass'
+    barrier = barrier_plane[center.x // 32, center.y // 32]
+    if barrier is BARRIER_EMPTY:
+        # Try the other orientation.
+        return None
+
+    error_hole = user_errors.BarrierHole(
+        pos=user_errors.to_threespace(origin + orient.up(64)),
+        axis=orient.up().axis(),
+        # TODO: Handle hole rendering better, user-specifiable?
+        large=hole_type.is_large,
+        small=not hole_type.is_large,
+        footprint=True,
+    )
+
+    for variant_ids in barrier.type.hole_variants:
+        try:
+            variant = hole_type.variants[variant_ids]
+            break
+        except KeyError:
+            pass
+    else:
+        if len(barrier.type.hole_variants) == 0:
+            # Entirely disallowed for this barrier type.
+            message = user_errors.TOK_BARRIER_HOLE_DISALLOWED.format(
+                barrier=barrier.type.id,
+                hole=hole_type.id,
+            )
+        else:
+            message = user_errors.TOK_BARRIER_HOLE_NOVARIANT.format(
+                barrier=barrier.type.id,
+                hole=hole_type.id,
+                types_barrier=TransToken.list_and([
+                    TRANS_VARIABLE.format(value=variant)
+                    for variant in barrier.type.hole_variants
+                ]),
+                types_hole=TransToken.list_or([
+                    TRANS_VARIABLE.format(value=variant)
+                    for variant in hole_type.variants.keys()
+                ], sort=True),
+            )
+        raise user_errors.UserError(message, barrier_hole=error_hole)
 
     for offset in hole_type.footprint:
         pos = offset @ orient + origin
         local = plane.world_to_plane(pos)
         off_type = barrier_plane[local.x // 32, local.y // 32]
-        if off_type is BARRIER_EMPTY:
-            # No side
-            LOGGER.warning('No offset barrier at {}, {}', pos, plane)
-            return 'nospace'
-        if off_type != center_type:
+        if off_type != barrier:
             # Different type.
-            LOGGER.warning('Wrong barrier type at {}, {}: {} != {}', pos, plane, off_type, center_type)
-            return 'nospace'
+            LOGGER.warning(
+                'Wrong barrier type at {}, {}: {} (expected {})',
+                pos, plane, off_type, barrier,
+            )
+            raise user_errors.UserError(
+                user_errors.TOK_BARRIER_HOLE_FOOTPRINT.format(hole=hole_type.id),
+                barrier_hole=error_hole,
+            )
 
     # In each direction, make sure a large hole isn't present.
-    if isinstance(hole_type, LargeHoleType):
+    if isinstance(variant, LargeHoleConfig):
         for offset in LARGE_DISALLOWED:
             side_pos = plane.plane_to_world(*offset).freeze()
-            if isinstance(HOLES[plane].get(side_pos), LargeHoleType):
-                # TODO: Draw this other hole as well?
-                return 'nospace'
-    return 'valid'
+            try:
+                other_hole = HOLES[plane][side_pos]
+            except KeyError:
+                pass
+            else:
+                if isinstance(other_hole.variant, LargeHoleConfig):
+                    # TODO: Draw the other hole as well?
+                    raise user_errors.UserError(
+                        user_errors.TOK_BARRIER_HOLE_FOOTPRINT.format(hole=hole_type.id),
+                        barrier_hole=error_hole,
+                    )
+    return variant
 
 
 @conditions.make_result('GlassHole')
@@ -706,31 +791,31 @@ def res_glass_hole(inst: Entity, res: Keyvalues) -> None:
     origin += orient.up(-64.0)
     slice_key = utils.SliceKey(orient.up(-1.0), origin)
 
-    first_placement = test_hole_spot(origin, slice_key, orient, hole_type)
-    if first_placement == 'valid':
+    first_variant = test_hole_spot(origin, slice_key, orient, hole_type)
+    if first_variant is not None:
         sel_plane = slice_key
         sel_orient = orient
+        sel_variant = first_variant
     else:
         # Test the opposite side of the glass too.
         alt_orient = FrozenMatrix.from_roll(180) @ orient
         slice_key = utils.SliceKey(alt_orient.up(-1.0), origin)
 
-        sec_placement = test_hole_spot(origin, slice_key, alt_orient, hole_type)
-        if sec_placement == 'valid':
+        sec_variant = test_hole_spot(origin, slice_key, alt_orient, hole_type)
+        if sec_variant is not None:
             sel_orient = alt_orient
             sel_plane = slice_key
+            sel_variant = sec_variant
             inst['angles'] = sel_orient.to_angle()
         else:
             raise user_errors.UserError(
-                user_errors.TOK_BARRIER_HOLE_FOOTPRINT
-                if first_placement == 'nospace' or sec_placement == 'nospace' else
-                user_errors.TOK_BARRIER_HOLE_MISPLACED,
+                user_errors.TOK_BARRIER_HOLE_MISPLACED.format(hole=hole_type.id),
                 barrier_hole=user_errors.BarrierHole(
                     pos=user_errors.to_threespace(origin + orient.up(64)),
                     axis=orient.up().axis(),
                     # TODO: Handle hole rendering better, user-specifiable?
-                    large=isinstance(hole_type, LargeHoleType),
-                    small=not isinstance(hole_type, LargeHoleType),
+                    large=hole_type.is_large,
+                    small=not hole_type.is_large,
                     footprint=True,
                 )
             )
@@ -746,13 +831,23 @@ def res_glass_hole(inst: Entity, res: Keyvalues) -> None:
             barrier_hole=user_errors.BarrierHole(
                 pos=user_errors.to_threespace(origin),
                 axis=sel_plane.normal.axis(),
-                large=isinstance(hole_type, LargeHoleType) or isinstance(existing, LargeHoleType),
-                small=not isinstance(hole_type, LargeHoleType) or not isinstance(existing, LargeHoleType),
+                large=isinstance(sel_variant, LargeHoleConfig) or isinstance(existing.variant, LargeHoleConfig),
+                small=not isinstance(hole_type, LargeHoleConfig) or not isinstance(existing.variant, LargeHoleConfig),
                 footprint=False,
             ),
         )
-    HOLES[sel_plane][origin] = Hole(inst, hole_type, sel_plane, sel_orient, origin.thaw())
+    HOLES[sel_plane][origin] = Hole(
+        inst=inst,
+        type=hole_type,
+        variant=sel_variant,
+        plane=sel_plane,
+        orient=sel_orient,
+        origin=origin.thaw(),
+    )
     inst['origin'] = origin
+    inst.fixup['$variant'] = sel_variant.id
+    if sel_variant.instance:
+        inst['file'] = sel_variant.instance
 
 
 def template_solids_and_coll(template_id: str) -> HoleTemplate:
@@ -882,8 +977,8 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
                     barrier_hole={
                         'pos': user_errors.to_threespace(hole.origin),
                         'axis': hole.plane.normal.axis(),
-                        'large': isinstance(HoleType, LargeHoleType),
-                        'small': not isinstance(HoleType, LargeHoleType),
+                        'large': hole.type.is_large,
+                        'small': not hole.type.is_large,
                         'footprint': True,
                     }
                 )
@@ -1007,15 +1102,14 @@ def place_concave_corner(
 def try_place_hole(vmf: VMF, plane: Plane[Barrier], barrier: Barrier, hole: Hole) -> None:
     """Try and place a hole in the barrier."""
     # First check if the footprint is present. If not, we're some other piece of glass.
-    hole_u, hole_v = hole.plane_pos
-    for u_off, v_off in hole.type.footprint:
-        if ((hole_u + u_off) // 32, (hole_v + v_off) // 32) not in plane:
+    for offset in hole.type.footprint:
+        local = hole.plane.world_to_plane(hole.origin + offset @ hole.orient)
+        if (local.x // 32, local.y // 32) not in plane:
             return
 
     # Found, we're generating this.
     hole.inserted = True
 
-    angles = hole.plane.orient.to_angle()
     hole_temp: list[tuple[list[Solid], list[collisions.BBox], Matrix | FrozenMatrix]] = []
     hole_plane = HOLES[hole.plane]
 
@@ -1023,7 +1117,7 @@ def try_place_hole(vmf: VMF, plane: Plane[Barrier], barrier: Barrier, hole: Hole
     # diagonally, and we allow the corner glass to not be present since
     # the hole doesn't actually use that 32x32 segment.
     # So we need to determine which of 3 templates to use.
-    if isinstance(hole.type, LargeHoleType):
+    if isinstance(hole.variant, LargeHoleConfig):
         for yaw in (0, 90, 180, 270):
             corn_mat = Matrix.from_yaw(yaw) @ hole.plane.orient
 
@@ -1034,23 +1128,23 @@ def try_place_hole(vmf: VMF, plane: Plane[Barrier], barrier: Barrier, hole: Hole
             corn_u = corner_pos.x // 32
             corn_v = corner_pos.y // 32
 
-            if diag_hole is not None and isinstance(diag_hole.type, LargeHoleType):
+            if diag_hole is not None and isinstance(diag_hole.variant, LargeHoleConfig):
                 # There's another large template to this direction.
                 # Just have 1 generate both combined, so the brushes can
                 # be more optimal. To pick, arbitrarily make the upper one
                 # be in charge.
-                if corn_v > (hole_v // 32):
-                    hole_temp.append(hole.type.template_diagonal + (corn_mat, ))
+                if corn_v > (hole.plane_pos[1] // 32):
+                    hole_temp.append(hole.variant.template_diagonal + (corn_mat, ))
                 continue
             # This bit of the glass is present, so include it in our brush, then clear.
             if (corn_u, corn_v) in plane:
-                hole_temp.append(hole.type.template_square + (corn_mat, ))
+                hole_temp.append(hole.variant.template_square + (corn_mat, ))
                 plane[corn_u, corn_v] = BARRIER_EMPTY
             else:
-                hole_temp.append(hole.type.template + (corn_mat, ))
+                hole_temp.append(hole.variant.template + (corn_mat, ))
 
     else:
-        hole_temp.append(hole.type.template + (hole.plane.orient, ))
+        hole_temp.append(hole.variant.template + (hole.plane.orient, ))
 
     # for _, bbox_list, matrix in hole_temp:
     #     # Place the collisions.
@@ -1058,10 +1152,11 @@ def try_place_hole(vmf: VMF, plane: Plane[Barrier], barrier: Barrier, hole: Hole
     #         bbox = bbox @ matrix + origin
     #         coll.add(bbox.with_attrs(name=str(barrier.id), contents=barrier.type.contents))
 
-    for u_off, v_off in hole.type.footprint:
+    for offset in hole.type.footprint:
+        local = hole.plane.world_to_plane(hole.origin + offset @ hole.orient)
         # This is in the plane still, but marked as blank. That way diagonally overlapping holes
         # still work.
-        plane[(hole_u + u_off) // 32, (hole_v + v_off) // 32] = BARRIER_EMPTY
+        plane[local.x // 32, local.y // 32] = BARRIER_EMPTY
 
     hole_origin_cell = hole.origin
 
@@ -1338,6 +1433,7 @@ def beam_hole_split(axis: str, min_pos: Vec, max_pos: Vec) -> Iterator[tuple[Vec
     # Go along the shape. For each point, check if a hole is present,
     # and split at that.
     # Our positions are centered, but we return ones at the ends.
+    # TODO: Need to make sure all these points actually have this barrier.
 
     # Inset in 4 units from each end to not overlap with the frames.
     start_pos = min_pos - Vec.with_axes(axis, 60)
@@ -1354,8 +1450,8 @@ def beam_hole_split(axis: str, min_pos: Vec, max_pos: Vec) -> Iterator[tuple[Vec
             except KeyError:
                 continue
             else:
-                yield start_pos, pos - Vec.with_axes(axis, hole.type.size / 2.0)
-                start_pos = pos + Vec.with_axes(axis, hole.type.size / 2.0)
+                yield start_pos, pos - Vec.with_axes(axis, hole.variant.radius)
+                start_pos = pos + Vec.with_axes(axis, hole.variant.radius)
 
     # Last segment, or all if no holes.
     yield start_pos, max_pos + Vec.with_axes(axis, 60)

@@ -283,18 +283,29 @@ TOK_CUBE_SUPERPOS_MULTILINK = TransToken.ui(
 )
 
 TOK_BARRIER_HOLE_FOOTPRINT = TransToken.ui(
-    'A glass/grating Hole does not have sufficent space. The entire highlighted yellow area should '
-    'be occupied by continous glass or grating. For large holes, the diagonally adjacient voxels '
-    'are not required. In addition, two Hole items cannot overlap each other.'
+    'A Barrier Hole (<var>"{hole}"</var>) does not have sufficent space. '
+    'The entire highlighted yellow area should be occupied by continous glass/grating/etc which is'
+    'not itself occupied by a different hole.'
 )
 
 TOK_BARRIER_HOLE_MISPLACED = TransToken.ui(
-    'A glass/grating Hole was misplaced. The item must be placed against a glass or grating sheet, '
-    'which it will then cut a hole into. To rotate the item properly, you may need to place it on '
-    'a wall with the same orientation first, then drag it onto the glass without dragging it over '
-    'surfaces with different orientations. Alternatively put a block temporarily in the glass or '
-    "grating's location to position the hole item, then carve into the block from a side to remove "
-    'it while keeping the hole in the same position.'
+    'A Barrier Hole (<var>"{hole}"</var>) was misplaced. The item must be placed against a '
+    'glass/grating/etc sheet, which it will then cut a hole into. To rotate the item properly, '
+    'you may need to place it on a wall with the same orientation first, then drag it onto the '
+    'glass without dragging it over surfaces with different orientations. '
+    "Alternatively put a block temporarily in the barrier's location to position the hole item, "
+    'then carve into the block from a side to remove it while keeping the hole in the same position.'
+)
+
+TOK_BARRIER_HOLE_NOVARIANT = TransToken.ui(
+    'A Barrier Hole (<var>"{hole}"</var>) was placed on top of a <var>"{barrier}"</var> barrier, but this '
+    'barrier does not support this type of hole. The barrier allows ({types_barrier}), '
+    'but the hole only has ({types_hole}) available.'
+)
+
+TOK_BARRIER_HOLE_DISALLOWED = TransToken.ui(
+    'A Barrier Hole ("{hole}") was placed on top of a <var>"{barrier}"</var> barrier, '
+    'which does not allow holes.'
 )
 
 TOK_CHAINING_MULTI_INPUT = TransToken.ui(
