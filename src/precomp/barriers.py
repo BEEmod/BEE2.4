@@ -148,6 +148,7 @@ class Hole:
     inst: Entity
     type: HoleType
     plane: utils.SliceKey
+    orient: FrozenMatrix
     origin: Vec
     # If true, we found a matching barrier this was inserted into.
     inserted: bool = False
@@ -650,7 +651,12 @@ def parse_map(vmf: VMF, info: conditions.MapInfo) -> None:
                 inst.remove()
 
 
-def test_hole_spot(origin: FrozenVec, plane: utils.SliceKey, hole_type: HoleType) -> Literal['noglass', 'valid', 'nospace']:
+def test_hole_spot(
+    origin: FrozenVec,
+    plane: utils.SliceKey,
+    orient: FrozenMatrix,
+    hole_type: HoleType,
+) -> Literal['noglass', 'valid', 'nospace']:
     """Check if the given position is valid for holes.
 
     We need to check that it's actually placed on glass/grating, and that
@@ -667,10 +673,10 @@ def test_hole_spot(origin: FrozenVec, plane: utils.SliceKey, hole_type: HoleType
     if center_type is BARRIER_EMPTY:
         return 'noglass'
 
-    # The corners don't matter, but all 4 neighbours must be there.
-    for u_off, v_off in hole_type.footprint:
-        pos = plane.plane_to_world(center.x + u_off, center.y + v_off)
-        off_type = barrier_plane[(center.x + u_off) // 32, (center.y + v_off) // 32]
+    for offset in hole_type.footprint:
+        pos = offset @ orient + origin
+        local = plane.world_to_plane(pos)
+        off_type = barrier_plane[local.x // 32, local.y // 32]
         if off_type is BARRIER_EMPTY:
             # No side
             LOGGER.warning('No offset barrier at {}, {}', pos, plane)
@@ -695,29 +701,33 @@ def res_glass_hole(inst: Entity, res: Keyvalues) -> None:
     """Add Glass/grating holes. The value should be 'large' or 'small'."""
     hole_type = HOLE_TYPES[utils.parse_obj_id(res.value)]
 
-    normal: FrozenVec = FrozenVec(z=-1) @ Angle.from_str(inst['angles'])
+    orient = FrozenMatrix.from_angstr(inst['angles'])
     origin: FrozenVec = FrozenVec.from_str(inst['origin']) // 128 * 128 + 64
-    origin += 64 * normal
-    slice_key = utils.SliceKey(normal, origin)
+    origin += orient.up(-64.0)
+    slice_key = utils.SliceKey(orient.up(-1.0), origin)
 
-    first_placement = test_hole_spot(origin, slice_key, hole_type)
+    first_placement = test_hole_spot(origin, slice_key, orient, hole_type)
     if first_placement == 'valid':
         sel_plane = slice_key
+        sel_orient = orient
     else:
         # Test the opposite side of the glass too.
-        slice_key = utils.SliceKey(-normal, origin)
+        alt_orient = FrozenMatrix.from_roll(180) @ orient
+        slice_key = utils.SliceKey(alt_orient.up(-1.0), origin)
 
-        sec_placement = test_hole_spot(origin, slice_key, hole_type)
+        sec_placement = test_hole_spot(origin, slice_key, alt_orient, hole_type)
         if sec_placement == 'valid':
+            sel_orient = alt_orient
             sel_plane = slice_key
+            inst['angles'] = sel_orient.to_angle()
         else:
             raise user_errors.UserError(
                 user_errors.TOK_BARRIER_HOLE_FOOTPRINT
                 if first_placement == 'nospace' or sec_placement == 'nospace' else
                 user_errors.TOK_BARRIER_HOLE_MISPLACED,
                 barrier_hole=user_errors.BarrierHole(
-                    pos=user_errors.to_threespace(origin + 64 * normal),
-                    axis=normal.axis(),
+                    pos=user_errors.to_threespace(origin + orient.up(64)),
+                    axis=orient.up().axis(),
                     # TODO: Handle hole rendering better, user-specifiable?
                     large=isinstance(hole_type, LargeHoleType),
                     small=not isinstance(hole_type, LargeHoleType),
@@ -741,10 +751,8 @@ def res_glass_hole(inst: Entity, res: Keyvalues) -> None:
                 footprint=False,
             ),
         )
-    HOLES[sel_plane][origin] = Hole(inst, hole_type, sel_plane, origin.thaw())
+    HOLES[sel_plane][origin] = Hole(inst, hole_type, sel_plane, sel_orient, origin.thaw())
     inst['origin'] = origin
-    # TODO: We need to preserve the rotation of the hole, for non-symmetrical items.
-    inst['angles'] = (-sel_plane.normal).to_angle()
 
 
 def template_solids_and_coll(template_id: str) -> HoleTemplate:
