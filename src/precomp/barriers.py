@@ -914,7 +914,7 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
                     'bee2_template_tilesetter',
                     origin=plane_slice.plane_to_world(32 * u + 16, 32 * v + 16, 2),
                     angles=plane_slice.orient,
-                    skin=debug_skin[barrier.type.id],
+                    skin=debug_skin.get(barrier.type.id, 1),
                     targetname=f'barrier_{debug_id}',
                     comment=f'Border: {borders[u, v]}, u={u}, v={v}',
                 )
