@@ -601,7 +601,7 @@ def parse_conf(kv: Keyvalues) -> None:
         )
 
 
-def parse_map(vmf: VMF, info: conditions.MapInfo) -> None:
+def parse_map(vmf: VMF) -> None:
     """Find all glass/grating in the map.
 
     This removes the per-tile instances, and all original brushwork.
