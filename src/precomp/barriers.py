@@ -34,6 +34,7 @@ class FrameOrient(Enum):
     """The kind of frame orientation."""
     HORIZ = "horizontal"
     VERT = "vertical"
+    FLAT = "flat"
 
 
 class Border(Flag):
@@ -455,7 +456,7 @@ class SegmentBrush(Segment):
             return  # No brushes?
         diff = direction * (length - STRAIGHT_LEN)
         for face in temp.detail.sides():
-            if face.normal().dot(direction) < -0.99:
+            if face.normal().dot(direction) < -0.9:
                 face.translate(diff)
 
 
@@ -526,14 +527,16 @@ def parse_conf(kv: Keyvalues) -> None:
     FRAME_TYPES.clear()
     for block in kv.find_children('BarrierFrames'):
         frame_id = utils.parse_obj_id(block.real_name)
-        if 'horiz' in block and 'vert' in block:
+        if 'horiz' in block and 'vert' in block and 'flat' in block:
             horiz_conf = FrameType.parse(block.find_key('horiz'))
             vert_conf = FrameType.parse(block.find_key('vert'))
+            flat_conf = FrameType.parse(block.find_key('flat'))
         else:
-            horiz_conf = vert_conf = FrameType.parse(block)
+            horiz_conf = vert_conf = flat_conf = FrameType.parse(block)
         FRAME_TYPES[frame_id] = {
             FrameOrient.HORIZ: horiz_conf,
             FrameOrient.VERT: vert_conf,
+            FrameOrient.FLAT: flat_conf,
         }
     for block in kv.find_children('Barriers'):
         barrier = BarrierType.parse(block)
@@ -900,7 +903,8 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
     add_debug = conditions.fetch_debug_visgroup(vmf, 'Barriers')
     group_id = 0
     for plane_slice, plane in BARRIERS.items():
-        frame_orient = FrameOrient.HORIZ if abs(plane_slice.normal.z) < 0.5 else FrameOrient.VERT
+        # If set, it's a floor/ceiling barrier, not a wall.
+        is_flat = abs(plane_slice.normal.z) > 0.5
         hole_plane = HOLES[plane_slice]
         for barrier, group_plane in find_plane_groups(plane):
             group_id += 1
@@ -928,20 +932,25 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
             lighting_origin = place_lighting_origin(vmf, barrier, plane_slice, group_plane)
 
             for (u, v) in group_plane:
+                # Wall frame orientation is arbitrary right now, what to do?
                 place_concave_corner(
-                    vmf, barrier, lighting_origin, plane_slice, borders, frame_orient,
+                    vmf, barrier, lighting_origin, plane_slice, borders,
+                    FrameOrient.FLAT if is_flat else FrameOrient.HORIZ,
                     u, v, ORIENT_W, +1, +1,
                 )
                 place_concave_corner(
-                    vmf, barrier, lighting_origin, plane_slice, borders, frame_orient,
+                    vmf, barrier, lighting_origin, plane_slice, borders,
+                    FrameOrient.FLAT if is_flat else FrameOrient.VERT,
                     u, v, ORIENT_S, -1, +1,
                 )
                 place_concave_corner(
-                    vmf, barrier, lighting_origin, plane_slice, borders, frame_orient,
+                    vmf, barrier, lighting_origin, plane_slice, borders,
+                    FrameOrient.FLAT if is_flat else FrameOrient.HORIZ,
                     u, v, ORIENT_E, -1, -1,
                 )
                 place_concave_corner(
-                    vmf, barrier, lighting_origin, plane_slice, borders, frame_orient,
+                    vmf, barrier, lighting_origin, plane_slice, borders,
+                    FrameOrient.FLAT if is_flat else FrameOrient.VERT,
                     u, v, ORIENT_N, +1, -1,
                 )
 
@@ -1296,7 +1305,10 @@ def place_straight_run(
     direction = Vec(off_u, off_v) @ slice_key.orient
     if backwards:
         direction = -direction
-    frame_orient = FrameOrient.HORIZ if abs(direction.z) < 0.5 else FrameOrient.VERT
+    if abs(slice_key.normal.z) > 0.5:
+        frame_orient = FrameOrient.FLAT
+    else:
+        frame_orient = FrameOrient.HORIZ if abs(direction.z) < 0.5 else FrameOrient.VERT
 
     while straight in borders[end_u + off_u, end_v + off_v]:
         total_dist += 32
