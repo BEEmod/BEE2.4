@@ -1305,12 +1305,14 @@ def place_straight_run(
     for frame in barrier.type.frames[frame_orient]:
         start_off = 0
         frame_length = total_dist
+        end_off = total_dist
         # If corners are present, shrink the straight piece inwards to not overlap.
         if corner_start in borders[start_u, start_v]:
             frame_length -= frame.corner_size
             start_off += frame.corner_size
         if corner_end in borders[end_u, end_v]:
             frame_length -= frame.corner_size
+            end_off -= frame.corner_size
 
         if frame.seg_straight_prop:
             off = start_off
@@ -1330,7 +1332,7 @@ def place_straight_run(
                 if not backwards:
                     off += size
 
-        off = frame_length if backwards else start_off
+        off = end_off if backwards else start_off
         for brush_seg in frame.seg_straight_brush:
             brush_seg.place_sized(
                 vmf, slice_key,
