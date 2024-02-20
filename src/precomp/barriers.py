@@ -469,8 +469,7 @@ class FrameType:
 
     seg_corner: Sequence[Segment] = ()
     seg_concave_corner: Sequence[Segment] = ()
-    corner_size_horiz: int = 4
-    corner_size_vert: int = 4
+    corner_size: int = 4
 
     @classmethod
     def parse(cls, kv: Keyvalues) -> Self:
@@ -490,8 +489,7 @@ class FrameType:
             else:
                 seg_straight_brush.append(segment)
 
-        corner_size_horiz = kv.int('cornerSize', 4)
-        corner_size_vert = kv.int('cornerVertSize', corner_size_horiz)
+        corner_size = kv.int('cornerSize', 4)
 
         for block in kv.find_all('corner'):
             seg_corner.append(Segment.parse(block))
@@ -504,8 +502,7 @@ class FrameType:
             seg_straight_fitter=utils.get_piece_fitter(list(seg_straight_prop)),
             seg_corner=seg_corner,
             seg_concave_corner=seg_concave_corner,
-            corner_size_horiz=corner_size_horiz,
-            corner_size_vert=corner_size_vert,
+            corner_size=corner_size,
         )
 
 
@@ -1310,10 +1307,10 @@ def place_straight_run(
         frame_length = total_dist
         # If corners are present, shrink the straight piece inwards to not overlap.
         if corner_start in borders[start_u, start_v]:
-            start_off += frame.corner_size_horiz
-            frame_length -= frame.corner_size_horiz
+            frame_length -= frame.corner_size
+            start_off += frame.corner_size
         if corner_end in borders[end_u, end_v]:
-            frame_length -= frame.corner_size_horiz
+            frame_length -= frame.corner_size
 
         if frame.seg_straight_prop:
             off = start_off
