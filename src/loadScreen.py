@@ -86,7 +86,7 @@ class ScreenStage:
     """A single stage in a loading screen."""
     def __init__(self, title: TransToken) -> None:
         self.title = title
-        self.id = ipc_types.StageID(hex(id(self)))
+        self.id = ipc_types.StageID(format(id(self), '016X'))
         self._bound: Set[LoadScreen] = set()
         self._current = 0
         self._max = 0
