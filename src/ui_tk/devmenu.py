@@ -1,9 +1,11 @@
 """Options specifically for app development."""
-from typing import Callable
+from typing_extensions import NoReturn
+from typing import Callable, Tuple
 from tkinter import ttk
 import tkinter as tk
 import pprint
 
+from exceptiongroup import ExceptionGroup
 from srctools import logger
 import attrs
 import trio
@@ -39,10 +41,38 @@ def dump_widgets() -> None:
     LOGGER.info('Dump done!')
 
 
+def crasher(exc: BaseException) -> Tuple[Callable[[], object], Callable[[], object]]:
+    """Make a function that raises an exception, to test crash handlers. This returns a sync and async pair."""
+    def fg_raise() -> NoReturn:
+        """Raise in the foreground."""
+        raise exc
+
+    async def bg_raise() -> NoReturn:
+        """Raise in the background."""
+        await trio.sleep(1)
+        raise exc
+
+    return fg_raise, lambda: background_run(bg_raise)
+
+
 def make_menu(menu: tk.Menu) -> None:
     """Create the TK menu bar."""
     menu.add_command(label='Dump widgets', command=dump_widgets)
     menu.add_command(label='Stats', command=make_stats_window())
+
+    menu.add_cascade(label='Crash', menu=(crash_menu := tk.Menu(menu)))
+
+    fg_single, bg_single = crasher(NotImplementedError('Crashing time!'))
+    fg_group, bg_group = crasher(ExceptionGroup('A group', [
+        ZeroDivisionError('Divided'),
+        BufferError('Buffer'),
+        MemoryError('RAM'),
+    ]))
+
+    crash_menu.add_command(label='Sync, Singluar', command=fg_single)
+    crash_menu.add_command(label='Sync, Grouped', command=fg_group)
+    crash_menu.add_command(label='Async, Singular', command=bg_single)
+    crash_menu.add_command(label='Async, Grouped', command=bg_group)
 
 
 def make_stats_window() -> Callable[[], object]:
