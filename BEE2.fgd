@@ -191,6 +191,7 @@
 		"SpeedGel"  : "Propulsion Gel"
 		]
 	sync(boolean) : "Sync" : 0 : "For funnels only, synchronise to the base track."
+	volume(floaT) : "Volume" "1.0" : "The volume to use for this track."
 
 	track01(sound) : "Track" : : "A track which may be potentially selected."
 	track02(sound) : "Track" : : "A track which may be potentially selected."
