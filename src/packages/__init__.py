@@ -2,7 +2,7 @@
 Handles scanning through the zip packages to find all items, styles, etc.
 """
 from __future__ import annotations
-from typing import Iterator, Mapping, NoReturn, ClassVar, Optional, TypeVar, Type, cast
+from typing import Iterator, List, Mapping, NoReturn, ClassVar, Optional, TypeVar, Type, cast
 from typing_extensions import Literal, Self, assert_never
 
 from collections.abc import Collection, Iterable
@@ -58,10 +58,10 @@ PACK_CONFIG = ConfigFile('packages.cfg')
 TRANS_AP_TAG = TransToken.ui('Aperture Tag')
 TRANS_MEL = TransToken.ui('Portal Stories: Mel')
 TRANS_MISSING_PAK_DIR = TransToken.ui(
-    'Package directory does not exist: {path}'
+    'Package directory does not exist: "{path}"'
 )
 TRANS_EMPTY_PAK_DIR = TransToken.ui(
-    'Package directory did not contain any packages: {path}'
+    'Package directory did not contain any packages: "{path}"'
 )
 TRANS_INVALID_PAK_BAD_FORMAT = TransToken.ui(
     'Package file has the incorrect file format: {path}\n'
@@ -482,90 +482,90 @@ def get_loaded_packages() -> PackagesSet:
 _LOADED = PackagesSet()
 
 
-async def find_packages(
-    nursery: trio.Nursery, errors: ErrorUI, packset: PackagesSet,
-    pak_dir: Path,
-    folder_kind: Literal['source', 'subfolder'],
-) -> None:
-    """Search a folder for packages, recursing if necessary."""
+async def find_packages(errors: ErrorUI, packset: PackagesSet, pak_dir: Path) -> bool:
+    """Search a folder for packages, recursing if necessary.
+
+    This returns True if at least one package was found.
+    """
     found_pak = False
     try:
         contents = list(pak_dir.iterdir())
     except FileNotFoundError:
         errors.add(TRANS_MISSING_PAK_DIR.format(path=pak_dir))
-        return
+        return False
 
-    for name in contents:  # Both files and dirs
-        folded = name.stem.casefold()
-        if folded.endswith('.vpk') and not folded.endswith('_dir.vpk'):
-            # _000.vpk files, useless without the directory
-            continue
-
-        filesys: FileSystem
-        if name.is_dir():
-            filesys = RawFileSystem(name)
-        else:
-            ext = name.suffix.casefold()
-            try:
-                if ext in ('.bee_pack', '.zip'):
-                    filesys = await trio.to_thread.run_sync(ZipFileSystem, name, abandon_on_cancel=True)
-                elif ext == '.vpk':
-                    filesys = await trio.to_thread.run_sync(VPKFileSystem, name, abandon_on_cancel=True)
-                else:
-                    LOGGER.info('Extra file: {}', name)
-                    continue
-            except (ValueError, zipfile.BadZipFile) as exc:
-                LOGGER.warning('Failed to parse "{}":', name, exc_info=exc)
-                errors.add(TRANS_INVALID_PAK_BAD_FORMAT.format(path=name))
+    children: List[utils.Result[bool]] = []
+    async with trio.open_nursery() as nursery:
+        for name in contents:  # Both files and dirs
+            folded = name.stem.casefold()
+            if folded.endswith('.vpk') and not folded.endswith('_dir.vpk'):
+                # _000.vpk files, useless without the directory
                 continue
 
-        LOGGER.debug('Reading package "{}"', name)
-
-        # Valid packages must have an info.txt file!
-        try:
-            info = await trio.to_thread.run_sync(filesys.read_kv1, 'info.txt', abandon_on_cancel=True)
-        except FileNotFoundError:
+            filesys: FileSystem
             if name.is_dir():
-                # This isn't a package, so check the subfolders too...
-                LOGGER.debug('Checking subdir "{}" for packages...', name)
-                nursery.start_soon(find_packages, nursery, errors, packset, name, 'subfolder')
+                filesys = RawFileSystem(name)
             else:
-                errors.add(TRANS_INVALID_PAK_NO_INFO.format(path=name))
-            # Don't continue to parse this "package"
-            continue
-        try:
-            pak_id = info['ID']
-        except LookupError:
-            errors.add(TRANS_INVALID_PAK_NO_ID.format(path=Path(filesys.path, 'info.txt')))
-            continue  # Skip this.
+                ext = name.suffix.casefold()
+                try:
+                    if ext in ('.bee_pack', '.zip'):
+                        filesys = await trio.to_thread.run_sync(ZipFileSystem, name, abandon_on_cancel=True)
+                    elif ext == '.vpk':
+                        filesys = await trio.to_thread.run_sync(VPKFileSystem, name, abandon_on_cancel=True)
+                    else:
+                        LOGGER.info('Extra file: {}', name)
+                        continue
+                except (ValueError, zipfile.BadZipFile) as exc:
+                    LOGGER.warning('Failed to parse "{}":', name, exc_info=exc)
+                    errors.add(TRANS_INVALID_PAK_BAD_FORMAT.format(path=name))
+                    continue
 
-        if pak_id.casefold() in packset.packages:
-            duplicate = packset.packages[pak_id.casefold()]
-            raise AppError(TRANS_DUPLICATE_PAK_ID.format(
-                pak_id=pak_id,
-                path1=duplicate.fsys.path,
-                path2=filesys.path,
-            ))
+            LOGGER.debug('Reading package "{}"', name)
 
-        PACKAGE_SYS[pak_id.casefold()] = filesys
+            # Valid packages must have an info.txt file!
+            try:
+                info = await trio.to_thread.run_sync(filesys.read_kv1, 'info.txt', abandon_on_cancel=True)
+            except FileNotFoundError:
+                if name.is_dir():
+                    # This isn't a package, so check the subfolders too...
+                    LOGGER.debug('Checking subdir "{}" for packages...', name)
+                    children.append(utils.Result(
+                        nursery, find_packages,
+                        errors, packset, name,
+                    ))
+                else:
+                    errors.add(TRANS_INVALID_PAK_NO_INFO.format(path=name))
+                # Don't continue to parse this "package"
+                continue
+            try:
+                pak_id = info['ID']
+            except LookupError:
+                errors.add(TRANS_INVALID_PAK_NO_ID.format(path=Path(filesys.path, 'info.txt')))
+                continue  # Skip this.
 
-        packset.packages[pak_id.casefold()] = Package(
-            pak_id,
-            filesys,
-            info,
-            name,
-        )
-        found_pak = True
+            if pak_id.casefold() in packset.packages:
+                duplicate = packset.packages[pak_id.casefold()]
+                raise AppError(TRANS_DUPLICATE_PAK_ID.format(
+                    pak_id=pak_id,
+                    path1=duplicate.fsys.path,
+                    path2=filesys.path,
+                ))
 
-    if not found_pak:
-        if folder_kind == 'subfolder':
-            # Don't warn for subfolders of a main package directory.
-            LOGGER.info('Directory {} was empty.', pak_dir)
-        elif folder_kind == 'source':
-            # It's likely a problem if the directory a user specified is completely empty.
-            errors.add(TRANS_EMPTY_PAK_DIR.format(path=pak_dir))
-        else:
-            assert_never(folder_kind)
+            PACKAGE_SYS[pak_id.casefold()] = filesys
+
+            packset.packages[pak_id.casefold()] = Package(
+                pak_id,
+                filesys,
+                info,
+                name,
+            )
+            found_pak = True
+
+    if found_pak or any(result() for result in children):
+        return True
+    else:
+        LOGGER.info('Directory {} was empty.', pak_dir)
+        return False
 
 
 async def load_packages(
@@ -575,9 +575,14 @@ async def load_packages(
 ) -> None:
     """Scan and read in all packages."""
     async with trio.open_nursery() as find_nurs:
-        for pak_dir in pak_dirs:
-            find_nurs.start_soon(find_packages, find_nurs, errors, packset, pak_dir, 'source')
-
+        find_sources = [
+            utils.Result(find_nurs, find_packages, errors, packset, pak_dir)
+            for pak_dir in pak_dirs
+        ]
+    # Once they've all run, check if any sources failed to find any packages - that's probably an error.
+    for pak_dir, find_res in zip(pak_dirs, find_sources):
+        if not find_res():
+            errors.add(TRANS_EMPTY_PAK_DIR.format(path=pak_dir))
     pack_count = len(packset.packages)
     await LOAD_PAK.set_length(pack_count)
 
@@ -864,12 +869,12 @@ def parse_pack_transtoken(pack: Package, kv: Keyvalues) -> None:
 class Package:
     """Represents a package."""
     id: str
-    fsys: FileSystem
-    info: Keyvalues
+    fsys: FileSystem = attrs.field(repr=False)
+    info: Keyvalues = attrs.field(repr=False)
     path: Path
     disp_name: TransToken
     additional_tokens: dict[str, TransToken]
-    desc: TransToken
+    desc: TransToken = attrs.field(repr=False)
 
     def __init__(
         self,
