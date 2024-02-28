@@ -342,4 +342,4 @@ def load_collision_bbox(item: Item, ent: Entity) -> None:
 def save_collision_bbox(item: Item, vmf: VMF) -> None:
     """Export precise BEE collisions."""
     for coll in item.collisions:
-        coll.as_ent(vmf)
+        vmf.add_ent(coll.as_ent(vmf))

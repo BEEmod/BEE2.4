@@ -55,7 +55,7 @@ class CollideType(Flag):
     # OR all defined members from above.
     EVERYTHING = functools.reduce(
         operator.or_,
-        filter(lambda x: isinstance(x, int), vars().values()),
+        (x for x in vars().values() if isinstance(x, int)),
     )
 
     @classmethod
@@ -67,6 +67,19 @@ class CollideType(Flag):
                 coll |= cls[word.upper()]
             except KeyError:
                 raise ValueError(f'Unknown collide type "{word}"!') from None
+        return coll
+
+    @classmethod
+    def from_ent_kvs(cls, entity: Entity) -> CollideType:
+        """Parse from a bunch of boolean keyvalues."""
+        coll = cls.NOTHING
+        for key, value in entity.items():
+            if key.casefold().startswith('coll_') and conv_bool(value):
+                coll_name = key[5:].upper()
+                try:
+                    coll |= cls[coll_name]
+                except KeyError:
+                    LOGGER.warning('Invalid collide type: "{}"!', key)
         return coll
 
 # The types we want to write into vmfs.
@@ -238,14 +251,7 @@ class BBox:
     @classmethod
     def from_ent(cls, ent: Entity) -> Iterator[BBox]:
         """Parse keyvalues on a VMF entity. One bounding box is produced for each brush."""
-        coll = CollideType.NOTHING
-        for key, value in ent.items():
-            if key.casefold().startswith('coll_') and conv_bool(value):
-                coll_name = key[5:].upper()
-                try:
-                    coll |= CollideType[coll_name]
-                except KeyError:
-                    LOGGER.warning('Invalid collide type: "{}"!', key)
+        coll = CollideType.from_ent_kvs(ent)
         tags = frozenset(ent['tags'].split())
 
         for solid in ent.solids:
@@ -270,6 +276,19 @@ class BBox:
 
             yield cls(mins, maxes, contents=coll, tags=tags)
 
+    def _to_kvs(self, vmf: VMF, classname: str) -> Entity:
+        """Fill in keyvalues for an entity."""
+        ent = Entity(vmf, {
+            'classname': classname,
+            'tags': ' '.join(sorted(self.tags)),
+            'item_id': self.name,
+        })
+        # Exclude the aliases.
+        for coll in EXPORT_KVALUES:
+            assert coll.name is not None
+            ent[f'coll_{coll.name.lower()}'] = (coll & self.contents) is not CollideType.NOTHING
+        return ent
+
     def as_ent(self, vmf: VMF) -> Entity:
         """Convert back into an entity."""
         # If a plane, then we have to produce a valid brush - subtract in the negative dir, put skip
@@ -288,15 +307,7 @@ class BBox:
         else:
             prism = vmf.make_prism(self.mins, self.maxes, consts.Tools.CLIP)
 
-        ent = vmf.create_ent(
-            'bee2_collision_bbox',
-            tags=' '.join(sorted(self.tags)),
-            item_id=self.name,
-        )
-        # Exclude the aliases.
-        for coll in EXPORT_KVALUES:
-            assert coll.name is not None
-            ent[f'coll_{coll.name.lower()}'] = (coll & self.contents) is not CollideType.NOTHING
+        ent = self._to_kvs(vmf, 'bee2_collision_bbox')
         ent.solids.append(prism.solid)
         return ent
 
