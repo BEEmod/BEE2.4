@@ -232,7 +232,7 @@ class BBox:
             return Vec(0.0, 0.0, 1.0)
         return None
 
-    def with_points(self, point1: Vec | FrozenVec, point2: Vec | FrozenVec) -> BBox:
+    def _with_points(self, point1: Vec | FrozenVec, point2: Vec | FrozenVec) -> BBox:
         """Return a new bounding box with the specified points, but this collision and tags."""
         return BBox(point1, point2, contents=self.contents, tags=self.tags, name=self.name)
 
@@ -241,7 +241,7 @@ class BBox:
         name: str | None = None,
         contents: CollideType | None = None,
         tags: Iterable[str] | str | None = None,
-    ) -> BBox:
+    ) -> Self:
         """Return a new bounding box with the name, contents or tags changed."""
         return BBox(
             self.min_x, self.min_y, self.min_z,
@@ -319,6 +319,10 @@ class BBox:
 
         If so, return the bbox representing the overlap.
         """
+        if isinstance(other, Volume):
+            # Make it do the logic.
+            return other.intersect(self)
+
         comb = self.contents & other.contents
         if comb is CollideType.NOTHING:
             return None
@@ -433,23 +437,18 @@ class BBox:
 
     def __matmul__(self, other: AnyAngle | AnyMatrix) -> Self:
         """Rotate the bounding box by an angle. This should be multiples of 90 degrees."""
-        matrix, mins, maxs = self._rotate_bbox(other)
-        return BBox(
-            mins, maxs,
-            contents=self.contents,
-            tags=self.tags,
-            name=self.name,
-        )
+        matrix, mins, maxes = self._rotate_bbox(other)
+        return self._with_points(mins, maxes)
 
     def __add__(self, other: Vec | FrozenVec | tuple[float, float, float]) -> Self:
         """Shift the bounding box forwards by this amount."""
         if isinstance(other, BBox):  # Special-case error.
             raise TypeError('Two bounding boxes cannot be added!')
-        return self.with_points(self.mins + other, self.maxes + other)
+        return self._with_points(self.mins + other, self.maxes + other)
 
     def __sub__(self, other: Vec | FrozenVec | tuple[float, float, float]) -> Self:
         """Shift the bounding box backwards by this amount."""
-        return self.with_points(self.mins - other, self.maxes - other)
+        return self._with_points(self.mins - other, self.maxes - other)
 
     # radd/rsub intentionally omitted. Don't allow inverting, that's nonsensical.
 
@@ -528,6 +527,24 @@ class Volume(BBox):
             ))
 
         return ent
+
+    def with_attrs(
+        self, *,
+        name: str | None = None,
+        contents: CollideType | None = None,
+        tags: Iterable[str] | str | None = None,
+    ) -> BBox:
+        """Return a new bounding box with the name, contents or tags changed."""
+        return Volume(
+            self.mins.freeze(), self.maxes.freeze(),
+            self.planes,
+            contents=contents if contents is not None else self.contents,
+            name=name if name is not None else self.name,
+            tags=tags if tags is not None else self.tags,
+        )
+
+    def intersect(self, other: BBox) -> BBox | None:
+        raise NotImplementedError("Intersections of volumes!")
 
     def __matmul__(self, other: AnyAngle | AnyMatrix) -> Self:
         """Rotate the bounding box by an angle."""
