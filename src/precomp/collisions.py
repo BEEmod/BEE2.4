@@ -5,12 +5,12 @@ import attrs
 from srctools import Entity, Matrix, VMF, Vec
 from srctools.vmf import EntityGroup
 
-from collisions import CollideType as CollideType, BBox as BBox  # re-export.
+from collisions import CollideType as CollideType, BBox as BBox, Volume as Volume  # re-export.
 from editoritems import Item
 from tree import RTree
 
 
-__all__ = ['CollideType', 'BBox', 'Collisions']
+__all__ = ['CollideType', 'BBox', 'Volume', 'Collisions']
 
 
 @attrs.define
@@ -62,6 +62,7 @@ class Collisions:
             group = EntityGroup(vmf, shown=False)
             for bbox in bb_list:
                 ent = bbox.as_ent(vmf)
+                vmf.add_ent(ent)
                 ent['item_id'] = name
                 ent.visgroup_ids.add(visgroup.id)
                 ent.groups.add(group.id)

@@ -146,7 +146,7 @@ class TileSetter(VoxelSetter):
 
 @attrs.define
 class CollisionDef(TemplateEntity):
-    """Adds a bounding box to the map."""
+    """Adds a collision shape to the map."""
     bbox: collisions.BBox
     visgroups: set[str]  # Visgroups required to add this.
 
@@ -667,6 +667,11 @@ def _parse_template(loc: UnparsedTemplate) -> Template:
     for ent in vmf.by_class['bee2_collision_bbox']:
         visgroup_set = set(map(visgroup_names.__getitem__, ent.visgroup_ids))
         for bbox in collisions.BBox.from_ent(ent):
+            coll.append(CollisionDef(bbox, visgroup_set))
+
+    for ent in vmf.by_class['bee2_collision_volume']:
+        visgroup_set = set(map(visgroup_names.__getitem__, ent.visgroup_ids))
+        for bbox in collisions.Volume.from_ent(ent):
             coll.append(CollisionDef(bbox, visgroup_set))
 
     return Template(

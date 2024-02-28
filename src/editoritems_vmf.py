@@ -8,7 +8,7 @@ import re
 from srctools import FrozenVec, Matrix, Angle, Vec, logger, conv_int
 from srctools.vmf import VMF, Entity
 
-from collisions import BBox
+from collisions import BBox, Volume
 from editoritems import Item, ConnSide, OccuType, AntlinePoint, Coord, OccupiedVoxel, bounding_boxes
 
 
@@ -336,6 +336,12 @@ def save_occupiedvoxel(item: Item, vmf: VMF) -> None:
 def load_collision_bbox(item: Item, ent: Entity) -> None:
     """Load precise BEE collisions."""
     item.collisions.extend(BBox.from_ent(ent))
+
+
+@_loader('bee2_collision_volume')
+def load_collision_volume(item: Item, ent: Entity) -> None:
+    """Load precise BEE collisions."""
+    item.collisions.extend(Volume.from_ent(ent))
 
 
 @_saver
