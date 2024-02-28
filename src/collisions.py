@@ -1,12 +1,15 @@
 """Defines the region of space items occupy and computes collisions."""
 from __future__ import annotations
-from typing import Iterable, Iterator, Sequence, overload
+from typing import Iterable, Iterator, Sequence, Tuple, overload
+from typing_extensions import Self
+
 from enum import Flag, auto as enum_auto
 import functools
 import operator
 
-from srctools import VMF, Entity, Side, conv_bool, logger
-from srctools.math import AnyAngle, AnyMatrix, FrozenVec, Vec, to_matrix
+from srctools.vmf import UVAxis, VMF, Entity, Solid, Side
+from srctools.math import AnyAngle, AnyMatrix, FrozenVec, Matrix, Vec, to_matrix
+from srctools import conv_bool, logger
 import attrs
 
 import consts
@@ -249,7 +252,7 @@ class BBox:
         )
 
     @classmethod
-    def from_ent(cls, ent: Entity) -> Iterator[BBox]:
+    def from_ent(cls, ent: Entity) -> Iterator[Self]:
         """Parse keyvalues on a VMF entity. One bounding box is produced for each brush."""
         coll = CollideType.from_ent_kvs(ent)
         tags = frozenset(ent['tags'].split())
@@ -357,88 +360,231 @@ class BBox:
         except NonBBoxError:  # Edge or corner, don't count those.
             return None
 
-    def __matmul__(self, other: AnyAngle | AnyMatrix) -> BBox:
-        """Rotate the bounding box by an angle. This should be multiples of 90 degrees."""
+    def _rotate_bbox(self, other: AnyAngle | AnyMatrix) -> Tuple[Matrix, Vec, Vec]:
         # https://gamemath.com/book/geomprims.html#transforming_aabbs
         m = to_matrix(other)
+        mins = Vec()
+        maxs = Vec()
 
         if m[0, 0] > 0.0:
-            min_x = m[0, 0] * self.min_x
-            max_x = m[0, 0] * self.max_x
+            mins.x = m[0, 0] * self.min_x
+            maxs.x = m[0, 0] * self.max_x
         else:
-            min_x = m[0, 0] * self.max_x
-            max_x = m[0, 0] * self.min_x
+            mins.x = m[0, 0] * self.max_x
+            maxs.x = m[0, 0] * self.min_x
 
         if m[0, 1] > 0.0:
-            min_y = m[0, 1] * self.min_x
-            max_y = m[0, 1] * self.max_x
+            mins.y = m[0, 1] * self.min_x
+            maxs.y = m[0, 1] * self.max_x
         else:
-            min_y = m[0, 1] * self.max_x
-            max_y = m[0, 1] * self.min_x
+            mins.y = m[0, 1] * self.max_x
+            maxs.y = m[0, 1] * self.min_x
 
         if m[0, 2] > 0.0:
-            min_z = m[0, 2] * self.min_x
-            max_z = m[0, 2] * self.max_x
+            mins.z = m[0, 2] * self.min_x
+            maxs.z = m[0, 2] * self.max_x
         else:
-            min_z = m[0, 2] * self.max_x
-            max_z = m[0, 2] * self.min_x
+            mins.z = m[0, 2] * self.max_x
+            maxs.z = m[0, 2] * self.min_x
 
         if m[1, 0] > 0.0:
-            min_x += m[1, 0] * self.min_y
-            max_x += m[1, 0] * self.max_y
+            mins.x += m[1, 0] * self.min_y
+            maxs.x += m[1, 0] * self.max_y
         else:
-            min_x += m[1, 0] * self.max_y
-            max_x += m[1, 0] * self.min_y
+            mins.x += m[1, 0] * self.max_y
+            maxs.x += m[1, 0] * self.min_y
 
         if m[1, 1] > 0.0:
-            min_y += m[1, 1] * self.min_y
-            max_y += m[1, 1] * self.max_y
+            mins.y += m[1, 1] * self.min_y
+            maxs.y += m[1, 1] * self.max_y
         else:
-            min_y += m[1, 1] * self.max_y
-            max_y += m[1, 1] * self.min_y
+            mins.y += m[1, 1] * self.max_y
+            maxs.y += m[1, 1] * self.min_y
 
         if m[1, 2] > 0.0:
-            min_z += m[1, 2] * self.min_y
-            max_z += m[1, 2] * self.max_y
+            mins.z += m[1, 2] * self.min_y
+            maxs.z += m[1, 2] * self.max_y
         else:
-            min_z += m[1, 2] * self.max_y
-            max_z += m[1, 2] * self.min_y
+            mins.z += m[1, 2] * self.max_y
+            maxs.z += m[1, 2] * self.min_y
 
         if m[2, 0] > 0.0:
-            min_x += m[2, 0] * self.min_z
-            max_x += m[2, 0] * self.max_z
+            mins.x += m[2, 0] * self.min_z
+            maxs.x += m[2, 0] * self.max_z
         else:
-            min_x += m[2, 0] * self.max_z
-            max_x += m[2, 0] * self.min_z
+            mins.x += m[2, 0] * self.max_z
+            maxs.x += m[2, 0] * self.min_z
 
         if m[2, 1] > 0.0:
-            min_y += m[2, 1] * self.min_z
-            max_y += m[2, 1] * self.max_z
+            mins.y += m[2, 1] * self.min_z
+            maxs.y += m[2, 1] * self.max_z
         else:
-            min_y += m[2, 1] * self.max_z
-            max_y += m[2, 1] * self.min_z
+            mins.y += m[2, 1] * self.max_z
+            maxs.y += m[2, 1] * self.min_z
 
         if m[2, 2] > 0.0:
-            min_z += m[2, 2] * self.min_z
-            max_z += m[2, 2] * self.max_z
+            mins.z += m[2, 2] * self.min_z
+            maxs.z += m[2, 2] * self.max_z
         else:
-            min_z += m[2, 2] * self.max_z
-            max_z += m[2, 2] * self.min_z
+            mins.z += m[2, 2] * self.max_z
+            maxs.z += m[2, 2] * self.min_z
+
+        return m, mins, maxs
+
+    def __matmul__(self, other: AnyAngle | AnyMatrix) -> Self:
+        """Rotate the bounding box by an angle. This should be multiples of 90 degrees."""
+        matrix, mins, maxs = self._rotate_bbox(other)
         return BBox(
-            min_x, min_y, min_z, max_x, max_y, max_z,
+            mins, maxs,
             contents=self.contents,
             tags=self.tags,
             name=self.name,
         )
 
-    def __add__(self, other: Vec | FrozenVec | tuple[float, float, float]) -> BBox:
-        """Add a vector to the mins and maxes."""
+    def __add__(self, other: Vec | FrozenVec | tuple[float, float, float]) -> Self:
+        """Shift the bounding box forwards by this amount."""
         if isinstance(other, BBox):  # Special-case error.
             raise TypeError('Two bounding boxes cannot be added!')
         return self.with_points(self.mins + other, self.maxes + other)
 
-    def __sub__(self, other: Vec | FrozenVec | tuple[float, float, float]) -> BBox:
-        """Add a vector to the mins and maxes."""
+    def __sub__(self, other: Vec | FrozenVec | tuple[float, float, float]) -> Self:
+        """Shift the bounding box backwards by this amount."""
         return self.with_points(self.mins - other, self.maxes - other)
 
     # radd/rsub intentionally omitted. Don't allow inverting, that's nonsensical.
+
+
+@attrs.frozen
+class Plane:
+    """A plane, used to represent the sides of a volume."""
+    normal: FrozenVec
+    distance: float
+
+    @property
+    def point(self) -> FrozenVec:
+        """Return an arbitary point on this plane."""
+        return self.normal * self.distance
+
+
+@attrs.frozen(init=False)
+class Volume(BBox):
+    """A bounding box with additional clipping planes, allowing it to be an arbitary polyhedron."""
+    planes: Sequence[Plane]
+
+    # noinspection PyMissingConstructor
+    def __init__(
+        self,
+        bbox_min: FrozenVec, bbox_max: FrozenVec,
+        planes: Sequence[Plane],
+        *,
+        contents: CollideType = CollideType.SOLID,
+        tags: Iterable[str] | str = frozenset(),
+        name: str = '',
+    ) -> None:
+        self.__attrs_init__(
+            round(bbox_min.x), round(bbox_min.y), round(bbox_min.z),
+            round(bbox_max.x), round(bbox_max.y), round(bbox_max.z),
+            contents,
+            name,
+            frozenset([tags] if isinstance(tags, str) else tags),
+            planes,
+        )
+
+    @classmethod
+    def from_ent(cls, ent: Entity) -> Iterator[Self]:
+        """Parse keyvalues on a VMF entity. One volume is produced for each brush."""
+        coll = CollideType.from_ent_kvs(ent)
+        tags = frozenset(ent['tags'].split())
+
+        for solid in ent.solids:
+            mins, maxes = solid.get_bbox()
+            yield cls(mins.freeze(), maxes.freeze(), contents=coll, tags=tags, planes=[
+                Plane(norm := face.normal().freeze(), FrozenVec.dot(norm, face.planes[0]))
+                for face in solid.sides
+            ])
+
+    def as_ent(self, vmf: VMF) -> Entity:
+        """Convert back into an entity."""
+        ent = self._to_kvs(vmf, 'bee2_collision_volume')
+        solid = Solid(vmf)
+        ent.solids.append(solid)
+
+        for plane in self.planes:
+            # Use this to pick two arbitrary planes for the UVs.
+            orient = Matrix.from_angle(plane.normal.to_angle())
+            point = plane.point
+            u = -orient.left()
+            v = -orient.up()
+            solid.sides.append(Side(
+                vmf,
+                [
+                    plane.point - 16 * u,
+                    plane.point,
+                    plane.point + 16 * v,
+                ],
+                mat=consts.Tools.CLIP,
+                uaxis=UVAxis(*u),
+                vaxis=UVAxis(*v),
+            ))
+
+        return ent
+
+    def __matmul__(self, other: AnyAngle | AnyMatrix) -> Self:
+        """Rotate the bounding box by an angle."""
+        matrix, mins, maxs = self._rotate_bbox(other)
+        return Volume(
+            mins.freeze(), maxs.freeze(),
+            planes=[
+                Plane(plane.normal @ matrix, plane.distance)
+                for plane in self.planes
+            ],
+            contents=self.contents,
+            tags=self.tags,
+            name=self.name,
+        )
+
+    def __add__(self, other: Vec | FrozenVec | tuple[float, float, float]) -> Self:
+        """Shift the bounding box forwards by this amount."""
+        if isinstance(other, BBox):  # Special-case error.
+            raise TypeError('Two bounding boxes cannot be added!')
+        other = FrozenVec(other)
+
+        planes = [
+            Plane(
+                plane.normal,
+                plane.distance + Vec.dot(plane.normal, other)
+            )
+            for plane in self.planes
+        ]
+
+        return Volume(
+            self.mins + other,
+            self.maxes + other,
+            planes=planes,
+            contents=self.contents,
+            tags=self.tags,
+            name=self.name,
+        )
+
+    def __sub__(self, other: Vec | FrozenVec | tuple[float, float, float]) -> Self:
+        """Shift the bounding box backwards by this amount."""
+        if isinstance(other, BBox):  # Special-case error.
+            raise TypeError('Two bounding boxes cannot be subtracted!')
+        other = FrozenVec(other)
+
+        planes = [
+            Plane(
+                plane.normal,
+                plane.distance - Vec.dot(plane.normal, other),
+            )
+            for plane in self.planes
+        ]
+
+        return Volume(
+            self.mins - other,
+            self.maxes - other,
+            planes=planes,
+            contents=self.contents,
+            tags=self.tags,
+            name=self.name,
+        )
