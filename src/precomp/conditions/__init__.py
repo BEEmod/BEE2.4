@@ -43,7 +43,7 @@ from decimal import Decimal
 from enum import Enum
 from typing import (
     Generic, Protocol, TypeVar, Any, Callable, TextIO, Tuple, Type, Union, overload,
-    cast,
+    cast, Final,
 )
 
 import attrs
@@ -98,71 +98,62 @@ class SWITCH_TYPE(Enum):
     ALL = 'all'  # Run all matching commands
 
 
-xp = FrozenVec(1, 0, 0)
-xn = FrozenVec(-1, 0, 0)
-yp = FrozenVec(0, 1, 0)
-yn = FrozenVec(0, -1, 0)
-zp = FrozenVec(0, 0, 1)
-zn = FrozenVec(0, 0, -1)
-
-DIRECTIONS: Mapping[str, FrozenVec] = {
+DIRECTIONS: Final[Mapping[str, FrozenVec]] = {
     # Translate these words into a normal vector
-    '+x': xp,
-    '-x': xn,
+    '+x': FrozenVec.x_pos,
+    '-x': FrozenVec.x_neg,
 
-    '+y': yp,
-    '-y': yn,
+    '+y': FrozenVec.y_pos,
+    '-y': FrozenVec.y_neg,
 
-    '+z': zp,
-    '-z': zn,
+    '+z': FrozenVec.z_pos,
+    '-z': FrozenVec.z_neg,
 
-    'x': xp,  # For with allow_inverse
-    'y': yp,
-    'z': zp,
+    'x': FrozenVec.x_pos,  # For with allow_inverse
+    'y': FrozenVec.y_pos,
+    'z': FrozenVec.z_pos,
 
-    'up': zp,
-    'dn': zn,
-    'down': zn,
-    'floor': zp,
-    'ceiling': zn,
-    'ceil': zn,
+    'up': FrozenVec.z_pos,
+    'dn': FrozenVec.z_neg,
+    'down': FrozenVec.z_neg,
+    'floor': FrozenVec.z_pos,
+    'ceiling': FrozenVec.z_neg,
+    'ceil': FrozenVec.z_neg,
 
-    'n': yp,
-    'north': yp,
-    's': yn,
-    'south': yn,
+    'n': FrozenVec.y_pos,
+    'north': FrozenVec.y_pos,
+    's': FrozenVec.y_neg,
+    'south': FrozenVec.y_neg,
 
-    'e': xp,
-    'east': xp,
-    'w': xn,
-    'west': xn,
+    'e': FrozenVec.x_pos,
+    'east': FrozenVec.x_pos,
+    'w': FrozenVec.x_neg,
+    'west': FrozenVec.x_neg,
 }
 
-INST_ANGLE = {
+INST_ANGLE: Final[Mapping[FrozenVec, FrozenAngle]] = {
     # IE up = zp = floor
-    zp: FrozenAngle(0, 0, 0),
-    zn: FrozenAngle(0, 0, 0),
+    FrozenVec.z_pos: FrozenAngle(0, 0, 0),
+    FrozenVec.z_neg: FrozenAngle(180, 0, 0),
 
-    xn: FrozenAngle(0, 0, 0),
-    yn: FrozenAngle(0, 90, 0),
-    xp: FrozenAngle(0, 180, 0),
-    yp: FrozenAngle(0, 270, 0),
+    FrozenVec.x_neg: FrozenAngle(0, 0, 0),
+    FrozenVec.y_neg: FrozenAngle(0, 90, 0),
+    FrozenVec.x_pos: FrozenAngle(0, 180, 0),
+    FrozenVec.y_pos: FrozenAngle(0, 270, 0),
 
 }
 
-PETI_INST_ANGLE = {
+PETI_INST_ANGLE: Final[Mapping[FrozenVec, FrozenAngle]] = {
     # The angles needed to point a PeTI instance in this direction
     # IE north = yn
-    zp: FrozenAngle(0, 0, 0),
-    zn: FrozenAngle(180, 0, 0),
+    FrozenVec.z_pos: FrozenAngle(0, 0, 0),
+    FrozenVec.z_neg: FrozenAngle(180, 0, 0),
 
-    yn: FrozenAngle(0, 0, 90),
-    xp: FrozenAngle(0, 90, 90),
-    yp: FrozenAngle(0, 180, 90),
-    xn: FrozenAngle(0, 270, 90),
+    FrozenVec.y_neg: FrozenAngle(0, 0, 90),
+    FrozenVec.x_pos: FrozenAngle(0, 90, 90),
+    FrozenVec.y_pos: FrozenAngle(0, 180, 90),
+    FrozenVec.x_neg: FrozenAngle(0, 270, 90),
 }
-
-del xp, xn, yp, yn, zp, zn
 
 
 class NextInstance(Exception):
@@ -182,7 +173,7 @@ class Unsatisfiable(Exception):
     """
     pass
 
-# Flag to indicate a result doesn't need to be executed anymore,
+# Flag to indicate a result doesn't need to be executed any more,
 # and can be cleaned up - adding a global instance, for example.
 RES_EXHAUSTED = object()
 
@@ -1070,19 +1061,20 @@ def local_name(inst: Entity, name: str | Entity | None) -> str:
     fixup = inst['fixup_style', '0']
 
     if fixup == '2' or not targ_name:
-        # We can't do fixup..
+        # We can't do fixup...
         return name
     elif fixup == '0':
         # Prefix
-        return targ_name + '-' + name
+        return f'{targ_name}-{name}'
     elif fixup == '1':
         # Postfix
-        return name + '-' + targ_name
+        return f'{name}-{targ_name}'
     else:
         raise ValueError(f'Unknown fixup style {fixup}!')
 
 
 class DebugAdder(Protocol):
+    """Result of fetch_debug_visgroup()."""
     @overload
     def __call__(self, ent: Entity, /) -> Entity:
         """Add this entity to the map, the visgroup and make it hidden."""
