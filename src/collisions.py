@@ -241,7 +241,7 @@ class BBox:
         name: str | None = None,
         contents: CollideType | None = None,
         tags: Iterable[str] | str | None = None,
-    ) -> Self:
+    ) -> BBox:
         """Return a new bounding box with the name, contents or tags changed."""
         return BBox(
             self.min_x, self.min_y, self.min_z,
@@ -364,7 +364,7 @@ class BBox:
         except NonBBoxError:  # Edge or corner, don't count those.
             return None
 
-    def _rotate_bbox(self, other: AnyAngle | AnyMatrix) -> Tuple[Matrix, Vec, Vec]:
+    def _rotate_bbox(self, other: AnyAngle | AnyMatrix) -> Tuple[AnyMatrix, Vec, Vec]:
         # https://gamemath.com/book/geomprims.html#transforming_aabbs
         m = to_matrix(other)
         mins = Vec()
@@ -435,18 +435,18 @@ class BBox:
 
         return m, mins, maxs
 
-    def __matmul__(self, other: AnyAngle | AnyMatrix) -> Self:
+    def __matmul__(self, other: AnyAngle | AnyMatrix) -> BBox:
         """Rotate the bounding box by an angle. This should be multiples of 90 degrees."""
         matrix, mins, maxes = self._rotate_bbox(other)
         return self._with_points(mins, maxes)
 
-    def __add__(self, other: Vec | FrozenVec | tuple[float, float, float]) -> Self:
+    def __add__(self, other: Vec | FrozenVec | tuple[float, float, float]) -> BBox:
         """Shift the bounding box forwards by this amount."""
         if isinstance(other, BBox):  # Special-case error.
             raise TypeError('Two bounding boxes cannot be added!')
         return self._with_points(self.mins + other, self.maxes + other)
 
-    def __sub__(self, other: Vec | FrozenVec | tuple[float, float, float]) -> Self:
+    def __sub__(self, other: Vec | FrozenVec | tuple[float, float, float]) -> BBox:
         """Shift the bounding box backwards by this amount."""
         return self._with_points(self.mins - other, self.maxes - other)
 
@@ -465,8 +465,8 @@ class Plane:
         return self.normal * self.distance
 
 
-@attrs.frozen(init=False)
-class Volume(BBox):
+@attrs.frozen(init=False)  # __attrs_init__() is incompatible with the superclass.
+class Volume(BBox):  # type: ignore[override]
     """A bounding box with additional clipping planes, allowing it to be an arbitary polyhedron."""
     planes: Sequence[Plane]
 
@@ -517,9 +517,9 @@ class Volume(BBox):
             solid.sides.append(Side(
                 vmf,
                 [
-                    plane.point - 16 * u,
-                    plane.point,
-                    plane.point + 16 * v,
+                    (plane.point - 16 * u).thaw(),
+                    plane.point.thaw(),
+                    (plane.point + 16 * v).thaw(),
                 ],
                 mat=consts.Tools.CLIP,
                 uaxis=UVAxis(*u),
@@ -533,7 +533,7 @@ class Volume(BBox):
         name: str | None = None,
         contents: CollideType | None = None,
         tags: Iterable[str] | str | None = None,
-    ) -> BBox:
+    ) -> Volume:
         """Return a new bounding box with the name, contents or tags changed."""
         return Volume(
             self.mins.freeze(), self.maxes.freeze(),
@@ -546,7 +546,7 @@ class Volume(BBox):
     def intersect(self, other: BBox) -> BBox | None:
         raise NotImplementedError("Intersections of volumes!")
 
-    def __matmul__(self, other: AnyAngle | AnyMatrix) -> Self:
+    def __matmul__(self, other: AnyAngle | AnyMatrix) -> Volume:
         """Rotate the bounding box by an angle."""
         matrix, mins, maxs = self._rotate_bbox(other)
         return Volume(
@@ -560,7 +560,7 @@ class Volume(BBox):
             name=self.name,
         )
 
-    def __add__(self, other: Vec | FrozenVec | tuple[float, float, float]) -> Self:
+    def __add__(self, other: Vec | FrozenVec | tuple[float, float, float]) -> Volume:
         """Shift the bounding box forwards by this amount."""
         if isinstance(other, BBox):  # Special-case error.
             raise TypeError('Two bounding boxes cannot be added!')
@@ -575,15 +575,15 @@ class Volume(BBox):
         ]
 
         return Volume(
-            self.mins + other,
-            self.maxes + other,
+            self.mins.freeze() + other,
+            self.maxes.freeze() + other,
             planes=planes,
             contents=self.contents,
             tags=self.tags,
             name=self.name,
         )
 
-    def __sub__(self, other: Vec | FrozenVec | tuple[float, float, float]) -> Self:
+    def __sub__(self, other: Vec | FrozenVec | tuple[float, float, float]) -> Volume:
         """Shift the bounding box backwards by this amount."""
         if isinstance(other, BBox):  # Special-case error.
             raise TypeError('Two bounding boxes cannot be subtracted!')
@@ -598,8 +598,8 @@ class Volume(BBox):
         ]
 
         return Volume(
-            self.mins - other,
-            self.maxes - other,
+            self.mins.freeze() - other,
+            self.maxes.freeze() - other,
             planes=planes,
             contents=self.contents,
             tags=self.tags,
