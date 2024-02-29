@@ -528,9 +528,9 @@ class CondCall(Generic[CallResultT]):
             return self._cback(ent.map, coll, info, ent, conf)  # type: ignore
         else:
             # Execute setup functions if required.
-            try:
+            if id(conf) in self._setup_data:
                 cback = self._setup_data[id(conf)]
-            except KeyError:
+            else:
                 # The entity should never be used in setup functions. Pass a dummy object
                 # so errors occur if it's used.
                 cback = self._setup_data[id(conf)] = self._cback(  # type: ignore
