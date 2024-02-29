@@ -1,12 +1,11 @@
 """Adds breakable glass."""
 from typing_extensions import Literal, assert_never
-from typing import Any, Iterator, Tuple, Dict, List, Optional
+from typing import Any, Tuple, Dict, List, Optional
 
-from srctools import FrozenVec, Keyvalues, Vec, VMF, Entity, Output, Angle
+from srctools import FrozenVec, Keyvalues, Vec, VMF, Entity, Output
 import srctools.logger
 
-from precomp import template_brush, conditions
-from precomp.instanceLocs import resolve_one
+from precomp import conditions
 import consts
 
 
@@ -63,177 +62,8 @@ CORNER_POINTS: Dict[FrozenVec, List[Tuple[Direction, Direction, Direction]]] = {
 }
 
 
-def glass_item_setup(conf: dict, item_id, config_dict: Dict[str, Dict[str, Any]]):
-    """Build the config dictionary for a custom glass item."""
-    base_inst = resolve_one(f'<{item_id}:0>', error=True)
-
-    conf.update({
-        'frame_' + name: resolve_one(f'<{item_id}:bee2_frame_{name}>', error=True)
-        for name in ['edge', 'single', 'ubend', 'corner']
-    })
-    config_dict[base_inst.casefold()] = conf
-
-
-def find_glass_items(config: Dict[str, Conf], vmf: VMF) -> Iterator[Tuple[str, Vec, Vec, Vec, Conf]]:
-    """Find the bounding boxes for all the glass items matching a config.
-
-    This yields (targetname, min, max, normal, config) tuples.
-    """
-    # targetname -> min, max, normal, config
-    glass_items: Dict[str, Tuple[Vec, Vec, Vec, dict]] = {}
-    for inst in vmf.by_class['func_instance']:
-        try:
-            conf = config[inst['file'].casefold()]
-        except KeyError:
-            continue
-        targ = inst['targetname']
-        norm = Vec(x=1) @ Angle.from_str(inst['angles'])
-        origin = Vec.from_str(inst['origin']) - 64 * norm
-        try:
-            bbox_min, bbox_max, group_norm, group_conf = glass_items[targ]
-        except KeyError:
-            # First of this group..
-            bbox_min, bbox_max = origin.copy(), origin.copy()
-            group_norm = norm.copy()
-            glass_items[targ] = bbox_min, bbox_max, group_norm, conf
-        else:
-            bbox_min.min(origin)
-            bbox_max.max(origin)
-            assert group_norm == norm, f'"{targ}" is inconsistently rotated!'
-            assert group_conf is conf, f'"{targ}" has multiple configs!'
-        inst.remove()
-
-    for targ, (bbox_min, bbox_max, norm, conf) in glass_items.items():
-        yield targ, bbox_min, bbox_max, norm, conf
-
-
-def make_frames(
-    vmf: VMF,
-    targ: str,
-    conf: dict,
-    bbox_min: Vec,
-    bbox_max: Vec,
-    norm: Vec,
-) -> None:
-    """Generate frames for a rectangular glass item."""
-    def make_frame(frame_type: str, loc: Vec, angles: Angle) -> None:
-        """Make a frame instance."""
-        conditions.add_inst(
-            vmf,
-            targetname=targ,
-            file=conf['frame_' + frame_type],
-            # Position at the center of the block, instead of at the glass.
-            origin=loc - norm * 64,
-            angles=angles,
-        )
-
-    if bbox_min == bbox_max:
-        # 1x1 glass..
-        make_frame('single', bbox_min, norm.to_angle())
-        return
-
-    norm_axis = norm.axis()
-    u_axis, v_axis = Vec.INV_AXIS[norm_axis]
-
-    u_norm = Vec()
-    v_norm = Vec()
-    u_norm[u_axis] = 1
-    v_norm[v_axis] = 1
-
-    single_u = bbox_min[u_axis] == bbox_max[u_axis]
-    single_v = bbox_min[v_axis] == bbox_max[v_axis]
-
-    # If single in either direction, it needs a u-bend.
-    if single_u:
-        ubend_axis = v_axis
-    elif single_v:
-        ubend_axis = u_axis
-    else:
-        ubend_axis = None
-
-    if ubend_axis is not None:
-        for bend_mag, bbox in [(1, bbox_min), (-1, bbox_max)]:
-            make_frame(
-                'ubend',
-                bbox,
-                norm.to_angle_roll(Vec.with_axes(ubend_axis, bend_mag)),
-            )
-    else:
-        # Make 4 corners - one in each roll direction.
-
-        for roll in range(0, 360, 90):
-            angles = norm.to_angle(roll)
-            # The two directions with a border in the corner instance.
-            # We want to put it on those sides.
-            corner_a = Vec(y=-1) @ angles
-            corner_b = Vec(z=-1) @ angles
-
-            # If the normal is positive, we want to be bbox_max in that axis,
-            # otherwise bbox_min.
-
-            pos = Vec.with_axes(
-                norm_axis, bbox_min,
-
-                corner_a.axis(),
-                (bbox_max if corner_a >= (0, 0, 0) else bbox_min),
-
-                corner_b.axis(),
-                (bbox_max if corner_b >= (0, 0, 0) else bbox_min),
-            )
-
-            make_frame(
-                'corner',
-                pos,
-                angles,
-            )
-
-    # Make straight sections.
-    straight_u_pos = norm.to_angle_roll(v_norm)
-    straight_u_neg = norm.to_angle_roll(-v_norm)
-    straight_v_pos = norm.to_angle_roll(u_norm)
-    straight_v_neg = norm.to_angle_roll(-u_norm)
-    for u_pos in range(int(bbox_min[u_axis] + 128), int(bbox_max[u_axis]), 128):
-        make_frame(
-            'edge',
-            Vec.with_axes(u_axis, u_pos, v_axis, bbox_min, norm_axis, bbox_min),
-            straight_u_pos,
-        )
-        make_frame(
-            'edge',
-            Vec.with_axes(u_axis, u_pos, v_axis, bbox_max, norm_axis, bbox_min),
-            straight_u_neg,
-        )
-    for v_pos in range(int(bbox_min[v_axis] + 128), int(bbox_max[v_axis]), 128):
-        make_frame(
-            'edge',
-            Vec.with_axes(v_axis, v_pos, u_axis, bbox_min, norm_axis, bbox_min),
-            straight_v_pos,
-        )
-        make_frame(
-            'edge',
-            Vec.with_axes(v_axis, v_pos, u_axis, bbox_max, norm_axis, bbox_min),
-            straight_v_neg,
-        )
-
-
-@conditions.make_result_setup('BreakableGlass')
-def res_breakable_glass_setup(res: Keyvalues):
-    item_id = res['item']
-    conf = {
-        'template': template_brush.get_scaling_template(res['template']),
-        'offset': res.float('offset', 0.5),
-        # Distance inward from the frames the glass should span.
-        'border_size': res.float('border_size', 0),
-        'thickness': res.float('thickness', 4),
-        }
-
-    glass_item_setup(conf, item_id, BREAKABLE_GLASS_CONF)
-
-    return res.value
-
-
-@conditions.make_result('BreakableGlass')
-def res_breakable_glass(inst: Entity, res: Keyvalues) -> object:
+# TODO: Reimplement
+def res_breakable_glass(vmf: VMF, inst: Entity, res: Keyvalues) -> object:
     """Adds breakable glass to the map.
 
     Parameters:
@@ -244,9 +74,7 @@ def res_breakable_glass(inst: Entity, res: Keyvalues) -> object:
           appear on the border.)
     * `material`: Name of the func_breakable_surf material.
     """
-    vmf = inst.map
-
-    glass_items = find_glass_items(BREAKABLE_GLASS_CONF, vmf)
+    glass_items: Any = ...
 
     damage_filter: Optional[Entity] = None
 
@@ -351,7 +179,5 @@ def res_breakable_glass(inst: Entity, res: Keyvalues) -> object:
                 else:
                     assert_never(axis_type)
             breakable_surf[name] = corner
-
-        make_frames(vmf, targ, conf, bbox_min, bbox_max, -norm)
 
     return conditions.RES_EXHAUSTED
