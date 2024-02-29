@@ -754,6 +754,13 @@ def check_all(vmf: VMF, coll: Collisions, info: MapInfo) -> None:
             # Suppress errors for future conditions.
             ALL_INST.update(extra)
 
+    # Clear out any blank instances.
+    for inst in vmf.by_class['func_instance']:
+        # If editoritems instances are set to "", PeTI will autocorrect it to
+        # ".vmf" - we need to handle that too.
+        if inst['file'].casefold() in ('', '.vmf'):
+            inst.remove()
+
     LOGGER.info('---------------------')
     LOGGER.info(
         'Conditions executed, {}/{} ({:.0%}) skipped!',
@@ -1250,18 +1257,6 @@ def debug_test_result(inst: Entity, kv: Keyvalues) -> bool:
 def dummy_result() -> None:
     """Dummy result that doesn't do anything."""
     pass
-
-
-@meta_cond(priority=1000, only_once=False)
-def remove_blank_inst(inst: Entity) -> None:
-    """Remove instances with a blank file keyvalue.
-
-    This allows conditions to strip the instances when requested.
-    """
-    # If editoritems instances are set to "", PeTI will autocorrect it to
-    # ".vmf" - we need to handle that too.
-    if inst['file', ''] in ('', '.vmf'):
-        inst.remove()
 
 
 @make_result('timedRelay')
