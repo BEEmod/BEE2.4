@@ -1,4 +1,4 @@
-"""Adds breakable glass."""
+"""Controls placing custom barrier (glass/grating) items."""
 from typing_extensions import Literal, assert_never
 from typing import Any, Tuple, Dict, List, Optional
 
@@ -9,15 +9,11 @@ from precomp import conditions
 import consts
 
 
-COND_MOD_NAME = 'Breakable Glass'
+COND_MOD_NAME = 'Glass / Grating Barriers'
 
 LOGGER = srctools.logger.get_logger(__name__)
 
-Conf = Dict[str, Any]  # TODO: Replace with class.
-BREAKABLE_GLASS_CONF: Dict[str, Conf] = {}
-
-# For each direction, whether min/max
-# zero should be the normal axis.
+# For each direction, the positions of the func_breakable_surf keyvalues.
 MIN: Literal[-1] = -1
 MAX: Literal[1] = 1
 Direction = Literal[-1, 0, 1]
