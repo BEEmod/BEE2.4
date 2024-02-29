@@ -225,6 +225,9 @@ class Condition:
     priority: Decimal = Decimal()
     source: str | None = None
 
+    # If set, this is a meta-condition, and this bypasses everything.
+    meta_func: CondCall[object] | None = None
+
     @classmethod
     def parse(cls, kv_block: Keyvalues, *, toplevel: bool) -> Condition:
         """Create a condition from a Keyvalues block."""
@@ -295,6 +298,10 @@ class Condition:
 
         If we find that no instance will succeed, raise Unsatisfiable.
         """
+        if self.meta_func is not None:
+            self.meta_func(coll, info, inst, Keyvalues.root())
+            raise EndCondition
+
         success = True
         # Only the first one can cause this condition to be skipped.
         # We could have a situation where the first test modifies the map
@@ -605,30 +612,25 @@ def add_meta(func: Callable[..., object], priority: MetaCond) -> None:
     Used to allow users to allow adding conditions before or after a
     transformation like the adding of quotes.
     """
-    # This adds a condition result like "func" (with quotes), which cannot
-    # be entered into keyvalues files.
-    # The qualified name will be unique across modules.
-    name = f'"{func.__qualname__}"'
+    name = f'{getattr(func, "__module__", "???")}.{func.__qualname__}()'
     LOGGER.debug(
-        "Adding metacondition ({}) with priority: {!r}",
+        "Adding metacondition {} with priority: {!r}",
         name,
         priority,
     )
 
     # We don't care about setup functions for this.
-    RESULT_LOOKUP[name] = wrapper = CondCall(func, _get_cond_group(func))
+    wrapper = CondCall(func, _get_cond_group(func))
 
     cond = Condition(
-        results=[
-            Keyvalues(name, ''),
-            Keyvalues('endCondition', '')
-        ],
         priority=priority.value,
-        source=f'MetaCondition {name}'
+        source=f'MetaCondition {name}',
+        # Special attribute, overrides results when present.
+        meta_func=wrapper,
     )
 
     conditions.append(cond)
-    ALL_META.append((name, priority, wrapper))
+    ALL_META.append((func.__qualname__, priority, wrapper))
 
 
 def make_test(orig_name: str, *aliases: str) -> Callable[[TestCallT], TestCallT]:
