@@ -31,10 +31,12 @@ async def step_write_vbsp_config(exp: ExportData) -> None:
         'Fizzlers',
         'Options',
         'StyleVars',
+        'Barriers',
+        'BarrierFrames',
+        'BarrierHoles',
         'DropperItems',
-        'Conditions',
         'Quotes',
-        'PackTriggers',
+        'Conditions',
     )
 
     def write_file(conf: Keyvalues, filename: str) -> None:
