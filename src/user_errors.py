@@ -186,6 +186,9 @@ TOK_UNKNOWN_ID = TransToken.ui('Unknown {kind} ID "<var>{id}</var>".')
 TOK_WRONG_ITEM_TYPE = TransToken.ui(
     'The item "<var>{item}</var>" is not a {kind}!<br>Instance: <code>{inst}</code>'
 )
+TOK_NO_CONNECTION_ITEM = TransToken.ui(
+    'The instance "<var>{inst}</var>" does not have any connection information defined!'
+)
 
 TOK_SEEDOCS = TransToken.untranslated('{msg}\n<p><a href="{url}">{docs}</a>.</p>').format(
     docs=TransToken.ui('See the documentation')
@@ -282,14 +285,24 @@ TOK_CUBE_SUPERPOS_MULTILINK = TransToken.ui(
     'Two Superposition Entanglers cannot be connected to a single dropper!'
 )
 
+TOK_BARRIER_ITEMNAME = TransToken.ui('Glass / Grating item')
+TOK_BARRIER_CUST_NO_OUTPUT = TransToken.ui(
+    'The custom barrier item "<var>{name}</var>" must be connected via output to one or more '
+    'regular glass or grating items. It will then change the type of that barrier.'
+)
+TOK_BARRIER_CUST_ALREADY_CONVERTED = TransToken.ui(
+    'The barrier at this posiiton has been connected to multiple custom barrier items. '
+    'Remove all but one connection.'
+)
+
 TOK_BARRIER_HOLE_FOOTPRINT = TransToken.ui(
-    'A Barrier Hole (<var>"{hole}"</var>) does not have sufficent space. '
+    'A Barrier Hole ("<var>{hole}</var>") does not have sufficent space. '
     'The entire highlighted yellow area should be occupied by continous glass/grating/etc which is'
     'not itself occupied by a different hole.'
 )
 
 TOK_BARRIER_HOLE_MISPLACED = TransToken.ui(
-    'A Barrier Hole (<var>"{hole}"</var>) was misplaced. The item must be placed against a '
+    'A Barrier Hole ("<var>{hole}</var>") was misplaced. The item must be placed against a '
     'glass/grating/etc sheet, which it will then cut a hole into. To rotate the item properly, '
     'you may need to place it on a wall with the same orientation first, then drag it onto the '
     'glass without dragging it over surfaces with different orientations. '
@@ -298,13 +311,13 @@ TOK_BARRIER_HOLE_MISPLACED = TransToken.ui(
 )
 
 TOK_BARRIER_HOLE_NOVARIANT = TransToken.ui(
-    'A Barrier Hole (<var>"{hole}"</var>) was placed on top of a <var>"{barrier}"</var> barrier, but this '
+    'A Barrier Hole ("<var>{hole}</var>") was placed on top of a "<var>{barrier}</var>" barrier, but this '
     'barrier does not support this type of hole. The barrier allows ({types_barrier}), '
     'but the hole only has ({types_hole}) available.'
 )
 
 TOK_BARRIER_HOLE_DISALLOWED = TransToken.ui(
-    'A Barrier Hole ("{hole}") was placed on top of a <var>"{barrier}"</var> barrier, '
+    'A Barrier Hole ("<var>{hole}</var>") was placed on top of a "<var>{barrier}</var>" barrier, '
     'which does not allow holes.'
 )
 
@@ -329,19 +342,19 @@ TOK_CHAINING_INVALID_KIND = TransToken.ui(
 )
 
 TOK_TEMPLATE_MULTI_VISGROUPS = TransToken.ui(
-    'The template "{id}" has a {type} with two visgroups: <var>{groups}</var>. Brushes and'
+    'The template "<var>{id}</var>" has a {type} with two visgroups: "<var>{groups}</var>". Brushes and'
     'overlays in templates may currently only use one visgroup each.'
 )
 
-TOK_FIZZLER_NO_ITEM = TransToken.ui('No item ID for fizzler instance <var>"{inst}"</var>!')
-TOK_FIZZLER_UNKNOWN_TYPE = TransToken.ui('No fizzler type for {item} (<var>"{inst}"</var>)!')
+TOK_FIZZLER_NO_ITEM = TransToken.ui('No item ID for fizzler instance "<var>{inst}</var>"!')
+TOK_FIZZLER_UNKNOWN_TYPE = TransToken.ui('No fizzler type for {item} ("<var>{inst}</var>")!')
 TOK_FIZZLER_NO_MODEL_SIDE = TransToken.ui('No model specified for one side of "{id}" fizzlers.')
 
 TOK_INSTLOC_EMPTY = TransToken.ui(
-    'Instance lookup path <code>"{path}"</code> returned no instances.'
+    'Instance lookup path "<code>{path}</code>" returned no instances.'
 )
 TOK_INSTLOC_MULTIPLE = TransToken.ui(
-    'Instance lookup path <code>"{path}"</code> was expected to provide one instance, '
+    'Instance lookup path "<code>{path}</code>" was expected to provide one instance, '
     'but it returned multiple instances:'
 )
 

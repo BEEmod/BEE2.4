@@ -5,8 +5,10 @@ from typing import Any, Tuple, Dict, List, Optional
 from srctools import FrozenVec, Keyvalues, Vec, VMF, Entity, Output
 import srctools.logger
 
-from precomp import conditions
+import utils
+from precomp import conditions, connections, barriers
 import consts
+import user_errors
 
 
 COND_MOD_NAME = 'Glass / Grating Barriers'
@@ -56,6 +58,71 @@ CORNER_POINTS: Dict[FrozenVec, List[Tuple[Direction, Direction, Direction]]] = {
         (MAX, MIN, 0),
     ]
 }
+
+
+@conditions.make_result('CustomBarrier')
+def res_cust_barrier(inst: Entity, res: Keyvalues) -> None:
+    """Convert regular glass/grating into a custom item.
+
+    The specified item needs to have an output which will be connected to glass/grating.
+    """
+    try:
+        barrier_type = barriers.BARRIER_TYPES[utils.parse_obj_id(res.value)]
+    except KeyError:
+        raise user_errors.UserError(
+            user_errors.TOK_UNKNOWN_ID.format(kind='Barrier Type', id=res.value)
+        )
+
+    try:
+        cust_item = connections.ITEMS[inst['targetname']]
+    except KeyError as exc:
+        raise user_errors.UserError(
+            user_errors.TOK_NO_CONNECTION_ITEM.format(inst=inst['file']),
+            points=[Vec.from_str(inst['origin'])],
+        ) from exc
+    cust_item.delete_antlines()
+    barrier: Optional[barriers.Barrier] = None
+    for conn in list(cust_item.outputs):
+        targ_item = conn.to_item
+        conn.remove()
+        try:
+            if targ_item.config.id != 'ITEM_BARRIER':
+                raise KeyError
+            gls_barrier = barriers.BARRIERS_BY_NAME.pop(targ_item.name)
+        except KeyError:
+            raise user_errors.UserError(
+                user_errors.TOK_WRONG_ITEM_TYPE.format(
+                    item=targ_item.config.id,
+                    kind=user_errors.TOK_BARRIER_ITEMNAME,
+                    inst=inst['file'],
+                    points=[Vec.from_str(inst['origin'])],
+                )
+            )
+        # Transfer over connections.
+        targ_item.transfer_antlines(cust_item)
+        for gls_conn in list(targ_item.outputs):
+            gls_conn.from_item = cust_item
+        for gls_conn in list(targ_item.inputs):
+            gls_conn.to_item = cust_item
+
+        # If None, this is the first glass item, and we want to edit inplace.
+        # Otherwise, we want to go overwrite everywhere this item is.
+        if barrier is None:
+            barrier = gls_barrier
+            barrier.type = barrier_type
+            barrier.item = cust_item
+            barrier.name = cust_item.name
+            barriers.BARRIERS_BY_NAME[cust_item.name] = barrier
+        else:
+            # Check each location first, because it could have been changed to
+            # something else.
+            barrier.instances.extend(gls_barrier.instances)
+            for slice_key, start_u, start_v in gls_barrier.original_voxels:
+                plane = barriers.BARRIERS[slice_key]
+                for u in range(start_u, start_u + 4):
+                    for v in range(start_v, start_v + 4):
+                        if plane[u, v] is gls_barrier:
+                            plane[u, v] = barrier
 
 
 # TODO: Reimplement
