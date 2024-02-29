@@ -269,6 +269,10 @@ class Barrier:
     type: BarrierType
     item: connections.Item | None = None
     instances: List[Entity] = attrs.Factory(list)
+    # Set only for vanilla glass/grating items. Stores a list of the
+    # original voxel positions this item took up, so changing the
+    # type can overwrite this.
+    original_voxels: Sequence[Tuple[utils.SliceKey, int, int]] = ()
 
     def __eq__(self, other: object) -> bool:
         """Two barriers are equal if are for the same instance or if mergable. The type must always match."""
@@ -611,6 +615,7 @@ def parse_map(vmf: VMF, conn_items: Mapping[str, connections.Item]) -> None:
     """
     frame_inst = instanceLocs.resolve_filter('[glass_frames]', silent=True)
     segment_inst = instanceLocs.resolve_filter('[glass_128]', silent=True)
+    barrier_pos_lists: Dict[str, List[Tuple[utils.SliceKey, int, int]]] = {}
 
     for inst in vmf.by_class['func_instance']:
         filename = inst['file'].casefold()
@@ -630,12 +635,15 @@ def parse_map(vmf: VMF, conn_items: Mapping[str, connections.Item]) -> None:
 
             try:
                 barrier = BARRIERS_BY_NAME[inst_name]
+                barrier_list = barrier_pos_lists[inst_name]
             except KeyError:
+                barrier_list = barrier_pos_lists[inst_name] = []
                 barrier = BARRIERS_BY_NAME[inst_name] = Barrier(
                     name=inst_name,
                     type=BARRIER_EMPTY_TYPE,
                     item=conn_items.get(inst_name),
                     instances=[],
+                    original_voxels=barrier_list,
                 )
             barrier.instances.append(inst)
 
@@ -646,6 +654,12 @@ def parse_map(vmf: VMF, conn_items: Mapping[str, connections.Item]) -> None:
                     (local.x + u_off) // 32,
                     (local.y + v_off) // 32,
                 ] = barrier
+            # Store off the voxels, for use by CustomBarrier.
+            barrier_list.append((
+                plane_slice,
+                round((local.x - 48) // 32),
+                round((local.y - 48) // 32),
+            ))
 
         if filename in frame_inst:  # Frames are useless, we'll make our own.
             inst.remove()
