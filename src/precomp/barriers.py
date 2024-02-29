@@ -15,7 +15,7 @@ import srctools.logger
 import attrs
 
 from plane import Plane
-from precomp import instanceLocs, options, template_brush, conditions, collisions
+from precomp import instanceLocs, options, template_brush, conditions, collisions, connections
 from precomp.grid_optim import optimise as grid_optimise
 from transtoken import TransToken
 import consts
@@ -259,7 +259,7 @@ class BarrierType:
         )
 
 
-@attrs.define(eq=False)
+@attrs.define(eq=False, kw_only=True)
 class Barrier:
     """A glass/grating item.
 
@@ -267,6 +267,7 @@ class Barrier:
     """
     name: str
     type: BarrierType
+    item: connections.Item | None = None
     instances: List[Entity] = attrs.Factory(list)
 
     def __eq__(self, other: object) -> bool:
@@ -509,7 +510,7 @@ class FrameType:
 
 # Special barrier representing the lack of one.
 BARRIER_EMPTY_TYPE = BarrierType(id=utils.ID_EMPTY, mergeable=True)
-BARRIER_EMPTY = Barrier('', BARRIER_EMPTY_TYPE)
+BARRIER_EMPTY = Barrier(name='', type=BARRIER_EMPTY_TYPE, item=None)
 # Planar slice -> plane of barriers.
 # The plane is specified as the edge of the voxel.
 BARRIERS: dict[utils.SliceKey, Plane[Barrier]] = defaultdict(lambda: Plane(default=BARRIER_EMPTY))
@@ -601,11 +602,12 @@ def parse_conf(kv: Keyvalues) -> None:
         )
 
 
-def parse_map(vmf: VMF) -> None:
+def parse_map(vmf: VMF, conn_items: Mapping[str, connections.Item]) -> None:
     """Find all glass/grating in the map.
 
     This removes the per-tile instances, and all original brushwork.
     The frames are updated with a fixup var, as appropriate.
+    Requires connection items to be parsed!
     """
     frame_inst = instanceLocs.resolve_filter('[glass_frames]', silent=True)
     segment_inst = instanceLocs.resolve_filter('[glass_128]', silent=True)
@@ -629,7 +631,12 @@ def parse_map(vmf: VMF) -> None:
             try:
                 barrier = BARRIERS_BY_NAME[inst_name]
             except KeyError:
-                barrier = BARRIERS_BY_NAME[inst_name] = Barrier(inst_name, BARRIER_EMPTY_TYPE)
+                barrier = BARRIERS_BY_NAME[inst_name] = Barrier(
+                    name=inst_name,
+                    type=BARRIER_EMPTY_TYPE,
+                    item=conn_items.get(inst_name),
+                    instances=[],
+                )
             barrier.instances.append(inst)
 
             # Now set each 32-grid cell to be the barrier. Since this is square the orientation
@@ -1112,8 +1119,11 @@ def place_lighting_origin(
     avg_pos = (avg_u / count, avg_v / count)
 
     best_u, best_v = min(group_plane, key=lambda uv: math.dist(uv, avg_pos))
-    name = conditions.local_name(barrier.instances[0], 'lighting')
-    vmf.create_ent(
+    if barrier.item is not None:
+        name = conditions.local_name(barrier.item.inst, 'lighting')
+    else:
+        name = 'lighting'
+    ent = vmf.create_ent(
         'info_lighting',
         origin=plane_slice.plane_to_world(
             best_u * 32 + 16.0,
@@ -1122,6 +1132,8 @@ def place_lighting_origin(
         ),
         targetname=name,
     )
+    if barrier.item is None:
+        ent.make_unique()
     return name
 
 

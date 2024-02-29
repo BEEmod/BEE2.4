@@ -1642,7 +1642,7 @@ async def main() -> None:
         change_ents(vmf)
 
         fizzler.parse_map(vmf, info)
-        barriers.parse_map(vmf)
+        barriers.parse_map(vmf, connections.ITEMS)
         # We have barriers, pass to our error display.
         errors.load_barriers(barriers.BARRIERS)
 
