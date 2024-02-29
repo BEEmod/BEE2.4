@@ -1192,7 +1192,7 @@ def res_script_cube_predicate(vmf: VMF, ent: Entity, res: Keyvalues) -> object:
     return conditions.RES_EXHAUSTED
 
 
-@conditions.meta_cond(priority=-750, only_once=True)
+@conditions.MetaCond.LinkCubes.register
 def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
     """Determine the cubes set based on instance settings.
 
@@ -1853,7 +1853,7 @@ def make_cube(
     return has_addon_inst, ent
 
 
-@conditions.meta_cond(priority=750, only_once=True)
+@conditions.MetaCond.GenerateCubes.register
 def generate_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
     """After other conditions are run, generate cubes."""
     bounce_in_map = info.has_attr('bouncegel')

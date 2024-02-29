@@ -142,7 +142,7 @@ def res_linked_item(res: Keyvalues) -> Callable[[Entity], None]:
     return applier
 
 
-@conditions.meta_cond(-300)
+@conditions.MetaCond.LinkedItems.register
 def link_items(vmf: VMF) -> None:
     """Take the defined linked items, and actually link them together."""
     for name, group in ITEMS_TO_LINK.items():

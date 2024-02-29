@@ -79,7 +79,7 @@ RESULT_SETUP: dict[str, Callable[..., Any]] = {}
 # Used to dump a list of the tests, results, meta-conditions
 ALL_TESTS: list[tuple[str, tuple[str, ...], CondCall[bool]]] = []
 ALL_RESULTS: list[tuple[str, tuple[str, ...], CondCall[object]]] = []
-ALL_META: list[tuple[str, Decimal, CondCall[object]]] = []
+ALL_META: list[tuple[str, 'MetaCond', CondCall[object]]] = []
 
 
 ResultT = TypeVar('ResultT')
@@ -185,6 +185,35 @@ class Unsatisfiable(Exception):
 # Flag to indicate a result doesn't need to be executed anymore,
 # and can be cleaned up - adding a global instance, for example.
 RES_EXHAUSTED = object()
+
+
+class MetaCond(Enum):
+    """Priority values for meta conditions."""
+    FaithPlate = Decimal(-900)
+    LinkCubes = Decimal(-750)
+    LinkedItems = Decimal(-300)
+    MonCameraLink = Decimal(-275)
+    ScaffoldLinkOld = Decimal('-250.0001')
+    Connections = Decimal(-250)
+    ExitSigns = Decimal(-10)
+    ElevatorVideos = Decimal(50)
+    FogEnts = Decimal(100)
+    VoiceLine = Decimal(100)
+    Barriers = Decimal(150)
+    ApertureTag = Decimal(200)
+    AntiFizzBump = Decimal(200)
+    PlayerModel = Decimal(400)
+    Vactubes = Decimal(400)
+    PlayerPortalGun = Decimal(500)
+    Fizzler = Decimal(500)
+    Screenshot = Decimal(750)
+    GenerateCubes = Decimal(750)
+    RemoveBlankInst = Decimal(1000)
+
+    def register(self, func: CallableT) -> CallableT:
+        """Register a meta-condition."""
+        add_meta(func, self)
+        return func
 
 
 @attrs.define
@@ -570,46 +599,36 @@ def _get_cond_group(func: Any) -> str | None:
     return str(group)
 
 
-def add_meta(func: Callable[..., object], priority: Decimal | int, only_once: bool = True) -> None:
+def add_meta(func: Callable[..., object], priority: MetaCond) -> None:
     """Add a metacondition, which executes a function at a priority level.
 
     Used to allow users to allow adding conditions before or after a
     transformation like the adding of quotes.
     """
-    dec_priority = Decimal(priority)
     # This adds a condition result like "func" (with quotes), which cannot
     # be entered into keyvalues files.
     # The qualified name will be unique across modules.
     name = f'"{func.__qualname__}"'
     LOGGER.debug(
-        "Adding metacondition ({}) with priority {!s}!",
+        "Adding metacondition ({}) with priority: {!r}",
         name,
-        dec_priority,
+        priority,
     )
 
     # We don't care about setup functions for this.
     RESULT_LOOKUP[name] = wrapper = CondCall(func, _get_cond_group(func))
 
     cond = Condition(
-        results=[Keyvalues(name, '')],
-        priority=dec_priority,
+        results=[
+            Keyvalues(name, ''),
+            Keyvalues('endCondition', '')
+        ],
+        priority=priority.value,
         source=f'MetaCondition {name}'
     )
 
-    if only_once:
-        cond.results.append(
-            Keyvalues('endCondition', '')
-        )
     conditions.append(cond)
-    ALL_META.append((name, dec_priority, wrapper))
-
-
-def meta_cond(priority: int | Decimal=0, only_once: bool=True) -> Callable[[CallableT], CallableT]:
-    """Decorator version of add_meta."""
-    def x(func: CallableT) -> CallableT:
-        add_meta(func, priority, only_once)
-        return func
-    return x
+    ALL_META.append((name, priority, wrapper))
 
 
 def make_test(orig_name: str, *aliases: str) -> Callable[[TestCallT], TestCallT]:
@@ -754,7 +773,8 @@ def check_all(vmf: VMF, coll: Collisions, info: MapInfo) -> None:
             # Suppress errors for future conditions.
             ALL_INST.update(extra)
 
-    # Clear out any blank instances.
+    # Clear out any blank instances. This allows code elsewhere to have a convenient way
+    # to just delete instances.
     for inst in vmf.by_class['func_instance']:
         # If editoritems instances are set to "", PeTI will autocorrect it to
         # ".vmf" - we need to handle that too.
@@ -906,9 +926,9 @@ def dump_conditions(file: TextIO) -> None:
 
     file.write(DOC_META_COND)
 
-    ALL_META.sort(key=lambda i: i[1])  # Sort by priority
+    ALL_META.sort(key=lambda tup: tup[1].value)  # Sort by priority
     for test_key, priority, func in ALL_META:
-        file.write(f'#### `{test_key}` ({priority}):\n\n')
+        file.write(f'#### `{test_key}` ({priority.value}):\n\n')
         dump_func_docs(file, func)
         file.write('\n')
 

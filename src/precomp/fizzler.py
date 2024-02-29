@@ -1200,7 +1200,7 @@ def parse_map(vmf: VMF, info: conditions.MapInfo) -> None:
             conn.from_item = fizz_item
 
 
-@conditions.meta_cond(priority=500, only_once=True)
+@conditions.MetaCond.Fizzler.register
 def generate_fizzlers(vmf: VMF) -> None:
     """Generates fizzler models and the brushes according to their set types.
 

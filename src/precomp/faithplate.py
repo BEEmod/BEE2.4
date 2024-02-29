@@ -63,7 +63,7 @@ class PaintDropper(FaithPlate):
     target: Union[Vec, tiling.TileDef]
 
 
-@conditions.meta_cond(-900)
+@conditions.MetaCond.FaithPlate.register
 def associate_faith_plates(vmf: VMF) -> None:
     """Parse through the map, collecting all faithplate segments.
 

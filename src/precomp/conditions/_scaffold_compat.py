@@ -133,7 +133,7 @@ def res_old_unst_scaffold(res: Keyvalues) -> None:
     )
 
 
-@conditions.meta_cond(priority=Decimal('-250.0001'))
+@conditions.MetaCond.ScaffoldLinkOld.register
 def legacy_scaffold_link(vmf: VMF) -> None:
     """Apply the legacy scaffold logic."""
     if not SCAFFOLD_CONFIGS:

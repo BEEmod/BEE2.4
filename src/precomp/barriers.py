@@ -199,7 +199,7 @@ def template_solids_and_coll(
         ]
 
 
-@conditions.meta_cond(150)
+@conditions.MetaCond.Barriers.register
 def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
     """Make barrier entities. get_tex is vbsp.get_tex."""
     glass_temp = template_brush.get_scaling_template(options.GLASS_TEMPLATE())

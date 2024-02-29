@@ -242,7 +242,7 @@ def res_vactubes(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
     return result
 
 
-@conditions.meta_cond(400)
+@conditions.MetaCond.Vactubes.register
 def vactube_gen(vmf: VMF) -> None:
     """Generate the vactubes, after most conditions have run."""
     if not VAC_TRACKS:

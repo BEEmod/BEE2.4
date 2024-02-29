@@ -216,7 +216,7 @@ def res_camera(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
     return add_camera
 
 
-@conditions.meta_cond(priority=-275)
+@conditions.MetaCond.MonCameraLink.register
 def mon_camera_link(vmf: VMF) -> None:
     """Link cameras to monitors."""
     import vbsp
