@@ -688,6 +688,69 @@ class Volume(BBox):  # type: ignore[override]
             name=self.name,
         )
 
+    def trace_ray(self, start: Vec | FrozenVec, delta: Vec | FrozenVec) -> Hit | None:
+        """Trace a ray against the bbox, returning the hit position (if any).
+
+        :raises ValueError: If no hit occured.
+        :parameter start: The starting point for the ray.
+        :parameter delta: Both the direction and the maximum length to check.
+        """
+        start = FrozenVec(start)
+        delta = FrozenVec(delta)
+
+        # Early out, check against the bbox first.
+        if super().trace_ray(start, delta) is None:
+            return None
+
+        max_dist = delta.mag()
+        direction = delta / max_dist
+
+        best_hit: Hit | None = None
+        inside = True
+        for plane in self.planes:
+            dot = Vec.dot(plane.normal, direction)
+            # If perpendicular or facing in the same direction, the ray can't trace into it.
+            if dot <= 0.0:
+                # Check if the start point is inside the plane.
+                if Vec.dot(start, plane.normal) > plane.distance:
+                    inside = False
+                continue
+            t = (plane.distance - Vec.dot(start, plane.normal)) / dot
+            if not (0.0 <= t <= max_dist) or (best_hit is not None and t > best_hit.distance):
+                # Not in bounds for the ray, or worse than our best result.
+                continue
+            impact = start + t * direction
+            # Check this impact is actually possible.
+            for other_plane in self.planes:
+                if other_plane is plane:
+                    continue
+                if Vec.dot(impact, other_plane.normal) < other_plane.distance:
+                    # We're outside this plane, the impact is wrong.
+                    break
+            else:  # All other plane tests succeeded.
+                best_hit = Hit(
+                    start=start,
+                    direction=direction,
+                    impact=impact,
+                    normal=plane.normal,
+                    distance=t,
+                    volume=self,
+                )
+
+        if best_hit is None:
+            if inside:
+                # The start point is inside all the planes, so we started inside.
+                return Hit(
+                    start=start,
+                    direction=direction,
+                    normal=-direction,
+                    impact=start,
+                    distance=0.0,
+                    volume=self,
+                )
+            else:
+                return None
+        return best_hit
 
 
 def trace_ray(start: Vec | FrozenVec, delta: Vec | FrozenVec, volumes: Iterable[BBox]) -> Hit | None:
