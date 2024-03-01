@@ -99,6 +99,16 @@ EXPORT_KVALUES: Sequence[CollideType] = [
 ]
 
 
+@attrs.frozen(kw_only=True)
+class Hit:
+    """Represents the impact of a raytrace."""
+    start: FrozenVec
+    direction: FrozenVec
+    distance: float
+    impact: FrozenVec
+    normal: FrozenVec  # Pointing outward at the hit location.
+
+
 @attrs.frozen(init=False)
 class BBox:
     """An axis aligned volume for collision.
@@ -452,6 +462,72 @@ class BBox:
 
     # radd/rsub intentionally omitted. Don't allow inverting, that's nonsensical.
 
+    def trace_ray(self, start: Vec | FrozenVec, delta: Vec | FrozenVec) -> Hit:
+        """Trace a ray against the bbox, returning the hit position (if any).
+
+        :raises ValueError: If no hit occured.
+        :parameter start: The starting point for the ray.
+        :parameter delta: Both the direction and the maximum length to check.
+        """
+        start = FrozenVec(start)
+        delta = FrozenVec(delta)
+        # https://gamemath.com/book/geomtests.html#intersection_ray_aabb
+        inside = True
+        mins = self.mins
+        maxes = self.maxes
+
+        def check_plane(axis: Literal['x', 'y', 'z']) -> Tuple[float, float]:
+            """Determine where the intersection would be for each axial face pair."""
+            if start[axis] < mins[axis]:
+                time = mins[axis] - start[axis]
+                if time > delta[axis]:
+                    raise ValueError('No hit!')
+                time /= delta[axis]
+                return time, -1.0
+            elif start[axis] > maxes[axis]:
+                time = maxes[axis] - start[axis]
+                if time < delta[axis]:
+                    raise ValueError('No hit!')
+                time /= delta[axis]
+                return time, 1.0
+            else:
+                return -1.0, 0.0
+
+        xt, xn = check_plane('x')
+        yt, yn = check_plane('y')
+        zt, zn = check_plane('z')
+        if xn == yn == zn == 0.0:
+            # Inside the box. We immediately impact.
+            direction = delta.norm()
+            return Hit(
+                start=start,
+                direction=direction,
+                normal=-direction,
+                impact=start,
+                distance=0.0,
+            )
+
+        plane: Literal['x', 'y', 'z'] = 'x'
+        time = xt
+        if yt > time:
+            time = yt
+            plane = 'y'
+        if zt > time:
+            time = zt
+            plane = 'z'
+        impact = start + delta * time
+
+        if mins <= impact <= maxes:
+            return Hit(
+                start=start,
+                direction=delta.norm(),
+                normal=FrozenVec.with_axes(plane, FrozenVec(xn, yn, zn)),
+                impact=impact,
+                distance=(impact - start).mag(),
+            )
+        else:
+            raise ValueError('No hit!')
+
 
 @attrs.frozen
 class Plane:
@@ -534,7 +610,7 @@ class Volume(BBox):  # type: ignore[override]
         contents: CollideType | None = None,
         tags: Iterable[str] | str | None = None,
     ) -> Volume:
-        """Return a new bounding box with the name, contents or tags changed."""
+        """Return a new volume with the name, contents or tags changed."""
         return Volume(
             self.mins.freeze(), self.maxes.freeze(),
             self.planes,
