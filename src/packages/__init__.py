@@ -3,7 +3,7 @@ Handles scanning through the zip packages to find all items, styles, etc.
 """
 from __future__ import annotations
 from typing import Iterator, List, Mapping, NoReturn, ClassVar, Optional, TypeVar, Type, cast
-from typing_extensions import Literal, Self, assert_never
+from typing_extensions import Self
 
 from collections.abc import Collection, Iterable
 from collections import defaultdict

@@ -239,6 +239,7 @@ async def startup(*, task_status: trio.TaskStatus[None] = trio.TASK_STATUS_IGNOR
     global _bg_started
     if _bg_started:
         raise ValueError('Daemon already started!')
+    _bg_started = True
 
     # Initialise the daemon.
     process = multiprocessing.Process(

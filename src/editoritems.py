@@ -4,7 +4,7 @@ import sys
 from collections import defaultdict
 from collections.abc import Iterable, Iterator, Mapping
 from enum import Enum, Flag
-from typing import Callable, ClassVar, Final, List, Optional, Protocol, Any, Tuple
+from typing import Callable, ClassVar, List, Optional, Protocol, Any, Tuple
 from pathlib import PurePosixPath as FSPath
 
 import attrs

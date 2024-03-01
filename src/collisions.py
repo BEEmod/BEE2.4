@@ -511,15 +511,15 @@ class Volume(BBox):  # type: ignore[override]
         for plane in self.planes:
             # Use this to pick two arbitrary planes for the UVs.
             orient = Matrix.from_angle(plane.normal.to_angle())
-            point = plane.point
+            point = plane.point.thaw()
             u = -orient.left()
             v = -orient.up()
             solid.sides.append(Side(
                 vmf,
                 [
-                    (plane.point - 16 * u).thaw(),
-                    plane.point.thaw(),
-                    (plane.point + 16 * v).thaw(),
+                    point - 16 * u,
+                    point,
+                    point + 16 * v,
                 ],
                 mat=consts.Tools.CLIP,
                 uaxis=UVAxis(*u),
