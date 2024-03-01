@@ -107,6 +107,7 @@ class Hit:
     distance: float
     impact: FrozenVec
     normal: FrozenVec  # Pointing outward at the hit location.
+    volume: BBox = attrs.field(repr=False)
 
 
 @attrs.frozen(init=False)
@@ -498,6 +499,7 @@ class BBox:
             zt, zn = check_plane('z')
         except ValueError:
             return None
+
         if xn == yn == zn == 0.0:
             # Inside the box. We immediately impact.
             direction = delta.norm()
@@ -507,6 +509,7 @@ class BBox:
                 normal=-direction,
                 impact=start,
                 distance=0.0,
+                volume=self,
             )
 
         plane: Literal['x', 'y', 'z'] = 'x'
@@ -526,6 +529,7 @@ class BBox:
                 normal=FrozenVec.with_axes(plane, FrozenVec(xn, yn, zn)),
                 impact=impact,
                 distance=(impact - start).mag(),
+                volume=self,
             )
         else:
             return None
@@ -683,3 +687,19 @@ class Volume(BBox):  # type: ignore[override]
             tags=self.tags,
             name=self.name,
         )
+
+
+
+def trace_ray(start: Vec | FrozenVec, delta: Vec | FrozenVec, volumes: Iterable[BBox]) -> Hit | None:
+    """Trace a ray against multiple bboxes/volumes, returning the hit position (if any).
+
+    :raises ValueError: If no hit occured.
+    :parameter start: The starting point for the ray.
+    :parameter delta: Both the direction and the maximum length to check.
+    """
+    best_hit: Hit | None = None
+    for volume in volumes:
+        hit = volume.trace_ray(start, delta)
+        if hit is not None and (best_hit is None or best_hit.distance > hit.distance):
+            best_hit = hit
+    return best_hit
