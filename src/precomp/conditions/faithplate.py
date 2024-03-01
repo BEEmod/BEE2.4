@@ -79,21 +79,3 @@ def res_set_faith(res: Keyvalues) -> conditions.ResultCallable:
             if offset is not None:
                 plate.trig_offset = offset(inst) @ Angle.from_str(inst['angles'])
     return apply_attrs
-
-
-@conditions.make_result('faithMods')
-def res_faith_mods() -> object:
-    """This result is deprecated.
-
-    The functions provided by this have been replaced by other features:
-    - `FaithType` can be used to check the type of the plate.
-    - `setFaithAttrs` can be used to modify the trigger.
-    - Use the `comp_kv_setter` entity to add outputs or modify keyvalues
-      on the trigger(s).
-    """
-    LOGGER.warning(
-        'The "faithMods" result is deprecated. '
-        'Use "FaithType" and "setFaithAttrs" instead, '
-        'along with comp_kv_setter.'
-    )
-    return conditions.RES_EXHAUSTED
