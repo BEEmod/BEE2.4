@@ -42,7 +42,7 @@ from decimal import Decimal
 from enum import Enum
 from typing import (
     Generic, Protocol, TypeVar, Any, Callable, TextIO, Tuple, Type, Union, overload,
-    cast, Final, Iterable, Mapping, FrozenSet, Set
+    cast, Final, Iterable, Mapping, FrozenSet, Dict
 )
 
 import attrs
@@ -511,17 +511,17 @@ def conv_setup_pair(
     return func
 
 
+# Deduplicate the frozen sets.
+_META_PRIORITY_CACHE: Dict[FrozenSet[MetaCond], FrozenSet[MetaCond]] = {}
+
+
 def meta_priority_converter(priorities: typing.Iterable[MetaCond] | MetaCond) -> FrozenSet[MetaCond]:
     """Allow passing either a single enum, or any iterable."""
     if isinstance(priorities, MetaCond):
-        return frozenset([priorities])
+        result = frozenset([priorities])
     else:
-        return frozenset(priorities)
-
-
-# Hide from type checkers, trying to process a lru_cache as a converter isn't allowed.
-if not typing.TYPE_CHECKING:
-    meta_priority_converter = functools.lru_cache(meta_priority_converter)
+        result = frozenset(priorities)
+    return _META_PRIORITY_CACHE.setdefault(result, result)
 
 
 @attrs.define(eq=False)
