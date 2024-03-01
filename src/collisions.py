@@ -712,7 +712,7 @@ class Volume(BBox):  # type: ignore[override]
             # If perpendicular or facing in the same direction, the ray can't trace into it.
             if dot <= 0.0:
                 # Check if the start point is inside the plane.
-                if Vec.dot(start, plane.normal) > plane.distance:
+                if Vec.dot(start, plane.normal) < plane.distance:
                     inside = False
                 continue
             t = (plane.distance - Vec.dot(start, plane.normal)) / dot
