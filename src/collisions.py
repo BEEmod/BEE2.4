@@ -1,7 +1,7 @@
 """Defines the region of space items occupy and computes collisions."""
 from __future__ import annotations
 from typing import Iterable, Iterator, Sequence, Tuple, overload
-from typing_extensions import Self
+from typing_extensions import Self, Literal
 
 from enum import Flag, auto as enum_auto
 import functools
@@ -462,10 +462,9 @@ class BBox:
 
     # radd/rsub intentionally omitted. Don't allow inverting, that's nonsensical.
 
-    def trace_ray(self, start: Vec | FrozenVec, delta: Vec | FrozenVec) -> Hit:
+    def trace_ray(self, start: Vec | FrozenVec, delta: Vec | FrozenVec) -> Hit | None:
         """Trace a ray against the bbox, returning the hit position (if any).
 
-        :raises ValueError: If no hit occured.
         :parameter start: The starting point for the ray.
         :parameter delta: Both the direction and the maximum length to check.
         """
@@ -493,9 +492,12 @@ class BBox:
             else:
                 return -1.0, 0.0
 
-        xt, xn = check_plane('x')
-        yt, yn = check_plane('y')
-        zt, zn = check_plane('z')
+        try:
+            xt, xn = check_plane('x')
+            yt, yn = check_plane('y')
+            zt, zn = check_plane('z')
+        except ValueError:
+            return None
         if xn == yn == zn == 0.0:
             # Inside the box. We immediately impact.
             direction = delta.norm()
@@ -526,7 +528,7 @@ class BBox:
                 distance=(impact - start).mag(),
             )
         else:
-            raise ValueError('No hit!')
+            return None
 
 
 @attrs.frozen
