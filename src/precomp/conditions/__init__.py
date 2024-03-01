@@ -37,13 +37,12 @@ import sys
 import types
 import typing
 import warnings
-from collections.abc import Mapping
 from collections import defaultdict
 from decimal import Decimal
 from enum import Enum
 from typing import (
     Generic, Protocol, TypeVar, Any, Callable, TextIO, Tuple, Type, Union, overload,
-    cast,
+    cast, Final, Iterable, Mapping, FrozenSet, Dict
 )
 
 import attrs
@@ -79,7 +78,7 @@ RESULT_SETUP: dict[str, Callable[..., Any]] = {}
 # Used to dump a list of the tests, results, meta-conditions
 ALL_TESTS: list[tuple[str, tuple[str, ...], CondCall[bool]]] = []
 ALL_RESULTS: list[tuple[str, tuple[str, ...], CondCall[object]]] = []
-ALL_META: list[tuple[str, Decimal, CondCall[object]]] = []
+ALL_META: list[tuple[str, 'MetaCond', CondCall[object]]] = []
 
 
 ResultT = TypeVar('ResultT')
@@ -98,71 +97,62 @@ class SWITCH_TYPE(Enum):
     ALL = 'all'  # Run all matching commands
 
 
-xp = FrozenVec(1, 0, 0)
-xn = FrozenVec(-1, 0, 0)
-yp = FrozenVec(0, 1, 0)
-yn = FrozenVec(0, -1, 0)
-zp = FrozenVec(0, 0, 1)
-zn = FrozenVec(0, 0, -1)
-
-DIRECTIONS: Mapping[str, FrozenVec] = {
+DIRECTIONS: Final[Mapping[str, FrozenVec]] = {
     # Translate these words into a normal vector
-    '+x': xp,
-    '-x': xn,
+    '+x': FrozenVec.x_pos,
+    '-x': FrozenVec.x_neg,
 
-    '+y': yp,
-    '-y': yn,
+    '+y': FrozenVec.y_pos,
+    '-y': FrozenVec.y_neg,
 
-    '+z': zp,
-    '-z': zn,
+    '+z': FrozenVec.z_pos,
+    '-z': FrozenVec.z_neg,
 
-    'x': xp,  # For with allow_inverse
-    'y': yp,
-    'z': zp,
+    'x': FrozenVec.x_pos,  # For with allow_inverse
+    'y': FrozenVec.y_pos,
+    'z': FrozenVec.z_pos,
 
-    'up': zp,
-    'dn': zn,
-    'down': zn,
-    'floor': zp,
-    'ceiling': zn,
-    'ceil': zn,
+    'up': FrozenVec.z_pos,
+    'dn': FrozenVec.z_neg,
+    'down': FrozenVec.z_neg,
+    'floor': FrozenVec.z_pos,
+    'ceiling': FrozenVec.z_neg,
+    'ceil': FrozenVec.z_neg,
 
-    'n': yp,
-    'north': yp,
-    's': yn,
-    'south': yn,
+    'n': FrozenVec.y_pos,
+    'north': FrozenVec.y_pos,
+    's': FrozenVec.y_neg,
+    'south': FrozenVec.y_neg,
 
-    'e': xp,
-    'east': xp,
-    'w': xn,
-    'west': xn,
+    'e': FrozenVec.x_pos,
+    'east': FrozenVec.x_pos,
+    'w': FrozenVec.x_neg,
+    'west': FrozenVec.x_neg,
 }
 
-INST_ANGLE = {
+INST_ANGLE: Final[Mapping[FrozenVec, FrozenAngle]] = {
     # IE up = zp = floor
-    zp: FrozenAngle(0, 0, 0),
-    zn: FrozenAngle(0, 0, 0),
+    FrozenVec.z_pos: FrozenAngle(0, 0, 0),
+    FrozenVec.z_neg: FrozenAngle(180, 0, 0),
 
-    xn: FrozenAngle(0, 0, 0),
-    yn: FrozenAngle(0, 90, 0),
-    xp: FrozenAngle(0, 180, 0),
-    yp: FrozenAngle(0, 270, 0),
+    FrozenVec.x_neg: FrozenAngle(0, 0, 0),
+    FrozenVec.y_neg: FrozenAngle(0, 90, 0),
+    FrozenVec.x_pos: FrozenAngle(0, 180, 0),
+    FrozenVec.y_pos: FrozenAngle(0, 270, 0),
 
 }
 
-PETI_INST_ANGLE = {
+PETI_INST_ANGLE: Final[Mapping[FrozenVec, FrozenAngle]] = {
     # The angles needed to point a PeTI instance in this direction
     # IE north = yn
-    zp: FrozenAngle(0, 0, 0),
-    zn: FrozenAngle(180, 0, 0),
+    FrozenVec.z_pos: FrozenAngle(0, 0, 0),
+    FrozenVec.z_neg: FrozenAngle(180, 0, 0),
 
-    yn: FrozenAngle(0, 0, 90),
-    xp: FrozenAngle(0, 90, 90),
-    yp: FrozenAngle(0, 180, 90),
-    xn: FrozenAngle(0, 270, 90),
+    FrozenVec.y_neg: FrozenAngle(0, 0, 90),
+    FrozenVec.x_pos: FrozenAngle(0, 90, 90),
+    FrozenVec.y_pos: FrozenAngle(0, 180, 90),
+    FrozenVec.x_neg: FrozenAngle(0, 270, 90),
 }
-
-del xp, xn, yp, yn, zp, zn
 
 
 class NextInstance(Exception):
@@ -182,9 +172,38 @@ class Unsatisfiable(Exception):
     """
     pass
 
-# Flag to indicate a result doesn't need to be executed anymore,
+# Flag to indicate a result doesn't need to be executed any more,
 # and can be cleaned up - adding a global instance, for example.
 RES_EXHAUSTED = object()
+
+
+class MetaCond(Enum):
+    """Priority values for meta conditions."""
+    FaithPlate = Decimal(-900)
+    LinkCubes = Decimal(-750)
+    LinkedItems = Decimal(-300)
+    MonCameraLink = Decimal(-275)
+    ScaffoldLinkOld = Decimal('-250.0001')
+    Connections = Decimal(-250)
+    ExitSigns = Decimal(-10)
+    ElevatorVideos = Decimal(50)
+    FogEnts = Decimal(100)
+    VoiceLine = Decimal(100)
+    Barriers = Decimal(150)
+    ApertureTag = Decimal(200)
+    AntiFizzBump = Decimal(200)
+    PlayerModel = Decimal(400)
+    Vactubes = Decimal(400)
+    PlayerPortalGun = Decimal(500)
+    Fizzler = Decimal(500)
+    Screenshot = Decimal(750)
+    GenerateCubes = Decimal(750)
+    RemoveBlankInst = Decimal(1000)
+
+    def register(self, func: CallableT) -> CallableT:
+        """Register a meta-condition."""
+        add_meta(func, self)
+        return func
 
 
 @attrs.define
@@ -195,6 +214,9 @@ class Condition:
     else_results: list[Keyvalues] = attrs.Factory(list)
     priority: Decimal = Decimal()
     source: str | None = None
+
+    # If set, this is a meta-condition, and this bypasses everything.
+    meta_func: CondCall[object] | None = None
 
     @classmethod
     def parse(cls, kv_block: Keyvalues, *, toplevel: bool) -> Condition:
@@ -266,6 +288,10 @@ class Condition:
 
         If we find that no instance will succeed, raise Unsatisfiable.
         """
+        if self.meta_func is not None:
+            self.meta_func(coll, info, inst, Keyvalues.root())
+            raise EndCondition
+
         success = True
         # Only the first one can cause this condition to be skipped.
         # We could have a situation where the first test modifies the map
@@ -485,29 +511,42 @@ def conv_setup_pair(
     return func
 
 
+# Deduplicate the frozen sets.
+_META_PRIORITY_CACHE: Dict[FrozenSet[MetaCond], FrozenSet[MetaCond]] = {}
+
+
+def meta_priority_converter(priorities: typing.Iterable[MetaCond] | MetaCond) -> FrozenSet[MetaCond]:
+    """Allow passing either a single enum, or any iterable."""
+    if isinstance(priorities, MetaCond):
+        result = frozenset([priorities])
+    else:
+        result = frozenset(priorities)
+    return _META_PRIORITY_CACHE.setdefault(result, result)
+
+
+@attrs.define(eq=False)
 class CondCall(Generic[CallResultT]):
     """A result or test callback.
 
     This should be called to execute it.
     """
-    __slots__ = ['func', 'group', '_cback', '_setup_data']
-    _setup_data: dict[int, Callable[[Entity], CallResultT]] | None
+    func: Callable[..., CallResultT | Callable[[Entity], CallResultT]]
+    group: str | None
+    valid_before: FrozenSet[MetaCond] = attrs.field(kw_only=True, converter=meta_priority_converter)
+    valid_after: FrozenSet[MetaCond] = attrs.field(kw_only=True, converter=meta_priority_converter)
 
-    def __init__(
-        self,
-        func: Callable[..., CallResultT | Callable[[Entity], CallResultT]],
-        group: str | None,
-    ) -> None:
-        self.func = func
-        self.group = group
+    _setup_data: dict[int, Callable[[Entity], CallResultT]] | None = attrs.field(init=False)
+    _cback: Callable[
+        [srctools.VMF, Collisions, MapInfo, Entity, Keyvalues],
+        CallResultT | Callable[[Entity], CallResultT],
+    ] = attrs.field(init=False)
+
+    def __attrs_post_init__(self) -> None:
         cback, arg_order = annotation_caller(
-            func,
+            self.func,
             srctools.VMF, Collisions, MapInfo, Entity, Keyvalues,
         )
-        self._cback: Callable[
-            [srctools.VMF, Collisions, MapInfo, Entity, Keyvalues],
-            CallResultT | Callable[[Entity], CallResultT],
-        ] = cback
+        self._cback = cback
         if Entity not in arg_order:
             # We have setup functions.
             self._setup_data = {}
@@ -516,6 +555,7 @@ class CondCall(Generic[CallResultT]):
 
     @property
     def __doc__(self) -> str | None:
+        """Pass through __doc__ to the wrapped function."""
         return self.func.__doc__
 
     @__doc__.setter
@@ -528,9 +568,9 @@ class CondCall(Generic[CallResultT]):
             return self._cback(ent.map, coll, info, ent, conf)  # type: ignore
         else:
             # Execute setup functions if required.
-            try:
+            if id(conf) in self._setup_data:
                 cback = self._setup_data[id(conf)]
-            except KeyError:
+            else:
                 # The entity should never be used in setup functions. Pass a dummy object
                 # so errors occur if it's used.
                 cback = self._setup_data[id(conf)] = self._cback(  # type: ignore
@@ -570,52 +610,45 @@ def _get_cond_group(func: Any) -> str | None:
     return str(group)
 
 
-def add_meta(func: Callable[..., object], priority: Decimal | int, only_once: bool = True) -> None:
+def add_meta(func: Callable[..., object], priority: MetaCond) -> None:
     """Add a metacondition, which executes a function at a priority level.
 
     Used to allow users to allow adding conditions before or after a
     transformation like the adding of quotes.
     """
-    dec_priority = Decimal(priority)
-    # This adds a condition result like "func" (with quotes), which cannot
-    # be entered into keyvalues files.
-    # The qualified name will be unique across modules.
-    name = f'"{func.__qualname__}"'
+    name = f'{getattr(func, "__module__", "???")}.{func.__qualname__}()'
     LOGGER.debug(
-        "Adding metacondition ({}) with priority {!s}!",
+        "Adding metacondition {} with priority: {!r}",
         name,
-        dec_priority,
+        priority,
     )
 
-    # We don't care about setup functions for this.
-    RESULT_LOOKUP[name] = wrapper = CondCall(func, _get_cond_group(func))
+    # We don't care about setup functions for this, and valid before/after is also useless.
+    wrapper = CondCall(func, _get_cond_group(func), valid_before=(), valid_after=())
 
     cond = Condition(
-        results=[Keyvalues(name, '')],
-        priority=dec_priority,
-        source=f'MetaCondition {name}'
+        priority=priority.value,
+        source=f'MetaCondition {name}',
+        # Special attribute, overrides results when present.
+        meta_func=wrapper,
     )
 
-    if only_once:
-        cond.results.append(
-            Keyvalues('endCondition', '')
-        )
     conditions.append(cond)
-    ALL_META.append((name, dec_priority, wrapper))
+    ALL_META.append((func.__qualname__, priority, wrapper))
 
 
-def meta_cond(priority: int | Decimal=0, only_once: bool=True) -> Callable[[CallableT], CallableT]:
-    """Decorator version of add_meta."""
-    def x(func: CallableT) -> CallableT:
-        add_meta(func, priority, only_once)
-        return func
-    return x
-
-
-def make_test(orig_name: str, *aliases: str) -> Callable[[TestCallT], TestCallT]:
+def make_test(
+    orig_name: str, *aliases: str,
+    valid_before: Iterable[MetaCond] | MetaCond = (),
+    valid_after: Iterable[MetaCond] | MetaCond = (),
+) -> Callable[[TestCallT], TestCallT]:
     """Decorator to add tests to the lookup."""
     def x(func: TestCallT) -> TestCallT:
-        wrapper: CondCall[bool] = CondCall(func, _get_cond_group(func))
+        wrapper: CondCall[bool] = CondCall(
+            func, _get_cond_group(func),
+            valid_before=valid_before,
+            valid_after=valid_after,
+        )
         ALL_TESTS.append((orig_name, aliases, wrapper))
         name = orig_name.casefold()
         if name in TEST_LOOKUP:
@@ -629,7 +662,11 @@ def make_test(orig_name: str, *aliases: str) -> Callable[[TestCallT], TestCallT]
     return x
 
 
-def make_result(orig_name: str, *aliases: str) -> Callable[[CallableT], CallableT]:
+def make_result(
+    orig_name: str, *aliases: str,
+    valid_before: Iterable[MetaCond] | MetaCond = (),
+    valid_after: Iterable[MetaCond] | MetaCond = (),
+) -> Callable[[CallableT], CallableT]:
     """Decorator to add results to the lookup."""
     folded_name = orig_name.casefold()
     # Discard the original name from aliases, if it's also there.
@@ -652,7 +689,11 @@ def make_result(orig_name: str, *aliases: str) -> Callable[[CallableT], Callable
             assert setup_func is not None
             func = conv_setup_pair(setup_func, result_func)
 
-        wrapper: CondCall[object] = CondCall(func, _get_cond_group(result_func))
+        wrapper: CondCall[object] = CondCall(
+            func, _get_cond_group(result_func),
+            valid_before=valid_before,
+            valid_after=valid_after,
+        )
         if orig_name.casefold() in RESULT_LOOKUP:
             raise ValueError(f'Result {orig_name} is a duplicate!')
         RESULT_LOOKUP[orig_name.casefold()] = wrapper
@@ -753,6 +794,14 @@ def check_all(vmf: VMF, coll: Collisions, info: MapInfo) -> None:
                     extra.add(inst['file'].casefold())
             # Suppress errors for future conditions.
             ALL_INST.update(extra)
+
+    # Clear out any blank instances. This allows code elsewhere to have a convenient way
+    # to just delete instances.
+    for inst in vmf.by_class['func_instance']:
+        # If editoritems instances are set to "", PeTI will autocorrect it to
+        # ".vmf" - we need to handle that too.
+        if inst['file'].casefold() in ('', '.vmf'):
+            inst.remove()
 
     LOGGER.info('---------------------')
     LOGGER.info(
@@ -899,9 +948,9 @@ def dump_conditions(file: TextIO) -> None:
 
     file.write(DOC_META_COND)
 
-    ALL_META.sort(key=lambda i: i[1])  # Sort by priority
+    ALL_META.sort(key=lambda tup: tup[1].value)  # Sort by priority
     for test_key, priority, func in ALL_META:
-        file.write(f'#### `{test_key}` ({priority}):\n\n')
+        file.write(f'#### `{test_key}` ({priority.value}):\n\n')
         dump_func_docs(file, func)
         file.write('\n')
 
@@ -1041,19 +1090,20 @@ def local_name(inst: Entity, name: str | Entity | None) -> str:
     fixup = inst['fixup_style', '0']
 
     if fixup == '2' or not targ_name:
-        # We can't do fixup..
+        # We can't do fixup...
         return name
     elif fixup == '0':
         # Prefix
-        return targ_name + '-' + name
+        return f'{targ_name}-{name}'
     elif fixup == '1':
         # Postfix
-        return name + '-' + targ_name
+        return f'{name}-{targ_name}'
     else:
         raise ValueError(f'Unknown fixup style {fixup}!')
 
 
 class DebugAdder(Protocol):
+    """Result of fetch_debug_visgroup()."""
     @overload
     def __call__(self, ent: Entity, /) -> Entity:
         """Add this entity to the map, the visgroup and make it hidden."""
@@ -1250,18 +1300,6 @@ def debug_test_result(inst: Entity, kv: Keyvalues) -> bool:
 def dummy_result() -> None:
     """Dummy result that doesn't do anything."""
     pass
-
-
-@meta_cond(priority=1000, only_once=False)
-def remove_blank_inst(inst: Entity) -> None:
-    """Remove instances with a blank file keyvalue.
-
-    This allows conditions to strip the instances when requested.
-    """
-    # If editoritems instances are set to "", PeTI will autocorrect it to
-    # ".vmf" - we need to handle that too.
-    if inst['file', ''] in ('', '.vmf'):
-        inst.remove()
 
 
 @make_result('timedRelay')

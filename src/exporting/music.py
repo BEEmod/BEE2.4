@@ -29,10 +29,14 @@ async def step_music_conf(exp_data: ExportData) -> None:
             continue
 
         sounds = music.sound[channel]
+        channel_block = Keyvalues(channel.value, [
+            Keyvalues('volume', str(music.volume.get(channel, 1.0))),
+        ])
+        music_conf.append(channel_block)
         if len(sounds) == 1:
-            music_conf.append(Keyvalues(channel.value, sounds[0]))
+            channel_block.append(Keyvalues('sound', sounds[0]))
         else:
-            music_conf.append(Keyvalues(channel.value, [
+            channel_block.append(Keyvalues('sound', [
                 Keyvalues('snd', snd)
                 for snd in sounds
             ]))

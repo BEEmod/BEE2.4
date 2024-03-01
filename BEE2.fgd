@@ -177,7 +177,8 @@
 	coll_against(string) : "Collide Against" : "" : "Types this collides against." 
 	]
 
-@SolidClass = bee2_collision_bbox: "Defines a region of item collision for the compiler."
+@SolidClass 
+= bee2_collision_bbox: "Defines an AABB region of item collision for the compiler."
 	[
 	tags(string): "Tags" : : "Space-seperated list of tags to associate with the collision volume."
 	item_id(string) readonly: "Item ID" : : "In exports of the full map collisions, this is the item ID this collision is for."
@@ -190,6 +191,12 @@
 	coll_decoration(boolean): "Collide: Decoration" : 0 : "Prohibits additional decoration from being placed in this area."
 	coll_antlines(boolean):   "Collide: Antlines"   : 0 : "Prohibits antlines from being placed in this area."
 	coll_oob(boolean):     "Collide: Out Of Bounds" : 0 : "Indicates a region which might be air, but is outside the puzzle. Objects will be prevented from spawning here."
+	]
+
+@SolidClass base(bee2_collision_bbox) 
+= bee2_collision_volume: "Defines a region of item collision for the compiler. " +
+	"This does not need to align to axes."
+	[
 	]
 
 // Entities added to the finished map to pass information to VRAD.
@@ -208,6 +215,7 @@
 		"SpeedGel"  : "Propulsion Gel"
 		]
 	sync(boolean) : "Sync" : 0 : "For funnels only, synchronise to the base track."
+	volume(float) : "Volume" : "1.0" : "The volume to use for this track."
 
 	track01(sound) : "Track" : : "A track which may be potentially selected."
 	track02(sound) : "Track" : : "A track which may be potentially selected."
@@ -310,6 +318,11 @@
 		"bee2_music_channel"
 		"bee2_coop_response"
 		"bee2_cube_filter_script"
+		]
+	"Collisions"
+		[
+		"bee2_collision_bbox"
+		"bee2_collision_volume"
 		]
 	]
 

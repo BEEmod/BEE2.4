@@ -22,7 +22,8 @@ SENDTOR_RELAYS: dict[str, list[Entity]] = defaultdict(list)
 TOK_SENDTOR_BAD_OUTPUT = TransToken.parse('HMW_SENDIFICATOR', 'BAD_OUTPUT_ITEM')
 
 
-@conditions.make_result('SendificatorLaser')
+# Doesn't actually require connections, but it needs to be before Sendificator.
+@conditions.make_result('SendificatorLaser', valid_before=conditions.MetaCond.Connections)
 def res_sendificator_laser(res: Keyvalues) -> conditions.ResultCallable:
     """Record the position of the target for Sendificator Lasers."""
     offset = LazyValue.parse(res['offset', '']).as_vec()
@@ -34,7 +35,7 @@ def res_sendificator_laser(res: Keyvalues) -> conditions.ResultCallable:
     return set_laser
 
 
-@conditions.make_result('Sendificator')
+@conditions.make_result('Sendificator', valid_before=conditions.MetaCond.Connections)
 def res_sendificator(vmf: VMF, inst: Entity) -> None:
     """Implement Sendificators."""
     # For our version, we know which Sendificator connects to what laser,

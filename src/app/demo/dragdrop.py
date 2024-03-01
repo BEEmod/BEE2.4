@@ -30,11 +30,9 @@ async def test() -> None:
         for loc in BEE2_config.get_package_locs():
             pack_nursery.start_soon(
                 packages.find_packages,
-                pack_nursery,
                 errors,
                 packages.get_loaded_packages(),
                 loc,
-                'source',
             )
     assert app._APP_NURSERY is not None
     await app._APP_NURSERY.start(img.init, packages.PACKAGE_SYS,  TK_IMG)

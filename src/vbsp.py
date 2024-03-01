@@ -234,7 +234,7 @@ async def load_map(map_path: str) -> VMF:
     return vmf
 
 
-@conditions.meta_cond(priority=100)
+@conditions.MetaCond.VoiceLine.register
 def add_voice(vmf: VMF, coll: Collisions, info: corridor.Info) -> None:
     """Add voice lines to the map."""
     voice_line.add_voice(
@@ -250,7 +250,7 @@ FIZZ_BUMPER_WIDTH = 32  # The width of bumper brushes
 FIZZ_NOPORTAL_WIDTH = 16  # Width of noportal_volumes
 
 
-@conditions.meta_cond(priority=200, only_once=True)
+@conditions.MetaCond.AntiFizzBump.register
 def anti_fizz_bump(vmf: VMF) -> None:
     """Create portal_bumpers and noportal_volumes surrounding fizzlers.
 
@@ -342,7 +342,7 @@ PLAYER_MODELS = {
 }
 
 
-@conditions.meta_cond(priority=400, only_once=True)
+@conditions.MetaCond.PlayerModel.register
 def set_player_model(vmf: VMF, info: corridor.Info) -> None:
     """Set the player model in SinglePlayer."""
 
@@ -416,7 +416,7 @@ def set_player_model(vmf: VMF, info: corridor.Info) -> None:
         ))
 
 
-@conditions.meta_cond(priority=500, only_once=True)
+@conditions.MetaCond.PlayerPortalGun.register
 def set_player_portalgun(vmf: VMF, info: corridor.Info) -> None:
     """Controls which portalgun the player will be given.
 
@@ -624,7 +624,7 @@ def set_player_portalgun(vmf: VMF, info: corridor.Info) -> None:
     LOGGER.info('Done!')
 
 
-@conditions.meta_cond(priority=750, only_once=True)
+@conditions.MetaCond.Screenshot.register
 def add_screenshot_logic(vmf: VMF, info: corridor.Info) -> None:
     """If the screenshot type is 'auto', add in the needed ents."""
     if BEE2_config.get_val(
@@ -641,7 +641,7 @@ def add_screenshot_logic(vmf: VMF, info: corridor.Info) -> None:
         LOGGER.info('Added Screenshot Logic')
 
 
-@conditions.meta_cond(priority=100, only_once=True)
+@conditions.MetaCond.FogEnts.register
 def add_fog_ents(vmf: VMF, info: corridor.Info) -> None:
     """Add the tonemap and fog controllers, based on the skybox."""
     pos = options.GLOBAL_ENTS_LOC()
@@ -764,7 +764,7 @@ def add_fog_ents(vmf: VMF, info: corridor.Info) -> None:
         ))
 
 
-@conditions.meta_cond(priority=50, only_once=True)
+@conditions.MetaCond.ElevatorVideos.register
 def set_elev_videos(vmf: VMF, info: corridor.Info) -> None:
     """Add the scripts and options for customisable elevator videos to the map."""
     vid_type = settings['elevator']['type'].casefold()
@@ -1014,7 +1014,7 @@ def cond_force_clump(res: Keyvalues) -> conditions.ResultCallable:
     return set_tex
 
 
-@conditions.meta_cond(priority=-10)
+@conditions.MetaCond.ExitSigns.register
 def position_exit_signs(vmf: VMF) -> None:
     """Configure exit signage.
 

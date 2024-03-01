@@ -140,7 +140,7 @@ async def step_copy_resources(exp: ExportData) -> None:
                 already_copied.add(dest)
                 nursery.start_soon(copy_file, file, dest)
                 count += 1
-        await STAGE_RESOURCES.set_length(count)
+            await STAGE_RESOURCES.set_length(count)
 
     LOGGER.info('Cache copied.')
 

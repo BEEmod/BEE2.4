@@ -2,6 +2,7 @@
 from typing import Awaitable, Callable, Any, ClassVar, Deque, Dict, Optional, List, Tuple
 import time
 import collections
+import logging
 
 from outcome import Outcome, Error
 from srctools import Keyvalues
@@ -112,35 +113,46 @@ async def init_app() -> None:
         # of building a callable.
         TK_ROOT.tk.call('after', 10, 'raise', TK_ROOT)
 
-        await trio.sleep_forever()
+        confs = [
+            BEE2_config.GEN_OPTS,
+            UI.item_opts,
+            CompilerPane.COMPILE_CFG,
+        ]
 
-    LOGGER.info('Shutting down application.')
+        try:
+            await trio.sleep_forever()
 
-    # If our window isn't actually visible, this is set to nonsense -
-    # ignore those values.
-    if TK_ROOT.winfo_viewable():
-        config.APP.store_conf(WindowState(
-            x=TK_ROOT.winfo_rootx(),
-            y=TK_ROOT.winfo_rooty(),
-        ), 'main_window')
+        finally:
+            LOGGER.info('Shutting down application.')
 
-    try:
-        config.APP.write_file()
-    except Exception:
-        LOGGER.exception('Saving main conf:')
-    try:
-        BEE2_config.GEN_OPTS.save_check()
-    except Exception:
-        LOGGER.exception('Saving GEN_OPTS:')
+            # Save all our configs, but skip if any exceptions occur.
 
-    UI.item_opts.save_check()
-    CompilerPane.COMPILE_CFG.save_check()
-    try:
-        gameMan.save()
-    except Exception:
-        pass
-    # Clean this out.
-    sound.clean_sample_folder()
+            # If our window isn't actually visible, this is set to nonsense -
+            # ignore those values.
+            if TK_ROOT.winfo_viewable():
+                config.APP.store_conf(WindowState(
+                    x=TK_ROOT.winfo_rootx(),
+                    y=TK_ROOT.winfo_rooty(),
+                ), 'main_window')
+
+            try:
+                config.APP.write_file()
+            except Exception:
+                LOGGER.exception('Saving main conf:')
+            for conf_file in confs:
+                try:
+                    conf_file.save_check()
+                except Exception:
+                    LOGGER.exception('Saving {}:', conf_file.filename)
+            try:
+                gameMan.save()
+            except Exception:
+                LOGGER.exception('Saving game config')
+            # Clean this out.
+            try:
+                sound.clean_sample_folder()
+            except Exception:
+                LOGGER.exception('Deleting music samples.')
 
 
 class Tracer(trio.abc.Instrument):
@@ -261,12 +273,15 @@ def start_main(init: Callable[[], Awaitable[object]] = init_app) -> None:
     tk_func_name = TK_ROOT.register(tk_func)
 
     LOGGER.debug('Starting Trio loop.')
-    trio.lowlevel.start_guest_run(
-        app_main, init,
-        run_sync_soon_threadsafe=run_sync_soon_threadsafe,
-        run_sync_soon_not_threadsafe=run_sync_soon_not_threadsafe,
-        done_callback=done_callback,
-        instruments=[Tracer()] if utils.DEV_MODE else [],
-        strict_exception_groups=True,
-    )
-    TK_ROOT.mainloop()
+    try:
+        trio.lowlevel.start_guest_run(
+            app_main, init,
+            run_sync_soon_threadsafe=run_sync_soon_threadsafe,
+            run_sync_soon_not_threadsafe=run_sync_soon_not_threadsafe,
+            done_callback=done_callback,
+            instruments=[Tracer()] if utils.DEV_MODE else [],
+            strict_exception_groups=True,
+        )
+        TK_ROOT.mainloop()
+    finally:
+        logging.shutdown()

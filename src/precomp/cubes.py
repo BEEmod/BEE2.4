@@ -974,7 +974,7 @@ def _make_multi_filter(
     return filter_ent['targetname']
 
 
-@conditions.make_test('CubeType')
+@conditions.make_test('CubeType', valid_after=conditions.MetaCond.LinkCubes)
 def test_cube_type(inst: Entity, kv: Keyvalues) -> bool:
     """Check if an instance is/should be a cube.
 
@@ -1033,7 +1033,7 @@ def test_cube_type(inst: Entity, kv: Keyvalues) -> bool:
     return pair.cube_type.id == cube_type.upper()
 
 
-@conditions.make_test('DropperColor')
+@conditions.make_test('DropperColor', valid_after=conditions.MetaCond.LinkCubes)
 def check_dropper_color(inst: Entity, kv: Keyvalues) -> bool:
     """Detect the color of a cube on droppers.
 
@@ -1051,7 +1051,11 @@ def check_dropper_color(inst: Entity, kv: Keyvalues) -> bool:
     return data.tint is not None
 
 
-@conditions.make_result('CubeAddon', 'DropperAddon')
+@conditions.make_result(
+    'CubeAddon', 'DropperAddon',
+    valid_before=conditions.MetaCond.GenerateCubes,
+    valid_after=conditions.MetaCond.LinkCubes,
+)
 def res_dropper_addon(inst: Entity, res: Keyvalues) -> None:
     """Attach an addon to an item."""
     try:
@@ -1071,7 +1075,11 @@ def res_dropper_addon(inst: Entity, res: Keyvalues) -> None:
     pair.addons.add(addon)
 
 
-@conditions.make_result('SetDropperOffset')
+@conditions.make_result(
+    'SetDropperOffset',
+    valid_before=conditions.MetaCond.GenerateCubes,
+    valid_after=conditions.MetaCond.LinkCubes,
+)
 def res_set_dropper_off(res: Keyvalues) -> conditions.ResultCallable:
     """Update the position cubes will be spawned at for a dropper."""
     offset = LazyValue.parse(res.value).as_vec()
@@ -1087,7 +1095,11 @@ def res_set_dropper_off(res: Keyvalues) -> conditions.ResultCallable:
     return apply_offset
 
 
-@conditions.make_result('ChangeCubeType', 'SetCubeType')
+@conditions.make_result(
+    'ChangeCubeType', 'SetCubeType',
+    valid_before=conditions.MetaCond.GenerateCubes,
+    valid_after=conditions.MetaCond.LinkCubes,
+)
 def res_change_cube_type(inst: Entity, res: Keyvalues) -> None:
     """Change the cube-type of a cube item.
 
@@ -1109,7 +1121,10 @@ def res_change_cube_type(inst: Entity, res: Keyvalues) -> None:
         )) from None
 
 
-@conditions.make_result('CubeFilter')
+@conditions.make_result(
+    'CubeFilter',
+    valid_after=conditions.MetaCond.LinkCubes,
+)
 def res_cube_filter(vmf: VMF, inst: Entity, res: Keyvalues) -> None:
     """Given a set of cube-type IDs, generate a filter for them.
 
@@ -1132,7 +1147,10 @@ def res_cube_filter(vmf: VMF, inst: Entity, res: Keyvalues) -> None:
     )
 
 
-@conditions.make_result('VScriptCubePredicate')
+@conditions.make_result(
+    'VScriptCubePredicate',
+    valid_after=conditions.MetaCond.LinkCubes,
+)
 def res_script_cube_predicate(vmf: VMF, ent: Entity, res: Keyvalues) -> object:
     """Given a set of cube-type IDs, generate VScript code to identify them.
 
@@ -1192,7 +1210,7 @@ def res_script_cube_predicate(vmf: VMF, ent: Entity, res: Keyvalues) -> object:
     return conditions.RES_EXHAUSTED
 
 
-@conditions.meta_cond(priority=-750, only_once=True)
+@conditions.MetaCond.LinkCubes.register
 def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
     """Determine the cubes set based on instance settings.
 
@@ -1853,7 +1871,7 @@ def make_cube(
     return has_addon_inst, ent
 
 
-@conditions.meta_cond(priority=750, only_once=True)
+@conditions.MetaCond.GenerateCubes.register
 def generate_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
     """After other conditions are run, generate cubes."""
     bounce_in_map = info.has_attr('bouncegel')

@@ -4,6 +4,7 @@
 
 * Fix add-game prompt failing to appear if installed fresh.
 * Remove some now-outdated splash screens.
+* Music can now have a volume specified in the config.
 
 ------------------------------------------
 

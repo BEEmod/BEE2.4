@@ -891,7 +891,7 @@ def template_solids_and_coll(template_id: str) -> HoleTemplate:
         if coll.visgroups.issubset(visgroups)
     ]
 
-@conditions.meta_cond(150)
+@conditions.MetaCond.Barriers.register
 def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
     """Make barrier entities."""
     LOGGER.info('Generating barriers (glass/grating)...')

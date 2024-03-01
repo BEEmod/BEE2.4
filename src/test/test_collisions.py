@@ -4,10 +4,11 @@ from typing import Iterable, Tuple
 from pathlib import Path
 import math
 
+from pytest_regressions.file_regression import FileRegressionFixture
 from srctools import VMF, Angle, Keyvalues, Matrix, Solid, Vec
 import pytest
 
-from collisions import BBox, CollideType
+from collisions import BBox, CollideType, Volume
 
 
 tuple3 = Tuple[int, int, int]
@@ -345,3 +346,21 @@ def test_bbox_parse_plane(axis: str, mins: tuple3, maxes: tuple3) -> None:
     ent.solids.append(prism.solid)
     [bbox] = BBox.from_ent(ent)
     assert_bbox(bbox, mins, maxes, CollideType.SOLID, set())
+
+
+def test_volume_rotation(file_regression: FileRegressionFixture) -> None:
+    """Test rotating bboxes."""
+    with Path(__file__, '../volume_sample.vmf').open() as f:
+        vmf = VMF.parse(Keyvalues.parse(f))
+
+    volumes = [
+        volume
+        for ent in vmf.entities
+        for volume in Volume.from_ent(ent)
+    ]
+    for yaw in range(30, 360, 30):
+        orient = Matrix.from_angle(15.0 if (yaw % 60) == 0 else -15.0, yaw, 0.0)
+        for volume in volumes:
+            vmf.add_ent((volume @ orient).as_ent(vmf))
+
+    file_regression.check(vmf.export(), extension='.vmf', binary=False)

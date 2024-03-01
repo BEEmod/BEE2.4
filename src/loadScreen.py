@@ -86,7 +86,7 @@ class ScreenStage:
     """A single stage in a loading screen."""
     def __init__(self, title: TransToken) -> None:
         self.title = title
-        self.id = ipc_types.StageID(hex(id(self)))
+        self.id = ipc_types.StageID(format(id(self), '016X'))
         self._bound: Set[LoadScreen] = set()
         self._current = 0
         self._max = 0
@@ -239,6 +239,7 @@ async def startup(*, task_status: trio.TaskStatus[None] = trio.TASK_STATUS_IGNOR
     global _bg_started
     if _bg_started:
         raise ValueError('Daemon already started!')
+    _bg_started = True
 
     # Initialise the daemon.
     process = multiprocessing.Process(

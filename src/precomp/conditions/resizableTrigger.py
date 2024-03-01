@@ -15,7 +15,7 @@ COND_MOD_NAME: str | None = None
 LOGGER = srctools.logger.get_logger(__name__, alias='cond.resizeTrig')
 
 
-@conditions.make_result('ResizeableTrigger')
+@conditions.make_result('ResizeableTrigger', valid_before=conditions.MetaCond.Connections)
 def res_resizeable_trigger(vmf: VMF, info: conditions.MapInfo, res: Keyvalues) -> object:
     """Replace two markers with a trigger brush.
 

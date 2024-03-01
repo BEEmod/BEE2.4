@@ -700,7 +700,7 @@ def do_item_optimisation(vmf: VMF) -> None:
         )
 
 
-@conditions.meta_cond(-250, only_once=True)
+@conditions.MetaCond.Connections.register
 def gen_item_outputs(vmf: VMF) -> None:
     """Create outputs for all items with connections.
 

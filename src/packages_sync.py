@@ -209,11 +209,9 @@ async def main(files: List[str]) -> int:
             for loc in get_package_locs():
                 nursery.start_soon(
                     find_packages,
-                    nursery,
                     errors,
                     get_loaded_packages(),
                     loc,
-                    'source',
                 )
     packages_logger.setLevel(logging.INFO)
 

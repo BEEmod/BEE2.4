@@ -1,9 +1,11 @@
 """Definitions for background music used in the map."""
 from __future__ import annotations
 from typing import Iterator, Mapping
+
 from typing_extensions import Self
 from collections.abc import Iterable
 
+from srctools import conv_float
 import srctools.logger
 
 from app import lazy_conf
@@ -25,6 +27,7 @@ class Music(PakObject, needs_foreground=True, style_suggest_key='music'):
         *,
         children: Mapping[MusicChannel, str],
         sample: Mapping[MusicChannel, str | None],
+        volume: Mapping[MusicChannel, float],
         config: lazy_conf.LazyConf = lazy_conf.BLANK,
         inst: str | None = None,
         pack: Iterable[str] = (),
@@ -39,6 +42,7 @@ class Music(PakObject, needs_foreground=True, style_suggest_key='music'):
         self.packfiles = list(pack)
         self.len = loop_len
         self.sample = sample
+        self.volume = volume
 
         self.selitem_data = selitem_data
 
@@ -120,6 +124,21 @@ class Music(PakObject, needs_foreground=True, style_suggest_key='music'):
         else:
             snd_length = srctools.conv_int(snd_length_str)
 
+        volume_kv = data.info.find_key('volume', '')
+        if volume_kv.has_children():
+            volume: dict[MusicChannel, float] = {}
+            for channel in MusicChannel:
+                volume[channel] = volume_kv.float(channel.value, 1.0)
+        else:
+            # By default, make gel music quieter.
+            conf_volume = conv_float(volume_kv.value, 1.0)
+            volume = {
+                MusicChannel.BASE: conf_volume,
+                MusicChannel.TBEAM: conf_volume,
+                MusicChannel.BOUNCE: 0.5 * conf_volume,
+                MusicChannel.SPEED: 0.5 * conf_volume,
+            }
+
         children_prop = data.info.find_block('children', or_blank=True)
 
         return cls(
@@ -137,6 +156,7 @@ class Music(PakObject, needs_foreground=True, style_suggest_key='music'):
             pack=[prop.value for prop in data.info.find_all('pack')],
             loop_len=snd_length,
             synch_tbeam=synch_tbeam,
+            volume=volume,
         )
 
     def add_over(self, override: Self) -> None:

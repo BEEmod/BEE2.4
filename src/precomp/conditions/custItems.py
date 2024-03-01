@@ -11,10 +11,8 @@ from precomp import connections, antlines, conditions
 
 COND_MOD_NAME = 'Custom Items'
 
-LOGGER = srctools.logger.get_logger(__name__, alias='cond.custItems')
 
-
-@conditions.make_result('custAntline')
+@conditions.make_result('custAntline', valid_before=conditions.MetaCond.Connections)
 def res_cust_antline_setup(res: Keyvalues) -> Callable[[Entity], None]:
     """Customise the output antlines.
 
@@ -47,17 +45,3 @@ def res_cust_antline_setup(res: Keyvalues) -> Callable[[Entity], None]:
         if toggle_var:
             item.ant_toggle_var = toggle_var
     return change_antlines
-
-
-@conditions.make_result('changeOutputs')
-def res_change_outputs() -> object:
-    """Deprecated, use ChangeIOType."""
-    LOGGER.warning('ChangeOutputs is deprecated. Use ChangeIOType.')
-    return conditions.RES_EXHAUSTED
-
-
-@conditions.make_result('changeInputs')
-def res_change_inputs() -> object:
-    """Deprecated, use ChangeIOType."""
-    LOGGER.warning('ChangeInputs is deprecated. Use ChangeIOType.')
-    return conditions.RES_EXHAUSTED
