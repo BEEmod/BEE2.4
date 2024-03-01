@@ -520,6 +520,9 @@ class CondCall(Generic[CallResultT]):
     """
     func: Callable[..., CallResultT | Callable[[Entity], CallResultT]]
     group: str | None
+    valid_before: MetaCond | None = attrs.field(kw_only=True)
+    valid_after: MetaCond | None = attrs.field(kw_only=True)
+
     _setup_data: dict[int, Callable[[Entity], CallResultT]] | None = attrs.field(init=False)
     _cback: Callable[
         [srctools.VMF, Collisions, MapInfo, Entity, Keyvalues],
@@ -608,8 +611,8 @@ def add_meta(func: Callable[..., object], priority: MetaCond) -> None:
         priority,
     )
 
-    # We don't care about setup functions for this.
-    wrapper = CondCall(func, _get_cond_group(func))
+    # We don't care about setup functions for this, and valid before/after is also useless.
+    wrapper = CondCall(func, _get_cond_group(func), valid_before=None, valid_after=None)
 
     cond = Condition(
         priority=priority.value,
@@ -622,10 +625,18 @@ def add_meta(func: Callable[..., object], priority: MetaCond) -> None:
     ALL_META.append((func.__qualname__, priority, wrapper))
 
 
-def make_test(orig_name: str, *aliases: str) -> Callable[[TestCallT], TestCallT]:
+def make_test(
+    orig_name: str, *aliases: str,
+    valid_before: MetaCond | None = None,
+    valid_after: MetaCond | None = None,
+) -> Callable[[TestCallT], TestCallT]:
     """Decorator to add tests to the lookup."""
     def x(func: TestCallT) -> TestCallT:
-        wrapper: CondCall[bool] = CondCall(func, _get_cond_group(func))
+        wrapper: CondCall[bool] = CondCall(
+            func, _get_cond_group(func),
+            valid_before=valid_before,
+            valid_after=valid_after,
+        )
         ALL_TESTS.append((orig_name, aliases, wrapper))
         name = orig_name.casefold()
         if name in TEST_LOOKUP:
@@ -639,7 +650,11 @@ def make_test(orig_name: str, *aliases: str) -> Callable[[TestCallT], TestCallT]
     return x
 
 
-def make_result(orig_name: str, *aliases: str) -> Callable[[CallableT], CallableT]:
+def make_result(
+    orig_name: str, *aliases: str,
+    valid_before: MetaCond | None = None,
+    valid_after: MetaCond | None = None,
+) -> Callable[[CallableT], CallableT]:
     """Decorator to add results to the lookup."""
     folded_name = orig_name.casefold()
     # Discard the original name from aliases, if it's also there.
@@ -662,7 +677,11 @@ def make_result(orig_name: str, *aliases: str) -> Callable[[CallableT], Callable
             assert setup_func is not None
             func = conv_setup_pair(setup_func, result_func)
 
-        wrapper: CondCall[object] = CondCall(func, _get_cond_group(result_func))
+        wrapper: CondCall[object] = CondCall(
+            func, _get_cond_group(result_func),
+            valid_before=valid_before,
+            valid_after=valid_after,
+        )
         if orig_name.casefold() in RESULT_LOOKUP:
             raise ValueError(f'Result {orig_name} is a duplicate!')
         RESULT_LOOKUP[orig_name.casefold()] = wrapper
