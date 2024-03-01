@@ -512,29 +512,26 @@ def conv_setup_pair(
     return func
 
 
+@attrs.define(eq=False)
 class CondCall(Generic[CallResultT]):
     """A result or test callback.
 
     This should be called to execute it.
     """
-    __slots__ = ['func', 'group', '_cback', '_setup_data']
-    _setup_data: dict[int, Callable[[Entity], CallResultT]] | None
+    func: Callable[..., CallResultT | Callable[[Entity], CallResultT]]
+    group: str | None
+    _setup_data: dict[int, Callable[[Entity], CallResultT]] | None = attrs.field(init=False)
+    _cback: Callable[
+        [srctools.VMF, Collisions, MapInfo, Entity, Keyvalues],
+        CallResultT | Callable[[Entity], CallResultT],
+    ] = attrs.field(init=False)
 
-    def __init__(
-        self,
-        func: Callable[..., CallResultT | Callable[[Entity], CallResultT]],
-        group: str | None,
-    ) -> None:
-        self.func = func
-        self.group = group
+    def __attrs_post_init__(self) -> None:
         cback, arg_order = annotation_caller(
-            func,
+            self.func,
             srctools.VMF, Collisions, MapInfo, Entity, Keyvalues,
         )
-        self._cback: Callable[
-            [srctools.VMF, Collisions, MapInfo, Entity, Keyvalues],
-            CallResultT | Callable[[Entity], CallResultT],
-        ] = cback
+        self._cback = cback
         if Entity not in arg_order:
             # We have setup functions.
             self._setup_data = {}
@@ -543,6 +540,7 @@ class CondCall(Generic[CallResultT]):
 
     @property
     def __doc__(self) -> str | None:
+        """Pass through __doc__ to the wrapped function."""
         return self.func.__doc__
 
     @__doc__.setter
