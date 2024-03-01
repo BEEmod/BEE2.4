@@ -140,12 +140,15 @@ def ap_tag_modifications(vmf: VMF) -> None:
             )
 
 
-@conditions.make_result('TagFizzler')
+@conditions.make_result(
+    'TagFizzler',
+    valid_before=[conditions.MetaCond.Fizzler, conditions.MetaCond.Connections],
+)
 def res_make_tag_fizzler(vmf: VMF, info: conditions.MapInfo, res: Keyvalues) -> conditions.ResultCallable:
     """Add an Aperture Tag Paint Gun activation fizzler.
 
     These fizzlers are created via signs, and work very specially.
-    This must be before -250 so it runs before fizzlers and connections.
+    This must be before -250 so that it runs before fizzlers and connections.
     """
     if 'ioconf' in res:
         fizz_conn_conf = Config.parse('<TAG_FIZZER>', res.find_key('ioconf'))

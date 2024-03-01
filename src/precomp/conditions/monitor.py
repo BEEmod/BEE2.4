@@ -59,7 +59,7 @@ def scriptvar_set(
     )
 
 
-@conditions.make_result('Monitor')
+@conditions.make_result('Monitor', valid_before=conditions.MetaCond.MonCameraLink)
 def res_monitor(info: conditions.MapInfo, res: Keyvalues) -> conditions.ResultCallable:
     """Result for the monitor component.
 
@@ -117,7 +117,7 @@ def res_monitor(info: conditions.MapInfo, res: Keyvalues) -> conditions.ResultCa
     return add_monitor
 
 
-@conditions.make_result('Camera')
+@conditions.make_result('Camera', valid_before=conditions.MetaCond.MonCameraLink)
 def res_camera(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
     """Result for the camera item.
 

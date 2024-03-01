@@ -8,7 +8,10 @@ COND_MOD_NAME = 'Faith Plates'
 LOGGER = logger.get_logger(__name__, alias='cond.faithplate')
 
 
-@conditions.make_test("FaithType")
+@conditions.make_test(
+    "FaithType",
+    valid_after=conditions.MetaCond.FaithPlate,
+)
 def test_faith_type(inst: Entity, kv: Keyvalues) -> bool:
     """Determine the type of faith plate used.
 
@@ -39,7 +42,10 @@ def test_faith_type(inst: Entity, kv: Keyvalues) -> bool:
         return plate is not None
 
 
-@conditions.make_result('setFaithAttrs', 'setFaith', 'setFaithAttr')
+@conditions.make_result(
+    'setFaithAttrs', 'setFaith', 'setFaithAttr',
+    valid_after=conditions.MetaCond.FaithPlate,
+)
 def res_set_faith(res: Keyvalues) -> conditions.ResultCallable:
     """Modify the `trigger_catapult`s used for `ItemFaithPlate` items.
 

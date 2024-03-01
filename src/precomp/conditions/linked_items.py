@@ -60,11 +60,14 @@ def resolve_optional(prop: Keyvalues, key: str) -> str:
 ITEMS_TO_LINK: dict[str, list[item_chain.Node[Config]]] = {}
 
 
-@conditions.make_result('LinkedItem')
+@conditions.make_result(
+    'LinkedItem',
+    valid_before=conditions.MetaCond.LinkedItems,
+)
 def res_linked_item(res: Keyvalues) -> Callable[[Entity], None]:
     """Marks the current instance for linkage together into a chain.
 
-    At priority level -300, the sequence of similarly-marked items this links
+    At priority level <PRIORITY>, the sequence of similarly-marked items this links
     to is grouped together, and given fixup values to allow linking them.
 
     Every instance has `$type` set to `loop`, `start`, `mid` or `end` depending on its role.
@@ -140,6 +143,12 @@ def res_linked_item(res: Keyvalues) -> Callable[[Entity], None]:
         """Store off this instance for later linkage."""
         group_list.append(item_chain.Node.from_inst(inst, conf))
     return applier
+
+
+assert res_linked_item.__doc__ is not None
+res_linked_item.__doc__ = res_linked_item.__doc__.replace(
+    '<PRIORITY>', str(conditions.MetaCond.LinkedItems.value),
+)
 
 
 @conditions.MetaCond.LinkedItems.register

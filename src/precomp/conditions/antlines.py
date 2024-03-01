@@ -6,7 +6,6 @@ import attrs
 
 from precomp import instanceLocs, connections, conditions, antlines
 import srctools.logger
-from precomp.conditions import make_result
 from srctools import VMF, Keyvalues, Output, Vec, Entity, Matrix
 
 
@@ -171,7 +170,7 @@ class Group:
             raise ValueError(f'Antline {seg} has no endpoint {endpoint}!')
 
 
-@make_result('AntLaser')
+@conditions.make_result('AntLaser', valid_before=conditions.MetaCond.Connections)
 def res_antlaser(vmf: VMF, res: Keyvalues) -> object:
     """The condition to generate AntLasers and Antline Corners.
 

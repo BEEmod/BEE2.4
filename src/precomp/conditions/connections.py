@@ -76,11 +76,10 @@ def res_add_output(res: Keyvalues) -> Callable[[Entity], None]:
     return add_output
 
 
-@conditions.make_result('ChangeIOType')
+@conditions.make_result('ChangeIOType', valid_before=conditions.MetaCond.Connections)
 def res_change_io_type(kv: Keyvalues) -> Callable[[Entity], None]:
     """Switch an item to use different inputs or outputs.
 
-    Must be done before priority level -250.
     The contents are the same as that allowed in the input BEE2 block in
     editoritems.
     """
@@ -105,11 +104,11 @@ def res_change_io_type(kv: Keyvalues) -> Callable[[Entity], None]:
     return change_item
 
 
-@conditions.make_result('AppendConnInputs')
+@conditions.make_result('AppendConnInputs', valid_before=conditions.MetaCond.Connections)
 def res_append_io_type(res: Keyvalues) -> Callable[[Entity], None]:
     """Append additional outputs to an item's connections, which are fired when inputs change.
 
-    Must be done before priority level -250. This has the same format of the editoritems BEE2 block,
+    This has the same format of the editoritems BEE2 block,
     but only accepts any number of the following:
     - `enable_cmd`
     - `disable_cmd`

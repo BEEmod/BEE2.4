@@ -112,7 +112,7 @@ def mode_quotes(kv_block: Keyvalues, flag_set: Set[str]):
                 yield kv
 
 
-@conditions.make_result('QuoteEvent')
+@conditions.make_result('QuoteEvent', valid_before=conditions.MetaCond.VoiceLine)
 def res_quote_event(res: Keyvalues):
     """Enable a quote event. The given file is the default instance."""
     QUOTE_EVENTS[res['id'].casefold()] = res['file']

@@ -14,7 +14,7 @@ COND_MOD_NAME = 'Custom Items'
 LOGGER = srctools.logger.get_logger(__name__, alias='cond.custItems')
 
 
-@conditions.make_result('custAntline')
+@conditions.make_result('custAntline', valid_before=conditions.MetaCond.Connections)
 def res_cust_antline_setup(res: Keyvalues) -> Callable[[Entity], None]:
     """Customise the output antlines.
 

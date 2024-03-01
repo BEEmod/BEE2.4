@@ -64,7 +64,7 @@ SCAFFOLD_CONFIGS: Dict[str, Tuple[
 ]] = {}
 
 
-@conditions.make_result('UnstScaffold')
+@conditions.make_result('UnstScaffold', valid_before=conditions.MetaCond.ScaffoldLinkOld)
 def res_old_unst_scaffold(res: Keyvalues) -> None:
     """The pre-2.4.40 version of the condition used to generate Unstationary Scaffolds.
 

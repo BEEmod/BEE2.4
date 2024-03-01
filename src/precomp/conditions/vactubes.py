@@ -82,7 +82,10 @@ class Marker:
 VAC_CONFIGS: dict[str, dict[str, tuple[Config, int]]] = {}
 
 
-@conditions.make_result('CustVactube')
+@conditions.make_result(
+    'CustVactube',
+    valid_before=[conditions.MetaCond.Connections, conditions.MetaCond.Vactubes],
+)
 def res_vactubes(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
     """Specialised result to parse vactubes from markers.
 

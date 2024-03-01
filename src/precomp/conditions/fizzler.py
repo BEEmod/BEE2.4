@@ -22,7 +22,7 @@ def test_fizz_type(inst: Entity, kv: Keyvalues) -> bool:
     return fizz.fizz_type.id.casefold() == kv.value.casefold()
 
 
-@conditions.make_result('ChangeFizzlerType')
+@conditions.make_result('ChangeFizzlerType', valid_before=conditions.MetaCond.Fizzler)
 def res_change_fizzler_type(inst: Entity, res: Keyvalues) -> None:
     """Change the type of the fizzler. Only valid when run on the base instance."""
     fizz_name = inst['targetname']
@@ -41,7 +41,10 @@ def res_change_fizzler_type(inst: Entity, res: Keyvalues) -> None:
         raise user_errors.UserError(user_errors.TOK_UNKNOWN_ID.format(kind='Fizzler', id=res.value)) from None
 
 
-@conditions.make_result('ReshapeFizzler')
+@conditions.make_result(
+    'ReshapeFizzler',
+    valid_before=[conditions.MetaCond.Fizzler, conditions.MetaCond.Connections],
+)
 def res_reshape_fizzler(vmf: VMF, shape_inst: Entity, res: Keyvalues) -> None:
     """Convert a fizzler connected via the output to a new shape.
 

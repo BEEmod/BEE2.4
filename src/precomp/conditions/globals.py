@@ -177,7 +177,7 @@ def res_set_style_var(res: Keyvalues) -> object:
     return conditions.RES_EXHAUSTED
 
 
-@conditions.make_result('has')
+@conditions.make_result('has', valid_before=conditions.MetaCond.VoiceLine)
 def res_set_voice_attr(info: conditions.MapInfo, res: Keyvalues) -> object:
     """Sets a number of Voice Attributes.
 
