@@ -37,13 +37,12 @@ import sys
 import types
 import typing
 import warnings
-from collections.abc import Mapping
 from collections import defaultdict
 from decimal import Decimal
 from enum import Enum
 from typing import (
     Generic, Protocol, TypeVar, Any, Callable, TextIO, Tuple, Type, Union, overload,
-    cast, Final,
+    cast, Final, Iterable, Mapping, FrozenSet, Set
 )
 
 import attrs
@@ -512,6 +511,19 @@ def conv_setup_pair(
     return func
 
 
+def meta_priority_converter(priorities: typing.Iterable[MetaCond] | MetaCond) -> FrozenSet[MetaCond]:
+    """Allow passing either a single enum, or any iterable."""
+    if isinstance(priorities, MetaCond):
+        return frozenset([priorities])
+    else:
+        return frozenset(priorities)
+
+
+# Hide from type checkers, trying to process a lru_cache as a converter isn't allowed.
+if not typing.TYPE_CHECKING:
+    meta_priority_converter = functools.lru_cache(meta_priority_converter)
+
+
 @attrs.define(eq=False)
 class CondCall(Generic[CallResultT]):
     """A result or test callback.
@@ -520,8 +532,8 @@ class CondCall(Generic[CallResultT]):
     """
     func: Callable[..., CallResultT | Callable[[Entity], CallResultT]]
     group: str | None
-    valid_before: MetaCond | None = attrs.field(kw_only=True)
-    valid_after: MetaCond | None = attrs.field(kw_only=True)
+    valid_before: FrozenSet[MetaCond] = attrs.field(kw_only=True, converter=meta_priority_converter)
+    valid_after: FrozenSet[MetaCond] = attrs.field(kw_only=True, converter=meta_priority_converter)
 
     _setup_data: dict[int, Callable[[Entity], CallResultT]] | None = attrs.field(init=False)
     _cback: Callable[
@@ -612,7 +624,7 @@ def add_meta(func: Callable[..., object], priority: MetaCond) -> None:
     )
 
     # We don't care about setup functions for this, and valid before/after is also useless.
-    wrapper = CondCall(func, _get_cond_group(func), valid_before=None, valid_after=None)
+    wrapper = CondCall(func, _get_cond_group(func), valid_before=(), valid_after=())
 
     cond = Condition(
         priority=priority.value,
@@ -627,8 +639,8 @@ def add_meta(func: Callable[..., object], priority: MetaCond) -> None:
 
 def make_test(
     orig_name: str, *aliases: str,
-    valid_before: MetaCond | None = None,
-    valid_after: MetaCond | None = None,
+    valid_before: Iterable[MetaCond] | MetaCond = (),
+    valid_after: Iterable[MetaCond] | MetaCond = (),
 ) -> Callable[[TestCallT], TestCallT]:
     """Decorator to add tests to the lookup."""
     def x(func: TestCallT) -> TestCallT:
@@ -652,8 +664,8 @@ def make_test(
 
 def make_result(
     orig_name: str, *aliases: str,
-    valid_before: MetaCond | None = None,
-    valid_after: MetaCond | None = None,
+    valid_before: Iterable[MetaCond] | MetaCond = (),
+    valid_after: Iterable[MetaCond] | MetaCond = (),
 ) -> Callable[[CallableT], CallableT]:
     """Decorator to add results to the lookup."""
     folded_name = orig_name.casefold()
