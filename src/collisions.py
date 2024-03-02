@@ -511,7 +511,8 @@ class Volume(BBox):  # type: ignore[override]
         for plane in self.planes:
             # Use this to pick two arbitrary planes for the UVs.
             orient = Matrix.from_angle(plane.normal.to_angle())
-            point = plane.point.thaw()
+            # Add 0.0 to convert -0 to +0.
+            point = plane.point.thaw() + (0.0, 0.0, 0.0)
             u = -orient.left()
             v = -orient.up()
             solid.sides.append(Side(
