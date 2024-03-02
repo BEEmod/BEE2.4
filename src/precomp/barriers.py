@@ -96,7 +96,6 @@ LARGE_DISALLOWED: Sequence[FrozenVec] = [
 class HoleConfig:
     """Configuration for how to create a hole for a specific barrier."""
     id: utils.ObjectID
-    radius: float  # Used for P1 floor beams.
     # Geo used to create the brush face.
     template: HoleTemplate
     instance: str
@@ -105,7 +104,6 @@ class HoleConfig:
     def parse(cls, kv: Keyvalues) -> HoleConfig:
         """Parse a configuration from a KV block."""
         conf_id = utils.parse_obj_id(kv.real_name)
-        radius = kv.float('diameter') / 2
         instance = kv['instance', '']
 
         template = template_solids_and_coll(kv['template'])
@@ -113,7 +111,6 @@ class HoleConfig:
             return LargeHoleConfig(
                 id=conf_id,
                 instance=instance,
-                radius=radius,
                 template=template,
 
                 template_diagonal=template_solids_and_coll(kv['templatediagonal']),
@@ -123,7 +120,6 @@ class HoleConfig:
             return HoleConfig(
                 id=conf_id,
                 instance=instance,
-                radius=radius,
                 template=template,
             )
 
