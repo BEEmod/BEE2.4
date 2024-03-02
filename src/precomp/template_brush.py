@@ -24,7 +24,7 @@ import user_errors
 import utils
 from .texturing import Portalable, GenCat, TileSize
 from .tiling import TileType
-from . import tiling, texturing, options, rand, collisions, barriers
+from . import tiling, texturing, options, rand, connections, collisions, barriers
 import consts
 
 
@@ -1378,9 +1378,10 @@ def retexture_template(
                 new_barrier = type_to_barrier[new_barrier_type]
             except KeyError:
                 new_barrier = type_to_barrier[new_barrier_type] = barriers.Barrier(
-                    targetname,
-                    new_barrier_type,
-                    [instance],
+                    name=targetname,
+                    type=new_barrier_type,
+                    item=connections.ITEMS.get(targetname, None),
+                    instances=[instance],
                 )
 
                 # This won't preserve identity if multiple types are created for one item.
