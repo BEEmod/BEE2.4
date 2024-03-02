@@ -76,8 +76,16 @@ async def terminate_error_server() -> bool:
     except FileNotFoundError:
         LOGGER.info("No error server file, it's not running.")
         return False
-    data: user_errors.ServerInfo = await trio.to_thread.run_sync(json.loads, json_text)
-    del json_text
+    try:
+        data: user_errors.ServerInfo = await trio.to_thread.run_sync(json.loads, json_text)
+    except json.JSONDecodeError as exc:
+        LOGGER.warning(
+            'Invalid server info file "{}", it could still be running.',
+            user_errors.SERVER_INFO_FILE.resolve(),
+            exc_info=exc,
+        )
+        return True
+    del json_text  # We don't need the raw text any more.
 
     with trio.move_on_after(10.0):
         port = data['port']
