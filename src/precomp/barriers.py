@@ -98,6 +98,9 @@ class HoleConfig:
     id: utils.ObjectID
     # Geo used to create the brush face.
     template: HoleTemplate
+    # If set, the bounds for the hole frame, used to cut P1 floor beams.
+    footprint: Sequence[collisions.BBox]
+    # Instance to place for the prop, clips etc.
     instance: str
 
     @classmethod
@@ -106,21 +109,25 @@ class HoleConfig:
         conf_id = utils.parse_obj_id(kv.real_name)
         instance = kv['instance', '']
 
-        template = template_solids_and_coll(kv['template'])
+        template, footprint = template_solids_and_coll(kv['template'])
         if 'templateDiagonal' in kv:
+            temp_diag, _ = template_solids_and_coll(kv['templatediagonal'])
+            temp_sqr, _ = template_solids_and_coll(kv['templatesquare'])
             return LargeHoleConfig(
                 id=conf_id,
                 instance=instance,
                 template=template,
+                footprint=footprint,
 
-                template_diagonal=template_solids_and_coll(kv['templatediagonal']),
-                template_square=template_solids_and_coll(kv['templatesquare']),
+                template_diagonal=temp_diag,
+                template_square=temp_sqr,
             )
         else:
             return HoleConfig(
                 id=conf_id,
                 instance=instance,
                 template=template,
+                footprint=footprint,
             )
 
 
@@ -877,15 +884,27 @@ def res_glass_hole(inst: Entity, res: Keyvalues) -> None:
         inst['file'] = sel_variant.instance
 
 
-def template_solids_and_coll(template_id: str) -> HoleTemplate:
-    """Retrieve the brushes and collision boxes for the specified visgroup."""
+def template_solids_and_coll(template_id: str) -> Tuple[HoleTemplate, Sequence[collisions.BBox]]:
+    """Retrieve the brushes and collision boxes for the specified visgroup.
+
+    Holes have multiple variants, this simplifies things. We also split off boxes tagged "footprint",
+    used to cut P1 floor beams.
+    """
     temp_id, visgroups = template_brush.parse_temp_name(template_id)
     visgroups.add('')
     template = template_brush.get_template(temp_id)
-    return template.visgrouped_solids(visgroups), [
-        coll.bbox for coll in template.collisions
-        if coll.visgroups.issubset(visgroups)
-    ]
+
+    footprint = []
+    bboxes = []
+    for coll in template.collisions:
+        if coll.visgroups.issubset(visgroups):
+            if 'footprint' in coll.bbox.tags:
+                footprint.append(coll)
+            else:
+                bboxes.append(coll)
+
+    return (template.visgrouped_solids(visgroups), bboxes), footprint
+
 
 @conditions.MetaCond.Barriers.register
 def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
