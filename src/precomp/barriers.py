@@ -894,14 +894,14 @@ def template_solids_and_coll(template_id: str) -> Tuple[HoleTemplate, Sequence[c
     visgroups.add('')
     template = template_brush.get_template(temp_id)
 
-    footprint = []
-    bboxes = []
+    footprint: list[collisions.BBox] = []
+    bboxes: list[collisions.BBox] = []
     for coll in template.collisions:
         if coll.visgroups.issubset(visgroups):
             if 'footprint' in coll.bbox.tags:
-                footprint.append(coll)
+                footprint.append(coll.bbox)
             else:
-                bboxes.append(coll)
+                bboxes.append(coll.bbox)
 
     return (template.visgrouped_solids(visgroups), bboxes), footprint
 
@@ -953,7 +953,7 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
 
             for hole in hole_plane.values():
                 if not hole.inserted:
-                    try_place_hole(vmf, group_plane, barrier, hole)
+                    try_place_hole(vmf, coll, group_plane, barrier, hole)
 
             for (u, v) in group_plane:
                 add_debug(
@@ -1213,7 +1213,13 @@ def place_concave_corner(
             )
 
 
-def try_place_hole(vmf: VMF, plane: Plane[Barrier], barrier: Barrier, hole: Hole) -> None:
+def try_place_hole(
+    vmf: VMF,
+    coll: collisions.Collisions,
+    plane: Plane[Barrier],
+    barrier: Barrier,
+    hole: Hole,
+) -> None:
     """Try and place a hole in the barrier."""
     # First check if the footprint is present. If not, we're some other piece of glass.
     for offset in hole.type.footprint:
@@ -1260,11 +1266,11 @@ def try_place_hole(vmf: VMF, plane: Plane[Barrier], barrier: Barrier, hole: Hole
     else:
         hole_temp.append(hole.variant.template + (hole.plane.orient, ))
 
-    # for _, bbox_list, matrix in hole_temp:
-    #     # Place the collisions.
-    #     for bbox in bbox_list:
-    #         bbox = bbox @ matrix + origin
-    #         coll.add(bbox.with_attrs(name=str(barrier.id), contents=barrier.type.contents))
+    for _, bbox_list, matrix in hole_temp:
+        # Place the collisions.
+        for bbox in bbox_list:
+            bbox = bbox @ matrix + hole.origin
+            coll.add(bbox.with_attrs(name=barrier.name, contents=barrier.type.contents))
 
     for offset in hole.type.footprint:
         local = hole.plane.world_to_plane(hole.origin + offset @ hole.orient)
