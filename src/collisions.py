@@ -15,6 +15,7 @@ import attrs
 import consts
 
 
+__all__ = ['NonBBoxError', 'CollideType', 'BBox', 'Volume', 'Hit', 'trace_ray']
 LOGGER = logger.get_logger(__name__)
 
 
@@ -691,7 +692,6 @@ class Volume(BBox):  # type: ignore[override]
     def trace_ray(self, start: Vec | FrozenVec, delta: Vec | FrozenVec) -> Hit | None:
         """Trace a ray against the bbox, returning the hit position (if any).
 
-        :raises ValueError: If no hit occured.
         :parameter start: The starting point for the ray.
         :parameter delta: Both the direction and the maximum length to check.
         """
