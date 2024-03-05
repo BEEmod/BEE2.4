@@ -215,8 +215,8 @@ TOK_VBSP_MISSING_INSTANCE = TransToken.ui(
 )
 
 TOK_GLASS_FLOORBEAM_TEMPLATE = TransToken.ui(
-    'Bad Glass Floorbeam template! The template must have a single brush, with one face '
-    'pointing in the <var>+X</var> direction.'
+    'Bad Glass Floorbeam template! The template must have a single brush, aligned along the '
+    '<var>X</var> axis.'
 )
 
 TOK_CONNECTION_REQUIRED_ITEM = TransToken.ui(

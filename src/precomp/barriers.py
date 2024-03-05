@@ -196,6 +196,45 @@ class Hole:
 
 
 @attrs.frozen(eq=False, kw_only=True)
+class FloorbeamConf:
+    """Configuration for the special P1 style floorbeam brushes."""
+    distance: range
+    brush: Solid
+    width: float
+
+    @classmethod
+    def parse(cls, kv: Keyvalues) -> Self:
+        """Parse the configuration."""
+        dist_min = kv.int('min', 64)
+        dist_max = kv.int('max', 256)
+        dist_step = kv.int('step', 8)
+
+        template = template_brush.get_template(kv['template'])
+
+        brush: Solid
+        try:
+            [brush] = template.visgrouped_solids()
+        except ValueError as exc:
+            raise user_errors.UserError(user_errors.TOK_GLASS_FLOORBEAM_TEMPLATE) from ValueError(
+                f'Floorbeam template {template.id} has multiple/zero solids!'
+            ).with_traceback(exc.__traceback__)
+        bbox_min, bbox_max = brush.get_bbox()
+
+        # Strip faces marked with skip. These will be the ends, which we will replace when generating.
+        brush.sides = [
+            face for face in brush.sides
+            if face.mat != consts.Tools.SKIP
+        ]
+        dimensions = bbox_max - bbox_min
+
+        return cls(
+            distance=range(dist_min, dist_max, dist_step),
+            width=dimensions.y,
+            brush=brush,
+        )
+
+
+@attrs.frozen(eq=False, kw_only=True)
 class BarrierType:
     """Type of barrier."""
     id: utils.ObjectID | utils.SpecialID
@@ -203,7 +242,7 @@ class BarrierType:
     error_disp: user_errors.Kind | None = None
     brushes: Sequence[Brush] = ()
     contents: collisions.CollideType = collisions.CollideType.SOLID
-    floorbeam_temp: template_brush.Template | None = None
+    floorbeam: FloorbeamConf | None = None
     coll_thick: float = 4.0
     hint_thick: float = 0.0
     # If set, the brushes for this item can be combined with others of the same type.
@@ -241,10 +280,11 @@ class BarrierType:
             if error_tex in user_errors.TEX_SET:
                 error_disp = error_tex  # type: ignore
 
-        if floorbeam_temp_id := kv['template_floorbeam', '']:
-            floorbeam_temp = template_brush.get_template(floorbeam_temp_id)
+        if 'floorbeam' in kv:
+            floorbeam = FloorbeamConf.parse(kv.find_key('floorbeam'))
+            LOGGER.info('Floorbeam: {}', floorbeam)
         else:
-            floorbeam_temp = None
+            floorbeam = None
 
         contents = collisions.CollideType.parse(kv['contents', 'solid'])
 
@@ -254,7 +294,7 @@ class BarrierType:
             error_disp=error_disp,
             brushes=brushes,
             contents=contents,
-            floorbeam_temp=floorbeam_temp,
+            floorbeam=floorbeam,
             hole_variants=hole_variants,
             hint_thick=kv.float('hint_thick'),
             coll_thick=kv.float('coll_thick', 4.0),
@@ -553,6 +593,11 @@ def parse_conf(kv: Keyvalues) -> None:
     for block in kv.find_children('BarrierHoles'):
         hole = HoleType.parse(block)
         HOLE_TYPES[hole.id] = hole
+
+    LOGGER.info(
+        'Parsed {} barrier types, {} frame types, and {} hole types.',
+        len(BARRIER_TYPES), len(FRAME_TYPES), len(HOLE_TYPES),
+    )
 
     # Make sure a basic map sorta works even without the new configuration.
     if GLASS_ID not in BARRIER_TYPES:
@@ -1420,7 +1465,12 @@ def place_convex_corner(
             seg.place(vmf, slice_key, lighting_origin, 32.0 * u, 32.0 * v, orient)
 
 
-def add_glass_floorbeams(vmf: VMF, temp_name: str) -> None:
+def add_glass_floorbeams(
+    vmf: VMF,
+    barrier: Barrier,
+    slice_key: utils.SliceKey,
+    plane: Plane[Barrier],
+) -> None:
     """Add beams to separate large glass panels.
 
     The texture is assumed to match plasticwall004a's shape.
