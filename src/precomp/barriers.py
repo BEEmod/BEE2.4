@@ -17,6 +17,7 @@ import attrs
 from plane import Plane
 from precomp import instanceLocs, options, template_brush, conditions, collisions, connections
 from precomp.grid_optim import optimise as grid_optimise
+from precomp.rand import seed as rand_seed
 from transtoken import TransToken
 import consts
 import user_errors
@@ -28,6 +29,7 @@ COND_MOD_NAME: str | None = None
 STRAIGHT_LEN: Final = 64  # Length of the brush for straight frame sections.
 HoleTemplate: TypeAlias = Tuple[List[Solid], List[collisions.BBox]]
 TRANS_VARIABLE = TransToken.untranslated('"<var>{value}</var>"')
+MAX_FLOORBEAM_REPOSITIONS: Final = 10  # Number of times to reposition if the beam is bad.
 
 
 class FrameOrient(Enum):
@@ -99,7 +101,7 @@ class HoleConfig:
     # Geo used to create the brush face.
     template: HoleTemplate
     # If set, the bounds for the hole frame, used to cut P1 floor beams.
-    footprint: Sequence[collisions.BBox]
+    shape: Sequence[collisions.BBox]
     # Instance to place for the prop, clips etc.
     instance: str
 
@@ -109,7 +111,7 @@ class HoleConfig:
         conf_id = utils.parse_obj_id(kv.real_name)
         instance = kv['instance', '']
 
-        template, footprint = template_solids_and_coll(kv['template'])
+        template, shape = template_solids_and_coll(kv['template'])
         if 'templateDiagonal' in kv:
             temp_diag, _ = template_solids_and_coll(kv['templatediagonal'])
             temp_sqr, _ = template_solids_and_coll(kv['templatesquare'])
@@ -117,7 +119,7 @@ class HoleConfig:
                 id=conf_id,
                 instance=instance,
                 template=template,
-                footprint=footprint,
+                shape=shape,
 
                 template_diagonal=temp_diag,
                 template_square=temp_sqr,
@@ -127,7 +129,7 @@ class HoleConfig:
                 id=conf_id,
                 instance=instance,
                 template=template,
-                footprint=footprint,
+                shape=shape,
             )
 
 
@@ -189,10 +191,16 @@ class Hole:
     inserted: bool = False
     # The U/V position in the plane.
     plane_pos: tuple[float, float] = attrs.field(init=False)
+    shape: Sequence[collisions.BBox] = attrs.field(init=False)
 
     def __attrs_post_init__(self) -> None:
         pos = self.plane.world_to_plane(self.origin)
         self.plane_pos = pos.x, pos.y
+        name = self.inst['targetname']
+        self.shape = [
+            (shape @ self.orient + self.origin).with_attrs(name=name)
+            for shape in self.variant.shape
+        ]
 
 
 @attrs.frozen(eq=False, kw_only=True)
@@ -201,13 +209,23 @@ class FloorbeamConf:
     distance: range
     brush: Solid
     width: float
+    border: int
 
     @classmethod
-    def parse(cls, kv: Keyvalues) -> Self:
+    def parse(cls, barrier_id: utils.ObjectID, kv: Keyvalues) -> Self:
         """Parse the configuration."""
         dist_min = kv.int('min', 64)
         dist_max = kv.int('max', 256)
         dist_step = kv.int('step', 8)
+        if dist_step <= 0:
+            raise user_errors.UserError(user_errors.TOK_INVALID_PARAM.format(
+                option='floorbeam.step',
+                value=kv['step'],
+                kind='Barrier Type',
+                id=barrier_id,
+            ))
+
+        border_thickness = kv.int('border_width', 4)
 
         template = template_brush.get_template(kv['template'])
 
@@ -231,6 +249,7 @@ class FloorbeamConf:
             distance=range(dist_min, dist_max, dist_step),
             width=dimensions.y,
             brush=brush,
+            border=border_thickness,
         )
 
 
@@ -253,6 +272,7 @@ class BarrierType:
     @classmethod
     def parse(cls, kv: Keyvalues) -> BarrierType:
         """Parse from keyvalues files."""
+        barrier_id = utils.parse_obj_id(kv.real_name)
         frames: Dict[FrameOrient, List[FrameType]] = {orient: [] for orient in FrameOrient}
         error_disp: user_errors.Kind | None = None
         brushes: List[Brush] = []
@@ -281,7 +301,7 @@ class BarrierType:
                 error_disp = error_tex  # type: ignore
 
         if 'floorbeam' in kv:
-            floorbeam = FloorbeamConf.parse(kv.find_key('floorbeam'))
+            floorbeam = FloorbeamConf.parse(barrier_id, kv.find_key('floorbeam'))
             LOGGER.info('Floorbeam: {}', floorbeam)
         else:
             floorbeam = None
@@ -289,7 +309,7 @@ class BarrierType:
         contents = collisions.CollideType.parse(kv['contents', 'solid'])
 
         return BarrierType(
-            id=utils.parse_obj_id(kv.real_name),
+            id=barrier_id,
             frames=frames,
             error_disp=error_disp,
             brushes=brushes,
@@ -1471,165 +1491,94 @@ def add_glass_floorbeams(
     slice_key: utils.SliceKey,
     plane: Plane[Barrier],
 ) -> None:
-    """Add beams to separate large glass panels.
+    """Add beams to separate large glass panels. This is rather special cased for P1 style."""
+    conf = barrier.type.floorbeam
+    assert conf is not None
 
-    The texture is assumed to match plasticwall004a's shape.
-    """
-    # TODO: Move floorbeams configuration to each barrier.
-    template = template_brush.get_template(temp_name)
-    beam_template: Solid
-    try:
-        [beam_template] = template.visgrouped_solids()
-    except ValueError as exc:
-        raise user_errors.UserError(user_errors.TOK_GLASS_FLOORBEAM_TEMPLATE) from ValueError(
-            f'Floorbeam template {temp_name} has multiple/zero solids!'
-        ).with_traceback(exc.__traceback__)
+    # Our beams align to the smallest axis.
+    plane_dims_x, plane_dims_y = plane.dimensions
+    if plane_dims_y > plane_dims_x:
+        beam_ind = 0
+        side_ind = 1
+        rot = Matrix()
 
-    # Grab the 'end' side, which we move around.
-    for side in beam_template.sides:
-        if side.normal() == (-1, 0, 0):
-            beam_end_face = side
-            break
+        def flip_axes(beam: float, side: float) -> tuple[float, float]:
+            """Flip axes if required"""
+            return (beam, side)
     else:
-        raise user_errors.UserError(user_errors.TOK_GLASS_FLOORBEAM_TEMPLATE)
+        beam_ind = 1
+        side_ind = 0
+        rot = Matrix.from_yaw(90)
 
-    separation = options.GLASS_FLOORBEAM_SEP() + 1
-    separation *= 128
+        def flip_axes(beam: float, side: float) -> tuple[float, float]:
+            """Flip axes if required"""
+            return (side, beam)
 
-    # First we want to find all the groups of contiguous glass sections.
-    # This is a mapping from some glass piece to its group list.
-    groups: dict[tuple[Barrier, FrozenVec], list[FrozenVec]] = {}
+    beam_ax = 'xyz'[beam_ind]
+    side_ax = 'xyz'[side_ind]
+    height = slice_key.plane_to_world(0, 0).z
 
-    for (origin, normal), barrier in BARRIERS.items():
-        # Grating doesn't use it.
-        if not barrier.use_floorbeams:
-            continue
+    rng = rand_seed(
+        b'barrier_floorbeams',
+        height,
+        *plane.mins, *plane.maxes,
+    )
 
-        if abs(normal.z) < 0.125:
-            # Not walls.
-            continue
+    distances = list(conf.distance)
+    hole_shapes = [
+        shape
+        for hole in HOLES[slice_key].values()
+        for shape in hole.shape
+    ]
+    name_to_hole = {
+        hole.inst['targetname']: hole
+        for hole in HOLES[slice_key].values()
+    }
 
-        pos = FrozenVec(origin) + normal * 62
+    min_side_offset = plane.mins[side_ind] * 32
+    max_side_offset = plane.maxes[side_ind] * 32
+    min_beam_offset = plane.mins[beam_ind] * 32
+    max_beam_offset = plane.maxes[beam_ind] * 32
+    half_width = conf.width / 2
 
-        groups[barrier, pos] = [pos]
+    def place_run(side_pos: int) -> bool:
+        """Try and place a run of beams, and return if we placed some."""
+        # First, check to see if we're overlapping two subvoxels. If so, error.
+        if (side_pos - half_width) // 32 != (side_pos + half_width) // 32:
+            return False
 
-    # Loop over every pos and check in the +x/y directions for another glass
-    # piece. If there, merge the two lists and set every pos in the group to
-    # point to the new list.
-    # Once done, every unique list = a group.
+        brushes: List[Solid] = []
+        side_grid = side_pos // 32
 
-    for barrier, pos in groups.keys():
-        for off in ((128, 0, 0), (0, 128, 0)):
-            neighbour = pos + off
-            if (barrier, neighbour) in groups:
-                our_group = groups[barrier, pos]
-                neigh_group = groups[barrier, neighbour]
-                if our_group is neigh_group:
-                    continue
+        # First, search for the first point in this plane that matches, for our starting position
+        for beam_start in range(min_beam_offset + conf.border, max_beam_offset, 32):
+            if flip_axes(beam_start // 32, side_grid) in plane:
+                break
+        else:  # This entire column is missing.
+            return False
 
-                # Now merge the two lists. We then need to update all dict
-                # locations to point to the new list.
-                if len(neigh_group) > len(our_group):
-                    small_group, large_group = our_group, neigh_group
-                else:
-                    small_group, large_group = neigh_group, our_group
+        normal_start = rot.forward()
+        while beam_start < max_beam_offset:
+            # Find where it ends.
+            beam_end = beam_start + 1
+            while flip_axes(beam_end, side_grid) in plane:
+                beam_end += 1
 
-                large_group.extend(small_group)
-                for pos in small_group:
-                    groups[barrier, pos] = large_group
+            # Next, check every hole to see if we overlap.
+            hit = collisions.trace_ray(
+                Vec(flip_axes(beam_start * 32, side_pos), height),
+                Vec(flip_axes(beam_end * 32, side_pos), height),
+                hole_shapes,
+            )
 
-    # Remove duplicate objects by using the ID as key.
-    group_list = list({
-        id(group): (barrier, group)
-        for (barrier, _), group in groups.items()
-    }.values())
+    position = min_side_offset
+    while position < max_side_offset:
+        rng.shuffle(distances)
+        potentials = distances[:10]
 
-    # Side -> u, v or None
-
-    for barrier, group in group_list:
-        bbox_min, bbox_max = Vec.bbox(group)
-        dimensions = bbox_max - bbox_min
-
-        # Our beams align to the smallest axis.
-        if dimensions.y > dimensions.x:
-            beam_ax = 'x'
-            side_ax = 'y'
-            rot = Matrix()
+        for offset in potentials:
+            if place_run(position + offset):
+                break
         else:
-            beam_ax = 'y'
-            side_ax = 'x'
-            rot = Matrix.from_yaw(90)
-
-        # Build min, max tuples for each axis in the other direction.
-        # This tells us where the beams will be.
-        beams: dict[float, tuple[float, float]] = {}
-
-        # Add 128 so the first pos isn't a beam.
-        offset = bbox_min[side_ax] + 128
-
-        for pos in group:
-            side_off = pos[side_ax]
-            beam_off = pos[beam_ax]
-            # Skip over non-'sep' positions..
-            if (side_off - offset) % separation != 0:
-                continue
-
-            try:
-                min_off, max_off = beams[side_off]
-            except KeyError:
-                beams[side_off] = beam_off, beam_off
-            else:
-                beams[side_off] = min(min_off, beam_off), max(max_off, beam_off)
-
-        detail = vmf.create_ent('func_detail')
-
-        for side_off, (min_off, max_off) in beams.items():
-            for min_pos, max_pos in beam_hole_split(
-                beam_ax,
-                Vec.with_axes(side_ax, side_off, beam_ax, min_off, 'z', bbox_min),
-                Vec.with_axes(side_ax, side_off, beam_ax, max_off, 'z', bbox_min),
-            ):
-
-                if min_pos[beam_ax] >= max_pos[beam_ax]:
-                    raise ValueError(min_pos, max_pos, beam_ax)
-
-                # Make the beam.
-                # Grab the end face and snap to the length we want.
-                beam_end_off = max_pos[beam_ax] - min_pos[beam_ax]
-                assert beam_end_off > 0, beam_end_off
-                for plane in beam_end_face.planes:
-                    plane.x = beam_end_off
-
-                new_beam = beam_template.copy(vmf_file=vmf)
-                new_beam.localise(min_pos, rot)
-                detail.solids.append(new_beam)
-
-
-def beam_hole_split(axis: str, min_pos: Vec, max_pos: Vec) -> Iterator[tuple[Vec, Vec]]:
-    """Break up floor beams to fit around holes."""
-
-    # Go along the shape. For each point, check if a hole is present,
-    # and split at that.
-    # Our positions are centered, but we return ones at the ends.
-    # TODO: Need to make sure all these points actually have this barrier.
-
-    # Inset in 4 units from each end to not overlap with the frames.
-    start_pos = min_pos - Vec.with_axes(axis, 60)
-    if HOLES:
-        # Extract normal from the z-axis.
-        grid_height = min_pos.z // 128 * 128 + 64
-        if grid_height < min_pos.z:
-            normal = FrozenVec(z=+1)
-        else:
-            normal = FrozenVec(z=-1)
-        for pos in min_pos.iter_line(max_pos, 128):
-            try:
-                hole: Hole = HOLES[FrozenVec(pos.x, pos.y, grid_height), normal]
-            except KeyError:
-                continue
-            else:
-                yield start_pos, pos - Vec.with_axes(axis, hole.variant.radius)
-                start_pos = pos + Vec.with_axes(axis, hole.variant.radius)
-
-    # Last segment, or all if no holes.
-    yield start_pos, max_pos + Vec.with_axes(axis, 60)
+            # Failed entirely, skip this section to make sure we terminate.
+            position += conf.distance.start
