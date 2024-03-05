@@ -50,6 +50,11 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
         """Return the maximum bounding point ever set."""
         return self._max_x, self._max_y
 
+    @property
+    def dimensions(self) -> tuple[int, int]:
+        """Return the difference between the mins and maxes."""
+        return self._max_x - self._min_x, self._max_y - self._min_y
+
     def __len__(self) -> int:
         """The length is the number of used slots."""
         return self._used
