@@ -10,7 +10,7 @@ import math
 
 from srctools import EmptyMapping, Keyvalues
 from srctools.math import AnyMatrix, to_matrix, FrozenMatrix, Vec, FrozenVec, Angle, Matrix
-from srctools.vmf import VMF, Solid, Entity
+from srctools.vmf import Side, VMF, Solid, Entity
 import srctools.logger
 import attrs
 
@@ -251,6 +251,21 @@ class FloorbeamConf:
             brush=brush,
             border=border_thickness,
         )
+
+    def generate(
+        self, vmf: VMF,
+        orient: AnyMatrix,
+        start_pos: Vec | FrozenVec,
+        start_normal: Vec | FrozenVec,
+        end_pos: Vec | FrozenVec,
+        end_normal: Vec | FrozenVec,
+    ) -> Solid:
+        """Generate a copy of the brush."""
+        brush = self.brush.copy(vmf_file=vmf)
+        brush.localise(start_pos, orient)
+        brush.sides.append(Side.from_plane(vmf, start_pos, start_normal))
+        brush.sides.append(Side.from_plane(vmf, end_pos, end_normal))
+        return brush
 
 
 @attrs.frozen(eq=False, kw_only=True)
@@ -947,6 +962,7 @@ def res_glass_hole(inst: Entity, res: Keyvalues) -> None:
     inst.fixup['$variant'] = sel_variant.id
     if sel_variant.instance:
         inst['file'] = sel_variant.instance
+        conditions.ALL_INST.add(sel_variant.instance.casefold())
 
 
 def template_solids_and_coll(template_id: str) -> Tuple[HoleTemplate, Sequence[collisions.BBox]]:
@@ -1015,6 +1031,8 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
             if barrier.type.hint_thick > 0:
                 # Do this before holes, so we cover those with the hint.
                 add_hints(vmf, plane_slice, group_plane, barrier.type.hint_thick)
+
+            add_glass_floorbeams(vmf, barrier, plane_slice, group_plane)
 
             for hole in hole_plane.values():
                 if not hole.inserted:
@@ -1369,7 +1387,6 @@ def try_place_hole(
         brush.generate(vmf, hole.plane, hole_brush_func)
 
 
-
 def place_straight_run(
     vmf: VMF,
     barrier: Barrier,
@@ -1493,14 +1510,16 @@ def add_glass_floorbeams(
 ) -> None:
     """Add beams to separate large glass panels. This is rather special cased for P1 style."""
     conf = barrier.type.floorbeam
-    assert conf is not None
+    # Don't add if none or defined or not flat.
+    if conf is None or slice_key.normal.z == 0.0:
+        return
 
     # Our beams align to the smallest axis.
     plane_dims_x, plane_dims_y = plane.dimensions
     if plane_dims_y > plane_dims_x:
         beam_ind = 0
         side_ind = 1
-        rot = Matrix()
+        rot = Matrix() @ slice_key.orient
 
         def flip_axes(beam: float, side: float) -> tuple[float, float]:
             """Flip axes if required"""
@@ -1508,7 +1527,7 @@ def add_glass_floorbeams(
     else:
         beam_ind = 1
         side_ind = 0
-        rot = Matrix.from_yaw(90)
+        rot = Matrix.from_yaw(90) @ slice_key.orient
 
         def flip_axes(beam: float, side: float) -> tuple[float, float]:
             """Flip axes if required"""
@@ -1521,7 +1540,7 @@ def add_glass_floorbeams(
     rng = rand_seed(
         b'barrier_floorbeams',
         height,
-        *plane.mins, *plane.maxes,
+        *map(float, plane.mins), *map(float, plane.maxes),
     )
 
     distances = list(conf.distance)
@@ -1536,7 +1555,7 @@ def add_glass_floorbeams(
     }
 
     min_side_offset = plane.mins[side_ind] * 32
-    max_side_offset = plane.maxes[side_ind] * 32
+    max_side_offset = plane.maxes[side_ind] * 32 - conf.distance.start
     min_beam_offset = plane.mins[beam_ind] * 32
     max_beam_offset = plane.maxes[beam_ind] * 32
     half_width = conf.width / 2
@@ -1549,6 +1568,8 @@ def add_glass_floorbeams(
 
         brushes: List[Solid] = []
         side_grid = side_pos // 32
+        forward = rot.forward(1.0)
+        beam_start: float  # If hitting a hole, comes from the impact point.
 
         # First, search for the first point in this plane that matches, for our starting position
         for beam_start in range(min_beam_offset + conf.border, max_beam_offset, 32):
@@ -1557,19 +1578,91 @@ def add_glass_floorbeams(
         else:  # This entire column is missing.
             return False
 
-        normal_start = rot.forward()
+        normal_start = forward
+        trace_against = hole_shapes
         while beam_start < max_beam_offset:
             # Find where it ends.
-            beam_end = beam_start + 1
-            while flip_axes(beam_end, side_grid) in plane:
-                beam_end += 1
+            beam_end = round(beam_start) // 32 * 32 + 32
+            while flip_axes(beam_end // 32, side_grid) in plane:
+                beam_end += 32
 
             # Next, check every hole to see if we overlap.
-            hit = collisions.trace_ray(
-                Vec(flip_axes(beam_start * 32, side_pos), height),
-                Vec(flip_axes(beam_end * 32, side_pos), height),
-                hole_shapes,
+            trace_direction = Vec(flip_axes(beam_end - beam_start, 0.0)) @ slice_key.orient
+            hit_left = collisions.trace_ray(
+                slice_key.plane_to_world(*flip_axes(beam_start, side_pos - half_width)),
+                trace_direction,
+                trace_against,
             )
+            if hit_left is None:
+                # No holes, just produce the beam.
+                brushes.append(conf.generate(
+                    vmf, rot,
+                    slice_key.plane_to_world(*flip_axes(beam_start, side_pos)),
+                    normal_start,
+                    slice_key.plane_to_world(*flip_axes(beam_end - conf.border, side_pos)),
+                    rot.forward(-1.0),
+                ))
+                # Look forward for the next position
+                for beam_start in range(beam_end + conf.border, max_beam_offset, 32):
+                    if flip_axes(beam_start // 32, side_grid) in plane:
+                        break
+                else:  # No more.
+                    break
+            else:
+                # We have a hole in the way.
+                hole_name = hit_left.volume.name
+                hole = name_to_hole[hole_name]
+
+                # Trace the other side.
+                hit_right = collisions.trace_ray(
+                    slice_key.plane_to_world(*flip_axes(beam_start, side_pos + half_width)),
+                    trace_direction,
+                    hole.shape,
+                )
+                if hit_right is None or not hits_aligned(hit_left, hit_right):
+                    # Only partially overlap or misaligned, can't place here.
+                    return False
+
+                # Generate the beam up to this hole.
+                brushes.append(conf.generate(
+                    vmf, rot,
+                    slice_key.plane_to_world(*flip_axes(beam_start, side_pos)),
+                    normal_start,
+                    hit_left.impact,
+                    -hit_left.normal,
+                ))
+
+                # Trace again, this time backwards to find out where to emerge from.
+                hit_left = collisions.trace_ray(
+                    slice_key.plane_to_world(*flip_axes(beam_end, side_pos - half_width)),
+                    -trace_direction,
+                    hole.shape,
+                )
+                hit_right = collisions.trace_ray(
+                    slice_key.plane_to_world(*flip_axes(beam_end, side_pos + half_width)),
+                    -trace_direction,
+                    hole.shape,
+                )
+                if hit_left is None or hit_right is None or not hits_aligned(hit_left, hit_right):
+                    # Incorrectly aligned on the backside.
+                    return False
+                # Snap to centerpoint, average
+                old_start = beam_start
+                beam_start = (
+                    forward.dot(hit_left.impact) + forward.dot(hit_right.impact)
+                ) / 2.0
+                normal_start = -hit_left.normal
+                # On the next iteration, disallow colliding with the same bboxes. Otherwise,
+                # we'll just immediately hit it again.
+                trace_against = [
+                    bbox for bbox in hole_shapes
+                    if bbox.name != hole_name
+                ]
+        if brushes:
+            # Succeeded, make the entity.
+            vmf.create_ent('func_detail').solids = brushes
+            return True
+        return False
 
     position = min_side_offset
     while position < max_side_offset:
@@ -1578,7 +1671,18 @@ def add_glass_floorbeams(
 
         for offset in potentials:
             if place_run(position + offset):
+                position += offset
                 break
         else:
             # Failed entirely, skip this section to make sure we terminate.
             position += conf.distance.start
+
+
+def hits_aligned(first: collisions.Hit, second: collisions.Hit) -> bool:
+    """Check whether both collisions are aligned to each other.
+
+    If not, there must be a vertex in-between, meaning we can't have beams here.
+    """
+    if Vec.dot(first.normal, second.normal) < 0.99:
+        return False
+    return abs(Vec.dot(first.normal, first.impact) - Vec.dot(second.normal, second.impact)) < 0.125

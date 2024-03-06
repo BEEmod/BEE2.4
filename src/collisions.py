@@ -591,23 +591,10 @@ class Volume(BBox):  # type: ignore[override]
         solid = Solid(vmf)
         ent.solids.append(solid)
 
-        for plane in self.planes:
-            # Use this to pick two arbitrary planes for the UVs.
-            orient = Matrix.from_angle(plane.normal.to_angle())
-            point = plane.point.thaw()
-            u = -orient.left()
-            v = -orient.up()
-            solid.sides.append(Side(
-                vmf,
-                [
-                    point - 16 * u,
-                    point,
-                    point + 16 * v,
-                ],
-                mat=consts.Tools.CLIP,
-                uaxis=UVAxis(*u),
-                vaxis=UVAxis(*v),
-            ))
+        solid.sides = [
+            Side.from_plane(vmf, plane.point, plane.normal, consts.Tools.CLIP)
+            for plane in self.planes
+        ]
 
         return ent
 
