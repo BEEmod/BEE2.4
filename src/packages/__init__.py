@@ -42,7 +42,7 @@ __all__ = [
 
     # Package objects.
     'Style', 'Item', 'StyleVar', 'Elevator', 'EditorSound', 'StyleVPK', 'Signage',
-    'Skybox', 'Music', 'QuotePack', 'PackList', 'CorridorGroup', 'ConfigGroup',
+    'Skybox', 'Music', 'QuotePack', 'PackList', 'CorridorGroup', 'ConfigGroup', 'BarrierHole',
 
     # Mainly intended for package object code.
     'ParseData', 'reraise_keyerror', 'get_config', 'set_cond_source',
@@ -263,8 +263,6 @@ class PakObject:
 
     In the class base list, set 'allow_mult' to True if duplicates are allowed.
     If duplicates occur, they will be treated as overrides.
-    Set 'has_img' to control whether the object will count towards the images
-    loading bar - this should be stepped in the UI.load_packages() method.
     Setting `needs_foreground` indicates that it is unable to load after the main UI.
     If `style_suggest_key` is set, this is the keyvalue in Style definitions containing IDs to suggest.
     `suggest_default` is then the default item to provide if none are specified.
@@ -353,35 +351,41 @@ def reraise_keyerror(err: NoKeyError | IndexError, obj_id: str) -> NoReturn:
 def get_config(
     prop_block: Keyvalues,
     folder: str,
+    /,
     pak_id: str,
-    prop_name: str='config',
-    extension: str='.cfg',
-    source: str='',
+    *,
+    prop_name: str = 'config',
+    extension: str = '.cfg',
+    source: str = '',
 ) -> lazy_conf.LazyConf:
-    """Lazily extract a config file referred to by the given property block.
+    """Lazily extract a config file referred to by the given keyvalues block.
 
-    Looks for the prop_name key in the given prop_block.
-    If the keyvalue has a value of "", an empty tree is returned.
-    If it has children, a copy of them will be returned.
-    Otherwise, the value is a filename in the zip which will be parsed.
+    Looks for one or more prop_name keys in the given prop_block.
+    For each:
+        If the keyvalue has a value of "", it is skipped.
+        If it has children, a copy of them will be returned.
+        Otherwise, the value is a filename in the zip which will be parsed.
 
+    If multiple are defined, they get appended together.
     If source is supplied, set_cond_source() will be run.
     """
-    prop_block = prop_block.find_key(prop_name, "")
-    if prop_block.has_children():
-        prop = prop_block.copy()
-        prop.name = ""
-        return lazy_conf.raw_prop(prop, source=source)
-
-    if prop_block.value == '':
-        return lazy_conf.BLANK
-
-    # Zips must use '/' for the separator, even on Windows!
-    path = f'{folder}/{prop_block.value}'
-    if len(path) < 3 or path[-4] != '.':
-        # Add extension
-        path += extension
-    return lazy_conf.from_file(utils.PackagePath(pak_id, path), source=f'{pak_id}:{path}')
+    conf = lazy_conf.BLANK
+    for kv_block in prop_block.find_all(prop_name):
+        if kv_block.has_children():
+            kv = kv_block.copy()
+            kv.name = ""
+            conf = lazy_conf.concat(conf, lazy_conf.raw_prop(kv, source=source))
+        elif kv_block.value:
+            # Zips must use '/' for the separator, even on Windows!
+            path = f'{folder}/{kv_block.value}'
+            if len(path) < 3 or path[-4] != '.':
+                # Add extension
+                path += extension
+            conf = lazy_conf.concat(conf, lazy_conf.from_file(
+                utils.PackagePath(pak_id, path),
+                source=f'{pak_id}:{path}',
+            ))
+    return conf
 
 
 def set_cond_source(kv: Keyvalues, source: str) -> None:
@@ -1195,3 +1199,4 @@ from packages.quote_pack import QuotePack
 from packages.pack_list import PackList
 from packages.corridor import CorridorGroup
 from packages.widgets import ConfigGroup
+from packages.barrier_hole import BarrierHole
