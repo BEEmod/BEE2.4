@@ -765,7 +765,6 @@ async def export_editoritems(pal_ui: paletteUI.PaletteUI, bar: MenuBar, dialog: 
 
         # Save the configs since we're writing to disk lots anyway.
         GEN_OPTS.save_check()
-        item_opts.save_check()
         config.APP.write_file()
 
         if conf.launch_after_export or conf.after_export is not config.gen_opts.AfterExport.NORMAL:
