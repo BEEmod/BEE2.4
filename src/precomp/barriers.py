@@ -165,6 +165,11 @@ class HoleType:
         variants = {}
         for var_block in kv.find_children('Variants'):
             hole_conf = HoleConfig.parse(var_block)
+            if hole_conf.id in variants:
+                raise user_errors.UserError(user_errors.TOK_DUPLICATE_ID.format(
+                    kind='Barrier Hole Variant',
+                    id=f'{hole_id}:{hole_conf.id}',
+                ))
             variants[hole_conf.id] = hole_conf
         variant_types = {type(conf) for conf in variants.values()}
         if len(variant_types) > 1:
@@ -616,6 +621,11 @@ def parse_conf(kv: Keyvalues) -> None:
             flat_conf = FrameType.parse(block.find_key('flat'))
         else:
             horiz_conf = vert_conf = flat_conf = FrameType.parse(block)
+        if frame_id in FRAME_TYPES:
+            raise user_errors.UserError(user_errors.TOK_DUPLICATE_ID.format(
+                kind='Barrier Frame Type',
+                id=frame_id,
+            ))
         FRAME_TYPES[frame_id] = {
             FrameOrient.HORIZ: horiz_conf,
             FrameOrient.VERT: vert_conf,
@@ -623,10 +633,21 @@ def parse_conf(kv: Keyvalues) -> None:
         }
     for block in kv.find_children('Barriers'):
         barrier = BarrierType.parse(block)
+        if barrier.id in BARRIER_TYPES:
+            raise user_errors.UserError(user_errors.TOK_DUPLICATE_ID.format(
+                kind='Barrier Type',
+                id=barrier.id,
+            ))
         BARRIER_TYPES[barrier.id] = barrier
 
     for block in kv.find_children('BarrierHoles'):
         hole = HoleType.parse(block)
+        # Should be merged by the app, but check anyway.
+        if hole.id in BARRIER_TYPES:
+            raise user_errors.UserError(user_errors.TOK_DUPLICATE_ID.format(
+                kind='Barrier Hole Type',
+                id=hole.id,
+            ))
         HOLE_TYPES[hole.id] = hole
 
     LOGGER.info(
@@ -1578,7 +1599,7 @@ def add_glass_floorbeams(
         else:  # This entire column is missing.
             return False
 
-        normal_start = forward
+        normal_start: Vec | FrozenVec = forward
         trace_against = hole_shapes
         while beam_start < max_beam_offset:
             # Find where it ends.
