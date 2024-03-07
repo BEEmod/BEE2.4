@@ -15,7 +15,7 @@ from typing_extensions import assert_never
 
 import exporting
 from app import TK_ROOT, background_run, quit_app
-from BEE2_config import ConfigFile, GEN_OPTS
+from BEE2_config import GEN_OPTS
 from app.dialogs import Dialogs
 from loadScreen import MAIN_UI as LOAD_UI
 import packages
@@ -88,10 +88,6 @@ selected_style = "BEE2_CLEAN"
 
 # Maps item IDs to our wrapper for the object.
 item_list: Dict[str, 'Item'] = {}
-
-item_opts = ConfigFile('item_configs.cfg')
-# A config file which remembers changed property options, chosen
-# versions, etc
 
 # Piles of global widgets, should be made local...
 frmScroll: ttk.Frame  # Frame holding the item list.
@@ -285,7 +281,6 @@ class Item:
 
     def change_version(self, version: str) -> None:
         """Set the version of this item."""
-        item_opts[self.id]['sel_version'] = version
         old_conf = config.APP.get_cur_conf(ItemDefault, self.id, ItemDefault())
         config.APP.store_conf(attrs.evolve(old_conf, version=version), self.id)
         self.load_data()

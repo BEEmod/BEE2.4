@@ -115,7 +115,6 @@ async def init_app() -> None:
 
         confs = [
             BEE2_config.GEN_OPTS,
-            UI.item_opts,
             CompilerPane.COMPILE_CFG,
         ]
 
