@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from typing import Callable, Dict, Final, Iterator, List, Mapping, Set, Tuple
-from typing_extensions import Literal, Self, Sequence, TypeAlias, override
+from typing_extensions import Literal, Self, Sequence, TypeAlias, assert_never, override
 
 from collections import defaultdict
 from enum import Enum, Flag, auto as enum_auto
@@ -279,11 +279,9 @@ class BarrierType:
     id: utils.ObjectID | utils.SpecialID
     frames: Mapping[FrameOrient, Sequence[FrameType]] = attrs.field(default=dict.fromkeys(FrameOrient, ()), repr=False)
     error_disp: user_errors.Kind | None = None
-    brushes: Sequence[Brush] = ()
-    contents: collisions.CollideType = collisions.CollideType.SOLID
+    surfaces: Sequence[Brush | Collide] = ()
     floorbeam: FloorbeamConf | None = None
     coll_thick: float = 4.0
-    hint_thick: float = 0.0
     # If set, the brushes for this item can be combined with others of the same type.
     mergeable: bool = False
     # Hole variants valid for this kind of barrier.
@@ -295,7 +293,7 @@ class BarrierType:
         barrier_id = utils.parse_obj_id(kv.real_name)
         frames: Dict[FrameOrient, List[FrameType]] = {orient: [] for orient in FrameOrient}
         error_disp: user_errors.Kind | None = None
-        brushes: List[Brush] = []
+        surfaces: List[Brush | Collide] = []
 
         for sub_kv in kv.find_all('Frame'):
             frame_id = utils.parse_obj_id(sub_kv.value)
@@ -308,7 +306,10 @@ class BarrierType:
                     frames[orient].append(frame)
 
         for sub_kv in kv.find_all('Brush'):
-            brushes.append(Brush.parse(sub_kv))
+            surfaces.append(Brush.parse(sub_kv))
+
+        for sub_kv in kv.find_all('Collide'):
+            surfaces.append(Collide.parse(sub_kv))
 
         hole_variants = [
             utils.parse_obj_id(sub_kv.value)
@@ -326,17 +327,13 @@ class BarrierType:
         else:
             floorbeam = None
 
-        contents = collisions.CollideType.parse(kv['contents', 'solid'])
-
         return BarrierType(
             id=barrier_id,
             frames=frames,
             error_disp=error_disp,
-            brushes=brushes,
-            contents=contents,
+            surfaces=surfaces,
             floorbeam=floorbeam,
             hole_variants=hole_variants,
-            hint_thick=kv.float('hint_thick'),
             coll_thick=kv.float('coll_thick', 4.0),
             mergeable=kv.bool('mergeable'),
         )
@@ -367,17 +364,44 @@ class Barrier:
 
 
 @attrs.frozen(eq=False, kw_only=True)
-class Brush:
-    """Configuration for a brush generated for a barrier."""
+class Surface:
+    """Either a brush or collision volume."""
     offset: float
     thickness: float
+    carve_by_hole: bool = True  # If true, this is cut into by holes.
 
+
+@attrs.frozen(eq=False, kw_only=True)
+class Collide(Surface):
+    """Collision volumes added to barriers."""
+    contents: collisions.CollideType
+
+    @classmethod
+    def parse(cls, kv: Keyvalues) -> Collide:
+        """Parse from keyvalues files."""
+
+        thickness = kv.int('thickness', 4)
+        if thickness <= 1:
+            raise ValueError('Collisions must have thickness!')
+
+        return cls(
+            offset=kv.int('offset', 0),
+            thickness=thickness,
+            carve_by_hole=kv.bool('carve_by_hole', True),
+            contents=collisions.CollideType.parse(kv['contents', 'solid'])
+        )
+
+
+@attrs.frozen(eq=False, kw_only=True)
+class Brush(Surface):
+    """Configuration for a brush generated for a barrier."""
     face_temp: template_brush.ScalingTemplate
     material: str = ''  # If set, override face_temp.
     # Texture on the sides.
     side_mat: str = consts.Tools.NODRAW
     # If vertical, use the original player clip and func-detail. Otherwise, add it inside this one.
     static_player_clip: bool = False
+    world: bool = False  # If set, produce world geo, not a brush ent.
 
     keyvalues: Mapping[str, str] = EmptyMapping
 
@@ -398,6 +422,10 @@ class Brush:
         for child in kv.find_children('keys'):
             ent_kvs[child.name] = child.value
 
+        world = kv.bool('world')
+        if world and ent_kvs:
+            raise ValueError('Cannot set brush keyvalues for a world brush!')
+
         if 'side_mat' in kv:
             side_mat = kv['side_mat']
         elif kv.bool('tooltexture'):
@@ -411,6 +439,8 @@ class Brush:
             face_temp=face_temp,
             material=material,
             side_mat=side_mat,
+            world=world,
+            carve_by_hole=kv.bool('carve_by_hole', True),
             static_player_clip=kv.bool('staticplayerclip'),
             keyvalues=ent_kvs,
         )
@@ -421,18 +451,25 @@ class Brush:
         solid_func: Callable[[float, float], List[Solid]],
     ) -> None:
         """Generate this brush."""
+        brushes = solid_func(self.offset, self.offset + self.thickness)
+
+        for brush in brushes:
+            for face in brush.sides:
+                if abs(face.normal().dot(plane_slice.normal)) > 0.99:
+                    face.mat = self.material
+                    self.face_temp.apply(face, change_mat=not self.material)
+                else:
+                    face.mat = self.side_mat
+
+        if self.world:
+            vmf.add_brushes(brushes)
+            return
+
         ent = vmf.create_ent('func_detail')
-        ent.solids = solid_func(self.offset, self.offset + self.thickness)
+        ent.solids = brushes
         ent.update(self.keyvalues)
         if ent['classname'] != 'func_detail':
             ent['origin'] = ent.get_origin()
-
-        for face in ent.sides():
-            if abs(face.normal().dot(plane_slice.normal)) > 0.99:
-                face.mat = self.material
-                self.face_temp.apply(face, change_mat=not self.material)
-            else:
-                face.mat = self.side_mat
 
         if self.static_player_clip:
             if abs(plane_slice.normal.z) > 0.5:
@@ -665,15 +702,20 @@ def parse_conf(kv: Keyvalues) -> None:
         LOGGER.warning('No definition for {}!', GLASS_ID)
         BARRIER_TYPES[GLASS_ID] = BarrierType(
             id=GLASS_ID,
-            contents=collisions.CollideType.GLASS,
             error_disp='glass',
-            brushes=[
+            surfaces=[
                 Brush(
                     face_temp=template_brush.ScalingTemplate.world(consts.Special.GLASS),
                     side_mat=consts.Special.GLASS,
+                    carve_by_hole=True,
                     offset=0.5,
                     thickness=1.0,
                     keyvalues={'classname': 'func_detail'},
+                ),
+                Collide(
+                    offset=0,
+                    thickness=4,
+                    contents=collisions.CollideType.GLASS,
                 ),
             ],
         )
@@ -682,12 +724,17 @@ def parse_conf(kv: Keyvalues) -> None:
         LOGGER.warning('No definition for {}!', GRATE_ID)
         BARRIER_TYPES[GRATE_ID] = BarrierType(
             id=GRATE_ID,
-            contents=collisions.CollideType.GRATING,
             error_disp='grating',
-            brushes=[
+            surfaces=[
+                Collide(
+                    offset=0,
+                    thickness=4,
+                    contents=collisions.CollideType.GLASS,
+                ),
                 Brush(
                     face_temp=template_brush.ScalingTemplate.world(consts.Special.GRATING),
                     side_mat=consts.Special.GRATING,
+                    carve_by_hole=True,
                     offset=0.5,
                     thickness=1.0,
                     keyvalues={
@@ -699,6 +746,7 @@ def parse_conf(kv: Keyvalues) -> None:
                 Brush(
                     face_temp=template_brush.ScalingTemplate.world(consts.Tools.PLAYER_CLIP),
                     side_mat=consts.Tools.PLAYER_CLIP,
+                    carve_by_hole=True,
                     offset=0,
                     thickness=4.0,
                     keyvalues={'classname': 'func_detail'},
@@ -706,6 +754,7 @@ def parse_conf(kv: Keyvalues) -> None:
                 Brush(
                     face_temp=template_brush.ScalingTemplate.world(consts.Tools.TRIGGER),
                     side_mat=consts.Tools.TRIGGER,
+                    carve_by_hole=True,
                     offset=0,
                     thickness=4.0,
                     keyvalues={
@@ -1056,9 +1105,9 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
 
             borders = calc_borders(group_plane)
 
-            if barrier.type.hint_thick > 0:
-                # Do this before holes, so we cover those with the hint.
-                add_hints(vmf, plane_slice, group_plane, barrier.type.hint_thick)
+            # Place brushes that should not be carved by holes.
+            for min_u, min_v, max_u, max_v, sub_barrier in grid_optimise(group_plane):
+                place_planar_surfaces(vmf, coll, barrier, plane_slice, False, min_u, min_v, max_u, max_v)
 
             add_glass_floorbeams(vmf, barrier, plane_slice, group_plane)
 
@@ -1155,7 +1204,7 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
             for min_u, min_v, max_u, max_v, sub_barrier in grid_optimise(group_plane):
                 if sub_barrier is BARRIER_EMPTY:
                     continue
-                place_planar_brushes(vmf, barrier, plane_slice, min_u, min_v, max_u, max_v)
+                place_planar_surfaces(vmf, coll, barrier, plane_slice, True, min_u, min_v, max_u, max_v)
 
     for hole_plane in HOLES.values():
         for hole in hole_plane.values():
@@ -1225,23 +1274,6 @@ def calc_borders(plane: Plane[Barrier]) -> Plane[Border]:
     return borders
 
 
-def add_hints(vmf: VMF, plane_slice: utils.SliceKey, plane: Plane[Barrier], thick: float) -> None:
-    """Surround the barrier with hints, to assist with translucency sorting.
-
-    This can't be done with Brush{} definitions because this should not be cut by holes.
-    """
-    for min_u, min_v, max_u, max_v, _ in grid_optimise(plane):
-        hint = vmf.make_prism(
-            plane_slice.plane_to_world(32.0 * min_u, 32.0 * min_v),
-            plane_slice.plane_to_world(32.0 * max_u + 32.0, 32.0 * max_v + 32.0, thick),
-            mat=consts.Tools.SKIP,
-        )
-        norm = plane_slice.normal.thaw()
-        hint[norm].mat = consts.Tools.HINT
-        hint[-norm].mat = consts.Tools.HINT
-        vmf.add_brush(hint.solid)
-
-
 def place_lighting_origin(
     vmf: VMF, barrier: Barrier,
     plane_slice: utils.SliceKey,
@@ -1277,11 +1309,12 @@ def place_lighting_origin(
     return name
 
 
-def place_planar_brushes(
-    vmf: VMF, barrier: Barrier, plane_slice: utils.SliceKey,
+def place_planar_surfaces(
+    vmf: VMF, coll: collisions.Collisions, barrier: Barrier,
+    plane_slice: utils.SliceKey, carved: bool,
     min_u: int, min_v: int, max_u: int, max_v: int,
 ) -> None:
-    """Place brushes to fill these tiles."""
+    """Place brushes and collisions across the surface of the barrier."""
     def solid_func(z1: float, z2: float) -> List[Solid]:
         """Generate prism brushes."""
         prism = vmf.make_prism(
@@ -1290,8 +1323,19 @@ def place_planar_brushes(
         )
         return [prism.solid]
 
-    for brush in barrier.type.brushes:
-        brush.generate(vmf, plane_slice, solid_func)
+    for surface in barrier.type.surfaces:
+        if surface.carve_by_hole == carved:
+            if isinstance(surface, Brush):
+                surface.generate(vmf, plane_slice, solid_func)
+            elif isinstance(surface, Collide):
+                coll.add(collisions.BBox(
+                    plane_slice.plane_to_world(32.0 * min_u, 32.0 * min_v, surface.offset),
+                    plane_slice.plane_to_world(32.0 * max_u + 32.0, 32.0 * max_v + 32.0, surface.thickness),
+                    name=barrier.name,
+                    contents=surface.contents,
+                ))
+            else:
+                assert_never(surface)
 
 
 def place_concave_corner(
@@ -1377,12 +1421,6 @@ def try_place_hole(
     else:
         hole_temp.append(hole.variant.template + (hole.plane.orient, ))
 
-    for _, bbox_list, matrix in hole_temp:
-        # Place the collisions.
-        for bbox in bbox_list:
-            bbox = bbox @ matrix + hole.origin
-            coll.add(bbox.with_attrs(name=barrier.name, contents=barrier.type.contents))
-
     for offset in hole.type.footprint:
         local = hole.plane.world_to_plane(hole.origin + offset @ hole.orient)
         # This is in the plane still, but marked as blank. That way diagonally overlapping holes
@@ -1411,8 +1449,25 @@ def try_place_hole(
                     face.lightmap = 8
         return new_brushes
 
-    for brush in barrier.type.brushes:
-        brush.generate(vmf, hole.plane, hole_brush_func)
+    for surface in barrier.type.surfaces:
+        if not surface.carve_by_hole:
+            continue
+        if isinstance(surface, Brush):
+            surface.generate(vmf, hole.plane, hole_brush_func)
+        elif isinstance(surface, Collide):
+            # Collisions
+            for _, bbox_list, matrix in hole_temp:
+                for bbox in bbox_list:
+                    bbox = bbox.with_attrs(name=barrier.name, contents=surface.contents)
+                    bbox = bbox.scale_to(
+                        'z',
+                        round(surface.offset),
+                        round(surface.offset + surface.thickness),
+                    )
+                    bbox = bbox @ matrix + hole.origin
+                    coll.add(bbox)
+        else:
+            assert_never(surface)
 
 
 def place_straight_run(
