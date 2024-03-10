@@ -246,6 +246,11 @@ class BBox:
 
     def _with_points(self, point1: Vec | FrozenVec, point2: Vec | FrozenVec) -> BBox:
         """Return a new bounding box with the specified points, but this collision and tags."""
+        if (
+            point1 == (self.min_x, self.min_y, self.min_z) and
+            point2 == (self.max_x, self.max_y, self.max_z)
+        ):
+            return self
         return BBox(point1, point2, contents=self.contents, tags=self.tags, name=self.name)
 
     def with_attrs(
@@ -255,12 +260,25 @@ class BBox:
         tags: Iterable[str] | str | None = None,
     ) -> BBox:
         """Return a new bounding box with the name, contents or tags changed."""
+        if tags is not None:
+            tags = frozenset([tags] if isinstance(tags, str) else tags)
+            if tags == self.tags:  # Reuse the existing instance.
+                tags = self.tags
+        else:
+            tags = self.tags
+        if contents is None:
+            contents = self.contents
+        if name is None:
+            name = self.name
+
+        if name == self.name and contents is self.contents and tags is self.tags:
+            # Unchanged.
+            return self
+
         return BBox(
             self.min_x, self.min_y, self.min_z,
             self.max_x, self.max_y, self.max_z,
-            contents=contents if contents is not None else self.contents,
-            name=name if name is not None else self.name,
-            tags=tags if tags is not None else self.tags,
+            contents=contents, name=name, tags=tags,
         )
 
     @classmethod
@@ -332,7 +350,7 @@ class BBox:
         If so, return the bbox representing the overlap.
         """
         if isinstance(other, Volume):
-            # Make it do the logic.
+            # Only Volume knows how to intersect.
             return other.intersect(self)
 
         comb = self.contents & other.contents
@@ -369,9 +387,9 @@ class BBox:
         try:
             return BBox(
                 min_x, min_y, min_z, max_x, max_y, max_z,
-                contents=self.contents,
+                contents=comb,
                 tags=self.tags,
-                name=self.name,
+                name=f'{self.name}&{other.name}',
             )
         except NonBBoxError:  # Edge or corner, don't count those.
             return None
@@ -614,6 +632,9 @@ class Volume(BBox):  # type: ignore[override]
         )
 
     def intersect(self, other: BBox) -> BBox | None:
+        if not isinstance(other, Volume):
+            other = other.as_volume()
+
         raise NotImplementedError("Intersections of volumes!")
 
     def __matmul__(self, other: AnyAngle | AnyMatrix) -> Volume:
@@ -630,51 +651,39 @@ class Volume(BBox):  # type: ignore[override]
             name=self.name,
         )
 
-    def __add__(self, other: Vec | FrozenVec | tuple[float, float, float]) -> Volume:
-        """Shift the bounding box forwards by this amount."""
-        if isinstance(other, BBox):  # Special-case error.
-            raise TypeError('Two bounding boxes cannot be added!')
-        other = FrozenVec(other)
+    def _shift(self, other: FrozenVec) -> Volume:
+        """Shift the bounding box by a vector."""
+        changed = False
 
-        planes = [
-            Plane(
-                plane.normal,
-                plane.distance + Vec.dot(plane.normal, other)
-            )
-            for plane in self.planes
-        ]
+        planes = []
+        for plane in self.planes:
+            offset = Vec.dot(plane.normal, other)
+            if abs(offset) > 1e-6:
+                planes.append(Plane(plane.normal, plane.distance + offset))
+                changed = True
+            else:
+                planes.append(plane)
 
         return Volume(
             self.mins.freeze() + other,
             self.maxes.freeze() + other,
-            planes=planes,
+            planes=planes if changed else self.planes,
             contents=self.contents,
             tags=self.tags,
             name=self.name,
         )
+
+    def __add__(self, other: Vec | FrozenVec | tuple[float, float, float]) -> Volume:
+        """Shift the bounding box forwards by this amount."""
+        if isinstance(other, BBox):  # Special-case error.
+            raise TypeError('Two bounding boxes cannot be added!')
+        return self._shift(FrozenVec(other))
 
     def __sub__(self, other: Vec | FrozenVec | tuple[float, float, float]) -> Volume:
         """Shift the bounding box backwards by this amount."""
         if isinstance(other, BBox):  # Special-case error.
             raise TypeError('Two bounding boxes cannot be subtracted!')
-        other = FrozenVec(other)
-
-        planes = [
-            Plane(
-                plane.normal,
-                plane.distance - Vec.dot(plane.normal, other),
-            )
-            for plane in self.planes
-        ]
-
-        return Volume(
-            self.mins.freeze() - other,
-            self.maxes.freeze() - other,
-            planes=planes,
-            contents=self.contents,
-            tags=self.tags,
-            name=self.name,
-        )
+        return self._shift(-FrozenVec(other))
 
     def trace_ray(self, start: Vec | FrozenVec, delta: Vec | FrozenVec) -> Hit | None:
         """Trace a ray against the bbox, returning the hit position (if any).
