@@ -7,8 +7,8 @@ from enum import Flag, auto as enum_auto
 import functools
 import operator
 
-from srctools.vmf import UVAxis, VMF, Entity, Solid, Side
-from srctools.math import AnyAngle, AnyMatrix, FrozenVec, Matrix, Vec, to_matrix
+from srctools.vmf import VMF, Entity, Solid, Side
+from srctools.math import AnyAngle, AnyMatrix, FrozenVec, Matrix, Vec, to_matrix, lerp
 from srctools import conv_bool, logger
 import attrs
 
@@ -344,6 +344,23 @@ class BBox:
         ent.solids.append(prism.solid)
         return ent
 
+    def as_volume(self) -> Volume:
+        """Convert to a Volume object."""
+        return Volume(
+            self.mins.freeze(), self.maxes.freeze(),
+            [
+                Plane(Vec.x_neg, -self.min_x),
+                Plane(Vec.x_pos, +self.max_x),
+                Plane(Vec.y_neg, -self.min_y),
+                Plane(Vec.y_pos, +self.max_y),
+                Plane(Vec.z_neg, -self.min_z),
+                Plane(Vec.z_pos, +self.max_z),
+            ],
+            name=self.name,
+            tags=self.tags,
+            contents=self.contents,
+        )
+
     def intersect(self, other: BBox) -> BBox | None:
         """Check if another bbox collides with this one.
 
@@ -553,6 +570,38 @@ class BBox:
         else:
             return None
 
+    def scale_to(self, axis: Literal['x', 'y', 'z'], mins: int, maxs: int) -> BBox:
+        """Resize the bounding box along an axis."""
+        new_bbox = BBox.__new__(BBox)
+        if axis == 'x':
+            if mins == self.min_x and maxs == self.max_x:
+                return self  # Unchanged, just return self
+            new_bbox.__attrs_init__(
+                mins, self.min_y, self.min_z,
+                maxs, self.max_y, self.max_z,
+                self.contents, self.name, self.tags,
+            )
+        elif axis == 'y':
+            if mins == self.min_y and maxs == self.max_y:
+                return self
+            new_bbox.__attrs_init__(
+                self.min_x, mins, self.min_z,
+                self.max_x, maxs, self.max_z,
+                self.contents, self.name, self.tags,
+            )
+        elif axis == 'z':
+            if mins == self.min_z and maxs == self.max_z:
+                return self
+
+            new_bbox.__attrs_init__(
+                self.min_x, self.min_y, mins,
+                self.max_x, self.max_y, maxs,
+                self.contents, self.name, self.tags,
+            )
+        else:
+            raise ValueError(f'Expected "x"/"y"/"z", got "{axis}"')
+        return new_bbox
+
 
 @attrs.frozen
 class Plane:
@@ -615,6 +664,10 @@ class Volume(BBox):  # type: ignore[override]
         ]
 
         return ent
+
+    def as_volume(self) -> Volume:
+        """Returns this unchanged."""
+        return self
 
     def with_attrs(
         self, *,
@@ -747,6 +800,42 @@ class Volume(BBox):  # type: ignore[override]
             else:
                 return None
         return best_hit
+
+    def scale_to(self, axis: Literal['x', 'y', 'z'], mins: int, maxs: int) -> Volume:
+        """Resize the bounding box along an axis."""
+        bb_mins = self.mins
+        bb_maxes = self.maxes
+
+        old_mins = bb_mins[axis]
+        old_maxs = bb_maxes[axis]
+
+        if old_mins == mins and old_maxs == maxs:
+            # Already aligned.
+            return self
+
+        bb_mins[axis] = mins
+        bb_maxes[axis] = maxs
+
+        matrix = Matrix()
+        axis_ind = 'xyz'.index(axis)
+        matrix[axis_ind, axis_ind] = (maxs - mins) / (old_maxs - old_mins)
+        # For normals.
+        inverse = matrix.inverse().transpose()
+        new_planes = []
+        for plane in self.planes:
+            point = plane.point.thaw()
+            point[axis] = lerp(point[axis], old_mins, old_maxs, mins, maxs)
+            norm = (plane.normal @ inverse).norm()
+            dist = Vec.dot(norm, point)
+            if norm == plane.normal and abs(dist - plane.distance) < 1e-6:
+                new_planes.append(plane)
+            else:
+                new_planes.append(Plane(norm, dist))
+        return Volume(
+            bb_maxes.freeze(), bb_maxes.freeze(),
+            new_planes,
+            contents=self.contents, name=self.name, tags=self.tags,
+        )
 
 
 def trace_ray(start: Vec | FrozenVec, delta: Vec | FrozenVec, volumes: Iterable[BBox]) -> Hit | None:
