@@ -374,8 +374,8 @@ class Brush:
 
     face_temp: template_brush.ScalingTemplate
     material: str = ''  # If set, override face_temp.
-    # Texture the whole thing with the face.
-    is_tool: bool = False
+    # Texture on the sides.
+    side_mat: str = consts.Tools.NODRAW
     # If vertical, use the original player clip and func-detail. Otherwise, add it inside this one.
     static_player_clip: bool = False
 
@@ -398,12 +398,19 @@ class Brush:
         for child in kv.find_children('keys'):
             ent_kvs[child.name] = child.value
 
+        if 'side_mat' in kv:
+            side_mat = kv['side_mat']
+        elif kv.bool('tooltexture'):
+            side_mat = material or consts.Tools.NODRAW
+        else:
+            side_mat = consts.Tools.NODRAW
+
         return cls(
             offset=kv.float('offset'),
             thickness=thickness,
             face_temp=face_temp,
             material=material,
-            is_tool=kv.bool('tooltexture'),
+            side_mat=side_mat,
             static_player_clip=kv.bool('staticplayerclip'),
             keyvalues=ent_kvs,
         )
@@ -424,10 +431,8 @@ class Brush:
             if abs(face.normal().dot(plane_slice.normal)) > 0.99:
                 face.mat = self.material
                 self.face_temp.apply(face, change_mat=not self.material)
-            elif self.is_tool:
-                face.mat = self.material or consts.Tools.NODRAW
             else:
-                face.mat = consts.Tools.NODRAW
+                face.mat = self.side_mat
 
         if self.static_player_clip:
             if abs(plane_slice.normal.z) > 0.5:
@@ -665,6 +670,7 @@ def parse_conf(kv: Keyvalues) -> None:
             brushes=[
                 Brush(
                     face_temp=template_brush.ScalingTemplate.world(consts.Special.GLASS),
+                    side_mat=consts.Special.GLASS,
                     offset=0.5,
                     thickness=1.0,
                     keyvalues={'classname': 'func_detail'},
@@ -681,6 +687,7 @@ def parse_conf(kv: Keyvalues) -> None:
             brushes=[
                 Brush(
                     face_temp=template_brush.ScalingTemplate.world(consts.Special.GRATING),
+                    side_mat=consts.Special.GRATING,
                     offset=0.5,
                     thickness=1.0,
                     keyvalues={
@@ -691,16 +698,16 @@ def parse_conf(kv: Keyvalues) -> None:
                 ),
                 Brush(
                     face_temp=template_brush.ScalingTemplate.world(consts.Tools.PLAYER_CLIP),
+                    side_mat=consts.Tools.PLAYER_CLIP,
                     offset=0,
                     thickness=4.0,
-                    is_tool=True,
                     keyvalues={'classname': 'func_detail'},
                 ),
                 Brush(
                     face_temp=template_brush.ScalingTemplate.world(consts.Tools.TRIGGER),
+                    side_mat=consts.Tools.TRIGGER,
                     offset=0,
                     thickness=4.0,
-                    is_tool=True,
                     keyvalues={
                         'classname': 'func_clip_vphysics',
                         'filtername': '@grating_filter',
