@@ -37,7 +37,6 @@ async def init_app() -> None:
     conf = config.APP.get_cur_conf(GenOptions)
 
     LOGGER.debug('Starting loading screen...')
-    localisation.add_callback(call=False)(loadScreen.update_translations)
     await loadScreen.MAIN_UI.set_length(16)
     loadScreen.set_force_ontop(conf.force_load_ontop)
     loadScreen.show_main_loader(conf.compact_splash)

@@ -21,7 +21,7 @@ import trio
 
 from config.gen_opts import GenOptions
 from config import APP
-from transtoken import TransToken
+from transtoken import TransToken, CURRENT_LANG
 import ipc_types
 import utils
 
@@ -224,11 +224,34 @@ class LoadScreen:
         ))
 
 
-def update_translations() -> None:
-    """Update the translations."""
-    _QUEUE_SEND_LOAD.put(ipc_types.Load2Daemon_UpdateTranslations(
-        {key: str(tok) for key, tok in TRANSLATIONS.items()},
-    ))
+async def _update_translations() -> None:
+    """Update the translations whenever the language changes."""
+    while True:
+        await CURRENT_LANG.wait_transition()
+        _QUEUE_SEND_LOAD.put(ipc_types.Load2Daemon_UpdateTranslations(
+            {key: str(tok) for key, tok in TRANSLATIONS.items()},
+        ))
+
+
+async def _listen_to_process() -> None:
+    """Listen to responses from the loading screens."""
+    while True:
+        op = await trio.to_thread.run_sync(_QUEUE_REPLY_LOAD.get, abandon_on_cancel=True)
+        LOGGER.debug('Logger response: {}', op)
+        if isinstance(op, ipc_types.Daemon2Load_MainSetCompact):
+            # Save the compact state to the config.
+            conf = APP.get_cur_conf(GenOptions)
+            APP.store_conf(attrs.evolve(conf, compact_splash=op.compact))
+        elif isinstance(op, ipc_types.Daemon2Load_Cancel):
+            try:
+                screen = _ALL_SCREENS[op.screen]
+            except KeyError:
+                pass
+            else:
+                if screen._scope is not None:
+                    screen._scope.cancel()
+        else:
+            assert_never(op)
 
 
 _bg_started = False
@@ -255,24 +278,10 @@ async def startup(*, task_status: trio.TaskStatus[None] = trio.TASK_STATUS_IGNOR
     await trio.sleep(0)
     process.start()
     try:
-        task_status.started()
-        while True:
-            op = await trio.to_thread.run_sync(_QUEUE_REPLY_LOAD.get, abandon_on_cancel=True)
-            LOGGER.info('Logger response: {}', op)
-            if isinstance(op, ipc_types.Daemon2Load_MainSetCompact):
-                # Save the compact state to the config.
-                conf = APP.get_cur_conf(GenOptions)
-                APP.store_conf(attrs.evolve(conf, compact_splash=op.compact))
-            elif isinstance(op, ipc_types.Daemon2Load_Cancel):
-                try:
-                    screen = _ALL_SCREENS[op.screen]
-                except KeyError:
-                    pass
-                else:
-                    if screen._scope is not None:
-                        screen._scope.cancel()
-            else:
-                assert_never(op)
+        async with trio.open_nursery() as nursery:
+            nursery.start_soon(_update_translations)
+            nursery.start_soon(_listen_to_process)
+            task_status.started()
     finally:
         _QUEUE_SEND_LOAD.close()
         _QUEUE_REPLY_LOAD.close()
