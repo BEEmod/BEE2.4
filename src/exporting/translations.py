@@ -12,11 +12,9 @@ import transtoken
 @STEPS.add_step(prereq=[], results=[StepResource.VCONF_DATA])
 async def step_set_error_translations(exp_data: ExportData) -> None:
     """Pass along the location of the current language file, for translating error messages."""
-    if transtoken.CURRENT_LANG.ui_filename is not None:
-        exp_data.vbsp_conf.set_key(
-            ('Options', 'error_translations'),
-            str(transtoken.CURRENT_LANG.ui_filename),
-        )
+    filename = transtoken.CURRENT_LANG.value.ui_filename
+    if filename is not None:
+        exp_data.vbsp_conf.set_key(('Options', 'error_translations'), filename.as_posix())
 
 
 @STEPS.add_step(prereq=[], results=[StepResource.VCONF_DATA])

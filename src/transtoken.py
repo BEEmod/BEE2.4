@@ -9,12 +9,14 @@ from typing import (
     Any, Callable, ClassVar, Dict, Final, Iterable, List, Mapping, NoReturn,
     Optional, Protocol, Sequence, Tuple, cast, final,
 )
+
 from typing_extensions import LiteralString, TypeAlias, override
 from enum import Enum
 from html import escape as html_escape
 from pathlib import Path
 import string
 
+from trio_util import AsyncValue
 from srctools import EmptyMapping, logger
 import attrs
 
@@ -60,7 +62,7 @@ class Language:
 
 
 # The current language. Can be set to change language, but don't do that in the UI.
-CURRENT_LANG = Language(lang_code='en', trans={})
+CURRENT_LANG: Final = AsyncValue(Language(lang_code='en', trans={}))
 # Special language which replaces all text with ## to easily identify untranslatable text.
 DUMMY: Final = Language(lang_code='dummy', trans={})
 
@@ -231,20 +233,22 @@ class TransToken:
 
     def _convert_token(self) -> str:
         """Return the translated version of our token."""
+        cur_lang = CURRENT_LANG.value
+
         # If in the untranslated namespace or blank, don't translate.
         if self.namespace == NS_UNTRANSLATED or not self.token:
             return self.token
-        elif CURRENT_LANG is DUMMY:
+        elif cur_lang is DUMMY:
             return '#' * len(self.token)
         elif self.namespace == NS_GAME:
             try:
-                return CURRENT_LANG.game_trans[self.token]
+                return cur_lang.game_trans[self.token]
             except KeyError:
                 return self.token
         else:
             try:
                 # noinspection PyProtectedMember
-                return CURRENT_LANG._trans[self.namespace].gettext(self.token)
+                return cur_lang._trans[self.namespace].gettext(self.token)
             except KeyError:
                 return self.token
 
@@ -252,7 +256,7 @@ class TransToken:
         """Calling str on a token translates it."""
         text = self._convert_token()
         if self.parameters:
-            formatter = ui_format_getter(CURRENT_LANG.lang_code)
+            formatter = ui_format_getter(CURRENT_LANG.value.lang_code)
             try:
                 if formatter is not None:
                     return formatter.vformat(text, (), self.parameters)
@@ -328,18 +332,19 @@ class PluralTransToken(TransToken):
             n = int(cast(str, self.parameters['n']))
         except KeyError:
             raise ValueError('Plural token requires "n" parameter!') from None
+        cur_lang = CURRENT_LANG.value
 
         # If in the untranslated namespace or blank, don't translate.
         if self.namespace == NS_UNTRANSLATED or not self.token:
             return self.token if n == 1 else self.token_plural
-        elif CURRENT_LANG is DUMMY:
+        elif cur_lang is DUMMY:
             return '#' * len(self.token if n == 1 else self.token_plural)
         elif self.namespace == NS_GAME:
             raise ValueError('Game namespace cannot be pluralised!')
         else:
             try:
                 # noinspection PyProtectedMember
-                return CURRENT_LANG._trans[self.namespace].ngettext(self.token, self.token_plural, n)
+                return cur_lang._trans[self.namespace].ngettext(self.token, self.token_plural, n)
             except KeyError:
                 return self.token
 
@@ -427,7 +432,7 @@ class ListTransToken(JoinTransToken):
         items = [str(child) for child in self.children]
         if self.sort:
             items.sort()
-        return ui_list_getter(CURRENT_LANG.lang_code, self.kind, items)
+        return ui_list_getter(CURRENT_LANG.value.lang_code, self.kind, items)
 
 
 # TODO: Move this back to app.errors when that can be imported in compiler safely.

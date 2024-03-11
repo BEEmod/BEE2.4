@@ -206,11 +206,11 @@ def get_lang_name(lang: Language) -> str:
         # Fake langauge code for debugging, no need to translate.
         return '<DUMMY>'
 
-    if transtoken.CURRENT_LANG is DUMMY:
+    if transtoken.CURRENT_LANG.value is DUMMY:
         # Use english in lang code mode.
         cur_lang = 'en_au'
     else:
-        cur_lang = transtoken.CURRENT_LANG.lang_code
+        cur_lang = transtoken.CURRENT_LANG.value.lang_code
 
     targ_langs = expand_langcode(lang.lang_code)
     cur_langs = expand_langcode(cur_lang)
@@ -383,10 +383,10 @@ def get_languages() -> Iterator[Language]:
 def set_language(lang: Language) -> None:
     """Change the app's language."""
     PARSE_CANCEL.cancel()
-    transtoken.CURRENT_LANG = lang
 
     conf = config.APP.get_cur_conf(GenOptions)
     config.APP.store_conf(attrs.evolve(conf, language=lang.lang_code))
+    transtoken.CURRENT_LANG.value = lang
 
     # Reload all our localisations.
     for func in _langchange_callback:
@@ -430,7 +430,7 @@ async def load_aux_langs(
     PARSE_CANCEL.cancel()  # Stop any other in progress loads.
 
     if lang is None:
-        lang = transtoken.CURRENT_LANG
+        lang = transtoken.CURRENT_LANG.value
 
     if lang is DUMMY:
         # Dummy does not need to load these files.

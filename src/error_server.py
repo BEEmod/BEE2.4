@@ -177,7 +177,7 @@ async def load_info() -> None:
         except OSError:
             LOGGER.exception('Could not load UI translations file!')
             return
-        transtoken.CURRENT_LANG = transtoken.Language(
+        transtoken.CURRENT_LANG.value = transtoken.Language(
             lang_code='',
             ui_filename=current_error.language_file,
             trans=translations,
