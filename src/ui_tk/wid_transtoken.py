@@ -8,12 +8,12 @@ from weakref import WeakKeyDictionary
 
 from typing_extensions import TypeAlias
 
-from transtoken import TransToken as TransToken  # Re-export
-from app.localisation import add_callback as add_callback  # Re-export.
+from transtoken import TransToken, CURRENT_LANG
+from app.localisation import add_callback as add_callback
 
 
 __all__ = [
-    'add_callback', 'TransToken',  # Re-exports
+    'add_callback', 'TransToken', 'CURRENT_LANG',  # Re-exports
     'set_text', 'set_win_title', 'set_menu_text', 'clear_stored_menu',
 ]
 
@@ -68,16 +68,17 @@ def clear_stored_menu(menu: tk.Menu) -> None:
     _applied_menu_tokens.pop(menu, None)
 
 
-@add_callback(call=False)
-def _apply_changes() -> None:
+async def update_task() -> None:
     """Apply new languages to all stored widgets."""
-    for text_widget, token in _applied_text_tokens.items():
-        text_widget['text'] = str(token)
-    for menu, menu_map in _applied_menu_tokens.items():
-        for index, token in menu_map.items():
-            menu.entryconfigure(index, label=str(token))
-    for window, token in _window_titles.items():
-        window.wm_title(str(token))
+    while True:
+        await CURRENT_LANG.wait_transition()
+        for text_widget, token in _applied_text_tokens.items():
+            text_widget['text'] = str(token)
+        for menu, menu_map in _applied_menu_tokens.items():
+            for index, token in menu_map.items():
+                menu.entryconfigure(index, label=str(token))
+        for window, token in _window_titles.items():
+            window.wm_title(str(token))
 
 
 def stats() -> str:

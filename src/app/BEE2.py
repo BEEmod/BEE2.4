@@ -17,6 +17,7 @@ from config.windows import WindowState
 from transtoken import TransToken
 from ui_tk.dialogs import DIALOG
 from ui_tk.errors import display_errors
+from ui_tk import wid_transtoken
 from config.gen_opts import GenOptions
 from config.last_sel import LastSelected
 from exporting import mod_support, ExportData
@@ -86,6 +87,7 @@ async def init_app() -> None:
         from ui_tk.img import TK_IMG
         app.background_run(img.init, package_sys, TK_IMG)
         app.background_run(sound.sound_task)
+        app.background_run(wid_transtoken.update_task)
         app.background_run(localisation.load_aux_langs, gameMan.all_games, packset)
 
         # Load filesystems into various modules
