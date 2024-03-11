@@ -1,21 +1,19 @@
 """Store overridden defaults for items, and also the selected version."""
 from typing import Any, Dict, Final
-from typing_extensions import TypeAlias, Self, override
-
-from configparser import ConfigParser
+from typing_extensions import override
 
 from srctools import Keyvalues, logger
 from srctools.dmx import Element
 import attrs
 
+from BEE2_config import ConfigFile
 from editoritems_props import PROP_TYPES, ItemPropKind
 import config
-import utils
 
 
 LOGGER = logger.get_logger(__name__)
 DEFAULT_VERSION: Final = 'VER_DEFAULT'
-DefaultMap: TypeAlias = Dict[ItemPropKind[Any], str]
+LEGACY = ConfigFile('item_configs.cfg')
 
 
 @config.PALETTE.register
@@ -24,26 +22,17 @@ DefaultMap: TypeAlias = Dict[ItemPropKind[Any], str]
 class ItemDefault(config.Data, conf_name='ItemDefault', uses_id=True):
     """Overrides the defaults for item properties."""
     version: str = DEFAULT_VERSION
-    defaults: DefaultMap = attrs.Factory(dict)
+    defaults: Dict[ItemPropKind[Any], str] = attrs.Factory(dict)
 
     @classmethod
     @override
-    def parse_legacy(cls, conf: Keyvalues) -> Dict[str, Self]:
+    def parse_legacy(cls, conf: Keyvalues) -> Dict[str, 'ItemDefault']:
         """Parse the data in the legacy item_configs.cfg file."""
-        result: dict[str, ItemDefault] = {}
-
-        legacy = ConfigParser(default_section='__default_section')
-        try:
-            with utils.conf_location('config/item_configs.cfg').open() as f:
-                legacy.read_file(f)
-        except FileNotFoundError:
-            # No legacy config found.
-            return result
-
-        for item_id, section in legacy.items():
-            if item_id == legacy.default_section:
+        result: Dict[str, ItemDefault] = {}
+        for item_id, section in LEGACY.items():
+            if item_id == LEGACY.default_section:
                 continue  # Section for keys before the [] markers? Not useful.
-            props: DefaultMap = {}
+            props: Dict[ItemPropKind[Any], str] = {}
             for prop_name, value in section.items():
                 if not prop_name.startswith('prop_'):
                     continue
@@ -59,11 +48,11 @@ class ItemDefault(config.Data, conf_name='ItemDefault', uses_id=True):
 
     @classmethod
     @override
-    def parse_kv1(cls, data: Keyvalues, version: int) -> Self:
+    def parse_kv1(cls, data: Keyvalues, version: int) -> 'ItemDefault':
         """Parse keyvalues1 data."""
         if version != 1:
             raise AssertionError(version)
-        props: DefaultMap = {}
+        props: Dict[ItemPropKind[Any], str] = {}
         for kv in data.find_children('properties'):
             try:
                 prop_type = PROP_TYPES[kv.name.casefold()]
@@ -86,7 +75,7 @@ class ItemDefault(config.Data, conf_name='ItemDefault', uses_id=True):
 
     @classmethod
     @override
-    def parse_dmx(cls, data: Element, version: int) -> Self:
+    def parse_dmx(cls, data: Element, version: int) -> 'ItemDefault':
         """Parse DMX configuration."""
         if version != 1:
             raise AssertionError(version)
@@ -94,7 +83,7 @@ class ItemDefault(config.Data, conf_name='ItemDefault', uses_id=True):
             item_version = data['version'].val_string
         except KeyError:
             item_version = DEFAULT_VERSION
-        props: DefaultMap = {}
+        props: Dict[ItemPropKind[Any], str] = {}
         for attr in data['properties'].val_elem.values():
             if attr.name == 'name':  # The 'properties' name itself.
                 continue
