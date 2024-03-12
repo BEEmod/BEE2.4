@@ -91,7 +91,7 @@ class ExportData:
     # Flag set to indicate that the error server may be running.
     maybe_error_server_running: bool = True
     # Can be called to indicate a non-fatal error.
-    warn: Callable[[WarningExc], None]
+    warn: Callable[[WarningExc | TransToken], None]
 
 
 STEPS = StepOrder(ExportData, StepResource)
