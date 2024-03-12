@@ -87,6 +87,9 @@
 * Handle unparsable existing antigel materials gracefully.
 * Fix issues with P1 Track Platforms not generating correctly.
 * Fix export of corridor configuration in some cases when picking default corridors.
+* Warn and handle duplicate definitions in both the style and item packages. 
+  This fixes an issue where older style definitions would cause errors if checkmark/timer panels
+  were present in the map.
 
 ------------------------------------------
 

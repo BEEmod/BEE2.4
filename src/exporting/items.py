@@ -24,6 +24,9 @@ from packages.item import Item, ItemConfig
 # Finds names surrounded by %s
 RE_PERCENT_VAR = re.compile(r'%(\w*)%')
 LOGGER = srctools.logger.get_logger(__name__)
+TRANS_OLD_STYLE_DEF = TransToken.ui(
+    'Style includes old definition for {item}. Override the item package object instead.'
+)
 
 
 def apply_replacements(conf: Keyvalues, item_id: str) -> Keyvalues:
@@ -131,6 +134,13 @@ async def step_write_items(exp_data: ExportData) -> None:
     vbsp_config = exp_data.vbsp_conf
     pal_list: dict[str, dict[int, tuple[int, int]]] = exp_data.selected[Item]
 
+    # Originally indicator items were in the style config, now they're default items.
+    # Check to prevent overlaps.
+    style_items = {
+        item.id.casefold(): item
+        for item in exp_data.all_items
+    }
+
     style_id = exp_data.selected_style.id
     item: Item
     default_conf = ItemDefault()
@@ -139,7 +149,13 @@ async def step_write_items(exp_data: ExportData) -> None:
 
         (items, config_part) = get_export_data(item, pal_list, style_id, prop_conf)
 
-        exp_data.all_items.extend(items)
+        for editor_def in items:
+            if editor_def.id.casefold() in style_items:
+                exp_data.warn(TRANS_OLD_STYLE_DEF.format(item=editor_def.id))
+                # Pop so we warn only once.
+                exp_data.all_items.remove(style_items.pop(editor_def.id.casefold()))
+            exp_data.all_items.append(editor_def)
+
         vbsp_config.extend(apply_replacements(await config_part(), item.id))
 
         # Add auxiliary configs as well.
