@@ -1,12 +1,12 @@
 """The package containg all UI code."""
-import tkinter as tk
-from types import TracebackType, new_class
-from typing import Any, Awaitable, Callable, Optional, Type, TypeVar, Generic
-
+from typing import Any, Awaitable, Callable, Tuple, Type, TypeVar, Generic, Union, overload
 from typing_extensions import TypeVarTuple, Unpack
+from types import TracebackType, new_class
+import tkinter as tk
+
+import trio  # Import first, so it monkeypatches traceback before us.
 
 import utils
-import trio  # Import first, so it monkeypatches traceback before us.
 
 # We must always have one Tk object, and it needs to be constructed
 # before most of TKinter will function. So doing it here does it first.
@@ -14,9 +14,11 @@ TK_ROOT = tk.Tk()
 TK_ROOT.withdraw()  # Hide the window until everything is loaded.
 
 # The nursery where UI tasks etc are run in.
-_APP_NURSERY: Optional[trio.Nursery] = None
+_APP_NURSERY: Union[trio.Nursery, None] = None
 # This is quit to exit the sleep_forever(), beginning the shutdown process.
 _APP_QUIT_SCOPE = trio.CancelScope()
+T = TypeVar("T")
+PosArgsT = TypeVarTuple('PosArgsT')
 
 
 def quit_app() -> None:
@@ -56,7 +58,7 @@ del _run_main_loop
 def tk_error(
     exc_type: Type[BaseException],
     exc_value: BaseException,
-    exc_tb: Optional[TracebackType],
+    exc_tb: Union[TracebackType, None],
 ) -> None:
     """Log TK errors."""
     # The exception is caught inside the TK code.
@@ -89,7 +91,7 @@ TK_ROOT.report_callback_exception = tk_error
 def on_error(
     exc_type: Type[BaseException],
     exc_value: BaseException,
-    exc_tb: Optional[TracebackType],
+    exc_tb: Union[TracebackType, None],
 ) -> None:
     """Run when the application crashes. Display to the user, log it, and quit."""
     # We don't want this to fail, so import everything here, and wrap in
@@ -146,13 +148,10 @@ def on_error(
         pass
 
 
-PosArgsT = TypeVarTuple('PosArgsT')
-
-
 def background_run(
     func: Callable[[Unpack[PosArgsT]], Awaitable[object]],
     /, *args: Unpack[PosArgsT],
-    name: Optional[str] = None,
+    name: Union[str, None] = None,
 ) -> None:
     """When the UI is live, begin this specified task."""
     if _APP_NURSERY is None:
@@ -163,3 +162,56 @@ def background_run(
 # Various configuration booleans.
 LAUNCH_AFTER_EXPORT = tk.BooleanVar(value=True, name='OPT_launch_after_export')
 DEV_MODE = tk.BooleanVar(value=utils.DEV_MODE, name='OPT_development_mode')
+
+
+class EdgeTrigger(Generic[Unpack[PosArgsT]]):
+    """A variation on a Trio Event which can only be tripped while a task is waiting for it.
+
+    When tripped, arbitary arguments can be passed along as well.
+    """
+    def __init__(self) -> None:
+        self._event: Union[trio.Event, None] = None
+        self._result: Union[Tuple[Unpack[PosArgsT]], None] = None
+
+    @property
+    def ready(self) -> bool:
+        """Check if this is ready to be triggered."""
+        return self._event is not None
+
+    @overload
+    async def wait(self: 'EdgeTrigger[()]') -> None: ...
+    @overload
+    async def wait(self: 'EdgeTrigger[T]') -> T: ...
+    @overload  # Ignore spurious warnings about the above overloads being impossible.
+    async def wait(self) -> Tuple[Unpack[PosArgsT]]: ...  # type: ignore[misc]
+    async def wait(self) -> Union[T, Tuple[Unpack[PosArgsT]], None]:
+        """Wait for the trigger to fire, then return the parameters.
+
+        Only one task can wait at a time.
+        """
+        if self._event is not None:
+            raise ValueError('Only one task may wait() at a time!')
+        self._event = trio.Event()
+        self._result = None
+        try:
+            await self._event.wait()
+            assert self._result is not None
+            if len(self._result) == 1:
+                return self._result[0]
+            elif len(self._result) == 0:
+                return None
+            else:
+                return self._result
+        finally:
+            self._event = self._result = None
+
+    def trigger(self, *args: Unpack[PosArgsT]) -> None:
+        """Wake up a task blocked on wait(), and pass arguments along to it.
+
+        Raises a ValueError if no task is blocked.
+        If triggered multiple times, the last result wins.
+        """
+        if self._event is None:
+            raise ValueError('No task is blocked on wait()!')
+        self._result = args
+        self._event.set()
