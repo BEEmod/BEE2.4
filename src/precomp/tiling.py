@@ -1217,7 +1217,7 @@ class TileDef:
             )
         if self.use_bullseye():
             # Add the bullseye overlay.
-            orient = Matrix.from_angle(self.normal.to_angle())
+            orient = Matrix.from_basis(x=self.normal)
             srctools.vmf.make_overlay(
                 vmf,
                 orient.forward(),

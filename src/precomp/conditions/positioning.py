@@ -606,4 +606,4 @@ def res_rotate_inst(inst: Entity, res: Keyvalues) -> None:
         origin = Vec.from_str(inst['origin'])
         inst['origin'] = origin + (-offset @ orient + offset) @ angles
 
-    inst['angles'] = (orient @ angles).to_angle()
+    inst['angles'] = orient @ angles

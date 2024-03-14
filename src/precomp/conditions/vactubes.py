@@ -4,7 +4,7 @@ from __future__ import annotations
 from collections.abc import Iterator, Iterable
 
 import attrs
-from srctools import Vec, Keyvalues, Entity, VMF, Solid, Matrix
+from srctools import Angle, Vec, Keyvalues, Entity, VMF, Solid, Matrix
 import srctools.logger
 
 from precomp import tiling, instanceLocs, conditions, connections, template_brush
@@ -391,7 +391,7 @@ def make_straight(
                     conditions.add_inst(
                         vmf,
                         origin=position,
-                        angles=Matrix.from_basis(x=normal, z=supp_dir).to_angle(),
+                        angles=Angle.from_basis(x=normal, z=supp_dir),
                         file=config.inst_support,
                     )
                     placed_support = True

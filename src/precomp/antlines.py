@@ -654,7 +654,7 @@ def fix_single_straight(
     """Figure out the correct rotation for 1-long straight antlines."""
     # Check the U and V axis, to see if there's another antline on both
     # sides. If there is that's the correct orientation.
-    orient = Matrix.from_angle(seg.normal.to_angle())
+    orient = Matrix.from_basis(x=seg.normal)
 
     center = seg.start
 

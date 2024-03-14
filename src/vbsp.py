@@ -1057,7 +1057,7 @@ def position_exit_signs(vmf: VMF) -> None:
     arrow_dir = -Vec.from_str(exit_arrow['basisv'])  # Texture points down.
     u = Vec.from_str(exit_sign['basisu'])
     v = Vec.from_str(exit_sign['basisv'])
-    angles = Matrix.from_basis(x=u, y=v, z=sign_norm).to_angle()
+    angles = Angle.from_basis(x=u, y=v, z=sign_norm)
 
     if arrow_dir == u:
         sign_dir = 'east'

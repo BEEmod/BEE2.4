@@ -1150,8 +1150,7 @@ def retexture_template(
             template_data.debug_marker(
                 'bee2_template_voxelsetter',
                 origin=setter_pos,
-                # X -> Z correction.
-                angles=Angle(0, 90, 90) @ setter_norm.to_angle(),
+                angles=Angle.from_basis(z=voxel_setter.normal),
                 skin=TILETYPE_TO_SKIN[voxel_setter.tile_type],
                 force=voxel_setter.force,
             )
@@ -1184,8 +1183,7 @@ def retexture_template(
             template_data.debug_marker(
                 'bee2_template_tilesetter',
                 origin=setter_pos,
-                # X -> Z correction.
-                angles=Angle(0, 90, 90) @ setter_norm.to_angle(),
+                angles=Angle.from_basis(z=setter_norm),
                 skin=TILETYPE_TO_SKIN[setter_type],
                 force=tile_setter.force,
                 picker_name=tile_setter.picker_name,
