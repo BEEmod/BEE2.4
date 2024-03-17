@@ -5,7 +5,7 @@ from pathlib import Path
 import math
 
 from pytest_regressions.file_regression import FileRegressionFixture
-from srctools import VMF, Angle, Keyvalues, Matrix, Solid, Vec
+from srctools import UVAxis, VMF, Angle, Keyvalues, Matrix, Solid, Vec
 import pytest
 
 from collisions import BBox, CollideType, Volume
@@ -362,5 +362,20 @@ def test_volume_rotation(file_regression: FileRegressionFixture) -> None:
         orient = Matrix.from_angle(15.0 if (yaw % 60) == 0 else -15.0, yaw, 0.0)
         for volume in volumes:
             vmf.add_ent((volume @ orient).as_ent(vmf))
+
+    # Go through and round everything so we ignore slight inaccuracies.
+    for ent in vmf.entities:
+        for side in ent.sides():
+            side.planes = [round(vec, 6) for vec in side.planes]
+            side.uaxis = UVAxis(
+                *round(side.uaxis.vec() + (0, 0, 0), 6),
+                round(side.uaxis.offset),
+                side.uaxis.scale,
+            )
+            side.vaxis = UVAxis(
+                *round(side.vaxis.vec() + (0, 0, 0), 6),
+                round(side.vaxis.offset),
+                side.vaxis.scale,
+            )
 
     file_regression.check(vmf.export(), extension='.vmf', binary=False)
