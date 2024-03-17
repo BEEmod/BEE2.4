@@ -286,6 +286,9 @@ class BarrierType:
     mergeable: bool = False
     # Hole variants valid for this kind of barrier.
     hole_variants: Sequence[utils.ObjectID] = ()
+    # Sorta a hack, force frame brushwork to be world brushes, so they don't get carved.
+    # Tinted Glass needs this due to its nodraw clip.
+    frame_world_brush: bool = False
 
     @classmethod
     def parse(cls, kv: Keyvalues) -> BarrierType:
@@ -336,6 +339,7 @@ class BarrierType:
             hole_variants=hole_variants,
             coll_thick=kv.float('coll_thick', 4.0),
             mergeable=kv.bool('mergeable'),
+            frame_world_brush=kv.bool('frame_world_brush'),
         )
 
 
@@ -517,15 +521,20 @@ class Segment:
     def place(
         self, vmf: VMF, slice_key: utils.SliceKey, lighting_origin: str,
         u: float, v: float, angles: AnyMatrix,
+        frame_world_brush: bool,
     ) -> None:
         """Place the segment at the specified location."""
         rotation = to_matrix(angles) @ slice_key.orient
         origin = slice_key.plane_to_world(u, v) + self.offset @ rotation
         self._place(
-            vmf, origin, self.orient @ rotation, lighting_origin,
+            vmf, origin, self.orient @ rotation, lighting_origin, frame_world_brush,
         )
 
-    def _place(self, vmf: VMF, origin: Vec, angles: FrozenMatrix, lighting_origin: str) -> None:
+    def _place(
+        self, vmf: VMF, origin: Vec, angles: FrozenMatrix,
+        lighting_origin: str,
+        frame_world_brush: bool,
+    ) -> None:
         """Place the segment at the specified location."""
         raise NotImplementedError
 
@@ -536,7 +545,11 @@ class SegmentProp(Segment):
     model: str
 
     @override
-    def _place(self, vmf: VMF, origin: Vec, angles: FrozenMatrix, lighting_origin: str) -> None:
+    def _place(
+        self, vmf: VMF, origin: Vec, angles: FrozenMatrix,
+        lighting_origin: str,
+        frame_world_brush: bool,
+    ) -> None:
         """Place the segment at the specified location."""
         vmf.create_ent(
             'prop_static',
@@ -555,13 +568,19 @@ class SegmentBrush(Segment):
     brush: template_brush.Template
 
     @override
-    def _place(self, vmf: VMF, origin: Vec, angles: FrozenMatrix, lighting_origin: str) -> None:
+    def _place(
+        self, vmf: VMF, origin: Vec, angles: FrozenMatrix,
+        lighting_origin: str,
+        frame_world_brush: bool,
+    ) -> None:
         """Place the segment at the specified location."""
-        temp = template_brush.import_template(
+        template_brush.import_template(
             vmf,
             self.brush,
             origin, angles,
-            force_type=template_brush.TEMP_TYPES.detail,
+            force_type=template_brush.TEMP_TYPES.world
+            if frame_world_brush else
+            template_brush.TEMP_TYPES.detail,
         )
 
     def place_sized(
@@ -571,21 +590,36 @@ class SegmentBrush(Segment):
         orient: FrozenMatrix,
         direction: Vec,
         length: float,
+        frame_world_brush: bool,
     ) -> None:
         """Place this template, but resize it to match the specified length."""
         rotation = orient @ slice_key.orient
         origin = slice_key.plane_to_world(u, v) + self.offset @ rotation
-        temp = template_brush.import_template(
-            vmf,
-            self.brush,
-            origin,
-            self.orient @ rotation,
-            force_type=template_brush.TEMP_TYPES.detail,
-        )
-        if temp.detail is None:
-            return  # No brushes?
+
+        if frame_world_brush:
+            temp = template_brush.import_template(
+                vmf,
+                self.brush,
+                origin,
+                self.orient @ rotation,
+                force_type=template_brush.TEMP_TYPES.world,
+                add_to_map=True,
+            )
+            faces = (face for brush in temp.world for face in brush.sides)
+        else:
+            temp = template_brush.import_template(
+                vmf,
+                self.brush,
+                origin,
+                self.orient @ rotation,
+                force_type=template_brush.TEMP_TYPES.detail,
+            )
+            if temp.detail is None:
+                return  # No brushes?
+            faces = temp.detail.sides()
+
         diff = direction * (length - STRAIGHT_LEN)
-        for face in temp.detail.sides():
+        for face in faces:
             if face.normal().dot(direction) < -0.9:
                 face.translate(diff)
 
@@ -1364,7 +1398,7 @@ def place_concave_corner(
                 lighting_origin,
                 32. * u + 16. * off_u + 16.0,
                 32. * v + 16. * off_v + 16.0,
-                orient,
+                orient, barrier.type.frame_world_brush,
             )
 
 
@@ -1551,6 +1585,7 @@ def place_straight_run(
                         32. * start_u + off_u * off + pos_u,
                         32. * start_v + off_v * off + pos_v,
                         orient,
+                        barrier.type.frame_world_brush,
                     )
 
                 if not backwards:
@@ -1563,6 +1598,7 @@ def place_straight_run(
                 32.0 * start_u + off_u * off + pos_u,
                 32.0 * start_v + off_v * off + pos_v,
                 orient, direction, frame_length,
+                barrier.type.frame_world_brush,
             )
     # Only one of these has an actual length.
     for u in range(start_u, end_u + 1):
@@ -1582,7 +1618,11 @@ def place_convex_corner(
     """Try to place a convex corner here."""
     for frame in barrier.type.frames[FrameOrient.HORIZ]:
         for seg in frame.seg_corner:
-            seg.place(vmf, slice_key, lighting_origin, 32.0 * u, 32.0 * v, orient)
+            seg.place(
+                vmf, slice_key, lighting_origin,
+                32.0 * u, 32.0 * v, orient,
+                barrier.type.frame_world_brush,
+            )
 
 
 def add_glass_floorbeams(
