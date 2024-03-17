@@ -1,4 +1,5 @@
 """Records the collisions for each item."""
+from collections import defaultdict
 from typing import Dict, List
 
 import attrs
@@ -16,8 +17,8 @@ __all__ = ['CollideType', 'BBox', 'Volume', 'Collisions', 'Hit', 'trace_ray']
 @attrs.define
 class Collisions:
     """All the collisions for items in the map."""
-    # Bounding box -> items with that bounding box.
-    _by_bbox: RTree[BBox] = attrs.field(factory=RTree, repr=False, eq=False)
+    # type -> bounding box -> items with that bounding box.
+    _by_bbox: Dict[CollideType, RTree[BBox]] = attrs.field(factory=lambda: defaultdict(RTree), repr=False, eq=False)
     # Item names -> bounding boxes of that item
     _by_name: Dict[str, List[BBox]] = attrs.Factory(dict)
 
@@ -25,7 +26,7 @@ class Collisions:
         """Add the given bounding box to the map."""
         if not bbox.name:
             raise ValueError(f'Collision {bbox!r} must have a name to be inserted!')
-        self._by_bbox.insert(bbox.mins, bbox.maxes, bbox)
+        self._by_bbox[bbox.contents].insert(bbox.mins, bbox.maxes, bbox)
         lst = self._by_name.setdefault(bbox.name.casefold(), [])
         if bbox not in lst:
             lst.append(bbox)
@@ -34,7 +35,7 @@ class Collisions:
         """Remove the given bounding box from the map."""
         if not bbox.name:
             raise ValueError(f'Collision {bbox!r} must have a name to be removed!')
-        self._by_bbox.remove(bbox.mins, bbox.maxes, bbox)
+        self._by_bbox[bbox.contents].remove(bbox.mins, bbox.maxes, bbox)
         try:
             self._by_name[bbox.name.casefold()].remove(bbox)
         except LookupError:
