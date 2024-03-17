@@ -406,7 +406,7 @@ class BBox:
                 min_x, min_y, min_z, max_x, max_y, max_z,
                 contents=comb,
                 tags=self.tags,
-                name=f'{self.name}&{other.name}',
+                name=f'{self.name}&{other.name}' if self.name and other.name else '',
             )
         except NonBBoxError:  # Edge or corner, don't count those.
             return None
