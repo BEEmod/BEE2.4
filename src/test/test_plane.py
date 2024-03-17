@@ -100,6 +100,7 @@ def test_insertion_complex(pattern: List[Tuple[int, int]], off_x: int, off_y: in
             max_y = y
         assert plane.mins == (min_x, min_y)
         assert plane.maxes == (max_x, max_y)
+        assert plane.dimensions == (max_x - min_x, max_y - min_y)
 
         assert dict(plane.items()) == backup
         for (chk_x, chk_y), check in backup.items():

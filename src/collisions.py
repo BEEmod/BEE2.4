@@ -1,20 +1,21 @@
 """Defines the region of space items occupy and computes collisions."""
 from __future__ import annotations
 from typing import Iterable, Iterator, Sequence, Tuple, overload
-from typing_extensions import Self
+from typing_extensions import Self, Literal
 
 from enum import Flag, auto as enum_auto
 import functools
 import operator
 
-from srctools.vmf import UVAxis, VMF, Entity, Solid, Side
-from srctools.math import AnyAngle, AnyMatrix, FrozenVec, Matrix, Vec, to_matrix
+from srctools.vmf import VMF, Entity, Solid, Side
+from srctools.math import AnyAngle, AnyMatrix, FrozenVec, Matrix, Vec, to_matrix, lerp
 from srctools import conv_bool, logger
 import attrs
 
 import consts
 
 
+__all__ = ['NonBBoxError', 'CollideType', 'BBox', 'Volume', 'Hit', 'trace_ray']
 LOGGER = logger.get_logger(__name__)
 
 
@@ -97,6 +98,17 @@ EXPORT_KVALUES: Sequence[CollideType] = [
     CollideType.SOLID,
     CollideType.TEMPORARY,
 ]
+
+
+@attrs.frozen(kw_only=True)
+class Hit:
+    """Represents the impact of a raytrace."""
+    start: FrozenVec
+    direction: FrozenVec
+    distance: float
+    impact: FrozenVec
+    normal: FrozenVec  # Pointing outward at the hit location.
+    volume: BBox = attrs.field(repr=False)
 
 
 @attrs.frozen(init=False)
@@ -234,6 +246,11 @@ class BBox:
 
     def _with_points(self, point1: Vec | FrozenVec, point2: Vec | FrozenVec) -> BBox:
         """Return a new bounding box with the specified points, but this collision and tags."""
+        if (
+            point1 == (self.min_x, self.min_y, self.min_z) and
+            point2 == (self.max_x, self.max_y, self.max_z)
+        ):
+            return self
         return BBox(point1, point2, contents=self.contents, tags=self.tags, name=self.name)
 
     def with_attrs(
@@ -243,12 +260,25 @@ class BBox:
         tags: Iterable[str] | str | None = None,
     ) -> BBox:
         """Return a new bounding box with the name, contents or tags changed."""
+        if tags is not None:
+            tags = frozenset([tags] if isinstance(tags, str) else tags)
+            if tags == self.tags:  # Reuse the existing instance.
+                tags = self.tags
+        else:
+            tags = self.tags
+        if contents is None:
+            contents = self.contents
+        if name is None:
+            name = self.name
+
+        if name == self.name and contents is self.contents and tags is self.tags:
+            # Unchanged.
+            return self
+
         return BBox(
             self.min_x, self.min_y, self.min_z,
             self.max_x, self.max_y, self.max_z,
-            contents=contents if contents is not None else self.contents,
-            name=name if name is not None else self.name,
-            tags=tags if tags is not None else self.tags,
+            contents=contents, name=name, tags=tags,
         )
 
     @classmethod
@@ -314,13 +344,30 @@ class BBox:
         ent.solids.append(prism.solid)
         return ent
 
+    def as_volume(self) -> Volume:
+        """Convert to a Volume object."""
+        return Volume(
+            self.mins.freeze(), self.maxes.freeze(),
+            [
+                Plane(Vec.x_neg, -self.min_x),
+                Plane(Vec.x_pos, +self.max_x),
+                Plane(Vec.y_neg, -self.min_y),
+                Plane(Vec.y_pos, +self.max_y),
+                Plane(Vec.z_neg, -self.min_z),
+                Plane(Vec.z_pos, +self.max_z),
+            ],
+            name=self.name,
+            tags=self.tags,
+            contents=self.contents,
+        )
+
     def intersect(self, other: BBox) -> BBox | None:
         """Check if another bbox collides with this one.
 
         If so, return the bbox representing the overlap.
         """
         if isinstance(other, Volume):
-            # Make it do the logic.
+            # Only Volume knows how to intersect.
             return other.intersect(self)
 
         comb = self.contents & other.contents
@@ -357,9 +404,9 @@ class BBox:
         try:
             return BBox(
                 min_x, min_y, min_z, max_x, max_y, max_z,
-                contents=self.contents,
+                contents=comb,
                 tags=self.tags,
-                name=self.name,
+                name=f'{self.name}&{other.name}',
             )
         except NonBBoxError:  # Edge or corner, don't count those.
             return None
@@ -452,6 +499,109 @@ class BBox:
 
     # radd/rsub intentionally omitted. Don't allow inverting, that's nonsensical.
 
+    def trace_ray(self, start: Vec | FrozenVec, delta: Vec | FrozenVec) -> Hit | None:
+        """Trace a ray against the bbox, returning the hit position (if any).
+
+        :parameter start: The starting point for the ray.
+        :parameter delta: Both the direction and the maximum length to check.
+        """
+        start = FrozenVec(start)
+        delta = FrozenVec(delta)
+        # https://gamemath.com/book/geomtests.html#intersection_ray_aabb
+        inside = True
+        mins = self.mins
+        maxes = self.maxes
+
+        def check_plane(axis: Literal['x', 'y', 'z']) -> Tuple[float, float]:
+            """Determine where the intersection would be for each axial face pair."""
+            if start[axis] < mins[axis]:
+                time = mins[axis] - start[axis]
+                if time > delta[axis]:
+                    raise ValueError('No hit!')
+                time /= delta[axis]
+                return time, -1.0
+            elif start[axis] > maxes[axis]:
+                time = maxes[axis] - start[axis]
+                if time < delta[axis]:
+                    raise ValueError('No hit!')
+                time /= delta[axis]
+                return time, 1.0
+            else:
+                return -1.0, 0.0
+
+        try:
+            xt, xn = check_plane('x')
+            yt, yn = check_plane('y')
+            zt, zn = check_plane('z')
+        except ValueError:
+            return None
+
+        if xn == yn == zn == 0.0:
+            # Inside the box. We immediately impact.
+            direction = delta.norm()
+            return Hit(
+                start=start,
+                direction=direction,
+                normal=-direction,
+                impact=start,
+                distance=0.0,
+                volume=self,
+            )
+
+        plane: Literal['x', 'y', 'z'] = 'x'
+        time = xt
+        if yt > time:
+            time = yt
+            plane = 'y'
+        if zt > time:
+            time = zt
+            plane = 'z'
+        impact = start + delta * time
+
+        if mins <= impact <= maxes:
+            return Hit(
+                start=start,
+                direction=delta.norm(),
+                normal=FrozenVec.with_axes(plane, FrozenVec(xn, yn, zn)),
+                impact=impact,
+                distance=(impact - start).mag(),
+                volume=self,
+            )
+        else:
+            return None
+
+    def scale_to(self, axis: Literal['x', 'y', 'z'], mins: int, maxs: int) -> BBox:
+        """Resize the bounding box along an axis."""
+        new_bbox = BBox.__new__(BBox)
+        if axis == 'x':
+            if mins == self.min_x and maxs == self.max_x:
+                return self  # Unchanged, just return self
+            new_bbox.__attrs_init__(
+                mins, self.min_y, self.min_z,
+                maxs, self.max_y, self.max_z,
+                self.contents, self.name, self.tags,
+            )
+        elif axis == 'y':
+            if mins == self.min_y and maxs == self.max_y:
+                return self
+            new_bbox.__attrs_init__(
+                self.min_x, mins, self.min_z,
+                self.max_x, maxs, self.max_z,
+                self.contents, self.name, self.tags,
+            )
+        elif axis == 'z':
+            if mins == self.min_z and maxs == self.max_z:
+                return self
+
+            new_bbox.__attrs_init__(
+                self.min_x, self.min_y, mins,
+                self.max_x, self.max_y, maxs,
+                self.contents, self.name, self.tags,
+            )
+        else:
+            raise ValueError(f'Expected "x"/"y"/"z", got "{axis}"')
+        return new_bbox
+
 
 @attrs.frozen
 class Plane:
@@ -508,26 +658,17 @@ class Volume(BBox):  # type: ignore[override]
         solid = Solid(vmf)
         ent.solids.append(solid)
 
-        for plane in self.planes:
-            # Use this to pick two arbitrary planes for the UVs.
-            orient = Matrix.from_angle(plane.normal.to_angle())
+        solid.sides = [
             # Add 0.0 to convert -0 to +0.
-            point = plane.point.thaw() + (0.0, 0.0, 0.0)
-            u = -orient.left()
-            v = -orient.up()
-            solid.sides.append(Side(
-                vmf,
-                [
-                    point - 16 * u,
-                    point,
-                    point + 16 * v,
-                ],
-                mat=consts.Tools.CLIP,
-                uaxis=UVAxis(*u),
-                vaxis=UVAxis(*v),
-            ))
+            Side.from_plane(vmf, plane.point + (0, 0, 0), plane.normal, consts.Tools.CLIP)
+            for plane in self.planes
+        ]
 
         return ent
+
+    def as_volume(self) -> Volume:
+        """Returns this unchanged."""
+        return self
 
     def with_attrs(
         self, *,
@@ -535,7 +676,7 @@ class Volume(BBox):  # type: ignore[override]
         contents: CollideType | None = None,
         tags: Iterable[str] | str | None = None,
     ) -> Volume:
-        """Return a new bounding box with the name, contents or tags changed."""
+        """Return a new volume with the name, contents or tags changed."""
         return Volume(
             self.mins.freeze(), self.maxes.freeze(),
             self.planes,
@@ -545,6 +686,9 @@ class Volume(BBox):  # type: ignore[override]
         )
 
     def intersect(self, other: BBox) -> BBox | None:
+        if not isinstance(other, Volume):
+            other = other.as_volume()
+
         raise NotImplementedError("Intersections of volumes!")
 
     def __matmul__(self, other: AnyAngle | AnyMatrix) -> Volume:
@@ -561,48 +705,150 @@ class Volume(BBox):  # type: ignore[override]
             name=self.name,
         )
 
-    def __add__(self, other: Vec | FrozenVec | tuple[float, float, float]) -> Volume:
-        """Shift the bounding box forwards by this amount."""
-        if isinstance(other, BBox):  # Special-case error.
-            raise TypeError('Two bounding boxes cannot be added!')
-        other = FrozenVec(other)
+    def _shift(self, other: FrozenVec) -> Volume:
+        """Shift the bounding box by a vector."""
+        changed = False
 
-        planes = [
-            Plane(
-                plane.normal,
-                plane.distance + Vec.dot(plane.normal, other)
-            )
-            for plane in self.planes
-        ]
+        planes = []
+        for plane in self.planes:
+            offset = Vec.dot(plane.normal, other)
+            if abs(offset) > 1e-6:
+                planes.append(Plane(plane.normal, plane.distance + offset))
+                changed = True
+            else:
+                planes.append(plane)
 
         return Volume(
             self.mins.freeze() + other,
             self.maxes.freeze() + other,
-            planes=planes,
+            planes=planes if changed else self.planes,
             contents=self.contents,
             tags=self.tags,
             name=self.name,
         )
+
+    def __add__(self, other: Vec | FrozenVec | tuple[float, float, float]) -> Volume:
+        """Shift the bounding box forwards by this amount."""
+        if isinstance(other, BBox):  # Special-case error.
+            raise TypeError('Two bounding boxes cannot be added!')
+        return self._shift(FrozenVec(other))
 
     def __sub__(self, other: Vec | FrozenVec | tuple[float, float, float]) -> Volume:
         """Shift the bounding box backwards by this amount."""
         if isinstance(other, BBox):  # Special-case error.
             raise TypeError('Two bounding boxes cannot be subtracted!')
-        other = FrozenVec(other)
+        return self._shift(-FrozenVec(other))
 
-        planes = [
-            Plane(
-                plane.normal,
-                plane.distance - Vec.dot(plane.normal, other),
-            )
-            for plane in self.planes
-        ]
+    def trace_ray(self, start: Vec | FrozenVec, delta: Vec | FrozenVec) -> Hit | None:
+        """Trace a ray against the bbox, returning the hit position (if any).
 
+        :parameter start: The starting point for the ray.
+        :parameter delta: Both the direction and the maximum length to check.
+        """
+        start = FrozenVec(start)
+        delta = FrozenVec(delta)
+
+        # Early out, check against the bbox first.
+        if super().trace_ray(start, delta) is None:
+            return None
+
+        max_dist = delta.mag()
+        direction = delta / max_dist
+
+        best_hit: Hit | None = None
+        inside = True
+        for plane in self.planes:
+            dot = Vec.dot(plane.normal, direction)
+            # If perpendicular or facing in the same direction, the ray can't trace into it.
+            if dot <= 0.0:
+                # Check if the start point is inside the plane.
+                if Vec.dot(start, plane.normal) < plane.distance:
+                    inside = False
+                continue
+            t = (plane.distance - Vec.dot(start, plane.normal)) / dot
+            if not (0.0 <= t <= max_dist) or (best_hit is not None and t > best_hit.distance):
+                # Not in bounds for the ray, or worse than our best result.
+                continue
+            impact = start + t * direction
+            # Check this impact is actually possible.
+            for other_plane in self.planes:
+                if other_plane is plane:
+                    continue
+                if Vec.dot(impact, other_plane.normal) < other_plane.distance:
+                    # We're outside this plane, the impact is wrong.
+                    break
+            else:  # All other plane tests succeeded.
+                best_hit = Hit(
+                    start=start,
+                    direction=direction,
+                    impact=impact,
+                    normal=plane.normal,
+                    distance=t,
+                    volume=self,
+                )
+
+        if best_hit is None:
+            if inside:
+                # The start point is inside all the planes, so we started inside.
+                return Hit(
+                    start=start,
+                    direction=direction,
+                    normal=-direction,
+                    impact=start,
+                    distance=0.0,
+                    volume=self,
+                )
+            else:
+                return None
+        return best_hit
+
+    def scale_to(self, axis: Literal['x', 'y', 'z'], mins: int, maxs: int) -> Volume:
+        """Resize the bounding box along an axis."""
+        bb_mins = self.mins
+        bb_maxes = self.maxes
+
+        old_mins = bb_mins[axis]
+        old_maxs = bb_maxes[axis]
+
+        if old_mins == mins and old_maxs == maxs:
+            # Already aligned.
+            return self
+
+        bb_mins[axis] = mins
+        bb_maxes[axis] = maxs
+
+        matrix = Matrix()
+        axis_ind = 'xyz'.index(axis)
+        matrix[axis_ind, axis_ind] = (maxs - mins) / (old_maxs - old_mins)
+        # For normals.
+        inverse = matrix.inverse().transpose()
+        new_planes = []
+        for plane in self.planes:
+            point = plane.point.thaw()
+            point[axis] = lerp(point[axis], old_mins, old_maxs, mins, maxs)
+            norm = (plane.normal @ inverse).norm()
+            dist = Vec.dot(norm, point)
+            if norm == plane.normal and abs(dist - plane.distance) < 1e-6:
+                new_planes.append(plane)
+            else:
+                new_planes.append(Plane(norm, dist))
         return Volume(
-            self.mins.freeze() - other,
-            self.maxes.freeze() - other,
-            planes=planes,
-            contents=self.contents,
-            tags=self.tags,
-            name=self.name,
+            bb_maxes.freeze(), bb_maxes.freeze(),
+            new_planes,
+            contents=self.contents, name=self.name, tags=self.tags,
         )
+
+
+def trace_ray(start: Vec | FrozenVec, delta: Vec | FrozenVec, volumes: Iterable[BBox]) -> Hit | None:
+    """Trace a ray against multiple bboxes/volumes, returning the hit position (if any).
+
+    :raises ValueError: If no hit occured.
+    :parameter start: The starting point for the ray.
+    :parameter delta: Both the direction and the maximum length to check.
+    """
+    best_hit: Hit | None = None
+    for volume in volumes:
+        hit = volume.trace_ray(start, delta)
+        if hit is not None and (best_hit is None or best_hit.distance > hit.distance):
+            best_hit = hit
+    return best_hit

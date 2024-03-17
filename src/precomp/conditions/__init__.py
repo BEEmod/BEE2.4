@@ -876,7 +876,7 @@ def import_conditions() -> None:
     # or add_result() functions, which save the functions into our dicts.
     from . import ( # noqa
         _scaffold_compat, addInstance, antlines, apTag, brushes, catwalks, collisions, connections,
-        conveyorBelt, custItems, cutoutTile, entities, errors, faithplate, fizzler, glass, globals,
+        conveyorBelt, custItems, cutoutTile, entities, errors, faithplate, fizzler, barriers, globals,
         instances, linked_items, logical, marker, monitor, piston_platform, positioning, python,
         randomise, removed, resizableTrigger, sendificator, signage, trackPlat, vactubes,
     )
@@ -1156,7 +1156,7 @@ def fetch_debug_visgroup(
     def adder(target: str | Entity | Solid, /, **kwargs: ValidKVs) -> Entity | Solid:
         """Add a marker to the map."""
         if isinstance(target, str):
-            comment = kwargs.pop('comment', '')
+            comment = kwargs.pop('comments', kwargs.pop('comment', ''))
             target = vmf.create_ent(target, **kwargs)
             target.comments = str(comment)
         elif isinstance(target, Solid):

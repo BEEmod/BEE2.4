@@ -166,11 +166,9 @@ async def load_settings() -> Tuple[
     for cond in conf.find_all('conditions', 'condition'):
         conditions.add(cond)
 
-    # Data for different cube types.
     cubes.parse_conf(conf)
-
-    # Fizzler data
     fizzler.read_configs(conf)
+    barriers.parse_conf(conf)
 
     # Selected corridors.
     corridor_conf = res_corr()
@@ -1644,7 +1642,7 @@ async def main() -> None:
         change_ents(vmf)
 
         fizzler.parse_map(vmf, info)
-        barriers.parse_map(vmf, info)
+        barriers.parse_map(vmf, connections.ITEMS)
         # We have barriers, pass to our error display.
         errors.load_barriers(barriers.BARRIERS)
 

@@ -2,6 +2,7 @@
 """
 from __future__ import annotations
 from collections.abc import Iterator, Iterable
+from typing import Callable, Sequence
 
 import attrs
 from srctools import Angle, Vec, Keyvalues, Entity, VMF, Solid, Matrix
@@ -39,11 +40,11 @@ class Config:
 
     # For straight instances, a size (multiple of 128) -> instance.
     inst_straight: dict[int, str]
-    # And those sizes from large to small.
-    inst_straight_sizes: list[int] = attrs.field(init=False)
-    @inst_straight_sizes.default
-    def _straight_size(self) -> list[int]:
-        return sorted(self.inst_straight.keys(), reverse=True)
+    # Then a "fitter" to assemble those into an optimum pattern.
+    inst_straight_fitter: Callable[[int], Sequence[int]] = attrs.field(init=False)
+
+    def __attrs_post_init__(self) -> None:
+        self.inst_straight_fitter = utils.get_piece_fitter(self.inst_straight.keys())
 
 
 @attrs.define
@@ -362,7 +363,7 @@ def make_straight(
         push_trigger(vmf, origin, normal, [solid])
 
     off = 0
-    for seg_dist in utils.fit(dist, config.inst_straight_sizes):
+    for seg_dist in config.inst_straight_fitter(dist):
         conditions.add_inst(
             vmf,
             origin=origin + off * orient.forward(),

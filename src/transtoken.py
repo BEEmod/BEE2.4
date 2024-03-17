@@ -65,7 +65,7 @@ DUMMY: Final = Language(lang_code='dummy', trans={})
 # It's initialised to a basic version, in case we're running in the compiler.
 ui_format_getter: Callable[[str], Optional[string.Formatter]] = lambda lang, /: None
 # Similarly, joins a list given the language, kind of list and children.
-ui_list_getter: Callable[[str, ListStyle, List[str]], str] = lambda lang, kind, children, /: ' ,'.join(children)
+ui_list_getter: Callable[[str, ListStyle, List[str]], str] = lambda lang, kind, children, /: ', '.join(children)
 
 
 class HTMLFormatter(string.Formatter):

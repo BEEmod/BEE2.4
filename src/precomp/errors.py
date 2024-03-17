@@ -8,11 +8,12 @@ import pickle
 from srctools import FrozenVec, Vec, VMF, AtomicWriter, logger
 import attrs
 
+import utils
+from plane import Plane
 from user_errors import DATA_LOC, UserError, TOK_VBSP_LEAK
 from precomp.tiling import TileDef, TileType
-from precomp.barriers import BarrierType
 from precomp.brushLoc import Grid
-from precomp import options
+from precomp import options, barriers, grid_optim
 import consts
 
 
@@ -36,13 +37,11 @@ def _vec2tup(vec: Vec | FrozenVec) -> tuple[float, float, float]:
 
 def load_tiledefs(tiles: Iterable[TileDef], grid: Grid) -> None:
     """Load tiledef info into a simplified tiles list."""
-    # noinspection PyProtectedMember
-    simple_tiles = UserError._simple_tiles
 
-    tiles_white = simple_tiles["white"] = []
-    tiles_black = simple_tiles["black"] = []
-    tiles_goo_partial = simple_tiles["goopartial"] = []
-    tiles_goo_full = simple_tiles["goofull"] = []
+    tiles_white = UserError.simple_tiles["white"]
+    tiles_black = UserError.simple_tiles["black"]
+    tiles_goo_partial = UserError.simple_tiles["goopartial"]
+    tiles_goo_full = UserError.simple_tiles["goofull"]
     for tile in tiles:
         if not tile.base_type.is_tile:
             continue
@@ -62,32 +61,45 @@ def load_tiledefs(tiles: Iterable[TileDef], grid: Grid) -> None:
         tile_list.append({
             'orient': NORM_2_ORIENT[tile.normal.freeze()],
             'position': _vec2tup((tile.pos + 64 * tile.normal) / 128),
+            'width': 1.0,
+            'height': 1.0,
         })
-    goo_tiles = simple_tiles["goo"] = []
+    goo_tiles = UserError.simple_tiles["goo"]
     for pos, block in grid.items():
         if block.is_top:  # Both goo and bottomless pits.
             goo_tiles.append({
                 'orient': 'd',
                 'position': _vec2tup(pos + (0.5, 0.5, 0.75)),
+                'width': 1.0,
+                'height': 1.0,
             })
+    LOGGER.info('Stored map geometry for error display.')
 
 
-def load_barriers(barriers: dict[tuple[FrozenVec, FrozenVec], BarrierType]) -> None:
+def load_barriers(barrier_map: dict[utils.SliceKey, Plane[barriers.Barrier]]) -> None:
     """Load barrier data for display in errors."""
-    # noinspection PyProtectedMember
-    glass_list = UserError._simple_tiles["glass"] = []
-    # noinspection PyProtectedMember
-    grate_list = UserError._simple_tiles["grating"] = []
-    kind_to_list = {
-        BarrierType.GLASS: glass_list,
-        BarrierType.GRATING: grate_list,
-    }
-    for (pos, normal), kind in barriers.items():
-        pos = pos + 56.0 * normal
-        kind_to_list[kind].append({
-            'orient': NORM_2_ORIENT[normal],
-            'position': _vec2tup(pos / 128.0),
-        })
+    for slice_key, plane in barrier_map.items():
+        orient = NORM_2_ORIENT[slice_key.normal]
+        for min_u, min_v, max_u, max_v, barrier in grid_optim.optimise(plane):
+            if barrier.type.error_disp is None:
+                continue
+            try:
+                tile_list = UserError.simple_tiles[barrier.type.error_disp]
+            except KeyError:
+                continue
+            max_u += 1
+            max_v += 1
+            pos = slice_key.plane_to_world(
+                32.0 * (min_u + max_u) / 2.0,
+                32.0 * (min_v + max_v) / 2.0,
+                1.0,
+            )
+            tile_list.append({
+                'orient': orient,
+                'position': _vec2tup(pos / 128.0),
+                'width': 0.25 * (max_u - min_u),
+                'height': 0.25 * (max_v - min_v),
+            })
 
 
 def make_map(error: UserError) -> VMF:

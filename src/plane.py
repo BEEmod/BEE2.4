@@ -50,6 +50,11 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
         """Return the maximum bounding point ever set."""
         return self._max_x, self._max_y
 
+    @property
+    def dimensions(self) -> tuple[int, int]:
+        """Return the difference between the mins and maxes."""
+        return self._max_x - self._min_x, self._max_y - self._min_y
+
     def __len__(self) -> int:
         """The length is the number of used slots."""
         return self._used
@@ -103,6 +108,24 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
     def __getitem__(self, pos: tuple[float, float]) -> ValT:
         """Return the value at a given position."""
         return self.get(pos, self.default)
+
+    def __contains__(self, pos: tuple[float, float] | object) -> bool:
+        """Check if a value is set at the given location."""
+        try:
+            x, y = map(int, pos)  # type: ignore
+        except (ValueError, TypeError):
+            return False
+
+        y += self._yoff
+        if y < 0:
+            return False
+        try:
+            x += self._xoffs[y]
+            if x < 0:
+                return False
+            return (row := self._data[y]) is not None and row[x] is not _UNSET
+        except IndexError:
+            return False
 
     @overload
     def get(self, __key: tuple[float, float]) -> Optional[ValT]: ...
@@ -222,8 +245,12 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
             raise KeyError(pos) from None
 
         y += self._yoff
+        if y < 0:
+            return
         try:
             x += self._xoffs[y]
+            if x < 0:
+                return
             if (row := self._data[y]) is not None and row[x] is not _UNSET:
                 self._used -= 1
                 row[x] = _UNSET

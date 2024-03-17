@@ -5,12 +5,12 @@ import attrs
 from srctools import Entity, Matrix, VMF, Vec
 from srctools.vmf import EntityGroup
 
-from collisions import CollideType as CollideType, BBox as BBox, Volume as Volume  # re-export.
+from collisions import *  # re-export.
 from editoritems import Item
 from tree import RTree
 
 
-__all__ = ['CollideType', 'BBox', 'Volume', 'Collisions']
+__all__ = ['CollideType', 'BBox', 'Volume', 'Collisions', 'Hit', 'trace_ray']
 
 
 @attrs.define

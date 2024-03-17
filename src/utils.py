@@ -1,14 +1,19 @@
 """Various functions shared among the compiler and application."""
 from __future__ import annotations
+
 from typing import (
-    Final, NewType, TYPE_CHECKING, Any, Awaitable, Callable, Generator, Generic, ItemsView,
-    Iterable, Iterator, KeysView, Mapping, NoReturn, Optional,
-    Sequence, SupportsInt, Tuple, Type, TypeVar, ValuesView,
+    ClassVar, Collection, Final, NewType, TYPE_CHECKING, Any, Awaitable, Callable, Generator,
+    Generic,
+    ItemsView, Iterable, Iterator, KeysView, Mapping, NoReturn, Optional, Sequence, SupportsInt,
+    Tuple, Type, TypeVar, ValuesView,
 )
+
 from typing_extensions import ParamSpec, TypeVarTuple, Unpack
 from collections import deque
 from enum import Enum
 from pathlib import Path
+import functools
+import itertools
 import copyreg
 import logging
 import os
@@ -17,8 +22,10 @@ import stat
 import sys
 import types
 import zipfile
+import math
 
-from srctools import Angle
+from srctools.math import AnyVec, Angle, FrozenMatrix, FrozenVec, Vec
+import attrs
 import trio
 
 
@@ -26,7 +33,7 @@ __all__ = [
     'WIN', 'MAC', 'LINUX', 'STEAM_IDS', 'DEV_MODE', 'CODE_DEV_MODE', 'BITNESS',
     'get_git_version', 'install_path', 'bins_path', 'conf_location', 'fix_cur_directory',
     'run_bg_daemon', 'not_none', 'CONN_LOOKUP', 'CONN_TYPES', 'freeze_enum_props', 'FuncLookup',
-    'PackagePath', 'Result', 'acompose', 'get_indent', 'iter_grid', 'check_cython',
+    'PackagePath', 'Result', 'SliceKey', 'acompose', 'get_indent', 'iter_grid', 'check_cython',
     'check_shift', 'fit', 'group_runs', 'restart_app', 'quit_app', 'set_readonly',
     'unset_readonly', 'merge_tree', 'write_lang_pot',
 ]
@@ -71,6 +78,17 @@ copyreg.add_extension('srctools.math', '_mk_fvec', 243)
 copyreg.add_extension('srctools.math', '_mk_fang', 244)
 copyreg.add_extension('srctools.math', '_mk_fmat', 245)
 copyreg.add_extension('srctools.keyvalues', 'Keyvalues', 246)
+
+lcm: Callable[[int, int], int]
+try:
+    from math import lcm
+except ImportError:
+    def lcm(a: int, b: int) -> int:
+        """Calculate the lowest common multiple.
+
+        TODO: Remove once we drop 3.8.
+        """
+        return (a * b) // math.gcd(a, b)
 
 
 # Appropriate locations to store config options for each OS.
@@ -449,20 +467,23 @@ class FuncLookup(Generic[LookupT], Mapping[str, LookupT]):
 
 # An object ID, which has been made uppercase. This excludes <> and [] names.
 ObjectID = NewType("ObjectID", str)
-# Special ID includes <>/[] names
+# Special ID includes <>/[] names, and ''.
 SpecialID = NewType("SpecialID", str)
+
+ID_NONE: Final = SpecialID('<NONE>')
+ID_EMPTY: Final = SpecialID('')
 
 
 def parse_obj_id(value: str) -> ObjectID:
     """Parse an object ID."""
-    if value.startswith(('(', '<', '[')) or value.endswith((')', '>', ']')):
+    if not value or value.startswith(('(', '<', '[')) or value.endswith((')', '>', ']')):
         raise ValueError(f'Invalid object ID "{value}". IDs may not start/end with brackets.')
     return ObjectID(value.casefold().upper())
 
 
 def parse_obj_special_id(value: str) -> ObjectID | SpecialID:
     """Parse an object ID or a special name."""
-    if value.startswith(('(', '<', '[')) or value.endswith((')', '>', ']')):
+    if not value or value.startswith(('(', '<', '[')) or value.endswith((')', '>', ']')):
         return SpecialID(value.casefold())
     else:
         return ObjectID(value.casefold().upper())
@@ -517,6 +538,89 @@ class PackagePath:
         """Return a child file of this package."""
         child = child.rstrip('\\/')
         return PackagePath(self.package, f'{self.path.rstrip("/")}/{child}')
+
+
+@attrs.frozen(eq=False, hash=False, init=False)
+class SliceKey:
+    """A hashable key used to identify 2-dimensional plane slices."""
+    # Reuse the same instance for the vector, and precompute the hash.
+    _norm_cache: ClassVar[Mapping[FrozenVec, Tuple[FrozenVec, int]]] = {
+        FrozenVec.N: (FrozenVec.N, hash(b'n')),
+        FrozenVec.S: (FrozenVec.S, hash(b's')),
+        FrozenVec.E: (FrozenVec.E, hash(b'e')),
+        FrozenVec.W: (FrozenVec.W, hash(b'w')),
+        FrozenVec.T: (FrozenVec.T, hash(b't')),
+        FrozenVec.B: (FrozenVec.B, hash(b'b')),
+    }
+    # The orientation points Z = normal, X = sideways, Y = upward.
+    _orients: ClassVar[Mapping[FrozenVec, FrozenMatrix]] = {
+        FrozenVec.N: FrozenMatrix.from_basis(x=Vec(-1, 0, 0), y=Vec(0, 0, 1)),
+        FrozenVec.S: FrozenMatrix.from_basis(x=Vec(1, 0, 0), y=Vec(0, 0, 1)),
+        FrozenVec.E: FrozenMatrix.from_basis(x=Vec(0, 1, 0), y=Vec(0, 0, 1)),
+        FrozenVec.W: FrozenMatrix.from_basis(x=Vec(0, -1, 0), y=Vec(0, 0, 1)),
+        FrozenVec.T: FrozenMatrix.from_basis(x=Vec(1, 0, 0), y=Vec(0, 1, 0)),
+        FrozenVec.B: FrozenMatrix.from_basis(x=Vec(-1, 0, 0), y=Vec(0, 1, 0)),
+    }
+    _inv_orients: ClassVar[Mapping[FrozenVec, FrozenMatrix]] = {
+        norm: orient.transpose()
+        for norm, orient in _orients.items()
+    }
+
+    normal: FrozenVec
+    distance: float
+    _hash: int = attrs.field(repr=False)
+
+    def __init__(self, normal: AnyVec, dist: AnyVec | float) -> None:
+        try:
+            norm, norm_hash = self._norm_cache[FrozenVec(normal)]
+        except KeyError:
+            raise ValueError(f'{normal!r} is not an on-axis normal!')
+        if not isinstance(dist, (int, float)):
+            dist = norm.dot(dist)
+
+        self.__attrs_init__(
+            norm,
+            dist,
+            hash(dist) ^ norm_hash,
+        )
+
+    @property
+    def orient(self) -> FrozenMatrix:
+        """Return a matrix with the forward direction facing along the slice."""
+        return self._orients[self.normal]
+
+    def left(self) -> Vec:
+        """Return the +Y axis for this slice orientation, where +X is along the normal."""
+        return self._orients[self.normal].left()
+
+    def up(self) -> Vec:
+        """Return the +Z axis for this slice orientation, where +X is along the normal."""
+        return self._orients[self.normal].up()
+
+    def __hash__(self) -> int:
+        return self._hash
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, SliceKey):
+            return self.normal is other.normal and self.distance == other.distance
+        else:
+            return NotImplemented
+
+    def __ne__(self, other: object) -> bool:
+        if isinstance(other, SliceKey):
+            return self.normal is not other.normal or self.distance != other.distance
+        else:
+            return NotImplemented
+
+    def plane_to_world(self, x: float, y: float, z: float = 0.0) -> Vec:
+        """Return a position relative to this plane."""
+        orient = self._orients[self.normal]
+        return Vec(x, y, z) @ orient + self.normal * self.distance
+
+    def world_to_plane(self, pos: AnyVec) -> Vec:
+        """Take a world position and return the location relative to this plane."""
+        orient = self._inv_orients[self.normal]
+        return (Vec(pos) - self.normal * self.distance) @ orient
 
 
 ResultT = TypeVar('ResultT')
@@ -663,6 +767,82 @@ def _append_bothsides(deq: deque[T]) -> Generator[None, T, None]:
     while True:
         deq.append((yield))
         deq.appendleft((yield))
+
+
+def get_piece_fitter(sizes: Collection[int]) -> Callable[[SupportsInt], Sequence[int]]:
+    """Compute the smallest number of repeated sizes that add up to the specified distance.
+
+    We tend to reuse the set of sizes, so this allows caching some computation.
+    """
+    size_list = sorted(sizes)
+
+    if not size_list:
+        def always_fails(size: SupportsInt) -> NoReturn:
+            """No pieces, always fails."""
+            raise ValueError(f'No solution to fit {size}, no pieces provided!')
+
+        return always_fails
+
+    # First, for each size other than the largest, calculate the lowest common multiple between
+    # it and all larger sizes.
+    # That tells us how many of the small one we'd need before it can be matched by the next size up,
+    # and more is therefore useless.
+    counters: list[range] = []
+    for i, small in enumerate(size_list[:-1]):
+        multiple = min(lcm(small, large) for large in size_list[i+1:])
+        counters.append(range(multiple // small))
+
+    *pieces, largest = size_list
+    pieces.reverse()
+    counters.reverse()
+
+    solutions: dict[int, list[int]] = {}
+    largest = size_list[-1]
+
+    # Now, pre-calculate every combination of smaller pieces.
+    # That's the hard part, but there's only a smaller amount of those.
+    for tup in itertools.product(*counters):
+        count = sum(tup)
+        result = sum(x * y for x, y in zip(tup, pieces))
+        try:
+            existing = solutions[result]
+        except KeyError:
+            pass
+        else:
+            if len(existing) < count:
+                continue
+        # Otherwise this solution is better, add it.
+        solutions[result] = [
+            size for size, count in zip(pieces, tup)
+            for _ in range(count)
+        ]
+
+    @functools.lru_cache
+    def calculate(size: SupportsInt) -> Sequence[int]:
+        """Compute a solution."""
+        size = int(size)
+
+        # Figure out how many large pieces are required before we'd overshoot.
+        cutoff = math.ceil(size / largest)
+
+        # Try each potential large piece to see if we have a solution
+        # for the remaining amount. Start with the most large pieces we can, that should
+        # give a more optimal smaller count. If none match, there is no solution.
+        best: list[int] | None = None
+        for large_count in reversed(range(cutoff + 1)):
+            part = size - large_count * largest
+            try:
+                potential = solutions[part] + [largest] * large_count
+            except KeyError:
+                continue
+            if best is None or len(potential) < len(best):
+                best = potential
+        if best is not None:
+            return best
+        else:
+            raise ValueError(f'No solution to fit {size} with {size_list}')
+
+    return calculate  # type: ignore[return-value]  # lru_cache issues
 
 
 def fit(dist: SupportsInt, obj: Sequence[int]) -> list[int]:

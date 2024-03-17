@@ -254,7 +254,7 @@ def res_piston_plat(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
             template_brush.retexture_template(
                 temp_result,
                 origin,
-                pist_ent.fixup,
+                pist_ent,
                 generator=GenCat.PANEL,
             )
 
