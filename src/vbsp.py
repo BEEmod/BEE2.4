@@ -698,7 +698,7 @@ def add_fog_ents(vmf: VMF, info: corridor.Info) -> None:
             'OnMapSpawn',
             '@clientcommand',
             'Command',
-            'r_flashlightbrightness 1',
+            'r_flashlightbrightness 3',
         ),
 
         Output(
