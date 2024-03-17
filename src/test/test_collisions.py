@@ -368,12 +368,16 @@ def test_volume_rotation(file_regression: FileRegressionFixture) -> None:
         for side in ent.sides():
             side.planes = [round(vec, 6) for vec in side.planes]
             side.uaxis = UVAxis(
-                *round(side.uaxis.vec() + (0, 0, 0), 6),
+                round(side.uaxis.x + 0.0, 6),
+                round(side.uaxis.y + 0.0, 6),
+                round(side.uaxis.z + 0.0, 6),
                 round(side.uaxis.offset),
                 side.uaxis.scale,
             )
             side.vaxis = UVAxis(
-                *round(side.vaxis.vec() + (0, 0, 0), 6),
+                round(side.vaxis.x + 0.0, 6),
+                round(side.vaxis.y + 0.0, 6),
+                round(side.vaxis.z + 0.0, 6),
                 round(side.vaxis.offset),
                 side.vaxis.scale,
             )

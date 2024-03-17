@@ -17,7 +17,7 @@ async def test_basic_operation() -> None:
 
     # Can't trigger when no task is waiting.
     with pytest.raises(ValueError):
-        trigger.trigger()
+        trigger.trigger()  # type: ignore
 
     async def wait_task() -> None:
         """Wait for the trigger."""
@@ -84,7 +84,7 @@ async def test_no_arg() -> None:
     async def wait_task() -> None:
         """Wait for the trigger."""
         event.set()
-        value = await trigger.wait()
+        value = await trigger.wait()  # type: ignore[func-returns-value]
         assert_type(value, None)
         assert value is None
 
