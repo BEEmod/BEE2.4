@@ -59,6 +59,12 @@ class PlaneKey:
         self.__attrs_init__(norm, dist, hash(dist) ^ norm_hash)
 
     @property
+    def is_horizontal(self) -> bool:
+        """Return whether this is pointing up or down."""
+        # We reuse one of the preset vectors, so direct comparison is all that's required.
+        return self.normal.z != 0.0
+
+    @property
     def orient(self) -> FrozenMatrix:
         """Return a matrix with the forward direction facing along the slice."""
         return self._orients[self.normal]

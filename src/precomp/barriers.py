@@ -476,7 +476,7 @@ class Brush(Surface):
             ent['origin'] = ent.get_origin()
 
         if self.static_player_clip:
-            if abs(plane.normal.z) > 0.5:
+            if plane.is_horizontal:
                 ent['classname'] = 'func_brush'
                 ent['solidbsp'] = '1'
                 # Create an additional clip to block through portals.
@@ -1133,7 +1133,7 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
     group_id = 0
     for plane_slice, plane in BARRIERS.items():
         # If set, it's a floor/ceiling barrier, not a wall.
-        is_flat = abs(plane_slice.normal.z) > 0.5
+        is_flat = plane_slice.is_horizontal
         hole_plane = HOLES[plane_slice]
         for barrier, group_plane in find_plane_groups(plane):
             group_id += 1
@@ -1534,7 +1534,7 @@ def place_straight_run(
     direction = Vec(off_u, off_v) @ plane.orient
     if backwards:
         direction = -direction
-    if abs(plane.normal.z) > 0.5:
+    if plane.is_horizontal:
         frame_orient = FrameOrient.FLAT
     else:
         frame_orient = FrameOrient.HORIZ if abs(direction.z) < 0.5 else FrameOrient.VERT
@@ -1610,7 +1610,7 @@ def add_glass_floorbeams(
     """Add beams to separate large glass panels. This is rather special cased for P1 style."""
     conf = barrier.type.floorbeam
     # Don't add if none or defined or not flat.
-    if conf is None or plane.normal.z == 0.0:
+    if conf is None or not plane.is_horizontal:
         return
 
     # Our beams align to the smallest axis.
