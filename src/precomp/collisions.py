@@ -87,6 +87,8 @@ class Collisions:
         for coll_type, tree in self._by_bbox.items():
             if coll_type & self.vscript_flags is CollideType.NOTHING:
                 continue
+            if CollideType.SOLID in coll_type:
+                continue  # This would produce an excessive amount of data.
             for mins, maxs, volume in tree:
                 center = (volume.mins + volume.maxes) / 2
                 ent = vmf.create_ent(

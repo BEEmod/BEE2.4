@@ -123,8 +123,14 @@ def res_vscript_export(coll: Collisions, inst: Entity, res: Keyvalues) -> None:
     """Mark the specified collision type as being required for VScript code.
 
     All collision volumes containing that type will be written into a VScript database for querying
-    at runtime. Don't use a common value like SOLID, that'll produce a big table.
+    at runtime.
+
+    The SOLID type is excluded, since TraceLine should handle that, and it'd be a massive table.
     """
     content = CollideType.parse(inst.fixup.substitute(res.value))
     LOGGER.info('Marking collision type(s) {} to be exported to VScript!', content)
     coll.vscript_flags |= content
+
+    if CollideType.SOLID in content:
+        LOGGER.warning('Cannot export SOLID to VScript!')
+        coll.vscript_flags &= ~CollideType.SOLID
