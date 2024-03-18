@@ -189,7 +189,7 @@ class Hole:
     inst: Entity
     type: HoleType
     variant: HoleConfig
-    plane: plane.PlaneKey
+    plane: PlaneKey
     orient: FrozenMatrix
     origin: Vec
     # If true, we found a matching barrier this was inserted into.
