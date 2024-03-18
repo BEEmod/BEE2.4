@@ -1,9 +1,11 @@
 """Records the collisions for each item."""
 from collections import defaultdict
-from typing import Dict, List
+from io import StringIO
+from typing import Dict, List, Optional
 
 import attrs
 from srctools import Entity, Matrix, VMF, Vec
+from srctools.math import format_float
 from srctools.vmf import EntityGroup
 
 from collisions import *  # re-export.
@@ -59,8 +61,8 @@ class Collisions:
         for coll in item.collisions:
             self.add((coll @ orient + origin).with_attrs(name=inst['targetname']))
 
-    def dump(self, vmf: VMF, vis_name: str = 'Collisions') -> None:
-        """Dump all the bounding boxes as a set of brushes."""
+    def export_debug(self, vmf: VMF, vis_name: str) -> None:
+        """After compilation, export all collisions for debugging purposes."""
         visgroup = vmf.create_visgroup(vis_name)
         for name, bb_list in self._by_name.items():
             group = EntityGroup(vmf, shown=False)
@@ -72,3 +74,27 @@ class Collisions:
                 ent.groups.add(group.id)
                 ent.vis_shown = False
                 ent.hidden = True
+
+    def export_vscript(self, vmf: VMF) -> None:
+        """After compilation, export a subset of collisions to VScript files.
+
+        This allows traces to be performed at runtime.
+        """
+        if self.vscript_flags is CollideType.NOTHING:
+            return
+        vmf.spawn['bee2_vscript_coll_mask'] = self.vscript_flags.value
+
+        for coll_type, tree in self._by_bbox.items():
+            if coll_type & self.vscript_flags is CollideType.NOTHING:
+                continue
+            for mins, maxs, volume in tree:
+                ent = vmf.create_ent(
+                    'bee2_vscript_collision',
+                    origin=(volume.mins + volume.maxes) / 2,
+                    mins=volume.mins,
+                    maxs=volume.maxes,
+                    contents=coll_type.value,
+                )
+                if isinstance(volume, Volume):
+                    for i, plane in enumerate(volume.planes, 1):
+                        ent[f'plane_{i:02}'] = f'{plane.normal} {format_float(plane.distance)}'

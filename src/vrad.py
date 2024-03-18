@@ -59,8 +59,7 @@ def load_transforms() -> None:
         finder.load_all()
 
     # Load our additional BSP transforms.
-    # noinspection PyUnresolvedReferences
-    from postcomp import coop_responses, filter, user_error, debug_info  # noqa: F401
+    from postcomp import coop_responses, filter, user_error, debug_info, collisions_export  # noqa: F401
 
 
 def run_vrad(args: List[str]) -> None:

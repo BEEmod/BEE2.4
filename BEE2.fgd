@@ -201,6 +201,34 @@
 
 // Entities added to the finished map to pass information to VRAD.
 	
+
+@PointClass
+	wirebox(mins, maxs)
+	iconsprite("BEE2/editor/bee2_icon.vmt")
+= bee2_vscript_collision: "Stores a collision volume of either type, to be exported to VScript."
+	[
+	mins(vector) : "Mins"
+	maxs(vector) : "Maxes"
+	contents(integer) : "Contents" : 0 : "Collision type."
+
+	plane_01(string) : "Plane" : : "X Y Z distance."
+	plane_02(string) : "Plane" : : "X Y Z distance."
+	plane_03(string) : "Plane" : : "X Y Z distance."
+	plane_04(string) : "Plane" : : "X Y Z distance."
+	plane_05(string) : "Plane" : : "X Y Z distance."
+	plane_06(string) : "Plane" : : "X Y Z distance."
+	plane_07(string) : "Plane" : : "X Y Z distance."
+	plane_08(string) : "Plane" : : "X Y Z distance."
+	plane_09(string) : "Plane" : : "X Y Z distance."
+	plane_10(string) : "Plane" : : "X Y Z distance."
+	plane_11(string) : "Plane" : : "X Y Z distance."
+	plane_12(string) : "Plane" : : "X Y Z distance."
+	plane_13(string) : "Plane" : : "X Y Z distance."
+	plane_14(string) : "Plane" : : "X Y Z distance."
+	plane_15(string) : "Plane" : : "X Y Z distance."
+	plane_16(string) : "Plane" : : "X Y Z distance."
+	]
+
 @PointClass
 	base(Angles)
 	iconsprite("BEE2/editor/bee2_icon.vmt")
@@ -318,6 +346,7 @@
 		"bee2_music_channel"
 		"bee2_coop_response"
 		"bee2_cube_filter_script"
+		"bee2_vscript_collision"
 		]
 	"Collisions"
 		[

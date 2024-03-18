@@ -38,17 +38,20 @@ class NonBBoxError(ValueError):
 
 
 class CollideType(Flag):
-    """Type of collision."""
+    """Type of collision.
+
+    Must be kept synchronised with scripts/vscripts/BEE2/collisions.nut!
+    """
     NOTHING = 0
-    SOLID = enum_auto()  # Regular solid walls, props etc.
-    DECORATION = enum_auto()  # A location where decoration may not be placed.
-    GRATING = enum_auto()  # Grating, blocks movement, but does not block energy beams.
-    GLASS = enum_auto()   # Only permits lasers through.
-    BRIDGE = enum_auto()
-    FIZZLER = enum_auto()
-    TEMPORARY = enum_auto()  # Collision is only sometimes present here.
-    ANTLINES = enum_auto()  # Antlines should not pass here.
-    OOB = enum_auto()  # Areas outside the puzzle, don't allow things to be placed here.
+    SOLID = 1  # Regular solid walls, props, glass which blocks lasers, etc.
+    DECORATION = 2  # A location where decoration may not be placed.
+    GRATING = 4  # Grating, blocks movement, but does not block energy beams.
+    GLASS = 8   # Only permits lasers through.
+    BRIDGE = 16
+    FIZZLER = 32
+    TEMPORARY = 64  # Collision is only sometimes present here.
+    ANTLINES = 128  # Antlines should not pass here.
+    OOB = 256  # Areas outside the puzzle, don't allow things to be placed here.
 
     GRATE = GRATING
     DECO = DECORATION

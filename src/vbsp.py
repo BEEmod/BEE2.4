@@ -1664,7 +1664,8 @@ async def main() -> None:
         fix_worldspawn(vmf)
 
         if utils.DEV_MODE:
-            coll.dump(vmf, vis_name='collisions')
+            coll.export_debug(vmf, vis_name='collisions')
+        coll.export_vscript(vmf)
 
         # Ensure all VMF outputs use the correct separator.
         for ent in vmf.entities:
