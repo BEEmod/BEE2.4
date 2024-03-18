@@ -8,12 +8,11 @@ import pickle
 from srctools import FrozenVec, Vec, VMF, AtomicWriter, logger
 import attrs
 
-import utils
-from plane import PlaneGrid
 from user_errors import DATA_LOC, UserError, TOK_VBSP_LEAK
 from precomp.tiling import TileDef, TileType
 from precomp.brushLoc import Grid as BrushLoc
 from precomp import options, barriers, grid_optim
+from plane import PlaneKey, PlaneGrid
 import consts
 
 
@@ -76,11 +75,11 @@ def load_tiledefs(tiles: Iterable[TileDef], grid: BrushLoc) -> None:
     LOGGER.info('Stored map geometry for error display.')
 
 
-def load_barriers(barrier_map: dict[utils.SliceKey, PlaneGrid[barriers.Barrier]]) -> None:
+def load_barriers(barrier_map: dict[PlaneKey, PlaneGrid[barriers.Barrier]]) -> None:
     """Load barrier data for display in errors."""
-    for slice_key, plane in barrier_map.items():
-        orient = NORM_2_ORIENT[slice_key.normal]
-        for min_u, min_v, max_u, max_v, barrier in grid_optim.optimise(plane):
+    for plane, grid in barrier_map.items():
+        orient = NORM_2_ORIENT[plane.normal]
+        for min_u, min_v, max_u, max_v, barrier in grid_optim.optimise(grid):
             if barrier.type.error_disp is None:
                 continue
             try:
@@ -89,7 +88,7 @@ def load_barriers(barrier_map: dict[utils.SliceKey, PlaneGrid[barriers.Barrier]]
                 continue
             max_u += 1
             max_v += 1
-            pos = slice_key.plane_to_world(
+            pos = plane.plane_to_world(
                 32.0 * (min_u + max_u) / 2.0,
                 32.0 * (min_v + max_v) / 2.0,
                 1.0,

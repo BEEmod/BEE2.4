@@ -25,6 +25,7 @@ import utils
 from .texturing import Portalable, GenCat, TileSize
 from .tiling import TileType
 from . import tiling, texturing, options, rand, connections, collisions, barriers
+from plane import PlaneKey
 import consts
 
 
@@ -1315,7 +1316,7 @@ def retexture_template(
         for normal in NORMALS:
             # Don't bother rotating, it doesn't make any difference unless the template
             # is not axis aligned.
-            setter_plane = utils.SliceKey(normal, setter_pos - 16 * normal)
+            setter_plane = PlaneKey(normal, setter_pos - 16 * normal)
             local = setter_plane.world_to_plane(setter_pos)
             del barriers.BARRIERS[setter_plane][local.x // 32, local.y // 32]
 
@@ -1336,10 +1337,10 @@ def retexture_template(
             continue
 
         setter_pos = round(barrier_setter.offset @ template_data.orient + template_data.origin + sense_offset, 6)
-        setter_plane = utils.SliceKey(barrier_setter.normal @ template_data.orient, setter_pos)
+        setter_plane = PlaneKey(barrier_setter.normal @ template_data.orient, setter_pos)
         local = setter_plane.world_to_plane(setter_pos)
         uv = (local.x // 32, local.y // 32)
-        barrier_plane = barriers.BARRIERS[setter_plane]
+        barrier_grid = barriers.BARRIERS[setter_plane]
 
         if template_data.debug_marker is not None:
             template_data.debug_marker(
@@ -1349,10 +1350,10 @@ def retexture_template(
 
         if barrier_setter.id == "":
             # Always replace if we're removing it
-            del barrier_plane[uv]
+            del barrier_grid[uv]
             continue
         # Otherwise, we want to check.
-        existing = barrier_plane[uv]
+        existing = barrier_grid[uv]
 
         # We need an instance and valid barrier type.
         if instance is None or not targetname:
@@ -1385,7 +1386,7 @@ def retexture_template(
                 # This won't preserve identity if multiple types are created for one item.
                 if targetname:
                     barriers.BARRIERS_BY_NAME.setdefault(targetname, new_barrier)
-            barrier_plane[uv] = new_barrier
+            barrier_grid[uv] = new_barrier
 
     for brush in all_brushes:
         for face in brush:

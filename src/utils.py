@@ -2,8 +2,7 @@
 from __future__ import annotations
 
 from typing import (
-    ClassVar, Collection, Final, NewType, TYPE_CHECKING, Any, Awaitable, Callable, Generator,
-    Generic,
+    Collection, Final, NewType, TYPE_CHECKING, Any, Awaitable, Callable, Generator, Generic,
     ItemsView, Iterable, Iterator, KeysView, Mapping, NoReturn, Optional, Sequence, SupportsInt,
     Tuple, Type, TypeVar, ValuesView,
 )
@@ -24,8 +23,7 @@ import types
 import zipfile
 import math
 
-from srctools.math import AnyVec, Angle, FrozenMatrix, FrozenVec, Vec
-import attrs
+from srctools.math import Angle
 import trio
 
 
@@ -33,7 +31,7 @@ __all__ = [
     'WIN', 'MAC', 'LINUX', 'STEAM_IDS', 'DEV_MODE', 'CODE_DEV_MODE', 'BITNESS',
     'get_git_version', 'install_path', 'bins_path', 'conf_location', 'fix_cur_directory',
     'run_bg_daemon', 'not_none', 'CONN_LOOKUP', 'CONN_TYPES', 'freeze_enum_props', 'FuncLookup',
-    'PackagePath', 'Result', 'SliceKey', 'acompose', 'get_indent', 'iter_grid', 'check_cython',
+    'PackagePath', 'Result', 'acompose', 'get_indent', 'iter_grid', 'check_cython',
     'check_shift', 'fit', 'group_runs', 'restart_app', 'quit_app', 'set_readonly',
     'unset_readonly', 'merge_tree', 'write_lang_pot',
 ]
@@ -538,89 +536,6 @@ class PackagePath:
         """Return a child file of this package."""
         child = child.rstrip('\\/')
         return PackagePath(self.package, f'{self.path.rstrip("/")}/{child}')
-
-
-@attrs.frozen(eq=False, hash=False, init=False)
-class SliceKey:
-    """A hashable key used to identify 2-dimensional plane slices."""
-    # Reuse the same instance for the vector, and precompute the hash.
-    _norm_cache: ClassVar[Mapping[FrozenVec, Tuple[FrozenVec, int]]] = {
-        FrozenVec.N: (FrozenVec.N, hash(b'n')),
-        FrozenVec.S: (FrozenVec.S, hash(b's')),
-        FrozenVec.E: (FrozenVec.E, hash(b'e')),
-        FrozenVec.W: (FrozenVec.W, hash(b'w')),
-        FrozenVec.T: (FrozenVec.T, hash(b't')),
-        FrozenVec.B: (FrozenVec.B, hash(b'b')),
-    }
-    # The orientation points Z = normal, X = sideways, Y = upward.
-    _orients: ClassVar[Mapping[FrozenVec, FrozenMatrix]] = {
-        FrozenVec.N: FrozenMatrix.from_basis(x=Vec(-1, 0, 0), y=Vec(0, 0, 1)),
-        FrozenVec.S: FrozenMatrix.from_basis(x=Vec(1, 0, 0), y=Vec(0, 0, 1)),
-        FrozenVec.E: FrozenMatrix.from_basis(x=Vec(0, 1, 0), y=Vec(0, 0, 1)),
-        FrozenVec.W: FrozenMatrix.from_basis(x=Vec(0, -1, 0), y=Vec(0, 0, 1)),
-        FrozenVec.T: FrozenMatrix.from_basis(x=Vec(1, 0, 0), y=Vec(0, 1, 0)),
-        FrozenVec.B: FrozenMatrix.from_basis(x=Vec(-1, 0, 0), y=Vec(0, 1, 0)),
-    }
-    _inv_orients: ClassVar[Mapping[FrozenVec, FrozenMatrix]] = {
-        norm: orient.transpose()
-        for norm, orient in _orients.items()
-    }
-
-    normal: FrozenVec
-    distance: float
-    _hash: int = attrs.field(repr=False)
-
-    def __init__(self, normal: AnyVec, dist: AnyVec | float) -> None:
-        try:
-            norm, norm_hash = self._norm_cache[FrozenVec(normal)]
-        except KeyError:
-            raise ValueError(f'{normal!r} is not an on-axis normal!')
-        if not isinstance(dist, (int, float)):
-            dist = norm.dot(dist)
-
-        self.__attrs_init__(
-            norm,
-            dist,
-            hash(dist) ^ norm_hash,
-        )
-
-    @property
-    def orient(self) -> FrozenMatrix:
-        """Return a matrix with the forward direction facing along the slice."""
-        return self._orients[self.normal]
-
-    def left(self) -> Vec:
-        """Return the +Y axis for this slice orientation, where +X is along the normal."""
-        return self._orients[self.normal].left()
-
-    def up(self) -> Vec:
-        """Return the +Z axis for this slice orientation, where +X is along the normal."""
-        return self._orients[self.normal].up()
-
-    def __hash__(self) -> int:
-        return self._hash
-
-    def __eq__(self, other: object) -> bool:
-        if isinstance(other, SliceKey):
-            return self.normal is other.normal and self.distance == other.distance
-        else:
-            return NotImplemented
-
-    def __ne__(self, other: object) -> bool:
-        if isinstance(other, SliceKey):
-            return self.normal is not other.normal or self.distance != other.distance
-        else:
-            return NotImplemented
-
-    def plane_to_world(self, x: float, y: float, z: float = 0.0) -> Vec:
-        """Return a position relative to this plane."""
-        orient = self._orients[self.normal]
-        return Vec(x, y, z) @ orient + self.normal * self.distance
-
-    def world_to_plane(self, pos: AnyVec) -> Vec:
-        """Take a world position and return the location relative to this plane."""
-        orient = self._inv_orients[self.normal]
-        return (Vec(pos) - self.normal * self.distance) @ orient
 
 
 ResultT = TypeVar('ResultT')

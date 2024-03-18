@@ -14,7 +14,7 @@ from srctools.vmf import Side, VMF, Solid, Entity
 import srctools.logger
 import attrs
 
-from plane import PlaneGrid
+from plane import PlaneKey, PlaneGrid
 from precomp import instanceLocs, options, template_brush, conditions, collisions, connections
 from precomp.grid_optim import optimise as grid_optimise
 from precomp.rand import seed as rand_seed
@@ -189,7 +189,7 @@ class Hole:
     inst: Entity
     type: HoleType
     variant: HoleConfig
-    plane: utils.SliceKey
+    plane: plane.PlaneKey
     orient: FrozenMatrix
     origin: Vec
     # If true, we found a matching barrier this was inserted into.
@@ -356,7 +356,7 @@ class Barrier:
     # Set only for vanilla glass/grating items. Stores a list of the
     # original voxel positions this item took up, so changing the
     # type can overwrite this.
-    original_voxels: Sequence[Tuple[utils.SliceKey, int, int]] = ()
+    original_voxels: Sequence[Tuple[PlaneKey, int, int]] = ()
 
     def __eq__(self, other: object) -> bool:
         """Two barriers are equal if are for the same instance or if mergable. The type must always match."""
@@ -451,7 +451,7 @@ class Brush(Surface):
 
     def generate(
         self, vmf: VMF,
-        plane_slice: utils.SliceKey,
+        plane: PlaneKey,
         solid_func: Callable[[float, float], List[Solid]],
     ) -> None:
         """Generate this brush."""
@@ -459,7 +459,7 @@ class Brush(Surface):
 
         for brush in brushes:
             for face in brush.sides:
-                if abs(face.normal().dot(plane_slice.normal)) > 0.99:
+                if abs(face.normal().dot(plane.normal)) > 0.99:
                     face.mat = self.material
                     self.face_temp.apply(face, change_mat=not self.material)
                 else:
@@ -476,7 +476,7 @@ class Brush(Surface):
             ent['origin'] = ent.get_origin()
 
         if self.static_player_clip:
-            if abs(plane_slice.normal.z) > 0.5:
+            if abs(plane.normal.z) > 0.5:
                 ent['classname'] = 'func_brush'
                 ent['solidbsp'] = '1'
                 # Create an additional clip to block through portals.
@@ -519,13 +519,13 @@ class Segment:
             )
 
     def place(
-        self, vmf: VMF, slice_key: utils.SliceKey, lighting_origin: str,
+        self, vmf: VMF, plane: PlaneKey, lighting_origin: str,
         u: float, v: float, angles: AnyMatrix,
         frame_world_brush: bool,
     ) -> None:
         """Place the segment at the specified location."""
-        rotation = to_matrix(angles) @ slice_key.orient
-        origin = slice_key.plane_to_world(u, v) + self.offset @ rotation
+        rotation = to_matrix(angles) @ plane.orient
+        origin = plane.plane_to_world(u, v) + self.offset @ rotation
         self._place(
             vmf, origin, self.orient @ rotation, lighting_origin, frame_world_brush,
         )
@@ -585,7 +585,7 @@ class SegmentBrush(Segment):
 
     def place_sized(
         self,
-        vmf: VMF, slice_key: utils.SliceKey,
+        vmf: VMF, plane: PlaneKey,
         u: float, v: float,
         orient: FrozenMatrix,
         direction: Vec,
@@ -593,8 +593,8 @@ class SegmentBrush(Segment):
         frame_world_brush: bool,
     ) -> None:
         """Place this template, but resize it to match the specified length."""
-        rotation = orient @ slice_key.orient
-        origin = slice_key.plane_to_world(u, v) + self.offset @ rotation
+        rotation = orient @ plane.orient
+        origin = plane.plane_to_world(u, v) + self.offset @ rotation
         faces: Iterable[Side]
 
         if frame_world_brush:
@@ -677,10 +677,10 @@ BARRIER_EMPTY_TYPE = BarrierType(id=utils.ID_EMPTY, mergeable=True)
 BARRIER_EMPTY = Barrier(name='', type=BARRIER_EMPTY_TYPE, item=None)
 # Planar slice -> plane of barriers.
 # The plane is specified as the edge of the voxel.
-BARRIERS: dict[utils.SliceKey, PlaneGrid[Barrier]] = defaultdict(lambda: PlaneGrid(default=BARRIER_EMPTY))
+BARRIERS: dict[PlaneKey, PlaneGrid[Barrier]] = defaultdict(lambda: PlaneGrid(default=BARRIER_EMPTY))
 BARRIERS_BY_NAME: dict[str, Barrier] = {}
 # plane -> {position -> hole}
-HOLES: dict[utils.SliceKey, dict[FrozenVec, Hole]] = defaultdict(dict)
+HOLES: dict[PlaneKey, dict[FrozenVec, Hole]] = defaultdict(dict)
 
 HOLE_TYPES: Dict[utils.ObjectID, HoleType] = {}
 FRAME_TYPES: Dict[utils.ObjectID, Dict[FrameOrient, FrameType]] = {}
@@ -810,7 +810,7 @@ def parse_map(vmf: VMF, conn_items: Mapping[str, connections.Item]) -> None:
     """
     frame_inst = instanceLocs.resolve_filter('[glass_frames]', silent=True)
     segment_inst = instanceLocs.resolve_filter('[glass_128]', silent=True)
-    barrier_pos_lists: Dict[str, List[Tuple[utils.SliceKey, int, int]]] = {}
+    barrier_pos_lists: Dict[str, List[Tuple[PlaneKey, int, int]]] = {}
 
     for inst in vmf.by_class['func_instance']:
         filename = inst['file'].casefold()
@@ -823,8 +823,8 @@ def parse_map(vmf: VMF, conn_items: Mapping[str, connections.Item]) -> None:
             center = Vec.from_str(inst['origin']) // 128 * 128 + (64, 64, 64)
             norm = Vec(x=1) @ Angle.from_str(inst['angles'])
             center -= 64 * norm
-            plane_slice = utils.SliceKey(norm, center)
-            local = plane_slice.world_to_plane(center)
+            plane = PlaneKey(norm, center)
+            local = plane.world_to_plane(center)
 
             inst_name = inst['targetname']
 
@@ -845,13 +845,13 @@ def parse_map(vmf: VMF, conn_items: Mapping[str, connections.Item]) -> None:
             # Now set each 32-grid cell to be the barrier. Since this is square the orientation
             # doesn't matter.
             for u_off, v_off in FULL_SQUARE:
-                BARRIERS[plane_slice][
+                BARRIERS[plane][
                     (local.x + u_off) // 32,
                     (local.y + v_off) // 32,
                 ] = barrier
             # Store off the voxels, for use by CustomBarrier.
             barrier_list.append((
-                plane_slice,
+                plane,
                 round((local.x - 48) // 32),
                 round((local.y - 48) // 32),
             ))
@@ -876,13 +876,13 @@ def parse_map(vmf: VMF, conn_items: Mapping[str, connections.Item]) -> None:
 
                 # Offset to be the voxel side, not center.
                 center += 64 * norm
-                plane_slice = utils.SliceKey(-norm, center)
-                local = plane_slice.world_to_plane(center)
+                plane = PlaneKey(-norm, center)
+                local = plane.world_to_plane(center)
 
                 # Figure out the instance this matches from above.
                 # At this point all barrier definitions are whole voxel, so it doesn't matter which we pick.
                 try:
-                    barrier = BARRIERS[plane_slice][local.x // 32, local.y // 32]
+                    barrier = BARRIERS[plane][local.x // 32, local.y // 32]
                 except KeyError:
                     LOGGER.warning('glass/grating at {}, {} has no corresponding instance?', center, norm)
                     break  # Don't check remaining faces.
@@ -896,7 +896,7 @@ def parse_map(vmf: VMF, conn_items: Mapping[str, connections.Item]) -> None:
                 elif barrier_type is not barrier_type:
                     LOGGER.warning(
                         'Barrier at {}, {} is both glass and grating simultaneously?',
-                        center, norm, plane_slice,
+                        center, norm, plane,
                     )
 
                 break  # Don't check the remaining faces.
@@ -917,7 +917,7 @@ def parse_map(vmf: VMF, conn_items: Mapping[str, connections.Item]) -> None:
 
 def test_hole_spot(
     origin: FrozenVec,
-    plane: utils.SliceKey,
+    plane: PlaneKey,
     orient: FrozenMatrix,
     hole_type: HoleType,
 ) -> HoleConfig | None:
@@ -1015,22 +1015,22 @@ def res_glass_hole(inst: Entity, res: Keyvalues) -> None:
     orient = FrozenMatrix.from_angstr(inst['angles'])
     origin: FrozenVec = FrozenVec.from_str(inst['origin']) // 128 * 128 + 64
     origin += orient.up(-64.0)
-    slice_key = utils.SliceKey(orient.up(-1.0), origin)
+    plane = PlaneKey(orient.up(-1.0), origin)
 
-    first_variant = test_hole_spot(origin, slice_key, orient, hole_type)
+    first_variant = test_hole_spot(origin, plane, orient, hole_type)
     if first_variant is not None:
-        sel_plane = slice_key
+        sel_plane = plane
         sel_orient = orient
         sel_variant = first_variant
     else:
         # Test the opposite side of the glass too.
         alt_orient = FrozenMatrix.from_roll(180) @ orient
-        slice_key = utils.SliceKey(alt_orient.up(-1.0), origin)
+        plane = PlaneKey(alt_orient.up(-1.0), origin)
 
-        sec_variant = test_hole_spot(origin, slice_key, alt_orient, hole_type)
+        sec_variant = test_hole_spot(origin, plane, alt_orient, hole_type)
         if sec_variant is not None:
             sel_orient = alt_orient
-            sel_plane = slice_key
+            sel_plane = plane
             sel_variant = sec_variant
             inst['angles'] = sel_orient.to_angle()
         else:
@@ -1142,7 +1142,8 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
 
             # Place brushes that should not be carved by holes.
             for min_u, min_v, max_u, max_v, sub_barrier in grid_optimise(group_plane):
-                place_planar_surfaces(vmf, coll, barrier, plane_slice, False, min_u, min_v, max_u, max_v)
+                place_planar_surfaces(vmf, coll, barrier, plane_slice, False, min_u, min_v, max_u,
+                                      max_v)
 
             add_glass_floorbeams(vmf, barrier, plane_slice, group_plane)
 
@@ -1164,56 +1165,36 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
 
             for (u, v) in group_plane:
                 # Wall frame orientation is arbitrary right now, what to do?
-                place_concave_corner(
-                    vmf, barrier, lighting_origin, plane_slice, borders,
-                    FrameOrient.FLAT if is_flat else FrameOrient.HORIZ,
-                    u, v, ORIENT_W, +1, +1,
-                )
-                place_concave_corner(
-                    vmf, barrier, lighting_origin, plane_slice, borders,
-                    FrameOrient.FLAT if is_flat else FrameOrient.VERT,
-                    u, v, ORIENT_S, -1, +1,
-                )
-                place_concave_corner(
-                    vmf, barrier, lighting_origin, plane_slice, borders,
-                    FrameOrient.FLAT if is_flat else FrameOrient.HORIZ,
-                    u, v, ORIENT_E, -1, -1,
-                )
-                place_concave_corner(
-                    vmf, barrier, lighting_origin, plane_slice, borders,
-                    FrameOrient.FLAT if is_flat else FrameOrient.VERT,
-                    u, v, ORIENT_N, +1, -1,
-                )
+                place_concave_corner(vmf, barrier, lighting_origin, plane_slice, borders,
+                                     FrameOrient.FLAT if is_flat else FrameOrient.HORIZ, u, v,
+                                     ORIENT_W, +1, +1)
+                place_concave_corner(vmf, barrier, lighting_origin, plane_slice, borders,
+                                     FrameOrient.FLAT if is_flat else FrameOrient.VERT, u, v,
+                                     ORIENT_S, -1, +1)
+                place_concave_corner(vmf, barrier, lighting_origin, plane_slice, borders,
+                                     FrameOrient.FLAT if is_flat else FrameOrient.HORIZ, u, v,
+                                     ORIENT_E, -1, -1)
+                place_concave_corner(vmf, barrier, lighting_origin, plane_slice, borders,
+                                     FrameOrient.FLAT if is_flat else FrameOrient.VERT, u, v,
+                                     ORIENT_N, +1, -1)
 
             for (u, v), border in borders.items():
                 if Border.STRAIGHT_N in border:
-                    place_straight_run(
-                        vmf, barrier, plane_slice, borders, lighting_origin, u, v,
-                        Border.STRAIGHT_N, ORIENT_E, 'x', False,
-                        Border.CORNER_NE, Border.CORNER_NW,
-                        0, 32,
-                    )
+                    place_straight_run(vmf, barrier, plane_slice, borders, lighting_origin, u, v,
+                                       Border.STRAIGHT_N, ORIENT_E, 'x', False, Border.CORNER_NE,
+                                       Border.CORNER_NW, 0, 32)
                 if Border.STRAIGHT_S in border:
-                    place_straight_run(
-                        vmf, barrier, plane_slice, borders, lighting_origin, u, v,
-                        Border.STRAIGHT_S, ORIENT_W, 'x', True,
-                        Border.CORNER_SE, Border.CORNER_SW,
-                        0, 0,
-                    )
+                    place_straight_run(vmf, barrier, plane_slice, borders, lighting_origin, u, v,
+                                       Border.STRAIGHT_S, ORIENT_W, 'x', True, Border.CORNER_SE,
+                                       Border.CORNER_SW, 0, 0)
                 if Border.STRAIGHT_E in border:
-                    place_straight_run(
-                        vmf, barrier, plane_slice, borders, lighting_origin, u, v,
-                        Border.STRAIGHT_E, ORIENT_N, 'y', False,
-                        Border.CORNER_SE, Border.CORNER_NE,
-                        0, 0,
-                    )
+                    place_straight_run(vmf, barrier, plane_slice, borders, lighting_origin, u, v,
+                                       Border.STRAIGHT_E, ORIENT_N, 'y', False, Border.CORNER_SE,
+                                       Border.CORNER_NE, 0, 0)
                 if Border.STRAIGHT_W in border:
-                    place_straight_run(
-                        vmf, barrier, plane_slice, borders, lighting_origin, u, v,
-                        Border.STRAIGHT_W, ORIENT_S, 'y', True,
-                        Border.CORNER_SW, Border.CORNER_NW,
-                        32, 0,
-                    )
+                    place_straight_run(vmf, barrier, plane_slice, borders, lighting_origin, u, v,
+                                       Border.STRAIGHT_W, ORIENT_S, 'y', True, Border.CORNER_SW,
+                                       Border.CORNER_NW, 32, 0)
 
                 if Border.CORNER_NW in border:
                     place_convex_corner(
@@ -1239,7 +1220,8 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
             for min_u, min_v, max_u, max_v, sub_barrier in grid_optimise(group_plane):
                 if sub_barrier is BARRIER_EMPTY:
                     continue
-                place_planar_surfaces(vmf, coll, barrier, plane_slice, True, min_u, min_v, max_u, max_v)
+                place_planar_surfaces(vmf, coll, barrier, plane_slice, True, min_u, min_v, max_u,
+                                      max_v)
 
     for hole_plane in HOLES.values():
         for hole in hole_plane.values():
@@ -1311,28 +1293,28 @@ def calc_borders(plane: PlaneGrid[Barrier]) -> PlaneGrid[Border]:
 
 def place_lighting_origin(
     vmf: VMF, barrier: Barrier,
-    plane_slice: utils.SliceKey,
-    group_plane: PlaneGrid[Barrier],
+    plane: PlaneKey,
+    group_grid: PlaneGrid[Barrier],
 ) -> str:
     """Create a lighting origin for a barrier's frame. This should be placed roughly in the centre."""
     # First, calculate the average UV position, then find the tile that's closest to that.
     # This way something like an L-shaped piece of glass doesn't put the origin in the void.
     count = avg_u = avg_v = 0
-    for u, v in group_plane:
+    for u, v in group_grid:
         avg_u += u
         avg_v += v
         count += 1
 
     avg_pos = (avg_u / count, avg_v / count)
 
-    best_u, best_v = min(group_plane, key=lambda uv: math.dist(uv, avg_pos))
+    best_u, best_v = min(group_grid, key=lambda uv: math.dist(uv, avg_pos))
     if barrier.item is not None:
         name = conditions.local_name(barrier.item.inst, 'lighting')
     else:
         name = 'lighting'
     ent = vmf.create_ent(
         'info_lighting',
-        origin=plane_slice.plane_to_world(
+        origin=plane.plane_to_world(
             best_u * 32 + 16.0,
             best_v * 32 + 16.0,
             barrier.type.coll_thick / 2,
@@ -1346,26 +1328,26 @@ def place_lighting_origin(
 
 def place_planar_surfaces(
     vmf: VMF, coll: collisions.Collisions, barrier: Barrier,
-    plane_slice: utils.SliceKey, carved: bool,
+    plane: PlaneKey, carved: bool,
     min_u: int, min_v: int, max_u: int, max_v: int,
 ) -> None:
     """Place brushes and collisions across the surface of the barrier."""
     def solid_func(z1: float, z2: float) -> List[Solid]:
         """Generate prism brushes."""
         prism = vmf.make_prism(
-            plane_slice.plane_to_world(32.0 * min_u, 32.0 * min_v, z1),
-            plane_slice.plane_to_world(32.0 * max_u + 32.0, 32.0 * max_v + 32.0, z2),
+            plane.plane_to_world(32.0 * min_u, 32.0 * min_v, z1),
+            plane.plane_to_world(32.0 * max_u + 32.0, 32.0 * max_v + 32.0, z2),
         )
         return [prism.solid]
 
     for surface in barrier.type.surfaces:
         if surface.carve_by_hole == carved:
             if isinstance(surface, Brush):
-                surface.generate(vmf, plane_slice, solid_func)
+                surface.generate(vmf, plane, solid_func)
             elif isinstance(surface, Collide):
                 coll.add(collisions.BBox(
-                    plane_slice.plane_to_world(32.0 * min_u, 32.0 * min_v, surface.offset),
-                    plane_slice.plane_to_world(32.0 * max_u + 32.0, 32.0 * max_v + 32.0, surface.thickness),
+                    plane.plane_to_world(32.0 * min_u, 32.0 * min_v, surface.offset),
+                    plane.plane_to_world(32.0 * max_u + 32.0, 32.0 * max_v + 32.0, surface.thickness),
                     name=barrier.name,
                     contents=surface.contents,
                 ))
@@ -1377,7 +1359,7 @@ def place_concave_corner(
     vmf: VMF,
     barrier: Barrier,
     lighting_origin: str,
-    slice_key: utils.SliceKey,
+    plane: PlaneKey,
     borders: PlaneGrid[Border],
     frame_orient: FrameOrient,
     u: int,
@@ -1395,7 +1377,7 @@ def place_concave_corner(
     for frame in barrier.type.frames[frame_orient]:
         for seg in frame.seg_concave_corner:
             seg.place(
-                vmf, slice_key,
+                vmf, plane,
                 lighting_origin,
                 32. * u + 16. * off_u + 16.0,
                 32. * v + 16. * off_v + 16.0,
@@ -1508,7 +1490,7 @@ def try_place_hole(
 def place_straight_run(
     vmf: VMF,
     barrier: Barrier,
-    slice_key: utils.SliceKey,
+    plane: PlaneKey,
     borders: PlaneGrid[Border],
     lighting_origin: str,
     start_u: int,
@@ -1527,7 +1509,7 @@ def place_straight_run(
     Parameters:
         * vmf: The map.
         * barrier: The barrier to generate frames for.
-        * slice_key: Orientation of the plane.
+        * plane: Orientation of the plane.
         * borders: Computed border shapes that are yet to be placed.
         * lighting_origin: Name of the info_lighting entity to use.
         * start_u: Starting cell with this straight type.
@@ -1549,10 +1531,10 @@ def place_straight_run(
         off_u, off_v = 1, 0
     else:
         off_u, off_v = 0, 1
-    direction = Vec(off_u, off_v) @ slice_key.orient
+    direction = Vec(off_u, off_v) @ plane.orient
     if backwards:
         direction = -direction
-    if abs(slice_key.normal.z) > 0.5:
+    if abs(plane.normal.z) > 0.5:
         frame_orient = FrameOrient.FLAT
     else:
         frame_orient = FrameOrient.HORIZ if abs(direction.z) < 0.5 else FrameOrient.VERT
@@ -1581,26 +1563,19 @@ def place_straight_run(
                     off += size
 
                 for piece in frame.seg_straight_prop[size]:
-                    piece.place(
-                        vmf, slice_key, lighting_origin,
-                        32. * start_u + off_u * off + pos_u,
-                        32. * start_v + off_v * off + pos_v,
-                        orient,
-                        barrier.type.frame_world_brush,
-                    )
+                    piece.place(vmf, plane, lighting_origin,
+                                32. * start_u + off_u * off + pos_u,
+                                32. * start_v + off_v * off + pos_v, orient,
+                                barrier.type.frame_world_brush)
 
                 if not backwards:
                     off += size
 
         off = end_off if backwards else start_off
         for brush_seg in frame.seg_straight_brush:
-            brush_seg.place_sized(
-                vmf, slice_key,
-                32.0 * start_u + off_u * off + pos_u,
-                32.0 * start_v + off_v * off + pos_v,
-                orient, direction, frame_length,
-                barrier.type.frame_world_brush,
-            )
+            brush_seg.place_sized(vmf, plane, 32.0 * start_u + off_u * off + pos_u,
+                                  32.0 * start_v + off_v * off + pos_v, orient, direction,
+                                  frame_length, barrier.type.frame_world_brush)
     # Only one of these has an actual length.
     for u in range(start_u, end_u + 1):
         for v in range(start_v, end_v + 1):
@@ -1610,7 +1585,7 @@ def place_straight_run(
 def place_convex_corner(
     vmf: VMF,
     barrier: Barrier,
-    slice_key: utils.SliceKey,
+    plane: PlaneKey,
     lighting_origin: str,
     orient: FrozenMatrix,
     u: float,
@@ -1620,7 +1595,7 @@ def place_convex_corner(
     for frame in barrier.type.frames[FrameOrient.HORIZ]:
         for seg in frame.seg_corner:
             seg.place(
-                vmf, slice_key, lighting_origin,
+                vmf, plane, lighting_origin,
                 32.0 * u, 32.0 * v, orient,
                 barrier.type.frame_world_brush,
             )
@@ -1629,13 +1604,13 @@ def place_convex_corner(
 def add_glass_floorbeams(
     vmf: VMF,
     barrier: Barrier,
-    slice_key: utils.SliceKey,
+    plane: PlaneKey,
     grid: PlaneGrid[Barrier],
 ) -> None:
     """Add beams to separate large glass panels. This is rather special cased for P1 style."""
     conf = barrier.type.floorbeam
     # Don't add if none or defined or not flat.
-    if conf is None or slice_key.normal.z == 0.0:
+    if conf is None or plane.normal.z == 0.0:
         return
 
     # Our beams align to the smallest axis.
@@ -1643,7 +1618,7 @@ def add_glass_floorbeams(
     if plane_dims_y > plane_dims_x:
         beam_ind = 0
         side_ind = 1
-        rot = Matrix() @ slice_key.orient
+        rot = Matrix() @ plane.orient
 
         def flip_axes(beam: float, side: float) -> tuple[float, float]:
             """Flip axes if required"""
@@ -1651,7 +1626,7 @@ def add_glass_floorbeams(
     else:
         beam_ind = 1
         side_ind = 0
-        rot = Matrix.from_yaw(90) @ slice_key.orient
+        rot = Matrix.from_yaw(90) @ plane.orient
 
         def flip_axes(beam: float, side: float) -> tuple[float, float]:
             """Flip axes if required"""
@@ -1659,7 +1634,7 @@ def add_glass_floorbeams(
 
     beam_ax = 'xyz'[beam_ind]
     side_ax = 'xyz'[side_ind]
-    height = slice_key.plane_to_world(0, 0).z
+    height = plane.plane_to_world(0, 0).z
 
     rng = rand_seed(
         b'barrier_floorbeams',
@@ -1670,12 +1645,12 @@ def add_glass_floorbeams(
     distances = list(conf.distance)
     hole_shapes = [
         shape
-        for hole in HOLES[slice_key].values()
+        for hole in HOLES[plane].values()
         for shape in hole.shape
     ]
     name_to_hole = {
         hole.inst['targetname']: hole
-        for hole in HOLES[slice_key].values()
+        for hole in HOLES[plane].values()
     }
 
     min_side_offset = grid.mins[side_ind] * 32
@@ -1711,9 +1686,9 @@ def add_glass_floorbeams(
                 beam_end += 32
 
             # Next, check every hole to see if we overlap.
-            trace_direction = Vec(flip_axes(beam_end - beam_start, 0.0)) @ slice_key.orient
+            trace_direction = Vec(flip_axes(beam_end - beam_start, 0.0)) @ plane.orient
             hit_left = collisions.trace_ray(
-                slice_key.plane_to_world(*flip_axes(beam_start, side_pos - half_width)),
+                plane.plane_to_world(*flip_axes(beam_start, side_pos - half_width)),
                 trace_direction,
                 trace_against,
             )
@@ -1721,9 +1696,9 @@ def add_glass_floorbeams(
                 # No holes, just produce the beam.
                 brushes.append(conf.generate(
                     vmf, rot,
-                    slice_key.plane_to_world(*flip_axes(beam_start, side_pos)),
+                    plane.plane_to_world(*flip_axes(beam_start, side_pos)),
                     normal_start,
-                    slice_key.plane_to_world(*flip_axes(beam_end - conf.border, side_pos)),
+                    plane.plane_to_world(*flip_axes(beam_end - conf.border, side_pos)),
                     rot.forward(-1.0),
                 ))
                 # Look forward for the next position
@@ -1739,7 +1714,7 @@ def add_glass_floorbeams(
 
                 # Trace the other side.
                 hit_right = collisions.trace_ray(
-                    slice_key.plane_to_world(*flip_axes(beam_start, side_pos + half_width)),
+                    plane.plane_to_world(*flip_axes(beam_start, side_pos + half_width)),
                     trace_direction,
                     hole.shape,
                 )
@@ -1750,7 +1725,7 @@ def add_glass_floorbeams(
                 # Generate the beam up to this hole.
                 brushes.append(conf.generate(
                     vmf, rot,
-                    slice_key.plane_to_world(*flip_axes(beam_start, side_pos)),
+                    plane.plane_to_world(*flip_axes(beam_start, side_pos)),
                     normal_start,
                     hit_left.impact,
                     -hit_left.normal,
@@ -1758,12 +1733,12 @@ def add_glass_floorbeams(
 
                 # Trace again, this time backwards to find out where to emerge from.
                 hit_left = collisions.trace_ray(
-                    slice_key.plane_to_world(*flip_axes(beam_end, side_pos - half_width)),
+                    plane.plane_to_world(*flip_axes(beam_end, side_pos - half_width)),
                     -trace_direction,
                     hole.shape,
                 )
                 hit_right = collisions.trace_ray(
-                    slice_key.plane_to_world(*flip_axes(beam_end, side_pos + half_width)),
+                    plane.plane_to_world(*flip_axes(beam_end, side_pos + half_width)),
                     -trace_direction,
                     hole.shape,
                 )
