@@ -28,13 +28,15 @@ def write_vscript_collisions(ctx: Context) -> None:
 
     code = StringIO()
     code.write('IncludeScript("BEE2/collisions");\nVOLUMES <- [\n')
+    ctx.pack.pack_file('scripts/vscripts/BEE2/collisions.nut')
 
     for coll_type, ents in mask_to_volumes.items():
 
         code.write(f'\tEntry({coll_type.value}, [ // {coll_type.name}\n')
         for ent in ents:
-            mins = Vec.from_str(ent['mins'])
-            maxes = Vec.from_str(ent['maxs'])
+            origin = Vec.from_str(ent['origin'])
+            mins = Vec.from_str(ent['mins']) + origin
+            maxes = Vec.from_str(ent['maxs']) + origin
             code.write(f'\t\tVolume({mins.join()}, {maxes.join()}, ')
 
             planes = [

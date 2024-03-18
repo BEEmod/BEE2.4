@@ -88,11 +88,12 @@ class Collisions:
             if coll_type & self.vscript_flags is CollideType.NOTHING:
                 continue
             for mins, maxs, volume in tree:
+                center = (volume.mins + volume.maxes) / 2
                 ent = vmf.create_ent(
                     'bee2_vscript_collision',
-                    origin=(volume.mins + volume.maxes) / 2,
-                    mins=volume.mins,
-                    maxs=volume.maxes,
+                    origin=center,
+                    mins=volume.mins - center,
+                    maxs=volume.maxes - center,
                     contents=coll_type.value,
                 )
                 if isinstance(volume, Volume):
