@@ -3,7 +3,7 @@
 """
 from __future__ import annotations
 from typing import (
-    Any, ClassVar, Generic, ItemsView, Iterable, Iterator, Mapping, MutableMapping, Optional,
+    Any, Final, Generic, ItemsView, Iterable, Iterator, Mapping, MutableMapping, Optional,
     Tuple, Type, TypeVar, Union, ValuesView, overload,
 )
 import copy
@@ -18,31 +18,34 @@ DefaultT = TypeVar('DefaultT')
 _UNSET: Any = type('_UnsetType', (), {'__repr__': lambda s: 'UNSET'})()
 
 
+# The 6 possible normal vectors for the plane.
+# Reuse the same instance for the vector, and precompute the hash.
+_NORMALS: Final[Mapping[FrozenVec, Tuple[FrozenVec, int]]] = {
+    FrozenVec.N: (FrozenVec.N, hash(b'n')),
+    FrozenVec.S: (FrozenVec.S, hash(b's')),
+    FrozenVec.E: (FrozenVec.E, hash(b'e')),
+    FrozenVec.W: (FrozenVec.W, hash(b'w')),
+    FrozenVec.T: (FrozenVec.T, hash(b't')),
+    FrozenVec.B: (FrozenVec.B, hash(b'b')),
+}
+# The orientation points Z = normal, X = sideways, Y = upward.
+_ORIENTS: Final[Mapping[FrozenVec, FrozenMatrix]] = {
+    FrozenVec.N: FrozenMatrix.from_basis(x=Vec(-1, 0, 0), y=Vec(0, 0, 1)),
+    FrozenVec.S: FrozenMatrix.from_basis(x=Vec(1, 0, 0), y=Vec(0, 0, 1)),
+    FrozenVec.E: FrozenMatrix.from_basis(x=Vec(0, 1, 0), y=Vec(0, 0, 1)),
+    FrozenVec.W: FrozenMatrix.from_basis(x=Vec(0, -1, 0), y=Vec(0, 0, 1)),
+    FrozenVec.T: FrozenMatrix.from_basis(x=Vec(1, 0, 0), y=Vec(0, 1, 0)),
+    FrozenVec.B: FrozenMatrix.from_basis(x=Vec(-1, 0, 0), y=Vec(0, 1, 0)),
+}
+_INV_ORIENTS: Final[Mapping[FrozenVec, FrozenMatrix]] = {
+    norm: orient.transpose()
+    for norm, orient in _ORIENTS.items()
+}
+
+
 @attrs.frozen(eq=False, hash=False, init=False)
 class PlaneKey:
     """A hashable key used to identify 2-dimensional plane slices."""
-    # Reuse the same instance for the vector, and precompute the hash.
-    _norm_cache: ClassVar[Mapping[FrozenVec, Tuple[FrozenVec, int]]] = {
-        FrozenVec.N: (FrozenVec.N, hash(b'n')),
-        FrozenVec.S: (FrozenVec.S, hash(b's')),
-        FrozenVec.E: (FrozenVec.E, hash(b'e')),
-        FrozenVec.W: (FrozenVec.W, hash(b'w')),
-        FrozenVec.T: (FrozenVec.T, hash(b't')),
-        FrozenVec.B: (FrozenVec.B, hash(b'b')),
-    }
-    # The orientation points Z = normal, X = sideways, Y = upward.
-    _orients: ClassVar[Mapping[FrozenVec, FrozenMatrix]] = {
-        FrozenVec.N: FrozenMatrix.from_basis(x=Vec(-1, 0, 0), y=Vec(0, 0, 1)),
-        FrozenVec.S: FrozenMatrix.from_basis(x=Vec(1, 0, 0), y=Vec(0, 0, 1)),
-        FrozenVec.E: FrozenMatrix.from_basis(x=Vec(0, 1, 0), y=Vec(0, 0, 1)),
-        FrozenVec.W: FrozenMatrix.from_basis(x=Vec(0, -1, 0), y=Vec(0, 0, 1)),
-        FrozenVec.T: FrozenMatrix.from_basis(x=Vec(1, 0, 0), y=Vec(0, 1, 0)),
-        FrozenVec.B: FrozenMatrix.from_basis(x=Vec(-1, 0, 0), y=Vec(0, 1, 0)),
-    }
-    _inv_orients: ClassVar[Mapping[FrozenVec, FrozenMatrix]] = {
-        norm: orient.transpose()
-        for norm, orient in _orients.items()
-    }
 
     normal: FrozenVec
     distance: float
@@ -50,7 +53,7 @@ class PlaneKey:
 
     def __init__(self, normal: AnyVec, dist: AnyVec | float) -> None:
         try:
-            norm, norm_hash = self._norm_cache[FrozenVec(normal)]
+            norm, norm_hash = _NORMALS[FrozenVec(normal)]
         except KeyError:
             raise ValueError(f'{normal!r} is not an on-axis normal!')
         if not isinstance(dist, (int, float)):
@@ -66,16 +69,8 @@ class PlaneKey:
 
     @property
     def orient(self) -> FrozenMatrix:
-        """Return a matrix with the forward direction facing along the slice."""
-        return self._orients[self.normal]
-
-    def left(self) -> Vec:
-        """Return the +Y axis for this slice orientation, where +X is along the normal."""
-        return self._orients[self.normal].left()
-
-    def up(self) -> Vec:
-        """Return the +Z axis for this slice orientation, where +X is along the normal."""
-        return self._orients[self.normal].up()
+        """Return a matrix with the +Z direction facing along the slice."""
+        return _ORIENTS[self.normal]
 
     def __hash__(self) -> int:
         return self._hash
@@ -94,12 +89,12 @@ class PlaneKey:
 
     def plane_to_world(self, x: float, y: float, z: float = 0.0) -> Vec:
         """Return a position relative to this plane."""
-        orient = self._orients[self.normal]
+        orient = _ORIENTS[self.normal]
         return Vec(x, y, z) @ orient + self.normal * self.distance
 
     def world_to_plane(self, pos: AnyVec) -> Vec:
         """Take a world position and return the location relative to this plane."""
-        orient = self._inv_orients[self.normal]
+        orient = _INV_ORIENTS[self.normal]
         return (Vec(pos) - self.normal * self.distance) @ orient
 
 
