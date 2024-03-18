@@ -2,7 +2,7 @@
 Handles scanning through the zip packages to find all items, styles, etc.
 """
 from __future__ import annotations
-from typing import Iterator, List, Mapping, NoReturn, ClassVar, Optional, TypeVar, Type, cast
+from typing import Generic, Iterator, List, Mapping, NoReturn, ClassVar, Optional, TypeVar, Type, cast
 from typing_extensions import Self
 
 from collections.abc import Collection, Iterable
@@ -330,6 +330,20 @@ class PakObject:
     async def post_parse(cls, packset: PackagesSet) -> None:
         """Do processing after all objects of this type have been fully parsed (but others may not)."""
         pass
+
+
+@attrs.frozen
+class PakRef(Generic[PakT]):
+    """Encapsulates an ID for a specific pakobject class."""
+    obj: type[PakT]
+    id: utils.ObjectID
+
+    def resolve(self, packset: PackagesSet) -> PakT | None:
+        """Look up this object, or return None if missing."""
+        try:
+            return packset.obj_by_id(self.obj, self.id)
+        except KeyError:
+            return None
 
 
 def reraise_keyerror(err: NoKeyError | IndexError, obj_id: str) -> NoReturn:
