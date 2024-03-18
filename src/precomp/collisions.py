@@ -22,6 +22,9 @@ class Collisions:
     # Item names -> bounding boxes of that item
     _by_name: Dict[str, List[BBox]] = attrs.Factory(dict)
 
+    # Indicates flags which VScript code has requested be exposed.
+    vscript_flags: CollideType = CollideType.NOTHING
+
     def add(self, bbox: BBox) -> None:
         """Add the given bounding box to the map."""
         if not bbox.name:
