@@ -6,5 +6,4 @@ pytest-datadir>=1.4.1
 pytest-regressions>=2.4.2
 dirty_equals >= 0.6
 types-Pillow>=9.4.0.5
-types-atomicwrites>=1.4.0
 types-babel>=2.10.0
