@@ -836,7 +836,7 @@ class Volume(BBox):  # type: ignore[override]
             else:
                 new_planes.append(Plane(norm, dist))
         return Volume(
-            bb_maxes.freeze(), bb_maxes.freeze(),
+            bb_mins.freeze(), bb_maxes.freeze(),
             new_planes,
             contents=self.contents, name=self.name, tags=self.tags,
         )
