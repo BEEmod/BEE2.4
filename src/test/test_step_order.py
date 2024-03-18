@@ -2,6 +2,7 @@
 from enum import Enum
 from typing import List
 
+from trio.testing import RaisesGroup
 import pytest
 import trio
 
@@ -85,7 +86,7 @@ async def test_direct_cycle(autojump_clock: trio.abc.Clock) -> None:
     async def step_4(ctx: object) -> None:
         pytest.fail("Shouldn't run.")
 
-    with pytest.raises(CycleError):
+    with RaisesGroup(CycleError, strict=False):
         await order.run(None)
 
     assert log == ['step 1', 'step 2']  # These still ran.
