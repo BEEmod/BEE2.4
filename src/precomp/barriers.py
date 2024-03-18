@@ -1,8 +1,8 @@
 """Implements Glass and Grating."""
 from __future__ import annotations
 
-from typing import Callable, Dict, Final, Iterator, List, Mapping, Set, Tuple
-from typing_extensions import Literal, Self, Sequence, TypeAlias, assert_never, override
+from typing import Callable, Dict, Final, Iterable, Iterator, List, Mapping, Set, Tuple, Sequence
+from typing_extensions import Literal, Self, TypeAlias, assert_never, override
 
 from collections import defaultdict
 from enum import Enum, Flag, auto as enum_auto
@@ -14,7 +14,7 @@ from srctools.vmf import Side, VMF, Solid, Entity
 import srctools.logger
 import attrs
 
-from plane import Plane
+from plane import PlaneGrid
 from precomp import instanceLocs, options, template_brush, conditions, collisions, connections
 from precomp.grid_optim import optimise as grid_optimise
 from precomp.rand import seed as rand_seed
@@ -595,6 +595,7 @@ class SegmentBrush(Segment):
         """Place this template, but resize it to match the specified length."""
         rotation = orient @ slice_key.orient
         origin = slice_key.plane_to_world(u, v) + self.offset @ rotation
+        faces: Iterable[Side]
 
         if frame_world_brush:
             temp = template_brush.import_template(
@@ -676,7 +677,7 @@ BARRIER_EMPTY_TYPE = BarrierType(id=utils.ID_EMPTY, mergeable=True)
 BARRIER_EMPTY = Barrier(name='', type=BARRIER_EMPTY_TYPE, item=None)
 # Planar slice -> plane of barriers.
 # The plane is specified as the edge of the voxel.
-BARRIERS: dict[utils.SliceKey, Plane[Barrier]] = defaultdict(lambda: Plane(default=BARRIER_EMPTY))
+BARRIERS: dict[utils.SliceKey, PlaneGrid[Barrier]] = defaultdict(lambda: PlaneGrid(default=BARRIER_EMPTY))
 BARRIERS_BY_NAME: dict[str, Barrier] = {}
 # plane -> {position -> hole}
 HOLES: dict[utils.SliceKey, dict[FrozenVec, Hole]] = defaultdict(dict)
@@ -1255,21 +1256,21 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
                 )
 
 
-def find_plane_groups(plane: Plane[Barrier]) -> Iterator[Tuple[Barrier, Plane[Barrier]]]:
+def find_plane_groups(grid: PlaneGrid[Barrier]) -> Iterator[Tuple[Barrier, PlaneGrid[Barrier]]]:
     """Yield sub-graphs of a barrier plane, containing contiguous barriers."""
     stack: Set[Tuple[int, int]] = set()
-    completed: Plane[bool] = Plane.fromkeys(plane, False)
-    for start, cmp_value in plane.items():
+    completed: PlaneGrid[bool] = PlaneGrid.fromkeys(grid, False)
+    for start, cmp_value in grid.items():
         if completed[start] or cmp_value is BARRIER_EMPTY:
             continue
-        group: Plane[Barrier] = Plane()
+        group: PlaneGrid[Barrier] = PlaneGrid()
         stack.add(start)
         mergeable = cmp_value.type.mergeable
         while stack:
             x, y = pos = stack.pop()
             if completed[pos]:
                 continue
-            value = plane[pos]
+            value = grid[pos]
             if value == cmp_value or (mergeable and value.type is cmp_value.type):
                 completed[pos] = True
                 group[pos] = value
@@ -1282,9 +1283,9 @@ def find_plane_groups(plane: Plane[Barrier]) -> Iterator[Tuple[Barrier, Plane[Ba
         yield cmp_value, group
 
 
-def calc_borders(plane: Plane[Barrier]) -> Plane[Border]:
+def calc_borders(plane: PlaneGrid[Barrier]) -> PlaneGrid[Border]:
     """Calculate which borders are required for each section of this plane."""
-    borders = Plane(default=Border.NONE)
+    borders = PlaneGrid(default=Border.NONE)
     for (x, y) in plane:
         border = Border.NONE
         if north := (x, y + 1) not in plane:
@@ -1311,7 +1312,7 @@ def calc_borders(plane: Plane[Barrier]) -> Plane[Border]:
 def place_lighting_origin(
     vmf: VMF, barrier: Barrier,
     plane_slice: utils.SliceKey,
-    group_plane: Plane[Barrier],
+    group_plane: PlaneGrid[Barrier],
 ) -> str:
     """Create a lighting origin for a barrier's frame. This should be placed roughly in the centre."""
     # First, calculate the average UV position, then find the tile that's closest to that.
@@ -1377,7 +1378,7 @@ def place_concave_corner(
     barrier: Barrier,
     lighting_origin: str,
     slice_key: utils.SliceKey,
-    borders: Plane[Border],
+    borders: PlaneGrid[Border],
     frame_orient: FrameOrient,
     u: int,
     v: int,
@@ -1405,7 +1406,7 @@ def place_concave_corner(
 def try_place_hole(
     vmf: VMF,
     coll: collisions.Collisions,
-    plane: Plane[Barrier],
+    grid: PlaneGrid[Barrier],
     barrier: Barrier,
     hole: Hole,
 ) -> None:
@@ -1413,7 +1414,7 @@ def try_place_hole(
     # First check if the footprint is present. If not, we're some other piece of glass.
     for offset in hole.type.footprint:
         local = hole.plane.world_to_plane(hole.origin + offset @ hole.orient)
-        if (local.x // 32, local.y // 32) not in plane:
+        if (local.x // 32, local.y // 32) not in grid:
             return
 
     # Found, we're generating this.
@@ -1446,9 +1447,9 @@ def try_place_hole(
                     hole_temp.append(hole.variant.template_diagonal + (corn_mat, ))
                 continue
             # This bit of the glass is present, so include it in our brush, then clear.
-            if (corn_u, corn_v) in plane:
+            if (corn_u, corn_v) in grid:
                 hole_temp.append(hole.variant.template_square + (corn_mat, ))
-                plane[corn_u, corn_v] = BARRIER_EMPTY
+                grid[corn_u, corn_v] = BARRIER_EMPTY
             else:
                 hole_temp.append(hole.variant.template + (corn_mat, ))
 
@@ -1459,7 +1460,7 @@ def try_place_hole(
         local = hole.plane.world_to_plane(hole.origin + offset @ hole.orient)
         # This is in the plane still, but marked as blank. That way diagonally overlapping holes
         # still work.
-        plane[local.x // 32, local.y // 32] = BARRIER_EMPTY
+        grid[local.x // 32, local.y // 32] = BARRIER_EMPTY
 
     hole_origin_cell = hole.origin
 
@@ -1508,7 +1509,7 @@ def place_straight_run(
     vmf: VMF,
     barrier: Barrier,
     slice_key: utils.SliceKey,
-    borders: Plane[Border],
+    borders: PlaneGrid[Border],
     lighting_origin: str,
     start_u: int,
     start_v: int,
@@ -1629,7 +1630,7 @@ def add_glass_floorbeams(
     vmf: VMF,
     barrier: Barrier,
     slice_key: utils.SliceKey,
-    plane: Plane[Barrier],
+    grid: PlaneGrid[Barrier],
 ) -> None:
     """Add beams to separate large glass panels. This is rather special cased for P1 style."""
     conf = barrier.type.floorbeam
@@ -1638,7 +1639,7 @@ def add_glass_floorbeams(
         return
 
     # Our beams align to the smallest axis.
-    plane_dims_x, plane_dims_y = plane.dimensions
+    plane_dims_x, plane_dims_y = grid.dimensions
     if plane_dims_y > plane_dims_x:
         beam_ind = 0
         side_ind = 1
@@ -1663,7 +1664,7 @@ def add_glass_floorbeams(
     rng = rand_seed(
         b'barrier_floorbeams',
         height,
-        *map(float, plane.mins), *map(float, plane.maxes),
+        *map(float, grid.mins), *map(float, grid.maxes),
     )
 
     distances = list(conf.distance)
@@ -1677,10 +1678,10 @@ def add_glass_floorbeams(
         for hole in HOLES[slice_key].values()
     }
 
-    min_side_offset = plane.mins[side_ind] * 32
-    max_side_offset = plane.maxes[side_ind] * 32 - conf.distance.start
-    min_beam_offset = plane.mins[beam_ind] * 32
-    max_beam_offset = plane.maxes[beam_ind] * 32
+    min_side_offset = grid.mins[side_ind] * 32
+    max_side_offset = grid.maxes[side_ind] * 32 - conf.distance.start
+    min_beam_offset = grid.mins[beam_ind] * 32
+    max_beam_offset = grid.maxes[beam_ind] * 32
     half_width = conf.width / 2
 
     def place_run(side_pos: int) -> bool:
@@ -1696,7 +1697,7 @@ def add_glass_floorbeams(
 
         # First, search for the first point in this plane that matches, for our starting position
         for beam_start in range(min_beam_offset + conf.border, max_beam_offset, 32):
-            if flip_axes(beam_start // 32, side_grid) in plane:
+            if flip_axes(beam_start // 32, side_grid) in grid:
                 break
         else:  # This entire column is missing.
             return False
@@ -1706,7 +1707,7 @@ def add_glass_floorbeams(
         while beam_start < max_beam_offset:
             # Find where it ends.
             beam_end = round(beam_start) // 32 * 32 + 32
-            while flip_axes(beam_end // 32, side_grid) in plane:
+            while flip_axes(beam_end // 32, side_grid) in grid:
                 beam_end += 32
 
             # Next, check every hole to see if we overlap.
@@ -1727,7 +1728,7 @@ def add_glass_floorbeams(
                 ))
                 # Look forward for the next position
                 for beam_start in range(beam_end + conf.border, max_beam_offset, 32):
-                    if flip_axes(beam_start // 32, side_grid) in plane:
+                    if flip_axes(beam_start // 32, side_grid) in grid:
                         break
                 else:  # No more.
                     break

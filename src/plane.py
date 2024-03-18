@@ -15,7 +15,7 @@ DefaultT = TypeVar('DefaultT')
 _UNSET: Any = type('_UnsetType', (), {'__repr__': lambda s: 'UNSET'})()
 
 
-class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
+class PlaneGrid(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
     """An adaptive 2D matrix holding arbitary values.
 
     Note that None is considered empty / lack of a value.
@@ -64,13 +64,13 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
 
     @classmethod
     def fromkeys(
-        cls: Type[Plane[ValT]],
-        source: Union[Plane[Any], Iterable[Tuple[int, int]]],
+        cls: Type[PlaneGrid[ValT]],
+        source: Union[PlaneGrid[Any], Iterable[Tuple[int, int]]],
         value: ValT,
-    ) -> Plane[ValT]:
+    ) -> PlaneGrid[ValT]:
         """Create a plane from an existing set of keys, setting all values to a specific value."""
-        if isinstance(source, Plane):
-            res: Plane[ValT] = cls.__new__(cls)
+        if isinstance(source, PlaneGrid):
+            res: PlaneGrid[ValT] = cls.__new__(cls)
             res.__dict__.update(source.__dict__)  # Immutables
             res._xoffs = source._xoffs.copy()
             res._data = [
@@ -79,14 +79,14 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
             ]
             return res
         else:
-            res = Plane()
+            res = PlaneGrid()
             for xy in source:
                 res[xy] = value
             return res
 
-    def copy(self) -> Plane[ValT]:
+    def copy(self) -> PlaneGrid[ValT]:
         """Shallow-copy the plane."""
-        cpy = Plane.__new__(Plane)
+        cpy = PlaneGrid.__new__(PlaneGrid)
         cpy.__dict__.update(self.__dict__)  # Immutables
         cpy._xoffs = self._xoffs.copy()
         cpy._data = [
@@ -97,9 +97,9 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
 
     __copy__ = copy
 
-    def __deepcopy__(self, memodict: dict[int, Any] | None = None) -> Plane[ValT]:
+    def __deepcopy__(self, memodict: dict[int, Any] | None = None) -> PlaneGrid[ValT]:
         """Deep-copy the plane."""
-        cpy = Plane.__new__(Plane)
+        cpy = PlaneGrid.__new__(PlaneGrid)
         cpy.__dict__.update(self.__dict__) # Immutables
         cpy._xoffs = self._xoffs.copy()
         cpy._data = copy.deepcopy(self._data, memodict)
@@ -266,18 +266,18 @@ class Plane(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
 
     def values(self) -> ValuesView[ValT]:
         """D.values() -> a set-like object providing a view on D's values"""
-        return PlaneValues(self)
+        return GridValues(self)
 
     def items(self) -> ItemsView[Tuple[int, int], ValT]:
         """D.items() -> a set-like object providing a view on D's items"""
-        return PlaneItems(self)
+        return GridItems(self)
 
 
 # noinspection PyProtectedMember
-class PlaneValues(ValuesView[ValT]):
-    """Implementation of Plane.values()."""
+class GridValues(ValuesView[ValT]):
+    """Implementation of PlaneGrid.values()."""
     __slots__ = ()
-    _mapping: Plane[ValT]  # Defined in superclass.
+    _mapping: PlaneGrid[ValT]  # Defined in superclass.
 
     def __contains__(self, item: object) -> bool:
         """Check if the provided item is a value."""
@@ -299,14 +299,10 @@ class PlaneValues(ValuesView[ValT]):
 
 
 # noinspection PyProtectedMember
-class PlaneItems(ItemsView[Tuple[int, int], ValT]):
-    """Implementation of Plane.items()."""
+class GridItems(ItemsView[Tuple[int, int], ValT]):
+    """Implementation of PlaneGrid.items()."""
     __slots__ = ()
-    _mapping: Plane[ValT]  # Defined in superclass.
-
-    def __init__(self, plane: Plane[ValT]) -> None:
-        self._mapping = plane
-        super().__init__(plane)
+    _mapping: PlaneGrid[ValT]  # Defined in superclass.
 
     def __contains__(self, item: object) -> bool:
         """Check if the provided pos/value pair is present."""

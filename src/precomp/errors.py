@@ -9,10 +9,10 @@ from srctools import FrozenVec, Vec, VMF, AtomicWriter, logger
 import attrs
 
 import utils
-from plane import Plane
+from plane import PlaneGrid
 from user_errors import DATA_LOC, UserError, TOK_VBSP_LEAK
 from precomp.tiling import TileDef, TileType
-from precomp.brushLoc import Grid
+from precomp.brushLoc import Grid as BrushLoc
 from precomp import options, barriers, grid_optim
 import consts
 
@@ -35,7 +35,7 @@ def _vec2tup(vec: Vec | FrozenVec) -> tuple[float, float, float]:
     return (round(vec.x, 12), round(vec.y, 12), round(vec.z, 12))
 
 
-def load_tiledefs(tiles: Iterable[TileDef], grid: Grid) -> None:
+def load_tiledefs(tiles: Iterable[TileDef], grid: BrushLoc) -> None:
     """Load tiledef info into a simplified tiles list."""
 
     tiles_white = UserError.simple_tiles["white"]
@@ -76,7 +76,7 @@ def load_tiledefs(tiles: Iterable[TileDef], grid: Grid) -> None:
     LOGGER.info('Stored map geometry for error display.')
 
 
-def load_barriers(barrier_map: dict[utils.SliceKey, Plane[barriers.Barrier]]) -> None:
+def load_barriers(barrier_map: dict[utils.SliceKey, PlaneGrid[barriers.Barrier]]) -> None:
     """Load barrier data for display in errors."""
     for slice_key, plane in barrier_map.items():
         orient = NORM_2_ORIENT[slice_key.normal]

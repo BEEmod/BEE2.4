@@ -20,7 +20,7 @@ from srctools.vmf import VMF, Entity, Side, Solid, Output, UVAxis
 import srctools.logger
 import srctools.vmf
 
-from plane import Plane
+from plane import PlaneGrid
 from precomp.brushLoc import POS as BLOCK_POS, Block, grid_to_world
 from precomp.texturing import TileSize, Portalable
 from . import (
@@ -2014,8 +2014,8 @@ def inset_flip_panel(panel: list[Solid], pos: Vec, normal: Vec) -> None:
 
 
 def bevel_split(
-    rect_points: Plane[bool],
-    tile_pos: Plane[TileDef],
+    rect_points: PlaneGrid[bool],
+    tile_pos: PlaneGrid[TileDef],
 ) -> Iterator[tuple[int, int, int, int, tuple[bool, bool, bool, bool]]]:
     """Split the optimised segments to produce the correct bevelling."""
     for min_u, min_v, max_u, max_v, _ in grid_optim.optimise(rect_points):
@@ -2100,9 +2100,9 @@ def generate_brushes(vmf: VMF) -> None:
         bbox_min, bbox_max = Vec.bbox(tile.pos for tile in tiles)
 
         # (type, is_antigel, texture) -> (u, v) -> present/absent
-        grid_pos: dict[tuple[TileType, bool, str], Plane[bool]] = defaultdict(Plane)
+        grid_pos: dict[tuple[TileType, bool, str], PlaneGrid[bool]] = defaultdict(PlaneGrid)
 
-        tile_pos: Plane[TileDef] = Plane()
+        tile_pos: PlaneGrid[TileDef] = PlaneGrid()
 
         for tile in tiles:
             pos = tile.pos + 64 * tile.normal

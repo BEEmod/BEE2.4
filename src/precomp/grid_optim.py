@@ -5,7 +5,7 @@ set positions.
 """
 from typing import Mapping, Tuple, Iterator, TypeVar, Union, Any
 
-from plane import Plane
+from plane import PlaneGrid
 
 
 __all__ = ['optimise']
@@ -14,7 +14,7 @@ VOID: Any = object()  # Sentinel
 
 
 def optimise(
-    grid: Union[Mapping[Tuple[int, int], T], Plane[T]],
+    grid: Union[Mapping[Tuple[int, int], T], PlaneGrid[T]],
 ) -> Iterator[Tuple[int, int, int, int, T]]:
     """Given a grid, produce an efficient set of bounding boxes for each value.
 
@@ -22,7 +22,7 @@ def optimise(
     This yields (min_x, min_y, max_x, max_y, T) tuples, where this region has the same value.
     The values are compared by identity.
     """
-    full_grid: Plane[T] = Plane(grid, default=VOID)
+    full_grid: PlaneGrid[T] = PlaneGrid(grid, default=VOID)
     x_min, y_min = full_grid.mins
     x_max, y_max = full_grid.maxes
     x_max += 1
@@ -39,7 +39,7 @@ def optimise(
 
 
 def _do_cell(
-    grid: Plane[T],
+    grid: PlaneGrid[T],
     value: T,
     min_x: int,
     min_y: int,
