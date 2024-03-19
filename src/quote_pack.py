@@ -1,10 +1,10 @@
 """Data structures for quote packs."""
 import enum
-from collections.abc import Iterator
-from typing import Dict, Iterable, List, Mapping, Optional, Set
+from collections.abc import Iterable, Iterator, Mapping
+from typing import Dict, List, Optional, Sequence, Set
 
 import attrs
-from srctools import Angle, Keyvalues, Vec, conv_int, logger
+from srctools import Angle, Keyvalues, Output, Vec, conv_int, logger
 from typing_extensions import Self, assert_never
 
 import utils
@@ -15,6 +15,7 @@ LOGGER = logger.get_logger(__name__)
 TRANS_QUOTE = TransToken.untranslated('"{line}"')
 TRANS_QUOTE_ACT = TransToken.untranslated(': "{line}"')
 TRANS_NO_NAME = TransToken.ui('No Name!')
+MIDCHAMBER_ID = 'MIDCHAMBER'
 
 
 @utils.freeze_enum_props
@@ -123,6 +124,14 @@ class QuoteEvent:
         )
 
 
+@attrs.frozen
+class Choreo:
+    """A choreo scene, and associated data."""
+    scenes: Sequence[str]
+    end_commands: Sequence[Output]
+    name: str
+
+
 @attrs.frozen(kw_only=True)
 class Line:
     """A single group of lines that can be played."""
@@ -134,16 +143,15 @@ class Line:
     only_once: bool
     atomic: bool
 
-    choreo_name: str
     caption_name: str
     bullseyes: List[str]
     instances: List[str]
     sounds: List[str]
-    scenes: List[str]
+    scenes: List[Choreo]
     set_stylevars: Set[str]
 
     @classmethod
-    def parse(cls, pak_id: str, kv: Keyvalues) -> Self:
+    def parse(cls, pak_id: str, kv: Keyvalues, require_quote_name: bool) -> Self:
         """Parse from the keyvalues data.
 
         The keyvalue should have its name start with "line".
@@ -170,20 +178,46 @@ class Line:
         only_once = kv.bool('onlyonce')
         atomic = kv.bool('atomic')
         caption_name = kv['cc_emit', '']
-        # todo: Old EndCommand syntax, defined for the whole line.
         stylevars = {
             child.value.casefold()
             for child in kv.find_all('setstylevar')
         }
-        # Files have these double-nested, but that's rather pointless.
-        scenes = [
-            filename
-            for child in kv.find_all('choreo')
-            for filename in child.as_array()
-        ]
         sounds = [child.value for child in kv.find_all('snd')]
         bullseyes = [child.value for child in kv.find_all('bullseye')]
         instances = [child.value for child in kv.find_all('file')]
+        scenes = []
+
+        # Scenes and the dependent commands are order dependent
+        cur_choreo_name = ''
+        end_commands: List[Output] = []
+        for child in kv:
+            if child.name == 'choreo_name':
+                cur_choreo_name = child.value
+            elif child.name == 'endcommand':
+                end_commands.append(Output(
+                    'OnCompletion',
+                    child['target'],
+                    child['input'],
+                    child['parm', ''],
+                    child.float('delay'),
+                    only_once=child.bool('only_once'),
+                    times=child.int('times', -1),
+                ))
+            elif child.name == 'choreo':
+                if require_quote_name and not cur_choreo_name:
+                    LOGGER.warning('Quote Pack has no quote name for midchamber line!')
+                scenes.append(Choreo(
+                    child.as_array(),
+                    end_commands,
+                    cur_choreo_name,
+                ))
+                cur_choreo_name = ''
+                end_commands = []
+
+        if cur_choreo_name:
+            LOGGER.warning('Choreo_name set without a choreo scene to apply it to!')
+        if end_commands:
+            LOGGER.warning('EndCommands supplied without a choreo scene to apply it to!')
 
         return cls(
             id=quote_id,
@@ -192,7 +226,6 @@ class Line:
             transcript=transcript,
             only_once=kv.bool('onlyonce'),
             atomic=atomic,
-            choreo_name=kv['choreo_name', ''],
             set_stylevars=stylevars,
             scenes=scenes,
             sounds=sounds,
@@ -230,7 +263,7 @@ class Quote:
     lines: List[Line]
 
     @classmethod
-    def parse(cls, pak_id: str, kv: Keyvalues) -> Self:
+    def parse(cls, pak_id: str, kv: Keyvalues, require_quote_name: bool) -> Self:
         """Parse from the keyvalues data."""
         lines: List[Line] = []
         tests: List[Keyvalues] = []
@@ -238,7 +271,7 @@ class Quote:
         name: TransToken = TransToken.BLANK
         for child in kv:
             if child.name.startswith('line'):
-                lines.append(Line.parse(pak_id, child))
+                lines.append(Line.parse(pak_id, child, require_quote_name))
             elif child.name == 'priority':
                 priority = conv_int(child.value)
             elif child.name == 'name':
@@ -252,6 +285,12 @@ class Quote:
         yield self.name, path + '.name'
         for i, line in enumerate(self.lines, 1):
             yield from line.iter_trans_tokens(f'{path}/{line.id}')
+
+    def filter_criteria(self, flag_set: Set[LineCriteria]) -> Iterator[Line]:
+        """Filter the lines by the specified criteria set."""
+        for line in self.lines:
+            if flag_set.issuperset(line.criterion):
+                yield line
 
 
 @attrs.frozen(kw_only=True)
@@ -286,10 +325,11 @@ class Group:
         except LookupError:
             choreo_loc = None
 
-        quotes = [
-            Quote.parse(pak_id, child)
-            for child in kv.find_all('Quote')
-        ]
+        with logger.context(name_raw):
+            quotes = [
+                Quote.parse(pak_id, child, False)
+                for child in kv.find_all('Quote')
+            ]
 
         return cls(
             id=group_id,
@@ -331,6 +371,7 @@ class QuoteInfo:
 
     groups: Dict[str, Group]
     events: Dict[str, QuoteEvent]
+    response_use_dings: bool  # Override from the regular setting.
     responses: Dict[Response, List[Line]]
     midchamber: List[Quote]
     monitor: Optional[Monitor]

@@ -94,7 +94,7 @@ class QuotePack(PakObject, needs_foreground=True, style_suggest_key='quote'):
                 groups[group.id] = group
 
         for mid_kv in quotes_kv.find_all('Midchamber', 'Quote'):
-            midchamber.append(Quote.parse(data.pak_id, mid_kv))
+            midchamber.append(Quote.parse(data.pak_id, mid_kv, True))
 
         for event_kv in quotes_kv.find_all('QuoteEvents', 'Event'):
             event = QuoteEvent.parse(event_kv)
@@ -105,6 +105,8 @@ class QuotePack(PakObject, needs_foreground=True, style_suggest_key='quote'):
                 )
             events[event.id] = event
 
+        response_dings = use_dings
+
         for resp_kv in quotes_kv.find_children('CoopResponses'):
             try:
                 resp = RESPONSE_NAMES[resp_kv.name]
@@ -112,9 +114,11 @@ class QuotePack(PakObject, needs_foreground=True, style_suggest_key='quote'):
                 raise AppError(TransToken.ui(
                     'Invalid response kind "{name}" in config for quote pack {id}!'
                 ).format(name=resp_kv.real_name, id=data.id)) from None
+            response_dings = resp_kv.bool('use_dings', response_dings)
+
             lines = responses.setdefault(resp, [])
             for line_kv in resp_kv:
-                lines.append(Line.parse(data.pak_id, line_kv))
+                lines.append(Line.parse(data.pak_id, line_kv, False))
 
         return cls(
             data.id,
@@ -130,6 +134,7 @@ class QuotePack(PakObject, needs_foreground=True, style_suggest_key='quote'):
                 groups=groups,
                 events=events,
                 midchamber=midchamber,
+                response_use_dings=response_dings,
                 responses=responses,
 
                 chars=chars,

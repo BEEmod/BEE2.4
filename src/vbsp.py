@@ -134,10 +134,6 @@ async def load_settings() -> Tuple[
     options.load(conf.find_all('Options'))
     utils.DEV_MODE = options.DEV_MODE()
 
-    # The voice line keyvalues block
-    for quote_block in conf.find_all("quotes"):
-        voice_line.QUOTE_DATA.extend(quote_block)
-
     # Configuration properties for styles.
     for stylevar_block in conf.find_all('stylevars'):
         for var in stylevar_block:
