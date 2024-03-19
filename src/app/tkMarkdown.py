@@ -117,7 +117,7 @@ MarkdownData.BLANK = MarkdownData()  # type: ignore
 class TranslatedMarkdown(MarkdownData):
     """Markdown data parsed out of translated sources."""
     source: TransToken
-    package: str | None
+    package: utils.ObjectID | None
     _blocks: Sequence[Block] = attrs.Factory(list)
     _cache_hash: int = -1
 
@@ -163,13 +163,13 @@ class RenderState:
 
     Since the TKRenderer is shared, we need this to prevent storing state on that.
     """
-    package: str | None
+    package: utils.ObjectID | None
     # The lists we're currently generating.
     # If none it's bulleted, otherwise it's the current count.
     list_stack: list[int | None] = attrs.Factory(list)
 
 
-no_state = RenderState('')
+no_state = RenderState(None)
 state = ContextVar('tk_markdown_state', default=no_state)
 
 if not hasattr(base_renderer.BaseRenderer, '__class_getitem__'):
@@ -360,7 +360,7 @@ def _merge(*blocks: SingleMarkdown) -> SingleMarkdown:
     return SingleMarkdown(result)
 
 
-def _convert(text: str, package: str | None) -> SingleMarkdown:
+def _convert(text: str, package: utils.ObjectID | None) -> SingleMarkdown:
     """Actually convert markdown data."""
     tok = state.set(RenderState(package))
     with _RENDERER:
@@ -370,7 +370,7 @@ def _convert(text: str, package: str | None) -> SingleMarkdown:
             state.reset(tok)
 
 
-def convert(text: TransToken, package: str | None) -> MarkdownData:
+def convert(text: TransToken, package: utils.ObjectID | None) -> MarkdownData:
     """Convert Markdown syntax into data ready to be passed to richTextBox.
 
     The package must be passed to allow using images in the document. None should only be

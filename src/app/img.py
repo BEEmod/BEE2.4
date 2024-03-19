@@ -117,13 +117,17 @@ def tuple_size(size: tuple[int, int] | int) -> tuple[int, int]:
 
 
 # Special paths which map to various images.
-PATH_BLANK = utils.PackagePath('<special>', 'blank')
-PATH_ERROR = utils.PackagePath('<special>', 'error')
-PATH_LOAD = utils.PackagePath('<special>', 'load')
-PATH_NONE = utils.PackagePath('<special>', 'none')
-PATH_BG = utils.PackagePath('<special>', 'bg')
-PATH_BLACK = utils.PackagePath('<color>', '000')
-PATH_WHITE = utils.PackagePath('<color>', 'fff')
+PAK_SPECIAL = utils.special_id('<special>')
+PAK_COLOR = utils.special_id('<color>')
+PAK_BEE2 = utils.special_id('<bee2>')
+
+PATH_BLANK = utils.PackagePath(PAK_SPECIAL, 'blank')
+PATH_ERROR = utils.PackagePath(PAK_SPECIAL, 'error')
+PATH_LOAD = utils.PackagePath(PAK_SPECIAL, 'load')
+PATH_NONE = utils.PackagePath(PAK_SPECIAL, 'none')
+PATH_BG = utils.PackagePath(PAK_SPECIAL, 'bg')
+PATH_BLACK = utils.PackagePath(PAK_COLOR, '000')
+PATH_WHITE = utils.PackagePath(PAK_COLOR, 'fff')
 
 
 def current_theme() -> Theme:
@@ -294,7 +298,7 @@ class Handle(User):
     def parse(
         cls: Type[Handle],
         kv: Keyvalues,
-        pack: str,
+        pack: utils.ObjectID,
         width: int,
         height: int,
         *,
@@ -362,7 +366,7 @@ class Handle(User):
             args = [0, 0, 0]
         elif uri.package.startswith('<') and uri.package.endswith('>'):  # Special names.
             special_name = uri.package[1:-1]
-            if special_name == 'special':
+            if special_name == 'SPECIAL':
                 args = []
                 name = uri.path.casefold()
                 if name == 'blank':
@@ -374,7 +378,7 @@ class Handle(User):
                     typ = ImgBackground
                 else:
                     raise ValueError(f'Unknown special type "{uri.path}"!')
-            elif special_name in ('color', 'colour', 'rgb'):
+            elif special_name in ('COLOR', 'COLOUR', 'RGB'):
                 color = uri.path
                 try:
                     if ',' in color:  # <color>:R,G,B
@@ -399,7 +403,7 @@ class Handle(User):
                         raise ValueError(f'Colors must be #RGB, #RRGGBB hex values, or R,G,B decimal, not {uri}') from None
                 typ = ImgColor
                 args = [r, g, b]
-            elif special_name in ('bee', 'bee2'):  # Builtin resources.
+            elif special_name in ('BEE', 'BEE2'):  # Builtin resources.
                 if subfolder:
                     uri = uri.in_folder(subfolder)
                 typ = ImgBuiltin
@@ -416,12 +420,12 @@ class Handle(User):
     @classmethod
     def builtin(cls, path: str, width: int = 0, height: int = 0) -> ImgBuiltin:
         """Shortcut for getting a handle to a builtin UI image."""
-        return ImgBuiltin._deduplicate(width, height, utils.PackagePath('<bee2>', path + '.png'))
+        return ImgBuiltin._deduplicate(width, height, utils.PackagePath(PAK_BEE2, path + '.png'))
 
     @classmethod
     def sprite(cls, path: str, width: int = 0, height: int = 0) -> ImgSprite:
         """Shortcut for getting a handle to a builtin UI image, but with nearest-neighbour rescaling."""
-        return ImgSprite._deduplicate(width, height, utils.PackagePath('<bee2>', path + '.png'))
+        return ImgSprite._deduplicate(width, height, utils.PackagePath(PAK_BEE2, path + '.png'))
 
     @classmethod
     def composite(cls, children: Sequence[Handle], width: int = 0, height: int = 0) -> Handle:

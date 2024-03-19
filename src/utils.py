@@ -496,19 +496,20 @@ class PackagePath:
     reserved for app-specific usages (internal or generated paths)
     """
     __slots__ = ['package', 'path']
-    package: Final[str]
+    package: Final[SpecialID]
     path: Final[str]
-    def __init__(self, pack_id: str, path: str) -> None:
-        self.package = pack_id.casefold()
+    def __init__(self, pack_id: SpecialID, path: str) -> None:
+        self.package = pack_id
         self.path = path.replace('\\', '/').lstrip("/")
 
     @classmethod
-    def parse(cls, uri: str | PackagePath, def_package: str) -> PackagePath:
+    def parse(cls, uri: str | PackagePath, def_package: SpecialID) -> PackagePath:
         """Parse a string into a path. If a package isn't provided, the default is used."""
         if isinstance(uri, PackagePath):
             return uri
         if ':' in uri:
-            return cls(*uri.split(':', 1))
+            pack_str, path = uri.split(':', 1)
+            return cls(special_id(pack_str), path)
         else:
             return cls(def_package, uri)
 

@@ -366,7 +366,7 @@ def get_config(
     prop_block: Keyvalues,
     folder: str,
     /,
-    pak_id: str,
+    pak_id: utils.ObjectID,
     *,
     prop_name: str = 'config',
     extension: str = '.cfg',

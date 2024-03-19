@@ -54,7 +54,7 @@ async def test() -> None:
 
     def demo_item(
         name: str,
-        pak_id: str,
+        pak_id: utils.ObjectID,
         icon: str,
         group: str | None = None,
         group_icon: str | None = None,
@@ -101,8 +101,8 @@ async def test() -> None:
         event: Event[Slot[str]] | Event[None] = getattr(manager, 'on_' + evt)
         event.register(func(evt))
 
-    PAK_CLEAN = 'BEE2_CLEAN_STYLE'
-    PAK_ELEM = 'VALVE_TEST_ELEM'
+    PAK_CLEAN = utils.obj_id('BEE2_CLEAN_STYLE')
+    PAK_ELEM = utils.obj_id('VALVE_TEST_ELEM')
     items = [
         demo_item('Dropper', PAK_CLEAN, 'dropper'),
         demo_item('Entry', PAK_CLEAN, 'entry_door'),

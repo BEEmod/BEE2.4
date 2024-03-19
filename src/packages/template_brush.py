@@ -7,13 +7,13 @@ import srctools.logger
 import trio
 
 from packages import PackagesSet
-from utils import PackagePath
+from utils import ObjectID, PackagePath
 
 
 LOGGER = srctools.logger.get_logger(__name__)
 
 
-async def parse_template(packset: PackagesSet, pak_id: str, file: File) -> None:
+async def parse_template(packset: PackagesSet, pak_id: ObjectID, file: File) -> None:
     """Parse the specified template file, extracting its ID."""
     path = f'{pak_id}:{file.path}'
     temp_id = await trio.to_thread.run_sync(parse_template_fast, file, path, abandon_on_cancel=True)
