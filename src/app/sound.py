@@ -5,7 +5,7 @@ If PyGame fails to load, all fx() calls will fail silently.
 (Sounds are not critical to the app, so they just won't play.)
 """
 from __future__ import annotations
-from typing import IO, Any, Callable, Optional
+from typing import IO, Callable
 import functools
 import os
 import shutil
@@ -73,7 +73,7 @@ class NullSound:
         finally:
             self._block_count -= 1
 
-    async def load(self, name: str) -> Optional[Source]:
+    async def load(self, name: str) -> Source | None:
         """Load and do nothing."""
         return None
 
@@ -102,7 +102,7 @@ class PygletSound(NullSound):
         super().__init__()
         self.sources: dict[str, Source] = {}
 
-    async def load(self, name: str) -> Optional[Source]:
+    async def load(self, name: str) -> Source | None:
         """Load the given UI sound into a source."""
         global sounds
         fname = SOUNDS[name]
@@ -146,7 +146,7 @@ class PygletSound(NullSound):
                     _nursery.cancel_scope.cancel()
                 sounds = NullSound()
                 return 0.1
-            duration: Optional[float] = snd.duration
+            duration: float | None = snd.duration
             if duration is not None:
                 return duration
             else:
@@ -195,8 +195,8 @@ def fx(name: str) -> None:
 def fx_blockable(sound: str) -> None:
     """Play a sound effect.
 
-    This waits for a certain amount of time between retriggering sounds
-    so they don't overlap.
+    This waits for a certain amount of time between retriggering sounds,
+    so that they don't overlap.
     """
     if _nursery is not None and not _nursery.cancel_scope.cancel_called:
         _nursery.start_soon(sounds.fx_blockable, sound)
@@ -256,20 +256,20 @@ class SamplePlayer:
     """Handles playing a single audio file, and allows toggling it on/off."""
     def __init__(
         self,
+        # TODO: Replace these callbacks with AsyncValue?
         start_callback: Callable[[], None],
         stop_callback: Callable[[], None],
         system: FileSystemChain,
     ) -> None:
-        """Initialise the sample-playing manager.
-        """
-        self.player: Optional[pyglet.media.Player] = None
-        self.after: Optional[str] = None
+        """Initialise the sample-playing manager."""
+        self.player: pyglet.media.Player | None = None
+        self.after: str | None = None
         self.start_callback = start_callback
         self.stop_callback = stop_callback
-        self.cur_file: Optional[str] = None
+        self.cur_file: str | None = None
         # The system we need to clean up.
-        self._handle: Optional[IO[bytes]] = None
-        self._cur_sys: Optional[FileSystem[Any]] = None
+        self._handle: IO[bytes] | None = None
+        self._cur_sys: FileSystem | None = None
         self.system: FileSystemChain = system
 
     @property
@@ -277,7 +277,7 @@ class SamplePlayer:
         """Is the player currently playing sounds?"""
         return self.player is not None
 
-    def play_sample(self, _: object=None) -> None:
+    def play_sample(self, _: object = None) -> None:
         """Play a sample of music.
 
         If music is being played it will be stopped instead.
