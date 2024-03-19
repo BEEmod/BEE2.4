@@ -132,6 +132,7 @@ async def display_errors(
 
             window.deiconify()
             window.lift()
+            tk_tools.center_onscreen(window)
             window.bell()
             await close_event.wait()
             window.withdraw()
