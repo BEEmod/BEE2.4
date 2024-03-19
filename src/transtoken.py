@@ -4,9 +4,10 @@ Translation only occurs in the app, using the localisation module. In the compil
 so that data structures can be shared.
 We take care not to directly import gettext and babel, so the compiler can omit those.
 """
+from __future__ import annotations
 from typing import (
     Any, Callable, ClassVar, Dict, Final, Iterable, List, Mapping, NoReturn,
-    Optional, Protocol, Sequence, Tuple, cast,
+    Optional, Protocol, Sequence, Tuple, cast, final,
 )
 from typing_extensions import LiteralString, TypeAlias, override
 from enum import Enum
@@ -23,9 +24,9 @@ import utils
 LOGGER = logger.get_logger(__name__)
 del logger
 
-NS_UI: Final = utils.SpecialID('<BEE2>')  # Our UI translations.
-NS_GAME: Final = utils.SpecialID('<PORTAL2>')   # Lookup from basemodui.txt
-NS_UNTRANSLATED: Final = utils.SpecialID('<NOTRANSLATE>')  # Legacy values which don't have translation
+NS_UI: Final = utils.special_id('<BEE2>')  # Our UI translations.
+NS_GAME: Final = utils.special_id('<PORTAL2>')   # Lookup from basemodui.txt
+NS_UNTRANSLATED: Final = utils.special_id('<NOTRANSLATE>')  # Legacy values which don't have translation
 
 # The prefix for all Valve's editor keys.
 PETI_KEY_PREFIX: Final = 'PORTAL2_PuzzleEditor'
@@ -426,3 +427,21 @@ class ListTransToken(JoinTransToken):
         if self.sort:
             items.sort()
         return ui_list_getter(CURRENT_LANG.lang_code, self.kind, items)
+
+
+# TODO: Move this back to app.errors when that can be imported in compiler safely.
+
+@final
+@attrs.define(init=False)
+class AppError(Exception):
+    """An error that occurs when using the app, that should be displayed to the user."""
+    message: TransToken
+    fatal: bool
+
+    def __init__(self, message: TransToken) -> None:
+        super().__init__(message)
+        self.message = message
+        self.fatal = False
+
+    def __str__(self) -> str:
+        return f"AppError: {self.message}"

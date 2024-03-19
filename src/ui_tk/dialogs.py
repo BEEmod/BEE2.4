@@ -9,9 +9,8 @@ from typing_extensions import override
 
 from loadScreen import suppress_screens
 from app.dialogs import DEFAULT_TITLE, Dialogs, Icon, validate_non_empty
-from app.errors import AppError
 from app.tk_tools import set_window_icon, center_onscreen
-from transtoken import TransToken
+from transtoken import AppError, TransToken
 
 from app import TK_ROOT
 from ui_tk.wid_transtoken import set_text

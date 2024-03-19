@@ -9,8 +9,8 @@ import math
 import trio
 
 from app import TK_ROOT, tk_tools
-from app.errors import AppError, ErrorUI
-from transtoken import TransToken
+from app.errors import ErrorUI
+from transtoken import AppError, TransToken
 from ui_tk.wid_transtoken import set_text, set_win_title
 
 

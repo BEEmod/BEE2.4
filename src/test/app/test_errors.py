@@ -3,8 +3,8 @@ from exceptiongroup import ExceptionGroup
 
 import pytest
 
-from app.errors import AppError, ErrorUI, Result
-from transtoken import TransToken
+from app.errors import ErrorUI, Result
+from transtoken import AppError, TransToken
 
 
 @pytest.fixture(scope="module", autouse=True)

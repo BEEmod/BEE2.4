@@ -2,8 +2,7 @@
 from enum import Enum
 from typing import Callable, ClassVar, Optional, Protocol, Literal
 
-from app.errors import AppError
-from transtoken import TransToken
+from transtoken import AppError, TransToken
 
 
 DEFAULT_TITLE = TransToken.ui('BEEmod')

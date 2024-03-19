@@ -13,8 +13,7 @@ import struct
 import trio
 from srctools import VPK, logger
 
-from app.errors import AppError
-from transtoken import TransToken
+from transtoken import AppError, TransToken
 from . import ExportData, STEPS, StepResource
 from packages import StyleVPK
 import utils

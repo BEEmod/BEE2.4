@@ -23,13 +23,13 @@ from srctools import Keyvalues, NoKeyError
 from srctools.tokenizer import TokenSyntaxError
 from srctools.filesys import FileSystem, RawFileSystem, ZipFileSystem, VPKFileSystem
 
-from app.errors import AppError, ErrorUI
+from app.errors import ErrorUI
 from editoritems import Item as EditorItem, Renderable, RenderableType
 from corridor import CORRIDOR_COUNTS, GameMode, Direction
 from loadScreen import MAIN_PAK as LOAD_PAK, MAIN_OBJ as LOAD_OBJ
 import srctools.logger
 
-from transtoken import TransToken, TransTokenSource
+from transtoken import AppError, TransToken, TransTokenSource
 
 
 __all__ = [

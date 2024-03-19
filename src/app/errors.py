@@ -12,7 +12,7 @@ import types
 import srctools.logger
 
 from transtoken import TransToken
-from utils import AppError as AppError  # TODO: Move back to this module, once app no longer imports tk.
+from transtoken import AppError as AppError  # TODO: Move back to this module, once app no longer imports tk.
 
 
 LOGGER = srctools.logger.get_logger(__name__)

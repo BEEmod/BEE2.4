@@ -1,8 +1,7 @@
 from typing import List, Set, Iterator
 
-from app.errors import AppError
 from quote_pack import Line, Quote, QuoteEvent, Group, QuoteInfo, Response, Monitor, RESPONSE_NAMES
-from transtoken import TransToken, TransTokenSource
+from transtoken import AppError, TransToken, TransTokenSource
 from packages import PackagesSet, PakObject, set_cond_source, ParseData, get_config, SelitemData
 from srctools import Angle, Keyvalues, NoKeyError, logger
 import srctools

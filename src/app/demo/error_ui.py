@@ -3,8 +3,8 @@ from tkinter import ttk
 import trio
 
 from app import TK_ROOT
-from app.errors import AppError, ErrorUI
-from transtoken import TransToken
+from app.errors import ErrorUI
+from transtoken import AppError, TransToken
 
 
 async def test() -> None:
