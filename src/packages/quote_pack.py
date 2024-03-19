@@ -172,10 +172,10 @@ class QuotePack(PakObject, needs_foreground=True, style_suggest_key='quote'):
                 'Duplicate event IDs for quote pack {}: {}',
                 self.id, sorted(overlap),
             )
-        self.data.events |= override.data.events
+        self.data.events.update(override.data.events)
 
     def __repr__(self) -> str:
-        return '<Voice:' + self.id + '>'
+        return f'<Voice:{self.id}>'
 
     @classmethod
     async def post_parse(cls, packset: PackagesSet) -> None:

@@ -100,9 +100,10 @@ class Response(enum.Enum):
             assert_never(self)
 
 RESPONSE_NAMES: Mapping[str, Response] = {
-    resp.name.lower(): resp
-    for resp in Response
-} | {
+    **{
+        resp.name.lower(): resp
+        for resp in Response
+    },
     # Legacy names accepted in earlier versions. Only maybe used in UCPs?
     'taunt_generic': Response.GESTURE_GENERIC,
     'camera_generic': Response.GESTURE_CAMERA,
