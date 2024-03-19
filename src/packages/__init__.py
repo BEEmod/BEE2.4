@@ -116,7 +116,7 @@ class SelitemData:
     packages: frozenset[str] = attrs.Factory(frozenset)
 
     @classmethod
-    def parse(cls, info: Keyvalues, pack_id: str) -> SelitemData:
+    def parse(cls, info: Keyvalues, pack_id: utils.ObjectID) -> SelitemData:
         """Parse from a keyvalues block."""
         auth = set(sep_values(info['authors', '']))
         name = TransToken.parse(pack_id, info['name'])
@@ -220,7 +220,7 @@ class ObjData:
     """
     fsys: FileSystem
     info_block: Keyvalues = attrs.field(repr=False)
-    pak_id: str
+    pak_id: utils.ObjectID
     disp_name: TransToken
 
 
@@ -230,7 +230,7 @@ class ParseData:
     fsys: FileSystem
     id: str
     info: Keyvalues = attrs.field(repr=False)
-    pak_id: str
+    pak_id: utils.ObjectID
     is_override: bool
 
 
@@ -270,7 +270,7 @@ class PakObject:
     # ID of the object
     id: str
     # ID of the package.
-    pak_id: str
+    pak_id: utils.SpecialID
     # Display name of the package.
     pak_name: str
 
@@ -420,7 +420,7 @@ class PackagesSet:
 
     This is swapped out to reload packages.
     """
-    packages: dict[str, Package] = attrs.Factory(dict)
+    packages: dict[utils.ObjectID, Package] = attrs.Factory(dict)
     # type -> id -> object
     # The object data before being parsed, and the final result.
     unparsed: dict[Type[PakObject], dict[str, ObjData]] = attrs.field(factory=dict, repr=False)
@@ -478,7 +478,7 @@ class PackagesSet:
             raise ValueError(cls.__name__ + ' has not been parsed yet!')
         return cast('dict[str, PakT]', self.objects[cls])[object_id.casefold()]
 
-    def add(self, obj: PakT, pak_id: str, pak_name: str) -> None:
+    def add(self, obj: PakT, pak_id: utils.SpecialID, pak_name: str) -> None:
         """Add an object to our dataset later, with the given package name."""
         self.objects[type(obj)][obj.id.casefold()] = obj
         if not hasattr(obj, 'pak_id'):
@@ -552,22 +552,22 @@ async def find_packages(errors: ErrorUI, packset: PackagesSet, pak_dir: Path) ->
                 # Don't continue to parse this "package"
                 continue
             try:
-                pak_id = info['ID']
+                pak_id = utils.parse_obj_id(info['ID'])
             except LookupError:
                 errors.add(TRANS_INVALID_PAK_NO_ID.format(path=Path(filesys.path, 'info.txt')))
                 continue  # Skip this.
 
-            if pak_id.casefold() in packset.packages:
-                duplicate = packset.packages[pak_id.casefold()]
+            if pak_id in packset.packages:
+                duplicate = packset.packages[pak_id]
                 raise AppError(TRANS_DUPLICATE_PAK_ID.format(
                     pak_id=pak_id,
                     path1=duplicate.fsys.path,
                     path2=filesys.path,
                 ))
 
-            PACKAGE_SYS[pak_id.casefold()] = filesys
+            PACKAGE_SYS[pak_id] = filesys
 
-            packset.packages[pak_id.casefold()] = Package(
+            packset.packages[pak_id] = Package(
                 pak_id,
                 filesys,
                 info,
@@ -882,7 +882,7 @@ def parse_pack_transtoken(pack: Package, kv: Keyvalues) -> None:
 @attrs.define(eq=False, init=False)
 class Package:
     """Represents a package."""
-    id: str
+    id: utils.ObjectID
     fsys: FileSystem = attrs.field(repr=False)
     info: Keyvalues = attrs.field(repr=False)
     path: Path
@@ -892,7 +892,7 @@ class Package:
 
     def __init__(
         self,
-        pak_id: str,
+        pak_id: utils.ObjectID,
         filesystem: FileSystem,
         info: Keyvalues,
         path: Path,
@@ -1069,7 +1069,7 @@ class Style(PakObject, needs_foreground=True):
                 raise ValueError(f'Style "{data.id}" missing configuration folder!') from None
         else:
             with data.fsys[folder + '/items.txt'].open_str() as f:
-                items, renderables = await trio.to_thread.run_sync(EditorItem.parse, f)
+                items, renderables = await trio.to_thread.run_sync(EditorItem.parse, f, data.pak_id)
             vbsp = lazy_conf.from_file(
                 utils.PackagePath(data.pak_id, folder + '/vbsp_config.cfg'),
                 missing_ok=True,
@@ -1168,7 +1168,7 @@ def parse_multiline_key(info: Keyvalues, prop_name: str, *, allow_old_format: bo
 def desc_parse(
     info: Keyvalues,
     source: str,
-    pak_id: str,
+    pak_id: utils.ObjectID,
     *,
     prop_name: str='description',
 ) -> tkMarkdown.MarkdownData:

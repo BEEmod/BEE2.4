@@ -17,6 +17,7 @@ from connections import Config as ConnConfig, InputType, OutNames
 from editoritems_props import ItemProp, ItemPropKind, PROP_TYPES
 from collisions import CollideType, BBox, NonBBoxError
 from transtoken import TransToken, TransTokenSource
+import utils
 
 
 __all__ = [
@@ -755,7 +756,7 @@ class SubType:
             self.pal_pos = None
 
     @classmethod
-    def parse(cls, tok: Tokenizer, pak_id: str) -> SubType:
+    def parse(cls, tok: Tokenizer, pak_id: utils.ObjectID) -> SubType:
         """Parse a subtype from editoritems."""
         subtype = SubType()
         for key in tok.block('Subtype'):
@@ -962,6 +963,7 @@ class Item:
     def parse(
         cls,
         file: Iterable[str],
+        pak_id: utils.ObjectID,
         filename: str | None = None,
     ) -> tuple[list[Item], dict[RenderableType, Renderable]]:
         """Parse an entire editoritems file.
@@ -994,7 +996,7 @@ class Item:
                 raise tok.error(tok_type)
 
             if tok_value.casefold() == 'item':
-                it = cls.parse_one(tok)
+                it = cls.parse_one(tok, pak_id)
                 if it.id.casefold() in known_ids:
                     LOGGER.warning('Item {} redeclared!', it.id)
                 known_ids.add(it.id.casefold())
@@ -1014,7 +1016,7 @@ class Item:
         return items, icons
 
     @classmethod
-    def parse_one(cls, tok: Tokenizer, pak_id: str='') -> Item:
+    def parse_one(cls, tok: Tokenizer, pak_id: utils.ObjectID) -> Item:
         """Parse an item.
 
         This expects the "Item" token to have been read already.
@@ -1095,7 +1097,7 @@ class Item:
         'pseudohandle': 'pseudo_handle',
     }
 
-    def _parse_editor_block(self, tok: Tokenizer, pak_id: str) -> None:
+    def _parse_editor_block(self, tok: Tokenizer, pak_id: utils.ObjectID) -> None:
         """Parse the editor block of the item definitions."""
         for key in tok.block('Editor'):
             folded_key = key.casefold()
@@ -1151,7 +1153,7 @@ class Item:
                 else:
                     setattr(self, conf_attr, conv_bool(tok.expect(Token.STRING)))
 
-    def _parse_properties_block(self, tok: Tokenizer, pak_id: str) -> None:
+    def _parse_properties_block(self, tok: Tokenizer, pak_id: utils.ObjectID) -> None:
         """Parse the properties block of the item definitions."""
         for prop_str in tok.block('Properties'):
             prop_type: ItemPropKind[Any] | None

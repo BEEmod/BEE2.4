@@ -13,6 +13,7 @@ from corridor import GameMode, Direction, Orient
 from config.last_sel import LastSelected
 from config.corridors import UIState, Config
 from transtoken import TransToken
+import utils
 import config
 import packages
 
@@ -36,7 +37,7 @@ FALLBACK = corridor.CorridorGroup(
         for orient in Orient
     }
 )
-FALLBACK.pak_id = '<fallback>'
+FALLBACK.pak_id = utils.parse_obj_special_id('<FALLBACK>')
 FALLBACK.pak_name = '???'
 
 TRANS_AUTHORS = TransToken.ui_plural('Author: {authors}', 'Authors: {authors}')

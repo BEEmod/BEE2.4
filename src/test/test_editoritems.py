@@ -1,12 +1,14 @@
 """Test Editoritems syntax."""
 from srctools import Vec
 
+import utils
 from app.localisation import TransToken
 from editoritems import (
     ConnSide, Coord, DesiredFacing, FSPath, Handle, InstCount, Item, ItemClass,
     OccupiedVoxel, OccuType, Sound,
 )
 
+PAK_ID = utils.parse_obj_id('test_package')
 
 # Definition for a simple item, with 'exporting' open.
 START_EXPORTING = '''
@@ -48,7 +50,7 @@ def test_parse_goo() -> None:
                 }
                 "Palette"
                 {
-                    "Tooltip"	"PORTAL2_PuzzleEditor_Palette_goo"
+                    "Tooltip"	"Custom palette"
                     "Image"		"palette/goo.png"
                     "Position"	"2 6 0"
                 }
@@ -83,7 +85,7 @@ def test_parse_goo() -> None:
             }
         }
     }
-    ''')
+    ''', PAK_ID)
     assert item.id == "ITEM_GOO"
     assert item.cls is ItemClass.GOO
     assert len(item.subtypes) == 1
@@ -95,7 +97,7 @@ def test_parse_goo() -> None:
         FSPath("goo_man.mdl"),
         FSPath("goo_man_water.mdl"),
     ]
-    assert subtype.pal_name == TransToken.from_valve("PORTAL2_PuzzleEditor_Palette_goo")
+    assert subtype.pal_name == TransToken(PAK_ID, PAK_ID, "Custom palette", {})
     assert subtype.pal_icon == FSPath("palette/goo.vtf")
     assert subtype.pal_pos == (2, 6)
 
@@ -179,7 +181,7 @@ def test_instances() -> None:
             }
         }
     }} // End exporting + item
-    ''')
+    ''', PAK_ID)
     assert len(item.instances) == 6
     assert item.instances[0] == InstCount(FSPath("instances/p2editor/something.vmf"), 30, 28, 4892)
     assert item.instances[1] == InstCount(FSPath("instances/somewhere_else/item.vmf"), 0, 0, 0)

@@ -44,7 +44,7 @@ class InheritKind(Enum):
 @attrs.frozen
 class UnParsedItemVariant:
     """The desired variant for an item, before we've figured out the dependencies."""
-    pak_id: str  # The package that defined this variant.
+    pak_id: utils.ObjectID  # The package that defined this variant.
     filesys: FileSystem  # The original filesystem.
     folder: str | None  # If set, use the given folder from our package.
     style: str | None  # Inherit from a specific style (implies folder is None)
@@ -71,7 +71,7 @@ class ItemVariant:
 
     def __init__(
         self,
-        pak_id: str,
+        pak_id: utils.ObjectID,
         editoritems: EditorItem,
         vbsp_config: lazy_conf.LazyConf,
         editor_extra: list[EditorItem],
@@ -131,7 +131,7 @@ class ItemVariant:
         self.vbsp_config = lazy_conf.concat(self.vbsp_config, other.vbsp_config)
         self.desc = tkMarkdown.join(self.desc, other.desc)
 
-    async def modify(self, pak_id: str, kv: Keyvalues, source: str) -> ItemVariant:
+    async def modify(self, pak_id: utils.ObjectID, kv: Keyvalues, source: str) -> ItemVariant:
         """Apply a config to this item variant.
 
         This produces a copy with various modifications - switching
@@ -233,7 +233,7 @@ class ItemVariant:
         self,
         kv: Keyvalues,
         editor: list[EditorItem],
-        pak_id: str,
+        pak_id: utils.ObjectID,
         source: str,
         is_extra: bool,
     ) -> list[EditorItem]:
@@ -715,7 +715,7 @@ async def parse_item_folder(
     fold: str,
     filesystem: FileSystem,
     item_id: str,
-    pak_id: str,
+    pak_id: utils.ObjectID,
 ) -> ItemVariant:
     """Parse through data in item/ folders, and return the result."""
     prop_path = f'items/{fold}/properties.txt'

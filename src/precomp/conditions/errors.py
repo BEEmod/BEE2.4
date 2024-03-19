@@ -4,6 +4,7 @@ from typing import Dict, List
 from srctools import Keyvalues, Entity, Vec
 import srctools.logger
 
+import utils
 from precomp import conditions
 from transtoken import TransToken
 import user_errors
@@ -34,6 +35,7 @@ def res_user_error(inst: Entity, res: Keyvalues) -> None:
         tok_package, token_id = token_id.split(':', 1)
     except ValueError:
         raise ValueError('No colon in token ID "{}"!', token_id) from None
+    package_id = utils.parse_obj_id(tok_package)
 
     points: List[Vec] = []
     voxels: List[Vec] = []
@@ -53,6 +55,6 @@ def res_user_error(inst: Entity, res: Keyvalues) -> None:
     }
 
     raise user_errors.UserError(
-        TransToken(tok_package, tok_package, token_id, params),
+        TransToken(package_id, package_id, token_id, params),
         voxels=voxels, points=points,
     )

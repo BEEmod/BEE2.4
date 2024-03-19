@@ -17,13 +17,15 @@ import string
 from srctools import EmptyMapping, logger
 import attrs
 
+import utils
+
 
 LOGGER = logger.get_logger(__name__)
 del logger
 
-NS_UI: Final = '<BEE2>'  # Our UI translations.
-NS_GAME: Final = '<PORTAL2>'   # Lookup from basemodui.txt
-NS_UNTRANSLATED: Final = '<NOTRANSLATE>'  # Legacy values which don't have translation
+NS_UI: Final = utils.SpecialID('<BEE2>')  # Our UI translations.
+NS_GAME: Final = utils.SpecialID('<PORTAL2>')   # Lookup from basemodui.txt
+NS_UNTRANSLATED: Final = utils.SpecialID('<NOTRANSLATE>')  # Legacy values which don't have translation
 
 # The prefix for all Valve's editor keys.
 PETI_KEY_PREFIX: Final = 'PORTAL2_PuzzleEditor'
@@ -91,9 +93,9 @@ def _param_convert(params: Mapping[str, object]) -> Mapping[str, object]:
 class TransToken:
     """A named section of text that can be translated later on."""
     # The package name, or a NS_* constant.
-    namespace: str
+    namespace: utils.SpecialID
     # Original package where this was parsed from.
-    orig_pack: str
+    orig_pack: utils.SpecialID
     # The token to lookup, or the default if undefined.
     token: str
     # Keyword arguments passed when formatting.
@@ -102,16 +104,15 @@ class TransToken:
     BLANK: ClassVar['TransToken']   # Quick access to blank token.
 
     @classmethod
-    def parse(cls, package: str, text: str) -> 'TransToken':
+    def parse(cls, package: utils.SpecialID, text: str) -> 'TransToken':
         """Parse a string to find a translation token, if any."""
         orig_pack = package
         if text.startswith('[['):  # "[[package]] default"
             try:
-                package, token = text[2:].split(']]', 1)
+                package_str, token = text[2:].split(']]', 1)
                 token = token.lstrip()  # Allow whitespace between "]" and text.
                 # Don't allow specifying our special namespaces.
-                if package.startswith('<') or package.endswith('>'):
-                    raise ValueError
+                package = utils.parse_obj_id(package)
             except ValueError:
                 LOGGER.warning('Unparsable translation token - expected "[[package]] text", got:\n{}', text)
                 return cls(package, orig_pack, text, EmptyMapping)

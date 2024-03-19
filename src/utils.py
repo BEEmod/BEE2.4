@@ -463,10 +463,10 @@ class FuncLookup(Generic[LookupT], Mapping[str, LookupT]):
         self._registry.clear()
 
 
-# An object ID, which has been made uppercase. This excludes <> and [] names.
-ObjectID = NewType("ObjectID", str)
 # Special ID includes <>/[] names, and ''.
 SpecialID = NewType("SpecialID", str)
+# An object ID, which has been made uppercase. This excludes <> and [] names.
+ObjectID = NewType("ObjectID", SpecialID)
 
 ID_NONE: Final = SpecialID('<NONE>')
 ID_EMPTY: Final = SpecialID('')
@@ -476,15 +476,15 @@ def parse_obj_id(value: str) -> ObjectID:
     """Parse an object ID."""
     if not value or value.startswith(('(', '<', '[')) or value.endswith((')', '>', ']')):
         raise ValueError(f'Invalid object ID "{value}". IDs may not start/end with brackets.')
-    return ObjectID(value.casefold().upper())
+    return ObjectID(SpecialID(value.casefold().upper()))
 
 
-def parse_obj_special_id(value: str) -> ObjectID | SpecialID:
+def parse_obj_special_id(value: str) -> SpecialID:
     """Parse an object ID or a special name."""
     if not value or value.startswith(('(', '<', '[')) or value.endswith((')', '>', ']')):
-        return SpecialID(value.casefold())
+        return SpecialID(value.casefold().upper())
     else:
-        return ObjectID(value.casefold().upper())
+        return ObjectID(SpecialID(value.casefold().upper()))
 
 
 class PackagePath:

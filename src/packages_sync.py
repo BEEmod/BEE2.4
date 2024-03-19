@@ -50,9 +50,9 @@ def get_package(file: Path) -> RawFileSystem:
     global PACKAGE_REPEAT
     try:
         with CONF.open() as f:
-            last_package = f.read().strip()
+            last_package = utils.parse_obj_id(f.read().strip())
     except FileNotFoundError:
-        last_package = ''
+        last_package = None
 
     if last_package:
         if PACKAGE_REPEAT is not None:
@@ -87,7 +87,7 @@ def get_package(file: Path) -> RawFileSystem:
             pack_id = last_package
 
         try:
-            fsys = get_loaded_packages().packages[pack_id.casefold()].fsys
+            fsys = get_loaded_packages().packages[utils.parse_obj_id(pack_id)].fsys
         except KeyError:
             continue
         if isinstance(fsys, RawFileSystem):
