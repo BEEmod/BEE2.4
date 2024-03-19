@@ -112,7 +112,7 @@ class TransToken:
                 package_str, token = text[2:].split(']]', 1)
                 token = token.lstrip()  # Allow whitespace between "]" and text.
                 # Don't allow specifying our special namespaces.
-                package = utils.parse_obj_id(package)
+                package = utils.obj_id(package)
             except ValueError:
                 LOGGER.warning('Unparsable translation token - expected "[[package]] text", got:\n{}', text)
                 return cls(package, orig_pack, text, EmptyMapping)

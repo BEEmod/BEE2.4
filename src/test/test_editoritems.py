@@ -8,7 +8,7 @@ from editoritems import (
     OccupiedVoxel, OccuType, Sound,
 )
 
-PAK_ID = utils.parse_obj_id('test_package')
+PAK_ID = utils.obj_id('test_package')
 
 # Definition for a simple item, with 'exporting' open.
 START_EXPORTING = '''

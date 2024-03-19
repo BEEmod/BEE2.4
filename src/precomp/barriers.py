@@ -55,8 +55,8 @@ class Border(Flag):
 
 # IDs for the default barrier definitions. These are detected by the generated brushes, not
 # from the instance (since that's the same for both).
-GLASS_ID: Final = utils.parse_obj_id('VALVE_GLASS')
-GRATE_ID: Final = utils.parse_obj_id('VALVE_GRATING')
+GLASS_ID: Final = utils.obj_id('VALVE_GLASS')
+GRATE_ID: Final = utils.obj_id('VALVE_GRATING')
 
 ORIENT_E: Final = FrozenMatrix.from_yaw(0)
 ORIENT_N: Final = FrozenMatrix.from_yaw(90)
@@ -108,7 +108,7 @@ class HoleConfig:
     @classmethod
     def parse(cls, kv: Keyvalues) -> HoleConfig:
         """Parse a configuration from a KV block."""
-        conf_id = utils.parse_obj_id(kv.real_name)
+        conf_id = utils.obj_id(kv.real_name)
         instance = kv['instance', '']
 
         template, shape = template_solids_and_coll(kv['template'])
@@ -152,7 +152,7 @@ class HoleType:
     @classmethod
     def parse(cls, kv: Keyvalues) -> HoleType:
         """Parse hole types from keyvalues data."""
-        hole_id = utils.parse_obj_id(kv.real_name)
+        hole_id = utils.obj_id(kv.real_name)
 
         # Use a template to make it easy to specify these.
         temp_id, visgroups = template_brush.parse_temp_name(kv['footprint'])
@@ -293,13 +293,13 @@ class BarrierType:
     @classmethod
     def parse(cls, kv: Keyvalues) -> BarrierType:
         """Parse from keyvalues files."""
-        barrier_id = utils.parse_obj_id(kv.real_name)
+        barrier_id = utils.obj_id(kv.real_name)
         frames: Dict[FrameOrient, List[FrameType]] = {orient: [] for orient in FrameOrient}
         error_disp: user_errors.Kind | None = None
         surfaces: List[Brush | Collide] = []
 
         for sub_kv in kv.find_all('Frame'):
-            frame_id = utils.parse_obj_id(sub_kv.value)
+            frame_id = utils.obj_id(sub_kv.value)
             try:
                 frame_map = FRAME_TYPES[frame_id]
             except KeyError:
@@ -315,7 +315,7 @@ class BarrierType:
             surfaces.append(Collide.parse(sub_kv))
 
         hole_variants = [
-            utils.parse_obj_id(sub_kv.value)
+            utils.obj_id(sub_kv.value)
             for sub_kv in kv.find_all('HoleVariant')
         ]
 
@@ -691,7 +691,7 @@ def parse_conf(kv: Keyvalues) -> None:
     """Parse frame configurations."""
     FRAME_TYPES.clear()
     for block in kv.find_children('BarrierFrames'):
-        frame_id = utils.parse_obj_id(block.real_name)
+        frame_id = utils.obj_id(block.real_name)
         if 'horiz' in block and 'vert' in block and 'flat' in block:
             horiz_conf = FrameType.parse(block.find_key('horiz'))
             vert_conf = FrameType.parse(block.find_key('vert'))
@@ -1010,7 +1010,7 @@ def test_hole_spot(
 @conditions.make_result('GlassHole')
 def res_glass_hole(inst: Entity, res: Keyvalues) -> None:
     """Add Glass/grating holes. The value should be 'large' or 'small'."""
-    hole_type = HOLE_TYPES[utils.parse_obj_id(res.value)]
+    hole_type = HOLE_TYPES[utils.obj_id(res.value)]
 
     orient = FrozenMatrix.from_angstr(inst['angles'])
     origin: FrozenVec = FrozenVec.from_str(inst['origin']) // 128 * 128 + 64

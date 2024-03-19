@@ -8,8 +8,8 @@ import utils
 def token_constructor() -> None:
     """Test the constructors work as expected."""
     tok = TransToken(
-        utils.parse_obj_id("SOME_pACKAGE"),
-        utils.parse_obj_id("ORIG_PACK"),
+        utils.obj_id("SOME_pACKAGE"),
+        utils.obj_id("ORIG_PACK"),
         "Style: {style}", {"style": "Clean"},
     )
     assert tok.namespace == "SOME_PACKAGE"
@@ -18,7 +18,7 @@ def token_constructor() -> None:
     assert tok.parameters == {"style": "Clean"}
 
     # If not provided, it uses the singleton object.
-    tok = TransToken(utils.parse_obj_id("PACK"), utils.parse_obj_id("PACK"), "No Parameters", {})
+    tok = TransToken(utils.obj_id("PACK"), utils.obj_id("PACK"), "No Parameters", {})
     assert tok.parameters is EmptyMapping
 
     tok = TransToken.from_valve('PORTAL2_PuzzleEditor_Palette_sphere')
@@ -34,8 +34,8 @@ def token_constructor() -> None:
 
 def test_token_parse() -> None:
     """Test that the parsing code works correctly."""
-    pack = utils.parse_obj_id("SOME_PACKAGE")
-    owner = utils.parse_obj_id("OWNER")
+    pack = utils.obj_id("SOME_PACKAGE")
+    owner = utils.obj_id("OWNER")
 
     assert TransToken.parse(pack, "Regular text") == TransToken(
         pack, pack, "Regular text", EmptyMapping

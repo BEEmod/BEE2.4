@@ -700,7 +700,7 @@ def _parse_template(loc: UnparsedTemplate) -> Template:
             offset=Vec.from_str(ent['origin']),
             normal=Matrix.from_angstr(ent['angles']).up(),
             visgroups=set(map(visgroup_names.__getitem__, ent.visgroup_ids)),
-            id=utils.parse_obj_special_id(ent['barrierid']),
+            id=utils.special_id(ent['barrierid']),
             force=srctools.conv_bool(ent['force']),
         ))
 

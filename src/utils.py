@@ -32,6 +32,7 @@ __all__ = [
     'get_git_version', 'install_path', 'bins_path', 'conf_location', 'fix_cur_directory',
     'run_bg_daemon', 'not_none', 'CONN_LOOKUP', 'CONN_TYPES', 'freeze_enum_props', 'FuncLookup',
     'PackagePath', 'Result', 'acompose', 'get_indent', 'iter_grid', 'check_cython',
+    'ObjectID', 'SpecialID', 'obj_id', 'special_id',
     'check_shift', 'fit', 'group_runs', 'restart_app', 'quit_app', 'set_readonly',
     'unset_readonly', 'merge_tree', 'write_lang_pot',
 ]
@@ -472,14 +473,14 @@ ID_NONE: Final = SpecialID('<NONE>')
 ID_EMPTY: Final = SpecialID('')
 
 
-def parse_obj_id(value: str) -> ObjectID:
+def obj_id(value: str) -> ObjectID:
     """Parse an object ID."""
     if not value or value.startswith(('(', '<', '[')) or value.endswith((')', '>', ']')):
         raise ValueError(f'Invalid object ID "{value}". IDs may not start/end with brackets.')
     return ObjectID(SpecialID(value.casefold().upper()))
 
 
-def parse_obj_special_id(value: str) -> SpecialID:
+def special_id(value: str) -> SpecialID:
     """Parse an object ID or a special name."""
     if not value or value.startswith(('(', '<', '[')) or value.endswith((')', '>', ']')):
         return SpecialID(value.casefold().upper())

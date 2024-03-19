@@ -20,7 +20,7 @@ SENDTOR_TARGETS: dict[str, tuple[Vec, Vec]] = {}
 # Laser instance -> relays created.
 SENDTOR_RELAYS: dict[str, list[Entity]] = defaultdict(list)
 
-TOK_SENDTOR_BAD_OUTPUT = TransToken.parse(utils.parse_obj_id('HMW_SENDIFICATOR'), 'BAD_OUTPUT_ITEM')
+TOK_SENDTOR_BAD_OUTPUT = TransToken.parse(utils.obj_id('HMW_SENDIFICATOR'), 'BAD_OUTPUT_ITEM')
 
 
 # Doesn't actually require connections, but it needs to be before Sendificator.

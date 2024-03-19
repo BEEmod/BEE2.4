@@ -35,7 +35,7 @@ def res_user_error(inst: Entity, res: Keyvalues) -> None:
         tok_package, token_id = token_id.split(':', 1)
     except ValueError:
         raise ValueError('No colon in token ID "{}"!', token_id) from None
-    package_id = utils.parse_obj_id(tok_package)
+    package_id = utils.obj_id(tok_package)
 
     points: List[Vec] = []
     voxels: List[Vec] = []

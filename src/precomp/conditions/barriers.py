@@ -67,7 +67,7 @@ def res_cust_barrier(inst: Entity, res: Keyvalues) -> None:
     The specified item needs to have an output which will be connected to glass/grating.
     """
     try:
-        barrier_type = barriers.BARRIER_TYPES[utils.parse_obj_id(res.value)]
+        barrier_type = barriers.BARRIER_TYPES[utils.obj_id(res.value)]
     except KeyError:
         raise user_errors.UserError(
             user_errors.TOK_UNKNOWN_ID.format(kind='Barrier Type', id=res.value)

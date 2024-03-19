@@ -552,7 +552,7 @@ async def find_packages(errors: ErrorUI, packset: PackagesSet, pak_dir: Path) ->
                 # Don't continue to parse this "package"
                 continue
             try:
-                pak_id = utils.parse_obj_id(info['ID'])
+                pak_id = utils.obj_id(info['ID'])
             except LookupError:
                 errors.add(TRANS_INVALID_PAK_NO_ID.format(path=Path(filesys.path, 'info.txt')))
                 continue  # Skip this.

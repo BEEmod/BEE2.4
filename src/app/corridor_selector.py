@@ -37,7 +37,7 @@ FALLBACK = corridor.CorridorGroup(
         for orient in Orient
     }
 )
-FALLBACK.pak_id = utils.parse_obj_special_id('<FALLBACK>')
+FALLBACK.pak_id = utils.special_id('<FALLBACK>')
 FALLBACK.pak_name = '???'
 
 TRANS_AUTHORS = TransToken.ui_plural('Author: {authors}', 'Authors: {authors}')
