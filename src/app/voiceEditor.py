@@ -88,7 +88,10 @@ win.withdraw()
 
 
 def quit(event: object = None) -> None:
-    """Close the window."""
+    """Close the window, discarding changes."""
+    global voice_item
+    if voice_item is not None:
+        voice_item = None
     win.grab_release()
     win.wm_withdraw()
 
@@ -188,7 +191,8 @@ def check_toggled(var: BooleanVar, config_section: SectionProxy, quote_id: str) 
     config_section[quote_id] = srctools.bool_as_int(var.get())
 
 
-def save() -> None:
+def save(e) -> None:
+    """Save and close the window."""
     global voice_item
     if voice_item is not None:
         voice_item = None
@@ -196,8 +200,8 @@ def save() -> None:
         config.save_check()
         config_mid.save_check()
         config_resp.save_check()
-        win.grab_release()
-        win.withdraw()
+    win.grab_release()
+    win.withdraw()
 
 
 def add_tabs(tk_img: TKImages) -> None:
