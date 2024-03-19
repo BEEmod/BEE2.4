@@ -112,14 +112,15 @@ class TransToken:
             try:
                 package_str, token = text[2:].split(']]', 1)
                 token = token.lstrip()  # Allow whitespace between "]" and text.
-                # Don't allow specifying our special namespaces.
-                package = utils.obj_id(package)
+                # Don't allow specifying our special namespaces, except allow empty string for UNTRANSLATED
+                package = utils.obj_id(package_str) if package_str else NS_UNTRANSLATED
             except ValueError:
-                LOGGER.warning('Unparsable translation token - expected "[[package]] text", got:\n{}', text)
+                LOGGER.warning(
+                    'Unparsable translation token - expected "[[package]] text", got:\n{!r}',
+                    text
+                )
                 return cls(package, orig_pack, text, EmptyMapping)
             else:
-                if not package:
-                    package = NS_UNTRANSLATED
                 return cls(package, orig_pack, token, EmptyMapping)
         elif text.startswith(PETI_KEY_PREFIX):
             return cls(NS_GAME, orig_pack, text, EmptyMapping)
