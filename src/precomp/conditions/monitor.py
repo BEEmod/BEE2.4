@@ -1,10 +1,12 @@
 import math
 
-from precomp import instanceLocs, connections, conditions, options, faithplate, voice_line
+from precomp import instanceLocs, connections, conditions, options, faithplate
 from srctools import Matrix, Keyvalues, Vec, Entity, VMF, Output, Angle
 import srctools.logger
 
 from typing import List, NamedTuple, Literal, Optional
+
+from quote_pack import QuoteInfo
 
 
 COND_MOD_NAME = 'Monitors'
@@ -27,9 +29,9 @@ HAS_MONITOR: bool = False
 MONITOR_RELATIONSHIP_ENTS: List[Entity] = []
 
 
-def get_studio_pose() -> Vec:
+def get_studio_pose(voice: QuoteInfo) -> Vec:
     """Return the position of the studio camera."""
-    return voice_line.get_studio_loc() + options.VOICE_STUDIO_CAM_LOC()
+    return voice.position + options.VOICE_STUDIO_CAM_LOC()
 
 
 def scriptvar_set(
@@ -217,7 +219,7 @@ def res_camera(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
 
 
 @conditions.MetaCond.MonCameraLink.register
-def mon_camera_link(vmf: VMF) -> None:
+def mon_camera_link(vmf: VMF, voice: QuoteInfo) -> None:
     """Link cameras to monitors."""
     import vbsp
 
@@ -264,7 +266,7 @@ def mon_camera_link(vmf: VMF) -> None:
         # No cameras start active, we need to be positioned elsewhere.
         if options.VOICE_STUDIO_INST():
             # Start at the studio, if it exists.
-            start_pos = get_studio_pose()
+            start_pos = get_studio_pose(voice)
             start_angles = Angle(
                 options.VOICE_STUDIO_CAM_PITCH(),
                 options.VOICE_STUDIO_CAM_YAW(),
@@ -340,9 +342,9 @@ def mon_camera_link(vmf: VMF) -> None:
 
     if options.VOICE_STUDIO_INST():
         # We have a voice studio, send values to the script.
-        scriptvar_set(cam_ent, get_studio_pose(), 'CAM_STUDIO_LOC', mode='pos')
+        scriptvar_set(cam_ent, get_studio_pose(voice), 'CAM_STUDIO_LOC', mode='pos')
         scriptvar_set(
-            cam_ent, get_studio_pose(), 'CAM_STUDIO_ANG', mode='ang',
+            cam_ent, get_studio_pose(voice), 'CAM_STUDIO_ANG', mode='ang',
             angles='{:g} {:g} 0'.format(
                 options.VOICE_STUDIO_CAM_PITCH(),
                 options.VOICE_STUDIO_CAM_YAW(),
@@ -358,14 +360,14 @@ def mon_camera_link(vmf: VMF) -> None:
     scriptvar_set(cam_ent, start_pos + (0, 0, 16), 'CAM_STUDIO_CHANCE', swap_chance)
 
 
-def make_voice_studio(vmf: VMF) -> bool:
+def make_voice_studio(vmf: VMF, voice: QuoteInfo) -> bool:
     """Create the voice-line studio.
 
     This is either an instance (if monitors are present), or a nodraw room.
     """
 
     studio_file = options.VOICE_STUDIO_INST()
-    loc = voice_line.get_studio_loc()
+    loc = voice.position
 
     if HAS_MONITOR and studio_file:
         conditions.add_inst(

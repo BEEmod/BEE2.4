@@ -16,6 +16,7 @@ from editoritems_props import PanelAnimation
 import utils
 import consts
 from precomp.lazy_value import LazyValue
+from quote_pack import QuoteInfo
 
 
 COND_MOD_NAME = 'Brushes'
@@ -385,6 +386,7 @@ def res_import_template(
     vmf: VMF,
     coll: collisions.Collisions,
     info: corridor.Info,
+    voice: QuoteInfo,
     res: Keyvalues,
 ) -> conditions.ResultCallable:
     """Import a template VMF file, retexturing it to match orientation.
@@ -610,7 +612,7 @@ def res_import_template(
             return
 
         for vis_test_block in visgroup_instvars:
-            if all(conditions.check_test(test, coll, info, inst) for test in vis_test_block):
+            if all(conditions.check_test(test, coll, info, voice, inst) for test in vis_test_block):
                 visgroups.add(vis_test_block.real_name)
             if utils.DEV_MODE and vis_test_block.real_name not in template.visgroups:
                 LOGGER.warning('"{}" may use missing visgroup "{}"!', template.id, vis_test_block.real_name)

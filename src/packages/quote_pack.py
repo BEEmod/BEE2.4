@@ -1,8 +1,10 @@
-from typing import Optional, Set, Iterator
+from typing import List, Set, Iterator
 
-from transtoken import TransTokenSource
+from app.errors import AppError
+from quote_pack import Line, Quote, QuoteEvent, Group, QuoteInfo, Response, Monitor, RESPONSE_NAMES
+from transtoken import TransToken, TransTokenSource
 from packages import PackagesSet, PakObject, set_cond_source, ParseData, get_config, SelitemData
-from srctools import Keyvalues, Vec, NoKeyError, logger
+from srctools import Angle, Keyvalues, NoKeyError, logger
 import srctools
 
 
@@ -16,29 +18,14 @@ class QuotePack(PakObject, needs_foreground=True, style_suggest_key='quote'):
         quote_id: str,
         selitem_data: SelitemData,
         config: Keyvalues,
-        chars: Optional[Set[str]] = None,
-        skin: Optional[int] = None,
-        studio: Optional[str] = None,
-        studio_actor: str = '',
-        cam_loc: Optional[Vec] = None,
-        turret_hate: bool = False,
-        interrupt: float = 0.0,
-        cam_pitch: float = 0.0,
-        cam_yaw: float = 0.0,
+        *,
+        data: QuoteInfo,
     ) -> None:
         self.id = quote_id
         self.selitem_data = selitem_data
-        self.cave_skin = skin
         self.config = config
         set_cond_source(config, f'QuotePack <{quote_id}>')
-        self.chars = chars or {'??'}
-        self.studio = studio
-        self.studio_actor = studio_actor
-        self.cam_loc = cam_loc
-        self.inter_chance = interrupt
-        self.cam_pitch = cam_pitch
-        self.cam_yaw = cam_yaw
-        self.turret_hate = turret_hate
+        self.data = data
 
     @classmethod
     async def parse(cls, data: ParseData) -> 'QuotePack':
@@ -58,17 +45,16 @@ class QuotePack(PakObject, needs_foreground=True, style_suggest_key='quote'):
         try:
             monitor_data = data.info.find_key('monitor')
         except NoKeyError:
-            mon_studio = mon_cam_loc = None
-            mon_interrupt = mon_cam_pitch = mon_cam_yaw = 0.0
-            mon_studio_actor = ''
-            turret_hate = False
+            monitor = None
         else:
-            mon_studio = monitor_data['studio']
-            mon_studio_actor = monitor_data['studio_actor', '']
-            mon_interrupt = monitor_data.float('interrupt_chance', 0)
-            mon_cam_loc = monitor_data.vec('Cam_loc')
-            mon_cam_pitch, mon_cam_yaw, _ = monitor_data.vec('Cam_angles')
-            turret_hate = monitor_data.bool('TurretShoot')
+            monitor = Monitor(
+                studio=monitor_data['studio'],
+                studio_actor=monitor_data['studio_actor', ''],
+                interrupt=monitor_data.float('interrupt_chance', 0),
+                cam_loc=monitor_data.vec('Cam_loc'),
+                cam_angle=Angle(monitor_data.vec('cam_angles')),
+                turret_hate=monitor_data.bool('TurretShoot'),
+            )
 
         config = await get_config(
             data.info,
@@ -77,73 +63,125 @@ class QuotePack(PakObject, needs_foreground=True, style_suggest_key='quote'):
             prop_name='file',
         )()
 
+        try:
+            quotes_kv = config.find_key('Quotes')
+        except NoKeyError:
+            raise AppError(TransToken.ui(
+                'No "Quotes" key in config for quote pack {id}!'
+            ).format(id=data.id)) from None
+        else:
+            del config['Quotes']
+        if 'Quotes' in config:
+            raise AppError(TransToken.ui(
+                'Multiple "Quotes" keys found in config for quote pack {id}!'
+            ).format(id=data.id))
+
+        base_inst = quotes_kv['base', '']
+        position = quotes_kv.vec('quote_loc', -10_000.0, 0.0, 0.0)
+        use_dings = quotes_kv.bool('use_dings')
+        use_microphones = quotes_kv.bool('UseMicrophones')
+        global_bullseye = quotes_kv['bullseye', '']
+        groups: dict[str, Group] = {}
+        events: dict[str, QuoteEvent] = {}
+        responses: dict[Response, List[Line]] = {}
+        midchamber: list[Quote] = []
+
+        for group_kv in quotes_kv.find_all('Group'):
+            group = Group.parse(data.pak_id, group_kv)
+            if group.id in groups:
+                groups[group.id] += group
+            else:
+                groups[group.id] = group
+
+        with logger.context('Midchamber'):
+            for mid_kv in quotes_kv.find_all('Midchamber', 'Quote'):
+                midchamber.append(Quote.parse(data.pak_id, mid_kv, True))
+
+        for event_kv in quotes_kv.find_all('QuoteEvents', 'Event'):
+            event = QuoteEvent.parse(event_kv)
+            if event.id in events:
+                LOGGER.warning(
+                    'Duplicate QuoteEvent "{}" for quote pack {}',
+                    event.id, data.id
+                )
+            events[event.id] = event
+
+        response_dings = use_dings
+
+        for resp_kv in quotes_kv.find_children('CoopResponses'):
+            try:
+                resp = RESPONSE_NAMES[resp_kv.name]
+            except KeyError:
+                raise AppError(TransToken.ui(
+                    'Invalid response kind "{name}" in config for quote pack {id}!'
+                ).format(name=resp_kv.real_name, id=data.id)) from None
+            response_dings = resp_kv.bool('use_dings', response_dings)
+
+            lines = responses.setdefault(resp, [])
+            with logger.context(repr(resp)):
+                for line_kv in resp_kv:
+                    lines.append(Line.parse(data.pak_id, line_kv, False))
+
         return cls(
             data.id,
             selitem_data,
             config,
-            chars=chars,
-            skin=port_skin,
-            studio=mon_studio,
-            studio_actor=mon_studio_actor,
-            interrupt=mon_interrupt,
-            cam_loc=mon_cam_loc,
-            cam_pitch=mon_cam_pitch,
-            cam_yaw=mon_cam_yaw,
-            turret_hate=turret_hate,
-            )
+            data=QuoteInfo(
+                id=data.id,
+                base_inst=base_inst,
+                position=position,
+                use_dings=use_dings,
+                use_microphones=use_microphones,
+                global_bullseye=global_bullseye,
+                groups=groups,
+                events=events,
+                midchamber=midchamber,
+                response_use_dings=response_dings,
+                responses=responses,
+
+                chars=chars,
+                cave_skin=port_skin,
+                monitor=monitor,
+            ),
+        )
 
     def add_over(self, override: 'QuotePack') -> None:
         """Add the additional lines to ourselves."""
         self.selitem_data += override.selitem_data
         self.config += override.config
-        self.config.merge_children(
-            'quotes_sp',
-            'quotes_coop',
-        )
-        if self.cave_skin is None:
-            self.cave_skin = override.cave_skin
+        self.data.midchamber += override.data.midchamber
+        for group in override.data.groups.values():
+            if group.id in self.data.groups:
+                self.data.groups[group.id] += group
+            else:
+                self.data.groups[group.id] = group
 
-        if self.studio is None:
-            self.studio = override.studio
-            self.studio_actor = override.studio_actor
-            self.cam_loc = override.cam_loc
-            self.inter_chance = override.inter_chance
-            self.cam_pitch = override.cam_pitch
-            self.cam_yaw = override.cam_yaw
-            self.turret_hate = override.turret_hate
+        for resp, lines in override.data.responses.items():
+            try:
+                self.data.responses[resp] += lines
+            except KeyError:
+                self.data.responses[resp] = lines
+
+        if self.data.cave_skin is None:
+            self.data.cave_skin = override.data.cave_skin
+
+        if self.data.monitor is None:
+            self.data.monitor = override.data.monitor
+
+        if overlap := self.data.events.keys() & override.data.events.keys():
+            LOGGER.warning(
+                'Duplicate event IDs for quote pack {}: {}',
+                self.id, sorted(overlap),
+            )
+        self.data.events |= override.data.events
 
     def __repr__(self) -> str:
         return '<Voice:' + self.id + '>'
 
-    @staticmethod
-    def strip_quote_data(kv: Keyvalues, _depth: int = 0) -> Keyvalues:
-        """Strip unused property blocks from the config files.
-
-        This removes data like the captions which the compiler doesn't need.
-        The returned property tree is a deep-copy of the original.
-        """
-        children = []
-        for sub_prop in kv:
-            # Make sure it's in the right nesting depth - tests might
-            # have arbitrary props in lower depths...
-            if _depth == 3:  # 'Line' blocks
-                if sub_prop.name == 'trans':
-                    continue
-                elif sub_prop.name == 'name' and 'id' in kv:
-                    continue  # The name isn't needed if an ID is available
-            elif _depth == 2 and sub_prop.name == 'name':
-                # In the "quote" section, the name isn't used in the compiler.
-                continue
-
-            if sub_prop.has_children():
-                children.append(QuotePack.strip_quote_data(sub_prop, _depth + 1))
-            else:
-                children.append(Keyvalues(sub_prop.real_name, sub_prop.value))
-        return Keyvalues(kv.real_name, children)
-
     @classmethod
     async def post_parse(cls, packset: PackagesSet) -> None:
         """Verify no quote packs have duplicate IDs."""
+        # TODO rewrite!
 
         def iter_lines(conf: Keyvalues) -> Iterator[Keyvalues]:
             """Iterate over the varios line blocks."""
@@ -174,8 +212,15 @@ class QuotePack(PakObject, needs_foreground=True, style_suggest_key='quote'):
                 used.add(quote_id)
 
     def iter_trans_tokens(self) -> Iterator[TransTokenSource]:
-        """Yield all translation tokens in this voice pack.
-
-        TODO: Parse out translations in the pack itself.
-        """
-        return self.selitem_data.iter_trans_tokens(f'voiceline/{self.id}')
+        """Yield all translation tokens in this voice pack."""
+        yield from self.selitem_data.iter_trans_tokens(f'voiceline/{self.id}')
+        for group in self.data.groups.values():
+            yield group.name, f'voiceline/{self.id}/{group.id}.name'
+            yield group.desc, f'voiceline/{self.id}/{group.id}.desc'
+            for quote in group.quotes:
+                yield from quote.iter_trans_tokens(f'voiceline/{self.id}/{group.id}')
+        for resp, lines in self.data.responses.items():
+            for line in lines:
+                yield from line.iter_trans_tokens(f'voiceline/{self.id}/responses')
+        for quote in self.data.midchamber:
+            yield from quote.iter_trans_tokens(f'voiceline/{self.id}/midchamber/{quote.name.token}')

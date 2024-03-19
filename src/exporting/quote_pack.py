@@ -1,5 +1,6 @@
 """Export quote pack configurations."""
 from typing import Optional
+import pickle
 import shutil
 
 import srctools
@@ -25,37 +26,13 @@ async def step_quote_pack(exp_data: ExportData) -> None:
     except KeyError:
         raise Exception(f"Selected voice ({sel_id}) doesn't exist?") from None
 
-    vbsp_config = exp_data.vbsp_conf
+    exp_data.vbsp_conf += voice.config
 
-    # We want to strip 'trans' sections from the voice pack, since
-    # they're not useful.
-    for prop in voice.config:
-        if prop.name == 'quotes':
-            vbsp_config.append(QuotePack.strip_quote_data(prop))
-        else:
-            vbsp_config.append(prop.copy())
+    pickle_data = await trio.to_thread.run_sync(pickle.dumps, voice.data, pickle.HIGHEST_PROTOCOL)
+    await trio.Path(exp_data.game.abs_path('bin/bee2/voice.bin')).write_bytes(pickle_data)
+    del pickle_data
 
-    # Set values in vbsp_config, so tests can determine which voiceline
-    # is selected.
-    options = vbsp_config.ensure_exists('Options')
-
-    options['voice_pack'] = voice.id
-    options['voice_char'] = ','.join(voice.chars)
-
-    if voice.cave_skin is not None:
-        options['cave_port_skin'] = str(voice.cave_skin)
-
-    if voice.studio is not None:
-        options['voice_studio_inst'] = voice.studio
-        options['voice_studio_actor'] = voice.studio_actor
-        options['voice_studio_inter_chance'] = str(voice.inter_chance)
-        if voice.cam_loc is not None:
-            options['voice_studio_cam_loc'] = voice.cam_loc.join(' ')
-        options['voice_studio_cam_pitch'] = str(voice.cam_pitch)
-        options['voice_studio_cam_yaw'] = str(voice.cam_yaw)
-        options['voice_studio_should_shoot'] = srctools.bool_as_int(voice.turret_hate)
-
-    # Copy the config files for this voiceline..
+    # Copy the config files for this voice line...
     for prefix, pretty in [
         ('', 'normal'),
         ('mid_', 'MidChamber'),
