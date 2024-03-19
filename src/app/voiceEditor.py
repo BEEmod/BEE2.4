@@ -355,16 +355,14 @@ def make_tab(
     UI['tabs'].add(outer_frame)
 
     # This holds the actual elements
-    frame = ttk.Frame(
-        canv,
-        )
+    frame = ttk.Frame(canv)
     frame.columnconfigure(0, weight=1)
     canv.create_window(0, 0, window=frame, anchor="nw")
 
     set_text(
         ttk.Label(frame, anchor='center', font='tkHeadingFont'),
         name,
-    ).grid(row=0,column=0, sticky='EW')
+    ).grid(row=0, column=0, sticky='EW')
 
     set_text(ttk.Label(frame), desc).grid(row=1, column=0, sticky='EW')
 
@@ -412,7 +410,7 @@ def make_tab(
     def configure_canv(e: Event) -> None:
         """Allow resizing the windows."""
         canv['scrollregion'] = (
-            4,
+            0,
             0,
             canv.winfo_reqwidth(),
             frame.winfo_reqheight(),
