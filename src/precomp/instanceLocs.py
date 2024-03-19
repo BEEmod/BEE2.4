@@ -13,29 +13,26 @@ Valid path styles:
 - "[spExitCorridor]": Hardcoded shortcuts for specific items
 - "path/to_instance": A single direct instance path.
 """
-import logging
-import re
+from __future__ import annotations
+from typing import Callable, Dict, TypeVar, Iterable, overload
 from collections import defaultdict
 from functools import lru_cache
+import logging
+import re
 
 import editoritems
 import srctools.logger
-
-from typing import (
-    Callable, FrozenSet, Optional, Sequence, Union,
-    List, Dict, Tuple, TypeVar, Iterable, overload,
-)
 import corridor
 import user_errors
 
 LOGGER = srctools.logger.get_logger(__name__)
 
 # The list of instances each item uses.
-INSTANCE_FILES: Dict[str, List[str]] = {}
+INSTANCE_FILES: dict[str, list[str]] = {}
 
 # Item ID and index/special name for instances set in editoritems.
 # Note this is imperfect - two items could reuse the same instance.
-ITEM_FOR_FILE: Dict[str, Tuple[str, Union[int, str]]] = {}
+ITEM_FOR_FILE: dict[str, tuple[str, int | str]] = {}
 
 _RE_DEFS = re.compile(r'\s* (\[ [^][]+] | < [^<>]+ >) \s* ,? \s*', re.VERBOSE)
 _RE_SUBITEMS = re.compile(r'''
@@ -50,12 +47,12 @@ _RE_SUBITEMS = re.compile(r'''
 
 # A dict holding dicts of additional custom instance names - used to define
 # names in conditions or BEE2-added features.
-CUST_INST_FILES: Dict[str, Dict[str, str]] = defaultdict(dict)
+CUST_INST_FILES: dict[str, dict[str, str]] = defaultdict(dict)
 
 # Special names for some specific instances - those which have special
 # functionality which can't be used in custom items like entry/exit doors,
 # or indicator panels.
-SPECIAL_INST: Dict[str, str] = {
+SPECIAL_INST: dict[str, str] = {
     # Glass only generates borders for genuine ITEM_BARRIER items,
     # so it's possible to define special names.
     'glass_128':                 '<ITEM_BARRIER:0>',
@@ -136,7 +133,7 @@ SPECIAL_INST: Dict[str, str] = {
 }
 
 # The resolved versions of SPECIAL_INST
-INST_SPECIAL: Dict[str, List[str]] = {}
+INST_SPECIAL: dict[str, list[str]] = {}
 
 # Categories and prefixes for the corridors, so can update the values after
 CORR_SPECIALS = [
@@ -148,7 +145,7 @@ CORR_SPECIALS = [
 
 # Give names to reusable instance fields, so you don't need to remember
 # indexes
-SUBITEMS: Dict[str, Union[int, Tuple[int, ...]]] = {
+SUBITEMS: dict[str, int | tuple[int, ...]] = {
     # Cube
     'standard': 0,
     'companion': 1,
@@ -267,7 +264,7 @@ def load_conf(items: Iterable[editoritems.Item]) -> None:
 
 def set_chosen_corridor(
     sel_mode: corridor.GameMode,
-    selected: Dict[corridor.Direction, corridor.Corridor],
+    selected: dict[corridor.Direction, corridor.Corridor],
 ) -> None:
     """Alter our stored corridor filenames to include the selected corridor.
 
@@ -296,7 +293,7 @@ def set_chosen_corridor(
     resolve_filter.cache_clear()
 
 
-def resolve(path: str, silent: bool=False) -> List[str]:
+def resolve(path: str, silent: bool = False) -> list[str]:
     """Resolve an instance path into the values it refers to.
 
     This returns a list of instances which match the selector, or an empty list
@@ -322,7 +319,7 @@ def resolve(path: str, silent: bool=False) -> List[str]:
 
 
 @lru_cache(maxsize=100)
-def resolve_filter(path: str, silent: bool=False) -> FrozenSet[str]:
+def resolve_filter(path: str, silent: bool = False) -> frozenset[str]:
     """Resolve an instance path into a list of instances, for filtering.
 
     This skips empty filenames, and filters them all.
@@ -340,8 +337,8 @@ Default_T = TypeVar('Default_T')
 @overload
 def resolve_one(path: str, *, error: bool) -> str: ...
 @overload
-def resolve_one(path: str, default: Default_T) -> Union[str, Default_T]: ...
-def resolve_one(path: str, default: Union[str, Default_T]='', *, error: bool=False) -> Union[str, Default_T]:
+def resolve_one(path: str, default: Default_T) -> str | Default_T: ...
+def resolve_one(path: str, default: str | Default_T = '', *, error: bool = False) -> str | Default_T:
     """Resolve a path into one instance.
 
     If multiple are given, this returns the first.
@@ -365,7 +362,7 @@ def resolve_one(path: str, default: Union[str, Default_T]='', *, error: bool=Fal
 
 # Cache the return values, since they're constant.
 @lru_cache(maxsize=100)
-def _resolve(path: str) -> List[str]:
+def _resolve(path: str) -> list[str]:
     """Use a secondary function to allow caching values, while ignoring the
     'silent' parameter.
     """
@@ -404,9 +401,9 @@ def _resolve(path: str) -> List[str]:
         return [path]
 
 
-def get_subitems(comma_list: str, item_inst: List[str], item_id: str) -> List[str]:
+def get_subitems(comma_list: str, item_inst: list[str], item_id: str) -> list[str]:
     """Pick out the subitems from a list."""
-    output: List[Union[str, int]] = []
+    output: list[str | int] = []
     folded_id = item_id.casefold()
     for val in comma_list.split(','):
         folded_value = val.strip().casefold()
@@ -462,7 +459,7 @@ def get_subitems(comma_list: str, item_inst: List[str], item_id: str) -> List[st
 resolve_cache_info: Callable[[], object] = _resolve.cache_info
 
 
-def get_cust_inst(item_id: str, inst: str) -> Optional[str]:
+def get_cust_inst(item_id: str, inst: str) -> str | None:
     """Get the filename used for a custom instance defined in editoritems.
 
     This returns None if the given value is not present.

@@ -1,6 +1,4 @@
 """Handles adding music to the level."""
-from typing import List
-
 from srctools import VMF, Vec, Keyvalues, Output
 from precomp import corridor, options, conditions
 from consts import MusicChannel as Channel

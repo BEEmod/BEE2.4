@@ -191,7 +191,7 @@ def check_toggled(var: BooleanVar, config_section: SectionProxy, quote_id: str) 
     config_section[quote_id] = srctools.bool_as_int(var.get())
 
 
-def save(e) -> None:
+def save(event: object = None) -> None:
     """Save and close the window."""
     global voice_item
     if voice_item is not None:

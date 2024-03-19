@@ -55,7 +55,7 @@ class PlaneKey:
         try:
             norm, norm_hash = _NORMALS[FrozenVec(normal)]
         except KeyError:
-            raise ValueError(f'{normal!r} is not an on-axis normal!')
+            raise ValueError(f'{normal!r} is not an on-axis normal!') from None
         if not isinstance(dist, (int, float)):
             dist = norm.dot(dist)
 

@@ -68,10 +68,10 @@ def res_cust_barrier(inst: Entity, res: Keyvalues) -> None:
     """
     try:
         barrier_type = barriers.BARRIER_TYPES[utils.obj_id(res.value)]
-    except KeyError:
+    except KeyError as exc:
         raise user_errors.UserError(
             user_errors.TOK_UNKNOWN_ID.format(kind='Barrier Type', id=res.value)
-        )
+        ) from exc
 
     try:
         cust_item = connections.ITEMS[inst['targetname']]
@@ -89,7 +89,7 @@ def res_cust_barrier(inst: Entity, res: Keyvalues) -> None:
             if targ_item.config.id != 'ITEM_BARRIER':
                 raise KeyError
             gls_barrier = barriers.BARRIERS_BY_NAME.pop(targ_item.name)
-        except KeyError:
+        except KeyError as exc:
             raise user_errors.UserError(
                 user_errors.TOK_WRONG_ITEM_TYPE.format(
                     item=targ_item.config.id,
@@ -97,7 +97,7 @@ def res_cust_barrier(inst: Entity, res: Keyvalues) -> None:
                     inst=inst['file'],
                     points=[Vec.from_str(inst['origin'])],
                 )
-            )
+            ) from exc
         # Transfer over connections.
         targ_item.transfer_antlines(cust_item)
         for gls_conn in list(targ_item.outputs):

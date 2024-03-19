@@ -156,7 +156,7 @@ def ind_for_pos(pos: int) -> int | None:
         return selected_item.visual_subtypes[ind]
 
 
-def sub_sel(pos, e=None) -> None:
+def sub_sel(pos: int, e: object = None) -> None:
     """Change the currently-selected sub-item."""
     ind = ind_for_pos(pos)
     # Can only change the subitem on the preview window
@@ -167,7 +167,7 @@ def sub_sel(pos, e=None) -> None:
         show_prop(selected_sub_item, warp_cursor=True)
 
 
-def sub_open(pos, e=None):
+def sub_open(pos: int, e: object = None) -> None:
     """Move the context window to apply to the given item."""
     ind = ind_for_pos(pos)
     if ind is not None:
@@ -175,9 +175,10 @@ def sub_open(pos, e=None):
         selected_sub_item.open_menu_at_sub(ind)
 
 
-def open_event(item) -> Callable[[tk.Event], object]:
+def open_event(item: UI.PalItem) -> Callable[[tk.Event], object]:
     """Show the window for a particular PalItem."""
     def func(e: tk.Event) -> None:
+        """Show the window."""
         sound.fx('expand')
         show_prop(item)
     return func
@@ -437,7 +438,7 @@ def load_item_data(tk_img: TKImages) -> None:
         tooltip.set_tooltip(wid_sprite[SPR.OUTPUT], TransToken.untranslated(blurb))
 
 
-def adjust_position(e=None) -> None:
+def adjust_position(e: object = None) -> None:
     """Move the properties window onto the selected item.
 
     We call this constantly, so the property window will not go outside

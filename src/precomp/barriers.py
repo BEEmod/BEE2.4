@@ -1632,8 +1632,6 @@ def add_glass_floorbeams(
             """Flip axes if required"""
             return (side, beam)
 
-    beam_ax = 'xyz'[beam_ind]
-    side_ax = 'xyz'[side_ind]
     height = plane.plane_to_world(0, 0).z
 
     rng = rand_seed(
@@ -1746,7 +1744,6 @@ def add_glass_floorbeams(
                     # Incorrectly aligned on the backside.
                     return False
                 # Snap to centerpoint, average
-                old_start = beam_start
                 beam_start = (
                     forward.dot(hit_left.impact) + forward.dot(hit_right.impact)
                 ) / 2.0

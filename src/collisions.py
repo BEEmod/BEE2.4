@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Iterable, Iterator, Sequence, Tuple, overload
 from typing_extensions import Self, Literal
 
-from enum import Flag, auto as enum_auto
+from enum import Flag
 import functools
 import operator
 
@@ -511,7 +511,6 @@ class BBox:
         start = FrozenVec(start)
         delta = FrozenVec(delta)
         # https://gamemath.com/book/geomtests.html#intersection_ray_aabb
-        inside = True
         mins = self.mins
         maxes = self.maxes
 

@@ -52,6 +52,7 @@ allowed-confusables = [
 extend-ignore = [
 	"E402",  # Allow module level import later in the file.
 	"E721",  # Allow using type(x) is Class
+	"E731",  # Lambda assignment used intentionally for callbacks.
 	"F403",  # Allow *-imports,
 	"F405",  # name may be undefined, or defined from star imports: module
 
@@ -70,6 +71,7 @@ extend-ignore = [
 	"PLC0414",  # import x as x is used for type checking.
 	"PLE1205",  # Too many arguments for logging, doesn't handle our format
 	"PLW2901",  # Allow redefining loop var inside the loop.
+	"PLW0120",  # for-else with return/break inside is just stylistic, exactly equivalent.
 
 	# Flake8-Trio:
 	"TRIO115",  # Stick with sleep(0) instead of lowlevel.checkpoint(), for now?
@@ -87,6 +89,8 @@ extend-ignore = [
 	"PIE790",
 	# Allow aliases for enum values, used often.
 	"PIE796",
+	# Start arg for range is sometimes clearer
+	"PIE808",
 	]
 
 [tool.ruff.lint.flake8-bugbear]

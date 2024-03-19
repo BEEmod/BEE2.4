@@ -1,7 +1,6 @@
 """Original result used to generate unstationary scaffolds, kept for backwards compatibility."""
 from __future__ import annotations
 
-from decimal import Decimal
 from typing import Dict, List, Tuple, Optional, Any, Union
 from enum import Enum
 import math

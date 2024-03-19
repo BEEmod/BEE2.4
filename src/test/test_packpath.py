@@ -25,7 +25,9 @@ def test_parse() -> None:
     assert PackagePath.parse('blah.html', obj_id('DEFAULT')) == PackagePath(obj_id('DEFAULT'), 'blah.html')
     path = PackagePath(obj_id('SOME_PACKAGE'), 'item/blah.txt')
     assert PackagePath.parse(path, obj_id('another')) is path
-    assert PackagePath.parse('package:path:value/text.txt', obj_id('default')) == PackagePath(obj_id('package'), 'path:value/text.txt')
+
+    path = PackagePath.parse('package:path:value/text.txt', obj_id('default'))
+    assert path == PackagePath(obj_id('package'), 'path:value/text.txt')
 
 
 def test_methods() -> None:
@@ -34,5 +36,6 @@ def test_methods() -> None:
 
     path = PackagePath(pak, "folder/subfolder\\/").child("value.txt")
     assert path == PackagePath(pak, "folder/subfolder/value.txt")
+
     path = PackagePath(pak, "folder/value.txt").in_folder("parent\\/")
     assert path == PackagePath(pak, "parent/folder/value.txt")

@@ -2,7 +2,7 @@
 
 """
 from typing import Dict, FrozenSet, Iterable, List, Optional, Callable, Tuple
-from srctools import Vec, Entity, Keyvalues, VMF, Angle
+from srctools import Entity, Keyvalues, VMF, Angle
 import srctools.logger
 
 from precomp import instanceLocs, options, collisions, conditions, rand, corridor

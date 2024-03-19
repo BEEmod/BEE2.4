@@ -201,7 +201,7 @@ class Grid(MutableMapping[_grid_keys, Block]):
         collide_set = frozenset(collide)
         # 50x50x50 diagonal = 86, so that's the largest distance
         # you could possibly move.
-        for i in range(90):
+        for _ in range(90):
             next_pos = pos + direction_v
             block = super().get(next_pos.as_tuple(), Block.VOID)
             if block is Block.VOID:
@@ -212,8 +212,8 @@ class Grid(MutableMapping[_grid_keys, Block]):
             if block in collide_set:
                 return pos
             pos = next_pos
-        else:
-            raise ValueError('Moved too far! (> 90)')
+        # We should always hit VOID at some point before this.
+        raise ValueError('Moved too far! (> 90)')
 
     def raycast_world(
         self,

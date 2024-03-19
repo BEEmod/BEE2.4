@@ -151,7 +151,7 @@ class Line:
     set_stylevars: Set[str]
 
     @classmethod
-    def parse(cls, pak_id: str, kv: Keyvalues, require_quote_name: bool) -> Self:
+    def parse(cls, pak_id: utils.ObjectID, kv: Keyvalues, require_quote_name: bool) -> Self:
         """Parse from the keyvalues data.
 
         The keyvalue should have its name start with "line".
@@ -224,7 +224,7 @@ class Line:
             criterion=criterion,
             name=disp_name,
             transcript=transcript,
-            only_once=kv.bool('onlyonce'),
+            only_once=only_once,
             atomic=atomic,
             set_stylevars=stylevars,
             scenes=scenes,
@@ -235,7 +235,7 @@ class Line:
         )
 
     @classmethod
-    def _parse_transcript(cls, pak_id: str, kvs: Iterable[Keyvalues]) -> Iterator[tuple[str, TransToken]]:
+    def _parse_transcript(cls, pak_id: utils.ObjectID, kvs: Iterable[Keyvalues]) -> Iterator[tuple[str, TransToken]]:
         for child in kvs:
             if ':' in child.value:
                 name, trans = child.value.split(':', 1)
@@ -263,7 +263,7 @@ class Quote:
     lines: List[Line]
 
     @classmethod
-    def parse(cls, pak_id: str, kv: Keyvalues, require_quote_name: bool) -> Self:
+    def parse(cls, pak_id: utils.ObjectID, kv: Keyvalues, require_quote_name: bool) -> Self:
         """Parse from the keyvalues data."""
         lines: List[Line] = []
         tests: List[Keyvalues] = []
@@ -306,7 +306,7 @@ class Group:
     quotes: List[Quote]
 
     @classmethod
-    def parse(cls, pak_id: str, kv: Keyvalues) -> Self:
+    def parse(cls, pak_id: utils.ObjectID, kv: Keyvalues) -> Self:
         """Parse from the keyvalues data."""
         choreo_name = kv['Choreo_Name', '@choreo']
         use_dings = kv.bool('use_dings', True)

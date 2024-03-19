@@ -79,7 +79,7 @@ RESULT_SETUP: dict[str, Callable[..., Any]] = {}
 # Used to dump a list of the tests, results, meta-conditions
 ALL_TESTS: list[tuple[str, tuple[str, ...], CondCall[bool]]] = []
 ALL_RESULTS: list[tuple[str, tuple[str, ...], CondCall[object]]] = []
-ALL_META: list[tuple[str, 'MetaCond', CondCall[object]]] = []
+ALL_META: list[tuple[str, MetaCond, CondCall[object]]] = []
 
 
 ResultT = TypeVar('ResultT')

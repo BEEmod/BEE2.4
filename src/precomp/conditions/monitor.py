@@ -345,7 +345,7 @@ def mon_camera_link(vmf: VMF, voice: QuoteInfo) -> None:
         scriptvar_set(cam_ent, get_studio_pose(voice), 'CAM_STUDIO_LOC', mode='pos')
         scriptvar_set(
             cam_ent, get_studio_pose(voice), 'CAM_STUDIO_ANG', mode='ang',
-            angles='{:g} {:g} 0'.format(
+            angles=Angle(
                 options.VOICE_STUDIO_CAM_PITCH(),
                 options.VOICE_STUDIO_CAM_YAW(),
             ),

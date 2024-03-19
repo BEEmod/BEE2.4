@@ -753,10 +753,11 @@ class FizzlerBrush:
             return
 
         # Produce a hex colour string, and use that as the material name.
-        side.mat = 'bee2/fizz_sides/side_color_{:02X}{:02X}{:02X}'.format(
-            round(self.side_color.x * 255),
-            round(self.side_color.y * 255),
-            round(self.side_color.z * 255),
+        side.mat = (
+            f'bee2/fizz_sides/side_color_'
+            f'{round(self.side_color.x * 255):02X}'
+            f'{round(self.side_color.y * 255):02X}'
+            f'{round(self.side_color.z * 255):02X}'
         )
         used_tex_func(side.mat)
 

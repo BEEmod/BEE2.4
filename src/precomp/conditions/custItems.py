@@ -4,7 +4,6 @@
 from __future__ import annotations
 from typing import Callable
 from srctools import Keyvalues, Entity
-import srctools.logger
 
 from precomp import connections, antlines, conditions
 

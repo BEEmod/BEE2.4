@@ -143,10 +143,9 @@ class BaseLoadScreen:
         self.win.deiconify()
         self.win.lift()
         self.win.update()  # Force an update so the reqwidth is correct
-        self.win.geometry('+{x:g}+{y:g}'.format(
-            x=(self.win.winfo_screenwidth() - self.win.winfo_reqwidth()) // 2,
-            y=(self.win.winfo_screenheight() - self.win.winfo_reqheight()) // 2,
-        ))
+        x = self.win.winfo_screenwidth() - self.win.winfo_reqwidth()
+        y = self.win.winfo_screenheight() - self.win.winfo_reqheight()
+        self.win.geometry(f'+{x // 2:g}+{y // 2:g}')
 
     def op_hide(self) -> None:
         """Hide the window."""
@@ -844,8 +843,8 @@ def run_background(
                     op = queue_rec_load.get_nowait()
                 except queue.Empty:
                     break
-                except ValueError:
-                    raise BrokenPipeError
+                except ValueError as exc:
+                    raise BrokenPipeError from exc
                 had_values = True
                 if time.monotonic() - cur_time > TIMEOUT:
                     # ensure we do run the logs too if we timeout, but if we don't share the same timeout.
@@ -898,8 +897,8 @@ def run_background(
                     rec_args = queue_rec_log.get_nowait()
                 except queue.Empty:
                     break
-                except ValueError:
-                    raise BrokenPipeError
+                except ValueError as exc:
+                    raise BrokenPipeError from exc
                 if time.monotonic() - cur_time > TIMEOUT:
                     break
 

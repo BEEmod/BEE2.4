@@ -1,7 +1,6 @@
 """Records the collisions for each item."""
 from collections import defaultdict
-from io import StringIO
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 import attrs
 from srctools import Entity, Matrix, VMF, Vec
