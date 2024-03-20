@@ -67,10 +67,6 @@ async def widget_slider(
         # Only trigger sounds when moving each step.
         if last_value != new_pos:
             itemconfig.widget_sfx()
-            if conf.zero_off and math.isclose(value_num, 0.0):
-                set_text(disp, TRANS_OFF)
-            else:
-                set_text(disp, TransToken.untranslated(new_pos))
             last_value = holder.value = new_pos
 
     frame = ttk.Frame(parent)
