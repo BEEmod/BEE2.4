@@ -5,9 +5,7 @@ The widgets tokens are applied to are stored, so changing language can update th
 from __future__ import annotations
 
 import string
-from typing import (
-    Any, AsyncIterator, Callable, Iterable, Iterator, List, TypeVar, TYPE_CHECKING,
-)
+from typing import Any, AsyncGenerator, Callable, Iterable, Iterator, List, TypeVar, TYPE_CHECKING
 from typing_extensions import ParamSpec, override
 from collections import defaultdict
 import io
@@ -494,7 +492,7 @@ async def load_aux_langs(
     set_language(attrs.evolve(lang, trans=lang_map, game_trans=game_dict))
 
 
-async def get_package_tokens(packset: packages.PackagesSet) -> AsyncIterator[TransTokenSource]:
+async def get_package_tokens(packset: packages.PackagesSet) -> AsyncGenerator[TransTokenSource, None]:
     """Get all the tokens from all packages."""
     for pack in packset.packages.values():
         yield pack.disp_name, 'package/name'
@@ -530,27 +528,29 @@ async def rebuild_package_langs(packset: packages.PackagesSet) -> None:
             )
 
     LOGGER.info('Collecting translations...')
-    async for orig_tok, source in get_package_tokens(packset):
-        for tok in _get_children(orig_tok):
-            if not tok:
-                continue  # Ignore blank tokens, not important to translate.
-            try:
-                pack_path, catalog = pack_paths[tok.namespace.casefold()]
-            except KeyError:
-                continue
-            # Line number is just zero - we don't know which lines these originated from.
-            if tok.namespace.casefold() != tok.orig_pack.casefold():
-                # Originated from a different package, include that.
-                loc = [(f'{tok.orig_pack}:{source}', 0)]
-            else:  # Omit, most of the time.
-                loc = [(source, 0)]
+    async with utils.aclosing(get_package_tokens(packset)) as agen:
+        async for orig_tok, source in agen:
+            for tok in _get_children(orig_tok):
+                if not tok:
+                    continue  # Ignore blank tokens, not important to translate.
+                await trio.lowlevel.checkpoint()
+                try:
+                    pack_path, catalog = pack_paths[tok.namespace.casefold()]
+                except KeyError:
+                    continue
+                # Line number is just zero - we don't know which lines these originated from.
+                if tok.namespace.casefold() != tok.orig_pack.casefold():
+                    # Originated from a different package, include that.
+                    loc = [(f'{tok.orig_pack}:{source}', 0)]
+                else:  # Omit, most of the time.
+                    loc = [(source, 0)]
 
-            if isinstance(tok, PluralTransToken):
-                catalog.add((tok.token, tok.token_plural), locations=loc)
-                tok2pack[tok.token, tok.token_plural].add(tok.namespace)
-            else:
-                catalog.add(tok.token, locations=loc)
-                tok2pack[tok.token].add(tok.namespace)
+                if isinstance(tok, PluralTransToken):
+                    catalog.add((tok.token, tok.token_plural), locations=loc)
+                    tok2pack[tok.token, tok.token_plural].add(tok.namespace)
+                else:
+                    catalog.add(tok.token, locations=loc)
+                    tok2pack[tok.token].add(tok.namespace)
 
     for pak_id, (pack_path, catalog) in pack_paths.items():
         LOGGER.info('Exporting translations for {}...', pak_id.upper())

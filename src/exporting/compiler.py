@@ -223,8 +223,10 @@ async def step_copy_compiler(exp_data: ExportData) -> None:
 
             raise AppError(msg.format(file=dest, game=exp_data.game.name)) from exc
 
-    async with trio.open_nursery() as nursery:
-        async for comp_file in STAGE_COMPILER.iterate(list(compiler_src.rglob('*'))):
+    async with trio.open_nursery() as nursery, utils.aclosing(
+        STAGE_COMPILER.iterate(list(compiler_src.rglob('*')))
+    ) as agen:
+        async for comp_file in agen:
             # Ignore folders.
             if comp_file.is_dir():
                 continue

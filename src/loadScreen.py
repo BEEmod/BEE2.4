@@ -191,6 +191,22 @@ class LoadScreen:
             res = scope.__exit__(exc_type, exc_val, exc_tb)
         return res
 
+    async def __aenter__(self) -> LoadScreen:
+        """Allow use as an async context manager too.
+
+         This makes using aclosing(stage.iterate()) more compact.
+         """
+        return self.__enter__()
+
+    async def __aexit__(
+        self,
+        exc_type: Type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> bool:
+        """Same as synchronous exiting."""
+        return self.__exit__(exc_type, exc_val, exc_tb)
+
     def _show(self) -> None:
         """Display the loading screen."""
         self.active = True
