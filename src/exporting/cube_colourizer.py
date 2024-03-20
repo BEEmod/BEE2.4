@@ -41,8 +41,8 @@ async def make_cube_colourizer_legend(exp_data: ExportData) -> None:
         LOGGER.debug('No COLOR widget in {}', config.multi_widgets)
         return
     colors = {
-        int(tim): parse_color(value)
-        for tim, value in wid.values.items()
+        int(tim): parse_color(holder.value)
+        for tim, holder in wid.holders.items()
     }
 
     legend = Image.new('RGB', (LEGEND_SIZE, LEGEND_SIZE), color=(255, 255, 255))
