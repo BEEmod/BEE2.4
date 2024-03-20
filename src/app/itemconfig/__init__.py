@@ -201,6 +201,7 @@ async def create_group(master: ttk.Frame, nursery: trio.Nursery, tk_img: TKImage
             create_func = _UI_IMPL_SINGLE[s_wid.kind]
             try:
                 with logger.context(f'{group.id}:{s_wid.id}'):
+                    LOGGER.debug('Constructing widget...')
                     widget = await nursery.start(create_func, wid_frame, tk_img, s_wid.holder, s_wid.config)
             except Exception:
                 LOGGER.exception('Could not construct widget {}.{}', group.id, s_wid.id)
@@ -245,6 +246,7 @@ async def create_group(master: ttk.Frame, nursery: trio.Nursery, tk_img: TKImage
         wid_frame.grid(row=row, column=0, sticky='ew', pady=5)
         try:
             with logger.context(f'{group.id}:{m_wid.id}'):
+                LOGGER.debug('Constructing widget...')
                 await nursery.start(
                     multi_func,
                     wid_frame, tk_img,
@@ -419,6 +421,8 @@ async def make_pane(
         else:  # Begin creating, or loading.
             loading_text.grid(row=0, column=0, sticky='ew')
             if new_group not in groups_being_created:
+                LOGGER.info('Creating group: "{}"...', group.id)
+
                 async def task() -> None:
                     """Create the widgets, then display."""
                     group_to_frame[new_group] = await create_group(canvas_frame, nursery, tk_img,new_group)
