@@ -151,7 +151,7 @@ class ConfigFile(ConfigParser):
             self[section] = {}
             return super().__getitem__(section)
 
-    def getboolean(self, section: str, option: str, default: bool = False, **kwargs: Any) -> bool:  # type: ignore[override]
+    def getboolean(self, section: str, option: str, default: bool = False, **kwargs: Any) -> bool:
         """Get the value in the specified section, coercing to a Boolean.
 
             If either does not exist, set to the default and return it.
@@ -168,7 +168,7 @@ class ConfigFile(ConfigParser):
 
     get_bool = getboolean
 
-    def getint(self, section: str, option: str, default: int=0, **kwargs: Any) -> int:  # type: ignore[override]
+    def getint(self, section: str, option: str, default: int=0, **kwargs: Any) -> int:
         """Get the value in the specified section, coercing to an Integer.
 
         If either does not exist, set to the default and return it.
