@@ -474,7 +474,7 @@ async def make_pane(
         # Update canvas when the window resizes.
         canvas.bind('<Configure>', f'{canvas} configure -scrollregion [{canvas} bbox all]')
         await display_group(cur_group)
-
+        task_status.started()
         await trio.sleep_forever()
 
 
