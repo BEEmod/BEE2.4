@@ -24,7 +24,7 @@ def pits_allowed() -> bool:
     return bool(SETTINGS)
 
 
-def is_pit(bbox_min: Vec, bbox_max: Vec):
+def is_pit(bbox_min: Vec, bbox_max: Vec) -> bool:
     """Check if the given location can be a bottomless pit."""
     return BOTTOMLESS_PIT_MIN >= bbox_min.z
 
@@ -64,7 +64,7 @@ def load_settings(pit: Keyvalues) -> None:
         PIT_INST[inst_type] = vals
 
 
-def make_bottomless_pit(vmf: VMF, max_height):
+def make_bottomless_pit(vmf: VMF, max_height: float) -> None:
     """Generate bottomless pits."""
     import vbsp
 
@@ -301,7 +301,7 @@ def make_bottomless_pit(vmf: VMF, max_height):
                 ).make_unique()
 
 
-def fix_base_brush(vmf: VMF, solid: Solid, face: Side):
+def fix_base_brush(vmf: VMF, solid: Solid, face: Side) -> None:
     """Retexture the brush forming the bottom of a pit."""
     if SETTINGS['skybox'] != '':
         face.mat = 'tools/toolsskybox'
@@ -310,7 +310,7 @@ def fix_base_brush(vmf: VMF, solid: Solid, face: Side):
         vmf.remove_brush(solid)
 
 
-def make_pit_shell(vmf: VMF):
+def make_pit_shell(vmf: VMF) -> None:
     """If the pit is surrounded on all sides, we can just extend walls down.
 
     That avoids needing to use skybox workarounds."""

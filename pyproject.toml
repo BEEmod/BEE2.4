@@ -36,6 +36,7 @@ target-version = "py38"
 
 exclude = [
 	"src/perlin.py",
+	"src/precomp/conditions/cutoutTile.py",
 ]
 
 [tool.ruff.lint]

@@ -1,9 +1,9 @@
 """Customizable configuration for specific items or groups of them."""
 from typing import (
-    Any, Awaitable, Callable, Dict, Generic, Iterable, Iterator, List, Optional, Protocol, Set,
+    Any, Callable, Dict, Generic, Iterable, Iterator, List, Optional, Protocol, Set,
     Tuple, Type, TypeVar,
 )
-from typing_extensions import Self, TypeAlias
+from typing_extensions import Self
 import itertools
 
 from srctools import EmptyMapping, Keyvalues, Vec, logger

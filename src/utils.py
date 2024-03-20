@@ -94,7 +94,7 @@ except ImportError:
 try:
     from contextlib import aclosing
 except ImportError:  # TODO Directly use stdlib when we drop 3.9 and below
-    from async_generator import aclosing  # type: ignore
+    from async_generator import aclosing  # type: ignore  # noqa
 
 
 # Appropriate locations to store config options for each OS.

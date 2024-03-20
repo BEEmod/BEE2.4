@@ -1,7 +1,7 @@
 """Customizable configuration for specific items or groups of them."""
 from __future__ import annotations
-from typing import Iterable, Mapping, Callable, List, Tuple, Dict, Iterator, Awaitable, Type, Union
 from typing_extensions import Protocol
+from collections.abc import Awaitable, Callable, Mapping, Iterator
 from datetime import timedelta
 from tkinter import ttk
 import tkinter as tk
@@ -85,11 +85,11 @@ class MultiCreateNoConfTask(Protocol):
 
 
 # The functions registered for each.
-_UI_IMPL_SINGLE: Dict[WidgetType, SingleCreateTask] = {}
-_UI_IMPL_MULTI: Dict[WidgetType, MultiCreateTask] = {}
+_UI_IMPL_SINGLE: dict[WidgetType, SingleCreateTask] = {}
+_UI_IMPL_MULTI: dict[WidgetType, MultiCreateTask] = {}
 
 INF = TransToken.untranslated('∞')
-TIMER_NUM_TRANS: Dict[TimerNum, TransToken] = {
+TIMER_NUM_TRANS: dict[TimerNum, TransToken] = {
     num: TransToken.untranslated('{delta:ms}').format(delta=timedelta(seconds=float(num)))
     for num in TIMER_NUM
 }
@@ -97,12 +97,12 @@ TIMER_NUM_TRANS[TIMER_STR_INF] = INF
 TRANS_COLON = TransToken.untranslated('{text}: ')
 TRANS_GROUP_HEADER = TransToken.ui('{name} ({page}/{count})')  # i18n: Header layout for Item Properties pane.
 # For the item-variant widget, we need to refresh on style changes.
-ITEM_VARIANT_LOAD: List[Tuple[str, Callable[[], object]]] = []
+ITEM_VARIANT_LOAD: list[tuple[str, Callable[[], object]]] = []
 
 window: SubPane | None = None
 
 
-def ui_single_wconf(cls: Type[ConfT]) -> Callable[[SingleCreateTask[ConfT]], SingleCreateTask[
+def ui_single_wconf(cls: type[ConfT]) -> Callable[[SingleCreateTask[ConfT]], SingleCreateTask[
     ConfT]]:
     """Register the UI function used for singular widgets with configs."""
     kind = CLS_TO_KIND[cls]
@@ -135,7 +135,7 @@ def ui_single_no_conf(kind: WidgetType) -> Callable[[SingleCreateNoConfTask], Si
     return deco
 
 
-def ui_multi_wconf(cls: Type[ConfT]) -> Callable[[MultiCreateTask[ConfT]], MultiCreateTask[ConfT]]:
+def ui_multi_wconf(cls: type[ConfT]) -> Callable[[MultiCreateTask[ConfT]], MultiCreateTask[ConfT]]:
     """Register the UI function used for multi widgets with configs."""
     kind = CLS_TO_KIND[cls]
 
@@ -167,7 +167,12 @@ def ui_multi_no_conf(kind: WidgetType) -> Callable[[MultiCreateNoConfTask], Mult
     return deco
 
 
-async def create_group(master: ttk.Frame, nursery: trio.Nursery, tk_img: TKImages, group: ConfigGroup) -> ttk.Frame:
+async def create_group(
+    master: ttk.Frame,
+    nursery: trio.Nursery,
+    tk_img: TKImages,
+    group: ConfigGroup,
+) -> ttk.Frame:
     """Create the widgets for a group."""
     frame = ttk.Frame(master)
     frame.columnconfigure(0, weight=1)
@@ -277,7 +282,7 @@ STYLEVAR_GROUP = ConfigGroup(
 
 
 async def make_pane(
-    tool_frame: Union[tk.Frame, ttk.Frame],
+    tool_frame: tk.Frame | ttk.Frame,
     menu_bar: tk.Menu,
     tk_img: TKImages,
     *, task_status: trio.TaskStatus[None] = trio.TASK_STATUS_IGNORED,
@@ -297,7 +302,7 @@ async def make_pane(
         tool_col=12,
     )
 
-    ordered_conf: List[ConfigGroup] = sorted(
+    ordered_conf: list[ConfigGroup] = sorted(
         packages.get_loaded_packages().all_obj(ConfigGroup),
         key=lambda grp: str(grp.name),
     )
@@ -375,7 +380,7 @@ async def make_pane(
     loading_text.grid(row=0, column=0, sticky='ew')
     loading_text.grid_forget()
 
-    group_to_frame: Dict[ConfigGroup, ttk.Frame] = {
+    group_to_frame: dict[ConfigGroup, ttk.Frame] = {
         STYLEVAR_GROUP: stylevar_frame,
     }
     groups_being_created: set[ConfigGroup] = set()
@@ -516,7 +521,7 @@ def widget_timer_generic(widget_func: SingleCreateTask[ConfT]) -> MultiCreateTas
 def multi_grid(
     holders: Mapping[TimerNum, AsyncValue[str]],
     columns: int = 10,
-) -> Iterator[Tuple[int, int, TimerNum, TransToken, AsyncValue[str]]]:
+) -> Iterator[tuple[int, int, TimerNum, TransToken, AsyncValue[str]]]:
     """Generate the row and columns needed for a nice layout of widgets."""
     for tim, holder in holders.items():
         if tim == 'inf':
@@ -559,7 +564,7 @@ async def widget_item_variant(
         task_status.started(await signage_ui.init_widgets(parent, tk_img))
         await trio.sleep_forever()
 
-    version_lookup: List[str] = []
+    version_lookup: list[str] = []
 
     def update_data() -> None:
         """Refresh the data in the list."""
