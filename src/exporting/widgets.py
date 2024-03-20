@@ -10,10 +10,10 @@ async def step_widget_conf(exp_data: ExportData) -> None:
         config_section = CONFIG[conf.id]
         for s_wid in conf.widgets:
             if s_wid.has_values:
-                config_section[s_wid.id] = s_wid.value
+                config_section[s_wid.id] = s_wid.holder.value
         for m_wid in conf.multi_widgets:
-            for num, value in m_wid.values.items():
-                config_section[f'{m_wid.id}_{num}'] = value
+            for num, holder in m_wid.holders.items():
+                config_section[f'{m_wid.id}_{num}'] = holder.value
         if not config_section:
             del CONFIG[conf.id]
     CONFIG.save_check()

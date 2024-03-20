@@ -31,7 +31,7 @@ class ConfigProto(Protocol):
 
 
 ConfT = TypeVar('ConfT', bound=ConfigProto)  # Type of the config object for a widget.
-OptConfT = TypeVar('OptConfT', bound=Optional[ConfigProto])
+OptConfT_contra = TypeVar('OptConfT_contra', bound=Optional[ConfigProto], contravariant=True)
 LOGGER = logger.get_logger(__name__)
 
 
@@ -51,7 +51,6 @@ class WidgetTypeWithConf(WidgetType, Generic[ConfT]):
 # Maps widget type names to the type info.
 WIDGET_KINDS: Dict[str, WidgetType] = {}
 CLS_TO_KIND: Dict[Type[ConfigProto], WidgetTypeWithConf[Any]] = {}
-UpdateFunc: TypeAlias = Callable[[str], Awaitable[None]]
 
 CONFIG = BEE2_config.ConfigFile('item_cust_configs.cfg')
 

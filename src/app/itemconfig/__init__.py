@@ -1,32 +1,27 @@
 """Customizable configuration for specific items or groups of them."""
-from typing import (
-    Iterable, Optional, Callable, List, Set, Tuple, Dict, Iterator, AsyncIterator,
-    Awaitable, Type, Union,
-)
-from typing_extensions import TypeAlias
+from __future__ import annotations
+from typing import Iterable, Mapping, Callable, List, Tuple, Dict, Iterator, Awaitable, Type, Union
+from typing_extensions import Protocol
 from datetime import timedelta
 from tkinter import ttk
 import tkinter as tk
 import functools
 
 from srctools import logger
+from trio_util import AsyncValue
 import trio
 
-from app import (
-    TK_ROOT, UI, background_run, localisation, signage_ui, sound, tk_tools,
-    StyleVarPane,
-)
+from app import TK_ROOT, UI, localisation, signage_ui, sound, tk_tools, StyleVarPane
 from app.tooltip import add_tooltip
-from config.filters import FilterConf
 # Re-export.
 from config.widgets import (
     WidgetConfig, TimerNum as TimerNum, TIMER_NUM as TIMER_NUM,
     TIMER_STR_INF as TIMER_STR_INF,
 )
 from packages.widgets import (
-    CLS_TO_KIND, ConfT, ConfigGroup, ItemVariantConf, OptConfT, UpdateFunc,
+    CLS_TO_KIND, ConfT, ConfigGroup, ItemVariantConf, OptConfT_contra,
     WidgetType,
-    WidgetTypeWithConf, nop_update,
+    WidgetTypeWithConf,
 )
 from transtoken import TransToken
 
@@ -40,40 +35,58 @@ import packages
 LOGGER = logger.get_logger(__name__)
 
 
-# This is called when a new value is loaded, to update the UI contents.
-# This should be called when the value changes.
-SingleChangeFunc: TypeAlias = Callable[[str], object]
-# This variant is for multi-widget overrides.
-MultiChangeFunc: TypeAlias = Callable[[TimerNum], SingleChangeFunc]
+class SingleCreateTask(Protocol[OptConfT_contra]):
+    """A task which creates a widget. 
+    
+    It is passed a parent frame, the configuration object, and the async value involved.
+    The widget to be installed should be passed to started().
+    """
+    def __call__(
+        self, parent: tk.Widget, tk_img: TKImages,
+        holder: AsyncValue[str],
+        config: OptConfT_contra,
+        /, *, task_status: trio.TaskStatus[tk.Widget] = ...,
+    ) -> Awaitable[None]: ...
 
-# Functions for each widget.
-# The function is passed a parent frame, the configuration object, and a function to call when the value changes.
-# The widget to be installed should be returned, and a callback to refresh the UI (which is called immediately).
-# If wide is set, the widget is put into a labelframe, instead of having a label to the side.
-SingleCreateFunc: TypeAlias = Callable[
-    [tk.Widget, TKImages, SingleChangeFunc, OptConfT],
-    Awaitable[Tuple[tk.Widget, UpdateFunc]]
-]
-SingleCreateNoConfFunc: TypeAlias = Callable[
-    [tk.Widget, TKImages, SingleChangeFunc],
-    Awaitable[Tuple[tk.Widget, UpdateFunc]]
-]
+
+class SingleCreateNoConfTask(Protocol):
+    """Variant protocol for a widget that needs no configuration."""
+    def __call__(
+        self, parent: tk.Widget, tk_img: TKImages,
+        holder: AsyncValue[str],
+        /, *, task_status: trio.TaskStatus[tk.Widget] = ...,
+    ) -> Awaitable[None]: ...
+
 
 # Override for timer-type widgets to be more compact - passed a list of timer numbers instead.
 # The widgets should insert themselves into the parent frame.
 # It then yields timer_val, update-func pairs.
-MultiCreateFunc: TypeAlias = Callable[
-    [tk.Widget, TKImages, Iterable[TimerNum], MultiChangeFunc, OptConfT],
-    AsyncIterator[Tuple[TimerNum, UpdateFunc]]
-]
-MultiCreateNoConfFunc: TypeAlias = Callable[
-    [tk.Widget, TKImages, Iterable[TimerNum], MultiChangeFunc],
-    AsyncIterator[Tuple[TimerNum, UpdateFunc]]
-]
+class MultiCreateTask(Protocol[OptConfT_contra]):
+    """Override for timer-type widgets to be more compact.
+
+    It is passed a parent frame, the configuration object, and the async value involved.
+    The widgets should insert themselves into the parent frame.
+    """
+    def __call__(
+        self, parent: tk.Widget, tk_img: TKImages,
+        holders: Mapping[TimerNum, AsyncValue[str]],
+        config: OptConfT_contra,
+        /, *, task_status: trio.TaskStatus[None] = ...,
+    ) -> Awaitable[None]: ...
+
+
+class MultiCreateNoConfTask(Protocol):
+    """Variant protocol for a timer-type widget set that needs no configuration."""
+    def __call__(
+        self, parent: tk.Widget, tk_img: TKImages,
+        holders: Mapping[TimerNum, AsyncValue[str]],
+        /, *, task_status: trio.TaskStatus[None] = ...,
+    ) -> Awaitable[None]: ...
+
 
 # The functions registered for each.
-_UI_IMPL_SINGLE: Dict[WidgetType, SingleCreateFunc] = {}
-_UI_IMPL_MULTI: Dict[WidgetType, MultiCreateFunc] = {}
+_UI_IMPL_SINGLE: Dict[WidgetType, SingleCreateTask] = {}
+_UI_IMPL_MULTI: Dict[WidgetType, MultiCreateTask] = {}
 
 INF = TransToken.untranslated('∞')
 TIMER_NUM_TRANS: Dict[TimerNum, TransToken] = {
@@ -86,31 +99,34 @@ TRANS_GROUP_HEADER = TransToken.ui('{name} ({page}/{count})')  # i18n: Header la
 # For the item-variant widget, we need to refresh on style changes.
 ITEM_VARIANT_LOAD: List[Tuple[str, Callable[[], object]]] = []
 
-window: Optional[SubPane] = None
+window: SubPane | None = None
 
 
-def ui_single_wconf(cls: Type[ConfT]) -> Callable[[SingleCreateFunc[ConfT]], SingleCreateFunc[
+def ui_single_wconf(cls: Type[ConfT]) -> Callable[[SingleCreateTask[ConfT]], SingleCreateTask[
     ConfT]]:
     """Register the UI function used for singular widgets with configs."""
     kind = CLS_TO_KIND[cls]
 
-    def deco(func: SingleCreateFunc[ConfT]) -> SingleCreateFunc[ConfT]:
+    def deco(func: SingleCreateTask[ConfT]) -> SingleCreateTask[ConfT]:
         """Do the registration."""
         _UI_IMPL_SINGLE[kind] = func
         return func
     return deco
 
 
-def ui_single_no_conf(kind: WidgetType) -> Callable[[SingleCreateNoConfFunc], SingleCreateNoConfFunc]:
+def ui_single_no_conf(kind: WidgetType) -> Callable[[SingleCreateNoConfTask], SingleCreateNoConfTask]:
     """Register the UI function used for singular widgets without configs."""
-    def deco(func: SingleCreateNoConfFunc) -> SingleCreateNoConfFunc:
+    def deco(func: SingleCreateNoConfTask) -> SingleCreateNoConfTask:
         """Do the registration."""
         def wrapper(
-            parent: tk.Widget, tk_img: TKImages, on_changed: SingleChangeFunc, conf: None,
-        ) -> Awaitable[Tuple[tk.Widget, UpdateFunc]]:
+            parent: tk.Widget, tk_img: TKImages,
+            holder: AsyncValue[str],
+            config: None,
+            /, *, task_status: trio.TaskStatus[tk.Widget] = trio.TASK_STATUS_IGNORED,
+        ) -> Awaitable[None]:
             """Don't pass the config through to the UI function."""
-            assert conf is None
-            return func(parent, tk_img, on_changed)
+            assert config is None
+            return func(parent, tk_img, holder, task_status=task_status)
 
         if isinstance(kind, WidgetTypeWithConf):
             raise TypeError('Widget type has config, but singular function does not!')
@@ -119,28 +135,30 @@ def ui_single_no_conf(kind: WidgetType) -> Callable[[SingleCreateNoConfFunc], Si
     return deco
 
 
-def ui_multi_wconf(cls: Type[ConfT]) -> Callable[[MultiCreateFunc[ConfT]], MultiCreateFunc[ConfT]]:
+def ui_multi_wconf(cls: Type[ConfT]) -> Callable[[MultiCreateTask[ConfT]], MultiCreateTask[ConfT]]:
     """Register the UI function used for multi widgets with configs."""
     kind = CLS_TO_KIND[cls]
 
-    def deco(func: MultiCreateFunc[ConfT]) -> MultiCreateFunc[ConfT]:
+    def deco(func: MultiCreateTask[ConfT]) -> MultiCreateTask[ConfT]:
         """Do the registration."""
         _UI_IMPL_MULTI[kind] = func
         return func
     return deco
 
 
-def ui_multi_no_conf(kind: WidgetType) -> Callable[[MultiCreateNoConfFunc], MultiCreateNoConfFunc]:
+def ui_multi_no_conf(kind: WidgetType) -> Callable[[MultiCreateNoConfTask], MultiCreateNoConfTask]:
     """Register the UI function used for multi widgets without configs."""
-    def deco(func: MultiCreateNoConfFunc) -> MultiCreateNoConfFunc:
+    def deco(func: MultiCreateNoConfTask) -> MultiCreateNoConfTask:
         """Do the registration."""
         def wrapper(
-            parent: tk.Widget, tk_img: TKImages, tim: Iterable[TimerNum],
-            on_changed: MultiChangeFunc, conf: None,
-        ) -> AsyncIterator[Tuple[TimerNum, UpdateFunc]]:
+            parent: tk.Widget, tk_img: TKImages,
+            holders: Mapping[TimerNum, AsyncValue[str]],
+            config: None,
+            /, *, task_status: trio.TaskStatus[None] = trio.TASK_STATUS_IGNORED,
+        ) -> Awaitable[None]:
             """Don't pass the config through to the UI function."""
-            assert conf is None
-            return func(parent, tk_img, tim, on_changed)
+            assert config is None
+            return func(parent, tk_img, holders, task_status=task_status)
 
         if isinstance(kind, WidgetTypeWithConf):
             raise TypeError('Widget type has config, but multi function does not!')
@@ -149,7 +167,7 @@ def ui_multi_no_conf(kind: WidgetType) -> Callable[[MultiCreateNoConfFunc], Mult
     return deco
 
 
-async def create_group(master: ttk.Frame, tk_img: TKImages, group: ConfigGroup) -> ttk.Frame:
+async def create_group(master: ttk.Frame, nursery: trio.Nursery, tk_img: TKImages, group: ConfigGroup) -> ttk.Frame:
     """Create the widgets for a group."""
     frame = ttk.Frame(master)
     frame.columnconfigure(0, weight=1)
@@ -167,7 +185,7 @@ async def create_group(master: ttk.Frame, tk_img: TKImages, group: ConfigGroup) 
             wid_frame.columnconfigure(1, weight=1)
             await trio.sleep(0)
 
-            label: Optional[ttk.Label] = None
+            label: ttk.Label | None = None
             if s_wid.name:
                 if s_wid.kind.is_wide:
                     wid_frame = set_text(
@@ -183,13 +201,10 @@ async def create_group(master: ttk.Frame, tk_img: TKImages, group: ConfigGroup) 
             create_func = _UI_IMPL_SINGLE[s_wid.kind]
             try:
                 with logger.context(f'{group.id}:{s_wid.id}'):
-                    widget, s_wid.ui_cback = await create_func(wid_frame, tk_img, s_wid.on_changed, s_wid.config)
+                    widget = await nursery.start(create_func, wid_frame, tk_img, s_wid.holder, s_wid.config)
             except Exception:
                 LOGGER.exception('Could not construct widget {}.{}', group.id, s_wid.id)
                 continue
-            # Do an initial update, so it has the right value.
-            await s_wid.ui_cback(s_wid.value)
-
             if label is not None:
                 widget.grid(row=0, column=1, sticky='e')
                 if isinstance(widget, ttk.Checkbutton):
@@ -201,6 +216,7 @@ async def create_group(master: ttk.Frame, tk_img: TKImages, group: ConfigGroup) 
                 await config.APP.set_and_run_ui_callback(
                     WidgetConfig, s_wid.apply_conf, f'{s_wid.group_id}:{s_wid.id}',
                 )
+            nursery.start_soon(s_wid.state_store_task)
             if s_wid.tooltip:
                 add_tooltip(widget, s_wid.tooltip)
                 if label is not None:
@@ -229,20 +245,19 @@ async def create_group(master: ttk.Frame, tk_img: TKImages, group: ConfigGroup) 
         wid_frame.grid(row=row, column=0, sticky='ew', pady=5)
         try:
             with logger.context(f'{group.id}:{m_wid.id}'):
-                async for tim_val, update_cback in multi_func(
+                await nursery.start(
+                    multi_func,
                     wid_frame, tk_img,
-                    m_wid.values.keys(),
-                    m_wid.get_on_changed,
+                    m_wid.holders,
                     m_wid.config,
-                ):
-                    m_wid.ui_cbacks[tim_val] = update_cback
-                    await update_cback(m_wid.values[tim_val])
+                )
         except Exception:
             LOGGER.exception('Could not construct widget {}.{}', group.id, m_wid.id)
             continue
         await config.APP.set_and_run_ui_callback(
             WidgetConfig, m_wid.apply_conf, f'{m_wid.group_id}:{m_wid.id}',
         )
+        nursery.start_soon(m_wid.state_store_task)
         await trio.sleep(0)
 
         if m_wid.tooltip:
@@ -263,6 +278,7 @@ async def make_pane(
     tool_frame: Union[tk.Frame, ttk.Frame],
     menu_bar: tk.Menu,
     tk_img: TKImages,
+    *, task_status: trio.TaskStatus[None] = trio.TASK_STATUS_IGNORED,
 ) -> None:
     """Create the item properties pane, with the widgets it uses."""
     global window
@@ -313,6 +329,9 @@ async def make_pane(
     label_font.config(weight='bold')
     group_label['font'] = label_font
 
+    group_label.bind('<Enter>', f'{group_label} configure -foreground "#2873FF"')
+    group_label.bind('<Leave>', f'{group_label} configure -foreground ""')
+
     group_menu = tk.Menu(group_label, tearoff=False)
     group_var = tk.StringVar(window)
 
@@ -357,7 +376,7 @@ async def make_pane(
     group_to_frame: Dict[ConfigGroup, ttk.Frame] = {
         STYLEVAR_GROUP: stylevar_frame,
     }
-    groups_being_created: Set[ConfigGroup] = set()
+    groups_being_created: set[ConfigGroup] = set()
     cur_group = STYLEVAR_GROUP
     win_max_width = 0
 
@@ -396,17 +415,17 @@ async def make_pane(
         update_disp()
         if new_group in group_to_frame:
             # Ready, add.
-            background_run(display_group, new_group)
+            nursery.start_soon(display_group, new_group)
         else:  # Begin creating, or loading.
             loading_text.grid(row=0, column=0, sticky='ew')
             if new_group not in groups_being_created:
                 async def task() -> None:
                     """Create the widgets, then display."""
-                    group_to_frame[new_group] = await create_group(canvas_frame, tk_img,new_group)
+                    group_to_frame[new_group] = await create_group(canvas_frame, nursery, tk_img,new_group)
                     groups_being_created.discard(new_group)
                     await display_group(new_group)
 
-                background_run(task)
+                nursery.start_soon(task)
                 groups_being_created.add(new_group)
 
     def select_directional(direction: int) -> None:
@@ -443,42 +462,46 @@ async def make_pane(
             )
         update_disp()
 
-    tk_tools.bind_leftclick(group_label, lambda evt: group_menu.post(evt.x_root, evt.y_root))
-    tk_tools.bind_mousewheel([
-        selection_frame, arrow_left, arrow_right, group_label,
-    ], select_directional)
-    group_label.bind('<Enter>', f'{group_label} configure -foreground "#2873FF"')
-    group_label.bind('<Leave>', f'{group_label} configure -foreground ""')
+    async with trio.open_nursery() as nursery:
 
-    await tk_tools.wait_eventloop()
+        tk_tools.bind_leftclick(group_label, lambda evt: group_menu.post(evt.x_root, evt.y_root))
+        tk_tools.bind_mousewheel([
+            selection_frame, arrow_left, arrow_right, group_label,
+        ], select_directional)
 
-    # Update canvas when the window resizes.
-    canvas.bind('<Configure>', f'{canvas} configure -scrollregion [{canvas} bbox all]')
-    await display_group(cur_group)
+        await tk_tools.wait_eventloop()
+
+        # Update canvas when the window resizes.
+        canvas.bind('<Configure>', f'{canvas} configure -scrollregion [{canvas} bbox all]')
+        await display_group(cur_group)
+
+        await trio.sleep_forever()
 
 
-def widget_timer_generic(widget_func: SingleCreateFunc[ConfT]) -> MultiCreateFunc[ConfT]:
+def widget_timer_generic(widget_func: SingleCreateTask[ConfT]) -> MultiCreateTask[ConfT]:
     """For widgets without a multi version, do it generically."""
     async def generic_func(
         parent: tk.Widget,
         tk_img: TKImages,
-        timers: Iterable[TimerNum],
-        get_on_changed: MultiChangeFunc,
-        conf: ConfT,
-    ) -> AsyncIterator[Tuple[TimerNum, UpdateFunc]]:
+        holders: Mapping[TimerNum, AsyncValue[str]],
+        config: ConfT,
+        /, *,
+        task_status: trio.TaskStatus[None] = trio.TASK_STATUS_IGNORED,
+    ) -> None:
         """Generically make a set of labels."""
-        for row, tim_val in enumerate(timers):
-            timer_disp = TIMER_NUM_TRANS[tim_val]
-            parent.columnconfigure(1, weight=1)
+        async with trio.open_nursery() as nursery:
+            for row, (tim_val, holder) in enumerate(holders.items()):
+                timer_disp = TIMER_NUM_TRANS[tim_val]
+                parent.columnconfigure(1, weight=1)
 
-            label = ttk.Label(parent)
-            set_text(label, TRANS_COLON.format(text=timer_disp))
-            label.grid(row=row, column=0)
-            widget, update = await widget_func(
-                parent, tk_img, get_on_changed(tim_val), conf,
-            )
-            yield tim_val, update
-            widget.grid(row=row, column=1, sticky='ew')
+                label = ttk.Label(parent)
+                set_text(label, TRANS_COLON.format(text=timer_disp))
+                label.grid(row=row, column=0)
+                widget = await nursery.start(
+                    widget_func,
+                    parent, tk_img, holder, config,
+                )
+                widget.grid(row=row, column=1, sticky='ew')
 
     return generic_func
 
@@ -507,9 +530,11 @@ def widget_sfx(*args: object) -> None:
 @ui_single_wconf(ItemVariantConf)
 async def widget_item_variant(
     parent: tk.Widget, tk_img: TKImages,
-    _: SingleChangeFunc,
+    holder: AsyncValue[str],
     conf: ItemVariantConf,
-) -> Tuple[tk.Widget, UpdateFunc]:
+    /, *,
+    task_status: trio.TaskStatus[tk.Widget] = trio.TASK_STATUS_IGNORED,
+) -> None:
     """Special widget - chooses item variants.
 
     This replicates the box on the right-click menu for items.
@@ -523,7 +548,9 @@ async def widget_item_variant(
 
     if item.id == 'ITEM_BEE2_SIGNAGE':
         # Even more special case, display the "configure signage" button.
-        return await signage_ui.init_widgets(parent, tk_img), nop_update
+        # This probably will need to use start(), eventually.
+        task_status.started(await signage_ui.init_widgets(parent, tk_img))
+        await trio.sleep_forever()
 
     version_lookup: List[str] = []
 
@@ -545,9 +572,13 @@ async def widget_item_variant(
     combobox.state(['readonly'])  # Prevent directly typing in values
     combobox.bind('<<ComboboxSelected>>', change_callback)
 
-    ITEM_VARIANT_LOAD.append((item.id, update_data))
-    update_data()
-    return combobox, nop_update
+    load = (item.id, update_data)
+    ITEM_VARIANT_LOAD.append(load)
+    try:
+        task_status.started(combobox)
+        await trio.sleep_forever()
+    finally:
+        ITEM_VARIANT_LOAD.remove(load)
 
 
 # Load all the widgets.
