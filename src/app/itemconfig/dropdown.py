@@ -10,6 +10,7 @@ from packages.widgets import DropdownOptions
 from app import itemconfig
 from transtoken import CURRENT_LANG
 from ui_tk.img import TKImages
+import utils
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -33,13 +34,14 @@ async def dropdown(
 
     async def update_ui() -> None:
         """Update when new values are picked."""
-        async for value in holder.eventual_values():
-            try:
-                index = conf.key_to_index[value.casefold()]
-            except KeyError:
-                LOGGER.warning('Invalid combobox value: "{}"!', value)
-                return
-            combobox.current(index)
+        async with utils.aclosing(holder.eventual_values()) as agen:
+            async for value in agen:
+                try:
+                    index = conf.key_to_index[value.casefold()]
+                except KeyError:
+                    LOGGER.warning('Invalid combobox value: "{}"!', value)
+                    return
+                combobox.current(index)
 
     async def update_combo_values() -> None:
         """Update the combo box when translations change."""

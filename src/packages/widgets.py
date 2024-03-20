@@ -21,6 +21,7 @@ from config.widgets import (
     TimerNum as TimerNum, WidgetConfig,
 )
 from transtoken import TransToken, TransTokenSource
+import utils
 
 
 class ConfigProto(Protocol):
@@ -120,8 +121,9 @@ class SingleWidget(Widget):
     async def state_store_task(self) -> None:
         """Async task which stores the state in configs whenever it changes."""
         data_id = f'{self.group_id}:{self.id}'
-        async for value in self.holder.eventual_values():
-            config.APP.store_conf(WidgetConfig(value), data_id)
+        async with utils.aclosing(self.holder.eventual_values()) as agen:
+            async for value in agen:
+                config.APP.store_conf(WidgetConfig(value), data_id)
 
 
 @attrs.define

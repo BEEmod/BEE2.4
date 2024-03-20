@@ -91,6 +91,12 @@ except ImportError:
         return (a * b) // math.gcd(a, b)
 
 
+try:
+    from contextlib import aclosing
+except ImportError:  # TODO Directly use stdlib when we drop 3.9 and below
+    from async_generator import aclosing  # type: ignore
+
+
 # Appropriate locations to store config options for each OS.
 _SETTINGS_ROOT: Optional[Path]
 if WIN:

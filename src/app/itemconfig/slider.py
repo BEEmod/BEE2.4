@@ -12,6 +12,7 @@ from packages.widgets import SliderOptions
 from app import itemconfig
 from ui_tk.img import TKImages
 from ui_tk.wid_transtoken import TransToken, set_text
+import utils
 
 
 # If enabled, optionally override text to this when set to 0. This is for options where zero turns
@@ -90,12 +91,13 @@ async def widget_slider(
     scale.grid(row=0, column=1, sticky='ew')
 
     task_status.started(frame)
-    async for new_value in holder.eventual_values():
-        value_num = float(new_value)
-        if conf.zero_off and math.isclose(value_num, 0.0):
-            set_text(disp, TRANS_OFF)
-        else:
-            set_text(disp, TransToken.untranslated(format(value_num, txt_format)))
+    async with utils.aclosing(holder.eventual_values()) as agen:
+        async for new_value in agen:
+            value_num = float(new_value)
+            if conf.zero_off and math.isclose(value_num, 0.0):
+                set_text(disp, TRANS_OFF)
+            else:
+                set_text(disp, TransToken.untranslated(format(value_num, txt_format)))
 
-        off = (value_num - conf.min) / conf.step
-        ui_var.set(round(off, points))
+            off = (value_num - conf.min) / conf.step
+            ui_var.set(round(off, points))

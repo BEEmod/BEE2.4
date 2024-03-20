@@ -9,6 +9,7 @@ import trio
 from packages.widgets import KIND_STRING
 from app import itemconfig
 from ui_tk.img import TKImages
+import utils
 
 
 @itemconfig.ui_single_no_conf(KIND_STRING)
@@ -23,11 +24,12 @@ async def widget_string(
 
     def on_changed(*args: object) -> None:
         """When changed, propagate."""
-        holder.value = entry.get()
+        holder.value = var.get()
 
     var.trace_add('write', on_changed)
 
     task_status.started(entry)
 
-    async for value in holder.eventual_values():
-        var.set(value)
+    async with utils.aclosing(holder.eventual_values(held_for=0.125)) as agen:
+        async for value in agen:
+            var.set(value)

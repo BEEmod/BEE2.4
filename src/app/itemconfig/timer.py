@@ -11,6 +11,7 @@ from packages.widgets import TimerOptions
 from app import itemconfig
 from app.tooltip import add_tooltip
 from ui_tk.img import TKImages
+import utils
 
 
 LOGGER = logger.get_logger('itemconfig.timer')
@@ -136,12 +137,13 @@ async def widget_minute_seconds(
 
     task_status.started(spinbox)
     # We need to set this after, it gets reset to the first one.
-    async for new_val in holder.eventual_values():
-        seconds = conv_int(new_val, -1)
-        if conf.min <= seconds <= conf.max:
-            disp_var.set(f'{seconds // 60}:{seconds % 60:02}')
-        else:
-            LOGGER.warning('Bad timer value "{}"!', new_val)
-            # Replace with a known safe value.
-            disp_var.set(values[0])
-            set_var()
+    async with utils.aclosing(holder.eventual_values()) as agen:
+        async for new_val in agen:
+            seconds = conv_int(new_val, -1)
+            if conf.min <= seconds <= conf.max:
+                disp_var.set(f'{seconds // 60}:{seconds % 60:02}')
+            else:
+                LOGGER.warning('Bad timer value "{}"!', new_val)
+                # Replace with a known safe value.
+                disp_var.set(values[0])
+                set_var()
