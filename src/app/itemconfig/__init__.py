@@ -11,7 +11,7 @@ from srctools import logger
 from trio_util import AsyncValue
 import trio
 
-from app import TK_ROOT, UI, localisation, signage_ui, sound, tk_tools, StyleVarPane
+from app import TK_ROOT, UI, signage_ui, sound, tk_tools, StyleVarPane
 from app.tooltip import add_tooltip
 # Re-export.
 from config.widgets import (
@@ -23,7 +23,7 @@ from packages.widgets import (
     WidgetType,
     WidgetTypeWithConf,
 )
-from transtoken import TransToken
+from transtoken import TransToken, CURRENT_LANG
 
 from app.SubPane import SubPane
 from app.tkMarkdown import MarkdownData
@@ -451,28 +451,30 @@ async def make_pane(
         arrow_left.state(['disabled' if pos == 0 else '!disabled'])
         arrow_right.state(['disabled' if pos + 1 == len(ordered_conf) else '!disabled'])
 
-    @localisation.add_callback(call=True)
-    def update_selector() -> None:
+    async def update_translations() -> None:
         """Update translations in the display, reordering if necessary."""
         # Stylevar always goes at the start.
-        ordered_conf.sort(key=lambda grp: (0 if grp is STYLEVAR_GROUP else 1, str(grp.name)))
-        # Remake all the menu widgets.
-        group_menu.delete(0, 'end')
-        for group in ordered_conf:
-            group_menu.insert_radiobutton(
-                'end', label=str(group.name),
-                variable=group_var, value=group.id,
-                command=functools.partial(select_group, group),
-            )
-        update_disp()
+        while True:
+            ordered_conf.sort(key=lambda grp: (0 if grp is STYLEVAR_GROUP else 1, str(grp.name)))
+            # Remake all the menu widgets.
+            group_menu.delete(0, 'end')
+            for group in ordered_conf:
+                group_menu.insert_radiobutton(
+                    'end', label=str(group.name),
+                    variable=group_var, value=group.id,
+                    command=functools.partial(select_group, group),
+                )
+            update_disp()
+            await CURRENT_LANG.wait_transition()
 
     async with trio.open_nursery() as nursery:
-
+        # Open the nursery before binding, to make sure it's valid.
         tk_tools.bind_leftclick(group_label, lambda evt: group_menu.post(evt.x_root, evt.y_root))
         tk_tools.bind_mousewheel([
             selection_frame, arrow_left, arrow_right, group_label,
         ], select_directional)
 
+        nursery.start_soon(update_translations)
         await tk_tools.wait_eventloop()
 
         # Update canvas when the window resizes.
