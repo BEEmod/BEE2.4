@@ -9,11 +9,10 @@ from weakref import WeakKeyDictionary
 from typing_extensions import TypeAlias
 
 from transtoken import TransToken, CURRENT_LANG
-from app.localisation import add_callback as add_callback
 
 
 __all__ = [
-    'add_callback', 'TransToken', 'CURRENT_LANG',  # Re-exports
+    'TransToken', 'CURRENT_LANG',  # Re-exports
     'set_text', 'set_win_title', 'set_menu_text', 'clear_stored_menu',
 ]
 

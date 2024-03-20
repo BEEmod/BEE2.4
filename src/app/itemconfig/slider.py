@@ -10,9 +10,8 @@ import trio
 
 from packages.widgets import SliderOptions
 from app import itemconfig
-from transtoken import TransToken
 from ui_tk.img import TKImages
-from ui_tk.wid_transtoken import set_text
+from ui_tk.wid_transtoken import TransToken, set_text
 
 
 # If enabled, optionally override text to this when set to 0. This is for options where zero turns
