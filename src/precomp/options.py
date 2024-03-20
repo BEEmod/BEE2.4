@@ -410,12 +410,6 @@ GOO_MIST = Opt.boolean(
     It can be disabled globally by a style var.
     """)
 
-REMOVE_INFO_LIGHTING = Opt.boolean(
-    'remove_info_lighting', False,
-    """Remove the glass/grating info_lighting entities.
-    This should be used when the border is made of brushes.
-    """)
-
 TILING_TEMPLATE = Opt.string(
     '_tiling_template_', '__TILING_TEMPLATE__',
     """Change the template used for generating brushwork. 
@@ -555,19 +549,6 @@ SUPERPOSITION_GHOST_ALPHA = Opt.integer(
     Ranges from 0-255.
     """)
 
-GLASS_HOLE_TEMP = Opt.string_or_none(
-    'glass_hole_temp',
-    """Template used to generate glass/grating holes. This should have 
-    'large' and 'small' visgroup sections. It should range from x=60-64.
-    """)
-
-GLASS_TEMPLATE = Opt.string(
-    'glass_template', 'BEE2_GLASS_TEMPLATE',
-    """A template for rotation and scaling of glass.""")
-GRATING_TEMPLATE= Opt.string(
-    'grating_template', 'BEE2_GRATING_TEMPLATE',
-    """A template for rotation and scaling of grates.""")
-
 GOO_WALL_SCALE_TEMP = Opt.string_or_none(
     'goo_wall_scale_temp',
     """A template for rotation and scaling for `goo_wall` textures.
@@ -580,29 +561,6 @@ GENERATE_TIDELINES = Opt.boolean(
     """Generate tideline overlays around the outside of goo pits.
     
     The material used is configured by `overlays.tideline`.
-    """)
-
-GLASS_FLOORBEAM_TEMP = Opt.string_or_none(
-    'glass_floorbeam_temp',
-    """Template for beams in the middle of large glass floors.
-
-    The template must be a single brush, aligned on the X axis.
-    """)
-GLASS_FLOORBEAM_SEP = Opt.integer(
-    'glass_floorbeam_sep', 2,
-    """Number of blocks between beams.
-    """)
-GLASS_HOLE_SIZE_SMALL = Opt.float_num(
-    'glass_hole_size_small', 32.0,
-    """Size of the small glass hole. 
-    
-    This is used for glass floor beams.
-    """)
-GLASS_HOLE_SIZE_LARGE = Opt.float_num(
-    'glass_hole_size_large', 160.0,
-    """Size of the large glass hole. 
-    
-    This is used for glass floor beams.
     """)
 
 # Instance used for pti_ents

@@ -1221,11 +1221,6 @@ def add_extra_ents(vmf: VMF, info: corridor.Info) -> None:
 def change_ents(vmf: VMF) -> None:
     """Edit misc entities."""
     LOGGER.info("Editing Other Entities...")
-    if options.REMOVE_INFO_LIGHTING():
-        # Styles with brush-based glass edges don't need the info_lighting,
-        # delete it to save ents.
-        for ent in vmf.by_class['info_lighting']:
-            ent.remove()
     for auto in vmf.by_class['logic_auto']:
         # Remove all the logic_autos that set attachments, we can
         # replicate this in the instance
