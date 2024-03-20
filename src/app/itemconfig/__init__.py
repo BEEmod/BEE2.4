@@ -201,7 +201,7 @@ async def create_group(master: ttk.Frame, nursery: trio.Nursery, tk_img: TKImage
             create_func = _UI_IMPL_SINGLE[s_wid.kind]
             try:
                 with logger.context(f'{group.id}:{s_wid.id}'):
-                    LOGGER.debug('Constructing widget...')
+                    LOGGER.debug('Constructing widget with config {!r}...', s_wid.config)
                     widget = await nursery.start(create_func, wid_frame, tk_img, s_wid.holder, s_wid.config)
             except Exception:
                 LOGGER.exception('Could not construct widget {}.{}', group.id, s_wid.id)
@@ -246,7 +246,7 @@ async def create_group(master: ttk.Frame, nursery: trio.Nursery, tk_img: TKImage
         wid_frame.grid(row=row, column=0, sticky='ew', pady=5)
         try:
             with logger.context(f'{group.id}:{m_wid.id}'):
-                LOGGER.debug('Constructing widget...')
+                LOGGER.debug('Constructing widget with config {!r}...', m_wid.config)
                 await nursery.start(
                     multi_func,
                     wid_frame, tk_img,
