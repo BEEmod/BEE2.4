@@ -87,11 +87,10 @@ win = Toplevel(TK_ROOT, name='voiceEditor')
 win.withdraw()
 
 
-def quit(event: object = None) -> None:
+def close(event: object = None) -> None:
     """Close the window, discarding changes."""
-    global voice_item
-    if voice_item is not None:
-        voice_item = None
+    global voice_item, config, config_mid, config_resp
+    voice_item = config = config_mid = config_resp = None
     win.grab_release()
     win.wm_withdraw()
 
@@ -101,8 +100,8 @@ def init_widgets() -> None:
     win.columnconfigure(0, weight=1)
     win.transient(master=TK_ROOT)
     tk_tools.set_window_icon(win)
-    win.protocol("WM_DELETE_WINDOW", quit)
-    win.bind("<Escape>", quit)
+    win.protocol("WM_DELETE_WINDOW", close)
+    win.bind("<Escape>", close)
 
     pane = PanedWindow(
         win,
@@ -193,15 +192,16 @@ def check_toggled(var: BooleanVar, config_section: SectionProxy, quote_id: str) 
 
 def save(event: object = None) -> None:
     """Save and close the window."""
-    global voice_item
+    global voice_item, config, config_mid, config_resp
     if voice_item is not None:
-        voice_item = None
         LOGGER.info('Saving Configs!')
-        config.save_check()
-        config_mid.save_check()
-        config_resp.save_check()
-    win.grab_release()
-    win.withdraw()
+        if config is not None:
+            config.save_check()
+        if config_mid is not None:
+            config_mid.save_check()
+        if config_resp is not None:
+            config_resp.save_check()
+    close()
 
 
 def add_tabs(tk_img: TKImages) -> None:

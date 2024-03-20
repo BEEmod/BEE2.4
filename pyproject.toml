@@ -150,7 +150,6 @@ module = [
 	'app.selector_win',
 	'app.CheckDetails',
 	'app.backup',
-	'app.voiceEditor',
 	'app.contextWin',
 	'app.UI',
 	'app.paletteLoader',
