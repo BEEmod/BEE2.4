@@ -506,6 +506,7 @@ def widget_timer_generic(widget_func: SingleCreateTask[ConfT]) -> MultiCreateTas
                     parent, tk_img, holder, config,
                 )
                 widget.grid(row=row, column=1, sticky='ew')
+            task_status.started()
 
     return generic_func
 
