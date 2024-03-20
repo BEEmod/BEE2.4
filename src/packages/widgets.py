@@ -6,9 +6,10 @@ from typing import (
 from typing_extensions import Self, TypeAlias
 import itertools
 
+from srctools import EmptyMapping, Keyvalues, Vec, logger
+from trio_util import AsyncValue, wait_any
 import attrs
 import trio
-from srctools import EmptyMapping, Keyvalues, Vec, logger
 
 import BEE2_config
 import config
@@ -25,7 +26,8 @@ from transtoken import TransToken, TransTokenSource
 class ConfigProto(Protocol):
     """Protocol widget configuration classes must match."""
     @classmethod
-    def parse(cls, data: packages.ParseData, conf: Keyvalues, /) -> Self: ...
+    def parse(cls, data: packages.ParseData, conf: Keyvalues, /) -> Self:
+        """Parse keyvalues into a widget config."""
 
 
 ConfT = TypeVar('ConfT', bound=ConfigProto)  # Type of the config object for a widget.
@@ -88,10 +90,6 @@ def register_no_conf(*names: str, wide: bool=False) -> WidgetType:
     return kind
 
 
-async def nop_update(__value: str) -> None:
-    """Placeholder callback which does nothing."""
-
-
 @attrs.define
 class Widget:
     """Common logic for both kinds of widget that can appear on a ConfigGroup."""
@@ -111,64 +109,55 @@ class Widget:
 @attrs.define
 class SingleWidget(Widget):
     """Represents a single widget with no timer value."""
-    value: str
-    ui_cback: UpdateFunc = nop_update
+    holder: AsyncValue[str]
 
     async def apply_conf(self, data: WidgetConfig) -> None:
         """Apply the configuration to the UI."""
         if isinstance(data.values, str):
-            if data.values != self.value:
-                self.on_changed(data.values)
-                # Don't bother scheduling a no-op task.
-                if self.ui_cback is not nop_update:
-                    await self.ui_cback(self.value)
+            self.holder.value = data.values
         else:
             LOGGER.warning('{}:{}: Saved config is timer-based, but widget is singular.', self.group_id, self.id)
 
-    def on_changed(self, value: str) -> None:
-        """Recompute state and UI when changed."""
-        self.value = value
-        config.APP.store_conf(WidgetConfig(value), f'{self.group_id}:{self.id}')
+    async def state_store_task(self) -> None:
+        """Async task which stores the state in configs whenever it changes."""
+        data_id = f'{self.group_id}:{self.id}'
+        async for value in self.holder.eventual_values():
+            config.APP.store_conf(WidgetConfig(value), data_id)
 
 
 @attrs.define
 class MultiWidget(Widget):
     """Represents a group of multiple widgets for all the timer values."""
     use_inf: bool  # For timer, is infinite valid?
-    values: Dict[TimerNum, str]
-    ui_cbacks: Dict[TimerNum, UpdateFunc] = attrs.Factory(dict)
+    holders: Dict[TimerNum, AsyncValue[str]]
 
     async def apply_conf(self, data: WidgetConfig) -> None:
         """Apply the configuration to the UI."""
-        old = self.values.copy()
         if isinstance(data.values, str):
             # Single in conf, apply to all.
-            self.values = dict.fromkeys(self.values.keys(), data.values)
+            for holder in self.holders.values():
+                holder.value = data.values
         else:
-            for tim_val in self.values:
+            for num, holder in self.holders.items():
                 try:
-                    self.values[tim_val] = data.values[tim_val]
+                    holder.value = data.values[num]
                 except KeyError:
                     continue
-        if self.values != old:
-            async with trio.open_nursery() as nursery:
-                for tim_val, cback in self.ui_cbacks.items():
-                    nursery.start_soon(cback, self.values[tim_val])
-            config.APP.store_conf(
-                WidgetConfig(self.values.copy()),
-                f'{self.group_id}:{self.id}',
-            )
 
-    def get_on_changed(self, num: TimerNum) -> Callable[[str], object]:
-        """Returns a function to recompute state and UI when changed."""
-        def on_changed(value: str) -> None:
-            """Should be called when this timer has changed."""
-            self.values[num] = value
-            config.APP.store_conf(
-                WidgetConfig(self.values.copy()),
-                f'{self.group_id}:{self.id}',
-            )
-        return on_changed
+    async def state_store_task(self) -> None:
+        """Async task which stores the state in configs whenever it changes."""
+        data_id = f'{self.group_id}:{self.id}'
+        while True:
+            # Wait for any to change, then store. We don't do them individually, since
+            # we don't want a store spam if they get changed all at once.
+            await wait_any(*[
+                holder.wait_transition
+                for holder in self.holders.values()
+            ])
+            config.APP.store_conf(WidgetConfig({
+                num: holder.value
+                for num, holder in self.holders.items()
+            }), data_id)
 
 
 class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
@@ -253,7 +242,7 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
                     # All the same.
                     defaults = dict.fromkeys(TIMER_NUM_INF if use_inf else TIMER_NUM, default_prop.value)
 
-                values: Dict[TimerNum, str] = {}
+                holders: Dict[TimerNum, AsyncValue[str]] = {}
                 for num in (TIMER_NUM_INF if use_inf else TIMER_NUM):
                     if prev_conf is EmptyMapping:
                         # No new conf, check the old conf.
@@ -262,7 +251,7 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
                         cur_value = prev_conf
                     else:
                         cur_value = prev_conf[num]
-                    values[num] = cur_value
+                    holders[num] = AsyncValue(cur_value)
 
                 multi_widgets.append(MultiWidget(
                     group_id=data.id,
@@ -271,7 +260,7 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
                     tooltip=tooltip,
                     config=wid_conf,
                     kind=kind,
-                    values=values,
+                    holders=holders,
                     use_inf=use_inf,
                 ))
             else:
@@ -299,7 +288,7 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
                     tooltip=tooltip,
                     kind=kind,
                     config=wid_conf,
-                    value=cur_value,
+                    holder=AsyncValue(cur_value),
                 ))
         # If we are new, write our defaults to config.
         CONFIG.save_check()
