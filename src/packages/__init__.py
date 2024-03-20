@@ -55,6 +55,10 @@ OBJ_TYPES: dict[str, Type[PakObject]] = {}
 PACKAGE_SYS: dict[str, FileSystem] = {}
 PACK_CONFIG = ConfigFile('packages.cfg')
 
+# "Package ID" used to indicate that this mod is required.
+MUSIC_ID_TAG = utils.special_id('<TAG_MUSIC>')
+MUSIC_ID_MEL = utils.special_id('<MEL_MUSIC>')
+
 TRANS_AP_TAG = TransToken.ui('Aperture Tag')
 TRANS_MEL = TransToken.ui('Portal Stories: Mel')
 TRANS_MISSING_PAK_DIR = TransToken.ui(
@@ -250,7 +254,7 @@ LEGACY_CORRIDORS = {
 }
 
 # This package contains necessary components, and must be available.
-CLEAN_PACKAGE = 'BEE2_CLEAN_STYLE'.casefold()
+CLEAN_PACKAGE = utils.obj_id('BEE2_CLEAN_STYLE')
 
 
 T = TypeVar('T')
@@ -698,15 +702,16 @@ async def parse_package(
     from packages import template_brush  # Avoid circular imports
     for pre in pack.info.find_children('Prerequisites'):
         # Special case - disable these packages when the music isn't copied.
-        if pre.value == '<TAG_MUSIC>':
+        required_id = utils.special_id(pre.value)
+        if required_id == MUSIC_ID_TAG:
             if not packset.has_tag_music:
                 errors.add(TRANS_MISSING_REQUIRED_GAME.format(pak_id=pack.id, req=TRANS_AP_TAG))
                 return
-        elif pre.value == '<MEL_MUSIC>':
+        elif required_id == MUSIC_ID_MEL:
             if not packset.has_mel_music:
                 errors.add(TRANS_MISSING_REQUIRED_GAME.format(pak_id=pack.id, req=TRANS_MEL))
                 return
-        elif pre.value.casefold() not in packset.packages:
+        elif required_id not in packset.packages:
             errors.add(TRANS_MISSING_REQUIRED_PACK.format(pak_id=pack.id, req=pre.value))
             return
 
