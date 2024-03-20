@@ -151,12 +151,23 @@ def on_error(
 def background_run(
     func: Callable[[Unpack[PosArgsT]], Awaitable[object]],
     /, *args: Unpack[PosArgsT],
-    name: Union[str, None] = None,
+    name: str | None = None,
 ) -> None:
-    """When the UI is live, begin this specified task."""
+    """When the UI is live, run this specified task in app-global nursery."""
     if _APP_NURSERY is None:
         raise ValueError('App nursery has not started.')
     _APP_NURSERY.start_soon(func, *args, name=name)
+
+
+async def background_start(
+    func: Callable[..., Awaitable[object]], /,
+    *args: object,
+    name: str | None = None,
+) -> Any:
+    """When the UI is live, start this specified task and return when started() is called."""
+    if _APP_NURSERY is None:
+        raise ValueError('App nursery has not started.')
+    await _APP_NURSERY.start(func, *args, name=name)
 
 
 # Various configuration booleans.
