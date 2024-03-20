@@ -208,8 +208,8 @@ def add_tabs(tk_img: TKImages) -> None:
     """Add the tabs to the notebook."""
     notebook: ttk.Notebook = UI['tabs']
     # Save the current tab index, so we can restore it after.
-    try:
-        current_tab = notebook.index(notebook.select())
+    try:  # Currently typed as Any, hence the type-ignore.
+        current_tab = notebook.index(notebook.select())  # type: ignore[no-untyped-call]
     except TclError:  # .index() will fail if the voice is empty,
         current_tab = None  # in that case abandon remembering the tab.
 

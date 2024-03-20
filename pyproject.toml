@@ -154,7 +154,6 @@ module = [
 	'app.UI',
 	'app.paletteLoader',
 	'precomp.conditions._scaffold_compat',
-	'precomp.conditions.glass',
 	'precomp.bottomlessPit',
 	'precomp.connections',
 	'precomp.fizzler',
@@ -162,7 +161,6 @@ module = [
 	'precomp.voice_line',
 	'BEE2_config',
 	'FakeZip',
-	'pygtrie',
 ]
 strict_optional = false
 
