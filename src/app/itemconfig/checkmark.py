@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from typing import AsyncIterator, Iterable, Tuple
+from typing import Mapping
 from tkinter import ttk
 import tkinter as tk
 
 from srctools import conv_bool
+from trio_util import AsyncValue
+import trio
 
-import packages.widgets
 from app import itemconfig
 from app.tooltip import add_tooltip
 from packages.widgets import KIND_CHECKMARK
@@ -16,19 +17,16 @@ from ui_tk.img import TKImages
 @itemconfig.ui_single_no_conf(KIND_CHECKMARK)
 async def widget_checkmark(
     parent: tk.Widget, tk_img: TKImages,
-    on_changed: itemconfig.SingleChangeFunc,
-) -> Tuple[tk.Widget, packages.widgets.UpdateFunc]:
+    holder: AsyncValue[str],
+    /, *, task_status: trio.TaskStatus[tk.Widget] = trio.TASK_STATUS_IGNORED,
+) -> None:
     """Allows ticking a box."""
     var = tk.BooleanVar(parent)
 
     def command() -> None:
         """Called when the checkmark is edited."""
         itemconfig.widget_sfx()
-        on_changed('1' if var.get() else '0')
-
-    async def update(value: str) -> None:
-        """Update the checkmark from stored values."""
-        var.set(conv_bool(value))
+        holder.value = '1' if var.get() else '0'
 
     check = ttk.Checkbutton(
         parent,
@@ -38,19 +36,21 @@ async def widget_checkmark(
         offvalue='0',
         command=command,
     )
-
-    return check, update
+    task_status.started(check)
+    async for value in holder.eventual_values():
+        var.set(conv_bool(value))
 
 
 @itemconfig.ui_multi_no_conf(KIND_CHECKMARK)
 async def widget_checkmark_multi(
     parent: tk.Widget, tk_img: TKImages,
-    values: Iterable[itemconfig.TimerNum],
-    get_on_changed: itemconfig.MultiChangeFunc,
-) -> AsyncIterator[Tuple[itemconfig.TimerNum, packages.widgets.UpdateFunc]]:
+    holders: Mapping[itemconfig.TimerNum, AsyncValue[str]],
+    /, *, task_status: trio.TaskStatus[None] = trio.TASK_STATUS_IGNORED,
+) -> None:
     """For checkmarks, display in a more compact form."""
-    for row, column, tim_val, tim_text in itemconfig.multi_grid(values):
-        checkbox, update = await widget_checkmark(parent, tk_img, get_on_changed(tim_val))
-        checkbox.grid(row=row, column=column)
-        add_tooltip(checkbox, tim_text, delay=0)
-        yield tim_val, update
+    async with trio.open_nursery() as nursery:
+        for row, column, tim_val, tim_text, holder in itemconfig.multi_grid(holders):
+            checkbox = await nursery.start(widget_checkmark, parent, tk_img, holder)
+            checkbox.grid(row=row, column=column)
+            add_tooltip(checkbox, tim_text, delay=0)
+        task_status.started()

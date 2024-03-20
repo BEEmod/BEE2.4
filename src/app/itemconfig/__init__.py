@@ -507,11 +507,11 @@ def widget_timer_generic(widget_func: SingleCreateTask[ConfT]) -> MultiCreateTas
 
 
 def multi_grid(
-    timers: Iterable[TimerNum],
+    holders: Mapping[TimerNum, AsyncValue[str]],
     columns: int = 10,
-) -> Iterator[Tuple[int, int, TimerNum, TransToken]]:
+) -> Iterator[Tuple[int, int, TimerNum, TransToken, AsyncValue[str]]]:
     """Generate the row and columns needed for a nice layout of widgets."""
-    for tim in timers:
+    for tim, holder in holders.items():
         if tim == 'inf':
             tim_disp = INF
             index = 0
@@ -519,7 +519,7 @@ def multi_grid(
             tim_disp = TIMER_NUM_TRANS[tim]
             index = int(tim)
         row, column = divmod(index - 1, columns)
-        yield row, column, tim, tim_disp
+        yield row, column, tim, tim_disp, holder
 
 
 def widget_sfx(*args: object) -> None:
