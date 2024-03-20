@@ -158,7 +158,6 @@ module = [
 	'precomp.connections',
 	'precomp.fizzler',
 	'precomp.tiling',
-	'precomp.voice_line',
 	'BEE2_config',
 	'FakeZip',
 ]

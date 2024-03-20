@@ -1,5 +1,5 @@
 """Adds voicelines dynamically into the map."""
-from typing import List, Set, Iterator
+from collections.abc import Iterator
 from decimal import Decimal
 import itertools
 import pickle
@@ -20,7 +20,7 @@ import vbsp
 LOGGER = srctools.logger.get_logger(__name__)
 COND_MOD_NAME = 'Voice Lines'
 
-ADDED_BULLSEYES: Set[str] = set()
+ADDED_BULLSEYES: set[str] = set()
 
 # Special quote instances associated with an item/style.
 # These are only added if the condition executes.
@@ -40,7 +40,7 @@ RESP_HAS_NAMES = {
 class PossibleQuote:
     """Bundle up the priority together with a list of filtered lines."""
     priority: int
-    lines: List[Line]
+    lines: list[Line]
 
 
 # Create a fake instance to pass to condition flags. This way we can
@@ -113,10 +113,10 @@ def find_group_quotes(
     coll: Collisions,
     info: corridor.Info,
     voice: QuoteInfo,
-    quotes: List[Quote],
+    quotes: list[Quote],
     group_id: str,
     conf: ConfigFile,
-    player_flag_set: Set[LineCriteria],
+    player_flag_set: set[LineCriteria],
 ) -> Iterator[PossibleQuote]:
     """Scan through a group, looking for applicable quote options."""
     valid_quotes = 0
@@ -134,7 +134,7 @@ def find_group_quotes(
 
         valid_quotes += 1
 
-        poss_quotes: List[Line] = []
+        poss_quotes: list[Line] = []
         for line in quote.filter_criteria(player_flag_set):
             # Check if the ID is enabled!
             if conf.get_bool(group_id, line.id, True):
@@ -219,14 +219,14 @@ def add_line(
     line: Line,
     targetname: str,
     quote_loc: Vec,
-    style_vars: dict,
+    style_vars: dict[str, bool],
     use_dings: bool,
 ) -> None:
     """Add a line to the map."""
     LOGGER.info('Adding quote: {}', line)
 
-    start_ents: List[Entity] = []
-    start_names: List[str] = []
+    start_ents: list[Entity] = []
+    start_names: list[str] = []
 
     # The OnUser1 outputs always play the quote (PlaySound/Start), so you can
     # mix ent types in the same pack.
@@ -492,9 +492,12 @@ def add_voice(
         ):
             rng = rand.seed(b'mid_quote', *[line.id for line in mid_lines.lines])
             add_line(
-                vmf, rng.choice(mid_lines.lines),
+                vmf,
+                rng.choice(mid_lines.lines),
                 '@midchamber',
-                quote_loc, style_vars, voice.use_dings,
+                quote_loc,
+                style_vars,
+                voice.use_dings,
             )
 
     if ADDED_BULLSEYES or voice.use_microphones:
