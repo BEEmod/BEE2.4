@@ -11,9 +11,10 @@ A set of observable collections are provided, which fire off events
 whenever they are modified.
 """
 from __future__ import annotations
-from typing import Generator, TypeVar, Any, Generic, Callable, Awaitable
+from typing import Any, Generic
 from typing_extensions import TypeVarTuple, Unpack
 
+from collections.abc import Callable, Awaitable, Generator
 from contextlib import contextmanager
 import math
 
@@ -21,11 +22,9 @@ import attrs
 import trio
 import srctools.logger
 
-__all__ = ['Event', 'ValueChange', 'ObsValue']
+__all__ = ['Event']
 LOGGER = srctools.logger.get_logger(__name__)
 ArgT = TypeVarTuple('ArgT')
-ValueT = TypeVar('ValueT')
-ValueT_co = TypeVar('ValueT_co', covariant=True)
 
 
 @attrs.define(init=False, eq=False)
@@ -125,35 +124,3 @@ class Event(Generic[Unpack[ArgT]]):
             send.close()
             assert self._override is send, self._override
             self._override = None
-
-
-@attrs.frozen
-class ValueChange(Generic[ValueT_co]):
-    """Holds information about when a value changes."""
-    old: ValueT_co
-    new: ValueT_co
-
-
-class ObsValue(Generic[ValueT]):
-    """Holds a single value of any type, firing an event whenever it is altered."""
-    on_changed: Event[ValueChange[ValueT]]
-    _value: ValueT
-
-    def __init__(self, initial: ValueT, name: str='') -> None:
-        self.on_changed = Event(name)
-        self._value = initial
-
-    @property
-    def value(self) -> ValueT:
-        """Get the value."""
-        return self._value
-
-    async def set(self, new: ValueT) -> None:
-        """Set the value, and fire the event."""
-        # Note: fire the event AFTER we change the contents.
-        old = self._value
-        self._value = new
-        await self.on_changed(ValueChange(old, new))
-
-    def __repr__(self) -> str:
-        return f'ObsValue({self._value!r}, on_changed={self.on_changed})'
