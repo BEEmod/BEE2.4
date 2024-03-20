@@ -475,8 +475,10 @@ def add_voice(
 
             # Add one of the associated quotes
             add_line(
-                vmf, rng.choice(chosen),
-                group.choreo_name, group.choreo_loc,
+                vmf,
+                rng.choice(chosen),
+                group.choreo_name,
+                group.choreo_loc or quote_loc,
                 style_vars,
                 group.choreo_use_dings and voice.use_dings,
             )
