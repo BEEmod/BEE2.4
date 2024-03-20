@@ -1,8 +1,7 @@
 """Conditions for randomising instances."""
 from typing import Callable
 
-from srctools import Keyvalues, Vec, Entity, Angle
-import srctools
+from srctools import Keyvalues, Vec, Angle, Entity
 
 from precomp import collisions, conditions, rand
 from precomp.conditions import Condition, RES_EXHAUSTED, make_result, MapInfo

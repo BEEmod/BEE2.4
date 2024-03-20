@@ -275,7 +275,7 @@ def load(opt_blocks: Iterator[Keyvalues]) -> None:
         try:
             SETTINGS[opt.id] = SETTINGS[opt.fallback]
         except KeyError:
-            raise Exception(f'Bad fallback for "{opt.id}"!')
+            raise Exception(f'Bad fallback for "{opt.id}": {opt.fallback!r}') from None
         # Check they have the same type.
         assert opt.type is options[opt.fallback].type
 

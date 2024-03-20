@@ -110,6 +110,6 @@ def seed(
         else:
             try:
                 algo.update(val)
-            except TypeError:
-                raise TypeError(values)
+            except TypeError as exc:
+                raise TypeError(values) from exc
     return Random(int.from_bytes(algo.digest(), 'little'))

@@ -151,7 +151,7 @@ class ConfigFile(ConfigParser):
             self[section] = {}
             return super().__getitem__(section)
 
-    def getboolean(self, section: str, value: str, default: bool=False, **kwargs) -> bool:  # type: ignore[override]
+    def getboolean(self, section: str, option: str, default: bool = False, **kwargs: Any) -> bool:  # type: ignore[override]
         """Get the value in the specified section, coercing to a Boolean.
 
             If either does not exist, set to the default and return it.
@@ -159,27 +159,27 @@ class ConfigFile(ConfigParser):
         if section not in self:
             self[section] = {}
         try:
-            return super().getboolean(section, value, **kwargs)
+            return super().getboolean(section, option, **kwargs)
         except (ValueError, NoOptionError):
             #  Invalid boolean, or not found
             self.has_changed.set()
-            self[section][value] = str(int(default))
+            self[section][option] = str(int(default))
             return default
 
     get_bool = getboolean
 
-    def getint(self, section: str, value: str, default: int=0, **kwargs) -> int:  # type: ignore[override]
-        """Get the value in the specified section, coercing to a Integer.
+    def getint(self, section: str, option: str, default: int=0, **kwargs: Any) -> int:  # type: ignore[override]
+        """Get the value in the specified section, coercing to an Integer.
 
-            If either does not exist, set to the default and return it.
-            """
+        If either does not exist, set to the default and return it.
+        """
         if section not in self:
             self[section] = {}
         try:
-            return super().getint(section, value, **kwargs)
+            return super().getint(section, option, **kwargs)
         except (ValueError, NoOptionError):
             self.has_changed.set()
-            self[section][value] = str(int(default))
+            self[section][option] = str(int(default))
             return default
 
     get_int = getint

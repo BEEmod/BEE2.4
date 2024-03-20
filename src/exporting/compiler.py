@@ -98,8 +98,8 @@ async def terminate_error_server() -> bool:
         else:
             # Wait for the file to be deleted.
             # Unfortunately no way to be notified for when this occurs.
-            while user_errors.SERVER_INFO_FILE.exists():
-                await trio.sleep(0.125)  # noqa: TRIO110
+            while user_errors.SERVER_INFO_FILE.exists():  # noqa: TRIO110
+                await trio.sleep(0.125)
             return False
     # noinspection PyUnreachableCode
     LOGGER.warning('Hit error server timeout, may still be running!')

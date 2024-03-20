@@ -1,7 +1,7 @@
 """Conditions related to packing."""
-from typing import Dict, Set
+from __future__ import annotations
 
-from srctools import VMF, Keyvalues, Vec
+from srctools import VMF, Keyvalues
 import srctools.logger
 
 from precomp import conditions, options
@@ -11,9 +11,9 @@ LOGGER = srctools.logger.get_logger(__name__)
 COND_MOD_NAME = 'Packing'
 
 # Filenames we've packed, so we can avoid adding duplicate ents.
-_PACKED_FILES: Set[str] = set()
+_PACKED_FILES: set[str] = set()
 
-PACKLISTS: Dict[str, Set[str]] = {}
+PACKLISTS: dict[str, set[str]] = {}
 
 
 def parse_packlists(kv: Keyvalues) -> None:
@@ -25,7 +25,7 @@ def parse_packlists(kv: Keyvalues) -> None:
 def pack_list(
     vmf: VMF,
     packlist_name: str,
-    file_type: str='generic',
+    file_type: str = 'generic',
 ) -> None:
     """Pack the given packing list."""
     if not packlist_name:
@@ -41,7 +41,7 @@ def pack_list(
 def pack_files(
     vmf: VMF,
     *files: str,
-    file_type: str='generic',
+    file_type: str = 'generic',
 ) -> None:
     """Add the given files to the packing list."""
 

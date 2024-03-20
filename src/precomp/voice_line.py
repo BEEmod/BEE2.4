@@ -349,7 +349,7 @@ def add_voice(
     coll: Collisions,
     info: corridor.Info,
     voice: QuoteInfo,
-    use_priority=True,
+    use_priority: bool = True,
 ) -> None:
     """Add a voice line to the map."""
     LOGGER.info('Adding Voice Lines!')

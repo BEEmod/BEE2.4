@@ -102,10 +102,10 @@ class TransToken:
     # Keyword arguments passed when formatting.
     parameters: Mapping[str, object] = attrs.field(converter=_param_convert)
 
-    BLANK: ClassVar['TransToken']   # Quick access to blank token.
+    BLANK: ClassVar[TransToken]   # Quick access to blank token.
 
     @classmethod
-    def parse(cls, package: utils.SpecialID, text: str) -> 'TransToken':
+    def parse(cls, package: utils.SpecialID, text: str) -> TransToken:
         """Parse a string to find a translation token, if any."""
         orig_pack = package
         if text.startswith('[['):  # "[[package]] default"
@@ -128,26 +128,26 @@ class TransToken:
             return cls(package, orig_pack, text, EmptyMapping)
 
     @classmethod
-    def ui(cls, token: LiteralString, /, **kwargs: str) -> 'TransToken':
+    def ui(cls, token: LiteralString, /, **kwargs: str) -> TransToken:
         """Make a token for a UI string."""
         return cls(NS_UI, NS_UI, token, kwargs)
 
     @staticmethod
-    def ui_plural(singular: LiteralString, plural: LiteralString,  /, **kwargs: str) -> 'PluralTransToken':
+    def ui_plural(singular: LiteralString, plural: LiteralString,  /, **kwargs: str) -> PluralTransToken:
         """Make a plural token for a UI string."""
         return PluralTransToken(NS_UI, NS_UI, singular, kwargs, plural)
 
-    def join(self, children: Iterable['TransToken'], sort: bool=False) -> 'JoinTransToken':
+    def join(self, children: Iterable[TransToken], sort: bool=False) -> JoinTransToken:
         """Use this as a separator to join other tokens together."""
         return JoinTransToken(self.namespace, self.orig_pack, self.token, self.parameters, list(children), sort)
 
     @classmethod
-    def from_valve(cls, text: str) -> 'TransToken':
+    def from_valve(cls, text: str) -> TransToken:
         """Make a token for a string that should be looked up in Valve's translation files."""
         return cls(NS_GAME, NS_GAME, text, EmptyMapping)
 
     @classmethod
-    def untranslated(cls, text: str) -> 'TransToken':
+    def untranslated(cls, text: str) -> TransToken:
         """Make a token that is not actually translated at all.
 
         In this case, the token is the literal text to use.
@@ -155,7 +155,7 @@ class TransToken:
         return cls(NS_UNTRANSLATED, NS_UNTRANSLATED, text, EmptyMapping)
 
     @classmethod
-    def list_and(cls, children: Iterable['TransToken'], sort: bool=False) -> 'ListTransToken':
+    def list_and(cls, children: Iterable[TransToken], sort: bool=False) -> ListTransToken:
         """Join multiple tokens together in an and-list."""
         return ListTransToken(
             NS_UNTRANSLATED, NS_UNTRANSLATED, ', ', EmptyMapping,
@@ -163,7 +163,7 @@ class TransToken:
         )
 
     @classmethod
-    def list_or(cls, children: Iterable['TransToken'], sort: bool=False) -> 'ListTransToken':
+    def list_or(cls, children: Iterable[TransToken], sort: bool=False) -> ListTransToken:
         """Join multiple tokens together in an or-list."""
         return ListTransToken(
             NS_UNTRANSLATED, NS_UNTRANSLATED, ', ', EmptyMapping,
@@ -185,7 +185,7 @@ class TransToken:
         """Check if this is builtin UI text."""
         return self.namespace == NS_UI
 
-    def format(self, /, **kwargs: object) -> 'TransToken':
+    def format(self, /, **kwargs: object) -> TransToken:
         """Return a new token with the provided parameters added in."""
         # Only merge together if we had parameters, otherwise just store the dict.
         if self.parameters and kwargs:
@@ -298,7 +298,7 @@ class PluralTransToken(TransToken):
     ui = ui_plural = untranslated = from_valve = _not_allowed  # type: ignore[assignment]
 
     @override
-    def join(self, children: Iterable['TransToken'], sort: bool = False) -> 'JoinTransToken':
+    def join(self, children: Iterable[TransToken], sort: bool = False) -> JoinTransToken:
         """Joining is not allowed."""
         raise NotImplementedError('This is not allowed.')
 
