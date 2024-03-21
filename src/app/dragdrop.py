@@ -1,7 +1,7 @@
 """Implements drag/drop logic."""
 from __future__ import annotations
 from typing import (
-    Callable, Dict, Final, Generic, Iterable, Iterator, List, Optional, Tuple, TypeVar,
+    Any, Callable, Dict, Final, Generic, Iterable, Iterator, List, Optional, Tuple, TypeVar,
 )
 from typing_extensions import ParamSpec, TypeAlias
 from collections import defaultdict
@@ -166,7 +166,7 @@ class ManagerBase(Generic[ItemT, ParentT]):
     def __init__(
         self,
         *,
-        info_cb: InfoCB,
+        info_cb: InfoCB[ItemT],
         size: Tuple[int, int] = (64, 64),
         config_icon: bool = False,
         pick_flexi_group: Optional[FlexiCB] = None,
@@ -551,13 +551,9 @@ class Slot(Generic[ItemT]):
 
     # The kind of slot.
     type: SlotType
-    man: ManagerBase  # Our drag/drop controller.
+    man: ManagerBase[ItemT, Any]  # Our drag/drop controller.
 
-    def __init__(
-        self,
-        man: ManagerBase,
-        kind: SlotType,
-    ) -> None:
+    def __init__(self, man: ManagerBase[ItemT, Any], kind: SlotType) -> None:
         """Internal only, use Manager.slot_*()."""
         self.man = man
         self.kind = kind

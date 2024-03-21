@@ -80,7 +80,7 @@ def place_icon(canv: tk.Canvas, icon: IconUI, x: int, y: int, tag: str) -> None:
     )
 
 
-class TkSelector(Selector):
+class TkSelector(Selector[IconUI]):
     """Corridor selection window."""
     win: tk.Toplevel
 

@@ -24,7 +24,7 @@ LOGGER = srctools.logger.get_logger(__name__, alias='cond._scaffold_compat')
 
 
 def get_config(
-    node: item_chain.Node,
+    node: item_chain.Node[Dict[str, Any]],
 ) -> Tuple[str, Vec]:
     """Compute the config values for a node."""
 

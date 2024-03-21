@@ -1,6 +1,8 @@
 """Customizable configuration for specific items or groups of them."""
 from __future__ import annotations
+from typing import Any
 from typing_extensions import Protocol
+
 from collections.abc import Awaitable, Callable, Mapping, Iterator
 from datetime import timedelta
 from tkinter import ttk
@@ -85,8 +87,8 @@ class MultiCreateNoConfTask(Protocol):
 
 
 # The functions registered for each.
-_UI_IMPL_SINGLE: dict[WidgetType, SingleCreateTask] = {}
-_UI_IMPL_MULTI: dict[WidgetType, MultiCreateTask] = {}
+_UI_IMPL_SINGLE: dict[WidgetType, SingleCreateTask[Any]] = {}
+_UI_IMPL_MULTI: dict[WidgetType, MultiCreateTask[Any]] = {}
 
 INF = TransToken.untranslated('∞')
 TIMER_NUM_TRANS: dict[TimerNum, TransToken] = {

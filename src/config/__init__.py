@@ -107,7 +107,10 @@ class ConfigSpec:
     # applies the data to the UI. This way we know it can be done safely now.
     # If data was loaded from the config, the callback is immediately awaited.
     # One is provided independently for each ID, so it can be sent to the right object.
-    callback: Dict[Tuple[Type[Data], str], Callable[[Data], Awaitable]] = attrs.field(factory=dict, repr=False)
+    callback: Dict[
+        Tuple[type[Data], str],
+        Callable[[Data], Awaitable[object]],
+    ] = attrs.field(factory=dict, repr=False)
 
     _current: Config = attrs.Factory(lambda: Config({}))
 
@@ -128,7 +131,7 @@ class ConfigSpec:
     async def set_and_run_ui_callback(
         self,
         typ: Type[DataT],
-        func: Callable[[DataT], Awaitable],
+        func: Callable[[DataT], Awaitable[object]],
         data_id: str='',
     ) -> None:
         """Set the callback used to apply this config type to the UI.

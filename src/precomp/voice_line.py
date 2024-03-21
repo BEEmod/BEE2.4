@@ -344,7 +344,7 @@ def sort_func(quote: PossibleQuote) -> Decimal:
 
 
 def add_voice(
-    style_vars: dict,
+    style_vars: dict[str, bool],
     vmf: VMF,
     coll: Collisions,
     info: corridor.Info,

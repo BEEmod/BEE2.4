@@ -19,8 +19,8 @@ from ui_tk.dialogs import TkDialogs
 window = tk.Toplevel(TK_ROOT, name='packagesWin')
 window.withdraw()
 
-list_widget: CheckDetails
-pack_items: list[tuple[packages.Package, CheckItem]] = []
+list_widget: CheckDetails[None]
+pack_items: list[tuple[packages.Package, CheckItem[None]]] = []
 
 
 def show() -> None:
@@ -33,7 +33,7 @@ def show() -> None:
     list_widget.refresh()
 
 
-def make_packitems() -> Iterable[CheckItem]:
+def make_packitems() -> Iterable[CheckItem[None]]:
     """Make the checkitems used in the details view."""
     pack_items.clear()
     for pack in packages.get_loaded_packages().packages.values():
@@ -42,7 +42,7 @@ def make_packitems() -> Iterable[CheckItem]:
             hover_text=pack.desc,
             # The clean package can't be disabled!
             lock_check=(pack.id.casefold() == packages.CLEAN_PACKAGE),
-            state=pack.enabled
+            state=pack.enabled,
         )
         pack_items.append((pack, item))
         yield item

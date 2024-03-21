@@ -105,7 +105,7 @@ async def test_isolate() -> None:
     func1.assert_awaited_once_with(4)
 
     func1.reset_mock()
-    rec: trio.MemoryReceiveChannel
+    rec: trio.MemoryReceiveChannel[tuple[int]]
     with event.isolate() as rec:
         with pytest.raises(ValueError):  # No nesting.
             with event.isolate():
