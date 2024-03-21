@@ -81,18 +81,14 @@ if __name__ == '__main__':
 
     localisation.setup(conf.language)
 
+    from app import BEE2, backup, CompilerPane
     if app_name == 'bee2':
-        from app import BEE2
         BEE2.start_main()
     elif app_name == 'backup':
-        from app import backup, BEE2
         BEE2.start_main(backup.init_application)
     elif app_name == 'compilepane':
-        from app import CompilerPane
-        CompilerPane.init_application()
-        TK_ROOT.mainloop()
+        BEE2.start_main(CompilerPane.init_application)
     elif app_name.startswith('test_'):
-        from app import BEE2
         import importlib
         mod = importlib.import_module('app.demo.' + sys.argv[1][5:])
         BEE2.start_main(getattr(mod, 'test'))

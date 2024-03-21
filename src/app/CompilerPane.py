@@ -770,18 +770,20 @@ async def make_pane(
     await config.APP.set_and_run_ui_callback(CompilePaneState, apply_state)
 
 
-def init_application() -> None:
+async def init_application() -> None:
     """Initialise when standalone."""
     global window
     from ui_tk.img import TK_IMG
+    from app import _APP_QUIT_SCOPE
     window = cast(SubPane.SubPane, TK_ROOT)
     wid_transtoken.set_win_title(window, TransToken.ui(
         'Compiler Options - {ver}',
     ).format(ver=utils.BEE_VERSION))
     window.resizable(True, False)
 
-    # TODO load async properly.
-    import trio
-    trio.run(make_widgets, TK_IMG)
+    with _APP_QUIT_SCOPE:
+        await make_widgets(TK_IMG)
 
-    TK_ROOT.deiconify()
+        TK_ROOT.deiconify()
+        tk_tools.center_onscreen(TK_ROOT)
+        await trio.sleep_forever()
