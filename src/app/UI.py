@@ -1402,7 +1402,6 @@ async def init_windows(tk_img: TKImages) -> None:
         width=TK_ROOT.winfo_screenwidth(),
         height=TK_ROOT.winfo_screenheight(),
     )
-    TK_ROOT.protocol("WM_DELETE_WINDOW", quit_app)
     gameMan.ON_GAME_CHANGED.register(set_game)
     # Initialise the above and the menu bar.
     await gameMan.ON_GAME_CHANGED(gameMan.selected_game)

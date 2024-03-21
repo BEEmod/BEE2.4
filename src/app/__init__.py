@@ -25,6 +25,7 @@ def quit_app() -> None:
     """Quit the application."""
     _APP_QUIT_SCOPE.cancel()
 
+TK_ROOT.protocol("WM_DELETE_WINDOW", quit_app)
 
 if '__class_getitem__' not in vars(tk.Event):
     # Patch in it being generic, by replacing it with a copy that subclasses Generic.
