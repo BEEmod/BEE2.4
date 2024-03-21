@@ -16,7 +16,7 @@ import os
 import shutil
 import string
 
-from srctools import Keyvalues, KeyValError
+from srctools import EmptyMapping, Keyvalues, KeyValError
 import srctools.logger
 import trio
 
@@ -819,12 +819,17 @@ def init(tk_img: TKImages) -> None:
 async def init_application() -> None:
     """Initialise the standalone application."""
     from ui_tk.img import TK_IMG
-    from app import gameMan
+    from app import gameMan, _APP_QUIT_SCOPE
     global window
     window = cast(tk.Toplevel, TK_ROOT)
     set_win_title(TK_ROOT, TransToken.ui(
         'BEEMOD {version} - Backup / Restore Puzzles',
     ).format(version=utils.BEE_VERSION))
+
+    loadScreen.main_loader.destroy()
+    # Initialise images, but don't load anything from packages.
+    background_run(img.init, EmptyMapping, TK_IMG)
+    # We don't need sound or language reload handling.
 
     init(TK_IMG)
 
@@ -867,18 +872,21 @@ async def init_application() -> None:
 
     window['menu'] = bar
 
-    window.deiconify()
-    window.update()
+    with _APP_QUIT_SCOPE:
+        window.deiconify()
+        window.update()
 
-    await gameMan.load(DIALOG)
-    ui_new_backup()
+        await gameMan.load(DIALOG)
+        ui_new_backup()
 
-    @gameMan.ON_GAME_CHANGED.register
-    async def cback(game: gameMan.Game) -> None:
-        """UI.py isn't present, so we use this callback."""
-        await load_game(game)
+        @gameMan.ON_GAME_CHANGED.register
+        async def cback(game: gameMan.Game) -> None:
+            """UI.py isn't present, so we use this callback."""
+            await load_game(game)
 
-    gameMan.add_menu_opts(game_menu)
+        gameMan.add_menu_opts(game_menu)
+
+        await trio.sleep_forever()
 
 
 def init_backup_settings() -> None:
