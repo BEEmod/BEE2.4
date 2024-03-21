@@ -634,7 +634,7 @@ class SplashScreen(BaseLoadScreen):
 
 class LogWindow:
     """Implements the logging window."""
-    def __init__(self, queue: multiprocessing.Queue) -> None:
+    def __init__(self, queue: multiprocessing.Queue[ARGS_REPLY_LOGGING]) -> None:
         """Initialise the window."""
         self.win = window = tk.Toplevel(TK_ROOT, name='logWin')
         self.queue = queue
@@ -752,7 +752,7 @@ class LogWindow:
         firstline, *lines = text.split('\n')
 
         if self.has_text:
-            # Start with a newline so it doesn't end with one.
+            # Add a newline to the existing text, since we don't end with it.
             self.text.insert(tk.END, '\n', ())
 
         self.text.insert(tk.END, firstline, (level_name,))
@@ -762,7 +762,7 @@ class LogWindow:
                 '\n',
                 ('INDENT',),
                 line,
-                # Indent following lines.
+                # Indent lines after the first.
                 (level_name, 'INDENT'),
             )
         self.text.see(tk.END)  # Scroll to the end
@@ -799,17 +799,18 @@ class LogWindow:
         self.has_text = False
         self.text['state'] = "disabled"
 
-    def handle(self, msg: tuple) -> None:
+    def handle(self, msg: ARGS_SEND_LOGGING) -> None:
         """Handle messages from the main app."""
+        # TODO: Use match statement here once 3.8 is dropped.
         operation, parm1, parm2 = msg
-        if operation == 'log':
+        if operation == 'log' and isinstance(parm1, str) and isinstance(parm2, str):
             self.log(parm1, parm2)
-        elif operation == 'visible':
+        elif operation == 'visible' and isinstance(parm1, bool):
             if parm1:
                 self.win.deiconify()
             else:
                 self.win.withdraw()
-        elif operation == 'level':
+        elif operation == 'level' and isinstance(parm1, str):
             self.level_selector.current(BOX_LEVELS.index(parm1))
         else:
             raise ValueError(f'Bad command {operation!r}({parm1!r}, {parm2!r})!')

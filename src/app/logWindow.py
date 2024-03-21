@@ -59,10 +59,12 @@ class TextHandler(logging.Handler):
     def setLevel(self, level: int | str) -> None:
         """Set the level of the log window."""
         if isinstance(level, int):
-            level = logging.getLevelName(level)
-        super().setLevel(level)
+            level_str = logging.getLevelName(level)
+        else:
+            level_str = level
+        super().setLevel(level_str)
         try:
-            _QUEUE_SEND_LOGGING.put(('level', level, None), timeout=0.5)
+            _QUEUE_SEND_LOGGING.put(('level', level_str, None), timeout=0.5)
         except queue.Full:
             pass
 
@@ -82,6 +84,7 @@ async def loglevel_bg() -> None:
         except ValueError:
             # Pipe closed, we're useless.
             return
+        # TODO: Use match statement here once 3.8 is dropped.
         if cmd == 'level' and isinstance(param, str):
             TextHandler.setLevel(HANDLER, param)
             conf = config.APP.get_cur_conf(GenOptions)

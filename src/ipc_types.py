@@ -101,7 +101,7 @@ ARGS_REPLY_LOAD: TypeAlias = Union[Daemon2Load_Cancel, Daemon2Load_MainSetCompac
 ARGS_SEND_LOGGING: TypeAlias = Union[  # logging -> daemon
     Tuple[Literal['log'], str, str],
     Tuple[Literal['visible'], bool, None],
-    Tuple[Literal['level'], Union[str, int], None],
+    Tuple[Literal['level'], str, None],
 ]
 ARGS_REPLY_LOGGING: TypeAlias = Union[  # daemon -> logging
     Tuple[Literal['level'], str],
