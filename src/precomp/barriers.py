@@ -1436,7 +1436,11 @@ def try_place_hole(
                 hole_temp.append(hole.variant.template + (corn_mat, ))
 
     else:
-        hole_temp.append(hole.variant.template + (hole.plane.orient, ))
+        orient = Matrix.from_basis(
+            x=hole.orient.forward(),
+            z=hole.plane.normal,
+        )
+        hole_temp.append(hole.variant.template + (orient, ))
 
     for offset in hole.type.footprint:
         local = hole.plane.world_to_plane(hole.origin + offset @ hole.orient)
