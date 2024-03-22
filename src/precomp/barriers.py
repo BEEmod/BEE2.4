@@ -1007,9 +1007,9 @@ def test_hole_spot(
     return variant
 
 
-@conditions.make_result('GlassHole')
-def res_glass_hole(inst: Entity, res: Keyvalues) -> None:
-    """Add Glass/grating holes. The value should be 'large' or 'small'."""
+@conditions.make_result('BarrierHole', 'GlassHole')
+def res_barrier_hole(inst: Entity, res: Keyvalues) -> None:
+    """Add Glass/grating holes. The value is the ID of a BarrierHole."""
     hole_type = HOLE_TYPES[utils.obj_id(res.value)]
 
     orient = FrozenMatrix.from_angstr(inst['angles'])
