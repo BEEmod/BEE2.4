@@ -37,6 +37,15 @@ window.addEventListener("load", () => {
 	const renderer = new THREE.WebGLRenderer();
 	const controls = new OrbitControls( camera, renderer.domElement );
 
+	function convertAngle(pitch, yaw, roll) {
+		return new THREE.Euler(
+			pitch * Math.PI / 180,
+			(yaw + 90.0) * Math.PI / 180,
+			roll * Math.PI / 180,
+			"YZX",
+		);
+	}
+
 	async function updateScene(data) {
 		const mats = new Map();
 		const loader_tex = new THREE.TextureLoader();
@@ -217,13 +226,17 @@ window.addEventListener("load", () => {
 				for (const hole of data.barrier_holes) {
 					for (const child of hole_geo.children) {
 						// shape = small/medium/large etc, kind = frame/footprint
+						// The shape is something like medium_frame, slot_center_footprint
 						// Data is {footprint: bool, shape: str}.
-						const [shape, kind] = child.name.split("_");
+						const underscore_pos = child.name.lastIndexOf("_");
+						if (underscore_pos === -1) { continue; }
+						const shape = child.name.slice(0, underscore_pos);
+						const kind = child.name.slice(underscore_pos + 1);
 						if (hole.shape === shape && (kind === "frame" || hole.footprint)) {
-							const mdl = new THREE.Mesh(child.geometry, hole_mats.get(child.material.name));
-							mdl.position.set(hole.pos[0], hole.pos[1], hole.pos[2]);
-							mdl.setRotationFromQuaternion(axes.get(hole.axis));
-							scene.add(mdl);
+							const mesh = new THREE.Mesh(child.geometry, hole_mats.get(child.material.name));
+							mesh.position.set(hole.pos[0], hole.pos[1], hole.pos[2]);
+							mesh.setRotationFromEuler(convertAngle(hole.pitch, hole.yaw, hole.roll));
+							scene.add(mesh);
 						}
 					}
 				}

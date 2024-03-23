@@ -16,16 +16,17 @@ class BarrierHole(PakObject, allow_mult=True):
         hole_id: str,
         *,
         footprint_id: str,
+        error_shape: str,
         variant_conf: lazy_conf.LazyConf,
     ) -> None:
         self.id = hole_id
         self.footprint_id = footprint_id
+        self.error_shape = error_shape
         self.variant_conf = variant_conf
 
     @classmethod
     async def parse(cls, data: ParseData) -> Self:
         """Parse barrier holes from the package."""
-        footprint_id = data.info['footprint']
         variant_conf = get_config(
             data.info,
             'items', data.pak_id,
@@ -34,7 +35,8 @@ class BarrierHole(PakObject, allow_mult=True):
         )
         return cls(
             data.id,
-            footprint_id=footprint_id,
+            footprint_id=data.info['footprint'],
+            error_shape=data.info['error_shape', 'small'],
             variant_conf=variant_conf,
         )
 

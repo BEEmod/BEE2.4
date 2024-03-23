@@ -23,6 +23,7 @@ async def step_barrier_hole(exp_data: ExportData) -> None:
 
         conf_block.append(Keyvalues(hole.id, [
             Keyvalues('Footprint', hole.footprint_id),
+            Keyvalues('error_shape', hole.error_shape),
             kv,
         ]))
 

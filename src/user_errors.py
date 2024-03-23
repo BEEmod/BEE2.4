@@ -39,7 +39,9 @@ class SimpleTile(TypedDict):
 class BarrierHole(TypedDict):
     """Information for improperly placed glass/grating hole items."""
     pos: TuplePos
-    axis: Literal["x", "y", "z"]
+    pitch: float
+    yaw: float
+    roll: float
     shape: str
     footprint: bool
 

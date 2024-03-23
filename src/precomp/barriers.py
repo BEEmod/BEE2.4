@@ -189,6 +189,21 @@ class HoleType:
     def __repr__(self) -> str:
         return f'<{type(self).__name__} {self.id!r}, variants={sorted(self.variants)}>'
 
+    def error_info(self, origin: Vec | FrozenVec, orient: AnyMatrix, footprint: bool) -> user_errors.BarrierHole:
+        """Produce a dict for use in error display.
+
+        This is defined here and not Hole since a hole might not have been created yet.
+        """
+        angles = orient.to_angle()
+        return user_errors.BarrierHole(
+            pos=user_errors.to_threespace(origin),
+            pitch=angles.pitch,
+            yaw=angles.yaw,
+            roll=angles.roll,
+            shape=self.error_shape,
+            footprint=footprint,
+        )
+
 
 @attrs.define(eq=False, kw_only=True)
 class Hole:
@@ -944,10 +959,9 @@ def test_hole_spot(
         # Try the other orientation.
         return None
 
-    error_hole = user_errors.BarrierHole(
-        pos=user_errors.to_threespace(origin + orient.up(64)),
-        axis=orient.up().axis(),
-        shape=hole_type.error_shape,
+    error_hole = hole_type.error_info(
+        origin=origin + orient.up(64),
+        orient=orient,
         footprint=True,
     )
 
@@ -1012,10 +1026,9 @@ def test_hole_spot(
                         user_errors.TOK_BARRIER_HOLE_FOOTPRINT.format(hole=hole_type.id),
                         barrier_holes=[
                             error_hole,
-                            user_errors.BarrierHole(
-                                pos=user_errors.to_threespace(other_hole.origin + other_hole.orient.up(64)),
-                                axis=other_hole.orient.up().axis(),
-                                shape=other_hole.type.error_shape,
+                            other_hole.type.error_info(
+                                origin=other_hole.origin + other_hole.orient.up(64),
+                                orient=other_hole.orient,
                                 footprint=True,
                             ),
                         ],
@@ -1052,12 +1065,11 @@ def res_barrier_hole(inst: Entity, res: Keyvalues) -> None:
         else:
             raise user_errors.UserError(
                 user_errors.TOK_BARRIER_HOLE_MISPLACED.format(hole=hole_type.id),
-                barrier_holes=[user_errors.BarrierHole(
-                    pos=user_errors.to_threespace(origin + orient.up(64)),
-                    axis=orient.up().axis(),
-                    shape=hole_type.error_shape,
+                barrier_holes=[hole_type.error_info(
+                    origin=origin,
+                    orient=orient,
                     footprint=True,
-                )]
+                )],
             )
     # Place it, or error if there's already one here.
     try:
@@ -1065,21 +1077,18 @@ def res_barrier_hole(inst: Entity, res: Keyvalues) -> None:
     except KeyError:
         pass
     else:
-        pos = user_errors.to_threespace(origin)
         raise user_errors.UserError(
             user_errors.TOK_BARRIER_HOLE_FOOTPRINT,
             points=[origin],
             barrier_holes=[
-                user_errors.BarrierHole(
-                    pos=pos,
-                    axis=sel_plane.normal.axis(),
-                    shape=hole_type.error_shape,
-                    footprint=False,
+                hole_type.error_info(
+                    origin=origin,
+                    orient=sel_orient,
+                    footprint=True,
                 ),
-                user_errors.BarrierHole(
-                    pos=pos,
-                    axis=sel_plane.normal.axis(),
-                    shape=existing.type.error_shape,
+                existing.type.error_info(
+                    origin=origin,
+                    orient=existing.orient,
                     footprint=False,
                 ),
             ],
@@ -1254,10 +1263,8 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
             if not hole.inserted:
                 raise user_errors.UserError(
                     user_errors.TOK_BARRIER_HOLE_FOOTPRINT,
-                    barrier_holes=[user_errors.BarrierHole(
-                        pos=user_errors.to_threespace(hole.origin),
-                        axis=hole.plane.normal.axis(),
-                        shape=hole.type.error_shape,
+                    barrier_holes=[hole.type.error_info(
+                        hole.origin, hole.orient,
                         footprint=True,
                     )],
                 )

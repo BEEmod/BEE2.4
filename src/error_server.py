@@ -34,7 +34,7 @@ from user_errors import (
 import transtoken
 
 root_path = utils.bins_path('error_display').absolute()
-LOGGER.info('Root path: ', root_path)
+LOGGER.info('Root path: {!r}', root_path)
 
 app = QuartTrio(
     __name__,
@@ -81,7 +81,7 @@ async def route_render_data() -> Dict[str, Any]:
         'points': current_error.points,
         'leak': current_error.leakpoints,
         'lines': current_error.lines,
-        'barrier_hole': current_error.barrier_holes,
+        'barrier_holes': current_error.barrier_holes,
     }
 
 
@@ -148,6 +148,7 @@ class PackageLang(transtoken.GetText):
 
 async def load_info() -> None:
     """Load the error info from disk."""
+    LOGGER.info('Loading data: {}', DATA_LOC)
     global current_error
     try:
         data = pickle.loads(await trio.Path(DATA_LOC).read_bytes())
