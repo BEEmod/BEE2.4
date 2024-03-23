@@ -2,11 +2,11 @@
 
 This also handles Bomb-type Paint Droppers.
 """
-from typing import ClassVar, Dict, List, Optional, Tuple, Union
+from typing import ClassVar, Dict, Optional, Union
 import collections
 
 import attrs
-from srctools import Entity, Vec, VMF, Angle, logger
+from srctools import Entity, FrozenVec, Vec, VMF, Angle, logger
 
 from precomp import tiling, brushLoc, instanceLocs, template_brush, conditions
 
@@ -194,18 +194,18 @@ def associate_faith_plates(vmf: VMF) -> None:
 def gen_faithplates(vmf: VMF, has_superpos: bool) -> None:
     """Place the targets and catapults into the map."""
     # Target positions -> list of triggers wanting to aim there.
-    pos_to_trigs: Dict[
-        Union[Tuple[float, float, float], tiling.TileDef],
-        List[Entity]
+    pos_to_trigs: dict[
+        FrozenVec | tiling.TileDef,
+        list[Entity]
     ] = collections.defaultdict(list)
 
     for plate in PLATES.values():
         if isinstance(plate, (AngledPlate, PaintDropper)):
-            targ_pos: Union[Tuple[float, float, float], tiling.TileDef]
+            targ_pos: FrozenVec | tiling.TileDef
             if isinstance(plate.target, tiling.TileDef):
                 targ_pos = plate.target  # Use the ID directly.
             else:
-                targ_pos = plate.target.as_tuple()
+                targ_pos = plate.target.freeze()
             pos_to_trigs[targ_pos].append(plate.trig)
 
         if isinstance(plate, StraightPlate):
@@ -242,7 +242,7 @@ def gen_faithplates(vmf: VMF, has_superpos: bool) -> None:
             pos_or_tile.position_bullseye(target)
         else:
             # Static target.
-            target['origin'] = Vec(pos_or_tile)
+            target['origin'] = pos_or_tile
 
         target.make_unique('faith_target')
 

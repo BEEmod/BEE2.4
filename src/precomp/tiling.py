@@ -48,10 +48,7 @@ LOGGER = srctools.logger.get_logger(__name__)
 # thickness = 2,4,8
 # TILE_TEMP[tile_norm]['tile'] = front_face
 # TILE_TEMP[tile_norm]['back'] = back_face
-TILE_TEMP: dict[
-    tuple[float, float, float],
-    dict[str | tuple[int, int, int, bool], Side]
-] = {}
+TILE_TEMP: dict[FrozenVec, dict[str | tuple[int, int, int, bool], Side]] = {}
 
 NORMALS = [
     FrozenVec(x=+1),
@@ -1524,7 +1521,7 @@ def edit_quarter_tile(
 def make_tile(
     vmf: VMF,
     origin: Vec,
-    normal: Vec,
+    normal: FrozenVec | Vec,
     top_surf: str,
     back_surf: str=consts.Tools.NODRAW.value,
     *,
@@ -1562,7 +1559,7 @@ def make_tile(
         antigel: If the tile is known to be antigel.
     """
     assert TILE_TEMP, "make_tile called without data loaded!"
-    template = TILE_TEMP[normal.as_tuple()]
+    template = TILE_TEMP[FrozenVec(normal)]
 
     assert width >= 8 and height >= 8, f'Tile is too small! ({width}x{height})'
     assert thickness in (2, 4, 8), f'Bad thickness {thickness}'
@@ -1660,7 +1657,7 @@ def gen_tile_temp() -> None:
         axis_norm = norm.axis()
 
         temp_part: dict[str | tuple[int, int, int, bool], Side] = {}
-        TILE_TEMP[norm.as_tuple()] = temp_part
+        TILE_TEMP[norm] = temp_part
 
         for (thickness, bevel), temp in categories.items():
             brush = temp.copy()

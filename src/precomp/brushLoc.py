@@ -5,10 +5,10 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Iterator
 from collections import deque
-from typing import Union, Any, Tuple, ItemsView, MutableMapping
+from typing import TypeVar, Union, Any, Tuple, ItemsView, MutableMapping
 from enum import Enum
 
-from srctools import Vec, Matrix, VMF
+from srctools import FrozenVec, Vec, Matrix, VMF
 
 import srctools.logger
 from typing_extensions import Self
@@ -23,14 +23,15 @@ LOGGER = srctools.logger.get_logger(__name__)
 # The attribute to set if these are in the map.
 VOICE_ATTR_GOO = 'goo'
 VOICE_ATTR_PIT = 'bottomless_pit'
+VecT = TypeVar("VecT", Vec, FrozenVec)
 
 
-def world_to_grid(pos: Vec) -> Vec:
+def world_to_grid(pos: VecT) -> VecT:
     """Given real coordinates, find the grid position."""
     return pos // 128
 
 
-def grid_to_world(pos: Vec) -> Vec:
+def grid_to_world(pos: VecT) -> VecT:
     """Given a grid position, find the center of the real block."""
     return pos * 128 + (64, 64, 64)
 
@@ -128,10 +129,10 @@ BLOCK_LOOKUP['pit'] = {
 }
 
 
-_grid_keys = Union[Vec, Tuple[float, float, float], slice]
+_grid_keys = Union[Vec, FrozenVec, Tuple[float, float, float], slice]
 
 
-def _conv_key(pos: _grid_keys) -> tuple[float, float, float]:
+def _conv_key(pos: _grid_keys) -> FrozenVec:
     """Convert the key given in [] to a grid-position, as an x,y,z tuple."""
     # TODO: Slices are assumed to be int by typeshed.
     system: str
@@ -139,18 +140,17 @@ def _conv_key(pos: _grid_keys) -> tuple[float, float, float]:
     if isinstance(pos, slice):
         system, slice_pos = pos.start, pos.stop
         if system == 'world':
-            return world_to_grid(Vec(slice_pos)).as_tuple()
+            return world_to_grid(FrozenVec(slice_pos))
         else:
-            return Vec(slice_pos).as_tuple()
-    x, y, z = pos
-    return x, y, z
+            return FrozenVec(slice_pos)
+    return FrozenVec(pos)
 
 
 class _GridItemsView(ItemsView[Vec, Block]):
     """Implements the Grid.items() view, providing a view over the pos, block pairs."""
     # Initialised by superclass.
-    _mapping: dict[tuple[float, float, float], Block]
-    def __init__(self, grid: dict[tuple[float, float, float], Block]) -> None:
+    _mapping: dict[FrozenVec, Block]
+    def __init__(self, grid: dict[FrozenVec, Block]) -> None:
         # Superclass typehints as expecting Mapping[Vec, Block], but we override everything.
         super().__init__(grid)  # type: ignore
 
@@ -163,7 +163,7 @@ class _GridItemsView(ItemsView[Vec, Block]):
 
     def __iter__(self) -> Iterator[tuple[Vec, Block]]:
         for pos, block in self._mapping.items():
-            yield (Vec(pos), block)
+            yield (pos.thaw(), block)
 
 
 class Grid(MutableMapping[_grid_keys, Block]):
@@ -173,12 +173,12 @@ class Grid(MutableMapping[_grid_keys, Block]):
     as a world position.
     """
     def __init__(self) -> None:
-        self._grid: dict[tuple[float, float, float], Block] = {}
+        self._grid: dict[FrozenVec, Block] = {}
 
     def raycast(
         self,
         pos: _grid_keys,
-        direction: Vec | Tuple[int, int, int],
+        direction: Vec | FrozenVec | Tuple[int, int, int],
         collide: Iterable[Block]=frozenset({
             Block.SOLID, Block.EMBED,
             Block.PIT_BOTTOM, Block.PIT_SINGLE,
@@ -203,7 +203,7 @@ class Grid(MutableMapping[_grid_keys, Block]):
         # you could possibly move.
         for _ in range(90):
             next_pos = pos + direction_v
-            block = super().get(next_pos.as_tuple(), Block.VOID)
+            block = super().get(next_pos.freeze(), Block.VOID)
             if block is Block.VOID:
                 raise ValueError(
                     f'Reached VOID at ({next_pos}) when raycasting from {start_pos} with '
@@ -229,7 +229,7 @@ class Grid(MutableMapping[_grid_keys, Block]):
 
     def lookup_world(self, pos: Iterable[float]) -> Block:
         """Lookup a world position."""
-        return self._grid.get(world_to_grid(Vec(pos)).as_tuple(), Block.VOID)
+        return self._grid.get(world_to_grid(FrozenVec(pos)), Block.VOID)
 
     def __getitem__(self, pos: _grid_keys) -> Block:
         return self._grid.get(_conv_key(pos), Block.VOID)
@@ -245,7 +245,7 @@ class Grid(MutableMapping[_grid_keys, Block]):
         if type(value) is not Block:
             raise ValueError(f'Must be set to a Block item, not "{type(value).__name__}"!')
 
-        self._grid[world_to_grid(Vec(pos)).as_tuple()] = value
+        self._grid[world_to_grid(FrozenVec(pos))] = value
 
     def __delitem__(self, pos: _grid_keys) -> None:
         del self._grid[_conv_key(pos)]
@@ -370,7 +370,7 @@ class Grid(MutableMapping[_grid_keys, Block]):
             pos = world_to_grid(brush.get_origin(bbox_min, bbox_max))
 
             if bbox_max - bbox_min == (128, 128, 128):
-                # Full block..
+                # Full block...
                 self[pos] = Block.SOLID
             else:
                 # Must be an embbedvoxel block

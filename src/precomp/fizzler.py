@@ -9,7 +9,7 @@ import itertools
 import attrs
 import srctools.vmf
 from srctools.vmf import VMF, Solid, Entity, Side, Output
-from srctools import Keyvalues, NoKeyError, Vec, Matrix, Angle, logger
+from srctools import FrozenVec, Keyvalues, NoKeyError, Vec, Matrix, Angle, logger
 
 import utils
 from precomp import (
@@ -1056,9 +1056,9 @@ def parse_map(vmf: VMF, info: conditions.MapInfo) -> None:
     fizz_models: dict[str, list[Entity]] = defaultdict(list)
 
     # Position and normal -> name, for output relays.
-    fizz_pos: dict[tuple[tuple[float, float, float], tuple[float, float, float]], str] = {}
+    fizz_pos: dict[tuple[FrozenVec, FrozenVec], str] = {}
 
-    # First use traits to gather up all the instances.
+    # First use traits to gather all the instances.
     for inst in vmf.by_class['func_instance']:
         traits = instance_traits.get(inst)
         if 'fizzler' not in traits:
@@ -1076,9 +1076,9 @@ def parse_map(vmf: VMF, info: conditions.MapInfo) -> None:
             LOGGER.warning('Fizzler "{}" has non-base, non-model instance?', name)
             continue
 
-        origin = Vec.from_str(inst['origin'])
-        normal = Vec(z=1) @ Angle.from_str(inst['angles'])
-        fizz_pos[origin.as_tuple(), normal.as_tuple()] = name
+        origin = FrozenVec.from_str(inst['origin'])
+        normal = FrozenVec(z=1) @ Angle.from_str(inst['angles'])
+        fizz_pos[origin, normal] = name
 
     for name, base_inst in fizz_bases.items():
         models = fizz_models[name]
@@ -1170,8 +1170,8 @@ def parse_map(vmf: VMF, info: conditions.MapInfo) -> None:
 
         try:
             fizz_name = fizz_pos[
-                Vec.from_str(inst['origin']).as_tuple(),
-                (Vec(0, 0, 1) @ Angle.from_str(inst['angles'])).as_tuple()
+                FrozenVec.from_str(inst['origin']),
+                FrozenVec(0, 0, 1) @ Angle.from_str(inst['angles']),
             ]
             fizz_item = connections.ITEMS[fizz_name]
         except KeyError:
