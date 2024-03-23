@@ -224,7 +224,7 @@ def make_bottomless_pit(vmf: VMF, max_height: float) -> None:
             )
 
         wall_pos |= {
-            (pos + off).freeze()
+            (pos + off)
             for off in [
                 (0, -128, 0), (0, +128, 0),
                 (-128, 0, 0), (+128, 0, 0),
@@ -257,7 +257,7 @@ def make_bottomless_pit(vmf: VMF, max_height: float) -> None:
 
     LOGGER.info('Pit instances: {}', side_types)
 
-    for pos in map(FrozenVec.thaw, wall_pos):
+    for pos in wall_pos:
         if not brushLoc.POS.lookup_world(pos).is_solid:
             # Not actually a wall here!
             continue

@@ -5,7 +5,7 @@ from collections.abc import Iterator, Iterable
 from typing import Callable, Sequence
 
 import attrs
-from srctools import Angle, Vec, Keyvalues, Entity, VMF, Solid, Matrix
+from srctools import Angle, FrozenVec, Vec, Keyvalues, Entity, VMF, Solid, Matrix
 import srctools.logger
 
 from precomp import tiling, instanceLocs, conditions, connections, template_brush
@@ -20,7 +20,7 @@ PUSH_SPEED = 700  # The speed of the push triggers.
 UP_PUSH_SPEED = 900  # Make it slightly faster when up to counteract gravity
 DN_PUSH_SPEED = 400  # Slow down when going down since gravity also applies..
 
-PUSH_TRIGS: dict[tuple[float, float, float], Entity] = {}
+PUSH_TRIGS: dict[FrozenVec, Entity] = {}
 VAC_TRACKS: list[tuple[Marker, dict[str, Marker]]] = []  # Tuples of (start, group)
 
 
@@ -294,16 +294,16 @@ def vactube_gen(vmf: VMF) -> None:
             conditions.ALL_INST.add(end.conf.inst_exit.casefold())
 
 
-def push_trigger(vmf: VMF, loc: Vec, normal: Vec, solids: list[Solid]) -> None:
+def push_trigger(vmf: VMF, loc: Vec | FrozenVec, normal: FrozenVec, solids: list[Solid]) -> None:
     """Generate the push trigger for these solids."""
     # We only need one trigger per direction, for now.
     try:
-        ent = PUSH_TRIGS[normal.as_tuple()]
+        ent = PUSH_TRIGS[normal]
     except KeyError:
-        ent = PUSH_TRIGS[normal.as_tuple()] = vmf.create_ent(
+        ent = PUSH_TRIGS[normal] = vmf.create_ent(
             classname='trigger_push',
             origin=loc,
-            # The z-direction is reversed..
+            # The z-direction is reversed...
             pushdir=normal.to_angle(),
             speed=(
                 UP_PUSH_SPEED if normal.z > 1e-6 else
@@ -336,8 +336,8 @@ def motion_trigger(vmf: VMF, *solids: Solid) -> None:
 
 def make_straight(
     vmf: VMF,
-    origin: Vec,
-    normal: Vec,
+    origin: Vec | FrozenVec,
+    normal: Vec | FrozenVec,
     dist: int,
     config: Config,
     is_start: bool = False,
@@ -360,7 +360,7 @@ def make_straight(
 
         motion_trigger(vmf, solid.copy())
 
-        push_trigger(vmf, origin, normal, [solid])
+        push_trigger(vmf, origin, FrozenVec(normal), [solid])
 
     off = 0
     for seg_dist in config.inst_straight_fitter(dist):

@@ -1629,7 +1629,7 @@ def res_goo_debris(vmf: VMF, res: Keyvalues) -> object:
         file = file[:-4]
 
     goo_top_locs = {
-        pos.as_tuple()
+        pos
         for pos, block in
         brushLoc.POS.items()
         if block.is_goo and block.is_top
@@ -1637,7 +1637,7 @@ def res_goo_debris(vmf: VMF, res: Keyvalues) -> object:
 
     if space == 0:
         # No spacing needed, just copy
-        possible_locs = [Vec(loc) for loc in goo_top_locs]
+        possible_locs = [loc.thaw() for loc in goo_top_locs]
     else:
         possible_locs = []
         for x, y, z in goo_top_locs:
@@ -1652,7 +1652,7 @@ def res_goo_debris(vmf: VMF, res: Keyvalues) -> object:
             ):
                 if x_off == y_off == 0:
                     continue  # We already know this is a goo location
-                if (x + x_off, y + y_off, z) not in goo_top_locs:
+                if FrozenVec(x + x_off, y + y_off, z) not in goo_top_locs:
                     break  # This doesn't qualify
             else:
                 possible_locs.append(brushLoc.grid_to_world(Vec(x, y, z)))

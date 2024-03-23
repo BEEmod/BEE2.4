@@ -775,7 +775,7 @@ class Generator(abc.ABC):
         self.orient = orient
         self.portal = portal
 
-    def get(self, loc: Vec, tex_name: str, *, antigel: bool | None = None) -> str:
+    def get(self, loc: FrozenVec | Vec, tex_name: str, *, antigel: bool | None = None) -> str:
         """Get one texture for a position.
 
         If antigel is set, this is directly on a tile and so whether it's antigel
@@ -783,10 +783,10 @@ class Generator(abc.ABC):
         The location should be 1 unit back from the tile, so it'll be in the
         correct block.
         """
-        grid_loc = loc // 128
+        grid_loc = FrozenVec(loc // 128)
 
         if antigel is None:
-            antigel = grid_loc.freeze() in ANTIGEL_LOCS
+            antigel = grid_loc in ANTIGEL_LOCS
         if antigel and self.category is GenCat.BULLSEYE and not self.options['antigel_bullseye']:
             assert self.orient is not None and self.portal is not None
             # We can't use antigel on bullseye materials, so revert to normal
@@ -819,7 +819,7 @@ class Generator(abc.ABC):
         return ValueError(f'Bad texture name: {tex_name}\n Allowed: {list(self.textures.keys())!r}')
 
     @abc.abstractmethod
-    def _get(self, loc: Vec, tex_name: str) -> str:
+    def _get(self, loc: Vec | FrozenVec, tex_name: str) -> str:
         """Actually get a texture.
 
         If KeyError is raised, an appropriate exception is raised from that.
@@ -866,7 +866,7 @@ class GenRandom(Generator):
             if type(default) != str:
                 self.enum_data[id(default)] = key
 
-    def _get(self, loc: Vec, tex_name: str) -> str:
+    def _get(self, loc: Vec | FrozenVec, tex_name: str) -> str:
         if type(tex_name) != str:
             try:
                 tex_name = self.enum_data[id(tex_name)]
@@ -1001,7 +1001,7 @@ class GenClump(Generator):
             len(tiles),
         )
 
-    def _get(self, loc: Vec, tex_name: str) -> str:
+    def _get(self, loc: Vec | FrozenVec, tex_name: str) -> str:
         clump_seed = self._find_clump(loc)
 
         if clump_seed is None:
@@ -1021,7 +1021,7 @@ class GenClump(Generator):
         rng = rand.seed(b'tex_clump_side', self.gen_seed, tex_name, clump_seed)
         return rng.choice(self.textures[tex_name])
 
-    def _find_clump(self, loc: Vec) -> bytes | None:
+    def _find_clump(self, loc: Vec | FrozenVec) -> bytes | None:
         """Return the clump seed matching a location."""
         for clump in self._clump_locs:
             if (

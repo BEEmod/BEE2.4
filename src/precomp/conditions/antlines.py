@@ -6,7 +6,7 @@ import attrs
 
 from precomp import instanceLocs, connections, conditions, antlines
 import srctools.logger
-from srctools import VMF, Keyvalues, Output, Vec, Entity, Matrix
+from srctools import FrozenVec, VMF, Keyvalues, Output, Vec, Entity, Matrix
 
 
 COND_MOD_NAME: str | None = None
@@ -102,10 +102,7 @@ class Group:
         self.links: set[frozenset[Node]] = set()
 
         # For antline corners, each endpoint + normal -> the segment
-        self.ant_seg: dict[tuple[
-            tuple[float, float, float],
-            tuple[float, float, float],
-        ], antlines.Segment] = {}
+        self.ant_seg: dict[tuple[FrozenVec, FrozenVec], antlines.Segment] = {}
 
         # Create a comp_relay to attach I/O to.
         # The corners have an origin on the floor whereas lasers are normal.
@@ -144,9 +141,9 @@ class Group:
             round(normal, 3),
             pos1, pos2,
         )
-        norm_key = seg.normal.as_tuple()
-        k1 = pos1.as_tuple(), norm_key
-        k2 = pos2.as_tuple(), norm_key
+        norm_key = seg.normal.freeze()
+        k1 = pos1.freeze(), norm_key
+        k2 = pos2.freeze(), norm_key
         if k1 in self.ant_seg:
             LOGGER.warning('Antline segment overlap: {}', k1)
         if k2 in self.ant_seg:
@@ -154,17 +151,17 @@ class Group:
         self.ant_seg[k1] = seg
         self.ant_seg[k2] = seg
 
-    def rem_ant_straight(self, norm: tuple[float, float, float], endpoint: Vec) -> Vec:
+    def rem_ant_straight(self, norm: FrozenVec, endpoint: Vec) -> Vec:
         """Remove an antline segment with this enpoint, and return its other.
 
         This is used for merging corners. We already checked it's valid.
         """
-        seg = self.ant_seg.pop((endpoint.as_tuple(), norm))
+        seg = self.ant_seg.pop((endpoint.freeze(), norm))
         if seg.start == endpoint:
-            del self.ant_seg[seg.end.as_tuple(), norm]
+            del self.ant_seg[seg.end.freeze(), norm]
             return seg.end
         elif seg.end == endpoint:
-            del self.ant_seg[seg.start.as_tuple(), norm]
+            del self.ant_seg[seg.start.freeze(), norm]
             return seg.start
         else:
             raise ValueError(f'Antline {seg} has no endpoint {endpoint}!')
@@ -423,7 +420,7 @@ def res_antlaser(vmf: VMF, res: Keyvalues) -> object:
                 # always a corner. Otherwise, it's one if there's an L, T or X
                 # junction.
                 use_corner = True
-                norm = node.orient.up().as_tuple()
+                norm = node.orient.up().freeze()
                 if not node.had_input:
                     neighbors = [
                         mag * direction for direction in [

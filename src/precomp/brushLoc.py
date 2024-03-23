@@ -136,7 +136,7 @@ def _conv_key(pos: _grid_keys) -> FrozenVec:
     """Convert the key given in [] to a grid-position, as an x,y,z tuple."""
     # TODO: Slices are assumed to be int by typeshed.
     system: str
-    slice_pos: Vec
+    slice_pos: Vec | FrozenVec
     if isinstance(pos, slice):
         system, slice_pos = pos.start, pos.stop
         if system == 'world':
@@ -146,13 +146,12 @@ def _conv_key(pos: _grid_keys) -> FrozenVec:
     return FrozenVec(pos)
 
 
-class _GridItemsView(ItemsView[Vec, Block]):
+class _GridItemsView(ItemsView[FrozenVec, Block]):
     """Implements the Grid.items() view, providing a view over the pos, block pairs."""
     # Initialised by superclass.
     _mapping: dict[FrozenVec, Block]
     def __init__(self, grid: dict[FrozenVec, Block]) -> None:
-        # Superclass typehints as expecting Mapping[Vec, Block], but we override everything.
-        super().__init__(grid)  # type: ignore
+        super().__init__(grid)
 
     def __contains__(self, item: Any) -> bool:
         pos, block = item
@@ -161,9 +160,9 @@ class _GridItemsView(ItemsView[Vec, Block]):
         except KeyError:
             return False
 
-    def __iter__(self) -> Iterator[tuple[Vec, Block]]:
+    def __iter__(self) -> Iterator[tuple[FrozenVec, Block]]:
         for pos, block in self._mapping.items():
-            yield (pos.thaw(), block)
+            yield (pos, block)
 
 
 class Grid(MutableMapping[_grid_keys, Block]):
@@ -257,8 +256,8 @@ class Grid(MutableMapping[_grid_keys, Block]):
             return False
         return coords in self._grid
 
-    def __iter__(self) -> Iterator[Vec]:
-        yield from map(Vec, self._grid)
+    def __iter__(self) -> Iterator[FrozenVec]:
+        yield from self._grid
 
     def __len__(self) -> int:
         return len(self._grid)

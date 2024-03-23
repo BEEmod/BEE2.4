@@ -1820,10 +1820,10 @@ def analyse_map(vmf_file: VMF, side_to_ant_seg: dict[int, list[antlines.Segment]
     # Now look at all the blocklocs in the map, applying goo sides.
     # Don't override white surfaces, they can only appear on panels.
     goo_replaceable = [TileType.BLACK, TileType.BLACK_4x4]
-    for pos, block in BLOCK_POS.items():
+    for fpos, block in BLOCK_POS.items():
         if block.is_goo:
             for fnorm in NORMALS:
-                grid_pos = grid_to_world(pos) - 128 * fnorm
+                grid_pos = grid_to_world(fpos).thaw() - 128 * fnorm
                 try:
                     tile = TILES[grid_pos.as_tuple(), fnorm.as_tuple()]
                 except KeyError:
@@ -2234,7 +2234,7 @@ def generate_goo(vmf: VMF) -> None:
     # Z, x-cell, y-cell, x-norm, y-norm = overlay ent.
     tideline_over: dict[tuple[float, float, float, int, int], Tideline] = {}
 
-    pos: Vec | None = None
+    pos: FrozenVec | None = None
     for pos, block_type in BLOCK_POS.items():
         if block_type is Block.GOO_SINGLE:
             goo_pos[pos.z, pos.z][round(pos.x), round(pos.y)] = True

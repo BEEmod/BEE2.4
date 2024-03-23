@@ -738,7 +738,7 @@ def res_antigel(vmf: VMF, inst: Entity) -> None:
 
 # Position -> entity
 # We merge ones within 3 blocks of our item.
-CHECKPOINT_TRIG: dict[tuple[float, float, float], Entity] = {}
+CHECKPOINT_TRIG: dict[FrozenVec, Entity] = {}
 
 # Approximately a 3-distance from
 # the center.
@@ -786,7 +786,7 @@ def res_checkpoint_trigger(info: conditions.MapInfo, inst: Entity, res: Keyvalue
     for offset in CHECKPOINT_NEIGHBOURS:
         near_pos = pos + offset
         try:
-            trig = CHECKPOINT_TRIG[near_pos.as_tuple()]
+            trig = CHECKPOINT_TRIG[near_pos.freeze()]
             break
         except KeyError:
             pass
@@ -797,7 +797,7 @@ def res_checkpoint_trigger(info: conditions.MapInfo, inst: Entity, res: Keyvalue
             origin=pos,
         )
         trig.solids = []
-        CHECKPOINT_TRIG[pos.as_tuple()] = trig
+        CHECKPOINT_TRIG[pos.freeze()] = trig
 
     trig.solids.append(inst.map.make_prism(
         bbox_min,
