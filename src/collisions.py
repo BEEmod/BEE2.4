@@ -521,13 +521,13 @@ class BBox:
                 if time > delta[axis]:
                     raise ValueError('No hit!')
                 time /= delta[axis]
-                return time, -1.0
+                return time, 1.0
             elif start[axis] > maxes[axis]:
                 time = maxes[axis] - start[axis]
                 if time < delta[axis]:
                     raise ValueError('No hit!')
                 time /= delta[axis]
-                return time, 1.0
+                return time, -1.0
             else:
                 return -1.0, 0.0
 
