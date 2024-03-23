@@ -40,8 +40,7 @@ class BarrierHole(TypedDict):
     """Information for improperly placed glass/grating hole items."""
     pos: TuplePos
     axis: Literal["x", "y", "z"]
-    large: bool
-    small: bool
+    shape: str
     footprint: bool
 
 
@@ -62,7 +61,7 @@ class ErrorInfo:
     # A list of point pairs which get lines drawn.
     lines: List[Tuple[TuplePos, TuplePos]] = attrs.Factory(list)
     # If a glass/grating hole is misplaced, show its location.
-    barrier_hole: Optional[BarrierHole] = None
+    barrier_holes: List[BarrierHole] = attrs.Factory(list)
 
 
 class ServerInfo(TypedDict):
@@ -103,7 +102,7 @@ class UserError(BaseException):
         textlist: Collection[str]=(),
         leakpoints: Collection[Union[Vec, FrozenVec]]=(),
         lines: Iterable[Tuple[Union[Vec, FrozenVec], Union[Vec, FrozenVec]]]=(),
-        barrier_hole: Optional[BarrierHole]=None,
+        barrier_holes: Collection[BarrierHole]=(),
     ) -> None:
         """Specify the info to show to the user.
 
@@ -116,7 +115,7 @@ class UserError(BaseException):
         :param textlist: If specified, adds the specified strings as a bulleted list.
         :param leakpoints: Specifies pointfile locations to display a leak.
         :param lines: A list of point pairs which get lines drawn.
-        :param barrier_hole: If set, an errored glass/grating hole to place.
+        :param barrier_holes: Errored glass/grating holes to show.
         """
         if utils.DEV_MODE:
             try:
@@ -155,7 +154,7 @@ class UserError(BaseException):
             points=list(map(to_threespace, points)),
             leakpoints=list(map(to_threespace, leakpoints)),
             lines=[(to_threespace(a), to_threespace(b)) for a, b in lines],
-            barrier_hole=barrier_hole,
+            barrier_holes=list(barrier_holes),
         )
 
     def __str__(self) -> str:

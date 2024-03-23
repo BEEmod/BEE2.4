@@ -141,12 +141,13 @@ class LargeHoleConfig(HoleConfig):
     template_square: HoleTemplate
 
 
-@attrs.frozen(eq=False, repr=False)
+@attrs.frozen(eq=False, repr=False, kw_only=True)
 class HoleType:
     """A type of hole."""
     id: utils.ObjectID
     footprint: Sequence[FrozenVec]  # Offsets occupied by the hole.
     variants: Mapping[utils.ObjectID, HoleConfig]
+    error_shape: str  # Variant to use in the error server.
     is_large: bool
 
     @classmethod
@@ -177,7 +178,13 @@ class HoleType:
                 f'Hole "{hole_id}" has both small and large variants, this must be consistent!'
             )
 
-        return cls(hole_id, footprint, variants, LargeHoleConfig in variant_types)
+        return cls(
+            id=hole_id,
+            footprint=footprint,
+            variants=variants,
+            error_shape=kv['error_shape', 'small'],
+            is_large=LargeHoleConfig in variant_types,
+        )
 
     def __repr__(self) -> str:
         return f'<{type(self).__name__} {self.id!r}, variants={sorted(self.variants)}>'
@@ -940,9 +947,7 @@ def test_hole_spot(
     error_hole = user_errors.BarrierHole(
         pos=user_errors.to_threespace(origin + orient.up(64)),
         axis=orient.up().axis(),
-        # TODO: Handle hole rendering better, user-specifiable?
-        large=hole_type.is_large,
-        small=not hole_type.is_large,
+        shape=hole_type.error_shape,
         footprint=True,
     )
 
@@ -972,12 +977,16 @@ def test_hole_spot(
                     for variant in hole_type.variants.keys()
                 ], sort=True),
             )
-        raise user_errors.UserError(message, barrier_hole=error_hole)
+        raise user_errors.UserError(message, barrier_holes=[error_hole])
+
+    world_points: set[tuple[int, int]] = set()
 
     for offset in hole_type.footprint:
         pos = offset @ orient + origin
         local = plane.world_to_plane(pos)
-        off_type = barrier_plane[local.x // 32, local.y // 32]
+        key = round(local.x // 32), round(local.y // 32)
+        off_type = barrier_plane[key]
+        world_points.add(key)
         if off_type != barrier:
             # Different type.
             LOGGER.warning(
@@ -986,7 +995,7 @@ def test_hole_spot(
             )
             raise user_errors.UserError(
                 user_errors.TOK_BARRIER_HOLE_FOOTPRINT.format(hole=hole_type.id),
-                barrier_hole=error_hole,
+                barrier_holes=[error_hole],
             )
 
     # In each direction, make sure a large hole isn't present.
@@ -999,10 +1008,17 @@ def test_hole_spot(
                 pass
             else:
                 if isinstance(other_hole.variant, LargeHoleConfig):
-                    # TODO: Draw the other hole as well?
                     raise user_errors.UserError(
                         user_errors.TOK_BARRIER_HOLE_FOOTPRINT.format(hole=hole_type.id),
-                        barrier_hole=error_hole,
+                        barrier_holes=[
+                            error_hole,
+                            user_errors.BarrierHole(
+                                pos=user_errors.to_threespace(other_hole.origin + other_hole.orient.up(64)),
+                                axis=other_hole.orient.up().axis(),
+                                shape=other_hole.type.error_shape,
+                                footprint=True,
+                            ),
+                        ],
                     )
     return variant
 
@@ -1036,14 +1052,12 @@ def res_barrier_hole(inst: Entity, res: Keyvalues) -> None:
         else:
             raise user_errors.UserError(
                 user_errors.TOK_BARRIER_HOLE_MISPLACED.format(hole=hole_type.id),
-                barrier_hole=user_errors.BarrierHole(
+                barrier_holes=[user_errors.BarrierHole(
                     pos=user_errors.to_threespace(origin + orient.up(64)),
                     axis=orient.up().axis(),
-                    # TODO: Handle hole rendering better, user-specifiable?
-                    large=hole_type.is_large,
-                    small=not hole_type.is_large,
+                    shape=hole_type.error_shape,
                     footprint=True,
-                )
+                )]
             )
     # Place it, or error if there's already one here.
     try:
@@ -1051,16 +1065,24 @@ def res_barrier_hole(inst: Entity, res: Keyvalues) -> None:
     except KeyError:
         pass
     else:
+        pos = user_errors.to_threespace(origin)
         raise user_errors.UserError(
             user_errors.TOK_BARRIER_HOLE_FOOTPRINT,
             points=[origin],
-            barrier_hole=user_errors.BarrierHole(
-                pos=user_errors.to_threespace(origin),
-                axis=sel_plane.normal.axis(),
-                large=isinstance(sel_variant, LargeHoleConfig) or isinstance(existing.variant, LargeHoleConfig),
-                small=not isinstance(hole_type, LargeHoleConfig) or not isinstance(existing.variant, LargeHoleConfig),
-                footprint=False,
-            ),
+            barrier_holes=[
+                user_errors.BarrierHole(
+                    pos=pos,
+                    axis=sel_plane.normal.axis(),
+                    shape=hole_type.error_shape,
+                    footprint=False,
+                ),
+                user_errors.BarrierHole(
+                    pos=pos,
+                    axis=sel_plane.normal.axis(),
+                    shape=existing.type.error_shape,
+                    footprint=False,
+                ),
+            ],
         )
     HOLES[sel_plane][origin] = Hole(
         inst=inst,
@@ -1142,8 +1164,10 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
 
             # Place brushes that should not be carved by holes.
             for min_u, min_v, max_u, max_v, sub_barrier in grid_optimise(group_plane):
-                place_planar_surfaces(vmf, coll, barrier, plane_slice, False, min_u, min_v, max_u,
-                                      max_v)
+                place_planar_surfaces(
+                    vmf, coll, barrier, plane_slice,
+                    False, min_u, min_v, max_u, max_v,
+                )
 
             add_glass_floorbeams(vmf, barrier, plane_slice, group_plane)
 
@@ -1220,21 +1244,22 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
             for min_u, min_v, max_u, max_v, sub_barrier in grid_optimise(group_plane):
                 if sub_barrier is BARRIER_EMPTY:
                     continue
-                place_planar_surfaces(vmf, coll, barrier, plane_slice, True, min_u, min_v, max_u,
-                                      max_v)
+                place_planar_surfaces(
+                    vmf, coll, barrier, plane_slice,
+                    True, min_u, min_v, max_u, max_v,
+                )
 
     for hole_plane in HOLES.values():
         for hole in hole_plane.values():
             if not hole.inserted:
                 raise user_errors.UserError(
                     user_errors.TOK_BARRIER_HOLE_FOOTPRINT,
-                    barrier_hole={
-                        'pos': user_errors.to_threespace(hole.origin),
-                        'axis': hole.plane.normal.axis(),
-                        'large': hole.type.is_large,
-                        'small': not hole.type.is_large,
-                        'footprint': True,
-                    }
+                    barrier_holes=[user_errors.BarrierHole(
+                        pos=user_errors.to_threespace(hole.origin),
+                        axis=hole.plane.normal.axis(),
+                        shape=hole.type.error_shape,
+                        footprint=True,
+                    )],
                 )
 
 

@@ -208,28 +208,24 @@ window.addEventListener("load", () => {
 			scene.add(new THREE.LineSegments(geo, lines_mat));
 		}
 
-		if (data.barrier_hole) {
+		if (data.barrier_holes.length > 0) {
 			await loader_obj.loadAsync('static/barrier_hole.obj').then((hole_geo) => {
 				console.log("Hole: ", hole_geo);
 				const hole_mats = new Map();
 				hole_mats.set("selection", select_mat);
 				hole_mats.set("framing", new THREE.MeshToonMaterial({color: 0xCCCCCC}));
-				for (const child of hole_geo.children) {
-					// name = small/large, kind = frame/footprint
-					// Data has large, small, footprint booleans.
-					const [name, kind] = child.name.split("_");
-					if (
-						!data.barrier_hole[name]  ||
-						(kind === "footprint" && !data.barrier_hole.footprint)
-					) { continue }
-					const mdl = new THREE.Mesh(child.geometry, hole_mats.get(child.material.name));
-					mdl.position.set(
-						data.barrier_hole.pos[0],
-						data.barrier_hole.pos[1],
-						data.barrier_hole.pos[2],
-					);
-					mdl.setRotationFromQuaternion(axes.get(data.barrier_hole.axis));
-					scene.add(mdl);
+				for (const hole of data.barrier_holes) {
+					for (const child of hole_geo.children) {
+						// shape = small/medium/large etc, kind = frame/footprint
+						// Data is {footprint: bool, shape: str}.
+						const [shape, kind] = child.name.split("_");
+						if (hole.shape === shape && (kind === "frame" || hole.footprint)) {
+							const mdl = new THREE.Mesh(child.geometry, hole_mats.get(child.material.name));
+							mdl.position.set(hole.pos[0], hole.pos[1], hole.pos[2]);
+							mdl.setRotationFromQuaternion(axes.get(hole.axis));
+							scene.add(mdl);
+						}
+					}
 				}
 			});
 		}

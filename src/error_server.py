@@ -67,7 +67,7 @@ async def route_display_errors() -> str:
             current_error.points
             or current_error.leakpoints
             or current_error.lines
-            or current_error.barrier_hole
+            or current_error.barrier_holes
         ),
     )
 
@@ -81,7 +81,7 @@ async def route_render_data() -> Dict[str, Any]:
         'points': current_error.points,
         'leak': current_error.leakpoints,
         'lines': current_error.lines,
-        'barrier_hole': current_error.barrier_hole,
+        'barrier_hole': current_error.barrier_holes,
     }
 
 
