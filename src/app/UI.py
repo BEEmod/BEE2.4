@@ -1689,7 +1689,7 @@ async def init_windows(tk_img: TKImages) -> None:
         # Disable this if the style doesn't have elevators
         elev_win.readonly = not style_obj.has_video
 
-        signage_ui.style_changed(style_obj)
+        signage_ui.style_changed(utils.obj_id(style_obj.id))
         item_search.rebuild_database()
 
         for sugg_cls, win in suggest_windows.items():

@@ -6,7 +6,7 @@ from typing_extensions import Self
 import attrs
 import srctools.logger
 
-from packages import PakObject, ParseData
+from packages import PakObject, PakRef, ParseData, Style
 from app.img import Handle as ImgHandle
 import utils
 
@@ -32,7 +32,7 @@ class SignageLegend(PakObject):
     It is useful to provide a backing, or to fill in unset signages.
     If provided, the blank image is inserted instead of unset signage.
 
-    Finally the overlay is composited on top, to allow setting the unwrapped
+    Finally, the overlay is composited on top, to allow setting the unwrapped
     model parts.
     """
     def __init__(
@@ -71,7 +71,7 @@ class Signage(PakObject, allow_mult=True, needs_foreground=True):
     def __init__(
         self,
         sign_id: str,
-        styles: dict[str, SignStyle],
+        styles: dict[PakRef[Style], SignStyle],
         disp_name: str,
         primary_id: str | None = None,
         secondary_id: str | None = None,
@@ -90,9 +90,9 @@ class Signage(PakObject, allow_mult=True, needs_foreground=True):
 
     @classmethod
     async def parse(cls, data: ParseData) -> Signage:
-        styles: dict[str, SignStyle] = {}
+        styles: dict[utils.ObjectID, SignStyle] = {}
         for prop in data.info.find_children('styles'):
-            sty_id = prop.name.upper()
+            sty_id = PakRef.parse(Style, prop.real_name)
 
             if not prop.has_children():
                 # Style lookup.

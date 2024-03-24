@@ -1,9 +1,10 @@
 """Configures which signs are defined for the Signage item."""
-from typing import Optional, Sequence, Tuple, List, Dict
-import tkinter as tk
+from __future__ import annotations
+from collections.abc import Sequence
 from datetime import timedelta
 
 from tkinter import ttk
+import tkinter as tk
 
 import trio
 import srctools.logger
@@ -24,17 +25,18 @@ LOGGER = srctools.logger.get_logger(__name__)
 
 window = tk.Toplevel(TK_ROOT, name='signageChooser')
 window.withdraw()
-SLOTS_SELECTED: Dict[int, dragdrop.Slot[Signage]] = {}
+SLOTS_SELECTED: dict[int, dragdrop.Slot[PakRef[Signage]]] = {}
 # The valid timer indexes for signs.
 SIGN_IND: Sequence[int] = range(3, 31)
 IMG_ERROR = img.Handle.error(64, 64)
 IMG_BLANK = img.Handle.background(64, 64)
 
 TRANS_SIGN_NAME = TransToken.ui('Signage: {name}')
-_cur_style: Optional[Style] = None
+TRANS_UNKNOWN_SIGN = TransToken.ui('Unknown Signage: {id}')
+_cur_style_id: PakRef[Style] = PakRef(Style, packages.CLEAN_STYLE)
 
 
-def export_data() -> List[Tuple[str, utils.ObjectID]]:
+def export_data() -> list[tuple[str, utils.ObjectID]]:
     """Returns selected items, for Signage.export() to use."""
     conf: Layout = config.APP.get_cur_conf(Layout, default=Layout())
     return [
@@ -44,35 +46,43 @@ def export_data() -> List[Tuple[str, utils.ObjectID]]:
     ]
 
 
-def get_drag_info(sign: Signage) -> DragInfo:
+def get_icon(sign: Signage, style: Style) -> img.Handle:
+    """Get the icon currently in use for a sign."""
+    for potential_style in style.bases:
+        try:
+            return sign.styles[potential_style.reference()].icon
+        except KeyError:
+            pass
+    LOGGER.warning(
+        'No valid <{}> style for "{}" signage!',
+        style.id,
+        sign.id,
+    )
+    try:
+        return sign.styles[PakRef(Style, packages.CLEAN_STYLE)].icon
+    except KeyError:
+        return IMG_ERROR
+
+
+def get_drag_info(ref: PakRef[Signage]) -> DragInfo:
     """Get the icon for displaying this sign."""
-    style = _cur_style
+    packset = packages.get_loaded_packages()
+    style = _cur_style_id.resolve(packset)
     if style is None:
         return DragInfo(IMG_ERROR)
 
-    for potential_style in style.bases:
-        try:
-            return DragInfo(sign.styles[potential_style.id.upper()].icon)
-        except KeyError:
-            pass
-    else:
-        LOGGER.warning(
-            'No valid <{}> style for "{}" signage!',
-            style.id,
-            sign.id,
-        )
-        try:
-            return DragInfo(sign.styles[packages.CLEAN_PACKAGE].icon)
-        except KeyError:
-            return DragInfo(IMG_ERROR)
+    sign = ref.resolve(packages.get_loaded_packages())
+    if sign is None:
+        LOGGER.warning('No signage with id "{}"!', ref.id)
+        return DragInfo(IMG_ERROR)
+    return DragInfo(get_icon(sign, style))
 
 
-drag_man: DragDrop[Signage] = DragDrop(window, info_cb=get_drag_info)
+drag_man: DragDrop[PakRef[Signage]] = DragDrop(window, info_cb=get_drag_info)
 
 
 async def apply_config(data: Layout) -> None:
     """Apply saved signage info to the UI."""
-    packset = packages.get_loaded_packages()
     for timer in SIGN_IND:
         try:
             slot = SLOTS_SELECTED[timer]
@@ -82,18 +92,15 @@ async def apply_config(data: Layout) -> None:
 
         value = data.signs.get(timer, '')
         if value:
-            try:
-                slot.contents = packset.obj_by_id(Signage, value)
-            except KeyError:
-                LOGGER.warning('No signage with id "{}"!', value)
+            slot.contents = PakRef(Signage, value)
         else:
             slot.contents = None
 
 
-def style_changed(new_style: Style) -> None:
+def style_changed(new_style_id: utils.ObjectID) -> None:
     """Update the icons for the selected signage."""
-    global _cur_style
-    _cur_style = new_style
+    global _cur_style_id
+    _cur_style_id = PakRef(Style, new_style_id)
     if window.winfo_ismapped():
         drag_man.load_icons()
 
@@ -138,45 +145,64 @@ async def init_widgets(master: tk.Widget, tk_img: TKImages) -> tk.Widget:
     hover_scope = trio.CancelScope()
 
     @drag_man.on_hover_enter.register
-    async def on_hover(hovered: dragdrop.Slot[Signage]) -> None:
+    async def on_hover(hovered: dragdrop.Slot[PakRef[Signage]]) -> None:
         """Show the signage when hovered, then toggle."""
         nonlocal hover_scope
-        hover_sign = hovered.contents
-        if hover_sign is None:
+        hover_sign_ref = hovered.contents
+        if hover_sign_ref is None:
             await on_leave(hovered)
             return
         hover_scope.cancel()
+        packset = packages.get_loaded_packages()
+
+        hover_sign = hover_sign_ref.resolve(packset)
+        if hover_sign is None:
+            set_text(name_label, TRANS_UNKNOWN_SIGN.format(id=hover_sign_ref.id))
+            tk_img.apply(preview_left, IMG_ERROR)
+            tk_img.apply(preview_right, IMG_ERROR)
+            return
 
         set_text(name_label, TRANS_SIGN_NAME.format(name=hover_sign.name))
 
-        packset = packages.get_loaded_packages()
+        style = _cur_style_id.resolve(packset)
+        if style is None:
+            LOGGER.warning('No such style: {}', _cur_style_id)
+            await on_leave(hovered)
+            return
 
-        sng_left = get_drag_info(hover_sign).icon
+        single_left = get_icon(hover_sign, style)
         try:
-            sng_right = get_drag_info(packset.obj_by_id(Signage, 'SIGN_ARROW')).icon
+            single_right = get_icon(packset.obj_by_id(Signage, 'SIGN_ARROW'), style)
         except KeyError:
             LOGGER.warning('No arrow signage defined!')
-            sng_right = IMG_BLANK
-        try:
-            dbl_left = get_drag_info(packset.obj_by_id(Signage, hover_sign.prim_id or '')).icon
-        except KeyError:
-            dbl_left = sng_left
-        try:
-            dbl_right = get_drag_info(packset.obj_by_id(Signage, hover_sign.sec_id or '')).icon
-        except KeyError:
-            dbl_right = IMG_BLANK
+            single_right = IMG_BLANK
+
+        double_left: img.Handle = single_left
+        double_right: img.Handle = IMG_BLANK
+
+        if hover_sign.prim_id:
+            try:
+                double_left = get_icon(packset.obj_by_id(Signage, hover_sign.prim_id), style)
+            except KeyError:
+                pass
+
+        if hover_sign.sec_id:
+            try:
+                double_right = get_icon(packset.obj_by_id(Signage, hover_sign.sec_id), style)
+            except KeyError:
+                pass
 
         with trio.CancelScope() as hover_scope:
             while True:
-                tk_img.apply(preview_left, sng_left)
-                tk_img.apply(preview_right, sng_right)
+                tk_img.apply(preview_left, single_left)
+                tk_img.apply(preview_right, single_right)
                 await trio.sleep(1.0)
-                tk_img.apply(preview_left, dbl_left)
-                tk_img.apply(preview_right, dbl_right)
+                tk_img.apply(preview_left, double_left)
+                tk_img.apply(preview_right, double_right)
                 await trio.sleep(1.0)
 
     @drag_man.on_hover_exit.register
-    async def on_leave(hovered: dragdrop.Slot[Signage]) -> None:
+    async def on_leave(hovered: dragdrop.Slot[PakRef[Signage]]) -> None:
         """Reset the visible sign when left."""
         nonlocal hover_scope
         name_label['text'] = ''
@@ -194,17 +220,14 @@ async def init_widgets(master: tk.Widget, tk_img: TKImages) -> tk.Widget:
         drag_man.slot_grid(slot, row=row, column=col, padx=1, pady=1)
 
         prev_id = DEFAULT_IDS.get(i, '')
-        if prev_id:
-            try:
-                slot.contents = load_packset.obj_by_id(Signage, prev_id)
-            except KeyError:
-                LOGGER.warning('Missing sign id: {}', prev_id)
+        if prev_id != "":
+            slot.contents = PakRef(Signage, prev_id)
 
     # TODO: Dynamically refresh this.
     for sign in sorted(load_packset.all_obj(Signage), key=lambda s: s.name):
         if not sign.hidden:
             slot = drag_man.slot_source(canv_all)
-            slot.contents = sign
+            slot.contents = PakRef(Signage, utils.obj_id(sign.id))
 
     drag_man.flow_slots(canv_all, drag_man.sources())
     canv_all.bind('<Configure>', lambda e: drag_man.flow_slots(canv_all, drag_man.sources()))
