@@ -1,12 +1,13 @@
 """Allows enabling and disabling specific voicelines."""
+from __future__ import annotations
 import functools
 from decimal import Decimal
 from enum import Enum
-from typing import Iterable, List, Tuple, TypedDict, Dict, Optional
+from typing import Iterable, TypedDict
 from configparser import SectionProxy
 
-from tkinter import *
-from tkinter import font
+import tkinter as tk
+from tkinter.font import nametofont as tk_nametofont
 from tkinter import ttk
 
 from srctools import Keyvalues
@@ -26,26 +27,26 @@ from ui_tk.wid_transtoken import set_text, set_win_title
 
 LOGGER = srctools.logger.get_logger(__name__)
 
-voice_item: Optional[QuotePack] = None
+voice_item: QuotePack | None = None
 
 
 class _WidgetsDict(TypedDict, total=False):
     """TODO Remove."""
-    pane: PanedWindow
     tabs: ttk.Notebook
-    trans: Text
-    trans_scroll: tk_tools.HidingScroll
+    trans: tk.Text
 
 UI: _WidgetsDict = {}
-TABS: List['Tab'] = []
+TABS: list[Tab] = []
 
-QUOTE_FONT = font.nametofont('TkHeadingFont').copy()
+QUOTE_FONT = tk_nametofont('TkHeadingFont').copy()
 QUOTE_FONT['weight'] = 'bold'
+ACTOR_FONT = tk_nametofont('TkDefaultFont').copy()
+ACTOR_FONT['weight'] = 'bold'
 
 IMG_MID = img.Handle.builtin('icons/mid_quote', 32, 16)
 IMG_RESP = img.Handle.builtin('icons/resp_quote', 16, 16)
 
-IMG: Dict[LineCriteria, img.Handle] = {
+IMG: dict[LineCriteria, img.Handle] = {
     criteria: img.Handle.builtin('icons/quote_' + criteria.name.lower())
     for criteria in LineCriteria
 }
@@ -60,13 +61,12 @@ TRANS_RESPONSE_DESC = TransToken.ui(
 )
 TRANS_MIDCHAMBER_TITLE = TransToken.ui('Mid - Chamber')
 TRANS_MIDCHAMBER_DESC = TransToken.ui(
-    'Lines played during the actual chamber, '
-    'after specific events have occurred.'
+    'Lines played during the actual chamber, after specific events have occurred.'
 )
 
-config: Optional[ConfigFile] = None
-config_mid: Optional[ConfigFile] = None
-config_resp: Optional[ConfigFile] = None
+config: ConfigFile | None = None
+config_mid: ConfigFile | None = None
+config_resp: ConfigFile | None = None
 
 
 class TabTypes(Enum):
@@ -83,7 +83,7 @@ class Tab:
     frame: ttk.Frame
     title: TransToken
 
-win = Toplevel(TK_ROOT, name='voiceEditor')
+win = tk.Toplevel(TK_ROOT, name='voiceEditor')
 win.withdraw()
 
 
@@ -103,14 +103,13 @@ def init_widgets() -> None:
     win.protocol("WM_DELETE_WINDOW", close)
     win.bind("<Escape>", close)
 
-    pane = PanedWindow(
+    pane = tk.PanedWindow(
         win,
-        orient=VERTICAL,
+        orient='vertical',
         sashpad=2,  # Padding above/below panes
         sashwidth=3,  # Width of border
-        sashrelief=RAISED,  # Raise the border between panes
+        sashrelief='raised',  # Raise the border between panes
         )
-    UI['pane'] = pane
     pane.grid(row=1, column=0, sticky='NSEW')
     win.rowconfigure(1, weight=1)
 
@@ -123,17 +122,16 @@ def init_widgets() -> None:
     trans_frame.rowconfigure(1, weight=1)
     trans_frame.columnconfigure(0, weight=1)
 
-    set_text(ttk.Label(trans_frame), TransToken.ui('Transcript:')).grid(row=0, column=0, sticky=W)
+    set_text(
+        ttk.Label(trans_frame), TransToken.ui('Transcript:'),
+    ).grid(row=0, column=0, sticky='W')
 
     trans_inner_frame = ttk.Frame(trans_frame, borderwidth=2, relief='sunken')
     trans_inner_frame.grid(row=1, column=0, sticky='NSEW')
     trans_inner_frame.rowconfigure(0, weight=1)
     trans_inner_frame.columnconfigure(0, weight=1)
 
-    default_bold_font = font.nametofont('TkDefaultFont').copy()
-    default_bold_font['weight'] = 'bold'
-
-    UI['trans'] = Text(
+    UI['trans'] = transcript = tk.Text(
         trans_inner_frame,
         width=10,
         height=4,
@@ -142,18 +140,15 @@ def init_widgets() -> None:
         state='disabled',
         font='TkDefaultFont',
         )
-    UI['trans_scroll'] = tk_tools.HidingScroll(
+    trans_scroll = tk_tools.HidingScroll(
         trans_inner_frame,
-        orient=VERTICAL,
-        command=UI['trans'].yview,
+        orient='vertical',
+        command=transcript.yview,
         )
-    UI['trans'].tag_config(
-        'bold',
-        font=default_bold_font,
-    )
-    UI['trans']['yscrollcommand'] = UI['trans_scroll'].set
-    UI['trans_scroll'].grid(row=0, column=1, sticky='NS')
-    UI['trans'].grid(row=0, column=0, sticky='NSEW')
+    transcript.tag_config('actor', font=ACTOR_FONT)
+    transcript['yscrollcommand'] = trans_scroll.set
+    trans_scroll.grid(row=0, column=1, sticky='NS')
+    transcript.grid(row=0, column=0, sticky='NSEW')
 
     set_text(ttk.Button(win, command=save), TransToken.ui('Save')).grid(row=2, column=0)
 
@@ -172,27 +167,26 @@ def quote_sort_func(quote: Keyvalues) -> Decimal:
         return Decimal('0')
 
 
-def show_trans(transcript: List[Tuple[str, TransToken]], e: Event) -> None:
+def show_trans(transcript: list[tuple[str, TransToken]], e: tk.Event) -> None:
     """Add the transcript to the list."""
     text = UI['trans']
     text['state'] = 'normal'
-    text.delete(1.0, END)
+    text.delete(1.0, tk.END)
     for actor, line in transcript:
-        text.insert('end', actor, ('bold',))
+        text.insert('end', actor, ('actor',))
         text.insert('end', str(line) + '\n\n')
     # Remove the trailing newlines
     text.delete('end-2char', 'end')
     text['state'] = 'disabled'
 
 
-def check_toggled(var: BooleanVar, config_section: SectionProxy, quote_id: str) -> None:
+def check_toggled(var: tk.BooleanVar, config_section: SectionProxy, quote_id: str) -> None:
     """Update the config file to match the checkbox."""
     config_section[quote_id] = srctools.bool_as_int(var.get())
 
 
-def save(event: object = None) -> None:
+def save() -> None:
     """Save and close the window."""
-    global voice_item, config, config_mid, config_resp
     if voice_item is not None:
         LOGGER.info('Saving Configs!')
         if config is not None:
@@ -210,7 +204,7 @@ def add_tabs(tk_img: TKImages) -> None:
     # Save the current tab index, so we can restore it after.
     try:  # Currently typed as Any, hence the type-ignore.
         current_tab = notebook.index(notebook.select())  # type: ignore[no-untyped-call]
-    except TclError:  # .index() will fail if the voice is empty,
+    except tk.TclError:  # .index() will fail if the voice is empty,
         current_tab = None  # in that case abandon remembering the tab.
 
     # Add or remove tabs so only the correct mode is visible.
@@ -227,7 +221,7 @@ def add_tabs(tk_img: TKImages) -> None:
         if tab.kind is TabTypes.RESPONSE:
             notebook.tab(
                 tab.frame,
-                compound=RIGHT,
+                compound='right',
                 image=tk_img.sync_load(IMG_RESP),
                 text=str(TRANS_RESPONSE_SHORT),
             )
@@ -259,14 +253,14 @@ def show(tk_img: TKImages, quote_pack: QuotePack) -> None:
     # Clear the transcript textbox
     text = UI['trans']
     text['state'] = 'normal'
-    text.delete(1.0, END)
+    text.delete(1.0, 'end')
     text['state'] = 'disabled'
 
     # Destroy all the old tabs
     for tab in TABS:
         try:
             notebook.forget(tab.frame)
-        except TclError:
+        except tk.TclError:
             pass
         tab.frame.destroy()
 
@@ -328,7 +322,7 @@ def make_tab(
     name: TransToken,
     desc: TransToken,
     config: ConfigFile,
-    contents: Iterable[Tuple[TransToken, str, Iterable[Line]]],
+    contents: Iterable[tuple[TransToken, str, Iterable[Line]]],
 ) -> None:
     """Create all the widgets for a tab."""
     # This is just to hold the canvas and scrollbar
@@ -339,13 +333,10 @@ def make_tab(
     TABS.append(Tab(tab_type, outer_frame, name))
 
     # We need a canvas to make the list scrollable.
-    canv = Canvas(
-        outer_frame,
-        highlightthickness=0,
-        )
+    canv = tk.Canvas(outer_frame, highlightthickness=0)
     scroll = tk_tools.HidingScroll(
         outer_frame,
-        orient=VERTICAL,
+        orient='vertical',
         command=canv.yview,
         )
     canv['yscrollcommand'] = scroll.set
@@ -366,21 +357,21 @@ def make_tab(
 
     set_text(ttk.Label(frame), desc).grid(row=1, column=0, sticky='EW')
 
-    ttk.Separator(frame, orient=HORIZONTAL).grid(
+    ttk.Separator(frame, orient=tk.HORIZONTAL).grid(
         row=2,
         column=0,
         sticky='EW',
     )
 
     for name, conf_id, lines in contents:
-        set_text(ttk.Label(frame, font=QUOTE_FONT), name).grid(column=0, sticky=W)
+        set_text(ttk.Label(frame, font=QUOTE_FONT), name).grid(column=0, sticky='W')
 
         for line in lines:
             line_frame = ttk.Frame(frame,)
             line_frame.grid(
                 column=0,
                 padx=(10, 0),
-                sticky=W,
+                sticky='W',
             )
             x = 0
             for x, criteria in enumerate(line.criterion):
@@ -392,7 +383,7 @@ def make_tab(
             x += 1  # Position after the badges
             line_frame.columnconfigure(x, weight=1)
 
-            quote_var = IntVar(value=config.get_bool(conf_id, line.id, True))
+            quote_var = tk.IntVar(value=config.get_bool(conf_id, line.id, True))
             check = ttk.Checkbutton(
                 line_frame,
                 variable=quote_var,
@@ -407,7 +398,7 @@ def make_tab(
             check.grid(row=0, column=x)
             check.bind("<Enter>", functools.partial(show_trans, line.transcript))
 
-    def configure_canv(e: Event) -> None:
+    def configure_canv(_: object) -> None:
         """Allow resizing the windows."""
         canv['scrollregion'] = (
             0,
