@@ -4,6 +4,7 @@ from random import Random
 from srctools import Keyvalues
 
 from config.signage import DEFAULT_IDS, Layout
+import utils
 
 
 DELAYS = range(3, 31)
@@ -24,7 +25,7 @@ def test_defaults_filled() -> None:
 def test_parse_kv() -> None:
     """Test parsing keyvalues1 configs."""
     kv_list = [
-        Keyvalues(str(i), "" if i in TEST_EMPTIES else f'TIMER_{i}_SIGN')
+        Keyvalues(str(i), "" if i in TEST_EMPTIES else f'TimER_{i}_SIGN')
         for i in DELAYS
     ]
     Random(38927).shuffle(kv_list)
@@ -48,20 +49,22 @@ def test_layout_copies() -> None:
     """Test the Layout class copies the mapping, to keep it immutable."""
     assert len(Layout().signs) == 28
     orig = {
-        3: 'three', 5: 'five', 23: 'twenty-three'
+        3: utils.obj_id('three'),
+        5: utils.obj_id('five'),
+        23: utils.obj_id('twenty_three'),
     }
     layout = Layout(orig)
     assert len(layout.signs) == 28
     assert layout.signs[8] == ''
-    assert layout.signs[23] == 'twenty-three'
-    orig[3] = 'III'
-    assert layout.signs[3] == 'three'
+    assert layout.signs[23] == 'TWENTY_THREE'
+    orig[3] = utils.obj_id('the_III')
+    assert layout.signs[3] == 'THREE'
 
 
 def test_export_kv() -> None:
     """Test exporting keyvalues1 configs."""
     conf = DEFAULT_IDS.copy()
-    conf[12] = 'CUSTOM_SIGN'
+    conf[12] = utils.obj_id('CUSTOM_SIGN')
     kv = Layout(conf).export_kv1()
     assert len(kv) == 28
 

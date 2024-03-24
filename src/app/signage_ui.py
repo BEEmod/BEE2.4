@@ -13,11 +13,11 @@ from ui_tk.img import TKImages
 from ui_tk.wid_transtoken import set_text, set_win_title
 from app import dragdrop, img, tk_tools, TK_ROOT
 from config.signage import DEFAULT_IDS, Layout
-from packages import Signage, Style
+from packages import Signage, Style, PakRef
 import packages
 from transtoken import TransToken
 import config
-
+import utils
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -34,11 +34,11 @@ TRANS_SIGN_NAME = TransToken.ui('Signage: {name}')
 _cur_style: Optional[Style] = None
 
 
-def export_data() -> List[Tuple[str, str]]:
+def export_data() -> List[Tuple[str, utils.ObjectID]]:
     """Returns selected items, for Signage.export() to use."""
     conf: Layout = config.APP.get_cur_conf(Layout, default=Layout())
     return [
-        (str(ind), sign_id)
+        (str(ind), utils.obj_id(sign_id))
         for ind in SIGN_IND
         if (sign_id := conf.signs.get(ind, '')) != ''
     ]

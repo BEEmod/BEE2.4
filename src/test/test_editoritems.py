@@ -182,7 +182,7 @@ def test_instances() -> None:
         }
     }} // End exporting + item
     ''', PAK_ID)
-    assert renderables == []
+    assert renderables == {}
     assert len(item.instances) == 6
     assert item.instances[0] == InstCount(FSPath("instances/p2editor/something.vmf"), 30, 28, 4892)
     assert item.instances[1] == InstCount(FSPath("instances/somewhere_else/item.vmf"), 0, 0, 0)
