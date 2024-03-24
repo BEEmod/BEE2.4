@@ -37,7 +37,7 @@ __all__ = [
     'OBJ_TYPES', 'PACK_CONFIG',
     'LegacyCorr', 'LEGACY_CORRIDORS',
     'CLEAN_PACKAGE', 'SelitemData',
-    'PakObject', 'PackagesSet', 'get_loaded_packages',
+    'PakObject', 'PackagesSet', 'get_loaded_packages', 'PakRef',
     'find_packages', 'load_packages',
 
     # Package objects.
@@ -255,6 +255,8 @@ LEGACY_CORRIDORS = {
 
 # This package contains necessary components, and must be available.
 CLEAN_PACKAGE = utils.obj_id('BEE2_CLEAN_STYLE')
+# We fall back to the Clean Style in some cases.
+CLEAN_STYLE = utils.obj_id('BEE2_CLEAN')
 
 
 T = TypeVar('T')
@@ -304,6 +306,10 @@ class PakObject:
         else:
             cls.suggest_default = ''
 
+    def reference(self) -> PakRef[Self]:
+        """Get a PakRef for this package object."""
+        return PakRef(type(self), utils.obj_id(self.id))
+
     @classmethod
     async def parse(cls, data: ParseData) -> Self:
         """Parse the package object from the info.txt block.
@@ -342,12 +348,21 @@ class PakRef(Generic[PakT]):
     obj: type[PakT]
     id: utils.ObjectID
 
+    @classmethod
+    def parse(cls, type: type[PakT], value: str) -> PakRef[PakT]:
+        """Parse the object ID, producing appropriate error messages."""
+        return cls(type, utils.obj_id(value, type.__name__))
+
     def resolve(self, packset: PackagesSet) -> PakT | None:
         """Look up this object, or return None if missing."""
         try:
             return packset.obj_by_id(self.obj, self.id)
         except KeyError:
             return None
+
+    def __str__(self) -> str:
+        """The string form is the ID itself."""
+        return self.id
 
 
 def reraise_keyerror(err: NoKeyError | IndexError, obj_id: str) -> NoReturn:
