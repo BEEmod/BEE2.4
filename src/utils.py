@@ -7,7 +7,7 @@ from typing import (
     Tuple, Type, TypeVar, ValuesView
 )
 
-from typing_extensions import ParamSpec, TypeVarTuple, Unpack
+from typing_extensions import Literal, ParamSpec, TypeVarTuple, Unpack
 from collections import deque
 from enum import Enum
 from pathlib import Path
@@ -471,28 +471,43 @@ class FuncLookup(Generic[LookupT], Mapping[str, LookupT]):
         self._registry.clear()
 
 
-# Special ID includes <>/[] names, and ''.
+# Special ID includes <>/[] names.
 SpecialID = NewType("SpecialID", str)
 # An object ID, which has been made uppercase. This excludes <> and [] names.
 ObjectID = NewType("ObjectID", SpecialID)
+BlankID = Literal[""]
 
 ID_NONE: Final = SpecialID('<NONE>')
-ID_EMPTY: Final = SpecialID('')
+ID_EMPTY: BlankID = ''
 
 
-def obj_id(value: str) -> ObjectID:
-    """Parse an object ID."""
-    if not value or value.startswith(('(', '<', '[')) or value.endswith((')', '>', ']')):
-        raise ValueError(f'Invalid object ID "{value}". IDs may not start/end with brackets.')
+def obj_id_optional(value: str, kind: str = 'object') -> ObjectID | Literal[""]:
+    """Parse an object ID, allowing through empty IDs."""
+    if value.startswith(('(', '<', '[')) or value.endswith((')', '>', ']')):
+        raise ValueError(f'Invalid {kind} ID "{value}". IDs may not start/end with brackets.')
     return ObjectID(SpecialID(value.casefold().upper()))
 
 
-def special_id(value: str) -> SpecialID:
+def obj_id(value: str, kind: str = 'object') -> ObjectID:
+    """Parse an object ID."""
+    result = obj_id_optional(value, kind)
+    if result == "":
+        raise ValueError(f'Invalid {kind} ID "{value}". IDs may not be blank.')
+    return result
+
+
+def special_id_optional(value: str, kind: str = 'object') -> SpecialID | Literal[""]:
+    """Parse an object ID or a special name, allowing empty IDs."""
+    # We don't actually need to check if it has brackets, since this allows everything.
+    return SpecialID(value.casefold().upper())
+
+
+def special_id(value: str, kind: str = 'object') -> SpecialID:
     """Parse an object ID or a special name."""
-    if not value or value.startswith(('(', '<', '[')) or value.endswith((')', '>', ']')):
-        return SpecialID(value.casefold().upper())
-    else:
-        return ObjectID(SpecialID(value.casefold().upper()))
+    result = special_id_optional(value, kind)
+    if result == "":
+        raise ValueError(f'Invalid {kind} ID "{value}". IDs may not be blank.')
+    return result
 
 
 class PackagePath:

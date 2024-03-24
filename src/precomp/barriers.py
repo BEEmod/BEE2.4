@@ -298,7 +298,7 @@ class FloorbeamConf:
 @attrs.frozen(eq=False, kw_only=True)
 class BarrierType:
     """Type of barrier."""
-    id: utils.ObjectID | utils.SpecialID
+    id: utils.ObjectID | utils.BlankID
     frames: Mapping[FrameOrient, Sequence[FrameType]] = attrs.field(default=dict.fromkeys(FrameOrient, ()), repr=False)
     error_disp: user_errors.Kind | None = None
     surfaces: Sequence[Brush | Collide] = ()
@@ -313,9 +313,8 @@ class BarrierType:
     frame_world_brush: bool = False
 
     @classmethod
-    def parse(cls, kv: Keyvalues) -> BarrierType:
+    def parse(cls, kv: Keyvalues, barrier_id: utils.ObjectID) -> BarrierType:
         """Parse from keyvalues files."""
-        barrier_id = utils.obj_id(kv.real_name)
         frames: Dict[FrameOrient, List[FrameType]] = {orient: [] for orient in FrameOrient}
         error_disp: user_errors.Kind | None = None
         surfaces: List[Brush | Collide] = []
@@ -706,7 +705,7 @@ HOLES: dict[PlaneKey, dict[FrozenVec, Hole]] = defaultdict(dict)
 
 HOLE_TYPES: Dict[utils.ObjectID, HoleType] = {}
 FRAME_TYPES: Dict[utils.ObjectID, Dict[FrameOrient, FrameType]] = {}
-BARRIER_TYPES: Dict[utils.ObjectID | utils.SpecialID, BarrierType] = {}
+BARRIER_TYPES: Dict[utils.ObjectID, BarrierType] = {}
 
 
 def parse_conf(kv: Keyvalues) -> None:
@@ -731,13 +730,13 @@ def parse_conf(kv: Keyvalues) -> None:
             FrameOrient.FLAT: flat_conf,
         }
     for block in kv.find_children('Barriers'):
-        barrier = BarrierType.parse(block)
-        if barrier.id in BARRIER_TYPES:
+        barrier_id = utils.obj_id(block.real_name, 'Barrier Type')
+        if barrier_id in BARRIER_TYPES:
             raise user_errors.UserError(user_errors.TOK_DUPLICATE_ID.format(
                 kind='Barrier Type',
-                id=barrier.id,
+                id=barrier_id,
             ))
-        BARRIER_TYPES[barrier.id] = barrier
+        BARRIER_TYPES[barrier_id] = BarrierType.parse(block, barrier_id)
 
     for block in kv.find_children('BarrierHoles'):
         hole = HoleType.parse(block)
@@ -1156,7 +1155,7 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
             filterclass='prop_paint_bomb',
         )
 
-    debug_skin: dict[utils.ObjectID | utils.SpecialID, int] = {
+    debug_skin: dict[utils.ObjectID | utils.BlankID, int] = {
         GLASS_ID: 5,
         GRATE_ID: 0,
     }

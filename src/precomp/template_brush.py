@@ -160,7 +160,7 @@ class CollisionDef(TemplateEntity):
 class BarrierSetter(PlanarTemplateEntity):
     """Alter the glass/grating barrier present in a particlar sub-voxel."""
     # The ID to use. Blank = remove.
-    id: utils.ObjectID | utils.SpecialID
+    id: utils.ObjectID | utils.BlankID
     force: bool  # Overwrite an existing barrier if true. Always overwrites if removing.
 
 
@@ -700,7 +700,7 @@ def _parse_template(loc: UnparsedTemplate) -> Template:
             offset=Vec.from_str(ent['origin']),
             normal=Matrix.from_angstr(ent['angles']).up(),
             visgroups=set(map(visgroup_names.__getitem__, ent.visgroup_ids)),
-            id=utils.special_id(ent['barrierid']),
+            id=utils.obj_id_optional(ent['barrierid'], 'Barrier Type'),
             force=srctools.conv_bool(ent['force']),
         ))
 
