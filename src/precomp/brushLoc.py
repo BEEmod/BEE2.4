@@ -161,8 +161,7 @@ class _GridItemsView(ItemsView[FrozenVec, Block]):
             return False
 
     def __iter__(self) -> Iterator[tuple[FrozenVec, Block]]:
-        for pos, block in self._mapping.items():
-            yield (pos, block)
+        yield from self._mapping.items()
 
 
 class Grid(MutableMapping[_grid_keys, Block]):

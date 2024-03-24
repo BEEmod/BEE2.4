@@ -188,7 +188,7 @@ class tkRichText(tkinter.Text):
                                 self.make_link_callback(block.url),
                             )
                             self._link_commands[block.url] = cmd_tag, cmd_id
-                        tags = block.tags + (cmd_tag, TextTag.LINK)
+                        tags = (*block.tags, cmd_tag, TextTag.LINK)
                     else:
                         tags = block.tags
                     # Strip newlines from the beginning and end of the textbox.

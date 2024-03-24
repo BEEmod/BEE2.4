@@ -23,17 +23,17 @@ def test_grid_insertion(dx: int, dy: int) -> None:
             assert grid[dx * i, dy * i] == i
             assert grid.get((dx * i, dy * i)) == i
         except KeyError:
-            pytest.fail(f'{dx*i}, {dy*i}')
+            pytest.fail(f'{dx * i}, {dy * i}')
     expected = {
-        (dx*i, dy*i): i
+        (dx * i, dy * i): i
         for i in range(10)
     }
     assert dict(grid.items()) == expected
     # Check other positions are ignored.
     min_x, min_y = grid.mins
     max_x, max_y = grid.maxes
-    for x in range(min_x-1, max_x+2):
-        for y in range(min_y-1, max_y+2):
+    for x in range(min_x - 1, max_x + 2):
+        for y in range(min_y - 1, max_y + 2):
             if (x, y) not in expected:
                 with pytest.raises(KeyError):
                     _ = grid[x, y]

@@ -71,6 +71,7 @@ extend-ignore = [
 	"PLW0603",  # Allow use of global statement.
 	"PLC0414",  # import x as x is used for type checking.
 	"PLE1205",  # Too many arguments for logging, doesn't handle our format
+	"PLC0415",  # Imports not at top level are used for specific reasons
 	"PLW2901",  # Allow redefining loop var inside the loop.
 	"PLW0120",  # for-else with return/break inside is just stylistic, exactly equivalent.
 

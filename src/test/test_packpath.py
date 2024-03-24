@@ -15,7 +15,7 @@ def test_basic() -> None:
     assert repr(path) == "PackagePath('BEE2_CLEAN', 'items/EditorItems.txt')"
     assert hash(path) == hash(("BEE2_CLEAN", "items/EditorItems.txt"))
 
-    path = PackagePath(obj_id("1950"),"another\\path.bin")
+    path = PackagePath(obj_id("1950"), "another\\path.bin")
     assert path.package == "1950"
     assert path.path == "another/path.bin"
 

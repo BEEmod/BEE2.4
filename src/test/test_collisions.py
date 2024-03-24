@@ -233,7 +233,7 @@ def test_bbox_intersection(
 
     We parameterise by swapping all the axes, and offsetting so that it's in all the quadrants.
     """
-    bbox1 = BBox(x-64, y-64, z-64, x+64, y+64, z+64, contents=CollideType.EVERYTHING)
+    bbox1 = BBox(x - 64, y - 64, z - 64, x + 64, y + 64, z + 64, contents=CollideType.EVERYTHING)
     bbox2 = BBox(reorder(mins, axes, x, y, z), reorder(maxs, axes, x, y, z), contents=CollideType.EVERYTHING)
     result = bbox1.intersect(bbox2)
     # assert result == bbox2.intersect(bbox1)  # Check order is irrelevant.
@@ -241,7 +241,11 @@ def test_bbox_intersection(
         assert result is None
     else:
         exp_a, exp_b = success
-        expected = BBox(reorder(exp_a, axes, x, y, z), reorder(exp_b, axes, x, y, z), contents=CollideType.EVERYTHING)
+        expected = BBox(
+            reorder(exp_a, axes, x, y, z),
+            reorder(exp_b, axes, x, y, z),
+            contents=CollideType.EVERYTHING,
+        )
         assert result == expected
 
 

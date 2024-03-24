@@ -135,13 +135,16 @@ class TransToken:
         return cls(NS_UI, NS_UI, token, kwargs)
 
     @staticmethod
-    def ui_plural(singular: LiteralString, plural: LiteralString,  /, **kwargs: str) -> PluralTransToken:
+    def ui_plural(singular: LiteralString, plural: LiteralString, /, **kwargs: str) -> PluralTransToken:
         """Make a plural token for a UI string."""
         return PluralTransToken(NS_UI, NS_UI, singular, kwargs, plural)
 
-    def join(self, children: Iterable[TransToken], sort: bool=False) -> JoinTransToken:
+    def join(self, children: Iterable[TransToken], sort: bool = False) -> JoinTransToken:
         """Use this as a separator to join other tokens together."""
-        return JoinTransToken(self.namespace, self.orig_pack, self.token, self.parameters, list(children), sort)
+        return JoinTransToken(
+            self.namespace, self.orig_pack, self.token, self.parameters,
+            list(children), sort,
+        )
 
     @classmethod
     def from_valve(cls, text: str) -> TransToken:

@@ -1343,7 +1343,7 @@ def run_vbsp(
     vbsp_args = [x for x in vbsp_args if x and not x.isspace()]
 
     # Ensure we've fixed the instance/ folder so instances are found.
-    if utils.MAC or utils.LINUX and is_peti:
+    if (utils.MAC or utils.LINUX) and is_peti:
         instance_symlink()
 
     # Use a special name for VBSP's output..
