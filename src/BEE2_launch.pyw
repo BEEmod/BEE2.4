@@ -36,16 +36,20 @@ DEFAULT_SETTINGS = {
 }
 
 import srctools.logger
-from app import localisation, on_error, TK_ROOT
+from app import localisation, on_error
+from pathlib import Path
 import utils
 
 if __name__ == '__main__':
     if len(sys.argv) > 1:
         log_name = app_name = sys.argv[1].lower()
-        if app_name not in ('backup', 'compilepane'):
-            log_name = 'bee2'
-    else:
+    elif 'python' not in sys.argv[0].casefold():
+        log_name = app_name = Path(sys.argv[0]).stem.casefold()
+    else:  # Running from source, by default.
         log_name = app_name = 'bee2'
+
+    if app_name not in ('backup', 'compiler_settings'):
+        log_name = 'bee2'
 
     # We need to initialise logging as early as possible - that way
     # it can record any errors in the initialisation of modules.
@@ -86,7 +90,7 @@ if __name__ == '__main__':
         BEE2.start_main()
     elif app_name == 'backup':
         BEE2.start_main(backup.init_application)
-    elif app_name == 'compilepane':
+    elif app_name == 'compiler_settings':
         BEE2.start_main(CompilerPane.init_application)
     elif app_name.startswith('test_'):
         import importlib

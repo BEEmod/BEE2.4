@@ -324,7 +324,7 @@ pyz = PYZ(
     bee2_a.zipped_data,
 )
 
-exe = EXE(
+bee_exe = EXE(
     pyz,
     bee2_a.scripts,
     [],
@@ -340,8 +340,40 @@ exe = EXE(
     icon='../BEE2.ico'
 )
 
+backup_exe = EXE(
+    pyz,
+    bee2_a.scripts,
+    [],
+    exclude_binaries=True,
+    name='backup',
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=False,
+    console=False,
+    contents_directory='bin',
+    windowed=True,
+    icon='../BEE2.ico'
+)
+
+compiler_settings_exe = EXE(
+    pyz,
+    bee2_a.scripts,
+    [],
+    exclude_binaries=True,
+    name='compiler_settings',
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=False,
+    console=False,
+    contents_directory='bin',
+    windowed=True,
+    icon='../BEE2.ico'
+)
+
 coll = COLLECT(
-    exe,
+    bee_exe, backup_exe, compiler_settings_exe,
     bee2_a.binaries,
     bee2_a.zipfiles,
     bee2_a.datas,
