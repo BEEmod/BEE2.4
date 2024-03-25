@@ -204,11 +204,12 @@ class EdgeTrigger(Generic[Unpack[PosArgsT]]):
         """
         if self._event is not None:
             raise ValueError('Only one task may wait() at a time!')
-        self._event = trio.Event()
-        self._result = None
-        self.ready.value = True
         try:
+            self._event = trio.Event()
+            self._result = None
+            self.ready.value = True
             await self._event.wait()
+            # TODO: Rewrite with match post 3.8
             assert self._result is not None
             if len(self._result) == 1:
                 return self._result[0]
