@@ -16,6 +16,7 @@ async def test_basic_operation() -> None:
     state = 'pre'
 
     # Can't trigger when no task is waiting.
+    assert not trigger.ready.value
     with pytest.raises(ValueError):
         trigger.trigger()  # type: ignore
 
@@ -29,6 +30,7 @@ async def test_basic_operation() -> None:
         async with seq(2):
             state = 'wait'
         result = await trigger.wait()
+        assert not trigger.ready.value
         assert_type(result, Tuple[int, int])
         assert result == (4, 2)
         assert state == 'trigger'
@@ -39,14 +41,17 @@ async def test_basic_operation() -> None:
         nonlocal state
         async with seq(1):
             assert state == 'pre'
+            assert not trigger.ready.value
             with pytest.raises(ValueError):
                 trigger.trigger(1, 2)  # Can't trigger yet.
 
         async with seq(3):
             assert state == 'wait'
+            assert trigger.ready.value
         state = 'trigger'
         trigger.trigger(3, 5)
         trigger.trigger(4, 2)  # Last result wins.
+        assert trigger.ready.value  # Still ready because trigger() works.
 
     async with trio.open_nursery() as nursery:
         nursery.start_soon(wait_task)

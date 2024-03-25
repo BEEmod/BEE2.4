@@ -1,10 +1,12 @@
 """The package containg all UI code."""
 from typing import Any, Awaitable, Callable, Tuple, Type, TypeVar, Generic, Union, overload
+
 from typing_extensions import TypeVarTuple, Unpack
 from types import TracebackType, new_class
 import tkinter as tk
 
-import trio  # Import first, so it monkeypatches traceback before us.
+from trio_util import AsyncBool
+import trio
 
 import utils
 
@@ -179,16 +181,15 @@ DEV_MODE = tk.BooleanVar(value=utils.DEV_MODE, name='OPT_development_mode')
 class EdgeTrigger(Generic[Unpack[PosArgsT]]):
     """A variation on a Trio Event which can only be tripped while a task is waiting for it.
 
-    When tripped, arbitary arguments can be passed along as well.
+    When tripped, arbitrary arguments can be passed along as well.
+
+    The ready attribute is updated to reflect whether trigger() can be called. The value should
+    not be set.
     """
     def __init__(self) -> None:
-        self._event: Union[trio.Event, None] = None
-        self._result: Union[Tuple[Unpack[PosArgsT]], None] = None
-
-    @property
-    def ready(self) -> bool:
-        """Check if this is ready to be triggered."""
-        return self._event is not None
+        self._event: trio.Event | None = None
+        self._result: tuple[Unpack[PosArgsT]] | None = None
+        self.ready = AsyncBool()
 
     @overload
     async def wait(self: 'EdgeTrigger[()]') -> None: ...
@@ -205,6 +206,7 @@ class EdgeTrigger(Generic[Unpack[PosArgsT]]):
             raise ValueError('Only one task may wait() at a time!')
         self._event = trio.Event()
         self._result = None
+        self.ready.value = True
         try:
             await self._event.wait()
             assert self._result is not None
@@ -216,6 +218,7 @@ class EdgeTrigger(Generic[Unpack[PosArgsT]]):
                 return self._result
         finally:
             self._event = self._result = None
+            self.ready.value = False
 
     def trigger(self, *args: Unpack[PosArgsT]) -> None:
         """Wake up a task blocked on wait(), and pass arguments along to it.
