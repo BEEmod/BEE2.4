@@ -21,12 +21,15 @@ class Skybox(
         config: lazy_conf.LazyConf,
         fog_opts: Keyvalues,
         mat: str,
+        draw_first: bool,
     ) -> None:
         self.id = sky_id
         self.selitem_data = selitem_data
         self.material = mat
         self.config = config
         self.fog_opts = fog_opts
+        # Unset r_skybox_draw_last to fix issues with certain skyboxes.
+        self.draw_first = draw_first
 
         # Extract this for selector windows to easily display
         self.fog_color = fog_opts.vec('primarycolor', 255, 255, 255)
@@ -36,6 +39,7 @@ class Skybox(
         """Parse a skybox definition."""
         selitem_data = SelitemData.parse(data.info, data.pak_id)
         mat = data.info['material', 'sky_black']
+        draw_first = data.info.bool('sky_draw_first')
         config = get_config(
             data.info,
             'skybox',
@@ -51,6 +55,7 @@ class Skybox(
             config,
             fog_opts,
             mat,
+            draw_first,
         )
 
     def add_over(self, override: Self) -> None:

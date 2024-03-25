@@ -201,7 +201,7 @@ async def load_settings() -> Tuple[
         'primary': fog_config['primaryColor', '40 53 64'],
         'secondary': fog_config['secondaryColor', ''],
         'direction': fog_config['direction', '0 0 0'],
-        # These appear to be always the same..
+        # These appear to be always the same.
         'height_start': fog_config['height_start', '0'],
         'height_density': fog_config['height_density', '0'],
         'height_max_density': fog_config['height_max_density', '1'],
@@ -689,7 +689,7 @@ def add_fog_ents(vmf: VMF, info: corridor.Info) -> None:
         fog_controller['fogcolor2'] = fog_opt['secondary']
         fog_controller['use_angles'] = '1'
 
-    logic_auto = vmf.create_ent(classname='logic_auto', origin=pos, flags='1')
+    logic_auto = vmf.create_ent(classname='logic_auto', origin=pos, flags='0')
 
     logic_auto.add_out(
         Output(
@@ -759,6 +759,19 @@ def add_fog_ents(vmf: VMF, info: corridor.Info) -> None:
             'SetFogController',
             '@fog_controller',
             only_once=True,
+        ))
+
+    if options.SKY_DRAW_FIRST():
+        logic_auto.add_out(Output(
+            'OnMapSpawn',
+            '@broadcastcommand',
+            'Command',
+            'r_skybox_draw_last 0',
+        ), Output(
+            'OnLoadGame',
+            '@broadcastcommand',
+            'Command',
+            'r_skybox_draw_last 0',
         ))
 
 

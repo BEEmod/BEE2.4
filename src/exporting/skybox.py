@@ -1,5 +1,5 @@
 """Export the selected skybox/fog configuration."""
-from typing import Optional
+from srctools import bool_as_int
 
 from . import ExportData, STEPS, StepResource
 from packages import Skybox
@@ -8,7 +8,7 @@ from packages import Skybox
 @STEPS.add_step(prereq=[], results=[StepResource.VCONF_DATA])
 async def step_skybox(exp_data: ExportData) -> None:
     """Export the selected skybox."""
-    sel_id: Optional[str] = exp_data.selected[Skybox]
+    sel_id: str | None = exp_data.selected[Skybox]
     if sel_id is None:
         return  # No skybox..
 
@@ -17,7 +17,8 @@ async def step_skybox(exp_data: ExportData) -> None:
     except KeyError:
         raise Exception(f"Selected skybox ({exp_data.selected}) doesn't exist?") from None
 
-    exp_data.vbsp_conf.set_key(('Options', 'Skybox'), skybox.material)
+    exp_data.vbsp_conf.set_key(('Options', 'skybox'), skybox.material)
+    exp_data.vbsp_conf.set_key(('Options', 'sky_draw_first'), bool_as_int(skybox.draw_first))
 
     exp_data.vbsp_conf.extend(await skybox.config())
 

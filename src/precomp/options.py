@@ -620,6 +620,10 @@ SKYBOX = Opt.string(
     'skybox', 'sky_black',
     """(Automatic) The skybox name to use for the map.
     """)
+SKY_DRAW_FIRST = Opt.boolean(
+    'sky_draw_first', False,
+    """(Automatic) Override r_sky_draw_last to fix issues with certain skyboxes.
+    """)
 VOICE_ID = Opt.string(
     'voice_id', "<NONE>",
     """(Automatic) The ID of the selected voice pack.

@@ -11,6 +11,7 @@
 * Added the ability to show multiple warning messages or errors for problems 
   occurring during package loading and export.
 * Added signage configuration option to the item's context menu, to help make it more visible.
+* Added `sky_draw_first` option to skyboxes, which can fix some rendering bugs with certain materials.
 
 ------------------------------------------
 
