@@ -841,12 +841,7 @@ def check_all(
         skipped_cond/len(conditions),
     )
     import vbsp
-    LOGGER.info('Map has attributes: {}', [
-        key
-        for key, value in
-        vbsp.settings['has_attr'].items()
-        if value
-    ])
+    LOGGER.info('Map has attributes: {}', sorted(info.iter_attrs()))
     # '' is always present, which sorts first, conveniently adding a \n at the start.
     LOGGER.debug('All instances referenced:{}', '\n'.join(sorted(ALL_INST)))
     LOGGER.info(

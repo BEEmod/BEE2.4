@@ -265,8 +265,8 @@ class Grid(MutableMapping[_grid_keys, Block]):
         """Return a view over the grid items."""
         return _GridItemsView(self._grid)
 
-    def read_from_map(self, vmf: VMF, has_attr: dict[str, bool], items: dict[str, editoritems.Item]) -> None:
-        """Given the map file, set blocks."""
+    def read_from_map(self, vmf: VMF, items: dict[str, editoritems.Item]) -> set[str]:
+        """Given the map file, set blocks. This returns some voice attributes that may be set."""
         from precomp.instance_traits import get_item_id
         from precomp import bottomlessPit
 
@@ -274,6 +274,8 @@ class Grid(MutableMapping[_grid_keys, Block]):
         # We want to fill goo first...
         air_search_locs: list[tuple[Vec, bool]] = []
         goo_search_locs: list[tuple[Vec, bool]] = []
+
+        has_attr: set[str] = set()
 
         for ent in vmf.entities:
             str_pos = ent['origin', None]
@@ -359,9 +361,9 @@ class Grid(MutableMapping[_grid_keys, Block]):
 
                 # Indicate that this map contains goo/pits
                 if is_pit:
-                    has_attr[VOICE_ATTR_PIT] = True
+                    has_attr.add(VOICE_ATTR_PIT)
                 else:
-                    has_attr[VOICE_ATTR_GOO] = True
+                    has_attr.add(VOICE_ATTR_GOO)
 
                 continue
 
@@ -380,6 +382,7 @@ class Grid(MutableMapping[_grid_keys, Block]):
         )
         self.fill_air(goo_search_locs + air_search_locs)
         LOGGER.info('Air filled!')
+        return has_attr
 
     def fill_air(self, search_locs: Iterable[tuple[Vec, bool]]) -> None:
         """Flood-fill the area, making all inside spaces air or goo.

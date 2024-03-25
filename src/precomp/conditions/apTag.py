@@ -93,7 +93,7 @@ def res_make_tag_coop_spawn(vmf: VMF, info: conditions.MapInfo, inst: Entity, re
 
 
 @conditions.MetaCond.ApertureTag.register
-def ap_tag_modifications(vmf: VMF) -> None:
+def ap_tag_modifications(vmf: VMF, info: conditions.MapInfo) -> None:
     """Perform modifications for Aperture Tag.
 
     * Paint is always present in every map!
@@ -106,14 +106,12 @@ def ap_tag_modifications(vmf: VMF) -> None:
 
     LOGGER.info('Performing Aperture Tag modifications...')
 
-    has = vbsp.settings['has_attr']
     # This will enable the PaintInMap keyvalue.
-    has['Gel'] = True
+    info.set_attr('Gel')
 
     # Set as if the player spawned with no pgun
-    has['spawn_dual'] = False
-    has['spawn_single'] = False
-    has['spawn_nogun'] = True
+    info.unset_attr('spawn_dual')
+    info.set_attr('spawn_single', 'spawn_nogun')
 
     transition_ents = instanceLocs.resolve_filter('[transitionents]')
     for inst in vmf.by_class['func_instance']:
@@ -412,8 +410,6 @@ def res_make_tag_fizzler(vmf: VMF, info: conditions.MapInfo, res: Keyvalues) -> 
             Output(output, neg_trig, 'Disable'),
         ]
 
-        voice_attr = vbsp.settings['has_attr']
-
         if blue_enabled or disable_other:
             # If this is blue/oran only, don't affect the other color
             neg_trig.outputs.append(Output(
@@ -430,10 +426,7 @@ def res_make_tag_fizzler(vmf: VMF, info: conditions.MapInfo, res: Keyvalues) -> 
             ))
             if blue_enabled:
                 # Add voice attributes - we have the gun and gel!
-                voice_attr['bluegelgun'] = True
-                voice_attr['bluegel'] = True
-                voice_attr['bouncegun'] = True
-                voice_attr['bouncegel'] = True
+                info.set_attr('bluegelgun', 'bluegel', 'bouncegun', 'bouncegel')
 
         if oran_enabled or disable_other:
             neg_trig.outputs.append(Output(
@@ -449,10 +442,7 @@ def res_make_tag_fizzler(vmf: VMF, info: conditions.MapInfo, res: Keyvalues) -> 
                 param=srctools.bool_as_int(pos_oran),
             ))
             if oran_enabled:
-                voice_attr['orangegelgun'] = True
-                voice_attr['orangegel'] = True
-                voice_attr['speedgelgun'] = True
-                voice_attr['speedgel'] = True
+                info.set_attr('orangegelgun', 'orangegel', 'speedgelgun', 'speedgel')
 
         if not oran_enabled and not blue_enabled:
             # If both are disabled, we must shutdown the gun when touching

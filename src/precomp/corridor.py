@@ -1,7 +1,7 @@
 """Modify and analyse corridors in the map."""
 from __future__ import annotations
 from collections import Counter
-from typing import Dict
+from collections.abc import Iterable, Iterator
 
 import attrs
 from srctools import Vec, Matrix
@@ -28,7 +28,7 @@ class Info:
     is_publishing: bool
     start_at_elevator: bool
     game_mode: GameMode
-    _attrs: Dict[str, bool]
+    _attrs: set[str] = attrs.field(init=False, factory=set)
     # The used corridor instances.
     corr_entry: Corridor
     corr_exit: Corridor
@@ -55,19 +55,29 @@ class Info:
 
     def has_attr(self, name: str) -> bool:
         """Check if this attribute is present in the map."""
-        return self._attrs[name.casefold()]
+        return name.casefold() in self._attrs
 
     def set_attr(self, *names: str) -> None:
         """Set these attributes to true."""
         for name in names:
-            self._attrs[name.casefold()] = True
+            self._attrs.add(name.casefold())
+
+    def unset_attr(self, name: str) -> None:
+        """Unset a specific attribute. Avoid using."""
+        folded = name.casefold()
+        if folded in self._attrs:
+            LOGGER.warning('Unsetting already-set voice attribute "{}"!', name)
+            self._attrs.discard(folded)
+
+    def iter_attrs(self) -> Iterator[str]:
+        """Iterate over defined voice attributes."""
+        yield from self._attrs
 
 
 def analyse_and_modify(
     vmf: VMF,
     conf: ExportedConf,
     elev_override: bool,
-    voice_attrs: Dict[str, bool],
 ) -> Info:
     """Modify corridors to match configuration, and report map settings gleaned from them.
 
@@ -249,7 +259,6 @@ def analyse_and_modify(
         is_publishing=is_publishing,
         start_at_elevator=elev_override or is_publishing,
         game_mode=game_mode,
-        attrs=voice_attrs,  # Todo: remove from settings.
         corr_entry=chosen_entry,
         corr_exit=chosen_exit,
     )

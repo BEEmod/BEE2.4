@@ -66,7 +66,6 @@ class _Settings(TypedDict):
     music_conf: Keyvalues
 
     style_vars: Dict[str, bool]
-    has_attr: Dict[str, bool]
 
 settings: _Settings = {
     "textures":       {},
@@ -76,7 +75,6 @@ settings: _Settings = {
     'music_conf':     Keyvalues('', []),
 
     "style_vars":     defaultdict(bool),
-    "has_attr":       defaultdict(bool),
 }
 
 COND_MOD_NAME = 'VBSP'
@@ -1259,15 +1257,15 @@ def write_itemid_list(vmf: VMF, used_items: Iterable[str]) -> None:
             lst_ent[f'itemid{j:02}'] = item_id
 
 
-def fix_worldspawn(vmf: VMF) -> None:
+def fix_worldspawn(vmf: VMF, info: conditions.MapInfo) -> None:
     """Adjust some properties on WorldSpawn."""
     LOGGER.info("Editing WorldSpawn")
     if vmf.spawn['paintinmap'] != '1':
         # If PeTI thinks there should be paint, don't touch it
         # Otherwise set it based on the 'gel' voice attribute
         # If the game is Aperture Tag, it's always forced on
-        vmf.spawn['paintinmap'] = srctools.bool_as_int(
-            settings['has_attr']['gel'] or
+        vmf.spawn['paintinmap'] = (
+            info.has_attr('gel') or
             options.GAME_ID() == utils.STEAM_IDS['APTAG']
         )
     vmf.spawn['skyname'] = options.SKYBOX()
@@ -1623,16 +1621,16 @@ async def main() -> None:
 
         used_inst = instance_traits.set_traits(vmf, id_to_item, coll)
         # Must be before corridors!
-        brushLoc.POS.read_from_map(vmf, settings['has_attr'], id_to_item)
+        initial_voice_attrs = brushLoc.POS.read_from_map(vmf, id_to_item)
 
         rand.init_seed(vmf)
 
         info = corridor.analyse_and_modify(
             vmf, corridor_conf,
             elev_override=BEE2_config.get_bool('General', 'spawn_elev'),
-            voice_attrs=settings['has_attr'],
         )
         is_publishing = info.is_publishing
+        info.set_attr(*initial_voice_attrs)
 
         ant, side_to_antline = antlines.parse_antlines(vmf)
 
@@ -1668,7 +1666,7 @@ async def main() -> None:
         tiling.generate_brushes(vmf)
         faithplate.gen_faithplates(vmf, info.has_attr('superposition'))
         change_overlays(vmf)
-        fix_worldspawn(vmf)
+        fix_worldspawn(vmf, info)
 
         if utils.DEV_MODE:
             coll.export_debug(vmf, vis_name='collisions')
