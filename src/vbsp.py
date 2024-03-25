@@ -60,7 +60,6 @@ import user_errors
 class _Settings(TypedDict):
     """Configuration data extracted from VBSP_config. TODO: Eliminate and make local vars."""
     textures: Dict[str, Any]
-    options: Dict[str, Any]
     fog: Dict[str, Any]
     elevator: Dict[str, str]
     music_conf: Keyvalues
@@ -69,7 +68,6 @@ class _Settings(TypedDict):
 
 settings: _Settings = {
     "textures":       {},
-    "options":        {},
     "fog":            {},
     "elevator":       {},
     'music_conf':     Keyvalues('', []),
