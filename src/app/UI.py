@@ -14,7 +14,7 @@ import trio
 from typing_extensions import assert_never
 
 import exporting
-from app import TK_ROOT, background_run, background_start, quit_app
+from app import EdgeTrigger, TK_ROOT, background_run, background_start, quit_app
 from BEE2_config import GEN_OPTS
 from app.dialogs import Dialogs
 from loadScreen import MAIN_UI as LOAD_UI
@@ -1545,8 +1545,14 @@ async def init_windows(tk_img: TKImages) -> None:
         nurs.start_soon(corridor.refresh)
     await LOAD_UI.step('options')
 
+    signage_trigger: EdgeTrigger[()] = EdgeTrigger()
+    background_run(signage_ui.init_widgets, tk_img, signage_trigger)
+
     async with trio.open_nursery() as nurs:
-        nurs.start_soon(background_start, itemconfig.make_pane, frames['toolMenu'], menu_bar.view_menu, tk_img)
+        nurs.start_soon(
+            background_start, itemconfig.make_pane,
+            frames['toolMenu'], menu_bar.view_menu, tk_img, signage_trigger,
+        )
     await LOAD_UI.step('itemvar')
 
     async with trio.open_nursery() as nurs:

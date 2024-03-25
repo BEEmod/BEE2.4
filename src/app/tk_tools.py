@@ -8,8 +8,10 @@ import sys
 from enum import Enum
 from typing import (
     Awaitable, Dict, Generic, Iterable, overload, cast, Any, TypeVar, Protocol, Union, Callable,
-    Optional, Tuple, Literal,
+    Optional, Tuple, Literal, NoReturn
 )
+
+from trio_util import AsyncValue
 from typing_extensions import TypeAlias, TypeVarTuple, Unpack
 
 from tkinter import ttk
@@ -452,6 +454,19 @@ def link_checkmark(check: ttk.Checkbutton, widget: tk.Widget) -> None:
 def event_cancel(*args: Any, **kwargs: Any) -> str:
     """Bind to an event to cancel it, and prevent it from propagating."""
     return 'break'
+
+
+async def apply_bool_enabled_state_task(value: AsyncValue[bool], *widgets: ttk.Widget) -> NoReturn:
+    """Apply an AsyncValue's state to one or more widgets.
+
+    This will make them disabled if the value is set to False.
+    """
+    async with utils.aclosing(value.eventual_values()) as agen:
+        async for cur_value in agen:
+            state = ('!disabled', ) if cur_value else ('disabled', )
+            for wid in widgets:
+                wid.state(state)
+        raise AssertionError('eventual_values() should be infinite!')
 
 
 def adjust_inside_screen(

@@ -13,7 +13,7 @@ from srctools import logger
 from trio_util import AsyncValue
 import trio
 
-from app import TK_ROOT, UI, signage_ui, sound, tk_tools, StyleVarPane
+from app import EdgeTrigger, TK_ROOT, UI, signage_ui, sound, tk_tools, StyleVarPane
 from app.tooltip import add_tooltip
 # Re-export.
 from config.widgets import (
@@ -35,6 +35,7 @@ import config
 import packages
 
 LOGGER = logger.get_logger(__name__)
+SIGNAGE_ID = 'ITEM_BEE2_SIGNAGE'
 
 
 class SingleCreateTask(Protocol[OptConfT_contra]):
@@ -173,6 +174,7 @@ async def create_group(
     master: ttk.Frame,
     nursery: trio.Nursery,
     tk_img: TKImages,
+    signage_trigger: EdgeTrigger[()],
     group: ConfigGroup,
 ) -> ttk.Frame:
     """Create the widgets for a group."""
@@ -206,10 +208,18 @@ async def create_group(
                     set_text(label, TRANS_COLON.format(text=s_wid.name))
                     label.grid(row=0, column=0)
             create_func = _UI_IMPL_SINGLE[s_wid.kind]
+
+            conf = s_wid.config
+            if isinstance(conf, ItemVariantConf) and conf.item_id == SIGNAGE_ID:
+                # Special case. This is a trigger to display the "Configure Signage" button.
+                # Replace the config with the edge trigger, signalling the creation func below
+                # to handle this.
+                conf = signage_trigger
+
             try:
                 with logger.context(f'{group.id}:{s_wid.id}'):
-                    LOGGER.debug('Constructing widget with config {!r}...', s_wid.config)
-                    widget = await nursery.start(create_func, wid_frame, tk_img, s_wid.holder, s_wid.config)
+                    LOGGER.debug('Constructing widget with config {!r}...', conf)
+                    widget = await nursery.start(create_func, wid_frame, tk_img, s_wid.holder, conf)
             except Exception:
                 LOGGER.exception('Could not construct widget {}.{}', group.id, s_wid.id)
                 continue
@@ -287,6 +297,7 @@ async def make_pane(
     tool_frame: tk.Frame | ttk.Frame,
     menu_bar: tk.Menu,
     tk_img: TKImages,
+    signage_trigger: EdgeTrigger[()],
     *, task_status: trio.TaskStatus[None] = trio.TASK_STATUS_IGNORED,
 ) -> None:
     """Create the item properties pane, with the widgets it uses."""
@@ -432,7 +443,10 @@ async def make_pane(
 
                 async def task() -> None:
                     """Create the widgets, then display."""
-                    group_to_frame[new_group] = await create_group(canvas_frame, nursery, tk_img,new_group)
+                    group_to_frame[new_group] = await create_group(
+                        canvas_frame, nursery, tk_img, signage_trigger,
+                        new_group,
+                    )
                     groups_being_created.discard(new_group)
                     await display_group(new_group)
 
@@ -545,26 +559,31 @@ def widget_sfx(*args: object) -> None:
 async def widget_item_variant(
     parent: tk.Widget, tk_img: TKImages,
     holder: AsyncValue[str],
-    conf: ItemVariantConf,
+    conf: ItemVariantConf | EdgeTrigger[()],
     /, *,
     task_status: trio.TaskStatus[tk.Widget] = trio.TASK_STATUS_IGNORED,
 ) -> None:
     """Special widget - chooses item variants.
 
     This replicates the box on the right-click menu for items.
-    It's special-cased in the above code.
+    It's special-cased in the above code in several ways.
+
+    The config is alternatively an EdgeTrigger instance for the special Configure Signage button.
     """
     from app import contextWin
+
+    if isinstance(conf, EdgeTrigger):
+        # Even more special case, display the "configure signage" button.
+        show_btn = ttk.Button(parent, command=conf.trigger)
+        set_text(show_btn, TransToken.ui('Configure Signage'))
+
+        task_status.started(show_btn)
+        await tk_tools.apply_bool_enabled_state_task(conf.ready, show_btn)
+
     try:
         item = UI.item_list[conf.item_id]
     except KeyError:
         raise ValueError(f'Unknown item "{conf.item_id}"!') from None
-
-    if item.id == 'ITEM_BEE2_SIGNAGE':
-        # Even more special case, display the "configure signage" button.
-        # This probably will need to use start(), eventually.
-        task_status.started(await signage_ui.init_widgets(parent, tk_img))
-        await trio.sleep_forever()
 
     version_lookup: list[str] = []
 

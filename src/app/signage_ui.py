@@ -12,7 +12,7 @@ import srctools.logger
 from ui_tk.dragdrop import DragDrop, DragInfo
 from ui_tk.img import TKImages
 from ui_tk.wid_transtoken import set_text, set_win_title
-from app import dragdrop, img, tk_tools, TK_ROOT
+from app import EdgeTrigger, dragdrop, img, tk_tools, TK_ROOT
 from config.signage import DEFAULT_IDS, Layout
 from packages import Signage, Style, PakRef
 import packages
@@ -105,9 +105,8 @@ def style_changed(new_style_id: utils.ObjectID) -> None:
         drag_man.load_icons()
 
 
-async def init_widgets(master: tk.Widget, tk_img: TKImages) -> tk.Widget:
-    """Construct the widgets, returning the configuration button.
-    """
+async def init_widgets(tk_img: TKImages, trigger: 'EdgeTrigger[()]') -> None:
+    """Construct the widgets, then handle opening/closing the view."""
     window.resizable(True, True)
     set_win_title(window, TransToken.ui('Configure Signage'))
 
@@ -232,8 +231,21 @@ async def init_widgets(master: tk.Widget, tk_img: TKImages) -> tk.Widget:
     drag_man.flow_slots(canv_all, drag_man.sources())
     canv_all.bind('<Configure>', lambda e: drag_man.flow_slots(canv_all, drag_man.sources()))
 
-    def hide_window() -> None:
-        """Hide the window."""
+    close_event = trio.Event()
+
+    window.protocol("WM_DELETE_WINDOW", lambda: close_event.set())  # Late binding!
+    await config.APP.set_and_run_ui_callback(Layout, apply_config)
+
+    # Alternate between showing and hiding.
+    while True:
+        await trigger.wait()
+        drag_man.load_icons()
+        window.deiconify()
+        tk_tools.center_win(window, TK_ROOT)
+
+        await close_event.wait()
+        close_event = trio.Event()
+
         # Store off the configured signage.
         config.APP.store_conf(Layout({
             timer: slt.contents.id if slt.contents is not None else ''
@@ -243,16 +255,3 @@ async def init_widgets(master: tk.Widget, tk_img: TKImages) -> tk.Widget:
         drag_man.unload_icons()
         tk_img.apply(preview_left, IMG_BLANK)
         tk_img.apply(preview_right, IMG_BLANK)
-
-    def show_window() -> None:
-        """Show the window."""
-        drag_man.load_icons()
-        window.deiconify()
-        tk_tools.center_win(window, TK_ROOT)
-
-    window.protocol("WM_DELETE_WINDOW", hide_window)
-    await config.APP.set_and_run_ui_callback(Layout, apply_config)
-
-    show_btn = ttk.Button(master, command=show_window)
-    set_text(show_btn, TransToken.ui('Configure Signage'))
-    return show_btn
