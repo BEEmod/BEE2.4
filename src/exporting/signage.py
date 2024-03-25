@@ -9,7 +9,7 @@ from srctools import Keyvalues
 import srctools.logger
 
 from app.img import Handle as ImgHandle
-from packages import PackagesSet, Style
+from packages import PackagesSet, PakRef, Style, CLEAN_STYLE
 from packages.signage import CELL_SIZE, LEGEND_SIZE, Signage, SignStyle, SignageLegend
 from . import ExportData, STEPS, StepResource
 
@@ -22,7 +22,7 @@ def serialise(sign: Signage, parent: Keyvalues, style: Style) -> Optional[SignSt
     """Write this sign's data for the style to the provided property."""
     for potential_style in style.bases:
         try:
-            data = sign.styles[potential_style.id.upper()]
+            data = sign.styles[potential_style.reference()]
             break
         except KeyError:
             pass
@@ -33,7 +33,7 @@ def serialise(sign: Signage, parent: Keyvalues, style: Style) -> Optional[SignSt
             sign.id,
         )
         try:
-            data = sign.styles['BEE2_CLEAN']
+            data = sign.styles[PakRef(Style, CLEAN_STYLE)]
         except KeyError:
             return None
     parent.append(Keyvalues('world', data.world))

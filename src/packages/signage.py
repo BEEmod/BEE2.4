@@ -90,7 +90,7 @@ class Signage(PakObject, allow_mult=True, needs_foreground=True):
 
     @classmethod
     async def parse(cls, data: ParseData) -> Signage:
-        styles: dict[utils.ObjectID, SignStyle] = {}
+        styles: dict[PakRef[Style], SignStyle] = {}
         for prop in data.info.find_children('styles'):
             sty_id = PakRef.parse(Style, prop.real_name)
 

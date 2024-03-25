@@ -36,7 +36,7 @@ __all__ = [
     # Generally global.
     'OBJ_TYPES', 'PACK_CONFIG',
     'LegacyCorr', 'LEGACY_CORRIDORS',
-    'CLEAN_PACKAGE', 'SelitemData',
+    'CLEAN_PACKAGE', 'CLEAN_STYLE', 'SelitemData',
     'PakObject', 'PackagesSet', 'get_loaded_packages', 'PakRef',
     'find_packages', 'load_packages',
 
