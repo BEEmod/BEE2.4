@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: https://github.com/BEEmod/BEE2.4/issues\n"
-"POT-Creation-Date: 2023-12-30 10:20+1000\n"
+"POT-Creation-Date: 2024-03-25 13:42+1000\n"
 "PO-Revision-Date: 2019-11-22 10:47+1000\n"
 "Last-Translator: Antecer <antecer@outlook.com>\n"
 "Language: zh\n"
@@ -12,7 +12,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.12.1\n"
+"Generated-By: Babel 2.14.0\n"
 
 #: loadScreen.py
 msgid "Skipped!"
@@ -72,6 +72,72 @@ msgstr "初始化界面"
 msgid "Better Extended Editor for Portal 2"
 msgstr "更棒的传送门2扩展编辑器"
 
+#: quote_pack.py
+msgid "No Name!"
+msgstr "没有名称！"
+
+#: quote_pack.py
+msgid "Singleplayer"
+msgstr "单人模式"
+
+#: quote_pack.py
+msgid "Cooperative"
+msgstr "合作模式"
+
+#: quote_pack.py
+msgid "ATLAS (SP/Coop)"
+msgstr ""
+
+#: quote_pack.py
+msgid "P-Body (SP/Coop)"
+msgstr ""
+
+#: app/CompilerPane.py quote_pack.py
+msgid "Bendy"
+msgstr "Bendy（纸片人小黑）"
+
+#: app/CompilerPane.py quote_pack.py
+msgid "Chell"
+msgstr "Chell（主角雪儿）"
+
+#: quote_pack.py
+msgid "Human characters (Bendy and Chell)"
+msgstr "人物角色（小黑人和雪儿）"
+
+#: quote_pack.py
+msgid "AI characters (ATLAS, P-Body, or Coop)"
+msgstr "AI字符（ATLAS，P-Body或Coop）"
+
+#: quote_pack.py
+#, fuzzy
+msgid "Death - Generic"
+msgstr "致命 - 激光力场"
+
+#: quote_pack.py
+msgid "Death - Toxic Goo"
+msgstr "致命 - 剧毒酸液"
+
+#: quote_pack.py
+msgid "Death - Turrets"
+msgstr "致命 - 炮塔"
+
+#: quote_pack.py
+msgid "Death - Crusher"
+msgstr "致命 - 钉板"
+
+#: quote_pack.py
+msgid "Death - LaserField"
+msgstr "致命 - 激光力场"
+
+#: quote_pack.py
+#, fuzzy
+msgid "Gesture - Generic"
+msgstr "致命 - 激光力场"
+
+#: quote_pack.py
+msgid "Gesture - Camera"
+msgstr ""
+
 #. i18n: Special token, must be exactly two lines, shown via game_text if an
 #. error occurs in Coop.
 #: user_errors.py
@@ -111,6 +177,13 @@ msgstr ""
 
 #. This uses HTML syntax.
 #: user_errors.py
+msgid ""
+"The instance \"<var>{inst}</var>\" does not have any connection "
+"information defined!"
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
 msgid "See the documentation"
 msgstr ""
 
@@ -144,8 +217,8 @@ msgstr ""
 #. This uses HTML syntax.
 #: user_errors.py
 msgid ""
-"Bad Glass Floorbeam template! The template must have a single brush, with"
-" one face pointing in the <var>+X</var> direction."
+"Bad Glass Floorbeam template! The template must have a single brush, "
+"aligned along the <var>X</var> axis."
 msgstr ""
 
 #. This uses HTML syntax.
@@ -269,24 +342,59 @@ msgstr ""
 
 #. This uses HTML syntax.
 #: user_errors.py
-msgid ""
-"A glass/grating Hole does not have sufficent space. The entire "
-"highlighted yellow area should be occupied by continous glass or grating."
-" For large holes, the diagonally adjacient voxels are not required. In "
-"addition, two Hole items cannot overlap each other."
+msgid "Glass / Grating item"
 msgstr ""
 
 #. This uses HTML syntax.
 #: user_errors.py
 msgid ""
-"A glass/grating Hole was misplaced. The item must be placed against a "
-"glass or grating sheet, which it will then cut a hole into. To rotate the"
-" item properly, you may need to place it on a wall with the same "
-"orientation first, then drag it onto the glass without dragging it over "
-"surfaces with different orientations. Alternatively put a block "
-"temporarily in the glass or grating's location to position the hole item,"
-" then carve into the block from a side to remove it while keeping the "
-"hole in the same position."
+"The custom barrier item \"<var>{name}</var>\" must be connected via "
+"output to one or more regular glass or grating items. It will then change"
+" the type of that barrier."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"The barrier at this posiiton has been connected to multiple custom "
+"barrier items. Remove all but one connection."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"A Barrier Hole (\"<var>{hole}</var>\") does not have sufficent space. The"
+" entire highlighted yellow area should be occupied by continous "
+"glass/grating/etc which isnot itself occupied by a different hole."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"A Barrier Hole (\"<var>{hole}</var>\") was misplaced. The item must be "
+"placed against a glass/grating/etc sheet, which it will then cut a hole "
+"into. To rotate the item properly, you may need to place it on a wall "
+"with the same orientation first, then drag it onto the glass without "
+"dragging it over surfaces with different orientations. Alternatively put "
+"a block temporarily in the barrier's location to position the hole item, "
+"then carve into the block from a side to remove it while keeping the hole"
+" in the same position."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"A Barrier Hole (\"<var>{hole}</var>\") was placed on top of a "
+"\"<var>{barrier}</var>\" barrier, but this barrier does not support this "
+"type of hole. The barrier allows ({types_barrier}), but the hole only has"
+" ({types_hole}) available."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"A Barrier Hole (\"<var>{hole}</var>\") was placed on top of a "
+"\"<var>{barrier}</var>\" barrier, which does not allow holes."
 msgstr ""
 
 #. This uses HTML syntax.
@@ -320,19 +428,19 @@ msgstr ""
 #. This uses HTML syntax.
 #: user_errors.py
 msgid ""
-"The template \"{id}\" has a {type} with two visgroups: "
-"<var>{groups}</var>. Brushes andoverlays in templates may currently only "
-"use one visgroup each."
+"The template \"<var>{id}</var>\" has a {type} with two visgroups: "
+"\"<var>{groups}</var>\". Brushes andoverlays in templates may currently "
+"only use one visgroup each."
 msgstr ""
 
 #. This uses HTML syntax.
 #: user_errors.py
-msgid "No item ID for fizzler instance <var>\"{inst}\"</var>!"
+msgid "No item ID for fizzler instance \"<var>{inst}</var>\"!"
 msgstr ""
 
 #. This uses HTML syntax.
 #: user_errors.py
-msgid "No fizzler type for {item} (<var>\"{inst}\"</var>)!"
+msgid "No fizzler type for {item} (\"<var>{inst}</var>\")!"
 msgstr ""
 
 #. This uses HTML syntax.
@@ -342,13 +450,13 @@ msgstr ""
 
 #. This uses HTML syntax.
 #: user_errors.py
-msgid "Instance lookup path <code>\"{path}\"</code> returned no instances."
+msgid "Instance lookup path \"<code>{path}</code>\" returned no instances."
 msgstr ""
 
 #. This uses HTML syntax.
 #: user_errors.py
 msgid ""
-"Instance lookup path <code>\"{path}\"</code> was expected to provide one "
+"Instance lookup path \"<code>{path}</code>\" was expected to provide one "
 "instance, but it returned multiple instances:"
 msgstr ""
 
@@ -362,6 +470,16 @@ msgstr ""
 msgid "Failed to load error!"
 msgstr ""
 
+#: app/BEE2.py
+#, fuzzy
+msgid "An error occurred when loading packages:"
+msgid_plural "Multiple errors occurred when loading packages:"
+msgstr[0] ""
+
+#: app/BEE2.py
+msgid "Loading packages was partially successful:"
+msgstr ""
+
 #: app/CheckDetails.py
 msgid "Toggle all checkboxes."
 msgstr "反选所有复选框"
@@ -373,14 +491,6 @@ msgstr "ATLAS（蓝色机器人）"
 #: app/CompilerPane.py
 msgid "P-Body"
 msgstr "P-Body（橙色机器人）"
-
-#: app/CompilerPane.py app/voiceEditor.py
-msgid "Chell"
-msgstr "Chell（主角雪儿）"
-
-#: app/CompilerPane.py app/voiceEditor.py
-msgid "Bendy"
-msgstr "Bendy（纸片人小黑）"
 
 #: app/CompilerPane.py
 msgid "Image Files"
@@ -796,18 +906,6 @@ msgid "Selected Items and Style successfully exported!"
 msgstr "所选物品和风格已成功导出！"
 
 #: app/UI.py
-#, fuzzy
-msgid ""
-"Selected Items and Style successfully exported!\n"
-"\n"
-"Warning: VPK files were not exported, quit Portal 2 and Hammer to ensure "
-"editor wall previews are changed."
-msgstr ""
-"所选物品和风格已成功导出！\n"
-"\n"
-"警告：VPK文件未导出，退出 Portal 2 和 Hammer 以应用地图编辑器的物品栏更改。"
-
-#: app/UI.py
 msgid "BEE2 - Export Complete"
 msgstr ""
 
@@ -991,6 +1089,11 @@ msgid ""
 "\n"
 "This has been copied to the clipboard."
 msgstr ""
+
+#: app/backup.py
+#, fuzzy
+msgid "Backup Puzzles"
+msgstr "备份/恢复 谜题"
 
 #: app/backup.py app/packageMan.py
 #, fuzzy
@@ -1322,6 +1425,15 @@ msgstr "更改默认值..."
 msgid "Change the default settings for this item when placed."
 msgstr "修改该物品在放置时的默认设置。"
 
+#: app/contextWin.py
+#, fuzzy
+msgid "Select Signage..."
+msgstr "建议"
+
+#: app/contextWin.py
+msgid "Change which signs are specified by each timer value."
+msgstr ""
+
 #: app/corridor_selector.py app/selector_win.py
 #, fuzzy
 msgid "Author: {authors}"
@@ -1338,7 +1450,7 @@ msgid ""
 "corridor will be picked for each map."
 msgstr ""
 
-#: app/dialogs.py app/tk_tools.py
+#: app/dialogs.py
 #, fuzzy
 msgid "BEEmod"
 msgstr "BEE模组物品"
@@ -1357,35 +1469,15 @@ msgid "An error occurred while performing this task:"
 msgid_plural "Multiple errors occurred while performing this task:"
 msgstr[0] ""
 
-#: app/gameMan.py
-msgid "Backup Original Files"
-msgstr ""
-
-#: app/gameMan.py
+#: app/errors.py
 #, fuzzy
-msgid "Backup Puzzles"
-msgstr "备份/恢复 谜题"
-
-#: app/gameMan.py
-msgid "Export Configuration"
-msgstr ""
-
-#: app/gameMan.py
-msgid "Copy Compiler"
-msgstr ""
-
-#: app/gameMan.py
-msgid "Copy Resources"
-msgstr ""
-
-#: app/gameMan.py
-msgid "Copy Music"
-msgstr ""
-
-#: app/gameMan.py
-#, fuzzy
-msgid "Exporting"
-msgstr "导出"
+msgid ""
+"An error occurred while performing this task, but it was partially "
+"successful:"
+msgid_plural ""
+"Multiple errors occurred while performing this task, but it was partially"
+" successful:"
+msgstr[0] ""
 
 #: app/gameMan.py
 #, fuzzy
@@ -1396,42 +1488,6 @@ msgstr "导出到 \"{game}\"..."
 #, fuzzy
 msgid "Export to \"{game}\"*..."
 msgstr "导出到 \"{game}\"*..."
-
-#: app/gameMan.py
-msgid "BEE2 - Export Failed!"
-msgstr "BEE2 - 导出失败！"
-
-#: app/gameMan.py
-msgid ""
-"Compiler file {file} missing. Exit Steam applications, then press OK to "
-"verify your game cache. You can then export again."
-msgstr "编译器文件 {file} 丢失。退出Steam程序，然后点击OK以校验你的游戏缓存。然后再次尝试导出。"
-
-#: app/gameMan.py
-msgid ""
-"Copying compiler file {file} failed. Ensure {game}'s map compiler is not "
-"running. The webserver for the error display may also be running, quit "
-"the vrad process or wait a few minutes."
-msgstr ""
-
-#: app/gameMan.py
-#, fuzzy
-msgid ""
-"Copying compiler file {file} failed. Ensure {game}'s map compiler is not "
-"running."
-msgstr "复制编译器文件 {file} 失败。确保 {game} 未运行"
-
-#: app/gameMan.py
-msgid "BEE2 - Aperture Tag Files Missing"
-msgstr "BEE2 - 光圈科技附加文件丢失"
-
-#: app/gameMan.py
-msgid ""
-"Ap-Tag Coop gun instance not found!\n"
-"Coop guns will not work - verify cache to fix."
-msgstr ""
-"找不到光圈科技附加传送枪的实例！\n"
-"传送器将不起作用 - 校验缓存以修复此问题。"
 
 #: app/gameMan.py
 msgid ""
@@ -2158,7 +2214,7 @@ msgid "Portal 2"
 msgstr "传送门2"
 
 #. i18n: Aperture Tag's palette
-#: app/paletteLoader.py
+#: app/paletteLoader.py packages/__init__.py
 msgid "Aperture Tag"
 msgstr "Aperture Tag"
 
@@ -2299,6 +2355,11 @@ msgid "Signage: {name}"
 msgstr "指示标志: {name}"
 
 #: app/signage_ui.py
+#, fuzzy
+msgid "Unknown Signage: {id}"
+msgstr "指示标志: {name}"
+
+#: app/itemconfig/__init__.py app/signage_ui.py
 msgid "Configure Signage"
 msgstr "设置指示标志"
 
@@ -2306,76 +2367,19 @@ msgstr "设置指示标志"
 msgid "Selected"
 msgstr "所选风格"
 
-#: app/voiceEditor.py
-msgid "Singleplayer"
-msgstr "单人模式"
-
-#: app/voiceEditor.py
-msgid "Cooperative"
-msgstr "合作模式"
-
-#: app/voiceEditor.py
-msgid "ATLAS (SP/Coop)"
-msgstr ""
-
-#: app/voiceEditor.py
-msgid "P-Body (SP/Coop)"
-msgstr ""
-
-#: app/voiceEditor.py
-msgid "Human characters (Bendy and Chell)"
-msgstr "人物角色（小黑人和雪儿）"
-
-#: app/voiceEditor.py
-msgid "AI characters (ATLAS, P-Body, or Coop)"
-msgstr "AI字符（ATLAS，P-Body或Coop）"
-
-#: app/voiceEditor.py
-#, fuzzy
-msgid "Death - Generic"
-msgstr "致命 - 激光力场"
-
-#: app/voiceEditor.py
-msgid "Death - Toxic Goo"
-msgstr "致命 - 剧毒酸液"
-
-#: app/voiceEditor.py
-msgid "Death - Turrets"
-msgstr "致命 - 炮塔"
-
-#: app/voiceEditor.py
-msgid "Death - Crusher"
-msgstr "致命 - 钉板"
-
-#: app/voiceEditor.py
-msgid "Death - LaserField"
-msgstr "致命 - 激光力场"
-
-#: app/voiceEditor.py
-msgid "Taunts - Generic"
-msgstr ""
-
-#: app/voiceEditor.py
-msgid "Camera Gesture - Generic"
-msgstr ""
-
-#: app/voiceEditor.py
-msgid "No Name!"
-msgstr "没有名称！"
-
 #. i18n: 'response' tab name, should be short.
 #: app/voiceEditor.py
 msgid "Resp"
 msgstr "响应"
 
+#. i18n: 'Response' tab header.
 #: app/voiceEditor.py
-msgid "Transcript:"
-msgstr "台词："
+msgid "Responses"
+msgstr "回应"
 
 #: app/voiceEditor.py
-#, fuzzy
-msgid "BEE2 - Configure \"{item}\""
-msgstr "BEE2 - 配置 \"{item}\""
+msgid "Lines played in response to certain events in Coop."
+msgstr "在合作模式中触发特定事件后播放的台词。"
 
 #: app/voiceEditor.py
 msgid "Mid - Chamber"
@@ -2388,12 +2392,13 @@ msgid ""
 msgstr "在测试室内触发特定事件后播放的台词。"
 
 #: app/voiceEditor.py
-msgid "Responses"
-msgstr "回应"
+msgid "Transcript:"
+msgstr "台词："
 
 #: app/voiceEditor.py
-msgid "Lines played in response to certain events in Coop."
-msgstr "在合作模式中触发特定事件后播放的台词。"
+#, fuzzy
+msgid "BEE2 - Configure \"{item}\""
+msgstr "BEE2 - 配置 \"{item}\""
 
 #: app/itemconfig/__init__.py
 msgid "{name} ({page}/{count})"
@@ -2420,21 +2425,154 @@ msgstr "选择一种颜色"
 msgid "Off"
 msgstr ""
 
-#: packages/__init__.py
+#: exporting/__init__.py
+msgid "Overall Progress"
+msgstr ""
+
+#: exporting/__init__.py
+msgid "Backup Original Files"
+msgstr ""
+
+#: exporting/__init__.py
+msgid "Copy Compiler"
+msgstr ""
+
+#: exporting/__init__.py
+msgid "Copy Resources"
+msgstr ""
+
+#: exporting/__init__.py
+msgid "Copy Music"
+msgstr ""
+
+#: exporting/__init__.py
+#, fuzzy
+msgid "Exporting"
+msgstr "导出"
+
+#: exporting/__init__.py
+#, fuzzy
+msgid "BEE2 Export - {game}"
+msgstr "导出到 \"{game}\"..."
+
+#: exporting/__init__.py
+msgid "Exporting failed. The following error occurred:"
+msgid_plural "Exporting failed. The following errors occurred:"
+msgstr[0] ""
+
+#: exporting/__init__.py
+msgid "Exporting was partially successful, but the following issue occurred:"
+msgid_plural "Exporting was partially successful, but the following issues occurred:"
+msgstr[0] ""
+
+#: exporting/compiler.py
+#, fuzzy
 msgid ""
-"one of the following locations:\n"
-"{loc}"
+"Compiler file {file} missing. You will need to verify the game's cache in"
+" Steam to get these files back. You can then export again."
+msgstr "编译器文件 {file} 丢失。退出Steam程序，然后点击OK以校验你的游戏缓存。然后再次尝试导出。"
+
+#: exporting/compiler.py
+msgid ""
+"Copying compiler file {file} failed. Ensure {game}'s map compiler is not "
+"running. The webserver for the error display may also be running, quit "
+"the vrad process or wait a few minutes."
+msgstr ""
+
+#: exporting/compiler.py
+#, fuzzy
+msgid ""
+"Copying compiler file {file} failed. Ensure {game}'s map compiler is not "
+"running."
+msgstr "复制编译器文件 {file} 失败。确保 {game} 未运行"
+
+#: exporting/items.py
+msgid ""
+"Style includes old definition for {item}. Override the item package "
+"object instead."
+msgstr ""
+
+#: exporting/vpks.py
+#, fuzzy
+msgid ""
+"VPK files were not exported, quit Portal 2 and Hammer to ensure editor "
+"wall previews are changed."
+msgstr ""
+"所选物品和风格已成功导出！\n"
+"\n"
+"警告：VPK文件未导出，退出 Portal 2 和 Hammer 以应用地图编辑器的物品栏更改。"
+
+#: exporting/vpks.py
+msgid ""
+"The VPK \"{filename}\" could not be parsed. If this was made by BEE, "
+"delete it, otherwise check if it is corrupt."
+msgstr ""
+
+#: packages/__init__.py
+#, fuzzy
+msgid "Portal Stories: Mel"
+msgstr "没有《传送门：梅尔的故事》的编辑器！"
+
+#: packages/__init__.py
+msgid "Package directory does not exist: \"{path}\""
+msgstr ""
+
+#: packages/__init__.py
+msgid "Package directory did not contain any packages: \"{path}\""
 msgstr ""
 
 #: packages/__init__.py
 msgid ""
-"{msg}\n"
-"Get the packages from \"https://github.com/BEEmod/BEE2-items\" and place "
-"them in {trailer}"
+"Package file has the incorrect file format: {path}\n"
+"Valid formats are zip archives (.zip or .bee_pack) and VPKs (.vpk)"
 msgstr ""
 
 #: packages/__init__.py
-msgid "BEE2 - Invalid Packages Directory!"
+msgid "Potential package file has no info.txt: {path}"
+msgstr ""
+
+#: packages/__init__.py
+msgid "Package has no ID defined: {path}"
+msgstr ""
+
+#: packages/__init__.py
+msgid "Package \"{pak_id}\" could not be enabled - {req} is not installed."
+msgstr ""
+
+#: packages/__init__.py
+msgid ""
+"Package \"{pak_id}\" could not be enabled - required package \"{req}\" "
+"not installed."
+msgstr ""
+
+#: packages/__init__.py
+msgid ""
+"Unknown object type \"{obj_type}\" with ID \"{obj_id}\" in package "
+"\"{pak_id}\"!"
+msgstr ""
+
+#: packages/__init__.py
+msgid ""
+"TemplateBrush \"{id}\" in package \"{pak_id}\" no longer needs to be "
+"defined in info.txt. Use a bee2_template_conf entity instead."
+msgstr ""
+
+#: packages/__init__.py
+msgid "No ID defined for \"{obj_type}\" object type in \"{pak_id}\" package!"
+msgstr ""
+
+#: packages/__init__.py
+msgid ""
+"Duplicate package with id \"{pak_id}\"!\n"
+"If you just updated the mod, delete any old files in packages/.\n"
+"Package 1: {path1}\n"
+"Package 2: {path2}"
+msgstr ""
+
+#: packages/__init__.py
+msgid ""
+"The ID \"{obj_id}\" was used twice for a {obj_type} in the packages "
+"\"{pak1}\" and \"{pak2}\"!"
 msgstr ""
 
 #: packages/__init__.py
@@ -2449,12 +2587,37 @@ msgid ""
 msgstr ""
 
 #: packages/__init__.py
+msgid ""
+"one of the following locations:\n"
+"{loc}"
+msgstr ""
+
+#: packages/__init__.py
+msgid ""
+"{msg}\n"
+"Get the packages from \"https://github.com/BEEmod/BEE2-items\" and place "
+"them in {trailer}"
+msgstr ""
+
+#: packages/__init__.py
 #, fuzzy
 msgid "No description!"
 msgstr "描述："
 
 #: packages/corridor.py
 msgid "Corridor"
+msgstr ""
+
+#: packages/quote_pack.py
+msgid "No \"Quotes\" key in config for quote pack {id}!"
+msgstr ""
+
+#: packages/quote_pack.py
+msgid "Multiple \"Quotes\" keys found in config for quote pack {id}!"
+msgstr ""
+
+#: packages/quote_pack.py
+msgid "Invalid response kind \"{name}\" in config for quote pack {id}!"
 msgstr ""
 
 #: ui_tk/corridor_selector.py
@@ -2581,4 +2744,17 @@ msgstr ""
 
 #~ msgid "Selected:"
 #~ msgstr "所选风格"
+
+#~ msgid "BEE2 - Export Failed!"
+#~ msgstr "BEE2 - 导出失败！"
+
+#~ msgid "BEE2 - Aperture Tag Files Missing"
+#~ msgstr "BEE2 - 光圈科技附加文件丢失"
+
+#~ msgid ""
+#~ "Ap-Tag Coop gun instance not found!\n"
+#~ "Coop guns will not work - verify cache to fix."
+#~ msgstr ""
+#~ "找不到光圈科技附加传送枪的实例！\n"
+#~ "传送器将不起作用 - 校验缓存以修复此问题。"
 
