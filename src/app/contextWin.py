@@ -16,14 +16,17 @@ import webbrowser
 import tkinter as tk
 from tkinter import ttk
 
+import trio
+
 from ui_tk.dialogs import TkDialogs
 from ui_tk.img import TKImages, TK_IMG
 from ui_tk.wid_transtoken import set_text
 from .richTextBox import tkRichText
 from . import (
-    itemconfig, tkMarkdown, tooltip, tk_tools, sound, img, UI,
-    TK_ROOT, DEV_MODE, background_run
+    EdgeTrigger, itemconfig, tkMarkdown, tooltip, tk_tools, sound, img, UI,
+    TK_ROOT, DEV_MODE, background_run,
 )
+from packages.signage import ITEM_ID as SIGNAGE_ITEM_ID
 from .item_properties import PropertyWindow
 import utils
 import srctools.logger
@@ -267,7 +270,6 @@ def get_description(
         return tkMarkdown.MarkdownData.BLANK  # No description
 
 
-
 def load_item_data(tk_img: TKImages) -> None:
     """Refresh the window to use the selected item's data."""
     item_data = selected_item.data
@@ -333,6 +335,13 @@ def load_item_data(tk_img: TKImages) -> None:
         wid['changedefaults'].state(['disabled'])
 
     version_lookup[:] = set_version_combobox(wid['variant'], selected_item)
+
+    if selected_item.id == SIGNAGE_ITEM_ID:
+        wid['variant'].grid_remove()
+        wid['signage_configure'].grid()
+    else:
+        wid['variant'].grid()
+        wid['signage_configure'].grid_remove()
 
     if selected_item.data.url is None:
         wid['moreinfo'].state(['disabled'])
@@ -483,7 +492,10 @@ def hide_context(e: object=None) -> None:
         wid['desc'].set_text('')
 
 
-def init_widgets(tk_img: TKImages) -> None:
+async def init_widgets(
+    tk_img: TKImages, signage_trigger: EdgeTrigger[()],
+    *, task_status: trio.TaskStatus[None] = trio.TASK_STATUS_IGNORED,
+) -> None:
     """Initiallise all the window components."""
     f = ttk.Frame(window, relief="raised", borderwidth="4")
     f.grid(row=0, column=0)
@@ -625,14 +637,35 @@ def init_widgets(tk_img: TKImages) -> None:
         TransToken.ui('Change the default settings for this item when placed.')
     )
 
-    wid['variant'] = ttk.Combobox(
+    wid['variant'] = wid_variant = ttk.Combobox(
         f,
         values=['VERSION'],
         exportselection=False,
         # On Mac this defaults to being way too wide!
         width=7 if utils.MAC else None,
     )
-    wid['variant'].state(['readonly'])  # Prevent directly typing in values
-    wid['variant'].bind('<<ComboboxSelected>>', lambda e: set_item_version(tk_img))
-    wid['variant'].current(0)
-    wid['variant'].grid(row=7, column=0, sticky='w')
+    wid_variant.state(['readonly'])  # Prevent directly typing in values
+    wid_variant.bind('<<ComboboxSelected>>', lambda e: set_item_version(tk_img))
+    wid_variant.current(0)
+
+    # Special button for signage items only.
+    wid['signage_configure'] = wid_sign_config = ttk.Button(
+        f, command=signage_trigger.trigger,
+    )
+    set_text(wid_sign_config, TransToken.ui('Select Signage...'))
+    tooltip.add_tooltip(
+        wid_sign_config,
+        TransToken.ui('Change which signs are specified by each timer value.')
+    )
+
+    wid_variant.grid(row=7, column=0, sticky='w')
+    wid_variant.grid_remove()
+    wid_sign_config.grid(row=7, column=0, sticky='w')
+    wid_sign_config.grid_remove()
+
+    async with trio.open_nursery() as nursery:
+        nursery.start_soon(
+            tk_tools.apply_bool_enabled_state_task,
+            signage_trigger.ready, wid_sign_config,
+        )
+        task_status.started()

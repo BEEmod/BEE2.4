@@ -1602,7 +1602,7 @@ async def init_windows(tk_img: TKImages) -> None:
     await LOAD_UI.step('backup')
     voiceEditor.init_widgets()
     await LOAD_UI.step('voiceline')
-    contextWin.init_widgets(tk_img)
+    await background_start(contextWin.init_widgets, tk_img, signage_trigger)
     await LOAD_UI.step('contextwin')
     await optionWindow.init_widgets(
         unhide_palettes=pal_ui.reset_hidden_palettes,

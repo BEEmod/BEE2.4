@@ -2,10 +2,15 @@
 
 # Version 4.44.1
 
-* Glass/grating is now generated entirely by the compiler, allowing fully custom items to be made. The original glass/grating frame is now also generated slightly more efficiently.
+* Glass/grating is now generated entirely by the compiler, allowing fully 
+  custom items to be made. The original glass/grating frame is now also 
+  generated slightly more efficiently.
 * Fix add-game prompt failing to appear if installed fresh.
 * Remove some now-outdated splash screens.
 * Music can now have a volume specified in the config.
+* Added the ability to show multiple warning messages or errors for problems 
+  occurring during package loading and export.
+* Added signage configuration option to the item's context menu, to help make it more visible.
 
 ------------------------------------------
 
