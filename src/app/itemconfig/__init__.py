@@ -13,7 +13,7 @@ from srctools import logger
 from trio_util import AsyncValue
 import trio
 
-from app import EdgeTrigger, TK_ROOT, UI, signage_ui, sound, tk_tools, StyleVarPane
+from app import EdgeTrigger, TK_ROOT, UI, sound, tk_tools, StyleVarPane
 from app.tooltip import add_tooltip
 # Re-export.
 from config.widgets import (
@@ -25,6 +25,7 @@ from packages.widgets import (
     WidgetType,
     WidgetTypeWithConf,
 )
+from packages.signage import ITEM_ID as SIGNAGE_ITEM_ID
 from transtoken import TransToken, CURRENT_LANG
 
 from app.SubPane import SubPane
@@ -35,7 +36,6 @@ import config
 import packages
 
 LOGGER = logger.get_logger(__name__)
-SIGNAGE_ID = 'ITEM_BEE2_SIGNAGE'
 
 
 class SingleCreateTask(Protocol[OptConfT_contra]):
@@ -210,7 +210,7 @@ async def create_group(
             create_func = _UI_IMPL_SINGLE[s_wid.kind]
 
             conf = s_wid.config
-            if isinstance(conf, ItemVariantConf) and conf.item_id == SIGNAGE_ID:
+            if isinstance(conf, ItemVariantConf) and conf.item_id == SIGNAGE_ITEM_ID:
                 # Special case. This is a trigger to display the "Configure Signage" button.
                 # Replace the config with the edge trigger, signalling the creation func below
                 # to handle this.

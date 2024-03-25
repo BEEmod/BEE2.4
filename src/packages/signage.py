@@ -10,10 +10,12 @@ from packages import PakObject, PakRef, ParseData, Style
 from app.img import Handle as ImgHandle
 import utils
 
-__all__ = ['LEGEND_SIZE', 'CELL_SIZE', 'Signage', 'SignageLegend', 'SignStyle']
+__all__ = ['LEGEND_SIZE', 'CELL_SIZE', 'ITEM_ID', 'Signage', 'SignageLegend', 'SignStyle']
 LOGGER = srctools.logger.get_logger(__name__)
 LEGEND_SIZE: Final = (512, 1024)
 CELL_SIZE: Final = 102
+# The signage item, used to trigger adding the "Configure Signage" button to its UI.
+ITEM_ID: Final = 'ITEM_BEE2_SIGNAGE'
 
 
 @attrs.frozen
