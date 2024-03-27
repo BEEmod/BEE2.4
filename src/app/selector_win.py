@@ -609,7 +609,6 @@ class SelectorWin(Generic[CallbackT]):
     # The widget used to control which menu option is selected.
     context_var: tk.StringVar
 
-
     def __init__(
         self,
         parent: tk.Tk | tk.Toplevel,

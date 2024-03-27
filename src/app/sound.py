@@ -267,9 +267,6 @@ class SamplePlayer:
         self.start_callback = start_callback
         self.stop_callback = stop_callback
         self.cur_file: str | None = None
-        # The system we need to clean up.
-        self._handle: IO[bytes] | None = None
-        self._cur_sys: FileSystem | None = None
         self.system: FileSystemChain = system
 
     @property
