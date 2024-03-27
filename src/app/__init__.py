@@ -170,7 +170,7 @@ async def background_start(
     """When the UI is live, start this specified task and return when started() is called."""
     if _APP_NURSERY is None:
         raise ValueError('App nursery has not started.')
-    await _APP_NURSERY.start(func, *args, name=name)
+    return await _APP_NURSERY.start(func, *args, name=name)
 
 
 # Various configuration booleans.
