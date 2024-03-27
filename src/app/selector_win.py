@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import copy
 from typing import Generic, Optional, Union, Iterable, Mapping, Callable, AbstractSet
-from typing_extensions import Concatenate, ParamSpec, Protocol, TypeAlias
+from typing_extensions import Concatenate, ParamSpec, TypeAlias
 from tkinter import font as tk_font
 from tkinter import ttk
 import tkinter as tk
@@ -504,11 +504,6 @@ class PreviewWindow:
 
 
 _PREVIEW = PreviewWindow()
-
-
-class _CreateTask(Protocol[CallbackT]):
-    async def __call__(self, *, task_status: trio.TaskStatus['SelectorWin[CallbackT]']) -> None:
-        ...
 
 
 class SelectorWin(Generic[CallbackT]):
