@@ -546,7 +546,8 @@ async def load_packages(packset: packages.PackagesSet, tk_img: TKImages) -> None
         suggested_refresh()
 
     # Defaults match Clean Style, if not found it uses the first item.
-    skybox_win = SelectorWin(
+    skybox_win = await background_start(functools.partial(
+        SelectorWin.create,
         TK_ROOT,
         sky_list,
         save_id='skyboxes',
@@ -563,9 +564,10 @@ async def load_packages(packset: packages.PackagesSet, tk_img: TKImages) -> None
             SelAttr.bool('3D', TransToken.ui('3D Skybox'), False),
             SelAttr.color('COLOR', TransToken.ui('Fog Color')),
         ],
-    )
+    ))
 
-    voice_win = SelectorWin(
+    voice_win = await background_start(functools.partial(
+        SelectorWin.create,
         TK_ROOT,
         voice_list,
         save_id='voicelines',
@@ -587,9 +589,10 @@ async def load_packages(packset: packages.PackagesSet, tk_img: TKImages) -> None
             SelAttr.bool('TURRET', TransToken.ui('Turret Shoot Monitor'), False),
             SelAttr.bool('MONITOR', TransToken.ui('Monitor Visuals'), False),
         ],
-    )
+    ))
 
-    style_win = SelectorWin(
+    style_win = await background_start(functools.partial(
+        SelectorWin.create,
         TK_ROOT,
         style_list,
         save_id='styles',
@@ -609,9 +612,10 @@ async def load_packages(packset: packages.PackagesSet, tk_img: TKImages) -> None
         attributes=[
             SelAttr.bool('VID', TransToken.ui('Elevator Videos'), default=True),
         ]
-    )
+    ))
 
-    elev_win = SelectorWin(
+    elev_win = await background_start(functools.partial(
+        SelectorWin.create,
         TK_ROOT,
         elev_list,
         save_id='elevators',
@@ -633,7 +637,7 @@ async def load_packages(packset: packages.PackagesSet, tk_img: TKImages) -> None
         attributes=[
             SelAttr.bool('ORIENT', TransToken.ui('Multiple Orientations')),
         ]
-    )
+    ))
 
     suggest_windows[packages.QuotePack] = voice_win
     suggest_windows[packages.Skybox] = skybox_win

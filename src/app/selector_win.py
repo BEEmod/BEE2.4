@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import copy
 from typing import Generic, Optional, Union, Iterable, Mapping, Callable, AbstractSet
-from typing_extensions import Concatenate, ParamSpec, TypeAlias
+from typing_extensions import Concatenate, ParamSpec, Protocol, TypeAlias
 from tkinter import font as tk_font
 from tkinter import ttk
 import tkinter as tk
@@ -20,14 +20,15 @@ import operator
 import math
 import random
 
-import attrs
 from srctools import Vec, EmptyMapping
 from srctools.filesys import FileSystemChain
+import attrs
+import trio
 import srctools.logger
 
 from app.richTextBox import tkRichText
 from app.tooltip import add_tooltip, set_tooltip
-from app import localisation, tkMarkdown, tk_tools, sound, img, TK_ROOT, DEV_MODE
+from app import tkMarkdown, tk_tools, sound, img, TK_ROOT, DEV_MODE
 from ui_tk.img import TK_IMG
 from ui_tk.wid_transtoken import set_menu_text, set_text, set_win_title
 from packages import SelitemData
@@ -36,7 +37,7 @@ from consts import (
     SEL_ICON_SIZE_LRG as ICON_SIZE_LRG,
     SEL_ICON_CROP_SHRINK as ICON_CROP_SHRINK
 )
-from transtoken import TransToken
+from transtoken import CURRENT_LANG, TransToken
 from config.last_sel import LastSelected
 from config.windows import SelectorState
 import utils
@@ -506,6 +507,11 @@ class PreviewWindow:
 _PREVIEW = PreviewWindow()
 
 
+class _CreateTask(Protocol[CallbackT]):
+    async def __call__(self, *, task_status: trio.TaskStatus['SelectorWin[CallbackT]']) -> None:
+        ...
+
+
 class SelectorWin(Generic[CallbackT]):
     """The selection window for skyboxes, music, goo and voice packs.
 
@@ -609,8 +615,9 @@ class SelectorWin(Generic[CallbackT]):
     # The widget used to control which menu option is selected.
     context_var: tk.StringVar
 
-    def __init__(
-        self,
+    @classmethod
+    async def create(
+        cls,
         parent: tk.Tk | tk.Toplevel,
         lst: list[Item],
         *,  # Make all keyword-only for readability
@@ -635,6 +642,8 @@ class SelectorWin(Generic[CallbackT]):
         callback_params: CallbackT.args = (),
         callback_keywords: CallbackT.kwargs = EmptyMapping,
         attributes: Iterable[AttrDef] = (),
+
+        task_status: trio.TaskStatus[SelectorWin[CallbackT]],
     ) -> None:
         """Create a window object.
 
@@ -676,6 +685,8 @@ class SelectorWin(Generic[CallbackT]):
         - readonly_override, if set will override the textbox when readonly.
         - modal: If True, the window will block others while open.
         """
+        self = cls()
+
         self.noneItem = Item(
             name='<NONE>',
             short_name=TransToken.BLANK,
@@ -1038,7 +1049,11 @@ class SelectorWin(Generic[CallbackT]):
         self.set_disp()
         self.refresh()
         self.wid_canvas.bind("<Configure>", self.flow_items)
-        localisation.add_callback(call=False)(self._update_translations)
+
+        task_status.started(self)
+
+        async with trio.open_nursery() as nursery:
+            nursery.start_soon(self._update_translations_task)
 
     def __repr__(self) -> str:
         return f'<SelectorWin "{self.save_id}">'
@@ -1270,13 +1285,15 @@ class SelectorWin(Generic[CallbackT]):
             self.disp_label.set(str(self._suggested_rollover.context_lbl))
             self.display.after(1000, self._pick_suggested)
 
-    def _update_translations(self) -> None:
+    async def _update_translations_task(self) -> None:
         """Update translations."""
-        if self._readonly and self.readonly_override is not None:
-            self.disp_label.set(str(self.readonly_override))
-        else:
-            # We don't care about updating to the rollover item, it'll swap soon anyway.
-            self.disp_label.set(str(self.selected.context_lbl))
+        async with utils.aclosing(CURRENT_LANG.eventual_values()) as agen:
+            async for lang in agen:
+                if self._readonly and self.readonly_override is not None:
+                    self.disp_label.set(str(self.readonly_override))
+                else:
+                    # We don't care about updating to the rollover item, it'll swap soon anyway.
+                    self.disp_label.set(str(self.selected.context_lbl))
 
     def _icon_clicked(self, _: tk.Event[tk.Misc]) -> None:
         """When the large image is clicked, either show the previews or play sounds."""
