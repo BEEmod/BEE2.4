@@ -5,12 +5,12 @@ If PyGame fails to load, all fx() calls will fail silently.
 (Sounds are not critical to the app, so they just won't play.)
 """
 from __future__ import annotations
-from typing import IO, Callable
 import functools
 import os
 import shutil
 
-from srctools.filesys import FileSystem, FileSystemChain, RawFileSystem
+from trio_util import AsyncBool
+from srctools.filesys import FileSystemChain, RawFileSystem
 import srctools.logger
 import trio
 
@@ -254,25 +254,13 @@ def clean_sample_folder() -> None:
 
 class SamplePlayer:
     """Handles playing a single audio file, and allows toggling it on/off."""
-    def __init__(
-        self,
-        # TODO: Replace these callbacks with AsyncValue?
-        start_callback: Callable[[], None],
-        stop_callback: Callable[[], None],
-        system: FileSystemChain,
-    ) -> None:
+    def __init__(self, system: FileSystemChain) -> None:
         """Initialise the sample-playing manager."""
         self.player: pyglet.media.Player | None = None
         self.after: str | None = None
-        self.start_callback = start_callback
-        self.stop_callback = stop_callback
         self.cur_file: str | None = None
         self.system: FileSystemChain = system
-
-    @property
-    def is_playing(self) -> bool:
-        """Is the player currently playing sounds?"""
-        return self.player is not None
+        self.is_playing = AsyncBool()
 
     def play_sample(self, _: object = None) -> None:
         """Play a sample of music.
@@ -289,7 +277,7 @@ class SamplePlayer:
         try:
             file = self.system[self.cur_file]
         except (KeyError, FileNotFoundError):
-            self.stop_callback()
+            self.is_playing.value = False
             LOGGER.error('Sound sample not found: "{}"', self.cur_file)
             return  # Abort if music isn't found..
 
@@ -308,9 +296,9 @@ class SamplePlayer:
             LOGGER.debug('Loading music {} as {}', self.cur_file, sample_fname)
             load_path = str(sample_fname)
         try:
-            sound = decoder.decode(None, load_path)
+            sound = decoder.decode(filename=load_path, file=None)
         except Exception:
-            self.stop_callback()
+            self.is_playing.value = False
             LOGGER.exception('Sound sample not valid: "{}"', self.cur_file)
             return  # Abort if music isn't found or can't be loaded.
 
@@ -319,14 +307,14 @@ class SamplePlayer:
             int(sound.duration * 1000),
             self._finished,
         )
-        self.start_callback()
+        self.is_playing.value = True
 
     def stop(self) -> None:
         """Cancel the music, if it's playing."""
         if self.player is not None:
             self.player.pause()
             self.player = None
-            self.stop_callback()
+            self.is_playing.value = False
 
         if self.after is not None:
             TK_ROOT.after_cancel(self.after)
@@ -336,4 +324,4 @@ class SamplePlayer:
         """Reset values after the sound has finished."""
         self.player = None
         self.after = None
-        self.stop_callback()
+        self.is_playing.value = False

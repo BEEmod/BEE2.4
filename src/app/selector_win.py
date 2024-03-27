@@ -16,7 +16,6 @@ import tkinter as tk
 from collections import defaultdict
 from enum import Enum
 import functools
-import operator
 import math
 import random
 
@@ -884,12 +883,7 @@ class SelectorWin(Generic[CallbackT]):
             samp_button.grid(row=0, column=1)
             add_tooltip(samp_button, TransToken.ui("Play a sample of this item."))
 
-            # On start/stop, update the button label.
-            self.sampler = sound.SamplePlayer(
-                stop_callback=functools.partial(operator.setitem, samp_button, 'text', BTN_PLAY),
-                start_callback=functools.partial(operator.setitem, samp_button, 'text', BTN_STOP),
-                system=sound_sys,
-            )
+            self.sampler = sound.SamplePlayer(system=sound_sys)
             samp_button['command'] = self.sampler.play_sample
             samp_button.state(('disabled',))
         else:
@@ -1050,10 +1044,20 @@ class SelectorWin(Generic[CallbackT]):
         self.refresh()
         self.wid_canvas.bind("<Configure>", self.flow_items)
 
-        task_status.started(self)
+        async def update_sampler() -> None:
+            """Update the sampler's display."""
+            sampler = self.sampler
+            samp_button = self.samp_button
+            if sampler is None or samp_button is None:
+                return  # Not required.
+            async with utils.aclosing(sampler.is_playing.eventual_values()) as agen:
+                async for is_playing in agen:
+                    samp_button['text'] = BTN_STOP if is_playing else BTN_PLAY
 
         async with trio.open_nursery() as nursery:
             nursery.start_soon(self._update_translations_task)
+            nursery.start_soon(update_sampler)
+            task_status.started(self)
 
     def __repr__(self) -> str:
         return f'<SelectorWin "{self.save_id}">'
