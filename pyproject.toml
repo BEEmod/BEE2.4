@@ -79,7 +79,7 @@ extend-ignore = [
 	"TRIO115",  # Stick with sleep(0) instead of lowlevel.checkpoint(), for now?
 
 	# Pyupgrade:
-	# Keep using typing types even with __future__.annotations.
+	# Keep using typing's types even with __future__.annotations.
 	"UP006", "UP007", "UP035",
 
 	# Flake8-bugbear:
