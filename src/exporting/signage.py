@@ -1,6 +1,7 @@
 """Export signage configuration, and write the legend."""
+from __future__ import annotations
 from pathlib import Path
-from typing import Final, Optional
+from typing import Final
 
 import trio.to_thread
 from PIL import Image
@@ -18,7 +19,7 @@ LOGGER = srctools.logger.get_logger(__name__)
 SIGN_LOC: Final = 'bee2/materials/BEE2/models/props_map_editor/signage/signage.vtf'
 
 
-def serialise(sign: Signage, parent: Keyvalues, style: Style) -> Optional[SignStyle]:
+def serialise(sign: Signage, parent: Keyvalues, style: Style) -> SignStyle | None:
     """Write this sign's data for the style to the provided property."""
     for potential_style in style.bases:
         try:
@@ -109,7 +110,7 @@ def make_legend(
     """Construct the legend texture for the signage."""
     legend = Image.new('RGBA', LEGEND_SIZE, (0, 0, 0, 0))
 
-    blank_img: Optional[Image.Image] = None
+    blank_img: Image.Image | None = None
     for style in sel_style.bases:
         try:
             legend_info = packset.obj_by_id(SignageLegend, style.id)

@@ -385,12 +385,17 @@ def res_make_catwalk(vmf: VMF, res: Keyvalues) -> object:
             # Look for continuous segments. This must be NS or EW, so easy to check.
             direction = FrozenVec(0, 128, 0) if dir_mask.N else FrozenVec(-128, 0, 0)
             start = end = f_origin
-            while catwalks[nextpos := start - direction] == dir_mask:
+            nextpos = start - direction
+            while catwalks[nextpos] == dir_mask:
                 start = nextpos
                 del catwalks[nextpos]
-            while catwalks[nextpos := end + direction] == dir_mask:
+                nextpos = start - direction
+
+            nextpos = end + direction
+            while catwalks[nextpos] == dir_mask:
                 end = nextpos
                 del catwalks[nextpos]
+                nextpos = end + direction
 
             # Figure out the most efficient number of sections.
             loc = start.copy()

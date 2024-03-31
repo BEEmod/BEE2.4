@@ -1,4 +1,5 @@
 """Adds voicelines dynamically into the map."""
+from __future__ import annotations
 from collections.abc import Iterator
 from decimal import Decimal
 import itertools

@@ -1,7 +1,7 @@
 """Data structures for quote packs."""
+from __future__ import annotations
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 import enum
-from collections.abc import Iterable, Iterator, Mapping
-from typing import Dict, List, Optional, Sequence, Set
 
 import attrs
 from srctools import Angle, Keyvalues, Output, Vec, conv_int, logger
@@ -137,19 +137,19 @@ class Choreo:
 class Line:
     """A single group of lines that can be played."""
     id: str
-    criterion: Set[LineCriteria]
+    criterion: set[LineCriteria]
     name: TransToken
-    transcript: List[tuple[str, TransToken]]
+    transcript: list[tuple[str, TransToken]]
 
     only_once: bool
     atomic: bool
 
     caption_name: str
-    bullseyes: List[str]
-    instances: List[str]
-    sounds: List[str]
-    scenes: List[Choreo]
-    set_stylevars: Set[str]
+    bullseyes: list[str]
+    instances: list[str]
+    sounds: list[str]
+    scenes: list[Choreo]
+    set_stylevars: set[str]
 
     @classmethod
     def parse(cls, pak_id: utils.ObjectID, kv: Keyvalues, require_quote_name: bool) -> Self:
@@ -157,7 +157,7 @@ class Line:
 
         The keyvalue should have its name start with "line".
         """
-        criterion: Set[LineCriteria] = set()
+        criterion: set[LineCriteria] = set()
         criteria_parts = kv.name.split('_')
         assert criteria_parts[0] == 'line'
         for part in criteria_parts[1:]:
@@ -190,7 +190,7 @@ class Line:
 
         # Scenes and the dependent commands are order dependent
         cur_choreo_name = ''
-        end_commands: List[Output] = []
+        end_commands: list[Output] = []
         for child in kv:
             if child.name == 'choreo_name':
                 cur_choreo_name = child.value
@@ -261,13 +261,13 @@ class Quote:
     tests: list[Keyvalues]
     priority: int
     name: TransToken
-    lines: List[Line]
+    lines: list[Line]
 
     @classmethod
     def parse(cls, pak_id: utils.ObjectID, kv: Keyvalues, require_quote_name: bool) -> Self:
         """Parse from the keyvalues data."""
-        lines: List[Line] = []
-        tests: List[Keyvalues] = []
+        lines: list[Line] = []
+        tests: list[Keyvalues] = []
         priority = 0
         name: TransToken = TransToken.BLANK
         for child in kv:
@@ -287,7 +287,7 @@ class Quote:
         for i, line in enumerate(self.lines, 1):
             yield from line.iter_trans_tokens(f'{path}/{line.id}')
 
-    def filter_criteria(self, flag_set: Set[LineCriteria]) -> Iterator[Line]:
+    def filter_criteria(self, flag_set: set[LineCriteria]) -> Iterator[Line]:
         """Filter the lines by the specified criteria set."""
         for line in self.lines:
             if flag_set.issuperset(line.criterion):
@@ -301,10 +301,10 @@ class Group:
     name: TransToken
     desc: TransToken
     choreo_name: str
-    choreo_loc: Optional[Vec]
+    choreo_loc: Vec | None
     choreo_use_dings: bool
 
-    quotes: List[Quote]
+    quotes: list[Quote]
 
     @classmethod
     def parse(cls, pak_id: utils.ObjectID, kv: Keyvalues) -> Self:
@@ -362,17 +362,17 @@ class Monitor:
 class QuoteInfo:
     """The data that is saved for the compiler to use."""
     id: str
-    cave_skin: Optional[int]
+    cave_skin: int | None
     use_dings: bool
     use_microphones: bool
     global_bullseye: str
-    chars: Set[str]
+    chars: set[str]
     base_inst: str
     position: Vec
 
-    groups: Dict[str, Group]
-    events: Dict[str, QuoteEvent]
+    groups: dict[str, Group]
+    events: dict[str, QuoteEvent]
     response_use_dings: bool  # Override from the regular setting.
-    responses: Dict[Response, List[Line]]
-    midchamber: List[Quote]
-    monitor: Optional[Monitor]
+    responses: dict[Response, list[Line]]
+    midchamber: list[Quote]
+    monitor: Monitor | None

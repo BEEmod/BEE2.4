@@ -1,5 +1,6 @@
 """The package containg all UI code."""
-from typing import Any, Awaitable, Callable, Tuple, Type, TypeVar, Generic, Union, overload
+from __future__ import annotations
+from typing import Any, Awaitable, Callable, TypeVar, Generic, overload
 
 from typing_extensions import TypeVarTuple, Unpack
 from types import TracebackType, new_class
@@ -16,7 +17,7 @@ TK_ROOT = tk.Tk()
 TK_ROOT.withdraw()  # Hide the window until everything is loaded.
 
 # The nursery where UI tasks etc are run in.
-_APP_NURSERY: Union[trio.Nursery, None] = None
+_APP_NURSERY: trio.Nursery | None = None
 # This is quit to exit the sleep_forever(), beginning the shutdown process.
 _APP_QUIT_SCOPE = trio.CancelScope()
 T = TypeVar("T")
@@ -59,9 +60,9 @@ del _run_main_loop
 
 # noinspection PyBroadException
 def tk_error(
-    exc_type: Type[BaseException],
+    exc_type: type[BaseException],
     exc_value: BaseException,
-    exc_tb: Union[TracebackType, None],
+    exc_tb: TracebackType | None,
 ) -> None:
     """Log TK errors."""
     # The exception is caught inside the TK code.
@@ -92,9 +93,9 @@ TK_ROOT.report_callback_exception = tk_error
 
 # noinspection PyBroadException
 def on_error(
-    exc_type: Type[BaseException],
+    exc_type: type[BaseException],
     exc_value: BaseException,
-    exc_tb: Union[TracebackType, None],
+    exc_tb: TracebackType | None,
 ) -> None:
     """Run when the application crashes. Display to the user, log it, and quit."""
     # We don't want this to fail, so import everything here, and wrap in
@@ -192,12 +193,12 @@ class EdgeTrigger(Generic[Unpack[PosArgsT]]):
         self.ready = AsyncBool()
 
     @overload
-    async def wait(self: 'EdgeTrigger[()]') -> None: ...
+    async def wait(self: EdgeTrigger[()]) -> None: ...
     @overload
-    async def wait(self: 'EdgeTrigger[T]') -> T: ...
+    async def wait(self: EdgeTrigger[T]) -> T: ...
     @overload  # Ignore spurious warnings about the above overloads being impossible.
-    async def wait(self) -> Tuple[Unpack[PosArgsT]]: ...  # type: ignore[misc]
-    async def wait(self) -> Union[T, Tuple[Unpack[PosArgsT]], None]:
+    async def wait(self) -> tuple[Unpack[PosArgsT]]: ...  # type: ignore[misc]
+    async def wait(self) -> T | tuple[Unpack[PosArgsT]] | None:
         """Wait for the trigger to fire, then return the parameters.
 
         Only one task can wait at a time.
