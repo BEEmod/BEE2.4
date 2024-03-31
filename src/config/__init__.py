@@ -108,7 +108,7 @@ class ConfigSpec:
     # If data was loaded from the config, the callback is immediately awaited.
     # One is provided independently for each ID, so it can be sent to the right object.
     callback: Dict[
-        Tuple[type[Data], str],
+        Tuple[Type[Data], str],
         Callable[[Data], Awaitable[object]],
     ] = attrs.field(factory=dict, repr=False)
 
