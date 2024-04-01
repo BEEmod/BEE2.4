@@ -15,7 +15,6 @@ import sys
 import shutil
 import logging
 import pickle
-import contextlib
 
 from srctools import AtomicWriter, Keyvalues, Vec, FrozenVec, Angle
 from srctools.vmf import VMF, Entity, Output
@@ -90,29 +89,27 @@ async def load_settings() -> Tuple[
 ]:
     """Load in all our settings from vbsp_config."""
     # Do all our file parsing concurrently.
-    try:
-        with contextlib.ExitStack() as file_stack:
-            file_config = file_stack.enter_context(open("bee2/vbsp_config.cfg", encoding='utf8'))
-            file_editor = file_stack.enter_context(open('bee2/editor.bin', 'rb'))
-            file_corridor = file_stack.enter_context(open('bee2/corridors.bin', 'rb'))
-            file_packlist = file_stack.enter_context(open('bee2/pack_list.cfg'))
+    def open_pickle(filename: str) -> Any:
+        """Open then load a pickle file."""
+        with open(filename, 'rb') as f:
+            return pickle.load(f)
 
-            async with trio.open_nursery() as nursery:
-                res_conf = utils.Result.sync(nursery, Keyvalues.parse, file_config)
-                res_editor: utils.Result[
-                    Iterable[editoritems.Item]
-                ] = utils.Result.sync(nursery, pickle.load, file_editor)
-                res_corr: utils.Result[corridor.ExportedConf] = utils.Result.sync(
-                    nursery,
-                    pickle.load, file_corridor,
-                )
-                res_packlist = utils.Result.sync(
-                    nursery,
-                    Keyvalues.parse, file_packlist, 'bee2/pack_list.cfg',
-                )
-                # Load in templates locations.
-                nursery.start_soon(template_brush.load_templates, 'bee2/templates.lst')
-    except FileNotFoundError:
+    def open_keyvalues(filename: str) -> Keyvalues:
+        """Open then load a keyvalues1 file."""
+        with open(filename, encoding='utf8') as f:
+            return Keyvalues.parse(f, filename)
+
+    res_editor: utils.Result[List[editoritems.Item]]
+    res_corr: utils.Result[corridor.ExportedConf]
+    try:
+        async with trio.open_nursery() as nursery:
+            res_conf = utils.Result.sync(nursery, open_keyvalues, "bee2/vbsp_config.cfg")
+            res_packlist = utils.Result.sync(nursery, open_keyvalues, 'bee2/pack_list.cfg')
+            res_editor = utils.Result.sync(nursery, open_pickle, 'bee2/editor.bin')
+            res_corr = utils.Result.sync(nursery, open_pickle, 'bee2/corridors.bin')
+            # Load in templates locations.
+            nursery.start_soon(template_brush.load_templates, 'bee2/templates.lst')
+    except Exception:  # TODO 3.8: except* (FileNotFoundError, IOError)
         LOGGER.exception(
             'Failed to parse required config file. Recompile the compiler '
             'and/or export the palette.'

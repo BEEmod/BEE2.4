@@ -1,7 +1,10 @@
 """Templates are sets of brushes which can be copied into the map."""
 from __future__ import annotations
 
-from typing import AbstractSet, Callable, Union, Optional, Dict, Tuple, Mapping, Iterable, Iterator
+from typing import (
+    AbstractSet, Callable, IO, Union, Optional, Dict, Tuple, Mapping, Iterable,
+    Iterator,
+)
 from typing_extensions import Literal, TypeAlias, assert_never
 import itertools
 import os
@@ -496,10 +499,16 @@ def parse_temp_name(name: str) -> tuple[str, set[str]]:
 
 async def load_templates(path: str) -> None:
     """Load in the template file, used for import_template()."""
-    with open(path, 'rb') as f:
-        dmx, fmt_name, fmt_ver = await trio.to_thread.run_sync(lambda: DMElement.parse(f, unicode=True))
-    if fmt_name != 'bee_templates' or fmt_ver not in [1]:
-        raise ValueError(f'Invalid template file format "{fmt_name}" v{fmt_ver}')
+    def read_templates() -> DMElement:
+        """Read templates from disk."""
+        with open(path, 'rb') as f:
+            dmx, fmt_name, fmt_ver = DMElement.parse(f, unicode=True)
+        if fmt_name != 'bee_templates' or fmt_ver not in [1]:
+            raise ValueError(f'Invalid template file format "{fmt_name}" v{fmt_ver}')
+        return dmx
+
+    dmx = await trio.to_thread.run_sync(read_templates)
+
     for template in dmx['temp'].iter_elem():
         _TEMPLATES[template.name.casefold()] = UnparsedTemplate(
             template.name.upper(),
