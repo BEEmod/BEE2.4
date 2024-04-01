@@ -32,7 +32,8 @@ __all__ = [
     'get_git_version', 'install_path', 'bins_path', 'conf_location', 'fix_cur_directory',
     'run_bg_daemon', 'not_none', 'CONN_LOOKUP', 'CONN_TYPES', 'freeze_enum_props', 'FuncLookup',
     'PackagePath', 'Result', 'acompose', 'get_indent', 'iter_grid', 'check_cython',
-    'ObjectID', 'SpecialID', 'obj_id', 'special_id',
+    'ObjectID', 'SpecialID', 'BlankID', 'ID_EMPTY', 'ID_NONE',
+    'obj_id', 'special_id', 'obj_id_optional', 'special_id_optional',
     'check_shift', 'fit', 'group_runs', 'restart_app', 'quit_app', 'set_readonly',
     'unset_readonly', 'merge_tree', 'write_lang_pot',
 ]
@@ -481,13 +482,23 @@ ID_NONE: Final = SpecialID('<NONE>')
 ID_EMPTY: BlankID = ''
 
 
-def obj_id_optional(value: str, kind: str = 'object') -> ObjectID | Literal[""]:
+def _uppercase_casefold(value: str) -> str:
+    """Casefold and uppercase."""
+    casefolded = value.casefold().upper()
+    if casefolded == value:
+        return value
+    else:
+        return casefolded
+
+
+def obj_id_optional(value: str, kind: str = 'object') -> ObjectID | BlankID:
     """Parse an object ID, allowing through empty IDs."""
     if value.startswith(('(', '<', '[')) or value.endswith((')', '>', ']')):
         raise ValueError(f'Invalid {kind} ID "{value}". IDs may not start/end with brackets.')
-    return ObjectID(SpecialID(value.casefold().upper()))
+    return ObjectID(SpecialID(_uppercase_casefold(value)))
 
 
+# TODO: Could use @overload + @deprecated to warn if input is already an ObjectID.
 def obj_id(value: str, kind: str = 'object') -> ObjectID:
     """Parse an object ID."""
     result = obj_id_optional(value, kind)
@@ -496,14 +507,17 @@ def obj_id(value: str, kind: str = 'object') -> ObjectID:
     return result
 
 
-def special_id_optional(value: str, kind: str = 'object') -> SpecialID | Literal[""]:
-    """Parse an object ID or a special name, allowing empty IDs."""
-    # We don't actually need to check if it has brackets, since this allows everything.
-    return SpecialID(value.casefold().upper())
+def special_id_optional(value: str, kind: str = 'object') -> SpecialID | BlankID:
+    """Parse an object ID or a <special> name, allowing empty IDs."""
+    # TODO: Check brackets are matching.
+    if value == "":
+        return ""
+    else:
+        return SpecialID(_uppercase_casefold(value))
 
 
 def special_id(value: str, kind: str = 'object') -> SpecialID:
-    """Parse an object ID or a special name."""
+    """Parse an object ID or a <special> name."""
     result = special_id_optional(value, kind)
     if result == "":
         raise ValueError(f'Invalid {kind} ID "{value}". IDs may not be blank.')
