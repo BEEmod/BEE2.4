@@ -10,7 +10,7 @@ import trio
 
 from config.corridors import Config
 from corridor import (
-    Orient, Direction, GameMode,
+    CorrKind, Corridor, Orient, Direction, GameMode,
     CORRIDOR_COUNTS, ID_TO_CORR,
     ExportedConf,
 )
@@ -32,7 +32,7 @@ async def step_corridor_conf(exp_data: ExportData) -> None:
     except KeyError:
         raise Exception(f'No corridor group for style "{style_id}"!') from None
 
-    export: ExportedConf = {}
+    export: dict[CorrKind, list[Corridor]] = {}
     for mode, direction, orient in itertools.product(GameMode, Direction, Orient):
         conf = config.APP.get_cur_conf(
             Config,
@@ -75,9 +75,13 @@ async def step_corridor_conf(exp_data: ExportData) -> None:
             exp_data.vbsp_conf.extend(await corr.config())
         export[mode, direction, orient] = list(map(CorridorUI.strip_ui, chosen))
 
+    result = ExportedConf(
+        corridors=export,
+    )
+
     # Now write out.
     LOGGER.info('Writing corridor configuration...')
-    pickle_data = await trio.to_thread.run_sync(pickle.dumps, export, pickle.HIGHEST_PROTOCOL)
+    pickle_data = await trio.to_thread.run_sync(pickle.dumps, result, pickle.HIGHEST_PROTOCOL)
     await trio.Path(exp_data.game.abs_path('bin/bee2/corridors.bin')).write_bytes(pickle_data)
     del pickle_data
 

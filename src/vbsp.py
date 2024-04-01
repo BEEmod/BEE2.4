@@ -89,8 +89,8 @@ async def load_settings() -> Tuple[
 ]:
     """Load in all our settings from vbsp_config."""
     # Do all our file parsing concurrently.
-    def open_pickle(filename: str) -> Any:
-        """Open then load a pickle file."""
+    def open_pickle(filename: str) -> object:
+        """Open then load a pickle file. Typed as object to force manual checks below."""
         with open(filename, 'rb') as f:
             return pickle.load(f)
 
@@ -99,8 +99,6 @@ async def load_settings() -> Tuple[
         with open(filename, encoding='utf8') as f:
             return Keyvalues.parse(f, filename)
 
-    res_editor: utils.Result[List[editoritems.Item]]
-    res_corr: utils.Result[corridor.ExportedConf]
     try:
         async with trio.open_nursery() as nursery:
             res_conf = utils.Result.sync(nursery, open_keyvalues, "bee2/vbsp_config.cfg")
@@ -132,10 +130,18 @@ async def load_settings() -> Tuple[
         for var in stylevar_block:
             settings['style_vars'][var.name.casefold()] = srctools.conv_bool(var.value)
 
-    # Load a copy of the item configuration.
+    # Load out a copy of the item configuration, checking types as we go.
+    # The pickle could have produced anything.
     id_to_item: Dict[str, editoritems.Item] = {}
-    for item in res_editor():
-        id_to_item[item.id.casefold()] = item
+
+    editor_list = res_editor()
+    if not isinstance(editor_list, list):
+        raise ValueError(f'Invalid list of editor items, got: {editor_list!r}')
+    for item in editor_list:
+        if isinstance(editor_list, editoritems.Item):
+            id_to_item[item.id.casefold()] = item
+        else:
+            raise ValueError(f'Invalid list of editor items, got: {editor_list!r}')
 
     # Send that data to the relevant modules.
     instanceLocs.load_conf(id_to_item.values())
@@ -162,6 +168,8 @@ async def load_settings() -> Tuple[
 
     # Selected corridors.
     corridor_conf = res_corr()
+    if not isinstance(corridor_conf, corridor.ExportedConf):
+        raise ValueError(f'Invalid corridor config, got {corridor_conf!r}')
 
     # Signage items
     from precomp.conditions.signage import load_signs

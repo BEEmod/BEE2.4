@@ -61,8 +61,6 @@ CORR_TO_ID: Final[Mapping[Tuple[GameMode, Direction], str]] = {v: k for k, v in 
 
 # The order of the keys we use.
 CorrKind: TypeAlias = Tuple[GameMode, Direction, Orient]
-# The data in the pickle file we write for the compiler to read.
-ExportedConf: TypeAlias = Dict[CorrKind, List[Corridor]]
 # Number of default instances for each kind.
 CORRIDOR_COUNTS: Final[Mapping[Tuple[GameMode, Direction], Literal[1, 4, 7]]] = {
     (GameMode.SP, Direction.ENTRY): 7,
@@ -70,6 +68,12 @@ CORRIDOR_COUNTS: Final[Mapping[Tuple[GameMode, Direction], Literal[1, 4, 7]]] = 
     (GameMode.COOP, Direction.ENTRY): 1,
     (GameMode.COOP, Direction.EXIT): 4,
 }
+
+
+@attrs.frozen
+class ExportedConf:
+    """Data written to the pickle file for the compiler to use."""
+    corridors: Dict[CorrKind, List[Corridor]]
 
 
 def parse_filename(filename: str) -> Optional[Tuple[GameMode, Direction, int]]:

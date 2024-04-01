@@ -149,7 +149,7 @@ def analyse_and_modify(
                 corr_orient = corr_orient.flipped
 
             max_count = CORRIDOR_COUNTS[corr_mode, corr_dir]
-            poss_corr = conf[corr_mode, corr_dir, corr_orient]
+            poss_corr = conf.corridors[corr_mode, corr_dir, corr_orient]
             if not poss_corr:
                 raise user_errors.UserError(user_errors.TOK_CORRIDOR_EMPTY_GROUP.format(
                     orient=corr_orient.value.title(),
