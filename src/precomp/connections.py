@@ -664,7 +664,7 @@ def do_item_optimisation(vmf: VMF) -> None:
 
     for item in list(ITEMS.values()):
         # We can't remove items that have functionality, or don't have IO.
-        if item.config is None or not item.config.input_type.is_logic:
+        if not item.config.input_type.is_logic:
             continue
 
         prim_inverted = conv_bool(item.inst.fixup.substitute(item.config.invert_var, allow_invert=True))
