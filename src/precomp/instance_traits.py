@@ -6,6 +6,7 @@ import attrs
 from srctools import Entity, VMF
 import srctools.logger
 
+import utils
 from precomp.instanceLocs import ITEM_FOR_FILE
 from precomp.collisions import Collisions
 from editoritems import Item, ItemClass
@@ -184,7 +185,7 @@ def get_item_id(inst: Entity) -> Optional[str]:
         return None
 
 
-def set_traits(vmf: VMF, id_to_item: Dict[str, Item], coll: Collisions) -> Set[str]:
+def set_traits(vmf: VMF, id_to_item: Dict[utils.ObjectID, Item], coll: Collisions) -> Set[str]:
     """Scan through the map, apply traits to instances, and set initial collisions.
 
     This returns a set of strings listing the used instances, for debugging purposes.
@@ -218,9 +219,9 @@ def set_traits(vmf: VMF, id_to_item: Dict[str, Item], coll: Collisions) -> Set[s
 
         item: Optional[Item]
         try:
-            item = id_to_item[item_id.casefold()]
-        except KeyError:  # dict fail
-            LOGGER.warning('Unknown item ID <{}>', item_id)
+            item = id_to_item[utils.obj_id(item_id)]
+        except (KeyError, ValueError):
+            LOGGER.warning('Unknown item ID "{}"', item_id)
             item_class = ItemClass.UNCLASSED
             item = None
         else:

@@ -84,7 +84,7 @@ IGNORED_OVERLAYS: Set[Entity] = set()
 
 async def load_settings() -> Tuple[
     antlines.IndicatorStyle,
-    Dict[str, editoritems.Item],
+    Dict[utils.ObjectID, editoritems.Item],
     corridor.ExportedConf,
 ]:
     """Load in all our settings from vbsp_config."""
@@ -132,14 +132,14 @@ async def load_settings() -> Tuple[
 
     # Load out a copy of the item configuration, checking types as we go.
     # The pickle could have produced anything.
-    id_to_item: Dict[str, editoritems.Item] = {}
+    id_to_item: Dict[utils.ObjectID, editoritems.Item] = {}
 
     editor_list = res_editor()
     if not isinstance(editor_list, list):
         raise ValueError(f'Invalid list of editor items, got: {editor_list!r}')
     for item in editor_list:
         if isinstance(editor_list, editoritems.Item):
-            id_to_item[item.id.casefold()] = item
+            id_to_item[utils.obj_id(item.id)] = item
         else:
             raise ValueError(f'Invalid list of editor items, got: {editor_list!r}')
 

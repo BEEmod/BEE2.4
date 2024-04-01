@@ -11,8 +11,9 @@ import attrs
 from srctools import EmptyMapping, FrozenVec, Vec, Matrix, Keyvalues, conv_float, logger
 from srctools.vmf import Output, VMF, overlay_bounds, make_overlay
 
+import utils
 from precomp import options, tiling, rand
-from connections import get_outputs, TimerModes
+from connections import get_outputs, TimerModes, INDICATOR_CHECK_ID, INDICATOR_TIMER_ID
 import consts
 import editoritems
 
@@ -270,10 +271,10 @@ class IndicatorStyle:
         return build
 
     @classmethod
-    def from_legacy(cls, id_to_item: dict[str, editoritems.Item]) -> IndicatorStyle:
+    def from_legacy(cls, id_to_item: dict[utils.ObjectID, editoritems.Item]) -> IndicatorStyle:
         """Produce the original legacy configs by reading from editoritems."""
-        check_item = id_to_item['item_indicator_panel']
-        timer_item = id_to_item['item_indicator_panel_timer']
+        check_item = id_to_item[INDICATOR_CHECK_ID]
+        timer_item = id_to_item[INDICATOR_TIMER_ID]
 
         return cls(
             wall=AntType.default(),

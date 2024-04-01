@@ -7,7 +7,10 @@ from collections import defaultdict
 
 from typing_extensions import assert_never
 
-from connections import InputType, FeatureMode, Config, ConnType, OutNames
+from connections import (
+    InputType, FeatureMode, Config, ConnType, OutNames,
+    INDICATOR_CHECK_ID, INDICATOR_TIMER_ID,
+)
 from srctools import conv_bool
 from srctools.math import Vec, Angle, format_float
 from srctools.vmf import VMF, EntityFixup, Entity, Output
@@ -28,6 +31,7 @@ __all__ = [
 ]
 COND_MOD_NAME = "Item Connections"
 LOGGER = srctools.logger.get_logger(__name__)
+# TODO: Migrate to ObjectID
 ITEM_TYPES: Dict[str, Config] = {}
 
 # Targetname -> item
@@ -433,8 +437,8 @@ def read_configs(all_items: Iterable[editoritems.Item]) -> None:
             ITEM_TYPES[item.id.casefold()] = item.conn_config
 
     # These must exist.
-    for item_id in ['item_indicator_panel', 'item_indicator_panel_timer']:
-        if item_id not in ITEM_TYPES:
+    for item_id in [INDICATOR_CHECK_ID, INDICATOR_TIMER_ID]:
+        if item_id.casefold() not in ITEM_TYPES:
             raise user_errors.UserError(
                 user_errors.TOK_CONNECTION_REQUIRED_ITEM.format(item=item_id.upper())
             )

@@ -265,7 +265,7 @@ class Grid(MutableMapping[_grid_keys, Block]):
         """Return a view over the grid items."""
         return _GridItemsView(self._grid)
 
-    def read_from_map(self, vmf: VMF, items: dict[str, editoritems.Item]) -> set[str]:
+    def read_from_map(self, vmf: VMF, items: dict[utils.ObjectID, editoritems.Item]) -> set[str]:
         """Given the map file, set blocks. This returns some voice attributes that may be set."""
         from precomp.instance_traits import get_item_id
         from precomp import bottomlessPit
@@ -298,7 +298,7 @@ class Grid(MutableMapping[_grid_keys, Block]):
             seeded = False
             if item_id:
                 try:
-                    item = items[item_id.casefold()]
+                    item = items[utils.obj_id(item_id)]
                 except KeyError:
                     pass
                 else:

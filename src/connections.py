@@ -98,8 +98,8 @@ class OutNames(Enum):
 
 
 # Item IDs used for the checkmark/timer panels.
-INDICATOR_CHECK_ID: Final = 'ITEM_INDICATOR_PANEL'
-INDICATOR_TIMER_ID: Final = 'ITEM_INDICATOR_PANEL_TIMER'
+INDICATOR_CHECK_ID: Final = utils.obj_id('ITEM_INDICATOR_PANEL')
+INDICATOR_TIMER_ID: Final = utils.obj_id('ITEM_INDICATOR_PANEL_TIMER')
 
 
 def _intern_out(out: tuple[str | None, str] | None) -> tuple[str | None, str] | None:
