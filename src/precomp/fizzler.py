@@ -195,7 +195,7 @@ class FizzlerType:
     nodraw_behind: bool
 
     # If set, add a brush ent using templates.
-    temp_brush_keys: Keyvalues
+    temp_brush_keys: Keyvalues | None
     temp_single: str | None
     temp_max: str | None
     temp_min: str | None
@@ -680,6 +680,7 @@ class FizzlerBrush:
         self.mat_mod_var = mat_mod_var
         self.mat_mod_name = mat_mod_name
 
+        # TODO: Make this some classes or something, enforce that all required textures are provided.
         self.textures: dict[TexGroup, str | None] = {}
         for group in TexGroup:
             self.textures[group] = textures.get(group, None)
@@ -907,7 +908,6 @@ class FizzlerBrush:
                     (brush_center, None, center_len),
                     (brush_right, -field_axis, 64.0),
                 ]
-                used_tex_func(self.textures[TexGroup.CENTER])
             else:
                 brushes = [
                     (brush_left, field_axis, side_len),
@@ -1254,6 +1254,7 @@ def generate_fizzlers(vmf: VMF) -> None:
                 classname='func_brush',
                 origin=fizz.base_inst['origin'],
             )
+            assert fizz_type.temp_brush_keys is not None
             conditions.set_ent_keys(template_brush_ent, fizz.base_inst, fizz_type.temp_brush_keys)
         else:
             template_brush_ent = None
@@ -1511,6 +1512,8 @@ def generate_fizzlers(vmf: VMF) -> None:
         # Generate the material modify controls.
         # One is needed for each texture used on the brush, unfortunately.
         for brush_type, used_tex in mat_mod_tex.items():
+            # Should not happen, the brush type is only added if the var is not None.
+            assert brush_type.mat_mod_var is not None, repr(brush_type)
             brush_name = conditions.local_name(fizz.base_inst, brush_type.name)
             mat_mod_name = conditions.local_name(fizz.base_inst, brush_type.mat_mod_name)
             for off, tex in zip(itertools.cycle(MATMOD_OFFSETS), sorted(used_tex)):

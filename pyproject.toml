@@ -158,7 +158,6 @@ module = [
 	'precomp.connections',
 	'precomp.fizzler',
 	'precomp.tiling',
-	'BEE2_config',
 	'FakeZip',
 ]
 strict_optional = false
