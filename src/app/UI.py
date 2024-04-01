@@ -145,7 +145,6 @@ class Item:
     __slots__ = [
         'ver_list',
         'item',
-        'def_data',
         'data',
         'inherit_kind',
         'visual_subtypes',
@@ -161,11 +160,10 @@ class Item:
         self.ver_list = sorted(item.versions.keys())
 
         self.item = item
-        self.def_data = item.def_ver.def_style
         # The indexes of subtypes that are actually visible.
         self.visual_subtypes = [
             ind
-            for ind, sub in enumerate(self.def_data.editor.subtypes)
+            for ind, sub in enumerate(item.def_ver.def_style.editor.subtypes)
             if sub.pal_name or sub.pal_icon
         ]
 
@@ -188,7 +186,10 @@ class Item:
     def load_data(self) -> None:
         """Reload data from the item."""
         version = self.selected_version()
-        self.data = version.styles.get(selected_style, self.def_data)
+        try:
+            self.data = version.styles[selected_style]
+        except KeyError:
+            self.data = self.item.def_ver.def_style
         self.inherit_kind = version.inherit_kind.get(selected_style, InheritKind.UNSTYLED)
 
     def get_tags(self, subtype: int) -> Iterator[str]:
