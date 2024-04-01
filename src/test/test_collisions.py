@@ -370,7 +370,7 @@ def test_volume_rotation(file_regression: FileRegressionFixture) -> None:
     # Go through and round everything so we ignore slight inaccuracies.
     for ent in vmf.entities:
         for side in ent.sides():
-            side.planes = [round(vec, 6) for vec in side.planes]
+            side.planes = [round(vec + 0.0, 6) for vec in side.planes]
             side.uaxis = UVAxis(
                 round(side.uaxis.x + 0.0, 6),
                 round(side.uaxis.y + 0.0, 6),
