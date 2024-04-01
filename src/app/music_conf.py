@@ -45,7 +45,7 @@ def load_filesystems(systems: Iterable[FileSystem[Any]]) -> None:
         filesystem.add_sys(system, prefix='resources/music_samp/')
 
 
-def set_suggested(packset: PackagesSet, music_id: str) -> None:
+def set_suggested(packset: PackagesSet, music_id: Optional[str]) -> None:
     """Set the music ID that is suggested for the base.
 
     If sel_item is true, select the suggested item as well.
