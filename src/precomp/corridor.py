@@ -1,17 +1,16 @@
 """Modify and analyse corridors in the map."""
 from __future__ import annotations
 from collections import Counter
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterator
 
-import attrs
-from srctools import Vec, Matrix
+from srctools import Vec, Matrix, logger
 from srctools.vmf import VMF, Entity
-import srctools.logger
+import attrs
 
 import consts
 import utils
 from . import instanceLocs, rand
-from corridor import (  # noqa
+from corridor import (
     GameMode, Direction, Orient,
     CORRIDOR_COUNTS, CORR_TO_ID, ID_TO_CORR,
     Corridor, ExportedConf, parse_filename,
@@ -19,7 +18,14 @@ from corridor import (  # noqa
 import user_errors
 
 
-LOGGER = srctools.logger.get_logger(__name__)
+__all__ = [
+    'Info', 'analyse_and_modify',
+    # Re-exports:
+    'GameMode', 'Direction', 'Orient',
+    'CORRIDOR_COUNTS', 'CORR_TO_ID', 'ID_TO_CORR',
+    'Corridor', 'ExportedConf', 'parse_filename',
+]
+LOGGER = logger.get_logger(__name__)
 
 
 @attrs.define
@@ -127,7 +133,7 @@ def analyse_and_modify(
             corr_mode, corr_dir, corr_ind = corr_info
             seen_game_modes.add(corr_mode)
             if 'no_player_start' in item.fixup:
-                seen_no_player_start.add(srctools.conv_bool(item.fixup['no_player_start']))
+                seen_no_player_start.add(item.fixup.bool('no_player_start'))
             orient = Matrix.from_angstr(item['angles'])
             origin = Vec.from_str(item['origin'])
             norm = orient.up()

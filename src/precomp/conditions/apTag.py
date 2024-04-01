@@ -13,7 +13,6 @@ from precomp import instanceLocs, options, connections, conditions
 from connections import Config
 from precomp.fizzler import FIZZLERS, FIZZ_TYPES, Fizzler
 import utils
-import vbsp
 
 
 COND_MOD_NAME: str | None = None
@@ -163,7 +162,6 @@ def res_make_tag_fizzler(vmf: VMF, info: conditions.MapInfo, res: Keyvalues) -> 
     oran_sign_on = res['oran_sign', '']
     oran_sign_off = res['oran_off_sign', '']
 
-    import vbsp
     if options.GAME_ID() != utils.STEAM_IDS['TAG']:
         # Abort - TAG fizzlers shouldn't appear in any other game!
         # So simply remove the fizzler when called.

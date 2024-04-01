@@ -63,7 +63,7 @@ skybox_win: 'SelectorWin[[]]'
 voice_win: 'SelectorWin[[]]'
 style_win: 'SelectorWin[[]]'
 elev_win: 'SelectorWin[[]]'
-suggest_windows: Dict[Type[packages.PakObject], 'SelectorWin[[]]'] = {}
+suggest_windows: Dict[Type[packages.PakObject], 'SelectorWin[...]'] = {}
 
 # Items chosen for the palette.
 pal_picked: List['PalItem'] = []
@@ -84,7 +84,7 @@ ICO_GEAR = img.Handle.sprite('icons/gear', 10, 10)
 ICO_GEAR_DIS = img.Handle.sprite('icons/gear_disabled', 10, 10)
 IMG_BLANK = img.Handle.background(64, 64)
 
-selected_style = "BEE2_CLEAN"
+selected_style: utils.ObjectID = packages.CLEAN_STYLE
 
 # Maps item IDs to our wrapper for the object.
 item_list: Dict[str, 'Item'] = {}
@@ -608,7 +608,7 @@ async def load_packages(packset: packages.PackagesSet, tk_img: TKImages) -> None
         # Selecting items changes much of the gui - don't allow when other
         # things are open...
         modal=True,
-        # callback set in the main initialisation function..
+        # callback set in the main initialisation function...
         attributes=[
             SelAttr.bool('VID', TransToken.ui('Elevator Videos'), default=True),
         ]
@@ -683,10 +683,12 @@ def reposition_panes() -> None:
     opt_win.move(
         x=xpos,
         y=TK_ROOT.winfo_rooty()-40,
-        width=itemconfig.window.winfo_reqwidth())
+        width=itemconfig.window.winfo_reqwidth(),
+    )
     itemconfig.window.move(
         x=xpos,
-        y=TK_ROOT.winfo_rooty() + opt_win.winfo_reqheight() + 25)
+        y=TK_ROOT.winfo_rooty() + opt_win.winfo_reqheight() + 25,
+    )
 
 
 def reset_panes() -> None:
@@ -701,12 +703,10 @@ def reset_panes() -> None:
 def suggested_refresh() -> None:
     """Enable or disable the suggestion setting button."""
     if 'suggested_style' in UI:
-        windows = [
-            voice_win,
-            skybox_win,
-            elev_win,
+        windows: list[SelectorWin[...]] = [
+            voice_win, skybox_win, elev_win,
+            *music_conf.WINDOWS.values(),
         ]
-        windows.extend(music_conf.WINDOWS.values())
         if all(win.is_suggested() for win in windows):
             UI['suggested_style'].state(['disabled'])
         else:
@@ -1682,7 +1682,7 @@ async def init_windows(tk_img: TKImages) -> None:
             style_win.set_disp()
             style_id = style_win.item_list[0].name
 
-        selected_style = style_id
+        selected_style = utils.obj_id(style_id)
 
         style_obj = current_style()
         for item in item_list.values():
