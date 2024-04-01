@@ -493,7 +493,10 @@ def _uppercase_casefold(value: str) -> str:
 
 def obj_id_optional(value: str, kind: str = 'object') -> ObjectID | BlankID:
     """Parse an object ID, allowing through empty IDs."""
-    if value.startswith(('(', '<', '[')) or value.endswith((')', '>', ']')):
+    if (
+        value.startswith(('(', '<', '[', ']', '>', ')')) or
+        value.endswith(('(', '<', '[', ']', '>', ')'))
+    ):
         raise ValueError(f'Invalid {kind} ID "{value}". IDs may not start/end with brackets.')
     return ObjectID(SpecialID(_uppercase_casefold(value)))
 
@@ -509,10 +512,18 @@ def obj_id(value: str, kind: str = 'object') -> ObjectID:
 
 def special_id_optional(value: str, kind: str = 'object') -> SpecialID | BlankID:
     """Parse an object ID or a <special> name, allowing empty IDs."""
-    # TODO: Check brackets are matching.
     if value == "":
         return ""
+    elif value.startswith('<') and value.endswith('>'):
+        return SpecialID(_uppercase_casefold(value))
+    # Ruled out valid combinations, any others are prohibited.
+    elif (
+        value.startswith(('(', '<', '[', ']', '>', ')')) or
+        value.endswith(('(', '<', '[', ']', '>', ')'))
+    ):
+        raise ValueError(f'Invalid {kind} ID "{value}". Only angle brackets are allowed.')
     else:
+        # No brackets at all, just an ObjectID.
         return SpecialID(_uppercase_casefold(value))
 
 

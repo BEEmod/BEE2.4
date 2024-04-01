@@ -16,6 +16,9 @@ EXAMPLES = [
 ]
 EXAMPLE_IDS = ['mixed', 'underscore', 'numeric', 'spaces', 'unchanged']
 
+BRACKETS = ['_', '<', '(', '[', ']', ')', '>']
+BRACKET_IDS = ['blank', 'lang', 'lpar', 'lbrak', 'rbrak', 'rpar', 'rang']
+
 
 @pytest.mark.parametrize('inp, result', EXAMPLES, ids=EXAMPLE_IDS)
 def test_parse_normal(inp: str, result: str) -> None:
@@ -77,19 +80,20 @@ def test_identity() -> None:
     assert special_id_optional(special) is special
 
 
-@pytest.mark.parametrize('bad', [
-    '<angonlyleft',
-    'angonlyright>',
-    '<angmismatch)',
-    '<angmismatch2]',
-])
-def test_bad_brackets(bad: str) -> None:
+@pytest.mark.parametrize('left', BRACKETS, ids=BRACKET_IDS)
+@pytest.mark.parametrize('right', BRACKETS, ids=BRACKET_IDS)
+def test_bad_bracket_combos(left: str, right: str) -> None:
     """Test invalid bracket combinations."""
+    if left == right == '_' or (left == '<' and right == '>'):
+        return  # These are valid.
+
+    bad = f'{left}some_id{right}'
+
     with pytest.raises(ValueError, match='may not start/end'):
         obj_id(bad)
     with pytest.raises(ValueError, match='may not start/end'):
         obj_id_optional(bad)
-    with pytest.raises(ValueError, match='mismatched'):
+    with pytest.raises(ValueError):
         special_id(bad)
-    with pytest.raises(ValueError, match='mismatched'):
+    with pytest.raises(ValueError):
         special_id_optional(bad)
