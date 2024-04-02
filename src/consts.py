@@ -7,6 +7,8 @@ from uuid import UUID, uuid5
 
 from srctools import Side
 
+import utils
+
 
 __all__ = [
     'MaterialGroup',
@@ -17,7 +19,7 @@ __all__ = [
     'Signage', 'Antlines',
     'Goo', 'Fizzler',
     'Special', 'Tools',
-    'FixupVars',
+    'FixupVars', 'DefaultItems',
     'COUNTER_AND_ON', 'COUNTER_AND_OFF',
     'COUNTER_OR_ON', 'COUNTER_OR_OFF',
     'SEL_ICON_SIZE', 'SEL_ICON_SIZE_LRG', 'SEL_ICON_CROP_SHRINK',
@@ -272,6 +274,70 @@ class Theme(Enum):
     """Different themes for the UI."""
     LIGHT = 'light'
     DARK = 'dark'
+
+
+class DefaultItems(Enum):
+    """ A list of all the default items."""
+    _value_: utils.ObjectID
+    id: utils.ObjectID
+    def __new__(cls, name: str) -> DefaultItems:
+        item_id = utils.obj_id(name)
+        result = object.__new__(cls)
+        result._value_ = item_id
+        result.id = item_id
+        return result
+
+    button_floor = 'ITEM_BUTTON_FLOOR'
+    button_pedestal = 'ITEM_BUTTON_PEDESTAL'
+
+    faith_plate = 'ITEM_CATAPULT'
+    faith_target = 'ITEM_CATAPULT_TARGET'
+
+    fizzler = 'ITEM_BARRIER_HAZARD'
+    goo = 'ITEM_GOO'
+    turret = 'ITEM_TURRET'
+
+    gel_splat = 'ITEM_PAINT_SPLAT'
+    gel_dropper = 'ITEM_DROPPER_PAINT'
+    cube = 'ITEM_CUBE'
+    cube_dropper = 'ITEM_DROPPER_CUBE'
+    light_bridge = 'ITEM_LIGHT_BRIDGE'
+    funnel = 'ITEM_TBEAM'
+
+    door_sp_entry = 'ITEM_ENTRY_DOOR'
+    door_sp_exit = 'ITEM_EXIT_DOOR'
+    door_coop_entry = 'ITEM_COOP_ENTRY_DOOR'
+    door_coop_exit = 'ITEM_COOP_EXIT_DOOR'
+    obs_room_large = 'ITEM_OBSERVATION_ROOM'
+    obs_room_small = 'ITEM_SECONDARY_OBSERVATION_ROOM'
+
+    piston_platform = 'ITEM_PISTON_PLATFORM'
+    track_platform = 'ITEM_RAIL_PLATFORM'
+    panel_flip = 'ITEM_PANEL_FLIP'
+    panel_glass = 'ITEM_PANEL_CLEAR'
+    panel_angled = 'ITEM_PANEL_ANGLED'
+    panel_stairs = 'ITEM_PANEL_STAIRS'
+    glass = grating = 'ITEM_BARRIER'
+    light_strip = 'ITEM_LIGHT_PANEL'
+
+    laser_emitter_center = 'ITEM_LASER_EMITTER_CENTER'
+    laser_catcher_center = 'ITEM_LASER_CATCHER_CENTER'
+    laser_relay_center = 'ITEM_LASER_RELAY_CENTER'
+
+    laser_emitter_offset = 'ITEM_LASER_EMITTER_OFFSET'
+    laser_catcher_offset = 'ITEM_LASER_CATCHER_OFFSET'
+    laser_relay_offset = 'ITEM_LASER_RELAY_OFFSET'
+
+    indicator_check = 'ITEM_INDICATOR_PANEL'
+    indicator_timer = 'ITEM_INDICATOR_PANEL_TIMER'
+    indicator_toggle = 'ITEM_INDICATOR_TOGGLE'
+    ambient_light = 'ITEM_POINT_LIGHT'
+    placement_helper = 'ITEM_PLACEMENT_HELPER'
+
+    extent_barrier = 'ITEM_BARRIER_EXTENT'
+    extent_fizzler = 'ITEM_BARRIER_HAZARD_EXTENT'
+    extent_piston = 'ITEM_PISTON_PLATFORM_EXTENT'
+    extent_track = 'ITEM_RAIL_PLATFORM_EXTENT'
 
 
 # Outputs we need to use to make a math_counter act like
