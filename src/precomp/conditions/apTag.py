@@ -23,6 +23,7 @@ LOGGER = srctools.logger.get_logger(__name__)
 TAG_FIZZ_ID = 'TAG_GEL_GUN'
 # Special version with gel logic.
 TRANSITION_ENTS = 'instances/bee2/transition_ents_tag.vmf'
+FIZZLER_CONN_ID = utils.special_id('<TAG_FIZZER>')
 
 
 @conditions.make_result('ATLAS_SpawnPoint')
@@ -148,7 +149,7 @@ def res_make_tag_fizzler(vmf: VMF, info: conditions.MapInfo, res: Keyvalues) -> 
     This must be before -250 so that it runs before fizzlers and connections.
     """
     if 'ioconf' in res:
-        fizz_conn_conf = Config.parse('<TAG_FIZZER>', res.find_key('ioconf'))
+        fizz_conn_conf = Config.parse(FIZZLER_CONN_ID, res.find_key('ioconf'))
     else:
         fizz_conn_conf = None
 

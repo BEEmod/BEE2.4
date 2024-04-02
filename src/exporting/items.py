@@ -11,6 +11,7 @@ import srctools.logger
 import trio
 
 import config
+import utils
 from app import lazy_conf
 from config.gen_opts import GenOptions
 from config.item_defaults import ItemDefault
@@ -87,7 +88,7 @@ def get_export_data(
     item_data = sel_version.styles[style_id]
 
     new_item = copy.deepcopy(item_data.editor)
-    new_item.id = item.id  # Set the item ID to match our item
+    new_item.id = utils.obj_id(item.id)  # Set the item ID to match our item
     # This allows the folders to be reused for different items if needed.
 
     for index, subtype in enumerate(new_item.subtypes):
@@ -137,7 +138,7 @@ async def step_write_items(exp_data: ExportData) -> None:
     # Originally indicator items were in the style config, now they're default items.
     # Check to prevent overlaps.
     style_items = {
-        item.id.casefold(): item
+        utils.obj_id(item.id): item
         for item in exp_data.all_items
     }
 
@@ -150,10 +151,10 @@ async def step_write_items(exp_data: ExportData) -> None:
         (items, config_part) = get_export_data(item, pal_list, style_id, prop_conf)
 
         for editor_def in items:
-            if editor_def.id.casefold() in style_items:
+            if editor_def.id in style_items:
                 exp_data.warn(TRANS_OLD_STYLE_DEF.format(item=editor_def.id))
                 # Pop so we warn only once.
-                exp_data.all_items.remove(style_items.pop(editor_def.id.casefold()))
+                exp_data.all_items.remove(style_items.pop(editor_def.id))
             exp_data.all_items.append(editor_def)
 
         vbsp_config.extend(apply_replacements(await config_part(), item.id))

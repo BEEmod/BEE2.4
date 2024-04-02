@@ -341,7 +341,7 @@ class Config:
         self.output_unlock = output_unlock
 
     @staticmethod
-    def parse(item_id: str, conf: Keyvalues) -> Config:
+    def parse(item_id: utils.SpecialID, conf: Keyvalues) -> Config:
         """Read the item type info from the given config."""
         desc = f'item "{item_id}"'
 

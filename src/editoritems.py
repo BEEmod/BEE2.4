@@ -867,7 +867,7 @@ class SubType:
 @attrs.define
 class Item:
     """A specific item."""
-    id: str  # The item's unique ID.
+    id: utils.ObjectID = utils.obj_id('_')  # The item's unique ID.
     # The C++ class used to instantiate the item in the editor.
     cls: ItemClass = ItemClass.UNCLASSED
     # Type if present.
@@ -976,7 +976,7 @@ class Item:
 
         The "ItemData" {} wrapper may optionally be included.
         """
-        known_ids: set[str] = set()
+        known_ids: set[utils.ObjectID] = set()
         items: list[Item] = []
         icons: dict[RenderableType, Renderable] = {}
         tok = Tokenizer(file, filename)
@@ -1003,9 +1003,9 @@ class Item:
 
             if tok_value.casefold() == 'item':
                 it = cls.parse_one(tok, pak_id)
-                if it.id.casefold() in known_ids:
+                if it.id in known_ids:
                     LOGGER.warning('Item {} redeclared!', it.id)
-                known_ids.add(it.id.casefold())
+                known_ids.add(it.id)
                 items.append(it)
             elif tok_value.casefold() == 'renderables':
                 for render_block in tok.block('Renderables'):
@@ -1027,9 +1027,10 @@ class Item:
 
         This expects the "Item" token to have been read already.
         """
+        item_id_set = False
         connections = Keyvalues('Connections', [])
         tok.expect(Token.BRACE_OPEN)
-        item = Item('')
+        item = Item()
 
         for token, tok_value in tok:
             if token is Token.BRACE_CLOSE:
@@ -1041,11 +1042,10 @@ class Item:
                 raise tok.error(token)
             tok_value = tok_value.casefold()
             if tok_value == 'type':
-                if item.id:
+                if item_id_set:
                     raise tok.error('Item ID (Type) set multiple times!')
-                item.id = tok.expect(Token.STRING).upper()
-                if not item.id:
-                    raise tok.error('Invalid item ID (Type) "{}"', item.id)
+                item.id = utils.obj_id(tok.expect(Token.STRING), 'Item')
+                item_id_set = True
                 # The items here are used internally and must have inputs.
                 if item.id in ANTLINE_ITEMS:
                     item.force_input = True
@@ -1070,8 +1070,8 @@ class Item:
             raise tok.error('File ended without closing item block!')
 
         # Done, check we're not missing critical stuff.
-        if not item.id:
-            raise tok.error('No item ID (Type) set!')
+        if not item_id_set:
+            raise tok.error('No item ID ("type") set!')
 
         # If the user defined a subtype property, that prop's default value should not be changed.
         if item.subtype_prop is not None:
@@ -1342,7 +1342,7 @@ class Item:
                 conf.disable_cmd += (Output('', '', conn.deactivate, inst_in=conn.deact_name), )
 
         if ConnTypes.POLARITY in self.conn_inputs:
-            if self.id.upper() != DefaultItems.funnel.id:
+            if self.id != DefaultItems.funnel.id:
                 LOGGER.warning(
                     'Item {} has polarity inputs, '
                     'this only works for the actual funnel!',
@@ -1366,7 +1366,7 @@ class Item:
         has_output = conf.output_act is not None or conf.output_deact is not None
 
         # Verify the configuration matches the input type.
-        if has_sec_input and conf.input_type is not InputType.DUAL and self.id.upper() != 'ITEM_TBEAM':
+        if has_sec_input and conf.input_type is not InputType.DUAL and self.id != DefaultItems.funnel.id:
             LOGGER.warning('Item "{}" has a secondary input but is not DUAL type!', self.id)
             conf.input_type = InputType.DUAL
 
@@ -1769,7 +1769,7 @@ class Item:
                 f.write('\t\t\t\t}\n')
             # Only add the tbeam input for actual funnels.
             # It doesn't work there.
-            if has_sec_input and self.id.casefold() == 'item_tbeam':
+            if has_sec_input and self.id == DefaultItems.funnel.id:
                 f.write(f'\t\t\t"{ConnTypes.POLARITY.value}"\n')
                 f.write('\t\t\t\t{\n')
                 f.write(f'\t\t\t\t"Activate" "{OutNames.IN_SEC_ACT.value}"\n')

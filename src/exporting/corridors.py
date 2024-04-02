@@ -18,7 +18,6 @@ from . import ExportData, STEPS, StepResource
 from packages.corridor import CorridorUI, CorridorGroup
 import config
 import editoritems
-import utils
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -90,7 +89,7 @@ async def step_corridor_conf(exp_data: ExportData) -> None:
     # This allows the compiler to easily recognise. Also force 64-64-64 offset.
     for item in exp_data.all_items:
         try:
-            (mode, direction) = ID_TO_CORR[utils.obj_id(item.id)]
+            (mode, direction) = ID_TO_CORR[item.id]
         except KeyError:
             continue
         count = CORRIDOR_COUNTS[mode, direction]

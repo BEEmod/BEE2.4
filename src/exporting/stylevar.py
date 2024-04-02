@@ -5,7 +5,6 @@ import srctools
 from srctools import Keyvalues
 
 import editoritems
-import utils
 from consts import DefaultItems
 from . import ExportData, STEPS, StepResource
 from packages import StyleVar
@@ -48,7 +47,7 @@ async def step_unlock_defaults(exp_data: ExportData) -> None:
         # Also add DESIRES_UP, so they place in the correct orientation.
         # That would have already been done for vertical-enabled corridors, but that's
         # fine.
-        if utils.obj_id(item.id) in UNLOCK_ITEMS:
+        if item.id in UNLOCK_ITEMS:
             exp_data.all_items[i] = item = copy.copy(item)
             item.deletable = item.copiable = True
             item.facing = editoritems.DesiredFacing.UP

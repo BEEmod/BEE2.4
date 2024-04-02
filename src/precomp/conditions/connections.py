@@ -1,6 +1,7 @@
 """Results relating to item connections."""
 from typing import Callable, Dict, List
 
+import utils
 from precomp import connections, conditions
 from srctools import Keyvalues, Entity, Output, logger
 import srctools
@@ -83,7 +84,7 @@ def res_change_io_type(kv: Keyvalues) -> Callable[[Entity], None]:
     The contents are the same as that allowed in the input BEE2 block in
     editoritems.
     """
-    conf = connections.Config.parse(f'<ChangeIOType: {id(kv):X}>', kv)
+    conf = connections.Config.parse(utils.special_id('<ChangeIOType: {id(kv):X}>'), kv)
 
     def change_item(inst: Entity) -> None:
         """Alter the type of each item passed in."""

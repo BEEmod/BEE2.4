@@ -1,6 +1,4 @@
 """Test the ID parsing code."""
-import sys
-
 import pytest
 
 from utils import obj_id, obj_id_optional, special_id, special_id_optional, ID_EMPTY

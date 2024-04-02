@@ -139,7 +139,7 @@ async def load_settings() -> Tuple[
         raise ValueError(f'Invalid list of editor items, got: {editor_list!r}')
     for item in editor_list:
         if isinstance(editor_list, editoritems.Item):
-            id_to_item[utils.obj_id(item.id)] = item
+            id_to_item[item.id] = item
         else:
             raise ValueError(f'Invalid list of editor items, got: {editor_list!r}')
 
