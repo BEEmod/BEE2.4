@@ -602,7 +602,7 @@ def calc_connections(
             conn_type = ConnType.DEFAULT
             in_outputs = inputs[inp_item.name]
 
-            if inp_item.config.id == 'ITEM_TBEAM':
+            if inp_item.config.id == consts.DefaultItems.funnel.id:
                 # It's a funnel - we need to figure out if this is polarity,
                 # or normal on/off.
                 for out in in_outputs:

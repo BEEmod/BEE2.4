@@ -5,6 +5,7 @@ from typing_extensions import Final, TypeAlias, Literal
 
 import attrs
 
+from consts import DefaultItems
 import utils
 
 
@@ -51,13 +52,13 @@ class Corridor:
 
 
 # Maps item IDs to their corridors, and vice versa.
-ID_TO_CORR: Final[Mapping[str, Tuple[GameMode, Direction]]] = {
-    'ITEM_ENTRY_DOOR': (GameMode.SP, Direction.ENTRY),
-    'ITEM_EXIT_DOOR': (GameMode.SP, Direction.EXIT),
-    'ITEM_COOP_ENTRY_DOOR': (GameMode.COOP, Direction.ENTRY),
-    'ITEM_COOP_EXIT_DOOR': (GameMode.COOP, Direction.EXIT),
+ID_TO_CORR: Final[Mapping[utils.ObjectID, Tuple[GameMode, Direction]]] = {
+    DefaultItems.door_sp_entry.id: (GameMode.SP, Direction.ENTRY),
+    DefaultItems.door_sp_exit.id: (GameMode.SP, Direction.EXIT),
+    DefaultItems.door_coop_entry.id: (GameMode.COOP, Direction.ENTRY),
+    DefaultItems.door_coop_exit.id: (GameMode.COOP, Direction.EXIT),
 }
-CORR_TO_ID: Final[Mapping[Tuple[GameMode, Direction], str]] = {v: k for k, v in ID_TO_CORR.items()}
+CORR_TO_ID: Final[Mapping[Tuple[GameMode, Direction], utils.ObjectID]] = {v: k for k, v in ID_TO_CORR.items()}
 
 # The order of the keys we use.
 CorrKind: TypeAlias = Tuple[GameMode, Direction, Orient]

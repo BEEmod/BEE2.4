@@ -24,15 +24,17 @@ import editoritems
 import srctools.logger
 import corridor
 import user_errors
+import utils
 
 LOGGER = srctools.logger.get_logger(__name__)
 
 # The list of instances each item uses.
+# TODO: Make this utils.ObjectID
 INSTANCE_FILES: dict[str, list[str]] = {}
 
 # Item ID and index/special name for instances set in editoritems.
 # Note this is imperfect - two items could reuse the same instance.
-ITEM_FOR_FILE: dict[str, tuple[str, int | str]] = {}
+ITEM_FOR_FILE: dict[str, tuple[utils.ObjectID, int | str]] = {}
 
 _RE_DEFS = re.compile(r'\s* (\[ [^][]+] | < [^<>]+ >) \s* ,? \s*', re.VERBOSE)
 _RE_SUBITEMS = re.compile(r'''
@@ -47,6 +49,7 @@ _RE_SUBITEMS = re.compile(r'''
 
 # A dict holding dicts of additional custom instance names - used to define
 # names in conditions or BEE2-added features.
+# TODO: Make this utils.ObjectID
 CUST_INST_FILES: dict[str, dict[str, str]] = defaultdict(dict)
 
 # Special names for some specific instances - those which have special
@@ -241,7 +244,7 @@ def load_conf(items: Iterable[editoritems.Item]) -> None:
                     cust_instances[name] = ''
                 else:
                     cust_instances[name] = fname
-                    ITEM_FOR_FILE[fname.casefold()] = (item.id, name)
+                    ITEM_FOR_FILE[fname.casefold()] = (utils.obj_id(item.id), name)
 
         # Normal instances: index -> filename
         INSTANCE_FILES[item.id.casefold()] = [
@@ -252,7 +255,7 @@ def load_conf(items: Iterable[editoritems.Item]) -> None:
             fname = str(inst.inst)
             # Not real instances.
             if fname != '.' and not fname.casefold().startswith('instances/bee2_corridor/'):
-                ITEM_FOR_FILE[fname.casefold()] = (item.id, ind)
+                ITEM_FOR_FILE[fname.casefold()] = (utils.obj_id(item.id), ind)
 
     INST_SPECIAL.clear()
     INST_SPECIAL.update({

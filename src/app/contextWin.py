@@ -18,6 +18,7 @@ from tkinter import ttk
 
 import trio
 
+from consts import DefaultItems
 from ui_tk.dialogs import TkDialogs
 from ui_tk.img import TKImages, TK_IMG
 from ui_tk.wid_transtoken import set_text
@@ -273,6 +274,7 @@ def get_description(
 def load_item_data(tk_img: TKImages) -> None:
     """Refresh the window to use the selected item's data."""
     item_data = selected_item.data
+    item_id = utils.obj_id(selected_item.id)
 
     for ind, pos in enumerate(SUBITEM_POS[len(selected_item.visual_subtypes)]):
         if pos == -1:
@@ -336,7 +338,7 @@ def load_item_data(tk_img: TKImages) -> None:
 
     version_lookup[:] = set_version_combobox(wid['variant'], selected_item)
 
-    if selected_item.id == SIGNAGE_ITEM_ID:
+    if item_id == SIGNAGE_ITEM_ID:
         wid['variant'].grid_remove()
         wid['signage_configure'].grid()
     else:
@@ -401,7 +403,7 @@ def load_item_data(tk_img: TKImages) -> None:
     set_sprite(tk_img, SPR.FACING, face_spr)
 
     # Now some special overrides for certain classes.
-    if selected_item.id == "ITEM_CUBE":
+    if item_id == DefaultItems.cube.id:
         # Cubes - they should show info for the dropper.
         set_sprite(tk_img, SPR.FACING, 'surf_ceil')
         set_sprite(tk_img, SPR.INPUT, 'in_norm')
@@ -425,7 +427,7 @@ def load_item_data(tk_img: TKImages) -> None:
         set_sprite(tk_img, SPR.COLLISION, 'space_embed')
 
     real_conn_item = editor
-    if selected_item.id in ["ITEM_CUBE", "ITEM_PAINT_SPLAT"]:
+    if item_id == DefaultItems.cube.id or item_id == DefaultItems.gel_splat.id:
         # The connections are on the dropper.
         try:
             [real_conn_item] = selected_item.data.editor_extra

@@ -10,6 +10,7 @@ import utils
 from precomp.instanceLocs import ITEM_FOR_FILE
 from precomp.collisions import Collisions
 from editoritems import Item, ItemClass
+from consts import DefaultItems
 from corridor import parse_filename as parse_corr_filename, CORR_TO_ID
 
 
@@ -17,30 +18,30 @@ LOGGER = srctools.logger.get_logger(__name__)
 # Indicates the collision should only go on the main instance.
 SKIP_COLL = '_skip_coll'
 
-# Special case - specific attributes..
-ID_ATTRS: Dict[str, List[Set[str]]] = {
-    'ITEM_PLACEMENT_HELPER': [
+# Special case - specific attributes...
+ID_ATTRS: Dict[utils.ObjectID, List[Set[str]]] = {
+    DefaultItems.placement_helper.id: [
         {'placement_helper'},
     ],
-    'ITEM_INDICATOR_TOGGLE': [
+    DefaultItems.indicator_toggle.id: [
         {'antline', 'toggle', 'indicator_toggle'},
     ],
-    'ITEM_INDICATOR_PANEL': [
+    DefaultItems.indicator_check.id: [
         {'antline', 'checkmark', 'indicator_panel'},
     ],
-    'ITEM_INDICATOR_PANEL_TIMER': [
+    DefaultItems.indicator_timer.id: [
         {'antline', 'timer', 'indicator_panel'},
     ],
-    'ITEM_POINT_LIGHT': [
+    DefaultItems.ambient_light.id: [
         {'ambient_light'},
     ],
-    'ITEM_PANEL_ANGLED': [
+    DefaultItems.panel_angled.id: [
         {'panel_brush'},
     ],
-    'ITEM_PANEL_CLEAR': [
+    DefaultItems.panel_glass.id: [
         {'panel_glass'},
     ],
-    'ITEM_OBSERVATION_ROOM': [
+    DefaultItems.obs_room_large.id: [
         {'preplaced'},
     ]
 }
@@ -219,7 +220,7 @@ def set_traits(vmf: VMF, id_to_item: Dict[utils.ObjectID, Item], coll: Collision
 
         item: Optional[Item]
         try:
-            item = id_to_item[utils.obj_id(item_id)]
+            item = id_to_item[item_id]
         except (KeyError, ValueError):
             LOGGER.warning('Unknown item ID "{}"', item_id)
             item_class = ItemClass.UNCLASSED
@@ -230,7 +231,7 @@ def set_traits(vmf: VMF, id_to_item: Dict[utils.ObjectID, Item], coll: Collision
         info = ENT_TO_TRAITS[inst] = TraitInfo(item_class, item_id)
 
         try:
-            info.traits |= ID_ATTRS[item_id.upper()][item_ind]
+            info.traits |= ID_ATTRS[item_id][item_ind]
         except (IndexError, KeyError):
             pass
         try:

@@ -15,7 +15,7 @@ LOGGER = srctools.logger.get_logger(__name__)
 LEGEND_SIZE: Final = (512, 1024)
 CELL_SIZE: Final = 102
 # The signage item, used to trigger adding the "Configure Signage" button to its UI.
-ITEM_ID: Final = 'ITEM_BEE2_SIGNAGE'
+ITEM_ID: Final = utils.obj_id('ITEM_BEE2_SIGNAGE')
 
 
 @attrs.frozen

@@ -1032,23 +1032,25 @@ def parse_map(vmf: VMF, info: conditions.MapInfo) -> None:
     """
 
     # Item ID and model skin -> fizzler type
-    fizz_types: dict[tuple[str, int], FizzlerType] = {}
+    fizz_types: dict[tuple[utils.ObjectID, int], FizzlerType] = {}
 
     for fizz_type in FIZZ_TYPES.values():
-        for item_id in fizz_type.item_ids:
-            if ':' in item_id:
-                item_id, barrier_type = item_id.split(':')
+        for item_id_str in fizz_type.item_ids:
+            if ':' in item_id_str:
+                item_id_str, barrier_type = item_id_str.split(':')
+                item_id = utils.obj_id(item_id_str)
                 if barrier_type == 'LASERFIELD':
                     barrier_skin = 2
                 elif barrier_type == 'FIZZLER':
                     barrier_skin = 0
                 else:
-                    LOGGER.error('Invalid barrier type ({}) for "{}"!', barrier_type, item_id)
+                    LOGGER.error('Invalid barrier type ({}) for "{}"!', barrier_type, item_id_str)
                     fizz_types[item_id, 0] = fizz_type
                     fizz_types[item_id, 2] = fizz_type
                     continue
                 fizz_types[item_id, barrier_skin] = fizz_type
             else:
+                item_id = utils.obj_id(item_id_str)
                 fizz_types[item_id, 0] = fizz_type
                 fizz_types[item_id, 2] = fizz_type
 

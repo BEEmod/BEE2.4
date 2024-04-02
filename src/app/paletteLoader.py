@@ -52,6 +52,7 @@ TRANS_NAMES: dict[str, TransToken] = {
 }
 
 # The original palette, plus BEEmod 1 and Aperture Tag's palettes.
+# Todo: Switch to DefaultItems/ObjectID here.
 DEFAULT_PALETTES: dict[str, list[list[tuple[str, int]]]] = {
     'EMPTY': [],
     'PORTAL2': [

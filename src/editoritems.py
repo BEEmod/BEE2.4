@@ -14,6 +14,7 @@ from srctools.tokenizer import Tokenizer, Token
 from typing_extensions import TypeAlias
 
 from connections import Config as ConnConfig, InputType, OutNames
+from consts import DefaultItems
 from editoritems_props import ItemProp, ItemPropKind, PROP_TYPES
 from collisions import CollideType, BBox, NonBBoxError
 from transtoken import TransToken, TransTokenSource
@@ -467,6 +468,11 @@ DEFAULT_SOUNDS = {
     Sound.DELETE: 'P2Editor.RemoveOther',
 }
 _BLANK_INST = [InstCount(FSPath(), 0, 0, 0)]
+ANTLINE_ITEMS = {
+    DefaultItems.indicator_check.id,
+    DefaultItems.indicator_timer.id,
+    DefaultItems.indicator_toggle.id,
+}
 
 
 class ConnSide(Enum):
@@ -1041,11 +1047,7 @@ class Item:
                 if not item.id:
                     raise tok.error('Invalid item ID (Type) "{}"', item.id)
                 # The items here are used internally and must have inputs.
-                if item.id in {
-                    'ITEM_INDICATOR_TOGGLE',
-                    'ITEM_INDICATOR_PANEL',
-                    'ITEM_INDICATOR_PANEL_TIMER',
-                }:
+                if item.id in ANTLINE_ITEMS:
                     item.force_input = True
             elif tok_value == 'itemclass':
                 item_class = tok.expect(Token.STRING)
@@ -1340,7 +1342,7 @@ class Item:
                 conf.disable_cmd += (Output('', '', conn.deactivate, inst_in=conn.deact_name), )
 
         if ConnTypes.POLARITY in self.conn_inputs:
-            if self.id.upper() != 'ITEM_TBEAM':
+            if self.id.upper() != DefaultItems.funnel.id:
                 LOGGER.warning(
                     'Item {} has polarity inputs, '
                     'this only works for the actual funnel!',
@@ -1982,9 +1984,7 @@ class Item:
                 'item class is not ItemButtonFloor, only instance 0 is shown.'
             )
         # The indicator items are special, they always have just one input...
-        if self.has_prim_input() and 'connectioncount' not in self.properties and self.id not in [
-            'ITEM_INDICATOR_TOGGLE', 'ITEM_INDICATOR_PANEL', 'ITEM_INDICATOR_PANEL_TIMER',
-        ]:
+        if self.has_prim_input() and 'connectioncount' not in self.properties and self.id not in ANTLINE_ITEMS:
             LOGGER.warning(
                 'Items with inputs must have ConnectionCount to work!'
             )
