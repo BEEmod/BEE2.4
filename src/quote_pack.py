@@ -188,11 +188,12 @@ class Line:
         instances = [child.value for child in kv.find_all('file')]
         scenes = []
 
-        # Scenes and the dependent commands are order dependent
+        # Scenes and the dependent commands are order dependent.
         cur_choreo_name = ''
         end_commands: list[Output] = []
         for child in kv:
-            if child.name == 'choreo_name':
+            # Several alternate names in different configs and sections.
+            if child.name in ['choreo_name', 'quote_name', 'target']:
                 cur_choreo_name = child.value
             elif child.name == 'endcommand':
                 end_commands.append(Output(
