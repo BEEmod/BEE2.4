@@ -138,10 +138,10 @@ async def load_settings() -> Tuple[
     if not isinstance(editor_list, list):
         raise ValueError(f'Invalid list of editor items, got: {editor_list!r}')
     for item in editor_list:
-        if isinstance(editor_list, editoritems.Item):
+        if isinstance(item, editoritems.Item):
             id_to_item[item.id] = item
         else:
-            raise ValueError(f'Invalid list of editor items, got: {editor_list!r}')
+            raise ValueError(f'Invalid editor item, got: {item!r}')
 
     # Send that data to the relevant modules.
     instanceLocs.load_conf(id_to_item.values())
