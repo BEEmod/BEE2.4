@@ -180,35 +180,37 @@ class QuotePack(PakObject, needs_foreground=True, style_suggest_key='quote'):
     @classmethod
     async def post_parse(cls, packset: PackagesSet) -> None:
         """Verify no quote packs have duplicate IDs."""
-        # TODO rewrite!
-
-        def iter_lines(conf: Keyvalues) -> Iterator[Keyvalues]:
-            """Iterate over the varios line blocks."""
-            yield from conf.find_all("Quotes", "Group", "Quote", "Line")
-
-            yield from conf.find_all("Quotes", "Midchamber", "Quote", "Line")
-
-            for group in conf.find_children("Quotes", "CoopResponses"):
-                if group.has_children():
-                    yield from group
-
+        used: Set[str] = set()
+        voice: QuotePack
         for voice in packset.all_obj(cls):
-            used: Set[str] = set()
-            for quote in iter_lines(voice.config):
-                try:
-                    quote_id = quote['id']
-                except LookupError:
-                    quote_id = quote['name', '']
-                    LOGGER.warning(
-                        'Quote Pack "{}" has no specific ID for "{}"!',
-                        voice.id, quote_id,
-                    )
-                if quote_id in used:
-                    LOGGER.warning(
-                        'Quote Pack "{}" has duplicate '
-                        'voice ID "{}"!', voice.id, quote_id,
-                    )
-                used.add(quote_id)
+            for group in voice.data.groups.values():
+                used.clear()
+                for quote in group.quotes:
+                    for line in quote.lines:
+                        if line.id in used:
+                            LOGGER.warning(
+                                'Quote Pack "{}" has duplicate line ID "{}" in group "{}"!',
+                                voice.id, line.id, group.id
+                            )
+                        used.add(line.id)
+            used.clear()
+            for quote in voice.data.midchamber:
+                for line in quote.lines:
+                    if line.id in used:
+                        LOGGER.warning(
+                            'Quote Pack "{}" has duplicate midchamber line ID "{}"',
+                            voice.id, line.id,
+                        )
+                    used.add(line.id)
+            used.clear()
+            for resp in voice.data.responses.values():
+                for line in resp:
+                    if line.id in used:
+                        LOGGER.warning(
+                            'Quote Pack "{}" has duplicate response line ID "{}"',
+                            voice.id, line.id,
+                        )
+                    used.add(line.id)
 
     def iter_trans_tokens(self) -> Iterator[TransTokenSource]:
         """Yield all translation tokens in this voice pack."""
