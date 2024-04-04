@@ -1653,6 +1653,7 @@ async def init_windows(tk_img: TKImages) -> None:
     # If the config is valid, this will move them to user-defined
     # positions.
     reposition_panes()
+    await tk_tools.wait_eventloop()
     itemconfig.window.load_conf()
     CompilerPane.window.load_conf()
     windows['opt'].load_conf()

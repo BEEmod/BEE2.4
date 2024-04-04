@@ -3,6 +3,8 @@ from typing import Callable, Any, Optional, Union
 import tkinter as tk
 from tkinter import ttk
 
+from srctools.logger import get_logger
+
 from app import tooltip, tk_tools, sound
 from app.img import Handle as ImgHandle
 from ui_tk.img import TKImages
@@ -21,6 +23,7 @@ style = ttk.Style()
 style.configure('Toolbar.TButton', padding='-20',)
 
 TOOL_BTN_TOOLTIP = TransToken.ui('Hide/Show the "{window}" window.')
+LOGGER = get_logger(__name__)
 
 
 def make_tool_button(
@@ -207,25 +210,29 @@ class SubPane(tk.Toplevel):
 
     def load_conf(self) -> None:
         """Load configuration from our config file."""
+        hide = False
         try:
             state = config.APP.get_cur_conf(WindowState, self.win_name, legacy_id=self.legacy_name)
         except KeyError:
             pass  # No configured state.
         else:
+            LOGGER.error('Load: {} = {}', self.win_name, state)
             width = state.width if self.can_resize_x and state.width > 0 else self.winfo_reqwidth()
             height = state.height if self.can_resize_y and state.height > 0 else self.winfo_reqheight()
             self.deiconify()
 
             self.geometry(f'{width}x{height}')
-            self.sizefrom('user')
 
             self.relX, self.relY = state.x, state.y
 
             self.follow_main()
-            self.positionfrom('user')
             if not state.visible:
-                self.after(150, self.hide_win)
+                hide = True
 
-        # Prevent this until here, so the <config> event won't erase our
-        #  settings
-        self.can_save = True
+        def set_can_save() -> None:
+            """Only allow saving after the window has stabilised in its position."""
+            self.can_save = True
+            if hide:
+                self.hide_win(False)
+
+        self.after(150, set_can_save)
