@@ -843,7 +843,7 @@ def parse_map(vmf: VMF, conn_items: Mapping[str, connections.Item]) -> None:
             # Look up the barriers
             center = Vec.from_str(inst['origin']) // 128 * 128 + (64, 64, 64)
             norm = Vec(x=1) @ Angle.from_str(inst['angles'])
-            center -= 64 * norm
+            center -= (32 if inst.fixup.bool('$start_reversed') else 64) * norm
             plane = PlaneKey(norm, center)
             local = plane.world_to_plane(center)
 
@@ -895,30 +895,36 @@ def parse_map(vmf: VMF, conn_items: Mapping[str, connections.Item]) -> None:
                 center = origin // 128 * 128 + (64, 64, 64)
                 norm = (origin - center).norm()
 
-                # Offset to be the voxel side, not center.
-                center += 64 * norm
-                plane = PlaneKey(-norm, center)
-                local = plane.world_to_plane(center)
-
-                # Figure out the instance this matches from above.
+                # Figure out the instance(s) this matches from above.
                 # At this point all barrier definitions are whole voxel, so it doesn't matter which we pick.
-                try:
-                    barrier = BARRIERS[plane][local.x // 32, local.y // 32]
-                except KeyError:
-                    LOGGER.warning('glass/grating at {}, {} has no corresponding instance?', center, norm)
-                    break  # Don't check remaining faces.
+                # We also know that only one type (glass/grating) can be placed, so it's fine to
+                # just set both the 64/32 offset planes.
+                found = False
+                for offset in [32, 64]:
+                    # Offset to be the voxel side, not center.
+                    plane_pos = center + offset * norm
+                    plane = PlaneKey(-norm, plane_pos)
+                    local = plane.world_to_plane(plane_pos)
+                    try:
+                        barrier = BARRIERS[plane][local.x // 32, local.y // 32]
+                    except KeyError:
+                        continue  # Try other side?
+                    found = True
 
-                if barrier.type is BARRIER_EMPTY_TYPE:
-                    # Not yet filled in, now we can set it. Also set a fixup so conditions can
-                    # identify the barrier.
-                    barrier.type = barrier_type
-                    for inst in barrier.instances:
-                        inst.fixup[consts.FixupVars.BEE_GLS_TYPE] = fixup_value
-                elif barrier_type is not barrier_type:
-                    LOGGER.warning(
-                        'Barrier at {}, {} is both glass and grating simultaneously?',
-                        center, norm, plane,
-                    )
+                    if barrier.type is BARRIER_EMPTY_TYPE:
+                        # Not yet filled in, now we can set it. Also set a fixup so conditions can
+                        # identify the barrier.
+                        barrier.type = barrier_type
+                        for inst in barrier.instances:
+                            inst.fixup[consts.FixupVars.BEE_GLS_TYPE] = fixup_value
+                    elif barrier_type is not barrier_type:
+                        LOGGER.warning(
+                            'Barrier at {}, {} is both glass and grating simultaneously?',
+                            plane_pos, norm, plane,
+                        )
+                    if not found:
+                        LOGGER.warning('glass/grating at {}, {} has no corresponding instance?',plane_pos, norm)
+                        break  # The opposite face won't match either.
 
                 break  # Don't check the remaining faces.
 
