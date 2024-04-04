@@ -555,7 +555,7 @@ class CondCall(Generic[CallResultT]):
     valid_before: frozenset[MetaCond] = attrs.field(kw_only=True, converter=meta_priority_converter)
     valid_after: frozenset[MetaCond] = attrs.field(kw_only=True, converter=meta_priority_converter)
 
-    _setup_data: dict[int, Callable[[Entity], CallResultT]] | None = attrs.field(init=False)
+    _setup_data: dict[int, Callable[[Entity], CallResultT]] | None = attrs.field(init=False, repr=False)
     _cback: Callable[
         [srctools.VMF, Collisions, MapInfo, QuoteInfo, Entity, Keyvalues],
         CallResultT | Callable[[Entity], CallResultT],
@@ -965,6 +965,7 @@ async def dump_conditions(filename: trio.Path) -> None:
     async with await filename.open('w') as file:
         for line in prelude:
             await file.write(line)
+        await file.write('\n')
 
         for test_key, priority, func in ALL_META:
             await file.write(f'#### `{test_key}` ({priority.value}):\n\n')
@@ -1017,7 +1018,19 @@ async def dump_conditions(filename: trio.Path) -> None:
                 for test_key, aliases, func in funcs:
                     await file.write(f'#### `{test_key}`:\n\n')
                     if aliases:
-                        await file.write(f'**Aliases:** `{"`, `".join(aliases)}`  \n\n')
+                        await file.write(f'**Aliases:** `{"`, `".join(aliases)}`  \n')
+                    if func.valid_after or func.valid_before:
+                        await file.write(f'**Valid Priority Levels:** ')
+                        before = [meta.value for meta in func.valid_before]
+                        after = [meta.value for meta in func.valid_after]
+                        if before and after:
+                            await file.write(f'between `{min(after):+}` \N{EN DASH} `{max(before):+}` (inclusive)\n')
+                        elif before:
+                            await file.write(f'less than `{min(before):+}`\n')
+                        elif after:
+                            await file.write(f'greater than `{max(after):+}`\n')
+                        else:
+                            raise AssertionError(func)
                     await file.write(dump_func_docs(func))
                     await file.write('\n\n')
 
