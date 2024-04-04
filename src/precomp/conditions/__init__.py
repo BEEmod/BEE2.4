@@ -28,28 +28,28 @@ only parsing configuration options once, and is expected to be used with a
 closure.
 """
 from __future__ import annotations
+from typing import (
+    Generic, Protocol, TypeVar, Any, Callable, Tuple, Type, Union, Final,
+    overload, cast, get_type_hints
+)
+from collections.abc import Iterable, Mapping, MutableMapping
+from collections import defaultdict
+from decimal import Decimal
+from enum import Enum
 import functools
 import inspect
-import io
 import math
 import pkgutil
 import sys
 import types
-import typing
 import warnings
-from collections import defaultdict
-from decimal import Decimal
-from enum import Enum
-from typing import (
-    Generic, Protocol, TypeVar, Any, Callable, TextIO, Tuple, Type, Union, overload,
-    cast, Final, Iterable, Mapping, FrozenSet, Dict
-)
 
-import attrs
-import srctools.logger
 from srctools.math import FrozenAngle, Vec, FrozenVec, AnyAngle, AnyMatrix, Angle
 from srctools.vmf import EntityGroup, VMF, Entity, Output, Solid, ValidKVs
 from srctools import Keyvalues
+import attrs
+import srctools.logger
+import trio
 
 from precomp import instanceLocs, rand
 from precomp.collisions import Collisions
@@ -408,7 +408,7 @@ def annotation_caller(
     else:
         return_val = None
     try:
-        hints = typing.get_type_hints(func)
+        hints = get_type_hints(func)
     except Exception:
         LOGGER.exception(
             'Could not compute type hints for function {}.{}!',
@@ -532,10 +532,10 @@ def conv_setup_pair(
 
 
 # Deduplicate the frozen sets.
-_META_PRIORITY_CACHE: Dict[FrozenSet[MetaCond], FrozenSet[MetaCond]] = {}
+_META_PRIORITY_CACHE: dict[frozenset[MetaCond], frozenset[MetaCond]] = {}
 
 
-def meta_priority_converter(priorities: typing.Iterable[MetaCond] | MetaCond) -> FrozenSet[MetaCond]:
+def meta_priority_converter(priorities: Iterable[MetaCond] | MetaCond) -> frozenset[MetaCond]:
     """Allow passing either a single enum, or any iterable."""
     if isinstance(priorities, MetaCond):
         result = frozenset([priorities])
@@ -552,8 +552,8 @@ class CondCall(Generic[CallResultT]):
     """
     func: Callable[..., CallResultT | Callable[[Entity], CallResultT]]
     group: str | None
-    valid_before: FrozenSet[MetaCond] = attrs.field(kw_only=True, converter=meta_priority_converter)
-    valid_after: FrozenSet[MetaCond] = attrs.field(kw_only=True, converter=meta_priority_converter)
+    valid_before: frozenset[MetaCond] = attrs.field(kw_only=True, converter=meta_priority_converter)
+    valid_after: frozenset[MetaCond] = attrs.field(kw_only=True, converter=meta_priority_converter)
 
     _setup_data: dict[int, Callable[[Entity], CallResultT]] | None = attrs.field(init=False)
     _cback: Callable[
@@ -910,7 +910,6 @@ def import_conditions() -> None:
     # If not frozen, check none are missing.
     if not utils.FROZEN:
         import builtins
-        from types import ModuleType
         ns = builtins.globals()
         # Verify none are missing.
         for mod_info in pkgutil.iter_modules(__path__, 'precomp.conditions.'):
@@ -920,7 +919,7 @@ def import_conditions() -> None:
             except KeyError as exc:
                 raise Exception(mod_info) from exc
             # Verify that we didn't shadow the import by importing in this __init__ module.
-            if not isinstance(found, ModuleType) or found.__name__ != mod_info.name:
+            if not isinstance(found, types.ModuleType) or found.__name__ != mod_info.name:
                 raise Exception(mod_info, found)
     LOGGER.info('Imported all conditions modules!')
 
@@ -946,99 +945,87 @@ They have limited utility otherwise.
 '''
 
 
-def dump_conditions(file: TextIO) -> None:
+async def dump_conditions(filename: trio.Path) -> None:
     """Dump docs for all the condition tests, results and metaconditions."""
 
     LOGGER.info('Dumping conditions...')
 
-    # Delete existing data, after the marker.
-    file.seek(0, io.SEEK_SET)
-
+    # Extract the text before the marker line.
     prelude = []
-
-    for line in file:
-        if DOC_MARKER in line:
-            break
-        prelude.append(line)
-
-    file.seek(0, io.SEEK_SET)
-    file.truncate(0)
-
-    if not prelude:
-        # No marker, blank the whole thing.
-        LOGGER.warning('No intro text before marker!')
-
-    for line in prelude:
-        file.write(line)
-    file.write(DOC_MARKER + '\n\n')
-
-    file.write(DOC_META_COND)
+    async with await filename.open('r') as file_prelude:
+        async for line in file_prelude:
+            prelude.append(line)
+            if DOC_MARKER in line:
+                break
+        else:
+            raise ValueError('No marker text!')
 
     ALL_META.sort(key=lambda tup: tup[1].value)  # Sort by priority
-    for test_key, priority, func in ALL_META:
-        file.write(f'#### `{test_key}` ({priority.value}):\n\n')
-        dump_func_docs(file, func)
-        file.write('\n')
 
-    all_cond_types: list[tuple[list[tuple[str, tuple[str, ...], CondCall[Any]]], str]] = [
-        (ALL_TESTS, 'Tests'),
-        (ALL_RESULTS, 'Results'),
-    ]
-    for lookup, name in all_cond_types:
-        print('<!------->', file=file)
-        print(f'# {name}', file=file)
-        print('<!------->', file=file)
+    async with await filename.open('w') as file:
+        for line in prelude:
+            await file.write(line)
 
-        lookup_grouped: dict[str, list[
-            tuple[str, tuple[str, ...], CondCall[Any]]
-        ]] = defaultdict(list)
+        for test_key, priority, func in ALL_META:
+            await file.write(f'#### `{test_key}` ({priority.value}):\n\n')
+            await file.write(dump_func_docs(func))
+            await file.write('\n\n')
 
-        for test_key, aliases, func in lookup:
-            group = getattr(func, 'group', 'ERROR')
-            if group is None:
-                group = '00special'
-            lookup_grouped[group].append((test_key, aliases, func))
+        all_cond_types: list[tuple[list[tuple[str, tuple[str, ...], CondCall[Any]]], str]] = [
+            (ALL_TESTS, 'Tests'),
+            (ALL_RESULTS, 'Results'),
+        ]
+        for lookup, name in all_cond_types:
+            await file.write('<!------->\n')
+            await file.write(f'# {name}\n')
+            await file.write('<!------->\n')
 
-        # Collapse 1-large groups into Ungrouped.
-        for group in list(lookup_grouped):
-            if len(lookup_grouped[group]) < 2:
-                lookup_grouped[''].extend(lookup_grouped[group])
-                del lookup_grouped[group]
+            lookup_grouped: dict[str, list[
+                tuple[str, tuple[str, ...], CondCall[Any]]
+            ]] = defaultdict(list)
 
-        if not lookup_grouped['']:
-            del lookup_grouped['']
+            for test_key, aliases, func in lookup:
+                group = getattr(func, 'group', 'ERROR')
+                if group is None:
+                    group = '00special'
+                lookup_grouped[group].append((test_key, aliases, func))
 
-        for header_ind, (group, funcs) in enumerate(sorted(lookup_grouped.items())):
-            if group == '':
-                group = 'Ungrouped Conditions'
+            # Collapse 1-large groups into Ungrouped.
+            for group in list(lookup_grouped):
+                if len(lookup_grouped[group]) < 2:
+                    lookup_grouped[''].extend(lookup_grouped[group])
+                    del lookup_grouped[group]
 
-            if header_ind:
-                # Not before the first one...
-                print('---------\n', file=file)
+            if not lookup_grouped['']:
+                del lookup_grouped['']
 
-            if group == '00special':
-                print(DOC_SPECIAL_GROUP, file=file)
-            else:
-                print(f'### {group}\n', file=file)
+            for header_ind, (group, funcs) in enumerate(sorted(lookup_grouped.items())):
+                if group == '':
+                    group = 'Ungrouped Conditions'
 
-            LOGGER.info('Doing {} group...', group)
+                if header_ind:
+                    # Not before the first one...
+                    await file.write('---------\n\n')
 
-            for test_key, aliases, func in funcs:
-                print(f'#### `{test_key}`:\n', file=file)
-                if aliases:
-                    print(f'**Aliases:** `{"`, `".join(aliases)}`  \n', file=file)
-                dump_func_docs(file, func)
-                file.write('\n')
+                if group == '00special':
+                    await file.write(DOC_SPECIAL_GROUP)
+                else:
+                    await file.write(f'### {group}\n\n')
+
+                LOGGER.info('Doing {} group...', group)
+
+                for test_key, aliases, func in funcs:
+                    await file.write(f'#### `{test_key}`:\n\n')
+                    if aliases:
+                        await file.write(f'**Aliases:** `{"`, `".join(aliases)}`  \n\n')
+                    await file.write(dump_func_docs(func))
+                    await file.write('\n\n')
 
 
-def dump_func_docs(file: TextIO, func: Callable[..., object]) -> None:
-    """Write the documentation for this function to the file."""
+def dump_func_docs(func: Callable[..., object]) -> str:
+    """Extract the documentation for a function."""
     import inspect
-    docs = inspect.getdoc(func)
-    if docs:
-        print(docs, file=file)
-    else:
-        print('**No documentation!**', file=file)
+    return inspect.getdoc(func) or '**No documentation!'
 
 
 def add_inst(
@@ -1239,7 +1226,7 @@ def widen_fizz_brush(brush: Solid, thickness: float, bounds: tuple[Vec, Vec] | N
 
 
 def set_ent_keys(
-    ent: typing.MutableMapping[str, str],
+    ent: MutableMapping[str, str],
     inst: Entity,
     kv_block: Keyvalues,
     block_name: str='Keys',

@@ -3,6 +3,7 @@ from typing import Dict, Generic, Iterator, Optional, TextIO, Tuple, Type, TypeV
 from enum import Enum
 import inspect
 import math
+import trio
 
 from srctools import Keyvalues, Vec, parse_vec_str
 import srctools.logger
@@ -381,26 +382,28 @@ This is a list of all current options for the config.
 '''
 
 
-def dump_info(file: TextIO) -> None:
+async def dump_info(filename: trio.Path) -> None:
     """Create the wiki page for item options, given a file to write to."""
-    print(DOC_HEADER, file=file)
+    async with await filename.open('w') as file:
+        await file.write(DOC_HEADER)
 
-    for opt in _ALL_OPTIONS:
-        if opt.hidden:
-            continue
-        if isinstance(opt, OptWithDefault):
-            if opt.type is Vec:
-                default = '(`' + opt.default.join(' ') + '`)'
+        for opt in _ALL_OPTIONS:
+            if opt.hidden:
+                continue
+            if isinstance(opt, OptWithDefault):
+                if opt.type is Vec:
+                    default = '(`' + opt.default.join(' ') + '`)'
+                else:
+                    default = ' = `' + repr(opt.default) + '`'
             else:
-                default = ' = `' + repr(opt.default) + '`'
-        else:
-            default = ''
-        file.write(INFO_DUMP_FORMAT.format(
-            id=opt.name,
-            default=default,
-            type=TYPE_NAMES[opt.type],
-            desc='\n'.join(opt.doc),
-        ))
+                default = ''
+            await file.write(INFO_DUMP_FORMAT.format(
+                id=opt.name,
+                default=default,
+                type=TYPE_NAMES[opt.type],
+                desc='\n'.join(opt.doc),
+            ))
+    LOGGER.info('Written options page!')
 
 GOO_MIST = Opt.boolean(
     'goo_mist', False,

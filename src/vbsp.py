@@ -221,13 +221,13 @@ async def load_settings() -> Tuple[
     return indicators, id_to_item, corridor_conf
 
 
-async def load_map(map_path: str) -> VMF:
+def load_map(map_path: str) -> VMF:
     """Load in the VMF file."""
     with open(map_path) as file:
         LOGGER.info("Parsing Map...")
-        kv = await trio.to_thread.run_sync(Keyvalues.parse, file, map_path)
+        kv = Keyvalues.parse(file, map_path)
     LOGGER.info('Reading Map...')
-    vmf = await trio.to_thread.run_sync(VMF.parse, kv)
+    vmf = VMF.parse(kv)
     LOGGER.info("Loading complete!")
     return vmf
 
@@ -1517,10 +1517,9 @@ async def main() -> None:
     if 'BEE2_WIKI_OPT_LOC' in os.environ:
         # Special override - generate docs for the BEE2 wiki.
         LOGGER.info('Writing Wiki text...')
-        with open(os.environ['BEE2_WIKI_OPT_LOC'], 'w') as f:
-            options.dump_info(f)
-        with open(os.environ['BEE2_WIKI_COND_LOC'], 'a+') as f:
-            conditions.dump_conditions(f)
+        async with trio.open_nursery() as nursery:
+            nursery.start_soon(options.dump_info, trio.Path(os.environ['BEE2_WIKI_OPT_LOC']))
+            nursery.start_soon(conditions.dump_conditions, trio.Path(os.environ['BEE2_WIKI_COND_LOC']))
         LOGGER.info('Done. Exiting now!')
         sys.exit()
 
@@ -1614,7 +1613,7 @@ async def main() -> None:
         LOGGER.info("Loading settings...")
         async with trio.open_nursery() as nursery:
             res_settings = utils.Result(nursery, load_settings)
-            vmf_res = utils.Result(nursery, load_map, path)
+            vmf_res = utils.Result.sync(nursery, load_map, path)
             voice_data_res = utils.Result(nursery, voice_line.load)
 
         ind_style, id_to_item, corridor_conf = res_settings()
