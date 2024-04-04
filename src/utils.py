@@ -660,6 +660,18 @@ def acompose(
     return task
 
 
+async def run_as_task(
+    func: Callable[[*PosArgsT], Awaitable[object]],
+    *args: Unpack[PosArgsT],
+) -> None:
+    """Run the specified function inside a nursery.
+
+    This ensures it gets detected by Trio's instrumentation as a subtask.
+    """
+    async with trio.open_nursery() as nursery:  # noqa: ASYNC112
+        nursery.start_soon(func, *args)
+
+
 def not_none(value: T | None) -> T:
     """Assert that the value is not None, inline."""
     if value is None:

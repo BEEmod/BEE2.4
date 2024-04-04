@@ -74,8 +74,8 @@ async def init_app() -> None:
                 'Multiple errors occurred when loading packages:',
             ),
             warn_desc=TransToken.ui('Loading packages was partially successful:'),
-        ) as error_ui, trio.open_nursery() as nurs:
-            nurs.start_soon(
+        ) as error_ui:
+            await utils.run_as_task(
                 packages.load_packages,
                 packset,
                 list(BEE2_config.get_package_locs()),
@@ -92,14 +92,12 @@ async def init_app() -> None:
 
         # Load filesystems into various modules
         music_conf.load_filesystems(package_sys.values())
-        async with trio.open_nursery() as nurs:
-            nurs.start_soon(UI.load_packages, packset, TK_IMG)
+        await utils.run_as_task(UI.load_packages, packset, TK_IMG)
         await loadScreen.MAIN_UI.step('package_load')
         LOGGER.info('Done!')
 
         LOGGER.info('Initialising UI...')
-        async with trio.open_nursery() as nurs:
-            nurs.start_soon(UI.init_windows, TK_IMG)  # create all windows
+        await utils.run_as_task(UI.init_windows, TK_IMG)
         LOGGER.info('UI initialised!')
 
         if Tracer.slow:

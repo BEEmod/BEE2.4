@@ -1092,8 +1092,7 @@ async def init_option(
     music_frame = ttk.Labelframe(props)
     wid_transtoken.set_text(music_frame, TransToken.ui('Music: '))
 
-    async with trio.open_nursery() as nursery:
-        nursery.start_soon(music_conf.make_widgets, packages.get_loaded_packages(), music_frame, pane)
+    await utils.run_as_task(music_conf.make_widgets, packages.get_loaded_packages(), music_frame, pane)
     suggest_windows[packages.Music] = music_conf.WINDOWS[music_conf.MusicChannel.BASE]
 
     def suggested_style_set() -> None:
@@ -1543,25 +1542,21 @@ async def init_windows(tk_img: TKImages) -> None:
         tool_img='icons/win_options',
         tool_col=11,
     )
-    async with trio.open_nursery() as nurs:
-        corridor = TkSelector(packages.get_loaded_packages(), tk_img)
-        nurs.start_soon(init_option, windows['opt'], tk_img, export, corridor)
-    async with trio.open_nursery() as nurs:
-        nurs.start_soon(corridor.refresh)
+    corridor = TkSelector(packages.get_loaded_packages(), tk_img)
+    await utils.run_as_task(init_option, windows['opt'], tk_img, export, corridor)
+    await utils.run_as_task(corridor.refresh)
     await LOAD_UI.step('options')
 
     signage_trigger: EdgeTrigger[()] = EdgeTrigger()
     background_run(signage_ui.init_widgets, tk_img, signage_trigger)
 
-    async with trio.open_nursery() as nurs:
-        nurs.start_soon(
-            background_start, itemconfig.make_pane,
-            frames['toolMenu'], menu_bar.view_menu, tk_img, signage_trigger,
-        )
+    await utils.run_as_task(
+        background_start, itemconfig.make_pane,
+        frames['toolMenu'], menu_bar.view_menu, tk_img, signage_trigger,
+    )
     await LOAD_UI.step('itemvar')
 
-    async with trio.open_nursery() as nurs:
-        nurs.start_soon(CompilerPane.make_pane, frames['toolMenu'], tk_img, menu_bar.view_menu)
+    await utils.run_as_task(CompilerPane.make_pane, frames['toolMenu'], tk_img, menu_bar.view_menu)
     await LOAD_UI.step('compiler')
 
     btn_clear = SubPane.make_tool_button(

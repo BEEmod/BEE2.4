@@ -12,6 +12,7 @@ import attrs
 import srctools.logger
 import trio
 
+import utils
 from loadScreen import ScreenStage
 
 
@@ -41,9 +42,7 @@ class Step(Generic[CtxT, ResourceT]):
         stage: Optional[ScreenStage],
     ) -> None:
         """Wraps the step functionality."""
-        # Use a nursery, so the func is visible as the yielding task for instrumentation.
-        async with trio.open_nursery() as nursery:
-            nursery.start_soon(self.func, ctx)
+        await utils.run_as_task(self.func, ctx)
         if stage is not None:
             await stage.step()
         await result_chan.send(self.results)

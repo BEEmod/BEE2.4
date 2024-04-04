@@ -13,6 +13,7 @@ from srctools import logger
 from trio_util import AsyncValue
 import trio
 
+import utils
 from app import EdgeTrigger, TK_ROOT, UI, sound, tk_tools, StyleVarPane
 from app.tooltip import add_tooltip
 # Re-export.
@@ -381,12 +382,11 @@ async def make_pane(
     canvas_frame.rowconfigure(1, weight=1)
 
     stylevar_frame = ttk.Frame(canvas_frame)
-    async with trio.open_nursery() as nursery:
-        nursery.start_soon(
-            StyleVarPane.make_stylevar_pane,
-            stylevar_frame,
-            packages.get_loaded_packages(),
-        )
+    await utils.run_as_task(
+        StyleVarPane.make_stylevar_pane,
+        stylevar_frame,
+        packages.get_loaded_packages(),
+    )
 
     loading_text = ttk.Label(canvas_frame)
     set_text(loading_text, TransToken.ui('Loading...'))
