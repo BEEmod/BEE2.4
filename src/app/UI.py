@@ -143,10 +143,8 @@ UI: _UIDict = {}
 class Item:
     """Represents an item that can appear on the list."""
     __slots__ = [
-        'ver_list',
         'item',
         'data',
-        'inherit_kind',
         'visual_subtypes',
         'id',
         'pak_id',
@@ -154,11 +152,8 @@ class Item:
         'names',
         ]
     data: ItemVariant
-    inherit_kind: InheritKind
 
     def __init__(self, item: packages.Item) -> None:
-        self.ver_list = sorted(item.versions.keys())
-
         self.item = item
         # The indexes of subtypes that are actually visible.
         self.visual_subtypes = [
@@ -190,7 +185,6 @@ class Item:
             self.data = version.styles[selected_style]
         except KeyError:
             self.data = self.item.def_ver.def_style
-        self.inherit_kind = version.inherit_kind.get(selected_style, InheritKind.UNSTYLED)
 
     def get_tags(self, subtype: int) -> Iterator[str]:
         """Return all the search keywords for this item/subtype."""
@@ -228,8 +222,9 @@ class Item:
         icon = self._get_raw_icon(sub_key, use_grouping)
         if self.item.unstyled or not config.APP.get_cur_conf(GenOptions).visualise_inheritance:
             return icon
-        if self.inherit_kind is not InheritKind.DEFINED:
-            icon = icon.overlay_text(self.inherit_kind.value.title(), 12)
+        inherit_kind = self.selected_version().inherit_kind.get(selected_style, InheritKind.UNSTYLED)
+        if inherit_kind is not InheritKind.DEFINED:
+            icon = icon.overlay_text(inherit_kind.value.title(), 12)
         return icon
 
     def _get_raw_icon(self, subKey: int, use_grouping: bool) -> img.Handle:
@@ -292,13 +287,13 @@ class Item:
         # item folders are reused, so we can find duplicates.
         style_obj_ids = {
             id(self.item.versions[ver_id].styles[selected_style])
-            for ver_id in self.ver_list
+            for ver_id in self.item.version_id_order
         }
-        versions = self.ver_list
+        versions = list(self.item.version_id_order)
         if len(style_obj_ids) == 1:
             # All the variants are the same, so we effectively have one
             # variant. Disable the version display.
-            versions = self.ver_list[:1]
+            versions = versions[:1]
 
         return versions, [
             self.item.versions[ver_id].name
