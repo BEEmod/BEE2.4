@@ -7,7 +7,7 @@ from typing import (
     Tuple, Type, TypeVar, ValuesView
 )
 
-from typing_extensions import Literal, ParamSpec, TypeVarTuple, Unpack
+from typing_extensions import Literal, ParamSpec, TypeGuard, TypeVarTuple, Unpack
 from collections import deque
 from enum import Enum
 from pathlib import Path
@@ -533,6 +533,11 @@ def special_id(value: str, kind: str = 'object') -> SpecialID:
     if result == "":
         raise ValueError(f'Invalid {kind} ID "{value}". IDs may not be blank.')
     return result
+
+
+def not_special_id(some_id: SpecialID) -> TypeGuard[ObjectID]:
+    """Check that an ID does not have brackets, meaning it is a regular ID."""
+    return not some_id.startswith('<') and not some_id.endswith('>')
 
 
 class PackagePath:

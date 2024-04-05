@@ -71,7 +71,7 @@ def apply_replacements(conf: Keyvalues, item_id: str) -> Keyvalues:
 def get_export_data(
     item: Item,
     pal_list: dict[str, dict[int, tuple[int, int]]],
-    style_id: str,
+    style_id: utils.ObjectID,
     prop_conf: ItemDefault,
 ) -> tuple[list[EditorItem], lazy_conf.LazyConf]:
     """Get the data for an exported item."""
@@ -142,7 +142,7 @@ async def step_write_items(exp_data: ExportData) -> None:
         for item in exp_data.all_items
     }
 
-    style_id = exp_data.selected_style.id
+    style_id = utils.obj_id(exp_data.selected_style.id)
     item: Item
     default_conf = ItemDefault()
     for item in sorted(exp_data.packset.all_obj(Item), key=operator.attrgetter('id')):

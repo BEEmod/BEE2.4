@@ -2,12 +2,15 @@
 
 A system is provided so configurations can be shared and partially modified
 as required.
+
+Unparsed style IDs can be <special>, used usually for unstyled items.
+Those are only relevant for default styles or explicit inheritance.
 """
 from __future__ import annotations
 import re
 import copy
+from collections.abc import Sequence, Iterable, Iterator
 from enum import Enum
-from typing import Iterable, Iterator
 from pathlib import PurePosixPath as FSPath
 
 import attrs
@@ -20,7 +23,7 @@ import config.gen_opts
 from app import tkMarkdown, img, lazy_conf, DEV_MODE
 import config
 from transtoken import TransToken, TransTokenSource
-from packages import PackagesSet, PakObject, ParseData, Style, sep_values, desc_parse, get_config
+from packages import PackagesSet, PakObject, PakRef, ParseData, Style, sep_values, desc_parse, get_config
 from config.item_defaults import DEFAULT_VERSION
 from editoritems import Item as EditorItem, InstCount
 from connections import Config as ConnConfig
@@ -47,7 +50,8 @@ class UnParsedItemVariant:
     pak_id: utils.ObjectID  # The package that defined this variant.
     filesys: FileSystem  # The original filesystem.
     folder: str | None  # If set, use the given folder from our package.
-    style: str | None  # Inherit from a specific style (implies folder is None)
+    # If non-None, either a single style ID, or version + style ID.
+    style: utils.SpecialID | tuple[str, utils.ObjectID] | None
     config: Keyvalues | None  # Config for editing
 
 
@@ -61,8 +65,8 @@ class UnParsedVersion:
     name: str
     id: str
     isolate: bool
-    styles: dict[str, UnParsedItemVariant | ItemVariant]
-    def_style: str
+    styles: dict[utils.SpecialID, UnParsedItemVariant | ItemVariant]
+    def_style: utils.SpecialID
     inherit_kind: dict[str, InheritKind]
 
 
@@ -412,12 +416,22 @@ class ItemVariant:
         return editor
 
 
+def style_with_version(style_id: str) -> utils.SpecialID | tuple[str, utils.ObjectID]:
+    """Parse either a bare ID or an ID plus style."""
+    if ':' in style_id:
+        version, style = style_id.split(':', 1)
+        # This looks up elsewhere, we can't support version IDs here yet....
+        return version, utils.obj_id(style, 'Style')
+    else:
+        return utils.special_id(style_id, 'style')
+
+
 @attrs.define(repr=False)
 class Version:
     """Versions are a set of styles defined for an item."""
     name: str  # Todo: Translation token?
     id: str
-    styles: dict[str, ItemVariant] = attrs.field(repr=False)  # Repr would be absolutely massive.
+    styles: dict[utils.ObjectID, ItemVariant] = attrs.field(repr=False)  # Repr would be absolutely massive.
     def_style: ItemVariant = attrs.field(repr=False)
     inherit_kind: dict[str, InheritKind]
 
@@ -488,32 +502,37 @@ class Item(PakObject, needs_foreground=True):
         for ver in data.info.find_all('version'):
             ver_name = ver['name', 'Regular']
             ver_id = ver['ID', DEFAULT_VERSION]
-            styles: dict[str, UnParsedItemVariant | ItemVariant] = {}
+            styles: dict[utils.SpecialID, UnParsedItemVariant | ItemVariant] = {}
             inherit_kind: dict[str, InheritKind] = {}
             ver_isolate = ver.bool('isolated')
-            def_style: str | None = None
+            def_style: utils.SpecialID | None = None
 
             for style in ver.find_children('styles'):
+                targ_style = utils.special_id(style.real_name, 'Style')
                 if style.has_children():
+                    if 'base' in style:
+                        sty_id = style_with_version(style['Base'])
+                    else:
+                        sty_id = None
                     folder = UnParsedItemVariant(
                         data.pak_id,
                         data.fsys,
                         folder=style['folder', None],
-                        style=style['Base', ''],
+                        style=sty_id,
                         config=style,
                     )
-                    inherit_kind[style.real_name] = InheritKind.MODIFIED
+                    inherit_kind[targ_style] = InheritKind.MODIFIED
 
                 elif style.value.startswith('<') and style.value.endswith('>'):
                     # Reusing another style unaltered using <>.
                     folder = UnParsedItemVariant(
                         data.pak_id,
                         data.fsys,
-                        style=style.value[1:-1],
+                        style=style_with_version(style.value[1:-1]),
                         folder=None,
                         config=None,
                     )
-                    inherit_kind[style.real_name] = InheritKind.REUSED
+                    inherit_kind[targ_style] = InheritKind.REUSED
                 else:
                     # Reference to the actual folder...
                     folder = UnParsedItemVariant(
@@ -523,7 +542,7 @@ class Item(PakObject, needs_foreground=True):
                         style=None,
                         config=None,
                     )
-                    inherit_kind[style.real_name] = InheritKind.DEFINED
+                    inherit_kind[targ_style] = InheritKind.DEFINED
                 # We need to parse the folder now if set.
                 if folder.folder:
                     folders_to_parse.add(folder.folder)
@@ -532,11 +551,11 @@ class Item(PakObject, needs_foreground=True):
                 # if not otherwise present.
                 # We set it to the name, then lookup later in setup_style_tree()
                 if def_style is None:
-                    def_style = style.real_name
+                    def_style = targ_style
                 # It'll only be UnParsed during our parsing.
-                styles[style.real_name] = folder
+                styles[targ_style] = folder
 
-                if style.real_name == folder.style:
+                if targ_style == folder.style:
                     raise ValueError(
                         f'Item "{data.id}"\'s "{style.real_name}" style '
                         "can't inherit from itself!"
@@ -709,6 +728,18 @@ class ItemConfig(PakObject, allow_mult=True):
                     our_styles[sty_id] = style
                 else:
                     our_styles[sty_id] = lazy_conf.concat(our_styles[sty_id], style)
+
+
+def _conv_pakref_item(value: PakRef[Item] | utils.ObjectID) -> PakRef[Item]:
+    """Allow passing a PakRef, or a raw ID."""
+    return value if isinstance(value, PakRef) else PakRef(Item, value)
+
+
+@attrs.frozen
+class SubItemRef:
+    """Represents an item with a specific subtype."""
+    item: PakRef[Item] = attrs.field(converter=_conv_pakref_item)
+    subtype: int = 0
 
 
 async def parse_item_folder(
@@ -891,9 +922,9 @@ async def assign_styled_items(all_styles: Iterable[Style], item: Item) -> None:
     for vers in all_ver:
         # We need to repeatedly loop to handle the chains of
         # dependencies. This is a list of (style_id, UnParsed).
-        to_change: list[tuple[str, UnParsedItemVariant]] = []
+        to_change: list[tuple[utils.SpecialID, UnParsedItemVariant]] = []
         # The finished styles.
-        styles: dict[str, ItemVariant] = {}
+        styles: dict[utils.SpecialID, ItemVariant] = {}
         for sty_id, conf in vers.styles.items():
             if isinstance(conf, UnParsedItemVariant):
                 to_change.append((sty_id, conf))
@@ -906,13 +937,13 @@ async def assign_styled_items(all_styles: Iterable[Style], item: Item) -> None:
         # Evaluate style lookups and modifications
         while to_change:
             # Needs to be done next loop.
-            deferred: list[tuple[str, UnParsedItemVariant]] = []
+            deferred: list[tuple[utils.SpecialID, UnParsedItemVariant]] = []
             start_data: ItemVariant
             for sty_id, conf in to_change:
                 if conf.style:  # Based on another styled version.
-                    if ':' in conf.style:  # Both version and style specified.
+                    if isinstance(conf.style, tuple):  # Both version and style specified.
                         try:
-                            ver_id, base_style_id = conf.style.split(':', 1)
+                            ver_id, base_style_id = conf.style
                             start_data = item.versions[ver_id].styles[base_style_id]
                             # TODO: This will fail if ver_id is after us in the all_ver list.
                             #       We need to do all the versions and styles together!
@@ -988,13 +1019,15 @@ async def assign_styled_items(all_styles: Iterable[Style], item: Item) -> None:
                         extra.validate()
 
         for style in all_styles:
-            if style.id in styles:
+            sty_id = utils.obj_id(style.id)
+            if sty_id in styles:
                 continue  # We already have a definition
             for base_style in style.bases:
-                if base_style.id in styles:
+                base_style_id = utils.obj_id(base_style.id)
+                if base_style_id in styles:
                     # Copy the values for the parent to the child style
-                    styles[style.id] = styles[base_style.id]
-                    vers.inherit_kind[style.id] = InheritKind.INHERIT
+                    styles[sty_id] = styles[base_style_id]
+                    vers.inherit_kind[sty_id] = InheritKind.INHERIT
                     # If requested, log this.
                     if not item.unstyled and config.APP.get_cur_conf(config.gen_opts.GenOptions).log_item_fallbacks:
                         LOGGER.warning(
@@ -1010,7 +1043,7 @@ async def assign_styled_items(all_styles: Iterable[Style], item: Item) -> None:
                         item.id, vers_desc, style.id,
                     )
                 # Unstyled elements allow inheriting anyway.
-                vers.inherit_kind[style.id] = InheritKind.INHERIT if item.unstyled else InheritKind.UNSTYLED
+                vers.inherit_kind[sty_id] = InheritKind.INHERIT if item.unstyled else InheritKind.UNSTYLED
                 # If 'isolate versions' is set on the item,
                 # we never consult other versions for matching styles.
                 # There we just use our first style (Clean usually).
@@ -1018,17 +1051,22 @@ async def assign_styled_items(all_styles: Iterable[Style], item: Item) -> None:
                 # If not isolated, we get the version from the default
                 # version. Note the default one is computed first,
                 # so it's guaranteed to have a value.
-                styles[style.id] = (
+                styles[sty_id] = (
                     default_style if
                     item.isolate_versions or vers.isolate
-                    else item.def_ver.styles[style.id]
+                    else item.def_ver.styles[sty_id]
                 )
 
         # Build the actual version object now we're complete.
         item.versions[vers.id] = real_version = Version(
             name=vers.name,
             id=vers.id,
-            styles=styles,
+            # Strip out <LOGIC> or the like, those can only end up in defaults.
+            styles={
+                sty_id: style
+                for (sty_id, style) in styles.items()
+                if utils.not_special_id(sty_id)
+            },
             inherit_kind=vers.inherit_kind,
             def_style=default_style,
         )
