@@ -155,13 +155,6 @@ class Item:
 
     def __init__(self, item: packages.Item) -> None:
         self.item = item
-        # The indexes of subtypes that are actually visible.
-        self.visual_subtypes = [
-            ind
-            for ind, sub in enumerate(item.def_ver.def_style.editor.subtypes)
-            if sub.pal_name or sub.pal_icon
-        ]
-
         self.id = item.id
         self.pak_id = item.pak_id
         self.pak_name = item.pak_name
@@ -990,16 +983,16 @@ async def set_palette(chosen_pal: paletteUI.Palette) -> None:
             LOGGER.warning('Unknown item "{}" for palette!', item)
             continue
 
-        if sub not in item_group.visual_subtypes:
+        if sub not in item_group.item.visual_subtypes:
             LOGGER.warning(
                 'Palette had incorrect subtype {} for "{}"! Valid subtypes: {}!',
-                item, sub, item_group.visual_subtypes,
+                item, sub, item_group.item.visual_subtypes,
             )
             continue
 
         pal_picked.append(PalItem(
             frames['preview'],
-            item_list[item],
+            item_group,
             sub,
             is_pre=True,
         ))
@@ -1039,7 +1032,7 @@ def pal_shuffle() -> None:
         if item.id not in palette_set
         if mandatory_unlocked or not item.needs_unlock
         if cur_filter is None or (item.id, item.subKey) in cur_filter
-        if item_list[item.id].visual_subtypes  # Check there's actually sub-items to show.
+        if len(item_list[item.id].item.visual_subtypes)  # Check there's actually sub-items to show.
     })
 
     random.shuffle(shuff_items)
@@ -1050,7 +1043,7 @@ def pal_shuffle() -> None:
             frames['preview'],
             item,
             # Pick a random available palette icon.
-            sub=random.choice(item.visual_subtypes),
+            sub=random.choice(item.item.visual_subtypes),
             is_pre=True,
         ))
     flow_preview()
@@ -1301,33 +1294,34 @@ async def flow_picker(filter_conf: FilterConf) -> None:
 
     i = 0
     # If cur_filter is None, it's blank and so show all of them.
-    for item in pal_items:
-        if item.needs_unlock and not mandatory_unlocked:
+    for pal_item in pal_items:
+        if pal_item.needs_unlock and not mandatory_unlocked:
             visible = False
         elif filter_conf.compress:
             # Show if this is the first, and any in this item are visible.
             # Visual subtypes should not be empty if we're here, but if so just hide.
-            if item.item.visual_subtypes and item.subKey == item.item.visual_subtypes[0]:
+            visual_subtypes = pal_item.item.item.visual_subtypes  # This is very silly.
+            if visual_subtypes and pal_item.subKey == visual_subtypes[0]:
                 visible = any(
-                    (item.item.id, subKey) in cur_filter
-                    for subKey in item.item.visual_subtypes
+                    (pal_item.item.id, subKey) in cur_filter
+                    for subKey in visual_subtypes
                 ) if cur_filter is not None else True
             else:
                 visible = False
         else:
             # Uncompressed, check each individually.
-            visible = cur_filter is None or (item.item.id, item.subKey) in cur_filter
+            visible = cur_filter is None or (pal_item.item.id, pal_item.subKey) in cur_filter
 
         if visible:
-            item.is_pre = False
-            item.load_data()
-            item.label.place(
+            pal_item.is_pre = False
+            pal_item.load_data()
+            pal_item.label.place(
                 x=((i % width) * 65 + 1),
                 y=((i // width) * 65 + 1),
                 )
             i += 1
         else:
-            item.label.place_forget()
+            pal_item.label.place_forget()
 
     num_items = i
 
@@ -1347,8 +1341,8 @@ async def flow_picker(filter_conf: FilterConf) -> None:
             pal_items_fake.append(TK_IMG.apply(ttk.Label(frmScroll), IMG_BLANK))
         pal_items_fake[i].place(x=((i + last_row) % width)*65 + 1, y=y)
 
-    for item in pal_items_fake[extra_items:]:
-        item.place_forget()
+    for pal_item in pal_items_fake[extra_items:]:
+        pal_item.place_forget()
 
 
 def init_drag_icon() -> None:

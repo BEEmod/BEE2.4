@@ -84,11 +84,11 @@ def rebuild_database() -> None:
     word_to_ids.clear()
 
     for item in UI.item_list.values():
-        for subtype_ind in item.visual_subtypes:
+        for subtype_ind in item.item.visual_subtypes:
             for tag in item.get_tags(subtype_ind):
                 for word in tag.split():
                     word_set = word_to_ids.setdefault(word.casefold(), set())
-                    word_set.add((item.id, subtype_ind))
+                    word_set.add((item.item.id, subtype_ind))
 
     LOGGER.info('Computed {} tags.', sum(1 for _ in word_to_ids.iterkeys()))
     if _type_cback is not None:

@@ -143,9 +143,9 @@ def set_sprite(tk_img: TKImages, pos: SPR, sprite: str) -> None:
 
 def pos_for_item(ind: int) -> int | None:
     """Get the index the specified subitem is located at."""
-    positions = SUBITEM_POS[len(selected_item.visual_subtypes)]
+    positions = SUBITEM_POS[len(selected_item.item.visual_subtypes)]
     for pos, sub in enumerate(positions):
-        if sub != -1 and ind == selected_item.visual_subtypes[sub]:
+        if sub != -1 and ind == selected_item.item.visual_subtypes[sub]:
             return pos
     else:
         return None
@@ -153,11 +153,11 @@ def pos_for_item(ind: int) -> int | None:
 
 def ind_for_pos(pos: int) -> int | None:
     """Return the subtype index for the specified position."""
-    ind = SUBITEM_POS[len(selected_item.visual_subtypes)][pos]
+    ind = SUBITEM_POS[len(selected_item.item.visual_subtypes)][pos]
     if ind == -1:
         return None
     else:
-        return selected_item.visual_subtypes[ind]
+        return selected_item.item.visual_subtypes[ind]
 
 
 def sub_sel(pos: int, e: object = None) -> None:
@@ -276,11 +276,11 @@ def load_item_data(tk_img: TKImages) -> None:
     item_data = selected_item.data
     item_id = utils.obj_id(selected_item.id)
 
-    for ind, pos in enumerate(SUBITEM_POS[len(selected_item.visual_subtypes)]):
+    for ind, pos in enumerate(SUBITEM_POS[len(selected_item.item.visual_subtypes)]):
         if pos == -1:
             icon = IMG_ALPHA
         else:
-            icon = selected_item.get_icon(selected_item.visual_subtypes[pos])
+            icon = selected_item.get_icon(selected_item.item.visual_subtypes[pos])
         tk_img.apply(wid_subitem[ind], icon)
         wid_subitem[ind]['relief'] = 'flat'
 
@@ -358,7 +358,7 @@ def load_item_data(tk_img: TKImages) -> None:
         if editor.has_sec_input():
             set_sprite(tk_img, SPR.INPUT, 'in_dual')
             # Real funnels work slightly differently.
-            if selected_item.id.casefold() == 'item_tbeam':
+            if item_id == DefaultItems.funnel.id:
                 tooltip.set_tooltip(wid_sprite[SPR.INPUT], TRANS_TOOL_TBEAM)
         else:
             set_sprite(tk_img, SPR.INPUT, 'in_norm')

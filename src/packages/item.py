@@ -449,6 +449,8 @@ class Item(PakObject, needs_foreground=True):
     versions: dict[str, Version]
     version_id_order: Sequence[str]  # IDs in the order to show in UI.
     def_ver: Version
+    # Subtypes which have palette icons, and thereforn can be shown.
+    visual_subtypes: Sequence[int]
 
     def __init__(
         self,
@@ -479,6 +481,7 @@ class Item(PakObject, needs_foreground=True):
         # Dict of folders we need to have decoded.
         self.folders = folders
         self.version_id_order = ()
+        self.visual_subtypes = ()
 
     @classmethod
     async def parse(cls, data: ParseData) -> Self:
@@ -1075,6 +1078,11 @@ async def assign_styled_items(all_styles: Iterable[Style], item: Item) -> None:
         if item._unparsed_def_ver is vers:
             item.def_ver = real_version
 
-    # Produce a consistent order
+    # Set these, now that everything is assigned.
     item.version_id_order = sorted(item.versions.keys())
+    item.visual_subtypes = [
+        ind
+        for ind, sub in enumerate(item.def_ver.def_style.editor.subtypes)
+        if sub.pal_name or sub.pal_icon
+    ]
     assert hasattr(item, 'def_ver'), vars(item)
