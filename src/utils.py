@@ -501,6 +501,8 @@ def obj_id_optional(value: str, kind: str = 'object') -> ObjectID | BlankID:
         value.endswith(('(', '<', '[', ']', '>', ')'))
     ):
         raise ValueError(f'Invalid {kind} ID "{value}". IDs may not start/end with brackets.')
+    if ':' in value:
+        raise ValueError(f'Invalid {kind} ID "{value}". IDs may not contain colons.')
     value = _uppercase_casefold(value)
     if value in PROHIBITED_IDS:
         raise ValueError(
@@ -523,24 +525,11 @@ def special_id_optional(value: str, kind: str = 'object') -> SpecialID | BlankID
     """Parse an object ID or a <special> name, allowing empty IDs."""
     if value == "":
         return ""
-    elif value.startswith('<') and value.endswith('>'):
+    if value.startswith('<') and value.endswith('>'):
         # Prohibited IDs are fine here, since they're not bare.
         return SpecialID(_uppercase_casefold(value))
-    # Ruled out valid combinations, any others are prohibited.
-    elif (
-        value.startswith(('(', '<', '[', ']', '>', ')')) or
-        value.endswith(('(', '<', '[', ']', '>', ')'))
-    ):
-        raise ValueError(f'Invalid {kind} ID "{value}". Only angle brackets are allowed.')
-
-    # No brackets at all, just an ObjectID.
-    value = _uppercase_casefold(value)
-    if value in PROHIBITED_IDS:
-        raise ValueError(
-            f'Invalid {kind} ID "{value}". '
-            f'IDs cannot be any of the following: {", ".join(PROHIBITED_IDS)}'
-        )
-    return ObjectID(SpecialID(value))
+    # Ruled out valid combinations, any others are prohibited, it's just an ObjectID now.
+    return obj_id_optional(value, kind)
 
 
 def special_id(value: str, kind: str = 'object') -> SpecialID:

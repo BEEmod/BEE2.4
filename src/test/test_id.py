@@ -14,6 +14,14 @@ EXAMPLES = [
 ]
 EXAMPLE_IDS = ['mixed', 'underscore', 'numeric', 'spaces', 'unchanged']
 
+SPECIAL_EXAMP = [
+    ('<nAme>', '<NAME>'),
+    ('<iD>', '<ID>'),
+    ('<verSion>', '<VERSION>'),
+    ('<tYPe>', '<TYPE>'),
+]
+SPECIAL_EXAMP_IDS = ['name', 'id', 'version', 'type']
+
 BRACKETS = ['_', '<', '(', '[', ']', ')', '>']
 BRACKET_IDS = ['blank', 'lang', 'lpar', 'lbrak', 'rbrak', 'rpar', 'rang']
 
@@ -45,10 +53,42 @@ def test_blank() -> None:
     ('<', '>'),
 ], ids=['angle'])
 @pytest.mark.parametrize('inp, result', EXAMPLES, ids=EXAMPLE_IDS)
-def test_special(inp: str, result: str, left: str, right: str) -> None:
+def test_special_superset(inp: str, result: str, left: str, right: str) -> None:
     """Test the same IDs, but with the three kinds of brackets surrounding."""
     inp = f'{left}{inp}{right}'
     result = f'{left}{result}{right}'
+    with pytest.raises(ValueError, match='may not start/end'):
+        obj_id(inp)
+    with pytest.raises(ValueError, match='may not start/end'):
+        obj_id_optional(inp)
+
+    assert special_id(inp) == result
+    assert special_id_optional(inp) == result
+
+
+@pytest.mark.parametrize('bad, reason', [
+    ('name', 'any of the following'),
+    ('iD', 'any of the following'),
+    ('verSion', 'any of the following'),
+    ('tYPe', 'any of the following'),
+
+    ('id:withcolon', 'contain colons'),
+], ids=['name', 'id', 'version', 'type', 'colon'])
+def test_prohibited_ids(bad: str, reason: str) -> None:
+    """Test various illegal IDs."""
+    with pytest.raises(ValueError, match=reason):
+        obj_id(bad)
+    with pytest.raises(ValueError, match=reason):
+        obj_id_optional(bad)
+    with pytest.raises(ValueError, match=reason):
+        special_id(bad)
+    with pytest.raises(ValueError, match=reason):
+        special_id_optional(bad)
+
+
+@pytest.mark.parametrize('inp, result', SPECIAL_EXAMP, ids=SPECIAL_EXAMP_IDS)
+def test_special(inp: str, result: str) -> None:
+    """Test additional IDs only allowed as special."""
     with pytest.raises(ValueError, match='may not start/end'):
         obj_id(inp)
     with pytest.raises(ValueError, match='may not start/end'):
@@ -85,24 +125,6 @@ def test_preset_ids() -> None:
 
     assert special_id(ID_NONE) is ID_NONE
     assert special_id(ID_RANDOM) is ID_RANDOM
-
-
-@pytest.mark.parametrize('bad', [
-    'name', 'iD', 'verSion', 'tYPe',
-])
-def test_prohibited(bad: str) -> None:
-    """Certain IDs are prohibited."""
-    with pytest.raises(ValueError, match='any of the following'):
-        obj_id(bad)
-    with pytest.raises(ValueError, match='any of the following'):
-        obj_id_optional(bad)
-    with pytest.raises(ValueError, match='any of the following'):
-        special_id(bad)
-    with pytest.raises(ValueError, match='any of the following'):
-        special_id_optional(bad)
-    # They are allowed when surrounded with braces.
-    assert special_id(f'<{bad}>') == f'<{bad.upper()}>'
-    assert special_id_optional(f'<{bad}>') == f'<{bad.upper()}>'
 
 
 @pytest.mark.parametrize('left', BRACKETS, ids=BRACKET_IDS)
