@@ -29,13 +29,13 @@ IMG_ARROW_RIGHT: Final = IMG_ARROW_LEFT.crop(transpose=img.FLIP_LEFT_RIGHT)
 
 # If no groups are defined for a style, use this.
 FALLBACK = corridor.CorridorGroup(
-    '<Fallback>',
-    {
+    id='<Fallback>',
+    corridors={
         (mode, direction, orient): []
         for mode in GameMode
         for direction in Direction
         for orient in Orient
-    }
+    },
 )
 FALLBACK.pak_id = utils.special_id('<FALLBACK>')
 FALLBACK.pak_name = '???'

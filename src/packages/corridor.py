@@ -3,8 +3,8 @@ from __future__ import annotations
 
 from collections import defaultdict
 from collections.abc import Sequence, Iterator, Mapping
-from typing import Dict, List, Tuple
 from typing_extensions import Final
+import itertools
 
 from srctools import Keyvalues
 import attrs
@@ -19,13 +19,13 @@ from corridor import (
     CORRIDOR_COUNTS, ID_TO_CORR,
     Corridor,
 )
-from transtoken import TransToken, TransTokenSource
+from transtoken import AppError, TransToken, TransTokenSource
 
 
 LOGGER = srctools.logger.get_logger(__name__)
 
 # For converting style corridor definitions, this indicates the attribute the old data was stored in.
-FALLBACKS: Final[Mapping[Tuple[GameMode, Direction], str]] = {
+FALLBACKS: Final[Mapping[tuple[GameMode, Direction], str]] = {
     (GameMode.SP, Direction.ENTRY): 'sp_entry',
     (GameMode.SP, Direction.EXIT): 'sp_exit',
     (GameMode.COOP, Direction.EXIT): 'coop',
@@ -40,22 +40,31 @@ IMG_WIDTH_LRG: Final = 256
 IMG_HEIGHT_LRG: Final = 192
 ICON_GENERIC_LRG = img.Handle.builtin('BEE2/corr_generic', IMG_WIDTH_LRG, IMG_HEIGHT_LRG)
 
+ALL_MODES: Final[Sequence[GameMode]] = list(GameMode)
+ALL_DIRS: Final[Sequence[Direction]] = list(Direction)
+ALL_ORIENT: Final[Sequence[Orient]] = list(Orient)
+
+TRANS_DUPLICATE_OPTION = TransToken.ui(
+    'Duplicate corridor option ID "{option}" in corridor group for style "{group}"!'
+)
+
 
 @attrs.frozen
 class Option:
     """An option that can be swapped between various values."""
-    id: str
+    id: utils.ObjectID
     name: TransToken
     default: str
-    values: Sequence[Tuple[str, TransToken]]
+    values: Sequence[tuple[str, TransToken]]
+    fixup: str
 
     @classmethod
-    def parse(cls, pak_id: utils.SpecialID, kv: Keyvalues) -> Option:
+    def parse(cls, pak_id: utils.SpecialID, opt_id: utils.ObjectID, kv: Keyvalues) -> Option:
         """Parse from KV1 configs."""
-        opt_id = kv['id']
         name = TransToken.parse(pak_id, kv['name'])
         valid_ids: set[str] = set()
-        values: List[Tuple[str, TransToken]] = []
+        values: list[tuple[str, TransToken]] = []
+        fixup = kv['var']
 
         for child in kv.find_children('Values'):
             if child.name in valid_ids:
@@ -81,7 +90,7 @@ class Option:
                 )
                 default = values[0][0]
 
-        return cls(opt_id, name, default, values)
+        return cls(opt_id, name, default, values, fixup)
 
 
 @attrs.frozen
@@ -93,7 +102,7 @@ class CorridorUI(Corridor):
     images: Sequence[img.Handle]
     icon: img.Handle
     authors: Sequence[TransToken]
-    options: Sequence[Option]
+    option_ids: frozenset[utils.ObjectID]
 
     def strip_ui(self) -> Corridor:
         """Strip these UI attributes for the compiler export."""
@@ -156,12 +165,24 @@ def parse_corr_kind(specifier: str) -> CorrKind:
     return mode, direction, orient
 
 
-@attrs.define(slots=False)
+def iter_spec(spec: CorrSpec) -> Iterator[CorrKind]:
+    """Yield all kinds that match this spec."""
+    spec_mode, spec_dir, spec_orient = spec
+    return itertools.product(
+        (spec_mode, ) if spec_mode is not None else ALL_MODES,
+        (spec_dir, ) if spec_dir is not None else ALL_DIRS,
+        (spec_orient, ) if spec_orient is not None else ALL_ORIENT,
+    )
+
+
+@attrs.define(slots=False, kw_only=True)
 class CorridorGroup(packages.PakObject, allow_mult=True):
     """A collection of corridors defined for the style with this ID."""
     id: str
-    corridors: Dict[CorrKind, List[CorridorUI]]
+    corridors: dict[CorrKind, list[CorridorUI]]
     inherit: Sequence[str] = ()  # Copy all the corridors defined in these groups.
+    options: dict[utils.ObjectID, Option] = attrs.Factory(dict)
+    global_options: dict[CorrKind, list[Option]] = attrs.Factory(dict)
 
     @classmethod
     async def parse(cls, data: packages.ParseData) -> CorridorGroup:
@@ -169,10 +190,17 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
         corridors: dict[CorrKind, list[CorridorUI]] = defaultdict(list)
         inherits: list[str] = []
 
-        global_options = [
-            Option.parse(data.pak_id, opt_kv)
-            for opt_kv in data.info.find_all('Option')
-        ]
+        options: dict[utils.ObjectID, Option] = {}
+        global_options: dict[CorrKind, list[Option]] = defaultdict(list)
+        for opt_kv in data.info.find_children('Options'):
+            opt_id = utils.obj_id(opt_kv.real_name, 'corridor option')
+            option = Option.parse(data.pak_id, opt_id, opt_kv)
+            if opt_id in options:
+                raise AppError(TRANS_DUPLICATE_OPTION.format(option=opt_id, group=data.id))
+            options[opt_id] = option
+            for spec_kv in opt_kv.find_all('global'):
+                for kind in iter_spec(parse_specifier(spec_kv.value)):
+                    global_options[kind].append(option)
 
         for kv in data.info:
             if kv.name == 'id':
@@ -211,11 +239,6 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
             except LookupError:
                 name = TRANS_CORRIDOR_GENERIC
 
-            options = global_options + [
-                Option.parse(data.pak_id, opt_kv)
-                for opt_kv in kv.find_all('Option')
-            ]
-
             corridors[mode, direction, orient].append(CorridorUI(
                 instance=kv['instance'],
                 name=name,
@@ -230,9 +253,18 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                     subprop.name: subprop.value
                     for subprop in kv.find_children('fixups')
                 },
-                options=options,
+                option_ids=frozenset({
+                    utils.obj_id(opt_kv.value, 'corridor option')
+                    for opt_kv in kv.find_all('Option')
+                }),
             ))
-        return CorridorGroup(data.id, dict(corridors), inherits)
+        return CorridorGroup(
+            id=data.id,
+            corridors=dict(corridors),
+            inherit=inherits,
+            options=options,
+            global_options=dict(global_options),
+        )
 
     def add_over(self: CorridorGroup, override: CorridorGroup) -> None:
         """Merge two corridor group definitions."""
@@ -245,6 +277,13 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                 corr_base.extend(corr_over)
         if override.inherit:
             self.inherit = override.inherit
+
+        for opt in override.options.values():
+            if opt.id in self.options:
+                raise AppError(TRANS_DUPLICATE_OPTION.format(option=opt.id, group=self.id))
+            self.options[opt.id] = opt
+        for kind, additional in override.global_options.items():
+            self.global_options[kind] += additional
 
     @classmethod
     async def post_parse(cls, packset: packages.PackagesSet) -> None:
@@ -268,7 +307,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                         corridor_group = packset.obj_by_id(cls, style_id)
                     except KeyError:
                         # Synthesise a new group to match.
-                        corridor_group = cls(style_id, {})
+                        corridor_group = cls(id=style_id, corridors={})
                         packset.add(corridor_group, item.pak_id, item.pak_name)
 
                     corr_list = corridor_group.corridors.setdefault(
@@ -306,7 +345,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                                 orig_index=ind + 1,
                                 fixups={},
                                 legacy=True,
-                                options=(),
+                                option_ids=frozenset(),
                             )
                         else:
                             style_info = style.legacy_corridors[mode, direction, ind + 1]
@@ -321,7 +360,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                                 orig_index=ind + 1,
                                 fixups={},
                                 legacy=True,
-                                options=(),
+                                option_ids=frozenset(),
                             )
                         corr_list.append(corridor)
                         had_legacy = True
@@ -401,3 +440,19 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
         output.sort(key=lambda corr: corr.orig_index)
         # Ignore extras beyond the actual size.
         return output[:CORRIDOR_COUNTS[mode, direction]]
+
+    def get_options(self, kind: CorrKind, corr: CorridorUI) -> Iterator[Option]:
+        """Determine all options that a specific corridor requires."""
+        matched = set()
+
+        for opt in self.global_options.get(kind, ()):
+            matched.add(opt.id)
+            yield opt
+        for opt_id in corr.option_ids - matched:
+            try:
+                yield self.options[opt_id]
+            except KeyError:
+                LOGGER.warning(
+                    'Unknown option {} for corridor group "{}"!\ninstance:{}',
+                    opt_id, self.id, corr.instance,
+                )
