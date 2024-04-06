@@ -60,8 +60,10 @@ ID_TO_CORR: Final[Mapping[utils.ObjectID, Tuple[GameMode, Direction]]] = {
 }
 CORR_TO_ID: Final[Mapping[Tuple[GameMode, Direction], utils.ObjectID]] = {v: k for k, v in ID_TO_CORR.items()}
 
-# The order of the keys we use.
+# A specific type of corridor.
 CorrKind: TypeAlias = Tuple[GameMode, Direction, Orient]
+# A filter on which types this applies to. None values match all possible instead.
+CorrSpec: TypeAlias = Tuple[Optional[GameMode], Optional[Direction], Optional[Orient]]
 # Number of default instances for each kind.
 CORRIDOR_COUNTS: Final[Mapping[Tuple[GameMode, Direction], Literal[1, 4, 7]]] = {
     (GameMode.SP, Direction.ENTRY): 7,

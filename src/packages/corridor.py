@@ -15,7 +15,7 @@ from app import img, lazy_conf, tkMarkdown
 import packages
 import editoritems
 from corridor import (
-    CorrKind, Orient, Direction, GameMode,
+    CorrKind, CorrSpec, Orient, Direction, GameMode,
     CORRIDOR_COUNTS, ID_TO_CORR,
     Corridor,
 )
@@ -50,7 +50,7 @@ class Option:
     values: Sequence[Tuple[str, TransToken]]
 
     @classmethod
-    def parse(cls, pak_id: str, kv: Keyvalues) -> Option:
+    def parse(cls, pak_id: utils.SpecialID, kv: Keyvalues) -> Option:
         """Parse from KV1 configs."""
         opt_id = kv['id']
         name = TransToken.parse(pak_id, kv['name'])
@@ -105,7 +105,7 @@ class CorridorUI(Corridor):
         )
 
 
-def parse_specifier(specifier: str) -> CorrKind:
+def parse_specifier(specifier: str) -> CorrSpec:
     """Parse a string like 'sp_entry' or 'exit_coop_dn' into the 3 enums."""
     orient: Orient | None = None
     mode: GameMode | None = None
@@ -138,9 +138,16 @@ def parse_specifier(specifier: str) -> CorrKind:
                 raise ValueError(f'Multiple sp/coop keywords in "{specifier}"!')
             mode = parsed_mode
             continue
-        raise ValueError(f'Unknown keyword "{part}" in "{specifier}"!')
+        # Completely empty specifier will split into [''], allow `sp__exit` too.
+        if part:
+            raise ValueError(f'Unknown keyword "{part}" in "{specifier}"!')
+    return mode, direction, orient
 
-    if orient is None:  # Allow omitting this additional variant.
+
+def parse_corr_kind(specifier: str) -> CorrKind:
+    """Parse a string into a specific corridor type."""
+    mode, direction, orient = parse_specifier(specifier)
+    if orient is None:  # Infer horizontal if unspecified.
         orient = Orient.HORIZONTAL
     if direction is None:
         raise ValueError(f'Direction must be specified in "{specifier}"!')
@@ -186,10 +193,9 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
             if not images:
                 images.append(ICON_GENERIC_LRG)
 
-            mode, direction, orient = parse_specifier(kv.name)
+            mode, direction, orient = parse_corr_kind(kv.name)
 
             if is_legacy := kv.bool('legacy'):
-
                 if orient is Orient.HORIZONTAL:
                     LOGGER.warning(
                         '{.value}_{.value}_{.value} has legacy corridor "{}"',
