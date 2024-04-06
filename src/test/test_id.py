@@ -87,6 +87,24 @@ def test_preset_ids() -> None:
     assert special_id(ID_RANDOM) is ID_RANDOM
 
 
+@pytest.mark.parametrize('bad', [
+    'name', 'iD', 'verSion', 'tYPe',
+])
+def test_prohibited(bad: str) -> None:
+    """Certain IDs are prohibited."""
+    with pytest.raises(ValueError, match='any of the following'):
+        obj_id(bad)
+    with pytest.raises(ValueError, match='any of the following'):
+        obj_id_optional(bad)
+    with pytest.raises(ValueError, match='any of the following'):
+        special_id(bad)
+    with pytest.raises(ValueError, match='any of the following'):
+        special_id_optional(bad)
+    # They are allowed when surrounded with braces.
+    assert special_id(f'<{bad}>') == f'<{bad.upper()}>'
+    assert special_id_optional(f'<{bad}>') == f'<{bad.upper()}>'
+
+
 @pytest.mark.parametrize('left', BRACKETS, ids=BRACKET_IDS)
 @pytest.mark.parametrize('right', BRACKETS, ids=BRACKET_IDS)
 def test_bad_bracket_combos(left: str, right: str) -> None:

@@ -481,6 +481,8 @@ BlankID = Literal[""]
 ID_NONE: Final[SpecialID] = SpecialID('<NONE>')
 ID_RANDOM: Final[SpecialID] = SpecialID('<RANDOM>')
 ID_EMPTY: BlankID = ''
+# Prohibit a bunch of IDs that keyvalues/dmx/etc might use for other purposes.
+PROHIBITED_IDS = {'ID', 'NAME', 'TYPE', 'VERSION'}
 
 
 def _uppercase_casefold(value: str) -> str:
@@ -499,7 +501,13 @@ def obj_id_optional(value: str, kind: str = 'object') -> ObjectID | BlankID:
         value.endswith(('(', '<', '[', ']', '>', ')'))
     ):
         raise ValueError(f'Invalid {kind} ID "{value}". IDs may not start/end with brackets.')
-    return ObjectID(SpecialID(_uppercase_casefold(value)))
+    value = _uppercase_casefold(value)
+    if value in PROHIBITED_IDS:
+        raise ValueError(
+            f'Invalid {kind} ID "{value}". '
+            f'IDs cannot be any of the following: {", ".join(PROHIBITED_IDS)}'
+        )
+    return ObjectID(SpecialID(value))
 
 
 # TODO: Could use @overload + @deprecated to warn if input is already an ObjectID.
@@ -516,6 +524,7 @@ def special_id_optional(value: str, kind: str = 'object') -> SpecialID | BlankID
     if value == "":
         return ""
     elif value.startswith('<') and value.endswith('>'):
+        # Prohibited IDs are fine here, since they're not bare.
         return SpecialID(_uppercase_casefold(value))
     # Ruled out valid combinations, any others are prohibited.
     elif (
@@ -523,9 +532,15 @@ def special_id_optional(value: str, kind: str = 'object') -> SpecialID | BlankID
         value.endswith(('(', '<', '[', ']', '>', ')'))
     ):
         raise ValueError(f'Invalid {kind} ID "{value}". Only angle brackets are allowed.')
-    else:
-        # No brackets at all, just an ObjectID.
-        return SpecialID(_uppercase_casefold(value))
+
+    # No brackets at all, just an ObjectID.
+    value = _uppercase_casefold(value)
+    if value in PROHIBITED_IDS:
+        raise ValueError(
+            f'Invalid {kind} ID "{value}". '
+            f'IDs cannot be any of the following: {", ".join(PROHIBITED_IDS)}'
+        )
+    return ObjectID(SpecialID(value))
 
 
 def special_id(value: str, kind: str = 'object') -> SpecialID:
