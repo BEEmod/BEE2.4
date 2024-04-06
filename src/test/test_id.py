@@ -1,7 +1,7 @@
 """Test the ID parsing code."""
 import pytest
 
-from utils import obj_id, obj_id_optional, special_id, special_id_optional, ID_EMPTY
+from utils import obj_id, obj_id_optional, special_id, special_id_optional, ID_EMPTY, ID_NONE, ID_RANDOM
 
 
 # Value -> casefolded ID
@@ -76,6 +76,15 @@ def test_identity() -> None:
     special = f'<{value}>'
     assert special_id(special) is special
     assert special_id_optional(special) is special
+
+
+def test_preset_ids() -> None:
+    """Check the preset IDs are cased correctly."""
+    assert obj_id_optional(ID_EMPTY) is ID_EMPTY
+    assert special_id_optional(ID_EMPTY) is ID_EMPTY
+
+    assert special_id(ID_NONE) is ID_NONE
+    assert special_id(ID_RANDOM) is ID_RANDOM
 
 
 @pytest.mark.parametrize('left', BRACKETS, ids=BRACKET_IDS)

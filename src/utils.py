@@ -32,7 +32,7 @@ __all__ = [
     'get_git_version', 'install_path', 'bins_path', 'conf_location', 'fix_cur_directory',
     'run_bg_daemon', 'not_none', 'CONN_LOOKUP', 'CONN_TYPES', 'freeze_enum_props', 'FuncLookup',
     'PackagePath', 'Result', 'acompose', 'get_indent', 'iter_grid', 'check_cython',
-    'ObjectID', 'SpecialID', 'BlankID', 'ID_EMPTY', 'ID_NONE',
+    'ObjectID', 'SpecialID', 'BlankID', 'ID_EMPTY', 'ID_NONE', 'ID_RANDOM',
     'obj_id', 'special_id', 'obj_id_optional', 'special_id_optional',
     'check_shift', 'fit', 'group_runs', 'restart_app', 'quit_app', 'set_readonly',
     'unset_readonly', 'merge_tree', 'write_lang_pot',
@@ -478,7 +478,8 @@ SpecialID = NewType("SpecialID", str)
 ObjectID = NewType("ObjectID", SpecialID)
 BlankID = Literal[""]
 
-ID_NONE: Final = SpecialID('<NONE>')
+ID_NONE: Final[SpecialID] = SpecialID('<NONE>')
+ID_RANDOM: Final[SpecialID] = SpecialID('<RANDOM>')
 ID_EMPTY: BlankID = ''
 
 
