@@ -7,11 +7,13 @@ import pickletools
 import shutil
 
 from srctools import AtomicWriter, Keyvalues, logger
+from srctools.dmx import Element
 from srctools.filesys import File
 import trio
 
 from app import backup
 from . import ExportData, STEPS, StepResource, STAGE_RESOURCES
+import config
 import editoritems
 
 
@@ -78,6 +80,25 @@ async def step_write_editoritems_db(exp: ExportData) -> None:
     pick = await trio.to_thread.run_sync(pickle.dumps, exp.all_items, pickle.HIGHEST_PROTOCOL)
     pick = await trio.to_thread.run_sync(pickletools.optimize, pick)
     await trio.Path(exp.game.abs_path('bin/bee2/editor.bin')).write_bytes(pick)
+
+
+@STEPS.add_step(prereq=[StepResource.CONFIG_DATA], results=[StepResource.CONFIG_FILE])
+async def step_write_configs(exp: ExportData) -> None:
+    """Write config data that is managed by the config package."""
+
+    def write(element: Element, filename: str) -> None:
+        """Write to disk."""
+        with AtomicWriter(filename, is_bytes=True) as file:
+            element.export_kv2(
+                file,
+                fmt_name=config.DMX_NAME,
+                fmt_ver=config.DMX_VERSION,
+                unicode='format',
+                cull_uuid=True,
+            )
+
+    dmx = await trio.to_thread.run_sync(config.COMPILER.build_dmx, exp.config)
+    await trio.to_thread.run_sync(write,  dmx, exp.game.abs_path('bin/bee2/config.dmx'))
 
 
 @STEPS.add_step(prereq=[], results=[StepResource.EI_FILE])

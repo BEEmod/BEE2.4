@@ -101,6 +101,7 @@ class Config(config.Data, conf_name='Corridor', uses_id=True, version=2):
         return elem
 
 
+@config.COMPILER.register
 @config.PALETTE.register
 @config.APP.register
 @attrs.frozen

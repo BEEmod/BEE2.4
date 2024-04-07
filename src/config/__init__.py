@@ -25,6 +25,9 @@ if not os.environ.get('BEE_LOG_CONFIG'):  # Debug messages are spammy.
 
 
 DataT = TypeVar('DataT', bound='Data')
+# Name and version to use for DMX files.
+DMX_NAME = 'BEEConfig'
+DMX_VERSION = 1
 
 
 @attrs.define(eq=False)
@@ -453,6 +456,7 @@ class ConfigSpec:
 APP_LOC = utils.conf_location('config/config.vdf')
 APP: ConfigSpec = ConfigSpec()
 PALETTE: ConfigSpec = ConfigSpec()
+COMPILER: ConfigSpec = ConfigSpec()
 
 
 # Import submodules, so they're registered.

@@ -12,6 +12,7 @@ from srctools import Keyvalues
 
 import loadScreen
 import packages
+import config as config_mod
 from app.errors import ErrorUI, Result as ErrorResult, WarningExc
 from app.backup import AUTO_BACKUP_STAGE
 from editoritems import Item as EditorItem, Renderable, RenderableType
@@ -33,6 +34,10 @@ class StepResource(Enum):
     EI_ITEMS = auto()  # Item definitions.
     EI_DATA = auto()  # Anything affecting the file.
     EI_FILE = auto()  # The file itself being written.
+
+    # The config file managed by the config package.
+    CONFIG_DATA = auto()  # Anything added to the config.
+    CONFIG_FILE = auto()  # The file itself being written.
 
     # vbsp_config-related resources.
     VCONF_DATA = auto()  # Anything affecting the file.
@@ -82,6 +87,7 @@ class ExportData:
     all_items: List[EditorItem] = attrs.field(factory=list, repr=False)
     # The error/connection icons
     renderables: Dict[RenderableType, Renderable] = attrs.Factory(dict)
+    config: config_mod.Config
     # vbsp_config.cfg file.
     vbsp_conf: Keyvalues = attrs.field(factory=Keyvalues.root, repr=False)
     # As steps export, they may fill this to include additional resources that
@@ -147,6 +153,7 @@ async def export(
                 selected=selected_objects,
                 packset=packset,
                 selected_style=style,
+                config=config_mod.APP.get_full_conf(config_mod.COMPILER),
                 copy_resources=should_refresh,
                 warn=error_ui.add,
             )
