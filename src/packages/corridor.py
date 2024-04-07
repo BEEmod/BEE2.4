@@ -181,16 +181,6 @@ def parse_corr_kind(specifier: str) -> CorrKind:
     return mode, direction, orient
 
 
-def iter_spec(spec: CorrSpec) -> Iterator[CorrKind]:
-    """Yield all kinds that match this spec."""
-    spec_mode, spec_dir, spec_orient = spec
-    return itertools.product(
-        (spec_mode, ) if spec_mode is not None else ALL_MODES,
-        (spec_dir, ) if spec_dir is not None else ALL_DIRS,
-        (spec_orient, ) if spec_orient is not None else ALL_ORIENT,
-    )
-
-
 @attrs.define(slots=False, kw_only=True)
 class CorridorGroup(packages.PakObject, allow_mult=True):
     """A collection of corridors defined for the style with this ID."""
@@ -198,7 +188,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
     corridors: dict[CorrKind, list[CorridorUI]]
     inherit: Sequence[str] = ()  # Copy all the corridors defined in these groups.
     options: dict[utils.ObjectID, Option] = attrs.Factory(dict)
-    global_options: dict[CorrKind, list[Option]] = attrs.Factory(dict)
+    global_options: dict[tuple[GameMode, Direction], list[Option]] = attrs.Factory(dict)
 
     @classmethod
     async def parse(cls, data: packages.ParseData) -> CorridorGroup:
@@ -207,7 +197,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
         inherits: list[str] = []
 
         options: dict[utils.ObjectID, Option] = {}
-        global_options: dict[CorrKind, list[Option]] = defaultdict(list)
+        global_options: dict[tuple[GameMode, Direction], list[Option]] = defaultdict(list)
         for opt_kv in data.info.find_children('Options'):
             opt_id = utils.obj_id(opt_kv.real_name, 'corridor option')
             option = Option.parse(data.pak_id, opt_id, opt_kv)
@@ -215,8 +205,13 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                 raise AppError(TRANS_DUPLICATE_OPTION.format(option=opt_id, group=data.id))
             options[opt_id] = option
             for spec_kv in opt_kv.find_all('global'):
-                for kind in iter_spec(parse_specifier(spec_kv.value)):
-                    global_options[kind].append(option)
+                spec_mode, spec_dir, spec_orient = parse_specifier(spec_kv.value)
+                # We don't differentiate by orientation.
+                for mode, direction in itertools.product(
+                    (spec_mode,) if spec_mode is not None else ALL_MODES,
+                    (spec_dir,) if spec_dir is not None else ALL_DIRS,
+                ):
+                    global_options[mode, direction].append(option)
 
         for kv in data.info:
             if kv.name in ('id', 'options'):
@@ -457,11 +452,11 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
         # Ignore extras beyond the actual size.
         return output[:CORRIDOR_COUNTS[mode, direction]]
 
-    def get_options(self, kind: CorrKind, corr: CorridorUI) -> Iterator[Option]:
+    def get_options(self, mode: GameMode, direction: Direction, corr: CorridorUI) -> Iterator[Option]:
         """Determine all options that a specific corridor requires."""
         matched = set()
 
-        for opt in self.global_options.get(kind, ()):
+        for opt in self.global_options.get((mode, direction), ()):
             matched.add(opt.id)
             yield opt
         for opt_id in corr.option_ids - matched:
