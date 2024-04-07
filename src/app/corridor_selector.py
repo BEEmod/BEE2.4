@@ -1,6 +1,6 @@
 """Implements UI for selecting corridors."""
 from __future__ import annotations
-from typing import Dict, Generic, Iterator, Optional, List, Protocol, Sequence, Tuple, TypeVar
+from typing import Dict, Generic, Iterator, Optional, List, Sequence, Tuple, TypeVar
 from typing_extensions import Final
 import itertools
 import random
@@ -12,7 +12,6 @@ import srctools.logger
 from app import DEV_MODE, EdgeTrigger, img, tkMarkdown
 from packages import corridor
 from corridor import GameMode, Direction, Orient
-from config.last_sel import LastSelected
 from config.corridors import UIState, Config
 from transtoken import TransToken
 import utils
@@ -55,9 +54,10 @@ TRANS_OPT_TITLE = {
     (GameMode.COOP, Direction.EXIT): TransToken.ui('Cooperative Exit Options:'),
 }
 TRANS_NO_OPTIONS = TransToken.ui('No options!')
+TRANS_RAND_OPTION = TransToken.ui('Randomise')
 
 
-class Icon(Protocol):
+class Icon:
     """API for corridor icons."""
 
     @property
@@ -78,18 +78,20 @@ class Icon(Protocol):
         raise NotImplementedError
 
 
-class OptionRow(Protocol):
+class OptionRow:
     """API for a row used for corridor options."""
-    @property
-    def value(self) -> AsyncValue[utils.SpecialID]:
-        """The current value for the row."""
-        raise NotImplementedError
+    # The current value for the row.
+    value: AsyncValue[utils.SpecialID]
 
-    async def display(self, row: int, option: corridor.Option, task_status: trio.TaskStatus[None]) -> None:
+    def __init__(self) -> None:
+        self.value = AsyncValue(utils.ID_RANDOM)
+
+    async def display(self, row: int, option: corridor.Option, remove_event: trio.Event) -> None:
         """Reconfigure this row to display the specified option, then show it.
 
-        When cancelled, remove the row.
+        Once the event triggers, remove the row.
         """
+        raise NotImplementedError
 
 
 IconT = TypeVar('IconT', bound=Icon)
@@ -131,6 +133,7 @@ class Selector(Generic[IconT, OptionRowT]):
         self.cur_images = None
         self.icons = []
         self.corr_list = []
+        self.option_rows = []
         self.show_trigger = EdgeTrigger()
         self.close_event = RepeatedEvent()
 
@@ -361,6 +364,7 @@ class Selector(Generic[IconT, OptionRowT]):
                 mode, direction, orient = self.ui_get_buttons()
                 options = list(self.corr_group.get_options(mode, direction, corr))
 
+                # Display our information.
                 self.ui_desc_display(
                     title=corr.name,
                     authors=author,
@@ -369,7 +373,18 @@ class Selector(Generic[IconT, OptionRowT]):
                     options_title=TRANS_OPT_TITLE[mode, direction],
                     show_no_options=not options,
                 )
-                corr = await self.displayed_corr.wait_value(corr_changed)
+
+                while len(options) > len(self.option_rows):
+                    self.option_rows.append(self.ui_option_create())
+
+                async with trio.open_nursery() as nursery:
+                    done_event = trio.Event()
+                    for ind, (opt, row) in enumerate(zip(options, self.option_rows)):
+                        nursery.start_soon(row.display, ind, opt, done_event)
+
+                    # Wait for a new corridor to be switched to, then close.
+                    corr = await self.displayed_corr.wait_value(corr_changed)
+                    done_event.set()
             else:  # Reset.
                 self.cur_images = None
                 self._sel_img(0)  # Update buttons.
@@ -455,5 +470,6 @@ class Selector(Generic[IconT, OptionRowT]):
         """Set the widget state for the large preview image in the description sidebar."""
         raise NotImplementedError
 
-    def ui_option_add(self) -> OptionRowT:
+    def ui_option_create(self) -> OptionRowT:
         """Create a new option row."""
+        raise NotImplementedError

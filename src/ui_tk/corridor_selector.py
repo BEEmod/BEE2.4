@@ -1,27 +1,29 @@
 """Tk implementation of the corridor selector."""
-import tkinter as tk
-from typing import Final, Optional, Tuple
-
-from trio_util import AsyncValue
+from __future__ import annotations
+from typing import Final
 from typing_extensions import override
-
+from collections.abc import Sequence
 from tkinter import ttk
+import tkinter as tk
 
-import config
-import utils
+import trio
+
 from app import TK_ROOT, background_run, img, tkMarkdown, tk_tools
 from app.corridor_selector import (
     HEIGHT, IMG_ARROW_LEFT, IMG_ARROW_RIGHT, IMG_CORR_BLANK, Icon,
-    OptionRow, Selector, TRANS_HELP, TRANS_NO_OPTIONS, WIDTH,
+    OptionRow, Selector, TRANS_HELP, TRANS_NO_OPTIONS, WIDTH, TRANS_RAND_OPTION,
 )
 from app.richTextBox import tkRichText
 from config.corridors import UIState
-from corridor import Direction, GameMode, Orient
+from corridor import CorrKind, Direction, GameMode, Orient
+from packages import corridor
 from transtoken import TransToken
 from ui_tk.dragdrop import CanvasPositioner
 from ui_tk.img import TKImages
-import packages
 from ui_tk.wid_transtoken import set_text, set_win_title
+import config
+import packages
+import utils
 
 
 ICON_CHECK_PADDING: Final = 2 if utils.WIN else 0
@@ -29,7 +31,7 @@ ICON_CHECK_PADDING: Final = 2 if utils.WIN else 0
 
 class IconUI(Icon):
     """An icon for a corridor."""
-    def __init__(self, selector: 'TkSelector', index: int) -> None:
+    def __init__(self, selector: TkSelector, index: int) -> None:
         """Create the widgets."""
         self.label = ttk.Label(selector.canvas, anchor='center')
         self.var = tk.BooleanVar(selector.win)
@@ -84,10 +86,33 @@ def place_icon(canv: tk.Canvas, icon: IconUI, x: int, y: int, tag: str) -> None:
 
 class OptionRowUI(OptionRow):
     """Implementation of the option row."""
-    value: AsyncValue[utils.SpecialID]
+    _value_order: Sequence[utils.SpecialID]
 
     def __init__(self, parent: ttk.Frame) -> None:
-        self.value = AsyncValue(utils.ID_RANDOM)
+        super().__init__()
+        self.label = ttk.Label(parent)
+        self.combo = ttk.Combobox(parent, state='readonly')
+        self._value_order = ()
+
+    @override
+    async def display(self, row: int, option: corridor.Option, remove_event: trio.Event) -> None:
+        """Display the row in the specified position, then remove when the event triggers."""
+        set_text(self.label, option.name)
+        self.combo['values'] = [
+            str(TRANS_RAND_OPTION),
+            *[str(val.name) for val in option.values],
+        ]
+        self._value_order = [
+            utils.ID_RANDOM,
+            *[val.id for val in option.values],
+        ]
+
+        # Increment to account for the title.
+        self.label.grid(row=row + 1, column=0)
+        self.combo.grid(row=row + 1, column=1, sticky='ew')
+        await remove_event.wait()
+        self.label.grid_forget()
+        self.combo.grid_forget()
 
 
 class TkSelector(Selector[IconUI, OptionRowUI]):
@@ -190,7 +215,7 @@ class TkSelector(Selector[IconUI, OptionRowUI]):
             self.wid_options_frm,
             font=("Helvetica", 10, "bold"),
         )
-        self.wid_options_title.grid(row=0, column=0, sticky='ew')
+        self.wid_options_title.grid(row=0, column=0, columnspan=2, sticky='ew')
         self.wid_no_options = set_text(ttk.Label(self.wid_options_frm), TRANS_NO_OPTIONS)
 
         frm_lower_btn = ttk.Frame(frm_right)
@@ -301,12 +326,12 @@ class TkSelector(Selector[IconUI, OptionRowUI]):
         tk_tools.center_win(self.win, TK_ROOT)
 
     @override
-    def ui_win_getsize(self) -> Tuple[int, int]:
+    def ui_win_getsize(self) -> tuple[int, int]:
         """Fetch the current dimensions, for saving."""
         return self.win.winfo_width(), self.win.winfo_height()
 
     @override
-    def ui_get_buttons(self) -> Tuple[GameMode, Direction, Orient]:
+    def ui_get_buttons(self) -> CorrKind:
         """Get the current button state."""
         return self.btn_mode.current, self.btn_direction.current, self.btn_orient.current
 
@@ -316,7 +341,7 @@ class TkSelector(Selector[IconUI, OptionRowUI]):
         self.icons.append(IconUI(self, len(self.icons)))
 
     @override
-    def ui_icon_set_img(self, icon: IconUI, handle: Optional[img.Handle]) -> None:
+    def ui_icon_set_img(self, icon: IconUI, handle: img.Handle | None) -> None:
         """Set the image used."""
         self.tk_img.apply(icon.label, handle)
 
@@ -341,13 +366,18 @@ class TkSelector(Selector[IconUI, OptionRowUI]):
 
         set_text(self.wid_options_title, options_title)
         if show_no_options:
-            self.wid_no_options.grid(row=1, column=0)
+            self.wid_no_options.grid(row=1, column=0, columnspan=2)
         else:
             self.wid_no_options.grid_remove()
 
     @override
-    def ui_desc_set_img_state(self, handle: Optional[img.Handle], left: bool, right: bool) -> None:
+    def ui_desc_set_img_state(self, handle: img.Handle | None, left: bool, right: bool) -> None:
         """Set the widget state for the large preview image in the description sidebar."""
         self.tk_img.apply(self.wid_image, handle)
         self.wid_image_left.state(('!disabled', ) if left else ('disabled', ))
         self.wid_image_right.state(('!disabled', ) if right else ('disabled', ))
+
+    @override
+    def ui_option_create(self) -> OptionRowUI:
+        """Create a new option row."""
+        return OptionRowUI(self.wid_options_frm)
