@@ -3,10 +3,9 @@
 Other modules define an immutable state class, then register it with this.
 They can then fetch the current state and store new state.
 """
-from typing import (
-    Awaitable, Callable, ClassVar, Dict, Iterator, NewType, Optional, Set,
-    Tuple, Type, TypeVar, Union, cast,
-)
+from __future__ import annotations
+from collections.abc import Awaitable, Callable, Iterator
+from typing import ClassVar, Dict, NewType, Type, TypeVar, cast
 from typing_extensions import Self
 from pathlib import Path
 import abc
@@ -66,7 +65,7 @@ class Data(abc.ABC):
         return cls.__info
 
     @classmethod
-    def parse_legacy(cls, conf: Keyvalues) -> Dict[str, Self]:
+    def parse_legacy(cls, conf: Keyvalues) -> dict[str, Self]:
         """Parse from the old legacy config. The user has to handle the uses_id style."""
         return {}
 
@@ -99,25 +98,25 @@ Config = NewType('Config', Dict[Type[Data], Dict[str, Data]])
 @attrs.define(eq=False)
 class ConfigSpec:
     """A config spec represents the set of data types in a particlar config file."""
-    _name_to_type: Dict[str, Type[Data]] = attrs.Factory(dict)
-    _registered: Set[Type[Data]] = attrs.Factory(set)
+    _name_to_type: dict[str, type[Data]] = attrs.Factory(dict)
+    _registered: set[type[Data]] = attrs.Factory(set)
 
     # After the relevant UI is initialised, this is set to an async func which
     # applies the data to the UI. This way we know it can be done safely now.
     # If data was loaded from the config, the callback is immediately awaited.
     # One is provided independently for each ID, so it can be sent to the right object.
-    callback: Dict[
-        Tuple[Type[Data], str],
+    callback: dict[
+        tuple[type[Data], str],
         Callable[[Data], Awaitable[object]],
     ] = attrs.field(factory=dict, repr=False)
 
     _current: Config = attrs.Factory(lambda: Config({}))
 
-    def datatype_for_name(self, name: str) -> Type[Data]:
+    def datatype_for_name(self, name: str) -> type[Data]:
         """Lookup the data type for a specific name."""
         return self._name_to_type[name.casefold()]
 
-    def register(self, cls: Type[DataT]) -> Type[DataT]:
+    def register(self, cls: type[DataT]) -> type[DataT]:
         """Register a config data type. The name must be unique."""
         info = cls.get_conf_info()
         folded_name = info.name.casefold()
@@ -129,7 +128,7 @@ class ConfigSpec:
 
     async def set_and_run_ui_callback(
         self,
-        typ: Type[DataT],
+        typ: type[DataT],
         func: Callable[[DataT], Awaitable[object]],
         data_id: str='',
     ) -> None:
@@ -151,7 +150,7 @@ class ConfigSpec:
         if data_id in data_map:
             await func(cast(DataT, data_map[data_id]))
 
-    async def apply_conf(self, typ: Type[Data], *, data_id: str= '') -> None:
+    async def apply_conf(self, typ: type[Data], *, data_id: str= '') -> None:
         """Apply the current settings for this config type and ID.
 
         If the data_id is not passed, all settings will be applied.
@@ -186,7 +185,7 @@ class ConfigSpec:
                     else:
                         nursery.start_soon(cb, data)
 
-    def get_full_conf(self, filter_to: Optional['ConfigSpec'] = None) -> Config:
+    def get_full_conf(self, filter_to: ConfigSpec | None = None) -> Config:
         """Get the config stored by this spec, filtering to another if requested."""
         if filter_to is None:
             filter_to = self
@@ -223,10 +222,10 @@ class ConfigSpec:
 
     def get_cur_conf(
         self,
-        cls: Type[DataT],
-        data_id: str='',
-        default: Union[DataT, None] = None,
-        legacy_id: str='',
+        cls: type[DataT],
+        data_id: str = '',
+        default: DataT | None = None,
+        legacy_id: str = '',
     ) -> DataT:
         """Fetch the currently active config for this ID.
 
@@ -258,7 +257,7 @@ class ConfigSpec:
         assert isinstance(data, cls), info
         return data
 
-    def store_conf(self, data: DataT, data_id: str='') -> None:
+    def store_conf(self, data: DataT, data_id: str = '') -> None:
         """Update the current data for this ID. """
         if type(data) not in self._registered:
             raise ValueError(f'Unregistered data type {type(data)!r}')
@@ -273,7 +272,7 @@ class ConfigSpec:
         except KeyError:
             self._current[cls] = {data_id: data}
 
-    def parse_kv1(self, kv: Keyvalues) -> Tuple[Config, bool]:
+    def parse_kv1(self, kv: Keyvalues) -> tuple[Config, bool]:
         """Parse a configuration file into individual data.
 
         The data is in the form {conf_type: {id: data}}, and a bool indicating if it was upgraded
@@ -316,7 +315,7 @@ class ConfigSpec:
                     info.name, version, info.version,
                 )
                 upgraded = True
-            data_map: Dict[str, Data] = {}
+            data_map: dict[str, Data] = {}
             conf[cls] = data_map
             if info.uses_id:
                 for data_prop in child:
