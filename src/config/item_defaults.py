@@ -13,7 +13,7 @@ import config
 
 LOGGER = logger.get_logger(__name__)
 DEFAULT_VERSION: Final = 'VER_DEFAULT'
-LEGACY = ConfigFile('item_configs.cfg')
+LEGACY = ConfigFile('item_configs.cfg', auto_load=False)
 
 
 @config.PALETTE.register
@@ -28,6 +28,7 @@ class ItemDefault(config.Data, conf_name='ItemDefault', uses_id=True):
     @override
     def parse_legacy(cls, conf: Keyvalues) -> Dict[str, 'ItemDefault']:
         """Parse the data in the legacy item_configs.cfg file."""
+        LEGACY.load()
         result: Dict[str, ItemDefault] = {}
         for item_id, section in LEGACY.items():
             if item_id == LEGACY.default_section:
