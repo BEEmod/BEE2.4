@@ -1,6 +1,8 @@
 """Tk implementation of the corridor selector."""
 import tkinter as tk
 from typing import Final, Optional, Tuple
+
+from trio_util import AsyncValue
 from typing_extensions import override
 
 from tkinter import ttk
@@ -10,7 +12,7 @@ import utils
 from app import TK_ROOT, background_run, img, tkMarkdown, tk_tools
 from app.corridor_selector import (
     HEIGHT, IMG_ARROW_LEFT, IMG_ARROW_RIGHT, IMG_CORR_BLANK, Icon,
-    Selector, TRANS_HELP, WIDTH,
+    OptionRow, Selector, TRANS_HELP, TRANS_NO_OPTIONS, WIDTH,
 )
 from app.richTextBox import tkRichText
 from config.corridors import UIState
@@ -80,7 +82,15 @@ def place_icon(canv: tk.Canvas, icon: IconUI, x: int, y: int, tag: str) -> None:
     )
 
 
-class TkSelector(Selector[IconUI]):
+class OptionRowUI(OptionRow):
+    """Implementation of the option row."""
+    value: AsyncValue[utils.SpecialID]
+
+    def __init__(self, parent: ttk.Frame) -> None:
+        self.value = AsyncValue(utils.ID_RANDOM)
+
+
+class TkSelector(Selector[IconUI, OptionRowUI]):
     """Corridor selection window."""
     win: tk.Toplevel
 
@@ -173,6 +183,15 @@ class TkSelector(Selector[IconUI]):
 
         self.wid_desc = tkRichText(right_scroll_frm, name='desc')
         self.wid_desc.grid(row=0, column=0, sticky='nsew')
+        self.wid_options_frm = ttk.Frame(right_scroll_frm)
+        self.wid_options_frm.grid(row=1, column=0, sticky='nsew')
+
+        self.wid_options_title = ttk.Label(
+            self.wid_options_frm,
+            font=("Helvetica", 10, "bold"),
+        )
+        self.wid_options_title.grid(row=0, column=0, sticky='ew')
+        self.wid_no_options = set_text(ttk.Label(self.wid_options_frm), TRANS_NO_OPTIONS)
 
         frm_lower_btn = ttk.Frame(frm_right)
         frm_lower_btn.grid(row=4, column=0, columnspan=2)
@@ -303,19 +322,28 @@ class TkSelector(Selector[IconUI]):
 
     @override
     def ui_desc_display(
-        self,
+        self, *,
         title: TransToken,
         authors: TransToken,
         desc: tkMarkdown.MarkdownData,
         enable_just_this: bool,
+        options_title: TransToken,
+        show_no_options: bool,
     ) -> None:
         """Display information for a corridor."""
         set_text(self.wid_title, title)
         set_text(self.wid_authors, authors)
         self.wid_desc.set_text(desc)
-        disp_lines = self.wid_desc.count(1.0, 'end', 'displaylines', 'update')
+        # Not yet typed in typeshed.
+        disp_lines = self.wid_desc.count(1.0, 'end', 'displaylines', 'update')  # type: ignore[no-untyped-call]
         self.wid_desc['height'] = max(6, disp_lines + 1)
         self.btn_just_this.state(('!disabled', ) if enable_just_this else ('disabled', ))
+
+        set_text(self.wid_options_title, options_title)
+        if show_no_options:
+            self.wid_no_options.grid(row=1, column=0)
+        else:
+            self.wid_no_options.grid_remove()
 
     @override
     def ui_desc_set_img_state(self, handle: Optional[img.Handle], left: bool, right: bool) -> None:

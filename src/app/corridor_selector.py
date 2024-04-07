@@ -48,6 +48,13 @@ TRANS_HELP = TransToken.ui(
     "Check the boxes to specify which corridors may be used. Ingame, a random corridor will "
     "be picked for each map."
 )
+TRANS_OPT_TITLE = {
+    (GameMode.SP, Direction.ENTRY): TransToken.ui('Singleplayer Entry Options:'),
+    (GameMode.SP, Direction.EXIT): TransToken.ui('Singleplayer Exit Options:'),
+    (GameMode.COOP, Direction.ENTRY): TransToken.ui('Cooperative Entry Options:'),
+    (GameMode.COOP, Direction.EXIT): TransToken.ui('Cooperative Exit Options:'),
+}
+TRANS_NO_OPTIONS = TransToken.ui('No options!')
 
 
 class Icon(Protocol):
@@ -71,10 +78,25 @@ class Icon(Protocol):
         raise NotImplementedError
 
 
+class OptionRow(Protocol):
+    """API for a row used for corridor options."""
+    @property
+    def value(self) -> AsyncValue[utils.SpecialID]:
+        """The current value for the row."""
+        raise NotImplementedError
+
+    async def display(self, row: int, option: corridor.Option, task_status: trio.TaskStatus[None]) -> None:
+        """Reconfigure this row to display the specified option, then show it.
+
+        When cancelled, remove the row.
+        """
+
+
 IconT = TypeVar('IconT', bound=Icon)
+OptionRowT = TypeVar('OptionRowT', bound=OptionRow)
 
 
-class Selector(Generic[IconT]):
+class Selector(Generic[IconT, OptionRowT]):
     """Corridor selection UI."""
     # When you click a corridor, it's saved here and displayed when others aren't
     # moused over. Reset on style/group swap.
@@ -98,6 +120,9 @@ class Selector(Generic[IconT]):
     # These are updated by load_corridors().
     corr_group: corridor.CorridorGroup
     conf_id: str
+
+    # The rows created for options. These are hidden if no longer used.
+    option_rows: List[OptionRowT]
 
     def __init__(self) -> None:
         self.sticky_corr = None
@@ -181,7 +206,6 @@ class Selector(Generic[IconT]):
 
     async def refresh(self, _: object = None) -> None:
         """Called to update the slots with new items if the corridor set changes."""
-
         mode, direction, orient = self.ui_get_buttons()
         self.conf_id = Config.get_id(self.corr_group.id, mode, direction, orient)
         conf = config.APP.get_cur_conf(Config, self.conf_id, Config())
@@ -299,18 +323,14 @@ class Selector(Generic[IconT]):
 
     async def _display_task(self) -> None:
         """This runs continually, updating which corridor is shown."""
-        corr = None
-
-        def corr_not_none(new: Optional[corridor.CorridorUI]) -> bool:
-            """Value predicate."""
-            return new is not None
+        corr: corridor.CorridorUI | None = None
 
         def corr_changed(new: Optional[corridor.CorridorUI]) -> bool:
             """Value predicate."""
             return new is not corr
 
         while True:
-            if corr is not None:
+            if corr is not None and self.corr_group is not FALLBACK:
                 self.img_ind = 0
                 self.cur_images = corr.images
                 self._sel_img(0)  # Updates the buttons.
@@ -336,18 +356,32 @@ class Selector(Generic[IconT]):
                     )
                 else:
                     description = corr.desc
+
+                # Figure out which options to show.
+                mode, direction, orient = self.ui_get_buttons()
+                options = list(self.corr_group.get_options(mode, direction, corr))
+
                 self.ui_desc_display(
-                    corr.name,
-                    author,
-                    description,
-                    corr is self.sticky_corr,
+                    title=corr.name,
+                    authors=author,
+                    desc=description,
+                    enable_just_this=corr is self.sticky_corr,
+                    options_title=TRANS_OPT_TITLE[mode, direction],
+                    show_no_options=not options,
                 )
                 corr = await self.displayed_corr.wait_value(corr_changed)
             else:  # Reset.
                 self.cur_images = None
                 self._sel_img(0)  # Update buttons.
-                self.ui_desc_display(TransToken.BLANK, TransToken.BLANK, tkMarkdown.MarkdownData.BLANK, False)
-                corr = await self.displayed_corr.wait_value(corr_not_none)
+                self.ui_desc_display(
+                    title=TransToken.BLANK,
+                    authors=TransToken.BLANK,
+                    options_title=TransToken.BLANK,
+                    desc=tkMarkdown.MarkdownData.BLANK,
+                    enable_just_this=False,
+                    show_no_options=False,
+                )
+                corr = await self.displayed_corr.wait_value(corr_changed)
 
     def _sel_img(self, direction: int) -> None:
         """Go forward or backwards in the preview images."""
@@ -406,11 +440,13 @@ class Selector(Generic[IconT]):
         raise NotImplementedError
 
     def ui_desc_display(
-        self,
+        self, *,
         title: TransToken,
         authors: TransToken,
         desc: tkMarkdown.MarkdownData,
         enable_just_this: bool,
+        options_title: TransToken,
+        show_no_options: bool,
     ) -> None:
         """Display information for a corridor."""
         raise NotImplementedError
@@ -418,3 +454,6 @@ class Selector(Generic[IconT]):
     def ui_desc_set_img_state(self, handle: Optional[img.Handle], left: bool, right: bool) -> None:
         """Set the widget state for the large preview image in the description sidebar."""
         raise NotImplementedError
+
+    def ui_option_add(self) -> OptionRowT:
+        """Create a new option row."""
