@@ -12,7 +12,7 @@ import abc
 import os
 
 from srctools import AtomicWriter, KeyValError, Keyvalues, logger
-from srctools.dmx import Element
+from srctools.dmx import Element, ValueType as DMXTypes
 import attrs
 import trio
 
@@ -296,7 +296,7 @@ class ConfigSpec:
             try:
                 cls = self._name_to_type[child.name]
             except KeyError:
-                LOGGER.warning('Unknown config option "{}"!', child.real_name)
+                LOGGER.warning('Unknown config section type "{}"!', child.real_name)
                 continue
             info = cls.get_conf_info()
             version = child.int('_version', 1)
@@ -306,7 +306,7 @@ class ConfigSpec:
                 pass
             if version > info.version:
                 LOGGER.warning(
-                    'Config option "{}" has version {}, '
+                    'Config section "{}" has version {}, '
                     'which is higher than the supported version ({})!',
                     info.name, version, info.version
                 )
@@ -354,6 +354,81 @@ class ConfigSpec:
                 LOGGER.warning('No legacy conf for "{}"!', info.name)
                 conf[cls] = {}
         return conf
+
+    def parse_dmx(self, dmx: Element, fmt_name: str, fmt_version: int) -> tuple[Config, bool]:
+        """Parse a configuration file in the DMX format into individual data.
+
+        * The format name and version parsed from the DMX file should also be supplied.
+        * The new config is returned, alongside a bool indicating if it was upgraded
+        and so should be resaved.
+        """
+        if fmt_name != DMX_NAME or fmt_version not in [1]:
+            raise ValueError(f'Unknown config {fmt_name} v{fmt_version}!')
+
+        conf = Config({})
+        upgraded = False
+        for attr in dmx.values():
+            if attr.name == 'id' or attr.type is not DMXTypes.ELEMENT:
+                continue
+            try:
+                cls = self._name_to_type[attr.name.casefold()]
+            except KeyError:
+                LOGGER.warning('Unknown config section type "{}"!', attr.name)
+                continue
+            info = cls.get_conf_info()
+            child = attr.val_elem
+            try:
+                if not child.type.startswith('Conf_v'):
+                    raise ValueError
+                version = int(child.type[6:])
+            except ValueError:
+                LOGGER.warning('Invalid config section version "{}"', child.type)
+                continue
+            if version > info.version:
+                LOGGER.warning(
+                    'Config section "{}" has version {}, '
+                    'which is higher than the supported version ({})!',
+                    info.name, version, info.version
+                )
+                # Don't try to parse, it'll be invalid.
+                continue
+            elif version != info.version:
+                LOGGER.warning(
+                    'Upgrading config section "{}" from {} -> {}',
+                    info.name, version, info.version,
+                )
+                upgraded = True
+            data_map: dict[str, Data] = {}
+            conf[cls] = data_map
+            if info.uses_id:
+                for data_attr in child.values():
+                    if data_attr.name == 'id' or data_attr.type is not DMXTypes.ELEMENT:
+                        continue
+                    data = data_attr.val_elem
+                    if data.type != 'SubConf':
+                        LOGGER.warning(
+                            'Invalid sub-config type "{}" for section {}',
+                            data.type, info.name,
+                        )
+                        continue
+                    try:
+                        data_map[data_attr.name] = cls.parse_dmx(data, version)
+                    except Exception:
+                        LOGGER.warning(
+                            'Failed to parse config {}[{}]:',
+                            info.name, data.name,
+                            exc_info=True,
+                        )
+            else:
+                try:
+                    data_map[''] = cls.parse_dmx(child, version)
+                except Exception:
+                    LOGGER.warning(
+                        'Failed to parse config {}:',
+                        info.name,
+                        exc_info=True,
+                    )
+        return conf, upgraded
 
     def build_kv1(self, conf: Config) -> Iterator[Keyvalues]:
         """Build out a configuration file from some data.
