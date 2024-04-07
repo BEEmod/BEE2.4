@@ -93,6 +93,7 @@ class OptionRowUI(OptionRow):
         self.label = ttk.Label(parent)
         self.combo = ttk.Combobox(parent, state='readonly')
         self._value_order = ()
+        self.combo.bind('<<ComboboxSelected>>', self.on_changed)
 
     @override
     async def display(self, row: int, option: corridor.Option, remove_event: trio.Event) -> None:
@@ -106,6 +107,8 @@ class OptionRowUI(OptionRow):
             utils.ID_RANDOM,
             *[val.id for val in option.values],
         ]
+        # Caller has assigned one of our IDs to our AsyncValue.
+        self.combo.current(self._value_order.index(self.current.value))
 
         # Increment to account for the title.
         self.label.grid(row=row + 1, column=0)
@@ -113,6 +116,10 @@ class OptionRowUI(OptionRow):
         await remove_event.wait()
         self.label.grid_forget()
         self.combo.grid_forget()
+
+    def on_changed(self, _: tk.Event) -> None:
+        """Apply changes to the combobox."""
+        self.current.value = self._value_order[self.combo.current()]
 
 
 class TkSelector(Selector[IconUI, OptionRowUI]):

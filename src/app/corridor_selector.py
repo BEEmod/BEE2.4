@@ -1,18 +1,20 @@
 """Implements UI for selecting corridors."""
 from __future__ import annotations
-from typing import Dict, Generic, Iterator, Optional, List, Sequence, Tuple, TypeVar
-from typing_extensions import Final
+from typing_extensions import Final, Generic, TypeVar
+from collections.abc import Sequence, Iterator
 import itertools
 import random
 
 from trio_util import AsyncValue, RepeatedEvent
-import trio
+import attrs
 import srctools.logger
+import trio
+import trio_util
 
 from app import DEV_MODE, EdgeTrigger, img, tkMarkdown
-from packages import corridor
+from config.corridors import UIState, Config, Options
 from corridor import GameMode, Direction, Orient
-from config.corridors import UIState, Config
+from packages import corridor
 from transtoken import TransToken
 import utils
 import config
@@ -81,10 +83,10 @@ class Icon:
 class OptionRow:
     """API for a row used for corridor options."""
     # The current value for the row.
-    value: AsyncValue[utils.SpecialID]
+    current: AsyncValue[utils.SpecialID]
 
     def __init__(self) -> None:
-        self.value = AsyncValue(utils.ID_RANDOM)
+        self.current = AsyncValue(utils.ID_RANDOM)
 
     async def display(self, row: int, option: corridor.Option, remove_event: trio.Event) -> None:
         """Reconfigure this row to display the specified option, then show it.
@@ -102,11 +104,11 @@ class Selector(Generic[IconT, OptionRowT]):
     """Corridor selection UI."""
     # When you click a corridor, it's saved here and displayed when others aren't
     # moused over. Reset on style/group swap.
-    sticky_corr: Optional[corridor.CorridorUI]
+    sticky_corr: corridor.CorridorUI | None
     # This is the corridor actually displayed right now.
-    displayed_corr: AsyncValue[Optional[corridor.CorridorUI]]
+    displayed_corr: AsyncValue[corridor.CorridorUI | None]
     # The currently selected images.
-    cur_images: Optional[Sequence[img.Handle]]
+    cur_images: Sequence[img.Handle] | None
     img_ind: int
 
     # Event which is triggered to show and hide the UI.
@@ -114,9 +116,9 @@ class Selector(Generic[IconT, OptionRowT]):
     close_event: RepeatedEvent
 
     # The widgets for each corridor.
-    icons: List[IconT]
+    icons: list[IconT]
     # The corresponding items for each slot.
-    corr_list: List[corridor.CorridorUI]
+    corr_list: list[corridor.CorridorUI]
 
     # The current corridor group for the selected style, and the config ID to save/load.
     # These are updated by load_corridors().
@@ -124,7 +126,7 @@ class Selector(Generic[IconT, OptionRowT]):
     conf_id: str
 
     # The rows created for options. These are hidden if no longer used.
-    option_rows: List[OptionRowT]
+    option_rows: list[OptionRowT]
 
     def __init__(self) -> None:
         self.sticky_corr = None
@@ -226,7 +228,7 @@ class Selector(Generic[IconT, OptionRowT]):
                 )
             self.corr_list = []
 
-        inst_enabled: Dict[str, bool] = {corr.instance.casefold(): False for corr in self.corr_list}
+        inst_enabled: dict[str, bool] = {corr.instance.casefold(): False for corr in self.corr_list}
         if conf.enabled:
             for sel_id, enabled in conf.enabled.items():
                 try:
@@ -328,7 +330,7 @@ class Selector(Generic[IconT, OptionRowT]):
         """This runs continually, updating which corridor is shown."""
         corr: corridor.CorridorUI | None = None
 
-        def corr_changed(new: Optional[corridor.CorridorUI]) -> bool:
+        def corr_changed(new: corridor.CorridorUI | None) -> bool:
             """Value predicate."""
             return new is not corr
 
@@ -374,20 +376,38 @@ class Selector(Generic[IconT, OptionRowT]):
                     show_no_options=not options,
                 )
 
+                # Place all options in the UI.
+                option_conf_id = Options.get_id(self.corr_group.id, mode, direction)
+                option_conf = config.APP.get_cur_conf(Options, option_conf_id, default=Options())
                 while len(options) > len(self.option_rows):
                     self.option_rows.append(self.ui_option_create())
 
+                option_async_vals = []
                 async with trio.open_nursery() as nursery:
                     done_event = trio.Event()
+                    opt: corridor.Option
+                    row: OptionRowT
                     for ind, (opt, row) in enumerate(zip(options, self.option_rows)):
+                        row.current.value = opt.id_from_config(option_conf)
                         nursery.start_soon(row.display, ind, opt, done_event)
+                        option_async_vals.append((opt.id, row.current))
 
-                    # Wait for a new corridor to be switched to, then close.
+                    # This task stores results when a config is changed.
+                    nursery.start_soon(
+                        self._store_options_task,
+                        option_async_vals,
+                        option_conf_id,
+                        done_event,
+                    )
+
+                    # Wait for a new corridor to be switched to, then cancel the event to remove
+                    # them all.
                     corr = await self.displayed_corr.wait_value(corr_changed)
                     done_event.set()
             else:  # Reset.
                 self.cur_images = None
                 self._sel_img(0)  # Update buttons.
+                # Clear the display entirely.
                 self.ui_desc_display(
                     title=TransToken.BLANK,
                     authors=TransToken.BLANK,
@@ -397,6 +417,27 @@ class Selector(Generic[IconT, OptionRowT]):
                     show_no_options=False,
                 )
                 corr = await self.displayed_corr.wait_value(corr_changed)
+
+    @staticmethod
+    async def _store_options_task(
+        async_vals: list[tuple[utils.ObjectID, AsyncValue[utils.SpecialID]]],
+        conf_id: str,
+        done_event: trio.Event,
+    ) -> None:
+        """Run while options are visible. This stores them when changed."""
+        wait_funcs = [val.wait_transition for opt_id, val in async_vals]
+        async with trio_util.move_on_when(done_event.wait):
+            while True:
+                await trio_util.wait_any(*wait_funcs)
+                conf = config.APP.get_cur_conf(Options, conf_id, default=Options())
+                config.APP.store_conf(attrs.evolve(conf, options={
+                    # Preserve any existing, unknown IDs.
+                    **conf.options,
+                    **{
+                        opt_id: val.value
+                        for opt_id, val in async_vals
+                    },
+                }), conf_id)
 
     def _sel_img(self, direction: int) -> None:
         """Go forward or backwards in the preview images."""
@@ -434,7 +475,7 @@ class Selector(Generic[IconT, OptionRowT]):
         """Show the window."""
         raise NotImplementedError
 
-    def ui_win_getsize(self) -> Tuple[int, int]:
+    def ui_win_getsize(self) -> tuple[int, int]:
         """Fetch the current dimensions, for saving."""
         raise NotImplementedError
 
@@ -442,7 +483,7 @@ class Selector(Generic[IconT, OptionRowT]):
         """Reposition everything after the window has resized."""
         raise NotImplementedError
 
-    def ui_get_buttons(self) -> Tuple[GameMode, Direction, Orient]:
+    def ui_get_buttons(self) -> corridor.CorrKind:
         """Get the current button positions."""
         raise NotImplementedError
 
@@ -450,7 +491,7 @@ class Selector(Generic[IconT, OptionRowT]):
         """Create a new icon widget, and append it to the list."""
         raise NotImplementedError
 
-    def ui_icon_set_img(self, icon: IconT, handle: Optional[img.Handle]) -> None:
+    def ui_icon_set_img(self, icon: IconT, handle: img.Handle | None) -> None:
         """Set the image for the specified corridor icon."""
         raise NotImplementedError
 
@@ -466,7 +507,7 @@ class Selector(Generic[IconT, OptionRowT]):
         """Display information for a corridor."""
         raise NotImplementedError
 
-    def ui_desc_set_img_state(self, handle: Optional[img.Handle], left: bool, right: bool) -> None:
+    def ui_desc_set_img_state(self, handle: img.Handle | None, left: bool, right: bool) -> None:
         """Set the widget state for the large preview image in the description sidebar."""
         raise NotImplementedError
 

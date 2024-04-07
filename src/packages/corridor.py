@@ -14,6 +14,7 @@ import utils
 from app import img, lazy_conf, tkMarkdown
 import packages
 import editoritems
+from config.corridors import Options
 from corridor import (
     CorrKind, CorrSpec, Orient, Direction, GameMode,
     CORRIDOR_COUNTS, ID_TO_CORR,
@@ -107,6 +108,23 @@ class Option:
                 default = values[0].id
 
         return cls(opt_id, name, default, values, fixup)
+
+    def id_from_config(self, config: Options) -> utils.SpecialID:
+        """Given a config, return the closest ID to use."""
+        try:
+            opt_id = config.options[self.id]
+        except KeyError:
+            return self.default
+        if opt_id == utils.ID_RANDOM:
+            return opt_id
+        for value in self.values:
+            if opt_id == value.id:
+                return opt_id
+        LOGGER.warning(
+            'Configured ID "{}" is not valid for option "{}"',
+            opt_id, self.id,
+        )
+        return self.default
 
 
 @attrs.frozen
