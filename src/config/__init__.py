@@ -368,7 +368,7 @@ class ConfigSpec:
         conf = Config({})
         upgraded = False
         for attr in dmx.values():
-            if attr.name == 'id' or attr.type is not DMXTypes.ELEMENT:
+            if attr.name == 'name' or attr.type is not DMXTypes.ELEMENT:
                 continue
             try:
                 cls = self._name_to_type[attr.name.casefold()]
@@ -402,7 +402,7 @@ class ConfigSpec:
             conf[cls] = data_map
             if info.uses_id:
                 for data_attr in child.values():
-                    if data_attr.name == 'id' or data_attr.type is not DMXTypes.ELEMENT:
+                    if data_attr.name == 'name' or data_attr.type is not DMXTypes.ELEMENT:
                         continue
                     data = data_attr.val_elem
                     if data.type != 'SubConf':

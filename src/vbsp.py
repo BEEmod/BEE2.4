@@ -17,6 +17,7 @@ import logging
 import pickle
 
 from srctools import AtomicWriter, Keyvalues, Vec, FrozenVec, Angle
+from srctools.dmx import Element
 from srctools.vmf import VMF, Entity, Output
 from srctools.game import Game
 import srctools
@@ -51,6 +52,7 @@ from precomp import (
     cubes,
     errors,
 )
+import config
 import consts
 import editoritems
 import user_errors
@@ -89,22 +91,32 @@ async def load_settings() -> Tuple[
 ]:
     """Load in all our settings from vbsp_config."""
     # Do all our file parsing concurrently.
-    def open_pickle(filename: str) -> object:
+    def load_pickle(filename: str) -> object:
         """Open then load a pickle file. Typed as object to force manual checks below."""
         with open(filename, 'rb') as f:
             return pickle.load(f)
 
-    def open_keyvalues(filename: str) -> Keyvalues:
+    def load_keyvalues(filename: str) -> Keyvalues:
         """Open then load a keyvalues1 file."""
         with open(filename, encoding='utf8') as f:
             return Keyvalues.parse(f, filename)
 
+    def load_dmx_config(filename: str) -> config.Config:
+        """Load our main DMX config."""
+        with open(filename, 'rb') as f:
+            dmx, fmt_name, fmt_ver = Element.parse(f)
+        conf, upgrade = config.COMPILER.parse_dmx(dmx, fmt_name, fmt_ver)
+        # We're never changing the file, no point upgrading it. The app will do so next
+        # export anyway.
+        return conf
+
     try:
         async with trio.open_nursery() as nursery:
-            res_conf = utils.Result.sync(nursery, open_keyvalues, "bee2/vbsp_config.cfg")
-            res_packlist = utils.Result.sync(nursery, open_keyvalues, 'bee2/pack_list.cfg')
-            res_editor = utils.Result.sync(nursery, open_pickle, 'bee2/editor.bin')
-            res_corr = utils.Result.sync(nursery, open_pickle, 'bee2/corridors.bin')
+            res_vconf = utils.Result.sync(nursery, load_keyvalues, "bee2/vbsp_config.cfg")
+            res_packlist = utils.Result.sync(nursery, load_keyvalues, 'bee2/pack_list.cfg')
+            res_editor = utils.Result.sync(nursery, load_pickle, 'bee2/editor.bin')
+            res_corr = utils.Result.sync(nursery, load_pickle, 'bee2/corridors.bin')
+            res_dmx_conf = utils.Result.sync(nursery, load_dmx_config, 'bee2/config.dmx')
             # Load in templates locations.
             nursery.start_soon(template_brush.load_templates, 'bee2/templates.lst')
     except Exception:  # TODO 3.8: except* (FileNotFoundError, IOError)
@@ -116,17 +128,18 @@ async def load_settings() -> Tuple[
         )
         sys.exit(1)
 
-    conf = res_conf()
-    tex_block = Keyvalues('Textures', list(conf.find_children('textures')))
+    vconf = res_vconf()
+    tex_block = Keyvalues('Textures', list(vconf.find_children('textures')))
 
     texturing.load_config(tex_block)
 
     # Load in our main configs...
-    options.load(conf.find_all('Options'))
+    options.load(vconf.find_all('Options'))
+    config.COMPILER.merge_conf(res_dmx_conf())
     utils.DEV_MODE = options.DEV_MODE()
 
     # Configuration properties for styles.
-    for stylevar_block in conf.find_all('stylevars'):
+    for stylevar_block in vconf.find_all('stylevars'):
         for var in stylevar_block:
             settings['style_vars'][var.name.casefold()] = srctools.conv_bool(var.value)
 
@@ -159,12 +172,12 @@ async def load_settings() -> Tuple[
     packing.parse_packlists(res_packlist())
 
     # Parse all the conditions.
-    for cond in conf.find_all('conditions', 'condition'):
+    for cond in vconf.find_all('conditions', 'condition'):
         conditions.add(cond)
 
-    cubes.parse_conf(conf)
-    fizzler.read_configs(conf)
-    barriers.parse_conf(conf)
+    cubes.parse_conf(vconf)
+    fizzler.read_configs(vconf)
+    barriers.parse_conf(vconf)
 
     # Selected corridors.
     corridor_conf = res_corr()
@@ -173,10 +186,10 @@ async def load_settings() -> Tuple[
 
     # Signage items
     from precomp.conditions.signage import load_signs
-    load_signs(conf)
+    load_signs(vconf)
 
     # Get configuration for the elevator, defaulting to ''.
-    elev = conf.find_block('elevator', or_blank=True)
+    elev = vconf.find_block('elevator', or_blank=True)
     settings['elevator'] = {
         key: elev[key, '']
         for key in
@@ -186,13 +199,13 @@ async def load_settings() -> Tuple[
         )
     }
 
-    settings['music_conf'] = conf.find_block('MusicScript', or_blank=True)
+    settings['music_conf'] = vconf.find_block('MusicScript', or_blank=True)
 
     # Bottomless pit configuration
-    bottomlessPit.load_settings(conf.find_block("bottomless_pit", or_blank=True))
+    bottomlessPit.load_settings(vconf.find_block("bottomless_pit", or_blank=True))
 
     # Fog settings - from the skybox (env_fog_controller, env_tonemap_controller)
-    fog_config = conf.find_block("fog", or_blank=True)
+    fog_config = vconf.find_block("fog", or_blank=True)
     # Update inplace so imports get the settings
     settings['fog'].update({
         # These defaults are from Clean Style.
