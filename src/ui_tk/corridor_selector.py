@@ -111,8 +111,9 @@ class TkSelector(Selector[IconUI]):
         frm_right = ttk.Frame(self.win, name='frm_right')
         frm_right.columnconfigure(0, weight=1)
         frm_right.grid(row=0, column=1, sticky='ns')
-        frm_img = ttk.Frame(frm_right, relief='raised', width=2)
-        frm_img.grid(row=0, column=0, sticky='ew')
+        self.frm_img = frm_img = ttk.Frame(frm_right, relief='raised')
+        frm_img.grid(row=0, column=0, columnspan=2, sticky='ew')
+        frm_img.rowconfigure(1, weight=1)
 
         sel_img = self._sel_img
         self.wid_image_left = ttk.Button(frm_img, name='imgLeft', command=lambda: sel_img(-1))
@@ -148,17 +149,30 @@ class TkSelector(Selector[IconUI]):
         )
         self.wid_authors.grid(row=2, column=0, columnspan=2, sticky='ew')
 
-        self.wid_desc = tkRichText(frm_right, name='desc')
-        desc_scroll = tk_tools.HidingScroll(
+        # Allows scrolling.
+        self.right_canv = right_canv = tk.Canvas(
+            frm_right,
+            highlightthickness=0, name='right_canv',
+        )
+        right_canv.grid(row=3, column=0, sticky='NSEW')
+        frm_right.rowconfigure(3, weight=1)
+
+        self.right_scroll_frm = right_scroll_frm = ttk.Frame(right_canv)
+        self.right_frame_winid = right_canv.create_window(0, 0, window=right_scroll_frm, anchor="nw")
+        right_scroll_frm.columnconfigure(0, weight=1)
+        right_scroll_frm.rowconfigure(0, weight=1)
+
+        self.right_scroll = tk_tools.HidingScroll(
             frm_right,
             orient='vertical',
-            name='desc_scroll',
-            command=self.wid_desc.yview,
+            name='right_scroll',
+            command=right_canv.yview,
         )
-        self.wid_desc['yscrollcommand'] = desc_scroll.set
-        self.wid_desc.grid(row=3, column=0, sticky='nsew')
-        desc_scroll.grid(row=3, column=1, sticky='ns')
-        frm_right.rowconfigure(3, weight=1)
+        right_canv['yscrollcommand'] = self.right_scroll.set
+        self.right_scroll.grid(row=3, column=1, sticky='ns')
+
+        self.wid_desc = tkRichText(right_scroll_frm, name='desc')
+        self.wid_desc.grid(row=0, column=0, sticky='nsew')
 
         frm_lower_btn = ttk.Frame(frm_right)
         frm_lower_btn.grid(row=4, column=0, columnspan=2)
@@ -223,7 +237,8 @@ class TkSelector(Selector[IconUI]):
         set_text(self.help_lbl, TRANS_HELP)
         self.help_lbl_win = self.canvas.create_window(0, 0, anchor='nw', window=self.help_lbl)
 
-        tk_tools.add_mousewheel(self.canvas, self.win)
+        tk_tools.add_mousewheel(self.canvas, frm_left)
+        tk_tools.add_mousewheel(right_canv, frm_right)
         self.load_corridors(packset, cur_style)
 
     @override
@@ -242,6 +257,18 @@ class TkSelector(Selector[IconUI]):
 
         pos.place_slots(self.visible_icons(), 'icons')
         pos.resize_canvas()
+
+        # Reshape the description frame.
+        right_width = self.frm_img.winfo_reqwidth()
+        if self.right_scroll.winfo_ismapped():
+            right_width -= self.right_scroll.winfo_width()
+        self.right_canv['scrollregion'] = (
+            0, 0,
+            right_width,
+            self.right_scroll_frm.winfo_reqheight()
+        )
+        self.right_canv.itemconfigure(self.right_frame_winid, width=right_width)
+        self.right_canv['width'] = right_width
 
     @override
     def ui_win_hide(self) -> None:
@@ -286,6 +313,8 @@ class TkSelector(Selector[IconUI]):
         set_text(self.wid_title, title)
         set_text(self.wid_authors, authors)
         self.wid_desc.set_text(desc)
+        disp_lines = self.wid_desc.count(1.0, 'end', 'displaylines', 'update')
+        self.wid_desc['height'] = max(6, disp_lines + 1)
         self.btn_just_this.state(('!disabled', ) if enable_just_this else ('disabled', ))
 
     @override
