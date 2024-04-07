@@ -22,7 +22,7 @@ import utils
 async def test() -> None:
     """Test the GUI."""
     BEE2_config.GEN_OPTS.load()
-    config.APP.read_file()
+    config.APP.read_file(config.APP_LOC)
 
     # Setup images to read from packages.
     print('Loading packages for images...')

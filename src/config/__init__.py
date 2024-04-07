@@ -99,7 +99,6 @@ Config = NewType('Config', Dict[Type[Data], Dict[str, Data]])
 @attrs.define(eq=False)
 class ConfigSpec:
     """A config spec represents the set of data types in a particlar config file."""
-    filename: Optional[Path]
     _name_to_type: Dict[str, Type[Data]] = attrs.Factory(dict)
     _registered: Set[Type[Data]] = attrs.Factory(set)
 
@@ -415,23 +414,20 @@ class ConfigSpec:
             root[info.name] = elem
         return root
 
-    def read_file(self) -> None:
+    def read_file(self, filename: Path) -> None:
         """Read and apply the settings from disk."""
-        if self.filename is None:
-            raise ValueError('No filename specified for this ConfigSpec!')
-
         try:
-            file = self.filename.open(encoding='utf8')
+            file = filename.open(encoding='utf8')
         except FileNotFoundError:
             return
         try:
             with file:
                 kv = Keyvalues.parse(file)
         except KeyValError:
-            LOGGER.warning('Cannot parse {}!', self.filename.name, exc_info=True)
+            LOGGER.warning('Cannot parse {}!', filename.name, exc_info=True)
             # Try and move to a backup name, if not don't worry about it.
             try:
-                self.filename.replace(self.filename.with_suffix('.err.vdf'))
+                filename.replace(filename.with_suffix('.err.vdf'))
             except OSError:
                 pass
 
@@ -439,11 +435,8 @@ class ConfigSpec:
         self._current.clear()
         self._current.update(conf)
 
-    def write_file(self) -> None:
+    def write_file(self, filename: Path) -> None:
         """Write the settings to disk."""
-        if self.filename is None:
-            raise ValueError('No filename specified for this ConfigSpec!')
-
         if not any(self._current.values()):
             # We don't have any data saved, abort!
             # This could happen while parsing, for example.
@@ -451,15 +444,16 @@ class ConfigSpec:
 
         kv = Keyvalues.root()
         kv.extend(self.build_kv1(self._current))
-        with AtomicWriter(self.filename) as file:
+        with AtomicWriter(filename) as file:
             for prop in kv:
                 for line in prop.export():
                     file.write(line)
 
 
-# Main application configs.
-APP: ConfigSpec = ConfigSpec(utils.conf_location('config/config.vdf'))
-PALETTE: ConfigSpec = ConfigSpec(None)
+# The configuration files we use.
+APP_LOC = utils.conf_location('config/config.vdf')
+APP: ConfigSpec = ConfigSpec()
+PALETTE: ConfigSpec = ConfigSpec()
 
 
 # Import submodules, so they're registered.

@@ -72,7 +72,7 @@ if __name__ == '__main__':
 
     GEN_OPTS.load()
     GEN_OPTS.set_defaults(DEFAULT_SETTINGS)
-    config.APP.read_file()
+    config.APP.read_file(config.APP_LOC)
     try:
         conf = config.APP.get_cur_conf(GenOptions)
     except KeyError:

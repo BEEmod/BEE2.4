@@ -137,7 +137,7 @@ async def clear_caches(dialogs: Dialogs) -> None:
         message = TRANS_CACHE_RESET
 
     gameMan.CONFIG.save_check()
-    config.APP.write_file()
+    config.APP.write_file(config.APP_LOC)
 
     # Since we've saved, dismiss this window.
     win.withdraw()

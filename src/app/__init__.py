@@ -146,7 +146,7 @@ def on_error(
             show_log_win=True,
             log_win_level='DEBUG',
         ))
-        config.APP.write_file()
+        config.APP.write_file(config.APP_LOC)
     except Exception:
         # Ignore failures...
         pass

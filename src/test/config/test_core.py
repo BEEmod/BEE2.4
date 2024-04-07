@@ -65,7 +65,7 @@ def test_get_info() -> None:
 
 def test_basic_store() -> None:
     """Test storing config values."""
-    spec = config.ConfigSpec(None)
+    spec = config.ConfigSpec()
     spec.register(DataSingle)
 
     data_1 = DataSingle("value_1", "b")
@@ -92,7 +92,7 @@ def test_basic_store() -> None:
 ])
 def test_parse_kv1_upgrades(value: str, triple: str) -> None:
     """Test parsing Keyvalues1 data, and upgrading old versions."""
-    spec = config.ConfigSpec(None)
+    spec = config.ConfigSpec()
     spec.register(DataSingle)
 
     kv = Keyvalues.root(
@@ -124,7 +124,7 @@ def test_parse_kv1_upgrades(value: str, triple: str) -> None:
 @pytest.mark.parametrize('value', ['val1', 'val2'])
 def test_export_kv1_regress(value: str, triple: str, file_regression: FileRegressionFixture) -> None:
     """Test exporting KV1 produces the same result."""
-    spec = config.ConfigSpec(None)
+    spec = config.ConfigSpec()
     spec.register(DataSingle)
 
     conf = config.Config({
@@ -145,7 +145,7 @@ def test_export_kv1_regress(value: str, triple: str, file_regression: FileRegres
 @pytest.mark.parametrize('value', ['val1', 'val2'])
 def test_export_dmx_regress(value: str, triple: str, file_regression: FileRegressionFixture) -> None:
     """Test exporting DMX produces the same result."""
-    spec = config.ConfigSpec(None)
+    spec = config.ConfigSpec()
     spec.register(DataSingle)
 
     conf = config.Config({

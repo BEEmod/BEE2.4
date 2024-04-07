@@ -134,7 +134,7 @@ async def init_app() -> None:
                 ), 'main_window')
 
             try:
-                config.APP.write_file()
+                config.APP.write_file(config.APP_LOC)
             except Exception:
                 LOGGER.exception('Saving main conf:')
             for conf_file in confs:

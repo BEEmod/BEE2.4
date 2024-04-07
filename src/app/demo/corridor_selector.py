@@ -14,7 +14,7 @@ from ui_tk.dialogs import DIALOG
 
 
 async def test() -> None:
-    config.APP.read_file()
+    config.APP.read_file(config.APP_LOC)
     await gameMan.load(DIALOG)
     mod_support.scan_music_locs(packages.get_loaded_packages(), gameMan.all_games)
     async with ErrorUI() as errors:
