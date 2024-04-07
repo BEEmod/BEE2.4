@@ -1153,16 +1153,18 @@ async def init_option(
     else:
         left_pad = (0, 0)
 
-    # Make all the selector window textboxes
+    # Make all the selector window textboxes.
     (await style_win.widget(props)).grid(row=0, column=1, sticky='EW', padx=left_pad)
     # row=1: Suggested.
     voice_frame.grid(row=2, column=1, sticky='EW')
     (await skybox_win.widget(props)).grid(row=3, column=1, sticky='EW', padx=left_pad)
     (await elev_win.widget(props)).grid(row=4, column=1, sticky='EW', padx=left_pad)
-    wid_transtoken.set_text(
-        ttk.Button(props, command=lambda: background_run(corridor.show)),
-        TransToken.ui('Select'),
-    ).grid(row=5, column=1, sticky='EW')
+
+    corr_button = ttk.Button(props, command=corridor.show_trigger.trigger)
+    wid_transtoken.set_text(corr_button, TransToken.ui('Select'))
+    corr_button.grid(row=5, column=1, sticky='EW')
+    background_run(tk_tools.apply_bool_enabled_state_task, corridor.show_trigger.ready, corr_button)
+
     music_frame.grid(row=6, column=0, sticky='EW', columnspan=2)
     (await voice_win.widget(voice_frame)).grid(row=0, column=1, sticky='EW', padx=left_pad)
 
@@ -1531,9 +1533,9 @@ async def init_windows(tk_img: TKImages) -> None:
         tool_img='icons/win_options',
         tool_col=11,
     )
-    corridor = TkSelector(packages.get_loaded_packages(), tk_img)
+    corridor = TkSelector(packages.get_loaded_packages(), tk_img, selected_style)
     await utils.run_as_task(init_option, windows['opt'], tk_img, export, corridor)
-    await utils.run_as_task(corridor.refresh)
+    background_run(corridor.task)
     await LOAD_UI.step('options')
 
     signage_trigger: EdgeTrigger[()] = EdgeTrigger()
@@ -1685,14 +1687,14 @@ async def init_windows(tk_img: TKImages) -> None:
         # Disable this if the style doesn't have elevators
         elev_win.readonly = not style_obj.has_video
 
-        signage_ui.style_changed(utils.obj_id(style_obj.id))
+        signage_ui.style_changed(selected_style)
         item_search.rebuild_database()
 
         for sugg_cls, win in suggest_windows.items():
             win.set_suggested(style_obj.suggested[sugg_cls])
         suggested_refresh()
         StyleVarPane.refresh(packset, style_obj)
-        corridor.load_corridors(packset)
+        corridor.load_corridors(packset, selected_style)
         background_run(corridor.refresh)
 
     style_win.callback = style_select_callback

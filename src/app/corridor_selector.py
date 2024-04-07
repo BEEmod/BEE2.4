@@ -1,13 +1,15 @@
 """Implements UI for selecting corridors."""
+from __future__ import annotations
+from typing import Dict, Generic, Iterator, Optional, List, Protocol, Sequence, Tuple, TypeVar
+from typing_extensions import Final
 import itertools
 import random
 
-from typing import Dict, Generic, Iterator, Optional, List, Protocol, Sequence, Tuple, TypeVar
-from typing_extensions import Final
-
+from trio_util import AsyncValue, RepeatedEvent
+import trio
 import srctools.logger
 
-from app import DEV_MODE, img, tkMarkdown
+from app import DEV_MODE, EdgeTrigger, img, tkMarkdown
 from packages import corridor
 from corridor import GameMode, Direction, Orient
 from config.last_sel import LastSelected
@@ -77,9 +79,15 @@ class Selector(Generic[IconT]):
     # When you click a corridor, it's saved here and displayed when others aren't
     # moused over. Reset on style/group swap.
     sticky_corr: Optional[corridor.CorridorUI]
+    # This is the corridor actually displayed right now.
+    displayed_corr: AsyncValue[Optional[corridor.CorridorUI]]
     # The currently selected images.
     cur_images: Optional[Sequence[img.Handle]]
     img_ind: int
+
+    # Event which is triggered to show and hide the UI.
+    show_trigger: EdgeTrigger[()]
+    close_event: RepeatedEvent
 
     # The widgets for each corridor.
     icons: List[IconT]
@@ -93,22 +101,33 @@ class Selector(Generic[IconT]):
 
     def __init__(self) -> None:
         self.sticky_corr = None
+        self.displayed_corr = AsyncValue(None)
         self.img_ind = 0
         self.cur_images = None
         self.icons = []
         self.corr_list = []
+        self.show_trigger = EdgeTrigger()
+        self.close_event = RepeatedEvent()
 
-    async def show(self) -> None:
-        """Display the window."""
-        await self.refresh()
-        self.ui_win_show()
+    async def task(self) -> None:
+        """Main task handling interaction with the corridor."""
+        async with trio.open_nursery() as nursery:
+            nursery.start_soon(self._window_task)
+            nursery.start_soon(self._display_task)
 
-    def hide(self) -> None:
-        """Hide the window."""
-        self.store_conf()
-        self.ui_win_hide()
-        for icon in self.icons:
-            self.ui_icon_set_img(icon, None)
+    async def _window_task(self) -> None:
+        """Run to allow opening/closing the window."""
+        while True:
+            await self.show_trigger.wait()
+            await self.refresh()
+            self.ui_win_show()
+
+            await self.close_event.wait()
+
+            self.store_conf()
+            self.ui_win_hide()
+            for icon in self.icons:
+                self.ui_icon_set_img(icon, None)
 
     def prevent_deselection(self) -> None:
         """Ensure at least one widget is selected."""
@@ -150,12 +169,8 @@ class Selector(Generic[IconT]):
 
         config.APP.store_conf(Config(enabled), self.conf_id)
 
-    def load_corridors(self, packset: packages.PackagesSet) -> None:
+    def load_corridors(self, packset: packages.PackagesSet, style_id: utils.ObjectID) -> None:
         """Fetch the current set of corridors from this style."""
-        style_id = config.APP.get_cur_conf(
-            LastSelected, 'styles',
-            LastSelected('BEE2_CLEAN'),
-        ).id or 'BEE2_CLEAN'
         try:
             self.corr_group = packset.obj_by_id(corridor.CorridorGroup, style_id)
         except KeyError:
@@ -214,7 +229,7 @@ class Selector(Generic[IconT]):
 
         # Reset item display, it's invalid.
         self.sticky_corr = None
-        self.disp_corr(None)
+        self.displayed_corr.value = None
         # Reposition everything.
         await self.ui_win_reflow()
 
@@ -240,14 +255,11 @@ class Selector(Generic[IconT]):
         except IndexError:
             LOGGER.warning("No corridor with index {}!", index)
             return
-        self.disp_corr(corr)
+        self.displayed_corr.value = corr
 
     def evt_hover_exit(self) -> None:
         """When leaving, reset to the sticky corridor."""
-        if self.sticky_corr is not None:
-            self.disp_corr(self.sticky_corr)
-        else:
-            self.disp_corr(None)
+        self.displayed_corr.value = self.sticky_corr
 
     def evt_selected(self, index: int) -> None:
         """Fires when a corridor icon is clicked."""
@@ -275,7 +287,7 @@ class Selector(Generic[IconT]):
                     other_icon.set_highlight(False)
             icon.set_highlight(True)
             self.sticky_corr = corr
-            self.disp_corr(corr)
+            self.displayed_corr.value = corr
 
     def evt_select_one(self) -> None:
         """Select just the sticky corridor."""
@@ -285,44 +297,57 @@ class Selector(Generic[IconT]):
             if icon is not None:
                 icon.selected = corr is self.sticky_corr
 
-    def disp_corr(self, corr: Optional[corridor.CorridorUI]) -> None:
-        """Display the specified corridor, or reset if None."""
-        if corr is not None:
-            self.img_ind = 0
-            self.cur_images = corr.images
-            self._sel_img(0)  # Updates the buttons.
+    async def _display_task(self) -> None:
+        """This runs continually, updating which corridor is shown."""
+        corr = None
 
-            if len(corr.authors) == 0:
-                author = TRANS_NO_AUTHORS
-            else:
-                author = TRANS_AUTHORS.format(
-                    authors=TransToken.list_and(corr.authors),
-                    n=len(corr.authors),
-                )
+        def corr_not_none(new: Optional[corridor.CorridorUI]) -> bool:
+            """Value predicate."""
+            return new is not None
 
-            if DEV_MODE.get():
-                # Show the instance in the description, plus fixups that are assigned.
-                description = tkMarkdown.join(
-                    tkMarkdown.MarkdownData.text(corr.instance + '\n', tkMarkdown.TextTag.CODE),
-                    corr.desc,
-                    tkMarkdown.MarkdownData.text('\nFixups:\n', tkMarkdown.TextTag.BOLD),
-                    tkMarkdown.convert(TransToken.untranslated('\n'.join([
-                        f'* `{var}`: `{value}`'
-                        for var, value in corr.fixups.items()
-                    ])), None)
+        def corr_changed(new: Optional[corridor.CorridorUI]) -> bool:
+            """Value predicate."""
+            return new is not corr
+
+        while True:
+            if corr is not None:
+                self.img_ind = 0
+                self.cur_images = corr.images
+                self._sel_img(0)  # Updates the buttons.
+
+                if len(corr.authors) == 0:
+                    author = TRANS_NO_AUTHORS
+                else:
+                    author = TRANS_AUTHORS.format(
+                        authors=TransToken.list_and(corr.authors),
+                        n=len(corr.authors),
+                    )
+
+                if DEV_MODE.get():
+                    # Show the instance in the description, plus fixups that are assigned.
+                    description = tkMarkdown.join(
+                        tkMarkdown.MarkdownData.text(corr.instance + '\n', tkMarkdown.TextTag.CODE),
+                        corr.desc,
+                        tkMarkdown.MarkdownData.text('\nFixups:\n', tkMarkdown.TextTag.BOLD),
+                        tkMarkdown.convert(TransToken.untranslated('\n'.join([
+                            f'* `{var}`: `{value}`'
+                            for var, value in corr.fixups.items()
+                        ])), None)
+                    )
+                else:
+                    description = corr.desc
+                self.ui_desc_display(
+                    corr.name,
+                    author,
+                    description,
+                    corr is self.sticky_corr,
                 )
-            else:
-                description = corr.desc
-            self.ui_desc_display(
-                corr.name,
-                author,
-                description,
-                corr is self.sticky_corr,
-            )
-        else:  # Reset.
-            self.cur_images = None
-            self._sel_img(0)  # Update buttons.
-            self.ui_desc_display(TransToken.BLANK, TransToken.BLANK, tkMarkdown.MarkdownData.BLANK, False)
+                corr = await self.displayed_corr.wait_value(corr_changed)
+            else:  # Reset.
+                self.cur_images = None
+                self._sel_img(0)  # Update buttons.
+                self.ui_desc_display(TransToken.BLANK, TransToken.BLANK, tkMarkdown.MarkdownData.BLANK, False)
+                corr = await self.displayed_corr.wait_value(corr_not_none)
 
     def _sel_img(self, direction: int) -> None:
         """Go forward or backwards in the preview images."""

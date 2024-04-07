@@ -219,7 +219,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                     global_options[kind].append(option)
 
         for kv in data.info:
-            if kv.name == 'id':
+            if kv.name in ('id', 'options'):
                 continue
             if kv.name == 'inherit':
                 inherits.append(kv.value)

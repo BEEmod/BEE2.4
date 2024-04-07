@@ -90,7 +90,7 @@ class TkSelector(Selector[IconUI]):
     wid_authors: ttk.Label
     wid_desc: tkRichText
 
-    def __init__(self, packset: packages.PackagesSet, tk_img: TKImages) -> None:
+    def __init__(self, packset: packages.PackagesSet, tk_img: TKImages, cur_style: utils.ObjectID) -> None:
         super().__init__()
         self.tk_img = tk_img
         self.sel_count = 0
@@ -98,7 +98,8 @@ class TkSelector(Selector[IconUI]):
 
         self.win = tk.Toplevel(TK_ROOT, name='corridor')
         self.win.withdraw()
-        self.win.wm_protocol("WM_DELETE_WINDOW", self.hide)
+        close_cmd = self.win.register(self.close_event.set)
+        self.win.wm_protocol("WM_DELETE_WINDOW", close_cmd)
         set_win_title(self.win, TransToken.ui('BEEmod - Select Corridor'))
 
         self.win.rowconfigure(0, weight=1)
@@ -167,7 +168,7 @@ class TkSelector(Selector[IconUI]):
         self.btn_just_this.grid(row=0, column=0)
 
         set_text(
-            ttk.Button(frm_lower_btn, name='closer', command=self.hide),
+            ttk.Button(frm_lower_btn, name='closer', command=close_cmd),
             TransToken.ui('Close'),
         ).grid(row=0, column=1)
 
@@ -223,7 +224,7 @@ class TkSelector(Selector[IconUI]):
         self.help_lbl_win = self.canvas.create_window(0, 0, anchor='nw', window=self.help_lbl)
 
         tk_tools.add_mousewheel(self.canvas, self.win)
-        self.load_corridors(packset)
+        self.load_corridors(packset, cur_style)
 
     @override
     async def ui_win_reflow(self) -> None:
