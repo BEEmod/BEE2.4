@@ -4,17 +4,19 @@ from collections import Counter
 from collections.abc import Iterator
 
 from srctools import Vec, Matrix, logger
-from srctools.vmf import VMF, Entity
+from srctools.vmf import EntityFixup, VMF, Entity
 import attrs
 
-import consts
-import utils
-from . import instanceLocs, rand
+from config.corridors import Options as CorrOptions
+from . import instanceLocs, options, rand
 from corridor import (
     GameMode, Direction, Orient,
     CORRIDOR_COUNTS, CORR_TO_ID, ID_TO_CORR,
     Corridor, ExportedConf, parse_filename,
 )
+import config
+import consts
+import utils
 import user_errors
 
 
@@ -80,6 +82,29 @@ class Info:
         yield from self._attrs
 
 
+def apply_options(
+    selected: ExportedConf, fixup: EntityFixup,
+    direction: Direction, mode: GameMode,
+    corridor: Corridor,
+) -> None:
+    """Apply options exposed by the group to the user."""
+    settings = config.COMPILER.get_cur_conf(CorrOptions, CorrOptions.get_id(
+        options.STYLE_ID(), mode, direction,
+    ), default=CorrOptions())
+    LOGGER.info('Corridor options for {}_{}: {}', mode.value, direction.value, settings)
+    for opt_id in (selected.global_opt_ids[mode, direction] | corridor.option_ids):
+        try:
+            option = selected.options[opt_id]
+        except KeyError:
+            LOGGER.warning('Unknown corridor option "{}"!', opt_id)
+            continue
+        value = settings.value_for(option)
+        if value == utils.ID_RANDOM:
+            rng = rand.seed(b'corr_opt', opt_id, mode.value, direction.value)
+            value = rng.choice(option.values).id
+        fixup[option.fixup] = value
+
+
 def analyse_and_modify(
     vmf: VMF,
     conf: ExportedConf,
@@ -107,6 +132,8 @@ def analyse_and_modify(
 
     chosen_entry: Corridor | None = None
     chosen_exit: Corridor | None = None
+    entry_fixups = EntityFixup()
+    exit_fixups = EntityFixup()
 
     filenames: Counter[str] = Counter()
     # Use sets, so we can detect contradictory instances.
@@ -175,14 +202,21 @@ def analyse_and_modify(
 
             if corr_dir is Direction.ENTRY:
                 chosen_entry = chosen
+                fixup = entry_fixups
             else:
                 chosen_exit = chosen
+                fixup = exit_fixups
 
             item.fixup['$type'] = corr_dir.value
             item.fixup['$direction'] = corr_orient.value
             item.fixup['$attach'] = corr_attach.value
-            # Do after so it overwrites these automatic ones.
-            item.fixup.update(chosen.fixups)
+            # Accumulate options into this so that it can be assigned to the elevator too.
+            # Assign it to the instance after the above fixups are computed
+            # so that they can be overridden if desired.
+
+            fixup.update(chosen.fixups)
+            apply_options(conf, fixup, corr_dir, corr_mode, chosen)
+            item.fixup.update(fixup)
 
             if chosen.legacy:
                 # Converted type, keep original angles and positioning.
@@ -255,9 +289,9 @@ def analyse_and_modify(
 
     # Apply selected fixups to the elevator also.
     if inst_elev_entry is not None:
-        inst_elev_entry.fixup.update(chosen_entry.fixups)
+        inst_elev_entry.fixup.update(entry_fixups)
     if inst_elev_exit is not None:
-        inst_elev_exit.fixup.update(chosen_exit.fixups)
+        inst_elev_exit.fixup.update(exit_fixups)
 
     [is_publishing] = seen_no_player_start
     [game_mode] = seen_game_modes

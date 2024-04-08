@@ -144,7 +144,9 @@ CORRIDOR_COUNTS: Final[Mapping[Tuple[GameMode, Direction], Literal[1, 4, 7]]] = 
 @attrs.frozen
 class ExportedConf:
     """Data written to the pickle file for the compiler to use."""
-    corridors: Dict[CorrKind, List[Corridor]]
+    corridors: Mapping[CorrKind, Sequence[Corridor]]
+    global_opt_ids: Mapping[OptionGroup, FrozenSet[utils.ObjectID]]
+    options: Mapping[utils.ObjectID, Option]
 
 
 def parse_filename(filename: str) -> Optional[Tuple[GameMode, Direction, int]]:

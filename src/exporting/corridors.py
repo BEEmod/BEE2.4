@@ -10,17 +10,21 @@ import trio
 
 from config.corridors import Config
 from corridor import (
-    CorrKind, Corridor, Orient, Direction, GameMode,
+    CorrKind, Corridor, OptionGroup, Orient, Direction, GameMode,
     CORRIDOR_COUNTS, ID_TO_CORR,
     ExportedConf,
 )
 from . import ExportData, STEPS, StepResource
-from packages.corridor import CorridorUI, CorridorGroup
+from packages.corridor import CorridorGroup
 import config
 import editoritems
 
 
 LOGGER = srctools.logger.get_logger(__name__)
+ALL_OPTION_KINDS: list[OptionGroup] = [
+    (mode, direction)
+    for mode in GameMode for direction in Direction
+]
 
 
 @STEPS.add_step(prereq=[StepResource.EI_ITEMS], results=[StepResource.EI_DATA, StepResource.VCONF_DATA])
@@ -73,10 +77,15 @@ async def step_corridor_conf(exp_data: ExportData) -> None:
 
         for corr in chosen:
             exp_data.vbsp_conf.extend(await corr.config())
-        export[mode, direction, orient] = list(map(CorridorUI.strip_ui, chosen))
+        export[mode, direction, orient] = [corr.strip_ui() for corr in chosen]
 
     result = ExportedConf(
         corridors=export,
+        global_opt_ids={
+            kind: frozenset({opt.id for opt in group.global_options.get(kind, ())})
+            for kind in ALL_OPTION_KINDS
+        },
+        options=group.options.copy(),
     )
 
     # Now write out.
@@ -86,7 +95,7 @@ async def step_corridor_conf(exp_data: ExportData) -> None:
     del pickle_data
 
     # Change out all the instances in items to names following a pattern.
-    # This allows the compiler to easily recognise. Also force 64-64-64 offset.
+    # This allows the compiler to easily recognise. Also force a few specific options.
     for item in exp_data.all_items:
         try:
             (mode, direction) = ID_TO_CORR[item.id]
