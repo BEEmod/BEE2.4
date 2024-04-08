@@ -13,7 +13,7 @@ import trio_util
 
 from app import DEV_MODE, EdgeTrigger, img, tkMarkdown
 from config.corridors import UIState, Config, Options
-from corridor import GameMode, Direction, Orient
+from corridor import GameMode, Direction, Orient, Option
 from packages import corridor
 from transtoken import TransToken
 import utils
@@ -88,7 +88,7 @@ class OptionRow:
     def __init__(self) -> None:
         self.current = AsyncValue(utils.ID_RANDOM)
 
-    async def display(self, row: int, option: corridor.Option, remove_event: trio.Event) -> None:
+    async def display(self, row: int, option: Option, remove_event: trio.Event) -> None:
         """Reconfigure this row to display the specified option, then show it.
 
         Once the event triggers, remove the row.
@@ -385,10 +385,10 @@ class Selector(Generic[IconT, OptionRowT]):
                 option_async_vals = []
                 async with trio.open_nursery() as nursery:
                     done_event = trio.Event()
-                    opt: corridor.Option
+                    opt: Option
                     row: OptionRowT
                     for ind, (opt, row) in enumerate(zip(options, self.option_rows)):
-                        row.current.value = opt.id_from_config(option_conf)
+                        row.current.value = option_conf.value_for(opt)
                         nursery.start_soon(row.display, ind, opt, done_event)
                         option_async_vals.append((opt.id, row.current))
 

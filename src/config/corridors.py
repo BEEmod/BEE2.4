@@ -3,19 +3,21 @@ from __future__ import annotations
 from typing import Mapping
 from typing_extensions import Self, override
 
-from srctools import EmptyMapping, Keyvalues, conv_bool, bool_as_int
-from srctools.dmx import Element, ValueType as DMXValue, Attribute
+from srctools import EmptyMapping, Keyvalues, conv_bool, bool_as_int, logger
+from srctools.dmx import Element, ValueType as DMXValue
 import attrs
 
-from corridor import Direction, GameMode, Orient
+from corridor import Direction, GameMode, Option, Orient
 import config
 import utils
 
 
+LOGGER = logger.get_logger(__name__)
 __all__ = [
     'Direction', 'GameMode', 'Orient',  # Re-export
     'Config', 'Options', 'UIState',
 ]
+
 
 
 @config.PALETTE.register
@@ -163,6 +165,23 @@ class Options(config.Data, conf_name='CorridorOptions', uses_id=True, version=1)
         for opt_id, value in self.options.items():
             elem[opt_id] = value
         return elem
+
+    def value_for(self, option: Option) -> utils.SpecialID:
+        """Return the currently selected value for the specified option."""
+        try:
+            opt_id = self.options[option.id]
+        except KeyError:
+            return option.default
+        if opt_id == utils.ID_RANDOM:
+            return opt_id
+        for value in option.values:
+            if opt_id == value.id:
+                return opt_id
+        LOGGER.warning(
+            'Configured ID "{}" is not valid for option "{}"',
+            opt_id, option.id,
+        )
+        return option.default
 
 
 @config.APP.register

@@ -15,8 +15,7 @@ from app.corridor_selector import (
 )
 from app.richTextBox import tkRichText
 from config.corridors import UIState
-from corridor import CorrKind, Direction, GameMode, Orient
-from packages import corridor
+from corridor import CorrKind, Direction, GameMode, Option, Orient
 from transtoken import TransToken
 from ui_tk.dragdrop import CanvasPositioner
 from ui_tk.img import TKImages
@@ -96,7 +95,7 @@ class OptionRowUI(OptionRow):
         self.combo.bind('<<ComboboxSelected>>', self.on_changed)
 
     @override
-    async def display(self, row: int, option: corridor.Option, remove_event: trio.Event) -> None:
+    async def display(self, row: int, option: Option, remove_event: trio.Event) -> None:
         """Display the row in the specified position, then remove when the event triggers."""
         set_text(self.label, option.name)
         self.combo['values'] = [

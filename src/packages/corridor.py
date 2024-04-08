@@ -6,7 +6,6 @@ from collections.abc import Sequence, Iterator, Mapping
 from typing_extensions import Final
 import itertools
 
-from srctools import Keyvalues
 import attrs
 import srctools.logger
 
@@ -14,11 +13,11 @@ import utils
 from app import img, lazy_conf, tkMarkdown
 import packages
 import editoritems
-from config.corridors import Options
 from corridor import (
-    CorrKind, CorrSpec, Orient, Direction, GameMode,
+    CorrKind, CorrSpec, OptionGroup,
+    Orient, Direction, GameMode,
+    Option, Corridor,
     CORRIDOR_COUNTS, ID_TO_CORR,
-    Corridor,
 )
 from transtoken import AppError, TransToken, TransTokenSource
 
@@ -51,83 +50,6 @@ TRANS_DUPLICATE_OPTION = TransToken.ui(
 
 
 @attrs.frozen
-class OptValue:
-    """A value for an option."""
-    id: utils.ObjectID
-    name: TransToken  # Name to use.
-
-
-@attrs.frozen
-class Option:
-    """An option that can be swapped between various values."""
-    id: utils.ObjectID
-    name: TransToken
-    default: utils.SpecialID  # id or <RANDOM>
-    values: Sequence[OptValue]
-    fixup: str
-
-    @classmethod
-    def parse(
-        cls,
-        pak_id: utils.SpecialID,
-        opt_id: utils.ObjectID,
-        kv: Keyvalues,
-    ) -> Option:
-        """Parse from KV1 configs."""
-        name = TransToken.parse(pak_id, kv['name'])
-        valid_ids: set[utils.ObjectID] = set()
-        values: list[OptValue] = []
-        fixup = kv['var']
-
-        for child in kv.find_children('Values'):
-            val_id = utils.obj_id(child.real_name, 'corridor option value')
-            if val_id in valid_ids:
-                LOGGER.warning(
-                    'Duplicate value "{}" for option "{}"!',
-                    child.name, opt_id,
-                )
-            valid_ids.add(val_id)
-            values.append(OptValue(
-                id=val_id,
-                name=TransToken.parse(pak_id, child.value),
-            ))
-
-        if not values:
-            raise ValueError(f'Option "{opt_id}" has no valid values!')
-
-        try:
-            default = utils.special_id(kv['default'], 'corridor option default')
-        except LookupError:
-            default = values[0].id
-        else:
-            if default not in valid_ids and default != utils.ID_RANDOM:
-                LOGGER.warning(
-                    'Default id "{}" is not valid for option "{}"',
-                    default, opt_id,
-                )
-                default = values[0].id
-
-        return cls(opt_id, name, default, values, fixup)
-
-    def id_from_config(self, config: Options) -> utils.SpecialID:
-        """Given a config, return the closest ID to use."""
-        try:
-            opt_id = config.options[self.id]
-        except KeyError:
-            return self.default
-        if opt_id == utils.ID_RANDOM:
-            return opt_id
-        for value in self.values:
-            if opt_id == value.id:
-                return opt_id
-        LOGGER.warning(
-            'Configured ID "{}" is not valid for option "{}"',
-            opt_id, self.id,
-        )
-        return self.default
-
-
-@attrs.frozen
 class CorridorUI(Corridor):
     """Additional data only useful for the UI. """
     name: TransToken
@@ -136,7 +58,6 @@ class CorridorUI(Corridor):
     images: Sequence[img.Handle]
     icon: img.Handle
     authors: Sequence[TransToken]
-    option_ids: frozenset[utils.ObjectID]
 
     def strip_ui(self) -> Corridor:
         """Strip these UI attributes for the compiler export."""
@@ -145,6 +66,7 @@ class CorridorUI(Corridor):
             orig_index=self.orig_index,
             legacy=self.legacy,
             fixups=self.fixups,
+            option_ids=self.option_ids,
         )
 
 
@@ -206,7 +128,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
     corridors: dict[CorrKind, list[CorridorUI]]
     inherit: Sequence[str] = ()  # Copy all the corridors defined in these groups.
     options: dict[utils.ObjectID, Option] = attrs.Factory(dict)
-    global_options: dict[tuple[GameMode, Direction], list[Option]] = attrs.Factory(dict)
+    global_options: dict[OptionGroup, list[Option]] = attrs.Factory(dict)
 
     @classmethod
     async def parse(cls, data: packages.ParseData) -> CorridorGroup:
@@ -215,7 +137,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
         inherits: list[str] = []
 
         options: dict[utils.ObjectID, Option] = {}
-        global_options: dict[tuple[GameMode, Direction], list[Option]] = defaultdict(list)
+        global_options: dict[OptionGroup, list[Option]] = defaultdict(list)
         for opt_kv in data.info.find_children('Options'):
             opt_id = utils.obj_id(opt_kv.real_name, 'corridor option')
             option = Option.parse(data.pak_id, opt_id, opt_kv)
