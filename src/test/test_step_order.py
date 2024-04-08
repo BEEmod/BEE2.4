@@ -14,6 +14,7 @@ class Resource(Enum):
     A = "a"
     B = "b"
     C = "c"
+    D = "d"
 
 
 async def test_basic(autojump_clock: trio.abc.Clock) -> None:
@@ -36,7 +37,8 @@ async def test_basic(autojump_clock: trio.abc.Clock) -> None:
         await trio.sleep(1)
         log.append('end 3')
 
-    @order.add_step(prereq=[Resource.A], results=[Resource.B])
+    # Note - D is not the result of any step, it should be ignored.
+    @order.add_step(prereq=[Resource.A, Resource.D], results=[Resource.B])
     async def step_2(ctx: object) -> None:
         assert ctx is data
         log.append('start 2')

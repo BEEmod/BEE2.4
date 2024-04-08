@@ -98,9 +98,10 @@ class StepOrder(Generic[CtxT, ResourceT]):
         send: trio.MemorySendChannel[Collection[ResourceT]]
         rec: trio.MemoryReceiveChannel[Collection[ResourceT]]
         send, rec = trio.open_memory_channel(math.inf)
-        completed: Set[ResourceT] = set()
+        # Resources that have nothing to produce them are already complete.
+        completed: Set[ResourceT] = {res for res in self._resources if awaiting_steps[res] <= 0}
         running = 0
-        LOGGER.info('Running {} steps.', len(todo))
+        LOGGER.info('Running {} steps. Unused resources: {}', len(todo), list(completed))
         async with trio.open_nursery() as nursery:
             while todo:
                 # Check if any steps have no prerequisites, and if so send them off.
