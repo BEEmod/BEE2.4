@@ -178,6 +178,7 @@ async def step_style(exp: ExportData) -> None:
 
     exp.all_items += style.items
     exp.renderables.update(style.renderables)
+    exp.vbsp_conf.set_key(('Options', 'style_id'), style.id)
 
 
 @STEPS.add_step(prereq=[], results=[StepResource.VCONF_DATA])

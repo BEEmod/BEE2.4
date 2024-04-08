@@ -631,6 +631,10 @@ VOICE_ID = Opt.string(
     'voice_id', "<NONE>",
     """(Automatic) The ID of the selected voice pack.
     """)
+STYLE_ID = Opt.string(
+    'style_id', "BEE2_CLEAN",
+    """(Automatic) The ID of the selected style.
+    """)
 VOICE_CHAR = Opt.string(
     'voice_char', "",
     """(Automatic) Comma-separated list of characters in the pack.
