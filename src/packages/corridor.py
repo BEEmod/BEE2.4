@@ -348,6 +348,21 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                     except KeyError:
                         corridor_group.corridors[kind] = corridors.copy()
 
+                # Copy over options, but don't overwrite ones that already exist.
+                for opt_kind, options in parent_group.global_options.items():
+                    try:
+                        existing = corridor_group.global_options[opt_kind]
+                    except KeyError:
+                        corridor_group.global_options[opt_kind] = options.copy()
+                    else:
+                        existing_ids = {opt.id for opt in existing}
+                        for option in options:
+                            if option.id not in existing_ids:
+                                existing.append(option)
+
+                for option in parent_group.options.values():
+                    corridor_group.options.setdefault(option.id, option)
+
         if utils.DEV_MODE:
             # Check no duplicate corridors exist.
             for corridor_group in packset.all_obj(cls):
