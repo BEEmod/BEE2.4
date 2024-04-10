@@ -82,6 +82,37 @@ class Info:
         yield from self._attrs
 
 
+def select_corridor(
+    conf: ExportedConf,
+    direction: Direction, mode: GameMode, orient: Orient,
+    ind: int, file: str,
+) -> Corridor:
+    """Select the corridor to use, from an existing file."""
+    max_count = CORRIDOR_COUNTS[mode, direction]
+    poss_corr = conf.corridors[mode, direction, orient]
+    if not poss_corr:
+        raise user_errors.UserError(user_errors.TOK_CORRIDOR_EMPTY_GROUP.format(
+            orient=orient.value.title(),
+            mode=mode.value.title(),
+            dir=direction.value.title(),
+        ))
+    elif len(poss_corr) > max_count:
+        # More than the entropy we have, use our randomisation.
+        chosen = rand.seed(b'corridor', file).choice(poss_corr)
+        LOGGER.info(
+            '{}_{}_{} corridor randomised to {}',
+            mode.value, direction.value, orient.value, chosen,
+        )
+    else:
+        # Enough entropy, use editor index.
+        chosen = poss_corr[ind % len(poss_corr)]
+        LOGGER.info(
+            '{}_{}_{} corridor selected {} -> {}',
+            mode.value, direction.value, orient.value, ind, chosen,
+        )
+    return chosen
+
+
 def apply_options(
     selected: ExportedConf, fixup: EntityFixup,
     direction: Direction, mode: GameMode,
@@ -171,32 +202,11 @@ def analyse_and_modify(
             else:
                 corr_orient = Orient.HORIZONTAL
             corr_attach = corr_orient
-            # entry_up is on the floor, so you go *up*.
+            # entry_up is on the floor, so you travel *up*.
             if corr_dir is Direction.ENTRY:
                 corr_orient = corr_orient.flipped
 
-            max_count = CORRIDOR_COUNTS[corr_mode, corr_dir]
-            poss_corr = conf.corridors[corr_mode, corr_dir, corr_orient]
-            if not poss_corr:
-                raise user_errors.UserError(user_errors.TOK_CORRIDOR_EMPTY_GROUP.format(
-                    orient=corr_orient.value.title(),
-                    mode=corr_mode.value.title(),
-                    dir=corr_dir.value.title(),
-                ))
-            elif len(poss_corr) > max_count:
-                # More than the entropy we have, use our randomisation.
-                chosen = rand.seed(b'corridor', file).choice(poss_corr)
-                LOGGER.info(
-                    '{}_{}_{} corridor randomised to {}',
-                    corr_mode.value, corr_dir.value, corr_orient.value, chosen,
-                )
-            else:
-                # Enough entropy, use editor index.
-                chosen = poss_corr[corr_ind % len(poss_corr)]
-                LOGGER.info(
-                    '{}_{}_{} corridor selected {} -> {}',
-                    corr_mode.value, corr_dir.value, corr_orient.value, corr_ind, chosen,
-                )
+            chosen = select_corridor(conf, corr_dir, corr_mode, corr_orient, corr_ind, file)
             item['file'] = chosen.instance
             file = chosen.instance.casefold()
 
