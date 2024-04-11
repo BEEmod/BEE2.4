@@ -352,12 +352,16 @@ class TkSelector(Selector[IconUI, OptionRowUI]):
         self.tk_img.apply(icon.label, handle)
 
     @override
+    def ui_enable_just_this(self, enable: bool) -> None:
+        """Set whether the just this button is pressable."""
+        self.btn_just_this.state(('!disabled', ) if enable else ('disabled', ))
+
+    @override
     def ui_desc_display(
         self, *,
         title: TransToken,
         authors: TransToken,
         desc: tkMarkdown.MarkdownData,
-        enable_just_this: bool,
         options_title: TransToken,
         show_no_options: bool,
     ) -> None:
@@ -368,7 +372,6 @@ class TkSelector(Selector[IconUI, OptionRowUI]):
         # Not yet typed in typeshed.
         disp_lines = self.wid_desc.count(1.0, 'end', 'displaylines', 'update')  # type: ignore[no-untyped-call]
         self.wid_desc['height'] = max(6, disp_lines + 1)
-        self.btn_just_this.state(('!disabled', ) if enable_just_this else ('disabled', ))
 
         set_text(self.wid_options_title, options_title)
         if show_no_options:

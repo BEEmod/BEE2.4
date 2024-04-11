@@ -304,11 +304,10 @@ class Selector(Generic[IconT, OptionRowT]):
                 for other_icon in self.visible_icons():
                     if other_icon is not icon and other_icon.selected:
                         icon.selected = False
-                        self.prevent_deselection()
                         break
             else:
                 icon.selected = True
-                self.prevent_deselection()
+            self.prevent_deselection()
         else:
             if self.sticky_corr is not None:
                 # Clear the old one.
@@ -320,11 +319,12 @@ class Selector(Generic[IconT, OptionRowT]):
 
     def evt_select_one(self) -> None:
         """Select just the sticky corridor."""
-        if self.sticky_corr is None:
-            return
-        for icon, corr in itertools.zip_longest(self.icons, self.corr_list):
-            if icon is not None:
-                icon.selected = corr is self.sticky_corr
+        if self.sticky_corr is not None:
+            for icon, corr in itertools.zip_longest(self.icons, self.corr_list):
+                if icon is not None:
+                    icon.selected = corr is self.sticky_corr
+            self.ui_enable_just_this(False)
+            self.prevent_deselection()
 
     async def _display_task(self) -> None:
         """This runs continually, updating which corridor is shown."""
@@ -362,6 +362,13 @@ class Selector(Generic[IconT, OptionRowT]):
                 else:
                     description = corr.desc
 
+                # "Enable Just This" can be clicked if this icon is deselected or any other
+                # icon is selected.
+                self.ui_enable_just_this(any(
+                    icon.selected != (ico_corr is corr)
+                    for icon, ico_corr in itertools.zip_longest(self.icons, self.corr_list)
+                ))
+
                 # Figure out which options to show.
                 mode, direction, orient = self.ui_get_buttons()
                 options = list(self.corr_group.get_options(mode, direction, corr))
@@ -371,7 +378,6 @@ class Selector(Generic[IconT, OptionRowT]):
                     title=corr.name,
                     authors=author,
                     desc=description,
-                    enable_just_this=corr is self.sticky_corr,
                     options_title=TRANS_OPT_TITLE[mode, direction],
                     show_no_options=not options,
                 )
@@ -415,9 +421,9 @@ class Selector(Generic[IconT, OptionRowT]):
                     authors=TransToken.BLANK,
                     options_title=TransToken.BLANK,
                     desc=tkMarkdown.MarkdownData.BLANK,
-                    enable_just_this=False,
                     show_no_options=False,
                 )
+                self.ui_enable_just_this(False)
                 corr = await self.displayed_corr.wait_value(corr_changed)
 
     @staticmethod
@@ -499,12 +505,15 @@ class Selector(Generic[IconT, OptionRowT]):
         """Set the image for the specified corridor icon."""
         raise NotImplementedError
 
+    def ui_enable_just_this(self, enable: bool) -> None:
+        """Set whether the just this button is pressable."""
+        raise NotImplementedError
+
     def ui_desc_display(
         self, *,
         title: TransToken,
         authors: TransToken,
         desc: tkMarkdown.MarkdownData,
-        enable_just_this: bool,
         options_title: TransToken,
         show_no_options: bool,
     ) -> None:
