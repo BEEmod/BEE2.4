@@ -282,7 +282,7 @@ def set_chosen_corridor(
             inst = corr.instance.casefold()
             INST_SPECIAL[prefix] = [inst]
             for i in range(1, count + 1):
-                INST_SPECIAL[f'{prefix}{i}'] = [inst] if corr.orig_index == i else []
+                INST_SPECIAL[f'{prefix}{i}'] =  []
             # Update raw item IDs too. Pretend it's repeated for all.
             ITEM_FOR_FILE[inst] = (item_id, 0)
             INSTANCE_FILES[item_id.casefold()][:count] = [inst] * count

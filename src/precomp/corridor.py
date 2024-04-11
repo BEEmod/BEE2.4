@@ -15,7 +15,6 @@ from corridor import (
     Corridor, ExportedConf, parse_filename,
 )
 import config
-import consts
 import utils
 import user_errors
 
@@ -231,8 +230,6 @@ def analyse_and_modify(
             if chosen.legacy:
                 # Converted type, keep original angles and positioning.
                 item['origin'] = origin - (0, 0, 64)
-                # And write the index.
-                item.fixup[consts.FixupVars.BEE_CORR_INDEX] = chosen.orig_index
             # Otherwise, give more useful orientations for building instances.
             # Keep it upright, with x pointing in the door direction for horizontal.
             else:

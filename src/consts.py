@@ -160,8 +160,6 @@ class FixupVars(MaterialGroup):
     BEE_CONN_COUNT_A = '$conn_count_a'
     BEE_CONN_COUNT_B = '$conn_count_b'
 
-    # Index of entry/exit corridor
-    BEE_CORR_INDEX = '$corr_index'
     # Videos set for arrival_departure_transition_ents.
     BEE_ELEV_VERT = '$vert_video'
     BEE_ELEV_HORIZ = '$horiz_video'

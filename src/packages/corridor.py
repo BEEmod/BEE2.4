@@ -49,7 +49,7 @@ TRANS_DUPLICATE_OPTION = TransToken.ui(
 )
 
 
-@attrs.frozen
+@attrs.frozen(kw_only=True)
 class CorridorUI(Corridor):
     """Additional data only useful for the UI. """
     name: TransToken
@@ -63,7 +63,7 @@ class CorridorUI(Corridor):
         """Strip these UI attributes for the compiler export."""
         return Corridor(
             instance=self.instance,
-            orig_index=self.orig_index,
+            default_enabled=self.default_enabled,
             legacy=self.legacy,
             fixups=self.fixups,
             option_ids=self.option_ids,
@@ -195,7 +195,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                 name=name,
                 authors=list(map(TransToken.untranslated, packages.sep_values(kv['authors', '']))),
                 desc=packages.desc_parse(kv, 'Corridor', data.pak_id),
-                orig_index=kv.int('DefaultIndex', 0),
+                default_enabled=not kv.bool('disabled', False),
                 config=packages.get_config(kv, 'items', data.pak_id, source='Corridor ' + kv.name),
                 images=images,
                 icon=icon,
@@ -293,8 +293,10 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                                 authors=list(map(TransToken.untranslated, style.selitem_data.auth)),
                                 desc=tkMarkdown.MarkdownData.BLANK,
                                 config=lazy_conf.BLANK,
-                                orig_index=ind + 1,
-                                fixups={},
+                                default_enabled=True,
+                                # Replicate previous behaviour, where this var was set to the
+                                # corridor index automatically.
+                                fixups={'corr_index': str(ind + 1)},
                                 legacy=True,
                                 option_ids=frozenset(),
                             )
@@ -308,8 +310,8 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                                 authors=list(map(TransToken.untranslated, style.selitem_data.auth)),
                                 desc=tkMarkdown.MarkdownData.text(style_info.desc),
                                 config=lazy_conf.BLANK,
-                                orig_index=ind + 1,
-                                fixups={},
+                                default_enabled=True,
+                                fixups={'corr_index': str(ind + 1)},
                                 legacy=True,
                                 option_ids=frozenset(),
                             )
@@ -396,16 +398,12 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                     self.id, mode.value, direction.value,
                 )
             return []
-        
-        output = [
-            corr 
+
+        return [
+            corr
             for corr in corr_list
-            if corr.orig_index > 0
+            if corr.default_enabled
         ]
-        # Sort so missing indexes are skipped.
-        output.sort(key=lambda corr: corr.orig_index)
-        # Ignore extras beyond the actual size.
-        return output[:CORRIDOR_COUNTS[mode, direction]]
 
     def get_options(self, mode: GameMode, direction: Direction, corr: CorridorUI) -> Iterator[Option]:
         """Determine all options that a specific corridor requires."""
