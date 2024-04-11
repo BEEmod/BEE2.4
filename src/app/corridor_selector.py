@@ -392,13 +392,15 @@ class Selector(Generic[IconT, OptionRowT]):
                         nursery.start_soon(row.display, ind, opt, done_event)
                         option_async_vals.append((opt.id, row.current))
 
-                    # This task stores results when a config is changed.
-                    nursery.start_soon(
-                        self._store_options_task,
-                        option_async_vals,
-                        option_conf_id,
-                        done_event,
-                    )
+                    # This task stores results when a config is changed. Not required
+                    # if we don't actually have any options.
+                    if option_async_vals:
+                        nursery.start_soon(
+                            self._store_options_task,
+                            option_async_vals,
+                            option_conf_id,
+                            done_event,
+                        )
 
                     # Wait for a new corridor to be switched to, then cancel the event to remove
                     # them all.
@@ -425,9 +427,11 @@ class Selector(Generic[IconT, OptionRowT]):
         done_event: trio.Event,
     ) -> None:
         """Run while options are visible. This stores them when changed."""
+        assert async_vals, "No options?"
         wait_funcs = [val.wait_transition for opt_id, val in async_vals]
         async with trio_util.move_on_when(done_event.wait):
             while True:
+                await trio.lowlevel.checkpoint()
                 await trio_util.wait_any(*wait_funcs)
                 conf = config.APP.get_cur_conf(Options, conf_id, default=Options())
                 config.APP.store_conf(attrs.evolve(conf, options={
