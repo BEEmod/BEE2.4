@@ -129,15 +129,15 @@ async def find_folder(game: Game) -> Path:
     return fallback
 
 
-def clear_files(folder: Path) -> None:
+def clear_files(filename: Path) -> None:
     """Remove existing VPK files from the specified game folder.
 
      We want to leave other files - otherwise users will end up
      regenerating the sound cache every time they export.
     """
-    os.makedirs(folder, exist_ok=True)
+    os.makedirs(filename.parent, exist_ok=True)
     try:
-        for file in folder.iterdir():
+        for file in filename.parent.iterdir():
             if file.suffix == '.vpk' and file.stem.startswith('pak01_'):
                 file.unlink()
     except PermissionError:
@@ -163,7 +163,7 @@ async def step_gen_vpk(exp_data: ExportData) -> None:
     vpk_filename = await find_folder(exp_data.game)
     LOGGER.info('VPK to write: {}', vpk_filename)
     try:
-        clear_files(vpk_filename.parent)
+        clear_files(vpk_filename)
     except PermissionError:
         # We can't edit the VPK files - P2 is open...
         exp_data.warn(AppError(TRANS_NO_PERMS))
