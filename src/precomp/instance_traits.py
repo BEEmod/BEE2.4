@@ -145,7 +145,7 @@ CLASS_ATTRS: Dict[ItemClass, List[Set[str]]] = {
 class TraitInfo:
     """The info associated for each instance."""
     item_class: ItemClass = ItemClass.UNCLASSED
-    item_id: Optional[str] = None
+    item_id: Optional[utils.ObjectID] = None
     traits: Set[str] = attrs.Factory(set)
 
 # Maps entities to their traits.
@@ -175,7 +175,7 @@ def get_class(inst: Entity) -> Optional[ItemClass]:
         return None
 
 
-def get_item_id(inst: Entity) -> Optional[str]:
+def get_item_id(inst: Entity) -> Optional[utils.ObjectID]:
     """If known, return the item ID for this instance.
 
     It must be the original entity placed by the PeTI.

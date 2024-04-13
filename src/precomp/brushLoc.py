@@ -298,7 +298,7 @@ class Grid(MutableMapping[_grid_keys, Block]):
             seeded = False
             if item_id:
                 try:
-                    item = items[utils.obj_id(item_id)]
+                    item = items[item_id]
                 except KeyError:
                     pass
                 else:

@@ -2,6 +2,7 @@
 from srctools import Keyvalues, Entity, Vec, VMF, Matrix
 import srctools.logger
 
+import consts
 import user_errors
 from precomp.instanceLocs import resolve_one
 from precomp import conditions, connections, fizzler
@@ -101,7 +102,7 @@ def res_reshape_fizzler(vmf: VMF, shape_inst: Entity, res: Keyvalues) -> None:
         )
         fizz_item = connections.Item(
             base_inst,
-            connections.ITEM_TYPES['item_barrier_hazard'],
+            connections.ITEM_TYPES[consts.DefaultItems.fizzler.id],
             ind_style=shape_item.ind_style,
         )
         connections.ITEMS[shape_name] = fizz_item

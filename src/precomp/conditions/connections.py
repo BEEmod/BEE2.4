@@ -36,18 +36,18 @@ def res_add_output(res: Keyvalues) -> Callable[[Entity], None]:
     parm = res['parm', '']
 
     if conf_output.startswith('<') and conf_output.endswith('>'):
-        out_id, out_type = conf_output.strip('<>').split(':', 1)
-        out_id = out_id.casefold()
+        out_id_str, out_type = conf_output.strip('<>').split(':', 1)
+        out_id = utils.obj_id(out_id_str, 'item')
         out_type = out_type.strip().casefold()
     else:
-        out_id = conf_output
+        out_id = utils.obj_id(conf_output, 'item')
         out_type = 'const'
 
     def add_output(inst: Entity) -> None:
         """Add the output."""
         if out_type in ('activate', 'deactivate'):
             try:
-                item_type = connections.ITEM_TYPES[out_id.casefold()]
+                item_type = connections.ITEM_TYPES[out_id]
             except KeyError:
                 LOGGER.warning('"{}" has no connections!', out_id)
                 return

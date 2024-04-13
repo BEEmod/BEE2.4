@@ -7,6 +7,7 @@ from collections import defaultdict
 
 from typing_extensions import assert_never
 
+import utils
 from connections import (
     InputType, FeatureMode, Config, ConnType, OutNames,
     INDICATOR_CHECK_ID, INDICATOR_TIMER_ID,
@@ -31,8 +32,7 @@ __all__ = [
 ]
 COND_MOD_NAME = "Item Connections"
 LOGGER = srctools.logger.get_logger(__name__)
-# TODO: Migrate to ObjectID
-ITEM_TYPES: Dict[str, Config] = {}
+ITEM_TYPES: Dict[utils.ObjectID, Config] = {}
 
 # Targetname -> item
 ITEMS: Dict[str, 'Item'] = {}
@@ -428,19 +428,19 @@ def collapse_item(item: Item) -> None:
 def read_configs(all_items: Iterable[editoritems.Item]) -> None:
     """Load our connection configuration from the config files."""
     for item in all_items:
-        if item.id.casefold() in ITEM_TYPES:
+        if item.id in ITEM_TYPES:
             raise ValueError(f'Duplicate item type "{item.id}"')
         if item.conn_config is None:
             # Generate a blank config.
-            ITEM_TYPES[item.id.casefold()] = Config(item.id)
+            ITEM_TYPES[item.id] = Config(item.id)
         else:
-            ITEM_TYPES[item.id.casefold()] = item.conn_config
+            ITEM_TYPES[item.id] = item.conn_config
 
     # These must exist.
-    for item_id in [INDICATOR_CHECK_ID, INDICATOR_TIMER_ID]:
-        if item_id.casefold() not in ITEM_TYPES:
+    for def_item in [consts.DefaultItems.indicator_check, consts.DefaultItems.indicator_timer]:
+        if def_item.id not in ITEM_TYPES:
             raise user_errors.UserError(
-                user_errors.TOK_CONNECTION_REQUIRED_ITEM.format(item=item_id.upper())
+                user_errors.TOK_CONNECTION_REQUIRED_ITEM.format(item=def_item.id)
             )
 
 
@@ -501,7 +501,7 @@ def calc_connections(
                 LOGGER.warning('No item ID for "{}"!', inst)
                 continue
             try:
-                item_type = ITEM_TYPES[item_id.casefold()]
+                item_type = ITEM_TYPES[item_id]
             except KeyError:
                 LOGGER.warning('No item type for "{}"!', item_id)
                 continue
