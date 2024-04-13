@@ -1318,7 +1318,7 @@ def debug_test_result(inst: Entity, kv: Keyvalues) -> bool:
     if kv.has_children():
         LOGGER.warning('Debug:\n{!s}\n{!s}', kv, inst)
     else:
-        LOGGER.warning('Debug: {}\n{inst!s}', kv.value, inst)
+        LOGGER.warning('Debug: {}\n{!s}', kv.value, inst)
     return True  # The test is always true
 
 
@@ -1330,9 +1330,9 @@ def dummy_result() -> None:
 
 @make_result('timedRelay')
 def res_timed_relay(vmf: VMF, res: Keyvalues) -> Callable[[Entity], None]:
-    """Generate a logic_relay with outputs delayed by a certain amount.
+    """Generate a `logic_relay` with outputs delayed by a certain amount.
 
-    This allows triggering outputs based $timer_delay values.
+    This allows triggering outputs based on `$timer_delay` values.
     """
     delay_var = res['variable', consts.FixupVars.TIM_DELAY]
     name = res['targetname']
