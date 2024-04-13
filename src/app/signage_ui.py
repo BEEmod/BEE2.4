@@ -40,7 +40,7 @@ def export_data() -> list[tuple[str, utils.ObjectID]]:
     """Returns selected items, for Signage.export() to use."""
     conf: Layout = config.APP.get_cur_conf(Layout, default=Layout())
     return [
-        (str(ind), utils.obj_id(sign_id))
+        (str(ind), sign_id)
         for ind in SIGN_IND
         if (sign_id := conf.signs.get(ind, '')) != ''
     ]
