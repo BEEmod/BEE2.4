@@ -137,6 +137,7 @@ def get_git_version(inst_path: Path | str) -> str:
         },
     )
 
+
 try:
     # This module is generated when the app is compiled.
     from _compiled_version import (  # type: ignore
@@ -201,6 +202,7 @@ def conf_location(path: str) -> Path:
     folder.mkdir(parents=True, exist_ok=True)
     return loc
 
+
 # Location of a message shown when user errors occur.
 COMPILE_USER_ERROR_PAGE = conf_location('error.html')
 
@@ -239,13 +241,14 @@ class CONN_TYPES(Enum):
     triple = 4  # Points N-S-W
     all = 5  # Points N-S-E-W
 
+
 N = Angle(yaw=90)
 S = Angle(yaw=270)
 E = Angle(yaw=0)
 W = Angle(yaw=180)
 # Lookup values for joining things together.
 CONN_LOOKUP: Mapping[Tuple[int, int, int, int], Tuple[CONN_TYPES, Angle]] = {
-    #N  S  E  W : (Type, Rotation)
+#    N  S  E  W : (Type, Rotation)
     (1, 0, 0, 0): (CONN_TYPES.side, N),
     (0, 1, 0, 0): (CONN_TYPES.side, S),
     (0, 0, 1, 0): (CONN_TYPES.side, E),
@@ -360,8 +363,8 @@ class FuncLookup(Generic[LookupT], Mapping[str, LookupT]):
         self,
         name: str,
         *,
-        casefold: bool=True,
-        attrs: Iterable[str]=(),
+        casefold: bool = True,
+        attrs: Iterable[str] = (),
     ) -> None:
         self.casefold = casefold
         self.__name__ = name
@@ -555,6 +558,7 @@ class PackagePath:
     __slots__ = ['package', 'path']
     package: Final[SpecialID]
     path: Final[str]
+
     def __init__(self, pack_id: SpecialID, path: str) -> None:
         self.package = pack_id
         self.path = path.replace('\\', '/').lstrip("/")
@@ -705,9 +709,9 @@ def get_indent(line: str) -> str:
 def iter_grid(
     max_x: int,
     max_y: int,
-    min_x: int=0,
-    min_y: int=0,
-    stride: int=1,
+    min_x: int = 0,
+    min_y: int = 0,
+    stride: int = 1,
 ) -> Iterator[tuple[int, int]]:
     """Loop over a rectangular grid area."""
     for x in range(min_x, max_x, stride):
@@ -903,7 +907,7 @@ def restart_app() -> NoReturn:
     os.execv(sys.executable, args)
 
 
-def quit_app(status: int=0) -> NoReturn:
+def quit_app(status: int = 0) -> NoReturn:
     """Quit the application."""
     sys.exit(status)
 
@@ -930,7 +934,7 @@ def unset_readonly(file: str | bytes | os.PathLike[str] | os.PathLike[bytes]) ->
 def merge_tree(
     src: str,
     dst: str,
-    copy_function: Callable[[str, str], None]=shutil.copy2,
+    copy_function: Callable[[str, str], None] = shutil.copy2,
 ) -> None:
     """Recursively copy a directory tree to a destination, which may exist.
 

@@ -339,7 +339,7 @@ def annotation_caller(
 @overload
 def annotation_caller(
     func: Callable[..., AnnResT],
-    parm1: Type[AnnArg1T], parm2: Type[AnnArg2T],  /,
+    parm1: Type[AnnArg1T], parm2: Type[AnnArg2T], /,
 ) -> tuple[
     Callable[[AnnArg1T, AnnArg2T], AnnResT],
     tuple[Type[AnnArg1T], Type[AnnArg2T]]
@@ -1020,7 +1020,7 @@ async def dump_conditions(filename: trio.Path) -> None:
                     if aliases:
                         await file.write(f'**Aliases:** `{"`, `".join(aliases)}`  \n')
                     if func.valid_after or func.valid_before:
-                        await file.write(f'**Valid Priority Levels:** ')
+                        await file.write('**Valid Priority Levels:** ')
                         before = [meta.value for meta in func.valid_before]
                         after = [meta.value for meta in func.valid_after]
                         if before and after:
@@ -1047,7 +1047,7 @@ def add_inst(
     file: str,
     origin: Vec | FrozenVec | str,
     angles: AnyAngle | AnyMatrix | str = '0 0 0',
-    targetname: str='',
+    targetname: str = '',
     fixup_style: int | str = '0',  # Default to Prefix.
     no_fixup: bool = False,
 ) -> Entity:
@@ -1139,7 +1139,7 @@ class DebugAdder(Protocol):
         """Add this brush to the map, the visgroup and make it hidden."""
 
     @overload
-    def __call__(self, classname: str, /, *, comment: str='', **kwargs: ValidKVs) -> Entity:
+    def __call__(self, classname: str, /, *, comment: str = '', **kwargs: ValidKVs) -> Entity:
         """Create an entity with the specified keyvalues."""
 
 
@@ -1242,7 +1242,7 @@ def set_ent_keys(
     ent: MutableMapping[str, str],
     inst: Entity,
     kv_block: Keyvalues,
-    block_name: str='Keys',
+    block_name: str = 'Keys',
 ) -> None:
     """Copy the given key prop block to an entity.
 

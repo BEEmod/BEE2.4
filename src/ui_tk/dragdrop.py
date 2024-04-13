@@ -126,9 +126,9 @@ class DragDrop(ManagerBase[ItemT, tk.Misc], Generic[ItemT]):
         parent: Union[tk.Tk, tk.Toplevel],
         *,
         info_cb: InfoCB[ItemT],
-        size: Tuple[int, int]=(64, 64),
-        config_icon: bool=False,
-        pick_flexi_group: Optional[FlexiCB]=None,
+        size: Tuple[int, int] = (64, 64),
+        config_icon: bool = False,
+        pick_flexi_group: Optional[FlexiCB] = None,
     ) -> None:
         super().__init__(
             info_cb=info_cb,
@@ -363,9 +363,9 @@ class DragDrop(ManagerBase[ItemT, tk.Misc], Generic[ItemT]):
         self,
         canv: tk.Canvas,
         slots: Iterable[Slot[ItemT]],
-        spacing: int=16 if utils.MAC else 8,
-        yoff: int=0,
-        tag: str=_CANV_TAG,
+        spacing: int = 16 if utils.MAC else 8,
+        yoff: int = 0,
+        tag: str = _CANV_TAG,
     ) -> int:
         """Place all the slots in a grid on the provided canvas.
 

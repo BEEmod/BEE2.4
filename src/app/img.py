@@ -81,6 +81,7 @@ def _load_special(path: str, theme: Theme) -> Image.Image:
         LOGGER.warning('"{}" icon could not be loaded!', path, exc_info=True)
         return Image.new('RGBA', (64, 64), (0, 0, 0, 0))
 
+
 ICONS: Dict[Tuple[str, Theme], Image.Image] = {
     (name, theme): _load_special(name, theme)
     for name in ['error', 'none', 'load']
@@ -140,7 +141,7 @@ def _load_file(
     uri: utils.PackagePath,
     width: int, height: int,
     resize_algo: Image.Resampling,
-    check_other_packages: bool=False,
+    check_other_packages: bool = False,
 ) -> Tuple[Image.Image, bool]:
     """Load an image from a filesystem."""
     path = uri.path.casefold()
@@ -302,8 +303,8 @@ class Handle(User):
         width: int,
         height: int,
         *,
-        subkey: str='',
-        subfolder: str='',
+        subkey: str = '',
+        subfolder: str = '',
     ) -> Handle:
         """Parse a keyvalue into an image handle.
 
@@ -345,7 +346,7 @@ class Handle(User):
         uri: utils.PackagePath,
         width: int = 0, height: int = 0,
         *,
-        subfolder: str='',
+        subfolder: str = '',
     ) -> Handle:
         """Parse a URI into an image handle.
 
@@ -383,11 +384,11 @@ class Handle(User):
                 try:
                     if ',' in color:  # <color>:R,G,B
                         r, g, b = map(int, color.split(','))
-                    elif len(color) == 3: # RGB
+                    elif len(color) == 3:  # RGB
                         r = int(color[0] * 2, 16)
                         g = int(color[1] * 2, 16)
                         b = int(color[2] * 2, 16)
-                    elif len(color) == 6: # RRGGBB
+                    elif len(color) == 6:  # RRGGBB
                         r = int(color[0:2], 16)
                         g = int(color[2:4], 16)
                         b = int(color[4:6], 16)
@@ -460,7 +461,7 @@ class Handle(User):
     @classmethod
     def error(cls, width: int, height: int) -> ImgIcon:
         """Shortcut for getting a handle to an error icon."""
-        return ImgIcon._deduplicate(width, height,  'error')
+        return ImgIcon._deduplicate(width, height, 'error')
 
     @classmethod
     def ico_none(cls, width: int, height: int) -> ImgIcon:

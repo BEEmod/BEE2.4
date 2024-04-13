@@ -108,7 +108,7 @@ class PlaneGrid(Generic[ValT], MutableMapping[Tuple[int, int], ValT]):
         self,
         contents: Mapping[tuple[int, int], ValT] | Iterable[tuple[tuple[int, int], ValT]] = (),
         *,
-        default: ValT=_UNSET,
+        default: ValT = _UNSET,
     ) -> None:
         """Initalises the plane with the provided values."""
         # Track the minimum/maximum position found

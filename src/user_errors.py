@@ -98,13 +98,13 @@ class UserError(BaseException):
         self,
         message: TransToken,
         *,
-        docsurl: str='',
-        voxels: Iterable[Union[Vec, FrozenVec]]=(),
-        points: Iterable[Union[Vec, FrozenVec]]=(),
-        textlist: Collection[str]=(),
-        leakpoints: Collection[Union[Vec, FrozenVec]]=(),
-        lines: Iterable[Tuple[Union[Vec, FrozenVec], Union[Vec, FrozenVec]]]=(),
-        barrier_holes: Collection[BarrierHole]=(),
+        docsurl: str = '',
+        voxels: Iterable[Union[Vec, FrozenVec]] = (),
+        points: Iterable[Union[Vec, FrozenVec]] = (),
+        textlist: Collection[str] = (),
+        leakpoints: Collection[Union[Vec, FrozenVec]] = (),
+        lines: Iterable[Tuple[Union[Vec, FrozenVec], Union[Vec, FrozenVec]]] = (),
+        barrier_holes: Collection[BarrierHole] = (),
     ) -> None:
         """Specify the info to show to the user.
 

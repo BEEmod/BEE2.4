@@ -87,7 +87,7 @@ class ItemVariant:
         url: str | None = None,
         all_name: TransToken = TransToken.BLANK,
         all_icon: FSPath | None = None,
-        source: str='',
+        source: str = '',
     ) -> None:
         self.editor = editoritems
         self.editor_extra = editor_extra
@@ -995,7 +995,7 @@ async def assign_styled_items(all_styles: Iterable[Style], item: Item) -> None:
                     styles[sty_id] = start_data.copy()
                 else:
                     styles[sty_id] = await start_data.modify(
-                        conf.pak_id, conf.config,f'<{item.id}:{vers.id}.{sty_id}>'
+                        conf.pak_id, conf.config, f'<{item.id}:{vers.id}.{sty_id}>'
                     )
 
             # If we defer all the styles, there must be a loop somewhere.

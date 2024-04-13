@@ -338,7 +338,7 @@ def write_sound(
     file: StringIO,
     snds: List[str],
     pack_list: PackList,
-    snd_prefix: str='*',
+    snd_prefix: str = '*',
 ) -> None:
     """Write either a single sound, or multiple rndsound.
 

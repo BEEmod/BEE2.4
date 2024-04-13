@@ -37,7 +37,7 @@ class Opt(Generic[OptionT]):
         opt_id: str,
         kind: Type[OptionT],
         doc: str,
-        fallback: Optional[str] =None,
+        fallback: Optional[str] = None,
         hidden: bool = False,
     ) -> None:
         self.type = kind
@@ -211,7 +211,7 @@ class OptWithDefault(Opt[OptionT], Generic[OptionT]):
         opt_id: str,
         default: OptionT,
         doc: str,
-        fallback: Optional[str] =None,
+        fallback: Optional[str] = None,
         hidden: bool = False,
     ) -> None:
         super().__init__(opt_id, type(default), doc, fallback, hidden)

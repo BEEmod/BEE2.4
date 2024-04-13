@@ -133,7 +133,7 @@ class ConfigSpec:
         self,
         typ: type[DataT],
         func: Callable[[DataT], Awaitable[object]],
-        data_id: str='',
+        data_id: str = '',
     ) -> None:
         """Set the callback used to apply this config type to the UI.
 
@@ -153,7 +153,7 @@ class ConfigSpec:
         if data_id in data_map:
             await func(cast(DataT, data_map[data_id]))
 
-    async def apply_conf(self, typ: type[Data], *, data_id: str= '') -> None:
+    async def apply_conf(self, typ: type[Data], *, data_id: str = '') -> None:
         """Apply the current settings for this config type and ID.
 
         If the data_id is not passed, all settings will be applied.

@@ -109,7 +109,7 @@ class BaseLoadScreen:
         self.win.bind('<B1-Motion>', self.move_motion)
         self.win.bind('<Escape>', self.cancel)
 
-    def cancel(self, event: Optional[tk.Event]=None) -> None:
+    def cancel(self, event: Optional[tk.Event] = None) -> None:
         """User pressed the cancel button."""
         self.op_reset()
         QUEUE_REPLY_LOAD.put(ipc_types.Daemon2Load_Cancel(self.scr_id))

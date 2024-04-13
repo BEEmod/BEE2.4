@@ -300,16 +300,16 @@ class Template:
         world: dict[str, list[Solid]],
         detail: dict[str, list[Solid]],
         overlays: dict[str, list[Entity]],
-        skip_faces: Iterable[str]=(),
-        realign_faces: Iterable[str]=(),
-        overlay_transfer_faces: Iterable[str]=(),
-        vertical_faces: Iterable[str]=(),
-        color_pickers: Iterable[ColorPicker]=(),
-        tile_setters: Iterable[TileSetter]=(),
-        voxel_setters: Iterable[VoxelSetter]=(),
-        barrier_setters: Iterable[BarrierSetter]=(),
-        barrier_clearers: Iterable[BarrierClearer]=(),
-        coll: Iterable[CollisionDef]=(),
+        skip_faces: Iterable[str] = (),
+        realign_faces: Iterable[str] = (),
+        overlay_transfer_faces: Iterable[str] = (),
+        vertical_faces: Iterable[str] = (),
+        color_pickers: Iterable[ColorPicker] = (),
+        tile_setters: Iterable[TileSetter] = (),
+        voxel_setters: Iterable[VoxelSetter] = (),
+        barrier_setters: Iterable[BarrierSetter] = (),
+        barrier_clearers: Iterable[BarrierClearer] = (),
+        coll: Iterable[CollisionDef] = (),
         debug: bool = False,
     ) -> None:
         self.id = temp_id
@@ -364,7 +364,7 @@ class Template:
 
     def visgrouped(
         self,
-        visgroups: str | Iterable[str]=(),
+        visgroups: str | Iterable[str] = (),
     ) -> tuple[list[Solid], list[Solid], list[Entity]]:
         """Given some visgroups, return the matching data.
 
@@ -394,7 +394,7 @@ class Template:
 
         return world_brushes, detail_brushes, overlays
 
-    def visgrouped_solids(self, visgroups: str | Iterable[str]=()) -> list[Solid]:
+    def visgrouped_solids(self, visgroups: str | Iterable[str] = ()) -> list[Solid]:
         """Given some visgroups, return the matching brushes.
 
         This ignores the world/detail brush distinction.
@@ -462,7 +462,7 @@ class ScalingTemplate(Mapping[
         mat, axis_u, axis_v, rotation = self._axes[FrozenVec(normal)]
         return mat, axis_u.copy(), axis_v.copy(), rotation
 
-    def rotate(self, angles: Union[Angle, Matrix], origin: Optional[Vec]=None) -> ScalingTemplate:
+    def rotate(self, angles: Union[Angle, Matrix], origin: Optional[Vec] = None) -> ScalingTemplate:
         """Rotate this template, and return a new template with those angles."""
         new_axis: dict[FrozenVec, tuple[str, UVAxis, UVAxis, float]] = {}
         if origin is None:
@@ -476,7 +476,7 @@ class ScalingTemplate(Mapping[
 
         return ScalingTemplate(self.id, new_axis)
 
-    def apply(self, face: Side, *, change_mat: bool=True) -> None:
+    def apply(self, face: Side, *, change_mat: bool = True) -> None:
         """Apply the template to a face."""
         mat, face.uaxis, face.vaxis, face.ham_rot = self[face.normal()]
         if change_mat:

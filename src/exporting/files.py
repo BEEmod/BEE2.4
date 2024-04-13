@@ -98,7 +98,7 @@ async def step_write_configs(exp: ExportData) -> None:
             )
 
     dmx = await trio.to_thread.run_sync(config.COMPILER.build_dmx, exp.config)
-    await trio.to_thread.run_sync(write,  dmx, exp.game.abs_path('bin/bee2/config.dmx'))
+    await trio.to_thread.run_sync(write, dmx, exp.game.abs_path('bin/bee2/config.dmx'))
 
 
 @STEPS.add_step(prereq=[], results=[StepResource.EI_FILE])

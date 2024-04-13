@@ -160,7 +160,7 @@ class TransToken:
         return cls(NS_UNTRANSLATED, NS_UNTRANSLATED, text, EmptyMapping)
 
     @classmethod
-    def list_and(cls, children: Iterable[TransToken], sort: bool=False) -> ListTransToken:
+    def list_and(cls, children: Iterable[TransToken], sort: bool = False) -> ListTransToken:
         """Join multiple tokens together in an and-list."""
         return ListTransToken(
             NS_UNTRANSLATED, NS_UNTRANSLATED, ', ', EmptyMapping,
@@ -168,7 +168,7 @@ class TransToken:
         )
 
     @classmethod
-    def list_or(cls, children: Iterable[TransToken], sort: bool=False) -> ListTransToken:
+    def list_or(cls, children: Iterable[TransToken], sort: bool = False) -> ListTransToken:
         """Join multiple tokens together in an or-list."""
         return ListTransToken(
             NS_UNTRANSLATED, NS_UNTRANSLATED, ', ', EmptyMapping,

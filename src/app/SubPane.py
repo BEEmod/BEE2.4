@@ -57,10 +57,10 @@ class SubPane(tk.Toplevel):
         menu_bar: tk.Menu,
         tool_col: int,
         title: TransToken,
-        resize_x: bool=False,
-        resize_y: bool=False,
-        name: str='',
-        legacy_name: str='',
+        resize_x: bool = False,
+        resize_y: bool = False,
+        name: str = '',
+        legacy_name: str = '',
     ) -> None:
         self.visible = tk.BooleanVar(parent, True)
         self.win_name = name
@@ -104,7 +104,7 @@ class SubPane(tk.Toplevel):
         self.bind('<Configure>', self.snap_win)
         self.bind('<FocusIn>', self.enable_snap)
 
-    def hide_win(self, play_snd: bool=True) -> None:
+    def hide_win(self, play_snd: bool = True) -> None:
         """Hide the window."""
         if play_snd:
             sound.fx('config')
@@ -113,7 +113,7 @@ class SubPane(tk.Toplevel):
         self.save_conf()
         self.tool_button.state(('!pressed',))
 
-    def show_win(self, play_snd: bool=True) -> None:
+    def show_win(self, play_snd: bool = True) -> None:
         """Show the window."""
         if play_snd:
             sound.fx('config')

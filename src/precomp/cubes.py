@@ -240,10 +240,10 @@ class CubeAddon:
     def __init__(
         self,
         addon_id: str,
-        inst: str='',
-        pack: str='',
-        vscript: str='',
-        outputs: MutableMapping[CubeOutputs, list[Output]]=EmptyMapping,
+        inst: str = '',
+        pack: str = '',
+        vscript: str = '',
+        outputs: MutableMapping[CubeOutputs, list[Output]] = EmptyMapping,
         fixups: list[tuple[str, str | AddonFixups]] | None = None,
     ) -> None:
         self.id = addon_id
@@ -1558,7 +1558,7 @@ def setup_output(
     template: Output,
     inst: Entity,
     output: str,
-    self_name: str='!self',
+    self_name: str = '!self',
 ) -> Output:
     """Modify parts of an output.
 
@@ -2022,8 +2022,8 @@ def generate_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
                 # Ghost doesn't support the Fizzle input, hook that up ourselves.
                 if pair.is_superpos_ghost:
                     pair.get_kv_setter(drop_done_name).add_out(Output(
-                        drop_done_command,'!activator',
-                        'CallScriptFunction','Spawned',
+                        drop_done_command, '!activator',
+                        'CallScriptFunction', 'Spawned',
                     ))
                     drop_cube.outputs.append(Output(
                         'OnUser1', '!self',

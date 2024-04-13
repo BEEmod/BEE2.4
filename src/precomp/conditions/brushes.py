@@ -1163,7 +1163,7 @@ def edit_panel(vmf: VMF, inst: Entity, props: Keyvalues, create: bool) -> None:
                 ):
                     break
             else:
-                LOGGER.warning('No panel to modify found for "{}"!',inst['targetname'])
+                LOGGER.warning('No panel to modify found for "{}"!', inst['targetname'])
                 continue
         panels.append(panel)
 

@@ -24,7 +24,7 @@ from transtoken import TransToken, TransTokenSource
 LOGGER = srctools.logger.get_logger(__name__)
 
 __all__ = [
-    'MarkdownData', 'convert',  'join',
+    'MarkdownData', 'convert', 'join',
     # For richtextbox only.
     'TextTag', 'TextSegment', 'Block', 'Image', 'TAG_HEADINGS',
 ]
@@ -348,6 +348,7 @@ class TKRenderer(base_renderer.BaseRenderer[SingleMarkdown]):
     def render_emphasis(self, token: stok.Emphasis) -> SingleMarkdown:
         """Render <em> tags, with italic fonts."""
         return self._with_tag(token, TextTag.ITALIC)
+
 
 _RENDERER = TKRenderer()
 

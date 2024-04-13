@@ -296,7 +296,7 @@ class Item:
         name: str,
         short_name: TransToken,
         long_name: TransToken | None = None,
-        icon: img.Handle | None=None,
+        icon: img.Handle | None = None,
         large_icon: img.Handle | None = None,
         previews: Iterable[img.Handle] = (),
         authors: Iterable[str] = (),
@@ -1571,7 +1571,7 @@ class SelectorWin(Generic[CallbackT]):
             key is NAV_KEYS.UP or key is NAV_KEYS.DN,
         )
 
-    def _offset_select(self, group_list: list[str], group_ind: int, item_ind: int, is_vert: bool=False) -> None:
+    def _offset_select(self, group_list: list[str], group_ind: int, item_ind: int, is_vert: bool = False) -> None:
         """Helper for key_navigate(), jump to the given index in a group.
 
         group_list is sorted list of group names.
@@ -1806,7 +1806,7 @@ class SelectorWin(Generic[CallbackT]):
             menu = self.context_menu
         menu.entryconfig(item._context_ind, font=new_font)
 
-    def set_suggested(self, suggested: AbstractSet[str]=frozenset()) -> None:
+    def set_suggested(self, suggested: AbstractSet[str] = frozenset()) -> None:
         """Set the suggested items to the set of IDs.
 
         If it is empty, the suggested ID will be cleared.

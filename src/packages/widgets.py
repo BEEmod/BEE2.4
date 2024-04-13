@@ -56,7 +56,7 @@ CLS_TO_KIND: Dict[Type[ConfigProto], WidgetTypeWithConf[Any]] = {}
 CONFIG = BEE2_config.ConfigFile('item_cust_configs.cfg')
 
 
-def register(*names: str, wide: bool=False) -> Callable[[Type[ConfT]], Type[ConfT]]:
+def register(*names: str, wide: bool = False) -> Callable[[Type[ConfT]], Type[ConfT]]:
     """Register a widget type that takes config.
 
     If wide is set, the widget is put into a labelframe, instead of having a label to the side.
@@ -77,7 +77,7 @@ def register(*names: str, wide: bool=False) -> Callable[[Type[ConfT]], Type[Conf
     return deco
 
 
-def register_no_conf(*names: str, wide: bool=False) -> WidgetType:
+def register_no_conf(*names: str, wide: bool = False) -> WidgetType:
     """Register a widget type which does not need additional configuration.
 
     Many only need the default values.

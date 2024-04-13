@@ -312,7 +312,7 @@ def test_bbox_parse_block() -> None:
     )
     ent.solids.append(vmf.make_prism(Vec(80, 10, 40), Vec(150, 220, 70)).solid)
     ent.solids.append(vmf.make_prism(Vec(-30, 45, 80), Vec(-20, 60, 120)).solid)
-    bb2, bb1 =  BBox.from_ent(ent)
+    bb2, bb1 = BBox.from_ent(ent)
     # Allow it to produce in either order.
     if bb1.min_x == -30:
         bb1, bb2 = bb2, bb1
@@ -331,12 +331,12 @@ def test_bbox_parse_block() -> None:
 
 
 @pytest.mark.parametrize('axis, mins, maxes', [
-    ('west',   (80, 10, 40),  (80, 220, 70)),   # -X
-    ('east',   (150, 10, 40), (150, 220, 70)),  # +X
-    ('south',  (80, 10, 40),  (150, 10, 70)),   # -Y
-    ('north',  (80, 220, 40), (150, 220, 70)),  # +Y
-    ('bottom', (80, 10, 40),  (150, 220, 40)),  # -Z
-    ('top',    (80, 10, 70),  (150, 220, 70)),  # +Z
+    ('west',   ( 80, 10,  40), ( 80, 220, 70)),   # -X
+    ('east',   (150, 10,  40), (150, 220, 70)),  # +X
+    ('south',  ( 80, 10,  40), (150,  10, 70)),   # -Y
+    ('north',  ( 80, 220, 40), (150, 220, 70)),  # +Y
+    ('bottom', ( 80, 10,  40), (150, 220, 40)),  # -Z
+    ('top',    ( 80, 10,  70), (150, 220, 70)),  # +Z
 ], ids=['-x', '+x', '-y', '+y', '-z', '+z'])
 def test_bbox_parse_plane(axis: str, mins: tuple3, maxes: tuple3) -> None:
     """Test parsing planar bboxes from a VMF.

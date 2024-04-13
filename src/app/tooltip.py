@@ -135,7 +135,7 @@ def set_tooltip(
     text: TransToken = TransToken.BLANK,
     *,
     image: img.Handle | None = None,
-    delay: int=-1,
+    delay: int = -1,
 ) -> None:
     """Change the tooltip for a widget.
 
@@ -160,8 +160,8 @@ def add_tooltip(
     text: TransToken = TransToken.BLANK,
     *,
     image: img.Handle | None = None,
-    delay: int=500,
-    show_when_disabled: bool=False,
+    delay: int = 500,
+    show_when_disabled: bool = False,
 ) -> None:
     """Add a tooltip to the specified widget.
 

@@ -381,7 +381,7 @@ class ManagerBase(Generic[ItemT, ParentT]):
         self,
         slot: Slot[ItemT] | DragWin,
         item: Optional[ItemT],
-        group: bool=False,
+        group: bool = False,
     ) -> None:
         """Display the specified item on the given slot."""
         image: img.Handle

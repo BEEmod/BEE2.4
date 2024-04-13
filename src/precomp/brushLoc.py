@@ -177,7 +177,7 @@ class Grid(MutableMapping[_grid_keys, Block]):
         self,
         pos: _grid_keys,
         direction: Vec | FrozenVec | Tuple[int, int, int],
-        collide: Iterable[Block]=frozenset({
+        collide: Iterable[Block] = frozenset({
             Block.SOLID, Block.EMBED,
             Block.PIT_BOTTOM, Block.PIT_SINGLE,
         }),
@@ -217,7 +217,7 @@ class Grid(MutableMapping[_grid_keys, Block]):
         self,
         pos: Vec,
         direction: Vec | Tuple[int, int, int],
-        collide: Iterable[Block]=frozenset({
+        collide: Iterable[Block] = frozenset({
             Block.SOLID, Block.EMBED,
             Block.PIT_BOTTOM, Block.PIT_SINGLE,
         }),

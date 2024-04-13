@@ -45,8 +45,8 @@ class ConfigFile(ConfigParser):
         self,
         filename: Optional[str],
         *,
-        in_conf_folder: bool=True,
-        auto_load: bool=True,
+        in_conf_folder: bool = True,
+        auto_load: bool = True,
     ) -> None:
         """Initialise the config file.
 
@@ -168,7 +168,7 @@ class ConfigFile(ConfigParser):
 
     get_bool = getboolean
 
-    def getint(self, section: str, option: str, default: int=0, **kwargs: Any) -> int:
+    def getint(self, section: str, option: str, default: int = 0, **kwargs: Any) -> int:
         """Get the value in the specified section, coercing to an Integer.
 
         If either does not exist, set to the default and return it.
@@ -194,7 +194,7 @@ class ConfigFile(ConfigParser):
         self.has_changed.set()
         return super().remove_section(section)
 
-    def set(self, section: str, option: str, value: Any=None) -> None:
+    def set(self, section: str, option: str, value: Any = None) -> None:
         """Set an option, marking the file dirty if this changed it."""
         orig_val = self.get(section, option, fallback=None)
         value = str(value)

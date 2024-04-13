@@ -37,7 +37,7 @@ class Event(Generic[Unpack[ArgT]]):
     name: str
     log: bool = attrs.field(repr=False)
 
-    def __init__(self, name: str='') -> None:
+    def __init__(self, name: str = '') -> None:
         self.name = name or f'<Unnamed {id(self):x}>'
         self.callbacks = []
         self._cur_calls = 0

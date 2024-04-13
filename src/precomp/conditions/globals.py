@@ -211,7 +211,7 @@ def res_pre_cache_model(vmf: VMF, res: Keyvalues) -> None:
     precache_model(vmf, model, skins)
 
 
-def precache_model(vmf: VMF, mdl_name: str, skinset: Collection[int]=()) -> None:
+def precache_model(vmf: VMF, mdl_name: str, skinset: Collection[int] = ()) -> None:
     """Precache the given model for switching.
 
     This places it as a `comp_precache_model`.

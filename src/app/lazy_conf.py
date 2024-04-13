@@ -25,7 +25,7 @@ async def _blank_prop() -> Keyvalues:
 BLANK: Final[LazyConf] = _blank_prop
 
 
-def raw_prop(block: Keyvalues, source: str= '') -> LazyConf:
+def raw_prop(block: Keyvalues, source: str = '') -> LazyConf:
 	"""Make an existing property conform to the interface."""
 	if block or block.name is not None:
 		if source:
@@ -45,7 +45,7 @@ def raw_prop(block: Keyvalues, source: str= '') -> LazyConf:
 		return BLANK
 
 
-def from_file(path: utils.PackagePath, missing_ok: bool=False, source: str= '') -> LazyConf:
+def from_file(path: utils.PackagePath, missing_ok: bool = False, source: str = '') -> LazyConf:
 	"""Lazily load the specified config."""
 	try:
 		fsys = packages.PACKAGE_SYS[path.package]

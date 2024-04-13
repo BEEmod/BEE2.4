@@ -1159,7 +1159,7 @@ class Style(PakObject, needs_foreground=True):
         return self.selitem_data.iter_trans_tokens('styles/' + self.id)
 
 
-def parse_multiline_key(info: Keyvalues, prop_name: str, *, allow_old_format: bool=False) -> str:
+def parse_multiline_key(info: Keyvalues, prop_name: str, *, allow_old_format: bool = False) -> str:
     """Allow several methods for entering multi-line keyvalues.
 
     Any combination of the following is allowed:
@@ -1190,7 +1190,7 @@ def desc_parse(
     source: str,
     pak_id: utils.ObjectID,
     *,
-    prop_name: str='description',
+    prop_name: str = 'description',
 ) -> tkMarkdown.MarkdownData:
     """Parse the description blocks, to create data which matches richTextBox.
 

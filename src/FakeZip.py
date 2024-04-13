@@ -60,10 +60,10 @@ class FakeZip:
         return False
 
     @overload
-    def open(self, name: str, mode: Literal['rb'], pwd: object=None) -> IO[bytes]: ...
+    def open(self, name: str, mode: Literal['rb'], pwd: object = None) -> IO[bytes]: ...
     @overload
-    def open(self, name: str, mode: Literal['r'] = 'r', pwd: object=None) -> IO[str]: ...
-    def open(self, name: str, mode: str = 'r', pwd: object=None) -> IO[Any]:
+    def open(self, name: str, mode: Literal['r'] = 'r', pwd: object = None) -> IO[str]: ...
+    def open(self, name: str, mode: str = 'r', pwd: object = None) -> IO[Any]:
         try:
             return open(os.path.join(self.folder, name), mode)
         except FileNotFoundError as err:
@@ -88,7 +88,7 @@ class FakeZip:
     def getinfo(self, file: str) -> FakeZipInfo:
         return FakeZipInfo(file)
 
-    def extract(self, member: str, path: str | None = None, pwd: object=None) -> None:
+    def extract(self, member: str, path: str | None = None, pwd: object = None) -> None:
         if path is None:
             path = os.getcwd()
         dest = os.path.join(path, member)

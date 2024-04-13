@@ -301,10 +301,10 @@ def round_grid(vec: Vec) -> Vec:
 
 
 def iter_uv(
-    umin: float=0,
-    umax: float=3,
-    vmin: float=0,
-    vmax: float=3
+    umin: float = 0,
+    umax: float = 3,
+    vmin: float = 0,
+    vmax: float = 3
 ) -> Iterator[tuple[int, int]]:
     """Iterate over points in a rectangle."""
     urange = range(int(umin), int(umax + 1))
@@ -1232,13 +1232,13 @@ class TileDef:
         is_wall: bool,
         bevels: set[tuple[int, int]],
         normal: Vec,
-        offset: int=64,
-        thickness: int=4,
-        vec_offset: Vec=None,
-        is_panel: bool=False,
-        add_bullseye: bool=False,
-        face_output: dict[tuple[int, int], Side] | None=None,
-        interior_bevel: bool=True,
+        offset: int = 64,
+        thickness: int = 4,
+        vec_offset: Vec = None,
+        is_panel: bool = False,
+        add_bullseye: bool = False,
+        face_output: dict[tuple[int, int], Side] | None = None,
+        interior_bevel: bool = True,
     ) -> tuple[list[Side], list[Solid]]:
         """Generate a bunch of tiles, and return the front faces.
 
@@ -1405,7 +1405,7 @@ class TileDef:
             self._portal_helper += 1
         # else: it's already a Vec, so don't override with a generic helper.
 
-    def remove_portal_helper(self, *, all: bool=False) -> None:
+    def remove_portal_helper(self, *, all: bool = False) -> None:
         """Remove a "generic" placement helper.
 
         If "all" is checked, all helpers are removed.
@@ -1523,16 +1523,16 @@ def make_tile(
     origin: Vec,
     normal: FrozenVec | Vec,
     top_surf: str,
-    back_surf: str=consts.Tools.NODRAW.value,
+    back_surf: str = consts.Tools.NODRAW.value,
     *,
-    recess_dist: int=0,
-    thickness: int=4,
-    width: float=16,
-    height: float=16,
-    bevels: tuple[bool, bool, bool, bool]=(False, False, False, False),
-    panel_edge: bool=False,
-    u_align: int=512,
-    v_align: int=512,
+    recess_dist: int = 0,
+    thickness: int = 4,
+    width: float = 16,
+    height: float = 16,
+    bevels: tuple[bool, bool, bool, bool] = (False, False, False, False),
+    panel_edge: bool = False,
+    u_align: int = 512,
+    v_align: int = 512,
     antigel: bool | None = None,
 ) -> tuple[Solid, Side]:
     """Generate a tile.

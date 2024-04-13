@@ -293,8 +293,8 @@ def bind_mousewheel(
 @overload
 def add_mousewheel(target: tk.XView, *frames: tk.Misc, orient: Literal['x']) -> None: ...
 @overload
-def add_mousewheel(target: tk.YView, *frames: tk.Misc, orient: Literal['y']='y') -> None: ...
-def add_mousewheel(target: Union[tk.XView, tk.YView], *frames: tk.Misc, orient: Literal['x', 'y']='y') -> None:
+def add_mousewheel(target: tk.YView, *frames: tk.Misc, orient: Literal['y'] = 'y') -> None: ...
+def add_mousewheel(target: Union[tk.XView, tk.YView], *frames: tk.Misc, orient: Literal['x', 'y'] = 'y') -> None:
     """Add events so scrolling anywhere in a frame will scroll a target.
 
     frames should be the TK objects to bind to - mainly Frame or
@@ -334,13 +334,13 @@ class _EventDeco(Protocol[AnyWidT]):
 
 class _Binder(Protocol):
     @overload
-    def __call__(self, wid: WidgetT, *, add: bool=False) -> _EventDeco[WidgetT]: ...  # type: ignore[overload-overlap]
+    def __call__(self, wid: WidgetT, *, add: bool = False) -> _EventDeco[WidgetT]: ...  # type: ignore[overload-overlap]
     @overload
-    def __call__(self, wid: tk.Misc, *, add: bool=False) -> _EventDeco[tk.Misc]: ...
+    def __call__(self, wid: tk.Misc, *, add: bool = False) -> _EventDeco[tk.Misc]: ...
     @overload
-    def __call__(self, wid: WidgetT, func: EventFunc[WidgetT], *, add: bool=False) -> str: ...
+    def __call__(self, wid: WidgetT, func: EventFunc[WidgetT], *, add: bool = False) -> str: ...
     @overload
-    def __call__(self, wid: tk.Misc, func: EventFunc[tk.Misc], *, add: bool=False) -> str: ...
+    def __call__(self, wid: tk.Misc, func: EventFunc[tk.Misc], *, add: bool = False) -> str: ...
 
 
 def _bind_event_handler(bind_func: Callable[[WidgetT, EventFunc[WidgetT], bool], None]) -> _Binder:
@@ -350,7 +350,7 @@ def _bind_event_handler(bind_func: Callable[[WidgetT, EventFunc[WidgetT], bool],
     attributes.
     """
     @functools.wraps(bind_func)
-    def deco(wid: WidgetT, func: Optional[EventFunc[WidgetT]]=None, *, add: bool=False) -> Optional[Callable[..., object]]:
+    def deco(wid: WidgetT, func: Optional[EventFunc[WidgetT]] = None, *, add: bool = False) -> Optional[Callable[..., object]]:
         """Decorator or normal interface, func is optional to be a decorator."""
         if func is None:
             def deco_2(func2: EventFuncT) -> EventFuncT:
@@ -362,6 +362,7 @@ def _bind_event_handler(bind_func: Callable[[WidgetT, EventFunc[WidgetT], bool],
             # Normally, call directly
             return bind_func(wid, func, add)
     return cast(_Binder, deco)
+
 
 if utils.MAC:
     # On OSX, make left-clicks switch to a right-click when control is held.
@@ -712,9 +713,11 @@ class FileField(ttk.Frame):
                 path = await _folderbrowse_powershell()
             except Exception as exc:
                 LOGGER.warning('Failed to browse for a directory:', exc_info=exc)
-                path = self.browser.show()  # Fallback to generic widget.
+                # Fallback to generic widget.
+                path = self.browser.show()  # type: ignore[no-untyped-call]
         else:
-            path = self.browser.show()
+            # show() is untyped.
+            path = self.browser.show()  # type: ignore[no-untyped-call]
 
         if path:
             self.value = path

@@ -1345,7 +1345,7 @@ def run_vbsp(
     path: str,
     new_path: Optional[str] = None,
     is_error_map: bool = False,
-    maybe_missing_inst: Iterable[Vec]=(),
+    maybe_missing_inst: Iterable[Vec] = (),
 ) -> None:
     """Execute the original VBSP, copying files around to make it work correctly.
 

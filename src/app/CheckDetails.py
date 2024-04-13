@@ -78,24 +78,24 @@ class Item(Generic[UserT]):
         self: Item[None],
         *values: TransToken,
         hover_text: TransToken = TransToken.BLANK,
-        lock_check: bool=False,
-        state: bool=False,
+        lock_check: bool = False,
+        state: bool = False,
     ) -> None: ...
     @overload
     def __init__(
         self: Item[UserT],
         *values: TransToken,
         hover_text: TransToken = TransToken.BLANK,
-        lock_check: bool=False,
-        state: bool=False,
+        lock_check: bool = False,
+        state: bool = False,
         user: UserT,
     ) -> None: ...
     def __init__(
         self,
         *values: TransToken,
         hover_text: TransToken = TransToken.BLANK,
-        lock_check: bool=False,
-        state: bool=False,
+        lock_check: bool = False,
+        state: bool = False,
         user: UserT | None = None,
     ) -> None:
         """Initialise an item.
@@ -202,9 +202,9 @@ class CheckDetails(ttk.Frame, Generic[UserT]):
     def __init__(
         self,
         parent: tk.Misc,
-        items: Iterable[Item[UserT]]=(),
-        headers: Iterable[TransToken]=(),
-        add_sizegrip: bool=False,
+        items: Iterable[Item[UserT]] = (),
+        headers: Iterable[TransToken] = (),
+        add_sizegrip: bool = False,
     ) -> None:
         """Initialise a CheckDetails pane.
 

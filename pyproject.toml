@@ -51,6 +51,7 @@ allowed-confusables = [
 	"×",  # Multiplication sign
 ]
 extend-ignore = [
+	"E226",  # Allow 4*6 + 8
 	"E402",  # Allow module level import later in the file.
 	"E721",  # Allow using type(x) is Class
 	"E731",  # Lambda assignment used intentionally for callbacks.
@@ -64,8 +65,11 @@ extend-ignore = [
 	"ANN401",  # Allow typing.Any
 
 	# Ruff:
-	"RUF100",  # Sometimes use # noqa for other linters
+	"RUF022",  # Sorting __all__
+	"RUF023",  # Sorting __slots__
 	"RUF005",  # Unpack instead of concat triggers on Vec.
+	"RUF100",  # Sometimes use # noqa for other linters
+	"RUF027",  # Catches TransToken using {}-formatting without an f-string.
 
 	# PyLint:
 	"PLW0603",  # Allow use of global statement.

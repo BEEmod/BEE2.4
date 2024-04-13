@@ -46,6 +46,7 @@ class PropGroup:
     """A group of widgets for modifying one or more props."""
     LARGE: ClassVar[bool] = False
     label: ttk.Label
+
     def __init__(self, parent: ttk.Frame, tk_img: TKImages, label_text: TransToken) -> None:
         self.frame = tk.Frame(parent)
         self.label = ttk.Label(parent)
@@ -65,6 +66,7 @@ class PropGroup:
 
     def set_tooltip(self, tok: TransToken) -> None:
         """Set a user tooltip on this group."""
+
 
 # The prop kinds that require this group, then a function to create it.
 PropGroupFactory: TypeAlias = Tuple[List[ItemPropKind[Any]], Callable[[ttk.Frame, TKImages], PropGroup]]

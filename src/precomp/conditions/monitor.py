@@ -38,14 +38,14 @@ def scriptvar_set(
     targ: Entity,
     pos: Vec,
     varname: str,
-    value: object='',
+    value: object = '',
     *,
     mode: Literal[
         'const', 'string', 'bool', 'inv_bool', 'name', 'handle', 'keyvalue',
         'pos', 'ang', 'off', 'dist', 'x', 'y', 'z', 'pos_x', 'pos_y', 'pos_z',
-    ]='const',
+    ] = 'const',
     index: Optional[int] = None,
-    angles: object='0 0 0',
+    angles: object = '0 0 0',
 ) -> None:
     """Add in a comp_scriptvar_setter entity."""
     if index is not None:

@@ -634,7 +634,7 @@ def make_ubend(
         )
 
 
-def join_markers(vmf: VMF, mark_a: Marker, mark_b: Marker, is_start: bool=False) -> None:
+def join_markers(vmf: VMF, mark_a: Marker, mark_b: Marker, is_start: bool = False) -> None:
     """Join two marker ents together with corners."""
     origin_a = Vec.from_str(mark_a.ent['origin'])
     origin_b = Vec.from_str(mark_b.ent['origin'])

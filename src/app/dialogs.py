@@ -41,7 +41,7 @@ class Dialogs(Protocol):
         message: TransToken,
         title: TransToken = DEFAULT_TITLE,
         icon: Icon = Icon.INFO,
-        detail: str='',
+        detail: str = '',
     ) -> None:
         """Show a message box with some information."""
 
@@ -52,7 +52,7 @@ class Dialogs(Protocol):
         message: TransToken,
         title: TransToken = DEFAULT_TITLE,
         icon: Icon = Icon.INFO,
-        detail: str='',
+        detail: str = '',
     ) -> bool:
         """Show a message box with "OK" and "Cancel" buttons."""
         raise NotImplementedError
@@ -62,7 +62,7 @@ class Dialogs(Protocol):
         message: TransToken,
         title: TransToken = DEFAULT_TITLE,
         icon: Icon = Icon.QUESTION,
-        detail: str='',
+        detail: str = '',
     ) -> bool:
         """Show a message box with "Yes" and "No" buttons."""
         raise NotImplementedError
@@ -72,7 +72,7 @@ class Dialogs(Protocol):
         message: TransToken,
         title: TransToken = DEFAULT_TITLE,
         icon: Icon = Icon.QUESTION,
-        detail: str='',
+        detail: str = '',
     ) -> Optional[bool]:
         """Show a message box with "Yes", "No" and "Cancel" buttons."""
         raise NotImplementedError

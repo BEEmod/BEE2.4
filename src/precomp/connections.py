@@ -304,7 +304,7 @@ class Item:
         params: str = '',
         delay: float = 0.0,
         times: int = -1,
-        inst_in: Optional[str]=None,
+        inst_in: Optional[str] = None,
     ) -> None:
         """Add an output to this item.
 
@@ -888,7 +888,7 @@ def add_locking(item: Item) -> None:
 def localise_output(
     out: Output, out_name: str, inst: Entity,
     *,
-    delay: float=0.0, only_once: bool=False,
+    delay: float = 0.0, only_once: bool = False,
 ) -> Output:
     """Create a copy of an output, with instance fixups substituted and with names localised."""
     return Output(
