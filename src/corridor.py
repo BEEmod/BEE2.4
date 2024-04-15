@@ -1,5 +1,6 @@
 """Data structure for specifying custom corridors."""
-from typing import FrozenSet, Optional, Sequence, Tuple, Mapping
+from __future__ import annotations
+from typing import Optional, Sequence, Tuple, Mapping
 from typing_extensions import Final, TypeAlias, Literal, Self
 from enum import Enum
 
@@ -118,13 +119,13 @@ class Option:
 
 
 # Maps item IDs to their corridors, and vice versa.
-ID_TO_CORR: Final[Mapping[utils.ObjectID, Tuple[GameMode, Direction]]] = {
+ID_TO_CORR: Final[Mapping[utils.ObjectID, tuple[GameMode, Direction]]] = {
     DefaultItems.door_sp_entry.id: (GameMode.SP, Direction.ENTRY),
     DefaultItems.door_sp_exit.id: (GameMode.SP, Direction.EXIT),
     DefaultItems.door_coop_entry.id: (GameMode.COOP, Direction.ENTRY),
     DefaultItems.door_coop_exit.id: (GameMode.COOP, Direction.EXIT),
 }
-CORR_TO_ID: Final[Mapping[Tuple[GameMode, Direction], utils.ObjectID]] = {v: k for k, v in ID_TO_CORR.items()}
+CORR_TO_ID: Final[Mapping[tuple[GameMode, Direction], utils.ObjectID]] = {v: k for k, v in ID_TO_CORR.items()}
 
 # A specific type of corridor.
 CorrKind: TypeAlias = Tuple[GameMode, Direction, Orient]
@@ -133,7 +134,7 @@ CorrSpec: TypeAlias = Tuple[Optional[GameMode], Optional[Direction], Optional[Or
 # Options are only differentiated based on mode/direction.
 OptionGroup: TypeAlias = Tuple[GameMode, Direction]
 # Number of default instances for each kind.
-CORRIDOR_COUNTS: Final[Mapping[Tuple[GameMode, Direction], Literal[1, 4, 7]]] = {
+CORRIDOR_COUNTS: Final[Mapping[tuple[GameMode, Direction], Literal[1, 4, 7]]] = {
     (GameMode.SP, Direction.ENTRY): 7,
     (GameMode.SP, Direction.EXIT): 4,
     (GameMode.COOP, Direction.ENTRY): 1,
@@ -145,11 +146,11 @@ CORRIDOR_COUNTS: Final[Mapping[Tuple[GameMode, Direction], Literal[1, 4, 7]]] = 
 class ExportedConf:
     """Data written to the pickle file for the compiler to use."""
     corridors: Mapping[CorrKind, Sequence[Corridor]]
-    global_opt_ids: Mapping[OptionGroup, FrozenSet[utils.ObjectID]]
+    global_opt_ids: Mapping[OptionGroup, frozenset[utils.ObjectID]]
     options: Mapping[utils.ObjectID, Option]
 
 
-def parse_filename(filename: str) -> Optional[Tuple[GameMode, Direction, int]]:
+def parse_filename(filename: str) -> tuple[GameMode, Direction, int] | None:
     """Parse the special format for corridor instance filenames."""
     folded = filename.casefold()
     if folded.startswith('instances/bee2_corridor/'):

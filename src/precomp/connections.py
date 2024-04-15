@@ -8,10 +8,7 @@ from collections import defaultdict
 from typing_extensions import assert_never
 
 import utils
-from connections import (
-    InputType, FeatureMode, Config, ConnType, OutNames,
-    INDICATOR_CHECK_ID, INDICATOR_TIMER_ID,
-)
+from connections import InputType, FeatureMode, Config, ConnType, OutNames
 from srctools import conv_bool
 from srctools.math import Vec, Angle, format_float
 from srctools.vmf import VMF, EntityFixup, Entity, Output
