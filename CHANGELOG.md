@@ -2,15 +2,17 @@
 
 # Version 4.44.1
 
+### New Features
+
 * Glass/grating is now generated entirely by the compiler, allowing fully 
   custom items to be made. The original glass/grating frame is now also 
   generated slightly more efficiently.
 * Added the ability to define variants for corridors. In Clean style this 
   allows specifying elevator directions, stair direction and the corridor's 
   light temperature. 
-* Fix add-game prompt failing to appear if installed fresh.
+
+# Enhancements
 * Remove some now-outdated splash screens.
-* Music can now have a volume specified in the config.
 * Added the ability to show multiple warning messages or errors for problems 
   occurring during package loading and export.
 * Added signage configuration option to the item's context menu, to help make it more visible.
@@ -26,10 +28,15 @@
 * As mentioned above, `CorridorGroup` now has `Options` blocks for specifying corridor options.
   These ultimately just set fixups on the instance. `DefaultIndex` has been replaced with just 
   `Disabled` - all corridors will now be enabled by default.
+* Music can now have a volume specified in the config.
 * Added the `AttachInputOverlay` result, which adds an overlay instance, 
   but connects it to the original as an additional input. This significantly
   simplifies logic if an additional prerequisite is required for the item to turn
   on.
+
+# Bugfixes:
+* Fix add-game prompt failing to appear if installed fresh.
+
 
 ------------------------------------------
 
