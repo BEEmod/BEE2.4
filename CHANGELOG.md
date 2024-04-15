@@ -14,7 +14,13 @@
 * Added the ability to show multiple warning messages or errors for problems 
   occurring during package loading and export.
 * Added signage configuration option to the item's context menu, to help make it more visible.
+
+### UCP-Relevant changes:
 * Added `sky_draw_first` option to skyboxes, which can fix some rendering bugs with certain materials.
+* Added the `AttachInputOverlay` result, which adds an overlay instance, 
+  but connects it to the original as an additional input. This significantly
+  simplifies logic if an additional prerequisite is required for the item to turn
+  on.
 
 ------------------------------------------
 
