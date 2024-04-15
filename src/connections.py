@@ -24,6 +24,17 @@ class ConnType(Enum):
 
     BOTH = 'both'  # Trigger both simultaneously.
 
+    @classmethod
+    def parse(cls, value: str, item_type: str) -> Self:
+        """Parse from a string."""
+        try:
+            return CONN_TYPE_NAMES[value.casefold()]
+        except KeyError:
+            raise ValueError(
+                f'Invalid default type for "{item_type}": {value}\n'
+                f'Valid values: {VALID_CONN_TYPE_NAMES}'
+            ) from None
+
 
 CONN_TYPE_NAMES: Dict[str, ConnType] = {
     'none': ConnType.DEFAULT,
@@ -37,10 +48,10 @@ CONN_TYPE_NAMES: Dict[str, ConnType] = {
     'a+b': ConnType.BOTH,
 }
 
-CONN_TYPE_NAMES.update(
-    (conn.value.casefold(), conn)
+CONN_TYPE_NAMES.update({
+    conn.value.casefold(): conn
     for conn in ConnType
-)
+})
 VALID_CONN_TYPE_NAMES = ', '.join([f'"{x}"' for x in sorted(CONN_TYPE_NAMES)])
 
 
@@ -398,15 +409,7 @@ class Config:
             sec_enable_cmd = get_outputs(conf, desc, 'sec_enable_cmd')
             sec_disable_cmd = get_outputs(conf, desc, 'sec_disable_cmd')
 
-            try:
-                default_dual = CONN_TYPE_NAMES[
-                    conf['Default_Dual', 'primary'].casefold()
-                ]
-            except KeyError:
-                raise ValueError(
-                    f'Invalid default type for "{item_id}": {conf["Default_Dual"]}\n'
-                    f'Valid values: {VALID_CONN_TYPE_NAMES}'
-                ) from None
+            default_dual = ConnType.parse(conf['default_dual', 'primary'], item_id)
 
             # We need an affinity to use when nothing else specifies it.
             if default_dual is ConnType.DEFAULT:
