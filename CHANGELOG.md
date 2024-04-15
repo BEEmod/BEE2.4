@@ -17,6 +17,15 @@
 
 ### UCP-Relevant changes:
 * Added `sky_draw_first` option to skyboxes, which can fix some rendering bugs with certain materials.
+* The barrier rework adds several new blocks to `vbsp_config`:
+  * `BarrierFrames` in `vbsp_config` contains definitions for the frame of barriers.
+  * `Barriers` in `vbsp_config` contains the definitions for the brushes to produce, and then which frame IDs to use.
+  * `BarrierHole` in `info.txt` defines a hole type. This is defined outside the item, because the different style
+    variants can be independently specified by each barrier type.
+  * The `CustomBarrier` result produces an item that converts attached glass/grating.
+* As mentioned above, `CorridorGroup` now has `Options` blocks for specifying corridor options.
+  These ultimately just set fixups on the instance. `DefaultIndex` has been replaced with just 
+  `Disabled` - all corridors will now be enabled by default.
 * Added the `AttachInputOverlay` result, which adds an overlay instance, 
   but connects it to the original as an additional input. This significantly
   simplifies logic if an additional prerequisite is required for the item to turn

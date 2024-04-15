@@ -62,9 +62,10 @@ CORNER_POINTS: Dict[FrozenVec, List[Tuple[Direction, Direction, Direction]]] = {
 
 @conditions.make_result('CustomBarrier')
 def res_cust_barrier(inst: Entity, res: Keyvalues) -> None:
-    """Convert regular glass/grating into a custom item.
+    """Convert regular glass/grating into a custom barrier type.
 
-    The specified item needs to have an output which will be connected to glass/grating.
+    The parameter is just the ID of the barrier type to produce.
+    The item this executes on needs to have an output which is connected to a glass/grating item.
     """
     try:
         barrier_type = barriers.BARRIER_TYPES[utils.obj_id(res.value)]
