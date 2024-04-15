@@ -3,23 +3,23 @@
 This allows checking which items are connected to what, and also regenerates
 the outputs with optimisations and custom settings.
 """
+from __future__ import annotations
+from typing import Optional, Iterable, Dict, List, Sequence, Set, Tuple, Iterator, Union
+from typing_extensions import assert_never, Self
 from collections import defaultdict
 
-from typing_extensions import assert_never
-
-import utils
-from connections import InputType, FeatureMode, Config, ConnType, OutNames
 from srctools import conv_bool
 from srctools.math import Vec, Angle, format_float
 from srctools.vmf import VMF, EntityFixup, Entity, Output
-from precomp.antlines import Antline, AntType, IndicatorStyle, PanelSwitchingStyle
-from precomp import instance_traits, options, packing, conditions
-import editoritems
-import consts
 import srctools.logger
 
-from typing import Optional, Iterable, Dict, List, Sequence, Set, Tuple, Iterator, Union
+from connections import InputType, FeatureMode, Config, ConnType, OutNames
+from precomp.antlines import Antline, AntType, IndicatorStyle, PanelSwitchingStyle
+from precomp import instance_traits, options, packing, conditions
+import consts
+import editoritems
 import user_errors
+import utils
 
 
 __all__ = [
@@ -240,6 +240,34 @@ class Item:
     def timer(self) -> None:
         """Remove the timer delay fixup value."""
         del self.inst.fixup[consts.FixupVars.TIM_DELAY]
+
+    def clone(self, inst: Entity, name: str) -> Item:
+        """Create a copy of this item, under a new name and using a different instance.
+
+        I/O and antlines are not cloned.
+        """
+        copy = Item.__new__(Item)
+        copy.inst = inst
+        copy.config = self.config
+
+        copy.ind_panels = set()
+        copy.antlines = set()
+        copy.shape_signs = []
+
+        copy.ind_style = self.ind_style
+        copy.ant_toggle_var = self.ant_toggle_var
+
+        copy.outputs = set()
+        copy.inputs = set()
+
+        copy.enable_cmd = self.enable_cmd
+        copy.disable_cmd = self.disable_cmd
+        copy.sec_enable_cmd = self.sec_enable_cmd
+        copy.sec_disable_cmd = self.sec_disable_cmd
+
+        copy._kv_setters = {}
+        ITEMS[name] = copy
+        return copy
 
     def output_act(self) -> Optional[Tuple[Optional[str], str]]:
         """Return the output used when this is activated."""

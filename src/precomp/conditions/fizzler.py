@@ -1,5 +1,6 @@
 """Results for custom fizzlers."""
 from srctools import Keyvalues, Entity, Vec, VMF, Matrix
+import attrs
 import srctools.logger
 
 import consts
@@ -9,7 +10,6 @@ from precomp import conditions, connections, fizzler
 
 
 COND_MOD_NAME = 'Fizzlers'
-
 LOGGER = srctools.logger.get_logger(__name__, alias='cond.fizzler')
 
 
@@ -76,8 +76,31 @@ def res_reshape_fizzler(vmf: VMF, shape_inst: Entity, res: Keyvalues) -> None:
         # Detach this connection and remove traces of it.
         conn.remove()
 
-        fizz.emitters.clear()  # Remove old positions.
-        fizz.up_axis = up_axis
+        if fizz.has_cust_position:
+            # This fizzler was already moved. We need to make a clone.
+            fizz_base = fizz.base_inst.copy()
+            vmf.add_ent(fizz_base)
+            fizz_base['targetname'] = shape_name
+            old_fizz_item = fizz_item
+            fizz = fizzler.FIZZLERS[shape_name] = attrs.evolve(
+                fizz,
+                base_inst=fizz_base,
+                emitters=[],
+                up_axis=up_axis,
+                has_cust_position=True,
+            )
+            fizz_item = old_fizz_item.clone(fizz_base, shape_name)
+            for fizz_conn in old_fizz_item.inputs:
+                connections.Connection(
+                    to_item=fizz_item,
+                    from_item=fizz_conn.from_item,
+                    conn_type=fizz_conn.type,
+                ).add()
+        else:
+            # Move the current fizzler.
+            fizz.emitters.clear()  # Remove old positions.
+            fizz.up_axis = up_axis
+            fizz.has_cust_position = True
         fizz.base_inst['origin'] = shape_inst['origin']
         fizz.base_inst['angles'] = shape_inst['angles']
         break
@@ -86,22 +109,23 @@ def res_reshape_fizzler(vmf: VMF, shape_inst: Entity, res: Keyvalues) -> None:
         # We create the fizzler instance, Fizzler object, and Item object
         # matching it.
         # This is hardcoded to use regular Emancipation Fields.
-        base_inst = conditions.add_inst(
+        fizz_base = conditions.add_inst(
             vmf,
             targetname=shape_name,
             origin=shape_inst['origin'],
             angles=shape_inst['angles'],
             file=resolve_one('<ITEM_BARRIER_HAZARD:fizz_base>', error=True),
         )
-        base_inst.fixup.update(shape_inst.fixup)
+        fizz_base.fixup.update(shape_inst.fixup)
         fizz = fizzler.FIZZLERS[shape_name] = fizzler.Fizzler(
             fizz_type=fizzler.FIZZ_TYPES['VALVE_MATERIAL_EMANCIPATION_GRID'],
             up_axis=up_axis,
-            base_inst=base_inst,
+            base_inst=fizz_base,
             emitters=[],
+            has_cust_position=True,
         )
         fizz_item = connections.Item(
-            base_inst,
+            fizz_base,
             connections.ITEM_TYPES[consts.DefaultItems.fizzler.id],
             ind_style=shape_item.ind_style,
         )
@@ -124,7 +148,6 @@ def res_reshape_fizzler(vmf: VMF, shape_inst: Entity, res: Keyvalues) -> None:
     fizz_base['origin'] = shape_inst['origin']
     origin = Vec.from_str(shape_inst['origin'])
 
-    fizz.has_cust_position = True
     # Since the fizzler is moved elsewhere, it's the responsibility of
     # the new item to have holes.
     fizz.embedded = False
