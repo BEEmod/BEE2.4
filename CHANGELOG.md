@@ -36,6 +36,7 @@
 
 # Bugfixes:
 * Fix add-game prompt failing to appear if installed fresh.
+* #2040: Warn if no compiler files were found when exporting.
 
 
 ------------------------------------------

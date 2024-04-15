@@ -36,6 +36,24 @@ if TYPE_CHECKING:
     from app.gameMan import Game
 
 
+TRANS_MISSING_FILE = TransToken.ui(
+    "Compiler file {file} missing. "
+    "You will need to verify the game's cache in Steam to get these files back. "
+    "You can then export again."
+)
+TRANS_PERMISSION_FAIL = TransToken.ui(
+    "Copying compiler file {file} failed. Ensure {game}'s map compiler is not running."
+)
+TRANS_PERMISSION_FAIL_ERROR_SERVER = TransToken.ui(
+    "Copying compiler file {file} failed. Ensure {game}'s map compiler is not running. "
+    'The webserver for the error display may also be running, quit the vrad process or'
+    ' wait a few minutes.'
+)
+TRANS_NO_COMPILER_FILES = TransToken.ui(
+    'No compiler files were found in "{folder}".'
+)
+
+
 async def is_original_executable(file: trio.Path) -> bool:
     """Check if the given application is Valve's, or ours.
 
@@ -160,11 +178,7 @@ async def backup(description: str, item_path: trio.Path, backup_path: trio.Path)
                 await item_path.unlink()
             except FileNotFoundError:
                 pass
-            raise AppError(TransToken.ui(
-                "Compiler file {file} missing. "
-                "You will need to verify the game's cache in Steam to get these files back. "
-                "You can then export again."
-            ).format(file=item_path.name))
+            raise AppError(TRANS_MISSING_FILE.format(file=item_path.name))
             # TODO: Trigger the messagebox for automatically validating.
             #       webbrowser.open('steam://validate/' + str(self.steamID))
 
@@ -209,23 +223,17 @@ async def step_copy_compiler(exp_data: ExportData) -> None:
             # running.
             if exp_data.maybe_error_server_running:
                 # Use a different error if this might be running.
-                msg = TransToken.ui(
-                    'Copying compiler file {file} failed. '
-                    "Ensure {game}'s map compiler is not running. "
-                    'The webserver for the error display may also be running, '
-                    'quit the vrad process or wait a few minutes.'
-                )
+                msg = TRANS_PERMISSION_FAIL_ERROR_SERVER
             else:
-                msg = TransToken.ui(
-                    'Copying compiler file {file} failed. '
-                    "Ensure {game}'s map compiler is not running."
-                )
+                msg = TRANS_PERMISSION_FAIL
 
             raise AppError(msg.format(file=dest, game=exp_data.game.name)) from exc
 
-    async with trio.open_nursery() as nursery, utils.aclosing(
-        STAGE_COMPILER.iterate(list(compiler_src.rglob('*')))
-    ) as agen:
+    files = list(compiler_src.rglob('*'))
+    if not files:
+        exp_data.warn(TRANS_NO_COMPILER_FILES.format(folder=compiler_src))
+
+    async with trio.open_nursery() as nursery, utils.aclosing(STAGE_COMPILER.iterate(files)) as agen:
         async for comp_file in agen:
             # Ignore folders.
             if comp_file.is_dir():
