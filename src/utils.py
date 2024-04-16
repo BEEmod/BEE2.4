@@ -25,6 +25,7 @@ import math
 
 from srctools.math import Angle
 import trio
+import trio_util
 
 
 __all__ = [
@@ -691,6 +692,15 @@ def not_none(value: T | None) -> T:
     if value is None:
         raise AssertionError('Value was none!')
     return value
+
+
+def val_setter(aval: trio_util.AsyncValue[T], value: T) -> Callable[[], None]:
+    """Create a setter that sets the value when called."""
+    def func() -> None:
+        """Set the provided value."""
+        aval.value = value
+
+    return func
 
 
 def get_indent(line: str) -> str:

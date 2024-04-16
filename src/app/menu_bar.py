@@ -117,7 +117,7 @@ class MenuBar:
             bar.add_cascade(menu=self.dev_menu, label='Dev')
 
             from ui_tk import devmenu
-            devmenu.make_menu(self.dev_menu)
+            background_run(devmenu.menu_task, self.dev_menu)
 
     def set_export_allowed(self, allowed: bool) -> None:
         """Configure if exporting is allowed from the UI."""
