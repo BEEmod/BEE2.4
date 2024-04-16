@@ -23,6 +23,7 @@ import json
 from hypercorn.config import Config
 from hypercorn.trio import serve
 from quart_trio import QuartTrio
+import psutil
 import quart
 import trio
 
@@ -45,9 +46,10 @@ LOGS = {'vbsp': '', 'vrad': ''}
 config = Config()
 config.bind = ["localhost:0"]  # Use localhost, request any free port.
 DELAY = 5 * 60  # After 5 minutes of no response, quit.
-# This cancel scope is cancelled after no response from the client, to shut us down.
-# It starts with an infinite deadline, to ensure there's time to boot the server.
-TIMEOUT_CANCEL = trio.CancelScope(deadline=math.inf)
+# This cancel scope is cancelled when the server should be shutdown.
+# That happens either if Portal 2 is detected to quit, or if no response is heard from clients
+# for DELAY seconds. It starts with an infinite deadline, to ensure there's time to boot the server.
+SHUTDOWN_SCOPE = trio.CancelScope(deadline=math.inf)
 
 current_error = ErrorInfo(message=TOK_ERR_MISSING)
 
@@ -121,14 +123,49 @@ async def route_static_js(filename: str) -> quart.ResponseReturnValue:
 async def route_shutdown() -> quart.ResponseReturnValue:
     """Called by the application to force us to shut down so this can be updated."""
     LOGGER.info('Recieved shutdown request!')
-    TIMEOUT_CANCEL.cancel()
+    SHUTDOWN_SCOPE.cancel()
     return 'DONE'
+
+
+async def check_portal2(allow_exit: trio.Event) -> None:
+    """Check if Portal 2 is our parent process, and if so exit early when that dies."""
+    try:
+        try:
+            proc_server = await trio.to_thread.run_sync(psutil.Process)
+            parents = await trio.to_thread.run_sync(proc_server.parents)
+            LOGGER.debug('Parents: {}', parents)
+        except psutil.NoSuchProcess as exc:
+            LOGGER.warning("We don't exist?", exc_info=exc)
+            return
+        for process in parents:
+            if trio.Path(process.name()).stem.casefold() == 'portal2':
+                LOGGER.info('Portal 2 = {}', process)
+                proc_portal = process
+                break
+        else:
+            LOGGER.info('No Portal 2 process found. Assuming a manual call...')
+            # Don't immediately abort, we're run manually.
+            return
+
+        # Wait for the server to init, then wait for Portal 2 to quit. At that point
+        # immediately stop the server.
+        await allow_exit.wait()
+        if proc_portal.is_running():
+            # Since we can immediately quit when Portal 2 does, disable the timeout.
+            SHUTDOWN_SCOPE.deadline = math.inf
+            LOGGER.info('Waiting for Portal 2 to quit...')
+            await trio.to_thread.run_sync(proc_portal.wait)
+        LOGGER.info('Portal 2 quit!')
+        SHUTDOWN_SCOPE.cancel()
+    except psutil.AccessDenied as exc:
+        LOGGER.warning('Failed to detect if Portal 2 is closed:', exc_info=exc)
 
 
 def update_deadline() -> None:
     """When interacted with, the deadline is reset into the future."""
-    TIMEOUT_CANCEL.deadline = trio.current_time() + DELAY
-    LOGGER.info('Reset deadline!')
+    if math.isfinite(SHUTDOWN_SCOPE.deadline):
+        SHUTDOWN_SCOPE.deadline = trio.current_time() + DELAY
+        LOGGER.info('Reset deadline!')
 
 
 @attrs.define(eq=False)
@@ -192,9 +229,9 @@ async def main() -> None:
 
     async def timeout_func() -> None:
         """Triggers the server to shut down with this cancel scope."""
-        with TIMEOUT_CANCEL:
+        with SHUTDOWN_SCOPE:
             await trio.sleep_forever()
-        LOGGER.info('Timeout elapsed.')
+        LOGGER.info('Shutdown triggered.')
         # Allow nursery to exit.
         stop_sleeping.cancel()
 
@@ -210,17 +247,24 @@ async def main() -> None:
         nursery.start_soon(load_compiler, 'vrad')
         nursery.start_soon(load_info)
 
+    allow_exit = trio.Event()
+
     SERVER_INFO_FILE.unlink(missing_ok=True)
     try:
         async with trio.open_nursery() as nursery:
+            nursery.start_soon(check_portal2, allow_exit)
+            await trio.lowlevel.checkpoint()
             binds = await nursery.start(functools.partial(
                 serve,
                 app, config,
-                shutdown_trigger=timeout_func
+                shutdown_trigger=timeout_func,
             ))
-            # Set deadline after app is ready.
-            TIMEOUT_CANCEL.deadline = trio.current_time() + DELAY
-            LOGGER.info('Current time: ', trio.current_time(), 'Deadline:', TIMEOUT_CANCEL.deadline)
+            # Set deadline after app is ready, and let check_portal2 do checks.
+            SHUTDOWN_SCOPE.deadline = trio.current_time() + DELAY
+            LOGGER.info(
+                'Current time= {}, deadline={}',
+                trio.current_time(), SHUTDOWN_SCOPE.deadline,
+            )
             if len(binds):
                 url, port = binds[0].rsplit(':', 1)
                 with srctools.AtomicWriter(SERVER_INFO_FILE) as f:
@@ -231,7 +275,8 @@ async def main() -> None:
             else:
                 return  # No connection?
             with stop_sleeping:
+                allow_exit.set()
                 await trio.sleep_forever()
     finally:
         SERVER_INFO_FILE.unlink(missing_ok=True)  # We quit, indicate that.
-    LOGGER.info('Shut down successfully.')
+    LOGGER.info('Shutdown successfully.')

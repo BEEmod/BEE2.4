@@ -16,6 +16,7 @@
 * Added the ability to show multiple warning messages or errors for problems 
   occurring during package loading and export.
 * Added signage configuration option to the item's context menu, to help make it more visible.
+* Shut down the error server automatically when Portal 2 quits.
 
 ### UCP-Relevant changes:
 * Added `sky_draw_first` option to skyboxes, which can fix some rendering bugs with certain materials.
