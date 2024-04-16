@@ -4,7 +4,6 @@ This controls how I/O is generated for each item.
 """
 from __future__ import annotations
 from typing import Dict, Final, Iterable
-from typing_extensions import Self
 from enum import Enum
 import sys
 
@@ -25,7 +24,7 @@ class ConnType(Enum):
     BOTH = 'both'  # Trigger both simultaneously.
 
     @classmethod
-    def parse(cls, value: str, item_type: str) -> Self:
+    def parse(cls, value: str, item_type: str) -> ConnType:
         """Parse from a string."""
         try:
             return CONN_TYPE_NAMES[value.casefold()]
@@ -211,7 +210,7 @@ class TimerCommand:
     fadetime_add_timer: bool = attrs.field(kw_only=True)  # If set, add $timer_delay to fade-time.
 
     @classmethod
-    def parse(cls, kv: Keyvalues, desc: str) -> Self:
+    def parse(cls, kv: Keyvalues, desc: str) -> TimerCommand:
         """Parse a command from keyvalues."""
         output = get_input('output', desc, kv['output', ''])
         if output is None:
