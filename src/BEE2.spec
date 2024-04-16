@@ -237,6 +237,7 @@ EXCLUDES = [
     'idlelib.textView',
 
     'numpy',  # PIL.ImageFilter imports, we don't need NumPy!
+    'stackscope',  # Only used in dev.
 
     'bz2',  # We aren't using this compression format (shutil, zipfile etc handle ImportError)..
 

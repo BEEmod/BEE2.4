@@ -1,6 +1,7 @@
 """Options specifically for app development."""
+from __future__ import annotations
 from typing_extensions import NoReturn
-from typing import Callable, Tuple
+from collections.abc import Callable
 from tkinter import ttk
 import tkinter as tk
 import pprint
@@ -38,12 +39,32 @@ def dump_widgets() -> None:
         else:
             f.write('\n')
 
-    with open('../dev/widget_tree.txt', 'w') as f:
+    with open('../reports/widget_tree.txt', 'w') as f:
         dump(TK_ROOT, '')
     LOGGER.info('Dump done!')
 
 
-def crasher(nursery: trio.Nursery, exc: BaseException) -> Tuple[Callable[[], object], Callable[[], object]]:
+def dump_tasktree() -> str:
+    """Write out the full tree of tasks."""
+    try:
+        import stackscope
+    except ImportError:
+        # Don't add this as a dependency.
+        return '<No stackscope module>'
+    stack = stackscope.extract(trio.lowlevel.current_root_task(), recurse_child_tasks=True)
+    with open('../reports/tasks.txt', 'w', encoding='utf8') as f:
+        f.write(str(stack))
+    return str(stack)
+
+
+def stats_trio() -> str:
+    """Include trio's stats."""
+    return 'Trio = ' + pprint.pformat(
+        attrs.asdict(trio.lowlevel.current_statistics(), recurse=True)
+    )
+
+
+def crasher(nursery: trio.Nursery, exc: BaseException) -> tuple[Callable[[], object], Callable[[], object]]:
     """Make a function that raises an exception, to test crash handlers. This returns a sync and async pair."""
     def fg_raise() -> NoReturn:
         """Raise in the foreground."""
@@ -69,6 +90,7 @@ async def menu_task(menu: tk.Menu) -> None:
 
         menu.add_command(label='Dump widgets', command=dump_widgets)
         menu.add_command(label='Stats', command=await nursery.start(stats_window_task))
+        menu.add_command(label='Dump Tasks', command=dump_tasktree)
 
         menu.add_cascade(label='Crash', menu=(crash_menu := tk.Menu(menu)))
 
@@ -95,6 +117,12 @@ async def stats_window_task(task_status: trio.TaskStatus[Callable[[], object]]) 
     open_val = trio_util.AsyncBool()
     window.protocol("WM_DELETE_WINDOW", utils.val_setter(open_val, False))
 
+    stat_funcs = [
+        TK_IMG.stats,
+        wid_transtoken.stats,
+        stats_trio,
+    ]
+
     task_status.started(utils.val_setter(open_val, True))
     while True:
         await open_val.wait_value(True)
@@ -103,13 +131,7 @@ async def stats_window_task(task_status: trio.TaskStatus[Callable[[], object]]) 
         ticker = False
         async with trio_util.move_on_when(open_val.wait_value, False):
             while True:
-                label['text'] = '\n'.join([
-                    TK_IMG.stats(),
-                    wid_transtoken.stats(),
-                    'Trio = ' + pprint.pformat(
-                        attrs.asdict(trio.lowlevel.current_statistics(), recurse=True)
-                    ),
-                ])
+                label['text'] = '\n'.join([func() for func in stat_funcs])
                 ticker = not ticker
                 ticker_lbl['text'] = '|' if ticker else '-'
                 await trio.sleep(1.0)
