@@ -81,19 +81,18 @@ class NullSound:
         """Play a sound effect.
 
         This waits for a certain amount of time between retriggering sounds
-        so they don't overlap.
+        so that they don't overlap.
         """
         if play_fx() and self._block_count == 0:
             self._block_count += 1
             try:
-                duration = await self.fx(sound)
-                await trio.sleep(duration)
+                await self.fx(sound)
             finally:
                 self._block_count -= 1
 
-    async def fx(self, sound: str) -> float:
-        """Play a sound effect, and return its expected length."""
-        return 0.0
+    async def fx(self, sound: str) -> None:
+        """Play a sound effect, sleeping for the duration."""
+        await trio.lowlevel.checkpoint()
 
 
 class PygletSound(NullSound):
@@ -126,8 +125,8 @@ class PygletSound(NullSound):
             self.sources[name] = src
             return src
 
-    async def fx(self, sound: str) -> float:
-        """Play a sound effect, and return its expected length."""
+    async def fx(self, sound: str) -> None:
+        """Play a sound effect, sleeping for the duration."""
         global sounds
         if play_fx():
             try:
@@ -145,14 +144,14 @@ class PygletSound(NullSound):
                 if _nursery is not None:
                     _nursery.cancel_scope.cancel()
                 sounds = NullSound()
-                return 0.1
+                await trio.sleep(0.1)
             duration: float | None = snd.duration
             if duration is not None:
-                return duration
+                await trio.sleep(duration)
             else:
                 LOGGER.warning('No duration: {}', sound)
-                return 0.75  # Should be long enough.
-        return 0.0
+                await trio.sleep(0.75)  # Should be long enough.
+        await trio.lowlevel.checkpoint()
 
 
 async def sound_task() -> None:
