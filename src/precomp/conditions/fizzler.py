@@ -5,41 +5,57 @@ import srctools.logger
 
 import consts
 import user_errors
+import utils
 from precomp.instanceLocs import resolve_one
 from precomp import conditions, connections, fizzler
 
 
 COND_MOD_NAME = 'Fizzlers'
 LOGGER = srctools.logger.get_logger(__name__, alias='cond.fizzler')
+EMANCIPATION_GRID = utils.obj_id('VALVE_MATERIAL_EMANCIPATION_GRID')
 
 
 @conditions.make_test('FizzlerType')
-def test_fizz_type(inst: Entity, kv: Keyvalues) -> bool:
+def test_fizz_type(kv: Keyvalues) -> conditions.TestCallable:
     """Check if a fizzler is the specified type name."""
-    try:
-        fizz = fizzler.FIZZLERS[inst['targetname']]
-    except KeyError:
-        return False
-    return fizz.fizz_type.id.casefold() == kv.value.casefold()
+    fizz_id = utils.obj_id(kv.value, 'fizzler')
+
+    def test(inst: Entity) -> bool:
+        """Do the check."""
+        try:
+            fizz = fizzler.FIZZLERS[inst['targetname']]
+        except KeyError:
+            return False
+        return fizz.fizz_type.id == fizz_id
+
+    return test
 
 
 @conditions.make_result('ChangeFizzlerType', valid_before=conditions.MetaCond.Fizzler)
-def res_change_fizzler_type(inst: Entity, res: Keyvalues) -> None:
+def res_change_fizzler_type(res: Keyvalues) -> conditions.ResultCallable:
     """Change the type of the fizzler. Only valid when run on the base instance."""
-    fizz_name = inst['targetname']
     try:
-        fizz = fizzler.FIZZLERS[fizz_name]
+        fizz_type = fizzler.FIZZ_TYPES[utils.obj_id(res.value, 'fizzler')]
     except KeyError:
-        raise user_errors.UserError(user_errors.TOK_WRONG_ITEM_TYPE.format(
-            item=fizz_name,
+        raise user_errors.UserError(user_errors.TOK_UNKNOWN_ID.format(
             kind='Fizzler',
-            inst=inst['file'],
+            id=res.value,
         )) from None
+    fizz_id = utils.obj_id(res.value, 'fizzler')
 
-    try:
-        fizz.fizz_type = fizzler.FIZZ_TYPES[res.value]
-    except KeyError:
-        raise user_errors.UserError(user_errors.TOK_UNKNOWN_ID.format(kind='Fizzler', id=res.value)) from None
+    def convert(inst: Entity) -> None:
+        """Modify the specified fizzler."""
+        fizz_name = inst['targetname']
+        try:
+            fizzler.FIZZLERS[fizz_name].fizz_type = fizz_type
+        except KeyError:
+            raise user_errors.UserError(user_errors.TOK_WRONG_ITEM_TYPE.format(
+                item=fizz_name,
+                kind='Fizzler',
+                inst=inst['file'],
+            )) from None
+
+    return convert
 
 
 @conditions.make_result(
@@ -118,7 +134,7 @@ def res_reshape_fizzler(vmf: VMF, shape_inst: Entity, res: Keyvalues) -> None:
         )
         fizz_base.fixup.update(shape_inst.fixup)
         fizz = fizzler.FIZZLERS[shape_name] = fizzler.Fizzler(
-            fizz_type=fizzler.FIZZ_TYPES['VALVE_MATERIAL_EMANCIPATION_GRID'],
+            fizz_type=fizzler.FIZZ_TYPES[EMANCIPATION_GRID],
             up_axis=up_axis,
             base_inst=fizz_base,
             emitters=[],

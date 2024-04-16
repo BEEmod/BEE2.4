@@ -28,7 +28,7 @@ import user_errors
 COND_MOD_NAME: str | None = None
 LOGGER = logger.get_logger(__name__)
 
-FIZZ_TYPES: dict[str, FizzlerType] = {}
+FIZZ_TYPES: dict[utils.ObjectID, FizzlerType] = {}
 FIZZLERS: dict[str, Fizzler] = {}
 
 # Fizzler textures are higher-res than laserfields.
@@ -164,7 +164,7 @@ def read_configs(conf: Keyvalues) -> None:
 class FizzlerType:
     """Implements a specific fizzler type."""
     # Name for the item.
-    id: str
+    id: utils.ObjectID
 
     # The item ID(s) this fizzler is produced from, optionally
     # with a :laserfield or :fizzler suffix to choose a specific
@@ -218,7 +218,7 @@ class FizzlerType:
     @classmethod
     def parse(cls, conf: Keyvalues) -> Self:
         """Read in a fizzler from a config."""
-        fizz_id = conf['id']
+        fizz_id = utils.obj_id(conf['id'])
         item_ids = [
             prop.value.upper()
             for prop in
@@ -686,7 +686,7 @@ class FizzlerBrush:
             self.textures[group] = textures.get(group, None)
 
     @classmethod
-    def parse(cls, conf: Keyvalues, fizz_id: str) -> FizzlerBrush:
+    def parse(cls, conf: Keyvalues, fizz_id: utils.ObjectID) -> FizzlerBrush:
         """Parse from a config file."""
         if 'side_color' in conf:
             side_color = conf.vec('side_color')

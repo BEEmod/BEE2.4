@@ -20,7 +20,7 @@ COND_MOD_NAME: str | None = None
 LOGGER = srctools.logger.get_logger(__name__)
 
 # Fizzler type ID for Gel Gun Activator.
-TAG_FIZZ_ID = 'TAG_GEL_GUN'
+TAG_FIZZ_ID = utils.obj_id('TAG_GEL_GUN')
 # Special version with gel logic.
 TRANSITION_ENTS = 'instances/bee2/transition_ents_tag.vmf'
 FIZZLER_CONN_ID = utils.special_id('<TAG_FIZZER>')
