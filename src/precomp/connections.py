@@ -1399,7 +1399,7 @@ def add_item_indicators(
         else:
             needs_toggle = has_ant and not has_sign
     else:
-        raise assert_never(inst_type)
+        assert_never(inst_type)
 
     first_inst = True
 
