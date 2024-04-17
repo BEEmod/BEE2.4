@@ -3,11 +3,12 @@ import pytest
 from srctools import Keyvalues
 from srctools.dmx import Attribute, Element, ValueType
 
-from config.widgets import TimerNum, WidgetConfig
+from config.widgets import TIMER_STR_INF, TimerNum, WidgetConfig
 
 
 # Sample set of timer delays.
 TIMER_DICT = {
+    TIMER_STR_INF: "1",
     TimerNum("3"): "180",
     TimerNum("4"): "240",
     TimerNum("5"): "300",
@@ -94,7 +95,7 @@ def test_parse_kv1_timer() -> None:
 def test_export_kv1_timer() -> None:
     """Test producing new keyvalues1 data, with a timer value."""
     kv = WidgetConfig(TIMER_DICT.copy()).export_kv1()
-    assert len(kv) == 28
+    assert len(kv) == 29
     for num, value in TIMER_DICT.items():
         assert kv[num] == value, f'kv[{num!r}]'
 
@@ -126,7 +127,7 @@ def test_parse_dmx_timer() -> None:
 def test_export_dmx_timer() -> None:
     """Test constructing DMX configs, with a timer value."""
     elem = WidgetConfig(TIMER_DICT.copy()).export_dmx()
-    assert len(elem) == 28 + 1  # Also name.
+    assert len(elem) == 29 + 1  # Also name.
     for num, value in TIMER_DICT.items():
         attr = elem[f'tim_{num}']
         assert attr.type is ValueType.STRING

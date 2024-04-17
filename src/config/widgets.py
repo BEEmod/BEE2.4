@@ -16,7 +16,7 @@ TimerNum = NewType('TimerNum', str)
 TIMER_NUM: List[TimerNum] = cast(List[TimerNum], list(map(str, range(3, 31))))
 TIMER_STR_INF: TimerNum = cast(TimerNum, 'inf')
 TIMER_NUM_INF: List[TimerNum] = [TIMER_STR_INF, *TIMER_NUM]
-VALID_NUMS = set(TIMER_NUM)
+VALID_NUMS = set(TIMER_NUM_INF)
 
 
 def parse_timer(value: str) -> TimerNum:
