@@ -91,7 +91,7 @@ async def apply_config(data: Layout) -> None:
             continue
 
         value = data.signs.get(timer, '')
-        if value:
+        if value != "":
             slot.contents = PakRef(Signage, value)
         else:
             slot.contents = None
@@ -105,7 +105,7 @@ def style_changed(new_style_id: utils.ObjectID) -> None:
         drag_man.load_icons()
 
 
-async def init_widgets(tk_img: TKImages, trigger: 'EdgeTrigger[()]') -> None:
+async def init_widgets(tk_img: TKImages, trigger: EdgeTrigger[()]) -> None:
     """Construct the widgets, then handle opening/closing the view."""
     window.resizable(True, True)
     set_win_title(window, TransToken.ui('Configure Signage'))

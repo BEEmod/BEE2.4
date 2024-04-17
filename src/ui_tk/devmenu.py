@@ -103,7 +103,6 @@ async def menu_task(menu: tk.Menu) -> None:
 
 async def stats_window_task(task_status: trio.TaskStatus[Callable[[], object]]) -> None:
     """Create the statistics window."""
-    cancel_scope = trio.CancelScope()
     window = tk.Toplevel(TK_ROOT, name='statsWin')
     window.withdraw()
 

@@ -35,7 +35,7 @@ class Orient(Enum):
     DOWN = DN = 'down'
 
     @property
-    def flipped(self) -> 'Orient':
+    def flipped(self) -> Orient:
         """Return the orient flipped along Z."""
         if self is Orient.UP:
             return Orient.DN

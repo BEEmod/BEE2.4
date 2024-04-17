@@ -1,20 +1,23 @@
 """Manages reading general options from vbsp_config."""
-from typing import Dict, Generic, Iterator, Optional, TextIO, Tuple, Type, TypeVar, Union, overload
+from __future__ import annotations
+from typing import Generic, TypeVar, Union, overload
+from typing_extensions import TypeAlias
+
+from collections.abc import Iterator
 from enum import Enum
 import inspect
 import math
-import trio
 
 from srctools import Keyvalues, Vec, parse_vec_str
 import srctools.logger
-from typing_extensions import TypeAlias
+import trio
 
 from BEE2_config import ConfigFile
 
 
 LOGGER = srctools.logger.get_logger(__name__)
 OptionType: TypeAlias = Union[str, int, float, bool, Vec]
-SETTINGS: Dict[str, Optional[OptionType]] = {}
+SETTINGS: dict[str, OptionType | None] = {}
 ITEM_CONFIG = ConfigFile('item_cust_configs.cfg')
 
 
@@ -35,9 +38,9 @@ class Opt(Generic[OptionT]):
     def __init__(
         self,
         opt_id: str,
-        kind: Type[OptionT],
+        kind: type[OptionT],
         doc: str,
-        fallback: Optional[str] = None,
+        fallback: str | None = None,
         hidden: bool = False,
     ) -> None:
         self.type = kind
@@ -54,9 +57,9 @@ class Opt(Generic[OptionT]):
     def string_or_none(
         cls, opt_id: str, doc: str,
         *,
-        fallback: Optional[str] = None,
+        fallback: str | None = None,
         hidden: bool = False,
-    ) -> 'Opt[str]':
+    ) -> Opt[str]:
         """A string option, which can be unset."""
         return Opt(opt_id, str, doc, fallback, hidden)
 
@@ -64,9 +67,9 @@ class Opt(Generic[OptionT]):
     def int_or_none(
         cls, opt_id: str, doc: str,
         *,
-        fallback: Optional[str] = None,
+        fallback: str | None = None,
         hidden: bool = False,
-    ) -> 'Opt[int]':
+    ) -> Opt[int]:
         """An integer option, which can be unset."""
         return Opt(opt_id, int, doc, fallback, hidden)
 
@@ -74,9 +77,9 @@ class Opt(Generic[OptionT]):
     def float_or_none(
         cls, opt_id: str, doc: str,
         *,
-        fallback: Optional[str] = None,
+        fallback: str | None = None,
         hidden: bool = False,
-    ) -> 'Opt[float]':
+    ) -> Opt[float]:
         """A float option, which can be unset."""
         return Opt(opt_id, float, doc, fallback, hidden)
 
@@ -84,9 +87,9 @@ class Opt(Generic[OptionT]):
     def bool_or_none(
         cls, opt_id: str, doc: str,
         *,
-        fallback: Optional[str] = None,
+        fallback: str | None = None,
         hidden: bool = False,
-    ) -> 'Opt[bool]':
+    ) -> Opt[bool]:
         """A boolean option, which can be unset."""
         return Opt(opt_id, bool, doc, fallback, hidden)
 
@@ -94,9 +97,9 @@ class Opt(Generic[OptionT]):
     def vec_or_none(
         cls, opt_id: str, doc: str,
         *,
-        fallback: Optional[str] = None,
+        fallback: str | None = None,
         hidden: bool = False,
-    ) -> 'Opt[Vec]':
+    ) -> Opt[Vec]:
         """A boolean option, which can be unset."""
         return Opt(opt_id, Vec, doc, fallback, hidden)
 
@@ -104,9 +107,9 @@ class Opt(Generic[OptionT]):
     def string(
         cls, opt_id: str, default: str, doc: str,
         *,
-        fallback: Optional[str] = None,
+        fallback: str | None = None,
         hidden: bool = False,
-    ) -> 'OptWithDefault[str]':
+    ) -> OptWithDefault[str]:
         """A string option, with a default value."""
         return OptWithDefault(opt_id, default, doc, fallback, hidden)
 
@@ -114,9 +117,9 @@ class Opt(Generic[OptionT]):
     def integer(
         cls, opt_id: str, default: int, doc: str,
         *,
-        fallback: Optional[str] = None,
+        fallback: str | None = None,
         hidden: bool = False,
-    ) -> 'OptWithDefault[int]':
+    ) -> OptWithDefault[int]:
         """An integer option, with a default value."""
         return OptWithDefault(opt_id, default, doc, fallback, hidden)
 
@@ -124,9 +127,9 @@ class Opt(Generic[OptionT]):
     def float_num(
         cls, opt_id: str, default: float, doc: str,
         *,
-        fallback: Optional[str] = None,
+        fallback: str | None = None,
         hidden: bool = False,
-    ) -> 'OptWithDefault[float]':
+    ) -> OptWithDefault[float]:
         """A float option, with a default value."""
         return OptWithDefault(opt_id, default, doc, fallback, hidden)
 
@@ -134,9 +137,9 @@ class Opt(Generic[OptionT]):
     def boolean(
         cls, opt_id: str, default: bool, doc: str,
         *,
-        fallback: Optional[str] = None,
+        fallback: str | None = None,
         hidden: bool = False,
-    ) -> 'OptWithDefault[bool]':
+    ) -> OptWithDefault[bool]:
         """A bool option, with a default value."""
         return OptWithDefault(opt_id, default, doc, fallback, hidden)
 
@@ -144,13 +147,13 @@ class Opt(Generic[OptionT]):
     def vector(
         cls, opt_id: str, default: Vec, doc: str,
         *,
-        fallback: Optional[str] = None,
+        fallback: str | None = None,
         hidden: bool = False,
-    ) -> 'OptWithDefault[Vec]':
+    ) -> OptWithDefault[Vec]:
         """A vector option, with a default value."""
         return OptWithDefault(opt_id, default, doc, fallback, hidden)
 
-    def __call__(self) -> Optional[OptionT]:
+    def __call__(self) -> OptionT | None:
         """Get the value of the option. The value can be none if it was never set."""
         try:
             val = SETTINGS[self.id]
@@ -167,7 +170,7 @@ class Opt(Generic[OptionT]):
         assert self.type is type(val)
         return val
 
-    def as_enum(self: 'Opt[str]', enum: Type[EnumT]) -> EnumT:
+    def as_enum(self: Opt[str], enum: type[EnumT]) -> EnumT:
         """Get an option, constraining it to an enumeration.
 
         If it fails, a warning is produced and the first value in the enum is returned.
@@ -184,7 +187,7 @@ class Opt(Generic[OptionT]):
             )
             return next(iter(enum))
 
-    def parse(self, value: str) -> Optional[OptionT]:
+    def parse(self, value: str) -> OptionT | None:
         """Parse a value to the type specified by this config."""
         # self.type -> OptionT doesn't work for type checking, so cast.
         if self.type is Vec:
@@ -195,7 +198,7 @@ class Opt(Generic[OptionT]):
             else:
                 return Vec(*parsed_vals)  # type: ignore
         elif self.type is bool:
-            parsed: Optional[bool] = srctools.conv_bool(value, None)
+            parsed: bool | None = srctools.conv_bool(value, None)
             return parsed  # type: ignore
         else:  # int, float, str - no special handling...
             try:
@@ -211,7 +214,7 @@ class OptWithDefault(Opt[OptionT], Generic[OptionT]):
         opt_id: str,
         default: OptionT,
         doc: str,
-        fallback: Optional[str] = None,
+        fallback: str | None = None,
         hidden: bool = False,
     ) -> None:
         super().__init__(opt_id, type(default), doc, fallback, hidden)
@@ -232,7 +235,7 @@ class OptWithDefault(Opt[OptionT], Generic[OptionT]):
 def load(opt_blocks: Iterator[Keyvalues]) -> None:
     """Read settings from the given property block."""
     SETTINGS.clear()
-    set_vals: Dict[str, str] = {}
+    set_vals: dict[str, str] = {}
     for opt_block in opt_blocks:
         for prop in opt_block:
             set_vals[prop.name] = prop.value
@@ -241,7 +244,7 @@ def load(opt_blocks: Iterator[Keyvalues]) -> None:
     if len(options) != len(_ALL_OPTIONS):
         from collections import Counter
 
-        # Find ids used more than once..
+        # Find ids used more than once...
         raise Exception('Duplicate option(s)! ({})'.format(', '.join(
             k for k, v in
             Counter(opt.id for opt in _ALL_OPTIONS).items()
@@ -261,7 +264,7 @@ def load(opt_blocks: Iterator[Keyvalues]) -> None:
         except KeyError:
             if opt.fallback is not None:
                 fallback_opts.append(opt)
-                assert opt.fallback in options, 'Invalid fallback in ' + opt.id
+                assert opt.fallback in options, f'Invalid fallback in {opt.id}'
             else:
                 SETTINGS[opt.id] = default
             continue
@@ -300,23 +303,23 @@ def set_opt(opt_name: str, value: str) -> None:
 
 @overload
 def get_itemconf(
-    name: Union[str, Tuple[str, str]],
+    name: str | tuple[str, str],
     default: OptionT,
-    timer_delay: Optional[int] = None,
+    timer_delay: int | None = None,
 ) -> OptionT: ...
 @overload
 def get_itemconf(
-    name: Union[str, Tuple[str, str]],
+    name: str | tuple[str, str],
     default: None,
-    timer_delay: Optional[int] = None,
-) -> Optional[str]: ...
+    timer_delay: int | None = None,
+) -> str | None: ...
 
 
 def get_itemconf(
-    name: Union[str, Tuple[str, str]],
-    default: Optional[OptionT],
-    timer_delay: Optional[int] = None,
-) -> Optional[OptionT]:
+    name: str | tuple[str, str],
+    default: OptionT | None,
+    timer_delay: int | None = None,
+) -> OptionT | None:
     """Get an itemconfig value.
 
     The name should be an 'ID:Section', or a tuple of the same.
@@ -348,7 +351,7 @@ def get_itemconf(
     if not value:
         return default
 
-    result: Union[str, Vec, bool, float, None]
+    result: str | Vec | bool | float | None
     if isinstance(default, str) or default is None:
         return value  # type: ignore
 
@@ -404,6 +407,7 @@ async def dump_info(filename: trio.Path) -> None:
                 desc='\n'.join(opt.doc),
             ))
     LOGGER.info('Written options page!')
+
 
 GOO_MIST = Opt.boolean(
     'goo_mist', False,
@@ -527,7 +531,8 @@ REMOVE_EXIT_SIGNS = Opt.boolean(
     This does not apply if signExitInst is set and the overlays are next to
     each other.
     """)
-REMOVE_EXIT_SIGNS_DUAL = Opt.boolean('remove_exit_signs_dual', True,
+REMOVE_EXIT_SIGNS_DUAL = Opt.boolean(
+    'remove_exit_signs_dual', True,
     """Remove the exit sign overlays if signExitInst is set and they're 
     next to each other.
     """)
