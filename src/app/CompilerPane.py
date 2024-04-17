@@ -72,7 +72,7 @@ PLAYER_MODELS = {
 assert PLAYER_MODELS.keys() == set(PLAYER_MODEL_ORDER)
 
 
-class _WidgetsDict(TypedDict, total=False):
+class _WidgetsDict(TypedDict):
     """TODO: Remove."""
     refresh_counts: ttk.Button
     packfile_filefield: tk_tools.FileField
@@ -91,7 +91,7 @@ class _WidgetsDict(TypedDict, total=False):
 COMPILE_CFG = BEE2_config.ConfigFile('compile.cfg')
 COMPILE_CFG.set_defaults(COMPILE_DEFAULTS)
 window: SubPane.SubPane
-UI: _WidgetsDict = {}
+UI: _WidgetsDict = cast(_WidgetsDict, {})
 
 chosen_thumb = tk.StringVar(
     value=COMPILE_CFG.get_val('Screenshot', 'Type', 'AUTO')

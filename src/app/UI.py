@@ -1,5 +1,7 @@
 """Main UI module, brings everything together."""
-from typing import List, Type, Dict, Tuple, Optional, Set, Iterator, Callable, TypedDict, Union
+from typing import (
+    List, Type, Dict, Tuple, Optional, Set, Iterator, Callable, TypedDict, Union, cast,
+)
 import tkinter as tk
 from tkinter import ttk
 import itertools
@@ -107,21 +109,21 @@ class DragWin(tk.Toplevel):
     drag_item: Optional['PalItem']  # The item currently being moved
 
 
-class _WindowsDict(TypedDict, total=False):
+class _WindowsDict(TypedDict):
     """TODO: Remove."""
     drag_win: DragWin
     opt: SubPane.SubPane
     pal: SubPane.SubPane
 
 
-class _FramesDict(TypedDict, total=False):
+class _FramesDict(TypedDict):
     """TODO: Remove."""
     picker: ttk.Frame
     preview: tk.Frame
     toolMenu: tk.Frame
 
 
-class _UIDict(TypedDict, total=False):
+class _UIDict(TypedDict):
     """TODO: Remove."""
     conf_voice: ttk.Button
     pal_export: ttk.Button
@@ -135,9 +137,9 @@ class _UIDict(TypedDict, total=False):
 
 
 # Holds the TK Toplevels, frames, widgets and menus
-windows: _WindowsDict = {}
-frames: _FramesDict = {}
-UI: _UIDict = {}
+windows: _WindowsDict = cast(_WindowsDict, {})
+frames: _FramesDict = cast(_FramesDict, {})
+UI: _UIDict = cast(_UIDict, {})
 
 
 class Item:

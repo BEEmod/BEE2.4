@@ -3,7 +3,7 @@ from __future__ import annotations
 import functools
 from decimal import Decimal
 from enum import Enum
-from typing import Iterable, TypedDict
+from typing import Iterable, TypedDict, cast
 from configparser import SectionProxy
 
 import tkinter as tk
@@ -30,12 +30,12 @@ LOGGER = srctools.logger.get_logger(__name__)
 voice_item: QuotePack | None = None
 
 
-class _WidgetsDict(TypedDict, total=False):
+class _WidgetsDict(TypedDict):
     """TODO Remove."""
     tabs: ttk.Notebook
     trans: tk.Text
 
-UI: _WidgetsDict = {}
+UI: _WidgetsDict = cast(_WidgetsDict, {})
 TABS: list[Tab] = []
 
 QUOTE_FONT = tk_nametofont('TkHeadingFont').copy()

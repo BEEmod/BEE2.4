@@ -1,6 +1,6 @@
 """The Style Properties tab, for configuring style-specific properties."""
 from __future__ import annotations
-from typing import TypedDict
+from typing import TypedDict, cast
 from tkinter import IntVar
 from tkinter import ttk
 import operator
@@ -84,7 +84,7 @@ styleOptions = [
 ]
 
 
-class _WidgetsDict(TypedDict, total=False):
+class _WidgetsDict(TypedDict):
     """Todo: Remove."""
     stylevar_chosen_none: ttk.Label
     stylevar_other_none: ttk.Label
@@ -95,7 +95,7 @@ checkbox_other: dict[str, ttk.Checkbutton] = {}
 tk_vars: dict[str, IntVar] = {}
 
 VAR_LIST: list[StyleVar] = []
-UI: _WidgetsDict = {}
+UI: _WidgetsDict = cast(_WidgetsDict, {})
 
 TRANS_DEFAULT = {
     # i18n: StyleVar default value.
