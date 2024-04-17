@@ -36,10 +36,10 @@ class WidgetConfig(config.Data, conf_name='ItemVar', uses_id=True):
 
     @classmethod
     @override
-    def parse_legacy(cls, props: Keyvalues) -> Dict[str, 'WidgetConfig']:
+    def parse_legacy(cls, config: Keyvalues) -> Dict[str, 'WidgetConfig']:
         """Parse from the old legacy config."""
         data = {}
-        for group in props.find_children('ItemVar'):
+        for group in config:
             if not group.has_children():
                 LOGGER.warning('Illegal leaf keyvalue "{}" in ItemVar conf', group.name)
             for widget in group:
