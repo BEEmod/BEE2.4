@@ -26,6 +26,7 @@ def parse_timer(value: str) -> TimerNum:
     raise ValueError('Invalid timer value!')
 
 
+@config.COMPILER.register
 @config.PALETTE.register
 @config.APP.register
 @attrs.frozen

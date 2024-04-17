@@ -61,7 +61,6 @@ def test_parse_legacy() -> None:
     }
 
 
-
 def test_parse_invalid_versions() -> None:
     """Test errors are raised for invalid versions."""
     kv = Keyvalues('WidgetConfig', [])

@@ -33,6 +33,7 @@ class ConfigProto(Protocol):
 
 ConfT = TypeVar('ConfT', bound=ConfigProto)  # Type of the config object for a widget.
 OptConfT_contra = TypeVar('OptConfT_contra', bound=Optional[ConfigProto], contravariant=True)
+LEGACY_CONFIG = BEE2_config.ConfigFile('item_cust_configs.cfg', legacy=True)
 LOGGER = logger.get_logger(__name__)
 
 
@@ -53,7 +54,6 @@ class WidgetTypeWithConf(WidgetType, Generic[ConfT]):
 WIDGET_KINDS: Dict[str, WidgetType] = {}
 CLS_TO_KIND: Dict[Type[ConfigProto], WidgetTypeWithConf[Any]] = {}
 
-CONFIG = BEE2_config.ConfigFile('item_cust_configs.cfg')
 
 
 def register(*names: str, wide: bool = False) -> Callable[[Type[ConfT]], Type[ConfT]]:
@@ -247,7 +247,7 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
                 for num in (TIMER_NUM_INF if use_inf else TIMER_NUM):
                     if prev_conf is EmptyMapping:
                         # No new conf, check the old conf.
-                        cur_value = CONFIG.get_val(data.id, f'{wid_id}_{num}', defaults[num])
+                        cur_value = LEGACY_CONFIG.get_val(data.id, f'{wid_id}_{num}', defaults[num])
                     elif isinstance(prev_conf, str):
                         cur_value = prev_conf
                     else:
@@ -275,7 +275,7 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
                     cur_value = ''  # Not used.
                 elif prev_conf is EmptyMapping:
                     # No new conf, check the old conf.
-                    cur_value = CONFIG.get_val(data.id, wid_id, default_prop.value)
+                    cur_value = LEGACY_CONFIG.get_val(data.id, wid_id, default_prop.value)
                 elif isinstance(prev_conf, str):
                     cur_value = prev_conf
                 else:
@@ -291,8 +291,6 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
                     config=wid_conf,
                     holder=AsyncValue(cur_value),
                 ))
-        # If we are new, write our defaults to config.
-        CONFIG.save_check()
 
         return cls(
             data.id,

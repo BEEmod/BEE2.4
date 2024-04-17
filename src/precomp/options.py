@@ -12,13 +12,13 @@ from srctools import Keyvalues, Vec, parse_vec_str
 import srctools.logger
 import trio
 
-from BEE2_config import ConfigFile
+from config.widgets import WidgetConfig, TIMER_NUM_INF, parse_timer
+from config import COMPILER
 
 
 LOGGER = srctools.logger.get_logger(__name__)
 OptionType: TypeAlias = Union[str, int, float, bool, Vec]
 SETTINGS: dict[str, OptionType | None] = {}
-ITEM_CONFIG = ConfigFile('item_cust_configs.cfg')
 
 
 TYPE_NAMES = {
@@ -341,15 +341,40 @@ def get_itemconf(
 
     wid_id = wid_id.casefold()
 
-    if timer_delay is not None:
-        if timer_delay < 3 or timer_delay > 30:
-            wid_id += '_inf'
-        else:
-            wid_id += f'_{timer_delay}'
-
-    value = ITEM_CONFIG.get_val(group_id, wid_id, '')
-    if not value:
+    try:
+        option = COMPILER.get_cur_conf(WidgetConfig, f'{group_id}:{wid_id}')
+    except KeyError:
         return default
+
+    if timer_delay is not None:
+        if isinstance(option.values, dict):
+            # Multi value and timer supplied, determine if infinite or numeric.
+            try:
+                if 3 <= timer_delay <= 30:
+                    value = option.values[parse_timer(str(timer_delay))]
+                else:
+                    value = option.values[TIMER_NUM_INF]
+            except KeyError:
+                return default
+        else:
+            # Singular value, timer supplied, just ignore the timer.
+            LOGGER.warning(
+                'ConfigGroup "{}:{}" was fetched with timer value "{}", '
+                'but this is not a timer!',
+                group_id, wid_id, timer_delay,
+            )
+            value = option.values
+    else:
+        if isinstance(option.values, dict):
+            # No timer, multi value.
+            LOGGER.warning(
+                'ConfigGroup "{}:{}" has different values for each timer delay, '
+                'but no timer was provided!',
+                group_id, wid_id,
+            )
+            return default
+        else:  # Singular value, no timer configured.
+            value = option.values
 
     result: str | Vec | bool | float | None
     if isinstance(default, str) or default is None:
