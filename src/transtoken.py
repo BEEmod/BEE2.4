@@ -56,7 +56,7 @@ class Language:
     """A language which may be loaded, and the associated translations."""
     lang_code: str
     ui_filename: Optional[Path] = None  # Filename of the UI translation, if it exists.
-    _trans: Dict[str, GetText]
+    _trans: Dict[str, GetText] = attrs.field(alias='trans')
     # The loaded translations from basemodui.txt
     game_trans: Mapping[str, str] = EmptyMapping
 

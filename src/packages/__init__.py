@@ -2,10 +2,10 @@
 Handles scanning through the zip packages to find all items, styles, etc.
 """
 from __future__ import annotations
-from typing import Generic, Iterator, List, Mapping, NoReturn, ClassVar, Optional, TypeVar, Type, cast
+from typing import Generic, NoReturn, ClassVar, TypeVar, cast
 from typing_extensions import Self
 
-from collections.abc import Collection, Iterable
+from collections.abc import Collection, Iterable, Iterator, Mapping
 from collections import defaultdict
 from pathlib import Path
 import os
@@ -50,7 +50,7 @@ __all__ = [
 ]
 
 LOGGER = srctools.logger.get_logger(__name__, alias='packages')
-OBJ_TYPES: dict[str, Type[PakObject]] = {}
+OBJ_TYPES: dict[str, type[PakObject]] = {}
 # Maps a package ID to the matching filesystem for reading files easily.
 PACKAGE_SYS: dict[str, FileSystem] = {}
 PACK_CONFIG = ConfigFile('packages.cfg')
@@ -442,18 +442,18 @@ class PackagesSet:
     packages: dict[utils.ObjectID, Package] = attrs.Factory(dict)
     # type -> id -> object
     # The object data before being parsed, and the final result.
-    unparsed: dict[Type[PakObject], dict[str, ObjData]] = attrs.field(factory=dict, repr=False)
-    objects: dict[Type[PakObject], dict[str, PakObject]] = attrs.Factory(dict)
+    unparsed: dict[type[PakObject], dict[str, ObjData]] = attrs.field(factory=dict, repr=False)
+    objects: dict[type[PakObject], dict[str, PakObject]] = attrs.Factory(dict)
     # For overrides, a type/ID pair to the list of overrides.
-    overrides: dict[tuple[Type[PakObject], str], list[ParseData]] = attrs.Factory(lambda: defaultdict(list))
+    overrides: dict[tuple[type[PakObject], str], list[ParseData]] = attrs.Factory(lambda: defaultdict(list))
 
     # The templates found in the packages. This maps an ID to the file.
     templates: dict[str, utils.PackagePath] = attrs.field(init=False, factory=dict)
 
     # Indicates if an object type has been fully parsed.
-    _type_ready: dict[Type[PakObject], trio.Event] = attrs.field(init=False, factory=dict)
+    _type_ready: dict[type[PakObject], trio.Event] = attrs.field(init=False, factory=dict)
     # Internal, indicates if all parse() calls were complete (but maybe not post_parse).
-    _parsed: set[Type[PakObject]] = attrs.field(init=False, factory=set)
+    _parsed: set[type[PakObject]] = attrs.field(init=False, factory=set)
 
     # If found, the folders where the music is present.
     mel_music_fsys: FileSystem | None = None
@@ -469,7 +469,7 @@ class PackagesSet:
         """Have we found Aperture Tag?"""
         return self.tag_music_fsys is not None
 
-    def ready(self, cls: Type[PakObject]) -> trio.Event:
+    def ready(self, cls: type[PakObject]) -> trio.Event:
         """Return a Trio Event which is set when a specific object type is fully parsed."""
         try:
             return self._type_ready[cls]
@@ -485,19 +485,19 @@ class PackagesSet:
             # ready() was never called on at least one class, so it can't possibly be done yet!
             return False
 
-    def all_obj(self, cls: Type[PakT]) -> Collection[PakT]:
+    def all_obj(self, cls: type[PakT]) -> Collection[PakT]:
         """Get the list of objects parsed."""
         if cls not in self._parsed:
             raise ValueError(cls.__name__ + ' has not been parsed yet!')
         return cast('dict[str, PakT]', self.objects[cls]).values()
 
-    def obj_by_id(self, cls: Type[PakT], object_id: str) -> PakT:
+    def obj_by_id(self, cls: type[PakT], object_id: str) -> PakT:
         """Return the object with a given ID."""
         if cls not in self._parsed:
             raise ValueError(cls.__name__ + ' has not been parsed yet!')
         return cast('dict[str, PakT]', self.objects[cls])[object_id.casefold()]
 
-    def add(self, obj: PakT, pak_id: utils.SpecialID, pak_name: str) -> None:
+    def add(self, obj: PakObject, pak_id: utils.SpecialID, pak_name: str) -> None:
         """Add an object to our dataset later, with the given package name."""
         self.objects[type(obj)][obj.id.casefold()] = obj
         if not hasattr(obj, 'pak_id'):
@@ -527,7 +527,7 @@ async def find_packages(errors: ErrorUI, packset: PackagesSet, pak_dir: Path) ->
         errors.add(TRANS_MISSING_PAK_DIR.format(path=pak_dir))
         return False
 
-    children: List[utils.Result[bool]] = []
+    children: list[utils.Result[bool]] = []
     async with trio.open_nursery() as nursery:
         for name in contents:  # Both files and dirs
             folded = name.stem.casefold()
@@ -690,7 +690,7 @@ async def load_packages(
                 )
 
 
-async def parse_type(packset: PackagesSet, obj_class: Type[PakT], objs: Iterable[str]) -> None:
+async def parse_type(packset: PackagesSet, obj_class: type[PakT], objs: Iterable[str]) -> None:
     """Parse all of a specific object type."""
     async with trio.open_nursery() as nursery:
         for obj_id in objs:
@@ -825,7 +825,7 @@ async def parse_package(
     await LOAD_PAK.step(pack.id)
 
 
-async def parse_object(packset: PackagesSet, obj_class: Type[PakObject], obj_id: str) -> None:
+async def parse_object(packset: PackagesSet, obj_class: type[PakObject], obj_id: str) -> None:
     """Parse through the object and store the resultant class."""
     obj_data = packset.unparsed[obj_class][obj_id]
     try:
@@ -990,7 +990,7 @@ class Style(PakObject, needs_foreground=True):
         renderables: dict[RenderableType, Renderable],
         suggested: dict[type[PakObject], set[str]],
         config: lazy_conf.LazyConf = lazy_conf.BLANK,
-        base_style: Optional[str] = None,
+        base_style: str | None = None,
         has_video: bool = True,
         vpk_name: str = '',
         legacy_corridors: Mapping[tuple[GameMode, Direction, int], LegacyCorr] = srctools.EmptyMapping,
