@@ -246,12 +246,18 @@ def precache_model(vmf: VMF, mdl_name: str, skinset: Collection[int] = ()) -> No
         ent['skinset'] = ''
 
 
-def get_itemconf(inst: Entity, res: Keyvalues) -> str | None:
-    """Implement ItemConfig and GetItemConfig shared logic."""
+def get_itemconf(inst: Entity, res: Keyvalues) -> tuple[bool, str | None]:
+    """Implement ItemConfig and GetItemConfig shared logic.
+
+    This returns the value, plus whether a fixup value was used in computing it.
+    """
+    uses_fixup = False
     timer_delay: int | None
 
     group_id = res['ID']
-    wid_name = inst.fixup.substitute(res['Name']).casefold()
+    wid_name = res['Name']
+    uses_fixup |= '$' in wid_name
+    wid_name = inst.fixup.substitute(wid_name).casefold()
 
     match = BRACE_RE.match(wid_name)
     if match is not None:  # Match name[timer], after $fixup substitution.
@@ -264,10 +270,11 @@ def get_itemconf(inst: Entity, res: Keyvalues) -> str | None:
             wid_name,
         )
         timer_delay = inst.fixup.int('$timer_delay')
+        uses_fixup = True
     else:
         timer_delay = None
 
-    return options.get_itemconf((group_id, wid_name), None, timer_delay)
+    return uses_fixup, options.get_itemconf((group_id, wid_name), None, timer_delay)
 
 
 @conditions.make_test('ItemConfig')
@@ -277,15 +284,23 @@ def res_match_item_config(inst: Entity, res: Keyvalues) -> bool:
     * `ID` is the ID of the group.
     * `Name` is the name of the widget, or "name[timer]" to pick the value for
       timer multi-widgets.
-    * If `UseTimer` is true, it uses `$timer_delay` to choose the value to use.
+    * The deprecated option `UseTimer` uses `$timer_delay` for the timer value.
+      Instead, use `name[$timer_delay]`.
     * `Value` is the value to compare to.
+    * If the value does not exist, this always fails.
     """
-    conf = get_itemconf(inst, res)
+    uses_fixup, conf = get_itemconf(inst, res)
     desired_value = res['Value']
-    if conf is None:  # Doesn't exist
-        return False
 
-    return global_bool(conf == desired_value)
+    # Always false if it doesn't exist.
+    if conf is not None and conf == desired_value:
+        return True
+    elif uses_fixup:
+        # We cannot raise Unsatisfiable here, it could be true with a different ent.
+        return False
+    else:
+        # No fixups used, this will always be false.
+        raise conditions.Unsatisfiable
 
 
 @conditions.make_result('GetItemConfig')
@@ -295,10 +310,11 @@ def res_item_config_to_fixup(inst: Entity, res: Keyvalues) -> None:
     * `ID` is the ID of the group.
     * `Name` is the name of the widget, or "name[timer]" to pick the value for
       timer multi-widgets.
-    * If `UseTimer` is true, it uses `$timer_delay` to choose the value to use.
+    * The deprecated option `UseTimer` uses `$timer_delay` for the timer value.
+      Instead, use `name[$timer_delay]`.
     * `resultVar` is the location to store the value into.
     * `Default` is the default value, if the config isn't found.
     """
     default = res['default']
-    conf = get_itemconf(inst, res)
+    uses_fixup, conf = get_itemconf(inst, res)
     inst.fixup[res['ResultVar']] = conf if conf is not None else default
