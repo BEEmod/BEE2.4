@@ -47,13 +47,15 @@ class ConfigFile(ConfigParser):
         *,
         in_conf_folder: bool = True,
         auto_load: bool = True,
+        legacy: bool = True,
     ) -> None:
         """Initialise the config file.
 
         `filename` is the name of the config file, in the `root` directory.
         If `auto_load` is true, this file will immediately be read and parsed.
-        If in_conf_folder is set, The folder is relative to the 'config/'
+        If `in_conf_folder` is set, the folder is relative to the 'config/'
         folder in the BEE2 folder.
+        If `legacy` is set, suppress errors if the file does not exist.
         """
         # Special section holding names outside braces, we never use this.
         super().__init__(default_section='__XXX_DEFAULT_SECTION')
@@ -67,11 +69,11 @@ class ConfigFile(ConfigParser):
             else:
                 self.filename = Path(filename)
             if auto_load:
-                self.load()
+                self.load(legacy)
         else:
             self.filename = None
 
-    def load(self) -> None:
+    def load(self, legacy: bool = False) -> None:
         """Load config options from disk."""
         if self.filename is None:
             return
@@ -83,10 +85,11 @@ class ConfigFile(ConfigParser):
                 self.has_changed.clear()
         # If missing, just use default values.
         except FileNotFoundError:
-            LOGGER.warning(
-                'Config "{}" not found! Using defaults...',
-                self.filename,
-            )
+            if not legacy:
+                LOGGER.warning(
+                    'Config "{}" not found! Using defaults...',
+                    self.filename,
+                )
         # But if we fail to read entirely, fall back to defaults.
         except (OSError, ParsingError, UnicodeDecodeError):
             LOGGER.warning(
