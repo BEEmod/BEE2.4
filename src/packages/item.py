@@ -1013,7 +1013,7 @@ async def assign_styled_items(all_styles: Iterable[Style], item: Item) -> None:
 
         default_style = styles[vers.def_style]
 
-        if DEV_MODE.get():
+        if DEV_MODE.value:
             # Check each editoritem definition for some known issues.
             for sty_id, variant in styles.items():
                 assert isinstance(variant, ItemVariant), f'{item.id}:{sty_id} = {variant!r}!!'

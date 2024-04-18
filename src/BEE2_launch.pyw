@@ -81,7 +81,7 @@ if __name__ == '__main__':
 
     # Special case, load in this early, so it applies.
     utils.DEV_MODE = conf.dev_mode
-    app.DEV_MODE.set(conf.dev_mode)
+    app.DEV_MODE.value = conf.dev_mode
 
     localisation.setup(conf.language)
 

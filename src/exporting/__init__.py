@@ -13,6 +13,7 @@ from srctools import Keyvalues
 import loadScreen
 import packages
 import config as config_mod
+from app import DEV_MODE
 from app.errors import ErrorUI, Result as ErrorResult, WarningExc
 from app.backup import AUTO_BACKUP_STAGE
 from editoritems import Item as EditorItem, Renderable, RenderableType
@@ -184,9 +185,8 @@ async def step_style(exp: ExportData) -> None:
 @STEPS.add_step(prereq=[], results=[StepResource.VCONF_DATA])
 async def step_add_core_info(exp: ExportData) -> None:
     """Add some core options to the config."""
-    from app import DEV_MODE  # TODO: Pass into export(), maybe?
     exp.vbsp_conf.set_key(('Options', 'Game_ID'), exp.game.steamID)
-    exp.vbsp_conf.set_key(('Options', 'dev_mode'), srctools.bool_as_int(DEV_MODE.get()))
+    exp.vbsp_conf.set_key(('Options', 'dev_mode'), srctools.bool_as_int(DEV_MODE.value))
 
 
 # Register everything.

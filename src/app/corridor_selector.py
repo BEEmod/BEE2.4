@@ -352,7 +352,7 @@ class Selector(Generic[IconT, OptionRowT]):
                 mode, direction, orient = self.ui_get_buttons()
                 options = list(self.corr_group.get_options(mode, direction, corr))
 
-                if DEV_MODE.get():
+                if DEV_MODE.value:
                     # Show the instance in the description, plus fixups that are assigned.
                     fixups = [
                         f'* `{var}` = `{value}`'

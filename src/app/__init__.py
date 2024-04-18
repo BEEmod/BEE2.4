@@ -4,7 +4,6 @@ from typing import Any, Awaitable, Callable, TypeVar, Generic, overload
 
 from typing_extensions import TypeVarTuple, Unpack
 from types import TracebackType
-import tkinter as tk
 
 from trio_util import AsyncBool
 import trio
@@ -18,14 +17,13 @@ _APP_QUIT_SCOPE = trio.CancelScope()
 T = TypeVar("T")
 PosArgsT = TypeVarTuple('PosArgsT')
 
+# We use this to activate various features only useful to package/app devs.
+DEV_MODE = AsyncBool(value=utils.DEV_MODE)
+
 
 def quit_app() -> None:
     """Quit the application."""
     _APP_QUIT_SCOPE.cancel()
-
-
-# TODO: Only required until we remove the vars from below.
-import ui_tk
 
 
 # noinspection PyBroadException
@@ -110,9 +108,6 @@ async def background_start(
     if _APP_NURSERY is None:
         raise ValueError('App nursery has not started.')
     return await _APP_NURSERY.start(func, *args, name=name)
-
-
-DEV_MODE = tk.BooleanVar(value=utils.DEV_MODE, name='OPT_development_mode')
 
 
 class EdgeTrigger(Generic[Unpack[PosArgsT]]):

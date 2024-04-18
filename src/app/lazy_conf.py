@@ -76,7 +76,7 @@ def from_file(path: utils.PackagePath, missing_ok: bool = False, source: str = '
 			raise
 		return kv
 
-	if app.DEV_MODE.get():
+	if app.DEV_MODE.value:
 		app.background_run(devmod_check, file, path)
 	return loader
 

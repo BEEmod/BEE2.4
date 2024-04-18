@@ -299,7 +299,7 @@ def load_item_data(tk_img: TKImages) -> None:
         style_desc=item_data.desc,
     )
     # Dump out the instances used in this item.
-    if DEV_MODE.get():
+    if DEV_MODE.value:
         inst_desc = []
         for editor in [selected_item.data.editor] + selected_item.data.editor_extra:
             if editor is selected_item.data.editor:
@@ -323,7 +323,7 @@ def load_item_data(tk_img: TKImages) -> None:
 
     wid['desc'].set_text(desc)
 
-    if DEV_MODE.get():
+    if DEV_MODE.value:
         source = selected_item.data.source.replace("from", "\nfrom")
         wid['item_id']['text'] = f'{source}\n-> {selected_item.id}:{selected_sub_item.subKey}'
         wid['item_id'].grid()
@@ -436,7 +436,7 @@ def load_item_data(tk_img: TKImages) -> None:
             # Moved elsewhere?
             pass
 
-    if DEV_MODE.get() and real_conn_item.conn_config is not None:
+    if DEV_MODE.value and real_conn_item.conn_config is not None:
         # Override tooltips with the raw information.
         blurb = real_conn_item.conn_config.get_input_blurb()
         if real_conn_item.force_input:

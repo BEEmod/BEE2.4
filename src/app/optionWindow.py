@@ -115,6 +115,7 @@ async def apply_config(conf: GenOptions) -> None:
     """Used to apply the configuration to all windows."""
     logWindow.HANDLER.set_visible(conf.show_log_win)
     loadScreen.set_force_ontop(conf.force_load_ontop)
+    DEV_MODE.value = conf.dev_mode
     # We don't propagate compact splash, that isn't important after the UI loads.
     UI.refresh_palette_icons()
 
@@ -351,7 +352,7 @@ async def init_gen_tab(
         conf = config.APP.get_cur_conf(GenOptions)
 
         lang_iter = localisation.get_languages()
-        if conf.language == localisation.DUMMY.lang_code or DEV_MODE.get():
+        if conf.language == localisation.DUMMY.lang_code or DEV_MODE.value:
             # Add the dummy translation.
             lang_iter = itertools.chain(lang_iter, [localisation.DUMMY])
 
@@ -524,7 +525,6 @@ async def init_dev_tab(f: ttk.Frame) -> None:
 
     make_checkbox(
         frm_check, 'dev_mode',
-        var=DEV_MODE,
         desc=TransToken.ui("Development Mode"),
         tooltip=TransToken.ui(
             'Enables displaying additional UI specific for '

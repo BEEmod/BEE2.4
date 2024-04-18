@@ -1424,7 +1424,7 @@ class SelectorWin(Generic[CallbackT]):
         else:
             self.prop_icon['cursor'] = tk_tools.Cursors.REGULAR
 
-        if DEV_MODE.get():
+        if DEV_MODE.value:
             # Show the ID of the item in the description
             if item is self.noneItem:
                 text = tkMarkdown.convert(TRANS_DEV_ITEM_ID.format(item='*NONE*'), None)
