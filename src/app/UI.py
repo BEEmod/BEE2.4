@@ -100,7 +100,7 @@ TRANS_EXPORTED = TransToken.ui('Selected Items and Style successfully exported!'
 TRANS_EXPORTED_TITLE = TransToken.ui('BEE2 - Export Complete')
 TRANS_MAIN_TITLE = TransToken.ui('BEEMOD {version} - {game}')
 TRANS_ERROR = TransToken.untranslated('???')
-
+TRANS_CORR_OPTS = TransToken.ui_plural('{n} option', '{n} options')  # i18n: Corridor options count
 
 class DragWin(tk.Toplevel):
     """Todo: use dragdrop module instead."""
@@ -472,6 +472,7 @@ async def load_packages(packset: packages.PackagesSet, tk_img: TKImages) -> None
             style.selitem_data,
             attrs={
                 'VID': style.has_video,
+                'CORR_OPTS': TRANS_CORR_OPTS.format(n=style.corridor_options_count(packset)),
             }
         ) for style in sorted(packset.all_obj(packages.Style), key=name_getter)
     ]
@@ -599,6 +600,7 @@ async def load_packages(packset: packages.PackagesSet, tk_img: TKImages) -> None
         # callback set in the main initialisation function...
         attributes=[
             SelAttr.bool('VID', TransToken.ui('Elevator Videos'), default=True),
+            SelAttr.string('CORR_OPTS', TransToken.ui('Corridor')),
         ]
     ))
 

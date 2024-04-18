@@ -1158,6 +1158,13 @@ class Style(PakObject, needs_foreground=True):
         """Iterate over translation tokens in the style."""
         return self.selitem_data.iter_trans_tokens('styles/' + self.id)
 
+    def corridor_options_count(self, packset: PackagesSet) -> int:
+        """Fetch the options available for this style's corridors."""
+        try:
+            return len(packset.obj_by_id(CorridorGroup, self.id).options)
+        except KeyError:
+            return 0
+
 
 def parse_multiline_key(info: Keyvalues, prop_name: str, *, allow_old_format: bool = False) -> str:
     """Allow several methods for entering multi-line keyvalues.
