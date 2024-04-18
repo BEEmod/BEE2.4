@@ -242,7 +242,7 @@ class TkDialogs(Dialogs):
             # If the main loop isn't running, this doesn't work correctly.
             # Probably also if it's not visible. So swap back to the old style.
             # It's also only a problem on Windows.
-            if Query is None:  # or (utils.WIN and (not _main_loop_running or not TK_ROOT.winfo_viewable())):
+            if Query is None:
                 query_cls = BasicQueryValidator
             else:
                 query_cls = QueryValidator
