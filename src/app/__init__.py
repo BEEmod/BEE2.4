@@ -28,39 +28,6 @@ from ui_tk import TK_ROOT as TK_ROOT  # TODO: Remove this import from here.
 
 
 # noinspection PyBroadException
-def tk_error(
-    exc_type: type[BaseException],
-    exc_value: BaseException,
-    exc_tb: TracebackType | None,
-) -> None:
-    """Log TK errors."""
-    # The exception is caught inside the TK code.
-    # We don't care about that, so try and move the traceback up
-    # one level.
-    import logging
-    if exc_tb is not None and exc_tb.tb_next:
-        exc_tb = exc_tb.tb_next
-
-    logger = logging.getLogger('BEE2')
-
-    try:
-        on_error(exc_type, exc_value, exc_tb)
-    except Exception:
-        logger.exception('Failed to display messagebox:')
-        pass
-
-    logger.error(
-        msg='Uncaught Tk Exception:',
-        exc_info=(exc_type, exc_value, exc_tb),
-    )
-
-    if _APP_NURSERY is not None:
-        _APP_NURSERY.cancel_scope.cancel()
-
-TK_ROOT.report_callback_exception = tk_error
-
-
-# noinspection PyBroadException
 def on_error(
     exc_type: type[BaseException],
     exc_value: BaseException,

@@ -17,7 +17,7 @@ from config.windows import WindowState
 from transtoken import TransToken
 from ui_tk.dialogs import DIALOG
 from ui_tk.errors import display_errors
-from ui_tk import wid_transtoken
+from ui_tk import wid_transtoken, route_callback_exceptions
 from ui_tk.img import TK_IMG
 from config.gen_opts import GenOptions
 from config.last_sel import LastSelected
@@ -119,7 +119,6 @@ async def init_app() -> None:
 
         try:
             await trio.sleep_forever()
-
         finally:
             LOGGER.info('Shutting down application.')
 
@@ -227,6 +226,7 @@ async def app_main(init: Callable[[], Awaitable[Any]]) -> None:
     LOGGER.debug('Opening nursery...')
     async with trio.open_nursery() as nursery:
         app._APP_NURSERY = nursery
+        await nursery.start(route_callback_exceptions)
         await nursery.start(display_errors)
         await nursery.start(loadScreen.startup)
         await gameMan.check_app_in_game(DIALOG)
@@ -240,7 +240,7 @@ def done_callback(result: Outcome[None]) -> None:
     """The app finished, quit."""
     if isinstance(result, Error):
         LOGGER.error('Trio exited with exception', exc_info=result.error)
-        app.tk_error(type(result.error), result.error, result.error.__traceback__)
+        app.on_error(type(result.error), result.error, result.error.__traceback__)
     else:
         LOGGER.debug('Trio exited normally.')
     TK_ROOT.quit()
@@ -271,15 +271,12 @@ def start_main(init: Callable[[], Awaitable[object]] = init_app) -> None:
     tk_func_name = TK_ROOT.register(tk_func)
 
     LOGGER.debug('Starting Trio loop.')
-    try:
-        trio.lowlevel.start_guest_run(
-            app_main, init,
-            run_sync_soon_threadsafe=run_sync_soon_threadsafe,
-            run_sync_soon_not_threadsafe=run_sync_soon_not_threadsafe,
-            done_callback=done_callback,
-            instruments=[Tracer()] if utils.DEV_MODE else [],
-            strict_exception_groups=True,
-        )
-        TK_ROOT.mainloop()
-    finally:
-        logging.shutdown()
+    trio.lowlevel.start_guest_run(
+        app_main, init,
+        run_sync_soon_threadsafe=run_sync_soon_threadsafe,
+        run_sync_soon_not_threadsafe=run_sync_soon_not_threadsafe,
+        done_callback=done_callback,
+        instruments=[Tracer()] if utils.DEV_MODE else [],
+        strict_exception_groups=True,
+    )
+    TK_ROOT.mainloop()

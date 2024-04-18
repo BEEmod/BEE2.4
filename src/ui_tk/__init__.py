@@ -1,7 +1,11 @@
 """This package contains UI code specific to TKinter."""
+from __future__ import annotations
 from typing import Generic, TypeVar
-from types import new_class
+from types import TracebackType, new_class
 import tkinter as tk
+
+from exceptiongroup import BaseExceptionGroup
+import trio
 
 import app
 
@@ -26,3 +30,29 @@ if '__class_getitem__' not in vars(tk.Event):
             if name in ['__doc__', '__module__', '__repr__']
         }),
     )
+
+
+async def route_callback_exceptions(
+    *, task_status: trio.TaskStatus[None] = trio.TASK_STATUS_IGNORED,
+) -> None:
+    """Set Tk.report_callback_exception, so that exceptions raised in callbacks crash the app."""
+    # Use a list, in case multiple callbacks error before the loop resumes.
+    exceptions: list[BaseException] = []
+    error_occurred = trio.Event()
+
+    def callback(
+        exc_type: type[BaseException],
+        exc_value: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
+        """Store off the exception, then wake the task to raise it."""
+        if exc_value is None:
+            exceptions.append(exc_type())
+        else:
+            exceptions.append(exc_value)
+        error_occurred.set()
+
+    TK_ROOT.report_callback_exception = callback
+    task_status.started()
+    await error_occurred.wait()
+    raise BaseExceptionGroup('In Tk callback', exceptions)

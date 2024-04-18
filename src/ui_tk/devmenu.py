@@ -1,6 +1,7 @@
 """Options specifically for app development."""
 from __future__ import annotations
 from typing_extensions import NoReturn
+
 from collections.abc import Callable
 from tkinter import ttk
 import tkinter as tk
@@ -12,9 +13,9 @@ import attrs
 import trio
 import trio_util
 
-from app import TK_ROOT, tk_tools
+from app import tk_tools
 from ui_tk.img import TK_IMG, label_to_user
-from ui_tk import wid_transtoken
+from ui_tk import wid_transtoken, TK_ROOT
 import utils
 
 
@@ -80,6 +81,11 @@ def crasher(nursery: trio.Nursery, exc: BaseException) -> tuple[Callable[[], obj
 
 async def menu_task(menu: tk.Menu) -> None:
     """Create the TK menu bar."""
+    def event_raise(e: tk.Event) -> None:
+        """Raise an event from inside an event handler."""
+        print(f'Exception: {e}')
+        raise NotImplementedError(f'{id(e):x} = {e!r}')
+
     async with trio.open_nursery() as nursery:
         fg_single, bg_single = crasher(nursery, NotImplementedError('Crashing time!'))
         fg_group, bg_group = crasher(nursery, ExceptionGroup('A group', [
@@ -94,10 +100,24 @@ async def menu_task(menu: tk.Menu) -> None:
 
         menu.add_cascade(label='Crash', menu=(crash_menu := tk.Menu(menu)))
 
-        crash_menu.add_command(label='Sync, Singluar', command=fg_single)
+        crash_menu.add_command(label='Sync, Singular', command=fg_single)
         crash_menu.add_command(label='Sync, Grouped', command=fg_group)
         crash_menu.add_command(label='Async, Singular', command=bg_single)
         crash_menu.add_command(label='Async, Grouped', command=bg_group)
+        crash_menu.add_command(
+            label='Event Handler, Singular',
+            command=lambda: TK_ROOT.event_generate('<<DevMenuSingleCrash>>'),
+        )
+        crash_menu.add_command(
+            label='Event Handler, Multi',
+            command=lambda: TK_ROOT.event_generate('<<DevMenuMultiCrash>>'),
+        )
+
+        TK_ROOT.bind('<<DevMenuSingleCrash>>', event_raise)
+        TK_ROOT.bind('<<DevMenuMultiCrash>>', event_raise, add='+')
+        TK_ROOT.bind('<<DevMenuMultiCrash>>', event_raise, add='+')
+        TK_ROOT.bind('<<DevMenuMultiCrash>>', event_raise, add='+')
+        TK_ROOT.bind('<<DevMenuMultiCrash>>', event_raise, add='+')
         await trio.sleep_forever()
 
 
