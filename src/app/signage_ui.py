@@ -12,7 +12,8 @@ import srctools.logger
 from ui_tk.dragdrop import DragDrop, DragInfo
 from ui_tk.img import TKImages
 from ui_tk.wid_transtoken import set_text, set_win_title
-from app import EdgeTrigger, dragdrop, img, tk_tools, TK_ROOT
+from ui_tk import TK_ROOT
+from app import EdgeTrigger, dragdrop, img, tk_tools
 from config.signage import DEFAULT_IDS, Layout
 from packages import Signage, Style, PakRef
 import packages

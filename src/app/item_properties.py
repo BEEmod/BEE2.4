@@ -11,11 +11,12 @@ from typing_extensions import Final, Literal, TypeAlias, override
 import srctools
 import srctools.logger
 
+from app import img, localisation, tk_tools, sound, tooltip
 from config.item_defaults import ItemDefault
-from app import img, localisation, tk_tools, sound, TK_ROOT, tooltip
-from ui_tk.img import TKImages
 from editoritems import ItemPropKind, Item
 from transtoken import TransToken
+from ui_tk import TK_ROOT
+from ui_tk.img import TKImages
 from ui_tk.wid_transtoken import set_text, set_win_title
 import utils
 import config

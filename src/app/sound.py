@@ -15,7 +15,7 @@ import srctools.logger
 import trio
 import trio_util
 
-from app import TK_ROOT
+from ui_tk import TK_ROOT
 from config.gen_opts import GenOptions
 import config
 import utils
@@ -277,6 +277,7 @@ def clean_sample_folder() -> None:
             pass
 
 
+# TODO: Switch this to a constantly-playing task, eliminate TK_ROOT usage.
 class SamplePlayer:
     """Handles playing a single audio file, and allows toggling it on/off."""
     def __init__(self, system: FileSystemChain) -> None:

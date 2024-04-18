@@ -17,7 +17,8 @@ import time
 
 from PIL import ImageTk
 
-from app import TK_ROOT, img, tk_tools
+from ui_tk import TK_ROOT
+from app import img, tk_tools
 from ipc_types import (
     ScreenID, StageID,
     ARGS_SEND_LOAD, ARGS_REPLY_LOAD, ARGS_SEND_LOGGING,  ARGS_REPLY_LOGGING,

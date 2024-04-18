@@ -20,10 +20,11 @@ import srctools.logger
 import trio.to_thread
 
 from app.richTextBox import tkRichText
-from app import tkMarkdown, tk_tools, sound, img, TK_ROOT, background_run
+from app import tkMarkdown, tk_tools, sound, img, background_run
 from ui_tk.dialogs import DIALOG
 from ui_tk.img import TKImages
 from ui_tk.wid_transtoken import set_text, set_win_title, set_menu_text
+from ui_tk import TK_ROOT
 from transtoken import TransToken
 import utils
 

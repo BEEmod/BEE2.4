@@ -20,7 +20,7 @@ from srctools import EmptyMapping, Keyvalues, KeyValError
 import srctools.logger
 import trio
 
-from app import tk_tools, img, TK_ROOT, background_run
+from app import tk_tools, img, background_run
 from app.CheckDetails import CheckDetails, Item as CheckItem
 from app.tooltip import add_tooltip
 from FakeZip import FakeZip, zip_names, zip_open_bin
@@ -28,6 +28,7 @@ from transtoken import TransToken
 from ui_tk.wid_transtoken import set_menu_text, set_text, set_win_title
 from ui_tk.dialogs import Dialogs, DIALOG, TkDialogs
 from ui_tk.img import TKImages
+from ui_tk import TK_ROOT
 import loadScreen
 import utils
 

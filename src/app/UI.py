@@ -16,7 +16,7 @@ import trio
 from typing_extensions import assert_never
 
 import exporting
-from app import EdgeTrigger, TK_ROOT, background_run, background_start, quit_app
+from app import EdgeTrigger, background_run, background_start, quit_app
 from BEE2_config import GEN_OPTS
 from app.dialogs import Dialogs
 from loadScreen import MAIN_UI as LOAD_UI
@@ -55,7 +55,7 @@ from app.menu_bar import MenuBar
 from ui_tk.corridor_selector import TkSelector
 from ui_tk.dialogs import DIALOG
 from ui_tk.img import TKImages, TK_IMG
-from ui_tk import wid_transtoken
+from ui_tk import wid_transtoken, TK_ROOT
 
 
 LOGGER = srctools.logger.get_logger(__name__)

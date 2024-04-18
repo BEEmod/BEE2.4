@@ -19,10 +19,11 @@ from packages import QuotePack
 from quote_pack import Line, LineCriteria
 from transtoken import TransToken
 from app.tooltip import add_tooltip
-from app import img, TK_ROOT
+from app import img
 from app import tk_tools
 from ui_tk.img import TKImages
 from ui_tk.wid_transtoken import set_text, set_win_title
+from ui_tk import TK_ROOT
 
 
 LOGGER = srctools.logger.get_logger(__name__)

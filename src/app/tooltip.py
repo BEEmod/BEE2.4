@@ -10,11 +10,12 @@ import weakref
 
 import attr
 
-from app import TK_ROOT, img
+from app import img
 from transtoken import TransToken
 from ui_tk.img import TK_IMG
 # Don't import set_text directly, could be confused with tooltip setter.
 from ui_tk import wid_transtoken
+from ui_tk import TK_ROOT
 import utils
 
 

@@ -14,17 +14,18 @@ import utils
 from app.reports import report_all_obj, report_items, report_editor_models
 from app.tooltip import add_tooltip
 from app import (
-    TK_ROOT, LAUNCH_AFTER_EXPORT, DEV_MODE, background_run,
+    LAUNCH_AFTER_EXPORT, DEV_MODE, background_run,
     contextWin, gameMan, localisation, tk_tools, sound, logWindow, img, UI,
 )
 from config.filters import FilterConf
-from ui_tk.dialogs import Dialogs, DIALOG, TkDialogs
 from config.gen_opts import GenOptions, AfterExport
 from consts import Theme
 from transtoken import TransToken
 import loadScreen
 import config
 from ui_tk.wid_transtoken import set_text, set_win_title
+from ui_tk.dialogs import Dialogs, DIALOG, TkDialogs
+from ui_tk import TK_ROOT
 
 
 LOGGER = srctools.logger.get_logger(__name__)

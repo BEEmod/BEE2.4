@@ -9,7 +9,8 @@ from PIL import Image, ImageTk
 from srctools.logger import get_logger
 import attrs
 
-from app import TK_ROOT, img
+from app import img
+from ui_tk import TK_ROOT
 
 
 # Widgets with an image attribute that can be set.

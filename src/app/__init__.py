@@ -24,7 +24,8 @@ def quit_app() -> None:
     _APP_QUIT_SCOPE.cancel()
 
 
-from ui_tk import TK_ROOT as TK_ROOT  # TODO: Remove this import from here.
+# TODO: Only required until we remove the vars from below.
+import ui_tk
 
 
 # noinspection PyBroadException
@@ -41,6 +42,7 @@ def on_error(
 
     # Grab and release the grab so nothing else can block the error message.
     try:
+        from ui_tk import TK_ROOT
         TK_ROOT.grab_set_global()
         TK_ROOT.grab_release()
 

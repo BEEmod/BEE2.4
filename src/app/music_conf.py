@@ -8,7 +8,7 @@ from srctools import FileSystemChain, FileSystem
 import srctools.logger
 import attrs
 
-from app import TK_ROOT, background_start
+from app import background_start
 from app.SubPane import SubPane
 from app.selector_win import Item as SelItem, SelectorWin, AttrDef as SelAttr
 from config.gen_opts import GenOptions
@@ -16,6 +16,7 @@ from consts import MusicChannel
 from packages import PackagesSet, Music
 from transtoken import TransToken
 from ui_tk.wid_transtoken import set_text
+from ui_tk import TK_ROOT
 import config
 import packages
 

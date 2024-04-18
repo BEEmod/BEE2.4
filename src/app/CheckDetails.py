@@ -498,7 +498,7 @@ class CheckDetails(ttk.Frame, Generic[UserT]):
 
 
 if __name__ == '__main__':
-    from app import TK_ROOT
+    from ui_tk import TK_ROOT
     tt = TransToken.untranslated
     test_inst = CheckDetails[None](
         parent=TK_ROOT,

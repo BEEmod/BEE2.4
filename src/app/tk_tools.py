@@ -24,13 +24,14 @@ from srctools import logger
 from idlelib.redirector import WidgetRedirector  # type: ignore[import-not-found]
 import trio
 
-from app import TK_ROOT, background_run
+from app import background_run
 from config.gen_opts import GenOptions
 import event
 import config
 import utils
 from transtoken import TransToken
 from ui_tk.wid_transtoken import set_text
+from ui_tk import TK_ROOT
 
 
 LOGGER = logger.get_logger(__name__)

@@ -2,9 +2,9 @@ import tkinter.constants
 
 import trio
 
-from app import TK_ROOT
 from transtoken import TransToken
 from ui_tk.dialogs import DIALOG
+from ui_tk import TK_ROOT
 
 
 async def test() -> None:

@@ -10,7 +10,7 @@ import trio
 from typing_extensions import override
 
 from app import (
-    CompilerPane, TK_ROOT, localisation, sound, img, gameMan, music_conf,
+    CompilerPane, localisation, sound, img, gameMan, music_conf,
     UI, logWindow,
 )
 from config.windows import WindowState
@@ -19,6 +19,7 @@ from ui_tk.dialogs import DIALOG
 from ui_tk.errors import display_errors
 from ui_tk import wid_transtoken, route_callback_exceptions
 from ui_tk.img import TK_IMG
+from ui_tk import TK_ROOT
 from config.gen_opts import GenOptions
 from config.last_sel import LastSelected
 from exporting import mod_support, ExportData

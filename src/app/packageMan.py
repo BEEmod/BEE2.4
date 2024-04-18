@@ -5,8 +5,7 @@ from typing import Iterable
 from tkinter import ttk
 import tkinter as tk
 
-from app import TK_ROOT, background_run, tk_tools
-
+from app import background_run, tk_tools
 from app.CheckDetails import CheckDetails, Item as CheckItem
 from app.dialogs import Dialogs
 from transtoken import TransToken
@@ -14,6 +13,7 @@ from ui_tk.wid_transtoken import set_text, set_win_title
 import packages
 import utils
 from ui_tk.dialogs import TkDialogs
+from ui_tk import TK_ROOT
 
 
 window = tk.Toplevel(TK_ROOT, name='packagesWin')

@@ -2,7 +2,7 @@ from tkinter import ttk
 
 import trio
 
-from app import TK_ROOT
+from ui_tk import TK_ROOT
 from app.errors import ErrorUI
 from transtoken import AppError, TransToken
 
