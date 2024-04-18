@@ -68,5 +68,9 @@ class Skybox(
         """Yield translation tokens used by this skybox."""
         return self.selitem_data.iter_trans_tokens('skyboxes/' + self.id)
 
+    def is_3d(self) -> bool:
+        """Check if this has a config, and is therefore 3D."""
+        return self.config is not lazy_conf.BLANK
+
     def __repr__(self) -> str:
         return f'<Skybox {self.id}>'

@@ -463,44 +463,21 @@ async def load_packages(packset: packages.PackagesSet, tk_img: TKImages) -> None
     for item in packset.all_obj(packages.Item):
         item_list[item.id] = Item(item)
 
-    sky_list: List[selWinItem] = []
-    voice_list: List[selWinItem] = []
-    style_list: List[selWinItem] = []
-    elev_list: List[selWinItem] = []
+    # Order packages by their original untranslated name.
+    name_getter = operator.attrgetter('selitem_data.name.token')
 
-    # These don't need special-casing, and act the same.
-    # The attrs are a map from selectorWin attributes, to the attribute on
-    # the object.
-    obj_types = [
-        (sky_list, packages.Skybox, {
-            '3D': 'config',  # Check if it has a config
-            'COLOR': 'fog_color',
-        }),
-        (style_list, packages.Style, {
-            'VID': 'has_video',
-        }),
-        (elev_list, packages.Elevator, {
-            'ORIENT': 'has_orient',
-        }),
+    style_list = [
+        selWinItem.from_data(
+            style.id,
+            style.selitem_data,
+            attrs={
+                'VID': style.has_video,
+            }
+        ) for style in sorted(packset.all_obj(packages.Style), key=name_getter)
     ]
 
-    for sel_list, obj_type, sel_attrs in obj_types:
-        # Extract the display properties out of the object, and create
-        # a SelectorWin item to display with.
-        for obj in sorted(packset.all_obj(obj_type), key=operator.attrgetter('selitem_data.name.token')):
-            sel_list.append(selWinItem.from_data(
-                obj.id,
-                obj.selitem_data,
-                attrs={
-                    key: getattr(obj, attr_name)
-                    for key, attr_name in
-                    sel_attrs.items()
-                }
-            ))
-
-    voice: packages.QuotePack
-    for voice in sorted(packset.all_obj(packages.QuotePack), key=operator.attrgetter('selitem_data.name.token')):
-        voice_list.append(selWinItem.from_data(
+    voice_list = [
+        selWinItem.from_data(
             voice.id,
             voice.selitem_data,
             attrs={
@@ -508,7 +485,27 @@ async def load_packages(packset: packages.PackagesSet, tk_img: TKImages) -> None
                 'MONITOR': voice.data.monitor is not None,
                 'TURRET': voice.data.monitor is not None and voice.data.monitor.turret_hate,
             }
-        ))
+        ) for voice in sorted(packset.all_obj(packages.QuotePack), key=name_getter)
+    ]
+
+    sky_list = [
+        selWinItem.from_data(
+            sky.id,
+            sky.selitem_data,
+            attrs={
+                '3D': sky.is_3d(),
+                'COLOR': sky.fog_color,
+            }
+        ) for sky in sorted(packset.all_obj(packages.Skybox), key=name_getter)
+    ]
+
+    elev_list = [
+        selWinItem.from_data(
+            elev.id,
+            elev.selitem_data,
+            attrs={'ORIENT': elev.has_orient}
+        ) for elev in sorted(packset.all_obj(packages.Elevator), key=name_getter)
+    ]
 
     def win_callback(sel_id: Optional[str]) -> None:
         """Callback for the selector windows.
