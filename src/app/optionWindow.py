@@ -14,7 +14,7 @@ import utils
 from app.reports import report_all_obj, report_items, report_editor_models
 from app.tooltip import add_tooltip
 from app import (
-    LAUNCH_AFTER_EXPORT, DEV_MODE, background_run,
+    DEV_MODE, background_run,
     contextWin, gameMan, localisation, tk_tools, sound, logWindow, img, UI,
 )
 from config.filters import FilterConf
@@ -327,7 +327,6 @@ async def init_gen_tab(
     make_checkbox(
         after_export_frame,
         'launch_after_export',
-        var=LAUNCH_AFTER_EXPORT,
         desc=TransToken.ui('Launch Game'),
         tooltip=TransToken.ui('After exporting, launch the selected game automatically.'),
     ).grid(row=3, column=0, sticky='W', pady=(10, 0))

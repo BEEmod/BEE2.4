@@ -112,8 +112,6 @@ async def background_start(
     return await _APP_NURSERY.start(func, *args, name=name)
 
 
-# Various configuration booleans.
-LAUNCH_AFTER_EXPORT = tk.BooleanVar(value=True, name='OPT_launch_after_export')
 DEV_MODE = tk.BooleanVar(value=utils.DEV_MODE, name='OPT_development_mode')
 
 
