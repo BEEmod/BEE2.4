@@ -348,16 +348,24 @@ class Selector(Generic[IconT, OptionRowT]):
                         n=len(corr.authors),
                     )
 
+                # Figure out which options to show.
+                mode, direction, orient = self.ui_get_buttons()
+                options = list(self.corr_group.get_options(mode, direction, corr))
+
                 if DEV_MODE.get():
                     # Show the instance in the description, plus fixups that are assigned.
+                    fixups = [
+                        f'* `{var}` = `{value}`'
+                        for var, value in corr.fixups.items()
+                    ] + [
+                        f'* `{opt.fixup}` = {opt.name}'
+                        for opt in options
+                    ]
                     description = tkMarkdown.join(
-                        tkMarkdown.MarkdownData.text(corr.instance + '\n', tkMarkdown.TextTag.CODE),
+                        tkMarkdown.MarkdownData.text(f'{corr.instance}\n', tkMarkdown.TextTag.CODE),
                         corr.desc,
                         tkMarkdown.MarkdownData.text('\nFixups:\n', tkMarkdown.TextTag.BOLD),
-                        tkMarkdown.convert(TransToken.untranslated('\n'.join([
-                            f'* `{var}`: `{value}`'
-                            for var, value in corr.fixups.items()
-                        ])), None)
+                        tkMarkdown.convert(TransToken.untranslated('\n'.join(fixups)), None)
                     )
                 else:
                     description = corr.desc
@@ -368,10 +376,6 @@ class Selector(Generic[IconT, OptionRowT]):
                     icon.selected != (ico_corr is corr)
                     for icon, ico_corr in itertools.zip_longest(self.icons, self.corr_list)
                 ))
-
-                # Figure out which options to show.
-                mode, direction, orient = self.ui_get_buttons()
-                options = list(self.corr_group.get_options(mode, direction, corr))
 
                 # Display our information.
                 self.ui_desc_display(
