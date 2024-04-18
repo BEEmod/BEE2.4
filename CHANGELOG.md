@@ -2,7 +2,7 @@
 
 # Version 4.44.1
 
-### New Features
+## New Features
 
 * Glass/grating is now generated entirely by the compiler, allowing fully 
   custom items to be made. The original glass/grating frame is now also 
@@ -11,31 +11,37 @@
   allows specifying elevator directions, stair direction and the corridor's 
   light temperature. 
 
-# Enhancements
+### Enhancements
 * Remove some now-outdated splash screens.
 * Added the ability to show multiple warning messages or errors for problems 
   occurring during package loading and export.
 * Added signage configuration option to the item's context menu, to help make it more visible.
 * Shut down the error server automatically when Portal 2 quits.
+* Added additional EXEs for `compiler_settings.exe` and `backup.exe`. These 
+  allow quickly opening just these windows.
 
 ### UCP-Relevant changes:
-* Added `sky_draw_first` option to skyboxes, which can fix some rendering bugs with certain materials.
+* Added `sky_draw_first` option to skyboxes, which can fix some rendering bugs 
+  with certain materials.
 * The barrier rework adds several new blocks to `vbsp_config`:
   * `BarrierFrames` in `vbsp_config` contains definitions for the frame of barriers.
-  * `Barriers` in `vbsp_config` contains the definitions for the brushes to produce, and then which frame IDs to use.
-  * `BarrierHole` in `info.txt` defines a hole type. This is defined outside the item, because the different style
+  * `Barriers` in `vbsp_config` contains the definitions for the brushes to 
+    produce, and then which frame IDs to use.
+  * `BarrierHole` in `info.txt` defines a hole type. This is defined outside the
+    item, because the different style
     variants can be independently specified by each barrier type.
   * The `CustomBarrier` result produces an item that converts attached glass/grating.
-* As mentioned above, `CorridorGroup` now has `Options` blocks for specifying corridor options.
-  These ultimately just set fixups on the instance. `DefaultIndex` has been replaced with just 
-  `Disabled` - all corridors will now be enabled by default.
+* As mentioned above, `CorridorGroup` now has `Options` blocks for specifying 
+  corridor options.
+  These ultimately just set fixups on the instance. `DefaultIndex` has been 
+  replaced with just `Disabled` - all corridors will now be enabled by default.
 * Music can now have a volume specified in the config.
 * Added the `AttachInputOverlay` result, which adds an overlay instance, 
   but connects it to the original as an additional input. This significantly
   simplifies logic if an additional prerequisite is required for the item to turn
   on.
 
-# Bugfixes:
+### Bugfixes:
 * Fix add-game prompt failing to appear if installed fresh.
 * #2040: Warn if no compiler files were found when exporting.
 * #1343: Clone fizzler items if connected to multiple standing/reclined fizzlers.
@@ -47,20 +53,24 @@
 
 ### Enhancements:
 * If a duplicate package is present, include the paths of both in the error message.
-* Change palette item format to permit "holes" in the position of items. This isn't exposed in the UI yet.
+* Change palette item format to permit "holes" in the position of items. This
+  isn't exposed in the UI yet.
 * Redo the selector on the Item Properties pane to make it more clear that it swaps pages.
 * Display the authors of corridors.
 * Rearranged the UI on the corridor picker display.
-* Add some informative errors if Unstationary Scaffolds (or similar UCP items) are connected in an
-  invalid manner.
+* Add some informative errors if Unstationary Scaffolds (or similar UCP items) 
+  are connected in an invalid manner.
 * Added "Compress Items" option, which hides all but one of each on the item list.
 * Skip disabled packages when extracting resources.
-* Timer-style indicator panels at the end of antlines can now have a custom appearance for some 
-  items (Delayers). This allows them to show both count-down and count-up displays.
+* Timer-style indicator panels at the end of antlines can now have a custom 
+  appearance for some items (Delayers). This allows them to show both count-down 
+  and count-up displays.
 * Moved various palette-related buttons, to group them with the other palette options.
 * VPK files can be now placed into `vpk_override` to have them be combined with the built VPK. 
-* Added a warning screen to the developer tab of the options window, indicating that some of these options can temporarily break BEE if changed.
-* #1984: The "save settings to palette" will now change to match the selected palette. This means clicking "save" won't accidentally delete saved settings.
+* Added a warning screen to the developer tab of the options window, indicating 
+  that some of these options can temporarily break BEE if changed.
+* #1984: The "save settings to palette" will now change to match the selected 
+  palette. This means clicking "save" won't accidentally delete saved settings.
 * #1893: Add compile logs to error display windows.
 * Internal files are now placed in a `bin/` subfolder, instead of cluttering
   the folders containing `BEE2.exe`, `vbsp.exe` and `vrad.exe`.
