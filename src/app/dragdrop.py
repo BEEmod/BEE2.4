@@ -12,7 +12,7 @@ from srctools.logger import get_logger
 from trio_util import AsyncValue
 import attrs
 
-from app import background_run, img, sound
+from app import background_run, img, sound, EdgeTrigger
 from event import Event
 from transtoken import TransToken
 import utils
@@ -146,10 +146,10 @@ SLOT_DRAG: Final = DragWin.DRAG
 # noinspection PyProtectedMember
 class ManagerBase(Generic[ItemT, ParentT]):
     """Manages a set of drag-drop points."""
+    # Various hooks for reacting to events.
 
-    # The various events that can fire. They provide either a relevant slot or None as the argument.
-    # Fires when items are right-clicked on. If one is registered, the gear icon appears.
-    on_config: Event[Slot[ItemT]]
+    # Fires when items are right-clicked on or the config button is pressed.
+    on_config: EdgeTrigger[Slot[ItemT]]
     # Fired when any slot is modified. This occurs only once if two swap etc. The parameter is None.
     on_modified: Event[()]
 
@@ -196,7 +196,7 @@ class ManagerBase(Generic[ItemT, ParentT]):
         # While dragging, the place we started at.
         self._cur_slot: Slot[ItemT] | None = None
 
-        self.on_config = Event('Config')
+        self.on_config = EdgeTrigger()
         self.on_modified = Event('Modified')
         self.on_redropped = Event('Redropped')
         self.on_flexi_flow = Event('Flexi Flow')
@@ -531,8 +531,8 @@ class ManagerBase(Generic[ItemT, ParentT]):
 
     def _on_configure(self, slot: Slot[ItemT]) -> None:
         """Configuration event, fired by clicking icon or right-clicking item."""
-        if slot.contents is not None:
-            background_run(self.on_config, slot)
+        if slot.contents is not None and self.on_config.ready.value:
+            self.on_config.trigger(slot)
 
 
 # noinspection PyProtectedMember
