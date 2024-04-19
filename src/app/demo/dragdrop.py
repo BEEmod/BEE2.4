@@ -155,15 +155,15 @@ async def test() -> None:
         """Just display when any event is triggered."""
         print('On redropped: ', slot)
 
-    @manager.on_modified.register
-    async def on_modified() -> None:
+    async def handle_modified() -> None:
         """Just display when any event is triggered."""
-        print('On modified')
+        async for _ in manager.on_modified.events():
+            print('On modified')
 
-    @manager.on_flexi_flow.register
-    async def on_flexi_flow() -> None:
+    async def handle_flexi_flow() -> None:
         """Just display when any event is triggered."""
-        print('On Flexi Flow')
+        async for _ in manager.on_flexi_flow.events():
+            print('On Flexi Flow')
 
     async def update_hover_text() -> None:
         """Update the hovered text."""
@@ -186,6 +186,8 @@ async def test() -> None:
         async with trio.open_nursery() as nursery:
             nursery.start_soon(update_hover_text)
             nursery.start_soon(handle_config)
+            nursery.start_soon(handle_modified)
+            nursery.start_soon(handle_flexi_flow)
             TK_ROOT.wm_protocol('WM_DELETE_WINDOW', scope.cancel)
             TK_ROOT.deiconify()
             await trio.sleep_forever()

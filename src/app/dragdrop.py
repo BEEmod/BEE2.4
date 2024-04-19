@@ -9,7 +9,7 @@ from enum import Enum
 import abc
 
 from srctools.logger import get_logger
-from trio_util import AsyncValue
+from trio_util import AsyncValue, RepeatedEvent
 import attrs
 
 from app import background_run, img, sound, EdgeTrigger
@@ -150,14 +150,14 @@ class ManagerBase(Generic[ItemT, ParentT]):
 
     # Fires when items are right-clicked on or the config button is pressed.
     on_config: EdgeTrigger[Slot[ItemT]]
-    # Fired when any slot is modified. This occurs only once if two swap etc. The parameter is None.
-    on_modified: Event[()]
+    # Fired when any slot is modified. This occurs only once if two swap etc.
+    on_modified: RepeatedEvent
 
     # Fired when a slot is dropped on itself - allows detecting a left click.
     on_redropped: Event[Slot[ItemT]]
 
     # When flexi slots are present, called when they're filled/emptied.
-    on_flexi_flow: Event[()]
+    on_flexi_flow: RepeatedEvent
 
     # The item currently being hovered over (including the drag item).
     hovered_item: AsyncValue[ItemT | None]
@@ -197,9 +197,9 @@ class ManagerBase(Generic[ItemT, ParentT]):
         self._cur_slot: Slot[ItemT] | None = None
 
         self.on_config = EdgeTrigger()
-        self.on_modified = Event('Modified')
+        self.on_modified = RepeatedEvent()
         self.on_redropped = Event('Redropped')
-        self.on_flexi_flow = Event('Flexi Flow')
+        self.on_flexi_flow = RepeatedEvent()
         self.hovered_item = AsyncValue(None)
 
     @property
@@ -471,18 +471,18 @@ class ManagerBase(Generic[ItemT, ParentT]):
                 if slot.is_flexi and slot.contents is None and group is not None:
                     slot.contents = self._cur_drag
                     slot.flexi_group = group
-                    background_run(self.on_modified)
+                    self.on_modified.set()
                     break
             else:
                 LOGGER.warning('Ran out of FLEXI slots for "{}", restored item: {}', group, self._cur_drag)
                 self._cur_slot.contents = self._cur_drag
-                background_run(self.on_modified)
+                self.on_modified.set()
         elif dest:  # We have a target.
             dest.contents = self._cur_drag
-            background_run(self.on_modified)
+            self.on_modified.set()
         # No target, and we dragged off an existing target, delete.
         elif not self._cur_slot.is_source:
-            background_run(self.on_modified)
+            self.on_modified.set()
             sound.fx('delete')
 
         self._cur_drag = None
@@ -504,7 +504,7 @@ class ManagerBase(Generic[ItemT, ParentT]):
                     sound.fx('config')
                     if slot.is_flexi:
                         slot.contents = None
-                    background_run(self.on_modified)
+                    self.on_modified.set()
                     return
                 elif free.contents is item:
                     # It's already on the board, don't change anything.
@@ -516,7 +516,7 @@ class ManagerBase(Generic[ItemT, ParentT]):
         else:
             # Fast-delete this.
             slot.contents = None
-            background_run(self.on_modified)
+            self.on_modified.set()
             sound.fx('delete')
 
     def _on_hover_enter(self, slot: Slot[ItemT]) -> None:
@@ -618,7 +618,7 @@ class Slot(Generic[ItemT]):
 
         if self.is_flexi and (old_cont is None) != (value is None):
             # We're showing/hiding, we need to redraw.
-            background_run(self.man.on_flexi_flow)
+            self.man.on_flexi_flow.set()
 
         if new_group is not None:
             # Update myself and the entire group to get the group
