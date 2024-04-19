@@ -2,7 +2,6 @@
 from typing import Awaitable, Callable, Any, ClassVar, Deque, Dict, Optional, List, Tuple
 import time
 import collections
-import logging
 
 from outcome import Outcome, Error
 from srctools import Keyvalues

@@ -98,7 +98,13 @@ class FakeZip:
             dest,
         )
 
-    def write(self, filename: str, arcname: str | None = None, compress_type: int | None = None) -> None:
+    def write(
+        self,
+        filename: str,
+        arcname: str | None = None,
+        compress_type: int | None = None,
+        compresslevel: int | None = None,
+    ) -> None:
         """Save the given file into the directory.
 
         arcname is the destination if given,
@@ -110,7 +116,13 @@ class FakeZip:
 
         shutil.copy(filename, self.folder + arcname)
 
-    def writestr(self, zinfo_or_arcname, data, *comp):
+    def writestr(
+        self,
+        zinfo_or_arcname: str,
+        data: str,
+        compress_type: int | None = None,
+        compresslevel: int | None = None,
+    ) -> None:
         dest = str(zinfo_or_arcname)
         with open(os.path.join(self.folder, dest), self.wr_mode) as f:
             f.write(data)

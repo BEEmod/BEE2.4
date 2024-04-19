@@ -1,16 +1,13 @@
-import trio
-
+from app import background_run, gameMan, img, sound
+from app.errors import ErrorUI
+from exporting import mod_support
+from ui_tk.corridor_selector import TkSelector
+from ui_tk.dialogs import DIALOG
+from ui_tk.img import TK_IMG
 import BEE2_config
 import config
 import loadScreen
 import packages
-from app import background_run, gameMan, img, sound
-from app.errors import ErrorUI
-from exporting import mod_support
-
-from ui_tk.corridor_selector import TkSelector
-from ui_tk.img import TK_IMG
-from ui_tk.dialogs import DIALOG
 
 
 async def test() -> None:

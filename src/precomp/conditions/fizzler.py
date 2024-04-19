@@ -41,7 +41,6 @@ def res_change_fizzler_type(res: Keyvalues) -> conditions.ResultCallable:
             kind='Fizzler',
             id=res.value,
         )) from None
-    fizz_id = utils.obj_id(res.value, 'fizzler')
 
     def convert(inst: Entity) -> None:
         """Modify the specified fizzler."""

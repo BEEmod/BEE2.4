@@ -1,13 +1,11 @@
 """Implements drag/drop logic."""
 from __future__ import annotations
-from typing import (
-    Any, Callable, Dict, Final, Generic, Iterable, Iterator, List, Optional, Tuple, TypeVar,
-)
+from typing import Any, Callable, Final, Generic, TypeVar, Optional
 from typing_extensions import ParamSpec, TypeAlias
+from collections.abc import Iterable, Iterator
 from collections import defaultdict
 from enum import Enum
 import abc
-import enum
 
 from srctools.logger import get_logger
 import attrs
@@ -107,7 +105,7 @@ class PositionerBase:
         self.current = 0
         self.yoff += self.item_height
 
-    def get_size(self) -> Tuple[int, int]:
+    def get_size(self) -> tuple[int, int]:
         """Calculate the total bounding box.
 
         This advances a row if the last is nonempty.
@@ -122,7 +120,7 @@ class PositionerBase:
         self,
         slots: Iterable[T],
         xoff: int,
-    ) -> Iterator[Tuple[T, int, int]]:
+    ) -> Iterator[tuple[T, int, int]]:
         """Place these slots gradually."""
         for slot in slots:
             x = self.xpos(self.current) + xoff
@@ -136,7 +134,7 @@ InfoCB: TypeAlias = Callable[[ItemT], DragInfo]
 FlexiCB: TypeAlias = Callable[[float, float], Optional[str]]
 
 
-class DragWin(enum.Enum):
+class DragWin(Enum):
     """Constant used instead of a Slot to represent the drag/drop window."""
     DRAG = "drag"
 
@@ -167,9 +165,9 @@ class ManagerBase(Generic[ItemT, ParentT]):
         self,
         *,
         info_cb: InfoCB[ItemT],
-        size: Tuple[int, int] = (64, 64),
+        size: tuple[int, int] = (64, 64),
         config_icon: bool = False,
-        pick_flexi_group: Optional[FlexiCB] = None,
+        pick_flexi_group: FlexiCB | None = None,
     ) -> None:
         """Create a group of drag-drop slots.
 
@@ -184,7 +182,7 @@ class ManagerBase(Generic[ItemT, ParentT]):
         """
         self.width, self.height = size
 
-        self._slots: List[Slot[ItemT]] = []
+        self._slots: list[Slot[ItemT]] = []
 
         self._img_blank = img.Handle.color(img.PETI_ITEM_BG, *size)
 
@@ -193,9 +191,9 @@ class ManagerBase(Generic[ItemT, ParentT]):
         self._pick_flexi_group = pick_flexi_group
 
         # If dragging, the item we are dragging.
-        self._cur_drag: Optional[ItemT] = None
+        self._cur_drag: ItemT | None = None
         # While dragging, the place we started at.
-        self._cur_slot: Optional[Slot[ItemT]] = None
+        self._cur_slot: Slot[ItemT] | None = None
 
         self.on_config = Event('Config')
         self.on_modified = Event('Modified')
@@ -205,7 +203,7 @@ class ManagerBase(Generic[ItemT, ParentT]):
         self.on_hover_exit = Event('Hover Exit')
 
     @property
-    def cur_slot(self) -> Optional[Slot[ItemT]]:
+    def cur_slot(self) -> Slot[ItemT] | None:
         """If dragging, the current slot."""
         return self._cur_slot
 
@@ -270,7 +268,7 @@ class ManagerBase(Generic[ItemT, ParentT]):
 
         # Count the number of items in each group to find
         # which should have group icons.
-        groups: Dict[Optional[str], int] = defaultdict(int)
+        groups: dict[str | None, int] = defaultdict(int)
         for slot in self._slots:
             if not slot.is_source:
                 groups[slot.contents_group] += 1
@@ -370,7 +368,7 @@ class ManagerBase(Generic[ItemT, ParentT]):
         """Move the drag window to this position."""
         raise NotImplementedError
 
-    def _pos_slot(self, x: float, y: float) -> Optional[Slot[ItemT]]:
+    def _pos_slot(self, x: float, y: float) -> Slot[ItemT] | None:
         """Find the slot under this X,Y (if any). Sources are ignored."""
         for slot in self._slots:
             if not slot.is_source and self._ui_slot_in_bbox(slot, x, y):
@@ -380,7 +378,7 @@ class ManagerBase(Generic[ItemT, ParentT]):
     def _display_item(
         self,
         slot: Slot[ItemT] | DragWin,
-        item: Optional[ItemT],
+        item: ItemT | None,
         group: bool = False,
     ) -> None:
         """Display the specified item on the given slot."""
@@ -393,7 +391,7 @@ class ManagerBase(Generic[ItemT, ParentT]):
             image = self._info_cb(item).icon
         self._ui_set_icon(slot, image)
 
-    def _group_update(self, group: Optional[str]) -> None:
+    def _group_update(self, group: str | None) -> None:
         """Update all target items with this group."""
         if group is None:
             # None to do.
@@ -547,7 +545,7 @@ class Slot(Generic[ItemT]):
     flexi_group: str  # If a flexi slot, the group.
 
     # The current thing in the slot.
-    _contents: Optional[ItemT]
+    _contents: ItemT | None
 
     # The kind of slot.
     type: SlotType
@@ -588,12 +586,12 @@ class Slot(Generic[ItemT]):
         self._is_highlighted = bool(value)
 
     @property
-    def contents(self) -> Optional[ItemT]:
+    def contents(self) -> ItemT | None:
         """Get the item in this slot, or None if empty."""
         return self._contents
 
     @contents.setter
-    def contents(self, value: Optional[ItemT]) -> None:
+    def contents(self, value: ItemT | None) -> None:
         """Set the item in this slot."""
         old_cont = self._contents
 
@@ -631,7 +629,7 @@ class Slot(Generic[ItemT]):
             self.man._display_item(self, value)
 
     @property
-    def contents_group(self) -> Optional[str]:
+    def contents_group(self) -> str | None:
         """If the item in this slot has a group, return it."""
         if self._contents is not None:
             return self.man._info_cb(self._contents).group

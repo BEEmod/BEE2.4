@@ -1,17 +1,15 @@
 """Templates are sets of brushes which can be copied into the map."""
 from __future__ import annotations
-
-from typing import (
-    AbstractSet, Callable, IO, Union, Optional, Dict, Tuple, Mapping, Iterable,
-    Iterator,
-)
+from typing import AbstractSet, Union, Tuple, Mapping
 from typing_extensions import Literal, TypeAlias, assert_never
-import itertools
-import os
+
+from collections.abc import Callable, Iterable, Iterator
 from collections import defaultdict
 from decimal import Decimal
 from enum import Enum
 from operator import attrgetter
+import itertools
+import os
 
 import trio
 import attrs
@@ -20,15 +18,15 @@ from srctools import Keyvalues
 from srctools.filesys import FileSystem, ZipFileSystem, RawFileSystem, VPKFileSystem
 from srctools.math import AnyAngle, AnyMatrix, FrozenVec, Vec, Angle, Matrix, to_matrix
 from srctools.vmf import Entity, EntityGroup, Solid, Side, VMF, UVAxis, ValidKVs, VisGroup
-from srctools.dmx import Element as DMElement
+from srctools.dmx import Element
 import srctools.logger
 
-import user_errors
-import utils
+from . import tiling, texturing, options, rand, connections, collisions, barriers
 from .texturing import Portalable, GenCat, TileSize
 from .tiling import TileType
-from . import tiling, texturing, options, rand, connections, collisions, barriers
 from plane import PlaneKey
+import user_errors
+import utils
 import consts
 
 
@@ -195,10 +193,7 @@ NORMALS = [
 
 B = Portalable.BLACK
 W = Portalable.WHITE
-TEMPLATE_RETEXTURE: dict[str, Union[
-    tuple[GenCat, str, None],
-    tuple[GenCat, TileSize, Portalable],
-]] = {
+TEMPLATE_RETEXTURE: dict[str, tuple[GenCat, str, None] | tuple[GenCat, TileSize, Portalable]] = {
     # textures map -> surface types for template brushes.
     # It's mainly for grid size and colour - floor/ceiling textures
     # will be used instead at those orientations
@@ -249,8 +244,11 @@ TEMP_TILE_PIX_SIZE = {
 
 
 # 'Opposite' values for retexture_template(force_colour)
-ForceColour: TypeAlias = Literal[AppliedColour.MATCH, AppliedColour.INVERT, Portalable.white, Portalable.black]
-TEMP_COLOUR_INVERT: Dict[ForceColour, ForceColour] = {
+ForceColour: TypeAlias = Literal[
+    AppliedColour.MATCH, AppliedColour.INVERT,
+    Portalable.white, Portalable.black,
+]
+TEMP_COLOUR_INVERT: dict[ForceColour, ForceColour] = {
     Portalable.white: Portalable.black,
     Portalable.black: Portalable.white,
     AppliedColour.MATCH: AppliedColour.INVERT,
@@ -269,21 +267,21 @@ class ExportedTemplate:
 
     """
     world: list[Solid]
-    detail: Optional[Entity]
+    detail: Entity | None
     overlay: list[Entity]
     orig_ids: dict[int, int]
     template: Template
     origin: Vec
     orient: Matrix
     visgroups: set[str]
-    picker_results: dict[str, Optional[Portalable]]
-    picker_type_results: dict[str, Optional[TileType]]
-    debug_marker: Optional[Callable[..., None]]
+    picker_results: dict[str, Portalable | None]
+    picker_type_results: dict[str, TileType | None]
+    debug_marker: Callable[..., None] | None
 
 
 # Make_prism() generates faces aligned to world, copy the required UVs.
 realign_solid: Solid = VMF().make_prism(Vec(-16, -16, -16), Vec(16, 16, 16)).solid
-REALIGN_UVS: Dict[FrozenVec, Tuple[UVAxis, UVAxis]] = {
+REALIGN_UVS: Mapping[FrozenVec, tuple[UVAxis, UVAxis]] = {
     face.normal().freeze(): (face.uaxis, face.vaxis)
     for face in realign_solid
 }
@@ -457,12 +455,16 @@ class ScalingTemplate(Mapping[
 
     def __getitem__(
         self,
-        normal: Union[Vec, FrozenVec, tuple[float, float, float]],
+        normal: Vec | FrozenVec | tuple[float, float, float],
     ) -> tuple[str, UVAxis, UVAxis, float]:
         mat, axis_u, axis_v, rotation = self._axes[FrozenVec(normal)]
         return mat, axis_u.copy(), axis_v.copy(), rotation
 
-    def rotate(self, angles: Union[Angle, Matrix], origin: Optional[Vec] = None) -> ScalingTemplate:
+    def rotate(
+        self,
+        angles: AnyAngle | AnyMatrix,
+        origin: Vec | FrozenVec | None = None,
+    ) -> ScalingTemplate:
         """Rotate this template, and return a new template with those angles."""
         new_axis: dict[FrozenVec, tuple[str, UVAxis, UVAxis, float]] = {}
         if origin is None:
@@ -499,10 +501,10 @@ def parse_temp_name(name: str) -> tuple[str, set[str]]:
 
 async def load_templates(path: str) -> None:
     """Load in the template file, used for import_template()."""
-    def read_templates() -> DMElement:
+    def read_templates() -> Element:
         """Read templates from disk."""
         with open(path, 'rb') as f:
-            dmx, fmt_name, fmt_ver = DMElement.parse(f, unicode=True)
+            dmx, fmt_name, fmt_ver = Element.parse(f, unicode=True)
         if fmt_name != 'bee_templates' or fmt_ver not in [1]:
             raise ValueError(f'Invalid template file format "{fmt_name}" v{fmt_ver}')
         return dmx
@@ -572,7 +574,7 @@ def _parse_template(loc: UnparsedTemplate) -> Template:
             yield detail.solids, True, detail.visgroup_ids
 
     force = conf['temp_type']
-    force_is_detail: Optional[bool]
+    force_is_detail: bool | None
     if force.casefold() == 'detail':
         force_is_detail = True
     elif force.casefold() == 'world':
@@ -822,9 +824,9 @@ def import_template(
     id_mapping: dict[int, int] = {}
     orient = to_matrix(angles)
 
-    dbg_visgroup: Optional[VisGroup] = None
-    dbg_group: Optional[EntityGroup] = None
-    dbg_add: Optional[Callable[..., None]] = None
+    dbg_visgroup: VisGroup | None = None
+    dbg_group: EntityGroup | None = None
+    dbg_add: Callable[..., None] | None = None
     if template.debug:
         # Find the visgroup for template debug data, and create an entity group.
         for dbg_visgroup in vmf.vis_tree:
@@ -904,7 +906,7 @@ def import_template(
     if add_to_map:
         vmf.add_brushes(new_world)
 
-    detail_ent: Optional[Entity] = None
+    detail_ent: Entity | None = None
 
     if new_detail:
         detail_ent = vmf.create_ent(classname='func_detail')
@@ -1093,13 +1095,13 @@ def retexture_template(
 
     # For each face, if it needs to be forced to a colour, or None if not.
     # If a string it's forced to that string specifically.
-    force_colour_faces: dict[str, Union[Portalable, str, None]] = defaultdict(lambda: None)
+    force_colour_faces: dict[str, Portalable | str | None] = defaultdict(lambda: None)
     # Picker names to their results.
     picker_results = template_data.picker_results
-    picker_type_results: dict[str, Optional[TileType]] = {}
+    picker_type_results: dict[str, TileType | None] = {}
 
     # If the "use patterns" option is enabled, face ID -> temp face to copy from.
-    picker_patterned: dict[str, Optional[Side]] = defaultdict(lambda: None)
+    picker_patterned: dict[str, Side | None] = defaultdict(lambda: None)
     # Then also a cache of the tiledef -> dict of template faces.
     pattern_cache: dict[tiling.TileDef, dict[tuple[int, int], Side]] = {}
 
@@ -1449,7 +1451,7 @@ def retexture_template(
                         (neg_v, pos_u),
                     ], key=lambda uv: -uv[1].z)
 
-            override_mat: Optional[list[str]]
+            override_mat: list[str] | None
             try:
                 override_mat = evalled_replace_tex['#' + orig_id]
             except KeyError:
@@ -1480,7 +1482,7 @@ def retexture_template(
             except KeyError:
                 continue  # It's nodraw, or something we shouldn't change
 
-            tex_colour: Optional[Portalable]
+            tex_colour: Portalable | None
             gen_type, tex_name, tex_colour = tex_type
 
             if not gen_type.is_tile:
