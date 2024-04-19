@@ -12,8 +12,7 @@ from srctools.logger import get_logger
 from trio_util import AsyncValue, RepeatedEvent
 import attrs
 
-from app import background_run, img, sound, EdgeTrigger
-from event import Event
+from app import img, sound, EdgeTrigger
 from transtoken import TransToken
 import utils
 
@@ -153,9 +152,6 @@ class ManagerBase(Generic[ItemT, ParentT]):
     # Fired when any slot is modified. This occurs only once if two swap etc.
     on_modified: RepeatedEvent
 
-    # Fired when a slot is dropped on itself - allows detecting a left click.
-    on_redropped: Event[Slot[ItemT]]
-
     # When flexi slots are present, called when they're filled/emptied.
     on_flexi_flow: RepeatedEvent
 
@@ -198,7 +194,6 @@ class ManagerBase(Generic[ItemT, ParentT]):
 
         self.on_config = EdgeTrigger()
         self.on_modified = RepeatedEvent()
-        self.on_redropped = Event('Redropped')
         self.on_flexi_flow = RepeatedEvent()
         self.hovered_item = AsyncValue(None)
 
@@ -452,12 +447,9 @@ class ManagerBase(Generic[ItemT, ParentT]):
         dest = self._pos_slot(x, y)
 
         if dest is self._cur_slot:
-            assert dest is not None
-            # Dropped on itself, fire special event, put the item back.
+            # Dropped on itself, just put the item back.
             dest.contents = self._cur_drag
-            background_run(self.on_redropped, dest)
-            self._cur_drag = None
-            self._cur_slot = None
+            self._cur_drag = self._cur_slot = None
             return
 
         sound.fx('config')

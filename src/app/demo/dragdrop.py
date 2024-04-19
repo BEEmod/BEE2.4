@@ -1,12 +1,11 @@
 from __future__ import annotations
-from typing import Awaitable, Callable
 from tkinter import messagebox, ttk
 import tkinter as tk
 
 import trio
 
 from app import background_run, img, sound
-from app.dragdrop import DragInfo, Slot
+from app.dragdrop import DragInfo
 from app.errors import ErrorUI
 from transtoken import TransToken
 from ui_tk.dragdrop import DragDrop
@@ -149,11 +148,6 @@ async def test() -> None:
 
     name_lbl = ttk.Label(TK_ROOT, text='')
     name_lbl.grid(row=3, column=0)
-
-    @manager.on_redropped.register
-    async def call(slot: Slot[str] | None) -> None:
-        """Just display when any event is triggered."""
-        print('On redropped: ', slot)
 
     async def handle_modified() -> None:
         """Just display when any event is triggered."""
