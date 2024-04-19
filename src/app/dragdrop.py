@@ -17,7 +17,10 @@ from transtoken import TransToken
 import utils
 
 
-__all__ = ['ManagerBase', 'Slot', 'DragInfo', 'ParentT', 'SlotType', 'SLOT_DRAG', 'ItemT']
+__all__ = [
+    'ManagerBase', 'Slot', 'DragInfo', 'ParentT', 'SlotType', 'SLOT_DRAG', 'ItemT',
+    'InfoCB', 'DragWin', 'FlexiCB', 'PositionerBase', 'in_bbox',
+]
 LOGGER = get_logger(__name__)
 
 
@@ -139,12 +142,27 @@ class DragWin(Enum):
     """Constant used instead of a Slot to represent the drag/drop window."""
     DRAG = "drag"
 
+
 SLOT_DRAG: Final = DragWin.DRAG
 
 
 # noinspection PyProtectedMember
 class ManagerBase(Generic[ItemT, ParentT]):
     """Manages a set of drag-drop points."""
+    width: Final[int]
+    height: Final[int]
+    config_icon: Final[bool]
+    _info_cb: InfoCB[ItemT]
+    _pick_flexi_group: FlexiCB | None
+
+    _slots: list[Slot[ItemT]]
+    _img_blank: img.Handle  # Image for an empty slot.
+
+    # If dragging, the item we are dragging.
+    _cur_drag: ItemT | None
+    # While dragging, the place we started at.
+    _cur_slot: Slot[ItemT] | None
+
     # Various hooks for reacting to events.
 
     # Fires when items are right-clicked on or the config button is pressed.
@@ -178,19 +196,13 @@ class ManagerBase(Generic[ItemT, ParentT]):
           and should return the name of the group to pick a slot from, or None if it should cancel.
         """
         self.width, self.height = size
-
-        self._slots: list[Slot[ItemT]] = []
-
-        self._img_blank = img.Handle.color(img.PETI_ITEM_BG, *size)
-
         self.config_icon = config_icon
         self._info_cb = info_cb
         self._pick_flexi_group = pick_flexi_group
 
-        # If dragging, the item we are dragging.
-        self._cur_drag: ItemT | None = None
-        # While dragging, the place we started at.
-        self._cur_slot: Slot[ItemT] | None = None
+        self._slots = []
+        self._img_blank = img.Handle.color(img.PETI_ITEM_BG, *size)
+        self._cur_drag = self._cur_slot = None
 
         self.on_config = EdgeTrigger()
         self.on_modified = RepeatedEvent()

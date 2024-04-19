@@ -10,7 +10,6 @@ from enum import Enum
 import attrs
 
 from app import img, tk_tools
-# noinspection PyProtectedMember
 from app.dragdrop import (
     SLOT_DRAG, DragWin, FlexiCB, InfoCB, ManagerBase, PositionerBase,
     Slot, in_bbox,
@@ -121,6 +120,12 @@ class SlotUI:
 
 class DragDrop(ManagerBase[ItemT, tk.Misc], Generic[ItemT]):
     """Implements UI functionality for the dragdrop module."""
+    # Widgets comprising items attached to the cursor.
+    _drag_win: tk.Toplevel
+    _drag_lbl: tk.Label
+
+    # Maps slots to the Tk implementation.
+    _slot_ui: dict[Slot[ItemT], SlotUI]
     def __init__(
         self,
         parent: Union[tk.Tk, tk.Toplevel],
@@ -136,7 +141,6 @@ class DragDrop(ManagerBase[ItemT, tk.Misc], Generic[ItemT]):
             config_icon=config_icon,
             pick_flexi_group=pick_flexi_group,
         )
-        self.parent = parent
 
         self._drag_win = drag_win = tk.Toplevel(parent, name='drag_icon')
         drag_win.withdraw()
@@ -150,7 +154,7 @@ class DragDrop(ManagerBase[ItemT, tk.Misc], Generic[ItemT]):
         drag_win.bind(tk_tools.EVENTS['LEFT_RELEASE'], self._evt_stop)
         drag_win.bind(tk_tools.EVENTS['LEFT_MOVE'], self._evt_move)
         
-        self._slot_ui: dict[Slot[ItemT], SlotUI] = {}
+        self._slot_ui = {}
 
     @override
     def _ui_set_icon(self, slot: Slot[ItemT] | DragWin, icon: img.Handle) -> None:
@@ -313,7 +317,6 @@ class DragDrop(ManagerBase[ItemT, tk.Misc], Generic[ItemT]):
         self._on_stop(evt.x_root, evt.y_root)
 
     # These call the method on the label, setting our attrs.
-    # Type-ignore because these are defined on Grid/Place/Pack, not Label...
     slot_grid = _make_placer(ttk.Label.grid_configure, GeoManager.GRID)
     slot_place = _make_placer(ttk.Label.place_configure, GeoManager.PLACE)
     slot_pack = _make_placer(ttk.Label.pack_configure, GeoManager.PACK)
