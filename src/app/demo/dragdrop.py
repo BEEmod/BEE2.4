@@ -98,7 +98,7 @@ async def test() -> None:
         """Just display when any event is triggered."""
         print('On Flexi Flow')
 
-    for evt in ['config', 'redropped', 'hover_enter', 'hover_exit']:
+    for evt in ['config', 'redropped']:
         event: Event[Slot[str]] | Event[None] = getattr(manager, 'on_' + evt)
         event.register(func(evt))
 
@@ -172,14 +172,14 @@ async def test() -> None:
     name_lbl = ttk.Label(TK_ROOT, text='')
     name_lbl.grid(row=3, column=0)
 
-    @manager.on_hover_enter.register
-    async def evt_enter(evt_slot: Slot[str]) -> None:
-        if evt_slot.contents is not None:
-            name_lbl['text'] = 'Name: ' + evt_slot.contents
-
-    @manager.on_hover_exit.register
-    async def evt_exit(evt_slot: Slot[str]) -> None:
-        name_lbl['text'] = ''
+    async def update_hover_text() -> None:
+        """Update the hovered text."""
+        async with utils.aclosing(manager.hovered_item.eventual_values()) as agen:
+            async for item in agen:
+                if item is not None:
+                    name_lbl['text'] = 'Name: ' + item
+                else:
+                    name_lbl['text'] = ''
 
     @manager.on_config.register
     async def evt_config(evt_slot: Slot[str]) -> None:
@@ -187,7 +187,9 @@ async def test() -> None:
 
     manager.load_icons()
 
-    TK_ROOT.deiconify()
     with trio.CancelScope() as scope:
-        TK_ROOT.wm_protocol('WM_DELETE_WINDOW', scope.cancel)
-        await trio.sleep_forever()
+        async with trio.open_nursery() as nursery:
+            nursery.start_soon(update_hover_text)
+            TK_ROOT.wm_protocol('WM_DELETE_WINDOW', scope.cancel)
+            TK_ROOT.deiconify()
+            await trio.sleep_forever()

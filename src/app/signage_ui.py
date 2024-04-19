@@ -1,13 +1,14 @@
 """Configures which signs are defined for the Signage item."""
 from __future__ import annotations
+from typing_extensions import TypeGuard
 from collections.abc import Sequence
 from datetime import timedelta
-
 from tkinter import ttk
 import tkinter as tk
 
-import trio
 import srctools.logger
+import trio
+import trio_util
 
 from ui_tk.dragdrop import DragDrop, DragInfo
 from ui_tk.img import TKImages
@@ -35,6 +36,11 @@ IMG_BLANK = img.Handle.background(64, 64)
 TRANS_SIGN_NAME = TransToken.ui('Signage: {name}')
 TRANS_UNKNOWN_SIGN = TransToken.ui('Unknown Signage: {id}')
 _cur_style_id: PakRef[Style] = PakRef(Style, packages.CLEAN_STYLE)
+
+
+def is_full(value: PakRef[Signage] | None) -> TypeGuard[PakRef[Signage]]:
+    """Predicate for valid contents."""
+    return value is not None
 
 
 def export_data() -> list[tuple[str, utils.ObjectID]]:
@@ -140,75 +146,64 @@ async def init_widgets(tk_img: TKImages, trigger: EdgeTrigger[()]) -> None:
     preview_left.grid(row=0, column=0)
     preview_right.grid(row=0, column=1)
 
-    # Dummy initial parameter, will be overwritten. Allows us to stop the display when the mouse
-    # leaves.
-    hover_scope = trio.CancelScope()
-
-    @drag_man.on_hover_enter.register
-    async def on_hover(hovered: dragdrop.Slot[PakRef[Signage]]) -> None:
+    async def hovering_task() -> None:
         """Show the signage when hovered, then toggle."""
-        nonlocal hover_scope
-        hover_sign_ref = hovered.contents
-        if hover_sign_ref is None:
-            await on_leave(hovered)
-            return
-        hover_scope.cancel()
-        packset = packages.get_loaded_packages()
+        while True:
+            hover_sign_ref = await drag_man.hovered_item.wait_value(is_full)
+            packset = packages.get_loaded_packages()
 
-        hover_sign = hover_sign_ref.resolve(packset)
-        if hover_sign is None:
-            set_text(name_label, TRANS_UNKNOWN_SIGN.format(id=hover_sign_ref.id))
-            tk_img.apply(preview_left, IMG_ERROR)
-            tk_img.apply(preview_right, IMG_ERROR)
-            return
+            hover_sign = hover_sign_ref.resolve(packset)
+            if hover_sign is None:
+                set_text(name_label, TRANS_UNKNOWN_SIGN.format(id=hover_sign_ref.id))
+                tk_img.apply(preview_left, IMG_ERROR)
+                tk_img.apply(preview_right, IMG_ERROR)
+                await drag_man.hovered_item.wait_transition()
+                continue
 
-        set_text(name_label, TRANS_SIGN_NAME.format(name=hover_sign.name))
+            set_text(name_label, TRANS_SIGN_NAME.format(name=hover_sign.name))
 
-        style = _cur_style_id.resolve(packset)
-        if style is None:
-            LOGGER.warning('No such style: {}', _cur_style_id)
-            await on_leave(hovered)
-            return
+            style = _cur_style_id.resolve(packset)
+            if style is None:
+                LOGGER.warning('No such style: {}', _cur_style_id)
+                tk_img.apply(preview_left, IMG_ERROR)
+                tk_img.apply(preview_right, IMG_ERROR)
+                await drag_man.hovered_item.wait_transition()
+                continue
 
-        single_left = get_icon(hover_sign, style)
-        try:
-            single_right = get_icon(packset.obj_by_id(Signage, 'SIGN_ARROW'), style)
-        except KeyError:
-            LOGGER.warning('No arrow signage defined!')
-            single_right = IMG_BLANK
-
-        double_left: img.Handle = single_left
-        double_right: img.Handle = IMG_BLANK
-
-        if hover_sign.prim_id:
+            single_left = get_icon(hover_sign, style)
             try:
-                double_left = get_icon(packset.obj_by_id(Signage, hover_sign.prim_id), style)
+                single_right = get_icon(packset.obj_by_id(Signage, 'SIGN_ARROW'), style)
             except KeyError:
-                pass
+                LOGGER.warning('No arrow signage defined!')
+                single_right = IMG_BLANK
 
-        if hover_sign.sec_id:
-            try:
-                double_right = get_icon(packset.obj_by_id(Signage, hover_sign.sec_id), style)
-            except KeyError:
-                pass
+            double_left: img.Handle = single_left
+            double_right: img.Handle = IMG_BLANK
 
-        with trio.CancelScope() as hover_scope:
-            while True:
-                tk_img.apply(preview_left, single_left)
-                tk_img.apply(preview_right, single_right)
-                await trio.sleep(1.0)
-                tk_img.apply(preview_left, double_left)
-                tk_img.apply(preview_right, double_right)
-                await trio.sleep(1.0)
+            if hover_sign.prim_id:
+                try:
+                    double_left = get_icon(packset.obj_by_id(Signage, hover_sign.prim_id), style)
+                except KeyError:
+                    pass
 
-    @drag_man.on_hover_exit.register
-    async def on_leave(hovered: dragdrop.Slot[PakRef[Signage]]) -> None:
-        """Reset the visible sign when left."""
-        nonlocal hover_scope
-        name_label['text'] = ''
-        hover_scope.cancel()
-        tk_img.apply(preview_left, IMG_BLANK)
-        tk_img.apply(preview_right, IMG_BLANK)
+            if hover_sign.sec_id:
+                try:
+                    double_right = get_icon(packset.obj_by_id(Signage, hover_sign.sec_id), style)
+                except KeyError:
+                    pass
+
+            async with trio_util.move_on_when(drag_man.hovered_item.wait_transition):
+                while True:
+                    tk_img.apply(preview_left, single_left)
+                    tk_img.apply(preview_right, single_right)
+                    await trio.sleep(1.0)
+                    tk_img.apply(preview_left, double_left)
+                    tk_img.apply(preview_right, double_right)
+                    await trio.sleep(1.0)
+            # noinspection PyUnreachableCode
+            name_label['text'] = ''
+            tk_img.apply(preview_left, IMG_BLANK)
+            tk_img.apply(preview_right, IMG_BLANK)
 
     load_packset = packages.get_loaded_packages()
     for i in SIGN_IND:
@@ -238,21 +233,24 @@ async def init_widgets(tk_img: TKImages, trigger: EdgeTrigger[()]) -> None:
     await config.APP.set_and_run_ui_callback(Layout, apply_config)
 
     # Alternate between showing and hiding.
-    while True:
-        await trigger.wait()
-        drag_man.load_icons()
-        window.deiconify()
-        tk_tools.center_win(window, TK_ROOT)
+    async with trio.open_nursery() as nursery:
+        nursery.start_soon(hovering_task)
 
-        await close_event.wait()
-        close_event = trio.Event()
+        while True:
+            await trigger.wait()
+            drag_man.load_icons()
+            window.deiconify()
+            tk_tools.center_win(window, TK_ROOT)
 
-        # Store off the configured signage.
-        config.APP.store_conf(Layout({
-            timer: slt.contents.id if slt.contents is not None else ''
-            for timer, slt in SLOTS_SELECTED.items()
-        }))
-        window.withdraw()
-        drag_man.unload_icons()
-        tk_img.apply(preview_left, IMG_BLANK)
-        tk_img.apply(preview_right, IMG_BLANK)
+            await close_event.wait()
+            close_event = trio.Event()
+
+            # Store off the configured signage.
+            config.APP.store_conf(Layout({
+                timer: slt.contents.id if slt.contents is not None else ''
+                for timer, slt in SLOTS_SELECTED.items()
+            }))
+            window.withdraw()
+            drag_man.unload_icons()
+            tk_img.apply(preview_left, IMG_BLANK)
+            tk_img.apply(preview_right, IMG_BLANK)

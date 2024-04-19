@@ -2,12 +2,14 @@
 from __future__ import annotations
 from typing import Any, Callable, Final, Generic, TypeVar, Optional
 from typing_extensions import ParamSpec, TypeAlias
+
 from collections.abc import Iterable, Iterator
 from collections import defaultdict
 from enum import Enum
 import abc
 
 from srctools.logger import get_logger
+from trio_util import AsyncValue
 import attrs
 
 from app import background_run, img, sound
@@ -145,7 +147,7 @@ SLOT_DRAG: Final = DragWin.DRAG
 class ManagerBase(Generic[ItemT, ParentT]):
     """Manages a set of drag-drop points."""
 
-    # The various events that can fire. They provide either a relevant slot or None as the argument."""
+    # The various events that can fire. They provide either a relevant slot or None as the argument.
     # Fires when items are right-clicked on. If one is registered, the gear icon appears.
     on_config: Event[Slot[ItemT]]
     # Fired when any slot is modified. This occurs only once if two swap etc. The parameter is None.
@@ -157,9 +159,8 @@ class ManagerBase(Generic[ItemT, ParentT]):
     # When flexi slots are present, called when they're filled/emptied.
     on_flexi_flow: Event[()]
 
-    # Mouse over or out of the items (including drag item).
-    on_hover_enter: Event[Slot[ItemT]]
-    on_hover_exit: Event[Slot[ItemT]]
+    # The item currently being hovered over (including the drag item).
+    hovered_item: AsyncValue[ItemT | None]
 
     def __init__(
         self,
@@ -199,8 +200,7 @@ class ManagerBase(Generic[ItemT, ParentT]):
         self.on_modified = Event('Modified')
         self.on_redropped = Event('Redropped')
         self.on_flexi_flow = Event('Flexi Flow')
-        self.on_hover_enter = Event('Hover Enter')
-        self.on_hover_exit = Event('Hover Exit')
+        self.hovered_item = AsyncValue(None)
 
     @property
     def cur_slot(self) -> Slot[ItemT] | None:
@@ -522,12 +522,12 @@ class ManagerBase(Generic[ItemT, ParentT]):
     def _on_hover_enter(self, slot: Slot[ItemT]) -> None:
         """Fired when the cursor starts hovering over the item."""
         self._ui_slot_showdeco(slot)
-        background_run(self.on_hover_enter, slot)
+        self.hovered_item.value = slot.contents
 
     def _on_hover_exit(self, slot: Slot[ItemT]) -> None:
         """Fired when the cursor stops hovering over the item."""
         self._ui_slot_hidedeco(slot)
-        background_run(self.on_hover_exit, slot)
+        self.hovered_item.value = None
 
     def _on_configure(self, slot: Slot[ItemT]) -> None:
         """Configuration event, fired by clicking icon or right-clicking item."""
