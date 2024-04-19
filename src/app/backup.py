@@ -324,8 +324,13 @@ def find_puzzles(game: gameMan.Game) -> str | None:
 
     puzzle_folder = PUZZLE_FOLDERS.get(str(game.steamID), 'portal2')
     path = game.abs_path(puzzle_folder + '/puzzles/')
+    try:
+        id_folders = os.listdir(path)
+    except FileNotFoundError:
+        # No puzzles folder at all...
+        return None
 
-    for folder in os.listdir(path):
+    for folder in id_folders:
         # The steam ID is all digits, so look for a folder with only digits
         # in the name
         if not folder.isdigit():
