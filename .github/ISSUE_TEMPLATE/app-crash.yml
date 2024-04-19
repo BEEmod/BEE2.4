@@ -17,13 +17,13 @@ body:
   - type: input
     attributes:
       label: BEE2 Application Version
-      description: Specify the version of BEE2.4 application (ex. 4.40.0 64bit)
+      description: Specify the version of BEE2.4 application (ex. 4.40.0 64bit). Don't use "latest", that isn't useful when looking back on issues in the future.
     validations:
       required: true
   - type: input
     attributes:
       label: BEE2 Package Version
-      description: Specify the version of BEE2.4 packages (ex. 4.40.0)
+      description: Specify the version of BEE2.4 packages (ex. 4.40.0).  Don't use "latest", that isn't useful when looking back on issues in the future.
     validations:
       required: true
   - type: dropdown
