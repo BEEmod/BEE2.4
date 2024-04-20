@@ -1,10 +1,11 @@
 """Data structure for specifying custom corridors."""
 from __future__ import annotations
-from typing import Optional, Sequence, Tuple, Mapping
-from typing_extensions import Final, TypeAlias, Literal, Self
+from typing import Optional, Tuple
+from typing_extensions import Final, TypeAlias, Literal
+from collections.abc import Sequence, Mapping
 from enum import Enum
 
-from srctools import Keyvalues, logger
+from srctools import logger
 import attrs
 
 from consts import DefaultItems
@@ -73,49 +74,6 @@ class Option:
     default: utils.SpecialID  # id or <RANDOM>
     values: Sequence[OptValue]
     fixup: str
-
-    @classmethod
-    def parse(
-        cls,
-        pak_id: utils.SpecialID,
-        opt_id: utils.ObjectID,
-        kv: Keyvalues,
-    ) -> Self:
-        """Parse from KV1 configs."""
-        name = TransToken.parse(pak_id, kv['name'])
-        valid_ids: set[utils.ObjectID] = set()
-        values: list[OptValue] = []
-        fixup = kv['var']
-
-        for child in kv.find_children('Values'):
-            val_id = utils.obj_id(child.real_name, 'corridor option value')
-            if val_id in valid_ids:
-                LOGGER.warning(
-                    'Duplicate value "{}" for option "{}"!',
-                    child.name, opt_id,
-                )
-            valid_ids.add(val_id)
-            values.append(OptValue(
-                id=val_id,
-                name=TransToken.parse(pak_id, child.value),
-            ))
-
-        if not values:
-            raise ValueError(f'Option "{opt_id}" has no valid values!')
-
-        try:
-            default = utils.special_id(kv['default'], 'corridor option default')
-        except LookupError:
-            default = values[0].id
-        else:
-            if default not in valid_ids and default != utils.ID_RANDOM:
-                LOGGER.warning(
-                    'Default id "{}" is not valid for option "{}"',
-                    default, opt_id,
-                )
-                default = values[0].id
-
-        return cls(opt_id, name, default, values, fixup)
 
 
 # Maps item IDs to their corridors, and vice versa.

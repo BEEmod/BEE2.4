@@ -1,11 +1,12 @@
 """Defines individual corridors to allow swapping which are used."""
 from __future__ import annotations
+from typing_extensions import Final
 
 from collections import defaultdict
 from collections.abc import Sequence, Iterator, Mapping
-from typing_extensions import Final
 import itertools
 
+from srctools import Keyvalues
 import attrs
 import srctools.logger
 
@@ -14,7 +15,7 @@ from app import img, lazy_conf, tkMarkdown
 import packages
 import editoritems
 from corridor import (
-    CorrKind, CorrSpec, OptionGroup,
+    CorrKind, CorrSpec, OptValue, OptionGroup,
     Orient, Direction, GameMode,
     Option, Corridor,
     CORRIDOR_COUNTS, ID_TO_CORR,
@@ -121,6 +122,48 @@ def parse_corr_kind(specifier: str) -> CorrKind:
     return mode, direction, orient
 
 
+def parse_option(
+    pak_id: utils.SpecialID,
+    kv: Keyvalues,
+) -> Option:
+    """Parse a KV1 config into an option."""
+    opt_id = utils.obj_id(kv.real_name, 'corridor option')
+    name = TransToken.parse(pak_id, kv['name'])
+    valid_ids: set[utils.ObjectID] = set()
+    values: list[OptValue] = []
+    fixup = kv['var']
+
+    for child in kv.find_children('Values'):
+        val_id = utils.obj_id(child.real_name, 'corridor option value')
+        if val_id in valid_ids:
+            LOGGER.warning(
+                'Duplicate value "{}" for option "{}"!',
+                child.name, opt_id,
+            )
+        valid_ids.add(val_id)
+        values.append(OptValue(
+            id=val_id,
+            name=TransToken.parse(pak_id, child.value),
+        ))
+
+    if not values:
+        raise ValueError(f'Option "{opt_id}" has no valid values!')
+
+    try:
+        default = utils.special_id(kv['default'], 'corridor option default')
+    except LookupError:
+        default = values[0].id
+    else:
+        if default not in valid_ids and default != utils.ID_RANDOM:
+            LOGGER.warning(
+                'Default id "{}" is not valid for option "{}"',
+                default, opt_id,
+            )
+            default = values[0].id
+
+    return Option(opt_id, name, default, values, fixup)
+
+
 @attrs.define(slots=False, kw_only=True)
 class CorridorGroup(packages.PakObject, allow_mult=True):
     """A collection of corridors defined for the style with this ID."""
@@ -139,11 +182,10 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
         options: dict[utils.ObjectID, Option] = {}
         global_options: dict[OptionGroup, list[Option]] = defaultdict(list)
         for opt_kv in data.info.find_children('Options'):
-            opt_id = utils.obj_id(opt_kv.real_name, 'corridor option')
-            option = Option.parse(data.pak_id, opt_id, opt_kv)
-            if opt_id in options:
-                raise AppError(TRANS_DUPLICATE_OPTION.format(option=opt_id, group=data.id))
-            options[opt_id] = option
+            option = parse_option(data.pak_id, opt_kv)
+            if option.id in options:
+                raise AppError(TRANS_DUPLICATE_OPTION.format(option=option.id, group=data.id))
+            options[option.id] = option
             for spec_kv in opt_kv.find_all('global'):
                 spec_mode, spec_dir, spec_orient = parse_specifier(spec_kv.value)
                 # We don't differentiate by orientation.
