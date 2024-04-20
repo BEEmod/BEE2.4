@@ -6,9 +6,8 @@ from collections import defaultdict
 from collections.abc import Sequence, Iterator, Mapping
 import itertools
 
-from srctools import Keyvalues
+from srctools import Keyvalues, logger
 import attrs
-import srctools.logger
 
 import utils
 from app import img, lazy_conf, tkMarkdown
@@ -23,7 +22,7 @@ from corridor import (
 from transtoken import AppError, TransToken, TransTokenSource
 
 
-LOGGER = srctools.logger.get_logger(__name__)
+LOGGER = logger.get_logger(__name__)
 
 # For converting style corridor definitions, this indicates the attribute the old data was stored in.
 FALLBACKS: Final[Mapping[tuple[GameMode, Direction], str]] = {
@@ -136,10 +135,7 @@ def parse_option(
     for child in kv.find_children('Values'):
         val_id = utils.obj_id(child.real_name, 'corridor option value')
         if val_id in valid_ids:
-            LOGGER.warning(
-                'Duplicate value "{}" for option "{}"!',
-                child.name, opt_id,
-            )
+            LOGGER.warning('Duplicate value "{}"!', child.name)
         valid_ids.add(val_id)
         values.append(OptValue(
             id=val_id,
@@ -155,10 +151,7 @@ def parse_option(
         default = values[0].id
     else:
         if default not in valid_ids and default != utils.ID_RANDOM:
-            LOGGER.warning(
-                'Default id "{}" is not valid for option "{}"',
-                default, opt_id,
-            )
+            LOGGER.warning('Default id "{}" is not valid!',default)
             default = values[0].id
 
     return Option(opt_id, name, default, values, fixup)
@@ -182,7 +175,8 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
         options: dict[utils.ObjectID, Option] = {}
         global_options: dict[OptionGroup, list[Option]] = defaultdict(list)
         for opt_kv in data.info.find_children('Options'):
-            option = parse_option(data.pak_id, opt_kv)
+            with logger.context(opt_kv.real_name):
+                option = parse_option(data.pak_id, opt_kv)
             if option.id in options:
                 raise AppError(TRANS_DUPLICATE_OPTION.format(option=option.id, group=data.id))
             options[option.id] = option
