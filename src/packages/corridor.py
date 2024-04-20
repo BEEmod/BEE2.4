@@ -122,7 +122,7 @@ def parse_corr_kind(specifier: str) -> CorrKind:
 
 
 def parse_option(
-    pak_id: utils.SpecialID,
+    pak_id: utils.ObjectID,
     kv: Keyvalues,
 ) -> Option:
     """Parse a KV1 config into an option."""
@@ -131,6 +131,7 @@ def parse_option(
     valid_ids: set[utils.ObjectID] = set()
     values: list[OptValue] = []
     fixup = kv['var']
+    desc = TransToken.parse(pak_id, packages.parse_multiline_key(kv, 'description'))
 
     for child in kv.find_children('Values'):
         val_id = utils.obj_id(child.real_name, 'corridor option value')
@@ -154,7 +155,14 @@ def parse_option(
             LOGGER.warning('Default id "{}" is not valid!',default)
             default = values[0].id
 
-    return Option(opt_id, name, default, values, fixup)
+    return Option(
+        id=opt_id,
+        name=name,
+        default=default,
+        values=values,
+        fixup=fixup,
+        desc=desc,
+    )
 
 
 @attrs.define(slots=False, kw_only=True)

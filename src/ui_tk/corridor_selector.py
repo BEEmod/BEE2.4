@@ -8,7 +8,7 @@ import tkinter as tk
 
 import trio
 
-from app import background_run, img, tkMarkdown, tk_tools
+from app import background_run, img, tkMarkdown, tk_tools, tooltip
 from app.corridor_selector import (
     HEIGHT, IMG_ARROW_LEFT, IMG_ARROW_RIGHT, IMG_CORR_BLANK, Icon,
     OptionRow, Selector, TRANS_HELP, TRANS_NO_OPTIONS, WIDTH, TRANS_RAND_OPTION,
@@ -94,11 +94,15 @@ class OptionRowUI(OptionRow):
         self.combo = ttk.Combobox(parent, state='readonly')
         self._value_order = ()
         self.combo.bind('<<ComboboxSelected>>', self.on_changed)
+        tooltip.add_tooltip(self.combo, delay=150)
+        tooltip.add_tooltip(self.label)
 
     @override
     async def display(self, row: int, option: Option, remove_event: trio.Event) -> None:
         """Display the row in the specified position, then remove when the event triggers."""
         set_text(self.label, option.name)
+        tooltip.set_tooltip(self.label, option.desc)
+        tooltip.set_tooltip(self.combo, option.desc)
         self.combo['values'] = [
             str(TRANS_RAND_OPTION),
             *[str(val.name) for val in option.values],
@@ -107,12 +111,13 @@ class OptionRowUI(OptionRow):
             utils.ID_RANDOM,
             *[val.id for val in option.values],
         ]
-        # Caller has assigned one of our IDs to our AsyncValue.
+        # Caller has assigned one of our IDs to our AsyncValue, so index() should always succeed.
         self.combo.current(self._value_order.index(self.current.value))
 
-        # Increment to account for the title.
+        # Increment the row by one to account for the title.
         self.label.grid(row=row + 1, column=0)
         self.combo.grid(row=row + 1, column=1, sticky='ew')
+        # Wait for the signal that the corridor has been deselected, then remove.
         await remove_event.wait()
         self.label.grid_forget()
         self.combo.grid_forget()

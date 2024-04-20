@@ -66,12 +66,13 @@ class OptValue:
     name: TransToken  # Name to use.
 
 
-@attrs.frozen
+@attrs.frozen(kw_only=True)
 class Option:
     """An option that can be swapped between various values."""
     id: utils.ObjectID
     name: TransToken
     default: utils.SpecialID  # id or <RANDOM>
+    desc: TransToken
     values: Sequence[OptValue]
     fixup: str
 
