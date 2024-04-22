@@ -56,6 +56,7 @@ from ui_tk.corridor_selector import TkSelector
 from ui_tk.dialogs import DIALOG
 from ui_tk.img import TKImages, TK_IMG
 from ui_tk import wid_transtoken, TK_ROOT
+from ui_tk.signage_ui import SignageUI
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -1542,8 +1543,8 @@ async def init_windows(tk_img: TKImages) -> None:
     await LOAD_UI.step('options')
 
     signage_trigger: EdgeTrigger[()] = EdgeTrigger()
-    sign_ui = signage_ui.SignageUIBase()
-    background_run(sign_ui.init_widgets, tk_img, signage_trigger)
+    sign_ui = SignageUI(TK_IMG)
+    background_run(sign_ui.task, signage_trigger)
 
     await utils.run_as_task(
         background_start, itemconfig.make_pane,
