@@ -94,6 +94,7 @@ item_list: Dict[str, 'Item'] = {}
 # Piles of global widgets, should be made local...
 frmScroll: ttk.Frame  # Frame holding the item list.
 pal_canvas: tk.Canvas  # Canvas for the item list to scroll.
+sign_ui: signage_ui.SignageUIBase
 
 
 TRANS_EXPORTED = TransToken.ui('Selected Items and Style successfully exported!')
@@ -1389,6 +1390,7 @@ async def init_windows(tk_img: TKImages) -> None:
     """Initialise all windows and panes.
 
     """
+    global sign_ui
     def export() -> None:
         """Export the palette, passing the required UI objects."""
         background_run(export_editoritems, pal_ui, menu_bar, DIALOG)
@@ -1540,7 +1542,8 @@ async def init_windows(tk_img: TKImages) -> None:
     await LOAD_UI.step('options')
 
     signage_trigger: EdgeTrigger[()] = EdgeTrigger()
-    background_run(signage_ui.init_widgets, tk_img, signage_trigger)
+    sign_ui = signage_ui.SignageUIBase()
+    background_run(sign_ui.init_widgets, tk_img, signage_trigger)
 
     await utils.run_as_task(
         background_start, itemconfig.make_pane,
@@ -1688,7 +1691,7 @@ async def init_windows(tk_img: TKImages) -> None:
         # Disable this if the style doesn't have elevators
         elev_win.readonly = not style_obj.has_video
 
-        signage_ui.style_changed(selected_style)
+        sign_ui.style_changed(selected_style)
         item_search.rebuild_database()
 
         for sugg_cls, win in suggest_windows.items():
