@@ -1,7 +1,7 @@
 """Configures which signs are defined for the Signage item."""
 from __future__ import annotations
 from typing import Any, Generic, TypeVar
-from typing_extensions import TypeGuard
+from typing_extensions import TypeAlias, TypeGuard
 
 from collections.abc import Sequence, Iterator
 from datetime import timedelta
@@ -20,8 +20,10 @@ import utils
 
 
 LOGGER = srctools.logger.get_logger(__name__)
-DragManT_co = TypeVar('DragManT_co', bound=dragdrop.ManagerBase[PakRef[Signage], Any], covariant=True)
+SignRef: TypeAlias = PakRef[Signage]
+DragManT_co = TypeVar('DragManT_co', bound=dragdrop.ManagerBase[SignRef, Any], covariant=True)
 ParentT = TypeVar('ParentT')
+
 
 # The valid timer indexes for signs.
 SIGN_IND: Sequence[int] = range(3, 31)
@@ -33,7 +35,7 @@ TRANS_UNKNOWN_SIGN = TransToken.ui('Unknown Signage: {id}')
 TRANS_TITLE = TransToken.ui('Configure Signage')
 
 
-def is_full(value: PakRef[Signage] | None) -> TypeGuard[PakRef[Signage]]:
+def is_full(value: SignRef | None) -> TypeGuard[SignRef]:
     """Predicate for valid contents."""
     return value is not None
 
@@ -68,7 +70,7 @@ def get_icon(sign: Signage, style: Style) -> img.Handle:
 
 class SignageUIBase(Generic[DragManT_co]):
     """Common implementation of the signage chooser."""
-    _slots: dict[int, dragdrop.Slot[PakRef[Signage]]]
+    _slots: dict[int, dragdrop.Slot[SignRef]]
     _cur_style_id: PakRef[Style]
 
     def __init__(self, drag_man: DragManT_co) -> None:
@@ -100,7 +102,7 @@ class SignageUIBase(Generic[DragManT_co]):
         if self.visible:
             self.drag_man.load_icons()
 
-    def _get_drag_info(self, ref: PakRef[Signage]) -> dragdrop.DragInfo:
+    def _get_drag_info(self, ref: SignRef) -> dragdrop.DragInfo:
         """Get the icon for displaying this sign."""
         packset = packages.get_loaded_packages()
         style = self._cur_style_id.resolve(packset)
@@ -147,10 +149,10 @@ class SignageUIBase(Generic[DragManT_co]):
                 self.ui_set_preview_img(IMG_BLANK, IMG_BLANK)
 
     def _create_slots(
-        self: SignageUIBase[dragdrop.ManagerBase[PakRef[Signage], ParentT]],
+        self: SignageUIBase[dragdrop.ManagerBase[SignRef, ParentT]],
         parent_chosen: ParentT,
         parent_all: ParentT,
-    ) -> Iterator[tuple[int, int, dragdrop.Slot[PakRef[Signage]]]]:
+    ) -> Iterator[tuple[int, int, dragdrop.Slot[SignRef]]]:
         """Create all the slots for the signage."""
         load_packset = packages.get_loaded_packages()
         for i in SIGN_IND:
