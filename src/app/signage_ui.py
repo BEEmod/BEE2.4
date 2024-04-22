@@ -1,6 +1,6 @@
 """Configures which signs are defined for the Signage item."""
 from __future__ import annotations
-from typing import Any, Generic, TypeVar
+from typing import Any, Final, Generic, TypeVar
 from typing_extensions import TypeAlias, TypeGuard
 
 from collections.abc import Sequence, Iterator
@@ -27,12 +27,13 @@ ParentT = TypeVar('ParentT')
 
 # The valid timer indexes for signs.
 SIGN_IND: Sequence[int] = range(3, 31)
-IMG_ERROR = img.Handle.error(64, 64)
-IMG_BLANK = img.Handle.background(64, 64)
+IMG_ERROR: Final[img.Handle] = img.Handle.error(64, 64)
+IMG_BLANK: Final[img.Handle] = img.Handle.background(64, 64)
 
-TRANS_SIGN_NAME = TransToken.ui('Signage: {name}')
-TRANS_UNKNOWN_SIGN = TransToken.ui('Unknown Signage: {id}')
-TRANS_TITLE = TransToken.ui('Configure Signage')
+TRANS_SIGN_NAME: Final = TransToken.ui('Signage: {name}')
+TRANS_UNKNOWN_SIGN: Final = TransToken.ui('Unknown Signage: {id}')
+TRANS_TITLE: Final = TransToken.ui('Configure Signage')
+TRANS_SELECTED: Final = TransToken.ui('Selected')
 
 
 def is_full(value: SignRef | None) -> TypeGuard[SignRef]:
@@ -202,8 +203,8 @@ class SignageUIBase(Generic[DragManT_co]):
                 LOGGER.warning('No arrow signage defined!')
                 single_right = IMG_BLANK
 
-            double_left: img.Handle = single_left
-            double_right: img.Handle = IMG_BLANK
+            double_left = single_left
+            double_right = IMG_BLANK
 
             if hover_sign.prim_id:
                 try:

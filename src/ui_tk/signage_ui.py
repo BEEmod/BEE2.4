@@ -12,7 +12,7 @@ from ui_tk.dragdrop import DragDrop
 from ui_tk.img import TKImages
 from ui_tk.wid_transtoken import set_text, set_win_title
 
-from app.signage_ui import IMG_BLANK, SignageUIBase, TRANS_TITLE
+from app.signage_ui import IMG_BLANK, SignageUIBase, TRANS_TITLE, TRANS_SELECTED
 
 
 class SignageUI(SignageUIBase[DragDrop[PakRef[Signage]]]):
@@ -34,7 +34,7 @@ class SignageUI(SignageUIBase[DragDrop[PakRef[Signage]]]):
             window, relief='raised', labelanchor='n',
             name='frame_selected',
         )
-        set_text(frame_selected, TransToken.ui('Selected'))
+        set_text(frame_selected, TRANS_SELECTED)
 
         canv_all = tk.Canvas(window, name='canv_all')
 
