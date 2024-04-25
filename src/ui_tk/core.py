@@ -1,4 +1,4 @@
-"""Run the BEE2."""
+"""Connect Trio and TK together, then run the application."""
 from typing import Awaitable, Callable, Any, ClassVar, Deque, Dict, Optional, List, Tuple
 from typing_extensions import override
 import collections

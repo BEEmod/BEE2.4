@@ -85,16 +85,17 @@ if __name__ == '__main__':
 
     localisation.setup(conf.language)
 
-    from app import BEE2, backup, CompilerPane
+    from app import backup, CompilerPane
+    from ui_tk.core import start_main
     if app_name == 'bee2':
-        BEE2.start_main()
+        start_main()
     elif app_name == 'backup':
-        BEE2.start_main(backup.init_application)
+        start_main(backup.init_application)
     elif app_name == 'compiler_settings':
-        BEE2.start_main(CompilerPane.init_application)
+        start_main(CompilerPane.init_application)
     elif app_name.startswith('test_'):
         import importlib
         mod = importlib.import_module('app.demo.' + sys.argv[1][5:])
-        BEE2.start_main(getattr(mod, 'test'))
+        start_main(getattr(mod, 'test'))
     else:
         raise ValueError(f'Invalid component name "{app_name}"!')
