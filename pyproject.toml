@@ -152,7 +152,6 @@ enable_error_code = [
 module = [
 	'app.gameMan',
 	'app.selector_win',
-	'app.CheckDetails',
 	'app.backup',
 	'app.contextWin',
 	'app.UI',
@@ -161,6 +160,7 @@ module = [
 	'precomp.bottomlessPit',
 	'precomp.fizzler',
 	'precomp.tiling',
+	'ui_tk.check_table',
 	'FakeZip',
 ]
 strict_optional = false
