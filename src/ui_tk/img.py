@@ -1,7 +1,7 @@
 """Image integrations for TKinter."""
 from __future__ import annotations
 from typing import TypeVar, Union
-from typing_extensions import TypeAlias, override
+from typing_extensions import TypeAliasType, override
 from tkinter import ttk
 import tkinter as tk
 
@@ -14,7 +14,7 @@ from ui_tk import TK_ROOT
 
 
 # Widgets with an image attribute that can be set.
-tkImgWidgets: TypeAlias = Union[tk.Label, ttk.Label, tk.Button, ttk.Button]
+tkImgWidgets = TypeAliasType("tkImgWidgets", Union[tk.Label, ttk.Label, tk.Button, ttk.Button])
 tkImgWidgetsT = TypeVar(
     'tkImgWidgetsT',
     tk.Label, ttk.Label,
@@ -22,7 +22,7 @@ tkImgWidgetsT = TypeVar(
     tk.Button, ttk.Button,
     Union[tk.Button, ttk.Button],
 )
-tkImg: TypeAlias = Union[ImageTk.PhotoImage, tk.PhotoImage]
+tkImg = TypeAliasType("tkImg", Union[ImageTk.PhotoImage, tk.PhotoImage])
 
 LOGGER = get_logger(__name__)
 label_to_user: dict[tkImgWidgets, LabelStyleUser] = {}

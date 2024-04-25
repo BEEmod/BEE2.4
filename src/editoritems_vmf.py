@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from typing import Callable, TypeVar
-from typing_extensions import TypeAlias
+from typing_extensions import TypeAliasType
 import re
 
 from srctools import FrozenVec, Matrix, Angle, Vec, logger, conv_int
@@ -13,8 +13,8 @@ from editoritems import Item, ConnSide, OccuType, AntlinePoint, Coord, OccupiedV
 
 
 LOGGER = logger.get_logger(__name__)
-LoadFunc: TypeAlias = Callable[[Item, Entity], None]
-SaveFunc: TypeAlias = Callable[[Item, VMF], None]
+LoadFunc = TypeAliasType("LoadFunc", Callable[[Item, Entity], None])
+SaveFunc = TypeAliasType("SaveFunc", Callable[[Item, VMF], None])
 LOAD_FUNCS: dict[str, LoadFunc] = {}
 SAVE_FUNCS: list[SaveFunc] = []
 LoadFuncT = TypeVar("LoadFuncT", bound=LoadFunc)

@@ -1,7 +1,7 @@
 """Implements drag/drop logic."""
 from __future__ import annotations
 from typing import Any, Callable, Final, Generic, TypeVar, Optional
-from typing_extensions import ParamSpec, TypeAlias
+from typing_extensions import ParamSpec, TypeAliasType
 
 from collections.abc import Iterable, Iterator
 from collections import defaultdict
@@ -134,8 +134,8 @@ class PositionerBase:
                 self.advance_row()
 
 
-InfoCB: TypeAlias = Callable[[ItemT], DragInfo]
-FlexiCB: TypeAlias = Callable[[float, float], Optional[str]]
+InfoCB = TypeAliasType("InfoCB", Callable[[ItemT], DragInfo], type_params=(ItemT, ))
+FlexiCB = TypeAliasType("FlexiCB", Callable[[float, float], Optional[str]])
 
 
 class DragWin(Enum):

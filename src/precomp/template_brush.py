@@ -1,7 +1,7 @@
 """Templates are sets of brushes which can be copied into the map."""
 from __future__ import annotations
 from typing import AbstractSet, Union, Tuple, Mapping
-from typing_extensions import Literal, TypeAlias, assert_never
+from typing_extensions import Literal, TypeAliasType, assert_never
 
 from collections.abc import Callable, Iterable, Iterator
 from collections import defaultdict
@@ -244,10 +244,10 @@ TEMP_TILE_PIX_SIZE = {
 
 
 # 'Opposite' values for retexture_template(force_colour)
-ForceColour: TypeAlias = Literal[
+ForceColour = TypeAliasType("ForceColour", Literal[
     AppliedColour.MATCH, AppliedColour.INVERT,
     Portalable.white, Portalable.black,
-]
+])
 TEMP_COLOUR_INVERT: dict[ForceColour, ForceColour] = {
     Portalable.white: Portalable.black,
     Portalable.black: Portalable.white,

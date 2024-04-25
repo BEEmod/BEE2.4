@@ -10,7 +10,7 @@ from typing import (
     Optional, Protocol, Sequence, Tuple, cast, final,
 )
 
-from typing_extensions import LiteralString, TypeAlias, override
+from typing_extensions import LiteralString, TypeAliasType, override
 from enum import Enum
 from html import escape as html_escape
 from pathlib import Path
@@ -286,7 +286,7 @@ class TransToken:
 TransToken.BLANK = TransToken.untranslated('')
 
 # Token and "source" string, for updating translation files.
-TransTokenSource: TypeAlias = Tuple[TransToken, str]
+TransTokenSource = TypeAliasType("TransTokenSource", Tuple[TransToken, str])
 
 
 @attrs.frozen(eq=False)

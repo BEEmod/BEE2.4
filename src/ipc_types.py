@@ -1,6 +1,6 @@
 """Defines types for the messages that can be passed to loadscreen/bg_daemon."""
 from typing import Dict, List, Tuple, Union
-from typing_extensions import Literal, NewType, TypeAlias
+from typing_extensions import Literal, NewType, TypeAliasType
 
 import attrs
 
@@ -91,20 +91,20 @@ class Daemon2Load_MainSetCompact:
     compact: bool
 
 
-ARGS_SEND_LOAD: TypeAlias = Union[
+ARGS_SEND_LOAD = TypeAliasType("ARGS_SEND_LOAD", Union[
     Load2Daemon_SetForceOnTop, Load2Daemon_SetForceOnTop,
     Load2Daemon_UpdateTranslations, Load2Daemon_SetIsCompact, Load2Daemon_Init,
     Load2Daemon_SetLength, Load2Daemon_Step, Load2Daemon_Skip, Load2Daemon_Hide,
     Load2Daemon_Reset, Load2Daemon_Destroy, Load2Daemon_Show,
-]
-ARGS_REPLY_LOAD: TypeAlias = Union[Daemon2Load_Cancel, Daemon2Load_MainSetCompact]
-ARGS_SEND_LOGGING: TypeAlias = Union[  # logging -> daemon
+])
+ARGS_REPLY_LOAD = TypeAliasType("ARGS_REPLY_LOAD", Union[Daemon2Load_Cancel, Daemon2Load_MainSetCompact])
+ARGS_SEND_LOGGING = TypeAliasType("ARGS_SEND_LOGGING", Union[  # logging -> daemon
     Tuple[Literal['log'], str, str],
     Tuple[Literal['visible'], bool, None],
     Tuple[Literal['level'], str, None],
-]
-ARGS_REPLY_LOGGING: TypeAlias = Union[  # daemon -> logging
+])
+ARGS_REPLY_LOGGING = TypeAliasType("ARGS_REPLY_LOGGING", Union[  # daemon -> logging
     Tuple[Literal['level'], str],
     Tuple[Literal['visible'], bool],
     Tuple[Literal['quit'], None],
-]
+])

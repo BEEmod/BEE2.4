@@ -1,7 +1,7 @@
 """Configures which signs are defined for the Signage item."""
 from __future__ import annotations
 from typing import Any, Final, Generic, TypeVar
-from typing_extensions import TypeAlias, TypeGuard
+from typing_extensions import TypeAliasType, TypeGuard
 
 from collections.abc import Sequence, Iterator
 from datetime import timedelta
@@ -20,7 +20,7 @@ import utils
 
 
 LOGGER = srctools.logger.get_logger(__name__)
-SignRef: TypeAlias = PakRef[Signage]
+SignRef = TypeAliasType("SignRef", PakRef[Signage])
 DragManT_co = TypeVar('DragManT_co', bound=dragdrop.ManagerBase[SignRef, Any], covariant=True)
 ParentT = TypeVar('ParentT')
 

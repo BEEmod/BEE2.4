@@ -1,17 +1,18 @@
 """Parses the Puzzlemaker's item format."""
 from __future__ import annotations
-import sys
+from typing import Callable, ClassVar, List, Optional, Protocol, Any, Tuple
+from typing_extensions import TypeAliasType
+
 from collections import defaultdict
 from collections.abc import Iterable, Iterator, Mapping
 from enum import Enum, Flag
-from typing import Callable, ClassVar, List, Optional, Protocol, Any, Tuple
 from pathlib import PurePosixPath as FSPath
+import sys
 
 import attrs
 
 from srctools import Vec, logger, conv_int, conv_bool, Keyvalues, Output
 from srctools.tokenizer import Tokenizer, Token
-from typing_extensions import TypeAlias
 
 from connections import Config as ConnConfig, InputType, OutNames
 from consts import DefaultItems
@@ -30,7 +31,10 @@ __all__ = [
 ]
 LOGGER = logger.get_logger(__name__)
 # __getstate__ / __setstate__ types.
-_SubTypeState: TypeAlias = Tuple[TransToken, List[str], List[str], List[int], TransToken, int, int, Optional[FSPath]]
+_SubTypeState = TypeAliasType("_SubTypeState", Tuple[
+    TransToken, List[str], List[str], List[int],
+    TransToken, int, int, Optional[FSPath],
+])
 
 
 class ItemClass(Enum):

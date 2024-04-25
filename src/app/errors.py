@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from enum import Enum, auto
 from typing import Awaitable, ClassVar, Generator, Iterator, Protocol, Union, final
-from typing_extensions import TypeAlias
+from typing_extensions import TypeAliasType
 from contextlib import contextmanager
 from exceptiongroup import BaseExceptionGroup, ExceptionGroup
 import types
@@ -39,7 +39,11 @@ class Result(Enum):
         return self.name in ['PARTIAL', 'FAILED']
 
 
-WarningExc: TypeAlias = Union[AppError, ExceptionGroup[Exception], BaseExceptionGroup[BaseException]]
+WarningExc = TypeAliasType("WarningExc", Union[
+    AppError,
+    ExceptionGroup[Exception],
+    BaseExceptionGroup[BaseException],
+])
 
 
 class Handler(Protocol):

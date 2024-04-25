@@ -1,6 +1,6 @@
 """Handler for app.errors."""
 from __future__ import annotations
-from typing_extensions import TypeAlias
+from typing_extensions import TypeAliasType
 from typing import List, Tuple
 from tkinter import ttk
 import tkinter as tk
@@ -15,7 +15,9 @@ from ui_tk.wid_transtoken import set_text, set_win_title
 from ui_tk import TK_ROOT
 
 
-ChannelValue: TypeAlias = Tuple[TransToken, TransToken, List[AppError], trio.Event]
+ChannelValue = TypeAliasType("ChannelValue", Tuple[
+    TransToken, TransToken, List[AppError], trio.Event,
+])
 
 
 async def display_errors(

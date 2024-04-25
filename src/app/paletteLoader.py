@@ -6,7 +6,7 @@ import shutil
 import zipfile
 import random
 import io
-from typing_extensions import TypeAlias, TypeGuard, Literal, Final
+from typing_extensions import TypeAliasType, TypeGuard, Literal, Final
 from uuid import UUID, uuid4, uuid5
 
 import srctools.logger
@@ -24,9 +24,9 @@ GROUP_BUILTIN: Final = '<BUILTIN>'
 PAL_EXT: Final = '.bee2_palette'
 CUR_VERSION: Final = 3
 
-HorizInd: TypeAlias = Literal[0, 1, 2, 3]
-VertInd: TypeAlias = Literal[0, 1, 2, 3, 4, 5, 6, 7]
-ItemPos: TypeAlias = Dict[Tuple[HorizInd, VertInd], Tuple[str, int]]
+HorizInd = TypeAliasType("HorizInd", Literal[0, 1, 2, 3])
+VertInd = TypeAliasType("VertInd", Literal[0, 1, 2, 3, 4, 5, 6, 7])
+ItemPos = TypeAliasType("ItemPos", Dict[Tuple[HorizInd, VertInd], Tuple[str, int]])
 HORIZ: Final[Sequence[HorizInd]] = cast(Sequence[HorizInd], range(4))
 VERT: Final[Sequence[VertInd]] = cast(Sequence[VertInd], range(8))
 COORDS: Sequence[Tuple[HorizInd, VertInd]] = [

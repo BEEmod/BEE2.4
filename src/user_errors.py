@@ -6,7 +6,7 @@ from typing import (
     ClassVar, Collection, Dict, Iterable, List, Literal, Optional, Set, Tuple,
     TypedDict, Union,
 )
-from typing_extensions import TypeAlias
+from typing_extensions import TypeAliasType
 from pathlib import Path
 
 from srctools import FrozenVec, Vec, logger
@@ -16,8 +16,12 @@ from transtoken import TransToken
 import utils
 
 
-Kind: TypeAlias = Literal["white", "black", "goo", "goopartial", "goofull", "back", "glass", "grating"]
-TuplePos: TypeAlias = Tuple[float, float, float]
+Kind = TypeAliasType("Kind", Literal[
+    "white", "black",
+    "goo", "goopartial", "goofull",
+    "back", "glass", "grating",
+])
+TuplePos = TypeAliasType("TuplePos", Tuple[float, float, float])
 # Textures for displaying barrier items.
 BARRIER_TEX_SET: Set[Kind] = {"glass", "grating", "white", "black"}
 TEX_SET: Set[Kind] = {

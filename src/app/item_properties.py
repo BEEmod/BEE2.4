@@ -6,7 +6,7 @@ from enum import Enum
 import tkinter as tk
 from tkinter import ttk
 from typing import Any, Callable, ClassVar, Generic, Iterator, Optional, Tuple, Dict, List, TypeVar
-from typing_extensions import Final, Literal, TypeAlias, override
+from typing_extensions import Final, Literal, TypeAliasType, override
 
 import srctools
 import srctools.logger
@@ -70,7 +70,10 @@ class PropGroup:
 
 
 # The prop kinds that require this group, then a function to create it.
-PropGroupFactory: TypeAlias = Tuple[List[ItemPropKind[Any]], Callable[[ttk.Frame, TKImages], PropGroup]]
+PropGroupFactory = TypeAliasType("PropGroupFactory", Tuple[
+    List[ItemPropKind[Any]],
+    Callable[[ttk.Frame, TKImages], PropGroup],
+])
 
 
 class BoolPropGroup(PropGroup):

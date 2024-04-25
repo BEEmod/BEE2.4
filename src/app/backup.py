@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from typing import List, TYPE_CHECKING, Dict, Any, Union, cast
-from typing_extensions import Self, TypeAlias
+from typing_extensions import Self, TypeAliasType
 
 from tkinter import filedialog, ttk
 from datetime import datetime
@@ -41,7 +41,7 @@ LOGGER = srctools.logger.get_logger(__name__)
 # The backup window - either a toplevel, or TK_ROOT.
 window: tk.Toplevel
 
-AnyZip: TypeAlias = Union[ZipFile, FakeZip]
+AnyZip = TypeAliasType("AnyZip", Union[ZipFile, FakeZip])
 UI: Dict[str, Any] = {}  # Holds all the widgets
 
 # Loading stage used during backup.

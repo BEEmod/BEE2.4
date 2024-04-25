@@ -1,7 +1,7 @@
 """Manages reading general options from vbsp_config."""
 from __future__ import annotations
 from typing import Generic, TypeVar, Union, overload
-from typing_extensions import TypeAlias
+from typing_extensions import TypeAliasType
 
 from collections.abc import Iterator
 from enum import Enum
@@ -17,7 +17,7 @@ from config import COMPILER
 
 
 LOGGER = srctools.logger.get_logger(__name__)
-OptionType: TypeAlias = Union[str, int, float, bool, Vec]
+OptionType = TypeAliasType("OptionType", Union[str, int, float, bool, Vec])
 SETTINGS: dict[str, OptionType | None] = {}
 
 

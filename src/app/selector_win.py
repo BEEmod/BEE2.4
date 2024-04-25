@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import copy
 from typing import Generic, Optional, Union, Iterable, Mapping, Callable, AbstractSet
-from typing_extensions import Concatenate, ParamSpec, TypeAlias
+from typing_extensions import Concatenate, ParamSpec, TypeAliasType
 from tkinter import font as tk_font
 from tkinter import ttk
 import tkinter as tk
@@ -111,7 +111,9 @@ class AttrTypes(Enum):
 
 
 # TransToken is str()-ified.
-AttrValues: TypeAlias = Union[str, TransToken, Iterable[Union[str, TransToken]], bool, Vec]
+AttrValues = TypeAliasType("AttrValues", Union[
+    str, TransToken, Iterable[Union[str, TransToken]], bool, Vec,
+])
 CallbackT = ParamSpec('CallbackT')
 TRANS_ATTR_DESC = TransToken.untranslated('{desc}: ')
 TRANS_ATTR_COLOR = TransToken.ui('Color: R={r}, G={g}, B={b}')  # i18n: Tooltip for colour swatch.

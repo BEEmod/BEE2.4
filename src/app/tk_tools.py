@@ -12,7 +12,7 @@ from typing import (
 )
 
 from trio_util import AsyncValue
-from typing_extensions import TypeAlias, TypeVarTuple, Unpack
+from typing_extensions import TypeAliasType, TypeVarTuple, Unpack
 
 from tkinter import ttk
 from tkinter import font as _tk_font
@@ -39,7 +39,7 @@ ICO_PATH = str(utils.bins_path('BEE2.ico'))
 T = TypeVar('T')
 AnyWidT = TypeVar('AnyWidT', bound=tk.Misc)
 WidgetT = TypeVar('WidgetT', bound=tk.Widget)
-EventFunc: TypeAlias = Callable[[tk.Event[AnyWidT]], object]
+EventFunc = TypeAliasType("EventFunc", Callable[[tk.Event[AnyWidT]], object], type_params=(AnyWidT, ))
 EventFuncT = TypeVar('EventFuncT', bound=EventFunc[tk.Misc])
 
 

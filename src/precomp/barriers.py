@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from typing import Callable, Dict, Final, Iterable, Iterator, List, Mapping, Set, Tuple, Sequence
-from typing_extensions import Literal, Self, TypeAlias, assert_never, override
+from typing_extensions import Literal, Self, TypeAliasType, assert_never, override
 
 from collections import defaultdict
 from enum import Enum, Flag, auto as enum_auto
@@ -27,7 +27,7 @@ import utils
 LOGGER = srctools.logger.get_logger(__name__)
 COND_MOD_NAME: str | None = None
 STRAIGHT_LEN: Final = 64  # Length of the brush for straight frame sections.
-HoleTemplate: TypeAlias = Tuple[List[Solid], List[collisions.BBox]]
+HoleTemplate = TypeAliasType("HoleTemplate", Tuple[List[Solid], List[collisions.BBox]])
 TRANS_VARIABLE = TransToken.untranslated('"<var>{value}</var>"')
 MAX_FLOORBEAM_REPOSITIONS: Final = 10  # Number of times to reposition if the beam is bad.
 

@@ -1,12 +1,12 @@
 """Manage applying translation tokens to TK widgets."""
 from __future__ import annotations
+from typing import TypeVar, Union
+from typing_extensions import TypeAliasType
 
 from tkinter import ttk
 import tkinter as tk
-from typing import TypeVar, Union
 from weakref import WeakKeyDictionary
 
-from typing_extensions import TypeAlias
 
 from transtoken import TransToken, CURRENT_LANG
 
@@ -18,10 +18,10 @@ __all__ = [
 
 
 # Widgets that have a 'text' property.
-TextWidget: TypeAlias = Union[
+TextWidget = TypeAliasType("TextWidget", Union[
     tk.Label, tk.LabelFrame, tk.Button, tk.Radiobutton, tk.Checkbutton,
     ttk.Label, ttk.LabelFrame, ttk.Button, ttk.Radiobutton, ttk.Checkbutton,
-]
+])
 TextWidgetT = TypeVar('TextWidgetT', bound=TextWidget)
 # Assigns to widget['text'].
 _applied_text_tokens: WeakKeyDictionary[TextWidget, TransToken] = WeakKeyDictionary()
