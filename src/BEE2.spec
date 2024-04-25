@@ -303,7 +303,7 @@ COMPILER_LOC = f'../dist/{bitness}bit/compiler/'
 # Finally, run the PyInstaller analysis process.
 
 bee2_a = Analysis(
-    ['BEE2_launch.pyw'],
+    ['BEE2_launch.py'],
     pathex=[workpath],
     datas=data_files + data_bin_files,
     hiddenimports=[
