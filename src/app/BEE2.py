@@ -1,12 +1,12 @@
 """Run the BEE2."""
 from typing import Awaitable, Callable, Any, ClassVar, Deque, Dict, Optional, List, Tuple
-import time
+from typing_extensions import override
 import collections
+import pprint
+import time
 
 from outcome import Outcome, Error
-from srctools import Keyvalues
 import trio
-from typing_extensions import override
 
 from app import (
     CompilerPane, localisation, sound, img, gameMan, music_conf,
@@ -21,7 +21,7 @@ from ui_tk.img import TK_IMG
 from ui_tk import TK_ROOT
 from config.gen_opts import GenOptions
 from config.last_sel import LastSelected
-from exporting import mod_support, ExportData
+from exporting import mod_support
 from app.errors import ErrorUI, Result as ErrorResult
 import config
 import app
@@ -152,6 +152,24 @@ async def init_app() -> None:
                 LOGGER.exception('Deleting music samples.')
 
 
+class SmallRepr(pprint.PrettyPrinter):
+    """Exclude values with large reprs."""
+    def format(
+        self,
+        target: object,
+        context: dict[int, Any],
+        maxlevels: int,
+        level: int,
+        /,
+    ) -> Tuple[str, bool, bool]:
+        """Format each sub-item."""
+        result, readable, recursive = super().format(target, context, maxlevels, level)
+        if len(result) > 200 and level > 0:
+            return f'{type(target).__qualname__}(...)', False, False
+        else:
+            return result, readable, recursive
+
+
 class Tracer(trio.abc.Instrument):
     """Track tasks to detect slow ones."""
     slow: ClassVar[List[Tuple[float, str]]] = []
@@ -160,6 +178,7 @@ class Tracer(trio.abc.Instrument):
         self.elapsed: Dict[trio.lowlevel.Task, float] = {}
         self.start_time: Dict[trio.lowlevel.Task, Optional[float]] = {}
         self.args: Dict[trio.lowlevel.Task, Dict[str, object]] = {}
+        self.formatter = SmallRepr(compact=True)
 
     @override
     def task_spawned(self, task: trio.lowlevel.Task) -> None:
@@ -210,15 +229,11 @@ class Tracer(trio.abc.Instrument):
     def get_args(self, task: trio.lowlevel.Task) -> object:
         """Get the args for a task."""
         args = self.args.pop(task, srctools.EmptyMapping)
-        return {
-            name: (
-                # Hide objects with really massive reprs.
-                '...' if isinstance(val, (dict, Keyvalues, packages.PackagesSet, ExportData))
-                else val
-            )
+        return self.formatter.pformat({
+            name: val
             for name, val in args.items()
             if 'KI_PROTECTION' not in name  # Trio flag.
-        }
+        })
 
 
 async def app_main(init: Callable[[], Awaitable[Any]]) -> None:
