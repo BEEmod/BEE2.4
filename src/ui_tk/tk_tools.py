@@ -762,58 +762,47 @@ EnumT = TypeVar('EnumT')
 class EnumButton(Generic[EnumT]):
     """Provides a set of buttons for toggling between enum values.
 
-    An event is fired with the value as the arg when changed.
+    This is bound to the provided AsyncValue, updating it when changed.
     """
     frame: ttk.Frame
-    _current: EnumT
     buttons: Dict[EnumT, ttk.Button]
-    on_changed: event.Event[EnumT]
+    current: AsyncValue[EnumT]
     def __init__(
         self,
         master: tk.Misc,
-        current: EnumT,
+        current: AsyncValue[EnumT],
         *values: Tuple[EnumT, TransToken],
     ) -> None:
         self.frame = ttk.Frame(master)
-        self._current = current
+        self.current = current
         self.buttons = {}
-        self.on_changed = event.Event()
 
         for x, (val, label) in enumerate(values):
             btn = ttk.Button(
                 self.frame,
-                # Make partial do the method binding.
-                command=functools.partial(EnumButton._select, self, val),
+                # Make partial do the method binding too.
+                command=functools.partial(EnumButton._evt_select, self, val),
             )
             set_text(btn, label)
             btn.grid(row=0, column=x)
             self.buttons[val] = btn
-            if val is current:
-                btn.state(['pressed'])
 
-        if current not in self.buttons:
-            raise ValueError(f'Default value {current!r} not present in {list(values)}')
+        if current.value not in self.buttons:
+            raise ValueError(f'Default value {current.value!r} not present in {list(values)}!')
 
         if len(self.buttons) != len(values):
             raise ValueError(f'No duplicates allowed, got: {list(values)}')
 
-    def _select(self, value: EnumT) -> None:
+    async def task(self) -> None:
+        """Task which must be run to update the button state."""
+        async with utils.aclosing(self.current.eventual_values()) as agen:
+            async for chosen in agen:
+                for val, button in self.buttons.items():
+                    button.state(('pressed', ) if val is chosen else ('!pressed', ))
+
+    def _evt_select(self, value: EnumT) -> None:
         """Select a specific value."""
-        if value is not self._current:
-            self.buttons[self._current].state(['!pressed'])
-            self._current = value
-            self.buttons[self._current].state(['pressed'])
-            background_run(self.on_changed, value)
-
-    @property
-    def current(self) -> EnumT:
-        """Return the currently selected button."""
-        return self._current
-
-    @current.setter
-    def current(self, value: EnumT) -> None:
-        """Change the currently selected button."""
-        self._select(value)
+        self.current.value = value
 
 
 class LineHeader(ttk.Frame):

@@ -138,7 +138,8 @@ class TkSelector(Selector[IconUI, OptionRowUI]):
     wid_desc: tkRichText
 
     def __init__(self, packset: packages.PackagesSet, tk_img: TKImages, cur_style: utils.ObjectID) -> None:
-        super().__init__()
+        conf = config.APP.get_cur_conf(UIState, default=UIState())
+        super().__init__(conf)
         self.tk_img = tk_img
         self.sel_count = 0
         self.sel_handle_moving = False
@@ -163,7 +164,7 @@ class TkSelector(Selector[IconUI, OptionRowUI]):
         frm_img.rowconfigure(1, weight=1)
 
         # Cache the TK name for the registered command so that we can reuse it.
-        self.changed_cmd = self.win.register(self._changed_trigger.maybe_trigger)
+        self.changed_cmd = self.win.register(self._select_trigger.maybe_trigger)
 
         sel_img = self._sel_img
         self.wid_image_left = ttk.Button(frm_img, name='imgLeft', command=lambda: sel_img(-1))
@@ -245,24 +246,23 @@ class TkSelector(Selector[IconUI, OptionRowUI]):
             TransToken.ui('Close'),
         ).grid(row=0, column=1)
 
-        conf = config.APP.get_cur_conf(UIState, default=UIState())
         if conf.width > 0 and conf.height > 0:
             self.win.geometry(f'{conf.width}x{conf.height}')
 
         button_frm = ttk.Frame(frm_left)
         button_frm.grid(row=0, column=0, columnspan=3)
         self.btn_mode = tk_tools.EnumButton(
-            button_frm, conf.last_mode,
+            button_frm, self.state_mode,
             (GameMode.SP, TransToken.ui('SP')),
             (GameMode.COOP, TransToken.ui('Coop')),
         )
         self.btn_direction = tk_tools.EnumButton(
-            button_frm, conf.last_direction,
+            button_frm, self.state_dir,
             (Direction.ENTRY, TransToken.ui('Entry')),
             (Direction.EXIT, TransToken.ui('Exit')),
         )
         self.btn_orient = tk_tools.EnumButton(
-            button_frm, conf.last_orient,
+            button_frm, self.state_orient,
             (Orient.FLAT, TransToken.ui('Flat')),
             (Orient.UP, TransToken.ui('Upward')),
             (Orient.DN, TransToken.ui('Downward')),
@@ -270,11 +270,6 @@ class TkSelector(Selector[IconUI, OptionRowUI]):
         self.btn_mode.frame.grid(row=0, column=0, padx=8)
         self.btn_direction.frame.grid(row=0, column=1, padx=8)
         self.btn_orient.frame.grid(row=0, column=2, padx=8)
-
-        mode_switch = self.evt_mode_switch
-        self.btn_mode.on_changed.register(mode_switch)
-        self.btn_direction.on_changed.register(mode_switch)
-        self.btn_orient.on_changed.register(mode_switch)
 
         canv_frame = ttk.Frame(frm_left, name='canv_frame', relief="sunken")
         canv_frame.grid(row=1, column=0, columnspan=3, sticky='nsew', ipadx=8, ipady=8)
@@ -299,6 +294,14 @@ class TkSelector(Selector[IconUI, OptionRowUI]):
         tk_tools.add_mousewheel(self.canvas, frm_left)
         tk_tools.add_mousewheel(right_canv, frm_right)
         self.load_corridors(packset, cur_style)
+
+    @override
+    async def ui_task(self) -> None:
+        """Task which runs to update the UI."""
+        async with trio.open_nursery() as nursery:
+            nursery.start_soon(self.btn_direction.task)
+            nursery.start_soon(self.btn_mode.task)
+            nursery.start_soon(self.btn_orient.task)
 
     @override
     async def ui_win_reflow(self) -> None:
@@ -344,11 +347,6 @@ class TkSelector(Selector[IconUI, OptionRowUI]):
     def ui_win_getsize(self) -> tuple[int, int]:
         """Fetch the current dimensions, for saving."""
         return self.win.winfo_width(), self.win.winfo_height()
-
-    @override
-    def ui_get_buttons(self) -> CorrKind:
-        """Get the current button state."""
-        return self.btn_mode.current, self.btn_direction.current, self.btn_orient.current
 
     @override
     def ui_icon_create(self) -> None:

@@ -114,6 +114,8 @@ class Selector(Generic[IconT, OptionRowT]):
     # Event which is triggered to show and hide the UI.
     show_trigger: EdgeTrigger[()]
     close_event: RepeatedEvent
+    # Triggered by the UI to indicate a corridor was (de)selected
+    _select_trigger: EdgeTrigger[()]
 
     # The widgets for each corridor.
     icons: list[IconT]
@@ -128,7 +130,12 @@ class Selector(Generic[IconT, OptionRowT]):
     # The rows created for options. These are hidden if no longer used.
     option_rows: list[OptionRowT]
 
-    def __init__(self) -> None:
+    # The current state of the three main selector buttons.
+    state_orient: AsyncValue[corridor.Orient]
+    state_dir: AsyncValue[corridor.Direction]
+    state_mode: AsyncValue[corridor.GameMode]
+
+    def __init__(self, conf: UIState) -> None:
         self.sticky_corr = None
         self.displayed_corr = AsyncValue(None)
         self.img_ind = 0
@@ -136,8 +143,11 @@ class Selector(Generic[IconT, OptionRowT]):
         self.icons = []
         self.corr_list = []
         self.option_rows = []
+        self.state_orient = AsyncValue(conf.last_orient)
+        self.state_dir = AsyncValue(conf.last_direction)
+        self.state_mode = AsyncValue(conf.last_mode)
         self.show_trigger = EdgeTrigger()
-        self._changed_trigger = EdgeTrigger()
+        self._select_trigger = EdgeTrigger()
         self.close_event = RepeatedEvent()
 
     async def task(self) -> None:
@@ -146,6 +156,8 @@ class Selector(Generic[IconT, OptionRowT]):
             nursery.start_soon(self._window_task)
             nursery.start_soon(self._display_task)
             nursery.start_soon(self._save_config_task)
+            nursery.start_soon(self._mode_switch_task)
+            nursery.start_soon(self.ui_task)
 
     async def _window_task(self) -> None:
         """Run to allow opening/closing the window."""
@@ -164,9 +176,20 @@ class Selector(Generic[IconT, OptionRowT]):
     async def _save_config_task(self) -> None:
         """When a checkmark is changed, store the new config."""
         while True:
-            await self._changed_trigger.wait()
+            await self._select_trigger.wait()
             self.prevent_deselection()
             self.store_conf()
+
+    async def _mode_switch_task(self) -> None:
+        """React to a mode being switched by reloading the corridor."""
+        while True:
+            await trio_util.wait_any(
+                self.state_orient.wait_transition,
+                self.state_mode.wait_transition,
+                self.state_dir.wait_transition,
+            )
+            self.store_conf()
+            await self.refresh()
 
     def prevent_deselection(self) -> None:
         """Ensure at least one widget is selected."""
@@ -215,12 +238,16 @@ class Selector(Generic[IconT, OptionRowT]):
         except KeyError:
             LOGGER.warning('No corridors defined for style "{}"', style_id)
             self.corr_group = FALLBACK
-        mode, direction, orient = self.ui_get_buttons()
-        self.conf_id = Config.get_id(style_id, mode, direction, orient)
+        self.conf_id = Config.get_id(
+            style_id,
+            self.state_mode.value, self.state_dir.value, self.state_orient.value,
+        )
 
     async def refresh(self, _: object = None) -> None:
         """Called to update the slots with new items if the corridor set changes."""
-        mode, direction, orient = self.ui_get_buttons()
+        mode = self.state_mode.value
+        direction = self.state_dir.value
+        orient = self.state_orient.value
         self.conf_id = Config.get_id(self.corr_group.id, mode, direction, orient)
         conf = config.APP.get_cur_conf(Config, self.conf_id, Config())
 
@@ -271,14 +298,15 @@ class Selector(Generic[IconT, OptionRowT]):
         # Reposition everything.
         await self.ui_win_reflow()
 
-    async def evt_mode_switch(self, _: object) -> None:
-        """We must save the current state before switching."""
-        self.store_conf()
-        await self.refresh()
-
     async def evt_resized(self) -> None:
         """When the window is resized, save configuration."""
-        config.APP.store_conf(UIState(*self.ui_get_buttons(), *self.ui_win_getsize()))
+        width, height = self.ui_win_getsize()
+        config.APP.store_conf(UIState(
+            self.state_mode.value,
+            self.state_dir.value,
+            self.state_orient.value,
+            width, height,
+        ))
         await self.ui_win_reflow()
 
     def evt_hover_enter(self, index: int) -> None:
@@ -353,7 +381,8 @@ class Selector(Generic[IconT, OptionRowT]):
                     )
 
                 # Figure out which options to show.
-                mode, direction, orient = self.ui_get_buttons()
+                mode = self.state_mode.value
+                direction = self.state_dir.value
                 options = list(self.corr_group.get_options(mode, direction, corr))
 
                 if DEV_MODE.value:
@@ -485,6 +514,10 @@ class Selector(Generic[IconT, OptionRowT]):
             self.img_ind < max_ind,
         )
 
+    async def ui_task(self) -> None:
+        """Task which is run to update the UI."""
+        raise NotImplementedError
+
     def ui_win_hide(self) -> None:
         """Hide the window."""
         raise NotImplementedError
@@ -499,10 +532,6 @@ class Selector(Generic[IconT, OptionRowT]):
 
     async def ui_win_reflow(self) -> None:
         """Reposition everything after the window has resized."""
-        raise NotImplementedError
-
-    def ui_get_buttons(self) -> corridor.CorrKind:
-        """Get the current button positions."""
         raise NotImplementedError
 
     def ui_icon_create(self) -> None:
