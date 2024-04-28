@@ -12,7 +12,6 @@ import srctools.logger
 import packages
 import utils
 from app.reports import report_all_obj, report_items, report_editor_models
-from app.tooltip import add_tooltip
 from app import (
     DEV_MODE, background_run,
     contextWin, gameMan, localisation, tk_tools, sound, logWindow, img, UI,
@@ -25,6 +24,7 @@ import loadScreen
 import config
 from ui_tk.wid_transtoken import set_text, set_win_title
 from ui_tk.dialogs import Dialogs, DIALOG, TkDialogs
+from ui_tk.tooltip import add_tooltip
 from ui_tk import TK_ROOT
 
 

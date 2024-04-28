@@ -18,7 +18,7 @@ from BEE2_config import ConfigFile
 from packages import QuotePack
 from quote_pack import Line, LineCriteria
 from transtoken import TransToken
-from app.tooltip import add_tooltip
+from ui_tk.tooltip import add_tooltip
 from app import img
 from app import tk_tools
 from ui_tk.img import TKImages

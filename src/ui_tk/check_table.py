@@ -13,8 +13,8 @@ import functools
 
 import attrs
 
-from app.tooltip import add_tooltip, set_tooltip
 from app import tk_tools
+from ui_tk.tooltip import add_tooltip, set_tooltip
 from ui_tk.wid_transtoken import TransToken, set_text
 
 

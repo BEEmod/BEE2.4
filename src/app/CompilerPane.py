@@ -20,7 +20,7 @@ from srctools.logger import get_logger
 
 import app
 from app import SubPane, localisation, tk_tools
-from app.tooltip import add_tooltip, set_tooltip
+from ui_tk.tooltip import add_tooltip, set_tooltip
 from transtoken import TransToken
 from ui_tk.img import TKImages
 from ui_tk import wid_transtoken, TK_ROOT

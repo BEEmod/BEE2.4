@@ -9,7 +9,7 @@ import trio
 
 from packages.widgets import TimerOptions
 from app import itemconfig
-from app.tooltip import add_tooltip
+from ui_tk.tooltip import add_tooltip
 from ui_tk.img import TKImages
 import utils
 

@@ -9,11 +9,12 @@ import itertools
 from srctools.logger import get_logger
 import trio
 
+from app import background_run
 from config.filters import FilterConf
-from packages import Style, StyleVar, PackagesSet
-from app import background_run, tooltip
-from transtoken import TransToken
 from config.stylevar import State
+from packages import Style, StyleVar, PackagesSet
+from transtoken import TransToken
+from ui_tk import tooltip
 from ui_tk.wid_transtoken import set_text
 import config
 

@@ -15,7 +15,7 @@ import trio
 
 import utils
 from app import EdgeTrigger, UI, sound, tk_tools, StyleVarPane
-from app.tooltip import add_tooltip
+from ui_tk.tooltip import add_tooltip
 # Re-export.
 from config.widgets import (
     WidgetConfig, TimerNum as TimerNum, TIMER_NUM as TIMER_NUM,

@@ -31,7 +31,7 @@ import config
 import utils
 from transtoken import TransToken
 from ui_tk.wid_transtoken import set_text
-from ui_tk import TK_ROOT
+from ui_tk import TK_ROOT, tooltip
 
 
 LOGGER = logger.get_logger(__name__)
@@ -659,7 +659,7 @@ class FileField(ttk.Frame):
         - callback is a function to be called with the new path whenever it
           changes.
         """
-        from app.tooltip import add_tooltip
+        from ui_tk.tooltip import add_tooltip
 
         super().__init__(master)
 
@@ -731,7 +731,6 @@ class FileField(ttk.Frame):
     @value.setter
     def value(self, path: str) -> None:
         """Set the current path. This calls the callback function."""
-        from app import tooltip
         self.callback(path)
         self._location = path
         tooltip.set_tooltip(self.textbox, TransToken.untranslated(path))

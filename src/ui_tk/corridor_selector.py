@@ -8,7 +8,7 @@ import tkinter as tk
 
 import trio
 
-from app import img, tkMarkdown, tk_tools, tooltip
+from app import img, tkMarkdown, tk_tools
 from app.corridor_selector import (
     HEIGHT, IMG_ARROW_LEFT, IMG_ARROW_RIGHT, IMG_CORR_BLANK, Icon,
     OptionRow, Selector, TRANS_HELP, TRANS_NO_OPTIONS, WIDTH, TRANS_RAND_OPTION,
@@ -20,7 +20,7 @@ from transtoken import TransToken
 from ui_tk.dragdrop import CanvasPositioner
 from ui_tk.img import TKImages
 from ui_tk.wid_transtoken import set_text, set_win_title
-from . import TK_ROOT
+from . import TK_ROOT, tooltip
 import config
 import packages
 import utils

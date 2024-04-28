@@ -9,7 +9,7 @@ from trio_util import AsyncValue
 import trio
 
 from app import itemconfig
-from app.tooltip import add_tooltip
+from ui_tk.tooltip import add_tooltip
 from packages.widgets import KIND_CHECKMARK
 from ui_tk.img import TKImages
 import utils

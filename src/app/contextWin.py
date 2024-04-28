@@ -22,10 +22,10 @@ from consts import DefaultItems
 from ui_tk.dialogs import TkDialogs
 from ui_tk.img import TKImages, TK_IMG
 from ui_tk.wid_transtoken import set_text
-from ui_tk import TK_ROOT
+from ui_tk import TK_ROOT, tooltip
 from .richTextBox import tkRichText
 from . import (
-    EdgeTrigger, itemconfig, tkMarkdown, tooltip, tk_tools, sound, img, UI,
+    EdgeTrigger, itemconfig, tkMarkdown, tk_tools, sound, img, UI,
     DEV_MODE, background_run,
 )
 from packages.signage import ITEM_ID as SIGNAGE_ITEM_ID

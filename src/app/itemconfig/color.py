@@ -12,7 +12,7 @@ import trio
 from packages.widgets import KIND_COLOR, parse_color
 from app import img, tk_tools
 from app import itemconfig
-from app.tooltip import add_tooltip
+from ui_tk.tooltip import add_tooltip
 from app.localisation import TransToken
 from ui_tk.img import TKImages
 import utils
