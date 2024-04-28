@@ -10,7 +10,8 @@ from trio_util import AsyncValue
 import trio
 
 from packages.widgets import KIND_COLOR, parse_color
-from app import img, tk_tools
+from app import img
+from ui_tk import tk_tools
 from app import itemconfig
 from ui_tk.tooltip import add_tooltip
 from app.localisation import TransToken

@@ -5,11 +5,11 @@ from tkinter import ttk
 
 from srctools.logger import get_logger
 
-from app import tk_tools, sound
+from app import sound
 from app.img import Handle as ImgHandle
 from config.windows import WindowState
 from transtoken import TransToken
-from ui_tk import tooltip, wid_transtoken
+from ui_tk import tk_tools, tooltip, wid_transtoken
 from ui_tk.img import TKImages
 import utils
 import config

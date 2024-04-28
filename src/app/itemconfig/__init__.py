@@ -14,7 +14,7 @@ from trio_util import AsyncValue
 import trio
 
 import utils
-from app import EdgeTrigger, UI, sound, tk_tools, StyleVarPane
+from app import EdgeTrigger, UI, sound, StyleVarPane
 from ui_tk.tooltip import add_tooltip
 # Re-export.
 from config.widgets import (
@@ -33,7 +33,7 @@ from app.SubPane import SubPane
 from app.tkMarkdown import MarkdownData
 from ui_tk.img import TKImages
 from ui_tk.wid_transtoken import set_text
-from ui_tk import TK_ROOT
+from ui_tk import TK_ROOT, tk_tools
 import config
 import packages
 

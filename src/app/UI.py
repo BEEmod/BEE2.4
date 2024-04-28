@@ -34,7 +34,6 @@ from app import (
     img,
     itemconfig,
     sound as snd,
-    tk_tools,
     SubPane,
     voiceEditor,
     contextWin,
@@ -54,7 +53,7 @@ from app.menu_bar import MenuBar
 from ui_tk.corridor_selector import TkSelector
 from ui_tk.dialogs import DIALOG
 from ui_tk.img import TKImages, TK_IMG
-from ui_tk import tooltip, wid_transtoken, TK_ROOT
+from ui_tk import tk_tools, tooltip, wid_transtoken, TK_ROOT
 from ui_tk.signage_ui import SignageUI
 
 

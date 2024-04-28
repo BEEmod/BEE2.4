@@ -4,13 +4,13 @@ from typing_extensions import override
 from tkinter import ttk
 import tkinter as tk
 
-from app import img, tk_tools
+from app import img
 from packages import PakRef, Signage
 from transtoken import TransToken
-from ui_tk import TK_ROOT
-from ui_tk.dragdrop import DragDrop
-from ui_tk.img import TKImages
-from ui_tk.wid_transtoken import set_text, set_win_title
+from . import TK_ROOT, tk_tools
+from .dragdrop import DragDrop
+from .img import TKImages
+from .wid_transtoken import set_text, set_win_title
 
 from app.signage_ui import IMG_BLANK, SignageUIBase, TRANS_TITLE, TRANS_SELECTED
 

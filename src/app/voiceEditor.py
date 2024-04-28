@@ -20,10 +20,9 @@ from quote_pack import Line, LineCriteria
 from transtoken import TransToken
 from ui_tk.tooltip import add_tooltip
 from app import img
-from app import tk_tools
 from ui_tk.img import TKImages
 from ui_tk.wid_transtoken import set_text, set_win_title
-from ui_tk import TK_ROOT
+from ui_tk import TK_ROOT, tk_tools
 
 
 LOGGER = srctools.logger.get_logger(__name__)

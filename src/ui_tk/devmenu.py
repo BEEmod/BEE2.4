@@ -13,9 +13,8 @@ import attrs
 import trio
 import trio_util
 
-from app import tk_tools
-from ui_tk.img import TK_IMG, label_to_user
-from ui_tk import wid_transtoken, TK_ROOT
+from .img import TK_IMG, label_to_user
+from . import tk_tools, wid_transtoken, TK_ROOT
 import utils
 
 

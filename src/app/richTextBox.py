@@ -9,7 +9,7 @@ from typing_extensions import Never
 
 from app import tkMarkdown
 from app.tkMarkdown import TextTag, TAG_HEADINGS
-from app.tk_tools import Cursors
+from ui_tk.tk_tools import Cursors
 from transtoken import TransToken
 from ui_tk.img import TK_IMG
 import srctools.logger

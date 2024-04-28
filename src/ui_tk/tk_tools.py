@@ -30,8 +30,8 @@ import event
 import config
 import utils
 from transtoken import TransToken
-from ui_tk.wid_transtoken import set_text
-from ui_tk import TK_ROOT, tooltip
+from .wid_transtoken import set_text
+from . import TK_ROOT, tooltip
 
 
 LOGGER = logger.get_logger(__name__)
@@ -659,7 +659,6 @@ class FileField(ttk.Frame):
         - callback is a function to be called with the new path whenever it
           changes.
         """
-        from ui_tk.tooltip import add_tooltip
 
         super().__init__(master)
 
@@ -690,7 +689,7 @@ class FileField(ttk.Frame):
         self.columnconfigure(0, weight=1)
         bind_leftclick(self.textbox, lambda e: background_run(self.browse))
         # The full location is displayed in a tooltip.
-        add_tooltip(self.textbox, TransToken.untranslated(self._location))
+        tooltip.add_tooltip(self.textbox, TransToken.untranslated(self._location))
         self.textbox.bind('<Configure>', self._text_configure)
 
         self.browse_btn = ttk.Button(

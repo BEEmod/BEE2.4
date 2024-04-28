@@ -19,11 +19,11 @@ from srctools import AtomicWriter, bool_as_int
 from srctools.logger import get_logger
 
 import app
-from app import SubPane, localisation, tk_tools
+from app import SubPane, localisation
 from ui_tk.tooltip import add_tooltip, set_tooltip
 from transtoken import TransToken
 from ui_tk.img import TKImages
-from ui_tk import wid_transtoken, TK_ROOT
+from ui_tk import tk_tools, wid_transtoken, TK_ROOT
 from config.compile_pane import CompilePaneState, PLAYER_MODEL_ORDER
 import config
 import BEE2_config

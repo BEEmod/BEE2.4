@@ -26,11 +26,11 @@ import trio
 import srctools.logger
 
 from app.richTextBox import tkRichText
-from app import tkMarkdown, tk_tools, sound, img, DEV_MODE
+from app import tkMarkdown, sound, img, DEV_MODE
 from ui_tk.tooltip import add_tooltip, set_tooltip
 from ui_tk.img import TK_IMG
 from ui_tk.wid_transtoken import set_menu_text, set_text, set_win_title
-from ui_tk import TK_ROOT
+from ui_tk import TK_ROOT, tk_tools
 from packages import SelitemData
 from consts import (
     SEL_ICON_SIZE as ICON_SIZE,

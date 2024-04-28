@@ -7,12 +7,12 @@ import tkinter as tk
 
 import trio
 
-from loadScreen import suppress_screens
 from app.dialogs import DEFAULT_TITLE, Dialogs, Icon, validate_non_empty
-from app.tk_tools import set_window_icon, center_onscreen
+from loadScreen import suppress_screens
 from transtoken import AppError, TransToken
 
 from . import TK_ROOT
+from .tk_tools import set_window_icon, center_onscreen
 from .wid_transtoken import set_text
 
 

@@ -10,15 +10,16 @@ import srctools.logger
 
 from app.dialogs import Dialogs
 from app.paletteLoader import Palette, ItemPos, VertInd, HorizInd, COORDS, VERT, HORIZ
-from app import background_run, localisation, tk_tools, paletteLoader, img
+from app import background_run, localisation, paletteLoader, img
 from consts import PALETTE_FORCE_SHOWN, UUID_BLANK, UUID_EXPORT, UUID_PORTAL2
 from config.palette import PaletteState
-from transtoken import TransToken
+from ui_tk import tk_tools
 from ui_tk.dialogs import TkDialogs
 from ui_tk.img import tkImg, TKImages
-import config
 from ui_tk.wid_transtoken import set_menu_text, set_text
+from transtoken import TransToken
 from utils import not_none
+import config
 
 
 LOGGER = srctools.logger.get_logger(__name__)

@@ -14,7 +14,7 @@ import utils
 from app.reports import report_all_obj, report_items, report_editor_models
 from app import (
     DEV_MODE, background_run,
-    contextWin, gameMan, localisation, tk_tools, sound, logWindow, img, UI,
+    contextWin, gameMan, localisation, sound, logWindow, img, UI,
 )
 from config.filters import FilterConf
 from config.gen_opts import GenOptions, AfterExport
@@ -25,7 +25,7 @@ import config
 from ui_tk.wid_transtoken import set_text, set_win_title
 from ui_tk.dialogs import Dialogs, DIALOG, TkDialogs
 from ui_tk.tooltip import add_tooltip
-from ui_tk import TK_ROOT
+from ui_tk import TK_ROOT, tk_tools
 
 
 LOGGER = srctools.logger.get_logger(__name__)

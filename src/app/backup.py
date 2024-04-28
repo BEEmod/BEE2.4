@@ -21,9 +21,9 @@ import srctools.logger
 import trio
 
 from FakeZip import FakeZip, zip_names, zip_open_bin
-from app import tk_tools, img, background_run
+from app import img, background_run
 from transtoken import TransToken
-from ui_tk import TK_ROOT
+from ui_tk import TK_ROOT, tk_tools
 from ui_tk.check_table import CheckDetails, Item as CheckItem
 from ui_tk.dialogs import Dialogs, DIALOG, TkDialogs
 from ui_tk.img import TKImages

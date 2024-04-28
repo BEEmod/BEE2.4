@@ -9,9 +9,9 @@ import BEE2_config
 import utils
 from transtoken import TransToken
 from app import (
-    gameMan, helpMenu, optionWindow, packageMan, tk_tools,
-    backup as backup_win, background_run, quit_app,
+    gameMan, helpMenu, optionWindow, packageMan, backup as backup_win, background_run, quit_app,
 )
+from ui_tk import tk_tools
 from ui_tk.dialogs import DIALOG
 from ui_tk.img import TKImages
 from ui_tk.wid_transtoken import set_menu_text

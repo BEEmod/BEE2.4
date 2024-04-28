@@ -8,11 +8,10 @@ import math
 
 import trio
 
-from app import tk_tools
 from app.errors import ErrorUI
 from transtoken import AppError, TransToken
-from ui_tk.wid_transtoken import set_text, set_win_title
-from ui_tk import TK_ROOT
+from .wid_transtoken import set_text, set_win_title
+from . import TK_ROOT, tk_tools
 
 
 ChannelValue = TypeAliasType("ChannelValue", Tuple[

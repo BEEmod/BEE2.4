@@ -5,10 +5,10 @@ from typing import Iterable
 from tkinter import ttk
 import tkinter as tk
 
-from app import background_run, tk_tools
+from app import background_run
 from app.dialogs import Dialogs
 from transtoken import TransToken
-from ui_tk import TK_ROOT
+from ui_tk import TK_ROOT, tk_tools
 from ui_tk.check_table import CheckDetails, Item as CheckItem
 from ui_tk.dialogs import TkDialogs
 from ui_tk.wid_transtoken import set_text, set_win_title
