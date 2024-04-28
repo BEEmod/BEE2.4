@@ -107,17 +107,20 @@ def check_support_locs(
     for point in points:
         pos = Vec(point)
         pos.localise(origin, matrix)
-        debug_add(
+        dbg = debug_add(
             'info_particle_system',
+            targetname='support_check',
             origin=pos,
             angles=normal.to_angle(),
         )
         try:
             tile, u, v = tiling.find_tile(pos, normal)
         except KeyError:
-            return False  # Not present at all.
+            dbg.comments = 'Fail: Not present'
+            return False
         if not tile[u, v].is_tile:
-            return False  # Not a tile.
+            dbg.comments = 'Fail: Not a tile'
+            return False
     return True
 
 
@@ -165,7 +168,6 @@ def place_catwalk_connections(
         # They point opposite to normal ones
         angle = conditions.INST_ANGLE[(-direction).freeze()]
         for stair_pos in range(0, -int(diff.z), 128):
-            LOGGER.debug(stair_pos)
             # Move twice the vertical horizontally
             loc = point_a + (2 * stair_pos + 256) * direction
             # Do the vertical offset plus additional 128 units
@@ -374,6 +376,15 @@ def res_make_catwalk(vmf: VMF, res: Keyvalues) -> object:
                 angles=angle,
                 file=supp,
             )
+
+    if utils.DEV_MODE:
+        for f_origin, dir_mask in catwalks.items():
+            debug_add(
+                'info_null' if dir_mask is EMPTY else 'info_target',
+            targetname='catwalk_node',
+            origin=f_origin,
+            comment=f'N: {dir_mask.N}, S: {dir_mask.S}, E: {dir_mask.E}, W: {dir_mask.W}',
+        )
 
     while catwalks:
         f_origin, dir_mask = catwalks.popitem()
