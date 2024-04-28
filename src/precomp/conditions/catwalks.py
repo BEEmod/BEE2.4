@@ -159,7 +159,7 @@ def place_catwalk_connections(
                 file=instances[Instances.STAIR],
             )
             catwalks[loc.freeze()] = EMPTY
-            catwalks[(loc + 128 * direction - (0, 0, 128)).freeze()] = EMPTY
+            catwalks[(loc + 128 * direction + (0, 0, 128)).freeze()] = EMPTY
         # This is the location we start flat sections at
         point_a = loc + 128 * direction
         point_a.z += 128
@@ -381,10 +381,10 @@ def res_make_catwalk(vmf: VMF, res: Keyvalues) -> object:
         for f_origin, dir_mask in catwalks.items():
             debug_add(
                 'info_null' if dir_mask is EMPTY else 'info_target',
-            targetname='catwalk_node',
-            origin=f_origin,
-            comment=f'N: {dir_mask.N}, S: {dir_mask.S}, E: {dir_mask.E}, W: {dir_mask.W}',
-        )
+                targetname='catwalk_node',
+                origin=f_origin,
+                comment=f'N: {dir_mask.N}, S: {dir_mask.S}, E: {dir_mask.E}, W: {dir_mask.W}',
+            )
 
     while catwalks:
         f_origin, dir_mask = catwalks.popitem()
