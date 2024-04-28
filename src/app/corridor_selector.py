@@ -137,6 +137,7 @@ class Selector(Generic[IconT, OptionRowT]):
         self.corr_list = []
         self.option_rows = []
         self.show_trigger = EdgeTrigger()
+        self._changed_trigger = EdgeTrigger()
         self.close_event = RepeatedEvent()
 
     async def task(self) -> None:
@@ -144,6 +145,7 @@ class Selector(Generic[IconT, OptionRowT]):
         async with trio.open_nursery() as nursery:
             nursery.start_soon(self._window_task)
             nursery.start_soon(self._display_task)
+            nursery.start_soon(self._save_config_task)
 
     async def _window_task(self) -> None:
         """Run to allow opening/closing the window."""
@@ -158,6 +160,13 @@ class Selector(Generic[IconT, OptionRowT]):
             self.ui_win_hide()
             for icon in self.icons:
                 self.ui_icon_set_img(icon, None)
+
+    async def _save_config_task(self) -> None:
+        """When a checkmark is changed, store the new config."""
+        while True:
+            await self._changed_trigger.wait()
+            self.prevent_deselection()
+            self.store_conf()
 
     def prevent_deselection(self) -> None:
         """Ensure at least one widget is selected."""
@@ -261,11 +270,6 @@ class Selector(Generic[IconT, OptionRowT]):
         self.displayed_corr.value = None
         # Reposition everything.
         await self.ui_win_reflow()
-
-    async def evt_check_changed(self) -> None:
-        """Handle a checkbox changing."""
-        self.prevent_deselection()
-        self.store_conf()
 
     async def evt_mode_switch(self, _: object) -> None:
         """We must save the current state before switching."""

@@ -8,7 +8,7 @@ import tkinter as tk
 
 import trio
 
-from app import background_run, img, tkMarkdown, tk_tools, tooltip
+from app import img, tkMarkdown, tk_tools, tooltip
 from app.corridor_selector import (
     HEIGHT, IMG_ARROW_LEFT, IMG_ARROW_RIGHT, IMG_CORR_BLANK, Icon,
     OptionRow, Selector, TRANS_HELP, TRANS_NO_OPTIONS, WIDTH, TRANS_RAND_OPTION,
@@ -39,7 +39,7 @@ class IconUI(Icon):
             self.label,
             name='check',
             variable=self.var,
-            command=lambda: background_run(selector.evt_check_changed),
+            command=selector.changed_cmd,
         )
         self.check.place(
             x=ICON_CHECK_PADDING,
@@ -161,6 +161,9 @@ class TkSelector(Selector[IconUI, OptionRowUI]):
         self.frm_img = frm_img = ttk.Frame(frm_right, relief='raised')
         frm_img.grid(row=0, column=0, columnspan=2, sticky='ew')
         frm_img.rowconfigure(1, weight=1)
+
+        # Cache the TK name for the registered command so that we can reuse it.
+        self.changed_cmd = self.win.register(self._changed_trigger.maybe_trigger)
 
         sel_img = self._sel_img
         self.wid_image_left = ttk.Button(frm_img, name='imgLeft', command=lambda: sel_img(-1))

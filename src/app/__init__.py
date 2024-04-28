@@ -6,10 +6,13 @@ from typing_extensions import TypeVarTuple, Unpack
 from types import TracebackType
 
 from trio_util import AsyncBool
+from srctools.logger import get_logger
 import trio
 
 import utils
 
+
+LOGGER = get_logger(__name__)
 # The nursery where UI tasks etc are run in.
 _APP_NURSERY: trio.Nursery | None = None
 # This is quit to exit the sleep_forever(), beginning the shutdown process.
@@ -163,3 +166,14 @@ class EdgeTrigger(Generic[Unpack[PosArgsT]]):
             raise ValueError('No task is blocked on wait()!')
         self._result = args
         self._event.set()
+
+    def maybe_trigger(self: EdgeTrigger[()]) -> None:
+        """Wake up a task blocked on wait(), but do nothing if not currently blocked.
+
+        This is only available if no arguments are specified, since then all calls are identical.
+        """
+        if self._event is not None:
+            self._result = ()
+            self._event.set()
+        else:
+            LOGGER.debug('EdgeTrigger.maybe_trigger() ignored!')
