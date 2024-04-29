@@ -23,7 +23,7 @@ from srctools import logger
 from trio_util import AsyncValue
 import trio
 
-from app import background_run
+from app import ICO_PATH, background_run
 from config.gen_opts import GenOptions
 from transtoken import TransToken
 import config
@@ -34,9 +34,9 @@ from . import TK_ROOT, tooltip
 
 
 LOGGER = logger.get_logger(__name__)
-ICO_PATH = str(utils.bins_path('BEE2.ico'))
 T = TypeVar('T')
 EnumT = TypeVar('EnumT', bound=Enum)
+PosArgsT = TypeVarTuple('PosArgsT')
 AnyWidT = TypeVar('AnyWidT', bound=tk.Misc)
 WidgetT = TypeVar('WidgetT', bound=tk.Widget)
 EventFunc = TypeAliasType("EventFunc", Callable[[tk.Event[AnyWidT]], object], type_params=(AnyWidT, ))
@@ -45,26 +45,11 @@ EventFuncT = TypeVar('EventFuncT', bound=EventFunc[tk.Misc])
 
 if utils.WIN:
     # Ensure everything has our icon (including dialogs)
-    TK_ROOT.wm_iconbitmap(default=ICO_PATH)
+    TK_ROOT.wm_iconbitmap(default=str(ICO_PATH))
 
     def set_window_icon(window: Union[tk.Toplevel, tk.Tk]) -> None:
         """Set the window icon."""
-        window.wm_iconbitmap(ICO_PATH)
-
-    import ctypes
-    # Use Windows APIs to tell the taskbar to group us as our own program,
-    # not with python.exe. Then our icon will apply, and also won't group
-    # with other scripts.
-    try:
-        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
-            'BEEMOD.application',
-        )
-    except (AttributeError, OSError, ValueError):
-        pass  # It's not too bad if it fails.
-
-    LISTBOX_BG_SEL_COLOR = '#0078D7'
-    LISTBOX_BG_COLOR = 'white'
-    LABEL_HIGHLIGHT_BG = '#5AD2D2'
+        window.wm_iconbitmap(str(ICO_PATH))
 elif utils.MAC:
     def set_window_icon(window: Union[tk.Toplevel, tk.Tk]) -> None:
         """ Call OS-X's specific api for setting the window icon."""
@@ -74,14 +59,10 @@ elif utils.MAC:
             256,  # largest size in the .ico
             256,
             '-imageFile',
-            ICO_PATH,
+            str(ICO_PATH),
         )
 
     set_window_icon(TK_ROOT)
-
-    LISTBOX_BG_SEL_COLOR = '#C2DDFF'
-    LISTBOX_BG_COLOR = 'white'
-    LABEL_HIGHLIGHT_BG = '#5AD2D2'
 else:  # Linux
     # Get the tk image object.
     from ui_tk.img import get_app_icon
@@ -90,11 +71,22 @@ else:  # Linux
     def set_window_icon(window: Union[tk.Toplevel, tk.Tk]) -> None:
         """Set the window icon."""
         # Weird argument order for default=True...
-        window.wm_iconphoto(True, app_icon)
+        window.wm_iconphoto(True, str(ICO_PATH))
 
+
+if utils.WIN:
+    LISTBOX_BG_SEL_COLOR = '#0078D7'
+    LISTBOX_BG_COLOR = 'white'
+    LABEL_HIGHLIGHT_BG = '#5AD2D2'
+elif utils.MAC:
+    LISTBOX_BG_SEL_COLOR = '#C2DDFF'
+    LISTBOX_BG_COLOR = 'white'
+    LABEL_HIGHLIGHT_BG = '#5AD2D2'
+else:  # Linux
     LISTBOX_BG_SEL_COLOR = 'blue'
     LISTBOX_BG_COLOR = 'white'
     LABEL_HIGHLIGHT_BG = '#5AD2D2'
+
 
 # Some events differ on different systems, so define them here.
 if utils.MAC:
@@ -102,7 +94,7 @@ if utils.MAC:
     KEY_SAVE = '<Command-s>'
     KEY_SAVE_AS = '<Command-Shift-s>'
 
-    # tkinter replaces Command- with the special symbol automatically.
+    # tkinter replaces `Command-*` with the special symbol automatically.
     ACCEL_EXPORT = 'Command-E'
     ACCEL_SAVE = 'Command-S'
     ACCEL_SAVE_AS = 'Command-Shift-S'
@@ -242,9 +234,6 @@ async def wait_eventloop() -> None:
         _cur_update = trio.Event()
         TK_ROOT.tk.call('after', 'idle', _update_complete)
     await _cur_update.wait()
-
-
-PosArgsT = TypeVarTuple('PosArgsT')
 
 
 def bind_mousewheel(

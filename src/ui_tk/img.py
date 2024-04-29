@@ -1,9 +1,11 @@
 """Image integrations for TKinter."""
 from __future__ import annotations
+
 from typing import TypeVar, Union
 from typing_extensions import TypeAliasType, override
 from tkinter import ttk
 import tkinter as tk
+import os
 
 from PIL import Image, ImageTk
 from srctools.logger import get_logger
@@ -30,7 +32,7 @@ textwid_to_user: dict[tk.Text, TextWidUser] = {}
 menu_to_user: dict[tk.Menu, MenuIconUser] = {}
 
 
-def get_app_icon(path: str) -> ImageTk.PhotoImage:
+def get_app_icon(path: os.PathLike[str]) -> ImageTk.PhotoImage:
     """On non-Windows, retrieve the application icon."""
     with open(path, 'rb') as f:
         return ImageTk.PhotoImage(Image.open(f))

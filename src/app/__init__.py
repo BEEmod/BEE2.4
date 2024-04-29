@@ -23,6 +23,22 @@ PosArgsT = TypeVarTuple('PosArgsT')
 # We use this to activate various features only useful to package/app devs.
 DEV_MODE = AsyncBool(value=utils.DEV_MODE)
 
+# The application icon.
+ICO_PATH = utils.bins_path('BEE2.ico')
+
+
+if utils.WIN:
+    import ctypes
+    # Use Windows APIs to tell the taskbar to group us as our own program,
+    # not with python.exe. Then our icon will apply, and also won't group
+    # with other scripts.
+    try:
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
+            'BEEMOD.application',
+        )
+    except (AttributeError, OSError, ValueError):
+        pass  # It's not too bad if it fails.
+
 
 def quit_app() -> None:
     """Quit the application."""
