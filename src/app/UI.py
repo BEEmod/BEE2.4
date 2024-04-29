@@ -36,7 +36,6 @@ from app import (
     sound as snd,
     SubPane,
     voiceEditor,
-    contextWin,
     gameMan,
     packageMan,
     StyleVarPane,
@@ -51,6 +50,7 @@ from app import (
 from app.errors import Result as ErrorResult
 from app.selector_win import SelectorWin, Item as selWinItem, AttrDef as SelAttr
 from app.menu_bar import MenuBar
+from ui_tk.context_win import ContextWin
 from ui_tk.corridor_selector import TkSelector
 from ui_tk.dialogs import DIALOG, TkDialogs
 from ui_tk.img import TKImages, TK_IMG
@@ -67,6 +67,8 @@ voice_win: 'SelectorWin[[]]'
 style_win: 'SelectorWin[[]]'
 elev_win: 'SelectorWin[[]]'
 suggest_windows: Dict[Type[packages.PakObject], 'SelectorWin[...]'] = {}
+
+context_win = ContextWin()
 
 # Items chosen for the palette.
 pal_picked: List['PalItem'] = []
@@ -327,7 +329,7 @@ class PalItem:
         )
         TK_IMG.apply(self.info_btn, ICO_GEAR)
 
-        click_func = contextWin.open_event(self)
+        click_func = context_win.open_event(self)
         tk_tools.bind_rightclick(lbl, click_func)
 
         @tk_tools.bind_leftclick(self.info_btn)
@@ -402,7 +404,7 @@ class PalItem:
         # Open on the palette, but also open on the item picker if needed
         for item in itertools.chain(items_list, pal_items):
             if item.id == self.id and item.subKey == ind:
-                contextWin.show_prop(item, warp_cursor=True)
+                context_win.show_prop(item, warp_cursor=True)
                 break
 
     def load_data(self) -> None:
@@ -1591,7 +1593,7 @@ async def init_windows(tk_img: TKImages) -> None:
     tk_tools.add_mousewheel(pal_canvas, TK_ROOT)
 
     # When clicking on any window hide the context window
-    hide_ctx_win = contextWin.hide_context
+    hide_ctx_win = context_win.hide_context
     tk_tools.bind_leftclick(TK_ROOT, hide_ctx_win)
     tk_tools.bind_leftclick(itemconfig.window, hide_ctx_win)
     tk_tools.bind_leftclick(CompilerPane.window, hide_ctx_win)
@@ -1604,7 +1606,7 @@ async def init_windows(tk_img: TKImages) -> None:
     await LOAD_UI.step('backup')
     voiceEditor.init_widgets()
     await LOAD_UI.step('voiceline')
-    await background_start(contextWin.init_widgets, tk_img, signage_trigger)
+    await background_start(context_win.init_widgets, tk_img, signage_trigger)
     await LOAD_UI.step('contextwin')
     await background_start(functools.partial(
         optionWindow.init_widgets,
@@ -1689,8 +1691,8 @@ async def init_windows(tk_img: TKImages) -> None:
             item.load_data()
         refresh_palette_icons()
 
-        if contextWin.is_visible():
-            contextWin.show_prop(contextWin.selected_sub_item)
+        if context_win.is_visible():
+            context_win.hide_context()
 
         # Update variant selectors on the itemconfig pane
         for item_id, func in itemconfig.ITEM_VARIANT_LOAD:
