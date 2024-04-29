@@ -2,34 +2,33 @@
 General code used for tkinter portions.
 
 """
-import functools
-import inspect
-import sys
-from enum import Enum
 from typing import (
     Awaitable, Dict, Generic, Iterable, overload, cast, Any, TypeVar, Protocol, Union, Callable,
     Optional, Tuple, Literal, NoReturn
 )
-
-from trio_util import AsyncValue
 from typing_extensions import TypeAliasType, TypeVarTuple, Unpack
 
-from tkinter import ttk
-from tkinter import font as _tk_font
+from enum import Enum
 from tkinter import filedialog, commondialog
-import tkinter as tk
+from tkinter import font as _tk_font
+from tkinter import ttk
+import functools
+import inspect
 import os.path
+import sys
+import tkinter as tk
 
-from srctools import logger
 from idlelib.redirector import WidgetRedirector  # type: ignore[import-not-found]
+from srctools import logger
+from trio_util import AsyncValue
 import trio
 
 from app import background_run
 from config.gen_opts import GenOptions
-import event
+from transtoken import TransToken
 import config
 import utils
-from transtoken import TransToken
+
 from .wid_transtoken import set_text
 from . import TK_ROOT, tooltip
 
@@ -37,6 +36,7 @@ from . import TK_ROOT, tooltip
 LOGGER = logger.get_logger(__name__)
 ICO_PATH = str(utils.bins_path('BEE2.ico'))
 T = TypeVar('T')
+EnumT = TypeVar('EnumT', bound=Enum)
 AnyWidT = TypeVar('AnyWidT', bound=tk.Misc)
 WidgetT = TypeVar('WidgetT', bound=tk.Widget)
 EventFunc = TypeAliasType("EventFunc", Callable[[tk.Event[AnyWidT]], object], type_params=(AnyWidT, ))
@@ -521,12 +521,6 @@ def center_onscreen(window: Union[tk.Tk, tk.Toplevel]) -> None:
     window.geometry(f'+{x}+{y}')
 
 
-def _default_validator(value: str) -> str:
-    if not value.strip():
-        raise ValueError("A value must be provided!")
-    return value
-
-
 class HidingScroll(ttk.Scrollbar):
     """A scrollbar variant which auto-hides when not needed.
 
@@ -756,9 +750,6 @@ class FileField(ttk.Frame):
         self._text_var.set(self._truncate(self._location))
 
 
-EnumT = TypeVar('EnumT')
-
-
 class EnumButton(Generic[EnumT]):
     """Provides a set of buttons for toggling between enum values.
 
@@ -778,11 +769,7 @@ class EnumButton(Generic[EnumT]):
         self.buttons = {}
 
         for x, (val, label) in enumerate(values):
-            btn = ttk.Button(
-                self.frame,
-                # Make partial do the method binding too.
-                command=functools.partial(EnumButton._evt_select, self, val),
-            )
+            btn = ttk.Button(self.frame, command=utils.val_setter(current, val))
             set_text(btn, label)
             btn.grid(row=0, column=x)
             self.buttons[val] = btn
@@ -799,10 +786,6 @@ class EnumButton(Generic[EnumT]):
             async for chosen in agen:
                 for val, button in self.buttons.items():
                     button.state(('pressed', ) if val is chosen else ('!pressed', ))
-
-    def _evt_select(self, value: EnumT) -> None:
-        """Select a specific value."""
-        self.current.value = value
 
 
 class LineHeader(ttk.Frame):
