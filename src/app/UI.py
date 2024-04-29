@@ -1704,6 +1704,7 @@ async def init_windows(tk_img: TKImages) -> None:
             item.load_data()
         refresh_palette_icons()
 
+        context_win.cur_style = ref
         context_win.hide_context()
 
         # Update variant selectors on the itemconfig pane
