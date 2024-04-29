@@ -74,11 +74,12 @@ _load_langs: Callable[[], object] = lambda: None
 
 def show() -> None:
     """Display the option window."""
+    from app.UI import context_win
     # Re-apply, so the vars update.
     load()
     _load_langs()
     win.deiconify()
-    contextWin.hide_context()  # Ensure this closes.
+    context_win.hide_context()  # Ensure this closes.
     tk_tools.center_win(win)
 
 

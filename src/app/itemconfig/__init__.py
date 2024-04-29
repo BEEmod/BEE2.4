@@ -571,7 +571,7 @@ async def widget_item_variant(
 
     The config is alternatively an EdgeTrigger instance for the special Configure Signage button.
     """
-    from app import contextWin
+    from app.UI import context_win
 
     if isinstance(conf, EdgeTrigger):
         # Even more special case, display the "configure signage" button.
@@ -591,7 +591,7 @@ async def widget_item_variant(
     def update_data() -> None:
         """Refresh the data in the list."""
         nonlocal version_lookup
-        version_lookup = contextWin.set_version_combobox(combobox, item)
+        version_lookup = context_win.set_version_combobox(combobox, item)
 
     def change_callback(e: object = None) -> None:
         """Change the item version."""
