@@ -21,7 +21,7 @@ from BEE2_config import GEN_OPTS
 from app.dialogs import Dialogs
 from loadScreen import MAIN_UI as LOAD_UI
 import packages
-from packages.item import ItemVariant, InheritKind
+from packages.item import ItemVariant, InheritKind, SubItemRef
 import utils
 from config.filters import FilterConf
 from config.gen_opts import GenOptions, AfterExport
@@ -66,7 +66,7 @@ style_win: 'SelectorWin[[]]'
 elev_win: 'SelectorWin[[]]'
 suggest_windows: Dict[Type[packages.PakObject], 'SelectorWin[...]'] = {}
 
-context_win = ContextWin()
+context_win = ContextWin(TK_IMG)
 
 # Items chosen for the palette.
 pal_picked: List['PalItem'] = []
@@ -296,6 +296,10 @@ class PalItem:
         self.item = item
         self.subKey = sub
         self.id = item.id
+        self.ref = SubItemRef(
+            packages.PakRef(packages.Item, utils.obj_id(item.id)),
+            sub,
+        )
         # Used to distinguish between picker and palette items
         self.is_pre = is_pre
         self.needs_unlock = item.item.needs_unlock
@@ -378,6 +382,7 @@ class PalItem:
             if item.id == self.id and item.subKey == ind:
                 item.kill()
         self.subKey = ind
+        self.ref = SubItemRef(self.ref.item, ind)
         self.load_data()
         self.label.master.update()  # Update the frame
         flow_preview()
@@ -393,7 +398,7 @@ class PalItem:
         # Open on the palette, but also open on the item picker if needed
         for item in itertools.chain(items_list, pal_items):
             if item.id == self.id and item.subKey == ind:
-                context_win.show_prop(item, warp_cursor=True)
+                context_win.show_prop(item, item.ref, warp_cursor=True)
                 break
 
     def load_data(self) -> None:
