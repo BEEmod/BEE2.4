@@ -164,7 +164,6 @@ enable_error_code = [
 module = [
 	'app.gameMan',
 	'app.backup',
-	'app.contextWin',
 	'app.UI',
 	'precomp.conditions._scaffold_compat',
 	'precomp.bottomlessPit',

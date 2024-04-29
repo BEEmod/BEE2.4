@@ -50,6 +50,10 @@ def set_version_combobox(box: ttk.Combobox, item: Item, cur_style: PakRef[Style]
 
 class ContextWin(ContextWinBase['UI.PalItem']):
     """Tk-specific item context window."""
+    wid_subitem: list[ttk.Label]
+    wid_sprite: dict[SPR, ttk.Label]
+    version_lookup: list[str]
+
     def __init__(
         self,
         tk_img: TKImages,
@@ -70,6 +74,7 @@ class ContextWin(ContextWinBase['UI.PalItem']):
         self.tk_img = tk_img
         self.wid_subitem = []
         self.wid_sprite = {}
+        self.version_lookup = []
 
         f = ttk.Frame(self.window, relief="raised", borderwidth="4")
         f.grid(row=0, column=0)

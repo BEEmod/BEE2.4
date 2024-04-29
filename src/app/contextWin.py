@@ -490,15 +490,16 @@ class ContextWinBase(Generic[TargetT]):
         """
         if self.selected is None or self.selected_widget is None:
             return
-        item = self.selected.item.resolve(packages.get_loaded_packages())
-        if item is None:
+        if (item := self.selected.item.resolve(packages.get_loaded_packages())) is None:
+            return
+        if (pos := pos_for_item(item, self.selected.subtype)) is None:
             return
 
         # Calculate the pixel offset between the window and the subitem in
         # the properties dialog, and shift if needed to keep it inside the
         # window
         targ_x, targ_y = self.ui_get_target_pos(self.selected_widget)
-        icon_x, icon_y = self.ui_get_icon_offset(pos_for_item(item, self.selected.subtype))
+        icon_x, icon_y = self.ui_get_icon_offset(pos)
 
         self.ui_show_window(targ_x - icon_x, targ_y - icon_y)
 
