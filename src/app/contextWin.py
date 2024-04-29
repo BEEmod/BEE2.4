@@ -124,6 +124,7 @@ TRANS_ENT_COUNT = TransToken.ui(
     'these items can be placed in a map at once.'
 )
 
+
 def pos_for_item(item: Item, ind: int) -> int | None:
     """Get the index the specified subitem is located at."""
     positions = SUBITEM_POS[len(item.visual_subtypes)]
@@ -132,6 +133,7 @@ def pos_for_item(item: Item, ind: int) -> int | None:
             return pos
     else:
         return None
+
 
 def ind_for_pos(item: Item, pos: int) -> int | None:
     """Return the subtype index for the specified position."""
@@ -188,6 +190,7 @@ class ContextWinBase(Generic[TargetT]):
         self.change_ver_func = change_ver_func
         self.open_match_func = open_match_func
         self.icon_func = icon_func
+        self.props_open = False
 
         # The current URL in the more-info button, if available.
         self.moreinfo_url = AsyncValue(None)
@@ -198,7 +201,7 @@ class ContextWinBase(Generic[TargetT]):
     @property
     def is_visible(self) -> bool:
         """We are visible if a selected item is defined."""
-        return self.selected is not None
+        return self.selected is not None and not self.props_open
 
     async def init_widgets(
         self,
@@ -488,7 +491,7 @@ class ContextWinBase(Generic[TargetT]):
         We call this constantly, so the property window will not go outside
         the screen, and snap back to the item when the main window returns.
         """
-        if self.selected is None or self.selected_widget is None:
+        if not self.is_visible or self.selected is None or self.selected_widget is None:
             return
         if (item := self.selected.item.resolve(packages.get_loaded_packages())) is None:
             return

@@ -253,7 +253,11 @@ class ContextWin(ContextWinBase['UI.PalItem']):
             if was_temp_hidden:
                 # Temporarily hide the context window while we're open.
                 self.window.withdraw()
-            await prop_window.show(variant.editor, self.window, subtype.name)
+            try:
+                self.props_open = True
+                await prop_window.show(variant.editor, self.window, subtype.name)
+            finally:
+                self.props_open = False
             sound.fx('contract')
             if was_temp_hidden:
                 # Restore the context window if we hid it earlier.
