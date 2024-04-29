@@ -21,7 +21,7 @@ import attrs
 import trio
 
 from app import tkMarkdown, img, lazy_conf, DEV_MODE
-from config.item_defaults import DEFAULT_VERSION
+from config.item_defaults import DEFAULT_VERSION, ItemDefault
 from connections import Config as ConnConfig
 from editoritems import Item as EditorItem, InstCount
 from packages import PackagesSet, PakObject, PakRef, ParseData, Style, sep_values, desc_parse, get_config
@@ -682,6 +682,16 @@ class Item(PakObject, needs_foreground=True):
             for item_to_style in packset.all_obj(Item):
                 nursery.start_soon(assign_styled_items, styles, item_to_style)
 
+    def selected_version(self) -> Version:
+        """Fetch the selected version for this item."""
+        conf = config.APP.get_cur_conf(ItemDefault, self.id, ItemDefault())
+        try:
+            return self.versions[conf.version]
+        except KeyError:
+            LOGGER.warning('Version ID {} is not valid for item {}', conf.version, self.id)
+            config.APP.store_conf(attrs.evolve(conf, version=self.def_ver.id), self.id)
+            return self.def_ver
+
 
 class ItemConfig(PakObject, allow_mult=True):
     """Allows adding additional configuration for items.
@@ -753,6 +763,14 @@ class SubItemRef:
     """Represents an item with a specific subtype."""
     item: PakRef[Item] = attrs.field(converter=_conv_pakref_item)
     subtype: int = 0
+
+    def __str__(self) -> str:
+        """Convert this to a compact ID."""
+        return f'{self.item.id}:{self.subtype}'
+
+    def with_subtype(self, ind: int) -> SubItemRef:
+        """Return the same item, but with a different subtype."""
+        return SubItemRef(self.item, ind)
 
 
 async def parse_item_folder(

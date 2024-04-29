@@ -106,6 +106,7 @@ TRANS_MAIN_TITLE = TransToken.ui('BEEMOD {version} - {game}')
 TRANS_ERROR = TransToken.untranslated('???')
 TRANS_CORR_OPTS = TransToken.ui_plural('{n} option', '{n} options')  # i18n: Corridor options count
 
+
 class DragWin(tk.Toplevel):
     """Todo: use dragdrop module instead."""
     passed_over_pal: bool  # Has the cursor passed over the palette
@@ -167,19 +168,9 @@ class Item:
 
         self.load_data()
 
-    def selected_version(self) -> packages.item.Version:
-        """Fetch the selected version for this item."""
-        conf = config.APP.get_cur_conf(ItemDefault, self.id, ItemDefault())
-        try:
-            return self.item.versions[conf.version]
-        except KeyError:
-            LOGGER.warning('Version ID {} is not valid for item {}', conf.version, self.item.id)
-            config.APP.store_conf(attrs.evolve(conf, version=self.item.def_ver.id), self.id)
-            return self.item.def_ver
-
     def load_data(self) -> None:
         """Reload data from the item."""
-        version = self.selected_version()
+        version = self.item.selected_version()
         try:
             self.data = version.styles[selected_style]
         except KeyError:
@@ -221,7 +212,7 @@ class Item:
         icon = self._get_raw_icon(sub_key, use_grouping)
         if self.item.unstyled or not config.APP.get_cur_conf(GenOptions).visualise_inheritance:
             return icon
-        inherit_kind = self.selected_version().inherit_kind.get(selected_style, InheritKind.UNSTYLED)
+        inherit_kind = self.item.selected_version().inherit_kind.get(selected_style, InheritKind.UNSTYLED)
         if inherit_kind is not InheritKind.DEFINED:
             icon = icon.overlay_text(inherit_kind.value.title(), 12)
         return icon
