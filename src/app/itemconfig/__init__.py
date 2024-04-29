@@ -102,7 +102,7 @@ TIMER_NUM_TRANS[TIMER_STR_INF] = INF
 TRANS_COLON = TransToken.untranslated('{text}: ')
 TRANS_GROUP_HEADER = TransToken.ui('{name} ({page}/{count})')  # i18n: Header layout for Item Properties pane.
 # For the item-variant widget, we need to refresh on style changes.
-ITEM_VARIANT_LOAD: list[tuple[str, Callable[[], object]]] = []
+ITEM_VARIANT_LOAD: list[tuple[str, Callable[[packages.PakRef[packages.Style]], object]]] = []
 
 window: SubPane | None = None
 
@@ -571,7 +571,7 @@ async def widget_item_variant(
 
     The config is alternatively an EdgeTrigger instance for the special Configure Signage button.
     """
-    from app.UI import context_win
+    from ui_tk import context_win
 
     if isinstance(conf, EdgeTrigger):
         # Even more special case, display the "configure signage" button.
@@ -582,21 +582,22 @@ async def widget_item_variant(
         await tk_tools.apply_bool_enabled_state_task(conf.ready, show_btn)
 
     try:
-        item = UI.item_list[conf.item_id]
+        item = packages.get_loaded_packages().obj_by_id(packages.Item, conf.item_id)
+        ui_item = UI.item_list[conf.item_id]
     except KeyError:
         raise ValueError(f'Unknown item "{conf.item_id}"!') from None
 
     version_lookup: list[str] = []
 
-    def update_data() -> None:
+    def update_data(cur_style: packages.PakRef[packages.Style]) -> None:
         """Refresh the data in the list."""
         nonlocal version_lookup
-        version_lookup = context_win.set_version_combobox(combobox, item)
+        version_lookup = context_win.set_version_combobox(combobox, item, cur_style)
 
     def change_callback(e: object = None) -> None:
         """Change the item version."""
         if version_lookup is not None:
-            item.change_version(version_lookup[combobox.current()])
+            ui_item.change_version(version_lookup[combobox.current()])
 
     combobox = ttk.Combobox(
         parent,

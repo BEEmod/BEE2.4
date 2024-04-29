@@ -9,39 +9,37 @@ various item properties.
 """
 from __future__ import annotations
 
-from typing import Any, Callable, Generic, TypeVar
+from typing import Callable, Generic, Tuple, TypeVar
 from enum import Enum
 import webbrowser
 
-import tkinter as tk
-from tkinter import ttk
-
-import trio
 from trio_util import AsyncValue
+from srctools.logger import get_logger
+import trio
 
-import packages
-from consts import DefaultItems
-from ui_tk.img import TKImages
-from app.dialogs import Dialogs
-from . import (
-    EdgeTrigger, itemconfig, tkMarkdown, sound, img, UI,
-    DEV_MODE,
-)
-from packages.item import Item, SubItemRef
-from packages.signage import ITEM_ID as SIGNAGE_ITEM_ID
+from . import EdgeTrigger, tkMarkdown, sound, img, DEV_MODE
 from .item_properties import PropertyWindow
-import utils
-import srctools.logger
-from editoritems import Handle as RotHandle, Surface, ItemClass, FSPath
+from app.dialogs import Dialogs
+from consts import DefaultItems
+from packages.item import Item, ItemVariant, SubItemRef, Version
+from packages.signage import ITEM_ID as SIGNAGE_ITEM_ID
+import packages
+
+from editoritems import Handle as RotHandle, SubType, Surface, ItemClass, FSPath
 from editoritems_props import prop_timer_delay
 from transtoken import TransToken
 
 
-LOGGER = srctools.logger.get_logger(__name__)
+LOGGER = get_logger(__name__)
 # The type of the widget representing palette icons.
 TargetT = TypeVar("TargetT")
-
-version_lookup: list[str] = []
+# Function called to change the version of the highlighted palette item.
+ChangeVersionFunc = Callable[[Tuple[int, int], SubItemRef], object]
+# Re-open the context window by finding an item matching this reference. The bool indicates if the
+# existing item is on the palette already.
+OpenMatchingFunc = Callable[[SubItemRef, bool], object]
+# Given an item + subtype, return the icon to show.
+IconFunc = Callable[[SubItemRef], img.Handle]
 
 SUBITEM_POS = {
     # Positions of subitems depending on the number of subitems that exist
@@ -165,59 +163,99 @@ def get_description(
 
 class ContextWinBase(Generic[TargetT]):
     """Shared logic for item context windows."""
+    # If we are open, info about the selected widget.
     selected: SubItemRef | None
-    selected_widget: TargetT | None
+    selected_widget: TargetT | None  # The widget object itself, so we can lock to it.
+    selected_pal_pos: tuple[int, int] | None  # Palette position, if from there. Allows changing version.
+
     moreinfo_url: AsyncValue[str | None]
     moreinfo_trigger: EdgeTrigger[str]
+    defaults_trigger: EdgeTrigger[()]
 
-    def __init__(self, dialog: Dialogs) -> None:
+    def __init__(
+        self,
+        dialog: Dialogs,
+        change_ver_func: ChangeVersionFunc,
+        open_match_func: OpenMatchingFunc,
+        icon_func: IconFunc,
+    ) -> None:
         self.selected = None
         self.selected_widget = None
+        self.selected_pal_pos = None
+        # TODO: Pass this in...
+        self.cur_style = packages.PakRef(packages.Style, packages.CLEAN_STYLE)
         self.dialog = dialog
+        self.change_ver_func = change_ver_func
+        self.open_match_func = open_match_func
+        self.icon_func = icon_func
 
         # The current URL in the more-info button, if available.
         self.moreinfo_url = AsyncValue(None)
         self.moreinfo_trigger = EdgeTrigger()
+        # Triggered to open the change-defaults button.
+        self.defaults_trigger = EdgeTrigger()
+
+    @property
+    def is_visible(self) -> bool:
+        """We are visible if a selected item is defined."""
+        return self.selected is not None
 
     async def init_widgets(
         self,
         signage_trigger: EdgeTrigger[()],
         *, task_status: trio.TaskStatus[None] = trio.TASK_STATUS_IGNORED,
     ) -> None:
-        """Initiallise all the window components."""
+        """Initialise all the window components."""
         async with trio.open_nursery() as nursery:
             nursery.start_soon(self.ui_task, signage_trigger)
             nursery.start_soon(self._moreinfo_task)
             task_status.started()
 
+    def get_current(self) -> tuple[Item, Version, ItemVariant, SubType]:
+        """Fetch the tree representing the selected subtype."""
+        assert self.selected is not None
+        item = self.selected.item.resolve(packages.get_loaded_packages())
+        assert item is not None, self.selected
+        version = item.selected_version()
+        try:
+            variant = version.styles[self.cur_style.id]
+        except KeyError:
+            LOGGER.warning('No {} style for {}!', self.cur_style, self.selected)
+            variant = version.def_style
+        try:
+            subtype = variant.editor.subtypes[self.selected.subtype]
+        except KeyError:
+            LOGGER.warning('No subtype {} in style {}!', self.selected, self.cur_style)
+            first = item.visual_subtypes[0]
+            self.selected = self.selected.with_subtype(first)
+            subtype = variant.editor.subtypes[first]
+
+        return item, version, variant, subtype
+
     def load_item_data(self) -> None:
         """Refresh the window to use the selected item's data."""
         assert self.selected is not None
-        item = self.selected.item.resolve(packages.get_loaded_packages())
-        if item is None:
-            return
-        version = item.selected_version()
-        item_data = selected_item.data
-        item_id = utils.obj_id(selected_item.id)
+        item, version, variant, subtype = self.get_current()
+        item_id = self.selected.item.id
 
         sel_pos = pos_for_item(item, self.selected.subtype)
         for ind, pos in enumerate(SUBITEM_POS[len(item.visual_subtypes)]):
             if pos == -1:
                 icon = IMG_ALPHA
             else:
-                icon = selected_item.get_icon(item.visual_subtypes[pos])
+                icon = self.icon_func(self.selected.with_subtype(item.visual_subtypes[pos]))
             self.ui_set_props_icon(ind, icon, ind == sel_pos)
 
         desc = get_description(
-            global_last=selected_item.item.glob_desc_last,
-            glob_desc=selected_item.item.glob_desc,
-            style_desc=item_data.desc,
+            global_last=item.glob_desc_last,
+            glob_desc=item.glob_desc,
+            style_desc=variant.desc,
         )
         # Dump out the instances used in this item.
         if DEV_MODE.value:
             inst_desc = []
-            for editor in [selected_item.data.editor] + selected_item.data.editor_extra:
-                if editor is selected_item.data.editor:
+            for editor in [variant.editor] + variant.editor_extra:
+                if editor is variant.editor:
                     heading = '\n\nInstances:\n'
                 else:
                     heading = f'\nInstances ({editor.id}):\n'
@@ -237,82 +275,73 @@ class ContextWinBase(Generic[TargetT]):
             desc = tkMarkdown.join(desc, tkMarkdown.SingleMarkdown(inst_desc))
 
         self.ui_set_props_main(
-            name=selected_sub_item.name,
+            name=subtype.name,
             authors=TransToken.list_and(
-                map(TransToken.untranslated, item_data.authors), sort=True,
+                map(TransToken.untranslated, variant.authors), sort=True,
             ),
             desc=desc,
-            ent_count=item_data.ent_count or '??',
+            ent_count=variant.ent_count or '??',
         )
 
         if DEV_MODE.value:
-            source = selected_item.data.source.replace("from", "\nfrom")
+            source = variant.source.replace("from", "\nfrom")
             self.ui_set_debug_itemid(f'{source}\n-> {self.selected}')
         else:
             self.ui_set_debug_itemid('')
 
-        editor = item_data.editor
-
-        if PropertyWindow.can_edit(editor):
-            wid['changedefaults'].state(['!disabled'])
-        else:
-            wid['changedefaults'].state(['disabled'])
-
-        version_lookup[:] = self.set_version_combobox(wid['variant'], selected_item)
+        self.ui_set_defaults_enabled(PropertyWindow.can_edit(variant.editor))
 
         if item_id == SIGNAGE_ITEM_ID:
-            wid['variant'].grid_remove()
-            wid['signage_configure'].grid()
+            self.ui_show_sign_config()
         else:
-            wid['variant'].grid()
-            wid['signage_configure'].grid_remove()
+            self.ui_show_variants(item)
 
-        self.moreinfo_url.value = selected_item.data.url
-        has_timer = any(prop.kind is prop_timer_delay for prop in editor.properties.values())
+        self.moreinfo_url.value = variant.url
+        has_timer = any(prop.kind is prop_timer_delay for prop in variant.editor.properties.values())
 
-        if editor.has_prim_input():
-            if editor.has_sec_input():
+        if variant.editor.has_prim_input():
+            if variant.editor.has_sec_input():
                 self.set_sprite(SPR.INPUT, 'in_dual')
                 # Real funnels work slightly differently.
-                if item_id == DefaultItems.funnel.id:
+                if self.selected.item.id == DefaultItems.funnel.id:
                     self.ui_set_sprite_tool(SPR.INPUT, TRANS_TOOL_TBEAM)
             else:
                 self.set_sprite(SPR.INPUT, 'in_norm')
         else:
             self.set_sprite(SPR.INPUT, 'in_none')
 
-        if editor.has_output():
+        if variant.editor.has_output():
             if has_timer:
                 self.set_sprite(SPR.OUTPUT, 'out_tim')
                 # Mention the Fizzler Output Relay here.
-                if editor.cls is ItemClass.FIZZLER:
+                if variant.editor.cls is ItemClass.FIZZLER:
                     self.ui_set_sprite_tool(SPR.OUTPUT, TRANS_TOOL_FIZZOUT_TIMED)
             else:
                 self.set_sprite(SPR.OUTPUT, 'out_norm')
-                if editor.cls is ItemClass.FIZZLER:
+                if variant.editor.cls is ItemClass.FIZZLER:
                     self.ui_set_sprite_tool(SPR.OUTPUT, TRANS_TOOL_FIZZOUT)
         else:
             self.set_sprite(SPR.OUTPUT, 'out_none')
 
-        self.set_sprite(SPR.ROTATION, ROT_TYPES[editor.handle])
+        self.set_sprite(SPR.ROTATION, ROT_TYPES[variant.editor.handle])
 
-        if editor.embed_voxels:
+        if variant.editor.embed_voxels:
             self.set_sprite(SPR.COLLISION, 'space_embed')
         else:
             self.set_sprite(SPR.COLLISION, 'space_none')
 
         face_spr = "surf"
-        if Surface.WALL not in editor.invalid_surf:
+        if Surface.WALL not in variant.editor.invalid_surf:
             face_spr += "_wall"
-        if Surface.FLOOR not in editor.invalid_surf:
+        if Surface.FLOOR not in variant.editor.invalid_surf:
             face_spr += "_floor"
-        if Surface.CEIL not in editor.invalid_surf:
+        if Surface.CEIL not in variant.editor.invalid_surf:
             face_spr += "_ceil"
         if face_spr == "surf":
             # This doesn't seem right - this item won't be placeable at all...
             LOGGER.warning(
                 "Item <{}> disallows all orientations. Is this right?",
-                selected_item.id,
+                item_id,
             )
             face_spr += "_none"
 
@@ -328,25 +357,25 @@ class ContextWinBase(Generic[TargetT]):
             # This can have 2 handles - the specified one, overridden to 36 on reflection cubes.
             # Concatenate the two definitions.
             self.ui_set_sprite_tool(SPR.ROTATION, TRANS_TOOL_CUBE.format(
-                generic_rot=SPRITE_TOOL[ROT_TYPES[editor.handle]]
+                generic_rot=SPRITE_TOOL[ROT_TYPES[variant.editor.handle]]
             ))
 
-        if editor.cls is ItemClass.GEL:
+        if variant.editor.cls is ItemClass.GEL:
             # Reflection or normal gel...
             self.set_sprite(SPR.FACING, 'surf_wall_ceil')
             self.set_sprite(SPR.INPUT, 'in_norm')
             self.set_sprite(SPR.COLLISION, 'space_none')
             self.set_sprite(SPR.OUTPUT, 'out_none')
             self.set_sprite(SPR.ROTATION, 'rot_paint')
-        elif editor.cls is ItemClass.TRACK_PLATFORM:
+        elif variant.editor.cls is ItemClass.TRACK_PLATFORM:
             # Track platform - always embeds into the floor.
             self.set_sprite(SPR.COLLISION, 'space_embed')
 
-        real_conn_item = editor
+        real_conn_item = variant.editor
         if item_id == DefaultItems.cube.id or item_id == DefaultItems.gel_splat.id:
             # The connections are on the dropper.
             try:
-                [real_conn_item] = selected_item.data.editor_extra
+                [real_conn_item] = variant.editor_extra
             except ValueError:
                 # Moved elsewhere?
                 pass
@@ -366,43 +395,39 @@ class ContextWinBase(Generic[TargetT]):
 
     def hide_context(self, e: object = None) -> None:
         """Hide the properties window, if it's open."""
-        global selected_item, selected_sub_item
-        if self.is_visible():
+        if self.is_visible:
             self.ui_hide_window()
             sound.fx('contract')
-            selected_item = selected_sub_item = None
+            self.selected = self.selected_widget = None
 
-    def show_prop(self, widget: TargetT, item: SubItemRef, warp_cursor: bool = False) -> None:
+    def show_prop(
+        self,
+        widget: TargetT, item: SubItemRef,
+        pal_pos: tuple[int, int] | None,
+        warp_cursor: bool = False,
+    ) -> None:
         """Show the properties window for an item.
 
-        wid should be the UI.PalItem widget that represents the item.
-        If warp_cursor is true, the cursor will be moved relative to this window so that
-        it stays on top of the selected subitem.
+        - widget should be the widget that represents the item.
+        - If warp_cursor is true, the cursor will be moved relative to this window so that
+          it stays on top of the selected subitem.
+        - If from the palette, pal_pos is the position.
         """
-        global selected_item, selected_sub_item
-        if warp_cursor and self.is_visible():
+        if warp_cursor and self.is_visible:
             offset = self.ui_get_cursor_offset()
         else:
             offset = None
         self.selected = item
         self.selected_widget = widget
+        self.selected_pal_pos = pal_pos
 
+        x, y = self.ui_get_target_pos(widget)
+        self.ui_show_window(x, y)
         self.adjust_position()
 
         if offset is not None:
             self.ui_set_cursor_offset(offset)
         self.load_item_data()
-
-    def set_item_version(self, tk_img: TKImages) -> None:
-        """Callback for the version combobox. Set the item variant."""
-        selected_item.change_version(version_lookup[wid['variant'].current()])
-        # Refresh our data.
-        self.load_item_data()
-
-        # Refresh itemconfig comboboxes to match us.
-        for item_id, func in itemconfig.ITEM_VARIANT_LOAD:
-            if selected_item.id == item_id:
-                func()
 
     async def _moreinfo_task(self) -> None:
         """Task to handle clicking on the 'more info' URL."""
@@ -442,40 +467,20 @@ class ContextWinBase(Generic[TargetT]):
             return
         ind = ind_for_pos(item, pos)
         # Can only change the subitem on the preview window
-        if selected_sub_item.is_pre and ind is not None:
+        if self.selected_pal_pos is not None and ind is not None:
             sound.fx('config')
-            selected_sub_item.change_subtype(ind)
-            # Redisplay the window to refresh data and move it to match
-            self.show_prop(selected_sub_item, self.selected.with_subtype(ind), warp_cursor=True)
+            ref = self.selected.with_subtype(ind)
+            self.change_ver_func(self.selected_pal_pos, ref)
 
     def sub_open(self, pos: int, e: object = None) -> None:
         """Move the context window to apply to the given item."""
-        ind = ind_for_pos(pos)
-        if ind is not None:
-            sound.fx('expand')
-            selected_sub_item.open_menu_at_sub(ind)
-
-    def is_visible(self) -> bool:
-        """Checks if the window is visible."""
-        return window.winfo_ismapped()
-
-    def set_version_combobox(self, box: ttk.Combobox, item: UI.Item) -> list[str]:
-        """Set values on the variant combobox.
-
-        This is in a function so itemconfig can reuse it.
-        It returns a list of IDs in the same order as the names.
-        """
-        ver_lookup, version_names = item.get_version_names()
-        if len(version_names) <= 1:
-            # There aren't any alternates to choose from, disable the box
-            box.state(['disabled'])
-            box['values'] = [str(TRANS_NO_VERSIONS)]
-            box.current(0)
-        else:
-            box.state(['!disabled'])
-            box['values'] = version_names
-            box.current(ver_lookup.index(item.item.selected_version().id))
-        return ver_lookup
+        assert self.selected is not None
+        item = self.selected.item.resolve(packages.get_loaded_packages())
+        if item is not None:
+            ind = ind_for_pos(item, pos)
+            if ind is not None:
+                sound.fx('expand')
+                self.open_match_func(self.selected.with_subtype(ind), self.selected_pal_pos is not None)
 
     def adjust_position(self, e: object = None) -> None:
         """Move the properties window onto the selected item.
@@ -483,16 +488,23 @@ class ContextWinBase(Generic[TargetT]):
         We call this constantly, so the property window will not go outside
         the screen, and snap back to the item when the main window returns.
         """
-        if not self.is_visible() or self.selected_widget is None:
+        if self.selected is None or self.selected_widget is None:
+            return
+        item = self.selected.item.resolve(packages.get_loaded_packages())
+        if item is None:
             return
 
         # Calculate the pixel offset between the window and the subitem in
         # the properties dialog, and shift if needed to keep it inside the
         # window
         targ_x, targ_y = self.ui_get_target_pos(self.selected_widget)
-        icon_x, icon_y = self.ui_get_icon_offset(pos_for_item(selected_sub_item.subKey))
+        icon_x, icon_y = self.ui_get_icon_offset(pos_for_item(item, self.selected.subtype))
 
         self.ui_show_window(targ_x - icon_x, targ_y - icon_y)
+
+    async def ui_task(self, signage_trigger: EdgeTrigger[()]) -> None:
+        """Run logic to update the UI."""
+        raise NotImplementedError
 
     def ui_set_sprite_img(self, sprite: SPR, icon: img.Handle) -> None:
         """Set the image for a connection sprite."""
@@ -548,6 +560,14 @@ class ContextWinBase(Generic[TargetT]):
         """Add the specified text to the clipboard."""
         raise NotImplementedError
 
-    async def ui_task(self, signage_trigger: EdgeTrigger[()]) -> None:
-        """Run logic to update the UI."""
+    def ui_show_sign_config(self) -> None:
+        """Show the special signage-configure button."""
+        raise NotImplementedError
+
+    def ui_show_variants(self, item: Item) -> None:
+        """Show the variants combo-box, and configure it."""
+        raise NotImplementedError
+
+    def ui_set_defaults_enabled(self, enable: bool) -> None:
+        """Set whether the Change Defaults button is enabled."""
         raise NotImplementedError

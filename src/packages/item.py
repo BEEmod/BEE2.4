@@ -686,6 +686,24 @@ class Item(PakObject, needs_foreground=True):
             config.APP.store_conf(attrs.evolve(conf, version=self.def_ver.id), self.id)
             return self.def_ver
 
+    def get_version_names(self, cur_style: PakRef[Style]) -> tuple[list[str], list[str]]:
+        """Get a list of the names and corresponding IDs for the item."""
+        # item folders are reused, so we can find duplicates.
+        style_obj_ids = {
+            id(self.versions[ver_id].styles[cur_style.id])
+            for ver_id in self.version_id_order
+        }
+        versions = list(self.version_id_order)
+        if len(style_obj_ids) == 1:
+            # All the variants are the same, so we effectively have one
+            # variant. Disable the version display.
+            versions = versions[:1]
+
+        return versions, [
+            self.versions[ver_id].name
+            for ver_id in versions
+        ]
+
 
 class ItemConfig(PakObject, allow_mult=True):
     """Allows adding additional configuration for items.

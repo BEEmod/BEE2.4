@@ -16,7 +16,7 @@ import trio
 from typing_extensions import assert_never
 
 import exporting
-from app import EdgeTrigger, background_run, background_start, quit_app
+from app import EdgeTrigger, background_run, background_start, quit_app, sound
 from BEE2_config import GEN_OPTS
 from app.dialogs import Dialogs
 from loadScreen import MAIN_UI as LOAD_UI
@@ -66,7 +66,7 @@ style_win: 'SelectorWin[[]]'
 elev_win: 'SelectorWin[[]]'
 suggest_windows: Dict[Type[packages.PakObject], 'SelectorWin[...]'] = {}
 
-context_win = ContextWin(TK_IMG)
+context_win: ContextWin
 
 # Items chosen for the palette.
 pal_picked: List['PalItem'] = []
@@ -270,24 +270,6 @@ class Item:
         self.load_data()
         self.refresh_subitems()
 
-    def get_version_names(self) -> Tuple[List[str], List[str]]:
-        """Get a list of the names and corresponding IDs for the item."""
-        # item folders are reused, so we can find duplicates.
-        style_obj_ids = {
-            id(self.item.versions[ver_id].styles[selected_style])
-            for ver_id in self.item.version_id_order
-        }
-        versions = list(self.item.version_id_order)
-        if len(style_obj_ids) == 1:
-            # All the variants are the same, so we effectively have one
-            # variant. Disable the version display.
-            versions = versions[:1]
-
-        return versions, [
-            self.item.versions[ver_id].name
-            for ver_id in versions
-        ]
-
 
 class PalItem:
     """The icon and associated data for a single subitem."""
@@ -322,19 +304,19 @@ class PalItem:
         )
         TK_IMG.apply(self.info_btn, ICO_GEAR)
 
-        click_func = context_win.open_event(self)
-        tk_tools.bind_rightclick(lbl, click_func)
+        show_context = self.show_context
+        tk_tools.bind_rightclick(lbl, show_context)
 
         @tk_tools.bind_leftclick(self.info_btn)
         def info_button_click(e: tk.Event[tk.Misc]) -> object:
             """When clicked, show the context window."""
-            click_func(e)
+            show_context(e)
             # Cancel the event sequence, so it doesn't travel up to the main
             # window and hide the window again.
             return 'break'
 
         # Right-click does the same as the icon.
-        tk_tools.bind_rightclick(self.info_btn, click_func)
+        tk_tools.bind_rightclick(self.info_btn, show_context)
 
     def __del__(self) -> None:
         """When destroyed, clean up the label."""
@@ -355,6 +337,15 @@ class PalItem:
             )
             return TRANS_ERROR
 
+    def show_context(self, _: tk.Event) -> None:
+        """Show the context window."""
+        sound.fx('expand')
+        if self.is_pre:
+            pos = (self.pre_x, self.pre_y)
+        else:
+            pos = None
+        context_win.show_prop(self, self.ref, pos)
+
     def rollover(self, _: tk.Event) -> None:
         """Show the name of a subitem and info button when moused over."""
         set_disp_name(self)
@@ -373,33 +364,51 @@ class PalItem:
         self.label['relief'] = 'flat'
         self.info_btn.place_forget()
 
-    def change_subtype(self, ind: int) -> None:
-        """Change the subtype of this icon.
+    @classmethod
+    def change_pal_subtype(cls, pos: tuple[int, int], ref: SubItemRef) -> None:
+        """Change the subtype of this icon, then reopen the context window.
 
         This removes duplicates from the palette if needed.
         """
+        x, y = pos
+        try:
+            target = pal_picked[y * 4 + x]
+        except IndexError:
+            LOGGER.warning('No item for {} at ({}, {})', ref, x, y)
+            return
+        if target.ref.item != ref.item:
+            LOGGER.warning('Item at {},{} = {} is not a {}', x, y, target.ref, ref)
+            return
+
         for item in pal_picked[:]:
-            if item.id == self.id and item.subKey == ind:
+            if item is not target and item.ref == ref:
                 item.kill()
-        self.subKey = ind
-        self.ref = SubItemRef(self.ref.item, ind)
-        self.load_data()
-        self.label.master.update()  # Update the frame
+        target.ref = ref
+        target.subKey = ref.subtype
+        target.load_data()
+        target.label.master.update()  # Update the frame
         flow_preview()
 
-    def open_menu_at_sub(self, ind: int) -> None:
-        """Make the contextWin open itself at the indicated subitem.
+        # Redisplay the window to refresh data and move it to match
+        context_win.show_prop(target, ref, pos, warp_cursor=True)
 
-        """
-        if self.is_pre:
-            items_list = pal_picked[:]
+    @classmethod
+    def open_menu_at_sub(cls, ref: SubItemRef, on_preview: bool) -> None:
+        """Make the contextWin open itself at the indicated subitem."""
+        if on_preview:
+            items_list = pal_picked
         else:
             items_list = []
-        # Open on the palette, but also open on the item picker if needed
+        # Prefer opening on the palette if it was on the palette, but fall back to the picker.
         for item in itertools.chain(items_list, pal_items):
-            if item.id == self.id and item.subKey == ind:
-                context_win.show_prop(item, item.ref, warp_cursor=True)
-                break
+            if item.ref != ref:
+                continue
+            if item.is_pre:
+                pos = (item.pre_x, item.pre_y)
+            else:
+                pos = None
+            context_win.show_prop(item, item.ref, pos, warp_cursor=True)
+            break
 
     def load_data(self) -> None:
         """Refresh our icon and name.
@@ -1387,7 +1396,8 @@ async def init_windows(tk_img: TKImages) -> None:
     """Initialise all windows and panes.
 
     """
-    global sign_ui
+    global sign_ui, context_win
+
     def export() -> None:
         """Export the palette, passing the required UI objects."""
         background_run(export_editoritems, pal_ui, menu_bar, DIALOG)
@@ -1580,21 +1590,18 @@ async def init_windows(tk_img: TKImages) -> None:
     # Make scrollbar work globally
     tk_tools.add_mousewheel(pal_canvas, TK_ROOT)
 
-    # When clicking on any window hide the context window
-    hide_ctx_win = context_win.hide_context
-    tk_tools.bind_leftclick(TK_ROOT, hide_ctx_win)
-    tk_tools.bind_leftclick(itemconfig.window, hide_ctx_win)
-    tk_tools.bind_leftclick(CompilerPane.window, hide_ctx_win)
-    tk_tools.bind_leftclick(corridor.win, hide_ctx_win)
-    tk_tools.bind_leftclick(windows['opt'], hide_ctx_win)
-    tk_tools.bind_leftclick(windows['pal'], hide_ctx_win)
-
     await trio.sleep(0)
     backup_win.init_toplevel(tk_img)
     await LOAD_UI.step('backup')
     voiceEditor.init_widgets()
     await LOAD_UI.step('voiceline')
-    await background_start(context_win.init_widgets, tk_img, signage_trigger)
+    context_win = ContextWin(
+        tk_img,
+        change_ver_func=PalItem.change_pal_subtype,
+        open_match_func=PalItem.open_menu_at_sub,
+        icon_func=lambda ref: item_list[ref.item.id].get_icon(ref.subtype),
+    )
+    await background_start(context_win.init_widgets, signage_trigger)
     await LOAD_UI.step('contextwin')
     await optionWindow.init_widgets(
         unhide_palettes=pal_ui.reset_hidden_palettes,
@@ -1604,6 +1611,15 @@ async def init_windows(tk_img: TKImages) -> None:
     init_drag_icon()
     await LOAD_UI.step('drag_icon')
     await trio.sleep(0)
+
+    # When clicking on any window, hide the context window
+    hide_ctx_win = context_win.hide_context
+    tk_tools.bind_leftclick(TK_ROOT, hide_ctx_win)
+    tk_tools.bind_leftclick(itemconfig.window, hide_ctx_win)
+    tk_tools.bind_leftclick(CompilerPane.window, hide_ctx_win)
+    tk_tools.bind_leftclick(corridor.win, hide_ctx_win)
+    tk_tools.bind_leftclick(windows['opt'], hide_ctx_win)
+    tk_tools.bind_leftclick(windows['pal'], hide_ctx_win)
 
     # Load to properly apply config settings, then save to ensure
     # the file has any defaults applied.
@@ -1672,18 +1688,18 @@ async def init_windows(tk_img: TKImages) -> None:
             style_id = style_win.item_list[0].name
 
         selected_style = utils.obj_id(style_id)
+        ref = packages.PakRef(packages.Style, selected_style)
 
         style_obj = current_style()
         for item in item_list.values():
             item.load_data()
         refresh_palette_icons()
 
-        if context_win.is_visible():
-            context_win.hide_context()
+        context_win.hide_context()
 
         # Update variant selectors on the itemconfig pane
         for item_id, func in itemconfig.ITEM_VARIANT_LOAD:
-            func()
+            func(ref)
 
         # Disable this if the style doesn't have elevators
         elev_win.readonly = not style_obj.has_video

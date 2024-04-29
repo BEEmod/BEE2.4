@@ -6,6 +6,8 @@ from enum import Enum
 import tkinter as tk
 from tkinter import ttk
 from typing import Any, Callable, ClassVar, Generic, Iterator, Optional, Tuple, Dict, List, TypeVar
+
+import trio
 from typing_extensions import Final, Literal, TypeAliasType, override
 
 import srctools
@@ -588,14 +590,13 @@ def matching_props(item: Item, props: List[ItemPropKind[Any]]) -> List[Tuple[all
 
 class PropertyWindow:
     """The window used for configuring properties."""
-    def __init__(self, tk_img: TKImages, close_callback: Callable[[], object]) -> None:
+    def __init__(self, tk_img: TKImages) -> None:
         """Build the window."""
-        self.callback = close_callback
-        self.cur_item: Optional[Item] = None
         # For each PROP_GROUP, the actually constructed group.
         self.groups: List[Optional[PropGroup]] = [None] * len(PROP_GROUPS)
 
         self.win = tk.Toplevel(TK_ROOT, name='itemPropsWin')
+        self.close_event = trio.Event()
 
         self.win.withdraw()
         self.win.transient(TK_ROOT)
@@ -635,35 +636,10 @@ class PropertyWindow:
 
     def evt_exit(self) -> None:
         """Exit the window."""
-        if self.cur_item is None:
-            raise AssertionError('No item?')
-        self.win.grab_release()
-        self.win.withdraw()
-
-        old_conf = config.APP.get_cur_conf(ItemDefault, self.cur_item.id, ItemDefault())
-
-        out: dict[ItemPropKind[Any], str] = {}
-        out.update(old_conf.defaults)  # Keep any extra values, just in case.
-        for (props, factory), group in zip(PROP_GROUPS, self.groups):
-            if group is None or not matching_props(self.cur_item, props):
-                continue
-            for prop_kind, value in group.get_conf():
-                try:
-                    prop = self.cur_item.properties[prop_kind.id.casefold()]
-                except KeyError:
-                    LOGGER.warning('No property {}={!r} in {}!', prop_kind.id, value, self.cur_item.id)
-                    continue
-                if prop.allow_user_default:
-                    out[prop_kind] = value
-
-        config.APP.store_conf(attrs.evolve(old_conf, defaults=out), self.cur_item.id)
-
-        self.callback()
+        self.close_event.set()
 
     async def show(self, item: Item, parent: tk.Toplevel, sub_name: TransToken) -> None:
-        """Display the window."""
-        self.cur_item = item
-
+        """Display the window, then wait for it to be closed."""
         large_groups: list[PropGroup] = []
         small_groups: list[PropGroup] = []
         group: PropGroup
@@ -803,6 +779,7 @@ class PropertyWindow:
 
         set_win_title(self.win, TRANS_TITLE.format(item=sub_name))
         set_text(self.lbl_title, TRANS_SUBTITLE.format(item=sub_name))
+        self.close_event = trio.Event()
         self.win.wm_deiconify()
         await tk_tools.wait_eventloop()
         self.win.lift(parent)
@@ -811,3 +788,25 @@ class PropertyWindow:
             f'+{parent.winfo_rootx() - 30}'
             f'+{parent.winfo_rooty() - self.win.winfo_reqheight() - 30}'
         )
+
+        # Wait for it to close...
+        await self.close_event.wait()
+
+        self.win.grab_release()
+        self.win.withdraw()
+
+        out: dict[ItemPropKind[Any], str] = {}
+        out.update(conf.defaults)  # Keep any extra values, just in case.
+        for (props, factory), group in zip(PROP_GROUPS, self.groups):
+            if group is None or not matching_props(item, props):
+                continue
+            for prop_kind, value in group.get_conf():
+                try:
+                    prop = item.properties[prop_kind.id.casefold()]
+                except KeyError:
+                    LOGGER.warning('No property {}={!r} in {}!', prop_kind.id, value, item.id)
+                    continue
+                if prop.allow_user_default:
+                    out[prop_kind] = value
+
+        config.APP.store_conf(attrs.evolve(conf, defaults=out), item.id)
