@@ -366,21 +366,22 @@ async def make_widgets(
     comp_frame = ttk.Frame(nbook, name='comp_settings')
     nbook.add(comp_frame, text='Comp')
 
-    async with trio.open_nursery() as nursery:
-        nursery.start_soon(make_map_widgets, map_frame)
-        nursery.start_soon(make_comp_widgets, comp_frame, tk_img)
-
     def update_label(e: tk.Event[tk.Misc]) -> None:
         """Force the top label to wrap."""
         reload_lbl['wraplength'] = window.winfo_width() - 10
 
-    window.bind('<Configure>', update_label, add='+')
-    task_status.started()
-    while True:
-        # Update tab names whenever languages update.
-        nbook.tab(0, text=str(TRANS_TAB_MAP))
-        nbook.tab(1, text=str(TRANS_TAB_COMPILE))
-        await CURRENT_LANG.wait_transition()
+    async with trio.open_nursery() as nursery:
+        async with trio.open_nursery() as start_nursery:
+            start_nursery.start_soon(nursery.start, make_map_widgets, map_frame)
+            start_nursery.start_soon(make_comp_widgets, comp_frame, tk_img)
+
+        window.bind('<Configure>', update_label, add='+')
+        task_status.started()
+        while True:
+            # Update tab names whenever languages update.
+            nbook.tab(0, text=str(TRANS_TAB_MAP))
+            nbook.tab(1, text=str(TRANS_TAB_COMPILE))
+            await CURRENT_LANG.wait_transition()
 
 
 async def make_comp_widgets(frame: ttk.Frame, tk_img: TKImages) -> None:
@@ -635,7 +636,11 @@ async def make_comp_widgets(frame: ttk.Frame, tk_img: TKImages) -> None:
     refresh_counts(count_brush, count_entity, count_overlay)
 
 
-async def make_map_widgets(frame: ttk.Frame) -> None:
+async def make_map_widgets(
+    frame: ttk.Frame,
+    *,
+    task_status: trio.TaskStatus[None] = trio.TASK_STATUS_IGNORED,
+) -> None:
     """Create widgets for the map settings pane.
 
     These are things which mainly affect the geometry or gameplay of the map.
@@ -718,15 +723,15 @@ async def make_map_widgets(frame: ttk.Frame) -> None:
     wid_transtoken.set_text(model_frame, TransToken.ui('Player Model (SP):'))
     model_frame.grid(row=4, column=0, sticky='ew')
 
-    player_model_combo = player_mdl = ttk.Combobox(model_frame, exportselection=False, width=20)
-    # Users can only use the dropdown
+    player_model_combo = player_mdl = ttk.Combobox(
+        model_frame,
+        exportselection=False,
+        width=20,
+        values=list(PLAYER_MODEL_ORDER),  # Temp, will be overridden at the end.
+    )
+    # Users can only use the dropdown, not type in values.
     player_mdl.state(['readonly'])
     player_mdl.grid(row=0, column=0, sticky=tk.EW)
-
-    @localisation.add_callback(call=True)
-    def update_model_values() -> None:
-        """Update the combo box when translations change."""
-        player_mdl['values'] = [str(PLAYER_MODELS[mdl]) for mdl in PLAYER_MODEL_ORDER]
 
     try:
         start_ind = PLAYER_MODEL_ORDER.index(COMPILE_CFG.get_val('General', 'player_model', 'PETI'))
@@ -748,6 +753,13 @@ async def make_map_widgets(frame: ttk.Frame) -> None:
     player_mdl.bind('<<ComboboxSelected>>', set_model)
 
     model_frame.columnconfigure(0, weight=1)
+    task_status.started()
+    while True:
+        # Update the combo box when translations change.
+        ind = player_mdl.current()
+        player_mdl['values'] = [str(PLAYER_MODELS[mdl]) for mdl in PLAYER_MODEL_ORDER]
+        player_mdl.current(ind)
+        await CURRENT_LANG.wait_transition()
 
 
 async def make_pane(
