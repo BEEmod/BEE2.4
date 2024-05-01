@@ -21,7 +21,7 @@ from srctools.logger import get_logger
 import app
 from app import SubPane, localisation
 from ui_tk.tooltip import add_tooltip, set_tooltip
-from transtoken import TransToken
+from transtoken import TransToken, CURRENT_LANG
 from ui_tk.img import TKImages
 from ui_tk import tk_tools, wid_transtoken, TK_ROOT
 from config.compile_pane import CompilePaneState, PLAYER_MODEL_ORDER
@@ -334,7 +334,11 @@ def make_setter(section: str, config: str, variable: tk.IntVar | tk. StringVar) 
     variable.trace_add('write', callback)
 
 
-async def make_widgets(tk_img: TKImages) -> None:
+async def make_widgets(
+    tk_img: TKImages,
+    *,
+    task_status: trio.TaskStatus[None] = trio.TASK_STATUS_IGNORED,
+) -> None:
     """Create the compiler options pane.
 
     """
@@ -362,12 +366,6 @@ async def make_widgets(tk_img: TKImages) -> None:
     comp_frame = ttk.Frame(nbook, name='comp_settings')
     nbook.add(comp_frame, text='Comp')
 
-    @localisation.add_callback(call=True)
-    def set_tab_names() -> None:
-        """Set the tab names."""
-        nbook.tab(0, text=str(TRANS_TAB_MAP))
-        nbook.tab(1, text=str(TRANS_TAB_COMPILE))
-
     async with trio.open_nursery() as nursery:
         nursery.start_soon(make_map_widgets, map_frame)
         nursery.start_soon(make_comp_widgets, comp_frame, tk_img)
@@ -377,6 +375,12 @@ async def make_widgets(tk_img: TKImages) -> None:
         reload_lbl['wraplength'] = window.winfo_width() - 10
 
     window.bind('<Configure>', update_label, add='+')
+    task_status.started()
+    while True:
+        # Update tab names whenever languages update.
+        nbook.tab(0, text=str(TRANS_TAB_MAP))
+        nbook.tab(1, text=str(TRANS_TAB_COMPILE))
+        await CURRENT_LANG.wait_transition()
 
 
 async def make_comp_widgets(frame: ttk.Frame, tk_img: TKImages) -> None:
@@ -750,6 +754,8 @@ async def make_pane(
     tool_frame: Union[tk.Frame, ttk.Frame],
     tk_img: TKImages,
     menu_bar: tk.Menu,
+    *,
+    task_status: trio.TaskStatus[None] = trio.TASK_STATUS_IGNORED,
 ) -> None:
     """Initialise when part of the BEE2."""
     global window
@@ -766,8 +772,11 @@ async def make_pane(
     )
     window.columnconfigure(0, weight=1)
     window.rowconfigure(0, weight=1)
-    await make_widgets(tk_img)
-    await config.APP.set_and_run_ui_callback(CompilePaneState, apply_state)
+    async with trio.open_nursery() as nursery:
+        await nursery.start(make_widgets, tk_img)
+        await config.APP.set_and_run_ui_callback(CompilePaneState, apply_state)
+        task_status.started()
+        await trio.sleep_forever()
 
 
 async def init_application() -> None:
@@ -782,8 +791,9 @@ async def init_application() -> None:
     window.resizable(True, False)
 
     with _APP_QUIT_SCOPE:
-        await make_widgets(TK_IMG)
+        async with trio.open_nursery() as nursery:
+            await nursery.start(make_widgets, TK_IMG)
 
-        TK_ROOT.deiconify()
-        tk_tools.center_onscreen(TK_ROOT)
-        await trio.sleep_forever()
+            TK_ROOT.deiconify()
+            tk_tools.center_onscreen(TK_ROOT)
+            await trio.sleep_forever()

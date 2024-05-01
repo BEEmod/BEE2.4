@@ -1550,7 +1550,10 @@ async def init_windows(tk_img: TKImages) -> None:
     )
     await LOAD_UI.step('itemvar')
 
-    await utils.run_as_task(CompilerPane.make_pane, frames['toolMenu'], tk_img, menu_bar.view_menu)
+    await utils.run_as_task(
+        background_start, CompilerPane.make_pane,
+        frames['toolMenu'], tk_img, menu_bar.view_menu,
+    )
     await LOAD_UI.step('compiler')
 
     btn_clear = SubPane.make_tool_button(
@@ -1598,10 +1601,11 @@ async def init_windows(tk_img: TKImages) -> None:
     await LOAD_UI.step('voiceline')
     await background_start(contextWin.init_widgets, tk_img, signage_trigger)
     await LOAD_UI.step('contextwin')
-    await optionWindow.init_widgets(
+    await background_start(functools.partial(
+        optionWindow.init_widgets,
         unhide_palettes=pal_ui.reset_hidden_palettes,
         reset_all_win=reset_panes,
-    )
+    ))
     await LOAD_UI.step('optionwindow')
     init_drag_icon()
     await LOAD_UI.step('drag_icon')

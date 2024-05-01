@@ -19,7 +19,7 @@ from app import (
 from config.filters import FilterConf
 from config.gen_opts import GenOptions, AfterExport
 from consts import Theme
-from transtoken import TransToken
+from transtoken import TransToken, CURRENT_LANG
 import loadScreen
 import config
 from ui_tk.wid_transtoken import set_text, set_win_title
@@ -185,6 +185,7 @@ async def init_widgets(
     *,
     unhide_palettes: Callable[[], object],
     reset_all_win: Callable[[], object],
+    task_status: trio.TaskStatus[None] = trio.TASK_STATUS_IGNORED,
 ) -> None:
     """Create all the widgets."""
     conf: GenOptions = config.APP.get_cur_conf(GenOptions)
@@ -236,13 +237,6 @@ async def init_widgets(
         warning_lbl.grid(row=0, column=0)
         warning_btn.grid(row=1, column=0)
 
-    @localisation.add_callback(call=True)
-    def set_tab_names() -> None:
-        """Set the tab names, when translations refresh."""
-        nbook.tab(0, text=str(TRANS_TAB_GEN))
-        nbook.tab(1, text=str(TRANS_TAB_WIN))
-        nbook.tab(2, text=str(TRANS_TAB_DEV))
-
     async with trio.open_nursery() as nursery:
         nursery.start_soon(init_gen_tab, fr_general, unhide_palettes)
         nursery.start_soon(init_win_tab, fr_win, reset_all_win)
@@ -276,6 +270,14 @@ async def init_widgets(
     load()  # Load the existing config.
     # Then apply to other windows.
     await config.APP.set_and_run_ui_callback(GenOptions, apply_config)
+
+    task_status.started()
+    while True:
+        # Update tab names whenever languages update.
+        nbook.tab(0, text=str(TRANS_TAB_GEN))
+        nbook.tab(1, text=str(TRANS_TAB_WIN))
+        nbook.tab(2, text=str(TRANS_TAB_DEV))
+        await CURRENT_LANG.wait_transition()
 
 
 async def init_gen_tab(
