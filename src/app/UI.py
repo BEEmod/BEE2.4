@@ -799,7 +799,7 @@ async def export_editoritems(pal_ui: paletteUI.PaletteUI, bar: MenuBar, dialog: 
         # But leave it at the current palette, if it's unmodified.
         if pal_ui.selected.items != pal_data:
             pal_ui.select_palette(paletteUI.UUID_EXPORT, False)
-            pal_ui.update_state()
+            pal_ui.is_dirty.set()
 
         # Re-fire this, so we clear the '*' on buttons if extracting cache.
         await gameMan.ON_GAME_CHANGED(gameMan.selected_game)
@@ -1518,6 +1518,7 @@ async def init_windows(tk_img: TKImages) -> None:
     TK_ROOT.bind_all(tk_tools.KEY_SAVE, lambda e: pal_ui.event_save(DIALOG))
     TK_ROOT.bind_all(tk_tools.KEY_SAVE_AS, lambda e: pal_ui.event_save_as(DIALOG))
     TK_ROOT.bind_all(tk_tools.KEY_EXPORT, lambda e: background_run(export_editoritems, pal_ui, menu_bar, DIALOG))
+    background_run(pal_ui.update_task)
 
     await LOAD_UI.step('palette')
 
@@ -1707,4 +1708,4 @@ async def init_windows(tk_img: TKImages) -> None:
     style_win.callback = style_select_callback
     style_select_callback(style_win.chosen_id)
     await set_palette(pal_ui.selected)
-    pal_ui.update_state()
+    pal_ui.is_dirty.set()
