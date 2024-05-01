@@ -71,6 +71,8 @@ class PaletteUI:
         self, f: ttk.Frame, menu: tk.Menu,
         *,
         tk_img: TKImages,
+        dialog_menu: Dialogs,
+        dialog_window: Dialogs,
         cmd_clear: Callable[[], None],
         cmd_shuffle: Callable[[], None],
         get_items: Callable[[], ItemPos],
@@ -95,8 +97,6 @@ class PaletteUI:
         self.var_pal_select = tk.StringVar(value=self.selected_uuid.hex)
         self.get_items = get_items
         self.set_items = set_items
-
-        dialog_window = TkDialogs(f.winfo_toplevel())
 
         f.rowconfigure(2, weight=1)
         f.columnconfigure(0, weight=1)
@@ -169,8 +169,6 @@ class PaletteUI:
         self.ui_group_treeids = {}
         # Set this event to trigger a reload.
         self.is_dirty = trio.Event()
-
-        dialog_menu = TkDialogs(menu.winfo_toplevel())
 
         menu.add_command(
             command=lambda: background_run(self.event_save, dialog_menu),

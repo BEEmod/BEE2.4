@@ -51,7 +51,7 @@ from app import (
 from app.selector_win import SelectorWin, Item as selWinItem, AttrDef as SelAttr
 from app.menu_bar import MenuBar
 from ui_tk.corridor_selector import TkSelector
-from ui_tk.dialogs import DIALOG
+from ui_tk.dialogs import DIALOG, TkDialogs
 from ui_tk.img import TKImages, TK_IMG
 from ui_tk import tk_tools, tooltip, wid_transtoken, TK_ROOT
 from ui_tk.signage_ui import SignageUI
@@ -1506,6 +1506,8 @@ async def init_windows(tk_img: TKImages) -> None:
     pal_ui = paletteUI.PaletteUI(
         pal_frame, menu_bar.pal_menu,
         tk_img=tk_img,
+        dialog_menu=TkDialogs(TK_ROOT),
+        dialog_window=TkDialogs(windows['pal']),
         cmd_clear=pal_clear,
         cmd_shuffle=pal_shuffle,
         get_items=lambda: {
