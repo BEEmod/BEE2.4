@@ -837,7 +837,7 @@ async def parse_item_folder(
                 subtype.pal_icon = subtype.pal_pos = None
                 subtype.pal_name = TransToken.BLANK
 
-                # In files this is specified as PNG, but it's always really VTF.
+    # In files this is specified as PNG, but it's always really VTF.
     try:
         all_icon = FSPath(props['all_icon']).with_suffix('.vtf')
     except LookupError:
@@ -847,6 +847,23 @@ async def parse_item_folder(
         all_name = TransToken.parse(pak_id, props['all_name'])
     except LookupError:
         all_name = TransToken.BLANK
+
+    icons: dict[str, img.Handle] = {}
+    for ico_kv in props.find_all('icon'):
+        if ico_kv.has_children():
+            for child in ico_kv:
+                icons[child.name] = img.Handle.parse(
+                    child, pak_id,
+                    64, 64,
+                    subfolder='items',
+                )
+        else:
+            # Put it as the first/only icon.
+            icons["0"] = img.Handle.parse(
+                ico_kv, pak_id,
+                64, 64,
+                subfolder='items',
+            )
 
     # Add the folder the item definition comes from,
     # so we can trace it later for debug messages.
@@ -863,15 +880,7 @@ async def parse_item_folder(
         desc=desc_parse(props, f'{pak_id}:{prop_path}', pak_id),
         ent_count=props['ent_count', ''],
         url=props['infoURL', None],
-        icons={
-            prop.name: img.Handle.parse(
-                prop, pak_id,
-                64, 64,
-                subfolder='items',
-            )
-            for prop in
-            props.find_children('icon')
-        },
+        icons=icons,
         all_name=all_name,
         all_icon=all_icon,
         vbsp_config=lazy_conf.from_file(
