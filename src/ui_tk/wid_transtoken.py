@@ -1,14 +1,17 @@
 """Manage applying translation tokens to TK widgets."""
 from __future__ import annotations
-from typing import TypeVar, Union
+
 from typing_extensions import TypeAliasType
+from typing import TypeVar, Union
 
 from tkinter import ttk
 import tkinter as tk
 from weakref import WeakKeyDictionary
 
-
+from app.localisation import gradual_iter
 from transtoken import TransToken, CURRENT_LANG
+import trio.lowlevel
+import utils
 
 
 __all__ = [
@@ -69,13 +72,22 @@ def clear_stored_menu(menu: tk.Menu) -> None:
 
 async def update_task() -> None:
     """Apply new languages to all stored widgets."""
+    # Using gradual_iter() yields to the event loop in-between each conversion.
     while True:
         await CURRENT_LANG.wait_transition()
-        for text_widget, token in _applied_text_tokens.items():
-            text_widget['text'] = str(token)
-        for menu, menu_map in _applied_menu_tokens.items():
-            for index, token in menu_map.items():
-                menu.entryconfigure(index, label=str(token))
+        async with utils.aclosing(gradual_iter(_applied_text_tokens)) as agen1:
+            async for text_widget, token in agen1:
+                text_widget['text'] = str(token)
+
+        await trio.lowlevel.checkpoint()
+
+        async with utils.aclosing(gradual_iter(_applied_menu_tokens)) as agen2:
+            async for menu, menu_map in agen2:
+                for index, token in menu_map.items():
+                    menu.entryconfigure(index, label=str(token))
+
+        await trio.lowlevel.checkpoint()
+
         for window, token in _window_titles.items():
             window.wm_title(str(token))
 

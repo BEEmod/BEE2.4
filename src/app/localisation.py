@@ -3,16 +3,18 @@
 The widgets tokens are applied to are stored, so changing language can update the UI.
 """
 from __future__ import annotations
-
-import string
-from typing import Any, AsyncGenerator, Callable, Iterable, Iterator, List, TypeVar, TYPE_CHECKING
+from typing import Any, Callable, TypeVar, TYPE_CHECKING
 from typing_extensions import ParamSpec, override
+
+from collections.abc import AsyncGenerator, Iterable, Iterator
 from collections import defaultdict
+import weakref
+import datetime
+import functools
 import io
 import itertools
 import os.path
-import functools
-import datetime
+import string
 
 from pathlib import Path
 import gettext as gettext_mod
@@ -50,7 +52,7 @@ if TYPE_CHECKING:
 
 __all__ = [
     'TransToken',
-    'add_callback',
+    'add_callback', 'gradual_iter',
     'DUMMY', 'Language', 'set_language', 'load_aux_langs',
     'setup', 'expand_langcode',
     'TransTokenSource', 'rebuild_app_langs', 'rebuild_package_langs',
@@ -62,6 +64,8 @@ P = ParamSpec('P')
 # Location of basemodui, relative to Portal 2
 BASEMODUI_PATH = 'portal2_dlc2/resource/basemodui_{}.txt'
 
+K = TypeVar('K')
+V = TypeVar('V')
 CBackT = TypeVar('CBackT', bound=Callable[[], object])
 # For anything else, this is called which will apply tokens.
 _langchange_callback: list[Callable[[], object]] = []
@@ -161,7 +165,7 @@ def _get_locale(lang_code: str) -> babel.Locale:
         return babel.Locale.parse('en_US')  # Should exist?
 
 
-def _format_list(lang_code: str, list_kind: transtoken.ListStyle, items: List[str]) -> str:
+def _format_list(lang_code: str, list_kind: transtoken.ListStyle, items: list[str]) -> str:
     """Formate a list according to the locale."""
     return format_list(items, list_kind.value, _get_locale(lang_code))
 
@@ -170,11 +174,33 @@ transtoken.ui_format_getter = UIFormatter
 transtoken.ui_list_getter = _format_list
 
 
+async def gradual_iter(wdict: weakref.WeakKeyDictionary[K, V]) -> AsyncGenerator[tuple[K, V], None]:
+    """Iterate gradually over the provided weak-key dictionary.
+
+    When doing an update, there's a lot of widgets to process. To avoid locking the
+    main thread for that whole time, just collect the refs first to freeze the iteration,
+    then re-lookup each to confirm it's still present.
+
+    Any added after we start would have been set to the new language.
+    """
+    for ref in wdict.keyrefs():
+        await trio.lowlevel.checkpoint()
+        key = ref()
+        if key is None:
+            continue  # It was destroyed in the meantime.
+        try:
+            value = wdict[key]
+        except KeyError:
+            continue  # Was cleared in the meantime.
+        yield key, value
+
+
 def add_callback(*, call: bool) -> Callable[[CBackT], CBackT]:
     """Register a function which is called after translations are reloaded.
 
     This should be used to re-apply tokens in complicated situations after languages change.
     If call is true, the function will immediately be called to apply it now.
+    TODO: Remove usage of this, use CURRENT_LANG.wait_transition() instead.
     """
     def deco(func: CBackT) -> CBackT:
         """Register when called as a decorator."""
