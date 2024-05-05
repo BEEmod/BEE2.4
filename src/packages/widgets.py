@@ -359,19 +359,15 @@ class ItemVariantConf:
 @attrs.define
 class DropdownOptions:
     """Options defined for a widget."""
-    options: List[str]
-    display: List[TransToken]
-    key_to_index: Dict[str, int]
+    options: list[tuple[str, TransToken]]
 
     @classmethod
     def parse(cls, data: packages.ParseData, conf: Keyvalues) -> Self:
         """Parse configuration."""
-        result = cls([], [], {})
-        for ind, prop in enumerate(conf.find_children('Options')):
-            result.options.append(prop.real_name)
-            result.display.append(TransToken.parse(data.pak_id, prop.value))
-            result.key_to_index[prop.name] = ind
-        return result
+        return cls([
+            (kv.real_name, TransToken.parse(data.pak_id, kv.value))
+            for kv in conf.find_children('Options')
+        ])
 
 
 @register('range', 'slider', wide=True)

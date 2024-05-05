@@ -1,5 +1,4 @@
 """A widget for picking from a specific list of options."""
-from tkinter import ttk
 import tkinter as tk
 
 from trio_util import AsyncValue
@@ -8,9 +7,8 @@ import trio
 
 from packages.widgets import DropdownOptions
 from app import itemconfig
-from transtoken import CURRENT_LANG
+from ui_tk import tk_tools
 from ui_tk.img import TKImages
-import utils
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -25,40 +23,13 @@ async def dropdown(
 ) -> None:
     """Dropdowns allow selecting from a few options."""
 
-    combobox = ttk.Combobox(
+    combobox = tk_tools.ComboBoxMap(
         parent,
-        exportselection=False,
-        state='readonly',
-        values=[str(token) for token in conf.display],
+        name='',  # Auto-generate.
+        current=holder,
+        values=conf.options,
     )
 
-    async def update_ui() -> None:
-        """Update when new values are picked."""
-        async with utils.aclosing(holder.eventual_values()) as agen:
-            async for value in agen:
-                try:
-                    index = conf.key_to_index[value.casefold()]
-                except KeyError:
-                    LOGGER.warning('Invalid combobox value: "{}"!', value)
-                    return
-                combobox.current(index)
-
-    async def update_combo_values() -> None:
-        """Update the combo box when translations change."""
-        while True:
-            await CURRENT_LANG.wait_transition()
-            index = combobox.current()
-            combobox['values'] = [str(token) for token in conf.display]
-            if index >= 0:  # -1 if empty.
-                combobox.current(index)  # Update display.
-
-    def changed(_: tk.Event) -> None:
-        """Called when the combobox changes."""
-        holder.value = conf.options[combobox.current()]
-
     async with trio.open_nursery() as nursery:
-        nursery.start_soon(update_ui)
-        nursery.start_soon(update_combo_values)
-
-        combobox.bind('<<ComboboxSelected>>', changed)
-        task_status.started(combobox)
+        nursery.start_soon(combobox.task)
+        task_status.started(combobox.widget)

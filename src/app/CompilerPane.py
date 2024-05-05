@@ -17,9 +17,10 @@ import trio
 
 from srctools import AtomicWriter, bool_as_int
 from srctools.logger import get_logger
+from trio_util import AsyncValue
 
 import app
-from app import SubPane, localisation
+from app import SubPane
 from ui_tk.tooltip import add_tooltip, set_tooltip
 from transtoken import TransToken, CURRENT_LANG
 from ui_tk.img import TKImages
@@ -64,10 +65,10 @@ COMPILE_DEFAULTS: dict[str, dict[str, str]] = {
 }
 
 PLAYER_MODELS = {
+    'PETI': TransToken.ui('Bendy'),
+    'SP': TransToken.ui('Chell'),
     'ATLAS': TransToken.ui('ATLAS'),
     'PBODY': TransToken.ui('P-Body'),
-    'SP': TransToken.ui('Chell'),
-    'PETI': TransToken.ui('Bendy'),
 }
 assert PLAYER_MODELS.keys() == set(PLAYER_MODEL_ORDER)
 
@@ -103,7 +104,7 @@ SCREENSHOT_LOC = str(utils.conf_location('screenshot.jpg'))
 
 VOICE_PRIORITY_VAR = tk.IntVar(value=COMPILE_CFG.get_bool('General', 'voiceline_priority', False))
 
-player_model_combo: ttk.Combobox
+player_model = AsyncValue(COMPILE_CFG.get_val('General', 'player_model', 'PETI'))
 start_in_elev = tk.IntVar(value=COMPILE_CFG.get_bool('General', 'spawn_elev'))
 cust_file_loc = COMPILE_CFG.get_val('Screenshot', 'Loc', '')
 cust_file_loc_var = tk.StringVar(value='')
@@ -147,12 +148,7 @@ async def apply_state(state: CompilePaneState) -> None:
     set_screenshot()
 
     start_in_elev.set(state.spawn_elev)
-    try:
-        player_model_combo.current(PLAYER_MODEL_ORDER.index(state.player_mdl))
-    except IndexError:
-        LOGGER.warning('Unknown player model "{}"!', state.player_mdl)
-    VOICE_PRIORITY_VAR.set(state.use_voice_priority)
-
+    player_model.value = state.player_mdl
     COMPILE_CFG['General']['spawn_elev'] = bool_as_int(state.spawn_elev)
     COMPILE_CFG['General']['player_model'] = state.player_mdl
     COMPILE_CFG['General']['voiceline_priority'] = bool_as_int(state.use_voice_priority)
@@ -723,43 +719,30 @@ async def make_map_widgets(
     wid_transtoken.set_text(model_frame, TransToken.ui('Player Model (SP):'))
     model_frame.grid(row=4, column=0, sticky='ew')
 
-    player_model_combo = player_mdl = ttk.Combobox(
+    if player_model.value not in PLAYER_MODEL_ORDER:
+        LOGGER.warning('Invalid player model "{}"!', player_model.value)
+        player_model.value = 'PETI'
+
+    player_mdl_combo = tk_tools.ComboBoxMap(
         model_frame,
-        exportselection=False,
-        width=20,
-        values=list(PLAYER_MODEL_ORDER),  # Temp, will be overridden at the end.
+        name='model_combo',
+        current=player_model,
+        values=PLAYER_MODELS.items(),
     )
-    # Users can only use the dropdown, not type in values.
-    player_mdl.state(['readonly'])
-    player_mdl.grid(row=0, column=0, sticky=tk.EW)
-
-    try:
-        start_ind = PLAYER_MODEL_ORDER.index(COMPILE_CFG.get_val('General', 'player_model', 'PETI'))
-    except IndexError:
-        LOGGER.warning('Invalid player model "{}"!', COMPILE_CFG['General']['player_model'])
-        start_ind = PLAYER_MODEL_ORDER.index('PETI')
-    player_mdl.current(start_ind)
-
-    def set_model(_: tk.Event[ttk.Combobox]) -> None:
-        """Save the selected player model."""
-        model = PLAYER_MODEL_ORDER[player_mdl.current()]
-        config.APP.store_conf(attrs.evolve(
-            config.APP.get_cur_conf(CompilePaneState, default=DEFAULT_STATE),
-            player_mdl=model,
-        ))
-        COMPILE_CFG['General']['player_model'] = model
-        COMPILE_CFG.save()
-
-    player_mdl.bind('<<ComboboxSelected>>', set_model)
+    player_mdl_combo.widget['width'] = 20
+    player_mdl_combo.grid(row=0, column=0, sticky=tk.EW)
 
     model_frame.columnconfigure(0, weight=1)
     task_status.started()
-    while True:
-        # Update the combo box when translations change.
-        ind = player_mdl.current()
-        player_mdl['values'] = [str(PLAYER_MODELS[mdl]) for mdl in PLAYER_MODEL_ORDER]
-        player_mdl.current(ind)
-        await CURRENT_LANG.wait_transition()
+    async with trio.open_nursery() as nursery, utils.aclosing(player_model.eventual_values()) as agen:
+        nursery.start_soon(player_mdl_combo.task)
+        async for model in agen:
+            config.APP.store_conf(attrs.evolve(
+                config.APP.get_cur_conf(CompilePaneState, default=DEFAULT_STATE),
+                player_mdl=model,
+            ))
+            COMPILE_CFG['General']['player_model'] = model
+            COMPILE_CFG.save()
 
 
 async def make_pane(

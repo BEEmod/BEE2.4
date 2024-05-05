@@ -3,12 +3,15 @@ General code used for tkinter portions.
 
 """
 from typing import (
-    Awaitable, Dict, Generic, Iterable, overload, cast, Any, TypeVar, Protocol, Union, Callable,
-    Optional, Tuple, Literal, NoReturn
+    Generic, overload, cast, Any, TypeVar, Protocol, Union, Callable,
+    Optional, Tuple, Literal, NoReturn, TypedDict
 )
+
+import trio_util
 from typing_extensions import TypeAliasType, TypeVarTuple, Unpack
 
 from enum import Enum
+from collections.abc import Mapping, Awaitable, Iterable
 from tkinter import filedialog, commondialog
 from tkinter import font as _tk_font
 from tkinter import ttk
@@ -25,7 +28,7 @@ import trio
 
 from app import ICO_PATH, background_run
 from config.gen_opts import GenOptions
-from transtoken import TransToken
+from transtoken import CURRENT_LANG, TransToken
 import config
 import utils
 
@@ -37,6 +40,7 @@ LOGGER = logger.get_logger(__name__)
 T = TypeVar('T')
 EnumT = TypeVar('EnumT', bound=Enum)
 PosArgsT = TypeVarTuple('PosArgsT')
+StrKeyT = TypeVar('StrKeyT', bound=str)
 AnyWidT = TypeVar('AnyWidT', bound=tk.Misc)
 WidgetT = TypeVar('WidgetT', bound=tk.Widget)
 EventFunc = TypeAliasType("EventFunc", Callable[[tk.Event[AnyWidT]], object], type_params=(AnyWidT, ))
@@ -315,6 +319,19 @@ def make_handler(func: Union[
             background_run(func, e)  # type: ignore
     functools.update_wrapper(wrapper, func)
     return wrapper
+
+
+class GridArgs(TypedDict, total=False):
+    """Arguments that can be passed to widget.grid(). This can be used for **kwargs."""
+    row: int
+    column: int
+    rowspan: int
+    columnspan: int
+    sticky: str
+    ipadx: float
+    ipady: float
+    padx: float | tuple[float, float]
+    pady: float | tuple[float, float]
 
 
 class _EventDeco(Protocol[AnyWidT]):
@@ -745,7 +762,7 @@ class EnumButton(Generic[EnumT]):
     This is bound to the provided AsyncValue, updating it when changed.
     """
     frame: ttk.Frame
-    buttons: Dict[EnumT, ttk.Button]
+    buttons: dict[EnumT, ttk.Button]
     current: AsyncValue[EnumT]
     def __init__(
         self,
@@ -796,3 +813,86 @@ class LineHeader(ttk.Frame):
         sep_right = ttk.Separator(self)
         sep_right.grid(row=0, column=2, sticky='EW')
         self.columnconfigure(2, weight=1)
+
+
+class ComboBoxMap(Generic[StrKeyT]):
+    """A Combobox which displays TransTokens, mapping them to internal IDs."""
+    _ordered_tokens: list[TransToken]
+    _index_to_key: list[StrKeyT]
+    _key_to_index: dict[StrKeyT, int]
+    current: AsyncValue[StrKeyT]
+
+    def __init__(
+        self,
+        parent: tk.Misc,
+        name: str,
+        current: AsyncValue[StrKeyT],
+        values: Iterable[tuple[StrKeyT, TransToken]],
+    ) -> None:
+        self._index_to_key = []
+        self._key_to_index = {}
+        self._ordered_tokens = []
+        self._build_values(values)
+        self.current = current
+        self.widget = ttk.Combobox(
+            parent,
+            name=name,
+            exportselection=False,
+            values=[str(tok) for tok in self._ordered_tokens],
+        )
+        self.widget.state(['readonly'])  # Prevent typing values in directly.
+        self.widget.bind('<<ComboboxSelected>>', self._evt_selected)
+        self.widget.current(self._key_to_index[current.value])
+
+    async def task(self) -> None:
+        """Task which updates the combobox when run."""
+        cur_lang = CURRENT_LANG.value
+        while True:
+            await trio_util.wait_any(
+                CURRENT_LANG.wait_transition,
+                self.current.wait_transition,
+            )
+            lang = CURRENT_LANG.value
+            if lang is not cur_lang:
+                self.widget['values'] = [str(tok) for tok in self._ordered_tokens]
+                cur_lang = lang
+            self.widget.current(self._key_to_index[self.current.value])
+
+    def _build_values(self, values: Iterable[tuple[StrKeyT, TransToken]]) -> None:
+        """Rebuild our dicts from a new set of values."""
+        self._index_to_key.clear()
+        self._key_to_index.clear()
+        self._ordered_tokens.clear()
+        for i, (key, token) in enumerate(values):
+            self._index_to_key.append(key)
+            self._key_to_index[key] = i
+            self._ordered_tokens.append(token)
+        if not self._ordered_tokens:
+            raise ValueError('Values are empty!')
+
+    def _evt_selected(self, event: tk.Event) -> None:
+        """A new value was selected."""
+        index = self.widget.current()
+        if index == -1:
+            return  # No item selected?
+        self.current.value = self._index_to_key[index]
+
+    def update(self, values: Iterable[tuple[StrKeyT, TransToken]]) -> None:
+        """Change the set of values displayed in the box.
+
+        If the old value is not present, the first is selected.
+        """
+        self._build_values(values)
+        self.widget['values'] = [str(tok) for tok in self._ordered_tokens]
+        try:
+            self.widget.current(self._key_to_index[self.current.value])
+        except IndexError:
+            self.widget.current(0)
+
+    def grid(self, **kwargs: Unpack[GridArgs]) -> None:
+        """Grid-manage the combobox widget."""
+        self.widget.grid(**kwargs)
+
+    def grid_remove(self) -> None:
+        """Remove the combobox from view, remembering previous options."""
+        self.widget.grid_remove()

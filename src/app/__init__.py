@@ -1,11 +1,11 @@
 """The package containg all UI code."""
 from __future__ import annotations
-from typing import Any, Awaitable, Callable, TypeVar, Generic, overload
+from typing import Any, Awaitable, Callable, Protocol, TypeVar, Generic, overload
 
 from typing_extensions import TypeVarTuple, Unpack
 from types import TracebackType
 
-from trio_util import AsyncBool
+from trio_util import AsyncBool, AsyncValue
 from srctools.logger import get_logger
 import trio
 
@@ -193,3 +193,9 @@ class EdgeTrigger(Generic[Unpack[PosArgsT]]):
             self._event.set()
         else:
             LOGGER.debug('EdgeTrigger.maybe_trigger() ignored!')
+
+
+class HasCurrentValue(Protocol[T]):
+    """Protocol for a class with an AsyncValue."""
+    @property
+    def current(self) -> AsyncValue[T]: ...
