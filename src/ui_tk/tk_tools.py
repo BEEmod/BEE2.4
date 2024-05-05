@@ -3,15 +3,14 @@ General code used for tkinter portions.
 
 """
 from typing import (
-    Generic, overload, cast, Any, TypeVar, Protocol, Union, Callable,
-    Optional, Tuple, Literal, NoReturn, TypedDict
+    Generic, overload, cast, Any, TypeVar, Protocol, Callable, Literal, NoReturn, TypedDict
 )
 
 import trio_util
 from typing_extensions import TypeAliasType, TypeVarTuple, Unpack
 
 from enum import Enum
-from collections.abc import Mapping, Awaitable, Iterable
+from collections.abc import Awaitable, Iterable
 from tkinter import filedialog, commondialog
 from tkinter import font as _tk_font
 from tkinter import ttk
@@ -51,11 +50,11 @@ if utils.WIN:
     # Ensure everything has our icon (including dialogs)
     TK_ROOT.wm_iconbitmap(default=str(ICO_PATH))
 
-    def set_window_icon(window: Union[tk.Toplevel, tk.Tk]) -> None:
+    def set_window_icon(window: tk.Toplevel | tk.Tk) -> None:
         """Set the window icon."""
         window.wm_iconbitmap(str(ICO_PATH))
 elif utils.MAC:
-    def set_window_icon(window: Union[tk.Toplevel, tk.Tk]) -> None:
+    def set_window_icon(window: tk.Toplevel | tk.Tk) -> None:
         """ Call OS-X's specific api for setting the window icon."""
         TK_ROOT.tk.call(
             'tk::mac::iconBitmap',
@@ -72,7 +71,7 @@ else:  # Linux
     from ui_tk.img import get_app_icon
     app_icon = get_app_icon(ICO_PATH)
 
-    def set_window_icon(window: Union[tk.Toplevel, tk.Tk]) -> None:
+    def set_window_icon(window: tk.Toplevel | tk.Tk) -> None:
         """Set the window icon."""
         # Weird argument order for default=True...
         window.wm_iconphoto(True, str(ICO_PATH))
@@ -216,7 +215,7 @@ elif utils.LINUX:
 else:
     raise AssertionError
 
-_cur_update: Optional[trio.Event] = None
+_cur_update: trio.Event | None = None
 
 
 @TK_ROOT.register
@@ -241,7 +240,7 @@ async def wait_eventloop() -> None:
 
 
 def bind_mousewheel(
-    widgets: Union[Iterable[tk.Misc], tk.Misc],
+    widgets: Iterable[tk.Misc] | tk.Misc,
     func: Callable[[int, Unpack[PosArgsT]], object],
     *args: Unpack[PosArgsT],
 ) -> None:
@@ -288,7 +287,7 @@ def bind_mousewheel(
 def add_mousewheel(target: tk.XView, *frames: tk.Misc, orient: Literal['x']) -> None: ...
 @overload
 def add_mousewheel(target: tk.YView, *frames: tk.Misc, orient: Literal['y'] = 'y') -> None: ...
-def add_mousewheel(target: Union[tk.XView, tk.YView], *frames: tk.Misc, orient: Literal['x', 'y'] = 'y') -> None:
+def add_mousewheel(target: tk.XView | tk.YView, *frames: tk.Misc, orient: Literal['x', 'y'] = 'y') -> None:
     """Add events so scrolling anywhere in a frame will scroll a target.
 
     frames should be the TK objects to bind to - mainly Frame or
@@ -300,10 +299,9 @@ def add_mousewheel(target: Union[tk.XView, tk.YView], *frames: tk.Misc, orient: 
     bind_mousewheel(frames, scroll_func, 'units', )
 
 
-def make_handler(func: Union[
-    Callable[[], Awaitable[object]],
-    Callable[[tk.Event[tk.Misc]], Awaitable[object]],
-]) -> Callable[[tk.Event[tk.Misc]], object]:
+def make_handler(
+    func: Callable[[], Awaitable[object]] | Callable[[tk.Event[tk.Misc]], Awaitable[object]],
+) -> Callable[[tk.Event[tk.Misc]], object]:
     """Given an asyncronous event handler, return a sync function which uses background_run().
 
     This checks the signature of the function to decide whether to pass along the event object.
@@ -357,7 +355,11 @@ def _bind_event_handler(bind_func: Callable[[WidgetT, EventFunc[WidgetT], bool],
     attributes.
     """
     @functools.wraps(bind_func)
-    def deco(wid: WidgetT, func: Optional[EventFunc[WidgetT]] = None, *, add: bool = False) -> Optional[Callable[..., object]]:
+    def deco(
+        wid: WidgetT,
+        func: EventFunc[WidgetT] | None = None,
+        *, add: bool = False,
+    ) -> Callable[..., object] | None:
         """Decorator or normal interface, func is optional to be a decorator."""
         if func is None:
             def deco_2(func2: EventFuncT) -> EventFuncT:
@@ -480,10 +482,10 @@ async def apply_bool_enabled_state_task(value: AsyncValue[bool], *widgets: ttk.W
 def adjust_inside_screen(
     x: int,
     y: int,
-    win: Union[tk.Tk, tk.Toplevel],
+    win: tk.Tk | tk.Toplevel,
     horiz_bound: int = 14,
     vert_bound: int = 45,
-) -> Tuple[int, int]:
+) -> tuple[int, int]:
     """Adjust a window position to ensure it fits inside the screen.
 
     The new value is returned.
@@ -506,7 +508,7 @@ def adjust_inside_screen(
     return x, y
 
 
-def center_win(window: Union[tk.Tk, tk.Toplevel], parent: Union[tk.Tk, tk.Toplevel, None] = None) -> None:
+def center_win(window: tk.Tk | tk.Toplevel, parent: tk.Tk | tk.Toplevel | None = None) -> None:
     """Center a subwindow to be inside a parent window."""
     if parent is None:
         parent = window.nametowidget(window.winfo_parent())
@@ -519,7 +521,7 @@ def center_win(window: Union[tk.Tk, tk.Toplevel], parent: Union[tk.Tk, tk.Toplev
     window.geometry(f'+{x}+{y}')
 
 
-def center_onscreen(window: Union[tk.Tk, tk.Toplevel]) -> None:
+def center_onscreen(window: tk.Tk | tk.Toplevel) -> None:
     """Center a window onscreen."""
     x = (window.winfo_screenwidth() - window.winfo_width()) // 2
     y = (window.winfo_screenheight() - window.winfo_height()) // 2
@@ -531,7 +533,7 @@ class HidingScroll(ttk.Scrollbar):
     """A scrollbar variant which auto-hides when not needed.
 
     """
-    def set(self, low: Union[float, str], high: Union[float, str]) -> None:
+    def set(self, low: float | str, high: float | str) -> None:
         """Set the size needed for the scrollbar, and hide/show if needed."""
         if float(low) <= 0.0 and float(high) >= 1.0:
             # Remove this, but remember gridding options
@@ -561,7 +563,7 @@ class ReadOnlyEntry(ttk.Entry):
 # Widget and Spinbox have conflicting identify() definitions, not important.
 class ttk_Spinbox(ttk.Widget, tk.Spinbox):  # type: ignore[misc]
     """This is missing from ttk, but still exists."""
-    def __init__(self, master: tk.Misc, range: Union[range, slice, None] = None, **kw: Any) -> None:
+    def __init__(self, master: tk.Misc, range: range | slice | None = None, **kw: Any) -> None:
         """Initialise a spinbox.
         Arguments:
             range: The range buttons will run in
@@ -610,7 +612,7 @@ if utils.WIN:
     filedialog.Directory.command = '::tk::dialog::file::chooseDir::'
 
 
-async def _folderbrowse_powershell() -> Optional[str]:
+async def _folderbrowse_powershell() -> str | None:
     """For Windows, the TK bindings don't work properly. Use Powershell to call this one API."""
     result = await trio.run_process(
         [
@@ -768,7 +770,7 @@ class EnumButton(Generic[EnumT]):
         self,
         master: tk.Misc,
         current: AsyncValue[EnumT],
-        *values: Tuple[EnumT, TransToken],
+        *values: tuple[EnumT, TransToken],
     ) -> None:
         self.frame = ttk.Frame(master)
         self.current = current

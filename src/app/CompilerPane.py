@@ -641,7 +641,6 @@ async def make_map_widgets(
 
     These are things which mainly affect the geometry or gameplay of the map.
     """
-    global player_model_combo
     frame.columnconfigure(0, weight=1)
 
     voice_frame = ttk.LabelFrame(frame, labelanchor='nw')

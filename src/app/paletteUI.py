@@ -1,6 +1,6 @@
 """Handles the UI required for saving and loading palettes."""
 from __future__ import annotations
-from typing import Awaitable, Callable
+from collections.abc import Awaitable, Callable
 from uuid import UUID
 
 from tkinter import ttk
@@ -16,7 +16,6 @@ from app import background_run, paletteLoader, img
 from consts import PALETTE_FORCE_SHOWN, UUID_BLANK, UUID_EXPORT, UUID_PORTAL2
 from config.palette import PaletteState
 from ui_tk import tk_tools
-from ui_tk.dialogs import TkDialogs
 from ui_tk.img import tkImg, TKImages
 from ui_tk.wid_transtoken import set_menu_text, set_text
 from transtoken import CURRENT_LANG, TransToken

@@ -15,7 +15,7 @@ from app.corridor_selector import (
 )
 from app.richTextBox import tkRichText
 from config.corridors import UIState
-from corridor import CorrKind, Direction, GameMode, Option, Orient
+from corridor import Direction, GameMode, Option, Orient
 from transtoken import TransToken
 from .dragdrop import CanvasPositioner
 from .img import TKImages

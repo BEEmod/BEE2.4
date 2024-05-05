@@ -10,7 +10,7 @@ if sys.stdout is None:
 if sys.stderr is None:
     sys.stderr = open(os.devnull, 'w')
 if sys.stdin is None:
-    sys.stdin = open(os.devnull, 'r')
+    sys.stdin = open(os.devnull)
 
 freeze_support()
 if __name__ == '__main__':
@@ -96,6 +96,6 @@ if __name__ == '__main__':
     elif app_name.startswith('test_'):
         import importlib
         mod = importlib.import_module('app.demo.' + sys.argv[1][5:])
-        start_main(getattr(mod, 'test'))
+        start_main(mod.test)
     else:
         raise ValueError(f'Invalid component name "{app_name}"!')
