@@ -948,7 +948,7 @@ def init_backup_settings() -> None:
 
     count = tk_tools.ttk_Spinbox(
         count_frame,
-        range=range(50),
+        domain=range(50),
         command=count_callback,
     )
     count.grid(row=1, column=0)

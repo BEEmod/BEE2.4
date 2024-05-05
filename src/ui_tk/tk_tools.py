@@ -563,21 +563,21 @@ class ReadOnlyEntry(ttk.Entry):
 # Widget and Spinbox have conflicting identify() definitions, not important.
 class ttk_Spinbox(ttk.Widget, tk.Spinbox):  # type: ignore[misc]
     """This is missing from ttk, but still exists."""
-    def __init__(self, master: tk.Misc, range: range | slice | None = None, **kw: Any) -> None:
+    def __init__(self, master: tk.Misc, domain: range | slice | None = None, **kw: Any) -> None:
         """Initialise a spinbox.
         Arguments:
-            range: The range buttons will run in
+            domain: The range buttons will run in
             values: A list of values to use
             wrap: Whether to loop at max/min
             format: A specifier of the form ' %<pad>.<pad>f'
             command: A command to run whenever the value changes
         """
-        if range is not None:
-            kw['from'] = range.start
-            kw['to'] = range.stop
-            kw['increment'] = range.step
+        if domain is not None:
+            kw['from'] = domain.start
+            kw['to'] = domain.stop
+            kw['increment'] = domain.step
             if 'width' not in kw:
-                kw['width'] = len(str(range.stop)) + 1
+                kw['width'] = len(str(domain.stop)) + 1
 
         self.old_val = kw.get('from', '0')
         kw['validate'] = 'all'
