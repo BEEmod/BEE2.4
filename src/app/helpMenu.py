@@ -21,7 +21,7 @@ import trio.to_thread
 
 from app.richTextBox import tkRichText
 from app import tkMarkdown, sound, img, background_run
-from ui_tk.dialogs import DIALOG
+from ui_tk.dialogs import DIALOG, Dialogs
 from ui_tk.img import TKImages
 from ui_tk.wid_transtoken import set_text, set_win_title, set_menu_text
 from ui_tk import TK_ROOT, tk_tools
@@ -445,11 +445,11 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ).replace('\n', '  \n')  # Add two spaces to keep line breaks
 
 
-class Dialog(tk.Toplevel):
-    """Show a dialog with a message."""
+class CreditsWindow(tk.Toplevel):
+    """The window showing credits information."""
     text: Optional[str]
 
-    def __init__(self, name: str, title: TransToken, text: str) -> None:
+    def __init__(self, *, name: str, title: TransToken, text: str) -> None:
         super().__init__(TK_ROOT, name=name)
         self.withdraw()
         set_win_title(self, title)
@@ -516,7 +516,7 @@ def load_database() -> Element:
     return elem
 
 
-async def open_url(url_key: str) -> None:
+async def open_url(dialogs: Dialogs, url_key: str) -> None:
     """Load the URL file if required, then open that URL."""
     global url_data
     if url_data is NULL:
@@ -524,18 +524,18 @@ async def open_url(url_key: str) -> None:
             url_data = await trio.to_thread.run_sync(load_database)
         except urllib.error.URLError as exc:
             LOGGER.error('Failed to download help url file:', exc_info=exc)
-            await DIALOG.show_info(
+            await dialogs.show_info(
                 TransToken.ui('BEEMOD2 - Failed to open URL'),
                 TransToken.ui('Failed to download list of URLs. Help menu links will not function. Check your Internet?'),
-                icon=DIALOG.ERROR,
+                icon=dialogs.ERROR,
             )
             return
         except (OSError, ValueError) as exc:
             LOGGER.error('Failed to parse help url file:', exc_info=exc)
-            await DIALOG.show_info(
+            await dialogs.show_info(
                 TransToken.ui('BEEMOD2 - Failed to open URL'),
                 TransToken.ui('Failed to parse help menu URLs file. Help menu links will not function.'),
-                icon=DIALOG.ERROR,
+                icon=dialogs.ERROR,
             )
             return
         LOGGER.debug('Help URLs:\n{}', '\n'.join([
@@ -548,7 +548,7 @@ async def open_url(url_key: str) -> None:
     except KeyError:
         LOGGER.warning('Invalid URL key "{}"!', url_key)
     else:
-        if await DIALOG.ask_yes_no(
+        if await dialogs.ask_yes_no(
             TransToken.ui('BEEMOD 2 - Open URL'),
             TransToken.ui('Do you wish to open the following URL?'),
             detail=f'"{url}"',
@@ -564,14 +564,18 @@ def make_help_menu(parent: tk.Menu, tk_img: TKImages) -> None:
     parent.add_cascade(menu=help_menu)
     set_menu_text(parent, TransToken.ui('Help'))
 
-    credit_window = Dialog(name='credits', title=TransToken.ui('BEE2 Credits'), text=CREDITS_TEXT)
+    credit_window = CreditsWindow(
+        name='credits',
+        title=TransToken.ui('BEE2 Credits'),
+        text=CREDITS_TEXT,
+    )
 
     for res in WEB_RESOURCES:
         if res is SEPERATOR:
             help_menu.add_separator()
         else:
             help_menu.add_command(
-                command=functools.partial(background_run, open_url, res.url_key),
+                command=functools.partial(background_run, open_url, DIALOG, res.url_key),
                 compound='left',
             )
             tk_img.menu_set_icon(help_menu, utils.not_none(help_menu.index('end')), ICONS[res.icon])
