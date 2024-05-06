@@ -4,11 +4,12 @@ All the URLs we have available here are not directly listed. Instead, we downloa
 GitHub repo, which ensures we're able to change them retroactively if the old URL becomes dead for
 whatever reason.
 """
+from __future__ import annotations
 import io
 import urllib.request
 import urllib.error
 from enum import Enum
-from typing import Any, Callable, Dict, Optional, cast
+from typing import Any, Callable, cast
 from tkinter import ttk
 import tkinter as tk
 import webbrowser
@@ -20,7 +21,7 @@ import srctools.logger
 import trio.to_thread
 
 from app.richTextBox import tkRichText
-from app import tkMarkdown, sound, img, background_run
+from app import EdgeTrigger, tkMarkdown, sound, img, background_run
 from ui_tk.dialogs import DIALOG, Dialogs
 from ui_tk.img import TKImages
 from ui_tk.wid_transtoken import set_text, set_win_title, set_menu_text
@@ -55,7 +56,7 @@ class WebResource:
     icon: ResIcon
 
 
-ICONS: Dict[ResIcon, img.Handle] = {
+ICONS: dict[ResIcon, img.Handle] = {
     icon: img.Handle.sprite(f'icons/{icon.value}', 16, 16)
     for icon in ResIcon
     if icon is not ResIcon.NONE
@@ -447,9 +448,9 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 class CreditsWindow(tk.Toplevel):
     """The window showing credits information."""
-    text: Optional[str]
+    open: EdgeTrigger[()]
 
-    def __init__(self, *, name: str, title: TransToken, text: str) -> None:
+    def __init__(self, *, name: str, title: TransToken) -> None:
         super().__init__(TK_ROOT, name=name)
         self.withdraw()
         set_win_title(self, title)
@@ -457,51 +458,65 @@ class CreditsWindow(tk.Toplevel):
         self.resizable(width=True, height=True)
         if utils.LINUX:
             self.wm_attributes('-type', 'dialog')
-        self.text = text
         tk_tools.set_window_icon(self)
+
+        # Controls opening/closing the window.
+        self.open = EdgeTrigger()
+        self._close_event = trio.Event()
 
         # Hide when the exit button is pressed, or Escape
         # on the keyboard.
-        self.wm_protocol("WM_DELETE_WINDOW", self.withdraw)
-        self.bind("<Escape>", f"wm withdraw {self}")
+        close_cmd = self.register(self._close)
+        self.wm_protocol("WM_DELETE_WINDOW", close_cmd)
+        self.bind("<Escape>", close_cmd)
 
         frame = tk.Frame(self, background='white')
         frame.grid(row=0, column=0, sticky='nsew')
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(0, weight=1)
 
-        self.textbox = tkRichText(frame, name='message', width=80, height=24)
-        self.textbox.configure(background='white', relief='flat')
-        self.textbox.grid(row=0, column=0, sticky='nsew')
+        self._textbox = tkRichText(frame, name='message', width=80, height=24)
+        self._textbox.configure(background='white', relief='flat')
+        self._textbox.grid(row=0, column=0, sticky='nsew')
         frame.grid_columnconfigure(0, weight=1)
         frame.grid_rowconfigure(0, weight=1)
 
         scrollbox = tk_tools.HidingScroll(
             frame,
             orient='vertical',
-            command=self.textbox.yview,
+            command=self._textbox.yview,
         )
         scrollbox.grid(row=0, column=1, sticky='ns')
-        self.textbox['yscrollcommand'] = scrollbox.set
+        self._textbox['yscrollcommand'] = scrollbox.set
 
         set_text(
-            ttk.Button(frame, command=self.withdraw),
+            ttk.Button(frame, command=close_cmd),
             TransToken.ui('Close'),
         ).grid(row=1, column=0)
 
-    async def show(self) -> None:
+    def _close(self) -> None:
+        """Called to close the window."""
+        self._close_event.set()
+
+    async def display_task(self) -> None:
         """Display the help dialog."""
+        await self.open.wait()
         # The first time we're shown, decode the text.
         # That way we don't need to do it on startup.
         # Don't translate this, it's all legal text - not really our business to change.
-        if self.text is not None:
-            parsed_text = tkMarkdown.convert(TransToken.untranslated(self.text), package=None)
-            self.textbox.set_text(parsed_text)
-            self.text = None
+        parsed_text = tkMarkdown.convert(TransToken.untranslated(CREDITS_TEXT), package=None)
+        self._textbox.set_text(parsed_text)
 
-        self.deiconify()
-        await tk_tools.wait_eventloop()
-        tk_tools.center_win(self, TK_ROOT)
+        # Then alternate between showing/hiding. We don't need to reparse ever again.
+        while True:
+            self.deiconify()
+            await tk_tools.wait_eventloop()
+            tk_tools.center_win(self, TK_ROOT)
+            await self._close_event.wait()
+
+            self._close_event = trio.Event()
+            self.withdraw()
+            await self.open.wait()
 
 
 def load_database() -> Element:
@@ -556,19 +571,18 @@ async def open_url(dialogs: Dialogs, url_key: str) -> None:
             webbrowser.open(url)
 
 
-def make_help_menu(parent: tk.Menu, tk_img: TKImages) -> None:
-    """Create the application 'Help' menu."""
+async def make_help_menu(
+    parent: tk.Menu, tk_img: TKImages,
+    *, task_status: trio.TaskStatus[None] = trio.TASK_STATUS_IGNORED,
+) -> None:
+    """Create and operate the application 'Help' menu."""
     # Using this name displays this correctly in OS X
     help_menu = tk.Menu(parent, name='help')
 
     parent.add_cascade(menu=help_menu)
     set_menu_text(parent, TransToken.ui('Help'))
 
-    credit_window = CreditsWindow(
-        name='credits',
-        title=TransToken.ui('BEE2 Credits'),
-        text=CREDITS_TEXT,
-    )
+    credit_window = CreditsWindow(name='credits', title=TransToken.ui('BEE2 Credits'))
 
     for res in WEB_RESOURCES:
         if res is SEPERATOR:
@@ -582,5 +596,14 @@ def make_help_menu(parent: tk.Menu, tk_img: TKImages) -> None:
             set_menu_text(help_menu, res.name)
 
     help_menu.add_separator()
-    help_menu.add_command(command=functools.partial(background_run, credit_window.show))
+    help_menu.add_command(command=credit_window.open.trigger)
+    credit_ind = help_menu.index('end')
+    assert credit_ind is not None
     set_menu_text(help_menu, TransToken.ui('Credits...'))
+
+    async with trio.open_nursery() as nursery:
+        nursery.start_soon(credit_window.display_task)
+        async with utils.aclosing(credit_window.open.ready.eventual_values()) as agen:
+            task_status.started()
+            async for enabled in agen:
+                help_menu.entryconfigure(credit_ind, state='normal' if enabled else 'disabled')

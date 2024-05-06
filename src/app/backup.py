@@ -874,7 +874,7 @@ async def init_application() -> None:
 
     from app import helpMenu
     # Add the 'Help' menu here too.
-    helpMenu.make_help_menu(bar, TK_IMG)
+    background_run(helpMenu.make_help_menu, bar, TK_IMG)
 
     window['menu'] = bar
 

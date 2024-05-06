@@ -109,7 +109,7 @@ class MenuBar:
         bar.add_cascade(menu=self.view_menu)
         set_menu_text(bar, TransToken.ui("View"))
 
-        helpMenu.make_help_menu(bar, tk_img)
+        background_run(helpMenu.make_help_menu, bar, tk_img)
         gameMan.ON_GAME_CHANGED.register(self._game_changed)
 
         if utils.CODE_DEV_MODE:
