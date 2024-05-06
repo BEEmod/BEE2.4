@@ -51,7 +51,7 @@ def res_add_global_inst(vmf: VMF, inst: Entity, res: Keyvalues) -> object:
         )
         try:
             new_inst['origin'] = inst.fixup.substitute(res['position'])
-        except IndexError:
+        except LookupError:
             new_inst['origin'] = options.GLOBAL_ENTS_LOC()
 
         conditions.GLOBAL_INSTANCES.add(file.casefold())
