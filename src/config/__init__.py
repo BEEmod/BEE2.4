@@ -4,9 +4,9 @@ Other modules define an immutable state class, then register it with this.
 They can then fetch the current state and store new state.
 """
 from __future__ import annotations
-from collections.abc import Awaitable, Callable, Iterator
 from typing import ClassVar, Dict, NewType, Type, TypeVar, cast
-from typing_extensions import Self
+from typing_extensions import Self, override
+from collections.abc import Awaitable, Callable, Iterator
 from pathlib import Path
 import abc
 import os
@@ -43,6 +43,7 @@ class Data(abc.ABC):
     __info: ClassVar[ConfInfo]
     __slots__ = ()  # No members itself.
 
+    @override
     def __init_subclass__(
         cls, *,
         conf_name: str = '',

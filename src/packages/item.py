@@ -7,28 +7,29 @@ Unparsed style IDs can be <special>, used usually for unstyled items.
 Those are only relevant for default styles or explicit inheritance.
 """
 from __future__ import annotations
-import re
-import copy
+from typing_extensions import Self, override
+
 from collections.abc import Sequence, Iterable, Iterator
 from enum import Enum
 from pathlib import PurePosixPath as FSPath
+import re
+import copy
 
-import attrs
-import trio
 from srctools import FileSystem, Keyvalues, VMF, logger
 from srctools.tokenizer import Tokenizer, Token
-from typing_extensions import Self
+import attrs
+import trio
 
-import config.gen_opts
 from app import tkMarkdown, img, lazy_conf, DEV_MODE
-import config
-from transtoken import TransToken, TransTokenSource
-from packages import PackagesSet, PakObject, PakRef, ParseData, Style, sep_values, desc_parse, get_config
 from config.item_defaults import DEFAULT_VERSION
-from editoritems import Item as EditorItem, InstCount
 from connections import Config as ConnConfig
-import editoritems_vmf
+from editoritems import Item as EditorItem, InstCount
+from packages import PackagesSet, PakObject, PakRef, ParseData, Style, sep_values, desc_parse, get_config
+from transtoken import TransToken, TransTokenSource
 import collisions
+import config
+import config.gen_opts
+import editoritems_vmf
 import utils
 
 
@@ -484,6 +485,7 @@ class Item(PakObject, needs_foreground=True):
         self.visual_subtypes = ()
 
     @classmethod
+    @override
     async def parse(cls, data: ParseData) -> Self:
         """Parse an item definition."""
         versions: dict[str, UnParsedVersion] = {}
@@ -628,6 +630,7 @@ class Item(PakObject, needs_foreground=True):
             }
         )
 
+    @override
     def add_over(self, override: Self) -> None:
         """Add the other item data to ourselves."""
         # Copy over all_conf always.
@@ -655,9 +658,11 @@ class Item(PakObject, needs_foreground=True):
                         )
                         # our_style.override_from_folder(style)
 
+    @override
     def __repr__(self) -> str:
         return f'<Item:{self.id}>'
 
+    @override
     def iter_trans_tokens(self) -> Iterator[TransTokenSource]:
         """Yield all translation tokens in this item."""
         yield from tkMarkdown.iter_tokens(self.glob_desc, f'items/{self.id}.desc')
@@ -666,6 +671,7 @@ class Item(PakObject, needs_foreground=True):
                 yield from variant.iter_trans_tokens(f'items/{self.id}/{style_id}')
 
     @classmethod
+    @override
     async def post_parse(cls, packset: PackagesSet) -> None:
         """After styles and items are done, assign all the versions."""
         # This has to be done after styles.
@@ -693,6 +699,7 @@ class ItemConfig(PakObject, allow_mult=True):
         self.all_conf = all_conf
 
     @classmethod
+    @override
     async def parse(cls, data: ParseData) -> ItemConfig:
         """Parse from config files."""
         vers: dict[str, dict[str, lazy_conf.LazyConf]] = {}
@@ -722,6 +729,7 @@ class ItemConfig(PakObject, allow_mult=True):
             vers,
         )
 
+    @override
     def add_over(self, override: ItemConfig) -> None:
         """Add additional style configs to the original config."""
         self.all_conf = lazy_conf.concat(self.all_conf, override.all_conf)

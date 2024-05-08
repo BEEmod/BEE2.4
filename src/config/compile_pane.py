@@ -1,10 +1,11 @@
 from __future__ import annotations
-from typing import Sequence
+from collections.abc import Sequence
 import base64
 
 from srctools import Keyvalues, bool_as_int, logger
 from srctools.dmx import Element
 import attrs
+from typing_extensions import override
 
 import config
 
@@ -32,6 +33,7 @@ class CompilePaneState(config.Data, conf_name='CompilerPane'):
     use_voice_priority: bool = False
 
     @classmethod
+    @override
     def parse_legacy(cls, conf: Keyvalues) -> dict[str, CompilePaneState]:
         """Parse legacy config data."""
         # No change from new KV1 format.
@@ -41,6 +43,7 @@ class CompilePaneState(config.Data, conf_name='CompilerPane'):
         )}
 
     @classmethod
+    @override
     def parse_kv1(cls, data: Keyvalues, version: int) -> CompilePaneState:
         """Parse Keyvalues1 format data."""
         if 'sshot_data' in data:
@@ -72,6 +75,7 @@ class CompilePaneState(config.Data, conf_name='CompilerPane'):
             use_voice_priority=data.bool('voiceline_priority', False),
         )
 
+    @override
     def export_kv1(self) -> Keyvalues:
         """Generate keyvalues1 format data."""
         kv = Keyvalues('', [
@@ -96,6 +100,7 @@ class CompilePaneState(config.Data, conf_name='CompilerPane'):
             ))
         return kv
 
+    @override
     def export_dmx(self) -> Element:
         """Generate DMX format data."""
         elem = Element('CompilerPaneState', 'DMElement')

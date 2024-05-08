@@ -5,6 +5,8 @@ If pyglet fails to load, all fx() calls will fail silently.
 (Sounds are not critical to the app, so they just won't play.)
 """
 from __future__ import annotations
+from typing_extensions import override
+
 from collections.abc import Callable
 import functools
 import os
@@ -114,6 +116,7 @@ class PygletSound(NullSound):
         super().__init__()
         self.sources: dict[str, Source] = {}
 
+    @override
     async def load(self, name: str) -> Source | None:
         """Load the given UI sound into a source."""
         global sounds
@@ -138,6 +141,7 @@ class PygletSound(NullSound):
             self.sources[name] = src
             return src
 
+    @override
     async def fx(self, sound: str) -> None:
         """Play a sound effect, sleeping for the duration."""
         global sounds

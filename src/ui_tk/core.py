@@ -154,6 +154,7 @@ async def init_app() -> None:
 
 class SmallRepr(pprint.PrettyPrinter):
     """Exclude values with large reprs."""
+    @override
     def format(
         self,
         target: object,

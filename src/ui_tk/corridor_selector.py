@@ -58,6 +58,7 @@ class IconUI(Icon):
         return self.var.get()
 
     @selected.setter
+    @override
     def selected(self, value: bool) -> None:
         self.var.set(value)
 

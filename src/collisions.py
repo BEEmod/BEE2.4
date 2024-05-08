@@ -1,7 +1,7 @@
 """Defines the region of space items occupy and computes collisions."""
 from __future__ import annotations
 from typing import Iterable, Iterator, Sequence, Tuple, overload
-from typing_extensions import Self, Literal
+from typing_extensions import Self, Literal, override
 
 from enum import Flag
 import functools
@@ -642,6 +642,7 @@ class Volume(BBox):  # type: ignore[override]
         )
 
     @classmethod
+    @override
     def from_ent(cls, ent: Entity) -> Iterator[Self]:
         """Parse keyvalues on a VMF entity. One volume is produced for each brush."""
         coll = CollideType.from_ent_kvs(ent)
@@ -654,6 +655,7 @@ class Volume(BBox):  # type: ignore[override]
                 for face in solid.sides
             ])
 
+    @override
     def as_ent(self, vmf: VMF) -> Entity:
         """Convert back into an entity."""
         ent = self._to_kvs(vmf, 'bee2_collision_volume')
@@ -668,10 +670,12 @@ class Volume(BBox):  # type: ignore[override]
 
         return ent
 
+    @override
     def as_volume(self) -> Volume:
         """Returns this unchanged."""
         return self
 
+    @override
     def with_attrs(
         self, *,
         name: str | None = None,
@@ -687,12 +691,14 @@ class Volume(BBox):  # type: ignore[override]
             tags=tags if tags is not None else self.tags,
         )
 
+    @override
     def intersect(self, other: BBox) -> BBox | None:
         if not isinstance(other, Volume):
             other = other.as_volume()
 
         raise NotImplementedError("Intersections of volumes!")
 
+    @override
     def __matmul__(self, other: AnyAngle | AnyMatrix) -> Volume:
         """Rotate the bounding box by an angle."""
         matrix, mins, maxs = self._rotate_bbox(other)
@@ -729,18 +735,21 @@ class Volume(BBox):  # type: ignore[override]
             name=self.name,
         )
 
+    @override
     def __add__(self, other: Vec | FrozenVec | tuple[float, float, float]) -> Volume:
         """Shift the bounding box forwards by this amount."""
         if isinstance(other, BBox):  # Special-case error.
             raise TypeError('Two bounding boxes cannot be added!')
         return self._shift(FrozenVec(other))
 
+    @override
     def __sub__(self, other: Vec | FrozenVec | tuple[float, float, float]) -> Volume:
         """Shift the bounding box backwards by this amount."""
         if isinstance(other, BBox):  # Special-case error.
             raise TypeError('Two bounding boxes cannot be subtracted!')
         return self._shift(-FrozenVec(other))
 
+    @override
     def trace_ray(self, start: Vec | FrozenVec, delta: Vec | FrozenVec) -> Hit | None:
         """Trace a ray against the bbox, returning the hit position (if any).
 
@@ -804,6 +813,7 @@ class Volume(BBox):  # type: ignore[override]
                 return None
         return best_hit
 
+    @override
     def scale_to(self, axis: Literal['x', 'y', 'z'], mins: int, maxs: int) -> Volume:
         """Resize the bounding box along an axis."""
         bb_mins = self.mins

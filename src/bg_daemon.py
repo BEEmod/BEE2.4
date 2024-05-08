@@ -5,8 +5,9 @@ We do this in another process to sidestep the GIL, and ensure the screen
 remains responsive. This is a separate module to reduce the required dependencies.
 """
 from __future__ import annotations
-from typing import Callable, Dict, List, Optional, Tuple
-from typing_extensions import assert_never
+from typing_extensions import assert_never, override
+
+from collections.abc import Callable
 from tkinter import ttk
 from tkinter.font import Font, families as tk_font_families
 import tkinter as tk
@@ -27,7 +28,7 @@ import ipc_types
 import utils
 
 
-SCREENS: Dict[ScreenID, BaseLoadScreen] = {}
+SCREENS: dict[ScreenID, BaseLoadScreen] = {}
 QUEUE_REPLY_LOAD: multiprocessing.Queue[ARGS_REPLY_LOAD]
 TIMEOUT = 0.125  # New iteration if we take more than this long.
 
@@ -68,15 +69,15 @@ START = '1.0'  # Row 1, column 0 = first character
 
 class BaseLoadScreen:
     """Code common to both loading screen types."""
-    drag_x: Optional[int]
-    drag_y: Optional[int]
+    drag_x: int | None
+    drag_y: int | None
 
     def __init__(
         self,
         scr_id: ScreenID,
         title_text: str,
         force_ontop: bool,
-        stages: List[Tuple[StageID, str]],
+        stages: list[tuple[StageID, str]],
     ) -> None:
         self.scr_id = scr_id
         self.title_text = title_text
@@ -91,9 +92,9 @@ class BaseLoadScreen:
         self.win.grid_columnconfigure(0, weight=1)
         self.win.grid_rowconfigure(0, weight=1)
 
-        self.values: Dict[StageID, int] = {}
-        self.maxes: Dict[StageID, int] = {}
-        self.names: Dict[StageID, str] = {}
+        self.values: dict[StageID, int] = {}
+        self.maxes: dict[StageID, int] = {}
+        self.names: dict[StageID, str] = {}
         self.stages = stages
         self.is_shown = False
 
@@ -110,7 +111,7 @@ class BaseLoadScreen:
         self.win.bind('<B1-Motion>', self.move_motion)
         self.win.bind('<Escape>', self.cancel)
 
-    def cancel(self, event: Optional[tk.Event] = None) -> None:
+    def cancel(self, event: object = None) -> None:
         """User pressed the cancel button."""
         self.op_reset()
         QUEUE_REPLY_LOAD.put(ipc_types.Daemon2Load_Cancel(self.scr_id))
@@ -134,7 +135,7 @@ class BaseLoadScreen:
         y = self.win.winfo_y() + event.y - self.drag_y
         self.win.geometry(f'+{x:g}+{y:g}')
 
-    def op_show(self, title: str, labels: List[str]) -> None:
+    def op_show(self, title: str, labels: list[str]) -> None:
         """Show the window."""
         self.win.title(title)
         for (st_id, _), name in zip(self.stages, labels):
@@ -201,7 +202,7 @@ class LoadScreen(BaseLoadScreen):
         scr_id: ScreenID,
         title_text: str,
         force_ontop: bool,
-        stages: List[Tuple[StageID, str]],
+        stages: list[tuple[StageID, str]],
     ) -> None:
         super().__init__(scr_id, title_text, force_ontop, stages)
 
@@ -224,10 +225,10 @@ class LoadScreen(BaseLoadScreen):
         self.cancel_btn = ttk.Button(self.frame, command=self.cancel)
         self.cancel_btn.grid(row=0, column=1)
 
-        self.bar_var: Dict[StageID, tk.IntVar] = {}
-        self.bars: Dict[StageID, ttk.Progressbar] = {}
-        self.titles: Dict[StageID, ttk.Label] = {}
-        self.labels: Dict[StageID, ttk.Label] = {}
+        self.bar_var: dict[StageID, tk.IntVar] = {}
+        self.bars: dict[StageID, ttk.Progressbar] = {}
+        self.titles: dict[StageID, ttk.Label] = {}
+        self.labels: dict[StageID, ttk.Label] = {}
 
         for ind, (st_id, stage_name) in enumerate(self.stages):
             if stage_name:
@@ -263,12 +264,14 @@ class LoadScreen(BaseLoadScreen):
         """Update translations."""
         self.cancel_btn['text'] = TRANSLATION['cancel']
 
+    @override
     def reset_stages(self) -> None:
         """Put the stage in the initial state, before maxes are provided."""
         for stage in self.values.keys():
             self.bar_var[stage].set(0)
             self.labels[stage]['text'] = '0/??'
 
+    @override
     def update_stage(self, stage: StageID) -> None:
         """Redraw the given stage."""
         max_val = self.maxes[stage]
@@ -280,7 +283,8 @@ class LoadScreen(BaseLoadScreen):
             ))
         self.labels[stage]['text'] = f'{self.values[stage]!s}/{max_val!s}'
 
-    def op_show(self, title: str, labels: List[str]) -> None:
+    @override
+    def op_show(self, title: str, labels: list[str]) -> None:
         """Show the window."""
         self.title_text = title
         self.win.title(title)
@@ -290,6 +294,7 @@ class LoadScreen(BaseLoadScreen):
                 self.titles[st_id]['text'] = name + ':'
         super().op_show(title, labels)
 
+    @override
     def op_skip_stage(self, stage: StageID) -> None:
         """Skip over this stage of the loading process."""
         self.values[stage] = 0
@@ -310,7 +315,7 @@ class SplashScreen(BaseLoadScreen):
         scr_id: ScreenID,
         title_text: str,
         force_ontop: bool,
-        stages: List[Tuple[StageID, str]],
+        stages: list[tuple[StageID, str]],
     ) -> None:
         super().__init__(scr_id, title_text, force_ontop, stages)
 
@@ -527,6 +532,7 @@ class SplashScreen(BaseLoadScreen):
                     font=progress_font,
                 )
 
+    @override
     def update_stage(self, stage: StageID) -> None:
         """Update all the text."""
         if self.maxes[stage] == 0:
@@ -554,6 +560,7 @@ class SplashScreen(BaseLoadScreen):
                 y2,
             )
 
+    @override
     def op_set_length(self, stage: StageID, num: int) -> None:
         """Set the number of items in a stage."""
         self.maxes[stage] = num
@@ -583,10 +590,12 @@ class SplashScreen(BaseLoadScreen):
                 )
             canvas.tag_lower('tick_' + stage, 'bar_' + stage)
 
+    @override
     def reset_stages(self) -> None:
         """Reset all stages."""
         pass
 
+    @override
     def op_skip_stage(self, stage: StageID) -> None:
         """Skip over this stage of the loading process."""
         self.values[stage] = 0
@@ -823,7 +832,7 @@ def run_background(
     queue_rec_log: multiprocessing.Queue[ARGS_SEND_LOGGING],
     queue_reply_log: multiprocessing.Queue[ARGS_REPLY_LOGGING],
     # Pass in various bits of translated text so, we don't need to do it here.
-    translations: Dict[str, str],
+    translations: dict[str, str],
 ) -> None:
     """Runs in the other process, with an end of a pipe for input."""
     global QUEUE_REPLY_LOAD

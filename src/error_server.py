@@ -10,9 +10,10 @@ This has 3 endpoints:
 """
 from __future__ import annotations
 import srctools.logger
+
 LOGGER = srctools.logger.init_logging('bee2/error_server.log')
 
-from typing import Any, Dict, List, Tuple
+from typing_extensions import override
 import functools
 import http
 import math
@@ -28,11 +29,11 @@ import psutil
 import quart
 import trio
 
-import utils
 from user_errors import (
     ErrorInfo, DATA_LOC, SERVER_INFO_FILE, ServerInfo, PackageTranslations,
     TOK_ERR_FAIL_LOAD, TOK_ERR_MISSING, TOK_COOP_SHOWURL,
 )
+import utils
 import transtoken
 
 root_path = utils.bins_path('error_display').absolute()
@@ -76,7 +77,7 @@ async def route_display_errors() -> str:
 
 
 @app.route('/displaydata')
-async def route_render_data() -> dict[str, Any]:
+async def route_render_data() -> dict[str, object]:
     """Return the geometry for rendering the current error."""
     return {
         'tiles': current_error.faces,
@@ -174,11 +175,13 @@ class PackageLang(transtoken.GetText):
     """Simple Gettext implementation for tokens loaded by packages."""
     tokens: dict[str, str]
 
+    @override
     def gettext(self, token: str, /) -> str:
         """Perform simple translations."""
         # In this context, the tokens must be IDs not the actual string.
         return self.tokens.get(token.casefold(), token)
 
+    @override
     def ngettext(self, single: str, plural: str, n: int, /) -> str:
         """We don't support plural translations yet, not required."""
         return self.tokens.get(single.casefold(), single)
@@ -231,7 +234,7 @@ async def load_info() -> None:
 
 async def main() -> None:
     """Start up the server."""
-    binds: List[str]
+    binds: list[str]
     stop_sleeping = trio.CancelScope()
 
     async def timeout_func() -> None:

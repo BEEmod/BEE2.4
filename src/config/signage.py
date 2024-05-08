@@ -1,4 +1,6 @@
 from __future__ import annotations
+from typing_extensions import override
+
 from collections.abc import Sequence, Mapping
 
 from srctools import Keyvalues, logger
@@ -54,6 +56,7 @@ class Layout(config.Data, conf_name='Signage'):
     )
 
     @classmethod
+    @override
     def parse_legacy(cls, kv: Keyvalues) -> dict[str, Layout]:
         """Parse the old config format."""
         # Simply call the new parse, it's unchanged.
@@ -61,6 +64,7 @@ class Layout(config.Data, conf_name='Signage'):
         return {'': sign}
 
     @classmethod
+    @override
     def parse_kv1(cls, data: Keyvalues | Sequence[Keyvalues], version: int) -> Layout:
         """Parse Keyvalues1 config values."""
         if not data:  # No config, use defaults.
@@ -85,6 +89,7 @@ class Layout(config.Data, conf_name='Signage'):
                 LOGGER.warning(exc.args[0])
         return cls(sign)
 
+    @override
     def export_kv1(self) -> Keyvalues:
         """Generate keyvalues for saving signages."""
         kv = Keyvalues('Signage', [])

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from typing import Mapping
 from typing_extensions import Self, override
+from collections.abc import Mapping
 
 from srctools import EmptyMapping, Keyvalues, conv_bool, bool_as_int, logger
 from srctools.dmx import Element, ValueType as DMXValue
@@ -17,7 +17,6 @@ __all__ = [
     'Direction', 'GameMode', 'Orient',  # Re-export
     'Config', 'Options', 'UIState',
 ]
-
 
 
 @config.PALETTE.register
@@ -124,6 +123,7 @@ class Options(config.Data, conf_name='CorridorOptions', uses_id=True, version=1)
         return f'{style.casefold()}:{mode.value}_{direction.value}'
 
     @classmethod
+    @override
     def parse_kv1(cls, data: Keyvalues, version: int) -> Self:
         if version != 1:
             raise ValueError(f'Unknown version {version}!')
@@ -137,6 +137,7 @@ class Options(config.Data, conf_name='CorridorOptions', uses_id=True, version=1)
                 raise ValueError(f'Invalid option value "{child.value}" for option "{opt_id}"!')
         return cls(options)
 
+    @override
     def export_kv1(self) -> Keyvalues:
         return Keyvalues('', [
             Keyvalues(opt_id, value)
@@ -144,6 +145,7 @@ class Options(config.Data, conf_name='CorridorOptions', uses_id=True, version=1)
         ])
 
     @classmethod
+    @override
     def parse_dmx(cls, data: Element, version: int) -> Self:
         if version != 1:
             raise ValueError(f'Unknown version {version}!')
@@ -160,6 +162,7 @@ class Options(config.Data, conf_name='CorridorOptions', uses_id=True, version=1)
 
         return cls(options)
 
+    @override
     def export_dmx(self) -> Element:
         elem = Element('CorridorOptions', 'DMConfig')
         for opt_id, value in self.options.items():
