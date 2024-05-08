@@ -144,6 +144,9 @@ disallow_any_generics = false
 enable_error_code = [
 	'unreachable',
 	'redundant-expr',
+	'truthy-bool',
+	'truthy-iterable',
+	'unreachable',
 	'unused-awaitable',
 ]
 

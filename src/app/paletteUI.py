@@ -365,7 +365,7 @@ class PaletteUI:
             if pal.uuid in PALETTE_FORCE_SHOWN:
                 return  # Disallowed.
             self.hidden_defaults.add(pal.uuid)
-        elif dialogs.ask_yes_no(
+        elif await dialogs.ask_yes_no(
             title=TRANS_TITLE_DELETE,
             message=TRANS_SHOULD_DELETE.format(palette=pal.name),
         ):

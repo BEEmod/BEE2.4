@@ -952,8 +952,7 @@ def add_timer_relay(item: Item, has_sounds: bool) -> None:
         relay['origin'] = item.inst['origin']
 
     for cmd in item.config.timer_done_cmd:
-        if cmd:
-            relay.add_out(localise_output(cmd, 'OnTrigger', item.inst, delay=timer_delay))
+        relay.add_out(localise_output(cmd, 'OnTrigger', item.inst, delay=timer_delay))
 
     if item.config.timer_sound_pos is not None and has_sounds:
         timer_sound = options.TIMER_SOUND()

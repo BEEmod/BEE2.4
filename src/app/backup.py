@@ -716,7 +716,7 @@ async def ui_delete_game(dialog: Dialogs) -> None:
 
     if not to_delete:
         return
-    if not dialog.ask_yes_no(
+    if not await dialog.ask_yes_no(
         title=TransToken.ui('Confirm Deletion'),
         message=TRANS_DELETE_DESC.format(n=len(to_delete)),
         detail='\n'.join([f'- "{p2c.title}" ({p2c.filename}.p2c)' for p2c in to_delete]),
