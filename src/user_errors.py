@@ -70,6 +70,12 @@ class ErrorInfo:
     barrier_holes: List[BarrierHole] = attrs.Factory(list)
 
 
+@attrs.frozen(eq=False)
+class PackageTranslations:
+    """The already-translated tokens for each package, for use in the server."""
+    translations: List[Tuple[str, Dict[str, str]]]
+
+
 class ServerInfo(TypedDict):
     """When the error server is active it writes this JSON to disk to communicate with us."""
     port: int  # The server should respond to 'https//localhost:{port}'.

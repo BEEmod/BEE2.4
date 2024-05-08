@@ -8,7 +8,7 @@ This has 3 endpoints:
 - /refresh causes it to reload the error from a text file on disk, if a new compile runs.
 - /ping is triggered by the webpage repeatedly while open, to ensure the server stays alive.
 """
-import attrs
+from __future__ import annotations
 import srctools.logger
 LOGGER = srctools.logger.init_logging('bee2/error_server.log')
 
@@ -23,13 +23,14 @@ import json
 from hypercorn.config import Config
 from hypercorn.trio import serve
 from quart_trio import QuartTrio
+import attrs
 import psutil
 import quart
 import trio
 
 import utils
 from user_errors import (
-    ErrorInfo, DATA_LOC, SERVER_INFO_FILE, ServerInfo,
+    ErrorInfo, DATA_LOC, SERVER_INFO_FILE, ServerInfo, PackageTranslations,
     TOK_ERR_FAIL_LOAD, TOK_ERR_MISSING, TOK_COOP_SHOWURL,
 )
 import transtoken
@@ -75,7 +76,7 @@ async def route_display_errors() -> str:
 
 
 @app.route('/displaydata')
-async def route_render_data() -> Dict[str, Any]:
+async def route_render_data() -> dict[str, Any]:
     """Return the geometry for rendering the current error."""
     return {
         'tiles': current_error.faces,
@@ -171,7 +172,7 @@ def update_deadline() -> None:
 @attrs.define(eq=False)
 class PackageLang(transtoken.GetText):
     """Simple Gettext implementation for tokens loaded by packages."""
-    tokens: Dict[str, str]
+    tokens: dict[str, str]
 
     def gettext(self, token: str, /) -> str:
         """Perform simple translations."""
@@ -196,17 +197,22 @@ async def load_info() -> None:
         current_error = ErrorInfo(message=TOK_ERR_FAIL_LOAD)
     else:
         current_error = data
+        LOGGER.info('Loaded error info')
 
-    translations: Dict[str, transtoken.GetText] = {}
+    translations: dict[str, transtoken.GetText] = {}
     try:
-        package_data: List[Tuple[str, Dict[str, str]]] = pickle.loads(
+        package_data = pickle.loads(
             await trio.Path('bee2/pack_translation.bin').read_bytes()
         )
     except Exception:
         LOGGER.exception('Failed to load package translations pickle!')
     else:
-        for pack_id, tokens in package_data:
-            translations[pack_id] = PackageLang(tokens)
+        if isinstance(package_data, PackageTranslations):
+            for pack_id, tokens in package_data.translations:
+                translations[pack_id] = PackageLang(tokens)
+        else:
+            LOGGER.exception('Invalid package translations: got {!r}', package_data)
+        LOGGER.info('Loaded package translations')
 
     if current_error.language_file is not None:
         try:
@@ -220,6 +226,7 @@ async def load_info() -> None:
             ui_filename=current_error.language_file,
             trans=translations,
         )
+        LOGGER.info('Loaded UI translations')
 
 
 async def main() -> None:
