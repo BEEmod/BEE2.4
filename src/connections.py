@@ -3,7 +3,9 @@
 This controls how I/O is generated for each item.
 """
 from __future__ import annotations
-from typing import Dict, Final, Iterable
+
+from typing import Final
+from collections.abc import Collection, Iterable
 from enum import Enum
 import sys
 
@@ -35,7 +37,7 @@ class ConnType(Enum):
             ) from None
 
 
-CONN_TYPE_NAMES: Dict[str, ConnType] = {
+CONN_TYPE_NAMES: dict[str, ConnType] = {
     'none': ConnType.DEFAULT,
     'a': ConnType.PRIMARY,
     'prim': ConnType.PRIMARY,
@@ -263,8 +265,8 @@ class Config:
         output_act: tuple[str | None, str] | None = None,
         output_deact: tuple[str | None, str] | None = None,
 
-        lock_cmd: Iterable[Output] = (),
-        unlock_cmd: Iterable[Output] = (),
+        lock_cmd: Collection[Output] = (),
+        unlock_cmd: Collection[Output] = (),
         output_lock: tuple[str | None, str] | None = None,
         output_unlock: tuple[str | None, str] | None = None,
         inf_lock_only: bool = False,

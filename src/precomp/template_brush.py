@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import AbstractSet, Union, Tuple, Mapping
 from typing_extensions import Literal, TypeAliasType, assert_never
 
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Callable, Collection, Iterable, Iterator
 from collections import defaultdict
 from decimal import Decimal
 from enum import Enum
@@ -778,7 +778,7 @@ def import_template(
     force_type: TEMP_TYPES = TEMP_TYPES.default,
     add_to_map: bool = True,
     additional_visgroups: Iterable[str] = (),
-    bind_tile_pos: Iterable[Vec] = (),
+    bind_tile_pos: Collection[Vec] = (),
     align_bind: bool = False,
     coll: collisions.Collisions | None = None,
     coll_add: collisions.CollideType = collisions.CollideType.NOTHING,

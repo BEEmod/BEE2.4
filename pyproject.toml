@@ -142,10 +142,13 @@ disallow_untyped_calls = true
 disallow_any_generics = false
 
 enable_error_code = [
-	'unreachable',
+	'mutable-override',
+	'narrowed-type-not-subtype',
 	'redundant-expr',
+	'redundant-self',
 	'truthy-bool',
 	'truthy-iterable',
+	'unimported-reveal',
 	'unreachable',
 	'unused-awaitable',
 ]
