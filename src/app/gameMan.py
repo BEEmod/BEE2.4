@@ -7,6 +7,7 @@ Does stuff related to the actual games.
 """
 from __future__ import annotations
 
+import subprocess
 import sys
 from typing import Dict, Optional, Union, Iterator
 from pathlib import Path
@@ -177,9 +178,17 @@ class Game:
 
         self.mod_times.clear()
 
-    def launch(self) -> None:
+    async def launch(self) -> None:
         """Try and launch the game."""
-        webbrowser.open('steam://rungameid/' + str(self.steamID))
+        url = f'steam://rungameid/{self.steamID}'
+        if utils.LINUX:
+            try:
+                await trio.run_process(['xdg-open', url])
+            except subprocess.CalledProcessError:
+                LOGGER.warning('Could not call xdg-open!')
+        else:
+            # This works on Windows and Mac.
+            await trio.to_thread.run_sync(webbrowser.open, url)
 
     def get_game_lang(self) -> str:
         """Load the app manifest file to determine Portal 2's language."""

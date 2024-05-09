@@ -783,7 +783,7 @@ async def export_editoritems(pal_ui: paletteUI.PaletteUI, bar: MenuBar, dialog: 
         if do_action:
             # Launch first so quitting doesn't affect this.
             if conf.launch_after_export:
-                gameMan.selected_game.launch()
+                await gameMan.selected_game.launch()
 
             if conf.after_export is AfterExport.NORMAL:
                 pass
