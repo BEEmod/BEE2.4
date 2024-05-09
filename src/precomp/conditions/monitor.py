@@ -169,12 +169,12 @@ def res_camera(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
 
         # Remove the triggers.
         plate.trig.remove()
-
         if isinstance(plate, faithplate.StraightPlate):
+            plate.helper_trig.remove()
+
+        if plate.target is None:
             # Just point straight ahead.
             target_loc = base_loc + 512 * normal
-            # And remove the helper.
-            plate.helper_trig.remove()
         else:
             if isinstance(plate.target, Vec):
                 target_loc = plate.target
