@@ -74,7 +74,7 @@ else:  # Linux
     def set_window_icon(window: tk.Toplevel | tk.Tk) -> None:
         """Set the window icon."""
         # Weird argument order for default=True...
-        window.wm_iconphoto(True, str(ICO_PATH))
+        window.wm_iconphoto(True, app_icon)
 
 
 if utils.WIN:
