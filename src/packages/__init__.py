@@ -535,6 +535,8 @@ async def find_packages(errors: ErrorUI, packset: PackagesSet, pak_dir: Path) ->
                 # _000.vpk files, useless without the directory
                 continue
 
+            LOGGER.debug('Reading package "{}"', name)
+
             filesys: FileSystem
             if name.is_dir():
                 filesys = RawFileSystem(name)
@@ -552,8 +554,6 @@ async def find_packages(errors: ErrorUI, packset: PackagesSet, pak_dir: Path) ->
                     LOGGER.warning('Failed to parse "{}":', name, exc_info=exc)
                     errors.add(TRANS_INVALID_PAK_BAD_FORMAT.format(path=name))
                     continue
-
-            LOGGER.debug('Reading package "{}"', name)
 
             # Valid packages must have an info.txt file!
             try:
