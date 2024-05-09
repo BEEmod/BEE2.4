@@ -6,13 +6,13 @@ Does stuff related to the actual games.
 - Generating and saving editoritems/vbsp_config
 """
 from __future__ import annotations
+from typing_extensions import Self
 
+from collections.abc import Iterator
+from pathlib import Path
 import subprocess
 import sys
-from typing import Dict, Optional, Union, Iterator
-from pathlib import Path
 
-import trio
 from tkinter import *  # ui library
 from tkinter import filedialog  # open/save as dialog creator
 
@@ -24,7 +24,7 @@ from srctools import Keyvalues
 import srctools.logger
 import srctools.fgd
 import attrs
-from typing_extensions import Self
+import trio
 
 from BEE2_config import ConfigFile
 from app import background_run, quit_app
@@ -43,9 +43,9 @@ import event
 LOGGER = srctools.logger.get_logger(__name__)
 
 all_games: list[Game] = []
-selected_game: Optional[Game] = None
+selected_game: Game | None = None
 selectedGame_radio = IntVar(value=0)
-game_menu: Optional[Menu] = None
+game_menu: Menu | None = None
 ON_GAME_CHANGED: event.Event[Game] = event.Event('game_changed')
 
 CONFIG = ConfigFile('games.cfg')
@@ -69,7 +69,7 @@ class Game:
     # The last modified date of packages, so we know whether to copy it over.
     mod_times: dict[str, int] = attrs.Factory(dict)
     # The style last exported to the game.
-    exported_style: Optional[str] = None
+    exported_style: str | None = None
 
     # In previous versions, we always wrote our VPK into dlc3. This tracks whether this game was
     # read in from a previous BEE install, and so has created the DLC3 folder even though it's
@@ -95,7 +95,7 @@ class Game:
         # This flag is only set if we parse from a config that doesn't include it.
         unmarked_dlc3 = config.getboolean(gm_id, 'unmarked_dlc3', True)
 
-        mod_times: Dict[str, int] = {}
+        mod_times: dict[str, int] = {}
 
         for name, value in config.items(gm_id):
             if name.startswith('pack_mod_'):
@@ -140,7 +140,7 @@ class Game:
                     folder not in blacklist):
                 yield folder
 
-    def abs_path(self, path: Union[str, Path]) -> str:
+    def abs_path(self, path: str | Path) -> str:
         """Return the full path to something relative to this game's folder."""
         return os.path.normcase(os.path.join(self.root, path))
 
