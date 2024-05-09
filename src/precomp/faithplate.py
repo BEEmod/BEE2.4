@@ -2,31 +2,35 @@
 
 This also handles Bomb-type Paint Droppers.
 """
-from typing import ClassVar, Dict, Optional, Union
+from __future__ import annotations
+from typing import ClassVar
 import collections
 
 import attrs
-from srctools import Entity, FrozenVec, Vec, VMF, Angle, logger
+from srctools import Entity, FrozenVec, Matrix, Vec, VMF, Angle, conv_float, logger
 
 from precomp import tiling, brushLoc, instanceLocs, template_brush, conditions
 
 
-COND_MOD_NAME: Optional[str] = None
+COND_MOD_NAME: str | None = None
 LOGGER = logger.get_logger(__name__)
 
 # Targetname -> plate.
 # Spell out the union to allow type narrowing.
-PLATES: Dict[str, Union['AngledPlate', 'StraightPlate', 'PaintDropper']] = {}
+PLATES: dict[str, AngledPlate | StraightPlate | PaintDropper] = {}
 
 
-@attrs.define
+@attrs.define(kw_only=True, repr=False)
 class FaithPlate:
     """A Faith Plate."""
     VISGROUP: ClassVar[str] = ''  # Visgroup name for the generated trigger.
     inst: Entity
     trig: Entity
+    # The target to use. It's only absent for straight plates on the floor.
+    target: Vec | tiling.TileDef | None
+
     trig_offset: Vec = attrs.field(init=False, factory=Vec().copy)
-    template: Optional[template_brush.Template] = attrs.field(init=False, default=None)
+    template: template_brush.Template | None = attrs.field(init=False, default=None)
 
     @property
     def name(self) -> str:
@@ -42,25 +46,23 @@ class FaithPlate:
         return f'<{type(self).__name__} "{vars(self)}">'
 
 
-@attrs.define
+@attrs.define(kw_only=True)
 class AngledPlate(FaithPlate):
     """A faith plate with an angled trajectory."""
     VISGROUP: ClassVar[str] = 'angled'
-    target: Union[Vec, tiling.TileDef]
 
 
-@attrs.define
+@attrs.define(kw_only=True)
 class StraightPlate(FaithPlate):
     """A faith plate with a straight trajectory."""
     VISGROUP: ClassVar[str] = 'straight'
     helper_trig: Entity
 
 
-@attrs.define
+@attrs.define(kw_only=True)
 class PaintDropper(FaithPlate):
     """A special case - bomb-type Paint Droppers use this to aim the bomb."""
     VISGROUP: ClassVar[str] = 'paintdrop'
-    target: Union[Vec, tiling.TileDef]
 
 
 @conditions.MetaCond.FaithPlate.register
@@ -74,9 +76,9 @@ def associate_faith_plates(vmf: VMF) -> None:
     """
 
     # Find all the triggers and targets first.
-    triggers: Dict[str, Optional[Entity]] = {}
-    helper_trigs: Dict[str, Entity] = {}
-    paint_trigs: Dict[str, Entity] = {}
+    triggers: dict[str, Entity | None] = {}
+    helper_trigs: dict[str, Entity] = {}
+    paint_trigs: dict[str, Entity] = {}
 
     for trig in vmf.by_class['trigger_catapult']:
         name = trig['targetname']
@@ -103,7 +105,7 @@ def associate_faith_plates(vmf: VMF) -> None:
         else:
             LOGGER.warning('Unknown trigger "{}"?', name)
 
-    target_to_pos: Dict[str, Union[Vec, tiling.TileDef]] = {}
+    target_to_pos: dict[str, Vec | tiling.TileDef] = {}
 
     for targ in vmf.by_class['info_target']:
         name = targ['targetname']
@@ -129,7 +131,7 @@ def associate_faith_plates(vmf: VMF) -> None:
         if block_type.is_goo and block_type.is_top:
             tile_pos.z -= 32
 
-        tile_or_pos: Union[Vec, tiling.TileDef] = tile_pos
+        tile_or_pos: Vec | tiling.TileDef = tile_pos
         for norm in [abs_norm, -abs_norm]:
             # Try both directions.
             try:
@@ -146,7 +148,7 @@ def associate_faith_plates(vmf: VMF) -> None:
         target_to_pos[name] = tile_or_pos
 
     # Loop over instances, recording plates and moving targets into the tiledefs.
-    instances: Dict[str, Entity] = {}
+    instances: dict[str, Entity] = {}
 
     faith_targ_files = instanceLocs.resolve_filter('<ITEM_CATAPULT_TARGET>')
     for inst in vmf.by_class['func_instance']:
@@ -171,14 +173,31 @@ def associate_faith_plates(vmf: VMF) -> None:
                 f'Faith plate {name} has a helper '
                 'trigger but no main trigger!'
             )
+        # Angled plates must have a target, and never have a helper trig.
+        # Straight plates have a helper trig, and might also have a target
+        # if mounted to the ceiling.
+        try:
+            helper_trig = helper_trigs[name]
+        except KeyError:
+            pass
+        else:
+            PLATES[name] = StraightPlate(
+                inst=instances[name],
+                trig=trig,
+                helper_trig=helper_trig,
+                target=target_to_pos.get(name),
+            )
+            continue
         try:
             pos = target_to_pos[name]
         except KeyError:
-            # No position, it's a straight plate.
-            PLATES[name] = StraightPlate(instances[name], trig, helper_trigs[name])
+            LOGGER.warning('Faith plate "{}" has no position or helper trig?')
         else:
-            # Target position, angled plate.
-            PLATES[name] = AngledPlate(instances[name], trig, pos)
+            PLATES[name] = AngledPlate(
+                inst=instances[name],
+                trig=trig,
+                target=pos,
+            )
 
     # And paint droppers
     for name, trig in paint_trigs.items():
@@ -187,8 +206,15 @@ def associate_faith_plates(vmf: VMF) -> None:
         except KeyError:
             LOGGER.warning('No target for paint dropper {}!', name)
             continue
-        # Target position, angled plate.
-        PLATES[name] = PaintDropper(instances[name], trig, pos)
+        PLATES[name] = PaintDropper(
+            inst=instances[name],
+            trig=trig,
+            target=pos,
+        )
+
+    LOGGER.debug('Plates:\n{}', '\n'.join([
+        f'- {plate!r}' for plate in PLATES.values()
+    ]))
 
 
 def gen_faithplates(vmf: VMF, has_superpos: bool) -> None:
@@ -200,13 +226,21 @@ def gen_faithplates(vmf: VMF, has_superpos: bool) -> None:
     ] = collections.defaultdict(list)
 
     for plate in PLATES.values():
-        if isinstance(plate, (AngledPlate, PaintDropper)):
+        plate_orient = Matrix.from_angstr(plate.inst['angles'])
+
+        if plate.target is not None:
             targ_pos: FrozenVec | tiling.TileDef
             if isinstance(plate.target, tiling.TileDef):
                 targ_pos = plate.target  # Use the ID directly.
             else:
                 targ_pos = plate.target.freeze()
-            pos_to_trigs[targ_pos].append(plate.trig)
+            # If the plate is straight, we want to aim the helper trig, not the regular one.
+            # This only happens with ceiling plates.
+            pos_to_trigs[targ_pos].append(
+                plate.helper_trig
+                if isinstance(plate, StraightPlate)
+                else plate.trig
+            )
 
         if isinstance(plate, StraightPlate):
             trigs = [plate.trig, plate.helper_trig]
@@ -220,7 +254,7 @@ def gen_faithplates(vmf: VMF, has_superpos: bool) -> None:
                     vmf,
                     plate.template,
                     trig_origin + plate.trig_offset,
-                    Angle.from_str(plate.inst['angles']),
+                    plate_orient,
                     force_type=template_brush.TEMP_TYPES.world,
                     add_to_map=False,
                 ).world
@@ -229,6 +263,10 @@ def gen_faithplates(vmf: VMF, has_superpos: bool) -> None:
                     solid.translate(plate.trig_offset)
             if has_superpos:
                 trig['filtername'] = '@not_superpos_ghost_filter'
+            # Safeguard - if the speed == 0, force it to be valid.
+            for keyvalue in ['playerspeed', 'physicsspeed']:
+                if conv_float(trig[keyvalue]) < 1.0:
+                    trig[keyvalue] = 1.0
 
     # Now, generate each target needed.
     for pos_or_tile, trigs in pos_to_trigs.items():
