@@ -43,7 +43,7 @@ StrKeyT = TypeVar('StrKeyT', bound=str)
 AnyWidT = TypeVar('AnyWidT', bound=tk.Misc)
 WidgetT = TypeVar('WidgetT', bound=tk.Widget)
 EventFunc = TypeAliasType("EventFunc", Callable[[tk.Event[AnyWidT]], object], type_params=(AnyWidT, ))
-EventFuncT = TypeVar('EventFuncT', bound=EventFunc[tk.Misc])
+EventFuncT = TypeVar('EventFuncT', bound=EventFunc[tk.Widget])
 
 
 if utils.WIN:
@@ -337,7 +337,7 @@ class _EventDeco(Protocol[AnyWidT]):
         ...
 
 
-class _Binder(Protocol):
+class _Binder(Protocol[WidgetT]):
     @overload
     def __call__(self, wid: WidgetT, *, add: bool = False) -> _EventDeco[WidgetT]: ...  # type: ignore[overload-overlap]
     @overload
@@ -348,7 +348,7 @@ class _Binder(Protocol):
     def __call__(self, wid: tk.Misc, func: EventFunc[tk.Misc], *, add: bool = False) -> str: ...
 
 
-def _bind_event_handler(bind_func: Callable[[WidgetT, EventFunc[WidgetT], bool], None]) -> _Binder:
+def _bind_event_handler(bind_func: Callable[[WidgetT, EventFunc[WidgetT], bool], None]) -> _Binder[WidgetT]:
     """Decorator for the bind_click functions.
 
     This allows calling directly, or decorating a function with just wid and add
@@ -362,7 +362,7 @@ def _bind_event_handler(bind_func: Callable[[WidgetT, EventFunc[WidgetT], bool],
     ) -> Callable[..., object] | None:
         """Decorator or normal interface, func is optional to be a decorator."""
         if func is None:
-            def deco_2(func2: EventFuncT) -> EventFuncT:
+            def deco_2(func2: EventFunc[WidgetT]) -> EventFunc[WidgetT]:
                 """Used as a decorator - must be called second with the function."""
                 bind_func(wid, func2, add)
                 return func2
@@ -432,14 +432,14 @@ def link_checkmark(check: ttk.Checkbutton, widget: tk.Widget) -> None:
         """Check if the mouse is hovering over the label, or the checkmark."""
         # identify-element returns the component name under the specified position,
         # or an empty string if the widget isn't there.
-        return str(widget.tk.call(
+        return bool(str(widget.tk.call(
             widget, 'identify', 'element',
             event.x, event.y,
-        )) != '' or str(check.tk.call(
+        )) or str(check.tk.call(
             check, 'identify', 'element',
             event.x_root - check.winfo_rootx(),
             event.y_root - check.winfo_rooty(),
-        )) != ''
+        )))
 
     def on_press(event: tk.Event) -> None:
         """When pressed, highlight the checkmark."""
@@ -604,6 +604,7 @@ class ttk_Spinbox(ttk.Widget, tk.Spinbox):  # type: ignore[misc]
             self.value = self.old_val
             return False
 
+
 _file_field_font = _tk_font.nametofont('TkFixedFont')  # Monospaced font
 _file_field_char_len = _file_field_font.measure('x')
 
@@ -647,6 +648,7 @@ class FileField(ttk.Frame):
     """A text box which allows searching for a file or directory.
     """
     browser: commondialog.Dialog
+
     def __init__(
         self,
         master: tk.Misc,
@@ -766,6 +768,7 @@ class EnumButton(Generic[EnumT]):
     frame: ttk.Frame
     buttons: dict[EnumT, ttk.Button]
     current: AsyncValue[EnumT]
+
     def __init__(
         self,
         master: tk.Misc,
