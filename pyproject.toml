@@ -51,6 +51,7 @@ allowed-confusables = [
 	"×",  # Multiplication sign
 ]
 extend-ignore = [
+	"E201", "E202", "E203", "E221", "E222", "E241", # Allow extra whitespace.
 	"E226",  # Allow 4*6 + 8
 	"E402",  # Allow module level import later in the file.
 	"E721",  # Allow using type(x) is Class
