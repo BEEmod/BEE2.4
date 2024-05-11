@@ -186,7 +186,10 @@ class Tracer(trio.abc.Instrument):
         """Setup vars when a task is spawned."""
         self.elapsed[task] = 0.0
         self.start_time[task] = None
-        self.args[task] = task.coro.cr_frame.f_locals.copy()
+        if task.coro.cr_frame is not None:
+            self.args[task] = task.coro.cr_frame.f_locals.copy()
+        else:
+            self.args[task] = {'???': '???'}
 
     @override
     def before_task_step(self, task: trio.lowlevel.Task) -> None:
@@ -210,7 +213,7 @@ class Tracer(trio.abc.Instrument):
                     LOGGER.warning(
                         'Task didn\'t yield ({:.02f}ms): {!r}:{}, args={}',
                         change*1000,
-                        task, task.coro.cr_frame.f_lineno,
+                        task, task.coro.cr_code.co_firstlineno,
                         self.get_args(task),
                     )
 
