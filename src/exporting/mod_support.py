@@ -1,8 +1,9 @@
 """Special behaviour for detecting and copying files from Mel and Tag."""
+from __future__ import annotations
+from typing import Final, Iterable, Iterator, Sequence, TYPE_CHECKING
 import math
 import os
 from pathlib import Path
-from typing import Final, Iterable, Iterator, Sequence, TYPE_CHECKING
 
 import srctools.logger
 import trio

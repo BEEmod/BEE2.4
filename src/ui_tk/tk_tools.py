@@ -2,6 +2,7 @@
 General code used for tkinter portions.
 
 """
+from __future__ import annotations
 from typing import (
     Generic, overload, cast, Any, TypeVar, Protocol, Callable, Literal, NoReturn, TypedDict
 )

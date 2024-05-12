@@ -1,4 +1,5 @@
 """Connect Trio and TK together, then run the application."""
+from __future__ import annotations
 from typing import Awaitable, Callable, Any, ClassVar, Deque, Dict, Optional, List, Tuple
 from typing_extensions import override
 import collections

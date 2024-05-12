@@ -693,7 +693,7 @@ def reset_panes() -> None:
 def suggested_refresh() -> None:
     """Enable or disable the suggestion setting button."""
     if 'suggested_style' in UI:
-        windows: list[SelectorWin[...]] = [
+        windows: List[SelectorWin[...]] = [
             voice_win, skybox_win, elev_win,
             *music_conf.WINDOWS.values(),
         ]

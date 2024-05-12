@@ -1,4 +1,5 @@
-from typing import List, Set, Iterator
+from __future__ import annotations
+from collections.abc import Iterator
 
 from quote_pack import Line, Quote, QuoteEvent, Group, QuoteInfo, Response, Monitor, RESPONSE_NAMES
 from transtoken import AppError, TransToken, TransTokenSource
@@ -82,7 +83,7 @@ class QuotePack(PakObject, needs_foreground=True, style_suggest_key='quote'):
         global_bullseye = quotes_kv['bullseye', '']
         groups: dict[str, Group] = {}
         events: dict[str, QuoteEvent] = {}
-        responses: dict[Response, List[Line]] = {}
+        responses: dict[Response, list[Line]] = {}
         midchamber: list[Quote] = []
 
         for group_kv in quotes_kv.find_all('Group'):
@@ -180,7 +181,7 @@ class QuotePack(PakObject, needs_foreground=True, style_suggest_key='quote'):
     @classmethod
     async def post_parse(cls, packset: PackagesSet) -> None:
         """Verify no quote packs have duplicate IDs."""
-        used: Set[str] = set()
+        used: set[str] = set()
         voice: QuotePack
         for voice in packset.all_obj(cls):
             for group in voice.data.groups.values():

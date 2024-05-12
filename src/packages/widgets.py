@@ -1,4 +1,5 @@
 """Customizable configuration for specific items or groups of them."""
+from __future__ import annotations
 from typing import (
     Any, Callable, Dict, Generic, Iterable, Iterator, List, Optional, Protocol, Set,
     Tuple, Type, TypeVar,
@@ -47,16 +48,15 @@ class WidgetType:
 @attrs.frozen
 class WidgetTypeWithConf(WidgetType, Generic[ConfT]):
     """Information about a type of widget, that requires configuration."""
-    conf_type: Type[ConfT]
+    conf_type: type[ConfT]
 
 
 # Maps widget type names to the type info.
-WIDGET_KINDS: Dict[str, WidgetType] = {}
-CLS_TO_KIND: Dict[Type[ConfigProto], WidgetTypeWithConf[Any]] = {}
+WIDGET_KINDS: dict[str, WidgetType] = {}
+CLS_TO_KIND: dict[type[ConfigProto], WidgetTypeWithConf[Any]] = {}
 
 
-
-def register(*names: str, wide: bool = False) -> Callable[[Type[ConfT]], Type[ConfT]]:
+def register(*names: str, wide: bool = False) -> Callable[[type[ConfT]], type[ConfT]]:
     """Register a widget type that takes config.
 
     If wide is set, the widget is put into a labelframe, instead of having a label to the side.
@@ -64,7 +64,7 @@ def register(*names: str, wide: bool = False) -> Callable[[Type[ConfT]], Type[Co
     if not names:
         raise TypeError('No name defined!')
 
-    def deco(cls: Type[ConfT]) -> Type[ConfT]:
+    def deco(cls: type[ConfT]) -> type[ConfT]:
         """Do the registration."""
         kind = WidgetTypeWithConf(names[0], wide, cls)
         assert cls not in CLS_TO_KIND, cls
@@ -130,7 +130,7 @@ class SingleWidget(Widget):
 class MultiWidget(Widget):
     """Represents a group of multiple widgets for all the timer values."""
     use_inf: bool  # For timer, is infinite valid?
-    holders: Dict[TimerNum, AsyncValue[str]]
+    holders: dict[TimerNum, AsyncValue[str]]
 
     async def apply_conf(self, data: WidgetConfig) -> None:
         """Apply the configuration to the UI."""
@@ -168,8 +168,8 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
         conf_id: str,
         group_name: TransToken,
         desc: tkMarkdown.MarkdownData,
-        widgets: List[SingleWidget],
-        multi_widgets: List[MultiWidget],
+        widgets: list[SingleWidget],
+        multi_widgets: list[MultiWidget],
     ) -> None:
         self.id = conf_id
         self.name = group_name
@@ -178,7 +178,7 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
         self.multi_widgets = multi_widgets
 
     @classmethod
-    async def parse(cls, data: packages.ParseData) -> 'ConfigGroup':
+    async def parse(cls, data: packages.ParseData) -> ConfigGroup:
         """Parse the config group from info.txt."""
         props = data.info
 

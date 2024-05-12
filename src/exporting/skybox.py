@@ -1,4 +1,5 @@
 """Export the selected skybox/fog configuration."""
+from __future__ import annotations
 from srctools import bool_as_int
 
 from . import ExportData, STEPS, StepResource

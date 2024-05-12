@@ -1,4 +1,5 @@
 """Generate fizzler side materials."""
+from __future__ import annotations
 from pathlib import Path
 
 from srctools.math import FrozenVec, format_float
