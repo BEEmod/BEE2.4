@@ -38,7 +38,7 @@ if TYPE_CHECKING:
 
 TRANS_MISSING_FILE = TransToken.ui(
     "Compiler file {file} missing. "
-    "You will need to verify the game's cache in Steam to get these files back. "
+    "You will need to verify the game's files in Steam to get these files back. "
     "You can then export again."
 )
 TRANS_PERMISSION_FAIL = TransToken.ui(
