@@ -1088,6 +1088,8 @@ def edit_panel(vmf: VMF, inst: Entity, props: Keyvalues, create: bool) -> None:
     origin = Vec.from_str(inst['origin'])
     uaxis, vaxis = Vec.INV_AXIS[normal.axis()]
 
+    add_debug = conditions.fetch_debug_visgroup(vmf, 'EditPanel')
+
     points: set[FrozenVec] = set()
 
     if 'point' in props:
@@ -1108,11 +1110,14 @@ def edit_panel(vmf: VMF, inst: Entity, props: Keyvalues, create: bool) -> None:
         })
 
     tiles_to_uv: dict[tiling.TileDef, set[tuple[int, int]]] = defaultdict(set)
+    normal_ang = normal.to_angle()
     for fpos in points:
         try:
             tile, u, v = tiling.find_tile(fpos, normal, force=create)
         except KeyError:
+            add_debug('info_null', origin=fpos, angles=normal_ang, targetname='point')
             continue
+        add_debug('info_target', origin=fpos, angles=normal_ang, targetname='point')
         tiles_to_uv[tile].add((u, v))
 
     if not tiles_to_uv:
@@ -1131,6 +1136,7 @@ def edit_panel(vmf: VMF, inst: Entity, props: Keyvalues, create: bool) -> None:
             # Individually specifying offsets.
             for bevel_str in bevel_prop.as_array():
                 bevel_point = Vec.from_str(bevel_str) @ orient + origin
+                add_debug('info_target', origin=bevel_point, targetname='bevel')
                 bevel_world.add((int(bevel_point[uaxis]), int(bevel_point[vaxis])))
         elif srctools.conv_bool(bevel_prop.value):
             # Fill the bounding box.
@@ -1139,6 +1145,7 @@ def edit_panel(vmf: VMF, inst: Entity, props: Keyvalues, create: bool) -> None:
             bbox_min -= off
             bbox_max += off
             for fpos in FrozenVec.iter_grid(bbox_min, bbox_max, 32):
+                add_debug('info_target', origin=fpos, targetname='bevel')
                 if fpos not in points:
                     bevel_world.add((int(fpos[uaxis]), int(fpos[vaxis])))
         # else: No bevels.
