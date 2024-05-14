@@ -157,12 +157,13 @@ class ModelSwapMeth(Enum):
 
 
 class CubePaintType(Enum):
-    """If a Cube Painter is present, indicates the type of gel to apply.
+    """Indicates the type of gel to apply.
 
     The value is the engine paint index.
     """
     BOUNCE = 0
     SPEED = 2
+    CLEAR = 4
 
 
 class CubeSkins(NamedTuple):
@@ -183,9 +184,9 @@ class CubeSkins(NamedTuple):
         """Check if this has a rusty skin."""
         return self.clean != self.rusty
 
-    def spawn_skin(self, paint: CubePaintType | None) -> int:
+    def spawn_skin(self, paint: CubePaintType) -> int:
         """Return the skin this paint would spawn with."""
-        if paint is None:
+        if paint is CubePaintType.CLEAR:
             return self.clean[0]
         elif paint is CubePaintType.BOUNCE:
             return self.bounce[0]
@@ -584,7 +585,7 @@ class CubePair:
         self.cube_fixup = cube_fixup
 
         # If set, the cube has this paint type.
-        self.paint_type: CubePaintType | None = None
+        self.paint_type: CubePaintType = CubePaintType.CLEAR
 
         # If set, this is quantum-entangled.
         self.superpos: Superposition | None = None
@@ -1438,6 +1439,8 @@ def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
             except ValueError:
                 # Don't touch if not bounce/speed.
                 continue
+            if paint_type is CubePaintType.CLEAR:
+                continue
 
             # Only 'use up' one splat, so you can place multiple to apply them
             # to both the cube and surface.
@@ -1673,7 +1676,7 @@ def make_cube(
         # Do not deal with the rest of the logic here.
         return False, ent
 
-    if pair.paint_type is not None:
+    if pair.paint_type is not CubePaintType.CLEAR:
         if is_frank:
             # Special case - frankenturrets don't have inputs for it.
             # We need a sprayer to generate the actual paint,
@@ -1684,6 +1687,8 @@ def make_cube(
                 ent['rendercolor'] = '255 106 0'
             elif pair.paint_type is CubePaintType.BOUNCE:
                 ent['rendercolor'] = '0 165 255'
+            else:
+                assert_never(pair.paint_type)
 
             vmf.create_ent(
                 targetname=conditions.local_name(targ_inst, 'cube_addon_painter'),
@@ -1764,7 +1769,7 @@ def make_cube(
                     )
                 )
                 # Don't paint it on spawn.
-                spawn_paint = None
+                spawn_paint = CubePaintType.CLEAR
 
     has_addon_inst = False
     vscripts = []
@@ -1891,7 +1896,7 @@ def generate_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
         if pair.is_superpos_ghost:
             # Ghost does not have functionality, and cannot be painted.
             pair.addons.clear()
-            pair.paint_type = None
+            pair.paint_type = CubePaintType.CLEAR
 
         # Add the custom model logic. But skip if we use the rusty version.
         # That overrides it to be using the normal model.
@@ -1915,7 +1920,7 @@ def generate_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
                     pair.drop_type is not None and
                     pair.drop_type.bounce_paint_file.casefold() != '<prepaint>'
                 ):
-                    spawn_paint = None
+                    spawn_paint = CubePaintType.CLEAR
                 else:
                     spawn_paint = pair.paint_type
 
