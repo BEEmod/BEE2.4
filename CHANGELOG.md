@@ -19,6 +19,9 @@
 * Shut down the error server automatically when Portal 2 quits.
 * Added additional EXEs for `compiler_settings.exe` and `backup.exe`. These 
   allow quickly opening just these windows.
+* The logic for detecting paint splats placed on cubes is improved to 
+  prioritise gel placed directly on droppers. In particular a cleansing gel
+  splat can be placed on the dropper to allow the floor below to still be painted.
 
 ### UCP-Relevant changes:
 * Added `sky_draw_first` option to skyboxes, which can fix some rendering bugs 

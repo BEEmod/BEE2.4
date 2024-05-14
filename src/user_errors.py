@@ -286,6 +286,16 @@ TOK_CUBE_DROPPER_LINKED = TransToken.ui(
     'Dropper above custom cube of type <var>{type}</var> is already linked! Custom cubes convert'
     'droppers above them into their type, to allow having droppers.',
 )
+TOK_CUBE_UNLINKED_COLOURISER = TransToken.ui(
+    'A cube colouriser must be placed onto a dropper or cube to set the colour, '
+    'it cannot be placed by itself.'
+)
+TOK_CUBE_MULTIPLE_PAINTS = TransToken.ui(
+    'Multiple paint splats were placed on this cube, meaning it is unclear '
+    "which gel to start the cube painted with. Remove all but one type. If you're wanting to "
+    'paint the floor below the cube differently to the dropper, place a different splat on '
+    'the ceiling.'
+)
 TOK_CUBE_SUPERPOS_BAD_REAL = TransToken.ui(
     'Superposition Entanglers must be placed on top of a single dropper.'
 )

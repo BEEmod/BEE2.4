@@ -1,6 +1,7 @@
 """Implement cubes and droppers."""
 from __future__ import annotations
 
+from collections import defaultdict
 from contextlib import suppress
 from weakref import WeakKeyDictionary
 
@@ -1390,6 +1391,11 @@ def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
         coloriser_inst, superpos_inst, splat_inst,
     )
 
+    # For each cube pair, a list of paint splats on the same surface, and on the opposite side.
+    paint_splats: dict[CubePair, tuple[
+        list[tuple[Entity, CubePaintType]], list[tuple[Entity, CubePaintType]],
+    ]] = defaultdict(lambda: ([], []))
+
     for inst in vmf.by_class['func_instance']:
         file = inst['file'].casefold()
 
@@ -1404,12 +1410,14 @@ def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
             continue
 
         pairs: list[CubePair] = []
+        direct_pair: CubePair | None = None
+        opposite_pair: CubePair | None = None
 
         origin = Vec.from_str(inst['origin'])
         orient = Matrix.from_angstr(inst['angles'])
 
         with suppress(KeyError):
-            pairs.append(CUBE_POS[FrozenVec(origin // 128)])
+            direct_pair = CUBE_POS[FrozenVec(origin // 128)]
 
         # If pointing up, check the ceiling too, so droppers can find a
         # colorizer
@@ -1420,7 +1428,7 @@ def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
                 direction=(0, 0, 1),
             ) // 128
             with suppress(KeyError):
-                pairs.append(CUBE_POS[pos.freeze()])
+                opposite_pair = CUBE_POS[pos.freeze()]
 
         if kind == 'color':
             # The instance is useless now we know about it.
@@ -1431,27 +1439,27 @@ def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
                 '255 255 255',
                 timer_delay=inst.fixup.int('$timer_delay'),
             ))
-            for pair in pairs:
-                pair.tint = color.copy()
+            if direct_pair is not None:
+                direct_pair.tint = color.copy()
+            elif opposite_pair is not None:
+                opposite_pair.tint = color.copy()
+            else:
+                raise user_errors.UserError(
+                    user_errors.TOK_CUBE_UNLINKED_COLOURISER,
+                    voxels=[Vec.from_str(inst['origin'])],
+                )
         elif kind == 'splat':
             try:
                 paint_type = CubePaintType(inst.fixup.int('$paint_type'))
             except ValueError:
                 # Don't touch if not bounce/speed.
                 continue
-            if paint_type is CubePaintType.CLEAR:
-                continue
 
-            # Only 'use up' one splat, so you can place multiple to apply them
-            # to both the cube and surface.
-            used = False
-
-            for pair in pairs:
-                if pair.paint_type is None:
-                    pair.paint_type = paint_type
-                    used = True
-            if used:
-                inst.remove()
+            if direct_pair is not None:
+                paint_splats[direct_pair][0].append((inst, paint_type))
+            elif opposite_pair is not None:
+                paint_splats[opposite_pair][1].append((inst, paint_type))
+            # Otherwise, a paint splat unrelated to droppers.
         elif kind == 'superpos':
             try:
                 superpos_item = connections.ITEMS[inst['targetname']]
@@ -1460,14 +1468,16 @@ def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
                 continue
             real_pair: CubePair
             conn: connections.Connection
-            try:
-                # Don't link to dropperless cubes.
-                [real_pair] = filter(lambda p: p.dropper is not None, pairs)
-            except ValueError:
+            # Don't link to dropperless cubes.
+            if direct_pair is not None and direct_pair.dropper is not None:
+                real_pair = direct_pair
+            elif opposite_pair is not None and opposite_pair.dropper is not None:
+                real_pair = opposite_pair
+            else:
                 raise user_errors.UserError(
                     user_errors.TOK_CUBE_SUPERPOS_BAD_REAL,
                     voxels=[Vec.from_str(inst['origin'])],
-                ) from None
+                )
             try:
                 [conn] = superpos_item.outputs
                 ghost_pair = INST_TO_PAIR[conn.to_item.inst]
@@ -1485,7 +1495,10 @@ def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
                     user_errors.TOK_CUBE_SUPERPOS_MULTILINK,
                     voxels=[
                         Vec.from_str(inst['origin']),
-                        real_pair.error_pos(),
+                        # Show the existing pair and the dropper we're wanting to add.
+                        ghost_pair.error_pos(),
+                        real_pair.superpos.real.error_pos(),
+                        real_pair.superpos.ghost.error_pos(),
                     ]
                 )
             if ghost_pair.superpos is not None:
@@ -1493,7 +1506,9 @@ def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
                     user_errors.TOK_CUBE_SUPERPOS_MULTILINK,
                     voxels=[
                         Vec.from_str(inst['origin']),
-                        ghost_pair.error_pos(),
+                        real_pair.error_pos(),
+                        ghost_pair.superpos.real.error_pos(),
+                        ghost_pair.superpos.ghost.error_pos(),
                     ]
                 )
             real_pair.superpos = ghost_pair.superpos = Superposition(
@@ -1508,6 +1523,9 @@ def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
     # and set Voice 'Has' attrs.
     if PAIRS:
         info.set_attr('cube')
+
+    # Don't allow a single splat to be used for multiple droppers.
+    used_splats: set[Entity] = set()
 
     for pair in PAIRS:
         # For superposition cubes, if there isn't a colouriser applied use some preset colours.
@@ -1527,6 +1545,28 @@ def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
             pair.cube_type.color_in_map = True
         else:
             pair.cube_type.in_map = True
+
+        # Figure out which paint splat to apply, if any. We prioritise splats
+        # placed directly against the dropper.
+        direct_splats, opposite_splats = paint_splats[pair]
+        # We only use the opposite splats if no splats were placed against the dropper, and it
+        # actually has both a cube and dropper.
+        splat_list = [splat for splat in direct_splats if splat[0] not in used_splats]
+        if not splat_list and pair.dropper is not None:
+            splat_list = [splat for splat in opposite_splats if splat[0] not in used_splats]
+        if splat_list:
+            paint_types = {paint_type for ent, paint_type in splat_list}
+            if len(paint_types) > 1:
+                raise user_errors.UserError(
+                    user_errors.TOK_CUBE_MULTIPLE_PAINTS,
+                    voxels=[Vec.from_str(inst['origin']) for inst, paint_type in splat_list],
+                )
+            # "Use up" and delete the splat, allowing multiple to be placed to also put gel on
+            # Note we also detect cleansing gel, allowing that to be used to override gel on the
+            # floor.
+            splat, pair.paint_type = splat_list[0]
+            used_splats.add(splat)
+            splat.remove()
 
         if pair.paint_type is CubePaintType.BOUNCE:
             info.set_attr('gel', 'bouncegel', 'BlueGel')
