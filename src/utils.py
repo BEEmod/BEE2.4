@@ -82,9 +82,9 @@ copyreg.add_extension('srctools.math', '_mk_fmat', 245)
 copyreg.add_extension('srctools.keyvalues', 'Keyvalues', 246)
 
 lcm: Callable[[int, int], int]
-try:
+if sys.version_info >= (3, 9):
     from math import lcm
-except ImportError:
+else:
     def lcm(a: int, b: int) -> int:
         """Calculate the lowest common multiple.
 
@@ -93,9 +93,9 @@ except ImportError:
         return (a * b) // math.gcd(a, b)
 
 
-try:
+if sys.version_info >= (3, 10):
     from contextlib import aclosing
-except ImportError:  # TODO Directly use stdlib when we drop 3.9 and below
+else:  # TODO Directly use stdlib when we drop 3.9 and below
     from async_generator import aclosing  # type: ignore  # noqa
 
 
