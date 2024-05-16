@@ -56,7 +56,14 @@ def _points(*pattern: str) -> List[Tuple[int, int]]:
     (3, 3), (1, 0), (0, 1), (1, 2), (2, 2), (4, 4), (0, 0), (-2, 10), (10, -5), (50, 50),
 ])
 @pytest.mark.parametrize('pattern', [
-    [(x, y) for x in  range(5) for y in range(5)],
+    [(x, y) for x in range(5) for y in range(5)],
+    _points(
+        '0...3',
+        '.....',
+        '...1.',
+        '.....',
+        '2...4',
+    ),
     _points(
         '.7..8',
         '..6..',
@@ -76,7 +83,7 @@ def _points(*pattern: str) -> List[Tuple[int, int]]:
         '..3..',
         '54..0',
     ),
-], ids=['order', 'patA', 'patB', 'patC'])
+], ids=['order', 'patA', 'patB', 'patC', 'patD'])
 def test_grid_insertion_complex(pattern: List[Tuple[int, int]], off_x: int, off_y: int) -> None:
     """Insert in various patterns, to test the dynamic resizing."""
     grid = PlaneGrid[object]()
@@ -103,6 +110,8 @@ def test_grid_insertion_complex(pattern: List[Tuple[int, int]], off_x: int, off_
         assert grid.maxes == (max_x, max_y)
         assert grid.dimensions == (max_x - min_x, max_y - min_y)
 
+        assert set(grid) == set(backup.keys())
+        assert set(grid.keys()) == set(backup.keys())
         assert dict(grid.items()) == backup
         for (chk_x, chk_y), check in backup.items():
             assert grid[chk_x, chk_y] == check, backup

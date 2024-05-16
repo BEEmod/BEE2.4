@@ -364,6 +364,19 @@ class BarrierType:
         )
 
 
+def _check_barrier_type_assignment(
+    self: Barrier,
+    attr: attrs.Attribute[BarrierType],
+    new_type: BarrierType,
+) -> None:
+    """Prevent altering BARRIER_EMPTY."""
+    try:
+        if self is BARRIER_EMPTY:
+            raise ValueError('BARRIER_EMPTY is immutable!')
+    except NameError:
+        pass   # We're constructing BARRIER_EMPTY.
+
+
 @attrs.define(eq=False, kw_only=True)
 class Barrier:
     """A glass/grating item.
@@ -371,7 +384,7 @@ class Barrier:
     BARRIER_EMPTY is unique, but others may not be if created dynamically!
     """
     name: str
-    type: BarrierType
+    type: BarrierType = attrs.field(validator=_check_barrier_type_assignment)
     item: connections.Item | None = None
     instances: List[Entity] = attrs.Factory(list)
     # Set only for vanilla glass/grating items. Stores a list of the
@@ -829,6 +842,7 @@ def parse_map(vmf: VMF, conn_items: Mapping[str, connections.Item]) -> None:
     The frames are updated with a fixup var, as appropriate.
     Requires connection items to be parsed!
     """
+    LOGGER.info('Parsing barrier items...')
     frame_inst = instanceLocs.resolve_filter('[glass_frames]', silent=True)
     segment_inst = instanceLocs.resolve_filter('[glass_128]', silent=True)
     barrier_pos_lists: Dict[str, List[Tuple[PlaneKey, int, int]]] = {}
@@ -905,9 +919,8 @@ def parse_map(vmf: VMF, conn_items: Mapping[str, connections.Item]) -> None:
                     plane_pos = center + offset * norm
                     plane = PlaneKey(-norm, plane_pos)
                     local = plane.world_to_plane(plane_pos)
-                    try:
-                        barrier = BARRIERS[plane][local.x // 32, local.y // 32]
-                    except KeyError:
+                    barrier = BARRIERS[plane][local.x // 32, local.y // 32]
+                    if barrier is BARRIER_EMPTY:
                         continue  # Try other side?
                     found = True
 
