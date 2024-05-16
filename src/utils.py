@@ -70,7 +70,7 @@ STEAM_IDS = {
 }
 
 
-# Add core srctools types into the pickle registry, so they can be more directly
+# Add very common types into the pickle registry, so they can be more directly
 # loaded.
 # IDs 240 - 255 are available for application uses.
 copyreg.add_extension('srctools.math', '_mk_vec', 240)
@@ -80,6 +80,12 @@ copyreg.add_extension('srctools.math', '_mk_fvec', 243)
 copyreg.add_extension('srctools.math', '_mk_fang', 244)
 copyreg.add_extension('srctools.math', '_mk_fmat', 245)
 copyreg.add_extension('srctools.keyvalues', 'Keyvalues', 246)
+copyreg.add_extension('transtoken', 'TransToken', 247)
+copyreg.add_extension('transtoken', 'PluralTransToken', 248)
+copyreg.add_extension('transtoken', 'JoinTransToken', 249)
+copyreg.add_extension('transtoken', 'ListTransToken', 250)
+copyreg.add_extension('pathlib', 'Path', 251)
+copyreg.add_extension('pathlib', 'PurePosixPath', 252)
 
 lcm: Callable[[int, int], int]
 if sys.version_info >= (3, 9):
