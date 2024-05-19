@@ -31,7 +31,7 @@ VertInd = TypeAliasType("VertInd", Literal[0, 1, 2, 3, 4, 5, 6, 7])
 ItemPos = TypeAliasType("ItemPos", Dict[Tuple[HorizInd, VertInd], Tuple[str, int]])
 HORIZ: Final[Sequence[HorizInd]] = cast(Sequence[HorizInd], range(4))
 VERT: Final[Sequence[VertInd]] = cast(Sequence[VertInd], range(8))
-COORDS: Sequence[Tuple[HorizInd, VertInd]] = [
+COORDS: Sequence[tuple[HorizInd, VertInd]] = [
     (x, y) for y in VERT for x in HORIZ
 ]
 
@@ -439,12 +439,9 @@ class Palette:
             os.remove(os.path.join(PAL_DIR, self.filename))
 
 
-def load_palettes() -> Iterator[Palette]:
-    """Scan and read in all palettes. Legacy files will be converted in the process."""
-    name: str
-    # Load our builtin palettes.
+def get_builtin_palettes() -> Iterator[Palette]:
+    """Yield the buildin palette definitions."""
     for name, items in DEFAULT_PALETTES.items():
-        LOGGER.info('Loading builtin "{}"', name)
         yield Palette(
             name,
             {
@@ -458,6 +455,11 @@ def load_palettes() -> Iterator[Palette]:
             group=GROUP_BUILTIN,
             uuid=uuid5(consts.PALETTE_NS, name),
         )
+
+
+def load_palettes() -> Iterator[Palette]:
+    """Scan and read in all palettes. Legacy files will be converted in the process."""
+    yield from get_builtin_palettes()
 
     for name in os.listdir(PAL_DIR):  # this is both files and dirs
         LOGGER.info('Loading "{}"', name)
