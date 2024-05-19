@@ -1,16 +1,18 @@
 """Defines the palette data structure and file saving/loading logic."""
 from __future__ import annotations
-from typing import IO, Sequence, Iterator, Dict, Tuple, cast
+from typing import IO, Dict, Tuple, cast
+
+from collections.abc import Sequence, Iterator
+from typing_extensions import TypeAliasType, TypeGuard, Literal, Final
+from uuid import UUID, uuid4, uuid5
 import os
 import shutil
 import zipfile
 import random
 import io
-from typing_extensions import TypeAliasType, TypeGuard, Literal, Final
-from uuid import UUID, uuid4, uuid5
 
-import srctools.logger
 from srctools import Keyvalues, NoKeyError, KeyValError
+import srctools.logger
 
 from transtoken import TransToken
 import config
@@ -288,9 +290,12 @@ class Palette:
         return f'<Palette {self.name!r} @ {self.uuid}>'
 
     @classmethod
-    def parse(cls, kv: Keyvalues, path: str) -> Palette:
-        """Parse a palette from a file."""
-        needs_save = False
+    def parse(cls, kv: Keyvalues, path: str) -> tuple[Palette, bool]:
+        """Parse a palette from a file.
+
+        The returned boolean indicates if it should be resaved.
+        """
+        needs_upgrade = False
         version = kv.int('version', 1)
         name = kv['Name', '??']
 
@@ -324,7 +329,7 @@ class Palette:
             raise FutureVersionError(version)
 
         if version != CUR_VERSION:
-            needs_save = True
+            needs_upgrade = True
 
         trans_name = kv['TransName', '']
         if trans_name:
@@ -335,7 +340,7 @@ class Palette:
                 uuid = UUID(hex=kv['UUID'])
             except (ValueError, LookupError):
                 uuid = uuid4()
-                needs_save = True
+                needs_upgrade = True
 
         settings: config.Config | None
         try:
@@ -345,7 +350,7 @@ class Palette:
         else:
             settings, upgraded_settings = config.PALETTE.parse_kv1(settings_conf)
             if upgraded_settings:
-                needs_save = True
+                needs_upgrade = True
 
         pal = Palette(
             name,
@@ -357,10 +362,7 @@ class Palette:
             uuid=uuid,
             settings=settings,
         )
-        if needs_save:
-            LOGGER.info('Resaving older palette file {}', pal.filename)
-            pal.save(ignore_readonly=True)
-        return pal
+        return pal, needs_upgrade
 
     def save(self, ignore_readonly: bool = False) -> None:
         """Save the palette file into the specified location.
@@ -469,13 +471,18 @@ def load_palettes() -> Iterator[Palette]:
                     with srctools.logger.context(name):
                         with open(path, encoding='utf8') as f:
                             kv = Keyvalues.parse(f, path)
-                        yield Palette.parse(kv, path)
+                        pal, needs_upgrade = Palette.parse(kv, path)
                 except KeyValError as exc:
                     # We don't need the traceback, this isn't an error in the app
                     # itself.
                     LOGGER.warning('Could not parse palette file, skipping:\n{}', exc)
                 except FutureVersionError as fut:
                     LOGGER.warning('Palette file "{}" using future version {}, skipping...',  name, fut.version)
+                else:
+                    if needs_upgrade:
+                        LOGGER.info('Resaving older palette file {}', pal.filename)
+                        pal.save(ignore_readonly=True)
+                    yield pal
                 continue
             elif name.endswith('.zip'):
                 # Extract from a zip
