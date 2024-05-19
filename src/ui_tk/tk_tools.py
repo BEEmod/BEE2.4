@@ -333,6 +333,21 @@ class GridArgs(TypedDict, total=False):
     pady: float | tuple[float, float]
 
 
+class PlaceArgs(TypedDict, total=False):
+    """Arguments that can be passed to widget.place(). This can be used for **kwargs."""
+    anchor: Literal["nw", "n", "ne", "w", "center", "e", "sw", "s", "se"]
+    bordermode: Literal["inside", "outside", "ignore"]
+    width: str | float
+    height: str | float
+    x: str | float
+    y: str | float
+    relheight: str | float
+    relwidth: str | float
+    relx: str | float
+    rely: str | float
+    in_: tk.Misc
+
+
 class _EventDeco(Protocol[AnyWidT]):
     def __call__(self, func: EventFunc[AnyWidT], /) -> EventFunc[AnyWidT]:
         ...
