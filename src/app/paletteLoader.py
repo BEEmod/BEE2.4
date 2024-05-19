@@ -288,19 +288,17 @@ class Palette:
         return f'<Palette {self.name!r} @ {self.uuid}>'
 
     @classmethod
-    def parse(cls, path: str) -> Palette:
+    def parse(cls, kv: Keyvalues, path: str) -> Palette:
         """Parse a palette from a file."""
         needs_save = False
-        with open(path, encoding='utf8') as f:
-            props = Keyvalues.parse(f, path)
-        version = props.int('version', 1)
-        name = props['Name', '??']
+        version = kv.int('version', 1)
+        name = kv['Name', '??']
 
         items: ItemPos = {}
 
         # v2 reused the Items key, v3 restores a copy of the old block for backward compat.
         if version in (2, 3):
-            for item_prop in props.find_children('Positions' if version == 3 else 'Items'):
+            for item_prop in kv.find_children('Positions' if version == 3 else 'Items'):
                 try:
                     x_str, y_str = item_prop.name.split()
                     x = int(x_str)
@@ -318,7 +316,7 @@ class Palette:
                 items[x, y] = (item_id, item_prop.int('subtype', 0))
 
         elif version == 1:
-            for pos, item in zip(COORDS, props.find_children('Items')):
+            for pos, item in zip(COORDS, kv.find_children('Items')):
                 items[pos] = (item.real_name, int(item.value))
         elif version < 1:
             raise ValueError(f'Invalid version {version}!')
@@ -328,20 +326,20 @@ class Palette:
         if version != CUR_VERSION:
             needs_save = True
 
-        trans_name = props['TransName', '']
+        trans_name = kv['TransName', '']
         if trans_name:
             # Builtin, force a fixed uuid. This is mainly for LAST_EXPORT.
             uuid = uuid5(consts.PALETTE_NS, trans_name)
         else:
             try:
-                uuid = UUID(hex=props['UUID'])
+                uuid = UUID(hex=kv['UUID'])
             except (ValueError, LookupError):
                 uuid = uuid4()
                 needs_save = True
 
         settings: config.Config | None
         try:
-            settings_conf = props.find_key('Settings')
+            settings_conf = kv.find_key('Settings')
         except NoKeyError:
             settings = None
         else:
@@ -353,8 +351,8 @@ class Palette:
             name,
             items,
             trans_name=trans_name,
-            group=props['group', ''],
-            readonly=props.bool('readonly'),
+            group=kv['group', ''],
+            readonly=kv.bool('readonly'),
             filename=os.path.basename(path),
             uuid=uuid,
             settings=settings,
@@ -469,7 +467,9 @@ def load_palettes() -> Iterator[Palette]:
             if name.endswith(PAL_EXT):
                 try:
                     with srctools.logger.context(name):
-                        yield Palette.parse(path)
+                        with open(path, encoding='utf8') as f:
+                            kv = Keyvalues.parse(f, path)
+                        yield Palette.parse(kv, path)
                 except KeyValError as exc:
                     # We don't need the traceback, this isn't an error in the app
                     # itself.
@@ -489,9 +489,9 @@ def load_palettes() -> Iterator[Palette]:
             else:  # A non-palette file, skip it.
                 LOGGER.debug('Skipping "{}"', name)
                 continue
-        except (KeyError, FileNotFoundError, zipfile.BadZipFile):
+        except (KeyError, FileNotFoundError, zipfile.BadZipFile) as exc:
             #  KeyError is returned by zipFile.open() if file is not present
-            LOGGER.warning('Bad palette file "{}"!', name)
+            LOGGER.warning('Bad palette file "{}"!', name, exc_info=exc)
             continue
         else:
             # Legacy parsing of BEE2.2 files..
