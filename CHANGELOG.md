@@ -1,6 +1,6 @@
 # Changelog
 
-# Version 4.44.1
+# Version `<dev>`
 
 ## New Features
 
@@ -12,7 +12,6 @@
   light temperature. 
 
 ### Enhancements
-* Remove some now-outdated splash screens.
 * Added the ability to show multiple warning messages or errors for problems 
   occurring during package loading and export.
 * Added signage configuration option to the item's context menu, to help make it more visible.
@@ -43,14 +42,20 @@
   but connects it to the original as an additional input. This significantly
   simplifies logic if an additional prerequisite is required for the item to turn
   on.
-
-### Bugfixes:
-* Fix add-game prompt failing to appear if installed fresh.
 * Fix catwalk end segment being placed at the top of upwards-facing stairs.
 * #2048: Fix ceiling Faith Plates not functioning correctly.
 * #2040: Warn if no compiler files were found when exporting.
 * #1343: Clone fizzler items if connected to multiple standing/reclined fizzlers.
 
+------------------------------------------
+
+# Version 4.44.1
+
+### Enhancements
+* Remove some now-outdated splash screens.
+
+### Bugfixes:
+* Fix add-game prompt failing to appear if installed fresh.
 
 ------------------------------------------
 
