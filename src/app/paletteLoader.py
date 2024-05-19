@@ -1,8 +1,8 @@
 """Defines the palette data structure and file saving/loading logic."""
 from __future__ import annotations
-from typing import IO, List, Dict, Tuple, Union, cast
+from typing import IO, List, Dict, Tuple, Union, Sequence, cast
 
-from collections.abc import Sequence, Iterator
+from collections.abc import Iterator
 from typing_extensions import TypeAliasType, TypeGuard, Literal, Final
 from uuid import UUID, uuid4, uuid5
 import os

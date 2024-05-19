@@ -91,7 +91,8 @@ async def test_nonfatal() -> None:
             task.append("before")
 
             error_block.add(exc1)
-            assert error_block.result is Result.PARTIAL
+            # Enum assert above makes Mypy think this cannot occur.
+            assert error_block.result is Result.PARTIAL  # type: ignore[comparison-overlap]
             task.append("mid")
 
             error_block.add(ExceptionGroup("two", [
@@ -144,7 +145,7 @@ async def test_fatal_only_err() -> None:
             task.append("before")
 
             error_block.add(exc1)
-            assert error_block.result is Result.PARTIAL
+            assert error_block.result is Result.PARTIAL  # type: ignore[comparison-overlap]
             task.append("mid")
 
             raise exc2
@@ -166,7 +167,7 @@ async def test_fatal_exc() -> None:
             task.append("before")
 
             error_block.add(exc)
-            assert error_block.result is Result.PARTIAL
+            assert error_block.result is Result.PARTIAL  # type: ignore[comparison-overlap]
             task.append("mid")
 
             raise unrelated
@@ -191,7 +192,7 @@ async def test_fatal_group() -> None:
             task.append("before")
 
             error_block.add(exc1)
-            assert error_block.result is Result.PARTIAL
+            assert error_block.result is Result.PARTIAL  # type: ignore[comparison-overlap]
             task.append("mid")
 
             raise group

@@ -1,7 +1,7 @@
 """Handles the UI required for saving and loading palettes."""
 from __future__ import annotations
 from collections.abc import Awaitable, Callable
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from tkinter import ttk
 import tkinter as tk
@@ -396,8 +396,8 @@ class PaletteUI:
             # Cancelled...
             return
         pal = Palette(name, self.get_items())
-        while pal.uuid in self.palettes:  # Should be impossible.
-            pal.uuid = paletteLoader.uuid4()
+        while pal.uuid in self.palettes:  # Should never occur, but check anyway.
+            pal.uuid = uuid4()
 
         if self.var_save_settings.get():
             pal.settings = config.APP.get_full_conf(config.PALETTE)

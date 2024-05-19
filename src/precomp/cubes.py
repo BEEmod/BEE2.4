@@ -658,7 +658,7 @@ class CubePair:
         return (
             not has_gel and
             self.cube_type.try_rusty and
-            self.paint_type is None and
+            self.paint_type is CubePaintType.CLEAR and
             self.tint is None and
             CUBE_SKINS[self.cube_type.type].has_rusty
         )
@@ -848,7 +848,8 @@ def cube_filter(vmf: VMF, pos: Vec, cubes: list[str]) -> str:
 
     # Some others which are predefined.
 
-    if len(inclusions) > len(CUBE_TYPES) / 2 and 0:
+    # TODO: Why is this disabled?
+    if len(inclusions) > len(CUBE_TYPES) / 2 and False:
         # If more than half of cubes are included, it's better to exclude
         # the missing ones.
         invert = True

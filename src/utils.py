@@ -347,7 +347,7 @@ def _exc_freeze(
 # See https://bugs.python.org/issue42369
 if sys.version_info < (3, 9) and hasattr(zipfile, '_SharedFile'):
     # noinspection PyProtectedMember
-    class _SharedZipFile(zipfile._SharedFile):  # type: ignore[name-defined, misc]
+    class _SharedZipFile(zipfile._SharedFile):  # type: ignore[name-defined]
         def __init__(self, *args: Any, **kwargs: Any) -> None:
             super().__init__(*args, **kwargs)
             # tell() reads the actual file position, but that may have been

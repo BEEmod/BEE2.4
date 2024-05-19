@@ -127,14 +127,18 @@ extend-immutable-calls = [
 mypy_path = "$MYPY_CONFIG_FILE_DIR/hammeraddons/src/"
 allow_redefinition = true
 check_untyped_defs = true
+extra_checks = true
+strict_equality = true
 strict_optional = true
 local_partial_types = true
+implicit_reexport = false
 # strict = true  # Only when overrides is gone.
 
 warn_unused_ignores = true
 warn_redundant_casts = true
 warn_return_any = true
 warn_no_return = true
+# warn_unreachable = true  # TODO: Bunch of errors still
 
 disallow_incomplete_defs = true
 disallow_untyped_defs = true
@@ -152,10 +156,11 @@ enable_error_code = [
 	'unimported-reveal',
 	'unreachable',
 	'unused-awaitable',
+	'comparison-overlap',
 ]
 
 [[tool.mypy.overrides]]
-# TODO
+# TODO: make these pass strict checks.
 module = [
 	'app.gameMan',
 	'app.backup',

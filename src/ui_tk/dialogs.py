@@ -1,7 +1,8 @@
 """A consistent interface for dialog boxes."""
+from __future__ import annotations
 from typing_extensions import override
-from typing import Callable, List, Optional, Tuple, Union
 
+from collections.abc import Callable
 from tkinter import simpledialog, ttk, commondialog
 import tkinter as tk
 
@@ -26,14 +27,14 @@ commondialog.Dialog.show = suppress_screens()(commondialog.Dialog.show)  # type:
 
 async def _messagebox(
     kind: str,
-    parent: Union[tk.Toplevel, tk.Tk],
+    parent: tk.Toplevel | tk.Tk,
     message: TransToken,
     title: TransToken,
     icon: Icon,
     detail: str,
 ) -> str:
     """Don't bother with `tkinter.messagebox`, it just calls this which is more flexible anyway."""
-    args: Tuple[str, ...] = (
+    args: tuple[str, ...] = (
         "tk_messageBox",
         "-type", kind,
         "-icon", icon.value,
@@ -51,7 +52,7 @@ async def _messagebox(
 
 class BasicQueryValidator(simpledialog.Dialog):
     """Implement the dialog with the simpledialog code."""
-    result: Optional[str]
+    result: str | None
     def __init__(
         self,
         parent: tk.Misc,
@@ -122,7 +123,7 @@ try:
 except ImportError:
     QueryValidator = BasicQueryValidator
 else:
-    class QueryValidator(Query):  # type: ignore[no-redef, misc]
+    class QueryValidator(Query):  # type: ignore[no-redef]
         """Implement using IDLE's better code for this."""
         def __init__(
             self,
@@ -146,7 +147,7 @@ else:
             """Wait for the query to close."""
             await self.__has_closed.wait()
 
-        def entry_ok(self) -> Optional[str]:
+        def entry_ok(self) -> str | None:
             """Return non-blank entry or None."""
             try:
                 return self.__validator(self.entry.get())
@@ -162,7 +163,7 @@ class TkDialogs(Dialogs):
     QUESTION = Icon.QUESTION
     ERROR = Icon.ERROR
 
-    def __init__(self, parent: Union[tk.Toplevel, tk.Tk]) -> None:
+    def __init__(self, parent: tk.Toplevel | tk.Tk) -> None:
         """Create with the specified parent."""
         self.parent = parent
 
@@ -218,7 +219,7 @@ class TkDialogs(Dialogs):
         title: TransToken = DEFAULT_TITLE,
         icon: Icon = Icon.QUESTION,
         detail: str = '',
-    ) -> Optional[bool]:
+    ) -> bool | None:
         """Show a message box with "Yes", "No" and "Cancel" buttons."""
         res = await _messagebox("yesnocancel", self.parent, message, title, icon, detail)
         if res == "yes":
@@ -237,7 +238,7 @@ class TkDialogs(Dialogs):
         title: TransToken = DEFAULT_TITLE,
         initial_value: TransToken = TransToken.BLANK,
         validator: Callable[[str], str] = validate_non_empty,
-    ) -> Optional[str]:
+    ) -> str | None:
         """Ask the user to enter a string."""
         with suppress_screens():
             # If the main loop isn't running, this doesn't work correctly.
