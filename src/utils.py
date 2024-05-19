@@ -36,7 +36,7 @@ __all__ = [
     'ObjectID', 'SpecialID', 'BlankID', 'ID_EMPTY', 'ID_NONE', 'ID_RANDOM',
     'obj_id', 'special_id', 'obj_id_optional', 'special_id_optional',
     'check_shift', 'fit', 'group_runs', 'restart_app', 'quit_app', 'set_readonly',
-    'unset_readonly', 'merge_tree', 'write_lang_pot',
+    'unset_readonly', 'merge_tree', 'write_lang_pot', 'aclosing', 'lcm',
 ]
 
 
@@ -347,7 +347,7 @@ def _exc_freeze(
 # See https://bugs.python.org/issue42369
 if sys.version_info < (3, 9) and hasattr(zipfile, '_SharedFile'):
     # noinspection PyProtectedMember
-    class _SharedZipFile(zipfile._SharedFile):  # type: ignore[name-defined]
+    class _SharedZipFile(zipfile._SharedFile):  # type: ignore[name-defined, misc]
         def __init__(self, *args: Any, **kwargs: Any) -> None:
             super().__init__(*args, **kwargs)
             # tell() reads the actual file position, but that may have been
