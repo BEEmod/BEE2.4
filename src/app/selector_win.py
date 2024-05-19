@@ -495,7 +495,7 @@ class PreviewWindow:
 
     def hide(self, _: tk.Event[tk.Misc] | None = None) -> None:
         """Swap grabs if the parent is modal."""
-        if self.parent.modal:
+        if self.parent is not None and self.parent.modal:
             self.win.grab_release()
             self.parent.win.grab_set()
         self.win.withdraw()
@@ -984,7 +984,7 @@ class SelectorWin(Generic[CallbackT]):
 
         # Wide before short.
         self.attrs = sorted(attributes, key=lambda at: 0 if at.type.is_wide else 1)
-        if attributes:
+        if self.attrs:
             attrs_frame = ttk.Frame(self.prop_frm)
             attrs_frame.grid(
                 row=5,
@@ -1127,7 +1127,7 @@ class SelectorWin(Generic[CallbackT]):
     @readonly.setter
     def readonly(self, value: bool) -> None:
         self._readonly = bool(value)
-        if self.display is None:
+        if self.display is None or self.disp_btn is None:
             # Widget hasn't been added yet, stop.
             # We update in the widget() method.
             return
@@ -1214,7 +1214,9 @@ class SelectorWin(Generic[CallbackT]):
             self.context_menu.add_cascade(menu=group._menu)
             set_menu_text(self.context_menu, self.group_names[group_key])
             # Track the menu's index. The one at the end is the one we just added.
-            group._menu_pos = self.context_menu.index('end')
+            menu_pos = self.context_menu.index('end')
+            assert menu_pos is not None, "Didn't add to the menu?"
+            group._menu_pos = menu_pos
         if self.win.winfo_ismapped():
             self.flow_items()
 
@@ -1285,7 +1287,7 @@ class SelectorWin(Generic[CallbackT]):
         if self.suggested and (force or self._suggested_rollover is not None):
             self._suggested_rollover = random.choice(self.suggested)
             self.disp_label.set(str(self._suggested_rollover.context_lbl))
-            self.display.after(1000, self._pick_suggested)
+            self.win.after(1000, self._pick_suggested)
 
     async def _update_translations_task(self) -> None:
         """Update translations."""
@@ -1442,13 +1444,15 @@ class SelectorWin(Generic[CallbackT]):
         else:
             self.prop_desc.set_text(item.desc)
 
-        self.selected.button.state(('!alternate',))
+        if self.selected.button is not None and item.button is not None:
+            self.selected.button.state(('!alternate',))
+            item.button.state(('alternate',))
         self.selected = item
-        item.button.state(('alternate',))
         self.scroll_to(item)
 
         if self.sampler:
-            is_playing = self.sampler.is_playing
+            assert self.samp_button is not None
+            is_playing = self.sampler.is_playing.value
             self.sampler.stop()
 
             self.sampler.cur_file = item.snd_sample

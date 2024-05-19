@@ -158,7 +158,6 @@ enable_error_code = [
 # TODO
 module = [
 	'app.gameMan',
-	'app.selector_win',
 	'app.backup',
 	'app.contextWin',
 	'app.UI',
