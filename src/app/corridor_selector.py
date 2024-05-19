@@ -131,9 +131,9 @@ class Selector(Generic[IconT, OptionRowT]):
     option_rows: list[OptionRowT]
 
     # The current state of the three main selector buttons.
-    state_orient: AsyncValue[corridor.Orient]
-    state_dir: AsyncValue[corridor.Direction]
-    state_mode: AsyncValue[corridor.GameMode]
+    state_orient: AsyncValue[Orient]
+    state_dir: AsyncValue[Direction]
+    state_mode: AsyncValue[GameMode]
 
     def __init__(self, conf: UIState) -> None:
         self.sticky_corr = None

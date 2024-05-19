@@ -974,7 +974,7 @@ def import_template(
                 if not coll_def.visgroups.issubset(chosen_groups):
                     continue
                 contents = (coll_def.bbox.contents & coll_mask) | coll_add
-                if contents is not contents.NOTHING:
+                if contents is not collisions.CollideType.NOTHING:
                     bbox = coll_def.bbox @ orient + origin
                     coll.add(bbox.with_attrs(name=targetname, contents=contents))
         else:
@@ -1184,7 +1184,7 @@ def retexture_template(
             # Only do the highest priority successful one.
             for side_id in color_picker.sides:
                 if force_colour_faces[side_id] is None:
-                    if tile_color is tile_color.WHITE:
+                    if tile_color is Portalable.WHITE:
                         force_colour_faces[side_id] = color_picker.force_tex_white or tile_color
                     else:
                         force_colour_faces[side_id] = color_picker.force_tex_black or tile_color

@@ -104,7 +104,7 @@ def selwin_callback(music_id: Optional[str], channel: MusicChannel) -> None:
     if music_id is None:
         music_id = '<NONE>'
     # If collapsed, the hidden ones follow the base always.
-    if channel is channel.BASE:
+    if channel is MusicChannel.BASE:
         set_suggested(packset, music_id)
 
         # If we have an instance, it's "custom" behaviour, so disable
@@ -115,7 +115,7 @@ def selwin_callback(music_id: Optional[str], channel: MusicChannel) -> None:
             has_inst = False
 
         for win_chan, win in WINDOWS.items():
-            if win_chan is not channel.BASE:
+            if win_chan is not MusicChannel.BASE:
                 win.readonly = has_inst
 
 

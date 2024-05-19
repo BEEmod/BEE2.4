@@ -48,6 +48,7 @@ from app import (
     paletteUI,
     music_conf,
 )
+from app.errors import Result as ErrorResult
 from app.selector_win import SelectorWin, Item as selWinItem, AttrDef as SelAttr
 from app.menu_bar import MenuBar
 from ui_tk.corridor_selector import TkSelector
@@ -55,6 +56,7 @@ from ui_tk.dialogs import DIALOG, TkDialogs
 from ui_tk.img import TKImages, TK_IMG
 from ui_tk import tk_tools, tooltip, wid_transtoken, TK_ROOT
 from ui_tk.signage_ui import SignageUI
+import consts
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -745,7 +747,7 @@ async def export_editoritems(pal_ui: paletteUI.PaletteUI, bar: MenuBar, dialog: 
             should_refresh=not conf.preserve_resources,
         )
 
-        if result is result.FAILED:
+        if result is ErrorResult.FAILED:
             return
 
         try:
@@ -1082,7 +1084,7 @@ async def init_option(
     wid_transtoken.set_text(music_frame, TransToken.ui('Music: '))
 
     await utils.run_as_task(music_conf.make_widgets, packages.get_loaded_packages(), music_frame, pane)
-    suggest_windows[packages.Music] = music_conf.WINDOWS[music_conf.MusicChannel.BASE]
+    suggest_windows[packages.Music] = music_conf.WINDOWS[consts.MusicChannel.BASE]
 
     def suggested_style_set() -> None:
         """Set music, skybox, voices, etc to the settings defined for a style."""

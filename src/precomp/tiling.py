@@ -143,12 +143,12 @@ class TileType(Enum):
     @property
     def is_nodraw(self) -> bool:
         """Should this swap to nodraw?"""
-        return self is self.NODRAW
+        return self is TileType.NODRAW
 
     @property
     def blocks_pattern(self) -> bool:
         """Does this affect patterns?"""
-        return self is not self.CUTOUT_TILE_BROKEN
+        return self is not TileType.CUTOUT_TILE_BROKEN
 
     @property
     def is_tile(self) -> bool:
@@ -170,7 +170,7 @@ class TileType(Enum):
         """The portalability of the tile."""
         if 'WHITE' in self.name:
             return texturing.Portalable.WHITE
-        elif 'BLACK' in self.name or self is self.GOO_SIDE:
+        elif 'BLACK' in self.name or self is TileType.GOO_SIDE:
             return texturing.Portalable.BLACK
         raise ValueError('No colour for ' + self.name + '!')
 
