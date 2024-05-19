@@ -427,7 +427,7 @@ def res_antlaser(vmf: VMF, res: Keyvalues) -> object:
                             node.orient.forward(),
                             node.orient.left(),
                         ] for mag in [-8.0, 8.0]
-                        if ((node.pos + mag * direction).as_tuple(), norm) in group.ant_seg
+                        if ((node.pos + mag * direction).freeze(), norm) in group.ant_seg
                     ]
                     if len(neighbors) == 2:
                         [off1, off2] = neighbors

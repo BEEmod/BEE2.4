@@ -16,6 +16,7 @@ from .tk_tools import set_window_icon, center_onscreen
 from .wid_transtoken import set_text
 
 
+__all__ = ['Dialogs', 'TkDialogs', 'DIALOG']
 # Patch various tk windows to hide loading screens while they are open.
 # Messageboxes, file dialogs and colorchooser all inherit from Dialog,
 # so patching .show() will fix them all.
@@ -30,7 +31,7 @@ async def _messagebox(
     title: TransToken,
     icon: Icon,
     detail: str,
-) -> List[str]:
+) -> str:
     """Don't bother with `tkinter.messagebox`, it just calls this which is more flexible anyway."""
     args: Tuple[str, ...] = (
         "tk_messageBox",
@@ -121,7 +122,7 @@ try:
 except ImportError:
     QueryValidator = BasicQueryValidator
 else:
-    class QueryValidator(Query):  # type: ignore[no-redef]
+    class QueryValidator(Query):  # type: ignore[no-redef, misc]
         """Implement using IDLE's better code for this."""
         def __init__(
             self,
