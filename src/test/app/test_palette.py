@@ -1,10 +1,11 @@
 """Test palette saving and loading."""
 from __future__ import annotations
 
+from pytest_regressions.data_regression import DataRegressionFixture
 from srctools import Keyvalues
 import pytest
 
-from app.paletteLoader import Palette
+from app.paletteLoader import Palette, DEFAULT_PALETTES, GROUP_BUILTIN
 from transtoken import TransToken
 
 
@@ -201,3 +202,25 @@ def test_palette_load_v3() -> None:
     assert pal.group == ''
     assert not pal.readonly
     assert pal.settings is None
+
+
+@pytest.mark.parametrize('pal_id', [
+    'EMPTY',
+    'BEEMOD',
+    'P2_COLLAPSED',
+    'PORTAL2',
+    'APTAG',
+])
+def test_builtin_regressions(pal_id: str, data_regression: DataRegressionFixture) -> None:
+    """Test the builtin palette definitions do not change."""
+    pal = Palette.builtin(pal_id, DEFAULT_PALETTES[pal_id])
+    assert pal.group == GROUP_BUILTIN
+    assert pal.name.is_ui
+    assert pal.trans_name == pal_id
+    assert pal.readonly is True
+
+    data_regression.check({
+        f'x={x}, y={y}': {'id': item_id, 'subtype': subtype}
+        for (x, y), (item_id, subtype) in
+        pal.items.items()
+    })

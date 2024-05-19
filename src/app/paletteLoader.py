@@ -1,6 +1,6 @@
 """Defines the palette data structure and file saving/loading logic."""
 from __future__ import annotations
-from typing import IO, Dict, Tuple, cast
+from typing import IO, List, Dict, Tuple, cast
 
 from collections.abc import Sequence, Iterator
 from typing_extensions import TypeAliasType, TypeGuard, Literal, Final
@@ -29,6 +29,7 @@ CUR_VERSION: Final = 3
 HorizInd = TypeAliasType("HorizInd", Literal[0, 1, 2, 3])
 VertInd = TypeAliasType("VertInd", Literal[0, 1, 2, 3, 4, 5, 6, 7])
 ItemPos = TypeAliasType("ItemPos", Dict[Tuple[HorizInd, VertInd], Tuple[str, int]])
+BuiltinPal = TypeAliasType("BuiltinPal", List[List[Tuple[str, int]]])
 HORIZ: Final[Sequence[HorizInd]] = cast(Sequence[HorizInd], range(4))
 VERT: Final[Sequence[VertInd]] = cast(Sequence[VertInd], range(8))
 COORDS: Sequence[tuple[HorizInd, VertInd]] = [
@@ -55,7 +56,7 @@ TRANS_NAMES: dict[str, TransToken] = {
 
 # The original palette, plus BEEmod 1 and Aperture Tag's palettes.
 # Todo: Switch to DefaultItems/ObjectID here.
-DEFAULT_PALETTES: dict[str, list[list[tuple[str, int]]]] = {
+DEFAULT_PALETTES: dict[str, BuiltinPal] = {
     'EMPTY': [],
     'PORTAL2': [
         [
@@ -242,6 +243,15 @@ class FutureVersionError(Exception):
 
 class Palette:
     """A palette, saving an arrangement of items for editoritems.txt"""
+    settings: config.Config | None
+    filename: str | None
+    uuid: UUID
+    group: str
+    readonly: bool
+    trans_name: str
+    items: ItemPos
+    name: TransToken
+
     def __init__(
         self,
         name: str,
@@ -438,11 +448,10 @@ class Palette:
         if self.filename is not None:
             os.remove(os.path.join(PAL_DIR, self.filename))
 
-
-def get_builtin_palettes() -> Iterator[Palette]:
-    """Yield the buildin palette definitions."""
-    for name, items in DEFAULT_PALETTES.items():
-        yield Palette(
+    @classmethod
+    def builtin(cls, name: str, items: BuiltinPal) -> Palette:
+        """Build a palette object for a builtin palette"""
+        return Palette(
             name,
             {
                 (x, y): item
@@ -459,7 +468,8 @@ def get_builtin_palettes() -> Iterator[Palette]:
 
 def load_palettes() -> Iterator[Palette]:
     """Scan and read in all palettes. Legacy files will be converted in the process."""
-    yield from get_builtin_palettes()
+    for name, items in DEFAULT_PALETTES.items():
+        yield Palette.builtin(name, items)
 
     for name in os.listdir(PAL_DIR):  # this is both files and dirs
         LOGGER.info('Loading "{}"', name)
