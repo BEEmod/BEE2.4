@@ -515,16 +515,16 @@ def load_palettes() -> Iterator[Palette]:
             LOGGER.warning('Bad palette file "{}"!', name, exc_info=exc)
             continue
         else:
-            # Legacy parsing of BEE2.2 files..
-            pal = parse_legacy(pos_file, prop_file, name)
-            if pal is not None:
-                yield pal
-            else:
+            # Legacy parsing of BEE2.2 files...
+            try:
+                yield parse_legacy(pos_file, prop_file, name)
+            except ValueError as exc:
+                LOGGER.warning('Failed to parse "{}":', name, exc_info=exc)
                 continue
         finally:
-            if pos_file:
+            if pos_file is not None:
                 pos_file.close()
-            if prop_file:
+            if prop_file is not None:
                 prop_file.close()
 
         LOGGER.warning('"{}" is a legacy palette - resaving!', name)
@@ -539,7 +539,7 @@ def load_palettes() -> Iterator[Palette]:
             shutil.rmtree(path)
 
 
-def parse_legacy(posfile: IO[str], propfile: IO[str], path: str) -> Palette | None:
+def parse_legacy(posfile: IO[str], propfile: IO[str], path: str) -> Palette:
     """Parse the original BEE2.2 palette format."""
     kv = Keyvalues.parse(propfile, path + ':properties.txt')
     name = kv['name', 'Unnamed']
@@ -559,10 +559,9 @@ def parse_legacy(posfile: IO[str], propfile: IO[str], path: str) -> Palette | No
                     try:
                         pos[next(coords)] = (item_id, subtype)
                     except StopIteration:
-                        LOGGER.warning('Too many items!')
+                        raise ValueError('Too many items!')
                 else:
-                    LOGGER.warning('Malformed row "{}"!', line)
-                    return None
+                    raise ValueError(f'Malformed row "{line}"!')
     return Palette(name, pos)
 
 if __name__ == '__main__':
