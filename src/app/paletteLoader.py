@@ -1,6 +1,6 @@
 """Defines the palette data structure and file saving/loading logic."""
 from __future__ import annotations
-from typing import IO, List, Dict, Tuple, cast
+from typing import IO, List, Dict, Tuple, Union, cast
 
 from collections.abc import Sequence, Iterator
 from typing_extensions import TypeAliasType, TypeGuard, Literal, Final
@@ -15,6 +15,7 @@ from srctools import Keyvalues, NoKeyError, KeyValError
 import srctools.logger
 
 from transtoken import TransToken
+from consts import DefaultItems
 import config
 import consts
 import utils
@@ -28,8 +29,11 @@ CUR_VERSION: Final = 3
 
 HorizInd = TypeAliasType("HorizInd", Literal[0, 1, 2, 3])
 VertInd = TypeAliasType("VertInd", Literal[0, 1, 2, 3, 4, 5, 6, 7])
+# TODO: Switch item ID here to ObjectID
 ItemPos = TypeAliasType("ItemPos", Dict[Tuple[HorizInd, VertInd], Tuple[str, int]])
-BuiltinPal = TypeAliasType("BuiltinPal", List[List[Tuple[str, int]]])
+BuiltinPal = TypeAliasType("BuiltinPal", List[List[
+    Tuple[Union[DefaultItems, utils.ObjectID], int],
+]])
 HORIZ: Final[Sequence[HorizInd]] = cast(Sequence[HorizInd], range(4))
 VERT: Final[Sequence[VertInd]] = cast(Sequence[VertInd], range(8))
 COORDS: Sequence[tuple[HorizInd, VertInd]] = [
@@ -55,170 +59,169 @@ TRANS_NAMES: dict[str, TransToken] = {
 }
 
 # The original palette, plus BEEmod 1 and Aperture Tag's palettes.
-# Todo: Switch to DefaultItems/ObjectID here.
 DEFAULT_PALETTES: dict[str, BuiltinPal] = {
     'EMPTY': [],
     'PORTAL2': [
         [
-            ("ITEM_BUTTON_PEDESTAL", 0),
-            ("ITEM_BUTTON_FLOOR", 0),  # Weighted
-            ("ITEM_BUTTON_FLOOR", 1),  # Cube
-            ("ITEM_BUTTON_FLOOR", 2),  # Ball
+            (DefaultItems.button_pedestal, 0),
+            (DefaultItems.button_floor, 0),  # Weighted
+            (DefaultItems.button_floor, 1),  # Cube
+            (DefaultItems.button_floor, 2),  # Ball
         ], [
-            ("ITEM_CUBE", 0),  # Standard
-            ("ITEM_CUBE", 1),  # Companion
-            ("ITEM_CUBE", 3),  # Sphere
-            ("ITEM_CUBE", 4),  # Franken
+            (DefaultItems.cube, 0),  # Standard
+            (DefaultItems.cube, 1),  # Companion
+            (DefaultItems.cube, 3),  # Sphere
+            (DefaultItems.cube, 4),  # Franken
         ], [
-            ("ITEM_TBEAM", 0),
-            ("ITEM_CATAPULT", 0),
-            ("ITEM_LIGHT_BRIDGE", 0),
-            ("ITEM_PANEL_STAIRS", 0),
+            (DefaultItems.funnel, 0),
+            (DefaultItems.faith_plate, 0),
+            (DefaultItems.light_bridge, 0),
+            (DefaultItems.panel_stairs, 0),
         ], [
-            ("ITEM_BARRIER_HAZARD", 0),  # Fizzler
-            ("ITEM_BARRIER", 0),  # Glass
-            ("ITEM_PISTON_PLATFORM", 0),
-            ("ITEM_RAIL_PLATFORM", 0),
+            (DefaultItems.fizzler, 0),  # Fizzler
+            (DefaultItems.glass, 0),
+            (DefaultItems.piston_platform, 0),
+            (DefaultItems.track_platform, 0),
         ], [
-            ("ITEM_LASER_EMITTER_CENTER", 0),
-            ("ITEM_LASER_CATCHER_CENTER", 0),
-            ("ITEM_LASER_RELAY_CENTER", 0),
-            ("ITEM_CUBE", 2),  # Reflect
+            (DefaultItems.laser_emitter_center, 0),
+            (DefaultItems.laser_catcher_center, 0),
+            (DefaultItems.laser_emitter_center, 0),
+            (DefaultItems.cube, 2),  # Reflect
         ], [
-            ("ITEM_PANEL_CLEAR", 0),
-            ("ITEM_PANEL_ANGLED", 0),
-            ("ITEM_PANEL_FLIP", 0),
-            ("ITEM_SECONDARY_OBSERVATION_ROOM", 0),
+            (DefaultItems.panel_glass, 0),
+            (DefaultItems.panel_angled, 0),
+            (DefaultItems.panel_flip, 0),
+            (DefaultItems.obs_room_small, 0),
         ], [
-            ("ITEM_BARRIER_HAZARD", 1),  # Laserfield
-            ("ITEM_TURRET", 0),
-            ("ITEM_GOO", 0),
-            ("ITEM_LIGHT_PANEL", 0),  # Cold
+            (DefaultItems.fizzler, 1),  # Laserfield
+            (DefaultItems.turret, 0),
+            (DefaultItems.goo, 0),
+            (DefaultItems.light_strip, 0),  # Cold
         ], [
-            ("ITEM_PAINT_SPLAT", 0),  # Bounce
-            ("ITEM_PAINT_SPLAT", 1),  # Speed
-            ("ITEM_PAINT_SPLAT", 2),  # Portal
-            ("ITEM_PAINT_SPLAT", 3),  # Erase
+            (DefaultItems.gel_splat, 0),  # Bounce
+            (DefaultItems.gel_splat, 1),  # Speed
+            (DefaultItems.gel_splat, 2),  # Portal
+            (DefaultItems.gel_splat, 3),  # Erase
         ]
     ],
     'BEEMOD': [
         [
-            ("ITEM_BUTTON_PEDESTAL", 0),
-            ("ITEM_BUTTON_FLOOR", 0),
-            ("ITEM_CUBE", 0),
-            ("ITEM_PAINT_SPLAT", 3),  # Erase
+            (DefaultItems.button_pedestal, 0),
+            (DefaultItems.button_floor, 0),
+            (DefaultItems.cube, 0),
+            (DefaultItems.gel_splat, 3),  # Erase
         ], [
-            ("ITEM_TBEAM", 0),
-            ("ITEM_CATAPULT", 0),
-            ("ITEM_DRAW_BRIDGE", 0),
-            ("ITEM_PANEL_STAIRS", 0),
+            (DefaultItems.funnel, 0),
+            (DefaultItems.faith_plate, 0),
+            (utils.obj_id("ITEM_DRAW_BRIDGE"), 0),
+            (DefaultItems.panel_stairs, 0),
         ], [
-            ("ITEM_BARRIER_HAZARD", 0),
-            ("ITEM_LIGHT_BRIDGE", 0),
-            ("ITEM_PISTON_PLATFORM", 0),
-            ("ITEM_RAIL_PLATFORM", 0),
+            (DefaultItems.fizzler, 0),  # Fizzler
+            (DefaultItems.light_bridge, 0),
+            (DefaultItems.piston_platform, 0),
+            (DefaultItems.track_platform, 0),
         ], [
-            ("ITEM_LASER_EMITTER_CENTER", 0),
-            ("ITEM_LASER_CATCHER_CENTER", 0),
-            ("ITEM_LASER_RELAY_CENTER", 0),
-            ("ITEM_BARRIER", 0),
+            (DefaultItems.laser_emitter_center, 0),
+            (DefaultItems.laser_catcher_center, 0),
+            (DefaultItems.laser_emitter_center, 0),
+            (DefaultItems.glass, 0),
         ], [
-            ("ITEM_PANEL_CLEAR", 0),
-            ("ITEM_PANEL_ANGLED", 0),
-            ("ITEM_PANEL_FLIP", 0),
-            ("ITEM_SECONDARY_OBSERVATION_ROOM", 0),
+            (DefaultItems.panel_glass, 0),
+            (DefaultItems.panel_angled, 0),
+            (DefaultItems.panel_flip, 0),
+            (DefaultItems.obs_room_small, 0),
         ], [
-            ("ITEM_GOO", 0),
-            ("ITEM_TURRET", 0),
-            ("ITEM_CRUSHER", 0),
-            ("ITEM_VENT", 0),
+            (DefaultItems.goo, 0),
+            (DefaultItems.turret, 0),
+            (utils.obj_id("ITEM_CRUSHER"), 0),
+            (utils.obj_id("ITEM_VENT"), 0),
         ], [
-            ("ITEM_HIGH_ENERGY_PELLET_EMITTER", 0),
-            ("ITEM_HIGH_ENERGY_PELLET_CATCHER", 0),
-            ("DOOR", 0),
-            ("ITEM_LIGHT_PANEL", 0),  # Cold
+            (utils.obj_id("ITEM_HIGH_ENERGY_PELLET_EMITTER"), 0),
+            (utils.obj_id("ITEM_HIGH_ENERGY_PELLET_CATCHER"), 0),
+            (utils.obj_id("DOOR"), 0),
+            (DefaultItems.light_strip, 0),  # Cold
         ], [
-            ("ITEM_TRIGGERS", 0),
-            ("ITEM_BEE_LOGIC", 0),
-            ("ITEM_AUTOPORTAL", 0),
-            ("ITEM_LIGHT_PANEL", 1),  # Warm
+            (utils.obj_id("ITEM_TRIGGERS"), 0),
+            (utils.obj_id("ITEM_BEE_LOGIC"), 0),
+            (utils.obj_id("ITEM_AUTOPORTAL"), 0),
+            (DefaultItems.light_strip, 1),  # Warm
         ],
     ],
 
     'P2_COLLAPSED': [
         [
-            ("ITEM_BUTTON_PEDESTAL", 0),
-            ("ITEM_BUTTON_FLOOR", 0),
-            ("ITEM_CUBE", 0),
-            ("ITEM_PAINT_SPLAT", 3),  # Erase
+            (DefaultItems.button_pedestal, 0),
+            (DefaultItems.button_floor, 0),
+            (DefaultItems.cube, 0),
+            (DefaultItems.gel_splat, 3),  # Erase
         ], [
-            ("ITEM_TBEAM", 0),
-            ("ITEM_CATAPULT", 0),
-            ("ITEM_PANEL_STAIRS", 0),
-            ("ITEM_LIGHT_PANEL", 0),
+            (DefaultItems.funnel, 0),
+            (DefaultItems.faith_plate, 0),
+            (DefaultItems.panel_stairs, 0),
+            (DefaultItems.light_strip, 0),
         ], [
-            ("ITEM_BARRIER_HAZARD", 0),
-            ("ITEM_LIGHT_BRIDGE", 0),
-            ("ITEM_PISTON_PLATFORM", 0),
-            ("ITEM_RAIL_PLATFORM", 0),
+            (DefaultItems.fizzler, 0),
+            (DefaultItems.light_bridge, 0),
+            (DefaultItems.piston_platform, 0),
+            (DefaultItems.track_platform, 0),
         ], [
-            ("ITEM_LASER_EMITTER_CENTER", 0),
-            ("ITEM_LASER_CATCHER_CENTER", 0),
-            ("ITEM_LASER_RELAY_CENTER", 0),
-            ("ITEM_BARRIER", 0),
+            (DefaultItems.laser_emitter_center, 0),
+            (DefaultItems.laser_catcher_center, 0),
+            (DefaultItems.laser_emitter_center, 0),
+            (DefaultItems.glass, 0),
         ], [
-            ("ITEM_PANEL_CLEAR", 0),
-            ("ITEM_PANEL_ANGLED", 0),
-            ("ITEM_PANEL_FLIP", 0),
-            ("ITEM_SECONDARY_OBSERVATION_ROOM", 0),
+            (DefaultItems.panel_glass, 0),
+            (DefaultItems.panel_angled, 0),
+            (DefaultItems.panel_flip, 0),
+            (DefaultItems.obs_room_small, 0),
         ], [
-            ("ITEM_GOO", 0),
-            ("ITEM_TURRET", 0),
+            (DefaultItems.goo, 0),
+            (DefaultItems.turret, 0),
         ],
     ],
 
     'APTAG': [
         [],  # Original has 4 paint fizzler items at the top.
         [
-            ("ITEM_BUTTON_PEDESTAL", 0),
-            ("ITEM_BUTTON_FLOOR", 0),
-            ("ITEM_CUBE", 0),
-            ("ITEM_PAINT_SPLAT", 3),  # Erase
+            (DefaultItems.button_pedestal, 0),
+            (DefaultItems.button_floor, 0),
+            (DefaultItems.cube, 0),
+            (DefaultItems.gel_splat, 3),  # Erase
         ], [
-            ("ITEM_TBEAM", 0),
-            ("ITEM_CATAPULT", 0),
-            ("ITEM_DRAW_BRIDGE", 0),
-            ("ITEM_PANEL_STAIRS", 0),
+            (DefaultItems.funnel, 0),
+            (DefaultItems.faith_plate, 0),
+            (utils.obj_id("ITEM_DRAW_BRIDGE"), 0),
+            (DefaultItems.panel_stairs, 0),
         ], [
-            ("ITEM_BARRIER_HAZARD", 0),
-            ("ITEM_LIGHT_BRIDGE", 0),
-            ("ITEM_PISTON_PLATFORM", 0),
-            ("ITEM_RAIL_PLATFORM", 0),
+            (DefaultItems.fizzler, 0),
+            (DefaultItems.light_bridge, 0),
+            (DefaultItems.piston_platform, 0),
+            (DefaultItems.track_platform, 0),
         ], [
-            ("ITEM_LASER_EMITTER_CENTER", 0),
-            ("ITEM_LASER_CATCHER_CENTER", 0),
-            ("ITEM_LASER_RELAY_CENTER", 0),
-            ("ITEM_BARRIER", 0),
+            (DefaultItems.laser_emitter_center, 0),
+            (DefaultItems.laser_catcher_center, 0),
+            (DefaultItems.laser_emitter_center, 0),
+            (DefaultItems.glass, 0),
         ], [
-            ("ITEM_PANEL_CLEAR", 0),
-            ("ITEM_PANEL_ANGLED", 0),
-            ("ITEM_PANEL_FLIP", 0),
-            ("ITEM_SECONDARY_OBSERVATION_ROOM", 0),
+            (DefaultItems.panel_glass, 0),
+            (DefaultItems.panel_angled, 0),
+            (DefaultItems.panel_flip, 0),
+            (DefaultItems.obs_room_small, 0),
         ], [
-            ("ITEM_GOO", 0),
-            ("ITEM_TURRET", 0),
-            ("ITEM_CRUSHER", 0),
-            ("ITEM_VENT", 0),
+            (DefaultItems.goo, 0),
+            (DefaultItems.turret, 0),
+            (utils.obj_id("ITEM_CRUSHER"), 0),
+            (utils.obj_id("ITEM_VENT"), 0),
         ], [
-            ("ITEM_HIGH_ENERGY_PELLET_EMITTER", 0),
-            ("ITEM_HIGH_ENERGY_PELLET_CATCHER", 0),
-            ("DOOR", 0),
-            ("ITEM_LIGHT_PANEL", 0),  # Cold
+            (utils.obj_id("ITEM_HIGH_ENERGY_PELLET_EMITTER"), 0),
+            (utils.obj_id("ITEM_HIGH_ENERGY_PELLET_CATCHER"), 0),
+            (utils.obj_id("DOOR"), 0),
+            (DefaultItems.light_strip, 0),  # Cold
         ], [
-            ("ITEM_TRIGGERS", 0),
-            ("ITEM_BEE_LOGIC", 0),
-            ("ITEM_AUTOPORTAL", 0),
-            ("ITEM_TAG_GUN_ACTIVATOR", 0),
+            (utils.obj_id("ITEM_TRIGGERS"), 0),
+            (utils.obj_id("ITEM_BEE_LOGIC"), 0),
+            (utils.obj_id("ITEM_AUTOPORTAL"), 0),
+            (utils.obj_id("ITEM_TAG_GUN_ACTIVATOR"), 0),
         ],
     ]
 }
@@ -423,9 +426,8 @@ class Palette:
             kv.append(settings_prop)
 
         # We need to write a new file, determine a valid path.
-        # Use a hash to ensure it's a valid path (without '-' if negative)
-        # If a conflict occurs, add ' ' and hash again to get a different
-        # value.
+        # Use a hash to ensure it's a valid path (without '-' if negative).
+        # If a conflict occurs, add a character and hash again to get a different value.
         if self.filename is None or (self.readonly and not ignore_readonly):
             hash_src = self.name.token
             while True:
@@ -454,9 +456,9 @@ class Palette:
         return Palette(
             name,
             {
-                (x, y): item
+                (x, y): ((item.id if isinstance(item, DefaultItems) else item), subtype)
                 for y, row in enumerate(items)
-                for x, item in enumerate(row)
+                for x, (item, subtype) in enumerate(row)
                 if validate_x(x) and validate_y(y)
             },
             name,
