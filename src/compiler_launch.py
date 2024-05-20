@@ -39,6 +39,6 @@ elif app_name in ('vrad.exe', 'vrad_osx', 'vrad_linux'):
             strict_exception_groups=True,
         )
 elif 'original' in app_name:
-    sys.exit('Original compilers replaced, verify game cache!')
+    sys.exit('Original compilers replaced, verify game files in Steam!')
 else:
     sys.exit(f'Unknown application name "{app_name}"!')
