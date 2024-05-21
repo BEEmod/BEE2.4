@@ -132,13 +132,14 @@ def res_track_plat(vmf: VMF, res: Keyvalues) -> object:
         # The direction horizontal track is offset
         orient = Matrix.from_angstr(first_track['angles'])
         local_facing = round(facing @ orient.transpose(), 3)
+        LOGGER.debug('Platform {} has facing {} with orient {}', plat_inst['targetname'], local_facing, orient)
         if abs(local_facing.z) > 0.125:
             raise ValueError(
                 'Platform facing is not in line with track: \n'
                 f'track={first_track["angles"]}, plat={plat_inst["angles"]}, facing={local_facing}'
             )
 
-        plat_facing = 'vert' if abs(local_facing.y) > 0.5 else 'horiz'
+        plat_facing = 'vert' if abs(local_facing.x) > 0.5 else 'horiz'
 
         if res.bool('plat_suffix'):
             conditions.add_suffix(plat_inst, '_' + plat_facing)
