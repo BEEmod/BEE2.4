@@ -385,7 +385,8 @@ def _bind_event_handler(bind_func: Callable[[WidgetT, EventFunc[WidgetT], bool],
             return deco_2
         else:
             # Normally, call directly
-            return bind_func(wid, func, add)
+            bind_func(wid, func, add)
+            return None
     return cast(_Binder, deco)
 
 
