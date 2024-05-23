@@ -3,33 +3,33 @@
 This allows us to change the arguments passed in,
 edit the BSP after instances are collapsed, and pack files.
 """
-# Run as early as possible to catch errors in imports.
-from srctools.logger import init_logging
-LOGGER = init_logging('bee2/vrad.log')
+from typing import List, Set
 
-import os
-import sys
 from io import BytesIO
 from zipfile import ZipFile
-from typing import List, Set
 from pathlib import Path
+import os
+import sys
 
 
-import srctools.run
 from srctools.bsp import BSP, BSP_LUMPS
 from srctools.filesys import RawFileSystem, ZipFileSystem, FileSystem
 from srctools.packlist import PackList
 from srctools.game import find_gameinfo
+from srctools.logger import get_logger
+import srctools.run
+import trio
 
 from hammeraddons.bsp_transform import run_transformations
 from hammeraddons.plugin import PluginFinder, Source as PluginSource
 from hammeraddons import __version__ as version_haddons
 
-import trio
-
 from BEE2_config import ConfigFile
 from postcomp import music, screenshot
 import utils
+
+
+LOGGER = get_logger()
 
 
 def load_transforms() -> None:

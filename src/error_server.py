@@ -9,10 +9,6 @@ This has 3 endpoints:
 - /ping is triggered by the webpage repeatedly while open, to ensure the server stays alive.
 """
 from __future__ import annotations
-import srctools.logger
-
-LOGGER = srctools.logger.init_logging('bee2/error_server.log')
-
 from typing_extensions import override
 import functools
 import http
@@ -24,6 +20,7 @@ import json
 from hypercorn.config import Config
 from hypercorn.trio import serve
 from quart_trio import QuartTrio
+import srctools.logger
 import attrs
 import psutil
 import quart
@@ -35,6 +32,8 @@ from user_errors import (
 )
 import utils
 import transtoken
+
+LOGGER = srctools.logger.get_logger()
 
 root_path = utils.bins_path('error_display').absolute()
 LOGGER.info('Root path: {!r}', root_path)
@@ -232,7 +231,7 @@ async def load_info() -> None:
         LOGGER.info('Loaded UI translations')
 
 
-async def main() -> None:
+async def main(argv: list[str]) -> None:
     """Start up the server."""
     binds: list[str]
     stop_sleeping = trio.CancelScope()

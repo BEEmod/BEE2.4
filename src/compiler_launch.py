@@ -1,5 +1,6 @@
 """Launches the correct compiler."""
-import exceptiongroup  # noqa - Install its import hook
+
+# ruff: noqa: E402  # Ignore import order, we want to set up logging as early as possible.
 import os
 import sys
 
@@ -15,30 +16,44 @@ else:
     # Sourcecode-launch - check first sys arg.
     app_name = sys.argv.pop(1).casefold()
 
+# TODO: Use removesuffix()
+if app_name.endswith(('.exe', '_osx')):
+    app_name = app_name[:-4]
+if app_name.endswith('_linux'):
+    app_name = app_name[:-6]
 
-if app_name in ('vbsp.exe', 'vbsp_osx', 'vbsp_linux'):
-    import trio
-
-    import vbsp
-    trio.run(vbsp.main)
-elif app_name in ('vrad.exe', 'vrad_osx', 'vrad_linux'):
-    if '--errorserver' in sys.argv:
-        import trio
-
-        import error_server
-        trio.run(
-            error_server.main,
-            strict_exception_groups=True,  # Opt into 3.11-style semantics.
-        )
-    else:
-        import trio
-
-        import vrad
-        trio.run(
-            vrad.main, sys.argv,
-            strict_exception_groups=True,
-        )
-elif 'original' in app_name:
+if 'original' in app_name:
     sys.exit('Original compilers replaced, verify game files in Steam!')
-else:
+
+if app_name not in ('vbsp', 'vrad'):
     sys.exit(f'Unknown application name "{app_name}"!')
+
+if app_name == 'vrad' and '--errorserver' in sys.argv:
+    app_name = 'error_server'
+
+from srctools.logger import init_logging
+LOGGER = init_logging(f'bee2/{app_name}.log')
+LOGGER.info('Arguments: {}', sys.argv)
+
+import utils
+import exceptiongroup  # noqa - Install its import hook
+
+LOGGER.info('Running "{}", version {}:', app_name, utils.BEE_VERSION)
+
+if app_name == 'vbsp':
+    import vbsp
+    func = vbsp.main
+elif app_name == 'error_server':
+    import error_server
+    func = error_server.main
+elif app_name == 'vrad':
+    import vrad
+    func = vrad.main
+else:
+    raise AssertionError(app_name)
+
+import trio
+trio.run(
+    func, sys.argv,
+    strict_exception_groups=True,  # Opt into 3.11-style semantics.
+)

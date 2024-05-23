@@ -1,11 +1,4 @@
 """Implements the BEE2 VBSP compiler replacement."""
-# Do this very early, so we log the startup sequence.
-from srctools.logger import init_logging
-
-
-LOGGER = init_logging('bee2/vbsp.log')
-
-
 from typing import Any, Dict, List, Tuple, Set, Iterable, Optional, Counter
 from typing_extensions import TypedDict
 from io import StringIO
@@ -56,6 +49,9 @@ import config
 import consts
 import editoritems
 import user_errors
+
+
+LOGGER = srctools.logger.get_logger()
 
 
 class _Settings(TypedDict):
@@ -1516,7 +1512,7 @@ def process_vbsp_fail(output: str, missing_locs: Iterable[Vec]) -> None:
     BEE2_config.save_check()
 
 
-async def main() -> None:
+async def main(argv: List[str]) -> None:
     """Main program code.
 
     """
@@ -1539,10 +1535,10 @@ async def main() -> None:
     # Just in case we fail, overwrite the VRAD config, so it doesn't use old data.
     open('bee2/vrad_config.cfg', 'w').close()
 
-    args = " ".join(sys.argv)
-    new_args = sys.argv[1:]
-    old_args = sys.argv[1:]
-    path = sys.argv[-1]  # The path is the last argument to vbsp
+    args = " ".join(argv)
+    new_args = argv[1:]
+    old_args = argv[1:]
+    path = argv[-1]  # The path is the last argument to vbsp
 
     if not old_args:
         # No arguments!
