@@ -383,7 +383,7 @@ def make_tab(
             x += 1  # Position after the badges
             line_frame.columnconfigure(x, weight=1)
 
-            quote_var = tk.IntVar(value=config.get_bool(conf_id, line.id, True))
+            quote_var = tk.BooleanVar(value=config.get_bool(conf_id, line.id, True))
             check = ttk.Checkbutton(
                 line_frame,
                 variable=quote_var,
