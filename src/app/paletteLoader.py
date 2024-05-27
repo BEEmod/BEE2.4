@@ -85,7 +85,7 @@ DEFAULT_PALETTES: dict[str, BuiltinPal] = {
         ], [
             (DefaultItems.laser_emitter_center, 0),
             (DefaultItems.laser_catcher_center, 0),
-            (DefaultItems.laser_emitter_center, 0),
+            (DefaultItems.laser_relay_center, 0),
             (DefaultItems.cube, 2),  # Reflect
         ], [
             (DefaultItems.panel_glass, 0),
@@ -123,7 +123,7 @@ DEFAULT_PALETTES: dict[str, BuiltinPal] = {
         ], [
             (DefaultItems.laser_emitter_center, 0),
             (DefaultItems.laser_catcher_center, 0),
-            (DefaultItems.laser_emitter_center, 0),
+            (DefaultItems.laser_relay_center, 0),
             (DefaultItems.glass, 0),
         ], [
             (DefaultItems.panel_glass, 0),
@@ -167,7 +167,7 @@ DEFAULT_PALETTES: dict[str, BuiltinPal] = {
         ], [
             (DefaultItems.laser_emitter_center, 0),
             (DefaultItems.laser_catcher_center, 0),
-            (DefaultItems.laser_emitter_center, 0),
+            (DefaultItems.laser_relay_center, 0),
             (DefaultItems.glass, 0),
         ], [
             (DefaultItems.panel_glass, 0),
@@ -200,7 +200,7 @@ DEFAULT_PALETTES: dict[str, BuiltinPal] = {
         ], [
             (DefaultItems.laser_emitter_center, 0),
             (DefaultItems.laser_catcher_center, 0),
-            (DefaultItems.laser_emitter_center, 0),
+            (DefaultItems.laser_relay_center, 0),
             (DefaultItems.glass, 0),
         ], [
             (DefaultItems.panel_glass, 0),
