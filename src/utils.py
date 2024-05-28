@@ -36,7 +36,7 @@ __all__ = [
     'ObjectID', 'SpecialID', 'BlankID', 'ID_EMPTY', 'ID_NONE', 'ID_RANDOM',
     'obj_id', 'special_id', 'obj_id_optional', 'special_id_optional',
     'check_shift', 'fit', 'group_runs', 'restart_app', 'quit_app', 'set_readonly',
-    'unset_readonly', 'merge_tree', 'write_lang_pot', 'aclosing', 'lcm',
+    'unset_readonly', 'merge_tree', 'write_lang_pot', 'aclosing',
 ]
 
 
@@ -86,17 +86,6 @@ copyreg.add_extension('transtoken', 'JoinTransToken', 249)
 copyreg.add_extension('transtoken', 'ListTransToken', 250)
 copyreg.add_extension('pathlib', 'Path', 251)
 copyreg.add_extension('pathlib', 'PurePosixPath', 252)
-
-lcm: Callable[[int, int], int]
-if sys.version_info >= (3, 9):
-    from math import lcm
-else:
-    def lcm(a: int, b: int) -> int:
-        """Calculate the lowest common multiple.
-
-        TODO: Remove once we drop 3.8.
-        """
-        return (a * b) // math.gcd(a, b)
 
 
 if sys.version_info >= (3, 10):
@@ -795,7 +784,7 @@ def get_piece_fitter(sizes: Collection[int]) -> Callable[[SupportsInt], Sequence
     # and more is therefore useless.
     counters: list[range] = []
     for i, small in enumerate(size_list[:-1]):
-        multiple = min(lcm(small, large) for large in size_list[i+1:])
+        multiple = min(math.lcm(small, large) for large in size_list[i+1:])
         counters.append(range(multiple // small))
 
     *pieces, largest = size_list
