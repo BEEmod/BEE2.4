@@ -2,9 +2,8 @@
 from __future__ import annotations
 
 from typing import (
-    Final, NewType, TYPE_CHECKING, Any, Generic,
-    NoReturn, Optional, SupportsInt,
-    Tuple, Type, TypeVar, Literal, TypeGuard
+    Final, NewType, TYPE_CHECKING, Any,
+    NoReturn, SupportsInt, Literal, TypeGuard
 )
 from collections.abc import (
     Awaitable, Callable, Collection, Generator, Iterable, Iterator,
@@ -91,7 +90,7 @@ copyreg.add_extension('pathlib', 'PurePosixPath', 252)
 
 
 # Appropriate locations to store config options for each OS.
-_SETTINGS_ROOT: Optional[Path]
+_SETTINGS_ROOT: Path | None
 if WIN:
     _SETTINGS_ROOT = Path(os.environ['APPDATA'])
 elif MAC:
@@ -310,7 +309,7 @@ def freeze_enum_props[EnumT: Enum](cls: type[EnumT]) -> type[EnumT]:
 
 def _exc_freeze[EnumT: Enum, RetT](
     data: Mapping[EnumT, RetT],
-    data_exc: Mapping[EnumT, tuple[Type[BaseException], tuple[object, ...]]],
+    data_exc: Mapping[EnumT, tuple[type[BaseException], tuple[object, ...]]],
 ) -> Callable[[EnumT], RetT]:
     """If the property raises exceptions, we need to reraise them."""
     def getter(value: EnumT) -> RetT:
@@ -603,7 +602,7 @@ class Result[ResultT]:
         /, *args: *Args,
         name: object = None,
     ) -> None:
-        self._nursery: Optional[trio.Nursery] = nursery
+        self._nursery: trio.Nursery | None = nursery
         self._result: ResultT = _NO_RESULT
         if not name:
             name = func

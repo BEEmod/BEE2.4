@@ -11,8 +11,6 @@ A set of observable collections are provided, which fire off events
 whenever they are modified.
 """
 from __future__ import annotations
-from typing import Any, Generic
-from typing_extensions import TypeVarTuple, Unpack
 
 from collections.abc import Callable, Awaitable, Generator
 from contextlib import contextmanager
@@ -24,15 +22,14 @@ import srctools.logger
 
 __all__ = ['Event']
 LOGGER = srctools.logger.get_logger(__name__)
-ArgT = TypeVarTuple('ArgT')
 
 
 @attrs.define(init=False, eq=False)
-class Event(Generic[Unpack[ArgT]]):
+class Event[*ArgT]:
     """Store functions to be called when an event occurs."""
-    callbacks: list[Callable[[Unpack[ArgT]], Awaitable[Any]]]
-    last_result: tuple[Unpack[ArgT]] | None = attrs.field(init=False)
-    _override: trio.MemorySendChannel[tuple[Unpack[ArgT]]] | None = attrs.field(repr=False)
+    callbacks: list[Callable[[*ArgT], Awaitable[object]]]
+    last_result: tuple[*ArgT] | None = attrs.field(init=False)
+    _override: trio.MemorySendChannel[tuple[*ArgT]] | None = attrs.field(repr=False)
     _cur_calls: int
     name: str
     log: bool = attrs.field(repr=False)
@@ -45,7 +42,7 @@ class Event(Generic[Unpack[ArgT]]):
         self.log = False
         self.last_result = None
 
-    def register(self, func: Callable[[Unpack[ArgT]], Awaitable[Any]]) -> Callable[[Unpack[ArgT]], Awaitable[Any]]:
+    def register(self, func: Callable[[*ArgT], Awaitable[object]]) -> Callable[[*ArgT], Awaitable[object]]:
         """Register the given function to be called.
 
         This can be used as a decorator.
@@ -53,7 +50,7 @@ class Event(Generic[Unpack[ArgT]]):
         self.callbacks.append(func)
         return func
 
-    async def register_and_prime(self, func: Callable[[Unpack[ArgT]], Awaitable[Any]]) -> None:
+    async def register_and_prime(self, func: Callable[[*ArgT], Awaitable[object]]) -> None:
         """Register the given function, then immediately call with the last value if present."""
         self.callbacks.append(func)
         if self.last_result is None:
@@ -61,7 +58,7 @@ class Event(Generic[Unpack[ArgT]]):
         else:
             await func(*self.last_result)
 
-    async def __call__(self, /, *args: Unpack[ArgT]) -> None:
+    async def __call__(self, /, *args: *ArgT) -> None:
         """Run the specified event.
 
         This is re-entrant - if called whilst the same event is already being
@@ -92,7 +89,7 @@ class Event(Generic[Unpack[ArgT]]):
         finally:
             self._cur_calls -= 1
 
-    def unregister(self, func: Callable[[Unpack[ArgT]], Awaitable[Any]]) -> None:
+    def unregister(self, func: Callable[[*ArgT], Awaitable[object]]) -> None:
         """Remove the given callback.
 
         If it is not registered, raise LookupError.
@@ -103,14 +100,14 @@ class Event(Generic[Unpack[ArgT]]):
             raise LookupError(func) from None
 
     @contextmanager
-    def isolate(self) -> Generator[trio.MemoryReceiveChannel[tuple[Unpack[ArgT]]], None, None]:
+    def isolate(self) -> Generator[trio.MemoryReceiveChannel[tuple[*ArgT]], None, None]:
         """Temporarily disable all listening callbacks, and redirect to the supplied channel.
 
         This is mainly intended for testing code, to prevent it from affecting other things.
         This cannot currently be nested within itself, but isolating different events is fine.
         """
-        send: trio.MemorySendChannel[tuple[Unpack[ArgT]]]
-        rec: trio.MemoryReceiveChannel[tuple[Unpack[ArgT]]]
+        send: trio.MemorySendChannel[tuple[*ArgT]]
+        rec: trio.MemoryReceiveChannel[tuple[*ArgT]]
 
         if self._override is not None:
             raise ValueError('Event.isolate() does not support nesting with itself!')

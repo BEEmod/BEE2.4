@@ -1,6 +1,6 @@
 """Implements UI for selecting corridors."""
 from __future__ import annotations
-from typing_extensions import Final, Generic, TypeVar
+from typing_extensions import Final
 from collections.abc import Sequence, Iterator
 import itertools
 import random
@@ -96,11 +96,7 @@ class OptionRow:
         raise NotImplementedError
 
 
-IconT = TypeVar('IconT', bound=Icon)
-OptionRowT = TypeVar('OptionRowT', bound=OptionRow)
-
-
-class Selector(Generic[IconT, OptionRowT]):
+class Selector[IconT: Icon, OptionRowT: OptionRow]:
     """Corridor selection UI."""
     # When you click a corridor, it's saved here and displayed when others aren't
     # moused over. Reset on style/group swap.

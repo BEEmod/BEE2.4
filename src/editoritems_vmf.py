@@ -1,8 +1,7 @@
 """Use pseudo-entities to make creating editoritems data more easily."""
 from __future__ import annotations
 
-from typing import Callable, TypeVar
-from typing_extensions import TypeAliasType
+from collections.abc  import Callable
 import re
 
 from srctools import FrozenVec, Matrix, Angle, Vec, logger, conv_int
@@ -12,13 +11,11 @@ from collisions import BBox, Volume
 from editoritems import Item, ConnSide, OccuType, AntlinePoint, Coord, OccupiedVoxel, bounding_boxes
 
 
+type LoadFunc = Callable[[Item, Entity], None]
+type SaveFunc = Callable[[Item, VMF], None]
 LOGGER = logger.get_logger(__name__)
-LoadFunc = TypeAliasType("LoadFunc", Callable[[Item, Entity], None])
-SaveFunc = TypeAliasType("SaveFunc", Callable[[Item, VMF], None])
 LOAD_FUNCS: dict[str, LoadFunc] = {}
 SAVE_FUNCS: list[SaveFunc] = []
-LoadFuncT = TypeVar("LoadFuncT", bound=LoadFunc)
-SaveFuncT = TypeVar("SaveFuncT", bound=SaveFunc)
 RE_NUMBER = re.compile('[0-9]+|[^0-9]+')
 
 
@@ -56,7 +53,7 @@ def save(item: Item) -> VMF:
     return vmf
 
 
-def _saver(func: SaveFuncT) -> SaveFuncT:
+def _saver[SaveFuncT: SaveFunc](func: SaveFuncT) -> SaveFuncT:
     """Define a saving function."""
     SAVE_FUNCS.append(func)
     return func
@@ -67,7 +64,7 @@ def _loader(name: str) -> Callable[[LoadFunc], LoadFunc]:
     if name.casefold() in LOAD_FUNCS:
         raise ValueError(f"Duplicate name: {name}")
 
-    def deco(func: LoadFuncT) -> LoadFuncT:
+    def deco(func: LoadFunc) -> LoadFunc:
         """Used as a decorator."""
         LOAD_FUNCS[name.casefold()] = func
         return func

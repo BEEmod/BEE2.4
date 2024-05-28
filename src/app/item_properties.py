@@ -1,15 +1,14 @@
 """Window for adjusting the default values of item properties."""
 from __future__ import annotations
 
-import attrs
-from enum import Enum
 import tkinter as tk
 from tkinter import ttk
-from typing import Any, Callable, ClassVar, Generic, Iterator, Optional, Tuple, Dict, List, TypeVar
+from enum import Enum
+from collections.abc import Callable, Iterator
+from typing import Any, ClassVar, Final, Literal, override
 
+import attrs
 import trio
-from typing_extensions import Final, Literal, TypeAliasType, override
-
 import srctools
 import srctools.logger
 
@@ -40,7 +39,6 @@ TRANS_READONLY_SUBTYPE = TransToken.ui(
     'This option picks which sub-item is used. '
     'Put a different item on the palette to change the default instead.'
 )
-EnumT = TypeVar('EnumT', bound=Enum)
 
 PIST_PROPS = [all_props.prop_pist_lower, all_props.prop_pist_upper]
 
@@ -55,7 +53,7 @@ class PropGroup:
         self.label = ttk.Label(parent)
         set_text(self.label, label_text)
 
-    def apply_conf(self, options: Dict[ItemPropKind[Any], Tuple[str, bool]]) -> None:
+    def apply_conf(self, options: dict[ItemPropKind[Any], tuple[str, bool]]) -> None:
         """Apply the specified options to the UI.
 
         For each property, this specifies the current value, and a boolean which is set if the option
@@ -72,10 +70,10 @@ class PropGroup:
 
 
 # The prop kinds that require this group, then a function to create it.
-PropGroupFactory = TypeAliasType("PropGroupFactory", Tuple[
-    List[ItemPropKind[Any]],
+type PropGroupFactory = tuple[
+    list[ItemPropKind[Any]],
     Callable[[ttk.Frame, TKImages], PropGroup],
-])
+]
 
 
 class BoolPropGroup(PropGroup):
@@ -101,7 +99,7 @@ class BoolPropGroup(PropGroup):
         tooltip.set_tooltip(self.check, tok)
 
     @override
-    def apply_conf(self, options: Dict[ItemPropKind[Any], Tuple[str, bool]]) -> None:
+    def apply_conf(self, options: dict[ItemPropKind[Any], tuple[str, bool]]) -> None:
         """Apply the specified options to the UI."""
         try:
             value, readonly = options[self.prop]
@@ -118,7 +116,7 @@ class BoolPropGroup(PropGroup):
         yield self.prop, srctools.bool_as_int(self.var.get())
 
 
-class ComboPropGroup(PropGroup, Generic[EnumT]):
+class ComboPropGroup[EnumT: Enum](PropGroup):
     """A prop group which uses a combobox to select specific options."""
     LARGE: ClassVar[bool] = True
 
@@ -127,7 +125,7 @@ class ComboPropGroup(PropGroup, Generic[EnumT]):
         parent: ttk.Frame,
         tk_img: TKImages,
         prop: ItemPropKind[EnumT],
-        values: Dict[EnumT, TransToken],
+        values: dict[EnumT, TransToken],
     ) -> None:
         super().__init__(parent, tk_img, TRANS_LABEL.format(name=prop.name))
         self.prop = prop
@@ -146,7 +144,7 @@ class ComboPropGroup(PropGroup, Generic[EnumT]):
         self.combo['values'] = [str(self.translated[key]) for key in self.value_order]
 
     @classmethod
-    def factory(cls, prop: ItemPropKind[EnumT], values: Dict[EnumT, TransToken]) -> PropGroupFactory:
+    def factory(cls, prop: ItemPropKind[EnumT], values: dict[EnumT, TransToken]) -> PropGroupFactory:
         """Make the factory used in PROP_GROUPS."""
         return ([prop], lambda parent, tk_img: cls(parent, tk_img, prop, values))
 
@@ -156,7 +154,7 @@ class ComboPropGroup(PropGroup, Generic[EnumT]):
         tooltip.set_tooltip(self.combo, tok)
 
     @override
-    def apply_conf(self, options: Dict[ItemPropKind[Any], Tuple[str, bool]]) -> None:
+    def apply_conf(self, options: dict[ItemPropKind[Any], tuple[str, bool]]) -> None:
         """Apply the specified options to the UI."""
         try:
             val_str, readonly = options[self.prop]
@@ -197,7 +195,7 @@ class TimerPropGroup(PropGroup):
         self._enable_cback = True
 
     @override
-    def apply_conf(self, options: Dict[ItemPropKind[Any], Tuple[str, bool]]) -> None:
+    def apply_conf(self, options: dict[ItemPropKind[Any], tuple[str, bool]]) -> None:
         """Apply the timer delay option to the UI."""
         try:
             value, readonly = options[all_props.prop_timer_delay]
@@ -247,19 +245,19 @@ class TrackStartActivePropGroup(BoolPropGroup):
     """The start active boolean is only useable if oscillating mode is enabled."""
     def __init__(self, parent: ttk.Frame, tk_img: TKImages, prop: ItemPropKind[bool]) -> None:
         super().__init__(parent, tk_img, prop)
-        self.osc_prop: Optional[BoolPropGroup] = None
+        self.osc_prop: BoolPropGroup | None = None
         self.has_osc = False
         self.user_tooltip = TransToken.BLANK
 
     @override
-    def apply_conf(self, options: Dict[ItemPropKind[Any], Tuple[str, bool]]) -> None:
+    def apply_conf(self, options: dict[ItemPropKind[Any], tuple[str, bool]]) -> None:
         """Apply the configuration to the UI."""
         super().apply_conf(options)
         self.has_osc = all_props.prop_track_is_oscillating in options
         self._update()
 
     @override
-    def get_conf(self) -> Iterator[Tuple[ItemPropKind[Any], str]]:
+    def get_conf(self) -> Iterator[tuple[ItemPropKind[Any], str]]:
         """Get the current configuration."""
         if self.osc_prop is not None and self.has_osc and not self.osc_prop.var.get():
             # Forced off.
@@ -352,7 +350,7 @@ class PistonPropGroup(PropGroup):
         self.canvas.bind('<Leave>', self.evt_mouse_leave)
 
     @override
-    def apply_conf(self, options: Dict[ItemPropKind[Any], Tuple[str, bool]]) -> None:
+    def apply_conf(self, options: dict[ItemPropKind[Any], tuple[str, bool]]) -> None:
         """Apply the specified options to the UI."""
         self.readonly = False
         try:
@@ -392,7 +390,7 @@ class PistonPropGroup(PropGroup):
         self.reposition()
 
     @override
-    def get_conf(self) -> Iterator[Tuple[ItemPropKind[Any], str]]:
+    def get_conf(self) -> Iterator[tuple[ItemPropKind[Any], str]]:
         """Export options from the UI configuration."""
         if self.destination > self.platform:
             yield all_props.prop_pist_start_up, '0'
@@ -572,9 +570,9 @@ PROP_GROUPS: list[PropGroupFactory] = [
 ]
 
 
-def matching_props(item: Item, props: List[ItemPropKind[Any]]) -> List[Tuple[all_props.ItemProp[Any], bool]]:
+def matching_props(item: Item, props: list[ItemPropKind[Any]]) -> list[tuple[all_props.ItemProp[Any], bool]]:
     """Return the properties in this item that match a specific group of properties."""
-    found: List[Tuple[all_props.ItemProp[Any], bool]] = []
+    found: list[tuple[all_props.ItemProp[Any], bool]] = []
     for kind in props:
         # Subtype properties get their default overridden.
         readonly = kind is item.subtype_prop
@@ -593,7 +591,7 @@ class PropertyWindow:
     def __init__(self, tk_img: TKImages) -> None:
         """Build the window."""
         # For each PROP_GROUP, the actually constructed group.
-        self.groups: List[Optional[PropGroup]] = [None] * len(PROP_GROUPS)
+        self.groups: list[PropGroup | None] = [None] * len(PROP_GROUPS)
 
         self.win = tk.Toplevel(TK_ROOT, name='itemPropsWin')
         self.close_event = trio.Event()
@@ -645,8 +643,8 @@ class PropertyWindow:
         group: PropGroup
         maybe_group: PropGroup | None
         # The Start Active prop needs to disable depending on this one's value.
-        oscillating_prop: Optional[BoolPropGroup] = None
-        start_active_prop: Optional[TrackStartActivePropGroup] = None
+        oscillating_prop: BoolPropGroup | None = None
+        start_active_prop: TrackStartActivePropGroup | None = None
 
         conf = config.APP.get_cur_conf(ItemDefault, item.id, ItemDefault())
 

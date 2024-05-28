@@ -1,7 +1,6 @@
-from __future__ import annotations
-
+"""A simple widget that configures a boolean value."""
 from contextlib import aclosing
-from typing import Mapping
+from collections.abc import Mapping
 from tkinter import ttk
 import tkinter as tk
 

@@ -83,8 +83,7 @@ async def test_single_arg() -> None:
 
 async def test_no_arg() -> None:
     """Test special behaviour with no args - return None."""
-    # TODO: can't do runtime generic with () in Python 3.8
-    trigger: EdgeTrigger[()] = EdgeTrigger()
+    trigger = EdgeTrigger[()]()
     event = trio.Event()
 
     async def wait_task() -> None:
