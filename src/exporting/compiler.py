@@ -205,7 +205,7 @@ async def step_do_backup(exp_data: ExportData) -> None:
 async def step_copy_compiler(exp_data: ExportData) -> None:
     """Copy the custom compiler tools."""
     LOGGER.info('Copying Custom Compiler!')
-    compiler_src = utils.install_path('compiler')
+    compiler_src = utils.bins_path('compiler')
     game = exp_data.game
     comp_dest = game.abs_path('bin/linux32' if utils.LINUX else 'bin')
 
