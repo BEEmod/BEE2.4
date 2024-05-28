@@ -101,6 +101,10 @@ class MarkdownData:
     def __iter__(self) -> Iterator[Block]:
         return iter(())
 
+    def __bool__(self) -> bool:
+        """Check if this is non-empty."""
+        return False
+
     @staticmethod
     def text(text: str, *tags: TextTag, url: str | None = None) -> SingleMarkdown:
         """Construct data with a single text segment."""
@@ -120,6 +124,10 @@ class TranslatedMarkdown(MarkdownData):
     package: utils.ObjectID | None
     _blocks: Sequence[Block] = attrs.Factory(list)
     _cache_hash: int = -1
+
+    def __bool__(self) -> bool:
+        """Check if this is non-empty."""
+        return bool(self.source)
 
     def __iter__(self) -> Iterator[Block]:
         """Convert if necessary, then return the blocks."""
