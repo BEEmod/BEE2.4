@@ -1,8 +1,8 @@
 """The package containg all UI code."""
 from __future__ import annotations
-from typing import Any, Awaitable, Callable, Protocol, TypeVar, Generic, assert_never, overload
+from typing import Any, Protocol, overload
 
-from typing_extensions import TypeVarTuple, Unpack
+from collections.abc import Awaitable, Callable
 from types import TracebackType
 
 from trio_util import AsyncBool, AsyncValue
@@ -17,8 +17,6 @@ LOGGER = get_logger(__name__)
 _APP_NURSERY: trio.Nursery | None = None
 # This is quit to exit the sleep_forever(), beginning the shutdown process.
 _APP_QUIT_SCOPE = trio.CancelScope()
-T = TypeVar("T")
-PosArgsT = TypeVarTuple('PosArgsT')
 
 # We use this to activate various features only useful to package/app devs.
 DEV_MODE = AsyncBool(value=utils.DEV_MODE)
@@ -107,9 +105,9 @@ def on_error(
         pass
 
 
-def background_run(
-    func: Callable[[Unpack[PosArgsT]], Awaitable[object]],
-    /, *args: Unpack[PosArgsT],
+def background_run[*Args](
+    func: Callable[[*Args], Awaitable[object]],
+    /, *args: *Args,
     name: str | None = None,
 ) -> None:
     """When the UI is live, run this specified task in app-global nursery."""
@@ -129,7 +127,7 @@ async def background_start(
     return await _APP_NURSERY.start(func, *args, name=name)
 
 
-class EdgeTrigger(Generic[Unpack[PosArgsT]]):
+class EdgeTrigger[*Args]:
     """A variation on a Trio Event which can only be tripped while a task is waiting for it.
 
     When tripped, arbitrary arguments can be passed along as well.
@@ -139,16 +137,16 @@ class EdgeTrigger(Generic[Unpack[PosArgsT]]):
     """
     def __init__(self) -> None:
         self._event: trio.Event | None = None
-        self._result: tuple[Unpack[PosArgsT]] | None = None
+        self._result: tuple[*Args] | None = None
         self.ready = AsyncBool()
 
     @overload
     async def wait(self: EdgeTrigger[()]) -> None: ...
     @overload
-    async def wait(self: EdgeTrigger[T]) -> T: ...
+    async def wait[T](self: EdgeTrigger[T]) -> T: ...
     @overload  # Ignore spurious warnings about the above overloads being impossible.
-    async def wait(self) -> tuple[Unpack[PosArgsT]]: ...  # type: ignore[misc]
-    async def wait(self) -> T | tuple[Unpack[PosArgsT]] | None:
+    async def wait(self) -> tuple[*Args]: ...  # type: ignore[misc]
+    async def wait(self) -> tuple[Any, ...] | None:
         """Wait for the trigger to fire, then return the parameters.
 
         Only one task can wait at a time.
@@ -173,7 +171,7 @@ class EdgeTrigger(Generic[Unpack[PosArgsT]]):
             self._event = self._result = None
             self.ready.value = False
 
-    def trigger(self, *args: Unpack[PosArgsT]) -> None:
+    def trigger(self, *args: *Args) -> None:
         """Wake up a task blocked on wait(), and pass arguments along to it.
 
         Raises a ValueError if no task is blocked.
@@ -196,7 +194,7 @@ class EdgeTrigger(Generic[Unpack[PosArgsT]]):
             LOGGER.debug('EdgeTrigger.maybe_trigger() ignored!')
 
 
-class HasCurrentValue(Protocol[T]):
+class HasCurrentValue[T](Protocol):
     """Protocol for a class with an AsyncValue."""
     @property
     def current(self) -> AsyncValue[T]: ...

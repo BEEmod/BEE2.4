@@ -28,11 +28,8 @@ only parsing configuration options once, and is expected to be used with a
 closure.
 """
 from __future__ import annotations
-from typing import (
-    Generic, Protocol, TypeVar, Any, Callable, Tuple, Type, Union, Final,
-    overload, cast, get_type_hints
-)
-from collections.abc import Iterable, Mapping, MutableMapping
+from typing import Protocol, Any, Final, overload, cast, get_type_hints
+from collections.abc import Callable, Iterable, Mapping, MutableMapping
 from collections import defaultdict
 from decimal import Decimal
 from enum import Enum
@@ -89,13 +86,9 @@ ALL_TESTS: list[tuple[str, tuple[str, ...], CondCall[bool]]] = []
 ALL_RESULTS: list[tuple[str, tuple[str, ...], CondCall[object]]] = []
 ALL_META: list[tuple[str, MetaCond, CondCall[object]]] = []
 
-
-ResultT = TypeVar('ResultT')
-CallableT = TypeVar('CallableT', bound=Callable[..., object])
 # The return values for 2-stage results and tests.
-TestCallable = Callable[[Entity], bool]
-ResultCallable = Callable[[Entity], object]
-TestCallT = TypeVar('TestCallT', bound=Callable[..., Union[bool, TestCallable]])
+type TestCallable = Callable[[Entity], bool]
+type ResultCallable = Callable[[Entity], object]
 
 
 class SWITCH_TYPE(Enum):
@@ -209,7 +202,7 @@ class MetaCond(Enum):
     GenerateCubes = Decimal(750)
     RemoveBlankInst = Decimal(1000)
 
-    def register(self, func: CallableT) -> CallableT:
+    def register[Call: Callable[..., object]](self, func: Call) -> Call:
         """Register a meta-condition."""
         add_meta(func, self)
         return func
@@ -326,70 +319,62 @@ class Condition:
                 results.remove(res)
 
 
-AnnResT = TypeVar('AnnResT')
 # TODO: want TypeVarTuple, but can't specify Map[Type, AnnArgT]
-AnnArg1T = TypeVar('AnnArg1T')
-AnnArg2T = TypeVar('AnnArg2T')
-AnnArg3T = TypeVar('AnnArg3T')
-AnnArg4T = TypeVar('AnnArg4T')
-AnnArg5T = TypeVar('AnnArg5T')
-AnnArg6T = TypeVar('AnnArg6T')
-
 
 @overload
-def annotation_caller(
-    func: Callable[..., AnnResT],
-    parm1: Type[AnnArg1T], /,
+def annotation_caller[A1, Res](
+    func: Callable[..., Res],
+    parm1: type[A1], /,
 ) -> tuple[
-    Callable[[AnnArg1T], AnnResT],
-    tuple[Type[AnnArg1T]]
+    Callable[[A1], Res],
+    tuple[type[A1]]
 ]: ...
 @overload
-def annotation_caller(
-    func: Callable[..., AnnResT],
-    parm1: Type[AnnArg1T], parm2: Type[AnnArg2T], /,
+def annotation_caller[A1, A2, Res](
+    func: Callable[..., Res],
+    parm1: type[A1], parm2: type[A2], /,
 ) -> tuple[
-    Callable[[AnnArg1T, AnnArg2T], AnnResT],
-    tuple[Type[AnnArg1T], Type[AnnArg2T]]
+    Callable[[A1, A2], Res],
+    tuple[type[A1], type[A2]]
 ]: ...
 @overload
-def annotation_caller(
-    func: Callable[..., AnnResT],
-    parm1: Type[AnnArg1T], parm2: Type[AnnArg2T], parm3: Type[AnnArg3T], /,
+def annotation_caller[A1, A2, A3, Res](
+    func: Callable[..., Res],
+    parm1: type[A1], parm2: type[A2], parm3: type[A3], /,
 ) -> tuple[
-    Callable[[AnnArg1T, AnnArg2T, AnnArg3T], AnnResT],
-    tuple[Type[AnnArg1T], Type[AnnArg2T], Type[AnnArg3T]],
+    Callable[[A1, A2, A3], Res],
+    tuple[type[A1], type[A2], type[A3]],
 ]: ...
 @overload
-def annotation_caller(
-    func: Callable[..., AnnResT],
-    parm1: Type[AnnArg1T], parm2: Type[AnnArg2T], parm3: Type[AnnArg3T], parm4: Type[AnnArg4T], /,
+def annotation_caller[A1, A2, A3, A4, Res](
+    func: Callable[..., Res],
+    parm1: type[A1], parm2: type[A2], parm3: type[A3], parm4: type[A4], /,
 ) -> tuple[
-    Callable[[AnnArg1T, AnnArg2T, AnnArg3T, AnnArg4T], AnnResT],
-    tuple[Type[AnnArg1T], Type[AnnArg2T], Type[AnnArg3T], Type[AnnArg4T]],
+    Callable[[A1, A2, A3, A4], Res],
+    tuple[type[A1], type[A2], type[A3], type[A4]],
 ]: ...
 @overload
-def annotation_caller(
-    func: Callable[..., AnnResT],
-    parm1: Type[AnnArg1T], parm2: Type[AnnArg2T], parm3: Type[AnnArg3T],
-    parm4: Type[AnnArg4T], parm5: Type[AnnArg5T], /,
+def annotation_caller[A1, A2, A3, A4, A5, Res](
+    func: Callable[..., Res],
+    parm1: type[A1], parm2: type[A2], parm3: type[A3],
+    parm4: type[A4], parm5: type[A5], /,
 ) -> tuple[
-    Callable[[AnnArg1T, AnnArg2T, AnnArg3T, AnnArg4T, AnnArg5T], AnnResT],
-    tuple[Type[AnnArg1T], Type[AnnArg2T], Type[AnnArg3T], Type[AnnArg4T], Type[AnnArg5T]],
+    Callable[[A1, A2, A3, A4, A5], Res],
+    tuple[type[A1], type[A2], type[A3], type[A4], type[A5]],
 ]: ...
 @overload
-def annotation_caller(
-    func: Callable[..., AnnResT],
-    parm1: Type[AnnArg1T], parm2: Type[AnnArg2T], parm3: Type[AnnArg3T],
-    parm4: Type[AnnArg4T], parm5: Type[AnnArg5T], param6: Type[AnnArg6T], /,
+def annotation_caller[A1, A2, A3, A4, A5, A6, Res](
+    func: Callable[..., Res],
+    parm1: type[A1], parm2: type[A2], parm3: type[A3],
+    parm4: type[A4], parm5: type[A5], param6: type[A6], /,
 ) -> tuple[
-    Callable[[AnnArg1T, AnnArg2T, AnnArg3T, AnnArg4T, AnnArg5T, AnnArg6T], AnnResT],
-    tuple[Type[AnnArg1T], Type[AnnArg2T], Type[AnnArg3T], Type[AnnArg4T], Type[AnnArg5T], Type[AnnArg6T]],
+    Callable[[A1, A2, A3, A4, A5, A6], Res],
+    tuple[type[A1], type[A2], type[A3], type[A4], type[A5], type[A6]],
 ]: ...
-def annotation_caller(
-    func: Callable[..., AnnResT], /,
+def annotation_caller[Res](
+    func: Callable[..., Res], /,
     *parms: type,
-) -> tuple[Callable[..., AnnResT], Tuple[type, ...]]:
+) -> tuple[Callable[..., Res], tuple[type, ...]]:
     """Reorders callback arguments to the requirements of the callback.
 
     parms should be the unique types of arguments in the order they will be
@@ -503,15 +488,12 @@ def _make_reorderer(inputs: str, outputs: str) -> Callable[[Callable[..., object
     return func
 
 
-CallResultT = TypeVar('CallResultT')
-
-
-def conv_setup_pair(
+def conv_setup_pair[Ret](
     setup: Callable[..., Any],
-    result: Callable[..., CallResultT],
+    result: Callable[..., Ret],
 ) -> Callable[
     [srctools.VMF, Keyvalues],
-    Callable[[Entity], CallResultT]
+    Callable[[Entity], Ret]
 ]:
     """Convert the old explict setup function into a new closure."""
     setup_wrap, _ = annotation_caller(
@@ -523,13 +505,13 @@ def conv_setup_pair(
         srctools.VMF, Entity, Keyvalues,
     )
 
-    def func(vmf: srctools.VMF, kv: Keyvalues) -> Callable[[Entity], CallResultT]:
+    def func(vmf: srctools.VMF, kv: Keyvalues) -> Callable[[Entity], Ret]:
         """Replacement function which performs the legacy behaviour."""
         # The old system for setup functions - smuggle them in by
         # setting Keyvalues.value to an arbitrary object.
         smuggle = Keyvalues(kv.real_name, setup_wrap(vmf, kv))
 
-        def closure(ent: Entity) -> CallResultT:
+        def closure(ent: Entity) -> Ret:
             """Use the closure to store the smuggled setup data."""
             return result_wrap(vmf, ent, smuggle)
 
@@ -553,7 +535,7 @@ def meta_priority_converter(priorities: Iterable[MetaCond] | MetaCond) -> frozen
 
 
 @attrs.define(eq=False)
-class CondCall(Generic[CallResultT]):
+class CondCall[CallResultT]:
     """A result or test callback.
 
     This should be called to execute it.
@@ -671,7 +653,7 @@ def add_meta(func: Callable[..., object], priority: MetaCond) -> None:
     ALL_META.append((func.__qualname__, priority, wrapper))
 
 
-def make_test(
+def make_test[TestCallT: Callable[..., bool | TestCallable]](
     orig_name: str, *aliases: str,
     valid_before: Iterable[MetaCond] | MetaCond = (),
     valid_after: Iterable[MetaCond] | MetaCond = (),
@@ -700,7 +682,7 @@ def make_result(
     orig_name: str, *aliases: str,
     valid_before: Iterable[MetaCond] | MetaCond = (),
     valid_after: Iterable[MetaCond] | MetaCond = (),
-) -> Callable[[CallableT], CallableT]:
+) -> utils.DecoratorProto:
     """Decorator to add results to the lookup."""
     folded_name = orig_name.casefold()
     # Discard the original name from aliases, if it's also there.
@@ -709,7 +691,7 @@ def make_result(
         if name.casefold() != folded_name
     ])
 
-    def x(result_func: Callable[..., ResultT]) -> Callable[..., ResultT]:
+    def x[ResultT](result_func: Callable[..., ResultT]) -> Callable[..., ResultT]:
         """Create the result when the function is supplied."""
         # Legacy setup func support.
         func: Callable[..., Callable[[Entity], object] | object]
@@ -744,19 +726,19 @@ def make_result(
     return x  # type: ignore[return-value]  # Callable[..., T] -> TypeVar(bound=Callable)
 
 
-def make_result_setup(*names: str) -> Callable[[CallableT], CallableT]:
+def make_result_setup(*names: str) -> utils.DecoratorProto:
     """Legacy setup function for results. This is no longer used."""
     # Users can't do anything about this, don't bother them.
     if utils.DEV_MODE:
         warnings.warn('Use closure system instead.', DeprecationWarning, stacklevel=2)
 
-    def x(func: CallableT) -> CallableT:
+    def deco[Func: Callable[..., object]](func: Func, /) -> Func:
         for name in names:
             if name.casefold() in RESULT_LOOKUP:
                 raise ValueError('Legacy setup called after making result!')
             RESULT_SETUP[name.casefold()] = func
         return func
-    return x
+    return deco
 
 
 def add(kv_block: Keyvalues) -> None:
@@ -1264,8 +1246,6 @@ def set_ent_keys(
         ent[kv.real_name] = inst.fixup.substitute(kv.value)
     for kv in kv_block.find_block('Local' + block_name, or_blank=True):
         ent[kv.real_name] = local_name(inst, inst.fixup.substitute(kv.value))
-
-T = TypeVar('T')
 
 
 def resolve_offset(inst: Entity, value: str, scale: float = 1.0, zoff: float = 0.0) -> Vec:

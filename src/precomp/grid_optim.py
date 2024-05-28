@@ -3,19 +3,19 @@
 Given a grid of positions, produce a set of rectangular boxes that efficiently cover all
 set positions.
 """
-from typing import Mapping, Tuple, Iterator, TypeVar, Union, Any
+from typing import Any
+from collections.abc import Mapping, Iterator
 
 from plane import PlaneGrid
 
 
 __all__ = ['optimise']
-T = TypeVar('T')
 VOID: Any = object()  # Sentinel
 
 
-def optimise(
-    grid: Union[Mapping[Tuple[int, int], T], PlaneGrid[T]],
-) -> Iterator[Tuple[int, int, int, int, T]]:
+def optimise[T](
+    grid: Mapping[tuple[int, int], T] | PlaneGrid[T],
+) -> Iterator[tuple[int, int, int, int, T]]:
     """Given a grid, produce an efficient set of bounding boxes for each value.
 
     The grid should be a (x, y): T dict.
@@ -38,14 +38,14 @@ def optimise(
     assert all(v is VOID for v in full_grid.values()), full_grid
 
 
-def _do_cell(
+def _do_cell[T](
     grid: PlaneGrid[T],
     value: T,
     min_x: int,
     min_y: int,
     max_x: int,
     max_y: int,
-) -> Tuple[int, int, int, int, T]:
+) -> tuple[int, int, int, int, T]:
     """From a cell (min x/y) find a good rectangle."""
     # We want to try both x,y and y,x order to see which is better.
     x1 = x2 = min_x

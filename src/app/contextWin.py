@@ -9,7 +9,7 @@ various item properties.
 """
 from __future__ import annotations
 
-from typing import Callable, Generic, Tuple, TypeVar
+from collections.abc import Callable
 from enum import Enum
 import webbrowser
 
@@ -31,15 +31,13 @@ from transtoken import TransToken
 
 
 LOGGER = get_logger(__name__)
-# The type of the widget representing palette icons.
-TargetT = TypeVar("TargetT")
 # Function called to change the version of the highlighted palette item.
-ChangeVersionFunc = Callable[[Tuple[int, int], SubItemRef], object]
+type ChangeVersionFunc = Callable[[tuple[int, int], SubItemRef], object]
 # Re-open the context window by finding an item matching this reference. The bool indicates if the
 # existing item is on the palette already.
-OpenMatchingFunc = Callable[[SubItemRef, bool], object]
+type OpenMatchingFunc = Callable[[SubItemRef, bool], object]
 # Given an item + subtype, return the icon to show.
-IconFunc = Callable[[SubItemRef], img.Handle]
+type IconFunc = Callable[[SubItemRef], img.Handle]
 
 SUBITEM_POS = {
     # Positions of subitems depending on the number of subitems that exist
@@ -163,8 +161,11 @@ def get_description(
         return tkMarkdown.MarkdownData.BLANK  # No description
 
 
-class ContextWinBase(Generic[TargetT]):
-    """Shared logic for item context windows."""
+class ContextWinBase[TargetT]:
+    """Shared logic for item context windows.
+
+    TargetT: The widget representing palette icons.
+    """
     # If we are open, info about the selected widget.
     selected: SubItemRef | None
     selected_widget: TargetT | None  # The widget object itself, so we can lock to it.

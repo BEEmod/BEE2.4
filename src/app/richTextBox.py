@@ -1,8 +1,8 @@
-import tkinter
 from tkinter.font import Font as tkFont, nametofont
 from tkinter.messagebox import askokcancel
+import tkinter
 
-from typing import Iterable, Iterator, TypeVar, Union, Tuple, Dict, Callable
+from collections.abc import Callable, Iterable, Iterator
 import webbrowser
 
 from typing_extensions import Never
@@ -16,10 +16,9 @@ import srctools.logger
 
 LOGGER = srctools.logger.get_logger(__name__)
 TRANS_WEBBROWSER = TransToken.ui('Open "{url}" in the default browser?')
-T = TypeVar('T')
 
 
-def iter_firstlast(iterable: Iterable[T]) -> Iterator[Tuple[bool, T, bool]]:
+def iter_firstlast[T](iterable: Iterable[T]) -> Iterator[tuple[bool, T, bool]]:
     """Iterate over anything, tracking if the value is the first or last one."""
     it = iter(iterable)
     try:
@@ -54,7 +53,7 @@ class tkRichText(tkinter.Text):
         *,
         name: str,
         width: int = 10, height: int = 4,
-        font: Union[str, tkFont] = "TkDefaultFont",
+        font: str | tkFont = "TkDefaultFont",
     ) -> None:
         # Setup all our configuration for inserting text.
         if isinstance(font, str):
@@ -67,7 +66,7 @@ class tkRichText(tkinter.Text):
         self.italic_font['slant'] = 'italic'
 
         # URL -> tag name and callback ID.
-        self._link_commands: Dict[str, Tuple[str, str]] = {}
+        self._link_commands: dict[str, tuple[str, str]] = {}
 
         super().__init__(
             parent,
@@ -153,7 +152,7 @@ class tkRichText(tkinter.Text):
 
     # noinspection PyUnresolvedReferences
     # noinspection PyProtectedMember
-    def set_text(self, text_data: Union[str, tkMarkdown.MarkdownData]) -> None:
+    def set_text(self, text_data: str | tkMarkdown.MarkdownData) -> None:
         """Write the rich-text into the textbox.
 
         text_data should either be a string, or the data returned from
@@ -176,7 +175,7 @@ class tkRichText(tkinter.Text):
 
             for is_first, block, is_last in iter_firstlast(text_data):
                 if isinstance(block, tkMarkdown.TextSegment):
-                    tags: Tuple[str, ...]
+                    tags: tuple[str, ...]
                     if block.url:
                         try:
                             cmd_tag, _ = self._link_commands[block.url]

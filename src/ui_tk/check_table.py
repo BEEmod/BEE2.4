@@ -6,9 +6,11 @@ be clicked to sort, the item can be enabled/disabled, and info can be shown
 via tooltips
 """
 from __future__ import annotations
-from typing import Generic, Optional, TypeVar, Iterable, Iterator, overload
+from typing import overload
 from tkinter import ttk, font
 import tkinter as tk
+
+from collections.abc import Iterable, Iterator
 import functools
 
 import attrs
@@ -26,7 +28,6 @@ ROW_HEIGHT = 16
 ROW_PADDING = 2
 
 BODY_FONT = font.nametofont('TkDefaultFont')
-UserT = TypeVar('UserT')
 
 style = ttk.Style()
 style.configure('CheckDetails.TCheckbutton', background='white')
@@ -39,7 +40,7 @@ EVENT_HAS_CHECKS = '<<ItemsChecked>>'
 TRANS_ELLIPSIS = TransToken.untranslated(ELLIPSIS)
 
 
-def truncate(text: str, width: int) -> Optional[TransToken]:
+def truncate(text: str, width: int) -> TransToken | None:
     """Truncate text to fit in the given space."""
     if BODY_FONT.measure(text) < width:
         return None  # No truncation needed!
@@ -70,7 +71,7 @@ class Header:
         self.sorter['background'] = ''
 
 
-class Item(Generic[UserT]):
+class Item[UserT]:
     """Represents one item in a CheckDetails list."""
     user: UserT
     @overload
@@ -197,7 +198,7 @@ class Item(Generic[UserT]):
         self.master.update_allcheck()
 
 
-class CheckDetails(ttk.Frame, Generic[UserT]):
+class CheckDetails[UserT](ttk.Frame):
     """A widget which displays items in a row with various attributes."""
     def __init__(
         self,

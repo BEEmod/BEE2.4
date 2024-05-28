@@ -2,8 +2,7 @@
 Handles scanning through the zip packages to find all items, styles, etc.
 """
 from __future__ import annotations
-from typing import Generic, NoReturn, ClassVar, TypeVar, cast
-from typing_extensions import Self
+from typing import NoReturn, ClassVar, Self, cast
 
 from collections.abc import Collection, Iterable, Iterator, Mapping
 from collections import defaultdict
@@ -259,8 +258,6 @@ CLEAN_PACKAGE = utils.obj_id('BEE2_CLEAN_STYLE')
 CLEAN_STYLE = utils.obj_id('BEE2_CLEAN')
 
 
-T = TypeVar('T')
-PakT = TypeVar('PakT', bound='PakObject')
 style_suggest_keys: dict[str, type[PakObject]] = {}
 
 
@@ -343,7 +340,7 @@ class PakObject:
 
 
 @attrs.frozen
-class PakRef(Generic[PakT]):
+class PakRef[PakT: PakObject]:
     """Encapsulates an ID for a specific pakobject class."""
     obj: type[PakT]
     id: utils.ObjectID
@@ -485,13 +482,13 @@ class PackagesSet:
             # ready() was never called on at least one class, so it can't possibly be done yet!
             return False
 
-    def all_obj(self, cls: type[PakT]) -> Collection[PakT]:
+    def all_obj[PakT: PakObject](self, cls: type[PakT]) -> Collection[PakT]:
         """Get the list of objects parsed."""
         if cls not in self._parsed:
             raise ValueError(cls.__name__ + ' has not been parsed yet!')
         return cast('dict[str, PakT]', self.objects[cls]).values()
 
-    def obj_by_id(self, cls: type[PakT], object_id: str) -> PakT:
+    def obj_by_id[PakT: PakObject](self, cls: type[PakT], object_id: str) -> PakT:
         """Return the object with a given ID."""
         if cls not in self._parsed:
             raise ValueError(cls.__name__ + ' has not been parsed yet!')
@@ -690,7 +687,7 @@ async def load_packages(
                 )
 
 
-async def parse_type(packset: PackagesSet, obj_class: type[PakT], objs: Iterable[str]) -> None:
+async def parse_type[PakT: PakObject](packset: PackagesSet, obj_class: type[PakT], objs: Iterable[str]) -> None:
     """Parse all of a specific object type."""
     async with trio.open_nursery() as nursery:
         for obj_id in objs:

@@ -14,7 +14,8 @@ Valid path styles:
 - "path/to_instance": A single direct instance path.
 """
 from __future__ import annotations
-from typing import Callable, Dict, TypeVar, Iterable, overload
+from typing import overload
+from collections.abc import Callable, Iterable
 from collections import defaultdict
 from functools import lru_cache
 import logging
@@ -230,7 +231,7 @@ SPECIAL_INST_FOLDED = {
 
 def load_conf(items: Iterable[editoritems.Item]) -> None:
     """Read the config and build our dictionaries."""
-    cust_instances: Dict[str, str]
+    cust_instances: dict[str, str]
     EMPTY = editoritems.FSPath()
     for item in items:
         # Extra definitions: key -> filename.
@@ -334,14 +335,11 @@ def resolve_filter(path: str, silent: bool = False) -> frozenset[str]:
     })
 
 
-Default_T = TypeVar('Default_T')
-
-
 @overload
 def resolve_one(path: str, *, error: bool) -> str: ...
 @overload
-def resolve_one(path: str, default: Default_T) -> str | Default_T: ...
-def resolve_one(path: str, default: str | Default_T = '', *, error: bool = False) -> str | Default_T:
+def resolve_one[Default](path: str, default: Default) -> str | Default: ...
+def resolve_one[Default](path: str, default: str | Default = '', *, error: bool = False) -> str | Default:
     """Resolve a path into one instance.
 
     If multiple are given, this returns the first.

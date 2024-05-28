@@ -4,10 +4,7 @@ General code used for tkinter portions.
 """
 from __future__ import annotations
 
-from typing import (
-    Generic, overload, cast, Any, TypeVar, Protocol, Callable, Literal, NoReturn, TypedDict
-)
-from typing_extensions import TypeAliasType, TypeVarTuple, Unpack
+from typing import Any, Protocol, Callable, Literal, NoReturn, TypedDict, Unpack, overload, cast
 
 from contextlib import aclosing
 from enum import Enum
@@ -38,14 +35,7 @@ from . import TK_ROOT, tooltip
 
 
 LOGGER = logger.get_logger(__name__)
-T = TypeVar('T')
-EnumT = TypeVar('EnumT', bound=Enum)
-PosArgsT = TypeVarTuple('PosArgsT')
-StrKeyT = TypeVar('StrKeyT', bound=str)
-AnyWidT = TypeVar('AnyWidT', bound=tk.Misc)
-WidgetT = TypeVar('WidgetT', bound=tk.Widget)
-EventFunc = TypeAliasType("EventFunc", Callable[[tk.Event[AnyWidT]], object], type_params=(AnyWidT, ))
-EventFuncT = TypeVar('EventFuncT', bound=EventFunc[tk.Widget])
+type EventFunc[Widget: tk.Misc] = Callable[[tk.Event[Widget]], object]
 
 
 if utils.WIN:
@@ -241,10 +231,10 @@ async def wait_eventloop() -> None:
     await _cur_update.wait()
 
 
-def bind_mousewheel(
+def bind_mousewheel[*Args](
     widgets: Iterable[tk.Misc] | tk.Misc,
-    func: Callable[[int, Unpack[PosArgsT]], object],
-    *args: Unpack[PosArgsT],
+    func: Callable[[int, *Args], object],
+    *args: *Args,
 ) -> None:
     """Bind mousewheel events, which function differently on each platform.
 
@@ -349,37 +339,43 @@ class PlaceArgs(TypedDict, total=False):
     in_: tk.Misc
 
 
-class _EventDeco(Protocol[AnyWidT]):
-    def __call__(self, func: EventFunc[AnyWidT], /) -> EventFunc[AnyWidT]:
+class _EventDeco[Widget: tk.Misc](Protocol):
+    def __call__(self, func: EventFunc[Widget], /) -> EventFunc[Widget]:
         ...
 
 
-class _Binder(Protocol[WidgetT]):
+class _Binder(Protocol):
     @overload
-    def __call__(self, wid: WidgetT, *, add: bool = False) -> _EventDeco[WidgetT]: ...  # type: ignore[overload-overlap]
+    def __call__[Widget: tk.Widget](self, wid: Widget, *, add: bool = False) -> _EventDeco[Widget]: ...  # type: ignore[overload-overlap]
     @overload
     def __call__(self, wid: tk.Misc, *, add: bool = False) -> _EventDeco[tk.Misc]: ...
     @overload
-    def __call__(self, wid: WidgetT, func: EventFunc[WidgetT], *, add: bool = False) -> str: ...
+    def __call__[Widget: tk.Widget](self, wid: Widget, func: EventFunc[Widget], *, add: bool = False) -> str: ...
     @overload
     def __call__(self, wid: tk.Misc, func: EventFunc[tk.Misc], *, add: bool = False) -> str: ...
 
 
-def _bind_event_handler(bind_func: Callable[[WidgetT, EventFunc[WidgetT], bool], None]) -> _Binder[WidgetT]:
+class _BindFunc(Protocol):
+    """Function passed to _bind_event_handler()"""
+    def __call__[Widget: tk.Widget](self, wid: Widget, func: EventFunc[Widget], add: bool = False) -> None:
+        ...
+
+
+def _bind_event_handler(bind_func: _BindFunc) -> _Binder:
     """Decorator for the bind_click functions.
 
     This allows calling directly, or decorating a function with just wid and add
     attributes.
     """
     @functools.wraps(bind_func)
-    def deco(
-        wid: WidgetT,
-        func: EventFunc[WidgetT] | None = None,
+    def deco[Widget: tk.Widget](
+        wid: Widget,
+        func: EventFunc[Widget] | None = None,
         *, add: bool = False,
     ) -> Callable[..., object] | None:
         """Decorator or normal interface, func is optional to be a decorator."""
         if func is None:
-            def deco_2(func2: EventFunc[WidgetT]) -> EventFunc[WidgetT]:
+            def deco_2(func2: EventFunc[Widget]) -> EventFunc[Widget]:
                 """Used as a decorator - must be called second with the function."""
                 bind_func(wid, func2, add)
                 return func2
@@ -394,9 +390,9 @@ def _bind_event_handler(bind_func: Callable[[WidgetT, EventFunc[WidgetT], bool],
 if utils.MAC:
     # On OSX, make left-clicks switch to a right-click when control is held.
     @_bind_event_handler
-    def bind_leftclick(wid: WidgetT, func: EventFunc[WidgetT], add: bool = False) -> None:
+    def bind_leftclick[Widget: tk.Widget](wid: Widget, func: EventFunc[Widget], add: bool = False) -> None:
         """On OSX, left-clicks are converted to right-click when control is held."""
-        def event_handler(e: tk.Event[WidgetT]) -> None:
+        def event_handler(e: tk.Event[Widget]) -> None:
             """Check if this should be treated as rightclick."""
             # e.state is a set of binary flags
             # Don't run the event if control is held!
@@ -405,9 +401,9 @@ if utils.MAC:
         wid.bind(EVENTS['LEFT'], event_handler, add=add)
 
     @_bind_event_handler
-    def bind_leftclick_double(wid: WidgetT, func: EventFunc[WidgetT], add: bool = False) -> None:
+    def bind_leftclick_double[Widget: tk.Widget](wid: Widget, func: EventFunc[Widget], add: bool = False) -> None:
         """On OSX, left-clicks are converted to right-click when control is held."""
-        def event_handler(e: tk.Event[WidgetT]) -> None:
+        def event_handler(e: tk.Event[Widget]) -> None:
             """Check if this should be treated as rightclick."""
             # e.state is a set of binary flags
             # Don't run the event if control is held!
@@ -416,23 +412,23 @@ if utils.MAC:
         wid.bind(EVENTS['LEFT_DOUBLE'], event_handler, add=add)
 
     @_bind_event_handler
-    def bind_rightclick(wid: WidgetT, func: EventFunc[WidgetT], add: bool = False) -> None:
+    def bind_rightclick[Widget: tk.Widget](wid: Widget, func: EventFunc[Widget], add: bool = False) -> None:
         """On OSX, we need to bind to both rightclick and control-leftclick."""
         wid.bind(EVENTS['RIGHT'], func, add=add)
         wid.bind(EVENTS['LEFT_CTRL'], func, add=add)
 else:
     @_bind_event_handler
-    def bind_leftclick(wid: WidgetT, func: EventFunc[WidgetT], add: bool = False) -> None:
+    def bind_leftclick[Widget: tk.Widget](wid: Widget, func: EventFunc[Widget], add: bool = False) -> None:
         """Other systems just bind directly."""
         wid.bind(EVENTS['LEFT'], func, add=add)
 
     @_bind_event_handler
-    def bind_leftclick_double(wid: WidgetT, func: EventFunc[WidgetT], add: bool = False) -> None:
+    def bind_leftclick_double[Widget: tk.Widget](wid: Widget, func: EventFunc[Widget], add: bool = False) -> None:
         """Other systems just bind directly."""
         wid.bind(EVENTS['LEFT_DOUBLE'], func, add=add)
 
     @_bind_event_handler
-    def bind_rightclick(wid: WidgetT, func: EventFunc[WidgetT], add: bool = False) -> None:
+    def bind_rightclick[Widget: tk.Widget](wid: Widget, func: EventFunc[Widget], add: bool = False) -> None:
         """Other systems just bind directly."""
         wid.bind(EVENTS['RIGHT'], func, add=add)
 
@@ -778,7 +774,7 @@ class FileField(ttk.Frame):
         self._text_var.set(self._truncate(self._location))
 
 
-class EnumButton(Generic[EnumT]):
+class EnumButton[EnumT: Enum]:
     """Provides a set of buttons for toggling between enum values.
 
     This is bound to the provided AsyncValue, updating it when changed.
@@ -838,7 +834,7 @@ class LineHeader(ttk.Frame):
         self.columnconfigure(2, weight=1)
 
 
-class ComboBoxMap(Generic[StrKeyT]):
+class ComboBoxMap[StrKeyT: str]:
     """A Combobox which displays TransTokens, mapping them to internal IDs."""
     _ordered_tokens: list[TransToken]
     _index_to_key: list[StrKeyT]

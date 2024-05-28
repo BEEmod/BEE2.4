@@ -2,8 +2,7 @@
 from __future__ import annotations
 
 from typing import (
-    Final, NewType, TYPE_CHECKING, Any,
-    NoReturn, SupportsInt, Literal, TypeGuard
+    Final, NewType, Protocol, TYPE_CHECKING, Any, NoReturn, SupportsInt, Literal, TypeGuard,
 )
 from collections.abc import (
     Awaitable, Callable, Collection, Generator, Iterable, Iterator,
@@ -264,6 +263,12 @@ CONN_LOOKUP: Mapping[tuple[int, int, int, int], tuple[CONN_TYPES, Angle]] = {
 }
 
 del N, S, E, W
+
+
+class DecoratorProto(Protocol):
+    """A decorator function which returns the callable unchanged."""
+    def __call__[Func: Callable[..., object]](self, func: Func, /) -> Func:
+        ...
 
 
 def freeze_enum_props[EnumT: Enum](cls: type[EnumT]) -> type[EnumT]:

@@ -1,8 +1,7 @@
 """Image integrations for TKinter."""
 from __future__ import annotations
 
-from typing import TypeVar, Union
-from typing_extensions import TypeAliasType, override
+from typing import override
 from tkinter import ttk
 import tkinter as tk
 import os
@@ -16,15 +15,8 @@ from ui_tk import TK_ROOT
 
 
 # Widgets with an image attribute that can be set.
-tkImgWidgets = TypeAliasType("tkImgWidgets", Union[tk.Label, ttk.Label, tk.Button, ttk.Button])
-tkImgWidgetsT = TypeVar(
-    'tkImgWidgetsT',
-    tk.Label, ttk.Label,
-    Union[tk.Label, ttk.Label],
-    tk.Button, ttk.Button,
-    Union[tk.Button, ttk.Button],
-)
-tkImg = TypeAliasType("tkImg", Union[ImageTk.PhotoImage, tk.PhotoImage])
+type tkImgWidgets = tk.Label | ttk.Label | tk.Button | ttk.Button
+type tkImg = ImageTk.PhotoImage | tk.PhotoImage
 
 LOGGER = get_logger(__name__)
 label_to_user: dict[tkImgWidgets, LabelStyleUser] = {}
@@ -178,7 +170,7 @@ class TKImages(img.UIImage):
         return self._load_tk(handle, force=False)
 
     # noinspection PyProtectedMember
-    def apply(self, widget: tkImgWidgetsT, image: img.Handle | None, /) -> tkImgWidgetsT:
+    def apply[Widget: tkImgWidgets](self, widget: Widget, image: img.Handle | None, /) -> Widget:
         """Set the image in a label-style widget.
 
         This tracks the widget, so later reloads will affect the widget.
