@@ -1,7 +1,5 @@
 """Handler for app.errors."""
 from __future__ import annotations
-from typing_extensions import TypeAliasType
-from typing import List, Tuple
 from tkinter import ttk
 import tkinter as tk
 import math
@@ -14,9 +12,7 @@ from .wid_transtoken import set_text, set_win_title
 from . import TK_ROOT, tk_tools
 
 
-ChannelValue = TypeAliasType("ChannelValue", Tuple[
-    TransToken, TransToken, List[AppError], trio.Event,
-])
+type ChannelValue = tuple[TransToken, TransToken, list[AppError], trio.Event]
 
 
 async def display_errors(
@@ -30,7 +26,7 @@ async def display_errors(
     # Set when the dialog was closed, and the handler can return. Immediately re-assigned.
     close_event = trio.Event()
 
-    async def handler(title: TransToken, desc: TransToken, errors: List[AppError]) -> None:
+    async def handler(title: TransToken, desc: TransToken, errors: list[AppError]) -> None:
         """Wait for the error box to display the message."""
         evt = trio.Event()
         await send.send((title, desc, errors, evt))
@@ -92,7 +88,7 @@ async def display_errors(
     set_text(wid_close, TransToken.ui("Close"))
 
     # Cache the labels and separators.
-    error_widgets: List[Tuple[tk.Label, ttk.Separator]] = []
+    error_widgets: list[tuple[tk.Label, ttk.Separator]] = []
 
     def on_resize(e: object) -> None:
         """Resize labels when the window does."""

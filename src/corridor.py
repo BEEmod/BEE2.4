@@ -1,7 +1,6 @@
 """Data structure for specifying custom corridors."""
 from __future__ import annotations
-from typing import Optional, Tuple
-from typing_extensions import Final, TypeAliasType, Literal
+from typing_extensions import Final, Literal
 from collections.abc import Sequence, Mapping
 from enum import Enum
 
@@ -87,13 +86,11 @@ ID_TO_CORR: Final[Mapping[utils.ObjectID, tuple[GameMode, Direction]]] = {
 CORR_TO_ID: Final[Mapping[tuple[GameMode, Direction], utils.ObjectID]] = {v: k for k, v in ID_TO_CORR.items()}
 
 # A specific type of corridor.
-CorrKind = TypeAliasType("CorrKind", Tuple[GameMode, Direction, Orient])
+type CorrKind = tuple[GameMode, Direction, Orient]
 # A filter on which types this applies to. None values match all possible instead.
-CorrSpec = TypeAliasType("CorrSpec", Tuple[
-    Optional[GameMode], Optional[Direction], Optional[Orient],
-])
+type CorrSpec = tuple[GameMode | None, Direction | None, Orient | None]
 # Options are only differentiated based on mode/direction.
-OptionGroup = TypeAliasType("OptionGroup", Tuple[GameMode, Direction])
+type OptionGroup = tuple[GameMode, Direction]
 # Number of default instances for each kind.
 CORRIDOR_COUNTS: Final[Mapping[tuple[GameMode, Direction], Literal[1, 4, 7]]] = {
     (GameMode.SP, Direction.ENTRY): 7,

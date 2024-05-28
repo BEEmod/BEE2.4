@@ -1,10 +1,6 @@
 """Manage applying translation tokens to TK widgets."""
 from __future__ import annotations
 
-
-from typing_extensions import TypeAliasType
-from typing import TypeVar, Union
-
 from tkinter import ttk
 import tkinter as tk
 from contextlib import aclosing
@@ -22,11 +18,10 @@ __all__ = [
 
 
 # Widgets that have a 'text' property.
-TextWidget = TypeAliasType("TextWidget", Union[
-    tk.Label, tk.LabelFrame, tk.Button, tk.Radiobutton, tk.Checkbutton,
-    ttk.Label, ttk.LabelFrame, ttk.Button, ttk.Radiobutton, ttk.Checkbutton,
-])
-TextWidgetT = TypeVar('TextWidgetT', bound=TextWidget)
+type TextWidget = (
+    tk.Label | tk.LabelFrame | tk.Button | tk.Radiobutton | tk.Checkbutton |
+    ttk.Label | ttk.LabelFrame | ttk.Button | ttk.Radiobutton | ttk.Checkbutton
+)
 # Assigns to widget['text'].
 _applied_text_tokens: WeakKeyDictionary[TextWidget, TransToken] = WeakKeyDictionary()
 # menu -> index -> token.
@@ -34,7 +29,7 @@ _applied_menu_tokens: WeakKeyDictionary[tk.Menu, dict[int, TransToken]] = WeakKe
 _window_titles: WeakKeyDictionary[tk.Wm, TransToken] = WeakKeyDictionary()
 
 
-def set_text(widget: TextWidgetT, token: TransToken) -> TextWidgetT:
+def set_text[Widget: TextWidget](widget: Widget, token: TransToken) -> Widget:
     """Apply a token to the specified label/button/etc."""
     widget['text'] = str(token)
     if token.is_untranslated:  # No need to have a callback for this one.

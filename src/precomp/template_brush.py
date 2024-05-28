@@ -1,9 +1,8 @@
 """Templates are sets of brushes which can be copied into the map."""
 from __future__ import annotations
-from typing import AbstractSet, Union, Tuple, Mapping
-from typing_extensions import Literal, TypeAliasType, assert_never
+from typing import Literal, assert_never
 
-from collections.abc import Callable, Collection, Iterable, Iterator
+from collections.abc import Callable, Collection, Iterable, Iterator, Mapping, Set as AbstractSet
 from collections import defaultdict
 from decimal import Decimal
 from enum import Enum
@@ -36,7 +35,7 @@ LOGGER = srctools.logger.get_logger(__name__, alias='template')
 # _TEMPLATES is initially filled with UnparsedTemplate,
 # then when each is retrieved we parse to an actual Template.
 # _SCALE_TEMP is converted from Template. The frozenset is the visgroups.
-_TEMPLATES: dict[str, Union[UnparsedTemplate, Template]] = {}
+_TEMPLATES: dict[str, UnparsedTemplate | Template] = {}
 _SCALE_TEMP: dict[tuple[str, frozenset[str]], ScalingTemplate] = {}
 
 
@@ -244,10 +243,10 @@ TEMP_TILE_PIX_SIZE = {
 
 
 # 'Opposite' values for retexture_template(force_colour)
-ForceColour = TypeAliasType("ForceColour", Literal[
+type ForceColour = Literal[
     AppliedColour.MATCH, AppliedColour.INVERT,
     Portalable.white, Portalable.black,
-])
+]
 TEMP_COLOUR_INVERT: dict[ForceColour, ForceColour] = {
     Portalable.white: Portalable.black,
     Portalable.black: Portalable.white,
@@ -402,8 +401,8 @@ class Template:
 
 
 class ScalingTemplate(Mapping[
-    Union[Vec, Tuple[float, float, float]],
-    Tuple[str, UVAxis, UVAxis, float]
+    Vec | tuple[float, float, float],
+    tuple[str, UVAxis, UVAxis, float]
 ]):
     """Represents a special version of templates, used for texturing brushes.
 

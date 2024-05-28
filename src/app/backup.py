@@ -3,8 +3,7 @@
 """
 from __future__ import annotations
 
-from typing import List, TYPE_CHECKING, Dict, Any, Union, cast
-from typing_extensions import Self, TypeAliasType
+from typing import TYPE_CHECKING, Any, cast, Self
 
 from tkinter import filedialog, ttk
 from datetime import datetime
@@ -42,8 +41,8 @@ LOGGER = srctools.logger.get_logger(__name__)
 # The backup window - either a toplevel, or TK_ROOT.
 window: tk.Toplevel
 
-AnyZip = TypeAliasType("AnyZip", Union[ZipFile, FakeZip])
-UI: Dict[str, Any] = {}  # Holds all the widgets
+type AnyZip = ZipFile | FakeZip
+UI: dict[str, Any] = {}  # Holds all the widgets
 
 # Loading stage used during backup.
 AUTO_BACKUP_STAGE = loadScreen.ScreenStage(TransToken.ui('Backup Puzzles'))
@@ -81,7 +80,7 @@ PUZZLE_FOLDERS = {
 }
 
 # The currently-loaded backup files.
-BACKUPS: Dict[str, Any] = {
+BACKUPS: dict[str, Any] = {
     'game': [],
     'back': [],
 
@@ -274,9 +273,9 @@ class Date:
 # directories.
 
 
-async def load_backup(zip_file: AnyZip) -> List[P2C]:
+async def load_backup(zip_file: AnyZip) -> list[P2C]:
     """Load in a backup file."""
-    maps: List[P2C] = []
+    maps: list[P2C] = []
     puzzles = [
         file[:-4]  # Strip extension
         for file in
@@ -342,7 +341,7 @@ def find_puzzles(game: gameMan.Game) -> str | None:
     return None
 
 
-async def backup_maps(dialogs: Dialogs, maps: List[P2C]) -> None:
+async def backup_maps(dialogs: Dialogs, maps: list[P2C]) -> None:
     """Copy the given maps to the backup."""
     back_zip: ZipFile = BACKUPS['backup_zip']
 
@@ -450,7 +449,7 @@ async def save_backup(dialogs: Dialogs) -> None:
     new_zip_data = BytesIO()
     new_zip = ZipFile(new_zip_data, 'w', compression=ZIP_LZMA)
 
-    maps: List[P2C] = [
+    maps: list[P2C] = [
         item.user
         for item in
         UI['back_details'].items
@@ -496,7 +495,7 @@ async def save_backup(dialogs: Dialogs) -> None:
         p2c.zip_file = new_zip
 
 
-async def restore_maps(dialogs: Dialogs, maps: List[P2C]) -> None:
+async def restore_maps(dialogs: Dialogs, maps: list[P2C]) -> None:
     """Copy the given maps to the game."""
     game_dir = BACKUPS['game_path']
     if game_dir is None:

@@ -1,10 +1,9 @@
 """Parses the Puzzlemaker's item format."""
 from __future__ import annotations
-from typing import Callable, ClassVar, List, Optional, Protocol, Any, Tuple
-from typing_extensions import TypeAliasType
+from typing import ClassVar, Protocol, Any
 
 from collections import defaultdict
-from collections.abc import Iterable, Iterator, Mapping
+from collections.abc import Callable, Iterable, Iterator, Mapping
 from enum import Enum, Flag
 from pathlib import PurePosixPath as FSPath
 import sys
@@ -31,10 +30,10 @@ __all__ = [
 ]
 LOGGER = logger.get_logger(__name__)
 # __getstate__ / __setstate__ types.
-_SubTypeState = TypeAliasType("_SubTypeState", Tuple[
-    TransToken, List[str], List[str], List[int],
-    TransToken, int, int, Optional[FSPath],
-])
+type _SubTypeState = tuple[
+    TransToken, list[str], list[str], list[int],
+    TransToken, int, int, FSPath | None,
+]
 
 
 class ItemClass(Enum):
@@ -492,7 +491,7 @@ class ConnSide(Enum):
 
     @classmethod
     def from_yaw(cls, value: int) -> ConnSide:
-        """Return the the side pointing in this yaw direction."""
+        """Return the side pointing in this yaw direction."""
         value %= 360
         if value == 0:
             return ConnSide.LEFT

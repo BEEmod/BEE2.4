@@ -146,7 +146,7 @@ class EdgeTrigger[*Args]:
     async def wait[T](self: EdgeTrigger[T]) -> T: ...
     @overload  # Ignore spurious warnings about the above overloads being impossible.
     async def wait(self) -> tuple[*Args]: ...  # type: ignore[misc]
-    async def wait(self) -> tuple[Any, ...] | None:
+    async def wait[T](self) -> T | tuple[Any, ...] | None:
         """Wait for the trigger to fire, then return the parameters.
 
         Only one task can wait at a time.

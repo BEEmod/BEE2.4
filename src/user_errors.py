@@ -2,11 +2,8 @@
 
 UserError is imported all over, so this needs to have minimal imports to avoid cycles.
 """
-from typing import (
-    ClassVar, Collection, Dict, Iterable, List, Literal, Optional, Set, Tuple,
-    TypedDict, Union,
-)
-from typing_extensions import TypeAliasType
+from typing import ClassVar, Literal, TypedDict
+from collections.abc import Collection, Iterable
 from pathlib import Path
 
 from srctools import FrozenVec, Vec, logger
@@ -16,15 +13,15 @@ from transtoken import TransToken
 import utils
 
 
-Kind = TypeAliasType("Kind", Literal[
+type Kind = Literal[
     "white", "black",
     "goo", "goopartial", "goofull",
     "back", "glass", "grating",
-])
-TuplePos = TypeAliasType("TuplePos", Tuple[float, float, float])
+]
+type TuplePos = tuple[float, float, float]
 # Textures for displaying barrier items.
-BARRIER_TEX_SET: Set[Kind] = {"glass", "grating", "white", "black"}
-TEX_SET: Set[Kind] = {
+BARRIER_TEX_SET: set[Kind] = {"glass", "grating", "white", "black"}
+TEX_SET: set[Kind] = {
     "white", "black",
     "glass", "grating",
     "goo", "goopartial", "goofull",
@@ -54,26 +51,26 @@ class BarrierHole(TypedDict):
 class ErrorInfo:
     """Data to display to the user."""
     message: TransToken
-    language_file: Optional[Path] = None
+    language_file: Path | None = None
     # Logging context
     context: str = ''
-    faces: Dict[Kind, List[SimpleTile]] = attrs.Factory(dict)
+    faces: dict[Kind, list[SimpleTile]] = attrs.Factory(dict)
     # Voxels of interest in the map.
-    voxels: List[TuplePos] = attrs.Factory(list)
+    voxels: list[TuplePos] = attrs.Factory(list)
     # Points of interest in the map.
-    points: List[TuplePos] = attrs.Factory(list)
+    points: list[TuplePos] = attrs.Factory(list)
     # Special list of locations forming a pointfile line.
-    leakpoints: List[TuplePos] = attrs.Factory(list)
+    leakpoints: list[TuplePos] = attrs.Factory(list)
     # A list of point pairs which get lines drawn.
-    lines: List[Tuple[TuplePos, TuplePos]] = attrs.Factory(list)
+    lines: list[tuple[TuplePos, TuplePos]] = attrs.Factory(list)
     # If a glass/grating hole is misplaced, show its location.
-    barrier_holes: List[BarrierHole] = attrs.Factory(list)
+    barrier_holes: list[BarrierHole] = attrs.Factory(list)
 
 
 @attrs.frozen(eq=False)
 class PackageTranslations:
     """The already-translated tokens for each package, for use in the server."""
-    translations: List[Tuple[str, Dict[str, str]]]
+    translations: list[tuple[str, dict[str, str]]]
 
 
 class ServerInfo(TypedDict):
@@ -87,7 +84,7 @@ DATA_LOC = utils.conf_location('compile_error.pickle')
 SERVER_INFO_FILE = utils.conf_location('error_server_info.json')
 
 
-def to_threespace(vec: Union[Vec, FrozenVec]) -> TuplePos:
+def to_threespace(vec: Vec | FrozenVec) -> TuplePos:
     """Convert a vector to the conventions THREE.js uses."""
     return (
         vec.x / 128.0,
@@ -102,18 +99,18 @@ class UserError(BaseException):
     This will result in the compile switching to compile a map which displays
     a HTML page to the user via the Steam Overlay.
     """
-    simple_tiles: ClassVar[Dict[Kind, List[SimpleTile]]] = {kind: [] for kind in TEX_SET}
+    simple_tiles: ClassVar[dict[Kind, list[SimpleTile]]] = {kind: [] for kind in TEX_SET}
 
     def __init__(
         self,
         message: TransToken,
         *,
         docsurl: str = '',
-        voxels: Iterable[Union[Vec, FrozenVec]] = (),
-        points: Iterable[Union[Vec, FrozenVec]] = (),
+        voxels: Iterable[Vec | FrozenVec] = (),
+        points: Iterable[Vec | FrozenVec] = (),
         textlist: Collection[str] = (),
-        leakpoints: Collection[Union[Vec, FrozenVec]] = (),
-        lines: Iterable[Tuple[Union[Vec, FrozenVec], Union[Vec, FrozenVec]]] = (),
+        leakpoints: Collection[Vec | FrozenVec] = (),
+        lines: Iterable[tuple[Vec | FrozenVec, Vec | FrozenVec]] = (),
         barrier_holes: Collection[BarrierHole] = (),
     ) -> None:
         """Specify the info to show to the user.
