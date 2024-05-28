@@ -1,6 +1,6 @@
 # Changelog
 
-# Version (dev)
+# Version 4.45.1
 * Fix the application looking in the wrong location for the compiler.
 
 # Version 4.45.0
