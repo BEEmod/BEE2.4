@@ -246,6 +246,9 @@ EXCLUDES = [
     'win32evtlogutil',
     'smtplib',
 
+    # Pulls in all of pytest etc, not required.
+    'trio.testing',
+
     'unittest',  # Imported in __name__==__main__..
     'doctest',
     'optparse',

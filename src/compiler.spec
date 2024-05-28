@@ -46,6 +46,8 @@ EXCLUDES = [
     'bg_daemon',
     # We don't need to actually run versioning at runtime.
     'versioningit',
+    # Pulls in all of pytest etc, not required.
+    'trio.testing',
 ]
 
 # The modules made available for plugins to use.
