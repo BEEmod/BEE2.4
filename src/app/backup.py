@@ -10,6 +10,7 @@ from tkinter import filedialog, ttk
 from datetime import datetime
 from io import BytesIO, TextIOWrapper
 from zipfile import ZipFile, ZIP_LZMA
+from contextlib import aclosing
 import tkinter as tk
 import atexit
 import os
@@ -285,7 +286,7 @@ async def load_backup(zip_file: AnyZip) -> List[P2C]:
     # Each P2C init requires reading in the properties file, so this may take
     # some time. Use a loading screen.
     LOGGER.info('Loading {} maps..', len(puzzles))
-    async with reading_loader, utils.aclosing(LOAD_STAGE.iterate(puzzles)) as agen:
+    async with reading_loader, aclosing(LOAD_STAGE.iterate(puzzles)) as agen:
         async for file in agen:
             new_map = await trio.to_thread.run_sync(P2C.from_file, file, zip_file)
             maps.append(new_map)
@@ -432,7 +433,7 @@ async def auto_backup(game: gameMan.Game) -> None:
     )
     LOGGER.info('Writing backup to "{}"', final_backup)
     with open(final_backup, 'wb') as f, ZipFile(f, mode='w', compression=ZIP_LZMA) as zip_file:
-        async with utils.aclosing(AUTO_BACKUP_STAGE.iterate(to_backup)) as agen:
+        async with aclosing(AUTO_BACKUP_STAGE.iterate(to_backup)) as agen:
             async for file in agen:
                 await trio.to_thread.run_sync(
                     zip_file.write,
@@ -463,7 +464,7 @@ async def save_backup(dialogs: Dialogs) -> None:
         )
         return
 
-    async with copy_loader, utils.aclosing(LOAD_STAGE.iterate(maps)) as agen:
+    async with copy_loader, aclosing(LOAD_STAGE.iterate(maps)) as agen:
         async for p2c in agen:
             old_zip = p2c.zip_file
             map_path = p2c.filename + '.p2c'
@@ -502,7 +503,7 @@ async def restore_maps(dialogs: Dialogs, maps: List[P2C]) -> None:
         LOGGER.warning('No game selected to restore from?')
         return
 
-    async with copy_loader, utils.aclosing(LOAD_STAGE.iterate(maps)) as agen:
+    async with copy_loader, aclosing(LOAD_STAGE.iterate(maps)) as agen:
         async for p2c in agen:
             back_zip = p2c.zip_file
             scr_path = p2c.filename + '.jpg'
@@ -723,7 +724,7 @@ async def ui_delete_game(dialog: Dialogs) -> None:
     ):
         return
 
-    async with deleting_loader, utils.aclosing(LOAD_STAGE.iterate(to_delete)) as agen:
+    async with deleting_loader, aclosing(LOAD_STAGE.iterate(to_delete)) as agen:
         async for p2c in agen:
             scr_path = p2c.filename + '.jpg'
             map_path = p2c.filename + '.p2c'

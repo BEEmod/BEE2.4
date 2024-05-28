@@ -2,6 +2,8 @@ from __future__ import annotations
 from tkinter import messagebox, ttk
 import tkinter as tk
 
+from contextlib import aclosing
+
 import trio
 
 from app import background_run, img, sound
@@ -161,7 +163,7 @@ async def test() -> None:
 
     async def update_hover_text() -> None:
         """Update the hovered text."""
-        async with utils.aclosing(manager.hovered_item.eventual_values()) as agen:
+        async with aclosing(manager.hovered_item.eventual_values()) as agen:
             async for item in agen:
                 if item is not None:
                     name_lbl['text'] = 'Name: ' + item

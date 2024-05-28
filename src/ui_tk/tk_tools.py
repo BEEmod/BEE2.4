@@ -3,13 +3,13 @@ General code used for tkinter portions.
 
 """
 from __future__ import annotations
+
 from typing import (
     Generic, overload, cast, Any, TypeVar, Protocol, Callable, Literal, NoReturn, TypedDict
 )
-
-import trio_util
 from typing_extensions import TypeAliasType, TypeVarTuple, Unpack
 
+from contextlib import aclosing
 from enum import Enum
 from collections.abc import Awaitable, Iterable
 from tkinter import filedialog, commondialog
@@ -24,6 +24,7 @@ import tkinter as tk
 from idlelib.redirector import WidgetRedirector  # type: ignore[import-not-found]
 from srctools import logger
 from trio_util import AsyncValue
+import trio_util
 import trio
 
 from app import ICO_PATH, background_run
@@ -488,7 +489,7 @@ async def apply_bool_enabled_state_task(value: AsyncValue[bool], *widgets: ttk.W
 
     This will make them disabled if the value is set to False.
     """
-    async with utils.aclosing(value.eventual_values()) as agen:
+    async with aclosing(value.eventual_values()) as agen:
         async for cur_value in agen:
             state = ('!disabled', ) if cur_value else ('disabled', )
             for wid in widgets:
@@ -810,7 +811,7 @@ class EnumButton(Generic[EnumT]):
 
     async def task(self) -> None:
         """Task which must be run to update the button state."""
-        async with utils.aclosing(self.current.eventual_values()) as agen:
+        async with aclosing(self.current.eventual_values()) as agen:
             async for chosen in agen:
                 for val, button in self.buttons.items():
                     button.state(('pressed', ) if val is chosen else ('!pressed', ))

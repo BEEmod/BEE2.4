@@ -3,11 +3,13 @@
 The widgets tokens are applied to are stored, so changing language can update the UI.
 """
 from __future__ import annotations
+
 from typing import Any, Callable, TypeVar, TYPE_CHECKING
 from typing_extensions import ParamSpec, override
 
 from collections.abc import AsyncGenerator, Iterable, Iterator
 from collections import defaultdict
+from contextlib import aclosing
 import weakref
 import datetime
 import functools
@@ -554,7 +556,7 @@ async def rebuild_package_langs(packset: packages.PackagesSet) -> None:
             )
 
     LOGGER.info('Collecting translations...')
-    async with utils.aclosing(get_package_tokens(packset)) as agen:
+    async with aclosing(get_package_tokens(packset)) as agen:
         async for orig_tok, source in agen:
             for tok in _get_children(orig_tok):
                 if not tok:

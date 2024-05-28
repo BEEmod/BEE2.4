@@ -1,10 +1,11 @@
 """Customizable configuration for specific items or groups of them."""
 from __future__ import annotations
+
 from typing import (
     Any, Callable, Dict, Generic, Iterable, Iterator, List, Optional, Protocol, Set,
-    Tuple, Type, TypeVar,
+    Tuple, TypeVar, Self
 )
-from typing_extensions import Self
+from contextlib import aclosing
 import itertools
 
 from srctools import EmptyMapping, Keyvalues, Vec, logger
@@ -22,7 +23,6 @@ from config.widgets import (
     TimerNum as TimerNum, WidgetConfig,
 )
 from transtoken import TransToken, TransTokenSource
-import utils
 
 
 class ConfigProto(Protocol):
@@ -121,7 +121,7 @@ class SingleWidget(Widget):
     async def state_store_task(self) -> None:
         """Async task which stores the state in configs whenever it changes."""
         data_id = f'{self.group_id}:{self.id}'
-        async with utils.aclosing(self.holder.eventual_values()) as agen:
+        async with aclosing(self.holder.eventual_values()) as agen:
             async for value in agen:
                 config.APP.store_conf(WidgetConfig(value), data_id)
 

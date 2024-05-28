@@ -36,7 +36,7 @@ __all__ = [
     'ObjectID', 'SpecialID', 'BlankID', 'ID_EMPTY', 'ID_NONE', 'ID_RANDOM',
     'obj_id', 'special_id', 'obj_id_optional', 'special_id_optional',
     'check_shift', 'fit', 'group_runs', 'restart_app', 'quit_app', 'set_readonly',
-    'unset_readonly', 'merge_tree', 'write_lang_pot', 'aclosing',
+    'unset_readonly', 'merge_tree', 'write_lang_pot',
 ]
 
 
@@ -86,12 +86,6 @@ copyreg.add_extension('transtoken', 'JoinTransToken', 249)
 copyreg.add_extension('transtoken', 'ListTransToken', 250)
 copyreg.add_extension('pathlib', 'Path', 251)
 copyreg.add_extension('pathlib', 'PurePosixPath', 252)
-
-
-if sys.version_info >= (3, 10):
-    from contextlib import aclosing
-else:  # TODO Directly use stdlib when we drop 3.9 and below
-    from async_generator import aclosing  # type: ignore  # noqa
 
 
 # Appropriate locations to store config options for each OS.

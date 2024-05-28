@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import tkinter as tk
 from tkinter import ttk
+from contextlib import aclosing
 
 from trio_util import AsyncValue
 import trio
@@ -9,7 +10,6 @@ import trio
 from packages.widgets import KIND_STRING
 from app import itemconfig
 from ui_tk.img import TKImages
-import utils
 
 
 @itemconfig.ui_single_no_conf(KIND_STRING)
@@ -30,6 +30,6 @@ async def widget_string(
 
     task_status.started(entry)
 
-    async with utils.aclosing(holder.eventual_values(held_for=0.125)) as agen:
+    async with aclosing(holder.eventual_values(held_for=0.125)) as agen:
         async for value in agen:
             var.set(value)

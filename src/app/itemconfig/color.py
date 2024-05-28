@@ -1,6 +1,8 @@
 """A Widget for allowing selecting a colour."""
 from __future__ import annotations
-from typing import Mapping
+
+from contextlib import aclosing
+from collections.abc import Mapping
 
 from tkinter import ttk
 from tkinter.colorchooser import askcolor
@@ -16,7 +18,6 @@ from app import itemconfig
 from ui_tk.tooltip import add_tooltip
 from app.localisation import TransToken
 from ui_tk.img import TKImages
-import utils
 
 
 TRANS_SELECT_TITLE = TransToken.ui('Choose a Color')
@@ -84,6 +85,6 @@ async def make_color_swatch(
     tk_tools.bind_leftclick(swatch, open_win)
 
     task_status.started(swatch)
-    async with utils.aclosing(holder.eventual_values()) as agen:
+    async with aclosing(holder.eventual_values()) as agen:
         async for value in agen:
             tk_img.apply(swatch, img.Handle.color(parse_color(value), size, size))

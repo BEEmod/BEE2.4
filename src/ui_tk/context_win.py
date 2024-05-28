@@ -1,8 +1,9 @@
 """Tk-specific code for the window that shows item information."""
 from __future__ import annotations
-from typing import Callable, override
+from typing import override
 from tkinter import ttk
 import tkinter as tk
+from contextlib import aclosing
 import functools
 
 from trio_util import AsyncValue
@@ -214,7 +215,7 @@ class ContextWin(ContextWinBase['UI.PalItem']):
 
         async def update_more_info(widget: ttk.Button, avalue: AsyncValue[str | None]) -> None:
             """Update the state of the more-info button."""
-            async with utils.aclosing(avalue.eventual_values()) as agen:
+            async with aclosing(avalue.eventual_values()) as agen:
                 async for val in agen:
                     if val is not None:
                         widget.state(['!disabled'])

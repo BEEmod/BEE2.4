@@ -7,6 +7,7 @@ from __future__ import annotations
 from typing import TypedDict, Union, cast
 from tkinter import filedialog, ttk
 import tkinter as tk
+from contextlib import aclosing
 import functools
 import io
 import random
@@ -733,7 +734,7 @@ async def make_map_widgets(
 
     model_frame.columnconfigure(0, weight=1)
     task_status.started()
-    async with trio.open_nursery() as nursery, utils.aclosing(player_model.eventual_values()) as agen:
+    async with trio.open_nursery() as nursery, aclosing(player_model.eventual_values()) as agen:
         nursery.start_soon(player_mdl_combo.task)
         async for model in agen:
             config.APP.store_conf(attrs.evolve(

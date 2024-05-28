@@ -6,16 +6,17 @@ Each item has a description, author, and icon.
 """
 from __future__ import annotations
 
-import copy
 from typing import Generic, Optional, Union, Iterable, Mapping, Callable, AbstractSet
 from typing_extensions import Concatenate, ParamSpec, TypeAliasType
 from tkinter import font as tk_font
 from tkinter import ttk
 import tkinter as tk
 
+from contextlib import aclosing
 from collections import defaultdict
 from enum import Enum
 import functools
+import copy
 import math
 import random
 
@@ -1048,7 +1049,7 @@ class SelectorWin(Generic[CallbackT]):
             samp_button = self.samp_button
             if sampler is None or samp_button is None:
                 return  # Not required.
-            async with utils.aclosing(sampler.is_playing.eventual_values()) as agen:
+            async with aclosing(sampler.is_playing.eventual_values()) as agen:
                 async for is_playing in agen:
                     samp_button['text'] = BTN_STOP if is_playing else BTN_PLAY
 
@@ -1291,7 +1292,7 @@ class SelectorWin(Generic[CallbackT]):
 
     async def _update_translations_task(self) -> None:
         """Update translations."""
-        async with utils.aclosing(CURRENT_LANG.eventual_values()) as agen:
+        async with aclosing(CURRENT_LANG.eventual_values()) as agen:
             async for lang in agen:
                 if self._readonly and self.readonly_override is not None:
                     self.disp_label.set(str(self.readonly_override))

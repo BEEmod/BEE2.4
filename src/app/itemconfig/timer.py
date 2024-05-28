@@ -1,5 +1,6 @@
 """Adds a widget for specifying minute-second durations."""
-from typing import Mapping, Tuple
+from collections.abc import Mapping
+from contextlib import aclosing
 from functools import lru_cache
 import tkinter as tk
 
@@ -11,14 +12,13 @@ from packages.widgets import TimerOptions
 from app import itemconfig
 from ui_tk.tooltip import add_tooltip
 from ui_tk.img import TKImages
-import utils
 
 
 LOGGER = logger.get_logger('itemconfig.timer')
 
 
 @lru_cache(maxsize=20)
-def timer_values(min_value: int, max_value: int) -> Tuple[str, ...]:
+def timer_values(min_value: int, max_value: int) -> tuple[str, ...]:
     """Return 0:38-like strings up to the max value."""
     # Put a cache on this, since we can share it.
     return tuple([
@@ -137,7 +137,7 @@ async def widget_minute_seconds(
 
     task_status.started(spinbox)
     # We need to set this after, it gets reset to the first one.
-    async with utils.aclosing(holder.eventual_values()) as agen:
+    async with aclosing(holder.eventual_values()) as agen:
         async for new_val in agen:
             seconds = conv_int(new_val, -1)
             if conf.min <= seconds <= conf.max:
