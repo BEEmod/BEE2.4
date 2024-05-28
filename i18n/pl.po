@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: https://github.com/BEEmod/BEE2.4/issues\n"
-"POT-Creation-Date: 2024-03-25 13:42+1000\n"
+"POT-Creation-Date: 2024-05-28 11:53+1000\n"
 "PO-Revision-Date: 2021-06-07 15:18+0200\n"
 "Last-Translator: \n"
 "Language: pl\n"
@@ -13,7 +13,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.14.0\n"
+"Generated-By: Babel 2.12.1\n"
 
 #: loadScreen.py
 msgid "Skipped!"
@@ -326,6 +326,22 @@ msgstr ""
 
 #. This uses HTML syntax.
 #: user_errors.py
+msgid ""
+"A cube colouriser must be placed onto a dropper or cube to set the "
+"colour, it cannot be placed by itself."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"Multiple paint splats were placed on this cube, meaning it is unclear "
+"which gel to start the cube painted with. Remove all but one type. If "
+"you're wanting to paint the floor below the cube differently to the "
+"dropper, place a different splat on the ceiling."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
 msgid "Superposition Entanglers must be placed on top of a single dropper."
 msgstr ""
 
@@ -470,22 +486,6 @@ msgstr ""
 #: user_errors.py
 msgid "Failed to load error!"
 msgstr ""
-
-#: app/BEE2.py
-#, fuzzy
-msgid "An error occurred when loading packages:"
-msgid_plural "Multiple errors occurred when loading packages:"
-msgstr[0] ""
-msgstr[1] ""
-msgstr[2] ""
-
-#: app/BEE2.py
-msgid "Loading packages was partially successful:"
-msgstr ""
-
-#: app/CheckDetails.py
-msgid "Toggle all checkboxes."
-msgstr "Zaznacz wszystkie pola."
 
 #: app/CompilerPane.py
 msgid "ATLAS"
@@ -934,6 +934,14 @@ msgid "BEEMOD {version} - {game}"
 msgstr ""
 
 #: app/UI.py
+#, fuzzy
+msgid "{n} option"
+msgid_plural "{n} options"
+msgstr[0] "Brak opcji!"
+msgstr[1] ""
+msgstr[2] ""
+
+#: app/UI.py
 msgid "Select Skyboxes"
 msgstr "Wybierz skybox"
 
@@ -1013,6 +1021,10 @@ msgstr ""
 #: app/UI.py
 msgid "Elevator Videos"
 msgstr "Filmy przy windzie"
+
+#: app/UI.py packages/corridor.py
+msgid "Corridor"
+msgstr ""
 
 #: app/UI.py
 msgid "Select Elevator Video"
@@ -1491,6 +1503,36 @@ msgid ""
 "Check the boxes to specify which corridors may be used. Ingame, a random "
 "corridor will be picked for each map."
 msgstr ""
+
+#: app/corridor_selector.py
+#, fuzzy
+msgid "Singleplayer Entry Options:"
+msgstr "Tryb jednoosobowy"
+
+#: app/corridor_selector.py
+#, fuzzy
+msgid "Singleplayer Exit Options:"
+msgstr "Tryb jednoosobowy"
+
+#: app/corridor_selector.py
+#, fuzzy
+msgid "Cooperative Entry Options:"
+msgstr "Opcje kompilacji"
+
+#: app/corridor_selector.py
+#, fuzzy
+msgid "Cooperative Exit Options:"
+msgstr "Opcje kompilacji"
+
+#: app/corridor_selector.py
+#, fuzzy
+msgid "No options!"
+msgstr "Brak opcji!"
+
+#: app/corridor_selector.py
+#, fuzzy
+msgid "Randomise"
+msgstr "Losuj"
 
 #: app/dialogs.py
 #, fuzzy
@@ -2546,19 +2588,12 @@ msgstr[2] ""
 #: exporting/compiler.py
 #, fuzzy
 msgid ""
-"Compiler file {file} missing. You will need to verify the game's cache in"
+"Compiler file {file} missing. You will need to verify the game's files in"
 " Steam to get these files back. You can then export again."
 msgstr ""
 "Brakuje pliku kompilatora {file}. Wyjdź z aplikacji Steam, następnie "
 "kliknij OK, aby zweryfikować cache gry. Wtedy możesz wyeksportować "
 "ponownie."
-
-#: exporting/compiler.py
-msgid ""
-"Copying compiler file {file} failed. Ensure {game}'s map compiler is not "
-"running. The webserver for the error display may also be running, quit "
-"the vrad process or wait a few minutes."
-msgstr ""
 
 #: exporting/compiler.py
 #, fuzzy
@@ -2568,6 +2603,17 @@ msgid ""
 msgstr ""
 "Kopiowanie pliku kompilatora {file} nie powiodło się. Upewnij się, że gra"
 " {game} nie jest uruchomiona."
+
+#: exporting/compiler.py
+msgid ""
+"Copying compiler file {file} failed. Ensure {game}'s map compiler is not "
+"running. The webserver for the error display may also be running, quit "
+"the vrad process or wait a few minutes."
+msgstr ""
+
+#: exporting/compiler.py
+msgid "No compiler files were found in \"{folder}\"."
+msgstr ""
 
 #: exporting/items.py
 msgid ""
@@ -2689,7 +2735,9 @@ msgid "No description!"
 msgstr "Opis:"
 
 #: packages/corridor.py
-msgid "Corridor"
+msgid ""
+"Duplicate corridor option ID \"{option}\" in corridor group for style "
+"\"{group}\"!"
 msgstr ""
 
 #: packages/quote_pack.py
@@ -2702,6 +2750,22 @@ msgstr ""
 
 #: packages/quote_pack.py
 msgid "Invalid response kind \"{name}\" in config for quote pack {id}!"
+msgstr ""
+
+#: ui_tk/check_table.py
+msgid "Toggle all checkboxes."
+msgstr "Zaznacz wszystkie pola."
+
+#: ui_tk/core.py
+#, fuzzy
+msgid "An error occurred when loading packages:"
+msgid_plural "Multiple errors occurred when loading packages:"
+msgstr[0] ""
+msgstr[1] ""
+msgstr[2] ""
+
+#: ui_tk/core.py
+msgid "Loading packages was partially successful:"
 msgstr ""
 
 #: ui_tk/corridor_selector.py

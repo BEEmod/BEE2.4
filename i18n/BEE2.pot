@@ -4,14 +4,14 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: https://github.com/BEEmod/BEE2.4/issues\n"
-"POT-Creation-Date: 2024-03-25 13:51+1000\n"
+"POT-Creation-Date: 2024-05-28 11:54+1000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.14.0\n"
+"Generated-By: Babel 2.12.1\n"
 
 #: loadScreen.py
 msgid "Skipped!"
@@ -319,6 +319,22 @@ msgstr ""
 
 #. This uses HTML syntax.
 #: user_errors.py
+msgid ""
+"A cube colouriser must be placed onto a dropper or cube to set the "
+"colour, it cannot be placed by itself."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"Multiple paint splats were placed on this cube, meaning it is unclear "
+"which gel to start the cube painted with. Remove all but one type. If "
+"you're wanting to paint the floor below the cube differently to the "
+"dropper, place a different splat on the ceiling."
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
 msgid "Superposition Entanglers must be placed on top of a single dropper."
 msgstr ""
 
@@ -462,20 +478,6 @@ msgstr ""
 #. This uses HTML syntax.
 #: user_errors.py
 msgid "Failed to load error!"
-msgstr ""
-
-#: app/BEE2.py
-msgid "An error occurred when loading packages:"
-msgid_plural "Multiple errors occurred when loading packages:"
-msgstr[0] ""
-msgstr[1] ""
-
-#: app/BEE2.py
-msgid "Loading packages was partially successful:"
-msgstr ""
-
-#: app/CheckDetails.py
-msgid "Toggle all checkboxes."
 msgstr ""
 
 #: app/CompilerPane.py
@@ -859,6 +861,12 @@ msgid "BEEMOD {version} - {game}"
 msgstr ""
 
 #: app/UI.py
+msgid "{n} option"
+msgid_plural "{n} options"
+msgstr[0] ""
+msgstr[1] ""
+
+#: app/UI.py
 msgid "Select Skyboxes"
 msgstr ""
 
@@ -924,6 +932,10 @@ msgstr ""
 
 #: app/UI.py
 msgid "Elevator Videos"
+msgstr ""
+
+#: app/UI.py packages/corridor.py
+msgid "Corridor"
 msgstr ""
 
 #: app/UI.py
@@ -1373,6 +1385,30 @@ msgstr ""
 msgid ""
 "Check the boxes to specify which corridors may be used. Ingame, a random "
 "corridor will be picked for each map."
+msgstr ""
+
+#: app/corridor_selector.py
+msgid "Singleplayer Entry Options:"
+msgstr ""
+
+#: app/corridor_selector.py
+msgid "Singleplayer Exit Options:"
+msgstr ""
+
+#: app/corridor_selector.py
+msgid "Cooperative Entry Options:"
+msgstr ""
+
+#: app/corridor_selector.py
+msgid "Cooperative Exit Options:"
+msgstr ""
+
+#: app/corridor_selector.py
+msgid "No options!"
+msgstr ""
+
+#: app/corridor_selector.py
+msgid "Randomise"
 msgstr ""
 
 #: app/dialogs.py
@@ -2344,8 +2380,14 @@ msgstr[1] ""
 
 #: exporting/compiler.py
 msgid ""
-"Compiler file {file} missing. You will need to verify the game's cache in"
+"Compiler file {file} missing. You will need to verify the game's files in"
 " Steam to get these files back. You can then export again."
+msgstr ""
+
+#: exporting/compiler.py
+msgid ""
+"Copying compiler file {file} failed. Ensure {game}'s map compiler is not "
+"running."
 msgstr ""
 
 #: exporting/compiler.py
@@ -2356,9 +2398,7 @@ msgid ""
 msgstr ""
 
 #: exporting/compiler.py
-msgid ""
-"Copying compiler file {file} failed. Ensure {game}'s map compiler is not "
-"running."
+msgid "No compiler files were found in \"{folder}\"."
 msgstr ""
 
 #: exporting/items.py
@@ -2473,7 +2513,9 @@ msgid "No description!"
 msgstr ""
 
 #: packages/corridor.py
-msgid "Corridor"
+msgid ""
+"Duplicate corridor option ID \"{option}\" in corridor group for style "
+"\"{group}\"!"
 msgstr ""
 
 #: packages/quote_pack.py
@@ -2486,6 +2528,20 @@ msgstr ""
 
 #: packages/quote_pack.py
 msgid "Invalid response kind \"{name}\" in config for quote pack {id}!"
+msgstr ""
+
+#: ui_tk/check_table.py
+msgid "Toggle all checkboxes."
+msgstr ""
+
+#: ui_tk/core.py
+msgid "An error occurred when loading packages:"
+msgid_plural "Multiple errors occurred when loading packages:"
+msgstr[0] ""
+msgstr[1] ""
+
+#: ui_tk/core.py
+msgid "Loading packages was partially successful:"
 msgstr ""
 
 #: ui_tk/corridor_selector.py
