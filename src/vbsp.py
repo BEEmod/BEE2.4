@@ -115,7 +115,7 @@ async def load_settings() -> Tuple[
             res_dmx_conf = utils.Result.sync(nursery, load_dmx_config, 'bee2/config.dmx')
             # Load in templates locations.
             nursery.start_soon(template_brush.load_templates, 'bee2/templates.lst')
-    except Exception:  # TODO 3.8: except* (FileNotFoundError, IOError)
+    except* OSError:
         LOGGER.exception(
             'Failed to parse required config file. Recompile the compiler '
             'and/or export the palette.'

@@ -1,6 +1,6 @@
 """The package containg all UI code."""
 from __future__ import annotations
-from typing import Any, Awaitable, Callable, Protocol, TypeVar, Generic, overload
+from typing import Any, Awaitable, Callable, Protocol, TypeVar, Generic, assert_never, overload
 
 from typing_extensions import TypeVarTuple, Unpack
 from types import TracebackType
@@ -160,14 +160,15 @@ class EdgeTrigger(Generic[Unpack[PosArgsT]]):
             self._result = None
             self.ready.value = True
             await self._event.wait()
-            # TODO: Rewrite with match post 3.8
-            assert self._result is not None
-            if len(self._result) == 1:
-                return self._result[0]
-            elif len(self._result) == 0:
-                return None
-            else:
-                return self._result
+            match self._result:
+                case None:
+                    raise AssertionError(f'{self!r} was not set!')
+                case []:
+                    return None
+                case [value]:
+                    return value
+                case multiple:
+                    return multiple
         finally:
             self._event = self._result = None
             self.ready.value = False
