@@ -1,7 +1,8 @@
 """Configures which signs are defined for the Signage item."""
 from __future__ import annotations
-from typing import Any, Final, Generic, TypeVar
-from typing_extensions import TypeAliasType, TypeGuard
+
+import abc
+from typing import Any, Final, TypeGuard
 
 from collections.abc import Sequence, Iterator
 from datetime import timedelta
@@ -20,9 +21,7 @@ import utils
 
 
 LOGGER = srctools.logger.get_logger(__name__)
-SignRef = TypeAliasType("SignRef", PakRef[Signage])
-DragManT_co = TypeVar('DragManT_co', bound=dragdrop.ManagerBase[SignRef, Any], covariant=True)
-ParentT = TypeVar('ParentT')
+type SignRef = PakRef[Signage]
 
 
 # The valid timer indexes for signs.
@@ -69,14 +68,23 @@ def get_icon(sign: Signage, style: Style) -> img.Handle:
         return IMG_ERROR
 
 
-class SignageUIBase(Generic[DragManT_co]):
+class SignageUIBase[ParentT]:
     """Common implementation of the signage chooser."""
     _slots: dict[int, dragdrop.Slot[SignRef]]
     _cur_style_id: PakRef[Style]
 
-    def __init__(self, drag_man: DragManT_co) -> None:
+    @property
+    @abc.abstractmethod
+    def drag_man(self) -> dragdrop.ManagerBase[SignRef, ParentT]:
+        """Subclasses must create an appropriate drag manager.
+
+        We can't require this to be passed into __init__(), since that ends up requiring
+        HKT in _create_slots().
+        """
+        ...
+
+    def __init__(self) -> None:
         """Create the chooser."""
-        self.drag_man = drag_man
         self.visible = False
         self._close_event = trio.Event()
         self._slots = {}
@@ -150,7 +158,7 @@ class SignageUIBase(Generic[DragManT_co]):
                 self.ui_set_preview_img(IMG_BLANK, IMG_BLANK)
 
     def _create_slots(
-        self: SignageUIBase[dragdrop.ManagerBase[SignRef, ParentT]],
+        self,
         parent_chosen: ParentT,
         parent_all: ParentT,
     ) -> Iterator[tuple[int, int, dragdrop.Slot[SignRef]]]:

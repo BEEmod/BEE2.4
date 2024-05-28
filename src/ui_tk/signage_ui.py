@@ -15,14 +15,16 @@ from .wid_transtoken import set_text, set_win_title
 from app.signage_ui import IMG_BLANK, SignageUIBase, TRANS_TITLE, TRANS_SELECTED
 
 
-class SignageUI(SignageUIBase[DragDrop[PakRef[Signage]]]):
+class SignageUI(SignageUIBase[tk.Misc]):
     """Tk-specific implementation of the signage UI."""
+    drag_man: DragDrop[PakRef[Signage]]
 
     def __init__(self, tk_img: TKImages) -> None:
         """Creat the UI."""
         self.window = window = tk.Toplevel(TK_ROOT, name='signageChooser')
         window.withdraw()
-        super().__init__(DragDrop(window, info_cb=self._get_drag_info))
+        self.drag_man = DragDrop(window, info_cb=self._get_drag_info)
+        super().__init__()
 
         window.resizable(True, True)
         window.protocol("WM_DELETE_WINDOW", self._evt_on_closed)
