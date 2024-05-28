@@ -48,27 +48,27 @@ jobs:
       # Use the tag if created there, dev each week, or what's specified when done manually.
       - name: Checkout tag
         if: github.event_name == 'create'
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
           submodules: true
       - name: Checkout dev
         if: github.event_name == 'schedule'
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           ref: 'dev'
           fetch-depth: 0
           submodules: true
       - name: Checkout reference
         if: github.event_name == 'workflow_dispatch'
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           ref: ${{ inputs.source }}
           fetch-depth: 0
           submodules: true
 
       - name: Set up Python ${{ matrix.python-version }}-${{ matrix.arch }}
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
           architecture: ${{ matrix.arch }}
@@ -100,7 +100,7 @@ jobs:
         working-directory: ./dist/${{ matrix.bitness }}bit/BEE2/
 
       - name: Artifact upload (tag)
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: github.event_name == 'create'
         with:
           name: beemod2_${{ github.event.ref }}_${{ matrix.artifact-name }}
@@ -108,7 +108,7 @@ jobs:
           if-no-files-found: error
 
       - name: Artifact upload (hash)
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: github.event_name != 'create'
         with:
           name: beemod2_${{ github.sha }}_${{ matrix.artifact-name }}

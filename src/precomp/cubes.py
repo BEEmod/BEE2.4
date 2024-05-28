@@ -1,6 +1,7 @@
 """Implement cubes and droppers."""
 from __future__ import annotations
 
+from collections import defaultdict
 from contextlib import suppress
 from weakref import WeakKeyDictionary
 
@@ -157,36 +158,43 @@ class ModelSwapMeth(Enum):
 
 
 class CubePaintType(Enum):
-    """If a Cube Painter is present, indicates the type of gel to apply.
+    """Indicates the type of gel to apply.
 
     The value is the engine paint index.
     """
     BOUNCE = 0
     SPEED = 2
+    CLEAR = 4
 
 
 class CubeSkins(NamedTuple):
     """Specifies the various skins present for cubes.
 
     Rusty skins are only applicable if the map doesn't contain gels, since
-    all of the cube types have one or more bad gel skins. If None, there's
-    no rusty version.
+    all the cube types have one or more bad gel skins. If no rusty version exists,
+    it's equal to clean.
     For each, the first is the off skin, the second is the on skin.
     """
     clean: tuple[int, int]
-    rusty: tuple[int, int] | None
+    rusty: tuple[int, int]
     bounce: tuple[int, int]
     speed: tuple[int, int]
 
-    def spawn_skin(self, paint: CubePaintType | None) -> int:
+    @property
+    def has_rusty(self) -> bool:
+        """Check if this has a rusty skin."""
+        return self.clean != self.rusty
+
+    def spawn_skin(self, paint: CubePaintType) -> int:
         """Return the skin this paint would spawn with."""
-        if paint is None:
+        if paint is CubePaintType.CLEAR:
             return self.clean[0]
         elif paint is CubePaintType.BOUNCE:
             return self.bounce[0]
         elif paint is CubePaintType.SPEED:
             return self.speed[0]
-        raise AssertionError(f"Unknown value: {paint}")
+        else:
+            assert_never(paint)
 
 
 # (paint, type and rusty) -> off, on skins.
@@ -199,7 +207,7 @@ CUBE_SKINS: dict[CubeEntType, CubeSkins] = {
     ),
     CubeEntType.comp: CubeSkins(
         clean=(1, 4),
-        rusty=None,
+        rusty=(1, 4),
         # On-painted skins are actually normal!
         # Not really noticeable though, so don't bother
         # fixing.
@@ -215,13 +223,13 @@ CUBE_SKINS: dict[CubeEntType, CubeSkins] = {
     ),
     CubeEntType.sphere: CubeSkins(
         clean=(0, 1),
-        rusty=None,
+        rusty=(0, 1),
         bounce=(2, 2),
         speed=(3, 3),
     ),
     CubeEntType.antique: CubeSkins(
         clean=(0, 0),
-        rusty=None,
+        rusty=(0, 0),
         bounce=(1, 1),
         speed=(2, 2),
     ),
@@ -234,12 +242,12 @@ class CubeAddon:
     def __init__(
         self,
         addon_id: str,
-        inst: str='',
-        pack: str='',
-        vscript: str='',
-        outputs: MutableMapping[CubeOutputs, list[Output]]=EmptyMapping,
+        inst: str = '',
+        pack: str = '',
+        vscript: str = '',
+        outputs: MutableMapping[CubeOutputs, list[Output]] = EmptyMapping,
         fixups: list[tuple[str, str | AddonFixups]] | None = None,
-    ):
+    ) -> None:
         self.id = addon_id
         self.inst = inst
         self.pack = pack
@@ -266,7 +274,7 @@ class CubeAddon:
         return addon
 
     @classmethod
-    def base_parse(cls, cube_id: str, kv: Keyvalues):
+    def base_parse(cls, cube_id: str, kv: Keyvalues) -> CubeAddon | None:
         """Parse from the config for cube types."""
         inst = kv['overlay_inst', '']
         pack = kv['overlay_pack', '']
@@ -398,7 +406,7 @@ class CubeType:
         base_tint: Vec,
         overlay_addon: CubeAddon | None,
         overlay_think: str | None,
-    ):
+    ) -> None:
         self.id = cube_id
         self.instances = resolve_inst(cube_item_id)
 
@@ -554,7 +562,7 @@ class CubePair:
         cube: Entity | None = None,
         cube_fixup: EntityFixup | None = None,
         tint: Vec | None = None,
-    ):
+    ) -> None:
         self.cube_type = cube_type
         # This may be None if it's a dropper-only pair.
         self.cube = cube
@@ -578,7 +586,7 @@ class CubePair:
         self.cube_fixup = cube_fixup
 
         # If set, the cube has this paint type.
-        self.paint_type: CubePaintType | None = None
+        self.paint_type: CubePaintType = CubePaintType.CLEAR
 
         # If set, this is quantum-entangled.
         self.superpos: Superposition | None = None
@@ -650,13 +658,14 @@ class CubePair:
         return (
             not has_gel and
             self.cube_type.try_rusty and
-            self.paint_type is None and
+            self.paint_type is CubePaintType.CLEAR and
             self.tint is None and
-            CUBE_SKINS[self.cube_type.type].rusty is not None
+            CUBE_SKINS[self.cube_type.type].has_rusty
         )
 
-    def get_kv_setter(self, name: str) -> Entity:
+    def get_kv_setter(self, name: str | None) -> Entity:
         """Get a KV setter setting this dropper-local name, creating if required."""
+        assert self.dropper is not None
         name = conditions.local_name(self.dropper, name)
         try:
             return self._kv_setters[name]
@@ -667,6 +676,15 @@ class CubePair:
                 target=name,
             )
             return kv_setter
+
+    def error_pos(self) -> Vec:
+        """Report a relevant location for error-reporting views."""
+        if self.dropper is not None:
+            return Vec.from_str(self.dropper['origin'])
+        if self.cube is not None:
+            return Vec.from_str(self.cube['origin'])
+        LOGGER.error('Pair {} has no cube and no dropper?', self)
+        return Vec(-192, -192, -192)
 
 
 @attrs.define
@@ -830,7 +848,8 @@ def cube_filter(vmf: VMF, pos: Vec, cubes: list[str]) -> str:
 
     # Some others which are predefined.
 
-    if len(inclusions) > len(CUBE_TYPES) / 2 and 0:
+    # TODO: Why is this disabled?
+    if len(inclusions) > len(CUBE_TYPES) / 2 and False:
         # If more than half of cubes are included, it's better to exclude
         # the missing ones.
         invert = True
@@ -958,7 +977,7 @@ def _make_multi_filter(
     return filter_ent['targetname']
 
 
-@conditions.make_test('CubeType')
+@conditions.make_test('CubeType', valid_after=conditions.MetaCond.LinkCubes)
 def test_cube_type(inst: Entity, kv: Keyvalues) -> bool:
     """Check if an instance is/should be a cube.
 
@@ -1017,7 +1036,7 @@ def test_cube_type(inst: Entity, kv: Keyvalues) -> bool:
     return pair.cube_type.id == cube_type.upper()
 
 
-@conditions.make_test('DropperColor')
+@conditions.make_test('DropperColor', valid_after=conditions.MetaCond.LinkCubes)
 def check_dropper_color(inst: Entity, kv: Keyvalues) -> bool:
     """Detect the color of a cube on droppers.
 
@@ -1035,7 +1054,11 @@ def check_dropper_color(inst: Entity, kv: Keyvalues) -> bool:
     return data.tint is not None
 
 
-@conditions.make_result('CubeAddon', 'DropperAddon')
+@conditions.make_result(
+    'CubeAddon', 'DropperAddon',
+    valid_before=conditions.MetaCond.GenerateCubes,
+    valid_after=conditions.MetaCond.LinkCubes,
+)
 def res_dropper_addon(inst: Entity, res: Keyvalues) -> None:
     """Attach an addon to an item."""
     try:
@@ -1055,7 +1078,11 @@ def res_dropper_addon(inst: Entity, res: Keyvalues) -> None:
     pair.addons.add(addon)
 
 
-@conditions.make_result('SetDropperOffset')
+@conditions.make_result(
+    'SetDropperOffset',
+    valid_before=conditions.MetaCond.GenerateCubes,
+    valid_after=conditions.MetaCond.LinkCubes,
+)
 def res_set_dropper_off(res: Keyvalues) -> conditions.ResultCallable:
     """Update the position cubes will be spawned at for a dropper."""
     offset = LazyValue.parse(res.value).as_vec()
@@ -1071,7 +1098,11 @@ def res_set_dropper_off(res: Keyvalues) -> conditions.ResultCallable:
     return apply_offset
 
 
-@conditions.make_result('ChangeCubeType', 'SetCubeType')
+@conditions.make_result(
+    'ChangeCubeType', 'SetCubeType',
+    valid_before=conditions.MetaCond.GenerateCubes,
+    valid_after=conditions.MetaCond.LinkCubes,
+)
 def res_change_cube_type(inst: Entity, res: Keyvalues) -> None:
     """Change the cube-type of a cube item.
 
@@ -1093,7 +1124,10 @@ def res_change_cube_type(inst: Entity, res: Keyvalues) -> None:
         )) from None
 
 
-@conditions.make_result('CubeFilter')
+@conditions.make_result(
+    'CubeFilter',
+    valid_after=conditions.MetaCond.LinkCubes,
+)
 def res_cube_filter(vmf: VMF, inst: Entity, res: Keyvalues) -> None:
     """Given a set of cube-type IDs, generate a filter for them.
 
@@ -1116,7 +1150,10 @@ def res_cube_filter(vmf: VMF, inst: Entity, res: Keyvalues) -> None:
     )
 
 
-@conditions.make_result('VScriptCubePredicate')
+@conditions.make_result(
+    'VScriptCubePredicate',
+    valid_after=conditions.MetaCond.LinkCubes,
+)
 def res_script_cube_predicate(vmf: VMF, ent: Entity, res: Keyvalues) -> object:
     """Given a set of cube-type IDs, generate VScript code to identify them.
 
@@ -1176,7 +1213,7 @@ def res_script_cube_predicate(vmf: VMF, ent: Entity, res: Keyvalues) -> object:
     return conditions.RES_EXHAUSTED
 
 
-@conditions.meta_cond(priority=-750, only_once=True)
+@conditions.MetaCond.LinkCubes.register
 def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
     """Determine the cubes set based on instance settings.
 
@@ -1355,6 +1392,11 @@ def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
         coloriser_inst, superpos_inst, splat_inst,
     )
 
+    # For each cube pair, a list of paint splats on the same surface, and on the opposite side.
+    paint_splats: dict[CubePair, tuple[
+        list[tuple[Entity, CubePaintType]], list[tuple[Entity, CubePaintType]],
+    ]] = defaultdict(lambda: ([], []))
+
     for inst in vmf.by_class['func_instance']:
         file = inst['file'].casefold()
 
@@ -1369,12 +1411,14 @@ def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
             continue
 
         pairs: list[CubePair] = []
+        direct_pair: CubePair | None = None
+        opposite_pair: CubePair | None = None
 
         origin = Vec.from_str(inst['origin'])
         orient = Matrix.from_angstr(inst['angles'])
 
         with suppress(KeyError):
-            pairs.append(CUBE_POS[FrozenVec(origin // 128)])
+            direct_pair = CUBE_POS[FrozenVec(origin // 128)]
 
         # If pointing up, check the ceiling too, so droppers can find a
         # colorizer
@@ -1385,7 +1429,7 @@ def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
                 direction=(0, 0, 1),
             ) // 128
             with suppress(KeyError):
-                pairs.append(CUBE_POS[pos.freeze()])
+                opposite_pair = CUBE_POS[pos.freeze()]
 
         if kind == 'color':
             # The instance is useless now we know about it.
@@ -1396,8 +1440,15 @@ def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
                 '255 255 255',
                 timer_delay=inst.fixup.int('$timer_delay'),
             ))
-            for pair in pairs:
-                pair.tint = color.copy()
+            if direct_pair is not None:
+                direct_pair.tint = color.copy()
+            elif opposite_pair is not None:
+                opposite_pair.tint = color.copy()
+            else:
+                raise user_errors.UserError(
+                    user_errors.TOK_CUBE_UNLINKED_COLOURISER,
+                    voxels=[Vec.from_str(inst['origin'])],
+                )
         elif kind == 'splat':
             try:
                 paint_type = CubePaintType(inst.fixup.int('$paint_type'))
@@ -1405,16 +1456,11 @@ def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
                 # Don't touch if not bounce/speed.
                 continue
 
-            # Only 'use up' one splat, so you can place multiple to apply them
-            # to both the cube and surface.
-            used = False
-
-            for pair in pairs:
-                if pair.paint_type is None:
-                    pair.paint_type = paint_type
-                    used = True
-            if used:
-                inst.remove()
+            if direct_pair is not None:
+                paint_splats[direct_pair][0].append((inst, paint_type))
+            elif opposite_pair is not None:
+                paint_splats[opposite_pair][1].append((inst, paint_type))
+            # Otherwise, a paint splat unrelated to droppers.
         elif kind == 'superpos':
             try:
                 superpos_item = connections.ITEMS[inst['targetname']]
@@ -1423,14 +1469,16 @@ def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
                 continue
             real_pair: CubePair
             conn: connections.Connection
-            try:
-                # Don't link to dropperless cubes.
-                [real_pair] = filter(lambda p: p.dropper is not None, pairs)
-            except ValueError:
+            # Don't link to dropperless cubes.
+            if direct_pair is not None and direct_pair.dropper is not None:
+                real_pair = direct_pair
+            elif opposite_pair is not None and opposite_pair.dropper is not None:
+                real_pair = opposite_pair
+            else:
                 raise user_errors.UserError(
                     user_errors.TOK_CUBE_SUPERPOS_BAD_REAL,
                     voxels=[Vec.from_str(inst['origin'])],
-                ) from None
+                )
             try:
                 [conn] = superpos_item.outputs
                 ghost_pair = INST_TO_PAIR[conn.to_item.inst]
@@ -1448,7 +1496,10 @@ def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
                     user_errors.TOK_CUBE_SUPERPOS_MULTILINK,
                     voxels=[
                         Vec.from_str(inst['origin']),
-                        Vec.from_str(real_pair.dropper['origin']),
+                        # Show the existing pair and the dropper we're wanting to add.
+                        ghost_pair.error_pos(),
+                        real_pair.superpos.real.error_pos(),
+                        real_pair.superpos.ghost.error_pos(),
                     ]
                 )
             if ghost_pair.superpos is not None:
@@ -1456,16 +1507,16 @@ def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
                     user_errors.TOK_CUBE_SUPERPOS_MULTILINK,
                     voxels=[
                         Vec.from_str(inst['origin']),
-                        Vec.from_str(ghost_pair.dropper['origin']),
+                        real_pair.error_pos(),
+                        ghost_pair.superpos.real.error_pos(),
+                        ghost_pair.superpos.ghost.error_pos(),
                     ]
                 )
             real_pair.superpos = ghost_pair.superpos = Superposition(
                 real_pair, ghost_pair, inst,
             )
             LOGGER.info('Found superposition link:\n* real = {}\n* ghost = {}', real_pair, ghost_pair)
-            inst.fixup['$ghost_alpha'] = min(255, max(0, options.get(
-                int, 'superposition_ghost_alpha',
-            )))
+            inst.fixup['$ghost_alpha'] = min(255, max(0, options.SUPERPOSITION_GHOST_ALPHA()))
         else:
             assert_never(kind)
 
@@ -1473,6 +1524,9 @@ def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
     # and set Voice 'Has' attrs.
     if PAIRS:
         info.set_attr('cube')
+
+    # Don't allow a single splat to be used for multiple droppers.
+    used_splats: set[Entity] = set()
 
     for pair in PAIRS:
         # For superposition cubes, if there isn't a colouriser applied use some preset colours.
@@ -1492,6 +1546,28 @@ def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
             pair.cube_type.color_in_map = True
         else:
             pair.cube_type.in_map = True
+
+        # Figure out which paint splat to apply, if any. We prioritise splats
+        # placed directly against the dropper.
+        direct_splats, opposite_splats = paint_splats[pair]
+        # We only use the opposite splats if no splats were placed against the dropper, and it
+        # actually has both a cube and dropper.
+        splat_list = [splat for splat in direct_splats if splat[0] not in used_splats]
+        if not splat_list and pair.dropper is not None:
+            splat_list = [splat for splat in opposite_splats if splat[0] not in used_splats]
+        if splat_list:
+            paint_types = {paint_type for ent, paint_type in splat_list}
+            if len(paint_types) > 1:
+                raise user_errors.UserError(
+                    user_errors.TOK_CUBE_MULTIPLE_PAINTS,
+                    voxels=[Vec.from_str(inst['origin']) for inst, paint_type in splat_list],
+                )
+            # "Use up" and delete the splat, allowing multiple to be placed to also put gel on
+            # Note we also detect cleansing gel, allowing that to be used to override gel on the
+            # floor.
+            splat, pair.paint_type = splat_list[0]
+            used_splats.add(splat)
+            splat.remove()
 
         if pair.paint_type is CubePaintType.BOUNCE:
             info.set_attr('gel', 'bouncegel', 'BlueGel')
@@ -1526,8 +1602,8 @@ def setup_output(
     template: Output,
     inst: Entity,
     output: str,
-    self_name: str='!self',
-):
+    self_name: str = '!self',
+) -> Output:
     """Modify parts of an output.
 
     inst is the instance to fixup names to fire into.
@@ -1588,6 +1664,7 @@ def make_cube(
         angles = drop_type.cube_orient @ Angle.from_str(pair.dropper['angles'])
         targ_inst = pair.dropper
     else:
+        assert pair.cube is not None
         angles = Angle(0, 180, 0) @ Angle.from_str(pair.cube['angles'])
         targ_inst = pair.cube
 
@@ -1640,7 +1717,7 @@ def make_cube(
         # Do not deal with the rest of the logic here.
         return False, ent
 
-    if pair.paint_type is not None:
+    if pair.paint_type is not CubePaintType.CLEAR:
         if is_frank:
             # Special case - frankenturrets don't have inputs for it.
             # We need a sprayer to generate the actual paint,
@@ -1651,6 +1728,8 @@ def make_cube(
                 ent['rendercolor'] = '255 106 0'
             elif pair.paint_type is CubePaintType.BOUNCE:
                 ent['rendercolor'] = '0 165 255'
+            else:
+                assert_never(pair.paint_type)
 
             vmf.create_ent(
                 targetname=conditions.local_name(targ_inst, 'cube_addon_painter'),
@@ -1731,7 +1810,7 @@ def make_cube(
                     )
                 )
                 # Don't paint it on spawn.
-                spawn_paint = None
+                spawn_paint = CubePaintType.CLEAR
 
     has_addon_inst = False
     vscripts = []
@@ -1838,7 +1917,7 @@ def make_cube(
     return has_addon_inst, ent
 
 
-@conditions.meta_cond(priority=750, only_once=True)
+@conditions.MetaCond.GenerateCubes.register
 def generate_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
     """After other conditions are run, generate cubes."""
     bounce_in_map = info.has_attr('bouncegel')
@@ -1858,7 +1937,7 @@ def generate_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
         if pair.is_superpos_ghost:
             # Ghost does not have functionality, and cannot be painted.
             pair.addons.clear()
-            pair.paint_type = None
+            pair.paint_type = CubePaintType.CLEAR
 
         # Add the custom model logic. But skip if we use the rusty version.
         # That overrides it to be using the normal model.
@@ -1879,9 +1958,10 @@ def generate_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
                 # If we have a bounce cube painter, it needs to be the normal skin.
                 if (
                     pair.paint_type is CubePaintType.BOUNCE and
+                    pair.drop_type is not None and
                     pair.drop_type.bounce_paint_file.casefold() != '<prepaint>'
                 ):
-                    spawn_paint = None
+                    spawn_paint = CubePaintType.CLEAR
                 else:
                     spawn_paint = pair.paint_type
 
@@ -1917,7 +1997,7 @@ def generate_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
             ))
 
         if pair.dropper:
-            assert pair.drop_type is not None
+            assert pair.drop_type is not None, pair
             pos = Vec.from_str(pair.dropper['origin'])
             pos += pair.spawn_offset @ Angle.from_str(pair.dropper['angles'])
             has_addon, drop_cube = make_cube(vmf, pair, pos, True, bounce_in_map, speed_in_map)
@@ -1988,8 +2068,8 @@ def generate_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
                 # Ghost doesn't support the Fizzle input, hook that up ourselves.
                 if pair.is_superpos_ghost:
                     pair.get_kv_setter(drop_done_name).add_out(Output(
-                        drop_done_command,'!activator',
-                        'CallScriptFunction','Spawned',
+                        drop_done_command, '!activator',
+                        'CallScriptFunction', 'Spawned',
                     ))
                     drop_cube.outputs.append(Output(
                         'OnUser1', '!self',
@@ -2086,7 +2166,7 @@ def generate_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
                     Template02=conditions.local_name(pair.cube, 'cube_addon_*'),
                 )
             else:
-                if dropperless_temp_count == 16:
+                if dropperless_temp_count == 16 or dropperless_temp is None:
                     dropperless_temp = vmf.create_ent(
                         classname='point_template',
                         targetname='@template_spawn_3',
@@ -2148,6 +2228,9 @@ def generate_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
         if drop_cube is not None and cube is not None:
             # We have both - it's a linked cube and dropper.
             # We need to trigger commands back and forth for this.
+            assert pair.cube is not None, pair
+            assert pair.dropper is not None, pair
+            assert pair.drop_type is not None, pair
 
             # Trigger the dropper when fizzling a cube.
             if should_respawn:

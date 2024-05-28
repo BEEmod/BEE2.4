@@ -7,7 +7,7 @@ from typing import Optional, Set, Callable, Tuple
 import srctools.logger
 from pygtrie import CharTrie
 
-from app import UI, TK_ROOT, localisation
+from app import UI, localisation
 from ui_tk.wid_transtoken import set_text
 
 
@@ -53,8 +53,8 @@ def init(frm: ttk.Frame, refresh_cback: Callable[[Optional[Set[Tuple[str, int]]]
         # stops typing.
         result = found
         if refresh_tim is not None:
-            TK_ROOT.after_cancel(refresh_tim)
-        refresh_tim = TK_ROOT.after(500, trigger_cback)
+            frm.after_cancel(refresh_tim)
+        refresh_tim = frm.after(500, trigger_cback)
 
     def trigger_cback() -> None:
         """Trigger the callback, after the user paused the UI."""
@@ -84,11 +84,11 @@ def rebuild_database() -> None:
     word_to_ids.clear()
 
     for item in UI.item_list.values():
-        for subtype_ind in item.visual_subtypes:
+        for subtype_ind in item.item.visual_subtypes:
             for tag in item.get_tags(subtype_ind):
                 for word in tag.split():
                     word_set = word_to_ids.setdefault(word.casefold(), set())
-                    word_set.add((item.id, subtype_ind))
+                    word_set.add((item.item.id, subtype_ind))
 
     LOGGER.info('Computed {} tags.', sum(1 for _ in word_to_ids.iterkeys()))
     if _type_cback is not None:

@@ -16,7 +16,7 @@ TimerNum = NewType('TimerNum', str)
 TIMER_NUM: List[TimerNum] = cast(List[TimerNum], list(map(str, range(3, 31))))
 TIMER_STR_INF: TimerNum = cast(TimerNum, 'inf')
 TIMER_NUM_INF: List[TimerNum] = [TIMER_STR_INF, *TIMER_NUM]
-VALID_NUMS = set(TIMER_NUM)
+VALID_NUMS = set(TIMER_NUM_INF)
 
 
 def parse_timer(value: str) -> TimerNum:
@@ -26,6 +26,7 @@ def parse_timer(value: str) -> TimerNum:
     raise ValueError('Invalid timer value!')
 
 
+@config.COMPILER.register
 @config.PALETTE.register
 @config.APP.register
 @attrs.frozen
@@ -36,10 +37,10 @@ class WidgetConfig(config.Data, conf_name='ItemVar', uses_id=True):
 
     @classmethod
     @override
-    def parse_legacy(cls, props: Keyvalues) -> Dict[str, 'WidgetConfig']:
+    def parse_legacy(cls, config: Keyvalues) -> Dict[str, 'WidgetConfig']:
         """Parse from the old legacy config."""
         data = {}
-        for group in props.find_children('ItemVar'):
+        for group in config:
             if not group.has_children():
                 LOGGER.warning('Illegal leaf keyvalue "{}" in ItemVar conf', group.name)
             for widget in group:

@@ -5,7 +5,6 @@ import {OBJLoader} from "./OBJLoader.js";
 window.addEventListener("load", () => {
 	const TILE_SIZE = 64;
 	const PADDING = 96;
-	const content_box = document.querySelector("main");
 	const FREQ = 30 * 1000;
 
 	const fireHeartbeat = () => {
@@ -38,21 +37,37 @@ window.addEventListener("load", () => {
 	const renderer = new THREE.WebGLRenderer();
 	const controls = new OrbitControls( camera, renderer.domElement );
 
+	function convertAngle(pitch, yaw, roll) {
+		return new THREE.Euler(
+			pitch * Math.PI / 180,
+			(yaw + 90.0) * Math.PI / 180,
+			roll * Math.PI / 180,
+			"YZX",
+		);
+	}
+
 	async function updateScene(data) {
 		const mats = new Map();
 		const loader_tex = new THREE.TextureLoader();
+		async function load_tex_wrapping(filename) {
+			// Textures don't wrap by default.
+			const tex = await loader_tex.loadAsync(filename);
+			tex.wrapS = THREE.RepeatWrapping;
+			tex.wrapT = THREE.RepeatWrapping;
+			return tex;
+		}
 		const loader_obj = new OBJLoader();
 		mats.set("white", new THREE.MeshToonMaterial({
-			map: await loader_tex.loadAsync('static/grid3.png'),
+			map: await load_tex_wrapping('static/grid3.png'),
 		}));
 		mats.set("black", new THREE.MeshToonMaterial({
-			map: await loader_tex.loadAsync('static/grid3b.png'),
+			map: await load_tex_wrapping('static/grid3b.png'),
 		}));
 		mats.set("goopartial", new THREE.MeshToonMaterial({
-			map: await loader_tex.loadAsync('static/grid_goo_partial.png'),
+			map: await load_tex_wrapping('static/grid_goo_partial.png'),
 		}));
 		mats.set("goofull", new THREE.MeshToonMaterial({
-			map: await loader_tex.loadAsync('static/grid_goo_full.png'),
+			map: await load_tex_wrapping('static/grid_goo_full.png'),
 }		));
 		mats.set("glass", new THREE.MeshToonMaterial({
 			color: 0x3CA1ED,
@@ -61,7 +76,7 @@ window.addEventListener("load", () => {
 			side: THREE.DoubleSide,
 		}));
 		mats.set("grating", new THREE.MeshToonMaterial({
-			map: await loader_tex.loadAsync('static/grating.png'),
+			map: await load_tex_wrapping('static/grating.png'),
 			transparent: true,
 			side: THREE.DoubleSide,
 		}));
@@ -97,8 +112,7 @@ window.addEventListener("load", () => {
 		scene.add(lighting.target);
 		console.log("Scene data:", data);
 
-		const tile_geo = new THREE.PlaneGeometry(1.0, 1.0);
-		const grate_geo = new THREE.PlaneGeometry(1.0, 1.0);
+		const rect_geo = new Map();
 		const orients = new Map();
 		orients.set("n", new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI));
 		orients.set("s", new THREE.Quaternion());
@@ -134,7 +148,36 @@ window.addEventListener("load", () => {
 				} else {
 					mat = mats.get(kind);
 				}
-				const mesh = new THREE.Mesh(kind === "grating" ? grate_geo : tile_geo, mat);
+
+				let geo = rect_geo.get({width: tile.width, height: tile.height})
+				if (geo === undefined) {
+					// Can't use PlaneGeometry because we need to resize the UVs.
+					// Data here copied from that.
+					// geo = new THREE.PlaneGeometry(2, 4);
+					geo = new THREE.BufferGeometry();
+					geo.setIndex([0, 2, 1, 2, 3, 1]);
+					geo.setAttribute("position", new THREE.Float32BufferAttribute([
+						-tile.width/2, tile.height/2, 0,
+						tile.width/2, tile.height/2, 0,
+						-tile.width/2, -tile.height/2, 0,
+						tile.width/2, -tile.height/2, 0,
+					], 3));
+					geo.setAttribute("normal", new THREE.Float32BufferAttribute([
+						0, 0, 1,
+						0, 0, 1,
+						0, 0, 1,
+						0, 0, 1,
+					], 3));
+					geo.setAttribute("uv", new THREE.Float32BufferAttribute([
+						0, tile.height,
+						tile.width, tile.height,
+						0, 0,
+						tile.width, 0,
+					], 2))
+					rect_geo.set({width: tile.width, height: tile.height}, geo);
+
+				}
+				const mesh = new THREE.Mesh(geo, mat);
 				mesh.position.set(tile.position[0], tile.position[2], -tile.position[1]);
 				mesh.applyQuaternion(orients.get(tile.orient));
 				scene.add(mesh);
@@ -174,28 +217,28 @@ window.addEventListener("load", () => {
 			scene.add(new THREE.LineSegments(geo, lines_mat));
 		}
 
-		if (data.barrier_hole) {
+		if (data.barrier_holes.length > 0) {
 			await loader_obj.loadAsync('static/barrier_hole.obj').then((hole_geo) => {
 				console.log("Hole: ", hole_geo);
 				const hole_mats = new Map();
 				hole_mats.set("selection", select_mat);
 				hole_mats.set("framing", new THREE.MeshToonMaterial({color: 0xCCCCCC}));
-				for (const child of hole_geo.children) {
-					// name = small/large, kind = frame/footprint
-					// Data has large, small, footprint booleans.
-					const [name, kind] = child.name.split("_");
-					if (
-						!data.barrier_hole[name]  ||
-						(kind === "footprint" && !data.barrier_hole.footprint)
-					) { continue }
-					const mdl = new THREE.Mesh(child.geometry, hole_mats.get(child.material.name));
-					mdl.position.set(
-						data.barrier_hole.pos[0],
-						data.barrier_hole.pos[1],
-						data.barrier_hole.pos[2],
-					);
-					mdl.setRotationFromQuaternion(axes.get(data.barrier_hole.axis));
-					scene.add(mdl);
+				for (const hole of data.barrier_holes) {
+					for (const child of hole_geo.children) {
+						// shape = small/medium/large etc, kind = frame/footprint
+						// The shape is something like medium_frame, slot_center_footprint
+						// Data is {footprint: bool, shape: str}.
+						const underscore_pos = child.name.lastIndexOf("_");
+						if (underscore_pos === -1) { continue; }
+						const shape = child.name.slice(0, underscore_pos);
+						const kind = child.name.slice(underscore_pos + 1);
+						if (hole.shape === shape && (kind === "frame" || hole.footprint)) {
+							const mesh = new THREE.Mesh(child.geometry, hole_mats.get(child.material.name));
+							mesh.position.set(hole.pos[0], hole.pos[1], hole.pos[2]);
+							mesh.setRotationFromEuler(convertAngle(hole.pitch, hole.yaw, hole.roll));
+							scene.add(mesh);
+						}
+					}
 				}
 			});
 		}
@@ -239,4 +282,11 @@ window.addEventListener("load", () => {
 	};
 	window.visualViewport.addEventListener("resize", update);
 	update();
+
+	const render_details = document.getElementById("render-details");
+	render_details.addEventListener("toggle", () => {
+		if (render_details.open) {
+			update();
+		}
+	})
 });

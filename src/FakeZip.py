@@ -2,7 +2,8 @@
 
 This is useful to allow using the same code for reading folders or zips of data.
 """
-from typing import Any, IO, Iterator, Literal, Optional, Set, TextIO, Union, overload
+from __future__ import annotations
+from typing import Any, IO, Iterator, Literal, Set, overload
 from typing_extensions import Self
 from zipfile import ZIP_STORED, ZipFile
 import io
@@ -31,7 +32,7 @@ class FakeZipInfo:
     def __call__(self, m: Literal['rb']) -> IO[bytes]: ...
     @overload
     def __call__(self, m: Literal['r'] = 'r') -> IO[str]: ...
-    def __call__(self, m: str = 'r') -> Union[IO[str], IO[bytes]]:
+    def __call__(self, m: str = 'r') -> IO[str] | IO[bytes]:
         return open(self.filename, m)
 
 
@@ -59,10 +60,10 @@ class FakeZip:
         return False
 
     @overload
-    def open(self, name: str, mode: Literal['rb'], pwd: object=None) -> IO[bytes]: ...
+    def open(self, name: str, mode: Literal['rb'], pwd: object = None) -> IO[bytes]: ...
     @overload
-    def open(self, name: str, mode: Literal['r'] = 'r', pwd: object=None) -> IO[str]: ...
-    def open(self, name: str, mode: str = 'r', pwd: object=None) -> IO[Any]:
+    def open(self, name: str, mode: Literal['r'] = 'r', pwd: object = None) -> IO[str]: ...
+    def open(self, name: str, mode: str = 'r', pwd: object = None) -> IO[Any]:
         try:
             return open(os.path.join(self.folder, name), mode)
         except FileNotFoundError as err:
@@ -87,7 +88,7 @@ class FakeZip:
     def getinfo(self, file: str) -> FakeZipInfo:
         return FakeZipInfo(file)
 
-    def extract(self, member: str, path: Optional[str] = None, pwd: object=None) -> None:
+    def extract(self, member: str, path: str | None = None, pwd: object = None) -> None:
         if path is None:
             path = os.getcwd()
         dest = os.path.join(path, member)
@@ -97,7 +98,13 @@ class FakeZip:
             dest,
         )
 
-    def write(self, filename: str, arcname: Optional[str] = None, compress_type: Optional[int] = None) -> None:
+    def write(
+        self,
+        filename: str,
+        arcname: str | None = None,
+        compress_type: int | None = None,
+        compresslevel: int | None = None,
+    ) -> None:
         """Save the given file into the directory.
 
         arcname is the destination if given,
@@ -109,7 +116,13 @@ class FakeZip:
 
         shutil.copy(filename, self.folder + arcname)
 
-    def writestr(self, zinfo_or_arcname, data, *comp):
+    def writestr(
+        self,
+        zinfo_or_arcname: str,
+        data: str,
+        compress_type: int | None = None,
+        compresslevel: int | None = None,
+    ) -> None:
         dest = str(zinfo_or_arcname)
         with open(os.path.join(self.folder, dest), self.wr_mode) as f:
             f.write(data)
@@ -119,7 +132,7 @@ class FakeZip:
         pass
 
 
-def zip_names(zip: Union[FakeZip, ZipFile]) -> Iterator[str]:
+def zip_names(zip: FakeZip | ZipFile) -> Iterator[str]:
     """For FakeZips, use the generator instead of the zip file.
 
     """
@@ -134,7 +147,7 @@ def zip_names(zip: Union[FakeZip, ZipFile]) -> Iterator[str]:
         return zip_filter()
 
 
-def zip_open_bin(zip: Union[FakeZip, ZipFile], filename: str) -> IO[bytes]:
+def zip_open_bin(zip: FakeZip | ZipFile, filename: str) -> IO[bytes]:
     """Open zips and fake zips in binary mode."""
     if isinstance(zip, FakeZip):
         return zip.open(filename, 'rb')
@@ -142,7 +155,7 @@ def zip_open_bin(zip: Union[FakeZip, ZipFile], filename: str) -> IO[bytes]:
         return zip.open(filename, 'r')
 
 
-def zip_open_text(zip: Union[FakeZip, ZipFile], filename: str) -> IO[str]:
+def zip_open_text(zip: FakeZip | ZipFile, filename: str) -> IO[str]:
     """Open zips and fake zips in text mode."""
     if isinstance(zip, FakeZip):
         return zip.open(filename)

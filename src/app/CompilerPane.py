@@ -17,13 +17,14 @@ import trio
 
 from srctools import AtomicWriter, bool_as_int
 from srctools.logger import get_logger
+from trio_util import AsyncValue
 
 import app
-from app import SubPane, localisation, tk_tools, TK_ROOT
-from app.tooltip import add_tooltip, set_tooltip
-from transtoken import TransToken
+from app import SubPane
+from ui_tk.tooltip import add_tooltip, set_tooltip
+from transtoken import TransToken, CURRENT_LANG
 from ui_tk.img import TKImages
-from ui_tk import wid_transtoken
+from ui_tk import tk_tools, wid_transtoken, TK_ROOT
 from config.compile_pane import CompilePaneState, PLAYER_MODEL_ORDER
 import config
 import BEE2_config
@@ -64,15 +65,15 @@ COMPILE_DEFAULTS: dict[str, dict[str, str]] = {
 }
 
 PLAYER_MODELS = {
+    'PETI': TransToken.ui('Bendy'),
+    'SP': TransToken.ui('Chell'),
     'ATLAS': TransToken.ui('ATLAS'),
     'PBODY': TransToken.ui('P-Body'),
-    'SP': TransToken.ui('Chell'),
-    'PETI': TransToken.ui('Bendy'),
 }
 assert PLAYER_MODELS.keys() == set(PLAYER_MODEL_ORDER)
 
 
-class _WidgetsDict(TypedDict, total=False):
+class _WidgetsDict(TypedDict):
     """TODO: Remove."""
     refresh_counts: ttk.Button
     packfile_filefield: tk_tools.FileField
@@ -91,19 +92,19 @@ class _WidgetsDict(TypedDict, total=False):
 COMPILE_CFG = BEE2_config.ConfigFile('compile.cfg')
 COMPILE_CFG.set_defaults(COMPILE_DEFAULTS)
 window: SubPane.SubPane
-UI: _WidgetsDict = {}
+UI: _WidgetsDict = cast(_WidgetsDict, {})
 
 chosen_thumb = tk.StringVar(
     value=COMPILE_CFG.get_val('Screenshot', 'Type', 'AUTO')
 )
-tk_screenshot = None  # The preview image shown
+tk_screenshot: ImageTk.PhotoImage | None = None  # The preview image shown
 
 # Location we copy custom screenshots to
 SCREENSHOT_LOC = str(utils.conf_location('screenshot.jpg'))
 
 VOICE_PRIORITY_VAR = tk.IntVar(value=COMPILE_CFG.get_bool('General', 'voiceline_priority', False))
 
-player_model_combo: ttk.Combobox
+player_model = AsyncValue(COMPILE_CFG.get_val('General', 'player_model', 'PETI'))
 start_in_elev = tk.IntVar(value=COMPILE_CFG.get_bool('General', 'spawn_elev'))
 cust_file_loc = COMPILE_CFG.get_val('Screenshot', 'Loc', '')
 cust_file_loc_var = tk.StringVar(value='')
@@ -147,12 +148,7 @@ async def apply_state(state: CompilePaneState) -> None:
     set_screenshot()
 
     start_in_elev.set(state.spawn_elev)
-    try:
-        player_model_combo.current(PLAYER_MODEL_ORDER.index(state.player_mdl))
-    except IndexError:
-        LOGGER.warning('Unknown player model "{}"!', state.player_mdl)
-    VOICE_PRIORITY_VAR.set(state.use_voice_priority)
-
+    player_model.value = state.player_mdl
     COMPILE_CFG['General']['spawn_elev'] = bool_as_int(state.spawn_elev)
     COMPILE_CFG['General']['player_model'] = state.player_mdl
     COMPILE_CFG['General']['voiceline_priority'] = bool_as_int(state.use_voice_priority)
@@ -334,7 +330,11 @@ def make_setter(section: str, config: str, variable: tk.IntVar | tk. StringVar) 
     variable.trace_add('write', callback)
 
 
-async def make_widgets(tk_img: TKImages) -> None:
+async def make_widgets(
+    tk_img: TKImages,
+    *,
+    task_status: trio.TaskStatus[None] = trio.TASK_STATUS_IGNORED,
+) -> None:
     """Create the compiler options pane.
 
     """
@@ -362,21 +362,22 @@ async def make_widgets(tk_img: TKImages) -> None:
     comp_frame = ttk.Frame(nbook, name='comp_settings')
     nbook.add(comp_frame, text='Comp')
 
-    @localisation.add_callback(call=True)
-    def set_tab_names() -> None:
-        """Set the tab names."""
-        nbook.tab(0, text=str(TRANS_TAB_MAP))
-        nbook.tab(1, text=str(TRANS_TAB_COMPILE))
-
-    async with trio.open_nursery() as nursery:
-        nursery.start_soon(make_map_widgets, map_frame)
-        nursery.start_soon(make_comp_widgets, comp_frame, tk_img)
-
     def update_label(e: tk.Event[tk.Misc]) -> None:
         """Force the top label to wrap."""
         reload_lbl['wraplength'] = window.winfo_width() - 10
 
-    window.bind('<Configure>', update_label, add='+')
+    async with trio.open_nursery() as nursery:
+        async with trio.open_nursery() as start_nursery:
+            start_nursery.start_soon(nursery.start, make_map_widgets, map_frame)
+            start_nursery.start_soon(make_comp_widgets, comp_frame, tk_img)
+
+        window.bind('<Configure>', update_label, add='+')
+        task_status.started()
+        while True:
+            # Update tab names whenever languages update.
+            nbook.tab(0, text=str(TRANS_TAB_MAP))
+            nbook.tab(1, text=str(TRANS_TAB_COMPILE))
+            await CURRENT_LANG.wait_transition()
 
 
 async def make_comp_widgets(frame: ttk.Frame, tk_img: TKImages) -> None:
@@ -631,12 +632,15 @@ async def make_comp_widgets(frame: ttk.Frame, tk_img: TKImages) -> None:
     refresh_counts(count_brush, count_entity, count_overlay)
 
 
-async def make_map_widgets(frame: ttk.Frame) -> None:
+async def make_map_widgets(
+    frame: ttk.Frame,
+    *,
+    task_status: trio.TaskStatus[None] = trio.TASK_STATUS_IGNORED,
+) -> None:
     """Create widgets for the map settings pane.
 
     These are things which mainly affect the geometry or gameplay of the map.
     """
-    global player_model_combo
     frame.columnconfigure(0, weight=1)
 
     voice_frame = ttk.LabelFrame(frame, labelanchor='nw')
@@ -714,42 +718,38 @@ async def make_map_widgets(frame: ttk.Frame) -> None:
     wid_transtoken.set_text(model_frame, TransToken.ui('Player Model (SP):'))
     model_frame.grid(row=4, column=0, sticky='ew')
 
-    player_model_combo = player_mdl = ttk.Combobox(model_frame, exportselection=False, width=20)
-    # Users can only use the dropdown
-    player_mdl.state(['readonly'])
-    player_mdl.grid(row=0, column=0, sticky=tk.EW)
+    if player_model.value not in PLAYER_MODEL_ORDER:
+        LOGGER.warning('Invalid player model "{}"!', player_model.value)
+        player_model.value = 'PETI'
 
-    @localisation.add_callback(call=True)
-    def update_model_values() -> None:
-        """Update the combo box when translations change."""
-        player_mdl['values'] = [str(PLAYER_MODELS[mdl]) for mdl in PLAYER_MODEL_ORDER]
-
-    try:
-        start_ind = PLAYER_MODEL_ORDER.index(COMPILE_CFG.get_val('General', 'player_model', 'PETI'))
-    except IndexError:
-        LOGGER.warning('Invalid player model "{}"!', COMPILE_CFG['General']['player_model'])
-        start_ind = PLAYER_MODEL_ORDER.index('PETI')
-    player_mdl.current(start_ind)
-
-    def set_model(_: tk.Event[ttk.Combobox]) -> None:
-        """Save the selected player model."""
-        model = PLAYER_MODEL_ORDER[player_mdl.current()]
-        config.APP.store_conf(attrs.evolve(
-            config.APP.get_cur_conf(CompilePaneState, default=DEFAULT_STATE),
-            player_mdl=model,
-        ))
-        COMPILE_CFG['General']['player_model'] = model
-        COMPILE_CFG.save()
-
-    player_mdl.bind('<<ComboboxSelected>>', set_model)
+    player_mdl_combo = tk_tools.ComboBoxMap(
+        model_frame,
+        name='model_combo',
+        current=player_model,
+        values=PLAYER_MODELS.items(),
+    )
+    player_mdl_combo.widget['width'] = 20
+    player_mdl_combo.grid(row=0, column=0, sticky=tk.EW)
 
     model_frame.columnconfigure(0, weight=1)
+    task_status.started()
+    async with trio.open_nursery() as nursery, utils.aclosing(player_model.eventual_values()) as agen:
+        nursery.start_soon(player_mdl_combo.task)
+        async for model in agen:
+            config.APP.store_conf(attrs.evolve(
+                config.APP.get_cur_conf(CompilePaneState, default=DEFAULT_STATE),
+                player_mdl=model,
+            ))
+            COMPILE_CFG['General']['player_model'] = model
+            COMPILE_CFG.save()
 
 
 async def make_pane(
     tool_frame: Union[tk.Frame, ttk.Frame],
     tk_img: TKImages,
     menu_bar: tk.Menu,
+    *,
+    task_status: trio.TaskStatus[None] = trio.TASK_STATUS_IGNORED,
 ) -> None:
     """Initialise when part of the BEE2."""
     global window
@@ -766,22 +766,28 @@ async def make_pane(
     )
     window.columnconfigure(0, weight=1)
     window.rowconfigure(0, weight=1)
-    await make_widgets(tk_img)
-    await config.APP.set_and_run_ui_callback(CompilePaneState, apply_state)
+    async with trio.open_nursery() as nursery:
+        await nursery.start(make_widgets, tk_img)
+        await config.APP.set_and_run_ui_callback(CompilePaneState, apply_state)
+        task_status.started()
+        await trio.sleep_forever()
 
 
-def init_application() -> None:
+async def init_application() -> None:
     """Initialise when standalone."""
     global window
     from ui_tk.img import TK_IMG
+    from app import _APP_QUIT_SCOPE
     window = cast(SubPane.SubPane, TK_ROOT)
     wid_transtoken.set_win_title(window, TransToken.ui(
         'Compiler Options - {ver}',
     ).format(ver=utils.BEE_VERSION))
     window.resizable(True, False)
 
-    # TODO load async properly.
-    import trio
-    trio.run(make_widgets, TK_IMG)
+    with _APP_QUIT_SCOPE:
+        async with trio.open_nursery() as nursery:
+            await nursery.start(make_widgets, TK_IMG)
 
-    TK_ROOT.deiconify()
+            TK_ROOT.deiconify()
+            tk_tools.center_onscreen(TK_ROOT)
+            await trio.sleep_forever()

@@ -1,8 +1,9 @@
 """Handles Aperture Tag modifications in the compiler."""
+from __future__ import annotations
+
 import itertools
 import math
 import os
-from typing import Optional
 
 from precomp.connections import Item
 from srctools import FrozenAngle, Vec, Keyvalues, VMF, Entity, Output, Angle, Matrix
@@ -12,17 +13,17 @@ from precomp import instanceLocs, options, connections, conditions
 from connections import Config
 from precomp.fizzler import FIZZLERS, FIZZ_TYPES, Fizzler
 import utils
-import vbsp
 
 
-COND_MOD_NAME = None
+COND_MOD_NAME: str | None = None
 
 LOGGER = srctools.logger.get_logger(__name__)
 
 # Fizzler type ID for Gel Gun Activator.
-TAG_FIZZ_ID = 'TAG_GEL_GUN'
+TAG_FIZZ_ID = utils.obj_id('TAG_GEL_GUN')
 # Special version with gel logic.
 TRANSITION_ENTS = 'instances/bee2/transition_ents_tag.vmf'
+FIZZLER_CONN_ID = utils.special_id('<TAG_FIZZER>')
 
 
 @conditions.make_result('ATLAS_SpawnPoint')
@@ -37,7 +38,7 @@ def res_make_tag_coop_spawn(vmf: VMF, info: conditions.MapInfo, inst: Entity, re
     if not info.is_coop:
         return conditions.RES_EXHAUSTED
 
-    is_tag = options.get(str, 'game_id') == utils.STEAM_IDS['TAG']
+    is_tag = options.GAME_ID() == utils.STEAM_IDS['TAG']
 
     origin = Vec.from_str(inst.fixup.substitute(res['origin', '0 0 0']))
     if 'angles' in res:
@@ -91,8 +92,8 @@ def res_make_tag_coop_spawn(vmf: VMF, info: conditions.MapInfo, inst: Entity, re
     return conditions.RES_EXHAUSTED
 
 
-@conditions.meta_cond(priority=200, only_once=True)
-def ap_tag_modifications(vmf: VMF) -> None:
+@conditions.MetaCond.ApertureTag.register
+def ap_tag_modifications(vmf: VMF, info: conditions.MapInfo) -> None:
     """Perform modifications for Aperture Tag.
 
     * Paint is always present in every map!
@@ -100,19 +101,17 @@ def ap_tag_modifications(vmf: VMF) -> None:
     * In singleplayer, override the transition ent instance to have the Gel Gun.
     * Create subdirectories with the user's steam ID to fix a workshop compile bug.
     """
-    if options.get(str, 'game_id') != utils.STEAM_IDS['APTAG']:
+    if options.GAME_ID() != utils.STEAM_IDS['APTAG']:
         return  # Wrong game!
 
     LOGGER.info('Performing Aperture Tag modifications...')
 
-    has = vbsp.settings['has_attr']
     # This will enable the PaintInMap keyvalue.
-    has['Gel'] = True
+    info.set_attr('Gel')
 
     # Set as if the player spawned with no pgun
-    has['spawn_dual'] = False
-    has['spawn_single'] = False
-    has['spawn_nogun'] = True
+    info.unset_attr('spawn_dual')
+    info.set_attr('spawn_single', 'spawn_nogun')
 
     transition_ents = instanceLocs.resolve_filter('[transitionents]')
     for inst in vmf.by_class['func_instance']:
@@ -139,15 +138,18 @@ def ap_tag_modifications(vmf: VMF) -> None:
             )
 
 
-@conditions.make_result('TagFizzler')
+@conditions.make_result(
+    'TagFizzler',
+    valid_before=[conditions.MetaCond.Fizzler, conditions.MetaCond.Connections],
+)
 def res_make_tag_fizzler(vmf: VMF, info: conditions.MapInfo, res: Keyvalues) -> conditions.ResultCallable:
     """Add an Aperture Tag Paint Gun activation fizzler.
 
     These fizzlers are created via signs, and work very specially.
-    This must be before -250 so it runs before fizzlers and connections.
+    This must be before -250 so that it runs before fizzlers and connections.
     """
     if 'ioconf' in res:
-        fizz_conn_conf = Config.parse('<TAG_FIZZER>', res.find_key('ioconf'))
+        fizz_conn_conf = Config.parse(FIZZLER_CONN_ID, res.find_key('ioconf'))
     else:
         fizz_conn_conf = None
 
@@ -161,16 +163,15 @@ def res_make_tag_fizzler(vmf: VMF, info: conditions.MapInfo, res: Keyvalues) -> 
     oran_sign_on = res['oran_sign', '']
     oran_sign_off = res['oran_off_sign', '']
 
-    import vbsp
-    if options.get(str, 'game_id') != utils.STEAM_IDS['TAG']:
+    if options.GAME_ID() != utils.STEAM_IDS['TAG']:
         # Abort - TAG fizzlers shouldn't appear in any other game!
         # So simply remove the fizzler when called.
         return Entity.remove
 
     def make_tag_fizz(inst: Entity) -> None:
         """Create the Tag fizzler."""
-        fizzler: Optional[Fizzler] = None
-        fizzler_item: Optional[Item] = None
+        fizzler: Fizzler | None = None
+        fizzler_item: Item | None = None
 
         # Look for the fizzler instance we want to replace.
         sign_item = connections.ITEMS[inst['targetname']]
@@ -408,8 +409,6 @@ def res_make_tag_fizzler(vmf: VMF, info: conditions.MapInfo, res: Keyvalues) -> 
             Output(output, neg_trig, 'Disable'),
         ]
 
-        voice_attr = vbsp.settings['has_attr']
-
         if blue_enabled or disable_other:
             # If this is blue/oran only, don't affect the other color
             neg_trig.outputs.append(Output(
@@ -426,10 +425,7 @@ def res_make_tag_fizzler(vmf: VMF, info: conditions.MapInfo, res: Keyvalues) -> 
             ))
             if blue_enabled:
                 # Add voice attributes - we have the gun and gel!
-                voice_attr['bluegelgun'] = True
-                voice_attr['bluegel'] = True
-                voice_attr['bouncegun'] = True
-                voice_attr['bouncegel'] = True
+                info.set_attr('bluegelgun', 'bluegel', 'bouncegun', 'bouncegel')
 
         if oran_enabled or disable_other:
             neg_trig.outputs.append(Output(
@@ -445,10 +441,7 @@ def res_make_tag_fizzler(vmf: VMF, info: conditions.MapInfo, res: Keyvalues) -> 
                 param=srctools.bool_as_int(pos_oran),
             ))
             if oran_enabled:
-                voice_attr['orangegelgun'] = True
-                voice_attr['orangegel'] = True
-                voice_attr['speedgelgun'] = True
-                voice_attr['speedgel'] = True
+                info.set_attr('orangegelgun', 'orangegel', 'speedgelgun', 'speedgel')
 
         if not oran_enabled and not blue_enabled:
             # If both are disabled, we must shutdown the gun when touching

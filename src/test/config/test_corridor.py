@@ -1,9 +1,12 @@
 """Test parsing corridor configurations."""
+from typing import Mapping
+
 import pytest
 from srctools import Keyvalues
 from srctools.dmx import Element
 
-from config.corridors import Direction, GameMode, Orient, Config, UIState
+from config.corridors import Direction, GameMode, Orient, Config, Options, UIState
+import utils
 
 # Two sets of sample instance names, for testing parsing - in V1 and V2 formats.
 CORR_ENABLED = {
@@ -15,6 +18,13 @@ CORR_ENABLED = {
 }
 CORR_SEL = [inst for inst, enabled in CORR_ENABLED.items() if enabled]
 CORR_UNSEL = [inst for inst, enabled in CORR_ENABLED.items() if not enabled]
+# Sample data for corridor options. Make sure to copy to ensure the class can't accidentally modify!
+OPTION_SAMPLE: Mapping[utils.ObjectID, utils.SpecialID] = {
+    utils.obj_id('direction_Entry'): utils.obj_id('up'),
+    utils.obj_id('temperature'): utils.obj_id('freezing'),
+    utils.obj_id('side'): utils.obj_id('left'),
+    utils.obj_id('suprises'): utils.ID_RANDOM,
+}
 
 
 def test_conf_parse_v3() -> None:
@@ -101,6 +111,65 @@ def test_conf_export_dmx() -> None:
         (attr.name, attr._value)
         for attr in elem.values()
     ] == list(CORR_ENABLED.items())
+
+
+def test_options_parse_v2() -> None:
+    """Version 2 is not supported."""
+    with pytest.raises(ValueError):  # Check version 2 is not allowed.
+        Options.parse_kv1(Keyvalues.root(), 2)
+
+    with pytest.raises(ValueError):  # Check version 2 is not allowed.
+        Options.parse_dmx(Element('CorridorOptions', 'DMConfig'), 2)
+
+
+def test_parse_v1_kv1() -> None:
+    """Test parsing keyvalues1 configs, in version 1 format."""
+    kv = Keyvalues.root(
+        Keyvalues('direction_entry', 'up'),
+        Keyvalues('temperature', 'freezing'),
+        Keyvalues('side', 'left'),
+        Keyvalues('suprises', '<ranDOM>'),
+    )
+    assert Options.parse_kv1(kv, 1) == Options(dict(OPTION_SAMPLE))
+
+
+def test_export_kv1() -> None:
+    """Test exporting keyvalues1 configs."""
+    result = Options(dict(OPTION_SAMPLE)).export_kv1()
+    assert len(result) == 4
+    assert result['direction_entry'] == 'UP'
+    assert result['temperature'] == 'FREEZING'
+    assert result['sIDe'] == 'LEFT'
+    assert result['suprises'] == utils.ID_RANDOM
+
+
+def test_parse_v1_dmx() -> None:
+    """Test parsing DMX configs, in version 1 format."""
+    elem = Element('CorrOpts', 'DMElement')
+    elem['directION_entry'] = 'up'
+    elem['tempERAture'] = 'freezing'
+    elem['sIDe'] = 'left'
+    elem['suprises'] = '<ranDOM>'
+
+    assert Options.parse_dmx(elem, 1) == Options(dict(OPTION_SAMPLE))
+
+
+def test_export_dmx() -> None:
+    """Test exporting DMX configs."""
+    result = Options(dict(OPTION_SAMPLE)).export_dmx()
+    result.pop('name')
+    assert len(result) == 4
+    assert result['direction_entry'].name == 'DIRECTION_ENTRY'
+    assert result['direction_entry']._value == 'UP'
+
+    assert result['temperature'].name == 'TEMPERATURE'
+    assert result['temperature']._value == 'FREEZING'
+
+    assert result['side'].name == 'SIDE'
+    assert result['side']._value == 'LEFT'
+
+    assert result['suprises'].name == 'SUPRISES'
+    assert result['suprises']._value == utils.ID_RANDOM
 
 
 @pytest.mark.parametrize('mode', GameMode)

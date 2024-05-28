@@ -1,24 +1,26 @@
 """Handles the UI required for saving and loading palettes."""
 from __future__ import annotations
-from typing import Awaitable, Callable
-from uuid import UUID
+from collections.abc import Awaitable, Callable
+from uuid import UUID, uuid4
 
 from tkinter import ttk
 import tkinter as tk
 
 import srctools.logger
+import trio
+import trio_util
 
 from app.dialogs import Dialogs
 from app.paletteLoader import Palette, ItemPos, VertInd, HorizInd, COORDS, VERT, HORIZ
-from app import background_run, localisation, tk_tools, paletteLoader, img
+from app import background_run, paletteLoader, img
 from consts import PALETTE_FORCE_SHOWN, UUID_BLANK, UUID_EXPORT, UUID_PORTAL2
 from config.palette import PaletteState
-from transtoken import TransToken
-from ui_tk.dialogs import TkDialogs
+from ui_tk import tk_tools
 from ui_tk.img import tkImg, TKImages
-import config
 from ui_tk.wid_transtoken import set_menu_text, set_text
+from transtoken import CURRENT_LANG, TransToken
 from utils import not_none
+import config
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -68,6 +70,8 @@ class PaletteUI:
         self, f: ttk.Frame, menu: tk.Menu,
         *,
         tk_img: TKImages,
+        dialog_menu: Dialogs,
+        dialog_window: Dialogs,
         cmd_clear: Callable[[], None],
         cmd_shuffle: Callable[[], None],
         get_items: Callable[[], ItemPos],
@@ -92,8 +96,6 @@ class PaletteUI:
         self.var_pal_select = tk.StringVar(value=self.selected_uuid.hex)
         self.get_items = get_items
         self.set_items = set_items
-
-        dialog_window = TkDialogs(f.winfo_toplevel())
 
         f.rowconfigure(2, weight=1)
         f.columnconfigure(0, weight=1)
@@ -164,8 +166,8 @@ class PaletteUI:
         self.ui_menu = menu
         self.ui_group_menus = {}
         self.ui_group_treeids = {}
-
-        dialog_menu = TkDialogs(menu.winfo_toplevel())
+        # Set this event to trigger a reload.
+        self.is_dirty = trio.Event()
 
         menu.add_command(
             command=lambda: background_run(self.event_save, dialog_menu),
@@ -210,7 +212,6 @@ class PaletteUI:
         menu.add_separator()
 
         self.ui_menu_palettes_index = not_none(menu.index('end')) + 1
-        localisation.add_callback(call=True)(self.update_state)
 
     @property
     def selected(self) -> Palette:
@@ -221,9 +222,18 @@ class PaletteUI:
             LOGGER.warning('No such palette with ID {}', self.selected_uuid)
             return self.palettes[UUID_PORTAL2]
 
-    def update_state(self) -> None:
+    async def update_task(self) -> None:
+        """Whenever a change occurs, update all the UI."""
+        while True:
+            self.is_dirty = trio.Event()
+            await trio_util.wait_any(
+                CURRENT_LANG.wait_transition,
+                self.is_dirty.wait,
+            )
+            self._update_state()
+
+    def _update_state(self) -> None:
         """Update the UI to show correct state."""
-        # This is called if languages change, so we can just immediately convert translation tokens.
 
         # Clear out all the current data.
         for grp_menu in self.ui_group_menus.values():
@@ -346,7 +356,7 @@ class PaletteUI:
         """Clear all hidden palettes, and save."""
         self.hidden_defaults.clear()
         self._store_configuration()
-        self.update_state()
+        self.is_dirty.set()
 
     async def event_remove(self, dialogs: Dialogs) -> None:
         """Remove the currently selected palette."""
@@ -355,14 +365,14 @@ class PaletteUI:
             if pal.uuid in PALETTE_FORCE_SHOWN:
                 return  # Disallowed.
             self.hidden_defaults.add(pal.uuid)
-        elif dialogs.ask_yes_no(
+        elif await dialogs.ask_yes_no(
             title=TRANS_TITLE_DELETE,
             message=TRANS_SHOULD_DELETE.format(palette=pal.name),
         ):
             pal.delete_from_disk()
             del self.palettes[pal.uuid]
         self.select_palette(UUID_PORTAL2, False)
-        self.update_state()
+        self.is_dirty.set()
         background_run(self.set_items, self.selected)
 
     async def event_save(self, dialogs: Dialogs) -> None:
@@ -377,7 +387,7 @@ class PaletteUI:
             else:
                 self.selected.settings = None
             self.selected.save(ignore_readonly=True)
-        self.update_state()
+        self.is_dirty.set()
 
     async def event_save_as(self, dialogs: Dialogs) -> None:
         """Save the palette with a new name."""
@@ -386,8 +396,8 @@ class PaletteUI:
             # Cancelled...
             return
         pal = Palette(name, self.get_items())
-        while pal.uuid in self.palettes:  # Should be impossible.
-            pal.uuid = paletteLoader.uuid4()
+        while pal.uuid in self.palettes:  # Should never occur, but check anyway.
+            pal.uuid = uuid4()
 
         if self.var_save_settings.get():
             pal.settings = config.APP.get_full_conf(config.PALETTE)
@@ -395,7 +405,7 @@ class PaletteUI:
         pal.save()
         self.palettes[pal.uuid] = pal
         self.select_palette(pal.uuid, False)
-        self.update_state()
+        self.is_dirty.set()
 
     async def event_rename(self, dialogs: Dialogs) -> None:
         """Rename an existing palette."""
@@ -406,7 +416,7 @@ class PaletteUI:
             # Cancelled...
             return
         self.selected.name = TransToken.untranslated(name)
-        self.update_state()
+        self.is_dirty.set()
 
     def select_palette(self, uuid: UUID, set_save_settings: bool) -> None:
         """Select a new palette.
@@ -437,14 +447,14 @@ class PaletteUI:
         if res is not None:
             self.selected.group = res.strip('<>')
             self.selected.save()
-            self.update_state()
+            self.is_dirty.set()
 
     async def event_select_menu(self) -> None:
         """Called when the menu buttons are clicked."""
         uuid_hex = self.var_pal_select.get()
         self.select_palette(UUID(hex=uuid_hex), True)
         await self.set_items(self.selected)
-        self.update_state()
+        self.is_dirty.set()
 
     async def event_select_tree(self) -> None:
         """Called when palettes are selected on the treeview."""
@@ -455,7 +465,7 @@ class PaletteUI:
         self.var_pal_select.set(uuid_hex)
         self.select_palette(UUID(hex=uuid_hex), True)
         await self.set_items(self.selected)
-        self.update_state()
+        self.is_dirty.set()
 
     def treeview_reselect(self) -> None:
         """When a group item is selected on the tree, reselect the palette."""

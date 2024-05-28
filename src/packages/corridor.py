@@ -1,35 +1,31 @@
 """Defines individual corridors to allow swapping which are used."""
 from __future__ import annotations
+from typing_extensions import Final
 
-import pickle
 from collections import defaultdict
 from collections.abc import Sequence, Iterator, Mapping
-from typing import Dict, List, Tuple
-from typing_extensions import Final
 import itertools
 
+from srctools import Keyvalues, logger
 import attrs
-import srctools.logger
-from srctools import Vec
 
 import utils
 from app import img, lazy_conf, tkMarkdown
-import config
 import packages
 import editoritems
-from config.corridors import Config
 from corridor import (
-    CorrKind, Orient, Direction, GameMode,
+    CorrKind, CorrSpec, OptValue, OptionGroup,
+    Orient, Direction, GameMode,
+    Option, Corridor,
     CORRIDOR_COUNTS, ID_TO_CORR,
-    Corridor, ExportedConf,
 )
-from transtoken import TransToken, TransTokenSource
+from transtoken import AppError, TransToken, TransTokenSource
 
 
-LOGGER = srctools.logger.get_logger(__name__)
+LOGGER = logger.get_logger(__name__)
 
 # For converting style corridor definitions, this indicates the attribute the old data was stored in.
-FALLBACKS: Final[Mapping[Tuple[GameMode, Direction], str]] = {
+FALLBACKS: Final[Mapping[tuple[GameMode, Direction], str]] = {
     (GameMode.SP, Direction.ENTRY): 'sp_entry',
     (GameMode.SP, Direction.EXIT): 'sp_exit',
     (GameMode.COOP, Direction.EXIT): 'coop',
@@ -44,8 +40,16 @@ IMG_WIDTH_LRG: Final = 256
 IMG_HEIGHT_LRG: Final = 192
 ICON_GENERIC_LRG = img.Handle.builtin('BEE2/corr_generic', IMG_WIDTH_LRG, IMG_HEIGHT_LRG)
 
+ALL_MODES: Final[Sequence[GameMode]] = list(GameMode)
+ALL_DIRS: Final[Sequence[Direction]] = list(Direction)
+ALL_ORIENT: Final[Sequence[Orient]] = list(Orient)
 
-@attrs.frozen
+TRANS_DUPLICATE_OPTION = TransToken.ui(
+    'Duplicate corridor option ID "{option}" in corridor group for style "{group}"!'
+)
+
+
+@attrs.frozen(kw_only=True)
 class CorridorUI(Corridor):
     """Additional data only useful for the UI. """
     name: TransToken
@@ -59,13 +63,14 @@ class CorridorUI(Corridor):
         """Strip these UI attributes for the compiler export."""
         return Corridor(
             instance=self.instance,
-            orig_index=self.orig_index,
+            default_enabled=self.default_enabled,
             legacy=self.legacy,
             fixups=self.fixups,
+            option_ids=self.option_ids,
         )
 
 
-def parse_specifier(specifier: str) -> CorrKind:
+def parse_specifier(specifier: str) -> CorrSpec:
     """Parse a string like 'sp_entry' or 'exit_coop_dn' into the 3 enums."""
     orient: Orient | None = None
     mode: GameMode | None = None
@@ -98,9 +103,16 @@ def parse_specifier(specifier: str) -> CorrKind:
                 raise ValueError(f'Multiple sp/coop keywords in "{specifier}"!')
             mode = parsed_mode
             continue
-        raise ValueError(f'Unknown keyword "{part}" in "{specifier}"!')
+        # Completely empty specifier will split into [''], allow `sp__exit` too.
+        if part:
+            raise ValueError(f'Unknown keyword "{part}" in "{specifier}"!')
+    return mode, direction, orient
 
-    if orient is None:  # Allow omitting this additional variant.
+
+def parse_corr_kind(specifier: str) -> CorrKind:
+    """Parse a string into a specific corridor type."""
+    mode, direction, orient = parse_specifier(specifier)
+    if orient is None:  # Infer horizontal if unspecified.
         orient = Orient.HORIZONTAL
     if direction is None:
         raise ValueError(f'Direction must be specified in "{specifier}"!')
@@ -109,20 +121,84 @@ def parse_specifier(specifier: str) -> CorrKind:
     return mode, direction, orient
 
 
-@attrs.define(slots=False)
-class CorridorGroup(packages.PakObject, allow_mult=True, export_priority=10):
+def parse_option(
+    pak_id: utils.ObjectID,
+    kv: Keyvalues,
+) -> Option:
+    """Parse a KV1 config into an option."""
+    opt_id = utils.obj_id(kv.real_name, 'corridor option')
+    name = TransToken.parse(pak_id, kv['name'])
+    valid_ids: set[utils.ObjectID] = set()
+    values: list[OptValue] = []
+    fixup = kv['var']
+    desc = TransToken.parse(pak_id, packages.parse_multiline_key(kv, 'description'))
+
+    for child in kv.find_children('Values'):
+        val_id = utils.obj_id(child.real_name, 'corridor option value')
+        if val_id in valid_ids:
+            LOGGER.warning('Duplicate value "{}"!', child.name)
+        valid_ids.add(val_id)
+        values.append(OptValue(
+            id=val_id,
+            name=TransToken.parse(pak_id, child.value),
+        ))
+
+    if not values:
+        raise ValueError(f'Option "{opt_id}" has no valid values!')
+
+    try:
+        default = utils.special_id(kv['default'], 'corridor option default')
+    except LookupError:
+        default = values[0].id
+    else:
+        if default not in valid_ids and default != utils.ID_RANDOM:
+            LOGGER.warning('Default id "{}" is not valid!',default)
+            default = values[0].id
+
+    return Option(
+        id=opt_id,
+        name=name,
+        default=default,
+        values=values,
+        fixup=fixup,
+        desc=desc,
+    )
+
+
+@attrs.define(slots=False, kw_only=True)
+class CorridorGroup(packages.PakObject, allow_mult=True):
     """A collection of corridors defined for the style with this ID."""
     id: str
-    corridors: Dict[CorrKind, List[CorridorUI]]
+    corridors: dict[CorrKind, list[CorridorUI]]
     inherit: Sequence[str] = ()  # Copy all the corridors defined in these groups.
+    options: dict[utils.ObjectID, Option] = attrs.Factory(dict)
+    global_options: dict[OptionGroup, list[Option]] = attrs.Factory(dict)
 
     @classmethod
     async def parse(cls, data: packages.ParseData) -> CorridorGroup:
         """Parse from the file."""
         corridors: dict[CorrKind, list[CorridorUI]] = defaultdict(list)
         inherits: list[str] = []
+
+        options: dict[utils.ObjectID, Option] = {}
+        global_options: dict[OptionGroup, list[Option]] = defaultdict(list)
+        for opt_kv in data.info.find_children('Options'):
+            with logger.context(opt_kv.real_name):
+                option = parse_option(data.pak_id, opt_kv)
+            if option.id in options:
+                raise AppError(TRANS_DUPLICATE_OPTION.format(option=option.id, group=data.id))
+            options[option.id] = option
+            for spec_kv in opt_kv.find_all('global'):
+                spec_mode, spec_dir, spec_orient = parse_specifier(spec_kv.value)
+                # We don't differentiate by orientation.
+                for mode, direction in itertools.product(
+                    (spec_mode,) if spec_mode is not None else ALL_MODES,
+                    (spec_dir,) if spec_dir is not None else ALL_DIRS,
+                ):
+                    global_options[mode, direction].append(option)
+
         for kv in data.info:
-            if kv.name == 'id':
+            if kv.name in ('id', 'options'):
                 continue
             if kv.name == 'inherit':
                 inherits.append(kv.value)
@@ -140,10 +216,9 @@ class CorridorGroup(packages.PakObject, allow_mult=True, export_priority=10):
             if not images:
                 images.append(ICON_GENERIC_LRG)
 
-            mode, direction, orient = parse_specifier(kv.name)
+            mode, direction, orient = parse_corr_kind(kv.name)
 
             if is_legacy := kv.bool('legacy'):
-
                 if orient is Orient.HORIZONTAL:
                     LOGGER.warning(
                         '{.value}_{.value}_{.value} has legacy corridor "{}"',
@@ -164,7 +239,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True, export_priority=10):
                 name=name,
                 authors=list(map(TransToken.untranslated, packages.sep_values(kv['authors', '']))),
                 desc=packages.desc_parse(kv, 'Corridor', data.pak_id),
-                orig_index=kv.int('DefaultIndex', 0),
+                default_enabled=not kv.bool('disabled', False),
                 config=packages.get_config(kv, 'items', data.pak_id, source='Corridor ' + kv.name),
                 images=images,
                 icon=icon,
@@ -173,8 +248,18 @@ class CorridorGroup(packages.PakObject, allow_mult=True, export_priority=10):
                     subprop.name: subprop.value
                     for subprop in kv.find_children('fixups')
                 },
+                option_ids=frozenset({
+                    utils.obj_id(opt_kv.value, 'corridor option')
+                    for opt_kv in kv.find_all('Option')
+                }),
             ))
-        return CorridorGroup(data.id, dict(corridors), inherits)
+        return CorridorGroup(
+            id=data.id,
+            corridors=dict(corridors),
+            inherit=inherits,
+            options=options,
+            global_options=dict(global_options),
+        )
 
     def add_over(self: CorridorGroup, override: CorridorGroup) -> None:
         """Merge two corridor group definitions."""
@@ -187,6 +272,13 @@ class CorridorGroup(packages.PakObject, allow_mult=True, export_priority=10):
                 corr_base.extend(corr_over)
         if override.inherit:
             self.inherit = override.inherit
+
+        for opt in override.options.values():
+            if opt.id in self.options:
+                raise AppError(TRANS_DUPLICATE_OPTION.format(option=opt.id, group=self.id))
+            self.options[opt.id] = opt
+        for kind, additional in override.global_options.items():
+            self.global_options[kind] += additional
 
     @classmethod
     async def post_parse(cls, packset: packages.PackagesSet) -> None:
@@ -210,7 +302,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True, export_priority=10):
                         corridor_group = packset.obj_by_id(cls, style_id)
                     except KeyError:
                         # Synthesise a new group to match.
-                        corridor_group = cls(style_id, {})
+                        corridor_group = cls(id=style_id, corridors={})
                         packset.add(corridor_group, item.pak_id, item.pak_name)
 
                     corr_list = corridor_group.corridors.setdefault(
@@ -245,9 +337,12 @@ class CorridorGroup(packages.PakObject, allow_mult=True, export_priority=10):
                                 authors=list(map(TransToken.untranslated, style.selitem_data.auth)),
                                 desc=tkMarkdown.MarkdownData.BLANK,
                                 config=lazy_conf.BLANK,
-                                orig_index=ind + 1,
-                                fixups={},
+                                default_enabled=True,
+                                # Replicate previous behaviour, where this var was set to the
+                                # corridor index automatically.
+                                fixups={'corr_index': str(ind + 1)},
                                 legacy=True,
+                                option_ids=frozenset(),
                             )
                         else:
                             style_info = style.legacy_corridors[mode, direction, ind + 1]
@@ -259,9 +354,10 @@ class CorridorGroup(packages.PakObject, allow_mult=True, export_priority=10):
                                 authors=list(map(TransToken.untranslated, style.selitem_data.auth)),
                                 desc=tkMarkdown.MarkdownData.text(style_info.desc),
                                 config=lazy_conf.BLANK,
-                                orig_index=ind + 1,
-                                fixups={},
+                                default_enabled=True,
+                                fixups={'corr_index': str(ind + 1)},
                                 legacy=True,
+                                option_ids=frozenset(),
                             )
                         corr_list.append(corridor)
                         had_legacy = True
@@ -298,6 +394,21 @@ class CorridorGroup(packages.PakObject, allow_mult=True, export_priority=10):
                     except KeyError:
                         corridor_group.corridors[kind] = corridors.copy()
 
+                # Copy over options, but don't overwrite ones that already exist.
+                for opt_kind, options in parent_group.global_options.items():
+                    try:
+                        existing = corridor_group.global_options[opt_kind]
+                    except KeyError:
+                        corridor_group.global_options[opt_kind] = options.copy()
+                    else:
+                        existing_ids = {opt.id for opt in existing}
+                        for option in options:
+                            if option.id not in existing_ids:
+                                existing.append(option)
+
+                for option in parent_group.options.values():
+                    corridor_group.options.setdefault(option.id, option)
+
         if utils.DEV_MODE:
             # Check no duplicate corridors exist.
             for corridor_group in packset.all_obj(cls):
@@ -331,103 +442,25 @@ class CorridorGroup(packages.PakObject, allow_mult=True, export_priority=10):
                     self.id, mode.value, direction.value,
                 )
             return []
-        
-        output = [
-            corr 
+
+        return [
+            corr
             for corr in corr_list
-            if corr.orig_index > 0
+            if corr.default_enabled
         ]
-        # Sort so missing indexes are skipped.
-        output.sort(key=lambda corr: corr.orig_index)
-        # Ignore extras beyond the actual size.
-        return output[:CORRIDOR_COUNTS[mode, direction]]
 
-    @classmethod
-    async def export(cls, exp_data: packages.ExportData) -> None:
-        """Override editoritems with the new corridor specifier."""
-        style_id = exp_data.selected_style.id
-        try:
-            group = exp_data.packset.obj_by_id(cls, style_id)
-        except KeyError:
-            raise Exception(f'No corridor group for style "{style_id}"!') from None
+    def get_options(self, mode: GameMode, direction: Direction, corr: CorridorUI) -> Iterator[Option]:
+        """Determine all options that a specific corridor requires."""
+        matched = set()
 
-        export: ExportedConf = {}
-        for mode, direction, orient in itertools.product(GameMode, Direction, Orient):
-            conf = config.APP.get_cur_conf(
-                Config,
-                Config.get_id(style_id, mode, direction, orient),
-                Config(),
-            )
+        for opt in self.global_options.get((mode, direction), ()):
+            matched.add(opt.id)
+            yield opt
+        for opt_id in corr.option_ids - matched:
             try:
-                inst_to_corr = {
-                    corr.instance.casefold(): corr
-                    for corr in group.corridors[mode, direction, orient]
-                }
+                yield self.options[opt_id]
             except KeyError:
-                # None defined for this corridor. This is not an error for vertical ones.
-                (LOGGER.warning if orient is Orient.HORIZONTAL else LOGGER.debug)(
-                    'No corridors defined for {}:{}_{}',
-                    style_id, mode.value, direction.value
+                LOGGER.warning(
+                    'Unknown option {} for corridor group "{}"!\ninstance:{}',
+                    opt_id, self.id, corr.instance,
                 )
-                export[mode, direction, orient] = []
-                continue
-
-            if conf.enabled:
-                chosen = [
-                    corr
-                    for corr_id, enabled in conf.enabled.items()
-                    if enabled and (corr := inst_to_corr.get(corr_id.casefold())) is not None
-                ]
-
-                if not chosen:
-                    LOGGER.warning(
-                        'No corridors selected for {}:{}_{}_{}',
-                        style_id,
-                        mode.value, direction.value, orient.value,
-                    )
-                    chosen = group.defaults(mode, direction, orient)
-            else:
-                # Use default setup, don't warn.
-                chosen = group.defaults(mode, direction, orient)
-
-            for corr in chosen:
-                exp_data.vbsp_conf.extend(await corr.config())
-            export[mode, direction, orient] = list(map(CorridorUI.strip_ui, chosen))
-
-        # Now write out.
-        LOGGER.info('Writing corridor configuration...')
-        with open(exp_data.game.abs_path('bin/bee2/corridors.bin'), 'wb') as file:
-            pickle.dump(export, file, protocol=pickle.HIGHEST_PROTOCOL)
-
-        # Change out all the instances in items to names following a pattern.
-        # This allows the compiler to easily recognise. Also force 64-64-64 offset.
-        # TODO: Need to ensure this happens after Item.export()!
-        for item in exp_data.all_items:
-            try:
-                (mode, direction) = ID_TO_CORR[item.id]
-            except KeyError:
-                continue
-            count = CORRIDOR_COUNTS[mode, direction]
-            # For all items these are at the start.
-            for i in range(count):
-                item.set_inst(i, editoritems.InstCount(editoritems.FSPath(
-                    f'instances/bee2_corridor/{mode.value}/{direction.value}/corr_{i + 1}.vmf'
-                )))
-            item.offset = Vec(64, 64, 64)
-            # If vertical corridors exist, allow placement there.
-            has_vert = False
-            if export[mode, direction, Orient.UP]:
-                item.invalid_surf.discard(
-                    editoritems.Surface.FLOOR if direction is Direction.ENTRY else editoritems.Surface.CEIL
-                )
-                has_vert = True
-            if export[mode, direction, Orient.DN]:
-                item.invalid_surf.discard(
-                    editoritems.Surface.CEIL if direction is Direction.ENTRY else editoritems.Surface.FLOOR
-                )
-                has_vert = True
-            if has_vert:
-                # Add a rotation handle.
-                item.handle = editoritems.Handle.QUAD
-            # Set desired facing to make them face upright, no matter what.
-            item.facing = editoritems.DesiredFacing.UP

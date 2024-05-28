@@ -3,12 +3,14 @@ from typing import Callable, Any, Optional, Union
 import tkinter as tk
 from tkinter import ttk
 
-from app import tooltip, tk_tools, sound
+from srctools.logger import get_logger
+
+from app import sound
 from app.img import Handle as ImgHandle
-from ui_tk.img import TKImages
-from ui_tk import wid_transtoken
-from transtoken import TransToken
 from config.windows import WindowState
+from transtoken import TransToken
+from ui_tk import tk_tools, tooltip, wid_transtoken
+from ui_tk.img import TKImages
 import utils
 import config
 
@@ -21,6 +23,7 @@ style = ttk.Style()
 style.configure('Toolbar.TButton', padding='-20',)
 
 TOOL_BTN_TOOLTIP = TransToken.ui('Hide/Show the "{window}" window.')
+LOGGER = get_logger(__name__)
 
 
 def make_tool_button(
@@ -54,10 +57,10 @@ class SubPane(tk.Toplevel):
         menu_bar: tk.Menu,
         tool_col: int,
         title: TransToken,
-        resize_x: bool=False,
-        resize_y: bool=False,
-        name: str='',
-        legacy_name: str='',
+        resize_x: bool = False,
+        resize_y: bool = False,
+        name: str = '',
+        legacy_name: str = '',
     ) -> None:
         self.visible = tk.BooleanVar(parent, True)
         self.win_name = name
@@ -101,7 +104,7 @@ class SubPane(tk.Toplevel):
         self.bind('<Configure>', self.snap_win)
         self.bind('<FocusIn>', self.enable_snap)
 
-    def hide_win(self, play_snd: bool=True) -> None:
+    def hide_win(self, play_snd: bool = True) -> None:
         """Hide the window."""
         if play_snd:
             sound.fx('config')
@@ -110,7 +113,7 @@ class SubPane(tk.Toplevel):
         self.save_conf()
         self.tool_button.state(('!pressed',))
 
-    def show_win(self, play_snd: bool=True) -> None:
+    def show_win(self, play_snd: bool = True) -> None:
         """Show the window."""
         if play_snd:
             sound.fx('config')
@@ -207,25 +210,29 @@ class SubPane(tk.Toplevel):
 
     def load_conf(self) -> None:
         """Load configuration from our config file."""
+        hide = False
         try:
             state = config.APP.get_cur_conf(WindowState, self.win_name, legacy_id=self.legacy_name)
         except KeyError:
             pass  # No configured state.
         else:
+            LOGGER.error('Load: {} = {}', self.win_name, state)
             width = state.width if self.can_resize_x and state.width > 0 else self.winfo_reqwidth()
             height = state.height if self.can_resize_y and state.height > 0 else self.winfo_reqheight()
             self.deiconify()
 
             self.geometry(f'{width}x{height}')
-            self.sizefrom('user')
 
             self.relX, self.relY = state.x, state.y
 
             self.follow_main()
-            self.positionfrom('user')
             if not state.visible:
-                self.after(150, self.hide_win)
+                hide = True
 
-        # Prevent this until here, so the <config> event won't erase our
-        #  settings
-        self.can_save = True
+        def set_can_save() -> None:
+            """Only allow saving after the window has stabilised in its position."""
+            self.can_save = True
+            if hide:
+                self.hide_win(False)
+
+        self.after(150, set_can_save)

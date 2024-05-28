@@ -2,69 +2,60 @@
 General code used for tkinter portions.
 
 """
+from __future__ import annotations
+from typing import (
+    Generic, overload, cast, Any, TypeVar, Protocol, Callable, Literal, NoReturn, TypedDict
+)
+
+import trio_util
+from typing_extensions import TypeAliasType, TypeVarTuple, Unpack
+
+from enum import Enum
+from collections.abc import Awaitable, Iterable
+from tkinter import filedialog, commondialog
+from tkinter import font as _tk_font
+from tkinter import ttk
 import functools
 import inspect
-import sys
-from enum import Enum
-from typing import (
-    Awaitable, Dict, Generic, Iterable, overload, cast, Any, TypeVar, Protocol, Union, Callable,
-    Optional,
-    Tuple, Literal,
-)
-from typing_extensions import TypeAlias, TypeVarTuple, Unpack
-
-from tkinter import ttk
-from tkinter import font as _tk_font
-from tkinter import filedialog, commondialog, messagebox
-import tkinter as tk
 import os.path
+import sys
+import tkinter as tk
 
-from srctools import logger
 from idlelib.redirector import WidgetRedirector  # type: ignore[import-not-found]
+from srctools import logger
+from trio_util import AsyncValue
 import trio
 
-from app import TK_ROOT, background_run
+from app import ICO_PATH, background_run
 from config.gen_opts import GenOptions
-import event
+from transtoken import CURRENT_LANG, TransToken
 import config
 import utils
-from transtoken import TransToken
-from ui_tk.wid_transtoken import set_text
+
+from .wid_transtoken import set_text
+from . import TK_ROOT, tooltip
 
 
 LOGGER = logger.get_logger(__name__)
-ICO_PATH = str(utils.bins_path('BEE2.ico'))
 T = TypeVar('T')
+EnumT = TypeVar('EnumT', bound=Enum)
+PosArgsT = TypeVarTuple('PosArgsT')
+StrKeyT = TypeVar('StrKeyT', bound=str)
 AnyWidT = TypeVar('AnyWidT', bound=tk.Misc)
 WidgetT = TypeVar('WidgetT', bound=tk.Widget)
-EventFunc: TypeAlias = Callable[[tk.Event[AnyWidT]], object]
-EventFuncT = TypeVar('EventFuncT', bound=EventFunc[tk.Misc])
+EventFunc = TypeAliasType("EventFunc", Callable[[tk.Event[AnyWidT]], object], type_params=(AnyWidT, ))
+EventFuncT = TypeVar('EventFuncT', bound=EventFunc[tk.Widget])
 
 
 if utils.WIN:
     # Ensure everything has our icon (including dialogs)
-    TK_ROOT.wm_iconbitmap(default=ICO_PATH)
+    TK_ROOT.wm_iconbitmap(default=str(ICO_PATH))
 
-    def set_window_icon(window: Union[tk.Toplevel, tk.Tk]) -> None:
+    def set_window_icon(window: tk.Toplevel | tk.Tk) -> None:
         """Set the window icon."""
-        window.wm_iconbitmap(ICO_PATH)
-
-    import ctypes
-    # Use Windows APIs to tell the taskbar to group us as our own program,
-    # not with python.exe. Then our icon will apply, and also won't group
-    # with other scripts.
-    try:
-        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
-            'BEEMOD.application',
-        )
-    except (AttributeError, OSError, ValueError):
-        pass  # It's not too bad if it fails.
-
-    LISTBOX_BG_SEL_COLOR = '#0078D7'
-    LISTBOX_BG_COLOR = 'white'
-    LABEL_HIGHLIGHT_BG = '#5AD2D2'
+        window.wm_iconbitmap(str(ICO_PATH))
 elif utils.MAC:
-    def set_window_icon(window: Union[tk.Toplevel, tk.Tk]) -> None:
+    def set_window_icon(window: tk.Toplevel | tk.Tk) -> None:
         """ Call OS-X's specific api for setting the window icon."""
         TK_ROOT.tk.call(
             'tk::mac::iconBitmap',
@@ -72,27 +63,34 @@ elif utils.MAC:
             256,  # largest size in the .ico
             256,
             '-imageFile',
-            ICO_PATH,
+            str(ICO_PATH),
         )
 
     set_window_icon(TK_ROOT)
-
-    LISTBOX_BG_SEL_COLOR = '#C2DDFF'
-    LISTBOX_BG_COLOR = 'white'
-    LABEL_HIGHLIGHT_BG = '#5AD2D2'
 else:  # Linux
     # Get the tk image object.
     from ui_tk.img import get_app_icon
     app_icon = get_app_icon(ICO_PATH)
 
-    def set_window_icon(window: Union[tk.Toplevel, tk.Tk]) -> None:
+    def set_window_icon(window: tk.Toplevel | tk.Tk) -> None:
         """Set the window icon."""
         # Weird argument order for default=True...
         window.wm_iconphoto(True, app_icon)
 
+
+if utils.WIN:
+    LISTBOX_BG_SEL_COLOR = '#0078D7'
+    LISTBOX_BG_COLOR = 'white'
+    LABEL_HIGHLIGHT_BG = '#5AD2D2'
+elif utils.MAC:
+    LISTBOX_BG_SEL_COLOR = '#C2DDFF'
+    LISTBOX_BG_COLOR = 'white'
+    LABEL_HIGHLIGHT_BG = '#5AD2D2'
+else:  # Linux
     LISTBOX_BG_SEL_COLOR = 'blue'
     LISTBOX_BG_COLOR = 'white'
     LABEL_HIGHLIGHT_BG = '#5AD2D2'
+
 
 # Some events differ on different systems, so define them here.
 if utils.MAC:
@@ -100,7 +98,7 @@ if utils.MAC:
     KEY_SAVE = '<Command-s>'
     KEY_SAVE_AS = '<Command-Shift-s>'
 
-    # tkinter replaces Command- with the special symbol automatically.
+    # tkinter replaces `Command-*` with the special symbol automatically.
     ACCEL_EXPORT = 'Command-E'
     ACCEL_SAVE = 'Command-S'
     ACCEL_SAVE_AS = 'Command-Shift-S'
@@ -218,7 +216,7 @@ elif utils.LINUX:
 else:
     raise AssertionError
 
-_cur_update: Optional[trio.Event] = None
+_cur_update: trio.Event | None = None
 
 
 @TK_ROOT.register
@@ -242,11 +240,8 @@ async def wait_eventloop() -> None:
     await _cur_update.wait()
 
 
-PosArgsT = TypeVarTuple('PosArgsT')
-
-
 def bind_mousewheel(
-    widgets: Union[Iterable[tk.Misc], tk.Misc],
+    widgets: Iterable[tk.Misc] | tk.Misc,
     func: Callable[[int, Unpack[PosArgsT]], object],
     *args: Unpack[PosArgsT],
 ) -> None:
@@ -292,8 +287,8 @@ def bind_mousewheel(
 @overload
 def add_mousewheel(target: tk.XView, *frames: tk.Misc, orient: Literal['x']) -> None: ...
 @overload
-def add_mousewheel(target: tk.YView, *frames: tk.Misc, orient: Literal['y']='y') -> None: ...
-def add_mousewheel(target: Union[tk.XView, tk.YView], *frames: tk.Misc, orient: Literal['x', 'y']='y') -> None:
+def add_mousewheel(target: tk.YView, *frames: tk.Misc, orient: Literal['y'] = 'y') -> None: ...
+def add_mousewheel(target: tk.XView | tk.YView, *frames: tk.Misc, orient: Literal['x', 'y'] = 'y') -> None:
     """Add events so scrolling anywhere in a frame will scroll a target.
 
     frames should be the TK objects to bind to - mainly Frame or
@@ -305,10 +300,9 @@ def add_mousewheel(target: Union[tk.XView, tk.YView], *frames: tk.Misc, orient: 
     bind_mousewheel(frames, scroll_func, 'units', )
 
 
-def make_handler(func: Union[
-    Callable[[], Awaitable[object]],
-    Callable[[tk.Event[tk.Misc]], Awaitable[object]],
-]) -> Callable[[tk.Event[tk.Misc]], object]:
+def make_handler(
+    func: Callable[[], Awaitable[object]] | Callable[[tk.Event[tk.Misc]], Awaitable[object]],
+) -> Callable[[tk.Event[tk.Misc]], object]:
     """Given an asyncronous event handler, return a sync function which uses background_run().
 
     This checks the signature of the function to decide whether to pass along the event object.
@@ -326,41 +320,75 @@ def make_handler(func: Union[
     return wrapper
 
 
+class GridArgs(TypedDict, total=False):
+    """Arguments that can be passed to widget.grid(). This can be used for **kwargs."""
+    row: int
+    column: int
+    rowspan: int
+    columnspan: int
+    sticky: str
+    ipadx: float
+    ipady: float
+    padx: float | tuple[float, float]
+    pady: float | tuple[float, float]
+
+
+class PlaceArgs(TypedDict, total=False):
+    """Arguments that can be passed to widget.place(). This can be used for **kwargs."""
+    anchor: Literal["nw", "n", "ne", "w", "center", "e", "sw", "s", "se"]
+    bordermode: Literal["inside", "outside", "ignore"]
+    width: str | float
+    height: str | float
+    x: str | float
+    y: str | float
+    relheight: str | float
+    relwidth: str | float
+    relx: str | float
+    rely: str | float
+    in_: tk.Misc
+
+
 class _EventDeco(Protocol[AnyWidT]):
     def __call__(self, func: EventFunc[AnyWidT], /) -> EventFunc[AnyWidT]:
         ...
 
 
-class _Binder(Protocol):
+class _Binder(Protocol[WidgetT]):
     @overload
-    def __call__(self, wid: WidgetT, *, add: bool=False) -> _EventDeco[WidgetT]: ...  # type: ignore[overload-overlap]
+    def __call__(self, wid: WidgetT, *, add: bool = False) -> _EventDeco[WidgetT]: ...  # type: ignore[overload-overlap]
     @overload
-    def __call__(self, wid: tk.Misc, *, add: bool=False) -> _EventDeco[tk.Misc]: ...
+    def __call__(self, wid: tk.Misc, *, add: bool = False) -> _EventDeco[tk.Misc]: ...
     @overload
-    def __call__(self, wid: WidgetT, func: EventFunc[WidgetT], *, add: bool=False) -> str: ...
+    def __call__(self, wid: WidgetT, func: EventFunc[WidgetT], *, add: bool = False) -> str: ...
     @overload
-    def __call__(self, wid: tk.Misc, func: EventFunc[tk.Misc], *, add: bool=False) -> str: ...
+    def __call__(self, wid: tk.Misc, func: EventFunc[tk.Misc], *, add: bool = False) -> str: ...
 
 
-def _bind_event_handler(bind_func: Callable[[WidgetT, EventFunc[WidgetT], bool], None]) -> _Binder:
+def _bind_event_handler(bind_func: Callable[[WidgetT, EventFunc[WidgetT], bool], None]) -> _Binder[WidgetT]:
     """Decorator for the bind_click functions.
 
     This allows calling directly, or decorating a function with just wid and add
     attributes.
     """
     @functools.wraps(bind_func)
-    def deco(wid: WidgetT, func: Optional[EventFunc[WidgetT]]=None, *, add: bool=False) -> Optional[Callable[..., object]]:
+    def deco(
+        wid: WidgetT,
+        func: EventFunc[WidgetT] | None = None,
+        *, add: bool = False,
+    ) -> Callable[..., object] | None:
         """Decorator or normal interface, func is optional to be a decorator."""
         if func is None:
-            def deco_2(func2: EventFuncT) -> EventFuncT:
+            def deco_2(func2: EventFunc[WidgetT]) -> EventFunc[WidgetT]:
                 """Used as a decorator - must be called second with the function."""
                 bind_func(wid, func2, add)
                 return func2
             return deco_2
         else:
             # Normally, call directly
-            return bind_func(wid, func, add)
+            bind_func(wid, func, add)
+            return None
     return cast(_Binder, deco)
+
 
 if utils.MAC:
     # On OSX, make left-clicks switch to a right-click when control is held.
@@ -421,14 +449,14 @@ def link_checkmark(check: ttk.Checkbutton, widget: tk.Widget) -> None:
         """Check if the mouse is hovering over the label, or the checkmark."""
         # identify-element returns the component name under the specified position,
         # or an empty string if the widget isn't there.
-        return str(widget.tk.call(
+        return bool(str(widget.tk.call(
             widget, 'identify', 'element',
             event.x, event.y,
-        )) != '' or str(check.tk.call(
+        )) or str(check.tk.call(
             check, 'identify', 'element',
             event.x_root - check.winfo_rootx(),
             event.y_root - check.winfo_rooty(),
-        )) != ''
+        )))
 
     def on_press(event: tk.Event) -> None:
         """When pressed, highlight the checkmark."""
@@ -455,13 +483,26 @@ def event_cancel(*args: Any, **kwargs: Any) -> str:
     return 'break'
 
 
+async def apply_bool_enabled_state_task(value: AsyncValue[bool], *widgets: ttk.Widget) -> NoReturn:
+    """Apply an AsyncValue's state to one or more widgets.
+
+    This will make them disabled if the value is set to False.
+    """
+    async with utils.aclosing(value.eventual_values()) as agen:
+        async for cur_value in agen:
+            state = ('!disabled', ) if cur_value else ('disabled', )
+            for wid in widgets:
+                wid.state(state)
+        raise AssertionError('eventual_values() should be infinite!')
+
+
 def adjust_inside_screen(
     x: int,
     y: int,
-    win: Union[tk.Tk, tk.Toplevel],
+    win: tk.Tk | tk.Toplevel,
     horiz_bound: int = 14,
     vert_bound: int = 45,
-) -> Tuple[int, int]:
+) -> tuple[int, int]:
     """Adjust a window position to ensure it fits inside the screen.
 
     The new value is returned.
@@ -484,7 +525,7 @@ def adjust_inside_screen(
     return x, y
 
 
-def center_win(window: Union[tk.Tk, tk.Toplevel], parent: Union[tk.Tk, tk.Toplevel, None] = None) -> None:
+def center_win(window: tk.Tk | tk.Toplevel, parent: tk.Tk | tk.Toplevel | None = None) -> None:
     """Center a subwindow to be inside a parent window."""
     if parent is None:
         parent = window.nametowidget(window.winfo_parent())
@@ -497,7 +538,7 @@ def center_win(window: Union[tk.Tk, tk.Toplevel], parent: Union[tk.Tk, tk.Toplev
     window.geometry(f'+{x}+{y}')
 
 
-def center_onscreen(window: Union[tk.Tk, tk.Toplevel]) -> None:
+def center_onscreen(window: tk.Tk | tk.Toplevel) -> None:
     """Center a window onscreen."""
     x = (window.winfo_screenwidth() - window.winfo_width()) // 2
     y = (window.winfo_screenheight() - window.winfo_height()) // 2
@@ -505,42 +546,11 @@ def center_onscreen(window: Union[tk.Tk, tk.Toplevel]) -> None:
     window.geometry(f'+{x}+{y}')
 
 
-def _default_validator(value: str) -> str:
-    if not value.strip():
-        raise ValueError("A value must be provided!")
-    return value
-
-
-class _MsgBoxFunc(Generic[T]):
-    """Wrap messagebox functions that take TransToken."""
-    _DEFAULT_TITLE = TransToken.ui('BEEmod')
-
-    def __init__(self, original: Callable[..., T]) -> None:
-        self.orig = original
-
-    def __call__(
-        self,
-        title: Optional[TransToken]=None,
-        message: Optional[TransToken]=None,
-        parent: tk.Misc=TK_ROOT,
-        **options: Any,
-    ) -> T:
-        disp_title = str(title) if title is not None else str(self._DEFAULT_TITLE)
-        disp_msg = str(message) if message is not None else None
-        return self.orig(disp_title, disp_msg, parent=parent, master=TK_ROOT, **options)
-
-
-showinfo       = _MsgBoxFunc(messagebox.showinfo)
-showerror      = _MsgBoxFunc(messagebox.showerror)
-askokcancel    = _MsgBoxFunc(messagebox.askokcancel)
-askyesno       = _MsgBoxFunc(messagebox.askyesno)
-
-
 class HidingScroll(ttk.Scrollbar):
     """A scrollbar variant which auto-hides when not needed.
 
     """
-    def set(self, low: Union[float, str], high: Union[float, str]) -> None:
+    def set(self, low: float | str, high: float | str) -> None:
         """Set the size needed for the scrollbar, and hide/show if needed."""
         if float(low) <= 0.0 and float(high) >= 1.0:
             # Remove this, but remember gridding options
@@ -570,21 +580,21 @@ class ReadOnlyEntry(ttk.Entry):
 # Widget and Spinbox have conflicting identify() definitions, not important.
 class ttk_Spinbox(ttk.Widget, tk.Spinbox):  # type: ignore[misc]
     """This is missing from ttk, but still exists."""
-    def __init__(self, master: tk.Misc, range: Union[range, slice, None] = None, **kw: Any) -> None:
+    def __init__(self, master: tk.Misc, domain: range | slice | None = None, **kw: Any) -> None:
         """Initialise a spinbox.
         Arguments:
-            range: The range buttons will run in
+            domain: The range buttons will run in
             values: A list of values to use
             wrap: Whether to loop at max/min
             format: A specifier of the form ' %<pad>.<pad>f'
             command: A command to run whenever the value changes
         """
-        if range is not None:
-            kw['from'] = range.start
-            kw['to'] = range.stop
-            kw['increment'] = range.step
+        if domain is not None:
+            kw['from'] = domain.start
+            kw['to'] = domain.stop
+            kw['increment'] = domain.step
             if 'width' not in kw:
-                kw['width'] = len(str(range.stop)) + 1
+                kw['width'] = len(str(domain.stop)) + 1
 
         self.old_val = kw.get('from', '0')
         kw['validate'] = 'all'
@@ -611,6 +621,7 @@ class ttk_Spinbox(ttk.Widget, tk.Spinbox):  # type: ignore[misc]
             self.value = self.old_val
             return False
 
+
 _file_field_font = _tk_font.nametofont('TkFixedFont')  # Monospaced font
 _file_field_char_len = _file_field_font.measure('x')
 
@@ -619,7 +630,7 @@ if utils.WIN:
     filedialog.Directory.command = '::tk::dialog::file::chooseDir::'
 
 
-async def _folderbrowse_powershell() -> Optional[str]:
+async def _folderbrowse_powershell() -> str | None:
     """For Windows, the TK bindings don't work properly. Use Powershell to call this one API."""
     result = await trio.run_process(
         [
@@ -654,6 +665,7 @@ class FileField(ttk.Frame):
     """A text box which allows searching for a file or directory.
     """
     browser: commondialog.Dialog
+
     def __init__(
         self,
         master: tk.Misc,
@@ -668,7 +680,6 @@ class FileField(ttk.Frame):
         - callback is a function to be called with the new path whenever it
           changes.
         """
-        from app.tooltip import add_tooltip
 
         super().__init__(master)
 
@@ -699,7 +710,7 @@ class FileField(ttk.Frame):
         self.columnconfigure(0, weight=1)
         bind_leftclick(self.textbox, lambda e: background_run(self.browse))
         # The full location is displayed in a tooltip.
-        add_tooltip(self.textbox, TransToken.untranslated(self._location))
+        tooltip.add_tooltip(self.textbox, TransToken.untranslated(self._location))
         self.textbox.bind('<Configure>', self._text_configure)
 
         self.browse_btn = ttk.Button(
@@ -723,9 +734,11 @@ class FileField(ttk.Frame):
                 path = await _folderbrowse_powershell()
             except Exception as exc:
                 LOGGER.warning('Failed to browse for a directory:', exc_info=exc)
-                path = self.browser.show()  # Fallback to generic widget.
+                # Fallback to generic widget.
+                path = self.browser.show()  # type: ignore[no-untyped-call]
         else:
-            path = self.browser.show()
+            # show() is untyped.
+            path = self.browser.show()  # type: ignore[no-untyped-call]
 
         if path:
             self.value = path
@@ -738,7 +751,6 @@ class FileField(ttk.Frame):
     @value.setter
     def value(self, path: str) -> None:
         """Set the current path. This calls the callback function."""
-        from app import tooltip
         self.callback(path)
         self._location = path
         tooltip.set_tooltip(self.textbox, TransToken.untranslated(path))
@@ -765,64 +777,43 @@ class FileField(ttk.Frame):
         self._text_var.set(self._truncate(self._location))
 
 
-EnumT = TypeVar('EnumT')
-
-
 class EnumButton(Generic[EnumT]):
     """Provides a set of buttons for toggling between enum values.
 
-    An event is fired with the value as the arg when changed.
+    This is bound to the provided AsyncValue, updating it when changed.
     """
     frame: ttk.Frame
-    _current: EnumT
-    buttons: Dict[EnumT, ttk.Button]
-    on_changed: event.Event[EnumT]
+    buttons: dict[EnumT, ttk.Button]
+    current: AsyncValue[EnumT]
+
     def __init__(
         self,
         master: tk.Misc,
-        current: EnumT,
-        *values: Tuple[EnumT, TransToken],
+        current: AsyncValue[EnumT],
+        *values: tuple[EnumT, TransToken],
     ) -> None:
         self.frame = ttk.Frame(master)
-        self._current = current
+        self.current = current
         self.buttons = {}
-        self.on_changed = event.Event()
 
         for x, (val, label) in enumerate(values):
-            btn = ttk.Button(
-                self.frame,
-                # Make partial do the method binding.
-                command=functools.partial(EnumButton._select, self, val),
-            )
+            btn = ttk.Button(self.frame, command=utils.val_setter(current, val))
             set_text(btn, label)
             btn.grid(row=0, column=x)
             self.buttons[val] = btn
-            if val is current:
-                btn.state(['pressed'])
 
-        if current not in self.buttons:
-            raise ValueError(f'Default value {current!r} not present in {list(values)}')
+        if current.value not in self.buttons:
+            raise ValueError(f'Default value {current.value!r} not present in {list(values)}!')
 
         if len(self.buttons) != len(values):
             raise ValueError(f'No duplicates allowed, got: {list(values)}')
 
-    def _select(self, value: EnumT) -> None:
-        """Select a specific value."""
-        if value is not self._current:
-            self.buttons[self._current].state(['!pressed'])
-            self._current = value
-            self.buttons[self._current].state(['pressed'])
-            background_run(self.on_changed, value)
-
-    @property
-    def current(self) -> EnumT:
-        """Return the currently selected button."""
-        return self._current
-
-    @current.setter
-    def current(self, value: EnumT) -> None:
-        """Change the currently selected button."""
-        self._select(value)
+    async def task(self) -> None:
+        """Task which must be run to update the button state."""
+        async with utils.aclosing(self.current.eventual_values()) as agen:
+            async for chosen in agen:
+                for val, button in self.buttons.items():
+                    button.state(('pressed', ) if val is chosen else ('!pressed', ))
 
 
 class LineHeader(ttk.Frame):
@@ -844,3 +835,86 @@ class LineHeader(ttk.Frame):
         sep_right = ttk.Separator(self)
         sep_right.grid(row=0, column=2, sticky='EW')
         self.columnconfigure(2, weight=1)
+
+
+class ComboBoxMap(Generic[StrKeyT]):
+    """A Combobox which displays TransTokens, mapping them to internal IDs."""
+    _ordered_tokens: list[TransToken]
+    _index_to_key: list[StrKeyT]
+    _key_to_index: dict[StrKeyT, int]
+    current: AsyncValue[StrKeyT]
+
+    def __init__(
+        self,
+        parent: tk.Misc,
+        name: str,
+        current: AsyncValue[StrKeyT],
+        values: Iterable[tuple[StrKeyT, TransToken]],
+    ) -> None:
+        self._index_to_key = []
+        self._key_to_index = {}
+        self._ordered_tokens = []
+        self._build_values(values)
+        self.current = current
+        self.widget = ttk.Combobox(
+            parent,
+            name=name,
+            exportselection=False,
+            values=[str(tok) for tok in self._ordered_tokens],
+        )
+        self.widget.state(['readonly'])  # Prevent typing values in directly.
+        self.widget.bind('<<ComboboxSelected>>', self._evt_selected)
+        self.widget.current(self._key_to_index[current.value])
+
+    async def task(self) -> None:
+        """Task which updates the combobox when run."""
+        cur_lang = CURRENT_LANG.value
+        while True:
+            await trio_util.wait_any(
+                CURRENT_LANG.wait_transition,
+                self.current.wait_transition,
+            )
+            lang = CURRENT_LANG.value
+            if lang is not cur_lang:
+                self.widget['values'] = [str(tok) for tok in self._ordered_tokens]
+                cur_lang = lang
+            self.widget.current(self._key_to_index[self.current.value])
+
+    def _build_values(self, values: Iterable[tuple[StrKeyT, TransToken]]) -> None:
+        """Rebuild our dicts from a new set of values."""
+        self._index_to_key.clear()
+        self._key_to_index.clear()
+        self._ordered_tokens.clear()
+        for i, (key, token) in enumerate(values):
+            self._index_to_key.append(key)
+            self._key_to_index[key] = i
+            self._ordered_tokens.append(token)
+        if not self._ordered_tokens:
+            raise ValueError('Values are empty!')
+
+    def _evt_selected(self, event: tk.Event) -> None:
+        """A new value was selected."""
+        index = self.widget.current()
+        if index == -1:
+            return  # No item selected?
+        self.current.value = self._index_to_key[index]
+
+    def update(self, values: Iterable[tuple[StrKeyT, TransToken]]) -> None:
+        """Change the set of values displayed in the box.
+
+        If the old value is not present, the first is selected.
+        """
+        self._build_values(values)
+        self.widget['values'] = [str(tok) for tok in self._ordered_tokens]
+        try:
+            self.widget.current(self._key_to_index[self.current.value])
+        except IndexError:
+            self.widget.current(0)
+
+    def grid(self, **kwargs: Unpack[GridArgs]) -> None:
+        """Grid-manage the combobox widget."""
+        self.widget.grid(**kwargs)
+
+    def grid_remove(self) -> None:
+        """Remove the combobox from view, remembering previous options."""
+        self.widget.grid_remove()

@@ -3,18 +3,18 @@
 The widgets tokens are applied to are stored, so changing language can update the UI.
 """
 from __future__ import annotations
-
-import string
-from typing import (
-    Any, AsyncIterator, Callable, Iterable, Iterator, List, TypeVar, TYPE_CHECKING,
-)
+from typing import Any, Callable, TypeVar, TYPE_CHECKING
 from typing_extensions import ParamSpec, override
+
+from collections.abc import AsyncGenerator, Iterable, Iterator
 from collections import defaultdict
+import weakref
+import datetime
+import functools
 import io
 import itertools
 import os.path
-import functools
-import datetime
+import string
 
 from pathlib import Path
 import gettext as gettext_mod
@@ -52,7 +52,7 @@ if TYPE_CHECKING:
 
 __all__ = [
     'TransToken',
-    'add_callback',
+    'add_callback', 'gradual_iter',
     'DUMMY', 'Language', 'set_language', 'load_aux_langs',
     'setup', 'expand_langcode',
     'TransTokenSource', 'rebuild_app_langs', 'rebuild_package_langs',
@@ -64,6 +64,8 @@ P = ParamSpec('P')
 # Location of basemodui, relative to Portal 2
 BASEMODUI_PATH = 'portal2_dlc2/resource/basemodui_{}.txt'
 
+K = TypeVar('K')
+V = TypeVar('V')
 CBackT = TypeVar('CBackT', bound=Callable[[], object])
 # For anything else, this is called which will apply tokens.
 _langchange_callback: list[Callable[[], object]] = []
@@ -163,7 +165,7 @@ def _get_locale(lang_code: str) -> babel.Locale:
         return babel.Locale.parse('en_US')  # Should exist?
 
 
-def _format_list(lang_code: str, list_kind: transtoken.ListStyle, items: List[str]) -> str:
+def _format_list(lang_code: str, list_kind: transtoken.ListStyle, items: list[str]) -> str:
     """Formate a list according to the locale."""
     return format_list(items, list_kind.value, _get_locale(lang_code))
 
@@ -172,11 +174,33 @@ transtoken.ui_format_getter = UIFormatter
 transtoken.ui_list_getter = _format_list
 
 
+async def gradual_iter(wdict: weakref.WeakKeyDictionary[K, V]) -> AsyncGenerator[tuple[K, V], None]:
+    """Iterate gradually over the provided weak-key dictionary.
+
+    When doing an update, there's a lot of widgets to process. To avoid locking the
+    main thread for that whole time, just collect the refs first to freeze the iteration,
+    then re-lookup each to confirm it's still present.
+
+    Any added after we start would have been set to the new language.
+    """
+    for ref in wdict.keyrefs():
+        await trio.lowlevel.checkpoint()
+        key = ref()
+        if key is None:
+            continue  # It was destroyed in the meantime.
+        try:
+            value = wdict[key]
+        except KeyError:
+            continue  # Was cleared in the meantime.
+        yield key, value
+
+
 def add_callback(*, call: bool) -> Callable[[CBackT], CBackT]:
     """Register a function which is called after translations are reloaded.
 
     This should be used to re-apply tokens in complicated situations after languages change.
     If call is true, the function will immediately be called to apply it now.
+    TODO: Remove usage of this, use CURRENT_LANG.wait_transition() instead.
     """
     def deco(func: CBackT) -> CBackT:
         """Register when called as a decorator."""
@@ -206,11 +230,11 @@ def get_lang_name(lang: Language) -> str:
         # Fake langauge code for debugging, no need to translate.
         return '<DUMMY>'
 
-    if transtoken.CURRENT_LANG is DUMMY:
+    if transtoken.CURRENT_LANG.value is DUMMY:
         # Use english in lang code mode.
         cur_lang = 'en_au'
     else:
-        cur_lang = transtoken.CURRENT_LANG.lang_code
+        cur_lang = transtoken.CURRENT_LANG.value.lang_code
 
     targ_langs = expand_langcode(lang.lang_code)
     cur_langs = expand_langcode(cur_lang)
@@ -383,10 +407,10 @@ def get_languages() -> Iterator[Language]:
 def set_language(lang: Language) -> None:
     """Change the app's language."""
     PARSE_CANCEL.cancel()
-    transtoken.CURRENT_LANG = lang
 
     conf = config.APP.get_cur_conf(GenOptions)
     config.APP.store_conf(attrs.evolve(conf, language=lang.lang_code))
+    transtoken.CURRENT_LANG.value = lang
 
     # Reload all our localisations.
     for func in _langchange_callback:
@@ -430,7 +454,7 @@ async def load_aux_langs(
     PARSE_CANCEL.cancel()  # Stop any other in progress loads.
 
     if lang is None:
-        lang = transtoken.CURRENT_LANG
+        lang = transtoken.CURRENT_LANG.value
 
     if lang is DUMMY:
         # Dummy does not need to load these files.
@@ -494,7 +518,7 @@ async def load_aux_langs(
     set_language(attrs.evolve(lang, trans=lang_map, game_trans=game_dict))
 
 
-async def get_package_tokens(packset: packages.PackagesSet) -> AsyncIterator[TransTokenSource]:
+async def get_package_tokens(packset: packages.PackagesSet) -> AsyncGenerator[TransTokenSource, None]:
     """Get all the tokens from all packages."""
     for pack in packset.packages.values():
         yield pack.disp_name, 'package/name'
@@ -530,27 +554,29 @@ async def rebuild_package_langs(packset: packages.PackagesSet) -> None:
             )
 
     LOGGER.info('Collecting translations...')
-    async for orig_tok, source in get_package_tokens(packset):
-        for tok in _get_children(orig_tok):
-            if not tok:
-                continue  # Ignore blank tokens, not important to translate.
-            try:
-                pack_path, catalog = pack_paths[tok.namespace.casefold()]
-            except KeyError:
-                continue
-            # Line number is just zero - we don't know which lines these originated from.
-            if tok.namespace.casefold() != tok.orig_pack.casefold():
-                # Originated from a different package, include that.
-                loc = [(f'{tok.orig_pack}:{source}', 0)]
-            else:  # Omit, most of the time.
-                loc = [(source, 0)]
+    async with utils.aclosing(get_package_tokens(packset)) as agen:
+        async for orig_tok, source in agen:
+            for tok in _get_children(orig_tok):
+                if not tok:
+                    continue  # Ignore blank tokens, not important to translate.
+                await trio.lowlevel.checkpoint()
+                try:
+                    pack_path, catalog = pack_paths[tok.namespace.casefold()]
+                except KeyError:
+                    continue
+                # Line number is just zero - we don't know which lines these originated from.
+                if tok.namespace.casefold() != tok.orig_pack.casefold():
+                    # Originated from a different package, include that.
+                    loc = [(f'{tok.orig_pack}:{source}', 0)]
+                else:  # Omit, most of the time.
+                    loc = [(source, 0)]
 
-            if isinstance(tok, PluralTransToken):
-                catalog.add((tok.token, tok.token_plural), locations=loc)
-                tok2pack[tok.token, tok.token_plural].add(tok.namespace)
-            else:
-                catalog.add(tok.token, locations=loc)
-                tok2pack[tok.token].add(tok.namespace)
+                if isinstance(tok, PluralTransToken):
+                    catalog.add((tok.token, tok.token_plural), locations=loc)
+                    tok2pack[tok.token, tok.token_plural].add(tok.namespace)
+                else:
+                    catalog.add(tok.token, locations=loc)
+                    tok2pack[tok.token].add(tok.namespace)
 
     for pak_id, (pack_path, catalog) in pack_paths.items():
         LOGGER.info('Exporting translations for {}...', pak_id.upper())

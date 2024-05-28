@@ -1,16 +1,16 @@
 from __future__ import annotations
-from typing import Awaitable, Callable
 from tkinter import messagebox, ttk
 import tkinter as tk
 
 import trio
 
-from app import TK_ROOT, background_run, img, sound
-from app.dragdrop import DragInfo, Slot
-from event import Event
+from app import background_run, img, sound
+from app.dragdrop import DragInfo
+from app.errors import ErrorUI
 from transtoken import TransToken
 from ui_tk.dragdrop import DragDrop
 from ui_tk.img import TK_IMG
+from ui_tk import TK_ROOT
 import app
 import BEE2_config
 import config
@@ -21,15 +21,15 @@ import utils
 async def test() -> None:
     """Test the GUI."""
     BEE2_config.GEN_OPTS.load()
-    config.APP.read_file()
+    config.APP.read_file(config.APP_LOC)
 
     # Setup images to read from packages.
     print('Loading packages for images...')
-    async with trio.open_nursery() as pack_nursery:
+    async with ErrorUI() as errors, trio.open_nursery() as pack_nursery:
         for loc in BEE2_config.get_package_locs():
             pack_nursery.start_soon(
                 packages.find_packages,
-                pack_nursery,
+                errors,
                 packages.get_loaded_packages(),
                 loc,
             )
@@ -53,7 +53,7 @@ async def test() -> None:
 
     def demo_item(
         name: str,
-        pak_id: str,
+        pak_id: utils.ObjectID,
         icon: str,
         group: str | None = None,
         group_icon: str | None = None,
@@ -79,29 +79,8 @@ async def test() -> None:
         config_icon=True,
     )
 
-    def func(ev: str) -> Callable[[Slot[str] | None], Awaitable[object]]:
-        """Ensure each callback is bound in a different scope."""
-        async def call(slot: Slot[str] | None) -> None:
-            """Just display when any event is triggered."""
-            print('Cback: ', ev, slot)
-        return call
-
-    @manager.on_modified.register
-    async def on_modified() -> None:
-        """Just display when any event is triggered."""
-        print('On modified')
-
-    @manager.on_flexi_flow.register
-    async def on_flexi_flow() -> None:
-        """Just display when any event is triggered."""
-        print('On Flexi Flow')
-
-    for evt in ['config', 'redropped', 'hover_enter', 'hover_exit']:
-        event: Event[Slot[str]] | Event[None] = getattr(manager, 'on_' + evt)
-        event.register(func(evt))
-
-    PAK_CLEAN = 'BEE2_CLEAN_STYLE'
-    PAK_ELEM = 'VALVE_TEST_ELEM'
+    PAK_CLEAN = utils.obj_id('BEE2_CLEAN_STYLE')
+    PAK_ELEM = utils.obj_id('VALVE_TEST_ELEM')
     items = [
         demo_item('Dropper', PAK_CLEAN, 'dropper'),
         demo_item('Entry', PAK_CLEAN, 'entry_door'),
@@ -170,22 +149,39 @@ async def test() -> None:
     name_lbl = ttk.Label(TK_ROOT, text='')
     name_lbl.grid(row=3, column=0)
 
-    @manager.on_hover_enter.register
-    async def evt_enter(evt_slot: Slot[str]) -> None:
-        if evt_slot.contents is not None:
-            name_lbl['text'] = 'Name: ' + evt_slot.contents
+    async def handle_modified() -> None:
+        """Just display when any event is triggered."""
+        async for _ in manager.on_modified.events():
+            print('On modified')
 
-    @manager.on_hover_exit.register
-    async def evt_exit(evt_slot: Slot[str]) -> None:
-        name_lbl['text'] = ''
+    async def handle_flexi_flow() -> None:
+        """Just display when any event is triggered."""
+        async for _ in manager.on_flexi_flow.events():
+            print('On Flexi Flow')
 
-    @manager.on_config.register
-    async def evt_config(evt_slot: Slot[str]) -> None:
-        messagebox.showinfo('Hello World', evt_slot.contents)
+    async def update_hover_text() -> None:
+        """Update the hovered text."""
+        async with utils.aclosing(manager.hovered_item.eventual_values()) as agen:
+            async for item in agen:
+                if item is not None:
+                    name_lbl['text'] = 'Name: ' + item
+                else:
+                    name_lbl['text'] = ''
+
+    async def handle_config() -> None:
+        """Respond to items being right-clicked."""
+        while True:
+            slot = await manager.on_config.wait()
+            messagebox.showinfo('Hello World', slot.contents)
 
     manager.load_icons()
 
-    TK_ROOT.deiconify()
     with trio.CancelScope() as scope:
-        TK_ROOT.wm_protocol('WM_DELETE_WINDOW', scope.cancel)
-        await trio.sleep_forever()
+        async with trio.open_nursery() as nursery:
+            nursery.start_soon(update_hover_text)
+            nursery.start_soon(handle_config)
+            nursery.start_soon(handle_modified)
+            nursery.start_soon(handle_flexi_flow)
+            TK_ROOT.wm_protocol('WM_DELETE_WINDOW', scope.cancel)
+            TK_ROOT.deiconify()
+            await trio.sleep_forever()

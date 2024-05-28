@@ -4,10 +4,11 @@ from typing import Iterable, Tuple
 from pathlib import Path
 import math
 
-from srctools import VMF, Angle, Keyvalues, Matrix, Solid, Vec
+from pytest_regressions.file_regression import FileRegressionFixture
+from srctools import UVAxis, VMF, Angle, Keyvalues, Matrix, Solid, Vec
 import pytest
 
-from collisions import BBox, CollideType
+from collisions import BBox, CollideType, Volume
 
 
 tuple3 = Tuple[int, int, int]
@@ -232,7 +233,7 @@ def test_bbox_intersection(
 
     We parameterise by swapping all the axes, and offsetting so that it's in all the quadrants.
     """
-    bbox1 = BBox(x-64, y-64, z-64, x+64, y+64, z+64, contents=CollideType.EVERYTHING)
+    bbox1 = BBox(x - 64, y - 64, z - 64, x + 64, y + 64, z + 64, contents=CollideType.EVERYTHING)
     bbox2 = BBox(reorder(mins, axes, x, y, z), reorder(maxs, axes, x, y, z), contents=CollideType.EVERYTHING)
     result = bbox1.intersect(bbox2)
     # assert result == bbox2.intersect(bbox1)  # Check order is irrelevant.
@@ -240,7 +241,11 @@ def test_bbox_intersection(
         assert result is None
     else:
         exp_a, exp_b = success
-        expected = BBox(reorder(exp_a, axes, x, y, z), reorder(exp_b, axes, x, y, z), contents=CollideType.EVERYTHING)
+        expected = BBox(
+            reorder(exp_a, axes, x, y, z),
+            reorder(exp_b, axes, x, y, z),
+            contents=CollideType.EVERYTHING,
+        )
         assert result == expected
 
 
@@ -307,7 +312,7 @@ def test_bbox_parse_block() -> None:
     )
     ent.solids.append(vmf.make_prism(Vec(80, 10, 40), Vec(150, 220, 70)).solid)
     ent.solids.append(vmf.make_prism(Vec(-30, 45, 80), Vec(-20, 60, 120)).solid)
-    bb2, bb1 =  BBox.from_ent(ent)
+    bb2, bb1 = BBox.from_ent(ent)
     # Allow it to produce in either order.
     if bb1.min_x == -30:
         bb1, bb2 = bb2, bb1
@@ -326,12 +331,12 @@ def test_bbox_parse_block() -> None:
 
 
 @pytest.mark.parametrize('axis, mins, maxes', [
-    ('west',   (80, 10, 40),  (80, 220, 70)),   # -X
-    ('east',   (150, 10, 40), (150, 220, 70)),  # +X
-    ('south',  (80, 10, 40),  (150, 10, 70)),   # -Y
-    ('north',  (80, 220, 40), (150, 220, 70)),  # +Y
-    ('bottom', (80, 10, 40),  (150, 220, 40)),  # -Z
-    ('top',    (80, 10, 70),  (150, 220, 70)),  # +Z
+    ('west',   ( 80, 10,  40), ( 80, 220, 70)),   # -X
+    ('east',   (150, 10,  40), (150, 220, 70)),  # +X
+    ('south',  ( 80, 10,  40), (150,  10, 70)),   # -Y
+    ('north',  ( 80, 220, 40), (150, 220, 70)),  # +Y
+    ('bottom', ( 80, 10,  40), (150, 220, 40)),  # -Z
+    ('top',    ( 80, 10,  70), (150, 220, 70)),  # +Z
 ], ids=['-x', '+x', '-y', '+y', '-z', '+z'])
 def test_bbox_parse_plane(axis: str, mins: tuple3, maxes: tuple3) -> None:
     """Test parsing planar bboxes from a VMF.
@@ -345,3 +350,40 @@ def test_bbox_parse_plane(axis: str, mins: tuple3, maxes: tuple3) -> None:
     ent.solids.append(prism.solid)
     [bbox] = BBox.from_ent(ent)
     assert_bbox(bbox, mins, maxes, CollideType.SOLID, set())
+
+
+def test_volume_rotation(file_regression: FileRegressionFixture) -> None:
+    """Test rotating bboxes."""
+    with Path(__file__, '../volume_sample.vmf').open() as f:
+        vmf = VMF.parse(Keyvalues.parse(f))
+
+    volumes = [
+        volume
+        for ent in vmf.entities
+        for volume in Volume.from_ent(ent)
+    ]
+    for yaw in range(30, 360, 30):
+        orient = Matrix.from_angle(15.0 if (yaw % 60) == 0 else -15.0, yaw, 0.0)
+        for volume in volumes:
+            vmf.add_ent((volume @ orient).as_ent(vmf))
+
+    # Go through and round everything so we ignore slight inaccuracies.
+    for ent in vmf.entities:
+        for side in ent.sides():
+            side.planes = [round(vec + 0.0, 6) for vec in side.planes]
+            side.uaxis = UVAxis(
+                round(side.uaxis.x + 0.0, 6),
+                round(side.uaxis.y + 0.0, 6),
+                round(side.uaxis.z + 0.0, 6),
+                round(side.uaxis.offset),
+                side.uaxis.scale,
+            )
+            side.vaxis = UVAxis(
+                round(side.vaxis.x + 0.0, 6),
+                round(side.vaxis.y + 0.0, 6),
+                round(side.vaxis.z + 0.0, 6),
+                round(side.vaxis.offset),
+                side.vaxis.scale,
+            )
+
+    file_regression.check(vmf.export(), extension='.vmf', binary=False)

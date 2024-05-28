@@ -1,10 +1,12 @@
 import math
 
-from precomp import instanceLocs, connections, conditions, options, faithplate, voice_line
+from precomp import instanceLocs, connections, conditions, options, faithplate
 from srctools import Matrix, Keyvalues, Vec, Entity, VMF, Output, Angle
 import srctools.logger
 
-from typing import List, NamedTuple, Literal
+from typing import List, NamedTuple, Literal, Optional
+
+from quote_pack import QuoteInfo
 
 
 COND_MOD_NAME = 'Monitors'
@@ -27,23 +29,23 @@ HAS_MONITOR: bool = False
 MONITOR_RELATIONSHIP_ENTS: List[Entity] = []
 
 
-def get_studio_pose() -> Vec:
+def get_studio_pose(voice: QuoteInfo) -> Vec:
     """Return the position of the studio camera."""
-    return voice_line.get_studio_loc() + options.get(Vec, 'voice_studio_cam_loc')
+    return voice.position + options.VOICE_STUDIO_CAM_LOC()
 
 
 def scriptvar_set(
     targ: Entity,
     pos: Vec,
     varname: str,
-    value: object='',
+    value: object = '',
     *,
     mode: Literal[
         'const', 'string', 'bool', 'inv_bool', 'name', 'handle', 'keyvalue',
         'pos', 'ang', 'off', 'dist', 'x', 'y', 'z', 'pos_x', 'pos_y', 'pos_z',
-    ]='const',
-    index: int=None,
-    angles: object='0 0 0',
+    ] = 'const',
+    index: Optional[int] = None,
+    angles: object = '0 0 0',
 ) -> None:
     """Add in a comp_scriptvar_setter entity."""
     if index is not None:
@@ -59,7 +61,7 @@ def scriptvar_set(
     )
 
 
-@conditions.make_result('Monitor')
+@conditions.make_result('Monitor', valid_before=conditions.MetaCond.MonCameraLink)
 def res_monitor(info: conditions.MapInfo, res: Keyvalues) -> conditions.ResultCallable:
     """Result for the monitor component.
 
@@ -83,7 +85,7 @@ def res_monitor(info: conditions.MapInfo, res: Keyvalues) -> conditions.ResultCa
         has_laser = info.has_attr('laser')
         # Allow turrets if the monitor is setup to allow it, and the actor should
         # be shot.
-        needs_turret = conf_bullseye_name and options.get(bool, 'voice_studio_should_shoot')
+        needs_turret = conf_bullseye_name and options.VOICE_STUDIO_SHOULD_SHOOT()
 
         inst.fixup['$is_breakable'] = has_laser or needs_turret
 
@@ -117,7 +119,7 @@ def res_monitor(info: conditions.MapInfo, res: Keyvalues) -> conditions.ResultCa
     return add_monitor
 
 
-@conditions.make_result('Camera')
+@conditions.make_result('Camera', valid_before=conditions.MetaCond.MonCameraLink)
 def res_camera(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
     """Result for the camera item.
 
@@ -167,12 +169,12 @@ def res_camera(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
 
         # Remove the triggers.
         plate.trig.remove()
-
         if isinstance(plate, faithplate.StraightPlate):
+            plate.helper_trig.remove()
+
+        if plate.target is None:
             # Just point straight ahead.
             target_loc = base_loc + 512 * normal
-            # And remove the helper.
-            plate.helper_trig.remove()
         else:
             if isinstance(plate.target, Vec):
                 target_loc = plate.target
@@ -216,8 +218,8 @@ def res_camera(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
     return add_camera
 
 
-@conditions.meta_cond(priority=-275)
-def mon_camera_link(vmf: VMF) -> None:
+@conditions.MetaCond.MonCameraLink.register
+def mon_camera_link(vmf: VMF, voice: QuoteInfo) -> None:
     """Link cameras to monitors."""
     import vbsp
 
@@ -262,12 +264,12 @@ def mon_camera_link(vmf: VMF) -> None:
             break
     else:
         # No cameras start active, we need to be positioned elsewhere.
-        if options.get(str, 'voice_studio_inst'):
+        if options.VOICE_STUDIO_INST():
             # Start at the studio, if it exists.
-            start_pos = get_studio_pose()
+            start_pos = get_studio_pose(voice)
             start_angles = Angle(
-                options.get(float, 'voice_studio_cam_pitch'),
-                options.get(float, 'voice_studio_cam_yaw'),
+                options.VOICE_STUDIO_CAM_PITCH(),
+                options.VOICE_STUDIO_CAM_YAW(),
             )
             # If we start at the studio, make the ai_relationships
             # for turret fire start active.
@@ -338,18 +340,18 @@ def mon_camera_link(vmf: VMF) -> None:
             value=active,
         )
 
-    if options.get(str, 'voice_studio_inst'):
+    if options.VOICE_STUDIO_INST():
         # We have a voice studio, send values to the script.
-        scriptvar_set(cam_ent, get_studio_pose(), 'CAM_STUDIO_LOC', mode='pos')
+        scriptvar_set(cam_ent, get_studio_pose(voice), 'CAM_STUDIO_LOC', mode='pos')
         scriptvar_set(
-            cam_ent, get_studio_pose(), 'CAM_STUDIO_ANG', mode='ang',
-            angles='{:g} {:g} 0'.format(
-                options.get(float, 'voice_studio_cam_pitch'),
-                options.get(float, 'voice_studio_cam_yaw'),
+            cam_ent, get_studio_pose(voice), 'CAM_STUDIO_ANG', mode='ang',
+            angles=Angle(
+                options.VOICE_STUDIO_CAM_PITCH(),
+                options.VOICE_STUDIO_CAM_YAW(),
             ),
         )
         use_turret = '1' if MONITOR_RELATIONSHIP_ENTS else '0'
-        swap_chance = options.get(float, 'voice_studio_inter_chance')
+        swap_chance = options.VOICE_STUDIO_INTER_CHANCE()
     else:
         use_turret = '0'
         swap_chance = -1
@@ -358,14 +360,14 @@ def mon_camera_link(vmf: VMF) -> None:
     scriptvar_set(cam_ent, start_pos + (0, 0, 16), 'CAM_STUDIO_CHANCE', swap_chance)
 
 
-def make_voice_studio(vmf: VMF) -> bool:
+def make_voice_studio(vmf: VMF, voice: QuoteInfo) -> bool:
     """Create the voice-line studio.
 
     This is either an instance (if monitors are present), or a nodraw room.
     """
 
-    studio_file = options.get(str, 'voice_studio_inst')
-    loc = voice_line.get_studio_loc()
+    studio_file = options.VOICE_STUDIO_INST()
+    loc = voice.position
 
     if HAS_MONITOR and studio_file:
         conditions.add_inst(

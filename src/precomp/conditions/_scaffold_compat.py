@@ -1,5 +1,6 @@
 """Original result used to generate unstationary scaffolds, kept for backwards compatibility."""
-from decimal import Decimal
+from __future__ import annotations
+
 from typing import Dict, List, Tuple, Optional, Any, Union
 from enum import Enum
 import math
@@ -17,13 +18,13 @@ class LinkType(Enum):
     END = 'end'
 
 
-COND_MOD_NAME = None
+COND_MOD_NAME: str | None = None
 
 LOGGER = srctools.logger.get_logger(__name__, alias='cond._scaffold_compat')
 
 
 def get_config(
-    node: item_chain.Node,
+    node: item_chain.Node[Dict[str, Any]],
 ) -> Tuple[str, Vec]:
     """Compute the config values for a node."""
 
@@ -62,7 +63,7 @@ SCAFFOLD_CONFIGS: Dict[str, Tuple[
 ]] = {}
 
 
-@conditions.make_result('UnstScaffold')
+@conditions.make_result('UnstScaffold', valid_before=conditions.MetaCond.ScaffoldLinkOld)
 def res_old_unst_scaffold(res: Keyvalues) -> None:
     """The pre-2.4.40 version of the condition used to generate Unstationary Scaffolds.
 
@@ -131,7 +132,7 @@ def res_old_unst_scaffold(res: Keyvalues) -> None:
     )
 
 
-@conditions.meta_cond(priority=Decimal('-250.0001'))
+@conditions.MetaCond.ScaffoldLinkOld.register
 def legacy_scaffold_link(vmf: VMF) -> None:
     """Apply the legacy scaffold logic."""
     if not SCAFFOLD_CONFIGS:

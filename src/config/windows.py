@@ -1,5 +1,6 @@
 from __future__ import annotations
-from typing import Dict, Mapping
+from typing_extensions import override
+from collections.abc import Mapping
 
 from srctools import Keyvalues, bool_as_int, conv_bool, logger
 from srctools.dmx import Attribute, Element, ValueType, Vec2
@@ -23,7 +24,8 @@ class WindowState(config.Data, conf_name='PaneState', uses_id=True):
     visible: bool = True
 
     @classmethod
-    def parse_legacy(cls, conf: Keyvalues) -> Dict[str, WindowState]:
+    @override
+    def parse_legacy(cls, conf: Keyvalues) -> dict[str, WindowState]:
         """Convert old GEN_OPTS configuration."""
         opt_block = LEGACY_CONF['win_state']
         names: set[str] = set()
@@ -45,6 +47,7 @@ class WindowState(config.Data, conf_name='PaneState', uses_id=True):
         }
 
     @classmethod
+    @override
     def parse_kv1(cls, data: Keyvalues, version: int) -> WindowState:
         """Parse keyvalues1 data."""
         assert version == 1, version
@@ -56,6 +59,7 @@ class WindowState(config.Data, conf_name='PaneState', uses_id=True):
             data.bool('visible', True),
         )
 
+    @override
     def export_kv1(self) -> Keyvalues:
         """Create keyvalues1 data."""
         kv = Keyvalues('WindowState', [
@@ -70,6 +74,7 @@ class WindowState(config.Data, conf_name='PaneState', uses_id=True):
         return kv
 
     @classmethod
+    @override
     def parse_dmx(cls, data: Element, version: int) -> WindowState:
         """Parse DMX configuation."""
         assert version == 1, version
@@ -82,6 +87,7 @@ class WindowState(config.Data, conf_name='PaneState', uses_id=True):
             visible=data['visible'].val_bool if 'visible' in data else True,
         )
 
+    @override
     def export_dmx(self) -> Element:
         """Create DMX configuation."""
         elem = Element('', '')
@@ -103,6 +109,7 @@ class SelectorState(config.Data, conf_name='SelectorWindow', uses_id=True):
     height: int = 0
 
     @classmethod
+    @override
     def parse_legacy(cls, conf: Keyvalues) -> dict[str, SelectorState]:
         """Convert the old legacy configuration."""
         result: dict[str, SelectorState] = {}
@@ -111,6 +118,7 @@ class SelectorState(config.Data, conf_name='SelectorWindow', uses_id=True):
         return result
 
     @classmethod
+    @override
     def parse_kv1(cls, data: Keyvalues, version: int) -> SelectorState:
         """Parse from keyvalues."""
         assert version == 1
@@ -123,6 +131,7 @@ class SelectorState(config.Data, conf_name='SelectorWindow', uses_id=True):
             data.int('width', -1), data.int('height', -1),
         )
 
+    @override
     def export_kv1(self) -> Keyvalues:
         """Generate keyvalues."""
         kv = Keyvalues('SelectorWindow', [])
@@ -135,10 +144,11 @@ class SelectorState(config.Data, conf_name='SelectorWindow', uses_id=True):
         return kv
 
     @classmethod
+    @override
     def parse_dmx(cls, data: Element, version: int) -> SelectorState:
         """Parse DMX elements."""
         assert version == 1
-        open_groups: Dict[str, bool] = {}
+        open_groups: dict[str, bool] = {}
         for name in data['closed'].iter_str():
             open_groups[name.casefold()] = False
         for name in data['opened'].iter_str():
@@ -146,6 +156,7 @@ class SelectorState(config.Data, conf_name='SelectorWindow', uses_id=True):
 
         return cls(open_groups, data['width'].val_int, data['height'].val_int)
 
+    @override
     def export_dmx(self) -> Element:
         """Serialise the state as a DMX element."""
         elem = Element('WindowState', 'DMElement')

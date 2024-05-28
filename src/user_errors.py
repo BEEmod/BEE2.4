@@ -3,10 +3,10 @@
 UserError is imported all over, so this needs to have minimal imports to avoid cycles.
 """
 from typing import (
-    ClassVar, Collection, Dict, Iterable, List, Literal, Optional, Tuple,
+    ClassVar, Collection, Dict, Iterable, List, Literal, Optional, Set, Tuple,
     TypedDict, Union,
 )
-from typing_extensions import TypeAlias
+from typing_extensions import TypeAliasType
 from pathlib import Path
 
 from srctools import FrozenVec, Vec, logger
@@ -16,22 +16,37 @@ from transtoken import TransToken
 import utils
 
 
-Kind: TypeAlias = Literal["white", "black", "goo", "goopartial", "goofull", "back", "glass", "grating"]
-TuplePos: TypeAlias = Tuple[float, float, float]
+Kind = TypeAliasType("Kind", Literal[
+    "white", "black",
+    "goo", "goopartial", "goofull",
+    "back", "glass", "grating",
+])
+TuplePos = TypeAliasType("TuplePos", Tuple[float, float, float])
+# Textures for displaying barrier items.
+BARRIER_TEX_SET: Set[Kind] = {"glass", "grating", "white", "black"}
+TEX_SET: Set[Kind] = {
+    "white", "black",
+    "glass", "grating",
+    "goo", "goopartial", "goofull",
+    "back",
+}
 
 
 class SimpleTile(TypedDict):
     """A super simplified version of tiledef data for the error window. This can be converted right to JSON."""
     position: TuplePos
     orient: Literal["n", "s", "e", "w", "u", "d"]
+    width: float
+    height: float
 
 
 class BarrierHole(TypedDict):
     """Information for improperly placed glass/grating hole items."""
     pos: TuplePos
-    axis: Literal["x", "y", "z"]
-    large: bool
-    small: bool
+    pitch: float
+    yaw: float
+    roll: float
+    shape: str
     footprint: bool
 
 
@@ -52,7 +67,13 @@ class ErrorInfo:
     # A list of point pairs which get lines drawn.
     lines: List[Tuple[TuplePos, TuplePos]] = attrs.Factory(list)
     # If a glass/grating hole is misplaced, show its location.
-    barrier_hole: Optional[BarrierHole] = None
+    barrier_holes: List[BarrierHole] = attrs.Factory(list)
+
+
+@attrs.frozen(eq=False)
+class PackageTranslations:
+    """The already-translated tokens for each package, for use in the server."""
+    translations: List[Tuple[str, Dict[str, str]]]
 
 
 class ServerInfo(TypedDict):
@@ -81,19 +102,19 @@ class UserError(BaseException):
     This will result in the compile switching to compile a map which displays
     a HTML page to the user via the Steam Overlay.
     """
-    _simple_tiles: ClassVar[Dict[Kind, List[SimpleTile]]] = {}
+    simple_tiles: ClassVar[Dict[Kind, List[SimpleTile]]] = {kind: [] for kind in TEX_SET}
 
     def __init__(
         self,
         message: TransToken,
         *,
-        docsurl: str='',
-        voxels: Iterable[Union[Vec, FrozenVec]]=(),
-        points: Iterable[Union[Vec, FrozenVec]]=(),
-        textlist: Collection[str]=(),
-        leakpoints: Collection[Union[Vec, FrozenVec]]=(),
-        lines: Iterable[Tuple[Union[Vec, FrozenVec], Union[Vec, FrozenVec]]]=(),
-        barrier_hole: Optional[BarrierHole]=None,
+        docsurl: str = '',
+        voxels: Iterable[Union[Vec, FrozenVec]] = (),
+        points: Iterable[Union[Vec, FrozenVec]] = (),
+        textlist: Collection[str] = (),
+        leakpoints: Collection[Union[Vec, FrozenVec]] = (),
+        lines: Iterable[Tuple[Union[Vec, FrozenVec], Union[Vec, FrozenVec]]] = (),
+        barrier_holes: Collection[BarrierHole] = (),
     ) -> None:
         """Specify the info to show to the user.
 
@@ -106,7 +127,7 @@ class UserError(BaseException):
         :param textlist: If specified, adds the specified strings as a bulleted list.
         :param leakpoints: Specifies pointfile locations to display a leak.
         :param lines: A list of point pairs which get lines drawn.
-        :param barrier_hole: If set, an errored glass/grating hole to place.
+        :param barrier_holes: Errored glass/grating holes to show.
         """
         if utils.DEV_MODE:
             try:
@@ -140,12 +161,12 @@ class UserError(BaseException):
             message=message,
             language_file=None,
             context=ctx,
-            faces=self._simple_tiles,
+            faces=self.simple_tiles,
             voxels=list(map(to_threespace, voxels)),
             points=list(map(to_threespace, points)),
             leakpoints=list(map(to_threespace, leakpoints)),
             lines=[(to_threespace(a), to_threespace(b)) for a, b in lines],
-            barrier_hole=barrier_hole,
+            barrier_holes=list(barrier_holes),
         )
 
     def __str__(self) -> str:
@@ -176,6 +197,9 @@ TOK_UNKNOWN_ID = TransToken.ui('Unknown {kind} ID "<var>{id}</var>".')
 TOK_WRONG_ITEM_TYPE = TransToken.ui(
     'The item "<var>{item}</var>" is not a {kind}!<br>Instance: <code>{inst}</code>'
 )
+TOK_NO_CONNECTION_ITEM = TransToken.ui(
+    'The instance "<var>{inst}</var>" does not have any connection information defined!'
+)
 
 TOK_SEEDOCS = TransToken.untranslated('{msg}\n<p><a href="{url}">{docs}</a>.</p>').format(
     docs=TransToken.ui('See the documentation')
@@ -202,8 +226,8 @@ TOK_VBSP_MISSING_INSTANCE = TransToken.ui(
 )
 
 TOK_GLASS_FLOORBEAM_TEMPLATE = TransToken.ui(
-    'Bad Glass Floorbeam template! The template must have a single brush, with one face '
-    'pointing in the <var>+X</var> direction.'
+    'Bad Glass Floorbeam template! The template must have a single brush, aligned along the '
+    '<var>X</var> axis.'
 )
 
 TOK_CONNECTION_REQUIRED_ITEM = TransToken.ui(
@@ -262,6 +286,16 @@ TOK_CUBE_DROPPER_LINKED = TransToken.ui(
     'Dropper above custom cube of type <var>{type}</var> is already linked! Custom cubes convert'
     'droppers above them into their type, to allow having droppers.',
 )
+TOK_CUBE_UNLINKED_COLOURISER = TransToken.ui(
+    'A cube colouriser must be placed onto a dropper or cube to set the colour, '
+    'it cannot be placed by itself.'
+)
+TOK_CUBE_MULTIPLE_PAINTS = TransToken.ui(
+    'Multiple paint splats were placed on this cube, meaning it is unclear '
+    "which gel to start the cube painted with. Remove all but one type. If you're wanting to "
+    'paint the floor below the cube differently to the dropper, place a different splat on '
+    'the ceiling.'
+)
 TOK_CUBE_SUPERPOS_BAD_REAL = TransToken.ui(
     'Superposition Entanglers must be placed on top of a single dropper.'
 )
@@ -272,19 +306,40 @@ TOK_CUBE_SUPERPOS_MULTILINK = TransToken.ui(
     'Two Superposition Entanglers cannot be connected to a single dropper!'
 )
 
+TOK_BARRIER_ITEMNAME = TransToken.ui('Glass / Grating item')
+TOK_BARRIER_CUST_NO_OUTPUT = TransToken.ui(
+    'The custom barrier item "<var>{name}</var>" must be connected via output to one or more '
+    'regular glass or grating items. It will then change the type of that barrier.'
+)
+TOK_BARRIER_CUST_ALREADY_CONVERTED = TransToken.ui(
+    'The barrier at this posiiton has been connected to multiple custom barrier items. '
+    'Remove all but one connection.'
+)
+
 TOK_BARRIER_HOLE_FOOTPRINT = TransToken.ui(
-    'A glass/grating Hole does not have sufficent space. The entire highlighted yellow area should '
-    'be occupied by continous glass or grating. For large holes, the diagonally adjacient voxels '
-    'are not required. In addition, two Hole items cannot overlap each other.'
+    'A Barrier Hole ("<var>{hole}</var>") does not have sufficent space. '
+    'The entire highlighted yellow area should be occupied by continous glass/grating/etc which is'
+    'not itself occupied by a different hole.'
 )
 
 TOK_BARRIER_HOLE_MISPLACED = TransToken.ui(
-    'A glass/grating Hole was misplaced. The item must be placed against a glass or grating sheet, '
-    'which it will then cut a hole into. To rotate the item properly, you may need to place it on '
-    'a wall with the same orientation first, then drag it onto the glass without dragging it over '
-    'surfaces with different orientations. Alternatively put a block temporarily in the glass or '
-    "grating's location to position the hole item, then carve into the block from a side to remove "
-    'it while keeping the hole in the same position.'
+    'A Barrier Hole ("<var>{hole}</var>") was misplaced. The item must be placed against a '
+    'glass/grating/etc sheet, which it will then cut a hole into. To rotate the item properly, '
+    'you may need to place it on a wall with the same orientation first, then drag it onto the '
+    'glass without dragging it over surfaces with different orientations. '
+    "Alternatively put a block temporarily in the barrier's location to position the hole item, "
+    'then carve into the block from a side to remove it while keeping the hole in the same position.'
+)
+
+TOK_BARRIER_HOLE_NOVARIANT = TransToken.ui(
+    'A Barrier Hole ("<var>{hole}</var>") was placed on top of a "<var>{barrier}</var>" barrier, but this '
+    'barrier does not support this type of hole. The barrier allows ({types_barrier}), '
+    'but the hole only has ({types_hole}) available.'
+)
+
+TOK_BARRIER_HOLE_DISALLOWED = TransToken.ui(
+    'A Barrier Hole ("<var>{hole}</var>") was placed on top of a "<var>{barrier}</var>" barrier, '
+    'which does not allow holes.'
 )
 
 TOK_CHAINING_MULTI_INPUT = TransToken.ui(
@@ -308,19 +363,19 @@ TOK_CHAINING_INVALID_KIND = TransToken.ui(
 )
 
 TOK_TEMPLATE_MULTI_VISGROUPS = TransToken.ui(
-    'The template "{id}" has a {type} with two visgroups: <var>{groups}</var>. Brushes and'
+    'The template "<var>{id}</var>" has a {type} with two visgroups: "<var>{groups}</var>". Brushes and'
     'overlays in templates may currently only use one visgroup each.'
 )
 
-TOK_FIZZLER_NO_ITEM = TransToken.ui('No item ID for fizzler instance <var>"{inst}"</var>!')
-TOK_FIZZLER_UNKNOWN_TYPE = TransToken.ui('No fizzler type for {item} (<var>"{inst}"</var>)!')
+TOK_FIZZLER_NO_ITEM = TransToken.ui('No item ID for fizzler instance "<var>{inst}</var>"!')
+TOK_FIZZLER_UNKNOWN_TYPE = TransToken.ui('No fizzler type for {item} ("<var>{inst}</var>")!')
 TOK_FIZZLER_NO_MODEL_SIDE = TransToken.ui('No model specified for one side of "{id}" fizzlers.')
 
 TOK_INSTLOC_EMPTY = TransToken.ui(
-    'Instance lookup path <code>"{path}"</code> returned no instances.'
+    'Instance lookup path "<code>{path}</code>" returned no instances.'
 )
 TOK_INSTLOC_MULTIPLE = TransToken.ui(
-    'Instance lookup path <code>"{path}"</code> was expected to provide one instance, '
+    'Instance lookup path "<code>{path}</code>" was expected to provide one instance, '
     'but it returned multiple instances:'
 )
 

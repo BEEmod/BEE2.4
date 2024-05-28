@@ -16,14 +16,19 @@ import webbrowser
 import tkinter as tk
 from tkinter import ttk
 
+import trio
+
+from consts import DefaultItems
 from ui_tk.dialogs import TkDialogs
 from ui_tk.img import TKImages, TK_IMG
 from ui_tk.wid_transtoken import set_text
+from ui_tk import TK_ROOT, tk_tools, tooltip
 from .richTextBox import tkRichText
 from . import (
-    itemconfig, tkMarkdown, tooltip, tk_tools, sound, img, UI,
-    TK_ROOT, DEV_MODE, background_run
+    EdgeTrigger, itemconfig, tkMarkdown, sound, img, UI,
+    DEV_MODE, background_run,
 )
+from packages.signage import ITEM_ID as SIGNAGE_ITEM_ID
 from .item_properties import PropertyWindow
 import utils
 import srctools.logger
@@ -139,9 +144,9 @@ def set_sprite(tk_img: TKImages, pos: SPR, sprite: str) -> None:
 
 def pos_for_item(ind: int) -> int | None:
     """Get the index the specified subitem is located at."""
-    positions = SUBITEM_POS[len(selected_item.visual_subtypes)]
+    positions = SUBITEM_POS[len(selected_item.item.visual_subtypes)]
     for pos, sub in enumerate(positions):
-        if sub != -1 and ind == selected_item.visual_subtypes[sub]:
+        if sub != -1 and ind == selected_item.item.visual_subtypes[sub]:
             return pos
     else:
         return None
@@ -149,14 +154,14 @@ def pos_for_item(ind: int) -> int | None:
 
 def ind_for_pos(pos: int) -> int | None:
     """Return the subtype index for the specified position."""
-    ind = SUBITEM_POS[len(selected_item.visual_subtypes)][pos]
+    ind = SUBITEM_POS[len(selected_item.item.visual_subtypes)][pos]
     if ind == -1:
         return None
     else:
-        return selected_item.visual_subtypes[ind]
+        return selected_item.item.visual_subtypes[ind]
 
 
-def sub_sel(pos, e=None) -> None:
+def sub_sel(pos: int, e: object = None) -> None:
     """Change the currently-selected sub-item."""
     ind = ind_for_pos(pos)
     # Can only change the subitem on the preview window
@@ -167,7 +172,7 @@ def sub_sel(pos, e=None) -> None:
         show_prop(selected_sub_item, warp_cursor=True)
 
 
-def sub_open(pos, e=None):
+def sub_open(pos: int, e: object = None) -> None:
     """Move the context window to apply to the given item."""
     ind = ind_for_pos(pos)
     if ind is not None:
@@ -175,9 +180,10 @@ def sub_open(pos, e=None):
         selected_sub_item.open_menu_at_sub(ind)
 
 
-def open_event(item) -> Callable[[tk.Event], object]:
+def open_event(item: UI.PalItem) -> Callable[[tk.Event], object]:
     """Show the window for a particular PalItem."""
     def func(e: tk.Event) -> None:
+        """Show the window."""
         sound.fx('expand')
         show_prop(item)
     return func
@@ -266,16 +272,16 @@ def get_description(
         return tkMarkdown.MarkdownData.BLANK  # No description
 
 
-
 def load_item_data(tk_img: TKImages) -> None:
     """Refresh the window to use the selected item's data."""
     item_data = selected_item.data
+    item_id = utils.obj_id(selected_item.id)
 
-    for ind, pos in enumerate(SUBITEM_POS[len(selected_item.visual_subtypes)]):
+    for ind, pos in enumerate(SUBITEM_POS[len(selected_item.item.visual_subtypes)]):
         if pos == -1:
             icon = IMG_ALPHA
         else:
-            icon = selected_item.get_icon(selected_item.visual_subtypes[pos])
+            icon = selected_item.get_icon(selected_item.item.visual_subtypes[pos])
         tk_img.apply(wid_subitem[ind], icon)
         wid_subitem[ind]['relief'] = 'flat'
 
@@ -293,7 +299,7 @@ def load_item_data(tk_img: TKImages) -> None:
         style_desc=item_data.desc,
     )
     # Dump out the instances used in this item.
-    if DEV_MODE.get():
+    if DEV_MODE.value:
         inst_desc = []
         for editor in [selected_item.data.editor] + selected_item.data.editor_extra:
             if editor is selected_item.data.editor:
@@ -317,7 +323,7 @@ def load_item_data(tk_img: TKImages) -> None:
 
     wid['desc'].set_text(desc)
 
-    if DEV_MODE.get():
+    if DEV_MODE.value:
         source = selected_item.data.source.replace("from", "\nfrom")
         wid['item_id']['text'] = f'{source}\n-> {selected_item.id}:{selected_sub_item.subKey}'
         wid['item_id'].grid()
@@ -333,6 +339,13 @@ def load_item_data(tk_img: TKImages) -> None:
 
     version_lookup[:] = set_version_combobox(wid['variant'], selected_item)
 
+    if item_id == SIGNAGE_ITEM_ID:
+        wid['variant'].grid_remove()
+        wid['signage_configure'].grid()
+    else:
+        wid['variant'].grid()
+        wid['signage_configure'].grid_remove()
+
     if selected_item.data.url is None:
         wid['moreinfo'].state(['disabled'])
         tooltip.set_tooltip(wid['moreinfo'], TransToken.BLANK)
@@ -346,7 +359,7 @@ def load_item_data(tk_img: TKImages) -> None:
         if editor.has_sec_input():
             set_sprite(tk_img, SPR.INPUT, 'in_dual')
             # Real funnels work slightly differently.
-            if selected_item.id.casefold() == 'item_tbeam':
+            if item_id == DefaultItems.funnel.id:
                 tooltip.set_tooltip(wid_sprite[SPR.INPUT], TRANS_TOOL_TBEAM)
         else:
             set_sprite(tk_img, SPR.INPUT, 'in_norm')
@@ -391,7 +404,7 @@ def load_item_data(tk_img: TKImages) -> None:
     set_sprite(tk_img, SPR.FACING, face_spr)
 
     # Now some special overrides for certain classes.
-    if selected_item.id == "ITEM_CUBE":
+    if item_id == DefaultItems.cube.id:
         # Cubes - they should show info for the dropper.
         set_sprite(tk_img, SPR.FACING, 'surf_ceil')
         set_sprite(tk_img, SPR.INPUT, 'in_norm')
@@ -415,7 +428,7 @@ def load_item_data(tk_img: TKImages) -> None:
         set_sprite(tk_img, SPR.COLLISION, 'space_embed')
 
     real_conn_item = editor
-    if selected_item.id in ["ITEM_CUBE", "ITEM_PAINT_SPLAT"]:
+    if item_id == DefaultItems.cube.id or item_id == DefaultItems.gel_splat.id:
         # The connections are on the dropper.
         try:
             [real_conn_item] = selected_item.data.editor_extra
@@ -423,7 +436,7 @@ def load_item_data(tk_img: TKImages) -> None:
             # Moved elsewhere?
             pass
 
-    if DEV_MODE.get() and real_conn_item.conn_config is not None:
+    if DEV_MODE.value and real_conn_item.conn_config is not None:
         # Override tooltips with the raw information.
         blurb = real_conn_item.conn_config.get_input_blurb()
         if real_conn_item.force_input:
@@ -437,7 +450,7 @@ def load_item_data(tk_img: TKImages) -> None:
         tooltip.set_tooltip(wid_sprite[SPR.OUTPUT], TransToken.untranslated(blurb))
 
 
-def adjust_position(e=None) -> None:
+def adjust_position(e: object = None) -> None:
     """Move the properties window onto the selected item.
 
     We call this constantly, so the property window will not go outside
@@ -471,7 +484,7 @@ def adjust_position(e=None) -> None:
 TK_ROOT.bind("<Configure>", adjust_position, add='+')
 
 
-def hide_context(e: object=None) -> None:
+def hide_context(e: object = None) -> None:
     """Hide the properties window, if it's open."""
     global selected_item, selected_sub_item
     if is_visible():
@@ -482,7 +495,10 @@ def hide_context(e: object=None) -> None:
         wid['desc'].set_text('')
 
 
-def init_widgets(tk_img: TKImages) -> None:
+async def init_widgets(
+    tk_img: TKImages, signage_trigger: EdgeTrigger[()],
+    *, task_status: trio.TaskStatus[None] = trio.TASK_STATUS_IGNORED,
+) -> None:
     """Initiallise all the window components."""
     f = ttk.Frame(window, relief="raised", borderwidth="4")
     f.grid(row=0, column=0)
@@ -624,14 +640,35 @@ def init_widgets(tk_img: TKImages) -> None:
         TransToken.ui('Change the default settings for this item when placed.')
     )
 
-    wid['variant'] = ttk.Combobox(
+    wid['variant'] = wid_variant = ttk.Combobox(
         f,
         values=['VERSION'],
         exportselection=False,
         # On Mac this defaults to being way too wide!
         width=7 if utils.MAC else None,
     )
-    wid['variant'].state(['readonly'])  # Prevent directly typing in values
-    wid['variant'].bind('<<ComboboxSelected>>', lambda e: set_item_version(tk_img))
-    wid['variant'].current(0)
-    wid['variant'].grid(row=7, column=0, sticky='w')
+    wid_variant.state(['readonly'])  # Prevent directly typing in values
+    wid_variant.bind('<<ComboboxSelected>>', lambda e: set_item_version(tk_img))
+    wid_variant.current(0)
+
+    # Special button for signage items only.
+    wid['signage_configure'] = wid_sign_config = ttk.Button(
+        f, command=signage_trigger.trigger,
+    )
+    set_text(wid_sign_config, TransToken.ui('Select Signage...'))
+    tooltip.add_tooltip(
+        wid_sign_config,
+        TransToken.ui('Change which signs are specified by each timer value.')
+    )
+
+    wid_variant.grid(row=7, column=0, sticky='w')
+    wid_variant.grid_remove()
+    wid_sign_config.grid(row=7, column=0, sticky='w')
+    wid_sign_config.grid_remove()
+
+    async with trio.open_nursery() as nursery:
+        nursery.start_soon(
+            tk_tools.apply_bool_enabled_state_task,
+            signage_trigger.ready, wid_sign_config,
+        )
+        task_status.started()

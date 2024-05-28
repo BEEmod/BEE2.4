@@ -1,4 +1,5 @@
-from typing import Dict, Union
+from __future__ import annotations
+from typing_extensions import override
 
 from srctools import Keyvalues
 from srctools.dmx import Element
@@ -12,10 +13,10 @@ import config
 @attrs.frozen
 class LastSelected(config.Data, conf_name='LastSelected', uses_id=True):
     """Used for several general items, specifies the last selected one for restoration."""
-    id: Union[str, None] = None
+    id: str | None = None
 
     @classmethod
-    def parse_legacy(cls, conf: Keyvalues) -> Dict[str, 'LastSelected']:
+    def parse_legacy(cls, conf: Keyvalues) -> dict[str, LastSelected]:
         """Parse legacy config data."""
         result = {}
         last_sel = conf.find_key('LastSelected', or_blank=True)
@@ -43,7 +44,8 @@ class LastSelected(config.Data, conf_name='LastSelected', uses_id=True):
         return result
 
     @classmethod
-    def parse_kv1(cls, data: Keyvalues, version: int) -> 'LastSelected':
+    @override
+    def parse_kv1(cls, data: Keyvalues, version: int) -> LastSelected:
         """Parse Keyvalues data."""
         assert version == 1, version
         if data.has_children():
@@ -52,12 +54,14 @@ class LastSelected(config.Data, conf_name='LastSelected', uses_id=True):
             return cls(None)
         return cls(data.value)
 
+    @override
     def export_kv1(self) -> Keyvalues:
         """Export to a property block."""
         return Keyvalues('', '<NONE>' if self.id is None else self.id)
 
     @classmethod
-    def parse_dmx(cls, data: Element, version: int) -> 'LastSelected':
+    @override
+    def parse_dmx(cls, data: Element, version: int) -> LastSelected:
         """Parse DMX elements."""
         assert version == 1, version
         if 'selected_none' in data and data['selected_none'].val_bool:
@@ -65,6 +69,7 @@ class LastSelected(config.Data, conf_name='LastSelected', uses_id=True):
         else:
             return cls(data['selected'].val_str)
 
+    @override
     def export_dmx(self) -> Element:
         """Export to a DMX element."""
         elem = Element('LastSelected', 'DMElement')

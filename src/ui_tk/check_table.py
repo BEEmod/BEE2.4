@@ -13,9 +13,9 @@ import functools
 
 import attrs
 
-from app.tooltip import add_tooltip, set_tooltip
-from app import tk_tools
-from ui_tk.wid_transtoken import TransToken, set_text
+from .tooltip import add_tooltip, set_tooltip
+from .wid_transtoken import TransToken, set_text
+from . import tk_tools
 
 
 UP_ARROW = '\u25B3'
@@ -78,24 +78,24 @@ class Item(Generic[UserT]):
         self: Item[None],
         *values: TransToken,
         hover_text: TransToken = TransToken.BLANK,
-        lock_check: bool=False,
-        state: bool=False,
+        lock_check: bool = False,
+        state: bool = False,
     ) -> None: ...
     @overload
     def __init__(
         self: Item[UserT],
         *values: TransToken,
         hover_text: TransToken = TransToken.BLANK,
-        lock_check: bool=False,
-        state: bool=False,
+        lock_check: bool = False,
+        state: bool = False,
         user: UserT,
     ) -> None: ...
     def __init__(
         self,
         *values: TransToken,
         hover_text: TransToken = TransToken.BLANK,
-        lock_check: bool=False,
-        state: bool=False,
+        lock_check: bool = False,
+        state: bool = False,
         user: UserT | None = None,
     ) -> None:
         """Initialise an item.
@@ -109,7 +109,7 @@ class Item(Generic[UserT]):
         """
         self.values = values
         self.state_var = tk.BooleanVar(value=bool(state))
-        self.master: CheckDetails | None = None
+        self.master: CheckDetails[UserT] | None = None
         self.check: ttk.Checkbutton | None = None
         self.locked = lock_check
         self.hover_text = hover_text  # Readonly.
@@ -117,7 +117,7 @@ class Item(Generic[UserT]):
         if user is not None:
             self.user = user
 
-    def make_widgets(self, master: CheckDetails) -> None:
+    def make_widgets(self, master: CheckDetails[UserT]) -> None:
         """Create the widgets for this item."""
         if self.master is not None:
             # If we let items move between lists, the old widgets will become
@@ -202,9 +202,9 @@ class CheckDetails(ttk.Frame, Generic[UserT]):
     def __init__(
         self,
         parent: tk.Misc,
-        items: Iterable[Item[UserT]]=(),
-        headers: Iterable[TransToken]=(),
-        add_sizegrip: bool=False,
+        items: Iterable[Item[UserT]] = (),
+        headers: Iterable[TransToken] = (),
+        add_sizegrip: bool = False,
     ) -> None:
         """Initialise a CheckDetails pane.
 
@@ -333,7 +333,7 @@ class CheckDetails(ttk.Frame, Generic[UserT]):
         sorter['text'] = ''
         return header
 
-    def add_items(self, *items: Item) -> None:
+    def add_items(self, *items: Item[UserT]) -> None:
         """Add items to the details list."""
         for item in items:
             self.items.append(item)
@@ -341,7 +341,7 @@ class CheckDetails(ttk.Frame, Generic[UserT]):
         self.update_allcheck()
         self.refresh()
 
-    def rem_items(self, *items: Item) -> None:
+    def rem_items(self, *items: Item[UserT]) -> None:
         """Remove items from the details list."""
         for item in items:
             self.items.remove(item)
@@ -484,13 +484,13 @@ class CheckDetails(ttk.Frame, Generic[UserT]):
         self.items.sort(key=lambda item: item.values[index].token, reverse=self.rev_sort)
         self.refresh()
 
-    def checked(self) -> Iterator[Item]:
+    def checked(self) -> Iterator[Item[UserT]]:
         """Yields enabled check items."""
         for item in self.items:
             if item.state_var.get():
                 yield item
 
-    def unchecked(self) -> Iterator[Item]:
+    def unchecked(self) -> Iterator[Item[UserT]]:
         """Yields disabled check items."""
         for item in self.items:
             if not item.state_var.get():
@@ -498,7 +498,7 @@ class CheckDetails(ttk.Frame, Generic[UserT]):
 
 
 if __name__ == '__main__':
-    from app import TK_ROOT
+    from ui_tk import TK_ROOT
     tt = TransToken.untranslated
     test_inst = CheckDetails[None](
         parent=TK_ROOT,

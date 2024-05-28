@@ -5,13 +5,14 @@ from collections import defaultdict
 from srctools import VMF, Entity, Keyvalues, Matrix, Output, Vec
 import srctools.logger
 
+import utils
 from precomp import conditions, connections
 from precomp.lazy_value import LazyValue
 from transtoken import TransToken
 import user_errors
 
 
-COND_MOD_NAME = None
+COND_MOD_NAME: str | None = None
 LOGGER = srctools.logger.get_logger(__name__, alias='cond.sendtor')
 
 # Laser instance -> offset, normal
@@ -19,10 +20,11 @@ SENDTOR_TARGETS: dict[str, tuple[Vec, Vec]] = {}
 # Laser instance -> relays created.
 SENDTOR_RELAYS: dict[str, list[Entity]] = defaultdict(list)
 
-TOK_SENDTOR_BAD_OUTPUT = TransToken.parse('HMW_SENDIFICATOR', 'BAD_OUTPUT_ITEM')
+TOK_SENDTOR_BAD_OUTPUT = TransToken.parse(utils.obj_id('HMW_SENDIFICATOR'), 'BAD_OUTPUT_ITEM')
 
 
-@conditions.make_result('SendificatorLaser')
+# Doesn't actually require connections, but it needs to be before Sendificator.
+@conditions.make_result('SendificatorLaser', valid_before=conditions.MetaCond.Connections)
 def res_sendificator_laser(res: Keyvalues) -> conditions.ResultCallable:
     """Record the position of the target for Sendificator Lasers."""
     offset = LazyValue.parse(res['offset', '']).as_vec()
@@ -34,7 +36,7 @@ def res_sendificator_laser(res: Keyvalues) -> conditions.ResultCallable:
     return set_laser
 
 
-@conditions.make_result('Sendificator')
+@conditions.make_result('Sendificator', valid_before=conditions.MetaCond.Connections)
 def res_sendificator(vmf: VMF, inst: Entity) -> None:
     """Implement Sendificators."""
     # For our version, we know which Sendificator connects to what laser,

@@ -10,9 +10,12 @@ if sys.stdout is None:
 if sys.stderr is None:
     sys.stderr = open(os.devnull, 'w')
 if sys.stdin is None:
-    sys.stdin = open(os.devnull, 'r')
+    sys.stdin = open(os.devnull)
 
 freeze_support()
+if __name__ == '__main__':
+    # Forking doesn't really work right, stick to spawning a fresh process.
+    set_start_method('spawn')
 
 if sys.platform == "darwin":
     # Disable here, can't get this to work.
@@ -33,19 +36,20 @@ DEFAULT_SETTINGS = {
 }
 
 import srctools.logger
-from app import localisation, on_error, TK_ROOT
+from app import localisation, on_error
+from pathlib import Path
 import utils
 
 if __name__ == '__main__':
-    # Forking doesn't really work right, stick to spawning a fresh process.
-    set_start_method('spawn')
-
     if len(sys.argv) > 1:
         log_name = app_name = sys.argv[1].lower()
-        if app_name not in ('backup', 'compilepane'):
-            log_name = 'bee2'
-    else:
+    elif 'python' not in sys.argv[0].casefold():
+        log_name = app_name = Path(sys.argv[0]).stem.casefold()
+    else:  # Running from source, by default.
         log_name = app_name = 'bee2'
+
+    if app_name not in ('backup', 'compiler_settings'):
+        log_name = 'bee2'
 
     # We need to initialise logging as early as possible - that way
     # it can record any errors in the initialisation of modules.
@@ -68,7 +72,7 @@ if __name__ == '__main__':
 
     GEN_OPTS.load()
     GEN_OPTS.set_defaults(DEFAULT_SETTINGS)
-    config.APP.read_file()
+    config.APP.read_file(config.APP_LOC)
     try:
         conf = config.APP.get_cur_conf(GenOptions)
     except KeyError:
@@ -77,31 +81,21 @@ if __name__ == '__main__':
 
     # Special case, load in this early, so it applies.
     utils.DEV_MODE = conf.dev_mode
-    app.DEV_MODE.set(conf.dev_mode)
+    app.DEV_MODE.value = conf.dev_mode
 
     localisation.setup(conf.language)
 
-    # Check early on for a common mistake - putting the BEE2 folder directly in Portal 2 means
-    # when we export we'll try and overwrite ourselves. Use Steam's appid file as a marker.
-    if utils.install_path('../steam_appid.txt').exists() and utils.install_path('.').name.casefold() == 'bee2':
-        from app import gameMan
-        gameMan.app_in_game_error()
-        sys.exit()
-
-    elif app_name == 'bee2':
-        from app import BEE2
-        BEE2.start_main()
+    from app import backup, CompilerPane
+    from ui_tk.core import start_main
+    if app_name == 'bee2':
+        start_main()
     elif app_name == 'backup':
-        from app import backup, BEE2
-        BEE2.start_main(backup.init_application)
-    elif app_name == 'compilepane':
-        from app import CompilerPane
-        CompilerPane.init_application()
-        TK_ROOT.mainloop()
+        start_main(backup.init_application)
+    elif app_name == 'compiler_settings':
+        start_main(CompilerPane.init_application)
     elif app_name.startswith('test_'):
-        from app import BEE2
         import importlib
         mod = importlib.import_module('app.demo.' + sys.argv[1][5:])
-        BEE2.start_main(getattr(mod, 'test'))
+        start_main(mod.test)
     else:
         raise ValueError(f'Invalid component name "{app_name}"!')

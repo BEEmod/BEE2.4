@@ -1,13 +1,4 @@
 """Implements the BEE2 VBSP compiler replacement."""
-# Do this very early, so we log the startup sequence.
-from srctools.logger import init_logging
-
-import user_errors
-
-
-LOGGER = init_logging('bee2/vbsp.log')
-
-
 from typing import Any, Dict, List, Tuple, Set, Iterable, Optional, Counter
 from typing_extensions import TypedDict
 from io import StringIO
@@ -17,9 +8,9 @@ import sys
 import shutil
 import logging
 import pickle
-import contextlib
 
-from srctools import AtomicWriter, Keyvalues, Vec, FrozenVec, Angle, Matrix
+from srctools import AtomicWriter, Keyvalues, Vec, FrozenVec, Angle
+from srctools.dmx import Element
 from srctools.vmf import VMF, Entity, Output
 from srctools.game import Game
 import srctools
@@ -30,6 +21,7 @@ import trio
 from BEE2_config import ConfigFile
 import utils
 from precomp.collisions import Collisions
+from quote_pack import QuoteInfo
 from precomp import (
     instance_traits,
     brushLoc,
@@ -53,30 +45,31 @@ from precomp import (
     cubes,
     errors,
 )
+import config
 import consts
 import editoritems
+import user_errors
+
+
+LOGGER = srctools.logger.get_logger()
 
 
 class _Settings(TypedDict):
     """Configuration data extracted from VBSP_config. TODO: Eliminate and make local vars."""
     textures: Dict[str, Any]
-    options: Dict[str, Any]
     fog: Dict[str, Any]
     elevator: Dict[str, str]
-    music_conf: Optional[Keyvalues]
+    music_conf: Keyvalues
 
     style_vars: Dict[str, bool]
-    has_attr: Dict[str, bool]
 
 settings: _Settings = {
     "textures":       {},
-    "options":        {},
     "fog":            {},
     "elevator":       {},
-    'music_conf':     None,
+    'music_conf':     Keyvalues('', []),
 
     "style_vars":     defaultdict(bool),
-    "has_attr":       defaultdict(bool),
 }
 
 COND_MOD_NAME = 'VBSP'
@@ -86,39 +79,43 @@ BEE2_config = ConfigFile('compile.cfg')
 # conditions, and shouldn't be restyled or modified later.
 IGNORED_OVERLAYS: Set[Entity] = set()
 
-PRESET_CLUMPS = []  # Additional clumps set by conditions, for certain areas.
-
 
 async def load_settings() -> Tuple[
     antlines.IndicatorStyle,
-    Dict[str, editoritems.Item],
+    Dict[utils.ObjectID, editoritems.Item],
     corridor.ExportedConf,
 ]:
     """Load in all our settings from vbsp_config."""
     # Do all our file parsing concurrently.
-    try:
-        with contextlib.ExitStack() as file_stack:
-            file_config = file_stack.enter_context(open("bee2/vbsp_config.cfg", encoding='utf8'))
-            file_editor = file_stack.enter_context(open('bee2/editor.bin', 'rb'))
-            file_corridor = file_stack.enter_context(open('bee2/corridors.bin', 'rb'))
-            file_packlist = file_stack.enter_context(open('bee2/pack_list.cfg'))
+    def load_pickle(filename: str) -> object:
+        """Open then load a pickle file. Typed as object to force manual checks below."""
+        with open(filename, 'rb') as f:
+            return pickle.load(f)
 
-            async with trio.open_nursery() as nursery:
-                res_conf = utils.Result.sync(nursery, Keyvalues.parse, file_config)
-                res_editor: utils.Result[
-                    Iterable[editoritems.Item]
-                ] = utils.Result.sync(nursery, pickle.load, file_editor)
-                res_corr: utils.Result[corridor.ExportedConf] = utils.Result.sync(
-                    nursery,
-                    pickle.load, file_corridor,
-                )
-                res_packlist = utils.Result.sync(
-                    nursery,
-                    Keyvalues.parse, file_packlist, 'bee2/pack_list.cfg',
-                )
-                # Load in templates locations.
-                nursery.start_soon(template_brush.load_templates, 'bee2/templates.lst')
-    except FileNotFoundError:
+    def load_keyvalues(filename: str) -> Keyvalues:
+        """Open then load a keyvalues1 file."""
+        with open(filename, encoding='utf8') as f:
+            return Keyvalues.parse(f, filename)
+
+    def load_dmx_config(filename: str) -> config.Config:
+        """Load our main DMX config."""
+        with open(filename, 'rb') as f:
+            dmx, fmt_name, fmt_ver = Element.parse(f)
+        conf, upgrade = config.COMPILER.parse_dmx(dmx, fmt_name, fmt_ver)
+        # We're never changing the file, no point upgrading it. The app will do so next
+        # export anyway.
+        return conf
+
+    try:
+        async with trio.open_nursery() as nursery:
+            res_vconf = utils.Result.sync(nursery, load_keyvalues, "bee2/vbsp_config.cfg")
+            res_packlist = utils.Result.sync(nursery, load_keyvalues, 'bee2/pack_list.cfg')
+            res_editor = utils.Result.sync(nursery, load_pickle, 'bee2/editor.bin')
+            res_corr = utils.Result.sync(nursery, load_pickle, 'bee2/corridors.bin')
+            res_dmx_conf = utils.Result.sync(nursery, load_dmx_config, 'bee2/config.dmx')
+            # Load in templates locations.
+            nursery.start_soon(template_brush.load_templates, 'bee2/templates.lst')
+    except Exception:  # TODO 3.8: except* (FileNotFoundError, IOError)
         LOGGER.exception(
             'Failed to parse required config file. Recompile the compiler '
             'and/or export the palette.'
@@ -127,28 +124,33 @@ async def load_settings() -> Tuple[
         )
         sys.exit(1)
 
-    conf = res_conf()
-    tex_block = Keyvalues('Textures', list(conf.find_children('textures')))
+    vconf = res_vconf()
+    tex_block = Keyvalues('Textures', list(vconf.find_children('textures')))
 
     texturing.load_config(tex_block)
 
     # Load in our main configs...
-    options.load(conf.find_all('Options'))
-    utils.DEV_MODE = options.get(bool, 'dev_mode')
-
-    # The voice line keyvalues block
-    for quote_block in conf.find_all("quotes"):
-        voice_line.QUOTE_DATA.extend(quote_block)
+    options.load(vconf.find_all('Options'))
+    config.COMPILER.merge_conf(res_dmx_conf())
+    utils.DEV_MODE = options.DEV_MODE()
 
     # Configuration properties for styles.
-    for stylevar_block in conf.find_all('stylevars'):
+    for stylevar_block in vconf.find_all('stylevars'):
         for var in stylevar_block:
             settings['style_vars'][var.name.casefold()] = srctools.conv_bool(var.value)
 
-    # Load a copy of the item configuration.
-    id_to_item: Dict[str, editoritems.Item] = {}
-    for item in res_editor():
-        id_to_item[item.id.casefold()] = item
+    # Load out a copy of the item configuration, checking types as we go.
+    # The pickle could have produced anything.
+    id_to_item: Dict[utils.ObjectID, editoritems.Item] = {}
+
+    editor_list = res_editor()
+    if not isinstance(editor_list, list):
+        raise ValueError(f'Invalid list of editor items, got: {editor_list!r}')
+    for item in editor_list:
+        if isinstance(item, editoritems.Item):
+            id_to_item[item.id] = item
+        else:
+            raise ValueError(f'Invalid editor item, got: {item!r}')
 
     # Send that data to the relevant modules.
     instanceLocs.load_conf(id_to_item.values())
@@ -166,24 +168,24 @@ async def load_settings() -> Tuple[
     packing.parse_packlists(res_packlist())
 
     # Parse all the conditions.
-    for cond in conf.find_all('conditions', 'condition'):
+    for cond in vconf.find_all('conditions', 'condition'):
         conditions.add(cond)
 
-    # Data for different cube types.
-    cubes.parse_conf(conf)
-
-    # Fizzler data
-    fizzler.read_configs(conf)
+    cubes.parse_conf(vconf)
+    fizzler.read_configs(vconf)
+    barriers.parse_conf(vconf)
 
     # Selected corridors.
     corridor_conf = res_corr()
+    if not isinstance(corridor_conf, corridor.ExportedConf):
+        raise ValueError(f'Invalid corridor config, got {corridor_conf!r}')
 
     # Signage items
     from precomp.conditions.signage import load_signs
-    load_signs(conf)
+    load_signs(vconf)
 
     # Get configuration for the elevator, defaulting to ''.
-    elev = conf.find_block('elevator', or_blank=True)
+    elev = vconf.find_block('elevator', or_blank=True)
     settings['elevator'] = {
         key: elev[key, '']
         for key in
@@ -193,13 +195,13 @@ async def load_settings() -> Tuple[
         )
     }
 
-    settings['music_conf'] = conf.find_block('MusicScript', or_blank=True)
+    settings['music_conf'] = vconf.find_block('MusicScript', or_blank=True)
 
     # Bottomless pit configuration
-    bottomlessPit.load_settings(conf.find_block("bottomless_pit", or_blank=True))
+    bottomlessPit.load_settings(vconf.find_block("bottomless_pit", or_blank=True))
 
     # Fog settings - from the skybox (env_fog_controller, env_tonemap_controller)
-    fog_config = conf.find_block("fog", or_blank=True)
+    fog_config = vconf.find_block("fog", or_blank=True)
     # Update inplace so imports get the settings
     settings['fog'].update({
         # These defaults are from Clean Style.
@@ -209,7 +211,7 @@ async def load_settings() -> Tuple[
         'primary': fog_config['primaryColor', '40 53 64'],
         'secondary': fog_config['secondaryColor', ''],
         'direction': fog_config['direction', '0 0 0'],
-        # These appear to be always the same..
+        # These appear to be always the same.
         'height_start': fog_config['height_start', '0'],
         'height_density': fog_config['height_density', '0'],
         'height_max_density': fog_config['height_max_density', '1'],
@@ -228,25 +230,26 @@ async def load_settings() -> Tuple[
     return indicators, id_to_item, corridor_conf
 
 
-async def load_map(map_path: str) -> VMF:
+def load_map(map_path: str) -> VMF:
     """Load in the VMF file."""
     with open(map_path) as file:
         LOGGER.info("Parsing Map...")
-        kv = await trio.to_thread.run_sync(Keyvalues.parse, file, map_path)
+        kv = Keyvalues.parse(file, map_path)
     LOGGER.info('Reading Map...')
-    vmf = await trio.to_thread.run_sync(VMF.parse, kv)
+    vmf = VMF.parse(kv)
     LOGGER.info("Loading complete!")
     return vmf
 
 
-@conditions.meta_cond(priority=100)
-def add_voice(vmf: VMF, coll: Collisions, info: corridor.Info) -> None:
+@conditions.MetaCond.VoiceLine.register
+def add_voice(vmf: VMF, coll: Collisions, info: corridor.Info, voice: QuoteInfo) -> None:
     """Add voice lines to the map."""
     voice_line.add_voice(
         style_vars=settings['style_vars'],
         coll=coll,
         vmf=vmf,
         info=info,
+        voice=voice,
         use_priority=BEE2_config.get_bool('General', 'voiceline_priority', False),
     )
 
@@ -255,7 +258,7 @@ FIZZ_BUMPER_WIDTH = 32  # The width of bumper brushes
 FIZZ_NOPORTAL_WIDTH = 16  # Width of noportal_volumes
 
 
-@conditions.meta_cond(priority=200, only_once=True)
+@conditions.MetaCond.AntiFizzBump.register
 def anti_fizz_bump(vmf: VMF) -> None:
     """Create portal_bumpers and noportal_volumes surrounding fizzlers.
 
@@ -347,7 +350,7 @@ PLAYER_MODELS = {
 }
 
 
-@conditions.meta_cond(priority=400, only_once=True)
+@conditions.MetaCond.PlayerModel.register
 def set_player_model(vmf: VMF, info: corridor.Info) -> None:
     """Set the player model in SinglePlayer."""
 
@@ -357,7 +360,7 @@ def set_player_model(vmf: VMF, info: corridor.Info) -> None:
     if info.is_coop:  # Not in coop..
         return
 
-    loc = options.get(Vec, 'global_ents_loc')
+    loc = options.GLOBAL_ENTS_LOC()
     assert loc is not None
     chosen_model = BEE2_config.get_val('General', 'player_model', 'PETI').casefold()
 
@@ -399,7 +402,7 @@ def set_player_model(vmf: VMF, info: corridor.Info) -> None:
         delay=0.1,
     ))
 
-    if pgun_skin and options.get(str, 'game_id') == utils.STEAM_IDS['PORTAL2']:
+    if pgun_skin and options.GAME_ID() == utils.STEAM_IDS['PORTAL2']:
         # Only change portalgun skins in Portal 2 - this is the vanilla
         # portalgun weapon/viewmodel.
         auto.add_out(Output(
@@ -421,7 +424,7 @@ def set_player_model(vmf: VMF, info: corridor.Info) -> None:
         ))
 
 
-@conditions.meta_cond(priority=500, only_once=True)
+@conditions.MetaCond.PlayerPortalGun.register
 def set_player_portalgun(vmf: VMF, info: corridor.Info) -> None:
     """Controls which portalgun the player will be given.
 
@@ -441,7 +444,7 @@ def set_player_portalgun(vmf: VMF, info: corridor.Info) -> None:
       `NeedsPortalMan` still works to add this in Coop.
     """
 
-    if options.get(str, 'game_id') == utils.STEAM_IDS['TAG']:
+    if options.GAME_ID() == utils.STEAM_IDS['TAG']:
         return  # Aperture Tag doesn't have Portal Guns!
 
     LOGGER.info('Setting Portalgun:')
@@ -464,7 +467,7 @@ def set_player_portalgun(vmf: VMF, info: corridor.Info) -> None:
     else:
         info.set_attr('spawn_nogun')
 
-    ent_pos = options.get(Vec, 'global_pti_ents_loc')
+    ent_pos = options.GLOBAL_PTI_ENTS_LOC()
     assert ent_pos is not None
 
     logic_auto = vmf.create_ent('logic_auto', origin=ent_pos, flags='1')
@@ -629,7 +632,7 @@ def set_player_portalgun(vmf: VMF, info: corridor.Info) -> None:
     LOGGER.info('Done!')
 
 
-@conditions.meta_cond(priority=750, only_once=True)
+@conditions.MetaCond.Screenshot.register
 def add_screenshot_logic(vmf: VMF, info: corridor.Info) -> None:
     """If the screenshot type is 'auto', add in the needed ents."""
     if BEE2_config.get_val(
@@ -639,17 +642,17 @@ def add_screenshot_logic(vmf: VMF, info: corridor.Info) -> None:
         vmf.create_ent(
             classname='func_instance',
             file=SSHOT_FNAME,
-            origin=options.get(Vec, 'global_ents_loc'),
+            origin=options.GLOBAL_ENTS_LOC(),
             angles='0 0 0',
         )
         conditions.ALL_INST.add(SSHOT_FNAME)
         LOGGER.info('Added Screenshot Logic')
 
 
-@conditions.meta_cond(priority=100, only_once=True)
+@conditions.MetaCond.FogEnts.register
 def add_fog_ents(vmf: VMF, info: corridor.Info) -> None:
     """Add the tonemap and fog controllers, based on the skybox."""
-    pos = options.get(Vec, 'global_ents_loc')
+    pos = options.GLOBAL_ENTS_LOC()
     vmf.create_ent(
         classname='env_tonemap_controller',
         targetname='@tonemapper',
@@ -696,14 +699,14 @@ def add_fog_ents(vmf: VMF, info: corridor.Info) -> None:
         fog_controller['fogcolor2'] = fog_opt['secondary']
         fog_controller['use_angles'] = '1'
 
-    logic_auto = vmf.create_ent(classname='logic_auto', origin=pos, flags='1')
+    logic_auto = vmf.create_ent(classname='logic_auto', origin=pos, flags='0')
 
     logic_auto.add_out(
         Output(
             'OnMapSpawn',
             '@clientcommand',
             'Command',
-            'r_flashlightbrightness 1',
+            'r_flashlightbrightness 3',
         ),
 
         Output(
@@ -768,8 +771,21 @@ def add_fog_ents(vmf: VMF, info: corridor.Info) -> None:
             only_once=True,
         ))
 
+    if options.SKY_DRAW_FIRST():
+        logic_auto.add_out(Output(
+            'OnMapSpawn',
+            '@broadcastcommand',
+            'Command',
+            'r_skybox_draw_last 0',
+        ), Output(
+            'OnLoadGame',
+            '@broadcastcommand',
+            'Command',
+            'r_skybox_draw_last 0',
+        ))
 
-@conditions.meta_cond(priority=50, only_once=True)
+
+@conditions.MetaCond.ElevatorVideos.register
 def set_elev_videos(vmf: VMF, info: corridor.Info) -> None:
     """Add the scripts and options for customisable elevator videos to the map."""
     vid_type = settings['elevator']['type'].casefold()
@@ -815,7 +831,7 @@ def set_elev_videos(vmf: VMF, info: corridor.Info) -> None:
         )
 
 
-def add_goo_mist(vmf, sides: Iterable[FrozenVec]):
+def add_goo_mist(vmf: VMF, sides: Iterable[FrozenVec]) -> None:
     """Add water_mist* particle systems to goo.
 
     This uses larger particles when needed to save ents.
@@ -898,10 +914,10 @@ def change_brush(vmf: VMF) -> None:
     """Alter all world/detail brush textures to use the configured ones."""
     LOGGER.info("Editing Brushes...")
 
-    goo_scale = options.get(float, 'goo_scale')
+    goo_scale = options.GOO_SCALE()
 
     # Goo mist must be enabled by both the style and the user.
-    make_goo_mist = options.get(bool, 'goo_mist') and srctools.conv_bool(
+    make_goo_mist = options.GOO_MIST() and srctools.conv_bool(
         settings['style_vars'].get('AllowGooMist', '1')
     )
     mist_solids: Set[FrozenVec] = set()
@@ -969,6 +985,7 @@ Clump = namedtuple('Clump', [
     'max_pos',
     'tex',
 ])
+PRESET_CLUMPS: List[Clump] = []  # Additional clumps set by conditions, for certain areas.
 
 
 @conditions.make_result('SetAreaTex')
@@ -1018,7 +1035,7 @@ def cond_force_clump(res: Keyvalues) -> conditions.ResultCallable:
     return set_tex
 
 
-@conditions.meta_cond(priority=-10)
+@conditions.MetaCond.ExitSigns.register
 def position_exit_signs(vmf: VMF) -> None:
     """Configure exit signage.
 
@@ -1036,13 +1053,13 @@ def position_exit_signs(vmf: VMF) -> None:
     except ValueError:
         exit_arrow = None
 
-    if options.get(bool, "remove_exit_signs"):
+    if options.REMOVE_EXIT_SIGNS():
         if exit_sign is not None:
             exit_sign.remove()
         if exit_arrow is not None:
             exit_arrow.remove()
 
-    inst_filename = options.get(str, 'signExitInst')
+    inst_filename = options.SIGN_EXIT_INST()
     if inst_filename is None or exit_sign is None or exit_arrow is None:
         return
 
@@ -1059,7 +1076,7 @@ def position_exit_signs(vmf: VMF) -> None:
     arrow_dir = -Vec.from_str(exit_arrow['basisv'])  # Texture points down.
     u = Vec.from_str(exit_sign['basisu'])
     v = Vec.from_str(exit_sign['basisv'])
-    angles = Matrix.from_basis(x=u, y=v, z=sign_norm).to_angle()
+    angles = Angle.from_basis(x=u, y=v, z=sign_norm)
 
     if arrow_dir == u:
         sign_dir = 'east'
@@ -1094,7 +1111,7 @@ def position_exit_signs(vmf: VMF) -> None:
     conditions.ALL_INST.add(inst_filename.casefold())
     inst.fixup['$arrow'] = sign_dir
     inst.fixup['$orient'] = orient
-    if options.get(bool, "remove_exit_signs_dual"):
+    if options.REMOVE_EXIT_SIGNS_DUAL():
         exit_sign.remove()
         exit_arrow.remove()
     else:
@@ -1107,13 +1124,13 @@ def change_overlays(vmf: VMF) -> None:
     LOGGER.info("Editing Overlays...")
 
     # A frame instance to add around all the 32x32 signs
-    sign_inst = options.get(str, 'signInst')
+    sign_inst = options.SIGN_INST()
     # Resize the signs to this size. 4 vertexes are saved relative
     # to the origin, so we must divide by 2.
-    sign_size = options.get(int, 'signSize') / 2
+    sign_size = options.SIGN_SIZE() / 2
 
     # A packlist associated with the sign_inst.
-    sign_inst_pack = options.get(str, 'signPack')
+    sign_inst_pack = options.SIGN_PACK()
 
     # Grab all the textures we're using...
     for over in vmf.by_class['info_overlay']:
@@ -1161,17 +1178,11 @@ def change_overlays(vmf: VMF) -> None:
 
 def add_extra_ents(vmf: VMF, info: corridor.Info) -> None:
     """Add the various extra instances to the map."""
-    loc = options.get(Vec, 'global_ents_loc')
-
-    music.add(vmf, loc, settings['music_conf'], info)
-
     LOGGER.info('Adding global ents...')
 
-    # Add the global_pti_ents instance automatically, with disable_pti_audio
-    # set.
-    global_ents_pos = options.get(Vec, 'global_ents_loc')
-    pti_file = options.get(str, 'global_pti_ents')
-    pti_loc = options.get(Vec, 'global_pti_ents_loc')
+    global_ents_pos = options.GLOBAL_ENTS_LOC()
+    pti_file = options.GLOBAL_PTI_ENTS()
+    pti_loc = options.GLOBAL_PTI_ENTS_LOC()
 
     # Add a nodraw box around the global entity location, to seal it.
     vmf.add_brushes(vmf.make_hollow(
@@ -1196,6 +1207,8 @@ def add_extra_ents(vmf: VMF, info: corridor.Info) -> None:
         angles='0 0 0',
     )
 
+    music.add(vmf, global_ents_pos, settings['music_conf'], info)
+
     if info.has_attr('bridge') or info.has_attr('lightbridge'):
         # If we have light bridges, make sure we precache the particle.
         vmf.create_ent(
@@ -1206,6 +1219,7 @@ def add_extra_ents(vmf: VMF, info: corridor.Info) -> None:
         )
 
     if pti_file:
+        # Add the global_pti_ents instance automatically, with disable_pti_audio set.
         LOGGER.info('Adding Global PTI Ents')
         global_pti_ents = vmf.create_ent(
             classname='func_instance',
@@ -1230,11 +1244,6 @@ def add_extra_ents(vmf: VMF, info: corridor.Info) -> None:
 def change_ents(vmf: VMF) -> None:
     """Edit misc entities."""
     LOGGER.info("Editing Other Entities...")
-    if options.get(bool, "remove_info_lighting"):
-        # Styles with brush-based glass edges don't need the info_lighting,
-        # delete it to save ents.
-        for ent in vmf.by_class['info_lighting']:
-            ent.remove()
     for auto in vmf.by_class['logic_auto']:
         # Remove all the logic_autos that set attachments, we can
         # replicate this in the instance
@@ -1250,7 +1259,7 @@ def write_itemid_list(vmf: VMF, used_items: Iterable[str]) -> None:
 
     used_item_list = sorted(used_items)
     LOGGER.debug('Used items: \n{}', '\n'.join(used_item_list))
-    global_ents_loc = options.get(Vec, 'global_ents_loc')
+    global_ents_loc = options.GLOBAL_ENTS_LOC()
     for offset in range(0, len(used_item_list), per_ent):
         lst_ent = vmf.create_ent(
             'bee2_item_list',
@@ -1260,18 +1269,18 @@ def write_itemid_list(vmf: VMF, used_items: Iterable[str]) -> None:
             lst_ent[f'itemid{j:02}'] = item_id
 
 
-def fix_worldspawn(vmf: VMF) -> None:
+def fix_worldspawn(vmf: VMF, info: conditions.MapInfo) -> None:
     """Adjust some properties on WorldSpawn."""
     LOGGER.info("Editing WorldSpawn")
     if vmf.spawn['paintinmap'] != '1':
         # If PeTI thinks there should be paint, don't touch it
         # Otherwise set it based on the 'gel' voice attribute
         # If the game is Aperture Tag, it's always forced on
-        vmf.spawn['paintinmap'] = srctools.bool_as_int(
-            settings['has_attr']['gel'] or
-            options.get(str, 'game_id') == utils.STEAM_IDS['APTAG']
+        vmf.spawn['paintinmap'] = (
+            info.has_attr('gel') or
+            options.GAME_ID() == utils.STEAM_IDS['APTAG']
         )
-    vmf.spawn['skyname'] = options.get(str, 'skybox')
+    vmf.spawn['skyname'] = options.SKYBOX()
 
 
 async def find_missing_instances(game: Game, vmf: VMF) -> List[Vec]:
@@ -1332,7 +1341,7 @@ def run_vbsp(
     path: str,
     new_path: Optional[str] = None,
     is_error_map: bool = False,
-    maybe_missing_inst: Iterable[Vec]=(),
+    maybe_missing_inst: Iterable[Vec] = (),
 ) -> None:
     """Execute the original VBSP, copying files around to make it work correctly.
 
@@ -1341,12 +1350,11 @@ def run_vbsp(
     If new_path is passed VBSP will be run on the map in styled/, and we'll
     read through the output to find the entity counts.
     """
-
     is_peti = new_path is not None
 
     # We can't overwrite the original vmf, so we run VBSP from a separate
     # location.
-    if is_peti:
+    if new_path is not None:
         # Copy the original log file
         if os.path.isfile(path.replace(".vmf", ".log")):
             shutil.copy(
@@ -1358,7 +1366,7 @@ def run_vbsp(
     vbsp_args = [x for x in vbsp_args if x and not x.isspace()]
 
     # Ensure we've fixed the instance/ folder so instances are found.
-    if utils.MAC or utils.LINUX and is_peti:
+    if (utils.MAC or utils.LINUX) and is_peti:
         instance_symlink()
 
     # Use a special name for VBSP's output..
@@ -1397,7 +1405,7 @@ def run_vbsp(
     # Print output
     LOGGER.info("VBSP Done!")
 
-    if is_peti:  # Ignore Hammer maps
+    if new_path is not None:  # Ignore Hammer maps
         process_vbsp_log(buff.getvalue())
 
     # Copy over the real files so vvis/vrad can read them
@@ -1504,11 +1512,10 @@ def process_vbsp_fail(output: str, missing_locs: Iterable[Vec]) -> None:
     BEE2_config.save_check()
 
 
-async def main() -> None:
+async def main(argv: List[str]) -> None:
     """Main program code.
 
     """
-    global MAP_RAND_SEED
     LOGGER.info("BEE{} VBSP hook initiallised, srctools v{}.", utils.BEE_VERSION, srctools.__version__)
 
     # Warn if srctools Cython code isn't installed.
@@ -1519,20 +1526,19 @@ async def main() -> None:
     if 'BEE2_WIKI_OPT_LOC' in os.environ:
         # Special override - generate docs for the BEE2 wiki.
         LOGGER.info('Writing Wiki text...')
-        with open(os.environ['BEE2_WIKI_OPT_LOC'], 'w') as f:
-            options.dump_info(f)
-        with open(os.environ['BEE2_WIKI_COND_LOC'], 'a+') as f:
-            conditions.dump_conditions(f)
+        async with trio.open_nursery() as nursery:
+            nursery.start_soon(options.dump_info, trio.Path(os.environ['BEE2_WIKI_OPT_LOC']))
+            nursery.start_soon(conditions.dump_conditions, trio.Path(os.environ['BEE2_WIKI_COND_LOC']))
         LOGGER.info('Done. Exiting now!')
         sys.exit()
 
     # Just in case we fail, overwrite the VRAD config, so it doesn't use old data.
     open('bee2/vrad_config.cfg', 'w').close()
 
-    args = " ".join(sys.argv)
-    new_args = sys.argv[1:]
-    old_args = sys.argv[1:]
-    path = sys.argv[-1]  # The path is the last argument to vbsp
+    args = " ".join(argv)
+    new_args = argv[1:]
+    old_args = argv[1:]
+    path = argv[-1]  # The path is the last argument to vbsp
 
     if not old_args:
         # No arguments!
@@ -1616,7 +1622,8 @@ async def main() -> None:
         LOGGER.info("Loading settings...")
         async with trio.open_nursery() as nursery:
             res_settings = utils.Result(nursery, load_settings)
-            vmf_res = utils.Result(nursery, load_map, path)
+            vmf_res = utils.Result.sync(nursery, load_map, path)
+            voice_data_res = utils.Result(nursery, voice_line.load)
 
         ind_style, id_to_item, corridor_conf = res_settings()
         vmf: VMF = vmf_res()
@@ -1625,16 +1632,16 @@ async def main() -> None:
 
         used_inst = instance_traits.set_traits(vmf, id_to_item, coll)
         # Must be before corridors!
-        brushLoc.POS.read_from_map(vmf, settings['has_attr'], id_to_item)
+        initial_voice_attrs = brushLoc.POS.read_from_map(vmf, id_to_item)
 
         rand.init_seed(vmf)
 
         info = corridor.analyse_and_modify(
             vmf, corridor_conf,
             elev_override=BEE2_config.get_bool('General', 'spawn_elev'),
-            voice_attrs=settings['has_attr'],
         )
         is_publishing = info.is_publishing
+        info.set_attr(*initial_voice_attrs)
 
         ant, side_to_antline = antlines.parse_antlines(vmf)
 
@@ -1651,7 +1658,7 @@ async def main() -> None:
         change_ents(vmf)
 
         fizzler.parse_map(vmf, info)
-        barriers.parse_map(vmf, info)
+        barriers.parse_map(vmf, connections.ITEMS)
         # We have barriers, pass to our error display.
         errors.load_barriers(barriers.BARRIERS)
 
@@ -1664,16 +1671,17 @@ async def main() -> None:
 
         await texturing.setup(game, vmf, list(tiling.TILES.values()))
 
-        conditions.check_all(vmf, coll, info)
+        conditions.check_all(vmf, coll, info, voice_data_res())
         add_extra_ents(vmf, info)
 
         tiling.generate_brushes(vmf)
         faithplate.gen_faithplates(vmf, info.has_attr('superposition'))
         change_overlays(vmf)
-        fix_worldspawn(vmf)
+        fix_worldspawn(vmf, info)
 
         if utils.DEV_MODE:
-            coll.dump(vmf, vis_name='collisions')
+            coll.export_debug(vmf, vis_name='collisions')
+        coll.export_vscript(vmf)
 
         # Ensure all VMF outputs use the correct separator.
         for ent in vmf.entities:

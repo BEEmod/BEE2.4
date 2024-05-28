@@ -17,7 +17,7 @@ import itertools
 import logging
 import weakref
 
-from PIL import Image, ImageColor, ImageDraw, ImageFont, ImageTk
+from PIL import Image, ImageColor, ImageDraw, ImageFont
 from srctools import Keyvalues, Vec
 from srctools.filesys import FileSystem, FileSystemChain, RawFileSystem
 from srctools.vtf import VTF, VTFFlags
@@ -81,6 +81,7 @@ def _load_special(path: str, theme: Theme) -> Image.Image:
         LOGGER.warning('"{}" icon could not be loaded!', path, exc_info=True)
         return Image.new('RGBA', (64, 64), (0, 0, 0, 0))
 
+
 ICONS: Dict[Tuple[str, Theme], Image.Image] = {
     (name, theme): _load_special(name, theme)
     for name in ['error', 'none', 'load']
@@ -117,13 +118,17 @@ def tuple_size(size: tuple[int, int] | int) -> tuple[int, int]:
 
 
 # Special paths which map to various images.
-PATH_BLANK = utils.PackagePath('<special>', 'blank')
-PATH_ERROR = utils.PackagePath('<special>', 'error')
-PATH_LOAD = utils.PackagePath('<special>', 'load')
-PATH_NONE = utils.PackagePath('<special>', 'none')
-PATH_BG = utils.PackagePath('<special>', 'bg')
-PATH_BLACK = utils.PackagePath('<color>', '000')
-PATH_WHITE = utils.PackagePath('<color>', 'fff')
+PAK_SPECIAL = utils.special_id('<special>')
+PAK_COLOR = utils.special_id('<color>')
+PAK_BEE2 = utils.special_id('<bee2>')
+
+PATH_BLANK = utils.PackagePath(PAK_SPECIAL, 'blank')
+PATH_ERROR = utils.PackagePath(PAK_SPECIAL, 'error')
+PATH_LOAD = utils.PackagePath(PAK_SPECIAL, 'load')
+PATH_NONE = utils.PackagePath(PAK_SPECIAL, 'none')
+PATH_BG = utils.PackagePath(PAK_SPECIAL, 'bg')
+PATH_BLACK = utils.PackagePath(PAK_COLOR, '000')
+PATH_WHITE = utils.PackagePath(PAK_COLOR, 'fff')
 
 
 def current_theme() -> Theme:
@@ -136,7 +141,7 @@ def _load_file(
     uri: utils.PackagePath,
     width: int, height: int,
     resize_algo: Image.Resampling,
-    check_other_packages: bool=False,
+    check_other_packages: bool = False,
 ) -> Tuple[Image.Image, bool]:
     """Load an image from a filesystem."""
     path = uri.path.casefold()
@@ -226,7 +231,6 @@ class Handle(User):
     height: int
 
     _cached_pil: Image.Image | None = attrs.field(init=False, default=None, repr=False)
-    _cached_tk: ImageTk.PhotoImage | None = attrs.field(init=False, default=None, repr=False)
 
     _users: set[User] = attrs.field(init=False, factory=set, repr=False)
     # If set, get_tk()/get_pil() was used.
@@ -295,12 +299,12 @@ class Handle(User):
     def parse(
         cls: Type[Handle],
         kv: Keyvalues,
-        pack: str,
+        pack: utils.ObjectID,
         width: int,
         height: int,
         *,
-        subkey: str='',
-        subfolder: str='',
+        subkey: str = '',
+        subfolder: str = '',
     ) -> Handle:
         """Parse a keyvalue into an image handle.
 
@@ -342,7 +346,7 @@ class Handle(User):
         uri: utils.PackagePath,
         width: int = 0, height: int = 0,
         *,
-        subfolder: str='',
+        subfolder: str = '',
     ) -> Handle:
         """Parse a URI into an image handle.
 
@@ -363,7 +367,7 @@ class Handle(User):
             args = [0, 0, 0]
         elif uri.package.startswith('<') and uri.package.endswith('>'):  # Special names.
             special_name = uri.package[1:-1]
-            if special_name == 'special':
+            if special_name == 'SPECIAL':
                 args = []
                 name = uri.path.casefold()
                 if name == 'blank':
@@ -375,16 +379,16 @@ class Handle(User):
                     typ = ImgBackground
                 else:
                     raise ValueError(f'Unknown special type "{uri.path}"!')
-            elif special_name in ('color', 'colour', 'rgb'):
+            elif special_name in ('COLOR', 'COLOUR', 'RGB'):
                 color = uri.path
                 try:
                     if ',' in color:  # <color>:R,G,B
                         r, g, b = map(int, color.split(','))
-                    elif len(color) == 3: # RGB
+                    elif len(color) == 3:  # RGB
                         r = int(color[0] * 2, 16)
                         g = int(color[1] * 2, 16)
                         b = int(color[2] * 2, 16)
-                    elif len(color) == 6: # RRGGBB
+                    elif len(color) == 6:  # RRGGBB
                         r = int(color[0:2], 16)
                         g = int(color[2:4], 16)
                         b = int(color[4:6], 16)
@@ -400,7 +404,7 @@ class Handle(User):
                         raise ValueError(f'Colors must be #RGB, #RRGGBB hex values, or R,G,B decimal, not {uri}') from None
                 typ = ImgColor
                 args = [r, g, b]
-            elif special_name in ('bee', 'bee2'):  # Builtin resources.
+            elif special_name in ('BEE', 'BEE2'):  # Builtin resources.
                 if subfolder:
                     uri = uri.in_folder(subfolder)
                 typ = ImgBuiltin
@@ -417,12 +421,12 @@ class Handle(User):
     @classmethod
     def builtin(cls, path: str, width: int = 0, height: int = 0) -> ImgBuiltin:
         """Shortcut for getting a handle to a builtin UI image."""
-        return ImgBuiltin._deduplicate(width, height, utils.PackagePath('<bee2>', path + '.png'))
+        return ImgBuiltin._deduplicate(width, height, utils.PackagePath(PAK_BEE2, path + '.png'))
 
     @classmethod
     def sprite(cls, path: str, width: int = 0, height: int = 0) -> ImgSprite:
         """Shortcut for getting a handle to a builtin UI image, but with nearest-neighbour rescaling."""
-        return ImgSprite._deduplicate(width, height, utils.PackagePath('<bee2>', path + '.png'))
+        return ImgSprite._deduplicate(width, height, utils.PackagePath(PAK_BEE2, path + '.png'))
 
     @classmethod
     def composite(cls, children: Sequence[Handle], width: int = 0, height: int = 0) -> Handle:
@@ -457,7 +461,7 @@ class Handle(User):
     @classmethod
     def error(cls, width: int, height: int) -> ImgIcon:
         """Shortcut for getting a handle to an error icon."""
-        return ImgIcon._deduplicate(width, height,  'error')
+        return ImgIcon._deduplicate(width, height, 'error')
 
     @classmethod
     def ico_none(cls, width: int, height: int) -> ImgIcon:
@@ -531,9 +535,13 @@ class Handle(User):
             self.force_load()
         elif not self._users and _load_nursery is not None:
             # Loading something unused, schedule it to be cleaned soon.
-            self._cancel_cleanup.cancel()
-            self._cancel_cleanup = trio.CancelScope()
-            _load_nursery.start_soon(self._cleanup_task, self._cancel_cleanup)
+            try:
+                trio.lowlevel.current_task()
+            except Exception:
+                # We're in a thread, do this back on the main thread.
+                trio.from_thread.run_sync(self._schedule_cleanup)
+            else:
+                self._schedule_cleanup()
         return self._load_pil()
 
     def force_load(self) -> None:
@@ -562,11 +570,9 @@ class Handle(User):
             child._decref(self)
         if _load_nursery is None:
             return  # Not loaded, can't unload.
-        if not self._users and (self._cached_tk is not None or self._cached_pil is not None):
-            # Schedule this handle to be cleaned up, and store a cancel scope so that
-            # can be aborted.
-            self._cancel_cleanup = trio.CancelScope()
-            _load_nursery.start_soon(self._cleanup_task, self._cancel_cleanup)
+        if not self._users and self._cached_pil is not None:
+            # Schedule this handle to be cleaned up.
+            self._schedule_cleanup()
 
     def _incref(self, ref: User) -> None:
         """Add some user to the list of those controlled by us."""
@@ -577,6 +583,15 @@ class Handle(User):
         self._cancel_cleanup.cancel()
         for child in self._children():
             child._incref(self)
+
+    def _schedule_cleanup(self) -> None:
+        """Schedule this handle to be cleaned up."""
+        if self._users:
+            return  # We do have users.
+        self._cancel_cleanup.cancel()
+        self._cancel_cleanup = trio.CancelScope()
+        if _load_nursery is not None:
+            _load_nursery.start_soon(self._cleanup_task, self._cancel_cleanup)
 
     def _request_load(self, force: bool = False) -> Handle:
         """Request a reload of this image.

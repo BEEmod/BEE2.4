@@ -237,6 +237,7 @@ EXCLUDES = [
     'idlelib.textView',
 
     'numpy',  # PIL.ImageFilter imports, we don't need NumPy!
+    'stackscope',  # Only used in dev.
 
     'bz2',  # We aren't using this compression format (shutil, zipfile etc handle ImportError)..
 
@@ -244,6 +245,9 @@ EXCLUDES = [
     'win32evtlog',
     'win32evtlogutil',
     'smtplib',
+
+    # Pulls in all of pytest etc, not required.
+    'trio.testing',
 
     'unittest',  # Imported in __name__==__main__..
     'doctest',
@@ -302,7 +306,7 @@ COMPILER_LOC = f'../dist/{bitness}bit/compiler/'
 # Finally, run the PyInstaller analysis process.
 
 bee2_a = Analysis(
-    ['BEE2_launch.pyw'],
+    ['BEE2_launch.py'],
     pathex=[workpath],
     datas=data_files + data_bin_files,
     hiddenimports=[
@@ -324,7 +328,7 @@ pyz = PYZ(
     bee2_a.zipped_data,
 )
 
-exe = EXE(
+bee_exe = EXE(
     pyz,
     bee2_a.scripts,
     [],
@@ -340,8 +344,40 @@ exe = EXE(
     icon='../BEE2.ico'
 )
 
+backup_exe = EXE(
+    pyz,
+    bee2_a.scripts,
+    [],
+    exclude_binaries=True,
+    name='backup',
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=False,
+    console=False,
+    contents_directory='bin',
+    windowed=True,
+    icon='../BEE2.ico'
+)
+
+compiler_settings_exe = EXE(
+    pyz,
+    bee2_a.scripts,
+    [],
+    exclude_binaries=True,
+    name='compiler_settings',
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=False,
+    console=False,
+    contents_directory='bin',
+    windowed=True,
+    icon='../BEE2.ico'
+)
+
 coll = COLLECT(
-    exe,
+    bee_exe, backup_exe, compiler_settings_exe,
     bee2_a.binaries,
     bee2_a.zipfiles,
     bee2_a.datas,

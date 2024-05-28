@@ -1,16 +1,21 @@
 """Options specifically for app development."""
-from typing import Callable
+from __future__ import annotations
+from typing_extensions import NoReturn
+
+from collections.abc import Callable
 from tkinter import ttk
 import tkinter as tk
 import pprint
 
+from exceptiongroup import ExceptionGroup
 from srctools import logger
 import attrs
 import trio
+import trio_util
 
-from app import TK_ROOT, background_run, tk_tools
-from ui_tk.img import TK_IMG, label_to_user
-from ui_tk import wid_transtoken
+from .img import TK_IMG, label_to_user
+from . import tk_tools, wid_transtoken, TK_ROOT
+import utils
 
 
 LOGGER = logger.get_logger(__name__)
@@ -34,23 +39,91 @@ def dump_widgets() -> None:
         else:
             f.write('\n')
 
-    with open('../dev/widget_tree.txt', 'w') as f:
+    with open('../reports/widget_tree.txt', 'w') as f:
         dump(TK_ROOT, '')
     LOGGER.info('Dump done!')
 
 
-def make_menu(menu: tk.Menu) -> None:
+def dump_tasktree() -> str:
+    """Write out the full tree of tasks."""
+    try:
+        import stackscope
+    except ImportError:
+        # Don't add this as a dependency.
+        return '<No stackscope module>'
+    stack = stackscope.extract(trio.lowlevel.current_root_task(), recurse_child_tasks=True)
+    with open('../reports/tasks.txt', 'w', encoding='utf8') as f:
+        f.write(str(stack))
+    return str(stack)
+
+
+def stats_trio() -> str:
+    """Include trio's stats."""
+    return 'Trio = ' + pprint.pformat(
+        attrs.asdict(trio.lowlevel.current_statistics(), recurse=True)
+    )
+
+
+def crasher(nursery: trio.Nursery, exc: BaseException) -> tuple[Callable[[], object], Callable[[], object]]:
+    """Make a function that raises an exception, to test crash handlers. This returns a sync and async pair."""
+    def fg_raise() -> NoReturn:
+        """Raise in the foreground."""
+        raise exc
+
+    async def bg_raise() -> NoReturn:
+        """Raise in the background."""
+        await trio.sleep(1)
+        raise exc
+
+    return fg_raise, lambda: nursery.start_soon(bg_raise)
+
+
+async def menu_task(menu: tk.Menu) -> None:
     """Create the TK menu bar."""
-    menu.add_command(label='Dump widgets', command=dump_widgets)
-    menu.add_command(label='Stats', command=make_stats_window())
+    def event_raise(e: tk.Event) -> None:
+        """Raise an event from inside an event handler."""
+        print(f'Exception: {e}')
+        raise NotImplementedError(f'{id(e):x} = {e!r}')
+
+    async with trio.open_nursery() as nursery:
+        fg_single, bg_single = crasher(nursery, NotImplementedError('Crashing time!'))
+        fg_group, bg_group = crasher(nursery, ExceptionGroup('A group', [
+            ZeroDivisionError('Divided'),
+            BufferError('Buffer'),
+            MemoryError('RAM'),
+        ]))
+
+        menu.add_command(label='Dump widgets', command=dump_widgets)
+        menu.add_command(label='Stats', command=await nursery.start(stats_window_task))
+        menu.add_command(label='Dump Tasks', command=dump_tasktree)
+
+        menu.add_cascade(label='Crash', menu=(crash_menu := tk.Menu(menu)))
+
+        crash_menu.add_command(label='Sync, Singular', command=fg_single)
+        crash_menu.add_command(label='Sync, Grouped', command=fg_group)
+        crash_menu.add_command(label='Async, Singular', command=bg_single)
+        crash_menu.add_command(label='Async, Grouped', command=bg_group)
+        crash_menu.add_command(
+            label='Event Handler, Singular',
+            command=lambda: TK_ROOT.event_generate('<<DevMenuSingleCrash>>'),
+        )
+        crash_menu.add_command(
+            label='Event Handler, Multi',
+            command=lambda: TK_ROOT.event_generate('<<DevMenuMultiCrash>>'),
+        )
+
+        TK_ROOT.bind('<<DevMenuSingleCrash>>', event_raise)
+        TK_ROOT.bind('<<DevMenuMultiCrash>>', event_raise, add='+')
+        TK_ROOT.bind('<<DevMenuMultiCrash>>', event_raise, add='+')
+        TK_ROOT.bind('<<DevMenuMultiCrash>>', event_raise, add='+')
+        TK_ROOT.bind('<<DevMenuMultiCrash>>', event_raise, add='+')
+        await trio.sleep_forever()
 
 
-def make_stats_window() -> Callable[[], object]:
+async def stats_window_task(task_status: trio.TaskStatus[Callable[[], object]]) -> None:
     """Create the statistics window."""
-    cancel_scope = trio.CancelScope()
     window = tk.Toplevel(TK_ROOT, name='statsWin')
     window.withdraw()
-    window.protocol("WM_DELETE_WINDOW", lambda: cancel_scope.cancel())  # Late binding.
 
     label = ttk.Label(window, name='info', text='...', font='TkFixedFont')
     window.grid_columnconfigure(0, weight=1)
@@ -59,26 +132,25 @@ def make_stats_window() -> Callable[[], object]:
     ticker_lbl = ttk.Label(window, name='ticker', text='-')
     ticker_lbl.grid(row=1, column=0)
 
-    async def open_window() -> None:
-        """Display the statistics window."""
-        nonlocal cancel_scope
-        if window.winfo_ismapped():
-            return  # Already visible.
-        with trio.CancelScope() as cancel_scope:
-            window.wm_deiconify()
-            tk_tools.center_win(window, TK_ROOT)
-            ticker = False
-            while not cancel_scope.cancel_called:
-                label['text'] = '\n'.join([
-                    TK_IMG.stats(),
-                    wid_transtoken.stats(),
-                    'Trio = ' + pprint.pformat(
-                        attrs.asdict(trio.lowlevel.current_statistics(), recurse=True)
-                    ),
-                ])
+    open_val = trio_util.AsyncBool()
+    window.protocol("WM_DELETE_WINDOW", utils.val_setter(open_val, False))
+
+    stat_funcs = [
+        TK_IMG.stats,
+        wid_transtoken.stats,
+        stats_trio,
+    ]
+
+    task_status.started(utils.val_setter(open_val, True))
+    while True:
+        await open_val.wait_value(True)
+        window.wm_deiconify()
+        tk_tools.center_win(window, TK_ROOT)
+        ticker = False
+        async with trio_util.move_on_when(open_val.wait_value, False):
+            while True:
+                label['text'] = '\n'.join([func() for func in stat_funcs])
                 ticker = not ticker
                 ticker_lbl['text'] = '|' if ticker else '-'
                 await trio.sleep(1.0)
         window.wm_withdraw()
-
-    return lambda: background_run(open_window)

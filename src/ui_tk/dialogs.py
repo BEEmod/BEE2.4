@@ -1,32 +1,40 @@
 """A consistent interface for dialog boxes."""
-from typing import Callable, List, Optional, Tuple, Union
+from __future__ import annotations
+from typing_extensions import override
 
-from tkinter import simpledialog, ttk
+from collections.abc import Callable
+from tkinter import simpledialog, ttk, commondialog
 import tkinter as tk
 
 import trio
-from typing_extensions import override
 
-from loadScreen import suppress_screens
 from app.dialogs import DEFAULT_TITLE, Dialogs, Icon, validate_non_empty
-from app.errors import AppError
-from app.tk_tools import set_window_icon, center_onscreen
-from transtoken import TransToken
+from loadScreen import suppress_screens
+from transtoken import AppError, TransToken
 
-from app import TK_ROOT
-from ui_tk.wid_transtoken import set_text
+from . import TK_ROOT
+from .tk_tools import set_window_icon, center_onscreen
+from .wid_transtoken import set_text
+
+
+__all__ = ['Dialogs', 'TkDialogs', 'DIALOG']
+# Patch various tk windows to hide loading screens while they are open.
+# Messageboxes, file dialogs and colorchooser all inherit from Dialog,
+# so patching .show() will fix them all.
+# contextlib managers can also be used as decorators.
+commondialog.Dialog.show = suppress_screens()(commondialog.Dialog.show)  # type: ignore
 
 
 async def _messagebox(
     kind: str,
-    parent: Union[tk.Toplevel, tk.Tk],
+    parent: tk.Toplevel | tk.Tk,
     message: TransToken,
     title: TransToken,
     icon: Icon,
     detail: str,
-) -> List[str]:
+) -> str:
     """Don't bother with `tkinter.messagebox`, it just calls this which is more flexible anyway."""
-    args: Tuple[str, ...] = (
+    args: tuple[str, ...] = (
         "tk_messageBox",
         "-type", kind,
         "-icon", icon.value,
@@ -38,12 +46,13 @@ async def _messagebox(
         args += ('-detail', detail)
 
     # Threading seems to work, not sure if safe...
-    return await trio.to_thread.run_sync(TK_ROOT.tk.call,*args)
+    with suppress_screens():
+        return await trio.to_thread.run_sync(TK_ROOT.tk.call,*args)
 
 
 class BasicQueryValidator(simpledialog.Dialog):
     """Implement the dialog with the simpledialog code."""
-    result: Optional[str]
+    result: str | None
     def __init__(
         self,
         parent: tk.Misc,
@@ -138,7 +147,7 @@ else:
             """Wait for the query to close."""
             await self.__has_closed.wait()
 
-        def entry_ok(self) -> Optional[str]:
+        def entry_ok(self) -> str | None:
             """Return non-blank entry or None."""
             try:
                 return self.__validator(self.entry.get())
@@ -154,7 +163,7 @@ class TkDialogs(Dialogs):
     QUESTION = Icon.QUESTION
     ERROR = Icon.ERROR
 
-    def __init__(self, parent: Union[tk.Toplevel, tk.Tk]) -> None:
+    def __init__(self, parent: tk.Toplevel | tk.Tk) -> None:
         """Create with the specified parent."""
         self.parent = parent
 
@@ -210,7 +219,7 @@ class TkDialogs(Dialogs):
         title: TransToken = DEFAULT_TITLE,
         icon: Icon = Icon.QUESTION,
         detail: str = '',
-    ) -> Optional[bool]:
+    ) -> bool | None:
         """Show a message box with "Yes", "No" and "Cancel" buttons."""
         res = await _messagebox("yesnocancel", self.parent, message, title, icon, detail)
         if res == "yes":
@@ -229,13 +238,13 @@ class TkDialogs(Dialogs):
         title: TransToken = DEFAULT_TITLE,
         initial_value: TransToken = TransToken.BLANK,
         validator: Callable[[str], str] = validate_non_empty,
-    ) -> Optional[str]:
+    ) -> str | None:
         """Ask the user to enter a string."""
         with suppress_screens():
             # If the main loop isn't running, this doesn't work correctly.
             # Probably also if it's not visible. So swap back to the old style.
             # It's also only a problem on Windows.
-            if Query is None:  # or (utils.WIN and (not _main_loop_running or not TK_ROOT.winfo_viewable())):
+            if Query is None:
                 query_cls = BasicQueryValidator
             else:
                 query_cls = QueryValidator

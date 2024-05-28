@@ -407,8 +407,11 @@ def check_blockpos_type(inst: Entity, kv: Keyvalues) -> bool:
     else:
         bbox = [pos1]
 
+    add_debug = conditions.fetch_debug_visgroup(inst.map, 'get_blocktype')
+
     for pos in bbox:
         block = brushLoc.POS.lookup_world(pos)
+        add_debug('info_target', origin=pos, comment=block.name)
         for block_type in types:
             try:
                 allowed = brushLoc.BLOCK_LOOKUP[block_type.casefold()]
@@ -606,4 +609,4 @@ def res_rotate_inst(inst: Entity, res: Keyvalues) -> None:
         origin = Vec.from_str(inst['origin'])
         inst['origin'] = origin + (-offset @ orient + offset) @ angles
 
-    inst['angles'] = (orient @ angles).to_angle()
+    inst['angles'] = orient @ angles

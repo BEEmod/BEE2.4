@@ -2,13 +2,14 @@
 from __future__ import annotations
 
 from pathlib import Path
+
 from PIL import Image, ImageDraw
 import colorsys
 
 from srctools.vtf import VTF, ImageFormats
 import srctools.logger
 
-from packages import PackagesSet
+from . import ExportData, STEPS, StepResource
 from packages.widgets import ConfigGroup, parse_color
 from app import img
 
@@ -23,12 +24,13 @@ CELL_SIZE = 96
 LEGEND_SIZE = 512
 
 
-def make_cube_colourizer_legend(packset: PackagesSet, bee2_loc: Path) -> None:
+@STEPS.add_step(prereq=[], results=[StepResource.RES_SPECIAL])
+async def make_cube_colourizer_legend(exp_data: ExportData) -> None:
     """Create a cube colourizer legend, showing the colours."""
     # Find the colourizer group, and grab its values. If not currently present,
     # we don't need to generate.
     try:
-        config = packset.obj_by_id(ConfigGroup, 'BEE2_CUBE_COLORISER')
+        config = exp_data.packset.obj_by_id(ConfigGroup, 'BEE2_CUBE_COLORISER')
     except KeyError:
         LOGGER.debug('No cube colorizer config group!')
         return
@@ -39,8 +41,8 @@ def make_cube_colourizer_legend(packset: PackagesSet, bee2_loc: Path) -> None:
         LOGGER.debug('No COLOR widget in {}', config.multi_widgets)
         return
     colors = {
-        int(tim): parse_color(value)
-        for tim, value in wid.values.items()
+        int(tim): parse_color(holder.value)
+        for tim, holder in wid.holders.items()
     }
 
     legend = Image.new('RGB', (LEGEND_SIZE, LEGEND_SIZE), color=(255, 255, 255))
@@ -89,7 +91,10 @@ def make_cube_colourizer_legend(packset: PackagesSet, bee2_loc: Path) -> None:
         frame = vtf.get(mipmap=i)
         frame.copy_from(b'\xFF' * (frame.width*frame.height), ImageFormats.I8)
 
-    vtf_loc = bee2_loc / 'materials/BEE2/models/props_map_editor/cube_coloriser_legend.vtf'
+    vtf_loc = Path(exp_data.game.abs_path(
+        'bee2/materials/BEE2/models/props_map_editor/cube_coloriser_legend.vtf'
+    ))
+    exp_data.resources.add(vtf_loc)
     vtf_loc.parent.mkdir(parents=True, exist_ok=True)
     with vtf_loc.open('wb') as f:
         LOGGER.info('Exporting "{}"...', f.name)

@@ -1,7 +1,7 @@
 """Implements callables which lazily parses and combines config files."""
 from __future__ import annotations
 from typing import Any, Awaitable, Callable, Final, Pattern
-from typing_extensions import TypeAlias
+from typing_extensions import TypeAliasType
 import functools
 
 from srctools import KeyValError, Keyvalues, logger
@@ -14,7 +14,7 @@ import utils
 
 
 LOGGER = logger.get_logger(__name__)
-LazyConf: TypeAlias = Callable[[], Awaitable[Keyvalues]]
+LazyConf = TypeAliasType("LazyConf", Callable[[], Awaitable[Keyvalues]])
 
 
 async def _blank_prop() -> Keyvalues:
@@ -25,7 +25,7 @@ async def _blank_prop() -> Keyvalues:
 BLANK: Final[LazyConf] = _blank_prop
 
 
-def raw_prop(block: Keyvalues, source: str= '') -> LazyConf:
+def raw_prop(block: Keyvalues, source: str = '') -> LazyConf:
 	"""Make an existing property conform to the interface."""
 	if block or block.name is not None:
 		if source:
@@ -45,7 +45,7 @@ def raw_prop(block: Keyvalues, source: str= '') -> LazyConf:
 		return BLANK
 
 
-def from_file(path: utils.PackagePath, missing_ok: bool=False, source: str= '') -> LazyConf:
+def from_file(path: utils.PackagePath, missing_ok: bool = False, source: str = '') -> LazyConf:
 	"""Lazily load the specified config."""
 	try:
 		fsys = packages.PACKAGE_SYS[path.package]
@@ -76,7 +76,7 @@ def from_file(path: utils.PackagePath, missing_ok: bool=False, source: str= '') 
 			raise
 		return kv
 
-	if app.DEV_MODE.get():
+	if app.DEV_MODE.value:
 		app.background_run(devmod_check, file, path)
 	return loader
 

@@ -2,6 +2,7 @@
 from enum import Enum
 from typing import List
 
+from trio.testing import RaisesGroup
 import pytest
 import trio
 
@@ -13,6 +14,7 @@ class Resource(Enum):
     A = "a"
     B = "b"
     C = "c"
+    D = "d"
 
 
 async def test_basic(autojump_clock: trio.abc.Clock) -> None:
@@ -35,7 +37,8 @@ async def test_basic(autojump_clock: trio.abc.Clock) -> None:
         await trio.sleep(1)
         log.append('end 3')
 
-    @order.add_step(prereq=[Resource.A], results=[Resource.B])
+    # Note - D is not the result of any step, it should be ignored.
+    @order.add_step(prereq=[Resource.A, Resource.D], results=[Resource.B])
     async def step_2(ctx: object) -> None:
         assert ctx is data
         log.append('start 2')
@@ -85,7 +88,7 @@ async def test_direct_cycle(autojump_clock: trio.abc.Clock) -> None:
     async def step_4(ctx: object) -> None:
         pytest.fail("Shouldn't run.")
 
-    with pytest.raises(CycleError):
+    with RaisesGroup(CycleError, strict=False):
         await order.run(None)
 
     assert log == ['step 1', 'step 2']  # These still ran.

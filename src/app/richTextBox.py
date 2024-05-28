@@ -9,7 +9,7 @@ from typing_extensions import Never
 
 from app import tkMarkdown
 from app.tkMarkdown import TextTag, TAG_HEADINGS
-from app.tk_tools import Cursors
+from ui_tk.tk_tools import Cursors
 from transtoken import TransToken
 from ui_tk.img import TK_IMG
 import srctools.logger
@@ -188,7 +188,7 @@ class tkRichText(tkinter.Text):
                                 self.make_link_callback(block.url),
                             )
                             self._link_commands[block.url] = cmd_tag, cmd_id
-                        tags = block.tags + (cmd_tag, TextTag.LINK)
+                        tags = (*block.tags, cmd_tag, TextTag.LINK)
                     else:
                         tags = block.tags
                     # Strip newlines from the beginning and end of the textbox.

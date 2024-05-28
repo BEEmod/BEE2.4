@@ -9,9 +9,9 @@ import BEE2_config
 import utils
 from transtoken import TransToken
 from app import (
-    gameMan, helpMenu, optionWindow, packageMan, tk_tools,
-    backup as backup_win, background_run,
+    gameMan, helpMenu, optionWindow, packageMan, backup as backup_win, background_run, quit_app,
 )
+from ui_tk import tk_tools
 from ui_tk.dialogs import DIALOG
 from ui_tk.img import TKImages
 from ui_tk.wid_transtoken import set_menu_text
@@ -32,7 +32,6 @@ class MenuBar:
         self,
         parent: tk.Tk,
         tk_img: TKImages,
-        quit_app: Callable[[], object],
         export: Callable[[], object],
     ) -> None:
         """Create the top menu bar.
@@ -110,7 +109,7 @@ class MenuBar:
         bar.add_cascade(menu=self.view_menu)
         set_menu_text(bar, TransToken.ui("View"))
 
-        helpMenu.make_help_menu(bar, tk_img)
+        background_run(helpMenu.make_help_menu, bar, tk_img)
         gameMan.ON_GAME_CHANGED.register(self._game_changed)
 
         if utils.CODE_DEV_MODE:
@@ -118,7 +117,7 @@ class MenuBar:
             bar.add_cascade(menu=self.dev_menu, label='Dev')
 
             from ui_tk import devmenu
-            devmenu.make_menu(self.dev_menu)
+            background_run(devmenu.menu_task, self.dev_menu)
 
     def set_export_allowed(self, allowed: bool) -> None:
         """Configure if exporting is allowed from the UI."""

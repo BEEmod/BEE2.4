@@ -4,26 +4,31 @@ Translation only occurs in the app, using the localisation module. In the compil
 so that data structures can be shared.
 We take care not to directly import gettext and babel, so the compiler can omit those.
 """
+from __future__ import annotations
 from typing import (
     Any, Callable, ClassVar, Dict, Final, Iterable, List, Mapping, NoReturn,
-    Optional, Protocol, Sequence, Tuple, cast,
+    Optional, Protocol, Sequence, Tuple, cast, final,
 )
-from typing_extensions import LiteralString, TypeAlias, override
+
+from typing_extensions import LiteralString, TypeAliasType, override
 from enum import Enum
 from html import escape as html_escape
 from pathlib import Path
 import string
 
+from trio_util import AsyncValue
 from srctools import EmptyMapping, logger
 import attrs
+
+import utils
 
 
 LOGGER = logger.get_logger(__name__)
 del logger
 
-NS_UI: Final = '<BEE2>'  # Our UI translations.
-NS_GAME: Final = '<PORTAL2>'   # Lookup from basemodui.txt
-NS_UNTRANSLATED: Final = '<NOTRANSLATE>'  # Legacy values which don't have translation
+NS_UI: Final = utils.special_id('<BEE2>')  # Our UI translations.
+NS_GAME: Final = utils.special_id('<PORTAL2>')   # Lookup from basemodui.txt
+NS_UNTRANSLATED: Final = utils.special_id('<NOTRANSLATE>')  # Legacy values which don't have translation
 
 # The prefix for all Valve's editor keys.
 PETI_KEY_PREFIX: Final = 'PORTAL2_PuzzleEditor'
@@ -51,13 +56,13 @@ class Language:
     """A language which may be loaded, and the associated translations."""
     lang_code: str
     ui_filename: Optional[Path] = None  # Filename of the UI translation, if it exists.
-    _trans: Dict[str, GetText]
+    _trans: Dict[str, GetText] = attrs.field(alias='trans')
     # The loaded translations from basemodui.txt
     game_trans: Mapping[str, str] = EmptyMapping
 
 
 # The current language. Can be set to change language, but don't do that in the UI.
-CURRENT_LANG = Language(lang_code='en', trans={})
+CURRENT_LANG: Final = AsyncValue(Language(lang_code='en', trans={}))
 # Special language which replaces all text with ## to easily identify untranslatable text.
 DUMMY: Final = Language(lang_code='dummy', trans={})
 
@@ -65,7 +70,7 @@ DUMMY: Final = Language(lang_code='dummy', trans={})
 # It's initialised to a basic version, in case we're running in the compiler.
 ui_format_getter: Callable[[str], Optional[string.Formatter]] = lambda lang, /: None
 # Similarly, joins a list given the language, kind of list and children.
-ui_list_getter: Callable[[str, ListStyle, List[str]], str] = lambda lang, kind, children, /: ' ,'.join(children)
+ui_list_getter: Callable[[str, ListStyle, List[str]], str] = lambda lang, kind, children, /: ', '.join(children)
 
 
 class HTMLFormatter(string.Formatter):
@@ -91,33 +96,33 @@ def _param_convert(params: Mapping[str, object]) -> Mapping[str, object]:
 class TransToken:
     """A named section of text that can be translated later on."""
     # The package name, or a NS_* constant.
-    namespace: str
+    namespace: utils.SpecialID
     # Original package where this was parsed from.
-    orig_pack: str
+    orig_pack: utils.SpecialID
     # The token to lookup, or the default if undefined.
     token: str
     # Keyword arguments passed when formatting.
     parameters: Mapping[str, object] = attrs.field(converter=_param_convert)
 
-    BLANK: ClassVar['TransToken']   # Quick access to blank token.
+    BLANK: ClassVar[TransToken]   # Quick access to blank token.
 
     @classmethod
-    def parse(cls, package: str, text: str) -> 'TransToken':
+    def parse(cls, package: utils.SpecialID, text: str) -> TransToken:
         """Parse a string to find a translation token, if any."""
         orig_pack = package
         if text.startswith('[['):  # "[[package]] default"
             try:
-                package, token = text[2:].split(']]', 1)
+                package_str, token = text[2:].split(']]', 1)
                 token = token.lstrip()  # Allow whitespace between "]" and text.
-                # Don't allow specifying our special namespaces.
-                if package.startswith('<') or package.endswith('>'):
-                    raise ValueError
+                # Don't allow specifying our special namespaces, except allow empty string for UNTRANSLATED
+                package = utils.obj_id(package_str) if package_str else NS_UNTRANSLATED
             except ValueError:
-                LOGGER.warning('Unparsable translation token - expected "[[package]] text", got:\n{}', text)
+                LOGGER.warning(
+                    'Unparsable translation token - expected "[[package]] text", got:\n{!r}',
+                    text
+                )
                 return cls(package, orig_pack, text, EmptyMapping)
             else:
-                if not package:
-                    package = NS_UNTRANSLATED
                 return cls(package, orig_pack, token, EmptyMapping)
         elif text.startswith(PETI_KEY_PREFIX):
             return cls(NS_GAME, orig_pack, text, EmptyMapping)
@@ -125,26 +130,29 @@ class TransToken:
             return cls(package, orig_pack, text, EmptyMapping)
 
     @classmethod
-    def ui(cls, token: LiteralString, /, **kwargs: str) -> 'TransToken':
+    def ui(cls, token: LiteralString, /, **kwargs: str) -> TransToken:
         """Make a token for a UI string."""
         return cls(NS_UI, NS_UI, token, kwargs)
 
     @staticmethod
-    def ui_plural(singular: LiteralString, plural: LiteralString,  /, **kwargs: str) -> 'PluralTransToken':
+    def ui_plural(singular: LiteralString, plural: LiteralString, /, **kwargs: str) -> PluralTransToken:
         """Make a plural token for a UI string."""
         return PluralTransToken(NS_UI, NS_UI, singular, kwargs, plural)
 
-    def join(self, children: Iterable['TransToken'], sort: bool=False) -> 'JoinTransToken':
+    def join(self, children: Iterable[TransToken], sort: bool = False) -> JoinTransToken:
         """Use this as a separator to join other tokens together."""
-        return JoinTransToken(self.namespace, self.orig_pack, self.token, self.parameters, list(children), sort)
+        return JoinTransToken(
+            self.namespace, self.orig_pack, self.token, self.parameters,
+            list(children), sort,
+        )
 
     @classmethod
-    def from_valve(cls, text: str) -> 'TransToken':
+    def from_valve(cls, text: str) -> TransToken:
         """Make a token for a string that should be looked up in Valve's translation files."""
         return cls(NS_GAME, NS_GAME, text, EmptyMapping)
 
     @classmethod
-    def untranslated(cls, text: str) -> 'TransToken':
+    def untranslated(cls, text: str) -> TransToken:
         """Make a token that is not actually translated at all.
 
         In this case, the token is the literal text to use.
@@ -152,7 +160,7 @@ class TransToken:
         return cls(NS_UNTRANSLATED, NS_UNTRANSLATED, text, EmptyMapping)
 
     @classmethod
-    def list_and(cls, children: Iterable['TransToken'], sort: bool=False) -> 'ListTransToken':
+    def list_and(cls, children: Iterable[TransToken], sort: bool = False) -> ListTransToken:
         """Join multiple tokens together in an and-list."""
         return ListTransToken(
             NS_UNTRANSLATED, NS_UNTRANSLATED, ', ', EmptyMapping,
@@ -160,7 +168,7 @@ class TransToken:
         )
 
     @classmethod
-    def list_or(cls, children: Iterable['TransToken'], sort: bool=False) -> 'ListTransToken':
+    def list_or(cls, children: Iterable[TransToken], sort: bool = False) -> ListTransToken:
         """Join multiple tokens together in an or-list."""
         return ListTransToken(
             NS_UNTRANSLATED, NS_UNTRANSLATED, ', ', EmptyMapping,
@@ -182,7 +190,7 @@ class TransToken:
         """Check if this is builtin UI text."""
         return self.namespace == NS_UI
 
-    def format(self, /, **kwargs: object) -> 'TransToken':
+    def format(self, /, **kwargs: object) -> TransToken:
         """Return a new token with the provided parameters added in."""
         # Only merge together if we had parameters, otherwise just store the dict.
         if self.parameters and kwargs:
@@ -228,20 +236,22 @@ class TransToken:
 
     def _convert_token(self) -> str:
         """Return the translated version of our token."""
+        cur_lang = CURRENT_LANG.value
+
         # If in the untranslated namespace or blank, don't translate.
         if self.namespace == NS_UNTRANSLATED or not self.token:
             return self.token
-        elif CURRENT_LANG is DUMMY:
+        elif cur_lang is DUMMY:
             return '#' * len(self.token)
         elif self.namespace == NS_GAME:
             try:
-                return CURRENT_LANG.game_trans[self.token]
+                return cur_lang.game_trans[self.token]
             except KeyError:
                 return self.token
         else:
             try:
                 # noinspection PyProtectedMember
-                return CURRENT_LANG._trans[self.namespace].gettext(self.token)
+                return cur_lang._trans[self.namespace].gettext(self.token)
             except KeyError:
                 return self.token
 
@@ -249,11 +259,15 @@ class TransToken:
         """Calling str on a token translates it."""
         text = self._convert_token()
         if self.parameters:
-            formatter = ui_format_getter(CURRENT_LANG.lang_code)
-            if formatter is not None:
-                return formatter.vformat(text, (), self.parameters)
-            else:
-                return text.format_map(self.parameters)
+            formatter = ui_format_getter(CURRENT_LANG.value.lang_code)
+            try:
+                if formatter is not None:
+                    return formatter.vformat(text, (), self.parameters)
+                else:
+                    return text.format_map(self.parameters)
+            except KeyError:
+                LOGGER.warning('Could not format {!r} with {}', text, self.parameters)
+                return text
         else:
             return text
 
@@ -272,7 +286,7 @@ class TransToken:
 TransToken.BLANK = TransToken.untranslated('')
 
 # Token and "source" string, for updating translation files.
-TransTokenSource: TypeAlias = Tuple[TransToken, str]
+TransTokenSource = TypeAliasType("TransTokenSource", Tuple[TransToken, str])
 
 
 @attrs.frozen(eq=False)
@@ -291,7 +305,7 @@ class PluralTransToken(TransToken):
     ui = ui_plural = untranslated = from_valve = _not_allowed  # type: ignore[assignment]
 
     @override
-    def join(self, children: Iterable['TransToken'], sort: bool = False) -> 'JoinTransToken':
+    def join(self, children: Iterable[TransToken], sort: bool = False) -> JoinTransToken:
         """Joining is not allowed."""
         raise NotImplementedError('This is not allowed.')
 
@@ -321,18 +335,19 @@ class PluralTransToken(TransToken):
             n = int(cast(str, self.parameters['n']))
         except KeyError:
             raise ValueError('Plural token requires "n" parameter!') from None
+        cur_lang = CURRENT_LANG.value
 
         # If in the untranslated namespace or blank, don't translate.
         if self.namespace == NS_UNTRANSLATED or not self.token:
             return self.token if n == 1 else self.token_plural
-        elif CURRENT_LANG is DUMMY:
+        elif cur_lang is DUMMY:
             return '#' * len(self.token if n == 1 else self.token_plural)
         elif self.namespace == NS_GAME:
             raise ValueError('Game namespace cannot be pluralised!')
         else:
             try:
                 # noinspection PyProtectedMember
-                return CURRENT_LANG._trans[self.namespace].ngettext(self.token, self.token_plural, n)
+                return cur_lang._trans[self.namespace].ngettext(self.token, self.token_plural, n)
             except KeyError:
                 return self.token
 
@@ -420,4 +435,22 @@ class ListTransToken(JoinTransToken):
         items = [str(child) for child in self.children]
         if self.sort:
             items.sort()
-        return ui_list_getter(CURRENT_LANG.lang_code, self.kind, items)
+        return ui_list_getter(CURRENT_LANG.value.lang_code, self.kind, items)
+
+
+# TODO: Move this back to app.errors when that can be imported in compiler safely.
+
+@final
+@attrs.define(init=False)
+class AppError(Exception):
+    """An error that occurs when using the app, that should be displayed to the user."""
+    message: TransToken
+    fatal: bool
+
+    def __init__(self, message: TransToken) -> None:
+        super().__init__(message)
+        self.message = message
+        self.fatal = False
+
+    def __str__(self) -> str:
+        return f"AppError: {self.message}"

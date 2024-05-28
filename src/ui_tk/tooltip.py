@@ -10,11 +10,12 @@ import weakref
 
 import attr
 
-from app import TK_ROOT, img
+from app import img
 from transtoken import TransToken
-from ui_tk.img import TK_IMG
+from .img import TK_IMG
 # Don't import set_text directly, could be confused with tooltip setter.
-from ui_tk import wid_transtoken
+from . import wid_transtoken
+from . import TK_ROOT
 import utils
 
 
@@ -135,7 +136,7 @@ def set_tooltip(
     text: TransToken = TransToken.BLANK,
     *,
     image: img.Handle | None = None,
-    delay: int=-1,
+    delay: int = -1,
 ) -> None:
     """Change the tooltip for a widget.
 
@@ -160,8 +161,8 @@ def add_tooltip(
     text: TransToken = TransToken.BLANK,
     *,
     image: img.Handle | None = None,
-    delay: int=500,
-    show_when_disabled: bool=False,
+    delay: int = 500,
+    show_when_disabled: bool = False,
 ) -> None:
     """Add a tooltip to the specified widget.
 

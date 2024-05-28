@@ -12,19 +12,20 @@ import srctools.logger
 import packages
 import utils
 from app.reports import report_all_obj, report_items, report_editor_models
-from app.tooltip import add_tooltip
 from app import (
-    TK_ROOT, LAUNCH_AFTER_EXPORT, DEV_MODE, background_run,
-    contextWin, gameMan, localisation, tk_tools, sound, logWindow, img, UI,
+    DEV_MODE, background_run,
+    contextWin, gameMan, localisation, sound, logWindow, img, UI,
 )
 from config.filters import FilterConf
-from ui_tk.dialogs import Dialogs, DIALOG, TkDialogs
 from config.gen_opts import GenOptions, AfterExport
 from consts import Theme
-from transtoken import TransToken
+from transtoken import TransToken, CURRENT_LANG
 import loadScreen
 import config
 from ui_tk.wid_transtoken import set_text, set_win_title
+from ui_tk.dialogs import Dialogs, DIALOG, TkDialogs
+from ui_tk.tooltip import add_tooltip
+from ui_tk import TK_ROOT, tk_tools
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -114,6 +115,7 @@ async def apply_config(conf: GenOptions) -> None:
     """Used to apply the configuration to all windows."""
     logWindow.HANDLER.set_visible(conf.show_log_win)
     loadScreen.set_force_ontop(conf.force_load_ontop)
+    DEV_MODE.value = conf.dev_mode
     # We don't propagate compact splash, that isn't important after the UI loads.
     UI.refresh_palette_icons()
 
@@ -137,7 +139,7 @@ async def clear_caches(dialogs: Dialogs) -> None:
         message = TRANS_CACHE_RESET
 
     gameMan.CONFIG.save_check()
-    config.APP.write_file()
+    config.APP.write_file(config.APP_LOC)
 
     # Since we've saved, dismiss this window.
     win.withdraw()
@@ -183,6 +185,7 @@ async def init_widgets(
     *,
     unhide_palettes: Callable[[], object],
     reset_all_win: Callable[[], object],
+    task_status: trio.TaskStatus[None] = trio.TASK_STATUS_IGNORED,
 ) -> None:
     """Create all the widgets."""
     conf: GenOptions = config.APP.get_cur_conf(GenOptions)
@@ -234,13 +237,6 @@ async def init_widgets(
         warning_lbl.grid(row=0, column=0)
         warning_btn.grid(row=1, column=0)
 
-    @localisation.add_callback(call=True)
-    def set_tab_names() -> None:
-        """Set the tab names, when translations refresh."""
-        nbook.tab(0, text=str(TRANS_TAB_GEN))
-        nbook.tab(1, text=str(TRANS_TAB_WIN))
-        nbook.tab(2, text=str(TRANS_TAB_DEV))
-
     async with trio.open_nursery() as nursery:
         nursery.start_soon(init_gen_tab, fr_general, unhide_palettes)
         nursery.start_soon(init_win_tab, fr_win, reset_all_win)
@@ -274,6 +270,14 @@ async def init_widgets(
     load()  # Load the existing config.
     # Then apply to other windows.
     await config.APP.set_and_run_ui_callback(GenOptions, apply_config)
+
+    task_status.started()
+    while True:
+        # Update tab names whenever languages update.
+        nbook.tab(0, text=str(TRANS_TAB_GEN))
+        nbook.tab(1, text=str(TRANS_TAB_WIN))
+        nbook.tab(2, text=str(TRANS_TAB_DEV))
+        await CURRENT_LANG.wait_transition()
 
 
 async def init_gen_tab(
@@ -326,7 +330,6 @@ async def init_gen_tab(
     make_checkbox(
         after_export_frame,
         'launch_after_export',
-        var=LAUNCH_AFTER_EXPORT,
         desc=TransToken.ui('Launch Game'),
         tooltip=TransToken.ui('After exporting, launch the selected game automatically.'),
     ).grid(row=3, column=0, sticky='W', pady=(10, 0))
@@ -351,7 +354,7 @@ async def init_gen_tab(
         conf = config.APP.get_cur_conf(GenOptions)
 
         lang_iter = localisation.get_languages()
-        if conf.language == localisation.DUMMY.lang_code or DEV_MODE.get():
+        if conf.language == localisation.DUMMY.lang_code or DEV_MODE.value:
             # Add the dummy translation.
             lang_iter = itertools.chain(lang_iter, [localisation.DUMMY])
 
@@ -524,7 +527,6 @@ async def init_dev_tab(f: ttk.Frame) -> None:
 
     make_checkbox(
         frm_check, 'dev_mode',
-        var=DEV_MODE,
         desc=TransToken.ui("Development Mode"),
         tooltip=TransToken.ui(
             'Enables displaying additional UI specific for '

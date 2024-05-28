@@ -5,10 +5,12 @@ from typing import Iterable
 from tkinter import ttk
 import tkinter as tk
 
-from app import TK_ROOT, tk_tools
-
-from app.CheckDetails import CheckDetails, Item as CheckItem
+from app import background_run
+from app.dialogs import Dialogs
 from transtoken import TransToken
+from ui_tk import TK_ROOT, tk_tools
+from ui_tk.check_table import CheckDetails, Item as CheckItem
+from ui_tk.dialogs import TkDialogs
 from ui_tk.wid_transtoken import set_text, set_win_title
 import packages
 import utils
@@ -17,8 +19,8 @@ import utils
 window = tk.Toplevel(TK_ROOT, name='packagesWin')
 window.withdraw()
 
-list_widget: CheckDetails
-pack_items: list[tuple[packages.Package, CheckItem]] = []
+list_widget: CheckDetails[None]
+pack_items: list[tuple[packages.Package, CheckItem[None]]] = []
 
 
 def show() -> None:
@@ -31,7 +33,7 @@ def show() -> None:
     list_widget.refresh()
 
 
-def make_packitems() -> Iterable[CheckItem]:
+def make_packitems() -> Iterable[CheckItem[None]]:
     """Make the checkitems used in the details view."""
     pack_items.clear()
     for pack in packages.get_loaded_packages().packages.values():
@@ -40,13 +42,13 @@ def make_packitems() -> Iterable[CheckItem]:
             hover_text=pack.desc,
             # The clean package can't be disabled!
             lock_check=(pack.id.casefold() == packages.CLEAN_PACKAGE),
-            state=pack.enabled
+            state=pack.enabled,
         )
         pack_items.append((pack, item))
         yield item
 
 
-def apply_changes() -> None:
+async def apply_changes(dialog: Dialogs) -> None:
     """Enable/disable the new packages."""
     values_changed = any(
         pack.enabled != item.state
@@ -59,10 +61,9 @@ def apply_changes() -> None:
         window.grab_release()
         return
 
-    if tk_tools.askokcancel(
+    if await dialog.ask_ok_cancel(
         title=TransToken.ui('BEE2 - Restart Required!'),
         message=TransToken.ui('Changing enabled packages requires a restart.\nContinue?'),
-        parent=window,
     ):
         window.withdraw()
         window.grab_release()
@@ -84,6 +85,7 @@ def cancel() -> None:
 def make_window() -> None:
     """Initialise the window."""
     global list_widget
+    dialog = TkDialogs(window)
     window.transient(TK_ROOT)
     set_win_title(window, TransToken.ui('BEE2 - Manage Packages'))
 
@@ -106,7 +108,7 @@ def make_window() -> None:
     frame.rowconfigure(0, weight=1)
 
     set_text(
-        ttk.Button(frame, command=apply_changes),
+        ttk.Button(frame, command=lambda: background_run(apply_changes, dialog)),
         TransToken.ui('OK'),
     ).grid(row=1, column=0, sticky='W')
 

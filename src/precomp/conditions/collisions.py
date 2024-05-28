@@ -5,12 +5,9 @@ from srctools import Matrix, Vec, Keyvalues, VMF, Entity, conv_float, logger
 from precomp import conditions, instance_traits
 from precomp.collisions import CollideType, Collisions, BBox
 
-from typing import Callable
-
 
 COND_MOD_NAME = 'Collisions'
 LOGGER = logger.get_logger('cond.collisions')
-CollModification = Callable[[Entity, Collisions], None]
 
 
 @conditions.make_result('Collisions')
@@ -119,3 +116,21 @@ def res_mod_conditions(vmf: VMF, inst: Entity, coll: Collisions, res: Keyvalues)
             ))
         else:
             LOGGER.warning('Unknown collision option "{}"!', prop.name)
+
+
+@conditions.make_result('VScriptCollide')
+def res_vscript_export(coll: Collisions, inst: Entity, res: Keyvalues) -> None:
+    """Mark the specified collision type as being required for VScript code.
+
+    All collision volumes containing that type will be written into a VScript database for querying
+    at runtime.
+
+    The SOLID type is excluded, since TraceLine should handle that, and it'd be a massive table.
+    """
+    content = CollideType.parse(inst.fixup.substitute(res.value))
+    LOGGER.info('Marking collision type(s) {} to be exported to VScript!', content)
+    coll.vscript_flags |= content
+
+    if CollideType.SOLID in content:
+        LOGGER.warning('Cannot export SOLID to VScript!')
+        coll.vscript_flags &= ~CollideType.SOLID

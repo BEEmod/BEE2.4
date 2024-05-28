@@ -1,4 +1,6 @@
 from __future__ import annotations
+from typing_extensions import override
+
 from uuid import UUID
 
 from srctools import Keyvalues, bool_as_int
@@ -22,6 +24,7 @@ class PaletteState(config.Data, conf_name='Palette'):
     hidden_defaults: frozenset[UUID] = attrs.Factory(frozenset)
 
     @classmethod
+    @override
     def parse_legacy(cls, conf: Keyvalues) -> dict[str, PaletteState]:
         """Convert the legacy config options to the new format."""
         # These are all in the GEN_OPTS config.
@@ -37,6 +40,7 @@ class PaletteState(config.Data, conf_name='Palette'):
         )}
 
     @classmethod
+    @override
     def parse_kv1(cls, data: Keyvalues, version: int) -> PaletteState:
         """Parse Keyvalues data."""
         assert version == 1
@@ -52,6 +56,7 @@ class PaletteState(config.Data, conf_name='Palette'):
         hidden -= FORCE_SHOWN
         return PaletteState(uuid, data.bool('save_settings', False), frozenset(hidden))
 
+    @override
     def export_kv1(self) -> Keyvalues:
         """Export to a property block."""
         kv = Keyvalues('', [
@@ -63,6 +68,7 @@ class PaletteState(config.Data, conf_name='Palette'):
         return kv
 
     @classmethod
+    @override
     def parse_dmx(cls, data: Element, version: int) -> PaletteState:
         """Parse DMX data."""
         try:
@@ -85,6 +91,7 @@ class PaletteState(config.Data, conf_name='Palette'):
             frozenset(hidden),
         )
 
+    @override
     def export_dmx(self) -> Element:
         """Export to a DMX."""
         elem = Element('Palette', 'DMElement')

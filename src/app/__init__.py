@@ -1,88 +1,55 @@
 """The package containg all UI code."""
-import tkinter as tk
-from types import TracebackType, new_class
-from typing import Any, Awaitable, Callable, Optional, Type, TypeVar, Generic
+from __future__ import annotations
+from typing import Any, Awaitable, Callable, Protocol, TypeVar, Generic, overload
 
 from typing_extensions import TypeVarTuple, Unpack
+from types import TracebackType
+
+from trio_util import AsyncBool, AsyncValue
+from srctools.logger import get_logger
+import trio
 
 import utils
-import trio  # Import first, so it monkeypatches traceback before us.
 
-# We must always have one Tk object, and it needs to be constructed
-# before most of TKinter will function. So doing it here does it first.
-TK_ROOT = tk.Tk()
-TK_ROOT.withdraw()  # Hide the window until everything is loaded.
 
+LOGGER = get_logger(__name__)
 # The nursery where UI tasks etc are run in.
-_APP_NURSERY: Optional[trio.Nursery] = None
+_APP_NURSERY: trio.Nursery | None = None
+# This is quit to exit the sleep_forever(), beginning the shutdown process.
+_APP_QUIT_SCOPE = trio.CancelScope()
+T = TypeVar("T")
+PosArgsT = TypeVarTuple('PosArgsT')
+
+# We use this to activate various features only useful to package/app devs.
+DEV_MODE = AsyncBool(value=utils.DEV_MODE)
+
+# The application icon.
+ICO_PATH = utils.bins_path('BEE2.ico')
 
 
-if '__class_getitem__' not in vars(tk.Event):
-    # Patch in it being generic, by replacing it with a copy that subclasses Generic.
-    _W_co = TypeVar("_W_co", covariant=True, bound=tk.Misc)
-    _W_co.__module__ = 'tkinter'
-    tk.Event = new_class(  # type: ignore
-        'Event', (Generic[_W_co], ),
-        exec_body=lambda ns: ns.update({
-            name: getattr(tk.Event, name)
-            for name in vars(tk.Event)
-            # Specify the vars to assign, so we don't include things like __dict__ descriptors.
-            if name in ['__doc__', '__module__', '__repr__']
-        }),
-    )
-
-
-def _run_main_loop(*args: Any, **kwargs: Any) -> None:
-    """Allow determining if this is running."""
-    global _main_loop_running
-    _main_loop_running = True
-    _orig_mainloop(*args, **kwargs)
-
-
-_main_loop_running = False
-_orig_mainloop = TK_ROOT.mainloop
-TK_ROOT.mainloop = _run_main_loop  # type: ignore[method-assign]
-del _run_main_loop
-
-
-# noinspection PyBroadException
-def tk_error(
-    exc_type: Type[BaseException],
-    exc_value: BaseException,
-    exc_tb: Optional[TracebackType],
-) -> None:
-    """Log TK errors."""
-    # The exception is caught inside the TK code.
-    # We don't care about that, so try and move the traceback up
-    # one level.
-    import logging
-    if exc_tb is not None and exc_tb.tb_next:
-        exc_tb = exc_tb.tb_next
-
-    logger = logging.getLogger('BEE2')
-
+if utils.WIN:
+    import ctypes
+    # Use Windows APIs to tell the taskbar to group us as our own program,
+    # not with python.exe. Then our icon will apply, and also won't group
+    # with other scripts.
     try:
-        on_error(exc_type, exc_value, exc_tb)
-    except Exception:
-        logger.exception('Failed to display messagebox:')
-        pass
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
+            'BEEMOD.application',
+        )
+    except (AttributeError, OSError, ValueError):
+        pass  # It's not too bad if it fails.
 
-    logger.error(
-        msg='Uncaught Tk Exception:',
-        exc_info=(exc_type, exc_value, exc_tb),
-    )
 
-    if _APP_NURSERY is not None:
-        _APP_NURSERY.cancel_scope.cancel()
-
-TK_ROOT.report_callback_exception = tk_error
+def quit_app() -> None:
+    """Quit the application."""
+    _APP_QUIT_SCOPE.cancel()
 
 
 # noinspection PyBroadException
 def on_error(
-    exc_type: Type[BaseException],
+    exc_type: type[BaseException],
     exc_value: BaseException,
-    exc_tb: Optional[TracebackType],
+    exc_tb: TracebackType | None,
 ) -> None:
     """Run when the application crashes. Display to the user, log it, and quit."""
     # We don't want this to fail, so import everything here, and wrap in
@@ -92,6 +59,7 @@ def on_error(
 
     # Grab and release the grab so nothing else can block the error message.
     try:
+        from ui_tk import TK_ROOT
         TK_ROOT.grab_set_global()
         TK_ROOT.grab_release()
 
@@ -133,26 +101,101 @@ def on_error(
             show_log_win=True,
             log_win_level='DEBUG',
         ))
-        config.APP.write_file()
+        config.APP.write_file(config.APP_LOC)
     except Exception:
         # Ignore failures...
         pass
 
 
-PosArgsT = TypeVarTuple('PosArgsT')
-
-
 def background_run(
     func: Callable[[Unpack[PosArgsT]], Awaitable[object]],
     /, *args: Unpack[PosArgsT],
-    name: Optional[str] = None,
+    name: str | None = None,
 ) -> None:
-    """When the UI is live, begin this specified task."""
+    """When the UI is live, run this specified task in app-global nursery."""
     if _APP_NURSERY is None:
         raise ValueError('App nursery has not started.')
     _APP_NURSERY.start_soon(func, *args, name=name)
 
 
-# Various configuration booleans.
-LAUNCH_AFTER_EXPORT = tk.BooleanVar(value=True, name='OPT_launch_after_export')
-DEV_MODE = tk.BooleanVar(value=utils.DEV_MODE, name='OPT_development_mode')
+async def background_start(
+    func: Callable[..., Awaitable[object]], /,
+    *args: object,
+    name: str | None = None,
+) -> Any:
+    """When the UI is live, start this specified task and return when started() is called."""
+    if _APP_NURSERY is None:
+        raise ValueError('App nursery has not started.')
+    return await _APP_NURSERY.start(func, *args, name=name)
+
+
+class EdgeTrigger(Generic[Unpack[PosArgsT]]):
+    """A variation on a Trio Event which can only be tripped while a task is waiting for it.
+
+    When tripped, arbitrary arguments can be passed along as well.
+
+    The ready attribute is updated to reflect whether trigger() can be called. The value should
+    not be set.
+    """
+    def __init__(self) -> None:
+        self._event: trio.Event | None = None
+        self._result: tuple[Unpack[PosArgsT]] | None = None
+        self.ready = AsyncBool()
+
+    @overload
+    async def wait(self: EdgeTrigger[()]) -> None: ...
+    @overload
+    async def wait(self: EdgeTrigger[T]) -> T: ...
+    @overload  # Ignore spurious warnings about the above overloads being impossible.
+    async def wait(self) -> tuple[Unpack[PosArgsT]]: ...  # type: ignore[misc]
+    async def wait(self) -> T | tuple[Unpack[PosArgsT]] | None:
+        """Wait for the trigger to fire, then return the parameters.
+
+        Only one task can wait at a time.
+        """
+        if self._event is not None:
+            raise ValueError('Only one task may wait() at a time!')
+        try:
+            self._event = trio.Event()
+            self._result = None
+            self.ready.value = True
+            await self._event.wait()
+            # TODO: Rewrite with match post 3.8
+            assert self._result is not None
+            if len(self._result) == 1:
+                return self._result[0]
+            elif len(self._result) == 0:
+                return None
+            else:
+                return self._result
+        finally:
+            self._event = self._result = None
+            self.ready.value = False
+
+    def trigger(self, *args: Unpack[PosArgsT]) -> None:
+        """Wake up a task blocked on wait(), and pass arguments along to it.
+
+        Raises a ValueError if no task is blocked.
+        If triggered multiple times, the last result wins.
+        """
+        if self._event is None:
+            raise ValueError('No task is blocked on wait()!')
+        self._result = args
+        self._event.set()
+
+    def maybe_trigger(self: EdgeTrigger[()]) -> None:
+        """Wake up a task blocked on wait(), but do nothing if not currently blocked.
+
+        This is only available if no arguments are specified, since then all calls are identical.
+        """
+        if self._event is not None:
+            self._result = ()
+            self._event.set()
+        else:
+            LOGGER.debug('EdgeTrigger.maybe_trigger() ignored!')
+
+
+class HasCurrentValue(Protocol[T]):
+    """Protocol for a class with an AsyncValue."""
+    @property
+    def current(self) -> AsyncValue[T]: ...

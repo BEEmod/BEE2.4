@@ -23,10 +23,10 @@ class Node(Generic[ConfT]):
     conf: ConfT = attrs.field(init=True)
 
     # Origin and angles of the instance.
-    pos = attrs.field(init=False, default=attrs.Factory(
+    pos: Vec = attrs.field(init=False, default=attrs.Factory(
         lambda self: Vec.from_str(self.item.inst['origin']), takes_self=True,
     ))
-    orient = attrs.field(init=False, default=attrs.Factory(
+    orient: Matrix = attrs.field(init=False, default=attrs.Factory(
         lambda self: Matrix.from_angstr(self.item.inst['angles']),
         takes_self=True,
     ))

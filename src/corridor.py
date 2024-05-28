@@ -1,11 +1,18 @@
 """Data structure for specifying custom corridors."""
+from __future__ import annotations
+from typing import Optional, Tuple
+from typing_extensions import Final, TypeAliasType, Literal
+from collections.abc import Sequence, Mapping
 from enum import Enum
-from typing import Dict, List, Optional, Tuple, Mapping
-from typing_extensions import Final, TypeAlias, Literal
 
+from srctools import logger
 import attrs
 
+from consts import DefaultItems
+from transtoken import TransToken
 import utils
+
+LOGGER = logger.get_logger(__name__)
 
 
 class GameMode(Enum):
@@ -29,7 +36,7 @@ class Orient(Enum):
     DOWN = DN = 'down'
 
     @property
-    def flipped(self) -> 'Orient':
+    def flipped(self) -> Orient:
         """Return the orient flipped along Z."""
         if self is Orient.UP:
             return Orient.DN
@@ -38,33 +45,57 @@ class Orient(Enum):
         return self
 
 
-@attrs.frozen
+@attrs.frozen(kw_only=True)
 class Corridor:
     """An individual corridor definition. """
     instance: str
     # Fixup values which are set on the corridor instance.
     fixups: Mapping[str, str]
-    # Indicates the initial corridor items if 1-7.
-    orig_index: int
+    # Whether this corridor should default to being enabled.
+    default_enabled: bool
     # If this was converted from editoritems.txt
     legacy: bool
+    # IDs of options specifically added to this corridor.
+    option_ids: frozenset[utils.ObjectID]
+
+
+@attrs.frozen
+class OptValue:
+    """A value for an option."""
+    id: utils.ObjectID
+    name: TransToken  # Name to use.
+
+
+@attrs.frozen(kw_only=True)
+class Option:
+    """An option that can be swapped between various values."""
+    id: utils.ObjectID
+    name: TransToken
+    default: utils.SpecialID  # id or <RANDOM>
+    desc: TransToken
+    values: Sequence[OptValue]
+    fixup: str
 
 
 # Maps item IDs to their corridors, and vice versa.
-ID_TO_CORR: Final[Mapping[str, Tuple[GameMode, Direction]]] = {
-    'ITEM_ENTRY_DOOR': (GameMode.SP, Direction.ENTRY),
-    'ITEM_EXIT_DOOR': (GameMode.SP, Direction.EXIT),
-    'ITEM_COOP_ENTRY_DOOR': (GameMode.COOP, Direction.ENTRY),
-    'ITEM_COOP_EXIT_DOOR': (GameMode.COOP, Direction.EXIT),
+ID_TO_CORR: Final[Mapping[utils.ObjectID, tuple[GameMode, Direction]]] = {
+    DefaultItems.door_sp_entry.id: (GameMode.SP, Direction.ENTRY),
+    DefaultItems.door_sp_exit.id: (GameMode.SP, Direction.EXIT),
+    DefaultItems.door_coop_entry.id: (GameMode.COOP, Direction.ENTRY),
+    DefaultItems.door_coop_exit.id: (GameMode.COOP, Direction.EXIT),
 }
-CORR_TO_ID: Final[Mapping[Tuple[GameMode, Direction], str]] = {v: k for k, v in ID_TO_CORR.items()}
+CORR_TO_ID: Final[Mapping[tuple[GameMode, Direction], utils.ObjectID]] = {v: k for k, v in ID_TO_CORR.items()}
 
-# The order of the keys we use.
-CorrKind: TypeAlias = Tuple[GameMode, Direction, Orient]
-# The data in the pickle file we write for the compiler to read.
-ExportedConf: TypeAlias = Dict[CorrKind, List[Corridor]]
+# A specific type of corridor.
+CorrKind = TypeAliasType("CorrKind", Tuple[GameMode, Direction, Orient])
+# A filter on which types this applies to. None values match all possible instead.
+CorrSpec = TypeAliasType("CorrSpec", Tuple[
+    Optional[GameMode], Optional[Direction], Optional[Orient],
+])
+# Options are only differentiated based on mode/direction.
+OptionGroup = TypeAliasType("OptionGroup", Tuple[GameMode, Direction])
 # Number of default instances for each kind.
-CORRIDOR_COUNTS: Final[Mapping[Tuple[GameMode, Direction], Literal[1, 4, 7]]] = {
+CORRIDOR_COUNTS: Final[Mapping[tuple[GameMode, Direction], Literal[1, 4, 7]]] = {
     (GameMode.SP, Direction.ENTRY): 7,
     (GameMode.SP, Direction.EXIT): 4,
     (GameMode.COOP, Direction.ENTRY): 1,
@@ -72,7 +103,15 @@ CORRIDOR_COUNTS: Final[Mapping[Tuple[GameMode, Direction], Literal[1, 4, 7]]] = 
 }
 
 
-def parse_filename(filename: str) -> Optional[Tuple[GameMode, Direction, int]]:
+@attrs.frozen
+class ExportedConf:
+    """Data written to the pickle file for the compiler to use."""
+    corridors: Mapping[CorrKind, Sequence[Corridor]]
+    global_opt_ids: Mapping[OptionGroup, frozenset[utils.ObjectID]]
+    options: Mapping[utils.ObjectID, Option]
+
+
+def parse_filename(filename: str) -> tuple[GameMode, Direction, int] | None:
     """Parse the special format for corridor instance filenames."""
     folded = filename.casefold()
     if folded.startswith('instances/bee2_corridor/'):

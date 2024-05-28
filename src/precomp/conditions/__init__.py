@@ -28,36 +28,45 @@ only parsing configuration options once, and is expected to be used with a
 closure.
 """
 from __future__ import annotations
+from typing import (
+    Generic, Protocol, TypeVar, Any, Callable, Tuple, Type, Union, Final,
+    overload, cast, get_type_hints
+)
+from collections.abc import Iterable, Mapping, MutableMapping
+from collections import defaultdict
+from decimal import Decimal
+from enum import Enum
 import functools
 import inspect
-import io
 import math
 import pkgutil
 import sys
 import types
-import typing
 import warnings
-from collections.abc import Mapping
-from collections import defaultdict
-from decimal import Decimal
-from enum import Enum
-from typing import (
-    Generic, Protocol, TypeVar, Any, Callable, TextIO, Tuple, Type, Union, overload,
-    cast,
-)
 
-import attrs
-import srctools.logger
 from srctools.math import FrozenAngle, Vec, FrozenVec, AnyAngle, AnyMatrix, Angle
 from srctools.vmf import EntityGroup, VMF, Entity, Output, Solid, ValidKVs
 from srctools import Keyvalues
+import attrs
+import srctools.logger
+import trio
 
-from precomp import instanceLocs, rand, collisions
+from precomp import instanceLocs, rand
+from precomp.collisions import Collisions
 from precomp.corridor import Info as MapInfo
+from quote_pack import QuoteInfo
 import consts
 import utils
 
 
+__all__ = [
+    'ALL_INST', 'DIRECTIONS', 'INST_ANGLE', 'PETI_INST_ANGLE', 'RES_EXHAUSTED',
+    'MapInfo',
+    'TestCallable', 'ResultCallable', 'make_test', 'make_result', 'make_result_setup', 'add_meta',
+    'add', 'check_all', 'check_test', 'import_conditions',
+    'add_inst', 'add_suffix', 'add_output', 'local_name', 'fetch_debug_visgroup', 'set_ent_keys',
+    'resolve_offset',
+]
 COND_MOD_NAME = 'Main Conditions'
 
 LOGGER = srctools.logger.get_logger(__name__, alias='cond.core')
@@ -78,7 +87,7 @@ RESULT_SETUP: dict[str, Callable[..., Any]] = {}
 # Used to dump a list of the tests, results, meta-conditions
 ALL_TESTS: list[tuple[str, tuple[str, ...], CondCall[bool]]] = []
 ALL_RESULTS: list[tuple[str, tuple[str, ...], CondCall[object]]] = []
-ALL_META: list[tuple[str, Decimal, CondCall[object]]] = []
+ALL_META: list[tuple[str, MetaCond, CondCall[object]]] = []
 
 
 ResultT = TypeVar('ResultT')
@@ -97,71 +106,62 @@ class SWITCH_TYPE(Enum):
     ALL = 'all'  # Run all matching commands
 
 
-xp = FrozenVec(1, 0, 0)
-xn = FrozenVec(-1, 0, 0)
-yp = FrozenVec(0, 1, 0)
-yn = FrozenVec(0, -1, 0)
-zp = FrozenVec(0, 0, 1)
-zn = FrozenVec(0, 0, -1)
-
-DIRECTIONS: Mapping[str, FrozenVec] = {
+DIRECTIONS: Final[Mapping[str, FrozenVec]] = {
     # Translate these words into a normal vector
-    '+x': xp,
-    '-x': xn,
+    '+x': FrozenVec.x_pos,
+    '-x': FrozenVec.x_neg,
 
-    '+y': yp,
-    '-y': yn,
+    '+y': FrozenVec.y_pos,
+    '-y': FrozenVec.y_neg,
 
-    '+z': zp,
-    '-z': zn,
+    '+z': FrozenVec.z_pos,
+    '-z': FrozenVec.z_neg,
 
-    'x': xp,  # For with allow_inverse
-    'y': yp,
-    'z': zp,
+    'x': FrozenVec.x_pos,  # For with allow_inverse
+    'y': FrozenVec.y_pos,
+    'z': FrozenVec.z_pos,
 
-    'up': zp,
-    'dn': zn,
-    'down': zn,
-    'floor': zp,
-    'ceiling': zn,
-    'ceil': zn,
+    'up': FrozenVec.z_pos,
+    'dn': FrozenVec.z_neg,
+    'down': FrozenVec.z_neg,
+    'floor': FrozenVec.z_pos,
+    'ceiling': FrozenVec.z_neg,
+    'ceil': FrozenVec.z_neg,
 
-    'n': yp,
-    'north': yp,
-    's': yn,
-    'south': yn,
+    'n': FrozenVec.y_pos,
+    'north': FrozenVec.y_pos,
+    's': FrozenVec.y_neg,
+    'south': FrozenVec.y_neg,
 
-    'e': xp,
-    'east': xp,
-    'w': xn,
-    'west': xn,
+    'e': FrozenVec.x_pos,
+    'east': FrozenVec.x_pos,
+    'w': FrozenVec.x_neg,
+    'west': FrozenVec.x_neg,
 }
 
-INST_ANGLE = {
+INST_ANGLE: Final[Mapping[FrozenVec, FrozenAngle]] = {
     # IE up = zp = floor
-    zp: FrozenAngle(0, 0, 0),
-    zn: FrozenAngle(0, 0, 0),
+    FrozenVec.z_pos: FrozenAngle(0, 0, 0),
+    FrozenVec.z_neg: FrozenAngle(180, 0, 0),
 
-    xn: FrozenAngle(0, 0, 0),
-    yn: FrozenAngle(0, 90, 0),
-    xp: FrozenAngle(0, 180, 0),
-    yp: FrozenAngle(0, 270, 0),
+    FrozenVec.x_neg: FrozenAngle(0, 0, 0),
+    FrozenVec.y_neg: FrozenAngle(0, 90, 0),
+    FrozenVec.x_pos: FrozenAngle(0, 180, 0),
+    FrozenVec.y_pos: FrozenAngle(0, 270, 0),
 
 }
 
-PETI_INST_ANGLE = {
+PETI_INST_ANGLE: Final[Mapping[FrozenVec, FrozenAngle]] = {
     # The angles needed to point a PeTI instance in this direction
     # IE north = yn
-    zp: FrozenAngle(0, 0, 0),
-    zn: FrozenAngle(180, 0, 0),
+    FrozenVec.z_pos: FrozenAngle(0, 0, 0),
+    FrozenVec.z_neg: FrozenAngle(180, 0, 0),
 
-    yn: FrozenAngle(0, 0, 90),
-    xp: FrozenAngle(0, 90, 90),
-    yp: FrozenAngle(0, 180, 90),
-    xn: FrozenAngle(0, 270, 90),
+    FrozenVec.y_neg: FrozenAngle(0, 0, 90),
+    FrozenVec.x_pos: FrozenAngle(0, 90, 90),
+    FrozenVec.y_pos: FrozenAngle(0, 180, 90),
+    FrozenVec.x_neg: FrozenAngle(0, 270, 90),
 }
-
-del xp, xn, yp, yn, zp, zn
 
 
 class NextInstance(Exception):
@@ -181,9 +181,38 @@ class Unsatisfiable(Exception):
     """
     pass
 
-# Flag to indicate a result doesn't need to be executed anymore,
+# Flag to indicate a result doesn't need to be executed any more,
 # and can be cleaned up - adding a global instance, for example.
 RES_EXHAUSTED = object()
+
+
+class MetaCond(Enum):
+    """Priority values for meta conditions."""
+    FaithPlate = Decimal(-900)
+    LinkCubes = Decimal(-750)
+    LinkedItems = Decimal(-300)
+    MonCameraLink = Decimal(-275)
+    ScaffoldLinkOld = Decimal('-250.0001')
+    Connections = Decimal(-250)
+    ExitSigns = Decimal(-10)
+    ElevatorVideos = Decimal(50)
+    FogEnts = Decimal(100)
+    VoiceLine = Decimal(100)
+    Barriers = Decimal(150)
+    ApertureTag = Decimal(200)
+    AntiFizzBump = Decimal(200)
+    PlayerModel = Decimal(400)
+    Vactubes = Decimal(400)
+    PlayerPortalGun = Decimal(500)
+    Fizzler = Decimal(500)
+    Screenshot = Decimal(750)
+    GenerateCubes = Decimal(750)
+    RemoveBlankInst = Decimal(1000)
+
+    def register(self, func: CallableT) -> CallableT:
+        """Register a meta-condition."""
+        add_meta(func, self)
+        return func
 
 
 @attrs.define
@@ -194,6 +223,9 @@ class Condition:
     else_results: list[Keyvalues] = attrs.Factory(list)
     priority: Decimal = Decimal()
     source: str | None = None
+
+    # If set, this is a meta-condition, and this bypasses everything.
+    meta_func: CondCall[object] | None = None
 
     @classmethod
     def parse(cls, kv_block: Keyvalues, *, toplevel: bool) -> Condition:
@@ -244,7 +276,11 @@ class Condition:
         )
 
     @staticmethod
-    def test_result(coll: collisions.Collisions, info: MapInfo, inst: Entity, res: Keyvalues) -> bool | object:
+    def test_result(
+        coll: Collisions, info: MapInfo, voice_data: QuoteInfo,
+        inst: Entity,
+        res: Keyvalues,
+    ) -> bool | object:
         """Execute the given result."""
         try:
             cond_call = RESULT_LOOKUP[res.name]
@@ -255,28 +291,37 @@ class Condition:
                 raise ValueError(err_msg) from None
             else:
                 LOGGER.warning(err_msg)
-                # Delete this so it doesn't re-fire..
+                # Delete this so it doesn't re-fire...
                 return RES_EXHAUSTED
         else:
-            return cond_call(coll, info, inst, res)
+            return cond_call(coll, info, voice_data, inst, res)
 
-    def test(self, coll: collisions.Collisions, info: MapInfo, inst: Entity) -> None:
+    def test(self, coll: Collisions, info: MapInfo, voice_data: QuoteInfo, inst: Entity) -> None:
         """Try to satisfy this condition on the given instance.
 
         If we find that no instance will succeed, raise Unsatisfiable.
         """
+        if self.meta_func is not None:
+            self.meta_func(coll, info, voice_data, inst, Keyvalues.root())
+            raise EndCondition
+
         success = True
         # Only the first one can cause this condition to be skipped.
         # We could have a situation where the first test modifies the map
         # such that it becomes satisfiable later, so this would be premature.
         # If we have else results, we also can't skip because those could modify state.
         for i, test in enumerate(self.tests):
-            if not check_test(test, coll, info, inst, can_skip=(i == 0) and not self.else_results):
+            if not check_test(
+                test,
+                coll, info, voice_data,
+                inst,
+                can_skip=(i == 0) and not self.else_results,
+            ):
                 success = False
                 break
         results = self.results if success else self.else_results
         for res in results[:]:
-            should_del = self.test_result(coll, info, inst, res)
+            should_del = self.test_result(coll, info, voice_data, inst, res)
             if should_del is RES_EXHAUSTED:
                 results.remove(res)
 
@@ -288,6 +333,7 @@ AnnArg2T = TypeVar('AnnArg2T')
 AnnArg3T = TypeVar('AnnArg3T')
 AnnArg4T = TypeVar('AnnArg4T')
 AnnArg5T = TypeVar('AnnArg5T')
+AnnArg6T = TypeVar('AnnArg6T')
 
 
 @overload
@@ -301,7 +347,7 @@ def annotation_caller(
 @overload
 def annotation_caller(
     func: Callable[..., AnnResT],
-    parm1: Type[AnnArg1T], parm2: Type[AnnArg2T],  /,
+    parm1: Type[AnnArg1T], parm2: Type[AnnArg2T], /,
 ) -> tuple[
     Callable[[AnnArg1T, AnnArg2T], AnnResT],
     tuple[Type[AnnArg1T], Type[AnnArg2T]]
@@ -331,6 +377,15 @@ def annotation_caller(
     Callable[[AnnArg1T, AnnArg2T, AnnArg3T, AnnArg4T, AnnArg5T], AnnResT],
     tuple[Type[AnnArg1T], Type[AnnArg2T], Type[AnnArg3T], Type[AnnArg4T], Type[AnnArg5T]],
 ]: ...
+@overload
+def annotation_caller(
+    func: Callable[..., AnnResT],
+    parm1: Type[AnnArg1T], parm2: Type[AnnArg2T], parm3: Type[AnnArg3T],
+    parm4: Type[AnnArg4T], parm5: Type[AnnArg5T], param6: Type[AnnArg6T], /,
+) -> tuple[
+    Callable[[AnnArg1T, AnnArg2T, AnnArg3T, AnnArg4T, AnnArg5T, AnnArg6T], AnnResT],
+    tuple[Type[AnnArg1T], Type[AnnArg2T], Type[AnnArg3T], Type[AnnArg4T], Type[AnnArg5T], Type[AnnArg6T]],
+]: ...
 def annotation_caller(
     func: Callable[..., AnnResT], /,
     *parms: type,
@@ -354,14 +409,14 @@ def annotation_caller(
     ]
 
     # For forward references and 3.7+ stringified arguments.
-    # Remove 'return' temporarily so we don't parse that, since we don't care.
+    # Since we don't care about the return value, temporarily remove it so it isn't parsed.
     ann_dict = getattr(func, '__annotations__', None)
     if ann_dict is not None:
         return_val = ann_dict.pop('return', allowed_kinds)  # Sentinel
     else:
         return_val = None
     try:
-        hints = typing.get_type_hints(func)
+        hints = get_type_hints(func)
     except Exception:
         LOGGER.exception(
             'Could not compute type hints for function {}.{}!',
@@ -436,7 +491,7 @@ def annotation_caller(
 
 
 @functools.lru_cache(maxsize=None)
-def _make_reorderer(inputs: str, outputs: str) -> Callable[[Callable[..., object]], Callable[..., None]]:
+def _make_reorderer(inputs: str, outputs: str) -> Callable[[Callable[..., object]], Callable[..., Any]]:
     """Build a function that does reordering for annotation caller.
 
     This allows the code objects to be cached.
@@ -484,29 +539,43 @@ def conv_setup_pair(
     return func
 
 
+# Deduplicate the frozen sets.
+_META_PRIORITY_CACHE: dict[frozenset[MetaCond], frozenset[MetaCond]] = {}
+
+
+def meta_priority_converter(priorities: Iterable[MetaCond] | MetaCond) -> frozenset[MetaCond]:
+    """Allow passing either a single enum, or any iterable."""
+    if isinstance(priorities, MetaCond):
+        result = frozenset([priorities])
+    else:
+        result = frozenset(priorities)
+    return _META_PRIORITY_CACHE.setdefault(result, result)
+
+
+@attrs.define(eq=False)
 class CondCall(Generic[CallResultT]):
     """A result or test callback.
 
     This should be called to execute it.
     """
-    __slots__ = ['func', 'group', '_cback', '_setup_data']
-    _setup_data: dict[int, Callable[[Entity], CallResultT]] | None
+    func: Callable[..., CallResultT | Callable[[Entity], CallResultT]]
+    group: str | None
+    valid_before: frozenset[MetaCond] = attrs.field(kw_only=True, converter=meta_priority_converter)
+    valid_after: frozenset[MetaCond] = attrs.field(kw_only=True, converter=meta_priority_converter)
 
-    def __init__(
-        self,
-        func: Callable[..., CallResultT | Callable[[Entity], CallResultT]],
-        group: str,
-    ):
-        self.func = func
-        self.group = group
+    _setup_data: dict[int, Callable[[Entity], CallResultT]] | None = attrs.field(init=False, repr=False)
+    _cback: Callable[
+        [srctools.VMF, Collisions, MapInfo, QuoteInfo, Entity, Keyvalues],
+        CallResultT | Callable[[Entity], CallResultT],
+    ] = attrs.field(init=False)
+
+    def __attrs_post_init__(self) -> None:
         cback, arg_order = annotation_caller(
-            func,
-            srctools.VMF, collisions.Collisions, MapInfo, Entity, Keyvalues,
+            self.func,
+            srctools.VMF, Collisions, MapInfo, QuoteInfo,
+            Entity, Keyvalues,
         )
-        self._cback: Callable[
-            [srctools.VMF, collisions.Collisions, MapInfo, Entity, Keyvalues],
-            CallResultT | Callable[[Entity], CallResultT],
-        ] = cback
+        self._cback = cback
         if Entity not in arg_order:
             # We have setup functions.
             self._setup_data = {}
@@ -514,26 +583,32 @@ class CondCall(Generic[CallResultT]):
             self._setup_data = None
 
     @property
-    def __doc__(self) -> str:
+    def __doc__(self) -> str | None:
+        """Pass through __doc__ to the wrapped function."""
         return self.func.__doc__
 
     @__doc__.setter
     def __doc__(self, value: str) -> None:
         self.func.__doc__ = value
 
-    def __call__(self, coll: collisions.Collisions, info: MapInfo, ent: Entity, conf: Keyvalues) -> CallResultT:
+    def __call__(
+        self,
+        coll: Collisions, info: MapInfo, voice: QuoteInfo,
+        ent: Entity,
+        conf: Keyvalues,
+    ) -> CallResultT:
         """Execute the callback."""
         if self._setup_data is None:
-            return self._cback(ent.map, coll, info, ent, conf)  # type: ignore
+            return self._cback(ent.map, coll, info, voice, ent, conf)  # type: ignore
         else:
             # Execute setup functions if required.
-            try:
+            if id(conf) in self._setup_data:
                 cback = self._setup_data[id(conf)]
-            except KeyError:
+            else:
                 # The entity should never be used in setup functions. Pass a dummy object
                 # so errors occur if it's used.
                 cback = self._setup_data[id(conf)] = self._cback(  # type: ignore
-                    ent.map, coll, info,
+                    ent.map, coll, info, voice,
                     cast(Entity, object()),
                     conf,
                 )
@@ -569,52 +644,45 @@ def _get_cond_group(func: Any) -> str | None:
     return str(group)
 
 
-def add_meta(func: Callable[..., object], priority: Decimal | int, only_once: bool = True) -> None:
+def add_meta(func: Callable[..., object], priority: MetaCond) -> None:
     """Add a metacondition, which executes a function at a priority level.
 
     Used to allow users to allow adding conditions before or after a
     transformation like the adding of quotes.
     """
-    dec_priority = Decimal(priority)
-    # This adds a condition result like "func" (with quotes), which cannot
-    # be entered into keyvalues files.
-    # The qualified name will be unique across modules.
-    name = f'"{func.__qualname__}"'
+    name = f'{getattr(func, "__module__", "???")}.{func.__qualname__}()'
     LOGGER.debug(
-        "Adding metacondition ({}) with priority {!s}!",
+        "Adding metacondition {} with priority: {!r}",
         name,
-        dec_priority,
+        priority,
     )
 
-    # We don't care about setup functions for this.
-    RESULT_LOOKUP[name] = wrapper = CondCall(func, _get_cond_group(func))
+    # We don't care about setup functions for this, and valid before/after is also useless.
+    wrapper = CondCall(func, _get_cond_group(func), valid_before=(), valid_after=())
 
     cond = Condition(
-        results=[Keyvalues(name, '')],
-        priority=dec_priority,
-        source=f'MetaCondition {name}'
+        priority=priority.value,
+        source=f'MetaCondition {name}',
+        # Special attribute, overrides results when present.
+        meta_func=wrapper,
     )
 
-    if only_once:
-        cond.results.append(
-            Keyvalues('endCondition', '')
-        )
     conditions.append(cond)
-    ALL_META.append((name, dec_priority, wrapper))
+    ALL_META.append((func.__qualname__, priority, wrapper))
 
 
-def meta_cond(priority: int | Decimal=0, only_once: bool=True) -> Callable[[CallableT], CallableT]:
-    """Decorator version of add_meta."""
-    def x(func: CallableT) -> CallableT:
-        add_meta(func, priority, only_once)
-        return func
-    return x
-
-
-def make_test(orig_name: str, *aliases: str) -> Callable[[TestCallT], TestCallT]:
+def make_test(
+    orig_name: str, *aliases: str,
+    valid_before: Iterable[MetaCond] | MetaCond = (),
+    valid_after: Iterable[MetaCond] | MetaCond = (),
+) -> Callable[[TestCallT], TestCallT]:
     """Decorator to add tests to the lookup."""
     def x(func: TestCallT) -> TestCallT:
-        wrapper: CondCall[bool] = CondCall(func, _get_cond_group(func))
+        wrapper: CondCall[bool] = CondCall(
+            func, _get_cond_group(func),
+            valid_before=valid_before,
+            valid_after=valid_after,
+        )
         ALL_TESTS.append((orig_name, aliases, wrapper))
         name = orig_name.casefold()
         if name in TEST_LOOKUP:
@@ -628,7 +696,11 @@ def make_test(orig_name: str, *aliases: str) -> Callable[[TestCallT], TestCallT]
     return x
 
 
-def make_result(orig_name: str, *aliases: str) -> Callable[[CallableT], CallableT]:
+def make_result(
+    orig_name: str, *aliases: str,
+    valid_before: Iterable[MetaCond] | MetaCond = (),
+    valid_after: Iterable[MetaCond] | MetaCond = (),
+) -> Callable[[CallableT], CallableT]:
     """Decorator to add results to the lookup."""
     folded_name = orig_name.casefold()
     # Discard the original name from aliases, if it's also there.
@@ -648,9 +720,14 @@ def make_result(orig_name: str, *aliases: str) -> Callable[[CallableT], Callable
             setup_func = None
         else:
             # Combine the legacy functions into one using a closure.
+            assert setup_func is not None
             func = conv_setup_pair(setup_func, result_func)
 
-        wrapper: CondCall[object] = CondCall(func, _get_cond_group(result_func))
+        wrapper: CondCall[object] = CondCall(
+            func, _get_cond_group(result_func),
+            valid_before=valid_before,
+            valid_after=valid_after,
+        )
         if orig_name.casefold() in RESULT_LOOKUP:
             raise ValueError(f'Result {orig_name} is a duplicate!')
         RESULT_LOOKUP[orig_name.casefold()] = wrapper
@@ -689,7 +766,12 @@ def add(kv_block: Keyvalues) -> None:
         conditions.append(con)
 
 
-def check_all(vmf: VMF, coll: collisions.Collisions, info: MapInfo) -> None:
+def check_all(
+    vmf: VMF,
+    coll: Collisions,
+    info: MapInfo,
+    voice_data: QuoteInfo,
+) -> None:
     """Check all conditions."""
     ALL_INST.update({
         inst['file'].casefold()
@@ -713,7 +795,7 @@ def check_all(vmf: VMF, coll: collisions.Collisions, info: MapInfo) -> None:
         with srctools.logger.context(condition.source or ''):
             for inst in vmf.by_class['func_instance']:
                 try:
-                    condition.test(coll, info, inst)
+                    condition.test(coll, info, voice_data, inst)
                 except NextInstance:
                     # NextInstance is raised to immediately stop running
                     # this condition, and skip to the next instance.
@@ -752,6 +834,14 @@ def check_all(vmf: VMF, coll: collisions.Collisions, info: MapInfo) -> None:
             # Suppress errors for future conditions.
             ALL_INST.update(extra)
 
+    # Clear out any blank instances. This allows code elsewhere to have a convenient way
+    # to just delete instances.
+    for inst in vmf.by_class['func_instance']:
+        # If editoritems instances are set to "", PeTI will autocorrect it to
+        # ".vmf" - we need to handle that too.
+        if inst['file'].casefold() in ('', '.vmf'):
+            inst.remove()
+
     LOGGER.info('---------------------')
     LOGGER.info(
         'Conditions executed, {}/{} ({:.0%}) skipped!',
@@ -759,12 +849,7 @@ def check_all(vmf: VMF, coll: collisions.Collisions, info: MapInfo) -> None:
         skipped_cond/len(conditions),
     )
     import vbsp
-    LOGGER.info('Map has attributes: {}', [
-        key
-        for key, value in
-        vbsp.settings['has_attr'].items()
-        if value
-    ])
+    LOGGER.info('Map has attributes: {}', sorted(info.iter_attrs()))
     # '' is always present, which sorts first, conveniently adding a \n at the start.
     LOGGER.debug('All instances referenced:{}', '\n'.join(sorted(ALL_INST)))
     LOGGER.info(
@@ -778,7 +863,7 @@ def check_all(vmf: VMF, coll: collisions.Collisions, info: MapInfo) -> None:
 
 def check_test(
     test: Keyvalues,
-    coll: collisions.Collisions, info: MapInfo,
+    coll: Collisions, info: MapInfo, voice: QuoteInfo,
     inst: Entity, can_skip: bool = False,
 ) -> bool:
     """Determine the result for a condition test.
@@ -802,11 +887,11 @@ def check_test(
             raise ValueError(err_msg) from None
         else:
             LOGGER.warning(err_msg)
-            # Skip these conditions..
+            # Skip these conditions...
             return False
 
     try:
-        res = func(coll, info, inst, test)
+        res = func(coll, info, voice, inst, test)
     except Unsatisfiable:
         if can_skip:
             raise
@@ -825,18 +910,25 @@ def import_conditions() -> None:
     # or add_result() functions, which save the functions into our dicts.
     from . import ( # noqa
         _scaffold_compat, addInstance, antlines, apTag, brushes, catwalks, collisions, connections,
-        conveyorBelt, custItems, cutoutTile, entities, errors, faithplate, fizzler, glass, globals,
+        conveyorBelt, custItems, cutoutTile, entities, errors, faithplate, fizzler, barriers, globals,
         instances, linked_items, logical, marker, monitor, piston_platform, positioning, python,
         randomise, removed, resizableTrigger, sendificator, signage, trackPlat, vactubes,
     )
 
     # If not frozen, check none are missing.
     if not utils.FROZEN:
-        ns = set(locals())
+        import builtins
+        ns = builtins.globals()
         # Verify none are missing.
-        for module in pkgutil.iter_modules(__path__, 'precomp.conditions.'):
-            stem = module.name.rsplit('.', 1)[-1]
-            assert stem in ns, module
+        for mod_info in pkgutil.iter_modules(__path__, 'precomp.conditions.'):
+            stem = mod_info.name.rsplit('.', 1)[-1]
+            try:
+                found = ns[stem]
+            except KeyError as exc:
+                raise Exception(mod_info) from exc
+            # Verify that we didn't shadow the import by importing in this __init__ module.
+            if not isinstance(found, types.ModuleType) or found.__name__ != mod_info.name:
+                raise Exception(mod_info, found)
     LOGGER.info('Imported all conditions modules!')
 
 DOC_MARKER = '''<!-- Only edit above this line. This is generated from text in the compiler code. -->'''
@@ -861,99 +953,100 @@ They have limited utility otherwise.
 '''
 
 
-def dump_conditions(file: TextIO) -> None:
+async def dump_conditions(filename: trio.Path) -> None:
     """Dump docs for all the condition tests, results and metaconditions."""
 
     LOGGER.info('Dumping conditions...')
 
-    # Delete existing data, after the marker.
-    file.seek(0, io.SEEK_SET)
-
+    # Extract the text before the marker line.
     prelude = []
+    async with await filename.open('r') as file_prelude:
+        async for line in file_prelude:
+            prelude.append(line)
+            if DOC_MARKER in line:
+                break
+        else:
+            raise ValueError('No marker text!')
 
-    for line in file:
-        if DOC_MARKER in line:
-            break
-        prelude.append(line)
+    ALL_META.sort(key=lambda tup: tup[1].value)  # Sort by priority
 
-    file.seek(0, io.SEEK_SET)
-    file.truncate(0)
+    async with await filename.open('w') as file:
+        for line in prelude:
+            await file.write(line)
+        await file.write('\n')
 
-    if not prelude:
-        # No marker, blank the whole thing.
-        LOGGER.warning('No intro text before marker!')
+        for test_key, priority, func in ALL_META:
+            await file.write(f'#### `{test_key}` ({priority.value}):\n\n')
+            await file.write(dump_func_docs(func))
+            await file.write('\n\n')
 
-    for line in prelude:
-        file.write(line)
-    file.write(DOC_MARKER + '\n\n')
+        all_cond_types: list[tuple[list[tuple[str, tuple[str, ...], CondCall[Any]]], str]] = [
+            (ALL_TESTS, 'Tests'),
+            (ALL_RESULTS, 'Results'),
+        ]
+        for lookup, name in all_cond_types:
+            await file.write('<!------->\n')
+            await file.write(f'# {name}\n')
+            await file.write('<!------->\n')
 
-    file.write(DOC_META_COND)
+            lookup_grouped: dict[str, list[
+                tuple[str, tuple[str, ...], CondCall[Any]]
+            ]] = defaultdict(list)
 
-    ALL_META.sort(key=lambda i: i[1])  # Sort by priority
-    for test_key, priority, func in ALL_META:
-        file.write(f'#### `{test_key}` ({priority}):\n\n')
-        dump_func_docs(file, func)
-        file.write('\n')
+            for test_key, aliases, func in lookup:
+                group = getattr(func, 'group', 'ERROR')
+                if group is None:
+                    group = '00special'
+                lookup_grouped[group].append((test_key, aliases, func))
 
-    all_cond_types: list[tuple[list[tuple[str, tuple[str, ...], CondCall[Any]]], str]] = [
-        (ALL_TESTS, 'Tests'),
-        (ALL_RESULTS, 'Results'),
-    ]
-    for lookup, name in all_cond_types:
-        print('<!------->', file=file)
-        print(f'# {name}', file=file)
-        print('<!------->', file=file)
+            # Collapse 1-large groups into Ungrouped.
+            for group in list(lookup_grouped):
+                if len(lookup_grouped[group]) < 2:
+                    lookup_grouped[''].extend(lookup_grouped[group])
+                    del lookup_grouped[group]
 
-        lookup_grouped: dict[str, list[
-            tuple[str, tuple[str, ...], CondCall[Any]]
-        ]] = defaultdict(list)
+            if not lookup_grouped['']:
+                del lookup_grouped['']
 
-        for test_key, aliases, func in lookup:
-            group = getattr(func, 'group', 'ERROR')
-            if group is None:
-                group = '00special'
-            lookup_grouped[group].append((test_key, aliases, func))
+            for header_ind, (group, funcs) in enumerate(sorted(lookup_grouped.items())):
+                if group == '':
+                    group = 'Ungrouped Conditions'
 
-        # Collapse 1-large groups into Ungrouped.
-        for group in list(lookup_grouped):
-            if len(lookup_grouped[group]) < 2:
-                lookup_grouped[''].extend(lookup_grouped[group])
-                del lookup_grouped[group]
+                if header_ind:
+                    # Not before the first one...
+                    await file.write('---------\n\n')
 
-        if not lookup_grouped['']:
-            del lookup_grouped['']
+                if group == '00special':
+                    await file.write(DOC_SPECIAL_GROUP)
+                else:
+                    await file.write(f'### {group}\n\n')
 
-        for header_ind, (group, funcs) in enumerate(sorted(lookup_grouped.items())):
-            if group == '':
-                group = 'Ungrouped Conditions'
+                LOGGER.info('Doing {} group...', group)
 
-            if header_ind:
-                # Not before the first one...
-                print('---------\n', file=file)
-
-            if group == '00special':
-                print(DOC_SPECIAL_GROUP, file=file)
-            else:
-                print(f'### {group}\n', file=file)
-
-            LOGGER.info('Doing {} group...', group)
-
-            for test_key, aliases, func in funcs:
-                print(f'#### `{test_key}`:\n', file=file)
-                if aliases:
-                    print(f'**Aliases:** `{"`, `".join(aliases)}`  \n', file=file)
-                dump_func_docs(file, func)
-                file.write('\n')
+                for test_key, aliases, func in funcs:
+                    await file.write(f'#### `{test_key}`:\n\n')
+                    if aliases:
+                        await file.write(f'**Aliases:** `{"`, `".join(aliases)}`  \n')
+                    if func.valid_after or func.valid_before:
+                        await file.write('**Valid Priority Levels:** ')
+                        before = [meta.value for meta in func.valid_before]
+                        after = [meta.value for meta in func.valid_after]
+                        if before and after:
+                            await file.write(f'between `{min(after):+}` \N{EN DASH} `{max(before):+}` (inclusive)\n')
+                        elif before:
+                            await file.write(f'less than `{min(before):+}`\n')
+                        elif after:
+                            await file.write(f'greater than `{max(after):+}`\n')
+                        else:
+                            raise AssertionError(func)
+                    await file.write(dump_func_docs(func))
+                    await file.write('\n\n')
 
 
-def dump_func_docs(file: TextIO, func: Callable[..., object]) -> None:
-    """Write the documentation for this function to the file."""
+def dump_func_docs(func: Callable[..., object]) -> str:
+    """Extract the documentation for a function."""
     import inspect
-    docs = inspect.getdoc(func)
-    if docs:
-        print(docs, file=file)
-    else:
-        print('**No documentation!**', file=file)
+    return inspect.getdoc(func) or '**No documentation!'
 
 
 def add_inst(
@@ -962,7 +1055,7 @@ def add_inst(
     file: str,
     origin: Vec | FrozenVec | str,
     angles: AnyAngle | AnyMatrix | str = '0 0 0',
-    targetname: str='',
+    targetname: str = '',
     fixup_style: int | str = '0',  # Default to Prefix.
     no_fixup: bool = False,
 ) -> Entity:
@@ -1007,39 +1100,44 @@ def add_suffix(inst: Entity, suff: str) -> None:
     ALL_INST.add(new_filename.casefold())
 
 
-def local_name(inst: Entity, name: str | Entity) -> str:
+def local_name(inst: Entity, name: str | Entity | None) -> str:
     """Fixup the given name for inside an instance.
 
     This handles @names, !activator, and obeys the fixup_style option.
 
     If the name is an entity, that entity's name is passed through unchanged.
+    If the name is blank or None, the instance's name is returned.
     """
     # Don't translate direct entity names - it's already the entity's full
     # name.
     if isinstance(name, Entity):
         return name['targetname']
 
+    targ_name = inst['targetname', '']
+
     # If blank, keep it blank, and don't fix special or global names
+    if name is None:
+        return targ_name
     if not name or name.startswith(('!', '@')):
         return name
 
     fixup = inst['fixup_style', '0']
-    targ_name = inst['targetname', '']
 
     if fixup == '2' or not targ_name:
-        # We can't do fixup..
+        # We can't do fixup...
         return name
     elif fixup == '0':
         # Prefix
-        return targ_name + '-' + name
+        return f'{targ_name}-{name}'
     elif fixup == '1':
         # Postfix
-        return name + '-' + targ_name
+        return f'{name}-{targ_name}'
     else:
         raise ValueError(f'Unknown fixup style {fixup}!')
 
 
 class DebugAdder(Protocol):
+    """Result of fetch_debug_visgroup()."""
     @overload
     def __call__(self, ent: Entity, /) -> Entity:
         """Add this entity to the map, the visgroup and make it hidden."""
@@ -1049,7 +1147,7 @@ class DebugAdder(Protocol):
         """Add this brush to the map, the visgroup and make it hidden."""
 
     @overload
-    def __call__(self, classname: str, /, *, comment: str='', **kwargs: ValidKVs) -> Entity:
+    def __call__(self, classname: str, /, *, comment: str = '', **kwargs: ValidKVs) -> Entity:
         """Create an entity with the specified keyvalues."""
 
 
@@ -1092,7 +1190,7 @@ def fetch_debug_visgroup(
     def adder(target: str | Entity | Solid, /, **kwargs: ValidKVs) -> Entity | Solid:
         """Add a marker to the map."""
         if isinstance(target, str):
-            comment = kwargs.pop('comment', '')
+            comment = kwargs.pop('comments', kwargs.pop('comment', ''))
             target = vmf.create_ent(target, **kwargs)
             target.comments = str(comment)
         elif isinstance(target, Solid):
@@ -1149,10 +1247,10 @@ def widen_fizz_brush(brush: Solid, thickness: float, bounds: tuple[Vec, Vec] | N
 
 
 def set_ent_keys(
-    ent: typing.MutableMapping[str, str],
+    ent: MutableMapping[str, str],
     inst: Entity,
     kv_block: Keyvalues,
-    block_name: str='Keys',
+    block_name: str = 'Keys',
 ) -> None:
     """Copy the given key prop block to an entity.
 
@@ -1170,7 +1268,7 @@ def set_ent_keys(
 T = TypeVar('T')
 
 
-def resolve_offset(inst, value: str, scale: float=1, zoff: float=0) -> Vec:
+def resolve_offset(inst: Entity, value: str, scale: float = 1.0, zoff: float = 0.0) -> Vec:
     """Retrieve an offset from an instance var. This allows several special values:
 
     * Any $replace variables
@@ -1228,7 +1326,7 @@ def debug_test_result(inst: Entity, kv: Keyvalues) -> bool:
     if kv.has_children():
         LOGGER.warning('Debug:\n{!s}\n{!s}', kv, inst)
     else:
-        LOGGER.warning('Debug: {}\n{inst!s}', kv.value, inst)
+        LOGGER.warning('Debug: {}\n{!s}', kv.value, inst)
     return True  # The test is always true
 
 
@@ -1238,23 +1336,11 @@ def dummy_result() -> None:
     pass
 
 
-@meta_cond(priority=1000, only_once=False)
-def remove_blank_inst(inst: Entity) -> None:
-    """Remove instances with a blank file keyvalue.
-
-    This allows conditions to strip the instances when requested.
-    """
-    # If editoritems instances are set to "", PeTI will autocorrect it to
-    # ".vmf" - we need to handle that too.
-    if inst['file', ''] in ('', '.vmf'):
-        inst.remove()
-
-
 @make_result('timedRelay')
 def res_timed_relay(vmf: VMF, res: Keyvalues) -> Callable[[Entity], None]:
-    """Generate a logic_relay with outputs delayed by a certain amount.
+    """Generate a `logic_relay` with outputs delayed by a certain amount.
 
-    This allows triggering outputs based $timer_delay values.
+    This allows triggering outputs based on `$timer_delay` values.
     """
     delay_var = res['variable', consts.FixupVars.TIM_DELAY]
     name = res['targetname']
@@ -1303,14 +1389,17 @@ def res_timed_relay(vmf: VMF, res: Keyvalues) -> Callable[[Entity], None]:
 
 
 @make_result('condition')
-def res_sub_condition(coll: collisions.Collisions, info: MapInfo, res: Keyvalues) -> ResultCallable:
+def res_sub_condition(
+    coll: Collisions, info: MapInfo, voice: QuoteInfo,
+    res: Keyvalues,
+) -> ResultCallable:
     """Check a different condition if the outer block is true."""
     cond = Condition.parse(res, toplevel=False)
 
     def test_cond(inst: Entity) -> None:
         """For child conditions, we need to check every time."""
         try:
-            cond.test(coll, info, inst)
+            cond.test(coll, info, voice, inst)
         except Unsatisfiable:
             pass
     return test_cond
@@ -1335,7 +1424,10 @@ def res_end_condition() -> None:
 
 
 @make_result('switch')
-def res_switch(coll: collisions.Collisions, info: MapInfo, res: Keyvalues) -> ResultCallable:
+def res_switch(
+    coll: Collisions, info: MapInfo, voice: QuoteInfo,
+    res: Keyvalues,
+) -> ResultCallable:
     """Run the same test multiple times with different arguments.
 
     * `method` is the way the search is done - `first`, `last`, `random`, or `all`.
@@ -1394,17 +1486,17 @@ def res_switch(coll: collisions.Collisions, info: MapInfo, res: Keyvalues) -> Re
         run_default = True
         for test, results in cases:
             # If not set, always succeed for the random situation.
-            if test.real_name and not check_test(test, coll, info, inst):
+            if test.real_name and not check_test(test, coll, info, voice, inst):
                 continue
             for sub_res in results:
-                Condition.test_result(coll, info, inst, sub_res)
+                Condition.test_result(coll, info, voice, inst, sub_res)
             run_default = False
             if method is not SWITCH_TYPE.ALL:
                 # All does them all, otherwise we quit now.
                 break
         if run_default:
             for sub_res in default:
-                Condition.test_result(coll, info, inst, sub_res)
+                Condition.test_result(coll, info, voice, inst, sub_res)
     return apply_switch
 
 
@@ -1540,7 +1632,7 @@ def res_goo_debris(vmf: VMF, res: Keyvalues) -> object:
         file = file[:-4]
 
     goo_top_locs = {
-        pos.as_tuple()
+        pos
         for pos, block in
         brushLoc.POS.items()
         if block.is_goo and block.is_top
@@ -1548,7 +1640,7 @@ def res_goo_debris(vmf: VMF, res: Keyvalues) -> object:
 
     if space == 0:
         # No spacing needed, just copy
-        possible_locs = [Vec(loc) for loc in goo_top_locs]
+        possible_locs = [loc.thaw() for loc in goo_top_locs]
     else:
         possible_locs = []
         for x, y, z in goo_top_locs:
@@ -1563,7 +1655,7 @@ def res_goo_debris(vmf: VMF, res: Keyvalues) -> object:
             ):
                 if x_off == y_off == 0:
                     continue  # We already know this is a goo location
-                if (x + x_off, y + y_off, z) not in goo_top_locs:
+                if FrozenVec(x + x_off, y + y_off, z) not in goo_top_locs:
                     break  # This doesn't qualify
             else:
                 possible_locs.append(brushLoc.grid_to_world(Vec(x, y, z)))

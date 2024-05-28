@@ -6,7 +6,7 @@ include = [
 exclude = [
 	"**/__pycache__"
 	]
-venv = "BEE2_39"
+venv = "BEE2-12"
 stubPath = "src/"   # Use our module for stubs.
 # We want to do conversions when setting.
 reportPropertyTypeMismatch = false
@@ -30,13 +30,20 @@ from_first = true
 combine_as_imports = true
 src_paths = ["src"]
 
-
 [tool.ruff]
 line-length = 127
 target-version = "py38"
+
+exclude = [
+	"src/perlin.py",
+	"src/precomp/conditions/cutoutTile.py",
+]
+
+[tool.ruff.lint]
 select = [
 	"E", "UP", "F", "C4", "ANN", "B", "PIE", "RUF",
 	"PLC", "PLE", "PLW",  # Pylint.
+	"TRIO",
 
 	"TCH005",  # Empty type-checking block.
 ]
@@ -44,8 +51,11 @@ allowed-confusables = [
 	"×",  # Multiplication sign
 ]
 extend-ignore = [
+	"E201", "E202", "E203", "E221", "E222", "E241", # Allow extra whitespace.
+	"E226",  # Allow 4*6 + 8
 	"E402",  # Allow module level import later in the file.
 	"E721",  # Allow using type(x) is Class
+	"E731",  # Lambda assignment used intentionally for callbacks.
 	"F403",  # Allow *-imports,
 	"F405",  # name may be undefined, or defined from star imports: module
 
@@ -56,17 +66,25 @@ extend-ignore = [
 	"ANN401",  # Allow typing.Any
 
 	# Ruff:
-	"RUF100",  # Sometimes use # noqa for other linters
+	"RUF022",  # Sorting __all__
+	"RUF023",  # Sorting __slots__
 	"RUF005",  # Unpack instead of concat triggers on Vec.
+	"RUF100",  # Sometimes use # noqa for other linters
+	"RUF027",  # Catches TransToken using {}-formatting without an f-string.
 
 	# PyLint:
 	"PLW0603",  # Allow use of global statement.
 	"PLC0414",  # import x as x is used for type checking.
 	"PLE1205",  # Too many arguments for logging, doesn't handle our format
+	"PLC0415",  # Imports not at top level are used for specific reasons
 	"PLW2901",  # Allow redefining loop var inside the loop.
+	"PLW0120",  # for-else with return/break inside is just stylistic, exactly equivalent.
+
+	# Flake8-Trio:
+	"TRIO115",  # Stick with sleep(0) instead of lowlevel.checkpoint(), for now?
 
 	# Pyupgrade:
-	# Keep using typing types even with __future__.annotations.
+	# Keep using typing's types even with __future__.annotations.
 	"UP006", "UP007", "UP035",
 
 	# Flake8-bugbear:
@@ -78,13 +96,11 @@ extend-ignore = [
 	"PIE790",
 	# Allow aliases for enum values, used often.
 	"PIE796",
+	# Start arg for range is sometimes clearer
+	"PIE808",
 	]
 
-exclude = [
-	"src/perlin.py",
-]
-
-[tool.ruff.flake8-bugbear]
+[tool.ruff.lint.flake8-bugbear]
 extend-immutable-calls = [
 	# Objects which are immutable, or close enough that it's fine to be in func defaults.
 	"srctools.math.FrozenVec", "srctools.math.FrozenAngle", "srctools.math.FrozenMatrix",
@@ -109,16 +125,20 @@ extend-immutable-calls = [
 
 [tool.mypy]
 mypy_path = "$MYPY_CONFIG_FILE_DIR/hammeraddons/src/"
-#plugins = "trio_typing.plugin"
 allow_redefinition = true
 check_untyped_defs = true
+extra_checks = true
+strict_equality = true
 strict_optional = true
+local_partial_types = true
+implicit_reexport = false
 # strict = true  # Only when overrides is gone.
 
 warn_unused_ignores = true
 warn_redundant_casts = true
 warn_return_any = true
 warn_no_return = true
+# warn_unreachable = true  # TODO: Bunch of errors still
 
 disallow_incomplete_defs = true
 disallow_untyped_defs = true
@@ -127,49 +147,31 @@ disallow_untyped_calls = true
 disallow_any_generics = false
 
 enable_error_code = [
-	'unreachable',
+	'mutable-override',
+	'narrowed-type-not-subtype',
 	'redundant-expr',
+	'redundant-self',
+	'truthy-bool',
+	'truthy-iterable',
+	'unimported-reveal',
+	'unreachable',
 	'unused-awaitable',
+	'comparison-overlap',
 ]
 
 [[tool.mypy.overrides]]
-# TODO
+# TODO: make these pass strict checks.
 module = [
 	'app.gameMan',
-	'app.music_conf',
-	'app.selector_win',
-	'app.CheckDetails',
 	'app.backup',
-	'app.voiceEditor',
 	'app.contextWin',
 	'app.UI',
-	'app.paletteLoader',
 	'precomp.conditions._scaffold_compat',
-	'precomp.conditions.addInstance',
-	'precomp.conditions.antlines',
-	'precomp.conditions.fizzler',
-	'precomp.conditions.glass',
-	'precomp.conditions.globals',
-	'precomp.conditions.instances',
-	'precomp.conditions.monitor',
-	'precomp.conditions.removed',
-	'precomp.conditions.trackPlat',
-	'precomp.antlines',
-	'precomp.barriers',
 	'precomp.bottomlessPit',
-	'precomp.conditions',
-	'precomp.connections',
-	'precomp.cubes',
 	'precomp.fizzler',
-	'precomp.music',
-	'precomp.options',
-	'precomp.packing',
 	'precomp.tiling',
-	'precomp.voice_line',
-	'BEE2_config',
+	'ui_tk.check_table',
 	'FakeZip',
-	'pygtrie',
-	'vbsp',
 ]
 strict_optional = false
 

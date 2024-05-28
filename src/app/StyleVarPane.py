@@ -1,6 +1,6 @@
 """The Style Properties tab, for configuring style-specific properties."""
 from __future__ import annotations
-from typing import TypedDict
+from typing import TypedDict, cast
 from tkinter import IntVar
 from tkinter import ttk
 import operator
@@ -9,11 +9,12 @@ import itertools
 from srctools.logger import get_logger
 import trio
 
+from app import background_run
 from config.filters import FilterConf
-from packages import Style, StyleVar, PackagesSet
-from app import background_run, tooltip
-from transtoken import TransToken
 from config.stylevar import State
+from packages import Style, StyleVar, PackagesSet
+from transtoken import TransToken
+from ui_tk import tooltip
 from ui_tk.wid_transtoken import set_text
 import config
 
@@ -84,7 +85,7 @@ styleOptions = [
 ]
 
 
-class _WidgetsDict(TypedDict, total=False):
+class _WidgetsDict(TypedDict):
     """Todo: Remove."""
     stylevar_chosen_none: ttk.Label
     stylevar_other_none: ttk.Label
@@ -95,7 +96,7 @@ checkbox_other: dict[str, ttk.Checkbutton] = {}
 tk_vars: dict[str, IntVar] = {}
 
 VAR_LIST: list[StyleVar] = []
-UI: _WidgetsDict = {}
+UI: _WidgetsDict = cast(_WidgetsDict, {})
 
 TRANS_DEFAULT = {
     # i18n: StyleVar default value.
@@ -269,6 +270,7 @@ async def make_stylevar_pane(
     # then the UI callbacks are done after.
     async with trio.open_nursery() as nursery:
         for var in VAR_LIST:
+            await trio.sleep(0)
             tk_vars[var.id] = int_var = IntVar(value=var.enabled)
             desc = make_desc(packset, var)
             if var.applies_to_all(packset):

@@ -1,12 +1,12 @@
 """Conditions for randomising instances."""
 from typing import Callable
 
-from srctools import Keyvalues, Vec, Entity, Angle
-import srctools
+from srctools import Keyvalues, Vec, Angle, Entity
 
 from precomp import collisions, conditions, rand
 from precomp.conditions import Condition, RES_EXHAUSTED, make_result, MapInfo
 from precomp.lazy_value import LazyValue
+from quote_pack import QuoteInfo
 
 
 COND_MOD_NAME = 'Randomisation'
@@ -33,7 +33,10 @@ def check_random(res: Keyvalues) -> conditions.TestCallable:
 
 
 @make_result('random')
-def res_random(coll: collisions.Collisions, info: MapInfo, res: Keyvalues) -> conditions.ResultCallable:
+def res_random(
+    coll: collisions.Collisions, info: MapInfo, voice: QuoteInfo,
+    res: Keyvalues,
+) -> conditions.ResultCallable:
     """Randomly choose one of the sub-results to execute.
 
     The `chance` value defines the percentage chance for any result to be
@@ -81,11 +84,11 @@ def res_random(coll: collisions.Collisions, info: MapInfo, res: Keyvalues) -> co
             pass
         elif choice.name == 'group':
             for sub_res in choice:
-                if Condition.test_result(coll, info, inst, sub_res) is RES_EXHAUSTED:
+                if Condition.test_result(coll, info, voice, inst, sub_res) is RES_EXHAUSTED:
                     sub_res.name = 'nop'
                     sub_res.value = ''
         else:
-            if Condition.test_result(coll, info, inst, choice) is RES_EXHAUSTED:
+            if Condition.test_result(coll, info, voice, inst, choice) is RES_EXHAUSTED:
                 choice.name = 'nop'
                 choice.value = ''
     return apply_random

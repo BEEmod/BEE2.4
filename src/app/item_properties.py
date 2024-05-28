@@ -6,16 +6,17 @@ from enum import Enum
 import tkinter as tk
 from tkinter import ttk
 from typing import Any, Callable, ClassVar, Generic, Iterator, Optional, Tuple, Dict, List, TypeVar
-from typing_extensions import Final, Literal, TypeAlias, override
+from typing_extensions import Final, Literal, TypeAliasType, override
 
 import srctools
 import srctools.logger
 
+from app import img, localisation, sound
 from config.item_defaults import ItemDefault
-from app import img, localisation, tk_tools, sound, TK_ROOT, tooltip
-from ui_tk.img import TKImages
 from editoritems import ItemPropKind, Item
 from transtoken import TransToken
+from ui_tk import TK_ROOT, tk_tools, tooltip
+from ui_tk.img import TKImages
 from ui_tk.wid_transtoken import set_text, set_win_title
 import utils
 import config
@@ -46,6 +47,7 @@ class PropGroup:
     """A group of widgets for modifying one or more props."""
     LARGE: ClassVar[bool] = False
     label: ttk.Label
+
     def __init__(self, parent: ttk.Frame, tk_img: TKImages, label_text: TransToken) -> None:
         self.frame = tk.Frame(parent)
         self.label = ttk.Label(parent)
@@ -66,8 +68,12 @@ class PropGroup:
     def set_tooltip(self, tok: TransToken) -> None:
         """Set a user tooltip on this group."""
 
+
 # The prop kinds that require this group, then a function to create it.
-PropGroupFactory: TypeAlias = Tuple[List[ItemPropKind[Any]], Callable[[ttk.Frame, TKImages], PropGroup]]
+PropGroupFactory = TypeAliasType("PropGroupFactory", Tuple[
+    List[ItemPropKind[Any]],
+    Callable[[ttk.Frame, TKImages], PropGroup],
+])
 
 
 class BoolPropGroup(PropGroup):

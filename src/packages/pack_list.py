@@ -1,9 +1,8 @@
 from typing import List
 
-from srctools import Keyvalues
 import srctools.logger
 
-from packages import ExportData, PakObject, ParseData
+from packages import PakObject, ParseData
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -61,32 +60,3 @@ class PackList(PakObject, allow_mult=True):
         for item in override.files:
             if item not in self.files:
                 self.files.append(item)
-
-    @staticmethod
-    async def export(exp_data: ExportData) -> None:
-        """Export all the packlists."""
-
-        pack_block = Keyvalues('PackList', [])
-
-        for pack in exp_data.packset.all_obj(PackList):
-            # Build a
-            # "Pack_id"
-            # {
-            # "File" "filename"
-            # "File" "filename"
-            # }
-            # block for each packlist
-            files = [
-                Keyvalues('File', file)
-                for file in
-                pack.files
-            ]
-            pack_block.append(Keyvalues(
-                pack.id,
-                files,
-            ))
-
-        LOGGER.info('Writing packing list!')
-        with open(exp_data.game.abs_path('bin/bee2/pack_list.cfg'), 'w') as pack_file:
-            for line in pack_block.export():
-                pack_file.write(line)

@@ -1,6 +1,4 @@
 """Handles adding music to the level."""
-from typing import List
-
 from srctools import VMF, Vec, Keyvalues, Output
 from precomp import corridor, options, conditions
 from consts import MusicChannel as Channel
@@ -19,8 +17,8 @@ def add(
     LOGGER.info("Adding Music...")
     # These values are exported by the BEE2 app, indicating the
     # options on the music item.
-    inst = options.get(str, 'music_instance')
-    snd_length = options.get(int, 'music_looplen')
+    inst = options.MUSIC_INSTANCE()
+    snd_length = options.MUSIC_LOOPLEN()
 
     # Don't add our logic if an instance was provided.
     # If this settings is set, we have a music config.
@@ -121,18 +119,18 @@ def add(
         make_channel_conf(
             vmf, loc,
             Channel.BASE,
-            conf.find_key('base', or_blank=True).as_array(),
+            conf.find_key('base', or_blank=True),
         )
         make_channel_conf(
             vmf, loc,
             Channel.SPEED,
-            conf.find_key('speedgel', or_blank=True).as_array(),
+            conf.find_key('speedgel', or_blank=True),
         )
         if info.has_attr('funnel') or info.has_attr('excursionfunnel'):
             make_channel_conf(
                 vmf, loc,
                 Channel.TBEAM,
-                funnel.as_array(),
+                funnel,
                 conf.bool('sync_funnel'),
             )
 
@@ -140,7 +138,7 @@ def add(
             make_channel_conf(
                 vmf, loc,
                 Channel.BOUNCE,
-                bounce.as_array(),
+                bounce,
             )
 
         packfiles = conf.find_key('pack', or_blank=True).as_array()
@@ -163,15 +161,17 @@ def make_channel_conf(
     vmf: VMF,
     pos: Vec,
     channel: Channel,
-    tracks: List[str],
+    config: Keyvalues,
     sync: bool = False,
 ) -> None:
     """Embed the specified channel's data into the map via a custom ent."""
+    tracks = config.find_key('sound', or_blank=True).as_array()
     if tracks:
         ent = vmf.create_ent(
             'bee2_music_channel',
             origin=pos,
             channel=channel.value,
+            volume=config['volume', '1.0'],
             sync=sync,
         )
         for i, track in enumerate(tracks, 1):

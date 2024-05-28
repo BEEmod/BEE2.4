@@ -1,19 +1,21 @@
 from __future__ import annotations
 
-from typing import Mapping
-from typing_extensions import override
+from typing_extensions import Self, override
+from collections.abc import Mapping
 
-from srctools import EmptyMapping, Keyvalues, conv_bool, bool_as_int
+from srctools import EmptyMapping, Keyvalues, conv_bool, bool_as_int, logger
 from srctools.dmx import Element, ValueType as DMXValue
 import attrs
 
-from corridor import Direction, GameMode, Orient
+from corridor import Direction, GameMode, Option, Orient
 import config
+import utils
 
 
+LOGGER = logger.get_logger(__name__)
 __all__ = [
     'Direction', 'GameMode', 'Orient',  # Re-export
-    'Config', 'UIState',
+    'Config', 'Options', 'UIState',
 ]
 
 
@@ -98,6 +100,91 @@ class Config(config.Data, conf_name='Corridor', uses_id=True, version=2):
             elem[inst] = enabled
 
         return elem
+
+
+@config.COMPILER.register
+@config.PALETTE.register
+@config.APP.register
+@attrs.frozen
+class Options(config.Data, conf_name='CorridorOptions', uses_id=True, version=1):
+    """Configuration defined for a specific corridor group."""
+    options: Mapping[utils.ObjectID, utils.SpecialID] = EmptyMapping
+
+    @staticmethod
+    def get_id(
+        style: str,
+        mode: GameMode,
+        direction: Direction,
+    ) -> str:
+        """Given the style and kind of corridor, return the ID for config lookup.
+
+        Orientation is not included.
+        """
+        return f'{style.casefold()}:{mode.value}_{direction.value}'
+
+    @classmethod
+    @override
+    def parse_kv1(cls, data: Keyvalues, version: int) -> Self:
+        if version != 1:
+            raise ValueError(f'Unknown version {version}!')
+        options = {}
+        for child in data:
+            opt_id = utils.obj_id(child.real_name, 'corridor option ID')
+            value = utils.special_id(child.value, 'corridor option value')
+            if utils.not_special_id(value) or value == utils.ID_RANDOM:
+                options[opt_id] = value
+            else:
+                raise ValueError(f'Invalid option value "{child.value}" for option "{opt_id}"!')
+        return cls(options)
+
+    @override
+    def export_kv1(self) -> Keyvalues:
+        return Keyvalues('', [
+            Keyvalues(opt_id, value)
+            for opt_id, value in self.options.items()
+        ])
+
+    @classmethod
+    @override
+    def parse_dmx(cls, data: Element, version: int) -> Self:
+        if version != 1:
+            raise ValueError(f'Unknown version {version}!')
+        options = {}
+        for child in data.values():
+            if child.name == 'name':
+                continue
+            opt_id = utils.obj_id(child.name, 'corridor option ID')
+            value = utils.special_id(child.val_string, 'corridor option value')
+            if utils.not_special_id(value) or value == utils.ID_RANDOM:
+                options[opt_id] = value
+            else:
+                raise ValueError(f'Invalid option value "{value}" for option "{opt_id}"!')
+
+        return cls(options)
+
+    @override
+    def export_dmx(self) -> Element:
+        elem = Element('CorridorOptions', 'DMConfig')
+        for opt_id, value in self.options.items():
+            elem[opt_id] = value
+        return elem
+
+    def value_for(self, option: Option) -> utils.SpecialID:
+        """Return the currently selected value for the specified option."""
+        try:
+            opt_id = self.options[option.id]
+        except KeyError:
+            return option.default
+        if opt_id == utils.ID_RANDOM:
+            return opt_id
+        for value in option.values:
+            if opt_id == value.id:
+                return opt_id
+        LOGGER.warning(
+            'Configured ID "{}" is not valid for option "{}"',
+            opt_id, option.id,
+        )
+        return option.default
 
 
 @config.APP.register

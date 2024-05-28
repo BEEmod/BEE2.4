@@ -1,14 +1,17 @@
 """Adds a widget for specifying minute-second durations."""
-from typing import AsyncIterator, Iterable, Tuple
+from typing import Mapping, Tuple
 from functools import lru_cache
 import tkinter as tk
 
 from srctools import conv_int, logger
+from trio_util import AsyncValue
+import trio
 
-from packages.widgets import TimerOptions, UpdateFunc
+from packages.widgets import TimerOptions
 from app import itemconfig
-from app.tooltip import add_tooltip
+from ui_tk.tooltip import add_tooltip
 from ui_tk.img import TKImages
+import utils
 
 
 LOGGER = logger.get_logger('itemconfig.timer')
@@ -27,23 +30,27 @@ def timer_values(min_value: int, max_value: int) -> Tuple[str, ...]:
 @itemconfig.ui_multi_wconf(TimerOptions)
 async def widget_minute_seconds_multi(
     parent: tk.Widget, tk_img: TKImages,
-    timers: Iterable[itemconfig.TimerNum],
-    get_on_changed: itemconfig.MultiChangeFunc,
+    holders: Mapping[itemconfig.TimerNum, AsyncValue[str]],
     conf: TimerOptions,
-) -> AsyncIterator[Tuple[itemconfig.TimerNum, UpdateFunc]]:
+    /, *, task_status: trio.TaskStatus[None] = trio.TASK_STATUS_IGNORED,
+) -> None:
     """For timers, display in a more compact form."""
-    for row, column, tim_val, tim_text in itemconfig.multi_grid(timers, columns=5):
-        timer, update = await widget_minute_seconds(parent, tk_img, get_on_changed(tim_val), conf)
-        timer.grid(row=row, column=column)
-        add_tooltip(timer, tim_text, delay=0)
-        yield tim_val, update
+    timer: tk.Widget
+    async with trio.open_nursery() as nursery:
+        for row, column, tim_val, tim_text, holder in itemconfig.multi_grid(holders, columns=5):
+            timer = await nursery.start(widget_minute_seconds, parent, tk_img, holder, conf)
+            timer.grid(row=row, column=column)
+            add_tooltip(timer, tim_text, delay=0)
+        task_status.started()
 
 
 @itemconfig.ui_single_wconf(TimerOptions)
 async def widget_minute_seconds(
     parent: tk.Widget, tk_img: TKImages,
-    on_changed: itemconfig.SingleChangeFunc, conf: TimerOptions,
-) -> Tuple[tk.Widget, UpdateFunc]:
+    holder: AsyncValue[str],
+    conf: TimerOptions,
+    /, *, task_status: trio.TaskStatus[tk.Widget] = trio.TASK_STATUS_IGNORED,
+) -> None:
     """A widget for specifying times - minutes and seconds.
 
     The value is saved as seconds.
@@ -56,17 +63,6 @@ async def widget_minute_seconds(
     # Stores the 'pretty' value in the actual textbox.
     disp_var = tk.StringVar()
 
-    async def update_disp(new_val: str) -> None:
-        """Whenever the string changes, update the displayed text."""
-        seconds = conv_int(new_val, -1)
-        if conf.min <= seconds <= conf.max:
-            disp_var.set(f'{seconds // 60}:{seconds % 60:02}')
-        else:
-            LOGGER.warning('Bad timer value "{}"!')
-            # Recurse, with a known safe value.
-            disp_var.set(values[0])
-            set_var()
-
     def set_var() -> None:
         """Set the variable to the current value."""
         try:
@@ -75,7 +71,7 @@ async def widget_minute_seconds(
         except (ValueError, TypeError):
             pass  # Don't store, incomplete value.
         else:
-            on_changed(str(total))
+            holder.value = str(total)
 
     def validate(reason: str, operation_type: str, cur_value: str, new_char: str, new_value: str) -> bool:
         """Validate the values for the text.
@@ -121,8 +117,6 @@ async def widget_minute_seconds(
             var.set(str(seconds))  # This then re-writes the textbox.
         return True
 
-    validate_cmd = parent.register(validate)
-
     # Unfortunately we can't use ttk.Spinbox() here, it doesn't support
     # the validation options.
     # TODO: Update when possible.
@@ -136,9 +130,20 @@ async def widget_minute_seconds(
         width=5,
 
         validate='all',
-        # These define which of the possible values will be passed along.
-        # http://tcl.tk/man/tcl8.6/TkCmd/spinbox.htm#M26
-        validatecommand=(validate_cmd, '%V', '%d', '%s', '%S', '%P'),
     )
+    # These define which of the possible values will be passed along.
+    # http://tcl.tk/man/tcl8.6/TkCmd/spinbox.htm#M26
+    spinbox['validatecommand'] = (spinbox.register(validate), '%V', '%d', '%s', '%S', '%P')
+
+    task_status.started(spinbox)
     # We need to set this after, it gets reset to the first one.
-    return spinbox, update_disp
+    async with utils.aclosing(holder.eventual_values()) as agen:
+        async for new_val in agen:
+            seconds = conv_int(new_val, -1)
+            if conf.min <= seconds <= conf.max:
+                disp_var.set(f'{seconds // 60}:{seconds % 60:02}')
+            else:
+                LOGGER.warning('Bad timer value "{}"!', new_val)
+                # Replace with a known safe value.
+                disp_var.set(values[0])
+                set_var()

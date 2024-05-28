@@ -1,14 +1,18 @@
 """Various functions shared among the compiler and application."""
 from __future__ import annotations
+
 from typing import (
-    Final, TYPE_CHECKING, Any, Awaitable, Callable, Generator, Generic, ItemsView,
-    Iterable, Iterator, KeysView, Mapping, NoReturn, Optional,
-    Sequence, SupportsInt, Tuple, Type, TypeVar, ValuesView,
+    Collection, Final, NewType, TYPE_CHECKING, Any, Awaitable, Callable, Generator, Generic,
+    ItemsView, Iterable, Iterator, KeysView, Mapping, NoReturn, Optional, Sequence, SupportsInt,
+    Tuple, Type, TypeVar, ValuesView
 )
-from typing_extensions import ParamSpec, TypeVarTuple, Unpack
+
+from typing_extensions import Literal, ParamSpec, TypeGuard, TypeVarTuple, Unpack
 from collections import deque
 from enum import Enum
 from pathlib import Path
+import functools
+import itertools
 import copyreg
 import logging
 import os
@@ -17,9 +21,11 @@ import stat
 import sys
 import types
 import zipfile
+import math
 
-from srctools import Angle
+from srctools.math import Angle
 import trio
+import trio_util
 
 
 __all__ = [
@@ -27,9 +33,12 @@ __all__ = [
     'get_git_version', 'install_path', 'bins_path', 'conf_location', 'fix_cur_directory',
     'run_bg_daemon', 'not_none', 'CONN_LOOKUP', 'CONN_TYPES', 'freeze_enum_props', 'FuncLookup',
     'PackagePath', 'Result', 'acompose', 'get_indent', 'iter_grid', 'check_cython',
+    'ObjectID', 'SpecialID', 'BlankID', 'ID_EMPTY', 'ID_NONE', 'ID_RANDOM',
+    'obj_id', 'special_id', 'obj_id_optional', 'special_id_optional',
     'check_shift', 'fit', 'group_runs', 'restart_app', 'quit_app', 'set_readonly',
-    'unset_readonly', 'merge_tree', 'write_lang_pot',
+    'unset_readonly', 'merge_tree', 'write_lang_pot', 'aclosing', 'lcm',
 ]
+
 
 WIN = sys.platform.startswith('win')
 MAC = sys.platform.startswith('darwin')
@@ -61,7 +70,7 @@ STEAM_IDS = {
 }
 
 
-# Add core srctools types into the pickle registry, so they can be more directly
+# Add very common types into the pickle registry, so they can be more directly
 # loaded.
 # IDs 240 - 255 are available for application uses.
 copyreg.add_extension('srctools.math', '_mk_vec', 240)
@@ -71,6 +80,29 @@ copyreg.add_extension('srctools.math', '_mk_fvec', 243)
 copyreg.add_extension('srctools.math', '_mk_fang', 244)
 copyreg.add_extension('srctools.math', '_mk_fmat', 245)
 copyreg.add_extension('srctools.keyvalues', 'Keyvalues', 246)
+copyreg.add_extension('transtoken', 'TransToken', 247)
+copyreg.add_extension('transtoken', 'PluralTransToken', 248)
+copyreg.add_extension('transtoken', 'JoinTransToken', 249)
+copyreg.add_extension('transtoken', 'ListTransToken', 250)
+copyreg.add_extension('pathlib', 'Path', 251)
+copyreg.add_extension('pathlib', 'PurePosixPath', 252)
+
+lcm: Callable[[int, int], int]
+if sys.version_info >= (3, 9):
+    from math import lcm
+else:
+    def lcm(a: int, b: int) -> int:
+        """Calculate the lowest common multiple.
+
+        TODO: Remove once we drop 3.8.
+        """
+        return (a * b) // math.gcd(a, b)
+
+
+if sys.version_info >= (3, 10):
+    from contextlib import aclosing
+else:  # TODO Directly use stdlib when we drop 3.9 and below
+    from async_generator import aclosing  # type: ignore  # noqa
 
 
 # Appropriate locations to store config options for each OS.
@@ -111,6 +143,7 @@ def get_git_version(inst_path: Path | str) -> str:
             },
         },
     )
+
 
 try:
     # This module is generated when the app is compiled.
@@ -176,6 +209,7 @@ def conf_location(path: str) -> Path:
     folder.mkdir(parents=True, exist_ok=True)
     return loc
 
+
 # Location of a message shown when user errors occur.
 COMPILE_USER_ERROR_PAGE = conf_location('error.html')
 
@@ -191,7 +225,7 @@ def fix_cur_directory() -> None:
 if TYPE_CHECKING:
     from bg_daemon import run_background as run_bg_daemon
 else:
-    def run_bg_daemon(*args) -> None:
+    def run_bg_daemon(*args: Any) -> None:
         """Helper to make loadScreen not need to import bg_daemon.
 
         Instead, we can redirect the import through here, which is a module
@@ -214,13 +248,14 @@ class CONN_TYPES(Enum):
     triple = 4  # Points N-S-W
     all = 5  # Points N-S-E-W
 
+
 N = Angle(yaw=90)
 S = Angle(yaw=270)
 E = Angle(yaw=0)
 W = Angle(yaw=180)
 # Lookup values for joining things together.
 CONN_LOOKUP: Mapping[Tuple[int, int, int, int], Tuple[CONN_TYPES, Angle]] = {
-    #N  S  E  W : (Type, Rotation)
+#    N  S  E  W : (Type, Rotation)
     (1, 0, 0, 0): (CONN_TYPES.side, N),
     (0, 1, 0, 0): (CONN_TYPES.side, S),
     (0, 0, 1, 0): (CONN_TYPES.side, E),
@@ -313,7 +348,7 @@ def _exc_freeze(
 if sys.version_info < (3, 9) and hasattr(zipfile, '_SharedFile'):
     # noinspection PyProtectedMember
     class _SharedZipFile(zipfile._SharedFile):  # type: ignore[name-defined]
-        def __init__(self, *args, **kwargs) -> None:
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
             super().__init__(*args, **kwargs)
             # tell() reads the actual file position, but that may have been
             # changed by another thread - instead keep our own private value.
@@ -335,8 +370,8 @@ class FuncLookup(Generic[LookupT], Mapping[str, LookupT]):
         self,
         name: str,
         *,
-        casefold: bool=True,
-        attrs: Iterable[str]=(),
+        casefold: bool = True,
+        attrs: Iterable[str] = (),
     ) -> None:
         self.casefold = casefold
         self.__name__ = name
@@ -447,6 +482,79 @@ class FuncLookup(Generic[LookupT], Mapping[str, LookupT]):
         self._registry.clear()
 
 
+# Special ID includes <>/[] names.
+SpecialID = NewType("SpecialID", str)
+# An object ID, which has been made uppercase. This excludes <> and [] names.
+ObjectID = NewType("ObjectID", SpecialID)
+BlankID = Literal[""]
+
+ID_NONE: Final[SpecialID] = SpecialID('<NONE>')
+ID_RANDOM: Final[SpecialID] = SpecialID('<RANDOM>')
+ID_EMPTY: BlankID = ''
+# Prohibit a bunch of IDs that keyvalues/dmx/etc might use for other purposes.
+PROHIBITED_IDS = {'ID', 'NAME', 'TYPE', 'VERSION'}
+
+
+def _uppercase_casefold(value: str) -> str:
+    """Casefold and uppercase."""
+    casefolded = value.casefold().upper()
+    if casefolded == value:
+        return value
+    else:
+        return casefolded
+
+
+def obj_id_optional(value: str, kind: str = 'object') -> ObjectID | BlankID:
+    """Parse an object ID, allowing through empty IDs."""
+    if (
+        value.startswith(('(', '<', '[', ']', '>', ')')) or
+        value.endswith(('(', '<', '[', ']', '>', ')'))
+    ):
+        raise ValueError(f'Invalid {kind} ID "{value}". IDs may not start/end with brackets.')
+    if ':' in value:
+        raise ValueError(f'Invalid {kind} ID "{value}". IDs may not contain colons.')
+    value = _uppercase_casefold(value)
+    if value in PROHIBITED_IDS:
+        raise ValueError(
+            f'Invalid {kind} ID "{value}". '
+            f'IDs cannot be any of the following: {", ".join(PROHIBITED_IDS)}'
+        )
+    return ObjectID(SpecialID(value))
+
+
+# TODO: Could use @overload + @deprecated to warn if input is already an ObjectID.
+def obj_id(value: str, kind: str = 'object') -> ObjectID:
+    """Parse an object ID."""
+    result = obj_id_optional(value, kind)
+    if result == "":
+        raise ValueError(f'Invalid {kind} ID "{value}". IDs may not be blank.')
+    return result
+
+
+def special_id_optional(value: str, kind: str = 'object') -> SpecialID | BlankID:
+    """Parse an object ID or a <special> name, allowing empty IDs."""
+    if value == "":
+        return ""
+    if value.startswith('<') and value.endswith('>'):
+        # Prohibited IDs are fine here, since they're not bare.
+        return SpecialID(_uppercase_casefold(value))
+    # Ruled out valid combinations, any others are prohibited, it's just an ObjectID now.
+    return obj_id_optional(value, kind)
+
+
+def special_id(value: str, kind: str = 'object') -> SpecialID:
+    """Parse an object ID or a <special> name."""
+    result = special_id_optional(value, kind)
+    if result == "":
+        raise ValueError(f'Invalid {kind} ID "{value}". IDs may not be blank.')
+    return result
+
+
+def not_special_id(some_id: SpecialID) -> TypeGuard[ObjectID]:
+    """Check that an ID does not have brackets, meaning it is a regular ID."""
+    return not some_id.startswith('<') and not some_id.endswith('>')
+
+
 class PackagePath:
     """Represents a file located inside a specific package.
 
@@ -455,19 +563,21 @@ class PackagePath:
     reserved for app-specific usages (internal or generated paths)
     """
     __slots__ = ['package', 'path']
-    package: Final[str]
+    package: Final[SpecialID]
     path: Final[str]
-    def __init__(self, pack_id: str, path: str) -> None:
-        self.package = pack_id.casefold()
+
+    def __init__(self, pack_id: SpecialID, path: str) -> None:
+        self.package = pack_id
         self.path = path.replace('\\', '/').lstrip("/")
 
     @classmethod
-    def parse(cls, uri: str | PackagePath, def_package: str) -> PackagePath:
+    def parse(cls, uri: str | PackagePath, def_package: SpecialID) -> PackagePath:
         """Parse a string into a path. If a package isn't provided, the default is used."""
         if isinstance(uri, PackagePath):
             return uri
         if ':' in uri:
-            return cls(*uri.split(':', 1))
+            pack_str, path = uri.split(':', 1)
+            return cls(special_id(pack_str), path)
         else:
             return cls(def_package, uri)
 
@@ -571,11 +681,32 @@ def acompose(
     return task
 
 
+async def run_as_task(
+    func: Callable[[*PosArgsT], Awaitable[object]],
+    *args: Unpack[PosArgsT],
+) -> None:
+    """Run the specified function inside a nursery.
+
+    This ensures it gets detected by Trio's instrumentation as a subtask.
+    """
+    async with trio.open_nursery() as nursery:  # noqa: ASYNC112
+        nursery.start_soon(func, *args)
+
+
 def not_none(value: T | None) -> T:
     """Assert that the value is not None, inline."""
     if value is None:
         raise AssertionError('Value was none!')
     return value
+
+
+def val_setter(aval: trio_util.AsyncValue[T], value: T) -> Callable[[], None]:
+    """Create a setter that sets the value when called."""
+    def func() -> None:
+        """Set the provided value."""
+        aval.value = value
+
+    return func
 
 
 def get_indent(line: str) -> str:
@@ -594,9 +725,9 @@ def get_indent(line: str) -> str:
 def iter_grid(
     max_x: int,
     max_y: int,
-    min_x: int=0,
-    min_y: int=0,
-    stride: int=1,
+    min_x: int = 0,
+    min_y: int = 0,
+    stride: int = 1,
 ) -> Iterator[tuple[int, int]]:
     """Loop over a rectangular grid area."""
     for x in range(min_x, max_x, stride):
@@ -642,6 +773,82 @@ def _append_bothsides(deq: deque[T]) -> Generator[None, T, None]:
     while True:
         deq.append((yield))
         deq.appendleft((yield))
+
+
+def get_piece_fitter(sizes: Collection[int]) -> Callable[[SupportsInt], Sequence[int]]:
+    """Compute the smallest number of repeated sizes that add up to the specified distance.
+
+    We tend to reuse the set of sizes, so this allows caching some computation.
+    """
+    size_list = sorted(sizes)
+
+    if not size_list:
+        def always_fails(size: SupportsInt) -> NoReturn:
+            """No pieces, always fails."""
+            raise ValueError(f'No solution to fit {size}, no pieces provided!')
+
+        return always_fails
+
+    # First, for each size other than the largest, calculate the lowest common multiple between
+    # it and all larger sizes.
+    # That tells us how many of the small one we'd need before it can be matched by the next size up,
+    # and more is therefore useless.
+    counters: list[range] = []
+    for i, small in enumerate(size_list[:-1]):
+        multiple = min(lcm(small, large) for large in size_list[i+1:])
+        counters.append(range(multiple // small))
+
+    *pieces, largest = size_list
+    pieces.reverse()
+    counters.reverse()
+
+    solutions: dict[int, list[int]] = {}
+    largest = size_list[-1]
+
+    # Now, pre-calculate every combination of smaller pieces.
+    # That's the hard part, but there's only a smaller amount of those.
+    for tup in itertools.product(*counters):
+        count = sum(tup)
+        result = sum(x * y for x, y in zip(tup, pieces))
+        try:
+            existing = solutions[result]
+        except KeyError:
+            pass
+        else:
+            if len(existing) < count:
+                continue
+        # Otherwise this solution is better, add it.
+        solutions[result] = [
+            size for size, count in zip(pieces, tup)
+            for _ in range(count)
+        ]
+
+    @functools.lru_cache
+    def calculate(size: SupportsInt) -> Sequence[int]:
+        """Compute a solution."""
+        size = int(size)
+
+        # Figure out how many large pieces are required before we'd overshoot.
+        cutoff = math.ceil(size / largest)
+
+        # Try each potential large piece to see if we have a solution
+        # for the remaining amount. Start with the most large pieces we can, that should
+        # give a more optimal smaller count. If none match, there is no solution.
+        best: list[int] | None = None
+        for large_count in reversed(range(cutoff + 1)):
+            part = size - large_count * largest
+            try:
+                potential = solutions[part] + [largest] * large_count
+            except KeyError:
+                continue
+            if best is None or len(potential) < len(best):
+                best = potential
+        if best is not None:
+            return best
+        else:
+            raise ValueError(f'No solution to fit {size} with {size_list}')
+
+    return calculate  # type: ignore[return-value]  # lru_cache issues
 
 
 def fit(dist: SupportsInt, obj: Sequence[int]) -> list[int]:
@@ -711,15 +918,12 @@ def restart_app() -> NoReturn:
     # We need to add the program to the arguments list, since python
     # strips that off.
     args = [sys.executable] + sys.argv
-    logging.root.info('Restarting using "{}", with args {!r}'.format(
-        sys.executable,
-        args,
-    ))
+    logging.root.info(f'Restarting using "{sys.executable}", with args {args!r}')
     logging.shutdown()
     os.execv(sys.executable, args)
 
 
-def quit_app(status: int=0) -> NoReturn:
+def quit_app(status: int = 0) -> NoReturn:
     """Quit the application."""
     sys.exit(status)
 
@@ -746,7 +950,7 @@ def unset_readonly(file: str | bytes | os.PathLike[str] | os.PathLike[bytes]) ->
 def merge_tree(
     src: str,
     dst: str,
-    copy_function: Callable[[str, str], None]=shutil.copy2,
+    copy_function: Callable[[str, str], None] = shutil.copy2,
 ) -> None:
     """Recursively copy a directory tree to a destination, which may exist.
 

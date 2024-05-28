@@ -1,24 +1,26 @@
 """Implements drag/drop logic."""
 from __future__ import annotations
-from typing import (
-    Callable, Dict, Final, Generic, Iterable, Iterator, List, Optional, Tuple, TypeVar,
-)
-from typing_extensions import ParamSpec, TypeAlias
+from typing import Any, Callable, Final, Generic, TypeVar, Optional
+from typing_extensions import ParamSpec, TypeAliasType
+
+from collections.abc import Iterable, Iterator
 from collections import defaultdict
 from enum import Enum
 import abc
-import enum
 
 from srctools.logger import get_logger
+from trio_util import AsyncValue, RepeatedEvent
 import attrs
 
-from app import background_run, img, sound
-from event import Event
+from app import img, sound, EdgeTrigger
 from transtoken import TransToken
 import utils
 
 
-__all__ = ['ManagerBase', 'Slot', 'DragInfo', 'ParentT', 'SlotType', 'SLOT_DRAG', 'ItemT']
+__all__ = [
+    'ManagerBase', 'Slot', 'DragInfo', 'ParentT', 'SlotType', 'SLOT_DRAG', 'ItemT',
+    'InfoCB', 'DragWin', 'FlexiCB', 'PositionerBase', 'in_bbox',
+]
 LOGGER = get_logger(__name__)
 
 
@@ -107,7 +109,7 @@ class PositionerBase:
         self.current = 0
         self.yoff += self.item_height
 
-    def get_size(self) -> Tuple[int, int]:
+    def get_size(self) -> tuple[int, int]:
         """Calculate the total bounding box.
 
         This advances a row if the last is nonempty.
@@ -122,7 +124,7 @@ class PositionerBase:
         self,
         slots: Iterable[T],
         xoff: int,
-    ) -> Iterator[Tuple[T, int, int]]:
+    ) -> Iterator[tuple[T, int, int]]:
         """Place these slots gradually."""
         for slot in slots:
             x = self.xpos(self.current) + xoff
@@ -132,13 +134,14 @@ class PositionerBase:
                 self.advance_row()
 
 
-InfoCB: TypeAlias = Callable[[ItemT], DragInfo]
-FlexiCB: TypeAlias = Callable[[float, float], Optional[str]]
+InfoCB = TypeAliasType("InfoCB", Callable[[ItemT], DragInfo], type_params=(ItemT, ))
+FlexiCB = TypeAliasType("FlexiCB", Callable[[float, float], Optional[str]])
 
 
-class DragWin(enum.Enum):
+class DragWin(Enum):
     """Constant used instead of a Slot to represent the drag/drop window."""
     DRAG = "drag"
+
 
 SLOT_DRAG: Final = DragWin.DRAG
 
@@ -146,30 +149,40 @@ SLOT_DRAG: Final = DragWin.DRAG
 # noinspection PyProtectedMember
 class ManagerBase(Generic[ItemT, ParentT]):
     """Manages a set of drag-drop points."""
+    width: Final[int]
+    height: Final[int]
+    config_icon: Final[bool]
+    _info_cb: InfoCB[ItemT]
+    _pick_flexi_group: FlexiCB | None
 
-    # The various events that can fire. They provide either a relevant slot or None as the argument."""
-    # Fires when items are right-clicked on. If one is registered, the gear icon appears.
-    on_config: Event[Slot[ItemT]]
-    # Fired when any slot is modified. This occurs only once if two swap etc. The parameter is None.
-    on_modified: Event[()]
+    _slots: list[Slot[ItemT]]
+    _img_blank: img.Handle  # Image for an empty slot.
 
-    # Fired when a slot is dropped on itself - allows detecting a left click.
-    on_redropped: Event[Slot[ItemT]]
+    # If dragging, the item we are dragging.
+    _cur_drag: ItemT | None
+    # While dragging, the place we started at.
+    _cur_slot: Slot[ItemT] | None
+
+    # Various hooks for reacting to events.
+
+    # Fires when items are right-clicked on or the config button is pressed.
+    on_config: EdgeTrigger[Slot[ItemT]]
+    # Fired when any slot is modified. This occurs only once if two swap etc.
+    on_modified: RepeatedEvent
 
     # When flexi slots are present, called when they're filled/emptied.
-    on_flexi_flow: Event[()]
+    on_flexi_flow: RepeatedEvent
 
-    # Mouse over or out of the items (including drag item).
-    on_hover_enter: Event[Slot[ItemT]]
-    on_hover_exit: Event[Slot[ItemT]]
+    # The item currently being hovered over (including the drag item).
+    hovered_item: AsyncValue[ItemT | None]
 
     def __init__(
         self,
         *,
-        info_cb: InfoCB,
-        size: Tuple[int, int] = (64, 64),
+        info_cb: InfoCB[ItemT],
+        size: tuple[int, int] = (64, 64),
         config_icon: bool = False,
-        pick_flexi_group: Optional[FlexiCB] = None,
+        pick_flexi_group: FlexiCB | None = None,
     ) -> None:
         """Create a group of drag-drop slots.
 
@@ -183,29 +196,21 @@ class ManagerBase(Generic[ItemT, ParentT]):
           and should return the name of the group to pick a slot from, or None if it should cancel.
         """
         self.width, self.height = size
-
-        self._slots: List[Slot[ItemT]] = []
-
-        self._img_blank = img.Handle.color(img.PETI_ITEM_BG, *size)
-
         self.config_icon = config_icon
         self._info_cb = info_cb
         self._pick_flexi_group = pick_flexi_group
 
-        # If dragging, the item we are dragging.
-        self._cur_drag: Optional[ItemT] = None
-        # While dragging, the place we started at.
-        self._cur_slot: Optional[Slot[ItemT]] = None
+        self._slots = []
+        self._img_blank = img.Handle.color(img.PETI_ITEM_BG, *size)
+        self._cur_drag = self._cur_slot = None
 
-        self.on_config = Event('Config')
-        self.on_modified = Event('Modified')
-        self.on_redropped = Event('Redropped')
-        self.on_flexi_flow = Event('Flexi Flow')
-        self.on_hover_enter = Event('Hover Enter')
-        self.on_hover_exit = Event('Hover Exit')
+        self.on_config = EdgeTrigger()
+        self.on_modified = RepeatedEvent()
+        self.on_flexi_flow = RepeatedEvent()
+        self.hovered_item = AsyncValue(None)
 
     @property
-    def cur_slot(self) -> Optional[Slot[ItemT]]:
+    def cur_slot(self) -> Slot[ItemT] | None:
         """If dragging, the current slot."""
         return self._cur_slot
 
@@ -270,7 +275,7 @@ class ManagerBase(Generic[ItemT, ParentT]):
 
         # Count the number of items in each group to find
         # which should have group icons.
-        groups: Dict[Optional[str], int] = defaultdict(int)
+        groups: dict[str | None, int] = defaultdict(int)
         for slot in self._slots:
             if not slot.is_source:
                 groups[slot.contents_group] += 1
@@ -370,7 +375,7 @@ class ManagerBase(Generic[ItemT, ParentT]):
         """Move the drag window to this position."""
         raise NotImplementedError
 
-    def _pos_slot(self, x: float, y: float) -> Optional[Slot[ItemT]]:
+    def _pos_slot(self, x: float, y: float) -> Slot[ItemT] | None:
         """Find the slot under this X,Y (if any). Sources are ignored."""
         for slot in self._slots:
             if not slot.is_source and self._ui_slot_in_bbox(slot, x, y):
@@ -380,8 +385,8 @@ class ManagerBase(Generic[ItemT, ParentT]):
     def _display_item(
         self,
         slot: Slot[ItemT] | DragWin,
-        item: Optional[ItemT],
-        group: bool=False,
+        item: ItemT | None,
+        group: bool = False,
     ) -> None:
         """Display the specified item on the given slot."""
         image: img.Handle
@@ -393,7 +398,7 @@ class ManagerBase(Generic[ItemT, ParentT]):
             image = self._info_cb(item).icon
         self._ui_set_icon(slot, image)
 
-    def _group_update(self, group: Optional[str]) -> None:
+    def _group_update(self, group: str | None) -> None:
         """Update all target items with this group."""
         if group is None:
             # None to do.
@@ -454,12 +459,9 @@ class ManagerBase(Generic[ItemT, ParentT]):
         dest = self._pos_slot(x, y)
 
         if dest is self._cur_slot:
-            assert dest is not None
-            # Dropped on itself, fire special event, put the item back.
+            # Dropped on itself, just put the item back.
             dest.contents = self._cur_drag
-            background_run(self.on_redropped, dest)
-            self._cur_drag = None
-            self._cur_slot = None
+            self._cur_drag = self._cur_slot = None
             return
 
         sound.fx('config')
@@ -473,18 +475,18 @@ class ManagerBase(Generic[ItemT, ParentT]):
                 if slot.is_flexi and slot.contents is None and group is not None:
                     slot.contents = self._cur_drag
                     slot.flexi_group = group
-                    background_run(self.on_modified)
+                    self.on_modified.set()
                     break
             else:
                 LOGGER.warning('Ran out of FLEXI slots for "{}", restored item: {}', group, self._cur_drag)
                 self._cur_slot.contents = self._cur_drag
-                background_run(self.on_modified)
+                self.on_modified.set()
         elif dest:  # We have a target.
             dest.contents = self._cur_drag
-            background_run(self.on_modified)
+            self.on_modified.set()
         # No target, and we dragged off an existing target, delete.
         elif not self._cur_slot.is_source:
-            background_run(self.on_modified)
+            self.on_modified.set()
             sound.fx('delete')
 
         self._cur_drag = None
@@ -506,7 +508,7 @@ class ManagerBase(Generic[ItemT, ParentT]):
                     sound.fx('config')
                     if slot.is_flexi:
                         slot.contents = None
-                    background_run(self.on_modified)
+                    self.on_modified.set()
                     return
                 elif free.contents is item:
                     # It's already on the board, don't change anything.
@@ -518,23 +520,23 @@ class ManagerBase(Generic[ItemT, ParentT]):
         else:
             # Fast-delete this.
             slot.contents = None
-            background_run(self.on_modified)
+            self.on_modified.set()
             sound.fx('delete')
 
     def _on_hover_enter(self, slot: Slot[ItemT]) -> None:
         """Fired when the cursor starts hovering over the item."""
         self._ui_slot_showdeco(slot)
-        background_run(self.on_hover_enter, slot)
+        self.hovered_item.value = slot.contents
 
     def _on_hover_exit(self, slot: Slot[ItemT]) -> None:
         """Fired when the cursor stops hovering over the item."""
         self._ui_slot_hidedeco(slot)
-        background_run(self.on_hover_exit, slot)
+        self.hovered_item.value = None
 
     def _on_configure(self, slot: Slot[ItemT]) -> None:
         """Configuration event, fired by clicking icon or right-clicking item."""
-        if slot.contents is not None:
-            background_run(self.on_config, slot)
+        if slot.contents is not None and self.on_config.ready.value:
+            self.on_config.trigger(slot)
 
 
 # noinspection PyProtectedMember
@@ -547,17 +549,13 @@ class Slot(Generic[ItemT]):
     flexi_group: str  # If a flexi slot, the group.
 
     # The current thing in the slot.
-    _contents: Optional[ItemT]
+    _contents: ItemT | None
 
     # The kind of slot.
     type: SlotType
-    man: ManagerBase  # Our drag/drop controller.
+    man: ManagerBase[ItemT, Any]  # Our drag/drop controller.
 
-    def __init__(
-        self,
-        man: ManagerBase,
-        kind: SlotType,
-    ) -> None:
+    def __init__(self, man: ManagerBase[ItemT, Any], kind: SlotType) -> None:
         """Internal only, use Manager.slot_*()."""
         self.man = man
         self.kind = kind
@@ -592,12 +590,12 @@ class Slot(Generic[ItemT]):
         self._is_highlighted = bool(value)
 
     @property
-    def contents(self) -> Optional[ItemT]:
+    def contents(self) -> ItemT | None:
         """Get the item in this slot, or None if empty."""
         return self._contents
 
     @contents.setter
-    def contents(self, value: Optional[ItemT]) -> None:
+    def contents(self, value: ItemT | None) -> None:
         """Set the item in this slot."""
         old_cont = self._contents
 
@@ -624,7 +622,7 @@ class Slot(Generic[ItemT]):
 
         if self.is_flexi and (old_cont is None) != (value is None):
             # We're showing/hiding, we need to redraw.
-            background_run(self.man.on_flexi_flow)
+            self.man.on_flexi_flow.set()
 
         if new_group is not None:
             # Update myself and the entire group to get the group
@@ -635,7 +633,7 @@ class Slot(Generic[ItemT]):
             self.man._display_item(self, value)
 
     @property
-    def contents_group(self) -> Optional[str]:
+    def contents_group(self) -> str | None:
         """If the item in this slot has a group, return it."""
         if self._contents is not None:
             return self.man._info_cb(self._contents).group

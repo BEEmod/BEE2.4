@@ -16,6 +16,7 @@ from editoritems_props import PanelAnimation
 import utils
 import consts
 from precomp.lazy_value import LazyValue
+from quote_pack import QuoteInfo
 
 
 COND_MOD_NAME = 'Brushes'
@@ -385,6 +386,7 @@ def res_import_template(
     vmf: VMF,
     coll: collisions.Collisions,
     info: corridor.Info,
+    voice: QuoteInfo,
     res: Keyvalues,
 ) -> conditions.ResultCallable:
     """Import a template VMF file, retexturing it to match orientation.
@@ -610,7 +612,7 @@ def res_import_template(
             return
 
         for vis_test_block in visgroup_instvars:
-            if all(conditions.check_test(test, coll, info, inst) for test in vis_test_block):
+            if all(conditions.check_test(test, coll, info, voice, inst) for test in vis_test_block):
                 visgroups.add(vis_test_block.real_name)
             if utils.DEV_MODE and vis_test_block.real_name not in template.visgroups:
                 LOGGER.warning('"{}" may use missing visgroup "{}"!', template.id, vis_test_block.real_name)
@@ -692,7 +694,7 @@ def res_import_template(
         template_brush.retexture_template(
             temp_data,
             origin,
-            inst.fixup,
+            inst,
             replace_tex,
             force_colour,
             force_grid,
@@ -736,7 +738,7 @@ def res_antigel(vmf: VMF, inst: Entity) -> None:
 
 # Position -> entity
 # We merge ones within 3 blocks of our item.
-CHECKPOINT_TRIG: dict[tuple[float, float, float], Entity] = {}
+CHECKPOINT_TRIG: dict[FrozenVec, Entity] = {}
 
 # Approximately a 3-distance from
 # the center.
@@ -784,7 +786,7 @@ def res_checkpoint_trigger(info: conditions.MapInfo, inst: Entity, res: Keyvalue
     for offset in CHECKPOINT_NEIGHBOURS:
         near_pos = pos + offset
         try:
-            trig = CHECKPOINT_TRIG[near_pos.as_tuple()]
+            trig = CHECKPOINT_TRIG[near_pos.freeze()]
             break
         except KeyError:
             pass
@@ -795,7 +797,7 @@ def res_checkpoint_trigger(info: conditions.MapInfo, inst: Entity, res: Keyvalue
             origin=pos,
         )
         trig.solids = []
-        CHECKPOINT_TRIG[pos.as_tuple()] = trig
+        CHECKPOINT_TRIG[pos.freeze()] = trig
 
     trig.solids.append(inst.map.make_prism(
         bbox_min,
@@ -1086,6 +1088,8 @@ def edit_panel(vmf: VMF, inst: Entity, props: Keyvalues, create: bool) -> None:
     origin = Vec.from_str(inst['origin'])
     uaxis, vaxis = Vec.INV_AXIS[normal.axis()]
 
+    add_debug = conditions.fetch_debug_visgroup(vmf, 'EditPanel')
+
     points: set[FrozenVec] = set()
 
     if 'point' in props:
@@ -1106,11 +1110,14 @@ def edit_panel(vmf: VMF, inst: Entity, props: Keyvalues, create: bool) -> None:
         })
 
     tiles_to_uv: dict[tiling.TileDef, set[tuple[int, int]]] = defaultdict(set)
+    normal_ang = normal.to_angle()
     for fpos in points:
         try:
             tile, u, v = tiling.find_tile(fpos, normal, force=create)
         except KeyError:
+            add_debug('info_null', origin=fpos, angles=normal_ang, targetname='point')
             continue
+        add_debug('info_target', origin=fpos, angles=normal_ang, targetname='point')
         tiles_to_uv[tile].add((u, v))
 
     if not tiles_to_uv:
@@ -1129,6 +1136,7 @@ def edit_panel(vmf: VMF, inst: Entity, props: Keyvalues, create: bool) -> None:
             # Individually specifying offsets.
             for bevel_str in bevel_prop.as_array():
                 bevel_point = Vec.from_str(bevel_str) @ orient + origin
+                add_debug('info_target', origin=bevel_point, targetname='bevel')
                 bevel_world.add((int(bevel_point[uaxis]), int(bevel_point[vaxis])))
         elif srctools.conv_bool(bevel_prop.value):
             # Fill the bounding box.
@@ -1137,6 +1145,7 @@ def edit_panel(vmf: VMF, inst: Entity, props: Keyvalues, create: bool) -> None:
             bbox_min -= off
             bbox_max += off
             for fpos in FrozenVec.iter_grid(bbox_min, bbox_max, 32):
+                add_debug('info_target', origin=fpos, targetname='bevel')
                 if fpos not in points:
                     bevel_world.add((int(fpos[uaxis]), int(fpos[vaxis])))
         # else: No bevels.
@@ -1161,7 +1170,7 @@ def edit_panel(vmf: VMF, inst: Entity, props: Keyvalues, create: bool) -> None:
                 ):
                     break
             else:
-                LOGGER.warning('No panel to modify found for "{}"!',inst['targetname'])
+                LOGGER.warning('No panel to modify found for "{}"!', inst['targetname'])
                 continue
         panels.append(panel)
 

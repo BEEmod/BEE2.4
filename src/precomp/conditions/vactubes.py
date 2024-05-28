@@ -2,16 +2,17 @@
 """
 from __future__ import annotations
 from collections.abc import Iterator, Iterable
+from typing import Callable, Sequence
 
 import attrs
-from srctools import Vec, Keyvalues, Entity, VMF, Solid, Matrix
+from srctools import Angle, FrozenVec, Vec, Keyvalues, Entity, VMF, Solid, Matrix
 import srctools.logger
 
 from precomp import tiling, instanceLocs, conditions, connections, template_brush
 from precomp.brushLoc import POS as BLOCK_POS
 import utils
 
-COND_MOD_NAME = None
+COND_MOD_NAME: str | None = None
 
 LOGGER = srctools.logger.get_logger(__name__, alias='cond.vactubes')
 
@@ -19,7 +20,7 @@ PUSH_SPEED = 700  # The speed of the push triggers.
 UP_PUSH_SPEED = 900  # Make it slightly faster when up to counteract gravity
 DN_PUSH_SPEED = 400  # Slow down when going down since gravity also applies..
 
-PUSH_TRIGS: dict[tuple[float, float, float], Entity] = {}
+PUSH_TRIGS: dict[FrozenVec, Entity] = {}
 VAC_TRACKS: list[tuple[Marker, dict[str, Marker]]] = []  # Tuples of (start, group)
 
 
@@ -39,11 +40,11 @@ class Config:
 
     # For straight instances, a size (multiple of 128) -> instance.
     inst_straight: dict[int, str]
-    # And those sizes from large to small.
-    inst_straight_sizes: list[int] = attrs.field(init=False)
-    @inst_straight_sizes.default
-    def _straight_size(self) -> list[int]:
-        return sorted(self.inst_straight.keys(), reverse=True)
+    # Then a "fitter" to assemble those into an optimum pattern.
+    inst_straight_fitter: Callable[[int], Sequence[int]] = attrs.field(init=False)
+
+    def __attrs_post_init__(self) -> None:
+        self.inst_straight_fitter = utils.get_piece_fitter(self.inst_straight.keys())
 
 
 @attrs.define
@@ -82,7 +83,10 @@ class Marker:
 VAC_CONFIGS: dict[str, dict[str, tuple[Config, int]]] = {}
 
 
-@conditions.make_result('CustVactube')
+@conditions.make_result(
+    'CustVactube',
+    valid_before=[conditions.MetaCond.Connections, conditions.MetaCond.Vactubes],
+)
 def res_vactubes(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
     """Specialised result to parse vactubes from markers.
 
@@ -242,7 +246,7 @@ def res_vactubes(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
     return result
 
 
-@conditions.meta_cond(400)
+@conditions.MetaCond.Vactubes.register
 def vactube_gen(vmf: VMF) -> None:
     """Generate the vactubes, after most conditions have run."""
     if not VAC_TRACKS:
@@ -290,16 +294,16 @@ def vactube_gen(vmf: VMF) -> None:
             conditions.ALL_INST.add(end.conf.inst_exit.casefold())
 
 
-def push_trigger(vmf: VMF, loc: Vec, normal: Vec, solids: list[Solid]) -> None:
+def push_trigger(vmf: VMF, loc: Vec | FrozenVec, normal: FrozenVec, solids: list[Solid]) -> None:
     """Generate the push trigger for these solids."""
     # We only need one trigger per direction, for now.
     try:
-        ent = PUSH_TRIGS[normal.as_tuple()]
+        ent = PUSH_TRIGS[normal]
     except KeyError:
-        ent = PUSH_TRIGS[normal.as_tuple()] = vmf.create_ent(
+        ent = PUSH_TRIGS[normal] = vmf.create_ent(
             classname='trigger_push',
             origin=loc,
-            # The z-direction is reversed..
+            # The z-direction is reversed...
             pushdir=normal.to_angle(),
             speed=(
                 UP_PUSH_SPEED if normal.z > 1e-6 else
@@ -332,8 +336,8 @@ def motion_trigger(vmf: VMF, *solids: Solid) -> None:
 
 def make_straight(
     vmf: VMF,
-    origin: Vec,
-    normal: Vec,
+    origin: Vec | FrozenVec,
+    normal: Vec | FrozenVec,
     dist: int,
     config: Config,
     is_start: bool = False,
@@ -356,10 +360,10 @@ def make_straight(
 
         motion_trigger(vmf, solid.copy())
 
-        push_trigger(vmf, origin, normal, [solid])
+        push_trigger(vmf, origin, FrozenVec(normal), [solid])
 
     off = 0
-    for seg_dist in utils.fit(dist, config.inst_straight_sizes):
+    for seg_dist in config.inst_straight_fitter(dist):
         conditions.add_inst(
             vmf,
             origin=origin + off * orient.forward(),
@@ -388,7 +392,7 @@ def make_straight(
                     conditions.add_inst(
                         vmf,
                         origin=position,
-                        angles=Matrix.from_basis(x=normal, z=supp_dir).to_angle(),
+                        angles=Angle.from_basis(x=normal, z=supp_dir),
                         file=config.inst_support,
                     )
                     placed_support = True
@@ -630,7 +634,7 @@ def make_ubend(
         )
 
 
-def join_markers(vmf: VMF, mark_a: Marker, mark_b: Marker, is_start: bool=False) -> None:
+def join_markers(vmf: VMF, mark_a: Marker, mark_b: Marker, is_start: bool = False) -> None:
     """Join two marker ents together with corners."""
     origin_a = Vec.from_str(mark_a.ent['origin'])
     origin_b = Vec.from_str(mark_b.ent['origin'])

@@ -1,7 +1,8 @@
 """
 General app configuration options, controlled by the options window.
 """
-from typing import Any, Dict, List
+from __future__ import annotations
+from typing import Any
 from typing_extensions import TypeGuard, override
 from enum import Enum
 
@@ -58,7 +59,7 @@ class GenOptions(config.Data, conf_name='Options', version=2):
 
     @classmethod
     @override
-    def parse_legacy(cls, conf: Keyvalues) -> Dict[str, 'GenOptions']:
+    def parse_legacy(cls, conf: Keyvalues) -> dict[str, GenOptions]:
         """Parse from the GEN_OPTS config file."""
         log_win_level = LEGACY_CONF.get(
             'Debug', 'window_log_level',
@@ -69,7 +70,7 @@ class GenOptions(config.Data, conf_name='Options', version=2):
         except ValueError:
             after_export = AfterExport.NORMAL
 
-        res: Dict[str, bool] = {}
+        res: dict[str, bool] = {}
         for field in gen_opts_bool:
             assert field.default is not None, field
             try:
@@ -94,7 +95,7 @@ class GenOptions(config.Data, conf_name='Options', version=2):
 
     @classmethod
     @override
-    def parse_kv1(cls, data: Keyvalues, version: int) -> 'GenOptions':
+    def parse_kv1(cls, data: Keyvalues, version: int) -> GenOptions:
         """Parse KV1 values."""
         if version > 2:
             raise AssertionError('Unknown version!')
@@ -130,12 +131,12 @@ class GenOptions(config.Data, conf_name='Options', version=2):
 
     @classmethod
     @override
-    def parse_dmx(cls, data: Element, version: int) -> 'GenOptions':
+    def parse_dmx(cls, data: Element, version: int) -> GenOptions:
         """Parse DMX configuration."""
         if version > 2:
             raise AssertionError('Unknown version!')
 
-        res: Dict[str, Any] = {}
+        res: dict[str, Any] = {}
         try:
             res['preserve_fgd'] = data['preserve_fgd' if version > 1 else 'preserve_resources'].val_bool
         except KeyError:
@@ -174,12 +175,12 @@ class GenOptions(config.Data, conf_name='Options', version=2):
 
 
 # Todo: For full type safety, make field = attrs.Attribute[Any], once mypy infers a union for iter(tuple).
-def _is_bool_attr(field: object) -> TypeGuard['attrs.Attribute[bool]']:
+def _is_bool_attr(field: object) -> TypeGuard[attrs.Attribute[bool]]:
     """Check if this is a boolean-type attribute."""
     return isinstance(field, attrs.Attribute) and (field.type is bool or str(field.type) == 'bool')
 
 
-gen_opts_bool: List['attrs.Attribute[bool]'] = [
+gen_opts_bool: list[attrs.Attribute[bool]] = [
     field
     for field in attrs.fields(GenOptions)
     if _is_bool_attr(field)

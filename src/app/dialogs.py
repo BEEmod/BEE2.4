@@ -2,8 +2,7 @@
 from enum import Enum
 from typing import Callable, ClassVar, Optional, Protocol, Literal
 
-from app.errors import AppError
-from transtoken import TransToken
+from transtoken import AppError, TransToken
 
 
 DEFAULT_TITLE = TransToken.ui('BEEmod')
@@ -42,7 +41,7 @@ class Dialogs(Protocol):
         message: TransToken,
         title: TransToken = DEFAULT_TITLE,
         icon: Icon = Icon.INFO,
-        detail: str='',
+        detail: str = '',
     ) -> None:
         """Show a message box with some information."""
 
@@ -53,7 +52,7 @@ class Dialogs(Protocol):
         message: TransToken,
         title: TransToken = DEFAULT_TITLE,
         icon: Icon = Icon.INFO,
-        detail: str='',
+        detail: str = '',
     ) -> bool:
         """Show a message box with "OK" and "Cancel" buttons."""
         raise NotImplementedError
@@ -63,7 +62,7 @@ class Dialogs(Protocol):
         message: TransToken,
         title: TransToken = DEFAULT_TITLE,
         icon: Icon = Icon.QUESTION,
-        detail: str='',
+        detail: str = '',
     ) -> bool:
         """Show a message box with "Yes" and "No" buttons."""
         raise NotImplementedError
@@ -73,7 +72,7 @@ class Dialogs(Protocol):
         message: TransToken,
         title: TransToken = DEFAULT_TITLE,
         icon: Icon = Icon.QUESTION,
-        detail: str='',
+        detail: str = '',
     ) -> Optional[bool]:
         """Show a message box with "Yes", "No" and "Cancel" buttons."""
         raise NotImplementedError

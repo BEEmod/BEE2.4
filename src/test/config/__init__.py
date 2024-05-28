@@ -2,9 +2,7 @@
 from typing import Generator
 import contextlib
 
-import pytest
-
-from BEE2_config import GEN_OPTS, ConfigFile
+from BEE2_config import ConfigFile
 
 
 @contextlib.contextmanager

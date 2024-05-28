@@ -20,7 +20,7 @@ from srctools.vmf import VMF, Entity, Side, Solid, Output, UVAxis
 import srctools.logger
 import srctools.vmf
 
-from plane import Plane
+from plane import PlaneGrid
 from precomp.brushLoc import POS as BLOCK_POS, Block, grid_to_world
 from precomp.texturing import TileSize, Portalable
 from . import (
@@ -37,7 +37,7 @@ import consts
 
 
 __all__ = [
-    'TileSize', 'Portalable',
+    'TileSize', 'Portalable', 'TileType',
     'TILETYPE_FROM_CHAR', 'TILETYPE_TO_CHAR', 'PanelType', 'Panel', 'round_grid', 'TileDef',
     'analyse_map', 'generate_brushes',
 ]
@@ -48,10 +48,7 @@ LOGGER = srctools.logger.get_logger(__name__)
 # thickness = 2,4,8
 # TILE_TEMP[tile_norm]['tile'] = front_face
 # TILE_TEMP[tile_norm]['back'] = back_face
-TILE_TEMP: dict[
-    tuple[float, float, float],
-    dict[str | tuple[int, int, int, bool], Side]
-] = {}
+TILE_TEMP: dict[FrozenVec, dict[str | tuple[int, int, int, bool], Side]] = {}
 
 NORMALS = [
     FrozenVec(x=+1),
@@ -146,12 +143,12 @@ class TileType(Enum):
     @property
     def is_nodraw(self) -> bool:
         """Should this swap to nodraw?"""
-        return self is self.NODRAW
+        return self is TileType.NODRAW
 
     @property
     def blocks_pattern(self) -> bool:
         """Does this affect patterns?"""
-        return self is not self.CUTOUT_TILE_BROKEN
+        return self is not TileType.CUTOUT_TILE_BROKEN
 
     @property
     def is_tile(self) -> bool:
@@ -173,7 +170,7 @@ class TileType(Enum):
         """The portalability of the tile."""
         if 'WHITE' in self.name:
             return texturing.Portalable.WHITE
-        elif 'BLACK' in self.name or self is self.GOO_SIDE:
+        elif 'BLACK' in self.name or self is TileType.GOO_SIDE:
             return texturing.Portalable.BLACK
         raise ValueError('No colour for ' + self.name + '!')
 
@@ -304,10 +301,10 @@ def round_grid(vec: Vec) -> Vec:
 
 
 def iter_uv(
-    umin: float=0,
-    umax: float=3,
-    vmin: float=0,
-    vmax: float=3
+    umin: float = 0,
+    umax: float = 3,
+    vmin: float = 0,
+    vmax: float = 3
 ) -> Iterator[tuple[int, int]]:
     """Iterate over points in a rectangle."""
     urange = range(int(umin), int(umax + 1))
@@ -643,7 +640,7 @@ class Panel:
             template_brush.retexture_template(
                 template,
                 front_pos + offset,
-                self.inst.fixup,
+                self.inst,
             )
             all_brushes += template.world
 
@@ -1217,7 +1214,7 @@ class TileDef:
             )
         if self.use_bullseye():
             # Add the bullseye overlay.
-            orient = Matrix.from_angle(self.normal.to_angle())
+            orient = Matrix.from_basis(x=self.normal)
             srctools.vmf.make_overlay(
                 vmf,
                 orient.forward(),
@@ -1235,13 +1232,13 @@ class TileDef:
         is_wall: bool,
         bevels: set[tuple[int, int]],
         normal: Vec,
-        offset: int=64,
-        thickness: int=4,
-        vec_offset: Vec=None,
-        is_panel: bool=False,
-        add_bullseye: bool=False,
-        face_output: dict[tuple[int, int], Side] | None=None,
-        interior_bevel: bool=True,
+        offset: int = 64,
+        thickness: int = 4,
+        vec_offset: Vec = None,
+        is_panel: bool = False,
+        add_bullseye: bool = False,
+        face_output: dict[tuple[int, int], Side] | None = None,
+        interior_bevel: bool = True,
     ) -> tuple[list[Side], list[Solid]]:
         """Generate a bunch of tiles, and return the front faces.
 
@@ -1408,7 +1405,7 @@ class TileDef:
             self._portal_helper += 1
         # else: it's already a Vec, so don't override with a generic helper.
 
-    def remove_portal_helper(self, *, all: bool=False) -> None:
+    def remove_portal_helper(self, *, all: bool = False) -> None:
         """Remove a "generic" placement helper.
 
         If "all" is checked, all helpers are removed.
@@ -1524,18 +1521,18 @@ def edit_quarter_tile(
 def make_tile(
     vmf: VMF,
     origin: Vec,
-    normal: Vec,
+    normal: FrozenVec | Vec,
     top_surf: str,
-    back_surf: str=consts.Tools.NODRAW.value,
+    back_surf: str = consts.Tools.NODRAW.value,
     *,
-    recess_dist: int=0,
-    thickness: int=4,
-    width: float=16,
-    height: float=16,
-    bevels: tuple[bool, bool, bool, bool]=(False, False, False, False),
-    panel_edge: bool=False,
-    u_align: int=512,
-    v_align: int=512,
+    recess_dist: int = 0,
+    thickness: int = 4,
+    width: float = 16,
+    height: float = 16,
+    bevels: tuple[bool, bool, bool, bool] = (False, False, False, False),
+    panel_edge: bool = False,
+    u_align: int = 512,
+    v_align: int = 512,
     antigel: bool | None = None,
 ) -> tuple[Solid, Side]:
     """Generate a tile.
@@ -1562,7 +1559,7 @@ def make_tile(
         antigel: If the tile is known to be antigel.
     """
     assert TILE_TEMP, "make_tile called without data loaded!"
-    template = TILE_TEMP[normal.as_tuple()]
+    template = TILE_TEMP[FrozenVec(normal)]
 
     assert width >= 8 and height >= 8, f'Tile is too small! ({width}x{height})'
     assert thickness in (2, 4, 8), f'Bad thickness {thickness}'
@@ -1649,8 +1646,7 @@ def gen_tile_temp() -> None:
     }
 
     try:
-        template = template_brush.get_template(
-            options.get(str, '_tiling_template_'))
+        template = template_brush.get_template(options.TILING_TEMPLATE())
         # Grab the single world brush for each visgroup.
         for (key, name) in cat_names.items():
             [categories[key]] = template.visgrouped_solids(name)
@@ -1661,7 +1657,7 @@ def gen_tile_temp() -> None:
         axis_norm = norm.axis()
 
         temp_part: dict[str | tuple[int, int, int, bool], Side] = {}
-        TILE_TEMP[norm.as_tuple()] = temp_part
+        TILE_TEMP[norm] = temp_part
 
         for (thickness, bevel), temp in categories.items():
             brush = temp.copy()
@@ -1758,7 +1754,7 @@ def analyse_map(vmf_file: VMF, side_to_ant_seg: dict[int, list[antlines.Segment]
                 tile.add_portal_helper()
             inst.remove()
 
-    dynamic_pan_parent = options.get(str, "dynamic_pan_parent")
+    dynamic_pan_parent = options.DYNAMIC_PAN_PARENT()
 
     # Find Angled Panel brushes.
     for brush_ent in vmf_file.by_class['func_brush']:
@@ -1824,10 +1820,10 @@ def analyse_map(vmf_file: VMF, side_to_ant_seg: dict[int, list[antlines.Segment]
     # Now look at all the blocklocs in the map, applying goo sides.
     # Don't override white surfaces, they can only appear on panels.
     goo_replaceable = [TileType.BLACK, TileType.BLACK_4x4]
-    for pos, block in BLOCK_POS.items():
+    for fpos, block in BLOCK_POS.items():
         if block.is_goo:
             for fnorm in NORMALS:
-                grid_pos = grid_to_world(pos) - 128 * fnorm
+                grid_pos = grid_to_world(fpos).thaw() - 128 * fnorm
                 try:
                     tile = TILES[grid_pos.as_tuple(), fnorm.as_tuple()]
                 except KeyError:
@@ -2015,8 +2011,8 @@ def inset_flip_panel(panel: list[Solid], pos: Vec, normal: Vec) -> None:
 
 
 def bevel_split(
-    rect_points: Plane[bool],
-    tile_pos: Plane[TileDef],
+    rect_points: PlaneGrid[bool],
+    tile_pos: PlaneGrid[TileDef],
 ) -> Iterator[tuple[int, int, int, int, tuple[bool, bool, bool, bool]]]:
     """Split the optimised segments to produce the correct bevelling."""
     for min_u, min_v, max_u, max_v, _ in grid_optim.optimise(rect_points):
@@ -2101,9 +2097,9 @@ def generate_brushes(vmf: VMF) -> None:
         bbox_min, bbox_max = Vec.bbox(tile.pos for tile in tiles)
 
         # (type, is_antigel, texture) -> (u, v) -> present/absent
-        grid_pos: dict[tuple[TileType, bool, str], Plane[bool]] = defaultdict(Plane)
+        grid_pos: dict[tuple[TileType, bool, str], PlaneGrid[bool]] = defaultdict(PlaneGrid)
 
-        tile_pos: Plane[TileDef] = Plane()
+        tile_pos: PlaneGrid[TileDef] = PlaneGrid()
 
         for tile in tiles:
             pos = tile.pos + 64 * tile.normal
@@ -2234,11 +2230,11 @@ def generate_goo(vmf: VMF) -> None:
     goo_heights: dict[float, int] = Counter()
 
     # If enabled, generate tideline overlays.
-    use_tidelines = options.get(bool, 'generate_tidelines')
+    use_tidelines = options.GENERATE_TIDELINES()
     # Z, x-cell, y-cell, x-norm, y-norm = overlay ent.
     tideline_over: dict[tuple[float, float, float, int, int], Tideline] = {}
 
-    pos: Vec | None = None
+    pos: FrozenVec | None = None
     for pos, block_type in BLOCK_POS.items():
         if block_type is Block.GOO_SINGLE:
             goo_pos[pos.z, pos.z][round(pos.x), round(pos.y)] = True
@@ -2336,7 +2332,7 @@ def generate_goo(vmf: VMF) -> None:
         damagetype=(1 << 18),  # Radiation
     )
 
-    goo_scale = options.get(float, 'goo_scale')
+    goo_scale = options.GOO_SCALE()
 
     # Find key with the highest value - that gives the largest z-level.
     [best_goo, _] = max(goo_heights.items(), key=lambda x: x[1])
