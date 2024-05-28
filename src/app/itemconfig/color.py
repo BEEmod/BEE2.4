@@ -1,6 +1,4 @@
-"""A Widget for allowing selecting a colour."""
-from __future__ import annotations
-
+"""A widget for allowing selecting a colour."""
 from contextlib import aclosing
 from collections.abc import Mapping
 

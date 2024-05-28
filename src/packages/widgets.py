@@ -1,10 +1,8 @@
 """Customizable configuration for specific items or groups of them."""
 from __future__ import annotations
 
-from typing import (
-    Any, Callable, Dict, Generic, Iterable, Iterator, List, Optional, Protocol, Set,
-    Tuple, TypeVar, Self
-)
+from typing import Any, Protocol, Self
+from collections.abc import Iterable, Iterator
 from contextlib import aclosing
 import itertools
 
@@ -32,8 +30,6 @@ class ConfigProto(Protocol):
         """Parse keyvalues into a widget config."""
 
 
-ConfT = TypeVar('ConfT', bound=ConfigProto)  # Type of the config object for a widget.
-OptConfT_contra = TypeVar('OptConfT_contra', bound=Optional[ConfigProto], contravariant=True)
 LEGACY_CONFIG = BEE2_config.ConfigFile('item_cust_configs.cfg', legacy=True)
 LOGGER = logger.get_logger(__name__)
 
@@ -46,7 +42,7 @@ class WidgetType:
 
 
 @attrs.frozen
-class WidgetTypeWithConf(WidgetType, Generic[ConfT]):
+class WidgetTypeWithConf[ConfT: ConfigProto](WidgetType):
     """Information about a type of widget, that requires configuration."""
     conf_type: type[ConfT]
 
@@ -56,7 +52,13 @@ WIDGET_KINDS: dict[str, WidgetType] = {}
 CLS_TO_KIND: dict[type[ConfigProto], WidgetTypeWithConf[Any]] = {}
 
 
-def register(*names: str, wide: bool = False) -> Callable[[type[ConfT]], type[ConfT]]:
+class RegisterDeco(Protocol):
+    """Return type for register()."""
+    def __call__[ConfT: ConfigProto](self, cls: type[ConfT], /) -> type[ConfT]:
+        ...
+
+
+def register(*names: str, wide: bool = False) -> RegisterDeco:
     """Register a widget type that takes config.
 
     If wide is set, the widget is put into a labelframe, instead of having a label to the side.
@@ -64,7 +66,7 @@ def register(*names: str, wide: bool = False) -> Callable[[type[ConfT]], type[Co
     if not names:
         raise TypeError('No name defined!')
 
-    def deco(cls: type[ConfT]) -> type[ConfT]:
+    def deco[ConfT: ConfigProto](cls: type[ConfT], /) -> type[ConfT]:
         """Do the registration."""
         kind = WidgetTypeWithConf(names[0], wide, cls)
         assert cls not in CLS_TO_KIND, cls
@@ -190,8 +192,8 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
 
         desc = packages.desc_parse(props, data.id, data.pak_id)
 
-        widgets: List[SingleWidget] = []
-        multi_widgets: List[MultiWidget] = []
+        widgets: list[SingleWidget] = []
+        multi_widgets: list[MultiWidget] = []
 
         for wid in props.find_all('Widget'):
             await trio.sleep(0)
@@ -243,7 +245,7 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
                     # All the same.
                     defaults = dict.fromkeys(TIMER_NUM_INF if use_inf else TIMER_NUM, default_prop.value)
 
-                holders: Dict[TimerNum, AsyncValue[str]] = {}
+                holders: dict[TimerNum, AsyncValue[str]] = {}
                 for num in (TIMER_NUM_INF if use_inf else TIMER_NUM):
                     if prev_conf is EmptyMapping:
                         # No new conf, check the old conf.
@@ -322,13 +324,13 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
         self.multi_widgets.extend(override.multi_widgets)
         self.desc = tkMarkdown.join(self.desc, override.desc)
 
-    def widget_ids(self) -> Set[str]:
+    def widget_ids(self) -> set[str]:
         """Return the set of widget IDs used."""
-        widgets: List[Iterable[Widget]] = [self.widgets, self.multi_widgets]
+        widgets: list[Iterable[Widget]] = [self.widgets, self.multi_widgets]
         return {wid.id for wid_list in widgets for wid in wid_list}
 
 
-def parse_color(color: str) -> Tuple[int, int, int]:
+def parse_color(color: str) -> tuple[int, int, int]:
     """Parse a string into a color."""
     if color.startswith('#'):
         try:

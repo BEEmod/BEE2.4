@@ -2,12 +2,14 @@
 from __future__ import annotations
 
 from typing import (
-    Collection, Final, NewType, TYPE_CHECKING, Any, Awaitable, Callable, Generator, Generic,
-    ItemsView, Iterable, Iterator, KeysView, Mapping, NoReturn, Optional, Sequence, SupportsInt,
-    Tuple, Type, TypeVar, ValuesView
+    Final, NewType, TYPE_CHECKING, Any, Generic,
+    NoReturn, Optional, SupportsInt,
+    Tuple, Type, TypeVar, Literal, TypeGuard
 )
-
-from typing_extensions import Literal, ParamSpec, TypeGuard, TypeVarTuple, Unpack
+from collections.abc import (
+    Awaitable, Callable, Collection, Generator, Iterable, Iterator,
+    Mapping, Sequence, KeysView, ValuesView, ItemsView
+)
 from collections import deque
 from enum import Enum
 from pathlib import Path
@@ -237,7 +239,7 @@ S = Angle(yaw=270)
 E = Angle(yaw=0)
 W = Angle(yaw=180)
 # Lookup values for joining things together.
-CONN_LOOKUP: Mapping[Tuple[int, int, int, int], Tuple[CONN_TYPES, Angle]] = {
+CONN_LOOKUP: Mapping[tuple[int, int, int, int], tuple[CONN_TYPES, Angle]] = {
 #    N  S  E  W : (Type, Rotation)
     (1, 0, 0, 0): (CONN_TYPES.side, N),
     (0, 1, 0, 0): (CONN_TYPES.side, S),
@@ -264,13 +266,8 @@ CONN_LOOKUP: Mapping[Tuple[int, int, int, int], Tuple[CONN_TYPES, Angle]] = {
 
 del N, S, E, W
 
-T = TypeVar('T')
-RetT = TypeVar('RetT')
-LookupT = TypeVar('LookupT')
-EnumT = TypeVar('EnumT', bound=Enum)
 
-
-def freeze_enum_props(cls: Type[EnumT]) -> Type[EnumT]:
+def freeze_enum_props[EnumT: Enum](cls: type[EnumT]) -> type[EnumT]:
     """Make an enum with property getters more efficent.
 
     Call the getter on each member, and then replace it with a dict lookup.
@@ -283,7 +280,7 @@ def freeze_enum_props(cls: Type[EnumT]) -> Type[EnumT]:
         ):
             continue
         data = {}
-        data_exc: dict[EnumT, tuple[Type[BaseException], tuple[object, ...]]] = {}
+        data_exc: dict[EnumT, tuple[type[BaseException], tuple[object, ...]]] = {}
 
         enum: EnumT
         for enum in cls:
@@ -311,7 +308,7 @@ def freeze_enum_props(cls: Type[EnumT]) -> Type[EnumT]:
     return cls
 
 
-def _exc_freeze(
+def _exc_freeze[EnumT: Enum, RetT](
     data: Mapping[EnumT, RetT],
     data_exc: Mapping[EnumT, tuple[Type[BaseException], tuple[object, ...]]],
 ) -> Callable[[EnumT], RetT]:
@@ -340,7 +337,7 @@ if sys.version_info < (3, 9) and hasattr(zipfile, '_SharedFile'):
     zipfile._SharedFile = _SharedZipFile
 
 
-class FuncLookup(Generic[LookupT], Mapping[str, LookupT]):
+class FuncLookup[LookupT](Mapping[str, LookupT]):
     """A dict for holding callback functions.
 
     Functions are added by using this as a decorator. Positional arguments
@@ -591,23 +588,19 @@ class PackagePath:
         return PackagePath(self.package, f'{self.path.rstrip("/")}/{child}')
 
 
-ResultT = TypeVar('ResultT')
-SyncResultT = TypeVar('SyncResultT')
-PosArgsT = TypeVarTuple('PosArgsT')
-ParamsT = ParamSpec('ParamsT')
 _NO_RESULT: Any = object()
 
 
-class Result(Generic[ResultT]):
+class Result[ResultT]:
     """Encasulates an async computation submitted to a nursery.
 
     Once the nursery has closed, the result is accessible.
     """
-    def __init__(
+    def __init__[*Args](
         self,
         nursery: trio.Nursery,
-        func: Callable[[Unpack[PosArgsT]], Awaitable[ResultT]],
-        /, *args: Unpack[PosArgsT],
+        func: Callable[[*Args], Awaitable[ResultT]],
+        /, *args: *Args,
         name: object = None,
     ) -> None:
         self._nursery: Optional[trio.Nursery] = nursery
@@ -617,11 +610,11 @@ class Result(Generic[ResultT]):
         nursery.start_soon(self._task, func, args, name=name)
 
     @classmethod
-    def sync(
+    def sync[*Args, SyncResultT](
         cls,
         nursery: trio.Nursery,
-        func: Callable[[Unpack[PosArgsT]], SyncResultT],
-        /, *args: Unpack[PosArgsT],
+        func: Callable[[*Args], SyncResultT],
+        /, *args: *Args,
         abandon_on_cancel: bool = False,
         limiter: trio.CapacityLimiter | None = None,
     ) -> Result[SyncResultT]:
@@ -636,10 +629,10 @@ class Result(Generic[ResultT]):
 
         return Result(nursery, task, name=func)
 
-    async def _task(
+    async def _task[*Args](
         self,
-        func: Callable[[Unpack[PosArgsT]], Awaitable[ResultT]],
-        args: Tuple[Unpack[PosArgsT]],
+        func: Callable[[*Args], Awaitable[ResultT]],
+        args: tuple[*Args],
     ) -> None:
         """The task that is run."""
         self._result = await func(*args)
@@ -652,7 +645,7 @@ class Result(Generic[ResultT]):
         return self._result
 
 
-def acompose(
+def acompose[**ParamsT, ResultT](
     func: Callable[ParamsT, Awaitable[ResultT]],
     on_completed: Callable[[ResultT], object],
 ) -> Callable[ParamsT, Awaitable[None]]:
@@ -664,9 +657,9 @@ def acompose(
     return task
 
 
-async def run_as_task(
-    func: Callable[[*PosArgsT], Awaitable[object]],
-    *args: Unpack[PosArgsT],
+async def run_as_task[*Args](
+    func: Callable[[*Args], Awaitable[object]],
+    *args: *Args,
 ) -> None:
     """Run the specified function inside a nursery.
 
@@ -676,14 +669,14 @@ async def run_as_task(
         nursery.start_soon(func, *args)
 
 
-def not_none(value: T | None) -> T:
+def not_none[T](value: T | None) -> T:
     """Assert that the value is not None, inline."""
     if value is None:
         raise AssertionError('Value was none!')
     return value
 
 
-def val_setter(aval: trio_util.AsyncValue[T], value: T) -> Callable[[], None]:
+def val_setter[T](aval: trio_util.AsyncValue[T], value: T) -> Callable[[], None]:
     """Create a setter that sets the value when called."""
     def func() -> None:
         """Set the provided value."""
@@ -751,7 +744,7 @@ else:
     print('Need implementation of utils.check_shift()!')
 
 
-def _append_bothsides(deq: deque[T]) -> Generator[None, T, None]:
+def _append_bothsides[T](deq: deque[T]) -> Generator[None, T, None]:
     """Alternately add to each side of a deque."""
     while True:
         deq.append((yield))
@@ -866,10 +859,7 @@ def fit(dist: SupportsInt, obj: Sequence[int]) -> list[int]:
     return list(items)  # Dump the deque
 
 
-ValueT = TypeVar('ValueT')
-
-
-def group_runs(iterable: Iterable[ValueT]) -> Iterator[tuple[ValueT, int, int]]:
+def group_runs[ValueT](iterable: Iterable[ValueT]) -> Iterator[tuple[ValueT, int, int]]:
     """Group runs of equal values.
 
     Yields (value, min_ind, max_ind) tuples, where all of iterable[min:max+1]

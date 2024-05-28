@@ -6,13 +6,13 @@ Each item has a description, author, and icon.
 """
 from __future__ import annotations
 
-from typing import Generic, Optional, Union, Iterable, Mapping, Callable, AbstractSet
-from typing_extensions import Concatenate, ParamSpec, TypeAliasType
+from typing import Concatenate
 from tkinter import font as tk_font
 from tkinter import ttk
 import tkinter as tk
 
 from contextlib import aclosing
+from collections.abc import Set as AbstractSet, Callable, Iterable, Mapping
 from collections import defaultdict
 from enum import Enum
 import functools
@@ -112,10 +112,7 @@ class AttrTypes(Enum):
 
 
 # TransToken is str()-ified.
-AttrValues = TypeAliasType("AttrValues", Union[
-    str, TransToken, Iterable[Union[str, TransToken]], bool, Vec,
-])
-CallbackT = ParamSpec('CallbackT')
+type AttrValues = str | TransToken | Iterable[str | TransToken] | bool | Vec
 TRANS_ATTR_DESC = TransToken.untranslated('{desc}: ')
 TRANS_ATTR_COLOR = TransToken.ui('Color: R={r}, G={g}, B={b}')  # i18n: Tooltip for colour swatch.
 TRANS_WINDOW_TITLE = TransToken.ui('BEE2 - {subtitle}')  # i18n: Window titles.
@@ -153,7 +150,7 @@ class AttrDef:
     def list_and(
         cls, attr_id: str,
         desc: TransToken = TransToken.BLANK,
-        default: Iterable[Union[str, TransToken]] | None = None,
+        default: Iterable[str | TransToken] | None = None,
     ) -> AttrDef:
         """Alternative constructor for list-type attrs, which should be joined with AND."""
         if default is None:
@@ -164,7 +161,7 @@ class AttrDef:
     def list_or(
         cls, attr_id: str,
         desc: TransToken = TransToken.BLANK,
-        default: Iterable[Union[str, TransToken]] | None = None,
+        default: Iterable[str | TransToken] | None = None,
     ) -> AttrDef:
         """Alternative constructor for list-type attrs, which should be joined with OR."""
         if default is None:
@@ -510,7 +507,7 @@ class PreviewWindow:
 _PREVIEW = PreviewWindow()
 
 
-class SelectorWin(Generic[CallbackT]):
+class SelectorWin[**CallbackT]:
     """The selection window for skyboxes, music, goo and voice packs.
 
     Optionally an aditional 'None' item can be added, which indicates
@@ -537,7 +534,7 @@ class SelectorWin(Generic[CallbackT]):
     disp_btn: ttk.Button | None
 
     # Callback function, and positional arguments to pass
-    callback: Callable[Concatenate[Optional[str], CallbackT], None] | None
+    callback: Callable[Concatenate[str | None, CallbackT], None] | None
     callback_params: CallbackT.args
     callback_kwargs: CallbackT.kwargs
 
@@ -636,7 +633,7 @@ class SelectorWin(Generic[CallbackT]):
         desc: TransToken = TransToken.BLANK,
         readonly_desc: TransToken = TransToken.BLANK,
         readonly_override: TransToken | None = None,
-        callback: Callable[Concatenate[Optional[str], CallbackT], None] | None = None,
+        callback: Callable[Concatenate[str | None, CallbackT], None] | None = None,
         callback_params: CallbackT.args = (),
         callback_keywords: CallbackT.kwargs = EmptyMapping,
         attributes: Iterable[AttrDef] = (),

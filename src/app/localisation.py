@@ -4,10 +4,9 @@ The widgets tokens are applied to are stored, so changing language can update th
 """
 from __future__ import annotations
 
-from typing import Any, Callable, TypeVar, TYPE_CHECKING
-from typing_extensions import ParamSpec, override
+from typing import Any, Protocol, TYPE_CHECKING, override
 
-from collections.abc import AsyncGenerator, Iterable, Iterator
+from collections.abc import AsyncGenerator, Callable, Iterable, Iterator
 from collections import defaultdict
 from contextlib import aclosing
 import weakref
@@ -61,14 +60,10 @@ __all__ = [
 ]
 
 LOGGER = logger.get_logger(__name__)
-P = ParamSpec('P')
 
 # Location of basemodui, relative to Portal 2
 BASEMODUI_PATH = 'portal2_dlc2/resource/basemodui_{}.txt'
 
-K = TypeVar('K')
-V = TypeVar('V')
-CBackT = TypeVar('CBackT', bound=Callable[[], object])
 # For anything else, this is called which will apply tokens.
 _langchange_callback: list[Callable[[], object]] = []
 
@@ -176,7 +171,7 @@ transtoken.ui_format_getter = UIFormatter
 transtoken.ui_list_getter = _format_list
 
 
-async def gradual_iter(wdict: weakref.WeakKeyDictionary[K, V]) -> AsyncGenerator[tuple[K, V], None]:
+async def gradual_iter[K, V](wdict: weakref.WeakKeyDictionary[K, V]) -> AsyncGenerator[tuple[K, V], None]:
     """Iterate gradually over the provided weak-key dictionary.
 
     When doing an update, there's a lot of widgets to process. To avoid locking the
@@ -197,14 +192,19 @@ async def gradual_iter(wdict: weakref.WeakKeyDictionary[K, V]) -> AsyncGenerator
         yield key, value
 
 
-def add_callback(*, call: bool) -> Callable[[CBackT], CBackT]:
+class CallbackProto(Protocol):
+    """Type of add_callback()."""
+    def __call__[CBackT: Callable[..., object]](self, func: CBackT, /) -> CBackT: ...
+
+
+def add_callback(*, call: bool) -> CallbackProto:
     """Register a function which is called after translations are reloaded.
 
     This should be used to re-apply tokens in complicated situations after languages change.
     If call is true, the function will immediately be called to apply it now.
     TODO: Remove usage of this, use CURRENT_LANG.wait_transition() instead.
     """
-    def deco(func: CBackT) -> CBackT:
+    def deco[CBackT: Callable[..., object]](func: CBackT, /) -> CBackT:
         """Register when called as a decorator."""
         _langchange_callback.append(func)
         LOGGER.debug('Add lang callback: {!r}, {} total', func, len(_langchange_callback))
