@@ -10,7 +10,7 @@ venv = "BEE2-12"
 stubPath = "src/"   # Use our module for stubs.
 # We want to do conversions when setting.
 reportPropertyTypeMismatch = false
-pythonVersion = "3.8"
+pythonVersion = "3.12"
 strictParameterNoneValue = false
 
 [tool.isort]
@@ -32,7 +32,7 @@ src_paths = ["src"]
 
 [tool.ruff]
 line-length = 127
-target-version = "py38"
+target-version = "py312"
 
 exclude = [
 	"src/perlin.py",
