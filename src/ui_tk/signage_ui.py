@@ -17,6 +17,7 @@ from app.signage_ui import IMG_BLANK, SignageUIBase, TRANS_TITLE, TRANS_SELECTED
 
 class SignageUI(SignageUIBase[tk.Misc]):
     """Tk-specific implementation of the signage UI."""
+    __slots__ = ['drag_man']  # Use a slot to override the superclass' property.
     drag_man: DragDrop[PakRef[Signage]]
 
     def __init__(self, tk_img: TKImages) -> None:
