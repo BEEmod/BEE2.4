@@ -3,7 +3,8 @@
 It only saves if the values are modified.
 Most functions are also altered to allow defaults instead of erroring.
 """
-from typing import Any, Iterator, Mapping, Optional
+from typing import Any
+from collections.abc import Iterator, Mapping
 from configparser import ConfigParser, NoOptionError, ParsingError, SectionProxy
 from pathlib import Path
 from threading import Event, Lock
@@ -39,11 +40,11 @@ class ConfigFile(ConfigParser):
     get_val, get_bool, and get_int are modified to return defaults instead
     of erroring.
     """
-    filename: Optional[Path]
+    filename: Path | None
 
     def __init__(
         self,
-        filename: Optional[str],
+        filename: str | None,
         *,
         in_conf_folder: bool = True,
         auto_load: bool = True,

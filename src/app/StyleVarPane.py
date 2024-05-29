@@ -1,10 +1,9 @@
 """The Style Properties tab, for configuring style-specific properties."""
 from __future__ import annotations
 from typing import TypedDict, cast
-from tkinter import IntVar
-from tkinter import ttk
-import operator
+from tkinter import IntVar, ttk
 import itertools
+import operator
 
 from srctools.logger import get_logger
 import trio
@@ -12,7 +11,7 @@ import trio
 from app import background_run
 from config.filters import FilterConf
 from config.stylevar import State
-from packages import Style, StyleVar, PackagesSet
+from packages import PackagesSet, Style, StyleVar
 from transtoken import TransToken
 from ui_tk import tooltip
 from ui_tk.wid_transtoken import set_text

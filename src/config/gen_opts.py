@@ -2,8 +2,7 @@
 General app configuration options, controlled by the options window.
 """
 from __future__ import annotations
-from typing import Any
-from typing_extensions import TypeGuard, override
+from typing import Any, TypeGuard, override
 from enum import Enum
 
 from srctools import Keyvalues

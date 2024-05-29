@@ -5,16 +5,19 @@ GitHub repo, which ensures we're able to change them retroactively if the old UR
 whatever reason.
 """
 from __future__ import annotations
-from typing import Any, Callable, cast
-from contextlib import aclosing
-import io
-import urllib.request
-import urllib.error
-from enum import Enum
+from typing import Any, cast
+
 from tkinter import ttk
 import tkinter as tk
-import webbrowser
+
+from collections.abc import Callable
+from contextlib import aclosing
+from enum import Enum
 import functools
+import io
+import urllib.error
+import urllib.request
+import webbrowser
 
 from srctools.dmx import Element, NULL
 import attrs

@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing_extensions import override
+from typing import override
 
 from srctools import Keyvalues
 from srctools.dmx import Element

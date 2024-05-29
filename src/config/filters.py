@@ -1,5 +1,5 @@
 """Configuration for the filter section, to restore after reopening the app."""
-from typing_extensions import Self, override
+from typing import Self, override
 
 from srctools.dmx import Element
 from srctools import Keyvalues

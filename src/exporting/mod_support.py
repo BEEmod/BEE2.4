@@ -1,18 +1,21 @@
 """Special behaviour for detecting and copying files from Mel and Tag."""
 from __future__ import annotations
-from typing import Final, Iterable, Iterator, Sequence, TYPE_CHECKING
+from typing import TYPE_CHECKING, Final
+from collections.abc import Iterable, Iterator, Sequence
+from pathlib import Path
 import math
 import os
-from pathlib import Path
 
+from srctools import VMF, Keyvalues, Output, Vec
+from srctools.filesys import File, RawFileSystem, VPKFileSystem
 import srctools.logger
 import trio
-from srctools import Keyvalues, Output, VMF, Vec
-from srctools.filesys import File, RawFileSystem, VPKFileSystem
 
-import utils
-from . import ExportData, STEPS, StepResource, STAGE_MUSIC
 from packages import PackagesSet
+import utils
+
+from . import STAGE_MUSIC, STEPS, ExportData, StepResource
+
 
 if TYPE_CHECKING:
     from app.gameMan import Game
@@ -87,7 +90,7 @@ MEL_MUSIC_NAMES: Final[Sequence[str]] = [
 ]
 
 
-def scan_music_locs(packset: PackagesSet, games: Iterable['Game']) -> None:
+def scan_music_locs(packset: PackagesSet, games: Iterable[Game]) -> None:
     """Try and determine the location of Aperture Tag and PS:Mel.
 
     If successful we can export the music to games.

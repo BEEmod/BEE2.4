@@ -2,7 +2,7 @@
 """
 from tkinter import ttk
 import tkinter as tk
-from typing import Optional, Set, Callable, Tuple
+from collections.abc import Callable
 
 import srctools.logger
 from pygtrie import CharTrie
@@ -12,19 +12,21 @@ from ui_tk.wid_transtoken import set_text
 
 
 LOGGER = srctools.logger.get_logger(__name__)
-word_to_ids: 'CharTrie[Set[Tuple[str, int]]]' = CharTrie()
-_type_cback: Optional[Callable[[], None]] = None
+# A set of id/subtype pairs.
+type FoundItems = set[tuple[str, int]]
+word_to_ids: 'CharTrie[FoundItems]' = CharTrie()
+_type_cback: Callable[[], None] | None = None
 
 
-def init(frm: ttk.Frame, refresh_cback: Callable[[Optional[Set[Tuple[str, int]]]], None]) -> None:
+def init(frm: ttk.Frame, refresh_cback: Callable[[set[tuple[str, int]] | None], None]) -> None:
     """Initialise the UI objects.
 
     The callback is triggered whenever the UI changes, passing along
     the visible items or None if no filter is specified.
     """
     global _type_cback
-    refresh_tim: Optional[str] = None
-    result: Optional[Set[Tuple[str, int]]] = None
+    refresh_tim: str | None = None
+    result: FoundItems | None = None
 
     def on_type(*args: object) -> None:
         """Re-search whenever text is typed."""
@@ -35,7 +37,7 @@ def init(frm: ttk.Frame, refresh_cback: Callable[[Optional[Set[Tuple[str, int]]]
             refresh_cback(None)
             return
 
-        found: Set[Tuple[str, int]] = set()
+        found: FoundItems = set()
         *words, last = words
         for word in words:
             try:
@@ -80,7 +82,7 @@ def rebuild_database() -> None:
     """Rebuild the search database."""
     LOGGER.info('Updating search database...')
     # Clear and reset.
-    word_set: Set[Tuple[str, int]]
+    word_set: FoundItems
     word_to_ids.clear()
 
     for item in UI.item_list.values():

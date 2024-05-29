@@ -1,8 +1,9 @@
 """Handles the music configuration UI."""
-import functools
-from typing import Any, Dict, Iterable, Optional, List
 from tkinter import ttk
 import tkinter
+
+from collections.abc import Iterable
+import functools
 
 from srctools import FileSystemChain, FileSystem
 import srctools.logger
@@ -29,8 +30,8 @@ BTN_CONTRACT_HOVER = '▲'
 LOGGER = srctools.logger.get_logger(__name__)
 
 # On 3.8 the ParamSpec is invalid syntax
-WINDOWS: Dict[MusicChannel, 'SelectorWin[[MusicChannel]]'] = {}
-SEL_ITEMS: Dict[str, SelItem] = {}
+WINDOWS: dict[MusicChannel, SelectorWin[[MusicChannel]]] = {}
+SEL_ITEMS: dict[str, SelItem] = {}
 # If the per-channel selector boxes are currently hidden.
 is_collapsed: bool = False
 
@@ -39,14 +40,14 @@ TRANS_BASE_COLL = TransToken.ui('Music:')
 TRANS_BASE_EXP = TransToken.ui('Base:')
 
 
-def load_filesystems(systems: Iterable[FileSystem[Any]]) -> None:
+def load_filesystems(systems: Iterable[FileSystem]) -> None:
     """Record the filesystems used for each package, so we can sample sounds."""
     filesystem.systems.clear()
     for system in systems:
         filesystem.add_sys(system, prefix='resources/music_samp/')
 
 
-def set_suggested(packset: PackagesSet, music_id: Optional[str]) -> None:
+def set_suggested(packset: PackagesSet, music_id: str | None) -> None:
     """Set the music ID that is suggested for the base.
 
     If sel_item is true, select the suggested item as well.
@@ -67,14 +68,14 @@ def set_suggested(packset: PackagesSet, music_id: Optional[str]) -> None:
             WINDOWS[channel].set_suggested({sugg} if sugg else set())
 
 
-def export_data(packset: PackagesSet) -> Dict[MusicChannel, Optional[Music]]:
+def export_data(packset: PackagesSet) -> dict[MusicChannel, Music | None]:
     """Return the data used to export this."""
     base_id = WINDOWS[MusicChannel.BASE].chosen_id
     if base_id is not None:
         base_track = packset.obj_by_id(Music, base_id)
     else:
         base_track = None
-    data: Dict[MusicChannel, Optional[Music]] = {
+    data: dict[MusicChannel, Music | None] = {
         MusicChannel.BASE: base_track,
     }
     for channel, win in WINDOWS.items():
@@ -95,7 +96,7 @@ def export_data(packset: PackagesSet) -> Dict[MusicChannel, Optional[Music]]:
     return data
 
 
-def selwin_callback(music_id: Optional[str], channel: MusicChannel) -> None:
+def selwin_callback(music_id: str | None, channel: MusicChannel) -> None:
     """Callback for the selector windows.
 
     This saves into the config file the last selected item.
@@ -122,7 +123,7 @@ def selwin_callback(music_id: Optional[str], channel: MusicChannel) -> None:
 async def make_widgets(packset: PackagesSet, frame: ttk.LabelFrame, pane: SubPane) -> None:
     """Generate the UI components, and return the base window."""
 
-    def for_channel(packset: PackagesSet, channel: MusicChannel) -> List[SelItem]:
+    def for_channel(packset: PackagesSet, channel: MusicChannel) -> list[SelItem]:
         """Get the items needed for a specific channel."""
         music_list = []
         for music in packset.all_obj(Music):
@@ -210,12 +211,12 @@ async def make_widgets(packset: PackagesSet, frame: ttk.LabelFrame, pane: SubPan
     assert set(WINDOWS.keys()) == set(MusicChannel), "Extra channels?"
 
     # Widgets we want to remove when collapsing.
-    exp_widgets: List[tkinter.Widget] = []
+    exp_widgets: list[tkinter.Widget] = []
 
-    def toggle_btn_enter(event: Optional[tkinter.Event[ttk.Label]] = None) -> None:
+    def toggle_btn_enter(event: object = None, /) -> None:
         toggle_btn['text'] = BTN_EXPAND_HOVER if is_collapsed else BTN_CONTRACT_HOVER
 
-    def toggle_btn_exit(event: Optional[tkinter.Event[ttk.Label]] = None) -> None:
+    def toggle_btn_exit(event: object = None, /) -> None:
         toggle_btn['text'] = BTN_EXPAND if is_collapsed else BTN_CONTRACT
 
     def set_collapsed() -> None:

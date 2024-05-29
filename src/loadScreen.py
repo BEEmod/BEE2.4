@@ -6,11 +6,12 @@ the main process is busy loading.
 The id() of the main-process object is used to identify loadscreens.
 """
 from __future__ import annotations
-
 from typing import assert_never
+from collections.abc import (
+    AsyncGenerator, Collection, Generator, MutableMapping,
+)
 from types import TracebackType
 from weakref import WeakValueDictionary
-from collections.abc import AsyncGenerator, Collection, Generator, MutableMapping
 import contextlib
 import multiprocessing
 
@@ -18,9 +19,9 @@ import attrs
 import srctools.logger
 import trio
 
-from config.gen_opts import GenOptions
 from config import APP
-from transtoken import TransToken, CURRENT_LANG
+from config.gen_opts import GenOptions
+from transtoken import CURRENT_LANG, TransToken
 import ipc_types
 import utils
 

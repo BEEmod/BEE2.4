@@ -1,18 +1,21 @@
 """Export signage configuration, and write the legend."""
 from __future__ import annotations
-from pathlib import Path
 from typing import Final
+from pathlib import Path
 
-import trio.to_thread
 from PIL import Image
-from srctools.vtf import ImageFormats, VTF, VTFFlags
 from srctools import Keyvalues
+from srctools.vtf import VTF, ImageFormats, VTFFlags
 import srctools.logger
+import trio.to_thread
 
 from app.img import Handle as ImgHandle
-from packages import PackagesSet, PakRef, Style, CLEAN_STYLE
-from packages.signage import CELL_SIZE, LEGEND_SIZE, Signage, SignStyle, SignageLegend
-from . import ExportData, STEPS, StepResource
+from packages import CLEAN_STYLE, PackagesSet, PakRef, Style
+from packages.signage import (
+    CELL_SIZE, LEGEND_SIZE, Signage, SignageLegend, SignStyle,
+)
+
+from . import STEPS, ExportData, StepResource
 
 
 LOGGER = srctools.logger.get_logger(__name__)

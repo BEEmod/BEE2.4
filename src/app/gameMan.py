@@ -6,7 +6,7 @@ Does stuff related to the actual games.
 - Generating and saving editoritems/vbsp_config
 """
 from __future__ import annotations
-from typing_extensions import Self
+from typing import Self
 
 from collections.abc import Iterator
 from pathlib import Path

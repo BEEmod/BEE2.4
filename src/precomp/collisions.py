@@ -1,13 +1,12 @@
 """Records the collisions for each item."""
 from collections import defaultdict
-from typing import Dict, List
 
 import attrs
 from srctools import Entity, Matrix, VMF, Vec
 from srctools.math import format_float
 from srctools.vmf import EntityGroup
 
-from collisions import *  # re-export.
+from collisions import CollideType, BBox, Hit, Volume, trace_ray  # re-export
 from editoritems import Item
 from tree import RTree
 
@@ -19,9 +18,9 @@ __all__ = ['CollideType', 'BBox', 'Volume', 'Collisions', 'Hit', 'trace_ray']
 class Collisions:
     """All the collisions for items in the map."""
     # type -> bounding box -> items with that bounding box.
-    _by_bbox: Dict[CollideType, RTree[BBox]] = attrs.field(factory=lambda: defaultdict(RTree), repr=False, eq=False)
+    _by_bbox: dict[CollideType, RTree[BBox]] = attrs.field(factory=lambda: defaultdict(RTree), repr=False, eq=False)
     # Item names -> bounding boxes of that item
-    _by_name: Dict[str, List[BBox]] = attrs.Factory(dict)
+    _by_name: dict[str, list[BBox]] = attrs.Factory(dict)
 
     # Indicates flags which VScript code has requested be exposed.
     vscript_flags: CollideType = CollideType.NOTHING
@@ -46,7 +45,7 @@ class Collisions:
             # already not present.
             pass
 
-    def collisions_for_item(self, name: str) -> List[BBox]:
+    def collisions_for_item(self, name: str) -> list[BBox]:
         """Fetch the bounding boxes for this item."""
         try:
             return self._by_name[name.casefold()].copy()

@@ -1,9 +1,9 @@
 """Manages parsing and regenerating antlines."""
 from __future__ import annotations
-from typing import Callable, Dict, Mapping, Tuple, final, List, Optional, Sequence
+from typing import final
 
+from collections.abc import Iterator, Container, Callable, Mapping, Sequence
 from collections import defaultdict
-from collections.abc import Iterator, Container
 from enum import Enum
 import math
 
@@ -105,6 +105,7 @@ class AntType:
         for ant_list, name in zip(
             [tex_straight, tex_corner, brok_straight, brok_corner],
             ('straight', 'corner', 'broken_straight', 'broken_corner'),
+            strict=True,
         ):
             for sub_prop in kv.find_all(name):
                 ant_list.append(AntTex.parse(sub_prop))
@@ -182,8 +183,8 @@ class IndicatorStyle:
         This parses immediately, then returns a callable to allows passing in the parent to inherit
         from later.
         """
-        wall: Optional[AntType] = None
-        floor: Optional[AntType] = None
+        wall: AntType | None = None
+        floor: AntType | None = None
         if 'floor' in kv:
             floor = AntType.parse(kv.find_key('floor'))
         if 'wall' in kv:
@@ -203,13 +204,13 @@ class IndicatorStyle:
         elif floor is None and wall is not None:
             floor = wall
 
-        timer_inst: Optional[str] = None
-        check: Optional[Tuple[str, List[Output], List[Output]]] = None
-        timer_adv_cmds: Dict[TimerModes, Sequence[Output]] = {}
-        timer_blue_cmd: Optional[List[Output]] = None
-        timer_oran_cmd: Optional[List[Output]] = None
-        timer_basic_start_cmd: Optional[List[Output]] = None
-        timer_basic_stop_cmd: Optional[List[Output]] = None
+        timer_inst: str | None = None
+        check: tuple[str, list[Output], list[Output]] | None = None
+        timer_adv_cmds: dict[TimerModes, Sequence[Output]] = {}
+        timer_blue_cmd: list[Output] | None = None
+        timer_oran_cmd: list[Output] | None = None
+        timer_basic_start_cmd: list[Output] | None = None
+        timer_basic_stop_cmd: list[Output] | None = None
         check_switching = PanelSwitchingStyle.CUSTOM
         timer_switching = PanelSwitchingStyle.CUSTOM
 

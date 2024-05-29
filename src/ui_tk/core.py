@@ -1,7 +1,7 @@
 """Connect Trio and TK together, then run the application."""
 from __future__ import annotations
-from typing import Awaitable, Callable, Any, ClassVar, Deque, Dict, Optional, List, Tuple
-from typing_extensions import override
+from typing import Any, ClassVar, override
+from collections.abc import Awaitable, Callable
 import collections
 import pprint
 import time
@@ -163,7 +163,7 @@ class SmallRepr(pprint.PrettyPrinter):
         maxlevels: int,
         level: int,
         /,
-    ) -> Tuple[str, bool, bool]:
+    ) -> tuple[str, bool, bool]:
         """Format each sub-item."""
         result, readable, recursive = super().format(target, context, maxlevels, level)
         if len(result) > 200 and level > 0:
@@ -174,12 +174,12 @@ class SmallRepr(pprint.PrettyPrinter):
 
 class Tracer(trio.abc.Instrument):
     """Track tasks to detect slow ones."""
-    slow: ClassVar[List[Tuple[float, str]]] = []
+    slow: ClassVar[list[tuple[float, str]]] = []
 
     def __init__(self) -> None:
-        self.elapsed: Dict[trio.lowlevel.Task, float] = {}
-        self.start_time: Dict[trio.lowlevel.Task, Optional[float]] = {}
-        self.args: Dict[trio.lowlevel.Task, Dict[str, object]] = {}
+        self.elapsed: dict[trio.lowlevel.Task, float] = {}
+        self.start_time: dict[trio.lowlevel.Task, float | None] = {}
+        self.args: dict[trio.lowlevel.Task, dict[str, object]] = {}
         self.formatter = SmallRepr(compact=True)
 
     @override
@@ -287,7 +287,7 @@ def start_main(init: Callable[[], Awaitable[object]] = init_app) -> None:
         # callbacks is triggered.
         TK_ROOT.call("after", "idle", "after", 0, tk_func_name)
 
-    queue: Deque[Callable[[], Any]] = collections.deque()
+    queue: collections.deque[Callable[[], Any]] = collections.deque()
     tk_func_name = TK_ROOT.register(tk_func)
 
     LOGGER.debug('Starting Trio loop.')

@@ -1,6 +1,5 @@
 """Test the edge trigger class."""
-from typing import Tuple
-from typing_extensions import assert_type
+from typing import assert_type
 
 from trio.testing import Sequencer
 import trio
@@ -31,7 +30,7 @@ async def test_basic_operation() -> None:
             state = 'wait'
         result = await trigger.wait()
         assert not trigger.ready.value
-        assert_type(result, Tuple[int, int])
+        assert_type(result, tuple[int, int])
         assert result == (4, 2)
         assert state == 'trigger'
         state = 'complete'

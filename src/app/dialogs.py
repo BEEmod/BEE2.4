@@ -1,6 +1,8 @@
 """API for dialog boxes."""
+from typing import ClassVar, Protocol, Literal
+
+from collections.abc import Callable
 from enum import Enum
-from typing import Callable, ClassVar, Optional, Protocol, Literal
 
 from transtoken import AppError, TransToken
 
@@ -73,7 +75,7 @@ class Dialogs(Protocol):
         title: TransToken = DEFAULT_TITLE,
         icon: Icon = Icon.QUESTION,
         detail: str = '',
-    ) -> Optional[bool]:
+    ) -> bool | None:
         """Show a message box with "Yes", "No" and "Cancel" buttons."""
         raise NotImplementedError
 
@@ -83,5 +85,5 @@ class Dialogs(Protocol):
         title: TransToken = DEFAULT_TITLE,
         initial_value: TransToken = TransToken.BLANK,
         validator: Callable[[str], str] = validate_non_empty,
-    ) -> Optional[str]:
+    ) -> str | None:
         """Ask the user to enter a string."""

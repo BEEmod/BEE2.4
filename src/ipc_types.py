@@ -3,6 +3,7 @@ from typing_extensions import Literal, NewType
 
 import attrs
 
+
 StageID = NewType('StageID', str)
 ScreenID = NewType('ScreenID', int)
 

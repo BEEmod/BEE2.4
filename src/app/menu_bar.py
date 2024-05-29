@@ -1,9 +1,10 @@
 """The widgets for the main menu bar."""
-import os
+from typing import Final
 import tkinter as tk
-from typing import Callable, Iterable, List, Tuple
-from typing_extensions import Final
+
+from collections.abc import Callable, Iterable
 from pathlib import Path
+import os
 
 import BEE2_config
 import utils
@@ -18,7 +19,7 @@ from ui_tk.wid_transtoken import set_menu_text
 
 
 EXPORT_BTN_POS: Final = 0  # Position of the export button.
-FOLDER_OPTIONS: List[Tuple[TransToken, Callable[['gameMan.Game'], Iterable[Path]]]] = [
+FOLDER_OPTIONS: list[tuple[TransToken, Callable[['gameMan.Game'], Iterable[Path]]]] = [
     (TransToken.ui('{game} Puzzle Folder'), lambda game: [Path(game.abs_path('portal2/puzzles/'))]),
     (TransToken.ui('{game} Folder'), lambda game: [Path(game.abs_path('.'))]),
     (TransToken.ui('Palettes Folder'), lambda game: [utils.conf_location('palettes')]),

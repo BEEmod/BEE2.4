@@ -1,7 +1,6 @@
 """Customizable configuration for specific items or groups of them."""
 from __future__ import annotations
-from typing import Any
-from typing_extensions import Protocol
+from typing import Any, Protocol
 
 from collections.abc import Awaitable, Callable, Mapping, Iterator
 from datetime import timedelta

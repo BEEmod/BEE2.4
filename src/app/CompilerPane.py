@@ -4,7 +4,7 @@ These can be set and take effect immediately, without needing to export.
 """
 from __future__ import annotations
 
-from typing import TypedDict, Union, cast
+from typing import TypedDict, cast
 from tkinter import filedialog, ttk
 import tkinter as tk
 from contextlib import aclosing
@@ -170,7 +170,7 @@ class LimitCounter:
         blurb: TransToken,
         name: str,
     ) -> None:
-        self._flasher: Union[trio.CancelScope, None] = None
+        self._flasher: trio.CancelScope | None = None
         self.var = tk.IntVar()
         self.max = maximum
         self.name = name
@@ -746,7 +746,7 @@ async def make_map_widgets(
 
 
 async def make_pane(
-    tool_frame: Union[tk.Frame, ttk.Frame],
+    tool_frame: tk.Frame | ttk.Frame,
     tk_img: TKImages,
     menu_bar: tk.Menu,
     *,

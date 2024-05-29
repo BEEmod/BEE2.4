@@ -1,12 +1,11 @@
 """Controls exporting the compiler files."""
 from __future__ import annotations
-
+from typing import TYPE_CHECKING
 from contextlib import aclosing
 from pathlib import Path
-from typing import TYPE_CHECKING
-import os
 import io
 import json
+import os
 import shutil
 import urllib.error
 import urllib.request
@@ -14,10 +13,11 @@ import urllib.request
 import srctools.logger
 import trio
 
+from transtoken import AppError, TransToken
 import user_errors
 import utils
-from . import ExportData, STAGE_COMPILER, STAGE_COMP_BACKUP, STEPS, StepResource
-from transtoken import AppError, TransToken
+
+from . import STAGE_COMP_BACKUP, STAGE_COMPILER, STEPS, ExportData, StepResource
 
 
 LOGGER = srctools.logger.get_logger(__name__)

@@ -1,7 +1,7 @@
-from typing import Callable, Any, Optional, Union
-
-import tkinter as tk
+from typing import Any
 from tkinter import ttk
+import tkinter as tk
+from collections.abc import Callable
 
 from srctools.logger import get_logger
 
@@ -11,8 +11,8 @@ from config.windows import WindowState
 from transtoken import TransToken
 from ui_tk import tk_tools, tooltip, wid_transtoken
 from ui_tk.img import TKImages
-import utils
 import config
+import utils
 
 
 # This is a bit of an ugly hack. On OSX the buttons are set to have
@@ -49,10 +49,10 @@ class SubPane(tk.Toplevel):
     """
     def __init__(
         self,
-        parent: Union[tk.Toplevel, tk.Tk],
+        parent: tk.Toplevel | tk.Tk,
         tk_img: TKImages,
         *,
-        tool_frame: Union[tk.Frame, ttk.Frame],
+        tool_frame: tk.Frame | ttk.Frame,
         tool_img: str,
         menu_bar: tk.Menu,
         tool_col: int,
@@ -143,10 +143,10 @@ class SubPane(tk.Toplevel):
 
     def move(
         self,
-        x: Optional[int] = None,
-        y: Optional[int] = None,
-        width: Optional[int] = None,
-        height: Optional[int] = None,
+        x: int | None = None,
+        y: int | None = None,
+        width: int | None = None,
+        height: int | None = None,
     ) -> None:
         """Move the window to the specified position.
 
@@ -171,11 +171,11 @@ class SubPane(tk.Toplevel):
         self.relY = y - self.parent.winfo_y()
         self.save_conf()
 
-    def enable_snap(self, e: Optional[tk.Event[tk.Misc]] = None) -> None:
+    def enable_snap(self, _: object = None, /) -> None:
         """Allow the window to snap."""
         self.allow_snap = True
 
-    def snap_win(self, e: Optional[tk.Event[tk.Misc]] = None) -> None:
+    def snap_win(self, _: object = None, /) -> None:
         """Callback for window movement.
 
         This allows it to snap to the edge of the main window.

@@ -3,8 +3,8 @@
 This is useful to allow using the same code for reading folders or zips of data.
 """
 from __future__ import annotations
-from typing import Any, IO, Iterator, Literal, Set, overload
-from typing_extensions import Self
+from typing import IO, Any, Literal, Self, overload
+from collections.abc import Iterator
 from zipfile import ZIP_STORED, ZipFile
 import io
 import os
@@ -76,7 +76,7 @@ class FakeZip:
             for name in filenames:
                 yield rel_path(dirpath + '/' + name, base)
 
-    def namelist(self) -> Set[str]:
+    def namelist(self) -> set[str]:
         """We actually return a set, since this is mainly used for 'in'
         testing.
         """

@@ -1410,7 +1410,6 @@ def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
             # Not one we care about.
             continue
 
-        pairs: list[CubePair] = []
         direct_pair: CubePair | None = None
         opposite_pair: CubePair | None = None
 

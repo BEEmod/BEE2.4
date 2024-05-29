@@ -1,7 +1,6 @@
 """Store overridden defaults for items, and also the selected version."""
 from __future__ import annotations
-from typing import Any, Final
-from typing_extensions import override
+from typing import Any, Final, override
 
 from srctools import Keyvalues, logger
 from srctools.dmx import Element
