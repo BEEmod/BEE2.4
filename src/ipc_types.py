@@ -99,8 +99,8 @@ type ARGS_SEND_LOAD = (
 type ARGS_REPLY_LOAD = Daemon2Load_Cancel | Daemon2Load_MainSetCompact
 type ARGS_SEND_LOGGING = (  # logging -> daemon
     tuple[Literal['log'], str, str] |
-    tuple[Literal['visible'], bool, None] |
-    tuple[Literal['level'], str, None]
+    tuple[Literal['visible'], bool] |
+    tuple[Literal['level'], str]
 )
 type ARGS_REPLY_LOGGING = (  # daemon -> logging
     tuple[Literal['level'], str] |

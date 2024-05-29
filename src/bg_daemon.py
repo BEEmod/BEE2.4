@@ -811,19 +811,18 @@ class LogWindow:
 
     def handle(self, msg: ARGS_SEND_LOGGING) -> None:
         """Handle messages from the main app."""
-        # TODO: Use match statement here once 3.8 is dropped.
-        operation, parm1, parm2 = msg
-        if operation == 'log' and isinstance(parm1, str) and isinstance(parm2, str):
-            self.log(parm1, parm2)
-        elif operation == 'visible' and isinstance(parm1, bool):
-            if parm1:
-                self.win.deiconify()
-            else:
-                self.win.withdraw()
-        elif operation == 'level' and isinstance(parm1, str):
-            self.level_selector.current(BOX_LEVELS.index(parm1))
-        else:
-            raise ValueError(f'Bad command {operation!r}({parm1!r}, {parm2!r})!')
+        match msg:
+            case ['log', str() as level, str() as message]:
+                self.log(level, message)
+            case ['visible', bool() as visible]:
+                if visible:
+                    self.win.deiconify()
+                else:
+                    self.win.withdraw()
+            case ['level', str() as level]:
+                self.level_selector.current(BOX_LEVELS.index(level))
+            case _:
+                raise ValueError(f'Bad command: {msg!r}!')
 
 
 def run_background(
