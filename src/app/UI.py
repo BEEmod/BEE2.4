@@ -132,7 +132,6 @@ class _FramesDict(TypedDict):
 
 class _UIDict(TypedDict):
     """TODO: Remove."""
-    conf_voice: ttk.Button
     pal_export: ttk.Button
     drag_lbl: ttk.Label
     pre_bg_img: tk.Label
@@ -521,27 +520,6 @@ async def load_packages(
             attrs={'ORIENT': elev.has_orient}
         ) for elev in sorted(packset.all_obj(packages.Elevator), key=name_getter)
     ]
-
-    async def voice_task(chosen: trio_util.AsyncValue[selWinItem]) -> None:
-        """Special handler for the voice selector window.
-
-        The configuration button is disabled when no music is selected.
-        """
-        voice: selWinItem
-        async with aclosing(chosen.eventual_values()) as agen:
-            async for voice in agen:
-                # This might be open, so force-close it to ensure it isn't corrupt...
-                voiceEditor.save()
-                try:
-                    if voice.name is None:
-                        UI['conf_voice'].state(['disabled'])
-                        tk_img.apply(UI['conf_voice'], ICO_GEAR_DIS)
-                    else:
-                        UI['conf_voice'].state(['!disabled'])
-                        tk_img.apply(UI['conf_voice'], ICO_GEAR)
-                except KeyError:
-                    # When first initialising, conf_voice won't exist!
-                    pass
 
     # Defaults match Clean Style, if not found it uses the first item.
     skybox_win = await core_nursery.start(functools.partial(
@@ -1128,15 +1106,15 @@ async def init_option(
 
     voice_frame = ttk.Frame(props)
     voice_frame.columnconfigure(1, weight=1)
-    UI['conf_voice'] = ttk.Button(
+    btn_conf_voice = ttk.Button(
         voice_frame,
         command=configure_voice,
         width=8,
     )
-    UI['conf_voice'].grid(row=0, column=0, sticky='NS')
-    tk_img.apply(UI['conf_voice'], ICO_GEAR_DIS)
+    btn_conf_voice.grid(row=0, column=0, sticky='NS')
+    tk_img.apply(btn_conf_voice, ICO_GEAR_DIS)
     tooltip.add_tooltip(
-        UI['conf_voice'],
+        btn_conf_voice,
         TransToken.ui('Enable or disable particular voice lines, to prevent them from being added.'),
     )
 
@@ -1165,9 +1143,24 @@ async def init_option(
         sizegrip = ttk.Sizegrip(props, cursor=tk_tools.Cursors.STRETCH_HORIZ)
         sizegrip.grid(row=2, column=5, rowspan=2, sticky="NS")
 
+    async def voice_conf_task() -> None:
+        """Turn the configuration button off when no voice is selected."""
+        voice: selWinItem
+        async with aclosing(voice_win.chosen.eventual_values()) as agen:
+            async for voice in agen:
+                # This might be open, so force-close it to ensure it isn't corrupt...
+                voiceEditor.save()
+                if voice.name == utils.ID_NONE:
+                    btn_conf_voice.state(['disabled'])
+                    tk_img.apply(btn_conf_voice, ICO_GEAR_DIS)
+                else:
+                    btn_conf_voice.state(['!disabled'])
+                    tk_img.apply(btn_conf_voice, ICO_GEAR)
+
     task_status.started()
     async with trio.open_nursery() as nursery:
         nursery.start_soon(tk_tools.apply_bool_enabled_state_task, corridor.show_trigger.ready, corr_button)
+        nursery.start_soon(voice_conf_task)
         while True:
             await trio_util.wait_any(*[
                 window.chosen.wait_transition
@@ -1696,7 +1689,7 @@ async def init_windows(
             async for style_item in agen:
                 packset = packages.get_loaded_packages()
                 global selected_style
-                if style_item.name is None:
+                if style_item.name == utils.ID_NONE:
                     LOGGER.warning('Style ID is None??')
                     style_win.choose_item(style_win.item_list[0])
                     continue
