@@ -11,7 +11,7 @@ from tkinter import ttk
 import tkinter as tk
 
 from contextlib import aclosing
-from collections.abc import Set as AbstractSet, Callable, Iterable, Mapping
+from collections.abc import Container, Callable, Iterable, Mapping
 from collections import defaultdict
 from enum import Enum
 import functools
@@ -21,6 +21,7 @@ import random
 
 from srctools import Vec, EmptyMapping
 from srctools.filesys import FileSystemChain
+from trio_util import AsyncValue
 import attrs
 import trio
 import srctools.logger
@@ -551,8 +552,11 @@ class SelectorWin[*CallbackT]:
     readonly_override: TransToken | None
 
     item_list: list[Item]
+
+    # The selected item is the one clicked on inside the window, while chosen
+    # is the one actually chosen.
+    chosen: AsyncValue[Item]
     selected: Item
-    orig_selected: Item
     parent: tk.Tk | tk.Toplevel
     _readonly: bool
     modal: bool
@@ -742,7 +746,7 @@ class SelectorWin[*CallbackT]:
             else:  # Arbitrarily pick first.
                 self.selected = self.item_list[0]
 
-        self.orig_selected = self.selected
+        self.chosen = AsyncValue(self.selected)
         self.parent = parent
         self._readonly = False
         self.modal = modal
@@ -1046,9 +1050,18 @@ class SelectorWin[*CallbackT]:
                 async for is_playing in agen:
                     samp_button['text'] = BTN_STOP if is_playing else BTN_PLAY
 
+        async def store_results() -> None:
+            """Store configured results when changed."""
+            async with aclosing(self.chosen.eventual_values()) as agen:
+                async for item in agen:
+                    config.APP.store_conf(LastSelected(item.name), self.save_id)
+
         async with trio.open_nursery() as nursery:
             nursery.start_soon(self._update_translations_task)
             nursery.start_soon(update_sampler)
+            if self.store_last_selected:
+                nursery.start_soon(store_results)
+
             task_status.started(self)
 
     def __repr__(self) -> str:
@@ -1105,10 +1118,10 @@ class SelectorWin[*CallbackT]:
     @property
     def chosen_id(self) -> str | None:
         """The currently selected item, or None if none is selected."""
-        if self.selected == self.noneItem:
+        if self.chosen.value == self.noneItem:
             return None
         else:
-            return self.selected.name
+            return self.chosen.value.name
 
     @property
     def readonly(self) -> bool:
@@ -1134,7 +1147,7 @@ class SelectorWin[*CallbackT]:
         else:
             new_st = ['!disabled']
             set_tooltip(self.display, self.description)
-            self.disp_label.set(str(self.selected.context_lbl))
+            self.disp_label.set(str(self.chosen.value.context_lbl))
 
         self.disp_btn.state(new_st)
         self.display.state(new_st)
@@ -1216,7 +1229,7 @@ class SelectorWin[*CallbackT]:
 
     def exit(self, _: object = None) -> None:
         """Quit and cancel, choosing the originally-selected item."""
-        self.sel_item(self.orig_selected)
+        self.selected = self.chosen.value
         self.save()
 
     def save(self, _: object = None) -> None:
@@ -1245,12 +1258,14 @@ class SelectorWin[*CallbackT]:
         if self.modal:
             self.win.grab_release()
         self.win.withdraw()
+        self.chosen.value = self.selected
         self.set_disp()
         self.prop_desc.set_text('')  # Free resources used.
         self.do_callback()
 
     def set_disp(self, _: object = None) -> str:
         """Set the display textbox."""
+        chosen = self.chosen.value
         # Bold the text if the suggested item is selected (like the
         # context menu). We check for truthiness to ensure it's actually
         # initialised.
@@ -1264,9 +1279,8 @@ class SelectorWin[*CallbackT]:
         if self._readonly and self.readonly_override is not None:
             self.disp_label.set(str(self.readonly_override))
         else:
-            self.disp_label.set(str(self.selected.context_lbl))
-        self.orig_selected = self.selected
-        self.context_var.set(self.selected.name)
+            self.disp_label.set(str(chosen.context_lbl))
+        self.context_var.set(chosen.name)
         return "break"  # stop the entry widget from continuing with this event
 
     def rollover_suggest(self) -> None:
@@ -1291,7 +1305,7 @@ class SelectorWin[*CallbackT]:
                     self.disp_label.set(str(self.readonly_override))
                 else:
                     # We don't care about updating to the rollover item, it'll swap soon anyway.
-                    self.disp_label.set(str(self.selected.context_lbl))
+                    self.disp_label.set(str(self.chosen.value.context_lbl))
 
     def _icon_clicked(self, _: tk.Event[tk.Misc]) -> None:
         """When the large image is clicked, either show the previews or play sounds."""
@@ -1344,7 +1358,7 @@ class SelectorWin[*CallbackT]:
 
         tk_tools.center_win(self.win, parent=self.parent)
 
-        self.sel_item(self.selected)
+        self.sel_item(self.chosen.value)
         self.win.after(2, self.flow_items)
         return None
 
@@ -1369,6 +1383,7 @@ class SelectorWin[*CallbackT]:
             else:
                 pool = self.suggested
             self.sel_item(random.choice(pool))
+        self.chosen.value = self.selected
         self.set_disp()
         self.do_callback()
 
@@ -1389,6 +1404,7 @@ class SelectorWin[*CallbackT]:
             if self.noneItem not in self.item_list:
                 return False
             self.sel_item(self.noneItem)
+            self.chosen.value = self.noneItem
             self.set_disp()
             self.do_callback()
             return True
@@ -1396,6 +1412,7 @@ class SelectorWin[*CallbackT]:
             for item in self.item_list:
                 if item.name == it_id:
                     self.sel_item(item)
+                    self.chosen.value = item
                     self.set_disp()
                     self.do_callback()
                     return True
@@ -1771,7 +1788,7 @@ class SelectorWin[*CallbackT]:
 
     def is_suggested(self) -> bool:
         """Return whether the current item is a suggested one."""
-        return self.selected in self.suggested
+        return self.chosen.value in self.suggested
 
     def can_suggest(self) -> bool:
         """Check if a new item can be suggested."""
@@ -1781,7 +1798,7 @@ class SelectorWin[*CallbackT]:
             return True
         # If we suggest one item which is selected, that's
         # pointless.
-        return self.suggested != [self.selected]
+        return self.suggested != [self.chosen.value]
 
     # noinspection PyProtectedMember
     def _set_context_font(self, item: Item, suggested: bool) -> None:
@@ -1807,7 +1824,7 @@ class SelectorWin[*CallbackT]:
             menu = self.context_menu
         menu.entryconfig(item._context_ind, font=new_font)
 
-    def set_suggested(self, suggested: AbstractSet[str] = frozenset()) -> None:
+    def set_suggested(self, suggested: Container[str] = ()) -> None:
         """Set the suggested items to the set of IDs.
 
         If it is empty, the suggested ID will be cleared.
@@ -1830,7 +1847,7 @@ class SelectorWin[*CallbackT]:
             else:
                 self._set_context_font(item, False)
 
-        self.set_disp()  # Update the textbox if needed
+        self.set_disp()  # Update the textbox if necessary.
         # Reposition all our items, but only if we're visible.
         if self.win.winfo_ismapped():
             self.flow_items()
