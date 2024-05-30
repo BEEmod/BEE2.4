@@ -88,7 +88,7 @@ class WidgetConfig(config.Data, conf_name='ItemVar', uses_id=True):
             for attr in data.values():
                 if attr.name.startswith('tim_'):
                     try:
-                        result[parse_timer(attr.name[4:])] = attr.val_string
+                        result[parse_timer(attr.name.removeprefix('tim_'))] = attr.val_string
                     except ValueError:
                         LOGGER.warning('Invalid timer value "{}" in ItemVar config', attr.name)
             return WidgetConfig(result)

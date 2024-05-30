@@ -82,7 +82,7 @@ class CollideType(Flag):
         coll = cls.NOTHING
         for key, value in entity.items():
             if key.casefold().startswith('coll_') and conv_bool(value):
-                coll_name = key[5:].upper()
+                coll_name = key.removeprefix('coll_').upper()
                 try:
                     coll |= cls[coll_name]
                 except KeyError:

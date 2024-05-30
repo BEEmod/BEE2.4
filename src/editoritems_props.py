@@ -385,8 +385,7 @@ prop_track_move_direction = ItemPropKind[Angle](
 # 0
 def _parse_pist_lower(value: str) -> int:
     # Bug, previous versions mistakenly wrote rounded floats.
-    if value.endswith('.0'):
-        value = value[:-2]
+    value = value.removesuffix('.0')
     try:
         pos = int(value)
         if 0 <= pos < 4:

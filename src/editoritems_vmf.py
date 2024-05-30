@@ -89,9 +89,7 @@ def parse_occutype(value: str) -> OccuType:
     """Parse an occupation type specification from the VMF."""
     val = OccuType.NOTHING
     for word in value.split():
-        word = word.upper()
-        if word.startswith('COLLIDE_'):
-            word = word[8:]
+        word = word.upper().removeprefix('COLLIDE_')
         try:
             val |= OccuType[word]
         except KeyError:

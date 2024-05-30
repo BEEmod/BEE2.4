@@ -1541,8 +1541,7 @@ def retexture_template(
             mat = rng.choice(replace_tex[mat])
             if instance is not None:
                 mat = instance.fixup.substitute(mat)
-            if mat.startswith('<') or mat.endswith('>'):
-                mat = mat[1:-1]
+            if mat.startswith('<') and mat.endswith('>'):
                 gen, tex_name = texturing.parse_name(mat[1:-1])
                 mat = gen.get(over_pos, tex_name)
         else:

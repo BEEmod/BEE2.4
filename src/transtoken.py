@@ -110,7 +110,7 @@ class TransToken:
         orig_pack = package
         if text.startswith('[['):  # "[[package]] default"
             try:
-                package_str, token = text[2:].split(']]', 1)
+                package_str, token = text.removeprefix('[[').split(']]', 1)
                 token = token.lstrip()  # Allow whitespace between "]" and text.
                 # Don't allow specifying our special namespaces, except allow empty string for UNTRANSLATED
                 package = utils.obj_id(package_str) if package_str else NS_UNTRANSLATED

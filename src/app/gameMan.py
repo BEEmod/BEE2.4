@@ -99,7 +99,7 @@ class Game:
 
         for name, value in config.items(gm_id):
             if name.startswith('pack_mod_'):
-                mod_times[name[9:].casefold()] = srctools.conv_int(value)
+                mod_times[name.removeprefix('pack_mod_').casefold()] = srctools.conv_int(value)
 
         return cls(gm_id, steam_id, folder, mod_times, exp_style, unmarked_dlc3)
 

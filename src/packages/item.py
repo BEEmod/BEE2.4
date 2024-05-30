@@ -390,9 +390,7 @@ class ItemVariant:
                     ) from None
                 editor[0].set_inst(ind, inst_data)
             else:  # BEE2 named instance
-                inst_name = inst.name
-                if inst_name.startswith('bee2_'):
-                    inst_name = inst_name[5:]
+                inst_name = inst.name.removeprefix('bee2_')
                 editor[0].cust_instances[inst_name] = inst_data.inst
 
         # Override IO commands.

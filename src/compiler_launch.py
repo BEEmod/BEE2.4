@@ -16,11 +16,7 @@ else:
     # Sourcecode-launch - check first sys arg.
     app_name = sys.argv.pop(1).casefold()
 
-# TODO: Use removesuffix()
-if app_name.endswith(('.exe', '_osx')):
-    app_name = app_name[:-4]
-if app_name.endswith('_linux'):
-    app_name = app_name[:-6]
+app_name = app_name.removesuffix('_osx').removesuffix('_linux').removesuffix('.exe')
 
 if 'original' in app_name:
     sys.exit('Original compilers replaced, verify game files in Steam!')

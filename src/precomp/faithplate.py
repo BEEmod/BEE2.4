@@ -85,12 +85,13 @@ def associate_faith_plates(vmf: VMF) -> None:
         # Conveniently, we can determine what sort of catapult was made by
         # examining the local name used.
         if name.endswith('-helperTrigger'):
-            helper_trigs[name[:-14]] = trig
+            name = name.removesuffix('helperTrigger')
+            helper_trigs[name] = trig
             # Also store None in the main trigger if no key is there,
             # so we can detect missing main triggers...
-            triggers.setdefault(name[:-14], None)
+            triggers.setdefault(name, None)
         elif name.endswith('-trigger'):
-            triggers[name[:-8]] = trig
+            triggers[name.removesuffix('-trigger')] = trig
             # Remove the original relay inputs. We need to keep the output
             # to the helper if necessary.
             trig.outputs[:] = [
@@ -101,7 +102,7 @@ def associate_faith_plates(vmf: VMF) -> None:
             ]
         elif name.endswith('-catapult'):
             # Paint droppers.
-            paint_trigs[name[:-9]] = trig
+            paint_trigs[name.removesuffix('-catapult')] = trig
         else:
             LOGGER.warning('Unknown trigger "{}"?', name)
 

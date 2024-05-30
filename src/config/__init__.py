@@ -379,7 +379,7 @@ class ConfigSpec:
             try:
                 if not child.type.startswith('Conf_v'):
                     raise ValueError
-                version = int(child.type[6:])
+                version = int(child.type.removeprefix('Conf_v'))
             except ValueError:
                 LOGGER.warning('Invalid config section version "{}"', child.type)
                 continue

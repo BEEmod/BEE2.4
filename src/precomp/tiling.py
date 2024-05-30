@@ -192,7 +192,7 @@ class TileType(Enum):
         if self is TileType.GOO_SIDE:
             return TileType.WHITE_4x4
         if self.name.startswith('BLACK'):
-            tile = getattr(TileType, f'WHITE{self.name[5:]}')
+            tile = getattr(TileType, f'WHITE{self.name.removeprefix('BLACK')}')
             assert isinstance(tile, TileType)
             return tile
         return self
@@ -201,7 +201,7 @@ class TileType(Enum):
     def as_black(self) -> TileType:
         """Force to the black version."""
         if self.is_white:
-            tile = getattr(TileType, f'BLACK{self.name[5:]}')
+            tile = getattr(TileType, f'BLACK{self.name.removeprefix('WHITE')}')
             assert isinstance(tile, TileType)
             return tile
         return self

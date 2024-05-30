@@ -344,7 +344,7 @@ def setup(conf_lang: str) -> None:
     if len(sys.argv) > 1:
         for arg in sys.argv[1:]:
             if arg.casefold().startswith('lang='):
-                lang_code = arg[5:]
+                lang_code = arg.removeprefix('lang=')
                 break
 
     if lang_code is None:

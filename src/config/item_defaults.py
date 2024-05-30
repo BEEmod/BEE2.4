@@ -37,7 +37,7 @@ class ItemDefault(config.Data, conf_name='ItemDefault', uses_id=True):
             for prop_name, value in section.items():
                 if not prop_name.startswith('prop_'):
                     continue
-                prop_name = prop_name[5:]
+                prop_name = prop_name.removeprefix('prop_')
                 try:
                     prop_type = PROP_TYPES[prop_name.casefold()]
                 except KeyError:

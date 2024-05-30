@@ -320,7 +320,7 @@ def _fill_predicates() -> None:
     for name, func in list(locals().items()):
         if name.startswith('pred_'):
             # Collapse it down into a lookup table.
-            TILE_PREDICATES[name[5:]] = set(filter(
+            TILE_PREDICATES[name.removeprefix('pred_')] = set(filter(
                 func, tiling.TileType.__members__.values()
             ))
 

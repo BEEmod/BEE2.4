@@ -412,13 +412,13 @@ def get_subitems(comma_list: str, item_inst: list[str], item_id: str) -> list[st
             # A custom value...
             bee_inst = CUST_INST_FILES[folded_id]
             try:
-                output.append(bee_inst[folded_value[5:]])
+                output.append(bee_inst[folded_value.removeprefix('bee2_')])
                 continue
             except KeyError:
                 LOGGER.warning(
                     'Invalid custom instance name - "{}" for '
                     '<{}> (Valid: {!r})',
-                    folded_value[5:],
+                    folded_value,
                     item_id,
                     bee_inst,
                 )

@@ -285,7 +285,7 @@ def anti_fizz_bump(vmf: VMF) -> None:
         fizz_name = cleanser['targetname']
         if fizz_name.endswith('_brush'):
             # Fizzlers will be changed to this in fix_func_brush()
-            fizz_name = fizz_name[:-6] + '-br_brush'
+            fizz_name = fizz_name.removesuffix('_brush') + '-br_brush'
 
         # Only have 1 bumper per brush
         if fizz_name not in bumpers:

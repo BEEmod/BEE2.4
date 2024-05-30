@@ -1248,7 +1248,7 @@ class Item:
         except ValueError:
             inst_ind = None
             if inst_name.casefold().startswith('bee2_'):
-                inst_name = inst_name[5:]
+                inst_name = inst_name.removeprefix('bee2_')
             # else:
             #     LOGGER.warning(
             #         'Custom instance name "{}" should have bee2_ prefix (line '

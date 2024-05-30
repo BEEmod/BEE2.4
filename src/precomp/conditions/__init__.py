@@ -1605,11 +1605,8 @@ def res_goo_debris(vmf: VMF, res: Keyvalues) -> object:
     else:
         rand_list = None
     chance = res.int('chance', 30) / 100
-    file = res['file']
+    file = res['file'].removesuffix('.vmf')
     offset = res.int('offset', 0)
-
-    if file.endswith('.vmf'):
-        file = file[:-4]
 
     goo_top_locs = {
         pos
