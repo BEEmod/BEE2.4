@@ -93,12 +93,12 @@ async def init_app(core_nursery: trio.Nursery) -> None:
 
         # Load filesystems into various modules.
         music_conf.load_filesystems(package_sys.values())
-        await utils.run_as_task(UI.load_packages, packset, TK_IMG)
+        await utils.run_as_task(UI.load_packages, core_nursery, packset, TK_IMG)
         await loadScreen.MAIN_UI.step('package_load')
         LOGGER.info('Done!')
 
         LOGGER.info('Initialising UI...')
-        await core_nursery.start(UI.init_windows, TK_IMG)
+        await core_nursery.start(UI.init_windows, core_nursery, TK_IMG)
         LOGGER.info('UI initialised!')
 
         if Tracer.slow:

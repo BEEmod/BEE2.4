@@ -1,7 +1,10 @@
 """Main UI module, brings everything together."""
-from typing import Optional, Iterator, Callable, TypedDict, Union, cast
-import tkinter as tk
+from typing import TypedDict, cast, assert_never
+
 from tkinter import ttk
+import tkinter as tk
+
+from collections.abc import Callable, Iterator
 from contextlib import aclosing
 import itertools
 import operator
@@ -13,10 +16,9 @@ import srctools.logger
 import attrs
 import trio
 import trio_util
-from typing_extensions import assert_never
 
 import exporting
-from app import EdgeTrigger, background_run, background_start, quit_app, sound
+from app import EdgeTrigger, background_run, quit_app, sound
 from BEE2_config import GEN_OPTS
 from app.dialogs import Dialogs
 from loadScreen import MAIN_UI as LOAD_UI
@@ -111,7 +113,7 @@ class DragWin(tk.Toplevel):
     """Todo: use dragdrop module instead."""
     passed_over_pal: bool  # Has the cursor passed over the palette
     from_pal: bool  # Are we dragging a palette item?
-    drag_item: Optional['PalItem']  # The item currently being moved
+    drag_item: 'PalItem | None'  # The item currently being moved
 
 
 class _WindowsDict(TypedDict):
@@ -461,6 +463,7 @@ class PalItem:
 
 
 async def load_packages(
+    core_nursery: trio.Nursery,
     packset: packages.PackagesSet,
     tk_img: TKImages,
 ) -> None:
@@ -541,7 +544,7 @@ async def load_packages(
                     pass
 
     # Defaults match Clean Style, if not found it uses the first item.
-    skybox_win = await background_start(functools.partial(
+    skybox_win = await core_nursery.start(functools.partial(
         SelectorWin.create,
         TK_ROOT,
         sky_list,
@@ -560,7 +563,7 @@ async def load_packages(
         ],
     ))
 
-    voice_win = await background_start(functools.partial(
+    voice_win = await core_nursery.start(functools.partial(
         SelectorWin.create,
         TK_ROOT,
         voice_list,
@@ -584,7 +587,7 @@ async def load_packages(
         ],
     ))
 
-    style_win = await background_start(functools.partial(
+    style_win = await core_nursery.start(functools.partial(
         SelectorWin.create,
         TK_ROOT,
         style_list,
@@ -607,7 +610,7 @@ async def load_packages(
         ]
     ))
 
-    elev_win = await background_start(functools.partial(
+    elev_win = await core_nursery.start(functools.partial(
         SelectorWin.create,
         TK_ROOT,
         elev_list,
@@ -1040,6 +1043,7 @@ def pal_shuffle() -> None:
 
 
 async def init_option(
+    core_nursery: trio.Nursery,
     pane: SubPane.SubPane,
     tk_img: TKImages,
     export: Callable[[], object],
@@ -1071,7 +1075,10 @@ async def init_option(
     music_frame = ttk.Labelframe(props)
     wid_transtoken.set_text(music_frame, TransToken.ui('Music: '))
 
-    await background_start(music_conf.make_widgets, packages.get_loaded_packages(), music_frame, pane)
+    await core_nursery.start(
+        music_conf.make_widgets,
+        packages.get_loaded_packages(), music_frame, pane,
+    )
     suggest_windows[packages.Music] = music_conf.WINDOWS[consts.MusicChannel.BASE]
 
     def suggested_style_set() -> None:
@@ -1150,7 +1157,6 @@ async def init_option(
     corr_button = ttk.Button(props, command=corridor.show_trigger.trigger)
     wid_transtoken.set_text(corr_button, TransToken.ui('Select'))
     corr_button.grid(row=5, column=1, sticky='EW')
-    background_run(tk_tools.apply_bool_enabled_state_task, corridor.show_trigger.ready, corr_button)
 
     music_frame.grid(row=6, column=0, sticky='EW', columnspan=2)
     (await voice_win.widget(voice_frame)).grid(row=0, column=1, sticky='EW', padx=left_pad)
@@ -1160,15 +1166,17 @@ async def init_option(
         sizegrip.grid(row=2, column=5, rowspan=2, sticky="NS")
 
     task_status.started()
-    while True:
-        await trio_util.wait_any(*[
-            window.chosen.wait_transition
-            for window in suggest_windows.values()
-        ])
-        if all(not win.can_suggest() for win in suggest_windows.values()):
-            sugg_btn.state(['disabled'])
-        else:
-            sugg_btn.state(['!disabled'])
+    async with trio.open_nursery() as nursery:
+        nursery.start_soon(tk_tools.apply_bool_enabled_state_task, corridor.show_trigger.ready, corr_button)
+        while True:
+            await trio_util.wait_any(*[
+                window.chosen.wait_transition
+                for window in suggest_windows.values()
+            ])
+            if all(not win.can_suggest() for win in suggest_windows.values()):
+                sugg_btn.state(['disabled'])
+            else:
+                sugg_btn.state(['!disabled'])
 
 
 def flow_preview() -> None:
@@ -1195,7 +1203,7 @@ def flow_preview() -> None:
     UI['pre_sel_line'].lift()
 
 
-def init_preview(tk_img: TKImages, f: Union[tk.Frame, ttk.Frame]) -> None:
+def init_preview(tk_img: TKImages, f: tk.Frame | ttk.Frame) -> None:
     """Generate the preview pane.
 
      This shows the items that will export to the palette.
@@ -1229,7 +1237,10 @@ def init_preview(tk_img: TKImages, f: Union[tk.Frame, ttk.Frame]) -> None:
     flow_preview()
 
 
-async def init_picker(f: Union[tk.Frame, ttk.Frame]) -> None:
+async def init_picker(
+    core_nursery: trio.Nursery,
+    f: tk.Frame | ttk.Frame,
+) -> None:
     """Construct the frame holding all the items."""
     global frmScroll, pal_canvas
     wid_transtoken.set_text(
@@ -1271,7 +1282,7 @@ async def init_picker(f: Union[tk.Frame, ttk.Frame]) -> None:
             if subtype.pal_icon or subtype.pal_name:
                 pal_items.append(PalItem(frmScroll, item, sub=i, is_pre=False))
 
-    f.bind("<Configure>", lambda e: background_run(
+    f.bind("<Configure>", lambda e: core_nursery.start_soon(
         flow_picker,
         config.APP.get_cur_conf(FilterConf, default=FilterConf()),
     ))
@@ -1383,6 +1394,7 @@ def refresh_palette_icons() -> None:
 
 
 async def init_windows(
+    core_nursery: trio.Nursery,
     tk_img: TKImages,
     *, task_status: trio.TaskStatus[None] = trio.TASK_STATUS_IGNORED,
 ) -> None:
@@ -1393,7 +1405,7 @@ async def init_windows(
 
     def export() -> None:
         """Export the palette, passing the required UI objects."""
-        background_run(export_editoritems, pal_ui, menu_bar, DIALOG)
+        core_nursery.start_soon(export_editoritems, pal_ui, menu_bar, DIALOG)
 
     menu_bar = MenuBar(TK_ROOT, tk_img=tk_img, export=export)
     TK_ROOT.maxsize(
@@ -1457,7 +1469,7 @@ async def init_windows(
         """Refresh filtered items whenever it's changed."""
         global cur_filter
         cur_filter = new_filter
-        background_run(flow_picker, config.APP.get_cur_conf(FilterConf))
+        core_nursery.start_soon(flow_picker, config.APP.get_cur_conf(FilterConf))
 
     item_search.init(search_frame, update_filter)
 
@@ -1473,7 +1485,7 @@ async def init_windows(
     frames['picker'].grid(row=1, column=0, sticky="NSEW")
     picker_split_frame.rowconfigure(1, weight=1)
     picker_split_frame.columnconfigure(0, weight=1)
-    await init_picker(frames['picker'])
+    await init_picker(core_nursery, frames['picker'])
 
     await LOAD_UI.step('picker')
 
@@ -1520,8 +1532,8 @@ async def init_windows(
 
     TK_ROOT.bind_all(tk_tools.KEY_SAVE, lambda e: pal_ui.event_save(DIALOG))
     TK_ROOT.bind_all(tk_tools.KEY_SAVE_AS, lambda e: pal_ui.event_save_as(DIALOG))
-    TK_ROOT.bind_all(tk_tools.KEY_EXPORT, lambda e: background_run(export_editoritems, pal_ui, menu_bar, DIALOG))
-    background_run(pal_ui.update_task)
+    TK_ROOT.bind_all(tk_tools.KEY_EXPORT, lambda e: export())
+    core_nursery.start_soon(pal_ui.update_task)
 
     await LOAD_UI.step('palette')
 
@@ -1540,22 +1552,22 @@ async def init_windows(
         tool_col=11,
     )
     corridor = TkSelector(packages.get_loaded_packages(), tk_img, selected_style)
-    await background_start(init_option, windows['opt'], tk_img, export, corridor)
-    background_run(corridor.task)
+    await core_nursery.start(init_option, core_nursery, windows['opt'], tk_img, export, corridor)
+    core_nursery.start_soon(corridor.task)
     await LOAD_UI.step('options')
 
     signage_trigger: EdgeTrigger[()] = EdgeTrigger()
     sign_ui = SignageUI(TK_IMG)
-    background_run(sign_ui.task, signage_trigger)
+    core_nursery.start_soon(sign_ui.task, signage_trigger)
 
     await utils.run_as_task(
-        background_start, itemconfig.make_pane,
+        core_nursery.start, itemconfig.make_pane,
         frames['toolMenu'], menu_bar.view_menu, tk_img, signage_trigger,
     )
     await LOAD_UI.step('itemvar')
 
     await utils.run_as_task(
-        background_start, CompilerPane.make_pane,
+        core_nursery.start, CompilerPane.make_pane,
         frames['toolMenu'], tk_img, menu_bar.view_menu,
     )
     await LOAD_UI.step('compiler')
@@ -1600,9 +1612,9 @@ async def init_windows(
         open_match_func=PalItem.open_menu_at_sub,
         icon_func=lambda ref: item_list[ref.item.id].get_icon(ref.subtype),
     )
-    await background_start(context_win.init_widgets, signage_trigger)
+    await core_nursery.start(context_win.init_widgets, signage_trigger)
     await LOAD_UI.step('contextwin')
-    await background_start(functools.partial(
+    await core_nursery.start(functools.partial(
         optionWindow.init_widgets,
         unhide_palettes=pal_ui.reset_hidden_palettes,
         reset_all_win=reset_panes,
