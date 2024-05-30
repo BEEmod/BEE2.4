@@ -310,7 +310,7 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
             yield widget.name, f'{source}/{widget.id}.name'
             yield widget.tooltip, f'{source}/{widget.id}.tooltip'
 
-    def add_over(self, override: 'ConfigGroup') -> None:
+    def add_over(self, override: ConfigGroup) -> None:
         """Override a ConfigGroup to add additional widgets."""
         # Make sure they don't double-up.
         conficts = self.widget_ids() & override.widget_ids()

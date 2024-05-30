@@ -558,7 +558,7 @@ def parse_legacy(posfile: IO[str], propfile: IO[str], path: str) -> Palette:
                     try:
                         pos[next(coords)] = (item_id, subtype)
                     except StopIteration:
-                        raise ValueError('Too many items!')
+                        raise ValueError('Too many items!') from None
                 else:
                     raise ValueError(f'Malformed row "{line}"!')
     return Palette(name, pos)

@@ -14,7 +14,7 @@ import utils
 from app.reports import report_all_obj, report_items, report_editor_models
 from app import (
     DEV_MODE, background_run,
-    contextWin, gameMan, localisation, sound, logWindow, img, UI,
+    gameMan, localisation, sound, logWindow, img, UI,
 )
 from config.filters import FilterConf
 from config.gen_opts import GenOptions, AfterExport

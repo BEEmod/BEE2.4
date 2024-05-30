@@ -1,11 +1,11 @@
 """Configures which signs are defined for the Signage item."""
 from __future__ import annotations
 
-import abc
-from typing import Any, Final, TypeGuard
+from typing import Final, TypeGuard
 
 from collections.abc import Sequence, Iterator
 from datetime import timedelta
+import abc
 
 import srctools.logger
 import trio

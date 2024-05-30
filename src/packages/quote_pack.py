@@ -28,7 +28,7 @@ class QuotePack(PakObject, needs_foreground=True, style_suggest_key='quote'):
         self.data = data
 
     @classmethod
-    async def parse(cls, data: ParseData) -> 'QuotePack':
+    async def parse(cls, data: ParseData) -> QuotePack:
         """Parse a voice line definition."""
         selitem_data = SelitemData.parse(data.info, data.pak_id)
         chars = {
@@ -145,7 +145,7 @@ class QuotePack(PakObject, needs_foreground=True, style_suggest_key='quote'):
             ),
         )
 
-    def add_over(self, override: 'QuotePack') -> None:
+    def add_over(self, override: QuotePack) -> None:
         """Add the additional lines to ourselves."""
         self.selitem_data += override.selitem_data
         self.config += override.config

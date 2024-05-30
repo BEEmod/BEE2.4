@@ -752,7 +752,7 @@ async def export_editoritems(pal_ui: paletteUI.PaletteUI, bar: MenuBar, dialog: 
         # Do the desired action - if quit, we don't bother to update UI.
         if do_action:
             # Launch first so quitting doesn't affect this.
-            if conf.launch_after_export:
+            if conf.launch_after_export and gameMan.selected_game is not None:
                 await gameMan.selected_game.launch()
 
             if conf.after_export is AfterExport.NORMAL:
@@ -1086,7 +1086,7 @@ async def init_option(
     def configure_voice() -> None:
         """Open the voiceEditor window to configure a Quote Pack."""
         try:
-            chosen_voice = packages.get_loaded_packages().obj_by_id(packages.QuotePack, voice_win.chosen_id)
+            chosen_voice = packages.get_loaded_packages().obj_by_id(packages.QuotePack, voice_win.chosen.value.name)
         except KeyError:
             pass
         else:

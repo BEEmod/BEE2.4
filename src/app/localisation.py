@@ -120,7 +120,7 @@ class UIFormatter(string.Formatter):
     @override
     def format_field(self, value: Any, format_spec: str) -> Any:
         """Format a field."""
-        if isinstance(value, (int, float)):
+        if isinstance(value, int | float):
             if not format_spec:
                 # This is the standard format for this language.
                 format_spec = self.locale.decimal_formats[None]
@@ -143,7 +143,7 @@ class UIFormatter(string.Formatter):
                 datetime.time(
                     hour=round(hours), minute=round(mins), second=round(sec),
                     microsecond=value.microseconds,
-                    tzinfo=datetime.timezone.utc,
+                    tzinfo=datetime.UTC,
                 ),
                 locale=self.locale,
             )
