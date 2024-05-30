@@ -7,7 +7,7 @@ from app.errors import ErrorUI
 from transtoken import AppError, TransToken
 
 
-async def test() -> None:
+async def test(core_nursery: trio.Nursery) -> None:
     """Test the ErrorUI display."""
     tt = TransToken.untranslated
 

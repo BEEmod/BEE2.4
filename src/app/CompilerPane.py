@@ -774,7 +774,7 @@ async def make_pane(
         await trio.sleep_forever()
 
 
-async def init_application() -> None:
+async def init_application(nursery: trio.Nursery) -> None:
     """Initialise when standalone."""
     global window
     from ui_tk.img import TK_IMG
@@ -786,9 +786,8 @@ async def init_application() -> None:
     window.resizable(True, False)
 
     with _APP_QUIT_SCOPE:
-        async with trio.open_nursery() as nursery:
-            await nursery.start(make_widgets, TK_IMG)
+        await nursery.start(make_widgets, TK_IMG)
 
-            TK_ROOT.deiconify()
-            tk_tools.center_onscreen(TK_ROOT)
-            await trio.sleep_forever()
+        TK_ROOT.deiconify()
+        tk_tools.center_onscreen(TK_ROOT)
+        await trio.sleep_forever()

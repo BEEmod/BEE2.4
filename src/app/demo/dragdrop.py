@@ -6,7 +6,7 @@ from contextlib import aclosing
 
 import trio
 
-from app import background_run, img, sound
+from app import img, sound
 from app.dragdrop import DragInfo
 from app.errors import ErrorUI
 from transtoken import TransToken
@@ -20,7 +20,7 @@ import packages
 import utils
 
 
-async def test() -> None:
+async def test(core_nursery: trio.Nursery) -> None:
     """Test the GUI."""
     BEE2_config.GEN_OPTS.load()
     config.APP.read_file(config.APP_LOC)
@@ -37,7 +37,7 @@ async def test() -> None:
             )
     assert app._APP_NURSERY is not None
     await app._APP_NURSERY.start(img.init, packages.PACKAGE_SYS,  TK_IMG)
-    background_run(sound.sound_task)
+    core_nursery.start_soon(sound.sound_task)
     print('Done.')
 
     left_frm = ttk.Frame(TK_ROOT)

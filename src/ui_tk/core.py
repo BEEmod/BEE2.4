@@ -35,7 +35,7 @@ import srctools.logger
 LOGGER = srctools.logger.get_logger('BEE2')
 
 
-async def init_app() -> None:
+async def init_app(core_nursery: trio.Nursery) -> None:
     """Initialise the application."""
     conf = config.APP.get_cur_conf(GenOptions)
 
@@ -50,7 +50,7 @@ async def init_app() -> None:
 
     logWindow.HANDLER.set_visible(conf.show_log_win)
     logWindow.HANDLER.setLevel(conf.log_win_level)
-    app.background_run(logWindow.loglevel_bg)
+    core_nursery.start_soon(logWindow.loglevel_bg)
 
     LOGGER.debug('Loading settings...')
 
@@ -86,10 +86,10 @@ async def init_app() -> None:
             return
         package_sys = packages.PACKAGE_SYS
         await loadScreen.MAIN_UI.step('pre_ui')
-        app.background_run(img.init, package_sys, TK_IMG)
-        app.background_run(sound.sound_task)
-        app.background_run(wid_transtoken.update_task)
-        app.background_run(localisation.load_aux_langs, gameMan.all_games, packset)
+        core_nursery.start_soon(img.init, package_sys, TK_IMG)
+        core_nursery.start_soon(sound.sound_task)
+        core_nursery.start_soon(wid_transtoken.update_task)
+        core_nursery.start_soon(localisation.load_aux_langs, gameMan.all_games, packset)
 
         # Load filesystems into various modules.
         music_conf.load_filesystems(package_sys.values())
@@ -98,7 +98,7 @@ async def init_app() -> None:
         LOGGER.info('Done!')
 
         LOGGER.info('Initialising UI...')
-        await app.background_start(UI.init_windows, TK_IMG)
+        await core_nursery.start(UI.init_windows, TK_IMG)
         LOGGER.info('UI initialised!')
 
         if Tracer.slow:
@@ -241,18 +241,20 @@ class Tracer(trio.abc.Instrument):
         })
 
 
-async def app_main(init: Callable[[], Awaitable[Any]]) -> None:
+async def app_main(init: Callable[[trio.Nursery], Awaitable[Any]]) -> None:
     """The main loop for Trio."""
     LOGGER.debug('Opening nursery...')
     async with trio.open_nursery() as nursery:
         app._APP_NURSERY = nursery
+        # Start some core tasks.
         await nursery.start(route_callback_exceptions)
         await nursery.start(display_errors)
         await nursery.start(loadScreen.startup)
         await gameMan.check_app_in_game(DIALOG)
 
-        # Run main app, then cancel this nursery to quit all other tasks.
-        await init()
+        # Run main app, then once completed cancel this nursery to quit all other tasks.
+        # It gets given the nursery to allow spawning new tasks here.
+        await init(nursery)
         nursery.cancel_scope.cancel()
 
 
@@ -266,7 +268,7 @@ def done_callback(result: Outcome[None]) -> None:
     TK_ROOT.quit()
 
 
-def start_main(init: Callable[[], Awaitable[object]] = init_app) -> None:
+def start_main(init: Callable[[trio.Nursery], Awaitable[object]] = init_app) -> None:
     """Starts the TK and Trio loops.
 
     See https://github.com/richardsheridan/trio-guest/.

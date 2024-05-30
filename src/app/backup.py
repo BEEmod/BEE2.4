@@ -822,7 +822,7 @@ def init(tk_img: TKImages) -> None:
     window.columnconfigure(2, weight=1)
 
 
-async def init_application() -> None:
+async def init_application(nursery: trio.Nursery) -> None:
     """Initialise the standalone application."""
     from ui_tk.img import TK_IMG
     from app import gameMan, _APP_QUIT_SCOPE
@@ -850,11 +850,11 @@ async def init_application() -> None:
 
     file_menu.add_command(command=ui_new_backup)
     set_menu_text(file_menu, TransToken.ui('New Backup'))
-    file_menu.add_command(command=lambda: background_run(ui_load_backup))
+    file_menu.add_command(command=lambda: nursery.start_soon(ui_load_backup))
     set_menu_text(file_menu, TransToken.ui('Open Backup'))
-    file_menu.add_command(command=lambda: background_run(ui_save_backup, DIALOG))
+    file_menu.add_command(command=lambda: nursery.start_soon(ui_save_backup, DIALOG))
     set_menu_text(file_menu, TransToken.ui('Save Backup'))
-    file_menu.add_command(command=lambda: background_run(ui_save_backup_as, DIALOG))
+    file_menu.add_command(command=lambda: nursery.start_soon(ui_save_backup_as, DIALOG))
     set_menu_text(file_menu, TransToken.ui('Save Backup As'))
 
     bar.add_cascade(menu=file_menu)
@@ -862,9 +862,9 @@ async def init_application() -> None:
 
     game_menu = tk.Menu(bar)
 
-    game_menu.add_command(command=lambda: background_run(gameMan.add_game, DIALOG))
+    game_menu.add_command(command=lambda: nursery.start_soon(gameMan.add_game, DIALOG))
     set_menu_text(game_menu, TransToken.ui('Add Game'))
-    game_menu.add_command(command=lambda: background_run(gameMan.remove_game, DIALOG))
+    game_menu.add_command(command=lambda: nursery.start_soon(gameMan.remove_game, DIALOG))
     set_menu_text(game_menu, TransToken.ui('Remove Game'))
     game_menu.add_separator()
 
@@ -874,7 +874,7 @@ async def init_application() -> None:
 
     from app import helpMenu
     # Add the 'Help' menu here too.
-    background_run(helpMenu.make_help_menu, bar, TK_IMG)
+    await nursery.start(helpMenu.make_help_menu, bar, TK_IMG)
 
     window['menu'] = bar
 
