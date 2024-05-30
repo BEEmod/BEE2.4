@@ -127,6 +127,19 @@ TRANS_NO_AUTHORS = TransToken.ui('Authors: Unknown')
 TRANS_DEV_ITEM_ID = TransToken.untranslated('**ID:** {item}')
 
 
+async def _update_sampler_task(sampler: sound.SamplePlayer, button: ttk.Button) -> None:
+    """Update the sampler's display."""
+    async with aclosing(sampler.is_playing.eventual_values()) as agen:
+        async for is_playing in agen:
+            button['text'] = BTN_STOP if is_playing else BTN_PLAY
+
+
+async def _store_results_task(chosen: AsyncValue[Item], save_id: str) -> None:
+    """Store configured results when changed."""
+    async with aclosing(chosen.eventual_values()) as agen:
+        async for item in agen:
+            config.APP.store_conf(LastSelected(item.name), save_id)
+
 @attrs.define
 class AttrDef:
     """Configuration for attributes shown on selector labels."""
@@ -870,7 +883,7 @@ class SelectorWin[*CallbackT]:
 
         # For music items, add a '>' button to play sound samples
         if sound_sys is not None and sound.has_sound():
-            self.samp_button = samp_button = ttk.Button(
+            samp_button = ttk.Button(
                 name_frame,
                 name='sample_button',
                 text=BTN_PLAY,
@@ -883,7 +896,7 @@ class SelectorWin[*CallbackT]:
             samp_button['command'] = self.sampler.play_sample
             samp_button.state(('disabled',))
         else:
-            self.samp_button = None
+            samp_button = None
             self.sampler = None
 
         self.prop_author = ttk.Label(self.prop_frm, text="Author: person")
@@ -1040,27 +1053,12 @@ class SelectorWin[*CallbackT]:
         self.refresh()
         self.wid_canvas.bind("<Configure>", self.flow_items)
 
-        async def update_sampler() -> None:
-            """Update the sampler's display."""
-            sampler = self.sampler
-            samp_button = self.samp_button
-            if sampler is None or samp_button is None:
-                return  # Not required.
-            async with aclosing(sampler.is_playing.eventual_values()) as agen:
-                async for is_playing in agen:
-                    samp_button['text'] = BTN_STOP if is_playing else BTN_PLAY
-
-        async def store_results() -> None:
-            """Store configured results when changed."""
-            async with aclosing(self.chosen.eventual_values()) as agen:
-                async for item in agen:
-                    config.APP.store_conf(LastSelected(item.name), self.save_id)
-
         async with trio.open_nursery() as nursery:
             nursery.start_soon(self._update_translations_task)
-            nursery.start_soon(update_sampler)
+            if self.sampler is not None and samp_button is not None:
+                nursery.start_soon(_update_sampler_task, self.sampler, samp_button)
             if self.store_last_selected:
-                nursery.start_soon(store_results)
+                nursery.start_soon(_store_results_task, self.chosen, self.save_id)
 
             task_status.started(self)
 
