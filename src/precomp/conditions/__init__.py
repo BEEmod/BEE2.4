@@ -442,7 +442,7 @@ def annotation_caller[Res](
         enumerate(sig.parameters.values())
     }
     letters = 'abcdefghijklmnopqrstuvwxyz'
-    for var_name, parm_typ in zip(letters, parms):
+    for var_name, parm_typ in zip(letters, parms, strict=False):
         inputs.append(var_name)
         out_name = type_to_parm[parm_typ]
         if out_name is not None:
@@ -475,7 +475,7 @@ def annotation_caller[Res](
     return reorder_func, tuple(ann_order)
 
 
-@functools.lru_cache(maxsize=None)
+@functools.cache
 def _make_reorderer(inputs: str, outputs: str) -> Callable[[Callable[..., object]], Callable[..., Any]]:
     """Build a function that does reordering for annotation caller.
 

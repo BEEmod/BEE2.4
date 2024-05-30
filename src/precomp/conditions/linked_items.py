@@ -194,7 +194,7 @@ def link_item(vmf: VMF, group: list[item_chain.Node[Config]]) -> None:
                 ],
                 lines=[
                     (a.pos, b.pos) for a, b in
-                    zip(node_list, node_list[1:])
+                    itertools.pairwise(node_list)
                 ],
             )
 

@@ -686,7 +686,7 @@ async def export_editoritems(pal_ui: paletteUI.PaletteUI, bar: MenuBar, dialog: 
         # The chosen items on the palette.
         pal_data: paletteUI.ItemPos = {
             pos: (it.id, it.subKey)
-            for pos, it in zip(paletteUI.COORDS, pal_picked)
+            for pos, it in zip(paletteUI.COORDS, pal_picked, strict=False)
         }
         # Group palette data by each item ID, so it can easily determine which items are actually
         # on the palette at all.
@@ -1518,7 +1518,7 @@ async def init_windows(
         cmd_shuffle=pal_shuffle,
         get_items=lambda: {
             pos: (it.id, it.subKey)
-            for pos, it in zip(paletteUI.COORDS, pal_picked)
+            for pos, it in zip(paletteUI.COORDS, pal_picked, strict=False)
         },
         set_items=set_palette,
     )

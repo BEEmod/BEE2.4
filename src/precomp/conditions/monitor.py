@@ -257,7 +257,7 @@ def mon_camera_link(vmf: VMF, voice: QuoteInfo) -> None:
             f'CamDisable({index})',
         ), )
 
-    for is_act, cam in zip(active_counts, ALL_CAMERAS):
+    for is_act, cam in zip(active_counts, ALL_CAMERAS, strict=True):
         if is_act:
             start_pos = cam.cam_pos
             start_angles = cam.cam_angles
@@ -315,7 +315,7 @@ def mon_camera_link(vmf: VMF, voice: QuoteInfo) -> None:
     scriptvar_set(cam_ent, start_pos - (0, 0, 16), 'CAM_ACTIVE_NUM', sum(active_counts))
     # Then add the values for each camera. We can use the setter's modes
     # to include the position as the actual loc.
-    for i, (cam, active) in enumerate(zip(ALL_CAMERAS, active_counts)):
+    for i, (cam, active) in enumerate(zip(ALL_CAMERAS, active_counts, strict=True)):
         scriptvar_set(
             cam_ent,
             cam.cam_pos,

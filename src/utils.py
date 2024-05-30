@@ -789,7 +789,7 @@ def get_piece_fitter(sizes: Collection[int]) -> Callable[[SupportsInt], Sequence
     # That's the hard part, but there's only a smaller amount of those.
     for tup in itertools.product(*counters):
         count = sum(tup)
-        result = sum(x * y for x, y in zip(tup, pieces))
+        result = sum(x * y for x, y in zip(tup, pieces, strict=True))
         try:
             existing = solutions[result]
         except KeyError:
@@ -799,7 +799,7 @@ def get_piece_fitter(sizes: Collection[int]) -> Callable[[SupportsInt], Sequence
                 continue
         # Otherwise this solution is better, add it.
         solutions[result] = [
-            size for size, count in zip(pieces, tup)
+            size for size, count in zip(pieces, tup, strict=True)
             for _ in range(count)
         ]
 

@@ -2,8 +2,10 @@
 
 """
 from __future__ import annotations
-from collections.abc import Iterable, Iterator, Mapping, MutableMapping, ValuesView, ItemsView
 from typing import Any, Final, overload
+from collections.abc import (
+    ItemsView, Iterable, Iterator, Mapping, MutableMapping, ValuesView,
+)
 import copy
 
 from srctools.math import AnyVec, FrozenMatrix, FrozenVec, Vec
@@ -52,7 +54,7 @@ class PlaneKey:
             norm, norm_hash = _NORMALS[FrozenVec(normal)]
         except KeyError:
             raise ValueError(f'{normal!r} is not an on-axis normal!') from None
-        if not isinstance(dist, (int, float)):
+        if not isinstance(dist, int | float):
             dist = norm.dot(dist)
 
         self.__attrs_init__(norm, dist, hash(dist) ^ norm_hash)
@@ -177,7 +179,7 @@ class PlaneGrid[ValT](MutableMapping[tuple[int, int], ValT]):
     def __deepcopy__(self, memodict: dict[int, Any] | None = None) -> PlaneGrid[ValT]:
         """Deep-copy the plane."""
         cpy = PlaneGrid.__new__(PlaneGrid)
-        cpy.__dict__.update(self.__dict__) # Immutables
+        cpy.__dict__.update(self.__dict__)  # Immutables
         cpy._xoffs = self._xoffs.copy()
         cpy._data = copy.deepcopy(self._data, memodict)
         return cpy
@@ -307,7 +309,7 @@ class PlaneGrid[ValT](MutableMapping[tuple[int, int], ValT]):
 
     def __iter__(self) -> Iterator[tuple[int, int]]:
         """Return all used keys."""
-        for y, (xoff, row) in enumerate(zip(self._xoffs, self._data), start=-self._yoff):
+        for y, (xoff, row) in enumerate(zip(self._xoffs, self._data, strict=True), start=-self._yoff):
             if row is None:
                 continue
             for x, data in enumerate(row, start=-xoff):
@@ -396,7 +398,7 @@ class GridItems[ValT](ItemsView[tuple[int, int], ValT]):
     def __iter__(self) -> Iterator[tuple[tuple[int, int], ValT]]:
         """Produce all coord, value pairs in the plane."""
         for y, (xoff, row) in enumerate(
-            zip(self._mapping._xoffs, self._mapping._data),
+            zip(self._mapping._xoffs, self._mapping._data, strict=True),
             start=-self._mapping._yoff,
         ):
             if row is None:

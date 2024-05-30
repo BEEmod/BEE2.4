@@ -426,7 +426,7 @@ class Selector[IconT: Icon, OptionRowT: OptionRow]:
                     done_event = trio.Event()
                     opt: Option
                     row: OptionRowT
-                    for ind, (opt, row) in enumerate(zip(options, self.option_rows)):
+                    for ind, (opt, row) in enumerate(zip(options, self.option_rows, strict=True)):
                         row.current.value = option_conf.value_for(opt)
                         nursery.start_soon(row.display, ind, opt, done_event)
                         option_async_vals.append((opt.id, row.current))

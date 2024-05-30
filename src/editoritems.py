@@ -1,11 +1,13 @@
 """Parses the Puzzlemaker's item format."""
 from __future__ import annotations
+
 from typing import ClassVar, Protocol, Any
 
 from collections import defaultdict
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from enum import Enum, Flag
 from pathlib import PurePosixPath as FSPath
+import itertools
 import sys
 
 import attrs
@@ -751,12 +753,12 @@ class SubType:
         self.models = list(map(FSPath, mdls))
         self.sounds = {
             snd: sndscript
-            for snd, sndscript in zip(Sound, snds)
+            for snd, sndscript in zip(Sound, snds, strict=True)
             if sndscript
         }
         self.anims = {
             anim: ind
-            for anim, ind in zip(Anim, anims)
+            for anim, ind in zip(Anim, anims, strict=True)
             if ind != -1
         }
         if x >= 0 and y >= 0:
@@ -1490,7 +1492,7 @@ class Item:
                     added_parts.add((sub_pos, sub_normal))
             if len(subpos_pairs) % 2 != 0:
                 raise tok.error('Subpos positions must be provided in pairs.')
-            for subpos1, subpos2 in zip(subpos_pairs[::2], subpos_pairs[1::2]):
+            for subpos1, subpos2 in itertools.batched(subpos_pairs, 2):
                 for sub_pos in Coord.bbox(subpos1, subpos2):
                     added_parts.add((sub_pos, normal))
 
@@ -1965,7 +1967,7 @@ class Item:
         ) = state
 
         self.properties = {prop.kind.id.casefold(): prop for prop in props}
-        self.antline_points = dict(zip(ConnSide, antline_points))
+        self.antline_points = dict(zip(ConnSide, antline_points, strict=True))
         self._has_collisions_block = False
 
     def validate(self) -> None:

@@ -552,7 +552,8 @@ PROP_GROUPS: list[PropGroupFactory] = [
         typ: TransToken.from_valve(f'PORTAL2_PuzzleEditor_ContextMenu_cube_type_{name}')
         for typ, name in zip(
             all_props.CubeTypes,
-            ['standard', 'companion', 'reflective', 'sphere', 'frankenturret']
+            ['standard', 'companion', 'reflective', 'sphere', 'frankenturret'],
+            strict=True,
         )
     }),
     ComboPropGroup.factory(all_props.prop_button_type, {
@@ -795,7 +796,7 @@ class PropertyWindow:
 
         out: dict[ItemPropKind[Any], str] = {}
         out.update(conf.defaults)  # Keep any extra values, just in case.
-        for (props, factory), group in zip(PROP_GROUPS, self.groups):
+        for (props, factory), group in zip(PROP_GROUPS, self.groups, strict=True):
             if group is None or not matching_props(item, props):
                 continue
             for prop_kind, value in group.get_conf():

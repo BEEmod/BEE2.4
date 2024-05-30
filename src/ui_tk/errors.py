@@ -116,7 +116,7 @@ async def display_errors(
                     ttk.Separator(wid_error_frm, orient='horizontal'),
                 ))
             error_wid_iter = iter(error_widgets)
-            for i, (error, (label, sep)) in enumerate(zip(errors, error_wid_iter)):
+            for i, (error, (label, sep)) in enumerate(zip(errors, error_wid_iter, strict=False)):
                 set_text(label, error.message)
                 label.grid(row=2 * i, column=0, pady=(4, 4), sticky='EW')
                 if i != 0:
