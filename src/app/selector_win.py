@@ -649,7 +649,7 @@ class SelectorWin[*CallbackT]:
         readonly_desc: TransToken = TransToken.BLANK,
         readonly_override: TransToken | None = None,
         callback: Callable[[str | None, *CallbackT], None] | None = None,
-        callback_params: tuple[*CallbackT],
+        callback_params: tuple[*CallbackT] = (),
         attributes: Iterable[AttrDef] = (),
 
         task_status: trio.TaskStatus[SelectorWin[*CallbackT]],

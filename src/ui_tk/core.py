@@ -91,14 +91,14 @@ async def init_app() -> None:
         app.background_run(wid_transtoken.update_task)
         app.background_run(localisation.load_aux_langs, gameMan.all_games, packset)
 
-        # Load filesystems into various modules
+        # Load filesystems into various modules.
         music_conf.load_filesystems(package_sys.values())
         await utils.run_as_task(UI.load_packages, packset, TK_IMG)
         await loadScreen.MAIN_UI.step('package_load')
         LOGGER.info('Done!')
 
         LOGGER.info('Initialising UI...')
-        await utils.run_as_task(UI.init_windows, TK_IMG)
+        await app.background_start(UI.init_windows, TK_IMG)
         LOGGER.info('UI initialised!')
 
         if Tracer.slow:
