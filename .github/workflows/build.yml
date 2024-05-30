@@ -37,12 +37,11 @@ jobs:
             os: 'windows-latest'
             bitness: '64'
             ffmpeg-repo: 'BtbN/FFmpeg-Builds'
-#          - artifact-name: 'linux64'
-#            python-version: '3.11'
-#            arch: 'x64'
-#            os: 'ubuntu-latest'
-#            bitness: '64'
-#            ffmpeg-repo: ''
+          - artifact-name: 'linux64'
+            python-version: '3.11'
+            arch: 'x64'
+            os: 'ubuntu-latest'
+            bitness: '64'
     runs-on: ${{ matrix.os }}
     steps:
       # Use the tag if created there, dev each week, or what's specified when done manually.
