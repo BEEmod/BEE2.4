@@ -883,7 +883,7 @@ class SelectorWin[*CallbackT]:
 
         # For music items, add a '>' button to play sound samples
         if sound_sys is not None and sound.has_sound():
-            samp_button = ttk.Button(
+            self.samp_button = samp_button = ttk.Button(
                 name_frame,
                 name='sample_button',
                 text=BTN_PLAY,
@@ -896,8 +896,7 @@ class SelectorWin[*CallbackT]:
             samp_button['command'] = self.sampler.play_sample
             samp_button.state(('disabled',))
         else:
-            samp_button = None
-            self.sampler = None
+            self.sampler = self.samp_button = samp_button = None
 
         self.prop_author = ttk.Label(self.prop_frm, text="Author: person")
         self.prop_author.grid(row=2, column=0, columnspan=4)
@@ -1256,10 +1255,8 @@ class SelectorWin[*CallbackT]:
         if self.modal:
             self.win.grab_release()
         self.win.withdraw()
-        self.chosen.value = self.selected
-        self.set_disp()
+        self.choose_item(self.selected)
         self.prop_desc.set_text('')  # Free resources used.
-        self.do_callback()
 
     def set_disp(self, _: object = None) -> str:
         """Set the display textbox."""
@@ -1371,7 +1368,7 @@ class SelectorWin[*CallbackT]:
         """Select the suggested item."""
         # Pick the hovered item.
         if self._suggested_rollover is not None:
-            self.sel_item(self._suggested_rollover)
+            self.choose_item(self._suggested_rollover)
         # Not hovering, but we have some, randomly pick.
         elif self.suggested:
             # Do not re-pick the same item if we can avoid it.
@@ -1380,17 +1377,7 @@ class SelectorWin[*CallbackT]:
                 pool.remove(self.selected)
             else:
                 pool = self.suggested
-            self.sel_item(random.choice(pool))
-        self.chosen.value = self.selected
-        self.set_disp()
-        self.do_callback()
-
-    def do_callback(self) -> None:
-        """Call the callback function."""
-        if self.store_last_selected:
-            config.APP.store_conf(LastSelected(self.chosen_id), self.save_id)
-        if self.callback is not None:
-            self.callback(self.chosen_id, *self.callback_params)
+            self.choose_item(random.choice(pool))
 
     def sel_item_id(self, it_id: str) -> bool:
         """Select the item with the given ID."""
@@ -1401,23 +1388,27 @@ class SelectorWin[*CallbackT]:
             # No none item, pretend it doesn't exist...
             if self.noneItem not in self.item_list:
                 return False
-            self.sel_item(self.noneItem)
-            self.chosen.value = self.noneItem
-            self.set_disp()
-            self.do_callback()
+            self.choose_item(self.noneItem)
             return True
         else:
             for item in self.item_list:
                 if item.name == it_id:
-                    self.sel_item(item)
-                    self.chosen.value = item
-                    self.set_disp()
-                    self.do_callback()
+                    self.choose_item(item)
                     return True
             return False
 
+    def choose_item(self, item: Item) -> None:
+        """Set the current item to this one."""
+        self.sel_item(item)
+        self.chosen.value = item
+        self.set_disp()
+        if self.store_last_selected:
+            config.APP.store_conf(LastSelected(self.chosen_id), self.save_id)
+        if self.callback is not None:
+            self.callback(self.chosen_id, *self.callback_params)
+
     def sel_item(self, item: Item, _: object = None) -> None:
-        """Select the specified item."""
+        """Select the specified item in the UI, but don't actually choose it."""
         self.prop_name['text'] = item.longName
         if len(item.authors) == 0:
             set_text(self.prop_author, TRANS_NO_AUTHORS)
