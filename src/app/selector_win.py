@@ -11,7 +11,7 @@ from tkinter import ttk
 import tkinter as tk
 
 from contextlib import aclosing
-from collections.abc import Container, Callable, Iterable, Mapping
+from collections.abc import Container, Iterable, Mapping
 from collections import defaultdict
 from enum import Enum
 import functools
@@ -520,7 +520,7 @@ class PreviewWindow:
 _PREVIEW = PreviewWindow()
 
 
-class SelectorWin[*CallbackT]:
+class SelectorWin:
     """The selection window for skyboxes, music, goo and voice packs.
 
     Optionally an aditional 'None' item can be added, which indicates
@@ -530,9 +530,8 @@ class SelectorWin[*CallbackT]:
     Attributes:
     - chosen_id: The currently-selected item ID. If set to None, the
       None Item is chosen.
-    - callback: A function called whenever an item is chosen. The first
-      argument is the selected ID.
-    - callback_params: A tuple of additional parameters given to the callback.
+    - chosen: The currently-selected item.
+    - selected: The item currently selected in the window, not the actually chosen one.
 
     - wid: The Toplevel window for this selector dialog.
     - suggested: The Item which is suggested by the style.
@@ -545,10 +544,6 @@ class SelectorWin[*CallbackT]:
 
     # The '...' button to open our window.
     disp_btn: ttk.Button | None
-
-    # Callback function, and positional arguments to pass
-    callback: Callable[[str | None, *CallbackT], None] | None
-    callback_params: tuple[*CallbackT]
 
     # Currently suggested item objects. This would be a set, but we want to randomly pick.
     suggested: list[Item]
@@ -648,11 +643,9 @@ class SelectorWin[*CallbackT]:
         desc: TransToken = TransToken.BLANK,
         readonly_desc: TransToken = TransToken.BLANK,
         readonly_override: TransToken | None = None,
-        callback: Callable[[str | None, *CallbackT], None] | None = None,
-        callback_params: tuple[*CallbackT] = (),
         attributes: Iterable[AttrDef] = (),
 
-        task_status: trio.TaskStatus[SelectorWin[*CallbackT]],
+        task_status: trio.TaskStatus[SelectorWin],
     ) -> None:
         """Create a window object.
 
@@ -677,11 +670,6 @@ class SelectorWin[*CallbackT]:
         - none_icon allows changing the icon for the <none> Item.
         - none_name allows setting the name shown for the <none> Item.
         - title is the title of the selector window.
-        - callback is a function to be called whenever the selected item
-         changes.
-        - callback_params and callback_keywords is a list of additional values which will be
-          passed to the callback function.
-          The first argument to the callback is always the selected item ID.
         - full_context controls if the short or long names are used for the
           context menu.
         - attributes is a list of AttrDef tuples.
@@ -713,10 +701,6 @@ class SelectorWin[*CallbackT]:
 
         # The '...' button to open our window.
         self.disp_btn = None
-
-        # Callback function, and positional arguments to pass
-        self.callback = callback
-        self.callback_params = callback_params
 
         # Currently suggested item objects. This would be a set, but we want to randomly pick.
         self.suggested = []
@@ -1404,8 +1388,6 @@ class SelectorWin[*CallbackT]:
         self.set_disp()
         if self.store_last_selected:
             config.APP.store_conf(LastSelected(self.chosen_id), self.save_id)
-        if self.callback is not None:
-            self.callback(self.chosen_id, *self.callback_params)
 
     def sel_item(self, item: Item, _: object = None) -> None:
         """Select the specified item in the UI, but don't actually choose it."""

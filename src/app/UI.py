@@ -62,10 +62,10 @@ import consts
 LOGGER = srctools.logger.get_logger(__name__)
 
 # These panes and a dict mapping object type to them.
-skybox_win: SelectorWin[()]
-voice_win: SelectorWin[()]
-style_win: SelectorWin[()]
-elev_win: SelectorWin[()]
+skybox_win: SelectorWin
+voice_win: SelectorWin
+style_win: SelectorWin
+elev_win: SelectorWin
 suggest_windows: dict[type[packages.PakObject], SelectorWin] = {}
 
 context_win: ContextWin
@@ -601,8 +601,6 @@ async def load_packages(
         # Selecting items changes much of the gui - don't allow when other
         # things are open...
         modal=True,
-        # callback set in the main initialisation function...
-        callback_params=(),
         attributes=[
             SelAttr.bool('VID', TransToken.ui('Elevator Videos'), default=True),
             SelAttr.string('CORR_OPTS', TransToken.ui('Corridor')),
@@ -1073,7 +1071,7 @@ async def init_option(
     music_frame = ttk.Labelframe(props)
     wid_transtoken.set_text(music_frame, TransToken.ui('Music: '))
 
-    await utils.run_as_task(music_conf.make_widgets, packages.get_loaded_packages(), music_frame, pane)
+    await background_start(music_conf.make_widgets, packages.get_loaded_packages(), music_frame, pane)
     suggest_windows[packages.Music] = music_conf.WINDOWS[consts.MusicChannel.BASE]
 
     def suggested_style_set() -> None:
