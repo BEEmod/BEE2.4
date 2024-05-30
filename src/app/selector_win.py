@@ -6,7 +6,6 @@ Each item has a description, author, and icon.
 """
 from __future__ import annotations
 
-from typing import Concatenate
 from tkinter import font as tk_font
 from tkinter import ttk
 import tkinter as tk
@@ -191,7 +190,7 @@ class AttrDef:
 
 class GroupHeader(tk_tools.LineHeader):
     """The widget used for group headers."""
-    def __init__(self, win: SelectorWin[...], title: TransToken, menu: tk.Menu) -> None:
+    def __init__(self, win: SelectorWin, title: TransToken, menu: tk.Menu) -> None:
         self.parent = win
         self._menu = menu  # The rightclick cascade widget.
         self._menu_pos = -1
@@ -332,7 +331,7 @@ class Item:
         # The button widget for this item.
         self.button: ttk.Button | None= None
         # The selector window we belong to.
-        self._selector: SelectorWin[...] | None = None
+        self._selector: SelectorWin | None = None
         # The position on the menu this item is located at.
         # This is needed to change the font.
         self._context_ind: int | None = None
@@ -457,7 +456,7 @@ class PreviewWindow:
         self.win.columnconfigure(1, weight=1)
         self.win.rowconfigure(0, weight=1)
 
-        self.parent: SelectorWin[...] | None = None
+        self.parent: SelectorWin | None = None
 
         self.prev_btn = ttk.Button(
             self.win, text=BTN_PREV, command=functools.partial(self.cycle, -1))
@@ -467,7 +466,7 @@ class PreviewWindow:
         self.img: list[img.Handle] = []
         self.index = 0
 
-    def show(self, parent: SelectorWin[...], item: Item) -> None:
+    def show(self, parent: SelectorWin, item: Item) -> None:
         """Show the window."""
         self.win.transient(parent.win)
         set_win_title(self.win, TRANS_PREVIEW_TITLE.format(item=item.longName))
@@ -507,7 +506,7 @@ class PreviewWindow:
 _PREVIEW = PreviewWindow()
 
 
-class SelectorWin[**CallbackT]:
+class SelectorWin[*CallbackT]:
     """The selection window for skyboxes, music, goo and voice packs.
 
     Optionally an aditional 'None' item can be added, which indicates
@@ -519,7 +518,7 @@ class SelectorWin[**CallbackT]:
       None Item is chosen.
     - callback: A function called whenever an item is chosen. The first
       argument is the selected ID.
-    - callback_params: A list of additional parameters given to the callback.
+    - callback_params: A tuple of additional parameters given to the callback.
 
     - wid: The Toplevel window for this selector dialog.
     - suggested: The Item which is suggested by the style.
@@ -534,9 +533,8 @@ class SelectorWin[**CallbackT]:
     disp_btn: ttk.Button | None
 
     # Callback function, and positional arguments to pass
-    callback: Callable[Concatenate[str | None, CallbackT], None] | None
-    callback_params: CallbackT.args
-    callback_kwargs: CallbackT.kwargs
+    callback: Callable[[str | None, *CallbackT], None] | None
+    callback_params: tuple[*CallbackT]
 
     # Currently suggested item objects. This would be a set, but we want to randomly pick.
     suggested: list[Item]
@@ -633,12 +631,11 @@ class SelectorWin[**CallbackT]:
         desc: TransToken = TransToken.BLANK,
         readonly_desc: TransToken = TransToken.BLANK,
         readonly_override: TransToken | None = None,
-        callback: Callable[Concatenate[str | None, CallbackT], None] | None = None,
-        callback_params: CallbackT.args = (),
-        callback_keywords: CallbackT.kwargs = EmptyMapping,
+        callback: Callable[[str | None, *CallbackT], None] | None = None,
+        callback_params: tuple[*CallbackT],
         attributes: Iterable[AttrDef] = (),
 
-        task_status: trio.TaskStatus[SelectorWin[CallbackT]],
+        task_status: trio.TaskStatus[SelectorWin[*CallbackT]],
     ) -> None:
         """Create a window object.
 
@@ -702,8 +699,7 @@ class SelectorWin[**CallbackT]:
 
         # Callback function, and positional arguments to pass
         self.callback = callback
-        self.callback_params = list(callback_params)
-        self.callback_kwargs = dict(callback_keywords)
+        self.callback_params = callback_params
 
         # Currently suggested item objects. This would be a set, but we want to randomly pick.
         self.suggested = []
@@ -1381,7 +1377,7 @@ class SelectorWin[**CallbackT]:
         if self.store_last_selected:
             config.APP.store_conf(LastSelected(self.chosen_id), self.save_id)
         if self.callback is not None:
-            self.callback(self.chosen_id, *self.callback_params, **self.callback_kwargs)
+            self.callback(self.chosen_id, *self.callback_params)
 
     def sel_item_id(self, it_id: str) -> bool:
         """Select the item with the given ID."""

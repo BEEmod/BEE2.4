@@ -62,11 +62,11 @@ import consts
 LOGGER = srctools.logger.get_logger(__name__)
 
 # These panes and a dict mapping object type to them.
-skybox_win: 'SelectorWin[[]]'
-voice_win: 'SelectorWin[[]]'
-style_win: 'SelectorWin[[]]'
-elev_win: 'SelectorWin[[]]'
-suggest_windows: Dict[Type[packages.PakObject], 'SelectorWin[...]'] = {}
+skybox_win: SelectorWin[()]
+voice_win: SelectorWin[()]
+style_win: SelectorWin[()]
+elev_win: SelectorWin[()]
+suggest_windows: Dict[Type[packages.PakObject], SelectorWin] = {}
 
 context_win: ContextWin
 
@@ -558,6 +558,7 @@ async def load_packages(packset: packages.PackagesSet, tk_img: TKImages) -> None
         default_id='BEE2_CLEAN',
         has_none=False,
         callback=win_callback,
+        callback_params=(),
         attributes=[
             SelAttr.bool('3D', TransToken.ui('3D Skybox'), False),
             SelAttr.color('COLOR', TransToken.ui('Fog Color')),
@@ -582,6 +583,7 @@ async def load_packages(packset: packages.PackagesSet, tk_img: TKImages) -> None
             'CHAR': [TransToken.ui('<Multiverse Cave only>')],
         },
         callback=voice_callback,
+        callback_params=(),
         attributes=[
             SelAttr.list_and('CHAR', TransToken.ui('Characters'), ['??']),
             SelAttr.bool('TURRET', TransToken.ui('Turret Shoot Monitor'), False),
@@ -607,6 +609,7 @@ async def load_packages(packset: packages.PackagesSet, tk_img: TKImages) -> None
         # things are open...
         modal=True,
         # callback set in the main initialisation function...
+        callback_params=(),
         attributes=[
             SelAttr.bool('VID', TransToken.ui('Elevator Videos'), default=True),
             SelAttr.string('CORR_OPTS', TransToken.ui('Corridor')),
@@ -633,6 +636,7 @@ async def load_packages(packset: packages.PackagesSet, tk_img: TKImages) -> None
         none_name=TransToken.ui('Random'),
         none_desc=TransToken.ui('Choose a random video.'),
         callback=win_callback,
+        callback_params=(),
         attributes=[
             SelAttr.bool('ORIENT', TransToken.ui('Multiple Orientations')),
         ]

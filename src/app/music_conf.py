@@ -30,7 +30,7 @@ BTN_CONTRACT_HOVER = '▲'
 LOGGER = srctools.logger.get_logger(__name__)
 
 # On 3.8 the ParamSpec is invalid syntax
-WINDOWS: dict[MusicChannel, SelectorWin[[MusicChannel]]] = {}
+WINDOWS: dict[MusicChannel, SelectorWin[MusicChannel]] = {}
 SEL_ITEMS: dict[str, SelItem] = {}
 # If the per-channel selector boxes are currently hidden.
 is_collapsed: bool = False
@@ -154,7 +154,7 @@ async def make_widgets(packset: PackagesSet, frame: ttk.LabelFrame, pane: SubPan
             'Add no music to the map at all. Testing Element-specific music may still be added.'
         ),
         callback=selwin_callback,
-        callback_params=[MusicChannel.BASE],
+        callback_params=(MusicChannel.BASE, ),
         attributes=[
             SelAttr.bool('SPEED', TransToken.ui('Propulsion Gel SFX')),
             SelAttr.bool('BOUNCE', TransToken.ui('Repulsion Gel SFX')),
@@ -174,7 +174,7 @@ async def make_widgets(packset: PackagesSet, frame: ttk.LabelFrame, pane: SubPan
         sound_sys=filesystem,
         none_desc=TransToken.ui('The regular base track will continue to play normally.'),
         callback=selwin_callback,
-        callback_params=[MusicChannel.TBEAM],
+        callback_params=(MusicChannel.TBEAM, ),
         attributes=[
             SelAttr.bool('TBEAM_SYNC', TransToken.ui('Synced Funnel Music')),
         ],
@@ -191,7 +191,7 @@ async def make_widgets(packset: PackagesSet, frame: ttk.LabelFrame, pane: SubPan
         sound_sys=filesystem,
         none_desc=TransToken.ui('Add no music when jumping on Repulsion Gel.'),
         callback=selwin_callback,
-        callback_params=[MusicChannel.BOUNCE],
+        callback_params=(MusicChannel.BOUNCE, ),
     ))
 
     WINDOWS[MusicChannel.SPEED] = await background_start(functools.partial(
@@ -205,7 +205,7 @@ async def make_widgets(packset: PackagesSet, frame: ttk.LabelFrame, pane: SubPan
         sound_sys=filesystem,
         none_desc=TransToken.ui('Add no music while running fast.'),
         callback=selwin_callback,
-        callback_params=[MusicChannel.SPEED],
+        callback_params=(MusicChannel.SPEED, ),
     ))
 
     assert set(WINDOWS.keys()) == set(MusicChannel), "Extra channels?"
