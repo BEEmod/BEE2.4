@@ -1,10 +1,9 @@
-mypy>=1.5.0
-mypy-extensions>=1.0.0
-pytest>=7.3.2
+mypy>=1.9.0
+pytest>=8.2.1
 pytest-trio>=0.8.0
-pytest-datadir>=1.4.1
-pytest-regressions>=2.4.2
-dirty_equals >= 0.6
+pytest-datadir>=1.5.0
+pytest-regressions>=2.5.0
+dirty_equals >= 0.7.1
 types-Pillow>=9.4.0.5
 types-babel>=2.10.0
 types-psutil>=5.9.0
