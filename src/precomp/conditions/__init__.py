@@ -60,7 +60,7 @@ __all__ = [
     'ALL_INST', 'DIRECTIONS', 'INST_ANGLE', 'PETI_INST_ANGLE', 'RES_EXHAUSTED',
     'MapInfo',
     'TestCallable', 'ResultCallable', 'make_test', 'make_result', 'make_result_setup', 'add_meta',
-    'add', 'check_all', 'check_test', 'import_conditions',
+    'add', 'check_all', 'check_test', 'import_conditions', 'Unsatisfiable',
     'add_inst', 'add_suffix', 'add_output', 'local_name', 'fetch_debug_visgroup', 'set_ent_keys',
     'resolve_offset',
 ]
@@ -89,14 +89,6 @@ ALL_META: list[tuple[str, MetaCond, CondCall[object]]] = []
 # The return values for 2-stage results and tests.
 type TestCallable = Callable[[Entity], bool]
 type ResultCallable = Callable[[Entity], object]
-
-
-class SWITCH_TYPE(Enum):
-    """The methods useable for switch options."""
-    FIRST = 'first'  # choose the first match
-    LAST = 'last'  # choose the last match
-    RANDOM = 'random'  # Randomly choose
-    ALL = 'all'  # Run all matching commands
 
 
 DIRECTIONS: Final[Mapping[str, FrozenVec]] = {
@@ -1368,23 +1360,6 @@ def res_timed_relay(vmf: VMF, res: Keyvalues) -> Callable[[Entity], None]:
     return make_relay
 
 
-@make_result('condition')
-def res_sub_condition(
-    coll: Collisions, info: MapInfo, voice: QuoteInfo,
-    res: Keyvalues,
-) -> ResultCallable:
-    """Check a different condition if the outer block is true."""
-    cond = Condition.parse(res, toplevel=False)
-
-    def test_cond(inst: Entity) -> None:
-        """For child conditions, we need to check every time."""
-        try:
-            cond.test(coll, info, voice, inst)
-        except Unsatisfiable:
-            pass
-    return test_cond
-
-
 @make_result('nextInstance')
 def res_break() -> None:
     """Skip to the next instance.
@@ -1401,83 +1376,6 @@ def res_end_condition() -> None:
     The value will be ignored.
     """
     raise EndCondition
-
-
-@make_result('switch')
-def res_switch(
-    coll: Collisions, info: MapInfo, voice: QuoteInfo,
-    res: Keyvalues,
-) -> ResultCallable:
-    """Run the same test multiple times with different arguments.
-
-    * `method` is the way the search is done - `first`, `last`, `random`, or `all`.
-    * `test` is the name of the test. (`flag` is accepted for backwards compatibility.)
-    * `seed` sets the randomisation seed for this block, for the random mode.
-
-    Each keyvalues group is a case to check - the Keyvalues name is the test
-    argument, and the contents are the results to execute in that case.
-    The special group `"<default>"` is only run if no other test is valid.
-    For `random` mode, you can omit the test to choose from all objects. In
-    this case the test arguments are ignored.
-    """
-    test_name = ''
-    method = SWITCH_TYPE.FIRST
-    raw_cases: list[Keyvalues] = []
-    default: list[Keyvalues] = []
-    rand_seed = ''
-    for kv in res:
-        if kv.has_children():
-            if kv.name == '<default>':
-                default.extend(kv)
-            else:
-                raw_cases.append(kv)
-        else:
-            if kv.name == 'test':
-                test_name = kv.value
-                continue
-            if kv.name == 'flag':
-                LOGGER.warning('Switch uses deprecated field "flag", this has been renamed to "test".')
-                test_name = kv.value
-                continue
-            if kv.name == 'method':
-                try:
-                    method = SWITCH_TYPE(kv.value.casefold())
-                except ValueError:
-                    pass
-            elif kv.name == 'seed':
-                rand_seed = kv.value
-
-    if method is SWITCH_TYPE.LAST:
-        raw_cases.reverse()
-
-    conf_cases: list[tuple[Keyvalues, list[Keyvalues]]] = [
-        (Keyvalues(test_name, case.real_name), list(case))
-        for case in raw_cases
-    ]
-
-    def apply_switch(inst: Entity) -> None:
-        """Execute a switch."""
-        if method is SWITCH_TYPE.RANDOM:
-            cases = conf_cases.copy()
-            rand.seed(b'switch', rand_seed, inst).shuffle(cases)
-        else:  # Won't change.
-            cases = conf_cases
-
-        run_default = True
-        for test, results in cases:
-            # If not set, always succeed for the random situation.
-            if test.real_name and not check_test(test, coll, info, voice, inst):
-                continue
-            for sub_res in results:
-                Condition.test_result(coll, info, voice, inst, sub_res)
-            run_default = False
-            if method is not SWITCH_TYPE.ALL:
-                # All does them all, otherwise we quit now.
-                break
-        if run_default:
-            for sub_res in default:
-                Condition.test_result(coll, info, voice, inst, sub_res)
-    return apply_switch
 
 
 @make_result('staticPiston')
