@@ -1,7 +1,8 @@
 """The different properties defineable for items."""
 from __future__ import annotations
 from enum import Enum
-from typing import Any, Callable, Generic, Sequence, Type, TypeVar
+from typing import Any
+from collections.abc import Callable, Sequence
 
 import attrs
 from srctools import Angle, bool_as_int, conv_bool, conv_float, conv_int
@@ -10,17 +11,13 @@ from typing_extensions import Self
 from transtoken import TransToken
 
 
-ValueT = TypeVar('ValueT')
-EnumT = TypeVar('EnumT', bound=Enum)
-
-
 def _unknown_parse(value: str) -> str:
     """Parse function for unrecognised properties. This way it can also be a sentinel."""
     return value
 
 
 @attrs.define(eq=False, kw_only=True, getstate_setstate=False)
-class ItemPropKind(Generic[ValueT]):
+class ItemPropKind[ValueT]:
     """A type of property for an item."""
     # Property name for this. This is case-sensitive!
     id: str
@@ -78,7 +75,7 @@ class ItemPropKind(Generic[ValueT]):
             return (ItemPropKind.unknown, (self.id,))
 
 
-class ItemProp(Generic[ValueT]):
+class ItemProp[ValueT]:
     """A property for an item."""
     def __init__(
         self,
@@ -137,8 +134,8 @@ def bool_prop(
     )
 
 
-def enum_prop(
-    enum: Type[EnumT],
+def enum_prop[EnumT: Enum](
+    enum: type[EnumT],
     id: str,
     name: TransToken,
     instvar: str,
@@ -388,8 +385,7 @@ prop_track_move_direction = ItemPropKind[Angle](
 # 0
 def _parse_pist_lower(value: str) -> int:
     # Bug, previous versions mistakenly wrote rounded floats.
-    if value.endswith('.0'):
-        value = value[:-2]
+    value = value.removesuffix('.0')
     try:
         pos = int(value)
         if 0 <= pos < 4:

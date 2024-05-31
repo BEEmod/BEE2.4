@@ -518,7 +518,7 @@ def make_ubend(
 
     side_norm = offset.norm()
 
-    for side_axis, side_dist_flt in zip('xyz', offset):
+    for side_axis, side_dist_flt in zip('xyz', offset, strict=True):
         if abs(side_dist_flt) > 0.01:
             side_dist = int(abs(side_dist_flt)) + 128
             break

@@ -7,7 +7,7 @@ from ui_tk.dialogs import DIALOG
 from ui_tk import TK_ROOT
 
 
-async def test() -> None:
+async def test(core_nursery: trio.Nursery) -> None:
     TK_ROOT.deiconify()
 
     label = tkinter.Label(TK_ROOT, text='Hello: |')

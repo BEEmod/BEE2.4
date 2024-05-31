@@ -1,12 +1,13 @@
 """Parses the Puzzlemaker's item format."""
 from __future__ import annotations
-from typing import Callable, ClassVar, List, Optional, Protocol, Any, Tuple
-from typing_extensions import TypeAliasType
+
+from typing import ClassVar, Protocol, Any
 
 from collections import defaultdict
-from collections.abc import Iterable, Iterator, Mapping
+from collections.abc import Callable, Iterable, Iterator, Mapping
 from enum import Enum, Flag
 from pathlib import PurePosixPath as FSPath
+import itertools
 import sys
 
 import attrs
@@ -31,10 +32,10 @@ __all__ = [
 ]
 LOGGER = logger.get_logger(__name__)
 # __getstate__ / __setstate__ types.
-_SubTypeState = TypeAliasType("_SubTypeState", Tuple[
-    TransToken, List[str], List[str], List[int],
-    TransToken, int, int, Optional[FSPath],
-])
+type _SubTypeState = tuple[
+    TransToken, list[str], list[str], list[int],
+    TransToken, int, int, FSPath | None,
+]
 
 
 class ItemClass(Enum):
@@ -492,7 +493,7 @@ class ConnSide(Enum):
 
     @classmethod
     def from_yaw(cls, value: int) -> ConnSide:
-        """Return the the side pointing in this yaw direction."""
+        """Return the side pointing in this yaw direction."""
         value %= 360
         if value == 0:
             return ConnSide.LEFT
@@ -752,12 +753,12 @@ class SubType:
         self.models = list(map(FSPath, mdls))
         self.sounds = {
             snd: sndscript
-            for snd, sndscript in zip(Sound, snds)
+            for snd, sndscript in zip(Sound, snds, strict=True)
             if sndscript
         }
         self.anims = {
             anim: ind
-            for anim, ind in zip(Anim, anims)
+            for anim, ind in zip(Anim, anims, strict=True)
             if ind != -1
         }
         if x >= 0 and y >= 0:
@@ -1247,7 +1248,7 @@ class Item:
         except ValueError:
             inst_ind = None
             if inst_name.casefold().startswith('bee2_'):
-                inst_name = inst_name[5:]
+                inst_name = inst_name.removeprefix('bee2_')
             # else:
             #     LOGGER.warning(
             #         'Custom instance name "{}" should have bee2_ prefix (line '
@@ -1491,7 +1492,7 @@ class Item:
                     added_parts.add((sub_pos, sub_normal))
             if len(subpos_pairs) % 2 != 0:
                 raise tok.error('Subpos positions must be provided in pairs.')
-            for subpos1, subpos2 in zip(subpos_pairs[::2], subpos_pairs[1::2]):
+            for subpos1, subpos2 in itertools.batched(subpos_pairs, 2):
                 for sub_pos in Coord.bbox(subpos1, subpos2):
                     added_parts.add((sub_pos, normal))
 
@@ -1966,7 +1967,7 @@ class Item:
         ) = state
 
         self.properties = {prop.kind.id.casefold(): prop for prop in props}
-        self.antline_points = dict(zip(ConnSide, antline_points))
+        self.antline_points = dict(zip(ConnSide, antline_points, strict=True))
         self._has_collisions_block = False
 
     def validate(self) -> None:

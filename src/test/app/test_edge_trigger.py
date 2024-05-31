@@ -1,6 +1,5 @@
 """Test the edge trigger class."""
-from typing import Tuple
-from typing_extensions import assert_type
+from typing import assert_type
 
 from trio.testing import Sequencer
 import trio
@@ -31,7 +30,7 @@ async def test_basic_operation() -> None:
             state = 'wait'
         result = await trigger.wait()
         assert not trigger.ready.value
-        assert_type(result, Tuple[int, int])
+        assert_type(result, tuple[int, int])
         assert result == (4, 2)
         assert state == 'trigger'
         state = 'complete'
@@ -83,8 +82,7 @@ async def test_single_arg() -> None:
 
 async def test_no_arg() -> None:
     """Test special behaviour with no args - return None."""
-    # TODO: can't do runtime generic with () in Python 3.8
-    trigger: EdgeTrigger[()] = EdgeTrigger()
+    trigger = EdgeTrigger[()]()
     event = trio.Event()
 
     async def wait_task() -> None:

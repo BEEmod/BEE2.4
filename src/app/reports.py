@@ -1,7 +1,6 @@
 """Various reports that can be triggered from the options menu."""
-from collections import defaultdict
+from collections import defaultdict, Counter
 from pathlib import Path, PurePosixPath
-from typing import Dict, Set, Counter
 
 import srctools.logger
 import trio
@@ -174,7 +173,7 @@ async def report_editor_models() -> None:
     from packages import Item, get_loaded_packages
     packset = get_loaded_packages()
     fsys = FileSystemChain()
-    mat_to_usage: Dict[str, Set[str]] = defaultdict(set)
+    mat_to_usage: dict[str, set[str]] = defaultdict(set)
     usage_counts = Counter[str]()
 
     LOGGER.info('Checking existing packages...')

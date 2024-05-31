@@ -1,11 +1,9 @@
 """Handles displaying errors to the user that occur during operations."""
-from __future__ import annotations
+from typing import ClassVar, Protocol, Self, final
 
-from enum import Enum, auto
-from typing import Awaitable, ClassVar, Generator, Iterator, Protocol, Union, final
-from typing_extensions import TypeAliasType
+from collections.abc import Awaitable, Generator, Iterator
 from contextlib import contextmanager
-from exceptiongroup import BaseExceptionGroup, ExceptionGroup
+from enum import Enum, auto
 import types
 
 
@@ -39,11 +37,7 @@ class Result(Enum):
         return self.name in ['PARTIAL', 'FAILED']
 
 
-WarningExc = TypeAliasType("WarningExc", Union[
-    AppError,
-    ExceptionGroup[Exception],
-    BaseExceptionGroup[BaseException],
-])
+type WarningExc = AppError | ExceptionGroup[Exception] | BaseExceptionGroup[BaseException]
 
 
 class Handler(Protocol):
@@ -145,7 +139,7 @@ class ErrorUI:
             if rest is not None:
                 raise rest
 
-    async def __aenter__(self) -> ErrorUI:
+    async def __aenter__(self) -> Self:
         return self
 
     async def __aexit__(

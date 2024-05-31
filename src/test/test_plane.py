@@ -155,7 +155,7 @@ def test_grid_views() -> None:
     }
 
     # Check keys, values, items is in the same order.
-    assert list(zip(grid.keys(), grid.values())) == list(grid.items())
+    assert list(zip(grid.keys(), grid.values(), strict=True)) == list(grid.items())
 
 
 # noinspection PyTypeChecker

@@ -669,8 +669,9 @@ class FizzlerBrush:
         self.set_axis_var = set_axis_var
 
         # If set, add a material_modify_control to control these brushes.
-        if mat_mod_var is not None and not mat_mod_var.startswith('$'):
-            mat_mod_var = '$' + mat_mod_var
+        if mat_mod_var is not None:
+            if not mat_mod_var.startswith('$'):
+                mat_mod_var = f'${mat_mod_var}'
             if mat_mod_name is None:
                 mat_mod_name = 'mat_mod'
             if not singular:

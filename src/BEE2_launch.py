@@ -95,7 +95,7 @@ if __name__ == '__main__':
         start_main(CompilerPane.init_application)
     elif app_name.startswith('test_'):
         import importlib
-        mod = importlib.import_module('app.demo.' + sys.argv[1][5:])
+        mod = importlib.import_module('app.demo.' + sys.argv[1].removeprefix('test_'))
         start_main(mod.test)
     else:
         raise ValueError(f'Invalid component name "{app_name}"!')

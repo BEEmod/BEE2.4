@@ -1,9 +1,8 @@
 """Implements drag/drop logic."""
 from __future__ import annotations
-from typing import Any, Callable, Final, Generic, TypeVar, Optional
-from typing_extensions import ParamSpec, TypeAliasType
+from typing import Any, Final
 
-from collections.abc import Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from collections import defaultdict
 from enum import Enum
 import abc
@@ -18,7 +17,7 @@ import utils
 
 
 __all__ = [
-    'ManagerBase', 'Slot', 'DragInfo', 'ParentT', 'SlotType', 'SLOT_DRAG', 'ItemT',
+    'ManagerBase', 'Slot', 'DragInfo', 'SlotType', 'SLOT_DRAG',
     'InfoCB', 'DragWin', 'FlexiCB', 'PositionerBase', 'in_bbox',
 ]
 LOGGER = get_logger(__name__)
@@ -31,12 +30,6 @@ class DragInfo:
     group: str | None = None
     # Set to the same as icon if not passed.
     group_icon: img.Handle = attrs.Factory(lambda self: self.icon, takes_self=True)
-
-
-ItemT = TypeVar('ItemT')  # String etc representing the item being moved around.
-ArgsT = ParamSpec('ArgsT')
-T = TypeVar('T')
-ParentT = TypeVar('ParentT')  # Type indicating the "parent" of slots when being created.
 
 
 class SlotType(Enum):
@@ -120,7 +113,7 @@ class PositionerBase:
             height += self.item_height
         return width, height
 
-    def _get_positions(
+    def _get_positions[T](
         self,
         slots: Iterable[T],
         xoff: int,
@@ -134,8 +127,8 @@ class PositionerBase:
                 self.advance_row()
 
 
-InfoCB = TypeAliasType("InfoCB", Callable[[ItemT], DragInfo], type_params=(ItemT, ))
-FlexiCB = TypeAliasType("FlexiCB", Callable[[float, float], Optional[str]])
+type InfoCB[ItemT] = Callable[[ItemT], DragInfo]
+type FlexiCB = Callable[[float, float], str | None]
 
 
 class DragWin(Enum):
@@ -147,8 +140,12 @@ SLOT_DRAG: Final = DragWin.DRAG
 
 
 # noinspection PyProtectedMember
-class ManagerBase(Generic[ItemT, ParentT]):
-    """Manages a set of drag-drop points."""
+class ManagerBase[ItemT, ParentT]:
+    """Manages a set of drag-drop points.
+
+    ItemT: Value representing the item being moved around.
+    ParentT: Indicates the "parent" of slots when being created.
+    """
     width: Final[int]
     height: Final[int]
     config_icon: Final[bool]
@@ -540,7 +537,7 @@ class ManagerBase(Generic[ItemT, ParentT]):
 
 
 # noinspection PyProtectedMember
-class Slot(Generic[ItemT]):
+class Slot[ItemT]:
     """Represents a single slot."""
 
     # Optional ability to highlight a specific slot.

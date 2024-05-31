@@ -3,11 +3,12 @@
 The widgets tokens are applied to are stored, so changing language can update the UI.
 """
 from __future__ import annotations
-from typing import Any, Callable, TypeVar, TYPE_CHECKING
-from typing_extensions import ParamSpec, override
 
-from collections.abc import AsyncGenerator, Iterable, Iterator
+from typing import Any, Protocol, TYPE_CHECKING, override
+
+from collections.abc import AsyncGenerator, Callable, Iterable, Iterator
 from collections import defaultdict
+from contextlib import aclosing
 import weakref
 import datetime
 import functools
@@ -59,14 +60,10 @@ __all__ = [
 ]
 
 LOGGER = logger.get_logger(__name__)
-P = ParamSpec('P')
 
 # Location of basemodui, relative to Portal 2
 BASEMODUI_PATH = 'portal2_dlc2/resource/basemodui_{}.txt'
 
-K = TypeVar('K')
-V = TypeVar('V')
-CBackT = TypeVar('CBackT', bound=Callable[[], object])
 # For anything else, this is called which will apply tokens.
 _langchange_callback: list[Callable[[], object]] = []
 
@@ -123,7 +120,7 @@ class UIFormatter(string.Formatter):
     @override
     def format_field(self, value: Any, format_spec: str) -> Any:
         """Format a field."""
-        if isinstance(value, (int, float)):
+        if isinstance(value, int | float):
             if not format_spec:
                 # This is the standard format for this language.
                 format_spec = self.locale.decimal_formats[None]
@@ -146,7 +143,7 @@ class UIFormatter(string.Formatter):
                 datetime.time(
                     hour=round(hours), minute=round(mins), second=round(sec),
                     microsecond=value.microseconds,
-                    tzinfo=datetime.timezone.utc,
+                    tzinfo=datetime.UTC,
                 ),
                 locale=self.locale,
             )
@@ -174,7 +171,7 @@ transtoken.ui_format_getter = UIFormatter
 transtoken.ui_list_getter = _format_list
 
 
-async def gradual_iter(wdict: weakref.WeakKeyDictionary[K, V]) -> AsyncGenerator[tuple[K, V], None]:
+async def gradual_iter[K, V](wdict: weakref.WeakKeyDictionary[K, V]) -> AsyncGenerator[tuple[K, V], None]:
     """Iterate gradually over the provided weak-key dictionary.
 
     When doing an update, there's a lot of widgets to process. To avoid locking the
@@ -195,14 +192,19 @@ async def gradual_iter(wdict: weakref.WeakKeyDictionary[K, V]) -> AsyncGenerator
         yield key, value
 
 
-def add_callback(*, call: bool) -> Callable[[CBackT], CBackT]:
+class CallbackProto(Protocol):
+    """Type of add_callback()."""
+    def __call__[CBackT: Callable[..., object]](self, func: CBackT, /) -> CBackT: ...
+
+
+def add_callback(*, call: bool) -> CallbackProto:
     """Register a function which is called after translations are reloaded.
 
     This should be used to re-apply tokens in complicated situations after languages change.
     If call is true, the function will immediately be called to apply it now.
     TODO: Remove usage of this, use CURRENT_LANG.wait_transition() instead.
     """
-    def deco(func: CBackT) -> CBackT:
+    def deco[CBackT: Callable[..., object]](func: CBackT, /) -> CBackT:
         """Register when called as a decorator."""
         _langchange_callback.append(func)
         LOGGER.debug('Add lang callback: {!r}, {} total', func, len(_langchange_callback))
@@ -342,7 +344,7 @@ def setup(conf_lang: str) -> None:
     if len(sys.argv) > 1:
         for arg in sys.argv[1:]:
             if arg.casefold().startswith('lang='):
-                lang_code = arg[5:]
+                lang_code = arg.removeprefix('lang=')
                 break
 
     if lang_code is None:
@@ -554,7 +556,7 @@ async def rebuild_package_langs(packset: packages.PackagesSet) -> None:
             )
 
     LOGGER.info('Collecting translations...')
-    async with utils.aclosing(get_package_tokens(packset)) as agen:
+    async with aclosing(get_package_tokens(packset)) as agen:
         async for orig_tok, source in agen:
             for tok in _get_children(orig_tok):
                 if not tok:

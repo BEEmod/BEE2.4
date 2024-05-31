@@ -4,8 +4,7 @@ Other modules define an immutable state class, then register it with this.
 They can then fetch the current state and store new state.
 """
 from __future__ import annotations
-from typing import ClassVar, Dict, NewType, Type, TypeVar, cast
-from typing_extensions import Self, override
+from typing import ClassVar, Self, NewType,  cast, override
 from collections.abc import Awaitable, Callable, Iterator
 from pathlib import Path
 import abc
@@ -24,7 +23,6 @@ if not os.environ.get('BEE_LOG_CONFIG'):  # Debug messages are spammy.
     LOGGER.setLevel('INFO')
 
 
-DataT = TypeVar('DataT', bound='Data')
 # Name and version to use for DMX files.
 DMX_NAME = 'BEEConfig'
 DMX_VERSION = 1
@@ -96,7 +94,7 @@ class Data(abc.ABC):
 
 # The current data loaded from the config file. This maps an ID to each value, or
 # is {'': data} if no key is used.
-Config = NewType('Config', Dict[Type[Data], Dict[str, Data]])
+Config = NewType('Config', dict[type[Data], dict[str, Data]])
 
 
 @attrs.define(eq=False)
@@ -120,7 +118,7 @@ class ConfigSpec:
         """Lookup the data type for a specific name."""
         return self._name_to_type[name.casefold()]
 
-    def register(self, cls: type[DataT]) -> type[DataT]:
+    def register[DataT: Data](self, cls: type[DataT]) -> type[DataT]:
         """Register a config data type. The name must be unique."""
         info = cls.get_conf_info()
         folded_name = info.name.casefold()
@@ -130,7 +128,7 @@ class ConfigSpec:
         self._registered.add(cls)
         return cls
 
-    async def set_and_run_ui_callback(
+    async def set_and_run_ui_callback[DataT: Data](
         self,
         typ: type[DataT],
         func: Callable[[DataT], Awaitable[object]],
@@ -224,7 +222,7 @@ class ConfigSpec:
                 if cls in self._registered:
                     nursery.start_soon(self.apply_conf, cls)
 
-    def get_cur_conf(
+    def get_cur_conf[DataT: Data](
         self,
         cls: type[DataT],
         data_id: str = '',
@@ -261,7 +259,7 @@ class ConfigSpec:
         assert isinstance(data, cls), info
         return data
 
-    def store_conf(self, data: DataT, data_id: str = '') -> None:
+    def store_conf(self, data: Data, data_id: str = '') -> None:
         """Update the current data for this ID. """
         if type(data) not in self._registered:
             raise ValueError(f'Unregistered data type {type(data)!r}')
@@ -381,7 +379,7 @@ class ConfigSpec:
             try:
                 if not child.type.startswith('Conf_v'):
                     raise ValueError
-                version = int(child.type[6:])
+                version = int(child.type.removeprefix('Conf_v'))
             except ValueError:
                 LOGGER.warning('Invalid config section version "{}"', child.type)
                 continue
@@ -467,7 +465,7 @@ class ConfigSpec:
         The data is in the form {conf_type: {id: data}}.
         """
         root = Element('BEE2Config', 'DMElement')
-        cls: Type[Data]
+        cls: type[Data]
         for cls, data_map in conf.items():
             if cls not in self._registered:
                 continue
@@ -536,7 +534,7 @@ COMPILER: ConfigSpec = ConfigSpec()
 
 
 # Import submodules, so they're registered.
-from config import (
+from config import (  # noqa: E402
     compile_pane, corridors, filters, gen_opts, item_defaults,  last_sel, palette,   # noqa: F401
     signage,  stylevar, widgets, windows,  # noqa: F401
 )

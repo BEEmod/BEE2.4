@@ -1,9 +1,8 @@
-from __future__ import annotations
-
-import math
-
 import tkinter as tk
 from tkinter import ttk
+
+from contextlib import aclosing
+import math
 
 from trio_util import AsyncValue
 import trio
@@ -12,7 +11,6 @@ from packages.widgets import SliderOptions
 from app import itemconfig
 from ui_tk.img import TKImages
 from ui_tk.wid_transtoken import TransToken, set_text
-import utils
 
 
 # If enabled, optionally override text to this when set to 0. This is for options where zero turns
@@ -91,7 +89,7 @@ async def widget_slider(
     scale.grid(row=0, column=1, sticky='ew')
 
     task_status.started(frame)
-    async with utils.aclosing(holder.eventual_values()) as agen:
+    async with aclosing(holder.eventual_values()) as agen:
         async for new_value in agen:
             value_num = float(new_value)
             if conf.zero_off and math.isclose(value_num, 0.0):

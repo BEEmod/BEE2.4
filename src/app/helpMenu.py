@@ -5,15 +5,19 @@ GitHub repo, which ensures we're able to change them retroactively if the old UR
 whatever reason.
 """
 from __future__ import annotations
-import io
-import urllib.request
-import urllib.error
-from enum import Enum
-from typing import Any, Callable, cast
+from typing import Any, cast
+
 from tkinter import ttk
 import tkinter as tk
-import webbrowser
+
+from collections.abc import Callable
+from contextlib import aclosing
+from enum import Enum
 import functools
+import io
+import urllib.error
+import urllib.request
+import webbrowser
 
 from srctools.dmx import Element, NULL
 import attrs
@@ -603,7 +607,7 @@ async def make_help_menu(
 
     async with trio.open_nursery() as nursery:
         nursery.start_soon(credit_window.display_task)
-        async with utils.aclosing(credit_window.open.ready.eventual_values()) as agen:
+        async with aclosing(credit_window.open.ready.eventual_values()) as agen:
             task_status.started()
             async for enabled in agen:
                 help_menu.entryconfigure(credit_ind, state='normal' if enabled else 'disabled')

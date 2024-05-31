@@ -1,8 +1,8 @@
 """Defines types for the messages that can be passed to loadscreen/bg_daemon."""
-from typing import Dict, List, Tuple, Union
-from typing_extensions import Literal, NewType, TypeAliasType
+from typing_extensions import Literal, NewType
 
 import attrs
+
 
 StageID = NewType('StageID', str)
 ScreenID = NewType('ScreenID', int)
@@ -17,7 +17,7 @@ class Load2Daemon_SetForceOnTop:
 @attrs.frozen
 class Load2Daemon_UpdateTranslations:
     """Update text on loading screens."""
-    translations: Dict[str, str]
+    translations: dict[str, str]
 
 
 @attrs.frozen
@@ -26,7 +26,7 @@ class Load2Daemon_Init:
     scr_id: ScreenID
     is_splash: bool
     title: str
-    stages: List[Tuple[StageID, str]]
+    stages: list[tuple[StageID, str]]
 
 
 @attrs.frozen
@@ -76,7 +76,7 @@ class Load2Daemon_Destroy(ScreenOp):
 class Load2Daemon_Show(ScreenOp):
     """Display the specified loading screen, passing along freshly translated stage titles."""
     title: str
-    stage_names: List[str]
+    stage_names: list[str]
 
 
 @attrs.frozen
@@ -91,20 +91,20 @@ class Daemon2Load_MainSetCompact:
     compact: bool
 
 
-ARGS_SEND_LOAD = TypeAliasType("ARGS_SEND_LOAD", Union[
-    Load2Daemon_SetForceOnTop, Load2Daemon_SetForceOnTop,
-    Load2Daemon_UpdateTranslations, Load2Daemon_SetIsCompact, Load2Daemon_Init,
-    Load2Daemon_SetLength, Load2Daemon_Step, Load2Daemon_Skip, Load2Daemon_Hide,
-    Load2Daemon_Reset, Load2Daemon_Destroy, Load2Daemon_Show,
-])
-ARGS_REPLY_LOAD = TypeAliasType("ARGS_REPLY_LOAD", Union[Daemon2Load_Cancel, Daemon2Load_MainSetCompact])
-ARGS_SEND_LOGGING = TypeAliasType("ARGS_SEND_LOGGING", Union[  # logging -> daemon
-    Tuple[Literal['log'], str, str],
-    Tuple[Literal['visible'], bool, None],
-    Tuple[Literal['level'], str, None],
-])
-ARGS_REPLY_LOGGING = TypeAliasType("ARGS_REPLY_LOGGING", Union[  # daemon -> logging
-    Tuple[Literal['level'], str],
-    Tuple[Literal['visible'], bool],
-    Tuple[Literal['quit'], None],
-])
+type ARGS_SEND_LOAD = (
+    Load2Daemon_SetForceOnTop | Load2Daemon_SetForceOnTop
+    | Load2Daemon_UpdateTranslations | Load2Daemon_SetIsCompact | Load2Daemon_Init
+    | Load2Daemon_SetLength | Load2Daemon_Step | Load2Daemon_Skip | Load2Daemon_Hide
+    | Load2Daemon_Reset | Load2Daemon_Destroy | Load2Daemon_Show
+)
+type ARGS_REPLY_LOAD = Daemon2Load_Cancel | Daemon2Load_MainSetCompact
+type ARGS_SEND_LOGGING = (  # logging -> daemon
+    tuple[Literal['log'], str, str] |
+    tuple[Literal['visible'], bool] |
+    tuple[Literal['level'], str]
+)
+type ARGS_REPLY_LOGGING = (  # daemon -> logging
+    tuple[Literal['level'], str] |
+    tuple[Literal['visible'], bool] |
+    tuple[Literal['quit'], None]
+)

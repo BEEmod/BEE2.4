@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing_extensions import Self, override
+from typing import Self, override
 from collections.abc import Mapping
 
 from srctools import EmptyMapping, Keyvalues, conv_bool, bool_as_int, logger

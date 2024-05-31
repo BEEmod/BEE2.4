@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing_extensions import override
+from typing import override
 
 from collections.abc import Sequence, Mapping
 

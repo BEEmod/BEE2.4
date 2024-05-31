@@ -3,16 +3,17 @@
 """
 from __future__ import annotations
 
-from typing import List, TYPE_CHECKING, Dict, Any, Union, cast
-from typing_extensions import Self, TypeAliasType
+from typing import TYPE_CHECKING, Any, cast, Self
 
 from tkinter import filedialog, ttk
 from datetime import datetime
 from io import BytesIO, TextIOWrapper
 from zipfile import ZipFile, ZIP_LZMA
+from contextlib import aclosing
 import tkinter as tk
 import atexit
 import os
+import itertools
 import shutil
 import string
 
@@ -41,8 +42,8 @@ LOGGER = srctools.logger.get_logger(__name__)
 # The backup window - either a toplevel, or TK_ROOT.
 window: tk.Toplevel
 
-AnyZip = TypeAliasType("AnyZip", Union[ZipFile, FakeZip])
-UI: Dict[str, Any] = {}  # Holds all the widgets
+type AnyZip = ZipFile | FakeZip
+UI: dict[str, Any] = {}  # Holds all the widgets
 
 # Loading stage used during backup.
 AUTO_BACKUP_STAGE = loadScreen.ScreenStage(TransToken.ui('Backup Puzzles'))
@@ -80,7 +81,7 @@ PUZZLE_FOLDERS = {
 }
 
 # The currently-loaded backup files.
-BACKUPS: Dict[str, Any] = {
+BACKUPS: dict[str, Any] = {
     'game': [],
     'back': [],
 
@@ -273,9 +274,9 @@ class Date:
 # directories.
 
 
-async def load_backup(zip_file: AnyZip) -> List[P2C]:
+async def load_backup(zip_file: AnyZip) -> list[P2C]:
     """Load in a backup file."""
-    maps: List[P2C] = []
+    maps: list[P2C] = []
     puzzles = [
         file[:-4]  # Strip extension
         for file in
@@ -285,7 +286,7 @@ async def load_backup(zip_file: AnyZip) -> List[P2C]:
     # Each P2C init requires reading in the properties file, so this may take
     # some time. Use a loading screen.
     LOGGER.info('Loading {} maps..', len(puzzles))
-    async with reading_loader, utils.aclosing(LOAD_STAGE.iterate(puzzles)) as agen:
+    async with reading_loader, aclosing(LOAD_STAGE.iterate(puzzles)) as agen:
         async for file in agen:
             new_map = await trio.to_thread.run_sync(P2C.from_file, file, zip_file)
             maps.append(new_map)
@@ -341,7 +342,7 @@ def find_puzzles(game: gameMan.Game) -> str | None:
     return None
 
 
-async def backup_maps(dialogs: Dialogs, maps: List[P2C]) -> None:
+async def backup_maps(dialogs: Dialogs, maps: list[P2C]) -> None:
     """Copy the given maps to the backup."""
     back_zip: ZipFile = BACKUPS['backup_zip']
 
@@ -411,9 +412,9 @@ async def auto_backup(game: gameMan.Game) -> None:
             AUTO_BACKUP_FILE.format(game=safe_name, ind='_'+str(i+1))
             for i in range(extra_back_count)
         ]
-        # Move each file over by 1 index, ignoring missing ones
-        # We need to reverse to ensure we don't overwrite any zips
-        for old_name, new_name in reversed(list(zip(back_files, back_files[1:]))):
+        # Move each file over by 1 index, ignoring missing ones.
+        # This will do 8->9, 7->8, 6->7, etc.
+        for new_name, old_name in itertools.pairwise(reversed(back_files)):
             LOGGER.info('Moving: {} -> {}', old_name, new_name)
             old_name = os.path.join(backup_dir, old_name)
             new_name = os.path.join(backup_dir, new_name)
@@ -432,7 +433,7 @@ async def auto_backup(game: gameMan.Game) -> None:
     )
     LOGGER.info('Writing backup to "{}"', final_backup)
     with open(final_backup, 'wb') as f, ZipFile(f, mode='w', compression=ZIP_LZMA) as zip_file:
-        async with utils.aclosing(AUTO_BACKUP_STAGE.iterate(to_backup)) as agen:
+        async with aclosing(AUTO_BACKUP_STAGE.iterate(to_backup)) as agen:
             async for file in agen:
                 await trio.to_thread.run_sync(
                     zip_file.write,
@@ -449,7 +450,7 @@ async def save_backup(dialogs: Dialogs) -> None:
     new_zip_data = BytesIO()
     new_zip = ZipFile(new_zip_data, 'w', compression=ZIP_LZMA)
 
-    maps: List[P2C] = [
+    maps: list[P2C] = [
         item.user
         for item in
         UI['back_details'].items
@@ -463,7 +464,7 @@ async def save_backup(dialogs: Dialogs) -> None:
         )
         return
 
-    async with copy_loader, utils.aclosing(LOAD_STAGE.iterate(maps)) as agen:
+    async with copy_loader, aclosing(LOAD_STAGE.iterate(maps)) as agen:
         async for p2c in agen:
             old_zip = p2c.zip_file
             map_path = p2c.filename + '.p2c'
@@ -495,14 +496,14 @@ async def save_backup(dialogs: Dialogs) -> None:
         p2c.zip_file = new_zip
 
 
-async def restore_maps(dialogs: Dialogs, maps: List[P2C]) -> None:
+async def restore_maps(dialogs: Dialogs, maps: list[P2C]) -> None:
     """Copy the given maps to the game."""
     game_dir = BACKUPS['game_path']
     if game_dir is None:
         LOGGER.warning('No game selected to restore from?')
         return
 
-    async with copy_loader, utils.aclosing(LOAD_STAGE.iterate(maps)) as agen:
+    async with copy_loader, aclosing(LOAD_STAGE.iterate(maps)) as agen:
         async for p2c in agen:
             back_zip = p2c.zip_file
             scr_path = p2c.filename + '.jpg'
@@ -723,7 +724,7 @@ async def ui_delete_game(dialog: Dialogs) -> None:
     ):
         return
 
-    async with deleting_loader, utils.aclosing(LOAD_STAGE.iterate(to_delete)) as agen:
+    async with deleting_loader, aclosing(LOAD_STAGE.iterate(to_delete)) as agen:
         async for p2c in agen:
             scr_path = p2c.filename + '.jpg'
             map_path = p2c.filename + '.p2c'
@@ -822,7 +823,7 @@ def init(tk_img: TKImages) -> None:
     window.columnconfigure(2, weight=1)
 
 
-async def init_application() -> None:
+async def init_application(nursery: trio.Nursery) -> None:
     """Initialise the standalone application."""
     from ui_tk.img import TK_IMG
     from app import gameMan, _APP_QUIT_SCOPE
@@ -850,11 +851,11 @@ async def init_application() -> None:
 
     file_menu.add_command(command=ui_new_backup)
     set_menu_text(file_menu, TransToken.ui('New Backup'))
-    file_menu.add_command(command=lambda: background_run(ui_load_backup))
+    file_menu.add_command(command=lambda: nursery.start_soon(ui_load_backup))
     set_menu_text(file_menu, TransToken.ui('Open Backup'))
-    file_menu.add_command(command=lambda: background_run(ui_save_backup, DIALOG))
+    file_menu.add_command(command=lambda: nursery.start_soon(ui_save_backup, DIALOG))
     set_menu_text(file_menu, TransToken.ui('Save Backup'))
-    file_menu.add_command(command=lambda: background_run(ui_save_backup_as, DIALOG))
+    file_menu.add_command(command=lambda: nursery.start_soon(ui_save_backup_as, DIALOG))
     set_menu_text(file_menu, TransToken.ui('Save Backup As'))
 
     bar.add_cascade(menu=file_menu)
@@ -862,9 +863,9 @@ async def init_application() -> None:
 
     game_menu = tk.Menu(bar)
 
-    game_menu.add_command(command=lambda: background_run(gameMan.add_game, DIALOG))
+    game_menu.add_command(command=lambda: nursery.start_soon(gameMan.add_game, DIALOG))
     set_menu_text(game_menu, TransToken.ui('Add Game'))
-    game_menu.add_command(command=lambda: background_run(gameMan.remove_game, DIALOG))
+    game_menu.add_command(command=lambda: nursery.start_soon(gameMan.remove_game, DIALOG))
     set_menu_text(game_menu, TransToken.ui('Remove Game'))
     game_menu.add_separator()
 
@@ -874,7 +875,7 @@ async def init_application() -> None:
 
     from app import helpMenu
     # Add the 'Help' menu here too.
-    background_run(helpMenu.make_help_menu, bar, TK_IMG)
+    await nursery.start(helpMenu.make_help_menu, bar, TK_IMG)
 
     window['menu'] = bar
 

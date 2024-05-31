@@ -2,9 +2,10 @@
 from srctools import Keyvalues
 import trio
 
-from . import ExportData, STEPS, StepResource
 from packages import BarrierHole
 import utils
+
+from . import STEPS, ExportData, StepResource
 
 
 @STEPS.add_step(prereq=[], results=[StepResource.VCONF_DATA])

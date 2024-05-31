@@ -1,7 +1,6 @@
 """Implements callables which lazily parses and combines config files."""
-from __future__ import annotations
-from typing import Any, Awaitable, Callable, Final, Pattern
-from typing_extensions import TypeAliasType
+from typing import Any, Final, Pattern
+from collections.abc import Awaitable, Callable
 import functools
 
 from srctools import KeyValError, Keyvalues, logger
@@ -14,7 +13,7 @@ import utils
 
 
 LOGGER = logger.get_logger(__name__)
-LazyConf = TypeAliasType("LazyConf", Callable[[], Awaitable[Keyvalues]])
+type LazyConf = Callable[[], Awaitable[Keyvalues]]
 
 
 async def _blank_prop() -> Keyvalues:

@@ -1,7 +1,6 @@
 """Customizable configuration for specific items or groups of them."""
 from __future__ import annotations
-from typing import Any
-from typing_extensions import Protocol
+from typing import Any, Protocol
 
 from collections.abc import Awaitable, Callable, Mapping, Iterator
 from datetime import timedelta
@@ -22,7 +21,7 @@ from config.widgets import (
     TIMER_STR_INF as TIMER_STR_INF,
 )
 from packages.widgets import (
-    CLS_TO_KIND, ConfT, ConfigGroup, ItemVariantConf, OptConfT_contra,
+    CLS_TO_KIND, ConfigGroup, ConfigProto, ItemVariantConf,
     WidgetType,
     WidgetTypeWithConf,
 )
@@ -40,7 +39,7 @@ import packages
 LOGGER = logger.get_logger(__name__)
 
 
-class SingleCreateTask(Protocol[OptConfT_contra]):
+class SingleCreateTask[ConfT: ConfigProto | None](Protocol):
     """A task which creates a widget. 
     
     It is passed a parent frame, the configuration object, and the async value involved.
@@ -49,7 +48,7 @@ class SingleCreateTask(Protocol[OptConfT_contra]):
     def __call__(
         self, parent: tk.Widget, tk_img: TKImages,
         holder: AsyncValue[str],
-        config: OptConfT_contra,
+        config: ConfT,
         /, *, task_status: trio.TaskStatus[tk.Widget] = ...,
     ) -> Awaitable[None]: ...
 
@@ -66,7 +65,7 @@ class SingleCreateNoConfTask(Protocol):
 # Override for timer-type widgets to be more compact - passed a list of timer numbers instead.
 # The widgets should insert themselves into the parent frame.
 # It then yields timer_val, update-func pairs.
-class MultiCreateTask(Protocol[OptConfT_contra]):
+class MultiCreateTask[ConfT: ConfigProto | None](Protocol):
     """Override for timer-type widgets to be more compact.
 
     It is passed a parent frame, the configuration object, and the async value involved.
@@ -75,7 +74,7 @@ class MultiCreateTask(Protocol[OptConfT_contra]):
     def __call__(
         self, parent: tk.Widget, tk_img: TKImages,
         holders: Mapping[TimerNum, AsyncValue[str]],
-        config: OptConfT_contra,
+        config: ConfT,
         /, *, task_status: trio.TaskStatus[None] = ...,
     ) -> Awaitable[None]: ...
 
@@ -102,13 +101,14 @@ TIMER_NUM_TRANS[TIMER_STR_INF] = INF
 TRANS_COLON = TransToken.untranslated('{text}: ')
 TRANS_GROUP_HEADER = TransToken.ui('{name} ({page}/{count})')  # i18n: Header layout for Item Properties pane.
 # For the item-variant widget, we need to refresh on style changes.
-ITEM_VARIANT_LOAD: list[tuple[str, Callable[[], object]]] = []
+ITEM_VARIANT_LOAD: list[tuple[str, Callable[[packages.PakRef[packages.Style]], object]]] = []
 
 window: SubPane | None = None
 
 
-def ui_single_wconf(cls: type[ConfT]) -> Callable[[SingleCreateTask[ConfT]], SingleCreateTask[
-    ConfT]]:
+def ui_single_wconf[ConfT: ConfigProto](
+    cls: type[ConfT],
+) -> Callable[[SingleCreateTask[ConfT]], SingleCreateTask[ConfT]]:
     """Register the UI function used for singular widgets with configs."""
     kind = CLS_TO_KIND[cls]
 
@@ -140,7 +140,9 @@ def ui_single_no_conf(kind: WidgetType) -> Callable[[SingleCreateNoConfTask], Si
     return deco
 
 
-def ui_multi_wconf(cls: type[ConfT]) -> Callable[[MultiCreateTask[ConfT]], MultiCreateTask[ConfT]]:
+def ui_multi_wconf[ConfT: ConfigProto](
+    cls: type[ConfT],
+) -> Callable[[MultiCreateTask[ConfT]], MultiCreateTask[ConfT]]:
     """Register the UI function used for multi widgets with configs."""
     kind = CLS_TO_KIND[cls]
 
@@ -506,7 +508,7 @@ async def make_pane(
         await trio.sleep_forever()
 
 
-def widget_timer_generic(widget_func: SingleCreateTask[ConfT]) -> MultiCreateTask[ConfT]:
+def widget_timer_generic[ConfT: ConfigProto](widget_func: SingleCreateTask[ConfT]) -> MultiCreateTask[ConfT]:
     """For widgets without a multi version, do it generically."""
     async def generic_func(
         parent: tk.Widget,
@@ -571,7 +573,7 @@ async def widget_item_variant(
 
     The config is alternatively an EdgeTrigger instance for the special Configure Signage button.
     """
-    from app import contextWin
+    from ui_tk import context_win
 
     if isinstance(conf, EdgeTrigger):
         # Even more special case, display the "configure signage" button.
@@ -582,21 +584,22 @@ async def widget_item_variant(
         await tk_tools.apply_bool_enabled_state_task(conf.ready, show_btn)
 
     try:
-        item = UI.item_list[conf.item_id]
+        item = packages.get_loaded_packages().obj_by_id(packages.Item, conf.item_id)
+        ui_item = UI.item_list[conf.item_id]
     except KeyError:
         raise ValueError(f'Unknown item "{conf.item_id}"!') from None
 
     version_lookup: list[str] = []
 
-    def update_data() -> None:
+    def update_data(cur_style: packages.PakRef[packages.Style]) -> None:
         """Refresh the data in the list."""
         nonlocal version_lookup
-        version_lookup = contextWin.set_version_combobox(combobox, item)
+        version_lookup = context_win.set_version_combobox(combobox, item, cur_style)
 
     def change_callback(e: object = None) -> None:
         """Change the item version."""
         if version_lookup is not None:
-            item.change_version(version_lookup[combobox.current()])
+            ui_item.change_version(version_lookup[combobox.current()])
 
     combobox = ttk.Combobox(
         parent,

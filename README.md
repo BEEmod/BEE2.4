@@ -42,7 +42,7 @@ As of version 4.37 we have stopped supporting BEE2.4 on Mac. See [this wiki arti
 
 ### Compilation ###
 
-* You'll need Python 3.8 or later, for 32-bit / Windows 7 you need 3.8 specifically.
+* You'll need Python 3.12 or later.
 * First, grab the repo and then clone the HammerAddons submodule:
 
 	    git clone --recurse-submodules https://github.com/BEEmod/BEE2.4.git

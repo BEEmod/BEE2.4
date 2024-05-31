@@ -88,7 +88,7 @@ def res_insert_overlay(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
 
             if mat[:1] == '$':
                 mat = inst.fixup[mat]
-            if mat.startswith('<') or mat.endswith('>'):
+            if mat.startswith('<') and mat.endswith('>'):
                 # Lookup in the texture data.
                 gen, mat = texturing.parse_name(mat[1:-1])
                 mat = gen.get(pos, mat)

@@ -6,11 +6,9 @@ We take care not to directly import gettext and babel, so the compiler can omit 
 """
 from __future__ import annotations
 from typing import (
-    Any, Callable, ClassVar, Dict, Final, Iterable, List, Mapping, NoReturn,
-    Optional, Protocol, Sequence, Tuple, cast, final,
+    Any, ClassVar, Final, NoReturn, Protocol, cast, final,  LiteralString, override
 )
-
-from typing_extensions import LiteralString, TypeAliasType, override
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from enum import Enum
 from html import escape as html_escape
 from pathlib import Path
@@ -55,8 +53,8 @@ class GetText(Protocol):
 class Language:
     """A language which may be loaded, and the associated translations."""
     lang_code: str
-    ui_filename: Optional[Path] = None  # Filename of the UI translation, if it exists.
-    _trans: Dict[str, GetText] = attrs.field(alias='trans')
+    ui_filename: Path | None = None  # Filename of the UI translation, if it exists.
+    _trans: dict[str, GetText] = attrs.field(alias='trans')
     # The loaded translations from basemodui.txt
     game_trans: Mapping[str, str] = EmptyMapping
 
@@ -68,9 +66,9 @@ DUMMY: Final = Language(lang_code='dummy', trans={})
 
 # Set by the localisation module to a function which gets a formatter for UI text, given the lang code.
 # It's initialised to a basic version, in case we're running in the compiler.
-ui_format_getter: Callable[[str], Optional[string.Formatter]] = lambda lang, /: None
+ui_format_getter: Callable[[str], string.Formatter | None] = lambda lang, /: None
 # Similarly, joins a list given the language, kind of list and children.
-ui_list_getter: Callable[[str, ListStyle, List[str]], str] = lambda lang, kind, children, /: ', '.join(children)
+ui_list_getter: Callable[[str, ListStyle, list[str]], str] = lambda lang, kind, children, /: ', '.join(children)
 
 
 class HTMLFormatter(string.Formatter):
@@ -112,7 +110,7 @@ class TransToken:
         orig_pack = package
         if text.startswith('[['):  # "[[package]] default"
             try:
-                package_str, token = text[2:].split(']]', 1)
+                package_str, token = text.removeprefix('[[').split(']]', 1)
                 token = token.lstrip()  # Allow whitespace between "]" and text.
                 # Don't allow specifying our special namespaces, except allow empty string for UNTRANSLATED
                 package = utils.obj_id(package_str) if package_str else NS_UNTRANSLATED
@@ -286,7 +284,7 @@ class TransToken:
 TransToken.BLANK = TransToken.untranslated('')
 
 # Token and "source" string, for updating translation files.
-TransTokenSource = TypeAliasType("TransTokenSource", Tuple[TransToken, str])
+type TransTokenSource = tuple[TransToken, str]
 
 
 @attrs.frozen(eq=False)

@@ -3,7 +3,9 @@
 This includes Unstationary Scaffolds and Vactubes.
 """
 from __future__ import annotations
-from typing import Optional, Iterator, TypeVar, Generic, Iterable
+
+from collections.abc import Iterable, Iterator
+import itertools
 
 from srctools import Entity, Matrix, Vec
 import attrs
@@ -13,11 +15,10 @@ from precomp.connections import Item
 import user_errors
 
 __all__ = ['Node', 'chain']
-ConfT = TypeVar('ConfT')
 
 
 @attrs.define(eq=False)
-class Node(Generic[ConfT]):
+class Node[ConfT]:
     """Represents a single node in the chain."""
     item: Item = attrs.field(init=True)
     conf: ConfT = attrs.field(init=True)
@@ -32,8 +33,8 @@ class Node(Generic[ConfT]):
     ))
 
     # The links between nodes
-    prev: Optional[Node[ConfT]] = attrs.field(default=None, init=False)
-    next: Optional[Node[ConfT]] = attrs.field(default=None, init=False)
+    prev: Node[ConfT] | None = attrs.field(default=None, init=False)
+    next: Node[ConfT] | None = attrs.field(default=None, init=False)
 
     @property
     def inst(self) -> Entity:
@@ -50,7 +51,7 @@ class Node(Generic[ConfT]):
             raise ValueError(f'No item for "{name}"?') from None
 
 
-def chain(
+def chain[ConfT](
     node_list: Iterable[Node[ConfT]],
     allow_loop: bool,
 ) -> Iterator[list[Node[ConfT]]]:
@@ -128,7 +129,10 @@ def chain(
                             points=[node.pos for node in node_out],
                             lines=[
                                 (a.pos, b.pos) for a, b in
-                                zip(node_out, [*node_out[1:], node_out[0]])
+                                # Add the first to the end so that we get a full loop of pairs.
+                                itertools.pairwise(itertools.chain(
+                                    node_out, [node_out[0]],
+                                ))
                             ]
                         )
                     break

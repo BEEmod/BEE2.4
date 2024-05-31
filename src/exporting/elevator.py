@@ -1,6 +1,4 @@
 """Export selected elevator videos."""
-from typing import Optional
-
 from . import ExportData, STEPS, StepResource
 from packages import Elevator
 
@@ -8,8 +6,8 @@ from packages import Elevator
 @STEPS.add_step(prereq=[], results=[StepResource.VCONF_DATA])
 async def step_elevator_video(exp_data: ExportData) -> None:
     """Export the chosen video into the configs."""
-    elevator: Optional[Elevator]
-    sel_id: Optional[str] = exp_data.selected[Elevator]
+    elevator: Elevator | None
+    sel_id: str | None = exp_data.selected[Elevator]
     if sel_id is None:
         elevator = None
     else:

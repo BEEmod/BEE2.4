@@ -3,9 +3,9 @@
 """
 from __future__ import annotations
 
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterable, Iterator, ItemsView, MutableMapping
 from collections import deque
-from typing import TypeVar, Union, Any, Tuple, ItemsView, MutableMapping
+from typing import Any
 from enum import Enum
 
 from srctools import FrozenVec, Vec, Matrix, VMF
@@ -23,15 +23,14 @@ LOGGER = srctools.logger.get_logger(__name__)
 # The attribute to set if these are in the map.
 VOICE_ATTR_GOO = 'goo'
 VOICE_ATTR_PIT = 'bottomless_pit'
-VecT = TypeVar("VecT", Vec, FrozenVec)
 
 
-def world_to_grid(pos: VecT) -> VecT:
+def world_to_grid[VecT: (Vec, FrozenVec)](pos: VecT) -> VecT:
     """Given real coordinates, find the grid position."""
     return pos // 128
 
 
-def grid_to_world(pos: VecT) -> VecT:
+def grid_to_world[VecT: (Vec, FrozenVec)](pos: VecT) -> VecT:
     """Given a grid position, find the center of the real block."""
     return pos * 128 + (64, 64, 64)
 
@@ -129,7 +128,7 @@ BLOCK_LOOKUP['pit'] = {
 }
 
 
-_grid_keys = Union[Vec, FrozenVec, Tuple[float, float, float], slice]
+type _grid_keys = Vec | FrozenVec | tuple[float, float, float] | slice
 
 
 def _conv_key(pos: _grid_keys) -> FrozenVec:
@@ -176,7 +175,7 @@ class Grid(MutableMapping[_grid_keys, Block]):
     def raycast(
         self,
         pos: _grid_keys,
-        direction: Vec | FrozenVec | Tuple[int, int, int],
+        direction: Vec | FrozenVec | tuple[int, int, int],
         collide: Iterable[Block] = frozenset({
             Block.SOLID, Block.EMBED,
             Block.PIT_BOTTOM, Block.PIT_SINGLE,
@@ -216,7 +215,7 @@ class Grid(MutableMapping[_grid_keys, Block]):
     def raycast_world(
         self,
         pos: Vec,
-        direction: Vec | Tuple[int, int, int],
+        direction: Vec | tuple[int, int, int],
         collide: Iterable[Block] = frozenset({
             Block.SOLID, Block.EMBED,
             Block.PIT_BOTTOM, Block.PIT_SINGLE,

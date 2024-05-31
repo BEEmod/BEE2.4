@@ -1,17 +1,14 @@
 """Manage applying translation tokens to TK widgets."""
 from __future__ import annotations
 
-from typing_extensions import TypeAliasType
-from typing import TypeVar, Union
-
 from tkinter import ttk
 import tkinter as tk
+from contextlib import aclosing
 from weakref import WeakKeyDictionary
 
 from app.localisation import gradual_iter
 from transtoken import TransToken, CURRENT_LANG
 import trio.lowlevel
-import utils
 
 
 __all__ = [
@@ -21,11 +18,10 @@ __all__ = [
 
 
 # Widgets that have a 'text' property.
-TextWidget = TypeAliasType("TextWidget", Union[
-    tk.Label, tk.LabelFrame, tk.Button, tk.Radiobutton, tk.Checkbutton,
-    ttk.Label, ttk.LabelFrame, ttk.Button, ttk.Radiobutton, ttk.Checkbutton,
-])
-TextWidgetT = TypeVar('TextWidgetT', bound=TextWidget)
+type TextWidget = (
+    tk.Label | tk.LabelFrame | tk.Button | tk.Radiobutton | tk.Checkbutton |
+    ttk.Label | ttk.LabelFrame | ttk.Button | ttk.Radiobutton | ttk.Checkbutton
+)
 # Assigns to widget['text'].
 _applied_text_tokens: WeakKeyDictionary[TextWidget, TransToken] = WeakKeyDictionary()
 # menu -> index -> token.
@@ -33,7 +29,7 @@ _applied_menu_tokens: WeakKeyDictionary[tk.Menu, dict[int, TransToken]] = WeakKe
 _window_titles: WeakKeyDictionary[tk.Wm, TransToken] = WeakKeyDictionary()
 
 
-def set_text(widget: TextWidgetT, token: TransToken) -> TextWidgetT:
+def set_text[Widget: TextWidget](widget: Widget, token: TransToken) -> Widget:
     """Apply a token to the specified label/button/etc."""
     widget['text'] = str(token)
     if token.is_untranslated:  # No need to have a callback for this one.
@@ -75,13 +71,13 @@ async def update_task() -> None:
     # Using gradual_iter() yields to the event loop in-between each conversion.
     while True:
         await CURRENT_LANG.wait_transition()
-        async with utils.aclosing(gradual_iter(_applied_text_tokens)) as agen1:
+        async with aclosing(gradual_iter(_applied_text_tokens)) as agen1:
             async for text_widget, token in agen1:
                 text_widget['text'] = str(token)
 
         await trio.lowlevel.checkpoint()
 
-        async with utils.aclosing(gradual_iter(_applied_menu_tokens)) as agen2:
+        async with aclosing(gradual_iter(_applied_menu_tokens)) as agen2:
             async for menu, menu_map in agen2:
                 for index, token in menu_map.items():
                     menu.entryconfigure(index, label=str(token))

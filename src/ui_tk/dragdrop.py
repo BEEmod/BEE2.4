@@ -1,7 +1,6 @@
 """UI implementation for the dragdrop module."""
 from __future__ import annotations
-from typing import Generic, TypeVar
-from typing_extensions import ParamSpec, Unpack, assert_never, override
+from typing import Unpack, assert_never, override
 
 from tkinter import ttk
 import tkinter as tk
@@ -14,8 +13,8 @@ from app import img
 from app.dragdrop import (
     SLOT_DRAG, DragWin, FlexiCB, InfoCB, ManagerBase, PositionerBase,
     Slot, in_bbox,
-    # Re-exports.
-    DragInfo as DragInfo, ItemT as ItemT,
+    # Re-export.
+    DragInfo as DragInfo,
 )
 from transtoken import TransToken
 from . import tk_tools
@@ -24,9 +23,7 @@ from .wid_transtoken import set_text
 import utils
 
 
-__all__ = ["CanvasPositioner", "DragDrop", "DragInfo", "ItemT", "InfoCB", "Slot"]
-ArgsT = ParamSpec('ArgsT')
-T = TypeVar('T')
+__all__ = ["CanvasPositioner", "DragDrop", "DragInfo", "InfoCB", "Slot"]
 
 # Tag used on canvases for our flowed slots.
 _CANV_TAG = '_BEE2_dragdrop_item'
@@ -39,7 +36,7 @@ class GeoManager(Enum):
     CANVAS = 'canvas'
 
 
-class CanvasPositioner(PositionerBase, Generic[T]):
+class CanvasPositioner[T](PositionerBase):
     """Positions slots on a canvas.
 
     T is the slot object, but it can be anything as long as the place_func matches.
@@ -88,7 +85,7 @@ class SlotUI:
     canv_info: tuple[int, int, int] | None = None
 
 
-class DragDrop(ManagerBase[ItemT, tk.Misc], Generic[ItemT]):
+class DragDrop[ItemT](ManagerBase[ItemT, tk.Misc]):
     """Implements UI functionality for the dragdrop module."""
     # Widgets comprising items attached to the cursor.
     _drag_win: tk.Toplevel

@@ -1,7 +1,6 @@
 """Store overridden defaults for items, and also the selected version."""
 from __future__ import annotations
-from typing import Any, Final
-from typing_extensions import override
+from typing import Any, Final, override
 
 from srctools import Keyvalues, logger
 from srctools.dmx import Element
@@ -38,7 +37,7 @@ class ItemDefault(config.Data, conf_name='ItemDefault', uses_id=True):
             for prop_name, value in section.items():
                 if not prop_name.startswith('prop_'):
                     continue
-                prop_name = prop_name[5:]
+                prop_name = prop_name.removeprefix('prop_')
                 try:
                     prop_type = PROP_TYPES[prop_name.casefold()]
                 except KeyError:

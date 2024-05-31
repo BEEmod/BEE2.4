@@ -1,20 +1,20 @@
 """Window for configuring BEE2's options, as well as the home of some options."""
-import itertools
-
 import tkinter as tk
-import trio
 from tkinter import ttk
-from typing import Callable, List, Optional, Tuple, Dict
+
+from collections.abc import Callable
+import itertools
 
 import attrs
 import srctools.logger
+import trio
 
 import packages
 import utils
 from app.reports import report_all_obj, report_items, report_editor_models
 from app import (
     DEV_MODE, background_run,
-    contextWin, gameMan, localisation, sound, logWindow, img, UI,
+    gameMan, localisation, sound, logWindow, img, UI,
 )
 from config.filters import FilterConf
 from config.gen_opts import GenOptions, AfterExport
@@ -32,7 +32,7 @@ LOGGER = srctools.logger.get_logger(__name__)
 AFTER_EXPORT_ACTION = tk.IntVar(name='OPT_after_export_action', value=AfterExport.MINIMISE.value)
 
 # action, launching_game -> suffix on the message box.
-AFTER_EXPORT_TEXT: Dict[Tuple[AfterExport, bool], TransToken] = {
+AFTER_EXPORT_TEXT: dict[tuple[AfterExport, bool], TransToken] = {
     (AfterExport.NORMAL, False): TransToken.untranslated('{msg}'),
     (AfterExport.NORMAL, True): TransToken.ui('{msg}\nLaunch Game?'),
 
@@ -44,7 +44,7 @@ AFTER_EXPORT_TEXT: Dict[Tuple[AfterExport, bool], TransToken] = {
 }
 
 # The checkbox variables, along with the GenOptions attribute they control.
-VARS: List[Tuple[str, tk.BooleanVar]] = []
+VARS: list[tuple[str, tk.BooleanVar]] = []
 VAR_COMPRESS_ITEMS = tk.BooleanVar(name='opt_compress_items')
 
 win = tk.Toplevel(TK_ROOT, name='optionsWin')
@@ -74,11 +74,12 @@ _load_langs: Callable[[], object] = lambda: None
 
 def show() -> None:
     """Display the option window."""
+    from app.UI import context_win
     # Re-apply, so the vars update.
     load()
     _load_langs()
     win.deiconify()
-    contextWin.hide_context()  # Ensure this closes.
+    context_win.hide_context()  # Ensure this closes.
     tk_tools.center_win(win)
 
 
@@ -96,10 +97,7 @@ def save() -> None:
     # Preserve options set elsewhere.
     existing = config.APP.get_cur_conf(GenOptions)
 
-    bool_options: Dict[str, bool] = {
-        name: var.get()
-        for name, var in VARS
-    }
+    bool_options: dict[str, bool] = {name: var.get() for name, var in VARS}
 
     config.APP.store_conf(attrs.evolve(
         existing,
@@ -152,9 +150,9 @@ def make_checkbox(
     name: str,
     *,
     desc: TransToken,
-    var: Optional[tk.BooleanVar] = None,
+    var: tk.BooleanVar | None = None,
     tooltip: TransToken = TransToken.BLANK,
-    callback: Optional[Callable[[], object]] = None,
+    callback: Callable[[], object] | None = None,
 ) -> ttk.Checkbutton:
     """Add a checkbox to the given frame which toggles an option.
 
@@ -344,8 +342,8 @@ async def init_gen_tab(
     lang_frm.columnconfigure(1, weight=1)
     lang_box.grid(row=0, column=1)
 
-    lang_order: List[localisation.Language] = []
-    lang_code_to_ind: Dict[str, int] = {}
+    lang_order: list[localisation.Language] = []
+    lang_code_to_ind: dict[str, int] = {}
 
     def load_langs() -> None:
         """Load languages when the window opens."""

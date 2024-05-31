@@ -24,24 +24,24 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # We want 3.8 because it works on Windows 7.
-          - artifact-name: 'win32'
-            python-version: '3.8.10'
-            arch: 'x86'
-            os: 'windows-latest'
-            bitness: '32'
-            ffmpeg-repo: 'sudo-nautilus/FFmpeg-Builds-Win32'
+#          - artifact-name: 'win32'
+#            python-version: '3.8.10'
+#            arch: 'x86'
+#            os: 'windows-latest'
+#            bitness: '32'
+#            ffmpeg-repo: 'sudo-nautilus/FFmpeg-Builds-Win32'
           - artifact-name: 'win64'
-            python-version: '3.11'
+            python-version: '3.12'
             arch: 'x64'
             os: 'windows-latest'
             bitness: '64'
             ffmpeg-repo: 'BtbN/FFmpeg-Builds'
           - artifact-name: 'linux64'
-            python-version: '3.11'
+            python-version: '3.12'
             arch: 'x64'
             os: 'ubuntu-latest'
             bitness: '64'
+            ffmpeg-repo: ''
     runs-on: ${{ matrix.os }}
     steps:
       # Use the tag if created there, dev each week, or what's specified when done manually.

@@ -1,14 +1,15 @@
 """Conditions that were present in older versions only."""
-from typing import TypeVar, Callable
-from precomp.conditions import RES_EXHAUSTED, make_test, make_result
+from collections.abc import Callable
+
 import srctools.logger
 
+from precomp.conditions import RES_EXHAUSTED, make_test, make_result
+
 COND_MOD_NAME = 'Removed'
-T = TypeVar('T')
 LOGGER = srctools.logger.get_logger(__name__)
 
 
-def make_func(msg: str, ret_val: T) -> Callable[[], T]:
+def make_func[T](msg: str, ret_val: T) -> Callable[[], T]:
     """Deprecate a test or result."""
     used = False
 

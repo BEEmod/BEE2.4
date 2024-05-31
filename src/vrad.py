@@ -3,8 +3,6 @@
 This allows us to change the arguments passed in,
 edit the BSP after instances are collapsed, and pack files.
 """
-from typing import List, Set
-
 from io import BytesIO
 from zipfile import ZipFile
 from pathlib import Path
@@ -62,7 +60,7 @@ def load_transforms() -> None:
     from postcomp import coop_responses, filter, user_error, debug_info, collisions_export  # noqa: F401
 
 
-def run_vrad(args: List[str]) -> None:
+def run_vrad(args: list[str]) -> None:
     """Execute the original VRAD."""
     code = srctools.run.run_compiler(
         os.path.join(os.getcwd(), 'linux32/vrad' if utils.LINUX else 'vrad'),
@@ -75,7 +73,7 @@ def run_vrad(args: List[str]) -> None:
         sys.exit(code)
 
 
-async def main(argv: List[str]) -> None:
+async def main(argv: list[str]) -> None:
     """Main VRAD script."""
     LOGGER.info(
         "BEE{} VRAD hook initiallised, srctools v{}, Hammer Addons v{}",
@@ -256,8 +254,8 @@ async def main(argv: List[str]) -> None:
         LOGGER.warning('Packing disabled!')
 
     # We need to disallow Valve folders.
-    pack_whitelist: Set[FileSystem] = set()
-    pack_blacklist: Set[FileSystem] = {pakfile_fs}
+    pack_whitelist: set[FileSystem] = set()
+    pack_blacklist: set[FileSystem] = {pakfile_fs}
 
     # Exclude absolutely everything except our folder.
     for child_sys, _ in fsys.systems:

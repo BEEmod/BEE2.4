@@ -1,11 +1,11 @@
 """Controls exporting the compiler files."""
 from __future__ import annotations
-
-import os
-from pathlib import Path
 from typing import TYPE_CHECKING
+from contextlib import aclosing
+from pathlib import Path
 import io
 import json
+import os
 import shutil
 import urllib.error
 import urllib.request
@@ -13,10 +13,11 @@ import urllib.request
 import srctools.logger
 import trio
 
+from transtoken import AppError, TransToken
 import user_errors
 import utils
-from . import ExportData, STAGE_COMPILER, STAGE_COMP_BACKUP, STEPS, StepResource
-from transtoken import AppError, TransToken
+
+from . import STAGE_COMP_BACKUP, STAGE_COMPILER, STEPS, ExportData, StepResource
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -233,7 +234,7 @@ async def step_copy_compiler(exp_data: ExportData) -> None:
     if not files:
         exp_data.warn(TRANS_NO_COMPILER_FILES.format(folder=compiler_src))
 
-    async with trio.open_nursery() as nursery, utils.aclosing(STAGE_COMPILER.iterate(files)) as agen:
+    async with trio.open_nursery() as nursery, aclosing(STAGE_COMPILER.iterate(files)) as agen:
         async for comp_file in agen:
             # Ignore folders.
             if comp_file.is_dir():

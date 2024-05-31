@@ -1,8 +1,8 @@
 """A value read from configs, which defers applying fixups until later."""
 from __future__ import annotations
 
-from typing import Callable, ClassVar, Generic, Optional, TypeVar
-from typing_extensions import override
+from typing import ClassVar, override
+from collections.abc import Callable
 
 import abc
 import operator
@@ -11,22 +11,15 @@ from srctools import Entity, conv_int, conv_float, conv_bool, Vec, Angle, Matrix
 
 __all__ = ['LazyValue']
 
-
-U_co = TypeVar("U_co", covariant=True)
-V_co = TypeVar("V_co", covariant=True)
-W_co = TypeVar("W_co", covariant=True)
-U = TypeVar("U")
-V = TypeVar("V")
-
 MutTypes = (Vec, Angle, Matrix)
 
 
-class LazyValue(abc.ABC, Generic[U_co]):
+class LazyValue[U](abc.ABC):
     """A base value."""
     # If true, this may depend on inst.
     has_fixups: ClassVar[bool] = True
 
-    def __call__(self, inst: Entity) -> U_co:
+    def __call__(self, inst: Entity) -> U:
         """Resolve the value by substituting from the instance, if required."""
         result = self._resolve(inst)
         if isinstance(result, MutTypes):
@@ -37,7 +30,7 @@ class LazyValue(abc.ABC, Generic[U_co]):
         return f'<Value: {self._repr_val()}>'
 
     @classmethod
-    def parse(cls, value: str, default: Optional[str] = None, allow_invert: bool = True) -> LazyValue[str]:
+    def parse(cls, value: str, default: str | None = None, allow_invert: bool = True) -> LazyValue[str]:
         """Starting point, read a config value."""
         if '$' in value:
             return InstValue(value, default, allow_invert)
@@ -61,11 +54,11 @@ class LazyValue(abc.ABC, Generic[U_co]):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def _resolve(self, inst: Entity) -> U_co:
+    def _resolve(self, inst: Entity) -> U:
         """Resolve the value by substituting from the instance, if required."""
         raise NotImplementedError
 
-    def map(self, func: Callable[[U_co], V], name: str = '') -> LazyValue[V]:
+    def map[V](self, func: Callable[[U], V], name: str = '') -> LazyValue[V]:
         """Map this map."""
         return UnaryMapValue(self, func, name)
 
@@ -117,13 +110,13 @@ class LazyValue(abc.ABC, Generic[U_co]):
         return OffsetValue(self, scale, zoff)
 
 
-class ConstValue(LazyValue[U_co], Generic[U_co]):
+class ConstValue[U](LazyValue[U]):
     """A value which is known."""
     has_fixups: ClassVar[bool] = False
 
-    value: U_co
+    value: U
 
-    def __init__(self, value: U_co) -> None:
+    def __init__(self, value: U) -> None:
         self.value = value
 
     @override
@@ -131,19 +124,19 @@ class ConstValue(LazyValue[U_co], Generic[U_co]):
         return repr(self.value)
 
     @override
-    def _resolve(self, inst: Entity) -> U_co:
+    def _resolve(self, inst: Entity) -> U:
         """No resolution is required."""
         return self.value
 
     @override
-    def map(self, func: Callable[[U_co], V], name: str = '') -> LazyValue[V]:
+    def map[V](self, func: Callable[[U], V], name: str = '') -> LazyValue[V]:
         """Apply a function."""
         return ConstValue(func(self.value))
 
 
-class UnaryMapValue(LazyValue[V_co], Generic[U_co, V_co]):
+class UnaryMapValue[U, V](LazyValue[V]):
     """Maps an existing value to another."""
-    def __init__(self, parent: LazyValue[U_co], func: Callable[[U_co], V_co], name: str) -> None:
+    def __init__(self, parent: LazyValue[U], func: Callable[[U], V], name: str) -> None:
         self.parent = parent
         self.func = func
         self.name = name or getattr(func, '__name__', repr(func))
@@ -153,17 +146,17 @@ class UnaryMapValue(LazyValue[V_co], Generic[U_co, V_co]):
         return f'{self.name}({self.parent._repr_val()})'
 
     @override
-    def _resolve(self, inst: Entity) -> V_co:
+    def _resolve(self, inst: Entity) -> V:
         """Resolve the parent, then call the function."""
         return self.func(self.parent._resolve(inst))
 
 
-class BinaryMapValue(LazyValue[W_co], Generic[U_co, V_co, W_co]):
+class BinaryMapValue[U, V, W](LazyValue[W]):
     """Maps two existing values to another."""
     def __init__(
         self,
-        a: LazyValue[U_co], b: LazyValue[V_co],
-        func: Callable[[U_co, V_co], W_co], name: str,
+        a: LazyValue[U], b: LazyValue[V],
+        func: Callable[[U, V], W], name: str,
     ) -> None:
         self.a = a
         self.b = b
@@ -175,7 +168,7 @@ class BinaryMapValue(LazyValue[W_co], Generic[U_co, V_co, W_co]):
         return f'{self.name}({self.a._repr_val(), self.b._repr_val()})'
 
     @override
-    def _resolve(self, inst: Entity) -> W_co:
+    def _resolve(self, inst: Entity) -> W:
         """Resolve the parents, then call the function."""
         return self.func(self.a._resolve(inst), self.b._resolve(inst))
 
@@ -183,13 +176,13 @@ class BinaryMapValue(LazyValue[W_co], Generic[U_co, V_co, W_co]):
 class InstValue(LazyValue[str]):
     """A value which will be resolved from an instance."""
     variable: str
-    default: Optional[str]
+    default: str | None
     allow_invert: bool
 
     def __init__(
         self,
         variable: str,
-        default: Optional[str] = None,
+        default: str | None = None,
         allow_invert: bool = True,
     ) -> None:
         self.variable = variable

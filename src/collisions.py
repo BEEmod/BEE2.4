@@ -1,8 +1,8 @@
 """Defines the region of space items occupy and computes collisions."""
 from __future__ import annotations
-from typing import Iterable, Iterator, Sequence, Tuple, overload
-from typing_extensions import Self, Literal, override
+from typing import Self, Literal, override, overload
 
+from collections.abc import Iterable, Iterator, Sequence
 from enum import Flag
 import functools
 import operator
@@ -82,7 +82,7 @@ class CollideType(Flag):
         coll = cls.NOTHING
         for key, value in entity.items():
             if key.casefold().startswith('coll_') and conv_bool(value):
-                coll_name = key[5:].upper()
+                coll_name = key.removeprefix('coll_').upper()
                 try:
                     coll |= cls[coll_name]
                 except KeyError:
@@ -174,7 +174,7 @@ class BBox:
                 raise TypeError(f'6 numbers must be supplied, not {args!r}') from None
         elif len(args) == 2:
             point1, point2 = args
-            if isinstance(point1, (Vec, FrozenVec)) and isinstance(point2, (Vec, FrozenVec)):
+            if isinstance(point1, Vec | FrozenVec) and isinstance(point2, Vec | FrozenVec):
                 min_x, min_y, min_z = round(point1.x), round(point1.y), round(point1.z)
                 max_x, max_y, max_z = round(point2.x), round(point2.y), round(point2.z)
             else:
@@ -414,7 +414,7 @@ class BBox:
         except NonBBoxError:  # Edge or corner, don't count those.
             return None
 
-    def _rotate_bbox(self, other: AnyAngle | AnyMatrix) -> Tuple[AnyMatrix, Vec, Vec]:
+    def _rotate_bbox(self, other: AnyAngle | AnyMatrix) -> tuple[AnyMatrix, Vec, Vec]:
         # https://gamemath.com/book/geomprims.html#transforming_aabbs
         m = to_matrix(other)
         mins = Vec()
@@ -514,7 +514,7 @@ class BBox:
         mins = self.mins
         maxes = self.maxes
 
-        def check_plane(axis: Literal['x', 'y', 'z']) -> Tuple[float, float]:
+        def check_plane(axis: Literal['x', 'y', 'z']) -> tuple[float, float]:
             """Determine where the intersection would be for each axial face pair."""
             if start[axis] < mins[axis]:
                 time = mins[axis] - start[axis]

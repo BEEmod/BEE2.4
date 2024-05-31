@@ -1,9 +1,9 @@
 """Implements Glass and Grating."""
 from __future__ import annotations
 
-from typing import Callable, Dict, Final, Iterable, Iterator, List, Mapping, Set, Tuple, Sequence
-from typing_extensions import Literal, Self, TypeAliasType, assert_never, override
+from typing import Final, Literal, Self, assert_never, override
 
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from collections import defaultdict
 from enum import Enum, Flag, auto as enum_auto
 import math
@@ -27,7 +27,7 @@ import utils
 LOGGER = srctools.logger.get_logger(__name__)
 COND_MOD_NAME: str | None = None
 STRAIGHT_LEN: Final = 64  # Length of the brush for straight frame sections.
-HoleTemplate = TypeAliasType("HoleTemplate", Tuple[List[Solid], List[collisions.BBox]])
+type HoleTemplate = tuple[list[Solid], list[collisions.BBox]]
 TRANS_VARIABLE = TransToken.untranslated('"<var>{value}</var>"')
 MAX_FLOORBEAM_REPOSITIONS: Final = 10  # Number of times to reposition if the beam is bad.
 
@@ -73,7 +73,7 @@ ORIENTS = {
 }
 
 # Direction -> border value for that side.
-NORMAL_TO_BORDER: Dict[Tuple[Literal[-1, 0, +1], Literal[-1, 0, +1]], Border] = {
+NORMAL_TO_BORDER: dict[tuple[Literal[-1, 0, +1], Literal[-1, 0, +1]], Border] = {
     (0, +1): Border.STRAIGHT_N,
     (0, -1): Border.STRAIGHT_S,
     (+1, 0): Border.STRAIGHT_W,
@@ -81,7 +81,7 @@ NORMAL_TO_BORDER: Dict[Tuple[Literal[-1, 0, +1], Literal[-1, 0, +1]], Border] = 
 }
 
 
-FULL_SQUARE: Final[Sequence[Tuple[int, int]]] = [
+FULL_SQUARE: Final[Sequence[tuple[int, int]]] = [
     (u, v)
     for u in [-48, -16, +16, +48]
     for v in [-48, -16, +16, +48]
@@ -315,9 +315,9 @@ class BarrierType:
     @classmethod
     def parse(cls, kv: Keyvalues, barrier_id: utils.ObjectID) -> BarrierType:
         """Parse from keyvalues files."""
-        frames: Dict[FrameOrient, List[FrameType]] = {orient: [] for orient in FrameOrient}
+        frames: dict[FrameOrient, list[FrameType]] = {orient: [] for orient in FrameOrient}
         error_disp: user_errors.Kind | None = None
-        surfaces: List[Brush | Collide] = []
+        surfaces: list[Brush | Collide] = []
 
         for sub_kv in kv.find_all('Frame'):
             frame_id = utils.obj_id(sub_kv.value)
@@ -386,11 +386,11 @@ class Barrier:
     name: str
     type: BarrierType = attrs.field(validator=_check_barrier_type_assignment)
     item: connections.Item | None = None
-    instances: List[Entity] = attrs.Factory(list)
+    instances: list[Entity] = attrs.Factory(list)
     # Set only for vanilla glass/grating items. Stores a list of the
     # original voxel positions this item took up, so changing the
     # type can overwrite this.
-    original_voxels: Sequence[Tuple[PlaneKey, int, int]] = ()
+    original_voxels: Sequence[tuple[PlaneKey, int, int]] = ()
 
     def __eq__(self, other: object) -> bool:
         """Two barriers are equal if are for the same instance or if mergable. The type must always match."""
@@ -486,7 +486,7 @@ class Brush(Surface):
     def generate(
         self, vmf: VMF,
         plane: PlaneKey,
-        solid_func: Callable[[float, float], List[Solid]],
+        solid_func: Callable[[float, float], list[Solid]],
     ) -> None:
         """Generate this brush."""
         brushes = solid_func(self.offset, self.offset + self.thickness)
@@ -675,7 +675,7 @@ class FrameType:
     def parse(cls, kv: Keyvalues) -> Self:
         """Parse from keyvalues configuration."""
         seg_straight_brush = []
-        seg_straight_prop: Dict[int, List[SegmentProp]] = defaultdict(list)
+        seg_straight_prop: dict[int, list[SegmentProp]] = defaultdict(list)
         seg_corner = []
         seg_concave_corner = []
 
@@ -716,9 +716,9 @@ BARRIERS_BY_NAME: dict[str, Barrier] = {}
 # plane -> {position -> hole}
 HOLES: dict[PlaneKey, dict[FrozenVec, Hole]] = defaultdict(dict)
 
-HOLE_TYPES: Dict[utils.ObjectID, HoleType] = {}
-FRAME_TYPES: Dict[utils.ObjectID, Dict[FrameOrient, FrameType]] = {}
-BARRIER_TYPES: Dict[utils.ObjectID, BarrierType] = {}
+HOLE_TYPES: dict[utils.ObjectID, HoleType] = {}
+FRAME_TYPES: dict[utils.ObjectID, dict[FrameOrient, FrameType]] = {}
+BARRIER_TYPES: dict[utils.ObjectID, BarrierType] = {}
 
 
 def parse_conf(kv: Keyvalues) -> None:
@@ -845,7 +845,7 @@ def parse_map(vmf: VMF, conn_items: Mapping[str, connections.Item]) -> None:
     LOGGER.info('Parsing barrier items...')
     frame_inst = instanceLocs.resolve_filter('[glass_frames]', silent=True)
     segment_inst = instanceLocs.resolve_filter('[glass_128]', silent=True)
-    barrier_pos_lists: Dict[str, List[Tuple[PlaneKey, int, int]]] = {}
+    barrier_pos_lists: dict[str, list[tuple[PlaneKey, int, int]]] = {}
 
     for inst in vmf.by_class['func_instance']:
         filename = inst['file'].casefold()
@@ -1126,7 +1126,7 @@ def res_barrier_hole(inst: Entity, res: Keyvalues) -> None:
         conditions.ALL_INST.add(sel_variant.instance.casefold())
 
 
-def template_solids_and_coll(template_id: str) -> Tuple[HoleTemplate, Sequence[collisions.BBox]]:
+def template_solids_and_coll(template_id: str) -> tuple[HoleTemplate, Sequence[collisions.BBox]]:
     """Retrieve the brushes and collision boxes for the specified visgroup.
 
     Holes have multiple variants, this simplifies things. We also split off boxes tagged "footprint",
@@ -1288,9 +1288,9 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
                 )
 
 
-def find_plane_groups(grid: PlaneGrid[Barrier]) -> Iterator[Tuple[Barrier, PlaneGrid[Barrier]]]:
+def find_plane_groups(grid: PlaneGrid[Barrier]) -> Iterator[tuple[Barrier, PlaneGrid[Barrier]]]:
     """Yield sub-graphs of a barrier plane, containing contiguous barriers."""
-    stack: Set[Tuple[int, int]] = set()
+    stack: set[tuple[int, int]] = set()
     completed: PlaneGrid[bool] = PlaneGrid.fromkeys(grid, False)
     for start, cmp_value in grid.items():
         if completed[start] or cmp_value is BARRIER_EMPTY:
@@ -1382,7 +1382,7 @@ def place_planar_surfaces(
     min_u: int, min_v: int, max_u: int, max_v: int,
 ) -> None:
     """Place brushes and collisions across the surface of the barrier."""
-    def solid_func(z1: float, z2: float) -> List[Solid]:
+    def solid_func(z1: float, z2: float) -> list[Solid]:
         """Generate prism brushes."""
         prism = vmf.make_prism(
             plane.plane_to_world(32.0 * min_u, 32.0 * min_v, z1),
@@ -1717,7 +1717,7 @@ def add_glass_floorbeams(
         if (side_pos - half_width) // 32 != (side_pos + half_width) // 32:
             return False
 
-        brushes: List[Solid] = []
+        brushes: list[Solid] = []
         side_grid = side_pos // 32
         forward = rot.forward(1.0)
         beam_start: float  # If hitting a hole, comes from the impact point.

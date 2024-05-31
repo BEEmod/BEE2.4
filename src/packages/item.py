@@ -21,7 +21,7 @@ import attrs
 import trio
 
 from app import tkMarkdown, img, lazy_conf, DEV_MODE
-from config.item_defaults import DEFAULT_VERSION
+from config.item_defaults import DEFAULT_VERSION, ItemDefault
 from connections import Config as ConnConfig
 from editoritems import Item as EditorItem, InstCount
 from packages import PackagesSet, PakObject, PakRef, ParseData, Style, sep_values, desc_parse, get_config
@@ -390,9 +390,7 @@ class ItemVariant:
                     ) from None
                 editor[0].set_inst(ind, inst_data)
             else:  # BEE2 named instance
-                inst_name = inst.name
-                if inst_name.startswith('bee2_'):
-                    inst_name = inst_name[5:]
+                inst_name = inst.name.removeprefix('bee2_')
                 editor[0].cust_instances[inst_name] = inst_data.inst
 
         # Override IO commands.
@@ -682,6 +680,34 @@ class Item(PakObject, needs_foreground=True):
             for item_to_style in packset.all_obj(Item):
                 nursery.start_soon(assign_styled_items, styles, item_to_style)
 
+    def selected_version(self) -> Version:
+        """Fetch the selected version for this item."""
+        conf = config.APP.get_cur_conf(ItemDefault, self.id, ItemDefault())
+        try:
+            return self.versions[conf.version]
+        except KeyError:
+            LOGGER.warning('Version ID {} is not valid for item {}', conf.version, self.id)
+            config.APP.store_conf(attrs.evolve(conf, version=self.def_ver.id), self.id)
+            return self.def_ver
+
+    def get_version_names(self, cur_style: PakRef[Style]) -> tuple[list[str], list[str]]:
+        """Get a list of the names and corresponding IDs for the item."""
+        # item folders are reused, so we can find duplicates.
+        style_obj_ids = {
+            id(self.versions[ver_id].styles[cur_style.id])
+            for ver_id in self.version_id_order
+        }
+        versions = list(self.version_id_order)
+        if len(style_obj_ids) == 1:
+            # All the variants are the same, so we effectively have one
+            # variant. Disable the version display.
+            versions = versions[:1]
+
+        return versions, [
+            self.versions[ver_id].name
+            for ver_id in versions
+        ]
+
 
 class ItemConfig(PakObject, allow_mult=True):
     """Allows adding additional configuration for items.
@@ -753,6 +779,14 @@ class SubItemRef:
     """Represents an item with a specific subtype."""
     item: PakRef[Item] = attrs.field(converter=_conv_pakref_item)
     subtype: int = 0
+
+    def __str__(self) -> str:
+        """Convert this to a compact ID."""
+        return f'{self.item.id}:{self.subtype}'
+
+    def with_subtype(self, ind: int) -> SubItemRef:
+        """Return the same item, but with a different subtype."""
+        return SubItemRef(self.item, ind)
 
 
 async def parse_item_folder(

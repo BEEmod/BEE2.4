@@ -170,7 +170,7 @@ def test_bbox_hash() -> None:
 
 def reorder(coord: tuple3, order: str, x: int, y: int, z: int) -> Vec:
     """Reorder the coords by these axes."""
-    assoc = dict(zip('xyz', coord))
+    assoc = dict(zip('xyz', coord, strict=True))
     return Vec(x + assoc[order[0]], y + assoc[order[1]], z + assoc[order[2]])
 
 

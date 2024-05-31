@@ -51,7 +51,7 @@ class TextHandler(logging.Handler):
         conf = config.APP.get_cur_conf(GenOptions)
         config.APP.store_conf(attrs.evolve(conf, show_log_win=is_visible))
         try:
-            _QUEUE_SEND_LOGGING.put(('visible', is_visible, None), timeout=0.5)
+            _QUEUE_SEND_LOGGING.put(('visible', is_visible), timeout=0.5)
         except queue.Full:
             pass
 
@@ -64,7 +64,7 @@ class TextHandler(logging.Handler):
             level_str = level
         super().setLevel(level_str)
         try:
-            _QUEUE_SEND_LOGGING.put(('level', level_str, None), timeout=0.5)
+            _QUEUE_SEND_LOGGING.put(('level', level_str), timeout=0.5)
         except queue.Full:
             pass
 

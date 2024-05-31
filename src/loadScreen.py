@@ -6,10 +6,10 @@ the main process is busy loading.
 The id() of the main-process object is used to identify loadscreens.
 """
 from __future__ import annotations
-
-
-from typing import AsyncGenerator, Collection, Generator, MutableMapping, Set, List, TypeVar, Type
-from typing_extensions import assert_never
+from typing import assert_never
+from collections.abc import (
+    AsyncGenerator, Collection, Generator, MutableMapping,
+)
 from types import TracebackType
 from weakref import WeakValueDictionary
 import contextlib
@@ -19,9 +19,9 @@ import attrs
 import srctools.logger
 import trio
 
-from config.gen_opts import GenOptions
 from config import APP
-from transtoken import TransToken, CURRENT_LANG
+from config.gen_opts import GenOptions
+from transtoken import CURRENT_LANG, TransToken
 import ipc_types
 import utils
 
@@ -35,8 +35,6 @@ _QUEUE_SEND_LOAD: multiprocessing.Queue[ipc_types.ARGS_SEND_LOAD] = multiprocess
 _QUEUE_REPLY_LOAD: multiprocessing.Queue[ipc_types.ARGS_REPLY_LOAD] = multiprocessing.Queue()
 _QUEUE_SEND_LOGGING: multiprocessing.Queue[ipc_types.ARGS_SEND_LOGGING] = multiprocessing.Queue()
 _QUEUE_REPLY_LOGGING: multiprocessing.Queue[ipc_types.ARGS_REPLY_LOGGING] = multiprocessing.Queue()
-
-T = TypeVar('T')
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -87,7 +85,7 @@ class ScreenStage:
     def __init__(self, title: TransToken) -> None:
         self.title = title
         self.id = ipc_types.StageID(format(id(self), '016X'))
-        self._bound: Set[LoadScreen] = set()
+        self._bound: set[LoadScreen] = set()
         self._current = 0
         self._max = 0
         self._skipped = False
@@ -115,7 +113,7 @@ class ScreenStage:
             _QUEUE_SEND_LOAD.put(ipc_types.Load2Daemon_Skip(screen.id, self.id))
         await trio.sleep(0)
 
-    async def iterate(self, seq: Collection[T]) -> AsyncGenerator[T, None]:
+    async def iterate[T](self, seq: Collection[T]) -> AsyncGenerator[T, None]:
         """Tie the progress of a stage to a sequence of some kind."""
         await self.set_length(len(seq))
         for item in seq:
@@ -141,7 +139,7 @@ class LoadScreen:
         # functions from doing anything
         self.active = False
         self.id = ipc_types.ScreenID(id(self))
-        self.stages: List[ScreenStage] = list(stages)
+        self.stages: list[ScreenStage] = list(stages)
         self.title = title_text
         self._scope: trio.CancelScope | None = None
 
@@ -171,7 +169,7 @@ class LoadScreen:
 
     def __exit__(
         self,
-        exc_type: Type[BaseException] | None,
+        exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
     ) -> bool:
@@ -200,7 +198,7 @@ class LoadScreen:
 
     async def __aexit__(
         self,
-        exc_type: Type[BaseException] | None,
+        exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
     ) -> bool:

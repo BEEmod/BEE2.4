@@ -3,7 +3,7 @@
 """
 from __future__ import annotations
 
-from typing import Protocol, TypeVar, Union
+from typing import Protocol
 import decimal
 import operator
 
@@ -16,7 +16,6 @@ from precomp.lazy_value import LazyValue
 
 LOGGER = srctools.logger.get_logger(__name__, 'cond.instances')
 COND_MOD_NAME = 'Instances'
-CompNumT_contra = TypeVar("CompNumT_contra", float, decimal.Decimal, str, contravariant=True)
 
 
 @conditions.make_test('instance')
@@ -109,9 +108,9 @@ def check_has_trait(inst: Entity, kv: Keyvalues) -> bool:
     return kv.value.casefold() in instance_traits.get(inst)
 
 
-class CompareProto(Protocol):
+class CompareProto[Number: (float, decimal.Decimal, str)](Protocol):
     """Operator functions are Any, define a valid signature for how we use them."""
-    def __call__(self, a: CompNumT_contra, b: CompNumT_contra, /) -> bool: ...
+    def __call__(self, a: Number, b: Number, /) -> bool: ...
 
 
 INSTVAR_COMP: dict[str, CompareProto] = {
@@ -374,7 +373,7 @@ def res_replace_instance(vmf: VMF, inst: Entity, res: Keyvalues) -> None:
     new_ent['targetname'] = inst['targetname']
 
 
-GLOBAL_INPUT_ENTS: dict[Union[str, None, object], Entity] = {}
+GLOBAL_INPUT_ENTS: dict[str | None | object, Entity] = {}
 ON_LOAD = object()
 
 
@@ -458,7 +457,7 @@ def res_global_input(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
 
 def global_input(
     vmf: VMF,
-    pos: Union[Vec, str],
+    pos: Vec | str,
     output: Output,
     relay_name: str | None = None,
 ) -> None:

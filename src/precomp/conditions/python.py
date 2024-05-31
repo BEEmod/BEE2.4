@@ -172,13 +172,9 @@ def res_python_setup(res: Keyvalues) -> conditions.ResultCallable:
         kw_defaults=[], 
         kwarg=None, 
         defaults=[],
+        posonlyargs=[ast.arg('_fixup', None)],
+        args=[]
     )
-    # Py 3.8+, make it pos-only.
-    if 'posonlyargs' in args._fields:
-        args.posonlyargs = [ast.arg('_fixup', None)]
-        args.args = []
-    else:  # Just make it a regular arg.
-        args.args = [ast.arg('_fixup', None)]
 
     func = ast.Module([
             ast.FunctionDef(

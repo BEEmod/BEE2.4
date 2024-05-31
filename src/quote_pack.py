@@ -1,14 +1,14 @@
 """Data structures for quote packs."""
 from __future__ import annotations
+from typing import Self, assert_never
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 import enum
 
-import attrs
 from srctools import Angle, Keyvalues, Output, Vec, conv_int, logger
-from typing_extensions import Self, assert_never
+import attrs
 
-import utils
 from transtoken import TransToken, TransTokenSource
+import utils
 
 
 LOGGER = logger.get_logger(__name__)

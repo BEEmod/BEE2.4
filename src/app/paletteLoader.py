@@ -1,9 +1,8 @@
 """Defines the palette data structure and file saving/loading logic."""
 from __future__ import annotations
-from typing import IO, List, Dict, Tuple, Union, Sequence, cast
+from typing import IO, TypeGuard, Literal, Final, cast
 
-from collections.abc import Iterator
-from typing_extensions import TypeAliasType, TypeGuard, Literal, Final
+from collections.abc import Iterator, Sequence
 from uuid import UUID, uuid4, uuid5
 import os
 import shutil
@@ -27,13 +26,13 @@ GROUP_BUILTIN: Final = '<BUILTIN>'
 PAL_EXT: Final = '.bee2_palette'
 CUR_VERSION: Final = 3
 
-HorizInd = TypeAliasType("HorizInd", Literal[0, 1, 2, 3])
-VertInd = TypeAliasType("VertInd", Literal[0, 1, 2, 3, 4, 5, 6, 7])
+type HorizInd = Literal[0, 1, 2, 3]
+type VertInd = Literal[0, 1, 2, 3, 4, 5, 6, 7]
 # TODO: Switch item ID here to ObjectID
-ItemPos = TypeAliasType("ItemPos", Dict[Tuple[HorizInd, VertInd], Tuple[str, int]])
-BuiltinPal = TypeAliasType("BuiltinPal", List[List[
-    Tuple[Union[DefaultItems, utils.ObjectID], int],
-]])
+type ItemPos = dict[tuple[HorizInd, VertInd], tuple[str, int]]
+type BuiltinPal = list[list[
+    tuple[DefaultItems | utils.ObjectID, int],
+]]
 HORIZ: Final[Sequence[HorizInd]] = cast(Sequence[HorizInd], range(4))
 VERT: Final[Sequence[VertInd]] = cast(Sequence[VertInd], range(8))
 COORDS: Sequence[tuple[HorizInd, VertInd]] = [
@@ -334,7 +333,7 @@ class Palette:
                 items[x, y] = (item_id, item_prop.int('subtype', 0))
 
         elif version == 1:
-            for pos, item in zip(COORDS, kv.find_children('Items')):
+            for pos, item in zip(COORDS, kv.find_children('Items'), strict=False):
                 items[pos] = (item.real_name, int(item.value))
         elif version < 1:
             raise ValueError(f'Invalid version {version}!')
@@ -559,7 +558,7 @@ def parse_legacy(posfile: IO[str], propfile: IO[str], path: str) -> Palette:
                     try:
                         pos[next(coords)] = (item_id, subtype)
                     except StopIteration:
-                        raise ValueError('Too many items!')
+                        raise ValueError('Too many items!') from None
                 else:
                     raise ValueError(f'Malformed row "{line}"!')
     return Palette(name, pos)

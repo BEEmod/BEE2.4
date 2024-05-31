@@ -1,7 +1,6 @@
 """Manages reading general options from vbsp_config."""
 from __future__ import annotations
-from typing import Generic, TypeVar, Union, overload
-from typing_extensions import TypeAliasType
+from typing import overload
 
 from collections.abc import Iterator
 from enum import Enum
@@ -17,7 +16,7 @@ from config import COMPILER
 
 
 LOGGER = srctools.logger.get_logger(__name__)
-OptionType = TypeAliasType("OptionType", Union[str, int, float, bool, Vec])
+type OptionType = str | int | float | bool | Vec
 SETTINGS: dict[str, OptionType | None] = {}
 
 
@@ -29,11 +28,8 @@ TYPE_NAMES = {
     Vec: 'Vector',
 }
 
-EnumT = TypeVar('EnumT', bound=Enum)
-OptionT = TypeVar('OptionT', bound=OptionType)
 
-
-class Opt(Generic[OptionT]):
+class Opt[OptionT: OptionType]:
     """A type of option that can be chosen, which may also be unset."""
     def __init__(
         self,
@@ -170,7 +166,7 @@ class Opt(Generic[OptionT]):
         assert self.type is type(val)
         return val
 
-    def as_enum(self: Opt[str], enum: type[EnumT]) -> EnumT:
+    def as_enum[EnumT: Enum](self: Opt[str], enum: type[EnumT]) -> EnumT:
         """Get an option, constraining it to an enumeration.
 
         If it fails, a warning is produced and the first value in the enum is returned.
@@ -207,7 +203,7 @@ class Opt(Generic[OptionT]):
                 return None
 
 
-class OptWithDefault(Opt[OptionT], Generic[OptionT]):
+class OptWithDefault[OptionT: OptionType](Opt[OptionT]):
     """A type of option that can be chosen, which has a default (and so cannot be None)."""
     def __init__(
         self,
@@ -302,7 +298,7 @@ def set_opt(opt_name: str, value: str) -> None:
 
 
 @overload
-def get_itemconf(
+def get_itemconf[OptionT: OptionType](
     name: str | tuple[str, str],
     default: OptionT,
     timer_delay: int | None = None,
@@ -315,7 +311,7 @@ def get_itemconf(
 ) -> str | None: ...
 
 
-def get_itemconf(
+def get_itemconf[OptionT: OptionType](
     name: str | tuple[str, str],
     default: OptionT | None,
     timer_delay: int | None = None,

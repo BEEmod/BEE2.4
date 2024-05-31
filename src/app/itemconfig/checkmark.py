@@ -1,6 +1,6 @@
-from __future__ import annotations
-
-from typing import Mapping
+"""A simple widget that configures a boolean value."""
+from contextlib import aclosing
+from collections.abc import Mapping
 from tkinter import ttk
 import tkinter as tk
 
@@ -12,7 +12,6 @@ from app import itemconfig
 from ui_tk.tooltip import add_tooltip
 from packages.widgets import KIND_CHECKMARK
 from ui_tk.img import TKImages
-import utils
 
 
 @itemconfig.ui_single_no_conf(KIND_CHECKMARK)
@@ -38,7 +37,7 @@ async def widget_checkmark(
         command=command,
     )
     task_status.started(check)
-    async with utils.aclosing(holder.eventual_values()) as agen:
+    async with aclosing(holder.eventual_values()) as agen:
         async for value in agen:
             var.set(conv_bool(value))
 

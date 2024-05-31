@@ -1,8 +1,8 @@
 """Implements the BEE2 VBSP compiler replacement."""
-from typing import Any, Dict, List, Tuple, Set, Iterable, Optional, Counter
-from typing_extensions import TypedDict
+from typing import Any, TypedDict
+from collections.abc import Iterable
+from collections import defaultdict, namedtuple, Counter
 from io import StringIO
-from collections import defaultdict, namedtuple
 import os
 import sys
 import shutil
@@ -56,12 +56,12 @@ LOGGER = srctools.logger.get_logger()
 
 class _Settings(TypedDict):
     """Configuration data extracted from VBSP_config. TODO: Eliminate and make local vars."""
-    textures: Dict[str, Any]
-    fog: Dict[str, Any]
-    elevator: Dict[str, str]
+    textures: dict[str, Any]
+    fog: dict[str, Any]
+    elevator: dict[str, str]
     music_conf: Keyvalues
 
-    style_vars: Dict[str, bool]
+    style_vars: dict[str, bool]
 
 settings: _Settings = {
     "textures":       {},
@@ -77,12 +77,12 @@ BEE2_config = ConfigFile('compile.cfg')
 
 # These are overlays which have been modified by
 # conditions, and shouldn't be restyled or modified later.
-IGNORED_OVERLAYS: Set[Entity] = set()
+IGNORED_OVERLAYS: set[Entity] = set()
 
 
-async def load_settings() -> Tuple[
+async def load_settings() -> tuple[
     antlines.IndicatorStyle,
-    Dict[utils.ObjectID, editoritems.Item],
+    dict[utils.ObjectID, editoritems.Item],
     corridor.ExportedConf,
 ]:
     """Load in all our settings from vbsp_config."""
@@ -115,7 +115,7 @@ async def load_settings() -> Tuple[
             res_dmx_conf = utils.Result.sync(nursery, load_dmx_config, 'bee2/config.dmx')
             # Load in templates locations.
             nursery.start_soon(template_brush.load_templates, 'bee2/templates.lst')
-    except Exception:  # TODO 3.8: except* (FileNotFoundError, IOError)
+    except* OSError:
         LOGGER.exception(
             'Failed to parse required config file. Recompile the compiler '
             'and/or export the palette.'
@@ -141,7 +141,7 @@ async def load_settings() -> Tuple[
 
     # Load out a copy of the item configuration, checking types as we go.
     # The pickle could have produced anything.
-    id_to_item: Dict[utils.ObjectID, editoritems.Item] = {}
+    id_to_item: dict[utils.ObjectID, editoritems.Item] = {}
 
     editor_list = res_editor()
     if not isinstance(editor_list, list):
@@ -285,7 +285,7 @@ def anti_fizz_bump(vmf: VMF) -> None:
         fizz_name = cleanser['targetname']
         if fizz_name.endswith('_brush'):
             # Fizzlers will be changed to this in fix_func_brush()
-            fizz_name = fizz_name[:-6] + '-br_brush'
+            fizz_name = fizz_name.removesuffix('_brush') + '-br_brush'
 
         # Only have 1 bumper per brush
         if fizz_name not in bumpers:
@@ -879,7 +879,7 @@ def add_goo_mist(vmf: VMF, sides: Iterable[FrozenVec]) -> None:
 def fit_goo_mist(
     vmf: VMF,
     sides: Iterable[FrozenVec],
-    needs_mist: Set[FrozenVec],
+    needs_mist: set[FrozenVec],
     grid_x: int,
     grid_y: int,
     particle: str,
@@ -920,7 +920,7 @@ def change_brush(vmf: VMF) -> None:
     make_goo_mist = options.GOO_MIST() and srctools.conv_bool(
         settings['style_vars'].get('AllowGooMist', '1')
     )
-    mist_solids: Set[FrozenVec] = set()
+    mist_solids: set[FrozenVec] = set()
 
     make_bottomless = bottomlessPit.pits_allowed()
     LOGGER.info('Make Bottomless Pit: {}', make_bottomless)
@@ -985,7 +985,7 @@ Clump = namedtuple('Clump', [
     'max_pos',
     'tex',
 ])
-PRESET_CLUMPS: List[Clump] = []  # Additional clumps set by conditions, for certain areas.
+PRESET_CLUMPS: list[Clump] = []  # Additional clumps set by conditions, for certain areas.
 
 
 @conditions.make_result('SetAreaTex')
@@ -1039,11 +1039,11 @@ def cond_force_clump(res: Keyvalues) -> conditions.ResultCallable:
 def position_exit_signs(vmf: VMF) -> None:
     """Configure exit signage.
 
-    If "remove_exit_signs" is set, then delete them. Otherwise if "signExitInst"
+    If "remove_exit_signs" is set, then delete them. Otherwise, if "signExitInst"
     is set, overlay the specified instance on top of the sign pair.
     """
-    exit_sign: Optional[Entity]
-    exit_arrow: Optional[Entity]
+    exit_sign: Entity | None
+    exit_arrow: Entity | None
     try:
         [exit_sign] = vmf.by_target['exitdoor_stickman']
     except ValueError:
@@ -1283,13 +1283,13 @@ def fix_worldspawn(vmf: VMF, info: conditions.MapInfo) -> None:
     vmf.spawn['skyname'] = options.SKYBOX()
 
 
-async def find_missing_instances(game: Game, vmf: VMF) -> List[Vec]:
+async def find_missing_instances(game: Game, vmf: VMF) -> list[Vec]:
     """Go through the map, and check for missing instances.
 
     We don't raise an error immediately, because it could be possible that VBSP checks differently
     and can find them anyway. In that case just let it continue successfully.
     """
-    missing: List[Vec] = []
+    missing: list[Vec] = []
     sdk_content = await trio.Path(game.path / '../sdk_content/maps/').absolute()
 
     async def check(inst: Entity) -> None:
@@ -1337,9 +1337,9 @@ def save(vmf: VMF, path: str) -> None:
 
 
 def run_vbsp(
-    vbsp_args: List[str],
+    vbsp_args: list[str],
     path: str,
-    new_path: Optional[str] = None,
+    new_path: str | None = None,
     is_error_map: bool = False,
     maybe_missing_inst: Iterable[Vec] = (),
 ) -> None:
@@ -1369,7 +1369,7 @@ def run_vbsp(
     if (utils.MAC or utils.LINUX) and is_peti:
         instance_symlink()
 
-    # Use a special name for VBSP's output..
+    # Use a special name for VBSP's output...
     vbsp_logger = srctools.logger.get_logger('valve.VBSP', alias='<Valve>')
 
     # And also save a copy for us to analyse.
@@ -1512,7 +1512,7 @@ def process_vbsp_fail(output: str, missing_locs: Iterable[Vec]) -> None:
     BEE2_config.save_check()
 
 
-async def main(argv: List[str]) -> None:
+async def main(argv: list[str]) -> None:
     """Main program code.
 
     """
@@ -1585,8 +1585,8 @@ async def main(argv: List[str]) -> None:
         elif a == '-game':
             game_dir = new_args[i+1]
 
-    LOGGER.info('Map path is "' + path + '"')
-    LOGGER.info('New path: "' + new_path + '"')
+    LOGGER.info('Map path is "{}"', path)
+    LOGGER.info('New path: "{}"', new_path)
     if not path:
         raise Exception("No map passed!")
     if not game_dir:

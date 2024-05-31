@@ -7,9 +7,9 @@ they are loaded in the background, then unloaded if removed from all widgets.
 """
 from __future__ import annotations
 
-from typing import Any, ClassVar, Dict, Final, Iterator, Tuple, Type
+from typing import Any, ClassVar, Final
 from typing_extensions import Self
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping, Sequence, Iterator
 from pathlib import Path
 import abc
 import functools
@@ -31,7 +31,7 @@ import utils
 
 # Used to deduplicate handles with existing ones. But if they're totally unused, let them die.
 _handles: weakref.WeakValueDictionary[
-    tuple[Type[Handle], tuple[object, ...], int, int],
+    tuple[type[Handle], tuple[object, ...], int, int],
     Handle,
 ] = weakref.WeakValueDictionary()
 
@@ -55,11 +55,11 @@ _UI_IMPL: UIImage | None = None
 # Colour of the palette item background
 PETI_ITEM_BG: Final = (229, 233, 233)
 PETI_ITEM_BG_HEX: Final = '#{:2X}{:2X}{:2X}'.format(*PETI_ITEM_BG)
-BACKGROUNDS: Mapping[Theme, Tuple[int, int, int]] = {
+BACKGROUNDS: Mapping[Theme, tuple[int, int, int]] = {
     Theme.LIGHT: (229, 233, 233),  # Same as palette items ingame.
     Theme.DARK: (26, 22, 22),
 }
-FOREGROUNDS: Mapping[Theme, Tuple[int, int, int, int]] = {
+FOREGROUNDS: Mapping[Theme, tuple[int, int, int, int]] = {
     Theme.LIGHT: (0, 0, 0, 255),
     Theme.DARK: (255, 255, 255, 255),
 }
@@ -82,7 +82,7 @@ def _load_special(path: str, theme: Theme) -> Image.Image:
         return Image.new('RGBA', (64, 64), (0, 0, 0, 0))
 
 
-ICONS: Dict[Tuple[str, Theme], Image.Image] = {
+ICONS: dict[tuple[str, Theme], Image.Image] = {
     (name, theme): _load_special(name, theme)
     for name in ['error', 'none', 'load']
     for theme in Theme
@@ -142,7 +142,7 @@ def _load_file(
     width: int, height: int,
     resize_algo: Image.Resampling,
     check_other_packages: bool = False,
-) -> Tuple[Image.Image, bool]:
+) -> tuple[Image.Image, bool]:
     """Load an image from a filesystem."""
     path = uri.path.casefold()
     if path[-4:-3] == '.':
@@ -297,7 +297,7 @@ class Handle(User):
 
     @classmethod
     def parse(
-        cls: Type[Handle],
+        cls,
         kv: Keyvalues,
         pack: utils.ObjectID,
         width: int,
@@ -355,7 +355,7 @@ class Handle(User):
         If subfolder is specified, files will be relative to this folder.
         The width/height may be zero to indicate it should not be resized.
         """
-        typ: Type[Handle]
+        typ: type[Handle]
         args: list[Any]
         if uri.path.casefold() == '<black>':  # Old special case name.
             LOGGER.warning(

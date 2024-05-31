@@ -1,5 +1,4 @@
-from typing import List
-from exceptiongroup import ExceptionGroup
+"""Test the ErrorUI handling system."""
 
 import pytest
 
@@ -25,7 +24,7 @@ def test_exception() -> None:
     assert str(err) == "AppError: The message"
 
 
-async def handler_fail(title: TransToken, desc: TransToken, errors: List[AppError]) -> None:
+async def handler_fail(title: TransToken, desc: TransToken, errors: list[AppError]) -> None:
     """Should never be used."""
     pytest.fail("Handler called!")
 
@@ -68,9 +67,9 @@ async def test_nonfatal() -> None:
     orig_title = TransToken.untranslated("The title")
     orig_error = TransToken.untranslated("nonfatal error, n={n}")
     orig_warn = TransToken.untranslated("nonfatal warn, n={n}")
-    caught_errors: List[AppError] = []
+    caught_errors: list[AppError] = []
 
-    async def catch(title: TransToken, desc: TransToken, errors: List[AppError]) -> None:
+    async def catch(title: TransToken, desc: TransToken, errors: list[AppError]) -> None:
         """Catch the errors that occur."""
         assert title is orig_title
         assert str(desc) == "nonfatal warn, n=5"
@@ -83,7 +82,7 @@ async def test_nonfatal() -> None:
     exc5 = AppError(TransToken.untranslated("Error 5"))
     unrelated = BufferError("Whatever")
 
-    task: List[str] = []
+    task: list[str] = []
     success = False
     with ErrorUI.install_handler(catch):
         async with ErrorUI(title=orig_title, error_desc=orig_error, warn_desc=orig_warn) as error_block:
@@ -127,9 +126,9 @@ async def test_fatal_only_err() -> None:
     orig_title = TransToken.untranslated("The title")
     orig_error = TransToken.untranslated("fatal_only_error error, n={n}")
     orig_warn = TransToken.untranslated("fatal_only_error warn, n={n}")
-    caught_errors: List[AppError] = []
+    caught_errors: list[AppError] = []
 
-    async def catch(title: TransToken, desc: TransToken, errors: List[AppError]) -> None:
+    async def catch(title: TransToken, desc: TransToken, errors: list[AppError]) -> None:
         """Catch the errors that occur."""
         assert title is orig_title
         assert str(desc) == "fatal_only_error error, n=2"
@@ -138,7 +137,7 @@ async def test_fatal_only_err() -> None:
     exc1 = AppError(TransToken.untranslated("Error 1"))
     exc2 = AppError(TransToken.untranslated("Error 2"))
 
-    task: List[str] = []
+    task: list[str] = []
     with ErrorUI.install_handler(catch):
         async with ErrorUI(title=orig_title, error_desc=orig_error, warn_desc=orig_warn) as error_block:
             assert error_block.result is Result.SUCCEEDED
@@ -160,7 +159,7 @@ async def test_fatal_exc() -> None:
     exc = AppError(TransToken.untranslated("Some Error"))
     unrelated = LookupError("something")
 
-    task: List[str] = []
+    task: list[str] = []
     with pytest.raises(ExceptionGroup) as group_catch, ErrorUI.install_handler(handler_fail):
         async with ErrorUI() as error_block:
             assert error_block.result is Result.SUCCEEDED
@@ -185,7 +184,7 @@ async def test_fatal_group() -> None:
     unrelated = LookupError("something")
     group = ExceptionGroup("group name", [exc2, unrelated])
 
-    task: List[str] = []
+    task: list[str] = []
     with pytest.raises(ExceptionGroup) as group_catch, ErrorUI.install_handler(handler_fail):
         async with ErrorUI() as error_block:
             assert error_block.result is Result.SUCCEEDED

@@ -1,10 +1,11 @@
 """The code for performing an export to the game folder."""
 from __future__ import annotations
 
-import os
+from typing import Any, TYPE_CHECKING
 from enum import Enum, auto
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Set, TYPE_CHECKING, Type
+from collections.abc import Callable
+import os
 
 import attrs
 import srctools.logger
@@ -79,22 +80,22 @@ class ExportData:
     packset: PackagesSet = attrs.field(repr=lambda pack: f'<PackagesSet @ {id(pack):x}>')
     game: Game  # The current game.
     # Usually str, but some items pass other things.
-    selected: Dict[Type[PakObject], Any]
+    selected: dict[type[PakObject], Any]
     # Some items need to know which style is selected
     selected_style: Style
     # If refreshing resources is enabled.
     copy_resources: bool
     # All the items in the map
-    all_items: List[EditorItem] = attrs.field(factory=list, repr=False)
+    all_items: list[EditorItem] = attrs.field(factory=list, repr=False)
     # The error/connection icons
-    renderables: Dict[RenderableType, Renderable] = attrs.Factory(dict)
+    renderables: dict[RenderableType, Renderable] = attrs.Factory(dict)
     config: config_mod.Config
     # vbsp_config.cfg file.
     vbsp_conf: Keyvalues = attrs.field(factory=Keyvalues.root, repr=False)
     # As steps export, they may fill this to include additional resources that
     # are written to the game folder. If updating the cache, these files won't
     # be deleted. This should be an absolute path.
-    resources: Set[Path] = attrs.Factory(set)
+    resources: set[Path] = attrs.Factory(set)
     # Flag set to indicate that the error server may be running.
     maybe_error_server_running: bool = True
     # Can be called to indicate a non-fatal error.
@@ -117,7 +118,7 @@ async def export(
     game: Game,
     packset: packages.PackagesSet,
     style: packages.Style,
-    selected_objects: Dict[Type[packages.PakObject], Any],
+    selected_objects: dict[type[packages.PakObject], Any],
     should_refresh: bool = False,
 ) -> ErrorResult:
     """Export configuration to the specified game.

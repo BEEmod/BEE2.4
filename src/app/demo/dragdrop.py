@@ -2,9 +2,11 @@ from __future__ import annotations
 from tkinter import messagebox, ttk
 import tkinter as tk
 
+from contextlib import aclosing
+
 import trio
 
-from app import background_run, img, sound
+from app import img, sound
 from app.dragdrop import DragInfo
 from app.errors import ErrorUI
 from transtoken import TransToken
@@ -18,7 +20,7 @@ import packages
 import utils
 
 
-async def test() -> None:
+async def test(core_nursery: trio.Nursery) -> None:
     """Test the GUI."""
     BEE2_config.GEN_OPTS.load()
     config.APP.read_file(config.APP_LOC)
@@ -35,7 +37,7 @@ async def test() -> None:
             )
     assert app._APP_NURSERY is not None
     await app._APP_NURSERY.start(img.init, packages.PACKAGE_SYS,  TK_IMG)
-    background_run(sound.sound_task)
+    core_nursery.start_soon(sound.sound_task)
     print('Done.')
 
     left_frm = ttk.Frame(TK_ROOT)
@@ -59,7 +61,7 @@ async def test() -> None:
         group_icon: str | None = None,
     ) -> str:
         """Simple implementation of the DND protocol."""
-        icon = img.Handle.parse_uri(
+        handle = img.Handle.parse_uri(
             utils.PackagePath(pak_id, f'items/clean/{icon}.png'),
             64, 64,
         )
@@ -69,8 +71,8 @@ async def test() -> None:
                 64, 64,
             )
         else:
-            group_handle = icon
-        infos[name] = DragInfo(icon, group, group_handle)
+            group_handle = handle
+        infos[name] = DragInfo(handle, group, group_handle)
         return name
 
     manager: DragDrop[str] = DragDrop(
@@ -161,7 +163,7 @@ async def test() -> None:
 
     async def update_hover_text() -> None:
         """Update the hovered text."""
-        async with utils.aclosing(manager.hovered_item.eventual_values()) as agen:
+        async with aclosing(manager.hovered_item.eventual_values()) as agen:
             async for item in agen:
                 if item is not None:
                     name_lbl['text'] = 'Name: ' + item

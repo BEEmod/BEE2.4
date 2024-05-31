@@ -1,8 +1,8 @@
 """Export the deprecated packlist system."""
-import trio
 from srctools import Keyvalues
+import trio
 
-from exporting import ExportData, STEPS
+from exporting import STEPS, ExportData
 from packages import PackList
 
 

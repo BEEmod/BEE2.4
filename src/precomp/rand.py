@@ -78,7 +78,8 @@ def init_seed(vmf: VMF) -> None:
 
 def seed(
     name: bytes,
-    *values: str | Entity | float | bytes | bytearray | Vec | FrozenVec | Angle | FrozenAngle | Matrix | FrozenMatrix,
+    *values: str | Entity | float | bytes | bytearray
+        | Vec | FrozenVec | Angle | FrozenAngle | Matrix | FrozenMatrix,
 ) -> Random:
     """Initialise a random number generator with these starting arguments.
 
@@ -88,28 +89,29 @@ def seed(
     algo = MAP_HASH.copy()
     algo.update(name)
     for val in values:
-        if isinstance(val, str):
-            algo.update(val.encode('utf8'))
-        elif isinstance(val, (Vec, FrozenVec, Angle, FrozenAngle)):
-            a, b, c = val
-            algo.update(THREE_FLOATS.pack(round(a, 6), round(b, 6), round(c, 6)))
-        elif isinstance(val, float):
-            algo.update(ONE_FLOAT.pack(val))
-        elif isinstance(val, (Matrix, FrozenMatrix)):
-            algo.update(NINE_FLOATS.pack(
-                val[0, 0], val[0, 1], val[0, 2],
-                val[1, 0], val[1, 1], val[1, 2],
-                val[2, 0], val[2, 1], val[2, 2],
-            ))
-        elif isinstance(val, Entity):
-            algo.update(val['targetname'].encode('ascii', 'replace'))
-            x, y, z = round(Vec.from_str(val['origin']), 6)
-            algo.update(THREE_FLOATS.pack(x, y, z))
-            p, y, r = Vec.from_str(val['origin'])
-            algo.update(THREE_FLOATS.pack(round(p, 6), round(y, 6), round(r, 6)))
-        else:
-            try:
-                algo.update(val)
-            except TypeError as exc:
-                raise TypeError(values) from exc
+        match val:
+            case str():
+                algo.update(val.encode('utf8'))
+            case Vec() | FrozenVec() | Angle() | FrozenAngle():
+                a, b, c = val
+                algo.update(THREE_FLOATS.pack(round(a, 6), round(b, 6), round(c, 6)))
+            case float():
+                algo.update(ONE_FLOAT.pack(val))
+            case Matrix() | FrozenMatrix():
+                algo.update(NINE_FLOATS.pack(
+                    val[0, 0], val[0, 1], val[0, 2],
+                    val[1, 0], val[1, 1], val[1, 2],
+                    val[2, 0], val[2, 1], val[2, 2],
+                ))
+            case Entity():
+                algo.update(val['targetname'].encode('ascii', 'replace'))
+                x, y, z = round(Vec.from_str(val['origin']), 6)
+                algo.update(THREE_FLOATS.pack(x, y, z))
+                p, y, r = Vec.from_str(val['origin'])
+                algo.update(THREE_FLOATS.pack(round(p, 6), round(y, 6), round(r, 6)))
+            case _:
+                try:
+                    algo.update(val)
+                except TypeError as exc:
+                    raise TypeError(values) from exc
     return Random(int.from_bytes(algo.digest(), 'little'))

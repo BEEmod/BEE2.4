@@ -1,25 +1,26 @@
 """Export item definitions."""
 from __future__ import annotations
+from collections.abc import Mapping
+from pathlib import PurePosixPath as FSPath
 import copy
 import operator
 import re
-from typing import Mapping
-from pathlib import PurePosixPath as FSPath
 
 from srctools import EmptyMapping, Keyvalues
 import srctools.logger
 import trio
 
-import config
-import utils
 from app import lazy_conf
 from config.gen_opts import GenOptions
 from config.item_defaults import ItemDefault
-from editoritems import Item as EditorItem, InstCount
 from connections import INDICATOR_CHECK_ID
-from transtoken import TransToken
-from . import ExportData, STEPS, StepResource
+from editoritems import InstCount, Item as EditorItem
 from packages.item import Item, ItemConfig
+from transtoken import TransToken
+import config
+import utils
+
+from . import STEPS, ExportData, StepResource
 
 
 # Finds names surrounded by %s
