@@ -848,7 +848,7 @@ class SelectorWin:
 
         self.prop_icon = ttk.Label(self.prop_icon_frm, name='prop_icon')
         self.prop_icon.grid(row=0, column=0)
-        self.prop_icon_frm.configure(dict(zip(('width', 'height'), ICON_SIZE_LRG)))
+        self.prop_icon_frm.configure(dict(zip(('width', 'height'), ICON_SIZE_LRG, strict=True)))
         tk_tools.bind_leftclick(self.prop_icon, self._icon_clicked)
 
         name_frame = ttk.Frame(self.prop_frm)

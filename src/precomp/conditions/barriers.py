@@ -231,15 +231,15 @@ def res_breakable_glass(vmf: VMF, inst: Entity, res: Keyvalues) -> object:
         # We need to set "lowerleft", "upperright" etc keyvalues to the corner
         # locations.
         # These are used to place the shattered glass, when it breaks.
-        for name, points in zip(CORNER_NAMES, CORNER_POINTS[norm.freeze()]):
+        for name, points in zip(CORNER_NAMES, CORNER_POINTS[norm.freeze()], strict=True):
             corner = Vec()
-            for axis, axis_type in zip('xyz', points):
+            for ind, axis_type in enumerate(points):
                 if axis_type == 0:  # solid_min is aligned to the front.
-                    corner[axis] = solid_min[axis]
+                    corner[ind] = solid_min[ind]
                 elif axis_type == MAX:
-                    corner[axis] = solid_max[axis]
+                    corner[ind] = solid_max[ind]
                 elif axis_type == MIN:
-                    corner[axis] = solid_min[axis]
+                    corner[ind] = solid_min[ind]
                 else:
                     assert_never(axis_type)
             breakable_surf[name] = corner

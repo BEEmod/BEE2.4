@@ -175,7 +175,10 @@ def link_item(vmf: VMF, group: list[item_chain.Node[Config]]) -> None:
                     points=[node.pos for node in node_list],
                     lines=[
                         (a.pos, b.pos) for a, b in
-                        zip(node_list, [*node_list[1:], node_list[0]])
+                        # Add the first to the end so that we get a full loop of pairs.
+                        itertools.pairwise(itertools.chain(
+                            node_list, [node_list[0]],
+                        ))
                     ]
                 )
             else:

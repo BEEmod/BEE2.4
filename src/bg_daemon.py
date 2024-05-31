@@ -138,7 +138,7 @@ class BaseLoadScreen:
     def op_show(self, title: str, labels: list[str]) -> None:
         """Show the window."""
         self.win.title(title)
-        for (st_id, _), name in zip(self.stages, labels):
+        for (st_id, _), name in zip(self.stages, labels, strict=True):
             self.names[st_id] = name
 
         self.is_shown = True
@@ -289,7 +289,7 @@ class LoadScreen(BaseLoadScreen):
         self.title_text = title
         self.win.title(title)
         self.title_lbl['text'] = title + '...',
-        for (st_id, _), name in zip(self.stages, labels):
+        for (st_id, _), name in zip(self.stages, labels, strict=True):
             if st_id in self.titles:
                 self.titles[st_id]['text'] = name + ':'
         super().op_show(title, labels)

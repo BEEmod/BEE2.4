@@ -177,6 +177,7 @@ def res_fix_rotation_axis(vmf: VMF, ent: Entity, res: Keyvalues) -> None:
     for flag, value in zip(
         ('x', 'y', 'z', 'rev'),
         [axis.x > 1e-6, axis.y > 1e-6, axis.z > 1e-6, reverse],
+        strict=True,
     ):
         if flag not in flag_values:
             continue

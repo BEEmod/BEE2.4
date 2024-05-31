@@ -13,6 +13,7 @@ from contextlib import aclosing
 import tkinter as tk
 import atexit
 import os
+import itertools
 import shutil
 import string
 
@@ -411,9 +412,9 @@ async def auto_backup(game: gameMan.Game) -> None:
             AUTO_BACKUP_FILE.format(game=safe_name, ind='_'+str(i+1))
             for i in range(extra_back_count)
         ]
-        # Move each file over by 1 index, ignoring missing ones
-        # We need to reverse to ensure we don't overwrite any zips
-        for old_name, new_name in reversed(list(zip(back_files, back_files[1:]))):
+        # Move each file over by 1 index, ignoring missing ones.
+        # This will do 8->9, 7->8, 6->7, etc.
+        for new_name, old_name in itertools.pairwise(reversed(back_files)):
             LOGGER.info('Moving: {} -> {}', old_name, new_name)
             old_name = os.path.join(backup_dir, old_name)
             new_name = os.path.join(backup_dir, new_name)

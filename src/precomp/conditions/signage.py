@@ -60,7 +60,7 @@ SIGNAGES: dict[str, Sign] = {}
 CONN_SIGNAGES: dict[str, Sign] = {
     str(time): Sign('', f'<overlay.{sign}>')
     for time, sign in
-    zip(range(3, 31), [
+    enumerate([
         'square',
         'cross',
         'dot',
@@ -71,7 +71,7 @@ CONN_SIGNAGES: dict[str, Sign] = {
         'star',
         'circle',
         'wavy',
-    ])
+    ], start=3)
 }
 
 

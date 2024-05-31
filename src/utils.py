@@ -3,7 +3,9 @@ from __future__ import annotations
 
 from typing import (
     Final, NewType, Protocol, TYPE_CHECKING, Any, NoReturn, SupportsInt, Literal, TypeGuard,
+    overload,
 )
+from typing_extensions import deprecated
 from collections.abc import (
     Awaitable, Callable, Collection, Generator, Iterable, Iterator,
     Mapping, Sequence, KeysView, ValuesView, ItemsView
@@ -488,6 +490,11 @@ def _uppercase_casefold(value: str) -> str:
         return casefolded
 
 
+@overload
+@deprecated('Value is already an ObjectID | BlankID!')
+def obj_id_optional(value: ObjectID | BlankID, kind: str = 'object') -> ObjectID | BlankID: ...
+@overload
+def obj_id_optional(value: str, kind: str = 'object') -> ObjectID | BlankID: ...
 def obj_id_optional(value: str, kind: str = 'object') -> ObjectID | BlankID:
     """Parse an object ID, allowing through empty IDs."""
     if (
@@ -506,7 +513,11 @@ def obj_id_optional(value: str, kind: str = 'object') -> ObjectID | BlankID:
     return ObjectID(SpecialID(value))
 
 
-# TODO: Could use @overload + @deprecated to warn if input is already an ObjectID.
+@overload
+@deprecated('Value is already an ObjectID!')
+def obj_id(value: ObjectID, kind: str = 'object') -> ObjectID: ...
+@overload
+def obj_id(value: str, kind: str = 'object') -> ObjectID: ...
 def obj_id(value: str, kind: str = 'object') -> ObjectID:
     """Parse an object ID."""
     result = obj_id_optional(value, kind)
@@ -515,6 +526,11 @@ def obj_id(value: str, kind: str = 'object') -> ObjectID:
     return result
 
 
+@overload
+@deprecated('Value is already a SpecialID | BlankID!')
+def special_id_optional(value: SpecialID | BlankID, kind: str = 'object') -> SpecialID | BlankID: ...
+@overload
+def special_id_optional(value: str, kind: str = 'object') -> SpecialID | BlankID: ...
 def special_id_optional(value: str, kind: str = 'object') -> SpecialID | BlankID:
     """Parse an object ID or a <special> name, allowing empty IDs."""
     if value == "":
@@ -526,6 +542,11 @@ def special_id_optional(value: str, kind: str = 'object') -> SpecialID | BlankID
     return obj_id_optional(value, kind)
 
 
+@overload
+@deprecated('Value is already a SpecialID!')
+def special_id(value: SpecialID, kind: str = 'object') -> SpecialID: ...
+@overload
+def special_id(value: str, kind: str = 'object') -> SpecialID: ...
 def special_id(value: str, kind: str = 'object') -> SpecialID:
     """Parse an object ID or a <special> name."""
     result = special_id_optional(value, kind)

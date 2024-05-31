@@ -606,11 +606,11 @@ async def load_packages(
     """Scan and read in all packages."""
     async with trio.open_nursery() as find_nurs:
         find_sources = [
-            utils.Result(find_nurs, find_packages, errors, packset, pak_dir)
+            (pak_dir, utils.Result(find_nurs, find_packages, errors, packset, pak_dir))
             for pak_dir in pak_dirs
         ]
     # Once they've all run, check if any sources failed to find any packages - that's probably an error.
-    for pak_dir, find_res in zip(pak_dirs, find_sources):
+    for pak_dir, find_res in find_sources:
         if not find_res():
             errors.add(TRANS_EMPTY_PAK_DIR.format(path=pak_dir))
     pack_count = len(packset.packages)

@@ -61,7 +61,7 @@ async def test(core_nursery: trio.Nursery) -> None:
         group_icon: str | None = None,
     ) -> str:
         """Simple implementation of the DND protocol."""
-        icon = img.Handle.parse_uri(
+        handle = img.Handle.parse_uri(
             utils.PackagePath(pak_id, f'items/clean/{icon}.png'),
             64, 64,
         )
@@ -71,8 +71,8 @@ async def test(core_nursery: trio.Nursery) -> None:
                 64, 64,
             )
         else:
-            group_handle = icon
-        infos[name] = DragInfo(icon, group, group_handle)
+            group_handle = handle
+        infos[name] = DragInfo(handle, group, group_handle)
         return name
 
     manager: DragDrop[str] = DragDrop(

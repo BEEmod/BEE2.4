@@ -165,7 +165,7 @@ class Item[UserT]:
     def place(self, check_width: int, head_pos: list[tuple[int, int]], y: int) -> None:
         """Position the widgets on the frame."""
         self.check.place(x=0, y=y, width=check_width, height=ROW_HEIGHT)
-        for text, widget, (x, width) in zip(self.values, self.val_widgets, head_pos):
+        for text, widget, (x, width) in zip(self.values, self.val_widgets, head_pos, strict=True):
             widget.place(
                 x=x+check_width,
                 y=y,

@@ -3,7 +3,9 @@
 This includes Unstationary Scaffolds and Vactubes.
 """
 from __future__ import annotations
+
 from collections.abc import Iterable, Iterator
+import itertools
 
 from srctools import Entity, Matrix, Vec
 import attrs
@@ -127,7 +129,10 @@ def chain[ConfT](
                             points=[node.pos for node in node_out],
                             lines=[
                                 (a.pos, b.pos) for a, b in
-                                zip(node_out, [*node_out[1:], node_out[0]])
+                                # Add the first to the end so that we get a full loop of pairs.
+                                itertools.pairwise(itertools.chain(
+                                    node_out, [node_out[0]],
+                                ))
                             ]
                         )
                     break
