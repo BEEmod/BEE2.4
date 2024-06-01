@@ -125,9 +125,7 @@ class _WindowsDict(TypedDict):
 
 class _FramesDict(TypedDict):
     """TODO: Remove."""
-    picker: ttk.Frame
     preview: tk.Frame
-    toolMenu: tk.Frame
 
 
 class _UIDict(TypedDict):
@@ -1468,21 +1466,21 @@ async def init_windows(
 
     await LOAD_UI.step('filter')
 
-    frames['picker'] = ttk.Frame(
+    picker_frame = ttk.Frame(
         picker_split_frame,
         name='picker',
         padding=5,
         borderwidth=4,
         relief="raised",
     )
-    frames['picker'].grid(row=1, column=0, sticky="NSEW")
+    picker_frame.grid(row=1, column=0, sticky="NSEW")
     picker_split_frame.rowconfigure(1, weight=1)
     picker_split_frame.columnconfigure(0, weight=1)
-    await init_picker(core_nursery, frames['picker'])
+    await init_picker(core_nursery, picker_frame)
 
     await LOAD_UI.step('picker')
 
-    frames['toolMenu'] = tk.Frame(
+    toolbar_frame = tk.Frame(
         frames['preview'],
         name='toolbar',
         bg=ItemsBG,
@@ -1490,7 +1488,7 @@ async def init_windows(
         height=26,
         borderwidth=0,
         )
-    frames['toolMenu'].place(x=73, y=2)
+    toolbar_frame.place(x=73, y=2)
 
     windows['pal'] = SubPane.SubPane(
         TK_ROOT, tk_img,
@@ -1499,7 +1497,7 @@ async def init_windows(
         menu_bar=menu_bar.view_menu,
         resize_x=True,
         resize_y=True,
-        tool_frame=frames['toolMenu'],
+        tool_frame=toolbar_frame,
         tool_img='icons/win_palette',
         tool_col=10,
     )
@@ -1540,7 +1538,7 @@ async def init_windows(
         name='opt',
         menu_bar=menu_bar.view_menu,
         resize_x=True,
-        tool_frame=frames['toolMenu'],
+        tool_frame=toolbar_frame,
         tool_img='icons/win_options',
         tool_col=11,
     )
@@ -1555,18 +1553,18 @@ async def init_windows(
 
     await utils.run_as_task(
         core_nursery.start, itemconfig.make_pane,
-        core_nursery, frames['toolMenu'], menu_bar.view_menu, tk_img, signage_trigger,
+        core_nursery, toolbar_frame, menu_bar.view_menu, tk_img, signage_trigger,
     )
     await LOAD_UI.step('itemvar')
 
     await utils.run_as_task(
         core_nursery.start, CompilerPane.make_pane,
-        frames['toolMenu'], tk_img, menu_bar.view_menu,
+        toolbar_frame, tk_img, menu_bar.view_menu,
     )
     await LOAD_UI.step('compiler')
 
     btn_clear = SubPane.make_tool_button(
-        frames['toolMenu'], tk_img,
+        toolbar_frame, tk_img,
         img='icons/clear_pal',
         command=pal_clear,
     )
@@ -1577,7 +1575,7 @@ async def init_windows(
     )
 
     btn_shuffle = SubPane.make_tool_button(
-        frames['toolMenu'], tk_img,
+        toolbar_frame, tk_img,
         img='icons/shuffle_pal',
         command=pal_shuffle,
     )
