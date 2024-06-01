@@ -252,23 +252,14 @@ class Item:
             self.data.pak_id, str(subtype.pal_icon)
         ), 64, 64)
 
-    def refresh_subitems(self) -> None:
-        """Call load_data() on all our subitems, so they reload icons and names."""
-        for item in pal_picked:
-            if item.id == self.id:
-                item.load_data()
-        flow_preview()
-        for item in pal_items:
-            if item.id == self.id:
-                item.load_data()
-        background_run(flow_picker, config.APP.get_cur_conf(FilterConf))
-
     def change_version(self, version: str) -> None:
         """Set the version of this item."""
         old_conf = config.APP.get_cur_conf(ItemDefault, self.id, ItemDefault())
         config.APP.store_conf(attrs.evolve(old_conf, version=version), self.id)
         self.load_data()
-        self.refresh_subitems()
+        for item in itertools.chain(pal_picked, pal_items):
+            if item.id == self.id:
+                item.load_data()
 
 
 class PalItem:
