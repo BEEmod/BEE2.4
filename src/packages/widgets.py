@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any, Protocol, Self
 from collections.abc import Iterable, Iterator
-from contextlib import aclosing
+from contextlib import AbstractContextManager, aclosing
 import itertools
 
 from srctools import EmptyMapping, Keyvalues, Vec, logger
@@ -113,12 +113,20 @@ class SingleWidget(Widget):
     """Represents a single widget with no timer value."""
     holder: AsyncValue[str]
 
-    async def apply_conf(self, data: WidgetConfig) -> None:
+    async def load_conf_task(
+        self, cm: AbstractContextManager[trio.MemoryReceiveChannel[WidgetConfig]],
+    ) -> None:
         """Apply the configuration to the UI."""
-        if isinstance(data.values, str):
-            self.holder.value = data.values
-        else:
-            LOGGER.warning('{}:{}: Saved config is timer-based, but widget is singular.', self.group_id, self.id)
+        data: WidgetConfig
+        with cm as channel:
+            async for data in channel:
+                if isinstance(data.values, str):
+                    self.holder.value = data.values
+                else:
+                    LOGGER.warning(
+                        '{}:{}: Saved config is timer-based, but widget is singular.',
+                        self.group_id, self.id,
+                    )
 
     async def state_store_task(self) -> None:
         """Async task which stores the state in configs whenever it changes."""
@@ -134,18 +142,23 @@ class MultiWidget(Widget):
     use_inf: bool  # For timer, is infinite valid?
     holders: dict[TimerNum, AsyncValue[str]]
 
-    async def apply_conf(self, data: WidgetConfig) -> None:
+    async def load_conf_task(
+        self, cm: AbstractContextManager[trio.MemoryReceiveChannel[WidgetConfig]],
+    ) -> None:
         """Apply the configuration to the UI."""
-        if isinstance(data.values, str):
-            # Single in conf, apply to all.
-            for holder in self.holders.values():
-                holder.value = data.values
-        else:
-            for num, holder in self.holders.items():
-                try:
-                    holder.value = data.values[num]
-                except KeyError:
-                    continue
+        data: WidgetConfig
+        with cm as channel:
+            async for data in channel:
+                if isinstance(data.values, str):
+                    # Single in conf, apply to all.
+                    for holder in self.holders.values():
+                        holder.value = data.values
+                else:
+                    for num, holder in self.holders.items():
+                        try:
+                            holder.value = data.values[num]
+                        except KeyError:
+                            continue
 
     async def state_store_task(self) -> None:
         """Async task which stores the state in configs whenever it changes."""

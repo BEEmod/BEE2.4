@@ -235,8 +235,11 @@ async def create_group(
             else:
                 widget.grid(row=0, column=0, columnspan=2, sticky='ew')
             if s_wid.has_values:
-                await config.APP.set_and_run_ui_callback(
-                    WidgetConfig, s_wid.apply_conf, f'{s_wid.group_id}:{s_wid.id}',
+                nursery.start_soon(
+                    s_wid.load_conf_task,
+                    config.APP.get_ui_channel(
+                        WidgetConfig,f'{s_wid.group_id}:{s_wid.id}',
+                    )
                 )
             nursery.start_soon(s_wid.state_store_task)
             if s_wid.tooltip:
@@ -277,8 +280,9 @@ async def create_group(
         except Exception:
             LOGGER.exception('Could not construct widget {}.{}', group.id, m_wid.id)
             continue
-        await config.APP.set_and_run_ui_callback(
-            WidgetConfig, m_wid.apply_conf, f'{m_wid.group_id}:{m_wid.id}',
+        nursery.start_soon(
+            m_wid.load_conf_task,
+            config.APP.get_ui_channel(WidgetConfig, f'{m_wid.group_id}:{m_wid.id}')
         )
         nursery.start_soon(m_wid.state_store_task)
         await trio.sleep(0)
