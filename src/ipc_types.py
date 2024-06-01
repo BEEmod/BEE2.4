@@ -92,10 +92,9 @@ class Daemon2Load_MainSetCompact:
 
 
 type ARGS_SEND_LOAD = (
-    Load2Daemon_SetForceOnTop | Load2Daemon_SetForceOnTop
-    | Load2Daemon_UpdateTranslations | Load2Daemon_SetIsCompact | Load2Daemon_Init
-    | Load2Daemon_SetLength | Load2Daemon_Step | Load2Daemon_Skip | Load2Daemon_Hide
-    | Load2Daemon_Reset | Load2Daemon_Destroy | Load2Daemon_Show
+    Load2Daemon_SetForceOnTop | Load2Daemon_UpdateTranslations | Load2Daemon_SetIsCompact
+    | Load2Daemon_Init | Load2Daemon_SetLength | Load2Daemon_Step | Load2Daemon_Skip
+    | Load2Daemon_Hide | Load2Daemon_Reset | Load2Daemon_Destroy | Load2Daemon_Show
 )
 type ARGS_REPLY_LOAD = Daemon2Load_Cancel | Daemon2Load_MainSetCompact
 type ARGS_SEND_LOGGING = (  # logging -> daemon

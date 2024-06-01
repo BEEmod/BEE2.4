@@ -6,7 +6,7 @@ We take care not to directly import gettext and babel, so the compiler can omit 
 """
 from __future__ import annotations
 from typing import (
-    Any, ClassVar, Final, NoReturn, Protocol, cast, final,  LiteralString, override
+    Any, ClassVar, Final, Never, NoReturn, Protocol, cast, final,  LiteralString, override
 )
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from enum import Enum
@@ -296,7 +296,7 @@ class PluralTransToken(TransToken):
     token_plural: str
 
     @classmethod
-    def _not_allowed(cls, *args: NoReturn, **kwargs: NoReturn) -> NoReturn:
+    def _not_allowed(cls, *args: Never, **kwargs: Never) -> NoReturn:
         raise NotImplementedError('This is not allowed.')
 
     # Also not allowed.

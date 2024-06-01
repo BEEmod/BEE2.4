@@ -41,7 +41,7 @@ exclude = [
 
 [tool.ruff.lint]
 select = [
-	"E", "UP", "F", "C4", "ANN", "B", "PIE", "RUF",
+	"E", "UP", "F", "C4", "ANN", "B", "PIE", "RUF", "PYI",
 	"PLC", "PLE", "PLW",  # Pylint.
 	"TRIO",
 
@@ -79,6 +79,9 @@ extend-ignore = [
 	"PLC0415",  # Imports not at top level are used for specific reasons
 	"PLW2901",  # Allow redefining loop var inside the loop.
 	"PLW0120",  # for-else with return/break inside is just stylistic, exactly equivalent.
+
+	# Flake8-pyi:
+	"PYI041",  # Use int | float
 
 	# Flake8-Trio:
 	"TRIO115",  # Stick with sleep(0) instead of lowlevel.checkpoint(), for now?

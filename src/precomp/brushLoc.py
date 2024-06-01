@@ -128,10 +128,10 @@ BLOCK_LOOKUP['pit'] = {
 }
 
 
-type _grid_keys = Vec | FrozenVec | tuple[float, float, float] | slice
+type _GridKeys = Vec | FrozenVec | tuple[float, float, float] | slice
 
 
-def _conv_key(pos: _grid_keys) -> FrozenVec:
+def _conv_key(pos: _GridKeys) -> FrozenVec:
     """Convert the key given in [] to a grid-position, as an x,y,z tuple."""
     # TODO: Slices are assumed to be int by typeshed.
     system: str
@@ -163,7 +163,7 @@ class _GridItemsView(ItemsView[FrozenVec, Block]):
         yield from self._mapping.items()
 
 
-class Grid(MutableMapping[_grid_keys, Block]):
+class Grid(MutableMapping[_GridKeys, Block]):
     """Mapping for grid positions.
 
     When doing lookups, the key can be prefixed with 'world': to treat
@@ -174,7 +174,7 @@ class Grid(MutableMapping[_grid_keys, Block]):
 
     def raycast(
         self,
-        pos: _grid_keys,
+        pos: _GridKeys,
         direction: Vec | FrozenVec | tuple[int, int, int],
         collide: Iterable[Block] = frozenset({
             Block.SOLID, Block.EMBED,
@@ -228,10 +228,10 @@ class Grid(MutableMapping[_grid_keys, Block]):
         """Lookup a world position."""
         return self._grid.get(world_to_grid(FrozenVec(pos)), Block.VOID)
 
-    def __getitem__(self, pos: _grid_keys) -> Block:
+    def __getitem__(self, pos: _GridKeys) -> Block:
         return self._grid.get(_conv_key(pos), Block.VOID)
 
-    def __setitem__(self, pos: _grid_keys, value: Block) -> None:
+    def __setitem__(self, pos: _GridKeys, value: Block) -> None:
         if type(value) is not Block:
             raise ValueError(f'Must be set to a Block item, not "{type(value).__name__}"!')
 
@@ -244,7 +244,7 @@ class Grid(MutableMapping[_grid_keys, Block]):
 
         self._grid[world_to_grid(FrozenVec(pos))] = value
 
-    def __delitem__(self, pos: _grid_keys) -> None:
+    def __delitem__(self, pos: _GridKeys) -> None:
         del self._grid[_conv_key(pos)]
 
     def __contains__(self, pos: object) -> bool:

@@ -6,7 +6,7 @@ the main process is busy loading.
 The id() of the main-process object is used to identify loadscreens.
 """
 from __future__ import annotations
-from typing import assert_never
+from typing import Self, assert_never
 from collections.abc import (
     AsyncGenerator, Collection, Generator, MutableMapping,
 )
@@ -155,7 +155,7 @@ class LoadScreen:
         ))
         _ALL_SCREENS[self.id] = self
 
-    def __enter__(self) -> LoadScreen:
+    def __enter__(self) -> Self:
         """LoadScreen can be used as a context manager.
 
         Inside the block, the screen will be visible. Cancelling will exit
@@ -189,7 +189,7 @@ class LoadScreen:
             res = scope.__exit__(exc_type, exc_val, exc_tb)
         return res
 
-    async def __aenter__(self) -> LoadScreen:
+    async def __aenter__(self) -> Self:
         """Allow use as an async context manager too.
 
          This makes using aclosing(stage.iterate()) more compact.

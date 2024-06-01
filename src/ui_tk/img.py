@@ -15,11 +15,11 @@ from ui_tk import TK_ROOT
 
 
 # Widgets with an image attribute that can be set.
-type tkImgWidgets = tk.Label | ttk.Label | tk.Button | ttk.Button
-type tkImg = ImageTk.PhotoImage | tk.PhotoImage
+type TkImgWidgets = tk.Label | ttk.Label | tk.Button | ttk.Button
+type TkImg = ImageTk.PhotoImage | tk.PhotoImage
 
 LOGGER = get_logger(__name__)
-label_to_user: dict[tkImgWidgets, LabelStyleUser] = {}
+label_to_user: dict[TkImgWidgets, LabelStyleUser] = {}
 textwid_to_user: dict[tk.Text, TextWidUser] = {}
 menu_to_user: dict[tk.Menu, MenuIconUser] = {}
 
@@ -84,7 +84,7 @@ TK_ROOT.bind_class('all', '<Destroy>', _on_destroyed, add='+')
 
 class TkUser(img.User):
     """Common methods."""
-    def set_img(self, handle: img.Handle, image: tkImg) -> None:
+    def set_img(self, handle: img.Handle, image: TkImg) -> None:
         """Apply this Tk image to users of it.
 
         This needs to catch TclError - that can occur if the image
@@ -96,11 +96,11 @@ class TkUser(img.User):
 @attrs.define(eq=False)
 class LabelStyleUser(TkUser):
     """A user for widgets with an 'image' attribute."""
-    label: tkImgWidgets
+    label: TkImgWidgets
     cur_handle: img.Handle | None
 
     @override
-    def set_img(self, handle: img.Handle, image: tkImg) -> None:
+    def set_img(self, handle: img.Handle, image: TkImg) -> None:
         """Set the image on the label."""
         try:
             self.label['image'] = image
@@ -115,7 +115,7 @@ class TextWidUser(TkUser):
     handle_to_ids: dict[img.Handle, list[str]]
 
     @override
-    def set_img(self, handle: img.Handle, image: tkImg) -> None:
+    def set_img(self, handle: img.Handle, image: TkImg) -> None:
         """Set this image for text elements using this handle."""
         try:
             img_ids = self.handle_to_ids[handle]
@@ -134,7 +134,7 @@ class MenuIconUser(TkUser):
     handle_to_pos: dict[img.Handle, set[int]]
 
     @override
-    def set_img(self, handle: img.Handle, image: tkImg) -> None:
+    def set_img(self, handle: img.Handle, image: TkImg) -> None:
         """Set this image for menu options that use this handle."""
         try:
             pos_set = self.handle_to_pos[handle]
@@ -160,7 +160,7 @@ class TKImages(img.UIImage):
         self.unused_img = {}
         self.tk_img = {}
 
-    def sync_load(self, handle: img.Handle) -> tkImg:
+    def sync_load(self, handle: img.Handle) -> TkImg:
         """Load the TK image if required immediately, then return it.
 
         Only available on BUILTIN type images since they cannot then be
@@ -170,7 +170,7 @@ class TKImages(img.UIImage):
         return self._load_tk(handle, force=False)
 
     # noinspection PyProtectedMember
-    def apply[Widget: tkImgWidgets](self, widget: Widget, image: img.Handle | None, /) -> Widget:
+    def apply[Widget: TkImgWidgets](self, widget: Widget, image: img.Handle | None, /) -> Widget:
         """Set the image in a label-style widget.
 
         This tracks the widget, so later reloads will affect the widget.

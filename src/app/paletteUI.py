@@ -16,7 +16,7 @@ from app import background_run, paletteLoader, img
 from consts import PALETTE_FORCE_SHOWN, UUID_BLANK, UUID_EXPORT, UUID_PORTAL2
 from config.palette import PaletteState
 from ui_tk import tk_tools
-from ui_tk.img import tkImg, TKImages
+from ui_tk.img import TkImg, TKImages
 from ui_tk.wid_transtoken import set_menu_text, set_text
 from transtoken import CURRENT_LANG, TransToken
 from utils import not_none
@@ -279,7 +279,7 @@ class PaletteUI:
                 grp_menu = self.ui_menu
                 grp_tree = ''  # Root.
             for pal in sorted(palettes, key=lambda p: str(p.name)):
-                gear_img: tkImg | str = self.tk_img.sync_load(ICO_GEAR) if pal.settings is not None else ''
+                gear_img: TkImg | str = self.tk_img.sync_load(ICO_GEAR) if pal.settings is not None else ''
                 grp_menu.add_radiobutton(
                     label=str(pal.name),
                     value=pal.uuid.hex,

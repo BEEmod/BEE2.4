@@ -1,6 +1,6 @@
 """Various constant values (Mainly texture names.)"""
 from __future__ import annotations
-from typing import Any, Final, cast
+from typing import Any, Final, Self, cast
 from collections.abc import MutableMapping, Iterator
 from enum import Enum, EnumMeta
 from uuid import UUID, uuid5
@@ -275,7 +275,7 @@ class DefaultItems(Enum):
     """ A list of all the default items."""
     _value_: utils.ObjectID
     id: utils.ObjectID
-    def __new__(cls, name: str) -> DefaultItems:
+    def __new__(cls, name: str) -> Self:
         item_id = utils.obj_id(name)
         result = object.__new__(cls)
         result._value_ = item_id
