@@ -5,6 +5,7 @@ from srctools import Entity, Keyvalues, logger
 
 from quote_pack import QuoteInfo
 from precomp.collisions import Collisions
+from precomp.rand import seed
 from precomp import conditions
 
 
@@ -176,7 +177,7 @@ def res_switch(
         """Execute a switch."""
         if method is SwitchType.RANDOM:
             cases = conf_cases.copy()
-            conditions.rand.seed(b'switch', rand_seed, inst).shuffle(cases)
+            seed(b'switch', rand_seed, inst).shuffle(cases)
         else:  # Won't change.
             cases = conf_cases
 
