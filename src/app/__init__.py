@@ -56,6 +56,7 @@ def on_error(
     err = ''.join(traceback.format_exception(exc_type, exc_value, exc_tb))
 
     # Grab and release the grab so nothing else can block the error message.
+    # TODO: Move this out of here?
     try:
         from ui_tk import TK_ROOT
         TK_ROOT.grab_set_global()

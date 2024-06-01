@@ -18,7 +18,7 @@ import trio
 import trio_util
 
 import exporting
-from app import EdgeTrigger, background_run, quit_app, sound
+from app import EdgeTrigger, quit_app, sound
 from BEE2_config import GEN_OPTS
 from app.dialogs import Dialogs
 from loadScreen import MAIN_UI as LOAD_UI
@@ -1220,8 +1220,9 @@ def init_preview(tk_img: TKImages, f: tk.Frame | ttk.Frame) -> None:
 
 
 async def init_picker(
-    core_nursery: trio.Nursery,
     f: tk.Frame | ttk.Frame,
+    *,
+    task_status: trio.TaskStatus[Callable[[], None]] = trio.TASK_STATUS_IGNORED,
 ) -> None:
     """Construct the frame holding all the items."""
     global frmScroll, pal_canvas
@@ -1264,18 +1265,34 @@ async def init_picker(
             if subtype.pal_icon or subtype.pal_name:
                 pal_items.append(PalItem(frmScroll, item, sub=i, is_pre=False))
 
-    f.bind("<Configure>", lambda e: core_nursery.start_soon(
-        flow_picker,
-        config.APP.get_cur_conf(FilterConf, default=FilterConf()),
-    ))
-    await config.APP.set_and_run_ui_callback(FilterConf, flow_picker)
+    reflow_event = trio.Event()
+
+    async def wait_filter() -> None:
+        """Trigger whenever the filter configuration changes."""
+        nonlocal conf
+        with config.APP.get_ui_channel(FilterConf) as channel:
+            async for conf in channel:
+                reflow_event.set()
+
+    conf = config.APP.get_cur_conf(FilterConf, default=FilterConf())
+
+    async with trio.open_nursery() as nursery:
+        nursery.start_soon(wait_filter)
+
+        # Late-binding!
+        f.bind("<Configure>", lambda e: reflow_event.set())
+        task_status.started(lambda: reflow_event.set())
+        while True:
+            await utils.run_as_task(_flow_picker, conf)
+            await reflow_event.wait()
+            reflow_event = trio.Event()
 
 
-async def flow_picker(filter_conf: FilterConf) -> None:
+async def _flow_picker(filter_conf: FilterConf) -> None:
     """Update the picker box so all items are positioned corrctly.
 
-    Should be run (e arg is ignored) whenever the items change, or the
-    window changes shape.
+    Should only be triggered by the above init_picker() task, so reentrancy issues don't
+    occur.
     """
     frmScroll.update_idletasks()
     frmScroll['width'] = pal_canvas.winfo_width()
@@ -1286,6 +1303,7 @@ async def flow_picker(filter_conf: FilterConf) -> None:
         width = 1  # we got way too small, prevent division by zero
 
     i = 0
+    cur_row = -1
     # If cur_filter is None, it's blank and so show all of them.
     for pal_item in pal_items:
         if pal_item.needs_unlock and not mandatory_unlocked:
@@ -1304,6 +1322,12 @@ async def flow_picker(filter_conf: FilterConf) -> None:
         else:
             # Uncompressed, check each individually.
             visible = cur_filter is None or (pal_item.item.id, pal_item.subKey) in cur_filter
+
+        row = i // width
+        if row != cur_row:
+            # Checkpoint once per row, to let other code run.
+            await trio.lowlevel.checkpoint()
+            cur_row = row
 
         if visible:
             pal_item.is_pre = False
@@ -1330,11 +1354,13 @@ async def flow_picker(filter_conf: FilterConf) -> None:
 
     y = (num_items // width)*65 + 1
     for i in range(extra_items):
+        await trio.lowlevel.checkpoint()
         if i >= len(pal_items_fake):
             pal_items_fake.append(TK_IMG.apply(ttk.Label(frmScroll), IMG_BLANK))
         pal_items_fake[i].place(x=((i + last_row) % width)*65 + 1, y=y)
 
     for pal_item in pal_items_fake[extra_items:]:
+        await trio.lowlevel.checkpoint()
         pal_item.place_forget()
 
 
@@ -1436,6 +1462,20 @@ async def init_windows(
     picker_split_frame.grid(row=0, column=5, sticky="NSEW", padx=5, pady=5)
     ui_bg.columnconfigure(5, weight=1)
 
+    picker_frame = ttk.Frame(
+        picker_split_frame,
+        name='picker',
+        padding=5,
+        borderwidth=4,
+        relief="raised",
+    )
+    picker_frame.grid(row=1, column=0, sticky="NSEW")
+    picker_split_frame.rowconfigure(1, weight=1)
+    picker_split_frame.columnconfigure(0, weight=1)
+    flow_picker = await core_nursery.start(init_picker, picker_frame)
+
+    await LOAD_UI.step('picker')
+
     # This will sit on top of the palette section, spanning from left
     # to right
     search_frame = ttk.Frame(
@@ -1447,29 +1487,15 @@ async def init_windows(
     )
     search_frame.grid(row=0, column=0, sticky='ew')
 
+    await LOAD_UI.step('filter')
+
     def update_filter(new_filter: set[tuple[str, int]] | None) -> None:
         """Refresh filtered items whenever it's changed."""
         global cur_filter
         cur_filter = new_filter
-        core_nursery.start_soon(flow_picker, config.APP.get_cur_conf(FilterConf))
+        flow_picker()
 
     item_search.init(search_frame, update_filter)
-
-    await LOAD_UI.step('filter')
-
-    picker_frame = ttk.Frame(
-        picker_split_frame,
-        name='picker',
-        padding=5,
-        borderwidth=4,
-        relief="raised",
-    )
-    picker_frame.grid(row=1, column=0, sticky="NSEW")
-    picker_split_frame.rowconfigure(1, weight=1)
-    picker_split_frame.columnconfigure(0, weight=1)
-    await init_picker(core_nursery, picker_frame)
-
-    await LOAD_UI.step('picker')
 
     toolbar_frame = tk.Frame(
         frames['preview'],
