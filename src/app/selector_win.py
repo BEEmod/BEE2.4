@@ -1041,17 +1041,13 @@ class SelectorWin:
             if self.sampler is not None and samp_button is not None:
                 nursery.start_soon(_update_sampler_task, self.sampler, samp_button)
             if self.store_last_selected:
+                nursery.start_soon(self._load_selected_task)
                 nursery.start_soon(_store_results_task, self.chosen, self.save_id)
 
             task_status.started(self)
 
     def __repr__(self) -> str:
         return f'<SelectorWin "{self.save_id}">'
-
-    async def _load_selected(self, selected: LastSelected) -> None:
-        """Load a new selected item."""
-        self.sel_item_id('<NONE>' if selected.id is None else selected.id)
-        self.save()
 
     async def widget(self, frame: tk.Misc) -> ttk.Entry:
         """Create the special textbox used to open the selector window.
@@ -1088,11 +1084,7 @@ class SelectorWin:
         # Set this property again, which updates the description if we actually
         # are readonly.
         self.readonly = self._readonly
-
-        if self.store_last_selected:
-            await config.APP.set_and_run_ui_callback(LastSelected, self._load_selected, self.save_id)
-        else:
-            self.save()
+        self.save()
 
         return self.display
 
@@ -1285,6 +1277,14 @@ class SelectorWin:
                 else:
                     # We don't care about updating to the rollover item, it'll swap soon anyway.
                     self.disp_label.set(str(self.chosen.value.context_lbl))
+
+    async def _load_selected_task(self) -> None:
+        """When configs change, load new items."""
+        selected: LastSelected
+        with config.APP.get_ui_channel(LastSelected, self.save_id) as channel:
+            async for selected in channel:
+                self.sel_item_id('<NONE>' if selected.id is None else selected.id)
+                self.save()
 
     def _icon_clicked(self, _: tk.Event[tk.Misc]) -> None:
         """When the large image is clicked, either show the previews or play sounds."""
