@@ -135,26 +135,29 @@ TRANS_TAB_MAP = TransToken.ui('Map Settings')
 TRANS_TAB_COMPILE = TransToken.ui('Compile Settings')
 
 
-async def apply_state(state: CompilePaneState) -> None:
+async def apply_state_task() -> None:
     """Apply saved state to the UI and compile config."""
-    chosen_thumb.set(state.sshot_type)
-    cleanup_screenshot.set(state.sshot_cleanup)
+    state: CompilePaneState
+    with config.APP.get_ui_channel(CompilePaneState) as channel:
+        async for state in channel:
+            chosen_thumb.set(state.sshot_type)
+            cleanup_screenshot.set(state.sshot_cleanup)
 
-    if state.sshot_type == 'CUST' and state.sshot_cust:
-        with AtomicWriter(SCREENSHOT_LOC, is_bytes=True) as f:
-            f.write(state.sshot_cust)
+            if state.sshot_type == 'CUST' and state.sshot_cust:
+                with AtomicWriter(SCREENSHOT_LOC, is_bytes=True) as f:
+                    f.write(state.sshot_cust)
 
-    # Refresh these.
-    await set_screen_type()
-    set_screenshot()
+            # Refresh these.
+            await set_screen_type()
+            set_screenshot()
 
-    start_in_elev.set(state.spawn_elev)
-    player_model.value = state.player_mdl
-    COMPILE_CFG['General']['spawn_elev'] = bool_as_int(state.spawn_elev)
-    COMPILE_CFG['General']['player_model'] = state.player_mdl
-    COMPILE_CFG['General']['voiceline_priority'] = bool_as_int(state.use_voice_priority)
+            start_in_elev.set(state.spawn_elev)
+            player_model.value = state.player_mdl
+            COMPILE_CFG['General']['spawn_elev'] = bool_as_int(state.spawn_elev)
+            COMPILE_CFG['General']['player_model'] = state.player_mdl
+            COMPILE_CFG['General']['voiceline_priority'] = bool_as_int(state.use_voice_priority)
 
-    COMPILE_CFG.save_check()
+            COMPILE_CFG.save_check()
 
 
 class LimitCounter:
@@ -769,9 +772,8 @@ async def make_pane(
     window.rowconfigure(0, weight=1)
     async with trio.open_nursery() as nursery:
         await nursery.start(make_widgets, tk_img)
-        await config.APP.set_and_run_ui_callback(CompilePaneState, apply_state)
+        nursery.start_soon(apply_state_task)
         task_status.started()
-        await trio.sleep_forever()
 
 
 async def init_application(nursery: trio.Nursery) -> None:
