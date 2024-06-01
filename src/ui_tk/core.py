@@ -249,7 +249,6 @@ async def app_main(init: Callable[[trio.Nursery], Awaitable[Any]]) -> None:
         # Start some core tasks.
         await nursery.start(route_callback_exceptions)
         await nursery.start(display_errors)
-        await nursery.start(config.APP.callback_task)
         await nursery.start(loadScreen.startup)
         await gameMan.check_app_in_game(DIALOG)
 

@@ -114,8 +114,6 @@ class ConfigSpec:
         trio.MemorySendChannel[Data],
     ] = attrs.field(factory=dict, repr=False)
 
-    _legacy_callback_nursery: trio.Nursery | None = None
-
     _current: Config = attrs.Factory(lambda: Config({}))
 
     def datatype_for_name(self, name: str) -> type[Data]:
@@ -131,33 +129,6 @@ class ConfigSpec:
         self._name_to_type[info.name.casefold()] = cls
         self._registered.add(cls)
         return cls
-
-    async def callback_task(self, *, task_status: trio.TaskStatus[None]) -> None:
-        """Open a task for running UI callbacks."""
-        if self._legacy_callback_nursery is not None:
-            raise ValueError('Started twice?')
-        async with trio.open_nursery() as self._legacy_callback_nursery:
-            task_status.started()
-            await trio.sleep_forever()
-
-    async def set_and_run_ui_callback[DataT: Data](
-        self,
-        typ: type[DataT],
-        func: Callable[[DataT], Awaitable[object]],
-        data_id: str = '',
-    ) -> None:
-        """Deprecated earlier version of get_ui_channel()."""
-        assert self._legacy_callback_nursery is not None, 'Task must be run!'
-
-        async def worker() -> None:
-            """Monitor the channel, then spawn the callback."""
-            async with trio.open_nursery() as nursery:
-                with self.get_ui_channel(typ, data_id) as rec:
-                    while True:
-                        data = await rec.receive()
-                        nursery.start_soon(func, data)
-
-        self._legacy_callback_nursery.start_soon(worker, name=f'legacy_callback:{typ.__name__}[{data_id!r}]')
 
     @contextlib.contextmanager
     def get_ui_channel[DataT: Data](
