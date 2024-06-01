@@ -90,21 +90,6 @@ class SignageUIBase[ParentT]:
         self._slots = {}
         self._cur_style_id = PakRef(Style, packages.CLEAN_STYLE)
 
-    async def apply_config(self, data: Layout) -> None:
-        """Apply saved signage info to the UI."""
-        for timer in SIGN_IND:
-            try:
-                slot = self._slots[timer]
-            except KeyError:
-                LOGGER.warning('Invalid timer value {}!', timer)
-                continue
-
-            value = data.signs.get(timer, '')
-            if value != "":
-                slot.contents = PakRef(Signage, value)
-            else:
-                slot.contents = None
-
     def style_changed(self, new_style_id: utils.ObjectID) -> None:
         """Update the icons for the selected signage."""
         self._cur_style_id = PakRef(Style, new_style_id)
@@ -131,10 +116,9 @@ class SignageUIBase[ParentT]:
 
     async def task(self, trigger: EdgeTrigger[()]) -> None:
         """Handles opening/closing the UI."""
-        await config.APP.set_and_run_ui_callback(Layout, self.apply_config)
-
         # Alternate between showing and hiding.
         async with trio.open_nursery() as nursery:
+            nursery.start_soon(self._apply_config_task)
             nursery.start_soon(self._hovering_task)
 
             while True:
@@ -181,6 +165,24 @@ class SignageUIBase[ParentT]:
             if not sign.hidden:
                 slot = self.drag_man.slot_source(parent_all)
                 slot.contents = PakRef(Signage, utils.obj_id(sign.id))
+
+    async def _apply_config_task(self) -> None:
+        """Apply saved signage info to the UI."""
+        data: Layout
+        with config.APP.get_ui_channel(Layout) as channel:
+            async for data in channel:
+                for timer in SIGN_IND:
+                    try:
+                        slot = self._slots[timer]
+                    except KeyError:
+                        LOGGER.warning('Invalid timer value {}!', timer)
+                        continue
+
+                    value = data.signs.get(timer, '')
+                    if value != "":
+                        slot.contents = PakRef(Signage, value)
+                    else:
+                        slot.contents = None
 
     async def _hovering_task(self) -> None:
         """Show the signage when hovered, then toggle."""
