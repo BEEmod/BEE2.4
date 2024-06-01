@@ -1266,6 +1266,7 @@ async def init_picker(
                 pal_items.append(PalItem(frmScroll, item, sub=i, is_pre=False))
 
     reflow_event = trio.Event()
+    conf = config.APP.get_cur_conf(FilterConf, default=FilterConf())
 
     async def wait_filter() -> None:
         """Trigger whenever the filter configuration changes."""
@@ -1273,8 +1274,6 @@ async def init_picker(
         with config.APP.get_ui_channel(FilterConf) as channel:
             async for conf in channel:
                 reflow_event.set()
-
-    conf = config.APP.get_cur_conf(FilterConf, default=FilterConf())
 
     async with trio.open_nursery() as nursery:
         nursery.start_soon(wait_filter)
