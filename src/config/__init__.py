@@ -157,7 +157,7 @@ class ConfigSpec:
                         data = await rec.receive()
                         nursery.start_soon(func, data)
 
-        self._legacy_callback_nursery.start_soon(worker)
+        self._legacy_callback_nursery.start_soon(worker, name=f'legacy_callback:{typ.__name__}[{data_id!r}]')
 
     @contextlib.contextmanager
     def get_ui_channel[DataT: Data](

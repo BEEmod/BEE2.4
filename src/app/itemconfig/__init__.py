@@ -302,6 +302,7 @@ STYLEVAR_GROUP = ConfigGroup(
 
 
 async def make_pane(
+    core_nursery: trio.Nursery,
     tool_frame: tk.Frame | ttk.Frame,
     menu_bar: tk.Menu,
     tk_img: TKImages,
@@ -390,7 +391,7 @@ async def make_pane(
 
     stylevar_frame = ttk.Frame(canvas_frame)
     await utils.run_as_task(
-        StyleVarPane.make_stylevar_pane,
+        core_nursery.start, StyleVarPane.make_stylevar_pane,
         stylevar_frame,
         packages.get_loaded_packages(),
     )

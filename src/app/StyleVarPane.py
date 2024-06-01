@@ -204,6 +204,7 @@ def refresh(packset: PackagesSet, selected_style: Style) -> None:
 async def make_stylevar_pane(
     frame: ttk.Frame,
     packset: PackagesSet,
+    *, task_status: trio.TaskStatus = trio.TASK_STATUS_IGNORED
 ) -> None:
     """Construct the stylevar pane."""
     frame_all = ttk.Labelframe(frame)
@@ -233,41 +234,54 @@ async def make_stylevar_pane(
     ), TransToken.ui('None!'))
     VAR_LIST[:] = sorted(packset.all_obj(StyleVar), key=operator.attrgetter('id'))
 
-    async def add_state_syncers(
+    filter_event = trio.Event()
+
+    async def update_filter_task() -> None:
+        """A special case. UnlockDefault needs to refresh the filter when changed.
+
+        That ensures the items disappear or reappear.
+        """
+        nonlocal filter_event
+        while True:
+            await filter_event.wait()
+            filter_event = trio.Event()
+            await config.APP.apply_conf(FilterConf)
+
+    async def state_sync_task(
         var_id: str,
         tk_var: IntVar,
         *checks: ttk.Checkbutton,
     ) -> None:
-        """Makes functions for syncing stylevar state. """
-        async def apply_state(state: State) -> None:
-            """Applies the given state."""
-            tk_var.set(state.value)
-        await config.APP.set_and_run_ui_callback(State, apply_state, var_id)
+        """Syncs stylevar state."""
 
         def cmd_func() -> None:
             """When clicked, store configuration."""
             config.APP.store_conf(State(tk_var.get() != 0), var_id)
-            # Special case - this needs to refresh the filter when swapping,
-            # so the items disappear or reappear.
+            filter_event.set()
             if var_id == 'UnlockDefault':
-                background_run(config.APP.apply_conf, FilterConf)
+                filter_event.set()
 
+        cmd = frame.register(cmd_func)
         for check in checks:
-            check['command'] = cmd_func
+            check['command'] = cmd
 
-    all_pos = 0
-    for all_pos, var in enumerate(styleOptions):
-        # Add the special stylevars which apply to all styles
-        tk_vars[var.id] = int_var = IntVar(value=var.default)
-        checkbox_all[var.id] = chk = ttk.Checkbutton(frame_all, variable=int_var)
-        set_text(chk, var.name)
-        chk.grid(row=all_pos, column=0, sticky="W", padx=3)
-        tooltip.add_tooltip(chk, make_desc(packset, var))
-        await add_state_syncers(var.id, int_var, chk)
+        # Apply loaded state.
+        with config.APP.get_ui_channel(State, var_id) as channel:
+            async for state in channel:
+                tk_var.set(state.value)
 
-    # The nursery is mainly used so constructing all the checkboxes can be done immediately,
-    # then the UI callbacks are done after.
     async with trio.open_nursery() as nursery:
+        nursery.start_soon(update_filter_task)
+        all_pos = 0
+        for all_pos, var in enumerate(styleOptions):
+            # Add the special stylevars which apply to all styles
+            tk_vars[var.id] = int_var = IntVar(value=var.default)
+            checkbox_all[var.id] = chk = ttk.Checkbutton(frame_all, variable=int_var)
+            set_text(chk, var.name)
+            chk.grid(row=all_pos, column=0, sticky="W", padx=3)
+            tooltip.add_tooltip(chk, make_desc(packset, var))
+            nursery.start_soon(state_sync_task, var.id, int_var, chk)
+
         for var in VAR_LIST:
             await trio.sleep(0)
             tk_vars[var.id] = int_var = IntVar(value=var.enabled)
@@ -279,7 +293,7 @@ async def make_stylevar_pane(
                 set_text(chk, var.name)
                 chk.grid(row=all_pos, column=0, sticky="W", padx=3)
                 tooltip.add_tooltip(chk, desc)
-                nursery.start_soon(add_state_syncers, var.id, int_var, chk)
+                nursery.start_soon(state_sync_task,  var.id, int_var, chk)
             else:
                 # Swap between checkboxes depending on style.
                 checkbox_chosen[var.id] = chk_chose = ttk.Checkbutton(frm_chosen, variable=tk_vars[var.id])
@@ -289,4 +303,6 @@ async def make_stylevar_pane(
                 set_text(chk_other, var.name)
                 tooltip.add_tooltip(checkbox_chosen[var.id], desc)
                 tooltip.add_tooltip(checkbox_other[var.id], desc)
-                nursery.start_soon(add_state_syncers, var.id, int_var, chk_chose, chk_other)
+                nursery.start_soon(state_sync_task, var.id, int_var, chk_chose, chk_other)
+
+        task_status.started()

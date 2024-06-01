@@ -1555,7 +1555,7 @@ async def init_windows(
 
     await utils.run_as_task(
         core_nursery.start, itemconfig.make_pane,
-        frames['toolMenu'], menu_bar.view_menu, tk_img, signage_trigger,
+        core_nursery, frames['toolMenu'], menu_bar.view_menu, tk_img, signage_trigger,
     )
     await LOAD_UI.step('itemvar')
 
