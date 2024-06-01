@@ -27,9 +27,6 @@ if TYPE_CHECKING:
 
 LOGGER = srctools.logger.get_logger(__name__)
 
-# Algorithms to use.
-GEN_CLASSES: utils.FuncLookup[type[Generator]] = utils.FuncLookup('Generators')
-
 # These can just be looked up directly.
 SPECIAL: Generator
 OVERLAYS: Generator
@@ -606,15 +603,18 @@ def load_config(conf: Keyvalues) -> None:
     # Now finally create the generators.
     for gen_key, tex_defaults in TEX_DEFAULTS.items():
         options, textures = data[gen_key]
-
+        generator: type[Generator]
         if isinstance(gen_key, tuple):
             # Check the algorithm to use.
             algo = options['algorithm']
             gen_cat, gen_orient, gen_portal = gen_key
-            try:
-                generator = GEN_CLASSES[algo]
-            except KeyError:
-                raise ValueError(f'Invalid algorithm "{algo}" for {gen_key}!') from None
+            match algo.casefold():
+                case 'rand':
+                    generator = GenRandom
+                case 'clump':
+                    generator = GenClump
+                case _:
+                    raise ValueError(f'Invalid algorithm "{algo}" for {gen_key}!') from None
         else:
             # Signage, Overlays always use the Random generator.
             generator = GenRandom
@@ -840,7 +840,6 @@ class Generator(abc.ABC):
             return False
 
 
-@GEN_CLASSES('RAND')
 class GenRandom(Generator):
     """Basic random generator.
 
@@ -889,7 +888,6 @@ class Clump:
     seed: bytes
 
 
-@GEN_CLASSES('CLUMP')
 class GenClump(Generator):
     """The clumping generator for tiles.
 

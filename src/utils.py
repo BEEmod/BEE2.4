@@ -7,8 +7,7 @@ from typing import (
 )
 from typing_extensions import deprecated
 from collections.abc import (
-    Awaitable, Callable, Collection, Generator, Iterable, Iterator,
-    Mapping, Sequence, KeysView, ValuesView, ItemsView
+    Awaitable, Callable, Collection, Generator, Iterable, Iterator, Mapping, Sequence,
 )
 from collections import deque
 from enum import Enum
@@ -21,7 +20,6 @@ import os
 import shutil
 import stat
 import sys
-import types
 import zipfile
 import math
 
@@ -33,7 +31,7 @@ import trio_util
 __all__ = [
     'WIN', 'MAC', 'LINUX', 'STEAM_IDS', 'DEV_MODE', 'CODE_DEV_MODE', 'BITNESS',
     'get_git_version', 'install_path', 'bins_path', 'conf_location', 'fix_cur_directory',
-    'run_bg_daemon', 'not_none', 'CONN_LOOKUP', 'CONN_TYPES', 'freeze_enum_props', 'FuncLookup',
+    'run_bg_daemon', 'not_none', 'CONN_LOOKUP', 'CONN_TYPES', 'freeze_enum_props',
     'PackagePath', 'Result', 'acompose', 'get_indent', 'iter_grid', 'check_cython',
     'ObjectID', 'SpecialID', 'BlankID', 'ID_EMPTY', 'ID_NONE', 'ID_RANDOM',
     'obj_id', 'special_id', 'obj_id_optional', 'special_id_optional',
@@ -240,7 +238,7 @@ E = Angle(yaw=0)
 W = Angle(yaw=180)
 # Lookup values for joining things together.
 CONN_LOOKUP: Mapping[tuple[int, int, int, int], tuple[CONN_TYPES, Angle]] = {
-#    N  S  E  W : (Type, Rotation)
+  #  N  S  E  W : (Type, Rotation)
     (1, 0, 0, 0): (CONN_TYPES.side, N),
     (0, 1, 0, 0): (CONN_TYPES.side, S),
     (0, 0, 1, 0): (CONN_TYPES.side, E),
@@ -341,131 +339,6 @@ if sys.version_info < (3, 9) and hasattr(zipfile, '_SharedFile'):
             self.tell = lambda: self._pos
 
     zipfile._SharedFile = _SharedZipFile
-
-
-class FuncLookup[LookupT](Mapping[str, LookupT]):
-    """A dict for holding callback functions.
-
-    Functions are added by using this as a decorator. Positional arguments
-    are aliases, keyword arguments will set attributes on the functions.
-    If casefold is True, this will casefold keys to be case-insensitive.
-    Additionally, overwriting names is not allowed.
-    Iteration yields all functions.
-    """
-    def __init__(
-        self,
-        name: str,
-        *,
-        casefold: bool = True,
-        attrs: Iterable[str] = (),
-    ) -> None:
-        self.casefold = casefold
-        self.__name__ = name
-        self._registry: dict[str, LookupT] = {}
-        self.allowed_attrs = set(attrs)
-
-    def __call__(self, *names: str, **kwargs: Any) -> Callable[[LookupT], LookupT]:
-        """Add a function to the dict."""
-        if not names:
-            raise TypeError('No names passed!')
-
-        bad_keywords = kwargs.keys() - self.allowed_attrs
-        if bad_keywords:
-            raise TypeError(
-                f'Invalid keywords: {", ".join(bad_keywords)}. '
-                f'Allowed: {", ".join(self.allowed_attrs)}'
-            )
-
-        def callback(func: LookupT) -> LookupT:
-            """Decorator to do the work of adding the function."""
-            # Set the name to <dict['name']>
-            if isinstance(func, types.FunctionType):
-                func.__name__ = f'<{self.__name__}[{names[0]!r}]>'
-            for name, value in kwargs.items():
-                setattr(func, name, value)
-            self.__setitem__(names, func)
-            return func
-
-        return callback
-
-    def __eq__(self, other: Any) -> bool:
-        if isinstance(other, FuncLookup):
-            return self._registry == other._registry
-        try:
-            conv = dict(other.items())
-        except (AttributeError, TypeError):
-            return NotImplemented
-        return self._registry == conv
-
-    def __iter__(self) -> Iterator[str]:
-        """Yield all the IDs."""
-        return iter(self._registry)
-
-    def keys(self) -> KeysView[str]:
-        """Yield all the valid IDs."""
-        return self._registry.keys()
-
-    def values(self) -> ValuesView[LookupT]:
-        """Yield all the functions."""
-        return self._registry.values()
-
-    def items(self) -> ItemsView[str, LookupT]:
-        """Return pairs of (ID, func)."""
-        return self._registry.items()
-
-    def __len__(self) -> int:
-        return len(set(self._registry.values()))
-
-    def __getitem__(self, names: str | tuple[str, ...]) -> LookupT:
-        if isinstance(names, str):
-            names = (names, )
-
-        for name in names:
-            if self.casefold:
-                name = name.casefold()
-            try:
-                return self._registry[name]
-            except KeyError:
-                pass
-        else:
-            raise KeyError(f'No function with names {", ".join(names)}!')
-
-    def __setitem__(
-        self,
-        names: str | tuple[str, ...],
-        func: LookupT,
-    ) -> None:
-        if isinstance(names, str):
-            names = (names, )
-
-        for name in names:
-            if self.casefold:
-                name = name.casefold()
-            if name in self._registry:
-                raise ValueError(f'Overwrote {name!r}!')
-            self._registry[name] = func
-
-    def __delitem__(self, name: str) -> None:
-        if not isinstance(name, str):
-            raise KeyError(name)
-        if self.casefold:
-            name = name.casefold()
-        del self._registry[name]
-
-    def __contains__(self, name: object) -> bool:
-        if not isinstance(name, str):
-            return False
-        if self.casefold:
-            name = name.casefold()
-        return name in self._registry
-
-    def functions(self) -> set[LookupT]:
-        """Return the set of functions in this mapping."""
-        return set(self._registry.values())
-
-    def clear(self) -> None:
-        """Delete all functions."""
-        self._registry.clear()
 
 
 # Special ID includes <>/[] names.
