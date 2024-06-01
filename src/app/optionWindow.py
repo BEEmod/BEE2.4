@@ -109,13 +109,16 @@ def save() -> None:
     background_run(config.APP.apply_conf, FilterConf)
 
 
-async def apply_config(conf: GenOptions) -> None:
-    """Used to apply the configuration to all windows."""
-    logWindow.HANDLER.set_visible(conf.show_log_win)
-    loadScreen.set_force_ontop(conf.force_load_ontop)
-    DEV_MODE.value = conf.dev_mode
-    # We don't propagate compact splash, that isn't important after the UI loads.
-    UI.refresh_palette_icons()
+async def apply_config() -> None:
+    """Apply the configuration to all windows whenever changed."""
+    conf: GenOptions
+    with config.APP.get_ui_channel(GenOptions) as channel:
+        async for conf in channel:
+            logWindow.HANDLER.set_visible(conf.show_log_win)
+            loadScreen.set_force_ontop(conf.force_load_ontop)
+            DEV_MODE.value = conf.dev_mode
+            # We don't propagate compact splash, that isn't important after the UI loads.
+            UI.refresh_palette_icons()
 
 
 async def clear_caches(dialogs: Dialogs) -> None:
@@ -254,6 +257,14 @@ async def init_widgets(
         win.withdraw()
         load()
 
+    async def update_translations() -> None:
+        """Update tab names whenever languages update."""
+        while True:
+            nbook.tab(0, text=str(TRANS_TAB_GEN))
+            nbook.tab(1, text=str(TRANS_TAB_WIN))
+            nbook.tab(2, text=str(TRANS_TAB_DEV))
+            await CURRENT_LANG.wait_transition()
+
     set_text(
         ttk.Button(ok_cancel, command=ok),
         TransToken.ui('OK'),
@@ -265,17 +276,12 @@ async def init_widgets(
 
     win.protocol("WM_DELETE_WINDOW", cancel)
 
-    load()  # Load the existing config.
-    # Then apply to other windows.
-    await config.APP.set_and_run_ui_callback(GenOptions, apply_config)
+    load()  # Load the existing config
 
-    task_status.started()
-    while True:
-        # Update tab names whenever languages update.
-        nbook.tab(0, text=str(TRANS_TAB_GEN))
-        nbook.tab(1, text=str(TRANS_TAB_WIN))
-        nbook.tab(2, text=str(TRANS_TAB_DEV))
-        await CURRENT_LANG.wait_transition()
+    async with trio.open_nursery() as nursery:
+        nursery.start_soon(update_translations)
+        nursery.start_soon(apply_config)
+        task_status.started()
 
 
 async def init_gen_tab(
