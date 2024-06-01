@@ -4,10 +4,12 @@ Other modules define an immutable state class, then register it with this.
 They can then fetch the current state and store new state.
 """
 from __future__ import annotations
-from typing import ClassVar, Self, NewType,  cast, override
-from collections.abc import Awaitable, Callable, Iterator
+
+from typing import ClassVar, Self, NewType, override
+from collections.abc import Awaitable, Callable, Generator, Iterator
 from pathlib import Path
 import abc
+import contextlib
 import os
 
 from srctools import AtomicWriter, KeyValError, Keyvalues, logger
@@ -103,14 +105,16 @@ class ConfigSpec:
     _name_to_type: dict[str, type[Data]] = attrs.Factory(dict)
     _registered: set[type[Data]] = attrs.Factory(set)
 
-    # After the relevant UI is initialised, this is set to an async func which
+    # After the relevant UI is initialised, this is set to a channel which
     # applies the data to the UI. This way we know it can be done safely now.
-    # If data was loaded from the config, the callback is immediately awaited.
+    # If data was loaded from the config, it gets sent into the channel.
     # One is provided independently for each ID, so it can be sent to the right object.
-    callback: dict[
+    _apply_channel: dict[
         tuple[type[Data], str],
-        Callable[[Data], Awaitable[object]],
+        trio.MemorySendChannel[Data],
     ] = attrs.field(factory=dict, repr=False)
+
+    _legacy_callback_nursery: trio.Nursery | None = None
 
     _current: Config = attrs.Factory(lambda: Config({}))
 
@@ -128,29 +132,74 @@ class ConfigSpec:
         self._registered.add(cls)
         return cls
 
+    async def callback_task(self, *, task_status: trio.TaskStatus[None]) -> None:
+        """Open a task for running UI callbacks."""
+        if self._legacy_callback_nursery is not None:
+            raise ValueError('Started twice?')
+        async with trio.open_nursery() as self._legacy_callback_nursery:
+            task_status.started()
+            await trio.sleep_forever()
+
     async def set_and_run_ui_callback[DataT: Data](
         self,
         typ: type[DataT],
         func: Callable[[DataT], Awaitable[object]],
         data_id: str = '',
     ) -> None:
-        """Set the callback used to apply this config type to the UI.
+        """Deprecated earlier version of get_ui_channel()."""
+        assert self._legacy_callback_nursery is not None, 'Task must be run!'
 
-        If the configs have been loaded, it will immediately be called. Whenever new configs
+        async def worker() -> None:
+            """Monitor the channel, then spawn the callback."""
+            async with trio.open_nursery() as nursery:
+                with self.get_ui_channel(typ, data_id) as rec:
+                    while True:
+                        data = await rec.receive()
+                        nursery.start_soon(func, data)
+
+        self._legacy_callback_nursery.start_soon(worker)
+
+    @contextlib.contextmanager
+    def get_ui_channel[DataT: Data](
+        self,
+        typ: type[DataT],
+        data_id: str = '',
+    ) -> Generator[trio.MemoryReceiveChannel[DataT], None, None]:
+        """Associate a channel which will be sent the config value whenever it changes.
+
+        If the configs have been loaded, it will immediately be set. Whenever new configs
         are loaded, it will be re-applied regardless.
+
+        This is a context manager, which closes and removes the channel when exited.
         """
-        await trio.sleep(0)  # Always checkpoint!
         if typ not in self._registered:
             raise ValueError(f'Unregistered data type {typ!r}')
         info = typ.get_conf_info()
         if data_id and not info.uses_id:
             raise ValueError(f'Data type "{info.name}" does not support IDs!')
-        if (typ, data_id) in self.callback:
-            raise ValueError(f'Cannot set callback for {info.name}[{data_id}] twice!')
-        self.callback[typ, data_id] = func  # type: ignore
+        if (typ, data_id) in self._apply_channel:
+            raise ValueError(f'Cannot associate two channels for {info.name}[{data_id}]!')
+
+        send: trio.MemorySendChannel[DataT]
+        rec: trio.MemoryReceiveChannel[DataT]
+        send, rec = trio.open_memory_channel(1)
+
         data_map = self._current.setdefault(typ, {})
-        if data_id in data_map:
-            await func(cast(DataT, data_map[data_id]))
+        try:
+            current = data_map[data_id]
+        except KeyError:
+            pass
+        else:
+            assert isinstance(current, typ), info
+            # Can't possibly block, we just created this.
+            send.send_nowait(current)
+        # Invalid to drop DataT -> Data.
+        self._apply_channel[typ, data_id] = send  # type: ignore
+        try:
+            yield rec
+        finally:
+            rec.close()
+            del self._apply_channel[typ, data_id]
 
     async def apply_conf(self, typ: type[Data], *, data_id: str = '') -> None:
         """Apply the current settings for this config type and ID.
@@ -166,12 +215,12 @@ class ConfigSpec:
                 raise ValueError(f'Data type "{info.name}" does not support IDs!')
             try:
                 data = self._current[typ][data_id]
-                cb = self.callback[typ, data_id]
+                channel = self._apply_channel[typ, data_id]
             except KeyError:
                 LOGGER.warning('{}[{!r}] has no UI callback!', info.name, data_id)
             else:
                 assert isinstance(data, typ), info
-                await cb(data)
+                await channel.send(data)
         else:
             try:
                 data_map = self._current[typ]
@@ -181,11 +230,11 @@ class ConfigSpec:
             async with trio.open_nursery() as nursery:
                 for dat_id, data in data_map.items():
                     try:
-                        cb = self.callback[typ, dat_id]
+                        channel = self._apply_channel[typ, dat_id]
                     except KeyError:
                         LOGGER.warning('{}[{!r}] has no UI callback!', info.name, dat_id)
                     else:
-                        nursery.start_soon(cb, data)
+                        nursery.start_soon(channel.send, data)
 
     def get_full_conf(self, filter_to: ConfigSpec | None = None) -> Config:
         """Get the config stored by this spec, filtering to another if requested."""
