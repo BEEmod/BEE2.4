@@ -231,6 +231,7 @@ class Anim(Enum):
     Flat there is on the floor without a dropper, fall is for the midair pose
     with a dropper.
     """
+    # We intentionally put the common 3 first, so that the pickle can drop unused ones at the end.
     IDLE = 'ANIM_IDLE'
 
     EDIT_START = 'ANIM_EDITING_ACTIVATE'
@@ -734,7 +735,9 @@ class SubType:
             x, y = self.pal_pos
 
         anim = [self.anims.get(anim, -1) for anim in Anim]
-        while anim and anim[-1] == -1:  # Remove any -1 from the end.
+        # Remove any missing from the end. We put the common ones first,
+        # so for most items this can be much shorter.
+        while anim and anim[-1] == -1:
             anim.pop()
 
         return (
@@ -758,7 +761,7 @@ class SubType:
         }
         self.anims = {
             anim: ind
-            for anim, ind in zip(Anim, anims, strict=True)
+            for anim, ind in zip(Anim, anims, strict=False)
             if ind != -1
         }
         if x >= 0 and y >= 0:
