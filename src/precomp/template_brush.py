@@ -771,13 +771,13 @@ def get_template(temp_name: str) -> Template:
 def import_template(
     vmf: VMF,
     temp_name: str | Template,
-    origin: Vec,
+    origin: Vec | FrozenVec,
     angles: AnyAngle | AnyMatrix | None = None,
     targetname: str = '',
     force_type: TEMP_TYPES = TEMP_TYPES.default,
     add_to_map: bool = True,
     additional_visgroups: Iterable[str] = (),
-    bind_tile_pos: Collection[Vec] = (),
+    bind_tile_pos: Collection[Vec | FrozenVec] = (),
     align_bind: bool = False,
     coll: collisions.Collisions | None = None,
     coll_add: collisions.CollideType = collisions.CollideType.NOTHING,
@@ -937,7 +937,7 @@ def import_template(
 
         tile_norm = orient.up()
         for tile_off in bind_tile_pos:
-            tile_off = tile_off.copy()
+            tile_off = Vec(tile_off)
             tile_off.localise(origin, orient)
             for axis in ('xyz' if align_bind else ''):
                 # Don't realign things in the normal's axis -
@@ -985,7 +985,7 @@ def import_template(
         overlay=new_over,
         orig_ids=id_mapping,
         template=template,
-        origin=origin,
+        origin=Vec(origin),
         orient=Matrix(orient),
         visgroups=chosen_groups,
         picker_results={},  # Filled by retexture_template.
@@ -1024,7 +1024,7 @@ def get_scaling_template(temp_id: str) -> ScalingTemplate:
 
 def retexture_template(
     template_data: ExportedTemplate,
-    origin: Vec,
+    origin: Vec | FrozenVec,
     instance: Entity | None = None,
     replace_tex: Mapping[str, list[str] | str] = srctools.EmptyMapping,
     force_colour: ForceColour = AppliedColour.MATCH,
