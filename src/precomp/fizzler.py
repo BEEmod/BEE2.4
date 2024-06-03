@@ -1,8 +1,9 @@
 """Implements fizzler/laserfield generation and customisation."""
 from __future__ import annotations
+from typing import Self, final, assert_never
+
+from collections.abc import Callable, Iterator, Sequence
 from collections import defaultdict
-from typing import Iterator, Callable, final
-from typing_extensions import Self, assert_never
 from enum import Enum
 import itertools
 
@@ -23,6 +24,7 @@ from precomp import (
 )
 import consts
 import user_errors
+from precomp.collisions import Collisions
 
 
 COND_MOD_NAME: str | None = None
@@ -196,9 +198,9 @@ class FizzlerType:
 
     # If set, add a brush ent using templates.
     temp_brush_keys: Keyvalues | None
-    temp_single: str | None
-    temp_max: str | None
-    temp_min: str | None
+    temp_single: Sequence[str]
+    temp_max: Sequence[str]
+    temp_min: Sequence[str]
 
     blocks_portals: bool = attrs.field(init=False, default=False)
     fizzles_portals: bool = attrs.field(init=False, default=False)
@@ -322,20 +324,23 @@ class FizzlerType:
                 beam_prop.int('RandSpeedMax', 0),
             ))
 
+        temp_min: Sequence[str]
+        temp_max: Sequence[str]
+        temp_single: Sequence[str]
         try:
             temp_conf = conf.find_key('TemplateBrush')
         except NoKeyError:
-            temp_brush_keys = temp_min = temp_max = temp_single = None
+            temp_brush_keys = None
+            temp_min = temp_max = temp_single = ()
         else:
-            temp_brush_keys = Keyvalues('--', [
-                temp_conf.find_key('Keys'),
+            temp_brush_keys = Keyvalues.root(
+                temp_conf.find_key('Keys', or_blank=True),
                 temp_conf.find_key('LocalKeys', or_blank=True),
-            ])
+            )
 
-            # Find and load the templates.
-            temp_min = temp_conf['Left', None]
-            temp_max = temp_conf['Right', None]
-            temp_single = temp_conf['Single', None]
+            temp_min = temp_conf.find_key('Left', or_blank=True).as_array()
+            temp_max = temp_conf.find_key('Right', or_blank=True).as_array()
+            temp_single = temp_conf.find_key('Single', or_blank=True).as_array()
 
         return FizzlerType(
             id=fizz_id,
@@ -1205,7 +1210,7 @@ def parse_map(vmf: VMF, info: conditions.MapInfo) -> None:
 
 
 @conditions.MetaCond.Fizzler.register
-def generate_fizzlers(vmf: VMF) -> None:
+def generate_fizzlers(vmf: VMF, coll: Collisions) -> None:
     """Generates fizzler models and the brushes according to their set types.
 
     After this is done, fizzler-related conditions will not function correctly.
@@ -1252,13 +1257,13 @@ def generate_fizzlers(vmf: VMF) -> None:
         # template_brush is used for the templated one.
         single_brushes: dict[FizzlerBrush, Entity] = {}
 
-        if fizz_type.temp_max or fizz_type.temp_min:
+        if fizz_type.temp_max or fizz_type.temp_min or fizz_type.temp_single:
             template_brush_ent = vmf.create_ent(
                 classname='func_brush',
                 origin=fizz.base_inst['origin'],
             )
-            assert fizz_type.temp_brush_keys is not None
-            conditions.set_ent_keys(template_brush_ent, fizz.base_inst, fizz_type.temp_brush_keys)
+            if fizz_type.temp_brush_keys is not None:
+                conditions.set_ent_keys(template_brush_ent, fizz.base_inst, fizz_type.temp_brush_keys)
         else:
             template_brush_ent = None
 
@@ -1395,32 +1400,39 @@ def generate_fizzlers(vmf: VMF) -> None:
 
             if template_brush_ent is not None:
                 if length == 128 and fizz_type.temp_single:
-                    temp = template_brush.import_template(
-                        vmf,
-                        fizz_type.temp_single,
-                        (seg_min + seg_max) / 2,
-                        min_orient,
-                        force_type=template_brush.TEMP_TYPES.world,
-                        add_to_map=False,
-                    )
-                    template_brush_ent.solids.extend(temp.world)
-                else:
-                    if fizz_type.temp_min:
+                    for temp_id in fizz_type.temp_single:
                         temp = template_brush.import_template(
                             vmf,
-                            fizz_type.temp_min,
-                            seg_min,
+                            temp_id,
+                            (seg_min + seg_max) / 2,
                             min_orient,
+                            coll=coll,
+                            targetname=fizz_name,
                             force_type=template_brush.TEMP_TYPES.world,
                             add_to_map=False,
                         )
                         template_brush_ent.solids.extend(temp.world)
-                    if fizz_type.temp_max:
+                else:
+                    for temp_id in fizz_type.temp_min:
                         temp = template_brush.import_template(
                             vmf,
-                            fizz_type.temp_max,
+                            temp_id,
+                            seg_min,
+                            min_orient,
+                            coll=coll,
+                            targetname=fizz_name,
+                            force_type=template_brush.TEMP_TYPES.world,
+                            add_to_map=False,
+                        )
+                        template_brush_ent.solids.extend(temp.world)
+                    for temp_id in fizz_type.temp_max:
+                        temp = template_brush.import_template(
+                            vmf,
+                            temp_id,
                             seg_max,
                             max_orient,
+                            coll=coll,
+                            targetname=fizz_name,
                             force_type=template_brush.TEMP_TYPES.world,
                             add_to_map=False,
                         )
@@ -1507,8 +1519,8 @@ def generate_fizzlers(vmf: VMF) -> None:
                 trigger_hurt_start_disabled,
             )
 
-        # If we have the config, but no templates used anywhere in this brush,
-        # remove the empty brush entity.
+        # Remove the empty brush entity if we created a brush entity for templates
+        # but never actually used it.
         if template_brush_ent is not None and not template_brush_ent.solids:
             template_brush_ent.remove()
 
