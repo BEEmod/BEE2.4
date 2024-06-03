@@ -39,10 +39,10 @@ _TEMPLATES: dict[str, UnparsedTemplate | Template] = {}
 _SCALE_TEMP: dict[tuple[str, frozenset[str]], ScalingTemplate] = {}
 
 
+@attrs.define
 class InvalidTemplateName(LookupError):
     """Raised if a template ID is invalid."""
-    def __init__(self, temp_name: str) -> None:
-        self.temp_name = temp_name
+    temp_name: str
 
     def __str__(self) -> str:
         # List all the templates that are available.
@@ -53,6 +53,22 @@ class InvalidTemplateName(LookupError):
                 for temp in
                 sorted(_TEMPLATES.keys())
             ),
+        )
+
+@attrs.define
+class InvalidVisgroupNames(LookupError):
+    """Raised if visleafs are not valid for a template."""
+    temp_name: str
+    invalid: str
+    chosen: Collection[str]
+    valid: Collection[str]
+
+    def __str__(self) -> str:
+        """List valid visgroups."""
+        return (
+            f'Unknown visgroup "{self.invalid}" for "{self.temp_name}"!\n'
+            f'chosen: {', '.join(sorted(map(repr, self.chosen)))}'
+            f'valid: {', '.join(sorted(map(repr, self.valid)))}'
         )
 
 
@@ -381,10 +397,7 @@ class Template:
             try:
                 world, detail, over = self._data[group.casefold()]
             except KeyError:
-                raise ValueError(
-                    f'Unknown visgroup "{group}" for "{self.id}"! '
-                    f'(valid: {", ".join(map(repr, self._data))})'
-                ) from None
+                raise InvalidVisgroupNames(self.id, group, chosen, self._data.keys()) from None
             world_brushes.extend(world)
             detail_brushes.extend(detail)
             overlays.extend(over)
