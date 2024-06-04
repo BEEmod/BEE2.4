@@ -450,19 +450,19 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ).replace('\n', '  \n')  # Add two spaces to keep line breaks
 
 
-class CreditsWindow(tk.Toplevel):
+class CreditsWindow:
     """The window showing credits information."""
     open: EdgeTrigger[()]
 
     def __init__(self, *, name: str, title: TransToken) -> None:
-        super().__init__(TK_ROOT, name=name)
-        self.withdraw()
-        set_win_title(self, title)
-        self.transient(master=TK_ROOT)
-        self.resizable(width=True, height=True)
+        self.win = win = tk.Toplevel(TK_ROOT, name=name)
+        win.withdraw()
+        set_win_title(win, title)
+        win.transient(master=TK_ROOT)
+        win.resizable(width=True, height=True)
         if utils.LINUX:
-            self.wm_attributes('-type', 'dialog')
-        tk_tools.set_window_icon(self)
+            win.wm_attributes('-type', 'dialog')
+        tk_tools.set_window_icon(win)
 
         # Controls opening/closing the window.
         self.open = EdgeTrigger()
@@ -470,14 +470,14 @@ class CreditsWindow(tk.Toplevel):
 
         # Hide when the exit button is pressed, or Escape
         # on the keyboard.
-        close_cmd = self.register(self._close)
-        self.wm_protocol("WM_DELETE_WINDOW", close_cmd)
-        self.bind("<Escape>", close_cmd)
+        close_cmd = win.register(self._close)
+        win.wm_protocol("WM_DELETE_WINDOW", close_cmd)
+        win.bind("<Escape>", close_cmd)
 
-        frame = tk.Frame(self, background='white')
+        frame = tk.Frame(win, background='white')
         frame.grid(row=0, column=0, sticky='nsew')
-        self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(0, weight=1)
+        win.grid_columnconfigure(0, weight=1)
+        win.grid_rowconfigure(0, weight=1)
 
         self._textbox = tkRichText(frame, name='message', width=80, height=24)
         self._textbox.configure(background='white', relief='flat')
@@ -513,13 +513,13 @@ class CreditsWindow(tk.Toplevel):
 
         # Then alternate between showing/hiding. We don't need to reparse ever again.
         while True:
-            self.deiconify()
+            self.win.deiconify()
             await tk_tools.wait_eventloop()
-            tk_tools.center_win(self, TK_ROOT)
+            tk_tools.center_win(self.win, TK_ROOT)
             await self._close_event.wait()
 
             self._close_event = trio.Event()
-            self.withdraw()
+            self.win.withdraw()
             await self.open.wait()
 
 
