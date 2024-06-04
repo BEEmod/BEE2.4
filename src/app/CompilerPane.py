@@ -135,6 +135,13 @@ TRANS_SCREENSHOT_FILETYPE = TransToken.ui('Image Files')   # note: File type des
 TRANS_TAB_MAP = TransToken.ui('Map Settings')
 TRANS_TAB_COMPILE = TransToken.ui('Compile Settings')
 
+TRANS_SCREENSHOT_TOOLTIP = TransToken.ui(
+    "Use a custom image for the map preview image. Click the "
+    "screenshot to select.\n"
+    "Images will be converted to JPEGs if necessary."
+)
+TRANS_SCREENSHOT_FILENAME = TransToken.ui('Filename: {path}')
+
 
 async def apply_state_task() -> None:
     """Apply saved state to the UI and compile config."""
@@ -281,6 +288,7 @@ def find_screenshot(e: tk.Event[ttk.Label] | None = None) -> None:
         config.APP.store_conf(attrs.evolve(
             config.APP.get_cur_conf(CompilePaneState, default=DEFAULT_STATE),
             sshot_cust=buf.getvalue(),
+            sshot_cust_fname=file_name,
         ))
         set_screenshot(image)
         COMPILE_CFG.save_check()
@@ -324,6 +332,14 @@ def set_screenshot(image: Image.Image | None = None) -> None:
     )
     tk_screenshot = ImageTk.PhotoImage(tk_img)
     UI['thumb_label']['image'] = tk_screenshot
+    conf = config.APP.get_cur_conf(CompilePaneState, default=DEFAULT_STATE)
+    if conf.sshot_cust_fname:
+        set_tooltip(UI['thumb_label'], TransToken.untranslated('{a}\n{b}').format(
+            a=TRANS_SCREENSHOT_TOOLTIP,
+            b=TRANS_SCREENSHOT_FILENAME.format(path=conf.sshot_cust_fname)
+        ))
+    else:
+        set_tooltip(UI['thumb_label'], TRANS_SCREENSHOT_TOOLTIP)
 
 
 def make_setter(section: str, config: str, variable: tk.IntVar | tk. StringVar) -> None:
@@ -448,13 +464,8 @@ async def make_comp_widgets(frame: ttk.Frame, tk_img: TKImages) -> None:
         "default PeTI screenshot will be used instead."
     ))
     add_tooltip(UI['thumb_peti'], TransToken.ui("Use the normal editor view for the map preview image."))
-    custom_tooltip = TransToken.ui(
-        "Use a custom image for the map preview image. Click the "
-        "screenshot to select.\n"
-        "Images will be converted to JPEGs if needed."
-    )
-    add_tooltip(UI['thumb_custom'], custom_tooltip)
-    add_tooltip(UI['thumb_label'], custom_tooltip)
+    add_tooltip(UI['thumb_custom'], TRANS_SCREENSHOT_TOOLTIP)
+    add_tooltip(UI['thumb_label'], TRANS_SCREENSHOT_TOOLTIP)
 
     add_tooltip(UI['thumb_cleanup'], TransToken.ui(
         'Automatically delete unused Automatic screenshots. Disable if you want '
