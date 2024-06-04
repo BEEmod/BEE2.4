@@ -28,6 +28,7 @@ class CompilePaneState(config.Data, conf_name='CompilerPane'):
     """
     sshot_type: str = 'PETI'
     sshot_cleanup: bool = False
+    sshot_cust_fname: str = ''
     sshot_cust: bytes = attrs.field(repr=False, default=b'')
     spawn_elev: bool = False
     player_mdl: str = 'PETI'
@@ -73,7 +74,7 @@ class CompilePaneState(config.Data, conf_name='CompilerPane'):
             sshot_type=sshot_type,
             sshot_cleanup=data.bool('sshot_cleanup', False),
             sshot_cust=screenshot_data,
-            # sshot_cust_fname=data['sshot_cust_fname', ''],
+            sshot_cust_fname=data['sshot_fname', ''],
             spawn_elev=data.bool('spawn_elev', False),
             player_mdl=player_mdl,
             use_voice_priority=data.bool('voiceline_priority', False),
@@ -102,19 +103,15 @@ class CompilePaneState(config.Data, conf_name='CompilerPane'):
                     base64.encodebytes(self.sshot_cust).decode('ascii').splitlines()
                 ]
             ))
+            kv.append(Keyvalues('sshot_fname', self.sshot_cust_fname))
         return kv
 
-    @override
     @classmethod
+    @override
     def parse_dmx(cls, data: Element, version: int) -> CompilePaneState:
         """Parse DMX format data."""
         if version != 1:
             raise config.UnknownVersion(version, '1')
-
-        try:
-            screenshot_data = data['sshot_data'].val_binary
-        except KeyError:
-            screenshot_data = b''
 
         try:
             sshot_type = data['sshot_type'].val_str.upper()
@@ -124,6 +121,19 @@ class CompilePaneState(config.Data, conf_name='CompilerPane'):
             if sshot_type not in ['AUTO', 'CUST', 'PETI']:
                 LOGGER.warning('Unknown screenshot type "{}"!', sshot_type)
                 sshot_type = 'AUTO'
+
+        if sshot_type == 'CUST':
+            try:
+                screenshot_data = data['sshot_data'].val_binary
+            except KeyError:
+                screenshot_data = b''
+            try:
+                screenshot_fname = data['sshot_fname'].val_string
+            except KeyError:
+                screenshot_fname = ''
+        else:
+            screenshot_data = b''
+            screenshot_fname = ''
 
         try:
             player_mdl = data['player_model'].val_str.upper()
@@ -153,6 +163,7 @@ class CompilePaneState(config.Data, conf_name='CompilerPane'):
             sshot_type=sshot_type,
             sshot_cleanup=sshot_cleanup,
             sshot_cust=screenshot_data,
+            sshot_cust_fname=screenshot_fname,
             spawn_elev=spawn_elev,
             player_mdl=player_mdl,
             use_voice_priority=use_voice_priority,
@@ -169,4 +180,5 @@ class CompilePaneState(config.Data, conf_name='CompilerPane'):
         elem['voiceline_priority'] = self.use_voice_priority
         if self.sshot_type == 'CUST':
             elem['sshot_data'] = self.sshot_cust
+            elem['sshot_fname'] = self.sshot_cust_fname
         return elem

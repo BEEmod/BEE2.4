@@ -39,6 +39,7 @@ def test_parse_kv1() -> None:
         sshot_type='PETI',
         sshot_cleanup=False,
         sshot_cust=b'',
+        sshot_cust_fname='',
         spawn_elev=False,
         player_mdl='PETI',
         use_voice_priority=False,
@@ -54,6 +55,7 @@ def test_parse_kv1() -> None:
         sshot_type='PETI',
         sshot_cleanup=True,
         sshot_cust=b'',
+        sshot_cust_fname='',
         spawn_elev=False,
         player_mdl='PBODY',
         use_voice_priority=True,
@@ -69,6 +71,7 @@ def test_parse_kv1() -> None:
         sshot_type='AUTO',
         sshot_cleanup=True,
         sshot_cust=b'',
+        sshot_cust_fname='',
         spawn_elev=True,
         player_mdl='ATLAS',
         use_voice_priority=False,
@@ -88,6 +91,7 @@ def test_parse_kv1() -> None:
         sshot_type='CUST',
         sshot_cleanup=True,
         sshot_cust=SCREENSHOT_DATA,
+        sshot_cust_fname='',
         spawn_elev=True,
         player_mdl='SP',
         use_voice_priority=True,
@@ -100,6 +104,7 @@ def test_export_kv1() -> None:
         sshot_type='PETI',
         sshot_cleanup=False,
         sshot_cust=b'',
+        sshot_cust_fname='',
         spawn_elev=False,
         player_mdl='PETI',
         use_voice_priority=False,
@@ -115,6 +120,7 @@ def test_export_kv1() -> None:
         sshot_type='PETI',
         sshot_cleanup=True,
         sshot_cust=b'',
+        sshot_cust_fname='',
         spawn_elev=False,
         player_mdl='PBODY',
         use_voice_priority=True,
@@ -130,6 +136,7 @@ def test_export_kv1() -> None:
         sshot_type='AUTO',
         sshot_cleanup=True,
         sshot_cust=b'',
+        sshot_cust_fname='',
         spawn_elev=True,
         player_mdl='ATLAS',
         use_voice_priority=False,
@@ -145,12 +152,14 @@ def test_export_kv1() -> None:
         sshot_type='CUST',
         sshot_cleanup=True,
         sshot_cust=SCREENSHOT_DATA,
+        sshot_cust_fname='C:/some_custom_file.png',
         spawn_elev=True,
         player_mdl='SP',
         use_voice_priority=False,
     ).export_kv1()
-    assert len(kv) == 6
+    assert len(kv) == 7
     assert kv['sshot_type'] == 'CUST'
+    assert kv['sshot_fname'] == 'C:/some_custom_file.png'
     assert kv['sshot_cleanup'] == '1'
     assert kv['spawn_elev'] == '1'
     assert kv['player_model'] == 'SP'
@@ -169,6 +178,7 @@ def test_parse_dmx() -> None:
         sshot_type='PETI',
         sshot_cleanup=False,
         sshot_cust=b'',
+        sshot_cust_fname='',
         spawn_elev=False,
         player_mdl='PETI',
         use_voice_priority=False,
@@ -184,6 +194,7 @@ def test_parse_dmx() -> None:
         sshot_type='PETI',
         sshot_cleanup=True,
         sshot_cust=b'',
+        sshot_cust_fname='',
         spawn_elev=False,
         player_mdl='PETI',
         use_voice_priority=True,
@@ -200,6 +211,7 @@ def test_parse_dmx() -> None:
         sshot_type='PETI',
         sshot_cleanup=True,
         sshot_cust=b'',
+        sshot_cust_fname='',
         spawn_elev=False,
         player_mdl='PBODY',
         use_voice_priority=True,
@@ -216,6 +228,7 @@ def test_parse_dmx() -> None:
         sshot_type='AUTO',
         sshot_cleanup=True,
         sshot_cust=b'',
+        sshot_cust_fname='',
         spawn_elev=True,
         player_mdl='ATLAS',
         use_voice_priority=False,
@@ -227,12 +240,14 @@ def test_parse_dmx() -> None:
     elem['player_model'] = 'sP'
     elem['sshot_type'] = 'CUST'
     elem['sshot_cleanup'] = True
+    elem['sshot_fname'] = 'C:/some_custom_file.png'
     elem['sshot_data'] = SCREENSHOT_DATA
 
     assert CompilePaneState.parse_dmx(elem, 1) == CompilePaneState(
         sshot_type='CUST',
         sshot_cleanup=True,
         sshot_cust=SCREENSHOT_DATA,
+        sshot_cust_fname='C:/some_custom_file.png',
         spawn_elev=True,
         player_mdl='SP',
         use_voice_priority=True,
@@ -290,13 +305,15 @@ def test_export_dmx() -> None:
         sshot_type='CUST',
         sshot_cleanup=True,
         sshot_cust=SCREENSHOT_DATA,
+        sshot_cust_fname='C:/some_custom_file.png',
         spawn_elev=True,
         player_mdl='SP',
         use_voice_priority=False,
     ).export_dmx()
-    assert len(elem) == 7
+    assert len(elem) == 8
     assert elem['sshot_type'] == Attribute.string('sshot_type', 'CUST')
     assert elem['sshot_cleanup'] == Attribute.bool('sshot_cleanup', True)
+    assert elem['sshot_fname'] == Attribute.string('sshot_fname', 'C:/some_custom_file.png')
     assert elem['sshot_data'] == Attribute.binary('sshot_data', SCREENSHOT_DATA)
     assert elem['spawn_elev'] == Attribute.bool('spawn_elev',True)
     assert elem['player_model'] == Attribute.string('player_model', 'SP')
