@@ -6,6 +6,7 @@ from srctools import Keyvalues
 from srctools.dmx import Element
 
 from config.corridors import Direction, GameMode, Orient, Config, Options, UIState
+from config import UnknownVersion
 import utils
 
 # Two sets of sample instance names, for testing parsing - in V1 and V2 formats.
@@ -29,10 +30,10 @@ OPTION_SAMPLE: Mapping[utils.ObjectID, utils.SpecialID] = {
 
 def test_conf_parse_v3() -> None:
     """Version 3 is not supported."""
-    with pytest.raises(ValueError):  # Check version 3 is not allowed.
+    with pytest.raises(UnknownVersion):  # Check version 3 is not allowed.
         Config.parse_kv1(Keyvalues.root(), 3)
 
-    with pytest.raises(ValueError):  # Check version 3 is not allowed.
+    with pytest.raises(UnknownVersion):  # Check version 3 is not allowed.
         Config.parse_dmx(Element('Config', 'DMConfig'), 3)
 
 
@@ -115,10 +116,10 @@ def test_conf_export_dmx() -> None:
 
 def test_options_parse_v2() -> None:
     """Version 2 is not supported."""
-    with pytest.raises(ValueError):  # Check version 2 is not allowed.
+    with pytest.raises(UnknownVersion):
         Options.parse_kv1(Keyvalues.root(), 2)
 
-    with pytest.raises(ValueError):  # Check version 2 is not allowed.
+    with pytest.raises(UnknownVersion):
         Options.parse_dmx(Element('CorridorOptions', 'DMConfig'), 2)
 
 
@@ -189,9 +190,6 @@ def test_ui_parse_kv1(mode: GameMode, orient: Orient, direction: Direction) -> N
         width=272, height=849,
     )
 
-    with pytest.raises(AssertionError):  # Check version 2 is not allowed.
-        UIState.parse_kv1(kv, 2)
-
 
 @pytest.mark.parametrize('mode', GameMode)
 @pytest.mark.parametrize('orient', Orient)
@@ -225,9 +223,6 @@ def test_ui_parse_dmx(mode: GameMode, orient: Orient, direction: Direction) -> N
         last_mode=mode, last_orient=orient, last_direction=direction,
         width=272, height=849,
     )
-
-    with pytest.raises(AssertionError):  # Check version 2 is not allowed.
-        UIState.parse_dmx(elem, 2)
 
 
 @pytest.mark.parametrize('mode', GameMode)

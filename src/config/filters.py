@@ -18,7 +18,7 @@ class FilterConf(config.Data, conf_name='ItemFilter', uses_id=False, version=1):
     @override
     def parse_kv1(cls, data: Keyvalues, version: int) -> Self:
         if version != 1:
-            raise AssertionError(version)
+            raise config.UnknownVersion(version, '1')
         return cls(
             compress=data.bool('compress'),
         )
@@ -33,7 +33,7 @@ class FilterConf(config.Data, conf_name='ItemFilter', uses_id=False, version=1):
     @override
     def parse_dmx(cls, data: Element, version: int) -> Self:
         if version != 1:
-            raise AssertionError(version)
+            raise config.UnknownVersion(version, '1')
         try:
             compress = data['compress'].val_bool
         except KeyError:

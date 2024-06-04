@@ -67,6 +67,9 @@ class Layout(config.Data, conf_name='Signage'):
     @override
     def parse_kv1(cls, data: Keyvalues | Sequence[Keyvalues], version: int) -> Layout:
         """Parse Keyvalues1 config values."""
+        if version != 1:
+            raise config.UnknownVersion(version, '1')
+
         if not data:  # No config, use defaults.
             return cls(DEFAULT_IDS)
 

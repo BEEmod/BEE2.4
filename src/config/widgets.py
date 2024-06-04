@@ -53,7 +53,8 @@ class WidgetConfig(config.Data, conf_name='ItemVar', uses_id=True):
     @override
     def parse_kv1(cls, data: Keyvalues, version: int) -> Self:
         """Parse Keyvalues config values."""
-        assert version == 1
+        if version != 1:
+            raise config.UnknownVersion(version, '1')
         if data.has_children():
             result: dict[TimerNum, str] = {}
             for prop in data:
@@ -80,7 +81,8 @@ class WidgetConfig(config.Data, conf_name='ItemVar', uses_id=True):
     @override
     def parse_dmx(cls, data: Element, version: int) -> Self:
         """Parse DMX format configuration."""
-        assert version == 1
+        if version != 1:
+            raise config.UnknownVersion(version, '1')
         if 'value' in data:
             return WidgetConfig(data['value'].val_string)
         else:

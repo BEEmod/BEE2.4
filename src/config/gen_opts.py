@@ -96,8 +96,8 @@ class GenOptions(config.Data, conf_name='Options', version=2):
     @override
     def parse_kv1(cls, data: Keyvalues, version: int) -> GenOptions:
         """Parse KV1 values."""
-        if version > 2:
-            raise AssertionError('Unknown version!')
+        if version not in (1, 2):
+            raise config.UnknownVersion(version, '1 or 2')
         preserve_fgd = data.bool('preserve_fgd' if version > 1 else 'preserve_resources')
         try:
             after_export = AfterExport(data.int('after_export', 0))
@@ -132,8 +132,8 @@ class GenOptions(config.Data, conf_name='Options', version=2):
     @override
     def parse_dmx(cls, data: Element, version: int) -> GenOptions:
         """Parse DMX configuration."""
-        if version > 2:
-            raise AssertionError('Unknown version!')
+        if version not in (1, 2):
+            raise config.UnknownVersion(version, '1 or 2')
 
         res: dict[str, Any] = {}
         try:

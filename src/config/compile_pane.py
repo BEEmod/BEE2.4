@@ -47,6 +47,8 @@ class CompilePaneState(config.Data, conf_name='CompilerPane'):
     @override
     def parse_kv1(cls, data: Keyvalues, version: int) -> CompilePaneState:
         """Parse Keyvalues1 format data."""
+        if version != 1:
+            raise config.UnknownVersion(version, '1')
         if 'sshot_data' in data:
             screenshot_parts = b'\n'.join([
                 prop.value.encode('ascii')

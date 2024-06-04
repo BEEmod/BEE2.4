@@ -50,7 +50,8 @@ class WindowState(config.Data, conf_name='PaneState', uses_id=True):
     @override
     def parse_kv1(cls, data: Keyvalues, version: int) -> WindowState:
         """Parse keyvalues1 data."""
-        assert version == 1, version
+        if version != 1:
+            raise config.UnknownVersion(version, '1')
         return WindowState(
             data.int('x', -1),
             data.int('y', -1),
@@ -77,7 +78,8 @@ class WindowState(config.Data, conf_name='PaneState', uses_id=True):
     @override
     def parse_dmx(cls, data: Element, version: int) -> WindowState:
         """Parse DMX configuation."""
-        assert version == 1, version
+        if version != 1:
+            raise config.UnknownVersion(version, '1')
         pos = data['pos'].val_vec2 if 'pos' in data else Vec2(-1, -1)
         return WindowState(
             x=int(pos.x),
@@ -121,7 +123,8 @@ class SelectorState(config.Data, conf_name='SelectorWindow', uses_id=True):
     @override
     def parse_kv1(cls, data: Keyvalues, version: int) -> SelectorState:
         """Parse from keyvalues."""
-        assert version == 1
+        if version != 1:
+            raise config.UnknownVersion(version, '1')
         open_groups = {
             prop.name: conv_bool(prop.value)
             for prop in data.find_children('Groups')
@@ -147,7 +150,8 @@ class SelectorState(config.Data, conf_name='SelectorWindow', uses_id=True):
     @override
     def parse_dmx(cls, data: Element, version: int) -> SelectorState:
         """Parse DMX elements."""
-        assert version == 1
+        if version != 1:
+            raise config.UnknownVersion(version, '1')
         open_groups: dict[str, bool] = {}
         for name in data['closed'].iter_str():
             open_groups[name.casefold()] = False

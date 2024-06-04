@@ -4,6 +4,7 @@ from srctools.dmx import Element
 import pytest
 
 from config.windows import SelectorState
+from config import UnknownVersion
 
 
 def test_parse_legacy() -> None:
@@ -48,6 +49,15 @@ def test_parse_legacy() -> None:
     )
 
 
+def test_parse_invalid_version() -> None:
+    """Check invalid versions raise errors."""
+    with pytest.raises(UnknownVersion):
+        SelectorState.parse_kv1(Keyvalues.root(), 2)
+
+    with pytest.raises(UnknownVersion):
+        SelectorState.parse_dmx(Element('SelectorState', 'DMConfig'), 2)
+
+
 def test_parse_kv1() -> None:
     """Test parsing Keyvalues1 state."""
     kv = Keyvalues('Selector', [
@@ -73,9 +83,6 @@ def test_parse_kv1() -> None:
             'notgroup': False,
         }
     )
-
-    with pytest.raises(AssertionError):
-        SelectorState.parse_kv1(kv, 2)
 
 
 def test_export_kv1() -> None:
@@ -124,9 +131,6 @@ def test_parse_dmx() -> None:
             'closedgroup': False,
         }
     )
-
-    with pytest.raises(AssertionError):
-        SelectorState.parse_dmx(elem, 2)
 
 
 def test_export_dmx() -> None:

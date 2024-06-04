@@ -6,6 +6,7 @@ import pytest
 
 from BEE2_config import GEN_OPTS
 from config.windows import WindowState
+from config import UnknownVersion
 
 from . import isolate_conf
 
@@ -33,6 +34,15 @@ def test_parse_legacy() -> None:
         }
 
 
+def test_parse_invalid_version() -> None:
+    """Check invalid versions raise errors."""
+    with pytest.raises(UnknownVersion):
+        WindowState.parse_kv1(Keyvalues.root(), 2)
+
+    with pytest.raises(UnknownVersion):
+        WindowState.parse_dmx(Element('WindowState', 'DMConfig'), 2)
+
+
 def test_parse_kv1() -> None:
     """Test parsing keyvalues1 data."""
     state = WindowState.parse_kv1(Keyvalues('Window', []), 1)
@@ -52,9 +62,6 @@ def test_parse_kv1() -> None:
         height=628,
         visible=False,
     )
-
-    with pytest.raises(AssertionError):  # Check version 2 is not allowed.
-        WindowState.parse_kv1(kv, 2)
 
 
 def test_export_kv1() -> None:
@@ -98,9 +105,6 @@ def test_parse_dmx() -> None:
         height=628,
         visible=False,
     )
-
-    with pytest.raises(AssertionError):  # Check version 2 is not allowed.
-        WindowState.parse_dmx(elem, 2)
 
 
 def test_export_dmx() -> None:

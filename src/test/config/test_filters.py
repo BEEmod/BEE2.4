@@ -4,6 +4,16 @@ from srctools.dmx import Element, ValueType
 import pytest
 
 from config.filters import FilterConf
+from config import UnknownVersion
+
+
+def test_parse_invalid_version() -> None:
+    """Check invalid versions raise errors."""
+    with pytest.raises(UnknownVersion):
+        FilterConf.parse_kv1(Keyvalues.root(), 2)
+
+    with pytest.raises(UnknownVersion):
+        FilterConf.parse_dmx(Element('FilterConf', 'DMConfig'), 2)
 
 
 def test_parse_kv1() -> None:
@@ -29,9 +39,6 @@ def test_parse_kv1() -> None:
         1,
     )
     assert conf.compress is False
-
-    with pytest.raises(AssertionError):
-        FilterConf.parse_kv1(Keyvalues('', []), 2)
 
 
 def test_export_kv1() -> None:
@@ -63,9 +70,6 @@ def test_parse_dmx() -> None:
 
     conf = FilterConf.parse_dmx(elem, 1)
     assert conf.compress is False
-
-    with pytest.raises(AssertionError):
-        FilterConf.parse_dmx(elem, 2)
 
 
 def test_export_dmx() -> None:

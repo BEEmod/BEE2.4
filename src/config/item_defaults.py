@@ -52,7 +52,7 @@ class ItemDefault(config.Data, conf_name='ItemDefault', uses_id=True):
     def parse_kv1(cls, data: Keyvalues, version: int) -> ItemDefault:
         """Parse keyvalues1 data."""
         if version != 1:
-            raise AssertionError(version)
+            raise config.UnknownVersion(version, '1')
         props: dict[ItemPropKind[Any], str] = {}
         for kv in data.find_children('properties'):
             try:
@@ -79,7 +79,7 @@ class ItemDefault(config.Data, conf_name='ItemDefault', uses_id=True):
     def parse_dmx(cls, data: Element, version: int) -> ItemDefault:
         """Parse DMX configuration."""
         if version != 1:
-            raise AssertionError(version)
+            raise config.UnknownVersion(version, '1')
         try:
             item_version = data['version'].val_string
         except KeyError:

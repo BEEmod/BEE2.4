@@ -4,6 +4,7 @@ from srctools import Keyvalues
 from srctools.dmx import Attribute, Element, ValueType
 
 from config.widgets import TIMER_STR_INF, TimerNum, WidgetConfig
+from config import UnknownVersion
 
 
 # Sample set of timer delays.
@@ -66,10 +67,10 @@ def test_parse_invalid_versions() -> None:
     kv = Keyvalues('WidgetConfig', [])
     elem = Element('WidgetConfig', 'DMEConfig')
 
-    with pytest.raises(AssertionError):
+    with pytest.raises(UnknownVersion):
         WidgetConfig.parse_kv1(kv, 2)
 
-    with pytest.raises(AssertionError):
+    with pytest.raises(UnknownVersion):
         WidgetConfig.parse_dmx(elem, 2)
 
 

@@ -47,7 +47,8 @@ class LastSelected(config.Data, conf_name='LastSelected', uses_id=True):
     @override
     def parse_kv1(cls, data: Keyvalues, version: int) -> LastSelected:
         """Parse Keyvalues data."""
-        assert version == 1, version
+        if version != 1:
+            raise config.UnknownVersion(version, '1')
         if data.has_children():
             raise ValueError(f'LastSelected cannot be a block: {data!r}')
         if data.value.casefold() == '<none>':
@@ -63,7 +64,8 @@ class LastSelected(config.Data, conf_name='LastSelected', uses_id=True):
     @override
     def parse_dmx(cls, data: Element, version: int) -> LastSelected:
         """Parse DMX elements."""
-        assert version == 1, version
+        if version != 1:
+            raise config.UnknownVersion(version, '1')
         if 'selected_none' in data and data['selected_none'].val_bool:
             return cls(None)
         else:

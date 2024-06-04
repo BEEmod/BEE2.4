@@ -30,6 +30,16 @@ DMX_NAME = 'BEEConfig'
 DMX_VERSION = 1
 
 
+@attrs.define
+class UnknownVersion(Exception):
+    """Raised for unknown versions during parsing."""
+    version: int
+    allowed: str
+    def __str__(self) -> str:
+        """Format nicely."""
+        return f'Invalid version {self.version}! Valid versions: {self.allowed}'
+
+
 @attrs.define(eq=False)
 class ConfInfo:
     """Holds information about a type of configuration data."""

@@ -43,7 +43,8 @@ class PaletteState(config.Data, conf_name='Palette'):
     @override
     def parse_kv1(cls, data: Keyvalues, version: int) -> PaletteState:
         """Parse Keyvalues data."""
-        assert version == 1
+        if version != 1:
+            raise config.UnknownVersion(version, '1')
         hidden = {
             UUID(hex=prop.value)
             for prop in data.find_all('hidden')
@@ -71,6 +72,8 @@ class PaletteState(config.Data, conf_name='Palette'):
     @override
     def parse_dmx(cls, data: Element, version: int) -> PaletteState:
         """Parse DMX data."""
+        if version != 1:
+            raise config.UnknownVersion(version, '1')
         try:
             uuid = UUID(bytes=data['selected'].val_bytes)
         except (LookupError, ValueError):

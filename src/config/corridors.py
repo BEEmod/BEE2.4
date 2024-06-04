@@ -51,7 +51,7 @@ class Config(config.Data, conf_name='Corridor', uses_id=True, version=2):
                 elif child.name == 'unselected' and not child.has_children():
                     enabled[child.value.casefold()] = False
         else:
-            raise ValueError(f'Unknown version {version}!')
+            raise config.UnknownVersion(version, '1 or 2')
 
         return Config(enabled)
 
@@ -88,7 +88,7 @@ class Config(config.Data, conf_name='Corridor', uses_id=True, version=2):
                 for inst in unselected.iter_str():
                     enabled[inst.casefold()] = False
         else:
-            raise ValueError(f'Unknown version {version}!')
+            raise config.UnknownVersion(version, '1 or 2')
 
         return Config(enabled)
 
@@ -126,7 +126,7 @@ class Options(config.Data, conf_name='CorridorOptions', uses_id=True, version=1)
     @override
     def parse_kv1(cls, data: Keyvalues, version: int) -> Self:
         if version != 1:
-            raise ValueError(f'Unknown version {version}!')
+            raise config.UnknownVersion(version, '1')
         options = {}
         for child in data:
             opt_id = utils.obj_id(child.real_name, 'corridor option ID')
@@ -148,7 +148,7 @@ class Options(config.Data, conf_name='CorridorOptions', uses_id=True, version=1)
     @override
     def parse_dmx(cls, data: Element, version: int) -> Self:
         if version != 1:
-            raise ValueError(f'Unknown version {version}!')
+            raise config.UnknownVersion(version, '1')
         options = {}
         for child in data.values():
             if child.name == 'name':
@@ -201,7 +201,8 @@ class UIState(config.Data, conf_name='CorridorUIState'):
     @override
     def parse_kv1(cls, data: Keyvalues, version: int) -> UIState:
         """Parse Keyvalues 1 configuration."""
-        assert version == 1, version
+        if version != 1:
+            raise config.UnknownVersion(version, '1')
         try:
             last_mode = GameMode(data['mode'])
         except (LookupError, ValueError):
@@ -238,7 +239,8 @@ class UIState(config.Data, conf_name='CorridorUIState'):
     @override
     def parse_dmx(cls, data: Element, version: int) -> UIState:
         """Parse Keyvalues 2 configuration."""
-        assert version == 1, version
+        if version != 1:
+            raise config.UnknownVersion(version, '1')
         try:
             last_mode = GameMode(data['mode'].val_string)
         except (LookupError, ValueError):

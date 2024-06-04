@@ -4,6 +4,7 @@ from srctools.dmx import Attribute, Element
 import pytest
 
 from config.stylevar import State
+from config import UnknownVersion
 
 
 def test_parse_legacy() -> None:
@@ -24,13 +25,19 @@ def test_parse_legacy() -> None:
     }
 
 
+def test_parse_invalid_version() -> None:
+    """Check invalid versions raise errors."""
+    with pytest.raises(UnknownVersion):
+        State.parse_kv1(Keyvalues.root(), 2)
+
+    with pytest.raises(UnknownVersion):
+        State.parse_dmx(Element('StyleState', 'DMConfig'), 2)
+
+
 def test_parse_kv1() -> None:
     """Test parsing keyvalues1 data."""
     assert State.parse_kv1(Keyvalues('StyleState', '0'), 1) == State(False)
     assert State.parse_kv1(Keyvalues('StyleState', '1'), 1) == State(True)
-
-    with pytest.raises(AssertionError):  # No future versions allowed.
-        State.parse_kv1(Keyvalues('StyleState', '0'), 2)
 
 
 def test_export_kv1() -> None:
@@ -48,9 +55,6 @@ def test_parse_dmx(value: bool) -> None:
     elem = Element('ConfData', 'DMEConfig')
     elem['value'] = Attribute.bool('value', value)
     assert State.parse_dmx(elem, 1) == State(value)
-
-    with pytest.raises(AssertionError):  # No future versions allowed.
-        State.parse_dmx(elem, 2)
 
 
 @pytest.mark.parametrize('value', [False, True])

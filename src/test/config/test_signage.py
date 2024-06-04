@@ -2,13 +2,23 @@
 from random import Random
 
 from srctools import Keyvalues
+import pytest
 
 from config.signage import DEFAULT_IDS, Layout
+from config import UnknownVersion
 import utils
 
 
 DELAYS = range(3, 31)
 TEST_EMPTIES = [8, 12, 13, 14]
+
+
+def test_parse_invalid_version() -> None:
+    """Check invalid versions raise errors."""
+    with pytest.raises(UnknownVersion):
+        Layout.parse_kv1(Keyvalues.root(), 2)
+
+    # TODO: DMX
 
 
 def test_defaults_filled() -> None:

@@ -4,6 +4,7 @@ from srctools.dmx import Element, ValueType
 import pytest
 
 from config.last_sel import LastSelected
+from config import UnknownVersion
 
 
 def test_parse_legacy() -> None:
@@ -35,13 +36,19 @@ def test_parse_legacy() -> None:
     }
 
 
+def test_parse_invalid_version() -> None:
+    """Check invalid versions raise errors."""
+    with pytest.raises(UnknownVersion):
+        LastSelected.parse_kv1(Keyvalues.root(), 2)
+
+    with pytest.raises(UnknownVersion):
+        LastSelected.parse_dmx(Element('LastSelected', 'DMConfig'), 2)
+
+
 def test_parse_kv1() -> None:
     """Test parsing keyvalues1 data."""
     assert LastSelected.parse_kv1(Keyvalues('', 'SOME_ID_value'), 1) == LastSelected('SOME_ID_value')
     assert LastSelected.parse_kv1(Keyvalues('', '<NonE>'), 1) == LastSelected(None)
-
-    with pytest.raises(AssertionError):  # Check version 2 is not allowed.
-        LastSelected.parse_kv1(Keyvalues('LastSelected', 'TEST'), 2)
 
 
 def test_export_kv1() -> None:
@@ -56,15 +63,9 @@ def test_parse_dmx() -> None:
     elem['selected'] = 'SomeIDValue'
     assert LastSelected.parse_dmx(elem, 1) == LastSelected('SomeIDValue')
 
-    with pytest.raises(AssertionError):  # Check version 2 is not allowed.
-        LastSelected.parse_dmx(elem, 2)
-
     elem['selected_none'] = True
     # Selected-none overrides regular selection.
     assert LastSelected.parse_dmx(elem, 1) == LastSelected(None)
-
-    with pytest.raises(AssertionError):
-        LastSelected.parse_dmx(elem, 2)
 
 
 def test_export_dmx() -> None:

@@ -28,7 +28,8 @@ class State(config.Data, conf_name='StyleVar', uses_id=True):
     @override
     def parse_kv1(cls, data: Keyvalues, version: int) -> State:
         """Parse KV1-formatted stylevar states."""
-        assert version == 1, version
+        if version != 1:
+            raise config.UnknownVersion(version, '1')
         return cls(conv_bool(data.value))
 
     @override
@@ -40,7 +41,8 @@ class State(config.Data, conf_name='StyleVar', uses_id=True):
     @override
     def parse_dmx(cls, data: Element, version: int) -> State:
         """Parse DMX config files."""
-        assert version == 1, version
+        if version != 1:
+            raise config.UnknownVersion(version, '1')
         try:
             value = data['value'].val_bool
         except KeyError:
