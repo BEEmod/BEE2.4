@@ -1282,7 +1282,7 @@ async def init_picker(
         f.bind("<Configure>", lambda e: reflow_event.set())
         task_status.started(lambda: reflow_event.set())
         while True:
-            await utils.run_as_task(_flow_picker, conf)
+            await _flow_picker(conf)
             await reflow_event.wait()
             reflow_event = trio.Event()
 
@@ -1293,7 +1293,6 @@ async def _flow_picker(filter_conf: FilterConf) -> None:
     Should only be triggered by the above init_picker() task, so reentrancy issues don't
     occur.
     """
-    frmScroll.update_idletasks()
     frmScroll['width'] = pal_canvas.winfo_width()
     mandatory_unlocked = StyleVarPane.mandatory_unlocked()
 
@@ -1302,9 +1301,8 @@ async def _flow_picker(filter_conf: FilterConf) -> None:
         width = 1  # we got way too small, prevent division by zero
 
     i = 0
-    cur_row = -1
     # If cur_filter is None, it's blank and so show all of them.
-    for pal_item in pal_items:
+    for pal_item, should_checkpoint in zip(pal_items, itertools.cycle('YNNNN')):
         if pal_item.needs_unlock and not mandatory_unlocked:
             visible = False
         elif filter_conf.compress:
@@ -1322,11 +1320,9 @@ async def _flow_picker(filter_conf: FilterConf) -> None:
             # Uncompressed, check each individually.
             visible = cur_filter is None or (pal_item.item.id, pal_item.subKey) in cur_filter
 
-        row = i // width
-        if row != cur_row:
-            # Checkpoint once per row, to let other code run.
+        if should_checkpoint == 'Y':
+            # Checkpoint often, to let other code run.
             await trio.lowlevel.checkpoint()
-            cur_row = row
 
         if visible:
             pal_item.is_pre = False
@@ -1442,7 +1438,7 @@ async def init_windows(
         padx=(2, 5), pady=5,
     )
     init_preview(tk_img, frames['preview'])
-    frames['preview'].update_idletasks()
+    await tk_tools.wait_eventloop()
     TK_ROOT.minsize(
         width=frames['preview'].winfo_reqwidth()+200,
         height=frames['preview'].winfo_reqheight()+5,
