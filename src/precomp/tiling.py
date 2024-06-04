@@ -229,6 +229,7 @@ class TileType(Enum):
         """Return the TileType with a size and color."""
         return _tiletype_tiles[size, color]
 
+
 _tiletype_tiles = {
     (TileSize.TILE_1x1, texturing.Portalable.BLACK): TileType.BLACK,
     (TileSize.TILE_1x1, texturing.Portalable.WHITE): TileType.WHITE,
@@ -427,6 +428,7 @@ def _make_patterns() -> None:
             fizz_u.append(pat_u)
         if pat_v.tiles:
             fizz_v.append(pat_v)
+
 
 _make_patterns()
 

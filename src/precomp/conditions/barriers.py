@@ -1,6 +1,5 @@
 """Controls placing custom barrier (glass/grating) items."""
-from typing_extensions import Literal, assert_never
-from typing import Any, Tuple, Dict, List, Optional
+from typing import Any, Literal, assert_never
 
 from srctools import FrozenVec, Keyvalues, Vec, VMF, Entity, Output
 import srctools.logger
@@ -20,7 +19,7 @@ MIN: Literal[-1] = -1
 MAX: Literal[1] = 1
 Direction = Literal[-1, 0, 1]
 CORNER_NAMES = ['lowerleft', 'lowerright', 'upperleft', 'upperright']
-CORNER_POINTS: Dict[FrozenVec, List[Tuple[Direction, Direction, Direction]]] = {
+CORNER_POINTS: dict[FrozenVec, list[tuple[Direction, Direction, Direction]]] = {
     Vec.N: [
         (MIN, 0, MIN),
         (MAX, 0, MIN),
@@ -82,7 +81,7 @@ def res_cust_barrier(inst: Entity, res: Keyvalues) -> None:
             points=[Vec.from_str(inst['origin'])],
         ) from exc
     cust_item.delete_antlines()
-    barrier: Optional[barriers.Barrier] = None
+    barrier: barriers.Barrier | None = None
     for conn in list(cust_item.outputs):
         targ_item = conn.to_item
         conn.remove()
@@ -140,7 +139,7 @@ def res_breakable_glass(vmf: VMF, inst: Entity, res: Keyvalues) -> object:
     """
     glass_items: Any = ...
 
-    damage_filter: Optional[Entity] = None
+    damage_filter: Entity | None = None
 
     for targ, bbox_min, bbox_max, norm, conf in glass_items:
         LOGGER.info('Making glass "{}"', targ)

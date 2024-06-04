@@ -1280,7 +1280,7 @@ async def init_picker(
 
         # Late-binding!
         f.bind("<Configure>", lambda e: reflow_event.set())
-        task_status.started(lambda: reflow_event.set())
+        task_status.started(lambda: reflow_event.set())  # noqa: PLW0108
         while True:
             await _flow_picker(conf)
             await reflow_event.wait()

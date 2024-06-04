@@ -67,7 +67,7 @@ async def test(core_nursery: trio.Nursery) -> None:
         )
         if group_icon is not None:
             group_handle = img.Handle.parse_uri(
-                utils.PackagePath(pak_id,f'items/clean/{group_icon}.png'),
+                utils.PackagePath(pak_id, f'items/clean/{group_icon}.png'),
                 64, 64,
             )
         else:

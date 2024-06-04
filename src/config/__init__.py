@@ -6,7 +6,7 @@ They can then fetch the current state and store new state.
 from __future__ import annotations
 
 from typing import ClassVar, Self, NewType, override
-from collections.abc import Awaitable, Callable, Generator, Iterator
+from collections.abc import Generator, Iterator
 from pathlib import Path
 import abc
 import contextlib

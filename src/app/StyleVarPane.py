@@ -8,7 +8,6 @@ import operator
 from srctools.logger import get_logger
 import trio
 
-from app import background_run
 from config.filters import FilterConf
 from config.stylevar import State
 from packages import PackagesSet, Style, StyleVar

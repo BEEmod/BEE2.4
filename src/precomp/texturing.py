@@ -183,6 +183,7 @@ class TileSize(str, Enum):
             return 8, 8
         raise AssertionError(self)
 
+
 GENERATORS: dict[
     GenCat | tuple[GenCat, Orient, Portalable],
     Generator,

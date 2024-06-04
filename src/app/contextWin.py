@@ -69,6 +69,7 @@ class SPR(Enum):
     COLLISION = 3
     FACING = 4
 
+
 SPRITE_TOOL = {
     # The tooltips associated with each sprite.
     'rot_0': TransToken.ui('This item may not be rotated.'),

@@ -90,6 +90,7 @@ class _WidgetsDict(TypedDict):
     light_fast: ttk.Radiobutton
     light_full: ttk.Radiobutton
 
+
 COMPILE_CFG = BEE2_config.ConfigFile('compile.cfg')
 COMPILE_CFG.set_defaults(COMPILE_DEFAULTS)
 window: SubPane.SubPane
@@ -162,6 +163,7 @@ async def apply_state_task() -> None:
 
 class LimitCounter:
     """Displays the current status of various compiler limits."""
+
     # i18n: Tooltip format for compiler limit bars.
     TOOLTIP = TransToken.ui('{count}/{max} ({frac:0.##%}):\n{blurb}')
     def __init__(

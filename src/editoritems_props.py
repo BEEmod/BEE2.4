@@ -466,6 +466,7 @@ def paint_type_prop(
         export=lambda value: str(order.index(value)),
     )
 
+
 # The main paint type property, directly specifying each paint type.
 prop_paint_type = paint_type_prop(
     PaintTypes.BOUNCE,
@@ -525,6 +526,7 @@ def _parse_connection_count(value: str) -> int:
         raise ValueError('Connection count cannot be negative!')
     return count
 
+
 prop_connection_count = ItemPropKind[int](
     id='ConnectionCount',
     instvar="$connectioncount",
@@ -546,6 +548,7 @@ prop_connection_count_polarity = ItemPropKind[int](
 def _parse_timer_delay(value: str) -> int:
     time = conv_int(value, 3)
     return max(0, min(30, time))
+
 
 prop_timer_delay = ItemPropKind[int](
     id="TimerDelay",
@@ -664,6 +667,7 @@ def _parse_angled_panel_anim(value: str) -> PanelAnimation:
             raise ValueError(f'Unknown animation {orig_value}') from None
     else:
         return PanelAnimation(int(value))
+
 
 # The angle the panel rises to.
 prop_angled_panel_anim = ItemPropKind[PanelAnimation](

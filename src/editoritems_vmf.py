@@ -1,7 +1,7 @@
 """Use pseudo-entities to make creating editoritems data more easily."""
 from __future__ import annotations
 
-from collections.abc  import Callable
+from collections.abc import Callable
 import re
 
 from srctools import FrozenVec, Matrix, Angle, Vec, logger, conv_int

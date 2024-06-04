@@ -127,6 +127,7 @@ class TextWidUser(TkUser):
             except tk.TclError:
                 pass
 
+
 @attrs.define(eq=False)
 class MenuIconUser(TkUser):
     """A user for menus, which may use images for icons."""
@@ -356,5 +357,6 @@ class TKImages(img.UIImage):
         for user in handle._users:
             if isinstance(user, TkUser):
                 user.set_img(handle, loading)
+
 
 TK_IMG = TKImages()

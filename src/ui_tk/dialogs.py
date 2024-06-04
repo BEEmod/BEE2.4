@@ -47,7 +47,7 @@ async def _messagebox(
 
     # Threading seems to work, not sure if safe...
     with suppress_screens():
-        return await trio.to_thread.run_sync(TK_ROOT.tk.call,*args)
+        return await trio.to_thread.run_sync(TK_ROOT.tk.call, *args)
 
 
 class BasicQueryValidator(simpledialog.Dialog):

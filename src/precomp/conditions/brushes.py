@@ -1,6 +1,6 @@
 """Results relating to brushwork."""
 from __future__ import annotations
-from typing import Callable, Iterable
+from collections.abc import Callable, Iterable
 from collections import defaultdict
 from random import Random
 

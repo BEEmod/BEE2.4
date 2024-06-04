@@ -386,7 +386,7 @@ def annotation_caller[Res](
     ]
 
     # For forward references and 3.7+ stringified arguments.
-    # Since we don't care about the return value, temporarily remove it so it isn't parsed.
+    # Since we don't care about the return value, temporarily remove it so that it isn't parsed.
     ann_dict = getattr(func, '__annotations__', None)
     if ann_dict is not None:
         return_val = ann_dict.pop('return', allowed_kinds)  # Sentinel

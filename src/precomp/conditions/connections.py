@@ -1,5 +1,5 @@
 """Results relating to item connections."""
-from typing import Callable, Dict, List
+from collections.abc import Callable
 
 import utils
 from precomp import connections, conditions
@@ -17,7 +17,7 @@ def res_add_output(res: Keyvalues) -> Callable[[Entity], None]:
     Values:
 
     - `output`: The output name. Can be `<ITEM_ID:activate>` or `<ITEM_ID:deactivate>`
-      to lookup that item type.
+      to look up the output from that item type.
     - `target`: The name of the target entity
     - `input`: The input to give
     - `parm`: Parameters for the input
@@ -116,7 +116,7 @@ def res_append_io_type(res: Keyvalues) -> Callable[[Entity], None]:
     - `sec_enable_cmd`
     - `sec_disable_cmd`
     """
-    prop_lists: Dict[str, List[Output]] = {
+    prop_lists: dict[str, list[Output]] = {
         name: []
         for name in ['enable_cmd', 'disable_cmd', 'sec_enable_cmd', 'sec_disable_cmd']
     }
