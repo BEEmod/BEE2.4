@@ -5,15 +5,8 @@ GitHub repo, which ensures we're able to change them retroactively if the old UR
 whatever reason.
 """
 from __future__ import annotations
-from typing import Any, cast
 
-from tkinter import ttk
-import tkinter as tk
-
-from collections.abc import Callable
-from contextlib import aclosing
 from enum import Enum
-import functools
 import io
 import urllib.error
 import urllib.request
@@ -24,20 +17,10 @@ import attrs
 import srctools.logger
 import trio.to_thread
 
-from app.richTextBox import tkRichText
-from app import EdgeTrigger, tkMarkdown, sound, img, background_run
-from ui_tk.dialogs import DIALOG, Dialogs
-from ui_tk.img import TKImages
-from ui_tk.wid_transtoken import set_text, set_win_title, set_menu_text
-from ui_tk import TK_ROOT, tk_tools
+from app import EdgeTrigger, sound, img
+from app.dialogs import Dialogs
 from transtoken import TransToken
 import utils
-
-# For version info
-import PIL
-import platform
-import mistletoe
-import pygtrie
 
 
 class ResIcon(Enum):
@@ -74,24 +57,27 @@ url_data: Element = NULL
 # This produces a '-------' instead.
 SEPERATOR = WebResource(TransToken.BLANK, '', ResIcon.NONE)
 
-Res: Callable[[TransToken, str, ResIcon], WebResource] = cast(Any, WebResource)
 WEB_RESOURCES = [
-    Res(TransToken.ui('Wiki...'), 'wiki_bee2', ResIcon.BEE2),
-    Res(TransToken.ui('Original Items...'), "wiki_peti", ResIcon.PORTAL2),
+    WebResource(TransToken.ui('Wiki...'), 'wiki_bee2', ResIcon.BEE2),
+    WebResource(TransToken.ui('Original Items...'), "wiki_peti", ResIcon.PORTAL2),
     # i18n: The chat program.
-    Res(TransToken.ui('Discord Server...'), "discord_bee2", ResIcon.DISCORD),
-    Res(TransToken.ui("aerond's Music Changer..."), "music_changer", ResIcon.MUSIC_CHANGER),
-    Res(TransToken.ui('Purchase Portal 2'), "store_portal2", ResIcon.PORTAL2),
+    WebResource(TransToken.ui('Discord Server...'), "discord_bee2", ResIcon.DISCORD),
+    WebResource(TransToken.ui("aerond's Music Changer..."), "music_changer", ResIcon.MUSIC_CHANGER),
+    WebResource(TransToken.ui('Purchase Portal 2'), "store_portal2", ResIcon.PORTAL2),
     SEPERATOR,
-    Res(TransToken.ui('Application Repository...'), "repo_bee2", ResIcon.GITHUB),
-    Res(TransToken.ui('Items Repository...'), "repo_items", ResIcon.GITHUB),
-    Res(TransToken.ui('Music Repository...'), "repo_music", ResIcon.GITHUB),
+    WebResource(TransToken.ui('Application Repository...'), "repo_bee2", ResIcon.GITHUB),
+    WebResource(TransToken.ui('Items Repository...'), "repo_items", ResIcon.GITHUB),
+    WebResource(TransToken.ui('Music Repository...'), "repo_music", ResIcon.GITHUB),
     SEPERATOR,
-    Res(TransToken.ui('Submit Application Bugs...'), "issues_app", ResIcon.BUGS),
-    Res(TransToken.ui('Submit Item Bugs...'), "issues_items", ResIcon.BUGS),
-    Res(TransToken.ui('Submit Music Bugs...'), "issues_music", ResIcon.BUGS),
+    WebResource(TransToken.ui('Submit Application Bugs...'), "issues_app", ResIcon.BUGS),
+    WebResource(TransToken.ui('Submit Item Bugs...'), "issues_items", ResIcon.BUGS),
+    WebResource(TransToken.ui('Submit Music Bugs...'), "issues_music", ResIcon.BUGS),
 ]
-del Res
+
+TRANS_MENU_BUTTON = TransToken.ui('Help')
+TRANS_CREDITS_TITLE = TransToken.ui('BEE2 Credits')
+TRANS_CREDITS_BUTTON = TransToken.ui('Credits...')
+TRANS_CLOSE_BUTTON = TransToken.ui('Close')
 
 # language=Markdown
 CREDITS_TEXT = '''\
@@ -102,7 +88,7 @@ Used software / libraries in the BEE2.4:
 * [pyglet][pyglet] `{pyglet_ver}` by Alex Holkner and Contributors
 * [Pillow][pillow] `{pil_ver}` by Alex Clark and Contributors
 * [noise][perlin_noise] `(2008-12-15)` by Casey Duncan
-* [mistletoe][mistletoe] `{mstle_ver}` by Mi Yu and Contributors
+* [mistletoe][mistletoe] `{mistletoe_ver}` by Mi Yu and Contributors
 * [pygtrie][pygtrie] `{pygtrie_ver}` by Michal Nazarewicz
 * [Tcl][tcl] `{tk_ver}` / [TK][tcl]` {tcl_ver}`
 * [Python][python] `{py_ver}`
@@ -436,67 +422,40 @@ CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE 
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-'''.format(
-    # Inject the running Python version.
-    py_ver=platform.python_version(),
-    tcl_ver=TK_ROOT.getvar('tk_patchLevel'),
-    tk_ver=TK_ROOT.tk.call('info', 'patchlevel'),
-    pyglet_ver=sound.pyglet_version,
-    mstle_ver=mistletoe.__version__,
-    pygtrie_ver=pygtrie.__version__,
-    pil_ver=PIL.__version__,
-    srctools_ver=srctools.__version__,
-    ha_ver=utils.HA_VERSION,
-).replace('\n', '  \n')  # Add two spaces to keep line breaks
+'''
 
 
-class CreditsWindow:
+def get_versions() -> dict[str, str]:
+    """Format the credits text with versions for the libraries used."""
+    # Only for version info, remove if we no longer use these.
+    import PIL
+    import platform
+    import mistletoe
+    import pygtrie
+    from ui_tk import TK_ROOT
+
+    return {
+        'py_ver': platform.python_version(),
+        'tcl_ver': TK_ROOT.getvar('tk_patchLevel'),
+        'tk_ver': TK_ROOT.tk.call('info', 'patchlevel'),
+        'pyglet_ver': sound.pyglet_version,
+        'mistletoe_ver': mistletoe.__version__,
+        'pygtrie_ver': pygtrie.__version__,
+        'pil_ver': PIL.__version__,
+        'srctools_ver': srctools.__version__,
+        'ha_ver': utils.HA_VERSION,
+    }
+
+
+class CreditsWindowBase:
     """The window showing credits information."""
     open: EdgeTrigger[()]
+    _close_event: trio.Event
 
-    def __init__(self, *, name: str, title: TransToken) -> None:
-        self.win = win = tk.Toplevel(TK_ROOT, name=name)
-        win.withdraw()
-        set_win_title(win, title)
-        win.transient(master=TK_ROOT)
-        win.resizable(width=True, height=True)
-        if utils.LINUX:
-            win.wm_attributes('-type', 'dialog')
-        tk_tools.set_window_icon(win)
-
+    def __init__(self) -> None:
         # Controls opening/closing the window.
         self.open = EdgeTrigger()
         self._close_event = trio.Event()
-
-        # Hide when the exit button is pressed, or Escape
-        # on the keyboard.
-        close_cmd = win.register(self._close)
-        win.wm_protocol("WM_DELETE_WINDOW", close_cmd)
-        win.bind("<Escape>", close_cmd)
-
-        frame = tk.Frame(win, background='white')
-        frame.grid(row=0, column=0, sticky='nsew')
-        win.grid_columnconfigure(0, weight=1)
-        win.grid_rowconfigure(0, weight=1)
-
-        self._textbox = tkRichText(frame, name='message', width=80, height=24)
-        self._textbox.configure(background='white', relief='flat')
-        self._textbox.grid(row=0, column=0, sticky='nsew')
-        frame.grid_columnconfigure(0, weight=1)
-        frame.grid_rowconfigure(0, weight=1)
-
-        scrollbox = tk_tools.HidingScroll(
-            frame,
-            orient='vertical',
-            command=self._textbox.yview,
-        )
-        scrollbox.grid(row=0, column=1, sticky='ns')
-        self._textbox['yscrollcommand'] = scrollbox.set
-
-        set_text(
-            ttk.Button(frame, command=close_cmd),
-            TransToken.ui('Close'),
-        ).grid(row=1, column=0)
 
     def _close(self) -> None:
         """Called to close the window."""
@@ -505,22 +464,35 @@ class CreditsWindow:
     async def display_task(self) -> None:
         """Display the help dialog."""
         await self.open.wait()
+
         # The first time we're shown, decode the text.
         # That way we don't need to do it on startup.
+        text = CREDITS_TEXT.format_map(get_versions())
+        text = text.replace('\n', '  \n')  # Add two spaces to keep line breaks
+
         # Don't translate this, it's all legal text - not really our business to change.
-        parsed_text = tkMarkdown.convert(TransToken.untranslated(CREDITS_TEXT), package=None)
-        self._textbox.set_text(parsed_text)
+        await self._ui_apply_text(TransToken.untranslated(text))
 
         # Then alternate between showing/hiding. We don't need to reparse ever again.
         while True:
-            self.win.deiconify()
-            await tk_tools.wait_eventloop()
-            tk_tools.center_win(self.win, TK_ROOT)
+            await self._ui_show_window()
             await self._close_event.wait()
 
             self._close_event = trio.Event()
-            self.win.withdraw()
+            await self._ui_hide_window()
             await self.open.wait()
+
+    async def _ui_apply_text(self, text: TransToken) -> None:
+        """Apply the credits text to the window."""
+        raise NotImplementedError
+
+    async def _ui_show_window(self) -> None:
+        """Show the window, and center it."""
+        raise NotImplementedError
+
+    async def _ui_hide_window(self) -> None:
+        """Hide the window."""
+        raise NotImplementedError
 
 
 def load_database() -> Element:
@@ -573,41 +545,3 @@ async def open_url(dialogs: Dialogs, url_key: str) -> None:
             detail=f'"{url}"',
         ):
             webbrowser.open(url)
-
-
-async def make_help_menu(
-    parent: tk.Menu, tk_img: TKImages,
-    *, task_status: trio.TaskStatus[None] = trio.TASK_STATUS_IGNORED,
-) -> None:
-    """Create and operate the application 'Help' menu."""
-    # Using this name displays this correctly in OS X
-    help_menu = tk.Menu(parent, name='help')
-
-    parent.add_cascade(menu=help_menu)
-    set_menu_text(parent, TransToken.ui('Help'))
-
-    credit_window = CreditsWindow(name='credits', title=TransToken.ui('BEE2 Credits'))
-
-    for res in WEB_RESOURCES:
-        if res is SEPERATOR:
-            help_menu.add_separator()
-        else:
-            help_menu.add_command(
-                command=functools.partial(background_run, open_url, DIALOG, res.url_key),
-                compound='left',
-            )
-            tk_img.menu_set_icon(help_menu, utils.not_none(help_menu.index('end')), ICONS[res.icon])
-            set_menu_text(help_menu, res.name)
-
-    help_menu.add_separator()
-    help_menu.add_command(command=credit_window.open.trigger)
-    credit_ind = help_menu.index('end')
-    assert credit_ind is not None
-    set_menu_text(help_menu, TransToken.ui('Credits...'))
-
-    async with trio.open_nursery() as nursery:
-        nursery.start_soon(credit_window.display_task)
-        async with aclosing(credit_window.open.ready.eventual_values()) as agen:
-            task_status.started()
-            async for enabled in agen:
-                help_menu.entryconfigure(credit_ind, state='normal' if enabled else 'disabled')

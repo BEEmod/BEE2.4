@@ -10,9 +10,9 @@ import BEE2_config
 import utils
 from transtoken import TransToken
 from app import (
-    gameMan, helpMenu, optionWindow, packageMan, backup as backup_win, background_run, quit_app,
+    gameMan, optionWindow, packageMan, backup as backup_win, background_run, quit_app,
 )
-from ui_tk import tk_tools
+from ui_tk import tk_tools, help_menu
 from ui_tk.dialogs import DIALOG
 from ui_tk.img import TKImages
 from ui_tk.wid_transtoken import set_menu_text
@@ -110,7 +110,7 @@ class MenuBar:
         bar.add_cascade(menu=self.view_menu)
         set_menu_text(bar, TransToken.ui("View"))
 
-        background_run(helpMenu.make_help_menu, bar, tk_img)
+        background_run(help_menu.create, bar, tk_img)
         gameMan.ON_GAME_CHANGED.register(self._game_changed)
 
         if utils.CODE_DEV_MODE:
