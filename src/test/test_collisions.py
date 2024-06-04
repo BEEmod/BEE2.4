@@ -185,7 +185,7 @@ def test_reorder_helper() -> None:
 
 def get_intersect_testcases() -> Iterable[tuple[tuple3, tuple3, tuple[tuple3, tuple3] | None]]:
     """Use a VMF to make it easier to generate the bounding boxes."""
-    with Path(__file__, '../bbox_samples.vmf').open() as f:
+    with Path(__file__, '..', 'bbox_samples.vmf').resolve().open() as f:
         vmf = VMF.parse(Keyvalues.parse(f))
 
     def process(brush: Solid) -> tuple[tuple3, tuple3]:
@@ -354,7 +354,7 @@ def test_bbox_parse_plane(axis: str, mins: tuple3, maxes: tuple3) -> None:
 
 def test_volume_rotation(file_regression: FileRegressionFixture) -> None:
     """Test rotating bboxes."""
-    with Path(__file__, '../volume_sample.vmf').open() as f:
+    with Path(__file__, '..', 'volume_sample.vmf').resolve().open() as f:
         vmf = VMF.parse(Keyvalues.parse(f))
 
     volumes = [

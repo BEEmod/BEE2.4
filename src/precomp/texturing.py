@@ -643,7 +643,7 @@ async def setup(game: Game, vmf: VMF, tiles: list[TileDef]) -> None:
     - Build clumps.
     - Generate antigel materials
     """
-    material_folder = game.path / '../bee2/materials/'
+    material_folder = game.path / '..' / 'bee2' / 'materials'
     antigel_loc = material_folder / ANTIGEL_PATH
     antigel_loc.mkdir(parents=True, exist_ok=True)
 
