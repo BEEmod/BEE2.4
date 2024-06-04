@@ -73,6 +73,7 @@ class CompilePaneState(config.Data, conf_name='CompilerPane'):
             sshot_type=sshot_type,
             sshot_cleanup=data.bool('sshot_cleanup', False),
             sshot_cust=screenshot_data,
+            # sshot_cust_fname=data['sshot_cust_fname', ''],
             spawn_elev=data.bool('spawn_elev', False),
             player_mdl=player_mdl,
             use_voice_priority=data.bool('voiceline_priority', False),
@@ -89,7 +90,7 @@ class CompilePaneState(config.Data, conf_name='CompilerPane'):
             Keyvalues('voiceline_priority', bool_as_int(self.use_voice_priority)),
         ])
 
-        # Embed the screenshot in so we can load it later.
+        # Embed the screenshot in so that we can load it later.
         if self.sshot_type == 'CUST':
             # encodebytes() splits it into multiple lines, which we write
             # in individual blocks to prevent having a massively long line
@@ -102,6 +103,60 @@ class CompilePaneState(config.Data, conf_name='CompilerPane'):
                 ]
             ))
         return kv
+
+    @override
+    @classmethod
+    def parse_dmx(cls, data: Element, version: int) -> CompilePaneState:
+        """Parse DMX format data."""
+        if version != 1:
+            raise config.UnknownVersion(version, '1')
+
+        try:
+            screenshot_data = data['sshot_data'].val_binary
+        except KeyError:
+            screenshot_data = b''
+
+        try:
+            sshot_type = data['sshot_type'].val_str.upper()
+        except KeyError:
+            sshot_type = 'AUTO'
+        else:
+            if sshot_type not in ['AUTO', 'CUST', 'PETI']:
+                LOGGER.warning('Unknown screenshot type "{}"!', sshot_type)
+                sshot_type = 'AUTO'
+
+        try:
+            player_mdl = data['player_model'].val_str.upper()
+        except KeyError:
+            player_mdl = 'PETI'
+        else:
+            if player_mdl not in PLAYER_MODEL_ORDER:
+                LOGGER.warning('Unknown player model "{}"!', player_mdl)
+                player_mdl = 'PETI'
+
+        try:
+            sshot_cleanup = data['sshot_cleanup'].val_bool
+        except KeyError:
+            sshot_cleanup = False
+
+        try:
+            spawn_elev = data['spawn_elev'].val_bool
+        except KeyError:
+            spawn_elev = False
+
+        try:
+            use_voice_priority = data['voiceline_priority'].val_bool
+        except KeyError:
+            use_voice_priority = False
+
+        return CompilePaneState(
+            sshot_type=sshot_type,
+            sshot_cleanup=sshot_cleanup,
+            sshot_cust=screenshot_data,
+            spawn_elev=spawn_elev,
+            player_mdl=player_mdl,
+            use_voice_priority=use_voice_priority,
+        )
 
     @override
     def export_dmx(self) -> Element:
