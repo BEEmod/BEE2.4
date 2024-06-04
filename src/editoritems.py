@@ -498,11 +498,11 @@ class ConnSide(Enum):
         value %= 360
         if value == 0:
             return ConnSide.LEFT
-        elif value == 90:
+        elif value == 270:
             return ConnSide.DOWN
         elif value == 180:
             return ConnSide.RIGHT
-        elif value == 270:
+        elif value == 90:
             return ConnSide.UP
         raise ValueError(f'Invalid yaw {value}!')
 

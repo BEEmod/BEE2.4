@@ -119,9 +119,8 @@ def load_connectionpoint(item: Item, ent: Entity) -> None:
 
     orient = Matrix.from_yaw(round(angles.yaw))
 
-    center = (origin - (-56, 56, 0)) / 16
+    center = (origin - (-56, -56, 0)) / 16
     center.z = 0
-    center.y = -center.y
     try:
         offset = SKIN_TO_CONN_OFFSETS[ent['skin']] @ orient
     except KeyError:
