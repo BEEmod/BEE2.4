@@ -73,11 +73,7 @@ if __name__ == '__main__':
     GEN_OPTS.load()
     GEN_OPTS.set_defaults(DEFAULT_SETTINGS)
     config.APP.read_file(config.APP_LOC)
-    try:
-        conf = config.APP.get_cur_conf(GenOptions)
-    except KeyError:
-        conf = GenOptions()
-        config.APP.store_conf(conf)
+    conf = config.APP.get_cur_conf(GenOptions)
 
     # Special case, load in this early, so it applies.
     utils.DEV_MODE = conf.dev_mode

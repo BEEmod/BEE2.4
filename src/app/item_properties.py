@@ -647,7 +647,7 @@ class PropertyWindow:
         oscillating_prop: BoolPropGroup | None = None
         start_active_prop: TrackStartActivePropGroup | None = None
 
-        conf = config.APP.get_cur_conf(ItemDefault, item.id, ItemDefault())
+        conf = config.APP.get_cur_conf(ItemDefault, item.id)
 
         # Stop our adjustment of the widgets from making sounds.
         sound.block_fx()

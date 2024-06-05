@@ -46,6 +46,7 @@ class ConfInfo:
     name: str
     version: int
     uses_id: bool  # If we manage individual configs for each of these IDs.
+    default: Data | None  # If non-None, the class can be called with no args, so a default is present.
 
 
 class Data(abc.ABC):
@@ -71,7 +72,8 @@ class Data(abc.ABC):
             raise ValueError('Config name must be specified!')
         if conf_name.casefold() in {'version', 'name'}:
             raise ValueError(f'Illegal name: "{conf_name}"')
-        cls.__info = ConfInfo(conf_name, version, uses_id)
+        # Default must be created during the register call.
+        cls.__info = ConfInfo(conf_name, version, uses_id, None)
 
     @classmethod
     def get_conf_info(cls) -> ConfInfo:
@@ -138,6 +140,12 @@ class ConfigSpec:
             raise ValueError(f'"{info.name}" is already registered!')
         self._name_to_type[info.name.casefold()] = cls
         self._registered.add(cls)
+
+        if info.default is None:
+            try:
+                info.default = cls()
+            except TypeError:
+                pass
         return cls
 
     @contextlib.contextmanager
@@ -256,13 +264,15 @@ class ConfigSpec:
         self,
         cls: type[DataT],
         data_id: str = '',
-        default: DataT | None = None,
+        default: DataT | type[Exception] | None = None,
         legacy_id: str = '',
     ) -> DataT:
         """Fetch the currently active config for this ID.
 
         If legacy_id is defined, this will be checked if the original does not exist, and if so
         moved to the actual ID.
+        Default can be set to an exception type to force an exception. Otherwise, if the class can
+        be constructed without args that will be returned by default.
         """
         if cls not in self._registered:
             raise ValueError(f'Unregistered data type {cls!r}')
@@ -281,8 +291,12 @@ class ConfigSpec:
                     pass
         if data is None:
             # Return a default value.
-            if default is not None:
+            if isinstance(default, type) and issubclass(default, Exception):
+                raise default(data_id)
+            elif default is not None:
                 return default
+            elif info.default is not None:
+                return info.default
             else:
                 raise KeyError(data_id)
 

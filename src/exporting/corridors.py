@@ -41,7 +41,6 @@ async def step_corridor_conf(exp_data: ExportData) -> None:
         conf = config.APP.get_cur_conf(
             Config,
             Config.get_id(style_id, mode, direction, orient),
-            Config(),
         )
         try:
             inst_to_corr = {

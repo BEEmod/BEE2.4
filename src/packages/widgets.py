@@ -234,7 +234,6 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
             prev_conf = config.APP.get_cur_conf(
                 WidgetConfig,
                 f'{data.id}:{wid_id}',
-                default=WidgetConfig(),
             ).values
 
             # Special case - can't be timer, and no values.

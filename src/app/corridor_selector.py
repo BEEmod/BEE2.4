@@ -213,11 +213,7 @@ class Selector[IconT: Icon, OptionRowT: OptionRow]:
 
     def store_conf(self) -> None:
         """Store the configuration for the current corridor."""
-        cur_conf = config.APP.get_cur_conf(
-            Config,
-            self.conf_id,
-            default=Config(),
-        )
+        cur_conf = config.APP.get_cur_conf(Config, self.conf_id)
         # Start with the existing config, so we preserve unknown instances.
         enabled = dict(cur_conf.enabled)
 
@@ -245,7 +241,7 @@ class Selector[IconT: Icon, OptionRowT: OptionRow]:
         direction = self.state_dir.value
         orient = self.state_orient.value
         self.conf_id = Config.get_id(self.corr_group.id, mode, direction, orient)
-        conf = config.APP.get_cur_conf(Config, self.conf_id, Config())
+        conf = config.APP.get_cur_conf(Config, self.conf_id)
 
         config.APP.store_conf(UIState(mode, direction, orient, *self.ui_win_getsize()))
 
@@ -417,7 +413,7 @@ class Selector[IconT: Icon, OptionRowT: OptionRow]:
 
                 # Place all options in the UI.
                 option_conf_id = Options.get_id(self.corr_group.id, mode, direction)
-                option_conf = config.APP.get_cur_conf(Options, option_conf_id, default=Options())
+                option_conf = config.APP.get_cur_conf(Options, option_conf_id)
                 while len(options) > len(self.option_rows):
                     self.option_rows.append(self.ui_option_create())
 
@@ -472,7 +468,7 @@ class Selector[IconT: Icon, OptionRowT: OptionRow]:
             while True:
                 await trio.lowlevel.checkpoint()
                 await trio_util.wait_any(*wait_funcs)
-                conf = config.APP.get_cur_conf(Options, conf_id, default=Options())
+                conf = config.APP.get_cur_conf(Options, conf_id)
                 config.APP.store_conf(attrs.evolve(conf, options={
                     # Preserve any existing, unknown IDs.
                     **conf.options,

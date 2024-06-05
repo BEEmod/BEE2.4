@@ -120,7 +120,7 @@ def apply_options(
     """Apply options exposed by the group to the user."""
     settings = config.COMPILER.get_cur_conf(CorrOptions, CorrOptions.get_id(
         options.STYLE_ID(), mode, direction,
-    ), default=CorrOptions())
+    ))
     LOGGER.info('Corridor options for {}_{}: {}', mode.value, direction.value, settings)
     for opt_id in (selected.global_opt_ids[mode, direction] | corridor.option_ids):
         try:

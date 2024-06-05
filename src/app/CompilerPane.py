@@ -129,8 +129,6 @@ else:
 
 cleanup_screenshot = tk.IntVar(value=COMPILE_CFG.get_bool('Screenshot', 'del_old', True))
 
-DEFAULT_STATE = CompilePaneState()
-
 TRANS_SCREENSHOT_FILETYPE = TransToken.ui('Image Files')   # note: File type description
 TRANS_TAB_MAP = TransToken.ui('Map Settings')
 TRANS_TAB_COMPILE = TransToken.ui('Compile Settings')
@@ -286,7 +284,7 @@ def find_screenshot(e: tk.Event[ttk.Label] | None = None) -> None:
 
         COMPILE_CFG['Screenshot']['LOC'] = SCREENSHOT_LOC
         config.APP.store_conf(attrs.evolve(
-            config.APP.get_cur_conf(CompilePaneState, default=DEFAULT_STATE),
+            config.APP.get_cur_conf(CompilePaneState),
             sshot_cust=buf.getvalue(),
             sshot_cust_fname=file_name,
         ))
@@ -306,7 +304,7 @@ async def set_screen_type() -> None:
     # Resize the pane to accommodate the shown/hidden image
     window.geometry(f'{window.winfo_width()}x{window.winfo_reqheight()}')
     config.APP.store_conf(attrs.evolve(
-        config.APP.get_cur_conf(CompilePaneState, default=DEFAULT_STATE),
+        config.APP.get_cur_conf(CompilePaneState),
         sshot_type=chosen,
     ))
     COMPILE_CFG.save_check()
@@ -332,7 +330,7 @@ def set_screenshot(image: Image.Image | None = None) -> None:
     )
     tk_screenshot = ImageTk.PhotoImage(tk_img)
     UI['thumb_label']['image'] = tk_screenshot
-    conf = config.APP.get_cur_conf(CompilePaneState, default=DEFAULT_STATE)
+    conf = config.APP.get_cur_conf(CompilePaneState)
     if conf.sshot_cust_fname:
         set_tooltip(UI['thumb_label'], TransToken.untranslated('{a}\n{b}').format(
             a=TRANS_SCREENSHOT_TOOLTIP,
@@ -667,7 +665,7 @@ async def make_map_widgets(
     def set_voice_priority() -> None:
         """Called when the voiceline priority is changed."""
         config.APP.store_conf(attrs.evolve(
-            config.APP.get_cur_conf(CompilePaneState, default=DEFAULT_STATE),
+            config.APP.get_cur_conf(CompilePaneState),
             use_voice_priority=VOICE_PRIORITY_VAR.get() != 0,
         ))
         COMPILE_CFG['General']['voiceline_priority'] = str(VOICE_PRIORITY_VAR.get())
@@ -695,7 +693,7 @@ async def make_map_widgets(
     def elev_changed(state: bool) -> None:
         """Called when an elevator is selected."""
         config.APP.store_conf(attrs.evolve(
-            config.APP.get_cur_conf(CompilePaneState, default=DEFAULT_STATE),
+            config.APP.get_cur_conf(CompilePaneState),
             spawn_elev=state,
         ))
         COMPILE_CFG['General']['spawn_elev'] = bool_as_int(state)
@@ -754,7 +752,7 @@ async def make_map_widgets(
         nursery.start_soon(player_mdl_combo.task)
         async for model in agen:
             config.APP.store_conf(attrs.evolve(
-                config.APP.get_cur_conf(CompilePaneState, default=DEFAULT_STATE),
+                config.APP.get_cur_conf(CompilePaneState),
                 player_mdl=model,
             ))
             COMPILE_CFG['General']['player_model'] = model

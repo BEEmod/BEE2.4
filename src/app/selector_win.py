@@ -723,7 +723,7 @@ class SelectorWin:
         prev_state = config.APP.get_cur_conf(
             LastSelected,
             save_id,
-            LastSelected(default_id),
+            default=LastSelected(default_id),
         )
         if store_last_selected:
             config.APP.store_conf(prev_state, save_id)

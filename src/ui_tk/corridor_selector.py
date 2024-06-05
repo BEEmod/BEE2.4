@@ -139,7 +139,7 @@ class TkSelector(Selector[IconUI, OptionRowUI]):
     wid_desc: tkRichText
 
     def __init__(self, packset: packages.PackagesSet, tk_img: TKImages, cur_style: utils.ObjectID) -> None:
-        conf = config.APP.get_cur_conf(UIState, default=UIState())
+        conf = config.APP.get_cur_conf(UIState)
         super().__init__(conf)
         self.tk_img = tk_img
         self.sel_count = 0

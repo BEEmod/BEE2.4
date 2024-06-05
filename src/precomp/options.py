@@ -338,7 +338,7 @@ def get_itemconf[OptionT: OptionType](
     wid_id = wid_id.casefold()
 
     try:
-        option = COMPILER.get_cur_conf(WidgetConfig, f'{group_id}:{wid_id}')
+        option = COMPILER.get_cur_conf(WidgetConfig, f'{group_id}:{wid_id}', default=KeyError)
     except KeyError:
         return default
 

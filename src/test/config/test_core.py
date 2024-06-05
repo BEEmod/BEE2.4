@@ -17,6 +17,9 @@ class DataSingle(config.Data, conf_name='TestName', version=2, uses_id=False):
         self.value = value
         self.triple = triple
 
+    def __repr__(self) -> str:
+        return f'DataSingle({self.value!r}, {self.triple!r})'
+
     def __eq__(self, other: object) -> bool:
         if isinstance(other, DataSingle):
             return self.value == other.value and self.triple == other.triple
@@ -35,7 +38,7 @@ class DataSingle(config.Data, conf_name='TestName', version=2, uses_id=False):
         elif version == 1:
             triple = "b" if data.bool('is_bee') else "a"
         else:
-            raise ValueError('Unknown version', version)
+            raise config.UnknownVersion(version, '1 or 2')
         return DataSingle(data['value'], triple)
 
     @override
@@ -44,6 +47,33 @@ class DataSingle(config.Data, conf_name='TestName', version=2, uses_id=False):
         return Keyvalues('TestData', [
             Keyvalues('value', self.value),
             Keyvalues('triple', self.triple),
+        ])
+
+
+class DefaultableData(config.Data, conf_name='HasDefault', version=1):
+    """A data type which can be constructed with no arguments."""
+    def __init__(self, value: str = 'none') -> None:
+        self.value = value
+
+    def __repr__(self) -> str:
+        return f'DefaultableData({self.value!r})'
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, DefaultableData):
+            return self.value == other.value
+        return NotImplemented
+
+    @classmethod
+    @override
+    def parse_kv1(cls, data: Keyvalues, version: int) -> 'DefaultableData':
+        if version != 1:
+            raise config.UnknownVersion(version, '1')
+        return cls(data['value', 'none'])
+
+    @override
+    def export_kv1(self) -> Keyvalues:
+        return Keyvalues('DefaultableData', [
+            Keyvalues('value', self.value),
         ])
 
 
@@ -67,10 +97,12 @@ def test_basic_store() -> None:
     """Test storing config values."""
     spec = config.ConfigSpec()
     spec.register(DataSingle)
+    spec.register(DefaultableData)
 
     data_1 = DataSingle("value_1", "b")
     data_2 = DataSingle("value_2", "b")
     data_3 = DataSingle("value_3", "a")
+    data_4 = DefaultableData('hi')
 
     with pytest.raises(KeyError):
         spec.get_cur_conf(DataSingle)
@@ -83,6 +115,18 @@ def test_basic_store() -> None:
     spec.store_conf(data_3)
     assert spec.get_cur_conf(DataSingle) is data_3
     assert spec.get_cur_conf(DataSingle, default=data_1) is data_3
+
+    default = spec.get_cur_conf(DefaultableData)
+    assert default is spec.get_cur_conf(DefaultableData)
+    assert default == DefaultableData('none')
+
+    with pytest.raises(ArithmeticError):
+        spec.get_cur_conf(DefaultableData, default=ArithmeticError)
+
+    assert spec.get_cur_conf(DefaultableData, default=data_4) is data_4
+
+    spec.store_conf(data_4)
+    assert spec.get_cur_conf(DefaultableData) is data_4
 
 
 @pytest.mark.parametrize('triple', ['a', 'b'])

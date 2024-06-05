@@ -254,7 +254,7 @@ class Item:
 
     def change_version(self, version: str) -> None:
         """Set the version of this item."""
-        old_conf = config.APP.get_cur_conf(ItemDefault, self.id, ItemDefault())
+        old_conf = config.APP.get_cur_conf(ItemDefault, self.id)
         config.APP.store_conf(attrs.evolve(old_conf, version=version), self.id)
         self.load_data()
         for item in itertools.chain(pal_picked, pal_items):
@@ -1266,7 +1266,7 @@ async def init_picker(
                 pal_items.append(PalItem(frmScroll, item, sub=i, is_pre=False))
 
     reflow_event = trio.Event()
-    conf = config.APP.get_cur_conf(FilterConf, default=FilterConf())
+    conf = config.APP.get_cur_conf(FilterConf)
 
     async def wait_filter() -> None:
         """Trigger whenever the filter configuration changes."""

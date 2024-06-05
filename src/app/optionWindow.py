@@ -89,7 +89,7 @@ def load() -> None:
     AFTER_EXPORT_ACTION.set(conf.after_export.value)
     for name, var in VARS:
         var.set(getattr(conf, name))
-    VAR_COMPRESS_ITEMS.set(config.APP.get_cur_conf(FilterConf, default=FilterConf()).compress)
+    VAR_COMPRESS_ITEMS.set(config.APP.get_cur_conf(FilterConf).compress)
 
 
 def save() -> None:

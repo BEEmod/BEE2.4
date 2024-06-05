@@ -89,7 +89,7 @@ class PaletteUI:
             pal.uuid: pal
             for pal in paletteLoader.load_palettes()
         }
-        prev_state = config.APP.get_cur_conf(PaletteState, default=PaletteState())
+        prev_state = config.APP.get_cur_conf(PaletteState)
         self.selected_uuid = prev_state.selected
         self.hidden_defaults = set(prev_state.hidden_defaults)
         self.var_save_settings = tk.BooleanVar(value=prev_state.save_settings)

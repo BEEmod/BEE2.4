@@ -145,9 +145,8 @@ async def step_write_items(exp_data: ExportData) -> None:
 
     style_id = utils.obj_id(exp_data.selected_style.id)
     item: Item
-    default_conf = ItemDefault()
     for item in sorted(exp_data.packset.all_obj(Item), key=operator.attrgetter('id')):
-        prop_conf = config.APP.get_cur_conf(ItemDefault, item.id, default_conf)
+        prop_conf = config.APP.get_cur_conf(ItemDefault, item.id)
 
         (items, config_part) = get_export_data(item, pal_list, style_id, prop_conf)
 

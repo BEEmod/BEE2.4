@@ -58,13 +58,9 @@ async def init_app(core_nursery: trio.Nursery) -> None:
     # noinspection PyProtectedMember
     with app._APP_QUIT_SCOPE:
         await gameMan.load(DIALOG)
-        try:
-            last_game = config.APP.get_cur_conf(LastSelected, 'game')
-        except KeyError:
-            pass
-        else:
-            if last_game.id is not None:
-                gameMan.set_game_by_name(last_game.id)
+        last_game = config.APP.get_cur_conf(LastSelected, 'game')
+        if last_game.id is not None:
+            gameMan.set_game_by_name(last_game.id)
 
         LOGGER.info('Loading Packages...')
         packset = packages.get_loaded_packages()
