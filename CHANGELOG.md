@@ -1,7 +1,14 @@
 # Changelog
 
+# Version (dev)
+* #2050, #2053: Fix gameinfo.txt not being modified during exports.
+
+------------------------------------------
+
 # Version 4.45.1
 * Fix the application looking in the wrong location for the compiler.
+
+------------------------------------------
 
 # Version 4.45.0
 

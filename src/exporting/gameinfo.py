@@ -7,7 +7,7 @@ import srctools
 import trio
 
 import utils
-from exporting import ExportData
+from exporting import ExportData, STEPS
 
 
 # The line we inject to add our BEE2 folder into the game search path.
@@ -22,6 +22,7 @@ if TYPE_CHECKING:
     from app.gameMan import Game
 
 
+@STEPS.add_step(prereq=(), results=())
 async def step_edit_gameinfo(exp: ExportData) -> None:
     """Modify gameinfo."""
     await edit_gameinfos(exp.game, True)
