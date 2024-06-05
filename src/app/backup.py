@@ -873,9 +873,9 @@ async def init_application(nursery: trio.Nursery) -> None:
     set_menu_text(bar, TransToken.ui('Game'))
     gameMan.game_menu = game_menu
 
-    from app import helpMenu
     # Add the 'Help' menu here too.
-    await nursery.start(helpMenu.make_help_menu, bar, TK_IMG)
+    from ui_tk import help_menu
+    await nursery.start(help_menu.create, bar, TK_IMG)
 
     window['menu'] = bar
 
