@@ -233,12 +233,6 @@ class DragDrop[ItemT](ManagerBase[ItemT, tk.Misc]):
             slot_ui.text_lbl.place_forget()
 
     @override
-    def _ui_slot_set_highlight(self, slot: Slot[ItemT], highlight: bool) -> None:
-        """Apply the highlighted state."""
-        slot_ui = self._slot_ui[slot]
-        slot_ui.lbl['background'] = tk_tools.LABEL_HIGHLIGHT_BG if highlight else ''
-
-    @override
     def _ui_dragwin_show(self, x: float, y: float) -> None:
         """Show the drag window."""
         self._drag_win.deiconify()

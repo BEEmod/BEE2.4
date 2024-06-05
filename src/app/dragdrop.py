@@ -348,11 +348,6 @@ class ManagerBase[ItemT, ParentT]:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def _ui_slot_set_highlight(self, slot: Slot[ItemT], highlight: bool) -> None:
-        """Apply the highlighted state."""
-        raise NotImplementedError
-
-    @abc.abstractmethod
     def _ui_slot_in_bbox(self, slot: Slot[ItemT], x: float, y: float) -> bool:
         """Check if this x/y coordinate is hovering over a slot."""
         raise NotImplementedError
