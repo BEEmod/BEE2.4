@@ -7,7 +7,7 @@ from __future__ import annotations
 from typing import Any, Protocol, Callable, Literal, NoReturn, TypedDict, Unpack, overload, cast
 
 from contextlib import aclosing
-from enum import Enum
+from enum import Enum, StrEnum
 from collections.abc import Awaitable, Iterable
 from tkinter import filedialog, commondialog
 from tkinter import font as _tk_font
@@ -157,7 +157,7 @@ else:
     raise AssertionError
 
 if utils.WIN:
-    class Cursors(str, Enum):
+    class Cursors(StrEnum):
         """Cursors we use, mapping to the relevant OS cursor."""
         REGULAR = 'arrow'
         LINK = 'hand2'
@@ -173,7 +173,7 @@ if utils.WIN:
             """Allow passing to tkinter."""
             return self.value
 elif utils.MAC:
-    class Cursors(str, Enum):  # type: ignore
+    class Cursors(StrEnum):  # type: ignore
         """Cursors we use, mapping to the relevant OS cursor."""
         REGULAR = 'arrow'
         LINK = 'pointinghand'
@@ -189,7 +189,7 @@ elif utils.MAC:
             """Allow passing to tkinter."""
             return self.value
 elif utils.LINUX:
-    class Cursors(str, Enum):  # type: ignore
+    class Cursors(StrEnum):  # type: ignore
         """Cursors we use, mapping to the relevant OS cursor."""
         REGULAR = 'arrow'
         LINK = 'hand1'

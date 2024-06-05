@@ -30,7 +30,7 @@ __all__ = [
 ]
 
 
-class TextTag(str, enum.Enum):
+class TextTag(enum.StrEnum):
     """Tags used in text segments."""
     H1 = 'heading_1'
     H2 = 'heading_2'
