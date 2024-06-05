@@ -21,7 +21,7 @@ class SignageUI(SignageUIBase[tk.Misc]):
     drag_man: DragDrop[PakRef[Signage]]
 
     def __init__(self, tk_img: TKImages) -> None:
-        """Creat the UI."""
+        """Create the UI."""
         self.window = window = tk.Toplevel(TK_ROOT, name='signageChooser')
         window.withdraw()
         self.drag_man = DragDrop(window, info_cb=self._get_drag_info)

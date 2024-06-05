@@ -140,7 +140,7 @@ async def export(
         ) as error_ui:
             LOGGER.info('Should refresh: {}', should_refresh)
             if should_refresh:
-                # Check to ensure the cache needs to be copied over..
+                # Check to ensure the cache needs to be copied over...
                 should_refresh = game.cache_invalid()
                 if should_refresh:
                     LOGGER.info("Cache invalid - copying..")
@@ -191,7 +191,7 @@ async def step_add_core_info(exp: ExportData) -> None:
 
 
 # Register everything.
-from exporting import (
+from exporting import (  # noqa: E402
     compiler, corridors, cube_colourizer, editor_sound, elevator, fgd, files, fizzler,  # noqa: F401
     gameinfo, items, music, pack_list, quote_pack, signage, skybox, stylevar, template_brush,  # noqa: F401
     translations, vpks, barrier_hole,  # noqa: F401

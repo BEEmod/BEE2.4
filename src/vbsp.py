@@ -1290,7 +1290,7 @@ async def find_missing_instances(game: Game, vmf: VMF) -> list[Vec]:
     and can find them anyway. In that case just let it continue successfully.
     """
     missing: list[Vec] = []
-    sdk_content = await trio.Path(game.path / '../sdk_content/maps/').absolute()
+    sdk_content = await trio.Path(game.path / '..' / 'sdk_content' / 'maps').absolute()
 
     async def check(inst: Entity) -> None:
         """See if this file exists."""
