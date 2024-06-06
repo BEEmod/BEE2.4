@@ -58,9 +58,9 @@ import utils
 
 __all__ = [
     'ALL_INST', 'DIRECTIONS', 'INST_ANGLE', 'PETI_INST_ANGLE', 'RES_EXHAUSTED',
-    'MapInfo',
-    'TestCallable', 'ResultCallable', 'make_test', 'make_result', 'make_result_setup', 'add_meta',
-    'add', 'check_all', 'check_test', 'import_conditions', 'Unsatisfiable',
+    'MapInfo', 'Condition',
+    'Test', 'Result', 'TestCallable', 'ResultCallable', 'make_test', 'make_result',
+    'make_result_setup', 'add_meta', 'add', 'check_all', 'import_conditions', 'Unsatisfiable',
     'add_inst', 'add_suffix', 'add_output', 'local_name', 'fetch_debug_visgroup', 'set_ent_keys',
     'resolve_offset',
 ]
@@ -200,12 +200,98 @@ class MetaCond(Enum):
         return func
 
 
+@attrs.define(eq=False)
+class Command[ResT]:
+    """A specific result or test, with the config."""
+    func: CondCall[ResT]
+    config: Keyvalues
+
+    @classmethod
+    def _get_func(
+        cls, name: str,
+        lookup: Mapping[str, CondCall[ResT]],
+        cond_kind: str, fallback: ResT,
+    ) -> CondCall[ResT]:
+        """Lookup the function to call, producing an error if not found."""
+        try:
+            return lookup[name]
+        except KeyError:
+            err_msg = f'"{name}" is not a valid condition {cond_kind}!'
+            if utils.DEV_MODE:
+                # Crash here.
+                raise ValueError(err_msg) from None
+            else:
+                LOGGER.warning(err_msg)
+                # Skip these conditions...
+                return CondCall(lambda: fallback, '', valid_before=(), valid_after=())
+
+
+@attrs.define(eq=False)
+class Test(Command[bool]):
+    """A specific test."""
+    inverted: bool
+
+    @classmethod
+    def parse_kv(cls, conf: Keyvalues) -> Test:
+        """Parse from a keyvalues definition."""
+        name = conf.name
+        # If starting with '!', invert the result.
+        if name[:1] == '!':
+            inverted = True
+            name = name[1:]
+        else:
+            inverted = False
+        func = cls._get_func(name, TEST_LOOKUP, 'test', False)
+        return cls(func, conf, inverted)
+
+    def test(
+        self,
+        coll: Collisions, info: MapInfo, voice: QuoteInfo,
+        inst: Entity, can_skip: bool = False,
+    ) -> bool:
+        """Determine the result for a condition test.
+
+        If can_skip is true, testd raising Unsatifiable will pass the exception through.
+        """
+        if self.inverted:
+            # Unsatisfiable is only valid when not inverted.
+            can_skip = False
+
+        try:
+            res = self.func(coll, info, voice, inst, self.config)
+        except Unsatisfiable:
+            if can_skip:
+                raise
+            else:
+                return self.inverted
+        else:
+            return res != self.inverted
+
+
+@attrs.define(eq=False)
+class Result(Command[object]):
+    """A specific result."""
+    @classmethod
+    def parse_kv(cls, conf: Keyvalues) -> Result:
+        """Parse from a keyvalues definition."""
+        func = cls._get_func(conf.name, RESULT_LOOKUP, 'result', RES_EXHAUSTED)
+        return cls(func, conf)
+
+    def execute(
+        self,
+        coll: Collisions, info: MapInfo, voice_data: QuoteInfo,
+        inst: Entity,
+    ) -> object:
+        """Execute the result."""
+        return self.func(coll, info, voice_data, inst, self.config)
+
+
 @attrs.define
 class Condition:
     """A single condition which may be evaluated."""
-    tests: list[Keyvalues] = attrs.Factory(list)
-    results: list[Keyvalues] = attrs.Factory(list)
-    else_results: list[Keyvalues] = attrs.Factory(list)
+    tests: list[Test] = attrs.Factory(list)
+    results: list[Result] = attrs.Factory(list)
+    else_results: list[Result] = attrs.Factory(list)
     priority: Decimal = Decimal()
     source: str | None = None
 
@@ -215,16 +301,18 @@ class Condition:
     @classmethod
     def parse(cls, kv_block: Keyvalues, *, toplevel: bool) -> Condition:
         """Create a condition from a Keyvalues block."""
-        tests: list[Keyvalues] = []
-        results: list[Keyvalues] = []
-        else_results: list[Keyvalues] = []
+        tests: list[Test] = []
+        results: list[Result] = []
+        else_results: list[Result] = []
         priority = Decimal()
         source = None
         for kv in kv_block:
             if kv.name == 'result':
-                results.extend(kv)  # join multiple ones together
+                for child in kv:
+                    results.append(Result.parse_kv(child))
             elif kv.name == 'else':
-                else_results.extend(kv)
+                for child in kv:
+                    else_results.append(Result.parse_kv(child))
             elif kv.name == '__src__':
                 # Value injected by the BEE2 export, this specifies
                 # the original source of the config.
@@ -232,13 +320,13 @@ class Condition:
 
             elif kv.name in ('condition', 'switch'):
                 # Shortcut to eliminate lots of Result - Condition pairs
-                results.append(kv)
+                results.append(Result.parse_kv(kv))
             elif kv.name == 'elsecondition':
                 kv.name = 'condition'
-                else_results.append(kv)
+                else_results.append(Result.parse_kv(kv))
             elif kv.name == 'elseswitch':
                 kv.name = 'switch'
-                else_results.append(kv)
+                else_results.append(Result.parse_kv(kv))
             elif kv.name == 'priority':
                 if not toplevel:
                     LOGGER.warning(
@@ -250,7 +338,7 @@ class Condition:
                 except ArithmeticError:
                     pass
             else:
-                tests.append(kv)
+                tests.append(Test.parse_kv(kv))
 
         return Condition(
             tests,
@@ -259,27 +347,6 @@ class Condition:
             priority,
             source,
         )
-
-    @staticmethod
-    def test_result(
-        coll: Collisions, info: MapInfo, voice_data: QuoteInfo,
-        inst: Entity,
-        res: Keyvalues,
-    ) -> bool | object:
-        """Execute the given result."""
-        try:
-            cond_call = RESULT_LOOKUP[res.name]
-        except KeyError:
-            err_msg = f'"{res.real_name}" is not a valid condition result!'
-            if utils.DEV_MODE:
-                # Crash here.
-                raise ValueError(err_msg) from None
-            else:
-                LOGGER.warning(err_msg)
-                # Delete this so it doesn't re-fire...
-                return RES_EXHAUSTED
-        else:
-            return cond_call(coll, info, voice_data, inst, res)
 
     def test(self, coll: Collisions, info: MapInfo, voice_data: QuoteInfo, inst: Entity) -> None:
         """Try to satisfy this condition on the given instance.
@@ -296,8 +363,7 @@ class Condition:
         # such that it becomes satisfiable later, so this would be premature.
         # If we have else results, we also can't skip because those could modify state.
         for i, test in enumerate(self.tests):
-            if not check_test(
-                test,
+            if not test.test(
                 coll, info, voice_data,
                 inst,
                 can_skip=(i == 0) and not self.else_results,
@@ -306,8 +372,7 @@ class Condition:
                 break
         results = self.results if success else self.else_results
         for res in results[:]:
-            should_del = self.test_result(coll, info, voice_data, inst, res)
-            if should_del is RES_EXHAUSTED:
+            if res.execute(coll, info, voice_data, inst) is RES_EXHAUSTED:
                 results.remove(res)
 
 
