@@ -41,12 +41,12 @@ class UnknownVersion(Exception):
 
 
 @attrs.define(eq=False)
-class ConfInfo:
+class ConfInfo[DataT: 'Data']:
     """Holds information about a type of configuration data."""
     name: str
     version: int
     uses_id: bool  # If we manage individual configs for each of these IDs.
-    default: Data | None  # If non-None, the class can be called with no args, so a default is present.
+    default: DataT | None  # If non-None, the class can be called with no args, so a default is present.
 
 
 class Data(abc.ABC):
@@ -72,11 +72,11 @@ class Data(abc.ABC):
             raise ValueError('Config name must be specified!')
         if conf_name.casefold() in {'version', 'name'}:
             raise ValueError(f'Illegal name: "{conf_name}"')
-        # Default must be created during the register call.
+        # Default must be created during the register call, after attrs decorator runs.
         cls.__info = ConfInfo(conf_name, version, uses_id, None)
 
     @classmethod
-    def get_conf_info(cls) -> ConfInfo:
+    def get_conf_info(cls) -> ConfInfo[Self]:
         """Return the ConfInfo for this class."""
         return cls.__info
 
