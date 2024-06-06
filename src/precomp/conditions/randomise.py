@@ -1,10 +1,10 @@
 """Conditions for randomising instances."""
-from typing import Callable
+from typing import Callable, assert_never
 
 from srctools import Keyvalues, Vec, Angle, Entity
 
 from precomp import collisions, conditions, rand
-from precomp.conditions import Condition, RES_EXHAUSTED, make_result, MapInfo
+from precomp.conditions import Result, RES_EXHAUSTED, make_result, MapInfo
 from precomp.lazy_value import LazyValue
 from quote_pack import QuoteInfo
 
@@ -46,19 +46,28 @@ def res_random(
     executed in order.
     """
     weight_str = LazyValue.make('')
-    results = []
+    # Each sub-list is a group of results, None = returned RES_EXHAUSTED.
+    results: list[list[Result | None]] = []
     chance = LazyValue.make(100)
     seed = LazyValue.make('')
     for kv in res:
-        if kv.name == 'chance':
-            # Allow ending with '%' sign
-            chance = LazyValue.parse(kv.value).map(lambda s: s.rstrip('%'), 'rstrip').as_int()
-        elif kv.name == 'weights':
-            weight_str = LazyValue.parse(kv.value)
-        elif kv.name == 'seed':
-            seed = LazyValue.parse('b' + kv.value)
-        else:
-            results.append(kv)
+        match kv.name:
+            case 'chance':
+                # Allow ending with '%' sign
+                chance = LazyValue.parse(kv.value).map(lambda s: s.rstrip('%'), 'rstrip').as_int()
+            case 'weights':
+                weight_str = LazyValue.parse(kv.value)
+            case 'seed':
+                seed = LazyValue.parse('b' + kv.value)
+            case 'group':
+                results.append([
+                    Result.parse_kv(child)
+                    for child in kv
+                ])
+            case 'nop':
+                results.append([])
+            case _:
+                results.append([Result.parse_kv(kv)])
 
     if not results:
         # Does nothing
@@ -79,18 +88,12 @@ def res_random(
             return
 
         ind = rng.choice(weights_list(inst))
-        choice = results[ind]
-        if choice.name == 'nop':
-            pass
-        elif choice.name == 'group':
-            for sub_res in choice:
-                if Condition.test_result(coll, info, voice, inst, sub_res) is RES_EXHAUSTED:
-                    sub_res.name = 'nop'
-                    sub_res.value = ''
-        else:
-            if Condition.test_result(coll, info, voice, inst, choice) is RES_EXHAUSTED:
-                choice.name = 'nop'
-                choice.value = ''
+        group = results[ind]
+        for j, res in enumerate(group):
+            if res is None:
+                continue
+            if res.execute(coll, info, voice, inst) is RES_EXHAUSTED:
+                group[j] = None
     return apply_random
 
 

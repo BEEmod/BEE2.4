@@ -215,10 +215,14 @@ def res_add_shuffle_group(
         conf_pools.setdefault(kv.name, []).append(kv.value)
 
     # (tests, value, pools)
-    conf_selectors: list[tuple[list[Keyvalues], str, frozenset[str]]] = []
+    conf_selectors: list[tuple[list[conditions.Test], str, frozenset[str]]] = []
     for kv in res.find_all('selector'):
         conf_value = kv['value', '']
-        conf_tests = list(kv.find_children('conditions'))
+        conf_tests = [
+            conditions.Test.parse_kv(child)
+            for child in
+            kv.find_children('conditions')
+        ]
         picked_pools: Iterable[str]
         try:
             picked_pools = kv['pools'].casefold().split()
@@ -243,7 +247,7 @@ def res_add_shuffle_group(
         pools = all_pools.copy()
         for (tests, value, potential_pools) in conf_selectors:
             for test in tests:
-                if not conditions.check_test(test, coll, info, voice, inst):
+                if not test.test(coll, info, voice, inst):
                     break
             else:  # Succeeded.
                 allowed_inst = [

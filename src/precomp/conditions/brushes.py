@@ -535,11 +535,17 @@ def res_import_template(
     visgroup_func: Callable[[Random, list[str]], Iterable[str]] | None = None
 
     try:  # allow both spellings.
-        visgroup_prop = res.find_key('visgroups')
+        visgroup_kv = res.find_key('visgroups')
     except NoKeyError:
-        visgroup_prop = res.find_key('visgroup', 'none')
-    if visgroup_prop.has_children():
-        visgroup_instvars = list(visgroup_prop)
+        visgroup_kv = res.find_key('visgroup', 'none')
+    if visgroup_kv.has_children():
+        # (group, [tests])
+        visgroup_instvars = [
+            (vis_kv.real_name, [
+                conditions.Test.parse_kv(child)
+                for child in vis_kv
+            ]) for vis_kv in visgroup_kv
+        ]
     else:
         visgroup_instvars = []
         visgroup_mode = res['visgroup', 'none'].casefold()
@@ -612,11 +618,11 @@ def res_import_template(
             # We don't want an error, just quit.
             return
 
-        for vis_test_block in visgroup_instvars:
-            if all(conditions.check_test(test, coll, info, voice, inst) for test in vis_test_block):
-                visgroups.add(vis_test_block.real_name)
-            if utils.DEV_MODE and vis_test_block.real_name not in template.visgroups:
-                LOGGER.warning('"{}" may use missing visgroup "{}"!', template.id, vis_test_block.real_name)
+        for vis_name, tests in visgroup_instvars:
+            if all(test.test(coll, info, voice, inst) for test in tests):
+                visgroups.add(vis_name)
+            if utils.DEV_MODE and vis_name not in template.visgroups:
+                LOGGER.warning('"{}" may use missing visgroup "{}"!', template.id, vis_name)
 
         force_colour = conf_force_colour
         if color_var == '<editor>':

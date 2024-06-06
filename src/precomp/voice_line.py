@@ -124,8 +124,10 @@ def find_group_quotes(
 
     for quote in quotes:
         valid_quote = True
-        for test in quote.tests:
-            if not conditions.check_test(test, coll, info, voice, fake_inst):
+        for test_conf in quote.tests:
+            # We only ever execute a group once, so it's fine to parse right here.
+            test = conditions.Test.parse_kv(test_conf)
+            if not test.test(coll, info, voice, fake_inst):
                 valid_quote = False
                 LOGGER.debug('Skip: {}', quote.name)
                 break

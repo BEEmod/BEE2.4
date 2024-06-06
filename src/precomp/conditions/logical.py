@@ -16,84 +16,104 @@ LOGGER = logger.get_logger(__name__, alias='cond.logical')
 @conditions.make_test('AND')
 def check_and(
     coll: Collisions, info: conditions.MapInfo, voice: QuoteInfo,
-    inst: Entity, kv: Keyvalues,
-) -> bool:
+    kv: Keyvalues,
+) -> conditions.TestCallable:
     """The AND group evaluates True if all subtests are True."""
-    for i, sub_test in enumerate(kv):
-        if not conditions.check_test(sub_test, coll, info, voice, inst, can_skip=i == 0):
-            return False
-    return True
+    children = [conditions.Test.parse_kv(sub_test) for sub_test in kv]
+    def test(inst: Entity) -> bool:
+        for i, sub_test in enumerate(children):
+            if not sub_test.test(coll, info, voice, inst, can_skip=i == 0):
+                return False
+        return True
+    return test
 
 
 @conditions.make_test('OR')
 def check_or(
     coll: Collisions, info: conditions.MapInfo, voice: QuoteInfo,
-    inst: Entity, kv: Keyvalues,
-) -> bool:
+    kv: Keyvalues,
+) -> conditions.TestCallable:
     """The OR group evaluates True if any subtests are True."""
-    satisfiable = False
-    for sub_test in kv:
-        try:
-            res = conditions.check_test(sub_test, coll, info, voice, inst, can_skip=True)
-        except conditions.Unsatisfiable:
-            pass
-        else:
-            satisfiable = True
-            if res:
-                return True
-    if not satisfiable:
-        # All raised, we raise too.
-        raise conditions.Unsatisfiable
-    return False
+    children = [conditions.Test.parse_kv(sub_test) for sub_test in kv]
+    def test(inst: Entity) -> bool:
+        satisfiable = False
+        for sub_test in children:
+            try:
+                res = sub_test.test(coll, info, voice, inst, can_skip=True)
+            except conditions.Unsatisfiable:
+                pass
+            else:
+                satisfiable = True
+                if res:
+                    return True
+        if not satisfiable:
+            # All raised, we raise too.
+            raise conditions.Unsatisfiable
+        return False
+    return test
 
 
 @conditions.make_test('NOT')
 def check_not(
     coll: Collisions, info: conditions.MapInfo, voice: QuoteInfo,
-    inst: Entity, kv: Keyvalues,
-) -> bool:
+    kv: Keyvalues,
+) -> conditions.TestCallable:
     """The NOT group inverts the value of it's one subtest.
 
     Alternatively, simply prefix any test with `!` (`"!instance"`).
     """
     try:
-        [subtest] = kv
+        [child] = kv
     except ValueError:
-        return False
-    return not conditions.check_test(subtest, coll, info, voice, inst)
+        return lambda inst: False
+
+    sub_test = conditions.Test.parse_kv(child)
+
+    def test(inst: Entity) -> bool:
+        return not sub_test.test(coll, info, voice, inst)
+    return test
 
 
 @conditions.make_test('XOR')
 def check_xor(
     coll: Collisions, info: conditions.MapInfo, voice: QuoteInfo,
     inst: Entity, kv: Keyvalues,
-) -> bool:
+) -> conditions.TestCallable:
     """The XOR group returns True if the number of true subtests is odd."""
-    return sum([conditions.check_test(sub_test, coll, info, voice, inst) for sub_test in kv]) % 2 == 1
+    children = [conditions.Test.parse_kv(sub_test) for sub_test in kv]
+    def test(inst: Entity) -> bool:
+        return sum([sub_test.test(coll, info, voice, inst) for sub_test in children]) % 2 == 1
+    return test
 
 
 @conditions.make_test('NOR')
 def check_nor(
     coll: Collisions, info: conditions.MapInfo, voice: QuoteInfo,
     inst: Entity, kv: Keyvalues,
-) -> bool:
+) -> conditions.TestCallable:
     """The NOR group evaluates True if any subtests are False."""
-    for sub_test in kv:
-        if conditions.check_test(sub_test, coll, info, voice, inst):
-            return True
-    return False
+    children = [conditions.Test.parse_kv(sub_test) for sub_test in kv]
+    def test(inst: Entity) -> bool:
+        for sub_test in children:
+            if sub_test.test(coll, info, voice, inst):
+                return True
+        return False
+    return test
 
 
 @conditions.make_test('NAND')
-def chec_nand(
+def check_nand(
     coll: Collisions, info: conditions.MapInfo, voice: QuoteInfo,
     inst: Entity, kv: Keyvalues,
-) -> bool:
+) -> conditions.TestCallable:
     """The NAND group evaluates True if all subtests are False."""
-    for sub_test in kv:
-        if not conditions.check_test(sub_test, coll, info, voice, inst):
-            return True
-    return False
+    children = [conditions.Test.parse_kv(sub_test) for sub_test in kv]
+    def test(inst: Entity) -> bool:
+        for sub_test in children:
+            if not sub_test.test(coll, info, voice, inst):
+                return True
+        return False
+    return test
 
 
 @conditions.make_result('condition')
@@ -141,12 +161,13 @@ def res_switch(
     test_name = ''
     method = SwitchType.FIRST
     raw_cases: list[Keyvalues] = []
-    default: list[Keyvalues] = []
+    default: list[conditions.Result] = []
     rand_seed = ''
     for kv in res:
         if kv.has_children():
             if kv.name == '<default>':
-                default.extend(kv)
+                for res in kv:
+                    default.append(conditions.Result.parse_kv(res))
             else:
                 raw_cases.append(kv)
         else:
@@ -168,10 +189,18 @@ def res_switch(
     if method is SwitchType.LAST:
         raw_cases.reverse()
 
-    conf_cases: list[tuple[Keyvalues, list[Keyvalues]]] = [
-        (Keyvalues(test_name, case.real_name), list(case))
-        for case in raw_cases
-    ]
+    conf_cases: list[tuple[conditions.Test | None, list[conditions.Result]]] = []
+    for case in raw_cases:
+        # In random mode, this can be None to always succeed.
+        if method is not SwitchType.RANDOM or case.name:
+            test = conditions.Test.parse_kv(Keyvalues(test_name, case.real_name))
+        else:
+            test = None
+        case_res = [
+            conditions.Result.parse_kv(res)
+            for res in case
+        ]
+        conf_cases.append((test, case_res))
 
     def apply_switch(inst: Entity) -> None:
         """Execute a switch."""
@@ -184,15 +213,15 @@ def res_switch(
         run_default = True
         for test, results in cases:
             # If not set, always succeed for the random situation.
-            if test.real_name and not conditions.check_test(test, coll, info, voice, inst):
+            if test is not None and not test.test(coll, info, voice, inst):
                 continue
             for sub_res in results:
-                conditions.Condition.test_result(coll, info, voice, inst, sub_res)
+                sub_res.execute(coll, info, voice, inst)
             run_default = False
             if method is not SwitchType.ALL:
                 # All does them all, otherwise we quit now.
                 break
         if run_default:
             for sub_res in default:
-                conditions.Condition.test_result(coll, info, voice, inst, sub_res)
+                sub_res.execute(coll, info, voice, inst)
     return apply_switch
