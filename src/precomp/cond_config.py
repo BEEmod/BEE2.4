@@ -1,11 +1,10 @@
 """Automatically parse condition tests or results based on annotated attrs classes."""
-import functools
 from typing import (
     Annotated, Any, Protocol, Self, get_origin as get_type_origin,
     get_args as get_type_args,
 )
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 
 from srctools import Keyvalues
 from srctools.dmx import Element, Attribute
@@ -23,14 +22,27 @@ class Config(attrs.AttrsInstance, Protocol):
     @classmethod
     def parse_dmx(cls, elem: Element) -> Self:
         """Parse DMX files."""
-        return ConfigParser.from_type(cls).parse_dmx(elem, '')
+        parse: ConfigParser[Self] = ConfigParser.from_type(cls)
+        return parse.parse_dmx(elem, '')
 
     def export_dmx(self) -> Element:
         """Build a DMX version of the config."""
         return ConfigParser.from_type(type(self)).export_dmx(self)
 
 
-def unpack_annotations(annotations: Iterable[object]) -> list[annotated_types.BaseMetadata]:
+@attrs.frozen
+class Empty(Config):
+    """Blank config used when none is required."""
+    @classmethod
+    def parse_kv1(cls, kv: Keyvalues) -> 'Empty':
+        """The keyvalues are ignored."""
+        return EMPTY
+
+
+EMPTY = Empty()
+
+
+def unpack_annotations(annotations: Iterable[object]) -> Iterator[annotated_types.BaseMetadata]:
     """Split annotations into simpler forms."""
     for ann in annotations:
         if isinstance(ann, annotated_types.GroupedMetadata):
@@ -72,33 +84,34 @@ class FieldParser[ValueT]:
 
 
 @attrs.define
-class ConfigParser[Conf: Config]:
+class ConfigParser[Conf]:
     """Parse a specific config."""
     conf_cls: type[Conf]
     fields: list[tuple[attrs.Attribute, FieldParser[Any]]]
 
     @classmethod
-    @functools.cache
-    def from_type(cls, conf_type: type[Conf]) -> Self:
+    # @functools.cache
+    def from_type[ClsT: Config](cls, conf_type: type[ClsT]) -> 'ConfigParser[ClsT]':
         """A parser for a specific config class."""
         fields = [
             (attr, FieldParser.from_type(attr.type))
             for attr in attrs.fields(conf_type)
         ]
-        return cls(conf_type, fields)
+        return ConfigParser(conf_type, fields)
 
     def parse_dmx(self, elem: Element, path: str) -> Conf:
         """Parse a DMX element."""
         result = {}
         for attr_info, field_parser in self.fields:
+            name = attr_info.alias or attr_info.name
             try:
-                attr = elem[attr_info.alias]
+                attr = elem[name]
             except KeyError:
                 if attr_info.default is attrs.NOTHING:
                     raise ValueError(f'{path}/{attr_info.name}: Value is required!')
-                result[attr_info.alias] = attr_info.default
+                result[name] = attr_info.default
             else:
-                result[attr_info.alias] = field_parser.parse_dmx(attr)
+                result[name] = field_parser.parse_dmx(attr)
 
         return self.conf_cls(**result)
 
@@ -106,8 +119,9 @@ class ConfigParser[Conf: Config]:
         """Output to DMX."""
         elem = Element('', self.conf_cls.__name__)
         for attr_info, field_parser in self.fields:
+            name = attr_info.alias or attr_info.name
             value = getattr(conf, attr_info.name)
-            elem[attr_info.alias] = field_parser.export_dmx(attr_info.alias, value)
+            elem[name] = field_parser.export_dmx(name, value)
         return elem
 
 
@@ -172,7 +186,7 @@ class StringField(FieldParser[str]):
         return Attribute.string(name, value)
 
 
-_FIELD_TYPES: dict[type, type[FieldParser]] = {
+_FIELD_TYPES: dict[object, type[FieldParser]] = {
     int: IntegralField,
     str: StringField,
 }

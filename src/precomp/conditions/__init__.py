@@ -48,7 +48,7 @@ import attrs
 import srctools.logger
 import trio
 
-from precomp import instanceLocs, rand
+from precomp import instanceLocs, rand, cond_config
 from precomp.collisions import Collisions
 from precomp.corridor import Info as MapInfo
 from quote_pack import QuoteInfo
@@ -75,20 +75,23 @@ GLOBAL_INSTANCES: set[str] = set()
 ALL_INST: set[str] = {''}
 
 conditions: list[Condition] = []
-TEST_LOOKUP: dict[str, CondCall[bool]] = {}
-RESULT_LOOKUP: dict[str, CondCall[object]] = {}
+TEST_LOOKUP: dict[str, CondCall[Any, bool]] = {}
+RESULT_LOOKUP: dict[str, CondCall[Any, object]] = {}
 
 # For legacy setup functions.
 RESULT_SETUP: dict[str, Callable[..., Any]] = {}
 
 # Used to dump a list of the tests, results, meta-conditions
-ALL_TESTS: list[tuple[str, tuple[str, ...], CondCall[bool]]] = []
-ALL_RESULTS: list[tuple[str, tuple[str, ...], CondCall[object]]] = []
-ALL_META: list[tuple[str, MetaCond, CondCall[object]]] = []
+ALL_TESTS: list[tuple[str, tuple[str, ...], CondCall[Any, bool]]] = []
+ALL_RESULTS: list[tuple[str, tuple[str, ...], CondCall[Any, object]]] = []
+ALL_META: list[tuple[str, MetaCond, CondCall[cond_config.Empty, object]]] = []
 
 # The return values for 2-stage results and tests.
 type TestCallable = Callable[[Entity], bool]
 type ResultCallable = Callable[[Entity], object]
+# The type of the config value passed to functions.
+# Either a parsed class, or just Keyvalues (legacy)
+type Config = cond_config.Config | Keyvalues
 
 
 DIRECTIONS: Final[Mapping[str, FrozenVec]] = {
@@ -201,20 +204,21 @@ class MetaCond(Enum):
 
 
 @attrs.define(eq=False)
-class Command[ResT]:
+class Command[ConfT: Config, ResT]:
     """A specific result or test, with the config."""
-    func: CondCall[ResT]
-    config: Keyvalues
+    func: CondCall[ConfT, ResT]
+    orig_config: Keyvalues
+    parsed_config: ConfT
 
     @classmethod
-    def _get_func(
-        cls, name: str,
-        lookup: Mapping[str, CondCall[ResT]],
+    def _parse(
+        cls, conf: Keyvalues, name: str,
+        lookup: Mapping[str, CondCall[Any, ResT]],
         cond_kind: str, fallback: ResT,
-    ) -> CondCall[ResT]:
-        """Lookup the function to call, producing an error if not found."""
+    ) -> tuple[CondCall[ConfT, ResT], ConfT]:
+        """Lookup the function to call, then parse the config."""
         try:
-            return lookup[name]
+            func = lookup[name]
         except KeyError:
             err_msg = f'"{name}" is not a valid condition {cond_kind}!'
             if utils.DEV_MODE:
@@ -223,11 +227,14 @@ class Command[ResT]:
             else:
                 LOGGER.warning(err_msg)
                 # Skip these conditions...
-                return CondCall(lambda: fallback, '', valid_before=(), valid_after=())
+                return CondCall(lambda: fallback, None, '', valid_before=(), valid_after=()), None  # type: ignore
+        if func.conf_cls is Keyvalues:
+            return func, conf  # type: ignore
+        return func, func.conf_cls.parse_kv1(conf)
 
 
 @attrs.define(eq=False)
-class Test(Command[bool]):
+class Test[ConfT: Config](Command[ConfT, bool]):
     """A specific test."""
     inverted: bool
 
@@ -241,8 +248,8 @@ class Test(Command[bool]):
             name = name[1:]
         else:
             inverted = False
-        func = cls._get_func(name, TEST_LOOKUP, 'test', False)
-        return cls(func, conf, inverted)
+        func, parsed = cls._parse(conf, name, TEST_LOOKUP, 'test', False)
+        return cls(func, conf, parsed, inverted)
 
     def test(
         self,
@@ -258,7 +265,7 @@ class Test(Command[bool]):
             can_skip = False
 
         try:
-            res = self.func(coll, info, voice, inst, self.config)
+            res = self.func(coll, info, voice, inst, self.parsed_config)
         except Unsatisfiable:
             if can_skip:
                 raise
@@ -269,13 +276,13 @@ class Test(Command[bool]):
 
 
 @attrs.define(eq=False)
-class Result(Command[object]):
+class Result[ConfT: Config](Command[ConfT, object]):
     """A specific result."""
     @classmethod
     def parse_kv(cls, conf: Keyvalues) -> Result:
         """Parse from a keyvalues definition."""
-        func = cls._get_func(conf.name, RESULT_LOOKUP, 'result', RES_EXHAUSTED)
-        return cls(func, conf)
+        func, parsed = cls._parse(conf, conf.name, RESULT_LOOKUP, 'result', RES_EXHAUSTED)
+        return cls(func, conf, parsed)
 
     def execute(
         self,
@@ -283,7 +290,7 @@ class Result(Command[object]):
         inst: Entity,
     ) -> object:
         """Execute the result."""
-        return self.func(coll, info, voice_data, inst, self.config)
+        return self.func(coll, info, voice_data, inst, self.parsed_config)
 
 
 @attrs.define
@@ -296,7 +303,7 @@ class Condition:
     source: str | None = None
 
     # If set, this is a meta-condition, and this bypasses everything.
-    meta_func: CondCall[object] | None = None
+    meta_func: CondCall[cond_config.Empty, object] | None = None
 
     @classmethod
     def parse(cls, kv_block: Keyvalues, *, toplevel: bool) -> Condition:
@@ -354,7 +361,7 @@ class Condition:
         If we find that no instance will succeed, raise Unsatisfiable.
         """
         if self.meta_func is not None:
-            self.meta_func(coll, info, voice_data, inst, Keyvalues.root())
+            self.meta_func(coll, info, voice_data, inst, cond_config.EMPTY)
             raise EndCondition
 
         success = True
@@ -592,19 +599,20 @@ def meta_priority_converter(priorities: Iterable[MetaCond] | MetaCond) -> frozen
 
 
 @attrs.define(eq=False)
-class CondCall[CallResultT]:
+class CondCall[ConfT: Config, CallResultT]:
     """A result or test callback.
 
     This should be called to execute it.
     """
     func: Callable[..., CallResultT | Callable[[Entity], CallResultT]]
+    conf_cls: type[ConfT]
     group: str | None
     valid_before: frozenset[MetaCond] = attrs.field(kw_only=True, converter=meta_priority_converter)
     valid_after: frozenset[MetaCond] = attrs.field(kw_only=True, converter=meta_priority_converter)
 
     _setup_data: dict[int, Callable[[Entity], CallResultT]] | None = attrs.field(init=False, repr=False)
     _cback: Callable[
-        [srctools.VMF, Collisions, MapInfo, QuoteInfo, Entity, Keyvalues],
+        [srctools.VMF, Collisions, MapInfo, QuoteInfo, Entity, ConfT],
         CallResultT | Callable[[Entity], CallResultT],
     ] = attrs.field(init=False)
 
@@ -612,11 +620,11 @@ class CondCall[CallResultT]:
         cback, arg_order = annotation_caller(
             self.func,
             srctools.VMF, Collisions, MapInfo, QuoteInfo,
-            Entity, Keyvalues,
+            Entity, self.conf_cls,
         )
         self._cback = cback
         if Entity not in arg_order:
-            # We have setup functions.
+            # We have set-up functions.
             self._setup_data = {}
         else:
             self._setup_data = None
@@ -634,7 +642,7 @@ class CondCall[CallResultT]:
         self,
         coll: Collisions, info: MapInfo, voice: QuoteInfo,
         ent: Entity,
-        conf: Keyvalues,
+        conf: ConfT,
     ) -> CallResultT:
         """Execute the callback."""
         if self._setup_data is None:
@@ -697,7 +705,8 @@ def add_meta(func: Callable[..., object], priority: MetaCond) -> None:
     )
 
     # We don't care about setup functions for this, and valid before/after is also useless.
-    wrapper = CondCall(func, _get_cond_group(func), valid_before=(), valid_after=())
+    # No config is provided either.
+    wrapper = CondCall(func, cond_config.Empty, _get_cond_group(func), valid_before=(), valid_after=())
 
     cond = Condition(
         priority=priority.value,
@@ -710,15 +719,26 @@ def add_meta(func: Callable[..., object], priority: MetaCond) -> None:
     ALL_META.append((func.__qualname__, priority, wrapper))
 
 
-def make_test[TestCallT: Callable[..., bool | TestCallable]](
+class _TestDeco[ResT](Protocol):
+    """Return value for make_tesT()."""
+    def __call__[CallT: Callable[..., bool | TestCallable]](cls, func: CallT, /) -> CallT: ...
+
+
+class _ResultDeco[ResT](Protocol):
+    """Return value for make_result()."""
+    def __call__[CallT: Callable[..., object | ResultCallable]](cls, func: CallT, /) -> CallT: ...
+
+
+def make_test[ConfT: Config](
     orig_name: str, *aliases: str,
+    config: type[ConfT] = Keyvalues,
     valid_before: Iterable[MetaCond] | MetaCond = (),
     valid_after: Iterable[MetaCond] | MetaCond = (),
-) -> Callable[[TestCallT], TestCallT]:
+) -> _TestDeco:
     """Decorator to add tests to the lookup."""
-    def x(func: TestCallT) -> TestCallT:
-        wrapper: CondCall[bool] = CondCall(
-            func, _get_cond_group(func),
+    def x[CallT: Callable[..., bool | TestCallable]](func: CallT, /) -> CallT:
+        wrapper: CondCall[Any, bool] = CondCall(
+            func, config, _get_cond_group(func),
             valid_before=valid_before,
             valid_after=valid_after,
         )
@@ -735,11 +755,12 @@ def make_test[TestCallT: Callable[..., bool | TestCallable]](
     return x
 
 
-def make_result(
+def make_result[ConfT: Config](
     orig_name: str, *aliases: str,
+    config: type[ConfT] = Keyvalues,
     valid_before: Iterable[MetaCond] | MetaCond = (),
     valid_after: Iterable[MetaCond] | MetaCond = (),
-) -> utils.DecoratorProto:
+) -> _ResultDeco:
     """Decorator to add results to the lookup."""
     folded_name = orig_name.casefold()
     # Discard the original name from aliases, if it's also there.
@@ -748,10 +769,10 @@ def make_result(
         if name.casefold() != folded_name
     ])
 
-    def x[ResultT](result_func: Callable[..., ResultT]) -> Callable[..., ResultT]:
+    def x[FuncT: Callable[..., bool | ResultCallable]](result_func: FuncT, /) -> FuncT:
         """Create the result when the function is supplied."""
         # Legacy setup func support.
-        func: Callable[..., Callable[[Entity], object] | object]
+        func: Callable[..., ResultCallable | object]
         try:
             setup_func = RESULT_SETUP.pop(orig_name.casefold())
         except KeyError:
@@ -762,8 +783,8 @@ def make_result(
             assert setup_func is not None
             func = conv_setup_pair(setup_func, result_func)
 
-        wrapper: CondCall[object] = CondCall(
-            func, _get_cond_group(result_func),
+        wrapper: CondCall[ConfT, object] = CondCall(
+            func, config, _get_cond_group(result_func),
             valid_before=valid_before,
             valid_after=valid_after,
         )
@@ -1019,7 +1040,7 @@ async def dump_conditions(filename: trio.Path) -> None:
             await file.write(dump_func_docs(func))
             await file.write('\n\n')
 
-        all_cond_types: list[tuple[list[tuple[str, tuple[str, ...], CondCall[Any]]], str]] = [
+        all_cond_types: list[tuple[list[tuple[str, tuple[str, ...], CondCall[Any, Any]]], str]] = [
             (ALL_TESTS, 'Tests'),
             (ALL_RESULTS, 'Results'),
         ]
@@ -1029,7 +1050,7 @@ async def dump_conditions(filename: trio.Path) -> None:
             await file.write('<!------->\n')
 
             lookup_grouped: dict[str, list[
-                tuple[str, tuple[str, ...], CondCall[Any]]
+                tuple[str, tuple[str, ...], CondCall[Any, Any]]
             ]] = defaultdict(list)
 
             for test_key, aliases, func in lookup:

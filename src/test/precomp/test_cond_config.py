@@ -1,7 +1,8 @@
 """Test condition config handling."""
-from typing import Annotated
+from typing import Annotated, Self
 
 import pytest
+from srctools import Keyvalues
 from srctools.dmx import Element
 
 from precomp import cond_config
@@ -19,6 +20,10 @@ class SampleData(cond_config.Config):
         annotated_types.Gt(0), annotated_types.Le(100),
         annotated_types.doc('A number between 1-100'),
     ]
+
+    @classmethod
+    def parse_kv1(cls, kv: Keyvalues) -> Self:
+        return cls('Should not be used', 0)
 
 
 def test_parse_string_field() -> None:
