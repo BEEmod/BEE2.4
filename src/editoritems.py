@@ -289,8 +289,8 @@ class ConnTypes(Enum):
 
 class _TextFile(Protocol):
     """The functions we require in order to write text to a file."""
-    def write(self, __text: str) -> Any:
-        """We simply need a write() method, and ignore the return value."""
+    def write(self, text: str, /) -> object:
+        """We simply need a `write()` method, and ignore the return value."""
 
 
 @attrs.define
