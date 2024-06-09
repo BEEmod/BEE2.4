@@ -50,8 +50,8 @@ async def step_corridor_conf(exp_data: ExportData) -> None:
         except KeyError:
             # None defined for this corridor. This is not an error for vertical ones.
             (LOGGER.warning if orient is Orient.HORIZONTAL else LOGGER.debug)(
-                'No corridors defined for {}:{}_{}',
-                style_id, mode.value, direction.value
+                'No corridors defined for {}:{}_{}_{}',
+                style_id, mode.value, direction.value, orient.value,
             )
             export[mode, direction, orient] = []
             continue
