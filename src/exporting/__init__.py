@@ -16,7 +16,6 @@ import packages
 import config as config_mod
 from app import DEV_MODE
 from app.errors import ErrorUI, Result as ErrorResult, WarningExc
-from app.backup import AUTO_BACKUP_STAGE
 from editoritems import Item as EditorItem, Renderable, RenderableType
 from packages import PackagesSet, PakObject, Style
 from step_order import StepOrder
@@ -59,13 +58,14 @@ class StepResource(Enum):
 # The progress bars used when exporting data into a game
 STAGE_STEPS = loadScreen.ScreenStage(TransToken.ui('Overall Progress'))
 STAGE_COMP_BACKUP = loadScreen.ScreenStage(TransToken.ui('Backup Original Files'))
+STAGE_AUTO_BACKUP = loadScreen.ScreenStage(TransToken.ui('Backup Puzzles'))
 STAGE_COMPILER = loadScreen.ScreenStage(TransToken.ui('Copy Compiler'))
 STAGE_RESOURCES = loadScreen.ScreenStage(TransToken.ui('Copy Resources'))
 STAGE_MUSIC = loadScreen.ScreenStage(TransToken.ui('Copy Music'))
 load_screen = loadScreen.LoadScreen(
     STAGE_STEPS,
     STAGE_COMP_BACKUP,
-    AUTO_BACKUP_STAGE,
+    STAGE_AUTO_BACKUP,
     STAGE_COMPILER,
     STAGE_RESOURCES,
     STAGE_MUSIC,

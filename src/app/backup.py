@@ -45,9 +45,6 @@ window: tk.Toplevel
 type AnyZip = ZipFile | FakeZip
 UI: dict[str, Any] = {}  # Holds all the widgets
 
-# Loading stage used during backup.
-AUTO_BACKUP_STAGE = loadScreen.ScreenStage(TransToken.ui('Backup Puzzles'))
-
 # Characters allowed in the backup filename
 BACKUP_CHARS = set(string.ascii_letters + string.digits + '_-.')
 # Format for the backup filename
@@ -372,7 +369,7 @@ async def backup_maps(dialogs: Dialogs, maps: list[P2C]) -> None:
     refresh_back_details()
 
 
-async def auto_backup(game: gameMan.Game) -> None:
+async def auto_backup(game: gameMan.Game, stage: loadScreen.ScreenStage) -> None:
     """Perform an automatic backup for the given game.
 
     We do this seperately since we don't need to read the property files.
@@ -380,12 +377,12 @@ async def auto_backup(game: gameMan.Game) -> None:
     from BEE2_config import GEN_OPTS
     if not GEN_OPTS.get_bool('General', 'enable_auto_backup'):
         # Don't backup!
-        await AUTO_BACKUP_STAGE.skip()
+        await stage.skip()
         return
 
     folder = find_puzzles(game)
     if not folder:
-        await AUTO_BACKUP_STAGE.skip()
+        await stage.skip()
         return
 
     # Keep this many previous
@@ -403,7 +400,7 @@ async def auto_backup(game: gameMan.Game) -> None:
         valid_chars=BACKUP_CHARS,
     )
 
-    await AUTO_BACKUP_STAGE.set_length(len(to_backup))
+    await stage.set_length(len(to_backup))
 
     if extra_back_count:
         back_files = [
@@ -433,7 +430,7 @@ async def auto_backup(game: gameMan.Game) -> None:
     )
     LOGGER.info('Writing backup to "{}"', final_backup)
     with open(final_backup, 'wb') as f, ZipFile(f, mode='w', compression=ZIP_LZMA) as zip_file:
-        async with aclosing(AUTO_BACKUP_STAGE.iterate(to_backup)) as agen:
+        async with aclosing(stage.iterate(to_backup)) as agen:
             async for file in agen:
                 await trio.to_thread.run_sync(
                     zip_file.write,

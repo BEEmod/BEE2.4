@@ -12,7 +12,7 @@ from srctools.filesys import File
 import trio
 
 from app import backup
-from . import ExportData, STEPS, StepResource, STAGE_RESOURCES
+from . import STAGE_RESOURCES, STAGE_AUTO_BACKUP, ExportData, STEPS, StepResource
 import config
 import editoritems
 
@@ -104,7 +104,7 @@ async def step_write_configs(exp: ExportData) -> None:
 @STEPS.add_step(prereq=[], results=[StepResource.EI_FILE])
 async def step_auto_backup(exp: ExportData) -> None:
     """Run an auto-backup, if requested to."""
-    await backup.auto_backup(exp.game)
+    await backup.auto_backup(exp.game, STAGE_AUTO_BACKUP)
 
 
 @STEPS.add_step(prereq=[StepResource.RES_SPECIAL], results=[StepResource.RES_PACKAGE])
