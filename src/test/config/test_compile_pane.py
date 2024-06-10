@@ -266,7 +266,7 @@ def test_export_dmx() -> None:
     assert len(elem) == 6
     assert elem['sshot_type'] == Attribute.string('sshot_type', 'PETI')
     assert elem['sshot_cleanup'] == Attribute.bool('sshot_cleanup', False)
-    assert elem['spawn_elev'] == Attribute.bool('spawn_elev',False)
+    assert elem['spawn_elev'] == Attribute.bool('spawn_elev', False)
     assert elem['player_model'] == Attribute.string('player_model', 'PETI')
     assert elem['voiceline_priority'] == Attribute.bool('voiceline_priority', False)
 
@@ -281,7 +281,7 @@ def test_export_dmx() -> None:
     assert len(elem) == 6
     assert elem['sshot_type'] == Attribute.string('sshot_type', 'PETI')
     assert elem['sshot_cleanup'] == Attribute.bool('sshot_cleanup', True)
-    assert elem['spawn_elev'] == Attribute.bool('spawn_elev',False)
+    assert elem['spawn_elev'] == Attribute.bool('spawn_elev', False)
     assert elem['player_model'] == Attribute.string('player_model', 'PBODY')
     assert elem['voiceline_priority'] == Attribute.bool('voiceline_priority', True)
 
@@ -296,7 +296,7 @@ def test_export_dmx() -> None:
     assert len(elem) == 6
     assert elem['sshot_type'] == Attribute.string('sshot_type', 'AUTO')
     assert elem['sshot_cleanup'] == Attribute.bool('sshot_cleanup', True)
-    assert elem['spawn_elev'] == Attribute.bool('spawn_elev',True)
+    assert elem['spawn_elev'] == Attribute.bool('spawn_elev', True)
     assert elem['player_model'] == Attribute.string('player_model', 'ATLAS')
     assert elem['voiceline_priority'] == Attribute.bool('voiceline_priority', False)
 
@@ -314,6 +314,6 @@ def test_export_dmx() -> None:
     assert elem['sshot_cleanup'] == Attribute.bool('sshot_cleanup', True)
     assert elem['sshot_fname'] == Attribute.string('sshot_fname', 'C:/some_custom_file.png')
     assert elem['sshot_data'] == Attribute.binary('sshot_data', SCREENSHOT_DATA)
-    assert elem['spawn_elev'] == Attribute.bool('spawn_elev',True)
+    assert elem['spawn_elev'] == Attribute.bool('spawn_elev', True)
     assert elem['player_model'] == Attribute.string('player_model', 'SP')
     assert elem['voiceline_priority'] == Attribute.bool('voiceline_priority', False)

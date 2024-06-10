@@ -63,6 +63,7 @@ class _Settings(TypedDict):
 
     style_vars: dict[str, bool]
 
+
 settings: _Settings = {
     "textures":       {},
     "fog":            {},
@@ -101,7 +102,7 @@ async def load_settings() -> tuple[
         """Load our main DMX config."""
         with open(filename, 'rb') as f:
             dmx, fmt_name, fmt_ver = Element.parse(f)
-        conf, upgrade = config.COMPILER.parse_dmx(dmx, fmt_name, fmt_ver)
+        conf, _ = config.COMPILER.parse_dmx(dmx, fmt_name, fmt_ver)
         # We're never changing the file, no point upgrading it. The app will do so next
         # export anyway.
         return conf
@@ -232,7 +233,7 @@ async def load_settings() -> tuple[
 
 def load_map(map_path: str) -> VMF:
     """Load in the VMF file."""
-    with open(map_path) as file:
+    with open(map_path, encoding='utf8') as file:
         LOGGER.info("Parsing Map...")
         kv = Keyvalues.parse(file, map_path)
     LOGGER.info('Reading Map...')
@@ -341,6 +342,7 @@ def anti_fizz_bump(vmf: VMF) -> None:
             face.mat = 'tools/toolsinvisible'
 
     LOGGER.info('Done!')
+
 
 # The paths for player models and the portalgun skin
 PLAYER_MODELS = {
@@ -1387,7 +1389,7 @@ def run_vbsp(
         LOGGER.info('Files present: {}', os.listdir(os.path.dirname(new_path)))
         if os.path.isfile(pointfile):  # We leaked!
             points = []
-            with open(pointfile) as f:
+            with open(pointfile, encoding='ascii') as f:
                 for line in f:
                     points.append(Vec.from_str(line.strip()))
             # Preserve this, rename to match the error map we generate.
@@ -1533,7 +1535,7 @@ async def main(argv: list[str]) -> None:
         sys.exit()
 
     # Just in case we fail, overwrite the VRAD config, so it doesn't use old data.
-    open('bee2/vrad_config.cfg', 'w').close()
+    open('bee2/vrad_config.cfg', 'wb').close()
 
     args = " ".join(argv)
     new_args = argv[1:]

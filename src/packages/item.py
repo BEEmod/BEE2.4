@@ -7,7 +7,8 @@ Unparsed style IDs can be <special>, used usually for unstyled items.
 Those are only relevant for default styles or explicit inheritance.
 """
 from __future__ import annotations
-from typing_extensions import Self, override
+
+from typing import Self, override
 
 from collections.abc import Sequence, Iterable, Iterator
 from enum import Enum
@@ -682,7 +683,7 @@ class Item(PakObject, needs_foreground=True):
 
     def selected_version(self) -> Version:
         """Fetch the selected version for this item."""
-        conf = config.APP.get_cur_conf(ItemDefault, self.id, ItemDefault())
+        conf = config.APP.get_cur_conf(ItemDefault, self.id)
         try:
             return self.versions[conf.version]
         except KeyError:
