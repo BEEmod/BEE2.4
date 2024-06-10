@@ -353,7 +353,10 @@ def add_voice(
     use_priority: bool = True,
 ) -> None:
     """Add a voice line to the map."""
-    LOGGER.info('Adding Voice Lines!')
+    if not voice.id:
+        LOGGER.info('No voiceline set!')
+        return
+    LOGGER.info('Adding Voice Line: {}', voice.id)
 
     norm_config = ConfigFile('bee2/voice.cfg', in_conf_folder=False)
     mid_config = ConfigFile('bee2/mid_voice.cfg', in_conf_folder=False)

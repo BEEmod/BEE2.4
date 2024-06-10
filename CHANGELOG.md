@@ -3,6 +3,9 @@
 # Version (dev)
 * #573: Show filename in tooltip for custom screenshots.
 
+### Bugfixes:
+* The case where no voicelines are set is once again handled correctly.
+
 ------------------------------------------
 
 # Version 4.45.2

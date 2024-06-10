@@ -12,11 +12,12 @@ from typing import Self, override
 
 from collections.abc import Sequence, Iterable, Iterator
 from enum import Enum
-from pathlib import PurePosixPath as FSPath
+from pathlib import PurePosixPath as FSPath, Path
 import re
 import copy
 
 from srctools import FileSystem, Keyvalues, VMF, logger
+from srctools.filesys import RawFileSystem
 from srctools.tokenizer import Tokenizer, Token
 import attrs
 import trio
@@ -862,6 +863,13 @@ async def parse_item_folder(
     editor_vmf = editor_vmf_res()
     if editor_vmf is not None:
         editoritems_vmf.load(first_item, editor_vmf)
+    # elif isinstance(filesystem, RawFileSystem):
+    #     # Write out editoritems.vmf.
+    #     editor_vmf = editoritems_vmf.save(first_item)
+    #     with Path(filesystem.path, vmf_path).open('w') as f:
+    #         LOGGER.info('Writing {}', f.name)
+    #         await trio.to_thread.run_sync(editor_vmf.export, f)
+
     del editor_vmf, editor_vmf_res
 
     first_item.generate_collisions()

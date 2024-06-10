@@ -362,7 +362,7 @@ class Monitor:
 @attrs.define(kw_only=True)
 class QuoteInfo:
     """The data that is saved for the compiler to use."""
-    id: str
+    id: str  # The ID of the pack, or '' if no line is set.
     cave_skin: int | None
     use_dings: bool
     use_microphones: bool

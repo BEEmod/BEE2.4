@@ -1,7 +1,7 @@
 import math
 
 from precomp import instanceLocs, connections, conditions, options, faithplate
-from srctools import Matrix, Keyvalues, Vec, Entity, VMF, Output, Angle
+from srctools import FrozenVec, Matrix, Keyvalues, Vec, Entity, VMF, Output, Angle
 import srctools.logger
 
 from typing import List, NamedTuple, Literal, Optional
@@ -28,15 +28,22 @@ HAS_MONITOR: bool = False
 # If non-emtpy we have monitors to shoot by turrets.
 MONITOR_RELATIONSHIP_ENTS: List[Entity] = []
 
+# The location of arrival_departure_transition_ents, which has toolsblack.
+BLACK_SCREEN_LOC = FrozenVec(-2500, -2500, 0)
 
-def get_studio_pose(voice: QuoteInfo) -> Vec:
+
+def get_studio_pose(voice: QuoteInfo) -> Vec | FrozenVec:
     """Return the position of the studio camera."""
-    return voice.position + options.VOICE_STUDIO_CAM_LOC()
+    if voice.id:
+        return voice.position + options.VOICE_STUDIO_CAM_LOC()
+    else:
+        # No voice line set, no studio.
+        return BLACK_SCREEN_LOC
 
 
 def scriptvar_set(
     targ: Entity,
-    pos: Vec,
+    pos: Vec | FrozenVec,
     varname: str,
     value: object = '',
     *,
@@ -145,7 +152,7 @@ def res_camera(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
     pitch_range = srctools.conv_int(res['PitchRange', ''], 90)
 
     def add_camera(inst: Entity) -> None:
-
+        """Add the camera."""
         normal = Vec(z=1) @ Angle.from_str(inst['angles'])
         if abs(normal.z) > 0.1:
             # Can't be on floor/ceiling!
@@ -257,6 +264,7 @@ def mon_camera_link(vmf: VMF, voice: QuoteInfo) -> None:
             f'CamDisable({index})',
         ), )
 
+    start_pos: Vec | FrozenVec
     for is_act, cam in zip(active_counts, ALL_CAMERAS, strict=True):
         if is_act:
             start_pos = cam.cam_pos
@@ -277,7 +285,7 @@ def mon_camera_link(vmf: VMF, voice: QuoteInfo) -> None:
                 relation['StartActive'] = '1'
         else:
             # Start in arrival_departure_transition_ents...
-            start_pos = Vec(-2500, -2500, 0)
+            start_pos = BLACK_SCREEN_LOC
             start_angles = Angle(0, 90, 0)
 
     cam_ent = vmf.create_ent(
@@ -365,6 +373,7 @@ def make_voice_studio(vmf: VMF, voice: QuoteInfo) -> bool:
 
     This is either an instance (if monitors are present), or a nodraw room.
     """
+    assert voice.id, "No voiceline defined?"
 
     studio_file = options.VOICE_STUDIO_INST()
     loc = voice.position
