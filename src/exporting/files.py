@@ -11,7 +11,6 @@ from srctools.dmx import Element
 from srctools.filesys import File
 import trio
 
-from app import backup
 from . import STAGE_RESOURCES, STAGE_AUTO_BACKUP, ExportData, STEPS, StepResource
 import config
 import editoritems
@@ -104,6 +103,8 @@ async def step_write_configs(exp: ExportData) -> None:
 @STEPS.add_step(prereq=[], results=[StepResource.EI_FILE])
 async def step_auto_backup(exp: ExportData) -> None:
     """Run an auto-backup, if requested to."""
+    # TODO: Move this import to toplevel, once this & app no longer imports ui_tk.
+    from app import backup
     await backup.auto_backup(exp.game, STAGE_AUTO_BACKUP)
 
 
