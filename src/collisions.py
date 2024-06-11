@@ -769,12 +769,12 @@ class Volume(BBox):  # type: ignore[override]
         best_hit: Hit | None = None
         inside = True
         for plane in self.planes:
+            # Check if the start point is inside the plane.
+            if Vec.dot(start, plane.normal) < plane.distance:
+                inside = False
             dot = Vec.dot(plane.normal, direction)
             # If perpendicular or facing in the same direction, the ray can't trace into it.
             if dot <= 0.0:
-                # Check if the start point is inside the plane.
-                if Vec.dot(start, plane.normal) < plane.distance:
-                    inside = False
                 continue
             t = (plane.distance - Vec.dot(start, plane.normal)) / dot
             if not (0.0 <= t <= max_dist) or (best_hit is not None and t > best_hit.distance):
