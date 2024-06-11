@@ -2,12 +2,20 @@
 from __future__ import annotations
 from srctools import Matrix, Vec, Keyvalues, VMF, Entity, conv_float, logger
 
-from precomp import conditions, instance_traits
-from precomp.collisions import CollideType, Collisions, BBox
+from precomp import conditions, instance_traits, brushLoc
+from precomp.collisions import CollideType, Collisions, BBox, trace_ray
 
 
 COND_MOD_NAME = 'Collisions'
 LOGGER = logger.get_logger('cond.collisions')
+
+
+def parse_tags(inst: Entity, value: str) -> frozenset[str]:
+    """Split a space-separated list into tags."""
+    return frozenset({
+        tag.casefold()
+        for tag in inst.fixup.substitute(value).split()
+    })
 
 
 @conditions.make_result('Collisions')
@@ -27,6 +35,15 @@ def res_mod_conditions(vmf: VMF, inst: Entity, coll: Collisions, res: Keyvalues)
         takes the same parameters as BBox, but the orientation is relative to the tracks not the
         platform. The volume is placed relative to each track end instance, then those are combined
         so it "sweeps" from the first to the last.
+    - SweepTrace: Traces in a specified direction, then sweeps a bounding box to the impact point.
+        Intended to produce the collisions for things like funnels or light bridges. The trace
+        starts from the midpoint of the initial bounding box, then a new box is formed from the
+        three points.
+        - type: Space-seperated list of collision types this collision will contain.
+        - tags: Space-seperated list of 'tags' to associate with these collisions.
+        - pos1, pos2: The two positions for this bounding box.
+        - mask: Space-separated list of collision types which stop the trace. This is always
+          stopped by chamber geometry. This defaults to "SOLID GLASS GRATING".
     """
     name = inst['targetname']
     LOGGER.info('"{}":{} -> coll {}', name, inst['file'], coll.collisions_for_item(inst['targetname']))
@@ -70,7 +87,7 @@ def res_mod_conditions(vmf: VMF, inst: Entity, coll: Collisions, res: Keyvalues)
                 for bbox in coll.collisions_for_item(name):
                     coll.remove_bbox(bbox)
             else:
-                tags = frozenset(map(str.casefold, inst.fixup.substitute(prop.value).split()))
+                tags = parse_tags(inst, prop.value)
                 for bbox in coll.collisions_for_item(name):
                     # Require all remove tags to match before removing.
                     # Users can use multiple for OR.
@@ -79,7 +96,7 @@ def res_mod_conditions(vmf: VMF, inst: Entity, coll: Collisions, res: Keyvalues)
         elif prop.name in ('bbox', 'trackplat'):
             pos1 = Vec.from_str(inst.fixup.substitute(prop['pos1']), -64, -64, -64)
             pos2 = Vec.from_str(inst.fixup.substitute(prop['pos2']), +64, +64, +64)
-            tags = frozenset(map(str.casefold, inst.fixup.substitute(prop['tags', '']).split()))
+            tags = parse_tags(inst, prop['tags', ''])
             content = CollideType.parse(inst.fixup.substitute(prop['type']))
 
             if prop.name == 'trackplat':
@@ -112,6 +129,40 @@ def res_mod_conditions(vmf: VMF, inst: Entity, coll: Collisions, res: Keyvalues)
             coll.add(BBox(
                 pos1 @ rotation + box_pos,
                 pos2 @ rotation + box_pos,
+                contents=content, tags=tags, name=name,
+            ))
+        elif prop.name == 'sweeptrace':
+            pos1 = conditions.resolve_offset(inst, prop['pos1'])
+            pos2 = conditions.resolve_offset(inst, prop['pos2'])
+            add_debug = conditions.fetch_debug_visgroup(vmf, 'sweeptrace')
+            tags = parse_tags(inst, prop['tags', ''])
+            content = CollideType.parse(inst.fixup.substitute(prop['type']))
+            mask = CollideType.parse(inst.fixup.substitute(prop['mask', 'SOLID GLASS GRATING']))
+            direction = Vec.from_str(
+                inst.fixup.substitute(prop['dir', '0 0 1']),
+                0, 0, 1,
+            ).norm() @ orient
+            start = (pos1 + pos2) / 2
+            back = start - direction * prop.float('back', 0.0)
+            end = brushLoc.POS.raycast_world(start, direction)
+            # Recalculate to keep this in line with the start position.
+            # Calculate the distance along the delta, add 64 to move to the edge of the voxel,
+            # then add back to start.
+            end = start + (Vec.dot(end - start, direction) + 64) * direction
+
+            add_debug(
+                'info_particle_system',
+                targetname=name,
+                origin=start, angles=direction.to_angle(),
+            )
+            add_debug('info_null', targetname=name, origin=end)
+
+            if (impact := coll.trace_ray(start, (end - start), mask)) is not None:
+                end = impact.impact.thaw()
+                add_debug('info_target', origin=impact.impact, angles=impact.normal.to_angle())
+            pos1, pos2 = Vec.bbox(pos1, pos2, back, end)
+            coll.add(BBox(
+                pos1, pos2,
                 contents=content, tags=tags, name=name,
             ))
         else:

@@ -6,6 +6,10 @@
 ### Bugfixes:
 * The case where no voicelines are set is once again handled correctly.
 
+### UCP-Relevant changes:
+* Add `SweepTrace` mode to `Collisions` result. This allows creating collisions 
+  which extend until impacting a surface.
+
 ------------------------------------------
 
 # Version 4.45.2

@@ -1,5 +1,6 @@
 """Records the collisions for each item."""
 from collections import defaultdict
+from collections.abc import Iterator
 
 import attrs
 from srctools import Entity, Matrix, VMF, Vec
@@ -44,6 +45,26 @@ class Collisions:
         except LookupError:
             # already not present.
             pass
+
+    def iter_inside(
+        self,
+        mins: Vec, maxs: Vec,
+        mask: CollideType = CollideType.EVERYTHING,
+    ) -> Iterator[BBox]:
+        """Iterate over bounding boxes which match the specified mask."""
+        for coll_type, tree in self._by_bbox.items():
+            if coll_type & mask is CollideType.NOTHING:
+                continue
+            yield from tree.find_bbox(mins, maxs)
+
+    def trace_ray(
+        self,
+        start: Vec, delta: Vec,
+        mask: CollideType = CollideType.EVERYTHING,
+    ) -> Hit | None:
+        """Trace a ray against all matching volumes."""
+        mins, maxs = Vec.bbox(start, start + delta)
+        return trace_ray(start, delta, self.iter_inside(mins - 1.0, maxs + 1.0, mask))
 
     def collisions_for_item(self, name: str) -> list[BBox]:
         """Fetch the bounding boxes for this item."""
