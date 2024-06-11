@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from app.gameMan import Game
 
 
-__all__ = []
+__all__: list[str] = []
 LOGGER = srctools.logger.get_logger(__name__)
 
 

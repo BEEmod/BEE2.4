@@ -1,4 +1,3 @@
-"""Implements stubs for pygtrie."""
 from typing import Any, Literal, NoReturn, Protocol, Self, overload
 from collections.abc import Callable, Iterable, Iterator, MutableMapping, MutableSet
 
@@ -134,7 +133,7 @@ class Trie[KeyT, ValueT](MutableMapping[KeyT, ValueT]):
     def __len__(self) -> int: ...
     def __bool__(self) -> bool: ...
     def __nonzero__(self) -> bool: ...
-    __hash__ = None  # type: ignore
+    __hash__: None = None  # type: ignore
     HAS_VALUE: int
     HAS_SUBTRIE: int
     def has_node(self, key: KeyT) -> bool: ...

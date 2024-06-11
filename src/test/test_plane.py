@@ -252,9 +252,9 @@ def test_key_constructor() -> None:
     assert key.normal is Vec.S
     assert key.distance == -26.8
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match='is not an on-axis normal'):
         PlaneKey(Vec(), 12)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match='is not an on-axis normal'):
         PlaneKey(Matrix.from_yaw(45).forward(), 8)
 
 

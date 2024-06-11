@@ -3,7 +3,7 @@ from __future__ import annotations
 from srctools import Matrix, Vec, Keyvalues, VMF, Entity, conv_float, logger
 
 from precomp import conditions, instance_traits, brushLoc
-from precomp.collisions import CollideType, Collisions, BBox, trace_ray
+from precomp.collisions import CollideType, Collisions, BBox
 
 
 COND_MOD_NAME = 'Collisions'

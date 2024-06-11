@@ -5,7 +5,7 @@ from trio.testing import Sequencer
 import trio
 import pytest
 
-from app import EdgeTrigger
+from app import EdgeTrigger, CannotTrigger
 
 
 async def test_basic_operation() -> None:
@@ -16,7 +16,7 @@ async def test_basic_operation() -> None:
 
     # Can't trigger when no task is waiting.
     assert not trigger.ready.value
-    with pytest.raises(ValueError):
+    with pytest.raises(CannotTrigger):
         trigger.trigger()  # type: ignore
 
     async def wait_task() -> None:
@@ -41,7 +41,7 @@ async def test_basic_operation() -> None:
         async with seq(1):
             assert state == 'pre'
             assert not trigger.ready.value
-            with pytest.raises(ValueError):
+            with pytest.raises(CannotTrigger):
                 trigger.trigger(1, 2)  # Can't trigger yet.
 
         async with seq(3):

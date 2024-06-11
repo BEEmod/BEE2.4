@@ -7,7 +7,7 @@ from transtoken import AppError, TransToken
 
 
 @pytest.fixture(scope="module", autouse=True)
-def reset_handler() -> None:
+def _reset_handler() -> None:
     """To ensure only relevant tests fail, reset the handler manually."""
     print("Resetting handler.")
     ErrorUI._handler = None

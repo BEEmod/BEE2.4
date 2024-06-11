@@ -43,7 +43,7 @@ exclude = [
 select = [
 	"E", "UP", "F", "C4", "ANN", "B", "PIE", "RUF", "PYI",
 	"PLC", "PLE", "PLW",  # Pylint.
-	"TRIO",
+	"TRIO", "YTT",
 
 	"TCH005",  # Empty type-checking block.
 ]

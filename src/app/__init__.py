@@ -128,6 +128,10 @@ async def background_start(
     return await _APP_NURSERY.start(func, *args, name=name)
 
 
+class CannotTrigger(Exception):
+    """Raised when an EdgeTrigger tried to trigger but no task was available."""
+
+
 class EdgeTrigger[*Args]:
     """A variation on a Trio Event which can only be tripped while a task is waiting for it.
 
@@ -179,7 +183,7 @@ class EdgeTrigger[*Args]:
         If triggered multiple times, the last result wins.
         """
         if self._event is None:
-            raise ValueError('No task is blocked on wait()!')
+            raise CannotTrigger('No task is blocked on wait()!')
         self._result = args
         self._event.set()
 

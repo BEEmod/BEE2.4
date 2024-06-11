@@ -8,7 +8,7 @@ from pytest_regressions.file_regression import FileRegressionFixture
 from srctools import UVAxis, VMF, Angle, Keyvalues, Matrix, Solid, Vec
 import pytest
 
-from collisions import BBox, CollideType, Volume
+from collisions import BBox, CollideType, NonBBoxError, Volume
 
 
 tuple3 = Tuple[int, int, int]
@@ -98,13 +98,13 @@ def test_bbox_construction() -> None:
 
 def test_illegal_bbox() -> None:
     """A line or point segement is not allowed."""
-    with pytest.raises(ValueError):
+    with pytest.raises(NonBBoxError):
         BBox(Vec(1, 2, 3), Vec(1, 2, 3))
-    with pytest.raises(ValueError):
+    with pytest.raises(NonBBoxError):
         BBox(Vec(1, 2, 3), Vec(10, 2, 3))
-    with pytest.raises(ValueError):
+    with pytest.raises(NonBBoxError):
         BBox(Vec(1, 2, 3), Vec(1, 20, 3))
-    with pytest.raises(ValueError):
+    with pytest.raises(NonBBoxError):
         BBox(Vec(1, 2, 3), Vec(1, 2, 30))
 
 
