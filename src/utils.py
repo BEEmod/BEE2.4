@@ -26,13 +26,14 @@ import math
 from srctools.math import Angle
 import trio
 import trio_util
+import aioresult
 
 
 __all__ = [
     'WIN', 'MAC', 'LINUX', 'STEAM_IDS', 'DEV_MODE', 'CODE_DEV_MODE', 'BITNESS',
     'get_git_version', 'install_path', 'bins_path', 'conf_location', 'fix_cur_directory',
     'run_bg_daemon', 'not_none', 'CONN_LOOKUP', 'CONN_TYPES', 'freeze_enum_props',
-    'PackagePath', 'Result', 'acompose', 'get_indent', 'iter_grid', 'check_cython',
+    'PackagePath', 'sync_result', 'acompose', 'get_indent', 'iter_grid', 'check_cython',
     'ObjectID', 'SpecialID', 'BlankID', 'ID_EMPTY', 'ID_NONE', 'ID_RANDOM',
     'obj_id', 'special_id', 'obj_id_optional', 'special_id_optional',
     'check_shift', 'fit', 'group_runs', 'restart_app', 'quit_app', 'set_readonly',
@@ -486,61 +487,23 @@ class PackagePath:
         return PackagePath(self.package, f'{self.path.rstrip("/")}/{child}')
 
 
-_NO_RESULT: Any = object()
+def sync_result[*Args, SyncResultT](
+    nursery: trio.Nursery,
+    func: Callable[[*Args], SyncResultT],
+    /, *args: *Args,
+    abandon_on_cancel: bool = False,
+    limiter: trio.CapacityLimiter | None = None,
+) -> aioresult.ResultCapture[SyncResultT]:
+    """Wrap a sync task, using to_thread.run_sync()."""
+    async def task() -> SyncResultT:
+        """Run in a thread."""
+        return await trio.to_thread.run_sync(
+            func, *args,
+            abandon_on_cancel=abandon_on_cancel,
+            limiter=limiter,
+        )
 
-
-class Result[ResultT]:
-    """Encasulates an async computation submitted to a nursery.
-
-    Once the nursery has closed, the result is accessible.
-    """
-    def __init__[*Args](
-        self,
-        nursery: trio.Nursery,
-        func: Callable[[*Args], Awaitable[ResultT]],
-        /, *args: *Args,
-        name: object = None,
-    ) -> None:
-        self._nursery: trio.Nursery | None = nursery
-        self._result: ResultT = _NO_RESULT
-        if not name:
-            name = func
-        nursery.start_soon(self._task, func, args, name=name)
-
-    @classmethod
-    def sync[*Args, SyncResultT](
-        cls,
-        nursery: trio.Nursery,
-        func: Callable[[*Args], SyncResultT],
-        /, *args: *Args,
-        abandon_on_cancel: bool = False,
-        limiter: trio.CapacityLimiter | None = None,
-    ) -> Result[SyncResultT]:
-        """Wrap a sync task, using to_thread.run_sync()."""
-        async def task() -> SyncResultT:
-            """Run in a thread."""
-            return await trio.to_thread.run_sync(
-                func, *args,
-                abandon_on_cancel=abandon_on_cancel,
-                limiter=limiter,
-            )
-
-        return Result(nursery, task, name=func)
-
-    async def _task[*Args](
-        self,
-        func: Callable[[*Args], Awaitable[ResultT]],
-        args: tuple[*Args],
-    ) -> None:
-        """The task that is run."""
-        self._result = await func(*args)
-
-    def __call__(self) -> ResultT:
-        """Fetch the result. The nursery must be closed."""
-        if self._nursery is not None and 'exited' not in repr(self._nursery.cancel_scope):
-            raise ValueError(f'Result cannot be fetched before nursery has closed! ({self._nursery.cancel_scope!r})')
-        self._nursery = None  # The check passed, no need to keep this alive.
-        return self._result
+    return aioresult.ResultCapture.start_soon(nursery, task)
 
 
 def acompose[**ParamsT, ResultT](

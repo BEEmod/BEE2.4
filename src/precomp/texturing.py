@@ -684,11 +684,11 @@ async def setup(game: Game, vmf: VMF, tiles: list[TileDef]) -> None:
     async with trio.open_nursery() as nursery:
         # Parse the filesystems (importantly the VPKs) in the background while we check the existing
         # VMTs.
-        fsys_res = utils.Result.sync(nursery, game.get_filesystem)
+        fsys_res = utils.sync_result(nursery, game.get_filesystem)
         for vmt_file in antigel_loc.glob('*.vmt'):
             nursery.start_soon(check_existing, vmt_file)
 
-    fsys = fsys_res()
+    fsys = fsys_res.result()
     materials: set[str] = set()
 
     for generator in GENERATORS.values():

@@ -1,4 +1,5 @@
 attrs >= 22.1.0
+aioresult >= 1.0.0
 mistletoe >= 1.3.0
 Pillow >= 10.3.0
 psutil >= 5.9.8

@@ -9,6 +9,7 @@ import shutil
 import logging
 import pickle
 
+from aioresult import ResultCapture
 from srctools import AtomicWriter, Keyvalues, Vec, FrozenVec, Angle
 from srctools.dmx import Element
 from srctools.vmf import VMF, Entity, Output
@@ -109,11 +110,11 @@ async def load_settings() -> tuple[
 
     try:
         async with trio.open_nursery() as nursery:
-            res_vconf = utils.Result.sync(nursery, load_keyvalues, "bee2/vbsp_config.cfg")
-            res_packlist = utils.Result.sync(nursery, load_keyvalues, 'bee2/pack_list.cfg')
-            res_editor = utils.Result.sync(nursery, load_pickle, 'bee2/editor.bin')
-            res_corr = utils.Result.sync(nursery, load_pickle, 'bee2/corridors.bin')
-            res_dmx_conf = utils.Result.sync(nursery, load_dmx_config, 'bee2/config.dmx')
+            res_vconf = utils.sync_result(nursery, load_keyvalues, "bee2/vbsp_config.cfg")
+            res_packlist = utils.sync_result(nursery, load_keyvalues, 'bee2/pack_list.cfg')
+            res_editor = utils.sync_result(nursery, load_pickle, 'bee2/editor.bin')
+            res_corr = utils.sync_result(nursery, load_pickle, 'bee2/corridors.bin')
+            res_dmx_conf = utils.sync_result(nursery, load_dmx_config, 'bee2/config.dmx')
             # Load in templates locations.
             nursery.start_soon(template_brush.load_templates, 'bee2/templates.lst')
     except* OSError:
@@ -125,14 +126,14 @@ async def load_settings() -> tuple[
         )
         sys.exit(1)
 
-    vconf = res_vconf()
+    vconf = res_vconf.result()
     tex_block = Keyvalues('Textures', list(vconf.find_children('textures')))
 
     texturing.load_config(tex_block)
 
     # Load in our main configs...
     options.load(vconf.find_all('Options'))
-    config.COMPILER.merge_conf(res_dmx_conf())
+    config.COMPILER.merge_conf(res_dmx_conf.result())
     utils.DEV_MODE = options.DEV_MODE()
 
     # Configuration properties for styles.
@@ -144,7 +145,7 @@ async def load_settings() -> tuple[
     # The pickle could have produced anything.
     id_to_item: dict[utils.ObjectID, editoritems.Item] = {}
 
-    editor_list = res_editor()
+    editor_list = res_editor.result()
     if not isinstance(editor_list, list):
         raise ValueError(f'Invalid list of editor items, got: {editor_list!r}')
     for item in editor_list:
@@ -166,7 +167,7 @@ async def load_settings() -> tuple[
     )
 
     # Parse packlist data.
-    packing.parse_packlists(res_packlist())
+    packing.parse_packlists(res_packlist.result())
 
     # Parse all the conditions.
     for cond in vconf.find_all('conditions', 'condition'):
@@ -177,7 +178,7 @@ async def load_settings() -> tuple[
     barriers.parse_conf(vconf)
 
     # Selected corridors.
-    corridor_conf = res_corr()
+    corridor_conf = res_corr.result()
     if not isinstance(corridor_conf, corridor.ExportedConf):
         raise ValueError(f'Invalid corridor config, got {corridor_conf!r}')
 
@@ -1236,10 +1237,7 @@ def add_extra_ents(vmf: VMF, info: corridor.Info) -> None:
         has_cave = srctools.conv_bool(
             settings['style_vars'].get('multiversecave', '1')
         )
-        global_pti_ents.fixup[
-            'disable_pti_audio'
-            ] = srctools.bool_as_int(not has_cave)
-
+        global_pti_ents.fixup['disable_pti_audio'] = not has_cave
         global_pti_ents.fixup['glados_script'] = 'choreo/glados.nut'  # Implements Multiverse Cave..
 
 
@@ -1623,12 +1621,12 @@ async def main(argv: list[str]) -> None:
 
         LOGGER.info("Loading settings...")
         async with trio.open_nursery() as nursery:
-            res_settings = utils.Result(nursery, load_settings)
-            vmf_res = utils.Result.sync(nursery, load_map, path)
-            voice_data_res = utils.Result(nursery, voice_line.load)
+            res_settings = ResultCapture.start_soon(nursery, load_settings)
+            vmf_res =  utils.sync_result(nursery, load_map, path)
+            voice_data_res = ResultCapture.start_soon(nursery, voice_line.load)
 
-        ind_style, id_to_item, corridor_conf = res_settings()
-        vmf: VMF = vmf_res()
+        ind_style, id_to_item, corridor_conf = res_settings.result()
+        vmf: VMF = vmf_res.result()
 
         coll = Collisions()
 
@@ -1673,7 +1671,7 @@ async def main(argv: list[str]) -> None:
 
         await texturing.setup(game, vmf, list(tiling.TILES.values()))
 
-        conditions.check_all(vmf, coll, info, voice_data_res())
+        conditions.check_all(vmf, coll, info, voice_data_res.result())
         add_extra_ents(vmf, info)
 
         tiling.generate_brushes(vmf)

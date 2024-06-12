@@ -10,6 +10,7 @@ from pathlib import Path
 import os
 import zipfile
 
+from aioresult import ResultCapture
 import attrs
 import trio
 import srctools
@@ -524,7 +525,7 @@ async def find_packages(errors: ErrorUI, packset: PackagesSet, pak_dir: Path) ->
         errors.add(TRANS_MISSING_PAK_DIR.format(path=pak_dir))
         return False
 
-    children: list[utils.Result[bool]] = []
+    children: list[ResultCapture[bool]] = []
     async with trio.open_nursery() as nursery:
         for name in contents:  # Both files and dirs
             folded = name.stem.casefold()
@@ -559,7 +560,7 @@ async def find_packages(errors: ErrorUI, packset: PackagesSet, pak_dir: Path) ->
                 if name.is_dir():
                     # This isn't a package, so check the subfolders too...
                     LOGGER.debug('Checking subdir "{}" for packages...', name)
-                    children.append(utils.Result(
+                    children.append(ResultCapture.start_soon(
                         nursery, find_packages,
                         errors, packset, name,
                     ))
@@ -591,7 +592,7 @@ async def find_packages(errors: ErrorUI, packset: PackagesSet, pak_dir: Path) ->
             )
             found_pak = True
 
-    if found_pak or any(result() for result in children):
+    if found_pak or any(result.result() for result in children):
         return True
     else:
         LOGGER.info('Directory {} was empty.', pak_dir)
@@ -606,12 +607,12 @@ async def load_packages(
     """Scan and read in all packages."""
     async with trio.open_nursery() as find_nurs:
         find_sources = [
-            (pak_dir, utils.Result(find_nurs, find_packages, errors, packset, pak_dir))
+            (pak_dir, ResultCapture.start_soon(find_nurs, find_packages, errors, packset, pak_dir))
             for pak_dir in pak_dirs
         ]
     # Once they've all run, check if any sources failed to find any packages - that's probably an error.
     for pak_dir, find_res in find_sources:
-        if not find_res():
+        if not find_res.result():
             errors.add(TRANS_EMPTY_PAK_DIR.format(path=pak_dir))
     pack_count = len(packset.packages)
     await LOAD_PAK.set_length(pack_count)

@@ -10,6 +10,7 @@ import shutil
 import urllib.error
 import urllib.request
 
+from aioresult import ResultCapture
 import srctools.logger
 import trio
 
@@ -156,18 +157,18 @@ async def backup(description: str, item_path: trio.Path, backup_path: trio.Path)
         # Always backup the non-_original file, it'd be newer.
         # But only if it's Valves - not our own.
         async with trio.open_nursery() as nursery:
-            should_backup_res = utils.Result(nursery, is_original_executable, item_path)
-            backup_is_good = utils.Result(nursery, is_original_executable, backup_path)
+            should_backup_res = ResultCapture.start_soon(nursery, is_original_executable, item_path)
+            backup_is_good = ResultCapture.start_soon(nursery, is_original_executable, backup_path)
 
-        should_backup = should_backup_res()
+        should_backup = should_backup_res.result()
         LOGGER.info(
             ': normal={}, backup={}',
             item_path.name,
             'Valve' if should_backup else 'BEE2',
-            'Valve' if backup_is_good() else 'BEE2',
+            'Valve' if backup_is_good.result() else 'BEE2',
         )
 
-        if not should_backup and not backup_is_good():
+        if not should_backup and not backup_is_good.result():
             # It's a BEE2 application, we have a problem.
             # Both the real and backup are bad, we need to get a
             # new one.

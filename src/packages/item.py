@@ -19,6 +19,7 @@ import copy
 from srctools import FileSystem, Keyvalues, VMF, logger
 from srctools.filesys import RawFileSystem
 from srctools.tokenizer import Tokenizer, Token
+from aioresult import ResultCapture
 import attrs
 import trio
 
@@ -590,8 +591,8 @@ class Item(PakObject, needs_foreground=True):
 
         # Parse all the folders for an item.
         async with trio.open_nursery() as nursery:
-            parsed_folders: dict[str, utils.Result[ItemVariant]] = {
-                folder: utils.Result(
+            parsed_folders: dict[str, ResultCapture[ItemVariant]] = {
+                folder: ResultCapture.start_soon(
                     nursery, parse_item_folder,
                     folder, data.fsys, data.id, data.pak_id,
                 )
@@ -601,10 +602,10 @@ class Item(PakObject, needs_foreground=True):
         # We want to ensure the number of visible subtypes doesn't change.
         subtype_counts = {
             tuple([
-                i for i, subtype in enumerate(item_variant_result().editor.subtypes, 1)
+                i for i, subtype in enumerate(item_variant.result().editor.subtypes, 1)
                 if subtype.pal_pos or subtype.pal_name
             ])
-            for item_variant_result in parsed_folders.values()
+            for item_variant in parsed_folders.values()
         }
         if len(subtype_counts) > 1:
             raise ValueError(
@@ -624,8 +625,8 @@ class Item(PakObject, needs_foreground=True):
             desc_last=desc_last,
             # Add filesystem to individualise this to the package.
             folders={
-                (data.fsys, folder): item_variant_result()
-                for folder, item_variant_result in
+                (data.fsys, folder): item_variant.result()
+                for folder, item_variant in
                 parsed_folders.items()
             }
         )
@@ -840,13 +841,13 @@ async def parse_item_folder(
             return prop.find_key('Properties', or_blank=True)
 
     async with trio.open_nursery() as nursery:
-        props_res = utils.Result.sync(nursery, parse_props, prop_path, abandon_on_cancel=True)
-        all_items = utils.Result.sync(nursery, parse_items, editor_path, abandon_on_cancel=True)
-        editor_vmf_res = utils.Result.sync(nursery, parse_vmf, vmf_path, abandon_on_cancel=True)
-    props = props_res()
+        props_res = utils.sync_result(nursery, parse_props, prop_path, abandon_on_cancel=True)
+        all_items = utils.sync_result(nursery, parse_items, editor_path, abandon_on_cancel=True)
+        editor_vmf_res = utils.sync_result(nursery, parse_vmf, vmf_path, abandon_on_cancel=True)
+    props = props_res.result()
 
     try:
-        first_item, *extra_items = all_items()
+        first_item, *extra_items = all_items.result()
     except ValueError:
         raise ValueError(
             f'"{pak_id}:items/{fold}/editoritems.txt has no '
@@ -860,7 +861,7 @@ async def parse_item_folder(
             item_id, first_item.id, pak_id, fold,
         )
 
-    editor_vmf = editor_vmf_res()
+    editor_vmf = editor_vmf_res.result()
     if editor_vmf is not None:
         editoritems_vmf.load(first_item, editor_vmf)
     # elif isinstance(filesystem, RawFileSystem):
