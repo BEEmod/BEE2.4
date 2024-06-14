@@ -18,7 +18,7 @@ import trio
 import trio_util
 
 import exporting
-from app import EdgeTrigger, quit_app, sound
+from app import EdgeTrigger, lifecycle, quit_app, sound
 from BEE2_config import GEN_OPTS
 from app.dialogs import Dialogs
 from loadScreen import MAIN_UI as LOAD_UI
@@ -662,8 +662,15 @@ def reset_panes() -> None:
     CompilerPane.window.save_conf()
 
 
-async def export_editoritems(pal_ui: paletteUI.PaletteUI, bar: MenuBar, dialog: Dialogs) -> None:
+async def export_editoritems(
+    export_trig: EdgeTrigger[exporting.ExportInfo],
+    export_rec: trio.MemoryReceiveChannel[lifecycle.ExportResult],
+    pal_ui: paletteUI.PaletteUI,
+    bar: MenuBar,
+    dialog: Dialogs,
+) -> None:
     """Export the selected Items and Style into the chosen game."""
+    # TODO: Rearrange so enable/disable is based on export_trig.ready
     # Disable, so you can't double-export.
     UI['pal_export'].state(('disabled',))
     bar.set_export_allowed(False)
@@ -679,14 +686,14 @@ async def export_editoritems(pal_ui: paletteUI.PaletteUI, bar: MenuBar, dialog: 
         }
         # Group palette data by each item ID, so it can easily determine which items are actually
         # on the palette at all.
-        pal_by_item: dict[str, dict[int, tuple[int, int]]] = {}
+        pal_by_item: dict[str, dict[int, tuple[paletteUI.HorizInd, paletteUI.VertInd]]] = {}
         for pos, (item_id, subkey) in pal_data.items():
             pal_by_item.setdefault(item_id.casefold(), {})[subkey] = pos
 
         conf = config.APP.get_cur_conf(config.gen_opts.GenOptions)
         packset = packages.get_loaded_packages()
 
-        result = await exporting.export(exporting.ExportInfo(
+        export_trig.trigger(exporting.ExportInfo(
             gameMan.selected_game,
             packset,
             style=chosen_style,
@@ -703,9 +710,17 @@ async def export_editoritems(pal_ui: paletteUI.PaletteUI, bar: MenuBar, dialog: 
             },
             should_refresh=not conf.preserve_resources,
         ))
-
+        info, result = await export_rec.receive()
         if result is ErrorResult.FAILED:
             return
+
+        # Recompute, in case the trigger was busy with another export?
+        pal_by_item = info.selected_objects[packages.Item]
+        pal_data = {
+            pos: (item_id, subkey)
+            for item_id, item_data in pal_by_item.items()
+            for subkey, pos in item_data.items()
+        }
 
         try:
             last_export = pal_ui.palettes[paletteUI.UUID_EXPORT]
@@ -1399,6 +1414,8 @@ def refresh_palette_icons() -> None:
 async def init_windows(
     core_nursery: trio.Nursery,
     tk_img: TKImages,
+    export_trig: EdgeTrigger[exporting.ExportInfo],
+    export_rec: trio.MemoryReceiveChannel[lifecycle.ExportResult],
     *, task_status: trio.TaskStatus[None] = trio.TASK_STATUS_IGNORED,
 ) -> None:
     """Initialise all windows and panes.
@@ -1408,7 +1425,10 @@ async def init_windows(
 
     def export() -> None:
         """Export the palette, passing the required UI objects."""
-        core_nursery.start_soon(export_editoritems, pal_ui, menu_bar, DIALOG)
+        core_nursery.start_soon(
+            export_editoritems,
+            export_trig, export_rec, pal_ui, menu_bar, DIALOG,
+        )
 
     menu_bar = MenuBar(TK_ROOT, tk_img=tk_img, export=export)
     TK_ROOT.maxsize(

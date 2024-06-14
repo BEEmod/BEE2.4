@@ -9,9 +9,10 @@ import time
 from outcome import Outcome, Error
 import trio
 
+import exporting
 from app import (
     CompilerPane, localisation, sound, img, gameMan, music_conf,
-    UI, logWindow,
+    UI, logWindow, lifecycle,
 )
 from config.windows import WindowState
 from transtoken import TransToken
@@ -62,29 +63,22 @@ async def init_app(core_nursery: trio.Nursery) -> None:
         if last_game.id is not None:
             gameMan.set_game_by_name(last_game.id)
 
-        LOGGER.info('Loading Packages...')
-        packset = packages.get_loaded_packages()
-        mod_support.scan_music_locs(packset, gameMan.all_games)
-        async with ErrorUI(
-            error_desc=TransToken.ui_plural(
-                'An error occurred when loading packages:',
-                'Multiple errors occurred when loading packages:',
-            ),
-            warn_desc=TransToken.ui('Loading packages was partially successful:'),
-        ) as error_ui:
-            await utils.run_as_task(
-                packages.load_packages,
-                packset,
-                list(BEE2_config.get_package_locs()),
-                error_ui,
-            )
-        if error_ui.result is ErrorResult.FAILED:
-            return
+        core_nursery.start_soon(sound.sound_task)
+        core_nursery.start_soon(wid_transtoken.update_task)
+
+        export_trig = app.EdgeTrigger[exporting.ExportInfo]()
+        export_send, export_rec = trio.open_memory_channel[lifecycle.ExportResult](1)
+
+        core_nursery.start_soon(
+            lifecycle.lifecycle,
+            app.EdgeTrigger[()](),  # For now, never reload.
+            export_trig,
+            export_send,
+        )
+        packset, _ = await packages.LOADED.wait_transition()
         package_sys = packages.PACKAGE_SYS
         await loadScreen.MAIN_UI.step('pre_ui')
         core_nursery.start_soon(img.init, package_sys, TK_IMG)
-        core_nursery.start_soon(sound.sound_task)
-        core_nursery.start_soon(wid_transtoken.update_task)
         core_nursery.start_soon(localisation.load_aux_langs, gameMan.all_games, packset)
 
         # Load filesystems into various modules.
@@ -94,7 +88,7 @@ async def init_app(core_nursery: trio.Nursery) -> None:
         LOGGER.info('Done!')
 
         LOGGER.info('Initialising UI...')
-        await core_nursery.start(UI.init_windows, core_nursery, TK_IMG)
+        await core_nursery.start(UI.init_windows, core_nursery, TK_IMG, export_trig, export_rec)
         LOGGER.info('UI initialised!')
 
         if Tracer.slow:
