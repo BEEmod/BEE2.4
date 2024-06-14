@@ -165,7 +165,6 @@ enable_error_code = [
 [[tool.mypy.overrides]]
 # TODO: make these pass strict checks.
 module = [
-	'app.gameMan',
 	'app.backup',
 	'app.UI',
 	'precomp.conditions._scaffold_compat',

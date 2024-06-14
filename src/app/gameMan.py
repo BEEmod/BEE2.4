@@ -13,8 +13,8 @@ from pathlib import Path
 import subprocess
 import sys
 
-from tkinter import *  # ui library
-from tkinter import filedialog  # open/save as dialog creator
+from tkinter import filedialog
+import tkinter as tk
 
 import os
 import shutil
@@ -44,8 +44,8 @@ LOGGER = srctools.logger.get_logger(__name__)
 
 all_games: list[Game] = []
 selected_game: Game | None = None
-selectedGame_radio = IntVar(value=0)
-game_menu: Menu | None = None
+selectedGame_radio = tk.IntVar(value=0)
+game_menu: tk.Menu | None = None
 ON_GAME_CHANGED: event.Event[Game] = event.Event('game_changed')
 
 CONFIG = ConfigFile('games.cfg')
@@ -368,6 +368,11 @@ async def remove_game(dialogs: Dialogs) -> None:
     """Remove the currently-chosen game from the game list."""
     from exporting.fgd import edit_fgd
     global selected_game
+    cur_game = selected_game
+    if cur_game is None:
+        LOGGER.warning('No games defined?')
+        quit_app()
+        return
     lastgame_mess = (
         TransToken.ui(
             'Are you sure you want to delete "{game}"?\n'
@@ -377,16 +382,16 @@ async def remove_game(dialogs: Dialogs) -> None:
     )
     if await dialogs.ask_yes_no(
         title=TransToken.ui('BEE2 - Remove Game'),
-        message=lastgame_mess.format(game=selected_game.name),
+        message=lastgame_mess.format(game=cur_game.name),
     ):
         await terminate_error_server()
-        await edit_gameinfos(selected_game, add_line=False)
-        edit_fgd(selected_game, add_lines=False)
-        await restore_backup(selected_game)
-        await selected_game.clear_cache()
+        await edit_gameinfos(cur_game, add_line=False)
+        edit_fgd(cur_game, add_lines=False)
+        await restore_backup(cur_game)
+        await cur_game.clear_cache()
 
-        all_games.remove(selected_game)
-        CONFIG.remove_section(selected_game.name)
+        all_games.remove(cur_game)
+        CONFIG.remove_section(cur_game.name)
         CONFIG.save()
 
         if not all_games:
@@ -395,16 +400,19 @@ async def remove_game(dialogs: Dialogs) -> None:
 
         selected_game = all_games[0]
         selectedGame_radio.set(0)
-        add_menu_opts(game_menu)
+        if game_menu is not None:
+            add_menu_opts(game_menu)
 
 
-def add_menu_opts(menu: Menu) -> None:
+def add_menu_opts(menu: tk.Menu) -> None:
     """Add the various games to the menu."""
-    for ind in range(menu.index(END), 0, -1):
-        # Delete all the old radiobutton
-        # Iterate backward to ensure indexes stay the same.
-        if menu.type(ind) == RADIOBUTTON:
-            menu.delete(ind)
+    length = menu.index('end')
+    if length is not None:
+        for ind in reversed(range(length)):
+            # Delete all the old radiobutton
+            # Iterate backward to ensure indexes stay the same.
+            if menu.type(ind) == tk.RADIOBUTTON:
+                menu.delete(ind)
 
     for val, game in enumerate(all_games):
         menu.add_radiobutton(
