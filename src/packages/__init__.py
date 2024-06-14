@@ -11,6 +11,7 @@ import os
 import zipfile
 
 from aioresult import ResultCapture
+from trio_util import AsyncValue
 import attrs
 import trio
 import srctools
@@ -508,9 +509,9 @@ def get_loaded_packages() -> PackagesSet:
 
     TODO: Try to make this local wherever possible?
     """
-    return _LOADED
+    return LOADED.value
 
-_LOADED = PackagesSet()
+LOADED = AsyncValue(PackagesSet())
 
 
 async def find_packages(errors: ErrorUI, packset: PackagesSet, pak_dir: Path) -> bool:

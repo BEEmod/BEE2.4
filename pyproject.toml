@@ -172,7 +172,6 @@ module = [
 	'precomp.fizzler',
 	'precomp.tiling',
 	'ui_tk.check_table',
-	'FakeZip',
 ]
 strict_optional = false
 
