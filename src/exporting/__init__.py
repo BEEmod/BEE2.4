@@ -114,47 +114,51 @@ TRANS_WARN = TransToken.ui_plural(
 )
 
 
-async def export(
-    game: Game,
-    packset: packages.PackagesSet,
-    style: packages.Style,
-    selected_objects: dict[type[packages.PakObject], Any],
-    should_refresh: bool = False,
-) -> ErrorResult:
+@attrs.frozen
+class ExportInfo:
+    """Parameters required for exporting."""
+    game: Game
+    packset: packages.PackagesSet
+    style: packages.Style
+    selected_objects: dict[type[packages.PakObject], Any]
+    should_refresh: bool = False
+
+
+async def export(info: ExportInfo) -> ErrorResult:
     """Export configuration to the specified game.
 
     - If no backup is present, the original editoritems is backed up.
     """
     LOGGER.info('-' * 20)
-    LOGGER.info('Exporting Items and Style for "{}"!', game.name)
+    LOGGER.info('Exporting Items and Style for "{}"!', info.game.name)
 
-    LOGGER.info('Style = {}', style.id)
-    for obj_type, selected in selected_objects.items():
+    LOGGER.info('Style = {}', info.style.id)
+    for obj_type, selected in info.selected_objects.items():
         LOGGER.info('{} = {}', obj_type, selected)
 
     with load_screen:
         async with ErrorUI(
-            title=TRANS_EXP_TITLE.format(game=game.name),
+            title=TRANS_EXP_TITLE.format(game=info.game.name),
             error_desc=TRANS_ERROR,
             warn_desc=TRANS_WARN,
         ) as error_ui:
-            LOGGER.info('Should refresh: {}', should_refresh)
-            if should_refresh:
+            LOGGER.info('Should refresh: {}', info.should_refresh)
+            if info.should_refresh:
                 # Check to ensure the cache needs to be copied over...
-                should_refresh = game.cache_invalid()
+                should_refresh = info.game.cache_invalid()
                 if should_refresh:
                     LOGGER.info("Cache invalid - copying..")
                 else:
                     LOGGER.info("Skipped copying cache!")
 
             # Make the folders we need to copy files to, if desired.
-            os.makedirs(game.abs_path('bin/bee2/'), exist_ok=True)
+            os.makedirs(info.game.abs_path('bin/bee2/'), exist_ok=True)
 
             exp_data = ExportData(
-                game=game,
-                selected=selected_objects,
-                packset=packset,
-                selected_style=style,
+                game=info.game,
+                selected=info.selected_objects,
+                packset=info.packset,
+                selected_style=info.style,
                 config=config_mod.APP.get_full_conf(config_mod.COMPILER),
                 copy_resources=should_refresh,
                 warn=error_ui.add,
@@ -162,8 +166,8 @@ async def export(
 
             await STEPS.run(exp_data, STAGE_STEPS)
 
-            game.exported_style = style.id
-            game.save()
+            info.game.exported_style = info.style.id
+            info.game.save()
     return error_ui.result
 
 

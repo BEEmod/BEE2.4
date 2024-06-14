@@ -686,7 +686,7 @@ async def export_editoritems(pal_ui: paletteUI.PaletteUI, bar: MenuBar, dialog: 
         conf = config.APP.get_cur_conf(config.gen_opts.GenOptions)
         packset = packages.get_loaded_packages()
 
-        result = await exporting.export(
+        result = await exporting.export(exporting.ExportInfo(
             gameMan.selected_game,
             packset,
             style=chosen_style,
@@ -702,7 +702,7 @@ async def export_editoritems(pal_ui: paletteUI.PaletteUI, bar: MenuBar, dialog: 
                 packages.Signage: signage_ui.export_data(),
             },
             should_refresh=not conf.preserve_resources,
-        )
+        ))
 
         if result is ErrorResult.FAILED:
             return
