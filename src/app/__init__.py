@@ -1,9 +1,11 @@
 """The package containg all UI code."""
 from __future__ import annotations
 from typing import Any, Protocol, overload
+from typing_extensions import deprecated
 
 from collections.abc import Awaitable, Callable
 from types import TracebackType
+
 
 from trio_util import AsyncBool, AsyncValue
 from srctools.logger import get_logger
@@ -106,6 +108,7 @@ def on_error(
         pass
 
 
+@deprecated('Pass the core nursery down instead.')
 def background_run[*Args](
     func: Callable[[*Args], Awaitable[object]],
     /, *args: *Args,
@@ -117,6 +120,7 @@ def background_run[*Args](
     _APP_NURSERY.start_soon(func, *args, name=name)
 
 
+@deprecated('Pass the core nursery down instead.')
 async def background_start(
     func: Callable[..., Awaitable[object]], /,
     *args: object,
