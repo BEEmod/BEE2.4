@@ -79,6 +79,7 @@ extend-ignore = [
 	"PLC0415",  # Imports not at top level are used for specific reasons
 	"PLW2901",  # Allow redefining loop var inside the loop.
 	"PLW0120",  # for-else with return/break inside is just stylistic, exactly equivalent.
+	"PLC1901",  # Allow comparison to empty string etc.
 
 	# Flake8-pyi:
 	"PYI041",  # Use int | float

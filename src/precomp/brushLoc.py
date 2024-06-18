@@ -34,6 +34,7 @@ def grid_to_world[VecT: (Vec, FrozenVec)](pos: VecT) -> VecT:
     """Given a grid position, find the center of the real block."""
     return pos * 128 + (64, 64, 64)
 
+
 w2g = world_to_grid
 g2w = grid_to_world
 
@@ -109,6 +110,7 @@ class Block(Enum):
         """Is this the base of goo or a bottomless pit?"""
         return self.value in (10, 13, 20, 23)
 
+
 # Keywords to a set of blocks.
 BLOCK_LOOKUP = {
     block.name.casefold(): {block}
@@ -149,6 +151,7 @@ class _GridItemsView(ItemsView[FrozenVec, Block]):
     """Implements the Grid.items() view, providing a view over the pos, block pairs."""
     # Initialised by superclass.
     _mapping: dict[FrozenVec, Block]
+
     def __init__(self, grid: dict[FrozenVec, Block]) -> None:
         super().__init__(grid)
 

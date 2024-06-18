@@ -99,10 +99,7 @@ class Music(PakObject, needs_foreground=True, style_suggest_key='music'):
                     sample[channel] = None
         else:
             # Single value, fill it into all channels.
-            sample = {
-                channel: sample_block.value
-                for channel in MusicChannel
-            }
+            sample = dict.fromkeys(MusicChannel, sample_block.value)
 
         snd_length_str = data.info['loop_len', '0']
         # Allow specifying lengths as [hour:]min:sec.

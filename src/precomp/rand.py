@@ -50,7 +50,7 @@ def parse_weights(count: int, weights: str) -> list[int]:
                 # Abandon parsing
                 break
     if len(weight) == 0:
-        LOGGER.warning('Failed parsing weight: {!r} for {} items',weights, count)
+        LOGGER.warning('Failed parsing weight: {!r} for {} items', weights, count)
         weight = list(range(count))
     # random.choice(weight) will now give an index with the correct
     # probabilities.

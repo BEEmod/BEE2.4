@@ -53,6 +53,7 @@ class Border(Flag):
     CORNER_SW = enum_auto()
     CORNER_SE = enum_auto()
 
+
 # IDs for the default barrier definitions. These are detected by the generated brushes, not
 # from the instance (since that's the same for both).
 GLASS_ID: Final = utils.obj_id('VALVE_GLASS')
@@ -808,7 +809,7 @@ def parse_conf(kv: Keyvalues) -> None:
                     thickness=1.0,
                     keyvalues={
                         'classname': 'func_brush',
-                        'renderfx': '14', # Constant Glow
+                        'renderfx': '14',  # Constant Glow
                         'solidity': '1',  # Never Solid
                     },
                 ),
@@ -936,7 +937,10 @@ def parse_map(vmf: VMF, conn_items: Mapping[str, connections.Item]) -> None:
                             plane_pos, norm, plane,
                         )
                     if not found:
-                        LOGGER.warning('glass/grating at {}, {} has no corresponding instance?',plane_pos, norm)
+                        LOGGER.warning(
+                            'glass/grating at {}, {} has no corresponding instance?',
+                            plane_pos, norm,
+                        )
                         break  # The opposite face won't match either.
 
                 break  # Don't check the remaining faces.

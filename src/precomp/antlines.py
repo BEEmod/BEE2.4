@@ -220,7 +220,7 @@ class IndicatorStyle:
             try:
                 check_switching = PanelSwitchingStyle(check_kv['switching'])
             except (LookupError, ValueError):
-                check_switching = PanelSwitchingStyle.CUSTOM  #  Assume no optimisations
+                check_switching = PanelSwitchingStyle.CUSTOM  # Assume no optimisations
             check_cmd = get_outputs(check_kv, desc, 'check_cmd')
             cross_cmd = get_outputs(check_kv, desc, 'cross_cmd')
             check = check_inst, check_cmd, cross_cmd
@@ -231,7 +231,7 @@ class IndicatorStyle:
             try:
                 timer_switching = PanelSwitchingStyle(timer_kv['switching'])
             except (LookupError, ValueError):
-                timer_switching = PanelSwitchingStyle.CUSTOM  #  Assume no optimisations
+                timer_switching = PanelSwitchingStyle.CUSTOM  # Assume no optimisations
             timer_blue_cmd = get_outputs(timer_kv, desc, 'blue_cmd')
             timer_oran_cmd = get_outputs(timer_kv, desc, 'oran_cmd')
             timer_basic_start_cmd = get_outputs(timer_kv, desc, 'basic_start_cmd')
@@ -639,7 +639,7 @@ def parse_antlines(vmf: VMF) -> tuple[
             # Except KeyError: this segment's already done??
             for neighbour in neighbours:
                 if neighbour not in segments:
-                    segments.append(neighbour)
+                    segments.append(neighbour)  # noqa: B909 - appending to our own loop var
 
         antlines.setdefault(over_name, []).append(Antline(over_name, segments))
 
