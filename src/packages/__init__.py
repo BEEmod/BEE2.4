@@ -4,7 +4,7 @@ Handles scanning through the zip packages to find all items, styles, etc.
 from __future__ import annotations
 from typing import NoReturn, ClassVar, Self, cast
 
-from collections.abc import Collection, Iterable, Iterator, Mapping
+from collections.abc import Callable, Collection, Iterable, Iterator, Mapping
 from collections import defaultdict
 from pathlib import Path
 import os
@@ -29,6 +29,7 @@ from editoritems import Item as EditorItem, Renderable, RenderableType
 from corridor import CORRIDOR_COUNTS, GameMode, Direction
 from loadScreen import MAIN_PAK as LOAD_PAK, MAIN_OBJ as LOAD_OBJ
 import srctools.logger
+import config
 
 from transtoken import AppError, TransToken, TransTokenSource
 
@@ -457,6 +458,9 @@ class PackagesSet:
     # If found, the folders where the music is present.
     mel_music_fsys: FileSystem | None = None
     tag_music_fsys: FileSystem | None = None
+
+    # A list of functions to call to upgrade old APP configurations.
+    conf_migrations: list[Callable[[config.Config], None]] = attrs.Factory(list)
 
     @property
     def has_mel_music(self) -> bool:

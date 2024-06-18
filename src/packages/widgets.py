@@ -1,26 +1,27 @@
 """Customizable configuration for specific items or groups of them."""
 from __future__ import annotations
 
-from typing import Any, Protocol, Self
+from typing import Any, Protocol, Self, override
 from collections.abc import Iterable, Iterator
 from contextlib import AbstractContextManager, aclosing
 import itertools
 
-from srctools import EmptyMapping, Keyvalues, Vec, logger
+from srctools import EmptyMapping, Keyvalues, Vec, logger, conv_bool, bool_as_int
+
 from trio_util import AsyncValue, wait_any
 import attrs
 import trio
 
-import BEE2_config
-import config
-import packages
 from app import tkMarkdown
-
+from config.stylevar import State as StyleVarState
 from config.widgets import (
     TIMER_NUM as TIMER_NUM, TIMER_NUM_INF as TIMER_NUM_INF,
     TimerNum as TimerNum, WidgetConfig,
 )
 from transtoken import TransToken, TransTokenSource
+import BEE2_config
+import config
+import packages
 
 
 class ConfigProto(Protocol):
@@ -112,6 +113,8 @@ class Widget:
 class SingleWidget(Widget):
     """Represents a single widget with no timer value."""
     holder: AsyncValue[str]
+    # If set, a stylevar ID this is replacing.
+    stylevar_id: str | None
 
     async def load_conf_task(
         self, cm: AbstractContextManager[trio.MemoryReceiveChannel[WidgetConfig]],
@@ -285,11 +288,21 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
                         f'{data.id}:{wid_id}: Can only have multiple defaults for timer-ed widgets!'
                     )
 
+                # If set, this was a stylevar, so read from that boolean.
+                stylevar_id = wid['legacy_stylevar_id', None]
+
                 if kind is KIND_ITEM_VARIANT:
                     cur_value = ''  # Not used.
                 elif prev_conf is EmptyMapping:
                     # No new conf, check the old conf.
                     cur_value = LEGACY_CONFIG.get_val(data.id, wid_id, default_prop.value)
+                    if stylevar_id is not None:
+                        try:
+                            cur_value = bool_as_int(config.APP.get_cur_conf(
+                                StyleVarState, stylevar_id, default=KeyError,
+                            ).value)
+                        except KeyError:
+                            pass
                 elif isinstance(prev_conf, str):
                     cur_value = prev_conf
                 else:
@@ -303,6 +316,7 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
                     tooltip=tooltip,
                     kind=kind,
                     config=wid_conf,
+                    stylevar_id=stylevar_id,
                     holder=AsyncValue(cur_value),
                 ))
 
@@ -335,6 +349,47 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
         self.widgets.extend(override.widgets)
         self.multi_widgets.extend(override.multi_widgets)
         self.desc = tkMarkdown.join(self.desc, override.desc)
+
+    @classmethod
+    @override
+    async def post_parse(cls, packset: packages.PackagesSet) -> None:
+        """Register a config migration to convert old stylevar configs."""
+        old_to_new: dict[str, tuple[str, str]] = {}
+        for group in packset.all_obj(cls):
+            await trio.lowlevel.checkpoint()
+            for widget in group.widgets:
+                if widget.stylevar_id is None:
+                    continue
+                style_id = widget.stylevar_id.casefold()
+                try:
+                    old_group, old_wid = old_to_new[style_id]
+                except KeyError:
+                    old_to_new[style_id] = group.id, widget.id
+                else:
+                    LOGGER.warning(
+                        'Two configs ({}:{} and {}:{}) claim stylevar "{}"!',
+                        old_group, old_wid, group.id, widget.id,
+                        style_id,
+                    )
+
+        @packset.conf_migrations.append
+        def migrate_stylevars(conf: config.Config) -> None:
+            """Migrate stylevars in a config."""
+            try:
+                stylevar_map = conf.get(StyleVarState)
+            except KeyError:
+                return  # Nothing to migrate.
+            widget_map = conf.get_or_blank(WidgetConfig)
+            for sty_id, state in list(stylevar_map.items()):
+                try:
+                    new_group, new_wid = old_to_new[sty_id.casefold()]
+                except KeyError:
+                    continue
+                key = f'{new_group}:{new_wid}'
+                if key in widget_map:
+                    continue
+                widget_map[key] = WidgetConfig(bool_as_int(state.value))
+                del stylevar_map[sty_id]
 
     def widget_ids(self) -> set[str]:
         """Return the set of widget IDs used."""
