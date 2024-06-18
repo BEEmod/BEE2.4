@@ -206,7 +206,7 @@ class ConfigSpec:
                 data = self._current[typ][data_id]
                 channel = self._apply_channel[typ, data_id]
             except KeyError:
-                LOGGER.warning('{}[{!r}] has no UI callback!', info.name, data_id)
+                LOGGER.warning('{}[{!r}] has no UI channel!', info.name, data_id)
             else:
                 assert isinstance(data, typ), info
                 await channel.send(data)
@@ -214,14 +214,14 @@ class ConfigSpec:
             try:
                 data_map = self._current[typ]
             except KeyError:
-                LOGGER.warning('{}[:] has no UI callback!', info.name)
+                LOGGER.warning('{}[:] has no UI channel!', info.name)
                 return
             async with trio.open_nursery() as nursery:
                 for dat_id, data in data_map.items():
                     try:
                         channel = self._apply_channel[typ, dat_id]
                     except KeyError:
-                        LOGGER.warning('{}[{!r}] has no UI callback!', info.name, dat_id)
+                        LOGGER.warning('{}[{!r}] has no UI channel!', info.name, dat_id)
                     else:
                         nursery.start_soon(channel.send, data)
 
