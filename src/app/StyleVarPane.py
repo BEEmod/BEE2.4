@@ -256,7 +256,6 @@ async def make_stylevar_pane(
         def cmd_func() -> None:
             """When clicked, store configuration."""
             config.APP.store_conf(State(tk_var.get() != 0), var_id)
-            filter_event.set()
             if var_id == 'UnlockDefault':
                 filter_event.set()
 
