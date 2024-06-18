@@ -123,11 +123,6 @@ class _WindowsDict(TypedDict):
     pal: SubPane.SubPane
 
 
-class _FramesDict(TypedDict):
-    """TODO: Remove."""
-    preview: tk.Frame
-
-
 class _UIDict(TypedDict):
     """TODO: Remove."""
     pal_export: ttk.Button
@@ -136,12 +131,13 @@ class _UIDict(TypedDict):
     pre_disp_name: ttk.Label
     pre_moving: ttk.Label
     pre_sel_line: tk.Label
+    preview_frame: tk.Frame
     picker_frame: ttk.Frame
 
 
 # Holds the TK Toplevels, frames, widgets and menus
 windows: _WindowsDict = cast(_WindowsDict, {})
-frames: _FramesDict = cast(_FramesDict, {})
+frames: None
 UI: _UIDict = cast(_UIDict, {})
 
 
@@ -868,7 +864,7 @@ def drag_stop(e: tk.Event[tk.Misc]) -> None:
         # is the cursor over the preview pane?
         if 0 <= pos_x < 4 and 0 <= pos_y < 8:
             drag_win.drag_item.clear()  # wipe duplicates off the palette first
-            new_item = drag_win.drag_item.copy(frames['preview'])
+            new_item = drag_win.drag_item.copy(UI['preview_frame'])
             new_item.is_pre = True
             if ind >= len(pal_picked):
                 pal_picked.append(new_item)
@@ -936,7 +932,7 @@ def drag_fast(drag_item: PalItem, e: tk.Event[tk.Misc]) -> None:
     else:  # over the picker
         if len(pal_picked) < 32:  # can't copy if there isn't room
             snd.fx('config')
-            new_item = drag_item.copy(frames['preview'])
+            new_item = drag_item.copy(UI['preview_frame'])
             new_item.is_pre = True
             pal_picked.append(new_item)
         else:
@@ -966,7 +962,7 @@ async def set_palette(chosen_pal: paletteUI.Palette) -> None:
             continue
 
         pal_picked.append(PalItem(
-            frames['preview'],
+            UI['preview_frame'],
             item_group,
             sub,
             is_pre=True,
@@ -1015,7 +1011,7 @@ def pal_shuffle() -> None:
     for item_id in shuff_items[:32-len(pal_picked)]:
         item = item_list[item_id]
         pal_picked.append(PalItem(
-            frames['preview'],
+            UI['preview_frame'],
             item,
             # Pick a random available palette icon.
             sub=random.choice(item.item.visual_subtypes),
@@ -1224,7 +1220,7 @@ def init_preview(tk_img: TKImages, f: tk.Frame | ttk.Frame) -> None:
         )
     tk_img.apply(UI['pre_sel_line'], img.Handle.builtin('BEE2/sel_bar', 4, 64))
     pal_picked_fake.extend([
-        tk_img.apply(ttk.Label(frames['preview']), IMG_BLANK)
+        tk_img.apply(ttk.Label(UI['preview_frame']), IMG_BLANK)
         for _ in range(32)
     ])
 
@@ -1451,17 +1447,17 @@ async def init_windows(
     style.configure('BG.TButton', background=ItemsBG)
     style.configure('Preview.TLabel', background='#F4F5F5')
 
-    frames['preview'] = tk.Frame(ui_bg, bg=ItemsBG, name='preview')
-    frames['preview'].grid(
+    UI['preview_frame'] = preview_frame = tk.Frame(ui_bg, bg=ItemsBG, name='preview')
+    preview_frame.grid(
         row=0, column=3,
         sticky="NW",
         padx=(2, 5), pady=5,
     )
-    init_preview(tk_img, frames['preview'])
+    init_preview(tk_img, preview_frame)
     await tk_tools.wait_eventloop()
     TK_ROOT.minsize(
-        width=frames['preview'].winfo_reqwidth()+200,
-        height=frames['preview'].winfo_reqheight()+5,
+        width=preview_frame.winfo_reqwidth()+200,
+        height=preview_frame.winfo_reqheight()+5,
     )  # Prevent making the window smaller than the preview pane
 
     await trio.sleep(0)
@@ -1513,7 +1509,7 @@ async def init_windows(
     item_search.init(search_frame, update_filter)
 
     toolbar_frame = tk.Frame(
-        frames['preview'],
+        preview_frame,
         name='toolbar',
         bg=ItemsBG,
         width=192,
