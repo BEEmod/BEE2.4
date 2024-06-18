@@ -675,36 +675,6 @@ CAVE_PORT_SKIN = Opt.int_or_none(
     * 3: 70's Cave with Caroline
     """)
 
-VOICE_STUDIO_INST = Opt.string_or_none(
-    'voice_studio_inst',
-    """(Automatic) Instance to use for monitor backdrop.
-    """)
-VOICE_STUDIO_INTER_CHANCE = Opt.float_num(
-    'voice_studio_inter_chance', 0.0,
-    """(Automatic) Chance to switch to the voice character.
-    """)
-VOICE_STUDIO_CAM_LOC = Opt.vector(
-    'voice_studio_cam_loc', Vec(0, 0, 0),
-    """(Automatic) Offset for the camera in the studio.
-    """)
-VOICE_STUDIO_CAM_PITCH = Opt.float_num(
-    'voice_studio_cam_pitch', 0.0,
-    """(Automatic) Pitch direction of the camera.
-    """)
-VOICE_STUDIO_CAM_YAW = Opt.float_num(
-    'voice_studio_cam_yaw', 0.0,
-    """(Automatic) Yaw direction of the camera.
-    """)
-VOICE_STUDIO_ACTOR = Opt.string_or_none(
-    'voice_studio_actor',
-    """(Automatic) Indicates that an actor is in the instance.
-
-    If set, no bullseye is output with this name in voicelines.
-    """)
-VOICE_STUDIO_SHOULD_SHOOT = Opt.boolean(
-    'voice_studio_should_shoot', False,
-    """(Automatic) Should turrets shoot at this character when shown?
-    """)
 
 _ALL_OPTIONS = [
     opt

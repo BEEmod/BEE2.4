@@ -34,10 +34,10 @@ BLACK_SCREEN_LOC = FrozenVec(-2500, -2500, 0)
 
 def get_studio_pose(voice: QuoteInfo) -> Vec | FrozenVec:
     """Return the position of the studio camera."""
-    if voice.id:
-        return voice.position + options.VOICE_STUDIO_CAM_LOC()
+    if voice.id and voice.monitor is not None:
+        return voice.position + voice.monitor.cam_loc
     else:
-        # No voice line set, no studio.
+        # No voice line set or no studio specified, use a black screen.
         return BLACK_SCREEN_LOC
 
 
@@ -69,7 +69,7 @@ def scriptvar_set(
 
 
 @conditions.make_result('Monitor', valid_before=conditions.MetaCond.MonCameraLink)
-def res_monitor(info: conditions.MapInfo, res: Keyvalues) -> conditions.ResultCallable:
+def res_monitor(info: conditions.MapInfo, voice: QuoteInfo, res: Keyvalues) -> conditions.ResultCallable:
     """Result for the monitor component.
 
     Options:
@@ -92,7 +92,7 @@ def res_monitor(info: conditions.MapInfo, res: Keyvalues) -> conditions.ResultCa
         has_laser = info.has_attr('laser')
         # Allow turrets if the monitor is setup to allow it, and the actor should
         # be shot.
-        needs_turret = conf_bullseye_name and options.VOICE_STUDIO_SHOULD_SHOOT()
+        needs_turret = conf_bullseye_name and voice.monitor is not None and voice.monitor.turret_hate
 
         inst.fixup['$is_breakable'] = has_laser or needs_turret
 
@@ -148,8 +148,7 @@ def res_camera(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
     yaw_inst = instanceLocs.resolve_one(res['yawInst', ''], error=False)
     pitch_inst = instanceLocs.resolve_one(res['pitchInst', ''], error=False)
 
-    yaw_range = srctools.conv_int(res['YawRange', ''], 90)
-    pitch_range = srctools.conv_int(res['PitchRange', ''], 90)
+    # TODO: pitch/yaw range?
 
     def add_camera(inst: Entity) -> None:
         """Add the camera."""
@@ -272,13 +271,10 @@ def mon_camera_link(vmf: VMF, voice: QuoteInfo) -> None:
             break
     else:
         # No cameras start active, we need to be positioned elsewhere.
-        if options.VOICE_STUDIO_INST():
+        if voice.monitor is not None:
             # Start at the studio, if it exists.
             start_pos = get_studio_pose(voice)
-            start_angles = Angle(
-                options.VOICE_STUDIO_CAM_PITCH(),
-                options.VOICE_STUDIO_CAM_YAW(),
-            )
+            start_angles = voice.monitor.cam_angle
             # If we start at the studio, make the ai_relationships
             # for turret fire start active.
             for relation in MONITOR_RELATIONSHIP_ENTS:
@@ -348,18 +344,16 @@ def mon_camera_link(vmf: VMF, voice: QuoteInfo) -> None:
             value=active,
         )
 
-    if options.VOICE_STUDIO_INST():
+    if voice.monitor is not None:
         # We have a voice studio, send values to the script.
-        scriptvar_set(cam_ent, get_studio_pose(voice), 'CAM_STUDIO_LOC', mode='pos')
+        studio_pos = get_studio_pose(voice)
+        scriptvar_set(cam_ent, studio_pos, 'CAM_STUDIO_LOC', mode='pos')
         scriptvar_set(
-            cam_ent, get_studio_pose(voice), 'CAM_STUDIO_ANG', mode='ang',
-            angles=Angle(
-                options.VOICE_STUDIO_CAM_PITCH(),
-                options.VOICE_STUDIO_CAM_YAW(),
-            ),
+            cam_ent, studio_pos, 'CAM_STUDIO_ANG', mode='ang',
+            angles=voice.monitor.cam_angle,
         )
         use_turret = '1' if MONITOR_RELATIONSHIP_ENTS else '0'
-        swap_chance = options.VOICE_STUDIO_INTER_CHANCE()
+        swap_chance = voice.monitor.interrupt
     else:
         use_turret = '0'
         swap_chance = -1
@@ -375,22 +369,19 @@ def make_voice_studio(vmf: VMF, voice: QuoteInfo) -> bool:
     """
     assert voice.id, "No voiceline defined?"
 
-    studio_file = options.VOICE_STUDIO_INST()
-    loc = voice.position
-
-    if HAS_MONITOR and studio_file:
+    if HAS_MONITOR and voice.monitor is not None:
         conditions.add_inst(
             vmf,
-            file=studio_file,
-            origin=loc,
+            file=voice.monitor.studio,
+            origin=voice.position,
         )
         return True
     else:
         # If there aren't monitors, the studio instance isn't used.
         # We need to seal anyway.
         vmf.add_brushes(vmf.make_hollow(
-            loc - 256,
-            loc + 256,
+            voice.position - 256,
+            voice.position + 256,
             thick=32,
         ))
         return False
