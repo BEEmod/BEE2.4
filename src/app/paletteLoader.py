@@ -326,15 +326,18 @@ class Palette:
                     LOGGER.warning('Invalid position {} in palette "{}"!', item_prop.name, path)
                     continue
                 try:
-                    item_id = item_prop['id']
+                    item_id = utils.obj_id(item_prop['id'])
                 except LookupError:
                     LOGGER.warning('No item in position ({}, {})', x, y)
+                    continue
+                except ValueError as exc:
+                    LOGGER.warning('Invalid item ID:', exc_info=exc)
                     continue
                 items[x, y] = (item_id, item_prop.int('subtype', 0))
 
         elif version == 1:
             for pos, item in zip(COORDS, kv.find_children('Items'), strict=False):
-                items[pos] = (item.real_name, int(item.value))
+                items[pos] = (utils.obj_id(item.name), int(item.value))
         elif version < 1:
             raise ValueError(f'Invalid version {version}!')
         else:

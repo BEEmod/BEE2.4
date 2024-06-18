@@ -150,6 +150,8 @@ async def export(info: ExportInfo) -> ErrorResult:
                     LOGGER.info("Cache invalid - copying..")
                 else:
                     LOGGER.info("Skipped copying cache!")
+            else:
+                should_refresh = False
 
             # Make the folders we need to copy files to, if desired.
             os.makedirs(info.game.abs_path('bin/bee2/'), exist_ok=True)

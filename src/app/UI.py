@@ -953,7 +953,7 @@ async def set_palette(chosen_pal: paletteUI.Palette) -> None:
         except KeyError:
             break  # TODO: Handle gaps.
         try:
-            item_group = item_list[item]
+            item_group = item_list[item.upper()]
         except KeyError:
             LOGGER.warning('Unknown item "{}" for palette!', item)
             continue
