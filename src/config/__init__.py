@@ -6,7 +6,7 @@ They can then fetch the current state and store new state.
 from __future__ import annotations
 
 from typing import ClassVar, Self, NewType, override
-from collections.abc import Generator, Iterator
+from collections.abc import Generator, ItemsView, Iterator, KeysView
 from pathlib import Path
 import abc
 import contextlib
@@ -106,9 +106,42 @@ class Data(abc.ABC):
         return Element.from_kv1(self.export_kv1())
 
 
-# The current data loaded from the config file. This maps an ID to each value, or
-# is {'': data} if no key is used.
-Config = NewType('Config', dict[type[Data], dict[str, Data]])
+@attrs.define
+class Config:
+    """The current data loaded from the config file.
+
+    This maps an ID to each value, or is {'': data} if no key is used.
+    """
+    _data: dict[type[Data], dict[str, Data]] = attrs.Factory(dict)
+
+    def is_blank(self) -> bool:
+        """Check if we have any values assigned."""
+        return not any(self._data.values())
+
+    def get[D: Data](self, cls: type[D]) -> dict[str, D]:
+        """Return the map for a single type."""
+        return self._data[cls]  # type: ignore
+
+    def overwrite[D: Data](self, cls: type[D], data_map: dict[str, D]) -> None:
+        """Overwrite the map for a type."""
+        self._data[cls] = data_map  # type: ignore
+
+    def get_or_blank[D: Data](self, cls: type[D]) -> dict[str, D]:
+        """Return the map for a single type, setting it to empty if not found."""
+        res: dict[str, Data]
+        try:
+            res = self._data[cls]
+        except KeyError:
+            self._data[cls] = res = {}
+        return res  # type: ignore
+
+    def keys(self) -> KeysView[type[Data]]:
+        """Return a view over the types present in the config."""
+        return self._data.keys()
+
+    def items(self) -> ItemsView[type[Data], dict[str, Data]]:
+        """Return a view over the types and associated items."""
+        return self._data.items()
 
 
 @attrs.define(eq=False)
@@ -173,7 +206,7 @@ class ConfigSpec:
         rec: trio.MemoryReceiveChannel[DataT]
         send, rec = trio.open_memory_channel(1)
 
-        data_map = self._current.setdefault(typ, {})
+        data_map = self._current.get(typ)
         try:
             current = data_map[data_id]
         except KeyError:
@@ -190,7 +223,7 @@ class ConfigSpec:
             rec.close()
             del self._apply_channel[typ, data_id]
 
-    async def apply_conf(self, typ: type[Data], *, data_id: str = '') -> None:
+    async def apply_conf[D: Data](self, typ: type[D], *, data_id: str = '') -> None:
         """Apply the current settings for this config type and ID.
 
         If the data_id is not passed, all settings will be applied.
@@ -203,7 +236,7 @@ class ConfigSpec:
             if not info.uses_id:
                 raise ValueError(f'Data type "{info.name}" does not support IDs!')
             try:
-                data = self._current[typ][data_id]
+                data = self._current.get(typ)[data_id]
                 channel = self._apply_channel[typ, data_id]
             except KeyError:
                 LOGGER.warning('{}[{!r}] has no UI channel!', info.name, data_id)
@@ -212,7 +245,7 @@ class ConfigSpec:
                 await channel.send(data)
         else:
             try:
-                data_map = self._current[typ]
+                data_map = self._current.get(typ)
             except KeyError:
                 LOGGER.warning('{}[:] has no UI channel!', info.name)
                 return
@@ -246,7 +279,7 @@ class ConfigSpec:
         for cls, opt_map in config.items():
             if cls not in self._registered:
                 continue
-            self._current[cls] = opt_map.copy()
+            self._current.overwrite(cls, opt_map.copy())
 
     async def apply_multi(self, config: Config) -> None:
         """Merge the values into our config, then apply the changed types.
@@ -256,7 +289,7 @@ class ConfigSpec:
         """
         self.merge_conf(config)
         async with trio.open_nursery() as nursery:
-            for cls in config:
+            for cls in config.keys():
                 if cls in self._registered:
                     nursery.start_soon(self.apply_conf, cls)
 
@@ -279,13 +312,13 @@ class ConfigSpec:
         info = cls.get_conf_info()
         if data_id and not info.uses_id:
             raise ValueError(f'Data type "{info.name}" does not support IDs!')
-        data: object = None
+        data: DataT | None = None
         try:
-            data = self._current[cls][data_id]
+            data = self._current.get(cls)[data_id]
         except KeyError:
             if legacy_id:
                 try:
-                    conf_map = self._current[cls]
+                    conf_map = self._current.get(cls)
                     data = conf_map[data_id] = conf_map.pop(legacy_id)
                 except KeyError:
                     pass
@@ -313,10 +346,7 @@ class ConfigSpec:
         if data_id and not info.uses_id:
             raise ValueError(f'Data type "{info.name}" does not support IDs!')
         LOGGER.debug('Storing conf {}[{}] = {!r}', info.name, data_id, data)
-        try:
-            self._current[cls][data_id] = data
-        except KeyError:
-            self._current[cls] = {data_id: data}
+        self._current.get_or_blank(cls)[data_id] = data
 
     def parse_kv1(self, kv: Keyvalues) -> tuple[Config, bool]:
         """Parse a configuration file into individual data.
@@ -331,7 +361,7 @@ class ConfigSpec:
         if version != 1:
             raise ValueError(f'Unknown config version {version}!')
 
-        conf = Config({})
+        conf = Config()
         upgraded = False
         for child in kv:
             if child.name == 'version':
@@ -361,8 +391,7 @@ class ConfigSpec:
                     info.name, version, info.version,
                 )
                 upgraded = True
-            data_map: dict[str, Data] = {}
-            conf[cls] = data_map
+            data_map = conf.get_or_blank(cls)
             if info.uses_id:
                 for data_prop in child:
                     try:
@@ -391,11 +420,12 @@ class ConfigSpec:
         for cls in self._name_to_type.values():
             info = cls.get_conf_info()
             if hasattr(cls, 'parse_legacy'):
-                conf[cls] = new = cls.parse_legacy(kv)
+                new = cls.parse_legacy(kv)
+                conf.overwrite(cls, new)
                 LOGGER.info('Converted legacy {} to {}', info.name, new)
             else:
                 LOGGER.warning('No legacy conf for "{}"!', info.name)
-                conf[cls] = {}
+                conf.overwrite(cls, {})
         return conf
 
     def parse_dmx(self, dmx: Element, fmt_name: str, fmt_version: int) -> tuple[Config, bool]:
@@ -408,7 +438,7 @@ class ConfigSpec:
         if fmt_name != DMX_NAME or fmt_version not in [1]:
             raise ValueError(f'Unknown config {fmt_name} v{fmt_version}!')
 
-        conf = Config({})
+        conf = Config()
         upgraded = False
         for attr in dmx.values():
             if attr.name == 'name' or attr.type is not DMXTypes.ELEMENT:
@@ -441,8 +471,7 @@ class ConfigSpec:
                     info.name, version, info.version,
                 )
                 upgraded = True
-            data_map: dict[str, Data] = {}
-            conf[cls] = data_map
+            data_map = conf.get_or_blank(cls)
             if info.uses_id:
                 for data_attr in child.values():
                     if data_attr.name == 'name' or data_attr.type is not DMXTypes.ELEMENT:
@@ -552,12 +581,11 @@ class ConfigSpec:
                 pass
 
         conf, _ = self.parse_kv1(kv)
-        self._current.clear()
-        self._current.update(conf)
+        self._current._data = conf._data
 
     def write_file(self, filename: Path) -> None:
         """Write the settings to disk."""
-        if not any(self._current.values()):
+        if self._current.is_blank():
             # We don't have any data saved, abort!
             # This could happen while parsing, for example.
             return

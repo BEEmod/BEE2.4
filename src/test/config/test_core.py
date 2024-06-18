@@ -149,7 +149,7 @@ def test_parse_kv1_upgrades(value: str, triple: str) -> None:
     )
     conf, upgraded = spec.parse_kv1(kv)
     assert upgraded
-    assert conf == {DataSingle: {'': DataSingle(value, triple)}}
+    assert conf == config.Config({DataSingle: {'': DataSingle(value, triple)}})
 
     kv = Keyvalues.root(
         Keyvalues('version', '1'),
@@ -161,7 +161,7 @@ def test_parse_kv1_upgrades(value: str, triple: str) -> None:
     )
     conf, upgraded = spec.parse_kv1(kv)
     assert not upgraded
-    assert conf == {DataSingle: {'': DataSingle(value, triple)}}
+    assert conf == config.Config({DataSingle: {'': DataSingle(value, triple)}})
 
 
 @pytest.mark.parametrize('triple', ['a', 'b', 'c'])
