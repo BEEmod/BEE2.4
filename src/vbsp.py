@@ -813,7 +813,7 @@ def set_elev_videos(vmf: VMF, info: corridor.Info) -> None:
         vert_vid = None
         horiz_vid = None
     else:
-        LOGGER.warning('Invalid elevator video type!')
+        LOGGER.warning('Invalid elevator video type: {!r}', vid_type)
         return
 
     transition_ents = instanceLocs.resolve_filter('[transitionents]')

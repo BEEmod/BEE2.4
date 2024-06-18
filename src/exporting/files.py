@@ -32,6 +32,7 @@ async def step_write_vbsp_config(exp: ExportData) -> None:
         'Fizzlers',
         'Options',
         'StyleVars',
+        'Elevator',
         'Barriers',
         'BarrierFrames',
         'BarrierHoles',
