@@ -610,8 +610,9 @@ async def widget_item_variant(
         parent,
         exportselection=False,
         values=[''],
+        state='readonly',  # Prevent directly typing in values
     )
-    combobox.state(['readonly'])  # Prevent directly typing in values
+    update_data(packages.PakRef(packages.Style, UI.selected_style))
     combobox.bind('<<ComboboxSelected>>', change_callback)
 
     load = (item.id, update_data)

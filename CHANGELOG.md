@@ -7,6 +7,7 @@
 * The case where no voicelines are set is once again handled correctly.
 * #4431: Fix monitors not showing the voiceline character.
 * #4431: Fix elevator videos not appearing.
+* Fix initial state for "variant" dropdown boxes on item properties pane.
 
 ### UCP-Relevant changes:
 * Add `SweepTrace` mode to `Collisions` result. This allows creating collisions 
