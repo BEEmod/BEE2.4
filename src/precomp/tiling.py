@@ -22,7 +22,7 @@ import srctools.vmf
 
 from plane import PlaneGrid
 from precomp.brushLoc import POS as BLOCK_POS, Block, grid_to_world
-from precomp.texturing import TileSize, Portalable
+from precomp.texturing import MaterialConf, TileSize, Portalable
 from . import (
     grid_optim,
     instanceLocs,
@@ -49,6 +49,8 @@ LOGGER = srctools.logger.get_logger(__name__)
 # TILE_TEMP[tile_norm]['tile'] = front_face
 # TILE_TEMP[tile_norm]['back'] = back_face
 TILE_TEMP: dict[FrozenVec, dict[str | tuple[int, int, int, bool], Side]] = {}
+
+NODRAW_MAT = MaterialConf(consts.Tools.NODRAW)
 
 NORMALS = [
     FrozenVec(x=+1),
@@ -712,28 +714,30 @@ class Panel:
 
             if use_bullseye and is_static:
                 # Add the bullseye overlay.
-                srctools.vmf.make_overlay(
+                over = srctools.vmf.make_overlay(
                     vmf,
                     angled_normal,
                     top_center,
                     64 * front_normal @ rotation,
                     64 * orient.left(),
-                    texturing.OVERLAYS.get(front_pos, 'bullseye'),
+                    '',
                     faces,
                 )
+                texturing.OVERLAYS.get(front_pos, 'bullseye').apply_over(over)
         else:
             # Do non-angled helpers.
             if use_bullseye and is_static:
                 # Add the bullseye overlay.
-                srctools.vmf.make_overlay(
+                over = srctools.vmf.make_overlay(
                     vmf,
                     tile.normal,
                     front_pos + offset,
                     64 * orient.left(),
                     64 * orient.forward(),
-                    texturing.OVERLAYS.get(front_pos, 'bullseye'),
+                    '',
                     faces,
                 )
+                texturing.OVERLAYS.get(front_pos, 'bullseye').apply_over(over)
 
             # If it's a flip panel, always create a helper.
             if has_helper or self.pan_type.is_flip:
@@ -831,7 +835,7 @@ class TileDef:
     brush_faces: list[Side]
     panels: list[Panel]
     _sub_tiles: dict[tuple[int, int], TileType] | None
-    override: tuple[str, template_brush.ScalingTemplate] | None
+    override: tuple[texturing.MaterialConf, template_brush.ScalingTemplate] | None
 
     bullseye_count: int
     _portal_helper: int | Vec
@@ -854,6 +858,16 @@ class TileDef:
         self.bullseye_count = 0
         self._portal_helper = 1 if has_helper else 0
         self.force_antigel = False
+
+    @property
+    def pos_voxel(self) -> Vec:
+        """Return the position of the voxel."""
+        return self.pos
+
+    @property
+    def pos_front(self) -> Vec:
+        """Return the position of the front of the voxel."""
+        return self.pos + 64 * self.normal
 
     @property
     def has_portal_helper(self) -> bool:
@@ -1127,7 +1141,7 @@ class TileDef:
 
         # Finally, for floors/ceilings you can place it 'sideways'.
         return (
-            self.normal.z != 0 and
+            abs(self.normal.z) > 0.1 and
             self[0, 1].is_white and self[0, 2].is_white and
             self[3, 1].is_white and self[3, 2].is_white
         )
@@ -1218,15 +1232,16 @@ class TileDef:
         if self.use_bullseye():
             # Add the bullseye overlay.
             orient = Matrix.from_basis(x=self.normal)
-            srctools.vmf.make_overlay(
+            over = srctools.vmf.make_overlay(
                 vmf,
                 orient.forward(),
                 front_pos,
                 64 * orient.left(),
                 64 * orient.up(),
-                texturing.OVERLAYS.get(front_pos, 'bullseye'),
+                '',
                 self.brush_faces,
             )
+            texturing.OVERLAYS.get(front_pos, 'bullseye').apply_over(over)
 
     def gen_multitile_pattern(
         self,
@@ -1300,20 +1315,20 @@ class TileDef:
                 if tile_type is TileType.GOO_SIDE:
                     # This forces a specific size.
                     u_size = v_size = 4
-                    tex = texturing.gen(
+                    mat_conf = texturing.gen(
                         gen_cat, normal, Portalable.BLACK
                     ).get(tile_center, TileSize.GOO_SIDE, antigel=False)
                 else:
                     if tile_type.is_4x4:
                         grid_size = TileSize.TILE_4x4
                     u_size, v_size = grid_size.size
-                    tex = texturing.gen(
+                    mat_conf = texturing.gen(
                         gen_cat, normal, tile_type.color,
                     ).get(tile_center, grid_size, antigel=is_antigel)
 
                 template: template_brush.ScalingTemplate | None
                 if self.override is not None:
-                    tex, template = self.override
+                    mat_conf, template = self.override
                 else:
                     template = None
 
@@ -1321,7 +1336,7 @@ class TileDef:
                     vmf,
                     tile_center,
                     normal,
-                    top_surf=tex,
+                    top_surf=mat_conf,
                     width=(umax - umin) * 32,
                     height=(vmax - vmin) * 32,
                     bevels=tile_bevels,
@@ -1525,8 +1540,8 @@ def make_tile(
     vmf: VMF,
     origin: Vec,
     normal: FrozenVec | Vec,
-    top_surf: str,
-    back_surf: str = consts.Tools.NODRAW.value,
+    top_surf: MaterialConf,
+    back_surf: MaterialConf = NODRAW_MAT,
     *,
     recess_dist: int = 0,
     thickness: int = 4,
@@ -1570,7 +1585,7 @@ def make_tile(
     axis_u, axis_v = Vec.INV_AXIS[normal.axis()]
 
     top_side = template['front'].copy(vmf_file=vmf)
-    top_side.mat = top_surf
+    top_surf.apply(top_side)
     top_side.translate(origin - recess_dist * normal)
 
     block_min = round_grid(origin) - (64, 64, 64)
@@ -1585,7 +1600,6 @@ def make_tile(
     bevel_umin, bevel_umax, bevel_vmin, bevel_vmax = bevels
 
     back_side = template['back'].copy(vmf_file=vmf)
-    back_side.mat = back_surf
     # The offset was set to zero in the original we copy from.
     back_side.uaxis.scale = BEVEL_BACK_SCALE[bevel_umin, bevel_umax]
     back_side.vaxis.scale = BEVEL_BACK_SCALE[bevel_vmin, bevel_vmax]
@@ -1594,6 +1608,7 @@ def make_tile(
         axis_u, 4 * bevel_umin - 64,
         axis_v, 4 * bevel_vmin - 64,
     ))
+    back_surf.apply(back_side)
 
     umin_side = template[-1, 0, thickness, bevel_umin].copy(vmf_file=vmf)
     umin_side.translate(origin + Vec.with_axes(axis_u, -width/2))
@@ -1616,12 +1631,11 @@ def make_tile(
     back_side.uaxis.offset %= 512
     back_side.vaxis.offset %= 512
 
-    edge_name = 'panel_edge' if panel_edge else 'edge'
-
-    umin_side.mat = texturing.SPECIAL.get(origin, edge_name, antigel=antigel)
-    umax_side.mat = texturing.SPECIAL.get(origin, edge_name, antigel=antigel)
-    vmin_side.mat = texturing.SPECIAL.get(origin, edge_name, antigel=antigel)
-    vmax_side.mat = texturing.SPECIAL.get(origin, edge_name, antigel=antigel)
+    edge_mat = texturing.SPECIAL.get(origin, 'panel_edge' if panel_edge else 'edge', antigel=antigel)
+    edge_mat.apply(umin_side)
+    edge_mat.apply(umax_side)
+    edge_mat.apply(vmin_side)
+    edge_mat.apply(vmax_side)
 
     return Solid(vmf, sides=[
         top_side, back_side,

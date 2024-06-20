@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 from typing import ClassVar, TYPE_CHECKING, Any, Iterable
+
+from collections.abc import Sequence
 from pathlib import Path
 from enum import Enum
 import itertools
@@ -10,10 +12,10 @@ import abc
 import attrs
 import trio
 
-from srctools import FrozenVec, Keyvalues, Vec, conv_bool
+from srctools import FrozenMatrix, FrozenVec, Keyvalues, Matrix, Vec, conv_bool
 from srctools.game import Game
 from srctools.tokenizer import TokenSyntaxError
-from srctools.vmf import VisGroup, VMF, Side, Solid
+from srctools.vmf import Entity, UVAxis, VisGroup, VMF, Side, Solid
 from srctools.vmt import Material
 import srctools.logger
 
@@ -91,6 +93,21 @@ class Orient(Enum):
         """Return the Z value of the normal expected for this surface."""
         return self.value
 
+    @classmethod
+    def from_normal(cls, norm: Vec | FrozenVec) -> Orient:
+        """Find the orient matching this normal."""
+        # Even if not axis-aligned, make mostly-flat surfaces
+        # floor/ceiling (+-40 degrees)
+        # sin(40) = ~0.707
+        # So use 0.8.
+
+        if norm.z > 0.8:
+            return Orient.FLOOR
+        elif norm.z < -0.8:
+            return Orient.CEIL
+        else:
+            return Orient.WALL
+
 
 GEN_CATS = {
     'overlays': GenCat.OVERLAYS,
@@ -150,6 +167,59 @@ Patch
   }}
  }}
 '''
+
+
+@utils.freeze_enum_props
+class QuarterRot(Enum):
+    """Valid 90-degree rotation values."""
+    NONE = 0
+    CCW = 90
+    HALF = 180
+    CW = 270
+
+    ROT_0 = 0
+    ROT_90 = 90
+    ROT_180 = 180
+    ROT_270 = 270
+
+    @classmethod
+    def parse(cls, value: str) -> QuarterRot:
+        """Parse a string into a rotation value."""
+        try:
+            angle = round(int(value))
+        except (TypeError, ValueError, OverflowError):
+            LOGGER.warning('Non-numeric rotation value "{}"!', value)
+            return QuarterRot.NONE
+        angle %= 360
+        try:
+            return cls(angle)
+        except ValueError:
+            LOGGER.warning('Rotation values must be multiples of 90 degrees, not {}!', angle)
+            return QuarterRot.NONE
+
+    def __add__(self, other: QuarterRot) -> QuarterRot:
+        """Adding two rotations concatenates them."""
+        return QuarterRot((self.value + other.value) % 360)
+
+    @property
+    def flips_uv(self) -> bool:
+        """Returns if the horizontal/vertical directions have swapped."""
+        return self.value in [90, 270]
+
+    @property
+    def mat_x(self) -> FrozenMatrix:
+        """Return the matrix performing this rotation, around the X axis."""
+        return FrozenMatrix.from_roll(self.value)
+
+    @property
+    def mat_y(self) -> FrozenMatrix:
+        """Return the matrix performing this rotation, around the Y axis."""
+        return FrozenMatrix.from_pitch(self.value)
+
+    @property
+    def mat_z(self) -> FrozenMatrix:
+        """Return the matrix performing this rotation, around the Z axis."""
+        return FrozenMatrix.from_yaw(self.value)
 
 
 @utils.freeze_enum_props
@@ -220,9 +290,78 @@ class TileSize(str, Enum):
 
         if self is TileSize.TILE_1x4:
             return TileSize.TILE_4x1
-        if self is TileSize.TILE_2x1:
+        if self is TileSize.TILE_4x1:
             return TileSize.TILE_1x4
         return self
+
+
+@attrs.frozen
+class MaterialConf:
+    """Texture, rotation, scale to apply."""
+    mat: str
+    scale: float = 1.0
+    rotation: QuarterRot = QuarterRot.NONE
+    # For tile materials, the original size of the surface.
+    # This is used for aligning UVs correctly.
+    tile_size: TileSize = TileSize.TILE_4x4
+
+    @classmethod
+    def parse(cls, kv: Keyvalues, tile_size: TileSize = TileSize.TILE_4x4) -> MaterialConf:
+        """Parse a property block."""
+        if not kv.has_children():
+            return cls(kv.value,  tile_size=tile_size)
+        try:
+            material = kv['material']
+        except LookupError:
+            raise ValueError('Material definition must have "material" key!') from None
+        scale = kv.float('scale', 1.0)
+        if scale <= 0.0:
+            LOGGER.warning('Material scale should be positive, not {}!', scale)
+            scale = 1.0
+        try:
+            rotation = QuarterRot.parse(kv['rotation'])
+        except LookupError:
+            rotation = QuarterRot.NONE
+        return cls(material, scale, rotation, tile_size)
+
+    def __bool__(self) -> bool:
+        """Blank materials are falsey."""
+        return self.mat != ''
+
+    def __str__(self) -> str:
+        """Stringifying the MatConf produces the material."""
+        return self.mat
+
+    def apply(self, face: Side) -> None:
+        """Apply the config to a brush face.
+        This will overwrite the material, scale, and potentially rotate the face.
+        For this reason the scale and offsets should be set first.
+        """
+        face.mat = self.mat
+        uaxis, vaxis = face.uaxis, face.vaxis
+
+        uaxis.scale *= self.scale
+        vaxis.scale *= self.scale
+        if self.rotation is not QuarterRot.NONE:
+            u_axis, v_axis = uaxis.vec(), vaxis.vec()
+            # Convert the offset values into an offset from the origin, then rotate.
+            # We can then extract the new offset via u/v axis dotting.
+            offset = u_axis * uaxis.offset + v_axis * vaxis.offset
+            orient = Matrix.axis_angle(face.normal(), self.rotation.value)
+            offset @= orient
+            u_axis @= orient
+            v_axis @= orient
+
+            face.uaxis = UVAxis(u_axis.x, u_axis.y, u_axis.z, Vec.dot(offset, u_axis), uaxis.scale)
+            face.vaxis = UVAxis(v_axis.x, v_axis.y, v_axis.z, Vec.dot(offset, v_axis), vaxis.scale)
+            # Doesn't actually do anything, but makes Hammer look nicer.
+            face.ham_rot = (face.ham_rot + self.rotation.value) % 360
+
+    def apply_over(self, over: Entity) -> None:
+        """Apply the config to an overlay."""
+        over['material'] = self.mat
+        # TODO: Rotation, scale
+
 
 GENERATORS: dict[
     GenCat | tuple[GenCat, Orient, Portalable],
@@ -234,7 +373,7 @@ GENERATORS: dict[
 # as the total number of generators.
 TEX_DEFAULTS: dict[
     GenCat | tuple[GenCat, Orient, Portalable],
-    dict[str, str],
+    dict[str, str | MaterialConf],
 ] = {
     # Signage overlays.
     GenCat.OVERLAYS: {
@@ -331,6 +470,7 @@ TEX_DEFAULTS: dict[
 OPTION_DEFAULTS = {
     'MixTiles': False,  # Apply the smaller tile textures to 1x1 as well.
     'ScaleUp256': False,  # In addition to TILE_DOUBLE, use 1x1 at 2x scale.
+    'MixRotation': False,  # If true, randomly rotate all tiles by adding 3 copies of each. True on ceilings always.
     'Antigel_Bullseye': False,  # If true, allow bullseyes on antigel panels.
     'Algorithm': 'RAND',  # The algorithm to use for tiles.
 
@@ -345,11 +485,27 @@ OPTION_DEFAULTS = {
 # if only 4x4 is.
 TILE_INHERIT = [
     (TileSize.TILE_4x4, TileSize.TILE_2x2),
+    (TileSize.TILE_4x4, TileSize.TILE_4x1),
+    (TileSize.TILE_4x4, TileSize.TILE_1x4),
     (TileSize.TILE_2x2, TileSize.TILE_2x1),
-    (TileSize.TILE_2x1, TileSize.TILE_1x1),
+    (TileSize.TILE_2x2, TileSize.TILE_1x2),
+    (TileSize.TILE_2x2, TileSize.TILE_1x1),
 
     (TileSize.TILE_4x4, TileSize.GOO_SIDE),
 ]
+
+DEFAULT_WEIGHTS = {
+    TileSize.TILE_DOUBLE: 32,
+    TileSize.TILE_1x1: 10,
+    TileSize.TILE_2x1: 16,
+    TileSize.TILE_1x2: 16,
+    TileSize.TILE_2x2: 6,
+    TileSize.TILE_4x1: 3,
+    TileSize.TILE_1x4: 3,
+    TileSize.TILE_4x4: 1,
+    TileSize.GOO_SIDE: 1,
+    TileSize.CLUMP_GAP: 1,
+}
 
 
 def format_gen_key(gen_key: GenCat | tuple[GenCat, Orient, Portalable]) -> str:
@@ -361,11 +517,18 @@ def format_gen_key(gen_key: GenCat | tuple[GenCat, Orient, Portalable]) -> str:
         return f'{gen_cat.value}.{portal}.{orient}'
 
 
-def parse_options(settings: dict[str, Any], global_settings: dict[str, Any]) -> dict[str, Any]:
+def parse_options(
+    settings: dict[str, Any],
+    global_settings: dict[str, Any],
+    mix_rotation_default: bool = False,
+) -> dict[str, Any]:
     """Parse the options for a generator block."""
     options = {}
     for opt, default in OPTION_DEFAULTS.items():
         opt = opt.casefold()
+        # We want to change the default for this on ceilings/floors.
+        if opt == 'mixrotation':
+            default = mix_rotation_default
         try:
             value = settings[opt]
         except KeyError:
@@ -404,19 +567,7 @@ def gen(
     if portalable is None:
         raise TypeError('Portalability not provided!')
 
-    # Even if not axis-aligned, make mostly-flat surfaces
-    # floor/ceiling (+-40 degrees)
-    # sin(40) = ~0.707
-    # floor_tolerance = 0.8
-
-    if normal.z > 0.8:
-        orient = Orient.FLOOR
-    elif normal.z < -0.8:
-        orient = Orient.CEIL
-    else:
-        orient = Orient.WALL
-
-    return GENERATORS[cat, orient, portalable]
+    return GENERATORS[cat, Orient.from_normal(normal), portalable]
 
 
 def parse_name(name: str) -> tuple[Generator, str]:
@@ -476,7 +627,7 @@ def apply(
     if loc is None:
         loc = face.get_origin()
 
-    face.mat = generator.get(loc + face.normal(), tex_name)
+    generator.get(loc + face.normal(), tex_name).apply(face)
 
 
 def load_config(conf: Keyvalues) -> None:
@@ -493,7 +644,10 @@ def load_config(conf: Keyvalues) -> None:
         global_options, global_options,
     ))
 
-    data: dict[Any, tuple[dict[str, Any], dict[str, list[str]]]] = {}
+    # We put the configurations for each generator in here, before constructing them.
+    all_options: dict[Any, dict[str, Any]] = {}
+    all_weights: dict[Any, dict[TileSize, int]] = {}
+    all_textures: dict[Any, dict[str, list[MaterialConf]]] = {}
 
     gen_cat: GenCat
     gen_orient: Orient | None
@@ -504,6 +658,11 @@ def load_config(conf: Keyvalues) -> None:
         tuple[GenCat, Orient | None, Portalable | None],
         Keyvalues,
     ] = {}
+
+    # In the version adding the configuration for texturing, we made 1x2 a tile type
+    # instead of an alias for 2x1. So check for the former, to see if we need to warn about
+    # the latter change.
+    has_block_mats = False
 
     for prop in conf:
         if prop.name in ('options', 'antlines'):
@@ -518,6 +677,11 @@ def load_config(conf: Keyvalues) -> None:
                 LOGGER.warning('Could not parse texture generator type "{}"!', prop.name)
                 continue
             conf_for_gen[gen_cat, gen_orient, gen_portal] = prop
+            if not has_block_mats and prop.has_children():
+                for child in prop:
+                    if child.name != 'options' and child.has_children():
+                        has_block_mats = True
+                        break
         else:
             try:
                 gen_cat = GEN_CATS[prop.name]
@@ -530,6 +694,7 @@ def load_config(conf: Keyvalues) -> None:
         if isinstance(gen_key, GenCat):
             # It's a non-tile generator.
             is_tile = False
+            is_ceil = False
             try:
                 gen_conf = conf_for_gen[gen_key, None, None]
             except KeyError:
@@ -552,46 +717,82 @@ def load_config(conf: Keyvalues) -> None:
                         Keyvalues('Algorithm', 'RAND'),
                     ])
                 ])
-        textures: dict[str, list[str]] = {}
-        tex_name: str
+            is_ceil = gen_key[1] is Orient.CEIL
 
         # First parse the options.
-        options = parse_options({
+        all_options[gen_key] = parse_options({
             prop.name or '': prop.value
             for prop in
             gen_conf.find_children('Options')
-        }, global_options)
+        }, global_options, is_ceil)
+
+        all_weights[gen_key] = weights = DEFAULT_WEIGHTS.copy()
+        textures: dict[str, list[MaterialConf]] = {}
+        tex_name: str
+        all_textures[gen_key] = textures
 
         # Now do textures.
         if is_tile:
             # Tile generator, always have all tile sizes, and
             # only use the defaults if no textures were specified.
-            for tex_name in TileSize:
-                textures[tex_name] = [
-                    prop.value for prop in
-                    gen_conf.find_all(str(tex_name))
+            tile_size: TileSize
+            for tile_size in TileSize:
+                textures[tile_size] = [
+                    MaterialConf.parse(prop, tile_size) for prop in
+                    gen_conf.find_all(str(tile_size))
                 ]
 
-            # In case someone switches them around, add on 2x1 to 1x2 textures.
-            textures[TileSize.TILE_2x1] += [
-                prop.value for prop in
-                gen_conf.find_all('1x2')
-            ]
+            if '1x2' in gen_conf and not has_block_mats:
+                LOGGER.warning('1x2 textures have changed to actually be two vertical tiles!')
 
+            if all_options[gen_key]['mixrotation']:
+                # Automatically rotate tiles.
+                orig_defs: dict[TileSize, list[MaterialConf]] = {
+                    tex_name: tex_list.copy()
+                    for tex_name, tex_list in textures.items()
+                    if isinstance(tex_name, TileSize)  # Always true.
+                }
+                for start_size, mat_list in orig_defs.items():
+                    for rot in QuarterRot:
+                        size = start_size.rotated if rot.flips_uv else start_size
+                        for mat in mat_list:
+                            textures[size].append(attrs.evolve(mat, rotation=mat.rotation + rot))
+
+            # If not provided, use defaults. Otherwise, ignore them entirely.
             if not any(textures.values()):
                 for tex_name, tex_default in tex_defaults.items():
-                    textures[tex_name] = [tex_default]
+                    assert isinstance(tex_name, TileSize), f'{tex_name}: {tex_default}'
+                    # Use default scale/rotation.
+                    textures[tex_name] = [
+                        MaterialConf(tex_default, tile_size=tex_name)
+                        if isinstance(tex_default, str) else tex_default
+                    ]
+                for subprop in gen_conf.find_children('weights'):
+                    try:
+                        size = TileSize(subprop.name)
+                    except ValueError:
+                        LOGGER.warning('Unknown tile size "{}"!', subprop.real_name)
+                        continue
+                    try:
+                        weights[size] = int(subprop.value)
+                    except (TypeError, ValueError, OverflowError):
+                        LOGGER.warning(
+                            'Invalid weight "{}" for size {}',
+                            subprop.value, subprop.real_name,
+                        )
         else:
             # Non-tile generator, use defaults for each value
             for tex_name, tex_default in tex_defaults.items():
                 textures[tex_name] = tex = [
-                    prop.value for prop in
+                    MaterialConf.parse(child) for child in
                     gen_conf.find_all(str(tex_name))
                 ]
                 if not tex and tex_default:
-                    tex.append(tex_default)
-
-        data[gen_key] = options, textures
+                    if isinstance(tex_default, str):
+                        # Use default scale/rotation.
+                        tex.append(MaterialConf(tex_default))
+                    else:
+                        tex.append(tex_default)
 
         # Next, do a check to see if any texture names were specified that
         # we don't recognise.
@@ -613,28 +814,20 @@ def load_config(conf: Keyvalues) -> None:
 
     # Now complete textures for tile types,
     # copying over data from other generators.
-    for gen_key, tex_defaults in TEX_DEFAULTS.items():
+    for gen_key in TEX_DEFAULTS:
         if isinstance(gen_key, GenCat):
             continue
         gen_cat, gen_orient, gen_portal = gen_key
 
-        options, textures = data[gen_key]
+        textures = all_textures[gen_key]
 
         if not any(textures.values()) and gen_cat is not GenCat.NORMAL:
             # For the additional categories of tiles, we copy the entire
             # NORMAL one over if it's not set.
-            textures.update(data[GenCat.NORMAL, gen_orient, gen_portal][1])
+            textures.update(all_textures[GenCat.NORMAL, gen_orient, gen_portal])
 
         if not textures[TileSize.TILE_4x4]:
             raise ValueError(f'No 4x4 tile set for "{gen_key}"!')
-
-        # Copy 4x4, 2x2, 2x1 textures to the 1x1 size if the option was set.
-        # Do it before inheriting tiles, so there won't be duplicates.
-        if options['mixtiles']:
-            block_tex = textures[TileSize.TILE_1x1]
-            block_tex += textures[TileSize.TILE_4x4]
-            block_tex += textures[TileSize.TILE_2x2]
-            block_tex += textures[TileSize.TILE_2x1]
 
         # We need to do more processing.
         for orig, targ in TILE_INHERIT:
@@ -643,7 +836,9 @@ def load_config(conf: Keyvalues) -> None:
 
     # Now finally create the generators.
     for gen_key, tex_defaults in TEX_DEFAULTS.items():
-        options, textures = data[gen_key]
+        options = all_options[gen_key]
+        weights = all_weights[gen_key]
+        textures = all_textures[gen_key]
         generator: type[Generator]
         if isinstance(gen_key, tuple):
             # Check the algorithm to use.
@@ -662,7 +857,7 @@ def load_config(conf: Keyvalues) -> None:
             gen_cat = gen_key
             gen_orient = gen_portal = None
 
-        GENERATORS[gen_key] = gentor = generator(gen_cat, gen_orient, gen_portal, options, textures)
+        GENERATORS[gen_key] = gentor = generator(gen_cat, gen_orient, gen_portal, options, weights, textures)
 
         # Allow it to use the default enums as direct lookups.
         if isinstance(gentor, GenRandom):
@@ -744,7 +939,9 @@ async def setup(game: Game, vmf: VMF, tiles: list[TileDef]) -> None:
         for (mat_cat, mats) in generator.textures.items():
             #  Skip these special mats.
             if mat_cat not in ('glass', 'grating', 'goo', 'goo_cheap'):
-                materials.update(mats)
+                # We don't care about the configured scale/rotation, just the mat.
+                for mat_conf in mats:
+                    materials.add(mat_conf.mat)
 
     async def generate_mat(mat_name: str) -> None:
         """Generate an antigel material."""
@@ -806,17 +1003,19 @@ class Generator(abc.ABC):
         orient: Orient | None,
         portal: Portalable | None,
         options: dict[str, Any],
-        textures: dict[str, list[str]],
+        weights: dict[TileSize, int],
+        textures: dict[str, list[MaterialConf]],
     ) -> None:
         self.options = options
         self.textures = textures
+        self.weights = weights
 
         # Tells us the category each generator matches to.
         self.category = category
         self.orient = orient
         self.portal = portal
 
-    def get(self, loc: FrozenVec | Vec, tex_name: str, *, antigel: bool | None = None) -> str:
+    def get(self, loc: FrozenVec | Vec, tex_name: str, *, antigel: bool | None = None) -> MaterialConf:
         """Get one texture for a position.
 
         If antigel is set, this is directly on a tile and so whether it's antigel
@@ -839,18 +1038,20 @@ class Generator(abc.ABC):
             tex_name = TileSize.GOO_SIDE
 
         try:
-            texture = self._get(loc, tex_name)
+            mat_conf = self._get(loc, tex_name)
         except KeyError as exc:
             raise self._missing_error(repr(exc.args[0])) from None
         if antigel:
             try:
-                return ANTIGEL_MATS[texture.casefold()]
+                antigel_tex = ANTIGEL_MATS[mat_conf.mat.casefold()]
             except KeyError:
-                LOGGER.warning('No antigel mat generated for "{}"!', texture)
+                LOGGER.warning('No antigel mat generated for {!r}!', mat_conf)
                 # Set it to itself to silence the warning.
-                ANTIGEL_MATS[texture.casefold()] = texture
+                ANTIGEL_MATS[mat_conf.mat.casefold()] = mat_conf.mat
+            else:
+                return attrs.evolve(mat_conf, mat=antigel_tex)
 
-        return texture
+        return mat_conf
 
     def setup(self, vmf: VMF, tiles: list[TileDef]) -> None:
         """Scan tiles in the map and set up the generator."""
@@ -860,16 +1061,16 @@ class Generator(abc.ABC):
         return ValueError(f'Bad texture name: {tex_name}\n Allowed: {list(self.textures.keys())!r}')
 
     @abc.abstractmethod
-    def _get(self, loc: Vec | FrozenVec, tex_name: str) -> str:
+    def _get(self, loc: Vec | FrozenVec, tex_name: str) -> MaterialConf:
         """Actually get a texture.
 
         If KeyError is raised, an appropriate exception is raised from that.
         """
 
-    def get_all(self, tex_name: str) -> list[str]:
+    def get_all(self, tex_name: str) -> Sequence[MaterialConf]:
         """Return all the textures possible for a given name."""
         try:
-            return list(self.textures[tex_name])
+            return self.textures[tex_name]
         except KeyError:
             raise self._missing_error(tex_name) from None
 
@@ -893,20 +1094,23 @@ class GenRandom(Generator):
         orient: Orient | None,
         portal: Portalable | None,
         options: dict[str, Any],
-        textures: dict[str, list[str]],
+        weights: dict[TileSize, int],
+        textures: dict[str, list[MaterialConf]],
     ) -> None:
-        super().__init__(category, orient, portal, options, textures)
+        super().__init__(category, orient, portal, options, weights, textures)
         # For enum constants, use the id() to lookup - this
         # way we're effectively comparing by identity.
         self.enum_data: dict[int, str] = {}
 
-    def set_enum(self, defaults: Iterable[tuple[str, str]]) -> None:
+    def set_enum(self, defaults: Iterable[tuple[str, MaterialConf | str]]) -> None:
         """For OVERLAY and SPECIAL, allow also passing in the enum constants."""
         for key, default in defaults:
+            if isinstance(default, MaterialConf):
+                default = default.mat
             if type(default) != str:
                 self.enum_data[id(default)] = key
 
-    def _get(self, loc: Vec | FrozenVec, tex_name: str) -> str:
+    def _get(self, loc: Vec | FrozenVec, tex_name: str) -> MaterialConf:
         if type(tex_name) != str:
             try:
                 tex_name = self.enum_data[id(tex_name)]
@@ -940,9 +1144,10 @@ class GenClump(Generator):
         orient: Orient | None,
         portal: Portalable | None,
         options: dict[str, Any],
-        textures: dict[str, list[str]],
+        weights: dict[TileSize, int],
+        textures: dict[str, list[MaterialConf]],
     ) -> None:
-        super().__init__(category, orient, portal, options, textures)
+        super().__init__(category, orient, portal, options, weights, textures)
 
         # A seed only unique to this generator.
         self.gen_seed = b''
@@ -1040,7 +1245,7 @@ class GenClump(Generator):
             len(tiles),
         )
 
-    def _get(self, loc: Vec | FrozenVec, tex_name: str) -> str:
+    def _get(self, loc: Vec | FrozenVec, tex_name: str) -> MaterialConf:
         clump_seed = self._find_clump(loc)
 
         if clump_seed is None:

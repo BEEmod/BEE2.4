@@ -256,7 +256,7 @@ def place_sign(
     texture = sign.overlay
     if texture.startswith('<') and texture.endswith('>'):
         gen, tex_name = texturing.parse_name(texture[1:-1])
-        texture = gen.get(pos, tex_name)
+        texture = gen.get(pos, tex_name).mat
 
     width, height = SIZES[sign.type]
     over = make_overlay(
