@@ -150,7 +150,7 @@ class EdgeTrigger[*Args]:
         self.ready = AsyncBool()
 
     @overload
-    async def wait(self: EdgeTrigger[()]) -> None: ...
+    async def wait(self: EdgeTrigger[()]) -> None: ...  # type: ignore[overload-overlap]
     @overload
     async def wait[T](self: EdgeTrigger[T]) -> T: ...
     @overload  # Ignore spurious warnings about the above overloads being impossible.

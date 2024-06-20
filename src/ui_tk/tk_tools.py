@@ -346,7 +346,7 @@ class _EventDeco[Widget: tk.Misc](Protocol):
 
 class _Binder(Protocol):
     @overload
-    def __call__[Widget: tk.Widget](self, wid: Widget, *, add: bool = False) -> _EventDeco[Widget]: ...  # type: ignore[overload-overlap]
+    def __call__[Widget: tk.Widget](self, wid: Widget, *, add: bool = False) -> _EventDeco[Widget]: ...
     @overload
     def __call__(self, wid: tk.Misc, *, add: bool = False) -> _EventDeco[tk.Misc]: ...
     @overload
