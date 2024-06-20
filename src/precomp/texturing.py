@@ -158,7 +158,12 @@ class TileSize(str, Enum):
     TILE_1x1 = '1x1'  # Full block
     TILE_4x4 = '4x4'  # 1/4 of a block
     TILE_2x2 = '2x2'  # 1/2 of a block
+
     TILE_2x1 = '2x1'  # Two vertical
+    TILE_1x2 = '1x2'  # Two horizontal
+
+    TILE_1x4 = '1x4'  # Horizontal strip
+    TILE_4x1 = '4x1'  # Vertical strip
 
     TILE_DOUBLE = 'double'  # 256x256 tile textures.
 
@@ -179,10 +184,45 @@ class TileSize(str, Enum):
             return 2, 2
         elif self.value == '2x1':
             return 2, 4
+        elif self.value == '1x2':
+            return 4, 2
+        elif self.value == '4x1':
+            return 1, 4
+        elif self.value == '1x4':
+            return 4, 1
         elif self.value == 'double':
             return 8, 8
         raise AssertionError(self)
 
+    @property
+    def width(self) -> int:
+        """Return the number of 32-size tiles this takes up, horizontally."""
+        return self.size[0]
+
+    @property
+    def height(self) -> int:
+        """Return the number of 32-size tiles this takes up, vertically."""
+        return self.size[1]
+
+    @property
+    def is_rect(self) -> bool:
+        """Return if this is a non-square shape."""
+        width, height = self.size
+        return width != height
+
+    @property
+    def rotated(self) -> TileSize:
+        """Return the size when this is rotated 90 degrees."""
+        if self is TileSize.TILE_1x2:
+            return TileSize.TILE_2x1
+        if self is TileSize.TILE_2x1:
+            return TileSize.TILE_1x2
+
+        if self is TileSize.TILE_1x4:
+            return TileSize.TILE_4x1
+        if self is TileSize.TILE_2x1:
+            return TileSize.TILE_1x4
+        return self
 
 GENERATORS: dict[
     GenCat | tuple[GenCat, Orient, Portalable],
