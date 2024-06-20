@@ -16,6 +16,7 @@ from editoritems_props import PanelAnimation
 import utils
 import consts
 from precomp.lazy_value import LazyValue
+from precomp.texturing import MaterialConf, QuarterRot
 from quote_pack import QuoteInfo
 
 
@@ -222,6 +223,7 @@ def res_set_texture(inst: Entity, res: Keyvalues) -> None:
      the 128 brushes (Useful with fizzler/light strip items).
 
     `tex` is the texture to use.
+    `scale` allows you to scale up/down the material - this is a multiplier, not the actual value.
 
     If `template` is set, the template should be an axis aligned cube. This
     will be rotated by the instance angles, and then the face with the same
@@ -235,6 +237,15 @@ def res_set_texture(inst: Entity, res: Keyvalues) -> None:
     pos.localise(origin, angles)
 
     norm = round(Vec.from_str(res['dir', '0 0 1']) @ angles, 6)
+
+    scale = res.float('scale', 1.0)
+    if scale <= 0.0:
+        LOGGER.warning('Material scale should be positive, not {}!', scale)
+        scale = 1.0
+    try:
+        rotation = QuarterRot.parse(res['rotation'])
+    except NoKeyError:
+        rotation = QuarterRot.NONE
 
     if srctools.conv_bool(res['gridpos', '0']):
         for axis in 'xyz':
@@ -271,11 +282,14 @@ def res_set_texture(inst: Entity, res: Keyvalues) -> None:
             'no longer usable! ("{}")',
             tex
         )
-    elif tex.startswith('[') and tex.endswith(']'):
-        gen, name = texturing.parse_name(tex[1:-1])
-        tex = gen.get(pos - 64 * norm, name)
 
-    tile.override = (tex, temp)
+    if tex.startswith('[') and tex.endswith(']'):
+        gen, name = texturing.parse_name(tex[1:-1])
+        mat_conf = gen.get(pos - 64 * norm, name)
+    else:
+        mat_conf = MaterialConf(tex, scale, rotation)
+
+    tile.override = (mat_conf, temp)
 
 
 @conditions.make_result('AddBrush')
@@ -341,36 +355,36 @@ def res_add_brush(vmf: VMF, inst: Entity, res: Keyvalues) -> None:
     solids = vmf.make_prism(point1, point2)
     center = (point1 + point2) / 2
 
-    solids.north.mat = texturing.gen(
+    texturing.gen(
         texturing.GenCat.NORMAL,
         Vec(Vec.N),
         tex_type,
-    ).get(center, tile_grids['y'])
-    solids.south.mat = texturing.gen(
+    ).get(center, tile_grids['y']).apply(solids.north)
+    texturing.gen(
         texturing.GenCat.NORMAL,
         Vec(Vec.S),
         tex_type,
-    ).get(center, tile_grids['y'])
-    solids.east.mat = texturing.gen(
+    ).get(center, tile_grids['y']).apply(solids.south)
+    texturing.gen(
         texturing.GenCat.NORMAL,
         Vec(Vec.E),
         tex_type,
-    ).get(solids.north.get_origin(), tile_grids['x'])
-    solids.west.mat = texturing.gen(
+    ).get(center, tile_grids['x']).apply(solids.east)
+    texturing.gen(
         texturing.GenCat.NORMAL,
         Vec(Vec.W),
         tex_type,
-    ).get(center, tile_grids['x'])
-    solids.top.mat = texturing.gen(
+    ).get(center, tile_grids['x']).apply(solids.west)
+    texturing.gen(
         texturing.GenCat.NORMAL,
         Vec(Vec.T),
         tex_type,
-    ).get(center, tile_grids['z'])
-    solids.bottom.mat = texturing.gen(
+    ).get(center, tile_grids['z']).apply(solids.top)
+    texturing.gen(
         texturing.GenCat.NORMAL,
         Vec(Vec.B),
         tex_type,
-    ).get(center, tile_grids['z'])
+    ).get(center, tile_grids['z']).apply(solids.bottom)
 
     if res.bool('detail'):
         # Add the brush to a func_detail entity

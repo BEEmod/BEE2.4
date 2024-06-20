@@ -8,6 +8,8 @@ from precomp import tiling, texturing, template_brush, conditions, rand
 from precomp.brushLoc import POS as BLOCK_POS
 from precomp.lazy_value import LazyValue
 from precomp.template_brush import TEMP_TYPES
+from precomp.texturing import MaterialConf
+
 
 COND_MOD_NAME = 'Entities'
 LOGGER = srctools.logger.get_logger(__name__, alias='cond.entities')
@@ -91,8 +93,9 @@ def res_insert_overlay(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
             if mat.startswith('<') and mat.endswith('>'):
                 # Lookup in the texture data.
                 gen, mat = texturing.parse_name(mat[1:-1])
-                mat = gen.get(pos, mat)
-            over['material'] = mat
+                gen.get(pos, mat).apply_over(over)
+            else:
+                over['material'] = mat
             tiledef.bind_overlay(over)
 
         # Wipe the brushes from the map.

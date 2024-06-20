@@ -612,12 +612,13 @@ class Fizzler:
                 origin=cent_pos + 64 * up,
                 uax=forward * overlay_len,
                 vax=Vec.cross(up, forward) * overlay_thickness,
-                material=texturing.SPECIAL.get(cent_pos + 64 * up, 'fizz_border'),
+                material='',
                 surfaces=[],
                 u_repeat=u_rep,
                 v_repeat=v_rep,
                 swap=flip_uv,
             )
+            texturing.SPECIAL.get(cent_pos + 64 * up, 'fizz_border').apply_over(over)
             for tile in tiledefs_up:
                 tile.bind_overlay(over)
 
@@ -628,12 +629,13 @@ class Fizzler:
                 origin=cent_pos - 64 * up,
                 uax=forward * overlay_len,
                 vax=Vec.cross(-up, forward) * overlay_thickness,
-                material=texturing.SPECIAL.get(cent_pos - 64 * up, 'fizz_border'),
+                material='',
                 surfaces=[],
                 u_repeat=u_rep,
                 v_repeat=v_rep,
                 swap=flip_uv,
             )
+            texturing.SPECIAL.get(cent_pos - 64 * up, 'fizz_border').apply_over(over)
             for tile in tiledefs_dn:
                 tile.bind_overlay(over)
 

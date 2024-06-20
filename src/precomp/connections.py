@@ -15,6 +15,7 @@ import srctools.logger
 
 from connections import InputType, FeatureMode, Config, ConnType, OutNames
 from precomp.antlines import Antline, AntType, IndicatorStyle, PanelSwitchingStyle
+from precomp.texturing import MaterialConf
 from precomp import instance_traits, options, packing, conditions
 import consts
 import editoritems
@@ -472,7 +473,8 @@ def read_configs(all_items: Iterable[editoritems.Item]) -> None:
 def calc_connections(
     vmf: VMF,
     antlines: dict[str, list[Antline]],
-    shape_frame_tex: list[str],
+    *,
+    shape_frame_mat: Sequence[MaterialConf],
     enable_shape_frame: bool,
     ind_style: IndicatorStyle,
 ) -> None:
@@ -659,8 +661,8 @@ def calc_connections(
             conn.add()
 
     # Make signage frames
-    shape_frame_tex = [mat for mat in shape_frame_tex if mat]
-    if shape_frame_tex and enable_shape_frame:
+    shape_frame_mat = [mat for mat in shape_frame_mat if mat]
+    if shape_frame_mat and enable_shape_frame:
         for shape_mat in sign_shape_by_index.values():
             # Sort so which gets what frame is consistent.
             shape_mat.sort()
@@ -668,13 +670,13 @@ def calc_connections(
                 shape.repeat_group = index
                 if index == 0:
                     continue  # First, no frames..
-                frame_mat = shape_frame_tex[(index-1) % len(shape_frame_tex)]
+                frame_mat = shape_frame_mat[(index-1) % len(shape_frame_mat)]
 
                 for overlay in shape:
                     frame = overlay.copy()
                     shape.overlay_frames.append(frame)
                     vmf.add_ent(frame)
-                    frame['material'] = frame_mat
+                    frame_mat.apply_over(frame)
                     frame['renderorder'] = 1  # On top
 
     # Now we've computed everything, strip numbers.

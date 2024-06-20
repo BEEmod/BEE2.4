@@ -171,7 +171,6 @@ module = [
 	'precomp.conditions._scaffold_compat',
 	'precomp.bottomlessPit',
 	'precomp.fizzler',
-	'precomp.tiling',
 	'ui_tk.check_table',
 ]
 strict_optional = false

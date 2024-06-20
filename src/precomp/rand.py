@@ -78,8 +78,8 @@ def init_seed(vmf: VMF) -> None:
 
 def seed(
     name: bytes,
-    *values: str | Entity | float | bytes | bytearray
-        | Vec | FrozenVec | Angle | FrozenAngle | Matrix | FrozenMatrix,
+    *values: str | Entity | float | bytes | bytearray |
+        Vec | FrozenVec | Angle | FrozenAngle | Matrix | FrozenMatrix,
 ) -> Random:
     """Initialise a random number generator with these starting arguments.
 

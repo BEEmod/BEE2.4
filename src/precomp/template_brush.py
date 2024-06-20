@@ -21,7 +21,7 @@ from srctools.dmx import Element
 import srctools.logger
 
 from . import tiling, texturing, options, rand, connections, collisions, barriers
-from .texturing import Portalable, GenCat, TileSize
+from .texturing import MaterialConf, Portalable, GenCat, TileSize
 from .tiling import TileType
 from plane import PlaneKey
 import user_errors
@@ -1474,13 +1474,13 @@ def retexture_template(
 
             if override_mat is not None:
                 # Replace_tex overrides everything.
-                mat =  rand.seed(b'template', norm, face.get_origin()).choice(override_mat)
+                mat = rand.seed(b'template', norm, face.get_origin()).choice(override_mat)
                 if instance is not None:
                     mat = instance.fixup.substitute(mat)
                 if mat.startswith('<') and mat.endswith('>'):
                     # Lookup in the style data.
                     gen, mat = texturing.parse_name(mat[1:-1])
-                    mat = gen.get(face.get_origin() + face.normal(), mat)
+                    mat = gen.get(face.get_origin() + face.normal(), mat).mat
                 # If blank, don't set.
                 if mat:
                     face.mat = mat
@@ -1556,19 +1556,20 @@ def retexture_template(
                 mat = instance.fixup.substitute(mat)
             if mat.startswith('<') and mat.endswith('>'):
                 gen, tex_name = texturing.parse_name(mat[1:-1])
-                mat = gen.get(over_pos, tex_name)
+                mat_conf = gen.get(over_pos, tex_name)
+            else:
+                mat_conf = MaterialConf(mat)
         else:
             try:
                 sign_type = consts.Signage(mat)
             except ValueError:
-                pass
+                mat_conf = MaterialConf(mat)
             else:
-                mat = texturing.OVERLAYS.get(over_pos, sign_type)
+                mat_conf = texturing.OVERLAYS.get(over_pos, sign_type)
 
-        if mat == '':
+        if mat_conf:
+            mat_conf.apply_over(over)
+        else:
             # If blank, remove the overlay from the map and the list.
-            # (Since it's inplace, this can affect the tuple.)
             template_data.overlay.remove(over)
             over.remove()
-        else:
-            over['material'] = mat

@@ -964,13 +964,13 @@ def change_brush(vmf: VMF) -> None:
                 # Use fancy goo on the level with the
                 # highest number of blocks.
                 # All plane z are the same.
-                face.mat = texturing.SPECIAL.get(
+                texturing.SPECIAL.get(
                     face.get_origin(), (
                         'goo' if
                         face.planes[0].z == best_goo
                         else 'goo_cheap'
                     ),
-                )
+                ).apply(face)
 
     if make_bottomless:
         LOGGER.info('Creating Bottomless Pits...')
@@ -1165,8 +1165,8 @@ def change_overlays(vmf: VMF) -> None:
         del over['targetname']
         del over['bee_noframe']  # Not needed anymore.
 
-        over['material'] = mat = texturing.OVERLAYS.get(over.get_origin(), sign_type)
-        if not mat:
+        texturing.OVERLAYS.get(over.get_origin(), sign_type).apply_over(over)
+        if not over['material']:
             over.remove()
         if sign_size != 16:
             # Resize the signage overlays
@@ -1649,11 +1649,10 @@ async def main(argv: list[str]) -> None:
 
         # Requires instance traits!
         connections.calc_connections(
-            vmf,
-            ant,
-            texturing.OVERLAYS.get_all('shapeframe'),
-            settings['style_vars']['enableshapesignageframe'],
-            ind_style,
+            vmf, ant,
+            shape_frame_mat= texturing.OVERLAYS.get_all('shapeframe'),
+            enable_shape_frame=settings['style_vars']['enableshapesignageframe'],
+            ind_style=ind_style,
         )
         change_ents(vmf)
 

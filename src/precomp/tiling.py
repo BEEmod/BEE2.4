@@ -563,7 +563,7 @@ class Panel:
             # Now, we need to flip this across the appropriate axis to
             # replicate rotation.
             u_ax, v_ax = Vec.INV_AXIS[tile.normal.axis()]
-            rot_flag = srctools.conv_int(self.brush_ent['spawnflags'])
+            rot_flag = srctools.conv_int(self.brush_ent['spawnflags']) if self.brush_ent is not None else 0
             if rot_flag & 64:
                 rot_axis = 'x'
             elif rot_flag & 128:
@@ -583,7 +583,7 @@ class Panel:
             else:
                 LOGGER.warning(
                     'Flip panel "{}" rotates on normal axis??',
-                    self.brush_ent['targetname'],
+                    self.brush_ent['targetname'] if self.brush_ent is not None else '<world>',
                 )
         else:  # Should never be needed, but makes typecheck happy.
             back_subtiles = sub_tiles
@@ -752,9 +752,9 @@ class Panel:
                 )
                 # On a flip panel don't parent. The helper can just stay on the front side.
                 if not is_static:
+                    assert self.brush_ent is not None
                     if self.pan_type.is_flip:
-                        helper['attach_target_name'] = self.brush_ent[
-                            'targetname']
+                        helper['attach_target_name'] = self.brush_ent['targetname']
                     else:
                         helper['parentname'] = self.brush_ent['targetname']
 
@@ -1252,7 +1252,7 @@ class TileDef:
         normal: Vec,
         offset: int = 64,
         thickness: int = 4,
-        vec_offset: Vec = None,
+        vec_offset: Vec | FrozenVec = FrozenVec(),
         is_panel: bool = False,
         add_bullseye: bool = False,
         face_output: dict[tuple[int, int], Side] | None = None,
@@ -1350,7 +1350,7 @@ class TileDef:
                 if template is not None:
                     # If the texture isn't supplied, use the one from the
                     # template.
-                    template.apply(face, change_mat=not tex)
+                    template.apply(face, change_mat=not mat_conf)
 
                 faces.append(face)
                 brushes.append(brush)
@@ -1370,7 +1370,7 @@ class TileDef:
                     vmf,
                     tile_center,
                     normal,
-                    top_surf=consts.Tools.NODRAW,
+                    top_surf=NODRAW_MAT,
                     width=(umax - umin) * 32,
                     height=(vmax - vmin) * 32,
                     bevels=tile_bevels,
@@ -2114,7 +2114,7 @@ def generate_brushes(vmf: VMF) -> None:
         bbox_min, bbox_max = Vec.bbox(tile.pos for tile in tiles)
 
         # (type, is_antigel, texture) -> (u, v) -> present/absent
-        grid_pos: dict[tuple[TileType, bool, str], PlaneGrid[bool]] = defaultdict(PlaneGrid)
+        grid_pos: dict[tuple[TileType, bool, MaterialConf], PlaneGrid[bool]] = defaultdict(PlaneGrid)
 
         tile_pos: PlaneGrid[TileDef] = PlaneGrid()
 
@@ -2124,15 +2124,15 @@ def generate_brushes(vmf: VMF) -> None:
 
             if tile_type is TileType.GOO_SIDE:
                 # This forces a specific size.
-                tex = texturing.gen(
+                mat_conf = texturing.gen(
                     texturing.GenCat.NORMAL,
                     normal,
                     Portalable.BLACK
                 ).get(pos, TileSize.GOO_SIDE, antigel=False)
             elif tile_type is TileType.NODRAW:
-                tex = consts.Tools.NODRAW
+                mat_conf = NODRAW_MAT
             else:
-                tex = texturing.gen(
+                mat_conf = texturing.gen(
                     texturing.GenCat.NORMAL,
                     normal,
                     tile.base_type.color
@@ -2140,10 +2140,10 @@ def generate_brushes(vmf: VMF) -> None:
 
             u_pos = int((pos[u_axis] - bbox_min[u_axis]) // 128)
             v_pos = int((pos[v_axis] - bbox_min[v_axis]) // 128)
-            grid_pos[tile.base_type, is_antigel, tex][u_pos, v_pos] = True
+            grid_pos[tile.base_type, is_antigel, mat_conf][u_pos, v_pos] = True
             tile_pos[u_pos, v_pos] = tile
 
-        for (subtile_type, is_antigel, tex), tex_pos in grid_pos.items():
+        for (subtile_type, is_antigel, mat_conf), tex_pos in grid_pos.items():
             for min_u, min_v, max_u, max_v, bevels in bevel_split(tex_pos, tile_pos):
                 center = Vec.with_axes(
                     norm_axis, plane_dist,
@@ -2160,7 +2160,7 @@ def generate_brushes(vmf: VMF) -> None:
                 )
                 if TileSize.TILE_DOUBLE in gen and (1 + max_u - min_u) % 2 == 0 and (1 + max_v - min_v) % 2 == 0:
                     is_double = True
-                    tex = gen.get(center, TileSize.TILE_DOUBLE, antigel=is_antigel)
+                    mat_conf = gen.get(center, TileSize.TILE_DOUBLE, antigel=is_antigel)
                 else:
                     is_double = False
 
@@ -2168,7 +2168,7 @@ def generate_brushes(vmf: VMF) -> None:
                     vmf,
                     center,
                     normal,
-                    tex,
+                    mat_conf,
                     texturing.SPECIAL.get(center, 'behind', antigel=is_antigel),
                     bevels=bevels,
                     width=(1 + max_u - min_u) * 128,
@@ -2285,7 +2285,6 @@ def generate_goo(vmf: VMF) -> None:
                     tideline = tideline_over[key] = Tideline(
                         vmf.create_ent(
                             'info_overlay',
-                            material=texturing.OVERLAYS.get(ent_pos, 'tideline'),
                             angles='0 0 0',
                             origin=ent_pos,
                             basisOrigin=ent_pos,
@@ -2299,6 +2298,7 @@ def generate_goo(vmf: VMF) -> None:
                         ),
                         off, off, off,
                     )
+                    texturing.OVERLAYS.get(ent_pos, 'tideline').apply_over(tideline.over)
                     OVERLAY_BINDS[tideline.over] = [tile]
                 else:
                     tideline.min = min(tideline.min, off)
@@ -2367,13 +2367,10 @@ def generate_goo(vmf: VMF) -> None:
             # Use fancy goo on the level with the
             # highest number of blocks.
             # All plane z are the same.
-            prism.top.mat = texturing.SPECIAL.get(
-                bbox_max + (0, 0, 96), (
-                    'goo' if
-                    max_z == best_goo
-                    else 'goo_cheap'
-                ),
-            )
+            texturing.SPECIAL.get(
+                (bbox_min + bbox_max) / 2.0 + (0.0, 0.0, 96.0),
+                ('goo' if max_z == best_goo else 'goo_cheap'),
+            ).apply(prism.top)
             vmf.add_brush(prism.solid)
 
     bbox_min = Vec()
