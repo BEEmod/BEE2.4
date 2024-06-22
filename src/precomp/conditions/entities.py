@@ -8,7 +8,6 @@ from precomp import tiling, texturing, template_brush, conditions, rand
 from precomp.brushLoc import POS as BLOCK_POS
 from precomp.lazy_value import LazyValue
 from precomp.template_brush import TEMP_TYPES
-from precomp.texturing import MaterialConf
 
 
 COND_MOD_NAME = 'Entities'
