@@ -2160,7 +2160,13 @@ def generate_brushes(vmf: VMF) -> None:
                 )
                 width = 1 + max_u - min_u
                 height = 1 + max_v - min_v
-                if TileSize.TILE_DOUBLE in gen and width % 2 == 0 and height % 2 == 0:
+                # For now, convert any tiles which happen to be multiples of 256 into double
+                # tiles, if we have any.
+                if (
+                    subtile_type is not TileType.GOO_SIDE
+                    and TileSize.TILE_DOUBLE in gen
+                    and width % 2 == height % 2 == 0
+                ):
                     is_double = True
                     tile_conf = gen.get(center, TileSize.TILE_DOUBLE, antigel=is_antigel)
                 else:
