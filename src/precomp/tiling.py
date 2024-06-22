@@ -2160,15 +2160,16 @@ def generate_brushes(vmf: VMF) -> None:
                 )
                 if TileSize.TILE_DOUBLE in gen and (1 + max_u - min_u) % 2 == 0 and (1 + max_v - min_v) % 2 == 0:
                     is_double = True
-                    mat_conf = gen.get(center, TileSize.TILE_DOUBLE, antigel=is_antigel)
+                    tile_conf = gen.get(center, TileSize.TILE_DOUBLE, antigel=is_antigel)
                 else:
+                    tile_conf = mat_conf
                     is_double = False
 
                 brush, front = make_tile(
                     vmf,
                     center,
                     normal,
-                    mat_conf,
+                    tile_conf,
                     texturing.SPECIAL.get(center, 'behind', antigel=is_antigel),
                     bevels=bevels,
                     width=(1 + max_u - min_u) * 128,
