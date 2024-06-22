@@ -33,7 +33,7 @@ def test_rotation_parse_warnings(caplog: pytest.LogCaptureFixture) -> None:
 
 
 def test_mat_parse(caplog: pytest.LogCaptureFixture) -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match='"material"'):
         # Material is required.
         MaterialConf.parse(Keyvalues('blah', [
             Keyvalues('scale', '0.25'),
