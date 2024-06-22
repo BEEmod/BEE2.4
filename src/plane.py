@@ -351,6 +351,26 @@ class PlaneGrid[ValT](MutableMapping[tuple[int, int], ValT]):
         """D.items() -> a set-like object providing a view on D's items"""
         return GridItems(self)
 
+    def largest_index(self) -> tuple[int, int, ValT]:
+        """Find a high index position, then return it plus the value.
+
+        For iterating through the grid in an arbitary order, this is the cheapest to pop.
+        """
+        # Skip past empty rows/columns. We'll pop them to save memory while we're here.
+        while self._data:
+            if not (row := self._data[-1]):
+                self._data.pop()
+                self._xoffs.pop()
+                continue
+            if (value := row[-1]) is _UNSET:
+                row.pop()
+                continue
+            y_ind = len(self._data) - 1
+            x = len(row) - 1 - self._xoffs[y_ind]
+            y = y_ind - self._yoff
+            return x, y, value
+        raise KeyError('Empty grid!')
+
 
 # noinspection PyProtectedMember
 class GridValues[ValT](ValuesView[ValT]):
