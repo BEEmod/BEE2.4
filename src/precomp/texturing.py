@@ -767,19 +767,19 @@ def load_config(conf: Keyvalues) -> None:
                         MaterialConf(tex_default, tile_size=tex_name)
                         if isinstance(tex_default, str) else tex_default
                     ]
-                for subprop in gen_conf.find_children('weights'):
-                    try:
-                        size = TileSize(subprop.name)
-                    except ValueError:
-                        LOGGER.warning('Unknown tile size "{}"!', subprop.real_name)
-                        continue
-                    try:
-                        weights[size] = int(subprop.value)
-                    except (TypeError, ValueError, OverflowError):
-                        LOGGER.warning(
-                            'Invalid weight "{}" for size {}',
-                            subprop.value, subprop.real_name,
-                        )
+            for subprop in gen_conf.find_children('weights'):
+                try:
+                    size = TileSize(subprop.name)
+                except ValueError:
+                    LOGGER.warning('Unknown tile size "{}"!', subprop.real_name)
+                    continue
+                try:
+                    weights[size] = int(subprop.value)
+                except (TypeError, ValueError, OverflowError):
+                    LOGGER.warning(
+                        'Invalid weight "{}" for size {}',
+                        subprop.value, subprop.real_name,
+                    )
         else:
             # Non-tile generator, use defaults for each value
             for tex_name, tex_default in tex_defaults.items():
@@ -824,10 +824,19 @@ def load_config(conf: Keyvalues) -> None:
         if not any(textures.values()) and gen_cat is not GenCat.NORMAL:
             # For the additional categories of tiles, we copy the entire
             # NORMAL one over if it's not set.
-            textures.update(all_textures[GenCat.NORMAL, gen_orient, gen_portal])
+            for text_name, mat_list in all_textures[GenCat.NORMAL, gen_orient, gen_portal].items():
+                textures[text_name] = mat_list.copy()
 
         if not textures[TileSize.TILE_4x4]:
             raise ValueError(f'No 4x4 tile set for "{gen_key}"!')
+
+        # Copy all other textures to the 1x1 size if the option was set.
+        # Do it before inheriting tiles, so there won't be duplicates.
+        if all_options[gen_key]['mixtiles']:
+            block_tex = textures[TileSize.TILE_1x1]
+            block_tex += textures[TileSize.TILE_4x4]
+            block_tex += textures[TileSize.TILE_2x2]
+            block_tex += textures[TileSize.TILE_2x1]
 
         # We need to do more processing.
         for orig, targ in TILE_INHERIT:
