@@ -1,17 +1,16 @@
 """Logic for generating the overall map geometry."""
 from __future__ import annotations
-from collections import Counter, defaultdict
-from typing import Iterator
+from collections import defaultdict
+from collections.abc import Iterator
 import functools
 
 import attrs
-from srctools import Angle, Entity, Output, VMF, Vec, logger
+from srctools import Angle, Entity, VMF, Vec, logger
 
 import consts
 import utils
 from plane import PlaneGrid
-from precomp import grid_optim, options, rand, texturing
-from precomp.brushLoc import Block, POS as BLOCK_POS
+from precomp import grid_optim, rand, texturing
 from precomp.texturing import MaterialConf, Orient, Portalable, TileSize
 from precomp.tiling import OVERLAY_BINDS, TILES, TileDef, TileType, make_tile
 
@@ -40,8 +39,6 @@ class TexDef:
 make_subtile = functools.lru_cache(maxsize=None)(SubTile)
 make_texdef = functools.lru_cache(maxsize=64)(TexDef)
 TEXDEF_NODRAW = TexDef(MaterialConf(consts.Tools.NODRAW))
-
-
 
 
 @attrs.define
@@ -114,8 +111,8 @@ def bevel_split(
             for u in u_range
         ]
 
-        u_group = list(utils.group_runs(zip(bevel_umins, bevel_umaxes)))
-        v_group = list(utils.group_runs(zip(bevel_vmins, bevel_vmaxes)))
+        u_group = list(utils.group_runs(zip(bevel_umins, bevel_umaxes, strict=True)))
+        v_group = list(utils.group_runs(zip(bevel_vmins, bevel_vmaxes, strict=True)))
 
         for bevel_u, v_ind_min, v_ind_max in u_group:
             for bevel_v, u_ind_min, u_ind_max in v_group:
