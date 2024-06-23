@@ -768,9 +768,6 @@ def gen_item_outputs(vmf: VMF) -> None:
     # We go 'backwards', creating all the inputs for each item.
     # That way we can change behaviour based on item counts.
     for item in ITEMS.values():
-        if item.config is None:  # Has no I/O.
-            continue
-
         # Try to add the locking IO.
         add_locking(item)
 

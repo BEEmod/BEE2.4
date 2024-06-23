@@ -18,7 +18,7 @@ TK_ROOT.protocol("WM_DELETE_WINDOW", app.quit_app)
 
 if '__class_getitem__' not in vars(tk.Event):
     # Patch in it being generic, by replacing it with a copy that subclasses Generic.
-    class _GenericEvent[W: tk.Misc](tk.Event):
+    class _GenericEvent[W: tk.Misc](tk.Event):  # type: ignore
         pass
 
     _GenericEvent.__name__ = 'Event'

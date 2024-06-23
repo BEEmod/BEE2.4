@@ -1,6 +1,6 @@
 import math
 
-from precomp import instanceLocs, connections, conditions, options, faithplate
+from precomp import instanceLocs, connections, conditions, faithplate
 from srctools import FrozenVec, Matrix, Keyvalues, Vec, Entity, VMF, Output, Angle
 import srctools.logger
 

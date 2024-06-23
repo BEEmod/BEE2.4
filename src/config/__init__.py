@@ -5,7 +5,7 @@ They can then fetch the current state and store new state.
 """
 from __future__ import annotations
 
-from typing import ClassVar, Self, NewType, override
+from typing import ClassVar, Self, override
 from collections.abc import Generator, ItemsView, Iterator, KeysView
 from pathlib import Path
 import abc

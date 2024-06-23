@@ -442,7 +442,7 @@ def link_checkmark(check: ttk.Checkbutton, widget: tk.Widget) -> None:
     widget.bind('<Enter>', f'{check} state active', add=True)
     widget.bind('<Leave>', f'{check} state !active', add=True)
 
-    def hovering(event: tk.Event) -> bool:
+    def hovering(event: tk.Event[tk.Widget]) -> bool:
         """Check if the mouse is hovering over the label, or the checkmark."""
         # identify-element returns the component name under the specified position,
         # or an empty string if the widget isn't there.
@@ -455,16 +455,16 @@ def link_checkmark(check: ttk.Checkbutton, widget: tk.Widget) -> None:
             event.y_root - check.winfo_rooty(),
         )))
 
-    def on_press(event: tk.Event) -> None:
+    def on_press(event: tk.Event[tk.Widget]) -> None:
         """When pressed, highlight the checkmark."""
         check.state(['pressed'])
 
-    def on_motion(event: tk.Event) -> None:
+    def on_motion(event: tk.Event[tk.Widget]) -> None:
         """The checkmark is pressed only while the mouse is over it."""
         # Check if the mouse is over the label, or the checkmark. Just a bbox check.
         check.state(['pressed' if hovering(event) else '!pressed'])
 
-    def on_release(event: tk.Event) -> None:
+    def on_release(event: tk.Event[tk.Widget]) -> None:
         """When released, toggle if the mouse is still over the widget."""
         check.state(['!pressed'])
         if hovering(event):
@@ -769,7 +769,7 @@ class FileField(ttk.Frame):
         else:
             return path
 
-    def _text_configure(self, e: tk.Event) -> None:
+    def _text_configure(self, e: tk.Event[ReadOnlyEntry]) -> None:
         """Truncate text every time the text widget resizes."""
         self._text_var.set(self._truncate(self._location))
 
@@ -889,7 +889,7 @@ class ComboBoxMap[StrKeyT: str]:
         if not self._ordered_tokens:
             raise ValueError('Values are empty!')
 
-    def _evt_selected(self, event: tk.Event) -> None:
+    def _evt_selected(self, event: tk.Event[ttk.Combobox]) -> None:
         """A new value was selected."""
         index = self.widget.current()
         if index == -1:

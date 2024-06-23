@@ -64,7 +64,7 @@ async def make_color_swatch(
     swatch = ttk.Label(parent)
 
     # Note: tkinter requires RGB as ints, not float!
-    def open_win(e: tk.Event) -> None:
+    def open_win(e: tk.Event[ttk.Label]) -> None:
         """Display the color selection window."""
         itemconfig.widget_sfx()
         r, g, b = parse_color(holder.value)

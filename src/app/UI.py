@@ -99,7 +99,7 @@ item_list: dict[str, 'Item'] = {}
 # Piles of global widgets, should be made local...
 frmScroll: ttk.Frame  # Frame holding the item list.
 pal_canvas: tk.Canvas  # Canvas for the item list to scroll.
-sign_ui: signage_ui.SignageUIBase
+sign_ui: SignageUI
 
 
 TRANS_EXPORTED = TransToken.ui('Selected Items and Style successfully exported!')

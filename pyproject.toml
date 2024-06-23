@@ -108,6 +108,7 @@ extend-ignore = [
 extend-immutable-calls = [
 	# Objects which are immutable, or close enough that it's fine to be in func defaults.
 	"srctools.math.FrozenVec", "srctools.math.FrozenAngle", "srctools.math.FrozenMatrix",
+	"srctools.FrozenVec", "srctools.FrozenAngle", "srctools.FrozenMatrix",
 	# Image handle variants, all publically frozen.
 	"app.img.Handle.background", "app.img.Handle.blank", "app.img.Handle.builtin",
 	"app.img.Handle.color", "app.img.Handle.composite", "app.img.Handle.crop",

@@ -198,7 +198,7 @@ def add_tooltip(
         if data.text or data.img is not None:
             _show(targ_widget, x, y)
 
-    def enter_handler(event: tk.Event) -> None:
+    def enter_handler(event: tk.Event[tk.Misc]) -> None:
         """Schedule showing the tooltip."""
         nonlocal event_id
         data = DATA[targ_widget]
@@ -211,7 +211,7 @@ def add_tooltip(
                 event.x_root, event.y_root,
             )
 
-    def exit_handler(_: tk.Event) -> None:
+    def exit_handler(_: tk.Event[tk.Misc]) -> None:
         """When the user leaves, cancel the event."""
         # We only want to cancel if the event hasn't expired already
         nonlocal event_id

@@ -108,9 +108,9 @@ def check_has_trait(inst: Entity, kv: Keyvalues) -> bool:
     return kv.value.casefold() in instance_traits.get(inst)
 
 
-class CompareProto[Number: (float, decimal.Decimal, str)](Protocol):
+class CompareProto(Protocol):
     """Operator functions are Any, define a valid signature for how we use them."""
-    def __call__(self, a: Number, b: Number, /) -> bool: ...
+    def __call__[Number: (float, decimal.Decimal, str)](self, a: Number, b: Number, /) -> bool: ...
 
 
 INSTVAR_COMP: dict[str, CompareProto] = {

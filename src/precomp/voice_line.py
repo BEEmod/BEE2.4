@@ -11,7 +11,7 @@ import attrs
 import trio
 
 from BEE2_config import ConfigFile
-from precomp import corridor, options as vbsp_options, conditions, rand
+from precomp import corridor, conditions, rand
 from precomp.collisions import Collisions
 from precomp.conditions.monitor import make_voice_studio
 from quote_pack import Line, Quote, QuoteInfo, LineCriteria, Response, MIDCHAMBER_ID
