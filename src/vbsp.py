@@ -1673,7 +1673,12 @@ async def main(argv: list[str]) -> None:
         conditions.check_all(vmf, coll, info, voice_data_res.result())
         add_extra_ents(vmf, info)
 
+        LOGGER.info('Generating tiles...')
         tiling.generate_brushes(vmf)
+        LOGGER.info('Generating goop...')
+        tiling.generate_goo(vmf)
+        tiling.bind_overlays()
+
         faithplate.gen_faithplates(vmf, info.has_attr('superposition'))
         change_overlays(vmf)
         fix_worldspawn(vmf, info)

@@ -2208,9 +2208,9 @@ def generate_brushes(vmf: VMF) -> None:
                     for v in range(min_v, max_v + 1):
                         tile_pos[u, v].brush_faces.append(front)
 
-    LOGGER.info('Generating goop...')
-    generate_goo(vmf)
 
+def bind_overlays() -> None:
+    """Set sides on overlays which were bound to tiledefs."""
     nodraw = consts.Tools.NODRAW
     for over, over_tiles in OVERLAY_BINDS.items():
         # Keep already set sides.
