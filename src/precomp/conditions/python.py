@@ -1,5 +1,6 @@
 """The Operation result allows executing math on instvars."""
-from typing import Any, Container, Dict, List, NoReturn
+from collections.abc import Callable, Container
+from typing import Any, NoReturn
 import ast
 
 from precomp import conditions
@@ -12,7 +13,7 @@ COND_MOD_NAME = 'Python'
 LOGGER = srctools.logger.get_logger(__name__)
 
 # Functions we allow the result to call.
-FUNC_GLOBALS = {
+FUNCS: dict[str, Callable[[str], object]] = {
     'int': int,
 
     'bool': conv_bool,
@@ -25,9 +26,12 @@ FUNC_GLOBALS = {
 
     'vector': Vec.from_str,
     'vec': Vec.from_str,
+}
+
+FUNC_GLOBALS = {
+    **FUNCS,
 
     'Vec': Vec,
-
     # Don't give other globals, they aren't needed.
     '__builtins__': None,
 }
@@ -103,16 +107,18 @@ class Checker(ast.NodeVisitor):
 @conditions.make_result('Python', 'Operation')
 def res_python_setup(res: Keyvalues) -> conditions.ResultCallable:
     """Apply a function to a fixup."""
-    variables = {}
+    variables: dict[str, Callable[[str], object]] = {}
     variable_order = []
     code = None
     result_var = None
     for child in res:
         if child.name.startswith('$'):
-            if child.value.casefold() not in FUNC_GLOBALS:
-                raise Exception(f'Invalid variable type! ({child.value})')
-            variables[child.name[1:]] = child.value.casefold()
-            variable_order.append(child.name[1:])
+            var_name = child.name[1:]
+            try:
+                variables[var_name] = FUNCS[child.value.casefold()]
+            except KeyError:
+                raise Exception(f'Invalid variable type! ({child.value})') from None
+            variable_order.append(var_name)
         elif child.name == 'op':
             code = child.value
         elif child.name == 'resultvar':
@@ -142,46 +148,26 @@ def res_python_setup(res: Keyvalues) -> conditions.ResultCallable:
 
     Checker(variable_order).visit(expression)
 
-    # For each variable, do
-    # var = func(_fixup['var'])
-    statements: List[ast.AST] = [
-        ast.Assign(
-            targets=[ast.Name(id=var_name, ctx=ast.Store())],
-            value=ast.Call(
-                func=ast.Name(id=variables[var_name], ctx=ast.Load()),
-                args=[
-                    ast.Subscript(
-                        value=ast.Name(id='_fixup', ctx=ast.Load()),
-                        slice=ast.Index(value=ast.Str(s=var_name)),
-                        ctx=ast.Load(),
-                    ),
-                ],
-                keywords=[],
-                starargs=None,
-                kwargs=None,
-            )
-        )
-        for var_name in variable_order
-    ]
-    # The last statement returns the target expression.
-    statements.append(ast.Return(expression))
-
     args = ast.arguments(
         vararg=None, 
-        kwonlyargs=[], 
+        kwonlyargs=[
+            ast.arg(var_name)
+            for var_name in variable_order
+        ],
         kw_defaults=[], 
         kwarg=None, 
         defaults=[],
-        posonlyargs=[ast.arg('_fixup', None)],
-        args=[]
+        posonlyargs=[],
+        args=[],
     )
 
     func = ast.Module([
             ast.FunctionDef(
                 name='_bee2_generated_func',
                 args=args,
-                body=statements,
+                body=[ast.Return(expression)],
                 decorator_list=[],
+                type_params=[],
             ),
         ],
         type_ignores=[],
@@ -190,13 +176,17 @@ def res_python_setup(res: Keyvalues) -> conditions.ResultCallable:
     # Fill in lineno and col_offset
     ast.fix_missing_locations(func)
 
-    ns: Dict[str, Any] = {}
-    eval(compile(func, '<bee2_op>', mode='exec'), FUNC_GLOBALS, ns)
+    ns: dict[str, Any] = {}
+    eval(compile(func, '<bee2_op>', mode='exec'), FUNC_GLOBALS.copy(), ns)
     compiled_func = ns['_bee2_generated_func']
     compiled_func.__name__ = '<bee2_func>'
 
     def apply_operation(inst: Entity) -> None:
-        result = compiled_func(inst.fixup)
+        """Run the operation."""
+        result = compiled_func({
+            var_name: conv_func(inst.fixup[var_name])
+            for var_name, conv_func in variables.items()
+        })
         if isinstance(result, bool):
             result = int(result)
         inst.fixup[result_var] = str(result)
