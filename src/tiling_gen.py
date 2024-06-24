@@ -1,8 +1,11 @@
 """Logic for generating the overall map geometry."""
 from __future__ import annotations
+
+import itertools
 from collections import defaultdict
 from collections.abc import Iterator
 import functools
+import operator
 
 import attrs
 from srctools import Angle, Entity, VMF, Vec, logger
@@ -12,7 +15,7 @@ import utils
 from plane import PlaneGrid
 from precomp import grid_optim, rand, texturing
 from precomp.texturing import MaterialConf, Orient, Portalable, TileSize
-from precomp.tiling import OVERLAY_BINDS, TILES, TileDef, TileType, make_tile
+from precomp.tiling import TILES, TileDef, TileType, Bevels, make_tile
 
 
 LOGGER = logger.get_logger(__name__)
@@ -86,7 +89,7 @@ def bevel_split(
     texture_plane: PlaneGrid[TexDef],
     tile_pos: PlaneGrid[TileDef],
     orig_tiles: PlaneGrid[SubTile],
-) -> Iterator[tuple[int, int, int, int, tuple[bool, bool, bool, bool], TexDef]]:
+) -> Iterator[tuple[int, int, int, int, Bevels, TexDef]]:
     """Split the optimised segments to produce the correct bevelling."""
     for min_u, min_v, max_u, max_v, texdef in grid_optim.optimise(texture_plane):
         u_range = range(min_u, max_u + 1)
@@ -94,25 +97,25 @@ def bevel_split(
 
         # These are sort of reversed around, which is a little confusing.
         # Bevel U is facing in the U direction, running across the V.
-        bevel_umins: list[bool] = [
-            compute_bevel(tile_pos[min_u, v], -1, 0, orig_tiles[min_u-1, v])
+        bevel_umins: list[Bevels] = [
+            Bevels.u_min if compute_bevel(tile_pos[min_u, v], -1, 0, orig_tiles[min_u-1, v]) else Bevels.none
             for v in v_range
         ]
-        bevel_umaxes: list[bool] = [
-            compute_bevel(tile_pos[max_u, v], 1, 0, orig_tiles[max_u+1, v])
+        bevel_umaxes: list[Bevels] = [
+            Bevels.u_max if compute_bevel(tile_pos[max_u, v], 1, 0, orig_tiles[max_u+1, v]) else Bevels.none
             for v in v_range
         ]
-        bevel_vmins: list[bool] = [
-            compute_bevel(tile_pos[u, min_v], 0, -1, orig_tiles[u, min_v-1])
+        bevel_vmins: list[Bevels] = [
+            Bevels.v_min if compute_bevel(tile_pos[u, min_v], 0, -1, orig_tiles[u, min_v-1]) else Bevels.none
             for u in u_range
         ]
-        bevel_vmaxes: list[bool] = [
-            compute_bevel(tile_pos[u, max_v], 0, 1, orig_tiles[u, min_v+1])
+        bevel_vmaxes: list[Bevels] = [
+            Bevels.v_max if compute_bevel(tile_pos[u, max_v], 0, 1, orig_tiles[u, min_v+1]) else Bevels.none
             for u in u_range
         ]
 
-        u_group = list(utils.group_runs(zip(bevel_umins, bevel_umaxes, strict=True)))
-        v_group = list(utils.group_runs(zip(bevel_vmins, bevel_vmaxes, strict=True)))
+        u_group = list(utils.group_runs(map(operator.or_, bevel_umins, bevel_umaxes)))
+        v_group = list(utils.group_runs(map(operator.or_, bevel_umins, bevel_vmaxes)))
 
         for bevel_u, v_ind_min, v_ind_max in u_group:
             for bevel_v, u_ind_min, u_ind_max in v_group:
@@ -121,13 +124,13 @@ def bevel_split(
                     min_v + v_ind_min,
                     min_u + u_ind_max,
                     min_v + v_ind_max,
-                    bevel_u + bevel_v,
+                    bevel_u | bevel_v,
                     texdef
                 )
 
 
 def generate_brushes(vmf: VMF) -> None:
-    """Generate all the brushes in the map, then set overlay sides."""
+    """Generate all the brushes in the map."""
     # Clear just in case.
     make_subtile.cache_clear()
     make_texdef.cache_clear()
@@ -190,25 +193,6 @@ def generate_brushes(vmf: VMF) -> None:
         make_subtile.cache_info(), make_texdef.cache_info(), compute_bevel.cache_info(),
     )
 
-    nodraw = consts.Tools.NODRAW
-    for over, over_tiles in OVERLAY_BINDS.items():
-        # Keep already set sides.
-        faces = set(over['sides', ''].split())
-        # We don't want to include nodraw, since that doesn't accept
-        # overlays anyway.
-        for tile in over_tiles:
-            faces.update(
-                str(f.id)
-                for f in tile.brush_faces
-                if f.mat != nodraw
-            )
-
-        # If it turns out there's no faces for this, discard the overlay.
-        if faces:
-            over['sides'] = ' '.join(sorted(faces))
-        else:
-            over.remove()
-
 
 def generate_plane(
     vmf: VMF,
@@ -243,8 +227,8 @@ def generate_plane(
                 subtile_pos[u_full + u, v_full + v] = make_subtile(tile_type, tile.is_antigel)
                 grid_pos[u_full + u, v_full + v] = tile
 
-    orig_tiles = subtile_pos.copy()
-    orig_tiles.default = None
+    # Create a copy, but clear the default to ensure an error is raised if indexed incorrectly.
+    orig_tiles = PlaneGrid(subtile_pos)
     # Now, reprocess subtiles into textures by repeatedly spreading.
     texture_plane: PlaneGrid[TexDef] = PlaneGrid()
     while subtile_pos:

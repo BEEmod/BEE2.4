@@ -7,11 +7,13 @@ Note: We also store a list of tiledefs in overlay entities in the map, if
 they were attached to the original brushes.
 """
 from __future__ import annotations
+
+import operator
 from typing import Iterable, cast
-from collections.abc import Iterator, MutableMapping
+from collections.abc import Callable, Iterator, MutableMapping
 from collections import defaultdict, Counter
 import math
-from enum import Enum
+from enum import Enum, Flag
 from weakref import WeakKeyDictionary
 
 import attrs
@@ -37,9 +39,10 @@ import consts
 
 
 __all__ = [
-    'TileSize', 'Portalable', 'TileType',
+    'TileSize', 'Portalable', 'TileType', 'Bevels',
     'TILETYPE_FROM_CHAR', 'TILETYPE_TO_CHAR', 'PanelType', 'Panel', 'round_grid', 'TileDef',
-    'analyse_map', 'generate_brushes',
+    'analyse_map', 'generate_brushes', 'make_tile',
+    'TILES',  # TODO make private, encapsulate?
 ]
 LOGGER = srctools.logger.get_logger(__name__)
 
@@ -90,15 +93,37 @@ SUBTILE_FIZZ_KEY: tuple[int, int] = cast('tuple[int, int]', object())
 # from the level.
 OVERLAY_BINDS: MutableMapping[Entity, list[TileDef]] = WeakKeyDictionary()
 
+
+class Bevels(Flag):
+    """Track which sides of a tile should be bevelled."""
+    none = 0
+    north = v_max = 0b1000
+    south = v_min = 0b0100
+    east  = u_min = 0b0010
+    west  = u_max = 0b0001
+
+    u_both = east | west
+    v_both = north | south
+    all = u_both | v_both
+
 # Given the two bevel options, determine the correct texturing
 # values.
-# (min, max) -> (scale, offset)
-BEVEL_BACK_SCALE = {
-    (False, False): 128/512,  # |__|
+# (min, max) -> scale
+_BEVEL_BACK_SCALE_SINGLE = {
+    (False, False): 128/512, # |__|
     (False, True): 124/512,  # |__/
     (True, False): 124/512,  # \__|
     (True, True): 120/512,   # \__/
 }
+# The above for both axes, pre-calculated for every bevel.
+BEVEL_BACK_SCALE = {
+    (bevel := Bevels(i)): (
+        _BEVEL_BACK_SCALE_SINGLE[Bevels.u_min in bevel, Bevels.u_max in bevel],
+        _BEVEL_BACK_SCALE_SINGLE[Bevels.v_min in bevel, Bevels.v_max in bevel],
+    )
+    for i in range(2**4)
+}
+del _BEVEL_BACK_SCALE_SINGLE
 
 # U, V offset -> points on that side.
 # This allows computing the set of bevel orientations from the surrounding tiles.
@@ -1285,12 +1310,15 @@ class TileDef:
             u_range = range(max(int(umin), 0), min(int(umax), 4))
             v_range = range(max(int(vmin), 0), min(int(vmax), 4))
 
-            tile_bevels = (
-                any((int(umin)-1, i) in bevels for i in v_range),
-                any((int(umax), i) in bevels for i in v_range),
-                any((i, int(vmin)-1) in bevels for i in u_range),
-                any((i, int(vmax)) in bevels for i in u_range),
-            )
+            tile_bevels = Bevels.none
+            if any((int(umin)-1, i) in bevels for i in v_range):
+                tile_bevels |= Bevels.u_min
+            if any((int(umax), i) in bevels for i in v_range):
+                tile_bevels |= Bevels.u_max
+            if any((i, int(vmin)-1) in bevels for i in u_range):
+                tile_bevels |= Bevels.v_min
+            if any((i, int(vmax)) in bevels for i in u_range):
+                tile_bevels |= Bevels.v_max
 
             # Check if this tile needs to use a bullseye material.
             tile_is_bullseye = add_bullseye and not (
@@ -1547,7 +1575,7 @@ def make_tile(
     thickness: int = 4,
     width: float = 16,
     height: float = 16,
-    bevels: tuple[bool, bool, bool, bool] = (False, False, False, False),
+    bevels: Bevels = Bevels.none,
     panel_edge: bool = False,
     u_align: int = 512,
     v_align: int = 512,
@@ -1569,8 +1597,7 @@ def make_tile(
             Must be larger than the recess_dist.
         width: size in the U-direction. Must be > 8.
         height: size in the V-direction. Must be > 8.
-        bevels: If that side should be 45° angled - in order,
-            umin, umax, vmin, vmax.
+        bevels: If that side should be 45° angled.
         panel_edge: If True, use the panel-type squarebeams.
         u_align: Wrap offsets to this much at maximum.
         v_align: Wrap offsets to this much at maximum.
@@ -1597,29 +1624,26 @@ def make_tile(
         block_min[axis_v] - (origin[axis_v] - height/2)
     ) % v_align
 
-    bevel_umin, bevel_umax, bevel_vmin, bevel_vmax = bevels
-
     back_side = template['back'].copy(vmf_file=vmf)
     # The offset was set to zero in the original we copy from.
-    back_side.uaxis.scale = BEVEL_BACK_SCALE[bevel_umin, bevel_umax]
-    back_side.vaxis.scale = BEVEL_BACK_SCALE[bevel_vmin, bevel_vmax]
+    back_side.uaxis.scale, back_side.vaxis.scale = BEVEL_BACK_SCALE[bevels]
     # Shift the surface such that it's aligned to the minimum edge.
     back_side.translate(origin - normal * thickness + Vec.with_axes(
-        axis_u, 4 * bevel_umin - 64,
-        axis_v, 4 * bevel_vmin - 64,
+        axis_u, 4 * (Bevels.u_min in bevels) - 64,
+        axis_v, 4 * (Bevels.v_min in bevels) - 64,
     ))
     back_surf.apply(back_side)
 
-    umin_side = template[-1, 0, thickness, bevel_umin].copy(vmf_file=vmf)
+    umin_side = template[-1, 0, thickness, Bevels.u_min in bevels].copy(vmf_file=vmf)
     umin_side.translate(origin + Vec.with_axes(axis_u, -width/2))
 
-    umax_side = template[1, 0, thickness, bevel_umax].copy(vmf_file=vmf)
+    umax_side = template[1, 0, thickness, Bevels.u_max in bevels].copy(vmf_file=vmf)
     umax_side.translate(origin + Vec.with_axes(axis_u, width/2))
 
-    vmin_side = template[0, -1, thickness, bevel_vmin].copy(vmf_file=vmf)
+    vmin_side = template[0, -1, thickness, Bevels.v_min in bevels].copy(vmf_file=vmf)
     vmin_side.translate(origin + Vec.with_axes(axis_v, -height/2))
 
-    vmax_side = template[0, 1, thickness, bevel_vmax].copy(vmf_file=vmf)
+    vmax_side = template[0, 1, thickness, Bevels.v_max in bevels].copy(vmf_file=vmf)
     vmax_side.translate(origin + Vec.with_axes(axis_v, height/2))
 
     for face in [umin_side, umax_side, vmin_side, vmax_side]:
@@ -2030,7 +2054,7 @@ def inset_flip_panel(panel: list[Solid], pos: Vec, normal: Vec) -> None:
 def bevel_split(
     rect_points: PlaneGrid[bool],
     tile_pos: PlaneGrid[TileDef],
-) -> Iterator[tuple[int, int, int, int, tuple[bool, bool, bool, bool]]]:
+) -> Iterator[tuple[int, int, int, int, Bevels]]:
     """Split the optimised segments to produce the correct bevelling."""
     for min_u, min_v, max_u, max_v, _ in grid_optim.optimise(rect_points):
         u_range = range(min_u, max_u + 1)
@@ -2038,25 +2062,27 @@ def bevel_split(
 
         # These are sort of reversed around, which is a little confusing.
         # Bevel U is facing in the U direction, running across the V.
-        bevel_umins: list[bool] = [
-            tile_pos[min_u, v].should_bevel(-1, 0)
+        bevel_umins: list[Bevels] = [
+            Bevels.u_min if tile_pos[min_u, v].should_bevel(-1, 0) else Bevels.none
             for v in v_range
         ]
-        bevel_umaxes: list[bool] = [
-            tile_pos[max_u, v].should_bevel(1, 0)
+        bevel_umaxes: list[Bevels] = [
+            Bevels.u_max if tile_pos[max_u, v].should_bevel(1, 0) else Bevels.none
             for v in v_range
         ]
-        bevel_vmins: list[bool] = [
-            tile_pos[u, min_v].should_bevel(0, -1)
+        bevel_vmins: list[Bevels] = [
+            Bevels.v_min if tile_pos[u, min_v].should_bevel(0, -1) else Bevels.none
             for u in u_range
         ]
-        bevel_vmaxes: list[bool] = [
-            tile_pos[u, max_v].should_bevel(0, 1)
+        bevel_vmaxes: list[Bevels] = [
+            Bevels.v_max if tile_pos[u, max_v].should_bevel(0, 1) else Bevels.none
             for u in u_range
         ]
 
-        u_group = list(utils.group_runs(zip(bevel_umins, bevel_umaxes, strict=True)))
-        v_group = list(utils.group_runs(zip(bevel_vmins, bevel_vmaxes, strict=True)))
+        combine: Callable[[Bevels, Bevels], Bevels] = operator.or_
+
+        u_group = list(utils.group_runs(map(combine, bevel_umins, bevel_umaxes)))
+        v_group = list(utils.group_runs(map(combine, bevel_vmins, bevel_vmaxes)))
 
         for bevel_u, v_ind_min, v_ind_max in u_group:
             for bevel_v, u_ind_min, u_ind_max in v_group:
@@ -2065,7 +2091,7 @@ def bevel_split(
                     min_v + v_ind_min,
                     min_u + u_ind_max,
                     min_v + v_ind_max,
-                    bevel_u + bevel_v,
+                    bevel_u | bevel_v,
                 )
 
 
