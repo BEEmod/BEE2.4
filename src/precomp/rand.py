@@ -16,6 +16,7 @@ from precomp import instanceLocs
 # This should be copied to use for specific purposes, never modified.
 MAP_HASH = hashlib.sha256()
 ONE_FLOAT = Struct('f')
+ONE_INT = Struct('<i')
 THREE_FLOATS = Struct('<3f')
 NINE_FLOATS = Struct('<9e')  # Half-precision float, don't need the accuracy.
 THREE_INTS = Struct('<3i')
@@ -97,6 +98,9 @@ def seed(
                 algo.update(THREE_FLOATS.pack(round(a, 6), round(b, 6), round(c, 6)))
             case float():
                 algo.update(ONE_FLOAT.pack(val))
+            case int():
+                # If multi-digit, hashing puts it back into valid range.
+                algo.update(ONE_INT.pack(hash(val)))
             case Matrix() | FrozenMatrix():
                 algo.update(NINE_FLOATS.pack(
                     val[0, 0], val[0, 1], val[0, 2],
