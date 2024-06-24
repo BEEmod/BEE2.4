@@ -495,11 +495,11 @@ TILE_INHERIT = [
 ]
 
 DEFAULT_WEIGHTS = {
-    TileSize.TILE_DOUBLE: 32,
-    TileSize.TILE_1x1: 10,
-    TileSize.TILE_2x1: 16,
-    TileSize.TILE_1x2: 16,
-    TileSize.TILE_2x2: 6,
+    TileSize.TILE_DOUBLE: 60,
+    TileSize.TILE_1x1: 40,
+    TileSize.TILE_2x1: 25,
+    TileSize.TILE_1x2: 25,
+    TileSize.TILE_2x2: 4,
     TileSize.TILE_4x1: 3,
     TileSize.TILE_1x4: 3,
     TileSize.TILE_4x4: 1,
