@@ -43,6 +43,14 @@ make_subtile = functools.lru_cache(maxsize=None)(SubTile)
 make_texdef = functools.lru_cache(maxsize=64)(TexDef)
 TEXDEF_NODRAW = TexDef(MaterialConf(consts.Tools.NODRAW))
 
+# Each bevel and the corresponding offset.
+BEVEL_OFFSETS = [
+    (Bevels.u_min, -1, 0),
+    (Bevels.u_max, +1, 0),
+    (Bevels.v_min, 0, -1),
+    (Bevels.v_max, 0, +1),
+]
+
 
 @attrs.define
 class Tideline:
@@ -69,54 +77,65 @@ ALLOWED_SIZES: dict[TileType, list[TileSize]] = {
 }
 
 
-def _compute_bevel(tile: TileDef, u: int, v: int, neighbour: SubTile | None) -> bool:
-    if neighbour is None:
-        # We know we don't modify the tiledefs while generating.
-        return _cached_bevel(tile, u, v)
-    if neighbour.type is TileType.VOID:  # Always bevel towards instances.
-        return True
-    if neighbour.type.is_tile:  # If there's a tile, no need to bevel since it's never visible.
-        return False
-    # We know we don't modify the tiledefs while generating.
-    return _cached_bevel(tile, u, v)
-
-# We know we don't modify the tiledefs while generating.
-_cached_bevel = functools.lru_cache(maxsize=64)(TileDef.should_bevel)
-compute_bevel = functools.lru_cache(maxsize=64)(_compute_bevel)
-
-
 def bevel_split(
     texture_plane: PlaneGrid[TexDef],
     tile_pos: PlaneGrid[TileDef],
     orig_tiles: PlaneGrid[SubTile],
 ) -> Iterator[tuple[int, int, int, int, Bevels, TexDef]]:
     """Split the optimised segments to produce the correct bevelling."""
-    for min_u, min_v, max_u, max_v, texdef in grid_optim.optimise(texture_plane):
-        u_range = range(min_u, max_u + 1)
-        v_range = range(min_v, max_v + 1)
+    bevels = PlaneGrid(default=Bevels.none)
 
+    total_mins_u, total_mins_v = texture_plane.mins
+    total_maxs_u, total_maxs_v = texture_plane.maxes
+
+    # Iterate over every TileDef, apply bevels due to those.
+    subtile_range = range(4)
+    for u, v in itertools.product(
+        range(total_mins_u, total_mins_u + 1, 4),
+        range(total_mins_v, total_mins_v + 1, 4),
+    ):
+        try:
+            tile = tile_pos[u, v]
+        except KeyError:
+            # This 4x4 tile is not present.
+            continue
+        min_u = u // 4 * 4
+        min_v = v // 4 * 4
         # These are sort of reversed around, which is a little confusing.
         # Bevel U is facing in the U direction, running across the V.
-        bevel_umins: list[Bevels] = [
-            Bevels.u_min if compute_bevel(tile_pos[min_u, v], -1, 0, orig_tiles[min_u-1, v]) else Bevels.none
-            for v in v_range
-        ]
-        bevel_umaxes: list[Bevels] = [
-            Bevels.u_max if compute_bevel(tile_pos[max_u, v], 1, 0, orig_tiles[max_u+1, v]) else Bevels.none
-            for v in v_range
-        ]
-        bevel_vmins: list[Bevels] = [
-            Bevels.v_min if compute_bevel(tile_pos[u, min_v], 0, -1, orig_tiles[u, min_v-1]) else Bevels.none
-            for u in u_range
-        ]
-        bevel_vmaxes: list[Bevels] = [
-            Bevels.v_max if compute_bevel(tile_pos[u, max_v], 0, 1, orig_tiles[u, min_v+1]) else Bevels.none
-            for u in u_range
-        ]
+        if tile.should_bevel(-1, 0):
+            for off in subtile_range:
+                bevels[min_u, min_v + off] |= Bevels.u_min
+        if tile.should_bevel(+1, 0):
+            for off in subtile_range:
+                bevels[min_u + 4, min_v + off] |= Bevels.u_max
+        if tile.should_bevel(0, -1):
+            for off in subtile_range:
+                bevels[min_u + off, min_v] |= Bevels.v_min
+        if tile.should_bevel(0, +1):
+            for off in subtile_range:
+                bevels[min_u + off, min_v + 4] |= Bevels.v_max
 
-        u_group = list(utils.group_runs(map(operator.or_, bevel_umins, bevel_umaxes)))
-        v_group = list(utils.group_runs(map(operator.or_, bevel_umins, bevel_vmaxes)))
+    # Iterate every tile, apply bevels from neighbours.
+    for (u, v), texdef in texture_plane.items():
+        for bevel, off_u, off_v in BEVEL_OFFSETS:
+            try:
+                neighbour = orig_tiles[u + off_u, v + off_v]
+            except KeyError:
+                continue
+            if neighbour.type is TileType.VOID:  # Always bevel towards instances.
+                bevels[u, v] |= bevel
+            if neighbour.type.is_tile:  # If there's a tile, no need to bevel since it's never visible.
+                bevels[u, v] &= ~bevel
 
+    for min_u, min_v, max_u, max_v, texdef in grid_optim.optimise(texture_plane):
+        u_group = list(utils.group_runs([
+            bevels[min_u, v] | bevels[max_u, v]
+            for v in range(min_v, max_v + 1)
+        ]))
+        v_group = list(utils.group_runs([
+            bevels[u, min_v] | bevels[u, max_v] for u in range(min_u, max_u + 1)
+        ]))
         for bevel_u, v_ind_min, v_ind_max in u_group:
             for bevel_v, u_ind_min, u_ind_max in v_group:
                 yield (
@@ -134,8 +153,6 @@ def generate_brushes(vmf: VMF) -> None:
     # Clear just in case.
     make_subtile.cache_clear()
     make_texdef.cache_clear()
-    compute_bevel.cache_clear()
-    _cached_bevel.cache_clear()
 
     LOGGER.info('Generating tiles...')
     # The key is (normal, plane distance)
@@ -189,8 +206,8 @@ def generate_brushes(vmf: VMF) -> None:
     for (norm_x, norm_y, norm_z, plane_dist), tiles in full_tiles.items():
         generate_plane(vmf, search_dists, Vec(norm_x, norm_y, norm_z), plane_dist, tiles)
     LOGGER.info(
-        'Caches: subtile={}, texdef={}, compute_bevel={}',
-        make_subtile.cache_info(), make_texdef.cache_info(), compute_bevel.cache_info(),
+        'Caches: subtile={}, texdef={}',
+        make_subtile.cache_info(), make_texdef.cache_info(),
     )
 
 
@@ -224,7 +241,7 @@ def generate_plane(
         v_full = int((pos[v_axis] - 64) // 32)
         for u, v, tile_type in tile:
             if tile_type is not VOID:
-                subtile_pos[u_full + u, v_full + v] = make_subtile(tile_type, tile.is_antigel)
+                subtile_pos[u_full + u, v_full + v] = make_subtile(tile_type, tile.is_antigel())
                 grid_pos[u_full + u, v_full + v] = tile
 
     # Create a copy, but clear the default to ensure an error is raised if indexed incorrectly.
