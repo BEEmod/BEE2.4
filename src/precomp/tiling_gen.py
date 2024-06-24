@@ -177,7 +177,7 @@ def generate_brushes(vmf: VMF) -> None:
             )
     for tile in TILES.values():
         # First, if not a simple tile, we have to deal with it individually.
-        if not tile.can_merge():
+        if not tile.is_simple():
             tile.export(vmf)
             continue
         # Otherwise, decompose into a big plane dict, for dynamic merging.
@@ -305,7 +305,7 @@ def generate_plane(
                 subtile.type.value, subtile.antigel,
             )
             gen = texturing.gen(texturing.GenCat.NORMAL, normal, subtile.type.color)
-            # Figure out tile sizes we can use.
+            # Figure out tile sizes we can use. TODO: Cache this generated list.
             sizes: list[TileSize] = []
             counts: list[int] = []
             for size in ALLOWED_SIZES[subtile.type]:

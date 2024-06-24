@@ -184,6 +184,11 @@ class TileType(Enum):
         return self.value < 10
 
     @property
+    def is_surface(self) -> bool:
+        """Is this some sort of flat surface - a tile or nodraw?"""
+        return self.value <= 10
+
+    @property
     def is_white(self) -> bool:
         """Is this portalable?"""
         return self.name.startswith('WHITE')
@@ -1421,7 +1426,10 @@ class TileDef:
         return faces, brushes
 
     def can_merge(self) -> bool:
-        """Check if this tile is a simple tile that can merge with neighbours."""
+        """Check if this tile is a simple tile that can merge with neighbours.
+
+        This is for the old generator, which cannot handle subtiles.
+        """
         if (
             self._sub_tiles is not None or
             self.panels or
@@ -1431,6 +1439,13 @@ class TileDef:
             return False
 
         return self.base_type.is_tile
+
+    def is_simple(self) -> bool:
+        """Check if this tile is a simple tile that can merge with neighbours."""
+        if self.panels or self.bullseye_count > 0 or self.override is not None:
+            return False
+
+        return self.base_type.is_surface
 
     def add_portal_helper(self, orient: Vec | None = None) -> None:
         """Add a portal placement helper to the tile.
