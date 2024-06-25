@@ -122,20 +122,21 @@ def bevel_split(
             try:
                 neighbour = orig_tiles[u + off_u, v + off_v]
             except KeyError:
-                continue
-            if neighbour.type is TileType.VOID:  # Always bevel towards instances.
+                # Always bevel towards instances.
                 bevels[u, v] |= bevel
+                continue
             if neighbour.type.is_tile:  # If there's a tile, no need to bevel since it's never visible.
                 bevels[u, v] &= ~bevel
 
     for min_u, min_v, max_u, max_v, texdef in grid_optim.optimise(texture_plane):
-        u_group = list(utils.group_runs([
-            bevels[min_u, v] | bevels[max_u, v]
+        u_group = list(utils.group_runs(
+            (bevels[min_u, v] | bevels[max_u, v]) & Bevels.u_both
             for v in range(min_v, max_v + 1)
-        ]))
-        v_group = list(utils.group_runs([
-            bevels[u, min_v] | bevels[u, max_v] for u in range(min_u, max_u + 1)
-        ]))
+        ))
+        v_group = list(utils.group_runs(
+            (bevels[u, min_v] | bevels[u, max_v]) & Bevels.v_both
+            for u in range(min_u, max_u + 1)
+        ))
         for bevel_u, v_ind_min, v_ind_max in u_group:
             for bevel_v, u_ind_min, u_ind_max in v_group:
                 yield (

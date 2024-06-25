@@ -1445,7 +1445,7 @@ class TileDef:
         if self.panels or self.bullseye_count > 0 or self.override is not None:
             return False
 
-        return self.base_type.is_surface
+        return True
 
     def add_portal_helper(self, orient: Vec | None = None) -> None:
         """Add a portal placement helper to the tile.
