@@ -1,7 +1,6 @@
 """Implements a dynamic item allowing placing the various test chamber signages."""
 from __future__ import annotations
-from typing import Optional, Final
-from typing_extensions import Self
+from typing import Final
 
 import attrs
 import srctools.logger
@@ -41,8 +40,8 @@ class SignageLegend(PakObject):
         self,
         sty_id: str,
         overlay: ImgHandle,
-        background: Optional[ImgHandle],
-        blank: Optional[ImgHandle],
+        background: ImgHandle | None,
+        blank: ImgHandle | None,
     ) -> None:
         self.id = sty_id
         self.overlay = overlay
@@ -50,7 +49,7 @@ class SignageLegend(PakObject):
         self.blank = blank
 
     @classmethod
-    async def parse(cls, data: ParseData) -> Self:
+    async def parse(cls, data: ParseData) -> SignageLegend:
         """Parse a signage legend."""
         if 'blank' in data.info:
             blank = ImgHandle.parse(data.info, data.pak_id, CELL_SIZE, CELL_SIZE, subkey='blank')

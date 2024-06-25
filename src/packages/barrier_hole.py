@@ -3,7 +3,7 @@
 These are separated from the item, because they vary not by style but based on the type of
 barrier they're placed onto.
 """
-from typing_extensions import Self
+from typing import Self
 
 from packages import PakObject, ParseData, get_config
 from app import lazy_conf

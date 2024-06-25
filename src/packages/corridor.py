@@ -1,6 +1,6 @@
 """Defines individual corridors to allow swapping which are used."""
 from __future__ import annotations
-from typing_extensions import Final
+from typing import Final
 
 from collections import defaultdict
 from collections.abc import Sequence, Iterator, Mapping

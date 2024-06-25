@@ -7,18 +7,18 @@ Note: We also store a list of tiledefs in overlay entities in the map, if
 they were attached to the original brushes.
 """
 from __future__ import annotations
+from typing import Iterable, Literal, cast
 
-import operator
-from typing import Iterable, cast
 from collections.abc import Callable, Iterator, MutableMapping
 from collections import defaultdict, Counter
-import math
 from enum import Enum, Flag
 from weakref import WeakKeyDictionary
+import operator
+import math
 
-import attrs
 from srctools import FrozenMatrix, FrozenVec, Vec, Angle, Matrix
 from srctools.vmf import VMF, Entity, Side, Solid, Output, UVAxis
+import attrs
 import srctools.logger
 import srctools.vmf
 
@@ -124,10 +124,11 @@ BEVEL_BACK_SCALE = {
     for i in range(2**4)
 }
 del _BEVEL_BACK_SCALE_SINGLE
+type Axis = Literal[-1, 0, +1]
 
 # U, V offset -> points on that side.
 # This allows computing the set of bevel orientations from the surrounding tiles.
-BEVEL_SIDES: list[tuple[int, int, set[tuple[int, int]]]] = [
+BEVEL_SIDES: list[tuple[Axis, Axis, set[tuple[int, int]]]] = [
     (-1, 0, {(-1, y) for y in range(4)}),
     (+1, 0, {(+4, y) for y in range(4)}),
     (0, -1, {(x, -1) for x in range(4)}),
@@ -1120,10 +1121,10 @@ class TileDef:
             return False
         return self.pos.freeze() in plane
 
-    def should_bevel(self, u: int, v: int) -> bool:
+    def should_bevel(self, u: Axis, v: Axis) -> bool:
         """Check if this side of the TileDef should be bevelled.
 
-        U and V should be 1 or -1.
+        U and V should be -1, 0 or +1.
         """
         # If there's a fully solid block on this side, we don't need to.
         if BLOCK_POS.lookup_world(self.uv_offset(128*u, 128*v, 0)).inside_map:
@@ -2111,7 +2112,7 @@ def bevel_split(
 
 
 def generate_brushes(vmf: VMF) -> None:
-    """Generate all the brushes in the map, then set overlay sides."""
+    """Generate all the brushes in the map."""
     LOGGER.info('Generating tiles...')
     # Each tile is either a full-block tile, or some kind of subtile/special surface.
     # Each subtile is generated individually. If it's a full-block tile we

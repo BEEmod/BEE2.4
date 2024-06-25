@@ -2,7 +2,6 @@
 from __future__ import annotations
 from typing import Iterator, Mapping
 
-from typing_extensions import Self
 from collections.abc import Iterable
 
 from srctools import conv_float
@@ -49,7 +48,7 @@ class Music(PakObject, needs_foreground=True, style_suggest_key='music'):
         self.has_synced_tbeam = synch_tbeam
 
     @classmethod
-    async def parse(cls, data: ParseData) -> Self:
+    async def parse(cls, data: ParseData) -> Music:
         """Parse a music definition."""
         selitem_data = SelitemData.parse(data.info, data.pak_id)
         inst = data.info['instance', None]
@@ -156,7 +155,7 @@ class Music(PakObject, needs_foreground=True, style_suggest_key='music'):
             volume=volume,
         )
 
-    def add_over(self, override: Self) -> None:
+    def add_over(self, override: Music) -> None:
         """Add the additional vbsp_config commands to ourselves."""
         self.config = lazy_conf.concat(self.config, override.config)
         self.selitem_data += override.selitem_data
@@ -245,7 +244,7 @@ class Music(PakObject, needs_foreground=True, style_suggest_key='music'):
                         )
                 # Look for tracks used in two items, indicates
                 # they should be children of one...
-                soundset = frozenset(map(str.casefold, music.sound[channel]))
+                soundset = frozenset({snd.casefold() for snd in music.sound[channel]})
                 if not soundset:
                     continue  # Blank shouldn't match blanks...
 

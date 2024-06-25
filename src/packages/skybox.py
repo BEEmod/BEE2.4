@@ -1,5 +1,5 @@
-from typing import Iterator
-from typing_extensions import Self
+from __future__ import annotations
+from collections.abc import Iterator
 
 from srctools import Keyvalues
 
@@ -35,7 +35,7 @@ class Skybox(
         self.fog_color = fog_opts.vec('primarycolor', 255, 255, 255)
 
     @classmethod
-    async def parse(cls, data: ParseData) -> Self:
+    async def parse(cls, data: ParseData) -> Skybox:
         """Parse a skybox definition."""
         selitem_data = SelitemData.parse(data.info, data.pak_id)
         mat = data.info['material', 'sky_black']
@@ -58,7 +58,7 @@ class Skybox(
             draw_first,
         )
 
-    def add_over(self, override: Self) -> None:
+    def add_over(self, override: Skybox) -> None:
         """Add the additional vbsp_config commands to ourselves."""
         self.selitem_data += override.selitem_data
         self.config = lazy_conf.concat(self.config, override.config)
