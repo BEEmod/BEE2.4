@@ -276,42 +276,15 @@ def generate_brushes(vmf: VMF) -> None:
     )
 
 
-def generate_plane(
-    vmf: VMF,
-    search_dists: dict[tuple[Portalable, Orient], int],
+def calculate_plane(
     normal: Vec, plane_dist: float,
-    tiles: list[TileDef],
-) -> None:
-    """Generate all the tiles in a single flat plane.
-
-    These are all the ones which could be potentially merged together.
-    Order of operations:
-    - Order the tiles by their UV positions, in a grid.
-    - Decompose those into individual subtile definitions.
-    - Repeatedly take sections and compute the texture.
-    - A second pass is made to determine the required bevelling.
-    - Finally that raw form is converted to brushes.
-    """
-    norm_axis = normal.axis()
+    search_dists: dict[tuple[Portalable, Orient], int],
+    subtile_pos: PlaneGrid[SubTile],
+) -> PlaneGrid[TexDef]:
+    """Calculate the textures to use for a plane of tiles."""
     orient = Orient.from_normal(normal)
-    u_axis, v_axis = Vec.INV_AXIS[norm_axis]
-    grid_pos: PlaneGrid[TileDef] = PlaneGrid()
 
-    VOID = TileType.VOID
-    subtile_pos = PlaneGrid(default=SubTile(VOID, False))
-
-    for tile in tiles:
-        pos = tile.pos_front
-        u_full = int((pos[u_axis] - 64) // 32)
-        v_full = int((pos[v_axis] - 64) // 32)
-        for u, v, tile_type in tile:
-            if tile_type is not VOID:
-                subtile_pos[u_full + u, v_full + v] = make_subtile(tile_type, tile.is_antigel())
-                grid_pos[u_full + u, v_full + v] = tile
-
-    # Create a copy, but clear the default to ensure an error is raised if indexed incorrectly.
-    orig_tiles = PlaneGrid(subtile_pos)
-    # Now, reprocess subtiles into textures by repeatedly spreading.
+    # Reprocess subtiles into textures by repeatedly spreading.
     texture_plane: PlaneGrid[TexDef] = PlaneGrid()
     while subtile_pos:
         max_u, max_v, subtile = subtile_pos.largest_index()
@@ -354,7 +327,7 @@ def generate_plane(
                 break
 
         # Then pick the biggest axis.
-        if (1+max_u - min_u1) * (1+max_v-min_v1) > (1+max_u - min_u2) * (1+max_v - min_v2):
+        if (1 + max_u - min_u1) * (1 + max_v - min_v1) > (1 + max_u - min_u2) * (1 + max_v - min_v2):
             width = max_u - min_u1 + 1
             height = max_v - min_v1 + 1
         else:
@@ -407,15 +380,50 @@ def generate_plane(
             # Not a tile, must be nodraw.
             tex_def = TEXDEF_NODRAW
 
-        for u in range(max_u-width+1, max_u+1):
-            for v in range(max_v-height+1, max_v+1):
+        for u in range(max_u - width + 1, max_u + 1):
+            for v in range(max_v - height + 1, max_v + 1):
                 del subtile_pos[u, v]
                 texture_plane[u, v] = tex_def
+    return texture_plane
 
-    from precomp.conditions import fetch_debug_visgroup
-    debug_on = (normal == (0, 0, 1) and plane_dist == 1408.0)
-    add_debug = fetch_debug_visgroup(vmf, 'tiledef_neighbour', force=debug_on)
 
+def generate_plane(
+    vmf: VMF,
+    search_dists: dict[tuple[Portalable, Orient], int],
+    normal: Vec, plane_dist: float,
+    tiles: list[TileDef],
+) -> None:
+    """Generate all the tiles in a single flat plane.
+
+    These are all the ones which could be potentially merged together.
+    Order of operations:
+    - Order the tiles by their UV positions, in a grid.
+    - Decompose those into individual subtile definitions.
+    - Repeatedly take sections and compute the texture.
+    - A second pass is made to determine the required bevelling.
+    - Finally that raw form is converted to brushes.
+    """
+    norm_axis = normal.axis()
+    u_axis, v_axis = Vec.INV_AXIS[norm_axis]
+    grid_pos: PlaneGrid[TileDef] = PlaneGrid()
+
+    subtile_pos = PlaneGrid(default=SubTile(TileType.VOID, False))
+
+    for tile in tiles:
+        pos = tile.pos_front
+        u_full = int((pos[u_axis] - 64) // 32)
+        v_full = int((pos[v_axis] - 64) // 32)
+        for u, v, tile_type in tile:
+            if tile_type is not TileType.VOID:
+                subtile_pos[u_full + u, v_full + v] = make_subtile(tile_type, tile.is_antigel())
+                grid_pos[u_full + u, v_full + v] = tile
+
+    # Create a copy, but clear the default to ensure an error is raised if indexed incorrectly.
+    orig_tiles = PlaneGrid(subtile_pos)
+
+    texture_plane = calculate_plane(normal, plane_dist, search_dists, subtile_pos)
+
+    # Split tiles into each brush that needs to be placed, then create it.
     for min_u, min_v, max_u, max_v, bevels, tex_def in bevel_split(texture_plane, grid_pos, orig_tiles):
         center = normal * plane_dist + Vec.with_axes(
             # Compute avg(32*min, 32*max)
