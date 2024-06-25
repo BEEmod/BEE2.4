@@ -5,15 +5,13 @@ import itertools
 from collections import defaultdict
 from collections.abc import Iterator
 import functools
-import operator
 
 import attrs
 from srctools import Angle, Entity, VMF, Vec, logger
 
 import consts
-import utils
 from plane import PlaneGrid
-from precomp import grid_optim, rand, texturing
+from precomp import rand, texturing
 from precomp.texturing import MaterialConf, Orient, Portalable, TileSize
 from precomp.tiling import TILES, TileDef, TileType, Bevels, make_tile
 
@@ -128,25 +126,91 @@ def bevel_split(
             if neighbour.type.is_tile:  # If there's a tile, no need to bevel since it's never visible.
                 bevels[u, v] &= ~bevel
 
-    for min_u, min_v, max_u, max_v, texdef in grid_optim.optimise(texture_plane):
-        u_group = list(utils.group_runs(
-            (bevels[min_u, v] | bevels[max_u, v]) & Bevels.u_both
-            for v in range(min_v, max_v + 1)
-        ))
-        v_group = list(utils.group_runs(
-            (bevels[u, min_v] | bevels[u, max_v]) & Bevels.v_both
-            for u in range(min_u, max_u + 1)
-        ))
-        for bevel_u, v_ind_min, v_ind_max in u_group:
-            for bevel_v, u_ind_min, u_ind_max in v_group:
-                yield (
-                    min_u + u_ind_min,
-                    min_v + v_ind_min,
-                    min_u + u_ind_max,
-                    min_v + v_ind_max,
-                    bevel_u | bevel_v,
-                    texdef
-                )
+    todo_plane = texture_plane.copy()
+
+    while todo_plane:
+        u, v, texdef = todo_plane.largest_index()
+        min_u, min_v, max_u, max_v, bevel = _bevel_extend(u, v, texdef, todo_plane, bevels)
+        yield min_u, min_v, max_u, max_v, bevel, texdef
+        for u, v in itertools.product(range(min_u, max_u + 1), range(min_v, max_v + 1)):
+            del todo_plane[u, v]
+
+
+def _bevel_extend(
+    u: int, v: int, texdef: TexDef,
+    texture_plane: PlaneGrid[TexDef],
+    bevel_plane: PlaneGrid[Bevels],
+) -> tuple[int, int, int, int, Bevels]:
+    """Extend a tile as far as it can."""
+    # Try both orders to see which produces the biggest tile.
+    min_u1, min_v1, max_u1, max_v1, bevels1 = _bevel_extend_u(
+        texture_plane, bevel_plane, texdef, Bevels.none,
+        u, v, u, v,
+    )
+    min_u1, min_v1, max_u1, max_v1, bevels1 = _bevel_extend_v(
+        texture_plane, bevel_plane, texdef, bevels1,
+        min_u1, min_v1, max_u1, max_v1,
+    )
+    min_u2, min_v2, max_u2, max_v2, bevels2 = _bevel_extend_v(
+        texture_plane, bevel_plane, texdef, Bevels.none,
+        u, v, u, v,
+    )
+    min_u2, min_v2, max_u2, max_v2, bevels2 = _bevel_extend_u(
+        texture_plane, bevel_plane, texdef, bevels2,
+        min_u2, min_v2, max_u2, max_v2,
+    )
+    if (max_u1 - min_u1) * (max_v1 - min_v1) > (max_u2 - min_u2) * (max_v2 - min_v2):
+        return min_u1, min_v1, max_u1, max_v1, bevels1
+    else:
+        return min_u2, min_v2, max_u2, max_v2, bevels2
+
+
+def _bevel_extend_u(
+    texture_plane: PlaneGrid[TexDef],
+    bevel_plane: PlaneGrid[Bevels],
+    tile: TexDef, bevels: Bevels,
+    min_u: int, min_v: int, max_u: int, max_v: int,
+) -> tuple[int, int, int, int, Bevels]:
+    """Extend this region in the -u direction.
+    This then returns the required bevelling and the tile size.
+    """
+    bevel_min = bevel_plane[min_u, min_v] & Bevels.v_min
+    bevel_max = bevel_plane[max_u, max_v] & Bevels.v_max
+    bevels |= bevel_min | bevel_max
+    while True:
+        u = min_u - 1
+        if (
+            bevel_plane[u, min_v] & Bevels.v_min != bevel_min or
+            bevel_plane[u, max_v] & Bevels.v_max != bevel_max or
+            any(texture_plane.get((u, v)) is not tile for v in range(min_v, max_v + 1))
+        ):
+            return min_u, min_v, max_u, max_v, bevels
+        # Else: all good, check next column.
+        min_u = u
+
+
+def _bevel_extend_v(
+    texture_plane: PlaneGrid[TexDef],
+    bevel_plane: PlaneGrid[Bevels],
+    tile: TexDef, bevels: Bevels,
+    min_u: int, min_v: int, max_u: int, max_v: int,
+) -> tuple[int, int, int, int, Bevels]:
+    """Extend this region in the -v direction.
+    This then returns the required bevelling and the tile size.
+    """
+    bevel_min = bevel_plane[min_u, min_v] & Bevels.u_min
+    bevel_max = bevel_plane[max_u, max_v] & Bevels.u_max
+    bevels |= bevel_min | bevel_max
+    while True:
+        v = min_v - 1
+        if (
+            bevel_plane[min_u, v] & Bevels.u_min != bevel_min or
+            bevel_plane[max_u, v] & Bevels.u_max != bevel_max or
+            any(texture_plane.get((u, v)) is not tile for u in range(min_u, max_u + 1))
+        ):
+            return min_u, min_v, max_u, max_v, bevels
+        # Else: all good, check next row.
+        min_v = v
 
 
 def generate_brushes(vmf: VMF) -> None:
@@ -347,6 +411,10 @@ def generate_plane(
             for v in range(max_v-height+1, max_v+1):
                 del subtile_pos[u, v]
                 texture_plane[u, v] = tex_def
+
+    from precomp.conditions import fetch_debug_visgroup
+    debug_on = (normal == (0, 0, 1) and plane_dist == 1408.0)
+    add_debug = fetch_debug_visgroup(vmf, 'tiledef_neighbour', force=debug_on)
 
     for min_u, min_v, max_u, max_v, bevels, tex_def in bevel_split(texture_plane, grid_pos, orig_tiles):
         center = normal * plane_dist + Vec.with_axes(
