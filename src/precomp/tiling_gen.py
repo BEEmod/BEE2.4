@@ -1,19 +1,20 @@
 """Logic for generating the overall map geometry."""
 from __future__ import annotations
+from typing import Literal
 
-import itertools
 from collections import defaultdict
 from collections.abc import Iterator
 import functools
+import itertools
 
-import attrs
 from srctools import Angle, Entity, VMF, Vec, logger
+import attrs
 
-import consts
 from plane import PlaneGrid
 from precomp import rand, texturing
 from precomp.texturing import MaterialConf, Orient, Portalable, TileSize
 from precomp.tiling import TILES, TileDef, TileType, Bevels, make_tile
+import consts
 
 
 LOGGER = logger.get_logger(__name__)
@@ -42,7 +43,7 @@ make_texdef = functools.lru_cache(maxsize=64)(TexDef)
 TEXDEF_NODRAW = TexDef(MaterialConf(consts.Tools.NODRAW))
 
 # Each bevel and the corresponding offset.
-BEVEL_OFFSETS = [
+BEVEL_OFFSETS: list[tuple[Bevels, Literal[-1, 0, +1], Literal[-1, 0, +1]]] = [
     (Bevels.u_min, -1, 0),
     (Bevels.u_max, +1, 0),
     (Bevels.v_min, 0, -1),
@@ -159,7 +160,7 @@ def _bevel_extend(
         texture_plane, bevel_plane, texdef, bevels2,
         min_u2, min_v2, max_u2, max_v2,
     )
-    if (max_u1 - min_u1) * (max_v1 - min_v1) > (max_u2 - min_u2) * (max_v2 - min_v2):
+    if (1 + max_u1 - min_u1) * (1 + max_v1 - min_v1) > (1 + max_u2 - min_u2) * (1 + max_v2 - min_v2):
         return min_u1, min_v1, max_u1, max_v1, bevels1
     else:
         return min_u2, min_v2, max_u2, max_v2, bevels2
@@ -411,11 +412,12 @@ def generate_plane(
 
     for tile in tiles:
         pos = tile.pos_front
+        antigel = tile.is_antigel()
         u_full = int((pos[u_axis] - 64) // 32)
         v_full = int((pos[v_axis] - 64) // 32)
         for u, v, tile_type in tile:
             if tile_type is not TileType.VOID:
-                subtile_pos[u_full + u, v_full + v] = make_subtile(tile_type, tile.is_antigel())
+                subtile_pos[u_full + u, v_full + v] = make_subtile(tile_type, antigel)
                 grid_pos[u_full + u, v_full + v] = tile
 
     # Create a copy, but clear the default to ensure an error is raised if indexed incorrectly.
