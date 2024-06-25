@@ -1129,20 +1129,22 @@ def fetch_debug_visgroup(
     vmf: VMF,
     vis_name: str,
     r: int = 113, g: int = 113, b: int = 0,
-    force: bool = False,
+    force: bool | None = None,
 ) -> DebugAdder:
     """If debugging is enabled, return a function that adds entities to the specified visgroup.
 
     * vis_name: The name of the visgroup to use. If already present the existing one is used.
     * r, g, b: Color to use, if creating.
-    * force: If true, always adds. Otherwise, this only adds if Dev Mode is enabled.
+    * force: If set, forces this to be present/absent. Otherwise, this only adds if Dev Mode is enabled.
 
     The returned function can either be called with a classname + keyvalues to create an ent,
     or given an existing ent/brush to add. If given an existing ent/brush, it should not be
     already added to the VMF - this will skip doing so if debugging is disabled. In that case
     the ent/brush will just be discarded harmlessly.
     """
-    if not force and not utils.DEV_MODE:
+    if force is None:
+        force = utils.DEV_MODE
+    if not force:
         def func(target: str | Entity | Solid, /, **kwargs: ValidKVs) -> Entity | Solid:
             """Do nothing."""
             if isinstance(target, str):

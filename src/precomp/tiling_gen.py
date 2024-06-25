@@ -91,8 +91,8 @@ def bevel_split(
     # Iterate over every TileDef, apply bevels due to those.
     subtile_range = range(4)
     for u, v in itertools.product(
-        range(total_mins_u, total_mins_u + 1, 4),
-        range(total_mins_v, total_mins_v + 1, 4),
+        range(total_mins_u, total_maxs_u + 1, 4),
+        range(total_mins_v, total_maxs_v + 1, 4),
     ):
         try:
             tile = tile_pos[u, v]
@@ -108,13 +108,13 @@ def bevel_split(
                 bevels[min_u, min_v + off] |= Bevels.u_min
         if tile.should_bevel(+1, 0):
             for off in subtile_range:
-                bevels[min_u + 4, min_v + off] |= Bevels.u_max
+                bevels[min_u + 3, min_v + off] |= Bevels.u_max
         if tile.should_bevel(0, -1):
             for off in subtile_range:
                 bevels[min_u + off, min_v] |= Bevels.v_min
         if tile.should_bevel(0, +1):
             for off in subtile_range:
-                bevels[min_u + off, min_v + 4] |= Bevels.v_max
+                bevels[min_u + off, min_v + 3] |= Bevels.v_max
 
     # Iterate every tile, apply bevels from neighbours.
     for (u, v), texdef in texture_plane.items():
