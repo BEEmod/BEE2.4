@@ -503,7 +503,7 @@ TILE_INHERIT = [
     (TileSize.TILE_4x4, TileSize.TILE_1x4),
     (TileSize.TILE_2x2, TileSize.TILE_2x1),
     (TileSize.TILE_2x2, TileSize.TILE_1x2),
-    (TileSize.TILE_2x2, TileSize.TILE_1x1),
+    (TileSize.TILE_2x1, TileSize.TILE_1x1),
 
     (TileSize.TILE_4x4, TileSize.GOO_SIDE),
 ]
@@ -764,6 +764,13 @@ def load_config(conf: Keyvalues) -> None:
 
             if '1x2' in gen_conf and not has_block_mats:
                 LOGGER.warning('1x2 textures have changed to actually be two vertical tiles!')
+
+            if NEW_TILE_GEN and TileSize.TILE_DOUBLE in textures and all_options[gen_key]['scaleup256']:
+                # Reimplement this logic.
+                textures[TileSize.TILE_DOUBLE] = [
+                    attrs.evolve(conf, scale=conf.scale * 2) for conf in
+                    textures[TileSize.TILE_DOUBLE]
+                ]
 
             if all_options[gen_key]['mixrotation']:
                 # Automatically rotate tiles.
