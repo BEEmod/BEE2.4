@@ -38,6 +38,7 @@ def test_mat_parse(caplog: pytest.LogCaptureFixture) -> None:
         MaterialConf.parse(Keyvalues('blah', [
             Keyvalues('scale', '0.25'),
             Keyvalues('rotation', '0'),
+            Keyvalues('repeat', '4'),
         ]))
 
     assert MaterialConf.parse(
@@ -51,8 +52,9 @@ def test_mat_parse(caplog: pytest.LogCaptureFixture) -> None:
             Keyvalues('scale', '0.3645'),
             Keyvalues('material', 'dev/devmeasuregeneric01'),
             Keyvalues('rotation', '90'),
+            Keyvalues('repeat', '4'),
         ])
-    ) == MaterialConf('dev/devmeasuregeneric01', 0.3645, QuarterRot.CCW)
+    ) == MaterialConf('dev/devmeasuregeneric01', 0.3645, QuarterRot.CCW, 4)
     assert not caplog.records
 
 
@@ -65,4 +67,16 @@ def test_mat_parse_warnings(caplog: pytest.LogCaptureFixture) -> None:
             ])
         ) == MaterialConf('dev/devmeasuregeneric01', 1.0, QuarterRot.NONE)
     assert any(record.levelname == 'WARNING' for record in caplog.records)
+    assert 'Material scale should be positive' in caplog.text
+    caplog.clear()
+
+    with caplog.at_level(logging.WARNING):
+        assert MaterialConf.parse(
+            Keyvalues('name', [
+                Keyvalues('repeat', '0'),
+                Keyvalues('material', 'dev/devmeasuregeneric01'),
+            ])
+        ) == MaterialConf('dev/devmeasuregeneric01', 1.0, QuarterRot.NONE, 1)
+    assert any(record.levelname == 'WARNING' for record in caplog.records)
+    assert 'Material repeat limit should be positive' in caplog.text
     caplog.clear()

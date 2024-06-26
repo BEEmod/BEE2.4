@@ -375,15 +375,15 @@ def calculate_plane(
             else:
                 # Only use the first.
                 size = sizes[0]
+            mat_conf = rng.choice(gen.get_all(size, subtile.antigel))
             if size is TileSize.TILE_4x4:
                 # Force this to only place 1x1, so that other sizes get a chance.
                 width = height = 1
             else:
-                max_width = width // size.width
-                max_height = height // size.height
-                width = round(rng.triangular(1, max_width, min(1.5, max_width))) * size.width
-                height = round(rng.triangular(1, max_height, min(1.5, max_height))) * size.height
-            mat_conf = rng.choice(gen.get_all(size, subtile.antigel))
+                max_width = min(width // size.width, mat_conf.repeat_limit)
+                max_height = min(height // size.height, mat_conf.repeat_limit)
+                width = round(rng.triangular(1, max_width, min(1.5, max_width))) * mat_conf.tile_size.width
+                height = round(rng.triangular(1, max_height, min(1.5, max_height))) * mat_conf.tile_size.height
             tex_def = make_texdef(
                 mat_conf,
                 subtile.antigel,

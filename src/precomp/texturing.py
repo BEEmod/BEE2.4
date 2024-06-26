@@ -312,6 +312,9 @@ class MaterialConf:
     mat: str
     scale: float = 1.0
     rotation: QuarterRot = QuarterRot.NONE
+    # If set, determines the maximum number of times this tile can be repeated before a new
+    # one must be calculated.
+    repeat_limit: int = 8
     # For tile materials, the original size of the surface.
     # This is used for aligning UVs correctly.
     tile_size: TileSize = TileSize.TILE_4x4
@@ -329,11 +332,15 @@ class MaterialConf:
         if scale <= 0.0:
             LOGGER.warning('Material scale should be positive, not {}!', scale)
             scale = 1.0
+        repeat_limit = kv.int('repeat', 8)
+        if repeat_limit <= 0:
+            LOGGER.warning('Material repeat limit should be positive, not {}!', repeat_limit)
+            repeat_limit = 1
         try:
             rotation = QuarterRot.parse(kv['rotation'])
         except LookupError:
             rotation = QuarterRot.NONE
-        return cls(material, scale, rotation, tile_size)
+        return cls(material, scale, rotation, repeat_limit, tile_size)
 
     def __bool__(self) -> bool:
         """Blank materials are falsey."""
