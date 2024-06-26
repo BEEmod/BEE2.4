@@ -299,6 +299,13 @@ class TileSize(str, Enum):
         return self
 
 
+BOTTOM_TRIM_CHAR = {
+    '1': TileSize.TILE_1x1,
+    '2': TileSize.TILE_2x2,
+    '4': TileSize.TILE_4x4,
+}
+
+
 @attrs.frozen
 class MaterialConf:
     """Texture, rotation, scale to apply."""
@@ -376,6 +383,7 @@ class MaterialConf:
             ANTIGEL_MATS[self.mat.casefold()] = self.mat
         else:
             return attrs.evolve(self, mat=antigel_tex)
+
 
 GENERATORS: dict[
     GenCat | tuple[GenCat, Orient, Portalable],
@@ -487,6 +495,7 @@ OPTION_DEFAULTS = {
     'MixRotation': False,  # If true, randomly rotate all tiles by adding 3 copies of each. True on ceilings always.
     'Antigel_Bullseye': False,  # If true, allow bullseyes on antigel panels.
     'Algorithm': 'RAND',  # The algorithm to use for tiles.
+    'BottomTrim': '',  # If set, 1/2/4 numbers to indicate tile sizes to force at the bottom of walls.
 
     # For clumping algorithm, the sizes to generate.
     'Clump_length': 4,  # Long direction max
@@ -1033,6 +1042,7 @@ class Generator(abc.ABC):
     # The settings which apply to all generators.
     # Since they're here all subclasses and instances can access this.
     global_settings: ClassVar[dict[str, Any]] = {}
+    bottom_trim_pattern: Sequence[TileSize]
 
     def __init__(
         self,
@@ -1051,6 +1061,14 @@ class Generator(abc.ABC):
         self.category = category
         self.orient = orient
         self.portal = portal
+
+        try:
+            self.bottom_trim_pattern = [
+                BOTTOM_TRIM_CHAR[char]
+                for char in options['bottomtrim']
+            ] or ()
+        except KeyError:
+            raise ValueError(f'Invalid bottom trim pattern "{options['bottomtrim']}"') from None
 
     def get(self, loc: FrozenVec | Vec, tex_name: str, *, antigel: bool | None = None) -> MaterialConf:
         """Get one texture for a position.

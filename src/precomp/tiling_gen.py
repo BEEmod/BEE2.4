@@ -59,6 +59,19 @@ class Tideline:
     min: float
     max: float
 
+
+@attrs.frozen
+class TrimColour:
+    """Used to allow pattern matching."""
+    tile_1x1: TileType
+    tile_4x4: TileType
+
+
+TRIM_COLOURS = [
+    TrimColour(TileType.WHITE, TileType.WHITE_4x4),
+    TrimColour(TileType.BLACK, TileType.BLACK_4x4),
+]
+
 # The TileSize values each type can pick from - first is the match, plus alts.
 tile_chain = [
     TileSize.TILE_DOUBLE, TileSize.TILE_1x1,
@@ -279,14 +292,14 @@ def generate_brushes(vmf: VMF) -> None:
 
 def calculate_plane(
     normal: Vec, plane_dist: float,
+    texture_plane: PlaneGrid[TexDef],
     search_dists: dict[tuple[Portalable, Orient], int],
     subtile_pos: PlaneGrid[SubTile],
-) -> PlaneGrid[TexDef]:
+) -> None:
     """Calculate the textures to use for a plane of tiles."""
     orient = Orient.from_normal(normal)
 
     # Reprocess subtiles into textures by repeatedly spreading.
-    texture_plane: PlaneGrid[TexDef] = PlaneGrid()
     while subtile_pos:
         max_u, max_v, subtile = subtile_pos.largest_index()
         if subtile.type.is_tile:
@@ -385,7 +398,95 @@ def calculate_plane(
             for v in range(max_v - height + 1, max_v + 1):
                 del subtile_pos[u, v]
                 texture_plane[u, v] = tex_def
-    return texture_plane
+
+
+def calculate_bottom_trim(
+    normal: Vec, plane_dist: float,
+    subtile_pos: PlaneGrid[SubTile],
+    texture_plane: PlaneGrid[TexDef],
+    gen: texturing.Generator,
+) -> None:
+    """In Portal 1 style, all black walls always have a specific pattern at the base.
+
+    This implements that before the regular tiles are calculated.
+    """
+    pattern = gen.bottom_trim_pattern
+    pattern_count = len(pattern)
+
+    min_u, min_v = subtile_pos.mins
+    max_u, max_v = subtile_pos.maxes
+
+    rng = rand.seed(
+        b'tex_btm_trim',
+        normal, plane_dist,
+        min_u, min_v, max_u, max_v,
+    )
+    # placed[u][v], we can drop a column once processed.
+    placed: dict[int, set[int]] = defaultdict(set)
+
+    for u in range(min_u, max_u + 1):
+        v = min_v
+        # This is the current progress through the tile sequence.
+        # We set it to len(pattern) (out of range) whenever we want to abandon
+        # the pattern - we must then have void to reset.
+        count = 0
+        placed_col = placed[u]
+        while v <= max_v:
+            if v in placed_col:
+                v += 1  # Column on the left already placed here.
+                count = pattern_count
+                continue
+            subtile = subtile_pos[u, v]
+            match subtile.type:
+                case TileType.VOID |  TileType.GOO_SIDE:
+                    v += 1
+                    count = 0
+                    continue
+                case TileType.NODRAW | TileType.BLACK_4x4:
+                    # Allow nodraw to take the place of only 4x4 tiles.
+                    # The 4x4 type also matches 4x4 tiles of course.
+                    v += 1
+                    if count < pattern_count and pattern[count] is TileSize.TILE_4x4:
+                        count += 1
+                    else:
+                        count = pattern_count
+                    continue
+                case TileType.BLACK:
+                    pass
+                case _:
+                    # Another wall type, abandon entirely.
+                    count = pattern_count
+                    v += 1
+                    continue
+
+            if count < pattern_count:
+                # Try to place this tile.
+                tile_size = pattern[count]
+                tile_u = range(tile_size.width)
+                tile_v = range(tile_size.height)
+                for u_off, v_off in itertools.product(tile_u, tile_v):
+                    if subtile_pos[u + u_off, v + v_off].type is not TileType.BLACK:
+                        count = pattern_count
+                        break
+                else:
+                    # All good. Place the tile.
+                    mat_conf = rng.choice(gen.get_all(tile_size, subtile.antigel))
+                    tex_u = u % mat_conf.tile_size.width
+                    tex_v = v % mat_conf.tile_size.height
+                    for u_off, v_off in itertools.product(tile_u, tile_v):
+                        texture_plane[u + u_off, v + v_off] = make_texdef(
+                            mat_conf, subtile.antigel,
+                            tex_u, tex_v,
+                        )
+                        placed[u + u_off].add(v + v_off)
+                count += 1
+                v += tile_size.height  # Skip multiple for 2x2 or 1x1 tiles.
+            else:
+                v += 1
+        # Do this after, so it doesn't affect logic for previous columns.
+        for v in placed_col:
+            del subtile_pos[u, v]
+        del placed[u]
 
 
 def generate_plane(
@@ -422,8 +523,15 @@ def generate_plane(
 
     # Create a copy, but clear the default to ensure an error is raised if indexed incorrectly.
     orig_tiles = PlaneGrid(subtile_pos)
+    texture_plane: PlaneGrid[TexDef] = PlaneGrid()
 
-    texture_plane = calculate_plane(normal, plane_dist, search_dists, subtile_pos)
+    # Check if the P1 style bottom trim option is set, and if so apply it.
+    gen = texturing.gen(texturing.GenCat.NORMAL, normal, Portalable.BLACK)
+    if gen.bottom_trim_pattern:
+        calculate_bottom_trim(normal, plane_dist, subtile_pos, texture_plane, gen)
+
+    # Calculate the required tiles.
+    calculate_plane(normal, plane_dist, texture_plane, search_dists, subtile_pos)
 
     # Split tiles into each brush that needs to be placed, then create it.
     for min_u, min_v, max_u, max_v, bevels, tex_def in bevel_split(texture_plane, grid_pos, orig_tiles):
