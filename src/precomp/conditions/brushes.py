@@ -355,34 +355,24 @@ def res_add_brush(vmf: VMF, inst: Entity, res: Keyvalues) -> None:
     solids = vmf.make_prism(point1, point2)
     center = (point1 + point2) / 2
 
-    texturing.gen(
+    wall_gen = texturing.gen(
         texturing.GenCat.NORMAL,
-        Vec(Vec.N),
+        texturing.Orient.WALL,
         tex_type,
-    ).get(center, tile_grids['y']).apply(solids.north)
+    )
+
+    wall_gen.get(center, tile_grids['y']).apply(solids.north)
+    wall_gen.get(center, tile_grids['y']).apply(solids.south)
+    wall_gen.get(center, tile_grids['x']).apply(solids.east)
+    wall_gen.get(center, tile_grids['x']).apply(solids.west)
     texturing.gen(
         texturing.GenCat.NORMAL,
-        Vec(Vec.S),
-        tex_type,
-    ).get(center, tile_grids['y']).apply(solids.south)
-    texturing.gen(
-        texturing.GenCat.NORMAL,
-        Vec(Vec.E),
-        tex_type,
-    ).get(center, tile_grids['x']).apply(solids.east)
-    texturing.gen(
-        texturing.GenCat.NORMAL,
-        Vec(Vec.W),
-        tex_type,
-    ).get(center, tile_grids['x']).apply(solids.west)
-    texturing.gen(
-        texturing.GenCat.NORMAL,
-        Vec(Vec.T),
+        texturing.Orient.FLOOR,
         tex_type,
     ).get(center, tile_grids['z']).apply(solids.top)
     texturing.gen(
         texturing.GenCat.NORMAL,
-        Vec(Vec.B),
+        texturing.Orient.CEILING,
         tex_type,
     ).get(center, tile_grids['z']).apply(solids.bottom)
 

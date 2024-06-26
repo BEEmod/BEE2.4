@@ -1303,6 +1303,7 @@ class TileDef:
         is_antigel = self.is_antigel()  # Cache result.
         brushes = []
         faces = []
+        orient = texturing.Orient.from_normal(normal)
 
         if interior_bevel:
             bevels = set(bevels)
@@ -1350,14 +1351,14 @@ class TileDef:
                     # This forces a specific size.
                     u_size = v_size = 4
                     mat_conf = texturing.gen(
-                        gen_cat, normal, Portalable.BLACK
+                        gen_cat, orient, Portalable.BLACK
                     ).get(tile_center, TileSize.GOO_SIDE, antigel=False)
                 else:
                     if tile_type.is_4x4:
                         grid_size = TileSize.TILE_4x4
                     u_size, v_size = grid_size.size
                     mat_conf = texturing.gen(
-                        gen_cat, normal, tile_type.color,
+                        gen_cat, orient, tile_type.color,
                     ).get(tile_center, grid_size, antigel=is_antigel)
 
                 template: template_brush.ScalingTemplate | None

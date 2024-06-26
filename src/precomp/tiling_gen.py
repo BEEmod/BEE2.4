@@ -343,7 +343,7 @@ def calculate_plane(
                 max_u, max_v,
                 subtile.type.value, subtile.antigel,
             )
-            gen = texturing.gen(texturing.GenCat.NORMAL, normal, subtile.type.color)
+            gen = texturing.gen(texturing.GenCat.NORMAL, orient, subtile.type.color)
             # Figure out tile sizes we can use. TODO: Cache this generated list.
             sizes: list[TileSize] = []
             counts: list[int] = []

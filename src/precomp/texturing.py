@@ -553,21 +553,27 @@ def parse_options(
 
 def gen(
     cat: GenCat,
-    normal: Vec | None = None,
+    normal_or_orient: Orient | Vec | FrozenVec | None = None,
     portalable: Portalable | None = None,
+    /,
 ) -> Generator:
-    """Given a category, normal, and white/black return the correct generator."""
+    """Given a category, normal/orient, and white/black return the correct generator."""
 
     if cat is GenCat.SPECIAL or cat is GenCat.OVERLAYS:
         return GENERATORS[cat]
 
-    if normal is None:
-        raise TypeError('Normal not provided!')
+    if normal_or_orient is None:
+        raise TypeError('Normal/Orient not provided!')
+
+    if isinstance(normal_or_orient, Orient):
+        orient = normal_or_orient
+    else:
+        orient = Orient.from_normal(normal_or_orient)
 
     if portalable is None:
         raise TypeError('Portalability not provided!')
 
-    return GENERATORS[cat, Orient.from_normal(normal), portalable]
+    return GENERATORS[cat, orient, portalable]
 
 
 def parse_name(name: str) -> tuple[Generator, str]:
@@ -612,7 +618,7 @@ def apply(
     face: Side,
     tex_name: str,
     portalable: Portalable | None = None,
-    normal: Vec | None = None,
+    normal: Orient | Vec | None = None,
     loc: Vec | None = None,
 ) -> None:
     """Apply directly to a face, optionally using that to retrieve the location."""
