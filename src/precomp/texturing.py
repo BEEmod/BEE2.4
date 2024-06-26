@@ -34,6 +34,10 @@ SPECIAL: Generator
 OVERLAYS: Generator
 
 
+# Whether to use the new generator or not
+NEW_TILE_GEN = False
+
+
 class GenCat(Enum):
     """Categories of textures, each with a generator."""
     NORMAL = 'normal'      # Normal tiles
@@ -848,7 +852,7 @@ def load_config(conf: Keyvalues) -> None:
 
         # Copy all other textures to the 1x1 size if the option was set.
         # Do it before inheriting tiles, so there won't be duplicates.
-        if all_options[gen_key]['mixtiles']:
+        if all_options[gen_key]['mixtiles'] and not NEW_TILE_GEN:
             block_tex = textures[TileSize.TILE_1x1]
             block_tex += textures[TileSize.TILE_4x4]
             block_tex += textures[TileSize.TILE_2x2]

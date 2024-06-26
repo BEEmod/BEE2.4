@@ -32,6 +32,7 @@ from precomp import (
     template_brush,
     texturing,
     tiling,
+    tiling_gen,
     barriers,
     connections,
     options,
@@ -1674,7 +1675,10 @@ async def main(argv: list[str]) -> None:
         add_extra_ents(vmf, info)
 
         LOGGER.info('Generating tiles...')
-        tiling.generate_brushes(vmf)
+        if texturing.NEW_TILE_GEN:
+            tiling_gen.generate_brushes(vmf)
+        else:
+            tiling.generate_brushes(vmf)
         LOGGER.info('Generating goop...')
         tiling.generate_goo(vmf)
         tiling.bind_overlays()
