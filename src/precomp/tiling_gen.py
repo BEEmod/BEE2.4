@@ -349,14 +349,14 @@ def calculate_plane(
             counts: list[int] = []
             for size in ALLOWED_SIZES[subtile.type]:
                 if size.width <= width and size.height <= height:
-                    tex_list = gen.get_all(size)
+                    tex_list = gen.get_all(size, subtile.antigel)
                     if tex_list:
                         sizes.append(size)
                         counts.append(len(tex_list) * gen.weights[size])
             if not sizes:
                 # Fallback, use 4x4.
                 sizes = [TileSize.TILE_4x4]
-                counts = [len(gen.get_all(TileSize.TILE_4x4))]
+                counts = [len(gen.get_all(TileSize.TILE_4x4, subtile.antigel))]
             if gen.options['mixtiles']:
                 [size] = rng.choices(sizes, counts)
             else:
@@ -370,7 +370,7 @@ def calculate_plane(
                 max_height = height // size.height
                 width = round(rng.triangular(1, max_width, min(1.5, max_width))) * size.width
                 height = round(rng.triangular(1, max_height, min(1.5, max_height))) * size.height
-            mat_conf = rng.choice(gen.get_all(size))
+            mat_conf = rng.choice(gen.get_all(size, subtile.antigel))
             tex_def = make_texdef(
                 mat_conf,
                 subtile.antigel,

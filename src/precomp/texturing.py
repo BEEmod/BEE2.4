@@ -362,6 +362,16 @@ class MaterialConf:
         over['material'] = self.mat
         # TODO: Rotation, scale
 
+    def as_antigel(self) -> MaterialConf:
+        """Return the antigel version of this material conf."""
+        try:
+            antigel_tex = ANTIGEL_MATS[self.mat.casefold()]
+        except KeyError:
+            LOGGER.warning('No antigel mat generated for {!r}!', self)
+            # Set it to itself to silence the warning.
+            ANTIGEL_MATS[self.mat.casefold()] = self.mat
+        else:
+            return attrs.evolve(self, mat=antigel_tex)
 
 GENERATORS: dict[
     GenCat | tuple[GenCat, Orient, Portalable],
@@ -998,6 +1008,7 @@ async def setup(game: Game, vmf: VMF, tiles: list[TileDef]) -> None:
             ))
         antigel_mat = str(Path(antigel_filename).relative_to(material_folder)).replace('\\', '/')
         ANTIGEL_MATS[mat_name.casefold()] = tex_to_antigel[texture.casefold()] = antigel_mat
+        ANTIGEL_MATS[antigel_mat.casefold()] = antigel_mat  # Make antigel conversion idempotent.
         antigel_mats.add(antigel_mat)
 
     async with trio.open_nursery() as nursery:
@@ -1056,17 +1067,7 @@ class Generator(abc.ABC):
             mat_conf = self._get(loc, tex_name)
         except KeyError as exc:
             raise self._missing_error(repr(exc.args[0])) from None
-        if antigel:
-            try:
-                antigel_tex = ANTIGEL_MATS[mat_conf.mat.casefold()]
-            except KeyError:
-                LOGGER.warning('No antigel mat generated for {!r}!', mat_conf)
-                # Set it to itself to silence the warning.
-                ANTIGEL_MATS[mat_conf.mat.casefold()] = mat_conf.mat
-            else:
-                return attrs.evolve(mat_conf, mat=antigel_tex)
-
-        return mat_conf
+        return mat_conf.as_antigel() if antigel else mat_conf
 
     def setup(self, vmf: VMF, tiles: list[TileDef]) -> None:
         """Scan tiles in the map and set up the generator."""
@@ -1082,12 +1083,23 @@ class Generator(abc.ABC):
         If KeyError is raised, an appropriate exception is raised from that.
         """
 
-    def get_all(self, tex_name: str) -> Sequence[MaterialConf]:
+    def get_all(self, tex_name: str, antigel: bool) -> Sequence[MaterialConf]:
         """Return all the textures possible for a given name."""
+        if antigel and self.category is GenCat.BULLSEYE and not self.options['antigel_bullseye']:
+            assert self.orient is not None and self.portal is not None
+            # We can't use antigel on bullseye materials, so revert to normal surfaces.
+            return GENERATORS[GenCat.NORMAL, self.orient, self.portal].get_all(tex_name, True)
+
         try:
-            return self.textures[tex_name]
+            mat_confs = self.textures[tex_name]
         except KeyError:
             raise self._missing_error(tex_name) from None
+        if antigel:
+            return [
+                conf.as_antigel()
+                for conf in mat_confs
+            ]
+        return mat_confs
 
     def __contains__(self, tex_name: str) -> bool:
         """Return True if the texture is defined."""

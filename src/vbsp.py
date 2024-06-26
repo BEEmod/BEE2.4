@@ -1650,7 +1650,7 @@ async def main(argv: list[str]) -> None:
         # Requires instance traits!
         connections.calc_connections(
             vmf, ant,
-            shape_frame_mat= texturing.OVERLAYS.get_all('shapeframe'),
+            shape_frame_mat=texturing.OVERLAYS.get_all('shapeframe', False),
             enable_shape_frame=settings['style_vars']['enableshapesignageframe'],
             ind_style=ind_style,
         )
