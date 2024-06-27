@@ -926,15 +926,15 @@ async def setup(game: Game, vmf: VMF, tiles: list[TileDef]) -> None:
 
     - Set randomisation seed on all the generators.
     - Build clumps.
-    - Generate antigel materials
+    - Generate antigel materials.
     """
-    material_folder = game.path / '..' / 'bee2' / 'materials'
+    material_folder = (game.path / '..' / 'bee2' / 'materials').resolve()
     antigel_loc = material_folder / ANTIGEL_PATH
     antigel_loc.mkdir(parents=True, exist_ok=True)
 
     # Basetexture -> material name
     tex_to_antigel: dict[str, str] = {}
-    # And all the filenames that exist.
+    # And all the filenames that exist already.
     antigel_mats: set[str] = set()
 
     async def check_existing(filename: Path) -> None:
@@ -950,7 +950,7 @@ async def setup(game: Game, vmf: VMF, tiles: list[TileDef]) -> None:
             # Delete the bad file.
             await trio.to_thread.run_sync(filename.unlink)
             return
-        mat_name = str(filename.relative_to(material_folder).with_suffix('')).replace('\\', '/')
+        mat_name = filename.relative_to(material_folder).with_suffix('').as_posix()
         texture: str | None = None
         for block in exist_mat.blocks:
             if block.name not in ['insert', 'replace']:
@@ -964,7 +964,7 @@ async def setup(game: Game, vmf: VMF, tiles: list[TileDef]) -> None:
             LOGGER.warning('No $basetexture in antigel material {}!', mat_name)
             return
         tex_to_antigel[texture.casefold()] = mat_name
-        antigel_mats.add(filename.stem)
+        antigel_mats.add(mat_name.casefold())
 
     async with trio.open_nursery() as nursery:
         # Parse the filesystems (importantly the VPKs) in the background while we check the existing
@@ -1019,22 +1019,24 @@ async def setup(game: Game, vmf: VMF, tiles: list[TileDef]) -> None:
             pass
         noportal = conv_bool(mat.get('%noportal', False))
         # We have to generate.
-        antigel_filename = str(antigel_loc / Path(texture).stem)
-        if antigel_filename in antigel_mats:
-            antigel_filename_base = antigel_filename.rstrip('0123456789')
+        antigel_filename = antigel_loc / Path(texture)
+        antigel_mat = Path(antigel_filename).relative_to(material_folder).with_suffix('').as_posix()
+        if antigel_mat in antigel_mats:
+            antigel_filename_base = antigel_filename.name.rstrip('0123456789')
             for i in itertools.count(1):
-                antigel_filename = f'{antigel_filename_base}{i:02}'
-                if antigel_filename not in antigel_mats:
+                antigel_filename = antigel_filename.with_name(f'{antigel_filename_base}{i:02}')
+                antigel_mat = Path(antigel_filename).relative_to(material_folder).with_suffix('').as_posix()
+                if antigel_mat not in antigel_mats:
                     break
-        with open(antigel_filename + '.vmt', 'w') as f:
-            f.write(ANTIGEL_TEMPLATE.format(
-                path=texture,
-                noportal=int(noportal),
-            ))
-        antigel_mat = str(Path(antigel_filename).relative_to(material_folder)).replace('\\', '/')
+        dest = trio.Path(antigel_filename.with_suffix('.vmt'))
+        antigel_mats.add(antigel_mat)  # Do first, make sure nobody else claims!
+        await dest.parent.mkdir(parents=True, exist_ok=True)
+        await dest.write_text(ANTIGEL_TEMPLATE.format(
+            path=texture,
+            noportal=int(noportal),
+        ))
         ANTIGEL_MATS[mat_name.casefold()] = tex_to_antigel[texture.casefold()] = antigel_mat
         ANTIGEL_MATS[antigel_mat.casefold()] = antigel_mat  # Make antigel conversion idempotent.
-        antigel_mats.add(antigel_mat)
 
     async with trio.open_nursery() as nursery:
         for mat_name in materials:
