@@ -124,7 +124,7 @@ def make_tag_coop_inst(filename: str) -> VMF:
 
     This way we avoid distributing the logic.
     """
-    with open(filename, 'ascii') as f:
+    with open(filename, encoding='ascii') as f:
         kv = Keyvalues.parse(f)
     vmf = VMF.parse(kv)
     del kv

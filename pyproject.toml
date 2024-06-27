@@ -43,7 +43,7 @@ exclude = [
 select = [
 	"E", "UP", "F", "C4", "ANN", "B", "PIE", "RUF", "PYI",
 	"PLC", "PLE", "PLW",  # Pylint.
-	"TRIO", "YTT",
+	"ASYNC", "YTT",
 
 	"TCH005",  # Empty type-checking block.
 ]
@@ -85,7 +85,7 @@ extend-ignore = [
 	"PYI041",  # Use int | float
 
 	# Flake8-Trio:
-	"TRIO115",  # Stick with sleep(0) instead of lowlevel.checkpoint(), for now?
+	"ASYNC115",  # Stick with sleep(0) instead of lowlevel.checkpoint(), for now?
 
 	# Pyupgrade:
 	# Keep using typing's types even with __future__.annotations.
