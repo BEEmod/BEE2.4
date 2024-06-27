@@ -580,7 +580,8 @@ async def rebuild_package_langs(packset: packages.PackagesSet) -> None:
                     catalog.add(tok.token, locations=loc)
                     tok2pack[tok.token].add(tok.namespace)
 
-    for pak_id, (pack_path, catalog) in pack_paths.items():
+    async def export_pack(pak_id: str, pack_path: trio.Path, catalog: Catalog) -> None:
+        """Write out a package."""
         LOGGER.info('Exporting translations for {}...', pak_id.upper())
         await pack_path.mkdir(parents=True, exist_ok=True)
         catalog.header_comment = PACKAGE_HEADER
@@ -590,20 +591,27 @@ async def rebuild_package_langs(packset: packages.PackagesSet) -> None:
             if utils.write_lang_pot(pack_template, buffer.getvalue()):
                 LOGGER.info('Written {}', pack_template)
 
+        lang_file: trio.Path
         for lang_file in await pack_path.iterdir():
             if lang_file.suffix != '.po':
                 continue
             data = await lang_file.read_text()
-            existing: Catalog = read_po(io.StringIO(data))
+            existing: Catalog = await trio.to_thread.run_sync(read_po, io.StringIO(data))
             existing.update(catalog)
             catalog.header_comment = PACKAGE_HEADER
             existing.version = utils.BEE_VERSION
             LOGGER.info('- Rewriting {}', lang_file)
             with io.BytesIO() as buffer:
                 write_po(buffer, existing, sort_output=True, width=120)
-                utils.write_lang_pot(Path(lang_file), buffer.getvalue())
-            with open(lang_file.with_suffix('.mo'), 'wb') as f:
-                write_mo(f, existing)
+                await trio.to_thread.run_sync(utils.write_lang_pot, Path(lang_file), buffer.getvalue())
+            with io.BytesIO() as buffer:
+                await trio.to_thread.run_sync(
+                    write_mo, buffer, existing)
+                await lang_file.with_suffix('.mo').write_bytes(buffer.getbuffer())
+
+    async with trio.open_nursery() as nursery:
+        for pak_id, (pack_path, catalog) in pack_paths.items():
+            nursery.start_soon(export_pack, pak_id, pack_path, catalog)
 
     LOGGER.info('Repeated tokens:\n{}', '\n'.join([
         f'{", ".join(sorted(tok_pack))} -> {token!r} '
