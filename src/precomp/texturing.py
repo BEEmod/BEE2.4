@@ -388,22 +388,19 @@ class MaterialConf:
             LOGGER.warning('No antigel mat generated for {!r}!', self)
             # Set it to itself to silence the warning.
             ANTIGEL_MATS[self.mat.casefold()] = self.mat
+            return self
         else:
             return attrs.evolve(self, mat=antigel_tex)
 
+# Identifier for each generator.
+type GenKey = GenCat | tuple[GenCat, Orient, Portalable]
 
-GENERATORS: dict[
-    GenCat | tuple[GenCat, Orient, Portalable],
-    Generator,
-] = {}
+GENERATORS: dict[GenKey, Generator] = {}
 
 # The defaults for each generator.
 # This also defines the texture names allowed, as well
 # as the total number of generators.
-TEX_DEFAULTS: dict[
-    GenCat | tuple[GenCat, Orient, Portalable],
-    dict[str, str | MaterialConf],
-] = {
+TEX_DEFAULTS: dict[GenKey, dict[str, str | MaterialConf]] = {
     # Signage overlays.
     GenCat.OVERLAYS: {
         'exit': consts.Signage.EXIT,
@@ -499,7 +496,8 @@ TEX_DEFAULTS: dict[
 OPTION_DEFAULTS = {
     'MixTiles': False,  # Apply the smaller tile textures to 1x1 as well.
     'ScaleUp256': False,  # In addition to TILE_DOUBLE, use 1x1 at 2x scale.
-    'MixRotation': False,  # If true, randomly rotate all tiles by adding 3 copies of each. True on ceilings always.
+    # If true, randomly rotate all tiles by adding 3 copies of each. True on floors/ceilings by default.
+    'MixRotation': False,
     'Antigel_Bullseye': False,  # If true, allow bullseyes on antigel panels.
     'Algorithm': 'RAND',  # The algorithm to use for tiles.
     'BottomTrim': '',  # If set, 1/2/4 numbers to indicate tile sizes to force at the bottom of walls.
@@ -681,9 +679,9 @@ def load_config(conf: Keyvalues) -> None:
     ))
 
     # We put the configurations for each generator in here, before constructing them.
-    all_options: dict[Any, dict[str, Any]] = {}
-    all_weights: dict[Any, dict[TileSize, int]] = {}
-    all_textures: dict[Any, dict[str, list[MaterialConf]]] = {}
+    all_options: dict[GenKey, dict[str, Any]] = {}
+    all_weights: dict[GenKey, dict[TileSize, int]] = {}
+    all_textures: dict[GenKey, dict[str, list[MaterialConf]]] = {}
 
     gen_cat: GenCat
     gen_orient: Orient | None
