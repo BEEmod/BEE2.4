@@ -87,3 +87,24 @@ class Dialogs(Protocol):
         validator: Callable[[str], str] = validate_non_empty,
     ) -> str | None:
         """Ask the user to enter a string."""
+
+
+async def test_generic(dialog: Dialogs) -> None:
+    """Test the dialog implementation."""
+    tt = TransToken.untranslated
+    await dialog.show_info(tt("Info dialog."))
+    await dialog.show_info(tt("Question dialog"), title=tt("A title"), icon=Icon.QUESTION)
+    await dialog.show_info(tt("Warning dialog"), title=tt("A title"), icon=Icon.WARNING)
+    await dialog.show_info(tt("Error dialog"), title=tt("A title"), icon=Icon.ERROR)
+
+    assert await dialog.ask_ok_cancel(tt("Press Ok for warning"), icon=Icon.WARNING) is True
+    assert await dialog.ask_ok_cancel(tt("Press Cancel for error"), icon=Icon.ERROR) is False
+    assert await dialog.ask_ok_cancel(tt("Press X")) is False
+
+    assert await dialog.ask_yes_no(tt("Press Yes for question"), icon=Icon.QUESTION) is True
+    assert await dialog.ask_yes_no(tt("Press No for warning"), icon=Icon.WARNING) is False
+
+    assert await dialog.ask_yes_no_cancel(tt("Press yes")) is True
+    assert await dialog.ask_yes_no_cancel(tt("Press no")) is False
+    assert await dialog.ask_yes_no_cancel(tt("Press cancel")) is None
+    assert await dialog.ask_yes_no_cancel(tt("Press X")) is None
