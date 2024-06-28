@@ -17,7 +17,7 @@ from config.windows import WindowState
 from trio_debug import Tracer
 from ui_wx.dialogs import DIALOG
 from ui_tk.errors import display_errors
-from ui_tk import wid_transtoken, route_callback_exceptions
+from ui_wx import wid_transtoken
 from ui_wx.img import WX_IMG
 from ui_wx import APP, MAIN_WINDOW
 from config.gen_opts import GenOptions
@@ -58,7 +58,6 @@ async def init_app(core_nursery: trio.Nursery) -> None:
             gameMan.set_game_by_name(last_game.id)
 
         core_nursery.start_soon(sound.sound_task)
-        core_nursery.start_soon(wid_transtoken.update_task)
 
         export_trig = app.EdgeTrigger[exporting.ExportInfo]()
         export_send, export_rec = trio.open_memory_channel[lifecycle.ExportResult](1)
@@ -135,8 +134,12 @@ async def app_main(init: Callable[[trio.Nursery], Awaitable[Any]]) -> None:
         # Start some core tasks.
         # await nursery.start(route_callback_exceptions)
         # await nursery.start(display_errors)
-        # await nursery.start(loadScreen.startup)
+
+        # Check very early before bad things happen.
         await gameMan.check_app_in_game(DIALOG)
+
+        nursery.start_soon(wid_transtoken.update_task)
+        # await nursery.start(loadScreen.startup)
 
         # Run main app, then once completed cancel this nursery to quit all other tasks.
         # It gets given the nursery to allow spawning new tasks here.
@@ -162,7 +165,6 @@ def start_main(init: Callable[[trio.Nursery], Awaitable[object]] = init_app) -> 
         """Called to execute the callback."""
         while queue:
             queue.popleft()()
-
 
     def run_sync_soon_threadsafe(func: Callable[[], Any]) -> None:
         """Run the specified func in the next loop, from other threads."""

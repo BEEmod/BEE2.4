@@ -61,7 +61,6 @@ async def init_app(core_nursery: trio.Nursery) -> None:
             gameMan.set_game_by_name(last_game.id)
 
         core_nursery.start_soon(sound.sound_task)
-        core_nursery.start_soon(wid_transtoken.update_task)
 
         export_trig = app.EdgeTrigger[exporting.ExportInfo]()
         export_send, export_rec = trio.open_memory_channel[lifecycle.ExportResult](1)
@@ -142,8 +141,12 @@ async def app_main(init: Callable[[trio.Nursery], Awaitable[Any]]) -> None:
         # Start some core tasks.
         await nursery.start(route_callback_exceptions)
         await nursery.start(display_errors)
-        await nursery.start(loadScreen.startup)
+
+        # Check very early before bad things happen.
         await gameMan.check_app_in_game(DIALOG)
+
+        await nursery.start(loadScreen.startup)
+        nursery.start_soon(wid_transtoken.update_task)
 
         # Run main app, then once completed cancel this nursery to quit all other tasks.
         # It gets given the nursery to allow spawning new tasks here.
