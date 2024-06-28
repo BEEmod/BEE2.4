@@ -545,12 +545,12 @@ def _get_children(tok: TransToken) -> Iterator[TransToken]:
 
 async def rebuild_package_langs(packset: packages.PackagesSet) -> None:
     """Write out POT templates for unzipped packages."""
-    tok2pack: dict[str | tuple[str, str], set[str]] = defaultdict(set)
-    pack_paths: dict[str, tuple[trio.Path, Catalog]] = {}
+    tok2pack: dict[str | tuple[str, str], set[utils.ObjectID]] = defaultdict(set)
+    pack_paths: dict[utils.ObjectID, tuple[trio.Path, Catalog]] = {}
 
     for pak_id, pack in packset.packages.items():
         if isinstance(pack.fsys, RawFileSystem):
-            pack_paths[pak_id.casefold()] = trio.Path(pack.path, 'resources', 'i18n'), Catalog(
+            pack_paths[pak_id] = trio.Path(pack.path, 'resources', 'i18n'), Catalog(
                 project=pack.disp_name.token,
                 version=utils.BEE_VERSION,
             )
@@ -559,15 +559,15 @@ async def rebuild_package_langs(packset: packages.PackagesSet) -> None:
     async with aclosing(get_package_tokens(packset)) as agen:
         async for orig_tok, source in agen:
             for tok in _get_children(orig_tok):
-                if not tok:
-                    continue  # Ignore blank tokens, not important to translate.
                 await trio.lowlevel.checkpoint()
+                if not tok or not utils.not_special_id(tok.namespace):
+                    continue  # Ignore blank tokens, not important to translate.
                 try:
-                    pack_path, catalog = pack_paths[tok.namespace.casefold()]
+                    pack_path, catalog = pack_paths[tok.namespace]
                 except KeyError:
                     continue
                 # Line number is just zero - we don't know which lines these originated from.
-                if tok.namespace.casefold() != tok.orig_pack.casefold():
+                if tok.namespace != tok.orig_pack:
                     # Originated from a different package, include that.
                     loc = [(f'{tok.orig_pack}:{source}', 0)]
                 else:  # Omit, most of the time.
@@ -580,9 +580,9 @@ async def rebuild_package_langs(packset: packages.PackagesSet) -> None:
                     catalog.add(tok.token, locations=loc)
                     tok2pack[tok.token].add(tok.namespace)
 
-    async def export_pack(pak_id: str, pack_path: trio.Path, catalog: Catalog) -> None:
+    async def export_pack(pak_id: utils.ObjectID, pack_path: trio.Path, catalog: Catalog) -> None:
         """Write out a package."""
-        LOGGER.info('Exporting translations for {}...', pak_id.upper())
+        LOGGER.info('Exporting translations for {}...', pak_id)
         await pack_path.mkdir(parents=True, exist_ok=True)
         catalog.header_comment = PACKAGE_HEADER
         with io.BytesIO() as buffer:
