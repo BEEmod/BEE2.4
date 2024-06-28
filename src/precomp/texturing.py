@@ -1170,11 +1170,11 @@ class GenRandom(Generator):
         for key, default in defaults:
             if isinstance(default, MaterialConf):
                 default = default.mat
-            if type(default) != str:
+            if type(default) is not str:
                 self.enum_data[id(default)] = key
 
     def _get(self, loc: Vec | FrozenVec, tex_name: str) -> MaterialConf:
-        if type(tex_name) != str:
+        if type(tex_name) is not str:
             try:
                 tex_name = self.enum_data[id(tex_name)]
             except KeyError:
