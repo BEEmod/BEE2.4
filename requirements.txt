@@ -17,3 +17,4 @@ typing_extensions >= 4.12.0
 hypercorn >= 0.14.3
 quart >= 0.19.4
 quart-trio >= 0.11.1
+wxpython >= 4.2.1

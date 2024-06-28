@@ -23,7 +23,7 @@ import sys
 import zipfile
 import math
 
-from srctools.math import Angle
+from srctools import Angle, conv_bool
 import trio
 import trio_util
 import aioresult
@@ -158,6 +158,9 @@ else:
 CODE_DEV_MODE = DEV_MODE
 BITNESS = '64' if sys.maxsize > (2 << 48) else '32'
 BEE_VERSION += f' {BITNESS}-bit'
+
+# Whether we should use WxWidgets instead of TK.
+USE_WX = CODE_DEV_MODE and conv_bool(os.environ.get('BEE_USE_WX'))
 
 
 def install_path(path: str) -> Path:
