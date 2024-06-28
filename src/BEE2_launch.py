@@ -80,9 +80,15 @@ if __name__ == '__main__':
     app.DEV_MODE.value = conf.dev_mode
 
     localisation.setup(conf.language)
-
     from app import backup, CompilerPane
-    from ui_tk.core import start_main
+
+    if utils.USE_WX:
+        from ui_wx.core import start_main
+        test_mod = 'ui_wx.demo'
+    else:
+        from ui_tk.core import start_main
+        test_mod = 'ui_tk.demo'
+
     if app_name == 'bee2':
         start_main()
     elif app_name == 'backup':
@@ -91,7 +97,7 @@ if __name__ == '__main__':
         start_main(CompilerPane.init_application)
     elif app_name.startswith('test_'):
         import importlib
-        mod = importlib.import_module('ui_tk.demo.' + sys.argv[1].removeprefix('test_'))
+        mod = importlib.import_module(f'{test_mod}.{sys.argv[1].removeprefix('test_')}')
         start_main(mod.test)
     else:
         raise ValueError(f'Invalid component name "{app_name}"!')

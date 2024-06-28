@@ -41,6 +41,7 @@ async def _messagebox(
         box.ShowDetailedText(detail)
     else:
         box = wx.MessageDialog(parent, str(message), str(title), style)
+    await trio.lowlevel.checkpoint()
     return box.ShowModal()
 
 
