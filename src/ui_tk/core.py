@@ -1,10 +1,8 @@
 """Connect Trio and TK together, then run the application."""
 from __future__ import annotations
-from typing import Any, ClassVar, override
+from typing import Any
 from collections.abc import Awaitable, Callable
 import collections
-import pprint
-import time
 
 from outcome import Outcome, Error
 import trio
@@ -15,6 +13,7 @@ from app import (
     UI, logWindow, lifecycle,
 )
 from config.windows import WindowState
+from trio_debug import Tracer
 from ui_tk.dialogs import DIALOG
 from ui_tk.errors import display_errors
 from ui_tk import wid_transtoken, route_callback_exceptions
@@ -31,6 +30,7 @@ import BEE2_config
 import srctools.logger
 
 LOGGER = srctools.logger.get_logger('BEE2')
+_TRACER = Tracer() if utils.CODE_DEV_MODE else None
 
 
 async def init_app(core_nursery: trio.Nursery) -> None:
@@ -88,12 +88,6 @@ async def init_app(core_nursery: trio.Nursery) -> None:
         await core_nursery.start(UI.init_windows, core_nursery, TK_IMG, export_trig, export_rec)
         LOGGER.info('UI initialised!')
 
-        if Tracer.slow:
-            LOGGER.info('Slow tasks\n{}', '\n'.join([
-                msg for _, msg in
-                sorted(Tracer.slow, key=lambda t: t[1], reverse=True)
-            ]))
-
         loadScreen.main_loader.destroy()
         # Delay this until the loop has actually run.
         # Directly run TK_ROOT.lift() in TCL, instead
@@ -140,94 +134,6 @@ async def init_app(core_nursery: trio.Nursery) -> None:
                 LOGGER.exception('Deleting music samples.')
 
 
-class SmallRepr(pprint.PrettyPrinter):
-    """Exclude values with large reprs."""
-    @override
-    def format(
-        self,
-        target: object,
-        context: dict[int, Any],
-        maxlevels: int,
-        level: int,
-        /,
-    ) -> tuple[str, bool, bool]:
-        """Format each sub-item."""
-        result, readable, recursive = super().format(target, context, maxlevels, level)
-        if len(result) > 200 and level > 0:
-            return f'{type(target).__qualname__}(...)', False, False
-        else:
-            return result, readable, recursive
-
-
-class Tracer(trio.abc.Instrument):
-    """Track tasks to detect slow ones."""
-    slow: ClassVar[list[tuple[float, str]]] = []
-
-    def __init__(self) -> None:
-        self.elapsed: dict[trio.lowlevel.Task, float] = {}
-        self.start_time: dict[trio.lowlevel.Task, float | None] = {}
-        self.args: dict[trio.lowlevel.Task, dict[str, object]] = {}
-        self.formatter = SmallRepr(compact=True)
-
-    @override
-    def task_spawned(self, task: trio.lowlevel.Task) -> None:
-        """Setup vars when a task is spawned."""
-        self.elapsed[task] = 0.0
-        self.start_time[task] = None
-        if task.coro.cr_frame is not None:
-            self.args[task] = task.coro.cr_frame.f_locals.copy()
-        else:
-            self.args[task] = {'???': '???'}
-
-    @override
-    def before_task_step(self, task: trio.lowlevel.Task) -> None:
-        """Begin timing this task."""
-        self.start_time[task] = time.perf_counter()
-
-    @override
-    def after_task_step(self, task: trio.lowlevel.Task) -> None:
-        """Count up the time."""
-        cur_time = time.perf_counter()
-        try:
-            prev = self.start_time[task]
-        except KeyError:
-            pass
-        else:
-            if prev is not None:
-                change = cur_time - prev
-                self.elapsed[task] += change
-                self.start_time[task] = None
-                if change > (5/1000):
-                    LOGGER.warning(
-                        'Task didn\'t yield ({:.02f}ms): {!r}:{}, args={}',
-                        change*1000,
-                        task, task.coro.cr_code.co_firstlineno,
-                        self.get_args(task),
-                    )
-
-    @override
-    def task_exited(self, task: trio.lowlevel.Task) -> None:
-        """Log results when exited."""
-        cur_time = time.perf_counter()
-        elapsed = self.elapsed.pop(task, 0.0)
-        start = self.start_time.pop(task, None)
-        if start is not None:
-            elapsed += cur_time - start
-
-        if elapsed > 0.1:
-            self.slow.append((elapsed, f'Task time={elapsed:.06}: {task!r}, args={self.get_args(task)}'))
-        self.args.pop(task, None)
-
-    def get_args(self, task: trio.lowlevel.Task) -> object:
-        """Get the args for a task."""
-        args = self.args.pop(task, srctools.EmptyMapping)
-        return self.formatter.pformat({
-            name: val
-            for name, val in args.items()
-            if 'KI_PROTECTION' not in name  # Trio flag.
-        })
-
-
 async def app_main(init: Callable[[trio.Nursery], Awaitable[Any]]) -> None:
     """The main loop for Trio."""
     LOGGER.debug('Opening nursery...')
@@ -252,6 +158,8 @@ def done_callback(result: Outcome[None]) -> None:
         app.on_error(type(result.error), result.error, result.error.__traceback__)
     else:
         LOGGER.debug('Trio exited normally.')
+        if _TRACER is not None:
+            _TRACER.display_slow()
     TK_ROOT.quit()
 
 
@@ -285,7 +193,7 @@ def start_main(init: Callable[[trio.Nursery], Awaitable[object]] = init_app) -> 
         run_sync_soon_threadsafe=run_sync_soon_threadsafe,
         run_sync_soon_not_threadsafe=run_sync_soon_not_threadsafe,
         done_callback=done_callback,
-        instruments=[Tracer()] if utils.DEV_MODE else [],
+        instruments=[_TRACER] if _TRACER is not None else [],
         strict_exception_groups=True,
     )
     TK_ROOT.mainloop()
