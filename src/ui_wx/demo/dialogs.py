@@ -30,5 +30,4 @@ async def test(core_nursery: trio.Nursery) -> None:
     async with trio.open_nursery() as nursery:
         nursery.start_soon(ticker)
         await test_generic(DIALOG)
-
-        # scope.cancel()
+        scope.cancel()

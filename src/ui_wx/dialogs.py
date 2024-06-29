@@ -54,16 +54,18 @@ class TextValidator(wx.Validator):
         done_event: trio.Event,
         error_label: wx.StaticText,
         func: Callable[[str], str],
+        show_error: Callable[[], object],
         value: str,
     ) -> None:
         super().__init__()
         self.error_label = error_label
         self.func = func
+        self.show_error = show_error
         self.done_event = done_event
         self.result: str | None = value
 
     def Clone(self) -> TextValidator:
-        copy = TextValidator(self.done_event, self.error_label, self.func, self.result)
+        copy = TextValidator(self.done_event, self.error_label, self.func, self.show_error, self.result)
         return copy
 
     def TransferToWindow(self) -> bool:
@@ -80,6 +82,7 @@ class TextValidator(wx.Validator):
         except AppError as err:
             set_text(self.error_label, err.message)
             self.error_label.Show()
+            self.show_error()
             wx.Bell()
             return False
         self.done_event.set()
@@ -110,8 +113,15 @@ async def text_entry_window(
     label_error.SetForegroundColour(wx.Colour(255, 0, 0))
     label_error.Hide()
     sizer_vert.Add(label_error, 0, wx.EXPAND, 0)
+    sizer_vert.SetSizeHints(dialog)
 
-    text_ctrl.SetValidator(TextValidator(done_event, label_error, func, str(initial)))
+    text_ctrl.SetValidator(TextValidator(
+        done_event=done_event,
+        error_label=label_error,
+        func=func,
+        show_error=lambda: sizer_vert.SetSizeHints(dialog),
+        value=str(initial),
+    ))
 
     sizer_btn = wx.StdDialogButtonSizer()
     sizer_vert.Add(sizer_btn, 0, wx.ALIGN_RIGHT | wx.ALL, 4)
@@ -138,6 +148,7 @@ async def text_entry_window(
         validator.result = None
         done_event.set()
 
+    sizer_vert.Layout()
     dialog.Layout()
     dialog.Bind(wx.EVT_CLOSE, on_cancel)
     btn_cancel.Bind(wx.EVT_BUTTON, on_cancel)
