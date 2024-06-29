@@ -9,9 +9,10 @@ from ui_wx import MAIN_WINDOW
 
 async def test(core_nursery: trio.Nursery) -> None:
     """Test the flow sizer."""
-    panel = wx.Panel(MAIN_WINDOW)
+    panel = wx.ScrolledWindow(MAIN_WINDOW, style=wx.VSCROLL)
     sizer = FlowSizer(25)
     panel.SetSizer(sizer)
+    MAIN_WINDOW.Layout()
 
     for i in range(1, 101):
         await trio.sleep(0)
