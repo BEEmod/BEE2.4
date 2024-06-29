@@ -55,7 +55,7 @@ class TextValidator(wx.Validator):
         error_label: wx.StaticText,
         func: Callable[[str], str],
         show_error: Callable[[], object],
-        value: str,
+        value: str | None,
     ) -> None:
         super().__init__()
         self.error_label = error_label
@@ -70,7 +70,7 @@ class TextValidator(wx.Validator):
 
     def TransferToWindow(self) -> bool:
         if isinstance(self.Window, wx.TextEntry):
-            self.Window.ChangeValue(self.result)
+            self.Window.ChangeValue(self.result or '')
             return True
         return False
 
