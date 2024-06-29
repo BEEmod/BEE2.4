@@ -48,9 +48,8 @@ class BasicUser(WxUser):
     @override
     def set_img(self, handle: img.Handle, image: wx.Bitmap) -> None:
         """Set the image for the basic widget."""
-        wid = self.widget()
-        if wid is not None:
-            self.widget.SetBitmap(image)
+        if (wid := self.widget()) is not None:
+            wid.SetBitmap(image)
 
     def destroyed(self, ref: WeakRef[WxImgWidgets]) -> None:
         """Handle the widget being destroyed."""
@@ -65,7 +64,6 @@ class WXImages(img.UIImage):
 
     def __init__(self) -> None:
         """Set up the TK code."""
-        self.unused_img = {}
         self.wx_img = {}
         self.empty = wx.Bitmap()
 

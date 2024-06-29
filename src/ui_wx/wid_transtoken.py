@@ -23,13 +23,13 @@ type TextWidget = (
 )
 _control_labels: WeakKeyDictionary[TextWidget, TransToken] = WeakKeyDictionary()
 _menu_labels: WeakKeyDictionary[wx.MenuItem, TransToken] = WeakKeyDictionary()
-_window_titles: WeakKeyDictionary[wx.Frame, TransToken] = WeakKeyDictionary()
+_window_titles: WeakKeyDictionary[wx.TopLevelWindow, TransToken] = WeakKeyDictionary()
 
 
 def set_text[Widget: TextWidget](widget: Widget, token: TransToken) -> Widget:
     """Apply a token to the specified control."""
     # TODO: Should we use SetLabel here to allow mnemonics?
-    widget.SetLabelText(str(token))
+    widget.SetLabel(str(token))
     if token.is_untranslated:  # No need to have a callback for this one.
         _control_labels.pop(widget, None)
     else:
@@ -37,7 +37,7 @@ def set_text[Widget: TextWidget](widget: Widget, token: TransToken) -> Widget:
     return widget
 
 
-def set_win_title(win: wx.Frame, token: TransToken) -> None:
+def set_win_title(win: wx.TopLevelWindow, token: TransToken) -> None:
     """Set the title of a window to this token."""
     win.SetTitle(str(token))
     _window_titles[win] = token
@@ -45,7 +45,7 @@ def set_win_title(win: wx.Frame, token: TransToken) -> None:
 
 def set_menu_text(menu: wx.MenuItem, token: TransToken) -> None:
     """Apply this text to an item on a menu."""
-    menu.SetItemLabel(token)
+    menu.SetItemLabel(str(token))
     _menu_labels[menu] = token
 
 
@@ -61,9 +61,8 @@ async def update_task() -> None:
         await trio.lowlevel.checkpoint()
 
         async with aclosing(gradual_iter(_menu_labels)) as agen2:
-            async for menu, menu_map in agen2:
-                for index, token in menu_map.items():
-                    menu.entryconfigure(index, label=str(token))
+            async for menu, token in agen2:
+                menu.SetItemLabel(str(token))
 
         await trio.lowlevel.checkpoint()
 
