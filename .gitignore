@@ -88,5 +88,7 @@ lib-32/av*
 # PyInstaller temporary file directory
 /build_tmp/
 
-# wxGlade backups
-src/ui_gen/*.bak
+# wxGlade backups and generated Python
+wxGlade/*.bak
+wxGlade/*.py
+wxGlade/#~wxg.autosave*
