@@ -8,12 +8,13 @@ from ui_wx import MAIN_WINDOW
 
 
 async def test(core_nursery: trio.Nursery) -> None:
-    """Test the TK implementation."""
+    """Test the WX implementation."""
     panel = wx.Panel(MAIN_WINDOW)
     label = wx.StaticText(panel, label='Hello: |')
     sizer = wx.BoxSizer(wx.VERTICAL)
     sizer.Add(label, wx.SizerFlags().Border(wx.TOP|wx.LEFT, 25))
     panel.SetSizer(sizer)
+    MAIN_WINDOW.Layout()
 
     scope = trio.CancelScope()
 

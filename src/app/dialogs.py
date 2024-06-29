@@ -91,6 +91,13 @@ class Dialogs(Protocol):
 
 async def test_generic(dialog: Dialogs) -> None:
     """Test the dialog implementation."""
+    def test_validator(value: str) -> str:
+        """Testing validator."""
+        validate_non_empty(value)
+        if not value.isupper():
+            raise AppError(TransToken.untranslated('Value must be uppercase!'))
+        return value.lower()
+
     # No need to translate tests.
     tt = TransToken.untranslated
 
@@ -111,15 +118,16 @@ async def test_generic(dialog: Dialogs) -> None:
     assert await dialog.ask_yes_no_cancel(tt("Press cancel")) is None
     assert await dialog.ask_yes_no_cancel(tt("Press X")) is None
 
-    def test_validator(value: str) -> str:
-        """Testing validator."""
-        validate_non_empty(value)
-        if not value.isupper():
-            raise AppError(TransToken.untranslated('Value must be uppercase!'))
-        return value.lower()
-
     res = await dialog.prompt(
         tt('Test lowercase is banned, then enter "HELLO"'),
+        title=tt("A title"),
+        initial_value=tt('lowercase'),
         validator=test_validator,
     )
-    assert res == 'hello', res
+    assert res == 'hello', repr(res)
+
+    res = await dialog.prompt(tt('Press cancel'))
+    assert res is None, repr(res)
+
+    res = await dialog.prompt(tt('Press X'))
+    assert res is None, repr(res)
