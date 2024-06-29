@@ -17,16 +17,12 @@ __all__ = [
 ]
 
 
-# Widgets that have a SetText method.
-type TextWidget = (
-    wx.Control
-)
-_control_labels: WeakKeyDictionary[TextWidget, TransToken] = WeakKeyDictionary()
+_control_labels: WeakKeyDictionary[wx.Control, TransToken] = WeakKeyDictionary()
 _menu_labels: WeakKeyDictionary[wx.MenuItem, TransToken] = WeakKeyDictionary()
 _window_titles: WeakKeyDictionary[wx.TopLevelWindow, TransToken] = WeakKeyDictionary()
 
 
-def set_text[Widget: TextWidget](widget: Widget, token: TransToken) -> Widget:
+def set_text[Widget: wx.Control](widget: Widget, token: TransToken) -> Widget:
     """Apply a token to the specified control."""
     # TODO: Should we use SetLabel here to allow mnemonics?
     widget.SetLabel(str(token))
@@ -56,7 +52,7 @@ async def update_task() -> None:
         await CURRENT_LANG.wait_transition()
         async with aclosing(gradual_iter(_control_labels)) as agen1:
             async for control, token in agen1:
-                control.SetTextLabel(str(token))
+                control.SetLabel(str(token))
 
         await trio.lowlevel.checkpoint()
 

@@ -7,7 +7,7 @@ class FlowSizer(wx.Sizer):
     def __init__(self, padding: int = 4) -> None:
         super().__init__()
         self.padding = padding
-        self._last_size = wx.Size()
+        self._last_size = wx.Rect()
 
     def CalcMin(self) -> wx.Size:
         """The minimum size is just a single widget, plus padding."""
@@ -22,12 +22,8 @@ class FlowSizer(wx.Sizer):
 
     def RepositionChildren(self, minSize: tuple[int, int] | wx.Size) -> None:
         """Reposition children based on our allotted size."""
-        item_width = min(1, minSize[0])
-
-        cur_size = self.GetSize()
-        width, height = cur_size.width, cur_size.height
+        width = self.GetSize().width
         padding = self.padding
-        columns = min(1, width // item_width)
         width -= padding  # Reserve the right-hand padding amount.
 
         cur_x = padding
