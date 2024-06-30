@@ -31,10 +31,11 @@ def get_app_icon(path: os.PathLike[str]) -> wx.Bitmap:
 
 class WxUser(img.User):
     """Common methods."""
-    def set_img(self, handle: img.Handle, image: wx.Bitmap) -> None:
+    def _set_img(self, handle: img.Handle, image: wx.Bitmap) -> None:
         """Apply this Wx image to users of it."""
 
 
+# noinspection PyProtectedMember
 @attrs.define(eq=False, init=False)
 class BasicUser(WxUser):
     """A user for basic widgets that contain only one image."""
@@ -46,7 +47,7 @@ class BasicUser(WxUser):
         self.cur_handle = None
 
     @override
-    def set_img(self, handle: img.Handle, image: wx.Bitmap) -> None:
+    def _set_img(self, handle: img.Handle, image: wx.Bitmap) -> None:
         """Set the image for the basic widget."""
         if (wid := self.widget()) is not None:
             wid.SetBitmap(image)
@@ -123,10 +124,6 @@ class WXImages(img.UIImage):
         ]
         return ''.join(info)
 
-    def _get_img(self, width: int, height: int) -> wx.Bitmap:
-        """Construct a new image."""
-        return wx.Bitmap(width or 16, height or 16)
-
     @override
     def ui_clear_handle(self, handle: img.Handle) -> None:
         """Clear cached WX images for this handle."""
@@ -146,7 +143,7 @@ class WXImages(img.UIImage):
                 handle._bg_composited = True
             if image is None:
                 image = self.wx_img[handle] = wx.Bitmap(res.width or 16, res.height or 16)
-            image.CopyFromBuffer(res)
+            image.CopyFromBuffer(res.tobytes())
         return image
 
     @override
@@ -158,7 +155,7 @@ class WXImages(img.UIImage):
             pass  # This isn't being used.
         else:
             # This updates the WX widget directly. TODO: Is this performant?
-            wx_img.CopyFromBuffer(frame)
+            wx_img.CopyFromBuffer(frame.tobytes())
 
     @override
     def ui_load_users(self, handle: img.Handle, force: bool) -> None:
@@ -166,7 +163,7 @@ class WXImages(img.UIImage):
         wx_img = self._load_wx(handle, force)
         for user in handle._users:
             if isinstance(user, WxUser):
-                user.set_img(handle, wx_img)
+                user._set_img(handle, wx_img)
 
     @override
     def ui_force_load(self, handle: img.Handle) -> None:
@@ -177,7 +174,7 @@ class WXImages(img.UIImage):
         )
         for user in handle._users:
             if isinstance(user, WxUser):
-                user.set_img(handle, loading)
+                user._set_img(handle, loading)
 
 
 WX_IMG = WXImages()

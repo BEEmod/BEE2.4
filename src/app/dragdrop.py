@@ -441,6 +441,14 @@ class ManagerBase[ItemT, ParentT]:
             return
         self._ui_dragwin_update(x, y)
 
+    def _on_cancel(self) -> None:
+        """Abort dragging."""
+        self._ui_dragwin_hide()
+        if self._cur_drag is not None and self._cur_slot is not None:
+            # Put the item back on its original position.
+            self._cur_slot.contents = self._cur_drag
+            self._cur_drag = self._cur_slot = None
+
     def _on_stop(self, x: float, y: float) -> None:
         """User released the item."""
         if self._cur_drag is None or self._cur_slot is None:

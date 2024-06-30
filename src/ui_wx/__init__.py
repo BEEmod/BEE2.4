@@ -5,8 +5,11 @@ import logging
 
 import wx
 
+
 APP = wx.App()
+APP.SetAppName('BEEmod')
 MAIN_WINDOW = wx.Frame(None)
+APP.SetTopWindow(MAIN_WINDOW)
 
 
 # Convert WX log levels to stdlib equivalents.
