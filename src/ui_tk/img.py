@@ -329,7 +329,7 @@ class TKImages(img.UIImage):
         return image
 
     @override
-    def ui_apply_load(self, handle: img.Handle, frame: Image.Image) -> None:
+    def ui_apply_load(self, handle: img.Handle, frame_handle: img.Handle, frame_pil: Image.Image) -> None:
         """Copy the loading icon to all users of the main image."""
         try:
             tk_img = self.tk_img[handle]
@@ -337,7 +337,7 @@ class TKImages(img.UIImage):
             pass  # This isn't being used.
         else:
             # This updates the TK widget directly.
-            tk_img.paste(frame)
+            tk_img.paste(frame_pil)
 
     @override
     def ui_load_users(self, handle: img.Handle, force: bool) -> None:

@@ -41,8 +41,8 @@ class DragDrop[ItemT](ManagerBase[ItemT, wx.Window]):
     _slot_ui: dict[Slot[ItemT], SlotUI]
 
     # The window and bitmap displayed inside.
-    _drag_win = wx.Frame
-    _drag_img = wx.DragImage
+    _drag_win: wx.Frame
+    _drag_img: wx.StaticBitmap
 
     def __init__(
         self,

@@ -600,25 +600,28 @@ class Handle(User):
         Otherwise, this returns the loading icon.
         If force is True, the image will be remade even if cached.
         """
+        load_handle = Handle.ico_loading(self.width, self.height)
         if self._loading:
-            return Handle.ico_loading(self.width, self.height)
+            return load_handle
         else:
             self._loading = True
             if _load_nursery is None:
                 _early_loads.add(self)
             else:
-                _load_nursery.start_soon(self._load_task, force)
-        return Handle.ico_loading(self.width, self.height)
+                _load_nursery.start_soon(self._load_task, load_handle, force)
+        return load_handle
 
-    async def _load_task(self, force: bool) -> None:
+    async def _load_task(self, load_handle: ImgLoading, force: bool) -> None:
         """Scheduled to load images then apply to the widgets."""
         Handle._currently_loading += 1
         try:
+            load_handle.load_targs.add(self)
             if Handle._currently_loading == 1:
                 # First to load, so wake up the anim.
                 ImgLoading.trigger_wakeup()
             await trio.to_thread.run_sync(self._load_pil)
         finally:
+            load_handle.load_targs.discard(self)
             Handle._currently_loading -= 1
         self._loading = False
         if _UI_IMPL is not None:
@@ -907,6 +910,7 @@ class ImgIcon(Handle):
         return True
 
 
+@attrs.define(eq=False)
 class ImgLoading(ImgIcon):
     """Special behaviour for the animated loading icon."""
     # Loader handles, which we want to cycle animate.
@@ -914,7 +918,10 @@ class ImgLoading(ImgIcon):
     load_anims: ClassVar[dict[tuple[int, int], tuple[ImgLoading, list[ImgLoading]]]] = {}
 
     # If all loading images stop, the animation task sleeps forever. This event wakes it up.
-    _wakeup: trio.Event = trio.Event()
+    _wakeup: ClassVar[trio.Event] = trio.Event()
+
+    # Currently loading handles using this icon.
+    load_targs: set[Handle] = attrs.field(init=False, factory=set)
 
     @classmethod
     def trigger_wakeup(cls) -> None:
@@ -930,7 +937,7 @@ class ImgLoading(ImgIcon):
             for handle, frames in cls.load_anims.values():
                 # This will keep the frame loaded, so next time it's cheap.
                 handle._cached_pil = pil_img = frames[i].get_pil()
-                ui.ui_apply_load(handle, pil_img)
+                ui.ui_apply_load(handle, frames[i], pil_img)
             if Handle._currently_loading == 0:
                 await cls._wakeup.wait()
 
@@ -989,8 +996,11 @@ class UIImage(abc.ABC):
         """Called when this handle is reloading, and should update all its widgets."""
         raise NotImplementedError
 
-    def ui_apply_load(self, handle: Handle, frame: Image.Image) -> None:
-        """Copy the loading icon to all users of the main image."""
+    def ui_apply_load(self, handle: ImgLoading, frame_handle: ImgLoading, frame_pil: Image.Image) -> None:
+        """Copy the loading icon to all users of the main image.
+
+        Tk applies the PIL image to the Tk image directly, while Wx needs to set each widget.
+        """
         raise NotImplementedError
 
 

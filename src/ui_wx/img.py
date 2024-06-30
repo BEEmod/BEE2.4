@@ -64,12 +64,12 @@ class WXImages(img.UIImage):
     wx_img: dict[img.Handle, wx.Bitmap]
 
     def __init__(self) -> None:
-        """Set up the TK code."""
+        """Set up the WX code."""
         self.wx_img = {}
         self.empty = wx.Bitmap()
 
     def sync_load(self, handle: img.Handle) -> wx.Bitmap:
-        """Load the TK image if required immediately, then return it.
+        """Load the WX image if required immediately, then return it.
 
         Only available on BUILTIN type images since they cannot then be
         reloaded.
@@ -118,7 +118,7 @@ class WXImages(img.UIImage):
         """Return some debugging stats."""
         info = [
             f'{img.stats()}'
-            'TK images:\n'
+            'WX images:\n'
             f' - Used = {len(self.wx_img)}\n'
             f' - Basic = {len(basic_users)}\n'
         ]
@@ -147,15 +147,13 @@ class WXImages(img.UIImage):
         return image
 
     @override
-    def ui_apply_load(self, handle: img.Handle, frame: Image.Image) -> None:
+    def ui_apply_load(self, handle: img.ImgLoading, frame_handle: img.ImgLoading, frame_pil: Image.Image) -> None:
         """Copy the loading icon to all users of the main image."""
-        try:
-            wx_img = self.wx_img[handle]
-        except KeyError:
-            pass  # This isn't being used.
-        else:
-            # This updates the WX widget directly. TODO: Is this performant?
-            wx_img.CopyFromBuffer(frame.tobytes())
+        img = self._load_wx(frame_handle, False)
+        for sub_handle in handle.load_targs:
+            for user in sub_handle._users:
+                if isinstance(user, WxUser):
+                    user._set_img(frame_handle, img)
 
     @override
     def ui_load_users(self, handle: img.Handle, force: bool) -> None:
