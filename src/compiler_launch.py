@@ -48,8 +48,15 @@ elif app_name == 'vrad':
 else:
     raise AssertionError(app_name)
 
+from trio_debug import Tracer
+tracer = Tracer() if utils.CODE_DEV_MODE else None
+
 import trio
 trio.run(
     func, sys.argv,
     strict_exception_groups=True,  # Opt into 3.11-style semantics.
+    instruments=[tracer] if tracer is not None else [],
 )
+
+if tracer is not None:
+    tracer.display_slow()
