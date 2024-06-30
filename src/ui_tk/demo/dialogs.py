@@ -3,7 +3,7 @@ import tkinter.constants
 import trio
 
 from transtoken import TransToken
-from app.dialogs import test_generic_msg, test_generic_prompt
+from app.dialogs import test_generic_msg, test_generic_prompt, test_generic_files
 from ui_tk.dialogs import DIALOG
 from ui_tk import TK_ROOT
 
@@ -22,6 +22,10 @@ async def test(core_nursery: trio.Nursery) -> None:
     tkinter.Button(
         TK_ROOT, text='Test prompt',
         command=lambda: nursery.start_soon(test_generic_prompt, DIALOG),
+    ).pack()
+    tkinter.Button(
+        TK_ROOT, text='Test file dialogs',
+        command=lambda: nursery.start_soon(test_generic_files, DIALOG),
     ).pack()
 
     async with trio.open_nursery() as nursery:

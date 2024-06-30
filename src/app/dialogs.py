@@ -88,6 +88,16 @@ class Dialogs(Protocol):
     ) -> str | None:
         """Ask the user to enter a string."""
 
+    async def ask_open_filename(
+        self,
+        title: TransToken = DEFAULT_TITLE,
+        file_types: tuple[TransToken, str] | None = None,
+    ) -> str:
+        """Ask the user to open a filename, optionally with a file filter.
+
+        The filter should be a description, plus an extension like `.txt`.
+        """
+
 
 async def test_generic_msg(dialog: Dialogs) -> None:
     """Test the dialog implementation for messageboxes."""
@@ -137,3 +147,16 @@ async def test_generic_prompt(dialog: Dialogs) -> None:
 
     res = await dialog.prompt(tt('Press X'))
     assert res is None, repr(res)
+
+
+async def test_generic_files(dialog: Dialogs) -> None:
+    """Test the dialog implementation for file windows."""
+    # No need to translate tests.
+    tt = TransToken.untranslated
+    res = await dialog.ask_open_filename(title=tt('Pick any file'))
+    print(f'Picked: {res!r}')
+    res = await dialog.ask_open_filename(
+        title=tt('Pick a PNG image'),
+        file_types=(tt('PNG images'), '.png'),
+    )
+    print(f'Picked: {res!r}')

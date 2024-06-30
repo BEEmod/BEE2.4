@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing_extensions import override
 
 from collections.abc import Callable
-from tkinter import simpledialog, ttk, commondialog
+from tkinter import simpledialog, ttk, commondialog, filedialog
 import tkinter as tk
 
 import trio
@@ -257,6 +257,22 @@ class TkDialogs(Dialogs):
 
             await win.wait()
             return win.result
+
+    @override
+    async def ask_open_filename(
+        self,
+        title: TransToken = DEFAULT_TITLE,
+        file_types: tuple[TransToken, str] | None = None,
+    ) -> str:
+        """Ask the user to open a filename, optionally with a file filter."""
+        if file_types is not None:
+            desc, ext = file_types
+            return filedialog.askopenfilename(
+                title=str(title),
+                filetypes=[(str(desc), f'*{ext.lstrip('*')}')],
+            )
+        else:
+            return filedialog.askopenfilename(title=str(title))
 
 
 DIALOG = TkDialogs(TK_ROOT)

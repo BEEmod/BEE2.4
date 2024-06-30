@@ -2,7 +2,7 @@ import wx
 
 import trio
 
-from app.dialogs import test_generic_msg, test_generic_prompt
+from app.dialogs import test_generic_msg, test_generic_prompt, test_generic_files
 from ui_wx.dialogs import DIALOG
 from ui_wx import MAIN_WINDOW
 
@@ -20,6 +20,10 @@ async def test(core_nursery: trio.Nursery) -> None:
 
     btn = wx.Button(panel, label='Test prompt')
     btn.Bind(wx.EVT_BUTTON, lambda evt: nursery.start_soon(test_generic_prompt, DIALOG))
+    sizer.Add(btn, wx.SizerFlags().Border(wx.TOP | wx.LEFT, 25))
+
+    btn = wx.Button(panel, label='Test file dialogs')
+    btn.Bind(wx.EVT_BUTTON, lambda evt: nursery.start_soon(test_generic_files, DIALOG))
     sizer.Add(btn, wx.SizerFlags().Border(wx.TOP | wx.LEFT, 25))
 
     panel.SetSizer(sizer)

@@ -249,5 +249,20 @@ class WxDialogs(Dialogs):
         with suppress_screens():
             return await text_entry_window(self.parent, title, message, initial_value, validator)
 
+    @override
+    async def ask_open_filename(
+        self,
+        title: TransToken = DEFAULT_TITLE,
+        file_types: tuple[TransToken, str] | None = None,
+    ) -> str:
+        """Ask the user to open a filename, optionally with a file filter."""
+        dialog = wx.FileDialog(self.parent, str(title), style=wx.FD_OPEN)
+        if file_types is not None:
+            desc, ext = file_types
+            dialog.SetWildcard(f'{desc}|*{ext}')
+        await trio.lowlevel.checkpoint()
+        dialog.ShowModal()
+        return dialog.GetPath()
+
 
 DIALOG = WxDialogs(MAIN_WINDOW)
