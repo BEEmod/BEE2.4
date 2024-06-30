@@ -11,7 +11,7 @@ from app import img, sound
 from app.dragdrop import DragInfo
 from app.errors import ErrorUI
 from transtoken import TransToken
-from ui_wx.dragdrop import DragDrop
+from ui_wx.dragdrop import DragDrop, Slot
 from ui_wx.flow_sizer import FlowSizer
 from ui_wx.img import WX_IMG
 from ui_wx.dialogs import DIALOG
@@ -57,10 +57,10 @@ async def test(core_nursery: trio.Nursery) -> None:
     sizer_vert.Add(sizer_main, wx.SizerFlags().Proportion(1))
     panel_main.SetSizer(sizer_vert)
 
-    slot_dest = []
-    slot_src = []
+    slot_dest: list[Slot[str]] = []
+    slot_src: list[Slot[str]] = []
 
-    infos = {}
+    infos: dict[str, DragInfo] = {}
 
     def demo_item(
         name: str,
@@ -130,12 +130,13 @@ async def test(core_nursery: trio.Nursery) -> None:
     for i, item in enumerate(items):
         slot = right_kind(right_panel, label=TransToken.untranslated('{n:00}').format(n=i+1))
         sizer_right.Add(manager.slot_widget(slot))
+        slot_src.append(slot)
         slot.contents = item
 
     left_panel.SetSizer(sizer_left)
     right_panel.SetSizer(sizer_right)
 
-    def src_debug() -> None:
+    def src_debug(evt: wx.Event) -> None:
         print('Source: ')
         for slot in slot_src:
             info: object = '<N/A>'
@@ -151,7 +152,7 @@ async def test(core_nursery: trio.Nursery) -> None:
     sizer_btn.Add(btn)
 
     btn = wx.Button(panel_main, label='Sources')
-    btn.Bind(wx.EVT_BUTTON, lambda evt: print('Source:', [slot.contents for slot in slot_src]))
+    btn.Bind(wx.EVT_BUTTON, src_debug)
     sizer_btn.Add(btn)
 
     name_lbl = wx.StaticText(panel_main)

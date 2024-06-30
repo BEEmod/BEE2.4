@@ -13,6 +13,7 @@ async def test(core_nursery: trio.Nursery) -> None:
     label = wx.StaticText(panel, label='Hello: |')
     sizer = wx.BoxSizer(wx.VERTICAL)
     sizer.Add(label, wx.SizerFlags().Border(wx.TOP|wx.LEFT, 25))
+    nursery: trio.Nursery
 
     btn = wx.Button(panel, label='Test messages')
     btn.Bind(wx.EVT_BUTTON, lambda evt: nursery.start_soon(test_generic_msg, DIALOG))

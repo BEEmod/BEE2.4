@@ -14,7 +14,7 @@ from app import img
 
 
 # Widgets with an image attribute that can be set.
-type WxImgWidgets = wx.StaticBitmap | wx.MenuItem
+type WxImgWidgets = wx.StaticBitmap | wx.MenuItem | wx.BitmapButton
 
 LOGGER = get_logger(__name__)
 basic_users: WeakKeyDictionary[WxImgWidgets, BasicUser] = WeakKeyDictionary()
