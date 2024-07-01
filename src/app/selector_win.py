@@ -138,7 +138,8 @@ async def _store_results_task(chosen: AsyncValue[Item], save_id: str) -> None:
     """Store configured results when changed."""
     async with aclosing(chosen.eventual_values()) as agen:
         async for item in agen:
-            config.APP.store_conf(LastSelected(item.name), save_id)
+            config.APP.store_conf(LastSelected(item.id), save_id)
+
 
 @attrs.define
 class AttrDef:
@@ -268,7 +269,7 @@ class GroupHeader(tk_tools.LineHeader):
 class Item:
     """An item on the panel.
 
-    - name: The item ID, used to distinguish it from others.
+    - id: The item ID, used to distinguish it from others.
     - longName: The full item name. This can be very long. If not set,
       this will be the same as the short name.
     - shortName: A shortened version of the full name. This should be <= 20
@@ -286,7 +287,7 @@ class Item:
     - source: For debugging only, the packages the item came from.
     """
     __slots__ = [
-        'name',
+        'id',
         'shortName',
         'longName',
         '_icon',
@@ -307,7 +308,7 @@ class Item:
     ]
     def __init__(
         self,
-        name: str,
+        id: str,
         short_name: TransToken,
         long_name: TransToken | None = None,
         icon: img.Handle | None = None,
@@ -321,8 +322,7 @@ class Item:
         snd_sample: str | None = None,
         source: str = '',
     ) -> None:
-        # Not a name, actually an ID
-        self.name = name
+        self.id = id
         self.shortName = short_name
         self.group_id = group.token.casefold()
         self.group = group
@@ -369,7 +369,7 @@ class Item:
         self._icon = image
 
     def __repr__(self) -> str:
-        return f'<Item:{self.name}>'
+        return f'<Item:{self.id}>'
 
     @property
     def context_lbl(self) -> TransToken:
@@ -396,7 +396,7 @@ class Item:
     ) -> Item:
         """Create a selector Item from a SelitemData tuple."""
         return Item(
-            name=obj_id,
+            id=obj_id,
             short_name=data.short_name,
             long_name=data.name,
             icon=data.icon,
@@ -434,7 +434,7 @@ class Item:
     def copy(self) -> Item:
         """Duplicate an item."""
         item = Item.__new__(Item)
-        item.name = self.name
+        item.id = self.id
         item.shortName = self.shortName
         item.longName = self.longName
         item.icon = self.icon
@@ -685,7 +685,7 @@ class SelectorWin:
         self = cls()
 
         self.noneItem = Item(
-            name='<NONE>',
+            id='<NONE>',
             short_name=TransToken.BLANK,
             icon=none_icon,
             desc=tkMarkdown.convert(none_desc, None),
@@ -737,7 +737,7 @@ class SelectorWin:
             self.selected = self.noneItem
         else:
             for item in self.item_list:
-                if item.name == prev_state.id:
+                if item.id == prev_state.id:
                     self.selected = item
                     break
             else:  # Arbitrarily pick first.
@@ -1094,7 +1094,7 @@ class SelectorWin:
         if self.chosen.value == self.noneItem:
             return None
         else:
-            return self.chosen.value.name
+            return self.chosen.value.id
 
     @property
     def readonly(self) -> bool:
@@ -1150,7 +1150,7 @@ class SelectorWin:
                 else:
                     item.button = ttk.Button(
                         self.pal_frame,
-                        name='item_' + item.name,
+                        name='item_' + item.id,
                         compound='top',
                     )
                     set_text(item.button, item.shortName)
@@ -1172,9 +1172,9 @@ class SelectorWin:
                     tk.Menu(self.context_menu) if group_key else self.context_menu,
                 )
             group._menu.add_radiobutton(
-                command=functools.partial(self.sel_item_id, item.name),
+                command=functools.partial(self.sel_item_id, item.id),
                 variable=self.context_var,
-                value=item.name,
+                value=item.id,
             )
             set_menu_text(group._menu, item.context_lbl)
             item._context_ind = group._menu.index('end')
@@ -1251,7 +1251,7 @@ class SelectorWin:
             self.disp_label.set(str(self.readonly_override))
         else:
             self.disp_label.set(str(chosen.context_lbl))
-        self.context_var.set(chosen.name)
+        self.context_var.set(chosen.id)
         return "break"  # stop the entry widget from continuing with this event
 
     def rollover_suggest(self) -> None:
@@ -1365,7 +1365,7 @@ class SelectorWin:
 
     def sel_item_id(self, it_id: str) -> bool:
         """Select the item with the given ID."""
-        if self.selected.name == it_id:
+        if self.selected.id == it_id:
             return True
 
         if it_id == '<NONE>':
@@ -1376,7 +1376,7 @@ class SelectorWin:
             return True
         else:
             for item in self.item_list:
-                if item.name == it_id:
+                if item.id == it_id:
                     self.choose_item(item)
                     return True
             return False
@@ -1416,7 +1416,7 @@ class SelectorWin:
                 text = tkMarkdown.convert(TRANS_DEV_ITEM_ID.format(item='*NONE*'), None)
             else:
                 text = tkMarkdown.convert(TRANS_DEV_ITEM_ID.format(
-                    item=f'`{item.source}`:`{item.name}`' if item.source else f'`{item.name}`',
+                    item=f'`{item.source}`:`{item.id}`' if item.source else f'`{item.id}`',
                 ), None)
             self.prop_desc.set_text(tkMarkdown.join(
                 text,
@@ -1753,7 +1753,7 @@ class SelectorWin:
             return obj in self.item_list
         else:
             for item in self.item_list:
-                if item.name == obj:
+                if item.id == obj:
                     return True
             return False
 
@@ -1812,7 +1812,7 @@ class SelectorWin:
         self._set_context_font(self.noneItem, '<NONE>' in suggested)
 
         for item in self.item_list:
-            if item.name in suggested:
+            if item.id in suggested:
                 self._set_context_font(item, True)
                 self.suggested.append(item)
             else:

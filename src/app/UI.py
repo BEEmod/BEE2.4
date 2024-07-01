@@ -1086,7 +1086,7 @@ async def init_option(
     def configure_voice() -> None:
         """Open the voiceEditor window to configure a Quote Pack."""
         try:
-            chosen_voice = packages.get_loaded_packages().obj_by_id(packages.QuotePack, voice_win.chosen.value.name)
+            chosen_voice = packages.get_loaded_packages().obj_by_id(packages.QuotePack, voice_win.chosen.value.id)
         except KeyError:
             pass
         else:
@@ -1150,7 +1150,7 @@ async def init_option(
             async for voice in agen:
                 # This might be open, so force-close it to ensure it isn't corrupt...
                 voiceEditor.save()
-                if voice.name == utils.ID_NONE:
+                if voice.id == utils.ID_NONE:
                     btn_conf_voice.state(['disabled'])
                     tk_img.apply(btn_conf_voice, ICO_GEAR_DIS)
                 else:
@@ -1715,12 +1715,12 @@ async def init_windows(
             async for style_item in agen:
                 packset = packages.get_loaded_packages()
                 global selected_style
-                if style_item.name == utils.ID_NONE:
+                if style_item.id == utils.ID_NONE:
                     LOGGER.warning('Style ID is None??')
                     style_win.choose_item(style_win.item_list[0])
                     continue
 
-                selected_style = utils.obj_id(style_item.name)
+                selected_style = utils.obj_id(style_item.id)
                 ref = packages.PakRef(packages.Style, selected_style)
 
                 style_obj = current_style()

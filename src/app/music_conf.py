@@ -271,7 +271,7 @@ async def make_widgets(
             This saves into the config file the last selected item.
             """
             packset = packages.get_loaded_packages()
-            music_id = music_item.name or '<NONE>'
+            music_id = music_item.id or '<NONE>'
             # If collapsed, the hidden ones follow the base always.
             set_suggested(packset, music_id)
 
