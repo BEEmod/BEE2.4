@@ -69,12 +69,12 @@ class SignageUI(SignageUIBase[tk.Misc]):
         self.wid_preview_left.grid(row=0, column=0)
         self.wid_preview_right.grid(row=0, column=1)
 
-        parent_sel: tk.Misc = frame_selected
-        parent_all: tk.Misc = canv_all
-        for row, col, slot in self._create_slots(parent_sel, parent_all):
+        for row, col, slot in self._create_chosen_slots(frame_selected):
             self.drag_man.slot_grid(slot, row=row, column=col, padx=1, pady=1)
 
-        self.drag_man.flow_slots(canv_all, self.drag_man.sources())
+        # Create the picker slots, then position them.
+        slots_all = list(self._create_picker_slots(canv_all))
+        self.drag_man.flow_slots(canv_all, slots_all)
         canv_all.bind('<Configure>', lambda e: self.drag_man.flow_slots(canv_all, self.drag_man.sources()))
 
     @override

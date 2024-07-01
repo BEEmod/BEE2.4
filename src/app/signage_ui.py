@@ -141,30 +141,32 @@ class SignageUIBase[ParentT]:
                 self.ui_set_preview_name(TransToken.BLANK)
                 self.ui_set_preview_img(IMG_BLANK, IMG_BLANK)
 
-    def _create_slots(
-        self,
-        parent_chosen: ParentT,
-        parent_all: ParentT,
+    def _create_chosen_slots(
+        self, parent_chosen: ParentT,
     ) -> Iterator[tuple[int, int, dragdrop.Slot[SignRef]]]:
-        """Create all the slots for the signage."""
-        load_packset = packages.get_loaded_packages()
+        """Create the slots for the currently selected signage."""
+        trans_time = TransToken.untranslated('{delta:ms}')
         for i in SIGN_IND:
             self._slots[i] = slot = self.drag_man.slot_target(
                 parent_chosen,
-                label=TransToken.untranslated('{delta:ms}').format(delta=timedelta(seconds=i)),
+                label=trans_time.format(delta=timedelta(seconds=i)),
             )
             row, col = divmod(i-3, 4)
-            yield row, col, slot
 
             prev_id = DEFAULT_IDS.get(i, '')
             if prev_id != "":
                 slot.contents = PakRef(Signage, prev_id)
+            yield row, col, slot
 
+    def _create_picker_slots(self, parent_picker: ParentT) -> Iterator[dragdrop.Slot[SignRef]]:
+        """Create the slots for all possible signs."""
+        load_packset = packages.get_loaded_packages()
         # TODO: Dynamically refresh this.
         for sign in sorted(load_packset.all_obj(Signage), key=lambda s: s.name):
             if not sign.hidden:
-                slot = self.drag_man.slot_source(parent_all)
+                slot = self.drag_man.slot_source(parent_picker)
                 slot.contents = PakRef(Signage, utils.obj_id(sign.id))
+                yield slot
 
     async def _apply_config_task(self) -> None:
         """Apply saved signage info to the UI."""
