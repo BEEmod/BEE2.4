@@ -8,7 +8,7 @@ from packages import PakRef, Signage
 from transtoken import TransToken
 from .dragdrop import DragDrop
 from .img import WXImages
-from . import MAIN_WINDOW
+from . import MAIN_WINDOW, get_scrollflow_size_handler
 from .wid_transtoken import set_text, set_win_title
 
 from app.signage_ui import IMG_BLANK, SignageUIBase, TRANS_TITLE, TRANS_SELECTED
@@ -39,11 +39,11 @@ class SignageUI(SignageUIBase[wx.Window]):
 
         # Panel holding the selected items.
         panel_select = wx.StaticBox(panel_main, style=wx.ALIGN_CENTRE_HORIZONTAL)
-        sizer_select_wrap = wx.StaticBoxSizer(panel_select)
-        sizer_left.Add(sizer_select_wrap, 0, wx.ALL | wx.EXPAND, 8)
+        sizer_select_wrapper = wx.StaticBoxSizer(panel_select)
+        sizer_left.Add(sizer_select_wrapper, 0, wx.ALL | wx.EXPAND, 8)
         set_text(panel_select, TRANS_SELECTED)
         sizer_select = wx.GridSizer(7, 4, 0, 0)
-        sizer_select_wrap.Add(sizer_select)
+        sizer_select_wrapper.Add(sizer_select)
 
         sizer_left.Add(wx.StaticLine(panel_main), 0, wx.EXPAND, 0)
 
@@ -69,6 +69,7 @@ class SignageUI(SignageUIBase[wx.Window]):
         self.panel_chooser.SetScrollRate(0, 10)
         self.sizer_chooser = wx.WrapSizer(wx.HORIZONTAL)
         self.panel_chooser.SetSizer(self.sizer_chooser)
+        win.Bind(wx.EVT_SIZE, get_scrollflow_size_handler(self.panel_chooser, self.sizer_chooser))
 
         sizer_cols.Add(self.panel_chooser, 1, wx.ALL | wx.EXPAND, 4)
 

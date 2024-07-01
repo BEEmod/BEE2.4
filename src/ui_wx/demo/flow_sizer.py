@@ -1,23 +1,26 @@
-"""Demonstrate the flow sizer."""
+"""Test interaction between a wrapped sizer and a scrolling window."""
 import wx
 
 import trio
 
-from ui_wx.flow_sizer import FlowSizer
-from ui_wx import MAIN_WINDOW
+from ui_wx import MAIN_WINDOW, get_scrollflow_size_handler
 
 
 async def test(core_nursery: trio.Nursery) -> None:
-    """Test the flow sizer."""
+    """Test wx.ScrolledWindow + wx.WrapSizer works."""
     panel = wx.ScrolledWindow(MAIN_WINDOW, style=wx.VSCROLL)
-    sizer = FlowSizer(25)
+    sizer = wx.WrapSizer()
     panel.SetSizer(sizer)
-    MAIN_WINDOW.Layout()
+    panel.SetScrollRate(0, 10)
+    MAIN_WINDOW.Bind(wx.EVT_SIZE, get_scrollflow_size_handler(panel, sizer))
 
     for i in range(1, 101):
         await trio.sleep(0)
         label = wx.StaticText(panel, label=f'Item {i:02}')
-        sizer.Add(label)
+        sizer.Add(label, wx.SizerFlags().TripleBorder())
         sizer.Layout()
 
-    await trio.sleep_forever()
+    MAIN_WINDOW.Layout()
+
+    async with trio.open_nursery() as nursery:
+        await trio.sleep_forever()

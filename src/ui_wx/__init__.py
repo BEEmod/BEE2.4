@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 
 import wx
 
@@ -49,3 +50,25 @@ class WXLogTarg(wx.Log):
         ))
 
 wx.Log.SetActiveTarget(WXLogTarg())
+
+
+def get_scrollflow_size_handler(
+    panel: wx.ScrolledWindow,
+    sizer: wx.WrapSizer,
+) -> Callable[[wx.SizeEvent], None]:
+    """Create an event handler used to fix interactions between a scrolling window and a wrap-sizer.
+
+    When making a scrolled window larger, the virtual size gets extended to match the window,
+    but it never gets shrunk. That means making the window smaller messes up the wrapping.
+    """
+    def size_handler(evt: wx.SizeEvent) -> None:
+        """Handle the event."""
+        size = panel.GetVirtualSize()
+        size.Width = 10
+        panel.SetVirtualSize(size)
+        # The sizer needs to be repositioned twice, otherwise it can be left with the
+        # last column sticking outside the window.
+        wx.CallAfter(wx.WrapSizer.RepositionChildren, sizer, size)
+        evt.Skip()
+
+    return size_handler
