@@ -45,7 +45,7 @@ def iter_firstlast[T](iterable: Iterable[T]) -> Iterator[tuple[bool, T, bool]]:
         prev = current
 
 
-class tkRichText(tkinter.Text):
+class RichText(tkinter.Text):
     """A version of the TK Text widget which allows using special formatting."""
     def __init__(
         self,

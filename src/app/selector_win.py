@@ -26,7 +26,7 @@ import attrs
 import trio
 import srctools.logger
 
-from app.richTextBox import tkRichText
+from ui_tk.rich_textbox import RichText
 from app import tkMarkdown, sound, img, DEV_MODE
 from ui_tk.tooltip import add_tooltip, set_tooltip
 from ui_tk.img import TK_IMG
@@ -605,7 +605,7 @@ class SelectorWin:
 
     prop_author: ttk.Label
     prop_desc_frm: ttk.Frame
-    prop_desc: tkRichText
+    prop_desc: RichText
     prop_scroll: tk_tools.HidingScroll
     prop_reset: ttk.Button
     context_menu: tk.Menu
@@ -891,7 +891,7 @@ class SelectorWin:
         self.prop_desc_frm.columnconfigure(0, weight=1)
         self.prop_frm.rowconfigure(4, weight=1)
 
-        self.prop_desc = tkRichText(
+        self.prop_desc = RichText(
             self.prop_desc_frm,
             name='prop_desc',
             width=40,

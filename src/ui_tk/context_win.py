@@ -16,14 +16,14 @@ from app.contextWin import (
     TRANS_NO_VERSIONS,
 )
 from app.item_properties import PropertyWindow
-from app.richTextBox import tkRichText
 from packages import PakRef, Style
 from packages.item import Item
 from transtoken import TransToken
-from ui_tk import TK_ROOT, tk_tools, tooltip
-from ui_tk.dialogs import TkDialogs
-from ui_tk.wid_transtoken import set_text
-from ui_tk.img import TKImages
+from . import TK_ROOT, tk_tools, tooltip
+from .dialogs import TkDialogs
+from .wid_transtoken import set_text
+from .img import TKImages
+from .rich_textbox import RichText
 import utils
 
 
@@ -136,7 +136,7 @@ class ContextWin(ContextWinBase['UI.PalItem']):
         desc_frame.grid(row=6, column=0, columnspan=3, sticky="EW")
         desc_frame.columnconfigure(0, weight=1)
 
-        self.wid_desc = tkRichText(desc_frame, name='desc', width=40, height=16)
+        self.wid_desc = RichText(desc_frame, name='desc', width=40, height=16)
         self.wid_desc.grid(row=0, column=0, sticky="EW")
 
         desc_scroll = tk_tools.HidingScroll(

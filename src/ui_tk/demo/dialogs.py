@@ -2,7 +2,6 @@ import tkinter.constants
 
 import trio
 
-from transtoken import TransToken
 from app.dialogs import test_generic_msg, test_generic_prompt, test_generic_files
 from ui_tk.dialogs import DIALOG
 from ui_tk import TK_ROOT

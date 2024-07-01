@@ -15,12 +15,12 @@ from app.helpMenu import (
     ICONS, WEB_RESOURCES, SEPERATOR,
     CreditsWindowBase, open_url,
 )
-from app.richTextBox import tkRichText
 from transtoken import TransToken
-from ui_tk import TK_ROOT, tk_tools
-from ui_tk.dialogs import DIALOG
-from ui_tk.img import TKImages
-from ui_tk.wid_transtoken import set_menu_text, set_text, set_win_title
+from . import TK_ROOT, tk_tools
+from .dialogs import DIALOG
+from .img import TKImages
+from .wid_transtoken import set_menu_text, set_text, set_win_title
+from .rich_textbox import RichText
 import utils
 
 
@@ -49,7 +49,7 @@ class CreditsWindow(CreditsWindowBase):
         win.grid_columnconfigure(0, weight=1)
         win.grid_rowconfigure(0, weight=1)
 
-        self._textbox = tkRichText(frame, name='message', width=80, height=24)
+        self._textbox = RichText(frame, name='message', width=80, height=24)
         self._textbox.configure(background='white', relief='flat')
         self._textbox.grid(row=0, column=0, sticky='nsew')
         frame.grid_columnconfigure(0, weight=1)

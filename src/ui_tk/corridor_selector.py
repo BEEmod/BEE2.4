@@ -13,13 +13,13 @@ from app.corridor_selector import (
     HEIGHT, IMG_ARROW_LEFT, IMG_ARROW_RIGHT, IMG_CORR_BLANK, Icon,
     OptionRow, Selector, TRANS_HELP, TRANS_NO_OPTIONS, WIDTH, TRANS_RAND_OPTION,
 )
-from app.richTextBox import tkRichText
 from config.corridors import UIState
 from corridor import Direction, GameMode, Option, Orient
 from transtoken import TransToken
 from .dragdrop import CanvasPositioner
 from .img import TKImages
 from .wid_transtoken import set_text, set_win_title
+from .rich_textbox import RichText
 from . import TK_ROOT, tk_tools, tooltip
 import config
 import packages
@@ -136,7 +136,7 @@ class TkSelector(Selector[IconUI, OptionRowUI]):
     wid_image: ttk.Label
     wid_title: ttk.Label
     wid_authors: ttk.Label
-    wid_desc: tkRichText
+    wid_desc: RichText
 
     def __init__(self, packset: packages.PackagesSet, tk_img: TKImages, cur_style: utils.ObjectID) -> None:
         conf = config.APP.get_cur_conf(UIState)
@@ -223,7 +223,7 @@ class TkSelector(Selector[IconUI, OptionRowUI]):
         right_canv['yscrollcommand'] = self.right_scroll.set
         self.right_scroll.grid(row=3, column=1, sticky='ns')
 
-        self.wid_desc = tkRichText(right_scroll_frm, name='desc')
+        self.wid_desc = RichText(right_scroll_frm, name='desc')
         self.wid_desc.grid(row=0, column=0, sticky='nsew')
         self.wid_options_frm = ttk.Frame(right_scroll_frm)
         self.wid_options_frm.grid(row=1, column=0, sticky='nsew')
