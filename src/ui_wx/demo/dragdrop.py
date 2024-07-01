@@ -12,10 +12,9 @@ from app.dragdrop import DragInfo
 from app.errors import ErrorUI
 from transtoken import TransToken
 from ui_wx.dragdrop import DragDrop, Slot
-from ui_wx.flow_sizer import FlowSizer
 from ui_wx.img import WX_IMG
 from ui_wx.dialogs import DIALOG
-from ui_wx import MAIN_WINDOW
+from ui_wx import MAIN_WINDOW, get_scrollflow_size_handler
 import app
 import BEE2_config
 import config
@@ -123,7 +122,7 @@ async def test(core_nursery: trio.Nursery) -> None:
             sizer_left.Add(manager.slot_widget(slot))
             slot_dest.append(slot)
 
-    sizer_right = FlowSizer()
+    sizer_right = wx.WrapSizer()
 
     FLEXI = False
     right_kind = manager.slot_flexi if FLEXI else manager.slot_source
@@ -135,6 +134,8 @@ async def test(core_nursery: trio.Nursery) -> None:
 
     left_panel.SetSizer(sizer_left)
     right_panel.SetSizer(sizer_right)
+
+    MAIN_WINDOW.Bind(wx.EVT_SIZE, get_scrollflow_size_handler(right_panel, sizer_right))
 
     def src_debug(evt: wx.Event) -> None:
         print('Source: ')
