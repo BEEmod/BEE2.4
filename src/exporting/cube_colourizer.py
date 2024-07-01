@@ -1,13 +1,13 @@
 """Generates various resources depending on package options."""
 from __future__ import annotations
 
-from pathlib import Path
-
 from PIL import Image, ImageDraw
 import colorsys
+import io
 
 from srctools.vtf import VTF, ImageFormats
 import srctools.logger
+import trio
 
 from . import ExportData, STEPS, StepResource
 from packages.widgets import ConfigGroup, parse_color
@@ -91,19 +91,19 @@ async def make_cube_colourizer_legend(exp_data: ExportData) -> None:
         frame = vtf.get(mipmap=i)
         frame.copy_from(b'\xFF' * (frame.width*frame.height), ImageFormats.I8)
 
-    vtf_loc = Path(exp_data.game.abs_path(
+    vtf_loc = trio.Path(exp_data.game.abs_path(
         'bee2/materials/BEE2/models/props_map_editor/cube_coloriser_legend.vtf'
     ))
     exp_data.resources.add(vtf_loc)
-    vtf_loc.parent.mkdir(parents=True, exist_ok=True)
-    with vtf_loc.open('wb') as f:
-        LOGGER.info('Exporting "{}"...', f.name)
-        try:
-            vtf.save(f)
-        except NotImplementedError:
-            LOGGER.warning('No DXT compressor, using RGB888.')
-            # No libsquish, so DXT compression doesn't work.
-            vtf.format = vtf.low_format = ImageFormats.RGB888
-            f.truncate(0)
-            f.seek(0)
-            vtf.save(f)
+    await vtf_loc.parent.mkdir(parents=True, exist_ok=True)
+    LOGGER.info('Exporting "{}"...', vtf_loc)
+    buf = io.BytesIO()
+    try:
+        await trio.to_thread.run_sync(vtf.save, buf)
+    except NotImplementedError:
+        LOGGER.warning('No DXT compressor, using RGB888.')
+        # No libsquish, so DXT compression doesn't work.
+        vtf.format = vtf.low_format = ImageFormats.RGB888
+        buf = io.BytesIO()
+        await trio.to_thread.run_sync(vtf.save, buf)
+    await vtf_loc.write_bytes(buf.getvalue())
