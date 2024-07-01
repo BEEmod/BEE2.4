@@ -105,7 +105,7 @@ TRANS_DUPLICATE_OBJ_ID = TransToken.ui(
 )
 
 
-@attrs.define
+@attrs.frozen
 class SelitemData:
     """Options which are displayed on the selector window."""
     name: TransToken  # Longer full name.
