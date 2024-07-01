@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any, TYPE_CHECKING
 from enum import Enum, auto
-from pathlib import Path
+from pathlib import Path, PurePath
 from collections.abc import Callable
 import os
 
@@ -95,7 +95,7 @@ class ExportData:
     # As steps export, they may fill this to include additional resources that
     # are written to the game folder. If updating the cache, these files won't
     # be deleted. This should be an absolute path.
-    resources: set[Path] = attrs.Factory(set)
+    resources: set[PurePath] = attrs.Factory(set)
     # Flag set to indicate that the error server may be running.
     maybe_error_server_running: bool = True
     # Can be called to indicate a non-fatal error.
