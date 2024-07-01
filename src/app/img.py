@@ -1029,7 +1029,8 @@ async def init(
             while _early_loads:
                 handle = _early_loads.pop()
                 if handle._users:
-                    _load_nursery.start_soon(Handle._load_task, handle, False)
+                    load_handle = Handle.ico_loading(handle.width, handle.height)
+                    _load_nursery.start_soon(Handle._load_task, handle, load_handle, False)
             _load_nursery.start_soon(ImgLoading.anim_task, implementation)
             task_status.started()
             # Sleep, until init() is potentially cancelled.
