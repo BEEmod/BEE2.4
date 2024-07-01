@@ -1533,9 +1533,6 @@ async def main(argv: list[str]) -> None:
         LOGGER.info('Done. Exiting now!')
         sys.exit()
 
-    # Just in case we fail, overwrite the VRAD config, so it doesn't use old data.
-    open('bee2/vrad_config.cfg', 'wb').close()
-
     args = " ".join(argv)
     new_args = argv[1:]
     old_args = argv[1:]
