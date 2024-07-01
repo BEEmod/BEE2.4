@@ -11,7 +11,7 @@ import attrs
 
 from app import img
 from app.dragdrop import (
-    SLOT_DRAG, DragWin, FlexiCB, InfoCB, ManagerBase, PositionerBase,
+    SLOT_DRAG, DragWin, FlexiCB, InfoCB, ManagerBase,
     Slot, in_bbox,
     # Re-export.
     DragInfo as DragInfo,
@@ -36,9 +36,12 @@ class GeoManager(Enum):
     CANVAS = 'canvas'
 
 
-class CanvasPositioner[T](PositionerBase):
+class CanvasPositioner[T]:
     """Positions slots on a canvas.
 
+
+    - spacing is the amount added on each side of each slot.
+    - yoff is the offset from the top, the new height is then returned to allow chaining.
     T is the slot object, but it can be anything as long as the place_func matches.
     """
     canvas: tk.Canvas
@@ -54,20 +57,44 @@ class CanvasPositioner[T](PositionerBase):
     ) -> None:
         self.canvas = canvas
         self._place_func = place_func
-        super().__init__(
-            canvas.winfo_width(), canvas.winfo_height(),
-            item_width, item_height, spacing, yoff
-        )
+        if spacing <= 0:
+            spacing = 16 if utils.MAC else 8
+
+        self.spacing = spacing
+        self.current = 0  # Current x index.
+        self.yoff = yoff + self.spacing
+
+        self.item_width = item_width + spacing * 2
+        self.item_height = item_height + spacing * 2
+
+        self.width = canvas.winfo_width()
+
+        self.columns = (self.width - spacing) // self.item_width
+        if self.columns < 1:
+            # Can't fit, they're going to stick out.
+            self.columns = 1
+
+    def advance_row(self) -> None:
+        """Advance to the next row."""
+        self.current = 0
+        self.yoff += self.item_height
 
     def resize_canvas(self) -> None:
         """Set the scroll region of the canvas to fit items."""
-        width, height = self.get_size()
+        width = self.columns * self.item_width + self.spacing
+        height = self.yoff
+        if self.current != 0:
+            height += self.item_height
         self.canvas['scrollregion'] = (0, 0, width, height)
 
     def place_slots(self, slots: Iterable[T], tag: str, xoff: int = 0) -> None:
         """Place slots onto the canvas."""
-        for slot, x, y in self._get_positions(slots, xoff):
-            self._place_func(self.canvas, slot, x, y, tag)
+        for slot in slots:
+            x = xoff + self.spacing + self.current * self.item_width
+            self._place_func(self.canvas, slot, x, self.yoff, tag)
+            self.current += 1
+            if self.current >= self.columns:
+                self.advance_row()
 
 
 @attrs.define

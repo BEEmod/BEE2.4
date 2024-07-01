@@ -2,7 +2,7 @@
 from __future__ import annotations
 from typing import Any, Final
 
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Callable, Iterator
 from collections import defaultdict
 from enum import Enum
 import abc
@@ -13,12 +13,11 @@ import attrs
 
 from app import img, sound, EdgeTrigger
 from transtoken import TransToken
-import utils
 
 
 __all__ = [
     'ManagerBase', 'Slot', 'DragInfo', 'SlotType', 'SLOT_DRAG',
-    'InfoCB', 'DragWin', 'FlexiCB', 'PositionerBase', 'in_bbox',
+    'InfoCB', 'DragWin', 'FlexiCB', 'in_bbox',
 ]
 LOGGER = get_logger(__name__)
 
@@ -53,78 +52,6 @@ def in_bbox(
     if x > left + width or y > top + height:
         return False
     return True
-
-
-class PositionerBase:
-    """Utility for positioning slots in a grid on a canvas.
-
-    - spacing is the amount added on each side of each slot.
-    - yoff is the offset from the top, the new height is then returned to allow chaining.
-    """
-
-    def __init__(
-        self,
-        width: int,
-        height: int,
-        item_width: int,
-        item_height: int,
-        spacing: int = -1,
-        yoff: int = 0,
-    ) -> None:
-        if spacing <= 0:
-            spacing = 16 if utils.MAC else 8
-
-        self.spacing = spacing
-        self.current = 0  # Current x index.
-        self.yoff = yoff + self.spacing
-
-        self.item_width = item_width + spacing * 2
-        self.item_height = item_height + spacing * 2
-
-        self.width = width
-        self.height = height
-
-        self.columns = (self.width - spacing) // self.item_width
-        if self.columns < 1:
-            # Can't fit, they're going to stick out.
-            self.columns = 1
-
-    def xpos(self, col: int) -> int:
-        """Return the x offset of a column"""
-        return self.spacing + col * self.item_width
-
-    def ypos(self, row: int) -> int:
-        """Return the y offset of a row."""
-        return self.yoff + row * self.item_height
-
-    def advance_row(self) -> None:
-        """Advance to the next row."""
-        self.current = 0
-        self.yoff += self.item_height
-
-    def get_size(self) -> tuple[int, int]:
-        """Calculate the total bounding box.
-
-        This advances a row if the last is nonempty.
-        """
-        width = self.columns * self.item_width + self.spacing
-        height = self.yoff
-        if self.current != 0:
-            height += self.item_height
-        return width, height
-
-    def _get_positions[T](
-        self,
-        slots: Iterable[T],
-        xoff: int,
-    ) -> Iterator[tuple[T, int, int]]:
-        """Place these slots gradually."""
-        for slot in slots:
-            x = self.xpos(self.current) + xoff
-            yield slot, x, self.yoff
-            self.current += 1
-            if self.current >= self.columns:
-                self.advance_row()
 
 
 type InfoCB[ItemT] = Callable[[ItemT], DragInfo]
