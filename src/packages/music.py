@@ -2,7 +2,7 @@
 from __future__ import annotations
 from typing import Iterator, Mapping
 
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 
 from srctools import conv_float
 import srctools.logger
@@ -26,7 +26,7 @@ class Music(PakObject, needs_foreground=True, style_suggest_key='music'):
         sound: Mapping[MusicChannel, list[str]],
         *,
         children: Mapping[MusicChannel, str],
-        sample: Mapping[MusicChannel, str | None],
+        sample: Mapping[MusicChannel, str],
         volume: Mapping[MusicChannel, float],
         config: lazy_conf.LazyConf = lazy_conf.BLANK,
         inst: str | None = None,
@@ -78,7 +78,7 @@ class Music(PakObject, needs_foreground=True, style_suggest_key='music'):
         # The sample music file to play, if found.
         sample_block = data.info.find_key('sample', '')
         if sample_block.has_children():
-            sample: dict[MusicChannel, str | None] = {}
+            sample: dict[MusicChannel, str] = {}
             for channel in MusicChannel:
                 chan_sample = sample[channel] = sample_block[channel.value, '']
                 if chan_sample:
@@ -96,7 +96,7 @@ class Music(PakObject, needs_foreground=True, style_suggest_key='music'):
                             zip_sample,
                         )
                 else:
-                    sample[channel] = None
+                    sample[channel] = ''
         else:
             # Single value, fill it into all channels.
             sample = dict.fromkeys(MusicChannel, sample_block.value)
@@ -200,15 +200,6 @@ class Music(PakObject, needs_foreground=True, style_suggest_key='music'):
             return utils.obj_id(child.id)
         return utils.ID_NONE
 
-    def get_sample(self, packset: PackagesSet, channel: MusicChannel) -> str | None:
-        """Get the path to the sample file, if present."""
-        if self.sample[channel]:
-            return self.sample[channel]
-        try:
-            children = packset.obj_by_id(Music, self.children[channel])
-        except KeyError:
-            return None
-        return children.sample[channel]
 
     @classmethod
     async def post_parse(cls, packset: PackagesSet) -> None:
@@ -286,3 +277,25 @@ class Music(PakObject, needs_foreground=True, style_suggest_key='music'):
         else:
             # No music is not synced.
             return {'TBEAM_SYNC': False}
+
+    @classmethod
+    def sample_getter_func(cls, channel: MusicChannel) -> Callable[[PackagesSet, utils.SpecialID], str]:
+        """Return a function which retrieves the sample sound for the specified channel."""
+        def sample_getter(packset: PackagesSet, music_id: utils.SpecialID) -> str:
+            """Fetch the sample."""
+            if utils.not_special_id(music_id):
+                try:
+                    music = packset.obj_by_id(cls, music_id)
+                except KeyError:
+                    return ''
+                if music.sample[channel]:
+                    return music.sample[channel]
+                try:
+                    children = packset.obj_by_id(cls, music.children[channel])
+                except KeyError:
+                    return ''
+                return children.sample[channel]
+            else:
+                # No music, no sample.
+                return ''
+        return sample_getter

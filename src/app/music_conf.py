@@ -142,7 +142,6 @@ async def make_widgets(
                     utils.obj_id(music.id),
                     music.selitem_data,
                 )
-                selitem.snd_sample = music.get_sample(packset, channel)
                 music_list.append(selitem)
         return music_list
 
@@ -158,6 +157,7 @@ async def make_widgets(
         ),
         none_item=DATA_NONE_BASE,
         default_id=utils.obj_id('VALVE_PETI'),
+        func_get_sample=Music.sample_getter_func(MusicChannel.BASE),
         sound_sys=filesystem,
         func_get_attr=Music.get_base_selector_attrs,
         attributes=[
@@ -176,6 +176,7 @@ async def make_widgets(
         title=TransToken.ui('Select Excursion Funnel Music'),
         desc=TransToken.ui('Set the music used while inside Excursion Funnels.'),
         none_item=DATA_NONE_FUNNEL,
+        func_get_sample=Music.sample_getter_func(MusicChannel.TBEAM),
         sound_sys=filesystem,
         func_get_attr=Music.get_funnel_selector_attrs,
         attributes=[
@@ -191,6 +192,7 @@ async def make_widgets(
         title=TransToken.ui('Select Repulsion Gel Music'),
         desc=TransToken.ui('Select the music played when players jump on Repulsion Gel.'),
         none_item=DATA_NONE_BOUNCE,
+        func_get_sample=Music.sample_getter_func(MusicChannel.BOUNCE),
         sound_sys=filesystem,
     ))
 
@@ -202,6 +204,7 @@ async def make_widgets(
         title=TransToken.ui('Select Propulsion Gel Music'),
         desc=TransToken.ui('Select music played when players have large amounts of horizontal velocity.'),
         none_item=DATA_NONE_SPEED,
+        func_get_sample=Music.sample_getter_func(MusicChannel.SPEED),
         sound_sys=filesystem,
     ))
 

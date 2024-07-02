@@ -91,7 +91,7 @@ class NAV_KEYS(Enum):
 
 
 # Callbacks used to get the info for items in the window.
-type FuncGetAttr = Callable[[packages.PackagesSet, utils.SpecialID], AttrMap]
+type GetterFunc[T] = Callable[[packages.PackagesSet, utils.SpecialID], T]
 
 TRANS_ATTR_DESC = TransToken.untranslated('{desc}: ')
 TRANS_ATTR_COLOR = TransToken.ui('Color: R={r}, G={g}, B={b}')  # i18n: Tooltip for colour swatch.
@@ -209,8 +209,6 @@ class Item:
         'id',
         'data',
         'button',
-        'snd_sample',
-        'source',
         '_selector',
         '_context_lbl',
         '_context_ind',
@@ -219,21 +217,16 @@ class Item:
         self,
         item_id: utils.SpecialID,
         data: SelitemData,
-        snd_sample: str | None = None,
-        source: str = '',
     ) -> None:
         self.id = item_id
         self.data = data
-        self.source = source or ', '.join(sorted(data.packages))
         if len(data.name.token) > 20:
             self._context_lbl = data.short_name
         else:
             self._context_lbl = data.name
 
-        self.snd_sample = snd_sample
-
         # The button widget for this item.
-        self.button: ttk.Button | None= None
+        self.button: ttk.Button | None = None
         # The selector window we belong to.
         self._selector: SelectorWin | None = None
         # The position on the menu this item is located at.
@@ -295,10 +288,7 @@ class Item:
         item = Item.__new__(Item)
         item.id = self.id
         item.data = self.data
-        item.snd_sample = self.snd_sample
         item._context_lbl = self._context_lbl
-        item.source = self.source
-
         item._selector = item.button = None
         return item
 
@@ -387,7 +377,8 @@ class SelectorWin:
     - suggested: The Item which is suggested by the style.
     """
     # Callback functions used to retrieve the data for the window.
-    func_get_attr: FuncGetAttr
+    func_get_attr: GetterFunc[AttrMap]
+    func_get_sample: GetterFunc[str] | None
 
     # Packages currently loaded for the window.
     _packset: packages.PackagesSet
@@ -487,6 +478,7 @@ class SelectorWin:
         store_last_selected: bool = True,
         has_def: bool = True,
         sound_sys: FileSystemChain | None = None,
+        func_get_sample: GetterFunc[str] | None = None,
         modal: bool = False,
         default_id: utils.SpecialID = utils.ID_NONE,
         none_item: SelitemData | None = packages.SEL_DATA_NONE,
@@ -495,7 +487,7 @@ class SelectorWin:
         readonly_desc: TransToken = TransToken.BLANK,
         readonly_override: TransToken | None = None,
         attributes: Iterable[AttrDef] = (),
-        func_get_attr: FuncGetAttr = lambda packset, item_id: EmptyMapping,
+        func_get_attr: GetterFunc[AttrMap] = lambda packset, item_id: EmptyMapping,
         task_status: trio.TaskStatus[SelectorWin],
     ) -> None:
         """Create a selector window object.
@@ -538,6 +530,7 @@ class SelectorWin:
 
         self._packset = packages.get_loaded_packages()  # TODO, handle reload
         self.func_get_attr = func_get_attr
+        self.func_get_sample = func_get_sample
 
         # The textbox on the parent window.
         self.display = None
@@ -711,7 +704,7 @@ class SelectorWin:
         self.prop_name.grid(row=0, column=0, sticky='ew')
 
         # For music items, add a '>' button to play sound samples
-        if sound_sys is not None and sound.has_sound():
+        if sound_sys is not None and sound.has_sound() and func_get_sample is not None:
             self.samp_button = samp_button = ttk.Button(
                 name_frame,
                 name='sample_button',
@@ -1253,7 +1246,7 @@ class SelectorWin:
         if DEV_MODE.value:
             # Show the ID of the item in the description
             text = tkMarkdown.convert(TRANS_DEV_ITEM_ID.format(
-                item=f'`{item.source}`:`{item.id}`' if item.source else f'`{item.id}`',
+                item=f'`{', '.join(data.packages)}`:`{item.id}`' if data.packages else f'`{item.id}`',
             ), None)
             self.prop_desc.set_text(tkMarkdown.join(
                 text,
@@ -1271,10 +1264,11 @@ class SelectorWin:
 
         if self.sampler:
             assert self.samp_button is not None
+            assert self.func_get_sample is not None
             is_playing = self.sampler.is_playing.value
             self.sampler.stop()
 
-            self.sampler.cur_file = item.snd_sample
+            self.sampler.cur_file = self.func_get_sample(self._packset, item.id)
             if self.sampler.cur_file:
                 self.samp_button.state(('!disabled',))
 
