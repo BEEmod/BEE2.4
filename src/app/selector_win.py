@@ -126,8 +126,8 @@ class GroupHeader(tk_tools.LineHeader):
     """The widget used for group headers."""
     def __init__(self, win: SelectorWin, title: TransToken, menu: tk.Menu) -> None:
         self.parent = win
-        self._menu = menu  # The rightclick cascade widget.
-        self._menu_pos = -1
+        self.menu = menu  # The rightclick cascade widget.
+        self.menu_pos = -1
         super().__init__(win.pal_frame, title)
 
         self.arrow = ttk.Label(
@@ -1007,13 +1007,13 @@ class SelectorWin:
                     self.group_names[group_key],
                     tk.Menu(self.context_menu) if group_key else self.context_menu,
                 )
-            group._menu.add_radiobutton(
+            group.menu.add_radiobutton(
                 command=functools.partial(self.sel_item_id, item.id),
                 variable=self.context_var,
                 value=item.id,
             )
-            set_menu_text(group._menu, item.context_lbl)
-            item._context_ind = group._menu.index('end')
+            set_menu_text(group.menu, item.context_lbl)
+            item._context_ind = group.menu.index('end')
 
         # Convert to a normal dictionary, after adding all items.
         self.grouped_items = dict(grouped_items)
@@ -1027,12 +1027,12 @@ class SelectorWin:
                 # Don't add the ungrouped menu to itself!
                 continue
             group = self.group_widgets[group_key]
-            self.context_menu.add_cascade(menu=group._menu)
+            self.context_menu.add_cascade(menu=group.menu)
             set_menu_text(self.context_menu, self.group_names[group_key])
             # Track the menu's index. The one at the end is the one we just added.
             menu_pos = self.context_menu.index('end')
             assert menu_pos is not None, "Didn't add to the menu?"
-            group._menu_pos = menu_pos
+            group.menu_pos = menu_pos
         if self.win.winfo_ismapped():
             self.flow_items()
 
@@ -1610,7 +1610,7 @@ class SelectorWin:
         new_font = self.sugg_font if suggested else self.norm_font
         if item.data.group_id:
             group = self.group_widgets[item.data.group_id]
-            menu = group._menu
+            menu = group.menu
 
             # Apply the font to the group header as well, if suggested.
             if suggested:
@@ -1619,7 +1619,7 @@ class SelectorWin:
                 # Also highlight the menu
                 # noinspection PyUnresolvedReferences
                 self.context_menu.entryconfig(
-                    group._menu_pos,
+                    group.menu_pos,
                     font=new_font,
                 )
         else:
@@ -1637,8 +1637,8 @@ class SelectorWin:
         # re-bold it.
         for group_key, header in self.group_widgets.items():
             header.title['font'] = self.norm_font
-            if header._menu_pos >= 0:
-                self.context_menu.entryconfig(header._menu_pos, font=self.norm_font)
+            if header.menu_pos >= 0:
+                self.context_menu.entryconfig(header.menu_pos, font=self.norm_font)
 
         self._set_context_font(self.noneItem, '<NONE>' in suggested)
 
