@@ -1,14 +1,21 @@
 from __future__ import annotations
 from collections.abc import Iterator
 
+import utils
 from quote_pack import Line, Quote, QuoteEvent, Group, QuoteInfo, Response, Monitor, RESPONSE_NAMES
 from transtoken import AppError, TransToken, TransTokenSource
-from packages import PackagesSet, PakObject, set_cond_source, ParseData, get_config, SelitemData
+from packages import (
+    AttrMap, PackagesSet, PakObject, set_cond_source, ParseData, get_config,
+    SelitemData,
+)
 from srctools import Angle, Keyvalues, NoKeyError, logger
 import srctools
 
 
 LOGGER = logger.get_logger('packages.quote_pack')
+NONE_SELECTOR_ATTRS: AttrMap = {
+    'CHAR': [TransToken.ui('<Multiverse Cave only>')],
+}
 
 
 class QuotePack(PakObject, needs_foreground=True, style_suggest_key='quote'):
@@ -226,3 +233,16 @@ class QuotePack(PakObject, needs_foreground=True, style_suggest_key='quote'):
                 yield from line.iter_trans_tokens(f'voiceline/{self.id}/responses')
         for quote in self.data.midchamber:
             yield from quote.iter_trans_tokens(f'voiceline/{self.id}/midchamber/{quote.name.token}')
+
+    @classmethod
+    def get_selector_attrs(cls, packset: PackagesSet, voice_id: utils.SpecialID) -> AttrMap:
+        """Return the attributes for the selector window."""
+        if utils.not_special_id(voice_id):
+            voice = packset.obj_by_id(cls, voice_id)
+            return {
+                'CHAR': voice.data.chars or {'???'},
+                'MONITOR': voice.data.monitor is not None,
+                'TURRET': voice.data.monitor is not None and voice.data.monitor.turret_hate,
+            }
+        else:
+            return NONE_SELECTOR_ATTRS

@@ -2,6 +2,8 @@
 Handles scanning through the zip packages to find all items, styles, etc.
 """
 from __future__ import annotations
+
+from enum import Enum
 from typing import NoReturn, ClassVar, Self, cast
 
 from collections.abc import Collection, Iterable, Iterator, Mapping, Sequence
@@ -20,7 +22,7 @@ from BEE2_config import ConfigFile
 from app import tkMarkdown, img, lazy_conf, background_run
 import utils
 import consts
-from srctools import Keyvalues, NoKeyError
+from srctools import Keyvalues, NoKeyError, Vec
 from srctools.tokenizer import TokenSyntaxError
 from srctools.filesys import FileSystem, RawFileSystem, ZipFileSystem, VPKFileSystem
 
@@ -37,9 +39,12 @@ __all__ = [
     # Generally global.
     'OBJ_TYPES', 'PACK_CONFIG',
     'LegacyCorr', 'LEGACY_CORRIDORS',
-    'CLEAN_PACKAGE', 'CLEAN_STYLE', 'SelitemData',
+    'CLEAN_PACKAGE', 'CLEAN_STYLE',
     'PakObject', 'PackagesSet', 'get_loaded_packages', 'PakRef',
     'find_packages', 'load_packages',
+
+    # Selector win data structures.
+    'SelitemData', 'AttrDef', 'AttrTypes', 'AttrValues', 'AttrMap',
 
     # Package objects.
     'Style', 'Item', 'StyleVar', 'Elevator', 'EditorSound', 'StyleVPK', 'Signage',
@@ -103,6 +108,92 @@ TRANS_DUPLICATE_PAK_ID = TransToken.ui(
 TRANS_DUPLICATE_OBJ_ID = TransToken.ui(
     'The ID "{obj_id}" was used twice for a {obj_type} in the packages "{pak1}" and "{pak2}"!'
 )
+TRANS_CORR_OPTS = TransToken.ui_plural('{n} option', '{n} options')  # i18n: Corridor options count
+
+
+@utils.freeze_enum_props
+class AttrTypes(Enum):
+    """The type of labels used for selectoritem attributes."""
+    STR = STRING = 'string'  # Normal text
+    LIST_AND = 'list_and'  # A sequence, joined by commas
+    LIST_OR = 'list_or'  # A sequence, joined by commas
+    BOOL = 'bool'  # A yes/no checkmark
+    COLOR = COLOUR = 'color'  # A Vec 0-255 RGB colour
+
+    @property
+    def is_wide(self) -> bool:
+        """Determine if this should be placed on its own row, or paired with another."""
+        return self.value in ('string', 'list_and', 'list_or')
+
+    @property
+    def is_list(self) -> bool:
+        """Determine if this is a list."""
+        return self.value.startswith('list_')
+
+
+# TransToken is str()-ified.
+type AttrValues = str | TransToken | Iterable[str | TransToken] | bool | Vec
+type AttrMap = Mapping[str, AttrValues]
+
+
+@attrs.define
+class AttrDef:
+    """Configuration for attributes shown on selector labels."""
+    id: str
+    desc: TransToken
+    default: AttrValues
+    type: AttrTypes
+
+    @classmethod
+    def string(
+        cls, attr_id: str,
+        desc: TransToken = TransToken.BLANK,
+        default: str = '',
+    ) -> AttrDef:
+        """Alternative constructor for string-type attrs."""
+        return AttrDef(attr_id, desc, default, AttrTypes.STRING)
+
+    @classmethod
+    def list_and(
+        cls, attr_id: str,
+        desc: TransToken = TransToken.BLANK,
+        default: Iterable[str | TransToken] | None = None,
+    ) -> AttrDef:
+        """Alternative constructor for list-type attrs, which should be joined with AND."""
+        if default is None:
+            default = []
+        return AttrDef(attr_id, desc, default, AttrTypes.LIST_AND)
+
+    @classmethod
+    def list_or(
+        cls, attr_id: str,
+        desc: TransToken = TransToken.BLANK,
+        default: Iterable[str | TransToken] | None = None,
+    ) -> AttrDef:
+        """Alternative constructor for list-type attrs, which should be joined with OR."""
+        if default is None:
+            default = []
+        return AttrDef(attr_id, desc, default, AttrTypes.LIST_OR)
+
+    @classmethod
+    def bool(
+        cls, attr_id: str,
+        desc: TransToken = TransToken.BLANK,
+        default: bool = False,
+    ) -> AttrDef:
+        """Alternative constructor for bool-type attrs."""
+        return AttrDef(attr_id, desc, default, AttrTypes.BOOL)
+
+    @classmethod
+    def color(
+        cls, attr_id: str,
+        desc: TransToken = TransToken.BLANK,
+        default: Vec | None = None,
+    ) -> AttrDef:
+        """Alternative constructor for color-type attrs."""
+        if default is None:
+            default = Vec(255, 255, 255)
+        return AttrDef(attr_id, desc, default, AttrTypes.COLOR)
 
 
 @attrs.frozen
@@ -1202,12 +1293,19 @@ class Style(PakObject, needs_foreground=True):
         """Iterate over translation tokens in the style."""
         return self.selitem_data.iter_trans_tokens('styles/' + self.id)
 
-    def corridor_options_count(self, packset: PackagesSet) -> int:
-        """Fetch the options available for this style's corridors."""
+    @classmethod
+    def get_selector_attrs(cls, packset: PackagesSet, style_id: utils.SpecialID) -> AttrMap:
+        """Return the attributes for the selector window."""
+        assert utils.not_special_id(style_id), f'None is not valid for styles: {style_id!r}'
+        style = packset.obj_by_id(cls, style_id)
         try:
-            return len(packset.obj_by_id(CorridorGroup, self.id).options)
+            corr_count = len(packset.obj_by_id(CorridorGroup, style_id).options)
         except KeyError:
-            return 0
+            corr_count = 0
+        return {
+            'VID': style.has_video,
+            'CORR_OPTS': TRANS_CORR_OPTS.format(n=corr_count),
+        }
 
 
 def parse_multiline_key(info: Keyvalues, prop_name: str, *, allow_old_format: bool = False) -> str:

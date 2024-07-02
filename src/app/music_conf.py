@@ -11,21 +11,20 @@ import attrs
 import srctools.logger
 import trio
 
-import utils
-from app import background_start
 from app.SubPane import SubPane
 from app.selector_win import (
-    Item as SelItem, SelectorWin, AttrDef as SelAttr, NONE_ICON,
+    Item as SelItem, SelectorWin, NONE_ICON,
     TRANS_NONE_NAME,
 )
 from config.gen_opts import GenOptions
 from consts import MusicChannel
-from packages import PackagesSet, Music, SelitemData
+from packages import PackagesSet, Music, SelitemData, AttrDef
 from transtoken import TransToken
 from ui_tk.wid_transtoken import set_text
 from ui_tk import TK_ROOT
 import config
 import packages
+import utils
 
 
 BTN_EXPAND = '▽'
@@ -46,6 +45,7 @@ TRANS_BASE_COLL = TransToken.ui('Music:')
 TRANS_BASE_EXP = TransToken.ui('Base:')
 
 DATA_NONE_BASE = SelitemData.build(
+    small_icon=NONE_ICON,
     short_name=TransToken.BLANK,
     long_name=TRANS_NONE_NAME,
     desc=TransToken.ui(
@@ -53,16 +53,19 @@ DATA_NONE_BASE = SelitemData.build(
     ),
 )
 DATA_NONE_FUNNEL = SelitemData.build(
+    small_icon=NONE_ICON,
     short_name=TransToken.BLANK,
     long_name=TRANS_NONE_NAME,
     desc=TransToken.ui('The regular base track will continue to play normally.'),
 )
 DATA_NONE_BOUNCE = SelitemData.build(
+    small_icon=NONE_ICON,
     short_name=TransToken.BLANK,
     long_name=TRANS_NONE_NAME,
     desc=TransToken.ui('Add no music when jumping on Repulsion Gel.'),
 )
 DATA_NONE_SPEED = SelitemData.build(
+    small_icon=NONE_ICON,
     short_name=TransToken.BLANK,
     long_name=TRANS_NONE_NAME,
     desc=TransToken.ui('Add no music while running fast.'),
@@ -125,7 +128,9 @@ def export_data(packset: PackagesSet) -> dict[MusicChannel, Music | None]:
     return data
 
 
+
 async def make_widgets(
+    core_nursery: trio.Nursery,
     packset: PackagesSet, frame: ttk.LabelFrame, pane: SubPane,
     *, task_status: trio.TaskStatus = trio.TASK_STATUS_IGNORED,
 ) -> None:
@@ -139,13 +144,12 @@ async def make_widgets(
                 selitem = SelItem.from_data(
                     utils.obj_id(music.id),
                     music.selitem_data,
-                    music.get_attrs(packset),
                 )
                 selitem.snd_sample = music.get_sample(packset, channel)
                 music_list.append(selitem)
         return music_list
 
-    WINDOWS[MusicChannel.BASE] = await background_start(functools.partial(
+    WINDOWS[MusicChannel.BASE] = await core_nursery.start(functools.partial(
         SelectorWin.create,
         TK_ROOT,
         for_channel(packset, MusicChannel.BASE),
@@ -158,15 +162,16 @@ async def make_widgets(
         none_item=DATA_NONE_BASE,
         default_id=utils.obj_id('VALVE_PETI'),
         sound_sys=filesystem,
+        func_get_attr=Music.get_base_selector_attrs,
         attributes=[
-            SelAttr.bool('SPEED', TransToken.ui('Propulsion Gel SFX')),
-            SelAttr.bool('BOUNCE', TransToken.ui('Repulsion Gel SFX')),
-            SelAttr.bool('TBEAM', TransToken.ui('Excursion Funnel Music')),
-            SelAttr.bool('TBEAM_SYNC', TransToken.ui('Synced Funnel Music')),
+            AttrDef.bool('SPEED', TransToken.ui('Propulsion Gel SFX')),
+            AttrDef.bool('BOUNCE', TransToken.ui('Repulsion Gel SFX')),
+            AttrDef.bool('TBEAM', TransToken.ui('Excursion Funnel Music')),
+            AttrDef.bool('TBEAM_SYNC', TransToken.ui('Synced Funnel Music')),
         ],
     ))
 
-    WINDOWS[MusicChannel.TBEAM] = await background_start(functools.partial(
+    WINDOWS[MusicChannel.TBEAM] = await core_nursery.start(functools.partial(
         SelectorWin.create,
         TK_ROOT,
         for_channel(packset, MusicChannel.TBEAM),
@@ -175,12 +180,13 @@ async def make_widgets(
         desc=TransToken.ui('Set the music used while inside Excursion Funnels.'),
         none_item=DATA_NONE_FUNNEL,
         sound_sys=filesystem,
+        func_get_attr=Music.get_funnel_selector_attrs,
         attributes=[
-            SelAttr.bool('TBEAM_SYNC', TransToken.ui('Synced Funnel Music')),
+            AttrDef.bool('TBEAM_SYNC', TransToken.ui('Synced Funnel Music')),
         ],
     ))
 
-    WINDOWS[MusicChannel.BOUNCE] = await background_start(functools.partial(
+    WINDOWS[MusicChannel.BOUNCE] = await core_nursery.start(functools.partial(
         SelectorWin.create,
         TK_ROOT,
         for_channel(packset, MusicChannel.BOUNCE),
@@ -191,7 +197,7 @@ async def make_widgets(
         sound_sys=filesystem,
     ))
 
-    WINDOWS[MusicChannel.SPEED] = await background_start(functools.partial(
+    WINDOWS[MusicChannel.SPEED] = await core_nursery.start(functools.partial(
         SelectorWin.create,
         TK_ROOT,
         for_channel(packset, MusicChannel.SPEED),

@@ -4,8 +4,9 @@ We can't pack BIKs, so this is mainly for Valve's existing ones.
 """
 from typing import Iterator, Optional
 
-from packages import PakObject, ParseData, SelitemData
+from packages import PackagesSet, PakObject, ParseData, SelitemData, AttrMap
 from transtoken import TransTokenSource
+import utils
 
 
 class Elevator(PakObject, needs_foreground=True, style_suggest_key='elev'):
@@ -59,3 +60,12 @@ class Elevator(PakObject, needs_foreground=True, style_suggest_key='elev'):
     def iter_trans_tokens(self) -> Iterator[TransTokenSource]:
         """Yield translation tokens present in the elevator."""
         return self.selitem_data.iter_trans_tokens('elevators/' + self.id)
+
+    @classmethod
+    def get_selector_attrs(cls, packset: PackagesSet, elev_id: utils.SpecialID) -> AttrMap:
+        """Return the attributes for the selector window."""
+        if utils.not_special_id(elev_id):
+            return {'ORIENT': packset.obj_by_id(cls, elev_id).has_orient}
+        else:
+            # None, no orientation
+            return {}

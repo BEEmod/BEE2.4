@@ -109,7 +109,6 @@ TRANS_EXPORTED = TransToken.ui('Selected Items and Style successfully exported!'
 TRANS_EXPORTED_TITLE = TransToken.ui('BEE2 - Export Complete')
 TRANS_MAIN_TITLE = TransToken.ui('BEEMOD {version} - {game}')
 TRANS_ERROR = TransToken.untranslated('???')
-TRANS_CORR_OPTS = TransToken.ui_plural('{n} option', '{n} options')  # i18n: Corridor options count
 
 
 DATA_NO_VOICE = packages.SelitemData.build(
@@ -485,10 +484,6 @@ async def load_packages(
         selWinItem.from_data(
             utils.obj_id(style.id),
             style.selitem_data,
-            attrs={
-                'VID': style.has_video,
-                'CORR_OPTS': TRANS_CORR_OPTS.format(n=style.corridor_options_count(packset)),
-            }
         ) for style in sorted(packset.all_obj(packages.Style), key=name_getter)
     ]
 
@@ -496,11 +491,6 @@ async def load_packages(
         selWinItem.from_data(
             utils.obj_id(voice.id),
             voice.selitem_data,
-            attrs={
-                'CHAR': voice.data.chars or {'???'},
-                'MONITOR': voice.data.monitor is not None,
-                'TURRET': voice.data.monitor is not None and voice.data.monitor.turret_hate,
-            }
         ) for voice in sorted(packset.all_obj(packages.QuotePack), key=name_getter)
     ]
 
@@ -508,10 +498,6 @@ async def load_packages(
         selWinItem.from_data(
             utils.obj_id(sky.id),
             sky.selitem_data,
-            attrs={
-                '3D': sky.is_3d(),
-                'COLOR': sky.fog_color,
-            }
         ) for sky in sorted(packset.all_obj(packages.Skybox), key=name_getter)
     ]
 
@@ -519,7 +505,6 @@ async def load_packages(
         selWinItem.from_data(
             utils.obj_id(elev.id),
             elev.selitem_data,
-            attrs={'ORIENT': elev.has_orient}
         ) for elev in sorted(packset.all_obj(packages.Elevator), key=name_getter)
     ]
 
@@ -556,9 +541,7 @@ async def load_packages(
         ),
         none_item=DATA_NO_VOICE,
         default_id=utils.obj_id('BEE2_GLADOS_CLEAN'),
-        none_attrs={
-            'CHAR': [TransToken.ui('<Multiverse Cave only>')],
-        },
+        func_get_attr=packages.QuotePack.get_selector_attrs,
         attributes=[
             SelAttr.list_and('CHAR', TransToken.ui('Characters'), ['??']),
             SelAttr.bool('TURRET', TransToken.ui('Turret Shoot Monitor'), False),
@@ -578,6 +561,7 @@ async def load_packages(
             'the appearance of entrances and exits, the design for most items as well as other '
             'settings.\n\nThe style broadly defines the time period a chamber is set in.'
         ),
+        func_get_attr=packages.Style.get_selector_attrs,
         none_item=None,
         has_def=False,
         # Selecting items changes much of the gui - don't allow when other
@@ -605,6 +589,7 @@ async def load_packages(
         readonly_override=TransToken.ui('<Not Present>'),
         none_item=DATA_RAND_ELEV,
         has_def=True,
+        func_get_attr=packages.Elevator.get_selector_attrs,
         attributes=[
             SelAttr.bool('ORIENT', TransToken.ui('Multiple Orientations')),
         ]
@@ -1067,7 +1052,7 @@ async def init_option(
     wid_transtoken.set_text(music_frame, TransToken.ui('Music: '))
 
     await core_nursery.start(
-        music_conf.make_widgets,
+        music_conf.make_widgets, core_nursery,
         packages.get_loaded_packages(), music_frame, pane,
     )
     suggest_windows[packages.Music] = music_conf.WINDOWS[consts.MusicChannel.BASE]

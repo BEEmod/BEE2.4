@@ -4,8 +4,9 @@ from collections.abc import Iterator
 from srctools import Keyvalues
 
 from transtoken import TransTokenSource
-from packages import PakObject, ParseData, SelitemData, get_config
+from packages import AttrMap, PackagesSet, PakObject, ParseData, SelitemData, get_config
 from app import lazy_conf
+import utils
 
 
 class Skybox(
@@ -68,9 +69,16 @@ class Skybox(
         """Yield translation tokens used by this skybox."""
         return self.selitem_data.iter_trans_tokens('skyboxes/' + self.id)
 
-    def is_3d(self) -> bool:
-        """Check if this has a config, and is therefore 3D."""
-        return self.config is not lazy_conf.BLANK
-
     def __repr__(self) -> str:
         return f'<Skybox {self.id}>'
+
+    @classmethod
+    def get_selector_attrs(cls, packset: PackagesSet, sky_id: utils.SpecialID) -> AttrMap:
+        """Return the attributes for the selector window."""
+        assert utils.not_special_id(sky_id), f'None is not valid for styles: {sky_id!r}'
+        sky = packset.obj_by_id(cls, sky_id)
+        return {
+            # If this has a config, it is 3D.
+            '3D': sky.config is not lazy_conf.BLANK,
+            'COLOR': sky.fog_color,
+        }

@@ -11,7 +11,7 @@ from tkinter import ttk
 import tkinter as tk
 
 from contextlib import aclosing
-from collections.abc import Container, Iterable, Mapping, Sequence
+from collections.abc import Callable, Container, Iterable, Sequence
 from collections import defaultdict
 from enum import Enum
 import functools
@@ -20,8 +20,8 @@ import random
 
 from srctools import Vec, EmptyMapping
 from srctools.filesys import FileSystemChain
+
 from trio_util import AsyncValue
-import attrs
 import trio
 import srctools.logger
 
@@ -31,7 +31,7 @@ from ui_tk.tooltip import add_tooltip, set_tooltip
 from ui_tk.img import TK_IMG
 from ui_tk.wid_transtoken import set_menu_text, set_text, set_win_title
 from ui_tk import TK_ROOT, tk_tools
-from packages import SelitemData
+from packages import SelitemData, AttrTypes, AttrDef as AttrDef, AttrMap
 from consts import (
     SEL_ICON_SIZE as ICON_SIZE,
     SEL_ICON_SIZE_LRG as ICON_SIZE_LRG,
@@ -41,6 +41,7 @@ from config.last_sel import LastSelected
 from config.windows import SelectorState
 import utils
 import config
+import packages
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -89,28 +90,9 @@ class NAV_KEYS(Enum):
     PLAY_SOUND = 'space'
 
 
-@utils.freeze_enum_props
-class AttrTypes(Enum):
-    """The type of labels used for selectoritem attributes."""
-    STR = STRING = 'string'  # Normal text
-    LIST_AND = 'list_and'  # A sequence, joined by commas
-    LIST_OR = 'list_or'  # A sequence, joined by commas
-    BOOL = 'bool'  # A yes/no checkmark
-    COLOR = COLOUR = 'color'  # A Vec 0-255 RGB colour
+# Callbacks used to get the info for items in the window.
+type FuncGetAttr = Callable[[packages.PackagesSet, utils.SpecialID], AttrMap]
 
-    @property
-    def is_wide(self) -> bool:
-        """Determine if this should be placed on its own row, or paired with another."""
-        return self.value in ('string', 'list_and', 'list_or')
-
-    @property
-    def is_list(self) -> bool:
-        """Determine if this is a list."""
-        return self.value.startswith('list_')
-
-
-# TransToken is str()-ified.
-type AttrValues = str | TransToken | Iterable[str | TransToken] | bool | Vec
 TRANS_ATTR_DESC = TransToken.untranslated('{desc}: ')
 TRANS_ATTR_COLOR = TransToken.ui('Color: R={r}, G={g}, B={b}')  # i18n: Tooltip for colour swatch.
 TRANS_WINDOW_TITLE = TransToken.ui('BEE2 - {subtitle}')  # i18n: Window titles.
@@ -147,65 +129,6 @@ async def _store_results_task(chosen: AsyncValue[Item], save_id: str) -> None:
         async for item in agen:
             config.APP.store_conf(LastSelected(item.id), save_id)
 
-
-@attrs.define
-class AttrDef:
-    """Configuration for attributes shown on selector labels."""
-    id: str
-    desc: TransToken
-    default: AttrValues
-    type: AttrTypes
-
-    @classmethod
-    def string(
-        cls, attr_id: str,
-        desc: TransToken = TransToken.BLANK,
-        default: str = '',
-    ) -> AttrDef:
-        """Alternative constructor for string-type attrs."""
-        return AttrDef(attr_id, desc, default, AttrTypes.STRING)
-
-    @classmethod
-    def list_and(
-        cls, attr_id: str,
-        desc: TransToken = TransToken.BLANK,
-        default: Iterable[str | TransToken] | None = None,
-    ) -> AttrDef:
-        """Alternative constructor for list-type attrs, which should be joined with AND."""
-        if default is None:
-            default = []
-        return AttrDef(attr_id, desc, default, AttrTypes.LIST_AND)
-
-    @classmethod
-    def list_or(
-        cls, attr_id: str,
-        desc: TransToken = TransToken.BLANK,
-        default: Iterable[str | TransToken] | None = None,
-    ) -> AttrDef:
-        """Alternative constructor for list-type attrs, which should be joined with OR."""
-        if default is None:
-            default = []
-        return AttrDef(attr_id, desc, default, AttrTypes.LIST_OR)
-
-    @classmethod
-    def bool(
-        cls, attr_id: str,
-        desc: TransToken = TransToken.BLANK,
-        default: bool = False,
-    ) -> AttrDef:
-        """Alternative constructor for bool-type attrs."""
-        return AttrDef(attr_id, desc, default, AttrTypes.BOOL)
-
-    @classmethod
-    def color(
-        cls, attr_id: str,
-        desc: TransToken = TransToken.BLANK,
-        default: Vec | None = None,
-    ) -> AttrDef:
-        """Alternative constructor for color-type attrs."""
-        if default is None:
-            default = Vec(255, 255, 255)
-        return AttrDef(attr_id, desc, default, AttrTypes.COLOR)
 
 
 class GroupHeader(tk_tools.LineHeader):
@@ -287,8 +210,7 @@ class Item:
     - desc: A MarkdownData value containing the description.
     - authors: A list of the item's authors.
     - group: Items with the same group name will be shown together.
-    - attrs: a dictionary containing the attribute values for this item.
-    - button, Set later, the button TK object for this item
+    - button, Set later, the button TK object for this item.
     - source: For debugging only, the packages the item came from.
     """
     authors: list[TransToken]
@@ -298,7 +220,6 @@ class Item:
         'group_id',
         'button',
         'snd_sample',
-        'attrs',
         'source',
         '_selector',
         '_context_lbl',
@@ -308,7 +229,6 @@ class Item:
         self,
         id: utils.SpecialID,
         data: SelitemData,
-        attributes: Mapping[str, AttrValues] = EmptyMapping,
         snd_sample: str | None = None,
         source: str = '',
     ) -> None:
@@ -323,7 +243,6 @@ class Item:
 
         self.snd_sample = snd_sample
 
-        self.attrs: dict[str, AttrValues] = dict(attributes)
         # The button widget for this item.
         self.button: ttk.Button | None= None
         # The selector window we belong to.
@@ -388,14 +307,10 @@ class Item:
         cls,
         obj_id: utils.SpecialID,
         data: SelitemData,
-        attrs: Mapping[str, AttrValues] = EmptyMapping,
+        attrs: AttrMap = EmptyMapping,
     ) -> Item:
         """Create a selector Item from a SelitemData tuple."""
-        return Item(
-            id=obj_id,
-            data=data,
-            attributes=attrs,
-        )
+        return Item(id=obj_id, data=data)
 
     def _on_click(self, _: object = None) -> None:
         """Handle clicking on the item.
@@ -425,7 +340,6 @@ class Item:
         item.data = self.data
         item.snd_sample = self.snd_sample
         item._context_lbl = self._context_lbl
-        item.attrs = self.attrs
         item.source = self.source
 
         item._selector = item.button = None
@@ -515,6 +429,12 @@ class SelectorWin:
     - wid: The Toplevel window for this selector dialog.
     - suggested: The Item which is suggested by the style.
     """
+    # Callback functions used to retrieve the data for the window.
+    func_get_attr: FuncGetAttr
+
+    # Packages currently loaded for the window.
+    _packset: packages.PackagesSet
+
     noneItem: Item
     # The textbox on the parent window.
     display: tk_tools.ReadOnlyEntry | None
@@ -613,16 +533,15 @@ class SelectorWin:
         modal: bool = False,
         default_id: utils.SpecialID = utils.ID_NONE,
         none_item: SelitemData | None = DATA_NONE,
-        none_attrs: Mapping[str, AttrValues] = EmptyMapping,
         title: TransToken = TransToken.untranslated('???'),
         desc: TransToken = TransToken.BLANK,
         readonly_desc: TransToken = TransToken.BLANK,
         readonly_override: TransToken | None = None,
         attributes: Iterable[AttrDef] = (),
-
+        func_get_attr: FuncGetAttr = lambda packset, item_id: EmptyMapping,
         task_status: trio.TaskStatus[SelectorWin],
     ) -> None:
-        """Create a window object.
+        """Create a selector window object.
 
         Read from .selected_id to get the currently-chosen Item name, or None
         if the <none> Item is selected.
@@ -657,9 +576,11 @@ class SelectorWin:
         self.noneItem = Item(
             id=utils.ID_NONE,
             data=none_item or DATA_NONE,
-            attributes=dict(none_attrs),
         )
         self.noneItem.context_lbl = self.noneItem.data.name
+
+        self._packset = packages.get_loaded_packages()  # TODO, handle reload
+        self.func_get_attr = func_get_attr
 
         # The textbox on the parent window.
         self.display = None
@@ -1414,6 +1335,7 @@ class SelectorWin:
                 self.prop_reset.state(('disabled',))
 
         # Set the attribute items.
+        item_attrs = self.func_get_attr(self._packset, item.id)
         for attr in self.attrs:
             val = item_attrs.get(attr.id, attr.default)
             attr_label = self.attr_labels[attr.id]

@@ -10,7 +10,7 @@ import srctools.logger
 import utils
 from app import lazy_conf
 from consts import MusicChannel
-from packages import PackagesSet, PakObject, ParseData, SelitemData, get_config
+from packages import AttrMap, PackagesSet, PakObject, ParseData, SelitemData, get_config
 from transtoken import TransTokenSource
 
 
@@ -190,16 +190,6 @@ class Music(PakObject, needs_foreground=True, style_suggest_key='music'):
             return False
         return bool(children.sound[channel])
 
-    def get_attrs(self, packset: PackagesSet) -> dict[str, bool]:
-        """Generate attributes for SelectorWin."""
-        attrs = {
-            channel.name: self.has_channel(packset, channel)
-            for channel in MusicChannel
-            if channel is not MusicChannel.BASE
-        }
-        attrs['TBEAM_SYNC'] = self.has_synced_tbeam
-        return attrs
-
     def get_suggestion(self, packset: PackagesSet, channel: MusicChannel) -> utils.SpecialID:
         """Get the ID we want to suggest for a channel."""
         try:
@@ -261,3 +251,38 @@ class Music(PakObject, needs_foreground=True, style_suggest_key='music'):
                             other_id,
                             sorted(soundset)
                         )
+
+    @classmethod
+    def get_base_selector_attrs(cls, packset: PackagesSet, music_id: utils.SpecialID) -> AttrMap:
+        """Indicates what sub-tracks are available."""
+        if utils.not_special_id(music_id):
+            try:
+                music = packset.obj_by_id(cls, music_id)
+            except KeyError:
+                LOGGER.warning('No music track with ID "{}"!', music_id)
+                return {}
+            attrs = {
+                channel.name: music.has_channel(packset, channel)
+                for channel in MusicChannel
+                if channel is not MusicChannel.BASE
+            }
+            attrs['TBEAM_SYNC'] = music.has_synced_tbeam
+            return attrs
+        else:
+            # None, no channels.
+            return {}
+
+    @classmethod
+    def get_funnel_selector_attrs(cls, packset: PackagesSet, music_id: utils.SpecialID) -> AttrMap:
+        """Indicate whether the funnel is synced."""
+        if utils.not_special_id(music_id):
+            try:
+                music = packset.obj_by_id(cls, music_id)
+            except KeyError:
+                return {}
+            return {
+                'TBEAM_SYNC': music.has_synced_tbeam,
+            }
+        else:
+            # No music is not synced.
+            return {'TBEAM_SYNC': False}
