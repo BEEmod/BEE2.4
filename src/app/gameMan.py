@@ -331,21 +331,21 @@ async def add_game(dialogs: Dialogs) -> bool:
             )
             return False
 
-        invalid_names = [gm.name for gm in all_games]
+        invalid_names = [gm.name.casefold() for gm in all_games]
         while True:
             name = await dialogs.prompt(
                 TransToken.ui("Enter the name of this game:"),
                 title=title,
                 initial_value=TransToken.untranslated(name),
             )
-            if name in invalid_names:
+            if name is None:
+                return False
+            elif name.casefold() in invalid_names:
                 await dialogs.show_info(
                     TransToken.ui('This name is already taken!'),
                     title=title,
                     icon=dialogs.ERROR,
                 )
-            elif name is None:
-                return False
             elif name == '':
                 await dialogs.show_info(
                     TransToken.ui('Please enter a name for this game!'),
@@ -431,10 +431,10 @@ def setGame() -> None:
     background_run(ON_GAME_CHANGED, selected_game)
 
 
-def set_game_by_name(name: str) -> None:
+def set_game_by_name(name: utils.SpecialID) -> None:
     global selected_game
     for game in all_games:
-        if game.name == name:
+        if utils.obj_id(game.name) == name:
             selected_game = game
             selectedGame_radio.set(all_games.index(game))
             # TODO: make this function async too to eliminate.

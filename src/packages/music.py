@@ -7,6 +7,7 @@ from collections.abc import Iterable
 from srctools import conv_float
 import srctools.logger
 
+import utils
 from app import lazy_conf
 from consts import MusicChannel
 from packages import PackagesSet, PakObject, ParseData, SelitemData, get_config
@@ -199,15 +200,15 @@ class Music(PakObject, needs_foreground=True, style_suggest_key='music'):
         attrs['TBEAM_SYNC'] = self.has_synced_tbeam
         return attrs
 
-    def get_suggestion(self, packset: PackagesSet, channel: MusicChannel) -> str | None:
+    def get_suggestion(self, packset: PackagesSet, channel: MusicChannel) -> utils.SpecialID:
         """Get the ID we want to suggest for a channel."""
         try:
             child = packset.obj_by_id(Music, self.children[channel])
         except KeyError:
             child = self
         if child.sound[channel]:
-            return child.id
-        return None
+            return utils.obj_id(child.id)
+        return utils.ID_NONE
 
     def get_sample(self, packset: PackagesSet, channel: MusicChannel) -> str | None:
         """Get the path to the sample file, if present."""

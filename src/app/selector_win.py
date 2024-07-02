@@ -308,7 +308,7 @@ class Item:
     ]
     def __init__(
         self,
-        id: str,
+        id: utils.SpecialID,
         data: SelitemData,
         attributes: Mapping[str, AttrValues] = EmptyMapping,
         snd_sample: str | None = None,
@@ -388,7 +388,7 @@ class Item:
     @classmethod
     def from_data(
         cls,
-        obj_id: str,
+        obj_id: utils.SpecialID,
         data: SelitemData,
         attrs: Mapping[str, AttrValues] = EmptyMapping,
     ) -> Item:
@@ -612,7 +612,7 @@ class SelectorWin:
         has_def: bool = True,
         sound_sys: FileSystemChain | None = None,
         modal: bool = False,
-        default_id: str = '<NONE>',
+        default_id: utils.SpecialID = utils.ID_NONE,
         none_item: SelitemData | None = DATA_NONE,
         none_attrs: Mapping[str, AttrValues] = EmptyMapping,
         title: TransToken = TransToken.untranslated('???'),
@@ -656,7 +656,7 @@ class SelectorWin:
         self = cls()
 
         self.noneItem = Item(
-            id='<NONE>',
+            id=utils.ID_NONE,
             data=none_item or DATA_NONE,
             attributes=dict(none_attrs),
         )
@@ -700,9 +700,8 @@ class SelectorWin:
             LOGGER.error('No items for window "{}"!', title)
             # We crash without items, forcefully add the None item in so at
             # least this works.
+            # TODO: Make no-items case valid.
             self.item_list = [self.noneItem]
-            self.selected = self.noneItem
-        elif prev_state.id is None and none_item is not None:
             self.selected = self.noneItem
         else:
             for item in self.item_list:
@@ -1058,12 +1057,9 @@ class SelectorWin:
         return self.display
 
     @property
-    def chosen_id(self) -> str | None:
+    def chosen_id(self) -> utils.SpecialID:
         """The currently selected item, or None if none is selected."""
-        if self.chosen.value == self.noneItem:
-            return None
-        else:
-            return self.chosen.value.id
+        return self.chosen.value.id
 
     @property
     def readonly(self) -> bool:
@@ -1097,7 +1093,8 @@ class SelectorWin:
     def refresh(self) -> None:
         """Rebuild the menus and options based on the item list."""
         # Sort alphabetically, preferring a sort key if present.
-        self.item_list.sort(key=lambda it: (it is not self.noneItem, it.sort_key or it.longName.token))
+        # Special items go to the start.
+        self.item_list.sort(key=lambda it: (utils.not_special_id(it.id), it.sort_key or it.longName.token))
         grouped_items = defaultdict(list)
         self.group_names = {'':  TRANS_GROUPLESS}
         # Ungrouped items appear directly in the menu.
@@ -1113,7 +1110,7 @@ class SelectorWin:
             item._selector = self
 
             if item.button is None:  # New, create the button widget.
-                if item is self.noneItem:
+                if utils.is_special_id(item.id):
                     item.button = ttk.Button(self.pal_frame, name='item_none')
                     item.context_lbl = item.context_lbl
                 else:
@@ -1252,7 +1249,7 @@ class SelectorWin:
         selected: LastSelected
         with config.APP.get_ui_channel(LastSelected, self.save_id) as channel:
             async for selected in channel:
-                self.sel_item_id('<NONE>' if selected.id is None else selected.id)
+                self.sel_item_id(selected.id)
                 self.save()
 
     def _icon_clicked(self, _: tk.Event[tk.Misc]) -> None:
@@ -1334,21 +1331,15 @@ class SelectorWin:
 
     def sel_item_id(self, it_id: str) -> bool:
         """Select the item with the given ID."""
-        if self.selected.id == it_id:
+        item_id = utils.special_id(it_id)
+        if self.selected.id == item_id:
             return True
 
-        if it_id == '<NONE>':
-            # No none item, pretend it doesn't exist...
-            if self.noneItem not in self.item_list:
-                return False
-            self.choose_item(self.noneItem)
-            return True
-        else:
-            for item in self.item_list:
-                if item.id == it_id:
-                    self.choose_item(item)
-                    return True
-            return False
+        for item in self.item_list:
+            if item.id == item_id:
+                self.choose_item(item)
+                return True
+        return False
 
     def choose_item(self, item: Item) -> None:
         """Set the current item to this one."""
@@ -1363,7 +1354,7 @@ class SelectorWin:
         data = item.data
 
         self.prop_name['text'] = data.name
-        if item is self.noneItem:
+        if utils.is_special_id(item.id):
             set_text(self.prop_author, TransToken.BLANK)
         elif len(data.auth) == 0:
             set_text(self.prop_author, TRANS_NO_AUTHORS)
@@ -1384,12 +1375,9 @@ class SelectorWin:
 
         if DEV_MODE.value:
             # Show the ID of the item in the description
-            if item is self.noneItem:
-                text = tkMarkdown.convert(TRANS_DEV_ITEM_ID.format(item='*NONE*'), None)
-            else:
-                text = tkMarkdown.convert(TRANS_DEV_ITEM_ID.format(
-                    item=f'`{item.source}`:`{item.id}`' if item.source else f'`{item.id}`',
-                ), None)
+            text = tkMarkdown.convert(TRANS_DEV_ITEM_ID.format(
+                item=f'`{item.source}`:`{item.id}`' if item.source else f'`{item.id}`',
+            ), None)
             self.prop_desc.set_text(tkMarkdown.join(
                 text,
                 tkMarkdown.MarkdownData.text('\n'),
@@ -1719,13 +1707,12 @@ class SelectorWin:
 
     def __contains__(self, obj: str | Item) -> bool:
         """Determine if the given SelWinItem or item ID is in this item list."""
-        if obj == '<None>':
-            return self.noneItem in self.item_list
-        elif isinstance(obj, Item):
+        if isinstance(obj, Item):
             return obj in self.item_list
         else:
+            item_id = utils.special_id(obj)
             for item in self.item_list:
-                if item.id == obj:
+                if item.id == item_id:
                     return True
             return False
 

@@ -53,8 +53,11 @@ async def init_app(core_nursery: trio.Nursery) -> None:
     # noinspection PyProtectedMember
     with app._APP_QUIT_SCOPE:
         await gameMan.load(DIALOG)
-        last_game = config.APP.get_cur_conf(LastSelected, 'game')
-        if last_game.id is not None:
+        try:
+            last_game = config.APP.get_cur_conf(LastSelected, 'game')
+        except KeyError:
+            pass
+        else:
             gameMan.set_game_by_name(last_game.id)
 
         core_nursery.start_soon(sound.sound_task)
@@ -76,7 +79,7 @@ async def init_app(core_nursery: trio.Nursery) -> None:
 
         # Load filesystems into various modules.
         music_conf.load_filesystems(package_sys.values())
-        await utils.run_as_task(UI.load_packages, core_nursery, packset, WX_IMG)
+        # await utils.run_as_task(UI.load_packages, core_nursery, packset, WX_IMG)
         await loadScreen.MAIN_UI.step('package_load')
         LOGGER.info('Done!')
 

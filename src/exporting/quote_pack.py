@@ -7,10 +7,10 @@ import srctools
 import trio
 from srctools import Vec
 
-import utils
 from exporting import ExportData, STEPS, StepResource
 from packages import QuotePack
 from quote_pack import QuoteInfo
+import utils
 
 
 if TYPE_CHECKING:
@@ -30,8 +30,8 @@ async def write_data(game: 'Game', data: QuoteInfo | None) -> None:
 @STEPS.add_step(prereq=[], results=[StepResource.VCONF_DATA])
 async def step_quote_pack(exp_data: ExportData) -> None:
     """Export the quotepack."""
-    sel_id: str | None = exp_data.selected[QuotePack]
-    if sel_id is None:
+    sel_id: utils.SpecialID = exp_data.selected[QuotePack]
+    if sel_id == utils.ID_NONE:
         # No quote pack selected at all. Write a blank definition.
         await write_data(exp_data.game, QuoteInfo(
             id='',

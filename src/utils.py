@@ -36,6 +36,7 @@ __all__ = [
     'PackagePath', 'sync_result', 'acompose', 'get_indent', 'iter_grid', 'check_cython',
     'ObjectID', 'SpecialID', 'BlankID', 'ID_EMPTY', 'ID_NONE', 'ID_RANDOM',
     'obj_id', 'special_id', 'obj_id_optional', 'special_id_optional',
+    'is_special_id', 'not_special_id',
     'check_shift', 'fit', 'group_runs', 'restart_app', 'quit_app', 'set_readonly',
     'unset_readonly', 'merge_tree', 'write_lang_pot',
 ]
@@ -430,6 +431,11 @@ def special_id(value: str, kind: str = 'object') -> SpecialID:
     if result == "":
         raise ValueError(f'Invalid {kind} ID "{value}". IDs may not be blank.')
     return result
+
+
+def is_special_id(some_id: SpecialID) -> bool:
+    """Check that an ID is a special ID and not just ObjectID."""
+    return some_id.startswith('<') and some_id.endswith('>')
 
 
 def not_special_id(some_id: SpecialID) -> TypeGuard[ObjectID]:

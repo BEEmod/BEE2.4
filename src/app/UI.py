@@ -483,7 +483,7 @@ async def load_packages(
 
     style_list = [
         selWinItem.from_data(
-            style.id,
+            utils.obj_id(style.id),
             style.selitem_data,
             attrs={
                 'VID': style.has_video,
@@ -494,7 +494,7 @@ async def load_packages(
 
     voice_list = [
         selWinItem.from_data(
-            voice.id,
+            utils.obj_id(voice.id),
             voice.selitem_data,
             attrs={
                 'CHAR': voice.data.chars or {'???'},
@@ -506,7 +506,7 @@ async def load_packages(
 
     sky_list = [
         selWinItem.from_data(
-            sky.id,
+            utils.obj_id(sky.id),
             sky.selitem_data,
             attrs={
                 '3D': sky.is_3d(),
@@ -517,7 +517,7 @@ async def load_packages(
 
     elev_list = [
         selWinItem.from_data(
-            elev.id,
+            utils.obj_id(elev.id),
             elev.selitem_data,
             attrs={'ORIENT': elev.has_orient}
         ) for elev in sorted(packset.all_obj(packages.Elevator), key=name_getter)
@@ -535,7 +535,7 @@ async def load_packages(
             'of sky (seen in some items), the style of bottomless pit (if present), as well as '
             'color of "fog" (seen in larger chambers).'
         ),
-        default_id='BEE2_CLEAN',
+        default_id=packages.CLEAN_STYLE,
         none_item=None,
         attributes=[
             SelAttr.bool('3D', TransToken.ui('3D Skybox'), False),
@@ -555,7 +555,7 @@ async def load_packages(
             '"Multiverse" Cave lines are controlled separately in Style Properties.'
         ),
         none_item=DATA_NO_VOICE,
-        default_id='BEE2_GLADOS_CLEAN',
+        default_id=utils.obj_id('BEE2_GLADOS_CLEAN'),
         none_attrs={
             'CHAR': [TransToken.ui('<Multiverse Cave only>')],
         },
@@ -571,7 +571,7 @@ async def load_packages(
         TK_ROOT,
         style_list,
         save_id='styles',
-        default_id='BEE2_CLEAN',
+        default_id=packages.CLEAN_STYLE,
         title=TransToken.ui('Select Style'),
         desc=TransToken.ui(
             'The Style controls many aspects of the map. It decides the materials used for walls, '
@@ -1411,7 +1411,7 @@ async def set_game(game: 'gameMan.Game') -> None:
     This updates the title bar to match, and saves it into the config.
     """
     wid_transtoken.set_win_title(TK_ROOT, TRANS_MAIN_TITLE.format(version=utils.BEE_VERSION, game=game.name))
-    config.APP.store_conf(LastSelected(game.name), 'game')
+    config.APP.store_conf(LastSelected(utils.obj_id(game.name)), 'game')
 
 
 def refresh_palette_icons() -> None:

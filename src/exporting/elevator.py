@@ -1,14 +1,15 @@
 """Export selected elevator videos."""
 from . import ExportData, STEPS, StepResource
 from packages import Elevator
+import utils
 
 
 @STEPS.add_step(prereq=[], results=[StepResource.VCONF_DATA])
 async def step_elevator_video(exp_data: ExportData) -> None:
     """Export the chosen video into the configs."""
     elevator: Elevator | None
-    sel_id: str | None = exp_data.selected[Elevator]
-    if sel_id is None:
+    sel_id: utils.SpecialID = exp_data.selected[Elevator]
+    if sel_id == utils.ID_NONE:
         elevator = None
     else:
         try:

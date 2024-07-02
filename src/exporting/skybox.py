@@ -4,13 +4,14 @@ from srctools import bool_as_int
 
 from . import ExportData, STEPS, StepResource
 from packages import Skybox
+import utils
 
 
 @STEPS.add_step(prereq=[], results=[StepResource.VCONF_DATA])
 async def step_skybox(exp_data: ExportData) -> None:
     """Export the selected skybox."""
-    sel_id: str | None = exp_data.selected[Skybox]
-    if sel_id is None:
+    sel_id: utils.SpecialID = exp_data.selected[Skybox]
+    if sel_id == utils.ID_NONE:
         return  # No skybox..
 
     try:

@@ -5,6 +5,7 @@ import pytest
 
 from config.last_sel import LastSelected
 from config import UnknownVersion
+import utils
 
 
 def test_parse_legacy() -> None:
@@ -24,15 +25,15 @@ def test_parse_legacy() -> None:
     )
     new_conf = LastSelected.parse_legacy(old_conf)
     assert new_conf == {
-        'music_base': LastSelected('PRO_BEEPS'),
-        'music_tbeam': LastSelected('VALVE_SAW_DEER'),
-        'music_speed': LastSelected('MEL_SYSTEM_CORRUPTION_ALT'),
-        'music_bounce': LastSelected(None),
-        'game': LastSelected('Portal 2'),
-        'styles': LastSelected('BEE2_1950s'),
-        'skyboxes': LastSelected('SKY_BLACK'),
-        'voicelines': LastSelected(None),
-        'elevators': LastSelected('VALVE_BOTS_LOAD'),
+        'music_base': LastSelected(utils.obj_id('PRO_BEEPS')),
+        'music_tbeam': LastSelected(utils.obj_id('VALVE_SAW_DEER')),
+        'music_speed': LastSelected(utils.obj_id('MEL_SYSTEM_CORRUPTION_ALT')),
+        'music_bounce': LastSelected(utils.ID_NONE),
+        'game': LastSelected(utils.obj_id('Portal 2')),
+        'styles': LastSelected(utils.obj_id('BEE2_1950s')),
+        'skyboxes': LastSelected(utils.obj_id('SKY_BLACK')),
+        'voicelines': LastSelected(utils.ID_NONE),
+        'elevators': LastSelected(utils.obj_id('VALVE_BOTS_LOAD')),
     }
 
 
@@ -47,35 +48,39 @@ def test_parse_invalid_version() -> None:
 
 def test_parse_kv1() -> None:
     """Test parsing keyvalues1 data."""
-    assert LastSelected.parse_kv1(Keyvalues('', 'SOME_ID_value'), 1) == LastSelected('SOME_ID_value')
-    assert LastSelected.parse_kv1(Keyvalues('', '<NonE>'), 1) == LastSelected(None)
+    res = LastSelected.parse_kv1(Keyvalues('', 'SOME_ID_value'), 1)
+    assert res == LastSelected(utils.special_id('Some_ID_value'))
+    res = LastSelected.parse_kv1(Keyvalues('', '<NonE>'), 1)
+    assert res == LastSelected(utils.ID_NONE)
 
 
 def test_export_kv1() -> None:
     """Test exporting keyvalues1 data."""
-    assert LastSelected('Some_ID').export_kv1().value == 'Some_ID'
-    assert LastSelected(None).export_kv1().value == '<NONE>'
+    some_id = utils.special_id('Some_ID')
+    assert LastSelected(some_id).export_kv1().value == some_id
+    assert LastSelected(utils.ID_NONE).export_kv1().value == utils.ID_NONE
 
 
 def test_parse_dmx() -> None:
     """Test parsing DMX configs."""
     elem = Element('LastSelected', 'DMElement')
     elem['selected'] = 'SomeIDValue'
-    assert LastSelected.parse_dmx(elem, 1) == LastSelected('SomeIDValue')
+    assert LastSelected.parse_dmx(elem, 1) == LastSelected(utils.special_id('SomeIDValue'))
 
     elem['selected_none'] = True
-    # Selected-none overrides regular selection.
-    assert LastSelected.parse_dmx(elem, 1) == LastSelected(None)
+    # The legacy selected-none option overrides regular selection.
+    assert LastSelected.parse_dmx(elem, 1) == LastSelected(utils.ID_NONE)
 
 
 def test_export_dmx() -> None:
     """Test exporting DMX configs."""
-    elem = LastSelected('SomeValueWITHCasing').export_dmx()
+    some_id = utils.obj_id('SomeValueWITHCasing')
+    elem = LastSelected(some_id).export_dmx()
     assert len(elem) == 2
     assert elem['selected'].type is ValueType.STRING
-    assert elem['selected'].val_string == 'SomeValueWITHCasing'
+    assert elem['selected'].val_string == some_id
 
-    elem = LastSelected(None).export_dmx()
+    elem = LastSelected(utils.ID_NONE).export_dmx()
     assert len(elem) == 2
-    assert elem['selected_none'].type is ValueType.BOOL
-    assert elem['selected_none'].val_bool is True
+    assert elem['selected'].type is ValueType.STRING
+    assert elem['selected'].val_string == utils.ID_NONE

@@ -11,6 +11,7 @@ import attrs
 import srctools.logger
 import trio
 
+import utils
 from app import background_start
 from app.SubPane import SubPane
 from app.selector_win import (
@@ -75,12 +76,12 @@ def load_filesystems(systems: Iterable[FileSystem]) -> None:
         filesystem.add_sys(system, prefix='resources/music_samp/')
 
 
-def set_suggested(packset: PackagesSet, music_id: str | None) -> None:
+def set_suggested(packset: PackagesSet, music_id: utils.SpecialID) -> None:
     """Set the music ID that is suggested for the base.
 
     If sel_item is true, select the suggested item as well.
     """
-    if music_id is None or music_id.casefold() == '<none>':
+    if music_id == utils.ID_NONE:
         # No music, special.
         for channel in MusicChannel:
             if channel is MusicChannel.BASE:
@@ -93,16 +94,16 @@ def set_suggested(packset: PackagesSet, music_id: str | None) -> None:
                 continue
 
             sugg = music.get_suggestion(packset, channel)
-            WINDOWS[channel].set_suggested([sugg] if sugg else ())
+            WINDOWS[channel].set_suggested([sugg] if sugg != utils.ID_NONE else ())
 
 
 def export_data(packset: PackagesSet) -> dict[MusicChannel, Music | None]:
     """Return the data used to export this."""
     base_id = WINDOWS[MusicChannel.BASE].chosen_id
-    if base_id is not None:
-        base_track = packset.obj_by_id(Music, base_id)
-    else:
+    if base_id == utils.ID_NONE:
         base_track = None
+    else:
+        base_track = packset.obj_by_id(Music, base_id)
     data: dict[MusicChannel, Music | None] = {
         MusicChannel.BASE: base_track,
     }
@@ -114,10 +115,10 @@ def export_data(packset: PackagesSet) -> dict[MusicChannel, Music | None]:
             if base_track is not None:
                 mus_id = base_track.get_suggestion(packset, channel)
             else:
-                mus_id = None
+                mus_id = utils.ID_NONE
         else:
             mus_id = win.chosen_id
-        if mus_id is not None:
+        if mus_id != utils.ID_NONE:
             data[channel] = packset.obj_by_id(Music, mus_id)
         else:
             data[channel] = None
@@ -136,7 +137,7 @@ async def make_widgets(
         for music in packset.all_obj(Music):
             if music.provides_channel(channel):
                 selitem = SelItem.from_data(
-                    music.id,
+                    utils.obj_id(music.id),
                     music.selitem_data,
                     music.get_attrs(packset),
                 )
@@ -155,7 +156,7 @@ async def make_widgets(
             'for specific test elements.'
         ),
         none_item=DATA_NONE_BASE,
-        default_id='VALVE_PETI',
+        default_id=utils.obj_id('VALVE_PETI'),
         sound_sys=filesystem,
         attributes=[
             SelAttr.bool('SPEED', TransToken.ui('Propulsion Gel SFX')),
@@ -291,14 +292,13 @@ async def make_widgets(
             This saves into the config file the last selected item.
             """
             packset = packages.get_loaded_packages()
-            music_id = music_item.id or '<NONE>'
             # If collapsed, the hidden ones follow the base always.
-            set_suggested(packset, music_id)
+            set_suggested(packset, music_item.id)
 
             # If we have an instance, it's "custom" behaviour, so disable
             # all the sub-channels.
             try:
-                has_inst = bool(packset.obj_by_id(Music, music_id).inst)
+                has_inst = bool(packset.obj_by_id(Music, music_item.id).inst)
             except KeyError:  # <none>
                 has_inst = False
 
