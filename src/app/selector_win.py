@@ -156,8 +156,6 @@ class AttrDef:
     default: AttrValues
     type: AttrTypes
 
-    label: ttk.Label = attrs.field(init=False)
-
     @classmethod
     def string(
         cls, attr_id: str,
@@ -551,6 +549,7 @@ class SelectorWin:
     modal: bool
     win: tk.Toplevel
     attrs: list[AttrDef]
+    attr_labels: dict[str, ttk.Label]
 
     # A map from group name -> header widget
     group_widgets: dict[str, GroupHeader]
@@ -946,6 +945,7 @@ class SelectorWin:
 
         # Wide before short.
         self.attrs = sorted(attributes, key=lambda at: 0 if at.type.is_wide else 1)
+        self.attr_labels = {}
         if self.attrs:
             attrs_frame = ttk.Frame(self.prop_frm)
             attrs_frame.grid(
@@ -964,16 +964,16 @@ class SelectorWin:
                 attr_frame = ttk.Frame(attrs_frame)
                 desc_label = ttk.Label(attr_frame)
                 set_text(desc_label, TRANS_ATTR_DESC.format(desc=attr.desc))
-                attr.label = ttk.Label(attr_frame)
+                self.attr_labels[attr.id] = attr_label = ttk.Label(attr_frame)
 
                 if attr.type is AttrTypes.COLOR:
                     # A small colour swatch.
-                    attr.label.configure(relief='raised')
+                    attr_label.configure(relief='raised')
                     # Show the color value when hovered.
-                    add_tooltip(attr.label)
+                    add_tooltip(attr_label)
 
                 desc_label.grid(row=0, column=0, sticky='e')
-                attr.label.grid(row=0, column=1, sticky='w')
+                attr_label.grid(row=0, column=1, sticky='w')
                 # Wide ones have their own row, narrow ones are two to a row
                 if attr.type.is_wide:
                     if index % 2:  # Row has a single narrow, skip the empty space.
@@ -1415,15 +1415,16 @@ class SelectorWin:
 
         # Set the attribute items.
         for attr in self.attrs:
-            val = item.attrs.get(attr.id, attr.default)
+            val = item_attrs.get(attr.id, attr.default)
+            attr_label = self.attr_labels[attr.id]
 
             if attr.type is AttrTypes.BOOL:
-                TK_IMG.apply(attr.label, ICON_CHECK if val else ICON_CROSS)
+                TK_IMG.apply(attr_label, ICON_CHECK if val else ICON_CROSS)
             elif attr.type is AttrTypes.COLOR:
                 assert isinstance(val, Vec)
-                TK_IMG.apply(attr.label, img.Handle.color(val, 16, 16))
+                TK_IMG.apply(attr_label, img.Handle.color(val, 16, 16))
                 # Display the full color when hovering...
-                set_tooltip(attr.label, TRANS_ATTR_COLOR.format(
+                set_tooltip(attr_label, TRANS_ATTR_COLOR.format(
                     r=int(val.x), g=int(val.y), b=int(val.z),
                 ))
             elif attr.type.is_list:
@@ -1434,14 +1435,14 @@ class SelectorWin:
                     for txt in val
                 ]
                 if attr.type is AttrTypes.LIST_AND:
-                    set_text(attr.label, TransToken.list_and(children, sort=True))
+                    set_text(attr_label, TransToken.list_and(children, sort=True))
                 else:
-                    set_text(attr.label, TransToken.list_or(children, sort=True))
+                    set_text(attr_label, TransToken.list_or(children, sort=True))
             elif attr.type is AttrTypes.STRING:
                 # Just a string.
                 if not isinstance(val, TransToken):
                     val = TransToken.untranslated(str(val))
-                set_text(attr.label, val)
+                set_text(attr_label, val)
             else:
                 raise ValueError(f'Invalid attribute type: "{attr.type}"')
 
