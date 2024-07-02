@@ -50,7 +50,10 @@ from app import (
     music_conf,
 )
 from app.errors import Result as ErrorResult
-from app.selector_win import SelectorWin, Item as selWinItem, AttrDef as SelAttr
+from app.selector_win import (
+    Item as selWinItem, SelectorWin, AttrDef as SelAttr, NONE_ICON,
+    TRANS_NONE_NAME,
+)
 from app.menu_bar import MenuBar
 from ui_tk.context_win import ContextWin
 from ui_tk.corridor_selector import TkSelector
@@ -107,6 +110,20 @@ TRANS_EXPORTED_TITLE = TransToken.ui('BEE2 - Export Complete')
 TRANS_MAIN_TITLE = TransToken.ui('BEEMOD {version} - {game}')
 TRANS_ERROR = TransToken.untranslated('???')
 TRANS_CORR_OPTS = TransToken.ui_plural('{n} option', '{n} options')  # i18n: Corridor options count
+
+
+DATA_NO_VOICE = packages.SelitemData.build(
+    short_name=TransToken.BLANK,
+    long_name=TRANS_NONE_NAME,
+    small_icon=NONE_ICON,
+    desc=TransToken.ui('Add no extra voice lines, only Multiverse Cave if enabled.')
+)
+DATA_RAND_ELEV = packages.SelitemData.build(
+    short_name=TransToken.BLANK,
+    long_name=TransToken.ui('Random'),
+    small_icon=img.Handle.builtin('BEE2/random', 96, 96),
+    desc=TransToken.ui('Choose a random video.'),
+)
 
 
 class DragWin(tk.Toplevel):
@@ -519,7 +536,7 @@ async def load_packages(
             'color of "fog" (seen in larger chambers).'
         ),
         default_id='BEE2_CLEAN',
-        has_none=False,
+        none_item=None,
         attributes=[
             SelAttr.bool('3D', TransToken.ui('3D Skybox'), False),
             SelAttr.color('COLOR', TransToken.ui('Fog Color')),
@@ -537,9 +554,8 @@ async def load_packages(
             'They are chosen based on which items are present in the map. The additional '
             '"Multiverse" Cave lines are controlled separately in Style Properties.'
         ),
-        has_none=True,
+        none_item=DATA_NO_VOICE,
         default_id='BEE2_GLADOS_CLEAN',
-        none_desc=TransToken.ui('Add no extra voice lines, only Multiverse Cave if enabled.'),
         none_attrs={
             'CHAR': [TransToken.ui('<Multiverse Cave only>')],
         },
@@ -562,7 +578,7 @@ async def load_packages(
             'the appearance of entrances and exits, the design for most items as well as other '
             'settings.\n\nThe style broadly defines the time period a chamber is set in.'
         ),
-        has_none=False,
+        none_item=None,
         has_def=False,
         # Selecting items changes much of the gui - don't allow when other
         # things are open...
@@ -587,11 +603,8 @@ async def load_packages(
         readonly_desc=TransToken.ui('This style does not have a elevator video screen.'),
         # i18n: Text when elevators are not present in the style.
         readonly_override=TransToken.ui('<Not Present>'),
-        has_none=True,
+        none_item=DATA_RAND_ELEV,
         has_def=True,
-        none_icon=img.Handle.builtin('BEE2/random', 96, 96),
-        none_name=TransToken.ui('Random'),
-        none_desc=TransToken.ui('Choose a random video.'),
         attributes=[
             SelAttr.bool('ORIENT', TransToken.ui('Multiple Orientations')),
         ]

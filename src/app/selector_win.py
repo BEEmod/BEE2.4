@@ -11,11 +11,10 @@ from tkinter import ttk
 import tkinter as tk
 
 from contextlib import aclosing
-from collections.abc import Container, Iterable, Mapping
+from collections.abc import Container, Iterable, Mapping, Sequence
 from collections import defaultdict
 from enum import Enum
 import functools
-import copy
 import math
 import random
 
@@ -36,7 +35,6 @@ from packages import SelitemData
 from consts import (
     SEL_ICON_SIZE as ICON_SIZE,
     SEL_ICON_SIZE_LRG as ICON_SIZE_LRG,
-    SEL_ICON_CROP_SHRINK as ICON_CROP_SHRINK
 )
 from transtoken import CURRENT_LANG, TransToken
 from config.last_sel import LastSelected
@@ -125,6 +123,15 @@ TRANS_GROUPLESS = TransToken.ui('Other')
 TRANS_AUTHORS = TransToken.ui_plural('Author: {authors}', 'Authors: {authors}')
 TRANS_NO_AUTHORS = TransToken.ui('Authors: Unknown')
 TRANS_DEV_ITEM_ID = TransToken.untranslated('**ID:** {item}')
+TRANS_NONE_NAME = TransToken.ui("<None>")
+
+NONE_ICON = img.Handle.parse_uri(img.PATH_NONE, ICON_SIZE, ICON_SIZE)
+DATA_NONE = SelitemData.build(
+    short_name=TransToken.BLANK,
+    long_name=TRANS_NONE_NAME,
+    small_icon=img.Handle.parse_uri(img.PATH_NONE, ICON_SIZE, ICON_SIZE),
+    desc=TransToken.ui('Do not add anything.'),
+)
 
 
 async def _update_sampler_task(sampler: sound.SamplePlayer, button: ttk.Button) -> None:
@@ -286,18 +293,11 @@ class Item:
     - button, Set later, the button TK object for this item
     - source: For debugging only, the packages the item came from.
     """
+    authors: list[TransToken]
     __slots__ = [
         'id',
-        'shortName',
-        'longName',
-        '_icon',
-        'large_icon',
-        'previews',
-        'desc',
-        'authors',
-        'group',
+        'data',
         'group_id',
-        'sort_key',
         'button',
         'snd_sample',
         'attrs',
@@ -309,38 +309,22 @@ class Item:
     def __init__(
         self,
         id: str,
-        short_name: TransToken,
-        long_name: TransToken | None = None,
-        icon: img.Handle | None = None,
-        large_icon: img.Handle | None = None,
-        previews: Iterable[img.Handle] = (),
-        authors: Iterable[str] = (),
-        desc: tkMarkdown.MarkdownData = tkMarkdown.MarkdownData.BLANK,
-        group: TransToken = TransToken.BLANK,
-        sort_key: str | None = None,
+        data: SelitemData,
         attributes: Mapping[str, AttrValues] = EmptyMapping,
         snd_sample: str | None = None,
         source: str = '',
     ) -> None:
         self.id = id
-        self.shortName = short_name
-        self.group_id = group.token.casefold()
-        self.group = group
-        self.longName = long_name or short_name
-        self.sort_key = sort_key
-        self.source = source
+        self.data = data
+        self.group_id = self.data.group.token.casefold()
+        self.source = source or ', '.join(sorted(data.packages))
         if len(self.longName.token) > 20:
             self._context_lbl = self.shortName
         else:
             self._context_lbl = self.longName
 
-        self._icon = icon
-        self.large_icon = large_icon
-        self.previews = list(previews)
-        self.desc = desc
-
         self.snd_sample = snd_sample
-        self.authors: list[TransToken] = list(map(TransToken.untranslated, authors))
+
         self.attrs: dict[str, AttrValues] = dict(attributes)
         # The button widget for this item.
         self.button: ttk.Button | None= None
@@ -351,22 +335,36 @@ class Item:
         self._context_ind: int | None = None
 
     @property
-    def icon(self) -> img.Handle:
-        """If the small image is missing, replace it with the cropped large one."""
-        if self._icon is None:
-            if self.large_icon is not None:
-                self._icon = self.large_icon.crop(
-                    ICON_CROP_SHRINK,
-                    width=ICON_SIZE, height=ICON_SIZE,
-                )
-            else:
-                self._icon = img.Handle.background(ICON_SIZE, ICON_SIZE)
-        return self._icon
+    def shortName(self) -> TransToken:
+        return self.data.short_name
 
-    @icon.setter
-    def icon(self, image: img.Handle | None) -> None:
-        """Alter the icon used."""
-        self._icon = image
+    @property
+    def longName(self) -> TransToken:
+        return self.data.name
+
+    @property
+    def group(self) -> TransToken:
+        return self.data.group
+
+    @property
+    def sort_key(self) -> str:
+        return self.data.sort_key
+
+    @property
+    def desc(self) -> tkMarkdown.MarkdownData:
+        return self.data.desc
+
+    @property
+    def icon(self) -> img.Handle:
+        return self.data.icon
+
+    @property
+    def large_icon(self) -> img.Handle:
+        return self.data.large_icon
+
+    @property
+    def previews(self) -> Sequence[img.Handle]:
+        return self.data.previews
 
     def __repr__(self) -> str:
         return f'<Item:{self.id}>'
@@ -397,17 +395,8 @@ class Item:
         """Create a selector Item from a SelitemData tuple."""
         return Item(
             id=obj_id,
-            short_name=data.short_name,
-            long_name=data.name,
-            icon=data.icon,
-            large_icon=data.large_icon,
-            previews=data.previews,
-            authors=data.auth,
-            desc=data.desc,
-            group=data.group,
-            sort_key=data.sort_key,
+            data=data,
             attributes=attrs,
-            source=', '.join(sorted(data.packages)),
         )
 
     def _on_click(self, _: object = None) -> None:
@@ -435,16 +424,7 @@ class Item:
         """Duplicate an item."""
         item = Item.__new__(Item)
         item.id = self.id
-        item.shortName = self.shortName
-        item.longName = self.longName
-        item.icon = self.icon
-        item.large_icon = self.large_icon
-        item.previews = self.previews.copy()
-        item.desc = copy.copy(self.desc)
-        item.authors = self.authors.copy()
-        item.group_id = self.group_id
-        item.group = self.group
-        item.sort_key = self.sort_key
+        item.data = self.data
         item.snd_sample = self.snd_sample
         item._context_lbl = self._context_lbl
         item.attrs = self.attrs
@@ -456,6 +436,7 @@ class Item:
 
 class PreviewWindow:
     """Displays images previewing the selected item."""
+    img: Sequence[img.Handle]
     def __init__(self) -> None:
         self.win = tk.Toplevel(TK_ROOT, name='selectorPreview')
         self.win.withdraw()
@@ -477,7 +458,7 @@ class PreviewWindow:
         self.next_btn = ttk.Button(
             self.win, text=BTN_NEXT, command=functools.partial(self.cycle, +1))
 
-        self.img: list[img.Handle] = []
+        self.img = ()
         self.index = 0
 
     def show(self, parent: SelectorWin, item: Item) -> None:
@@ -628,17 +609,12 @@ class SelectorWin:
         *,  # Make all keyword-only for readability
         save_id: str,  # Required!
         store_last_selected: bool = True,
-        has_none: bool = True,
         has_def: bool = True,
         sound_sys: FileSystemChain | None = None,
         modal: bool = False,
         default_id: str = '<NONE>',
-        # i18n: 'None' item description
-        none_desc: TransToken = TransToken.ui('Do not add anything.'),
+        none_item: SelitemData | None = DATA_NONE,
         none_attrs: Mapping[str, AttrValues] = EmptyMapping,
-        none_icon: img.Handle = img.Handle.parse_uri(img.PATH_NONE, ICON_SIZE, ICON_SIZE),
-        # i18n: 'None' item name.
-        none_name: TransToken = TransToken.ui("<None>"),
         title: TransToken = TransToken.untranslated('???'),
         desc: TransToken = TransToken.BLANK,
         readonly_desc: TransToken = TransToken.BLANK,
@@ -657,18 +633,13 @@ class SelectorWin:
         - save_id: The ID used to save/load the window state.
         - store_last_selected: If set, save/load the selected ID.
         - lst: A list of Item objects, defining the visible items.
-        - If has_none is True, a <none> item will be added to the beginning
-          of the list.
         - If has_def is True, the 'Reset to Default' button will appear,
           which resets to the suggested item.
         - default_id is the item to initially select, if no previous one is set.
         - If snd_sample_sys is set, a '>' button will appear next to names
           to play the associated audio sample for the item.
           The value should be a FileSystem to look for samples in.
-        - none_desc holds an optional description for the <none> Item,
-          which can be used to describe what it results in.
-        - none_icon allows changing the icon for the <none> Item.
-        - none_name allows setting the name shown for the <none> Item.
+        - If none_item is set, a <none> item is added to the list.
         - title is the title of the selector window.
         - full_context controls if the short or long names are used for the
           context menu.
@@ -686,12 +657,10 @@ class SelectorWin:
 
         self.noneItem = Item(
             id='<NONE>',
-            short_name=TransToken.BLANK,
-            icon=none_icon,
-            desc=tkMarkdown.convert(none_desc, None),
+            data=none_item or DATA_NONE,
             attributes=dict(none_attrs),
         )
-        self.noneItem.context_lbl = none_name
+        self.noneItem.context_lbl = self.noneItem.data.name
 
         # The textbox on the parent window.
         self.display = None
@@ -715,7 +684,7 @@ class SelectorWin:
         self.readonly_description = readonly_desc
         self.readonly_override = readonly_override
 
-        if has_none:
+        if none_item is not None:
             self.item_list = [self.noneItem] + lst
         else:
             self.item_list = lst
@@ -733,7 +702,7 @@ class SelectorWin:
             # least this works.
             self.item_list = [self.noneItem]
             self.selected = self.noneItem
-        elif prev_state.id is None and has_none:
+        elif prev_state.id is None and none_item is not None:
             self.selected = self.noneItem
         else:
             for item in self.item_list:
@@ -1391,21 +1360,24 @@ class SelectorWin:
 
     def sel_item(self, item: Item, _: object = None) -> None:
         """Select the specified item in the UI, but don't actually choose it."""
-        self.prop_name['text'] = item.longName
-        if len(item.authors) == 0:
+        data = item.data
+
+        self.prop_name['text'] = data.name
+        if item is self.noneItem:
+            set_text(self.prop_author, TransToken.BLANK)
+        elif len(data.auth) == 0:
             set_text(self.prop_author, TRANS_NO_AUTHORS)
         else:
             set_text(self.prop_author, TRANS_AUTHORS.format(
-                authors=TransToken.list_and(item.authors),
-                n=len(item.authors),
+                authors=TransToken.list_and(TransToken.untranslated(auth) for auth in data.auth),
+                n=len(data.auth),
             ))
 
-        # We have a large icon, use it.
-        icon = item.large_icon if item.large_icon is not None else item.icon
-        TK_IMG.apply(self.prop_icon, icon)
-        self.prop_icon_frm.configure(width=icon.width, height=icon.height)
+        # Change aspect ratio to match the large icon.
+        TK_IMG.apply(self.prop_icon, data.large_icon)
+        self.prop_icon_frm.configure(width=data.large_icon.width, height=data.large_icon.height)
 
-        if item.previews and not self.sampler:
+        if data.previews and not self.sampler:
             self.prop_icon['cursor'] = tk_tools.Cursors.ZOOM_IN
         else:
             self.prop_icon['cursor'] = tk_tools.Cursors.REGULAR
@@ -1421,10 +1393,10 @@ class SelectorWin:
             self.prop_desc.set_text(tkMarkdown.join(
                 text,
                 tkMarkdown.MarkdownData.text('\n'),
-                item.desc,
+                data.desc,
             ))
         else:
-            self.prop_desc.set_text(item.desc)
+            self.prop_desc.set_text(data.desc)
 
         if self.selected.button is not None and item.button is not None:
             self.selected.button.state(('!alternate',))

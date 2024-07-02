@@ -4,7 +4,7 @@ Handles scanning through the zip packages to find all items, styles, etc.
 from __future__ import annotations
 from typing import NoReturn, ClassVar, Self, cast
 
-from collections.abc import Collection, Iterable, Iterator, Mapping
+from collections.abc import Collection, Iterable, Iterator, Mapping, Sequence
 from collections import defaultdict
 from pathlib import Path
 import os
@@ -110,10 +110,10 @@ class SelitemData:
     """Options which are displayed on the selector window."""
     name: TransToken  # Longer full name.
     short_name: TransToken  # Shorter name for the icon.
-    auth: set[str]  # List of authors.
-    icon: img.Handle | None  # Small square icon.
-    large_icon: img.Handle | None  # Larger, landscape icon.
-    previews: list[img.Handle]  # Full size images used for previews.
+    auth: frozenset[str]  # List of authors.
+    icon: img.Handle  # Small square icon.
+    large_icon: img.Handle  # Larger, landscape icon.
+    previews: Sequence[img.Handle]  # Full size images used for previews.
     desc: tkMarkdown.MarkdownData
     group: TransToken
     sort_key: str
@@ -121,9 +121,53 @@ class SelitemData:
     packages: frozenset[str] = attrs.Factory(frozenset)
 
     @classmethod
+    def build(
+        cls, *,
+        long_name: TransToken,
+        short_name: TransToken | None = None,
+        authors: Iterable[str] = (),
+        small_icon: img.Handle | None = None,
+        large_icon: img.Handle | None = None,
+        previews: Sequence[img.Handle] = (),
+        desc: TransToken | tkMarkdown.MarkdownData = TransToken.BLANK,
+        group: TransToken = TransToken.BLANK,
+        sort_key: str = '',
+        packages: Iterable[utils.ObjectID] = frozenset(),
+    ) -> SelitemData:
+        """Create, automatically handling omitted names and icons."""
+        if short_name is None:
+            short_name = long_name
+
+        if small_icon is None:
+            if large_icon is not None:
+                small_icon = large_icon.crop(
+                    consts.SEL_ICON_CROP_SHRINK,
+                    width=consts.SEL_ICON_SIZE, height=consts.SEL_ICON_SIZE,
+                )
+            else:
+                small_icon = img.Handle.background(consts.SEL_ICON_SIZE, consts.SEL_ICON_SIZE)
+        if large_icon is None:
+            large_icon = small_icon
+        if isinstance(desc, TransToken):
+            desc = tkMarkdown.convert(desc, None)
+
+        return cls(
+            long_name,
+            short_name,
+            frozenset(authors),
+            small_icon,
+            large_icon,
+            previews,
+            desc,
+            group,
+            sort_key,
+            frozenset(packages),
+        )
+
+    @classmethod
     def parse(cls, info: Keyvalues, pack_id: utils.ObjectID) -> SelitemData:
         """Parse from a keyvalues block."""
-        auth = set(sep_values(info['authors', '']))
+        auth = frozenset(sep_values(info['authors', '']))
         name = TransToken.parse(pack_id, info['name'])
         sort_key = info['sort_key', '']
         desc = desc_parse(info, info['id'], pack_id)
@@ -155,6 +199,7 @@ class SelitemData:
                 pack_id,
                 *consts.SEL_ICON_SIZE_LRG,
             )
+        previews: Sequence[img.Handle]
         try:
             preview_block = info.find_block('previews')
         except LookupError:
@@ -166,7 +211,7 @@ class SelitemData:
                     0, 0,
                 )]
             else:
-                previews = []
+                previews = ()
         else:
             previews = [img.Handle.parse(
                 kv,
@@ -174,17 +219,17 @@ class SelitemData:
                 0, 0,
             ) for kv in preview_block]
 
-        return cls(
-            name,
-            short_name,
-            auth,
-            icon,
-            large_icon,
-            previews,
-            desc,
-            group,
-            sort_key,
-            frozenset({pack_id}),
+        return cls.build(
+            long_name=name,
+            short_name=short_name,
+            authors=auth,
+            small_icon=icon,
+            large_icon=large_icon,
+            previews=previews,
+            desc=desc,
+            group=group,
+            sort_key=sort_key,
+            packages={pack_id},
         )
 
     def __add__(self, other: SelitemData) -> SelitemData:
@@ -200,9 +245,9 @@ class SelitemData:
             self.name,
             self.short_name,
             self.auth | other.auth,
-            other.icon or self.icon,
-            other.large_icon or self.large_icon,
-            self.previews + other.previews,
+            self.icon,
+            self.large_icon,
+            [*self.previews, *other.previews],
             tkMarkdown.join(self.desc, other.desc),
             other.group or self.group,
             other.sort_key or self.sort_key,

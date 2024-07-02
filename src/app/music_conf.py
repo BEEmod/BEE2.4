@@ -13,10 +13,13 @@ import trio
 
 from app import background_start
 from app.SubPane import SubPane
-from app.selector_win import Item as SelItem, SelectorWin, AttrDef as SelAttr
+from app.selector_win import (
+    Item as SelItem, SelectorWin, AttrDef as SelAttr, NONE_ICON,
+    TRANS_NONE_NAME,
+)
 from config.gen_opts import GenOptions
 from consts import MusicChannel
-from packages import PackagesSet, Music
+from packages import PackagesSet, Music, SelitemData
 from transtoken import TransToken
 from ui_tk.wid_transtoken import set_text
 from ui_tk import TK_ROOT
@@ -40,6 +43,29 @@ is_collapsed: bool = False
 filesystem = FileSystemChain()
 TRANS_BASE_COLL = TransToken.ui('Music:')
 TRANS_BASE_EXP = TransToken.ui('Base:')
+
+DATA_NONE_BASE = SelitemData.build(
+    short_name=TransToken.BLANK,
+    long_name=TRANS_NONE_NAME,
+    desc=TransToken.ui(
+        'Add no music to the map at all. Testing Element-specific music may still be added.'
+    ),
+)
+DATA_NONE_FUNNEL = SelitemData.build(
+    short_name=TransToken.BLANK,
+    long_name=TRANS_NONE_NAME,
+    desc=TransToken.ui('The regular base track will continue to play normally.'),
+)
+DATA_NONE_BOUNCE = SelitemData.build(
+    short_name=TransToken.BLANK,
+    long_name=TRANS_NONE_NAME,
+    desc=TransToken.ui('Add no music when jumping on Repulsion Gel.'),
+)
+DATA_NONE_SPEED = SelitemData.build(
+    short_name=TransToken.BLANK,
+    long_name=TRANS_NONE_NAME,
+    desc=TransToken.ui('Add no music while running fast.'),
+)
 
 
 def load_filesystems(systems: Iterable[FileSystem]) -> None:
@@ -128,12 +154,9 @@ async def make_widgets(
             'This controls the background music used for a map. Expand the dropdown to set tracks '
             'for specific test elements.'
         ),
-        has_none=True,
+        none_item=DATA_NONE_BASE,
         default_id='VALVE_PETI',
         sound_sys=filesystem,
-        none_desc=TransToken.ui(
-            'Add no music to the map at all. Testing Element-specific music may still be added.'
-        ),
         attributes=[
             SelAttr.bool('SPEED', TransToken.ui('Propulsion Gel SFX')),
             SelAttr.bool('BOUNCE', TransToken.ui('Repulsion Gel SFX')),
@@ -149,9 +172,8 @@ async def make_widgets(
         save_id='music_tbeam',
         title=TransToken.ui('Select Excursion Funnel Music'),
         desc=TransToken.ui('Set the music used while inside Excursion Funnels.'),
-        has_none=True,
+        none_item=DATA_NONE_FUNNEL,
         sound_sys=filesystem,
-        none_desc=TransToken.ui('The regular base track will continue to play normally.'),
         attributes=[
             SelAttr.bool('TBEAM_SYNC', TransToken.ui('Synced Funnel Music')),
         ],
@@ -164,9 +186,8 @@ async def make_widgets(
         save_id='music_bounce',
         title=TransToken.ui('Select Repulsion Gel Music'),
         desc=TransToken.ui('Select the music played when players jump on Repulsion Gel.'),
-        has_none=True,
+        none_item=DATA_NONE_BOUNCE,
         sound_sys=filesystem,
-        none_desc=TransToken.ui('Add no music when jumping on Repulsion Gel.'),
     ))
 
     WINDOWS[MusicChannel.SPEED] = await background_start(functools.partial(
@@ -176,9 +197,8 @@ async def make_widgets(
         save_id='music_speed',
         title=TransToken.ui('Select Propulsion Gel Music'),
         desc=TransToken.ui('Select music played when players have large amounts of horizontal velocity.'),
-        has_none=True,
+        none_item=DATA_NONE_SPEED,
         sound_sys=filesystem,
-        none_desc=TransToken.ui('Add no music while running fast.'),
     ))
 
     assert set(WINDOWS.keys()) == set(MusicChannel), "Extra channels?"
