@@ -251,7 +251,7 @@ class SelitemData:
             previews,
             desc,
             group,
-            sort_key,
+            sort_key or long_name.token,
             frozenset(packages),
         )
 

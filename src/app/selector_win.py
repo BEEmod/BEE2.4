@@ -236,10 +236,10 @@ class Item:
         self.data = data
         self.group_id = self.data.group.token.casefold()
         self.source = source or ', '.join(sorted(data.packages))
-        if len(self.longName.token) > 20:
-            self._context_lbl = self.shortName
+        if len(data.name.token) > 20:
+            self._context_lbl = data.short_name
         else:
-            self._context_lbl = self.longName
+            self._context_lbl = data.name
 
         self.snd_sample = snd_sample
 
@@ -250,38 +250,6 @@ class Item:
         # The position on the menu this item is located at.
         # This is needed to change the font.
         self._context_ind: int | None = None
-
-    @property
-    def shortName(self) -> TransToken:
-        return self.data.short_name
-
-    @property
-    def longName(self) -> TransToken:
-        return self.data.name
-
-    @property
-    def group(self) -> TransToken:
-        return self.data.group
-
-    @property
-    def sort_key(self) -> str:
-        return self.data.sort_key
-
-    @property
-    def desc(self) -> tkMarkdown.MarkdownData:
-        return self.data.desc
-
-    @property
-    def icon(self) -> img.Handle:
-        return self.data.icon
-
-    @property
-    def large_icon(self) -> img.Handle:
-        return self.data.large_icon
-
-    @property
-    def previews(self) -> Sequence[img.Handle]:
-        return self.data.previews
 
     def __repr__(self) -> str:
         return f'<Item:{self.id}>'
@@ -373,14 +341,14 @@ class PreviewWindow:
         self.img = ()
         self.index = 0
 
-    def show(self, parent: SelectorWin, item: Item) -> None:
+    def show(self, parent: SelectorWin, data: SelitemData) -> None:
         """Show the window."""
         self.win.transient(parent.win)
-        set_win_title(self.win, TRANS_PREVIEW_TITLE.format(item=item.longName))
+        set_win_title(self.win, TRANS_PREVIEW_TITLE.format(item=data.name))
 
         self.parent = parent
         self.index = 0
-        self.img = item.previews
+        self.img = data.previews
         TK_IMG.apply(self.display, self.img[0])
 
         if len(self.img) > 1:
@@ -1013,9 +981,8 @@ class SelectorWin:
 
     def refresh(self) -> None:
         """Rebuild the menus and options based on the item list."""
-        # Sort alphabetically, preferring a sort key if present.
-        # Special items go to the start.
-        self.item_list.sort(key=lambda it: (utils.not_special_id(it.id), it.sort_key or it.longName.token))
+        # Special items go to the start, sort by the sort key.
+        self.item_list.sort(key=lambda it: (utils.not_special_id(it.id), it.data.sort_key))
         grouped_items = defaultdict(list)
         self.group_names = {'':  TRANS_GROUPLESS}
         # Ungrouped items appear directly in the menu.
@@ -1040,7 +1007,7 @@ class SelectorWin:
                         name='item_' + item.id,
                         compound='top',
                     )
-                    set_text(item.button, item.shortName)
+                    set_text(item.button, item.data.name)
 
                 # noinspection PyProtectedMember
                 tk_tools.bind_leftclick(item.button, item._on_click)
@@ -1049,7 +1016,7 @@ class SelectorWin:
             grouped_items[group_key].append(item)
 
             if group_key not in self.group_names:
-                self.group_names[group_key] = item.group
+                self.group_names[group_key] = item.data.group
             try:
                 group = self.group_widgets[group_key]
             except KeyError:
@@ -1177,8 +1144,8 @@ class SelectorWin:
         """When the large image is clicked, either show the previews or play sounds."""
         if self.sampler:
             self.sampler.play_sample()
-        elif self.selected.previews:
-            _PREVIEW.show(self, self.selected)
+        elif self.selected.data.previews:
+            _PREVIEW.show(self, self.selected.data)
 
     def open_win(self, _: object = None, *, force_open: bool = False) -> object:
         """Display the window."""
@@ -1188,7 +1155,7 @@ class SelectorWin:
 
         for item in self.item_list:
             if item.button is not None:
-                TK_IMG.apply(item.button, item.icon)
+                TK_IMG.apply(item.button, item.data.icon)
 
         # Restore configured states.
         if self.first_open:
@@ -1589,7 +1556,7 @@ class SelectorWin:
                     x=(i % width) * ITEM_WIDTH + 1,
                     y=(i // width) * ITEM_HEIGHT + y_off + 20,
                 )
-                item.button['text'] = item.shortName
+                item.button['text'] = item.data.name
 
             # Increase the offset by the total height of this item section
             y_off += math.ceil(len(items) / width) * ITEM_HEIGHT + 5
