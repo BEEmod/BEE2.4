@@ -1239,7 +1239,7 @@ class SelectorWin:
         """Select the specified item in the UI, but don't actually choose it."""
         data = item.data
 
-        self.prop_name['text'] = data.name
+        set_text(self.prop_name, data.name)
         if utils.is_special_id(item.id):
             set_text(self.prop_author, TransToken.BLANK)
         elif len(data.auth) == 0:
@@ -1554,7 +1554,6 @@ class SelectorWin:
                     x=(i % width) * ITEM_WIDTH + 1,
                     y=(i // width) * ITEM_HEIGHT + y_off + 20,
                 )
-                item.button['text'] = item.data.name
 
             # Increase the offset by the total height of this item section
             y_off += math.ceil(len(items) / width) * ITEM_HEIGHT + 5
