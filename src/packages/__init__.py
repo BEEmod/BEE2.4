@@ -352,6 +352,23 @@ class SelitemData:
         yield from tkMarkdown.iter_tokens(self.desc, f'{source}.desc')
 
 
+TRANS_NONE_NAME = TransToken.ui("<None>")
+NONE_ICON = img.Handle.ico_none(consts.SEL_ICON_SIZE, consts.SEL_ICON_SIZE)
+
+SEL_DATA_NONE = SelitemData.build(
+    short_name=TransToken.BLANK,
+    long_name=TRANS_NONE_NAME,
+    small_icon=NONE_ICON,
+    desc=TransToken.ui('Do not add anything.'),
+)
+SEL_DATA_MISSING = SelitemData.build(
+    long_name=TransToken.ui('Unknown Item'),
+    short_name=TransToken.ui('???'),
+    small_icon=img.Handle.error(consts.SEL_ICON_SIZE, consts.SEL_ICON_SIZE),
+    desc=TransToken.ui('This item is missing from loaded packages. Exporting it will fail.'),
+)
+
+
 @attrs.define
 class ObjData:
     """Temporary data stored when parsing info.txt, but before .parse() is called.

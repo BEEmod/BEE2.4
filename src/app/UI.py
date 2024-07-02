@@ -51,8 +51,7 @@ from app import (
 )
 from app.errors import Result as ErrorResult
 from app.selector_win import (
-    Item as selWinItem, SelectorWin, AttrDef as SelAttr, NONE_ICON,
-    TRANS_NONE_NAME,
+    Item as selWinItem, SelectorWin, AttrDef as SelAttr
 )
 from app.menu_bar import MenuBar
 from ui_tk.context_win import ContextWin
@@ -113,8 +112,8 @@ TRANS_ERROR = TransToken.untranslated('???')
 
 DATA_NO_VOICE = packages.SelitemData.build(
     short_name=TransToken.BLANK,
-    long_name=TRANS_NONE_NAME,
-    small_icon=NONE_ICON,
+    long_name=packages.TRANS_NONE_NAME,
+    small_icon=packages.NONE_ICON,
     desc=TransToken.ui('Add no extra voice lines, only Multiverse Cave if enabled.')
 )
 DATA_RAND_ELEV = packages.SelitemData.build(

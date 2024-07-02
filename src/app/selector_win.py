@@ -105,15 +105,6 @@ TRANS_GROUPLESS = TransToken.ui('Other')
 TRANS_AUTHORS = TransToken.ui_plural('Author: {authors}', 'Authors: {authors}')
 TRANS_NO_AUTHORS = TransToken.ui('Authors: Unknown')
 TRANS_DEV_ITEM_ID = TransToken.untranslated('**ID:** {item}')
-TRANS_NONE_NAME = TransToken.ui("<None>")
-
-NONE_ICON = img.Handle.parse_uri(img.PATH_NONE, ICON_SIZE, ICON_SIZE)
-DATA_NONE = SelitemData.build(
-    short_name=TransToken.BLANK,
-    long_name=TRANS_NONE_NAME,
-    small_icon=img.Handle.parse_uri(img.PATH_NONE, ICON_SIZE, ICON_SIZE),
-    desc=TransToken.ui('Do not add anything.'),
-)
 
 
 async def _update_sampler_task(sampler: sound.SamplePlayer, button: ttk.Button) -> None:
@@ -498,7 +489,7 @@ class SelectorWin:
         sound_sys: FileSystemChain | None = None,
         modal: bool = False,
         default_id: utils.SpecialID = utils.ID_NONE,
-        none_item: SelitemData | None = DATA_NONE,
+        none_item: SelitemData | None = packages.SEL_DATA_NONE,
         title: TransToken = TransToken.untranslated('???'),
         desc: TransToken = TransToken.BLANK,
         readonly_desc: TransToken = TransToken.BLANK,
@@ -541,7 +532,7 @@ class SelectorWin:
 
         self.noneItem = Item(
             utils.ID_NONE,
-            data=none_item or DATA_NONE,
+            data=none_item or packages.SEL_DATA_NONE,
         )
         self.noneItem.context_lbl = self.noneItem.data.name
 

@@ -12,10 +12,7 @@ import srctools.logger
 import trio
 
 from app.SubPane import SubPane
-from app.selector_win import (
-    Item as SelItem, SelectorWin, NONE_ICON,
-    TRANS_NONE_NAME,
-)
+from app.selector_win import Item as SelItem, SelectorWin
 from config.gen_opts import GenOptions
 from consts import MusicChannel
 from packages import PackagesSet, Music, SelitemData, AttrDef
@@ -45,29 +42,29 @@ TRANS_BASE_COLL = TransToken.ui('Music:')
 TRANS_BASE_EXP = TransToken.ui('Base:')
 
 DATA_NONE_BASE = SelitemData.build(
-    small_icon=NONE_ICON,
+    small_icon=packages.NONE_ICON,
     short_name=TransToken.BLANK,
-    long_name=TRANS_NONE_NAME,
+    long_name=packages.TRANS_NONE_NAME,
     desc=TransToken.ui(
         'Add no music to the map at all. Testing Element-specific music may still be added.'
     ),
 )
 DATA_NONE_FUNNEL = SelitemData.build(
-    small_icon=NONE_ICON,
+    small_icon=packages.NONE_ICON,
     short_name=TransToken.BLANK,
-    long_name=TRANS_NONE_NAME,
+    long_name=packages.TRANS_NONE_NAME,
     desc=TransToken.ui('The regular base track will continue to play normally.'),
 )
 DATA_NONE_BOUNCE = SelitemData.build(
-    small_icon=NONE_ICON,
+    small_icon=packages.NONE_ICON,
     short_name=TransToken.BLANK,
-    long_name=TRANS_NONE_NAME,
+    long_name=packages.TRANS_NONE_NAME,
     desc=TransToken.ui('Add no music when jumping on Repulsion Gel.'),
 )
 DATA_NONE_SPEED = SelitemData.build(
-    small_icon=NONE_ICON,
+    small_icon=packages.NONE_ICON,
     short_name=TransToken.BLANK,
-    long_name=TRANS_NONE_NAME,
+    long_name=packages.TRANS_NONE_NAME,
     desc=TransToken.ui('Add no music while running fast.'),
 )
 
