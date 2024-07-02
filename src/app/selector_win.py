@@ -217,7 +217,6 @@ class Item:
     __slots__ = [
         'id',
         'data',
-        'group_id',
         'button',
         'snd_sample',
         'source',
@@ -227,14 +226,13 @@ class Item:
     ]
     def __init__(
         self,
-        id: utils.SpecialID,
+        item_id: utils.SpecialID,
         data: SelitemData,
         snd_sample: str | None = None,
         source: str = '',
     ) -> None:
-        self.id = id
+        self.id = item_id
         self.data = data
-        self.group_id = self.data.group.token.casefold()
         self.source = source or ', '.join(sorted(data.packages))
         if len(data.name.token) > 20:
             self._context_lbl = data.short_name
@@ -265,7 +263,7 @@ class Item:
         self._context_lbl = value
         if self._selector and self._context_ind is not None:
             set_menu_text(
-                self._selector.context_menus[self.group_id],
+                self._selector.context_menus[self.data.group_id],
                 self._context_lbl,
                 self._context_ind,
             )
@@ -278,7 +276,7 @@ class Item:
         attrs: AttrMap = EmptyMapping,
     ) -> Item:
         """Create a selector Item from a SelitemData tuple."""
-        return Item(id=obj_id, data=data)
+        return Item(item_id=obj_id, data=data)
 
     def _on_click(self, _: object = None) -> None:
         """Handle clicking on the item.
@@ -542,7 +540,7 @@ class SelectorWin:
         self = cls()
 
         self.noneItem = Item(
-            id=utils.ID_NONE,
+            utils.ID_NONE,
             data=none_item or DATA_NONE,
         )
         self.noneItem.context_lbl = self.noneItem.data.name
@@ -1004,15 +1002,15 @@ class SelectorWin:
                 else:
                     item.button = ttk.Button(
                         self.pal_frame,
-                        name='item_' + item.id,
+                        # name='item_' + item.id,
                         compound='top',
                     )
-                    set_text(item.button, item.data.name)
 
                 # noinspection PyProtectedMember
                 tk_tools.bind_leftclick(item.button, item._on_click)
+            set_text(item.button, item.data.short_name)
 
-            group_key = item.group_id
+            group_key = item.data.group_id
             grouped_items[group_key].append(item)
 
             if group_key not in self.group_names:
@@ -1357,7 +1355,7 @@ class SelectorWin:
             self.save()
             return
 
-        cur_group_name = self.selected.group_id
+        cur_group_name = self.selected.data.group_id
         cur_group = self.grouped_items[cur_group_name]
         # Force the current group to be visible, so you can see what's
         # happening.
@@ -1626,8 +1624,8 @@ class SelectorWin:
         if item._context_ind is None:
             return
         new_font = self.sugg_font if suggested else self.norm_font
-        if item.group_id:
-            group = self.group_widgets[item.group_id]
+        if item.data.group_id:
+            group = self.group_widgets[item.data.group_id]
             menu = group._menu
 
             # Apply the font to the group header as well, if suggested.

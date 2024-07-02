@@ -196,7 +196,7 @@ class AttrDef:
         return AttrDef(attr_id, desc, default, AttrTypes.COLOR)
 
 
-@attrs.frozen
+@attrs.frozen(kw_only=True)
 class SelitemData:
     """Options which are displayed on the selector window."""
     name: TransToken  # Longer full name.
@@ -207,6 +207,7 @@ class SelitemData:
     previews: Sequence[img.Handle]  # Full size images used for previews.
     desc: tkMarkdown.MarkdownData
     group: TransToken
+    group_id: str
     sort_key: str
     # The packages used to define this, used for debugging.
     packages: frozenset[str] = attrs.Factory(frozenset)
@@ -243,16 +244,17 @@ class SelitemData:
             desc = tkMarkdown.convert(desc, None)
 
         return cls(
-            long_name,
-            short_name,
-            frozenset(authors),
-            small_icon,
-            large_icon,
-            previews,
-            desc,
-            group,
-            sort_key or long_name.token,
-            frozenset(packages),
+            name=long_name,
+            short_name=short_name,
+            auth=frozenset(authors),
+            icon=small_icon,
+            large_icon=large_icon,
+            previews=previews,
+            desc=desc,
+            group=group,
+            group_id=group.token.casefold(),
+            sort_key=sort_key or long_name.token,
+            packages=frozenset(packages),
         )
 
     @classmethod
@@ -332,17 +334,14 @@ class SelitemData:
         if not isinstance(other, SelitemData):
             return NotImplemented
 
-        return SelitemData(
-            self.name,
-            self.short_name,
-            self.auth | other.auth,
-            self.icon,
-            self.large_icon,
-            [*self.previews, *other.previews],
-            tkMarkdown.join(self.desc, other.desc),
-            other.group or self.group,
-            other.sort_key or self.sort_key,
-            self.packages | other.packages,
+        return attrs.evolve(
+            self,
+            auth=self.auth | other.auth,
+            previews=[*self.previews, *other.previews],
+            desc=tkMarkdown.join(self.desc, other.desc),
+            group=other.group or self.group,
+            group_id=other.group_id or self.group_id,
+            packages=self.packages | other.packages,
         )
 
     def iter_trans_tokens(self, source: str) -> Iterator[TransTokenSource]:
