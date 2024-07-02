@@ -114,11 +114,11 @@ async def _update_sampler_task(sampler: sound.SamplePlayer, button: ttk.Button) 
             button['text'] = BTN_STOP if is_playing else BTN_PLAY
 
 
-async def _store_results_task(chosen: AsyncValue[Item], save_id: str) -> None:
+async def _store_results_task(chosen: AsyncValue[utils.SpecialID], save_id: str) -> None:
     """Store configured results when changed."""
     async with aclosing(chosen.eventual_values()) as agen:
-        async for item in agen:
-            config.APP.store_conf(LastSelected(item.id), save_id)
+        async for item_id in agen:
+            config.APP.store_conf(LastSelected(item_id), save_id)
 
 
 
@@ -183,114 +183,6 @@ class GroupHeader(tk_tools.LineHeader):
             if self._visible else
             GRP_COLL
         )
-
-
-class Item:
-    """An item on the panel.
-
-    - id: The item ID, used to distinguish it from others.
-    - longName: The full item name. This can be very long. If not set,
-      this will be the same as the short name.
-    - shortName: A shortened version of the full name. This should be <= 20
-      characters.
-    - context_lbl: The text shown on the rightclick menu. This is either
-      the short or long name, depending on the size of the long name.
-    - icon: The image handle for the item icon. The icon should be 96x96
-      pixels large.
-    - large_icon: If set, a different handle to use for the 192x192 icon.
-    - desc: A MarkdownData value containing the description.
-    - authors: A list of the item's authors.
-    - group: Items with the same group name will be shown together.
-    - button, Set later, the button TK object for this item.
-    - source: For debugging only, the packages the item came from.
-    """
-    authors: list[TransToken]
-    __slots__ = [
-        'id',
-        'data',
-        'button',
-        '_selector',
-        '_context_lbl',
-        '_context_ind',
-    ]
-    def __init__(
-        self,
-        item_id: utils.SpecialID,
-        data: SelitemData,
-    ) -> None:
-        self.id = item_id
-        self.data = data
-        if len(data.name.token) > 20:
-            self._context_lbl = data.short_name
-        else:
-            self._context_lbl = data.name
-
-        # The button widget for this item.
-        self.button: ttk.Button | None = None
-        # The selector window we belong to.
-        self._selector: SelectorWin | None = None
-        # The position on the menu this item is located at.
-        # This is needed to change the font.
-        self._context_ind: int | None = None
-
-    def __repr__(self) -> str:
-        return f'<Item:{self.id}>'
-
-    @property
-    def context_lbl(self) -> TransToken:
-        """The text displayed on the rightclick menu."""
-        return self._context_lbl
-
-    @context_lbl.setter
-    def context_lbl(self, value: TransToken) -> None:
-        """Update the context menu whenver this is set."""
-        self._context_lbl = value
-        if self._selector and self._context_ind is not None:
-            set_menu_text(
-                self._selector.context_menus[self.data.group_id],
-                self._context_lbl,
-                self._context_ind,
-            )
-
-    @classmethod
-    def from_data(
-        cls,
-        obj_id: utils.SpecialID,
-        data: SelitemData,
-        attrs: AttrMap = EmptyMapping,
-    ) -> Item:
-        """Create a selector Item from a SelitemData tuple."""
-        return Item(item_id=obj_id, data=data)
-
-    def _on_click(self, _: object = None) -> None:
-        """Handle clicking on the item.
-
-        If it's already selected, save and close the window.
-        """
-        assert self._selector is not None
-        if self._selector.selected is self:
-            self._selector.save()
-        else:
-            self._selector.sel_item(self)
-
-    def set_pos(self, x: int | None = None, y: int | None = None) -> None:
-        """Place the item on the palette."""
-        assert self.button is not None
-        if x is None or y is None:
-            # Remove from the window.
-            self.button.place_forget()
-        else:
-            self.button.place(x=x, y=y)
-            self.button.lift()  # Force a particular stacking order for widgets
-
-    def copy(self) -> Item:
-        """Duplicate an item."""
-        item = Item.__new__(Item)
-        item.id = self.id
-        item.data = self.data
-        item._context_lbl = self._context_lbl
-        item._selector = item.button = None
-        return item
 
 
 class PreviewWindow:
@@ -378,12 +270,13 @@ class SelectorWin:
     """
     # Callback functions used to retrieve the data for the window.
     func_get_attr: GetterFunc[AttrMap]
+    func_get_data: GetterFunc[SelitemData]  # TODO: Maybe auto-catch KeyError for this to simplify user code?
     func_get_sample: GetterFunc[str] | None
+    func_get_ids: Callable[[packages.PackagesSet], Iterable[utils.SpecialID]]
 
     # Packages currently loaded for the window.
     _packset: packages.PackagesSet
 
-    noneItem: Item
     # The textbox on the parent window.
     display: tk_tools.ReadOnlyEntry | None
     # Variable associated with self.display.
@@ -393,10 +286,10 @@ class SelectorWin:
     disp_btn: ttk.Button | None
 
     # Currently suggested item objects. This would be a set, but we want to randomly pick.
-    suggested: list[Item]
+    suggested: list[utils.SpecialID]
     # While the user hovers over the "suggested" button, cycle through random items. But we
     # want to apply that specific item when clicked.
-    _suggested_rollover: Item | None
+    _suggested_rollover: utils.SpecialID | None
     _suggest_lbl: list[ttk.Label | ttk.LabelFrame]
 
     # Should we have the 'reset to default' button?
@@ -406,12 +299,11 @@ class SelectorWin:
     # If set, force textbox to display this when readonly.
     readonly_override: TransToken | None
 
-    item_list: list[Item]
 
     # The selected item is the one clicked on inside the window, while chosen
     # is the one actually chosen.
-    chosen: AsyncValue[Item]
-    selected: Item
+    chosen: AsyncValue[utils.SpecialID]
+    selected: utils.SpecialID
     parent: tk.Tk | tk.Toplevel
     _readonly: bool
     modal: bool
@@ -419,13 +311,23 @@ class SelectorWin:
     attrs: list[AttrDef]
     attr_labels: dict[str, ttk.Label]
 
+    # Current list of item IDs we display.
+    item_list: list[utils.SpecialID]
     # A map from group name -> header widget
     group_widgets: dict[str, GroupHeader]
     # A map from folded name -> display name
     group_names: dict[str, TransToken]
-    grouped_items: dict[str, list[Item]]
+    # Group name -> items in that group.
+    grouped_items: dict[str, list[utils.SpecialID]]
     # A list of casefolded group names in the display order.
     group_order: list[str]
+    # Maps item ID to the menu position.
+    _menu_index: dict[utils.SpecialID, int]
+
+    # Buttons we have constructed, corresponding to the same in the item list.
+    _item_buttons: list[ttk.Button]
+    # And a lookup from ID -> button
+    _id_to_button: dict[utils.SpecialID, ttk.Button]
 
     # The maximum number of items that fits per row (set in flow_items)
     item_width: int
@@ -472,8 +374,9 @@ class SelectorWin:
     async def create(
         cls,
         parent: tk.Tk | tk.Toplevel,
-        lst: list[Item],
         *,  # Make all keyword-only for readability
+        func_get_data: GetterFunc[SelitemData],
+        func_get_ids: Callable[[packages.PackagesSet], Iterable[utils.SpecialID]],
         save_id: str,  # Required!
         store_last_selected: bool = True,
         has_def: bool = True,
@@ -481,7 +384,6 @@ class SelectorWin:
         func_get_sample: GetterFunc[str] | None = None,
         modal: bool = False,
         default_id: utils.SpecialID = utils.ID_NONE,
-        none_item: SelitemData | None = packages.SEL_DATA_NONE,
         title: TransToken = TransToken.untranslated('???'),
         desc: TransToken = TransToken.BLANK,
         readonly_desc: TransToken = TransToken.BLANK,
@@ -495,18 +397,20 @@ class SelectorWin:
         Read from .selected_id to get the currently-chosen Item name, or None
         if the <none> Item is selected.
         Args:
-        - tk: Must be a Toplevel window, either the tk() root or another
+        - parent: Must be a Toplevel window, either the tk() root or another
         window if needed.
+        - func_get_data: Function to get the data for an ID. Should fetch a cached result, will
+          be called for every item.
+        - func_get_ids: Called to retrieve the list of item IDs.
         - save_id: The ID used to save/load the window state.
         - store_last_selected: If set, save/load the selected ID.
         - lst: A list of Item objects, defining the visible items.
-        - If has_def is True, the 'Reset to Default' button will appear,
+        - If `has_def` is True, the 'Reset to Default' button will appear,
           which resets to the suggested item.
-        - default_id is the item to initially select, if no previous one is set.
+        - `default_id` is the item to initially select, if no previous one is set.
         - If snd_sample_sys is set, a '>' button will appear next to names
           to play the associated audio sample for the item.
           The value should be a FileSystem to look for samples in.
-        - If none_item is set, a <none> item is added to the list.
         - title is the title of the selector window.
         - full_context controls if the short or long names are used for the
           context menu.
@@ -522,15 +426,15 @@ class SelectorWin:
         """
         self = cls()
 
-        self.noneItem = Item(
-            utils.ID_NONE,
-            data=none_item or packages.SEL_DATA_NONE,
-        )
-        self.noneItem.context_lbl = self.noneItem.data.name
-
-        self._packset = packages.get_loaded_packages()  # TODO, handle reload
+        # self.noneItem.context_lbl = self.noneItem.data.name
         self.func_get_attr = func_get_attr
         self.func_get_sample = func_get_sample
+        self.func_get_data = func_get_data
+        self.func_get_ids = func_get_ids
+
+        self.parent = parent
+        self._readonly = False
+        self.modal = modal
 
         # The textbox on the parent window.
         self.display = None
@@ -554,11 +458,6 @@ class SelectorWin:
         self.readonly_description = readonly_desc
         self.readonly_override = readonly_override
 
-        if none_item is not None:
-            self.item_list = [self.noneItem] + lst
-        else:
-            self.item_list = lst
-
         prev_state = config.APP.get_cur_conf(
             LastSelected,
             save_id,
@@ -566,30 +465,20 @@ class SelectorWin:
         )
         if store_last_selected:
             config.APP.store_conf(prev_state, save_id)
-        if not self.item_list:
-            LOGGER.error('No items for window "{}"!', title)
-            # We crash without items, forcefully add the None item in so at
-            # least this works.
-            # TODO: Make no-items case valid.
-            self.item_list = [self.noneItem]
-            self.selected = self.noneItem
-        else:
-            for item in self.item_list:
-                if item.id == prev_state.id:
-                    self.selected = item
-                    break
-            else:  # Arbitrarily pick first.
-                self.selected = self.item_list[0]
 
+        self.selected = prev_state.id
         self.chosen = AsyncValue(self.selected)
-        self.parent = parent
-        self._readonly = False
-        self.modal = modal
+
+        self._packset = packages.get_loaded_packages()  # TODO, handle reload
+        self.item_list = list(func_get_ids(self._packset))
 
         self.win = tk.Toplevel(parent, name='selwin_' + save_id)
         self.win.withdraw()
         self.win.transient(master=parent)
         set_win_title(self.win, TRANS_WINDOW_TITLE.format(subtitle=title))
+        self._item_buttons = []
+        self._id_to_button = {}
+        self._menu_index = {}
 
         # Allow resizing in X and Y.
         self.win.resizable(True, True)
@@ -930,7 +819,7 @@ class SelectorWin:
     @property
     def chosen_id(self) -> utils.SpecialID:
         """The currently selected item, or None if none is selected."""
-        return self.chosen.value.id
+        return self.chosen.value
 
     @property
     def readonly(self) -> bool:
@@ -956,49 +845,69 @@ class SelectorWin:
         else:
             new_st = ['!disabled']
             set_tooltip(self.display, self.description)
-            self.disp_label.set(str(self.chosen.value.context_lbl))
+            data = self._get_data(self.chosen.value)
+            self.disp_label.set(str(data.context_lbl))
 
         self.disp_btn.state(new_st)
         self.display.state(new_st)
 
+    def _get_data(self, item_id: utils.SpecialID) -> SelitemData:
+        """Call func_get_data, handling KeyError."""
+        try:
+            return self.func_get_data(self._packset, item_id)
+        except KeyError:
+            LOGGER.warning('ID "{}" does not exist', item_id)
+            return packages.SEL_DATA_MISSING
+
     def refresh(self) -> None:
         """Rebuild the menus and options based on the item list."""
-        # Special items go to the start, sort by the sort key.
-        self.item_list.sort(key=lambda it: (utils.not_special_id(it.id), it.data.sort_key))
+        get_data = self._get_data
+
+        def sort_func(item_id: utils.SpecialID) -> str:
+            """Sort the item list. Special items go to the start, otherwise sort by the sort key."""
+            if utils.special_id(item_id):
+                return f'0{item_id}'
+            else:
+                return f'1{get_data(item_id).sort_key}'
+
+        self.item_list.sort(key=sort_func)
         grouped_items = defaultdict(list)
         self.group_names = {'':  TRANS_GROUPLESS}
         # Ungrouped items appear directly in the menu.
         self.context_menus = {'': self.context_menu}
+        self._menu_index.clear()
+        self._id_to_button.clear()
 
         # First clear off the menu.
         self.context_menu.delete(0, 'end')
 
-        for item in self.item_list:
-            # noinspection PyProtectedMember
-            if item._selector is not None and item._selector is not self:
-                raise ValueError(f'Item {item} reused on a different selector!')
-            item._selector = self
+        for button in self._item_buttons:
+            button.place_forget()
 
-            if item.button is None:  # New, create the button widget.
-                if utils.is_special_id(item.id):
-                    item.button = ttk.Button(self.pal_frame, name='item_none')
-                    item.context_lbl = item.context_lbl
-                else:
-                    item.button = ttk.Button(
-                        self.pal_frame,
-                        # name='item_' + item.id,
-                        compound='top',
-                    )
+        while len(self.item_list) < len(self._item_buttons):
+            button = ttk.Button(self.pal_frame)
+            tk_tools.bind_leftclick(button, functools.partial(
+                SelectorWin._evt_button_click, self, len(self._item_buttons),
+            ))
+            self._item_buttons.append(button)
 
-                # noinspection PyProtectedMember
-                tk_tools.bind_leftclick(item.button, item._on_click)
-            set_text(item.button, item.data.short_name)
+        for item_id, button in zip(self.item_list, self._item_buttons, strict=False):
+            data = self.func_get_data(self._packset, item_id)
+            self._id_to_button[item_id] = button
+            # Special icons have no text.
+            button['compound'] = 'none' if utils.is_special_id(item_id) else 'top'
+            if utils.is_special_id(item_id):
+                button['compound'] = 'none'
+                set_text(button, TransToken.BLANK)
+            else:
+                button['compound'] = 'top'
+                set_text(button, data.short_name)
 
-            group_key = item.data.group_id
-            grouped_items[group_key].append(item)
+            group_key = data.group_id
+            grouped_items[group_key].append(item_id)
 
             if group_key not in self.group_names:
-                self.group_names[group_key] = item.data.group
+                self.group_names[group_key] = data.group
             try:
                 group = self.group_widgets[group_key]
             except KeyError:
@@ -1008,12 +917,14 @@ class SelectorWin:
                     tk.Menu(self.context_menu) if group_key else self.context_menu,
                 )
             group.menu.add_radiobutton(
-                command=functools.partial(self.sel_item_id, item.id),
+                command=functools.partial(self.sel_item_id, item_id),
                 variable=self.context_var,
-                value=item.id,
+                value=item_id,
             )
-            set_menu_text(group.menu, item.context_lbl)
-            item._context_ind = group.menu.index('end')
+            set_menu_text(group.menu, data.context_lbl)
+            menu_pos = self.context_menu.index('end')
+            assert menu_pos is not None, "Didn't add to the menu?"
+            self._menu_index[item_id] = menu_pos
 
         # Convert to a normal dictionary, after adding all items.
         self.grouped_items = dict(grouped_items)
@@ -1042,16 +953,15 @@ class SelectorWin:
         self.save()
 
     def save(self, _: object = None) -> None:
-        """Save the selected item into the textbox."""
+        """Save the selected item, close the window.."""
         # Stop sample sounds if they're playing
         if self.sampler is not None:
             self.sampler.stop()
 
-        for item in self.item_list:
-            if item.button is not None:
-                # Unpress everything.
-                item.button.state(('!alternate', '!pressed', '!active'))
-                TK_IMG.apply(item.button, None)
+        for button in self._item_buttons:
+            # Un-press everything, clear icons to allow them to unload.
+            button.state(('!alternate', '!pressed', '!active'))
+            TK_IMG.apply(button, None)
 
         if not self.first_open:  # We've got state to store.
             state = SelectorState(
@@ -1086,9 +996,24 @@ class SelectorWin:
         if self._readonly and self.readonly_override is not None:
             self.disp_label.set(str(self.readonly_override))
         else:
-            self.disp_label.set(str(chosen.context_lbl))
-        self.context_var.set(chosen.id)
+            data = self._get_data(chosen)
+            self.disp_label.set(str(data.context_lbl))
+        self.context_var.set(chosen)
         return "break"  # stop the entry widget from continuing with this event
+
+    def _evt_button_click(self, index: int, _: object) -> None:
+        """Handle clicking on an item.
+
+        If it's already selected, save and close the window.
+        """
+        try:
+            item_id = self.item_list[index]
+        except IndexError:
+            return  # Shouldn't be visible.
+        if item_id == self.selected:
+            self.save()
+        else:
+            self.sel_item_id(item_id)
 
     def rollover_suggest(self) -> None:
         """Pick a suggested item when the button is moused over, and keep cycling."""
@@ -1101,7 +1026,8 @@ class SelectorWin:
         """Randomly select a suggested item."""
         if self.suggested and (force or self._suggested_rollover is not None):
             self._suggested_rollover = random.choice(self.suggested)
-            self.disp_label.set(str(self._suggested_rollover.context_lbl))
+            data = self._get_data(self._suggested_rollover)
+            self.disp_label.set(str(data.context_lbl))
             self.win.after(1000, self._pick_suggested)
 
     async def _update_translations_task(self) -> None:
@@ -1112,7 +1038,8 @@ class SelectorWin:
                     self.disp_label.set(str(self.readonly_override))
                 else:
                     # We don't care about updating to the rollover item, it'll swap soon anyway.
-                    self.disp_label.set(str(self.chosen.value.context_lbl))
+                    data = self._get_data(self.chosen.value)
+                    self.disp_label.set(str(data.context_lbl))
 
     async def _load_selected_task(self) -> None:
         """When configs change, load new items."""
@@ -1126,8 +1053,10 @@ class SelectorWin:
         """When the large image is clicked, either show the previews or play sounds."""
         if self.sampler:
             self.sampler.play_sample()
-        elif self.selected.data.previews:
-            _PREVIEW.show(self, self.selected.data)
+            return
+        data = self._get_data(self.selected)
+        if data.previews:
+            _PREVIEW.show(self, data)
 
     def open_win(self, _: object = None, *, force_open: bool = False) -> object:
         """Display the window."""
@@ -1135,9 +1064,8 @@ class SelectorWin:
             TK_ROOT.bell()
             return 'break'  # Tell tk to stop processing this event
 
-        for item in self.item_list:
-            if item.button is not None:
-                TK_IMG.apply(item.button, item.data.icon)
+        for item_id, button in zip(self.item_list, self._item_buttons, strict=False):
+            TK_IMG.apply(button, self._get_data(item_id).icon)
 
         # Restore configured states.
         if self.first_open:
@@ -1202,29 +1130,25 @@ class SelectorWin:
     def sel_item_id(self, it_id: str) -> bool:
         """Select the item with the given ID."""
         item_id = utils.special_id(it_id)
-        if self.selected.id == item_id:
+        if item_id in self.item_list:
+            self.choose_item(item_id)
             return True
-
-        for item in self.item_list:
-            if item.id == item_id:
-                self.choose_item(item)
-                return True
         return False
 
-    def choose_item(self, item: Item) -> None:
+    def choose_item(self, item_id: utils.SpecialID) -> None:
         """Set the current item to this one."""
-        self.sel_item(item)
-        self.chosen.value = item
+        self.sel_item(item_id)
+        self.chosen.value = item_id
         self.set_disp()
         if self.store_last_selected:
-            config.APP.store_conf(LastSelected(self.chosen_id), self.save_id)
+            config.APP.store_conf(LastSelected(item_id), self.save_id)
 
-    def sel_item(self, item: Item, _: object = None) -> None:
+    def sel_item(self, item_id: utils.SpecialID, _: object = None) -> None:
         """Select the specified item in the UI, but don't actually choose it."""
-        data = item.data
+        data = self._get_data(item_id)
 
         set_text(self.prop_name, data.name)
-        if utils.is_special_id(item.id):
+        if utils.is_special_id(item_id):
             set_text(self.prop_author, TransToken.BLANK)
         elif len(data.auth) == 0:
             set_text(self.prop_author, TRANS_NO_AUTHORS)
@@ -1246,7 +1170,7 @@ class SelectorWin:
         if DEV_MODE.value:
             # Show the ID of the item in the description
             text = tkMarkdown.convert(TRANS_DEV_ITEM_ID.format(
-                item=f'`{', '.join(data.packages)}`:`{item.id}`' if data.packages else f'`{item.id}`',
+                item=f'`{', '.join(data.packages)}`:`{item_id}`' if data.packages else f'`{item_id}`',
             ), None)
             self.prop_desc.set_text(tkMarkdown.join(
                 text,
@@ -1256,11 +1180,18 @@ class SelectorWin:
         else:
             self.prop_desc.set_text(data.desc)
 
-        if self.selected.button is not None and item.button is not None:
-            self.selected.button.state(('!alternate',))
-            item.button.state(('alternate',))
-        self.selected = item
-        self.scroll_to(item)
+        try:
+            self._id_to_button[self.selected].state(('!alternate', ))
+        except KeyError:
+            pass
+        try:
+            self._id_to_button[item_id].state(('alternate', ))
+        except KeyError:
+            # Should never happen, but don't crash..
+            LOGGER.warning('No button for item {}??', item_id)
+
+        self.selected = item_id
+        self.scroll_to(item_id)
 
         if self.sampler:
             assert self.samp_button is not None
@@ -1268,7 +1199,7 @@ class SelectorWin:
             is_playing = self.sampler.is_playing.value
             self.sampler.stop()
 
-            self.sampler.cur_file = self.func_get_sample(self._packset, item.id)
+            self.sampler.cur_file = self.func_get_sample(self._packset, item_id)
             if self.sampler.cur_file:
                 self.samp_button.state(('!disabled',))
 
@@ -1285,7 +1216,7 @@ class SelectorWin:
                 self.prop_reset.state(('disabled',))
 
         # Set the attribute items.
-        item_attrs = self.func_get_attr(self._packset, item.id)
+        item_attrs = self.func_get_attr(self._packset, item_id)
         for attr in self.attrs:
             val = item_attrs.get(attr.id, attr.default)
             attr_label = self.attr_labels[attr.id]
@@ -1340,7 +1271,7 @@ class SelectorWin:
             self.save()
             return
 
-        cur_group_name = self.selected.data.group_id
+        cur_group_name = self._get_data(self.selected).group_id
         cur_group = self.grouped_items[cur_group_name]
         # Force the current group to be visible, so you can see what's
         # happening.
@@ -1373,7 +1304,10 @@ class SelectorWin:
             return
 
         # The index in the current group for an item
-        item_ind = cur_group.index(self.selected)
+        try:
+            item_ind = cur_group.index(self.selected)
+        except IndexError:
+            return  # Not present?
         # The index in the visible groups
         group_ind = ordered_groups.index(cur_group_name)
 
@@ -1412,7 +1346,7 @@ class SelectorWin:
 
         cur_group = self.grouped_items[group_list[group_ind]]
 
-        # Go back a group..
+        # Go back a group...
         if item_ind < 0:
             if group_ind == 0:  # First group - can't go back further!
                 self.sel_item(cur_group[0])
@@ -1435,13 +1369,13 @@ class SelectorWin:
                     item_ind,
                 )
 
-        # Go forward a group..
+        # Go forward a group...
         elif item_ind >= len(cur_group):
             #  Last group - can't go forward further!
             if group_ind == len(group_list):
                 self.sel_item(cur_group[-1])
             else:
-                # Recurse to check the next group..
+                # Recurse to check the next group...
                 if is_vert:
                     # We just jump to the same horizontal position.
                     item_ind %= self.item_width
@@ -1500,14 +1434,14 @@ class SelectorWin:
 
                 if not group_wid.visible:
                     # Hide everything!
-                    for item in items:
-                        item.set_pos()
+                    for item_id in items:
+                        self._id_to_button[item_id].place_forget()
                     continue
 
             # Place each item
-            for i, item in enumerate(items):
-                assert item.button is not None
-                if item in self.suggested:
+            for i, item_id in enumerate(items):
+                button = self._id_to_button[item_id]
+                if item_id in self.suggested:
                     # Reuse an existing suggested label.
                     try:
                         sugg_lbl = self._suggest_lbl[suggest_ind]
@@ -1534,11 +1468,12 @@ class SelectorWin:
                         x=(i % width) * ITEM_WIDTH + 1,
                         y=(i // width) * ITEM_HEIGHT + y_off,
                     )
-                    sugg_lbl['width'] = item.button.winfo_width()
-                item.set_pos(
+                    sugg_lbl['width'] = button.winfo_width()
+                button.place(
                     x=(i % width) * ITEM_WIDTH + 1,
                     y=(i // width) * ITEM_HEIGHT + y_off + 20,
                 )
+                button.lift()
 
             # Increase the offset by the total height of this item section
             y_off += math.ceil(len(items) / width) * ITEM_HEIGHT + 5
@@ -1551,9 +1486,11 @@ class SelectorWin:
         )
         self.pal_frame['height'] = y_off
 
-    def scroll_to(self, item: Item) -> None:
+    def scroll_to(self, item_id: utils.SpecialID) -> None:
         """Scroll to an item so it's visible."""
-        if item.button is None:
+        try:
+            button = self._id_to_button[item_id]
+        except KeyError:
             return  # Can't scroll to something that doesn't exist.
 
         canvas = self.wid_canvas
@@ -1566,7 +1503,7 @@ class SelectorWin:
         bottom *= height
         top *= height
 
-        y = item.button.winfo_y()
+        y = button.winfo_y()
 
         if bottom <= y - 8 and y + ICON_SIZE + 8 <= top:
             return  # Already in view
@@ -1576,17 +1513,6 @@ class SelectorWin:
             (y - (top - bottom) // 2)
             / height
         )
-
-    def __contains__(self, obj: str | Item) -> bool:
-        """Determine if the given SelWinItem or item ID is in this item list."""
-        if isinstance(obj, Item):
-            return obj in self.item_list
-        else:
-            item_id = utils.special_id(obj)
-            for item in self.item_list:
-                if item.id == item_id:
-                    return True
-            return False
 
     def is_suggested(self) -> bool:
         """Return whether the current item is a suggested one."""
@@ -1602,14 +1528,16 @@ class SelectorWin:
         # pointless.
         return self.suggested != [self.chosen.value]
 
-    # noinspection PyProtectedMember
-    def _set_context_font(self, item: Item, suggested: bool) -> None:
+    def _set_context_font(self, item_id: utils.SpecialID, suggested: bool) -> None:
         """Set the font of an item, and its parent group."""
-        if item._context_ind is None:
+        try:
+            menu_ind = self._menu_index[item_id]
+        except KeyError:
             return
         new_font = self.sugg_font if suggested else self.norm_font
-        if item.data.group_id:
-            group = self.group_widgets[item.data.group_id]
+        data = self._get_data(item_id)
+        if data.group_id:
+            group = self.group_widgets[data.group_id]
             menu = group.menu
 
             # Apply the font to the group header as well, if suggested.
@@ -1624,13 +1552,12 @@ class SelectorWin:
                 )
         else:
             menu = self.context_menu
-        menu.entryconfig(item._context_ind, font=new_font)
+        menu.entryconfig(menu_ind, font=new_font)
 
     def set_suggested(self, suggested: Container[str] = ()) -> None:
         """Set the suggested items to the set of IDs.
 
         If it is empty, the suggested ID will be cleared.
-        If "<NONE>" is present, the None item will be included.
         """
         self.suggested.clear()
         # Reset all the header fonts, if any item in that group is highlighted it'll
@@ -1640,14 +1567,12 @@ class SelectorWin:
             if header.menu_pos >= 0:
                 self.context_menu.entryconfig(header.menu_pos, font=self.norm_font)
 
-        self._set_context_font(self.noneItem, '<NONE>' in suggested)
-
-        for item in self.item_list:
-            if item.id in suggested:
-                self._set_context_font(item, True)
-                self.suggested.append(item)
+        for item_id in self.item_list:
+            if item_id in suggested:
+                self._set_context_font(item_id, True)
+                self.suggested.append(item_id)
             else:
-                self._set_context_font(item, False)
+                self._set_context_font(item_id, False)
 
         self.set_disp()  # Update the textbox if necessary.
         # Reposition all our items, but only if we're visible.

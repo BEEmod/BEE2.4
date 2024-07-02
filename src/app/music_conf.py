@@ -12,7 +12,7 @@ import srctools.logger
 import trio
 
 from app.SubPane import SubPane
-from app.selector_win import Item as SelItem, SelectorWin
+from app.selector_win import SelectorWin
 from config.gen_opts import GenOptions
 from consts import MusicChannel
 from packages import PackagesSet, Music, SelitemData, AttrDef
@@ -31,9 +31,7 @@ BTN_CONTRACT_HOVER = '▲'
 
 LOGGER = srctools.logger.get_logger(__name__)
 
-# On 3.8 the ParamSpec is invalid syntax
 WINDOWS: dict[MusicChannel, SelectorWin] = {}
-SEL_ITEMS: dict[str, SelItem] = {}
 # If the per-channel selector boxes are currently hidden.
 is_collapsed: bool = False
 
@@ -125,37 +123,23 @@ def export_data(packset: PackagesSet) -> dict[MusicChannel, Music | None]:
     return data
 
 
-
 async def make_widgets(
     core_nursery: trio.Nursery,
     packset: PackagesSet, frame: ttk.LabelFrame, pane: SubPane,
     *, task_status: trio.TaskStatus = trio.TASK_STATUS_IGNORED,
 ) -> None:
     """Generate the UI components, and return the base window."""
-
-    def for_channel(packset: PackagesSet, channel: MusicChannel) -> list[SelItem]:
-        """Get the items needed for a specific channel."""
-        music_list = []
-        for music in packset.all_obj(Music):
-            if music.provides_channel(channel):
-                selitem = SelItem.from_data(
-                    utils.obj_id(music.id),
-                    music.selitem_data,
-                )
-                music_list.append(selitem)
-        return music_list
-
     WINDOWS[MusicChannel.BASE] = await core_nursery.start(functools.partial(
         SelectorWin.create,
         TK_ROOT,
-        for_channel(packset, MusicChannel.BASE),
+        func_get_ids=Music.music_for_channel(MusicChannel.BASE),
+        func_get_data=Music.selector_data_getter(DATA_NONE_BASE),
         save_id='music_base',
         title=TransToken.ui('Select Background Music - Base'),
         desc=TransToken.ui(
             'This controls the background music used for a map. Expand the dropdown to set tracks '
             'for specific test elements.'
         ),
-        none_item=DATA_NONE_BASE,
         default_id=utils.obj_id('VALVE_PETI'),
         func_get_sample=Music.sample_getter_func(MusicChannel.BASE),
         sound_sys=filesystem,
@@ -171,11 +155,11 @@ async def make_widgets(
     WINDOWS[MusicChannel.TBEAM] = await core_nursery.start(functools.partial(
         SelectorWin.create,
         TK_ROOT,
-        for_channel(packset, MusicChannel.TBEAM),
+        func_get_ids=Music.music_for_channel(MusicChannel.TBEAM),
+        func_get_data=Music.selector_data_getter(DATA_NONE_FUNNEL),
         save_id='music_tbeam',
         title=TransToken.ui('Select Excursion Funnel Music'),
         desc=TransToken.ui('Set the music used while inside Excursion Funnels.'),
-        none_item=DATA_NONE_FUNNEL,
         func_get_sample=Music.sample_getter_func(MusicChannel.TBEAM),
         sound_sys=filesystem,
         func_get_attr=Music.get_funnel_selector_attrs,
@@ -187,11 +171,11 @@ async def make_widgets(
     WINDOWS[MusicChannel.BOUNCE] = await core_nursery.start(functools.partial(
         SelectorWin.create,
         TK_ROOT,
-        for_channel(packset, MusicChannel.BOUNCE),
+        func_get_ids=Music.music_for_channel(MusicChannel.BOUNCE),
+        func_get_data=Music.selector_data_getter(DATA_NONE_BOUNCE),
         save_id='music_bounce',
         title=TransToken.ui('Select Repulsion Gel Music'),
         desc=TransToken.ui('Select the music played when players jump on Repulsion Gel.'),
-        none_item=DATA_NONE_BOUNCE,
         func_get_sample=Music.sample_getter_func(MusicChannel.BOUNCE),
         sound_sys=filesystem,
     ))
@@ -199,11 +183,11 @@ async def make_widgets(
     WINDOWS[MusicChannel.SPEED] = await core_nursery.start(functools.partial(
         SelectorWin.create,
         TK_ROOT,
-        for_channel(packset, MusicChannel.SPEED),
+        func_get_ids=Music.music_for_channel(MusicChannel.SPEED),
+        func_get_data=Music.selector_data_getter(DATA_NONE_SPEED),
         save_id='music_speed',
         title=TransToken.ui('Select Propulsion Gel Music'),
         desc=TransToken.ui('Select music played when players have large amounts of horizontal velocity.'),
-        none_item=DATA_NONE_SPEED,
         func_get_sample=Music.sample_getter_func(MusicChannel.SPEED),
         sound_sys=filesystem,
     ))
@@ -292,19 +276,19 @@ async def make_widgets(
 
     async with aclosing(WINDOWS[MusicChannel.BASE].chosen.eventual_values()) as agen:
         task_status.started()
-        async for music_item in agen:
+        async for music_id in agen:
             """Callback for the selector windows.
 
             This saves into the config file the last selected item.
             """
             packset = packages.get_loaded_packages()
             # If collapsed, the hidden ones follow the base always.
-            set_suggested(packset, music_item.id)
+            set_suggested(packset, music_id)
 
             # If we have an instance, it's "custom" behaviour, so disable
             # all the sub-channels.
             try:
-                has_inst = bool(packset.obj_by_id(Music, music_item.id).inst)
+                has_inst = bool(packset.obj_by_id(Music, music_id).inst)
             except KeyError:  # <none>
                 has_inst = False
 

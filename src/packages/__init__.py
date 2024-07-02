@@ -4,9 +4,9 @@ Handles scanning through the zip packages to find all items, styles, etc.
 from __future__ import annotations
 
 from enum import Enum
-from typing import NoReturn, ClassVar, Self, cast
+from typing import Any, NoReturn, ClassVar, Self, cast
 
-from collections.abc import Collection, Iterable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Collection, Iterable, Iterator, Mapping, Sequence
 from collections import defaultdict
 from pathlib import Path
 import os
@@ -40,7 +40,7 @@ __all__ = [
     'OBJ_TYPES', 'PACK_CONFIG',
     'LegacyCorr', 'LEGACY_CORRIDORS',
     'CLEAN_PACKAGE', 'CLEAN_STYLE',
-    'PakObject', 'PackagesSet', 'get_loaded_packages', 'PakRef',
+    'PakObject', 'SelPakObject', 'PackagesSet', 'get_loaded_packages', 'PakRef',
     'find_packages', 'load_packages',
 
     # Selector win data structures.
@@ -198,19 +198,42 @@ class AttrDef:
 
 @attrs.frozen(kw_only=True)
 class SelitemData:
-    """Options which are displayed on the selector window."""
+    """Options which are displayed on the selector window.
+
+
+    - name: The full item name. This can be very long. If not set,
+      this will be the same as the short name.
+    - short_name: A shortened version of the full name. This should be <= 20
+      characters.
+    - context_lbl: The text shown on the rightclick menu. This is either
+      the short or long name, depending on the size of the long name.
+    - icon: The image handle for the item icon. The icon should be 96x96
+      pixels large.
+    - large_icon: If set, a different handle to use for the 192x192 icon.
+    - desc: A MarkdownData value containing the description.
+    - auth: A list of the item's authors.
+    - group: Items with the same group name will be shown together.
+    """
     name: TransToken  # Longer full name.
     short_name: TransToken  # Shorter name for the icon.
-    auth: frozenset[str]  # List of authors.
-    icon: img.Handle  # Small square icon.
-    large_icon: img.Handle  # Larger, landscape icon.
-    previews: Sequence[img.Handle]  # Full size images used for previews.
+    auth: frozenset[str]
+    icon: img.Handle
+    large_icon: img.Handle
+    previews: Sequence[img.Handle]
     desc: tkMarkdown.MarkdownData
     group: TransToken
     group_id: str
     sort_key: str
     # The packages used to define this, used for debugging.
     packages: frozenset[str] = attrs.Factory(frozenset)
+
+    @property
+    def context_lbl(self) -> TransToken:
+        """The text displayed on the rightclick menu."""
+        if len(self.name.token) > 20:
+            return self.short_name
+        else:
+            return self.name
 
     @classmethod
     def build(
@@ -412,7 +435,7 @@ CLEAN_PACKAGE = utils.obj_id('BEE2_CLEAN_STYLE')
 CLEAN_STYLE = utils.obj_id('BEE2_CLEAN')
 
 
-style_suggest_keys: dict[str, type[PakObject]] = {}
+style_suggest_keys: dict[str, type[SelPakObject]] = {}
 
 
 class PakObject:
@@ -434,28 +457,22 @@ class PakObject:
     _id_to_obj: ClassVar[dict[str, PakObject]]
     allow_mult: ClassVar[bool]
     needs_foreground: ClassVar[bool]
-    suggest_default: ClassVar[str]
 
     def __init_subclass__(
         cls,
         allow_mult: bool = False,
         needs_foreground: bool = False,
-        style_suggest_key: str = '',
-        suggest_default: str = '<NONE>',
     ) -> None:
         super().__init_subclass__()
+        if cls.__name__ == 'SelPakObject':
+            return  # Do not register this.
+
         OBJ_TYPES[cls.__name__.casefold()] = cls
 
         # Maps object IDs to the object.
         cls._id_to_obj = {}
         cls.allow_mult = allow_mult
         cls.needs_foreground = needs_foreground
-        if style_suggest_key:
-            assert style_suggest_key.casefold() not in style_suggest_keys
-            style_suggest_keys[style_suggest_key.casefold()] = cls
-            cls.suggest_default = suggest_default
-        else:
-            cls.suggest_default = ''
 
     def reference(self) -> PakRef[Self]:
         """Get a PakRef for this package object."""
@@ -491,6 +508,53 @@ class PakObject:
     async def post_parse(cls, packset: PackagesSet) -> None:
         """Do processing after all objects of this type have been fully parsed (but others may not)."""
         pass
+
+
+class SelPakObject(PakObject):
+    """Defines PakObjects which have SelItemData."""
+    suggest_default: ClassVar[str]
+
+    selitem_data: SelitemData
+
+    def __init_subclass__(
+        cls,
+        style_suggest_key: str = '',
+        suggest_default: str = '<NONE>',
+        **kwargs: Any,
+    ) -> None:
+        super().__init_subclass__(**kwargs)
+        if style_suggest_key:
+            assert style_suggest_key.casefold() not in style_suggest_keys
+            style_suggest_keys[style_suggest_key.casefold()] = cls
+            cls.suggest_default = suggest_default
+        else:
+            cls.suggest_default = ''
+
+    @classmethod
+    def selector_id_getter(cls, include_none: bool) -> Callable[[PackagesSet], Iterator[utils.SpecialID]]:
+        """Called by selector windows to get the current list of IDs for this item."""
+        def get_ids(packset: PackagesSet) -> Iterator[utils.SpecialID]:
+            """Fetch all IDs."""
+            if include_none:
+                yield utils.ID_NONE
+            for obj in packset.all_obj(cls):
+                yield utils.special_id(obj.id)
+        return get_ids
+
+    @classmethod
+    def selector_data_getter(cls, none_data: SelitemData | None) -> Callable[[PackagesSet, utils.SpecialID], SelitemData]:
+        """Produces a function which retrieves the data from this object type."""
+        def getter(packset: PackagesSet, item_id: utils.SpecialID) -> SelitemData:
+            """Fetch the data."""
+            if item_id == utils.ID_NONE and none_data is not None:
+                return none_data
+            elif utils.not_special_id(item_id):
+                return packset.obj_by_id(cls, item_id).selitem_data
+            else:
+                # Other special IDs are entirely prohibited.
+                LOGGER.warning('Invalid {} ID {!r}', cls.__name__, item_id)
+                return SEL_DATA_MISSING
+        return getter
 
 
 @attrs.frozen
@@ -1131,7 +1195,7 @@ class Package:
             return int(self.path.stat().st_mtime)
 
 
-class Style(PakObject, needs_foreground=True):
+class Style(SelPakObject, needs_foreground=True):
     """Represents a style, specifying the era a test was built in."""
     def __init__(
         self,
@@ -1139,7 +1203,7 @@ class Style(PakObject, needs_foreground=True):
         selitem_data: SelitemData,
         items: list[EditorItem],
         renderables: dict[RenderableType, Renderable],
-        suggested: dict[type[PakObject], set[str]],
+        suggested: dict[type[SelPakObject], set[str]],
         config: lazy_conf.LazyConf = lazy_conf.BLANK,
         base_style: str | None = None,
         has_video: bool = True,
@@ -1184,7 +1248,7 @@ class Style(PakObject, needs_foreground=True):
         items: list[EditorItem]
         renderables: dict[RenderableType, Renderable]
 
-        suggested: dict[type[PakObject], set[str]] = {
+        suggested: dict[type[SelPakObject], set[str]] = {
             pak_type: set()
             for pak_type in style_suggest_keys.values()
         }

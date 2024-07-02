@@ -5,7 +5,7 @@ import utils
 from quote_pack import Line, Quote, QuoteEvent, Group, QuoteInfo, Response, Monitor, RESPONSE_NAMES
 from transtoken import AppError, TransToken, TransTokenSource
 from packages import (
-    AttrMap, PackagesSet, PakObject, set_cond_source, ParseData, get_config,
+    AttrMap, PackagesSet, SelPakObject, set_cond_source, ParseData, get_config,
     SelitemData,
 )
 from srctools import Angle, Keyvalues, NoKeyError, logger
@@ -18,7 +18,7 @@ NONE_SELECTOR_ATTRS: AttrMap = {
 }
 
 
-class QuotePack(PakObject, needs_foreground=True, style_suggest_key='quote'):
+class QuotePack(SelPakObject, needs_foreground=True, style_suggest_key='quote'):
     """Adds lists of voice lines which are automatically chosen."""
     def __init__(
         self,

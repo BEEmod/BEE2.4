@@ -10,14 +10,14 @@ import srctools.logger
 import utils
 from app import lazy_conf
 from consts import MusicChannel
-from packages import AttrMap, PackagesSet, PakObject, ParseData, SelitemData, get_config
+from packages import AttrMap, PackagesSet, SelPakObject, ParseData, SelitemData, get_config
 from transtoken import TransTokenSource
 
 
 LOGGER = srctools.logger.get_logger(__name__)
 
 
-class Music(PakObject, needs_foreground=True, style_suggest_key='music'):
+class Music(SelPakObject, needs_foreground=True, style_suggest_key='music'):
     """Allows specifying background music for the map."""
     def __init__(
         self,
@@ -168,15 +168,6 @@ class Music(PakObject, needs_foreground=True, style_suggest_key='music'):
         """Yield all translation tokens used by this music."""
         yield from self.selitem_data.iter_trans_tokens('music/' + self.id)
 
-    def provides_channel(self, channel: MusicChannel) -> bool:
-        """Check if this music has this channel."""
-        if self.sound[channel]:
-            return True
-        if channel is MusicChannel.BASE and self.inst:
-            # The instance provides the base track.
-            return True
-        return False
-
     def has_channel(self, packset: PackagesSet, channel: MusicChannel) -> bool:
         """Check if this track or its children has a channel."""
         if self.sound[channel]:
@@ -242,6 +233,20 @@ class Music(PakObject, needs_foreground=True, style_suggest_key='music'):
                             other_id,
                             sorted(soundset)
                         )
+
+    @classmethod
+    def music_for_channel(cls, channel: MusicChannel) -> Callable[[PackagesSet], Iterator[utils.SpecialID]]:
+        """Return a callable which lists all music with the specified channel."""
+        def get_channels(packset: PackagesSet) -> Iterator[utils.SpecialID]:
+            """Return music with this channel."""
+            yield utils.ID_NONE
+            for music in packset.all_obj(cls):
+                if music.sound[channel]:
+                    yield utils.obj_id(music.id)
+                elif channel is MusicChannel.BASE and music.inst:
+                    # The instance provides the base track.
+                    yield utils.obj_id(music.id)
+        return get_channels
 
     @classmethod
     def get_base_selector_attrs(cls, packset: PackagesSet, music_id: utils.SpecialID) -> AttrMap:

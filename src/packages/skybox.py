@@ -4,13 +4,13 @@ from collections.abc import Iterator
 from srctools import Keyvalues
 
 from transtoken import TransTokenSource
-from packages import AttrMap, PackagesSet, PakObject, ParseData, SelitemData, get_config
+from packages import AttrMap, PackagesSet, SelPakObject, ParseData, SelitemData, get_config
 from app import lazy_conf
 import utils
 
 
 class Skybox(
-    PakObject,
+    SelPakObject,
     needs_foreground=True,
     style_suggest_key='skybox', suggest_default='SKY_BLACK',
 ):

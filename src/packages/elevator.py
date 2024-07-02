@@ -4,12 +4,12 @@ We can't pack BIKs, so this is mainly for Valve's existing ones.
 """
 from typing import Iterator, Optional
 
-from packages import PackagesSet, PakObject, ParseData, SelitemData, AttrMap
+from packages import PackagesSet, SelPakObject, ParseData, SelitemData, AttrMap
 from transtoken import TransTokenSource
 import utils
 
 
-class Elevator(PakObject, needs_foreground=True, style_suggest_key='elev'):
+class Elevator(SelPakObject, needs_foreground=True, style_suggest_key='elev'):
     """An elevator video definition.
 
     This is mainly defined just for Valve's items - you can't pack BIKs.

@@ -50,9 +50,7 @@ from app import (
     music_conf,
 )
 from app.errors import Result as ErrorResult
-from app.selector_win import (
-    Item as selWinItem, SelectorWin, AttrDef as SelAttr
-)
+from app.selector_win import SelectorWin, AttrDef as SelAttr
 from app.menu_bar import MenuBar
 from ui_tk.context_win import ContextWin
 from ui_tk.corridor_selector import TkSelector
@@ -70,7 +68,7 @@ skybox_win: SelectorWin
 voice_win: SelectorWin
 style_win: SelectorWin
 elev_win: SelectorWin
-suggest_windows: dict[type[packages.PakObject], SelectorWin] = {}
+suggest_windows: dict[type[packages.SelPakObject], SelectorWin] = {}
 
 context_win: ContextWin
 
@@ -476,42 +474,12 @@ async def load_packages(
     for item in packset.all_obj(packages.Item):
         item_list[item.id] = Item(item)
 
-    # Order packages by their original untranslated name.
-    name_getter = operator.attrgetter('selitem_data.name.token')
-
-    style_list = [
-        selWinItem.from_data(
-            utils.obj_id(style.id),
-            style.selitem_data,
-        ) for style in sorted(packset.all_obj(packages.Style), key=name_getter)
-    ]
-
-    voice_list = [
-        selWinItem.from_data(
-            utils.obj_id(voice.id),
-            voice.selitem_data,
-        ) for voice in sorted(packset.all_obj(packages.QuotePack), key=name_getter)
-    ]
-
-    sky_list = [
-        selWinItem.from_data(
-            utils.obj_id(sky.id),
-            sky.selitem_data,
-        ) for sky in sorted(packset.all_obj(packages.Skybox), key=name_getter)
-    ]
-
-    elev_list = [
-        selWinItem.from_data(
-            utils.obj_id(elev.id),
-            elev.selitem_data,
-        ) for elev in sorted(packset.all_obj(packages.Elevator), key=name_getter)
-    ]
-
     # Defaults match Clean Style, if not found it uses the first item.
     skybox_win = await core_nursery.start(functools.partial(
         SelectorWin.create,
         TK_ROOT,
-        sky_list,
+        func_get_ids=packages.Skybox.selector_id_getter(False),
+        func_get_data=packages.Skybox.selector_data_getter(None),
         save_id='skyboxes',
         title=TransToken.ui('Select Skyboxes'),
         desc=TransToken.ui(
@@ -520,7 +488,6 @@ async def load_packages(
             'color of "fog" (seen in larger chambers).'
         ),
         default_id=packages.CLEAN_STYLE,
-        none_item=None,
         attributes=[
             SelAttr.bool('3D', TransToken.ui('3D Skybox'), False),
             SelAttr.color('COLOR', TransToken.ui('Fog Color')),
@@ -530,7 +497,8 @@ async def load_packages(
     voice_win = await core_nursery.start(functools.partial(
         SelectorWin.create,
         TK_ROOT,
-        voice_list,
+        func_get_ids=packages.QuotePack.selector_id_getter(True),
+        func_get_data=packages.QuotePack.selector_data_getter(DATA_NO_VOICE),
         save_id='voicelines',
         title=TransToken.ui('Select Additional Voice Lines'),
         desc=TransToken.ui(
@@ -538,7 +506,6 @@ async def load_packages(
             'They are chosen based on which items are present in the map. The additional '
             '"Multiverse" Cave lines are controlled separately in Style Properties.'
         ),
-        none_item=DATA_NO_VOICE,
         default_id=utils.obj_id('BEE2_GLADOS_CLEAN'),
         func_get_attr=packages.QuotePack.get_selector_attrs,
         attributes=[
@@ -551,7 +518,8 @@ async def load_packages(
     style_win = await core_nursery.start(functools.partial(
         SelectorWin.create,
         TK_ROOT,
-        style_list,
+        func_get_ids=packages.Style.selector_id_getter(False),
+        func_get_data=packages.Style.selector_data_getter(None),
         save_id='styles',
         default_id=packages.CLEAN_STYLE,
         title=TransToken.ui('Select Style'),
@@ -561,7 +529,6 @@ async def load_packages(
             'settings.\n\nThe style broadly defines the time period a chamber is set in.'
         ),
         func_get_attr=packages.Style.get_selector_attrs,
-        none_item=None,
         has_def=False,
         # Selecting items changes much of the gui - don't allow when other
         # things are open...
@@ -575,7 +542,8 @@ async def load_packages(
     elev_win = await core_nursery.start(functools.partial(
         SelectorWin.create,
         TK_ROOT,
-        elev_list,
+        func_get_ids=packages.Elevator.selector_id_getter(True),
+        func_get_data=packages.Elevator.selector_data_getter(DATA_RAND_ELEV),
         save_id='elevators',
         title=TransToken.ui('Select Elevator Video'),
         desc=TransToken.ui(
@@ -586,7 +554,6 @@ async def load_packages(
         readonly_desc=TransToken.ui('This style does not have a elevator video screen.'),
         # i18n: Text when elevators are not present in the style.
         readonly_override=TransToken.ui('<Not Present>'),
-        none_item=DATA_RAND_ELEV,
         has_def=True,
         func_get_attr=packages.Elevator.get_selector_attrs,
         attributes=[
@@ -1083,7 +1050,7 @@ async def init_option(
     def configure_voice() -> None:
         """Open the voiceEditor window to configure a Quote Pack."""
         try:
-            chosen_voice = packages.get_loaded_packages().obj_by_id(packages.QuotePack, voice_win.chosen.value.id)
+            chosen_voice = packages.get_loaded_packages().obj_by_id(packages.QuotePack, voice_win.chosen.value)
         except KeyError:
             pass
         else:
@@ -1142,12 +1109,11 @@ async def init_option(
 
     async def voice_conf_task() -> None:
         """Turn the configuration button off when no voice is selected."""
-        voice: selWinItem
         async with aclosing(voice_win.chosen.eventual_values()) as agen:
-            async for voice in agen:
+            async for voice_id in agen:
                 # This might be open, so force-close it to ensure it isn't corrupt...
                 voiceEditor.save()
-                if voice.id == utils.ID_NONE:
+                if voice_id == utils.ID_NONE:
                     btn_conf_voice.state(['disabled'])
                     tk_img.apply(btn_conf_voice, ICO_GEAR_DIS)
                 else:
@@ -1707,17 +1673,16 @@ async def init_windows(
 
     async def style_select_callback() -> None:
         """Callback whenever a new style is chosen."""
-        style_item: selWinItem
         async with aclosing(style_win.chosen.eventual_values()) as agen:
-            async for style_item in agen:
+            async for style_id in agen:
                 packset = packages.get_loaded_packages()
                 global selected_style
-                if style_item.id == utils.ID_NONE:
+                if style_id == utils.ID_NONE:
                     LOGGER.warning('Style ID is None??')
                     style_win.choose_item(style_win.item_list[0])
                     continue
 
-                selected_style = utils.obj_id(style_item.id)
+                selected_style = utils.obj_id(style_id)
                 ref = packages.PakRef(packages.Style, selected_style)
 
                 style_obj = current_style()
