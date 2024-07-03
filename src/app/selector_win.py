@@ -17,6 +17,7 @@ from enum import Enum
 import functools
 import math
 import random
+from typing import Self
 
 from srctools import Vec, EmptyMapping
 from srctools.filesys import FileSystemChain
@@ -124,7 +125,7 @@ async def _store_results_task(chosen: AsyncValue[utils.SpecialID], save_id: str)
 
 class GroupHeader(tk_tools.LineHeader):
     """The widget used for group headers."""
-    def __init__(self, win: SelectorWin, title: TransToken, menu: tk.Menu) -> None:
+    def __init__(self, win: SelectorWinBase, title: TransToken, menu: tk.Menu) -> None:
         self.parent = win
         self.menu = menu  # The rightclick cascade widget.
         self.menu_pos = -1
@@ -202,7 +203,7 @@ class PreviewWindow:
         self.win.columnconfigure(1, weight=1)
         self.win.rowconfigure(0, weight=1)
 
-        self.parent: SelectorWin | None = None
+        self.parent: SelectorWinBase | None = None
 
         self.prev_btn = ttk.Button(
             self.win, text=BTN_PREV, command=functools.partial(self.cycle, -1))
@@ -212,7 +213,7 @@ class PreviewWindow:
         self.img = ()
         self.index = 0
 
-    def show(self, parent: SelectorWin, data: SelitemData) -> None:
+    def show(self, parent: SelectorWinBase, data: SelitemData) -> None:
         """Show the window."""
         self.win.transient(parent.win)
         set_win_title(self.win, TRANS_PREVIEW_TITLE.format(item=data.name))
@@ -252,7 +253,7 @@ class PreviewWindow:
 _PREVIEW = PreviewWindow()
 
 
-class SelectorWin:
+class SelectorWinBase:
     """The selection window for skyboxes, music, goo and voice packs.
 
     Optionally an aditional 'None' item can be added, which indicates
@@ -391,7 +392,7 @@ class SelectorWin:
         readonly_override: TransToken | None = None,
         attributes: Iterable[AttrDef] = (),
         func_get_attr: GetterFunc[AttrMap] = lambda packset, item_id: EmptyMapping,
-        task_status: trio.TaskStatus[SelectorWin],
+        task_status: trio.TaskStatus[Self],
     ) -> None:
         """Create a selector window object.
 
@@ -915,7 +916,7 @@ class SelectorWin:
             await trio.lowlevel.checkpoint()
             button = ttk.Button(self.pal_frame)
             tk_tools.bind_leftclick(button, functools.partial(
-                SelectorWin._evt_button_click, self, len(self._item_buttons),
+                type(self)._evt_button_click, self, len(self._item_buttons),
             ))
             self._item_buttons.append(button)
 

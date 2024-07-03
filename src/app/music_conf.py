@@ -12,11 +12,11 @@ import srctools.logger
 import trio
 
 from app.SubPane import SubPane
-from app.selector_win import SelectorWin
 from config.gen_opts import GenOptions
 from consts import MusicChannel
-from packages import PackagesSet, Music, SelitemData, AttrDef, TRANS_OBJ_NOT_FOUND
-from transtoken import AppError, TransToken
+from packages import PackagesSet, Music, SelitemData, AttrDef
+from transtoken import TransToken
+from ui_tk.selector_win import SelectorWin
 from ui_tk.wid_transtoken import set_text
 from ui_tk import TK_ROOT
 import config

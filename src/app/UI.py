@@ -50,8 +50,8 @@ from app import (
     music_conf,
 )
 from app.errors import Result as ErrorResult
-from app.selector_win import SelectorWin, AttrDef as SelAttr
 from app.menu_bar import MenuBar
+from ui_tk.selector_win import SelectorWin, AttrDef as SelAttr
 from ui_tk.context_win import ContextWin
 from ui_tk.corridor_selector import TkSelector
 from ui_tk.dialogs import DIALOG, TkDialogs
