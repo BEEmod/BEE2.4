@@ -884,7 +884,7 @@ class SelectorWin:
         for button in self._item_buttons:
             button.place_forget()
 
-        while len(self.item_list) < len(self._item_buttons):
+        while len(self._item_buttons) < len(self.item_list):
             button = ttk.Button(self.pal_frame)
             tk_tools.bind_leftclick(button, functools.partial(
                 SelectorWin._evt_button_click, self, len(self._item_buttons),
@@ -922,7 +922,7 @@ class SelectorWin:
                 value=item_id,
             )
             set_menu_text(group.menu, data.context_lbl)
-            menu_pos = self.context_menu.index('end')
+            menu_pos = group.menu.index('end')
             assert menu_pos is not None, "Didn't add to the menu?"
             self._menu_index[item_id] = menu_pos
 
