@@ -51,7 +51,7 @@ from app import (
 )
 from app.errors import Result as ErrorResult
 from app.menu_bar import MenuBar
-from ui_tk.selector_win import SelectorWin, AttrDef as SelAttr
+from ui_tk.selector_win import SelectorWin, AttrDef as SelAttr, Options as SelectorOptions
 from ui_tk.context_win import ContextWin
 from ui_tk.corridor_selector import TkSelector
 from ui_tk.dialogs import DIALOG, TkDialogs
@@ -476,9 +476,7 @@ async def load_packages(
         item_list[item.id] = Item(item)
 
     # Defaults match Clean Style, if not found it uses the first item.
-    skybox_win = await core_nursery.start(functools.partial(
-        SelectorWin.create,
-        TK_ROOT,
+    skybox_win = SelectorWin(TK_ROOT, SelectorOptions(
         func_get_ids=packages.Skybox.selector_id_getter(False),
         func_get_data=packages.Skybox.selector_data_getter(None),
         save_id='skyboxes',
@@ -494,10 +492,9 @@ async def load_packages(
             SelAttr.color('COLOR', TransToken.ui('Fog Color')),
         ],
     ))
+    core_nursery.start_soon(skybox_win.task)
 
-    voice_win = await core_nursery.start(functools.partial(
-        SelectorWin.create,
-        TK_ROOT,
+    voice_win = SelectorWin(TK_ROOT, SelectorOptions(
         func_get_ids=packages.QuotePack.selector_id_getter(True),
         func_get_data=packages.QuotePack.selector_data_getter(DATA_NO_VOICE),
         save_id='voicelines',
@@ -515,10 +512,9 @@ async def load_packages(
             SelAttr.bool('MONITOR', TransToken.ui('Monitor Visuals'), False),
         ],
     ))
+    core_nursery.start_soon(voice_win.task)
 
-    style_win = await core_nursery.start(functools.partial(
-        SelectorWin.create,
-        TK_ROOT,
+    style_win = SelectorWin(TK_ROOT, SelectorOptions(
         func_get_ids=packages.Style.selector_id_getter(False),
         func_get_data=packages.Style.selector_data_getter(None),
         save_id='styles',
@@ -539,10 +535,9 @@ async def load_packages(
             SelAttr.string('CORR_OPTS', TransToken.ui('Corridor')),
         ]
     ))
+    core_nursery.start_soon(style_win.task)
 
-    elev_win = await core_nursery.start(functools.partial(
-        SelectorWin.create,
-        TK_ROOT,
+    elev_win = SelectorWin(TK_ROOT, SelectorOptions(
         func_get_ids=packages.Elevator.selector_id_getter(True),
         func_get_data=packages.Elevator.selector_data_getter(DATA_RAND_ELEV),
         save_id='elevators',
@@ -561,6 +556,7 @@ async def load_packages(
             SelAttr.bool('ORIENT', TransToken.ui('Multiple Orientations')),
         ]
     ))
+    core_nursery.start_soon(elev_win.task)
 
     suggest_windows[packages.QuotePack] = voice_win
     suggest_windows[packages.Skybox] = skybox_win

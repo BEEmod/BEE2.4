@@ -19,6 +19,7 @@ import math
 import random
 from typing import Self
 
+import attrs
 from srctools import Vec, EmptyMapping
 from srctools.filesys import FileSystemChain
 
@@ -37,7 +38,7 @@ from consts import (
     SEL_ICON_SIZE as ICON_SIZE,
     SEL_ICON_SIZE_LRG as ICON_SIZE_LRG,
 )
-from transtoken import CURRENT_LANG, TransToken
+from transtoken import TransToken
 from config.last_sel import LastSelected
 from config.windows import SelectorState
 import utils
@@ -253,25 +254,65 @@ class PreviewWindow:
 _PREVIEW = PreviewWindow()
 
 
+@attrs.frozen(kw_only=True)
+class Options:
+    """Creation options for selector windows.
+
+    - parent: Must be a Toplevel window, either the tk() root or another
+    window if needed.
+    - func_get_data: Function to get the data for an ID. Should fetch a cached result, will
+      be called for every item.
+    - func_get_ids: Called to retrieve the list of item IDs.
+    - save_id: The ID used to save/load the window state.
+    - store_last_selected: If set, save/load the selected ID.
+    - lst: A list of Item objects, defining the visible items.
+    - If `has_def` is True, the 'Reset to Default' button will appear,
+      which resets to the suggested item.
+    - `default_id` is the item to initially select, if no previous one is set.
+    - If snd_sample_sys is set, a '>' button will appear next to names
+      to play the associated audio sample for the item.
+      The value should be a FileSystem to look for samples in.
+    - title is the title of the selector window.
+    - full_context controls if the short or long names are used for the
+      context menu.
+    - attributes is a list of AttrDef tuples.
+      Each tuple should contain an ID, display text, and default value.
+      If the values are True or False a check/cross will be displayed,
+      otherwise they're a string.
+    - desc is descriptive text to display on the window, and in the widget
+      tooltip.
+    - readonly_desc will be displayed on the widget tooltip when readonly.
+    - readonly_override, if set will override the textbox when readonly.
+    - modal: If True, the window will block others while open.
+    """
+    func_get_data: GetterFunc[SelitemData]
+    func_get_ids: Callable[[packages.PackagesSet], Iterable[utils.SpecialID]]
+    save_id: str  # Required!
+    store_last_selected: bool = True
+    has_def: bool = True
+    sound_sys: FileSystemChain | None = None
+    func_get_sample: GetterFunc[str] | None = None
+    modal: bool = False
+    default_id: utils.SpecialID = utils.ID_NONE
+    title: TransToken = TransToken.untranslated('???')
+    desc: TransToken = TransToken.BLANK
+    readonly_desc: TransToken = TransToken.BLANK
+    readonly_override: TransToken | None = None
+    attributes: Iterable[AttrDef] = ()
+    func_get_attr: GetterFunc[AttrMap] = lambda packset, item_id: EmptyMapping
+
+
 class SelectorWinBase:
     """The selection window for skyboxes, music, goo and voice packs.
 
-    Optionally an aditional 'None' item can be added, which indicates
-    that no item is to be used.
-    The string "<NONE>" is used for the none item's ID.
-
     Attributes:
-    - chosen_id: The currently-selected item ID. If set to None, the
-      None Item is chosen.
     - chosen: The currently-selected item.
     - selected: The item currently selected in the window, not the actually chosen one.
-
-    - wid: The Toplevel window for this selector dialog.
     - suggested: The Item which is suggested by the style.
     """
     # Callback functions used to retrieve the data for the window.
     func_get_attr: GetterFunc[AttrMap]
-    func_get_data: GetterFunc[SelitemData]  # TODO: Maybe auto-catch KeyError for this to simplify user code?
+    func_get_data: GetterFunc[SelitemData]
     func_get_sample: GetterFunc[str] | None
     func_get_ids: Callable[[packages.PackagesSet], Iterable[utils.SpecialID]]
 
@@ -372,72 +413,20 @@ class SelectorWinBase:
     # The widget used to control which menu option is selected.
     context_var: tk.StringVar
 
-    @classmethod
-    async def create(
-        cls,
+    def __init__(
+        self,
         parent: tk.Tk | tk.Toplevel,
-        *,  # Make all keyword-only for readability
-        func_get_data: GetterFunc[SelitemData],
-        func_get_ids: Callable[[packages.PackagesSet], Iterable[utils.SpecialID]],
-        save_id: str,  # Required!
-        store_last_selected: bool = True,
-        has_def: bool = True,
-        sound_sys: FileSystemChain | None = None,
-        func_get_sample: GetterFunc[str] | None = None,
-        modal: bool = False,
-        default_id: utils.SpecialID = utils.ID_NONE,
-        title: TransToken = TransToken.untranslated('???'),
-        desc: TransToken = TransToken.BLANK,
-        readonly_desc: TransToken = TransToken.BLANK,
-        readonly_override: TransToken | None = None,
-        attributes: Iterable[AttrDef] = (),
-        func_get_attr: GetterFunc[AttrMap] = lambda packset, item_id: EmptyMapping,
-        task_status: trio.TaskStatus[Self],
+        opt: Options,
     ) -> None:
-        """Create a selector window object.
-
-        Read from .selected_id to get the currently-chosen Item name, or None
-        if the <none> Item is selected.
-        Args:
-        - parent: Must be a Toplevel window, either the tk() root or another
-        window if needed.
-        - func_get_data: Function to get the data for an ID. Should fetch a cached result, will
-          be called for every item.
-        - func_get_ids: Called to retrieve the list of item IDs.
-        - save_id: The ID used to save/load the window state.
-        - store_last_selected: If set, save/load the selected ID.
-        - lst: A list of Item objects, defining the visible items.
-        - If `has_def` is True, the 'Reset to Default' button will appear,
-          which resets to the suggested item.
-        - `default_id` is the item to initially select, if no previous one is set.
-        - If snd_sample_sys is set, a '>' button will appear next to names
-          to play the associated audio sample for the item.
-          The value should be a FileSystem to look for samples in.
-        - title is the title of the selector window.
-        - full_context controls if the short or long names are used for the
-          context menu.
-        - attributes is a list of AttrDef tuples.
-          Each tuple should contain an ID, display text, and default value.
-          If the values are True or False a check/cross will be displayed,
-          otherwise they're a string.
-        - desc is descriptive text to display on the window, and in the widget
-          tooltip.
-        - readonly_desc will be displayed on the widget tooltip when readonly.
-        - readonly_override, if set will override the textbox when readonly.
-        - modal: If True, the window will block others while open.
-        """
-        self = cls()
-
-        # self.noneItem.context_lbl = self.noneItem.data.name
-        self.func_get_attr = func_get_attr
-        self.func_get_sample = func_get_sample
-        self.func_get_data = func_get_data
-        self.func_get_ids = func_get_ids
+        self.func_get_attr = opt.func_get_attr
+        self.func_get_sample = opt.func_get_sample
+        self.func_get_data = opt.func_get_data
+        self.func_get_ids = opt.func_get_ids
 
         self.parent = parent
         self._readonly = False
         self._loading = True
-        self.modal = modal
+        self.modal = opt.modal
 
         # The textbox on the parent window.
         self.display = None
@@ -456,28 +445,28 @@ class SelectorWinBase:
         self._suggest_lbl = []
 
         # Should we have the 'reset to default' button?
-        self.has_def = has_def
-        self.description = desc
-        self.readonly_description = readonly_desc
-        self.readonly_override = readonly_override
+        self.has_def = opt.has_def
+        self.description = opt.desc
+        self.readonly_description = opt.readonly_desc
+        self.readonly_override = opt.readonly_override
 
         prev_state = config.APP.get_cur_conf(
             LastSelected,
-            save_id,
-            default=LastSelected(default_id),
+            opt.save_id,
+            default=LastSelected(opt.default_id),
         )
-        if store_last_selected:
-            config.APP.store_conf(prev_state, save_id)
+        if opt.store_last_selected:
+            config.APP.store_conf(prev_state, opt.save_id)
 
         self.selected = prev_state.id
         self.chosen = AsyncValue(self.selected)
 
         self._packset = packages.PackagesSet()
 
-        self.win = tk.Toplevel(parent, name='selwin_' + save_id)
+        self.win = tk.Toplevel(parent, name='selwin_' + opt.save_id)
         self.win.withdraw()
         self.win.transient(master=parent)
-        set_win_title(self.win, TRANS_WINDOW_TITLE.format(subtitle=title))
+        set_win_title(self.win, TRANS_WINDOW_TITLE.format(subtitle=opt.title))
 
         self.item_list = []
         self._item_buttons = []
@@ -509,8 +498,8 @@ class SelectorWinBase:
         self.item_width = 1
 
         # The ID used to persist our window state across sessions.
-        self.save_id = save_id.casefold()
-        self.store_last_selected = store_last_selected
+        self.save_id = opt.save_id.casefold()
+        self.store_last_selected = opt.store_last_selected
         # Indicate that flow_items() should restore state.
         self.first_open = True
 
@@ -522,7 +511,7 @@ class SelectorWinBase:
             width=5,  # Keep a small width, so this doesn't affect the
             # initial window size.
         )
-        set_text(self.desc_label, desc)
+        set_text(self.desc_label, opt.desc)
         self.desc_label.grid(row=0, column=0, sticky='EW')
 
         # PanedWindow allows resizing the two areas independently.
@@ -597,7 +586,7 @@ class SelectorWinBase:
         self.prop_name.grid(row=0, column=0, sticky='ew')
 
         # For music items, add a '>' button to play sound samples
-        if sound_sys is not None and sound.has_sound() and func_get_sample is not None:
+        if opt.sound_sys is not None and sound.has_sound() and opt.func_get_sample is not None:
             self.samp_button = samp_button = ttk.Button(
                 name_frame,
                 name='sample_button',
@@ -607,7 +596,7 @@ class SelectorWinBase:
             samp_button.grid(row=0, column=1)
             add_tooltip(samp_button, TransToken.ui("Play a sample of this item."))
 
-            self.sampler = sound.SamplePlayer(system=sound_sys)
+            self.sampler = sound.SamplePlayer(system=opt.sound_sys)
             samp_button['command'] = self.sampler.play_sample
             samp_button.state(('disabled',))
         else:
@@ -708,7 +697,7 @@ class SelectorWinBase:
         )
 
         # Wide before short.
-        self.attrs = sorted(attributes, key=lambda at: 0 if at.type.is_wide else 1)
+        self.attrs = sorted(opt.attributes, key=lambda at: 0 if at.type.is_wide else 1)
         self.attr_labels = {}
         if self.attrs:
             attrs_frame = ttk.Frame(self.prop_frm)
@@ -767,15 +756,15 @@ class SelectorWinBase:
         self.set_disp()
         self.wid_canvas.bind("<Configure>", self.flow_items)
 
+    async def task(self) -> None:
+        """This must be run to make the window operational."""
         async with trio.open_nursery() as nursery:
             nursery.start_soon(self._load_data_task)
-            if self.sampler is not None and samp_button is not None:
-                nursery.start_soon(_update_sampler_task, self.sampler, samp_button)
+            if self.sampler is not None and self.samp_button is not None:
+                nursery.start_soon(_update_sampler_task, self.sampler, self.samp_button)
             if self.store_last_selected:
                 nursery.start_soon(self._load_selected_task)
                 nursery.start_soon(_store_results_task, self.chosen, self.save_id)
-
-            task_status.started(self)
 
     def __repr__(self) -> str:
         return f'<SelectorWin "{self.save_id}">'

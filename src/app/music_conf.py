@@ -16,7 +16,7 @@ from config.gen_opts import GenOptions
 from consts import MusicChannel
 from packages import PackagesSet, Music, SelitemData, AttrDef
 from transtoken import TransToken
-from ui_tk.selector_win import SelectorWin
+from ui_tk.selector_win import SelectorWin, Options as SelectorOptions
 from ui_tk.wid_transtoken import set_text
 from ui_tk import TK_ROOT
 import config
@@ -97,7 +97,7 @@ def set_suggested(packset: PackagesSet, music_id: utils.SpecialID) -> None:
 
 def export_data(packset: PackagesSet) -> dict[MusicChannel, utils.SpecialID]:
     """Return the data used to export this."""
-    base_id = WINDOWS[MusicChannel.BASE].chosen_id
+    base_id = WINDOWS[MusicChannel.BASE].chosen.value
     if base_id == utils.ID_NONE:
         base_track = None
     else:
@@ -120,7 +120,7 @@ def export_data(packset: PackagesSet) -> dict[MusicChannel, utils.SpecialID]:
             else:
                 mus_id = utils.ID_NONE
         else:
-            mus_id = win.chosen_id
+            mus_id = win.chosen.value
         data[channel] = mus_id
     return data
 
@@ -131,9 +131,7 @@ async def make_widgets(
     *, task_status: trio.TaskStatus = trio.TASK_STATUS_IGNORED,
 ) -> None:
     """Generate the UI components, and return the base window."""
-    WINDOWS[MusicChannel.BASE] = await core_nursery.start(functools.partial(
-        SelectorWin.create,
-        TK_ROOT,
+    WINDOWS[MusicChannel.BASE] = SelectorWin(TK_ROOT, SelectorOptions(
         func_get_ids=Music.music_for_channel(MusicChannel.BASE),
         func_get_data=Music.selector_data_getter(DATA_NONE_BASE),
         save_id='music_base',
@@ -154,9 +152,7 @@ async def make_widgets(
         ],
     ))
 
-    WINDOWS[MusicChannel.TBEAM] = await core_nursery.start(functools.partial(
-        SelectorWin.create,
-        TK_ROOT,
+    WINDOWS[MusicChannel.TBEAM] = SelectorWin(TK_ROOT, SelectorOptions(
         func_get_ids=Music.music_for_channel(MusicChannel.TBEAM),
         func_get_data=Music.selector_data_getter(DATA_NONE_FUNNEL),
         save_id='music_tbeam',
@@ -170,9 +166,7 @@ async def make_widgets(
         ],
     ))
 
-    WINDOWS[MusicChannel.BOUNCE] = await core_nursery.start(functools.partial(
-        SelectorWin.create,
-        TK_ROOT,
+    WINDOWS[MusicChannel.BOUNCE] = SelectorWin(TK_ROOT, SelectorOptions(
         func_get_ids=Music.music_for_channel(MusicChannel.BOUNCE),
         func_get_data=Music.selector_data_getter(DATA_NONE_BOUNCE),
         save_id='music_bounce',
@@ -182,9 +176,7 @@ async def make_widgets(
         sound_sys=filesystem,
     ))
 
-    WINDOWS[MusicChannel.SPEED] = await core_nursery.start(functools.partial(
-        SelectorWin.create,
-        TK_ROOT,
+    WINDOWS[MusicChannel.SPEED] = SelectorWin(TK_ROOT, SelectorOptions(
         func_get_ids=Music.music_for_channel(MusicChannel.SPEED),
         func_get_data=Music.selector_data_getter(DATA_NONE_SPEED),
         save_id='music_speed',
@@ -193,6 +185,8 @@ async def make_widgets(
         func_get_sample=Music.sample_getter_func(MusicChannel.SPEED),
         sound_sys=filesystem,
     ))
+    for win in WINDOWS.values():
+        core_nursery.start_soon(win.task)
 
     assert set(WINDOWS.keys()) == set(MusicChannel), "Extra channels?"
 
@@ -217,7 +211,7 @@ async def make_widgets(
         # Set all music to the children - so those are used.
         set_suggested(
             packages.get_loaded_packages(),
-            WINDOWS[MusicChannel.BASE].chosen_id,
+            WINDOWS[MusicChannel.BASE].chosen.value,
         )
 
         for wid in exp_widgets:

@@ -14,9 +14,9 @@ from . import TK_ROOT
 
 __all__ = [
     'TransToken', 'CURRENT_LANG',  # Re-exports
-    'set_text', 'set_win_title', 'set_menu_text', 'clear_stored_menu',
+    'set_text', 'set_win_title', 'set_stringvar',
+    'set_menu_text', 'clear_stored_menu',
 ]
-
 
 
 # Widgets that have a 'text' property.
