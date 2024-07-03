@@ -154,6 +154,7 @@ class ErrorUI:
 
         if isinstance(exc_val, AppError):
             self._errors.append(exc_val)
+            exc_val.fatal = True
             exc_val = None
         elif isinstance(exc_val, BaseExceptionGroup):
             matching, rest = exc_val.split(AppError)

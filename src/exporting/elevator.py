@@ -1,6 +1,7 @@
 """Export selected elevator videos."""
+from transtoken import AppError
 from . import ExportData, STEPS, StepResource
-from packages import Elevator
+from packages import Elevator, TRANS_OBJ_NOT_FOUND
 import utils
 
 
@@ -15,7 +16,7 @@ async def step_elevator_video(exp_data: ExportData) -> None:
         try:
             elevator = exp_data.packset.obj_by_id(Elevator, sel_id)
         except KeyError:
-            raise Exception(f"Selected elevator ({exp_data.selected}) doesn't exist?") from None
+            raise AppError(TRANS_OBJ_NOT_FOUND.format(object="Elevator", id=sel_id)) from None
 
     if exp_data.selected_style.has_video:
         if elevator is None:

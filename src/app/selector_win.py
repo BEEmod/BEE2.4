@@ -1231,7 +1231,14 @@ class SelectorWin:
                 self.prop_reset.state(('disabled',))
 
         # Set the attribute items.
-        item_attrs = self.func_get_attr(self._packset, item_id)
+        try:
+            item_attrs = self.func_get_attr(self._packset, item_id)
+        except KeyError:
+            LOGGER.warning(
+                'Selectorwin {}: item {} did not exist when fetching attributes?',
+                self.save_id, item_id,
+            )
+            item_attrs = EmptyMapping
         for attr in self.attrs:
             val = item_attrs.get(attr.id, attr.default)
             attr_label = self.attr_labels[attr.id]

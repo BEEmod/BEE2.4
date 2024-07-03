@@ -8,9 +8,10 @@ import trio
 from srctools import Vec
 
 from exporting import ExportData, STEPS, StepResource
-from packages import QuotePack
+from packages import QuotePack, TRANS_OBJ_NOT_FOUND
 from quote_pack import QuoteInfo
 import utils
+from transtoken import AppError
 
 
 if TYPE_CHECKING:
@@ -54,7 +55,7 @@ async def step_quote_pack(exp_data: ExportData) -> None:
     try:
         voice = exp_data.packset.obj_by_id(QuotePack, sel_id)
     except KeyError:
-        raise Exception(f"Selected voice ({sel_id}) doesn't exist?") from None
+        raise AppError(TRANS_OBJ_NOT_FOUND.format(object="Voice", id=sel_id)) from None
 
     exp_data.vbsp_conf += voice.config
     await write_data(exp_data.game, voice.data)

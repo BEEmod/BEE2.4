@@ -53,6 +53,8 @@ __all__ = [
     # Mainly intended for package object code.
     'ParseData', 'reraise_keyerror', 'get_config', 'set_cond_source',
     'parse_multiline_key', 'desc_parse', 'sep_values',
+
+    'TRANS_OBJ_NOT_FOUND',
 ]
 
 LOGGER = srctools.logger.get_logger(__name__, alias='packages')
@@ -98,6 +100,9 @@ TRANS_OLD_TEMPLATEBRUSH = TransToken.ui(
 )
 TRANS_NO_OBJ_ID = TransToken.ui(
     'No ID defined for "{obj_type}" object type in "{pak_id}" package!'
+)
+TRANS_OBJ_NOT_FOUND = TransToken.ui(
+    'Definition for {object} object "{id}" was not found. Check for missing packages.'
 )
 TRANS_DUPLICATE_PAK_ID = TransToken.ui(
     'Duplicate package with id "{pak_id}"!\n'

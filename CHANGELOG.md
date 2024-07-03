@@ -1,7 +1,12 @@
 # Changelog
 
 # Version (dev)
+
+### Enhancements
 * #573: Show filename in tooltip for custom screenshots.
+* The app is now able to handle having music, voicelines etc selected that 
+  aren't defined in loaded packages. Exporting will fail, but no crash will
+  occur and the selection will still be saved.
 
 ### Bugfixes:
 * The case where no voicelines are set is once again handled correctly.

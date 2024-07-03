@@ -106,6 +106,7 @@ TRANS_EXPORTED = TransToken.ui('Selected Items and Style successfully exported!'
 TRANS_EXPORTED_TITLE = TransToken.ui('BEE2 - Export Complete')
 TRANS_MAIN_TITLE = TransToken.ui('BEEMOD {version} - {game}')
 TRANS_ERROR = TransToken.untranslated('???')
+TRANS_EXPORT_MISSING_STYLE = TransToken.ui('Could not export: Style "{style}" does not exist!')
 
 
 DATA_NO_VOICE = packages.SelitemData.build(
@@ -566,11 +567,6 @@ async def load_packages(
     suggest_windows[packages.Elevator] = elev_win
 
 
-def current_style() -> packages.Style:
-    """Return the currently selected style."""
-    return packages.get_loaded_packages().obj_by_id(packages.Style, selected_style)
-
-
 def reposition_panes() -> None:
     """Position all the panes in the default places around the main window."""
     comp_win = CompilerPane.window
@@ -636,8 +632,6 @@ async def export_editoritems(
     bar.set_export_allowed(False)
     try:
         await tk_tools.wait_eventloop()
-        # Convert IntVar to boolean, and only export values in the selected style
-        chosen_style = current_style()
 
         # The chosen items on the palette.
         pal_data: paletteUI.ItemPos = {
@@ -652,6 +646,11 @@ async def export_editoritems(
 
         conf = config.APP.get_cur_conf(config.gen_opts.GenOptions)
         packset = packages.get_loaded_packages()
+        try:
+            chosen_style = packset.obj_by_id(packages.Style, selected_style)
+        except KeyError:
+            await dialog.show_info(TRANS_EXPORT_MISSING_STYLE.format(style=selected_style))
+            return
 
         export_trig.trigger(exporting.ExportInfo(
             gameMan.selected_game,
@@ -660,9 +659,9 @@ async def export_editoritems(
             selected_objects={
                 # Specify the 'chosen item' for each object type
                 packages.Music: music_conf.export_data(packset),
-                packages.Skybox: skybox_win.chosen_id,
-                packages.QuotePack: voice_win.chosen_id,
-                packages.Elevator: elev_win.chosen_id,
+                packages.Skybox: skybox_win.chosen.value,
+                packages.QuotePack: voice_win.chosen.value,
+                packages.Elevator: elev_win.chosen.value,
 
                 packages.Item: pal_by_item,
                 packages.StyleVar: StyleVarPane.export_data(chosen_style),
@@ -1685,7 +1684,7 @@ async def init_windows(
                 selected_style = utils.obj_id(style_id)
                 ref = packages.PakRef(packages.Style, selected_style)
 
-                style_obj = current_style()
+                style_obj = ref.resolve(packset)
                 for item in item_list.values():
                     item.load_data()
                 refresh_palette_icons()

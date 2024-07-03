@@ -15,8 +15,8 @@ from app.SubPane import SubPane
 from app.selector_win import SelectorWin
 from config.gen_opts import GenOptions
 from consts import MusicChannel
-from packages import PackagesSet, Music, SelitemData, AttrDef
-from transtoken import TransToken
+from packages import PackagesSet, Music, SelitemData, AttrDef, TRANS_OBJ_NOT_FOUND
+from transtoken import AppError, TransToken
 from ui_tk.wid_transtoken import set_text
 from ui_tk import TK_ROOT
 import config
@@ -95,15 +95,20 @@ def set_suggested(packset: PackagesSet, music_id: utils.SpecialID) -> None:
             WINDOWS[channel].set_suggested([sugg] if sugg != utils.ID_NONE else ())
 
 
-def export_data(packset: PackagesSet) -> dict[MusicChannel, Music | None]:
+def export_data(packset: PackagesSet) -> dict[MusicChannel, utils.SpecialID]:
     """Return the data used to export this."""
     base_id = WINDOWS[MusicChannel.BASE].chosen_id
     if base_id == utils.ID_NONE:
         base_track = None
     else:
-        base_track = packset.obj_by_id(Music, base_id)
-    data: dict[MusicChannel, Music | None] = {
-        MusicChannel.BASE: base_track,
+        try:
+            base_track = packset.obj_by_id(Music, base_id)
+        except KeyError:
+            # Ignore here, error will be raised during actual export.
+            base_track = None
+
+    data: dict[MusicChannel, utils.SpecialID] = {
+        MusicChannel.BASE: base_id,
     }
     for channel, win in WINDOWS.items():
         if channel is MusicChannel.BASE:
@@ -116,10 +121,7 @@ def export_data(packset: PackagesSet) -> dict[MusicChannel, Music | None]:
                 mus_id = utils.ID_NONE
         else:
             mus_id = win.chosen_id
-        if mus_id != utils.ID_NONE:
-            data[channel] = packset.obj_by_id(Music, mus_id)
-        else:
-            data[channel] = None
+        data[channel] = mus_id
     return data
 
 

@@ -1,31 +1,46 @@
-from typing import Dict, Optional
-
 import srctools
 from srctools import Keyvalues
 
 from consts import MusicChannel
+from transtoken import AppError
 from . import ExportData, STEPS, StepResource
-from packages import Music
+from packages import Music, TRANS_OBJ_NOT_FOUND
+import utils
 
 
 @STEPS.add_step(prereq=[], results=[StepResource.VCONF_DATA])
 async def step_music_conf(exp_data: ExportData) -> None:
     """Export the selected music."""
-    selected: Dict[MusicChannel, Optional[Music]] = exp_data.selected[Music]
-
-    base_music = selected[MusicChannel.BASE]
+    selected: dict[MusicChannel, utils.SpecialID] = exp_data.selected[Music]
 
     vbsp_config = exp_data.vbsp_conf
 
-    if base_music is not None:
-        vbsp_config += await base_music.config()
+    # Store in a list and then raise, so you get errors from all music that failed at once.
+    errors: list[AppError] = []
+
+    base_id = selected[MusicChannel.BASE]
+    if base_id == utils.ID_EMPTY:
+        base_music = None
+    else:
+        try:
+            base_music = exp_data.packset.obj_by_id(Music, base_id)
+        except KeyError:
+            # Ignore the error here, the for loop below will stop exporting.
+            base_music = None
+        else:
+            vbsp_config += await base_music.config()
 
     music_conf = Keyvalues('MusicScript', [])
     vbsp_config.append(music_conf)
     to_pack = set()
 
-    for channel, music in selected.items():
-        if music is None:
+    for channel, music_id in selected.items():
+        if music_id == utils.ID_NONE:
+            continue
+        try:
+            music = exp_data.packset.obj_by_id(Music, music_id)
+        except KeyError:
+            errors.append(AppError(TRANS_OBJ_NOT_FOUND.format(object="Music", id=music_id)))
             continue
 
         sounds = music.sound[channel]
@@ -42,6 +57,9 @@ async def step_music_conf(exp_data: ExportData) -> None:
             ]))
 
         to_pack.update(music.packfiles)
+
+    if errors:
+        raise ExceptionGroup('Music Export', errors)
 
     # If we need to pack, add the files to be unconditionally
     # packed.

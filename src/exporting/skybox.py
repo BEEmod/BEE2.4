@@ -2,8 +2,9 @@
 from __future__ import annotations
 from srctools import bool_as_int
 
+from transtoken import AppError
 from . import ExportData, STEPS, StepResource
-from packages import Skybox
+from packages import Skybox, TRANS_OBJ_NOT_FOUND
 import utils
 
 
@@ -17,7 +18,7 @@ async def step_skybox(exp_data: ExportData) -> None:
     try:
         skybox = exp_data.packset.obj_by_id(Skybox, sel_id)
     except KeyError:
-        raise Exception(f"Selected skybox ({exp_data.selected}) doesn't exist?") from None
+        raise AppError(TRANS_OBJ_NOT_FOUND.format(object="Skybox", id=sel_id)) from None
 
     exp_data.vbsp_conf.set_key(('Options', 'skybox'), skybox.material)
     exp_data.vbsp_conf.set_key(('Options', 'sky_draw_first'), bool_as_int(skybox.draw_first))
