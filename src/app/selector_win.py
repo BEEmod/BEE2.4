@@ -29,7 +29,7 @@ from ui_tk.rich_textbox import RichText
 from app import tkMarkdown, sound, img, DEV_MODE
 from ui_tk.tooltip import add_tooltip, set_tooltip
 from ui_tk.img import TK_IMG
-from ui_tk.wid_transtoken import set_menu_text, set_text, set_win_title
+from ui_tk.wid_transtoken import set_menu_text, set_text, set_win_title, set_stringvar
 from ui_tk import TK_ROOT, tk_tools
 from packages import SelitemData, AttrTypes, AttrDef as AttrDef, AttrMap
 from consts import (
@@ -767,7 +767,6 @@ class SelectorWin:
         self.wid_canvas.bind("<Configure>", self.flow_items)
 
         async with trio.open_nursery() as nursery:
-            nursery.start_soon(self._update_translations_task)
             if self.sampler is not None and samp_button is not None:
                 nursery.start_soon(_update_sampler_task, self.sampler, samp_button)
             if self.store_last_selected:
@@ -835,7 +834,8 @@ class SelectorWin:
     def readonly(self, value: bool) -> None:
         self._readonly = bool(value)
 
-    def _apply_readonly_state(self) -> None:
+    def _apply_load_readonly_state(self) -> None:
+        """Update the display box to account for readonly/loading state."""
         if self.display is None or self.disp_btn is None:
             # Widget hasn't been added yet, stop.
             # We update in the widget() method.
@@ -844,17 +844,20 @@ class SelectorWin:
         if self._loading:
             new_st = ['disabled']
             set_tooltip(self.display, TransToken.BLANK)
-            self.disp_label.set(str(TRANS_LOADING))
+            set_stringvar(self.disp_label, TRANS_LOADING)
         elif self._readonly:
             new_st = ['disabled']
             set_tooltip(self.display, self.readonly_description)
             if self.readonly_override is not None:
-                self.disp_label.set(str(self.readonly_override))
+                set_stringvar(self.disp_label, self.readonly_override)
+            else:
+                data = self._get_data(self.chosen.value)
+                set_stringvar(self.disp_label, data.context_lbl)
         else:
             new_st = ['!disabled']
             set_tooltip(self.display, self.description)
             data = self._get_data(self.chosen.value)
-            self.disp_label.set(str(data.context_lbl))
+            set_stringvar(self.disp_label, data.context_lbl)
 
         self.disp_btn.state(new_st)
         self.display.state(new_st)
@@ -1000,13 +1003,7 @@ class SelectorWin:
                 self.display['font'] = self.norm_font
 
         self._suggested_rollover = None  # Discard the rolled over item.
-        if self._loading:
-            self.disp_label.set(str(TRANS_LOADING))
-        elif self._readonly and self.readonly_override is not None:
-            self.disp_label.set(str(self.readonly_override))
-        else:
-            data = self._get_data(chosen)
-            self.disp_label.set(str(data.context_lbl))
+        self._apply_load_readonly_state()
         self.context_var.set(chosen)
         return "break"  # stop the entry widget from continuing with this event
 
@@ -1036,21 +1033,8 @@ class SelectorWin:
         if self.suggested and (force or self._suggested_rollover is not None):
             self._suggested_rollover = random.choice(self.suggested)
             data = self._get_data(self._suggested_rollover)
-            self.disp_label.set(str(data.context_lbl))
+            set_stringvar(self.disp_label, data.context_lbl)
             self.win.after(1000, self._pick_suggested)
-
-    async def _update_translations_task(self) -> None:
-        """Update translations."""
-        async with aclosing(CURRENT_LANG.eventual_values()) as agen:
-            async for lang in agen:
-                if self._loading:
-                    self.disp_label.set(str(TRANS_LOADING))
-                elif self._readonly and self.readonly_override is not None:
-                    self.disp_label.set(str(self.readonly_override))
-                else:
-                    # We don't care about updating to the rollover item, it'll swap soon anyway.
-                    data = self._get_data(self.chosen.value)
-                    self.disp_label.set(str(data.context_lbl))
 
     async def _load_selected_task(self) -> None:
         """When configs change, load new items."""
