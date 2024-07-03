@@ -435,7 +435,7 @@ class SelectorWin:
 
         self.parent = parent
         self._readonly = False
-        self._loading = False
+        self._loading = True
         self.modal = modal
 
         # The textbox on the parent window.
@@ -471,13 +471,14 @@ class SelectorWin:
         self.selected = prev_state.id
         self.chosen = AsyncValue(self.selected)
 
-        self._packset = packages.get_loaded_packages()  # TODO, handle reload
-        self.item_list = list(func_get_ids(self._packset))
+        self._packset = packages.PackagesSet()
 
         self.win = tk.Toplevel(parent, name='selwin_' + save_id)
         self.win.withdraw()
         self.win.transient(master=parent)
         set_win_title(self.win, TRANS_WINDOW_TITLE.format(subtitle=title))
+
+        self.item_list = []
         self._item_buttons = []
         self._id_to_button = {}
         self._menu_index = {}
@@ -763,10 +764,10 @@ class SelectorWin:
                     index += 1
 
         self.set_disp()
-        self.refresh()
         self.wid_canvas.bind("<Configure>", self.flow_items)
 
         async with trio.open_nursery() as nursery:
+            nursery.start_soon(self._load_data_task)
             if self.sampler is not None and samp_button is not None:
                 nursery.start_soon(_update_sampler_task, self.sampler, samp_button)
             if self.store_last_selected:
@@ -870,7 +871,22 @@ class SelectorWin:
             LOGGER.warning('ID "{}" does not exist', item_id)
             return packages.SEL_DATA_MISSING
 
-    def refresh(self) -> None:
+    async def _load_data_task(self) -> None:
+        """Whenever packages change, reload all items."""
+        async with aclosing(packages.LOADED.eventual_values()) as agen:
+            async for packset in agen:
+                LOGGER.debug('Reloading data for selectorwin {}...', self.save_id)
+                # Lock into the loading state so that it can't be interacted with while loading.
+                self._loading = True
+                self._apply_load_readonly_state()
+                self.exit()
+                self._packset = packset
+                await self._rebuild_items(packset)
+                self._loading = False
+                self._apply_load_readonly_state()
+                LOGGER.debug('Reload complete for selectorwin {}', self.save_id)
+
+    async def _rebuild_items(self, packset: packages.PackagesSet) -> None:
         """Rebuild the menus and options based on the item list."""
         get_data = self._get_data
 
@@ -881,7 +897,7 @@ class SelectorWin:
             else:
                 return f'1{get_data(item_id).sort_key}'
 
-        self.item_list.sort(key=sort_func)
+        self.item_list = sorted(self.func_get_ids(self._packset), key=sort_func)
         grouped_items = defaultdict(list)
         self.group_names = {'':  TRANS_GROUPLESS}
         # Ungrouped items appear directly in the menu.
@@ -896,6 +912,7 @@ class SelectorWin:
             button.place_forget()
 
         while len(self._item_buttons) < len(self.item_list):
+            await trio.lowlevel.checkpoint()
             button = ttk.Button(self.pal_frame)
             tk_tools.bind_leftclick(button, functools.partial(
                 SelectorWin._evt_button_click, self, len(self._item_buttons),
@@ -903,6 +920,7 @@ class SelectorWin:
             self._item_buttons.append(button)
 
         for item_id, button in zip(self.item_list, self._item_buttons, strict=False):
+            await trio.lowlevel.checkpoint()
             data = self.func_get_data(self._packset, item_id)
             self._id_to_button[item_id] = button
             # Special icons have no text.
@@ -916,6 +934,7 @@ class SelectorWin:
 
             group_key = data.group_id
             grouped_items[group_key].append(item_id)
+            await trio.lowlevel.checkpoint()
 
             if group_key not in self.group_names:
                 self.group_names[group_key] = data.group
@@ -945,6 +964,7 @@ class SelectorWin:
         self.group_order[:] = sorted(self.grouped_items.keys())
 
         for group_key in self.group_order:
+            await trio.lowlevel.checkpoint()
             if group_key == '':
                 # Don't add the ungrouped menu to itself!
                 continue
@@ -955,8 +975,6 @@ class SelectorWin:
             menu_pos = self.context_menu.index('end')
             assert menu_pos is not None, "Didn't add to the menu?"
             group.menu_pos = menu_pos
-        if self.win.winfo_ismapped():
-            self.flow_items()
 
     def exit(self, _: object = None) -> None:
         """Quit and cancel, choosing the originally-selected item."""
@@ -1132,7 +1150,9 @@ class SelectorWin:
 
     def choose_item(self, item_id: utils.SpecialID) -> None:
         """Set the current item to this one."""
-        self.sel_item(item_id)
+        if self.win.winfo_ismapped():
+            # Only update UI if it is actually visible.
+            self.sel_item(item_id)
         self.chosen.value = item_id
         self.set_disp()
         if self.store_last_selected:
