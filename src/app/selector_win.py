@@ -105,7 +105,7 @@ TRANS_GROUPLESS = TransToken.ui('Other')
 TRANS_AUTHORS = TransToken.ui_plural('Author: {authors}', 'Authors: {authors}')
 TRANS_NO_AUTHORS = TransToken.ui('Authors: Unknown')
 TRANS_DEV_ITEM_ID = TransToken.untranslated('**ID:** {item}')
-
+TRANS_LOADING = TransToken.ui('Loading...')
 
 async def _update_sampler_task(sampler: sound.SamplePlayer, button: ttk.Button) -> None:
     """Update the sampler's display."""
@@ -306,6 +306,7 @@ class SelectorWin:
     selected: utils.SpecialID
     parent: tk.Tk | tk.Toplevel
     _readonly: bool
+    _loading: bool  # This overrides readonly.
     modal: bool
     win: tk.Toplevel
     attrs: list[AttrDef]
@@ -434,6 +435,7 @@ class SelectorWin:
 
         self.parent = parent
         self._readonly = False
+        self._loading = False
         self.modal = modal
 
         # The textbox on the parent window.
@@ -832,12 +834,18 @@ class SelectorWin:
     @readonly.setter
     def readonly(self, value: bool) -> None:
         self._readonly = bool(value)
+
+    def _apply_readonly_state(self) -> None:
         if self.display is None or self.disp_btn is None:
             # Widget hasn't been added yet, stop.
             # We update in the widget() method.
             return
 
-        if value:
+        if self._loading:
+            new_st = ['disabled']
+            set_tooltip(self.display, TransToken.BLANK)
+            self.disp_label.set(str(TRANS_LOADING))
+        elif self._readonly:
             new_st = ['disabled']
             set_tooltip(self.display, self.readonly_description)
             if self.readonly_override is not None:
@@ -984,16 +992,17 @@ class SelectorWin:
         """Set the display textbox."""
         chosen = self.chosen.value
         # Bold the text if the suggested item is selected (like the
-        # context menu). We check for truthiness to ensure it's actually
-        # initialised.
-        if self.display:
+        # context menu).
+        if self.display is not None:
             if self.is_suggested():
                 self.display['font'] = self.sugg_font
             else:
                 self.display['font'] = self.norm_font
 
         self._suggested_rollover = None  # Discard the rolled over item.
-        if self._readonly and self.readonly_override is not None:
+        if self._loading:
+            self.disp_label.set(str(TRANS_LOADING))
+        elif self._readonly and self.readonly_override is not None:
             self.disp_label.set(str(self.readonly_override))
         else:
             data = self._get_data(chosen)
@@ -1034,7 +1043,9 @@ class SelectorWin:
         """Update translations."""
         async with aclosing(CURRENT_LANG.eventual_values()) as agen:
             async for lang in agen:
-                if self._readonly and self.readonly_override is not None:
+                if self._loading:
+                    self.disp_label.set(str(TRANS_LOADING))
+                elif self._readonly and self.readonly_override is not None:
                     self.disp_label.set(str(self.readonly_override))
                 else:
                     # We don't care about updating to the rollover item, it'll swap soon anyway.
@@ -1058,9 +1069,9 @@ class SelectorWin:
         if data.previews:
             _PREVIEW.show(self, data)
 
-    def open_win(self, _: object = None, *, force_open: bool = False) -> object:
+    def open_win(self, _: object = None) -> object:
         """Display the window."""
-        if self._readonly and not force_open:
+        if self._readonly:
             TK_ROOT.bell()
             return 'break'  # Tell tk to stop processing this event
 
@@ -1107,7 +1118,7 @@ class SelectorWin:
 
     def open_context(self, _: object = None) -> None:
         """Dislay the context window at the text widget."""
-        if not self._readonly and self.display is not None:
+        if not self._readonly and not self._loading and self.display is not None:
             self.context_menu.post(
                 self.display.winfo_rootx(),
                 self.display.winfo_rooty() + self.display.winfo_height())
