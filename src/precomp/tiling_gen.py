@@ -78,6 +78,7 @@ tile_chain = [
     TileSize.TILE_1x2, TileSize.TILE_2x1,
     TileSize.TILE_2x2,
     TileSize.TILE_1x4, TileSize.TILE_4x1,
+    TileSize.TILE_4x4,
 ]
 ALLOWED_SIZES: dict[TileType, list[TileSize]] = {
     TileType.WHITE: tile_chain,
@@ -364,8 +365,15 @@ def calculate_plane(
                 if size.width <= width and size.height <= height:
                     tex_list = gen.get_all(size, subtile.antigel)
                     if tex_list:
+                        weight = gen.weights[size]
+                        # If the weight is zero, only include if no larger tile matches.
+                        if weight == 0:
+                            if sizes:
+                                continue
+                            else:
+                                weight = 1
                         sizes.append(size)
-                        counts.append(len(tex_list) * gen.weights[size])
+                        counts.append(len(tex_list) * weight)
             if not sizes:
                 # Fallback, use 4x4.
                 sizes = [TileSize.TILE_4x4]
