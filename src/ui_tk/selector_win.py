@@ -1,12 +1,14 @@
 """Tk-specific implementation of the selector window."""
+from typing import Final
 from typing_extensions import override
-
 from tkinter import ttk, font as tk_font
 import tkinter as tk
 
+from collections.abc import Mapping
+
 from app import img
 from app.selector_win import (
-    SelectorWinBase, AttrDef, Options,
+    SelectorWinBase, AttrDef, Options, NavKeys,
     BTN_PLAY, BTN_STOP, BTN_PREV, BTN_NEXT,
     TRANS_ATTR_DESC,
     TRANS_SUGGESTED, TRANS_SUGGESTED_MAC, TRANS_WINDOW_TITLE,
@@ -29,6 +31,20 @@ __all__ = [
 ]
 
 type SuggLabel = ttk.Label | ttk.LabelFrame
+
+KEYSYM_TO_NAV: Final[Mapping[str, NavKeys]] = {
+    'Up': NavKeys.UP,
+    'Down': NavKeys.DOWN,
+    'Left': NavKeys.LEFT,
+    'Right': NavKeys.RIGHT,
+
+    'Home': NavKeys.HOME,
+    'End': NavKeys.END,
+
+    'Return': NavKeys.ENTER,
+    'space': NavKeys.PLAY_SOUND,
+    # Page up/down is 'Prior' / 'Next'
+}
 
 
 class SelectorWin(SelectorWinBase[
@@ -58,7 +74,7 @@ class SelectorWin(SelectorWinBase[
         self.win.bind("<Escape>", self.exit)
 
         # Allow navigating with arrow keys.
-        self.win.bind("<KeyPress>", self.key_navigate)
+        self.win.bind("<KeyPress>", self._evt_key_navigate)
 
         self.desc_label = ttk.Label(
             self.win,
@@ -311,6 +327,14 @@ class SelectorWin(SelectorWinBase[
 
         self.set_disp()
         self.wid_canvas.bind("<Configure>", self.flow_items)
+
+    def _evt_key_navigate(self, event: tk.Event[tk.Misc]) -> None:
+        """Handle keyboard control for the window."""
+        try:
+            key = KEYSYM_TO_NAV[event.keysym]
+        except KeyError:
+            return
+        self.key_navigate(key)
 
     @override
     def _ui_button_create(self, ind: int) -> ttk.Button:

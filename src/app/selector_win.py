@@ -5,6 +5,7 @@ It appears as a textbox-like widget with a ... button to open the selection wind
 Each item has a description, author, and icon.
 """
 from __future__ import annotations
+from typing import assert_never
 
 from abc import abstractmethod
 from tkinter import font as tk_font
@@ -14,7 +15,7 @@ import tkinter as tk
 from contextlib import aclosing
 from collections.abc import Callable, Container, Iterable, Sequence
 from collections import defaultdict
-from enum import Enum
+from enum import Enum, auto as enum_auto
 import functools
 import math
 import random
@@ -65,30 +66,19 @@ BTN_PREV = '⟨'
 BTN_NEXT = '⟩'
 
 
-class NAV_KEYS(Enum):
-    """Enum representing keys used for shifting through items.
+class NavKeys(Enum):
+    """Enum representing keys used for shifting through items."""
+    UP = enum_auto()
+    DOWN = enum_auto()
+    LEFT = enum_auto()
+    RIGHT = enum_auto()
 
-    The value is the TK key-sym value.
-    """
-    UP = 'Up'
-    DOWN = 'Down'
-    LEFT = 'Left'
-    RIGHT = 'Right'
-
-    DN = DOWN
-    LF = LEFT
-    RT = RIGHT
-
-    PG_UP = 'Prior'
-    PG_DOWN = 'Next'
-
-    HOME = 'Home'
-    END = 'End'
-
-    ENTER = 'Return'
+    HOME = enum_auto()
+    END = enum_auto()
+    ENTER = enum_auto()
 
     # Space plays the current item.
-    PLAY_SOUND = 'space'
+    PLAY_SOUND = enum_auto()
 
 
 # Callbacks used to get the info for items in the window.
@@ -993,25 +983,14 @@ class SelectorWinBase[ButtonT, SuggLblT]:
             else:
                 raise ValueError(f'Invalid attribute type: "{attr.type}"')
 
-    def key_navigate(self, event: tk.Event[tk.Misc]) -> None:
-        """Navigate using arrow keys.
+    def key_navigate(self, key: NavKeys) -> None:
+        """Navigate using arrow keys."""
 
-        Allowed keys are set in NAV_KEYS
-        """
-        try:
-            key = NAV_KEYS(event.keysym)
-        except (ValueError, AttributeError):
-            LOGGER.debug(
-                'Invalid nav-key in event: {}',
-                event.__dict__
-            )
-            return
-
-        if key is NAV_KEYS.PLAY_SOUND:
+        if key is NavKeys.PLAY_SOUND:
             if self.sampler is not None:
                 self.sampler.play_sample()
             return
-        elif key is NAV_KEYS.ENTER:
+        elif key is NavKeys.ENTER:
             self.save()
             return
 
@@ -1032,14 +1011,14 @@ class SelectorWinBase[ButtonT, SuggLblT]:
         if not ordered_groups:
             return  # No visible items!
 
-        if key is NAV_KEYS.HOME:
+        if key is NavKeys.HOME:
             self._offset_select(
                 ordered_groups,
                 group_ind=-1,
                 item_ind=0,
             )
             return
-        elif key is NAV_KEYS.END:
+        elif key is NavKeys.END:
             self._offset_select(
                 ordered_groups,
                 group_ind=len(ordered_groups),
@@ -1055,20 +1034,22 @@ class SelectorWinBase[ButtonT, SuggLblT]:
         # The index in the visible groups
         group_ind = ordered_groups.index(cur_group_name)
 
-        if key is NAV_KEYS.LF:
+        if key is NavKeys.LEFT:
             item_ind -= 1
-        elif key is NAV_KEYS.RT:
+        elif key is NavKeys.RIGHT:
             item_ind += 1
-        elif key is NAV_KEYS.UP:
+        elif key is NavKeys.UP:
             item_ind -= self.item_width
-        elif key is NAV_KEYS.DN:
+        elif key is NavKeys.DOWN:
             item_ind += self.item_width
+        else:
+            assert_never(key)
 
         self._offset_select(
             ordered_groups,
             group_ind,
             item_ind,
-            key is NAV_KEYS.UP or key is NAV_KEYS.DN,
+            key is NavKeys.UP or key is NavKeys.DOWN,
         )
 
     def _offset_select(self, group_list: list[str], group_ind: int, item_ind: int, is_vert: bool = False) -> None:
