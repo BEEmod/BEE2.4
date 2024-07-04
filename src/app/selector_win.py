@@ -6,6 +6,7 @@ Each item has a description, author, and icon.
 """
 from __future__ import annotations
 
+from abc import abstractmethod
 from tkinter import font as tk_font
 from tkinter import ttk
 import tkinter as tk
@@ -300,8 +301,12 @@ class Options:
     func_get_attr: GetterFunc[AttrMap] = lambda packset, item_id: EmptyMapping
 
 
-class SelectorWinBase:
+class SelectorWinBase[ButtonT, SuggLblT]:
     """The selection window for skyboxes, music, goo and voice packs.
+
+    Typevars:
+    - ButtonT: Type for the button widget.
+    - SuggLblT: Type for the widget used to highlight suggested items.
 
     Attributes:
     - chosen: The currently-selected item.
@@ -330,7 +335,7 @@ class SelectorWinBase:
     # While the user hovers over the "suggested" button, cycle through random items. But we
     # want to apply that specific item when clicked.
     _suggested_rollover: utils.SpecialID | None
-    _suggest_lbl: list[ttk.Label | ttk.LabelFrame]
+    _suggest_lbl: list[SuggLblT]
 
     # Should we have the 'reset to default' button?
     has_def: bool
@@ -366,9 +371,9 @@ class SelectorWinBase:
     _menu_index: dict[utils.SpecialID, int]
 
     # Buttons we have constructed, corresponding to the same in the item list.
-    _item_buttons: list[ttk.Button]
+    _item_buttons: list[ButtonT]
     # And a lookup from ID -> button
-    _id_to_button: dict[utils.SpecialID, ttk.Button]
+    _id_to_button: dict[utils.SpecialID, ButtonT]
 
     # The maximum number of items that fits per row (set in flow_items)
     item_width: int
@@ -629,28 +634,21 @@ class SelectorWinBase:
         self.context_menu.delete(0, 'end')
 
         for button in self._item_buttons:
-            button.place_forget()
+            self._ui_button_hide(button)
 
         while len(self._item_buttons) < len(self.item_list):
             await trio.lowlevel.checkpoint()
-            button = ttk.Button(self.pal_frame)
-            tk_tools.bind_leftclick(button, functools.partial(
-                type(self)._evt_button_click, self, len(self._item_buttons),
-            ))
-            self._item_buttons.append(button)
+            self._item_buttons.append(self._ui_button_create(len(self._item_buttons)))
 
         for item_id, button in zip(self.item_list, self._item_buttons, strict=False):
             await trio.lowlevel.checkpoint()
             data = self.func_get_data(self._packset, item_id)
             self._id_to_button[item_id] = button
             # Special icons have no text.
-            button['compound'] = 'none' if utils.is_special_id(item_id) else 'top'
             if utils.is_special_id(item_id):
-                button['compound'] = 'none'
-                set_text(button, TransToken.BLANK)
+                self._ui_button_set_text(button, TransToken.BLANK)
             else:
-                button['compound'] = 'top'
-                set_text(button, data.short_name)
+                self._ui_button_set_text(button, data.short_name)
 
             group_key = data.group_id
             grouped_items[group_key].append(item_id)
@@ -709,8 +707,8 @@ class SelectorWinBase:
 
         for button in self._item_buttons:
             # Un-press everything, clear icons to allow them to unload.
-            button.state(('!alternate', '!pressed', '!active'))
-            TK_IMG.apply(button, None)
+            self._ui_button_set_selected(button, False)
+            self._ui_button_set_img(button, None)
 
         if not self.first_open:  # We've got state to store.
             state = SelectorState(
@@ -745,7 +743,7 @@ class SelectorWinBase:
         self.context_var.set(chosen)
         return "break"  # stop the entry widget from continuing with this event
 
-    def _evt_button_click(self, index: int, _: object) -> None:
+    def _evt_button_click(self, index: int) -> None:
         """Handle clicking on an item.
 
         If it's already selected, save and close the window.
@@ -798,7 +796,7 @@ class SelectorWinBase:
             return 'break'  # Tell tk to stop processing this event
 
         for item_id, button in zip(self.item_list, self._item_buttons, strict=False):
-            TK_IMG.apply(button, self._get_data(item_id).icon)
+            self._ui_button_set_img(button, self._get_data(item_id).icon)
 
         # Restore configured states.
         if self.first_open:
@@ -916,17 +914,21 @@ class SelectorWinBase:
             self.prop_desc.set_text(data.desc)
 
         try:
-            self._id_to_button[self.selected].state(('!alternate', ))
+            button = self._id_to_button[self.selected]
         except KeyError:
             pass
+        else:
+            self._ui_button_set_selected(button, False)
         try:
-            self._id_to_button[item_id].state(('alternate', ))
+            button = self._id_to_button[item_id]
         except KeyError:
-            # Should never happen, but don't crash..
+            # Should never happen, but don't crash...
             LOGGER.warning('No button for item {}??', item_id)
+        else:
+            self._ui_button_set_selected(button, True)
+            self._ui_button_scroll_to(button)
 
         self.selected = item_id
-        self.scroll_to(item_id)
 
         if self.sampler:
             assert self.samp_button is not None
@@ -1152,7 +1154,7 @@ class SelectorWinBase:
 
         # Hide suggestion indicators if they end up unused.
         for lbl in self._suggest_lbl:
-            lbl.place_forget()
+            self._ui_sugg_hide(lbl)
         suggest_ind = 0
 
         # If only the '' group is present, force it to be visible, and hide
@@ -1177,7 +1179,7 @@ class SelectorWinBase:
                 if not group_wid.visible:
                     # Hide everything!
                     for item_id in items:
-                        self._id_to_button[item_id].place_forget()
+                        self._ui_button_hide(self._id_to_button[item_id])
                     continue
 
             # Place each item
@@ -1188,34 +1190,19 @@ class SelectorWinBase:
                     try:
                         sugg_lbl = self._suggest_lbl[suggest_ind]
                     except IndexError:
-                        # Not enough, make more.
-                        if utils.MAC:
-                            # Labelframe doesn't look good here on OSX
-                            sugg_lbl = ttk.Label(
-                                self.pal_frame,
-                                name=f'suggest_label_{suggest_ind}',
-                            )
-                            set_text(sugg_lbl, TRANS_SUGGESTED_MAC)
-                        else:
-                            sugg_lbl = ttk.LabelFrame(
-                                self.pal_frame,
-                                name=f'suggest_label_{suggest_ind}',
-                                labelanchor='n',
-                                height=50,
-                            )
-                            set_text(sugg_lbl, TRANS_SUGGESTED)
+                        sugg_lbl = self._ui_sugg_create(suggest_ind)
                         self._suggest_lbl.append(sugg_lbl)
                     suggest_ind += 1
-                    sugg_lbl.place(
+                    self._ui_sugg_place(
+                        sugg_lbl, button,
                         x=(i % width) * ITEM_WIDTH + 1,
                         y=(i // width) * ITEM_HEIGHT + y_off,
                     )
-                    sugg_lbl['width'] = button.winfo_width()
-                button.place(
+                self._ui_button_set_pos(
+                    button,
                     x=(i % width) * ITEM_WIDTH + 1,
                     y=(i // width) * ITEM_HEIGHT + y_off + 20,
                 )
-                button.lift()
 
             # Increase the offset by the total height of this item section
             y_off += math.ceil(len(items) / width) * ITEM_HEIGHT + 5
@@ -1227,34 +1214,6 @@ class SelectorWinBase:
             y_off,
         )
         self.pal_frame['height'] = y_off
-
-    def scroll_to(self, item_id: utils.SpecialID) -> None:
-        """Scroll to an item so it's visible."""
-        try:
-            button = self._id_to_button[item_id]
-        except KeyError:
-            return  # Can't scroll to something that doesn't exist.
-
-        canvas = self.wid_canvas
-
-        height = canvas.bbox('all')[3]  # Returns (x, y, width, height)
-
-        bottom, top = canvas.yview()
-        # The sizes are returned in fractions, but we use the pixel values
-        # for accuracy
-        bottom *= height
-        top *= height
-
-        y = button.winfo_y()
-
-        if bottom <= y - 8 and y + ICON_SIZE + 8 <= top:
-            return  # Already in view
-
-        # Center in the view
-        canvas.yview_moveto(
-            (y - (top - bottom) // 2)
-            / height
-        )
 
     def is_suggested(self) -> bool:
         """Return whether the current item is a suggested one."""
@@ -1320,3 +1279,56 @@ class SelectorWinBase:
         # Reposition all our items, but only if we're visible.
         if self.win.winfo_ismapped():
             self.flow_items()
+
+    @abstractmethod
+    def _ui_button_create(self, ind: int) -> ButtonT:
+        """Create a new button widget for the main item list.
+
+        The index should be passed to `_evt_button_click()`.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def _ui_button_set_text(self, button: ButtonT, text: TransToken) -> None:
+        """Change the text on a button. If set to BLANK, only the icon is shown."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def _ui_button_set_img(self, button: ButtonT, image: img.Handle | None) -> None:
+        """Set the icon for a button, or clear it if None."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def _ui_button_set_selected(self, button: ButtonT, selected: bool) -> None:
+        """Set whether the button should be highlighted as if selected."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def _ui_button_hide(self, button: ButtonT) -> None:
+        """Hide this button, it is no longer necessary."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def _ui_button_set_pos(self, button: ButtonT, x: int, y: int) -> None:
+        """Place this button at the specified location."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def _ui_button_scroll_to(self, button: ButtonT) -> None:
+        """Scroll to an item so it's visible."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def _ui_sugg_create(self, ind: int) -> SuggLblT:
+        """Create a label for highlighting suggested buttons."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def _ui_sugg_hide(self, label: SuggLblT) -> None:
+        """Hide the suggested button label."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def _ui_sugg_place(self, label: SuggLblT, button: ButtonT, x: int, y: int) -> None:
+        """Place the suggested button label at this position."""
+        raise NotImplementedError

@@ -1,20 +1,25 @@
 """Tk-specific implementation of the selector window."""
-import tkinter as tk
-from tkinter import ttk, font as tk_font
+from typing_extensions import override
 
+from tkinter import ttk, font as tk_font
+import tkinter as tk
+
+from app import img
 from app.selector_win import (
     SelectorWinBase, AttrDef, Options,
     BTN_PLAY, BTN_STOP, BTN_PREV, BTN_NEXT,
     TRANS_ATTR_DESC,
-    TRANS_WINDOW_TITLE,
+    TRANS_SUGGESTED, TRANS_SUGGESTED_MAC, TRANS_WINDOW_TITLE,
 )
+from consts import SEL_ICON_SIZE, SEL_ICON_SIZE_LRG as ICON_SIZE_LRG
 from packages import AttrTypes
 from transtoken import TransToken
 from ui_tk import tk_tools
+from ui_tk.img import TK_IMG
 from ui_tk.rich_textbox import RichText
 from ui_tk.tooltip import add_tooltip
 from ui_tk.wid_transtoken import set_text, set_win_title
-from consts import SEL_ICON_SIZE_LRG as ICON_SIZE_LRG
+import utils
 
 
 __all__ = [
@@ -23,8 +28,13 @@ __all__ = [
     'Options',
 ]
 
+type SuggLabel = ttk.Label | ttk.LabelFrame
 
-class SelectorWin(SelectorWinBase):
+
+class SelectorWin(SelectorWinBase[
+    ttk.Button,  # ButtonT
+    SuggLabel,  # SuggLblT
+]):
     """Tk implementation of the selector window."""
     def __init__(self, parent: tk.Tk | tk.Toplevel, opt: Options) -> None:
         super().__init__(parent, opt)
@@ -301,3 +311,86 @@ class SelectorWin(SelectorWinBase):
 
         self.set_disp()
         self.wid_canvas.bind("<Configure>", self.flow_items)
+
+    @override
+    def _ui_button_create(self, ind: int) -> ttk.Button:
+        button = ttk.Button(self.pal_frame)
+        tk_tools.bind_leftclick(button, lambda evt: self._evt_button_click(ind))
+        return button
+
+    @override
+    def _ui_button_set_text(self, button: ttk.Button, text: TransToken) -> None:
+        set_text(button, text)
+        if text is TransToken.BLANK:
+            # Special items have no text.
+            button['compound'] = 'none'
+        else:
+            button['compound'] = 'top'
+
+    def _ui_button_set_img(self, button: ttk.Button, image: img.Handle | None) -> None:
+        TK_IMG.apply(button, image)
+
+    @override
+    def _ui_button_set_selected(self, button: ttk.Button, selected: bool) -> None:
+        """Set whether the button should be highlighted as if selected."""
+        button.state(('alternate',) if selected else ('!alternate', ))
+
+    @override
+    def _ui_button_hide(self, button: ttk.Button) -> None:
+        button.place_forget()
+
+    @override
+    def _ui_button_set_pos(self, button: ttk.Button, x: int, y: int) -> None:
+        button.place(x=x, y=y)
+        button.lift()
+
+    def _ui_button_scroll_to(self, button: ttk.Button) -> None:
+        """Scroll to an item so it's visible."""
+        height = self.wid_canvas.bbox('all')[3]  # Returns (x, y, width, height)
+
+        bottom, top = self.wid_canvas.yview()
+        # The sizes are returned in fractions, but we use the pixel values
+        # for accuracy
+        bottom *= height
+        top *= height
+
+        y = button.winfo_y()
+
+        if bottom <= y - 8 and y + SEL_ICON_SIZE + 8 <= top:
+            return  # Already in view
+
+        # Center in the view
+        self.wid_canvas.yview_moveto(
+            (y - (top - bottom) // 2)
+            / height
+        )
+
+    @override
+    def _ui_sugg_create(self, ind: int) -> SuggLabel:
+        """Create a label for highlighting suggested buttons."""
+        sugg_lbl: SuggLabel
+        if utils.MAC:
+            # Labelframe doesn't look good here on OSX
+            sugg_lbl = ttk.Label(
+                self.pal_frame,
+                name=f'suggest_label_{ind}',
+            )
+            set_text(sugg_lbl, TRANS_SUGGESTED_MAC)
+        else:
+            sugg_lbl = ttk.LabelFrame(
+                self.pal_frame,
+                name=f'suggest_label_{ind}',
+                labelanchor='n',
+                height=50,
+            )
+            set_text(sugg_lbl, TRANS_SUGGESTED)
+        return sugg_lbl
+
+    def _ui_sugg_hide(self, label: SuggLabel) -> None:
+        """Hide the suggested button label."""
+        label.place_forget()
+
+    def _ui_sugg_place(self, label: SuggLabel, button: ttk.Button, x: int, y: int) -> None:
+        """Place the suggested button label at this position."""
+        label.place(x=x, y=y)
+        label['width'] = button.winfo_width()
