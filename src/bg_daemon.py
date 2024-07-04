@@ -28,7 +28,7 @@ import ipc_types
 import utils
 
 
-SCREENS: dict[ScreenID, BaseLoadScreen] = {}
+SCREENS: dict[ScreenID, LoadScreen | SplashScreen] = {}
 QUEUE_REPLY_LOAD: multiprocessing.Queue[ARGS_REPLY_LOAD]
 TIMEOUT = 0.125  # New iteration if we take more than this long.
 

@@ -245,7 +245,7 @@ def load_conf(items: Iterable[editoritems.Item]) -> None:
                     cust_instances[name] = ''
                 else:
                     cust_instances[name] = fname
-                    ITEM_FOR_FILE[fname.casefold()] = (utils.obj_id(item.id), name)
+                    ITEM_FOR_FILE[fname.casefold()] = (item.id, name)
 
         # Normal instances: index -> filename
         INSTANCE_FILES[item.id.casefold()] = [
@@ -256,7 +256,7 @@ def load_conf(items: Iterable[editoritems.Item]) -> None:
             fname = str(inst.inst)
             # Not real instances.
             if fname != '.' and not fname.casefold().startswith('instances/bee2_corridor/'):
-                ITEM_FOR_FILE[fname.casefold()] = (utils.obj_id(item.id), ind)
+                ITEM_FOR_FILE[fname.casefold()] = (item.id, ind)
 
     INST_SPECIAL.clear()
     INST_SPECIAL.update({

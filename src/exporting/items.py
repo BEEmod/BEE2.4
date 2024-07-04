@@ -139,7 +139,7 @@ async def step_write_items(exp_data: ExportData) -> None:
     # Originally indicator items were in the style config, now they're default items.
     # Check to prevent overlaps.
     style_items = {
-        utils.obj_id(item.id): item
+        item.id: item
         for item in exp_data.all_items
     }
 

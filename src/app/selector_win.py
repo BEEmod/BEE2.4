@@ -107,6 +107,7 @@ TRANS_NO_AUTHORS = TransToken.ui('Authors: Unknown')
 TRANS_DEV_ITEM_ID = TransToken.untranslated('**ID:** {item}')
 TRANS_LOADING = TransToken.ui('Loading...')
 
+
 async def _update_sampler_task(sampler: sound.SamplePlayer, button: ttk.Button) -> None:
     """Update the sampler's display."""
     async with aclosing(sampler.is_playing.eventual_values()) as agen:
@@ -119,7 +120,6 @@ async def _store_results_task(chosen: AsyncValue[utils.SpecialID], save_id: str)
     async with aclosing(chosen.eventual_values()) as agen:
         async for item_id in agen:
             config.APP.store_conf(LastSelected(item_id), save_id)
-
 
 
 class GroupHeader(tk_tools.LineHeader):
@@ -612,7 +612,7 @@ class SelectorWinBase:
 
         def sort_func(item_id: utils.SpecialID) -> str:
             """Sort the item list. Special items go to the start, otherwise sort by the sort key."""
-            if utils.special_id(item_id):
+            if utils.is_special_id(item_id):
                 return f'0{item_id}'
             else:
                 return f'1{get_data(item_id).sort_key}'
