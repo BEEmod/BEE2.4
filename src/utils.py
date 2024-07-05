@@ -363,9 +363,9 @@ def _uppercase_casefold(value: str) -> str:
     """Casefold and uppercase."""
     casefolded = value.casefold().upper()
     if casefolded == value:
-        return value
+        return sys.intern(value)
     else:
-        return casefolded
+        return sys.intern(casefolded)
 
 
 @overload
