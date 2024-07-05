@@ -27,10 +27,11 @@ import srctools.logger
 import trio
 import trio_util
 
-from ui_tk.rich_textbox import RichText
-from app import tkMarkdown, sound, img, DEV_MODE
+from app.mdown import MarkdownData
+from app import sound, img, DEV_MODE
 from ui_tk.tooltip import add_tooltip, set_tooltip
 from ui_tk.img import TK_IMG
+from ui_tk.rich_textbox import RichText
 from ui_tk.wid_transtoken import set_menu_text, set_text, set_win_title, set_stringvar
 from ui_tk import TK_ROOT, tk_tools
 from packages import SelitemData, AttrTypes, AttrDef as AttrDef, AttrMap
@@ -884,14 +885,10 @@ class SelectorWinBase[ButtonT, SuggLblT]:
 
         if DEV_MODE.value:
             # Show the ID of the item in the description
-            text = tkMarkdown.convert(TRANS_DEV_ITEM_ID.format(
-                item=f'`{', '.join(data.packages)}`:`{item_id}`' if data.packages else f'`{item_id}`',
+            text = MarkdownData(TRANS_DEV_ITEM_ID.format(
+                item=f'`{', '.join(data.packages)}`:`{item_id}`\n' if data.packages else f'`{item_id}`\n',
             ), None)
-            self.prop_desc.set_text(tkMarkdown.join(
-                text,
-                tkMarkdown.MarkdownData.text('\n'),
-                data.desc,
-            ))
+            self.prop_desc.set_text(text + data.desc)
         else:
             self.prop_desc.set_text(data.desc)
 

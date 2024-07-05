@@ -29,7 +29,7 @@ from packages.signage import ITEM_ID as SIGNAGE_ITEM_ID
 from transtoken import TransToken, CURRENT_LANG
 
 from app.SubPane import SubPane
-from app.tkMarkdown import MarkdownData
+from app.mdown import MarkdownData
 from ui_tk.img import TKImages
 from ui_tk.wid_transtoken import set_text
 from ui_tk import TK_ROOT, tk_tools

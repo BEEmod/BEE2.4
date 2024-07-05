@@ -19,6 +19,7 @@ import trio.to_thread
 
 from app import EdgeTrigger, sound, img
 from app.dialogs import Dialogs
+from app.mdown import MarkdownData
 from transtoken import TransToken
 import utils
 
@@ -471,7 +472,7 @@ class CreditsWindowBase:
         text = text.replace('\n', '  \n')  # Add two spaces to keep line breaks
 
         # Don't translate this, it's all legal text - not really our business to change.
-        await self._ui_apply_text(TransToken.untranslated(text))
+        await self._ui_apply_text(MarkdownData(TransToken.untranslated(text), None))
 
         # Then alternate between showing/hiding. We don't need to reparse ever again.
         while True:
@@ -482,7 +483,7 @@ class CreditsWindowBase:
             await self._ui_hide_window()
             await self.open.wait()
 
-    async def _ui_apply_text(self, text: TransToken) -> None:
+    async def _ui_apply_text(self, text: MarkdownData) -> None:
         """Apply the credits text to the window."""
         raise NotImplementedError
 

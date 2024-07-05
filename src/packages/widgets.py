@@ -7,20 +7,20 @@ from contextlib import AbstractContextManager, aclosing
 import itertools
 
 from srctools import EmptyMapping, Keyvalues, Vec, logger
+
 from trio_util import AsyncValue, wait_any
 import attrs
 import trio
 
-import BEE2_config
-import config
-import packages
-from app import tkMarkdown
-
+from app.mdown import MarkdownData
 from config.widgets import (
     TIMER_NUM as TIMER_NUM, TIMER_NUM_INF as TIMER_NUM_INF,
     TimerNum as TimerNum, WidgetConfig,
 )
 from transtoken import TransToken, TransTokenSource
+import config
+import BEE2_config
+import packages
 
 
 class ConfigProto(Protocol):
@@ -182,7 +182,7 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
         self,
         conf_id: str,
         group_name: TransToken,
-        desc: tkMarkdown.MarkdownData,
+        desc: MarkdownData,
         widgets: list[SingleWidget],
         multi_widgets: list[MultiWidget],
     ) -> None:
@@ -317,7 +317,8 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
     def iter_trans_tokens(self) -> Iterator[TransTokenSource]:
         """Yield translation tokens for this config group."""
         source = f'configgroup/{self.id}'
-        yield self.name, source + '.name'
+        yield self.name, f'{source}.name'
+        yield from self.desc.iter_tokens(f'{source}.desc')
         for widget in itertools.chain(self.widgets, self.multi_widgets):
             yield widget.name, f'{source}/{widget.id}.name'
             yield widget.tooltip, f'{source}/{widget.id}.tooltip'
@@ -334,7 +335,7 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
 
         self.widgets.extend(override.widgets)
         self.multi_widgets.extend(override.multi_widgets)
-        self.desc = tkMarkdown.join(self.desc, override.desc)
+        self.desc += override.desc
 
     def widget_ids(self) -> set[str]:
         """Return the set of widget IDs used."""

@@ -14,25 +14,25 @@ import zipfile
 
 from aioresult import ResultCapture
 from trio_util import AsyncValue
-import attrs
-import trio
-import srctools
-
-from BEE2_config import ConfigFile
-from app import tkMarkdown, img, lazy_conf, background_run
-import utils
-import consts
 from srctools import Keyvalues, NoKeyError, Vec
 from srctools.tokenizer import TokenSyntaxError
 from srctools.filesys import FileSystem, RawFileSystem, ZipFileSystem, VPKFileSystem
+import attrs
+import trio
+import srctools
+import srctools.logger
 
 from app.errors import ErrorUI
+from app.mdown import MarkdownData
+from transtoken import AppError, TransToken, TransTokenSource
 from editoritems import Item as EditorItem, Renderable, RenderableType
 from corridor import CORRIDOR_COUNTS, GameMode, Direction
 from loadScreen import MAIN_PAK as LOAD_PAK, MAIN_OBJ as LOAD_OBJ
-import srctools.logger
+from BEE2_config import ConfigFile
+from app import img, lazy_conf, background_run
+import utils
+import consts
 
-from transtoken import AppError, TransToken, TransTokenSource
 
 
 __all__ = [
@@ -225,7 +225,7 @@ class SelitemData:
     icon: img.Handle
     large_icon: img.Handle
     previews: Sequence[img.Handle]
-    desc: tkMarkdown.MarkdownData
+    desc: MarkdownData
     group: TransToken
     group_id: str
     sort_key: str
@@ -249,7 +249,7 @@ class SelitemData:
         small_icon: img.Handle | None = None,
         large_icon: img.Handle | None = None,
         previews: Sequence[img.Handle] = (),
-        desc: TransToken | tkMarkdown.MarkdownData = TransToken.BLANK,
+        desc: TransToken | MarkdownData = TransToken.BLANK,
         group: TransToken = TransToken.BLANK,
         sort_key: str = '',
         packages: Iterable[utils.ObjectID] = frozenset(),
@@ -269,7 +269,7 @@ class SelitemData:
         if large_icon is None:
             large_icon = small_icon
         if isinstance(desc, TransToken):
-            desc = tkMarkdown.convert(desc, None)
+            desc = MarkdownData(desc, None)
 
         return cls(
             name=long_name,
@@ -366,7 +366,7 @@ class SelitemData:
             self,
             auth=self.auth | other.auth,
             previews=[*self.previews, *other.previews],
-            desc=tkMarkdown.join(self.desc, other.desc),
+            desc=self.desc + other.desc,
             group=other.group or self.group,
             group_id=other.group_id or self.group_id,
             packages=self.packages | other.packages,
@@ -377,7 +377,7 @@ class SelitemData:
         yield self.name, f'{source}.long_name'
         yield self.short_name, f'{source}.short_name'
         yield self.group, f'{source}.group'
-        yield from tkMarkdown.iter_tokens(self.desc, f'{source}.desc')
+        yield from self.desc.iter_tokens(f'{source}.desc')
 
 
 TRANS_NONE_NAME = TransToken.ui("<None>")
@@ -1425,13 +1425,13 @@ def desc_parse(
     pak_id: utils.ObjectID,
     *,
     prop_name: str = 'description',
-) -> tkMarkdown.MarkdownData:
+) -> MarkdownData:
     """Parse the description blocks, to create data which matches richTextBox.
 
     """
     with srctools.logger.context(source):
         token = TransToken.parse(pak_id, parse_multiline_key(info, prop_name))
-    return tkMarkdown.convert(token, pak_id)
+    return MarkdownData(token, pak_id)
 
 
 def sep_values(string: str, delimiters: Iterable[str] = ',;/') -> list[str]:

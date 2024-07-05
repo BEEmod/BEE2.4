@@ -10,7 +10,8 @@ from srctools import Keyvalues, logger
 import attrs
 
 import utils
-from app import img, lazy_conf, tkMarkdown
+from app import img, lazy_conf
+from app.mdown import MarkdownData
 import packages
 import editoritems
 from corridor import (
@@ -54,7 +55,7 @@ class CorridorUI(Corridor):
     """Additional data only useful for the UI. """
     name: TransToken
     config: lazy_conf.LazyConf
-    desc: tkMarkdown.MarkdownData = attrs.field(repr=False)
+    desc: MarkdownData = attrs.field(repr=False)
     images: Sequence[img.Handle]
     icon: img.Handle
     authors: Sequence[TransToken]
@@ -335,7 +336,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                                 images=[ICON_GENERIC_LRG],
                                 icon=ICON_GENERIC_SML,
                                 authors=list(map(TransToken.untranslated, style.selitem_data.auth)),
-                                desc=tkMarkdown.MarkdownData.BLANK,
+                                desc=MarkdownData.BLANK,
                                 config=lazy_conf.BLANK,
                                 default_enabled=True,
                                 # Replicate previous behaviour, where this var was set to the
@@ -352,7 +353,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                                 images=[img.Handle.file(style_info.icon, IMG_WIDTH_LRG, IMG_HEIGHT_LRG)],
                                 icon=img.Handle.file(style_info.icon, IMG_WIDTH_SML, IMG_HEIGHT_SML),
                                 authors=list(map(TransToken.untranslated, style.selitem_data.auth)),
-                                desc=tkMarkdown.MarkdownData.text(style_info.desc),
+                                desc=MarkdownData(TransToken.untranslated(style_info.desc), None),
                                 config=lazy_conf.BLANK,
                                 default_enabled=True,
                                 fixups={'corr_index': str(ind + 1)},
@@ -428,8 +429,8 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
         for (mode, direction, orient), corridors in self.corridors.items():
             source = f'corridors/{self.id}.{mode.value}_{direction.value}_{orient.value}'
             for corr in corridors:
-                yield corr.name, source + '.name'
-                yield from tkMarkdown.iter_tokens(corr.desc, source + '.desc')
+                yield corr.name, f'{source}.name'
+                yield from corr.desc.iter_tokens(f'{source}.desc')
 
     def defaults(self, mode: GameMode, direction: Direction, orient: Orient) -> list[CorridorUI]:
         """Fetch the default corridor set for this mode, direction and orientation."""

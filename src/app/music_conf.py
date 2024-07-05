@@ -4,7 +4,6 @@ import tkinter
 
 from contextlib import aclosing
 from collections.abc import Iterable
-import functools
 
 from srctools import FileSystemChain, FileSystem
 import attrs

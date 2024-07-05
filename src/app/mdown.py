@@ -3,10 +3,10 @@
 Tkinter and WX most efficiently work with different result formats, so this flexibly handles either.
 """
 from __future__ import annotations
+from typing import ClassVar
 
 from abc import abstractmethod
 from collections.abc import Iterator
-from typing import ClassVar, cast
 
 import attrs
 
@@ -36,15 +36,19 @@ class MarkdownData:
         """Join multiple pieces of data together."""
         return JoinedData([self, other])
 
-    def iter_tokens(self, desc: str) -> Iterator[TransTokenSource]:
+    def __bool__(self) -> bool:
+        """Data is truthy if the source is non-blank."""
+        return bool(self.source)
+
+    def iter_tokens(self, source: str) -> Iterator[TransTokenSource]:
         """Iterate tokens contained in this data."""
-        yield self.source, desc
+        yield self.source, source
 
     # An empty set of data.
-    BLANK: ClassVar[MarkdownData] = cast('MarkdownData', ...)
+    BLANK: ClassVar[MarkdownData]
 
 
-MarkdownData.BLANK = MarkdownData(TransToken.BLANK, None)  # type: ignore
+MarkdownData.BLANK = MarkdownData(TransToken.BLANK, None)
 
 
 @attrs.define(init=False)
@@ -65,6 +69,12 @@ class JoinedData(MarkdownData):
         """Iterate tokens contained in this data."""
         for child in self.children:
             yield from child.iter_tokens(desc)
+
+    def __bool__(self) -> bool:
+        """Data is truthy if the source is non-blank."""
+        return any(self.children)
+
+    # Don't define __iadd__, we want these to be treated as mostly immutable.
 
     def __add__(self, other: MarkdownData) -> MarkdownData:
         """Join two pieces of data together, more efficiently."""

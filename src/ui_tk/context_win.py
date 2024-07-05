@@ -10,11 +10,12 @@ from trio_util import AsyncValue
 from srctools.logger import get_logger
 import trio
 
-from app import EdgeTrigger, img, sound, tkMarkdown, UI
+from app import EdgeTrigger, img, sound, UI
 from app.contextWin import (
     ChangeVersionFunc, ContextWinBase, IMG_ALPHA, IconFunc, OpenMatchingFunc, SPR, TRANS_ENT_COUNT,
     TRANS_NO_VERSIONS,
 )
+from app.mdown import MarkdownData
 from app.item_properties import PropertyWindow
 from packages import PakRef, Style
 from packages.item import Item
@@ -321,7 +322,7 @@ class ContextWin(ContextWinBase['UI.PalItem']):
         self,
         name: TransToken,
         authors: TransToken,
-        desc: tkMarkdown.MarkdownData,
+        desc: MarkdownData,
         ent_count: str,
     ) -> None:
         """Set the main set of widgets for properties."""

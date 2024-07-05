@@ -9,13 +9,12 @@ import functools
 
 import trio
 
-from app import tkMarkdown
 from app.helpMenu import (
     TRANS_CREDITS_BUTTON, TRANS_CREDITS_TITLE, TRANS_MENU_BUTTON, TRANS_CLOSE_BUTTON,
     ICONS, WEB_RESOURCES, SEPERATOR,
     CreditsWindowBase, open_url,
 )
-from transtoken import TransToken
+from app.mdown import MarkdownData
 from . import TK_ROOT, tk_tools
 from .dialogs import DIALOG
 from .img import TKImages
@@ -69,10 +68,9 @@ class CreditsWindow(CreditsWindowBase):
         ).grid(row=1, column=0)
 
     @override
-    async def _ui_apply_text(self, text: TransToken) -> None:
+    async def _ui_apply_text(self, text: MarkdownData) -> None:
         """Apply the credits text to the window."""
-        parsed_text = await trio.to_thread.run_sync(tkMarkdown.convert, text, None)
-        self._textbox.set_text(parsed_text)
+        self._textbox.set_text(text)
 
     @override
     async def _ui_show_window(self) -> None:

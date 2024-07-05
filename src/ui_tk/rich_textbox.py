@@ -194,8 +194,7 @@ class TKRenderer(base_renderer.BaseRenderer[list[Block]]):
         result = self.render_inner(token)
         for i, data in enumerate(result):
             if isinstance(data, TextSegment):
-                new_seg = TextSegment(data.text, tuple(added_tags.union(data.tags)), url or data.url)
-                result.blocks[i] = new_seg  # type: ignore  # Readonly to users.
+                result[i] = TextSegment(data.text, tuple(added_tags.union(data.tags)), url or data.url)
         return result
 
     def render_auto_link(self, token: stok.AutoLink) -> list[Block]:

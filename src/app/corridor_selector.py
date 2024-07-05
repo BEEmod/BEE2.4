@@ -11,7 +11,8 @@ import srctools.logger
 import trio
 import trio_util
 
-from app import DEV_MODE, EdgeTrigger, img, tkMarkdown
+from app import DEV_MODE, EdgeTrigger, img
+from app.mdown import MarkdownData
 from config.corridors import UIState, Config, Options
 from corridor import GameMode, Direction, Orient, Option
 from packages import corridor
@@ -377,20 +378,25 @@ class Selector[IconT: Icon, OptionRowT: OptionRow]:
                 direction = self.state_dir.value
                 options = list(self.corr_group.get_options(mode, direction, corr))
 
+                option_conf_id = Options.get_id(self.corr_group.id, mode, direction)
+                option_conf = config.APP.get_cur_conf(Options, option_conf_id)
+
                 if DEV_MODE.value:
                     # Show the instance in the description, plus fixups that are assigned.
-                    fixups = [
+                    fixup_corr = '\n'.join([
                         f'* `{var}` = `{value}`'
                         for var, value in corr.fixups.items()
-                    ] + [
-                        f'* `{opt.fixup}` = {opt.name}'
+                    ])
+                    fixup_opt = '\n'.join([
+                        f'* `{opt.fixup}` = {option_conf.value_for(opt)}'
                         for opt in options
-                    ]
-                    description = tkMarkdown.join(
-                        tkMarkdown.MarkdownData.text(f'{corr.instance}\n', tkMarkdown.TextTag.CODE),
-                        corr.desc,
-                        tkMarkdown.MarkdownData.text('\nFixups:\n', tkMarkdown.TextTag.BOLD),
-                        tkMarkdown.convert(TransToken.untranslated('\n'.join(fixups)), None)
+                    ])
+                    description = (
+                        MarkdownData(TransToken.untranslated(f'`{corr.instance}`\n'), None)
+                        + corr.desc
+                        + MarkdownData(TransToken.untranslated(
+                            f'\n**Fixups:**\n{fixup_corr}\n{fixup_opt}'
+                        ), None)
                     )
                 else:
                     description = corr.desc
@@ -412,8 +418,6 @@ class Selector[IconT: Icon, OptionRowT: OptionRow]:
                 )
 
                 # Place all options in the UI.
-                option_conf_id = Options.get_id(self.corr_group.id, mode, direction)
-                option_conf = config.APP.get_cur_conf(Options, option_conf_id)
                 while len(options) > len(self.option_rows):
                     self.option_rows.append(self.ui_option_create())
 
@@ -449,7 +453,7 @@ class Selector[IconT: Icon, OptionRowT: OptionRow]:
                     title=TransToken.BLANK,
                     authors=TransToken.BLANK,
                     options_title=TransToken.BLANK,
-                    desc=tkMarkdown.MarkdownData.BLANK,
+                    desc=MarkdownData.BLANK,
                     show_no_options=False,
                 )
                 self.ui_enable_just_this(False)
@@ -542,7 +546,7 @@ class Selector[IconT: Icon, OptionRowT: OptionRow]:
         self, *,
         title: TransToken,
         authors: TransToken,
-        desc: tkMarkdown.MarkdownData,
+        desc: MarkdownData,
         options_title: TransToken,
         show_no_options: bool,
     ) -> None:

@@ -8,11 +8,12 @@ import tkinter as tk
 
 import trio
 
-from app import img, tkMarkdown
+from app import img
 from app.corridor_selector import (
     HEIGHT, IMG_ARROW_LEFT, IMG_ARROW_RIGHT, IMG_CORR_BLANK, Icon,
     OptionRow, Selector, TRANS_HELP, TRANS_NO_OPTIONS, WIDTH, TRANS_RAND_OPTION,
 )
+from app.mdown import MarkdownData
 from config.corridors import UIState
 from corridor import Direction, GameMode, Option, Orient
 from transtoken import TransToken
@@ -369,7 +370,7 @@ class TkSelector(Selector[IconUI, OptionRowUI]):
         self, *,
         title: TransToken,
         authors: TransToken,
-        desc: tkMarkdown.MarkdownData,
+        desc: MarkdownData,
         options_title: TransToken,
         show_no_options: bool,
     ) -> None:

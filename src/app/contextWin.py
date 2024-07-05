@@ -17,9 +17,10 @@ from trio_util import AsyncValue
 from srctools.logger import get_logger
 import trio
 
-from . import EdgeTrigger, tkMarkdown, sound, img, DEV_MODE
+from . import EdgeTrigger, sound, img, DEV_MODE
 from .item_properties import PropertyWindow
-from app.dialogs import Dialogs
+from .mdown import MarkdownData
+from .dialogs import Dialogs
 from consts import DefaultItems
 from packages.item import Item, ItemVariant, SubItemRef, Version
 from packages.signage import ITEM_ID as SIGNAGE_ITEM_ID
@@ -145,21 +146,21 @@ def ind_for_pos(item: Item, pos: int) -> int | None:
 
 def get_description(
     global_last: bool,
-    glob_desc: tkMarkdown.MarkdownData,
-    style_desc: tkMarkdown.MarkdownData,
-) -> tkMarkdown.MarkdownData:
+    glob_desc: MarkdownData,
+    style_desc: MarkdownData,
+) -> MarkdownData:
     """Join together the general and style description for an item."""
     if glob_desc and style_desc:
         if global_last:
-            return tkMarkdown.join(style_desc, glob_desc)
+            return style_desc + glob_desc
         else:
-            return tkMarkdown.join(glob_desc, style_desc)
+            return glob_desc + style_desc
     elif glob_desc:
         return glob_desc
     elif style_desc:
         return style_desc
     else:
-        return tkMarkdown.MarkdownData.BLANK  # No description
+        return MarkdownData.BLANK  # No description
 
 
 class ContextWinBase[TargetT]:
@@ -258,26 +259,7 @@ class ContextWinBase[TargetT]:
         )
         # Dump out the instances used in this item.
         if DEV_MODE.value:
-            inst_desc = []
-            for editor in [variant.editor] + variant.editor_extra:
-                if editor is variant.editor:
-                    heading = '\n\nInstances:\n'
-                else:
-                    heading = f'\nInstances ({editor.id}):\n'
-                inst_desc.append(tkMarkdown.TextSegment(heading, (tkMarkdown.TextTag.BOLD, )))
-                for ind, inst in enumerate(editor.instances):
-                    inst_desc.append(tkMarkdown.TextSegment(f'{ind}: ', (tkMarkdown.TextTag.INDENT, )))
-                    inst_desc.append(
-                        tkMarkdown.TextSegment(f'{inst.inst}\n', (tkMarkdown.TextTag.CODE, ))
-                        if inst.inst != FSPath() else tkMarkdown.TextSegment('""\n')
-                    )
-                for name, inst_path in editor.cust_instances.items():
-                    inst_desc.append(tkMarkdown.TextSegment(f'"{name}": ', (tkMarkdown.TextTag.INDENT, )))
-                    inst_desc.append(
-                        tkMarkdown.TextSegment(f'{inst_path}\n', (tkMarkdown.TextTag.CODE, ))
-                        if inst_path != FSPath() else tkMarkdown.TextSegment('""\n')
-                    )
-            desc = tkMarkdown.join(desc, tkMarkdown.SingleMarkdown(inst_desc))
+            desc += variant.instance_desc()
 
         self.ui_set_props_main(
             name=subtype.name,
@@ -524,7 +506,7 @@ class ContextWinBase[TargetT]:
         self,
         name: TransToken,
         authors: TransToken,
-        desc: tkMarkdown.MarkdownData,
+        desc: MarkdownData,
         ent_count: str,
     ) -> None:
         """Set the main set of widgets for properties."""

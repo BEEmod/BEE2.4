@@ -22,7 +22,8 @@ from aioresult import ResultCapture
 import attrs
 import trio
 
-from app import tkMarkdown, img, lazy_conf, DEV_MODE
+from app import img, lazy_conf, DEV_MODE
+from app.mdown import MarkdownData
 from config.item_defaults import DEFAULT_VERSION, ItemDefault
 from connections import Config as ConnConfig
 from editoritems import Item as EditorItem, InstCount
@@ -84,7 +85,7 @@ class ItemVariant:
         editor_extra: list[EditorItem],
         authors: list[str],
         tags: list[str],
-        desc: tkMarkdown.MarkdownData,
+        desc: MarkdownData,
         icons: dict[str, img.Handle],
         ent_count: str = '',
         url: str | None = None,
@@ -108,6 +109,9 @@ class ItemVariant:
         # The name and VTF for grouped items
         self.all_name = all_name
         self.all_icon = all_icon
+
+        # Cached Markdown data with a representation of the instances used.
+        self._inst_desc: MarkdownData | None = None
 
     def copy(self) -> ItemVariant:
         """Make a copy of all the data."""
@@ -136,7 +140,7 @@ class ItemVariant:
         self.authors.extend(other.authors)
         self.tags.extend(self.tags)
         self.vbsp_config = lazy_conf.concat(self.vbsp_config, other.vbsp_config)
-        self.desc = tkMarkdown.join(self.desc, other.desc)
+        self.desc += other.desc
 
     async def modify(self, pak_id: utils.ObjectID, kv: Keyvalues, source: str) -> ItemVariant:
         """Apply a config to this item variant.
@@ -178,10 +182,7 @@ class ItemVariant:
             desc = self.desc
 
         if 'appenddesc' in kv:
-            desc = tkMarkdown.join(
-                desc,
-                desc_parse(kv, source, pak_id, prop_name='appenddesc'),
-            )
+            desc += desc_parse(kv, source, pak_id, prop_name='appenddesc')
 
         if 'authors' in kv:
             authors = sep_values(kv['authors', ''])
@@ -232,9 +233,35 @@ class ItemVariant:
         yield from self.editor.iter_trans_tokens(source)
         if self.all_name:
             yield self.all_name, source + '.all_name'
-        yield from tkMarkdown.iter_tokens(self.desc, source + '.desc')
+        yield from self.desc.iter_tokens(source + '.desc')
         for item in self.editor_extra:
             yield from item.iter_trans_tokens(f'{source}:{item.id}')
+
+    def instance_desc(self) -> MarkdownData:
+        """Produce a description of the instances used by this item."""
+        if self._inst_desc is not None:
+            return self._inst_desc
+        inst_desc = []
+        for editor in [self.editor] + self.editor_extra:
+            if editor is self.editor:
+                inst_desc.append('\n\n**Instances:**\n')
+            else:
+                inst_desc.append(f'\n**Instances ({editor.id}):**\n')
+            for ind, inst in enumerate(editor.instances):
+                inst_desc.append(f'* {ind}: ')
+                inst_desc.append(
+                    f'"`{inst.inst}`"\n'
+                    if inst.inst != FSPath() else '""\n'
+                )
+            for name, inst_path in editor.cust_instances.items():
+                inst_desc.append(f'* "{name}": ')
+                inst_desc.append(
+                    f'"`{inst_path}`"\n'
+                    if inst_path != FSPath() else '""\n'
+                )
+        LOGGER.info('Desc: {}', repr(''.join(inst_desc)))
+        self._inst_desc = desc = MarkdownData(TransToken.untranslated(''.join(inst_desc)), None)
+        return desc
 
     def _modify_editoritems(
         self,
@@ -463,7 +490,7 @@ class Item(PakObject, needs_foreground=True):
         all_conf: lazy_conf.LazyConf,
         unstyled: bool,
         isolate_versions: bool,
-        glob_desc: tkMarkdown.MarkdownData,
+        glob_desc: MarkdownData,
         desc_last: bool,
         folders: dict[tuple[FileSystem, str], ItemVariant],
     ) -> None:
@@ -665,7 +692,7 @@ class Item(PakObject, needs_foreground=True):
     @override
     def iter_trans_tokens(self) -> Iterator[TransTokenSource]:
         """Yield all translation tokens in this item."""
-        yield from tkMarkdown.iter_tokens(self.glob_desc, f'items/{self.id}.desc')
+        yield from self.glob_desc.iter_tokens(f'items/{self.id}.desc')
         for version in self.versions.values():
             for style_id, variant in version.styles.items():
                 yield from variant.iter_trans_tokens(f'items/{self.id}/{style_id}')
