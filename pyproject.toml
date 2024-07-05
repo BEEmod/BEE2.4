@@ -57,6 +57,7 @@ extend-ignore = [
 	"E731",  # Lambda assignment used intentionally for callbacks.
 	"F403",  # Allow *-imports,
 	"F405",  # name may be undefined, or defined from star imports: module
+	"F841",  # Unused local triggers on partial unpacks.
 
 	# Flake8-annotations.
 	# Type annotations for self & cls are not important.
@@ -79,6 +80,7 @@ extend-ignore = [
 	"PLW2901",  # Allow redefining loop var inside the loop.
 	"PLW0120",  # for-else with return/break inside is just stylistic, exactly equivalent.
 	"PLC1901",  # Allow comparison to empty string etc.
+	"PLW0108",  # Need lambdas for deliberate late binding sometimes.
 
 	# Flake8-pyi:
 	"PYI041",  # Use int | float

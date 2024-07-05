@@ -53,7 +53,6 @@ class SignageUI(SignageUIBase[wx.Window]):
         panel_preview = wx.Panel(panel_main, wx.ID_ANY, style=wx.BORDER_RAISED)
         # panel_preview.SetMinSize((148, 72))
         sizer_left.Add(panel_preview, 0, wx.ALIGN_CENTRE_HORIZONTAL | wx.ALL, 4)
-        sizer_preview_vert = wx.BoxSizer(wx.VERTICAL)
         sizer_preview_horiz = wx.BoxSizer(wx.HORIZONTAL)
         panel_preview.SetSizer(sizer_preview_horiz)
 

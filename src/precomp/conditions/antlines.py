@@ -197,9 +197,9 @@ def res_antlaser(vmf: VMF, res: Keyvalues) -> object:
             | 16  # StartSparks
             | 32  # EndSparks
             | 64  # Decal End
-            #| 128  # Shade Start
-            #| 256  # Shade End
-            #| 512  # Taper Out
+            # 128 - Shade Start
+            # 256 - Shade End
+            # 512 - Taper Out
         )
     else:
         conf_beam_flags = 0

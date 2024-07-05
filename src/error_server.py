@@ -9,6 +9,9 @@ This has 3 endpoints:
 - /ping is triggered by the webpage repeatedly while open, to ensure the server stays alive.
 """
 from __future__ import annotations
+
+import io
+
 from typing_extensions import override
 import functools
 import http
@@ -78,6 +81,7 @@ async def route_display_errors() -> str:
 @app.route('/displaydata')
 async def route_render_data() -> dict[str, object]:
     """Return the geometry for rendering the current error."""
+    await trio.lowlevel.checkpoint()
     return {
         'tiles': current_error.faces,
         'voxels': current_error.voxels,
@@ -125,6 +129,7 @@ async def route_shutdown() -> quart.ResponseReturnValue:
     """Called by the application to force us to shut down so this can be updated."""
     LOGGER.info('Recieved shutdown request!')
     SHUTDOWN_SCOPE.cancel()
+    await trio.lowlevel.checkpoint()
     return 'DONE'
 
 
@@ -218,8 +223,10 @@ async def load_info() -> None:
 
     if current_error.language_file is not None:
         try:
-            with open(current_error.language_file, 'rb') as f:
-                translations[transtoken.NS_UI] = gettext.GNUTranslations(f)
+            lang_data = await trio.Path(current_error.language_file).read_bytes()
+            # GNUTranslations immediately reads the whole thing, so this buffer doesn't change
+            # anything.
+            translations[transtoken.NS_UI] = gettext.GNUTranslations(io.BytesIO(lang_data))
         except OSError:
             LOGGER.exception('Could not load UI translations file!')
             return

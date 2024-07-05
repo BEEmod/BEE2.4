@@ -1,6 +1,7 @@
 """Test the ErrorUI handling system."""
 
 import pytest
+import trio.lowlevel
 
 from app.errors import ErrorUI, Result
 from transtoken import AppError, TransToken
@@ -26,6 +27,7 @@ def test_exception() -> None:
 
 async def handler_fail(title: TransToken, desc: TransToken, errors: list[AppError]) -> None:
     """Should never be used."""
+    await trio.lowlevel.checkpoint()
     pytest.fail("Handler called!")
 
 
@@ -74,6 +76,7 @@ async def test_nonfatal() -> None:
         assert title is orig_title
         assert str(desc) == "nonfatal warn, n=5"
         caught_errors.extend(errors)
+        await trio.lowlevel.checkpoint()
 
     exc1 = AppError(TransToken.untranslated("Error 1"))
     exc2 = AppError(TransToken.untranslated("Error 2"))
@@ -133,6 +136,7 @@ async def test_fatal_only_err() -> None:
         assert title is orig_title
         assert str(desc) == "fatal_only_error error, n=2"
         caught_errors.extend(errors)
+        await trio.lowlevel.checkpoint()
 
     exc1 = AppError(TransToken.untranslated("Error 1"))
     exc2 = AppError(TransToken.untranslated("Error 2"))

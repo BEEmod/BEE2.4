@@ -73,19 +73,23 @@ async def test_direct_cycle(autojump_clock: trio.abc.Clock) -> None:
     @order.add_step(prereq=[], results=[Resource.A])
     async def step_1(ctx: object) -> None:
         """Prerequisite to everything."""
+        await trio.lowlevel.checkpoint()
         log.append('step 1')
 
     @order.add_step(prereq=[Resource.A], results=[])
     async def step_2(ctx: object) -> None:
         """This is started when the cycle occurs, but is able to run."""
+        await trio.lowlevel.checkpoint()
         log.append('step 2')
 
     @order.add_step(prereq=[Resource.A, Resource.B], results=[Resource.C])
     async def step_3(ctx: object) -> None:
+        await trio.lowlevel.checkpoint()
         pytest.fail("Shouldn't run.")
 
     @order.add_step(prereq=[Resource.C], results=[Resource.B])
     async def step_4(ctx: object) -> None:
+        await trio.lowlevel.checkpoint()
         pytest.fail("Shouldn't run.")
 
     with RaisesGroup(CycleError, strict=False):

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any, TYPE_CHECKING
 from enum import Enum, auto
-from pathlib import Path, PurePath
+from pathlib import PurePath
 from collections.abc import Callable
 import os
 

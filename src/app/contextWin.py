@@ -26,7 +26,7 @@ from packages.item import Item, ItemVariant, SubItemRef, Version
 from packages.signage import ITEM_ID as SIGNAGE_ITEM_ID
 import packages
 
-from editoritems import Handle as RotHandle, SubType, Surface, ItemClass, FSPath
+from editoritems import Handle as RotHandle, SubType, Surface, ItemClass
 from editoritems_props import prop_timer_delay
 from transtoken import TransToken
 

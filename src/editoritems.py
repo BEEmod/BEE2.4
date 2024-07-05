@@ -1197,7 +1197,7 @@ class Item:
                     raise tok.error('Unknown property option "{}"!', prop_value)
             try:
                 self.properties[prop_type.id.casefold()] = ItemProp(
-                    prop_type,default, index, not disable_prop, desc,
+                    prop_type, default, index, not disable_prop, desc,
                 )
             except ValueError as exc:
                 raise tok.error(
