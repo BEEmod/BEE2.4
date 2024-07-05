@@ -1,11 +1,11 @@
 """Parse Markdown and display it in Tkinter widgets."""
 from __future__ import annotations
-from typing import Never, Final, cast
+from typing import Never
 from tkinter.font import Font as tkFont, nametofont
 from tkinter.messagebox import askokcancel
 import tkinter
 
-from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterable, Iterator, Mapping
 from contextvars import ContextVar
 import urllib.parse
 import itertools
@@ -18,15 +18,17 @@ import mistletoe
 import attrs
 import srctools.logger
 
-from app import tkMarkdown
 from app.img import Handle as ImgHandle
-from transtoken import TransToken, TransTokenSource
+from app import mdown
+from transtoken import TransToken
 from ui_tk.tk_tools import Cursors
 from ui_tk.img import TK_IMG
 import utils
 
 LOGGER = srctools.logger.get_logger(__name__)
 TRANS_WEBBROWSER = TransToken.ui('Open "{url}" in the default browser?')
+
+__all__ = ['RichText']
 
 
 def iter_firstlast[T](iterable: Iterable[T]) -> Iterator[tuple[bool, T, bool]]:
@@ -122,73 +124,9 @@ BULLETS = [
 ]
 
 
-class MarkdownData:
-    """Protocol for objects holding Markdown data."""
-    def __iter__(self) -> Iterator[Block]:
-        return iter(())
-
-    def __bool__(self) -> bool:
-        """Check if this is non-empty."""
-        return False
-
-    @staticmethod
-    def text(text: str, *tags: TextTag, url: str | None = None) -> SingleMarkdown:
-        """Construct data with a single text segment."""
-        return SingleMarkdown([TextSegment(text, tags, url)])
-
-    # An empty set of data.
-    BLANK: Final[MarkdownData] = cast('MarkdownData', ...)
-
-
-MarkdownData.BLANK = MarkdownData()  # type: ignore
-
-
-@attrs.define
-class TranslatedMarkdown(MarkdownData):
-    """Markdown data parsed out of translated sources."""
-    source: TransToken
-    package: utils.ObjectID | None
-    _blocks: Sequence[Block] = attrs.Factory(list)
-    _cache_hash: int = -1
-
-    def __bool__(self) -> bool:
-        """Check if this is non-empty."""
-        return bool(self.source)
-
-    def __iter__(self) -> Iterator[Block]:
-        """Convert if necessary, then return the blocks."""
-        text = str(self.source)
-        if hash(text) != self._cache_hash:
-            self._blocks = list(_convert(text, self.package))
-            self._cache_hash = hash(text)
-        return iter(self._blocks)
-
-
-@attrs.define
-class SingleMarkdown(MarkdownData):
-    """The output of the conversion, a set of tags and link references for callbacks.
-
-    Blocks are a list of data.
-    """
-    # External users shouldn't modify directly, so make it readonly.
-    blocks: Sequence[Block] = attrs.field(factory=[].copy)
-
-    def __iter__(self) -> Iterator[Block]:
-        return iter(self.blocks)
-
-    def __bool__(self) -> bool:
-        """Empty data is false."""
-        return bool(self.blocks)
-
-
-@attrs.define
-class JoinedMarkdown(MarkdownData):
-    """Multiple blocks of data which has been joined together."""
-    children: list[MarkdownData]
-
-    def __iter__(self) -> Iterator[Block]:
-        """Recursively iterate children."""
-        return itertools.chain.from_iterable(self.children)
+def segment(text: str, *tags: TextTag, url: str | None = None) -> list[Block]:
+    """Construct data with a single text segment."""
+    return [TextSegment(text, tags, url)]
 
 
 @attrs.define
@@ -211,17 +149,17 @@ if not hasattr(base_renderer.BaseRenderer, '__class_getitem__'):
     base_renderer.BaseRenderer.__class_getitem__ = lambda item: base_renderer.BaseRenderer  # type: ignore
 
 
-class TKRenderer(base_renderer.BaseRenderer[SingleMarkdown]):
+class TKRenderer(base_renderer.BaseRenderer[list[Block]]):
     """Extension needed to extract our list from the tree.
     """
-    def render(self, token: Token) -> SingleMarkdown:
+    def render(self, token: Token) -> list[Block]:
         """Check that the state has been fetched."""
         assert state.get() is not no_state
         result = super().render(token)
-        assert isinstance(result, SingleMarkdown)
+        assert isinstance(result, list)
         return result
 
-    def render_inner(self, token: Token) -> SingleMarkdown:
+    def render_inner(self, token: Token) -> list[Block]:
         """Recursively renders child tokens.
 
         We merge together adjacient segments, to tidy up the block list.
@@ -229,7 +167,7 @@ class TKRenderer(base_renderer.BaseRenderer[SingleMarkdown]):
         blocks: list[Block] = []
         if not hasattr(token, 'children'):
             result = super().render_inner(token)
-            assert isinstance(result, SingleMarkdown)
+            assert isinstance(result, list)
             return result
         child: Token
 
@@ -244,14 +182,14 @@ class TKRenderer(base_renderer.BaseRenderer[SingleMarkdown]):
                             continue
                 blocks.append(data)
 
-        return SingleMarkdown(blocks)
+        return blocks
 
     def _with_tag(
         self,
         token: stok.SpanToken | btok.BlockToken,
         *tags: TextTag,
         url: str | None = None,
-    ) -> SingleMarkdown:
+    ) -> list[Block]:
         added_tags = set(tags)
         result = self.render_inner(token)
         for i, data in enumerate(result):
@@ -260,56 +198,56 @@ class TKRenderer(base_renderer.BaseRenderer[SingleMarkdown]):
                 result.blocks[i] = new_seg  # type: ignore  # Readonly to users.
         return result
 
-    def render_auto_link(self, token: stok.AutoLink) -> SingleMarkdown:
+    def render_auto_link(self, token: stok.AutoLink) -> list[Block]:
         """An automatic link - the child is a single raw token."""
         [child] = token.children
         assert isinstance(child, stok.RawText)
-        return MarkdownData.text(child.content, TextTag.LINK, url=token.target)
+        return segment(child.content, TextTag.LINK, url=token.target)
 
-    def render_block_code(self, token: btok.BlockCode) -> SingleMarkdown:
+    def render_block_code(self, token: btok.BlockCode) -> list[Block]:
         """Render full code blocks."""
         [child] = token.children
         assert isinstance(child, stok.RawText)
         # TODO: Code block.
-        return MarkdownData.text(child.content, TextTag.CODE)
+        return segment(child.content, TextTag.CODE)
 
-    def render_document(self, token: btok.Document) -> SingleMarkdown:
+    def render_document(self, token: btok.Document) -> list[Block]:
         """Render the outermost document."""
         self.footnotes.update(token.footnotes)
         return self.render_inner(token)
 
-    def render_escape_sequence(self, token: stok.EscapeSequence) -> SingleMarkdown:
+    def render_escape_sequence(self, token: stok.EscapeSequence) -> list[Block]:
         """Render backslash escaped text."""
         [child] = token.children
         assert isinstance(child, stok.RawText)
-        return SingleMarkdown.text(child.content)
+        return [TextSegment(child.content)]
 
-    def render_image(self, token: stok.Image) -> SingleMarkdown:
+    def render_image(self, token: stok.Image) -> list[Block]:
         """Embed an image into a file."""
         package = state.get().package
         if package is None:
             raise ValueError("Image used, but no package supplied!")
         uri = utils.PackagePath.parse(urllib.parse.unquote(token.src), package)
-        return SingleMarkdown([Image(ImgHandle.parse_uri(uri))])
+        return [Image(ImgHandle.parse_uri(uri))]
 
-    def render_inline_code(self, token: stok.InlineCode) -> SingleMarkdown:
+    def render_inline_code(self, token: stok.InlineCode) -> list[Block]:
         """Render inline code segments."""
         [child] = token.children
         assert isinstance(child, stok.RawText)
-        return MarkdownData.text(child.content, TextTag.CODE)
+        return segment(child.content, TextTag.CODE)
 
-    def render_line_break(self, token: stok.LineBreak) -> SingleMarkdown:
+    def render_line_break(self, token: stok.LineBreak) -> list[Block]:
         """Render a newline."""
         if token.soft:
-            return SingleMarkdown([])
+            return []
         else:
-            return MarkdownData.text('\n')
+            return [TextSegment('\n')]
 
-    def render_link(self, token: stok.Link) -> SingleMarkdown:
+    def render_link(self, token: stok.Link) -> list[Block]:
         """Render links."""
         return self._with_tag(token, url=token.target)
 
-    def render_list(self, token: btok.List) -> SingleMarkdown:
+    def render_list(self, token: btok.List) -> list[Block]:
         """The wrapping around a list, specifying the type and start number."""
         stack = state.get().list_stack
         stack.append(token.start)
@@ -318,7 +256,7 @@ class TKRenderer(base_renderer.BaseRenderer[SingleMarkdown]):
         finally:
             stack.pop()
 
-    def render_list_item(self, token: btok.ListItem) -> SingleMarkdown:
+    def render_list_item(self, token: btok.ListItem) -> list[Block]:
         """The individual items in a list."""
         stack = state.get().list_stack
         count = stack[-1]
@@ -330,56 +268,56 @@ class TKRenderer(base_renderer.BaseRenderer[SingleMarkdown]):
             prefix = f'{count}. '
             stack[-1] = count + 1
 
-        return _merge(
-            MarkdownData.text(prefix, TextTag.LIST_START),
-            self._with_tag(token, TextTag.LIST),
-        )
+        return [
+            *segment(prefix, TextTag.LIST_START),
+            *self._with_tag(token, TextTag.LIST),
+        ]
 
-    def render_paragraph(self, token: btok.Paragraph) -> SingleMarkdown:
+    def render_paragraph(self, token: btok.Paragraph) -> list[Block]:
         """Render a text paragraph."""
         if state.get().list_stack:  # Collapse together.
-            return _merge(self.render_inner(token), MarkdownData.text('\n'))
+            return [*self.render_inner(token), *segment('\n')]
         else:
-            return _merge(MarkdownData.text('\n'), self.render_inner(token), MarkdownData.text('\n'))
+            return [*segment('\n'), *self.render_inner(token), *segment('\n')]
 
-    def render_raw_text(self, token: stok.RawText) -> SingleMarkdown:
+    def render_raw_text(self, token: stok.RawText) -> list[Block]:
         """Render raw text."""
-        return MarkdownData.text(token.content)
+        return segment(token.content)
 
-    def render_table(self, token: btok.Table) -> SingleMarkdown:
+    def render_table(self, token: btok.Table) -> list[Block]:
         """We don't support tables."""
         # TODO?
-        return MarkdownData.text('<Tables not supported>')
+        return segment('<Tables not supported>')
 
-    def render_table_cell(self, token: btok.TableCell) -> SingleMarkdown:
+    def render_table_cell(self, token: btok.TableCell) -> list[Block]:
         """Unimplemented table cells."""
-        return MarkdownData.text('<Tables not supported>')
+        return segment('<Tables not supported>')
 
-    def render_table_row(self, token: btok.TableRow) -> SingleMarkdown:
+    def render_table_row(self, token: btok.TableRow) -> list[Block]:
         """Unimplemented table rows."""
-        return MarkdownData.text('<Tables not supported>')
+        return segment('<Tables not supported>')
 
-    def render_thematic_break(self, token: btok.ThematicBreak) -> SingleMarkdown:
+    def render_thematic_break(self, token: btok.ThematicBreak) -> list[Block]:
         """Render a horizontal rule."""
-        return SingleMarkdown(_HR.copy())
+        return list[Block](_HR.copy())
 
-    def render_heading(self, token: btok.Heading) -> SingleMarkdown:
+    def render_heading(self, token: btok.Heading) -> list[Block]:
         """Render a level 1-6 heading."""
         return self._with_tag(token, TAG_HEADINGS[token.level])
 
-    def render_quote(self, token: btok.Quote) -> SingleMarkdown:
+    def render_quote(self, token: btok.Quote) -> list[Block]:
         """Render blockquotes."""
         return self._with_tag(token, TextTag.INDENT)
 
-    def render_strikethrough(self, token: stok.Strikethrough) -> SingleMarkdown:
+    def render_strikethrough(self, token: stok.Strikethrough) -> list[Block]:
         """Render strikethroughed text."""
         return self._with_tag(token, TextTag.STRIKETHROUGH)
 
-    def render_strong(self, token: stok.Strong) -> SingleMarkdown:
+    def render_strong(self, token: stok.Strong) -> list[Block]:
         """Render <strong> tags, with bold fonts."""
         return self._with_tag(token, TextTag.BOLD)
 
-    def render_emphasis(self, token: stok.Emphasis) -> SingleMarkdown:
+    def render_emphasis(self, token: stok.Emphasis) -> list[Block]:
         """Render <em> tags, with italic fonts."""
         return self._with_tag(token, TextTag.ITALIC)
 
@@ -387,15 +325,7 @@ class TKRenderer(base_renderer.BaseRenderer[SingleMarkdown]):
 _RENDERER = TKRenderer()
 
 
-def _merge(*blocks: SingleMarkdown) -> SingleMarkdown:
-    """Merge single markdown blocks together."""
-    result: list[Block] = []
-    for seg in blocks:
-        result.extend(seg.blocks)
-    return SingleMarkdown(result)
-
-
-def _convert(text: str, package: utils.ObjectID | None) -> SingleMarkdown:
+def _convert(text: str, package: utils.ObjectID | None) -> list[Block]:
     """Actually convert markdown data."""
     tok = state.set(RenderState(package))
     with _RENDERER:
@@ -405,32 +335,21 @@ def _convert(text: str, package: utils.ObjectID | None) -> SingleMarkdown:
             state.reset(tok)
 
 
-def convert(text: TransToken, package: utils.ObjectID | None) -> MarkdownData:
-    """Convert Markdown syntax into data ready to be passed to richTextBox.
+class DataConverter(mdown.BaseRenderer[list[Block]]):
+    """Converter specific to TK."""
+    def _convert(self, text: str, package: utils.ObjectID | None) -> list[Block]:
+        tok = state.set(RenderState(package))
+        with _RENDERER:
+            try:
+                return _RENDERER.render(mistletoe.Document(text))
+            finally:
+                state.reset(tok)
 
-    The package must be passed to allow using images in the document. None should only be
-    used for app-defined strings where we know that can't occur.
-    """
-    # If untranslated, it'll never change so convert to blocks and discard the source.
-    if text.is_untranslated:
-        return _convert(str(text), package)
-    # Otherwise, keep the source, don't change later.
-    return TranslatedMarkdown(text, package)
-
-
-def join(*args: MarkdownData) -> MarkdownData:
-    """Merge several mardown blocks together."""
-    # This preserves the originals, so they can be translated separately.
-    return JoinedMarkdown(list(args))
+    def _join(self, children: list[list[Block]]) -> list[Block]:
+        return list(itertools.chain.from_iterable(children))
 
 
-def iter_tokens(data: MarkdownData, source: str) -> Iterator[TransTokenSource]:
-    """Yield all tokens present in this data block."""
-    if isinstance(data, TranslatedMarkdown):
-        yield (data.source, source)
-    elif isinstance(data, JoinedMarkdown):
-        for child in data.children:
-            yield from iter_tokens(child, source)
+_CONVERTER = DataConverter(list)
 
 
 class RichText(tkinter.Text):
@@ -443,6 +362,7 @@ class RichText(tkinter.Text):
         width: int = 10, height: int = 4,
         font: str | tkFont = "TkDefaultFont",
     ) -> None:
+
         # Setup all our configuration for inserting text.
         if isinstance(font, str):
             font = nametofont(font)
@@ -540,11 +460,10 @@ class RichText(tkinter.Text):
 
     # noinspection PyUnresolvedReferences
     # noinspection PyProtectedMember
-    def set_text(self, text_data: str | tkMarkdown.MarkdownData) -> None:
+    def set_text(self, text_data: str | mdown.MarkdownData) -> None:
         """Write the rich-text into the textbox.
 
-        text_data should either be a string, or the data returned from
-        tkMarkdown.convert().
+        text_data should either be a string, or the data returned from MARKDOWN().
         """
         # Remove all previous link commands
         for cmd_tag, cmd_id in self._link_commands.values():
@@ -561,8 +480,10 @@ class RichText(tkinter.Text):
                 super().insert("end", text_data)
                 return
 
-            for is_first, block, is_last in iter_firstlast(text_data):
-                if isinstance(block, tkMarkdown.TextSegment):
+            converted = _CONVERTER.convert(text_data)
+
+            for is_first, block, is_last in iter_firstlast(converted):
+                if isinstance(block, TextSegment):
                     tags: tuple[str, ...]
                     if block.url:
                         try:
@@ -585,12 +506,11 @@ class RichText(tkinter.Text):
                     if is_last:
                         text = text.rstrip('\n')
                     super().insert('end', text, tags)
-                elif isinstance(block, tkMarkdown.Image):
+                elif isinstance(block, Image):
                     super().insert('end', '\n')
                     img_pos = TK_IMG.textwid_add(self, 'end', block.handle)
                     super().tag_add(TextTag.IMAGE, img_pos)
                     super().insert('end', '\n')
-
                 else:
                     raise ValueError(f'Unknown block {block!r}?')
         finally:
