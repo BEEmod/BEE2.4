@@ -20,13 +20,12 @@ import functools
 import math
 import random
 
-import attrs
 from srctools import Vec, EmptyMapping
 from srctools.filesys import FileSystemChain
-
-from trio_util import AsyncValue
-import trio
+import attrs
 import srctools.logger
+import trio
+import trio_util
 
 from ui_tk.rich_textbox import RichText
 from app import tkMarkdown, sound, img, DEV_MODE
@@ -106,7 +105,7 @@ async def _update_sampler_task(sampler: sound.SamplePlayer, button: ttk.Button) 
             button['text'] = BTN_STOP if is_playing else BTN_PLAY
 
 
-async def _store_results_task(chosen: AsyncValue[utils.SpecialID], save_id: str) -> None:
+async def _store_results_task(chosen: trio_util.AsyncValue[utils.SpecialID], save_id: str) -> None:
     """Store configured results when changed."""
     async with aclosing(chosen.eventual_values()) as agen:
         async for item_id in agen:
@@ -336,7 +335,7 @@ class SelectorWinBase[ButtonT, SuggLblT]:
 
     # The selected item is the one clicked on inside the window, while chosen
     # is the one actually chosen.
-    chosen: AsyncValue[utils.SpecialID]
+    chosen: trio_util.AsyncValue[utils.SpecialID]
     selected: utils.SpecialID
     _visible: bool  # If the window is currently open.
     _readonly: bool
@@ -414,8 +413,10 @@ class SelectorWinBase[ButtonT, SuggLblT]:
         # Currently suggested item objects. This would be a set, but we want to randomly pick.
         self.suggested = []
         # While the user hovers over the "suggested" button, cycle through random items. But we
-        # want to apply that specific item when clicked.
+        # want to apply that specific item when clicked. This stores the selected item.
         self._suggested_rollover = None
+        # And this is used to control whether to start/stop hovering.
+        self.suggested_rollover_active = trio_util.AsyncBool()
         self._suggest_lbl = []
 
         # Should we have the 'reset to default' button?
@@ -433,7 +434,7 @@ class SelectorWinBase[ButtonT, SuggLblT]:
             config.APP.store_conf(prev_state, opt.save_id)
 
         self.selected = prev_state.id
-        self.chosen = AsyncValue(self.selected)
+        self.chosen = trio_util.AsyncValue(self.selected)
 
         self._packset = packages.PackagesSet()
 
@@ -469,6 +470,7 @@ class SelectorWinBase[ButtonT, SuggLblT]:
         """This must be run to make the window operational."""
         async with trio.open_nursery() as nursery:
             nursery.start_soon(self._load_data_task)
+            nursery.start_soon(self._rollover_suggest_task)
             if self.sampler is not None and self.samp_button is not None:
                 nursery.start_soon(_update_sampler_task, self.sampler, self.samp_button)
             if self.store_last_selected:
@@ -647,6 +649,24 @@ class SelectorWinBase[ButtonT, SuggLblT]:
             assert menu_pos is not None, "Didn't add to the menu?"
             group.menu_pos = menu_pos
 
+    async def _rollover_suggest_task(self) -> None:
+        """Handle previewing suggested items when hovering over the 'set suggested' button."""
+        while True:
+            await self.suggested_rollover_active.wait_value(True)
+            async with trio_util.move_on_when(
+                self.suggested_rollover_active.wait_value, False,
+            ):
+                if self.suggested:
+                    while True:
+                        self._suggested_rollover = random.choice(self.suggested)
+                        self.set_disp()
+                        await trio.sleep(1.0)
+                else:
+                    # If there's nothing to suggest, wait until the button is re-hovered.
+                    await trio.sleep_forever()
+            self._suggested_rollover = None
+            self.set_disp()
+
     def exit(self, _: object = None) -> None:
         """Quit and cancel, choosing the originally-selected item."""
         self.selected = self.chosen.value
@@ -683,34 +703,53 @@ class SelectorWinBase[ButtonT, SuggLblT]:
     def set_disp(self) -> None:
         """Update the display textbox."""
         self.context_var.set(self.chosen.value)
-        # Bold the text if the suggested item is selected (like the
-        # context menu).
-        if self.display is not None and self.disp_btn is not None:
-            if self.is_suggested():
-                self.display['font'] = self.sugg_font
-            else:
-                self.display['font'] = self.norm_font
+        if self.display is None or self.disp_btn is None:
+            return  # Nothing to do.
 
-            if self._loading:
-                new_st = ['disabled']
-                set_tooltip(self.display, TransToken.BLANK)
-                set_stringvar(self.disp_label, TRANS_LOADING)
-            elif self._readonly:
-                new_st = ['disabled']
-                set_tooltip(self.display, self.readonly_description)
-                if self.readonly_override is not None:
-                    set_stringvar(self.disp_label, self.readonly_override)
-                else:
-                    data = self._get_data(self.chosen.value)
-                    set_stringvar(self.disp_label, data.context_lbl)
+        label_text: TransToken | None = None
+
+        # Lots of states which override each other.
+        if self._loading:
+            new_st = ['disabled']
+            new_font = self.norm_font
+            set_tooltip(self.display, TransToken.BLANK)
+            label_text = TRANS_LOADING
+        elif self._readonly:
+            new_st = ['disabled']
+            new_font = self.norm_font
+            set_tooltip(self.display, self.readonly_description)
+            if self.readonly_override is not None:
+                label_text = self.readonly_override
+        else:
+            # "Normal", can be edited.
+            new_st = ['!disabled']
+            set_tooltip(self.display, self.description)
+            if self._suggested_rollover is not None:
+                new_font = self.mouseover_font
+            elif self.is_suggested():
+                # Bold the text if the suggested item is selected
+                # (like the context menu).
+                new_font = self.sugg_font
             else:
-                new_st = ['!disabled']
-                set_tooltip(self.display, self.description)
+                new_font = self.norm_font
+
+        if label_text is not None:
+            set_stringvar(self.disp_label, label_text)
+        else:
+            # No override for the text is set, use the
+            # suggested-rollover one, or the selected item.
+            if self._suggested_rollover is not None:
+                data = self._get_data(self._suggested_rollover)
+            else:
                 data = self._get_data(self.chosen.value)
-                set_stringvar(self.disp_label, data.context_lbl)
+            set_stringvar(self.disp_label, data.context_lbl)
 
-            self.disp_btn.state(new_st)
-            self.display.state(new_st)
+        if str(self.display['font']) != str(new_font):
+            # Changing the font causes a flicker, so only set it
+            # when the font is actually different.
+            self.display['font'] = new_font
+        self.disp_btn.state(new_st)
+        self.display.state(new_st)
 
     def _evt_button_click(self, index: int) -> None:
         """Handle clicking on an item.
@@ -725,26 +764,6 @@ class SelectorWinBase[ButtonT, SuggLblT]:
             self.save()
         else:
             self.sel_item_id(item_id)
-
-    def rollover_suggest(self) -> None:
-        """Pick a suggested item when the button is moused over, and keep cycling."""
-        if self.can_suggest():
-            if self.display is not None:
-                self.display['font'] = self.mouseover_font
-            self._pick_suggested(force=True)
-
-    def rollout_suggest(self) -> None:
-        """Revert the textbox when the button is no longer being hovered."""
-        self._suggested_rollover = None
-        self.set_disp()
-
-    def _pick_suggested(self, force: bool = False) -> None:
-        """Randomly select a suggested item."""
-        if self.suggested and (force or self._suggested_rollover is not None):
-            self._suggested_rollover = random.choice(self.suggested)
-            data = self._get_data(self._suggested_rollover)
-            set_stringvar(self.disp_label, data.context_lbl)
-            self.win.after(1000, self._pick_suggested)
 
     async def _load_selected_task(self) -> None:
         """When configs change, load new items."""

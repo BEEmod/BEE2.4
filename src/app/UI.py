@@ -1026,12 +1026,12 @@ async def init_option(
     def suggested_style_mousein(_: tk.Event[tk.Misc]) -> None:
         """When mousing over the button, show the suggested items."""
         for win in suggest_windows.values():
-            win.rollover_suggest()
+            win.suggested_rollover_active.value = True
 
     def suggested_style_mouseout(_: tk.Event[tk.Misc]) -> None:
         """Return text to the normal value on mouseout."""
         for win in suggest_windows.values():
-            win.rollout_suggest()
+            win.suggested_rollover_active.value = False
 
     sugg_btn = ttk.Button(props, command=suggested_style_set)
     # '\u2193' is the downward arrow symbol.
