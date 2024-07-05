@@ -339,11 +339,10 @@ class SelectorWinBase[ButtonT, SuggLblT]:
     # is the one actually chosen.
     chosen: AsyncValue[utils.SpecialID]
     selected: utils.SpecialID
-    parent: tk.Tk | tk.Toplevel
     _readonly: bool
     _loading: bool  # This overrides readonly.
     modal: bool
-    win: tk.Toplevel
+    win: tk.Toplevel  # TODO move
     attrs: list[AttrDef]
     attr_labels: dict[str, ttk.Label]
 
@@ -375,25 +374,14 @@ class SelectorWinBase[ButtonT, SuggLblT]:
     first_open: bool
 
     desc_label: ttk.Label
-    pane_win: tk.PanedWindow
     wid_canvas: tk.Canvas
     pal_frame: ttk.Frame
-    wid_scroll: tk_tools.HidingScroll
-    # Holds all the widgets which provide info for the current item.
-    prop_frm: ttk.Frame
-    # Border around the selected item icon.
-    prop_icon_frm: ttk.Frame
-    prop_icon: ttk.Label
-    prop_name: ttk.Label
 
     samp_button: ttk.Button | None
     sampler: sound.SamplePlayer | None
 
-    prop_author: ttk.Label
     prop_desc_frm: ttk.Frame
     prop_desc: RichText
-    prop_scroll: tk_tools.HidingScroll
-    prop_reset: ttk.Button
     context_menu: tk.Menu
     norm_font: tk_font.Font
     # A font for showing suggested items in the context menu
@@ -406,17 +394,12 @@ class SelectorWinBase[ButtonT, SuggLblT]:
     # The widget used to control which menu option is selected.
     context_var: tk.StringVar
 
-    def __init__(
-        self,
-        parent: tk.Tk | tk.Toplevel,
-        opt: Options,
-    ) -> None:
+    def __init__(self, opt: Options) -> None:
         self.func_get_attr = opt.func_get_attr
         self.func_get_sample = opt.func_get_sample
         self.func_get_data = opt.func_get_data
         self.func_get_ids = opt.func_get_ids
 
-        self.parent = parent
         self._readonly = False
         self._loading = True
         self.modal = opt.modal
@@ -870,25 +853,19 @@ class SelectorWinBase[ButtonT, SuggLblT]:
         """Select the specified item in the UI, but don't actually choose it."""
         data = self._get_data(item_id)
 
-        set_text(self.prop_name, data.name)
+        self._ui_props_set_name(data.name)
         if utils.is_special_id(item_id):
-            set_text(self.prop_author, TransToken.BLANK)
+            self._ui_props_set_author(TransToken.BLANK)
         elif len(data.auth) == 0:
-            set_text(self.prop_author, TRANS_NO_AUTHORS)
+            self._ui_props_set_author(TRANS_NO_AUTHORS)
         else:
-            set_text(self.prop_author, TRANS_AUTHORS.format(
+            self._ui_props_set_author(TRANS_AUTHORS.format(
                 authors=TransToken.list_and(TransToken.untranslated(auth) for auth in data.auth),
                 n=len(data.auth),
             ))
 
         # Change aspect ratio to match the large icon.
-        TK_IMG.apply(self.prop_icon, data.large_icon)
-        self.prop_icon_frm.configure(width=data.large_icon.width, height=data.large_icon.height)
-
-        if data.previews and not self.sampler:
-            self.prop_icon['cursor'] = tk_tools.Cursors.ZOOM_IN
-        else:
-            self.prop_icon['cursor'] = tk_tools.Cursors.REGULAR
+        self._ui_props_set_icon(data.large_icon, data.previews and not self.sampler)
 
         if DEV_MODE.value:
             # Show the ID of the item in the description
@@ -937,10 +914,7 @@ class SelectorWinBase[ButtonT, SuggLblT]:
                 self.samp_button.state(('disabled',))
 
         if self.has_def:
-            if self.can_suggest():
-                self.prop_reset.state(('!disabled',))
-            else:
-                self.prop_reset.state(('disabled',))
+            self._ui_enable_reset(self.can_suggest())
 
         # Set the attribute items.
         try:
@@ -1262,7 +1236,7 @@ class SelectorWinBase[ButtonT, SuggLblT]:
             self.flow_items()
 
     @abstractmethod
-    def _ui_button_create(self, ind: int) -> ButtonT:
+    def _ui_button_create(self, ind: int, /) -> ButtonT:
         """Create a new button widget for the main item list.
 
         The index should be passed to `_evt_button_click()`.
@@ -1270,46 +1244,66 @@ class SelectorWinBase[ButtonT, SuggLblT]:
         raise NotImplementedError
 
     @abstractmethod
-    def _ui_button_set_text(self, button: ButtonT, text: TransToken) -> None:
+    def _ui_button_set_text(self, button: ButtonT, text: TransToken, /) -> None:
         """Change the text on a button. If set to BLANK, only the icon is shown."""
         raise NotImplementedError
 
     @abstractmethod
-    def _ui_button_set_img(self, button: ButtonT, image: img.Handle | None) -> None:
+    def _ui_button_set_img(self, button: ButtonT, image: img.Handle | None, /) -> None:
         """Set the icon for a button, or clear it if None."""
         raise NotImplementedError
 
     @abstractmethod
-    def _ui_button_set_selected(self, button: ButtonT, selected: bool) -> None:
+    def _ui_button_set_selected(self, button: ButtonT, selected: bool, /) -> None:
         """Set whether the button should be highlighted as if selected."""
         raise NotImplementedError
 
     @abstractmethod
-    def _ui_button_hide(self, button: ButtonT) -> None:
+    def _ui_button_hide(self, button: ButtonT, /) -> None:
         """Hide this button, it is no longer necessary."""
         raise NotImplementedError
 
     @abstractmethod
-    def _ui_button_set_pos(self, button: ButtonT, x: int, y: int) -> None:
+    def _ui_button_set_pos(self, button: ButtonT, /, x: int, y: int) -> None:
         """Place this button at the specified location."""
         raise NotImplementedError
 
     @abstractmethod
-    def _ui_button_scroll_to(self, button: ButtonT) -> None:
+    def _ui_button_scroll_to(self, button: ButtonT, /) -> None:
         """Scroll to an item so it's visible."""
         raise NotImplementedError
 
     @abstractmethod
-    def _ui_sugg_create(self, ind: int) -> SuggLblT:
+    def _ui_sugg_create(self, ind: int, /) -> SuggLblT:
         """Create a label for highlighting suggested buttons."""
         raise NotImplementedError
 
     @abstractmethod
-    def _ui_sugg_hide(self, label: SuggLblT) -> None:
+    def _ui_sugg_hide(self, label: SuggLblT, /) -> None:
         """Hide the suggested button label."""
         raise NotImplementedError
 
     @abstractmethod
-    def _ui_sugg_place(self, label: SuggLblT, button: ButtonT, x: int, y: int) -> None:
+    def _ui_sugg_place(self, label: SuggLblT, button: ButtonT, /, x: int, y: int) -> None:
         """Place the suggested button label at this position."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def _ui_props_set_author(self, author: TransToken, /) -> None:
+        """Set the author text for the selected item."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def _ui_props_set_name(self, name: TransToken, /) -> None:
+        """Set the name text for the selected item."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def _ui_props_set_icon(self, image: img.Handle, can_preview: bool, /) -> None:
+        """Set the large icon's image, and whether to show a zoom-in cursor."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def _ui_enable_reset(self, enabled: bool, /) -> None:
+        """Set whether the 'reset to default' button can be used."""
         raise NotImplementedError

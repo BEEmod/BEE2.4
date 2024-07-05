@@ -52,8 +52,26 @@ class SelectorWin(SelectorWinBase[
     SuggLabel,  # SuggLblT
 ]):
     """Tk implementation of the selector window."""
+    parent: tk.Tk | tk.Toplevel
+    win: tk.Toplevel
+    pane_win: tk.PanedWindow
+
+    wid_scroll: tk_tools.HidingScroll
+    # Holds all the widgets which provide info for the current item.
+    prop_frm: ttk.Frame
+    # Border around the selected item icon.
+    prop_icon_frm: ttk.Frame
+    prop_icon: ttk.Label
+    prop_name: ttk.Label
+
+    prop_author: ttk.Label
+    prop_desc_frm: ttk.Frame
+    prop_desc: RichText
+    prop_scroll: tk_tools.HidingScroll
+    prop_reset: ttk.Button
+
     def __init__(self, parent: tk.Tk | tk.Toplevel, opt: Options) -> None:
-        super().__init__(parent, opt)
+        super().__init__(opt)
 
         self.win = tk.Toplevel(parent, name='selwin_' + opt.save_id)
         self.win.withdraw()
@@ -410,11 +428,38 @@ class SelectorWin(SelectorWinBase[
             set_text(sugg_lbl, TRANS_SUGGESTED)
         return sugg_lbl
 
+    @override
     def _ui_sugg_hide(self, label: SuggLabel) -> None:
         """Hide the suggested button label."""
         label.place_forget()
 
+    @override
     def _ui_sugg_place(self, label: SuggLabel, button: ttk.Button, x: int, y: int) -> None:
         """Place the suggested button label at this position."""
         label.place(x=x, y=y)
         label['width'] = button.winfo_width()
+
+    @override
+    def _ui_props_set_author(self, author: TransToken, /) -> None:
+        """Set the author text for the selected item."""
+        set_text(self.prop_author, author)
+
+    @override
+    def _ui_props_set_name(self, name: TransToken, /) -> None:
+        """Set the name text for the selected item."""
+        set_text(self.prop_name, name)
+
+    @override
+    def _ui_props_set_icon(self, image: img.Handle, can_preview: bool, /) -> None:
+        """Set the large icon's image, and whether to show a zoom-in cursor."""
+        TK_IMG.apply(self.prop_icon, image)
+        self.prop_icon_frm.configure(width=image.width, height=image.height)
+        if can_preview:
+            self.prop_icon['cursor'] = tk_tools.Cursors.ZOOM_IN
+        else:
+            self.prop_icon['cursor'] = tk_tools.Cursors.REGULAR
+
+    @override
+    def _ui_enable_reset(self, enabled: bool, /) -> None:
+        """Set whether the 'reset to default' button can be used."""
+        self.prop_reset.state(('!disabled',) if enabled else ('disabled',))
