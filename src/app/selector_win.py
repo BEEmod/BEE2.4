@@ -334,11 +334,11 @@ class SelectorWinBase[ButtonT, SuggLblT]:
     # If set, force textbox to display this when readonly.
     readonly_override: TransToken | None
 
-
     # The selected item is the one clicked on inside the window, while chosen
     # is the one actually chosen.
     chosen: AsyncValue[utils.SpecialID]
     selected: utils.SpecialID
+    _visible: bool  # If the window is currently open.
     _readonly: bool
     _loading: bool  # This overrides readonly.
     modal: bool
@@ -402,6 +402,7 @@ class SelectorWinBase[ButtonT, SuggLblT]:
 
         self._readonly = False
         self._loading = True
+        self._visible = False
         self.modal = opt.modal
 
         # The textbox on the parent window.
@@ -684,19 +685,19 @@ class SelectorWinBase[ButtonT, SuggLblT]:
             self._ui_button_set_img(button, None)
 
         if not self.first_open:  # We've got state to store.
+            width, height = self._ui_win_get_size()
             state = SelectorState(
                 open_groups={
                     grp_id: grp.visible
                     for grp_id, grp in self.group_widgets.items()
                 },
-                width=self.win.winfo_width(),
-                height=self.win.winfo_height(),
+                width=width,
+                height=height,
             )
             config.APP.store_conf(state, self.save_id)
 
-        if self.modal:
-            self.win.grab_release()
-        self.win.withdraw()
+        self._ui_win_hide()
+        self._visible = False
         self.choose_item(self.selected)
         self.prop_desc.set_text('')  # Free resources used.
 
@@ -792,19 +793,15 @@ class SelectorWinBase[ButtonT, SuggLblT]:
                             self.save_id, grp_id,
                         )
                 if state.width > 0 or state.height > 0:
-                    width = state.width if state.width > 0 else self.win.winfo_reqwidth()
-                    height = state.height if state.height > 0 else self.win.winfo_reqheight()
-                    self.win.geometry(f'{width}x{height}')
+                    width, height = self._ui_win_get_size()
+                    if state.width > 0:
+                        width = state.width
+                    if state.height > 0:
+                        height = state.height
+                    self._ui_win_set_size(width, height)
 
-        self.win.deiconify()
-        self.win.lift()
-
-        if self.modal:
-            self.win.grab_set()
-        self.win.focus_force()  # Focus here to deselect the textbox
-
-        tk_tools.center_win(self.win, parent=self.parent)
-
+        self._ui_win_show()
+        self._visible = True
         self.sel_item(self.chosen.value)
         self.win.after(2, self.flow_items)
         return None
@@ -841,7 +838,7 @@ class SelectorWinBase[ButtonT, SuggLblT]:
 
     def choose_item(self, item_id: utils.SpecialID) -> None:
         """Set the current item to this one."""
-        if self.win.winfo_ismapped():
+        if self._visible:
             # Only update UI if it is actually visible.
             self.sel_item(item_id)
         self.chosen.value = item_id
@@ -1232,8 +1229,28 @@ class SelectorWinBase[ButtonT, SuggLblT]:
 
         self.set_disp()  # Update the textbox if necessary.
         # Reposition all our items, but only if we're visible.
-        if self.win.winfo_ismapped():
+        if self._visible:
             self.flow_items()
+
+    @abstractmethod
+    def _ui_win_hide(self, /) -> None:
+        """Close the window."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def _ui_win_show(self, /) -> None:
+        """Show the window, centred on the parent."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def _ui_win_get_size(self, /) -> tuple[int, int]:
+        """Get the current size, for storing in configs."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def _ui_win_set_size(self, width: int, height: int, /) -> None:
+        """Apply size from configs."""
+        raise NotImplementedError
 
     @abstractmethod
     def _ui_button_create(self, ind: int, /) -> ButtonT:

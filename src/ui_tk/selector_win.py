@@ -353,6 +353,35 @@ class SelectorWin(SelectorWinBase[
         except KeyError:
             return
         self.key_navigate(key)
+        raise NotImplementedError
+
+    @override
+    def _ui_win_hide(self) -> None:
+        if self.modal:
+            self.win.grab_release()
+        self.win.withdraw()
+
+    @override
+    def _ui_win_show(self, /) -> None:
+        """Show the window, centred on the parent."""
+        self.win.deiconify()
+        self.win.lift()
+
+        if self.modal:
+            self.win.grab_set()
+        self.win.focus_force()  # Focus here to deselect the textbox
+
+        tk_tools.center_win(self.win, parent=self.parent)
+
+    @override
+    def _ui_win_get_size(self, /) -> tuple[int, int]:
+        """Get the current size, for storing in configs."""
+        return self.win.winfo_width(), self.win.winfo_height()
+
+    @override
+    def _ui_win_set_size(self, width: int, height: int) -> None:
+        """Apply size from configs."""
+        self.win.geometry(f'{width}x{height}')
 
     @override
     def _ui_button_create(self, ind: int) -> ttk.Button:
