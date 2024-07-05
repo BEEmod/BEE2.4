@@ -6,7 +6,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any, NoReturn, ClassVar, Self, cast
 
-from collections.abc import Callable, Collection, Iterable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Collection, Iterable, Iterator, Mapping
 from collections import defaultdict
 from pathlib import Path
 import os
@@ -224,7 +224,6 @@ class SelitemData:
     auth: frozenset[str]
     icon: img.Handle
     large_icon: img.Handle
-    previews: Sequence[img.Handle]
     desc: MarkdownData
     group: TransToken
     group_id: str
@@ -248,7 +247,6 @@ class SelitemData:
         authors: Iterable[str] = (),
         small_icon: img.Handle | None = None,
         large_icon: img.Handle | None = None,
-        previews: Sequence[img.Handle] = (),
         desc: TransToken | MarkdownData = TransToken.BLANK,
         group: TransToken = TransToken.BLANK,
         sort_key: str = '',
@@ -277,7 +275,6 @@ class SelitemData:
             auth=frozenset(authors),
             icon=small_icon,
             large_icon=large_icon,
-            previews=previews,
             desc=desc,
             group=group,
             group_id=group.token.casefold(),
@@ -320,25 +317,6 @@ class SelitemData:
                 pack_id,
                 *consts.SEL_ICON_SIZE_LRG,
             )
-        previews: Sequence[img.Handle]
-        try:
-            preview_block = info.find_block('previews')
-        except LookupError:
-            # Use the large icon, if present.
-            if large_key is not None:
-                previews = [img.Handle.parse(
-                    large_key,
-                    pack_id,
-                    0, 0,
-                )]
-            else:
-                previews = ()
-        else:
-            previews = [img.Handle.parse(
-                kv,
-                pack_id,
-                0, 0,
-            ) for kv in preview_block]
 
         return cls.build(
             long_name=name,
@@ -346,7 +324,6 @@ class SelitemData:
             authors=auth,
             small_icon=icon,
             large_icon=large_icon,
-            previews=previews,
             desc=desc,
             group=group,
             sort_key=sort_key,
@@ -365,7 +342,6 @@ class SelitemData:
         return attrs.evolve(
             self,
             auth=self.auth | other.auth,
-            previews=[*self.previews, *other.previews],
             desc=self.desc + other.desc,
             group=other.group or self.group,
             group_id=other.group_id or self.group_id,

@@ -7,6 +7,7 @@ import tkinter as tk
 from collections.abc import Mapping
 
 from app import img
+from app.mdown import MarkdownData
 from app.selector_win import (
     SelectorWinBase, AttrDef, Options, NavKeys,
     BTN_PLAY, BTN_STOP, BTN_PREV, BTN_NEXT,
@@ -73,6 +74,7 @@ class SelectorWin(SelectorWinBase[
     def __init__(self, parent: tk.Tk | tk.Toplevel, opt: Options) -> None:
         super().__init__(opt)
 
+        self.parent = parent
         self.win = tk.Toplevel(parent, name='selwin_' + opt.save_id)
         self.win.withdraw()
         self.win.transient(master=parent)
@@ -479,15 +481,16 @@ class SelectorWin(SelectorWinBase[
         set_text(self.prop_name, name)
 
     @override
-    def _ui_props_set_icon(self, image: img.Handle, can_preview: bool) -> None:
+    def _ui_props_set_desc(self, desc: MarkdownData) -> None:
+        """Set the description for the selected item."""
+        self.prop_desc.set_text(desc)
+
+    @override
+    def _ui_props_set_icon(self, image: img.Handle) -> None:
         """Set the large icon's image, and whether to show a zoom-in cursor."""
         TK_IMG.apply(self.prop_icon, image)
         # Change aspect ratio to match the large icon.
         self.prop_icon_frm.configure(width=image.width, height=image.height)
-        if can_preview:
-            self.prop_icon['cursor'] = tk_tools.Cursors.ZOOM_IN
-        else:
-            self.prop_icon['cursor'] = tk_tools.Cursors.REGULAR
 
     @override
     def _ui_enable_reset(self, enabled: bool) -> None:

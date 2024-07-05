@@ -13,7 +13,7 @@ from tkinter import ttk
 import tkinter as tk
 
 from contextlib import aclosing
-from collections.abc import Callable, Container, Iterable, Sequence
+from collections.abc import Callable, Container, Iterable
 from collections import defaultdict
 from enum import Enum, auto as enum_auto
 import functools
@@ -31,13 +31,10 @@ from app.mdown import MarkdownData
 from app import sound, img, DEV_MODE
 from ui_tk.tooltip import add_tooltip, set_tooltip
 from ui_tk.img import TK_IMG
-from ui_tk.rich_textbox import RichText
-from ui_tk.wid_transtoken import set_menu_text, set_text, set_win_title, set_stringvar
+from ui_tk.wid_transtoken import set_menu_text, set_text, set_stringvar
 from ui_tk import TK_ROOT, tk_tools
 from packages import SelitemData, AttrTypes, AttrDef as AttrDef, AttrMap
-from consts import (
-    SEL_ICON_SIZE as ICON_SIZE,
-)
+from consts import SEL_ICON_SIZE as ICON_SIZE
 from transtoken import TransToken
 from config.last_sel import LastSelected
 from config.windows import SelectorState
@@ -174,73 +171,6 @@ class GroupHeader(tk_tools.LineHeader):
             if self._visible else
             GRP_COLL
         )
-
-
-class PreviewWindow:
-    """Displays images previewing the selected item."""
-    img: Sequence[img.Handle]
-    def __init__(self) -> None:
-        self.win = tk.Toplevel(TK_ROOT, name='selectorPreview')
-        self.win.withdraw()
-        self.win.resizable(False, False)
-
-        # Don't destroy the window when closed.
-        self.win.protocol("WM_DELETE_WINDOW", self.hide)
-        self.win.bind("<Escape>", self.hide)
-
-        self.display = ttk.Label(self.win)
-        self.display.grid(row=0, column=1, sticky='nsew')
-        self.win.columnconfigure(1, weight=1)
-        self.win.rowconfigure(0, weight=1)
-
-        self.parent: SelectorWinBase | None = None
-
-        self.prev_btn = ttk.Button(
-            self.win, text=BTN_PREV, command=functools.partial(self.cycle, -1))
-        self.next_btn = ttk.Button(
-            self.win, text=BTN_NEXT, command=functools.partial(self.cycle, +1))
-
-        self.img = ()
-        self.index = 0
-
-    def show(self, parent: SelectorWinBase, data: SelitemData) -> None:
-        """Show the window."""
-        self.win.transient(parent.win)
-        set_win_title(self.win, TRANS_PREVIEW_TITLE.format(item=data.name))
-
-        self.parent = parent
-        self.index = 0
-        self.img = data.previews
-        TK_IMG.apply(self.display, self.img[0])
-
-        if len(self.img) > 1:
-            self.prev_btn.grid(row=0, column=0, sticky='ns')
-            self.next_btn.grid(row=0, column=2, sticky='ns')
-        else:
-            self.prev_btn.grid_remove()
-            self.next_btn.grid_remove()
-
-        self.win.deiconify()
-        self.win.lift()
-        tk_tools.center_win(self.win, parent.win)
-        if parent.modal:
-            parent.win.grab_release()
-            self.win.grab_set()
-
-    def hide(self, _: tk.Event[tk.Misc] | None = None) -> None:
-        """Swap grabs if the parent is modal."""
-        if self.parent is not None and self.parent.modal:
-            self.win.grab_release()
-            self.parent.win.grab_set()
-        self.win.withdraw()
-
-    def cycle(self, off: int) -> None:
-        """Switch to a new image."""
-        self.index = (self.index + off) % len(self.img)
-        TK_IMG.apply(self.display, self.img[self.index])
-
-
-_PREVIEW = PreviewWindow()
 
 
 @attrs.frozen(kw_only=True)
@@ -380,8 +310,6 @@ class SelectorWinBase[ButtonT, SuggLblT]:
     samp_button: ttk.Button | None
     sampler: sound.SamplePlayer | None
 
-    prop_desc_frm: ttk.Frame
-    prop_desc: RichText
     context_menu: tk.Menu
     norm_font: tk_font.Font
     # A font for showing suggested items in the context menu
@@ -699,7 +627,7 @@ class SelectorWinBase[ButtonT, SuggLblT]:
         self._ui_win_hide()
         self._visible = False
         self.choose_item(self.selected)
-        self.prop_desc.set_text('')  # Free resources used.
+        self._ui_props_set_desc(MarkdownData.BLANK)  # Free resources used.
 
     def set_disp(self) -> None:
         """Update the display textbox."""
@@ -775,13 +703,9 @@ class SelectorWinBase[ButtonT, SuggLblT]:
                 self.save()
 
     def _icon_clicked(self, _: tk.Event[tk.Misc]) -> None:
-        """When the large image is clicked, either show the previews or play sounds."""
-        if self.sampler:
+        """When the large image is clicked, play sounds if available."""
+        if self.sampler is not None:
             self.sampler.play_sample()
-            return
-        data = self._get_data(self.selected)
-        if data.previews:
-            _PREVIEW.show(self, data)
 
     def open_win(self, _: object = None) -> object:
         """Display the window."""
@@ -881,16 +805,16 @@ class SelectorWinBase[ButtonT, SuggLblT]:
                 n=len(data.auth),
             ))
 
-        self._ui_props_set_icon(data.large_icon, can_preview=len(data.previews) > 0 and not self.sampler)
+        self._ui_props_set_icon(data.large_icon)
 
         if DEV_MODE.value:
             # Show the ID of the item in the description
             text = MarkdownData(TRANS_DEV_ITEM_ID.format(
                 item=f'`{', '.join(data.packages)}`:`{item_id}`\n' if data.packages else f'`{item_id}`\n',
             ), None)
-            self.prop_desc.set_text(text + data.desc)
+            self._ui_props_set_desc(text + data.desc)
         else:
-            self.prop_desc.set_text(data.desc)
+            self._ui_props_set_desc(data.desc)
 
         try:
             button = self._id_to_button[self.selected]
@@ -1331,7 +1255,12 @@ class SelectorWinBase[ButtonT, SuggLblT]:
         raise NotImplementedError
 
     @abstractmethod
-    def _ui_props_set_icon(self, image: img.Handle, /, *, can_preview: bool) -> None:
+    def _ui_props_set_desc(self, desc: MarkdownData, /) -> None:
+        """Set the description for the selected item."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def _ui_props_set_icon(self, image: img.Handle) -> None:
         """Set the large icon's image, and whether to show a zoom-in cursor."""
         raise NotImplementedError
 
