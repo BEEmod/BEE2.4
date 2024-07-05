@@ -494,7 +494,14 @@ class SelectorWinBase[ButtonT, SuggLblT]:
             self.display,
             self.open_win,
         )
-        self.display.bind("<Key>", self.set_disp)
+        set_disp = self.set_disp
+
+        def on_key(event: object) -> str:
+            """Prevent typing in the display by reverting, then cancelling the event."""
+            set_disp()
+            return 'break'
+
+        self.display.bind("<Key>", on_key)
         tk_tools.bind_rightclick(
             self.display,
             self.open_context,
@@ -512,7 +519,7 @@ class SelectorWinBase[ButtonT, SuggLblT]:
 
         # Set this property again, which updates the description if we actually
         # are readonly.
-        self._apply_load_readonly_state()
+        self.set_disp()
         self.save()
 
         return self.display
@@ -534,34 +541,6 @@ class SelectorWinBase[ButtonT, SuggLblT]:
     def readonly(self, value: bool) -> None:
         self._readonly = bool(value)
 
-    def _apply_load_readonly_state(self) -> None:
-        """Update the display box to account for readonly/loading state."""
-        if self.display is None or self.disp_btn is None:
-            # Widget hasn't been added yet, stop.
-            # We update in the widget() method.
-            return
-
-        if self._loading:
-            new_st = ['disabled']
-            set_tooltip(self.display, TransToken.BLANK)
-            set_stringvar(self.disp_label, TRANS_LOADING)
-        elif self._readonly:
-            new_st = ['disabled']
-            set_tooltip(self.display, self.readonly_description)
-            if self.readonly_override is not None:
-                set_stringvar(self.disp_label, self.readonly_override)
-            else:
-                data = self._get_data(self.chosen.value)
-                set_stringvar(self.disp_label, data.context_lbl)
-        else:
-            new_st = ['!disabled']
-            set_tooltip(self.display, self.description)
-            data = self._get_data(self.chosen.value)
-            set_stringvar(self.disp_label, data.context_lbl)
-
-        self.disp_btn.state(new_st)
-        self.display.state(new_st)
-
     def _get_data(self, item_id: utils.SpecialID) -> SelitemData:
         """Call func_get_data, handling KeyError."""
         try:
@@ -577,12 +556,12 @@ class SelectorWinBase[ButtonT, SuggLblT]:
                 LOGGER.debug('Reloading data for selectorwin {}...', self.save_id)
                 # Lock into the loading state so that it can't be interacted with while loading.
                 self._loading = True
-                self._apply_load_readonly_state()
+                self.set_disp()
                 self.exit()
                 self._packset = packset
                 await self._rebuild_items(packset)
                 self._loading = False
-                self._apply_load_readonly_state()
+                self.set_disp()
                 LOGGER.debug('Reload complete for selectorwin {}', self.save_id)
 
     async def _rebuild_items(self, packset: packages.PackagesSet) -> None:
@@ -701,21 +680,37 @@ class SelectorWinBase[ButtonT, SuggLblT]:
         self.choose_item(self.selected)
         self.prop_desc.set_text('')  # Free resources used.
 
-    def set_disp(self, _: object = None) -> str:
-        """Set the display textbox."""
-        chosen = self.chosen.value
+    def set_disp(self) -> None:
+        """Update the display textbox."""
+        self.context_var.set(self.chosen.value)
         # Bold the text if the suggested item is selected (like the
         # context menu).
-        if self.display is not None:
+        if self.display is not None and self.disp_btn is not None:
             if self.is_suggested():
                 self.display['font'] = self.sugg_font
             else:
                 self.display['font'] = self.norm_font
 
-        self._suggested_rollover = None  # Discard the rolled over item.
-        self._apply_load_readonly_state()
-        self.context_var.set(chosen)
-        return "break"  # stop the entry widget from continuing with this event
+            if self._loading:
+                new_st = ['disabled']
+                set_tooltip(self.display, TransToken.BLANK)
+                set_stringvar(self.disp_label, TRANS_LOADING)
+            elif self._readonly:
+                new_st = ['disabled']
+                set_tooltip(self.display, self.readonly_description)
+                if self.readonly_override is not None:
+                    set_stringvar(self.disp_label, self.readonly_override)
+                else:
+                    data = self._get_data(self.chosen.value)
+                    set_stringvar(self.disp_label, data.context_lbl)
+            else:
+                new_st = ['!disabled']
+                set_tooltip(self.display, self.description)
+                data = self._get_data(self.chosen.value)
+                set_stringvar(self.disp_label, data.context_lbl)
+
+            self.disp_btn.state(new_st)
+            self.display.state(new_st)
 
     def _evt_button_click(self, index: int) -> None:
         """Handle clicking on an item.
@@ -737,6 +732,11 @@ class SelectorWinBase[ButtonT, SuggLblT]:
             if self.display is not None:
                 self.display['font'] = self.mouseover_font
             self._pick_suggested(force=True)
+
+    def rollout_suggest(self) -> None:
+        """Revert the textbox when the button is no longer being hovered."""
+        self._suggested_rollover = None
+        self.set_disp()
 
     def _pick_suggested(self, force: bool = False) -> None:
         """Randomly select a suggested item."""
@@ -861,8 +861,7 @@ class SelectorWinBase[ButtonT, SuggLblT]:
                 n=len(data.auth),
             ))
 
-        # Change aspect ratio to match the large icon.
-        self._ui_props_set_icon(data.large_icon, data.previews and not self.sampler)
+        self._ui_props_set_icon(data.large_icon, can_preview=len(data.previews) > 0 and not self.sampler)
 
         if DEV_MODE.value:
             # Show the ID of the item in the description
@@ -1316,7 +1315,7 @@ class SelectorWinBase[ButtonT, SuggLblT]:
         raise NotImplementedError
 
     @abstractmethod
-    def _ui_props_set_icon(self, image: img.Handle, can_preview: bool, /) -> None:
+    def _ui_props_set_icon(self, image: img.Handle, /, *, can_preview: bool) -> None:
         """Set the large icon's image, and whether to show a zoom-in cursor."""
         raise NotImplementedError
 

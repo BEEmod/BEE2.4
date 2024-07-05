@@ -469,19 +469,20 @@ class SelectorWin(SelectorWinBase[
         label['width'] = button.winfo_width()
 
     @override
-    def _ui_props_set_author(self, author: TransToken, /) -> None:
+    def _ui_props_set_author(self, author: TransToken) -> None:
         """Set the author text for the selected item."""
         set_text(self.prop_author, author)
 
     @override
-    def _ui_props_set_name(self, name: TransToken, /) -> None:
+    def _ui_props_set_name(self, name: TransToken) -> None:
         """Set the name text for the selected item."""
         set_text(self.prop_name, name)
 
     @override
-    def _ui_props_set_icon(self, image: img.Handle, can_preview: bool, /) -> None:
+    def _ui_props_set_icon(self, image: img.Handle, can_preview: bool) -> None:
         """Set the large icon's image, and whether to show a zoom-in cursor."""
         TK_IMG.apply(self.prop_icon, image)
+        # Change aspect ratio to match the large icon.
         self.prop_icon_frm.configure(width=image.width, height=image.height)
         if can_preview:
             self.prop_icon['cursor'] = tk_tools.Cursors.ZOOM_IN
@@ -489,6 +490,6 @@ class SelectorWin(SelectorWinBase[
             self.prop_icon['cursor'] = tk_tools.Cursors.REGULAR
 
     @override
-    def _ui_enable_reset(self, enabled: bool, /) -> None:
+    def _ui_enable_reset(self, enabled: bool) -> None:
         """Set whether the 'reset to default' button can be used."""
         self.prop_reset.state(('!disabled',) if enabled else ('disabled',))

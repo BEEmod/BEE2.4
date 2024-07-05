@@ -1031,7 +1031,7 @@ async def init_option(
     def suggested_style_mouseout(_: tk.Event[tk.Misc]) -> None:
         """Return text to the normal value on mouseout."""
         for win in suggest_windows.values():
-            win.set_disp()
+            win.rollout_suggest()
 
     sugg_btn = ttk.Button(props, command=suggested_style_set)
     # '\u2193' is the downward arrow symbol.
