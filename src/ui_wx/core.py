@@ -16,7 +16,7 @@ from app import (
 from config.windows import WindowState
 from trio_debug import Tracer
 from ui_wx.dialogs import DIALOG
-from ui_tk.errors import display_errors
+from ui_wx.errors import display_errors
 from ui_wx import wid_transtoken
 from ui_wx.img import WX_IMG
 from ui_wx import APP, MAIN_WINDOW
@@ -135,8 +135,7 @@ async def app_main(init: Callable[[trio.Nursery], Awaitable[Any]]) -> None:
     async with trio.open_nursery() as nursery:
         app._APP_NURSERY = nursery
         # Start some core tasks.
-        # await nursery.start(route_callback_exceptions)
-        # await nursery.start(display_errors)
+        await nursery.start(display_errors)
 
         # Check very early before bad things happen.
         await gameMan.check_app_in_game(DIALOG)
