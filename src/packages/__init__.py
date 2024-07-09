@@ -119,11 +119,11 @@ TRANS_CORR_OPTS = TransToken.ui_plural('{n} option', '{n} options')  # i18n: Cor
 @utils.freeze_enum_props
 class AttrTypes(Enum):
     """The type of labels used for selectoritem attributes."""
-    STR = STRING = 'string'  # Normal text
+    STRING = 'string'  # Normal text
     LIST_AND = 'list_and'  # A sequence, joined by commas
     LIST_OR = 'list_or'  # A sequence, joined by commas
     BOOL = 'bool'  # A yes/no checkmark
-    COLOR = COLOUR = 'color'  # A Vec 0-255 RGB colour
+    COLOUR = 'color'  # A Vec 0-255 RGB colour
 
     @property
     def is_wide(self) -> bool:
@@ -131,9 +131,9 @@ class AttrTypes(Enum):
         return self.value in ('string', 'list_and', 'list_or')
 
     @property
-    def is_list(self) -> bool:
-        """Determine if this is a list."""
-        return self.value.startswith('list_')
+    def is_image(self) -> bool:
+        """Check if this uses an image, or is just text."""
+        return self.value in ('bool', 'color')
 
 
 # TransToken is str()-ified.
@@ -141,7 +141,7 @@ type AttrValues = str | TransToken | Iterable[str | TransToken] | bool | Vec
 type AttrMap = Mapping[str, AttrValues]
 
 
-@attrs.define
+@attrs.define(eq=False)
 class AttrDef:
     """Configuration for attributes shown on selector labels."""
     id: str
@@ -198,7 +198,7 @@ class AttrDef:
         """Alternative constructor for color-type attrs."""
         if default is None:
             default = Vec(255, 255, 255)
-        return AttrDef(attr_id, desc, default, AttrTypes.COLOR)
+        return AttrDef(attr_id, desc, default, AttrTypes.COLOUR)
 
 
 @attrs.frozen(kw_only=True)

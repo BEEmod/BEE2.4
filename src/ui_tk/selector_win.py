@@ -68,6 +68,7 @@ class SelectorWin(SelectorWinBase[
     prop_desc: RichText
     prop_scroll: tk_tools.HidingScroll
     prop_reset: ttk.Button
+    attr_labels: dict[AttrDef, ttk.Label]
 
     # Variable associated with self.display.
     disp_label: tk.StringVar
@@ -302,7 +303,6 @@ class SelectorWin(SelectorWinBase[
         )
 
         # Wide before short.
-        self.attrs = sorted(opt.attributes, key=lambda at: 0 if at.type.is_wide else 1)
         self.attr_labels = {}
         if self.attrs:
             attrs_frame = ttk.Frame(self.prop_frm)
@@ -314,17 +314,15 @@ class SelectorWin(SelectorWinBase[
                 padx=5,
             )
             attrs_frame.columnconfigure(0, weight=1)
-            attrs_frame.columnconfigure(1, weight=1)
+            attrs_frame.columnconfigure(2, weight=1)
 
-            # Add in all the attribute labels
-            index = 0
-            for attr in self.attrs:
+            for attr, row, col_type in self._attr_widget_positions():
                 attr_frame = ttk.Frame(attrs_frame)
                 desc_label = ttk.Label(attr_frame)
                 set_text(desc_label, TRANS_ATTR_DESC.format(desc=attr.desc))
-                self.attr_labels[attr.id] = attr_label = ttk.Label(attr_frame)
+                self.attr_labels[attr] = attr_label = ttk.Label(attr_frame)
 
-                if attr.type is AttrTypes.COLOR:
+                if attr.type is AttrTypes.COLOUR:
                     # A small colour swatch.
                     attr_label.configure(relief='raised')
                     # Show the color value when hovered.
@@ -333,30 +331,28 @@ class SelectorWin(SelectorWinBase[
                 desc_label.grid(row=0, column=0, sticky='e')
                 attr_label.grid(row=0, column=1, sticky='w')
                 # Wide ones have their own row, narrow ones are two to a row
-                if attr.type.is_wide:
-                    if index % 2:  # Row has a single narrow, skip the empty space.
-                        index += 1
-                    attr_frame.grid(
-                        row=index // 2,
-                        column=0, columnspan=3,
-                        sticky='w',
-                    )
-                    index += 2
-                else:
-                    if index % 2:  # Right.
-                        ttk.Separator(orient='vertical').grid(row=index // 2, column=1, sticky='NS')
+                match col_type:
+                    case 'wide':
                         attr_frame.grid(
-                            row=index // 2,
-                            column=2,
-                            sticky='E',
+                            row=row,
+                            column=0, columnspan=3,
+                            sticky='w',
                         )
-                    else:
+                    case 'left':
                         attr_frame.grid(
-                            row=index // 2,
+                            row=row,
                             column=0,
-                            sticky='W',
+                            sticky='w',
                         )
-                    index += 1
+                    case 'right':
+                        ttk.Separator(attrs_frame, orient='vertical').grid(row=row, column=1, sticky='NS')
+                        attr_frame.grid(
+                            row=row,
+                            column=2,
+                            sticky='e',
+                        )
+                    case _:
+                        assert_never(col_type)
 
         self.set_disp()
         self.wid_canvas.bind("<Configure>", self.flow_items)
@@ -531,6 +527,21 @@ class SelectorWin(SelectorWinBase[
         """Place the suggested button label at this position."""
         label.place(x=x, y=y)
         label['width'] = button.winfo_width()
+
+    @override
+    def _ui_attr_set_text(self, attr: AttrDef, text: TransToken, /) -> None:
+        """Set the value of a text-style attribute widget."""
+        set_text(self.attr_labels[attr], text)
+
+    @override
+    def _ui_attr_set_image(self, attr: AttrDef, image: img.Handle, /) -> None:
+        """Set the image for an image-style attribute widget."""
+        TK_IMG.apply(self.attr_labels[attr], image)
+
+    @override
+    def _ui_attr_set_tooltip(self, attr: AttrDef, tooltip: TransToken, /) -> None:
+        """Set the hover tooltip. This only applies to image-style widgets."""
+        set_tooltip(self.attr_labels[attr], tooltip)
 
     @override
     def _ui_props_set_author(self, author: TransToken) -> None:

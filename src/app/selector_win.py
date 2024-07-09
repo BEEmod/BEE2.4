@@ -12,7 +12,7 @@ from tkinter import ttk
 import tkinter as tk
 
 from contextlib import aclosing
-from collections.abc import Callable, Container, Iterable
+from collections.abc import Callable, Container, Iterable, Iterator
 from collections import defaultdict
 from enum import Enum, auto as enum_auto
 import functools
@@ -28,8 +28,6 @@ import trio_util
 
 from app.mdown import MarkdownData
 from app import sound, img, DEV_MODE
-from ui_tk.tooltip import set_tooltip
-from ui_tk.img import TK_IMG
 from ui_tk.wid_transtoken import set_menu_text, set_text
 from ui_tk import TK_ROOT, tk_tools
 from packages import SelitemData, AttrTypes, AttrDef as AttrDef, AttrMap
@@ -275,7 +273,6 @@ class SelectorWinBase[ButtonT, SuggLblT]:
     modal: bool
     win: tk.Toplevel  # TODO move
     attrs: list[AttrDef]
-    attr_labels: dict[str, ttk.Label]
 
     # Current list of item IDs we display.
     item_list: list[utils.SpecialID]
@@ -342,6 +339,7 @@ class SelectorWinBase[ButtonT, SuggLblT]:
         self.description = opt.desc
         self.readonly_description = opt.readonly_desc
         self.readonly_override = opt.readonly_override
+        self.attrs = list(opt.attributes)
 
         prev_state = config.APP.get_cur_conf(
             LastSelected,
@@ -520,6 +518,30 @@ class SelectorWinBase[ButtonT, SuggLblT]:
             menu_pos = self.context_menu.index('end')
             assert menu_pos is not None, "Didn't add to the menu?"
             group.menu_pos = menu_pos
+
+    def _attr_widget_positions(self) -> Iterator[tuple[
+        AttrDef, int,
+        Literal['left', 'right', 'wide'],
+    ]]:
+        """Positions all the required attribute widgets.
+
+        Yields (attr, row, col_type) tuples.
+        """
+        self.attrs.sort(key=lambda at: 0 if at.type.is_wide else 1)
+        index = 0
+        for attr in self.attrs:
+            # Wide ones have their own row, narrow ones are two to a row.
+            if attr.type.is_wide:
+                if index % 2:  # Row has a single narrow, skip the empty space.
+                    index += 1
+                yield attr, index // 2, 'wide'
+                index += 2
+            else:
+                if index % 2:
+                    yield attr, index // 2, 'right'
+                else:
+                    yield attr, index // 2, 'left'
+                index += 1
 
     async def _rollover_suggest_task(self) -> None:
         """Handle previewing suggested items when hovering over the 'set suggested' button."""
@@ -796,35 +818,34 @@ class SelectorWinBase[ButtonT, SuggLblT]:
             item_attrs = EmptyMapping
         for attr in self.attrs:
             val = item_attrs.get(attr.id, attr.default)
-            attr_label = self.attr_labels[attr.id]
-
-            if attr.type is AttrTypes.BOOL:
-                TK_IMG.apply(attr_label, ICON_CHECK if val else ICON_CROSS)
-            elif attr.type is AttrTypes.COLOR:
-                assert isinstance(val, Vec)
-                TK_IMG.apply(attr_label, img.Handle.color(val, 16, 16))
-                # Display the full color when hovering...
-                set_tooltip(attr_label, TRANS_ATTR_COLOR.format(
-                    r=int(val.x), g=int(val.y), b=int(val.z),
-                ))
-            elif attr.type.is_list:
-                # Join the values (in alphabetical order)
-                assert isinstance(val, Iterable) and not isinstance(val, Vec), repr(val)
-                children = [
-                    txt if isinstance(txt, TransToken) else TransToken.untranslated(txt)
-                    for txt in val
-                ]
-                if attr.type is AttrTypes.LIST_AND:
-                    set_text(attr_label, TransToken.list_and(children, sort=True))
-                else:
-                    set_text(attr_label, TransToken.list_or(children, sort=True))
-            elif attr.type is AttrTypes.STRING:
-                # Just a string.
-                if not isinstance(val, TransToken):
-                    val = TransToken.untranslated(str(val))
-                set_text(attr_label, val)
-            else:
-                raise ValueError(f'Invalid attribute type: "{attr.type}"')
+            match attr.type:
+                case AttrTypes.BOOL:
+                    self._ui_attr_set_image(attr, ICON_CHECK if val else ICON_CROSS)
+                case AttrTypes.COLOUR:
+                    assert isinstance(val, Vec)
+                    self._ui_attr_set_image(attr, img.Handle.color(val, 16, 16))
+                    # Display the full color when hovering...
+                    self._ui_attr_set_tooltip(attr, TRANS_ATTR_COLOR.format(
+                        r=int(val.x), g=int(val.y), b=int(val.z),
+                    ))
+                case AttrTypes.LIST_OR | AttrTypes.LIST_AND:
+                    # Join the values (in alphabetical order)
+                    assert isinstance(val, Iterable) and not isinstance(val, Vec), repr(val)
+                    children = [
+                        txt if isinstance(txt, TransToken) else TransToken.untranslated(txt)
+                        for txt in val
+                    ]
+                    if attr.type is AttrTypes.LIST_AND:
+                        self._ui_attr_set_text(attr, TransToken.list_and(children, sort=True))
+                    else:
+                        self._ui_attr_set_text(attr, TransToken.list_or(children, sort=True))
+                case AttrTypes.STRING:
+                    # Just a string.
+                    if not isinstance(val, TransToken):
+                        val = TransToken.untranslated(str(val))
+                    self._ui_attr_set_text(attr, val)
+                case _:
+                    assert_never(attr.type)
 
     def key_navigate(self, key: NavKeys) -> None:
         """Navigate using arrow keys."""
@@ -1174,6 +1195,21 @@ class SelectorWinBase[ButtonT, SuggLblT]:
     @abstractmethod
     def _ui_props_set_samp_button_icon(self, glyph: str, /) -> None:
         """Set the icon in the play-sample button."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def _ui_attr_set_text(self, attr: AttrDef, text: TransToken, /) -> None:
+        """Set the value of a text-style attribute widget."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def _ui_attr_set_image(self, attr: AttrDef, image: img.Handle, /) -> None:
+        """Set the image for an image-style attribute widget."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def _ui_attr_set_tooltip(self, attr: AttrDef, tooltip: TransToken, /) -> None:
+        """Set the hover tooltip. This only applies to image-style widgets."""
         raise NotImplementedError
 
     @abstractmethod
