@@ -1,5 +1,5 @@
 """Tk-specific implementation of the selector window."""
-from typing import Final
+from typing import Final, assert_never
 from typing_extensions import override
 from tkinter import ttk, font as tk_font
 import tkinter as tk
@@ -9,7 +9,7 @@ from collections.abc import Mapping
 from app import img
 from app.mdown import MarkdownData
 from app.selector_win import (
-    SelectorWinBase, AttrDef, Options, NavKeys,
+    DispFont, SelectorWinBase, AttrDef, Options, NavKeys,
     BTN_PLAY, BTN_STOP, BTN_PREV, BTN_NEXT,
     TRANS_ATTR_DESC,
     TRANS_SUGGESTED, TRANS_SUGGESTED_MAC, TRANS_WINDOW_TITLE,
@@ -20,8 +20,8 @@ from transtoken import TransToken
 from ui_tk import tk_tools
 from ui_tk.img import TK_IMG
 from ui_tk.rich_textbox import RichText
-from ui_tk.tooltip import add_tooltip
-from ui_tk.wid_transtoken import set_text, set_win_title
+from ui_tk.tooltip import add_tooltip, set_tooltip
+from ui_tk.wid_transtoken import set_stringvar, set_text, set_win_title
 import utils
 
 
@@ -70,6 +70,12 @@ class SelectorWin(SelectorWinBase[
     prop_desc: RichText
     prop_scroll: tk_tools.HidingScroll
     prop_reset: ttk.Button
+
+    norm_font: tk_font.Font
+    # A font for showing suggested items in the context menu
+    sugg_font: tk_font.Font
+    # A font for previewing the suggested items
+    mouseover_font: tk_font.Font
 
     def __init__(self, parent: tk.Tk | tk.Toplevel, opt: Options) -> None:
         super().__init__(opt)
@@ -493,6 +499,68 @@ class SelectorWin(SelectorWinBase[
         self.prop_icon_frm.configure(width=image.width, height=image.height)
 
     @override
+    def _ui_menu_set_font(self, item_id: utils.SpecialID, suggested: bool) -> None:
+        """Set the font of an item, and its parent group."""
+        try:
+            menu_ind = self._menu_index[item_id]
+        except KeyError:
+            return
+        new_font = self.sugg_font if suggested else self.norm_font
+        data = self._get_data(item_id)
+        if data.group_id:
+            group = self.group_widgets[data.group_id]
+            menu = group.menu
+
+            # Apply the font to the group header as well, if suggested.
+            if suggested:
+                group.title['font'] = new_font
+
+                # Also highlight the menu
+                # noinspection PyUnresolvedReferences
+                self.context_menu.entryconfig(
+                    group.menu_pos,
+                    font=new_font,
+                )
+        else:
+            menu = self.context_menu
+        menu.entryconfig(menu_ind, font=new_font)
+
+    @override
+    def _ui_menu_reset_suggested(self) -> None:
+        """Reset the fonts for all group widgets. menu_set_font() will then set them."""
+        for group_key, header in self.group_widgets.items():
+            header.title['font'] = self.norm_font
+            if header.menu_pos >= 0:
+                self.context_menu.entryconfig(header.menu_pos, font=self.norm_font)
+
+    @override
     def _ui_enable_reset(self, enabled: bool) -> None:
         """Set whether the 'reset to default' button can be used."""
         self.prop_reset.state(('!disabled',) if enabled else ('disabled',))
+
+    @override
+    def _ui_display_set(self, enabled: bool, text: TransToken, tooltip: TransToken, font: DispFont) -> None:
+        """Set the state of the display textbox and button."""
+        if self.display is None or self.disp_btn is None:
+            return  # Nothing to do.
+
+        match font:
+            case 'normal':
+                font_obj = self.norm_font
+            case 'suggested':
+                font_obj = self.sugg_font
+            case 'mouseover':
+                font_obj = self.mouseover_font
+            case _:
+                assert_never(font)
+
+        if str(self.display['font']) != str(font_obj):
+            # Changing the font causes a flicker, so only set it
+            # when the font is actually different.
+            self.display['font'] = font_obj
+        set_tooltip(self.display, tooltip)
+        set_stringvar(self.disp_label, text)
+
+        state = ('!disabled', ) if enabled else ('disabled', )
+        self.disp_btn.state(state)
+        self.display.state(state)

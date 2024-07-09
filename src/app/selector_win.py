@@ -5,10 +5,9 @@ It appears as a textbox-like widget with a ... button to open the selection wind
 Each item has a description, author, and icon.
 """
 from __future__ import annotations
-from typing import assert_never
+from typing import Literal, assert_never
 
 from abc import abstractmethod
-from tkinter import font as tk_font
 from tkinter import ttk
 import tkinter as tk
 
@@ -31,7 +30,7 @@ from app.mdown import MarkdownData
 from app import sound, img, DEV_MODE
 from ui_tk.tooltip import add_tooltip, set_tooltip
 from ui_tk.img import TK_IMG
-from ui_tk.wid_transtoken import set_menu_text, set_text, set_stringvar
+from ui_tk.wid_transtoken import set_menu_text, set_text
 from ui_tk import TK_ROOT, tk_tools
 from packages import SelitemData, AttrTypes, AttrDef as AttrDef, AttrMap
 from consts import SEL_ICON_SIZE as ICON_SIZE
@@ -80,6 +79,9 @@ class NavKeys(Enum):
 
 # Callbacks used to get the info for items in the window.
 type GetterFunc[T] = Callable[[packages.PackagesSet, utils.SpecialID], T]
+
+# The three kinds of font for the display textbox.
+type DispFont = Literal['suggested', 'mouseover', 'normal']
 
 TRANS_ATTR_DESC = TransToken.untranslated('{desc}: ')
 TRANS_ATTR_COLOR = TransToken.ui('Color: R={r}, G={g}, B={b}')  # i18n: Tooltip for colour swatch.
@@ -311,11 +313,6 @@ class SelectorWinBase[ButtonT, SuggLblT]:
     sampler: sound.SamplePlayer | None
 
     context_menu: tk.Menu
-    norm_font: tk_font.Font
-    # A font for showing suggested items in the context menu
-    sugg_font: tk_font.Font
-    # A font for previewing the suggested items
-    mouseover_font: tk_font.Font
 
     # The headers for the context menu
     context_menus: dict[str, tk.Menu]
@@ -635,50 +632,44 @@ class SelectorWinBase[ButtonT, SuggLblT]:
         if self.display is None or self.disp_btn is None:
             return  # Nothing to do.
 
-        label_text: TransToken | None = None
+        text: TransToken | None = None
+        font: DispFont
 
         # Lots of states which override each other.
         if self._loading:
-            new_st = ['disabled']
-            new_font = self.norm_font
-            set_tooltip(self.display, TransToken.BLANK)
-            label_text = TRANS_LOADING
+            enabled = False
+            font = 'normal'
+            tooltip = TransToken.BLANK
+            text = TRANS_LOADING
         elif self._readonly:
-            new_st = ['disabled']
-            new_font = self.norm_font
-            set_tooltip(self.display, self.readonly_description)
+            enabled = False
+            font = 'normal'
+            tooltip = self.readonly_description
             if self.readonly_override is not None:
-                label_text = self.readonly_override
+                text = self.readonly_override
         else:
             # "Normal", can be edited.
-            new_st = ['!disabled']
-            set_tooltip(self.display, self.description)
+            enabled = True
+            tooltip = self.description
             if self._suggested_rollover is not None:
-                new_font = self.mouseover_font
+                font = 'mouseover'
             elif self.is_suggested():
                 # Bold the text if the suggested item is selected
                 # (like the context menu).
-                new_font = self.sugg_font
+                font = 'suggested'
             else:
-                new_font = self.norm_font
+                font = 'normal'
 
-        if label_text is not None:
-            set_stringvar(self.disp_label, label_text)
-        else:
+        if text is None:
             # No override for the text is set, use the
             # suggested-rollover one, or the selected item.
             if self._suggested_rollover is not None:
                 data = self._get_data(self._suggested_rollover)
             else:
                 data = self._get_data(self.chosen.value)
-            set_stringvar(self.disp_label, data.context_lbl)
+            text = data.context_lbl
 
-        if str(self.display['font']) != str(new_font):
-            # Changing the font causes a flicker, so only set it
-            # when the font is actually different.
-            self.display['font'] = new_font
-        self.disp_btn.state(new_st)
-        self.display.state(new_st)
+        self._ui_display_set(enabled, text, tooltip, font)
 
     def _evt_button_click(self, index: int) -> None:
         """Handle clicking on an item.
@@ -1120,51 +1111,20 @@ class SelectorWinBase[ButtonT, SuggLblT]:
         # pointless.
         return self.suggested != [self.chosen.value]
 
-    def _set_context_font(self, item_id: utils.SpecialID, suggested: bool) -> None:
-        """Set the font of an item, and its parent group."""
-        try:
-            menu_ind = self._menu_index[item_id]
-        except KeyError:
-            return
-        new_font = self.sugg_font if suggested else self.norm_font
-        data = self._get_data(item_id)
-        if data.group_id:
-            group = self.group_widgets[data.group_id]
-            menu = group.menu
-
-            # Apply the font to the group header as well, if suggested.
-            if suggested:
-                group.title['font'] = new_font
-
-                # Also highlight the menu
-                # noinspection PyUnresolvedReferences
-                self.context_menu.entryconfig(
-                    group.menu_pos,
-                    font=new_font,
-                )
-        else:
-            menu = self.context_menu
-        menu.entryconfig(menu_ind, font=new_font)
-
     def set_suggested(self, suggested: Container[str] = ()) -> None:
         """Set the suggested items to the set of IDs.
 
         If it is empty, the suggested ID will be cleared.
         """
         self.suggested.clear()
-        # Reset all the header fonts, if any item in that group is highlighted it'll
-        # re-bold it.
-        for group_key, header in self.group_widgets.items():
-            header.title['font'] = self.norm_font
-            if header.menu_pos >= 0:
-                self.context_menu.entryconfig(header.menu_pos, font=self.norm_font)
+        self._ui_menu_reset_suggested()
 
         for item_id in self.item_list:
             if item_id in suggested:
-                self._set_context_font(item_id, True)
+                self._ui_menu_set_font(item_id, True)
                 self.suggested.append(item_id)
             else:
-                self._set_context_font(item_id, False)
+                self._ui_menu_set_font(item_id, False)
 
         self.set_disp()  # Update the textbox if necessary.
         # Reposition all our items, but only if we're visible.
@@ -1265,6 +1225,26 @@ class SelectorWinBase[ButtonT, SuggLblT]:
         raise NotImplementedError
 
     @abstractmethod
+    def _ui_menu_set_font(self, item_id: utils.SpecialID, suggested: bool) -> None:
+        """Set the font of an item, and its parent group."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def _ui_menu_reset_suggested(self) -> None:
+        """Reset the fonts for all group widgets. menu_set_font() will then set them."""
+        raise NotImplementedError
+
+    @abstractmethod
     def _ui_enable_reset(self, enabled: bool, /) -> None:
         """Set whether the 'reset to default' button can be used."""
         raise NotImplementedError
+
+    @abstractmethod
+    def _ui_display_set(
+        self,
+        enabled: bool,
+        text: TransToken,
+        tooltip: TransToken,
+        font: DispFont,
+    ) -> None:
+        """Set the state of the display textbox and button."""
