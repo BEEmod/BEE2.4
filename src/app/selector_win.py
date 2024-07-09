@@ -28,7 +28,7 @@ import trio_util
 
 from app.mdown import MarkdownData
 from app import sound, img, DEV_MODE
-from ui_tk.tooltip import add_tooltip, set_tooltip
+from ui_tk.tooltip import set_tooltip
 from ui_tk.img import TK_IMG
 from ui_tk.wid_transtoken import set_menu_text, set_text
 from ui_tk import TK_ROOT, tk_tools
@@ -103,16 +103,32 @@ async def _store_results_task(chosen: trio_util.AsyncValue[utils.SpecialID], sav
             config.APP.store_conf(LastSelected(item_id), save_id)
 
 
-class GroupHeader(tk_tools.LineHeader):
+class GroupHeader:
     """The widget used for group headers."""
     def __init__(self, win: SelectorWinBase, title: TransToken, menu: tk.Menu) -> None:
         self.parent = win
+        self.frame = frame = ttk.Frame(win.pal_frame)
         self.menu = menu  # The rightclick cascade widget.
         self.menu_pos = -1
-        super().__init__(win.pal_frame, title)
+
+        sep_left = ttk.Separator(frame)
+        sep_left.grid(row=0, column=0, sticky='EW')
+        frame.columnconfigure(0, weight=1)
+
+        self.title = ttk.Label(
+            frame,
+            font='TkMenuFont',
+            anchor='center',
+        )
+        set_text(self.title, title)
+        self.title.grid(row=0, column=1)
+
+        sep_right = ttk.Separator(frame)
+        sep_right.grid(row=0, column=2, sticky='EW')
+        frame.columnconfigure(2, weight=1)
 
         self.arrow = ttk.Label(
-            self,
+            frame,
             text=GRP_EXP,
             width=2,
         )
@@ -121,13 +137,13 @@ class GroupHeader(tk_tools.LineHeader):
         self._visible = True
 
         # For the mouse events to work, we need to bind on all the children too.
-        widgets = self.winfo_children()
-        widgets.append(self)
+        widgets = frame.winfo_children()
+        widgets.append(frame)
         for wid in widgets:
             tk_tools.bind_leftclick(wid, self.toggle)
             wid['cursor'] = tk_tools.Cursors.LINK
-        self.bind('<Enter>', self.hover_start)
-        self.bind('<Leave>', self.hover_end)
+        frame.bind('<Enter>', self.hover_start)
+        frame.bind('<Leave>', self.hover_end)
 
     @property
     def visible(self) -> bool:
@@ -235,14 +251,6 @@ class SelectorWinBase[ButtonT, SuggLblT]:
     # Packages currently loaded for the window.
     _packset: packages.PackagesSet
 
-    # The textbox on the parent window.
-    display: tk_tools.ReadOnlyEntry | None
-    # Variable associated with self.display.
-    disp_label: tk.StringVar
-
-    # The '...' button to open our window.
-    disp_btn: ttk.Button | None
-
     # Currently suggested item objects. This would be a set, but we want to randomly pick.
     suggested: list[utils.SpecialID]
     # While the user hovers over the "suggested" button, cycle through random items. But we
@@ -319,12 +327,6 @@ class SelectorWinBase[ButtonT, SuggLblT]:
         self._loading = True
         self._visible = False
         self.modal = opt.modal
-
-        # The textbox on the parent window.
-        self.display = None
-
-        # The '...' button to open our window.
-        self.disp_btn = None
 
         # Currently suggested item objects. This would be a set, but we want to randomly pick.
         self.suggested = []
@@ -573,8 +575,6 @@ class SelectorWinBase[ButtonT, SuggLblT]:
     def set_disp(self) -> None:
         """Update the display textbox."""
         self.context_var.set(self.chosen.value)
-        if self.display is None or self.disp_btn is None:
-            return  # Nothing to do.
 
         text: TransToken | None = None
         font: DispFont
@@ -644,7 +644,7 @@ class SelectorWinBase[ButtonT, SuggLblT]:
             async for is_playing in agen:
                 self._ui_props_set_samp_button_icon(BTN_STOP if is_playing else BTN_PLAY)
 
-    def _icon_clicked(self, _: tk.Event[tk.Misc]) -> None:
+    def _evt_icon_clicked(self, event: object) -> None:
         """When the large image is clicked, play sounds if available."""
         if self.sampler is not None:
             self.sampler.play_sample()
@@ -691,13 +691,6 @@ class SelectorWinBase[ButtonT, SuggLblT]:
         self.sel_item(self.chosen.value)
         self.win.after(2, self.flow_items)
         return None
-
-    def open_context(self, _: object = None) -> None:
-        """Dislay the context window at the text widget."""
-        if not self._readonly and not self._loading and self.display is not None:
-            self.context_menu.post(
-                self.display.winfo_rootx(),
-                self.display.winfo_rooty() + self.display.winfo_height())
 
     def sel_suggested(self) -> None:
         """Select the suggested item."""
@@ -997,15 +990,15 @@ class SelectorWinBase[ButtonT, SuggLblT]:
             group_wid = self.group_widgets[group_key]
 
             if no_groups:
-                group_wid.place_forget()
+                group_wid.frame.place_forget()
             else:
-                group_wid.place(
+                group_wid.frame.place(
                     x=0,
                     y=y_off,
                     width=width * ITEM_WIDTH,
                 )
-                group_wid.update_idletasks()
-                y_off += group_wid.winfo_reqheight()
+                group_wid.frame.update_idletasks()
+                y_off += group_wid.frame.winfo_reqheight()
 
                 if not group_wid.visible:
                     # Hide everything!

@@ -69,6 +69,13 @@ class SelectorWin(SelectorWinBase[
     prop_scroll: tk_tools.HidingScroll
     prop_reset: ttk.Button
 
+    # Variable associated with self.display.
+    disp_label: tk.StringVar
+    # The textbox on the parent window.
+    display: tk_tools.ReadOnlyEntry | None
+    # The '...' button to open our window.
+    disp_btn: ttk.Button | None
+
     samp_button: ttk.Button | None
 
     norm_font: tk_font.Font
@@ -88,6 +95,7 @@ class SelectorWin(SelectorWinBase[
 
         # Variable associated with self.display.
         self.disp_label = tk.StringVar()
+        self.display = self.disp_btn = None
 
         # Allow resizing in X and Y.
         self.win.resizable(True, True)
@@ -168,7 +176,7 @@ class SelectorWin(SelectorWinBase[
         self.prop_icon = ttk.Label(self.prop_icon_frm, name='prop_icon')
         self.prop_icon.grid(row=0, column=0)
         self.prop_icon_frm.configure(dict(zip(('width', 'height'), ICON_SIZE_LRG, strict=True)))
-        tk_tools.bind_leftclick(self.prop_icon, self._icon_clicked)
+        tk_tools.bind_leftclick(self.prop_icon, self._evt_icon_clicked)
 
         name_frame = ttk.Frame(self.prop_frm)
 
@@ -375,7 +383,7 @@ class SelectorWin(SelectorWinBase[
         self.display.bind("<Key>", on_key)
         tk_tools.bind_rightclick(
             self.display,
-            self.open_context,
+            self._evt_open_context,
         )
 
         self.disp_btn = ttk.Button(
@@ -394,6 +402,13 @@ class SelectorWin(SelectorWinBase[
         self.save()
 
         return self.display
+
+    def _evt_open_context(self, _: object = None) -> None:
+        """Dislay the context window at the text widget."""
+        if not self._readonly and not self._loading and self.display is not None:
+            self.context_menu.post(
+                self.display.winfo_rootx(),
+                self.display.winfo_rooty() + self.display.winfo_height())
 
     def _evt_key_navigate(self, event: tk.Event[tk.Misc]) -> None:
         """Handle keyboard control for the window."""

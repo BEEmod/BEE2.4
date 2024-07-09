@@ -810,27 +810,6 @@ class EnumButton[EnumT: Enum]:
                     button.state(('pressed', ) if val is chosen else ('!pressed', ))
 
 
-class LineHeader(ttk.Frame):
-    """A resizable line, with a title in the middle."""
-    def __init__(self, parent: tk.Misc, title: TransToken) -> None:
-        super().__init__(parent)
-        sep_left = ttk.Separator(self)
-        sep_left.grid(row=0, column=0, sticky='EW')
-        self.columnconfigure(0, weight=1)
-
-        self.title = ttk.Label(
-            self,
-            font='TkMenuFont',
-            anchor='center',
-        )
-        set_text(self.title, title)
-        self.title.grid(row=0, column=1)
-
-        sep_right = ttk.Separator(self)
-        sep_right.grid(row=0, column=2, sticky='EW')
-        self.columnconfigure(2, weight=1)
-
-
 class ComboBoxMap[StrKeyT: str]:
     """A Combobox which displays TransTokens, mapping them to internal IDs."""
     _ordered_tokens: list[TransToken]
