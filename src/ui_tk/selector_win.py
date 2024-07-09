@@ -10,9 +10,7 @@ from app import img
 from app.mdown import MarkdownData
 from app.selector_win import (
     DispFont, SelectorWinBase, AttrDef, Options, NavKeys,
-    BTN_PLAY, BTN_STOP, BTN_PREV, BTN_NEXT,
-    TRANS_ATTR_DESC,
-    TRANS_SUGGESTED, TRANS_SUGGESTED_MAC, TRANS_WINDOW_TITLE,
+    TRANS_ATTR_DESC, TRANS_SUGGESTED, TRANS_SUGGESTED_MAC, TRANS_WINDOW_TITLE,
 )
 from consts import SEL_ICON_SIZE, SEL_ICON_SIZE_LRG as ICON_SIZE_LRG
 from packages import AttrTypes
@@ -70,6 +68,8 @@ class SelectorWin(SelectorWinBase[
     prop_desc: RichText
     prop_scroll: tk_tools.HidingScroll
     prop_reset: ttk.Button
+
+    samp_button: ttk.Button | None
 
     norm_font: tk_font.Font
     # A font for showing suggested items in the context menu
@@ -189,7 +189,6 @@ class SelectorWin(SelectorWinBase[
             self.samp_button = samp_button = ttk.Button(
                 name_frame,
                 name='sample_button',
-                text=BTN_PLAY,
                 width=2,
             )
             samp_button.grid(row=0, column=1)
@@ -198,7 +197,7 @@ class SelectorWin(SelectorWinBase[
             samp_button['command'] = self.sampler.play_sample
             samp_button.state(('disabled',))
         else:
-            self.samp_button = samp_button = None
+            self.samp_button = None
 
         self.prop_author = ttk.Label(self.prop_frm, text="Author: person")
         self.prop_author.grid(row=2, column=0, columnspan=4)
@@ -499,6 +498,18 @@ class SelectorWin(SelectorWinBase[
         self.prop_icon_frm.configure(width=image.width, height=image.height)
 
     @override
+    def _ui_props_set_samp_button_enabled(self, enabled: bool, /) -> None:
+        """Set whether the sample button is enabled."""
+        assert self.samp_button is not None
+        self.samp_button.state(('!disabled',) if enabled else ('disabled',))
+
+    @override
+    def _ui_props_set_samp_button_icon(self, glyph: str, /) -> None:
+        """Set the icon in the play-sample button. These don't translate since it's a symbol."""
+        assert self.samp_button is not None
+        self.samp_button['text'] = glyph
+
+    @override
     def _ui_menu_set_font(self, item_id: utils.SpecialID, suggested: bool) -> None:
         """Set the font of an item, and its parent group."""
         try:
@@ -539,7 +550,7 @@ class SelectorWin(SelectorWinBase[
         self.prop_reset.state(('!disabled',) if enabled else ('disabled',))
 
     @override
-    def _ui_display_set(self, enabled: bool, text: TransToken, tooltip: TransToken, font: DispFont) -> None:
+    def _ui_display_set(self, *, enabled: bool, text: TransToken, tooltip: TransToken, font: DispFont) -> None:
         """Set the state of the display textbox and button."""
         if self.display is None or self.disp_btn is None:
             return  # Nothing to do.

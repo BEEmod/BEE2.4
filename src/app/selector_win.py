@@ -5,7 +5,7 @@ It appears as a textbox-like widget with a ... button to open the selection wind
 Each item has a description, author, and icon.
 """
 from __future__ import annotations
-from typing import Literal, assert_never
+from typing import Final, Literal, assert_never
 
 from abc import abstractmethod
 from tkinter import ttk
@@ -51,15 +51,13 @@ ICON_CHECK = img.Handle.builtin('icons/check', 16, 16)
 ICON_CROSS = img.Handle.builtin('icons/cross', 16, 16)
 
 # Arrows used to indicate the state of the group - collapsed or expanded
-GRP_COLL = '◁'
-GRP_COLL_HOVER = '◀'
-GRP_EXP = '▽'
-GRP_EXP_HOVER = '▼'
+GRP_COLL: Final = '◁'
+GRP_COLL_HOVER: Final = '◀'
+GRP_EXP: Final = '▽'
+GRP_EXP_HOVER: Final = '▼'
 
-BTN_PLAY = '▶'
-BTN_STOP = '■'
-BTN_PREV = '⟨'
-BTN_NEXT = '⟩'
+BTN_PLAY: Final = '▶'
+BTN_STOP: Final = '■'
 
 
 class NavKeys(Enum):
@@ -96,13 +94,6 @@ TRANS_AUTHORS = TransToken.ui_plural('Author: {authors}', 'Authors: {authors}')
 TRANS_NO_AUTHORS = TransToken.ui('Authors: Unknown')
 TRANS_DEV_ITEM_ID = TransToken.untranslated('**ID:** {item}')
 TRANS_LOADING = TransToken.ui('Loading...')
-
-
-async def _update_sampler_task(sampler: sound.SamplePlayer, button: ttk.Button) -> None:
-    """Update the sampler's display."""
-    async with aclosing(sampler.is_playing.eventual_values()) as agen:
-        async for is_playing in agen:
-            button['text'] = BTN_STOP if is_playing else BTN_PLAY
 
 
 async def _store_results_task(chosen: trio_util.AsyncValue[utils.SpecialID], save_id: str) -> None:
@@ -309,7 +300,6 @@ class SelectorWinBase[ButtonT, SuggLblT]:
     wid_canvas: tk.Canvas
     pal_frame: ttk.Frame
 
-    samp_button: ttk.Button | None
     sampler: sound.SamplePlayer | None
 
     context_menu: tk.Menu
@@ -397,8 +387,8 @@ class SelectorWinBase[ButtonT, SuggLblT]:
         async with trio.open_nursery() as nursery:
             nursery.start_soon(self._load_data_task)
             nursery.start_soon(self._rollover_suggest_task)
-            if self.sampler is not None and self.samp_button is not None:
-                nursery.start_soon(_update_sampler_task, self.sampler, self.samp_button)
+            if self.sampler is not None:
+                nursery.start_soon(self._update_sampler_task)
             if self.store_last_selected:
                 nursery.start_soon(self._load_selected_task)
                 nursery.start_soon(_store_results_task, self.chosen, self.save_id)
@@ -669,7 +659,7 @@ class SelectorWinBase[ButtonT, SuggLblT]:
                 data = self._get_data(self.chosen.value)
             text = data.context_lbl
 
-        self._ui_display_set(enabled, text, tooltip, font)
+        self._ui_display_set(enabled=enabled, text=text, tooltip=tooltip, font=font)
 
     def _evt_button_click(self, index: int) -> None:
         """Handle clicking on an item.
@@ -692,6 +682,13 @@ class SelectorWinBase[ButtonT, SuggLblT]:
             async for selected in channel:
                 self.sel_item_id(selected.id)
                 self.save()
+
+    async def _update_sampler_task(self) -> None:
+        """Update the sampler's display."""
+        assert self.sampler is not None
+        async with aclosing(self.sampler.is_playing.eventual_values()) as agen:
+            async for is_playing in agen:
+                self._ui_props_set_samp_button_icon(BTN_STOP if is_playing else BTN_PLAY)
 
     def _icon_clicked(self, _: tk.Event[tk.Misc]) -> None:
         """When the large image is clicked, play sounds if available."""
@@ -825,20 +822,18 @@ class SelectorWinBase[ButtonT, SuggLblT]:
         self.selected = item_id
 
         if self.sampler:
-            assert self.samp_button is not None
             assert self.func_get_sample is not None
             is_playing = self.sampler.is_playing.value
             self.sampler.stop()
 
             self.sampler.cur_file = self.func_get_sample(self._packset, item_id)
             if self.sampler.cur_file:
-                self.samp_button.state(('!disabled',))
-
+                self._ui_props_set_samp_button_enabled(True)
                 if is_playing:
                     # Start the sampler again, so it plays the current item!
                     self.sampler.play_sample()
             else:
-                self.samp_button.state(('disabled',))
+                self._ui_props_set_samp_button_enabled(False)
 
         if self.has_def:
             self._ui_enable_reset(self.can_suggest())
@@ -1220,12 +1215,22 @@ class SelectorWinBase[ButtonT, SuggLblT]:
         raise NotImplementedError
 
     @abstractmethod
-    def _ui_props_set_icon(self, image: img.Handle) -> None:
+    def _ui_props_set_icon(self, image: img.Handle, /) -> None:
         """Set the large icon's image, and whether to show a zoom-in cursor."""
         raise NotImplementedError
 
     @abstractmethod
-    def _ui_menu_set_font(self, item_id: utils.SpecialID, suggested: bool) -> None:
+    def _ui_props_set_samp_button_enabled(self, enabled: bool, /) -> None:
+        """Set whether the sample button is enabled."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def _ui_props_set_samp_button_icon(self, glyph: str, /) -> None:
+        """Set the icon in the play-sample button."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def _ui_menu_set_font(self, item_id: utils.SpecialID, /, suggested: bool) -> None:
         """Set the font of an item, and its parent group."""
         raise NotImplementedError
 
@@ -1241,7 +1246,7 @@ class SelectorWinBase[ButtonT, SuggLblT]:
 
     @abstractmethod
     def _ui_display_set(
-        self,
+        self, *,
         enabled: bool,
         text: TransToken,
         tooltip: TransToken,
