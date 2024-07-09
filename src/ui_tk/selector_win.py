@@ -353,6 +353,48 @@ class SelectorWin(SelectorWinBase[
         self.set_disp()
         self.wid_canvas.bind("<Configure>", self.flow_items)
 
+    async def widget(self, frame: tk.Misc) -> ttk.Entry:
+        """Create the special textbox used to open the selector window."""
+
+        self.display = tk_tools.ReadOnlyEntry(
+            frame,
+            textvariable=self.disp_label,
+            cursor=tk_tools.Cursors.REGULAR,
+        )
+        tk_tools.bind_leftclick(
+            self.display,
+            self.open_win,
+        )
+        set_disp = self.set_disp
+
+        def on_key(_: object) -> str:
+            """Prevent typing in the display by reverting, then cancelling the event."""
+            set_disp()
+            return 'break'
+
+        self.display.bind("<Key>", on_key)
+        tk_tools.bind_rightclick(
+            self.display,
+            self.open_context,
+        )
+
+        self.disp_btn = ttk.Button(
+            self.display,
+            text="...",
+            width=1.5,  # type: ignore
+            command=self.open_win,
+        )
+        self.disp_btn.pack(side='right')
+
+        add_tooltip(self.display, self.description, show_when_disabled=True)
+
+        # Set this property again, which updates the description if we actually
+        # are readonly.
+        self.set_disp()
+        self.save()
+
+        return self.display
+
     def _evt_key_navigate(self, event: tk.Event[tk.Misc]) -> None:
         """Handle keyboard control for the window."""
         try:
