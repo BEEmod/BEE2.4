@@ -26,7 +26,6 @@ import trio_util
 
 from app.mdown import MarkdownData
 from app import sound, img, DEV_MODE
-from ui_tk import TK_ROOT
 from packages import SelitemData, AttrTypes, AttrDef as AttrDef, AttrMap
 from transtoken import TransToken
 from config.last_sel import LastSelected
@@ -584,11 +583,10 @@ class SelectorWinBase[ButtonT]:
             GRP_COLL
         )
 
-    def open_win(self, _: object = None) -> object:
+    def open_win(self) -> object:
         """Display the window."""
         if self._readonly:
-            TK_ROOT.bell()
-            return 'break'  # Tell tk to stop processing this event
+            return
 
         for item_id, button in zip(self.item_list, self._item_buttons, strict=False):
             self._ui_button_set_img(button, self._get_data(item_id).icon)

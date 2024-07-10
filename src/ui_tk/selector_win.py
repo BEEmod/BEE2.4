@@ -1,14 +1,15 @@
 """Tk-specific implementation of the selector window."""
-import math
-from contextlib import aclosing
 from typing import Final, assert_never
-
-import trio.lowlevel
 from typing_extensions import override
+
 from tkinter import ttk, font as tk_font
 import tkinter as tk
 
 from collections.abc import Callable, Mapping
+from contextlib import aclosing
+import math
+
+import trio
 
 from app import img
 from app.mdown import MarkdownData
@@ -435,16 +436,21 @@ class SelectorWin(SelectorWinBase[ttk.Button]):
 
     async def widget(self, frame: tk.Misc) -> ttk.Entry:
         """Create the special textbox used to open the selector window."""
+        def open_window(event: object = None) -> str:
+            """If readonly, produce an error bell."""
+            if self._readonly:
+                self.win.bell()
+                return 'break'
+            else:
+                self.open_win()
+            return ''
 
         self.display = tk_tools.ReadOnlyEntry(
             frame,
             textvariable=self.disp_label,
             cursor=tk_tools.Cursors.REGULAR,
         )
-        tk_tools.bind_leftclick(
-            self.display,
-            self.open_win,
-        )
+        tk_tools.bind_leftclick(self.display, open_window)
         set_disp = self.set_disp
 
         def on_key(_: object) -> str:
@@ -462,7 +468,7 @@ class SelectorWin(SelectorWinBase[ttk.Button]):
             self.display,
             text="...",
             width=1.5,  # type: ignore
-            command=self.open_win,
+            command=open_window,
         )
         self.disp_btn.pack(side='right')
 
