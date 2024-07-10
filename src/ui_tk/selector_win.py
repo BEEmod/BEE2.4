@@ -1,6 +1,9 @@
 """Tk-specific implementation of the selector window."""
+import math
 from contextlib import aclosing
 from typing import Final, assert_never
+
+import trio.lowlevel
 from typing_extensions import override
 from tkinter import ttk, font as tk_font
 import tkinter as tk
@@ -30,7 +33,8 @@ __all__ = [
     'Options',
 ]
 
-type SuggLabel = ttk.Label | ttk.LabelFrame
+ITEM_WIDTH = SEL_ICON_SIZE + (32 if utils.MAC else 16)
+ITEM_HEIGHT = SEL_ICON_SIZE + 51
 
 KEYSYM_TO_NAV: Final[Mapping[str, NavKeys]] = {
     'Up': NavKeys.UP,
@@ -102,15 +106,14 @@ class GroupHeader:
         self.parent._evt_group_hover_end(self.id)
 
 
-class SelectorWin(SelectorWinBase[
-    ttk.Button,  # ButtonT
-    SuggLabel,  # SuggLblT
-    tk.Menu,  # MenuT
-]):
+class SelectorWin(SelectorWinBase[ttk.Button]):
     """Tk implementation of the selector window."""
     parent: tk.Tk | tk.Toplevel
     win: tk.Toplevel
     pane_win: tk.PanedWindow
+    desc_label: ttk.Label
+    wid_canvas: tk.Canvas
+    pal_frame: ttk.Frame
 
     wid_scroll: tk_tools.HidingScroll
     # Holds all the widgets which provide info for the current item.
@@ -135,6 +138,8 @@ class SelectorWin(SelectorWinBase[
     disp_btn: ttk.Button | None
 
     samp_button: ttk.Button | None
+    _suggest_lbl: list[ttk.Label | ttk.LabelFrame]
+
 
     # A map from group name -> header widget
     group_widgets: dict[str, GroupHeader]
@@ -357,6 +362,8 @@ class SelectorWin(SelectorWinBase[
         self.context_menus = {}
         # The widget used to control which menu option is selected.
         self.context_var = tk.StringVar()
+        self.extra_groups = []
+        self.group_widgets = {}
 
         self.pane_win.add(shim)
         self.pane_win.add(self.prop_frm)
@@ -423,7 +430,8 @@ class SelectorWin(SelectorWinBase[
                         assert_never(col_type)
 
         self.set_disp()
-        self.wid_canvas.bind("<Configure>", self.flow_items)
+        # Late binding!
+        self.wid_canvas.bind("<Configure>", lambda e: self.items_dirty.set())
 
     async def widget(self, frame: tk.Misc) -> ttk.Entry:
         """Create the special textbox used to open the selector window."""
@@ -519,6 +527,104 @@ class SelectorWin(SelectorWinBase[
         self.win.geometry(f'{width}x{height}')
 
     @override
+    async def _ui_reposition_items(self) -> None:
+        """Reposition all the items to fit in the current geometry.
+
+        Called whenever items change or the window is resized.
+        """
+        self.pal_frame.update_idletasks()
+        self.pal_frame['width'] = self.wid_canvas.winfo_width()
+        self.desc_label['wraplength'] = self.win.winfo_width() - 10
+
+        width = (self.wid_canvas.winfo_width() - 10) // ITEM_WIDTH
+        if width < 1:
+            width = 1  # we got way too small, prevent division by zero
+        self.item_width = width
+
+        # The offset for the current group
+        y_off = 0
+
+        # Hide suggestion indicators if they end up unused.
+        for lbl in self._suggest_lbl:
+            lbl.place_forget()
+        suggest_ind = 0
+
+        # If only the '' group is present, force it to be visible, and hide
+        # the header.
+        no_groups = self.group_order == ['']
+
+        for group_key in self.group_order:
+            await trio.lowlevel.checkpoint()
+            items = self.grouped_items[group_key]
+            group_wid = self.group_widgets[group_key]
+
+            if no_groups:
+                group_wid.frame.place_forget()
+            else:
+                group_wid.frame.place(
+                    x=0,
+                    y=y_off,
+                    width=width * ITEM_WIDTH,
+                )
+                group_wid.frame.update_idletasks()
+                y_off += group_wid.frame.winfo_reqheight()
+
+                if not self.group_visible.get(group_key):
+                    # Hide everything!
+                    for item_id in items:
+                        await trio.lowlevel.checkpoint()
+                        self._ui_button_hide(self._id_to_button[item_id])
+                    continue
+
+            # Place each item
+            for i, item_id in enumerate(items):
+                await trio.lowlevel.checkpoint()
+                button = self._id_to_button[item_id]
+                if item_id in self.suggested:
+                    # Reuse an existing suggested label.
+                    try:
+                        sugg_lbl = self._suggest_lbl[suggest_ind]
+                    except IndexError:
+                        if utils.MAC:
+                            # Labelframe doesn't look good here on OSX
+                            sugg_lbl = ttk.Label(
+                                self.pal_frame,
+                                name=f'suggest_label_{suggest_ind}',
+                            )
+                            set_text(sugg_lbl, TRANS_SUGGESTED_MAC)
+                        else:
+                            sugg_lbl = ttk.LabelFrame(
+                                self.pal_frame,
+                                name=f'suggest_label_{suggest_ind}',
+                                labelanchor='n',
+                                height=50,
+                            )
+                            set_text(sugg_lbl, TRANS_SUGGESTED)
+                        self._suggest_lbl.append(sugg_lbl)
+                    suggest_ind += 1
+                    sugg_lbl.place(
+                        x=(i % width) * ITEM_WIDTH + 1,
+                        y=(i // width) * ITEM_HEIGHT + y_off,
+                    )
+                    sugg_lbl['width'] = button.winfo_width()
+                self._ui_button_set_pos(
+                    button,
+                    x=(i % width) * ITEM_WIDTH + 1,
+                    y=(i // width) * ITEM_HEIGHT + y_off + 20,
+                )
+
+            # Increase the offset by the total height of this item section
+            y_off += math.ceil(len(items) / width) * ITEM_HEIGHT + 5
+
+        # Set the size of the canvas and frame to the amount we've used
+        self.wid_canvas['scrollregion'] = (
+            0, 0,
+            width * ITEM_WIDTH,
+            y_off,
+        )
+        self.pal_frame['height'] = y_off
+
+    @override
     def _ui_button_create(self, ind: int) -> ttk.Button:
         button = ttk.Button(self.pal_frame)
         tk_tools.bind_leftclick(button, lambda evt: self._evt_button_click(ind))
@@ -550,6 +656,7 @@ class SelectorWin(SelectorWinBase[
         button.place(x=x, y=y)
         button.lift()
 
+    @override
     def _ui_button_scroll_to(self, button: ttk.Button) -> None:
         """Scroll to an item so it's visible."""
         height = self.wid_canvas.bbox('all')[3]  # Returns (x, y, width, height)
@@ -570,38 +677,6 @@ class SelectorWin(SelectorWinBase[
             (y - (top - bottom) // 2)
             / height
         )
-
-    @override
-    def _ui_sugg_create(self, ind: int) -> SuggLabel:
-        """Create a label for highlighting suggested buttons."""
-        sugg_lbl: SuggLabel
-        if utils.MAC:
-            # Labelframe doesn't look good here on OSX
-            sugg_lbl = ttk.Label(
-                self.pal_frame,
-                name=f'suggest_label_{ind}',
-            )
-            set_text(sugg_lbl, TRANS_SUGGESTED_MAC)
-        else:
-            sugg_lbl = ttk.LabelFrame(
-                self.pal_frame,
-                name=f'suggest_label_{ind}',
-                labelanchor='n',
-                height=50,
-            )
-            set_text(sugg_lbl, TRANS_SUGGESTED)
-        return sugg_lbl
-
-    @override
-    def _ui_sugg_hide(self, label: SuggLabel) -> None:
-        """Hide the suggested button label."""
-        label.place_forget()
-
-    @override
-    def _ui_sugg_place(self, label: SuggLabel, button: ttk.Button, x: int, y: int) -> None:
-        """Place the suggested button label at this position."""
-        label.place(x=x, y=y)
-        label['width'] = button.winfo_width()
 
     @override
     def _ui_attr_set_text(self, attr: AttrDef, text: TransToken, /) -> None:
@@ -723,7 +798,7 @@ class SelectorWin(SelectorWinBase[
             return  # Already present.
         menu = tk.Menu(self.context_menu) if key else self.context_menu
         try:
-            group = self._extra_groups.pop()
+            group = self.extra_groups.pop()
         except IndexError:
             self.group_widgets[key] = GroupHeader(self, key, label, menu)
         else:

@@ -8,8 +8,6 @@ from __future__ import annotations
 from typing import Final, Literal, assert_never
 
 from abc import abstractmethod
-from tkinter import ttk
-import tkinter as tk
 
 from contextlib import aclosing
 from collections.abc import Callable, Container, Iterable, Iterator
@@ -30,7 +28,6 @@ from app.mdown import MarkdownData
 from app import sound, img, DEV_MODE
 from ui_tk import TK_ROOT
 from packages import SelitemData, AttrTypes, AttrDef as AttrDef, AttrMap
-from consts import SEL_ICON_SIZE as ICON_SIZE
 from transtoken import TransToken
 from config.last_sel import LastSelected
 from config.windows import SelectorState
@@ -40,8 +37,6 @@ import packages
 
 
 LOGGER = srctools.logger.get_logger(__name__)
-ITEM_WIDTH = ICON_SIZE + (32 if utils.MAC else 16)
-ITEM_HEIGHT = ICON_SIZE + 51
 
 # The two icons used for boolean item attributes
 ICON_CHECK = img.Handle.builtin('icons/check', 16, 16)
@@ -148,13 +143,11 @@ class Options:
     func_get_attr: GetterFunc[AttrMap] = lambda packset, item_id: EmptyMapping
 
 
-class SelectorWinBase[ButtonT, SuggLblT, MenuT]:
+class SelectorWinBase[ButtonT]:
     """The selection window for skyboxes, music, goo and voice packs.
 
     Typevars:
     - ButtonT: Type for the button widget.
-    - SuggLblT: Type for the widget used to highlight suggested items.
-    - MenuT: Type for the context menus.
 
     Attributes:
     - chosen: The currently-selected item.
@@ -175,7 +168,6 @@ class SelectorWinBase[ButtonT, SuggLblT, MenuT]:
     # While the user hovers over the "suggested" button, cycle through random items. But we
     # want to apply that specific item when clicked.
     _suggested_rollover: utils.SpecialID | None
-    _suggest_lbl: list[SuggLblT]
 
     # Should we have the 'reset to default' button?
     has_def: bool
@@ -192,8 +184,9 @@ class SelectorWinBase[ButtonT, SuggLblT, MenuT]:
     _readonly: bool
     _loading: bool  # This overrides readonly.
     modal: bool
-    win: tk.Toplevel  # TODO move
     attrs: list[AttrDef]
+    # Event set whenever the items needs to be redrawn/reflowed.
+    items_dirty: trio.Event
 
     # Current list of item IDs we display.
     item_list: list[utils.SpecialID]
@@ -222,10 +215,6 @@ class SelectorWinBase[ButtonT, SuggLblT, MenuT]:
     # Indicate that flow_items() should restore state.
     first_open: bool
 
-    desc_label: ttk.Label
-    wid_canvas: tk.Canvas
-    pal_frame: ttk.Frame
-
     sampler: sound.SamplePlayer | None
 
     def __init__(self, opt: Options) -> None:
@@ -247,6 +236,7 @@ class SelectorWinBase[ButtonT, SuggLblT, MenuT]:
         # And this is used to control whether to start/stop hovering.
         self.suggested_rollover_active = trio_util.AsyncBool()
         self._suggest_lbl = []
+        self.items_dirty = trio.Event()
 
         # Should we have the 'reset to default' button?
         self.has_def = opt.has_def
@@ -301,6 +291,7 @@ class SelectorWinBase[ButtonT, SuggLblT, MenuT]:
             nursery.start_soon(self._ui_task)
             nursery.start_soon(self._load_data_task)
             nursery.start_soon(self._rollover_suggest_task)
+            nursery.start_soon(self._refresh_items_task)
             if self.sampler is not None:
                 nursery.start_soon(self._update_sampler_task)
             if self.store_last_selected:
@@ -442,6 +433,12 @@ class SelectorWinBase[ButtonT, SuggLblT, MenuT]:
                     yield attr, index // 2, 'left'
                 index += 1
 
+    async def _refresh_items_task(self) -> None:
+        """Calls refresh_items whenever they're marked dirty."""
+        while True:
+            await self.items_dirty.wait()
+            await self._ui_reposition_items()
+            self.items_dirty = trio.Event()
     async def _rollover_suggest_task(self) -> None:
         """Handle previewing suggested items when hovering over the 'set suggested' button."""
         while True:
@@ -568,7 +565,7 @@ class SelectorWinBase[ButtonT, SuggLblT, MenuT]:
     def _evt_group_clicked(self, group_key: str) -> None:
         """Toggle the header on or off."""
         self.group_visible[group_key] = not self.group_visible.get(group_key)
-        self.flow_items()
+        self.items_dirty.set()
 
     def _evt_group_hover_start(self, group_key: str) -> None:
         """When hovered over, fill in the triangle."""
@@ -628,7 +625,7 @@ class SelectorWinBase[ButtonT, SuggLblT, MenuT]:
         self._ui_win_show()
         self._visible = True
         self.sel_item(self.chosen.value)
-        self.win.after(2, self.flow_items)
+        self.items_dirty.set()
         return None
 
     def sel_suggested(self) -> None:
@@ -897,86 +894,6 @@ class SelectorWinBase[ButtonT, SuggLblT, MenuT]:
         else:  # Within this group
             self.sel_item(cur_group[item_ind])
 
-    def flow_items(self, _: object = None) -> None:
-        """Reposition all the items to fit in the current geometry.
-
-        Called on the <Configure> event.
-        """
-        self.pal_frame.update_idletasks()
-        self.pal_frame['width'] = self.wid_canvas.winfo_width()
-        self.desc_label['wraplength'] = self.win.winfo_width() - 10
-
-        width = (self.wid_canvas.winfo_width() - 10) // ITEM_WIDTH
-        if width < 1:
-            width = 1  # we got way too small, prevent division by zero
-        self.item_width = width
-
-        # The offset for the current group
-        y_off = 0
-
-        # Hide suggestion indicators if they end up unused.
-        for lbl in self._suggest_lbl:
-            self._ui_sugg_hide(lbl)
-        suggest_ind = 0
-
-        # If only the '' group is present, force it to be visible, and hide
-        # the header.
-        no_groups = self.group_order == ['']
-
-        for group_key in self.group_order:
-            items = self.grouped_items[group_key]
-            group_wid = self.group_widgets[group_key]
-
-            if no_groups:
-                group_wid.frame.place_forget()
-            else:
-                group_wid.frame.place(
-                    x=0,
-                    y=y_off,
-                    width=width * ITEM_WIDTH,
-                )
-                group_wid.frame.update_idletasks()
-                y_off += group_wid.frame.winfo_reqheight()
-
-                if not self.group_visible.get(group_key):
-                    # Hide everything!
-                    for item_id in items:
-                        self._ui_button_hide(self._id_to_button[item_id])
-                    continue
-
-            # Place each item
-            for i, item_id in enumerate(items):
-                button = self._id_to_button[item_id]
-                if item_id in self.suggested:
-                    # Reuse an existing suggested label.
-                    try:
-                        sugg_lbl = self._suggest_lbl[suggest_ind]
-                    except IndexError:
-                        sugg_lbl = self._ui_sugg_create(suggest_ind)
-                        self._suggest_lbl.append(sugg_lbl)
-                    suggest_ind += 1
-                    self._ui_sugg_place(
-                        sugg_lbl, button,
-                        x=(i % width) * ITEM_WIDTH + 1,
-                        y=(i // width) * ITEM_HEIGHT + y_off,
-                    )
-                self._ui_button_set_pos(
-                    button,
-                    x=(i % width) * ITEM_WIDTH + 1,
-                    y=(i // width) * ITEM_HEIGHT + y_off + 20,
-                )
-
-            # Increase the offset by the total height of this item section
-            y_off += math.ceil(len(items) / width) * ITEM_HEIGHT + 5
-
-        # Set the size of the canvas and frame to the amount we've used
-        self.wid_canvas['scrollregion'] = (
-            0, 0,
-            width * ITEM_WIDTH,
-            y_off,
-        )
-        self.pal_frame['height'] = y_off
-
     def is_suggested(self) -> bool:
         """Return whether the current item is a suggested one."""
         return self.chosen.value in self.suggested
@@ -1009,7 +926,7 @@ class SelectorWinBase[ButtonT, SuggLblT, MenuT]:
         self.set_disp()  # Update the textbox if necessary.
         # Reposition all our items, but only if we're visible.
         if self._visible:
-            self.flow_items()
+            self.items_dirty.set()
 
     async def _ui_task(self) -> None:
         """Executed by task() to allow updating the UI."""
@@ -1033,6 +950,14 @@ class SelectorWinBase[ButtonT, SuggLblT, MenuT]:
     @abstractmethod
     def _ui_win_set_size(self, width: int, height: int, /) -> None:
         """Apply size from configs."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def _ui_reposition_items(self) -> None:
+        """Reposition all the items to fit in the current geometry.
+
+        Called whenever items change or the window is resized.
+        """
         raise NotImplementedError
 
     @abstractmethod
@@ -1071,21 +996,6 @@ class SelectorWinBase[ButtonT, SuggLblT, MenuT]:
     @abstractmethod
     def _ui_button_scroll_to(self, button: ButtonT, /) -> None:
         """Scroll to an item so it's visible."""
-        raise NotImplementedError
-
-    @abstractmethod
-    def _ui_sugg_create(self, ind: int, /) -> SuggLblT:
-        """Create a label for highlighting suggested buttons."""
-        raise NotImplementedError
-
-    @abstractmethod
-    def _ui_sugg_hide(self, label: SuggLblT, /) -> None:
-        """Hide the suggested button label."""
-        raise NotImplementedError
-
-    @abstractmethod
-    def _ui_sugg_place(self, label: SuggLblT, button: ButtonT, /, x: int, y: int) -> None:
-        """Place the suggested button label at this position."""
         raise NotImplementedError
 
     @abstractmethod
