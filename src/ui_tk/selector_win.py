@@ -1,10 +1,11 @@
 """Tk-specific implementation of the selector window."""
+from contextlib import aclosing
 from typing import Final, assert_never
 from typing_extensions import override
 from tkinter import ttk, font as tk_font
 import tkinter as tk
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 
 from app import img
 from app.mdown import MarkdownData
@@ -19,7 +20,7 @@ from ui_tk import tk_tools
 from ui_tk.img import TK_IMG
 from ui_tk.rich_textbox import RichText
 from ui_tk.tooltip import add_tooltip, set_tooltip
-from ui_tk.wid_transtoken import set_stringvar, set_text, set_win_title
+from ui_tk.wid_transtoken import set_stringvar, set_text, set_win_title, set_menu_text
 import utils
 
 
@@ -46,9 +47,65 @@ KEYSYM_TO_NAV: Final[Mapping[str, NavKeys]] = {
 }
 
 
+# noinspection PyProtectedMember
+class GroupHeader:
+    """The widget used for group headers."""
+    def __init__(self, win: 'SelectorWin', group_id: str, title: TransToken, menu: tk.Menu) -> None:
+        self.parent = win
+        self.frame = frame = ttk.Frame(win.pal_frame)
+        self.id = group_id  # Accessed by an attribute so it can be reassigned if reused.
+        self.menu = menu  # The rightclick cascade widget.
+        self.menu_pos = -1
+
+        sep_left = ttk.Separator(frame)
+        sep_left.grid(row=0, column=0, sticky='EW')
+        frame.columnconfigure(0, weight=1)
+
+        self.title = ttk.Label(
+            frame,
+            font='TkMenuFont',
+            anchor='center',
+        )
+        set_text(self.title, title)
+        self.title.grid(row=0, column=1)
+
+        sep_right = ttk.Separator(frame)
+        sep_right.grid(row=0, column=2, sticky='EW')
+        frame.columnconfigure(2, weight=1)
+
+        self.arrow = ttk.Label(
+            frame,
+            text='',
+            width=2,
+        )
+        self.arrow.grid(row=0, column=10)
+
+        # For the mouse events to work, we need to bind on all the children too.
+        widgets = frame.winfo_children()
+        widgets.append(frame)
+        for wid in widgets:
+            tk_tools.bind_leftclick(wid, self._evt_toggle)
+            wid['cursor'] = tk_tools.Cursors.LINK
+        frame.bind('<Enter>', self._evt_hover_start)
+        frame.bind('<Leave>', self._evt_hover_end)
+
+    def _evt_toggle(self, _: tk.Event[tk.Misc] | None = None) -> None:
+        """Toggle the header on or off."""
+        self.parent._evt_group_clicked(self.id)
+
+    def _evt_hover_start(self, _: tk.Event[tk.Misc] | None = None) -> None:
+        """When hovered over, fill in the triangle."""
+        self.parent._evt_group_hover_start(self.id)
+
+    def _evt_hover_end(self, _: tk.Event[tk.Misc] | None = None) -> None:
+        """When leaving, hollow the triangle."""
+        self.parent._evt_group_hover_end(self.id)
+
+
 class SelectorWin(SelectorWinBase[
     ttk.Button,  # ButtonT
     SuggLabel,  # SuggLblT
+    tk.Menu,  # MenuT
 ]):
     """Tk implementation of the selector window."""
     parent: tk.Tk | tk.Toplevel
@@ -78,6 +135,17 @@ class SelectorWin(SelectorWinBase[
     disp_btn: ttk.Button | None
 
     samp_button: ttk.Button | None
+
+    # A map from group name -> header widget
+    group_widgets: dict[str, GroupHeader]
+    # When refreshing, the groups already created allowing them to be reused.
+    extra_groups: list[GroupHeader]
+
+    context_menu: tk.Menu
+    # The menus for each group.
+    context_menus: dict[str, tk.Menu]
+    # The widget used to control which menu option is selected.
+    context_var: tk.StringVar
 
     norm_font: tk_font.Font
     # A font for showing suggested items in the context menu
@@ -416,6 +484,13 @@ class SelectorWin(SelectorWinBase[
         raise NotImplementedError
 
     @override
+    async def _ui_task(self) -> None:
+        """Executed by task()."""
+        async with aclosing(self.chosen.eventual_values()) as agen:
+            async for chosen_id in agen:
+                self.context_var.set(chosen_id)
+
+    @override
     def _ui_win_hide(self) -> None:
         if self.modal:
             self.win.grab_release()
@@ -578,6 +653,21 @@ class SelectorWin(SelectorWinBase[
         self.samp_button['text'] = glyph
 
     @override
+    def _ui_menu_clear(self) -> None:
+        """Remove all items from the main context menu."""
+        self.context_menu.delete(0, 'end')
+        self._menu_index.clear()
+        # Ungrouped items appear directly in the menu.
+        self.context_menus = {'': self.context_menu}
+
+        # Remove all group widgets.
+        self.extra_groups.extend(self.group_widgets.values())
+        self.group_widgets.clear()
+        for group in self.extra_groups:
+            set_text(group.title, TransToken.BLANK)
+            group.frame.place_forget()
+
+    @override
     def _ui_menu_set_font(self, item_id: utils.SpecialID, suggested: bool) -> None:
         """Set the font of an item, and its parent group."""
         try:
@@ -611,6 +701,54 @@ class SelectorWin(SelectorWinBase[
             header.title['font'] = self.norm_font
             if header.menu_pos >= 0:
                 self.context_menu.entryconfig(header.menu_pos, font=self.norm_font)
+
+    @override
+    def _ui_menu_add(self, group_key: str, item: utils.SpecialID, func: Callable[[], object], label: TransToken, /) -> None:
+        """Add a radio-selection menu option for this item."""
+        group = self.group_widgets[group_key]
+
+        group.menu.add_radiobutton(
+            command=func,
+            variable=self.context_var,
+            value=item,
+        )
+        set_menu_text(group.menu, label)
+        menu_pos = group.menu.index('end')
+        assert menu_pos is not None, "Didn't add to the menu?"
+        self._menu_index[item] = menu_pos
+
+    @override
+    def _ui_group_create(self, key: str, label: TransToken) -> None:
+        if key in self.group_widgets:
+            return  # Already present.
+        menu = tk.Menu(self.context_menu) if key else self.context_menu
+        try:
+            group = self._extra_groups.pop()
+        except IndexError:
+            self.group_widgets[key] = GroupHeader(self, key, label, menu)
+        else:
+            # Reuse an existing group.
+            self.group_widgets[key] = group
+            group.id = key
+            group.menu = menu
+            set_text(group.title, label)
+            group.menu_pos = -1
+
+    @override
+    def _ui_group_add(self, key: str, name: TransToken) -> None:
+        """Add the specified group to the rightclick menu."""
+        group = self.group_widgets[key]
+        self.context_menu.add_cascade(menu=group.menu)
+        set_menu_text(self.context_menu, name)
+        # Track the menu's index. The one at the end is the one we just added.
+        menu_pos = self.context_menu.index('end')
+        assert menu_pos is not None, "Didn't add to the menu?"
+        group.menu_pos = menu_pos
+
+    @override
+    def _ui_group_set_arrow(self, key: str, arrow: str) -> None:
+        """Set the arrow for a group widget."""
+        self.group_widgets[key].arrow['text'] = arrow
 
     @override
     def _ui_enable_reset(self, enabled: bool) -> None:

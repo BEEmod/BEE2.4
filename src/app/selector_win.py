@@ -28,8 +28,7 @@ import trio_util
 
 from app.mdown import MarkdownData
 from app import sound, img, DEV_MODE
-from ui_tk.wid_transtoken import set_menu_text, set_text
-from ui_tk import TK_ROOT, tk_tools
+from ui_tk import TK_ROOT
 from packages import SelitemData, AttrTypes, AttrDef as AttrDef, AttrMap
 from consts import SEL_ICON_SIZE as ICON_SIZE
 from transtoken import TransToken
@@ -101,85 +100,6 @@ async def _store_results_task(chosen: trio_util.AsyncValue[utils.SpecialID], sav
             config.APP.store_conf(LastSelected(item_id), save_id)
 
 
-class GroupHeader:
-    """The widget used for group headers."""
-    def __init__(self, win: SelectorWinBase, title: TransToken, menu: tk.Menu) -> None:
-        self.parent = win
-        self.frame = frame = ttk.Frame(win.pal_frame)
-        self.menu = menu  # The rightclick cascade widget.
-        self.menu_pos = -1
-
-        sep_left = ttk.Separator(frame)
-        sep_left.grid(row=0, column=0, sticky='EW')
-        frame.columnconfigure(0, weight=1)
-
-        self.title = ttk.Label(
-            frame,
-            font='TkMenuFont',
-            anchor='center',
-        )
-        set_text(self.title, title)
-        self.title.grid(row=0, column=1)
-
-        sep_right = ttk.Separator(frame)
-        sep_right.grid(row=0, column=2, sticky='EW')
-        frame.columnconfigure(2, weight=1)
-
-        self.arrow = ttk.Label(
-            frame,
-            text=GRP_EXP,
-            width=2,
-        )
-        self.arrow.grid(row=0, column=10)
-
-        self._visible = True
-
-        # For the mouse events to work, we need to bind on all the children too.
-        widgets = frame.winfo_children()
-        widgets.append(frame)
-        for wid in widgets:
-            tk_tools.bind_leftclick(wid, self.toggle)
-            wid['cursor'] = tk_tools.Cursors.LINK
-        frame.bind('<Enter>', self.hover_start)
-        frame.bind('<Leave>', self.hover_end)
-
-    @property
-    def visible(self) -> bool:
-        """Check if the contents are visible."""
-        return self._visible
-
-    @visible.setter
-    def visible(self, value: bool) -> None:
-        """Set if the contents are visible."""
-        value = bool(value)
-        if value == self._visible:
-            return  # Don't do anything..
-
-        self._visible = value
-        self.hover_start()  # Update arrow icon
-        self.parent.flow_items()
-
-    def toggle(self, _: tk.Event[tk.Misc] | None = None) -> None:
-        """Toggle the header on or off."""
-        self.visible = not self._visible
-
-    def hover_start(self, _: tk.Event[tk.Misc] | None = None) -> None:
-        """When hovered over, fill in the triangle."""
-        self.arrow['text'] = (
-            GRP_EXP_HOVER
-            if self._visible else
-            GRP_COLL_HOVER
-        )
-
-    def hover_end(self, _: tk.Event[tk.Misc] | None = None) -> None:
-        """When leaving, hollow the triangle."""
-        self.arrow['text'] = (
-            GRP_EXP
-            if self._visible else
-            GRP_COLL
-        )
-
-
 @attrs.frozen(kw_only=True)
 class Options:
     """Creation options for selector windows.
@@ -228,12 +148,13 @@ class Options:
     func_get_attr: GetterFunc[AttrMap] = lambda packset, item_id: EmptyMapping
 
 
-class SelectorWinBase[ButtonT, SuggLblT]:
+class SelectorWinBase[ButtonT, SuggLblT, MenuT]:
     """The selection window for skyboxes, music, goo and voice packs.
 
     Typevars:
     - ButtonT: Type for the button widget.
     - SuggLblT: Type for the widget used to highlight suggested items.
+    - MenuT: Type for the context menus.
 
     Attributes:
     - chosen: The currently-selected item.
@@ -276,12 +197,12 @@ class SelectorWinBase[ButtonT, SuggLblT]:
 
     # Current list of item IDs we display.
     item_list: list[utils.SpecialID]
-    # A map from group name -> header widget
-    group_widgets: dict[str, GroupHeader]
     # A map from folded name -> display name
     group_names: dict[str, TransToken]
     # Group name -> items in that group.
     grouped_items: dict[str, list[utils.SpecialID]]
+    # Group name -> is visible.
+    group_visible: dict[str, bool]
     # A list of casefolded group names in the display order.
     group_order: list[str]
     # Maps item ID to the menu position.
@@ -306,13 +227,6 @@ class SelectorWinBase[ButtonT, SuggLblT]:
     pal_frame: ttk.Frame
 
     sampler: sound.SamplePlayer | None
-
-    context_menu: tk.Menu
-
-    # The headers for the context menu
-    context_menus: dict[str, tk.Menu]
-    # The widget used to control which menu option is selected.
-    context_var: tk.StringVar
 
     def __init__(self, opt: Options) -> None:
         self.func_get_attr = opt.func_get_attr
@@ -359,10 +273,9 @@ class SelectorWinBase[ButtonT, SuggLblT]:
         self._id_to_button = {}
         self._menu_index = {}
 
-        # A map from group name -> header widget
-        self.group_widgets = {}
         # A map from folded name -> display name
         self.group_names = {}
+        self.group_visible = {}
         self.grouped_items = {}
         # A list of casefolded group names in the display order.
         self.group_order = []
@@ -385,6 +298,7 @@ class SelectorWinBase[ButtonT, SuggLblT]:
     async def task(self) -> None:
         """This must be run to make the window operational."""
         async with trio.open_nursery() as nursery:
+            nursery.start_soon(self._ui_task)
             nursery.start_soon(self._load_data_task)
             nursery.start_soon(self._rollover_suggest_task)
             if self.sampler is not None:
@@ -450,17 +364,15 @@ class SelectorWinBase[ButtonT, SuggLblT]:
         self.item_list = sorted(self.func_get_ids(self._packset), key=sort_func)
         grouped_items = defaultdict(list)
         self.group_names = {'':  TRANS_GROUPLESS}
-        # Ungrouped items appear directly in the menu.
-        self.context_menus = {'': self.context_menu}
         self._menu_index.clear()
         self._id_to_button.clear()
 
-        # First clear off the menu.
-        self.context_menu.delete(0, 'end')
-
+        # First, clear everything.
+        self._ui_menu_clear()
         for button in self._item_buttons:
             self._ui_button_hide(button)
 
+        # Create additional buttons so we have enough.
         while len(self._item_buttons) < len(self.item_list):
             await trio.lowlevel.checkpoint()
             self._item_buttons.append(self._ui_button_create(len(self._item_buttons)))
@@ -481,23 +393,16 @@ class SelectorWinBase[ButtonT, SuggLblT]:
 
             if group_key not in self.group_names:
                 self.group_names[group_key] = data.group
-            try:
-                group = self.group_widgets[group_key]
-            except KeyError:
-                self.group_widgets[group_key] = group = GroupHeader(
-                    self,
-                    self.group_names[group_key],
-                    tk.Menu(self.context_menu) if group_key else self.context_menu,
-                )
-            group.menu.add_radiobutton(
-                command=functools.partial(self.sel_item_id, item_id),
-                variable=self.context_var,
-                value=item_id,
+            self._ui_group_create(
+                group_key,
+                self.group_names[group_key],
             )
-            set_menu_text(group.menu, data.context_lbl)
-            menu_pos = group.menu.index('end')
-            assert menu_pos is not None, "Didn't add to the menu?"
-            self._menu_index[item_id] = menu_pos
+            self._ui_menu_add(
+                group_key,
+                item_id,
+                functools.partial(self.sel_item_id, item_id),
+                data.context_lbl,
+            )
 
         # Convert to a normal dictionary, after adding all items.
         self.grouped_items = dict(grouped_items)
@@ -507,17 +412,11 @@ class SelectorWinBase[ButtonT, SuggLblT]:
         self.group_order[:] = sorted(self.grouped_items.keys())
 
         for group_key in self.group_order:
+            self.group_visible[group_key] = True
             await trio.lowlevel.checkpoint()
-            if group_key == '':
-                # Don't add the ungrouped menu to itself!
-                continue
-            group = self.group_widgets[group_key]
-            self.context_menu.add_cascade(menu=group.menu)
-            set_menu_text(self.context_menu, self.group_names[group_key])
-            # Track the menu's index. The one at the end is the one we just added.
-            menu_pos = self.context_menu.index('end')
-            assert menu_pos is not None, "Didn't add to the menu?"
-            group.menu_pos = menu_pos
+            # Don't add the ungrouped menu to itself!
+            if group_key != '':
+                self._ui_group_add(group_key, self.group_names[group_key])
 
     def _attr_widget_positions(self) -> Iterator[tuple[
         AttrDef, int,
@@ -580,10 +479,7 @@ class SelectorWinBase[ButtonT, SuggLblT]:
         if not self.first_open:  # We've got state to store.
             width, height = self._ui_win_get_size()
             state = SelectorState(
-                open_groups={
-                    grp_id: grp.visible
-                    for grp_id, grp in self.group_widgets.items()
-                },
+                open_groups=self.group_visible.copy(),
                 width=width,
                 height=height,
             )
@@ -596,8 +492,6 @@ class SelectorWinBase[ButtonT, SuggLblT]:
 
     def set_disp(self) -> None:
         """Update the display textbox."""
-        self.context_var.set(self.chosen.value)
-
         text: TransToken | None = None
         font: DispFont
 
@@ -671,6 +565,29 @@ class SelectorWinBase[ButtonT, SuggLblT]:
         if self.sampler is not None:
             self.sampler.play_sample()
 
+    def _evt_group_clicked(self, group_key: str) -> None:
+        """Toggle the header on or off."""
+        self.group_visible[group_key] = not self.group_visible.get(group_key)
+        self.flow_items()
+
+    def _evt_group_hover_start(self, group_key: str) -> None:
+        """When hovered over, fill in the triangle."""
+        self._ui_group_set_arrow(
+            group_key,
+            GRP_EXP_HOVER
+            if self.group_visible.get(group_key) else
+            GRP_COLL_HOVER
+        )
+
+    def _evt_group_hover_end(self, group_key: str) -> None:
+        """When leaving, hollow the triangle."""
+        self._ui_group_set_arrow(
+            group_key,
+            GRP_EXP
+            if self.group_visible.get(group_key) else
+            GRP_COLL
+        )
+
     def open_win(self, _: object = None) -> object:
         """Display the window."""
         if self._readonly:
@@ -693,9 +610,9 @@ class SelectorWinBase[ButtonT, SuggLblT]:
                     self.save_id, state,
                 )
                 for grp_id, is_open in state.open_groups.items():
-                    try:
-                        self.group_widgets[grp_id].visible = is_open
-                    except KeyError:  # Stale config, ignore.
+                    if grp_id in self.group_visible:
+                        self.group_visible[grp_id] = is_open
+                    else:  # Stale config, ignore.
                         LOGGER.warning(
                             '({}): invalid selectorwin group: "{}"',
                             self.save_id, grp_id,
@@ -862,14 +779,14 @@ class SelectorWinBase[ButtonT, SuggLblT]:
         cur_group = self.grouped_items[cur_group_name]
         # Force the current group to be visible, so you can see what's
         # happening.
-        self.group_widgets[cur_group_name].visible = True
+        self.group_visible[cur_group_name] = True
 
         # A list of groups names, in the order that they're visible onscreen
         # (skipping hidden ones). Force-include
         ordered_groups = [
             group_name
             for group_name in self.group_order
-            if self.group_widgets[group_name].visible
+            if self.group_visible.get(group_name)
         ]
 
         if not ordered_groups:
@@ -1021,7 +938,7 @@ class SelectorWinBase[ButtonT, SuggLblT]:
                 group_wid.frame.update_idletasks()
                 y_off += group_wid.frame.winfo_reqheight()
 
-                if not group_wid.visible:
+                if not self.group_visible.get(group_key):
                     # Hide everything!
                     for item_id in items:
                         self._ui_button_hide(self._id_to_button[item_id])
@@ -1093,6 +1010,10 @@ class SelectorWinBase[ButtonT, SuggLblT]:
         # Reposition all our items, but only if we're visible.
         if self._visible:
             self.flow_items()
+
+    async def _ui_task(self) -> None:
+        """Executed by task() to allow updating the UI."""
+        # Not abstract, will just exit if not overridden.
 
     @abstractmethod
     def _ui_win_hide(self, /) -> None:
@@ -1213,6 +1134,11 @@ class SelectorWinBase[ButtonT, SuggLblT]:
         raise NotImplementedError
 
     @abstractmethod
+    def _ui_menu_clear(self) -> None:
+        """Remove all items from the main context menu, as well as clear the group widgets."""
+        raise NotImplementedError
+
+    @abstractmethod
     def _ui_menu_set_font(self, item_id: utils.SpecialID, /, suggested: bool) -> None:
         """Set the font of an item, and its parent group."""
         raise NotImplementedError
@@ -1220,6 +1146,26 @@ class SelectorWinBase[ButtonT, SuggLblT]:
     @abstractmethod
     def _ui_menu_reset_suggested(self) -> None:
         """Reset the fonts for all group widgets. menu_set_font() will then set them."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def _ui_menu_add(self, group_key: str, item: utils.SpecialID, func: Callable[[], object], label: TransToken, /) -> None:
+        """Add a radio-selection menu option for this item."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def _ui_group_create(self, key: str, label: TransToken) -> None:
+        """Ensure a group exists with this key, and text."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def _ui_group_add(self, key: str, name: TransToken) -> None:
+        """Add the specified group to the rightclick menu."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def _ui_group_set_arrow(self, key: str, arrow: str) -> None:
+        """Set the arrow for a group widget."""
         raise NotImplementedError
 
     @abstractmethod
