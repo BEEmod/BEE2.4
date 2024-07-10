@@ -1,6 +1,6 @@
 """This package contains UI code specific to TKinter."""
 from __future__ import annotations
-from types import TracebackType
+from types import TracebackType, GenericAlias
 import tkinter as tk
 
 from exceptiongroup import BaseExceptionGroup
@@ -17,12 +17,8 @@ TK_ROOT.withdraw()  # Hide the window until everything is loaded.
 TK_ROOT.protocol("WM_DELETE_WINDOW", app.quit_app)
 
 if '__class_getitem__' not in vars(tk.Event):
-    # Patch in it being generic, by replacing it with a copy that subclasses Generic.
-    class _GenericEvent[W: tk.Misc](tk.Event):  # type: ignore
-        pass
-
-    _GenericEvent.__name__ = 'Event'
-    tk.Event = _GenericEvent  # type: ignore
+    # Patch in it being generic.
+    tk.Event.__class_getitem__ = classmethod(GenericAlias)  # type: ignore
 
 
 async def route_callback_exceptions(
