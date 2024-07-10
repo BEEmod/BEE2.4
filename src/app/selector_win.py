@@ -235,7 +235,6 @@ class SelectorWinBase[ButtonT]:
         self._suggested_rollover = None
         # And this is used to control whether to start/stop hovering.
         self.suggested_rollover_active = trio_util.AsyncBool()
-        self._suggest_lbl = []
         self.items_dirty = trio.Event()
 
         # Should we have the 'reset to default' button?

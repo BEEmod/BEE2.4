@@ -140,7 +140,6 @@ class SelectorWin(SelectorWinBase[ttk.Button]):
     samp_button: ttk.Button | None
     _suggest_lbl: list[ttk.Label | ttk.LabelFrame]
 
-
     # A map from group name -> header widget
     group_widgets: dict[str, GroupHeader]
     # When refreshing, the groups already created allowing them to be reused.
@@ -364,6 +363,7 @@ class SelectorWin(SelectorWinBase[ttk.Button]):
         self.context_var = tk.StringVar()
         self.extra_groups = []
         self.group_widgets = {}
+        self._suggest_lbl = []
 
         self.pane_win.add(shim)
         self.pane_win.add(self.prop_frm)
