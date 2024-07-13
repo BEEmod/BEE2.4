@@ -66,7 +66,7 @@ class GroupHeader:
         )
         self.title = wx.StaticText(self.panel)
         set_text(self.title, title)
-        sizer.Add(self.title, wx.SizerFlags.Border(wx.LEFT | wx.RIGHT, 4))
+        sizer.Add(self.title, wx.SizerFlags().Border(wx.LEFT | wx.RIGHT, 4))
         sizer.Add(
             wx.StaticLine(self.panel, wx.HORIZONTAL),
             wx.SizerFlags().Expand().Proportion(1),
@@ -384,11 +384,13 @@ class SelectorWin(SelectorWinBase[wx.Button]):
 
     @override
     def _ui_props_set_samp_button_enabled(self, enabled: bool, /) -> None:
-        self.wid_samp_button.Enabled = enabled
+        if self.wid_samp_button is not None:
+            self.wid_samp_button.Enabled = enabled
 
     @override
     def _ui_props_set_samp_button_icon(self, glyph: str, /) -> None:
-        self.wid_samp_button.LabelText = glyph
+        if self.wid_samp_button is not None:
+            self.wid_samp_button.LabelText = glyph
 
     @override
     def _ui_attr_set_text(self, attr: AttrDef, text: TransToken, /) -> None:
@@ -427,7 +429,7 @@ class SelectorWin(SelectorWinBase[wx.Button]):
         group = self.group_widgets[group_key]
         self._menu_items[item] = menu = group.menu.AppendRadioItem(wx.ID_ANY, '', '')
         set_menu_text(menu, label)
-        menu.Bind(wx.EVT_COMMAND, lambda evt: func())
+        group.menu.Bind(wx.EVT_COMMAND, lambda evt: func())  # TODO: How does this work
 
     @override
     def _ui_menu_set_font(self, item_id: utils.SpecialID, /, suggested: bool) -> None:
@@ -470,13 +472,13 @@ class SelectorWin(SelectorWinBase[wx.Button]):
             group.id = key
             group.menu = menu
             set_text(group.title, label)
-            group.menu_pos = None
+            group.menu_item = None
 
     @override
     def _ui_group_add(self, key: str, name: TransToken) -> None:
         """Add the specified group to the rightclick menu."""
         group = self.group_widgets[key]
-        group.menu_pos = item = self.context_menu.AppendSubMenu(group.menu, '')
+        group.menu_item = item = self.context_menu.AppendSubMenu(group.menu, '')
         set_menu_text(item, name)
 
     @override
@@ -485,7 +487,8 @@ class SelectorWin(SelectorWinBase[wx.Button]):
 
     @override
     def _ui_enable_reset(self, enabled: bool, /) -> None:
-        self.wid_button_reset.Enabled = enabled
+        if self.wid_button_reset is not None:
+            self.wid_button_reset.Enabled = enabled
 
     @override
     def _ui_display_set(
@@ -509,6 +512,6 @@ class SelectorWin(SelectorWinBase[wx.Button]):
                 assert_never(font)
 
         self.display.SetFont(font_obj)
-        self.display.SetValue(text)
+        set_entry_value(self.display, text)
         set_tooltip(self.display, tooltip)
         self.display.Enabled = self.disp_btn.Enabled = enabled
