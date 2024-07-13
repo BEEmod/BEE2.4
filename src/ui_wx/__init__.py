@@ -5,6 +5,10 @@ import logging
 from collections.abc import Callable
 
 import wx
+import mistletoe
+
+import utils
+from app import mdown
 
 
 APP = wx.App()
@@ -72,3 +76,16 @@ def get_scrollflow_size_handler(
         evt.Skip()
 
     return size_handler
+
+
+class _MarkdownConverter(mdown.BaseRenderer[str]):
+    def _convert(self, text: str, package: utils.ObjectID | None) -> str:
+        """Convert to HTML."""
+        # TODO images?
+        return mistletoe.markdown(text)
+
+    def _join(self, children: list[str]) -> str:
+        """Join two fragments together."""
+        return '<br /><br />\n'.join(children)
+
+MARKDOWN = _MarkdownConverter(str)
