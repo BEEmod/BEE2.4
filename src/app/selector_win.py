@@ -583,7 +583,7 @@ class SelectorWinBase[ButtonT]:
             GRP_COLL
         )
 
-    def open_win(self) -> object:
+    def open_win(self) -> None:
         """Display the window."""
         if self._readonly:
             return
@@ -983,11 +983,6 @@ class SelectorWinBase[ButtonT]:
     @abstractmethod
     def _ui_button_hide(self, button: ButtonT, /) -> None:
         """Hide this button, it is no longer necessary."""
-        raise NotImplementedError
-
-    @abstractmethod
-    def _ui_button_set_pos(self, button: ButtonT, /, x: int, y: int) -> None:
-        """Place this button at the specified location."""
         raise NotImplementedError
 
     @abstractmethod

@@ -613,8 +613,7 @@ class SelectorWin(SelectorWinBase[ttk.Button]):
                         y=(i // width) * ITEM_HEIGHT + y_off,
                     )
                     sugg_lbl['width'] = button.winfo_width()
-                self._ui_button_set_pos(
-                    button,
+                button.place(
                     x=(i % width) * ITEM_WIDTH + 1,
                     y=(i // width) * ITEM_HEIGHT + y_off + 20,
                 )
@@ -645,6 +644,7 @@ class SelectorWin(SelectorWinBase[ttk.Button]):
         else:
             button['compound'] = 'top'
 
+    @override
     def _ui_button_set_img(self, button: ttk.Button, image: img.Handle | None) -> None:
         TK_IMG.apply(button, image)
 
@@ -656,11 +656,6 @@ class SelectorWin(SelectorWinBase[ttk.Button]):
     @override
     def _ui_button_hide(self, button: ttk.Button) -> None:
         button.place_forget()
-
-    @override
-    def _ui_button_set_pos(self, button: ttk.Button, x: int, y: int) -> None:
-        button.place(x=x, y=y)
-        button.lift()
 
     @override
     def _ui_button_scroll_to(self, button: ttk.Button) -> None:
@@ -746,6 +741,7 @@ class SelectorWin(SelectorWinBase[ttk.Button]):
         self.group_widgets.clear()
         for group in self.extra_groups:
             set_text(group.title, TransToken.BLANK)
+            group.menu_pos = -1
             group.frame.place_forget()
 
     @override
@@ -837,7 +833,13 @@ class SelectorWin(SelectorWinBase[ttk.Button]):
         self.prop_reset.state(('!disabled',) if enabled else ('disabled',))
 
     @override
-    def _ui_display_set(self, *, enabled: bool, text: TransToken, tooltip: TransToken, font: DispFont) -> None:
+    def _ui_display_set(
+        self, *,
+        enabled: bool,
+        text: TransToken,
+        tooltip: TransToken,
+        font: DispFont,
+    ) -> None:
         """Set the state of the display textbox and button."""
         if self.display is None or self.disp_btn is None:
             return  # Nothing to do.
