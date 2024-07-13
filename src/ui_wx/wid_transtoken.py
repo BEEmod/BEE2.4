@@ -13,13 +13,14 @@ from transtoken import TransToken, CURRENT_LANG
 
 __all__ = [
     'TransToken', 'CURRENT_LANG',  # Re-exports
-    'set_text', 'set_win_title', 'set_menu_text',
+    'set_text', 'set_tooltip', 'set_win_title', 'set_menu_text',
 ]
 
 
 _control_labels: WeakKeyDictionary[wx.Control, TransToken] = WeakKeyDictionary()
 _menu_labels: WeakKeyDictionary[wx.MenuItem, TransToken] = WeakKeyDictionary()
 _window_titles: WeakKeyDictionary[wx.TopLevelWindow, TransToken] = WeakKeyDictionary()
+_tooltips: WeakKeyDictionary[wx.Window, TransToken] = WeakKeyDictionary()
 
 
 def set_text[Widget: wx.Control](widget: Widget, token: TransToken) -> Widget:
@@ -33,6 +34,21 @@ def set_text[Widget: wx.Control](widget: Widget, token: TransToken) -> Widget:
     return widget
 
 
+def set_tooltip[Widget: wx.Window](widget: Widget, token: TransToken) -> Widget:
+    """Set the tooltip on a window, or remove if BLANK."""
+    if token:
+        widget.SetToolTip(str(token))
+        if token.is_untranslated:
+            _tooltips.pop(widget, None)
+        else:
+            _tooltips[widget] = token
+    else:
+        # Unset them.
+        widget.UnsetToolTip()
+        _tooltips.pop(widget, None)
+    return widget
+
+
 def set_win_title(win: wx.TopLevelWindow, token: TransToken) -> None:
     """Set the title of a window to this token."""
     win.SetTitle(str(token))
@@ -42,7 +58,10 @@ def set_win_title(win: wx.TopLevelWindow, token: TransToken) -> None:
 def set_menu_text(menu: wx.MenuItem, token: TransToken) -> None:
     """Apply this text to an item on a menu."""
     menu.SetItemLabel(str(token))
-    _menu_labels[menu] = token
+    if token.is_untranslated:
+        _menu_labels.pop(menu, None)
+    else:
+        _menu_labels[menu] = token
 
 
 async def update_task() -> None:
@@ -62,6 +81,12 @@ async def update_task() -> None:
 
         await trio.lowlevel.checkpoint()
 
+        async with aclosing(gradual_iter(_tooltips)) as agen3:
+            async for window, token in agen3:
+                window.SetToolTip(str(token))
+
+        await trio.lowlevel.checkpoint()
+
         for window, token in _window_titles.items():
             window.SetTitle(str(token))
 
@@ -71,6 +96,7 @@ def stats() -> str:
     return (
         f'TransTokens:\n'
         f'- Controls: {len(_control_labels)}\n'
+        f'- Tooltips: {len(_tooltips)}\n'
         f'- Menus: {len(_menu_labels)}\n'
         f'- Windows: {len(_window_titles)}\n'
     )
