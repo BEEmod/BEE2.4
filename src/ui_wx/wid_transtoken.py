@@ -13,7 +13,7 @@ from transtoken import TransToken, CURRENT_LANG
 
 __all__ = [
     'TransToken', 'CURRENT_LANG',  # Re-exports
-    'set_text', 'set_tooltip', 'set_win_title', 'set_menu_text',
+    'set_text', 'set_tooltip', 'set_win_title', 'set_menu_text', 'set_entry_value',
 ]
 
 
@@ -21,6 +21,7 @@ _control_labels: WeakKeyDictionary[wx.Control, TransToken] = WeakKeyDictionary()
 _menu_labels: WeakKeyDictionary[wx.MenuItem, TransToken] = WeakKeyDictionary()
 _window_titles: WeakKeyDictionary[wx.TopLevelWindow, TransToken] = WeakKeyDictionary()
 _tooltips: WeakKeyDictionary[wx.Window, TransToken] = WeakKeyDictionary()
+_entry_values: WeakKeyDictionary[wx.TextEntry, TransToken] = WeakKeyDictionary()
 
 
 def set_text[Widget: wx.Control](widget: Widget, token: TransToken) -> Widget:
@@ -64,6 +65,15 @@ def set_menu_text(menu: wx.MenuItem, token: TransToken) -> None:
         _menu_labels[menu] = token
 
 
+def set_entry_value(entry: wx.TextEntry, token: TransToken) -> None:
+    """Set the value of a textbox."""
+    entry.SetValue(str(token))
+    if token.is_untranslated:
+        _entry_values.pop(entry, None)
+    else:
+        _entry_values[entry] = token
+
+
 async def update_task() -> None:
     """Apply new languages to all stored widgets."""
     # Using gradual_iter() yields to the event loop in-between each conversion.
@@ -87,6 +97,12 @@ async def update_task() -> None:
 
         await trio.lowlevel.checkpoint()
 
+        async with aclosing(gradual_iter(_entry_values)) as agen4:
+            async for entry, token in agen3:
+                entry.SetValue(str(token))
+
+        await trio.lowlevel.checkpoint()
+
         for window, token in _window_titles.items():
             window.SetTitle(str(token))
 
@@ -98,5 +114,6 @@ def stats() -> str:
         f'- Controls: {len(_control_labels)}\n'
         f'- Tooltips: {len(_tooltips)}\n'
         f'- Menus: {len(_menu_labels)}\n'
+        f'- Entries: {len(_entry_values)}\n'
         f'- Windows: {len(_window_titles)}\n'
     )
