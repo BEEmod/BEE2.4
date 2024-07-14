@@ -21,7 +21,7 @@ from packages import AttrTypes
 from transtoken import TransToken
 from ui_wx import MARKDOWN
 from ui_wx.img import WX_IMG
-from ui_wx.wid_transtoken import set_text, set_win_title, set_menu_text, set_tooltip
+from ui_wx.wid_transtoken import set_text, set_win_title, set_menu_text, set_tooltip, set_entry_value
 import utils
 
 
@@ -78,7 +78,7 @@ class GroupHeader:
         #     item.Window.Bind(wx.EVT_LEFT_DOWN, self._evt_toggle)
         #     item.Window.SetCursor(wx.CURSOR_HAND)
         self.panel.Bind(wx.EVT_LEFT_DOWN, self._evt_toggle)
-        self.panel.SetCursor(wx.CURSOR_HAND)
+        self.panel.SetCursor(wx.Cursor(wx.CURSOR_HAND))
         self.panel.Bind(wx.EVT_ENTER_WINDOW, self._evt_hover_start)
         self.panel.Bind(wx.EVT_LEAVE_WINDOW, self._evt_hover_end)
         self.panel.SetSizer(sizer)
@@ -149,15 +149,20 @@ class SelectorWin(SelectorWinBase[wx.Button]):
         self.attr_text_labels = {}
         self.group_widgets = {}
         self.extra_groups = []
+        self.display = self.disp_btn = None
 
         self.win = wx.Frame(
             parent,
-            wx.CAPTION | wx.CLIP_CHILDREN | wx.CLOSE_BOX |
-            wx.FRAME_FLOAT_ON_PARENT | wx.RESIZE_BORDER | wx.SYSTEM_MENU,
+            style=wx.CAPTION | wx.CLIP_CHILDREN | wx.CLOSE_BOX
+            | wx.FRAME_FLOAT_ON_PARENT | wx.RESIZE_BORDER | wx.SYSTEM_MENU,
         )
-        set_win_title(self.win, opt.title)
+        set_win_title(self.win, TRANS_WINDOW_TITLE.format(subtitle=opt.title))
 
-        self.context_menu = wx.Menu(self.win)
+        self.context_menu = wx.Menu()
+
+        self.norm_font = wx.SystemSettings.GetFont(wx.SYS_DEFAULT_GUI_FONT)
+        self.sugg_font = self.norm_font.Bold()
+        self.mouseover_font = self.norm_font.Italic()
 
         panel_outer = wx.Panel(self.win)
         sizer_outer = wx.BoxSizer(wx.VERTICAL)
@@ -186,6 +191,7 @@ class SelectorWin(SelectorWinBase[wx.Button]):
         self.wid_props_name = wx.StaticText(self.wid_panel_info, wx.ID_ANY, "")
         self.wid_props_name.SetFont(wx.Font(14, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, 0, ""))
 
+        name_widget: wx.Sizer | wx.Window
         if self.sampler is not None:
             sizer_name = wx.BoxSizer(wx.HORIZONTAL)
             sizer_name.Add(self.wid_props_name, 1, 0, 0)
@@ -200,8 +206,8 @@ class SelectorWin(SelectorWinBase[wx.Button]):
 
         sizer_info.Add(name_widget, 0, wx.ALIGN_CENTER_HORIZONTAL | wx.ALL, 1)
 
-        wid_props_authors = wx.StaticText(self.wid_panel_info)
-        sizer_info.Add(wid_props_authors, 0, wx.ALIGN_CENTER_HORIZONTAL, 0)
+        self.wid_props_author = wx.StaticText(self.wid_panel_info)
+        sizer_info.Add(self.wid_props_author, 0, wx.ALIGN_CENTER_HORIZONTAL, 0)
 
         self.wid_props_desc = wx.html.HtmlWindow(self.wid_panel_info, wx.ID_ANY)
         sizer_info.Add(self.wid_props_desc, 1, wx.ALL | wx.EXPAND, 6)
@@ -209,12 +215,11 @@ class SelectorWin(SelectorWinBase[wx.Button]):
         if self.attrs:
             self.sizer_attrs = wx.GridBagSizer(0, 0)
             sizer_info.Add(self.sizer_attrs, 0, wx.ALL | wx.EXPAND, 4)
-            self.sizer_attrs.AddGrowableCol(0)
-            self.sizer_attrs.AddGrowableCol(2)
 
             for attr, row, col_type in self._attr_widget_positions():
                 desc_text = wx.StaticText(self.wid_panel_info)
                 set_text(desc_text, TRANS_ATTR_DESC.format(desc=attr.desc))
+                attr_wid: wx.Control
                 if attr.type.is_image:
                     self.attr_image_labels[attr] = attr_wid = wx.StaticBitmap(self.wid_panel_info)
                     if attr.type is AttrTypes.COLOUR:
@@ -222,8 +227,7 @@ class SelectorWin(SelectorWinBase[wx.Button]):
                 else:
                     self.attr_text_labels[attr] = attr_wid = wx.StaticText()
                 sizer_attr = wx.BoxSizer(wx.HORIZONTAL)
-                sizer_attr.Add(desc_text, wx.SizerFlags().Right())
-                sizer_attr.Add(attr_wid, wx.SizerFlags().Left())
+                sizer_attr.AddMany([desc_text, attr_wid])
 
                 # Wide ones have their own row, narrow ones are two to a row
                 match col_type:
@@ -231,28 +235,31 @@ class SelectorWin(SelectorWinBase[wx.Button]):
                         self.sizer_attrs.Add(
                             sizer_attr,
                             (row, 0), (1, 3),
-                            wx.SizerFlags().Expand().Proportion(1),
+                            wx.EXPAND,
                         )
                     case 'left':
                         self.sizer_attrs.Add(
                             sizer_attr,
                             (row, 0), (1, 1),
-                            wx.SizerFlags().Expand().Proportion(0),
+                            wx.EXPAND,
                         )
                     case 'right':
                         self.sizer_attrs.Add(
                             wx.StaticLine(self.wid_panel_info, style=wx.LI_VERTICAL),
                             (row, 1), (1, 1),
-                            wx.SizerFlags().Expand().Proportion(0),
+                            wx.EXPAND,
                         )
                         attr_wid.WindowStyle |= wx.ALIGN_RIGHT
                         self.sizer_attrs.Add(
                             sizer_attr,
                             (row, 2), (1, 1),
-                            wx.SizerFlags().Right().Expand().Proportion(0),
+                            wx.RIGHT | wx.EXPAND
                         )
                     case _:
                         assert_never(col_type)
+
+            self.sizer_attrs.AddGrowableCol(0)
+            self.sizer_attrs.AddGrowableCol(2)
 
         static_line_buttons = wx.StaticLine(self.wid_panel_info, wx.ID_ANY)
         sizer_info.Add(static_line_buttons, 0, wx.ALL | wx.EXPAND, 4)
@@ -301,7 +308,7 @@ class SelectorWin(SelectorWinBase[wx.Button]):
         self.display.SetEditable(False)
         self.display.Bind(wx.EVT_LEFT_DOWN, open_window)
 
-        self.disp_btn = wx.Button(parent, text="...", style=wx.BU_EXACTFIT)
+        self.disp_btn = wx.Button(parent, label="...", style=wx.BU_EXACTFIT)
         self.disp_btn.Bind(wx.EVT_BUTTON, open_window)
 
         sizer = wx.BoxSizer(wx.HORIZONTAL)
@@ -427,9 +434,9 @@ class SelectorWin(SelectorWinBase[wx.Button]):
                      label: TransToken, /) -> None:
         """Add the specified item to the group's menu."""
         group = self.group_widgets[group_key]
-        self._menu_items[item] = menu = group.menu.AppendRadioItem(wx.ID_ANY, '', '')
+        self._menu_items[item] = menu = group.menu.AppendRadioItem(wx.ID_ANY, f'<item>:{item}', '')
         set_menu_text(menu, label)
-        group.menu.Bind(wx.EVT_COMMAND, lambda evt: func())  # TODO: How does this work
+        # group.menu.Bind(wx.EVT_COMMAND, lambda evt: func())  # TODO: How does this work
 
     @override
     def _ui_menu_set_font(self, item_id: utils.SpecialID, /, suggested: bool) -> None:
@@ -443,11 +450,9 @@ class SelectorWin(SelectorWinBase[wx.Button]):
         # Apply the font to the group header as well, if suggested.
         if data.group_id and suggested:
             group = self.group_widgets[data.group_id]
-            group.menu_item.SetFont(self.sugg_font)
-            if suggested:
-                group.title.SetFont(self.sugg_font)
-                if group.menu_item is not None:
-                    group.menu_item.SetFont(self.sugg_font)
+            group.title.SetFont(self.sugg_font)
+            if group.menu_item is not None:
+                group.menu_item.SetFont(self.sugg_font)
 
     @override
     def _ui_menu_reset_suggested(self) -> None:
@@ -461,7 +466,7 @@ class SelectorWin(SelectorWinBase[wx.Button]):
     def _ui_group_create(self, key: str, label: TransToken) -> None:
         if key in self.group_widgets:
             return  # Already present.
-        menu = wx.Menu(self.context_menu) if key else self.context_menu
+        menu = wx.Menu() if key else self.context_menu
         try:
             group = self.extra_groups.pop()
         except IndexError:
@@ -478,7 +483,7 @@ class SelectorWin(SelectorWinBase[wx.Button]):
     def _ui_group_add(self, key: str, name: TransToken) -> None:
         """Add the specified group to the rightclick menu."""
         group = self.group_widgets[key]
-        group.menu_item = item = self.context_menu.AppendSubMenu(group.menu, '')
+        group.menu_item = item = self.context_menu.AppendSubMenu(group.menu, f'<group>:{name}')
         set_menu_text(item, name)
 
     @override
