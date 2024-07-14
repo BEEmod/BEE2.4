@@ -63,6 +63,21 @@ import consts
 
 LOGGER = srctools.logger.get_logger(__name__)
 
+ItemsBG = "#CDD0CE"  # Colour of the main background to match the menu image
+
+# Icon shown while items are being moved elsewhere.
+ICO_MOVING = img.Handle.builtin('BEE2/item_moving', 64, 64)
+ICO_GEAR = img.Handle.sprite('icons/gear', 10, 10)
+ICO_GEAR_DIS = img.Handle.sprite('icons/gear_disabled', 10, 10)
+IMG_BLANK = img.Handle.background(64, 64)
+
+TRANS_EXPORTED = TransToken.ui('Selected Items and Style successfully exported!')
+TRANS_EXPORTED_TITLE = TransToken.ui('BEE2 - Export Complete')
+TRANS_MAIN_TITLE = TransToken.ui('BEEMOD {version} - {game}')
+TRANS_ERROR = TransToken.untranslated('???')
+TRANS_EXPORT_MISSING_STYLE = TransToken.ui('Could not export: Style "{style}" does not exist!')
+
+
 # These panes and a dict mapping object type to them.
 skybox_win: SelectorWin
 voice_win: SelectorWin
@@ -83,14 +98,6 @@ pal_items_fake: list[ttk.Label] = []
 # The current filtering state.
 cur_filter: set[tuple[str, int]] | None = None
 
-ItemsBG = "#CDD0CE"  # Colour of the main background to match the menu image
-
-# Icon shown while items are being moved elsewhere.
-ICO_MOVING = img.Handle.builtin('BEE2/item_moving', 64, 64)
-ICO_GEAR = img.Handle.sprite('icons/gear', 10, 10)
-ICO_GEAR_DIS = img.Handle.sprite('icons/gear_disabled', 10, 10)
-IMG_BLANK = img.Handle.background(64, 64)
-
 selected_style: utils.ObjectID = packages.CLEAN_STYLE
 
 # Maps item IDs to our wrapper for the object.
@@ -100,14 +107,6 @@ item_list: dict[str, 'Item'] = {}
 frmScroll: ttk.Frame  # Frame holding the item list.
 pal_canvas: tk.Canvas  # Canvas for the item list to scroll.
 sign_ui: SignageUI
-
-
-TRANS_EXPORTED = TransToken.ui('Selected Items and Style successfully exported!')
-TRANS_EXPORTED_TITLE = TransToken.ui('BEE2 - Export Complete')
-TRANS_MAIN_TITLE = TransToken.ui('BEEMOD {version} - {game}')
-TRANS_ERROR = TransToken.untranslated('???')
-TRANS_EXPORT_MISSING_STYLE = TransToken.ui('Could not export: Style "{style}" does not exist!')
-
 
 DATA_NO_VOICE = packages.SelitemData.build(
     short_name=TransToken.BLANK,
