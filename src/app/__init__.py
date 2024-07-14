@@ -207,3 +207,49 @@ class HasCurrentValue[T](Protocol):
     """Protocol for a class with an AsyncValue."""
     @property
     def current(self) -> AsyncValue[T]: ...
+
+
+class WidgetCache[Widget]:
+    """Stores unused widgets so they can be recyled later."""
+    def __init__(
+        self,
+        create_func: Callable[[int], Widget],
+        hide_func: Callable[[Widget], object],
+    ) -> None:
+        self.create_func = create_func
+        self.hide_func = hide_func
+        self._next_id = 1  # Allows unique widget IDs.
+        # Widgets currently in use.
+        self.placed: list[Widget] = []
+        # Widgets that were previously placed.
+        self.was_visible: list[Widget] = []
+        # Widgets that were placed and are now hidden.
+        self.hidden: list[Widget] = []
+
+    def reset(self) -> None:
+        """Start a new batch of widgets."""
+        self.was_visible += self.placed
+        self.placed.clear()
+
+    def fetch(self) -> Widget:
+        """Fetch an existing widget or create one if necessary."""
+        try:
+            # Prefer reusing already visible ones, since they have
+            # to be changed anyway.
+            widget = self.was_visible.pop()
+        except IndexError:
+            try:
+                widget = self.hidden.pop()
+            except IndexError:
+                widget = self.create_func(self._next_id)
+                self._next_id += 1
+
+        self.placed.append(widget)
+        return widget
+
+    def hide_unused(self) -> None:
+        """Hide all widgets that aren't used in this batch."""
+        for wid in self.was_visible:
+            self.hide_func(wid)
+        self.hidden += self.was_visible
+        self.was_visible.clear()

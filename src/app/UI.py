@@ -48,6 +48,7 @@ from app import (
     signage_ui,
     paletteUI,
     music_conf,
+    WidgetCache,
 )
 from app.errors import Result as ErrorResult
 from app.menu_bar import MenuBar
@@ -92,9 +93,15 @@ pal_picked: list['PalItem'] = []
 # Array of the "all items" icons
 pal_items: list['PalItem'] = []
 # Labels used for the empty palette positions
-pal_picked_fake: list[ttk.Label] = []
-# Labels for empty picker positions
-pal_items_fake: list[ttk.Label] = []
+pal_picked_fake = WidgetCache(
+    lambda ind: TK_IMG.apply(ttk.Label(UI['preview_frame'], name=f'fake_item_{ind}'), IMG_BLANK),
+    ttk.Label.place_forget,
+)
+# Labels used for empty picker positions, to continue the grid.
+pal_items_fake = WidgetCache(
+    lambda ind: TK_IMG.apply(ttk.Label(frmScroll, name=f'fake_item_{ind}'), IMG_BLANK),
+    ttk.Label.place_forget,
+)
 # The current filtering state.
 cur_filter: set[tuple[str, int]] | None = None
 
@@ -1134,22 +1141,23 @@ def flow_preview() -> None:
 
     Run to refresh if items are moved around.
     """
-    for i, item in enumerate(pal_picked):
-        # These can be used to figure out where it is
-        item.pre_x = i % 4
-        item.pre_y = i // 4
-        item.label.place(x=(i % 4*65 + 4), y=(i // 4*65 + 32))
-        # Check to see if this should use the single-icon
-        item.load_data()
-        item.label.lift()
-
+    label: tk.Label | ttk.Label
     item_count = len(pal_picked)
-    for ind, fake in enumerate(pal_picked_fake):
-        if ind < item_count:
-            fake.place_forget()
+    pal_picked_fake.reset()
+    for i in range(32):
+        if i < item_count:
+            item = pal_picked[i]
+            # These can be used to figure out where it is
+            item.pre_x = i % 4
+            item.pre_y = i // 4
+            label = item.label
+            # Check to see if this should use the single-icon
+            item.load_data()
         else:
-            fake.place(x=(ind % 4*65+4), y=(ind//4*65+32))
-            fake.lift()
+            label = pal_picked_fake.fetch()
+        label.place(x=(i % 4*65 + 4), y=(i // 4*65 + 32))
+        label.lift()
+    pal_picked_fake.hide_unused()
     UI['pre_sel_line'].lift()
 
 
@@ -1176,10 +1184,6 @@ def init_preview(tk_img: TKImages, f: tk.Frame | ttk.Frame) -> None:
         relief="solid",
         )
     tk_img.apply(UI['pre_sel_line'], img.Handle.builtin('BEE2/sel_bar', 4, 64))
-    pal_picked_fake.extend([
-        tk_img.apply(ttk.Label(UI['preview_frame']), IMG_BLANK)
-        for _ in range(32)
-    ])
 
     UI['pre_moving'] = ttk.Label(f)
     tk_img.apply(UI['pre_moving'], ICO_MOVING)
@@ -1314,17 +1318,13 @@ async def _flow_picker(filter_conf: FilterConf) -> None:
     last_row = num_items % width
     # Special case, don't add a full row if it's exactly the right count.
     extra_items = (width - last_row) if last_row != 0 else 0
+    pal_items_fake.reset()
 
     y = (num_items // width)*65 + 1
     for i in range(extra_items):
         await trio.lowlevel.checkpoint()
-        if i >= len(pal_items_fake):
-            pal_items_fake.append(TK_IMG.apply(ttk.Label(frmScroll), IMG_BLANK))
-        pal_items_fake[i].place(x=((i + last_row) % width)*65 + 1, y=y)
-
-    for pal_item in pal_items_fake[extra_items:]:
-        await trio.lowlevel.checkpoint()
-        pal_item.place_forget()
+        pal_items_fake.fetch().place(x=((i + last_row) % width)*65 + 1, y=y)
+    pal_items_fake.hide_unused()
 
 
 def init_drag_icon() -> None:
