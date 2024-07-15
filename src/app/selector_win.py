@@ -157,8 +157,9 @@ class GroupHeaderBase:
 
     def _evt_toggle(self, _: object = None) -> None:
         """Toggle the header on or off."""
-        self.parent.group_visible[self.id] = not self.parent.group_visible.get(self.id)
+        self.parent.group_visible[self.id] = vis = not self.parent.group_visible.get(self.id)
         self.parent.items_dirty.set()
+        self._ui_set_arrow(GRP_EXP_HOVER if vis else GRP_COLL_HOVER)
 
     def _evt_hover_start(self, _: object | None = None) -> None:
         """When hovered over, fill in the triangle."""
@@ -654,6 +655,11 @@ class SelectorWinBase[ButtonT, GroupHeaderT: GroupHeaderBase]:
                     if state.height > 0:
                         height = state.height
                     self._ui_win_set_size(width, height)
+
+        for group in self.group_widgets.values():
+            # Update the arrow so that it matches the visible state.
+            # noinspection PyProtectedMember
+            group._evt_hover_end()
 
         self._ui_win_show()
         self._visible = True
