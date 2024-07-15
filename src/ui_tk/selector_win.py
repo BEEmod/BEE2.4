@@ -14,7 +14,7 @@ import trio
 from app import WidgetCache, img
 from app.mdown import MarkdownData
 from app.selector_win import (
-    DispFont, SelectorWinBase, AttrDef, Options, NavKeys,
+    DispFont, GroupHeaderBase, SelectorWinBase, AttrDef, Options, NavKeys,
     TRANS_ATTR_DESC, TRANS_SUGGESTED, TRANS_SUGGESTED_MAC, TRANS_WINDOW_TITLE,
 )
 from consts import SEL_ICON_SIZE, SEL_ICON_SIZE_LRG as ICON_SIZE_LRG
@@ -52,15 +52,12 @@ KEYSYM_TO_NAV: Final[Mapping[str, NavKeys]] = {
 }
 
 
-# noinspection PyProtectedMember
-class GroupHeader:
+class GroupHeader(GroupHeaderBase):
     """The widget used for group headers."""
     def __init__(self, win: 'SelectorWin') -> None:
-        self.parent = win
+        super().__init__(win)
+        self.parent_menu = win.context_menu
         self.frame = frame = ttk.Frame(win.pal_frame)
-        # Event functions access the attribute, so this can be changed to reassign.
-        self.id = '<unused group>'
-        # The right-click cascade widget. Default to the root one, will be reassigned after.
         self.menu = win.context_menu
         self.menu_pos = -1
 
@@ -92,26 +89,27 @@ class GroupHeader:
         frame.bind('<Leave>', self._evt_hover_end)
 
     def hide(self) -> None:
-        """Hide the widgets."""
+        """Hide the widgets and stop tracking translations."""
+        super().hide()
         set_text(self.title, TransToken.BLANK)
         self.menu_pos = -1
-        self.id = '<unused group>'
         self.frame.place_forget()
 
-    def _evt_toggle(self, _: tk.Event[tk.Misc] | None = None) -> None:
-        """Toggle the header on or off."""
-        self.parent._evt_group_clicked(self.id)
+    @override
+    def _ui_reassign(self, group_id: str, title: TransToken) -> None:
+        """Set the group label."""
+        super()._ui_reassign(group_id, title)
+        set_text(self.title, title)
+        self.menu = tk.Menu(self.parent_menu) if group_id else self.parent_menu
+        self.menu_pos = -1
 
-    def _evt_hover_start(self, _: tk.Event[tk.Misc] | None = None) -> None:
-        """When hovered over, fill in the triangle."""
-        self.parent._evt_group_hover_start(self.id)
-
-    def _evt_hover_end(self, _: tk.Event[tk.Misc] | None = None) -> None:
-        """When leaving, hollow the triangle."""
-        self.parent._evt_group_hover_end(self.id)
+    @override
+    def _ui_set_arrow(self, arrow: str) -> None:
+        """Set the arrow glyph."""
+        self.arrow['text'] = arrow
 
 
-class SelectorWin(SelectorWinBase[ttk.Button]):
+class SelectorWin(SelectorWinBase[ttk.Button, GroupHeader]):
     """Tk implementation of the selector window."""
     parent: tk.Tk | tk.Toplevel
     win: tk.Toplevel
@@ -144,11 +142,6 @@ class SelectorWin(SelectorWinBase[ttk.Button]):
 
     samp_button: ttk.Button | None
     _suggest_lbl: WidgetCache[ttk.Label | ttk.LabelFrame]
-
-    # A map from group name -> header widget
-    group_widgets: dict[str, GroupHeader]
-    # Recycles existing group headers.
-    group_cache: WidgetCache[GroupHeader]
 
     context_menu: tk.Menu
     # The menus for each group.
@@ -368,7 +361,6 @@ class SelectorWin(SelectorWinBase[ttk.Button]):
         self.context_var = tk.StringVar()
         group_self = self  # Avoid making 'self' a direct closure.
         self.group_cache = WidgetCache(lambda wid_id: GroupHeader(group_self), GroupHeader.hide)
-        self.group_widgets = {}
 
         if utils.MAC:
             def make_suggest_label(ind: int) -> ttk.Label | ttk.LabelFrame:
@@ -742,10 +734,6 @@ class SelectorWin(SelectorWinBase[ttk.Button]):
         # Ungrouped items appear directly in the menu.
         self.context_menus = {'': self.context_menu}
 
-        # Reset group widgets, so they can be added again.
-        self.group_cache.reset()
-        self.group_widgets.clear()
-
     @override
     def _ui_menu_set_font(self, item_id: utils.SpecialID, suggested: bool) -> None:
         """Set the font of an item, and its parent group."""
@@ -782,10 +770,8 @@ class SelectorWin(SelectorWinBase[ttk.Button]):
                 self.context_menu.entryconfig(header.menu_pos, font=self.norm_font)
 
     @override
-    def _ui_menu_add(self, group_key: str, item: utils.SpecialID, func: Callable[[], object], label: TransToken, /) -> None:
+    def _ui_menu_add(self, group: GroupHeader, item: utils.SpecialID, func: Callable[[], object], label: TransToken, /) -> None:
         """Add a radio-selection menu option for this item."""
-        group = self.group_widgets[group_key]
-
         group.menu.add_radiobutton(
             command=func,
             variable=self.context_var,
@@ -797,36 +783,14 @@ class SelectorWin(SelectorWinBase[ttk.Button]):
         self._menu_index[item] = menu_pos
 
     @override
-    def _ui_group_create(self, key: str, label: TransToken) -> None:
-        if key in self.group_widgets:
-            return  # Already present.
-
-        self.group_widgets[key] = group = self.group_cache.fetch()
-        group.menu = tk.Menu(self.context_menu) if key else self.context_menu
-        group.id = key
-        group.menu_pos = -1
-        set_text(group.title, label)
-
-    @override
-    def _ui_group_add(self, key: str, name: TransToken) -> None:
+    def _ui_group_add(self, group: GroupHeader, name: TransToken) -> None:
         """Add the specified group to the rightclick menu."""
-        group = self.group_widgets[key]
         self.context_menu.add_cascade(menu=group.menu)
         set_menu_text(self.context_menu, name)
         # Track the menu's index. The one at the end is the one we just added.
         menu_pos = self.context_menu.index('end')
         assert menu_pos is not None, "Didn't add to the menu?"
         group.menu_pos = menu_pos
-
-    @override
-    def _ui_group_hide_unused(self) -> None:
-        """Hide any group widgets that are still visible."""
-        self.group_cache.hide_unused()
-
-    @override
-    def _ui_group_set_arrow(self, key: str, arrow: str) -> None:
-        """Set the arrow for a group widget."""
-        self.group_widgets[key].arrow['text'] = arrow
 
     @override
     def _ui_enable_reset(self, enabled: bool) -> None:

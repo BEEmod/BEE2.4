@@ -25,7 +25,7 @@ import trio
 import trio_util
 
 from app.mdown import MarkdownData
-from app import sound, img, DEV_MODE
+from app import WidgetCache, sound, img, DEV_MODE
 from packages import SelitemData, AttrTypes, AttrDef as AttrDef, AttrMap
 from transtoken import TransToken
 from config.last_sel import LastSelected
@@ -142,11 +142,57 @@ class Options:
     func_get_attr: GetterFunc[AttrMap] = lambda packset, item_id: EmptyMapping
 
 
-class SelectorWinBase[ButtonT]:
+# noinspection PyProtectedMember
+class GroupHeaderBase:
+    """Base logic for the widget used for group headers."""
+    def __init__(self, win: SelectorWinBase) -> None:
+        self.parent = win
+        # Event functions access the attribute, so this can be changed to reassign.
+        self.id = '<unused group>'
+
+    @abstractmethod
+    def hide(self) -> None:
+        """Hide the widgets."""
+        self.id = '<unused group>'
+
+    def _evt_toggle(self, _: object = None) -> None:
+        """Toggle the header on or off."""
+        self.parent.group_visible[self.id] = not self.parent.group_visible.get(self.id)
+        self.parent.items_dirty.set()
+
+    def _evt_hover_start(self, _: object | None = None) -> None:
+        """When hovered over, fill in the triangle."""
+        self._ui_set_arrow(
+            GRP_EXP_HOVER
+            if self.parent.group_visible.get(self.id) else
+            GRP_COLL_HOVER
+        )
+
+    def _evt_hover_end(self, _: object | None = None) -> None:
+        """When leaving, hollow the triangle."""
+        self._ui_set_arrow(
+            GRP_EXP
+            if self.parent.group_visible.get(self.id) else
+            GRP_COLL
+        )
+
+    @abstractmethod
+    def _ui_reassign(self, group_id: str,  title: TransToken, /) -> None:
+        """Reassign to use this label, and create the menu."""
+        self.id = group_id
+
+    @abstractmethod
+    def _ui_set_arrow(self, arrow: str, /) -> None:
+        """Set the arrow for a group."""
+        raise NotImplementedError
+
+
+class SelectorWinBase[ButtonT, GroupHeaderT: GroupHeaderBase]:
     """The selection window for skyboxes, music, goo and voice packs.
 
     Typevars:
     - ButtonT: Type for the button widget.
+    - GroupHeaderT: Subclass for group headers.
 
     Attributes:
     - chosen: The currently-selected item.
@@ -197,6 +243,10 @@ class SelectorWinBase[ButtonT]:
     group_visible: dict[str, bool]
     # A list of casefolded group names in the display order.
     group_order: list[str]
+    # A map from group name -> header widget
+    group_widgets: dict[str, GroupHeaderT]
+    # Recycles existing group headers. Must be constructed in subclass!
+    group_cache: WidgetCache[GroupHeaderT]
     # Maps item ID to the menu position.
     _menu_index: dict[utils.SpecialID, int]
 
@@ -265,6 +315,7 @@ class SelectorWinBase[ButtonT]:
         self.group_names = {}
         self.group_visible = {}
         self.grouped_items = {}
+        self.group_widgets = {}
         # A list of casefolded group names in the display order.
         self.group_order = []
 
@@ -361,6 +412,10 @@ class SelectorWinBase[ButtonT]:
         for button in self._item_buttons:
             self._ui_button_hide(button)
 
+        # Reset groups.
+        self.group_cache.reset()
+        self.group_widgets.clear()
+
         # Create additional buttons so we have enough.
         while len(self._item_buttons) < len(self.item_list):
             await trio.lowlevel.checkpoint()
@@ -382,12 +437,15 @@ class SelectorWinBase[ButtonT]:
 
             if group_key not in self.group_names:
                 self.group_names[group_key] = data.group
-            self._ui_group_create(
-                group_key,
-                self.group_names[group_key],
-            )
+            try:
+                group = self.group_widgets[group_key]
+            except KeyError:
+                self.group_widgets[group_key] = group = self.group_cache.fetch()
+                # noinspection PyProtectedMember
+                group._ui_reassign(group_key, self.group_names[group_key])
+
             self._ui_menu_add(
-                group_key,
+                group,
                 item_id,
                 functools.partial(self.sel_item_id, item_id),
                 data.context_lbl,
@@ -405,8 +463,8 @@ class SelectorWinBase[ButtonT]:
             await trio.lowlevel.checkpoint()
             # Don't add the ungrouped menu to itself!
             if group_key != '':
-                self._ui_group_add(group_key, self.group_names[group_key])
-        self._ui_group_hide_unused()
+                self._ui_group_add(self.group_widgets[group_key], self.group_names[group_key])
+        self.group_cache.hide_unused()
 
     def _attr_widget_positions(self) -> Iterator[tuple[
         AttrDef, int,
@@ -560,29 +618,6 @@ class SelectorWinBase[ButtonT]:
         """When the large image is clicked, play sounds if available."""
         if self.sampler is not None:
             self.sampler.play_sample()
-
-    def _evt_group_clicked(self, group_key: str) -> None:
-        """Toggle the header on or off."""
-        self.group_visible[group_key] = not self.group_visible.get(group_key)
-        self.items_dirty.set()
-
-    def _evt_group_hover_start(self, group_key: str) -> None:
-        """When hovered over, fill in the triangle."""
-        self._ui_group_set_arrow(
-            group_key,
-            GRP_EXP_HOVER
-            if self.group_visible.get(group_key) else
-            GRP_COLL_HOVER
-        )
-
-    def _evt_group_hover_end(self, group_key: str) -> None:
-        """When leaving, hollow the triangle."""
-        self._ui_group_set_arrow(
-            group_key,
-            GRP_EXP
-            if self.group_visible.get(group_key) else
-            GRP_COLL
-        )
 
     def open_win(self) -> None:
         """Display the window."""
@@ -1052,28 +1087,13 @@ class SelectorWinBase[ButtonT]:
         raise NotImplementedError
 
     @abstractmethod
-    def _ui_menu_add(self, group_key: str, item: utils.SpecialID, func: Callable[[], object], label: TransToken, /) -> None:
+    def _ui_menu_add(self, group: GroupHeaderT, item: utils.SpecialID, func: Callable[[], object], label: TransToken, /) -> None:
         """Add a radio-selection menu option for this item."""
         raise NotImplementedError
 
     @abstractmethod
-    def _ui_group_create(self, key: str, label: TransToken) -> None:
-        """Ensure a group exists with this key, and text."""
-        raise NotImplementedError
-
-    @abstractmethod
-    def _ui_group_add(self, key: str, name: TransToken) -> None:
+    def _ui_group_add(self, group: GroupHeaderT, name: TransToken) -> None:
         """Add the specified group to the rightclick menu."""
-        raise NotImplementedError
-
-    @abstractmethod
-    def _ui_group_hide_unused(self) -> None:
-        """Hide any group widgets that are still visible."""
-        raise NotImplementedError
-
-    @abstractmethod
-    def _ui_group_set_arrow(self, key: str, arrow: str) -> None:
-        """Set the arrow for a group widget."""
         raise NotImplementedError
 
     @abstractmethod

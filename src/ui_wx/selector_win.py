@@ -13,7 +13,7 @@ import trio
 from app import WidgetCache, img
 from app.mdown import MarkdownData
 from app.selector_win import (
-    DispFont, SelectorWinBase, AttrDef, Options, NavKeys,
+    DispFont, GroupHeaderBase, SelectorWinBase, AttrDef, Options, NavKeys,
     TRANS_ATTR_DESC, TRANS_SUGGESTED, TRANS_SUGGESTED_MAC, TRANS_WINDOW_TITLE,
 )
 from consts import SEL_ICON_SIZE, SEL_ICON_SIZE_LRG as ICON_SIZE_LRG
@@ -49,14 +49,13 @@ KEY_TO_NAV: Final[Mapping[str, NavKeys]] = {
 
 
 # noinspection PyProtectedMember
-class GroupHeader:
+class GroupHeader(GroupHeaderBase):
     """The widget used for group headers."""
     menu_item: wx.MenuItem | None
     def __init__(self, win: SelectorWin) -> None:
-        self.parent = win
+        super().__init__(win)
+        self.parent_menu = win.context_menu
         self.panel = wx.Panel(win.wid_itemlist)
-        # Event functions access the attribute, so this can be changed to reassign.
-        self.id = '<unused group>'
         # The right-click cascade widget. Default to the root one, will be reassigned after.
         self.menu = win.context_menu
         self.menu_item = None
@@ -86,26 +85,28 @@ class GroupHeader:
 
     def hide(self) -> None:
         """Hide the widgets and stop tracking translations."""
+        super().hide()
         if self.menu_item is not None:
             set_menu_text(self.menu_item, TransToken.BLANK)
             self.menu_item = None
         set_text(self.title, TransToken.BLANK)
         self.panel.Hide()
 
-    def _evt_toggle(self, _: wx.Event) -> None:
-        """Toggle the header on or off."""
-        self.parent._evt_group_clicked(self.id)
+    @override
+    def _ui_reassign(self, group_id: str, title: TransToken) -> None:
+        """Set the group label."""
+        super()._ui_reassign(group_id, title)
+        set_text(self.title, title)
+        self.menu = wx.Menu() if group_id else self.parent_menu
+        self.menu_item = None
 
-    def _evt_hover_start(self, _: wx.Event) -> None:
-        """When hovered over, fill in the triangle."""
-        self.parent._evt_group_hover_start(self.id)
-
-    def _evt_hover_end(self, _: wx.Event) -> None:
-        """When leaving, hollow the triangle."""
-        self.parent._evt_group_hover_end(self.id)
+    @override
+    def _ui_set_arrow(self, arrow: str) -> None:
+        """Set the arrow glyph."""
+        self.arrow.SetLabelText(arrow)
 
 
-class SelectorWin(SelectorWinBase[wx.Button]):
+class SelectorWin(SelectorWinBase[wx.Button, GroupHeader]):
     """Wx implementation of the selector window."""
     parent: wx.TopLevelWindow
     win: wx.Frame
@@ -431,15 +432,9 @@ class SelectorWin(SelectorWinBase[wx.Button]):
         # Ungrouped items appear directly in the menu.
         self.context_menus = {'': self.context_menu}
 
-        # Reset group widgets, so they can be added again.
-        self.group_cache.reset()
-        self.group_widgets.clear()
-
     @override
-    def _ui_menu_add(self, group_key: str, item: utils.SpecialID, func: Callable[[], object],
-                     label: TransToken, /) -> None:
+    def _ui_menu_add(self, group: GroupHeader, item: utils.SpecialID, func: Callable[[], object], label: TransToken, /) -> None:
         """Add the specified item to the group's menu."""
-        group = self.group_widgets[group_key]
         self._menu_items[item] = menu = group.menu.AppendRadioItem(wx.ID_ANY, f'<item>:{item}', '')
         set_menu_text(menu, label)
         # group.menu.Bind(wx.EVT_COMMAND, lambda evt: func())  # TODO: How does this work
@@ -469,32 +464,10 @@ class SelectorWin(SelectorWinBase[wx.Button]):
                 header.menu_item.SetFont(self.norm_font)
 
     @override
-    def _ui_group_create(self, key: str, label: TransToken) -> None:
-        if key in self.group_widgets:
-            return  # Already present.
-        menu = wx.Menu() if key else self.context_menu
-
-        self.group_widgets[key] = group = self.group_cache.fetch()
-        group.menu = wx.Menu() if key else self.context_menu
-        group.id = key
-        group.menu_item = None
-        set_text(group.title, label)
-
-    @override
-    def _ui_group_add(self, key: str, name: TransToken) -> None:
+    def _ui_group_add(self, group: GroupHeader, name: TransToken) -> None:
         """Add the specified group to the rightclick menu."""
-        group = self.group_widgets[key]
         group.menu_item = item = self.context_menu.AppendSubMenu(group.menu, f'<group>:{name}')
         set_menu_text(item, name)
-
-    @override
-    def _ui_group_hide_unused(self) -> None:
-        """Hide any group widgets that are still visible."""
-        self.group_cache.reset()
-
-    @override
-    def _ui_group_set_arrow(self, key: str, arrow: str) -> None:
-        self.group_widgets[key].arrow.SetLabelText(arrow)
 
     @override
     def _ui_enable_reset(self, enabled: bool, /) -> None:
