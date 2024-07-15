@@ -98,7 +98,7 @@ async def update_task() -> None:
         await trio.lowlevel.checkpoint()
 
         async with aclosing(gradual_iter(_entry_values)) as agen4:
-            async for entry, token in agen3:
+            async for entry, token in agen4:
                 entry.SetValue(str(token))
 
         await trio.lowlevel.checkpoint()
