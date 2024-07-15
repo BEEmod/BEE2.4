@@ -11,7 +11,7 @@ import math
 
 import trio
 
-from app import img
+from app import WidgetCache, img
 from app.mdown import MarkdownData
 from app.selector_win import (
     DispFont, SelectorWinBase, AttrDef, Options, NavKeys,
@@ -139,7 +139,7 @@ class SelectorWin(SelectorWinBase[ttk.Button]):
     disp_btn: ttk.Button | None
 
     samp_button: ttk.Button | None
-    _suggest_lbl: list[ttk.Label | ttk.LabelFrame]
+    _suggest_lbl: WidgetCache[ttk.Label | ttk.LabelFrame]
 
     # A map from group name -> header widget
     group_widgets: dict[str, GroupHeader]
@@ -364,7 +364,29 @@ class SelectorWin(SelectorWinBase[ttk.Button]):
         self.context_var = tk.StringVar()
         self.extra_groups = []
         self.group_widgets = {}
-        self._suggest_lbl = []
+
+        if utils.MAC:
+            def make_suggest_label(ind: int) -> ttk.Label | ttk.LabelFrame:
+                """A labelframe doesn't look good on OSX."""
+                sugg_lbl = ttk.Label(
+                    self.pal_frame,
+                    name=f'suggest_label_{ind}',
+                )
+                set_text(sugg_lbl, TRANS_SUGGESTED_MAC)
+                return sugg_lbl
+        else:
+            def make_suggest_label(ind: int) -> ttk.Label | ttk.LabelFrame:
+                """Use a labelframe to add a nice line connecting this to the icon."""
+                sugg_lbl = ttk.LabelFrame(
+                    self.pal_frame,
+                    name=f'suggest_label_{ind}',
+                    labelanchor='n',
+                    height=50,
+                )
+                set_text(sugg_lbl, TRANS_SUGGESTED)
+                return sugg_lbl
+
+        self._suggest_lbl = WidgetCache(make_suggest_label, tk.Widget.place_forget)
 
         self.pane_win.add(shim)
         self.pane_win.add(self.prop_frm)
@@ -550,10 +572,7 @@ class SelectorWin(SelectorWinBase[ttk.Button]):
         # The offset for the current group
         y_off = 0
 
-        # Hide suggestion indicators if they end up unused.
-        for lbl in self._suggest_lbl:
-            lbl.place_forget()
-        suggest_ind = 0
+        self._suggest_lbl.reset()
 
         # If only the '' group is present, force it to be visible, and hide
         # the header.
@@ -587,27 +606,7 @@ class SelectorWin(SelectorWinBase[ttk.Button]):
                 await trio.lowlevel.checkpoint()
                 button = self._id_to_button[item_id]
                 if item_id in self.suggested:
-                    # Reuse an existing suggested label.
-                    try:
-                        sugg_lbl = self._suggest_lbl[suggest_ind]
-                    except IndexError:
-                        if utils.MAC:
-                            # Labelframe doesn't look good here on OSX
-                            sugg_lbl = ttk.Label(
-                                self.pal_frame,
-                                name=f'suggest_label_{suggest_ind}',
-                            )
-                            set_text(sugg_lbl, TRANS_SUGGESTED_MAC)
-                        else:
-                            sugg_lbl = ttk.LabelFrame(
-                                self.pal_frame,
-                                name=f'suggest_label_{suggest_ind}',
-                                labelanchor='n',
-                                height=50,
-                            )
-                            set_text(sugg_lbl, TRANS_SUGGESTED)
-                        self._suggest_lbl.append(sugg_lbl)
-                    suggest_ind += 1
+                    sugg_lbl = self._suggest_lbl.fetch()
                     sugg_lbl.place(
                         x=(i % width) * ITEM_WIDTH + 1,
                         y=(i // width) * ITEM_HEIGHT + y_off,
@@ -628,6 +627,7 @@ class SelectorWin(SelectorWinBase[ttk.Button]):
             y_off,
         )
         self.pal_frame['height'] = y_off
+        self._suggest_lbl.hide_unused()
 
     @override
     def _ui_button_create(self, ind: int) -> ttk.Button:
