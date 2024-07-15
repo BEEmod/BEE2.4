@@ -495,8 +495,8 @@ class SelectorWinBase[ButtonT, GroupHeaderT: GroupHeaderBase]:
         """Calls refresh_items whenever they're marked dirty."""
         while True:
             await self.items_dirty.wait()
-            await self._ui_reposition_items()
             self.items_dirty = trio.Event()
+            await self._ui_reposition_items()
     async def _rollover_suggest_task(self) -> None:
         """Handle previewing suggested items when hovering over the 'set suggested' button."""
         while True:
