@@ -55,23 +55,20 @@ KEYSYM_TO_NAV: Final[Mapping[str, NavKeys]] = {
 # noinspection PyProtectedMember
 class GroupHeader:
     """The widget used for group headers."""
-    def __init__(self, win: 'SelectorWin', group_id: str, title: TransToken, menu: tk.Menu) -> None:
+    def __init__(self, win: 'SelectorWin') -> None:
         self.parent = win
         self.frame = frame = ttk.Frame(win.pal_frame)
-        self.id = group_id  # Accessed by an attribute so it can be reassigned if reused.
-        self.menu = menu  # The rightclick cascade widget.
+        # Event functions access the attribute, so this can be changed to reassign.
+        self.id = '<unused group>'
+        # The right-click cascade widget. Default to the root one, will be reassigned after.
+        self.menu = win.context_menu
         self.menu_pos = -1
 
         sep_left = ttk.Separator(frame)
         sep_left.grid(row=0, column=0, sticky='EW')
         frame.columnconfigure(0, weight=1)
 
-        self.title = ttk.Label(
-            frame,
-            font='TkMenuFont',
-            anchor='center',
-        )
-        set_text(self.title, title)
+        self.title = ttk.Label(frame, font='TkMenuFont', anchor='center')
         self.title.grid(row=0, column=1)
 
         sep_right = ttk.Separator(frame)
@@ -93,6 +90,13 @@ class GroupHeader:
             wid['cursor'] = tk_tools.Cursors.LINK
         frame.bind('<Enter>', self._evt_hover_start)
         frame.bind('<Leave>', self._evt_hover_end)
+
+    def hide(self) -> None:
+        """Hide the widgets."""
+        set_text(self.title, TransToken.BLANK)
+        self.menu_pos = -1
+        self.id = '<unused group>'
+        self.frame.place_forget()
 
     def _evt_toggle(self, _: tk.Event[tk.Misc] | None = None) -> None:
         """Toggle the header on or off."""
@@ -143,8 +147,8 @@ class SelectorWin(SelectorWinBase[ttk.Button]):
 
     # A map from group name -> header widget
     group_widgets: dict[str, GroupHeader]
-    # When refreshing, the groups already created allowing them to be reused.
-    extra_groups: list[GroupHeader]
+    # Recycles existing group headers.
+    group_cache: WidgetCache[GroupHeader]
 
     context_menu: tk.Menu
     # The menus for each group.
@@ -362,7 +366,8 @@ class SelectorWin(SelectorWinBase[ttk.Button]):
         self.context_menus = {}
         # The widget used to control which menu option is selected.
         self.context_var = tk.StringVar()
-        self.extra_groups = []
+        group_self = self  # Avoid making 'self' a direct closure.
+        self.group_cache = WidgetCache(lambda wid_id: GroupHeader(group_self), GroupHeader.hide)
         self.group_widgets = {}
 
         if utils.MAC:
@@ -616,6 +621,7 @@ class SelectorWin(SelectorWinBase[ttk.Button]):
                     x=(i % width) * ITEM_WIDTH + 1,
                     y=(i // width) * ITEM_HEIGHT + y_off + 20,
                 )
+                button.lift()  # Over the suggested label.
 
             # Increase the offset by the total height of this item section
             y_off += math.ceil(len(items) / width) * ITEM_HEIGHT + 5
@@ -736,13 +742,9 @@ class SelectorWin(SelectorWinBase[ttk.Button]):
         # Ungrouped items appear directly in the menu.
         self.context_menus = {'': self.context_menu}
 
-        # Remove all group widgets.
-        self.extra_groups.extend(self.group_widgets.values())
+        # Reset group widgets, so they can be added again.
+        self.group_cache.reset()
         self.group_widgets.clear()
-        for group in self.extra_groups:
-            set_text(group.title, TransToken.BLANK)
-            group.menu_pos = -1
-            group.frame.place_forget()
 
     @override
     def _ui_menu_set_font(self, item_id: utils.SpecialID, suggested: bool) -> None:
@@ -798,18 +800,12 @@ class SelectorWin(SelectorWinBase[ttk.Button]):
     def _ui_group_create(self, key: str, label: TransToken) -> None:
         if key in self.group_widgets:
             return  # Already present.
-        menu = tk.Menu(self.context_menu) if key else self.context_menu
-        try:
-            group = self.extra_groups.pop()
-        except IndexError:
-            self.group_widgets[key] = GroupHeader(self, key, label, menu)
-        else:
-            # Reuse an existing group.
-            self.group_widgets[key] = group
-            group.id = key
-            group.menu = menu
-            set_text(group.title, label)
-            group.menu_pos = -1
+
+        self.group_widgets[key] = group = self.group_cache.fetch()
+        group.menu = tk.Menu(self.context_menu) if key else self.context_menu
+        group.id = key
+        group.menu_pos = -1
+        set_text(group.title, label)
 
     @override
     def _ui_group_add(self, key: str, name: TransToken) -> None:
@@ -821,6 +817,11 @@ class SelectorWin(SelectorWinBase[ttk.Button]):
         menu_pos = self.context_menu.index('end')
         assert menu_pos is not None, "Didn't add to the menu?"
         group.menu_pos = menu_pos
+
+    @override
+    def _ui_group_hide_unused(self) -> None:
+        """Hide any group widgets that are still visible."""
+        self.group_cache.hide_unused()
 
     @override
     def _ui_group_set_arrow(self, key: str, arrow: str) -> None:

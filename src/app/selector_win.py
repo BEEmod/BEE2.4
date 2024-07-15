@@ -406,6 +406,7 @@ class SelectorWinBase[ButtonT]:
             # Don't add the ungrouped menu to itself!
             if group_key != '':
                 self._ui_group_add(group_key, self.group_names[group_key])
+        self._ui_group_hide_unused()
 
     def _attr_widget_positions(self) -> Iterator[tuple[
         AttrDef, int,
@@ -1063,6 +1064,11 @@ class SelectorWinBase[ButtonT]:
     @abstractmethod
     def _ui_group_add(self, key: str, name: TransToken) -> None:
         """Add the specified group to the rightclick menu."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def _ui_group_hide_unused(self) -> None:
+        """Hide any group widgets that are still visible."""
         raise NotImplementedError
 
     @abstractmethod

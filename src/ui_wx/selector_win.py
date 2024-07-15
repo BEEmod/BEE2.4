@@ -10,7 +10,7 @@ import math
 import wx.html
 import trio
 
-from app import img
+from app import WidgetCache, img
 from app.mdown import MarkdownData
 from app.selector_win import (
     DispFont, SelectorWinBase, AttrDef, Options, NavKeys,
@@ -52,11 +52,13 @@ KEY_TO_NAV: Final[Mapping[str, NavKeys]] = {
 class GroupHeader:
     """The widget used for group headers."""
     menu_item: wx.MenuItem | None
-    def __init__(self, win: 'SelectorWin', group_id: str, title: TransToken, menu: wx.Menu) -> None:
+    def __init__(self, win: SelectorWin) -> None:
         self.parent = win
-        self.id = group_id  # Accessed by an attribute so that it can be reassigned if reused.
         self.panel = wx.Panel(win.wid_itemlist)
-        self.menu = menu  # The rightclick cascade widget.
+        # Event functions access the attribute, so this can be changed to reassign.
+        self.id = '<unused group>'
+        # The right-click cascade widget. Default to the root one, will be reassigned after.
+        self.menu = win.context_menu
         self.menu_item = None
 
         sizer = wx.BoxSizer(wx.HORIZONTAL)
@@ -65,7 +67,6 @@ class GroupHeader:
             wx.SizerFlags().Expand().Proportion(1),
         )
         self.title = wx.StaticText(self.panel)
-        set_text(self.title, title)
         sizer.Add(self.title, wx.SizerFlags().Border(wx.LEFT | wx.RIGHT, 4))
         sizer.Add(
             wx.StaticLine(self.panel, wx.HORIZONTAL),
@@ -82,6 +83,14 @@ class GroupHeader:
         self.panel.Bind(wx.EVT_ENTER_WINDOW, self._evt_hover_start)
         self.panel.Bind(wx.EVT_LEAVE_WINDOW, self._evt_hover_end)
         self.panel.SetSizer(sizer)
+
+    def hide(self) -> None:
+        """Hide the widgets and stop tracking translations."""
+        if self.menu_item is not None:
+            set_menu_text(self.menu_item, TransToken.BLANK)
+            self.menu_item = None
+        set_text(self.title, TransToken.BLANK)
+        self.panel.Hide()
 
     def _evt_toggle(self, _: wx.Event) -> None:
         """Toggle the header on or off."""
@@ -124,8 +133,8 @@ class SelectorWin(SelectorWinBase[wx.Button]):
 
     # A map from group name -> header widget
     group_widgets: dict[str, GroupHeader]
-    # When refreshing, the groups already created allowing them to be reused.
-    extra_groups: list[GroupHeader]
+    # Recycles existing group headers.
+    group_cache: WidgetCache[GroupHeader]
 
     context_menu: wx.Menu
     # The menus for each group.
@@ -148,8 +157,10 @@ class SelectorWin(SelectorWinBase[wx.Button]):
         self.attr_image_labels = {}
         self.attr_text_labels = {}
         self.group_widgets = {}
-        self.extra_groups = []
         self.display = self.disp_btn = None
+
+        closure_self = self  # Avoid making 'self' a direct closure.
+        self.group_cache = WidgetCache(lambda wid_id: GroupHeader(closure_self), GroupHeader.hide)
 
         self.win = wx.Frame(
             parent,
@@ -227,7 +238,8 @@ class SelectorWin(SelectorWinBase[wx.Button]):
                 else:
                     self.attr_text_labels[attr] = attr_wid = wx.StaticText()
                 sizer_attr = wx.BoxSizer(wx.HORIZONTAL)
-                sizer_attr.AddMany([desc_text, attr_wid])
+                sizer_attr.Add(desc_text)
+                sizer_attr.Add(attr_wid)
 
                 # Wide ones have their own row, narrow ones are two to a row
                 match col_type:
@@ -419,15 +431,9 @@ class SelectorWin(SelectorWinBase[wx.Button]):
         # Ungrouped items appear directly in the menu.
         self.context_menus = {'': self.context_menu}
 
-        # Remove all group widgets.
-        self.extra_groups.extend(self.group_widgets.values())
+        # Reset group widgets, so they can be added again.
+        self.group_cache.reset()
         self.group_widgets.clear()
-        for group in self.extra_groups:
-            if group.menu_item is not None:
-                set_menu_text(group.menu_item, TransToken.BLANK)
-                group.menu_item = None
-            set_text(group.title, TransToken.BLANK)
-            group.panel.Hide()
 
     @override
     def _ui_menu_add(self, group_key: str, item: utils.SpecialID, func: Callable[[], object],
@@ -467,17 +473,12 @@ class SelectorWin(SelectorWinBase[wx.Button]):
         if key in self.group_widgets:
             return  # Already present.
         menu = wx.Menu() if key else self.context_menu
-        try:
-            group = self.extra_groups.pop()
-        except IndexError:
-            self.group_widgets[key] = GroupHeader(self, key, label, menu)
-        else:
-            # Reuse an existing group.
-            self.group_widgets[key] = group
-            group.id = key
-            group.menu = menu
-            set_text(group.title, label)
-            group.menu_item = None
+
+        self.group_widgets[key] = group = self.group_cache.fetch()
+        group.menu = wx.Menu() if key else self.context_menu
+        group.id = key
+        group.menu_item = None
+        set_text(group.title, label)
 
     @override
     def _ui_group_add(self, key: str, name: TransToken) -> None:
@@ -485,6 +486,11 @@ class SelectorWin(SelectorWinBase[wx.Button]):
         group = self.group_widgets[key]
         group.menu_item = item = self.context_menu.AppendSubMenu(group.menu, f'<group>:{name}')
         set_menu_text(item, name)
+
+    @override
+    def _ui_group_hide_unused(self) -> None:
+        """Hide any group widgets that are still visible."""
+        self.group_cache.reset()
 
     @override
     def _ui_group_set_arrow(self, key: str, arrow: str) -> None:
