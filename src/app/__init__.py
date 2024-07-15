@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any, Protocol, overload
 from typing_extensions import deprecated
 
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Sequence
 from types import TracebackType
 
 
@@ -220,36 +220,41 @@ class WidgetCache[Widget]:
         self.hide_func = hide_func
         self._next_id = 1  # Allows unique widget IDs.
         # Widgets currently in use.
-        self.placed: list[Widget] = []
+        self._placed: list[Widget] = []
         # Widgets that were previously placed.
-        self.was_visible: list[Widget] = []
+        self._was_visible: list[Widget] = []
         # Widgets that were placed and are now hidden.
-        self.hidden: list[Widget] = []
+        self._hidden: list[Widget] = []
+
+    @property
+    def placed(self) -> Sequence[Widget]:
+        """The widgets currently placed."""
+        return self._placed
 
     def reset(self) -> None:
         """Start a new batch of widgets."""
-        self.was_visible += self.placed
-        self.placed.clear()
+        self._was_visible += self._placed
+        self._placed.clear()
 
     def fetch(self) -> Widget:
         """Fetch an existing widget or create one if necessary."""
         try:
             # Prefer reusing already visible ones, since they have
             # to be changed anyway.
-            widget = self.was_visible.pop()
+            widget = self._was_visible.pop()
         except IndexError:
             try:
-                widget = self.hidden.pop()
+                widget = self._hidden.pop()
             except IndexError:
                 widget = self.create_func(self._next_id)
                 self._next_id += 1
 
-        self.placed.append(widget)
+        self._placed.append(widget)
         return widget
 
     def hide_unused(self) -> None:
         """Hide all widgets that aren't used in this batch."""
-        for wid in self.was_visible:
+        for wid in self._was_visible:
             self.hide_func(wid)
-        self.hidden += self.was_visible
-        self.was_visible.clear()
+        self._hidden += self._was_visible
+        self._was_visible.clear()
