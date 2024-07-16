@@ -11,7 +11,7 @@ from srctools import Angle, Entity, VMF, Vec, logger
 import attrs
 
 from plane import PlaneGrid, PlaneKey
-from precomp import rand, texturing
+from precomp import rand, texturing, brushLoc
 from precomp.texturing import MaterialConf, Orient, Portalable, TileSize
 from precomp.tiling import TILES, TileDef, TileType, Bevels, make_tile
 import consts
@@ -423,20 +423,41 @@ def calculate_bottom_trim(
     placed: dict[int, set[int]] = defaultdict(set)
 
     for u in range(min_u, max_u + 1):
-        v = min_v
+        # Start one below, so we detect a VOID tile and do that logic below.
+        v = min_v - 1
         # This is the current progress through the tile sequence.
         # We set it to len(pattern) (out of range) whenever we want to abandon
         # the pattern - we must then have void to reset.
         count = 0
         placed_col = placed[u]
+
         while v <= max_v:
             if v in placed_col:
                 v += 1  # Column on the left already placed here.
                 count = pattern_count
                 continue
             subtile = subtile_pos[u, v]
+
+            # For NODRAW and VOID, we need to distinguish between these being set for faces inside
+            # and outside the map. For outside, we need to restart the pattern. For inside, VOID
+            # immediately cancels the pattern, while nodraw is treated as 4x4.
+            if subtile.type is TileType.NODRAW or subtile.type is TileType.VOID:
+                norm_axis = plane_key.normal.axis()
+                u_ax, v_ax = Vec.INV_AXIS[norm_axis]
+                pos = Vec.with_axes(
+                    norm_axis,
+                    plane_key.normal * (plane_key.distance + 1.0),
+                    u_ax, u * 32.0 + 16.0,
+                    v_ax, v * 32.0 + 16.0,
+                )
+                if not brushLoc.POS.lookup_world(pos).traversable:
+                    v += 1
+                    count = 0
+                    continue
+
             match subtile.type:
-                case TileType.VOID |  TileType.GOO_SIDE:
+                # Restart the pattern above goo tiles..
+                case TileType.GOO_SIDE:
                     v += 1
                     count = 0
                     continue
