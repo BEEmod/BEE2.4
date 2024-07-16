@@ -1785,7 +1785,7 @@ def analyse_map(vmf_file: VMF, side_to_ant_seg: dict[int, list[antlines.Segment]
             # 128x128x4 block..
             tiledefs_from_large_tile(face_to_tile, brush, grid_pos, norm)
         else:
-            # EmbedFace block..
+            # EmbedFace block...
             tiledefs_from_embedface(face_to_tile, brush, grid_pos, norm)
 
     # Look for Angled and Flip Panels, to link the tiledef to the instance.
@@ -1933,7 +1933,7 @@ def tiledefs_from_large_tile(
 
     neighbour_block = BLOCK_POS.lookup_world(grid_pos + 128 * norm)
 
-    if neighbour_block is Block.VOID:
+    if not neighbour_block.traversable:
         tex_kind = TileType.NODRAW
 
     tiledef = TileDef(
