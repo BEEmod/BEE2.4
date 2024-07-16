@@ -10,7 +10,7 @@ import itertools
 from srctools import Angle, Entity, VMF, Vec, logger
 import attrs
 
-from plane import PlaneGrid
+from plane import PlaneGrid, PlaneKey
 from precomp import rand, texturing
 from precomp.texturing import MaterialConf, Orient, Portalable, TileSize
 from precomp.tiling import TILES, TileDef, TileType, Bevels, make_tile
@@ -236,10 +236,7 @@ def generate_brushes(vmf: VMF) -> None:
 
     LOGGER.info('Generating tiles...')
     # The key is (normal, plane distance)
-    full_tiles: dict[
-        tuple[float, float, float, float],
-        list[TileDef]
-    ] = defaultdict(list)
+    full_tiles: dict[PlaneKey, list[TileDef]] = defaultdict(list)
 
     # First examine each portal/noportal + orient set, to see what the max clump distance can be.
     search_dists: dict[tuple[Portalable, Orient], int] = {}
@@ -261,21 +258,14 @@ def generate_brushes(vmf: VMF) -> None:
             tile.export(vmf)
             continue
         # Otherwise, decompose into a big plane dict, for dynamic merging.
-
-        pos = tile.pos + 64 * tile.normal
-        plane_dist = pos.dot(tile.normal)
-
-        full_tiles[
-            tile.normal.x, tile.normal.y, tile.normal.z,
-            plane_dist,
-        ].append(tile)
+        full_tiles[PlaneKey(tile.normal, tile.pos_front)].append(tile)
 
         if tile.has_portal_helper:
             # Add the portal helper in now, so the code below can treat the face normally.
             vmf.create_ent(
                 'info_placement_helper',
                 angles=Angle.from_basis(x=tile.normal, z=tile.portal_helper_orient),
-                origin=pos,
+                origin=tile.pos_front,
                 force_placement=int(tile.has_oriented_portal_helper),
                 snap_to_helper_angles=int(tile.has_oriented_portal_helper),
                 radius=64,
@@ -283,8 +273,8 @@ def generate_brushes(vmf: VMF) -> None:
 
     LOGGER.info('Generating {} planes:', len(full_tiles))
 
-    for (norm_x, norm_y, norm_z, plane_dist), tiles in full_tiles.items():
-        generate_plane(vmf, search_dists, Vec(norm_x, norm_y, norm_z), plane_dist, tiles)
+    for plane_key, tiles in full_tiles.items():
+        generate_plane(vmf, search_dists, plane_key, tiles)
     LOGGER.info(
         'Caches: subtile={}, texdef={}',
         make_subtile.cache_info(), make_texdef.cache_info(),
@@ -292,13 +282,13 @@ def generate_brushes(vmf: VMF) -> None:
 
 
 def calculate_plane(
-    normal: Vec, plane_dist: float,
+    plane_key: PlaneKey,
     texture_plane: PlaneGrid[TexDef],
     search_dists: dict[tuple[Portalable, Orient], int],
     subtile_pos: PlaneGrid[SubTile],
 ) -> None:
     """Calculate the textures to use for a plane of tiles."""
-    orient = Orient.from_normal(normal)
+    orient = Orient.from_normal(plane_key.normal)
 
     # Reprocess subtiles into textures by repeatedly spreading.
     while subtile_pos:
@@ -353,7 +343,7 @@ def calculate_plane(
             # Now, pick a tile size.
             rng = rand.seed(
                 b'tex_patch',
-                normal, plane_dist,
+                plane_key.normal, plane_key.distance,
                 max_u, max_v,
                 subtile.type.value, subtile.antigel,
             )
@@ -409,7 +399,7 @@ def calculate_plane(
 
 
 def calculate_bottom_trim(
-    normal: Vec, plane_dist: float,
+    plane_key: PlaneKey,
     subtile_pos: PlaneGrid[SubTile],
     texture_plane: PlaneGrid[TexDef],
     gen: texturing.Generator,
@@ -426,7 +416,7 @@ def calculate_bottom_trim(
 
     rng = rand.seed(
         b'tex_btm_trim',
-        normal, plane_dist,
+        plane_key.normal, plane_key.distance,
         min_u, min_v, max_u, max_v,
     )
     # placed[u][v], we can drop a column once processed.
@@ -500,7 +490,7 @@ def calculate_bottom_trim(
 def generate_plane(
     vmf: VMF,
     search_dists: dict[tuple[Portalable, Orient], int],
-    normal: Vec, plane_dist: float,
+    plane_key: PlaneKey,
     tiles: list[TileDef],
 ) -> None:
     """Generate all the tiles in a single flat plane.
@@ -513,7 +503,8 @@ def generate_plane(
     - A second pass is made to determine the required bevelling.
     - Finally that raw form is converted to brushes.
     """
-    norm_axis = normal.axis()
+    # TODO: Use PlaneKey instead of axis strings
+    norm_axis = plane_key.normal.axis()
     u_axis, v_axis = Vec.INV_AXIS[norm_axis]
     grid_pos: PlaneGrid[TileDef] = PlaneGrid()
 
@@ -534,16 +525,16 @@ def generate_plane(
     texture_plane: PlaneGrid[TexDef] = PlaneGrid()
 
     # Check if the P1 style bottom trim option is set, and if so apply it.
-    gen = texturing.gen(texturing.GenCat.NORMAL, normal, Portalable.BLACK)
+    gen = texturing.gen(texturing.GenCat.NORMAL, plane_key.normal, Portalable.BLACK)
     if gen.bottom_trim_pattern:
-        calculate_bottom_trim(normal, plane_dist, subtile_pos, texture_plane, gen)
+        calculate_bottom_trim(plane_key, subtile_pos, texture_plane, gen)
 
     # Calculate the required tiles.
-    calculate_plane(normal, plane_dist, texture_plane, search_dists, subtile_pos)
+    calculate_plane(plane_key, texture_plane, search_dists, subtile_pos)
 
     # Split tiles into each brush that needs to be placed, then create it.
     for min_u, min_v, max_u, max_v, bevels, tex_def in bevel_split(texture_plane, grid_pos, orig_tiles):
-        center = normal * plane_dist + Vec.with_axes(
+        center = plane_key.normal * plane_key.distance + Vec.with_axes(
             # Compute avg(32*min, 32*max)
             # = (32 * min + 32 * max) / 2
             # = (min + max) * 16
@@ -553,7 +544,7 @@ def generate_plane(
         brush, front = make_tile(
             vmf,
             center,
-            normal,
+            plane_key.normal,
             tex_def.tex,
             texturing.SPECIAL.get(center, 'behind', antigel=tex_def.antigel),
             bevels=bevels,
@@ -563,7 +554,7 @@ def generate_plane(
         )
         vmf.add_brush(brush)
         tile_min = Vec.with_axes(
-            norm_axis, plane_dist,
+            norm_axis, plane_key.distance,
             u_axis, -32 * tex_def.u_off,
             v_axis, -32 * tex_def.v_off,
         )
