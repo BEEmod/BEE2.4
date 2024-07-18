@@ -16,7 +16,7 @@ from app.selector_win import (
     DispFont, GroupHeaderBase, SelectorWinBase, AttrDef, Options, NavKeys,
     TRANS_ATTR_DESC, TRANS_SUGGESTED, TRANS_SUGGESTED_MAC, TRANS_WINDOW_TITLE,
 )
-from consts import SEL_ICON_SIZE, SEL_ICON_SIZE_LRG as ICON_SIZE_LRG
+from consts import SEL_ICON_SIZE
 from packages import AttrTypes
 from transtoken import TransToken
 from ui_wx import MARKDOWN

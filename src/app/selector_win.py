@@ -1093,7 +1093,13 @@ class SelectorWinBase[ButtonT, GroupHeaderT: GroupHeaderBase]:
         raise NotImplementedError
 
     @abstractmethod
-    def _ui_menu_add(self, group: GroupHeaderT, item: utils.SpecialID, func: Callable[[], object], label: TransToken, /) -> None:
+    def _ui_menu_add(
+        self, group: GroupHeaderT,
+        item: utils.SpecialID,
+        func: Callable[[], object],
+        label: TransToken,
+        /,
+    ) -> None:
         """Add a radio-selection menu option for this item."""
         raise NotImplementedError
 

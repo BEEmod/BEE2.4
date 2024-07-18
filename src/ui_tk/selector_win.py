@@ -17,7 +17,7 @@ from app.selector_win import (
     DispFont, GroupHeaderBase, SelectorWinBase, AttrDef, Options, NavKeys,
     TRANS_ATTR_DESC, TRANS_SUGGESTED, TRANS_SUGGESTED_MAC, TRANS_WINDOW_TITLE,
 )
-from consts import SEL_ICON_SIZE, SEL_ICON_SIZE_LRG as ICON_SIZE_LRG
+from consts import SEL_ICON_SIZE
 from packages import AttrTypes
 from transtoken import TransToken
 from ui_tk import tk_tools
@@ -233,20 +233,16 @@ class SelectorWin(SelectorWinBase[ttk.Button, GroupHeader]):
         self.prop_frm.columnconfigure(1, weight=1)
 
         # Border around the selected item icon.
-        width, height = ICON_SIZE_LRG
         self.prop_icon_frm = ttk.Frame(
             self.prop_frm,
             name='prop_icon_frame',
             borderwidth=4,
             relief='raised',
-            width=width,
-            height=height,
         )
         self.prop_icon_frm.grid(row=0, column=0, columnspan=4)
 
         self.prop_icon = ttk.Label(self.prop_icon_frm, name='prop_icon')
         self.prop_icon.grid(row=0, column=0)
-        self.prop_icon_frm.configure(dict(zip(('width', 'height'), ICON_SIZE_LRG, strict=True)))
         tk_tools.bind_leftclick(self.prop_icon, self._evt_icon_clicked)
 
         name_frame = ttk.Frame(self.prop_frm)
@@ -770,7 +766,13 @@ class SelectorWin(SelectorWinBase[ttk.Button, GroupHeader]):
                 self.context_menu.entryconfig(header.menu_pos, font=self.norm_font)
 
     @override
-    def _ui_menu_add(self, group: GroupHeader, item: utils.SpecialID, func: Callable[[], object], label: TransToken, /) -> None:
+    def _ui_menu_add(
+        self, group: GroupHeader,
+        item: utils.SpecialID,
+        func: Callable[[], object],
+        label: TransToken,
+        /,
+    ) -> None:
         """Add a radio-selection menu option for this item."""
         group.menu.add_radiobutton(
             command=func,
