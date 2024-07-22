@@ -244,7 +244,7 @@ def res_set_texture(inst: Entity, res: Keyvalues) -> None:
         scale = 1.0
     try:
         rotation = QuarterRot.parse(res['rotation'])
-    except NoKeyError:
+    except LookupError:
         rotation = QuarterRot.NONE
 
     if srctools.conv_bool(res['gridpos', '0']):
