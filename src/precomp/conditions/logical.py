@@ -69,7 +69,10 @@ def check_xor(
     inst: Entity, kv: Keyvalues,
 ) -> bool:
     """The XOR group returns True if the number of true subtests is odd."""
-    return sum([conditions.check_test(sub_test, coll, info, voice, inst) for sub_test in kv]) % 2 == 1
+    return sum(
+        conditions.check_test(sub_test, coll, info, voice, inst)
+        for sub_test in kv
+    ) % 2 == 1
 
 
 @conditions.make_test('NOR')

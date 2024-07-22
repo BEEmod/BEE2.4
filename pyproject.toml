@@ -153,8 +153,12 @@ disallow_untyped_calls = true
 disallow_any_generics = false
 
 enable_error_code = [
+	'comparison-overlap',
 	'mutable-override',
 	'narrowed-type-not-subtype',
+	'no-untyped-call',
+	'no-untyped-def',
+	'redundant-cast',
 	'redundant-expr',
 	'redundant-self',
 	'truthy-bool',
@@ -162,7 +166,7 @@ enable_error_code = [
 	'unimported-reveal',
 	'unreachable',
 	'unused-awaitable',
-	'comparison-overlap',
+#	'explicit-override',
 ]
 
 [[tool.mypy.overrides]]

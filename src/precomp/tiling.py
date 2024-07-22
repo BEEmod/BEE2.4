@@ -330,9 +330,10 @@ class PanelType(Enum):
             ) from None
 
 
-def round_grid(vec: Vec) -> Vec:
+def round_grid[VecT: Vec | FrozenVec](vec: VecT) -> VecT:
     """Round to the center of the grid."""
-    return vec // 128 * 128 + (64, 64, 64)
+    res: Vec | FrozenVec = vec // 128 * 128 + (64, 64, 64)
+    return res  # type: ignore
 
 
 def iter_uv(
@@ -1583,7 +1584,7 @@ def edit_quarter_tile(
 
 def make_tile(
     vmf: VMF,
-    origin: Vec,
+    origin: FrozenVec | Vec,
     normal: FrozenVec | Vec,
     top_surf: MaterialConf,
     back_surf: MaterialConf = NODRAW_MAT,

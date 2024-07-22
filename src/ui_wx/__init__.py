@@ -53,6 +53,7 @@ class WXLogTarg(wx.Log):
             info.func.decode('utf8', 'ignore'),
         ))
 
+
 wx.Log.SetActiveTarget(WXLogTarg())
 
 

@@ -335,16 +335,16 @@ class SelectorWin(SelectorWinBase[wx.Button, GroupHeader]):
         return sizer
 
     @override
-    def _ui_win_hide(self, /) -> None:
-        if self.modal:
-            pass  # TODO?
-        self.win.Hide()
-
-    @override
     def _ui_win_show(self, /) -> None:
         self.win.Show()
         self.win.Raise()
         self.win.CentreOnScreen()
+
+    @override
+    def _ui_win_hide(self, /) -> None:
+        if self.modal:
+            pass  # TODO?
+        self.win.Hide()
 
     @override
     def _ui_win_get_size(self, /) -> tuple[int, int]:
@@ -433,9 +433,17 @@ class SelectorWin(SelectorWinBase[wx.Button, GroupHeader]):
         self.context_menus = {'': self.context_menu}
 
     @override
-    def _ui_menu_add(self, group: GroupHeader, item: utils.SpecialID, func: Callable[[], object], label: TransToken, /) -> None:
+    def _ui_menu_add(
+        self,
+        group: GroupHeader,
+        item: utils.SpecialID,
+        func: Callable[[], object],
+        label: TransToken, /,
+    ) -> None:
         """Add the specified item to the group's menu."""
-        self._menu_items[item] = menu = group.menu.AppendRadioItem(wx.ID_ANY, f'<item>:{item}', '')
+        self._menu_items[item] = menu = group.menu.AppendRadioItem(
+            wx.ID_ANY, f'<item>:{item}', '',
+        )
         set_menu_text(menu, label)
         # group.menu.Bind(wx.EVT_COMMAND, lambda evt: func())  # TODO: How does this work
 

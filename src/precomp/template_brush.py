@@ -55,6 +55,7 @@ class InvalidTemplateName(LookupError):
             ),
         )
 
+
 @attrs.define
 class InvalidVisgroupNames(LookupError):
     """Raised if visleafs are not valid for a template."""
@@ -306,6 +307,7 @@ del realign_solid
 class Template:
     """Represents a template before it's imported into a map."""
     _data: dict[str, tuple[list[Solid], list[Solid], list[Entity]]]
+
     def __init__(
         self, *,
         temp_id: str,

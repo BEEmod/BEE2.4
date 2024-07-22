@@ -49,6 +49,7 @@ async def _messagebox(
 
 class TextValidator(wx.Validator):
     """Handles validation for the text entry window."""
+    result: str | None
     def __init__(
         self,
         done_event: trio.Event,
@@ -62,7 +63,7 @@ class TextValidator(wx.Validator):
         self.func = func
         self.show_error = show_error
         self.done_event = done_event
-        self.result: str | None = value
+        self.result = value
 
     def Clone(self) -> TextValidator:
         copy = TextValidator(self.done_event, self.error_label, self.func, self.show_error, self.result)
@@ -143,7 +144,7 @@ async def text_entry_window(
 
     def on_cancel(_: object) -> None:
         """Handle closing the dialog."""
-        validator = text_ctrl.GetValidator()
+        validator: wx.Validator = text_ctrl.GetValidator()
         assert isinstance(validator, TextValidator)
         validator.result = None
         done_event.set()
@@ -155,7 +156,7 @@ async def text_entry_window(
     dialog.Show()
     await done_event.wait()
     # Validators get cloned when set, so we have to fetch the one actually used.
-    validator = text_ctrl.GetValidator()
+    validator: wx.Validator = text_ctrl.GetValidator()
     assert isinstance(validator, TextValidator)
     dialog.Hide()
     dialog.Destroy()

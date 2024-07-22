@@ -858,6 +858,7 @@ def write_lang_pot(path: Path, new_contents: bytes) -> bool:
         with path.open('rb') as f:
             old_lines = f.read().splitlines()
     except FileNotFoundError:
+        old_lines = []
         force_write = True
     else:
         for lines in [old_lines, new_lines]:
