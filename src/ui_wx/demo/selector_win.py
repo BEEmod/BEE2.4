@@ -1,15 +1,13 @@
-"""Test the errorUI display."""
-from collections.abc import Awaitable, Callable
-
+"""Test selectorwin."""
+from srctools import FileSystemChain
 import trio
 import wx
-from srctools import FileSystemChain
 
 import exporting
 import utils
 from transtoken import TransToken
 from app import img, lifecycle, sound, EdgeTrigger
-from packages.music import Music, MusicChannel
+from consts import MusicChannel
 import packages
 import BEE2_config
 import config
@@ -47,8 +45,8 @@ async def test(core_nursery: trio.Nursery) -> None:
         filesystem.add_sys(pack.fsys, prefix='resources/music_samp/')
 
     selector = SelectorWin(MAIN_WINDOW, SelOptions(
-        func_get_ids=Music.music_for_channel(MusicChannel.BASE),
-        func_get_data=Music.selector_data_getter(packages.SelitemData.build(
+        func_get_ids=packages.Music.music_for_channel(MusicChannel.BASE),
+        func_get_data=packages.Music.selector_data_getter(packages.SelitemData.build(
             small_icon=packages.NONE_ICON,
             short_name=TransToken.BLANK,
             long_name=packages.TRANS_NONE_NAME,
@@ -63,9 +61,9 @@ async def test(core_nursery: trio.Nursery) -> None:
             'for specific test elements.'
         ),
         default_id=utils.obj_id('VALVE_PETI'),
-        func_get_sample=Music.sample_getter_func(MusicChannel.BASE),
+        func_get_sample=packages.Music.sample_getter_func(MusicChannel.BASE),
         sound_sys=filesystem,
-        func_get_attr=Music.get_base_selector_attrs,
+        func_get_attr=packages.Music.get_base_selector_attrs,
         attributes=[
             packages.AttrDef.bool('SPEED', TransToken.ui('Propulsion Gel SFX')),
             packages.AttrDef.bool('BOUNCE', TransToken.ui('Repulsion Gel SFX')),
