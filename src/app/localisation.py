@@ -275,10 +275,10 @@ def get_lang_name(lang: Language) -> str:
         return f'{name_in_lang} ({name_in_cur})'
 
 
-def find_basemodui(games: list[gameMan.Game], langs: list[str]) -> str:
+async def find_basemodui(games: Iterable[gameMan.Game], langs: list[str]) -> trio.Path | None:
     """Load basemodui.txt from Portal 2, to provide translations for the default items."""
     # Check Portal 2 first, others might not be fully correct?
-    games.sort(key=lambda gm: gm.steamID != '620')
+    sorted(games, key=lambda gm: gm.steamID != '620')
 
     for lang in langs:
         try:
@@ -291,25 +291,25 @@ def find_basemodui(games: list[gameMan.Game], langs: list[str]) -> str:
 
     for game in games:
         if game_lang:
-            loc = game.abs_path(BASEMODUI_PATH.format(game_lang))
+            loc = game.root_path / BASEMODUI_PATH.format(game_lang)
             LOGGER.debug('Checking lang "{}"', loc)
-            if os.path.exists(loc):
+            if await loc.exists():
                 return loc
         # Fall back to configured language.
-        game_lang = game.get_game_lang()
+        game_lang = await game.get_game_lang()
         if game_lang:
-            loc = game.abs_path(BASEMODUI_PATH.format(game_lang))
+            loc = game.root_path / BASEMODUI_PATH.format(game_lang)
             LOGGER.debug('Checking lang "{}"', loc)
-            if os.path.exists(loc):
+            if await loc.exists():
                 return loc
 
     # Nothing found, pick first english copy.
     for game in games:
-        loc = game.abs_path(BASEMODUI_PATH.format('english'))
+        loc = game.root_path / BASEMODUI_PATH.format('english')
         LOGGER.debug('Checking lang "{}"', loc)
-        if os.path.exists(loc):
+        if await loc.exists():
             return loc
-    return ''  # Failed.
+    return None  # Failed.
 
 
 def parse_basemodui(result: dict[str, str], data: bytes) -> None:
@@ -496,14 +496,14 @@ async def load_aux_langs(
 
     async def game_lang(game_it: Iterable[gameMan.Game], expanded_langs: list[str]) -> None:
         """Load the game language in the background."""
-        basemod_loc = find_basemodui(list(game_it), expanded_langs)
-        if not basemod_loc:
+        basemod_loc = await find_basemodui(game_it, expanded_langs)
+        if basemod_loc is None:
             LOGGER.warning('Could not find BaseModUI file for Portal 2!')
             return
         try:
             # BaseModUI files are encoded in UTF-16. But it's kinda broken, with line endings
             # sometimes 1-char long.
-            data = await trio.Path(basemod_loc).read_bytes()
+            data = await basemod_loc.read_bytes()
             await trio.to_thread.run_sync(parse_basemodui, game_dict, data)
         except FileNotFoundError:
             LOGGER.warning('BaseModUI file "{}" does not exist!', basemod_loc)

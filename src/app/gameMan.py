@@ -76,6 +76,11 @@ class Game:
     # not marked with our marker file.
     unmarked_dlc3_vpk: bool = False
 
+    @property
+    def root_path(self) -> trio.Path:
+        """Return the root, wrapped in a path object."""
+        return trio.Path(self.root)
+
     @classmethod
     def parse(cls, gm_id: str, config: ConfigFile) -> Self:
         """Parse out the given game ID from the config file."""
@@ -190,17 +195,17 @@ class Game:
             # This works on Windows and Mac.
             await trio.to_thread.run_sync(webbrowser.open, url)
 
-    def get_game_lang(self) -> str:
+    async def get_game_lang(self) -> str:
         """Load the app manifest file to determine Portal 2's language."""
         # We need to first figure out what language is used (if not English),
         # then load in the file. This is saved in the 'appmanifest'.
         try:
-            appman_file = open(self.abs_path('../../appmanifest_620.acf'))
+            appman_data = await (self.root_path / '../../appmanifest_620.acf').read_text('ascii')
         except FileNotFoundError:
             # Portal 2 isn't here...
             return 'en'
-        with appman_file:
-            appman = Keyvalues.parse(appman_file, 'appmanifest_620.acf')
+        appman = Keyvalues.parse(appman_data, 'appmanifest_620.acf')
+        del appman_data
         try:
             return appman.find_key('AppState').find_key('UserConfig')['language']
         except LookupError:
@@ -213,7 +218,7 @@ class Game:
         ).format(game=self.name)
 
 
-def find_steam_info(game_dir: str) -> tuple[str | None, str | None]:
+async def find_steam_info(game_dir: str) -> tuple[str | None, str | None]:
     """Determine the steam ID and game name of this folder, if it has one.
 
     This only works on Source games!
@@ -224,21 +229,24 @@ def find_steam_info(game_dir: str) -> tuple[str | None, str | None]:
     found_id = False
     for folder in os.listdir(game_dir):
         info_path = os.path.join(game_dir, folder, 'gameinfo.txt')
-        if os.path.isfile(info_path):
-            with open(info_path) as file:
-                for line in file:
-                    clean_line = srctools.clean_line(line).replace('\t', ' ')
-                    if not found_id and 'steamappid' in clean_line.casefold():
-                        raw_id = clean_line.casefold().replace(
-                            'steamappid', '').strip()
-                        if raw_id.isdigit():
-                            game_id = raw_id
-                    elif not found_name and 'game ' in clean_line.casefold():
-                        found_name = True
-                        ind = clean_line.casefold().rfind('game') + 4
-                        name = clean_line[ind:].strip().strip('"')
-                    if found_name and found_id:
-                        break
+        try:
+            file = await trio.open_file(info_path, encoding='utf8', errors='replace')
+        except FileNotFoundError:
+            continue
+        async with file:
+            line: str
+            async for line in file:
+                clean_line = srctools.clean_line(line).replace('\t', ' ')
+                if not found_id and 'steamappid' in clean_line.casefold():
+                    raw_id = clean_line.casefold().replace('steamappid', '').strip()
+                    if raw_id.isdigit():
+                        game_id = raw_id
+                elif not found_name and 'game ' in clean_line.casefold():
+                    found_name = True
+                    ind = clean_line.casefold().rfind('game') + 4
+                    name = clean_line[ind:].strip().strip('"')
+                if found_name and found_id:
+                    break
         if found_name and found_id:
             break
     return game_id, name
@@ -313,7 +321,7 @@ async def add_game(dialogs: Dialogs) -> bool:
         exe_loc = filedialog.askopenfilename(title=str(TransToken.ui('Find Game Binaries')))
     if exe_loc:
         folder = os.path.dirname(exe_loc)
-        gm_id, name = find_steam_info(folder)
+        gm_id, name = await find_steam_info(folder)
         if name is None or gm_id is None:
             await dialogs.show_info(
                 TransToken.ui('This does not appear to be a valid game folder!'),
@@ -431,12 +439,11 @@ def setGame() -> None:
     background_run(ON_GAME_CHANGED, selected_game)
 
 
-def set_game_by_name(name: utils.SpecialID) -> None:
+async def set_game_by_name(name: utils.SpecialID) -> None:
     global selected_game
     for game in all_games:
         if utils.obj_id(game.name) == name:
             selected_game = game
             selectedGame_radio.set(all_games.index(game))
-            # TODO: make this function async too to eliminate.
-            background_run(ON_GAME_CHANGED, selected_game)
+            await ON_GAME_CHANGED(selected_game)
             break

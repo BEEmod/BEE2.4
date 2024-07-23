@@ -58,7 +58,7 @@ async def init_app(core_nursery: trio.Nursery) -> None:
         except KeyError:
             pass
         else:
-            gameMan.set_game_by_name(last_game.id)
+            await gameMan.set_game_by_name(last_game.id)
 
         core_nursery.start_soon(sound.sound_task)
 
