@@ -1,10 +1,15 @@
 """The widgets for the main menu bar."""
 from typing import Final
+
 import tkinter as tk
 
 from collections.abc import Callable, Iterable
+from contextlib import aclosing
 from pathlib import Path
 import os
+
+import trio
+import trio_util
 
 import BEE2_config
 import utils
@@ -32,7 +37,6 @@ class MenuBar:
     def __init__(
         self,
         parent: tk.Tk,
-        tk_img: TKImages,
         export: Callable[[], object],
     ) -> None:
         """Create the top menu bar.
@@ -110,20 +114,48 @@ class MenuBar:
         bar.add_cascade(menu=self.view_menu)
         set_menu_text(bar, TransToken.ui("View"))
 
-        background_run(help_menu.create, bar, tk_img)
-        gameMan.ON_GAME_CHANGED.register(self._game_changed)
+        # Using this name displays this correctly in OS X
+        self.help_menu = tk.Menu(parent, name='help')
+
+        bar.add_cascade(menu=self.help_menu)
+        set_menu_text(bar, TransToken.ui("Help"))
 
         if utils.CODE_DEV_MODE:
-            self.dev_menu = tk.Menu(parent)  # Don't bother translating.
+            self.dev_menu: tk.Menu | None = tk.Menu(parent)
+            # Don't bother translating.
             bar.add_cascade(menu=self.dev_menu, label='Dev')
-
-            from ui_tk import devmenu
-            background_run(devmenu.menu_task, self.dev_menu)
+        else:
+            self.dev_menu = None
 
     def set_export_allowed(self, allowed: bool) -> None:
         """Configure if exporting is allowed from the UI."""
         self._can_export = allowed
         self.file_menu.entryconfigure(self.export_btn_pos, state='normal' if allowed else 'disabled')
+
+    async def task(self, tk_img: TKImages) -> None:
+        """Operate the menu bar."""
+        async with trio.open_nursery() as nursery:
+            nursery.start_soon(help_menu.create, self.help_menu, tk_img)
+            nursery.start_soon(self._update_export_btn_task)
+            nursery.start_soon(self._update_folder_btns_task)
+            if self.dev_menu is not None:
+                from ui_tk import devmenu
+                nursery.start_soon(devmenu.menu_task, self.dev_menu)
+
+    async def _update_export_btn_task(self) -> None:
+        """Update the export button."""
+        async with aclosing(gameMan.EXPORT_BTN_TEXT.eventual_values()) as agen:
+            async for name in agen:
+                set_menu_text(self.file_menu, name, self.export_btn_pos)
+
+    async def _update_folder_btns_task(self) -> None:
+        """Update folder buttons to show the current game."""
+        async with aclosing(gameMan.selected_game.eventual_values()) as agen:
+            async for game in agen:
+                name = game.name if game is not None else '???'
+
+                for i, (label, path_getter) in enumerate(FOLDER_OPTIONS):
+                    set_menu_text(self.folder_menu, label.format(game=name), i)
 
     def _evt_open_dir(self, path_getter: Callable[['gameMan.Game'], Iterable[Path]]) -> Callable[[], None]:
         """Get an event function which opens the specified folder."""
@@ -138,9 +170,3 @@ class MenuBar:
                     os.startfile(path)
             # TODO: Other OSes.
         return handler
-
-    async def _game_changed(self, game: 'gameMan.Game') -> None:
-        """Callback for when games are changed."""
-        set_menu_text(self.file_menu, game.get_export_text(), self.export_btn_pos)
-        for i, (label, path_getter) in enumerate(FOLDER_OPTIONS):
-            set_menu_text(self.folder_menu, label.format(game=game.name), i)

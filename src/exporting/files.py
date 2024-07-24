@@ -185,7 +185,8 @@ async def step_copy_resources(exp: ExportData) -> None:
         await STAGE_RESOURCES.set_length(count)
 
     # Save the new cache modification date.
-    exp.game.mod_times.clear()
-    for pack_id, pack in exp.packset.packages.items():
-        exp.game.mod_times[pack_id.casefold()] = pack.get_modtime()
+    exp.game.mod_times.value = {
+        pack_id.casefold(): pack.get_modtime()
+        for pack_id, pack in exp.packset.packages.items()
+    }
     exp.game.save()

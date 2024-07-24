@@ -8,6 +8,7 @@ import itertools
 import attrs
 import srctools.logger
 import trio
+from srctools import EmptyMapping
 
 import packages
 import utils
@@ -127,7 +128,7 @@ async def clear_caches(dialogs: Dialogs) -> None:
      This will force package resources to be extracted again.
      """
     for game in gameMan.all_games:
-        game.mod_times.clear()
+        game.mod_times.value = EmptyMapping
         game.save()
 
     # This needs to be disabled, since otherwise we won't actually export

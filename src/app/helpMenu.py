@@ -75,7 +75,6 @@ WEB_RESOURCES = [
     WebResource(TransToken.ui('Submit Music Bugs...'), "issues_music", ResIcon.BUGS),
 ]
 
-TRANS_MENU_BUTTON = TransToken.ui('Help')
 TRANS_CREDITS_TITLE = TransToken.ui('BEE2 Credits')
 TRANS_CREDITS_BUTTON = TransToken.ui('Credits...')
 TRANS_CLOSE_BUTTON = TransToken.ui('Close')

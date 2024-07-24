@@ -2,27 +2,26 @@
 from __future__ import annotations
 from typing import Self
 
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from pathlib import Path
+import os
+import shutil
 import subprocess
 import sys
+import webbrowser
 
 from tkinter import filedialog
 import tkinter as tk
 
-import os
-import shutil
-import webbrowser
-
-from trio_util import AsyncValue
-from srctools import Keyvalues
+from srctools import EmptyMapping, Keyvalues
 import srctools.logger
 import srctools.fgd
 import attrs
+import trio_util
 import trio
 
 from BEE2_config import ConfigFile
-from app import background_run, quit_app
+from app import EdgeTrigger, background_run, quit_app
 from app.dialogs import Dialogs
 from config.gen_opts import GenOptions
 from exporting.compiler import terminate_error_server, restore_backup
@@ -38,12 +37,15 @@ import event
 LOGGER = srctools.logger.get_logger(__name__)
 
 all_games: list[Game] = []
-selected_game: AsyncValue[Game | None] = AsyncValue(None)
+selected_game: trio_util.AsyncValue[Game | None] = trio_util.AsyncValue(None)
 selectedGame_radio = tk.IntVar(value=0)
 game_menu: tk.Menu | None = None
 ON_GAME_CHANGED: event.Event[Game] = event.Event('game_changed')
 
 CONFIG = ConfigFile('games.cfg')
+# Stores the current text for the export button, which is updated based on several
+# different criteria.
+EXPORT_BTN_TEXT = trio_util.AsyncValue(TransToken.BLANK)
 
 TRANS_EXPORT_BTN = TransToken.ui('Export to "{game}"...')
 TRANS_EXPORT_BTN_DIRTY = TransToken.ui('Export to "{game}"*...')
@@ -63,7 +65,10 @@ class Game:
     steamID: str
     root: str
     # The last modified date of packages, so we know whether to copy it over.
-    mod_times: dict[str, int] = attrs.field(factory=dict, eq=False)
+    mod_times: trio_util.AsyncValue[Mapping[str, int]] = attrs.field(
+        init=False, eq=False,
+        factory=lambda: trio_util.AsyncValue(EmptyMapping),
+    )
     # The style last exported to the game.
     exported_style: str | None = attrs.field(default=None, eq=False)
 
@@ -102,7 +107,9 @@ class Game:
             if name.startswith('pack_mod_'):
                 mod_times[name.removeprefix('pack_mod_').casefold()] = srctools.conv_int(value)
 
-        return cls(gm_id, steam_id, folder, mod_times, exp_style, unmarked_dlc3)
+        game = cls(gm_id, steam_id, folder, exp_style, unmarked_dlc3)
+        game.mod_times.value = mod_times
+        return game
 
     def save(self) -> None:
         """Write a game into the config page."""
@@ -113,7 +120,7 @@ class Game:
         CONFIG[self.name]['unmarked_dlc3'] = srctools.bool_as_int(self.unmarked_dlc3_vpk)
         if self.exported_style is not None:
             CONFIG[self.name]['exported_style'] = self.exported_style
-        for pack, mod_time in self.mod_times.items():
+        for pack, mod_time in self.mod_times.value.items():
             CONFIG[self.name]['pack_mod_' + pack] = str(mod_time)
 
     def dlc_priority(self) -> Iterator[str]:
@@ -153,12 +160,13 @@ class Game:
 
         # Check lengths, to ensure we re-extract if packages were removed.
         loaded = packages.get_loaded_packages()
-        if len(loaded.packages) != len(self.mod_times):
+        mod_times = self.mod_times.value
+        if len(loaded.packages) != len(mod_times):
             LOGGER.info('Need to extract - package counts inconsistent!')
             return True
 
         return any(
-            pack.is_stale(self.mod_times.get(pack_id.casefold(), 0))
+            pack.is_stale(mod_times.get(pack_id.casefold(), 0))
             for pack_id, pack in
             loaded.packages.items()
         )
@@ -177,7 +185,7 @@ class Game:
         except (FileNotFoundError, PermissionError):
             pass
 
-        self.mod_times.clear()
+        self.mod_times.value = EmptyMapping
 
     async def launch(self) -> None:
         """Try and launch the game."""
@@ -207,11 +215,54 @@ class Game:
         except LookupError:
             return ''
 
-    def get_export_text(self) -> TransToken:
-        """Return the text to use on export button labels."""
-        return (
-            TRANS_EXPORT_BTN_DIRTY if self.cache_invalid() else TRANS_EXPORT_BTN
-        ).format(game=self.name)
+
+async def update_export_text() -> None:
+    """Monitor various criteria, and set the text for the export button."""
+    trigger = EdgeTrigger[()]()
+
+    async def on_setting_change() -> None:
+        """Refresh whenever 'preserve resources' changes."""
+        preserve: bool | None = None
+        opt: config.gen_opts.GenOptions
+        with config.APP.get_ui_channel(config.gen_opts.GenOptions) as channel:
+            async for opt in channel:
+                if opt.preserve_resources is not preserve:
+                    preserve = opt.preserve_resources
+                    trigger.maybe_trigger()
+
+    async def on_packset_change() -> None:
+        """Refresh whenever the packages changes."""
+        while True:
+            await packages.LOADED.wait_transition()
+            trigger.maybe_trigger()
+
+    async def on_game_change() -> None:
+        """Refresh whenever a game changes, or updates its config."""
+        while True:
+            game = selected_game.value
+            if game is None:
+                await selected_game.wait_transition()
+            else:
+                await trio_util.wait_any(
+                    selected_game.wait_transition,
+                    game.mod_times.wait_transition,
+                )
+            trigger.maybe_trigger()
+
+    async with trio.open_nursery() as nursery:
+        nursery.start_soon(on_setting_change)
+        nursery.start_soon(on_packset_change)
+        nursery.start_soon(on_game_change)
+
+        while True:
+            game = selected_game.value
+            if game is None:
+                EXPORT_BTN_TEXT.value = TRANS_EXPORT_BTN.format(game='???')
+            elif game.cache_invalid():
+                EXPORT_BTN_TEXT.value = TRANS_EXPORT_BTN_DIRTY.format(game=game.name)
+            else:
+                EXPORT_BTN_TEXT.value = TRANS_EXPORT_BTN.format(game=game.name)
+            await trigger.wait()
 
 
 async def find_steam_info(game_dir: str) -> tuple[str | None, str | None]:

@@ -736,9 +736,6 @@ async def export_editoritems(
         if pal_ui.selected.items != pal_data:
             pal_ui.select_palette(paletteUI.UUID_EXPORT, False)
             pal_ui.is_dirty.set()
-
-        # Re-fire this, so we clear the '*' on buttons if extracting cache.
-        await gameMan.ON_GAME_CHANGED(game)
     finally:
         UI['pal_export'].state(('!disabled',))
         bar.set_export_allowed(True)
@@ -1006,12 +1003,6 @@ async def init_option(
     UI['pal_export'].state(('disabled',))
     UI['pal_export'].grid(row=4, sticky="EW", padx=5)
 
-    async def game_changed(game: gameMan.Game) -> None:
-        """When the game changes, update this button."""
-        wid_transtoken.set_text(UI['pal_export'], game.get_export_text())
-
-    await gameMan.ON_GAME_CHANGED.register_and_prime(game_changed)
-
     props = ttk.Frame(frame, width="50")
     props.columnconfigure(1, weight=1)
     props.grid(row=5, sticky="EW")
@@ -1122,10 +1113,17 @@ async def init_option(
                     btn_conf_voice.state(['!disabled'])
                     tk_img.apply(btn_conf_voice, ICO_GEAR)
 
+    async def export_btn_task() -> None:
+        """Update the export button as necessary."""
+        async with aclosing(gameMan.EXPORT_BTN_TEXT.eventual_values()) as agen:
+            async for text in agen:
+                wid_transtoken.set_text(UI['pal_export'], text)
+
     task_status.started()
     async with trio.open_nursery() as nursery:
         nursery.start_soon(tk_tools.apply_bool_enabled_state_task, corridor.show_trigger.ready, corr_button)
         nursery.start_soon(voice_conf_task)
+        nursery.start_soon(export_btn_task)
         while True:
             await trio_util.wait_any(*[
                 window.chosen.wait_transition
@@ -1384,11 +1382,13 @@ async def init_windows(
             export_trig, export_rec, pal_ui, menu_bar, DIALOG,
         )
 
-    menu_bar = MenuBar(TK_ROOT, tk_img=tk_img, export=export)
+    menu_bar = MenuBar(TK_ROOT, export=export)
+    core_nursery.start_soon(menu_bar.task, tk_img)
     TK_ROOT.maxsize(
         width=TK_ROOT.winfo_screenwidth(),
         height=TK_ROOT.winfo_screenheight(),
     )
+    core_nursery.start_soon(gameMan.update_export_text)
     gameMan.ON_GAME_CHANGED.register(set_game)
     # Initialise the above and the menu bar.
     await gameMan.ON_GAME_CHANGED(gameMan.selected_game.value)

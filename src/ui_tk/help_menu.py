@@ -10,7 +10,7 @@ import functools
 import trio
 
 from app.helpMenu import (
-    TRANS_CREDITS_BUTTON, TRANS_CREDITS_TITLE, TRANS_MENU_BUTTON, TRANS_CLOSE_BUTTON,
+    TRANS_CREDITS_BUTTON, TRANS_CREDITS_TITLE, TRANS_CLOSE_BUTTON,
     ICONS, WEB_RESOURCES, SEPERATOR,
     CreditsWindowBase, open_url,
 )
@@ -86,38 +86,32 @@ class CreditsWindow(CreditsWindowBase):
 
 
 async def create(
-    parent: tk.Menu, tk_img: TKImages,
+    menu: tk.Menu, tk_img: TKImages,
     *, task_status: trio.TaskStatus[None] = trio.TASK_STATUS_IGNORED,
 ) -> None:
     """Create and operate the application 'Help' menu."""
-    # Using this name displays this correctly in OS X
-    help_menu = tk.Menu(parent, name='help')
-
-    parent.add_cascade(menu=help_menu)
-    set_menu_text(parent, TRANS_MENU_BUTTON)
-
     credit_window = CreditsWindow()
 
     async with trio.open_nursery() as nursery:
         for res in WEB_RESOURCES:
             if res is SEPERATOR:
-                help_menu.add_separator()
+                menu.add_separator()
             else:
-                help_menu.add_command(
+                menu.add_command(
                     command=functools.partial(nursery.start_soon, open_url, DIALOG, res.url_key),
                     compound='left',
                 )
-                tk_img.menu_set_icon(help_menu, utils.not_none(help_menu.index('end')), ICONS[res.icon])
-                set_menu_text(help_menu, res.name)
+                tk_img.menu_set_icon(menu, utils.not_none(menu.index('end')), ICONS[res.icon])
+                set_menu_text(menu, res.name)
 
-        help_menu.add_separator()
-        help_menu.add_command(command=credit_window.open.trigger)
-        credit_ind = help_menu.index('end')
+        menu.add_separator()
+        menu.add_command(command=credit_window.open.trigger)
+        credit_ind = menu.index('end')
         assert credit_ind is not None
-        set_menu_text(help_menu, TRANS_CREDITS_BUTTON)
+        set_menu_text(menu, TRANS_CREDITS_BUTTON)
 
         nursery.start_soon(credit_window.display_task)
         async with aclosing(credit_window.open.ready.eventual_values()) as agen:
             task_status.started()
             async for enabled in agen:
-                help_menu.entryconfigure(credit_ind, state='normal' if enabled else 'disabled')
+                menu.entryconfigure(credit_ind, state='normal' if enabled else 'disabled')
