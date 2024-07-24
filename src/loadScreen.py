@@ -102,7 +102,7 @@ class ScreenStage:
         self._current += 1
         self._skipped = False
         for screen in list(self._bound):
-            _QUEUE_SEND_LOAD.put(ipc_types.Load2Daemon_Step(screen.id, self.id))
+            _QUEUE_SEND_LOAD.put(ipc_types.Load2Daemon_Set(screen.id, self.id, self._current))
         await trio.sleep(0)
 
     async def skip(self) -> None:

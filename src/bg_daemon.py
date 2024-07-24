@@ -162,9 +162,9 @@ class BaseLoadScreen:
             self.values[stage] = 0
         self.reset_stages()
 
-    def op_step(self, stage: StageID) -> None:
-        """Increment the specified value."""
-        self.values[stage] += 1
+    def op_set_value(self, stage: StageID, value: int) -> None:
+        """Set the value for the specified stage."""
+        self.values[stage] = value
         self.update_stage(stage)
 
     def op_set_length(self, stage: StageID, num: int) -> None:
@@ -889,8 +889,8 @@ def run_background(
                         screen.op_destroy()
                     elif isinstance(op, ipc_types.Load2Daemon_SetLength):
                         screen.op_set_length(op.stage, op.size)
-                    elif isinstance(op, ipc_types.Load2Daemon_Step):
-                        screen.op_step(op.stage)
+                    elif isinstance(op, ipc_types.Load2Daemon_Set):
+                        screen.op_set_value(op.stage, op.value)
                     elif isinstance(op, ipc_types.Load2Daemon_Skip):
                         screen.op_skip_stage(op.stage)
                     elif isinstance(op, ipc_types.Load2Daemon_SetIsCompact):
