@@ -21,8 +21,11 @@ from srctools import EmptyMapping, Keyvalues, KeyValError
 import srctools.logger
 import trio
 
+import trio_util
+from trio_util import AsyncBool
+
 from FakeZip import FakeZip, zip_names, zip_open_bin
-from app import img, background_run
+from app import EdgeTrigger, img, background_run
 from transtoken import TransToken
 from ui_tk import TK_ROOT, tk_tools
 from ui_tk.check_table import CheckDetails, Item as CheckItem
@@ -41,6 +44,9 @@ LOGGER = srctools.logger.get_logger(__name__)
 
 # The backup window - either a toplevel, or TK_ROOT.
 window: tk.Toplevel
+WINDOW_OPEN = AsyncBool()
+# Triggered to reload from a game
+REFRESH_GAME = EdgeTrigger[()]()
 
 type AnyZip = ZipFile | FakeZip
 UI: dict[str, Any] = {}  # Holds all the widgets
@@ -256,6 +262,9 @@ class Date:
         else:
             return self.date >= other.date
 
+    def __hash__(self) -> int:
+        return hash(self.date)
+
     def __eq__(self, other: object) -> bool:
         if isinstance(other, Date):
             return self.date == other.date
@@ -299,19 +308,6 @@ async def load_backup(zip_file: AnyZip) -> list[P2C]:
     TK_ROOT.after(500, UI['game_details'].refresh)
 
     return maps
-
-
-async def load_game(game: gameMan.Game) -> None:
-    """Callback for gameMan, load in files for a game."""
-    game_name.set(game.name)
-
-    puzz_path = find_puzzles(game)
-    if puzz_path:
-        zip_file = FakeZip(puzz_path)
-        BACKUPS['game'] = await load_backup(zip_file)
-        BACKUPS['game_path'] = puzz_path
-        BACKUPS['game_zip'] = zip_file
-        refresh_game_details()
 
 
 def find_puzzles(game: gameMan.Game) -> str | None:
@@ -477,8 +473,7 @@ async def save_backup(dialogs: Dialogs) -> None:
 
     new_zip.close()  # Finalize zip
 
-    with open(BACKUPS['backup_path'], 'wb') as backup:
-        backup.write(new_zip_data.getvalue())
+    await trio.Path(BACKUPS['backup_path']).write_bytes(new_zip_data.getvalue())
     BACKUPS['unsaved_file'] = new_zip_data
 
     # Remake the zipfile object, so it's open again.
@@ -500,7 +495,12 @@ async def restore_maps(dialogs: Dialogs, maps: list[P2C]) -> None:
         LOGGER.warning('No game selected to restore from?')
         return
 
-    async with copy_loader, aclosing(LOAD_STAGE.iterate(maps)) as agen:
+    def extract_file(zipfile: ZipFile, src_path: str, dest_path: str) -> None:
+        """Write the file in the background."""
+        with zip_open_bin(zipfile, src_path) as src, open(dest_path, 'wb') as dest:
+            shutil.copyfileobj(src, dest)
+
+    async with copy_loader, trio.open_nursery() as nursery, aclosing(LOAD_STAGE.iterate(maps)) as agen:
         async for p2c in agen:
             back_zip = p2c.zip_file
             scr_path = p2c.filename + '.jpg'
@@ -514,13 +514,8 @@ async def restore_maps(dialogs: Dialogs, maps: list[P2C]) -> None:
                 ):
                     continue
             if scr_path in zip_names(back_zip):
-                with zip_open_bin(back_zip, scr_path) as src:
-                    with open(abs_scr, 'wb') as dest:
-                        shutil.copyfileobj(src, dest)
-
-            with zip_open_bin(back_zip, map_path) as src:
-                with open(abs_map, 'wb') as dest:
-                    shutil.copyfileobj(src, dest)
+                nursery.start_soon(trio.to_thread.run_sync, extract_file, scr_path, abs_scr)
+            nursery.start_soon(trio.to_thread.run_sync, extract_file, map_path, abs_map)
 
             new_item = p2c.copy()
             new_item.zip_file = FakeZip(game_dir)
@@ -556,8 +551,8 @@ def show_window() -> None:
     window.lift()
     tk_tools.center_win(window, TK_ROOT)
     # Load our game data!
-    background_run(ui_refresh_game)
     window.update()
+    WINDOW_OPEN.value = True
     UI['game_details'].refresh()
     UI['back_details'].refresh()
 
@@ -635,11 +630,29 @@ async def ui_save_backup_as(dialogs: Dialogs) -> None:
     await ui_save_backup(dialogs)
 
 
-async def ui_refresh_game() -> None:
-    """Reload the game maps list."""
+async def refresh_task() -> None:
+    """Refresh the game list whenever the game changes, and we're open."""
     from app.gameMan import selected_game
-    if (game := selected_game.value) is not None:
-        await load_game(game)
+    while True:
+        await WINDOW_OPEN.wait_value(True)
+        # If the window is closed, cancel updating.
+        async with trio_util.move_on_when(WINDOW_OPEN.wait_value, False):
+            while True:
+                game = selected_game.value
+                game_name.set(game.name if game is not None else '???')
+                if game is not None:
+                    puzz_path = find_puzzles(game)
+                    if puzz_path:
+                        zip_file = FakeZip(puzz_path)
+                        BACKUPS['game'] = await load_backup(zip_file)
+                        BACKUPS['game_path'] = puzz_path
+                        BACKUPS['game_zip'] = zip_file
+                        refresh_game_details()
+
+                await trio_util.wait_any(
+                    selected_game.wait_transition,
+                    REFRESH_GAME.wait,
+                )
 
 
 async def ui_backup_sel(dialogs: Dialogs) -> None:
@@ -740,7 +753,10 @@ async def ui_delete_game(dialog: Dialogs) -> None:
     refresh_game_details()
 
 
-def init(tk_img: TKImages) -> None:
+async def init(
+    tk_img: TKImages,
+    *, task_status: trio.TaskStatus = trio.TASK_STATUS_IGNORED,
+) -> None:
     """Initialise all widgets in the given window."""
     dialog = TkDialogs(window)
     for cat, btn_text in [
@@ -789,10 +805,7 @@ def init(tk_img: TKImages) -> None:
 
         tk_tools.add_mousewheel(UI[cat + 'details'].wid_canvas, UI[cat + 'frame'])
 
-    game_refresh = ttk.Button(
-        UI['game_title_frame'],
-        command=lambda: background_run(ui_refresh_game),
-    )
+    game_refresh = ttk.Button(UI['game_title_frame'], command=REFRESH_GAME.trigger)
     game_refresh.grid(row=0, column=1, sticky='E')
     add_tooltip(game_refresh, TransToken.ui("Reload the map list."))
     tk_img.apply(game_refresh, img.Handle.builtin('icons/tool_sub', 16, 16))
@@ -808,7 +821,6 @@ def init(tk_img: TKImages) -> None:
     UI['back_btn_sel']['command'] = lambda: background_run(ui_restore_sel, dialog)
     UI['back_btn_del']['command'] = ui_delete_backup
 
-
     UI['back_frame'].grid(row=1, column=0, sticky='NSEW')
     ttk.Separator(orient=tk.VERTICAL).grid(
         row=1, column=1, sticky='NS', padx=5,
@@ -818,6 +830,11 @@ def init(tk_img: TKImages) -> None:
     window.rowconfigure(1, weight=1)
     window.columnconfigure(0, weight=1)
     window.columnconfigure(2, weight=1)
+
+    async with trio.open_nursery() as nursery:
+        nursery.start_soon(refresh_task)
+        nursery.start_soon(tk_tools.apply_bool_enabled_state_task, REFRESH_GAME.ready, game_refresh)
+        task_status.started()
 
 
 async def init_application(nursery: trio.Nursery) -> None:
@@ -835,7 +852,7 @@ async def init_application(nursery: trio.Nursery) -> None:
     background_run(img.init, EmptyMapping, TK_IMG)
     # We don't need sound or language reload handling.
 
-    init(TK_IMG)
+    await nursery.start(init, TK_IMG)
 
     UI['bar'] = bar = tk.Menu(TK_ROOT)
     window.option_add('*tearOff', False)
@@ -882,11 +899,6 @@ async def init_application(nursery: trio.Nursery) -> None:
 
         await gameMan.load(DIALOG)
         ui_new_backup()
-
-        @gameMan.ON_GAME_CHANGED.register
-        async def cback(game: gameMan.Game) -> None:
-            """UI.py isn't present, so we use this callback."""
-            await load_game(game)
 
         gameMan.add_menu_opts(game_menu)
 
@@ -953,7 +965,10 @@ def init_backup_settings() -> None:
     count.value = count_value
 
 
-def init_toplevel(tk_img: TKImages) -> None:
+async def init_toplevel(
+    tk_img: TKImages,
+    *, task_status: trio.TaskStatus = trio.TASK_STATUS_IGNORED,
+) -> None:
     """Initialise the window as part of the BEE2."""
     global window
     window = tk.Toplevel(TK_ROOT, name='backupWin')
@@ -966,12 +981,10 @@ def init_toplevel(tk_img: TKImages) -> None:
         """Close the window."""
         from BEE2_config import GEN_OPTS
         window.withdraw()
+        WINDOW_OPEN.value = False
         GEN_OPTS.save_check()
 
     window.protocol("WM_DELETE_WINDOW", quit_command)
-
-    init(tk_img)
-    init_backup_settings()
 
     # When embedded in the BEE2, use regular buttons and a dropdown!
     toolbar_frame = ttk.Frame(window)
@@ -996,7 +1009,12 @@ def init_toplevel(tk_img: TKImages) -> None:
     ).grid(row=0, column=3)
 
     toolbar_frame.grid(row=0, column=0, columnspan=3, sticky='W')
-    ui_new_backup()
+
+    async with trio.open_nursery() as nursery:
+        await nursery.start(init, tk_img)
+        init_backup_settings()
+        ui_new_backup()
+        task_status.started()
 
 
 @atexit.register

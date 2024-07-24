@@ -1579,7 +1579,7 @@ async def init_windows(
     tk_tools.add_mousewheel(pal_canvas, TK_ROOT)
 
     await trio.sleep(0)
-    backup_win.init_toplevel(tk_img)
+    await core_nursery.start(backup_win.init_toplevel, tk_img)
     await LOAD_UI.step('backup')
     voiceEditor.init_widgets()
     await LOAD_UI.step('voiceline')
