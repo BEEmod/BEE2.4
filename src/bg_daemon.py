@@ -857,51 +857,54 @@ def run_background(
                     raise BrokenPipeError from exc
                 had_values = True
                 if time.monotonic() - cur_time > TIMEOUT:
-                    # ensure we do run the logs too if we timeout, but if we don't share the same timeout.
+                    # ensure we do run the logs too if we time out, but if we don't share the same timeout.
                     cur_time = time.monotonic()
                     break
-                if isinstance(op, ipc_types.Load2Daemon_Init):
-                    # Create a new loadscreen.
-                    screen = (SplashScreen if op.is_splash else LoadScreen)(op.scr_id, op.title, force_ontop, op.stages)
-                    SCREENS[op.scr_id] = screen
-                elif isinstance(op, ipc_types.Load2Daemon_UpdateTranslations):
-                    TRANSLATION.update(op.translations)
-                    log_window.update_translations()
-                    for screen in SCREENS.values():
-                        if isinstance(screen, LoadScreen):
-                            screen.update_translations()
-                elif isinstance(op, ipc_types.Load2Daemon_SetForceOnTop):
-                    for screen in SCREENS.values():
-                        screen.win.attributes('-topmost', op.on_top)
-                elif isinstance(op, ipc_types.ScreenOp):
-                    try:
-                        screen = SCREENS[op.screen]
-                    except KeyError:
-                        continue
-
-                    if isinstance(op, ipc_types.Load2Daemon_Show):
-                        screen.op_show(op.title, op.stage_names)
-                    elif isinstance(op, ipc_types.Load2Daemon_Hide):
-                        screen.op_hide()
-                    elif isinstance(op, ipc_types.Load2Daemon_Reset):
-                        screen.op_reset()
-                    elif isinstance(op, ipc_types.Load2Daemon_Destroy):
-                        screen.op_destroy()
-                    elif isinstance(op, ipc_types.Load2Daemon_SetLength):
-                        screen.op_set_length(op.stage, op.size)
-                    elif isinstance(op, ipc_types.Load2Daemon_Set):
-                        screen.op_set_value(op.stage, op.value)
-                    elif isinstance(op, ipc_types.Load2Daemon_Skip):
-                        screen.op_skip_stage(op.stage)
-                    elif isinstance(op, ipc_types.Load2Daemon_SetIsCompact):
-                        if isinstance(screen, SplashScreen):
-                            screen.op_set_is_compact(op.compact)
-                        else:
-                            print('Called set_is_compact() on regular loadscreen?')
-                    else:
+                match op:
+                    case ipc_types.Load2Daemon_Init():
+                        # Create a new loadscreen.
+                        screen = (SplashScreen if op.is_splash else LoadScreen)(
+                            op.scr_id, op.title, force_ontop, op.stages,
+                        )
+                        SCREENS[op.scr_id] = screen
+                    case ipc_types.Load2Daemon_UpdateTranslations():
+                        TRANSLATION.update(op.translations)
+                        log_window.update_translations()
+                        for screen in SCREENS.values():
+                            if isinstance(screen, LoadScreen):
+                                screen.update_translations()
+                    case ipc_types.Load2Daemon_SetForceOnTop():
+                        for screen in SCREENS.values():
+                            screen.win.attributes('-topmost', op.on_top)
+                    case ipc_types.ScreenOp():
+                        try:
+                            screen = SCREENS[op.screen]
+                        except KeyError:
+                            continue
+                        match op:
+                            case ipc_types.Load2Daemon_Show():
+                                screen.op_show(op.title, op.stage_names)
+                            case ipc_types.Load2Daemon_Hide():
+                                screen.op_hide()
+                            case ipc_types.Load2Daemon_Reset():
+                                screen.op_reset()
+                            case ipc_types.Load2Daemon_Destroy():
+                                screen.op_destroy()
+                            case ipc_types.Load2Daemon_SetLength():
+                                screen.op_set_length(op.stage, op.size)
+                            case ipc_types.Load2Daemon_Set():
+                                screen.op_set_value(op.stage, op.value)
+                            case ipc_types.Load2Daemon_Skip():
+                                screen.op_skip_stage(op.stage)
+                            case ipc_types.Load2Daemon_SetIsCompact():
+                                if isinstance(screen, SplashScreen):
+                                    screen.op_set_is_compact(op.compact)
+                                else:
+                                    print('Called set_is_compact() on regular loadscreen?')
+                            case _:
+                                assert_never(op)
+                    case _:
                         assert_never(op)
-                else:
-                    assert_never(op)
             while True:  # Pop off all the values.
                 try:
                     rec_args = queue_rec_log.get_nowait()
