@@ -35,6 +35,7 @@ class UnknownVersion(Exception):
     """Raised for unknown versions during parsing."""
     version: int
     allowed: str
+
     def __str__(self) -> str:
         """Format nicely."""
         return f'Invalid version {self.version}! Valid versions: {self.allowed}'
@@ -156,7 +157,7 @@ class ConfigSpec:
     # One is provided independently for each ID, so it can be sent to the right object.
     _apply_channel: dict[
         tuple[type[Data], str],
-        trio.MemorySendChannel[Data],
+        list[trio.MemorySendChannel[Data]],
     ] = attrs.field(factory=dict, repr=False)
 
     _current: Config = attrs.Factory(lambda: Config({}))
@@ -199,8 +200,10 @@ class ConfigSpec:
         info = typ.get_conf_info()
         if data_id and not info.uses_id:
             raise ValueError(f'Data type "{info.name}" does not support IDs!')
-        if (typ, data_id) in self._apply_channel:
-            raise ValueError(f'Cannot associate two channels for {info.name}[{data_id}]!')
+
+        # Invalid to drop DataT -> Data.
+        chan_list: list[trio.MemorySendChannel[DataT]]
+        chan_list = self._apply_channel.setdefault((typ, data_id), [])  # type: ignore
 
         send: trio.MemorySendChannel[DataT]
         rec: trio.MemoryReceiveChannel[DataT]
@@ -215,13 +218,12 @@ class ConfigSpec:
             assert isinstance(current, typ), info
             # Can't possibly block, we just created this.
             send.send_nowait(current)
-        # Invalid to drop DataT -> Data.
-        self._apply_channel[typ, data_id] = send  # type: ignore
+        chan_list.append(send)
         try:
             yield rec
         finally:
             rec.close()
-            del self._apply_channel[typ, data_id]
+            chan_list.remove(send)
 
     async def apply_conf[D: Data](self, typ: type[D], *, data_id: str = '') -> None:
         """Apply the current settings for this config type and ID.
@@ -237,12 +239,14 @@ class ConfigSpec:
                 raise ValueError(f'Data type "{info.name}" does not support IDs!')
             try:
                 data = self._current.get(typ)[data_id]
-                channel = self._apply_channel[typ, data_id]
+                channel_list = self._apply_channel[typ, data_id]
             except KeyError:
                 LOGGER.warning('{}[{!r}] has no UI channel!', info.name, data_id)
             else:
                 assert isinstance(data, typ), info
-                await channel.send(data)
+                async with trio.open_nursery() as nursery:
+                    for channel in channel_list:
+                        nursery.start_soon(channel.send, data)
         else:
             try:
                 data_map = self._current.get(typ)
@@ -252,11 +256,12 @@ class ConfigSpec:
             async with trio.open_nursery() as nursery:
                 for dat_id, data in data_map.items():
                     try:
-                        channel = self._apply_channel[typ, dat_id]
+                        channel_list = self._apply_channel[typ, dat_id]
                     except KeyError:
                         LOGGER.warning('{}[{!r}] has no UI channel!', info.name, dat_id)
                     else:
-                        nursery.start_soon(channel.send, data)
+                        for channel in channel_list:
+                            nursery.start_soon(channel.send, data)
 
     def get_full_conf(self, filter_to: ConfigSpec | None = None) -> Config:
         """Get the config stored by this spec, filtering to another if requested."""
