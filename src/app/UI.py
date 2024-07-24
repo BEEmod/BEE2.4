@@ -648,6 +648,7 @@ async def export_editoritems(
 
         conf = config.APP.get_cur_conf(config.gen_opts.GenOptions)
         packset = packages.get_loaded_packages()
+        game = gameMan.selected_game.value
         try:
             chosen_style = packset.obj_by_id(packages.Style, selected_style)
         except KeyError:
@@ -655,7 +656,7 @@ async def export_editoritems(
             return
 
         export_trig.trigger(exporting.ExportInfo(
-            gameMan.selected_game,
+            game,
             packset,
             style=chosen_style,
             selected_objects={
@@ -717,8 +718,8 @@ async def export_editoritems(
         # Do the desired action - if quit, we don't bother to update UI.
         if do_action:
             # Launch first so quitting doesn't affect this.
-            if conf.launch_after_export and gameMan.selected_game is not None:
-                await gameMan.selected_game.launch()
+            if conf.launch_after_export and game is not None:
+                await game.launch()
 
             if conf.after_export is AfterExport.NORMAL:
                 pass
@@ -737,7 +738,7 @@ async def export_editoritems(
             pal_ui.is_dirty.set()
 
         # Re-fire this, so we clear the '*' on buttons if extracting cache.
-        await gameMan.ON_GAME_CHANGED(gameMan.selected_game)
+        await gameMan.ON_GAME_CHANGED(game)
     finally:
         UI['pal_export'].state(('!disabled',))
         bar.set_export_allowed(True)
@@ -1390,7 +1391,7 @@ async def init_windows(
     )
     gameMan.ON_GAME_CHANGED.register(set_game)
     # Initialise the above and the menu bar.
-    await gameMan.ON_GAME_CHANGED(gameMan.selected_game)
+    await gameMan.ON_GAME_CHANGED(gameMan.selected_game.value)
 
     ui_bg = tk.Frame(TK_ROOT, bg=ItemsBG, name='bg')
     ui_bg.grid(row=0, column=0, sticky='NSEW')

@@ -129,9 +129,10 @@ class MenuBar:
         """Get an event function which opens the specified folder."""
         def handler() -> None:
             """When called opens the path."""
-            if gameMan.selected_game is None:
+            game = gameMan.selected_game.value
+            if game is None:
                 return
-            paths = path_getter(gameMan.selected_game)
+            paths = path_getter(game)
             if utils.WIN:
                 for path in paths:
                     os.startfile(path)

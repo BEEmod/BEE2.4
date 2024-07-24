@@ -637,9 +637,9 @@ async def ui_save_backup_as(dialogs: Dialogs) -> None:
 
 async def ui_refresh_game() -> None:
     """Reload the game maps list."""
-    from app import gameMan
-    if gameMan.selected_game is not None:
-        await load_game(gameMan.selected_game)
+    from app.gameMan import selected_game
+    if (game := selected_game.value) is not None:
+        await load_game(game)
 
 
 async def ui_backup_sel(dialogs: Dialogs) -> None:

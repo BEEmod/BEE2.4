@@ -1,10 +1,4 @@
-"""
-Does stuff related to the actual games.
-- Adding and removing games
-- Handles locating parts of a given game,
-- Modifying GameInfo to support our special content folder.
-- Generating and saving editoritems/vbsp_config
-"""
+"""Keeps track of which games are known, and allows adding/removing them."""
 from __future__ import annotations
 from typing import Self
 
@@ -20,6 +14,7 @@ import os
 import shutil
 import webbrowser
 
+from trio_util import AsyncValue
 from srctools import Keyvalues
 import srctools.logger
 import srctools.fgd
@@ -43,7 +38,7 @@ import event
 LOGGER = srctools.logger.get_logger(__name__)
 
 all_games: list[Game] = []
-selected_game: Game | None = None
+selected_game: AsyncValue[Game | None] = AsyncValue(None)
 selectedGame_radio = tk.IntVar(value=0)
 game_menu: tk.Menu | None = None
 ON_GAME_CHANGED: event.Event[Game] = event.Event('game_changed')
@@ -63,18 +58,19 @@ EXE_SUFFIX = (
 
 @attrs.define(eq=False)
 class Game:
-    name: str
+    """A game that we are able to mod."""
+    name: str = attrs.field(eq=False)
     steamID: str
     root: str
     # The last modified date of packages, so we know whether to copy it over.
-    mod_times: dict[str, int] = attrs.Factory(dict)
+    mod_times: dict[str, int] = attrs.field(factory=dict, eq=False)
     # The style last exported to the game.
-    exported_style: str | None = None
+    exported_style: str | None = attrs.field(default=None, eq=False)
 
     # In previous versions, we always wrote our VPK into dlc3. This tracks whether this game was
     # read in from a previous BEE install, and so has created the DLC3 folder even though it's
     # not marked with our marker file.
-    unmarked_dlc3_vpk: bool = False
+    unmarked_dlc3_vpk: bool = attrs.field(default=False, eq=False)
 
     @property
     def root_path(self) -> trio.Path:
@@ -278,7 +274,6 @@ def save() -> None:
 
 async def load(dialogs: Dialogs) -> None:
     """Load the game configuration."""
-    global selected_game
     all_games.clear()
     for gm in CONFIG:
         if gm == CONFIG.default_section:
@@ -300,7 +295,7 @@ async def load(dialogs: Dialogs) -> None:
             quit_app()
             return
         loadScreen.main_loader.unsuppress()  # Show it again
-    selected_game = all_games[0]
+    selected_game.value = all_games[0]
 
 
 async def add_game(dialogs: Dialogs) -> bool:
@@ -375,8 +370,7 @@ async def add_game(dialogs: Dialogs) -> bool:
 async def remove_game(dialogs: Dialogs) -> None:
     """Remove the currently-chosen game from the game list."""
     from exporting.fgd import edit_fgd
-    global selected_game
-    cur_game = selected_game
+    cur_game = selected_game.value
     if cur_game is None:
         LOGGER.warning('No games defined?')
         quit_app()
@@ -406,7 +400,7 @@ async def remove_game(dialogs: Dialogs) -> None:
             quit_app()  # If we have no games, nothing can be done
             return
 
-        selected_game = all_games[0]
+        selected_game.value = all_games[0]
         selectedGame_radio.set(0)
         if game_menu is not None:
             add_menu_opts(game_menu)
@@ -417,33 +411,31 @@ def add_menu_opts(menu: tk.Menu) -> None:
     length = menu.index('end')
     if length is not None:
         for ind in reversed(range(length)):
-            # Delete all the old radiobutton
+            # Delete all the old radiobuttons
             # Iterate backward to ensure indexes stay the same.
             if menu.type(ind) == tk.RADIOBUTTON:
                 menu.delete(ind)
+
+    def set_from_radio() -> None:
+        """Apply the radio button."""
+        selected_game.value = game = all_games[selectedGame_radio.get()]
+        # TODO: make this function async to eliminate.
+        background_run(ON_GAME_CHANGED, game)
 
     for val, game in enumerate(all_games):
         menu.add_radiobutton(
             label=game.name,
             variable=selectedGame_radio,
             value=val,
-            command=setGame,
+            command=set_from_radio,
         )
-    setGame()
-
-
-def setGame() -> None:
-    global selected_game
-    selected_game = all_games[selectedGame_radio.get()]
-    # TODO: make this function async to eliminate.
-    background_run(ON_GAME_CHANGED, selected_game)
 
 
 async def set_game_by_name(name: utils.SpecialID) -> None:
-    global selected_game
+    """Select the game with the specified name."""
     for game in all_games:
         if utils.obj_id(game.name) == name:
-            selected_game = game
+            selected_game.value = game
             selectedGame_radio.set(all_games.index(game))
-            await ON_GAME_CHANGED(selected_game)
+            await ON_GAME_CHANGED(selected_game.value)
             break
