@@ -329,9 +329,11 @@ class SelectorWin(SelectorWinBase[wx.Button, GroupHeader]):
         self.display = wx.TextCtrl(parent)
         self.display.SetEditable(False)
         self.display.Bind(wx.EVT_LEFT_DOWN, open_window)
+        self.display.Bind(wx.EVT_RIGHT_DOWN, self._evt_show_menu)
 
         self.disp_btn = wx.Button(parent, label="...", style=wx.BU_EXACTFIT)
         self.disp_btn.Bind(wx.EVT_BUTTON, open_window)
+        self.disp_btn.Bind(wx.EVT_RIGHT_DOWN, self._evt_show_menu)
 
         sizer = wx.BoxSizer(wx.HORIZONTAL)
         sizer.Add(self.display, wx.SizerFlags().Proportion(1).Expand())
@@ -342,6 +344,14 @@ class SelectorWin(SelectorWinBase[wx.Button, GroupHeader]):
         self.save()
 
         return sizer
+
+    def _evt_show_menu(self, evt: wx.Event) -> None:
+        """Dislay the context window at the text widget."""
+        evt.Skip()
+        if not self._readonly and not self._loading and self.display is not None:
+            self.display.PopupMenu(self.context_menu)
+        else:
+            wx.Bell()
 
     @override
     def _ui_win_show(self, /) -> None:
