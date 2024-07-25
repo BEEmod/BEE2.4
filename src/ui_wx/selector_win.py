@@ -1,11 +1,11 @@
 """Wx-specific implementation of the selector window."""
 from __future__ import annotations
+
 from typing import Final, assert_never
 from typing_extensions import override
 
 from collections.abc import Callable, Mapping
-from contextlib import aclosing
-import math
+import itertools
 
 import wx.html
 import trio
@@ -134,6 +134,9 @@ class SelectorWin(SelectorWinBase[wx.Button, GroupHeader]):
     wid_samp_button: wx.Button | None
     _suggest_lbl: list[wx.Panel | wx.StaticBox]
 
+    # The overall sizer for the item list.
+    itemlist_sizer: wx.BoxSizer
+
     # A map from group name -> header widget
     group_widgets: dict[str, GroupHeader]
     # Recycles existing group headers.
@@ -192,9 +195,13 @@ class SelectorWin(SelectorWinBase[wx.Button, GroupHeader]):
         self.splitter.SetSashGravity(1.0)
         sizer_outer.Add(self.splitter, 1, wx.EXPAND, 0)
 
-        self.wid_itemlist = wx.ScrolledWindow(self.splitter)
+        self.wid_itemlist = wid_itemlist = wx.ScrolledWindow(self.splitter)
         self.wid_panel_info = wx.Panel(self.splitter)
-        self.splitter.SplitVertically(self.wid_itemlist, self.wid_panel_info)
+        self.splitter.SplitVertically(wid_itemlist, self.wid_panel_info)
+
+        self.itemlist_sizer = wx.BoxSizer(wx.VERTICAL)
+        wid_itemlist.SetSizer(self.itemlist_sizer)
+        wid_itemlist.Bind(wx.EVT_SIZE, self._evt_window_resized)
 
         sizer_info = wx.BoxSizer(wx.VERTICAL)
         self.wid_panel_info.SetSizer(sizer_info)
@@ -363,7 +370,54 @@ class SelectorWin(SelectorWinBase[wx.Button, GroupHeader]):
 
     @override
     async def _ui_reposition_items(self) -> None:
-        pass  # TODO
+        # self._suggest_lbl.reset()
+
+        # If only the '' group is present, force it to be visible, and hide
+        # the header.
+        no_groups = self.group_order == ['']
+
+        self.itemlist_sizer.Clear(delete_windows=False)
+        group_flags = wx.SizerFlags().Left().Expand().Border(wx.TOP, 16)
+        row_flags = wx.SizerFlags().Left().Border(wx.TOP | wx.BOTTOM, 4)
+        item_flags = wx.SizerFlags().Border(wx.ALL, 4)
+
+        for group_key in self.group_order:
+            await trio.lowlevel.checkpoint()
+            items = self.grouped_items[group_key]
+            group_wid = self.group_widgets[group_key]
+
+            if no_groups:
+                group_wid.hide()
+            else:
+                self.itemlist_sizer.Add(group_wid.panel, row_flags)
+                if not self.group_visible.get(group_key):
+                    # Hide everything!
+                    for item_id in items:
+                        await trio.lowlevel.checkpoint()
+                        self._id_to_button[item_id].Hide()
+                    continue
+
+            # Place each item
+            for row in itertools.batched(items, self.column_count):
+                await trio.lowlevel.checkpoint()
+                row_sizer = wx.BoxSizer(wx.HORIZONTAL)
+                self.itemlist_sizer.Add(row_sizer, row_flags)
+                for item_id in row:
+                    button = self._id_to_button[item_id]
+                    button.Show()
+                    # if item_id in self.suggested:
+                    #     sugg_lbl = self._suggest_lbl.fetch()
+                    #     sugg_lbl.place(
+                    #         x=(i % width) * ITEM_WIDTH + 1,
+                    #         y=(i // width) * ITEM_HEIGHT + y_off,
+                    #     )
+                    #     sugg_lbl['width'] = button.winfo_width()
+                    row_sizer.Add(button, item_flags)
+                    # button.Raise()  # Over the suggested label.
+
+        self.wid_itemlist.SetVirtualSize(10, 10)
+        self.itemlist_sizer.Layout()
+        # self._suggest_lbl.hide_unused()
 
     @override
     def _ui_button_create(self, ind: int, /) -> wx.Button:
