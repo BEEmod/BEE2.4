@@ -28,7 +28,7 @@ def dump_widgets() -> None:
         """Dump em."""
         f.write(f'{indent}{widget} ({type(widget).__qualname__})')
         if widget in label_to_user:
-            f.write(f'.img = {label_to_user[widget].cur_handle!r}')  # type: ignore
+            f.write(f'.img = {label_to_user[widget].cur_handle!r}')
         children = widget.winfo_children()
         if children:
             indent += '\t'
@@ -39,7 +39,7 @@ def dump_widgets() -> None:
         else:
             f.write('\n')
 
-    with open('../reports/widget_tree.txt', 'w') as f:
+    with open('../reports/widget_tree.txt', 'w', encoding='utf8') as f:
         dump(TK_ROOT, '')
     LOGGER.info('Dump done!')
 
@@ -93,8 +93,11 @@ async def menu_task(menu: tk.Menu) -> None:
             MemoryError('RAM'),
         ]))
 
+        stats_open = trio_util.AsyncBool()
+        nursery.start_soon(stats_window_task, stats_open)
+
         menu.add_command(label='Dump widgets', command=dump_widgets)
-        menu.add_command(label='Stats', command=await nursery.start(stats_window_task))
+        menu.add_command(label='Stats', command=utils.val_setter(stats_open, True))
         menu.add_command(label='Dump Tasks', command=dump_tasktree)
 
         menu.add_cascade(label='Crash', menu=(crash_menu := tk.Menu(menu)))
@@ -120,10 +123,12 @@ async def menu_task(menu: tk.Menu) -> None:
         await trio.sleep_forever()
 
 
-async def stats_window_task(task_status: trio.TaskStatus[Callable[[], object]]) -> None:
+async def stats_window_task(open_val: trio_util.AsyncBool) -> None:
     """Create the statistics window."""
+    await open_val.wait_value(True)
+    # We only need to create the window the first time it's requested.
+
     window = tk.Toplevel(TK_ROOT, name='statsWin')
-    window.withdraw()
 
     label = ttk.Label(window, name='info', text='...', font='TkFixedFont')
     window.grid_columnconfigure(0, weight=1)
@@ -132,7 +137,6 @@ async def stats_window_task(task_status: trio.TaskStatus[Callable[[], object]]) 
     ticker_lbl = ttk.Label(window, name='ticker', text='-')
     ticker_lbl.grid(row=1, column=0)
 
-    open_val = trio_util.AsyncBool()
     window.protocol("WM_DELETE_WINDOW", utils.val_setter(open_val, False))
 
     stat_funcs = [
@@ -141,7 +145,6 @@ async def stats_window_task(task_status: trio.TaskStatus[Callable[[], object]]) 
         stats_trio,
     ]
 
-    task_status.started(utils.val_setter(open_val, True))
     while True:
         await open_val.wait_value(True)
         window.wm_deiconify()
