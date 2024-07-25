@@ -4,6 +4,8 @@ from __future__ import annotations
 from typing import Final, assert_never
 from typing_extensions import override
 
+
+from contextlib import aclosing
 from collections.abc import Callable, Mapping
 import itertools
 
@@ -354,6 +356,21 @@ class SelectorWin(SelectorWinBase[wx.Button, GroupHeader]):
             wx.Bell()
 
     @override
+    async def _ui_task(self) -> None:
+        """Executed by task()."""
+        last_checked: wx.MenuItem | None = None
+        async with aclosing(self.chosen.eventual_values()) as agen:
+            async for chosen_id in agen:
+                if last_checked is not None:
+                    last_checked.Check(False)
+                try:
+                    last_checked = self._menu_items[chosen_id]
+                except KeyError:
+                    pass
+                else:
+                    last_checked.Check()
+
+    @override
     def _ui_win_show(self, /) -> None:
         self.win.Show()
         self.win.Raise()
@@ -431,9 +448,8 @@ class SelectorWin(SelectorWinBase[wx.Button, GroupHeader]):
 
     @override
     def _ui_button_create(self, ind: int, /) -> wx.Button:
-        button = wx.Button(self.wid_itemlist)
+        button = wx.Button(self.wid_itemlist, style=wx.BU_BOTTOM)
         button.Bind(wx.EVT_BUTTON, lambda evt: self._evt_button_click(ind))
-        button.SetBitmapPosition(wx.TOP)
         return button
 
     @override
@@ -511,11 +527,14 @@ class SelectorWin(SelectorWinBase[wx.Button, GroupHeader]):
         label: TransToken, /,
     ) -> None:
         """Add the specified item to the group's menu."""
-        self._menu_items[item] = menu = group.menu.AppendRadioItem(
+        # TODO: Ideally these should be radio buttons, not check buttons.
+        #       But each menu gets a different group assigned.
+        #       Maybe use custom bitmaps?
+        self._menu_items[item] = menu_item = group.menu.AppendCheckItem(
             wx.ID_ANY, f'<item>:{item}', '',
         )
-        set_menu_text(menu, label)
-        # group.menu.Bind(wx.EVT_COMMAND, lambda evt: func())  # TODO: How does this work
+        set_menu_text(menu_item, label)
+        group.menu.Bind(wx.EVT_MENU, lambda evt: func(), menu_item)
 
     @override
     def _ui_menu_set_font(self, item_id: utils.SpecialID, /, suggested: bool) -> None:
