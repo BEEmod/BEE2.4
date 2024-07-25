@@ -446,8 +446,7 @@ class SelectorWin(SelectorWinBase[ttk.Button, GroupHeader]):
                         assert_never(col_type)
 
         self.set_disp()
-        # Late binding!
-        self.wid_canvas.bind("<Configure>", lambda e: self.items_dirty.set())
+        self.wid_canvas.bind("<Configure>", self._evt_window_resized)
 
     async def widget(self, frame: tk.Misc) -> ttk.Entry:
         """Create the special textbox used to open the selector window."""
@@ -548,20 +547,22 @@ class SelectorWin(SelectorWinBase[ttk.Button, GroupHeader]):
         self.win.geometry(f'{width}x{height}')
 
     @override
+    def _evt_window_resized(self, event: object) -> None:
+        self.pal_frame.update_idletasks()
+        self.pal_frame['width'] = self.wid_canvas.winfo_width()
+        self.desc_label['wraplength'] = self.win.winfo_width() - 10
+        super()._evt_window_resized(event)
+
+    @override
+    def _ui_calc_columns(self) -> int:
+        return (self.wid_canvas.winfo_width() - 10) // ITEM_WIDTH
+
+    @override
     async def _ui_reposition_items(self) -> None:
         """Reposition all the items to fit in the current geometry.
 
         Called whenever items change or the window is resized.
         """
-        self.pal_frame.update_idletasks()
-        self.pal_frame['width'] = self.wid_canvas.winfo_width()
-        self.desc_label['wraplength'] = self.win.winfo_width() - 10
-
-        width = (self.wid_canvas.winfo_width() - 10) // ITEM_WIDTH
-        if width < 1:
-            width = 1  # we got way too small, prevent division by zero
-        self.item_width = width
-
         # The offset for the current group
         y_off = 0
 
@@ -582,7 +583,7 @@ class SelectorWin(SelectorWinBase[ttk.Button, GroupHeader]):
                 group_wid.frame.place(
                     x=0,
                     y=y_off,
-                    width=width * ITEM_WIDTH,
+                    width=self.column_count * ITEM_WIDTH,
                 )
                 group_wid.frame.update_idletasks()
                 y_off += group_wid.frame.winfo_reqheight()
@@ -598,26 +599,22 @@ class SelectorWin(SelectorWinBase[ttk.Button, GroupHeader]):
             for i, item_id in enumerate(items):
                 await trio.lowlevel.checkpoint()
                 button = self._id_to_button[item_id]
+                x = (i % self.column_count) * ITEM_WIDTH + 1
+                y = y_off + (i // self.column_count) * ITEM_HEIGHT
                 if item_id in self.suggested:
                     sugg_lbl = self._suggest_lbl.fetch()
-                    sugg_lbl.place(
-                        x=(i % width) * ITEM_WIDTH + 1,
-                        y=(i // width) * ITEM_HEIGHT + y_off,
-                    )
+                    sugg_lbl.place(x=x, y=y)
                     sugg_lbl['width'] = button.winfo_width()
-                button.place(
-                    x=(i % width) * ITEM_WIDTH + 1,
-                    y=(i // width) * ITEM_HEIGHT + y_off + 20,
-                )
+                button.place(x=x, y=y + 20)
                 button.lift()  # Over the suggested label.
 
             # Increase the offset by the total height of this item section
-            y_off += math.ceil(len(items) / width) * ITEM_HEIGHT + 5
+            y_off += math.ceil(len(items) / self.column_count) * ITEM_HEIGHT + 5
 
         # Set the size of the canvas and frame to the amount we've used
         self.wid_canvas['scrollregion'] = (
             0, 0,
-            width * ITEM_WIDTH,
+            self.column_count * ITEM_WIDTH,
             y_off,
         )
         self.pal_frame['height'] = y_off

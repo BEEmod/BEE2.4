@@ -52,6 +52,7 @@ KEY_TO_NAV: Final[Mapping[str, NavKeys]] = {
 class GroupHeader(GroupHeaderBase):
     """The widget used for group headers."""
     menu_item: wx.MenuItem | None
+
     def __init__(self, win: SelectorWin) -> None:
         super().__init__(win)
         self.parent_menu = win.context_menu
@@ -111,6 +112,7 @@ class SelectorWin(SelectorWinBase[wx.Button, GroupHeader]):
     parent: wx.TopLevelWindow
     win: wx.Frame
     split_win: wx.SplitterWindow
+    wid_itemlist: wx.ScrolledWindow
 
     # Border around the selected item icon.
     wid_props_icon: wx.StaticBitmap
@@ -354,6 +356,10 @@ class SelectorWin(SelectorWinBase[wx.Button, GroupHeader]):
     @override
     def _ui_win_set_size(self, width: int, height: int, /) -> None:
         self.win.SetSize(wx.DefaultCoord, wx.DefaultCoord, width, height)
+
+    @override
+    def _ui_calc_columns(self) -> int:
+        return (self.wid_itemlist.GetSize().Width - 10) // ITEM_WIDTH
 
     @override
     async def _ui_reposition_items(self) -> None:
