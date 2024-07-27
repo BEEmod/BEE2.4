@@ -16,13 +16,13 @@ from app import WidgetCache, img
 from app.mdown import MarkdownData
 from app.selector_win import (
     DispFont, GroupHeaderBase, SelectorWinBase, AttrDef, Options, NavKeys,
-    TRANS_ATTR_DESC, TRANS_SUGGESTED, TRANS_SUGGESTED_MAC, TRANS_WINDOW_TITLE,
+    TRANS_ATTR_DESC, TRANS_SUGGESTED, TRANS_WINDOW_TITLE,
 )
 from consts import SEL_ICON_SIZE
 from packages import AttrTypes
 from transtoken import TransToken
 from ui_wx import MARKDOWN
-from ui_wx.img import WX_IMG
+from ui_wx.img import WX_IMG, ImageSlot
 from ui_wx.wid_transtoken import set_text, set_win_title, set_menu_text, set_tooltip, set_entry_value
 import utils
 
@@ -33,7 +33,7 @@ __all__ = [
     'Options',
 ]
 
-ITEM_WIDTH = SEL_ICON_SIZE + (32 if utils.MAC else 16)
+ITEM_WIDTH = SEL_ICON_SIZE + 16
 ITEM_HEIGHT = SEL_ICON_SIZE + 51
 
 KEY_TO_NAV: Final[Mapping[str, NavKeys]] = {
@@ -48,6 +48,63 @@ KEY_TO_NAV: Final[Mapping[str, NavKeys]] = {
     'Return': NavKeys.ENTER,
     'Space': NavKeys.PLAY_SOUND,
 }
+PEN_SLOT_BORDER = wx.Pen(wx.Colour(101, 101, 101), 2)
+PEN_SLOT_BORDER_SEL = wx.Pen(wx.Colour(0, 150, 255), 2)
+BRUSH_TRANSPARENT = wx.Brush(wx.Colour(0, 0, 0, 0), wx.BRUSHSTYLE_TRANSPARENT)
+FONT_SUGGESTED = wx.Font(wx.FontInfo(8.0).Light())
+FONT_ITEM_NAME = wx.Font(wx.FontInfo(10.0))
+
+
+class ItemSlot(wx.Panel):
+    """The widget displaying items."""
+    def __init__(self, parent: wx.ScrolledWindow) -> None:
+        super().__init__(parent, style=wx.RESERVE_SPACE_EVEN_IF_HIDDEN)
+        size = wx.Size(ITEM_WIDTH, ITEM_HEIGHT)
+        self.SetSize(size)
+        self.SetMinSize(size)
+        self.Bind(wx.EVT_PAINT, self._on_paint)
+
+        self.slot = ImageSlot(self)
+        self.selected = False
+        self.suggested = False
+        self.label = TransToken.BLANK
+
+    def _on_paint(self, evt: wx.PaintEvent) -> None:
+        """Paint the widget."""
+        dc = wx.PaintDC(self)
+        dims = self.GetSize()
+
+        y = 0
+        if self.suggested:
+            dc.SetPen(PEN_SLOT_BORDER)
+            dc.SetFont(FONT_SUGGESTED)
+            extent = dc.DrawLabel(
+                str(TRANS_SUGGESTED), wx.NullBitmap,
+                wx.Rect(0, 4, SEL_ICON_SIZE + 16, 16),
+                alignment=wx.ALIGN_CENTRE_HORIZONTAL | wx.ALIGN_TOP,
+            )
+            mid_y = extent.Top + extent.Height // 2
+            dc.DrawLineList([
+                (7, mid_y, extent.Left - 2, mid_y),
+                (8, mid_y - 1, 8, 20),
+                (extent.Right + 2, mid_y, SEL_ICON_SIZE + 5, mid_y),
+                (SEL_ICON_SIZE + 5, mid_y, SEL_ICON_SIZE + 5, 20),
+            ])
+
+        dc.SetPen(PEN_SLOT_BORDER_SEL if self.selected else PEN_SLOT_BORDER)
+        y += 20
+        dc.DrawRectangle(
+            4, y, SEL_ICON_SIZE + 8, y + SEL_ICON_SIZE + 28,
+        )
+        y += 8
+        self.slot.draw(dc, 8, y, True)
+        y += SEL_ICON_SIZE + 8
+        dc.SetFont(FONT_ITEM_NAME)
+        dc.DrawLabel(
+            str(self.label),
+            wx.Rect(0, y, SEL_ICON_SIZE + 16, 8),
+            alignment=wx.ALIGN_CENTRE_HORIZONTAL | wx.ALIGN_TOP,
+        )
 
 
 # noinspection PyProtectedMember
@@ -77,10 +134,10 @@ class GroupHeader(GroupHeaderBase):
         self.arrow = wx.StaticText(self.panel)
         sizer.Add(self.arrow)
 
-        # for item in sizer.GetChildren():
-        #     item.Window.Bind(wx.EVT_LEFT_DOWN, self._evt_toggle)
-        #     item.Window.SetCursor(wx.CURSOR_HAND)
-        self.panel.Bind(wx.EVT_LEFT_DOWN, self._evt_toggle)
+        toggle = self._evt_toggle
+        for item in sizer.GetChildren():
+            item.Window.Bind(wx.EVT_LEFT_DOWN, toggle)
+        self.panel.Bind(wx.EVT_LEFT_DOWN, toggle)
         self.panel.SetCursor(wx.Cursor(wx.CURSOR_HAND))
         self.panel.Bind(wx.EVT_ENTER_WINDOW, self._evt_hover_start)
         self.panel.Bind(wx.EVT_LEAVE_WINDOW, self._evt_hover_end)
@@ -109,7 +166,7 @@ class GroupHeader(GroupHeaderBase):
         self.arrow.SetLabelText(arrow)
 
 
-class SelectorWin(SelectorWinBase[wx.Button, GroupHeader]):
+class SelectorWin(SelectorWinBase[ItemSlot, GroupHeader]):
     """Wx implementation of the selector window."""
     parent: wx.TopLevelWindow
     win: wx.Frame
@@ -134,7 +191,6 @@ class SelectorWin(SelectorWinBase[wx.Button, GroupHeader]):
     disp_btn: wx.Button | None
 
     wid_samp_button: wx.Button | None
-    _suggest_lbl: list[wx.Panel | wx.StaticBox]
 
     # The overall sizer for the item list.
     itemlist_sizer: wx.BoxSizer
@@ -203,6 +259,7 @@ class SelectorWin(SelectorWinBase[wx.Button, GroupHeader]):
 
         self.itemlist_sizer = wx.BoxSizer(wx.VERTICAL)
         wid_itemlist.SetSizer(self.itemlist_sizer)
+        wid_itemlist.SetScrollRate(0, 10)
         wid_itemlist.Bind(wx.EVT_SIZE, self._evt_window_resized)
 
         sizer_info = wx.BoxSizer(wx.VERTICAL)
@@ -397,8 +454,6 @@ class SelectorWin(SelectorWinBase[wx.Button, GroupHeader]):
 
     @override
     async def _ui_reposition_items(self) -> None:
-        # self._suggest_lbl.reset()
-
         # If only the '' group is present, force it to be visible, and hide
         # the header.
         no_groups = self.group_order == ['']
@@ -431,45 +486,40 @@ class SelectorWin(SelectorWinBase[wx.Button, GroupHeader]):
                 self.itemlist_sizer.Add(row_sizer, row_flags)
                 for item_id in row:
                     button = self._id_to_button[item_id]
+                    button.suggested = item_id in self.suggested
                     button.Show()
-                    # if item_id in self.suggested:
-                    #     sugg_lbl = self._suggest_lbl.fetch()
-                    #     sugg_lbl.place(
-                    #         x=(i % width) * ITEM_WIDTH + 1,
-                    #         y=(i // width) * ITEM_HEIGHT + y_off,
-                    #     )
-                    #     sugg_lbl['width'] = button.winfo_width()
                     row_sizer.Add(button, item_flags)
-                    # button.Raise()  # Over the suggested label.
 
         self.wid_itemlist.SetVirtualSize(10, 10)
         self.itemlist_sizer.Layout()
-        # self._suggest_lbl.hide_unused()
 
     @override
-    def _ui_button_create(self, ind: int, /) -> wx.Button:
-        button = wx.Button(self.wid_itemlist, style=wx.BU_BOTTOM)
-        button.Bind(wx.EVT_BUTTON, lambda evt: self._evt_button_click(ind))
-        return button
+    def _ui_button_create(self, ind: int, /) -> ItemSlot:
+        slot = ItemSlot(self.wid_itemlist)
+        slot.Bind(wx.EVT_LEFT_DOWN, lambda evt: self._evt_button_click(ind))
+        return slot
 
     @override
-    def _ui_button_set_text(self, button: wx.Button, text: TransToken, /) -> None:
-        set_text(button, text)
+    def _ui_button_set_text(self, slot: ItemSlot, text: TransToken, /) -> None:
+        slot.label = text
+        slot.Refresh()
 
     @override
-    def _ui_button_set_img(self, button: wx.Button, image: img.Handle | None, /) -> None:
-        WX_IMG.apply(button, image)
+    def _ui_button_set_img(self, item: ItemSlot, image: img.Handle | None, /) -> None:
+        item.slot.set_handle(image)
+        item.Refresh()
 
     @override
-    def _ui_button_set_selected(self, button: wx.Button, selected: bool, /) -> None:
-        pass  # TODO
+    def _ui_button_set_selected(self, item: ItemSlot, selected: bool, /) -> None:
+        item.selected = selected
+        item.Refresh()
 
     @override
-    def _ui_button_hide(self, button: wx.Button, /) -> None:
-        button.Hide()
+    def _ui_button_hide(self, item: ItemSlot, /) -> None:
+        item.Hide()
 
     @override
-    def _ui_button_scroll_to(self, button: wx.Button, /) -> None:
+    def _ui_button_scroll_to(self, item: ItemSlot, /) -> None:
         pass  # TODO
 
     @override

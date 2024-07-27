@@ -72,11 +72,18 @@ async def test(core_nursery: trio.Nursery) -> None:
         ],
     ))
 
+    def set_sugg(evt: wx.Event) -> None:
+        selector.set_suggested(selector.item_list[::2])
+
     async with trio.open_nursery() as nursery:
         nursery.start_soon(selector.task)
         MAIN_WINDOW.Bind(wx.EVT_CLOSE, lambda evt: nursery.cancel_scope.cancel())
 
         sizer.Add(await selector.widget(MAIN_WINDOW))
+
+        sugg = wx.Button(MAIN_WINDOW, label='Set suggested')
+        sugg.Bind(wx.EVT_BUTTON, set_sugg)
+        sizer.Add(sugg)
 
         MAIN_WINDOW.SetSizerAndFit(sizer)
         MAIN_WINDOW.Layout()
