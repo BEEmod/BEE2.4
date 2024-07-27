@@ -1,7 +1,7 @@
 """Image integrations for WxWidgets."""
 from __future__ import annotations
 
-from typing import override
+from typing import Final, override
 from weakref import ReferenceType as WeakRef, WeakKeyDictionary
 import wx
 import os
@@ -14,7 +14,7 @@ from app import img
 
 
 # Widgets with an image attribute that can be set.
-type WxImgWidgets = wx.StaticBitmap | wx.MenuItem | wx.BitmapButton
+type WxImgWidgets = wx.StaticBitmap | wx.MenuItem | wx.Button | wx.BitmapButton
 
 LOGGER = get_logger(__name__)
 basic_users: WeakKeyDictionary[WxImgWidgets, BasicUser] = WeakKeyDictionary()
@@ -56,6 +56,43 @@ class BasicUser(WxUser):
         """Handle the widget being destroyed."""
         if self.cur_handle is not None:
             self.cur_handle._decref(self)
+
+
+# noinspection PyProtectedMember
+@attrs.define(eq=False)
+class ImageSlot(WxUser):
+    """A slot which holds an image that can be retrieved for drawing operations."""
+    widget: Final[wx.Window]
+    _handle: img.Handle | None = attrs.field(init=False, default=None)
+    _bitmap: wx.Bitmap | None = attrs.field(init=False, default=None)
+
+    # def __attrs_post_init__(self) -> None:
+    #     self.widget.Bind(wx.EVT_DESTROY, self._destroyed)
+
+    def set_handle(self, handle: img.Handle) -> None:
+        """Change the image contained by this slot."""
+        if self._handle is not None:
+            self._handle._decref(self)
+        self._handle = handle
+        if handle is not None:
+            handle._incref(self)
+            self._bitmap = WX_IMG._load_wx(handle, False)
+
+    def draw(self, dc: wx.DC, x: int, y: int, mask: bool = False) -> None:
+        """Draw the image at the specified point."""
+        if self._bitmap is not None:
+            dc.DrawBitmap(self._bitmap, x, y, mask)
+
+    @override
+    def _set_img(self, handle: img.Handle, image: wx.Bitmap) -> None:
+        """Set the image used."""
+        self._bitmap = image
+        self.widget.Refresh()
+
+    def _destroyed(self, event: wx.WindowDestroyEvent) -> None:
+        """Handle the widget being destroyed."""
+        if self._handle is not None:
+            self._handle._decref(self)
 
 
 class WXImages(img.UIImage):
