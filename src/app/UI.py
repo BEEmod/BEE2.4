@@ -1348,13 +1348,18 @@ def init_drag_icon() -> None:
     drag_win.drag_item = None
 
 
-async def set_game(game: 'gameMan.Game') -> None:
+async def on_game_changed() -> None:
     """Callback for when the game is changed.
 
     This updates the title bar to match, and saves it into the config.
     """
-    wid_transtoken.set_win_title(TK_ROOT, TRANS_MAIN_TITLE.format(version=utils.BEE_VERSION, game=game.name))
-    config.APP.store_conf(LastSelected(utils.obj_id(game.name)), 'game')
+    async with aclosing(gameMan.selected_game.eventual_values()) as agen:
+        async for game in agen:
+            wid_transtoken.set_win_title(
+                TK_ROOT,
+                TRANS_MAIN_TITLE.format(version=utils.BEE_VERSION, game=game.name),
+            )
+            config.APP.store_conf(LastSelected(utils.obj_id(game.name)), 'game')
 
 
 def refresh_palette_icons() -> None:
@@ -1388,10 +1393,8 @@ async def init_windows(
         width=TK_ROOT.winfo_screenwidth(),
         height=TK_ROOT.winfo_screenheight(),
     )
+    core_nursery.start_soon(on_game_changed)
     core_nursery.start_soon(gameMan.update_export_text)
-    gameMan.ON_GAME_CHANGED.register(set_game)
-    # Initialise the above and the menu bar.
-    await gameMan.ON_GAME_CHANGED(gameMan.selected_game.value)
 
     ui_bg = tk.Frame(TK_ROOT, bg=ItemsBG, name='bg')
     ui_bg.grid(row=0, column=0, sticky='NSEW')

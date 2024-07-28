@@ -9,7 +9,6 @@ from pathlib import Path
 import os
 
 import trio
-import trio_util
 
 import BEE2_config
 import utils
