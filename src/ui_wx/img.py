@@ -66,10 +66,10 @@ class ImageSlot(WxUser):
     _handle: img.Handle | None = attrs.field(init=False, default=None)
     _bitmap: wx.Bitmap | None = attrs.field(init=False, default=None)
 
-    # def __attrs_post_init__(self) -> None:
-    #     self.widget.Bind(wx.EVT_DESTROY, self._destroyed)
+    def __attrs_post_init__(self) -> None:
+        self.widget.Bind(wx.EVT_WINDOW_DESTROY, self._destroyed)
 
-    def set_handle(self, handle: img.Handle) -> None:
+    def set_handle(self, handle: img.Handle | None) -> None:
         """Change the image contained by this slot."""
         if self._handle is not None:
             self._handle._decref(self)
@@ -180,7 +180,13 @@ class WXImages(img.UIImage):
                 handle._bg_composited = True
             if image is None:
                 image = self.wx_img[handle] = wx.Bitmap(res.width or 16, res.height or 16)
-            image.CopyFromBuffer(res.tobytes())
+            match res.mode:
+                case 'RGBA':
+                    image.CopyFromBuffer(res.tobytes(), wx.BitmapBufferFormat_RGBA)
+                case 'RGB':
+                    image.CopyFromBuffer(res.tobytes(), wx.BitmapBufferFormat_RGB)
+                case _:
+                    raise ValueError(f'Unknown PIL mode: {res}!')
         return image
 
     @override
