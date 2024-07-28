@@ -263,7 +263,7 @@ class SelectorWin(SelectorWinBase[ItemSlot, GroupHeader]):
         self.splitter.SetSashGravity(1.0)
         sizer_outer.Add(self.splitter, 1, wx.EXPAND, 0)
 
-        self.wid_itemlist = wid_itemlist = wx.ScrolledWindow(self.splitter)
+        self.wid_itemlist = wid_itemlist = wx.ScrolledWindow(self.splitter, style=wx.VSCROLL | wx.ALWAYS_SHOW_SB)
         self.wid_panel_info = wx.Panel(self.splitter)
         self.splitter.SplitVertically(wid_itemlist, self.wid_panel_info)
 
@@ -272,7 +272,7 @@ class SelectorWin(SelectorWinBase[ItemSlot, GroupHeader]):
         wid_itemlist.SetScrollRate(0, 10)
         wid_itemlist.Bind(wx.EVT_SIZE, self._evt_window_resized)
 
-        sizer_info = wx.BoxSizer(wx.VERTICAL)
+        self.sizer_info = sizer_info = wx.BoxSizer(wx.VERTICAL)
         self.wid_panel_info.SetSizer(sizer_info)
 
         self.wid_props_icon = wx.StaticBitmap(self.wid_panel_info, style=wx.BORDER_RAISED)
@@ -502,6 +502,7 @@ class SelectorWin(SelectorWinBase[ItemSlot, GroupHeader]):
 
         self.wid_itemlist.SetVirtualSize(10, 10)
         self.itemlist_sizer.Layout()
+        self.wid_itemlist.FitInside()
 
     @override
     def _ui_button_create(self, ind: int, /) -> ItemSlot:
@@ -547,6 +548,7 @@ class SelectorWin(SelectorWinBase[ItemSlot, GroupHeader]):
     @override
     def _ui_props_set_icon(self, image: img.Handle, /) -> None:
         WX_IMG.apply(self.wid_props_icon, image)
+        self.sizer_info.Layout()
 
     @override
     def _ui_props_set_samp_button_enabled(self, enabled: bool, /) -> None:
