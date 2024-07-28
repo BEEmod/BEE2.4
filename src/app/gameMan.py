@@ -21,7 +21,7 @@ import trio_util
 import trio
 
 from BEE2_config import ConfigFile
-from app import EdgeTrigger, background_run, quit_app
+from app import EdgeTrigger, quit_app
 from app.dialogs import Dialogs
 from config.gen_opts import GenOptions
 from exporting.compiler import terminate_error_server, restore_backup
@@ -32,7 +32,6 @@ import loadScreen
 import packages
 import utils
 import config
-import event
 
 LOGGER = srctools.logger.get_logger(__name__)
 
@@ -40,7 +39,6 @@ all_games: list[Game] = []
 selected_game: trio_util.AsyncValue[Game | None] = trio_util.AsyncValue(None)
 selectedGame_radio = tk.IntVar(value=0)
 game_menu: tk.Menu | None = None
-ON_GAME_CHANGED: event.Event[Game] = event.Event('game_changed')
 
 CONFIG = ConfigFile('games.cfg')
 # Stores the current text for the export button, which is updated based on several
@@ -470,8 +468,6 @@ def add_menu_opts(menu: tk.Menu) -> None:
     def set_from_radio() -> None:
         """Apply the radio button."""
         selected_game.value = game = all_games[selectedGame_radio.get()]
-        # TODO: make this function async to eliminate.
-        background_run(ON_GAME_CHANGED, game)
 
     for val, game in enumerate(all_games):
         menu.add_radiobutton(
@@ -482,11 +478,10 @@ def add_menu_opts(menu: tk.Menu) -> None:
         )
 
 
-async def set_game_by_name(name: utils.SpecialID) -> None:
+def set_game_by_name(name: utils.SpecialID) -> None:
     """Select the game with the specified name."""
     for game in all_games:
         if utils.obj_id(game.name) == name:
             selected_game.value = game
             selectedGame_radio.set(all_games.index(game))
-            await ON_GAME_CHANGED(selected_game.value)
             break
