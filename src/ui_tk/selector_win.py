@@ -54,12 +54,14 @@ KEYSYM_TO_NAV: Final[Mapping[str, NavKeys]] = {
 
 class GroupHeader(GroupHeaderBase):
     """The widget used for group headers."""
+    menu_pos: int | None
+
     def __init__(self, win: 'SelectorWin') -> None:
         super().__init__(win)
         self.parent_menu = win.context_menu
         self.frame = frame = ttk.Frame(win.pal_frame)
         self.menu = win.context_menu
-        self.menu_pos = -1
+        self.menu_pos = None
 
         sep_left = ttk.Separator(frame)
         sep_left.grid(row=0, column=0, sticky='EW')
@@ -92,7 +94,7 @@ class GroupHeader(GroupHeaderBase):
         """Hide the widgets and stop tracking translations."""
         super().hide()
         set_text(self.title, TransToken.BLANK)
-        self.menu_pos = -1
+        self.menu_pos = None
         self.frame.place_forget()
 
     @override
@@ -101,7 +103,7 @@ class GroupHeader(GroupHeaderBase):
         super()._ui_reassign(group_id, title)
         set_text(self.title, title)
         self.menu = tk.Menu(self.parent_menu) if group_id else self.parent_menu
-        self.menu_pos = -1
+        self.menu_pos = None
 
     @override
     def _ui_set_arrow(self, arrow: str) -> None:
@@ -746,10 +748,11 @@ class SelectorWin(SelectorWinBase[ttk.Button, GroupHeader]):
 
                 # Also highlight the menu
                 # noinspection PyUnresolvedReferences
-                self.context_menu.entryconfig(
-                    group.menu_pos,
-                    font=new_font,
-                )
+                if group.menu_pos is not None:
+                    self.context_menu.entryconfig(
+                        group.menu_pos,
+                        font=new_font,
+                    )
         else:
             menu = self.context_menu
         menu.entryconfig(menu_ind, font=new_font)
@@ -759,7 +762,7 @@ class SelectorWin(SelectorWinBase[ttk.Button, GroupHeader]):
         """Reset the fonts for all group widgets. menu_set_font() will then set them."""
         for group_key, header in self.group_widgets.items():
             header.title['font'] = self.norm_font
-            if header.menu_pos >= 0:
+            if header.menu_pos is not None:
                 self.context_menu.entryconfig(header.menu_pos, font=self.norm_font)
 
     @override
