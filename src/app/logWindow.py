@@ -68,6 +68,7 @@ class TextHandler(logging.Handler):
         except queue.Full:
             pass
 
+
 HANDLER = TextHandler()
 logging.getLogger().addHandler(HANDLER)
 
@@ -80,19 +81,17 @@ async def loglevel_bg() -> None:
         #       - so the data is potentially lost. But this should only be cancelled if
         #       the app's quitting, so that's fine.
         try:
-            cmd, param = await trio.to_thread.run_sync(_QUEUE_REPLY_LOGGING.get, abandon_on_cancel=True)
+            cmd = await trio.to_thread.run_sync(_QUEUE_REPLY_LOGGING.get, abandon_on_cancel=True)
         except ValueError:
             # Pipe closed, we're useless.
             return
-        # TODO: Use match statement here once 3.8 is dropped.
-        if cmd == 'level' and isinstance(param, str):
-            TextHandler.setLevel(HANDLER, param)
-            conf = config.APP.get_cur_conf(GenOptions)
-            config.APP.store_conf(attrs.evolve(conf, log_win_level=param))
-        elif cmd == 'visible' and isinstance(param, bool):
-            conf = config.APP.get_cur_conf(GenOptions)
-            config.APP.store_conf(attrs.evolve(conf, show_log_win=param))
-        elif cmd == 'quit':
-            return
-        else:
-            raise ValueError(f'Unknown command {cmd}({param})!')
+        match cmd:
+            case ['level', level]:
+                TextHandler.setLevel(HANDLER, level)
+                conf = config.APP.get_cur_conf(GenOptions)
+                config.APP.store_conf(attrs.evolve(conf, log_win_level=level))
+            case ['visible', enabled]:
+                conf = config.APP.get_cur_conf(GenOptions)
+                config.APP.store_conf(attrs.evolve(conf, show_log_win=enabled))
+            case _:
+                raise ValueError(f'Unknown command {cmd!r}!')

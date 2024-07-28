@@ -105,6 +105,5 @@ type ARGS_SEND_LOGGING = (  # logging -> daemon
 )
 type ARGS_REPLY_LOGGING = (  # daemon -> logging
     tuple[Literal['level'], str] |
-    tuple[Literal['visible'], bool] |
-    tuple[Literal['quit'], None]
+    tuple[Literal['visible'], bool]
 )
