@@ -34,7 +34,7 @@ __all__ = [
 ]
 
 ITEM_WIDTH = SEL_ICON_SIZE + 16
-ITEM_HEIGHT = SEL_ICON_SIZE + 51
+ITEM_HEIGHT = SEL_ICON_SIZE + 64
 
 KEY_TO_NAV: Final[Mapping[str, NavKeys]] = {
     'Up': NavKeys.UP,
@@ -52,7 +52,10 @@ PEN_SLOT_BORDER = wx.Pen(wx.Colour(101, 101, 101), 2)
 PEN_SLOT_BORDER_SEL = wx.Pen(wx.Colour(0, 150, 255), 2)
 BRUSH_TRANSPARENT = wx.Brush(wx.Colour(0, 0, 0, 0), wx.BRUSHSTYLE_TRANSPARENT)
 FONT_SUGGESTED = wx.Font(wx.FontInfo(8.0).Light())
-FONT_ITEM_NAME = wx.Font(wx.FontInfo(10.0))
+FONT_ITEM_NAME = [
+    wx.Font(wx.FontInfo(i))
+    for i in range(10, 5, -1)
+]
 
 
 class ItemSlot(wx.Panel):
@@ -72,8 +75,6 @@ class ItemSlot(wx.Panel):
     def _on_paint(self, evt: wx.PaintEvent) -> None:
         """Paint the widget."""
         dc = wx.PaintDC(self)
-        dims = self.GetSize()
-
         y = 0
         if self.suggested:
             dc.SetPen(PEN_SLOT_BORDER)
@@ -94,15 +95,24 @@ class ItemSlot(wx.Panel):
         dc.SetPen(PEN_SLOT_BORDER_SEL if self.selected else PEN_SLOT_BORDER)
         y += 20
         dc.DrawRectangle(
-            4, y, SEL_ICON_SIZE + 8, y + SEL_ICON_SIZE + 28,
+            4, y, SEL_ICON_SIZE + 8, y + SEL_ICON_SIZE + 20,
         )
         y += 8
         self.slot.draw(dc, 8, y, True)
         y += SEL_ICON_SIZE + 8
-        dc.SetFont(FONT_ITEM_NAME)
+
+        label = str(self.label)
+        label_rect = wx.Rect(4, y, SEL_ICON_SIZE + 8, 8)
+        # If the text is too long to fit, shrink it down a little.
+        if dc.CanGetTextExtent():
+            for font in FONT_ITEM_NAME:
+                dc.SetFont(font)
+                if dc.GetTextExtent(label).Width <= label_rect.Width:
+                    break
+        else:
+            dc.SetFont(FONT_ITEM_NAME[0])
         dc.DrawLabel(
-            str(self.label),
-            wx.Rect(0, y, SEL_ICON_SIZE + 16, 8),
+            label, label_rect,
             alignment=wx.ALIGN_CENTRE_HORIZONTAL | wx.ALIGN_TOP,
         )
 
@@ -459,9 +469,9 @@ class SelectorWin(SelectorWinBase[ItemSlot, GroupHeader]):
         no_groups = self.group_order == ['']
 
         self.itemlist_sizer.Clear(delete_windows=False)
-        group_flags = wx.SizerFlags().Left().Expand().Border(wx.TOP, 16)
-        row_flags = wx.SizerFlags().Left().Border(wx.TOP | wx.BOTTOM, 4)
-        item_flags = wx.SizerFlags().Border(wx.ALL, 4)
+        group_flags = wx.SizerFlags().Left().Expand().Border(wx.TOP, 8)
+        row_flags = wx.SizerFlags().Left().Border(wx.TOP | wx.BOTTOM, 2)
+        item_flags = wx.SizerFlags().Border(wx.ALL, 2)
 
         for group_key in self.group_order:
             await trio.lowlevel.checkpoint()
@@ -471,7 +481,7 @@ class SelectorWin(SelectorWinBase[ItemSlot, GroupHeader]):
             if no_groups:
                 group_wid.hide()
             else:
-                self.itemlist_sizer.Add(group_wid.panel, row_flags)
+                self.itemlist_sizer.Add(group_wid.panel, group_flags)
                 if not self.group_visible.get(group_key):
                     # Hide everything!
                     for item_id in items:
