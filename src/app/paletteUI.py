@@ -371,9 +371,10 @@ class PaletteUI:
         ):
             pal.delete_from_disk()
             del self.palettes[pal.uuid]
+        else:
+            return  # Cancelled
         self.select_palette(UUID_PORTAL2, False)
         self.is_dirty.set()
-        background_run(self.set_items, self.selected)
 
     async def event_save(self, dialogs: Dialogs) -> None:
         """Save the current palette over the original name."""
