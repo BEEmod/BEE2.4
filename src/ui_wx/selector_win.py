@@ -21,9 +21,8 @@ from app.selector_win import (
 from consts import SEL_ICON_SIZE
 from packages import AttrTypes
 from transtoken import TransToken
-from ui_wx import MARKDOWN
+from ui_wx import MARKDOWN, wid_transtoken
 from ui_wx.img import WX_IMG, ImageSlot
-from ui_wx.wid_transtoken import set_text, set_win_title, set_menu_text, set_tooltip, set_entry_value
 import utils
 
 
@@ -160,16 +159,16 @@ class GroupHeader(GroupHeaderBase):
         """Hide the widgets and stop tracking translations."""
         super().hide()
         if self.menu_item is not None:
-            set_menu_text(self.menu_item, TransToken.BLANK)
+            wid_transtoken.set_menu_text(self.menu_item, TransToken.BLANK)
             self.menu_item = None
-        set_text(self.title, TransToken.BLANK)
+        wid_transtoken.set_text(self.title, TransToken.BLANK)
         self.panel.Hide()
 
     @override
     def _ui_reassign(self, group_id: str, title: TransToken) -> None:
         """Set the group label."""
         super()._ui_reassign(group_id, title)
-        set_text(self.title, title)
+        wid_transtoken.set_text(self.title, title)
         self.menu = wx.Menu() if group_id else self.parent_menu
         self.menu_item = None
 
@@ -244,7 +243,7 @@ class SelectorWin(SelectorWinBase[ItemSlot, GroupHeader]):
             style=wx.CAPTION | wx.CLIP_CHILDREN | wx.CLOSE_BOX
             | wx.FRAME_FLOAT_ON_PARENT | wx.RESIZE_BORDER | wx.SYSTEM_MENU,
         )
-        set_win_title(self.win, TRANS_WINDOW_TITLE.format(subtitle=opt.title))
+        wid_transtoken.set_win_title(self.win, TRANS_WINDOW_TITLE.format(subtitle=opt.title))
 
         self.context_menu = wx.Menu()
 
@@ -257,7 +256,7 @@ class SelectorWin(SelectorWinBase[ItemSlot, GroupHeader]):
         panel_outer.SetSizer(sizer_outer)
 
         wid_label_windesc = wx.StaticText(panel_outer, wx.ID_ANY, "")
-        set_text(wid_label_windesc, opt.desc)
+        wid_transtoken.set_text(wid_label_windesc, opt.desc)
         wid_label_windesc.SetMinSize((-1, 80))
         sizer_outer.Add(wid_label_windesc, 0, wx.ALL | wx.EXPAND, 2)
 
@@ -311,7 +310,7 @@ class SelectorWin(SelectorWinBase[ItemSlot, GroupHeader]):
 
             for attr, row, col_type in self._attr_widget_positions():
                 desc_text = wx.StaticText(self.wid_panel_info)
-                set_text(desc_text, TRANS_ATTR_DESC.format(desc=attr.desc))
+                wid_transtoken.set_text(desc_text, TRANS_ATTR_DESC.format(desc=attr.desc))
                 attr_wid: wx.Control
                 if attr.type.is_image:
                     self.attr_image_labels[attr] = attr_wid = wx.StaticBitmap(self.wid_panel_info)
@@ -367,7 +366,7 @@ class SelectorWin(SelectorWinBase[ItemSlot, GroupHeader]):
 
         if self.has_def:
             self.wid_button_reset = wx.Button(self.wid_panel_info, wx.ID_ANY, "")
-            set_text(self.wid_button_reset, TransToken.ui("Select Suggested"))
+            wid_transtoken.set_text(self.wid_button_reset, TransToken.ui("Select Suggested"))
             sizer_buttons.Add(self.wid_button_reset, 0, 0, 0)
             sizer_buttons.Add((0, 0), 1, wx.EXPAND, 0)
         else:
@@ -472,7 +471,7 @@ class SelectorWin(SelectorWinBase[ItemSlot, GroupHeader]):
         no_groups = self.group_order == ['']
 
         self.itemlist_sizer.Clear(delete_windows=False)
-        group_flags = wx.SizerFlags().Left().Expand().Border(wx.TOP, 8)
+        group_flags = wx.SizerFlags().Expand().Border(wx.ALL, 8)
         row_flags = wx.SizerFlags().Left().Border(wx.TOP | wx.BOTTOM, 2)
         item_flags = wx.SizerFlags().Border(wx.ALL, 2)
 
@@ -538,11 +537,11 @@ class SelectorWin(SelectorWinBase[ItemSlot, GroupHeader]):
 
     @override
     def _ui_props_set_author(self, author: TransToken, /) -> None:
-        set_text(self.wid_props_author, author)
+        wid_transtoken.set_text(self.wid_props_author, author)
 
     @override
     def _ui_props_set_name(self, name: TransToken, /) -> None:
-        set_text(self.wid_props_name, name)
+        wid_transtoken.set_text(self.wid_props_name, name)
 
     @override
     def _ui_props_set_desc(self, desc: MarkdownData, /) -> None:
@@ -565,7 +564,7 @@ class SelectorWin(SelectorWinBase[ItemSlot, GroupHeader]):
 
     @override
     def _ui_attr_set_text(self, attr: AttrDef, text: TransToken, /) -> None:
-        set_text(self.attr_text_labels[attr], text)
+        wid_transtoken.set_text(self.attr_text_labels[attr], text)
 
     @override
     def _ui_attr_set_image(self, attr: AttrDef, image: img.Handle, /) -> None:
@@ -573,7 +572,7 @@ class SelectorWin(SelectorWinBase[ItemSlot, GroupHeader]):
 
     @override
     def _ui_attr_set_tooltip(self, attr: AttrDef, tooltip: TransToken, /) -> None:
-        set_tooltip(self.attr_image_labels[attr], tooltip)
+        wid_transtoken.set_tooltip(self.attr_image_labels[attr], tooltip)
 
     @override
     def _ui_menu_clear(self) -> None:
@@ -598,7 +597,7 @@ class SelectorWin(SelectorWinBase[ItemSlot, GroupHeader]):
         self._menu_items[item] = menu_item = group.menu.AppendCheckItem(
             wx.ID_ANY, f'<item>:{item}', '',
         )
-        set_menu_text(menu_item, label)
+        wid_transtoken.set_menu_text(menu_item, label)
         group.menu.Bind(wx.EVT_MENU, lambda evt: func(), menu_item)
 
     @override
@@ -629,7 +628,7 @@ class SelectorWin(SelectorWinBase[ItemSlot, GroupHeader]):
     def _ui_group_add(self, group: GroupHeader, name: TransToken) -> None:
         """Add the specified group to the rightclick menu."""
         group.menu_item = item = self.context_menu.AppendSubMenu(group.menu, f'<group>:{name}')
-        set_menu_text(item, name)
+        wid_transtoken.set_menu_text(item, name)
 
     @override
     def _ui_enable_reset(self, enabled: bool, /) -> None:
@@ -658,6 +657,6 @@ class SelectorWin(SelectorWinBase[ItemSlot, GroupHeader]):
                 assert_never(font)
 
         self.display.SetFont(font_obj)
-        set_entry_value(self.display, text)
-        set_tooltip(self.display, tooltip)
+        wid_transtoken.set_entry_value(self.display, text)
+        wid_transtoken.set_tooltip(self.display, tooltip)
         self.display.Enabled = self.disp_btn.Enabled = enabled
