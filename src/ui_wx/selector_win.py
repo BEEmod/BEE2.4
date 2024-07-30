@@ -131,22 +131,25 @@ class GroupHeader(GroupHeaderBase):
         self.menu_item = None
 
         sizer = wx.BoxSizer(wx.HORIZONTAL)
+        sizer.Add((8, 0))
         sizer.Add(
-            wx.StaticLine(self.panel, wx.HORIZONTAL),
+            wx.StaticLine(self.panel, style=wx.LI_HORIZONTAL),
             wx.SizerFlags().Expand().Proportion(1),
         )
         self.title = wx.StaticText(self.panel)
         sizer.Add(self.title, wx.SizerFlags().Border(wx.LEFT | wx.RIGHT, 4))
         sizer.Add(
-            wx.StaticLine(self.panel, wx.HORIZONTAL),
+            wx.StaticLine(self.panel, style=wx.LI_HORIZONTAL),
             wx.SizerFlags().Expand().Proportion(1),
         )
         self.arrow = wx.StaticText(self.panel)
         sizer.Add(self.arrow)
+        sizer.Add((8, 0))
 
         toggle = self._evt_toggle
         for item in sizer.GetChildren():
-            item.Window.Bind(wx.EVT_LEFT_DOWN, toggle)
+            if item.Window is not None:
+                item.Window.Bind(wx.EVT_LEFT_DOWN, toggle)
         self.panel.Bind(wx.EVT_LEFT_DOWN, toggle)
         self.panel.SetCursor(wx.Cursor(wx.CURSOR_HAND))
         self.panel.Bind(wx.EVT_ENTER_WINDOW, self._evt_hover_start)
