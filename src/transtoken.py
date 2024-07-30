@@ -232,32 +232,31 @@ class TransToken:
             frozenset(self.parameters.items()),
         ))
 
-    def _convert_token(self) -> str:
+    def _convert_token(self, lang: Language) -> str:
         """Return the translated version of our token."""
-        cur_lang = CURRENT_LANG.value
-
         # If in the untranslated namespace or blank, don't translate.
         if self.namespace == NS_UNTRANSLATED or not self.token:
             return self.token
-        elif cur_lang is DUMMY:
+        elif lang is DUMMY:
             return '#' * len(self.token)
         elif self.namespace == NS_GAME:
             try:
-                return cur_lang.game_trans[self.token]
+                return lang.game_trans[self.token]
             except KeyError:
                 return self.token
         else:
             try:
                 # noinspection PyProtectedMember
-                return cur_lang._trans[self.namespace].gettext(self.token)
+                return lang._trans[self.namespace].gettext(self.token)
             except KeyError:
                 return self.token
 
     def __str__(self) -> str:
         """Calling str on a token translates it."""
-        text = self._convert_token()
+        lang = CURRENT_LANG.value
+        text = self._convert_token(lang)
         if self.parameters:
-            formatter = ui_format_getter(CURRENT_LANG.value.lang_code)
+            formatter = ui_format_getter(lang.lang_code)
             try:
                 if formatter is not None:
                     return formatter.vformat(text, (), self.parameters)
@@ -274,7 +273,7 @@ class TransToken:
 
         Any non-token parameters will have HTML syntax escaped.
         """
-        text = self._convert_token()
+        text = self._convert_token(CURRENT_LANG.value)
         if self.parameters:
             return HTML_FORMAT.vformat(text, (), self.parameters)
         else:
@@ -327,25 +326,23 @@ class PluralTransToken(TransToken):
         ))
 
     @override
-    def _convert_token(self) -> str:
+    def _convert_token(self, lang: Language) -> str:
         """Return the translated version of our token, handling plurals."""
         try:
             n = int(cast(str, self.parameters['n']))
         except KeyError:
             raise ValueError('Plural token requires "n" parameter!') from None
-        cur_lang = CURRENT_LANG.value
-
         # If in the untranslated namespace or blank, don't translate.
         if self.namespace == NS_UNTRANSLATED or not self.token:
             return self.token if n == 1 else self.token_plural
-        elif cur_lang is DUMMY:
+        elif lang is DUMMY:
             return '#' * len(self.token if n == 1 else self.token_plural)
         elif self.namespace == NS_GAME:
             raise ValueError('Game namespace cannot be pluralised!')
         else:
             try:
                 # noinspection PyProtectedMember
-                return cur_lang._trans[self.namespace].ngettext(self.token, self.token_plural, n)
+                return lang._trans[self.namespace].ngettext(self.token, self.token_plural, n)
             except KeyError:
                 return self.token
 
@@ -383,7 +380,7 @@ class JoinTransToken(TransToken):
         """Translate the token."""
         if self.parameters:
             raise ValueError(f'Cannot format joined token: {vars(self)}')
-        sep = self._convert_token()
+        sep = self._convert_token(CURRENT_LANG.value)
         items = [str(child) for child in self.children]
         if self.sort:
             items.sort()
@@ -397,7 +394,7 @@ class JoinTransToken(TransToken):
         """
         if self.parameters:
             raise ValueError(f'Cannot format joined token: {vars(self)}')
-        sep = self._convert_token()
+        sep = self._convert_token(CURRENT_LANG.value)
         items = [child.translate_html() for child in self.children]
         if self.sort:
             items.sort()
@@ -413,6 +410,10 @@ class ListTransToken(JoinTransToken):
     def format(self, /, **kwargs: object) -> NoReturn:
         """List tokens cannot be formatted."""
         raise NotImplementedError('Cannot format list tokens!')
+
+    @override
+    def __hash__(self) -> int:
+        return hash((self.namespace, self.token, self.kind, *self.children))
 
     @override
     def __eq__(self, other: object) -> bool:
