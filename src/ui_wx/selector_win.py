@@ -470,6 +470,8 @@ class SelectorWin(SelectorWinBase[ItemSlot, GroupHeader]):
         # the header.
         no_groups = self.group_order == ['']
 
+        prev_scroll_pos = self.wid_itemlist.GetScrollPos(wx.VERTICAL) / self.wid_itemlist.GetScrollRange(wx.VERTICAL)
+
         self.itemlist_sizer.Clear(delete_windows=False)
         group_flags = wx.SizerFlags().Expand().Border(wx.ALL, 8)
         row_flags = wx.SizerFlags().Left().Border(wx.TOP | wx.BOTTOM, 2)
@@ -505,6 +507,12 @@ class SelectorWin(SelectorWinBase[ItemSlot, GroupHeader]):
         self.wid_itemlist.SetVirtualSize(10, 10)
         self.itemlist_sizer.Layout()
         self.wid_itemlist.FitInside()
+        # Restore the scrollbar position.
+        _, pixels_per = self.wid_itemlist.GetScrollPixelsPerUnit()
+        self.wid_itemlist.Scroll(
+            wx.DefaultCoord,
+            round(prev_scroll_pos * self.wid_itemlist.GetVirtualSize().Height / pixels_per),
+        )
 
     @override
     def _ui_button_create(self, ind: int, /) -> ItemSlot:
