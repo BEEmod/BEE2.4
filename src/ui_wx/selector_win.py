@@ -133,7 +133,7 @@ class GroupHeader(GroupHeaderBase):
         self.menu_item = None
         self.panel.SetMinSize((10, 24))
 
-        self._arrow = '-'
+        self.arrow_slot = ImageSlot(self.panel)
         self.title = TransToken.BLANK
         self.suggested = False
         self.panel.Bind(wx.EVT_PAINT, self._on_paint)
@@ -162,9 +162,9 @@ class GroupHeader(GroupHeaderBase):
         self.panel.Refresh()
 
     @override
-    def _ui_set_arrow(self, arrow: str) -> None:
+    def _ui_set_arrow(self, arrow: img.Handle) -> None:
         """Set the arrow glyph."""
-        self.arrow = arrow
+        self.arrow_slot.set_handle(arrow)
         self.panel.Refresh()
 
     def _on_paint(self, event: wx.PaintEvent) -> None:
@@ -182,14 +182,12 @@ class GroupHeader(GroupHeaderBase):
             alignment=wx.ALIGN_CENTRE_HORIZONTAL | wx.ALIGN_CENTRE_VERTICAL,
         )
         dc.SetFont(FONT_GROUP_HEADER)
-        arrow_rect = dc.DrawLabel(
-            self.arrow, wx.NullBitmap, size,
-            alignment=wx.ALIGN_RIGHT | wx.ALIGN_CENTRE_VERTICAL,
-        )
+        arrow_left = size.Width - 24
+        self.arrow_slot.draw(dc, arrow_left, (size.Height - 16) // 2)
         y = size.Height // 2
         dc.SetPen(PEN_GROUP_HEADER)
         dc.DrawLine(4, y, title_rect.Left - 4, y)
-        dc.DrawLine(title_rect.Right + 4, y, arrow_rect.Left - 4, y)
+        dc.DrawLine(title_rect.Right + 4, y, arrow_left - 4, y)
 
 
 class SelectorWin(SelectorWinBase[ItemSlot, GroupHeader]):
@@ -279,7 +277,11 @@ class SelectorWin(SelectorWinBase[ItemSlot, GroupHeader]):
         self.splitter.SetSashGravity(1.0)
         sizer_outer.Add(self.splitter, 1, wx.EXPAND, 0)
 
-        self.wid_itemlist = wid_itemlist = wx.ScrolledWindow(self.splitter, style=wx.VSCROLL | wx.ALWAYS_SHOW_SB)
+        self.wid_itemlist = wid_itemlist = wx.ScrolledWindow(
+            self.splitter,
+            style=wx.VSCROLL | wx.ALWAYS_SHOW_SB | wx.BORDER_SUNKEN,
+        )
+        wid_itemlist.SetBackgroundColour(img.PETI_ITEM_BG)
         self.wid_panel_info = wx.Panel(self.splitter)
         self.splitter.SplitVertically(wid_itemlist, self.wid_panel_info)
 
@@ -450,6 +452,12 @@ class SelectorWin(SelectorWinBase[ItemSlot, GroupHeader]):
         while True:
             await CURRENT_LANG.wait_transition()
             self.wid_itemlist.Refresh()
+
+    def _evt_window_resized(self, event: object) -> None:
+        """When resizing, we must always force the group headers to redraw."""
+        super()._evt_window_resized(event)
+        for header in self.group_widgets.values():
+            header.panel.Refresh()
 
     async def _update_menu_task(self) -> None:
         """When the item changes, update which menu options are set."""

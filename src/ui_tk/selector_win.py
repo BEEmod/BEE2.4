@@ -74,11 +74,7 @@ class GroupHeader(GroupHeaderBase):
         sep_right.grid(row=0, column=2, sticky='EW')
         frame.columnconfigure(2, weight=1)
 
-        self.arrow = ttk.Label(
-            frame,
-            text='',
-            width=2,
-        )
+        self.arrow = ttk.Label(frame, width=2)
         self.arrow.grid(row=0, column=10)
 
         # For the mouse events to work, we need to bind on all the children too.
@@ -106,9 +102,9 @@ class GroupHeader(GroupHeaderBase):
         self.menu_pos = None
 
     @override
-    def _ui_set_arrow(self, arrow: str) -> None:
+    def _ui_set_arrow(self, arrow: img.Handle) -> None:
         """Set the arrow glyph."""
-        self.arrow['text'] = arrow
+        TK_IMG.apply(self.arrow, arrow)
 
 
 class SelectorWin(SelectorWinBase[ttk.Button, GroupHeader]):

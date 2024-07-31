@@ -42,10 +42,10 @@ ICON_CHECK = img.Handle.builtin('icons/check', 16, 16)
 ICON_CROSS = img.Handle.builtin('icons/cross', 16, 16)
 
 # Arrows used to indicate the state of the group - collapsed or expanded
-GRP_COLL: Final = '◁'
-GRP_COLL_HOVER: Final = '◀'
-GRP_EXP: Final = '▽'
-GRP_EXP_HOVER: Final = '▼'
+IMG_GRP_EXP: Final = img.Handle.builtin('icons/group_arrow', 16, 16)
+IMG_GRP_EXP_HOVER: Final = img.Handle.builtin('icons/group_arrow_hover', 16, 16)
+IMG_GRP_COLL: Final = IMG_GRP_EXP.crop(transpose=img.ROTATE_CW)
+IMG_GRP_COLL_HOVER: Final = IMG_GRP_EXP_HOVER.crop(transpose=img.ROTATE_CW)
 
 BTN_PLAY: Final = '▶'
 BTN_STOP: Final = '■'
@@ -159,22 +159,22 @@ class GroupHeaderBase:
         """Toggle the header on or off."""
         self.parent.group_visible[self.id] = vis = not self.parent.group_visible.get(self.id)
         self.parent.items_dirty.set()
-        self._ui_set_arrow(GRP_EXP_HOVER if vis else GRP_COLL_HOVER)
+        self._ui_set_arrow(IMG_GRP_EXP_HOVER if vis else IMG_GRP_COLL_HOVER)
 
     def _evt_hover_start(self, _: object | None = None) -> None:
         """When hovered over, fill in the triangle."""
         self._ui_set_arrow(
-            GRP_EXP_HOVER
+            IMG_GRP_EXP_HOVER
             if self.parent.group_visible.get(self.id) else
-            GRP_COLL_HOVER
+            IMG_GRP_COLL_HOVER
         )
 
     def _evt_hover_end(self, _: object | None = None) -> None:
         """When leaving, hollow the triangle."""
         self._ui_set_arrow(
-            GRP_EXP
+            IMG_GRP_EXP
             if self.parent.group_visible.get(self.id) else
-            GRP_COLL
+            IMG_GRP_COLL
         )
 
     @abstractmethod
@@ -183,7 +183,7 @@ class GroupHeaderBase:
         self.id = group_id
 
     @abstractmethod
-    def _ui_set_arrow(self, arrow: str, /) -> None:
+    def _ui_set_arrow(self, arrow: img.Handle, /) -> None:
         """Set the arrow for a group."""
         raise NotImplementedError
 
@@ -231,7 +231,7 @@ class SelectorWinBase[ButtonT, GroupHeaderT: GroupHeaderBase]:
     _loading: bool  # This overrides readonly.
     modal: bool
     attrs: list[AttrDef]
-    # Event set whenever the items needs to be redrawn/reflowed.
+    # Event set whenever the items need to be redrawn/re-flowed.
     items_dirty: trio.Event
 
     # Current list of item IDs we display.

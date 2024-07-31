@@ -65,6 +65,8 @@ FOREGROUNDS: Mapping[Theme, tuple[int, int, int, int]] = {
 }
 
 # Re-exported from PIL.
+ROTATE_CW: Final = Image.Transpose.ROTATE_270
+ROTATE_CCW: Final = Image.Transpose.ROTATE_90
 FLIP_LEFT_RIGHT: Final = Image.Transpose.FLIP_LEFT_RIGHT
 FLIP_TOP_BOTTOM: Final = Image.Transpose.FLIP_TOP_BOTTOM
 FLIP_ROTATE: Final = Image.Transpose.ROTATE_180
