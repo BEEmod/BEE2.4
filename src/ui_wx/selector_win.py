@@ -20,7 +20,7 @@ from app.selector_win import (
 )
 from consts import SEL_ICON_SIZE
 from packages import AttrTypes
-from transtoken import TransToken
+from transtoken import CURRENT_LANG, TransToken
 from ui_wx import MARKDOWN, wid_transtoken
 from ui_wx.img import WX_IMG, ImageSlot
 import utils
@@ -49,7 +49,10 @@ KEY_TO_NAV: Final[Mapping[str, NavKeys]] = {
 }
 PEN_SLOT_BORDER = wx.Pen(wx.Colour(101, 101, 101), 2)
 PEN_SLOT_BORDER_SEL = wx.Pen(wx.Colour(0, 150, 255), 2)
+PEN_GROUP_HEADER = wx.Pen(wx.Colour(101, 101, 101), 2)
 BRUSH_TRANSPARENT = wx.Brush(wx.Colour(0, 0, 0, 0), wx.BRUSHSTYLE_TRANSPARENT)
+FONT_GROUP_HEADER = wx.Font(wx.FontInfo(12))
+FONT_GROUP_HEADER_SUGG = FONT_GROUP_HEADER.Bold()
 FONT_SUGGESTED = wx.Font(wx.FontInfo(8.0).Light())
 FONT_ITEM_NAME = [
     wx.Font(wx.FontInfo(i))
@@ -128,32 +131,17 @@ class GroupHeader(GroupHeaderBase):
         # The right-click cascade widget. Default to the root one, will be reassigned after.
         self.menu = win.context_menu
         self.menu_item = None
+        self.panel.SetMinSize((10, 24))
 
-        sizer = wx.BoxSizer(wx.HORIZONTAL)
-        sizer.Add((8, 0))
-        sizer.Add(
-            wx.StaticLine(self.panel, style=wx.LI_HORIZONTAL),
-            wx.SizerFlags().Expand().Proportion(1),
-        )
-        self.title = wx.StaticText(self.panel)
-        sizer.Add(self.title, wx.SizerFlags().Border(wx.LEFT | wx.RIGHT, 4))
-        sizer.Add(
-            wx.StaticLine(self.panel, style=wx.LI_HORIZONTAL),
-            wx.SizerFlags().Expand().Proportion(1),
-        )
-        self.arrow = wx.StaticText(self.panel)
-        sizer.Add(self.arrow)
-        sizer.Add((8, 0))
+        self._arrow = '-'
+        self.title = TransToken.BLANK
+        self.suggested = False
+        self.panel.Bind(wx.EVT_PAINT, self._on_paint)
 
-        toggle = self._evt_toggle
-        for item in sizer.GetChildren():
-            if item.Window is not None:
-                item.Window.Bind(wx.EVT_LEFT_DOWN, toggle)
-        self.panel.Bind(wx.EVT_LEFT_DOWN, toggle)
+        self.panel.Bind(wx.EVT_LEFT_DOWN, self._evt_toggle)
         self.panel.SetCursor(wx.Cursor(wx.CURSOR_HAND))
         self.panel.Bind(wx.EVT_ENTER_WINDOW, self._evt_hover_start)
         self.panel.Bind(wx.EVT_LEAVE_WINDOW, self._evt_hover_end)
-        self.panel.SetSizer(sizer)
 
     def hide(self) -> None:
         """Hide the widgets and stop tracking translations."""
@@ -161,21 +149,47 @@ class GroupHeader(GroupHeaderBase):
         if self.menu_item is not None:
             wid_transtoken.set_menu_text(self.menu_item, TransToken.BLANK)
             self.menu_item = None
-        wid_transtoken.set_text(self.title, TransToken.BLANK)
         self.panel.Hide()
 
     @override
     def _ui_reassign(self, group_id: str, title: TransToken) -> None:
         """Set the group label."""
         super()._ui_reassign(group_id, title)
-        wid_transtoken.set_text(self.title, title)
         self.menu = wx.Menu() if group_id else self.parent_menu
         self.menu_item = None
+        self.title = title
+        self.suggested = False
+        self.panel.Refresh()
 
     @override
     def _ui_set_arrow(self, arrow: str) -> None:
         """Set the arrow glyph."""
-        self.arrow.SetLabelText(arrow)
+        self.arrow = arrow
+        self.panel.Refresh()
+
+    def _on_paint(self, event: wx.PaintEvent) -> None:
+        """Draw the header."""
+        dc = wx.PaintDC(self.panel)
+        size = wx.Rect(self.panel.GetSize())
+        dc.SetFont(FONT_GROUP_HEADER_SUGG if self.suggested else FONT_GROUP_HEADER)
+        title = str(self.title)
+        required_size = dc.GetTextExtent(title)
+        if required_size.Height > size.Height:
+            self.panel.SetMinSize(required_size)
+
+        title_rect = dc.DrawLabel(
+            str(self.title), wx.NullBitmap, size,
+            alignment=wx.ALIGN_CENTRE_HORIZONTAL | wx.ALIGN_CENTRE_VERTICAL,
+        )
+        dc.SetFont(FONT_GROUP_HEADER)
+        arrow_rect = dc.DrawLabel(
+            self.arrow, wx.NullBitmap, size,
+            alignment=wx.ALIGN_RIGHT | wx.ALIGN_CENTRE_VERTICAL,
+        )
+        y = size.Height // 2
+        dc.SetPen(PEN_GROUP_HEADER)
+        dc.DrawLine(4, y, title_rect.Left - 4, y)
+        dc.DrawLine(title_rect.Right + 4, y, arrow_rect.Left - 4, y)
 
 
 class SelectorWin(SelectorWinBase[ItemSlot, GroupHeader]):
@@ -427,6 +441,18 @@ class SelectorWin(SelectorWinBase[ItemSlot, GroupHeader]):
     @override
     async def _ui_task(self) -> None:
         """Executed by task()."""
+        async with trio.open_nursery() as nursery:
+            nursery.start_soon(self._redraw_on_langchange)
+            nursery.start_soon(self._update_menu_task)
+
+    async def _redraw_on_langchange(self) -> None:
+        """When languages change, the item list needs to be re-drawn."""
+        while True:
+            await CURRENT_LANG.wait_transition()
+            self.wid_itemlist.Refresh()
+
+    async def _update_menu_task(self) -> None:
+        """When the item changes, update which menu options are set."""
         last_checked: wx.MenuItem | None = None
         async with aclosing(self.chosen.eventual_values()) as agen:
             async for chosen_id in agen:
@@ -636,16 +662,18 @@ class SelectorWin(SelectorWinBase[ItemSlot, GroupHeader]):
         data = self._get_data(item_id)
         # Apply the font to the group header as well, if suggested.
         if data.group_id and suggested:
-            group = self.group_widgets[data.group_id]
-            group.title.SetFont(self.sugg_font)
-            if group.menu_item is not None:
-                group.menu_item.SetFont(self.sugg_font)
+            header = self.group_widgets[data.group_id]
+            header.suggested = True
+            header.panel.Refresh()
+            if header.menu_item is not None:
+                header.menu_item.SetFont(self.sugg_font)
 
     @override
     def _ui_menu_reset_suggested(self) -> None:
         """Reset the fonts for all group widgets. menu_set_font() will then set them."""
         for group_key, header in self.group_widgets.items():
-            header.title.Font = self.norm_font
+            header.suggested = False
+            header.panel.Refresh()
             if header.menu_item is not None:
                 header.menu_item.SetFont(self.norm_font)
 
