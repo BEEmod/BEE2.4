@@ -541,7 +541,24 @@ class SelectorWin(SelectorWinBase[ItemSlot, GroupHeader]):
 
     @override
     def _ui_button_scroll_to(self, item: ItemSlot, /) -> None:
-        pass  # TODO
+        # Scroll-related things is done in scroll units, just convert to pixels
+        # for the computations here though.
+        _, pixels_per = self.wid_itemlist.GetScrollPixelsPerUnit()
+        # This is the size of the viewport.
+        view_height = self.wid_itemlist.GetScrollPageSize(wx.VERTICAL) * pixels_per
+
+        # This is relative to the viewport
+        y = item.GetPosition().y
+        item_height = item.GetMinHeight()
+
+        if 8 <= y <= view_height - item_height - 8:
+            return  # Already in view
+
+        # Center in the view. We need to add
+        top_off = self.wid_itemlist.GetScrollPos(wx.VERTICAL) * pixels_per
+
+        offset = top_off + y + (item_height - view_height) / 2
+        self.wid_itemlist.Scroll(wx.DefaultCoord, round(offset / pixels_per))
 
     @override
     def _ui_props_set_author(self, author: TransToken, /) -> None:
