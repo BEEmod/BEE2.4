@@ -567,10 +567,9 @@ async def ui_load_backup() -> None:
         return
 
     BACKUPS['backup_path'] = file
-    with open(file, 'rb') as f:
-        # Read the backup zip into memory!
-        data = f.read()
-        BACKUPS['unsaved_file'] = unsaved = BytesIO(data)
+    # Read the backup zip into memory!
+    data = await trio.Path(file).read_bytes()
+    BACKUPS['unsaved_file'] = unsaved = BytesIO(data)
 
     zip_file = ZipFile(
         unsaved,

@@ -191,7 +191,6 @@ class Music(SelPakObject, needs_foreground=True, style_suggest_key='music'):
             return utils.obj_id(child.id)
         return utils.ID_NONE
 
-
     @classmethod
     async def post_parse(cls, packset: PackagesSet) -> None:
         """Check children of each music item actually exist.

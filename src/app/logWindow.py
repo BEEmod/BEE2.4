@@ -12,7 +12,7 @@ import trio
 from typing_extensions import override
 
 from config.gen_opts import GenOptions
-from loadScreen import _QUEUE_SEND_LOGGING, _QUEUE_REPLY_LOGGING
+from loadScreen import _QUEUE_SEND_LOGGING, _QUEUE_REPLY_LOGGING  # noqa: PLC2701
 import config
 
 

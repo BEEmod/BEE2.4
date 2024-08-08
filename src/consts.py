@@ -2,7 +2,7 @@
 from __future__ import annotations
 from typing import Any, Final, Self, cast
 from collections.abc import MutableMapping, Iterator
-from enum import Enum, EnumMeta
+from enum import Enum, EnumMeta, StrEnum
 from uuid import UUID, uuid5
 
 from srctools import Side
@@ -89,7 +89,7 @@ class MaterialGroupMeta(EnumMeta):
         return cls.__new__(cls, value.casefold(), *args, **kwargs)  # type: ignore
 
 
-class MaterialGroup(str, Enum, metaclass=MaterialGroupMeta):
+class MaterialGroup(StrEnum, metaclass=MaterialGroupMeta):
     """Adds a few useful features to the string enums.
 
     * They are compared case-insensitively.
@@ -99,6 +99,7 @@ class MaterialGroup(str, Enum, metaclass=MaterialGroupMeta):
     * str(member) == member.value
     """
     value: str
+
     def __eq__(self, other: object) -> bool:
         """Compare case-insensitively."""
         if isinstance(other, Side):
@@ -275,6 +276,7 @@ class DefaultItems(Enum):
     """ A list of all the default items."""
     _value_: utils.ObjectID
     id: utils.ObjectID
+
     def __new__(cls, name: str) -> Self:
         item_id = utils.obj_id(name)
         result = object.__new__(cls)

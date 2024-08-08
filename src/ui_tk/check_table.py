@@ -74,6 +74,7 @@ class Header:
 class Item[UserT]:
     """Represents one item in a CheckDetails list."""
     user: UserT
+
     @overload
     def __init__(
         self: Item[None],

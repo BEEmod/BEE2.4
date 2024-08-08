@@ -50,6 +50,7 @@ async def _messagebox(
 class TextValidator(wx.Validator):
     """Handles validation for the text entry window."""
     result: str | None
+
     def __init__(
         self,
         done_event: trio.Event,

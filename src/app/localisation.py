@@ -14,7 +14,6 @@ import datetime
 import functools
 import io
 import itertools
-import os.path
 import string
 
 from pathlib import Path

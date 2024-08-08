@@ -344,7 +344,7 @@ class BarrierType:
         if 'error_tex' in kv:
             error_tex = kv['error_tex'].casefold()
             if error_tex in user_errors.TEX_SET:
-                error_disp = error_tex  # type: ignore
+                error_disp = error_tex
 
         if 'floorbeam' in kv:
             floorbeam = FloorbeamConf.parse(barrier_id, kv.find_key('floorbeam'))

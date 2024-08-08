@@ -6,11 +6,11 @@ import sys
 # We need to add dummy files if these are None - multiprocessing tries to flush
 # them.
 if sys.stdout is None:
-    sys.stdout = open(os.devnull, 'w')
+    sys.stdout = open(os.devnull, 'w', encoding='utf8')
 if sys.stderr is None:
-    sys.stderr = open(os.devnull, 'w')
+    sys.stderr = open(os.devnull, 'w', encoding='utf8')
 if sys.stdin is None:
-    sys.stdin = open(os.devnull)
+    sys.stdin = open(os.devnull, encoding='utf8')
 
 freeze_support()
 if __name__ == '__main__':

@@ -118,7 +118,7 @@ async def terminate_error_server() -> bool:
         else:
             # Wait for the file to be deleted.
             # Unfortunately no way to be notified for when this occurs.
-            while user_errors.SERVER_INFO_FILE.exists():  # noqa: TRIO110
+            while user_errors.SERVER_INFO_FILE.exists():  # noqa: ASYNC110
                 await trio.sleep(0.125)
             return False
     # noinspection PyUnreachableCode
@@ -129,13 +129,13 @@ async def terminate_error_server() -> bool:
 async def restore_backup(game: Game) -> None:
     """Restore the original files from the backup."""
     for name, filename, ext in FILES_TO_BACKUP:
-        item_path = game.abs_path(f"{filename}{ext}")
-        backup_path = game.abs_path(f'{filename}_original{ext}')
-        old_version = game.abs_path(f'{filename}_styles{ext}')
-        if os.path.isfile(old_version):
+        item_path = game.root_path / f"{filename}{ext}"
+        backup_path = game.root_path / f'{filename}_original{ext}'
+        old_version = game.root_path / f'{filename}_styles{ext}'
+        if await trio.Path(old_version).is_file():
             LOGGER.info('Restoring Stylechanger version of "{}"!', name)
             shutil.copy(old_version, item_path)
-        elif os.path.isfile(backup_path):
+        elif await trio.Path(backup_path).is_file():
             LOGGER.info('Restoring original "{}"!', name)
             shutil.move(backup_path, item_path)
 

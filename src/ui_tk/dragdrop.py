@@ -120,6 +120,7 @@ class DragDrop[ItemT](ManagerBase[ItemT, tk.Misc]):
 
     # Maps slots to the Tk implementation.
     _slot_ui: dict[Slot[ItemT], SlotUI]
+
     def __init__(
         self,
         parent: tk.Tk | tk.Toplevel,
