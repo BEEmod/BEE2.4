@@ -47,10 +47,9 @@ KEY_TO_NAV: Final[Mapping[str, NavKeys]] = {
     'Return': NavKeys.ENTER,
     'Space': NavKeys.PLAY_SOUND,
 }
-PEN_SLOT_BORDER = wx.Pen(wx.Colour(101, 101, 101), 2)
-PEN_SLOT_BORDER_SEL = wx.Pen(wx.Colour(0, 150, 255), 2)
-PEN_GROUP_HEADER = wx.Pen(wx.Colour(101, 101, 101), 2)
-BRUSH_TRANSPARENT = wx.Brush(wx.Colour(0, 0, 0, 0), wx.BRUSHSTYLE_TRANSPARENT)
+PEN_SLOT_BORDER = wx.Pen(wx.SystemSettings.GetColour(wx.SYS_COLOUR_WINDOWFRAME), 3)
+PEN_SLOT_BORDER_SEL = wx.Pen(wx.SystemSettings.GetColour(wx.SYS_COLOUR_HIGHLIGHT), 3)
+PEN_GROUP_HEADER = wx.Pen(wx.SystemSettings.GetColour(wx.SYS_COLOUR_WINDOWFRAME), 2)
 FONT_GROUP_HEADER = wx.Font(wx.FontInfo(12))
 FONT_GROUP_HEADER_SUGG = FONT_GROUP_HEADER.Bold()
 FONT_SUGGESTED = wx.Font(wx.FontInfo(8.0).Light())
@@ -281,7 +280,7 @@ class SelectorWin(SelectorWinBase[ItemSlot, GroupHeader]):
             self.splitter,
             style=wx.VSCROLL | wx.ALWAYS_SHOW_SB | wx.BORDER_SUNKEN,
         )
-        wid_itemlist.SetBackgroundColour(img.PETI_ITEM_BG)
+        wid_itemlist.SetBackgroundColour(wx.Colour(img.PETI_ITEM_BG))
         self.wid_panel_info = wx.Panel(self.splitter)
         self.splitter.SplitVertically(wid_itemlist, self.wid_panel_info)
 
