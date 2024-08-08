@@ -21,7 +21,7 @@ from app.selector_win import (
 from consts import SEL_ICON_SIZE
 from packages import AttrTypes
 from transtoken import CURRENT_LANG, TransToken
-from ui_wx import MARKDOWN, wid_transtoken
+from ui_wx import MARKDOWN, wid_transtoken, PEN_SLOT_BORDER, PEN_SLOT_BORDER_SEL
 from ui_wx.img import WX_IMG, ImageSlot
 import utils
 
@@ -47,8 +47,6 @@ KEY_TO_NAV: Final[Mapping[str, NavKeys]] = {
     'Return': NavKeys.ENTER,
     'Space': NavKeys.PLAY_SOUND,
 }
-PEN_SLOT_BORDER = wx.Pen(wx.SystemSettings.GetColour(wx.SYS_COLOUR_WINDOWFRAME), 3)
-PEN_SLOT_BORDER_SEL = wx.Pen(wx.SystemSettings.GetColour(wx.SYS_COLOUR_HIGHLIGHT), 3)
 PEN_GROUP_HEADER = wx.Pen(wx.SystemSettings.GetColour(wx.SYS_COLOUR_WINDOWFRAME), 2)
 FONT_GROUP_HEADER = wx.Font(wx.FontInfo(12))
 FONT_GROUP_HEADER_SUGG = FONT_GROUP_HEADER.Bold()

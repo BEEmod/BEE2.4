@@ -89,4 +89,8 @@ class _MarkdownConverter(mdown.BaseRenderer[str]):
         """Join two fragments together."""
         return '<br /><br />\n'.join(children)
 
+
 MARKDOWN = _MarkdownConverter(str)
+
+PEN_SLOT_BORDER = wx.Pen(wx.SystemSettings.GetColour(wx.SYS_COLOUR_WINDOWFRAME), 3)
+PEN_SLOT_BORDER_SEL = wx.Pen(wx.SystemSettings.GetColour(wx.SYS_COLOUR_HIGHLIGHT), 3)
