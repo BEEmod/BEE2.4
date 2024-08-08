@@ -10,15 +10,18 @@ import trio
 
 from app import WidgetCache, img
 from app.corridor_selector import (
-    HEIGHT, IMG_ARROW_LEFT, IMG_ARROW_RIGHT, IMG_CORR_BLANK, Icon,
-    OptionRow, Selector, TRANS_HELP, TRANS_NO_OPTIONS, WIDTH, TRANS_RAND_OPTION,
+    WIDTH, HEIGHT, IMG_ARROW_LEFT, IMG_ARROW_RIGHT, IMG_CORR_BLANK, Icon,
+    OPTS_DIR, OPTS_MODE, OPTS_ORIENT,
+    OptionRow, Selector,
+    TRANS_HELP, TRANS_NO_OPTIONS, TRANS_ONLY_THIS,
+    TRANS_TITLE, TRANS_RAND_OPTION,
 )
 from app.mdown import MarkdownData
 from config.corridors import UIState
-from corridor import Direction, GameMode, Option, Orient
+from corridor import Option
 from transtoken import TransToken
 from .dragdrop import CanvasPositioner
-from .img import TKImages, TK_IMG
+from .img import TKImages
 from .wid_transtoken import set_text, set_win_title
 from .rich_textbox import RichText
 from . import TK_ROOT, tk_tools, tooltip
@@ -149,8 +152,6 @@ class TkSelector(Selector[IconUI, OptionRowUI]):
         conf = config.APP.get_cur_conf(UIState)
         super().__init__(conf)
         self.tk_img = tk_img
-        self.sel_count = 0
-        self.sel_handle_moving = False
         self_ref = self
         self.icons = WidgetCache(lambda ind: IconUI(self_ref), lambda ico: ico.set_image(None))
 
@@ -158,7 +159,7 @@ class TkSelector(Selector[IconUI, OptionRowUI]):
         self.win.withdraw()
         close_cmd = self.win.register(self.close_event.set)
         self.win.wm_protocol("WM_DELETE_WINDOW", close_cmd)
-        set_win_title(self.win, TransToken.ui('BEEmod - Select Corridor'))
+        set_win_title(self.win, TRANS_TITLE)
 
         self.win.rowconfigure(0, weight=1)
         self.win.columnconfigure(0, weight=1)
@@ -248,7 +249,7 @@ class TkSelector(Selector[IconUI, OptionRowUI]):
         frm_lower_btn.grid(row=4, column=0, columnspan=2)
 
         self.btn_just_this = ttk.Button(frm_lower_btn, name='just_this', command=self.evt_select_one)
-        set_text(self.btn_just_this, TransToken.ui('Use Only This'))
+        set_text(self.btn_just_this, TRANS_ONLY_THIS)
         self.btn_just_this.grid(row=0, column=0)
 
         set_text(
@@ -261,22 +262,10 @@ class TkSelector(Selector[IconUI, OptionRowUI]):
 
         button_frm = ttk.Frame(frm_left)
         button_frm.grid(row=0, column=0, columnspan=3)
-        self.btn_mode = tk_tools.EnumButton(
-            button_frm, self.state_mode,
-            (GameMode.SP, TransToken.ui('SP')),
-            (GameMode.COOP, TransToken.ui('Coop')),
-        )
-        self.btn_direction = tk_tools.EnumButton(
-            button_frm, self.state_dir,
-            (Direction.ENTRY, TransToken.ui('Entry')),
-            (Direction.EXIT, TransToken.ui('Exit')),
-        )
-        self.btn_orient = tk_tools.EnumButton(
-            button_frm, self.state_orient,
-            (Orient.FLAT, TransToken.ui('Flat')),
-            (Orient.UP, TransToken.ui('Upward')),
-            (Orient.DN, TransToken.ui('Downward')),
-        )
+        self.btn_mode = tk_tools.EnumButton(button_frm, self.state_mode, OPTS_MODE)
+        self.btn_direction = tk_tools.EnumButton(button_frm, self.state_dir, OPTS_DIR)
+        self.btn_orient = tk_tools.EnumButton(button_frm, self.state_orient, OPTS_ORIENT)
+
         self.btn_mode.frame.grid(row=0, column=0, padx=8)
         self.btn_direction.frame.grid(row=0, column=1, padx=8)
         self.btn_orient.frame.grid(row=0, column=2, padx=8)

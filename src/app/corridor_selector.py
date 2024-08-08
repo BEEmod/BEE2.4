@@ -46,6 +46,7 @@ FALLBACK = corridor.CorridorGroup(
 FALLBACK.pak_id = utils.special_id('<FALLBACK>')
 FALLBACK.pak_name = '???'
 
+TRANS_TITLE = TransToken.ui('BEEmod - Select Corridor')
 TRANS_AUTHORS = TransToken.ui_plural('Author: {authors}', 'Authors: {authors}')
 TRANS_NO_AUTHORS = TransToken.ui('Authors: Unknown')
 TRANS_HELP = TransToken.ui(
@@ -60,6 +61,21 @@ TRANS_OPT_TITLE = {
 }
 TRANS_NO_OPTIONS = TransToken.ui('No options!')
 TRANS_RAND_OPTION = TransToken.ui('Randomise')
+TRANS_ONLY_THIS = TransToken.ui('Use Only This')
+
+OPTS_MODE = [
+    (GameMode.SP, TransToken.ui('SP')),
+    (GameMode.COOP, TransToken.ui('Coop')),
+]
+OPTS_DIR = [
+    (Direction.ENTRY, TransToken.ui('Entry')),
+    (Direction.EXIT, TransToken.ui('Exit')),
+]
+OPTS_ORIENT = [
+    (Orient.FLAT, TransToken.ui('Flat')),
+    (Orient.UP, TransToken.ui('Upward')),
+    (Orient.DN, TransToken.ui('Downward')),
+]
 
 
 class Icon:

@@ -1,5 +1,5 @@
 """Implements various widget combos."""
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from contextlib import aclosing
 from enum import Enum
 
@@ -23,7 +23,7 @@ class EnumButton[EnumT: Enum]:
         self,
         parent: wx.Window,
         current: AsyncValue[EnumT],
-        *values: tuple[EnumT, TransToken],
+        values: Sequence[tuple[EnumT, TransToken]],
     ) -> None:
         self.sizer = sizer = wx.BoxSizer(wx.HORIZONTAL)
         self.current = current
@@ -37,10 +37,10 @@ class EnumButton[EnumT: Enum]:
             self.buttons[val] = btn
 
         if current.value not in self.buttons:
-            raise ValueError(f'Default value {current.value!r} not present in {list(values)}!')
+            raise ValueError(f'Default value {current.value!r} not present in {values!r}!')
 
         if len(self.buttons) != len(values):
-            raise ValueError(f'No duplicates allowed, got: {list(values)}')
+            raise ValueError(f'No duplicates allowed, got: {values!r}')
 
     def _pressed_func(self, value: EnumT) -> Callable[[wx.CommandEvent], None]:
         """Create the function for a button."""

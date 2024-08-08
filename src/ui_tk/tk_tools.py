@@ -8,7 +8,7 @@ from typing import Any, Protocol, Callable, Literal, NoReturn, TypedDict, Unpack
 
 from contextlib import aclosing
 from enum import Enum, StrEnum
-from collections.abc import Awaitable, Iterable
+from collections.abc import Awaitable, Iterable, Sequence
 from tkinter import filedialog, commondialog
 from tkinter import font as _tk_font
 from tkinter import ttk
@@ -784,7 +784,7 @@ class EnumButton[EnumT: Enum]:
         self,
         master: tk.Misc,
         current: AsyncValue[EnumT],
-        *values: tuple[EnumT, TransToken],
+        values: Sequence[tuple[EnumT, TransToken]],
     ) -> None:
         self.frame = ttk.Frame(master)
         self.current = current
@@ -797,10 +797,10 @@ class EnumButton[EnumT: Enum]:
             self.buttons[val] = btn
 
         if current.value not in self.buttons:
-            raise ValueError(f'Default value {current.value!r} not present in {list(values)}!')
+            raise ValueError(f'Default value {current.value!r} not present in {values}!')
 
         if len(self.buttons) != len(values):
-            raise ValueError(f'No duplicates allowed, got: {list(values)}')
+            raise ValueError(f'No duplicates allowed, got: {values}')
 
     async def task(self) -> None:
         """Task which must be run to update the button state."""
