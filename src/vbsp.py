@@ -1603,8 +1603,6 @@ async def main(argv: list[str]) -> None:
         # limit to determine if we should convert
         is_hammer = "-entity_limit 1750" not in args
 
-    game = Game(game_dir)
-
     if is_hammer:
         LOGGER.warning("Hammer map detected! skipping conversion..")
         run_vbsp(
@@ -1619,8 +1617,9 @@ async def main(argv: list[str]) -> None:
 
         LOGGER.info("Loading settings...")
         async with trio.open_nursery() as nursery:
+            res_game = utils.sync_result(nursery, Game, game_dir)
             res_settings = ResultCapture.start_soon(nursery, load_settings)
-            vmf_res =  utils.sync_result(nursery, load_map, path)
+            vmf_res = utils.sync_result(nursery, load_map, path)
             voice_data_res = ResultCapture.start_soon(nursery, voice_line.load)
 
         ind_style, id_to_item, corridor_conf = res_settings.result()
@@ -1666,7 +1665,7 @@ async def main(argv: list[str]) -> None:
         # We have tiles, pass to our error display.
         errors.load_tiledefs(tiling.TILES.values(), brushLoc.POS)
 
-        await texturing.setup(game, vmf, list(tiling.TILES.values()))
+        await texturing.setup(res_game.result(), vmf, list(tiling.TILES.values()))
 
         conditions.check_all(vmf, coll, info, voice_data_res.result())
         add_extra_ents(vmf, info)
@@ -1705,7 +1704,7 @@ async def main(argv: list[str]) -> None:
                 vbsp_args=new_args,
                 path=path,
                 new_path=new_path,
-                maybe_missing_inst=await find_missing_instances(game, vmf),
+                maybe_missing_inst=await find_missing_instances(res_game.result(), vmf),
             )
     except errors.UserError as error:
         # The user did something wrong, so the map is invalid.
