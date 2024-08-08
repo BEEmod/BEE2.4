@@ -2,7 +2,7 @@
 from __future__ import annotations
 from typing import Final
 
-from collections.abc import Sequence, Iterator
+from collections.abc import Sequence
 from abc import abstractmethod
 import itertools
 import random
@@ -13,7 +13,7 @@ import srctools.logger
 import trio
 import trio_util
 
-from app import DEV_MODE, EdgeTrigger, img
+from app import DEV_MODE, EdgeTrigger, WidgetCache, img
 from app.mdown import MarkdownData
 from config.corridors import UIState, Config, Options
 from corridor import GameMode, Direction, Orient, Option
@@ -127,7 +127,7 @@ class Selector[IconT: Icon, OptionRowT: OptionRow]:
     _select_trigger: EdgeTrigger[()]
 
     # The widgets for each corridor.
-    icons: list[IconT]
+    icons: WidgetCache[IconT]
     # The corresponding items for each slot.
     corr_list: list[corridor.CorridorUI]
 
@@ -149,7 +149,6 @@ class Selector[IconT: Icon, OptionRowT: OptionRow]:
         self.displayed_corr = AsyncValue(None)
         self.img_ind = 0
         self.cur_images = None
-        self.icons = []
         self.corr_list = []
         self.option_rows = []
         self.state_orient = AsyncValue(conf.last_orient)
@@ -179,8 +178,7 @@ class Selector[IconT: Icon, OptionRowT: OptionRow]:
 
             self.store_conf()
             self.ui_win_hide()
-            for icon in self.icons:
-                icon.set_image(None)
+            self.icons.hide_all()
 
     async def _save_config_task(self) -> None:
         """When a checkmark is changed, store the new config."""
@@ -202,7 +200,7 @@ class Selector[IconT: Icon, OptionRowT: OptionRow]:
 
     def prevent_deselection(self) -> None:
         """Ensure at least one widget is selected."""
-        icons = list(self.visible_icons())
+        icons = self.icons.placed
         if not icons:
             return  # No icons, nothing to do.
         count = sum(icon.selected for icon in icons)
@@ -220,17 +218,13 @@ class Selector[IconT: Icon, OptionRowT: OptionRow]:
             for icon in icons:
                 icon.set_readonly(False)
 
-    def visible_icons(self) -> Iterator[IconT]:
-        """Iterate over the icons which should currently be visible."""
-        return itertools.islice(self.icons, len(self.corr_list))
-
     def store_conf(self) -> None:
         """Store the configuration for the current corridor."""
         cur_conf = config.APP.get_cur_conf(Config, self.conf_id)
         # Start with the existing config, so we preserve unknown instances.
         enabled = dict(cur_conf.enabled)
 
-        for icon, corr in itertools.zip_longest(self.icons, self.corr_list):
+        for icon, corr in itertools.zip_longest(self.icons.placed, self.corr_list):
             if icon is not None and corr is not None:
                 enabled[corr.instance.casefold()] = icon.selected
 
@@ -281,19 +275,13 @@ class Selector[IconT: Icon, OptionRowT: OptionRow]:
             for corr in self.corr_group.defaults(mode, direction, orient):
                 inst_enabled[corr.instance.casefold()] = True
 
-        # Create enough icons for the current corridor list.
-        for _ in range(len(self.corr_list) - len(self.icons)):
-            self.ui_icon_create()
-
-        for icon, corr in itertools.zip_longest(self.icons, self.corr_list):
-            assert icon is not None
+        self.icons.reset()
+        for corr in self.corr_list:
+            icon = self.icons.fetch()
             icon.set_highlight(False)
-            if corr is not None:
-                icon.set_image(corr.icon)
-                icon.selected = inst_enabled[corr.instance.casefold()]
-            else:
-                icon.set_image(None)
-                icon.selected = False
+            icon.set_image(corr.icon)
+            icon.selected = inst_enabled[corr.instance.casefold()]
+        self.icons.hide_unused()
 
         self.prevent_deselection()
 
@@ -314,12 +302,12 @@ class Selector[IconT: Icon, OptionRowT: OptionRow]:
         ))
         await self.ui_win_reflow()
 
-    def evt_hover_enter(self, index: int) -> None:
+    def evt_hover_enter(self, icon: IconT) -> None:
         """Display the specified corridor temporarily on hover."""
         try:
-            corr = self.corr_list[index]
+            corr = self.corr_list[self.icons.placed.index(icon)]
         except IndexError:
-            LOGGER.warning("No corridor with index {}!", index)
+            LOGGER.warning("Icon has no matching corridor!")
             return
         self.displayed_corr.value = corr
 
@@ -327,18 +315,17 @@ class Selector[IconT: Icon, OptionRowT: OptionRow]:
         """When leaving, reset to the sticky corridor."""
         self.displayed_corr.value = self.sticky_corr
 
-    def evt_selected(self, index: int) -> None:
+    def evt_selected(self, icon: IconT) -> None:
         """Fires when a corridor icon is clicked."""
         try:
-            icon = self.icons[index]
-            corr = self.corr_list[index]
+            corr = self.corr_list[self.icons.placed.index(icon)]
         except IndexError:
-            LOGGER.warning("No corridor with index {}!", index)
+            LOGGER.warning("Icon has no matching corridor!")
             return
         if self.sticky_corr is corr:
             # Already selected, toggle the checkbox. But only deselect if another is selected.
             if icon.selected:
-                for other_icon in self.visible_icons():
+                for other_icon in self.icons.placed:
                     if other_icon is not icon and other_icon.selected:
                         icon.selected = False
                         break
@@ -348,7 +335,7 @@ class Selector[IconT: Icon, OptionRowT: OptionRow]:
         else:
             if self.sticky_corr is not None:
                 # Clear the old one.
-                for other_icon in self.icons:
+                for other_icon in self.icons.placed:
                     other_icon.set_highlight(False)
             icon.set_highlight(True)
             self.sticky_corr = corr
@@ -357,9 +344,8 @@ class Selector[IconT: Icon, OptionRowT: OptionRow]:
     def evt_select_one(self) -> None:
         """Select just the sticky corridor."""
         if self.sticky_corr is not None:
-            for icon, corr in itertools.zip_longest(self.icons, self.corr_list):
-                if icon is not None:
-                    icon.selected = corr is self.sticky_corr
+            for icon, corr in zip(self.icons.placed, self.corr_list, strict=True):
+                icon.selected = corr is self.sticky_corr
             self.ui_enable_just_this(False)
             self.prevent_deselection()
 
@@ -417,7 +403,7 @@ class Selector[IconT: Icon, OptionRowT: OptionRow]:
                 # icon is selected.
                 self.ui_enable_just_this(any(
                     icon.selected != (ico_corr is corr)
-                    for icon, ico_corr in itertools.zip_longest(self.icons, self.corr_list)
+                    for icon, ico_corr in zip(self.icons.placed, self.corr_list, strict=True)
                 ))
 
                 # Display our information.
@@ -545,11 +531,6 @@ class Selector[IconT: Icon, OptionRowT: OptionRow]:
     @abstractmethod
     async def ui_win_reflow(self) -> None:
         """Reposition everything after the window has resized."""
-        raise NotImplementedError
-
-    @abstractmethod
-    def ui_icon_create(self) -> None:
-        """Create a new icon widget, and append it to the list."""
         raise NotImplementedError
 
     @abstractmethod

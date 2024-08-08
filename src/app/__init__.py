@@ -258,3 +258,8 @@ class WidgetCache[Widget]:
             self.hide_func(wid)
         self._hidden += self._was_visible
         self._was_visible.clear()
+
+    def hide_all(self) -> None:
+        """Hide all widgets completely, resetting the batch."""
+        self.reset()
+        self.hide_unused()

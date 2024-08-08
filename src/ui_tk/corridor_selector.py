@@ -8,7 +8,7 @@ import tkinter as tk
 
 import trio
 
-from app import img
+from app import WidgetCache, img
 from app.corridor_selector import (
     HEIGHT, IMG_ARROW_LEFT, IMG_ARROW_RIGHT, IMG_CORR_BLANK, Icon,
     OptionRow, Selector, TRANS_HELP, TRANS_NO_OPTIONS, WIDTH, TRANS_RAND_OPTION,
@@ -32,10 +32,11 @@ ICON_CHECK_PADDING: Final = 2 if utils.WIN else 0
 
 class IconUI(Icon):
     """An icon for a corridor."""
-    def __init__(self, selector: TkSelector, index: int) -> None:
+    def __init__(self, selector: TkSelector) -> None:
         """Create the widgets."""
         self.label = ttk.Label(selector.canvas, anchor='center')
         self.var = tk.BooleanVar(selector.win)
+        self.selector = selector
         self.check = ttk.Checkbutton(
             self.label,
             name='check',
@@ -48,14 +49,14 @@ class IconUI(Icon):
             anchor='sw',
         )
 
-        self.label.bind('<Enter>', lambda e: selector.evt_hover_enter(index))
-        self.label.bind('<Leave>', lambda e: selector.evt_hover_exit())
-        tk_tools.bind_leftclick(self.label, lambda e: selector.evt_selected(index))
+        self.label.bind('<Enter>', lambda e: self.selector.evt_hover_enter(self))
+        self.label.bind('<Leave>', lambda e: self.selector.evt_hover_exit())
+        tk_tools.bind_leftclick(self.label, lambda e: self.selector.evt_selected(self))
 
     @override
     def set_image(self, handle: img.Handle | None) -> None:
         """Set the image used."""
-        TK_IMG.apply(self.label, handle)
+        self.selector.tk_img.apply(self.label, handle)
 
     @property
     @override
@@ -150,6 +151,8 @@ class TkSelector(Selector[IconUI, OptionRowUI]):
         self.tk_img = tk_img
         self.sel_count = 0
         self.sel_handle_moving = False
+        self_ref = self
+        self.icons = WidgetCache(lambda ind: IconUI(self_ref), lambda ico: ico.set_image(None))
 
         self.win = tk.Toplevel(TK_ROOT, name='corridor')
         self.win.withdraw()
@@ -324,7 +327,7 @@ class TkSelector(Selector[IconUI, OptionRowUI]):
         (x1, y1, x2, y2) = self.canvas.bbox(self.help_lbl_win)
         pos.yoff += y2 - y1
 
-        pos.place_slots(self.visible_icons(), 'icons')
+        pos.place_slots(self.icons.placed, 'icons')
         pos.resize_canvas()
 
         # Reshape the description frame.
@@ -354,11 +357,6 @@ class TkSelector(Selector[IconUI, OptionRowUI]):
     def ui_win_getsize(self) -> tuple[int, int]:
         """Fetch the current dimensions, for saving."""
         return self.win.winfo_width(), self.win.winfo_height()
-
-    @override
-    def ui_icon_create(self) -> None:
-        """Create a new icon widget, and append it to the list."""
-        self.icons.append(IconUI(self, len(self.icons)))
 
     @override
     def ui_enable_just_this(self, enable: bool) -> None:
