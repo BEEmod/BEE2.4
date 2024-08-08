@@ -1,7 +1,9 @@
 """Implements UI for selecting corridors."""
 from __future__ import annotations
-from typing_extensions import Final
+from typing import Final
+
 from collections.abc import Sequence, Iterator
+from abc import abstractmethod
 import itertools
 import random
 
@@ -64,18 +66,22 @@ class Icon:
     """API for corridor icons."""
 
     @property
+    @abstractmethod
     def selected(self) -> bool:
         """If the icon is currently selected."""
         raise NotImplementedError
 
     @selected.setter
+    @abstractmethod
     def selected(self, value: bool) -> None:
         raise NotImplementedError
 
+    @abstractmethod
     def set_readonly(self, enabled: bool) -> None:
         """Set the checkbox to be readonly."""
         raise NotImplementedError
 
+    @abstractmethod
     def set_highlight(self, enabled: bool) -> None:
         """Set whether a highlight background is enabled."""
         raise NotImplementedError
@@ -89,6 +95,7 @@ class OptionRow:
     def __init__(self) -> None:
         self.current = AsyncValue(utils.ID_RANDOM)
 
+    @abstractmethod
     async def display(self, row: int, option: Option, remove_event: trio.Event) -> None:
         """Reconfigure this row to display the specified option, then show it.
 
@@ -510,38 +517,47 @@ class Selector[IconT: Icon, OptionRowT: OptionRow]:
             self.img_ind < max_ind,
         )
 
+    @abstractmethod
     async def ui_task(self) -> None:
         """Task which is run to update the UI."""
         raise NotImplementedError
 
+    @abstractmethod
     def ui_win_hide(self) -> None:
         """Hide the window."""
         raise NotImplementedError
 
+    @abstractmethod
     def ui_win_show(self) -> None:
         """Show the window."""
         raise NotImplementedError
 
+    @abstractmethod
     def ui_win_getsize(self) -> tuple[int, int]:
         """Fetch the current dimensions, for saving."""
         raise NotImplementedError
 
+    @abstractmethod
     async def ui_win_reflow(self) -> None:
         """Reposition everything after the window has resized."""
         raise NotImplementedError
 
+    @abstractmethod
     def ui_icon_create(self) -> None:
         """Create a new icon widget, and append it to the list."""
         raise NotImplementedError
 
+    @abstractmethod
     def ui_icon_set_img(self, icon: IconT, handle: img.Handle | None) -> None:
         """Set the image for the specified corridor icon."""
         raise NotImplementedError
 
+    @abstractmethod
     def ui_enable_just_this(self, enable: bool) -> None:
         """Set whether the just this button is pressable."""
         raise NotImplementedError
 
+    @abstractmethod
     def ui_desc_display(
         self, *,
         title: TransToken,
@@ -553,10 +569,12 @@ class Selector[IconT: Icon, OptionRowT: OptionRow]:
         """Display information for a corridor."""
         raise NotImplementedError
 
+    @abstractmethod
     def ui_desc_set_img_state(self, handle: img.Handle | None, left: bool, right: bool) -> None:
         """Set the widget state for the large preview image in the description sidebar."""
         raise NotImplementedError
 
+    @abstractmethod
     def ui_option_create(self) -> OptionRowT:
         """Create a new option row."""
         raise NotImplementedError
