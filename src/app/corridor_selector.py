@@ -65,6 +65,11 @@ TRANS_RAND_OPTION = TransToken.ui('Randomise')
 class Icon:
     """API for corridor icons."""
 
+    @abstractmethod
+    def set_image(self, handle: img.Handle | None) -> None:
+        """Set the image for this icon."""
+        raise NotImplementedError
+
     @property
     @abstractmethod
     def selected(self) -> bool:
@@ -175,7 +180,7 @@ class Selector[IconT: Icon, OptionRowT: OptionRow]:
             self.store_conf()
             self.ui_win_hide()
             for icon in self.icons:
-                self.ui_icon_set_img(icon, None)
+                icon.set_image(None)
 
     async def _save_config_task(self) -> None:
         """When a checkmark is changed, store the new config."""
@@ -284,10 +289,10 @@ class Selector[IconT: Icon, OptionRowT: OptionRow]:
             assert icon is not None
             icon.set_highlight(False)
             if corr is not None:
-                self.ui_icon_set_img(icon, corr.icon)
+                icon.set_image(corr.icon)
                 icon.selected = inst_enabled[corr.instance.casefold()]
             else:
-                self.ui_icon_set_img(icon, None)
+                icon.set_image(None)
                 icon.selected = False
 
         self.prevent_deselection()
@@ -545,11 +550,6 @@ class Selector[IconT: Icon, OptionRowT: OptionRow]:
     @abstractmethod
     def ui_icon_create(self) -> None:
         """Create a new icon widget, and append it to the list."""
-        raise NotImplementedError
-
-    @abstractmethod
-    def ui_icon_set_img(self, icon: IconT, handle: img.Handle | None) -> None:
-        """Set the image for the specified corridor icon."""
         raise NotImplementedError
 
     @abstractmethod

@@ -18,7 +18,7 @@ from config.corridors import UIState
 from corridor import Direction, GameMode, Option, Orient
 from transtoken import TransToken
 from .dragdrop import CanvasPositioner
-from .img import TKImages
+from .img import TKImages, TK_IMG
 from .wid_transtoken import set_text, set_win_title
 from .rich_textbox import RichText
 from . import TK_ROOT, tk_tools, tooltip
@@ -51,6 +51,11 @@ class IconUI(Icon):
         self.label.bind('<Enter>', lambda e: selector.evt_hover_enter(index))
         self.label.bind('<Leave>', lambda e: selector.evt_hover_exit())
         tk_tools.bind_leftclick(self.label, lambda e: selector.evt_selected(index))
+
+    @override
+    def set_image(self, handle: img.Handle | None) -> None:
+        """Set the image used."""
+        TK_IMG.apply(self.label, handle)
 
     @property
     @override
@@ -354,11 +359,6 @@ class TkSelector(Selector[IconUI, OptionRowUI]):
     def ui_icon_create(self) -> None:
         """Create a new icon widget, and append it to the list."""
         self.icons.append(IconUI(self, len(self.icons)))
-
-    @override
-    def ui_icon_set_img(self, icon: IconUI, handle: img.Handle | None) -> None:
-        """Set the image used."""
-        self.tk_img.apply(icon.label, handle)
 
     @override
     def ui_enable_just_this(self, enable: bool) -> None:
