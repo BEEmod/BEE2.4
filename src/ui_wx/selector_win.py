@@ -285,7 +285,7 @@ class SelectorWin(SelectorWinBase[ItemSlot, GroupHeader]):
         self.itemlist_sizer = wx.BoxSizer(wx.VERTICAL)
         wid_itemlist.SetSizer(self.itemlist_sizer)
         wid_itemlist.SetScrollRate(0, 10)
-        wid_itemlist.Bind(wx.EVT_SIZE, self._evt_window_resized)
+        wid_itemlist.Bind(wx.EVT_SIZE, self.evt_window_resized)
 
         self.sizer_info = sizer_info = wx.BoxSizer(wx.VERTICAL)
         self.wid_panel_info.SetSizer(sizer_info)
@@ -450,9 +450,9 @@ class SelectorWin(SelectorWinBase[ItemSlot, GroupHeader]):
             await CURRENT_LANG.wait_transition()
             self.wid_itemlist.Refresh()
 
-    def _evt_window_resized(self, event: object) -> None:
+    def evt_window_resized(self, event: object) -> None:
         """When resizing, we must always force the group headers to redraw."""
-        super()._evt_window_resized(event)
+        super().evt_window_resized(event)
         for header in self.group_widgets.values():
             header.panel.Refresh()
 

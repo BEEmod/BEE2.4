@@ -25,7 +25,7 @@ import trio
 import trio_util
 
 from app.mdown import MarkdownData
-from app import WidgetCache, sound, img, DEV_MODE
+from app import ReflowWindow, WidgetCache, sound, img, DEV_MODE
 from packages import SelitemData, AttrTypes, AttrDef as AttrDef, AttrMap
 from transtoken import TransToken
 from config.last_sel import LastSelected
@@ -188,7 +188,7 @@ class GroupHeaderBase:
         raise NotImplementedError
 
 
-class SelectorWinBase[ButtonT, GroupHeaderT: GroupHeaderBase]:
+class SelectorWinBase[ButtonT, GroupHeaderT: GroupHeaderBase](ReflowWindow):
     """The selection window for skyboxes, music, goo and voice packs.
 
     Typevars:
@@ -231,8 +231,6 @@ class SelectorWinBase[ButtonT, GroupHeaderT: GroupHeaderBase]:
     _loading: bool  # This overrides readonly.
     modal: bool
     attrs: list[AttrDef]
-    # Event set whenever the items need to be redrawn/re-flowed.
-    items_dirty: trio.Event
 
     # Current list of item IDs we display.
     item_list: list[utils.SpecialID]
@@ -256,9 +254,6 @@ class SelectorWinBase[ButtonT, GroupHeaderT: GroupHeaderBase]:
     # And a lookup from ID -> button
     _id_to_button: dict[utils.SpecialID, ButtonT]
 
-    # The current number of columns per row, always >= 1.
-    column_count: int
-
     # The ID used to persist our window state across sessions.
     save_id: str
     store_last_selected: bool
@@ -268,6 +263,7 @@ class SelectorWinBase[ButtonT, GroupHeaderT: GroupHeaderBase]:
     sampler: sound.SamplePlayer | None
 
     def __init__(self, opt: Options) -> None:
+        super().__init__()
         self.func_get_attr = opt.func_get_attr
         self.func_get_sample = opt.func_get_sample
         self.func_get_data = opt.func_get_data
@@ -285,7 +281,6 @@ class SelectorWinBase[ButtonT, GroupHeaderT: GroupHeaderBase]:
         self._suggested_rollover = None
         # And this is used to control whether to start/stop hovering.
         self.suggested_rollover_active = trio_util.AsyncBool()
-        self.items_dirty = trio.Event()
 
         # Should we have the 'reset to default' button?
         self.has_def = opt.has_def
@@ -320,8 +315,6 @@ class SelectorWinBase[ButtonT, GroupHeaderT: GroupHeaderBase]:
         # A list of casefolded group names in the display order.
         self.group_order = []
 
-        self.column_count = 1
-
         # The ID used to persist our window state across sessions.
         self.save_id = opt.save_id.casefold()
         self.store_last_selected = opt.store_last_selected
@@ -340,7 +333,7 @@ class SelectorWinBase[ButtonT, GroupHeaderT: GroupHeaderBase]:
             nursery.start_soon(self._ui_task)
             nursery.start_soon(self._load_data_task)
             nursery.start_soon(self._rollover_suggest_task)
-            nursery.start_soon(self._refresh_items_task)
+            nursery.start_soon(self.refresh_items_task)
             if self.sampler is not None:
                 nursery.start_soon(self._update_sampler_task)
             if self.store_last_selected:
@@ -490,13 +483,6 @@ class SelectorWinBase[ButtonT, GroupHeaderT: GroupHeaderBase]:
                     yield attr, index // 2, 'left'
                 index += 1
 
-    async def _refresh_items_task(self) -> None:
-        """Calls refresh_items whenever they're marked dirty."""
-        while True:
-            await self.items_dirty.wait()
-            self.items_dirty = trio.Event()
-            await utils.run_as_task(self._ui_reposition_items)
-
     async def _rollover_suggest_task(self) -> None:
         """Handle previewing suggested items when hovering over the 'set suggested' button."""
         while True:
@@ -614,15 +600,6 @@ class SelectorWinBase[ButtonT, GroupHeaderT: GroupHeaderBase]:
         async with aclosing(self.sampler.is_playing.eventual_values()) as agen:
             async for is_playing in agen:
                 self._ui_props_set_samp_button_icon(BTN_STOP if is_playing else BTN_PLAY)
-
-    def _evt_window_resized(self, event: object) -> None:
-        """Handle updating items, if the window width has changed."""
-        columns = self._ui_calc_columns()
-        if columns < 1:
-            columns = 1  # We got way too small, prevent division by zero
-        if columns != self.column_count:
-            self.column_count = columns
-            self.items_dirty.set()
 
     def _evt_icon_clicked(self, event: object) -> None:
         """When the large image is clicked, play sounds if available."""
@@ -998,18 +975,6 @@ class SelectorWinBase[ButtonT, GroupHeaderT: GroupHeaderBase]:
     @abstractmethod
     def _ui_win_set_size(self, width: int, height: int, /) -> None:
         """Apply size from configs."""
-        raise NotImplementedError
-
-    @abstractmethod
-    def _ui_calc_columns(self) -> int:
-        """Calculate the number of items that can be displayed per row."""
-
-    @abstractmethod
-    async def _ui_reposition_items(self) -> None:
-        """Reposition all the items to fit in the current geometry.
-
-        Called whenever items change or the window is resized.
-        """
         raise NotImplementedError
 
     @abstractmethod

@@ -444,7 +444,7 @@ class SelectorWin(SelectorWinBase[ttk.Button, GroupHeader]):
                         assert_never(col_type)
 
         self.set_disp()
-        self.wid_canvas.bind("<Configure>", self._evt_window_resized)
+        self.wid_canvas.bind("<Configure>", self.evt_window_resized)
 
     async def widget(self, frame: tk.Misc) -> ttk.Entry:
         """Create the special textbox used to open the selector window."""
@@ -545,11 +545,11 @@ class SelectorWin(SelectorWinBase[ttk.Button, GroupHeader]):
         self.win.geometry(f'{width}x{height}')
 
     @override
-    def _evt_window_resized(self, event: object) -> None:
+    def evt_window_resized(self, event: object) -> None:
         self.pal_frame.update_idletasks()
         self.pal_frame['width'] = self.wid_canvas.winfo_width()
         self.desc_label['wraplength'] = self.win.winfo_width() - 10
-        super()._evt_window_resized(event)
+        super().evt_window_resized(event)
 
     @override
     def _ui_calc_columns(self) -> int:

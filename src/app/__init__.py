@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any, Protocol, overload
 from typing_extensions import deprecated
 
+from abc import abstractmethod
 from collections.abc import Awaitable, Callable, Sequence
 from types import TracebackType
 
@@ -263,3 +264,44 @@ class WidgetCache[Widget]:
         """Hide all widgets completely, resetting the batch."""
         self.reset()
         self.hide_unused()
+
+
+class ReflowWindow:
+    """Base class which handles the logic for a window that reflows contents to fit."""
+    # Event set whenever the items need to be redrawn/re-flowed.
+    items_dirty: trio.Event
+    # The current number of columns per row, always >= 1.
+    column_count: int
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.items_dirty = trio.Event()
+        self.column_count = 1
+
+    async def refresh_items_task(self) -> None:
+        """Calls refresh_items whenever they're marked dirty."""
+        while True:
+            await self.items_dirty.wait()
+            self.items_dirty = trio.Event()
+            await utils.run_as_task(self._ui_reposition_items)
+
+    def evt_window_resized(self, event: object) -> None:
+        """Handle updating items, if the window width has changed."""
+        columns = self._ui_calc_columns()
+        if columns < 1:
+            columns = 1  # We got way too small, prevent division by zero
+        if columns != self.column_count:
+            self.column_count = columns
+            self.items_dirty.set()
+
+    @abstractmethod
+    def _ui_calc_columns(self) -> int:
+        """Calculate the number of items that can be displayed per row."""
+
+    @abstractmethod
+    async def _ui_reposition_items(self) -> None:
+        """Reposition all the items to fit in the current geometry.
+
+        Called whenever items change or the window is resized.
+        """
+        raise NotImplementedError
