@@ -97,8 +97,6 @@ def place_icon(canv: tk.Canvas, icon: IconUI, x: int, y: int, tag: str) -> None:
 
 class OptionRowUI(OptionRow):
     """Implementation of the option row."""
-    _value_order: Sequence[utils.SpecialID]
-
     def __init__(self, parent: ttk.Frame) -> None:
         super().__init__()
         self.label = ttk.Label(parent)
@@ -191,7 +189,6 @@ class TkSelector(Selector[IconUI, OptionRowUI]):
         tk_img.apply(self.wid_image_left, IMG_ARROW_LEFT)
         tk_img.apply(self.wid_image, IMG_CORR_BLANK)
         tk_img.apply(self.wid_image_right, IMG_ARROW_RIGHT)
-        self.tk_img = tk_img
 
         self.wid_title = ttk.Label(
             frm_right,
@@ -284,7 +281,8 @@ class TkSelector(Selector[IconUI, OptionRowUI]):
         self.canvas['yscrollcommand'] = scrollbar.set
 
         # Avoid making self a cell var.
-        self.canvas.bind('<Configure>', tk_tools.make_handler(self.evt_resized))
+        self.canvas.bind('<Configure>', self.evt_window_resized)
+        self._canv_pos = CanvasPositioner(place_icon, self.canvas, WIDTH, HEIGHT)
 
         self.help_lbl = ttk.Label(self.canvas)
         set_text(self.help_lbl, TRANS_HELP)
@@ -303,23 +301,14 @@ class TkSelector(Selector[IconUI, OptionRowUI]):
             nursery.start_soon(self.btn_orient.task)
 
     @override
-    async def ui_win_reflow(self) -> None:
-        """Called to reposition the corridors."""
-        self.canvas.delete('icons')
+    def evt_window_resized(self, event: object) -> None:
+        """Reshape various frames as required."""
+        super().evt_window_resized(event)
 
-        pos = CanvasPositioner(place_icon, self.canvas, WIDTH, HEIGHT)
+        width = self.canvas.winfo_width()
+        self.canvas.itemconfigure(self.help_lbl_win, width=width)
+        self.help_lbl['wraplength'] = width
 
-        self.canvas.itemconfigure(self.help_lbl_win, width=pos.width)
-        self.help_lbl['wraplength'] = pos.width
-
-        await tk_tools.wait_eventloop()
-        (x1, y1, x2, y2) = self.canvas.bbox(self.help_lbl_win)
-        pos.yoff += y2 - y1
-
-        pos.place_slots(self.icons.placed, 'icons')
-        pos.resize_canvas()
-
-        # Reshape the description frame.
         right_width = self.frm_img.winfo_reqwidth()
         if self.right_scroll.winfo_ismapped():
             right_width -= self.right_scroll.winfo_width()
@@ -330,6 +319,23 @@ class TkSelector(Selector[IconUI, OptionRowUI]):
         )
         self.right_canv.itemconfigure(self.right_frame_winid, width=right_width)
         self.right_canv['width'] = right_width
+
+    @override
+    def _ui_calc_columns(self) -> int:
+        """Calculate the required number of columns."""
+        return self._canv_pos.calc_columns()
+
+    @override
+    async def _ui_reposition_items(self) -> None:
+        """Called to reposition the corridors."""
+        self.canvas.delete('icons')
+
+        # Items are placed after the help text.
+        (x1, y1, x2, y2) = self.canvas.bbox(self.help_lbl_win)
+        self._canv_pos.reset(y2 - y1)
+
+        self._canv_pos.place_slots(self.icons.placed, 'icons')
+        self._canv_pos.resize_canvas()
 
     @override
     def ui_win_hide(self) -> None:

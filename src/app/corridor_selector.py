@@ -7,13 +7,15 @@ from abc import abstractmethod
 import itertools
 import random
 
+from typing_extensions import override
+
 from trio_util import AsyncValue, RepeatedEvent
 import attrs
 import srctools.logger
 import trio
 import trio_util
 
-from app import DEV_MODE, EdgeTrigger, WidgetCache, img
+from app import DEV_MODE, EdgeTrigger, ReflowWindow, WidgetCache, img
 from app.mdown import MarkdownData
 from config.corridors import UIState, Config, Options
 from corridor import GameMode, Direction, Orient, Option
@@ -112,6 +114,7 @@ class OptionRow:
     """API for a row used for corridor options."""
     # The current value for the row.
     current: AsyncValue[utils.SpecialID]
+    _value_order: Sequence[utils.SpecialID]
 
     def __init__(self) -> None:
         self.current = AsyncValue(utils.ID_RANDOM)
@@ -125,7 +128,7 @@ class OptionRow:
         raise NotImplementedError
 
 
-class Selector[IconT: Icon, OptionRowT: OptionRow]:
+class Selector[IconT: Icon, OptionRowT: OptionRow](ReflowWindow):
     """Corridor selection UI."""
     # When you click a corridor, it's saved here and displayed when others aren't
     # moused over. Reset on style/group swap.
@@ -161,6 +164,7 @@ class Selector[IconT: Icon, OptionRowT: OptionRow]:
     state_mode: AsyncValue[GameMode]
 
     def __init__(self, conf: UIState) -> None:
+        super().__init__()
         self.sticky_corr = None
         self.displayed_corr = AsyncValue(None)
         self.img_ind = 0
@@ -179,6 +183,7 @@ class Selector[IconT: Icon, OptionRowT: OptionRow]:
         async with trio.open_nursery() as nursery:
             nursery.start_soon(self._window_task)
             nursery.start_soon(self._display_task)
+            nursery.start_soon(self.refresh_items_task)
             nursery.start_soon(self._save_config_task)
             nursery.start_soon(self._mode_switch_task)
             nursery.start_soon(self.ui_task)
@@ -304,11 +309,13 @@ class Selector[IconT: Icon, OptionRowT: OptionRow]:
         # Reset item display, it's invalid.
         self.sticky_corr = None
         self.displayed_corr.value = None
-        # Reposition everything.
-        await self.ui_win_reflow()
+        # Items must be repositioned.
+        self.items_dirty.set()
 
-    async def evt_resized(self) -> None:
+    @override
+    def evt_window_resized(self, event: object) -> None:
         """When the window is resized, save configuration."""
+        super().evt_window_resized(event)
         width, height = self.ui_win_getsize()
         config.APP.store_conf(UIState(
             self.state_mode.value,
@@ -316,7 +323,6 @@ class Selector[IconT: Icon, OptionRowT: OptionRow]:
             self.state_orient.value,
             width, height,
         ))
-        await self.ui_win_reflow()
 
     def evt_hover_enter(self, icon: IconT) -> None:
         """Display the specified corridor temporarily on hover."""
@@ -542,11 +548,6 @@ class Selector[IconT: Icon, OptionRowT: OptionRow]:
     @abstractmethod
     def ui_win_getsize(self) -> tuple[int, int]:
         """Fetch the current dimensions, for saving."""
-        raise NotImplementedError
-
-    @abstractmethod
-    async def ui_win_reflow(self) -> None:
-        """Reposition everything after the window has resized."""
         raise NotImplementedError
 
     @abstractmethod
