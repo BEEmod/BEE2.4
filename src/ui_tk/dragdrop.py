@@ -39,9 +39,8 @@ class GeoManager(Enum):
 class CanvasPositioner[T]:
     """Positions slots on a canvas.
 
-
     - spacing is the amount added on each side of each slot.
-    - yoff is the offset from the top, the new height is then returned to allow chaining.
+    - yoff is the offset from the top.
     T is the slot object, but it can be anything as long as the place_func matches.
     """
     canvas: tk.Canvas
@@ -67,12 +66,22 @@ class CanvasPositioner[T]:
         self.item_width = item_width + spacing * 2
         self.item_height = item_height + spacing * 2
 
-        self.width = canvas.winfo_width()
+        self.width = 0
+        self.columns = self.calc_columns()
 
-        self.columns = (self.width - spacing) // self.item_width
+    def calc_columns(self) -> int:
+        """Recalcuate the required number of columns."""
+        self.width = self.canvas.winfo_width()
+        self.columns = (self.width - self.spacing) // self.item_width
         if self.columns < 1:
             # Can't fit, they're going to stick out.
             self.columns = 1
+        return self.columns
+
+    def reset(self, yoff: int = 0) -> None:
+        """Reset back to the start."""
+        self.current = 0  # Current x index.
+        self.yoff = yoff + self.spacing
 
     def advance_row(self) -> None:
         """Advance to the next row."""
