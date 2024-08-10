@@ -136,7 +136,10 @@ class OptionRowUI(OptionRow):
         self.combo.Bind(wx.EVT_COMBOBOX, self.on_changed)
 
     @override
-    async def display(self, row: int, option: Option, remove_event: trio.Event) -> None:
+    async def display(
+        self, row: int, option: Option, remove_event: trio.Event,
+        *, task_status: trio.TaskStatus = trio.TASK_STATUS_IGNORED,
+    ) -> None:
         """Reconfigure this row to display the specified option, then show it.
 
         Once the event triggers, remove the row.
@@ -361,4 +364,3 @@ class WxSelector(Selector[IconUI, OptionRowUI]):
     @override
     def ui_option_refreshed(self) -> None:
         self.sizer_right.Layout()
-        self.pane_right.Update()

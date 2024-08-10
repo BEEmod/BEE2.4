@@ -120,7 +120,11 @@ class OptionRow:
         self.current = AsyncValue(utils.ID_RANDOM)
 
     @abstractmethod
-    async def display(self, row: int, option: Option, remove_event: trio.Event) -> None:
+    async def display(
+        self,
+        row: int, option: Option, remove_event: trio.Event,
+        *, task_status: trio.TaskStatus = trio.TASK_STATUS_IGNORED,
+    ) -> None:
         """Reconfigure this row to display the specified option, then show it.
 
         Once the event triggers, remove the row.
@@ -446,10 +450,17 @@ class Selector[IconT: Icon, OptionRowT: OptionRow](ReflowWindow):
                     done_event = trio.Event()
                     opt: Option
                     row: OptionRowT
-                    for ind, (opt, row) in enumerate(zip(options, self.option_rows, strict=False)):
-                        row.current.value = option_conf.value_for(opt)
-                        nursery.start_soon(row.display, ind, opt, done_event)
-                        option_async_vals.append((opt.id, row.current))
+                    # This nursery exits only once all the option tasks has fully initialised.
+                    async with trio.open_nursery() as start_nursery:
+                        for ind, (opt, row) in enumerate(
+                            zip(options, self.option_rows, strict=False)
+                        ):
+                            row.current.value = option_conf.value_for(opt)
+                            start_nursery.start_soon(
+                                nursery.start,
+                                row.display, ind, opt, done_event,
+                            )
+                            option_async_vals.append((opt.id, row.current))
 
                     # This task stores results when a config is changed. Not required
                     # if we don't actually have any options.

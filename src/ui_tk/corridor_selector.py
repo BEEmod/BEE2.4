@@ -106,7 +106,10 @@ class OptionRowUI(OptionRow):
         tooltip.add_tooltip(self.label)
 
     @override
-    async def display(self, row: int, option: Option, remove_event: trio.Event) -> None:
+    async def display(
+        self, row: int, option: Option, remove_event: trio.Event,
+        *, task_status: trio.TaskStatus = trio.TASK_STATUS_IGNORED,
+    ) -> None:
         """Display the row in the specified position, then remove when the event triggers."""
         set_text(self.label, option.name)
         tooltip.set_tooltip(self.label, option.desc)
@@ -126,6 +129,7 @@ class OptionRowUI(OptionRow):
         self.label.grid(row=row + 1, column=0)
         self.combo.grid(row=row + 1, column=1, sticky='ew')
         # Wait for the signal that the corridor has been deselected, then remove.
+        task_status.started()
         await remove_event.wait()
         self.label.grid_forget()
         self.combo.grid_forget()
