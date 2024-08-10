@@ -30,7 +30,7 @@ LOGGER = srctools.logger.get_logger(__name__)
 WIDTH: Final = corridor.IMG_WIDTH_SML + 16
 HEIGHT: Final = corridor.IMG_HEIGHT_SML + 16
 
-IMG_CORR_BLANK: Final = img.Handle.blank(corridor.IMG_WIDTH_LRG, corridor.IMG_HEIGHT_LRG)
+IMG_CORR_BLANK: Final = img.Handle.background(corridor.IMG_WIDTH_LRG, corridor.IMG_HEIGHT_LRG)
 IMG_ARROW_LEFT: Final = img.Handle.builtin('BEE2/switcher_arrow', 17, 64)
 IMG_ARROW_RIGHT: Final = IMG_ARROW_LEFT.crop(transpose=img.FLIP_LEFT_RIGHT)
 

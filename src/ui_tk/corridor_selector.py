@@ -111,7 +111,7 @@ class OptionRowUI(OptionRow):
         *, task_status: trio.TaskStatus = trio.TASK_STATUS_IGNORED,
     ) -> None:
         """Display the row in the specified position, then remove when the event triggers."""
-        set_text(self.label, option.name)
+        set_text(self.label, TransToken.untranslated('{name}: ').format(name=option.name))
         tooltip.set_tooltip(self.label, option.desc)
         tooltip.set_tooltip(self.combo, option.desc)
         self.combo['values'] = [

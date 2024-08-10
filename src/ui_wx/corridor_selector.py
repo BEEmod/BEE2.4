@@ -127,7 +127,7 @@ class IconUI(Icon):
 class OptionRowUI(OptionRow):
     """Implementation of the option row."""
 
-    def __init__(self, parent: wx.Panel, sizer: wx.GridSizer) -> None:
+    def __init__(self, parent: wx.Panel, sizer: wx.GridBagSizer) -> None:
         super().__init__()
         self.parent_sizer = sizer
         self.label = wx.StaticText(parent, style=wx.ALIGN_RIGHT)
@@ -144,7 +144,7 @@ class OptionRowUI(OptionRow):
 
         Once the event triggers, remove the row.
         """
-        set_text(self.label, option.name)
+        set_text(self.label, TransToken.untranslated('{name}: ').format(name=option.name))
         set_tooltip(self.label, option.desc)
         set_tooltip(self.combo, option.desc)
         self.combo.Set([
@@ -157,13 +157,15 @@ class OptionRowUI(OptionRow):
         ]
         # Caller has assigned one of our IDs to our AsyncValue, so index() should always succeed.
         self.combo.Selection = self._value_order.index(self.current.value)
+        await trio.lowlevel.checkpoint()
 
-        self.parent_sizer.Add(self.label, 0, wx.EXPAND, 0)
-        self.parent_sizer.Add(self.combo, 0, 0, 0)
+        self.parent_sizer.Add(self.label, wx.GBPosition(row, 0), flag=wx.EXPAND | wx.ALIGN_CENTER_VERTICAL)
+        self.parent_sizer.Add(self.combo, wx.GBPosition(row, 1))
         self.label.Show()
         self.combo.Show()
         self.parent_sizer.Layout()
         # Wait for the signal that the corridor has been deselected, then remove.
+        task_status.started()
         await remove_event.wait()
         self.parent_sizer.Detach(self.label)
         self.parent_sizer.Detach(self.combo)
@@ -193,8 +195,9 @@ class WxSelector(Selector[IconUI, OptionRowUI]):
         self.win.Bind(wx.EVT_CLOSE, lambda evt: self_ref.close_event.set())
         set_win_title(self.win, TRANS_TITLE)
 
-        self.win_splitter = wx.SplitterWindow(self.win)
-        self.win_splitter.SetMinimumPaneSize(20)
+        self.win_splitter = wx.SplitterWindow(self.win, style=wx.SP_BORDER)
+        self.win_splitter.SetMinimumPaneSize(200)
+        self.win_splitter.SetSashGravity(1.0)  # Only left side moves when resized.
 
         self.pane_left = wx.Panel(self.win_splitter)
         self.pane_right = wx.Panel(self.win_splitter)
@@ -205,7 +208,7 @@ class WxSelector(Selector[IconUI, OptionRowUI]):
         self.pane_right.SetSizer(sizer_right)
 
         sizer_img = wx.BoxSizer(wx.HORIZONTAL)
-        sizer_right.Add(sizer_img, wx.SizerFlags().Proportion(0).CenterHorizontal())
+        sizer_right.Add(sizer_img, wx.SizerFlags().CenterHorizontal())
 
         self.btn_image_left = wx.Button(self.pane_right, style=wx.BU_EXACTFIT)
         self.wid_image = wx.StaticBitmap(self.pane_right)
@@ -223,35 +226,41 @@ class WxSelector(Selector[IconUI, OptionRowUI]):
 
         self.wid_title = wx.StaticText(self.pane_right)
         self.wid_title.SetFont(wx.Font(12, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, 0, ""))
-        sizer_right.Add(self.wid_title, wx.SizerFlags().Proportion(0).CenterHorizontal())
+        sizer_right.Add(self.wid_title, wx.SizerFlags().CenterHorizontal())
 
         self.wid_authors = wx.StaticText(self.pane_right)
-        sizer_right.Add(self.wid_authors, wx.SizerFlags().Proportion(0).CenterHorizontal())
+        sizer_right.Add(self.wid_authors, wx.SizerFlags().CenterHorizontal())
 
         self.wid_desc = wx.html.HtmlWindow(self.pane_right, wx.ID_ANY)
         sizer_right.Add(self.wid_desc, 1, wx.EXPAND, 0)
 
+        sizer_right.Add(0, 8)
         self.wid_options_title = wx.StaticText(self.pane_right)
         self.wid_options_title.SetFont(wx.Font(10, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, 0, ""))
-        sizer_right.Add(self.wid_options_title, 0, 0, 0)
+        sizer_right.Add(self.wid_options_title, wx.SizerFlags().CenterHorizontal())
 
         self.wid_no_options = wx.StaticText(self.pane_right)
         set_text(self.wid_no_options, TRANS_NO_OPTIONS)
-        sizer_right.Add(self.wid_no_options, 0, wx.EXPAND, 0)
+        sizer_right.Add(self.wid_no_options, wx.SizerFlags().CenterHorizontal())
 
-        self.sizer_options = wx.GridSizer(0, 2, 0, 0)
-        sizer_right.Add(self.sizer_options, 0, wx.EXPAND, 0)
+        self.sizer_options = wx.GridBagSizer(4, 2)
+        sizer_right.Add(self.sizer_options, wx.SizerFlags().CenterHorizontal())
 
         sizer_ctrl_btns = wx.BoxSizer(wx.HORIZONTAL)
         sizer_right.Add(0, 8)
+        sizer_right.Add(
+            wx.StaticLine(self.pane_right, wx.HORIZONTAL),
+            wx.SizerFlags().Expand(),
+        )
+        sizer_right.Add(0, 4)
         sizer_right.Add(sizer_ctrl_btns, 0, wx.ALIGN_CENTER_HORIZONTAL, 0)
 
         self.btn_just_this = wx.Button(self.pane_right)
         set_text(self.btn_just_this, TRANS_ONLY_THIS)
-        sizer_ctrl_btns.Add(self.btn_just_this, wx.SizerFlags().Proportion(0))
+        sizer_ctrl_btns.Add(self.btn_just_this, wx.SizerFlags())
 
         self.btn_close = wx.Button(self.pane_right, wx.ID_CLOSE, "")
-        sizer_ctrl_btns.Add(self.btn_close, wx.SizerFlags().Proportion(0))
+        sizer_ctrl_btns.Add(self.btn_close, wx.SizerFlags())
 
         self.btn_just_this.Bind(wx.EVT_BUTTON, lambda evt: self_ref.evt_select_one())
         self.btn_close.Bind(wx.EVT_BUTTON, lambda evt: self_ref.close_event.set())
@@ -260,24 +269,24 @@ class WxSelector(Selector[IconUI, OptionRowUI]):
         self.pane_left.SetSizer(sizer_left)
 
         sizer_btns = wx.BoxSizer(wx.HORIZONTAL)
-        sizer_left.Add(sizer_btns, wx.SizerFlags().Proportion(0))
+        sizer_left.Add(sizer_btns, wx.SizerFlags().CentreHorizontal())
 
         self.btn_mode = EnumButton(self.pane_left, self.state_mode, OPTS_MODE)
         self.btn_direction = EnumButton(self.pane_left, self.state_dir, OPTS_DIR)
         self.btn_orient = EnumButton(self.pane_left, self.state_orient, OPTS_ORIENT)
 
-        btn_flags = wx.SizerFlags().Proportion(0).Border(wx.LEFT | wx.RIGHT, 4)
+        btn_flags = wx.SizerFlags().Border(wx.LEFT | wx.RIGHT, 4)
         sizer_btns.Add(self.btn_mode.sizer, btn_flags)
         sizer_btns.Add(self.btn_direction.sizer, btn_flags)
         sizer_btns.Add(self.btn_orient.sizer, btn_flags)
 
         lbl_info = wx.StaticText(self.pane_left)
         set_text(lbl_info, TRANS_HELP)
-        sizer_left.Add(lbl_info, wx.SizerFlags().Proportion(0).Border(wx.ALL, 8))
+        sizer_left.Add(lbl_info, wx.SizerFlags().Border(wx.ALL, 8))
 
         self.panel_items = wx.ScrolledWindow(self.pane_left, style=wx.BORDER_SUNKEN)
         self.sizer_items = wx.BoxSizer(wx.VERTICAL)
-        sizer_left.Add(self.panel_items, wx.SizerFlags().Proportion(1).Expand())
+        sizer_left.Add(self.panel_items, wx.SizerFlags(1).Expand())
         self.panel_items.SetSizer(self.sizer_items)
         self.panel_items.Bind(wx.EVT_SIZE, self.evt_window_resized)
         self.panel_items.SetScrollRate(0, 10)
