@@ -460,6 +460,7 @@ class Selector[IconT: Icon, OptionRowT: OptionRow](ReflowWindow):
                             option_conf_id,
                             done_event,
                         )
+                    self.ui_option_refreshed()
 
                     # Wait for a new corridor to be switched to, then cancel the event to remove
                     # them all.
@@ -477,6 +478,7 @@ class Selector[IconT: Icon, OptionRowT: OptionRow](ReflowWindow):
                     show_no_options=False,
                 )
                 self.ui_enable_just_this(False)
+                self.ui_option_refreshed()
                 corr = await self.displayed_corr.wait_value(corr_changed)
 
     @staticmethod
@@ -576,3 +578,8 @@ class Selector[IconT: Icon, OptionRowT: OptionRow](ReflowWindow):
     def ui_option_create(self) -> OptionRowT:
         """Create a new option row."""
         raise NotImplementedError
+
+    @abstractmethod
+    def ui_option_refreshed(self) -> None:
+        """Called when the options have changed, so they can re re-layouted."""
+        # If not defined, do nothing.
