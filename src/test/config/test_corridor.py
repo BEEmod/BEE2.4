@@ -8,6 +8,8 @@ from srctools.dmx import Element
 from config.corridors import Direction, GameMode, Orient, Config, Options, UIState
 from config import UnknownVersion
 import utils
+from corridor import Attachment
+
 
 # Two sets of sample instance names, for testing parsing - in V1 and V2 formats.
 CORR_ENABLED = {
@@ -26,6 +28,15 @@ OPTION_SAMPLE: Mapping[utils.ObjectID, utils.SpecialID] = {
     utils.obj_id('side'): utils.obj_id('left'),
     utils.obj_id('suprises'): utils.ID_RANDOM,
 }
+
+ORIENT_COMBOS = [
+    (Direction.ENTRY, Orient.HORIZONTAL, Attachment.HORIZONTAL),
+    (Direction.ENTRY, Orient.UP, Attachment.FLOOR),
+    (Direction.ENTRY, Orient.DOWN, Attachment.CEILING),
+    (Direction.ENTRY, Orient.HORIZONTAL, Attachment.HORIZONTAL),
+    (Direction.EXIT, Orient.UP, Attachment.CEILING),
+    (Direction.EXIT, Orient.DOWN, Attachment.FLOOR),
+]
 
 
 def test_conf_parse_v3() -> None:
@@ -174,68 +185,109 @@ def test_export_dmx() -> None:
 
 
 @pytest.mark.parametrize('mode', GameMode)
-@pytest.mark.parametrize('orient', Orient)
+@pytest.mark.parametrize('attach', Attachment)
 @pytest.mark.parametrize('direction', Direction)
-def test_ui_parse_kv1(mode: GameMode, orient: Orient, direction: Direction) -> None:
+def test_ui_parse_kv1(mode: GameMode, attach: Attachment, direction: Direction) -> None:
     """Test parsing keyvalues1 UI state."""
     kv = Keyvalues('Corridor', [
         Keyvalues('mode', mode.value),
-        Keyvalues('orient', orient.value),
+        Keyvalues('attach', attach.value),
         Keyvalues('direction', direction.value),
         Keyvalues('width', '272'),
         Keyvalues('height', '849'),
     ])
     assert UIState.parse_kv1(kv, 1) == UIState(
-        last_mode=mode, last_orient=orient, last_direction=direction,
+        last_mode=mode, last_attach=attach, last_direction=direction,
         width=272, height=849,
     )
 
 
 @pytest.mark.parametrize('mode', GameMode)
-@pytest.mark.parametrize('orient', Orient)
+@pytest.mark.parametrize('direction, orient, attach', ORIENT_COMBOS)
+def test_ui_parse_kv1_orient(
+    mode: GameMode,
+    direction: Direction, orient: Orient,
+    attach: Attachment,
+) -> None:
+    """Test parsing old orient keys."""
+    kv = Keyvalues('Corridor', [
+        Keyvalues('mode', mode.value),
+        Keyvalues('direction', direction.value),
+        Keyvalues('orient', orient.value),
+        Keyvalues('width', '272'),
+        Keyvalues('height', '849'),
+    ])
+    assert UIState.parse_kv1(kv, 1) == UIState(
+        last_mode=mode, last_attach=attach, last_direction=direction,
+        width=272, height=849,
+    )
+
+
+@pytest.mark.parametrize('mode', GameMode)
+@pytest.mark.parametrize('attach', Attachment)
 @pytest.mark.parametrize('direction', Direction)
-def test_ui_export_kv1(mode: GameMode, orient: Orient, direction: Direction) -> None:
+def test_ui_export_kv1(mode: GameMode, attach: Attachment, direction: Direction) -> None:
     """Test exporting keyvalues1 UI state."""
     kv = UIState(
-        last_mode=mode, last_orient=orient, last_direction=direction,
+        last_mode=mode, last_attach=attach, last_direction=direction,
         width=272, height=849,
     ).export_kv1()
     assert len(kv) == 5
     assert kv['mode'] == mode.value
-    assert kv['orient'] == orient.value
+    assert kv['attach'] == attach.value
     assert kv['width'] == '272'
     assert kv['height'] == '849'
 
 
 @pytest.mark.parametrize('mode', GameMode)
-@pytest.mark.parametrize('orient', Orient)
+@pytest.mark.parametrize('attach', Attachment)
 @pytest.mark.parametrize('direction', Direction)
-def test_ui_parse_dmx(mode: GameMode, orient: Orient, direction: Direction) -> None:
+def test_ui_parse_dmx(mode: GameMode, attach: Attachment, direction: Direction) -> None:
     """Test parsing dmx UI state."""
+    elem = Element('UIState', 'DMEElement')
+    elem['mode'] = mode.value
+    elem['attach'] = attach.value
+    elem['direction'] = direction.value
+    elem['width'] = 272
+    elem['height'] = 849
+
+    assert UIState.parse_dmx(elem, 1) == UIState(
+        last_mode=mode, last_attach=attach, last_direction=direction,
+        width=272, height=849,
+    )
+
+
+@pytest.mark.parametrize('mode', GameMode)
+@pytest.mark.parametrize('direction, orient, attach', ORIENT_COMBOS)
+def test_ui_parse_dmx_orient(
+    mode: GameMode,
+    direction: Direction, orient: Orient,
+    attach: Attachment,
+) -> None:
+    """Test parsing old orient keys."""
     elem = Element('UIState', 'DMEElement')
     elem['mode'] = mode.value
     elem['orient'] = orient.value
     elem['direction'] = direction.value
     elem['width'] = 272
     elem['height'] = 849
-
     assert UIState.parse_dmx(elem, 1) == UIState(
-        last_mode=mode, last_orient=orient, last_direction=direction,
+        last_mode=mode, last_attach=attach, last_direction=direction,
         width=272, height=849,
     )
 
 
 @pytest.mark.parametrize('mode', GameMode)
-@pytest.mark.parametrize('orient', Orient)
+@pytest.mark.parametrize('attach', Attachment)
 @pytest.mark.parametrize('direction', Direction)
-def test_ui_export_dmx(mode: GameMode, orient: Orient, direction: Direction) -> None:
+def test_ui_export_dmx(mode: GameMode, attach: Attachment, direction: Direction) -> None:
     """Test exporting dmx UI state."""
     elem = UIState(
-        last_mode=mode, last_orient=orient, last_direction=direction,
+        last_mode=mode, last_attach=attach, last_direction=direction,
         width=272, height=849,
     ).export_dmx()
     assert len(elem) == 6
     assert elem['mode'].val_string == mode.value
-    assert elem['orient'].val_string == orient.value
+    assert elem['attach'].val_string == attach.value
     assert elem['width'].val_int == 272
     assert elem['height'].val_int == 849

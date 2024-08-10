@@ -7,16 +7,13 @@ from srctools import EmptyMapping, Keyvalues, conv_bool, bool_as_int, logger
 from srctools.dmx import Element, ValueType as DMXValue
 import attrs
 
-from corridor import Direction, GameMode, Option, Orient
+from corridor import Attachment, Direction, GameMode, ORIENT_TO_ATTACH, Option, Orient
 import config
 import utils
 
 
 LOGGER = logger.get_logger(__name__)
-__all__ = [
-    'Direction', 'GameMode', 'Orient',  # Re-export
-    'Config', 'Options', 'UIState',
-]
+__all__ = ['Config', 'Options', 'UIState']
 
 
 @config.PALETTE.register
@@ -193,7 +190,7 @@ class UIState(config.Data, conf_name='CorridorUIState'):
     """The current window state for saving and restoring."""
     last_mode: GameMode = GameMode.SP
     last_direction: Direction = Direction.ENTRY
-    last_orient: Orient = Orient.HORIZONTAL
+    last_attach: Attachment = Attachment.HORIZONTAL
     width: int = -1
     height: int = -1
 
@@ -214,12 +211,17 @@ class UIState(config.Data, conf_name='CorridorUIState'):
             last_direction = Direction.ENTRY
 
         try:
-            last_orient = Orient(data['orient'])
+            last_attach = Attachment(data['attach'])
         except (LookupError, ValueError):
-            last_orient = Orient.HORIZONTAL
+            try:
+                last_orient = Orient(data['orient'])
+            except (LookupError, ValueError):
+                last_attach = Attachment.HORIZONTAL
+            else:
+                last_attach = ORIENT_TO_ATTACH[last_direction, last_orient]
 
         return UIState(
-            last_mode, last_direction, last_orient,
+            last_mode, last_direction, last_attach,
             data.int('width', -1),
             data.int('height', -1),
         )
@@ -230,7 +232,7 @@ class UIState(config.Data, conf_name='CorridorUIState'):
         return Keyvalues('', [
             Keyvalues('mode', self.last_mode.value),
             Keyvalues('direction', self.last_direction.value),
-            Keyvalues('orient', self.last_orient.value),
+            Keyvalues('attach', self.last_attach.value),
             Keyvalues('width', str(self.width)),
             Keyvalues('height', str(self.height)),
         ])
@@ -255,6 +257,15 @@ class UIState(config.Data, conf_name='CorridorUIState'):
             last_orient = Orient(data['orient'].val_string)
         except (LookupError, ValueError):
             last_orient = Orient.HORIZONTAL
+        try:
+            last_attach = Attachment(data['attach'].val_string)
+        except (LookupError, ValueError):
+            try:
+                last_orient = Orient(data['orient'].val_string)
+            except (LookupError, ValueError):
+                last_attach = Attachment.HORIZONTAL
+            else:
+                last_attach = ORIENT_TO_ATTACH[last_direction, last_orient]
 
         try:
             width = data['width'].val_int
@@ -266,7 +277,7 @@ class UIState(config.Data, conf_name='CorridorUIState'):
             height = -1
 
         return UIState(
-            last_mode, last_direction, last_orient,
+            last_mode, last_direction, last_attach,
             width, height,
         )
 
@@ -276,7 +287,7 @@ class UIState(config.Data, conf_name='CorridorUIState'):
         element = Element('UIState', 'DMElement')
         element['mode'] = self.last_mode.value
         element['direction'] = self.last_direction.value
-        element['orient'] = self.last_orient.value
+        element['attach'] = self.last_attach.value
         element['width'] = self.width
         element['height'] = self.height
         return element
