@@ -15,10 +15,11 @@ from app.mdown import MarkdownData
 import packages
 import editoritems
 from corridor import (
-    CorrKind, CorrSpec, OptValue, OptionGroup,
+    Attachment, CorrKind, CorrSpec, OptValue, OptionGroup,
     Orient, Direction, GameMode,
     Option, Corridor,
     CORRIDOR_COUNTS, ID_TO_CORR,
+    ATTACH_TO_ORIENT, ORIENT_TO_ATTACH,
 )
 from transtoken import AppError, TransToken, TransTokenSource
 
@@ -73,6 +74,7 @@ class CorridorUI(Corridor):
 
 def parse_specifier(specifier: str) -> CorrSpec:
     """Parse a string like 'sp_entry' or 'exit_coop_dn' into the 3 enums."""
+    attach: Attachment | None = None
     orient: Orient | None = None
     mode: GameMode | None = None
     direction: Direction | None = None
@@ -87,12 +89,21 @@ def parse_specifier(specifier: str) -> CorrSpec:
             direction = parsed_dir
             continue
         try:
+            parsed_attach = Attachment[part.upper()]
+        except KeyError:
+            pass
+        else:
+            if attach is not None or orient is not None:
+                raise ValueError(f'Multiple attachment keywords in "{specifier}"!')
+            attach = parsed_attach
+            continue
+        try:
             parsed_orient = Orient[part.upper()]
         except KeyError:
             pass
         else:
-            if orient is not None:
-                raise ValueError(f'Multiple orientation keywords in "{specifier}"!')
+            if attach is not None or orient is not None:
+                raise ValueError(f'Multiple attachment keywords in "{specifier}"!')
             orient = parsed_orient
             continue
         try:
@@ -107,19 +118,22 @@ def parse_specifier(specifier: str) -> CorrSpec:
         # Completely empty specifier will split into [''], allow `sp__exit` too.
         if part:
             raise ValueError(f'Unknown keyword "{part}" in "{specifier}"!')
-    return mode, direction, orient
+    if orient is not None:
+        # Use exit so that 'up' -> ceiling, 'down' -> floor.
+        attach = ORIENT_TO_ATTACH[direction or Direction.EXIT, orient]
+    return mode, direction, attach
 
 
 def parse_corr_kind(specifier: str) -> CorrKind:
     """Parse a string into a specific corridor type."""
-    mode, direction, orient = parse_specifier(specifier)
-    if orient is None:  # Infer horizontal if unspecified.
-        orient = Orient.HORIZONTAL
+    mode, direction, attach = parse_specifier(specifier)
+    if attach is None:  # Infer horizontal if unspecified.
+        attach = Attachment.HORIZONTAL
     if direction is None:
         raise ValueError(f'Direction must be specified in "{specifier}"!')
     if mode is None:
         raise ValueError(f'Game mode must be specified in "{specifier}"!')
-    return mode, direction, orient
+    return mode, direction, attach
 
 
 def parse_option(
@@ -153,7 +167,7 @@ def parse_option(
         default = values[0].id
     else:
         if default not in valid_ids and default != utils.ID_RANDOM:
-            LOGGER.warning('Default id "{}" is not valid!',default)
+            LOGGER.warning('Default id "{}" is not valid!', default)
             default = values[0].id
 
     return Option(
@@ -217,17 +231,17 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
             if not images:
                 images.append(ICON_GENERIC_LRG)
 
-            mode, direction, orient = parse_corr_kind(kv.name)
+            mode, direction, attach = parse_corr_kind(kv.name)
 
             if is_legacy := kv.bool('legacy'):
-                if orient is Orient.HORIZONTAL:
+                if attach is Attachment.HORIZONTAL:
                     LOGGER.warning(
                         '{.value}_{.value}_{.value} has legacy corridor "{}"',
-                        mode, direction, orient, kv['Name', kv['instance']],
+                        mode, direction, attach, kv['Name', kv['instance']],
                     )
                 else:
                     raise ValueError(
-                        f'Non-horizontal {mode.value}_{direction.value}_{orient.value} corridor '
+                        f'Non-horizontal {mode.value}_{direction.value}_{attach.value} corridor '
                         f'"{kv["Name", kv["instance"]]}" cannot be defined as a legacy corridor!'
                     )
             try:
@@ -235,7 +249,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
             except LookupError:
                 name = TRANS_CORRIDOR_GENERIC
 
-            corridors[mode, direction, orient].append(CorridorUI(
+            corridors[mode, direction, attach].append(CorridorUI(
                 instance=kv['instance'],
                 name=name,
                 authors=list(map(TransToken.untranslated, packages.sep_values(kv['authors', '']))),
@@ -307,7 +321,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                         packset.add(corridor_group, item.pak_id, item.pak_name)
 
                     corr_list = corridor_group.corridors.setdefault(
-                        (mode, direction, Orient.HORIZONTAL),
+                        (mode, direction, Attachment.HORIZONTAL),
                         [],
                     )
                     # If the item has corridors defined, transfer to this.
@@ -432,12 +446,12 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                 yield corr.name, f'{source}.name'
                 yield from corr.desc.iter_tokens(f'{source}.desc')
 
-    def defaults(self, mode: GameMode, direction: Direction, orient: Orient) -> list[CorridorUI]:
+    def defaults(self, mode: GameMode, direction: Direction, attach: Attachment) -> list[CorridorUI]:
         """Fetch the default corridor set for this mode, direction and orientation."""
         try:
-            corr_list = self.corridors[mode, direction, orient]
+            corr_list = self.corridors[mode, direction, attach]
         except KeyError:
-            if orient is Orient.HORIZONTAL:
+            if attach is Attachment.HORIZONTAL:
                 LOGGER.warning(
                     'No corridors defined for {}:{}_{}',
                     self.id, mode.value, direction.value,

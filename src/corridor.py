@@ -1,5 +1,8 @@
 """Data structure for specifying custom corridors."""
 from __future__ import annotations
+
+from typing import assert_never
+
 from typing_extensions import Final, Literal
 from collections.abc import Sequence, Mapping
 from enum import Enum
@@ -27,8 +30,32 @@ class Direction(Enum):
 
 
 @utils.freeze_enum_props
+class Attachment(Enum):
+    """The surface the corridor attaches to. Horizontal is vanilla."""
+    HORIZONTAL = 'horizontal'
+    FLAT = HORIZ = HORIZONTAL
+    FLOOR = 'floor'
+    CEILING = 'ceiling'
+    CEIL = CEILING
+
+    @property
+    def flipped(self) -> Attachment:
+        """Return the attachment flipped along Z."""
+        match self:
+            case Attachment.CEILING:
+                return Attachment.FLOOR
+            case Attachment.FLOOR:
+                return Attachment.CEILING
+            case Attachment.HORIZONTAL:
+                return Attachment.HORIZONTAL
+            case _:
+                # Aliases are treated as distinct.
+                assert_never(self)  # type: ignore[arg-type]
+
+
+@utils.freeze_enum_props
 class Orient(Enum):
-    """The orientation of the corridor, up/down are new."""
+    """Legacy enum, refers to the direction through the corridor."""
     HORIZONTAL = 'horizontal'
     FLAT = HORIZ = HORIZONTAL
     UP = 'up'
@@ -42,6 +69,20 @@ class Orient(Enum):
         if self is Orient.DN:
             return Orient.UP
         return self
+
+
+ORIENT_TO_ATTACH: Mapping[tuple[Direction, Orient], Attachment] = {
+    (Direction.ENTRY, Orient.FLAT): Attachment.FLAT,
+    (Direction.ENTRY, Orient.UP): Attachment.FLOOR,
+    (Direction.ENTRY, Orient.DN): Attachment.CEILING,
+    (Direction.EXIT, Orient.FLAT): Attachment.FLAT,
+    (Direction.EXIT, Orient.UP): Attachment.CEILING,
+    (Direction.EXIT, Orient.DN): Attachment.FLOOR,
+}
+ATTACH_TO_ORIENT: Mapping[tuple[Direction, Attachment], Orient] = {
+    (direct, attach): orient
+    for (direct, orient), attach in ORIENT_TO_ATTACH.items()
+}
 
 
 @attrs.frozen(kw_only=True)
@@ -86,9 +127,9 @@ ID_TO_CORR: Final[Mapping[utils.ObjectID, tuple[GameMode, Direction]]] = {
 CORR_TO_ID: Final[Mapping[tuple[GameMode, Direction], utils.ObjectID]] = {v: k for k, v in ID_TO_CORR.items()}
 
 # A specific type of corridor.
-type CorrKind = tuple[GameMode, Direction, Orient]
+type CorrKind = tuple[GameMode, Direction, Attachment]
 # A filter on which types this applies to. None values match all possible instead.
-type CorrSpec = tuple[GameMode | None, Direction | None, Orient | None]
+type CorrSpec = tuple[GameMode | None, Direction | None, Attachment | None]
 # Options are only differentiated based on mode/direction.
 type OptionGroup = tuple[GameMode, Direction]
 # Number of default instances for each kind.
