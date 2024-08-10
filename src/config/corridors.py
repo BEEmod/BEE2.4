@@ -28,10 +28,13 @@ class Config(config.Data, conf_name='Corridor', uses_id=True, version=2):
         style: str,
         mode: GameMode,
         direction: Direction,
-        orient: Orient,
+        attach: Attachment,
     ) -> str:
         """Given the style and kind of corridor, return the ID for config lookup."""
-        return f'{style.casefold()}:{mode.value}_{direction.value}_{orient.value}'
+        # We did use to use orientation here, but since only 1 corridor for each type was made
+        # at the time, they couldn't be disabled so no configs actually got saved.
+        # Only horizontal could be, but that didn't change.
+        return f'{style.casefold()}:{mode.value}_{direction.value}_{attach.value}'
 
     @classmethod
     @override
