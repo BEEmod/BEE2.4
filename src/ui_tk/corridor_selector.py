@@ -2,7 +2,7 @@
 from __future__ import annotations
 from typing import Final
 from typing_extensions import override
-from collections.abc import Sequence
+
 from tkinter import ttk
 import tkinter as tk
 
@@ -11,23 +11,22 @@ import trio
 from app import WidgetCache, img
 from app.corridor_selector import (
     WIDTH, HEIGHT, IMG_ARROW_LEFT, IMG_ARROW_RIGHT, IMG_CORR_BLANK, Icon,
-    OPTS_DIR, OPTS_MODE, OPTS_ORIENT,
-    OptionRow, Selector,
-    TRANS_HELP, TRANS_NO_OPTIONS, TRANS_ONLY_THIS,
-    TRANS_TITLE, TRANS_RAND_OPTION,
+    OPTS_DIR, OPTS_MODE, OPTS_ORIENT, OptionRow, Selector,
+    TRANS_HELP, TRANS_NO_OPTIONS, TRANS_ONLY_THIS, TRANS_RAND_OPTION, TRANS_TITLE,
 )
 from app.mdown import MarkdownData
 from config.corridors import UIState
 from corridor import Option
 from transtoken import TransToken
 from .dragdrop import CanvasPositioner
+import config
+import packages
+import utils
+
 from .img import TKImages
 from .wid_transtoken import set_text, set_win_title
 from .rich_textbox import RichText
 from . import TK_ROOT, tk_tools, tooltip
-import config
-import packages
-import utils
 
 
 ICON_CHECK_PADDING: Final = 2 if utils.WIN else 0
@@ -173,7 +172,7 @@ class TkSelector(Selector[IconUI, OptionRowUI]):
         frm_img.rowconfigure(1, weight=1)
 
         # Cache the TK name for the registered command so that we can reuse it.
-        self.changed_cmd = self.win.register(self._select_trigger.maybe_trigger)
+        self.changed_cmd = self.win.register(self.select_trigger.maybe_trigger)
 
         sel_img = self._sel_img
         self.wid_image_left = ttk.Button(frm_img, name='imgLeft', command=lambda: sel_img(-1))

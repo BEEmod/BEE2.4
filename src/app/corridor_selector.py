@@ -143,7 +143,7 @@ class Selector[IconT: Icon, OptionRowT: OptionRow](ReflowWindow):
     show_trigger: EdgeTrigger[()]
     close_event: RepeatedEvent
     # Triggered by the UI to indicate a corridor was (de)selected
-    _select_trigger: EdgeTrigger[()]
+    select_trigger: EdgeTrigger[()]
 
     # The widgets for each corridor.
     icons: WidgetCache[IconT]
@@ -175,7 +175,7 @@ class Selector[IconT: Icon, OptionRowT: OptionRow](ReflowWindow):
         self.state_dir = AsyncValue(conf.last_direction)
         self.state_mode = AsyncValue(conf.last_mode)
         self.show_trigger = EdgeTrigger()
-        self._select_trigger = EdgeTrigger()
+        self.select_trigger = EdgeTrigger()
         self.close_event = RepeatedEvent()
 
     async def task(self) -> None:
@@ -204,7 +204,7 @@ class Selector[IconT: Icon, OptionRowT: OptionRow](ReflowWindow):
     async def _save_config_task(self) -> None:
         """When a checkmark is changed, store the new config."""
         while True:
-            await self._select_trigger.wait()
+            await self.select_trigger.wait()
             self.prevent_deselection()
             self.store_conf()
 
@@ -579,7 +579,6 @@ class Selector[IconT: Icon, OptionRowT: OptionRow](ReflowWindow):
         """Create a new option row."""
         raise NotImplementedError
 
-    @abstractmethod
     def ui_option_refreshed(self) -> None:
         """Called when the options have changed, so they can re re-layouted."""
         # If not defined, do nothing.

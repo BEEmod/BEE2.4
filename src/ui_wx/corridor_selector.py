@@ -1,12 +1,11 @@
 """Wx implementation of the corridor selector."""
 from __future__ import annotations
-
-import itertools
 from typing import Final
-
-import trio
 from typing_extensions import override
 
+import itertools
+
+import trio
 import wx.html
 
 from app import WidgetCache, img
@@ -29,7 +28,7 @@ from .wid_transtoken import set_text, set_tooltip, set_win_title
 from .widgets import EnumButton
 
 
-ICON_CHECK_PADDING: Final = 8
+ICON_INSET: Final = 8
 
 
 class IconUI(Icon):
@@ -41,12 +40,22 @@ class IconUI(Icon):
         self.selector = selector
         self.img = ImageSlot(self.widget)
         self._selected = self._hovered = self._highlight = self._readonly = False
+        self.check_bounds = wx.Rect()
 
         self.widget.SetMinSize((WIDTH, HEIGHT))
         self.widget.Bind(wx.EVT_ENTER_WINDOW, self._evt_hover_enter)
         self.widget.Bind(wx.EVT_LEAVE_WINDOW, self._evt_hover_exit)
-        self.widget.Bind(wx.EVT_LEFT_UP, lambda e: self.selector.evt_selected(self))
+        self.widget.Bind(wx.EVT_LEFT_UP, self._evt_clicked)
         self.widget.Bind(wx.EVT_PAINT, self._on_paint)
+
+    def _evt_clicked(self, evt: wx.MouseEvent) -> None:
+        """Detect clicking on the checkbox."""
+        if not self._readonly and self.check_bounds.Contains(evt.Position):
+            self._selected = not self._selected
+            self.widget.Refresh()
+            self.selector.select_trigger.maybe_trigger()
+        else:
+            self.selector.evt_selected(self)
 
     def _on_paint(self, evt: wx.PaintEvent) -> None:
         """Draw the icon."""
@@ -57,15 +66,16 @@ class IconUI(Icon):
 
         dc.SetPen(PEN_SLOT_BORDER_SEL if self._highlight else PEN_SLOT_BORDER)
         dc.DrawRectangle(wx.Rect(wid_size))
-        self.img.draw(dc, 8, 8)
+        self.img.draw(dc, ICON_INSET, ICON_INSET)
 
+        self.check_bounds = wx.Rect(
+            ICON_INSET,
+            wid_size.Height - check_size.Height - ICON_INSET,
+            check_size.Width, check_size.Height,
+        )
         native.DrawCheckBox(
             self.widget, dc,
-            wx.Rect(
-                ICON_CHECK_PADDING,
-                wid_size.Height - check_size.Height - ICON_CHECK_PADDING,
-                check_size.Width, check_size.Height,
-            ),
+            self.check_bounds,
             (self._selected * wx.CONTROL_CHECKED) |
             (self._hovered * wx.CONTROL_CURRENT) |
             (self._readonly * wx.CONTROL_DISABLED),
@@ -192,7 +202,7 @@ class WxSelector(Selector[IconUI, OptionRowUI]):
         self.pane_right.SetSizer(sizer_right)
 
         sizer_img = wx.BoxSizer(wx.HORIZONTAL)
-        sizer_right.Add(sizer_img, 1, wx.ALIGN_CENTER_HORIZONTAL, 0)
+        sizer_right.Add(sizer_img, wx.SizerFlags().Proportion(0).CenterHorizontal())
 
         self.btn_image_left = wx.Button(self.pane_right, style=wx.BU_EXACTFIT)
         self.wid_image = wx.StaticBitmap(self.pane_right)
@@ -209,10 +219,10 @@ class WxSelector(Selector[IconUI, OptionRowUI]):
 
         self.wid_title = wx.StaticText(self.pane_right)
         self.wid_title.SetFont(wx.Font(12, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, 0, ""))
-        sizer_right.Add(self.wid_title, 0, wx.ALIGN_CENTER_HORIZONTAL, 0)
+        sizer_right.Add(self.wid_title, wx.SizerFlags().Proportion(0).CenterHorizontal())
 
         self.wid_authors = wx.StaticText(self.pane_right)
-        sizer_right.Add(self.wid_authors, 0, wx.ALIGN_CENTER_HORIZONTAL, 0)
+        sizer_right.Add(self.wid_authors, wx.SizerFlags().Proportion(0).CenterHorizontal())
 
         self.wid_desc = wx.html.HtmlWindow(self.pane_right, wx.ID_ANY)
         sizer_right.Add(self.wid_desc, 1, wx.EXPAND, 0)
@@ -258,7 +268,7 @@ class WxSelector(Selector[IconUI, OptionRowUI]):
 
         lbl_info = wx.StaticText(self.pane_left)
         set_text(lbl_info, TRANS_HELP)
-        sizer_left.Add(lbl_info, wx.SizerFlags().Proportion(0))
+        sizer_left.Add(lbl_info, wx.SizerFlags().Proportion(0).Border(wx.ALL, 8))
 
         self.panel_items = wx.ScrolledWindow(self.pane_left, style=wx.BORDER_SUNKEN)
         self.sizer_items = wx.BoxSizer(wx.VERTICAL)
