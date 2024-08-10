@@ -10,7 +10,7 @@ import trio
 
 from config.corridors import Config
 from corridor import (
-    CorrKind, Corridor, OptionGroup, Orient, Direction, GameMode,
+    CorrKind, Corridor, OptionGroup, Direction, GameMode, Attachment,
     CORRIDOR_COUNTS, ID_TO_CORR,
     ExportedConf,
 )
@@ -37,23 +37,23 @@ async def step_corridor_conf(exp_data: ExportData) -> None:
         raise Exception(f'No corridor group for style "{style_id}"!') from None
 
     export: dict[CorrKind, list[Corridor]] = {}
-    for mode, direction, orient in itertools.product(GameMode, Direction, Orient):
+    for mode, direction, attach in itertools.product(GameMode, Direction, Attachment):
         conf = config.APP.get_cur_conf(
             Config,
-            Config.get_id(style_id, mode, direction, orient),
+            Config.get_id(style_id, mode, direction, attach),
         )
         try:
             inst_to_corr = {
                 corr.instance.casefold(): corr
-                for corr in group.corridors[mode, direction, orient]
+                for corr in group.corridors[mode, direction, attach]
             }
         except KeyError:
             # None defined for this corridor. This is not an error for vertical ones.
-            (LOGGER.warning if orient is Orient.HORIZONTAL else LOGGER.debug)(
+            (LOGGER.warning if attach is Attachment.HORIZONTAL else LOGGER.debug)(
                 'No corridors defined for {}:{}_{}_{}',
-                style_id, mode.value, direction.value, orient.value,
+                style_id, mode.value, direction.value, attach.value,
             )
-            export[mode, direction, orient] = []
+            export[mode, direction, attach] = []
             continue
 
         if conf.enabled:
@@ -67,16 +67,16 @@ async def step_corridor_conf(exp_data: ExportData) -> None:
                 LOGGER.warning(
                     'No corridors selected for {}:{}_{}_{}',
                     style_id,
-                    mode.value, direction.value, orient.value,
+                    mode.value, direction.value, attach.value,
                 )
-                chosen = group.defaults(mode, direction, orient)
+                chosen = group.defaults(mode, direction, attach)
         else:
             # Use default setup, don't warn.
-            chosen = group.defaults(mode, direction, orient)
+            chosen = group.defaults(mode, direction, attach)
 
         for corr in chosen:
             exp_data.vbsp_conf.extend(await corr.config())
-        export[mode, direction, orient] = [corr.strip_ui() for corr in chosen]
+        export[mode, direction, attach] = [corr.strip_ui() for corr in chosen]
 
     result = ExportedConf(
         corridors=export,
@@ -109,15 +109,11 @@ async def step_corridor_conf(exp_data: ExportData) -> None:
         item.offset = Vec(64, 64, 64)
         # If vertical corridors exist, allow placement there.
         has_vert = False
-        if export[mode, direction, Orient.UP]:
-            item.invalid_surf.discard(
-                editoritems.Surface.FLOOR if direction is Direction.ENTRY else editoritems.Surface.CEIL
-            )
+        if export[mode, direction, Attachment.FLOOR]:
+            item.invalid_surf.discard(editoritems.Surface.FLOOR)
             has_vert = True
-        if export[mode, direction, Orient.DN]:
-            item.invalid_surf.discard(
-                editoritems.Surface.CEIL if direction is Direction.ENTRY else editoritems.Surface.FLOOR
-            )
+        if export[mode, direction, Attachment.CEILING]:
+            item.invalid_surf.discard(editoritems.Surface.CEIL)
             has_vert = True
         if has_vert:
             # Add a rotation handle.
