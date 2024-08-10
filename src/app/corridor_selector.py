@@ -18,7 +18,7 @@ import trio_util
 from app import DEV_MODE, EdgeTrigger, ReflowWindow, WidgetCache, img
 from app.mdown import MarkdownData
 from config.corridors import UIState, Config, Options
-from corridor import GameMode, Direction, Orient, Option
+from corridor import Attachment, GameMode, Direction, Option
 from packages import corridor
 from transtoken import TransToken
 import utils
@@ -39,10 +39,10 @@ IMG_ARROW_RIGHT: Final = IMG_ARROW_LEFT.crop(transpose=img.FLIP_LEFT_RIGHT)
 FALLBACK = corridor.CorridorGroup(
     id='<Fallback>',
     corridors={
-        (mode, direction, orient): []
+        (mode, direction, attach): []
         for mode in GameMode
         for direction in Direction
-        for orient in Orient
+        for attach in Attachment
     },
 )
 FALLBACK.pak_id = utils.special_id('<FALLBACK>')
@@ -73,10 +73,10 @@ OPTS_DIR = [
     (Direction.ENTRY, TransToken.ui('Entry')),
     (Direction.EXIT, TransToken.ui('Exit')),
 ]
-OPTS_ORIENT = [
-    (Orient.FLAT, TransToken.ui('Flat')),
-    (Orient.UP, TransToken.ui('Upward')),
-    (Orient.DN, TransToken.ui('Downward')),
+OPTS_ATTACH = [
+    (Attachment.FLAT, TransToken.ui('Flat')),
+    (Attachment.FLOOR, TransToken.ui('Floor')),
+    (Attachment.CEILING, TransToken.ui('Ceiling')),
 ]
 
 
@@ -163,7 +163,7 @@ class Selector[IconT: Icon, OptionRowT: OptionRow](ReflowWindow):
     option_rows: list[OptionRowT]
 
     # The current state of the three main selector buttons.
-    state_orient: AsyncValue[Orient]
+    state_attach: AsyncValue[Attachment]
     state_dir: AsyncValue[Direction]
     state_mode: AsyncValue[GameMode]
 
@@ -175,7 +175,7 @@ class Selector[IconT: Icon, OptionRowT: OptionRow](ReflowWindow):
         self.cur_images = None
         self.corr_list = []
         self.option_rows = []
-        self.state_orient = AsyncValue(conf.last_orient)
+        self.state_attach = AsyncValue(conf.last_attach)
         self.state_dir = AsyncValue(conf.last_direction)
         self.state_mode = AsyncValue(conf.last_mode)
         self.show_trigger = EdgeTrigger()
@@ -216,7 +216,7 @@ class Selector[IconT: Icon, OptionRowT: OptionRow](ReflowWindow):
         """React to a mode being switched by reloading the corridor."""
         while True:
             await trio_util.wait_any(
-                self.state_orient.wait_transition,
+                self.state_attach.wait_transition,
                 self.state_mode.wait_transition,
                 self.state_dir.wait_transition,
             )
@@ -264,24 +264,24 @@ class Selector[IconT: Icon, OptionRowT: OptionRow](ReflowWindow):
             self.corr_group = FALLBACK
         self.conf_id = Config.get_id(
             style_id,
-            self.state_mode.value, self.state_dir.value, self.state_orient.value,
+            self.state_mode.value, self.state_dir.value, self.state_attach.value,
         )
 
     async def refresh(self, _: object = None) -> None:
         """Called to update the slots with new items if the corridor set changes."""
         mode = self.state_mode.value
         direction = self.state_dir.value
-        orient = self.state_orient.value
-        self.conf_id = Config.get_id(self.corr_group.id, mode, direction, orient)
+        attach = self.state_attach.value
+        self.conf_id = Config.get_id(self.corr_group.id, mode, direction, attach)
         conf = config.APP.get_cur_conf(Config, self.conf_id)
 
-        config.APP.store_conf(UIState(mode, direction, orient, *self.ui_win_getsize()))
+        config.APP.store_conf(UIState(mode, direction, attach, *self.ui_win_getsize()))
 
         try:
-            self.corr_list = self.corr_group.corridors[mode, direction, orient]
+            self.corr_list = self.corr_group.corridors[mode, direction, attach]
         except KeyError:
             # Up/down can have missing ones.
-            if orient is Orient.HORIZONTAL:
+            if attach is Attachment.HORIZONTAL:
                 LOGGER.warning(
                     'No flat corridor for {}:{}_{}!',
                     self.corr_group.id, mode.value, direction.value,
@@ -297,7 +297,7 @@ class Selector[IconT: Icon, OptionRowT: OptionRow](ReflowWindow):
                     LOGGER.warning('Unknown corridor instance "{}" in config!', sel_id)
         else:
             # No configuration, populate with the defaults.
-            for corr in self.corr_group.defaults(mode, direction, orient):
+            for corr in self.corr_group.defaults(mode, direction, attach):
                 inst_enabled[corr.instance.casefold()] = True
 
         self.icons.reset()
@@ -324,7 +324,7 @@ class Selector[IconT: Icon, OptionRowT: OptionRow](ReflowWindow):
         config.APP.store_conf(UIState(
             self.state_mode.value,
             self.state_dir.value,
-            self.state_orient.value,
+            self.state_attach.value,
             width, height,
         ))
 

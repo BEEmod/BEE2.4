@@ -11,7 +11,7 @@ import trio
 from app import WidgetCache, img
 from app.corridor_selector import (
     WIDTH, HEIGHT, IMG_ARROW_LEFT, IMG_ARROW_RIGHT, IMG_CORR_BLANK, Icon,
-    OPTS_DIR, OPTS_MODE, OPTS_ORIENT, OptionRow, Selector,
+    OPTS_DIR, OPTS_MODE, OPTS_ATTACH, OptionRow, Selector,
     TRANS_HELP, TRANS_NO_OPTIONS, TRANS_ONLY_THIS, TRANS_RAND_OPTION, TRANS_TITLE,
 )
 from app.mdown import MarkdownData
@@ -264,11 +264,11 @@ class TkSelector(Selector[IconUI, OptionRowUI]):
         button_frm.grid(row=0, column=0, columnspan=3)
         self.btn_mode = tk_tools.EnumButton(button_frm, self.state_mode, OPTS_MODE)
         self.btn_direction = tk_tools.EnumButton(button_frm, self.state_dir, OPTS_DIR)
-        self.btn_orient = tk_tools.EnumButton(button_frm, self.state_orient, OPTS_ORIENT)
+        self.btn_attach = tk_tools.EnumButton(button_frm, self.state_attach, OPTS_ATTACH)
 
         self.btn_mode.frame.grid(row=0, column=0, padx=8)
         self.btn_direction.frame.grid(row=0, column=1, padx=8)
-        self.btn_orient.frame.grid(row=0, column=2, padx=8)
+        self.btn_attach.frame.grid(row=0, column=2, padx=8)
 
         canv_frame = ttk.Frame(frm_left, name='canv_frame', relief="sunken")
         canv_frame.grid(row=1, column=0, columnspan=3, sticky='nsew', ipadx=8, ipady=8)
@@ -301,7 +301,7 @@ class TkSelector(Selector[IconUI, OptionRowUI]):
         async with trio.open_nursery() as nursery:
             nursery.start_soon(self.btn_direction.task)
             nursery.start_soon(self.btn_mode.task)
-            nursery.start_soon(self.btn_orient.task)
+            nursery.start_soon(self.btn_attach.task)
 
     @override
     def evt_window_resized(self, event: object) -> None:

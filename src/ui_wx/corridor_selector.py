@@ -11,7 +11,7 @@ import wx.html
 from app import WidgetCache, img
 from app.corridor_selector import (
     WIDTH, HEIGHT, IMG_ARROW_LEFT, IMG_ARROW_RIGHT, IMG_CORR_BLANK, Icon,
-    OPTS_DIR, OPTS_MODE, OPTS_ORIENT, OptionRow, Selector,
+    OPTS_DIR, OPTS_MODE, OPTS_ATTACH, OptionRow, Selector,
     TRANS_HELP, TRANS_NO_OPTIONS, TRANS_ONLY_THIS, TRANS_RAND_OPTION, TRANS_TITLE,
 )
 from app.mdown import MarkdownData
@@ -273,12 +273,12 @@ class WxSelector(Selector[IconUI, OptionRowUI]):
 
         self.btn_mode = EnumButton(self.pane_left, self.state_mode, OPTS_MODE)
         self.btn_direction = EnumButton(self.pane_left, self.state_dir, OPTS_DIR)
-        self.btn_orient = EnumButton(self.pane_left, self.state_orient, OPTS_ORIENT)
+        self.btn_attach = EnumButton(self.pane_left, self.state_attach, OPTS_ATTACH)
 
         btn_flags = wx.SizerFlags().Border(wx.LEFT | wx.RIGHT, 4)
         sizer_btns.Add(self.btn_mode.sizer, btn_flags)
         sizer_btns.Add(self.btn_direction.sizer, btn_flags)
-        sizer_btns.Add(self.btn_orient.sizer, btn_flags)
+        sizer_btns.Add(self.btn_attach.sizer, btn_flags)
 
         lbl_info = wx.StaticText(self.pane_left)
         set_text(lbl_info, TRANS_HELP)
@@ -301,7 +301,7 @@ class WxSelector(Selector[IconUI, OptionRowUI]):
         async with trio.open_nursery() as nursery:
             nursery.start_soon(self.btn_direction.task)
             nursery.start_soon(self.btn_mode.task)
-            nursery.start_soon(self.btn_orient.task)
+            nursery.start_soon(self.btn_attach.task)
 
     @override
     def _ui_calc_columns(self) -> int:
