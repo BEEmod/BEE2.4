@@ -10,7 +10,7 @@ import attrs
 from config.corridors import Options as CorrOptions
 from . import instanceLocs, options, rand
 from corridor import (
-    GameMode, Direction, Orient,
+    ATTACH_TO_ORIENT, Attachment, GameMode, Direction, Orient,
     CORRIDOR_COUNTS, CORR_TO_ID, ID_TO_CORR,
     Corridor, ExportedConf, parse_filename,
 )
@@ -83,15 +83,15 @@ class Info:
 
 def select_corridor(
     conf: ExportedConf,
-    direction: Direction, mode: GameMode, orient: Orient,
+    direction: Direction, mode: GameMode, attach: Attachment,
     ind: int, file: str,
 ) -> Corridor:
     """Select the corridor to use, from an existing file."""
     max_count = CORRIDOR_COUNTS[mode, direction]
-    poss_corr = conf.corridors[mode, direction, orient]
+    poss_corr = conf.corridors[mode, direction, attach]
     if not poss_corr:
         raise user_errors.UserError(user_errors.TOK_CORRIDOR_EMPTY_GROUP.format(
-            orient=orient.value.title(),
+            orient=attach.value.title(),
             mode=mode.value.title(),
             dir=direction.value.title(),
         ))
@@ -100,14 +100,14 @@ def select_corridor(
         chosen = rand.seed(b'corridor', file).choice(poss_corr)
         LOGGER.info(
             '{}_{}_{} corridor randomised to {}',
-            mode.value, direction.value, orient.value, chosen,
+            mode.value, direction.value, attach.value, chosen,
         )
     else:
         # Enough entropy, use editor index.
         chosen = poss_corr[ind % len(poss_corr)]
         LOGGER.info(
             '{}_{}_{} corridor selected {} -> {}',
-            mode.value, direction.value, orient.value, ind, chosen,
+            mode.value, direction.value, attach.value, ind, chosen,
         )
     return chosen
 
@@ -195,17 +195,18 @@ def analyse_and_modify(
             origin = Vec.from_str(item['origin'])
             norm = orient.up()
             if norm.z > 0.5:
-                corr_orient = Orient.DN
+                corr_attach = Attachment.FLOOR
+                # The old fixup used when Orient was used directly.
+                item.fixup['$attach'] = 'down'
             elif norm.z < -0.5:
-                corr_orient = Orient.UP
+                corr_attach = Attachment.CEILING
+                item.fixup['$attach'] = 'up'
             else:
-                corr_orient = Orient.HORIZONTAL
-            corr_attach = corr_orient
-            # entry_up is on the floor, so you travel *up*.
-            if corr_dir is Direction.ENTRY:
-                corr_orient = corr_orient.flipped
+                corr_attach = Attachment.HORIZONTAL
+                item.fixup['$attach'] = 'horizontal'
+            corr_orient = ATTACH_TO_ORIENT[corr_dir, corr_attach]
 
-            chosen = select_corridor(conf, corr_dir, corr_mode, corr_orient, corr_ind, file)
+            chosen = select_corridor(conf, corr_dir, corr_mode, corr_attach, corr_ind, file)
             item['file'] = chosen.instance
             file = chosen.instance.casefold()
 
@@ -218,7 +219,7 @@ def analyse_and_modify(
 
             item.fixup['$type'] = corr_dir.value
             item.fixup['$direction'] = corr_orient.value
-            item.fixup['$attach'] = corr_attach.value
+            item.fixup['$attachment'] = corr_attach.value
             # Accumulate options into this so that it can be assigned to the elevator too.
             # Assign it to the instance after the above fixups are computed
             # so that they can be overridden if desired.
