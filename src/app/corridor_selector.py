@@ -64,6 +64,9 @@ TRANS_OPT_TITLE = {
 TRANS_NO_OPTIONS = TransToken.ui('No options!')
 TRANS_RAND_OPTION = TransToken.ui('Randomise')
 TRANS_ONLY_THIS = TransToken.ui('Use Only This')
+TRANS_GROUP_MODE = TransToken.ui('Game Mode')
+TRANS_GROUP_DIR = TransToken.ui('Corridor Type')
+TRANS_GROUP_ATTACH = TransToken.ui('Attachment Surface')
 
 OPTS_MODE = [
     (GameMode.SP, TransToken.ui('SP')),

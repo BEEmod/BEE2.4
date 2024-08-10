@@ -10,7 +10,9 @@ import trio
 
 from app import WidgetCache, img
 from app.corridor_selector import (
-    WIDTH, HEIGHT, IMG_ARROW_LEFT, IMG_ARROW_RIGHT, IMG_CORR_BLANK, Icon,
+    TRANS_GROUP_ATTACH, TRANS_GROUP_DIR, TRANS_GROUP_MODE, WIDTH, HEIGHT, IMG_ARROW_LEFT,
+    IMG_ARROW_RIGHT,
+    IMG_CORR_BLANK, Icon,
     OPTS_DIR, OPTS_MODE, OPTS_ATTACH, OptionRow, Selector,
     TRANS_HELP, TRANS_NO_OPTIONS, TRANS_ONLY_THIS, TRANS_RAND_OPTION, TRANS_TITLE,
 )
@@ -262,9 +264,9 @@ class TkSelector(Selector[IconUI, OptionRowUI]):
 
         button_frm = ttk.Frame(frm_left)
         button_frm.grid(row=0, column=0, columnspan=3)
-        self.btn_mode = tk_tools.EnumButton(button_frm, self.state_mode, OPTS_MODE)
-        self.btn_direction = tk_tools.EnumButton(button_frm, self.state_dir, OPTS_DIR)
-        self.btn_attach = tk_tools.EnumButton(button_frm, self.state_attach, OPTS_ATTACH)
+        self.btn_mode = tk_tools.EnumButton(button_frm, self.state_mode, TRANS_GROUP_MODE, OPTS_MODE)
+        self.btn_direction = tk_tools.EnumButton(button_frm, self.state_dir, TRANS_GROUP_DIR, OPTS_DIR)
+        self.btn_attach = tk_tools.EnumButton(button_frm, self.state_attach, TRANS_GROUP_ATTACH, OPTS_ATTACH)
 
         self.btn_mode.frame.grid(row=0, column=0, padx=8)
         self.btn_direction.frame.grid(row=0, column=1, padx=8)

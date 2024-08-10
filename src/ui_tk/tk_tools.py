@@ -776,7 +776,7 @@ class EnumButton[EnumT: Enum]:
 
     This is bound to the provided AsyncValue, updating it when changed.
     """
-    frame: ttk.Frame
+    frame: ttk.LabelFrame
     buttons: dict[EnumT, ttk.Button]
     current: AsyncValue[EnumT]
 
@@ -784,9 +784,11 @@ class EnumButton[EnumT: Enum]:
         self,
         master: tk.Misc,
         current: AsyncValue[EnumT],
+        title: TransToken,
         values: Sequence[tuple[EnumT, TransToken]],
     ) -> None:
-        self.frame = ttk.Frame(master)
+        self.frame = ttk.LabelFrame(master, labelanchor='n')
+        set_text(self.frame, title)
         self.current = current
         self.buttons = {}
 

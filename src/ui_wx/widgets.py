@@ -23,14 +23,17 @@ class EnumButton[EnumT: Enum]:
         self,
         parent: wx.Window,
         current: AsyncValue[EnumT],
+        title: TransToken,
         values: Sequence[tuple[EnumT, TransToken]],
     ) -> None:
-        self.sizer = sizer = wx.BoxSizer(wx.HORIZONTAL)
+        self.frame = wx.StaticBox(parent, style=wx.ALIGN_CENTRE_HORIZONTAL)
+        self.sizer = sizer = wx.StaticBoxSizer(self.frame, wx.HORIZONTAL)
+        set_text(self.frame, title)
         self.current = current
         self.buttons = {}
 
         for x, (val, label) in enumerate(values):
-            btn = wx.ToggleButton(parent)
+            btn = wx.ToggleButton(self.frame)
             btn.Bind(wx.EVT_TOGGLEBUTTON, self._pressed_func(val))
             set_text(btn, label)
             sizer.Add(btn)
