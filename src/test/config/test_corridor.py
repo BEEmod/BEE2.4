@@ -5,10 +5,10 @@ import pytest
 from srctools import Keyvalues
 from srctools.dmx import Element
 
-from config.corridors import Direction, GameMode, Orient, Config, Options, UIState
+from config.corridors import Config, Options, UIState
 from config import UnknownVersion
 import utils
-from corridor import Attachment
+from corridor import Attachment, Direction, GameMode, Orient
 
 
 # Two sets of sample instance names, for testing parsing - in V1 and V2 formats.

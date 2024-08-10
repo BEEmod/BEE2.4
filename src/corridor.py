@@ -1,8 +1,6 @@
 """Data structure for specifying custom corridors."""
 from __future__ import annotations
 
-from typing import assert_never
-
 from typing_extensions import Final, Literal
 from collections.abc import Sequence, Mapping
 from enum import Enum
@@ -38,37 +36,13 @@ class Attachment(Enum):
     CEILING = 'ceiling'
     CEIL = CEILING
 
-    @property
-    def flipped(self) -> Attachment:
-        """Return the attachment flipped along Z."""
-        match self:
-            case Attachment.CEILING:
-                return Attachment.FLOOR
-            case Attachment.FLOOR:
-                return Attachment.CEILING
-            case Attachment.HORIZONTAL:
-                return Attachment.HORIZONTAL
-            case _:
-                # Aliases are treated as distinct.
-                assert_never(self)  # type: ignore[arg-type]
 
-
-@utils.freeze_enum_props
 class Orient(Enum):
     """Legacy enum, refers to the direction through the corridor."""
     HORIZONTAL = 'horizontal'
     FLAT = HORIZ = HORIZONTAL
     UP = 'up'
     DOWN = DN = 'down'
-
-    @property
-    def flipped(self) -> Orient:
-        """Return the orient flipped along Z."""
-        if self is Orient.UP:
-            return Orient.DN
-        if self is Orient.DN:
-            return Orient.UP
-        return self
 
 
 ORIENT_TO_ATTACH: Mapping[tuple[Direction, Orient], Attachment] = {

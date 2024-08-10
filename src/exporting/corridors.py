@@ -10,9 +10,8 @@ import trio
 
 from config.corridors import Config
 from corridor import (
-    CorrKind, Corridor, OptionGroup, Direction, GameMode, Attachment,
+    CorrKind, Corridor, OptionGroup, Direction, GameMode, Attachment, ExportedConf,
     CORRIDOR_COUNTS, ID_TO_CORR,
-    ExportedConf,
 )
 from . import ExportData, STEPS, StepResource
 from packages.corridor import CorridorGroup

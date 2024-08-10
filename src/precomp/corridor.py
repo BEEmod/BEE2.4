@@ -10,7 +10,7 @@ import attrs
 from config.corridors import Options as CorrOptions
 from . import instanceLocs, options, rand
 from corridor import (
-    ATTACH_TO_ORIENT, Attachment, GameMode, Direction, Orient,
+    ATTACH_TO_ORIENT, Attachment, GameMode, Direction,
     CORRIDOR_COUNTS, CORR_TO_ID, ID_TO_CORR,
     Corridor, ExportedConf, parse_filename,
 )
@@ -22,7 +22,7 @@ import user_errors
 __all__ = [
     'Info', 'analyse_and_modify',
     # Re-exports:
-    'GameMode', 'Direction', 'Orient',
+    'GameMode', 'Direction', 'Attachment',
     'CORRIDOR_COUNTS', 'CORR_TO_ID', 'ID_TO_CORR',
     'Corridor', 'ExportedConf', 'parse_filename',
 ]
@@ -235,7 +235,7 @@ def analyse_and_modify(
             # Keep it upright, with x pointing in the door direction for horizontal.
             else:
                 orient = Matrix.from_basis(
-                    x=norm if corr_orient is Orient.HORIZONTAL else orient.forward(),
+                    x=norm if corr_attach is Attachment.HORIZONTAL else orient.forward(),
                     z=Vec(0, 0, 1.0),
                 )
                 item['angles'] = orient.to_angle()

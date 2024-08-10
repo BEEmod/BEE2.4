@@ -19,7 +19,7 @@ from corridor import (
     Orient, Direction, GameMode,
     Option, Corridor,
     CORRIDOR_COUNTS, ID_TO_CORR,
-    ATTACH_TO_ORIENT, ORIENT_TO_ATTACH,
+    ORIENT_TO_ATTACH,
 )
 from transtoken import AppError, TransToken, TransTokenSource
 
@@ -44,7 +44,6 @@ ICON_GENERIC_LRG = img.Handle.builtin('BEE2/corr_generic', IMG_WIDTH_LRG, IMG_HE
 
 ALL_MODES: Final[Sequence[GameMode]] = list(GameMode)
 ALL_DIRS: Final[Sequence[Direction]] = list(Direction)
-ALL_ORIENT: Final[Sequence[Orient]] = list(Orient)
 
 TRANS_DUPLICATE_OPTION = TransToken.ui(
     'Duplicate corridor option ID "{option}" in corridor group for style "{group}"!'
