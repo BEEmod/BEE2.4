@@ -1,8 +1,9 @@
 """This package contains UI code specific to WxWidgets."""
 from __future__ import annotations
+from typing import Literal
 
-import logging
 from collections.abc import Callable
+import logging
 
 import wx
 import mistletoe
@@ -77,6 +78,29 @@ def get_scrollflow_size_handler(
         evt.Skip()
 
     return size_handler
+
+
+def discretise_scrollwheel(func: Callable[[Literal[-1, 1]], None]) -> Callable[[wx.MouseEvent], None]:
+    """Convert the scrollwheel events into discrete movement calls.
+
+    Mousewheel events might trigger with less/more than a single tick, so this needs
+    to accumulate results, then trigger the function.
+    """
+    amount = 0
+
+    def handler(evt: wx.MouseEvent) -> None:
+        """Handle using the mousewheel on the corridor icon."""
+        nonlocal amount
+        amount += evt.WheelRotation
+        delta = max(1, evt.WheelDelta)
+        while amount >= delta:
+            amount -= delta
+            func(-1)
+        while amount <= -delta:
+            amount += delta
+            func(1)
+
+    return handler
 
 
 class _MarkdownConverter(mdown.BaseRenderer[str]):

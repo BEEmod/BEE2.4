@@ -23,7 +23,7 @@ import packages
 import utils
 
 from .img import ImageSlot, WXImages
-from . import MARKDOWN, PEN_SLOT_BORDER, PEN_SLOT_BORDER_SEL, MAIN_WINDOW
+from . import MARKDOWN, PEN_SLOT_BORDER, PEN_SLOT_BORDER_SEL, MAIN_WINDOW, discretise_scrollwheel
 from .wid_transtoken import set_text, set_tooltip, set_win_title
 from .widgets import EnumButton
 
@@ -216,6 +216,7 @@ class WxSelector(Selector[IconUI, OptionRowUI]):
         wx_img.apply(self.btn_image_right, IMG_ARROW_RIGHT)
         self.btn_image_left.Bind(wx.EVT_BUTTON, lambda evt: self_ref._sel_img(-1))
         self.btn_image_right.Bind(wx.EVT_BUTTON, lambda evt: self_ref._sel_img(+1))
+        self.wid_image.Bind(wx.EVT_MOUSEWHEEL, discretise_scrollwheel(self._sel_img))
 
         self.wid_title = wx.StaticText(self.pane_right)
         self.wid_title.SetFont(wx.Font(12, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD, 0, ""))
@@ -239,6 +240,7 @@ class WxSelector(Selector[IconUI, OptionRowUI]):
         sizer_right.Add(self.sizer_options, 0, wx.EXPAND, 0)
 
         sizer_ctrl_btns = wx.BoxSizer(wx.HORIZONTAL)
+        sizer_right.Add(0, 8)
         sizer_right.Add(sizer_ctrl_btns, 0, wx.ALIGN_CENTER_HORIZONTAL, 0)
 
         self.btn_just_this = wx.Button(self.pane_right)
@@ -359,3 +361,4 @@ class WxSelector(Selector[IconUI, OptionRowUI]):
     @override
     def ui_option_refreshed(self) -> None:
         self.sizer_right.Layout()
+        self.pane_right.Update()
