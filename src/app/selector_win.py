@@ -157,11 +157,11 @@ class GroupHeaderBase:
 
     def _evt_hover_start(self, _: object | None = None) -> None:
         """When hovered over, fill in the triangle."""
-        self._ui_set_arrow(self.parent.group_visible.get(self.id), True)
+        self._ui_set_arrow(self.parent.group_visible.get(self.id, False), True)
 
     def _evt_hover_end(self, _: object | None = None) -> None:
         """When leaving, hollow the triangle."""
-        self._ui_set_arrow(self.parent.group_visible.get(self.id), False)
+        self._ui_set_arrow(self.parent.group_visible.get(self.id, False), False)
 
     @abstractmethod
     def _ui_reassign(self, group_id: str,  title: TransToken, /) -> None:
@@ -631,7 +631,7 @@ class SelectorWinBase[ButtonT, GroupHeaderT: GroupHeaderBase](ReflowWindow):
         for group in self.group_widgets.values():
             # Update the arrow so that it matches the visible state.
             # noinspection PyProtectedMember
-            group._ui_set_arrow(self.group_visible.get(group.id), False)
+            group._ui_set_arrow(self.group_visible.get(group.id, False), False)
 
         self._ui_win_show()
         self._visible = True
