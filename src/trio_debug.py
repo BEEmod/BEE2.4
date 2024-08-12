@@ -1,9 +1,10 @@
 """Instrumentation which outputs statistics about Trio tasks."""
 from typing_extensions import override
-from typing import Any, ClassVar
+from typing import Any
 import pprint
 import time
 
+from aioresult import ResultCapture
 import srctools.logger
 import trio
 
@@ -23,6 +24,13 @@ class SmallRepr(pprint.PrettyPrinter):
         /,
     ) -> tuple[str, bool, bool]:
         """Format each sub-item."""
+        if isinstance(target, ResultCapture):
+            return self.format((
+                'ResultCapture',
+                target.routine,
+                *target.args,
+            ), context, maxlevels, level)
+
         result, readable, recursive = super().format(target, context, maxlevels, level)
         if len(result) > 200 and level > 0:
             return f'{type(target).__qualname__}(...)', False, False
