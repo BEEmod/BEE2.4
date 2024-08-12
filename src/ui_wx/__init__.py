@@ -1,6 +1,6 @@
 """This package contains UI code specific to WxWidgets."""
 from __future__ import annotations
-from typing import Literal
+from typing import Final, Literal
 
 from collections.abc import Callable
 import logging
@@ -118,3 +118,19 @@ MARKDOWN = _MarkdownConverter(str)
 
 PEN_SLOT_BORDER = wx.Pen(wx.SystemSettings.GetColour(wx.SYS_COLOUR_WINDOWFRAME), 3)
 PEN_SLOT_BORDER_SEL = wx.Pen(wx.SystemSettings.GetColour(wx.SYS_COLOUR_HIGHLIGHT), 3)
+
+
+def _make_radio_icon() -> wx.Bitmap:
+    """Generate a bitmap which makes check-style menus look like radio menus."""
+    from PIL import Image, ImageDraw
+    fill = wx.SystemSettings.GetColour(wx.SYS_COLOUR_MENUTEXT)
+    # Draw oversize then scale down to get some antialiasing.
+    img = Image.new('RGBA', (64, 64))
+    draw = ImageDraw.Draw(img)
+    draw.ellipse([20, 20, 40, 40], (fill.red, fill.green, fill.blue, fill.alpha))
+    return wx.Bitmap.FromBufferRGBA(16, 16, img.resize((16, 16)).tobytes())
+
+
+# TODO: Can't change the button design on other platforms, unfortunately.
+#       They only allow a single icon for both checked/unchecked.
+RADIO_MENU_BITMAP: Final = _make_radio_icon() if utils.WIN else wx.NullBitmap

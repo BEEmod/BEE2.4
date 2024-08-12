@@ -21,7 +21,7 @@ from app.selector_win import (
 from consts import SEL_ICON_SIZE
 from packages import AttrTypes
 from transtoken import CURRENT_LANG, TransToken
-from ui_wx import MARKDOWN, wid_transtoken, PEN_SLOT_BORDER, PEN_SLOT_BORDER_SEL
+from ui_wx import MARKDOWN, PEN_SLOT_BORDER, PEN_SLOT_BORDER_SEL, RADIO_MENU_BITMAP, wid_transtoken
 from ui_wx.img import WX_IMG, ImageSlot
 import utils
 
@@ -670,14 +670,12 @@ class SelectorWin(SelectorWinBase[ItemSlot, GroupHeader]):
         label: TransToken, /,
     ) -> None:
         """Add the specified item to the group's menu."""
-        # TODO: Ideally these should be radio buttons, not check buttons.
-        #       But each menu gets a different group assigned.
-        #       Maybe use custom bitmaps?
         self._menu_items[item] = menu_item = group.menu.AppendCheckItem(
             wx.ID_ANY, f'<item>:{item}', '',
         )
         wid_transtoken.set_menu_text(menu_item, label)
         group.menu.Bind(wx.EVT_MENU, lambda evt: func(), menu_item)
+        menu_item.SetBitmap(RADIO_MENU_BITMAP, True)
 
     @override
     def _ui_menu_set_font(self, item_id: utils.SpecialID, /, suggested: bool) -> None:
