@@ -191,11 +191,16 @@ async def make_widgets(
 
     # Widgets we want to remove when collapsing.
     exp_widgets: list[tkinter.Widget] = []
+    btn_hover = False
 
     def toggle_btn_enter(event: object = None, /) -> None:
+        nonlocal btn_hover
+        btn_hover = True
         toggle_btn['text'] = BTN_EXPAND_HOVER if is_collapsed else BTN_CONTRACT_HOVER
 
     def toggle_btn_exit(event: object = None, /) -> None:
+        nonlocal btn_hover
+        btn_hover = False
         toggle_btn['text'] = BTN_EXPAND if is_collapsed else BTN_CONTRACT
 
     def set_collapsed() -> None:
@@ -205,7 +210,7 @@ async def make_widgets(
         conf = config.APP.get_cur_conf(GenOptions)
         config.APP.store_conf(attrs.evolve(conf, music_collapsed=True))
         set_text(base_lbl, TRANS_BASE_COLL)
-        toggle_btn_exit()
+        toggle_btn['text'] = BTN_EXPAND_HOVER if btn_hover else BTN_EXPAND
 
         # Set all music to the children - so those are used.
         set_suggested(
@@ -223,7 +228,7 @@ async def make_widgets(
         conf = config.APP.get_cur_conf(GenOptions)
         config.APP.store_conf(attrs.evolve(conf, music_collapsed=False))
         set_text(base_lbl, TRANS_BASE_EXP)
-        toggle_btn_exit()
+        toggle_btn['text'] = BTN_CONTRACT_HOVER if btn_hover else BTN_CONTRACT
         for wid in exp_widgets:
             wid.grid()
         pane.update_idletasks()
