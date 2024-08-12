@@ -4,7 +4,9 @@ General code used for tkinter portions.
 """
 from __future__ import annotations
 
-from typing import Any, Protocol, Callable, Literal, NoReturn, TypedDict, Unpack, overload, cast
+from typing import (
+    Any, Protocol, Callable, Literal, NoReturn, TypedDict, Unpack, overload, cast, override,
+)
 
 from contextlib import aclosing
 from enum import Enum, StrEnum
@@ -20,11 +22,12 @@ import tkinter as tk
 
 from idlelib.redirector import WidgetRedirector  # type: ignore[import-not-found]
 from srctools import logger
+
 from trio_util import AsyncValue
 import trio_util
 import trio
 
-from app import ICO_PATH, background_run
+from app import BaseEnumButton, ICO_PATH, background_run
 from config.gen_opts import GenOptions
 from transtoken import CURRENT_LANG, TransToken
 import config
@@ -771,14 +774,12 @@ class FileField(ttk.Frame):
         self._text_var.set(self._truncate(self._location))
 
 
-class EnumButton[EnumT: Enum]:
+class EnumButton[EnumT: Enum](BaseEnumButton[ttk.Button, EnumT]):
     """Provides a set of buttons for toggling between enum values.
 
     This is bound to the provided AsyncValue, updating it when changed.
     """
     frame: ttk.LabelFrame
-    buttons: dict[EnumT, ttk.Button]
-    current: AsyncValue[EnumT]
 
     def __init__(
         self,
@@ -789,27 +790,25 @@ class EnumButton[EnumT: Enum]:
     ) -> None:
         self.frame = ttk.LabelFrame(master, labelanchor='n')
         set_text(self.frame, title)
-        self.current = current
-        self.buttons = {}
 
-        for x, (val, label) in enumerate(values):
-            btn = ttk.Button(self.frame, command=utils.val_setter(current, val))
-            set_text(btn, label)
-            btn.grid(row=0, column=x)
-            self.buttons[val] = btn
+        super().__init__(current, values)
 
-        if current.value not in self.buttons:
-            raise ValueError(f'Default value {current.value!r} not present in {values}!')
+    @override
+    def _ui_create(
+        self,
+        ind: int, label: TransToken,
+        func: BaseEnumButton.EventFunc,
+    ) -> ttk.Button:
+        """Create a button."""
+        button = ttk.Button(self.frame, command=func)
+        set_text(button, label)
+        button.grid(row=0, column=ind)
+        return button
 
-        if len(self.buttons) != len(values):
-            raise ValueError(f'No duplicates allowed, got: {values}')
-
-    async def task(self) -> None:
-        """Task which must be run to update the button state."""
-        async with aclosing(self.current.eventual_values()) as agen:
-            async for chosen in agen:
-                for val, button in self.buttons.items():
-                    button.state(('pressed', ) if val is chosen else ('!pressed', ))
+    @override
+    def _ui_set(self, button: ttk.Button, pressed: bool) -> None:
+        """Set the state manually."""
+        button.state(('pressed', ) if pressed else ('!pressed', ))
 
 
 class ComboBoxMap[StrKeyT: str]:

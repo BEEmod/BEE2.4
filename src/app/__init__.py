@@ -5,9 +5,11 @@ from typing_extensions import deprecated
 
 from abc import abstractmethod
 from collections.abc import Awaitable, Callable, Sequence
+from contextlib import aclosing
+from enum import Enum
 from types import TracebackType
 
-
+from transtoken import TransToken
 from trio_util import AsyncBool, AsyncValue
 from srctools.logger import get_logger
 import trio
@@ -304,4 +306,62 @@ class ReflowWindow:
 
         Called whenever items change or the window is resized.
         """
+        raise NotImplementedError
+
+
+class BaseEnumButton[Button, EnumT: Enum]:
+    """Provides a set of buttons for toggling between enum values.
+
+    This is bound to the provided AsyncValue, updating it when changed.
+    """
+    _buttons: dict[EnumT, Button]
+    current: AsyncValue[EnumT]
+
+    class EventFunc(Protocol):
+        """Event functions ignore the event."""
+        def __call__(self, event: object = ..., /) -> None:
+            pass
+
+    def __init__(
+        self,
+        current: AsyncValue[EnumT],
+        values: Sequence[tuple[EnumT, TransToken]],
+    ) -> None:
+        self.current = current
+        self._buttons = {}
+
+        for ind, (val, label) in enumerate(values):
+            btn = self._ui_create(ind, label, self._pressed_func(val))
+            self._buttons[val] = btn
+
+        if current.value not in self._buttons:
+            raise ValueError(f'Default value {current.value!r} not present in {values!r}!')
+
+        if len(self._buttons) != len(values):
+            raise ValueError(f'No duplicates allowed, got: {values!r}')
+
+    def _pressed_func(self, value: EnumT) -> BaseEnumButton.EventFunc:
+        """Create the function for a button."""
+        def handler(evt: object = None) -> None:
+            """Handle changes."""
+            self.current.value = value
+            # Re-press the button, to ensure it doesn't toggler itself if pressed twice.
+            self._ui_set(self._buttons[value], True)
+        return handler
+
+    async def task(self) -> None:
+        """Task which must be run to update the button state."""
+        async with aclosing(self.current.eventual_values()) as agen:
+            async for chosen in agen:
+                for val, button in self._buttons.items():
+                    self._ui_set(button, val is chosen)
+
+    @abstractmethod
+    def _ui_create(self, ind: int, label: TransToken, func: BaseEnumButton.EventFunc) -> Button:
+        """Create a button."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def _ui_set(self, button: Button, pressed: bool, /) -> None:
+        """Set the current state for a button."""
         raise NotImplementedError
