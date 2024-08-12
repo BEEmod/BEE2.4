@@ -261,7 +261,7 @@ class WxSelector(Selector[IconUI, OptionRowUI]):
         sizer_ctrl_btns = wx.BoxSizer(wx.HORIZONTAL)
         sizer_right.Add(0, 8)
         sizer_right.Add(
-            wx.StaticLine(self.pane_right, wx.HORIZONTAL),
+            wx.StaticLine(self.pane_right, style=wx.HORIZONTAL),
             wx.SizerFlags().Expand(),
         )
         sizer_right.Add(0, 4)
