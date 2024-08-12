@@ -41,23 +41,32 @@ class IconUI(Icon):
         self.index = index
         self.selector = selector
         self.img = ImageSlot(self.widget)
-        self._selected = self._hovered = self._highlight = self._readonly = False
+        self._selected = self._hovered = self._highlight = self._readonly = self._pressed = False
         self.check_bounds = wx.Rect()
 
         self.widget.SetMinSize((WIDTH, HEIGHT))
         self.widget.Bind(wx.EVT_ENTER_WINDOW, self._evt_hover_enter)
         self.widget.Bind(wx.EVT_LEAVE_WINDOW, self._evt_hover_exit)
-        self.widget.Bind(wx.EVT_LEFT_UP, self._evt_clicked)
+        self.widget.Bind(wx.EVT_MOTION, self._evt_mousedown)
+        self.widget.Bind(wx.EVT_LEFT_UP, self._evt_mouseup)
         self.widget.Bind(wx.EVT_PAINT, self._on_paint)
 
-    def _evt_clicked(self, evt: wx.MouseEvent) -> None:
+    def _evt_mousedown(self, evt: wx.MouseEvent) -> None:
         """Detect clicking on the checkbox."""
+        hovered = not self._readonly and self.check_bounds.Contains(evt.Position)
+        if self._hovered is not hovered:
+            self._hovered = hovered
+            self.widget.Refresh()
+
+    def _evt_mouseup(self, evt: wx.MouseEvent) -> None:
+        """Detect clicking on the checkbox."""
+        self._hovered = False
         if not self._readonly and self.check_bounds.Contains(evt.Position):
             self._selected = not self._selected
-            self.widget.Refresh()
             self.selector.select_trigger.maybe_trigger()
         else:
             self.selector.evt_selected(self)
+        self.widget.Refresh()
 
     def _on_paint(self, evt: wx.PaintEvent) -> None:
         """Draw the icon."""
@@ -80,6 +89,7 @@ class IconUI(Icon):
             self.check_bounds,
             (self._selected * wx.CONTROL_CHECKED) |
             (self._hovered * wx.CONTROL_CURRENT) |
+            (self._pressed * wx.CONTROL_PRESSED) |
             (self._readonly * wx.CONTROL_DISABLED),
         )
 
@@ -91,7 +101,7 @@ class IconUI(Icon):
 
     def _evt_hover_exit(self, evt: wx.MouseEvent) -> None:
         """Handle hovering out of the window."""
-        self._hovered = False
+        self._hovered = self._pressed = False
         self.selector.evt_hover_exit()
         self.widget.Refresh()
 
