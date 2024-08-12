@@ -130,12 +130,14 @@ class GroupHeader(GroupHeaderBase):
         self.menu_item = None
         self.panel.SetMinSize((10, 24))
 
-        self.arrow_slot = ImageSlot(self.panel)
         self.title = TransToken.BLANK
         self.suggested = False
+        self._hovered = self._opened = self._pressed = False
+        self._arrow_flags = wx.CONTROL_NONE
         self.panel.Bind(wx.EVT_PAINT, self._on_paint)
 
-        self.panel.Bind(wx.EVT_LEFT_DOWN, self._evt_toggle)
+        self.panel.Bind(wx.EVT_LEFT_DOWN, self._evt_mouse_down)
+        self.panel.Bind(wx.EVT_LEFT_UP, self._evt_toggle)
         self.panel.SetCursor(wx.Cursor(wx.CURSOR_HAND))
         self.panel.Bind(wx.EVT_ENTER_WINDOW, self._evt_hover_start)
         self.panel.Bind(wx.EVT_LEAVE_WINDOW, self._evt_hover_end)
@@ -148,6 +150,10 @@ class GroupHeader(GroupHeaderBase):
             self.menu_item = None
         self.panel.Hide()
 
+    def _evt_mouse_down(self, evt: wx.MouseEvent) -> None:
+        self._pressed = True
+        self.panel.Refresh()
+
     @override
     def _ui_reassign(self, group_id: str, title: TransToken) -> None:
         """Set the group label."""
@@ -159,19 +165,26 @@ class GroupHeader(GroupHeaderBase):
         self.panel.Refresh()
 
     @override
-    def _ui_set_arrow(self, arrow: img.Handle) -> None:
+    def _ui_set_arrow(self, opened: bool, hovered: bool) -> None:
         """Set the arrow glyph."""
-        self.arrow_slot.set_handle(arrow)
+        self._opened = opened
+        self._hovered = hovered
+        self._pressed = False
         self.panel.Refresh()
 
     def _on_paint(self, event: wx.PaintEvent) -> None:
         """Draw the header."""
         dc = wx.PaintDC(self.panel)
+        native = wx.RendererNative.Get()
         size = wx.Rect(self.panel.GetSize())
         dc.SetFont(FONT_GROUP_HEADER_SUGG if self.suggested else FONT_GROUP_HEADER)
         title = str(self.title)
+
         required_size = dc.GetTextExtent(title)
-        if required_size.Height > size.Height:
+        arrow_size = native.GetCollapseButtonSize(self.panel, dc)
+        if required_size.height < arrow_size.height:
+            required_size.height = arrow_size.height
+        if required_size.Height > size.Height or required_size.width > size.width:
             self.panel.SetMinSize(required_size)
 
         title_rect = dc.DrawLabel(
@@ -179,8 +192,18 @@ class GroupHeader(GroupHeaderBase):
             alignment=wx.ALIGN_CENTRE_HORIZONTAL | wx.ALIGN_CENTRE_VERTICAL,
         )
         dc.SetFont(FONT_GROUP_HEADER)
-        arrow_left = size.Width - 24
-        self.arrow_slot.draw(dc, arrow_left, (size.Height - 16) // 2)
+        arrow_left = size.Width - 8 - arrow_size.width
+        native.DrawCollapseButton(
+            self.panel, dc,
+            wx.Rect(
+                arrow_left,
+                (size.Height - arrow_size.Height) // 2,
+                arrow_size.Width, arrow_size.Height,
+            ),
+            (self._opened * wx.CONTROL_EXPANDED) |
+            (self._hovered * wx.CONTROL_CURRENT) |
+            (self._pressed * wx.CONTROL_PRESSED),
+        )
         y = size.Height // 2
         dc.SetPen(PEN_GROUP_HEADER)
         dc.DrawLine(4, y, title_rect.Left - 4, y)

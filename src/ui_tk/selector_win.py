@@ -34,6 +34,14 @@ __all__ = [
     'Options',
 ]
 
+# Arrows used to indicate the state of the group. First bool is opened, second is hover.
+GROUP_ARROWS = {
+    (False, False): '◁',
+    (False, True): '◀',
+    (True, False): '▽',
+    (True, True): '▼',
+}
+
 ITEM_WIDTH = SEL_ICON_SIZE + (32 if utils.MAC else 16)
 ITEM_HEIGHT = SEL_ICON_SIZE + 51
 
@@ -102,9 +110,9 @@ class GroupHeader(GroupHeaderBase):
         self.menu_pos = None
 
     @override
-    def _ui_set_arrow(self, arrow: img.Handle) -> None:
-        """Set the arrow glyph."""
-        TK_IMG.apply(self.arrow, arrow)
+    def _ui_set_arrow(self, opened: bool, hover: bool) -> None:
+        """Refresh to the non-hovered state."""
+        self.arrow['text'] = GROUP_ARROWS[opened, hover]
 
 
 class SelectorWin(SelectorWinBase[ttk.Button, GroupHeader]):

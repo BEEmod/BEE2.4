@@ -41,12 +41,6 @@ LOGGER = srctools.logger.get_logger(__name__)
 ICON_CHECK = img.Handle.builtin('icons/check', 16, 16)
 ICON_CROSS = img.Handle.builtin('icons/cross', 16, 16)
 
-# Arrows used to indicate the state of the group - collapsed or expanded
-IMG_GRP_EXP: Final = img.Handle.builtin('icons/group_arrow', 16, 16)
-IMG_GRP_EXP_HOVER: Final = img.Handle.builtin('icons/group_arrow_hover', 16, 16)
-IMG_GRP_COLL: Final = IMG_GRP_EXP.crop(transpose=img.ROTATE_CW)
-IMG_GRP_COLL_HOVER: Final = IMG_GRP_EXP_HOVER.crop(transpose=img.ROTATE_CW)
-
 BTN_PLAY: Final = '▶'
 BTN_STOP: Final = '■'
 
@@ -159,23 +153,15 @@ class GroupHeaderBase:
         """Toggle the header on or off."""
         self.parent.group_visible[self.id] = vis = not self.parent.group_visible.get(self.id)
         self.parent.items_dirty.set()
-        self._ui_set_arrow(IMG_GRP_EXP_HOVER if vis else IMG_GRP_COLL_HOVER)
+        self._ui_set_arrow(vis, True)
 
     def _evt_hover_start(self, _: object | None = None) -> None:
         """When hovered over, fill in the triangle."""
-        self._ui_set_arrow(
-            IMG_GRP_EXP_HOVER
-            if self.parent.group_visible.get(self.id) else
-            IMG_GRP_COLL_HOVER
-        )
+        self._ui_set_arrow(self.parent.group_visible.get(self.id), True)
 
     def _evt_hover_end(self, _: object | None = None) -> None:
         """When leaving, hollow the triangle."""
-        self._ui_set_arrow(
-            IMG_GRP_EXP
-            if self.parent.group_visible.get(self.id) else
-            IMG_GRP_COLL
-        )
+        self._ui_set_arrow(self.parent.group_visible.get(self.id), False)
 
     @abstractmethod
     def _ui_reassign(self, group_id: str,  title: TransToken, /) -> None:
@@ -183,7 +169,7 @@ class GroupHeaderBase:
         self.id = group_id
 
     @abstractmethod
-    def _ui_set_arrow(self, arrow: img.Handle, /) -> None:
+    def _ui_set_arrow(self, opened: bool, hovered: bool) -> None:
         """Set the arrow for a group."""
         raise NotImplementedError
 
@@ -645,7 +631,7 @@ class SelectorWinBase[ButtonT, GroupHeaderT: GroupHeaderBase](ReflowWindow):
         for group in self.group_widgets.values():
             # Update the arrow so that it matches the visible state.
             # noinspection PyProtectedMember
-            group._evt_hover_end()
+            group._ui_set_arrow(self.group_visible.get(group.id), False)
 
         self._ui_win_show()
         self._visible = True
