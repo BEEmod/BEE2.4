@@ -49,12 +49,12 @@ class LazyValue[U](abc.ABC):
             return ConstValue(value)
 
     @abc.abstractmethod
-    def _repr_val(self) -> str:
+    def _repr_val(self, /) -> str:
         """Return the repr() for the computation, for the overall repr()."""
         raise NotImplementedError
 
     @abc.abstractmethod
-    def _resolve(self, inst: Entity) -> U:
+    def _resolve(self, inst: Entity, /) -> U:
         """Resolve the value by substituting from the instance, if required."""
         raise NotImplementedError
 

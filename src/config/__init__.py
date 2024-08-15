@@ -82,27 +82,27 @@ class Data(abc.ABC):
         return cls.__info
 
     @classmethod
-    def parse_legacy(cls, conf: Keyvalues) -> dict[str, Self]:
+    def parse_legacy(cls, conf: Keyvalues, /) -> dict[str, Self]:
         """Parse from the old legacy config. The user has to handle the uses_id style."""
         return {}
 
     @classmethod
     @abc.abstractmethod
-    def parse_kv1(cls, data: Keyvalues, version: int) -> Self:
+    def parse_kv1(cls, data: Keyvalues, /, version: int) -> Self:
         """Parse keyvalues config values."""
         raise NotImplementedError
 
     @abc.abstractmethod
-    def export_kv1(self) -> Keyvalues:
+    def export_kv1(self, /) -> Keyvalues:
         """Generate keyvalues for saving configuration."""
         raise NotImplementedError
 
     @classmethod
-    def parse_dmx(cls, data: Element, version: int) -> Self:
+    def parse_dmx(cls, data: Element, /, version: int) -> Self:
         """Parse DMX config values."""
         return cls.parse_kv1(data.to_kv1(), version)
 
-    def export_dmx(self) -> Element:
+    def export_dmx(self, /) -> Element:
         """Generate DMX for saving the configuration."""
         return Element.from_kv1(self.export_kv1())
 
