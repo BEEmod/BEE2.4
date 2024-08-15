@@ -114,13 +114,6 @@ _load_nursery: trio.Nursery | None = None
 _early_loads: set[Handle] = set()
 
 
-def tuple_size(size: tuple[int, int] | int) -> tuple[int, int]:
-    """Return a xy tuple given a size or tuple."""
-    if isinstance(size, tuple):
-        return size
-    return size, size
-
-
 # Special paths which map to various images.
 PAK_SPECIAL = utils.special_id('<special>')
 PAK_COLOR = utils.special_id('<color>')
@@ -473,8 +466,11 @@ class Handle(User):
         return ImgIcon._deduplicate(width, height, 'none')
 
     @classmethod
-    def ico_loading(cls, width: int, height: int) -> ImgLoading:
+    def ico_loading(cls, width: int, height: int) -> Handle:
         """Retrieve a handle to a 'loading' icon."""
+        if width < 64 or height < 64:
+            # Too small to show the icon, just use a blank image.
+            return ImgBackground._deduplicate(width, height)
         try:
             return ImgLoading.load_anims[width, height][0]
         except KeyError:
@@ -556,6 +552,7 @@ class Handle(User):
         if not self.allow_raw:
             raise ValueError(f'Cannot force-load handle with non-builtin type {self!r}!')
         if not self._force_loaded:
+            LOGGER.debug('Force loading: {!r}', self)
             _force_loaded_handles.append(self)
             self._force_loaded = True
 
@@ -615,17 +612,19 @@ class Handle(User):
                 _load_nursery.start_soon(self._load_task, load_handle, force)
         return load_handle
 
-    async def _load_task(self, load_handle: ImgLoading, force: bool) -> None:
+    async def _load_task(self, load_handle: Handle, force: bool) -> None:
         """Scheduled to load images then apply to the widgets."""
         Handle._currently_loading += 1
         try:
-            load_handle.load_targs.add(self)
-            if Handle._currently_loading == 1:
-                # First to load, so wake up the anim.
-                ImgLoading.trigger_wakeup()
+            if isinstance(load_handle, ImgLoading):
+                load_handle.load_targs.add(self)
+                if Handle._currently_loading == 1:
+                    # First to load, so wake up the anim.
+                    ImgLoading.trigger_wakeup()
             await trio.to_thread.run_sync(self._load_pil)
         finally:
-            load_handle.load_targs.discard(self)
+            if isinstance(load_handle, ImgLoading):
+                load_handle.load_targs.discard(self)
             Handle._currently_loading -= 1
         self._loading = False
         if _UI_IMPL is not None:
