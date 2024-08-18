@@ -1113,7 +1113,7 @@ class Generator(abc.ABC):
         return ValueError(f'Bad texture name: {tex_name}\n Allowed: {list(self.textures.keys())!r}')
 
     @abc.abstractmethod
-    def _get(self, loc: Vec | FrozenVec, tex_name: str) -> MaterialConf:
+    def _get(self, loc: Vec | FrozenVec, tex_name: str, /) -> MaterialConf:
         """Actually get a texture.
 
         If KeyError is raised, an appropriate exception is raised from that.

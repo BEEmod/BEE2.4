@@ -84,27 +84,29 @@ def _load_special(path: str, theme: Theme) -> Image.Image:
         return Image.new('RGBA', (64, 64), (0, 0, 0, 0))
 
 
-ICONS: dict[tuple[str, Theme], Image.Image] = {
-    (name, theme): _load_special(name, theme)
-    for name in ['error', 'none', 'load']
-    for theme in Theme
-}
-# The icon has 8 parts, with the gap in the 1 pos. So mirror/rotate to
-# derive the others.
-for _theme in Theme:
-    ICONS['load_0', _theme] = _load_icon = ICONS['load', _theme]
-    ICONS['load_7', _theme] = _load_icon_flip = _load_icon.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
-    ICONS['load_1', _theme] = _load_icon_flip.transpose(Image.Transpose.ROTATE_270)
-    ICONS['load_2', _theme] = _load_icon.transpose(Image.Transpose.ROTATE_270)
-    ICONS['load_3', _theme] = _load_icon.transpose(Image.Transpose.FLIP_TOP_BOTTOM)
-    ICONS['load_4', _theme] = _load_icon.transpose(Image.Transpose.ROTATE_180)
-    ICONS['load_5', _theme] = _load_icon_flip.transpose(Image.Transpose.ROTATE_90)
-    ICONS['load_6', _theme] = _load_icon.transpose(Image.Transpose.ROTATE_90)
+def _build_icons() -> dict[tuple[str, Theme], Image.Image]:
+    icons = {
+        (name, theme): _load_special(name, theme)
+        for name in ['error', 'none', 'load']
+        for theme in Theme
+    }
+    # The icon has 8 parts, with the gap in the 1 pos. So mirror/rotate to
+    # derive the others.
+    for _theme in Theme:
+        icons['load_0', _theme] = _load_icon = icons['load', _theme]
+        icons['load_7', _theme] = _load_icon_flip = _load_icon.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
+        icons['load_1', _theme] = _load_icon_flip.transpose(Image.Transpose.ROTATE_270)
+        icons['load_2', _theme] = _load_icon.transpose(Image.Transpose.ROTATE_270)
+        icons['load_3', _theme] = _load_icon.transpose(Image.Transpose.FLIP_TOP_BOTTOM)
+        icons['load_4', _theme] = _load_icon.transpose(Image.Transpose.ROTATE_180)
+        icons['load_5', _theme] = _load_icon_flip.transpose(Image.Transpose.ROTATE_90)
+        icons['load_6', _theme] = _load_icon.transpose(Image.Transpose.ROTATE_90)
+    return icons
+
+
+ICONS: Mapping[tuple[str, Theme], Image.Image] = _build_icons()
 # Frame indices in order.
 LOAD_FRAME_IND = range(8)
-
-del _load_icon, _load_icon_flip, _theme
-
 # Once initialised, schedule here.
 _load_nursery: trio.Nursery | None = None
 # Load calls occurring before init. This is done so apply() can be called during import etc,
