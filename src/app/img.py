@@ -1142,18 +1142,21 @@ async def init(
     global _load_nursery, _UI_IMPL
 
     try:
-        _UI_IMPL = implementation
+        async with trio.open_nursery() as nursery:
+            if _load_nursery is not None or _UI_IMPL is not None:
+                raise AssertionError('Only one image system can be run at a time!')
+            _load_nursery = nursery
+            _UI_IMPL = implementation
 
-        async with trio.open_nursery() as _load_nursery:
-            await _load_nursery.start(_load_fsys_task)
+            await nursery.start(_load_fsys_task)
 
             LOGGER.debug('Early loads: {}', _early_loads)
             while _early_loads:
                 handle = _early_loads.pop()
                 if handle._users:
                     load_handle = Handle.ico_loading(handle.width, handle.height)
-                    _load_nursery.start_soon(Handle._load_task, handle, load_handle, False)
-            _load_nursery.start_soon(ImgLoading.anim_task, implementation)
+                    nursery.start_soon(Handle._load_task, handle, load_handle, False)
+            nursery.start_soon(ImgLoading.anim_task, implementation)
             task_status.started()
             # Sleep, until init() is potentially cancelled.
             await trio.sleep_forever()
@@ -1161,7 +1164,6 @@ async def init(
         # Unset and clear everything, for the benefit of test code.
         _UI_IMPL = None
         _load_nursery = None
-        _current_theme = Theme.LIGHT
         PACK_SYSTEMS.clear()
         ImgLoading.load_anims.clear()
         _early_loads.clear()
