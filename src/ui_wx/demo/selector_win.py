@@ -34,7 +34,7 @@ async def test(core_nursery: trio.Nursery) -> None:
     )
     packset, _ = await packages.LOADED.wait_transition()
 
-    await core_nursery.start(img.init, packages.PACKAGE_SYS,  WX_IMG)
+    await core_nursery.start(img.init,  WX_IMG)
     core_nursery.start_soon(sound.sound_task)
     print('Done.')
 

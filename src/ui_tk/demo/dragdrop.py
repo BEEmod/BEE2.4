@@ -36,7 +36,7 @@ async def test(core_nursery: trio.Nursery) -> None:
                 loc,
             )
     assert app._APP_NURSERY is not None
-    await app._APP_NURSERY.start(img.init, packages.PACKAGE_SYS,  TK_IMG)
+    await app._APP_NURSERY.start(img.init,  TK_IMG)
     core_nursery.start_soon(sound.sound_task)
     print('Done.')
 

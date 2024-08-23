@@ -848,7 +848,7 @@ async def init_application(nursery: trio.Nursery) -> None:
 
     loadScreen.main_loader.destroy()
     # Initialise images, but don't load anything from packages.
-    background_run(img.init, EmptyMapping, TK_IMG)
+    background_run(img.init, TK_IMG)
     # We don't need sound or language reload handling.
 
     await nursery.start(init, TK_IMG)

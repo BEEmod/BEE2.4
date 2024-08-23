@@ -77,7 +77,7 @@ async def init_app(core_nursery: trio.Nursery) -> None:
         packset, _ = await packages.LOADED.wait_transition()
         package_sys = packages.PACKAGE_SYS
         await loadScreen.MAIN_UI.step('pre_ui')
-        core_nursery.start_soon(img.init, package_sys, TK_IMG)
+        core_nursery.start_soon(img.init, TK_IMG)
         core_nursery.start_soon(localisation.load_aux_langs, gameMan.all_games, packset)
 
         # Load filesystems into various modules.

@@ -7,7 +7,9 @@ they are loaded in the background, then unloaded if removed from all widgets.
 """
 from __future__ import annotations
 
-from typing import Any, ClassVar, Final
+from abc import abstractmethod
+from contextlib import aclosing
+from typing import Any, ClassVar, Final, override
 from typing_extensions import Self
 from collections.abc import Mapping, Sequence, Iterator
 from pathlib import Path
@@ -252,6 +254,7 @@ class Handle(User):
         """Yield all the handles this depends on."""
         return iter(())
 
+    @abstractmethod
     def _make_image(self) -> Image.Image:
         """Construct the image data, must be implemented by subclass."""
         raise NotImplementedError
@@ -261,10 +264,12 @@ class Handle(User):
         """Override in subclasses to convert mutable attributes to deduplicate."""
         return args
 
+    @abstractmethod
     def resize(self, width: int, height: int) -> Self:
         """Return a copy with a different size."""
         raise NotImplementedError
 
+    @abstractmethod
     def _is_themed(self) -> bool:
         """Return if this image may need to reload when the theme changes.
 
@@ -278,6 +283,11 @@ class Handle(User):
         This only needs to be set after the image is loaded at least once.
         """
         return self._bg_composited or self._is_themed()
+
+    @abstractmethod
+    def uses_packsys(self) -> bool:
+        """Returns whether this image uses package resources."""
+        return False
 
     @classmethod
     def _deduplicate(cls, width: int | tuple[int, int], height: int, *args: Any) -> Self:
@@ -515,7 +525,7 @@ class Handle(User):
     def reload(self) -> bool:
         """Reload this handle if permitted to, returning whether it was queued.
 
-        Reloading will not occur if the handle was forced loaded, already loading.
+        Reloading will not occur if the handle was forced loaded or already loading.
         """
         # If force-loaded it's builtin UI etc we shouldn't reload.
         # If already loading, no point.
@@ -649,6 +659,7 @@ class ImgColor(Handle):
     green: int
     blue: int
 
+    @override
     def _make_image(self) -> Image.Image:
         """Directly produce an image of this size with the specified color."""
         return Image.new(
@@ -657,12 +668,19 @@ class ImgColor(Handle):
             (self.red, self.green, self.blue, 255),
         )
 
+    @override
     def resize(self, width: int, height: int) -> Self:
         """Return the same colour with a different image size."""
         return self._deduplicate(width, height)
 
+    @override
     def _is_themed(self) -> bool:
         """This is never themed."""
+        return False
+
+    @override
+    def uses_packsys(self) -> bool:
+        """This doesn't use package resources."""
         return False
 
 
@@ -670,6 +688,7 @@ class ImgColor(Handle):
 class ImgBackground(Handle):
     """A solid image with the theme-appropriate background."""
 
+    @override
     def _make_image(self) -> Image.Image:
         """Directly produce an image of this size with the specified color."""
         return Image.new(
@@ -678,29 +697,44 @@ class ImgBackground(Handle):
             BACKGROUNDS[_current_theme],  # This is a 3-tuple, but PIL fills alpha=255.
         )
 
+    @override
     def resize(self, width: int, height: int) -> Self:
         """Return a new background with this image size."""
         return self._deduplicate(width, height)
 
+    @override
     def _is_themed(self) -> bool:
         """This image must reload when the theme changes."""
         return True
+
+    @override
+    def uses_packsys(self) -> bool:
+        """This doesn't use package resources."""
+        return False
 
 
 class ImgAlpha(Handle):
     """An image which is entirely transparent."""
     alpha_result: ClassVar[bool] = True
 
+    @override
     def _make_image(self) -> Image.Image:
         """Produce an image of this size with transparent pixels."""
         return Image.new('RGBA', (self.width or 16, self.height or 16), (0, 0, 0, 0))
 
+    @override
     def resize(self, width: int, height: int) -> ImgAlpha:
         """Return a transparent image with a different size."""
         return self._deduplicate(width, height)
 
+    @override
     def _is_themed(self) -> bool:
         """This is never themed."""
+        return False
+
+    @override
+    def uses_packsys(self) -> bool:
+        """This doesn't use package resources."""
         return False
 
 
@@ -710,6 +744,7 @@ class ImgStripAlpha(Handle):
     alpha_result: ClassVar[bool] = False
     original: Handle
 
+    @override
     def _make_image(self) -> Image.Image:
         """Strip the alpha from our child image."""
         img = self.original._load_pil().convert('RGB')
@@ -717,20 +752,27 @@ class ImgStripAlpha(Handle):
             img = img.resize((self.width, self.height))
         return img.convert('RGBA')
 
+    @override
     def resize(self, width: int, height: int) -> ImgStripAlpha:
         """Return a copy with a different size."""
         return self._deduplicate(width, height, self.original.resize(width, height))
 
-    # Subclass methods
+    @override
     def _children(self) -> Iterator[Handle]:
         """Yield all the handles this depends on."""
         yield self.original
 
+    @override
     def _is_themed(self) -> bool:
         """This is themed if the original is."""
         return self.original.is_themed()
 
+    @override
+    def uses_packsys(self) -> bool:
+        return self.original.uses_packsys()
+
     @classmethod
+    @override
     def _to_key(cls, args: tuple[object, ...]) -> tuple[object, ...]:
         """Handles aren't hashable, so we need to use identity."""
         [original] = args
@@ -743,6 +785,7 @@ class ImgFile(Handle):
     uri: utils.PackagePath
     _uses_theme: bool = False
 
+    @override
     def _make_image(self) -> Image.Image:
         """Load from a app package."""
         try:
@@ -756,13 +799,20 @@ class ImgFile(Handle):
             self._uses_theme = True
         return img
 
+    @override
     def resize(self, width: int, height: int) -> ImgFile:
         """Return a copy with a different size."""
         return self._deduplicate(width, height, self.uri)
 
+    @override
     def _is_themed(self) -> bool:
         """Return it this uses a themed image."""
         return self._uses_theme
+
+    @override
+    def uses_packsys(self) -> bool:
+        """This always uses package resources."""
+        return True
 
 
 @attrs.define(eq=False)
@@ -774,6 +824,7 @@ class ImgBuiltin(Handle):
     resize_mode: ClassVar[Image.Resampling] = Image.Resampling.LANCZOS
     _uses_theme: bool = False
 
+    @override
     def _make_image(self) -> Image.Image:
         """Load from the builtin UI resources."""
         img, uses_theme = _load_file(FSYS_BUILTIN, self.uri, self.width, self.height, self.resize_mode)
@@ -781,13 +832,20 @@ class ImgBuiltin(Handle):
             self._uses_theme = True
         return img
 
+    @override
     def resize(self, width: int, height: int) -> ImgBuiltin:
         """Return a copy with a different size."""
         return self._deduplicate(width, height, self.uri)
 
+    @override
     def _is_themed(self) -> bool:
-        """Return it this uses a themed image."""
+        """Return if this uses a themed image."""
         return self._uses_theme
+
+    @override
+    def uses_packsys(self) -> bool:
+        """This doesn't use package resources."""
+        return False
 
 
 class ImgSprite(ImgBuiltin):
@@ -802,14 +860,27 @@ class ImgComposite(Handle):
     layers: Sequence[Handle]
 
     @classmethod
+    @override
     def _to_key(cls, children: tuple[Handle, ...]) -> tuple[int, ...]:
         """Handles aren't hashable, so we need to use identity."""
         return tuple(map(id, children))
 
+    @override
     def _is_themed(self) -> bool:
         """Check if this needs to be updated for theming."""
         return any(layer.is_themed() for layer in self.layers)
 
+    @override
+    def _children(self) -> Iterator[Handle]:
+        """Yield the children this depends on."""
+        yield from self.layers
+
+    @override
+    def uses_packsys(self) -> bool:
+        """Check if any children use package resources."""
+        return any(layer.uses_packsys() for layer in self.layers)
+
+    @override
     def _make_image(self) -> Image.Image:
         """Combine several images into one."""
         width = self.width or self.layers[0].width
@@ -826,6 +897,7 @@ class ImgComposite(Handle):
             img.alpha_composite(child)
         return img
 
+    @override
     def resize(self, width: int, height: int) -> ImgComposite:
         """Return a copy with a different size."""
         return self._deduplicate(width, height, [
@@ -842,10 +914,12 @@ class ImgCrop(Handle):
     bounds: tuple[int, int, int, int] | None  # left, top, right, bottom coords.
     transpose: Image.Transpose | None
 
+    @override
     def _children(self) -> Iterator[Handle]:
         yield self.source
 
     @classmethod
+    @override
     def _to_key(
         cls,
         args: tuple[Handle, tuple[int, int, int, int] | None, Image.Transpose | None],
@@ -854,9 +928,15 @@ class ImgCrop(Handle):
         [child, bounds, transpose] = args
         return (id(child), bounds, transpose)
 
+    @override
     def _is_themed(self) -> bool:
         return self.source.is_themed()
 
+    @override
+    def uses_packsys(self) -> bool:
+        return self.source.uses_packsys()
+
+    @override
     def _make_image(self) -> Image.Image:
         """Crop this image down to part of the source."""
         src_w = self.source.width
@@ -878,6 +958,7 @@ class ImgCrop(Handle):
             image = image.resize((self.width, self.height), resample=Image.Resampling.LANCZOS)
         return image
 
+    @override
     def resize(self, width: int, height: int) -> ImgCrop:
         """Return a copy with a different size."""
         return self._deduplicate(width, height, self.source, self.bounds, self.transpose)
@@ -889,6 +970,7 @@ class ImgIcon(Handle):
     icon_name: str
     allow_raw: ClassVar[bool] = True
 
+    @override
     def _make_image(self) -> Image.Image:
         """Construct an image with an overlaid icon."""
         ico = ICONS[self.icon_name, _current_theme]
@@ -904,13 +986,20 @@ class ImgIcon(Handle):
 
         return img
 
+    @override
     def resize(self, width: int, height: int) -> ImgIcon:
         """Return a copy with a different size."""
         return self._deduplicate(width, height, self.icon_name)
 
+    @override
     def _is_themed(self) -> bool:
         """This includes the background."""
         return True
+
+    @override
+    def uses_packsys(self) -> bool:
+        """This doesn't use package resources."""
+        return False
 
 
 @attrs.define(eq=False)
@@ -952,6 +1041,7 @@ class ImgTextOverlay(Handle):
     size: int
     # TODO: If exposed, we might want to specify the quadrant to apply to
 
+    @override
     def _make_image(self) -> Image.Image:
         """Construct an image with text in the lower-left."""
         img = Image.new('RGBA', (self.width, self.height), (0, 0, 0, 0))
@@ -973,13 +1063,20 @@ class ImgTextOverlay(Handle):
         )
         return img
 
+    @override
     def resize(self, width: int, height: int) -> ImgTextOverlay:
         """Return a copy with a different size."""
         return self._deduplicate(width, height, self.text, self.size)
 
+    @override
     def _is_themed(self) -> bool:
         """This includes the background."""
         return True
+
+    @override
+    def uses_packsys(self) -> bool:
+        """This only uses UI resources."""
+        return False
 
 
 class UIImage(abc.ABC):
@@ -1007,27 +1104,49 @@ class UIImage(abc.ABC):
         raise NotImplementedError
 
 
+async def _load_fsys_task(*, task_status: trio.TaskStatus = trio.TASK_STATUS_IGNORED) -> None:
+    """When packages change, reload images."""
+    # Circular import
+    from packages import LOADED, PackagesSet
+
+    global PACK_SYSTEMS
+    async with aclosing(LOADED.eventual_values()) as agen:
+        packset: PackagesSet
+        async for packset in agen:
+            PACK_SYSTEMS = {
+                pack.id: FileSystemChain(
+                    (pack.fsys, 'resources/BEE2/'),
+                    (pack.fsys, 'resources/materials/'),
+                    (pack.fsys, 'resources/materials/models/props_map_editor/'),
+                )
+                for pack in packset.packages.values()
+            }
+            done = 0
+            for handle in list(_handles.values()):
+                if handle.uses_packsys() and handle.has_users() and handle.reload():
+                    done += 1
+            LOGGER.info('Reloaded {} handles that use packages.', done)
+
+            task_status.started()
+            # Real task statuses raises if called multiple twice.
+            task_status = trio.TASK_STATUS_IGNORED
+
+
 # noinspection PyProtectedMember
 async def init(
-    filesystems: Mapping[str, FileSystem[Any]], implementation: UIImage,
+    implementation: UIImage,
     *, task_status: trio.TaskStatus[None] = trio.TASK_STATUS_IGNORED,
 ) -> None:
     """Start the background loading of images, using the specified filesystem and implementation.
     """
     global _load_nursery, _UI_IMPL
 
-    PACK_SYSTEMS.clear()
-    for pak_id, sys in filesystems.items():
-        PACK_SYSTEMS[pak_id] = FileSystemChain(
-            (sys, 'resources/BEE2/'),
-            (sys, 'resources/materials/'),
-            (sys, 'resources/materials/models/props_map_editor/'),
-        )
-
     try:
         _UI_IMPL = implementation
 
         async with trio.open_nursery() as _load_nursery:
+            await _load_nursery.start(_load_fsys_task)
+
             LOGGER.debug('Early loads: {}', _early_loads)
             while _early_loads:
                 handle = _early_loads.pop()

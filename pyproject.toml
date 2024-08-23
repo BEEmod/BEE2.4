@@ -126,7 +126,6 @@ extend-immutable-calls = [
 	"tkMarkdown.MarkdownData.text",
 	# Cast is not really a function call, just returns the arg.
 	"typing.cast",
-	"srctools.logger.get_logger",
 ]
 
 [tool.mypy]

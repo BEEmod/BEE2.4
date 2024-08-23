@@ -34,13 +34,12 @@ import utils
 import consts
 
 
-
 __all__ = [
     # Generally global.
     'OBJ_TYPES', 'PACK_CONFIG',
     'LegacyCorr', 'LEGACY_CORRIDORS',
     'CLEAN_PACKAGE', 'CLEAN_STYLE',
-    'PakObject', 'SelPakObject', 'PackagesSet', 'get_loaded_packages', 'PakRef',
+    'PakObject', 'SelPakObject', 'PackagesSet', 'LOADED', 'get_loaded_packages', 'PakRef',
     'find_packages', 'load_packages',
 
     # Selector win data structures.
@@ -707,6 +706,7 @@ def get_loaded_packages() -> PackagesSet:
     TODO: Try to make this local wherever possible?
     """
     return LOADED.value
+
 
 LOADED = AsyncValue(PackagesSet())
 

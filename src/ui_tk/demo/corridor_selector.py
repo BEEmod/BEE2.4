@@ -22,7 +22,7 @@ async def test(core_nursery: trio.Nursery) -> None:
             list(BEE2_config.get_package_locs()),
             errors,
         )
-    core_nursery.start_soon(img.init, packages.PACKAGE_SYS, TK_IMG)
+    core_nursery.start_soon(img.init, TK_IMG)
     core_nursery.start_soon(sound.sound_task)
     loadScreen.main_loader.destroy()
 
