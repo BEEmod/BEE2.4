@@ -1011,8 +1011,7 @@ async def init_option(
     wid_transtoken.set_text(music_frame, TransToken.ui('Music: '))
 
     await core_nursery.start(
-        music_conf.make_widgets, core_nursery,
-        packages.get_loaded_packages(), music_frame, pane,
+        music_conf.make_widgets, core_nursery, music_frame, pane,
     )
     suggest_windows[packages.Music] = music_conf.WINDOWS[consts.MusicChannel.BASE]
 

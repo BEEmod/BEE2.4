@@ -34,7 +34,6 @@ WINDOWS: dict[MusicChannel, SelectorWin] = {}
 # If the per-channel selector boxes are currently hidden.
 is_collapsed: bool = False
 
-filesystem = FileSystemChain()
 TRANS_BASE_COLL = TransToken.ui('Music:')
 TRANS_BASE_EXP = TransToken.ui('Base:')
 
@@ -64,13 +63,6 @@ DATA_NONE_SPEED = SelitemData.build(
     long_name=packages.TRANS_NONE_NAME,
     desc=TransToken.ui('Add no music while running fast.'),
 )
-
-
-def load_filesystems(systems: Iterable[FileSystem]) -> None:
-    """Record the filesystems used for each package, so we can sample sounds."""
-    filesystem.systems.clear()
-    for system in systems:
-        filesystem.add_sys(system, prefix='resources/music_samp/')
 
 
 def set_suggested(packset: PackagesSet, music_id: utils.SpecialID) -> None:
@@ -124,12 +116,24 @@ def export_data(packset: PackagesSet) -> dict[MusicChannel, utils.SpecialID]:
     return data
 
 
+async def filesys_update_task(filesys: FileSystemChain) -> None:
+    """When packages reload, update the filesystem."""
+    packset: PackagesSet
+    async with aclosing(packages.LOADED.eventual_values()) as agen:
+        async for packset in agen:
+            filesys.systems.clear()
+            for pack in packset.packages.values():
+                filesys.add_sys(pack.fsys, prefix='resources/music_samp/')
+
+
 async def make_widgets(
     core_nursery: trio.Nursery,
-    packset: PackagesSet, frame: ttk.LabelFrame, pane: SubPane,
+    frame: ttk.LabelFrame, pane: SubPane,
     *, task_status: trio.TaskStatus = trio.TASK_STATUS_IGNORED,
 ) -> None:
     """Generate the UI components, and return the base window."""
+    filesystem = FileSystemChain()
+    core_nursery.start_soon(filesys_update_task, filesystem)
     WINDOWS[MusicChannel.BASE] = SelectorWin(TK_ROOT, SelectorOptions(
         func_get_ids=Music.music_for_channel(MusicChannel.BASE),
         func_get_data=Music.selector_data_getter(DATA_NONE_BASE),
