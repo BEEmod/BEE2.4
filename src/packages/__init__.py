@@ -6,7 +6,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any, NoReturn, ClassVar, Self, cast
 
-from collections.abc import Callable, Collection, Iterable, Iterator, Mapping
+from collections.abc import Awaitable, Callable, Collection, Iterable, Iterator, Mapping
 from collections import defaultdict
 from pathlib import Path
 import os
@@ -510,14 +510,19 @@ class SelPakObject(PakObject):
             cls.suggest_default = ''
 
     @classmethod
-    def selector_id_getter(cls, include_none: bool) -> Callable[[PackagesSet], Iterator[utils.SpecialID]]:
+    def selector_id_getter(
+        cls, include_none: bool,
+    ) -> Callable[[PackagesSet], Awaitable[list[utils.SpecialID]]]:
         """Called by selector windows to get the current list of IDs for this item."""
-        def get_ids(packset: PackagesSet) -> Iterator[utils.SpecialID]:
+        async def get_ids(packset: PackagesSet) -> list[utils.SpecialID]:
             """Fetch all IDs."""
+            await packset.ready(cls).wait()
+            ids = []
             if include_none:
-                yield utils.ID_NONE
+                ids.append(utils.ID_NONE)
             for obj in packset.all_obj(cls):
-                yield utils.special_id(obj.id)
+                ids.append(utils.special_id(obj.id))
+            return ids
         return get_ids
 
     @classmethod

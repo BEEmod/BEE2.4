@@ -2,7 +2,7 @@
 from __future__ import annotations
 from typing import Iterator, Mapping
 
-from collections.abc import Callable, Iterable
+from collections.abc import Awaitable, Callable, Iterable
 
 from srctools import conv_float
 import srctools.logger
@@ -240,17 +240,19 @@ class Music(SelPakObject, needs_foreground=True, style_suggest_key='music'):
                         )
 
     @classmethod
-    def music_for_channel(cls, channel: MusicChannel) -> Callable[[PackagesSet], Iterator[utils.SpecialID]]:
+    def music_for_channel(cls, channel: MusicChannel) -> Callable[[PackagesSet], Awaitable[list[utils.SpecialID]]]:
         """Return a callable which lists all music with the specified channel."""
-        def get_channels(packset: PackagesSet) -> Iterator[utils.SpecialID]:
+        async def get_channels(packset: PackagesSet) -> list[utils.SpecialID]:
             """Return music with this channel."""
-            yield utils.ID_NONE
+            await packset.ready(cls).wait()
+            ids = [utils.ID_NONE]
             for music in packset.all_obj(cls):
                 if music.sound[channel]:
-                    yield utils.obj_id(music.id)
+                    ids.append(utils.obj_id(music.id))
                 elif channel is MusicChannel.BASE and music.inst:
                     # The instance provides the base track.
-                    yield utils.obj_id(music.id)
+                    ids.append(utils.obj_id(music.id))
+            return ids
         return get_channels
 
     @classmethod

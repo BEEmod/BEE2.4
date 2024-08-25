@@ -10,7 +10,7 @@ from typing import Final, Literal, assert_never
 from abc import abstractmethod
 
 from contextlib import aclosing
-from collections.abc import Callable, Container, Iterable, Iterator
+from collections.abc import Awaitable, Callable, Container, Iterable, Iterator
 from collections import defaultdict
 from enum import Enum, auto as enum_auto
 import functools
@@ -120,7 +120,7 @@ class Options:
     - modal: If True, the window will block others while open.
     """
     func_get_data: GetterFunc[SelitemData]
-    func_get_ids: Callable[[packages.PackagesSet], Iterable[utils.SpecialID]]
+    func_get_ids: Callable[[packages.PackagesSet], Awaitable[list[utils.SpecialID]]]
     save_id: str  # Required!
     store_last_selected: bool = True
     has_def: bool = True
@@ -190,7 +190,7 @@ class SelectorWinBase[ButtonT, GroupHeaderT: GroupHeaderBase](ReflowWindow):
     func_get_attr: GetterFunc[AttrMap]
     func_get_data: GetterFunc[SelitemData]
     func_get_sample: GetterFunc[str] | None
-    func_get_ids: Callable[[packages.PackagesSet], Iterable[utils.SpecialID]]
+    func_get_ids: Callable[[packages.PackagesSet], Awaitable[list[utils.SpecialID]]]
 
     # Packages currently loaded for the window.
     _packset: packages.PackagesSet
@@ -380,7 +380,8 @@ class SelectorWinBase[ButtonT, GroupHeaderT: GroupHeaderBase](ReflowWindow):
             else:
                 return f'1{get_data(item_id).sort_key}'
 
-        self.item_list = sorted(self.func_get_ids(self._packset), key=sort_func)
+        self.item_list = await self.func_get_ids(self._packset)
+        self.item_list.sort(key=sort_func)
         grouped_items = defaultdict(list)
         self.group_names = {'':  TRANS_GROUPLESS}
         self._menu_index.clear()
