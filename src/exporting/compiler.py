@@ -5,7 +5,6 @@ from contextlib import aclosing
 from pathlib import Path
 import io
 import json
-import os
 import shutil
 import urllib.error
 import urllib.request
@@ -106,12 +105,16 @@ async def terminate_error_server() -> bool:
         return True
     del json_text  # We don't need the raw text any more.
 
+    def send_termination(port: object) -> None:
+        """Send the termination signal."""
+        with urllib.request.urlopen(f'http://127.0.0.1:{port}/shutdown') as response:
+            response.read()
+
     with trio.move_on_after(10.0):
         port = data['port']
         LOGGER.info('Error server port: {}', port)
         try:
-            with urllib.request.urlopen(f'http://127.0.0.1:{port}/shutdown') as response:
-                response.read()
+            await trio.to_thread.run_sync(send_termination, port, abandon_on_cancel=True)
         except urllib.error.URLError as exc:
             LOGGER.info("No response from error server, assuming it's dead: {}", exc.reason)
             return False
