@@ -1,4 +1,5 @@
 """Implements callables which lazily parses and combines config files."""
+from __future__ import annotations
 from typing import Any, Final, Pattern
 from collections.abc import Awaitable, Callable
 import functools
@@ -18,6 +19,7 @@ type LazyConf = Callable[[], Awaitable[Keyvalues]]
 
 async def _blank_prop() -> Keyvalues:
 	"""An empty config. This is used as a singleton."""
+	await trio.lowlevel.checkpoint()
 	return Keyvalues.root()
 
 
@@ -30,6 +32,7 @@ def raw_prop(block: Keyvalues, source: str = '') -> LazyConf:
 		if source:
 			async def copy_with_source() -> Keyvalues:
 				"""Copy the config, then apply the source."""
+				await trio.lowlevel.checkpoint()
 				copy = block.copy()
 				packages.set_cond_source(copy, source)
 				return copy
@@ -37,6 +40,7 @@ def raw_prop(block: Keyvalues, source: str = '') -> LazyConf:
 		else:
 			async def copy_no_source() -> Keyvalues:
 				"""Just copy the block."""
+				await trio.lowlevel.checkpoint()
 				return block.copy()
 
 			return copy_no_source
