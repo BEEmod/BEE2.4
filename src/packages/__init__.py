@@ -58,8 +58,6 @@ __all__ = [
 
 LOGGER = srctools.logger.get_logger(__name__, alias='packages')
 OBJ_TYPES: dict[str, type[PakObject]] = {}
-# Maps a package ID to the matching filesystem for reading files easily.
-PACKAGE_SYS: dict[str, FileSystem] = {}
 PACK_CONFIG = ConfigFile('packages.cfg')
 
 # "Package ID" used to indicate that this mod is required.
@@ -782,8 +780,6 @@ async def find_packages(errors: ErrorUI, packset: PackagesSet, pak_dir: Path) ->
                     path1=duplicate.fsys.path,
                     path2=filesys.path,
                 ))
-
-            PACKAGE_SYS[pak_id] = filesys
 
             packset.packages[pak_id] = Package(
                 pak_id,
