@@ -356,6 +356,7 @@ class SelectorWinBase[ButtonT, GroupHeaderT: GroupHeaderBase](ReflowWindow):
 
     async def _load_data_task(self) -> None:
         """Whenever packages change, reload all items."""
+        scope: trio.CancelScope
         async with aclosing(packages.LOADED.eventual_values()) as agen:
             async for packset in agen:
                 LOGGER.debug('Reloading data for selectorwin {}...', self.save_id)
@@ -364,7 +365,11 @@ class SelectorWinBase[ButtonT, GroupHeaderT: GroupHeaderBase](ReflowWindow):
                 self.set_disp()
                 self.exit()
                 self._packset = packset
-                await self._rebuild_items(packset)
+                async with trio_util.move_on_when(packages.LOADED.wait_transition) as scope:
+                    await self._rebuild_items(packset)
+                if scope.cancelled_caught:
+                    # Packages reloaded again while we were building, restart.
+                    continue
                 self._loading = False
                 self.set_disp()
                 LOGGER.debug('Reload complete for selectorwin {}', self.save_id)
