@@ -387,6 +387,7 @@ class ObjData:
 @attrs.define
 class ParseData:
     """The arguments for pak_object.parse()."""
+    packset: PackagesSet
     fsys: FileSystem
     id: str
     info: Keyvalues = attrs.field(repr=False)
@@ -973,7 +974,7 @@ async def parse_package(
                 except LookupError:
                     raise AppError(TRANS_NO_OBJ_ID.format(obj_type=obj_type, pak_id=pack.id)) from None
                 packset.overrides[obj_type, obj_id.casefold()].append(
-                    ParseData(pack.fsys, obj_id, over_prop, pack.id, True)
+                    ParseData(packset, pack.fsys, obj_id, over_prop, pack.id, True)
                 )
         else:
             try:
@@ -994,7 +995,7 @@ async def parse_package(
                 if obj_type.allow_mult:
                     # Pretend this is an override, but don't actually set the bool.
                     packset.overrides[obj_type, obj_id.casefold()].append(
-                        ParseData(pack.fsys, obj_id, obj, pack.id, False)
+                        ParseData(packset, pack.fsys, obj_id, obj, pack.id, False)
                     )
                 else:
                     raise AppError(TRANS_DUPLICATE_OBJ_ID.format(
@@ -1028,6 +1029,7 @@ async def parse_object(packset: PackagesSet, obj_class: type[PakObject], obj_id:
         with srctools.logger.context(f'{obj_data.pak_id}:{obj_id}'):
             object_ = await obj_class.parse(
                 ParseData(
+                    packset,
                     obj_data.fsys,
                     obj_id,
                     obj_data.info_block,
