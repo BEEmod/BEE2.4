@@ -44,16 +44,22 @@ def raw_prop(block: Keyvalues, source: str = '') -> LazyConf:
 		return BLANK
 
 
-def from_file(path: utils.PackagePath, missing_ok: bool = False, source: str = '') -> LazyConf:
+def from_file(
+	packset: packages.PackagesSet,
+	path: utils.PackagePath,
+	*,
+	missing_ok: bool = False, source: str = '',
+) -> LazyConf:
 	"""Lazily load the specified config."""
 	try:
-		fsys = packages.PACKAGE_SYS[path.package]
+		# If package is a special ID, this will fail.
+		pack = packset.packages[utils.ObjectID(path.package)]
 	except KeyError:
 		if not missing_ok:
 			LOGGER.warning('Package does not exist: "{}"', path)
 		return BLANK
 	try:
-		file = fsys[path.path]
+		file = pack.fsys[path.path]
 	except FileNotFoundError:
 		if not missing_ok:
 			LOGGER.warning('File does not exist: "{}"', path)
@@ -76,11 +82,11 @@ def from_file(path: utils.PackagePath, missing_ok: bool = False, source: str = '
 		return kv
 
 	if app.DEV_MODE.value:
-		app.background_run(devmod_check, file, path)
+		app.background_run(devmode_check, file, path)
 	return loader
 
 
-async def devmod_check(file: File[Any], path: utils.PackagePath) -> None:
+async def devmode_check(file: File[Any], path: utils.PackagePath) -> None:
 	"""In dev mode, parse files in the background to ensure they exist and have valid syntax."""
 	def worker() -> None:
 		"""Parse immediately, to check the syntax."""

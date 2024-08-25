@@ -64,6 +64,7 @@ class QuotePack(SelPakObject, needs_foreground=True, style_suggest_key='quote'):
             )
 
         config = await get_config(
+            data.packset,
             data.info,
             'voice',
             pak_id=data.pak_id,

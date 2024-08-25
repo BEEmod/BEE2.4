@@ -254,7 +254,12 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                 authors=list(map(TransToken.untranslated, packages.sep_values(kv['authors', '']))),
                 desc=packages.desc_parse(kv, 'Corridor', data.pak_id),
                 default_enabled=not kv.bool('disabled', False),
-                config=packages.get_config(kv, 'items', data.pak_id, source='Corridor ' + kv.name),
+                config=packages.get_config(
+                    data.packset, kv,
+                    'items',
+                    data.pak_id,
+                    source=f'Corridor {kv.name}',
+                ),
                 images=images,
                 icon=icon,
                 legacy=is_legacy,

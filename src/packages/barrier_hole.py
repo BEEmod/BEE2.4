@@ -28,7 +28,7 @@ class BarrierHole(PakObject, allow_mult=True):
     async def parse(cls, data: ParseData) -> Self:
         """Parse barrier holes from the package."""
         variant_conf = get_config(
-            data.info,
+            data.packset, data.info,
             'items', data.pak_id,
             prop_name='variants',
             source=f'Barrier Hole <{data.id}>',

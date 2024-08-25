@@ -142,7 +142,13 @@ class ItemVariant:
         self.vbsp_config = lazy_conf.concat(self.vbsp_config, other.vbsp_config)
         self.desc += other.desc
 
-    async def modify(self, pak_id: utils.ObjectID, kv: Keyvalues, source: str) -> ItemVariant:
+    async def modify(
+        self,
+        packset: PackagesSet,
+        pak_id: utils.ObjectID,
+        kv: Keyvalues,
+        source: str,
+    ) -> ItemVariant:
         """Apply a config to this item variant.
 
         This produces a copy with various modifications - switching
@@ -152,6 +158,7 @@ class ItemVariant:
         if 'config' in kv:
             # Item.parse() has resolved this to the actual config.
             vbsp_config = get_config(
+                packset,
                 kv,
                 'items',
                 pak_id,
@@ -169,6 +176,7 @@ class ItemVariant:
             ])
 
         vbsp_config = lazy_conf.concat(vbsp_config, get_config(
+            packset,
             kv,
             'items',
             pak_id,
@@ -526,7 +534,7 @@ class Item(PakObject, needs_foreground=True):
         desc_last = data.info.bool('AllDescLast')
 
         all_config = get_config(
-            data.info,
+            data.packset, data.info,
             'items',
             pak_id=data.pak_id,
             prop_name='all_conf',
@@ -707,7 +715,7 @@ class Item(PakObject, needs_foreground=True):
         styles = packset.all_obj(Style)
         async with trio.open_nursery() as nursery:
             for item_to_style in packset.all_obj(Item):
-                nursery.start_soon(assign_styled_items, styles, item_to_style)
+                nursery.start_soon(assign_styled_items, packset, styles, item_to_style)
 
     def selected_version(self) -> Version:
         """Fetch the selected version for this item."""
@@ -761,6 +769,7 @@ class ItemConfig(PakObject, allow_mult=True):
         styles: dict[str, lazy_conf.LazyConf]
 
         all_config = get_config(
+            data.packset,
             data.info,
             'items',
             pak_id=data.pak_id,
@@ -774,6 +783,7 @@ class ItemConfig(PakObject, allow_mult=True):
             for sty_block in ver.find_all('Styles'):
                 for style in sty_block:
                     styles[style.real_name] = lazy_conf.from_file(
+                        data.packset,
                         utils.PackagePath(data.pak_id, f'items/{style.value}.cfg'),
                         source=f'<ItemConfig {data.pak_id}:{data.id} in "{style.real_name}">',
                     )
@@ -960,6 +970,7 @@ async def parse_item_folder(
         all_name=all_name,
         all_icon=all_icon,
         vbsp_config=lazy_conf.from_file(
+            data.packset,
             utils.PackagePath(data.pak_id, config_path),
             missing_ok=True,
             source=source,
@@ -988,7 +999,7 @@ async def parse_item_folder(
 
 
 # noinspection PyProtectedMember
-async def assign_styled_items(all_styles: Iterable[Style], item: Item) -> None:
+async def assign_styled_items(packset: PackagesSet, all_styles: Iterable[Style], item: Item) -> None:
     """Handle inheritance across item folders.
 
     This will guarantee that all items have a definition for each
@@ -1080,7 +1091,8 @@ async def assign_styled_items(all_styles: Iterable[Style], item: Item) -> None:
                     styles[sty_id] = start_data.copy()
                 else:
                     styles[sty_id] = await start_data.modify(
-                        conf.pak_id, conf.config, f'<{item.id}:{vers.id}.{sty_id}>'
+                        packset, conf.pak_id, conf.config,
+                        f'<{item.id}:{vers.id}.{sty_id}>',
                     )
 
             # If we defer all the styles, there must be a loop somewhere.

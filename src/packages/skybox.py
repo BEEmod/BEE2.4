@@ -42,6 +42,7 @@ class Skybox(
         mat = data.info['material', 'sky_black']
         draw_first = data.info.bool('sky_draw_first')
         config = get_config(
+            data.packset,
             data.info,
             'skybox',
             pak_id=data.pak_id,
