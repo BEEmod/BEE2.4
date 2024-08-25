@@ -86,11 +86,11 @@ async def loglevel_bg() -> None:
             # Pipe closed, we're useless.
             return
         match cmd:
-            case ['level', level]:
+            case ['level', str() as level]:
                 TextHandler.setLevel(HANDLER, level)
                 conf = config.APP.get_cur_conf(GenOptions)
                 config.APP.store_conf(attrs.evolve(conf, log_win_level=level))
-            case ['visible', enabled]:
+            case ['visible', bool() as enabled]:
                 conf = config.APP.get_cur_conf(GenOptions)
                 config.APP.store_conf(attrs.evolve(conf, show_log_win=enabled))
             case _:
