@@ -620,7 +620,7 @@ class Item(PakObject, needs_foreground=True):
             parsed_folders: dict[str, ResultCapture[ItemVariant]] = {
                 folder: ResultCapture.start_soon(
                     nursery, parse_item_folder,
-                    folder, data.fsys, data.id, data.pak_id,
+                    data, folder,
                 )
                 for folder in folders_to_parse
             }
@@ -819,10 +819,8 @@ class SubItemRef:
 
 
 async def parse_item_folder(
+    data: ParseData,
     fold: str,
-    filesystem: FileSystem,
-    item_id: str,
-    pak_id: utils.ObjectID,
 ) -> ItemVariant:
     """Parse through data in item/ folders, and return the result."""
     prop_path = f'items/{fold}/properties.txt'
@@ -834,16 +832,16 @@ async def parse_item_folder(
         """Parse the editoritems in order in a file."""
         items: list[EditorItem] = []
         try:
-            f = filesystem[path].open_str()
+            f = data.fsys[path].open_str()
         except FileNotFoundError as err:
-            raise OSError(f'"{pak_id}:items/{fold}" not valid! Folder likely missing! ') from err
+            raise OSError(f'"{data.pak_id}:items/{fold}" not valid! Folder likely missing! ') from err
         with f:
             tok = Tokenizer(f, path)
             for tok_type, tok_value in tok:
                 if tok_type is Token.STRING:
                     if tok_value.casefold() != 'item':
                         raise tok.error('Unknown item option "{}"!', tok_value)
-                    items.append(EditorItem.parse_one(tok, pak_id))
+                    items.append(EditorItem.parse_one(tok, data.pak_id))
                 elif tok_type is not Token.NEWLINE:
                     raise tok.error(tok_type)
         return items
@@ -851,7 +849,7 @@ async def parse_item_folder(
     def parse_vmf(path: str) -> VMF | None:
         """Parse the VMF portion."""
         try:
-            vmf_keyvalues = filesystem.read_kv1(path)
+            vmf_keyvalues = data.fsys.read_kv1(path)
         except FileNotFoundError:
             return None
         else:
@@ -860,7 +858,7 @@ async def parse_item_folder(
     def parse_props(path: str) -> Keyvalues:
         """Parse the keyvalues file containing extra metadata."""
         try:
-            prop = filesystem.read_kv1(path)
+            prop = data.fsys.read_kv1(path)
         except FileNotFoundError:
             return Keyvalues('Properties', [])
         else:
@@ -876,15 +874,15 @@ async def parse_item_folder(
         first_item, *extra_items = all_items.result()
     except ValueError:
         raise ValueError(
-            f'"{pak_id}:items/{fold}/editoritems.txt has no '
+            f'"{data.pak_id}:items/{fold}/editoritems.txt has no '
             '"Item" block!'
         ) from None
 
-    if first_item.id.casefold() != item_id.casefold():
+    if first_item.id.casefold() != data.id.casefold():
         LOGGER.warning(
             'Item ID "{}" does not match "{}" in "{}:items/{}/editoritems.txt"! '
             'Info.txt ID will override, update editoritems!',
-            item_id, first_item.id, pak_id, fold,
+            data.id, first_item.id, data.pak_id, fold,
         )
 
     editor_vmf = editor_vmf_res.result()
@@ -909,7 +907,7 @@ async def parse_item_folder(
         for subtype in extra_item.subtypes:
             if subtype.pal_pos is not None:
                 LOGGER.warning(
-                    f'"{pak_id}:items/{fold}/editoritems.txt has '
+                    f'"{data.pak_id}:items/{fold}/editoritems.txt has '
                     f'palette set for extra item blocks. Deleting.'
                 )
                 subtype.pal_icon = subtype.pal_pos = None
@@ -922,7 +920,7 @@ async def parse_item_folder(
         all_icon = None
 
     try:
-        all_name = TransToken.parse(pak_id, props['all_name'])
+        all_name = TransToken.parse(data.pak_id, props['all_name'])
     except LookupError:
         all_name = TransToken.BLANK
 
@@ -931,38 +929,38 @@ async def parse_item_folder(
         if ico_kv.has_children():
             for child in ico_kv:
                 icons[child.name] = img.Handle.parse(
-                    child, pak_id,
+                    child, data.pak_id,
                     64, 64,
                     subfolder='items',
                 )
         else:
             # Put it as the first/only icon.
             icons["0"] = img.Handle.parse(
-                ico_kv, pak_id,
+                ico_kv, data.pak_id,
                 64, 64,
                 subfolder='items',
             )
 
     # Add the folder the item definition comes from,
     # so we can trace it later for debug messages.
-    source = f'<{pak_id}>/items/{fold}'
+    source = f'<{data.pak_id}>/items/{fold}'
 
     variant = ItemVariant(
         editoritems=first_item,
         editor_extra=extra_items,
 
-        pak_id=pak_id,
+        pak_id=data.pak_id,
         source=source,
         authors=sep_values(props['authors', '']),
         tags=sep_values(props['tags', '']),
-        desc=desc_parse(props, f'{pak_id}:{prop_path}', pak_id),
+        desc=desc_parse(props, f'{data.pak_id}:{prop_path}', data.pak_id),
         ent_count=props['ent_count', ''],
         url=props['infoURL', None],
         icons=icons,
         all_name=all_name,
         all_icon=all_icon,
         vbsp_config=lazy_conf.from_file(
-            utils.PackagePath(pak_id, config_path),
+            utils.PackagePath(data.pak_id, config_path),
             missing_ok=True,
             source=source,
         ),
@@ -971,7 +969,7 @@ async def parse_item_folder(
     if not variant.ent_count and config.APP.get_cur_conf(config.gen_opts.GenOptions).log_missing_ent_count:
         LOGGER.warning(
             '"{}:{}" has missing entity count!',
-            pak_id,
+            data.pak_id,
             prop_path,
         )
 
@@ -983,7 +981,7 @@ async def parse_item_folder(
         LOGGER.warning(
             'Warning: "{}:{}" has incomplete grouping icon '
             'definition!',
-            pak_id,
+            data.pak_id,
             prop_path,
         )
     return variant
