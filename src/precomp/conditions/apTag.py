@@ -273,7 +273,7 @@ def res_make_tag_fizzler(vmf: VMF, info: conditions.MapInfo, res: Keyvalues) -> 
                 # For the other two, we compare to the line,
                 # or compare to the closest side (in line with the fizz)
 
-                if fizz_norm_axis == 'x':  #  Extends in Y direction
+                if fizz_norm_axis == 'x':  # Extends in Y direction
                     other_axis = 'y'
                     side_min = pos1.y
                     side_max = pos2.y

@@ -7,7 +7,6 @@ from precomp.lazy_value import LazyValue
 import utils
 
 
-
 COND_MOD_NAME = 'Track Platforms'
 LOGGER = logger.get_logger(__name__, alias='cond.trackPlat')
 FACINGS = {

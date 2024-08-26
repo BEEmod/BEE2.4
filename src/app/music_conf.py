@@ -3,9 +3,8 @@ from tkinter import ttk
 import tkinter
 
 from contextlib import aclosing
-from collections.abc import Iterable
 
-from srctools import FileSystemChain, FileSystem
+from srctools import FileSystemChain
 import attrs
 import srctools.logger
 import trio

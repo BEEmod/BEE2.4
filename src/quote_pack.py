@@ -99,6 +99,7 @@ class Response(enum.Enum):
         else:
             assert_never(self)
 
+
 RESPONSE_NAMES: Mapping[str, Response] = {
     **{
         resp.name.lower(): resp

@@ -35,6 +35,7 @@ class _WidgetsDict(TypedDict):
     tabs: ttk.Notebook
     trans: tk.Text
 
+
 UI: _WidgetsDict = cast(_WidgetsDict, {})
 TABS: list[Tab] = []
 
@@ -82,6 +83,7 @@ class Tab:
     kind: TabTypes
     frame: ttk.Frame
     title: TransToken
+
 
 win = tk.Toplevel(TK_ROOT, name='voiceEditor')
 win.withdraw()

@@ -678,10 +678,10 @@ def make_result(
     """Decorator to add results to the lookup."""
     folded_name = orig_name.casefold()
     # Discard the original name from aliases, if it's also there.
-    aliases = tuple([
+    aliases = tuple(
         name for name in aliases
         if name.casefold() != folded_name
-    ])
+    )
 
     def x[ResultT](result_func: Callable[..., ResultT]) -> Callable[..., ResultT]:
         """Create the result when the function is supplied."""
@@ -904,6 +904,7 @@ def import_conditions() -> None:
             if not isinstance(found, types.ModuleType) or found.__name__ != mod_info.name:
                 raise Exception(mod_info, found)
     LOGGER.info('Imported all conditions modules!')
+
 
 DOC_MARKER = '''<!-- Only edit above this line. This is generated from text in the compiler code. -->'''
 

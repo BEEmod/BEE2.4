@@ -19,6 +19,7 @@ class Camera(NamedTuple):
     cam_pos: Vec
     cam_angles: Angle
 
+
 ALL_CAMERAS: List[Camera] = []
 
 # Do any monitors exist?

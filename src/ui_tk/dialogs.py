@@ -53,6 +53,7 @@ async def _messagebox(
 class BasicQueryValidator(simpledialog.Dialog):
     """Implement the dialog with the simpledialog code."""
     result: str | None
+
     def __init__(
         self,
         parent: tk.Misc,

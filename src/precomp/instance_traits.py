@@ -148,6 +148,7 @@ class TraitInfo:
     item_id: Optional[utils.ObjectID] = None
     traits: Set[str] = attrs.Factory(set)
 
+
 # Maps entities to their traits.
 ENT_TO_TRAITS: MutableMapping[Entity, TraitInfo] = WeakKeyDictionary()
 

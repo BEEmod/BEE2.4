@@ -88,6 +88,7 @@ class _WidgetsDict(TypedDict):
     stylevar_chosen_none: ttk.Label
     stylevar_other_none: ttk.Label
 
+
 checkbox_all: dict[str, ttk.Checkbutton] = {}
 checkbox_chosen: dict[str, ttk.Checkbutton] = {}
 checkbox_other: dict[str, ttk.Checkbutton] = {}

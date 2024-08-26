@@ -9,10 +9,7 @@ import trio
 import wx
 
 import exporting
-from app import (
-    CompilerPane, localisation, sound, img, gameMan, music_conf,
-    UI, logWindow, lifecycle,
-)
+from app import CompilerPane, localisation, sound, img, gameMan, UI, logWindow, lifecycle
 from config.windows import WindowState
 from trio_debug import Tracer
 from ui_wx.dialogs import DIALOG

@@ -89,6 +89,7 @@ class CollideType(Flag):
                     LOGGER.warning('Invalid collide type: "{}"!', key)
         return coll
 
+
 # The types we want to write into vmfs.
 EXPORT_KVALUES: Sequence[CollideType] = [
     CollideType.ANTLINES,
@@ -578,7 +579,7 @@ class BBox:
         if axis == 'x':
             if mins == self.min_x and maxs == self.max_x:
                 return self  # Unchanged, just return self
-            new_bbox.__attrs_init__(
+            new_bbox.__attrs_init__(  # noqa: PLC2801  # Direct dunder call
                 mins, self.min_y, self.min_z,
                 maxs, self.max_y, self.max_z,
                 self.contents, self.name, self.tags,
@@ -586,7 +587,7 @@ class BBox:
         elif axis == 'y':
             if mins == self.min_y and maxs == self.max_y:
                 return self
-            new_bbox.__attrs_init__(
+            new_bbox.__attrs_init__(  # noqa: PLC2801
                 self.min_x, mins, self.min_z,
                 self.max_x, maxs, self.max_z,
                 self.contents, self.name, self.tags,
@@ -595,7 +596,7 @@ class BBox:
             if mins == self.min_z and maxs == self.max_z:
                 return self
 
-            new_bbox.__attrs_init__(
+            new_bbox.__attrs_init__(  # noqa: PLC2801
                 self.min_x, self.min_y, mins,
                 self.max_x, self.max_y, maxs,
                 self.contents, self.name, self.tags,

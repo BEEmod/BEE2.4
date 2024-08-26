@@ -392,6 +392,7 @@ class MaterialConf:
         else:
             return attrs.evolve(self, mat=antigel_tex)
 
+
 # Identifier for each generator.
 type GenKey = GenCat | tuple[GenCat, Orient, Portalable]
 

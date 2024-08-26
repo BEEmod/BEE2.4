@@ -17,14 +17,14 @@ from ui_tk.img import TKImages
 LOGGER = logger.get_logger('itemconfig.timer')
 
 
+# Put a cache on this, since we can share it.
 @lru_cache(maxsize=20)
 def timer_values(min_value: int, max_value: int) -> tuple[str, ...]:
     """Return 0:38-like strings up to the max value."""
-    # Put a cache on this, since we can share it.
-    return tuple([
+    return tuple(
         f'{i // 60}:{i % 60:02}'
         for i in range(min_value, max_value + 1)
-    ])
+    )
 
 
 @itemconfig.ui_multi_wconf(TimerOptions)

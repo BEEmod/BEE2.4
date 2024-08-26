@@ -106,14 +106,15 @@ class Bevels(Flag):
     v_both = north | south
     all = u_both | v_both
 
+
 # Given the two bevel options, determine the correct texturing
 # values.
 # (min, max) -> scale
 _BEVEL_BACK_SCALE_SINGLE = {
-    (False, False): 128/512, # |__|
-    (False, True): 124/512,  # |__/
-    (True, False): 124/512,  # \__|
-    (True, True): 120/512,   # \__/
+    (False, False): 128/512,  # |__|
+    (False, True): 124/512,   # |__/
+    (True, False): 124/512,   # \__|
+    (True, True): 120/512,    # \__/
 }
 # The above for both axes, pre-calculated for every bevel.
 BEVEL_BACK_SCALE = {
@@ -386,6 +387,7 @@ def order_bbox(bbox: tuple[int, int, int, int]) -> tuple[int, int, int, int]:
     """
     umin, vmin, umax, vmax = bbox
     return umin, vmin, -umax, -vmax
+
 
 PATTERNS: dict[str, list[Pattern]] = {
     'clean': [

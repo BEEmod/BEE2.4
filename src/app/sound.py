@@ -246,6 +246,7 @@ def play_fx() -> bool:
     """Return if sounds should play."""
     return config.APP.get_cur_conf(GenOptions).play_sounds
 
+
 if utils.WIN:
     if utils.FROZEN:
         _libs_folder = utils.bins_path(".")

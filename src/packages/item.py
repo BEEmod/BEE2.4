@@ -635,10 +635,10 @@ class Item(PakObject, needs_foreground=True):
 
         # We want to ensure the number of visible subtypes doesn't change.
         subtype_counts = {
-            tuple([
+            tuple(
                 i for i, subtype in enumerate(item_variant.result().editor.subtypes, 1)
                 if subtype.pal_pos or subtype.pal_name
-            ])
+            )
             for item_variant in parsed_folders.values()
         }
         if len(subtype_counts) > 1:

@@ -32,6 +32,7 @@ class RTree[ValueT]:
         tuple[float, float, float, float, float, float],
         ValueHolder[ValueT]
     ]
+
     def __init__(self) -> None:
         self.tree = index.Index(properties=PROPS)
         self._by_id = {}

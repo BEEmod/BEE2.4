@@ -23,6 +23,7 @@ class SignType(Enum):
     TALL = 'tall'  # Half-wide
     WIDE = 'wide'  # Half-height
 
+
 SIZES: dict[SignType, tuple[int, int]] = {
     SignType.DEFAULT: (32, 32),
     SignType.TALL: (16, 32),

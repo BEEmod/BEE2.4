@@ -330,7 +330,7 @@ def add_line(
             if ent['targetname'] == name:
                 # Don't block yourself.
                 continue
-            ent.add_out(Output('OnUser1', name,'Kill', only_once=True))
+            ent.add_out(Output('OnUser1', name, 'Kill', only_once=True))
 
 
 def sort_func(quote: PossibleQuote) -> Decimal:

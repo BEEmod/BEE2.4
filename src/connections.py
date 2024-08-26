@@ -145,6 +145,7 @@ def format_delay(offset: float, add_timer_delay: bool) -> str:
         else:
             return str(offset)
 
+
 OUT_NAME_DESC = (
     'This should be either an instance output name like '
     '"instance:ent_name;OnSomeOutput", or a simple output name like "OnStartTouch" '

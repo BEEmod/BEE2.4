@@ -60,6 +60,7 @@ class TooltipData:
     img: img.Handle | None
     delay: int
 
+
 DATA: weakref.WeakKeyDictionary[tk.Misc, TooltipData] = weakref.WeakKeyDictionary()
 
 

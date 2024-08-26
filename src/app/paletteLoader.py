@@ -566,6 +566,7 @@ def parse_legacy(posfile: IO[str], propfile: IO[str], path: str) -> Palette:
                     raise ValueError(f'Malformed row "{line}"!')
     return Palette(name, pos)
 
+
 if __name__ == '__main__':
     results = load_palettes()
     for palette in results:

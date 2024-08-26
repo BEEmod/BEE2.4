@@ -171,6 +171,7 @@ class LimitCounter:
 
     # i18n: Tooltip format for compiler limit bars.
     TOOLTIP = TransToken.ui('{count}/{max} ({frac:0.##%}):\n{blurb}')
+
     def __init__(
         self,
         master: ttk.LabelFrame,

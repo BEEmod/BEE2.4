@@ -80,7 +80,7 @@ class StepOrder[CtxT, ResourceT]:
 
         return deco
 
-    async def run(self, ctx: CtxT, stage: ScreenStage | None= None) -> None:
+    async def run(self, ctx: CtxT, stage: ScreenStage | None = None) -> None:
         """Run the tasks."""
         self._locked = True
         # For each resource, the number of steps producing it that haven't been completed.

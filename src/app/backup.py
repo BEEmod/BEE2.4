@@ -17,7 +17,7 @@ import itertools
 import shutil
 import string
 
-from srctools import EmptyMapping, Keyvalues, KeyValError
+from srctools import Keyvalues, KeyValError
 import srctools.logger
 import trio
 

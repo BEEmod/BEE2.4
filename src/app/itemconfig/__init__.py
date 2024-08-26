@@ -238,7 +238,7 @@ async def create_group(
                 nursery.start_soon(
                     s_wid.load_conf_task,
                     config.APP.get_ui_channel(
-                        WidgetConfig,f'{s_wid.group_id}:{s_wid.id}',
+                        WidgetConfig, f'{s_wid.group_id}:{s_wid.id}',
                     )
                 )
             nursery.start_soon(s_wid.state_store_task)

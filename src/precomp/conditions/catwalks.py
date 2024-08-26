@@ -37,6 +37,7 @@ class Instances(Enum):
     SUPP_GOO = 'support_goo'
     SINGLE_WALL = 'single_wall'
 
+
 CATWALK_TYPES: Mapping[utils.CONN_TYPES, Instances | None] = {
     utils.CONN_TYPES.straight: Instances.STRAIGHT_1,
     utils.CONN_TYPES.corner: Instances.CORNER,
