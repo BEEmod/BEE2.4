@@ -1,0 +1,20 @@
+extend = "../../pyproject.toml"
+
+[lint]
+extend-ignore = [
+	# Type checking isn't particularly important in test code.
+	"ANN",
+	# Permit multiple statements in pytest.raises blocks, we want to test for loops and
+	# with statements raise.
+	"PT012",
+	# Allow star imports.
+	"F403", "F405",
+	# Ignore explicity truth/false checks, more clear.
+	"PLC1901",
+]
+# Enable pytest-specific checks.
+extend-select = ["PT"]
+
+[lint.flake8-pytest-style]
+mark-parentheses = false
+parametrize-names-type = "csv"
