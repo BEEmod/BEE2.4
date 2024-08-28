@@ -1612,6 +1612,7 @@ async def main(argv: list[str]) -> None:
         return
 
     is_publishing = False
+    vmf: VMF | None = None
     try:
         LOGGER.info("PeTI map detected!")
 
@@ -1623,7 +1624,7 @@ async def main(argv: list[str]) -> None:
             voice_data_res = ResultCapture.start_soon(nursery, voice_line.load)
 
         ind_style, id_to_item, corridor_conf = res_settings.result()
-        vmf: VMF = vmf_res.result()
+        vmf = vmf_res.result()
 
         coll = Collisions()
 
@@ -1714,10 +1715,11 @@ async def main(argv: list[str]) -> None:
         LOGGER.error('"User" error detected, aborting compile: ', exc_info=True)
 
         # Try to preserve the current map.
-        try:
-            save(vmf, new_path[:-4] + '.error.vmf')  # noqa
-        except Exception:
-            pass
+        if vmf is not None:
+            try:
+                save(vmf, new_path[:-4] + '.error.vmf')  # noqa
+            except Exception:
+                pass
 
         vmf = errors.make_map(error)
 

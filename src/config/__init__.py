@@ -5,7 +5,7 @@ They can then fetch the current state and store new state.
 """
 from __future__ import annotations
 
-from typing import ClassVar, Self, override
+from typing import ClassVar, Self, cast, override
 from collections.abc import Generator, ItemsView, Iterator, KeysView
 from pathlib import Path
 import abc
@@ -202,8 +202,10 @@ class ConfigSpec:
             raise ValueError(f'Data type "{info.name}" does not support IDs!')
 
         # Invalid to drop DataT -> Data.
-        chan_list: list[trio.MemorySendChannel[DataT]]
-        chan_list = self._apply_channel.setdefault((typ, data_id), [])  # type: ignore
+        chan_list = cast(
+            list[trio.MemorySendChannel[DataT]],
+            self._apply_channel.setdefault((typ, data_id), [])
+        )
 
         send: trio.MemorySendChannel[DataT]
         rec: trio.MemoryReceiveChannel[DataT]
@@ -584,6 +586,7 @@ class ConfigSpec:
                 filename.replace(filename.with_suffix('.err.vdf'))
             except OSError:
                 pass
+            return
 
         conf, _ = self.parse_kv1(kv)
         self._current._data = conf._data

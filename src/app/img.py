@@ -260,7 +260,7 @@ class Handle(User):
         raise NotImplementedError
 
     @classmethod
-    def _to_key(cls, args: tuple[Any, ...]) -> tuple[Any, ...]:
+    def _to_key(cls, args: tuple[Any, ...], /) -> tuple[Any, ...]:
         """Override in subclasses to convert mutable attributes to deduplicate."""
         return args
 
@@ -773,7 +773,7 @@ class ImgStripAlpha(Handle):
 
     @classmethod
     @override
-    def _to_key(cls, args: tuple[object, ...]) -> tuple[object, ...]:
+    def _to_key(cls, args: tuple[object, ...], /) -> tuple[object, ...]:
         """Handles aren't hashable, so we need to use identity."""
         [original] = args
         return (id(original), )
@@ -861,7 +861,7 @@ class ImgComposite(Handle):
 
     @classmethod
     @override
-    def _to_key(cls, children: tuple[Handle, ...]) -> tuple[int, ...]:
+    def _to_key(cls, children: tuple[Handle, ...], /) -> tuple[int, ...]:
         """Handles aren't hashable, so we need to use identity."""
         return tuple(map(id, children))
 
@@ -923,6 +923,7 @@ class ImgCrop(Handle):
     def _to_key(
         cls,
         args: tuple[Handle, tuple[int, int, int, int] | None, Image.Transpose | None],
+        /,
     ) -> tuple[int, tuple[int, int, int, int] | None, Image.Transpose | None]:
         """Handles aren't hashable, so we need to use identity."""
         [child, bounds, transpose] = args

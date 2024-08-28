@@ -17,23 +17,22 @@ class SmallRepr(pprint.PrettyPrinter):
     @override
     def format(
         self,
-        target: object,
+        object: object,
         context: dict[int, Any],
         maxlevels: int,
         level: int,
-        /,
     ) -> tuple[str, bool, bool]:
         """Format each sub-item."""
-        if isinstance(target, ResultCapture):
+        if isinstance(object, ResultCapture):
             return self.format((
                 'ResultCapture',
-                target.routine,
-                *target.args,
+                object.routine,
+                *object.args,
             ), context, maxlevels, level)
 
-        result, readable, recursive = super().format(target, context, maxlevels, level)
+        result, readable, recursive = super().format(object, context, maxlevels, level)
         if len(result) > 200 and level > 0:
-            return f'{type(target).__qualname__}(...)', False, False
+            return f'{type(object).__qualname__}(...)', False, False
         else:
             return result, readable, recursive
 
