@@ -150,8 +150,8 @@ async def stats_window_task(open_val: trio_util.AsyncBool) -> None:
         window.wm_deiconify()
         tk_tools.center_win(window, TK_ROOT)
         ticker = False
-        async with trio_util.move_on_when(open_val.wait_value, False):
-            while True:
+        async with trio_util.move_on_when(open_val.wait_value, False) as scope:
+            while not scope.cancel_called:
                 label['text'] = '\n'.join([func() for func in stat_funcs])
                 ticker = not ticker
                 ticker_lbl['text'] = '|' if ticker else '-'

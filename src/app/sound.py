@@ -194,8 +194,8 @@ async def sound_task() -> None:
         # Only tick if we actually have sounds playing.
         while True:
             await _playing_count.wait_value(is_positive)
-            async with trio_util.move_on_when(wait_for_quiet):
-                while True:
+            async with trio_util.move_on_when(wait_for_quiet) as scope:
+                while not scope.cancel_called:
                     try:
                         tick(True)  # True = don't sleep().
                     except Exception:

@@ -504,8 +504,8 @@ class Selector[IconT: Icon, OptionRowT: OptionRow](ReflowWindow):
         """Run while options are visible. This stores them when changed."""
         assert async_vals, "No options?"
         wait_funcs = [val.wait_transition for opt_id, val in async_vals]
-        async with trio_util.move_on_when(done_event.wait):
-            while True:
+        async with trio_util.move_on_when(done_event.wait) as scope:
+            while not scope.cancel_called:
                 await trio.lowlevel.checkpoint()
                 await trio_util.wait_any(*wait_funcs)
                 conf = config.APP.get_cur_conf(Options, conf_id)

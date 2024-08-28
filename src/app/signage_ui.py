@@ -230,13 +230,13 @@ class SignageUIBase[ParentT]:
                 except KeyError:
                     pass
 
-            async with trio_util.move_on_when(self.drag_man.hovered_item.wait_transition):
-                while True:
+            async with trio_util.move_on_when(self.drag_man.hovered_item.wait_transition) as scope:
+                # Will be cancelled anyway, the check ensures static analysis understands.
+                while not scope.cancel_called:
                     self.ui_set_preview_img(single_left, single_right)
                     await trio.sleep(1.0)
                     self.ui_set_preview_img(double_left, double_right)
                     await trio.sleep(1.0)
-            # noinspection PyUnreachableCode
             self.ui_set_preview_name(TransToken.BLANK)
             self.ui_set_preview_img(IMG_BLANK, IMG_BLANK)
 
