@@ -49,6 +49,5 @@ async def step_add_editor_sounds(exp_data: ExportData) -> None:
         await trio.to_thread.run_sync(f.writelines, file_data)
         f.write(EDITOR_SOUND_LINE + '\n')
         for sound in sounds:
-            for line in sound.data.export():
-                f.write(line)
+            sound.data.serialise(f)
             f.write('\n')  # Add a little spacing

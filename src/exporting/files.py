@@ -44,8 +44,7 @@ async def step_write_vbsp_config(exp: ExportData) -> None:
     def write_file(conf: Keyvalues, filename: str) -> None:
         """Write the file."""
         with AtomicWriter(filename, encoding='utf8') as vbsp_file:
-            for line in conf.export():
-                vbsp_file.write(line)
+            conf.serialise(vbsp_file)
 
     await trio.to_thread.run_sync(
         write_file,

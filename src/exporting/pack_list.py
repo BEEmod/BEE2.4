@@ -20,8 +20,8 @@ async def step_packlist_conf(exp_data: ExportData) -> None:
         # }
         # block for each packlist
         files = [
-            Keyvalues('File', file)
-            for file in
+            Keyvalues('File', filename)
+            for filename in
             pack.files
         ]
         pack_block.append(Keyvalues(
@@ -33,5 +33,4 @@ async def step_packlist_conf(exp_data: ExportData) -> None:
         exp_data.game.abs_path('bin/bee2/pack_list.cfg'),
         'w',
     ) as pack_file:
-        for line in pack_block.export():
-            await pack_file.write(line)
+        await pack_file.write(await trio.to_thread.run_sync(pack_block.serialise))

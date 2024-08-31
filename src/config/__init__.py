@@ -601,9 +601,7 @@ class ConfigSpec:
         kv = Keyvalues.root()
         kv.extend(self.build_kv1(self._current))
         with AtomicWriter(filename) as file:
-            for prop in kv:
-                for line in prop.export():
-                    file.write(line)
+            kv.serialise(file)
 
 
 # The configuration files we use.

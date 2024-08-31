@@ -174,13 +174,10 @@ def test_export_kv1_regress(value: str, triple: str, file_regression: FileRegres
     conf = config.Config({
         DataSingle: {'': DataSingle(value, triple)}
     })
-    props = Keyvalues.root(*spec.build_kv1(conf))
-
-    buf = io.StringIO()
-    buf.writelines(props.export())
+    kv = Keyvalues.root(*spec.build_kv1(conf))
 
     file_regression.check(
-        buf.getvalue(),
+        kv.serialise(),
         basename=f'export_noid_{triple}_{value}', extension='.vdf',
     )
 

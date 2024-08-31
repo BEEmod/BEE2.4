@@ -444,8 +444,7 @@ class Palette:
         else:
             file = open(os.path.join(PAL_DIR, self.filename), 'w', encoding='utf8')
         with file:
-            for line in kv.export():
-                file.write(line)
+            kv.serialise(file)
 
     def delete_from_disk(self) -> None:
         """Delete this palette from disk."""
