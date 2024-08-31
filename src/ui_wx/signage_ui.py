@@ -11,7 +11,7 @@ from .img import WXImages
 from . import MAIN_WINDOW, get_scrollflow_size_handler
 from .wid_transtoken import set_text, set_win_title
 
-from app.signage_ui import IMG_BLANK, SignageUIBase, TRANS_TITLE, TRANS_SELECTED
+from app.signage_ui import IMG_BLANK, SignSlot, SignageUIBase, TRANS_TITLE, TRANS_SELECTED
 
 
 class SignageUI(SignageUIBase[wx.Window]):
@@ -71,16 +71,12 @@ class SignageUI(SignageUIBase[wx.Window]):
         win.Bind(wx.EVT_SIZE, get_scrollflow_size_handler(self.panel_chooser, self.sizer_chooser))
 
         sizer_cols.Add(self.panel_chooser, 1, wx.ALL | wx.EXPAND, 4)
-
         # tk_tools.add_mousewheel(canv_all, canv_all, window)
 
         flags = wx.SizerFlags().Border()
 
         for row, col, slot in self._create_chosen_slots(panel_select):
             sizer_select.Add(self.drag_man.slot_widget(slot), flags)
-
-        for slot in self._create_picker_slots(self.panel_chooser):
-            self.sizer_chooser.Add(self.drag_man.slot_widget(slot), flags)
 
     @override
     def ui_win_show(self) -> None:
@@ -103,3 +99,26 @@ class SignageUI(SignageUIBase[wx.Window]):
         """Set the images for the preview."""
         self.wx_img.apply(self.wid_preview_left, left)
         self.wx_img.apply(self.wid_preview_right, right)
+
+    @override
+    def ui_picker_create(self, index: int) -> SignSlot:
+        """Create a picker slot."""
+        return self.drag_man.slot_source(self.panel_chooser)
+
+    @override
+    def ui_picker_hide(self, slot: SignSlot) -> None:
+        """Hide the specified slot."""
+        self.drag_man.slot_widget(slot).Hide()
+
+    @override
+    def _ui_calc_columns(self) -> int:
+        """WrapSizer doesn't need assistance for repoisitioning, so return a constant value."""
+        return 1
+
+    @override
+    async def _ui_reposition_items(self) -> None:
+        """Re-add all items in the correct order."""
+        flags = wx.SizerFlags().Border()
+        self.sizer_chooser.Clear(delete_windows=False)
+        for slot in self.picker_slots.placed:
+            self.sizer_chooser.Add(self.drag_man.slot_widget(slot), flags)

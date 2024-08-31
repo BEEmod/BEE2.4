@@ -8,11 +8,11 @@ from app import img
 from packages import PakRef, Signage
 from transtoken import TransToken
 from . import TK_ROOT, tk_tools
-from .dragdrop import DragDrop
+from .dragdrop import CanvasPositioner, DragDrop, Slot
 from .img import TKImages
 from .wid_transtoken import set_text, set_win_title
 
-from app.signage_ui import IMG_BLANK, SignageUIBase, TRANS_TITLE, TRANS_SELECTED
+from app.signage_ui import IMG_BLANK, SignSlot, SignageUIBase, TRANS_TITLE, TRANS_SELECTED
 
 
 class SignageUI(SignageUIBase[tk.Misc]):
@@ -39,7 +39,11 @@ class SignageUI(SignageUIBase[tk.Misc]):
         )
         set_text(frame_selected, TRANS_SELECTED)
 
-        canv_all = tk.Canvas(window, name='canv_all')
+        self.picker_canv = canv_all = tk.Canvas(window, name='canv_all')
+        self.canv_pos = CanvasPositioner(
+            self.drag_man.slot_canvas, canv_all,
+            self.drag_man.width, self.drag_man.height,
+        )
 
         scroll = tk_tools.HidingScroll(
             window, orient='vertical',
@@ -47,6 +51,7 @@ class SignageUI(SignageUIBase[tk.Misc]):
             name='scrollbar',
         )
         canv_all['yscrollcommand'] = scroll.set
+        canv_all.bind('<Configure>', self.evt_window_resized)
 
         self.wid_name_label = ttk.Label(window, text='', justify='center', name='lbl_name')
         frame_preview = ttk.Frame(window, relief='raised', borderwidth=4, name='frame_preview')
@@ -72,10 +77,18 @@ class SignageUI(SignageUIBase[tk.Misc]):
         for row, col, slot in self._create_chosen_slots(frame_selected):
             self.drag_man.slot_grid(slot, row=row, column=col, padx=1, pady=1)
 
-        # Create the picker slots, then position them.
-        slots_all = list(self._create_picker_slots(canv_all))
-        self.drag_man.flow_slots(canv_all, slots_all)
-        canv_all.bind('<Configure>', lambda e: self.drag_man.flow_slots(canv_all, self.drag_man.sources()))
+    @override
+    def _ui_calc_columns(self) -> int:
+        """Calculate the required number of columns for picker items."""
+        return self.canv_pos.calc_columns()
+
+    @override
+    async def _ui_reposition_items(self) -> None:
+        """Reposition all the picker items."""
+        self.picker_canv.delete("picker_slots")
+        self.canv_pos.reset()
+        self.canv_pos.place_slots(self.picker_slots.placed, "picker_slots")
+        self.canv_pos.resize_canvas()
 
     @override
     def ui_win_show(self) -> None:
@@ -98,3 +111,13 @@ class SignageUI(SignageUIBase[tk.Misc]):
         """Set the images for the preview."""
         self.tk_img.apply(self.wid_preview_left, left)
         self.tk_img.apply(self.wid_preview_right, right)
+
+    @override
+    def ui_picker_create(self, index: int) -> Slot[PakRef[Signage]]:
+        """Create a slot source."""
+        return self.drag_man.slot_source(self.picker_canv)
+
+    @override
+    def ui_picker_hide(self, slot: SignSlot) -> None:
+        """Hide the specified slot."""
+        self.drag_man.slot_hide(slot)

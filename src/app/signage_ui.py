@@ -1,9 +1,9 @@
 """Configures which signs are defined for the Signage item."""
 from __future__ import annotations
-
 from typing import Final, TypeGuard
 
 from collections.abc import Sequence, Iterator
+from contextlib import aclosing
 from datetime import timedelta
 import abc
 
@@ -11,7 +11,7 @@ import srctools.logger
 import trio
 import trio_util
 
-from app import EdgeTrigger, dragdrop, img
+from app import EdgeTrigger, ReflowWindow, WidgetCache, dragdrop, img
 from config.signage import DEFAULT_IDS, Layout
 from packages import Signage, Style, PakRef
 import packages
@@ -22,6 +22,7 @@ import utils
 
 LOGGER = srctools.logger.get_logger(__name__)
 type SignRef = PakRef[Signage]
+type SignSlot = dragdrop.Slot[SignRef]
 
 
 # The valid timer indexes for signs.
@@ -68,10 +69,11 @@ def get_icon(sign: Signage, style: Style) -> img.Handle:
         return IMG_ERROR
 
 
-class SignageUIBase[ParentT]:
+class SignageUIBase[ParentT](ReflowWindow):
     """Common implementation of the signage chooser."""
     _slots: dict[int, dragdrop.Slot[SignRef]]
     _cur_style_id: PakRef[Style]
+    picker_slots: WidgetCache[SignSlot]
 
     @property
     @abc.abstractmethod
@@ -85,10 +87,12 @@ class SignageUIBase[ParentT]:
 
     def __init__(self) -> None:
         """Create the chooser."""
+        super().__init__()
         self.visible = False
         self._close_event = trio.Event()
         self._slots = {}
         self._cur_style_id = PakRef(Style, packages.CLEAN_STYLE)
+        self.picker_slots = WidgetCache(self.ui_picker_create, self.ui_picker_hide)
 
     def style_changed(self, new_style_id: utils.ObjectID) -> None:
         """Update the icons for the selected signage."""
@@ -120,6 +124,8 @@ class SignageUIBase[ParentT]:
         async with trio.open_nursery() as nursery:
             nursery.start_soon(self._apply_config_task)
             nursery.start_soon(self._hovering_task)
+            nursery.start_soon(self.refresh_items_task)
+            nursery.start_soon(self._update_picker_items_task)
 
             while True:
                 await trigger.wait()
@@ -143,7 +149,7 @@ class SignageUIBase[ParentT]:
 
     def _create_chosen_slots(
         self, parent_chosen: ParentT,
-    ) -> Iterator[tuple[int, int, dragdrop.Slot[SignRef]]]:
+    ) -> Iterator[tuple[int, int, SignSlot]]:
         """Create the slots for the currently selected signage."""
         trans_time = TransToken.untranslated('{delta:ms}')
         for i in SIGN_IND:
@@ -158,15 +164,22 @@ class SignageUIBase[ParentT]:
                 slot.contents = PakRef(Signage, prev_id)
             yield row, col, slot
 
-    def _create_picker_slots(self, parent_picker: ParentT) -> Iterator[dragdrop.Slot[SignRef]]:
+    async def _update_picker_items_task(self) -> None:
         """Create the slots for all possible signs."""
-        load_packset = packages.get_loaded_packages()
-        # TODO: Dynamically refresh this.
-        for sign in sorted(load_packset.all_obj(Signage), key=lambda s: s.name):
-            if not sign.hidden:
-                slot = self.drag_man.slot_source(parent_picker)
-                slot.contents = PakRef(Signage, utils.obj_id(sign.id))
-                yield slot
+        packset: packages.PackagesSet
+        async with aclosing(packages.LOADED.eventual_values()) as agen:
+            async for packset in agen:
+                async with trio_util.move_on_when(packages.LOADED.wait_transition) as load_scope:
+                    await packset.ready(Signage).wait()
+                if load_scope.cancelled_caught:
+                    # Reloaded again while we were waiting.
+                    continue
+                self.picker_slots.reset()
+                for sign in sorted(packset.all_obj(Signage), key=lambda s: s.name):
+                    if not sign.hidden:
+                        self.picker_slots.fetch().contents = PakRef(Signage, utils.obj_id(sign.id))
+                self.picker_slots.hide_unused()
+                self.items_dirty.set()
 
     async def _apply_config_task(self) -> None:
         """Apply saved signage info to the UI."""
@@ -240,18 +253,32 @@ class SignageUIBase[ParentT]:
             self.ui_set_preview_name(TransToken.BLANK)
             self.ui_set_preview_img(IMG_BLANK, IMG_BLANK)
 
+    @abc.abstractmethod
     def ui_win_show(self) -> None:
         """Show the window."""
         raise NotImplementedError
 
+    @abc.abstractmethod
     def ui_win_hide(self) -> None:
         """Hide the window."""
         raise NotImplementedError
 
+    @abc.abstractmethod
     def ui_set_preview_name(self, name: TransToken) -> None:
         """Set the text for the preview."""
         raise NotImplementedError
 
+    @abc.abstractmethod
     def ui_set_preview_img(self, left: img.Handle, right: img.Handle) -> None:
         """Set the images for the preview."""
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def ui_picker_create(self, index: int) -> SignSlot:
+        """Create a source slot, likely by calling dragdrop.slot_source."""
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def ui_picker_hide(self, slot: SignSlot) -> None:
+        """Hide the specified slot widget."""
         raise NotImplementedError

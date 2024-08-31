@@ -362,7 +362,7 @@ class DragDrop[ItemT](ManagerBase[ItemT, tk.Misc]):
         """Remove this slot from the set position manager."""
         slot_ui = self._slot_ui[slot]
         if slot_ui.pos_type is None:
-            raise ValueError('Not added to a geometry manager yet!')
+            return  # Already hidden.
         elif slot_ui.pos_type is GeoManager.CANVAS:
             # Attached via canvas, with an ID as suffix.
             canv = slot_ui.lbl.nametowidget(slot_ui.lbl.winfo_parent())
