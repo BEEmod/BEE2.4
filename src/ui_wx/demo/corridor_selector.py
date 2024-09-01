@@ -15,7 +15,7 @@ import packages
 async def test(core_nursery: trio.Nursery) -> None:
     config.APP.read_file(config.APP_LOC)
     await gameMan.load(DIALOG)
-    mod_support.scan_music_locs(packages.get_loaded_packages(), gameMan.all_games)
+    await mod_support.scan_music_locs(packages.get_loaded_packages(), gameMan.all_games)
     async with ErrorUI() as errors:
         await packages.load_packages(
             packages.get_loaded_packages(),

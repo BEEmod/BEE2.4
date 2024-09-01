@@ -90,24 +90,24 @@ MEL_MUSIC_NAMES: Final[Sequence[str]] = [
 ]
 
 
-def scan_music_locs(packset: PackagesSet, games: Iterable[Game]) -> None:
+async def scan_music_locs(packset: PackagesSet, games: Iterable[Game]) -> None:
     """Try and determine the location of Aperture Tag and PS:Mel.
 
     If successful we can export the music to games.
     """
-    steamapp_locs = {
-        os.path.normpath(game.abs_path('../'))
+    steamapp_locs: set[trio.Path] = {
+        await trio.Path(game.root_path.parent).resolve()
         for game in games
     }
 
     for loc in steamapp_locs:
-        tag_loc = os.path.join(loc, MUSIC_TAG_DIR)
-        mel_loc = os.path.join(loc, MUSIC_MEL_DIR)
-        if os.path.exists(tag_loc) and packset.tag_music_fsys is None:
+        tag_loc = loc / MUSIC_TAG_DIR
+        mel_loc = loc / MUSIC_MEL_DIR
+        if await tag_loc.exists() and packset.tag_music_fsys is None:
             packset.tag_music_fsys = RawFileSystem(tag_loc, constrain_path=False)
             LOGGER.info('Ap-Tag dir: {}', tag_loc)
 
-        if os.path.exists(mel_loc) and packset.mel_music_fsys is None:
+        if await mel_loc.exists() and packset.mel_music_fsys is None:
             packset.mel_music_fsys = VPKFileSystem(mel_loc)
             LOGGER.info('PS-Mel dir: {}', mel_loc)
 

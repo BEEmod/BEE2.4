@@ -50,7 +50,7 @@ async def lifecycle(
     while True:
         LOGGER.info('Loading packages...')
         packset = packages.PackagesSet()
-        mod_support.scan_music_locs(packset, gameMan.all_games)
+        await mod_support.scan_music_locs(packset, gameMan.all_games)
         async with ErrorUI(error_desc=TRANS_LOAD_ERROR, warn_desc=TRANS_LOAD_PARTIAL) as error_ui:
             await utils.run_as_task(
                 packages.load_packages,
