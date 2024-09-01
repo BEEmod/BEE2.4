@@ -41,16 +41,23 @@ class Tracer(trio.abc.Instrument):
     """Track tasks to detect slow ones."""
     def __init__(self) -> None:
         self.slow: list[tuple[float, str]] = []
+        self.blocking: list[tuple[float, str]] = []
         self.elapsed: dict[trio.lowlevel.Task, float] = {}
-        self.start_time: dict[trio.lowlevel.Task, float | None] = {}
+        # (time, line number)
+        self.start_point: dict[trio.lowlevel.Task, tuple[float, int] | None] = {}
         self.args: dict[trio.lowlevel.Task, dict[str, object]] = {}
         self.formatter = SmallRepr(compact=True)
+
+    def _get_linenum(self, task: trio.lowlevel.Task) -> int:
+        if (frame := task.coro.cr_frame) is not None:
+            return frame.f_lineno
+        else:
+            return task.coro.cr_code.co_firstlineno
 
     @override
     def task_spawned(self, task: trio.lowlevel.Task) -> None:
         """Setup vars when a task is spawned."""
         self.elapsed[task] = 0.0
-        self.start_time[task] = None
         if task.coro.cr_frame is not None:
             self.args[task] = task.coro.cr_frame.f_locals.copy()
         else:
@@ -59,37 +66,37 @@ class Tracer(trio.abc.Instrument):
     @override
     def before_task_step(self, task: trio.lowlevel.Task) -> None:
         """Begin timing this task."""
-        self.start_time[task] = time.perf_counter()
+        self.start_point[task] = time.perf_counter(), self._get_linenum(task)
 
     @override
     def after_task_step(self, task: trio.lowlevel.Task) -> None:
         """Count up the time."""
         cur_time = time.perf_counter()
         try:
-            prev = self.start_time[task]
+            start = self.start_point.pop(task)
         except KeyError:
             pass
         else:
-            if prev is not None:
-                change = cur_time - prev
-                self.elapsed[task] += change
-                self.start_time[task] = None
-                if change > (5/1000):
-                    LOGGER.warning(
-                        'Task didn\'t yield ({:.02f}ms): {!r}:{}, args={}',
-                        change*1000,
-                        task, task.coro.cr_code.co_firstlineno,
-                        self.get_args(task),
-                    )
+            prev, start_line = start
+            change = cur_time - prev
+            self.elapsed[task] += change
+            if change > (5/1000):
+                self.blocking.append((
+                    change,
+                    f'Block for={change*1000:.02f}ms: '
+                    f'{task!r}:{start_line}-{self._get_linenum(task)}, '
+                    f'args={self.get_args(task)}'
+                ))
 
     @override
     def task_exited(self, task: trio.lowlevel.Task) -> None:
         """Log results when exited."""
         cur_time = time.perf_counter()
         elapsed = self.elapsed.pop(task, 0.0)
-        start = self.start_time.pop(task, None)
+        start = self.start_point.pop(task, None)
         if start is not None:
-            elapsed += cur_time - start
+            prev, _ = start
+            elapsed += cur_time - prev
 
         if elapsed > 0.1:
             self.slow.append((elapsed, f'Task time={elapsed:.06}: {task!r}, args={self.get_args(task)}'))
@@ -106,10 +113,14 @@ class Tracer(trio.abc.Instrument):
 
     def display_slow(self) -> None:
         """Print out a list of 'slow' tasks."""
-        if not self.slow:
+        if not self.slow and not self.no_yield:
             return
 
         LOGGER.info('Slow tasks\n{}', '\n'.join([
             msg for _, msg in
-            sorted(self.slow, key=lambda t: t[1], reverse=True)
+            sorted(self.slow, key=lambda t: t[0], reverse=True)
+        ]))
+        LOGGER.info('Blocking tasks\n{}', '\n'.join([
+            msg for _, msg in
+            sorted(self.blocking, key=lambda t: t[0], reverse=True)
         ]))
