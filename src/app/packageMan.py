@@ -79,7 +79,7 @@ def cancel() -> None:
     window.withdraw()
     window.grab_release()
     list_widget.remove_all()
-    list_widget.add_items(*make_packitems())
+    list_widget.add_items(make_packitems())
 
 
 def make_window() -> None:
@@ -100,8 +100,8 @@ def make_window() -> None:
     list_widget = CheckDetails(
         frame,
         headers=[TransToken.ui('Name')],
-        items=make_packitems(),
     )
+    list_widget.add_items(make_packitems())
 
     list_widget.grid(row=0, column=0, columnspan=2, sticky='NSEW')
     frame.columnconfigure(0, weight=1)

@@ -528,22 +528,22 @@ def refresh_game_details() -> None:
     """Remake the items in the game maps list."""
     game = UI['game_details']
     game.remove_all()
-    game.add_items(*(
+    game.add_items(
         peti_map.make_item()
         for peti_map in
         BACKUPS['game']
-    ))
+    )
 
 
 def refresh_back_details() -> None:
     """Remake the items in the backup list."""
     backup = UI['back_details']
     backup.remove_all()
-    backup.add_items(*(
+    backup.add_items(
         peti_map.make_item()
         for peti_map in
         BACKUPS['back']
-    ))
+    )
 
 
 def show_window() -> None:

@@ -204,7 +204,6 @@ class CheckDetails[UserT](ttk.Frame):
     def __init__(
         self,
         parent: tk.Misc,
-        items: Iterable[Item[UserT]] = (),
         headers: Iterable[TransToken] = (),
         add_sizegrip: bool = False,
     ) -> None:
@@ -301,8 +300,6 @@ class CheckDetails[UserT](ttk.Frame):
         self.wid_header.bind('<B1-Motion>', refresh_cmd)
         self.wid_header.bind('<Configure>', refresh_cmd)
 
-        self.add_items(*items)
-
         tk_tools.add_mousewheel(
             self.wid_canvas,
 
@@ -335,19 +332,11 @@ class CheckDetails[UserT](ttk.Frame):
         sorter['text'] = ''
         return header
 
-    def add_items(self, *items: Item[UserT]) -> None:
+    def add_items(self, items: Iterable[Item[UserT]]) -> None:
         """Add items to the details list."""
         for item in items:
             self.items.append(item)
             item.make_widgets(self)
-        self.update_allcheck()
-        self.refresh()
-
-    def rem_items(self, *items: Item[UserT]) -> None:
-        """Remove items from the details list."""
-        for item in items:
-            self.items.remove(item)
-            item.destroy()
         self.update_allcheck()
         self.refresh()
 
