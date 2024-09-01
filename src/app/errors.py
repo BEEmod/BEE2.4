@@ -129,16 +129,17 @@ class ErrorUI:
         If an exception group is passed, this will extract the AppErrors, reraising others.
         A TransToken can be supplied for convenience, which is wrapped in an AppError.
         """
-        if isinstance(error, TransToken):
-            self._errors.append(AppError(error))
-        elif isinstance(error, AppError):
-            self._errors.append(error)
-        else:
-            matching, rest = error.split(AppError)
-            if matching is not None:
-                self._errors.extend(_collapse_excgroup(matching, False))
-            if rest is not None:
-                raise rest
+        match error:
+            case TransToken():
+                self._errors.append(AppError(error))
+            case AppError():
+                self._errors.append(error)
+            case _:
+                matching, rest = error.split(AppError)
+                if matching is not None:
+                    self._errors.extend(_collapse_excgroup(matching, False))
+                if rest is not None:
+                    raise rest
 
     async def __aenter__(self) -> Self:
         await trio.lowlevel.checkpoint()

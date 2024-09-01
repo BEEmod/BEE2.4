@@ -567,16 +567,17 @@ def parse_options(
                 options[opt] = default
                 continue
 
-        if isinstance(default, str):
-            options[opt] = value
-        elif isinstance(default, bool):
-            options[opt] = srctools.conv_bool(value, default)
-        elif isinstance(default, int):
-            options[opt] = srctools.conv_int(value, default)
-        elif isinstance(default, float):
-            options[opt] = srctools.conv_float(value, default)
-        else:
-            raise ValueError(f'Bad default {default!r} for "{opt}"!')
+        match default:
+            case str():
+                options[opt] = value
+            case True | False:
+                options[opt] = srctools.conv_bool(value, default)
+            case int():
+                options[opt] = srctools.conv_int(value, default)
+            case float():
+                options[opt] = srctools.conv_float(value, default)
+            case _:
+                raise ValueError(f'Bad default {default!r} for "{opt}"!')
     return options
 
 

@@ -684,12 +684,8 @@ class PropertyWindow:
                 tooltip_bits = [prop.desc for prop, readonly in matching if prop.desc]
                 if any(prop.kind is item.subtype_prop for prop, readonly in matching):
                     tooltip_bits.insert(0, TRANS_READONLY_SUBTYPE)
-                if len(tooltip_bits) > 1:
-                    group.set_tooltip(TransToken.untranslated('\n').join(tooltip_bits))
-                elif len(tooltip_bits) == 1:
-                    group.set_tooltip(tooltip_bits[0])
-                else:
-                    group.set_tooltip(TransToken.BLANK)
+
+                group.set_tooltip(TransToken.untranslated('\n').join(tooltip_bits))
             elif maybe_group is not None:  # Constructed but now hiding.
                 maybe_group.label.grid_forget()
                 maybe_group.frame.grid_forget()

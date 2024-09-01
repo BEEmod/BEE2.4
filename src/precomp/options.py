@@ -373,19 +373,19 @@ def get_itemconf[OptionT: OptionType](
             value = option.values
 
     result: str | Vec | bool | float | None
-    if isinstance(default, str) or default is None:
-        return value  # type: ignore
-
-    if isinstance(default, Vec):
-        result = Vec.from_str(value, default.x, default.y, default.z)
-    elif isinstance(default, bool):
-        result = srctools.conv_bool(value, default)
-    elif isinstance(default, float):
-        result = srctools.conv_float(value, default)
-    elif isinstance(default, int):
-        result = srctools.conv_int(value, default)
-    else:
-        raise TypeError(f'Invalid default type "{type(default).__name__}"!')
+    match default:
+        case str() | None:
+            return value  # type: ignore
+        case Vec():
+            result = Vec.from_str(value, default.x, default.y, default.z)
+        case True | False:
+            result = srctools.conv_bool(value, default)
+        case float():
+            result = srctools.conv_float(value, default)
+        case int():
+            result = srctools.conv_int(value, default)
+        case _:
+            raise TypeError(f'Invalid default type "{type(default).__name__}"!')
 
     assert type(result) is type(default), f'{default!r} -> {result!r}'
     return result  # type: ignore

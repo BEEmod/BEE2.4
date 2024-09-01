@@ -76,11 +76,13 @@ class MaterialGroupMeta(EnumMeta):
 
     def __contains__(cls, value: object) -> bool:
         """MaterialGroup can check if strings are equal to a member."""
-        if isinstance(value, str):
-            return value.casefold() in cls._value2member_map_
-        elif isinstance(value, Side):
-            return value.mat.casefold() in cls._value2member_map_
-        return super().__contains__(value)
+        match value:
+            case str() as string:
+                return string.casefold() in cls._value2member_map_
+            case Side() as side:
+                return side.mat.casefold() in cls._value2member_map_
+            case _:
+                return super().__contains__(value)
 
     def __call__[GroupT](cls: type[GroupT], value: str, *args: object, **kwargs: object) -> GroupT:
         """Find the existing member with this name."""

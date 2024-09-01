@@ -252,20 +252,21 @@ async def _listen_to_process() -> None:
     while True:
         op = await trio.to_thread.run_sync(_QUEUE_REPLY_LOAD.get, abandon_on_cancel=True)
         LOGGER.debug('Logger response: {}', op)
-        if isinstance(op, ipc_types.Daemon2Load_MainSetCompact):
-            # Save the compact state to the config.
-            conf = APP.get_cur_conf(GenOptions)
-            APP.store_conf(attrs.evolve(conf, compact_splash=op.compact))
-        elif isinstance(op, ipc_types.Daemon2Load_Cancel):
-            try:
-                screen = _ALL_SCREENS[op.screen]
-            except KeyError:
-                pass
-            else:
-                if screen._scope is not None:
-                    screen._scope.cancel()
-        else:
-            assert_never(op)
+        match op:
+            case ipc_types.Daemon2Load_MainSetCompact():
+                # Save the compact state to the config.
+                conf = APP.get_cur_conf(GenOptions)
+                APP.store_conf(attrs.evolve(conf, compact_splash=op.compact))
+            case ipc_types.Daemon2Load_Cancel():
+                try:
+                    screen = _ALL_SCREENS[op.screen]
+                except KeyError:
+                    pass
+                else:
+                    if screen._scope is not None:
+                        screen._scope.cancel()
+            case _:
+                assert_never(op)
 
 
 _bg_started = False
