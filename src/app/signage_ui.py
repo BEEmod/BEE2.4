@@ -167,19 +167,17 @@ class SignageUIBase[ParentT](ReflowWindow):
     async def _update_picker_items_task(self) -> None:
         """Create the slots for all possible signs."""
         packset: packages.PackagesSet
-        async with aclosing(packages.LOADED.eventual_values()) as agen:
-            async for packset in agen:
-                async with trio_util.move_on_when(packages.LOADED.wait_transition) as load_scope:
+        async with utils.iterval_cancelling(packages.LOADED) as aiterator:
+            async for scope in aiterator:
+                with scope as packset:
                     await packset.ready(Signage).wait()
-                if load_scope.cancelled_caught:
-                    # Reloaded again while we were waiting.
-                    continue
-                self.picker_slots.reset()
-                for sign in sorted(packset.all_obj(Signage), key=lambda s: s.name):
-                    if not sign.hidden:
-                        self.picker_slots.fetch().contents = PakRef(Signage, utils.obj_id(sign.id))
-                self.picker_slots.hide_unused()
-                self.items_dirty.set()
+                    self.picker_slots.reset()
+                    for sign in sorted(packset.all_obj(Signage), key=lambda s: s.name):
+                        await trio.lowlevel.checkpoint()
+                        if not sign.hidden:
+                            self.picker_slots.fetch().contents = PakRef(Signage, utils.obj_id(sign.id))
+                    self.picker_slots.hide_unused()
+                    self.items_dirty.set()
 
     async def _apply_config_task(self) -> None:
         """Apply saved signage info to the UI."""

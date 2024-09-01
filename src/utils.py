@@ -1,13 +1,15 @@
 """Various functions shared among the compiler and application."""
 from __future__ import annotations
 
+import types
 from typing import (
     Final, NewType, Protocol, TYPE_CHECKING, Any, NoReturn, SupportsInt, Literal, TypeGuard,
     overload,
 )
-from typing_extensions import deprecated
+from typing_extensions import deprecated, AsyncContextManager
 from collections.abc import (
-    Awaitable, Callable, Collection, Generator, Iterable, Iterator, Mapping, Sequence,
+    AsyncGenerator, AsyncIterator, Awaitable, Callable, Collection, Generator, Iterable,
+    Iterator, Mapping, Sequence,
 )
 from collections import deque
 from enum import Enum
@@ -538,6 +540,77 @@ async def run_as_task[*Args](
     """
     async with trio.open_nursery() as nursery:  # noqa: ASYNC112
         nursery.start_soon(func, *args)
+
+
+class CancelWrapper[T]:
+    """Enter a cancel scope, then yield a value. Can be used either async or sync."""
+    def __init__(self, value: T, scope: trio.CancelScope) -> None:
+        self.value = value
+        self.scope = scope
+
+    def __enter__(self) -> T:
+        self.scope.__enter__()
+        return self.value
+
+    async def __aenter__(self) -> T:
+        self.scope.__enter__()
+        return self.value
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: types.TracebackType | None,
+    ) -> bool | None:
+        return self.scope.__exit__(exc_type, exc_val, exc_tb)
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: types.TracebackType | None,
+    ) -> bool | None:
+        return self.scope.__exit__(exc_type, exc_val, exc_tb)
+
+
+class _IterValCancel[T](AsyncContextManager[AsyncIterator[CancelWrapper[T]], None]):
+    def __init__(self, value: trio_util.AsyncValue[T]) -> None:
+        self.value = value
+        self._agen: AsyncGenerator[T, None] | None = None
+
+    async def __aenter__(self) -> AsyncIterator[CancelWrapper[T]]:
+        if self._agen is not None:
+            raise RecursionError('Cannot re-enter.')
+        self._agen = agen = self.value.eventual_values()
+        return self._iterate(agen)
+
+    async def __aexit__(self, exc_type: object, exc_val: object, exc_tb: object) -> None:
+        if self._agen is not None:
+            await self._agen.aclose()
+
+    async def _iterate(
+        self, agen: AsyncGenerator[T, None],
+    ) -> AsyncIterator[CancelWrapper[T]]:
+        scope = trio.CancelScope()
+        yield CancelWrapper(await anext(agen), scope)
+        async for value in agen:
+            scope.cancel()
+            scope = trio.CancelScope()
+            yield CancelWrapper(value, scope)
+
+
+def iterval_cancelling[T](
+    value: trio_util.AsyncValue[T],
+) -> AsyncContextManager[AsyncIterator[CancelWrapper[T]], None]:
+    """Iterate over the values produced by an AsyncValue, cancelling the iteration if it changes again.
+
+    Use like so:
+    async with iterval_cancelling(some_value) as aiterator:
+        async for scope in aiterator:
+            [async] with scope as result:
+                await use(result)
+    """
+    return _IterValCancel(value)
 
 
 def not_none[T](value: T | None) -> T:
