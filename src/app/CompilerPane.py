@@ -143,6 +143,10 @@ TRANS_SCREENSHOT_FILENAME = TransToken.ui('Filename: {path}')
 
 async def apply_state_task() -> None:
     """Apply saved state to the UI and compile config."""
+    def save_screenshot(data: bytes) -> None:
+        with AtomicWriter(SCREENSHOT_LOC, is_bytes=True) as f:
+            f.write(data)
+
     state: CompilePaneState
     with config.APP.get_ui_channel(CompilePaneState) as channel:
         async for state in channel:
@@ -150,9 +154,7 @@ async def apply_state_task() -> None:
             cleanup_screenshot.set(state.sshot_cleanup)
 
             if state.sshot_type == 'CUST' and state.sshot_cust:
-                with AtomicWriter(SCREENSHOT_LOC, is_bytes=True) as f:
-                    f.write(state.sshot_cust)
-
+                await trio.to_thread.run_sync(save_screenshot, state.sshot_cust)
             # Refresh these.
             await set_screen_type()
             set_screenshot()
