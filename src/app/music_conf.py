@@ -153,6 +153,7 @@ async def make_widgets(
             AttrDef.bool('TBEAM_SYNC', TransToken.ui('Synced Funnel Music')),
         ],
     ))
+    await trio.lowlevel.checkpoint()
 
     WINDOWS[MusicChannel.TBEAM] = SelectorWin(TK_ROOT, SelectorOptions(
         func_get_ids=Music.music_for_channel(MusicChannel.TBEAM),
@@ -167,6 +168,7 @@ async def make_widgets(
             AttrDef.bool('TBEAM_SYNC', TransToken.ui('Synced Funnel Music')),
         ],
     ))
+    await trio.lowlevel.checkpoint()
 
     WINDOWS[MusicChannel.BOUNCE] = SelectorWin(TK_ROOT, SelectorOptions(
         func_get_ids=Music.music_for_channel(MusicChannel.BOUNCE),
@@ -177,6 +179,7 @@ async def make_widgets(
         func_get_sample=Music.sample_getter_func(MusicChannel.BOUNCE),
         sound_sys=filesystem,
     ))
+    await trio.lowlevel.checkpoint()
 
     WINDOWS[MusicChannel.SPEED] = SelectorWin(TK_ROOT, SelectorOptions(
         func_get_ids=Music.music_for_channel(MusicChannel.SPEED),
@@ -187,10 +190,13 @@ async def make_widgets(
         func_get_sample=Music.sample_getter_func(MusicChannel.SPEED),
         sound_sys=filesystem,
     ))
+    await trio.lowlevel.checkpoint()
+
     for win in WINDOWS.values():
         core_nursery.start_soon(win.task)
 
     assert set(WINDOWS.keys()) == set(MusicChannel), "Extra channels?"
+    await trio.lowlevel.checkpoint()
 
     # Widgets we want to remove when collapsing.
     exp_widgets: list[tkinter.Widget] = []
@@ -245,6 +251,8 @@ async def make_widgets(
         pane.update_idletasks()
         pane.move()
 
+    await trio.lowlevel.checkpoint()
+
     frame.columnconfigure(2, weight=1)
 
     base_lbl = ttk.Label(frame)
@@ -271,6 +279,7 @@ async def make_widgets(
         set_text(label, text)
         exp_widgets.append(label)
         label.grid(row=row, column=1, sticky='EW')
+    await trio.lowlevel.checkpoint()
 
     if config.APP.get_cur_conf(GenOptions).music_collapsed:
         set_collapsed()
@@ -280,10 +289,7 @@ async def make_widgets(
     async with aclosing(WINDOWS[MusicChannel.BASE].chosen.eventual_values()) as agen:
         task_status.started()
         async for music_id in agen:
-            """Callback for the selector windows.
-
-            This saves into the config file the last selected item.
-            """
+            # This saves into the config file the last selected item.
             packset = packages.get_loaded_packages()
             # If collapsed, the hidden ones follow the base always.
             set_suggested(packset, music_id)

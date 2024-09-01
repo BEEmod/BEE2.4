@@ -456,6 +456,8 @@ class SelectorWin(SelectorWinBase[ttk.Button, GroupHeader]):
 
     async def widget(self, frame: tk.Misc) -> ttk.Entry:
         """Create the special textbox used to open the selector window."""
+        await trio.lowlevel.checkpoint()
+
         def open_window(event: object = None) -> str:
             """If readonly, produce an error bell."""
             if self._readonly:

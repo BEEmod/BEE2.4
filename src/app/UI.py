@@ -1601,7 +1601,7 @@ async def init_windows(
     await LOAD_UI.step('optionwindow')
     init_drag_icon()
     await LOAD_UI.step('drag_icon')
-    await trio.sleep(0)
+    await trio.lowlevel.checkpoint()
 
     # When clicking on any window, hide the context window
     hide_ctx_win = context_win.hide_context
@@ -1614,19 +1614,22 @@ async def init_windows(
 
     # Load to properly apply config settings, then save to ensure
     # the file has any defaults applied.
+    await trio.lowlevel.checkpoint()
     optionWindow.load()
+    await trio.lowlevel.checkpoint()
     optionWindow.save()
 
-    TK_ROOT.deiconify()  # show it once we've loaded everything
-    windows['pal'].deiconify()
-    windows['opt'].deiconify()
-    itemconfig.window.deiconify()
-    CompilerPane.window.deiconify()
+    for window in [
+        TK_ROOT, windows['pal'], windows['opt'],
+        itemconfig.window, CompilerPane.window,
+    ]:
+        await trio.lowlevel.checkpoint()
+        window.deiconify()  # show it once we've loaded everything
 
     if utils.MAC:
         TK_ROOT.lift()  # Raise to the top of the stack
 
-    await trio.sleep(0.1)
+    await tk_tools.wait_eventloop()
 
     # Position windows according to remembered settings:
     try:
