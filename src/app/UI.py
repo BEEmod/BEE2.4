@@ -1388,12 +1388,9 @@ async def init_windows(
 
     menu_bar = MenuBar(TK_ROOT, export=export)
     core_nursery.start_soon(menu_bar.task, tk_img)
-    TK_ROOT.maxsize(
-        width=TK_ROOT.winfo_screenwidth(),
-        height=TK_ROOT.winfo_screenheight(),
-    )
     core_nursery.start_soon(on_game_changed)
     core_nursery.start_soon(gameMan.update_export_text)
+    await trio.lowlevel.checkpoint()
 
     ui_bg = tk.Frame(TK_ROOT, bg=ItemsBG, name='bg')
     ui_bg.grid(row=0, column=0, sticky='NSEW')
@@ -1407,6 +1404,7 @@ async def init_windows(
     style.configure('BG.TButton', background=ItemsBG)
     style.configure('Preview.TLabel', background='#F4F5F5')
 
+    await trio.lowlevel.checkpoint()
     UI['preview_frame'] = preview_frame = tk.Frame(ui_bg, bg=ItemsBG, name='preview')
     preview_frame.grid(
         row=0, column=3,
@@ -1656,10 +1654,12 @@ async def init_windows(
     # positions.
     reposition_panes()
     await tk_tools.wait_eventloop()
-    itemconfig.window.load_conf()
-    CompilerPane.window.load_conf()
-    windows['opt'].load_conf()
-    windows['pal'].load_conf()
+    for pane in [
+        itemconfig.window, CompilerPane.window,
+        windows['opt'], windows['pal'],
+    ]:
+        pane.load_conf()
+        await trio.lowlevel.checkpoint()
 
     async def enable_export() -> None:
         """Enable exporting only after all packages are loaded."""

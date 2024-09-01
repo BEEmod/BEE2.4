@@ -65,6 +65,7 @@ async def lifecycle(
         LOGGER.info('Package loading complete.')
         packages.LOADED.value = packset
         while True:
+            await trio.lowlevel.checkpoint()
             if export_info is not None:
                 await export_results.send((export_info, await exporting.export(export_info)))
             # Wait for either trigger to fire.

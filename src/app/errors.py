@@ -8,6 +8,7 @@ import types
 
 
 import srctools.logger
+import trio
 
 from transtoken import TransToken
 from transtoken import AppError as AppError  # TODO: Move back to this module, once app no longer imports tk.
@@ -140,6 +141,7 @@ class ErrorUI:
                 raise rest
 
     async def __aenter__(self) -> Self:
+        await trio.lowlevel.checkpoint()
         return self
 
     async def __aexit__(

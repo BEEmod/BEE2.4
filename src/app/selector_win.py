@@ -407,6 +407,7 @@ class SelectorWinBase[ButtonT, GroupHeaderT: GroupHeaderBase](ReflowWindow):
             await trio.lowlevel.checkpoint()
             data = self.func_get_data(self._packset, item_id)
             self._id_to_button[item_id] = button
+            await trio.lowlevel.checkpoint()
             # Special icons have no text.
             if utils.is_special_id(item_id):
                 self._ui_button_set_text(button, TransToken.BLANK)
@@ -423,9 +424,11 @@ class SelectorWinBase[ButtonT, GroupHeaderT: GroupHeaderBase](ReflowWindow):
                 group = self.group_widgets[group_key]
             except KeyError:
                 self.group_widgets[group_key] = group = self.group_cache.fetch()
+                await trio.lowlevel.checkpoint()
                 # noinspection PyProtectedMember
                 group._ui_reassign(group_key, self.group_names[group_key])
 
+            await trio.lowlevel.checkpoint()
             self._ui_menu_add(
                 group,
                 item_id,
