@@ -493,6 +493,17 @@ async def apply_bool_enabled_state_task(value: AsyncValue[bool], *widgets: ttk.W
         raise AssertionError('eventual_values() should be infinite!')
 
 
+async def apply_bool_enabled_menu_task(value: AsyncValue[bool], menu: tk.Menu, ind: int) -> NoReturn:
+    """Apply an AsyncValue's state to a menu widget.
+
+    This will make it disabled if the value is set to False.
+    """
+    async with aclosing(value.eventual_values()) as agen:
+        async for cur_value in agen:
+            menu.entryconfigure(ind, state='normal' if cur_value else 'disabled')
+        raise AssertionError('eventual_values() should be infinite!')
+
+
 def adjust_inside_screen(
     x: int,
     y: int,

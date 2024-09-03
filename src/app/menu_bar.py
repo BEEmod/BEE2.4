@@ -3,7 +3,7 @@ from typing import Final
 
 import tkinter as tk
 
-from collections.abc import Callable, Iterable
+from collections.abc import Awaitable, Callable, Iterable
 from contextlib import aclosing
 from pathlib import Path
 import os
@@ -12,9 +12,11 @@ import trio
 
 import BEE2_config
 import utils
+from app.dialogs import Dialogs
 from transtoken import TransToken
 from app import (
-    gameMan, optionWindow, packageMan, backup as backup_win, background_run, quit_app,
+    gameMan, optionWindow, packageMan, backup as backup_win,
+    quit_app, EdgeTrigger,
 )
 from ui_tk import tk_tools, help_menu
 from ui_tk.dialogs import DIALOG
@@ -31,6 +33,16 @@ FOLDER_OPTIONS: list[tuple[TransToken, Callable[['gameMan.Game'], Iterable[Path]
 ]
 
 
+async def _button_task(
+    trigger: EdgeTrigger[()],
+    func: Callable[[Dialogs], Awaitable[object]],
+) -> None:
+    """Run a function whenever the associated event fires."""
+    while True:
+        await trigger.wait()
+        await func(DIALOG)
+
+
 class MenuBar:
     """The main window's menu bar."""
     def __init__(
@@ -44,6 +56,8 @@ class MenuBar:
         """
         self._can_export = False
         self.export_func = export
+        self.evt_add_game = EdgeTrigger[()]()
+        self.evt_remove_game = EdgeTrigger[()]()
         self.bar = bar = tk.Menu(parent, name='main_menu')
         # Suppress ability to make each menu a separate window - weird old
         # TK behaviour
@@ -70,11 +84,13 @@ class MenuBar:
         self.export_btn_pos = utils.not_none(self.file_menu.index('end'))
         self.file_menu.entryconfigure(self.export_btn_pos, state='disabled')
 
-        self.file_menu.add_command(command=lambda: background_run(gameMan.add_game, DIALOG))
+        self.file_menu.add_command(command=self.evt_add_game.maybe_trigger)
         set_menu_text(self.file_menu, TransToken.ui("Add Game"))
+        self.add_btn_pos = utils.not_none(self.file_menu.index('end'))
 
-        self.file_menu.add_command(command=lambda: background_run(gameMan.remove_game, DIALOG))
+        self.file_menu.add_command(command=self.evt_remove_game.maybe_trigger)
         set_menu_text(self.file_menu, TransToken.ui("Uninstall from Selected Game"))
+        self.remove_btn_pos = utils.not_none(self.file_menu.index('end'))
 
         self.file_menu.add_command(command=backup_win.show_window)
         set_menu_text(self.file_menu, TransToken.ui("Backup/Restore Puzzles..."))
@@ -137,6 +153,16 @@ class MenuBar:
             nursery.start_soon(help_menu.create, self.help_menu, tk_img)
             nursery.start_soon(self._update_export_btn_task)
             nursery.start_soon(self._update_folder_btns_task)
+            nursery.start_soon(_button_task, self.evt_add_game, gameMan.add_game)
+            nursery.start_soon(_button_task, self.evt_remove_game, gameMan.remove_game)
+            nursery.start_soon(
+                tk_tools.apply_bool_enabled_menu_task,
+                self.evt_add_game.ready, self.file_menu, self.add_btn_pos,
+            )
+            nursery.start_soon(
+                tk_tools.apply_bool_enabled_menu_task,
+                self.evt_remove_game.ready, self.file_menu, self.remove_btn_pos,
+            )
             if self.dev_menu is not None:
                 from ui_tk import devmenu
                 nursery.start_soon(devmenu.menu_task, self.dev_menu)
