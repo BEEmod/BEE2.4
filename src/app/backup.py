@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, cast, Self
 
 from tkinter import filedialog, ttk
 from datetime import datetime
-from io import BytesIO, TextIOWrapper
+from io import BytesIO, BufferedWriter, TextIOWrapper
 from zipfile import ZipFile, ZIP_LZMA
 from contextlib import aclosing
 import tkinter as tk
@@ -25,7 +25,7 @@ import trio_util
 from trio_util import AsyncBool
 
 from FakeZip import FakeZip, zip_names, zip_open_bin
-from app import EdgeTrigger, img, background_run
+from app import EdgeTrigger, img
 from transtoken import TransToken
 from ui_tk import TK_ROOT, tk_tools
 from ui_tk.check_table import CheckDetails, Item as CheckItem
@@ -52,7 +52,7 @@ type AnyZip = ZipFile | FakeZip
 UI: dict[str, Any] = {}  # Holds all the widgets
 
 # Characters allowed in the backup filename
-BACKUP_CHARS = set(string.ascii_letters + string.digits + '_-.')
+BACKUP_CHARS = {*string.ascii_letters, *string.digits, '_', '-', '.'}
 # Format for the backup filename
 AUTO_BACKUP_FILE = 'back_{game}{ind}.zip'
 
@@ -425,7 +425,8 @@ async def auto_backup(game: gameMan.Game, stage: loadScreen.ScreenStage) -> None
         AUTO_BACKUP_FILE.format(game=safe_name, ind=''),
     )
     LOGGER.info('Writing backup to "{}"', final_backup)
-    with open(final_backup, 'wb') as f, ZipFile(f, mode='w', compression=ZIP_LZMA) as zip_file:
+    f: BufferedWriter = await trio.to_thread.run_sync(open, final_backup, 'wb')
+    with f, ZipFile(f, mode='w', compression=ZIP_LZMA) as zip_file:
         async with aclosing(stage.iterate(to_backup)) as agen:
             async for file in agen:
                 await trio.to_thread.run_sync(
@@ -812,12 +813,13 @@ async def init(
     UI['game_title']['textvariable'] = game_name
     UI['back_title']['textvariable'] = backup_name
 
-    UI['game_btn_all']['command'] = lambda: background_run(ui_backup_all, dialog)
-    UI['game_btn_sel']['command'] = lambda: background_run(ui_backup_sel, dialog)
-    UI['game_btn_del']['command'] = lambda: background_run(ui_delete_game, dialog)
+    nursery: trio.Nursery
+    UI['game_btn_all']['command'] = lambda: nursery.start_soon(ui_backup_all, dialog)
+    UI['game_btn_sel']['command'] = lambda: nursery.start_soon(ui_backup_sel, dialog)
+    UI['game_btn_del']['command'] = lambda: nursery.start_soon(ui_delete_game, dialog)
 
-    UI['back_btn_all']['command'] = lambda: background_run(ui_restore_all, dialog)
-    UI['back_btn_sel']['command'] = lambda: background_run(ui_restore_sel, dialog)
+    UI['back_btn_all']['command'] = lambda: nursery.start_soon(ui_restore_all, dialog)
+    UI['back_btn_sel']['command'] = lambda: nursery.start_soon(ui_restore_sel, dialog)
     UI['back_btn_del']['command'] = ui_delete_backup
 
     UI['back_frame'].grid(row=1, column=0, sticky='NSEW')
@@ -848,7 +850,7 @@ async def init_application(nursery: trio.Nursery) -> None:
 
     loadScreen.main_loader.destroy()
     # Initialise images, but don't load anything from packages.
-    background_run(img.init, TK_IMG)
+    nursery.start_soon(img.init, TK_IMG)
     # We don't need sound or language reload handling.
 
     await nursery.start(init, TK_IMG)
@@ -993,17 +995,17 @@ async def init_toplevel(
     ).grid(row=0, column=0)
 
     set_text(
-        ttk.Button(toolbar_frame, command=lambda: background_run(ui_load_backup)),
+        ttk.Button(toolbar_frame, command=lambda: nursery.start_soon(ui_load_backup)),
         TransToken.ui('Open Backup'),
     ).grid(row=0, column=1)
 
     set_text(
-        ttk.Button(toolbar_frame, command=lambda: background_run(ui_save_backup, dialog)),
+        ttk.Button(toolbar_frame, command=lambda: nursery.start_soon(ui_save_backup, dialog)),
         TransToken.ui('Save Backup'),
     ).grid(row=0, column=2)
 
     set_text(
-        ttk.Button(toolbar_frame, command=lambda: background_run(ui_save_backup_as, dialog)),
+        ttk.Button(toolbar_frame, command=lambda: nursery.start_soon(ui_save_backup_as, dialog)),
         TransToken.ui('.. As'),
     ).grid(row=0, column=3)
 
