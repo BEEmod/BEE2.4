@@ -494,15 +494,15 @@ if __name__ == '__main__':
     test_inst = CheckDetails[None](
         parent=TK_ROOT,
         headers=[tt('Name'), tt('Author'), tt('Description')],
-        items=[
-            Item(tt('Item1'), tt('Auth1'), tt('Blah blah blah')),
-            Item(tt('Item5'), tt('Auth3'), tt('Lorem Ipsum')),
-            Item(tt('Item3'), tt('Auth2'), tt('.........')),
-            Item(tt('Item4'), tt('Auth2'), tt('.........')),
-            Item(tt('Item6'), tt('Sir VeryLongName'), tt('.....')),
-            Item(tt('Item2'), tt('Auth1'), tt('...')),
-        ]
     )
+    test_inst.add_items([
+        Item(tt('Item1'), tt('Auth1'), tt('Blah blah blah')),
+        Item(tt('Item5'), tt('Auth3'), tt('Lorem Ipsum')),
+        Item(tt('Item3'), tt('Auth2'), tt('.........')),
+        Item(tt('Item4'), tt('Auth2'), tt('.........')),
+        Item(tt('Item6'), tt('Sir VeryLongName'), tt('.....')),
+        Item(tt('Item2'), tt('Auth1'), tt('...')),
+    ])
     test_inst.grid(sticky='NSEW')
     tk_tools.add_mousewheel(test_inst.wid_canvas, TK_ROOT)
 

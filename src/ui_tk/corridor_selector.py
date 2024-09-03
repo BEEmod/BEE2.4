@@ -376,9 +376,8 @@ class TkSelector(Selector[IconUI, OptionRowUI]):
         set_text(self.wid_title, title)
         set_text(self.wid_authors, authors)
         self.wid_desc.set_text(desc)
-        # Not yet typed in typeshed.
-        disp_lines = self.wid_desc.count(1.0, 'end', 'displaylines', 'update')  # type: ignore[no-untyped-call]
-        self.wid_desc['height'] = max(6, disp_lines + 1)
+        disp_lines = self.wid_desc.count(1.0, 'end', 'displaylines', 'update')
+        self.wid_desc['height'] = max(6, (disp_lines or 0) + 1)
 
         set_text(self.wid_options_title, options_title)
         if show_no_options:

@@ -44,7 +44,7 @@ class Tracer(trio.abc.Instrument):
         self.blocking: list[tuple[float, str]] = []
         self.elapsed: dict[trio.lowlevel.Task, float] = {}
         # (time, line number)
-        self.start_point: dict[trio.lowlevel.Task, tuple[float, int] | None] = {}
+        self.start_point: dict[trio.lowlevel.Task, tuple[float, int]] = {}
         self.args: dict[trio.lowlevel.Task, dict[str, object]] = {}
         self.formatter = SmallRepr(compact=True)
 
@@ -113,7 +113,7 @@ class Tracer(trio.abc.Instrument):
 
     def display_slow(self) -> None:
         """Print out a list of 'slow' tasks."""
-        if not self.slow and not self.no_yield:
+        if not self.slow and not self.blocking:
             return
 
         LOGGER.info('Slow tasks\n{}', '\n'.join([

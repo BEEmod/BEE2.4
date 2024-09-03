@@ -1617,8 +1617,11 @@ async def init_windows(
     await trio.lowlevel.checkpoint()
     optionWindow.save()
 
+    await trio.lowlevel.checkpoint()
+    TK_ROOT.deiconify()
+
     for window in [
-        TK_ROOT, windows['pal'], windows['opt'],
+        windows['pal'], windows['opt'],
         itemconfig.window, CompilerPane.window,
     ]:
         await trio.lowlevel.checkpoint()
