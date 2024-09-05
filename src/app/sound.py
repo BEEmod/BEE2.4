@@ -122,7 +122,6 @@ class PygletSound(NullSound):
         global sounds
         fname = SOUNDS[name]
         path = str(utils.install_path(f'sounds/{fname}.ogg'))
-        LOGGER.info('Loading sound "{}" -> {}', name, path)
         try:
             src: pyglet.media.Source = await trio.to_thread.run_sync(functools.partial(
                 decoder.decode,
@@ -131,13 +130,14 @@ class PygletSound(NullSound):
                 streaming=False,
             ))
         except Exception:
-            LOGGER.exception("Couldn't load sound {}:", name)
+            LOGGER.exception('Couldn\'t load sound "{}" -> {}', name, path)
             LOGGER.info('UI sounds disabled.')
             sounds = NullSound()
             if _nursery is not None:
                 _nursery.cancel_scope.cancel()
             return None
         else:
+            LOGGER.info('Loaded sound "{}" -> {}', name, path)
             self.sources[name] = src
             return src
 
