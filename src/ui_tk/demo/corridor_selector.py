@@ -17,12 +17,7 @@ async def test(core_nursery: trio.Nursery) -> None:
     export_trig = EdgeTrigger[exporting.ExportInfo]()
     export_send, export_rec = trio.open_memory_channel[lifecycle.ExportResult](1)
 
-    core_nursery.start_soon(
-        lifecycle.lifecycle,
-        EdgeTrigger[()](),  # Never reload.
-        export_trig,
-        export_send,
-    )
+    core_nursery.start_soon(lifecycle.lifecycle)
     packset, _ = await packages.LOADED.wait_transition()
     core_nursery.start_soon(img.init, TK_IMG)
     core_nursery.start_soon(sound.sound_task)

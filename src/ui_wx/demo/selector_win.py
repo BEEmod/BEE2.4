@@ -3,10 +3,9 @@ from srctools import FileSystemChain
 import trio
 import wx
 
-import exporting
 import utils
 from transtoken import TransToken
-from app import img, lifecycle, sound, EdgeTrigger
+from app import img, lifecycle, sound
 from consts import MusicChannel
 import packages
 import BEE2_config
@@ -22,15 +21,7 @@ async def test(core_nursery: trio.Nursery) -> None:
     BEE2_config.GEN_OPTS.load()
     config.APP.read_file(config.APP_LOC)
 
-    export_trig = EdgeTrigger[exporting.ExportInfo]()
-    export_send, export_rec = trio.open_memory_channel[lifecycle.ExportResult](1)
-
-    core_nursery.start_soon(
-        lifecycle.lifecycle,
-        EdgeTrigger[()](),  # Never reload.
-        export_trig,
-        export_send,
-    )
+    core_nursery.start_soon(lifecycle.lifecycle)
     packset, _ = await packages.LOADED.wait_transition()
 
     # Setup images to read from packages.

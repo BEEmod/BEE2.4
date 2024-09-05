@@ -1,11 +1,9 @@
 import trio
 
-import exporting
-from app import EdgeTrigger, gameMan, img, lifecycle, sound
+from app import gameMan, img, lifecycle, sound
 from ui_wx.corridor_selector import WxSelector
 from ui_wx.dialogs import DIALOG
 from ui_wx.img import WX_IMG
-import BEE2_config
 import config
 import loadScreen
 import packages
@@ -15,15 +13,7 @@ async def test(core_nursery: trio.Nursery) -> None:
     config.APP.read_file(config.APP_LOC)
     await gameMan.load(DIALOG)
 
-    export_trig = EdgeTrigger[exporting.ExportInfo]()
-    export_send, export_rec = trio.open_memory_channel[lifecycle.ExportResult](1)
-
-    core_nursery.start_soon(
-        lifecycle.lifecycle,
-        EdgeTrigger[()](),  # Never reload.
-        export_trig,
-        export_send,
-    )
+    core_nursery.start_soon(lifecycle.lifecycle)
     packset, _ = await packages.LOADED.wait_transition()
     core_nursery.start_soon(img.init, WX_IMG)
     core_nursery.start_soon(sound.sound_task)

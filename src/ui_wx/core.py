@@ -64,7 +64,6 @@ async def init_app(core_nursery: trio.Nursery) -> None:
 
         core_nursery.start_soon(
             lifecycle.lifecycle,
-            app.EdgeTrigger[()](),  # For now, never reload.
             export_trig,
             export_send,
         )

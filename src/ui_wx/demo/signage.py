@@ -10,7 +10,6 @@ from app.errors import ErrorUI
 from ui_wx.img import WX_IMG
 from ui_wx.signage_ui import SignageUI
 from ui_wx import MAIN_WINDOW
-import exporting
 import app
 import BEE2_config
 import config
@@ -32,15 +31,7 @@ async def test(core_nursery: trio.Nursery) -> None:
                 loc,
             )
 
-    export_trig = app.EdgeTrigger[exporting.ExportInfo]()
-    export_send, export_rec = trio.open_memory_channel[lifecycle.ExportResult](1)
-
-    core_nursery.start_soon(
-        lifecycle.lifecycle,
-        app.EdgeTrigger[()](),  # Never reload.
-        export_trig,
-        export_send,
-    )
+    core_nursery.start_soon(lifecycle.lifecycle)
     await packages.LOADED.wait_transition()
     await core_nursery.start(img.init, WX_IMG)
     core_nursery.start_soon(sound.sound_task)

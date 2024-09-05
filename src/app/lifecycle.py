@@ -1,4 +1,6 @@
 """Manages the core package loading/export lifecycle."""
+from typing import overload
+
 import srctools.logger
 import trio
 
@@ -20,16 +22,31 @@ TRANS_LOAD_PARTIAL = TransToken.ui('Loading packages was partially successful:')
 type ExportResult = tuple[ExportInfo, ErrorResult]
 
 
+@overload
+async def lifecycle() -> None: ...
+@overload
 async def lifecycle(
-    reload_trigger: EdgeTrigger[()],
     export_trigger: EdgeTrigger[ExportInfo],
     export_results: trio.MemorySendChannel[ExportResult],
+) -> None: ...
+@overload
+async def lifecycle(
+    export_trigger: EdgeTrigger[ExportInfo],
+    export_results: trio.MemorySendChannel[ExportResult],
+    reload_trigger: EdgeTrigger[()],
+) -> None: ...
+async def lifecycle(
+    export_trigger: EdgeTrigger[ExportInfo] | None = None,
+    export_results: trio.MemorySendChannel[ExportResult] | None = None,
+    reload_trigger: EdgeTrigger[()] | None = None,
 ) -> None:
     """Switches between loading packages, then exporting.
 
-    :param reload_trigger: Triggered to cause a package reload.
+    For testing code, params can be omitted to disable that feature.
+
     :param export_trigger: Triggered with the UI state to trigger exporting, if possible.
     :param export_results: After an export, the result is sent here.
+    :param reload_trigger: Triggered to cause a package reload.
     """
     export_info: ExportInfo | None = None
     should_reload = False
@@ -37,15 +54,23 @@ async def lifecycle(
     async def wait_reload() -> None:
         """React to the reload trigger."""
         nonlocal should_reload
-        await reload_trigger.wait()
-        should_reload = True
-        wait_nursery.cancel_scope.cancel()
+        if reload_trigger is not None:
+            await reload_trigger.wait()
+            should_reload = True
+            wait_nursery.cancel_scope.cancel()
+        else:
+            # Can never reload.
+            await trio.sleep_forever()
 
     async def wait_export() -> None:
         """Enable the export UI, then wait for an export command."""
         nonlocal export_info
-        export_info = await export_trigger.wait()
-        wait_nursery.cancel_scope.cancel()
+        if export_trigger is not None:
+            export_info = await export_trigger.wait()
+            wait_nursery.cancel_scope.cancel()
+        else:
+            # Can never export.
+            await trio.sleep_forever()
 
     while True:
         LOGGER.info('Loading packages...')
@@ -81,8 +106,9 @@ async def lifecycle(
 
         while True:
             await trio.lowlevel.checkpoint()
-            if export_info is not None:
+            if export_info is not None and export_results is not None:
                 # User pressed export, perform the export.
+                # If export_results is None, we just ignore export requests.
                 await export_results.send((export_info, await exporting.export(export_info)))
             # Wait for either trigger to fire.
             async with trio.open_nursery() as wait_nursery:
