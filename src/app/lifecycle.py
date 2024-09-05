@@ -3,15 +3,19 @@ from typing import overload
 
 import srctools.logger
 import trio
+from srctools import KeyValError, Keyvalues
+from srctools.filesys import File
 
 import exporting
-from app import EdgeTrigger, gameMan, quit_app
+from app import EdgeTrigger, gameMan, quit_app, DEV_MODE
 from app.errors import ErrorUI, Result as ErrorResult
 from exporting import ExportInfo, mod_support
 from transtoken import TransToken
 import BEE2_config
 import packages
 import utils
+from utils import PackagePath
+
 
 LOGGER = srctools.logger.get_logger(__name__)
 TRANS_LOAD_ERROR = TransToken.ui_plural(
@@ -88,7 +92,14 @@ async def lifecycle(
             quit_app()
             return
 
-        async with trio.open_nursery() as load_nursery:
+        dev_filecheck_send, dev_filecheck_rec = trio.open_memory_channel[tuple[PackagePath, File]](256)
+
+        async with trio.open_nursery() as load_nursery, dev_filecheck_send:
+            if DEV_MODE.value:
+                load_nursery.start_soon(filecheck_task, dev_filecheck_rec)
+                packset.devmode_filecheck_chan = dev_filecheck_send
+            # else: The channels will just be left unused.
+
             # noinspection PyProtectedMember
             load_nursery.start_soon(packages._load_objects, packset)
             # noinspection PyProtectedMember
@@ -119,3 +130,17 @@ async def lifecycle(
                 wait_nursery.start_soon(wait_export)
             if should_reload:
                 break  # Go the outer loop, which will reload again.
+
+
+async def filecheck_task(rec_channel: trio.MemoryReceiveChannel[tuple[PackagePath, File]]) -> None:
+    """Check all the provided files for syntax errors."""
+    def worker(file: File) -> None:
+        """Parse immediately, to check the syntax."""
+        with file.open_str() as f:
+            Keyvalues.parse(f)
+
+    async for path, file in rec_channel:
+        try:
+            await trio.to_thread.run_sync(worker, file, abandon_on_cancel=True)
+        except (KeyValError, FileNotFoundError, UnicodeDecodeError):
+            LOGGER.exception('Unable to read "{}"', path)

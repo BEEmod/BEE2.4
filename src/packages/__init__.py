@@ -16,7 +16,7 @@ from aioresult import ResultCapture
 from trio_util import AsyncValue
 from srctools import Keyvalues, NoKeyError, Vec
 from srctools.tokenizer import TokenSyntaxError
-from srctools.filesys import FileSystem, RawFileSystem, ZipFileSystem, VPKFileSystem
+from srctools.filesys import FileSystem, RawFileSystem, ZipFileSystem, VPKFileSystem, File
 import attrs
 import trio
 import srctools
@@ -582,7 +582,7 @@ def reraise_keyerror(err: NoKeyError | IndexError, obj_id: str) -> NoReturn:
     raise Exception(f'No "{key_error.key}" in {obj_id!s} object!') from err
 
 
-def get_config(
+async def get_config(
     packset: PackagesSet,
     prop_block: Keyvalues,
     folder: str,
@@ -661,6 +661,10 @@ class PackagesSet:
     # If found, the folders where the music is present.
     mel_music_fsys: FileSystem | None = None
     tag_music_fsys: FileSystem | None = None
+
+    # In dev mode, all lazy files are sent here to be syntax checked.
+    # The other end is implemented in lifecycle.
+    devmode_filecheck_chan: trio.MemorySendChannel[tuple[utils.PackagePath, File]] | None = None
 
     @property
     def has_mel_music(self) -> bool:

@@ -85,22 +85,9 @@ async def from_file(
 			raise
 		return kv
 
-	if app.DEV_MODE.value:
-		app.background_run(devmode_check, file, path)
+	if packset.devmode_filecheck_chan is not None:
+		await packset.devmode_filecheck_chan.send((path, file))
 	return loader
-
-
-async def devmode_check(file: File[Any], path: utils.PackagePath) -> None:
-	"""In dev mode, parse files in the background to ensure they exist and have valid syntax."""
-	def worker() -> None:
-		"""Parse immediately, to check the syntax."""
-		with file.open_str() as f:
-			Keyvalues.parse(f)
-
-	try:
-		await trio.to_thread.run_sync(worker, abandon_on_cancel=True)
-	except (KeyValError, FileNotFoundError, UnicodeDecodeError):
-		LOGGER.exception('Unable to read "{}"', path)
 
 
 def concat(a: LazyConf, b: LazyConf) -> LazyConf:
