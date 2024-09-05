@@ -616,7 +616,7 @@ def get_config(
             if len(path) < 3 or path[-4] != '.':
                 # Add extension
                 path += extension
-            conf = lazy_conf.concat(conf, lazy_conf.from_file(
+            conf = lazy_conf.concat(conf, await lazy_conf.from_file(
                 packset,
                 utils.PackagePath(pak_id, path),
                 source=f'{pak_id}:{path}',
@@ -1303,7 +1303,7 @@ class Style(SelPakObject, needs_foreground=True):
         else:
             with data.fsys[folder + '/items.txt'].open_str() as f:
                 items, renderables = await trio.to_thread.run_sync(EditorItem.parse, f, data.pak_id)
-            vbsp = lazy_conf.from_file(
+            vbsp = await lazy_conf.from_file(
                 data.packset,
                 utils.PackagePath(data.pak_id, folder + '/vbsp_config.cfg'),
                 missing_ok=True,

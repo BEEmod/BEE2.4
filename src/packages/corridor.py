@@ -254,7 +254,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                 authors=list(map(TransToken.untranslated, packages.sep_values(kv['authors', '']))),
                 desc=packages.desc_parse(kv, 'Corridor', data.pak_id),
                 default_enabled=not kv.bool('disabled', False),
-                config=packages.get_config(
+                config=await packages.get_config(
                     data.packset, kv,
                     'items',
                     data.pak_id,

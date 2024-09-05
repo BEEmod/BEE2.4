@@ -157,7 +157,7 @@ class ItemVariant:
         vbsp_config: lazy_conf.LazyConf
         if 'config' in kv:
             # Item.parse() has resolved this to the actual config.
-            vbsp_config = get_config(
+            vbsp_config = await get_config(
                 packset,
                 kv,
                 'items',
@@ -175,7 +175,7 @@ class ItemVariant:
                 kv.find_children('Replace')
             ])
 
-        vbsp_config = lazy_conf.concat(vbsp_config, get_config(
+        vbsp_config = lazy_conf.concat(vbsp_config, await get_config(
             packset,
             kv,
             'items',
@@ -533,7 +533,7 @@ class Item(PakObject, needs_foreground=True):
         glob_desc = desc_parse(data.info, 'global:' + data.id, data.pak_id)
         desc_last = data.info.bool('AllDescLast')
 
-        all_config = get_config(
+        all_config = await get_config(
             data.packset, data.info,
             'items',
             pak_id=data.pak_id,
@@ -768,7 +768,7 @@ class ItemConfig(PakObject, allow_mult=True):
         vers: dict[str, dict[str, lazy_conf.LazyConf]] = {}
         styles: dict[str, lazy_conf.LazyConf]
 
-        all_config = get_config(
+        all_config = await get_config(
             data.packset,
             data.info,
             'items',
@@ -782,7 +782,7 @@ class ItemConfig(PakObject, allow_mult=True):
             vers[ver_id] = styles = {}
             for sty_block in ver.find_all('Styles'):
                 for style in sty_block:
-                    styles[style.real_name] = lazy_conf.from_file(
+                    styles[style.real_name] = await lazy_conf.from_file(
                         data.packset,
                         utils.PackagePath(data.pak_id, f'items/{style.value}.cfg'),
                         source=f'<ItemConfig {data.pak_id}:{data.id} in "{style.real_name}">',
@@ -969,7 +969,7 @@ async def parse_item_folder(
         icons=icons,
         all_name=all_name,
         all_icon=all_icon,
-        vbsp_config=lazy_conf.from_file(
+        vbsp_config=await lazy_conf.from_file(
             data.packset,
             utils.PackagePath(data.pak_id, config_path),
             missing_ok=True,

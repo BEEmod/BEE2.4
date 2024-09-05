@@ -149,7 +149,7 @@ class Music(SelPakObject, needs_foreground=True, style_suggest_key='music'):
             },
             inst=inst,
             sample=sample,
-            config=get_config(
+            config=await get_config(
                 data.packset,
                 data.info,
                 'music',

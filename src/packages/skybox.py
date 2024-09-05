@@ -41,7 +41,7 @@ class Skybox(
         selitem_data = SelitemData.parse(data.info, data.pak_id)
         mat = data.info['material', 'sky_black']
         draw_first = data.info.bool('sky_draw_first')
-        config = get_config(
+        config = await get_config(
             data.packset,
             data.info,
             'skybox',

@@ -48,7 +48,7 @@ def raw_prop(block: Keyvalues, source: str = '') -> LazyConf:
 		return BLANK
 
 
-def from_file(
+async def from_file(
 	packset: packages.PackagesSet,
 	path: utils.PackagePath,
 	*,
@@ -63,7 +63,7 @@ def from_file(
 			LOGGER.warning('Package does not exist: "{}"', path)
 		return BLANK
 	try:
-		file = pack.fsys[path.path]
+		file = await trio.to_thread.run_sync(pack.fsys.__getitem__, path.path)
 	except FileNotFoundError:
 		if not missing_ok:
 			LOGGER.warning('File does not exist: "{}"', path)

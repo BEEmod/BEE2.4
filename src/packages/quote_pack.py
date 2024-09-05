@@ -63,13 +63,14 @@ class QuotePack(SelPakObject, needs_foreground=True, style_suggest_key='quote'):
                 turret_hate=monitor_data.bool('TurretShoot'),
             )
 
-        config = await get_config(
+        # Parse immediately.
+        config = await (await get_config(
             data.packset,
             data.info,
             'voice',
             pak_id=data.pak_id,
             prop_name='file',
-        )()
+        ))()
 
         try:
             quotes_kv = config.find_key('Quotes')
