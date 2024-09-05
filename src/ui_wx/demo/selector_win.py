@@ -22,18 +22,18 @@ async def test(core_nursery: trio.Nursery) -> None:
     BEE2_config.GEN_OPTS.load()
     config.APP.read_file(config.APP_LOC)
 
-    # Setup images to read from packages.
     export_trig = EdgeTrigger[exporting.ExportInfo]()
     export_send, export_rec = trio.open_memory_channel[lifecycle.ExportResult](1)
 
     core_nursery.start_soon(
         lifecycle.lifecycle,
-        EdgeTrigger[()](),  # For now, never reload.
+        EdgeTrigger[()](),  # Never reload.
         export_trig,
         export_send,
     )
     packset, _ = await packages.LOADED.wait_transition()
 
+    # Setup images to read from packages.
     await core_nursery.start(img.init,  WX_IMG)
     core_nursery.start_soon(sound.sound_task)
     print('Done.')

@@ -40,7 +40,9 @@ __all__ = [
     'LegacyCorr', 'LEGACY_CORRIDORS',
     'CLEAN_PACKAGE', 'CLEAN_STYLE',
     'PakObject', 'SelPakObject', 'PackagesSet', 'LOADED', 'get_loaded_packages', 'PakRef',
-    'find_packages', 'load_packages',
+    'find_packages',
+    # For use by lifecycle only.
+    '_load_packages', '_load_objects', '_load_templates',
 
     # Selector win data structures.
     'SelitemData', 'AttrDef', 'AttrTypes', 'AttrValues', 'AttrMap',
@@ -801,7 +803,7 @@ async def find_packages(errors: ErrorUI, packset: PackagesSet, pak_dir: Path) ->
         return False
 
 
-async def load_packages(
+async def _load_packages(
     packset: PackagesSet,
     pak_dirs: list[Path],
     errors: ErrorUI,
@@ -860,7 +862,12 @@ async def load_packages(
             nursery.start_soon(parse_package, nursery, errors, packset, pack)
         LOGGER.debug('Submitted packages.')
 
-    LOGGER.debug('Parsed packages, now parsing objects.')
+    LOGGER.debug('Parsed packages.')
+
+
+async def _load_objects(packset: PackagesSet) -> None:
+    """Parse all the objects in a packset."""
+    LOGGER.debug('Parsing objects...')
 
     await LOAD_OBJ.set_length(sum(
         len(obj_map)
@@ -875,19 +882,29 @@ async def load_packages(
         sorted(packset.unparsed.items(), key=lambda t: len(t[1]), reverse=True)
     ))
 
-    # Load either now, or in background.
     async with trio.open_nursery() as nursery:
         for obj_class, objs in packset.unparsed.items():
-            if obj_class.needs_foreground:
-                nursery.start_soon(
-                    parse_type,
-                    packset, obj_class, objs,
-                )
-            else:
-                background_run(
-                    parse_type,
-                    packset, obj_class, objs,
-                )
+            nursery.start_soon(
+                parse_type,
+                packset, obj_class, objs,
+            )
+
+
+async def _load_templates(packset: PackagesSet) -> None:
+    """Parse templates in a packset."""
+    from packages import template_brush  # Avoid circular imports
+
+    async def find_temp(pack: Package) -> None:
+        """Find templates for a package."""
+        for template in pack.fsys.walk_folder('templates'):
+            await trio.sleep(0)
+            if template.path.casefold().endswith('.vmf'):
+                nursery.start_soon(template_brush.parse_template, packset, pack.id, template)
+
+    async with trio.open_nursery() as nursery:
+        for package in packset.packages.values():
+            nursery.start_soon(find_temp, package)
+    LOGGER.info('Loaded all templates.')
 
 
 async def parse_type[PakT: PakObject](packset: PackagesSet, obj_class: type[PakT], objs: Iterable[str]) -> None:
@@ -914,7 +931,6 @@ async def parse_package(
     pack: Package,
 ) -> None:
     """Parse through the given package to find all the components."""
-    from packages import template_brush  # Avoid circular imports
     for pre in pack.info.find_children('Prerequisites'):
         # Special case - disable these packages when the music isn't copied.
         required_id = utils.special_id(pre.value)
@@ -1018,10 +1034,6 @@ async def parse_package(
     if desc:
         pack.desc = TransToken.parse(pack.id, '\n'.join(desc))
 
-    for template in pack.fsys.walk_folder('templates'):
-        await trio.sleep(0)
-        if template.path.casefold().endswith('.vmf'):
-            nursery.start_soon(template_brush.parse_template, packset, pack.id, template)
     await LOAD_PAK.step(pack.id)
 
 

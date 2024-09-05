@@ -42,7 +42,7 @@ async def lifecycle(
         wait_nursery.cancel_scope.cancel()
 
     async def wait_export() -> None:
-        """React to the reload trigger."""
+        """Enable the export UI, then wait for an export command."""
         nonlocal export_info
         export_info = await export_trigger.wait()
         wait_nursery.cancel_scope.cancel()
@@ -52,8 +52,9 @@ async def lifecycle(
         packset = packages.PackagesSet()
         await mod_support.scan_music_locs(packset, gameMan.all_games)
         async with ErrorUI(error_desc=TRANS_LOAD_ERROR, warn_desc=TRANS_LOAD_PARTIAL) as error_ui:
+            # noinspection PyProtectedMember
             await utils.run_as_task(
-                packages.load_packages,
+                packages._load_packages,
                 packset,
                 list(BEE2_config.get_package_locs()),
                 error_ui,
@@ -62,16 +63,32 @@ async def lifecycle(
             quit_app()
             return
 
-        LOGGER.info('Package loading complete.')
-        packages.LOADED.value = packset
+        async with trio.open_nursery() as load_nursery:
+            # noinspection PyProtectedMember
+            load_nursery.start_soon(packages._load_objects, packset)
+            # noinspection PyProtectedMember
+            load_nursery.start_soon(packages._load_templates, packset)
+
+            # Todo: Move these ready calls elsewhere, then eliminate foreground.
+            for pack_cls in packages.OBJ_TYPES.values():
+                if pack_cls.needs_foreground:
+                    await packset.ready(pack_cls).wait()
+                    LOGGER.debug('{} ready', pack_cls)
+
+            # Foreground objects loaded, release the packset for the UI.
+            packages.LOADED.value = packset
+        # Everything is loaded now, we can export.
+
         while True:
             await trio.lowlevel.checkpoint()
             if export_info is not None:
+                # User pressed export, perform the export.
                 await export_results.send((export_info, await exporting.export(export_info)))
             # Wait for either trigger to fire.
             async with trio.open_nursery() as wait_nursery:
                 should_reload = False
                 export_info = None
+                # Starting wait_export will enable the UI buttons.
                 wait_nursery.start_soon(wait_reload)
                 wait_nursery.start_soon(wait_export)
             if should_reload:

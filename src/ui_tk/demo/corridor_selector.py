@@ -1,12 +1,10 @@
 import trio
 
-from app import gameMan, img, sound
-from app.errors import ErrorUI
-from exporting import mod_support
+from app import EdgeTrigger, gameMan, img, lifecycle, sound
 from ui_tk.corridor_selector import TkSelector
 from ui_tk.dialogs import DIALOG
 from ui_tk.img import TK_IMG
-import BEE2_config
+import exporting
 import config
 import loadScreen
 import packages
@@ -15,13 +13,17 @@ import packages
 async def test(core_nursery: trio.Nursery) -> None:
     config.APP.read_file(config.APP_LOC)
     await gameMan.load(DIALOG)
-    await mod_support.scan_music_locs(packages.get_loaded_packages(), gameMan.all_games)
-    async with ErrorUI() as errors:
-        await packages.load_packages(
-            packages.get_loaded_packages(),
-            list(BEE2_config.get_package_locs()),
-            errors,
-        )
+
+    export_trig = EdgeTrigger[exporting.ExportInfo]()
+    export_send, export_rec = trio.open_memory_channel[lifecycle.ExportResult](1)
+
+    core_nursery.start_soon(
+        lifecycle.lifecycle,
+        EdgeTrigger[()](),  # Never reload.
+        export_trig,
+        export_send,
+    )
+    packset, _ = await packages.LOADED.wait_transition()
     core_nursery.start_soon(img.init, TK_IMG)
     core_nursery.start_soon(sound.sound_task)
     loadScreen.main_loader.destroy()
