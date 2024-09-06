@@ -6,6 +6,7 @@ whatever reason.
 """
 from __future__ import annotations
 
+import abc
 from enum import Enum
 import io
 import urllib.error
@@ -482,14 +483,17 @@ class CreditsWindowBase:
             await self._ui_hide_window()
             await self.open.wait()
 
+    @abc.abstractmethod
     async def _ui_apply_text(self, text: MarkdownData) -> None:
         """Apply the credits text to the window."""
         raise NotImplementedError
 
+    @abc.abstractmethod
     async def _ui_show_window(self) -> None:
         """Show the window, and center it."""
         raise NotImplementedError
 
+    @abc.abstractmethod
     async def _ui_hide_window(self) -> None:
         """Hide the window."""
         raise NotImplementedError
@@ -540,8 +544,8 @@ async def open_url(dialogs: Dialogs, url_key: str) -> None:
         LOGGER.warning('Invalid URL key "{}"!', url_key)
     else:
         if await dialogs.ask_yes_no(
-            TransToken.ui('BEEMOD 2 - Open URL'),
-            TransToken.ui('Do you wish to open the following URL?'),
+            title=TransToken.ui('BEEMOD 2 - Open URL'),
+            message=TransToken.ui('Do you wish to open the following URL?'),
             detail=f'"{url}"',
         ):
             webbrowser.open(url)
