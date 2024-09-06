@@ -655,6 +655,8 @@ class SelectorWin(SelectorWinBase[ItemSlot, GroupHeader]):
 
     @override
     def _ui_menu_clear(self) -> None:
+        for menu in self.context_menus.values():
+            wid_transtoken.clear_stored_menu(menu)
         for item in list(self.context_menu.GetMenuItems()):
             self.context_menu.Remove(item)
         self._menu_items.clear()

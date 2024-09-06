@@ -18,10 +18,11 @@ __all__ = [
 
 
 _control_labels: WeakKeyDictionary[wx.Control, TransToken] = WeakKeyDictionary()
-_menu_labels: WeakKeyDictionary[wx.MenuItem, TransToken] = WeakKeyDictionary()
 _window_titles: WeakKeyDictionary[wx.TopLevelWindow, TransToken] = WeakKeyDictionary()
 _tooltips: WeakKeyDictionary[wx.Window, TransToken] = WeakKeyDictionary()
 _entry_values: WeakKeyDictionary[wx.TextEntry, TransToken] = WeakKeyDictionary()
+# MenuItems are temporary, so track IDs for each menu."""
+_menu_labels: WeakKeyDictionary[wx.Menu, dict[int, TransToken]] = WeakKeyDictionary()
 
 
 def set_text[Widget: wx.Control](widget: Widget, token: TransToken) -> Widget:
@@ -56,13 +57,25 @@ def set_win_title(win: wx.TopLevelWindow, token: TransToken) -> None:
     _window_titles[win] = token
 
 
-def set_menu_text(menu: wx.MenuItem, token: TransToken) -> None:
+def set_menu_text(menu_item: wx.MenuItem, token: TransToken) -> None:
     """Apply this text to an item on a menu."""
-    menu.SetItemLabel(str(token))
+    menu_item.SetItemLabel(str(token))
+    menu = menu_item.GetMenu()
+    item_id = menu_item.GetId()
+    try:
+        menu_map = _menu_labels[menu]
+    except KeyError:
+        menu_map = _menu_labels[menu] = {}
+
     if token.is_untranslated:
-        _menu_labels.pop(menu, None)
+        menu_map.pop(menu_item.GetId(), None)
     else:
-        _menu_labels[menu] = token
+        menu_map[menu_item.GetId()] = token
+
+
+def clear_stored_menu(menu: wx.Menu) -> None:
+    """Clear the tokens for the specified menu."""
+    _menu_labels.pop(menu, None)
 
 
 def set_entry_value(entry: wx.TextEntry, token: TransToken) -> None:
@@ -86,8 +99,9 @@ async def update_task() -> None:
         await trio.lowlevel.checkpoint()
 
         async with aclosing(gradual_iter(_menu_labels)) as agen2:
-            async for menu, token in agen2:
-                menu.SetItemLabel(str(token))
+            async for menu, menu_map in agen2:
+                for menu_id, token in menu_map.items():
+                    menu.SetLabel(menu_id, str(token))
 
         await trio.lowlevel.checkpoint()
 

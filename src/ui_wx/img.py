@@ -14,10 +14,11 @@ from app import img
 
 
 # Widgets with an image attribute that can be set.
-type WxImgWidgets = wx.StaticBitmap | wx.MenuItem | wx.Button | wx.BitmapButton
+type WxImgWidgets = wx.StaticBitmap | wx.Button | wx.BitmapButton
 
 LOGGER = get_logger(__name__)
 basic_users: WeakKeyDictionary[WxImgWidgets, BasicUser] = WeakKeyDictionary()
+menu_users: WeakKeyDictionary[wx.Menu, MenuUser] = WeakKeyDictionary()
 
 
 def get_app_icon(path: os.PathLike[str]) -> wx.Bitmap:
@@ -56,6 +57,37 @@ class BasicUser(WxUser):
         """Handle the widget being destroyed."""
         if self.cur_handle is not None:
             self.cur_handle._decref(self)
+
+
+# noinspection PyProtectedMember
+@attrs.define(eq=False, init=False)
+class MenuUser(WxUser):
+    """A user for menu items. MenuItems are temporary, so use IDs instead."""
+    menu: WeakRef[wx.Menu]
+    handle_to_ids: dict[img.Handle, set[int]]
+
+    def __init__(self, widget: wx.Menu) -> None:
+        self.menu = WeakRef(widget, self.destroyed)
+        self.handle_to_ids = {}
+
+    @override
+    def _set_img(self, handle: img.Handle, image: wx.Bitmap) -> None:
+        """Set this image for menu options that use this handle."""
+        menu = self.menu()
+        if menu is None:
+            return
+        try:
+            pos_set = self.handle_to_ids[handle]
+        except KeyError:
+            return
+        for pos in pos_set:
+            menu_item, _ = menu.FindItem(pos)
+            menu_item.SetBitmap(image)
+
+    def destroyed(self, ref: WeakRef[WxImgWidgets]) -> None:
+        """Handle the widget being destroyed."""
+        for handle in self.handle_to_ids:
+            handle._decref(self)
 
 
 # noinspection PyProtectedMember
@@ -150,6 +182,39 @@ class WXImages(img.UIImage):
             loading = image._request_load()
             widget.SetBitmap(self._load_wx(loading, False))
         return widget
+
+    def menu_set_icon(self, menu_item: wx.MenuItem, image: img.Handle) -> None:
+        """Set the icon used by a menu option."""
+        menu = menu_item.GetMenu()
+        menu_id = menu_item.GetId()
+        try:
+            user = menu_users[menu]
+        except KeyError:
+            # No user yet, create + bind.
+            user = menu_users[menu] = MenuUser(menu)
+        try:
+            pos_set = user.handle_to_ids[image]
+        except KeyError:  # First time this is added to this widget.
+            pos_set = user.handle_to_ids[image] = {menu_id}
+            image._incref(user)
+        else:
+            pos_set.add(menu_id)
+        try:
+            wx_img = self.wx_img[image]
+        except KeyError:  # Need to load.
+            loading = image._request_load()
+            wx_img = self._load_wx(loading, False)
+
+        menu_item.SetBitmap(wx_img)
+
+    def menu_clear(self, menu: wx.Menu) -> None:
+        """Remove all added icons from this menu, freeing resources."""
+        try:
+            user = menu_users.pop(menu)
+        except KeyError:
+            return  # Not used at all, don't care.
+        for handle in user.handle_to_ids:
+            handle._decref(user)
 
     def stats(self) -> str:
         """Return some debugging stats."""
