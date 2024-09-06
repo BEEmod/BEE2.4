@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import Final, TypeGuard
 
 from collections.abc import Sequence, Iterator
-from contextlib import aclosing
 from datetime import timedelta
 import abc
 

@@ -1,14 +1,12 @@
 """Implements callables which lazily parses and combines config files."""
 from __future__ import annotations
-from typing import Any, Final, Pattern
+from typing import Final, Pattern
 from collections.abc import Awaitable, Callable
 import functools
 
 from srctools import KeyValError, Keyvalues, logger
-from srctools.filesys import File
 import trio
 
-import app
 import packages
 import utils
 

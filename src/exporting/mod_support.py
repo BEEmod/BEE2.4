@@ -4,7 +4,6 @@ from typing import TYPE_CHECKING, Final
 from collections.abc import Iterable, Iterator, Sequence
 from pathlib import Path
 import math
-import os
 
 from srctools import VMF, Keyvalues, Output, Vec
 from srctools.filesys import File, RawFileSystem, VPKFileSystem

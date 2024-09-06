@@ -29,7 +29,7 @@ from editoritems import Item as EditorItem, Renderable, RenderableType
 from corridor import CORRIDOR_COUNTS, GameMode, Direction
 from loadScreen import MAIN_PAK as LOAD_PAK, MAIN_OBJ as LOAD_OBJ
 from BEE2_config import ConfigFile
-from app import img, lazy_conf, background_run
+from app import img, lazy_conf
 import utils
 import consts
 
