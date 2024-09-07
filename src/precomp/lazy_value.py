@@ -29,6 +29,10 @@ class LazyValue[U](abc.ABC):
     def __repr__(self) -> str:
         return f'<Value: {self._repr_val()}>'
 
+    def is_constant(self) -> bool:
+        """Check if this does not require an instance to compute."""
+        return isinstance(self, ConstValue)
+
     @classmethod
     def parse(cls, value: str, default: str | None = None, allow_invert: bool = True) -> LazyValue[str]:
         """Starting point, read a config value."""
@@ -38,7 +42,7 @@ class LazyValue[U](abc.ABC):
             return ConstValue(value)
 
     @classmethod
-    def make(cls, value: U | LazyValue[U]) -> LazyValue[U]:
+    def make[T](cls, value: T | LazyValue[T]) -> LazyValue[T]:
         """Make a value lazy. If it's already a LazyValue, just return it.
 
         Otherwise, treat as a constant and wrap it.
@@ -59,8 +63,18 @@ class LazyValue[U](abc.ABC):
         raise NotImplementedError
 
     def map[V](self, func: Callable[[U], V], name: str = '') -> LazyValue[V]:
-        """Map this map."""
+        """Map the value with a function."""
         return UnaryMapValue(self, func, name)
+
+    @classmethod
+    def bimap[A, B, Res](
+        cls,
+        func: Callable[[A, B], Res],
+        val_a: LazyValue[A], val_b: LazyValue[B],
+        name: str = '',
+    ) -> LazyValue[Res]:
+        """Combine two values together."""
+        return BinaryMapValue(val_a, val_b, func, name)
 
     def as_int(self: LazyValue[str], default: int = 0) -> LazyValue[int]:
         """Call conv_int()."""
@@ -103,8 +117,8 @@ class LazyValue[U](abc.ABC):
 
     def as_offset(
         self: LazyValue[str],
-        scale: float | LazyValue[float] = 1,
-        zoff: float | LazyValue[float] = 0,
+        scale: float | LazyValue[float] = 1.0,
+        zoff: float | LazyValue[float] = 0.0,
     ) -> LazyValue[Vec]:
         """Call resolve_offset()."""
         return OffsetValue(self, scale, zoff)
@@ -192,7 +206,7 @@ class InstValue(LazyValue[str]):
     @override
     def _repr_val(self) -> str:
         """The operation to perform."""
-        return f'${self.variable!r}'
+        return repr(self.variable)
 
     @override
     def _resolve(self, inst: Entity) -> str:
@@ -218,7 +232,11 @@ class OffsetValue(LazyValue[Vec]):
 
     @override
     def _repr_val(self) -> str:
-        return f'resolve_offset({self.parent._repr_val()})'
+        return (
+            f'resolve_offset({self.parent._repr_val()}, '
+            f'scale={self.scale._repr_val()}, '
+            f'zoff={self.zoff._repr_val()})'
+        )
 
     @override
     def _resolve(self, inst: Entity) -> Vec:
