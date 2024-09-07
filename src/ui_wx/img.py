@@ -77,12 +77,11 @@ class MenuUser(WxUser):
         if menu is None:
             return
         try:
-            pos_set = self.handle_to_ids[handle]
+            ids_set = self.handle_to_ids[handle]
         except KeyError:
             return
-        for pos in pos_set:
-            menu_item, _ = menu.FindItem(pos)
-            menu_item.SetBitmap(image)
+        for pos in ids_set:
+            menu.FindItemById(pos).SetBitmap(image)
 
     def destroyed(self, ref: WeakRef[wx.Menu]) -> None:
         """Handle the widget being destroyed."""
