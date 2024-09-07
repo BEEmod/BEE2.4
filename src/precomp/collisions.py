@@ -15,13 +15,13 @@ from tree import RTree
 __all__ = ['CollideType', 'BBox', 'Volume', 'Collisions', 'Hit', 'trace_ray']
 
 
-@attrs.define
+@attrs.define(eq=False)
 class Collisions:
     """All the collisions for items in the map."""
     # type -> bounding box -> items with that bounding box.
-    _by_bbox: dict[CollideType, RTree[BBox]] = attrs.field(factory=lambda: defaultdict(RTree), repr=False, eq=False)
+    _by_bbox: dict[CollideType, RTree[BBox]] = attrs.field(factory=lambda: defaultdict(RTree), repr=False)
     # Item names -> bounding boxes of that item
-    _by_name: dict[str, list[BBox]] = attrs.Factory(dict)
+    _by_name: dict[str, list[BBox]] = attrs.field(factory=dict, repr=False)
 
     # Indicates flags which VScript code has requested be exposed.
     vscript_flags: CollideType = CollideType.NOTHING
