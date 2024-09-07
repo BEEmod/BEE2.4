@@ -1,24 +1,22 @@
 """A value read from configs, which defers applying fixups until later."""
 from __future__ import annotations
 
-from typing import ClassVar, override
+from typing import override
 from collections.abc import Callable
 
 import abc
 import operator
 
-from srctools import Entity, conv_int, conv_float, conv_bool, Vec, Angle, Matrix
+from srctools.vmf import Entity, Output
+from srctools import conv_int, conv_float, conv_bool, Vec, Angle, Matrix
 
 __all__ = ['LazyValue']
 
-MutTypes = (Vec, Angle, Matrix)
+MutTypes = (Vec, Angle, Matrix, Entity, Output)
 
 
 class LazyValue[U](abc.ABC):
     """A base value."""
-    # If true, this may depend on inst.
-    has_fixups: ClassVar[bool] = True
-
     def __call__(self, inst: Entity) -> U:
         """Resolve the value by substituting from the instance, if required."""
         result = self._resolve(inst)
@@ -74,7 +72,10 @@ class LazyValue[U](abc.ABC):
         name: str = '',
     ) -> LazyValue[Res]:
         """Combine two values together."""
-        return BinaryMapValue(val_a, val_b, func, name)
+        if isinstance(val_a, ConstValue) and isinstance(val_b, ConstValue):
+            return ConstValue(func(val_a.value, val_b.value))
+        else:
+            return BinaryMapValue(val_a, val_b, func, name)
 
     def as_int(self: LazyValue[str], default: int = 0) -> LazyValue[int]:
         """Call conv_int()."""
@@ -126,8 +127,6 @@ class LazyValue[U](abc.ABC):
 
 class ConstValue[U](LazyValue[U]):
     """A value which is known."""
-    has_fixups: ClassVar[bool] = False
-
     value: U
 
     def __init__(self, value: U) -> None:
@@ -146,6 +145,16 @@ class ConstValue[U](LazyValue[U]):
     def map[V](self, func: Callable[[U], V], name: str = '') -> LazyValue[V]:
         """Apply a function."""
         return ConstValue(func(self.value))
+
+    def __matmul__(
+        self: ConstValue[Vec],
+        other: LazyValue[Angle] | LazyValue[Matrix] | Angle | Matrix,
+    ) -> LazyValue[Vec]:
+        """Rotate a vector by an angle."""
+        if isinstance(other, LazyValue):
+            return BinaryMapValue(self, LazyValue.make(other), operator.matmul, '@')
+        else:
+            return ConstValue(self.value @ other)
 
 
 class UnaryMapValue[U, V](LazyValue[V]):

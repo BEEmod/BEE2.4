@@ -536,7 +536,11 @@ def res_import_template(
             key_values['origin'] = '0 0 0'
 
         outputs = [
-            Output.parse(kv)
+            LazyValue.bimap(
+                lambda name, val: Output.parse(Keyvalues(name, val)),
+                LazyValue.parse(kv.real_name), LazyValue.parse(kv.value),
+                'Output.parse',
+            )
             for kv in
             res.find_children('Outputs')
         ]
@@ -548,14 +552,15 @@ def res_import_template(
     visgroup_func: Callable[[Random, list[str]], Iterable[str]] | None = None
 
     try:  # allow both spellings.
-        visgroup_prop = res.find_key('visgroups')
+        visgroup_kv = res.find_key('visgroups')
     except NoKeyError:
-        visgroup_prop = res.find_key('visgroup', 'none')
-    if visgroup_prop.has_children():
-        visgroup_instvars = list(visgroup_prop)
+        visgroup_kv = res.find_key('visgroup', 'none')
+    if visgroup_kv.has_children():
+        visgroup_instvars = list(visgroup_kv)
     else:
         visgroup_instvars = []
-        visgroup_mode = res['visgroup', 'none'].casefold()
+        # TODO: Support fixups for this.
+        visgroup_mode = visgroup_kv.value.casefold()
         # Generate the function which picks which visgroups to add to the map.
         if visgroup_mode == 'none':
             pass
@@ -573,7 +578,7 @@ def res_import_template(
                             yield group
 
     picker_vars = [
-        (prop.real_name, prop.value)
+        (LazyValue.parse(prop.real_name), prop.value)
         for prop in res.find_children('pickerVars')
     ]
     try:
@@ -587,14 +592,11 @@ def res_import_template(
 
     offset = LazyValue.parse(res['offset', '0 0 0']).as_offset()
     invert_var = LazyValue.parse(res['invertVar', '']).as_bool()
-    color_var = res['colorVar', '']
-    if color_var.casefold() == '<editor>':
-        color_var = '<editor>'
+    color_var = LazyValue.parse(res['colorVar', '']).casefold()
 
     # If true, force visgroups to all be used.
-    visgroup_force_var = res['forceVisVar', '']
-
-    conf_sense_offset = res['senseOffset', '']
+    visgroup_force = LazyValue.parse(res['forceVisVar', '']).as_bool()
+    sense_offset = LazyValue.parse(res['senseOffset', '']).as_vec()
 
     def place_template(inst: Entity) -> None:
         """Place a template."""
@@ -638,28 +640,25 @@ def res_import_template(
             if utils.DEV_MODE and vis_test_block.real_name not in template.visgroups:
                 LOGGER.warning('"{}" may use missing visgroup "{}"!', template.id, vis_test_block.real_name)
 
-        if color_var == '<editor>':
-            # Check traits for the colour it should be.
-            traits = instance_traits.get(inst)
-            if 'white' in traits:
+        match color_var(inst):
+            case '<editor>':
+                # Check traits for the colour it should be.
+                traits = instance_traits.get(inst)
+                if 'white' in traits:
+                    force_colour = texturing.Portalable.white
+                elif 'black' in traits:
+                    force_colour = texturing.Portalable.black
+                else:
+                    LOGGER.warning(
+                        '"{}": Instance "{}" ' "isn't one with inherent color!",
+                        temp_id,
+                        inst['file'],
+                    )
+            case 'white':
                 force_colour = texturing.Portalable.white
-            elif 'black' in traits:
+            case 'black':
                 force_colour = texturing.Portalable.black
-            else:
-                LOGGER.warning(
-                    '"{}": Instance "{}" '
-                    "isn't one with inherent color!",
-                    temp_id,
-                    inst['file'],
-                )
-        elif color_var:
-            color_val = inst.fixup.substitute(color_var).casefold()
-
-            if color_val == 'white':
-                force_colour = texturing.Portalable.white
-            elif color_val == 'black':
-                force_colour = texturing.Portalable.black
-        # else: no color var
+            # else: no color var
 
         if invert_var(inst):
             force_colour = template_brush.TEMP_COLOUR_INVERT[force_colour]
@@ -672,7 +671,7 @@ def res_import_template(
         origin = offset(inst)
 
         # If this var is set, it forces all to be included.
-        if srctools.conv_bool(inst.fixup.substitute(visgroup_force_var, allow_invert=True)):
+        if visgroup_force(inst):
             visgroups.update(template.visgroups)
         elif visgroup_func is not None:
             visgroups.update(visgroup_func(
@@ -680,7 +679,10 @@ def res_import_template(
                 list(template.visgroups),
             ))
 
-        LOGGER.debug('Placing template "{}" at ({} @ {}) with visgroups {}', template.id, origin, orient.to_angle(), visgroups)
+        LOGGER.debug(
+            'Placing template "{}" at ({} @ {}) with visgroups {}',
+            template.id, origin, orient.to_angle(), visgroups,
+        )
 
         temp_data = template_brush.import_template(
             vmf,
@@ -706,8 +708,8 @@ def res_import_template(
             if move_dir.startswith('<') and move_dir.endswith('>'):
                 temp_data.detail['movedir'] = (Vec.from_str(move_dir) @ orient).to_angle()
 
-            for out in outputs:
-                out = out.copy()
+            for lazy_out in outputs:
+                out = lazy_out(inst)
                 out.target = conditions.local_name(inst, out.target)
                 temp_data.detail.add_out(out)
 
@@ -719,11 +721,11 @@ def res_import_template(
             force_colour,
             force_grid,
             surf_cat,
-            Vec.from_str(inst.fixup.substitute(conf_sense_offset)),
+            sense_offset(inst),
         )
 
         for picker_name, picker_var in picker_vars:
-            picker_val = temp_data.picker_results.get(picker_name, None)
+            picker_val = temp_data.picker_results.get(picker_name(inst), None)
             if picker_val is not None:
                 inst.fixup[picker_var] = picker_val.value
             else:

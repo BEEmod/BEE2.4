@@ -20,7 +20,7 @@
 * Add `multi_track` to `TrackPlatform` result. This allows replacing the instances
   with multi-voxel long ones for better efficiency.
 * Fixed `TemplateBrush` 's `invertVar` option not working properly if `colorVar = <editor>`.
-* Allow fixup values in `TemplateBrush` `force` options.
+* Allow fixup values in many more `TemplateBrush` options - `force`, `colorVar`, `forceVisVar`, `senseOffset`, `outputs` and `pickerVars`.
 
 ------------------------------------------
 
