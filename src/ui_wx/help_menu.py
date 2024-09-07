@@ -87,7 +87,7 @@ async def create(
                 items.append(menu_item)
                 menu.Bind(wx.EVT_MENU, command(res.url_key), menu_item)
                 set_menu_text(menu_item, res.name)
-                WX_IMG.apply(menu_item, ICONS[res.icon])
+                WX_IMG.menu_set_icon(menu_item, ICONS[res.icon])
 
         menu.AppendSeparator()
 

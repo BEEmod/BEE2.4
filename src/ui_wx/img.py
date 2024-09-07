@@ -84,7 +84,7 @@ class MenuUser(WxUser):
             menu_item, _ = menu.FindItem(pos)
             menu_item.SetBitmap(image)
 
-    def destroyed(self, ref: WeakRef[WxImgWidgets]) -> None:
+    def destroyed(self, ref: WeakRef[wx.Menu]) -> None:
         """Handle the widget being destroyed."""
         for handle in self.handle_to_ids:
             handle._decref(self)
