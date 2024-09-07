@@ -208,10 +208,14 @@ class LoadScreen:
     def _show(self) -> None:
         """Display the loading screen."""
         self.active = True
-        # Translate and send these across now.
+        # Translate and send across the titles now.
+        # noinspection PyProtectedMember
         _QUEUE_SEND_LOAD.put(ipc_types.Load2Daemon_Show(
             self.id, str(self.title),
-            [str(stage.title) for stage in self.stages],
+            [
+                (str(stage.title), stage._max)
+                for stage in self.stages
+            ],
         ))
         for stage in self.stages:
             stage._bound.add(self)
@@ -232,9 +236,13 @@ class LoadScreen:
     def unsuppress(self) -> None:
         """Undo temporarily hiding the screen."""
         self.active = True
+        # noinspection PyProtectedMember
         _QUEUE_SEND_LOAD.put(ipc_types.Load2Daemon_Show(
             self.id, str(self.title),
-            [str(stage.title) for stage in self.stages],
+            [
+                (str(stage.title), stage._max)
+                for stage in self.stages
+            ],
         ))
 
 

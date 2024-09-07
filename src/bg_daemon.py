@@ -135,11 +135,12 @@ class BaseLoadScreen:
         y = self.win.winfo_y() + event.y - self.drag_y
         self.win.geometry(f'+{x:g}+{y:g}')
 
-    def op_show(self, title: str, labels: list[str]) -> None:
+    def op_show(self, title: str, stages: list[tuple[str, int]]) -> None:
         """Show the window."""
         self.win.title(title)
-        for (st_id, _), name in zip(self.stages, labels, strict=True):
+        for (st_id, _), (name, max_val) in zip(self.stages, stages, strict=True):
             self.names[st_id] = name
+            self.maxes[st_id] = max_val
 
         self.is_shown = True
         self.win.deiconify()
@@ -158,7 +159,6 @@ class BaseLoadScreen:
         """Hide and reset values in all bars."""
         self.op_hide()
         for stage in self.values.keys():
-            self.maxes[stage] = 10
             self.values[stage] = 0
         self.reset_stages()
 
@@ -284,15 +284,15 @@ class LoadScreen(BaseLoadScreen):
         self.labels[stage]['text'] = f'{self.values[stage]!s}/{max_val!s}'
 
     @override
-    def op_show(self, title: str, labels: list[str]) -> None:
+    def op_show(self, title: str, stages: list[tuple[str, int]]) -> None:
         """Show the window."""
         self.title_text = title
         self.win.title(title)
         self.title_lbl['text'] = title + '...',
-        for (st_id, _), name in zip(self.stages, labels, strict=True):
+        for (st_id, _), (name, max_val) in zip(self.stages, stages, strict=True):
             if st_id in self.titles:
                 self.titles[st_id]['text'] = name + ':'
-        super().op_show(title, labels)
+        super().op_show(title, stages)
 
     @override
     def op_skip_stage(self, stage: StageID) -> None:
@@ -851,7 +851,7 @@ def handle_load_cmd(op: ARGS_SEND_LOAD, log_window: LogWindow, force_ontop: bool
                 return force_ontop
             match op:
                 case ipc_types.Load2Daemon_Show():
-                    screen.op_show(op.title, op.stage_names)
+                    screen.op_show(op.title, op.stages)
                 case ipc_types.Load2Daemon_Hide():
                     screen.op_hide()
                 case ipc_types.Load2Daemon_Reset():

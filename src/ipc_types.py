@@ -75,9 +75,12 @@ class Load2Daemon_Destroy(ScreenOp):
 
 @attrs.frozen
 class Load2Daemon_Show(ScreenOp):
-    """Display the specified loading screen, passing along freshly translated stage titles."""
+    """Display the specified loading screen.
+
+    This passes along newly translated titles and max lengths.
+    """
     title: str
-    stage_names: list[str]
+    stages: list[tuple[str, int]]
 
 
 @attrs.frozen
