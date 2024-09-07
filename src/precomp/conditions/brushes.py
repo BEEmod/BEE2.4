@@ -647,7 +647,7 @@ def res_import_template(
         # else: no color var
 
         if invert_var(inst):
-            force_colour = template_brush.TEMP_COLOUR_INVERT[conf_force_colour]
+            force_colour = template_brush.TEMP_COLOUR_INVERT[force_colour]
         # else: False value, no invert.
 
         if ang_override is not None:
