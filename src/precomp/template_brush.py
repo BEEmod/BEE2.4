@@ -954,11 +954,12 @@ def import_template(
         for tile_off in bind_tile_pos:
             tile_off = Vec(tile_off)
             tile_off.localise(origin, orient)
-            for axis in ('xyz' if align_bind else ''):
-                # Don't realign things in the normal's axis -
-                # those are already fine.
-                if abs(tile_norm[axis]) < 1e-6:
-                    tile_off[axis] = tile_off[axis] // 128 * 128 + 64
+            if align_bind:
+                for axis in 'xyz':
+                    # Don't realign things in the normal's axis -
+                    # those are already fine.
+                    if abs(tile_norm[axis]) < 1e-6:
+                        tile_off[axis] = tile_off[axis] // 128 * 128 + 64
             try:
                 tile = tiling.TILES[tile_off.as_tuple(), tile_norm.as_tuple()]
             except KeyError:

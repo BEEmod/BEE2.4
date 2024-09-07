@@ -386,6 +386,51 @@ def res_add_brush(vmf: VMF, inst: Entity, res: Keyvalues) -> None:
         vmf.add_brush(solids.solid)
 
 
+def parse_tempbrush_force(value: str) -> tuple[
+    template_brush.ForceColour,
+    template_brush.TEMP_TYPES,
+    texturing.TileSize | None,
+    texturing.GenCat,
+]:
+    """Parse the 'force' option for TemplateBrush."""
+    colour: template_brush.ForceColour
+    grid: texturing.TileSize | None
+
+    force = value.casefold().split()
+    if 'white' in force:
+        colour = texturing.Portalable.white
+    elif 'black' in force:
+        colour = texturing.Portalable.black
+    elif 'invert' in force:
+        colour = template_brush.AppliedColour.INVERT
+    else:
+        colour = template_brush.AppliedColour.MATCH
+
+    if 'world' in force:
+        ent_type = template_brush.TEMP_TYPES.world
+    elif 'detail' in force:
+        ent_type = template_brush.TEMP_TYPES.detail
+    else:
+        ent_type = template_brush.TEMP_TYPES.default
+
+    size: texturing.TileSize
+    for size in texturing.TileSize:
+        if size in force:
+            grid = size
+            break
+    else:
+        grid = None
+
+    if 'bullseye' in force:
+        surf_cat = texturing.GenCat.BULLSEYE
+    elif 'special' in force or 'panel' in force:
+        surf_cat = texturing.GenCat.PANEL
+    else:
+        surf_cat = texturing.GenCat.NORMAL
+
+    return colour, ent_type, grid, surf_cat
+
+
 @conditions.make_result('TemplateBrush', 'BrushTemplate')
 def res_import_template(
     vmf: VMF,
@@ -461,43 +506,10 @@ def res_import_template(
         orig_temp_id = res.value
         res = Keyvalues('TemplateBrush', [])
 
-    force = res['force', ''].casefold().split()
-    conf_force_colour: template_brush.ForceColour
-    if 'white' in force:
-        conf_force_colour = texturing.Portalable.white
-    elif 'black' in force:
-        conf_force_colour = texturing.Portalable.black
-    elif 'invert' in force:
-        conf_force_colour = template_brush.AppliedColour.INVERT
-    else:
-        conf_force_colour = template_brush.AppliedColour.MATCH
-
-    if 'world' in force:
-        force_type = template_brush.TEMP_TYPES.world
-    elif 'detail' in force:
-        force_type = template_brush.TEMP_TYPES.detail
-    else:
-        force_type = template_brush.TEMP_TYPES.default
-
-    force_grid: texturing.TileSize | None
-    size: texturing.TileSize
-    for size in texturing.TileSize:
-        if size in force:
-            force_grid = size
-            break
-    else:
-        force_grid = None
-
-    if 'bullseye' in force:
-        surf_cat = texturing.GenCat.BULLSEYE
-    elif 'special' in force or 'panel' in force:
-        surf_cat = texturing.GenCat.PANEL
-    else:
-        surf_cat = texturing.GenCat.NORMAL
-
+    force_opts = LazyValue.parse(res['force', '']).map(parse_tempbrush_force)
     replace_tex: dict[str, list[str]] = {}
-    for prop in res.find_block('replace', or_blank=True):
-        replace_tex.setdefault(prop.name, []).append(prop.value)
+    for kv in res.find_block('replace', or_blank=True):
+        replace_tex.setdefault(kv.name, []).append(kv.value)
 
     if 'replaceBrush' in res:
         LOGGER.warning(
@@ -506,12 +518,12 @@ def res_import_template(
             orig_temp_id,
         )
     bind_tile_pos = [
-        # So it's the floor block location.
-        Vec.from_str(value) - (0, 0, 128)
-        for value in
-        res.find_key('BindOverlay', or_blank=True).as_array()
+        # Offset so that 0 0 0 is the floor block location.
+        LazyValue.parse(value).as_vec().map(lambda v: v - (0, 0, 128))
+        for child in res.find_all('BindOverlay')
+        for value in child.as_array()
     ]
-    align_bind_overlay = res.bool('alignBindOverlay')
+    align_bind_overlay = LazyValue.parse(res['alignBindOverlay', '']).as_bool()
 
     key_values = res.find_block("Keys", or_blank=True)
     if key_values:
@@ -523,12 +535,9 @@ def res_import_template(
         if 'origin' not in key_values:
             key_values['origin'] = '0 0 0'
 
-        # Spawn everything as detail, so they get put into a brush
-        # entity.
-        force_type = template_brush.TEMP_TYPES.detail
         outputs = [
-            Output.parse(prop)
-            for prop in
+            Output.parse(kv)
+            for kv in
             res.find_children('Outputs')
         ]
     else:
@@ -616,13 +625,19 @@ def res_import_template(
             # We don't want an error, just quit.
             return
 
+        force_colour, force_type, force_grid, surf_cat = force_opts(inst)
+
+        if key_block is not None:
+            # Spawn everything as detail, so they get put into a brush
+            # entity.
+            force_type = template_brush.TEMP_TYPES.detail
+
         for vis_test_block in visgroup_instvars:
             if all(conditions.check_test(test, coll, info, voice, inst) for test in vis_test_block):
                 visgroups.add(vis_test_block.real_name)
             if utils.DEV_MODE and vis_test_block.real_name not in template.visgroups:
                 LOGGER.warning('"{}" may use missing visgroup "{}"!', template.id, vis_test_block.real_name)
 
-        force_colour = conf_force_colour
         if color_var == '<editor>':
             # Check traits for the colour it should be.
             traits = instance_traits.get(inst)
@@ -677,8 +692,8 @@ def res_import_template(
             add_to_map=True,
             coll=coll,
             additional_visgroups=visgroups,
-            bind_tile_pos=bind_tile_pos,
-            align_bind=align_bind_overlay,
+            bind_tile_pos=[value(inst) for value in bind_tile_pos],
+            align_bind=align_bind_overlay(inst),
         )
 
         if key_block is not None and temp_data.detail is not None:
