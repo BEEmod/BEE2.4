@@ -38,7 +38,7 @@ __all__ = [
     # Generally global.
     'OBJ_TYPES', 'PACK_CONFIG',
     'LegacyCorr', 'LEGACY_CORRIDORS',
-    'CLEAN_PACKAGE', 'CLEAN_STYLE',
+    'MANDATORY_PACKAGES', 'CLEAN_STYLE',
     'PakObject', 'SelPakObject', 'PackagesSet', 'LOADED', 'get_loaded_packages', 'PakRef',
     'find_packages',
     # For use by lifecycle only.
@@ -410,8 +410,11 @@ LEGACY_CORRIDORS = {
     (GameMode.COOP, Direction.EXIT): 'coop',
 }
 
-# This package contains necessary components, and must be available.
-CLEAN_PACKAGE = utils.obj_id('BEE2_CLEAN_STYLE')
+# These packages contain necessary components, and must be available.
+MANDATORY_PACKAGES = {
+    utils.obj_id('BEE2_CLEAN_STYLE'),
+    utils.obj_id('BEE2_CORE'),
+}
 # We fall back to the Clean Style in some cases.
 CLEAN_STYLE = utils.obj_id('BEE2_CLEAN')
 
@@ -825,15 +828,22 @@ async def _load_packages(
     pack_count = len(packset.packages)
     await LOAD_PAK.set_length(pack_count)
 
-    # We must have the clean style package.
-    if CLEAN_PACKAGE not in packset.packages:
+    # These packages are required.
+    missing = MANDATORY_PACKAGES - packset.packages.keys()
+    if missing:
         if pack_count == 0:  # None at all
             message = TransToken.ui('No packages found!')
         else:
-            message = TransToken.ui(
-                'No Clean Style package! '
-                'This is required for some essential resources and objects.'
-            )
+            message = TransToken.ui_plural(
+                'Critical package missing: {pack}'
+                'These are required for some essential resources and objects.',
+
+                'Critical packages missing: {pack}'
+                'These are required for some essential resources and objects.',
+            ).format(pack=TransToken.list_and([
+                TransToken.untranslated(pak_id)
+                for pak_id in missing
+            ]), n=len(missing))
 
         if len(pak_dirs) == 1:
             trailer = TransToken.untranslated(str((os.getcwd() / pak_dirs[0]).resolve()))
@@ -1023,7 +1033,7 @@ async def parse_package(
                 else:
                     raise AppError(TRANS_DUPLICATE_OBJ_ID.format(
                         obj_id=obj_id,
-                        obj_type=obj_type,
+                        obj_type=obj_type.__name__,
                         pak2=existing.pak_id,
                         pak1=pack.id,
                     ))
@@ -1151,9 +1161,8 @@ class Package:
     @property
     def enabled(self) -> bool:
         """Should this package be loaded?"""
-        if self.id.casefold() == CLEAN_PACKAGE:
-            # The clean style package is special!
-            # It must be present.
+        if self.id in MANDATORY_PACKAGES:
+            # These are special, they cannot be disabled.
             return True
 
         return PACK_CONFIG.get_bool(self.id, 'Enabled', default=True)
@@ -1161,8 +1170,8 @@ class Package:
     @enabled.setter
     def enabled(self, value: bool) -> None:
         """Enable or disable the package."""
-        if self.id.casefold() == CLEAN_PACKAGE:
-            raise ValueError('The Clean Style package cannot be disabled!')
+        if self.id in MANDATORY_PACKAGES:
+            raise ValueError(f'Mandatory package "{self.id}" cannot be disabled!')
 
         PACK_CONFIG[self.id]['Enabled'] = srctools.bool_as_int(value)
 

@@ -40,8 +40,8 @@ def make_packitems() -> Iterable[CheckItem[None]]:
         item = CheckItem(
             pack.disp_name,
             hover_text=pack.desc,
-            # The clean package can't be disabled!
-            lock_check=(pack.id.casefold() == packages.CLEAN_PACKAGE),
+            # These packages can't be disabled!
+            lock_check=pack.id in packages.MANDATORY_PACKAGES,
             state=pack.enabled,
         )
         pack_items.append((pack, item))
@@ -68,7 +68,7 @@ async def apply_changes(dialog: Dialogs) -> None:
         window.withdraw()
         window.grab_release()
         for pack, item in pack_items:
-            if pack.id.casefold() != packages.CLEAN_PACKAGE:
+            if pack.id not in packages.MANDATORY_PACKAGES:
                 pack.enabled = item.state
         packages.PACK_CONFIG.save_check()
         utils.restart_app()
