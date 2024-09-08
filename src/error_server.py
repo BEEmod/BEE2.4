@@ -124,7 +124,7 @@ async def route_static_js(filename: str) -> quart.ResponseReturnValue:
     )
 
 
-@app.route('/shutdown')
+@app.route('/bee2_shutdown')
 async def route_shutdown() -> quart.ResponseReturnValue:
     """Called by the application to force us to shut down so this can be updated."""
     LOGGER.info('Recieved shutdown request!')
