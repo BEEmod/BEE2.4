@@ -232,7 +232,7 @@ async def create_group(
                 conf = signage_trigger
 
             try:
-                with logger.context(f'{group.id}:{s_wid.id}'):
+                with logger.context(s_wid.conf_id()):
                     LOGGER.debug('Constructing widget with config {!r}...', conf)
                     widget = await nursery.start(create_func, wid_frame, tk_img, s_wid.holder, conf)
             except Exception:
@@ -246,7 +246,7 @@ async def create_group(
             else:
                 widget.grid(row=0, column=0, columnspan=2, sticky='ew')
             if s_wid.has_values:
-                wid_id = f'{s_wid.group_id}:{s_wid.id}'
+                wid_id = s_wid.conf_id()
                 nursery.start_soon(
                     s_wid.load_conf_task,
                     config.APP.get_ui_channel(
@@ -283,7 +283,7 @@ async def create_group(
 
         wid_frame.grid(row=row, column=0, sticky='ew', pady=5)
         try:
-            with logger.context(f'{group.id}:{m_wid.id}'):
+            with logger.context(m_wid.conf_id()):
                 LOGGER.debug('Constructing widget with config {!r}...', m_wid.config)
                 await nursery.start(
                     multi_func,
@@ -296,7 +296,7 @@ async def create_group(
             continue
         nursery.start_soon(
             m_wid.load_conf_task,
-            config.APP.get_ui_channel(WidgetConfig, f'{m_wid.group_id}:{m_wid.id}')
+            config.APP.get_ui_channel(WidgetConfig, m_wid.conf_id())
         )
         nursery.start_soon(m_wid.state_store_task)
         await trio.sleep(0)

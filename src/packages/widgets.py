@@ -122,6 +122,10 @@ class Widget:
         """Item variant widgets don't have configuration, all others do."""
         return self.kind is not KIND_ITEM_VARIANT
 
+    def conf_id(self) -> str:
+        """Return the config key used for this widget."""
+        return f'{self.group_id}:{self.id}'
+
 
 @attrs.define
 class SingleWidget(Widget):
@@ -147,7 +151,7 @@ class SingleWidget(Widget):
 
     async def state_store_task(self) -> None:
         """Async task which stores the state in configs whenever it changes."""
-        data_id = f'{self.group_id}:{self.id}'
+        data_id = self.conf_id()
         async with aclosing(self.holder.eventual_values()) as agen:
             async for value in agen:
                 config.APP.store_conf(WidgetConfig(value), data_id)
@@ -182,7 +186,7 @@ class MultiWidget(Widget):
 
     async def state_store_task(self) -> None:
         """Async task which stores the state in configs whenever it changes."""
-        data_id = f'{self.group_id}:{self.id}'
+        data_id = self.conf_id()
         while True:
             # Wait for any to change, then store. We don't do them individually, since
             # we don't want a store spam if they get changed all at once.
@@ -331,7 +335,10 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
                 elif isinstance(prev_conf, str):
                     cur_value = prev_conf
                 else:
-                    LOGGER.warning('Widget {}:{} had timer defaults, but widget is singular!', data.id, wid_id)
+                    LOGGER.warning(
+                        'Widget {}:{} had timer defaults, but widget is singular!',
+                        data.id, wid_id,
+                    )
                     cur_value = default_prop.value
 
                 widgets.append(SingleWidget(
@@ -391,7 +398,7 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
                 await trio.lowlevel.checkpoint()
                 if not wid.stylevar_id:
                     continue
-                wid_id = f'{group.id}:{wid.id}'
+                wid_id = wid.conf_id()
                 if wid_id not in wid_map and wid.stylevar_id in var_map:
                     wid_map[wid_id] = WidgetConfig(bool_as_int(
                         var_map.pop(wid.stylevar_id).value
