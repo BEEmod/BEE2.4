@@ -31,6 +31,7 @@ from transtoken import TransToken
 from config.last_sel import LastSelected
 from config.windows import SelectorState
 import utils
+import async_util
 import config
 import packages
 
@@ -357,7 +358,7 @@ class SelectorWinBase[ButtonT, GroupHeaderT: GroupHeaderBase](ReflowWindow):
     async def _load_data_task(self) -> None:
         """Whenever packages change, reload all items."""
         packset: packages.PackagesSet
-        async with utils.iterval_cancelling(packages.LOADED) as aiterator:
+        async with async_util.iterval_cancelling(packages.LOADED) as aiterator:
             async for scope in aiterator:
                 with scope as packset:
                     LOGGER.debug('Reloading data for selectorwin {}...', self.save_id)
@@ -366,7 +367,7 @@ class SelectorWinBase[ButtonT, GroupHeaderT: GroupHeaderBase](ReflowWindow):
                     self.set_disp()
                     self.exit()
                     self._packset = packset
-                    await utils.run_as_task(self._rebuild_items, packset)
+                    await async_util.run_as_task(self._rebuild_items, packset)
                     self._loading = False
                     self.set_disp()
                     LOGGER.debug('Reload complete for selectorwin {}', self.save_id)

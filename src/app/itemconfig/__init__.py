@@ -9,12 +9,23 @@ import tkinter as tk
 import functools
 
 from srctools import logger
+
 from trio_util import AsyncValue
 import trio
 
-import utils
-from app import EdgeTrigger, UI, sound, StyleVarPane
+from app import UI, sound, StyleVarPane
+from app.SubPane import SubPane
+from app.mdown import MarkdownData
+from async_util import EdgeTrigger,  run_as_task
+from packages.signage import ITEM_ID as SIGNAGE_ITEM_ID
+from transtoken import TransToken, CURRENT_LANG
+from ui_tk import TK_ROOT, tk_tools
+from ui_tk.img import TKImages
 from ui_tk.tooltip import add_tooltip
+from ui_tk.wid_transtoken import set_text
+import config
+import packages
+
 # Re-export.
 from config.widgets import (
     WidgetConfig, TimerNum as TimerNum, TIMER_NUM as TIMER_NUM,
@@ -25,16 +36,6 @@ from packages.widgets import (
     WidgetType,
     WidgetTypeWithConf,
 )
-from packages.signage import ITEM_ID as SIGNAGE_ITEM_ID
-from transtoken import TransToken, CURRENT_LANG
-
-from app.SubPane import SubPane
-from app.mdown import MarkdownData
-from ui_tk.img import TKImages
-from ui_tk.wid_transtoken import set_text
-from ui_tk import TK_ROOT, tk_tools
-import config
-import packages
 
 LOGGER = logger.get_logger(__name__)
 
@@ -390,7 +391,7 @@ async def make_pane(
     canvas_frame.rowconfigure(1, weight=1)
 
     stylevar_frame = ttk.Frame(canvas_frame)
-    await utils.run_as_task(
+    await run_as_task(
         core_nursery.start, StyleVarPane.make_stylevar_pane,
         stylevar_frame,
         packages.get_loaded_packages(),

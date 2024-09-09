@@ -18,7 +18,8 @@ import attrs
 import srctools.logger
 import trio.to_thread
 
-from app import EdgeTrigger, sound, img
+from app import sound, img
+from async_util import EdgeTrigger
 from app.dialogs import Dialogs
 from app.mdown import MarkdownData
 from transtoken import TransToken

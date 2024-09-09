@@ -17,7 +17,8 @@ from trio_util import AsyncValue
 from srctools.logger import get_logger
 import trio
 
-from . import EdgeTrigger, sound, img, DEV_MODE
+from . import sound, img, DEV_MODE
+from async_util import EdgeTrigger
 from .item_properties import PropertyWindow
 from .mdown import MarkdownData
 from .dialogs import Dialogs

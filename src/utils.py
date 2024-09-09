@@ -1,14 +1,13 @@
 """Various functions shared among the compiler and application."""
 from __future__ import annotations
 
-import types
 from typing import (
     Final, NewType, Protocol, TYPE_CHECKING, Any, NoReturn, SupportsInt, Literal, TypeGuard,
     overload,
 )
-from typing_extensions import deprecated, AsyncContextManager
+from typing_extensions import deprecated
 from collections.abc import (
-    AsyncGenerator, AsyncIterator, Awaitable, Callable, Collection, Generator, Iterable,
+    Callable, Collection, Generator, Iterable,
     Iterator, Mapping, Sequence,
 )
 from collections import deque
@@ -26,16 +25,14 @@ import zipfile
 import math
 
 from srctools import Angle, conv_bool
-import trio
 import trio_util
-import aioresult
 
 
 __all__ = [
     'WIN', 'MAC', 'LINUX', 'STEAM_IDS', 'DEV_MODE', 'CODE_DEV_MODE', 'BITNESS',
     'get_git_version', 'install_path', 'bins_path', 'conf_location', 'fix_cur_directory',
     'run_bg_daemon', 'not_none', 'CONN_LOOKUP', 'CONN_TYPES', 'freeze_enum_props',
-    'PackagePath', 'sync_result', 'acompose', 'get_indent', 'iter_grid', 'check_cython',
+    'PackagePath', 'get_indent', 'iter_grid', 'check_cython',
     'ObjectID', 'SpecialID', 'BlankID', 'ID_EMPTY', 'ID_NONE', 'ID_RANDOM',
     'obj_id', 'special_id', 'obj_id_optional', 'special_id_optional',
     'is_special_id', 'not_special_id',
@@ -499,120 +496,6 @@ class PackagePath:
         return PackagePath(self.package, f'{self.path.rstrip("/")}/{child}')
 
 
-def sync_result[*Args, SyncResultT](
-    nursery: trio.Nursery,
-    func: Callable[[*Args], SyncResultT],
-    /, *args: *Args,
-    abandon_on_cancel: bool = False,
-    limiter: trio.CapacityLimiter | None = None,
-) -> aioresult.ResultCapture[SyncResultT]:
-    """Wrap a sync task, using to_thread.run_sync()."""
-    async def task() -> SyncResultT:
-        """Run in a thread."""
-        return await trio.to_thread.run_sync(
-            func, *args,
-            abandon_on_cancel=abandon_on_cancel,
-            limiter=limiter,
-        )
-
-    return aioresult.ResultCapture.start_soon(nursery, task)
-
-
-def acompose[**ParamsT, ResultT](
-    func: Callable[ParamsT, Awaitable[ResultT]],
-    on_completed: Callable[[ResultT], object],
-) -> Callable[ParamsT, Awaitable[None]]:
-    """Compose an awaitable function with a sync function that recieves the result."""
-    async def task(*args: ParamsT.args, **kwargs: ParamsT.kwargs) -> None:
-        """Run the func, then call on_completed on the result."""
-        res = await func(*args, **kwargs)
-        on_completed(res)
-    return task
-
-
-async def run_as_task[*Args](
-    func: Callable[[*Args], Awaitable[object]],
-    *args: *Args,
-) -> None:
-    """Run the specified function inside a nursery.
-
-    This ensures it gets detected by Trio's instrumentation as a subtask.
-    """
-    async with trio.open_nursery() as nursery:  # noqa: ASYNC112
-        nursery.start_soon(func, *args)
-
-
-class CancelWrapper[T]:
-    """Enter a cancel scope, then yield a value. Can be used either async or sync."""
-    def __init__(self, value: T, scope: trio.CancelScope) -> None:
-        self.value = value
-        self.scope = scope
-
-    def __enter__(self) -> T:
-        self.scope.__enter__()
-        return self.value
-
-    async def __aenter__(self) -> T:
-        self.scope.__enter__()
-        return self.value
-
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_val: BaseException | None,
-        exc_tb: types.TracebackType | None,
-    ) -> bool | None:
-        return self.scope.__exit__(exc_type, exc_val, exc_tb)
-
-    async def __aexit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_val: BaseException | None,
-        exc_tb: types.TracebackType | None,
-    ) -> bool | None:
-        return self.scope.__exit__(exc_type, exc_val, exc_tb)
-
-
-class _IterValCancel[T](AsyncContextManager[AsyncIterator[CancelWrapper[T]], None]):
-    def __init__(self, value: trio_util.AsyncValue[T]) -> None:
-        self.value = value
-        self._agen: AsyncGenerator[T, None] | None = None
-
-    async def __aenter__(self) -> AsyncIterator[CancelWrapper[T]]:
-        if self._agen is not None:
-            raise RecursionError('Cannot re-enter.')
-        self._agen = agen = self.value.eventual_values()
-        return self._iterate(agen)
-
-    async def __aexit__(self, exc_type: object, exc_val: object, exc_tb: object) -> None:
-        if self._agen is not None:
-            await self._agen.aclose()
-
-    async def _iterate(
-        self, agen: AsyncGenerator[T, None],
-    ) -> AsyncIterator[CancelWrapper[T]]:
-        scope = trio.CancelScope()
-        yield CancelWrapper(await anext(agen), scope)
-        async for value in agen:
-            scope.cancel()
-            scope = trio.CancelScope()
-            yield CancelWrapper(value, scope)
-
-
-def iterval_cancelling[T](
-    value: trio_util.AsyncValue[T],
-) -> AsyncContextManager[AsyncIterator[CancelWrapper[T]], None]:
-    """Iterate over the values produced by an AsyncValue, cancelling the iteration if it changes again.
-
-    Use like so:
-    async with iterval_cancelling(some_value) as aiterator:
-        async for scope in aiterator:
-            [async] with scope as result:
-                await use(result)
-    """
-    return _IterValCancel(value)
-
-
 def not_none[T](value: T | None) -> T:
     """Assert that the value is not None, inline."""
     if value is None:
@@ -656,7 +539,7 @@ def iter_grid(
 
 
 def check_cython(report: Callable[[str], None] = print) -> None:
-    """Check if srctools has its Cython accellerators installed correctly."""
+    """Check if srctools has its Cython accelerators installed correctly."""
     from srctools import math, tokenizer
     if math.Cy_Vec is math.Py_Vec:
         report('Cythonised vector lib is not installed, expect slow math.')

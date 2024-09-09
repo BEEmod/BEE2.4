@@ -5,7 +5,7 @@ from trio.testing import Sequencer
 import trio
 import pytest
 
-from app import EdgeTrigger, CannotTrigger
+from async_util import CannotTrigger, EdgeTrigger
 
 
 async def test_basic_operation() -> None:

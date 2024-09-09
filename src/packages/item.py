@@ -18,6 +18,7 @@ import copy
 
 from srctools import FileSystem, Keyvalues, VMF, logger
 from srctools.tokenizer import Tokenizer, Token
+
 from aioresult import ResultCapture
 import attrs
 import trio
@@ -33,6 +34,7 @@ import collisions
 import config
 import config.gen_opts
 import editoritems_vmf
+import async_util
 import utils
 
 
@@ -875,9 +877,9 @@ async def parse_item_folder(
             return prop.find_key('Properties', or_blank=True)
 
     async with trio.open_nursery() as nursery:
-        props_res = utils.sync_result(nursery, parse_props, prop_path, abandon_on_cancel=True)
-        all_items = utils.sync_result(nursery, parse_items, editor_path, abandon_on_cancel=True)
-        editor_vmf_res = utils.sync_result(nursery, parse_vmf, vmf_path, abandon_on_cancel=True)
+        props_res = async_util.sync_result(nursery, parse_props, prop_path, abandon_on_cancel=True)
+        all_items = async_util.sync_result(nursery, parse_items, editor_path, abandon_on_cancel=True)
+        editor_vmf_res = async_util.sync_result(nursery, parse_vmf, vmf_path, abandon_on_cancel=True)
     props = props_res.result()
 
     try:

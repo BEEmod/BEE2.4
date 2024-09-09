@@ -5,6 +5,7 @@ from __future__ import annotations
 import trio
 import wx
 
+import async_util
 from app import img, lifecycle, sound
 from app.errors import ErrorUI
 from ui_wx.img import WX_IMG
@@ -41,7 +42,7 @@ async def test(core_nursery: trio.Nursery) -> None:
     sizer_main = wx.BoxSizer(wx.VERTICAL)
     panel_main.SetSizer(sizer_main)
 
-    signage_trigger: app.EdgeTrigger[()] = app.EdgeTrigger()
+    signage_trigger: async_util.EdgeTrigger[()] = async_util.EdgeTrigger()
     sign_ui = SignageUI(WX_IMG)
     core_nursery.start_soon(sign_ui.task, signage_trigger)
 

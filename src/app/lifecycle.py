@@ -7,7 +7,8 @@ from srctools import KeyValError, Keyvalues
 from srctools.filesys import File
 
 import exporting
-from app import EdgeTrigger, gameMan, quit_app, DEV_MODE
+from app import gameMan, quit_app, DEV_MODE
+from async_util import EdgeTrigger, run_as_task
 from app.errors import ErrorUI, Result as ErrorResult
 from exporting import ExportInfo, mod_support
 from transtoken import TransToken
@@ -82,7 +83,7 @@ async def lifecycle(
         await mod_support.scan_music_locs(packset, gameMan.all_games)
         async with ErrorUI(error_desc=TRANS_LOAD_ERROR, warn_desc=TRANS_LOAD_PARTIAL) as error_ui:
             # noinspection PyProtectedMember
-            await utils.run_as_task(
+            await run_as_task(
                 packages._load_packages,
                 packset,
                 list(BEE2_config.get_package_locs()),

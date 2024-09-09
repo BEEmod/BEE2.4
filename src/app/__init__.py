@@ -14,6 +14,7 @@ from trio_util import AsyncBool, AsyncValue
 from srctools.logger import get_logger
 import trio
 
+from async_util import run_as_task
 import utils
 
 
@@ -135,83 +136,6 @@ async def background_start(
     return await _APP_NURSERY.start(func, *args, name=name)
 
 
-class CannotTrigger(Exception):
-    """Raised when an EdgeTrigger tried to trigger but no task was available."""
-
-
-class EdgeTrigger[*Args]:
-    """A variation on a Trio Event which can only be tripped while a task is waiting for it.
-
-    When tripped, arbitrary arguments can be passed along as well.
-
-    The ready attribute is updated to reflect whether trigger() can be called. The value should
-    not be set.
-    """
-    def __init__(self) -> None:
-        self._event: trio.Event | None = None
-        self._result: tuple[*Args] | None = None
-        self.ready = AsyncBool()
-
-    @overload
-    async def wait(self: EdgeTrigger[()]) -> None: ...  # type: ignore[overload-overlap]
-    @overload
-    async def wait[T](self: EdgeTrigger[T]) -> T: ...
-    @overload  # Ignore spurious warnings about the above overloads being impossible.
-    async def wait(self) -> tuple[*Args]: ...  # type: ignore[misc]
-    async def wait(self) -> object:
-        """Wait for the trigger to fire, then return the parameters.
-
-        Only one task can wait at a time.
-        """
-        if self._event is not None:
-            raise ValueError('Only one task may wait() at a time!')
-        try:
-            self._event = trio.Event()
-            self._result = None
-            self.ready.value = True
-            await self._event.wait()
-            match self._result:
-                case None:
-                    raise AssertionError(f'{self!r} was not set!')
-                case []:
-                    return None
-                case [value]:
-                    return value
-                case multiple:
-                    return multiple
-        finally:
-            self._event = self._result = None
-            self.ready.value = False
-
-    def trigger(self, *args: *Args) -> None:
-        """Wake up a task blocked on wait(), and pass arguments along to it.
-
-        Raises a ValueError if no task is blocked.
-        If triggered multiple times, the last result wins.
-        """
-        if self._event is None:
-            raise CannotTrigger('No task is blocked on wait()!')
-        self._result = args
-        self._event.set()
-
-    def maybe_trigger(self: EdgeTrigger[()]) -> None:
-        """Wake up a task blocked on wait(), but do nothing if not currently blocked.
-
-        This is only available if no arguments are specified, since then all calls are identical.
-        """
-        if self._event is not None:
-            self._result = ()
-            self._event.set()
-        else:
-            LOGGER.debug('EdgeTrigger.maybe_trigger() ignored!')
-
-
-class HasCurrentValue[T](Protocol):
-    """Protocol for a class with an AsyncValue."""
-    @property
-    def current(self) -> AsyncValue[T]: ...
-
-
 class WidgetCache[Widget]:
     """Stores unused widgets so they can be recyled later."""
     def __init__(
@@ -285,7 +209,7 @@ class ReflowWindow:
         while True:
             await self.items_dirty.wait()
             self.items_dirty = trio.Event()
-            await utils.run_as_task(self._ui_reposition_items)
+            await run_as_task(self._ui_reposition_items)
 
     def evt_window_resized(self, event: object) -> None:
         """Handle updating items, if the window width has changed."""

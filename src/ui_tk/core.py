@@ -7,6 +7,7 @@ import collections
 from outcome import Outcome, Error
 import trio
 
+import async_util
 import exporting
 from app import CompilerPane, localisation, sound, img, gameMan, UI, logWindow, lifecycle
 from config.windows import WindowState
@@ -62,7 +63,7 @@ async def init_app(core_nursery: trio.Nursery) -> None:
 
         core_nursery.start_soon(sound.sound_task)
 
-        export_trig = app.EdgeTrigger[exporting.ExportInfo]()
+        export_trig = async_util.EdgeTrigger[exporting.ExportInfo]()
         export_send, export_rec = trio.open_memory_channel[lifecycle.ExportResult](1)
 
         core_nursery.start_soon(
@@ -75,7 +76,7 @@ async def init_app(core_nursery: trio.Nursery) -> None:
         core_nursery.start_soon(img.init, TK_IMG)
         core_nursery.start_soon(localisation.load_aux_langs, gameMan.all_games, packset)
 
-        await utils.run_as_task(UI.load_packages, core_nursery, packset, TK_IMG)
+        await async_util.run_as_task(UI.load_packages, core_nursery, packset, TK_IMG)
         await loadScreen.MAIN_UI.step('package_load')
         LOGGER.info('Done!')
 

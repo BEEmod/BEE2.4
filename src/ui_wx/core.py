@@ -8,6 +8,7 @@ from outcome import Outcome, Error
 import trio
 import wx
 
+import async_util
 import exporting
 from app import CompilerPane, localisation, sound, img, gameMan, UI, logWindow, lifecycle
 from config.windows import WindowState
@@ -59,7 +60,7 @@ async def init_app(core_nursery: trio.Nursery) -> None:
 
         core_nursery.start_soon(sound.sound_task)
 
-        export_trig = app.EdgeTrigger[exporting.ExportInfo]()
+        export_trig = async_util.EdgeTrigger[exporting.ExportInfo]()
         export_send, export_rec = trio.open_memory_channel[lifecycle.ExportResult](1)
 
         core_nursery.start_soon(

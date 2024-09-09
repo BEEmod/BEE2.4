@@ -21,6 +21,7 @@ import srctools.logger
 
 from precomp import rand
 from precomp.brushLoc import POS as BLOCK_TYPE
+import async_util
 import consts
 import utils
 
@@ -971,7 +972,7 @@ async def setup(game: Game, vmf: VMF, tiles: list[TileDef]) -> None:
     async with trio.open_nursery() as nursery:
         # Parse the filesystems (importantly the VPKs) in the background while we check the existing
         # VMTs.
-        fsys_res = utils.sync_result(nursery, game.get_filesystem)
+        fsys_res = async_util.sync_result(nursery, game.get_filesystem)
         for vmt_file in antigel_loc.glob('*.vmt'):
             nursery.start_soon(check_existing, vmt_file)
 

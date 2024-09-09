@@ -10,7 +10,8 @@ import srctools.logger
 import trio
 import trio_util
 
-from app import EdgeTrigger, ReflowWindow, WidgetCache, dragdrop, img
+from app import ReflowWindow, WidgetCache, dragdrop, img
+from async_util import iterval_cancelling, EdgeTrigger
 from config.signage import DEFAULT_IDS, Layout
 from packages import Signage, Style, PakRef
 import packages
@@ -166,7 +167,7 @@ class SignageUIBase[ParentT](ReflowWindow):
     async def _update_picker_items_task(self) -> None:
         """Create the slots for all possible signs."""
         packset: packages.PackagesSet
-        async with utils.iterval_cancelling(packages.LOADED) as aiterator:
+        async with iterval_cancelling(packages.LOADED) as aiterator:
             async for scope in aiterator:
                 with scope as packset:
                     await packset.ready(Signage).wait()

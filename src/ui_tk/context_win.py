@@ -10,7 +10,8 @@ from trio_util import AsyncValue
 from srctools.logger import get_logger
 import trio
 
-from app import EdgeTrigger, img, sound, UI
+from app import img, sound, UI
+from async_util import EdgeTrigger
 from app.contextWin import (
     ChangeVersionFunc, ContextWinBase, IMG_ALPHA, IconFunc, OpenMatchingFunc, SPR, TRANS_ENT_COUNT,
     TRANS_NO_VERSIONS,

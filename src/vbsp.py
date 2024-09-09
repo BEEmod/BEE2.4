@@ -9,6 +9,7 @@ import shutil
 import logging
 import pickle
 
+import async_util
 from aioresult import ResultCapture
 from srctools import AtomicWriter, Keyvalues, Vec, FrozenVec, Angle
 from srctools.dmx import Element
@@ -111,11 +112,11 @@ async def load_settings() -> tuple[
 
     try:
         async with trio.open_nursery() as nursery:
-            res_vconf = utils.sync_result(nursery, load_keyvalues, "bee2/vbsp_config.cfg")
-            res_packlist = utils.sync_result(nursery, load_keyvalues, 'bee2/pack_list.cfg')
-            res_editor = utils.sync_result(nursery, load_pickle, 'bee2/editor.bin')
-            res_corr = utils.sync_result(nursery, load_pickle, 'bee2/corridors.bin')
-            res_dmx_conf = utils.sync_result(nursery, load_dmx_config, 'bee2/config.dmx')
+            res_vconf = async_util.sync_result(nursery, load_keyvalues, "bee2/vbsp_config.cfg")
+            res_packlist = async_util.sync_result(nursery, load_keyvalues, 'bee2/pack_list.cfg')
+            res_editor = async_util.sync_result(nursery, load_pickle, 'bee2/editor.bin')
+            res_corr = async_util.sync_result(nursery, load_pickle, 'bee2/corridors.bin')
+            res_dmx_conf = async_util.sync_result(nursery, load_dmx_config, 'bee2/config.dmx')
             # Load in templates locations.
             nursery.start_soon(template_brush.load_templates, 'bee2/templates.lst')
     except* OSError:
@@ -1618,9 +1619,9 @@ async def main(argv: list[str]) -> None:
 
         LOGGER.info("Loading settings...")
         async with trio.open_nursery() as nursery:
-            res_game = utils.sync_result(nursery, Game, game_dir)
+            res_game = async_util.sync_result(nursery, Game, game_dir)
             res_settings = ResultCapture.start_soon(nursery, load_settings)
-            vmf_res = utils.sync_result(nursery, load_map, path)
+            vmf_res = async_util.sync_result(nursery, load_map, path)
             voice_data_res = ResultCapture.start_soon(nursery, voice_line.load)
 
         ind_style, id_to_item, corridor_conf = res_settings.result()

@@ -25,7 +25,8 @@ import trio_util
 from trio_util import AsyncBool
 
 from FakeZip import FakeZip, zip_names, zip_open_bin
-from app import EdgeTrigger, img
+from app import img
+from async_util import EdgeTrigger
 from transtoken import TransToken
 from ui_tk import TK_ROOT, tk_tools
 from ui_tk.check_table import CheckDetails, Item as CheckItem

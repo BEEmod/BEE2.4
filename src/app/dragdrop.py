@@ -11,7 +11,8 @@ from srctools.logger import get_logger
 from trio_util import AsyncValue, RepeatedEvent
 import attrs
 
-from app import img, sound, EdgeTrigger
+from app import img, sound
+from async_util import EdgeTrigger
 from transtoken import TransToken
 
 

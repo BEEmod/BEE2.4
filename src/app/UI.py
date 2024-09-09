@@ -18,7 +18,8 @@ import trio
 import trio_util
 
 import exporting
-from app import EdgeTrigger, lifecycle, quit_app, sound
+from app import lifecycle, quit_app, sound
+from async_util import EdgeTrigger, run_as_task
 from BEE2_config import GEN_OPTS
 from app.dialogs import Dialogs
 from loadScreen import MAIN_UI as LOAD_UI
@@ -1537,13 +1538,13 @@ async def init_windows(
     sign_ui = SignageUI(TK_IMG)
     core_nursery.start_soon(sign_ui.task, signage_trigger)
 
-    await utils.run_as_task(
+    await run_as_task(
         core_nursery.start, itemconfig.make_pane,
         core_nursery, toolbar_frame, menu_bar.view_menu, tk_img, signage_trigger,
     )
     await LOAD_UI.step('itemvar')
 
-    await utils.run_as_task(
+    await run_as_task(
         core_nursery.start, CompilerPane.make_pane,
         toolbar_frame, tk_img, menu_bar.view_menu,
     )

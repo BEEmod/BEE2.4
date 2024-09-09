@@ -11,6 +11,7 @@ import attrs
 import srctools.logger
 import trio
 
+import async_util
 import utils
 from loadScreen import ScreenStage
 
@@ -37,7 +38,7 @@ class Step[CtxT, ResourceT]:
         stage: ScreenStage | None,
     ) -> None:
         """Wraps the step functionality."""
-        await utils.run_as_task(self.func, ctx)
+        await async_util.run_as_task(self.func, ctx)
         if stage is not None:
             await stage.step()
         await result_chan.send(self.results)

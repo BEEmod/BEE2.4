@@ -15,7 +15,8 @@ import srctools.logger
 import trio
 import trio_util
 
-from app import DEV_MODE, EdgeTrigger, ReflowWindow, WidgetCache, img
+from app import DEV_MODE, ReflowWindow, WidgetCache, img
+from async_util import EdgeTrigger
 from app.mdown import MarkdownData
 from config.corridors import UIState, Config, Options
 from corridor import Attachment, GameMode, Direction, Option

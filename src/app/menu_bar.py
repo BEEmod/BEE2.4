@@ -16,8 +16,9 @@ from app.dialogs import Dialogs
 from transtoken import TransToken
 from app import (
     gameMan, optionWindow, packageMan, backup as backup_win,
-    quit_app, EdgeTrigger,
+    quit_app,
 )
+from async_util import EdgeTrigger
 from ui_tk import tk_tools, help_menu
 from ui_tk.dialogs import DIALOG
 from ui_tk.img import TKImages

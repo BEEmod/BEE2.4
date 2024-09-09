@@ -21,7 +21,8 @@ import trio_util
 import trio
 
 from BEE2_config import ConfigFile
-from app import EdgeTrigger, quit_app
+from app import quit_app
+from async_util import EdgeTrigger
 from app.dialogs import Dialogs
 from config.gen_opts import GenOptions
 from exporting.compiler import terminate_error_server, restore_backup
