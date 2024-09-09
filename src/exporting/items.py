@@ -13,8 +13,10 @@ import trio
 from app import lazy_conf
 from config.gen_opts import GenOptions
 from config.item_defaults import ItemDefault
+from config.widgets import WidgetConfig
 from connections import INDICATOR_CHECK_ID
-from editoritems import InstCount, Item as EditorItem
+from consts import DefaultItems
+from editoritems import InstCount, Item as EditorItem, DesiredFacing
 from packages.item import Item, ItemConfig
 from transtoken import TransToken
 import config
@@ -29,6 +31,15 @@ LOGGER = srctools.logger.get_logger(__name__)
 TRANS_OLD_STYLE_DEF = TransToken.ui(
     'Style includes old definition for {item}. Override the item package object instead.'
 )
+
+# Mandatory items to unlock.
+UNLOCK_ITEMS = {
+    DefaultItems.door_sp_entry.id,
+    DefaultItems.door_coop_entry.id,
+    DefaultItems.door_sp_entry.id,
+    DefaultItems.door_sp_exit.id,
+    DefaultItems.obs_room_large.id,
+}
 
 
 def apply_replacements(conf: Keyvalues, item_id: str) -> Keyvalues:
@@ -121,6 +132,24 @@ def get_export_data(
         # Add all_conf first so it's conditions run first by default
         lazy_conf.concat(item.all_conf, item_data.vbsp_config),
     )
+
+
+@STEPS.add_step(prereq=[StepResource.EI_ITEMS], results=[StepResource.EI_DATA])
+async def step_unlock_defaults(exp_data: ExportData) -> None:
+    """If the unlock defaults option is set, unlock the default items."""
+    await trio.lowlevel.checkpoint()
+
+    for i, item in enumerate(exp_data.all_items):
+        # If the Unlock Default Items option is enabled, we
+        # want to force the corridors and obs room to be
+        # deletable and copyable.
+        # Also add DESIRES_UP, so they place in the correct orientation.
+        # That would have already been done for vertical-enabled corridors, but that's
+        # fine.
+        if item.id in UNLOCK_ITEMS:
+            exp_data.all_items[i] = item = copy.copy(item)
+            item.deletable = item.copiable = True
+            item.facing = DesiredFacing.UP
 
 
 @STEPS.add_step(

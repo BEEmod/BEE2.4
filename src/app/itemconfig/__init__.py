@@ -1,5 +1,7 @@
 """Customizable configuration for specific items or groups of them."""
 from __future__ import annotations
+
+from contextlib import aclosing
 from typing import Any, Protocol
 
 from collections.abc import Awaitable, Callable, Mapping, Iterator
@@ -16,7 +18,8 @@ import trio
 from app import UI, sound, StyleVarPane
 from app.SubPane import SubPane
 from app.mdown import MarkdownData
-from async_util import EdgeTrigger,  run_as_task
+from async_util import EdgeTrigger, run_as_task
+from config.filters import FilterConf
 from packages.signage import ITEM_ID as SIGNAGE_ITEM_ID
 from transtoken import TransToken, CURRENT_LANG
 from ui_tk import TK_ROOT, tk_tools
@@ -33,8 +36,8 @@ from config.widgets import (
 )
 from packages.widgets import (
     CLS_TO_KIND, ConfigGroup, ConfigProto, ItemVariantConf,
-    WidgetType,
-    WidgetTypeWithConf,
+    UNLOCK_DEFAULT_ID,
+    WidgetType, WidgetTypeWithConf,
 )
 
 LOGGER = logger.get_logger(__name__)
@@ -175,6 +178,13 @@ def ui_multi_no_conf(kind: WidgetType) -> Callable[[MultiCreateNoConfTask], Mult
     return deco
 
 
+async def unlock_default_ui_listener(holder: AsyncValue[str]) -> None:
+    """When Unlock Default Items are changed, refresh the item list."""
+    async with aclosing(holder.eventual_values()) as agen:
+        async for value in agen:
+            await config.APP.apply_conf(FilterConf)
+
+
 async def create_group(
     master: ttk.Frame,
     nursery: trio.Nursery,
@@ -236,12 +246,15 @@ async def create_group(
             else:
                 widget.grid(row=0, column=0, columnspan=2, sticky='ew')
             if s_wid.has_values:
+                wid_id = f'{s_wid.group_id}:{s_wid.id}'
                 nursery.start_soon(
                     s_wid.load_conf_task,
                     config.APP.get_ui_channel(
-                        WidgetConfig, f'{s_wid.group_id}:{s_wid.id}',
+                        WidgetConfig, wid_id,
                     )
                 )
+                if wid_id == UNLOCK_DEFAULT_ID:
+                    nursery.start_soon(unlock_default_ui_listener, s_wid.holder)
             nursery.start_soon(s_wid.state_store_task)
             if s_wid.tooltip:
                 add_tooltip(widget, s_wid.tooltip)

@@ -1,7 +1,7 @@
 """Customizable configuration for specific items or groups of them."""
 from __future__ import annotations
 
-from typing import Any, Protocol, Self, override
+from typing import Any, Final, Protocol, Self, override
 from collections.abc import Iterable, Iterator
 from contextlib import AbstractContextManager, aclosing
 import itertools
@@ -34,6 +34,8 @@ class ConfigProto(Protocol):
         """Parse keyvalues into a widget config."""
 
 
+# This has to reload items when changed.
+UNLOCK_DEFAULT_ID: Final = 'VALVE_MANDATORY:unlockdefault'
 LEGACY_CONFIG = BEE2_config.ConfigFile('item_cust_configs.cfg', legacy=True)
 LOGGER = logger.get_logger(__name__)
 
@@ -94,6 +96,15 @@ def register_no_conf(*names: str, wide: bool = False) -> WidgetType:
         assert name not in WIDGET_KINDS, name
         WIDGET_KINDS[name] = kind
     return kind
+
+
+def mandatory_unlocked() -> bool:
+    """Check if mandatory items should be shown."""
+    option = config.APP.get_cur_conf(WidgetConfig, UNLOCK_DEFAULT_ID).values
+    if not isinstance(option, str):
+        LOGGER.warning('Unlock Default option is a timer?')
+        return False
+    return conv_bool(option)
 
 
 @attrs.define

@@ -38,17 +38,6 @@ styleOptions = [
     ),
 
     StyleVar.unstyled(
-        id='UnlockDefault',
-        name=TransToken.ui('Unlock Default Items'),
-        default=False,
-        desc=TransToken.ui(
-            'Allow placing and deleting the mandatory Entry/Exit Doors and '
-            'Large Observation Room. Use with caution, this can have weird '
-            'results!'
-        ),
-    ),
-
-    StyleVar.unstyled(
         id='AllowGooMist',
         name=TransToken.ui('Allow Adding Goo Mist'),
         default=True,
@@ -111,14 +100,6 @@ TRANS_ALL_STYLES = TransToken.ui('Styles: All')
 # i18n: Order of lines in the tooltip.
 TRANS_TOOLTIP = TransToken.ui('{desc}\n{defaults}\n{styles}')
 TRANS_COMMA = TransToken.ui(', ')
-
-
-def mandatory_unlocked() -> bool:
-    """Return whether mandatory items are unlocked currently."""
-    try:
-        return tk_vars['UnlockDefault'].get() != 0
-    except KeyError:  # Not loaded yet
-        return False
 
 
 def export_data(chosen_style: Style) -> dict[str, bool]:
@@ -234,19 +215,6 @@ async def make_stylevar_pane(
     ), TransToken.ui('None!'))
     VAR_LIST[:] = sorted(packset.all_obj(StyleVar), key=operator.attrgetter('id'))
 
-    filter_event = trio.Event()
-
-    async def update_filter_task() -> None:
-        """A special case. UnlockDefault needs to refresh the filter when changed.
-
-        That ensures the items disappear or reappear.
-        """
-        nonlocal filter_event
-        while True:
-            await filter_event.wait()
-            filter_event = trio.Event()
-            await config.APP.apply_conf(FilterConf)
-
     async def state_sync_task(
         var_id: str,
         tk_var: IntVar,
@@ -257,8 +225,6 @@ async def make_stylevar_pane(
         def cmd_func() -> None:
             """When clicked, store configuration."""
             config.APP.store_conf(State(tk_var.get() != 0), var_id)
-            if var_id == 'UnlockDefault':
-                filter_event.set()
 
         cmd = frame.register(cmd_func)
         for check in checks:
@@ -270,7 +236,6 @@ async def make_stylevar_pane(
                 tk_var.set(state.value)
 
     async with trio.open_nursery() as nursery:
-        nursery.start_soon(update_filter_task)
         all_pos = 0
         for all_pos, var in enumerate(styleOptions):
             # Add the special stylevars which apply to all styles

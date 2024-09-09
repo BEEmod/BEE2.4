@@ -25,6 +25,7 @@ from app.dialogs import Dialogs
 from loadScreen import MAIN_UI as LOAD_UI
 import packages
 from packages.item import ItemVariant, InheritKind, SubItemRef
+from packages.widgets import mandatory_unlocked
 import utils
 from config.filters import FilterConf
 from config.gen_opts import GenOptions, AfterExport
@@ -904,7 +905,7 @@ def drag_fast(drag_item: PalItem, e: tk.Event[tk.Misc]) -> None:
     flow_preview()
 
 
-async def set_palette(chosen_pal: paletteUI.Palette) -> None:
+async def set_palette(chosen_pal: paletteUI.Palette, flow_picker: Callable[[], object]) -> None:
     """Select a palette."""
     pal_clear()
     for coord in paletteUI.COORDS:
@@ -932,12 +933,17 @@ async def set_palette(chosen_pal: paletteUI.Palette) -> None:
             is_pre=True,
         ))
 
+    old_mandatory = mandatory_unlocked()
+
     if chosen_pal.settings is not None:
         conf = await packages.get_loaded_packages().migrate_conf(chosen_pal.settings)
         LOGGER.info('Settings: {}', conf)
         await config.APP.apply_multi(conf)
 
     flow_preview()
+    if old_mandatory is not mandatory_unlocked():
+        # Changed, update the preview.
+        flow_picker()
 
 
 def pal_clear() -> None:
@@ -949,7 +955,7 @@ def pal_clear() -> None:
 
 def pal_shuffle() -> None:
     """Set the palette to a list of random items."""
-    mandatory_unlocked = StyleVarPane.mandatory_unlocked()
+    include_mandatory = mandatory_unlocked()
 
     if len(pal_picked) == 32:
         return
@@ -966,7 +972,7 @@ def pal_shuffle() -> None:
         # obey the mandatory item lock and filters.
         for item in pal_items
         if item.id not in palette_set
-        if mandatory_unlocked or not item.needs_unlock
+        if include_mandatory or not item.needs_unlock
         if cur_filter is None or (item.id, item.subKey) in cur_filter
         if len(item_list[item.id].item.visual_subtypes)  # Check there's actually sub-items to show.
     })
@@ -1266,7 +1272,7 @@ async def _flow_picker(filter_conf: FilterConf) -> None:
     occur.
     """
     frmScroll['width'] = pal_canvas.winfo_width()
-    mandatory_unlocked = StyleVarPane.mandatory_unlocked()
+    hide_mandatory = not mandatory_unlocked()
 
     width = (pal_canvas.winfo_width() - 10) // 65
     if width < 1:
@@ -1275,7 +1281,7 @@ async def _flow_picker(filter_conf: FilterConf) -> None:
     i = 0
     # If cur_filter is None, it's blank and so show all of them.
     for pal_item, should_checkpoint in zip(pal_items, itertools.cycle('YNNNN')):
-        if pal_item.needs_unlock and not mandatory_unlocked:
+        if hide_mandatory and pal_item.needs_unlock:
             visible = False
         elif filter_conf.compress:
             # Show if this is the first, and any in this item are visible.
@@ -1495,6 +1501,10 @@ async def init_windows(
     windows['pal'].columnconfigure(0, weight=1)
     windows['pal'].rowconfigure(0, weight=1)
 
+    async def set_items(pal: paletteUI.Palette) -> None:
+        """Pass along the reflow-picker function to set_palette."""
+        await set_palette(pal, flow_picker)
+
     pal_ui = paletteUI.PaletteUI(
         pal_frame, menu_bar.pal_menu,
         tk_img=tk_img,
@@ -1506,7 +1516,7 @@ async def init_windows(
             pos: (it.id, it.subKey)
             for pos, it in zip(paletteUI.COORDS, pal_picked, strict=False)
         },
-        set_items=set_palette,
+        set_items=set_items,
     )
 
     TK_ROOT.bind_all(tk_tools.KEY_SAVE, lambda e: pal_ui.event_save(DIALOG))
@@ -1719,6 +1729,6 @@ async def init_windows(
         nursery.start_soon(enable_export)
         nursery.start_soon(style_select_callback)
         await first_select.wait()
-        await set_palette(pal_ui.selected)
+        await set_palette(pal_ui.selected, flow_picker)
         pal_ui.is_dirty.set()
         task_status.started()
