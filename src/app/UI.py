@@ -933,8 +933,9 @@ async def set_palette(chosen_pal: paletteUI.Palette) -> None:
         ))
 
     if chosen_pal.settings is not None:
-        LOGGER.info('Settings: {}', chosen_pal.settings)
-        await config.APP.apply_multi(chosen_pal.settings)
+        conf = await packages.get_loaded_packages().migrate_conf(chosen_pal.settings)
+        LOGGER.info('Settings: {}', conf)
+        await config.APP.apply_multi(conf)
 
     flow_preview()
 

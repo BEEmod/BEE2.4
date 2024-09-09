@@ -1,12 +1,15 @@
 """Customizable configuration for specific items or groups of them."""
 from __future__ import annotations
 
-from typing import Any, Protocol, Self
+from typing import Any, Protocol, Self, override
 from collections.abc import Iterable, Iterator
 from contextlib import AbstractContextManager, aclosing
 import itertools
 
-from srctools import EmptyMapping, Keyvalues, Vec, logger
+from srctools import EmptyMapping, Keyvalues, Vec, bool_as_int, conv_bool, logger
+
+from config import Config
+from packages import PackagesSet
 
 from trio_util import AsyncValue, wait_any
 import attrs
@@ -17,6 +20,7 @@ from config.widgets import (
     TIMER_NUM as TIMER_NUM, TIMER_NUM_INF as TIMER_NUM_INF,
     TimerNum as TimerNum, WidgetConfig,
 )
+from config.stylevar import State as StyleVarState
 from transtoken import TransToken, TransTokenSource
 import config
 import BEE2_config
@@ -112,6 +116,8 @@ class Widget:
 class SingleWidget(Widget):
     """Represents a single widget with no timer value."""
     holder: AsyncValue[str]
+    # Used for some configs ported from stylevars.
+    stylevar_id: str
 
     async def load_conf_task(
         self, cm: AbstractContextManager[trio.MemoryReceiveChannel[WidgetConfig]],
@@ -134,6 +140,9 @@ class SingleWidget(Widget):
         async with aclosing(self.holder.eventual_values()) as agen:
             async for value in agen:
                 config.APP.store_conf(WidgetConfig(value), data_id)
+                # Make sure the old ID is no longer present whenever saving.
+                if self.stylevar_id:
+                    config.APP.discard_conf(StyleVarState, self.stylevar_id)
 
 
 @attrs.define
@@ -193,6 +202,7 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
         self.multi_widgets = multi_widgets
 
     @classmethod
+    @override
     async def parse(cls, data: packages.ParseData) -> ConfigGroup:
         """Parse the config group from info.txt."""
         props = data.info
@@ -246,6 +256,23 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
                 wid_conf: object = kind.conf_type.parse(data, wid)
             else:
                 wid_conf = None
+
+            if stylevar_id := wid['legacy_stylevar_id', '']:
+                if kind is not KIND_CHECKMARK:
+                    raise ValueError(
+                        f'"{data.id}.{wid_id}": '
+                        f'Legacy Stylevars can only be checkmark kinds, not {kind}!'
+                    )
+                if is_timer:
+                    raise ValueError(
+                        f'"{data.id}.{wid_id}": Legacy Stylevars can only be singular!'
+                    )
+                if prev_conf is EmptyMapping:
+                    prev_conf = config.APP.get_cur_conf(
+                        StyleVarState, stylevar_id,
+                        StyleVarState(conv_bool(default_prop)),
+                    )
+                    LOGGER.debug('Converted legacy stylevar "{}"', stylevar_id)
 
             if is_timer:
                 if default_prop.has_children():
@@ -304,6 +331,7 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
                     kind=kind,
                     config=wid_conf,
                     holder=AsyncValue(cur_value),
+                    stylevar_id=stylevar_id,
                 ))
 
         return cls(
@@ -314,6 +342,7 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
             multi_widgets,
         )
 
+    @override
     def iter_trans_tokens(self) -> Iterator[TransTokenSource]:
         """Yield translation tokens for this config group."""
         source = f'configgroup/{self.id}'
@@ -323,6 +352,7 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
             yield widget.name, f'{source}/{widget.id}.name'
             yield widget.tooltip, f'{source}/{widget.id}.tooltip'
 
+    @override
     def add_over(self, override: ConfigGroup) -> None:
         """Override a ConfigGroup to add additional widgets."""
         # Make sure they don't double-up.
@@ -336,6 +366,29 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
         self.widgets.extend(override.widgets)
         self.multi_widgets.extend(override.multi_widgets)
         self.desc += override.desc
+
+    @classmethod
+    @override
+    async def migrate_config(cls, packset: PackagesSet, conf: Config) -> None:
+        """Update configs to migrate stylevars."""
+        await packset.ready(cls).wait()
+        wid_map = conf.get_or_blank(WidgetConfig)
+        var_map = conf.get_or_blank(StyleVarState)
+
+        for group in packset.all_obj(cls):
+            for wid in group.widgets:
+                await trio.lowlevel.checkpoint()
+                if not wid.stylevar_id:
+                    continue
+                wid_id = f'{group.id}:{wid.id}'
+                if wid_id not in wid_map and wid.stylevar_id in var_map:
+                    wid_map[wid_id] = WidgetConfig(bool_as_int(
+                        var_map.pop(wid.stylevar_id).value
+                    ))
+                    LOGGER.info(
+                        'Migrate stylevar {} -> widget {}',
+                        wid.stylevar_id, wid_id,
+                    )
 
     def widget_ids(self) -> set[str]:
         """Return the set of widget IDs used."""

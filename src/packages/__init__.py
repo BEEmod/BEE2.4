@@ -13,6 +13,7 @@ import os
 import zipfile
 
 from aioresult import ResultCapture
+from config import Config
 from trio_util import AsyncValue
 from srctools import Keyvalues, NoKeyError, Vec
 from srctools.tokenizer import TokenSyntaxError
@@ -493,6 +494,11 @@ class PakObject:
         """Do processing after all objects of this type have been fully parsed (but others may not)."""
         pass
 
+    @classmethod
+    async def migrate_config(cls, packset: PackagesSet, conf: Config) -> None:
+        """Update configs based on the loaded packages."""
+        pass
+
 
 class SelPakObject(PakObject):
     """Defines PakObjects which have SelItemData."""
@@ -713,6 +719,14 @@ class PackagesSet:
         if not hasattr(obj, 'pak_id'):
             obj.pak_id = pak_id
             obj.pak_name = pak_name
+
+    async def migrate_conf(self, conf: Config) -> Config:
+        """Migrate configs based on the loaded packages."""
+        conf = conf.copy()
+        async with trio.open_nursery() as nursery:
+            for cls in OBJ_TYPES.values():
+                nursery.start_soon(cls.migrate_config, self, conf)
+        return conf
 
 
 def get_loaded_packages() -> PackagesSet:

@@ -107,13 +107,27 @@ class Data(abc.ABC):
         return Element.from_kv1(self.export_kv1())
 
 
-@attrs.define
+@attrs.define(repr=False)
 class Config:
     """The current data loaded from the config file.
 
     This maps an ID to each value, or is {'': data} if no key is used.
     """
     _data: dict[type[Data], dict[str, Data]] = attrs.Factory(dict)
+
+    def __repr__(self) -> str:
+        vals = ', '.join([
+            f'{len(data_map)}x {cls.get_conf_info().name}'
+            for cls, data_map in self._data.items()
+        ])
+        return f'<Config: {vals}>'
+
+    def copy(self) -> Config:
+        """Copy the config, assuming values are immutable."""
+        return Config({
+            cls: data_map.copy()
+            for cls, data_map in self._data.items()
+        })
 
     def is_blank(self) -> bool:
         """Check if we have any values assigned."""
@@ -135,6 +149,18 @@ class Config:
         except KeyError:
             self._data[cls] = res = {}
         return res  # type: ignore
+
+    def discard(self, cls: type[Data], data_id: str) -> bool:
+        """Remove the specified data ID, returning whether a change occurred."""
+        try:
+            data_map = self._data[cls]
+            data_map.pop(data_id)
+        except KeyError:
+            return False
+        if not data_map:
+            # Clean up any empty dicts.
+            del self._data[cls]
+        return True
 
     def keys(self) -> KeysView[type[Data]]:
         """Return a view over the types present in the config."""
@@ -354,6 +380,17 @@ class ConfigSpec:
             raise ValueError(f'Data type "{info.name}" does not support IDs!')
         LOGGER.debug('Storing conf {}[{}] = {!r}', info.name, data_id, data)
         self._current.get_or_blank(cls)[data_id] = data
+
+    def discard_conf(self, cls: type[Data], data_id: str = '') -> None:
+        """Remove the specified ID."""
+        if cls not in self._registered:
+            raise ValueError(f'Unregistered data type {cls!r}')
+        info = cls.get_conf_info()
+
+        if data_id and not info.uses_id:
+            raise ValueError(f'Data type "{info.name}" does not support IDs!')
+        if self._current.discard(cls, data_id):
+            LOGGER.debug('Discarding conf {}[{}]', info.name, data_id)
 
     def parse_kv1(self, kv: Keyvalues) -> tuple[Config, bool]:
         """Parse a configuration file into individual data.
