@@ -42,6 +42,9 @@ TRANS_VPK_IO_ERROR = TransToken.ui(
     'The VPK "{filename}" could not be parsed. If this was made by BEE, delete it, otherwise check '
     'if it is corrupt.'
 )
+TRANS_SUB_VPK_IO = TransToken.ui(
+    'The vpk_override VPK "{filename}" could not be parsed. Contents was skipped.'
+)
 
 
 if TYPE_CHECKING:
@@ -150,6 +153,73 @@ def clear_files(filename: Path) -> None:
         raise
 
 
+async def fill_vpk(exp_data: ExportData, vpk_file: VPK, style_vpk: StyleVPK) -> None:
+    """Generate the new VPK."""
+    def add_files(vpk: VPK, style_vpk: StyleVPK) -> None:
+        """Add selected files to the VPK."""
+        for file in style_vpk.fsys.walk_folder(style_vpk.dir):
+            with file.open_bin() as open_file:
+                vpk.add_file(
+                    file.path,
+                    open_file.read(),
+                    style_vpk.dir,
+                )
+
+    # Write the marker, so we can identify this later. Always put it in the _dir.vpk.
+    vpk_file.add_file(MARKER_FILENAME, MARKER_CONTENTS, arch_index=None)
+
+    if style_vpk is not None:
+        await trio.to_thread.run_sync(add_files, vpk_file, style_vpk)
+
+    # Additionally, pack in game/vpk_override/ into the vpk - this allows
+    # users to easily override resources in general.
+
+    override_folder = exp_data.game.root_path / 'vpk_override'
+    await override_folder.mkdir(exist_ok=True)
+
+    # Also write a file to explain what it's for...
+    readme = override_folder / 'BEE2_README.txt'
+    await readme.write_text(
+        VPK_OVERRIDE_README,
+        encoding='utf8'
+    )
+
+    # Matches pak01_038.vpk, etc. These shouldn't be opened.
+    numeric_vpk = re.compile(r'_[0-9]+\.vpk')
+
+    file_path: trio.Path
+    for file_path in await override_folder.rglob("*"):
+        if file_path == readme or not await file_path.is_file():
+            # Skip the readme and folders themselves.
+            continue
+        rel_path = file_path.relative_to(override_folder)
+        if file_path.suffix == '.vpk':
+            # If a VPK file is found in vpk_override, copy the contents into ours.
+            # Skip trying to open pak01_028.vpk files, we just want to find the dir.
+            if numeric_vpk.search(file_path.name) is not None:
+                continue
+            try:
+                other_vpk = await trio.to_thread.run_sync(VPK, file_path)
+            except (ValueError, struct.error):
+                LOGGER.exception('Could not open sub-VPK file "{}":', file_path)
+                exp_data.warn(TRANS_SUB_VPK_IO.format(filename=str(file_path)))
+            else:
+                for entry in other_vpk:
+                    LOGGER.info('Adding "{}:{}" to the VPK', file_path, entry.filename)
+                    await trio.to_thread.run_sync(
+                        vpk_file.add_file,
+                        # If the VPK is itself in a subfolder, put its children in there.
+                        str(rel_path.parent / entry.filename),
+                        await trio.to_thread.run_sync(entry.read),
+                    )
+        else:
+            LOGGER.debug('Adding "{}" to the VPK', file_path)
+            await trio.to_thread.run_sync(
+                vpk_file.add_file,
+                str(rel_path),
+                await trio.Path(file_path).read_bytes(),
+            )
+
 @STEPS.add_step(prereq=[], results=[StepResource.VPK_WRITTEN])
 async def step_gen_vpk(exp_data: ExportData) -> None:
     """Generate the VPK file in the game folder."""
@@ -198,67 +268,12 @@ async def step_gen_vpk(exp_data: ExportData) -> None:
         exp_data.warn(AppError(TRANS_NO_PERMS))
         return
 
-    def add_files(vpk: VPK, sel_vpk: StyleVPK) -> None:
-        """Add selected files to the VPK."""
-        for file in sel_vpk.fsys.walk_folder(sel_vpk.dir):
-            with file.open_bin() as open_file:
-                vpk.add_file(
-                    file.path,
-                    open_file.read(),
-                    sel_vpk.dir,
-                )
-
-    with vpk_file:
-        # Write the marker, so we can identify this later. Always put it in the _dir.vpk.
-        vpk_file.add_file(MARKER_FILENAME, MARKER_CONTENTS, arch_index=None)
-
-        if sel_vpk is not None:
-            await trio.to_thread.run_sync(add_files, vpk_file, sel_vpk)
-
-        # Additionally, pack in game/vpk_override/ into the vpk - this allows
-        # users to easily override resources in general.
-
-        override_folder = exp_data.game.abs_path('vpk_override')
-        os.makedirs(override_folder, exist_ok=True)
-
-        # Also write a file to explain what it's for...
-        await trio.Path(os.path.join(override_folder, 'BEE2_README.txt')).write_text(
-            VPK_OVERRIDE_README,
-            encoding='utf8'
-        )
-
-        # Matches pak01_038.vpk, etc. These shouldn't be opened.
-        numeric_vpk = re.compile(r'_[0-9]+\.vpk')
-
-        for subfolder, _, filenames, in os.walk(override_folder):
-            # Subfolder relative to the folder.
-            # normpath removes '.' and similar values from the beginning
-            vpk_path = os.path.normpath(os.path.relpath(subfolder, override_folder))
-            for filename in filenames:
-                if filename == 'BEE2_README.txt':
-                    continue  # Don't add this to the VPK though.
-                file_path = os.path.join(subfolder, filename)
-                if vpk_path == '.' and filename.endswith('.vpk'):
-                    # If a VPK file is found in vpk_override, copy the contents into ours.
-                    # Skip trying to open pak01_028.vpk files, we just want to find the dir.
-                    if numeric_vpk.search(filename) is not None:
-                        continue
-                    try:
-                        other_vpk = await trio.to_thread.run_sync(VPK, file_path)
-                    except ValueError:
-                        LOGGER.exception('Could not open VPK file "{}":', file_path)
-                    else:
-                        for entry in other_vpk:
-                            LOGGER.info('Adding "{}:{}" to the VPK', file_path, entry.filename)
-                            vpk_file.add_file(
-                                entry.filename,
-                                await trio.to_thread.run_sync(entry.read),
-                            )
-                else:
-                    LOGGER.debug('Adding "{}" to the VPK', file_path)
-                    vpk_file.add_file(
-                        (vpk_path, filename),
-                        await trio.Path(file_path).read_bytes(),
-                    )
+    try:
+        with vpk_file:
+            await fill_vpk(exp_data, vpk_file, sel_vpk)
+    except Exception:
+        # Failed to write, remove the VPK so future exports don't error.
+        await trio.Path(vpk_filename).unlink()
+        raise
 
     LOGGER.info('Written {} files to VPK!', len(vpk_file))
