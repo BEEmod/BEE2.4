@@ -117,6 +117,7 @@ async def find_folder(game: Game) -> Path:
 
     event: trio.Event
     filename: Path
+    found = fallback
     async with trio.open_nursery() as nursery:
         for filename, event in zip(potentials, events, strict=True):
             nursery.start_soon(worker, filename, event)
@@ -125,9 +126,11 @@ async def find_folder(game: Game) -> Path:
             await event.wait()
             if results[filename]:
                 LOGGER.info('Found BEE vpk: {}', filename)
-                return filename
-    LOGGER.info('No BEE vpk found, writing to: {}', fallback)
-    return fallback
+                found = filename
+                break
+    if found is fallback:
+        LOGGER.info('No BEE vpk found, writing to: {}', fallback)
+    return found
 
 
 def clear_files(filename: Path) -> None:

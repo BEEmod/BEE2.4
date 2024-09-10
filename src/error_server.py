@@ -10,15 +10,16 @@ This has 3 endpoints:
 """
 from __future__ import annotations
 
-import io
 
 from typing_extensions import override
 import functools
+import gettext
 import http
+import io
+import json
 import math
 import pickle
-import gettext
-import json
+import sys
 
 from hypercorn.config import Config
 from hypercorn.trio import serve
@@ -133,7 +134,7 @@ async def route_shutdown() -> quart.ResponseReturnValue:
     return 'DONE'
 
 
-async def check_portal2(allow_exit: trio.Event) -> None:
+async def check_portal2_running(allow_exit: trio.Event) -> None:
     """Check if Portal 2 is our parent process, and if so exit early when that dies."""
     try:
         try:
@@ -268,7 +269,7 @@ async def main(argv: list[str]) -> None:
     SERVER_INFO_FILE.unlink(missing_ok=True)
     try:
         async with trio.open_nursery() as nursery:
-            nursery.start_soon(check_portal2, allow_exit)
+            nursery.start_soon(check_portal2_running, allow_exit)
             await trio.lowlevel.checkpoint()
             binds = await nursery.start(functools.partial(
                 serve,
@@ -289,7 +290,7 @@ async def main(argv: list[str]) -> None:
                         coop_text=str(TOK_COOP_SHOWURL),
                     ), f)
             else:
-                return  # No connection?
+                sys.exit("Server didn't startup?")
             with stop_sleeping:
                 allow_exit.set()
                 await trio.sleep_forever()
