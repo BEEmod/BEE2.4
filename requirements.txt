@@ -1,20 +1,25 @@
+# Misc
 attrs >= 22.1.0
-aioresult >= 1.0.0
-mistletoe >= 1.3.0
-Pillow >= 10.3.0
-psutil >= 5.9.8
-pyglet >= 2.0.15
-PyInstaller >= 6.7.0
-pygtrie >= 2.4.0
-babel >= 2.15.0
+srctools >= 2.4.0
+typing_extensions >= 4.12.0
+rtree >= 0.9.7
+# Async
 trio >= 0.25.1
 outcome >= 1.3.0  # Trio dependency
+aioresult >= 1.0.0
 trio-util >= 0.7.0
+# Build tools
+PyInstaller >= 6.7.0
 versioningit >= 2.1.0
-srctools >= 2.4.0
-rtree >= 0.9.7
-typing_extensions >= 4.12.0
+# UI
+mistletoe >= 1.3.0
+Pillow >= 10.3.0
+# wxpython >= 4.2.1
+pyglet >= 2.0.15
+pygtrie >= 2.4.0
+babel >= 2.15.0
+# Web server
 hypercorn >= 0.14.3
 quart >= 0.19.4
 quart-trio >= 0.11.1
-# wxpython >= 4.2.1
+psutil >= 5.9.8
