@@ -3,10 +3,10 @@
 This allows altering the in-editor wall textures, as well as a few others.
 """
 from __future__ import annotations
-import os
 
 from srctools import FileSystem
 import srctools.logger
+import trio
 
 from packages import PakObject, ParseData
 
@@ -30,10 +30,10 @@ class StyleVPK(PakObject):
         """Read the VPK file from the package."""
         vpk_name = data.info['filename']
 
-        source_folder = os.path.normpath('vpk/' + vpk_name)
+        source_folder = f'vpk/{vpk_name}'
 
         # At least one exists?
-        if not any(data.fsys.walk_folder(source_folder)):
+        if not await trio.to_thread.run_sync(any, data.fsys.walk_folder(source_folder)):
             raise Exception(
                 f'VPK object "{data.id}" has no associated files!'
             )

@@ -180,7 +180,7 @@ class Game:
         try:
             vpk_filename = await vpks.find_folder(self)
             LOGGER.info('VPK filename to remove: {}', vpk_filename)
-            vpks.clear_files(vpk_filename)
+            await vpks.clear_files(vpk_filename)
         except (FileNotFoundError, PermissionError):
             pass
 

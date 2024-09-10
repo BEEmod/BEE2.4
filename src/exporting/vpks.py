@@ -1,11 +1,13 @@
 """Generate a VPK, to override editor resources."""
 from __future__ import annotations
 
-from typing import Dict, Iterator, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
+from collections.abc import Iterator
+from functools import partial
 from pathlib import Path
 import itertools
-import os
+import math
 import re
 import shutil
 import struct
@@ -58,7 +60,7 @@ def iter_dlcs(root: Path) -> Iterator[Path]:
         yield root / f'portal2_dlc{dlc}'
 
 
-async def find_folder(game: Game) -> Path:
+async def find_folder(game: Game) -> trio.Path:
     """Figure out which folder to use for this game."""
     if game.unmarked_dlc3_vpk:
         # Special case. This game had the old BEE behaviour, where it blindly wrote to DLC3
@@ -92,7 +94,7 @@ async def find_folder(game: Game) -> Path:
 
     for game_folder in iter_dlcs(Path(game.root)):
         vpk_filename = game_folder / 'pak01_dir.vpk'
-        if vpk_filename.exists():
+        if await trio.Path(vpk_filename).exists():
             potentials.append(vpk_filename)
         else:
             fallback = vpk_filename
@@ -115,7 +117,7 @@ async def find_folder(game: Game) -> Path:
         results[filename] = MARKER_FILENAME in vpk
         event.set()
 
-    results: Dict[Path, Optional[bool]] = dict.fromkeys(potentials, None)
+    results: dict[Path, bool | None] = dict.fromkeys(potentials, None)
     events = [trio.Event() for _ in potentials]
 
     event: trio.Event
@@ -133,27 +135,28 @@ async def find_folder(game: Game) -> Path:
                 break
     if found is fallback:
         LOGGER.info('No BEE vpk found, writing to: {}', fallback)
-    return found
+    return trio.Path(found)
 
 
-def clear_files(filename: Path) -> None:
+async def clear_files(filename: trio.Path) -> None:
     """Remove existing VPK files from the specified game folder.
 
      We want to leave other files - otherwise users will end up
      regenerating the sound cache every time they export.
     """
-    os.makedirs(filename.parent, exist_ok=True)
+    await filename.parent.mkdir(exist_ok=True)
     try:
-        for file in filename.parent.iterdir():
+        file: trio.Path
+        for file in await filename.parent.iterdir():
             if file.suffix == '.vpk' and file.stem.startswith('pak01_'):
-                file.unlink()
+                await file.unlink()
     except PermissionError:
         # The player might have Portal 2 open. Abort changing the VPK.
         LOGGER.warning("Couldn't replace VPK files. Is Portal 2 or Hammer open?")
         raise
 
 
-async def fill_vpk(exp_data: ExportData, vpk_file: VPK, style_vpk: StyleVPK) -> None:
+async def fill_vpk(exp_data: ExportData, vpk_file: VPK, style_vpk: StyleVPK | None) -> None:
     """Generate the new VPK."""
     def add_files(vpk: VPK, style_vpk: StyleVPK) -> None:
         """Add selected files to the VPK."""
@@ -220,12 +223,13 @@ async def fill_vpk(exp_data: ExportData, vpk_file: VPK, style_vpk: StyleVPK) -> 
                 await trio.Path(file_path).read_bytes(),
             )
 
+
 @STEPS.add_step(prereq=[], results=[StepResource.VPK_WRITTEN])
 async def step_gen_vpk(exp_data: ExportData) -> None:
     """Generate the VPK file in the game folder."""
     sel_vpk_name = exp_data.selected_style.vpk_name
 
-    sel_vpk: Optional[StyleVPK]
+    sel_vpk: StyleVPK | None
     if sel_vpk_name:
         try:
             sel_vpk = exp_data.packset.obj_by_id(StyleVPK, sel_vpk_name)
@@ -237,7 +241,7 @@ async def step_gen_vpk(exp_data: ExportData) -> None:
     vpk_filename = await find_folder(exp_data.game)
     LOGGER.info('VPK to write: {}', vpk_filename)
     try:
-        clear_files(vpk_filename)
+        await clear_files(vpk_filename)
     except PermissionError:
         # We can't edit the VPK files - P2 is open...
         exp_data.warn(AppError(TRANS_NO_PERMS))
@@ -262,7 +266,7 @@ async def step_gen_vpk(exp_data: ExportData) -> None:
 
     # Generate the VPK.
     try:
-        vpk_file = VPK(vpk_filename, mode='w')
+        vpk_file = await trio.to_thread.run_sync(partial(VPK, str(vpk_filename), mode='w'))
     except PermissionError:
         # Failed to open?
         exp_data.warn(AppError(TRANS_NO_PERMS))
@@ -273,7 +277,9 @@ async def step_gen_vpk(exp_data: ExportData) -> None:
             await fill_vpk(exp_data, vpk_file, sel_vpk)
     except Exception:
         # Failed to write, remove the VPK so future exports don't error.
-        await trio.Path(vpk_filename).unlink()
+        # Shield against cancellation, it's fine if this takes too long.
+        with trio.CancelScope(shield=True, deadline=math.inf):
+            await vpk_filename.unlink()
         raise
 
     LOGGER.info('Written {} files to VPK!', len(vpk_file))
