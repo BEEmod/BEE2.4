@@ -553,6 +553,9 @@ def generate_plane(
     # Calculate the required tiles.
     calculate_plane(plane_key, texture_plane, search_dists, subtile_pos)
 
+    from precomp.conditions import fetch_debug_visgroup
+    missing_tiles = fetch_debug_visgroup(vmf, 'Missing plane tiles')
+
     # Split tiles into each brush that needs to be placed, then create it.
     for min_u, min_v, max_u, max_v, bevels, tex_def in bevel_split(texture_plane, grid_pos, orig_tiles):
         center = plane_key.normal * plane_key.distance + Vec.with_axes(
@@ -582,9 +585,18 @@ def generate_plane(
         front.uaxis.offset = (Vec.dot(tile_min, front.uaxis.vec()) / front.uaxis.scale)
         front.vaxis.offset = (Vec.dot(tile_min, front.vaxis.vec()) / front.vaxis.scale)
 
-        for tiledef in {
-            grid_pos[u, v]
-            for u in range(min_u, max_u + 1)
-            for v in range(min_v, max_v + 1)
-        }:
+        tiledefs = set()
+        for u in range(min_u, max_u + 1):
+            for v in range(min_v, max_v + 1):
+                try:
+                    tiledefs.add(grid_pos[u, v])
+                except KeyError:
+                    pos = Vec.with_axes(
+                        norm_axis, plane_key.distance,
+                        u_axis, 32. * u + 16.,
+                        v_axis, 32. * v + 16.,
+                    )
+                    LOGGER.warning('Tile badly generated @ {}', pos)
+                    missing_tiles('info_null', origin=pos)
+        for tiledef in tiledefs:
             tiledef.brush_faces.append(front)
