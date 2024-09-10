@@ -12,6 +12,7 @@ import utils
 
 __all__ = ['LEGEND_SIZE', 'CELL_SIZE', 'ITEM_ID', 'Signage', 'SignageLegend', 'SignStyle']
 LOGGER = srctools.logger.get_logger(__name__)
+# Sizes for the generated legend texture.
 LEGEND_SIZE: Final = (512, 1024)
 CELL_SIZE: Final = 102
 # The signage item, used to trigger adding the "Configure Signage" button to its UI.
@@ -34,8 +35,9 @@ class SignageLegend(PakObject):
     It is useful to provide a backing, or to fill in unset signages.
     If provided, the blank image is inserted instead of unset signage.
 
-    Finally, the overlay is composited on top, to allow setting the unwrapped
+    The overlay is composited on top, to allow setting the unwrapped
     model parts.
+    Lastly, the numbers image is used as a spritesheet to add numbers to the sign.
     """
     def __init__(
         self,
@@ -43,11 +45,15 @@ class SignageLegend(PakObject):
         overlay: ImgHandle,
         background: ImgHandle | None,
         blank: ImgHandle | None,
+        numbers: ImgHandle | None,
+        num_off: tuple[int, int],
     ) -> None:
         self.id = sty_id
         self.overlay = overlay
         self.background = background
         self.blank = blank
+        self.numbers = numbers
+        self.num_off = num_off
 
     @classmethod
     async def parse(cls, data: ParseData) -> SignageLegend:
@@ -61,11 +67,17 @@ class SignageLegend(PakObject):
             bg = ImgHandle.parse(data.info, data.pak_id, 0, 0, subkey='background')
         else:
             bg = None
+        if 'numbers' in data.info:
+            numbers = ImgHandle.parse(data.info, data.pak_id, 0, 0, subkey='numbers')
+            num_off = data.info.int('num_left'), data.info.int('num_bottom')
+        else:
+            numbers = None
+            num_off = (0, 0)
 
         return cls(
             data.id,
             ImgHandle.parse(data.info, data.pak_id, *LEGEND_SIZE, subkey='overlay'),
-            bg, blank,
+            bg, blank, numbers, num_off,
         )
 
 

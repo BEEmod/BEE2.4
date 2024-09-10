@@ -1,5 +1,7 @@
 """Export signage configuration, and write the legend."""
 from __future__ import annotations
+
+from collections.abc import Iterator
 from typing import Final
 from pathlib import Path
 
@@ -19,7 +21,7 @@ from . import STEPS, ExportData, StepResource
 
 
 LOGGER = srctools.logger.get_logger(__name__)
-SIGN_LOC: Final = 'bee2/materials/BEE2/models/props_map_editor/signage/signage.vtf'
+SIGN_LOC: Final = 'bee2/materials/bee2/models/props_map_editor/signage/signage.vtf'
 
 
 def serialise(sign: Signage, parent: Keyvalues, style: Style) -> SignStyle | None:
@@ -104,6 +106,15 @@ async def step_signage(exp_data: ExportData) -> None:
     )
 
 
+def iter_cells() -> Iterator[tuple[int, int, int]]:
+    """Iterate over all timer values and the associated x/y pixel coordinates."""
+    for i in range(3, 31):
+        y, x = divmod(i - 3, 5)
+        if y == 5:  # Last row is shifted over to center.
+            x += 1
+        yield i, x * CELL_SIZE, y * CELL_SIZE
+
+
 def make_legend(
     sign_path: Path,
     packset: PackagesSet,
@@ -114,6 +125,8 @@ def make_legend(
     legend = Image.new('RGBA', LEGEND_SIZE, (0, 0, 0, 0))
 
     blank_img: Image.Image | None = None
+    num_sheet: Image.Image | None = None
+    num_step = num_x = num_y = 0
     for style in sel_style.bases:
         try:
             legend_info = packset.obj_by_id(SignageLegend, style.id)
@@ -122,28 +135,55 @@ def make_legend(
         else:
             overlay = legend_info.overlay.get_pil()
             if legend_info.blank is not None:
-                blank_img = legend_info.blank.get_pil().convert('RGB')
+                blank_img = legend_info.blank.get_pil()
             if legend_info.background is not None:
                 legend.paste(legend_info.background.get_pil(), (0, 0))
+            if legend_info.numbers is not None:
+                num_sheet = legend_info.numbers.get_pil()
+                num_x, num_y = legend_info.num_off
+                num_step, num_rem = divmod(num_sheet.width, 10)
+                if num_rem != 0:
+                    LOGGER.warning('Signage legend number texture width must be divisible by ten!')
             break
     else:
         LOGGER.warning('No Signage style overlay defined.')
         overlay = None
 
-    for i in range(28):
-        y, x = divmod(i, 5)
-        if y == 5:  # Last row is shifted over to center.
-            x += 1
+    for num, x, y in iter_cells():
         try:
-            ico = icons[i + 3].get_pil().resize(
+            ico = icons[num].get_pil().resize(
                 (CELL_SIZE, CELL_SIZE),
                 Image.Resampling.LANCZOS,
             ).convert('RGB')
         except KeyError:
             if blank_img is None:
+                # Blank this section.
+                legend.paste(
+                    (0, 0, 0, 0),
+                    (x, y, x + CELL_SIZE, y + CELL_SIZE),
+                )
                 continue
             ico = blank_img
-        legend.paste(ico, (x * CELL_SIZE, y * CELL_SIZE))
+        legend.paste(ico, (x, y))
+        if num_sheet is not None and ico is not blank_img:
+            tens, ones = divmod(num, 10)
+            y += CELL_SIZE - num_y - num_sheet.height
+            legend.alpha_composite(
+                num_sheet,
+                (x + num_x, y),
+                (
+                    tens * num_step, 0,
+                    (tens + 1) * num_step, num_sheet.height,
+                ),
+            )
+            legend.alpha_composite(
+                num_sheet,
+                (x + num_x + num_step, y),
+                (
+                    ones * num_step, 0,
+                    (ones + 1) * num_step, num_sheet.height,
+                ),
+            )
 
     if overlay is not None:
         legend = Image.alpha_composite(legend, overlay)
