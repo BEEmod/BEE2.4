@@ -57,12 +57,14 @@ async def from_file(
 		# If package is a special ID, this will fail.
 		pack = packset.packages[utils.ObjectID(path.package)]
 	except KeyError:
+		await trio.lowlevel.checkpoint()
 		if not missing_ok:
 			LOGGER.warning('Package does not exist: "{}"', path)
 		return BLANK
 	try:
 		file = await trio.to_thread.run_sync(pack.fsys.__getitem__, path.path)
 	except FileNotFoundError:
+		await trio.lowlevel.checkpoint()
 		if not missing_ok:
 			LOGGER.warning('File does not exist: "{}"', path)
 		return BLANK

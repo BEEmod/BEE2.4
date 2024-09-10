@@ -409,6 +409,7 @@ async def make_comp_widgets(frame: ttk.Frame, tk_img: TKImages) -> None:
     These are generally things that are aesthetic, and to do with the file and
     compilation process.
     """
+    await trio.lowlevel.checkpoint()
     make_setter("General", "packfile_auto_enable", packfile_auto_enable)
     frame.columnconfigure(0, weight=1)
 
@@ -441,6 +442,7 @@ async def make_comp_widgets(frame: ttk.Frame, tk_img: TKImages) -> None:
         variable=chosen_thumb,
         command=set_screen,
     ), TransToken.ui('Custom:'))
+    await trio.lowlevel.checkpoint()
 
     UI['thumb_label'] = ttk.Label(
         thumb_frame,
@@ -454,6 +456,7 @@ async def make_comp_widgets(frame: ttk.Frame, tk_img: TKImages) -> None:
         TransToken.ui('Cleanup old screenshots'),
     )
 
+    await trio.lowlevel.checkpoint()
     UI['thumb_auto'].grid(row=0, column=0, sticky='W')
     UI['thumb_peti'].grid(row=0, column=1, sticky='W')
     UI['thumb_custom'].grid(row=1, column=0, columnspan=2, sticky='NEW')
@@ -472,6 +475,7 @@ async def make_comp_widgets(frame: ttk.Frame, tk_img: TKImages) -> None:
         'Automatically delete unused Automatic screenshots. Disable if you want '
         'to keep things in "portal2/screenshots". '
     ))
+    await trio.lowlevel.checkpoint()
 
     if chosen_thumb.get() == 'CUST':
         # Show this if the user has set it before
@@ -482,6 +486,7 @@ async def make_comp_widgets(frame: ttk.Frame, tk_img: TKImages) -> None:
     wid_transtoken.set_text(vrad_frame, TransToken.ui('Lighting:'))
     vrad_frame.grid(row=1, column=0, sticky='ew')
 
+    await trio.lowlevel.checkpoint()
     UI['light_none'] = wid_transtoken.set_text(ttk.Radiobutton(
         vrad_frame,
         value='NONE',
@@ -500,6 +505,8 @@ async def make_comp_widgets(frame: ttk.Frame, tk_img: TKImages) -> None:
         variable=vrad_compile_type,
     ), TransToken.ui('Full'))
     UI['light_full'].grid(row=0, column=2)
+
+    await trio.lowlevel.checkpoint()
 
     light_conf_swap = TransToken.ui(  # i18n: Info for toggling lighting via a key.
         "{desc}\n\n"
@@ -528,6 +535,7 @@ async def make_comp_widgets(frame: ttk.Frame, tk_img: TKImages) -> None:
             "publishing, this is always used."
         ), keymode=TransToken.ui("Fast"),
     ))
+    await trio.lowlevel.checkpoint()
 
     packfile_enable = wid_transtoken.set_text(ttk.Checkbutton(
         frame,
@@ -558,6 +566,7 @@ async def make_comp_widgets(frame: ttk.Frame, tk_img: TKImages) -> None:
     packfile_filefield.grid(row=0, column=0, sticky='ew')
     packfile_frame.columnconfigure(0, weight=1)
     ttk.Frame(packfile_frame).grid(row=1)
+    await trio.lowlevel.checkpoint()
 
     set_pack_dump_enabled()
 
@@ -577,6 +586,7 @@ async def make_comp_widgets(frame: ttk.Frame, tk_img: TKImages) -> None:
         ttk.Label(count_frame, anchor='n'),
         TransToken.ui('Entity'),
     ).grid(row=0, column=0, columnspan=3, sticky='ew')
+    await trio.lowlevel.checkpoint()
 
     count_entity = LimitCounter(
         count_frame,
@@ -601,6 +611,7 @@ async def make_comp_widgets(frame: ttk.Frame, tk_img: TKImages) -> None:
         padx=5,
     )
 
+    await trio.lowlevel.checkpoint()
     wid_transtoken.set_text(
         ttk.Label(count_frame, anchor='center'),
         TransToken.ui('Overlay'),
@@ -619,6 +630,7 @@ async def make_comp_widgets(frame: ttk.Frame, tk_img: TKImages) -> None:
     )
     count_overlay.bar.grid(row=3, column=0, sticky='ew', padx=5)
 
+    await trio.lowlevel.checkpoint()
     UI['refresh_counts'] = SubPane.make_tool_button(
         count_frame, tk_img,
         'icons/tool_sub',
@@ -647,6 +659,7 @@ async def make_comp_widgets(frame: ttk.Frame, tk_img: TKImages) -> None:
     )
     count_brush.bar.grid(row=3, column=2, sticky='ew', padx=5)
 
+    await trio.lowlevel.checkpoint()
     refresh_counts(count_brush, count_entity, count_overlay)
 
 

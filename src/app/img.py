@@ -1025,6 +1025,7 @@ class ImgLoading(ImgIcon):
     @classmethod
     async def anim_task(cls, ui: UIImage) -> None:
         """Cycle loading icons."""
+        await trio.lowlevel.checkpoint()
         for i in itertools.cycle(LOAD_FRAME_IND):
             await trio.sleep(0.125)
             for handle, frames in cls.load_anims.values():

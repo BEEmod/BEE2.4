@@ -279,6 +279,7 @@ class Selector[IconT: Icon, OptionRowT: OptionRow](ReflowWindow):
         self.conf_id = Config.get_id(self.corr_group.id, mode, direction, attach)
         conf = config.APP.get_cur_conf(Config, self.conf_id)
 
+        await trio.lowlevel.checkpoint()
         config.APP.store_conf(UIState(mode, direction, attach, *self.ui_win_getsize()))
 
         try:
@@ -293,6 +294,7 @@ class Selector[IconT: Icon, OptionRowT: OptionRow](ReflowWindow):
             self.corr_list = []
 
         inst_enabled: dict[str, bool] = {corr.instance.casefold(): False for corr in self.corr_list}
+        await trio.lowlevel.checkpoint()
         if conf.enabled:
             for sel_id, enabled in conf.enabled.items():
                 try:
@@ -306,12 +308,14 @@ class Selector[IconT: Icon, OptionRowT: OptionRow](ReflowWindow):
 
         self.icons.reset()
         for corr in self.corr_list:
+            await trio.lowlevel.checkpoint()
             icon = self.icons.fetch()
             icon.set_highlight(False)
             icon.set_image(corr.icon)
             icon.selected = inst_enabled[corr.instance.casefold()]
         self.icons.hide_unused()
 
+        await trio.lowlevel.checkpoint()
         self.prevent_deselection()
 
         # Reset item display, it's invalid.

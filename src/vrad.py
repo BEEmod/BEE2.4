@@ -189,6 +189,7 @@ async def main(argv: list[str]) -> None:
     if not is_peti:
         # Skip everything, if the user wants these features install the Hammer Addons postcompiler.
         LOGGER.info("Hammer map detected! Skipping all transforms.")
+        await trio.lowlevel.checkpoint()
         run_vrad(full_args)
         return
 

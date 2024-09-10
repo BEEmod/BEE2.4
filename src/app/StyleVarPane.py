@@ -247,7 +247,7 @@ async def make_stylevar_pane(
             nursery.start_soon(state_sync_task, var.id, int_var, chk)
 
         for var in VAR_LIST:
-            await trio.sleep(0)
+            await trio.lowlevel.checkpoint()
             tk_vars[var.id] = int_var = IntVar(value=var.enabled)
             desc = make_desc(packset, var)
             if var.applies_to_all(packset):

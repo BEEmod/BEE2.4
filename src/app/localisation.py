@@ -179,6 +179,7 @@ async def gradual_iter[K, V](wdict: weakref.WeakKeyDictionary[K, V]) -> AsyncGen
 
     Any added after we start would have been set to the new language.
     """
+    await trio.lowlevel.checkpoint()
     for ref in wdict.keyrefs():
         await trio.lowlevel.checkpoint()
         key = ref()
@@ -481,8 +482,9 @@ async def load_aux_langs(
     async def package_lang(pak_id: str, fsys: FileSystem) -> None:
         """Load the package language in the background."""
         for code in expanded:
+            await trio.lowlevel.checkpoint()
             try:
-                file = fsys[f'resources/i18n/{code}.mo']
+                file = await trio.to_thread.run_sync(fsys.__getitem__, f'resources/i18n/{code}.mo')
             except FileNotFoundError:
                 continue
             LOGGER.debug('Found localisation file {}:{}', pak_id, file.path)
@@ -524,14 +526,16 @@ async def get_package_tokens(packset: packages.PackagesSet) -> AsyncGenerator[Tr
     for pack in packset.packages.values():
         yield pack.disp_name, 'package/name'
         yield pack.desc, 'package/desc'
+        await trio.lowlevel.checkpoint()
         for tok_id, tok in pack.additional_tokens.items():
+            await trio.lowlevel.checkpoint()
             yield tok, f'package/cust/{tok_id}'
     for obj_type in packset.objects:
         LOGGER.debug('Checking object type {}', obj_type.__name__)
         for obj in packset.all_obj(obj_type):
             for tup in obj.iter_trans_tokens():
+                await trio.lowlevel.checkpoint()
                 yield tup
-            await trio.lowlevel.checkpoint()
 
 
 def _get_children(tok: TransToken) -> Iterator[TransToken]:

@@ -4,6 +4,7 @@ from typing import Final
 
 import attrs
 import srctools.logger
+import trio
 
 from packages import PakObject, PakRef, ParseData, Style
 from app.img import Handle as ImgHandle
@@ -51,6 +52,7 @@ class SignageLegend(PakObject):
     @classmethod
     async def parse(cls, data: ParseData) -> SignageLegend:
         """Parse a signage legend."""
+        await trio.lowlevel.checkpoint()
         if 'blank' in data.info:
             blank = ImgHandle.parse(data.info, data.pak_id, CELL_SIZE, CELL_SIZE, subkey='blank')
         else:
@@ -91,6 +93,7 @@ class Signage(PakObject, allow_mult=True, needs_foreground=True):
 
     @classmethod
     async def parse(cls, data: ParseData) -> Signage:
+        await trio.lowlevel.checkpoint()
         styles: dict[PakRef[Style], SignStyle] = {}
         for prop in data.info.find_children('styles'):
             sty_id = PakRef.parse(Style, prop.real_name)

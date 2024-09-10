@@ -220,6 +220,7 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
     @override
     async def parse(cls, data: packages.ParseData) -> ConfigGroup:
         """Parse the config group from info.txt."""
+        await trio.lowlevel.checkpoint()
         props = data.info
 
         if data.is_override:
@@ -234,7 +235,7 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
         multi_widgets: list[MultiWidget] = []
 
         for wid in props.find_all('Widget'):
-            await trio.sleep(0)
+            await trio.lowlevel.checkpoint()
             try:
                 kind = WIDGET_KINDS[wid['type'].casefold()]
             except KeyError:

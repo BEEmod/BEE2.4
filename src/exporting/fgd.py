@@ -22,6 +22,7 @@ if TYPE_CHECKING:
 @STEPS.add_step(prereq=[], results=[])
 async def step_edit_fgd(exp: ExportData) -> None:
     """Modify the FGD."""
+    await trio.lowlevel.checkpoint()
     if not config.APP.get_cur_conf(GenOptions).preserve_fgd:
         await trio.to_thread.run_sync(edit_fgd, exp.game, True)
 

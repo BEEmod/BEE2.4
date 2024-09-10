@@ -1519,6 +1519,7 @@ async def main(argv: list[str]) -> None:
 
     """
     LOGGER.info("BEE{} VBSP hook initiallised, srctools v{}.", utils.BEE_VERSION, srctools.__version__)
+    await trio.lowlevel.checkpoint()
 
     # Warn if srctools Cython code isn't installed.
     utils.check_cython(LOGGER.warning)
@@ -1606,6 +1607,7 @@ async def main(argv: list[str]) -> None:
 
     if is_hammer:
         LOGGER.warning("Hammer map detected! skipping conversion..")
+        await trio.lowlevel.checkpoint()
         run_vbsp(
             vbsp_args=old_args,
             path=path,

@@ -120,6 +120,7 @@ async def find_folder(game: Game) -> Path:
     async with trio.open_nursery() as nursery:
         for filename, event in zip(potentials, events, strict=True):
             nursery.start_soon(worker, filename, event)
+        await trio.lowlevel.checkpoint()
         for filename, event in zip(potentials, events, strict=True):
             await event.wait()
             if results[filename]:

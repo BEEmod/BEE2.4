@@ -127,13 +127,16 @@ async def load_server() -> Tuple[int, str]:
 
     # Wait for it to boot, and update the ports file.
     with trio.move_on_after(5.0):
+        await trio.lowlevel.checkpoint()
         while proc.returncode is None:
+            await trio.lowlevel.checkpoint()
             try:
                 data = json.loads(await ASYNC_SERVER_INFO.read_text('utf8'))
             except (FileNotFoundError, json.JSONDecodeError):
                 await trio.sleep(0.1)
                 continue
             else:
+                await trio.lowlevel.checkpoint()
                 port = data['port']
                 coop_text = data.get('coop_text', '')
                 assert isinstance(port, int), data

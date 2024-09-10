@@ -479,6 +479,7 @@ async def load_packages(
     This must be called before initMain() can run.
     """
     global skybox_win, voice_win, style_win, elev_win
+    await trio.lowlevel.checkpoint()
 
     for item in packset.all_obj(packages.Item):
         item_list[item.id] = Item(item)
@@ -501,6 +502,7 @@ async def load_packages(
         ],
     ))
     core_nursery.start_soon(skybox_win.task)
+    await trio.lowlevel.checkpoint()
 
     voice_win = SelectorWin(TK_ROOT, SelectorOptions(
         func_get_ids=packages.QuotePack.selector_id_getter(True),
@@ -521,6 +523,7 @@ async def load_packages(
         ],
     ))
     core_nursery.start_soon(voice_win.task)
+    await trio.lowlevel.checkpoint()
 
     style_win = SelectorWin(TK_ROOT, SelectorOptions(
         func_get_ids=packages.Style.selector_id_getter(False),
@@ -544,6 +547,7 @@ async def load_packages(
         ]
     ))
     core_nursery.start_soon(style_win.task)
+    await trio.lowlevel.checkpoint()
 
     elev_win = SelectorWin(TK_ROOT, SelectorOptions(
         func_get_ids=packages.Elevator.selector_id_getter(True),
@@ -565,6 +569,7 @@ async def load_packages(
         ]
     ))
     core_nursery.start_soon(elev_win.task)
+    await trio.lowlevel.checkpoint()
 
     suggest_windows[packages.QuotePack] = voice_win
     suggest_windows[packages.Skybox] = skybox_win
@@ -908,7 +913,9 @@ def drag_fast(drag_item: PalItem, e: tk.Event[tk.Misc]) -> None:
 async def set_palette(chosen_pal: paletteUI.Palette, flow_picker: Callable[[], object]) -> None:
     """Select a palette."""
     pal_clear()
+    await trio.lowlevel.checkpoint()
     for coord in paletteUI.COORDS:
+        await trio.lowlevel.checkpoint()
         try:
             item, sub = chosen_pal.items[coord]
         except KeyError:
@@ -940,8 +947,10 @@ async def set_palette(chosen_pal: paletteUI.Palette, flow_picker: Callable[[], o
         LOGGER.info('Settings: {}', conf)
         await config.APP.apply_multi(conf)
 
+    await trio.lowlevel.checkpoint()
     flow_preview()
     if old_mandatory is not mandatory_unlocked():
+        await trio.lowlevel.checkpoint()
         # Changed, update the preview.
         flow_picker()
 
@@ -1203,6 +1212,7 @@ async def init_picker(
     task_status: trio.TaskStatus[Callable[[], None]] = trio.TASK_STATUS_IGNORED,
 ) -> None:
     """Construct the frame holding all the items."""
+    await trio.lowlevel.checkpoint()
     global frmScroll, pal_canvas
     wid_transtoken.set_text(
         ttk.Label(f, anchor="center"),
@@ -1238,13 +1248,14 @@ async def init_picker(
     items.sort(key=operator.attrgetter('pak_id'), reverse=True)
 
     for item in items:
-        await trio.sleep(0)
+        await trio.lowlevel.checkpoint()
         for i, subtype in enumerate(item.data.editor.subtypes):
             if subtype.pal_icon or subtype.pal_name:
                 pal_items.append(PalItem(frmScroll, item, sub=i, is_pre=False))
 
     reflow_event = trio.Event()
     conf = config.APP.get_cur_conf(FilterConf)
+    await trio.lowlevel.checkpoint()
 
     async def wait_filter() -> None:
         """Trigger whenever the filter configuration changes."""
@@ -1254,6 +1265,7 @@ async def init_picker(
                 reflow_event.set()
 
     async with trio.open_nursery() as nursery:
+        await trio.lowlevel.checkpoint()
         nursery.start_soon(wait_filter)
 
         # Late-binding!
@@ -1313,6 +1325,7 @@ async def _flow_picker(filter_conf: FilterConf) -> None:
         else:
             pal_item.label.place_forget()
 
+    await trio.lowlevel.checkpoint()
     num_items = i
 
     height = int(math.ceil(num_items / width)) * 65 + 2
@@ -1426,7 +1439,7 @@ async def init_windows(
         height=preview_frame.winfo_reqheight()+5,
     )  # Prevent making the window smaller than the preview pane
 
-    await trio.sleep(0)
+    await trio.lowlevel.checkpoint()
     await LOAD_UI.step('preview')
 
     ttk.Separator(ui_bg, orient='vertical').grid(
@@ -1590,7 +1603,7 @@ async def init_windows(
     # Make scrollbar work globally
     tk_tools.add_mousewheel(pal_canvas, TK_ROOT)
 
-    await trio.sleep(0)
+    await trio.lowlevel.checkpoint()
     await core_nursery.start(backup_win.init_toplevel, tk_img)
     await LOAD_UI.step('backup')
     voiceEditor.init_widgets()
@@ -1678,6 +1691,7 @@ async def init_windows(
 
     async def enable_export() -> None:
         """Enable exporting only after all packages are loaded."""
+        await trio.lowlevel.checkpoint()
         packset = packages.get_loaded_packages()
         for cls in packages.OBJ_TYPES.values():
             await packset.ready(cls).wait()
