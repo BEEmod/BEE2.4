@@ -284,10 +284,10 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
                         f'"{data.id}.{wid_id}": Legacy Stylevars can only be singular!'
                     )
                 if prev_conf is EmptyMapping:
-                    prev_conf = config.APP.get_cur_conf(
+                    prev_conf = bool_as_int(config.APP.get_cur_conf(
                         StyleVarState, stylevar_id,
-                        StyleVarState(conv_bool(default_prop)),
-                    )
+                        StyleVarState(conv_bool(default_prop.value)),
+                    ).value)
                     LOGGER.debug('Converted legacy stylevar "{}"', stylevar_id)
 
             if is_timer:
