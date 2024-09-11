@@ -738,7 +738,8 @@ def gen_item_outputs(vmf: VMF) -> None:
     This performs an optimization pass over items with outputs to remove
     redundancy, then applies all the outputs to the instances. Before this,
     connection count and inversion values are not valid. After this point,
-    items may not have connections altered.
+    items may not have connections altered, but the connection count is set,
+    checkmark/timer instances exist, etc.
     """
     LOGGER.info('Generating item IO...')
 

@@ -17,13 +17,16 @@ def res_add_output(res: Keyvalues) -> Callable[[Entity], None]:
     Values:
 
     - `output`: The output name. Can be `<ITEM_ID:activate>` or `<ITEM_ID:deactivate>`
-      to look up the output from that item type.
-    - `target`: The name of the target entity
-    - `input`: The input to give
-    - `parm`: Parameters for the input
-    - `delay`: Delay for the output
-    - `only_once`: True to make the input last only once (overrides times)
-    - `times`: The number of times to trigger the input
+      to look up the output from that item type. (This is unrelated to instance lookups.)
+    - `target`: The name of the target entity, local to the instance (if not starting
+      with `@` or `!`). If the target is blank, it is fired directly at the instance. That
+      is only useful if [`replaceInstance`](#replaceInstance) has been used to convert the
+      instance into another entity.
+    - `input`: The input to give.
+    - `parm`: Parameters for the input.
+    - `delay`: Delay for the output.
+    - `only_once`: True to make the input last only once (overrides times).
+    - `times`: The number of times to trigger the input.
     """
     conf_output = res['output']
     input_name = res['input']
@@ -41,7 +44,7 @@ def res_add_output(res: Keyvalues) -> Callable[[Entity], None]:
         out_type = out_type.strip().casefold()
     else:
         out_id = utils.obj_id(conf_output, 'item')
-        out_type = 'const'
+        out_type = None
 
     def add_output(inst: Entity) -> None:
         """Add the output."""
@@ -51,18 +54,26 @@ def res_add_output(res: Keyvalues) -> Callable[[Entity], None]:
             except KeyError:
                 LOGGER.warning('"{}" has no connections!', out_id)
                 return
-            if out_type[0] == 'a':
+            if out_type == 'activate':
                 if item_type.output_act is None:
+                    LOGGER.warning('"{}" has no activation output!', out_id)
                     return
 
                 inst_out, output = item_type.output_act
             else:
                 if item_type.output_deact is None:
+                    LOGGER.warning('"{}" has no deactivation output!', out_id)
                     return
                 inst_out, output = item_type.output_deact
-        else:
+        elif out_type is None:
             output = out_id
             inst_out = conf_inst_out
+        else:
+            LOGGER.warning(
+                'Unknown output type "{}", expected "activate" or "deactivate"!',
+                out_type,
+            )
+            return
 
         inst.add_out(Output(
             inst.fixup.substitute(output),

@@ -961,7 +961,7 @@ async def dump_conditions(filename: trio.Path) -> None:
         ]
         for lookup, name in all_cond_types:
             await file.write('<!------->\n')
-            await file.write(f'# {name}\n')
+            await file.write(f'## {name}\n')
             await file.write('<!------->\n')
 
             lookup_grouped: dict[str, list[

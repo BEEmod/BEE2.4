@@ -1217,7 +1217,9 @@ def res_script_cube_predicate(vmf: VMF, ent: Entity, res: Keyvalues) -> object:
 def link_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
     """Determine the cubes set based on instance settings.
 
-    This sets data, but doesn't implement the changes.
+    This sets the cube type used by droppers. Marker items like Cube Colourisers,
+    Superposition Entanglers, gel splats (if applied to a dropper) and custom cube items
+    will have been removed.
     """
     # cube or dropper -> cubetype or droppertype value.
     inst_to_cube: dict[str, CubeType] = {
@@ -1918,7 +1920,11 @@ def make_cube(
 
 @conditions.MetaCond.GenerateCubes.register
 def generate_cubes(vmf: VMF, info: conditions.MapInfo) -> None:
-    """After other conditions are run, generate cubes."""
+    """Generates cube instances.
+
+    After this point, all the addon instances, cube entities, droppers etc have been
+    generated.
+    """
     bounce_in_map = info.has_attr('bouncegel')
     speed_in_map = info.has_attr('speedgel')
 

@@ -140,6 +140,45 @@ def res_switch(
     The special group `"<default>"` is only run if no other test is valid.
     For `random` mode, you can omit the test to choose from all objects. In
     this case the test arguments are ignored.
+
+    For example:
+    ```keyvalues
+    "Switch"
+        {
+        "method" "first"
+        "test" "instvar"
+        "$cube_type 0" // "instvar" "cube_type 0"
+            {
+            ...
+            }
+        "$cube_type 1"
+            {
+            ...
+            }
+        "<default>"
+            {
+            // Run for all other types.
+            }
+        }
+    // Random mode:
+    "Switch"
+        {
+        "method" "random"
+        "seed" "unique text"
+        ""
+            {
+            // Choice 1
+            }
+        ""
+            {
+            // Choice 2
+            }
+        ""
+            {
+            // Choice 3
+            }
+        }
+    ```
     """
     test_name = ''
     method = SwitchType.FIRST

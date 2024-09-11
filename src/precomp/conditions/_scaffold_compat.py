@@ -67,7 +67,7 @@ SCAFFOLD_CONFIGS: Dict[str, Tuple[
 def res_old_unst_scaffold(res: Keyvalues) -> None:
     """The pre-2.4.40 version of the condition used to generate Unstationary Scaffolds.
 
-    This has since been swapped to use the LinkedItems result, but this is kept for package
+    This has since been swapped to use the [LinkedItems](#LinkedItems) result, but this is kept for package
     compatiblity.
     """
     group = res['group', 'DEFAULT_GROUP']
@@ -134,7 +134,10 @@ def res_old_unst_scaffold(res: Keyvalues) -> None:
 
 @conditions.MetaCond.ScaffoldLinkOld.register
 def legacy_scaffold_link(vmf: VMF) -> None:
-    """Apply the legacy scaffold logic."""
+    """Apply the legacy [scaffold](#UnstScaffold) logic.
+
+    Prefer using [LinkedItems](#LinkedItems) instead.
+    """
     if not SCAFFOLD_CONFIGS:
         return
 
