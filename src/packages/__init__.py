@@ -495,9 +495,9 @@ class PakObject:
         pass
 
     @classmethod
-    async def migrate_config(cls, packset: PackagesSet, conf: Config) -> None:
+    async def migrate_config(cls, packset: PackagesSet, conf: Config) -> Config:
         """Update configs based on the loaded packages."""
-        pass
+        return conf
 
 
 class SelPakObject(PakObject):
@@ -722,10 +722,8 @@ class PackagesSet:
 
     async def migrate_conf(self, conf: Config) -> Config:
         """Migrate configs based on the loaded packages."""
-        conf = conf.copy()
-        async with trio.open_nursery() as nursery:
-            for cls in OBJ_TYPES.values():
-                nursery.start_soon(cls.migrate_config, self, conf)
+        for cls in OBJ_TYPES.values():
+            conf = await cls.migrate_config(self, conf)
         return conf
 
 

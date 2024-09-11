@@ -6,7 +6,7 @@ They can then fetch the current state and store new state.
 from __future__ import annotations
 
 from typing import ClassVar, Self, cast, override
-from collections.abc import Generator, ItemsView, Iterator, KeysView
+from collections.abc import Generator, ItemsView, Iterator, KeysView, Mapping
 from pathlib import Path
 import abc
 import contextlib
@@ -107,13 +107,13 @@ class Data(abc.ABC):
         return Element.from_kv1(self.export_kv1())
 
 
-@attrs.define(repr=False)
+@attrs.frozen(repr=False)
 class Config:
     """The current data loaded from the config file.
 
     This maps an ID to each value, or is {'': data} if no key is used.
     """
-    _data: dict[type[Data], dict[str, Data]] = attrs.Factory(dict)
+    _data: Mapping[type[Data], Mapping[str, Data]] = attrs.Factory(dict)
 
     def __repr__(self) -> str:
         vals = ', '.join([
@@ -125,7 +125,7 @@ class Config:
     def copy(self) -> Config:
         """Copy the config, assuming values are immutable."""
         return Config({
-            cls: data_map.copy()
+            cls: dict(data_map)
             for cls, data_map in self._data.items()
         })
 
@@ -153,32 +153,34 @@ class Config:
         if data_id and not info.uses_id:
             raise ValueError(f'Data type "{info.name}" does not support IDs!')
         LOGGER.debug('Storing conf {}[{}] = {!r}', info.name, data_id, data)
-        self.get_or_blank(cls)[data_id] = data
-        return self.copy()
-
-    def overwrite[D: Data](self, cls: type[D], data_map: dict[str, D]) -> None:
-        """Overwrite the map for a type."""
-        self._data[cls] = data_map  # type: ignore
-
-    def get_or_blank[D: Data](self, cls: type[D]) -> dict[str, D]:
-        """Return the map for a single type, setting it to empty if not found."""
-        res: dict[str, Data]
         try:
-            res = self._data[cls]
+            data_map = dict(self._data[cls])
         except KeyError:
-            self._data[cls] = res = {}
-        return res  # type: ignore
+            data_map = {data_id: data}
+        else:
+            data_map[data_id] = data
+        return Config({
+            **self._data,
+            cls: data_map,
+        })
+
+    def with_cls_map[D: Data](self, cls: type[D], data_map: Mapping[str, D]) -> Config:
+        """Return a copy with an entire class replaced."""
+        return Config({
+            **self._data,
+            cls: data_map,
+        })
 
     def discard[D: Data](self, cls: type[D], data_id: str) -> tuple[Config, D | None]:
         """Remove the specified data ID, returning the value or None if not present."""
         try:
             # If cls or data_id is not present, raises.
-            data_map = self._data[cls].copy()
+            data_map = dict(self._data[cls])
             popped = cast(D, data_map.pop(data_id))
         except KeyError:
             return self, None
 
-        copy = self._data.copy()
+        copy = dict(self._data)
         if data_map:
             # This data map is missing just the specified ID.
             copy[cls] = data_map
@@ -191,7 +193,7 @@ class Config:
         """Return a view over the types present in the config."""
         return self._data.keys()
 
-    def items(self) -> ItemsView[type[Data], dict[str, Data]]:
+    def items(self) -> ItemsView[type[Data], Mapping[str, Data]]:
         """Return a view over the types and associated items."""
         return self._data.items()
 
@@ -324,9 +326,8 @@ class ConfigSpec:
         if filter_to is None:
             filter_to = self
 
-        # Fully copy the Config structure so these don't interact with each other.
         return Config({
-            cls: conf_map.copy()
+            cls: conf_map
             for cls, conf_map in self._current.items()
             if cls in filter_to._registered
         })
@@ -340,7 +341,7 @@ class ConfigSpec:
         for cls, opt_map in config.items():
             if cls not in self._registered:
                 continue
-            self._current.overwrite(cls, opt_map.copy())
+            self._current = self._current.with_cls_map(cls, opt_map)
 
     async def apply_multi(self, config: Config) -> None:
         """Merge the values into our config, then apply the changed types.
@@ -459,8 +460,11 @@ class ConfigSpec:
                     info.name, version, info.version,
                 )
                 upgraded = True
-            data_map = conf.get_or_blank(cls)
             if info.uses_id:
+                try:
+                    data_map = dict(conf.items_cls(cls))
+                except KeyError:
+                    data_map = {}
                 for data_prop in child:
                     try:
                         data_map[data_prop.real_name] = cls.parse_kv1(data_prop, version)
@@ -470,15 +474,18 @@ class ConfigSpec:
                             info.name, data_prop.real_name,
                             exc_info=True,
                         )
+                conf = conf.with_cls_map(cls, data_map)
             else:
                 try:
-                    data_map[''] = cls.parse_kv1(child, version)
+                    data = cls.parse_kv1(child, version)
                 except Exception:
                     LOGGER.warning(
                         'Failed to parse config {}:',
                         info.name,
                         exc_info=True,
                     )
+                else:
+                    conf = conf.with_value(data)
         return conf, upgraded
 
     def _parse_legacy(self, kv: Keyvalues) -> Config:
@@ -489,11 +496,11 @@ class ConfigSpec:
             info = cls.get_conf_info()
             if hasattr(cls, 'parse_legacy'):
                 new = cls.parse_legacy(kv)
-                conf.overwrite(cls, new)
+                conf = conf.with_cls_map(cls, new)
                 LOGGER.info('Converted legacy {} to {}', info.name, new)
             else:
                 LOGGER.warning('No legacy conf for "{}"!', info.name)
-                conf.overwrite(cls, {})
+                conf = conf.with_cls_map(cls, {})
         return conf
 
     def parse_dmx(self, dmx: Element, fmt_name: str, fmt_version: int) -> tuple[Config, bool]:
@@ -539,8 +546,11 @@ class ConfigSpec:
                     info.name, version, info.version,
                 )
                 upgraded = True
-            data_map = conf.get_or_blank(cls)
             if info.uses_id:
+                try:
+                    data_map = dict(conf.items_cls(cls))
+                except KeyError:
+                    data_map = {}
                 for data_attr in child.values():
                     if data_attr.name == 'name' or data_attr.type is not DMXTypes.ELEMENT:
                         continue
@@ -559,15 +569,18 @@ class ConfigSpec:
                             info.name, data.name,
                             exc_info=True,
                         )
+                conf = conf.with_cls_map(cls, data_map)
             else:
                 try:
-                    data_map[''] = cls.parse_dmx(child, version)
+                    parsed = cls.parse_dmx(child, version)
                 except Exception:
                     LOGGER.warning(
                         'Failed to parse config {}:',
                         info.name,
                         exc_info=True,
                     )
+                else:
+                    conf = conf.with_value(parsed)
         return conf, upgraded
 
     def build_kv1(self, conf: Config) -> Iterator[Keyvalues]:
@@ -649,8 +662,7 @@ class ConfigSpec:
                 pass
             return
 
-        conf, _ = self.parse_kv1(kv)
-        self._current._data = conf._data
+        self._current, _ = self.parse_kv1(kv)
 
     def write_file(self, filename: Path) -> None:
         """Write the settings to disk."""

@@ -388,11 +388,9 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
 
     @classmethod
     @override
-    async def migrate_config(cls, packset: PackagesSet, conf: Config) -> None:
+    async def migrate_config(cls, packset: PackagesSet, conf: Config) -> Config:
         """Update configs to migrate stylevars."""
         await packset.ready(cls).wait()
-        wid_map = conf.get_or_blank(WidgetConfig)
-        var_map = conf.get_or_blank(StyleVarState)
 
         for group in packset.all_obj(cls):
             for wid in group.widgets:
@@ -400,14 +398,22 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
                 if not wid.stylevar_id:
                     continue
                 wid_id = wid.conf_id()
-                if wid_id not in wid_map and wid.stylevar_id in var_map:
-                    wid_map[wid_id] = WidgetConfig(bool_as_int(
-                        var_map.pop(wid.stylevar_id).value
-                    ))
+                try:
+                    conf.get(WidgetConfig, wid_id)
+                    continue  # Already present.
+                except KeyError:
+                    pass
+                conf, stylevar = conf.discard(StyleVarState, wid.stylevar_id)
+                if stylevar is not None:
+                    conf = conf.with_value(
+                        WidgetConfig(bool_as_int(stylevar.value)),
+                        wid_id,
+                    )
                     LOGGER.info(
                         'Migrate stylevar {} -> widget {}',
                         wid.stylevar_id, wid_id,
                     )
+        return conf
 
     def widget_ids(self) -> set[str]:
         """Return the set of widget IDs used."""
