@@ -133,9 +133,28 @@ class Config:
         """Check if we have any values assigned."""
         return not any(self._data.values())
 
-    def _get_map[D: Data](self, cls: type[D]) -> dict[str, D]:
-        """Return the map for a single type."""
-        return self._data[cls]  # type: ignore
+    def get[D: Data](
+        self,
+        cls: type[D],
+        data_id: str = '',
+    ) -> D:
+        """Fetch the value defined for a specific ID."""
+        info = cls.get_conf_info()
+        if data_id and not info.uses_id:
+            raise ValueError(f'Data type "{info.name}" does not support IDs!')
+        data_map = cast('dict[str, D]', self._data[cls])
+        return data_map[data_id]
+
+    def with_value(self, data: Data, data_id: str = '') -> Config:
+        """Return a copy of the config with the data stored under the specified ID."""
+        cls = type(data)
+        info = cls.get_conf_info()
+
+        if data_id and not info.uses_id:
+            raise ValueError(f'Data type "{info.name}" does not support IDs!')
+        LOGGER.debug('Storing conf {}[{}] = {!r}', info.name, data_id, data)
+        self.get_or_blank(cls)[data_id] = data
+        return self.copy()
 
     def overwrite[D: Data](self, cls: type[D], data_map: dict[str, D]) -> None:
         """Overwrite the map for a type."""
@@ -150,25 +169,36 @@ class Config:
             self._data[cls] = res = {}
         return res  # type: ignore
 
-    def discard(self, cls: type[Data], data_id: str) -> bool:
-        """Remove the specified data ID, returning whether a change occurred."""
+    def discard[D: Data](self, cls: type[D], data_id: str) -> tuple[Config, D | None]:
+        """Remove the specified data ID, returning the value or None if not present."""
         try:
-            data_map = self._data[cls]
-            data_map.pop(data_id)
+            # If cls or data_id is not present, raises.
+            data_map = self._data[cls].copy()
+            popped = cast(D, data_map.pop(data_id))
         except KeyError:
-            return False
-        if not data_map:
-            # Clean up any empty dicts.
-            del self._data[cls]
-        return True
+            return self, None
 
-    def keys(self) -> KeysView[type[Data]]:
+        copy = self._data.copy()
+        if data_map:
+            # This data map is missing just the specified ID.
+            copy[cls] = data_map
+        else:
+            # Last ID for this class, remove entirely.
+            del copy[cls]
+        return Config(copy), popped
+
+    def classes(self) -> KeysView[type[Data]]:
         """Return a view over the types present in the config."""
         return self._data.keys()
 
     def items(self) -> ItemsView[type[Data], dict[str, Data]]:
         """Return a view over the types and associated items."""
         return self._data.items()
+
+    def items_cls[D: Data](self, cls: type[D]) -> ItemsView[str, D]:
+        """Return a view over the items for a specific class."""
+        data_map = cast('dict[str, D]', self._data[cls])
+        return data_map.items()
 
 
 @attrs.define(eq=False)
@@ -237,13 +267,11 @@ class ConfigSpec:
         rec: trio.MemoryReceiveChannel[DataT]
         send, rec = trio.open_memory_channel(1)
 
-        data_map = self._current._get_map(typ)
         try:
-            current = data_map[data_id]
+            current = self._current.get(typ, data_id)
         except KeyError:
             pass
         else:
-            assert isinstance(current, typ), info
             # Can't possibly block, we just created this.
             send.send_nowait(current)
         chan_list.append(send)
@@ -266,7 +294,7 @@ class ConfigSpec:
             if not info.uses_id:
                 raise ValueError(f'Data type "{info.name}" does not support IDs!')
             try:
-                data = self._current._get_map(typ)[data_id]
+                data = self._current.get(typ, data_id)
                 channel_list = self._apply_channel[typ, data_id]
             except KeyError:
                 LOGGER.warning('{}[{!r}] has no UI channel!', info.name, data_id)
@@ -277,12 +305,12 @@ class ConfigSpec:
                         nursery.start_soon(channel.send, data)
         else:
             try:
-                data_map = self._current._get_map(typ)
+                data_map = self._current.items_cls(typ)
             except KeyError:
                 LOGGER.warning('{}[:] has no UI channel!', info.name)
                 return
             async with trio.open_nursery() as nursery:
-                for dat_id, data in data_map.items():
+                for dat_id, data in data_map:
                     try:
                         channel_list = self._apply_channel[typ, dat_id]
                     except KeyError:
@@ -322,7 +350,7 @@ class ConfigSpec:
         """
         self.merge_conf(config)
         async with trio.open_nursery() as nursery:
-            for cls in config.keys():
+            for cls in config.classes():
                 if cls in self._registered:
                     nursery.start_soon(self.apply_conf, cls)
 
@@ -343,18 +371,18 @@ class ConfigSpec:
         if cls not in self._registered:
             raise ValueError(f'Unregistered data type {cls!r}')
         info = cls.get_conf_info()
-        if data_id and not info.uses_id:
-            raise ValueError(f'Data type "{info.name}" does not support IDs!')
         data: DataT | None = None
         try:
-            data = self._current._get_map(cls)[data_id]
+            return self._current.get(cls, data_id)
         except KeyError:
             if legacy_id:
                 try:
-                    conf_map = self._current._get_map(cls)
-                    data = conf_map[data_id] = conf_map.pop(legacy_id)
+                    conf, data = self._current.discard(cls, legacy_id)
+                    if data is not None:
+                        self._current = conf.with_value(data, data_id)
                 except KeyError:
                     pass
+
         if data is None:
             # Return a default value.
             if isinstance(default, type) and issubclass(default, Exception):
@@ -373,13 +401,7 @@ class ConfigSpec:
         """Update the current data for this ID. """
         if type(data) not in self._registered:
             raise ValueError(f'Unregistered data type {type(data)!r}')
-        cls = type(data)
-        info = cls.get_conf_info()
-
-        if data_id and not info.uses_id:
-            raise ValueError(f'Data type "{info.name}" does not support IDs!')
-        LOGGER.debug('Storing conf {}[{}] = {!r}', info.name, data_id, data)
-        self._current.get_or_blank(cls)[data_id] = data
+        self._current = self._current.with_value(data, data_id)
 
     def discard_conf(self, cls: type[Data], data_id: str = '') -> None:
         """Remove the specified ID."""
@@ -389,8 +411,10 @@ class ConfigSpec:
 
         if data_id and not info.uses_id:
             raise ValueError(f'Data type "{info.name}" does not support IDs!')
-        if self._current.discard(cls, data_id):
+        new_conf, popped = self._current.discard(cls, data_id)
+        if self._current.discard(cls, data_id) is not None:
             LOGGER.debug('Discarding conf {}[{}]', info.name, data_id)
+            self._current = new_conf
 
     def parse_kv1(self, kv: Keyvalues) -> tuple[Config, bool]:
         """Parse a configuration file into individual data.
