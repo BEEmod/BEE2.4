@@ -133,7 +133,7 @@ class Config:
         """Check if we have any values assigned."""
         return not any(self._data.values())
 
-    def get[D: Data](self, cls: type[D]) -> dict[str, D]:
+    def _get_map[D: Data](self, cls: type[D]) -> dict[str, D]:
         """Return the map for a single type."""
         return self._data[cls]  # type: ignore
 
@@ -237,7 +237,7 @@ class ConfigSpec:
         rec: trio.MemoryReceiveChannel[DataT]
         send, rec = trio.open_memory_channel(1)
 
-        data_map = self._current.get(typ)
+        data_map = self._current._get_map(typ)
         try:
             current = data_map[data_id]
         except KeyError:
@@ -266,7 +266,7 @@ class ConfigSpec:
             if not info.uses_id:
                 raise ValueError(f'Data type "{info.name}" does not support IDs!')
             try:
-                data = self._current.get(typ)[data_id]
+                data = self._current._get_map(typ)[data_id]
                 channel_list = self._apply_channel[typ, data_id]
             except KeyError:
                 LOGGER.warning('{}[{!r}] has no UI channel!', info.name, data_id)
@@ -277,7 +277,7 @@ class ConfigSpec:
                         nursery.start_soon(channel.send, data)
         else:
             try:
-                data_map = self._current.get(typ)
+                data_map = self._current._get_map(typ)
             except KeyError:
                 LOGGER.warning('{}[:] has no UI channel!', info.name)
                 return
@@ -347,11 +347,11 @@ class ConfigSpec:
             raise ValueError(f'Data type "{info.name}" does not support IDs!')
         data: DataT | None = None
         try:
-            data = self._current.get(cls)[data_id]
+            data = self._current._get_map(cls)[data_id]
         except KeyError:
             if legacy_id:
                 try:
-                    conf_map = self._current.get(cls)
+                    conf_map = self._current._get_map(cls)
                     data = conf_map[data_id] = conf_map.pop(legacy_id)
                 except KeyError:
                     pass
