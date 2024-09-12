@@ -19,6 +19,7 @@ from app import (
     quit_app,
 )
 from async_util import EdgeTrigger
+from trio_util import AsyncValue
 from ui_tk import tk_tools, help_menu
 from ui_tk.dialogs import DIALOG
 from ui_tk.img import TKImages
@@ -50,6 +51,7 @@ class MenuBar:
         self,
         parent: tk.Tk,
         export: Callable[[], object],
+        export_ready: AsyncValue[bool],
     ) -> None:
         """Create the top menu bar.
 
@@ -59,6 +61,7 @@ class MenuBar:
         self.export_func = export
         self.evt_add_game = EdgeTrigger[()]()
         self.evt_remove_game = EdgeTrigger[()]()
+        self.export_ready = export_ready
         self.bar = bar = tk.Menu(parent, name='main_menu')
         # Suppress ability to make each menu a separate window - weird old
         # TK behaviour
@@ -154,6 +157,7 @@ class MenuBar:
             nursery.start_soon(help_menu.create, self.help_menu, tk_img)
             nursery.start_soon(self._update_export_btn_task)
             nursery.start_soon(self._update_folder_btns_task)
+            nursery.start_soon(self._enable_export_task)
             nursery.start_soon(_button_task, self.evt_add_game, gameMan.add_game)
             nursery.start_soon(_button_task, self.evt_remove_game, gameMan.remove_game)
             nursery.start_soon(
@@ -167,6 +171,11 @@ class MenuBar:
             if self.dev_menu is not None:
                 from ui_tk import devmenu
                 nursery.start_soon(devmenu.menu_task, self.dev_menu)
+
+    async def _enable_export_task(self) -> None:
+        async with aclosing(self.export_ready.eventual_values()) as agen:
+            async for enabled in agen:
+                self.set_export_allowed(enabled)
 
     async def _update_export_btn_task(self) -> None:
         """Update the export button."""

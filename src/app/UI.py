@@ -78,7 +78,6 @@ TRANS_EXPORTED = TransToken.ui('Selected Items and Style successfully exported!'
 TRANS_EXPORTED_TITLE = TransToken.ui('BEE2 - Export Complete')
 TRANS_MAIN_TITLE = TransToken.ui('BEEMOD {version} - {game}')
 TRANS_ERROR = TransToken.untranslated('???')
-TRANS_EXPORT_MISSING_STYLE = TransToken.ui('Could not export: Style "{style}" does not exist!')
 
 
 # These panes and a dict mapping object type to them.
@@ -627,125 +626,124 @@ def reset_panes() -> None:
     CompilerPane.window.save_conf()
 
 
-async def export_editoritems(
-    export_trig: EdgeTrigger[exporting.ExportInfo],
+def fetch_export_info() -> exporting.ExportInfo | None:
+    """Fetch the required information for performing an export."""
+
+    # The chosen items on the palette.
+    pal_data: paletteUI.ItemPos = {
+        pos: (it.id, it.subKey)
+        for pos, it in zip(paletteUI.COORDS, pal_picked, strict=False)
+    }
+    # Group palette data by each item ID, so it can easily determine which items are actually
+    # on the palette at all.
+    pal_by_item: dict[str, dict[int, tuple[paletteUI.HorizInd, paletteUI.VertInd]]] = {}
+    for pos, (item_id, subkey) in pal_data.items():
+        pal_by_item.setdefault(item_id.casefold(), {})[subkey] = pos
+
+    conf = config.APP.get_cur_conf(config.gen_opts.GenOptions)
+    packset = packages.get_loaded_packages()
+    game = gameMan.selected_game.value
+    if game is None:
+        LOGGER.warning('Could not export: No game set?')
+        return None
+    try:
+        chosen_style = packset.obj_by_id(packages.Style, selected_style)
+    except KeyError:
+        LOGGER.warning('Could not export: Style "{style}" does not exist?')
+        return None
+
+    return exporting.ExportInfo(
+        game,
+        packset,
+        style=chosen_style,
+        selected_objects={
+            # Specify the 'chosen item' for each object type
+            packages.Music: music_conf.export_data(packset),
+            packages.Skybox: skybox_win.chosen.value,
+            packages.QuotePack: voice_win.chosen.value,
+            packages.Elevator: elev_win.chosen.value,
+
+            packages.Item: pal_by_item,
+            packages.StyleVar: StyleVarPane.export_data(chosen_style),
+            packages.Signage: signage_ui.export_data(),
+        },
+        should_refresh=not conf.preserve_resources,
+    )
+
+
+async def export_complete_task(
     export_rec: trio.MemoryReceiveChannel[lifecycle.ExportResult],
     pal_ui: paletteUI.PaletteUI,
-    bar: MenuBar,
     dialog: Dialogs,
 ) -> None:
-    """Export the selected Items and Style into the chosen game."""
-    # TODO: Rearrange so enable/disable is based on export_trig.ready
-    # Disable, so you can't double-export.
-    UI['pal_export'].state(('disabled',))
-    bar.set_export_allowed(False)
-    try:
-        await tk_tools.wait_eventloop()
+    """Run actions after an export completes.
+    """
+    async with export_rec:
+        async for info, result in export_rec:
+            if result is ErrorResult.FAILED:
+                continue
 
-        # The chosen items on the palette.
-        pal_data: paletteUI.ItemPos = {
-            pos: (it.id, it.subKey)
-            for pos, it in zip(paletteUI.COORDS, pal_picked, strict=False)
-        }
-        # Group palette data by each item ID, so it can easily determine which items are actually
-        # on the palette at all.
-        pal_by_item: dict[str, dict[int, tuple[paletteUI.HorizInd, paletteUI.VertInd]]] = {}
-        for pos, (item_id, subkey) in pal_data.items():
-            pal_by_item.setdefault(item_id.casefold(), {})[subkey] = pos
+            # Recompute, in case the trigger was busy with another export?
+            pal_by_item = info.selected_objects[packages.Item]
+            pal_data = {
+                pos: (item_id, subkey)
+                for item_id, item_data in pal_by_item.items()
+                for subkey, pos in item_data.items()
+            }
+            conf = config.APP.get_cur_conf(config.gen_opts.GenOptions)
 
-        conf = config.APP.get_cur_conf(config.gen_opts.GenOptions)
-        packset = packages.get_loaded_packages()
-        game = gameMan.selected_game.value
-        try:
-            chosen_style = packset.obj_by_id(packages.Style, selected_style)
-        except KeyError:
-            await dialog.show_info(TRANS_EXPORT_MISSING_STYLE.format(style=selected_style))
-            return
-
-        export_trig.trigger(exporting.ExportInfo(
-            game,
-            packset,
-            style=chosen_style,
-            selected_objects={
-                # Specify the 'chosen item' for each object type
-                packages.Music: music_conf.export_data(packset),
-                packages.Skybox: skybox_win.chosen.value,
-                packages.QuotePack: voice_win.chosen.value,
-                packages.Elevator: elev_win.chosen.value,
-
-                packages.Item: pal_by_item,
-                packages.StyleVar: StyleVarPane.export_data(chosen_style),
-                packages.Signage: signage_ui.export_data(),
-            },
-            should_refresh=not conf.preserve_resources,
-        ))
-        info, result = await export_rec.receive()
-        if result is ErrorResult.FAILED:
-            return
-
-        # Recompute, in case the trigger was busy with another export?
-        pal_by_item = info.selected_objects[packages.Item]
-        pal_data = {
-            pos: (item_id, subkey)
-            for item_id, item_data in pal_by_item.items()
-            for subkey, pos in item_data.items()
-        }
-
-        try:
-            last_export = pal_ui.palettes[paletteUI.UUID_EXPORT]
-        except KeyError:
-            last_export = pal_ui.palettes[paletteUI.UUID_EXPORT] = paletteUI.Palette(
-                '',
-                pal_data,
-                # This makes it lookup the translated name
-                # instead of using a configured one.
-                trans_name='LAST_EXPORT',
-                uuid=paletteUI.UUID_EXPORT,
-                readonly=True,
-            )
-        else:
-            last_export.items = pal_data
-        last_export.save(ignore_readonly=True)
-
-        # Save the configs since we're writing to disk lots anyway.
-        GEN_OPTS.save_check()
-        config.APP.write_file(config.APP_LOC)
-
-        if conf.launch_after_export or conf.after_export is not config.gen_opts.AfterExport.NORMAL:
-            do_action = await dialog.ask_yes_no(
-                optionWindow.AFTER_EXPORT_TEXT[
-                    conf.after_export, conf.launch_after_export,
-                ].format(msg=TRANS_EXPORTED),
-                title=TRANS_EXPORTED_TITLE,
-            )
-        else:  # No action to do, so just show an OK.
-            await dialog.show_info(TRANS_EXPORTED, title=TRANS_EXPORTED_TITLE)
-            do_action = False
-
-        # Do the desired action - if quit, we don't bother to update UI.
-        if do_action:
-            # Launch first so quitting doesn't affect this.
-            if conf.launch_after_export and game is not None:
-                await game.launch()
-
-            if conf.after_export is AfterExport.NORMAL:
-                pass
-            elif conf.after_export is AfterExport.MINIMISE:
-                TK_ROOT.iconify()
-            elif conf.after_export is AfterExport.QUIT:
-                quit_app()
-                return
+            try:
+                last_export = pal_ui.palettes[paletteUI.UUID_EXPORT]
+            except KeyError:
+                last_export = pal_ui.palettes[paletteUI.UUID_EXPORT] = paletteUI.Palette(
+                    '',
+                    pal_data,
+                    # This makes it lookup the translated name
+                    # instead of using a configured one.
+                    trans_name='LAST_EXPORT',
+                    uuid=paletteUI.UUID_EXPORT,
+                    readonly=True,
+                )
             else:
-                assert_never(conf.after_export)
+                last_export.items = pal_data
+            last_export.save(ignore_readonly=True)
 
-        # Select the last_export palette, so reloading loads this item selection.
-        # But leave it at the current palette, if it's unmodified.
-        if pal_ui.selected.items != pal_data:
-            pal_ui.select_palette(paletteUI.UUID_EXPORT, False)
-            pal_ui.is_dirty.set()
-    finally:
-        UI['pal_export'].state(('!disabled',))
-        bar.set_export_allowed(True)
+            # Save the configs since we're writing to disk lots anyway.
+            GEN_OPTS.save_check()
+            config.APP.write_file(config.APP_LOC)
+
+            if conf.launch_after_export or conf.after_export is not config.gen_opts.AfterExport.NORMAL:
+                do_action = await dialog.ask_yes_no(
+                    optionWindow.AFTER_EXPORT_TEXT[
+                        conf.after_export, conf.launch_after_export,
+                    ].format(msg=TRANS_EXPORTED),
+                    title=TRANS_EXPORTED_TITLE,
+                )
+            else:  # No action to do, so just show an OK.
+                await dialog.show_info(TRANS_EXPORTED, title=TRANS_EXPORTED_TITLE)
+                do_action = False
+
+            # Do the desired action - if quit, we don't bother to update UI.
+            if do_action:
+                # Launch first so quitting doesn't affect this.
+                if conf.launch_after_export:
+                    await info.game.launch()
+
+                if conf.after_export is AfterExport.NORMAL:
+                    pass
+                elif conf.after_export is AfterExport.MINIMISE:
+                    TK_ROOT.iconify()
+                elif conf.after_export is AfterExport.QUIT:
+                    quit_app()
+                    continue
+                else:
+                    assert_never(conf.after_export)
+
+            # Select the last_export palette, so reloading loads this item selection.
+            # But leave it at the current palette, if it's unmodified.
+            if pal_ui.selected.items != pal_data:
+                pal_ui.select_palette(paletteUI.UUID_EXPORT, False)
+                pal_ui.is_dirty.set()
 
 
 def set_disp_name(item: PalItem, e: object = None) -> None:
@@ -1005,6 +1003,7 @@ async def init_option(
     pane: SubPane.SubPane,
     tk_img: TKImages,
     export: Callable[[], object],
+    export_ready: trio_util.AsyncValue[bool],
     corridor: TkSelector,
     task_status: trio.TaskStatus[None] = trio.TASK_STATUS_IGNORED,
 ) -> None:
@@ -1137,6 +1136,7 @@ async def init_option(
 
     task_status.started()
     async with trio.open_nursery() as nursery:
+        nursery.start_soon(tk_tools.apply_bool_enabled_state_task, export_ready, UI['pal_export'])
         nursery.start_soon(tk_tools.apply_bool_enabled_state_task, corridor.show_trigger.ready, corr_button)
         nursery.start_soon(voice_conf_task)
         nursery.start_soon(export_btn_task)
@@ -1401,13 +1401,12 @@ async def init_windows(
     global sign_ui, context_win
 
     def export() -> None:
-        """Export the palette, passing the required UI objects."""
-        core_nursery.start_soon(
-            export_editoritems,
-            export_trig, export_rec, pal_ui, menu_bar, DIALOG,
-        )
+        """Export the palette."""
+        info = fetch_export_info()
+        if info is not None and export_trig.ready.value:
+            export_trig.trigger(info)
 
-    menu_bar = MenuBar(TK_ROOT, export=export)
+    menu_bar = MenuBar(TK_ROOT, export, export_trig.ready)
     core_nursery.start_soon(menu_bar.task, tk_img)
     core_nursery.start_soon(on_game_changed)
     core_nursery.start_soon(gameMan.update_export_text)
@@ -1537,6 +1536,8 @@ async def init_windows(
     TK_ROOT.bind_all(tk_tools.KEY_EXPORT, lambda e: export())
     core_nursery.start_soon(pal_ui.update_task)
 
+    core_nursery.start_soon(export_complete_task, export_rec, pal_ui, DIALOG)
+
     await LOAD_UI.step('palette')
 
     packageMan.make_window()
@@ -1554,7 +1555,7 @@ async def init_windows(
         tool_col=11,
     )
     corridor = TkSelector(packages.get_loaded_packages(), tk_img, selected_style)
-    await core_nursery.start(init_option, core_nursery, windows['opt'], tk_img, export, corridor)
+    await core_nursery.start(init_option, core_nursery, windows['opt'], tk_img, export, export_trig.ready, corridor)
     core_nursery.start_soon(corridor.task)
     await LOAD_UI.step('options')
 
@@ -1689,15 +1690,6 @@ async def init_windows(
         pane.load_conf()
         await trio.lowlevel.checkpoint()
 
-    async def enable_export() -> None:
-        """Enable exporting only after all packages are loaded."""
-        await trio.lowlevel.checkpoint()
-        packset = packages.get_loaded_packages()
-        for cls in packages.OBJ_TYPES.values():
-            await packset.ready(cls).wait()
-        UI['pal_export'].state(('!disabled',))
-        menu_bar.set_export_allowed(True)
-
     first_select = trio.Event()
 
     async def style_select_callback() -> None:
@@ -1740,7 +1732,6 @@ async def init_windows(
                 first_select.set()  # Only set the palette after the first iteration runs.
 
     async with trio.open_nursery() as nursery:
-        nursery.start_soon(enable_export)
         nursery.start_soon(style_select_callback)
         await first_select.wait()
         await set_palette(pal_ui.selected, flow_picker)

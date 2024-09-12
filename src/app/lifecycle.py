@@ -59,23 +59,23 @@ async def lifecycle(
     async def wait_reload() -> None:
         """React to the reload trigger."""
         nonlocal should_reload
-        if reload_trigger is not None:
-            await reload_trigger.wait()
-            should_reload = True
-            wait_nursery.cancel_scope.cancel()
-        else:
-            # Can never reload.
-            await trio.sleep_forever()
+        if reload_trigger is None:
+            return  # Nothing to do.
+        LOGGER.debug('Waiting for reload...')
+        await reload_trigger.wait()
+        LOGGER.info('Triggered reload!')
+        should_reload = True
+        wait_nursery.cancel_scope.cancel()
 
     async def wait_export() -> None:
         """Enable the export UI, then wait for an export command."""
         nonlocal export_info
-        if export_trigger is not None:
-            export_info = await export_trigger.wait()
-            wait_nursery.cancel_scope.cancel()
-        else:
-            # Can never export.
-            await trio.sleep_forever()
+        if export_trigger is None:
+            return  # Can never export.
+        LOGGER.debug('Waiting for export...')
+        export_info = await export_trigger.wait()
+        LOGGER.info('Triggered export!')
+        wait_nursery.cancel_scope.cancel()
 
     while True:
         LOGGER.info('Loading packages...')
@@ -129,6 +129,7 @@ async def lifecycle(
                 # Starting wait_export will enable the UI buttons.
                 wait_nursery.start_soon(wait_reload)
                 wait_nursery.start_soon(wait_export)
+                await trio.sleep_forever()
             if should_reload:
                 break  # Go the outer loop, which will reload again.
 
