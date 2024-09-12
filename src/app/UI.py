@@ -146,7 +146,6 @@ class _WindowsDict(TypedDict):
 
 class _UIDict(TypedDict):
     """TODO: Remove."""
-    pal_export: ttk.Button
     drag_lbl: ttk.Label
     pre_bg_img: tk.Label
     pre_disp_name: ttk.Label
@@ -158,7 +157,6 @@ class _UIDict(TypedDict):
 
 # Holds the TK Toplevels, frames, widgets and menus
 windows: _WindowsDict = cast(_WindowsDict, {})
-frames: None
 UI: _UIDict = cast(_UIDict, {})
 
 
@@ -1015,9 +1013,9 @@ async def init_option(
     frame.grid(row=0, column=0, sticky='nsew')
     frame.columnconfigure(0, weight=1)
 
-    UI['pal_export'] = ttk.Button(frame, command=export)
-    UI['pal_export'].state(('disabled',))
-    UI['pal_export'].grid(row=4, sticky="EW", padx=5)
+    export_btn = ttk.Button(frame, command=export)
+    export_btn.state(('disabled',))
+    export_btn.grid(row=4, sticky="EW", padx=5)
 
     props = ttk.Frame(frame, width="50")
     props.columnconfigure(1, weight=1)
@@ -1132,11 +1130,11 @@ async def init_option(
         """Update the export button as necessary."""
         async with aclosing(gameMan.EXPORT_BTN_TEXT.eventual_values()) as agen:
             async for text in agen:
-                wid_transtoken.set_text(UI['pal_export'], text)
+                wid_transtoken.set_text(export_btn, text)
 
     task_status.started()
     async with trio.open_nursery() as nursery:
-        nursery.start_soon(tk_tools.apply_bool_enabled_state_task, export_ready, UI['pal_export'])
+        nursery.start_soon(tk_tools.apply_bool_enabled_state_task, export_ready, export_btn)
         nursery.start_soon(tk_tools.apply_bool_enabled_state_task, corridor.show_trigger.ready, corr_button)
         nursery.start_soon(voice_conf_task)
         nursery.start_soon(export_btn_task)
