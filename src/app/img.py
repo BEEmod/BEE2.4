@@ -376,47 +376,50 @@ class Handle(User):
             )
             return cls.color((0, 0, 0), width, height)
         elif uri.package.startswith('<') and uri.package.endswith('>'):  # Special names.
-            special_name = uri.package[1:-1]
-            if special_name == 'SPECIAL':
-                name = uri.path.casefold()
-                if name == 'blank':
-                    return ImgAlpha._deduplicate(width, height)
-                elif name in ('error', 'none'):
-                    return ImgIcon._deduplicate(width, height, name)
-                elif name == 'bg':
-                    return ImgBackground._deduplicate(width, height)
-                else:
-                    raise ValueError(f'Unknown special type "{uri.path}"!')
-            elif special_name in ('COLOR', 'COLOUR', 'RGB'):
-                color = uri.path
-                try:
-                    if ',' in color:  # <color>:R,G,B
-                        r, g, b = map(int, color.split(','))
-                    elif len(color) == 3:  # RGB
-                        r = int(color[0] * 2, 16)
-                        g = int(color[1] * 2, 16)
-                        b = int(color[2] * 2, 16)
-                    elif len(color) == 6:  # RRGGBB
-                        r = int(color[0:2], 16)
-                        g = int(color[2:4], 16)
-                        b = int(color[4:6], 16)
-                    else:
-                        raise ValueError
-                except (ValueError, TypeError, OverflowError):
+            match uri.package[1:-1]:
+                case 'SPECIAL':
+                    match uri.path.casefold():
+                        case 'blank':
+                            return ImgAlpha._deduplicate(width, height)
+                        case 'error' | 'none' as icon:
+                            return ImgIcon._deduplicate(width, height, icon)
+                        case 'bg':
+                            return ImgBackground._deduplicate(width, height)
+                        case _:
+                            raise ValueError(f'Unknown special type "{uri.path}"!')
+                case 'COLOR' | 'COLOUR' | 'RGB':
+                    color = uri.path
                     try:
-                        # <color>:#RRGGBB, :rgb(RR, GG, BB), :hsv(HH, SS, VV) etc
-                        r, g, b, *a = ImageColor.getrgb(color)
-                        if len(a) not in (0, 1):
+                        if ',' in color:  # <color>:R,G,B
+                            r, g, b = map(int, color.split(','))
+                        elif len(color) == 3:  # RGB
+                            r = int(color[0] * 2, 16)
+                            g = int(color[1] * 2, 16)
+                            b = int(color[2] * 2, 16)
+                        elif len(color) == 6:  # RRGGBB
+                            r = int(color[0:2], 16)
+                            g = int(color[2:4], 16)
+                            b = int(color[4:6], 16)
+                        else:
                             raise ValueError
-                    except ValueError:
-                        raise ValueError(f'Colors must be #RGB, #RRGGBB hex values, or R,G,B decimal, not {uri}') from None
-                return cls.color((r, g, b), width, height)
-            elif special_name in ('BEE', 'BEE2'):  # Builtin resources.
-                if subfolder:
-                    uri = uri.in_folder(subfolder)
-                return cls.builtin(uri, width, height)
-            else:
-                raise ValueError(f'Unknown special icon type "{uri}"!')
+                    except (ValueError, TypeError, OverflowError):
+                        try:
+                            # <color>:#RRGGBB, :rgb(RR, GG, BB), :hsv(HH, SS, VV) etc
+                            r, g, b, *a = ImageColor.getrgb(color)
+                            if len(a) not in (0, 1):
+                                raise ValueError
+                        except ValueError:
+                            raise ValueError(
+                                f'Colors must be #RGB, #RRGGBB hex values, '
+                                f'or R,G,B decimal, not {uri}'
+                            ) from None
+                    return cls.color((r, g, b), width, height)
+                case 'BEE' | 'BEE2':  # Builtin resources.
+                    if subfolder:
+                        uri = uri.in_folder(subfolder)
+                    return cls.builtin(uri, width, height)
+                case _:
+                    raise ValueError(f'Unknown special icon type "{uri}"!')
         else:  # File item
             if subfolder:
                 uri = uri.in_folder(subfolder)
