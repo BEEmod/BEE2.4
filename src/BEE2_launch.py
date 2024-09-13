@@ -98,6 +98,11 @@ if __name__ == '__main__':
     elif app_name.startswith('test_'):
         import importlib
         mod = importlib.import_module(f'{test_mod}.{sys.argv[1].removeprefix('test_')}')
+        if utils.USE_WX:
+            from wx.lib.inspection import InspectionTool
+
+            inspection = InspectionTool()
+            inspection.Show()
         start_main(mod.test)
     else:
         raise ValueError(f'Invalid component name "{app_name}"!')
