@@ -974,18 +974,17 @@ class ImgTransform(Handle):
     def uses_packsys(self) -> bool:
         return self.source.uses_packsys()
 
-    def _crop(self, image: Image.Image) -> Image.Image:
+    def _crop(self, ratio: Fraction, image: Image.Image) -> Image.Image:
         # Alter the image to have the specified ratio.
         width = image.width
         height = image.height
-        targ_ratio = Fraction(*self.ratio)
-        if targ_ratio == Fraction(width, height):
+        if ratio == Fraction(width, height):
             return image
 
         # One direction requires expanding,
         # the other requires cropping. We use the latter.
-        crop_width = (width - (height * targ_ratio)) / 2
-        crop_height = (height - (width / targ_ratio)) / 2
+        crop_width = (width - (height * ratio)) / 2
+        crop_height = (height - (width / ratio)) / 2
         # First, we might need to scale up to keep the pixel counts.
         # That could cause extreme sizes, so guard against that.
         scale = max(crop_width, crop_height).denominator
@@ -995,7 +994,7 @@ class ImgTransform(Handle):
             if width > 512 or height > 512:
                 LOGGER.warning('Cropped image too big at {}x{}!', width, height)
                 # Just give up, rescale to the target ratio.
-                return image.resize((384, int(384 * targ_ratio)))
+                return image.resize((384, int(384 * ratio)))
 
             image = image.resize(
                 (width, height),
@@ -1017,7 +1016,7 @@ class ImgTransform(Handle):
 
         image = self.source._load_pil()
         if self.ratio is not None:
-            image = self._crop(image)
+            image = self._crop(Fraction(*self.ratio), image)
 
         if self.transpose is not None:
             image = image.transpose(self.transpose)
