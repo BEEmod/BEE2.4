@@ -12,7 +12,7 @@ from contextlib import aclosing
 from typing import Any, ClassVar, Final, override
 from typing_extensions import Self
 from collections.abc import Mapping, Sequence, Iterator
-from pathlib import Path
+from pathlib import Path, PurePath
 import abc
 import functools
 import itertools
@@ -21,7 +21,7 @@ import weakref
 
 from PIL import Image, ImageColor, ImageDraw, ImageFont
 from srctools import Keyvalues, Vec
-from srctools.filesys import FileSystem, FileSystemChain, RawFileSystem
+from srctools.filesys import FileSystem, FileSystemChain, RawFileSystem, File as FSFile
 from srctools.vtf import VTF, VTFFlags
 import attrs
 import srctools.logger
@@ -40,6 +40,7 @@ _handles: weakref.WeakValueDictionary[
 LOGGER = srctools.logger.get_logger('img')
 LOGGER.setLevel('INFO')
 
+FOLDER_PROPS_MAP_EDITOR = PurePath('resources', 'materials', 'models', 'props_map_editor')
 FSYS_BUILTIN = RawFileSystem(str(utils.install_path('images')))
 PACK_SYSTEMS: dict[str, FileSystem[Any]] = {}
 # Force-loaded handles must be kept alive.
@@ -135,21 +136,18 @@ def current_theme() -> Theme:
     return _current_theme
 
 
-def _load_file(
+def _find_file(
     fsys: FileSystem[Any],
     uri: utils.PackagePath,
-    width: int, height: int,
-    resize_algo: Image.Resampling,
     check_other_packages: bool = False,
-) -> tuple[Image.Image, bool]:
-    """Load an image from a filesystem."""
+) -> tuple[FSFile | None, bool]:
+    """Locate an image within the filesystem."""
     path = uri.path.casefold()
     if path[-4:-3] == '.':
         path, ext = path[:-4], path[-3:]
     else:
         ext = "png"
 
-    image: Image.Image
     try:
         img_file = fsys[f'{path}.{_current_theme.value}.{ext}']
         uses_theme = True
@@ -176,12 +174,20 @@ def _load_file(
 
     if img_file is None:
         LOGGER.error('"{}" does not exist!', uri)
-        return Handle.error(width, height).get_pil(), False
+    return img_file, uses_theme
 
+
+def _load_file(
+    file: FSFile,
+    uri: utils.PackagePath,
+    width: int, height: int,
+    resize_algo: Image.Resampling,
+) -> Image.Image:
+    """Load an image, given the filesystem reference."""
     try:
-        with img_file.open_bin() as file:
-            if ext.casefold() == 'vtf':
-                vtf = VTF.read(file)
+        with file.open_bin() as stream:
+            if file.path.endswith('.vtf'):
+                vtf = VTF.read(stream)
                 mipmap = 0
                 # If resizing, pick the mipmap equal to or slightly larger than
                 # the desired size. With powers of two, most cases we don't
@@ -195,7 +201,7 @@ def _load_file(
                             break
                 image = vtf.get(mipmap=mipmap).to_PIL()
             else:
-                image = Image.open(file)
+                image = Image.open(stream)
                 image.load()
                 if image.mode != 'RGBA':
                     image = image.convert('RGBA')
@@ -205,11 +211,11 @@ def _load_file(
             uri,
             exc_info=True,
         )
-        return Handle.error(width, height).get_pil(), False
+        return Handle.error(width, height).get_pil()
 
     if width > 0 and height > 0 and (width, height) != image.size:
         image = image.resize((width, height), resample=resize_algo)
-    return image, uses_theme
+    return image
 
 
 class User:
@@ -794,7 +800,11 @@ class ImgFile(Handle):
             LOGGER.warning('Unknown package for loading images: "{}"!', self.uri)
             return Handle.error(self.width, self.height).get_pil()
 
-        img, uses_theme = _load_file(fsys, self.uri, self.width, self.height, Image.Resampling.LANCZOS, True)
+        file, uses_theme = _find_file(fsys, self.uri, True)
+        if file is not None:
+            img = _load_file(file, self.uri, self.width, self.height, Image.Resampling.LANCZOS)
+        else:
+            img = Handle.error(self.width, self.height).get_pil()
         if uses_theme:
             self._uses_theme = True
         return img
@@ -814,6 +824,24 @@ class ImgFile(Handle):
         """This always uses package resources."""
         return True
 
+    def palette_filename(self) -> PurePath | None:
+        """Determine if this image can be directly referenced by the puzzlemaker.
+
+        If so, return the filename to use.
+        """
+        try:
+            fsys = PACK_SYSTEMS[self.uri.package]
+        except KeyError:
+            return None
+        file, uses_theme = _find_file(fsys, self.uri, True)
+        if uses_theme or file is None:
+            return None
+        path = PurePath(file.path)
+        try:
+            return path.relative_to(FOLDER_PROPS_MAP_EDITOR).with_suffix('.png')
+        except ValueError:
+            return None
+
 
 @attrs.define(eq=False)
 class ImgBuiltin(Handle):
@@ -827,10 +855,13 @@ class ImgBuiltin(Handle):
     @override
     def _make_image(self) -> Image.Image:
         """Load from the builtin UI resources."""
-        img, uses_theme = _load_file(FSYS_BUILTIN, self.uri, self.width, self.height, self.resize_mode)
+        file, uses_theme = _find_file(FSYS_BUILTIN, self.uri)
         if uses_theme:
             self._uses_theme = True
-        return img
+        if file is not None:
+            return _load_file(file, self.uri, self.width, self.height, self.resize_mode)
+        else:
+            return Handle.error(self.width, self.height).get_pil()
 
     @override
     def resize(self, width: int, height: int) -> ImgBuiltin:
@@ -1110,6 +1141,7 @@ async def _load_fsys_task(*, task_status: trio.TaskStatus = trio.TASK_STATUS_IGN
     """When packages change, reload images."""
     # Circular import
     from packages import LOADED, PackagesSet
+    props_map_editor = FOLDER_PROPS_MAP_EDITOR.as_posix()
 
     global PACK_SYSTEMS
     async with aclosing(LOADED.eventual_values()) as agen:
@@ -1117,9 +1149,9 @@ async def _load_fsys_task(*, task_status: trio.TaskStatus = trio.TASK_STATUS_IGN
         async for packset in agen:
             PACK_SYSTEMS = {
                 pack.id: FileSystemChain(
-                    (pack.fsys, 'resources/BEE2/'),
+                    (pack.fsys, 'resources/bee2/'),
                     (pack.fsys, 'resources/materials/'),
-                    (pack.fsys, 'resources/materials/models/props_map_editor/'),
+                    (pack.fsys, props_map_editor),
                 )
                 for pack in packset.packages.values()
             }
