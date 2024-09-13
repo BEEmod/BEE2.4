@@ -74,6 +74,7 @@ class ItemSlot(wx.Panel):
     def _on_paint(self, evt: wx.PaintEvent) -> None:
         """Paint the widget."""
         dc = wx.PaintDC(self)
+        gc = wx.GraphicsContext.Create(dc)
         y = 0
         if self.suggested:
             dc.SetPen(PEN_SLOT_BORDER)
@@ -97,7 +98,7 @@ class ItemSlot(wx.Panel):
             4, y, SEL_ICON_SIZE + 8, y + SEL_ICON_SIZE + 20,
         )
         y += 8
-        self.slot.draw(dc, 8, y, True)
+        self.slot.draw_sized(gc, 8, y, SEL_ICON_SIZE, SEL_ICON_SIZE)
         y += SEL_ICON_SIZE + 8
 
         label = str(self.label)
@@ -356,6 +357,7 @@ class SelectorWin(SelectorWinBase[ItemSlot, GroupHeader]):
                 attr_wid: wx.Control
                 if attr.type.is_image:
                     self.attr_image_labels[attr] = attr_wid = wx.StaticBitmap(self.wid_panel_info)
+                    attr_wid.SetSize(16, 16)
                     if attr.type is AttrTypes.COLOUR:
                         attr_wid.WindowStyle |= wx.BORDER_RAISED
                 else:
