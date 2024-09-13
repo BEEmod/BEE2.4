@@ -368,28 +368,23 @@ class Handle(User):
         If subfolder is specified, files will be relative to this folder.
         The width/height may be zero to indicate it should not be resized.
         """
-        typ: type[Handle]
-        args: list[Any]
         if uri.path.casefold() == '<black>':  # Old special case name.
             LOGGER.warning(
                 'Using "{}" for a black icon is deprecated, use "<color>:black", '
                 '"<color>:#000" or "<rgb>:rgb(0,0,0)".',
                 uri,
             )
-            typ = ImgColor
-            args = [0, 0, 0]
+            return cls.color((0, 0, 0), width, height)
         elif uri.package.startswith('<') and uri.package.endswith('>'):  # Special names.
             special_name = uri.package[1:-1]
             if special_name == 'SPECIAL':
-                args = []
                 name = uri.path.casefold()
                 if name == 'blank':
-                    typ = ImgAlpha
-                elif name in ('error', 'none', 'load'):
-                    typ = ImgIcon
-                    args = [name]
+                    return ImgAlpha._deduplicate(width, height)
+                elif name in ('error', 'none'):
+                    return ImgIcon._deduplicate(width, height, name)
                 elif name == 'bg':
-                    typ = ImgBackground
+                    return ImgBackground._deduplicate(width, height)
                 else:
                     raise ValueError(f'Unknown special type "{uri.path}"!')
             elif special_name in ('COLOR', 'COLOUR', 'RGB'):
@@ -415,31 +410,31 @@ class Handle(User):
                             raise ValueError
                     except ValueError:
                         raise ValueError(f'Colors must be #RGB, #RRGGBB hex values, or R,G,B decimal, not {uri}') from None
-                typ = ImgColor
-                args = [r, g, b]
+                return cls.color((r, g, b), width, height)
             elif special_name in ('BEE', 'BEE2'):  # Builtin resources.
                 if subfolder:
                     uri = uri.in_folder(subfolder)
-                typ = ImgBuiltin
-                args = [uri]
+                return cls.builtin(uri, width, height)
             else:
                 raise ValueError(f'Unknown special icon type "{uri}"!')
         else:  # File item
             if subfolder:
                 uri = uri.in_folder(subfolder)
-            typ = ImgFile
-            args = [uri]
-        return typ._deduplicate(width, height, *args)
+            return cls.file(uri, width, height)
 
     @classmethod
-    def builtin(cls, path: str, width: int = 0, height: int = 0) -> ImgBuiltin:
+    def builtin(cls, path: utils.PackagePath | str, width: int = 0, height: int = 0) -> ImgBuiltin:
         """Shortcut for getting a handle to a builtin UI image."""
-        return ImgBuiltin._deduplicate(width, height, utils.PackagePath(PAK_BEE2, path + '.png'))
+        if isinstance(path, str):
+            path = utils.PackagePath(PAK_BEE2, path + '.png')
+        return ImgBuiltin._deduplicate(width, height, path)
 
     @classmethod
-    def sprite(cls, path: str, width: int = 0, height: int = 0) -> ImgSprite:
+    def sprite(cls, path: utils.PackagePath | str, width: int = 0, height: int = 0) -> ImgSprite:
         """Shortcut for getting a handle to a builtin UI image, but with nearest-neighbour rescaling."""
-        return ImgSprite._deduplicate(width, height, utils.PackagePath(PAK_BEE2, path + '.png'))
+        if isinstance(path, str):
+            path = utils.PackagePath(PAK_BEE2, path + '.png')
+        return ImgSprite._deduplicate(width, height, path)
 
     @classmethod
     def composite(cls, children: Sequence[Handle], width: int = 0, height: int = 0) -> Handle:
