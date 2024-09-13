@@ -12,7 +12,6 @@ import srctools.logger
 import trio
 
 import async_util
-import utils
 from loadScreen import ScreenStage
 
 

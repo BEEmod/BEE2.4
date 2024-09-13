@@ -13,7 +13,6 @@ import trio
 from app import lazy_conf
 from config.gen_opts import GenOptions
 from config.item_defaults import ItemDefault
-from config.widgets import WidgetConfig
 from connections import INDICATOR_CHECK_ID
 from consts import DefaultItems
 from editoritems import InstCount, Item as EditorItem, DesiredFacing

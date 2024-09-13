@@ -1,6 +1,6 @@
 """The package containg all UI code."""
 from __future__ import annotations
-from typing import Any, Protocol, overload
+from typing import Any, Protocol
 from typing_extensions import deprecated
 
 from abc import abstractmethod

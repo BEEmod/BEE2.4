@@ -14,7 +14,6 @@ from exporting import ExportInfo, mod_support
 from transtoken import TransToken
 import BEE2_config
 import packages
-import utils
 from utils import PackagePath
 
 

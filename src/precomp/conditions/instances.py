@@ -11,7 +11,7 @@ import srctools.logger
 from precomp import instance_traits, instanceLocs, conditions, options
 from srctools import Keyvalues, Angle, Vec, Entity, Output, VMF, conv_bool
 
-from precomp.lazy_value import LazyValue, ConstValue
+from precomp.lazy_value import LazyValue
 
 
 LOGGER = srctools.logger.get_logger(__name__, 'cond.instances')

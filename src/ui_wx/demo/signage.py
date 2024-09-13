@@ -11,7 +11,6 @@ from app.errors import ErrorUI
 from ui_wx.img import WX_IMG
 from ui_wx.signage_ui import SignageUI
 from ui_wx import MAIN_WINDOW
-import app
 import BEE2_config
 import config
 import packages
