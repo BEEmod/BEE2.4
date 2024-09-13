@@ -13,6 +13,7 @@ from app.dragdrop import (
     DragInfo as DragInfo,
 )
 from transtoken import TransToken
+from . import set_fixed_size
 from .img import WX_IMG
 from .wid_transtoken import set_text
 
@@ -28,7 +29,7 @@ CUR_NO_DROP = wx.Cursor(wx.CURSOR_NO_ENTRY)
 class SlotUI:
     """Widgets associated with a slot."""
     # Our main widget.
-    lbl: wx.StaticBitmap
+    lbl: wx.GenericStaticBitmap
     # The two widgets shown at the bottom when moused over, and the sizer placing them.
     sizer: wx.BoxSizer
     text_lbl: wx.StaticText | None
@@ -42,7 +43,7 @@ class DragDrop[ItemT](ManagerBase[ItemT, wx.Window]):
 
     # The window and bitmap displayed inside.
     _drag_win: wx.Frame
-    _drag_img: wx.StaticBitmap
+    _drag_img: wx.GenericStaticBitmap
 
     def __init__(
         self,
@@ -63,7 +64,9 @@ class DragDrop[ItemT](ManagerBase[ItemT, wx.Window]):
         self._drag_win = drag_win = wx.Frame(parent, style=wx.STAY_ON_TOP | wx.FRAME_NO_TASKBAR)
         self._drag_win.Hide()
 
-        self._drag_img = wx.StaticBitmap(drag_win)
+        self._drag_img = wx.GenericStaticBitmap(drag_win)
+        self._drag_img.SetScaleMode(self._drag_img.Scale_AspectFit)
+        set_fixed_size(self._drag_img, self.width * 1.25, self.height * 1.25)
 
         drag_win.Bind(wx.EVT_LEFT_UP, self._evt_stop)
         drag_win.Bind(wx.EVT_MOTION, self._evt_move)
@@ -93,7 +96,9 @@ class DragDrop[ItemT](ManagerBase[ItemT, wx.Window]):
         title: TransToken,
     ) -> None:
         """Called when a slot is added, to create the UI form."""
-        wid_icon = wx.StaticBitmap(parent)
+        wid_icon = wx.GenericStaticBitmap(parent)
+        wid_icon.SetScaleMode(wid_icon.Scale_AspectFit)
+        set_fixed_size(wid_icon, self.width, self.height)
         WX_IMG.apply(wid_icon, self._img_blank)
 
         def on_leftclick(evt: wx.MouseEvent) -> None:
@@ -187,9 +192,10 @@ class DragDrop[ItemT](ManagerBase[ItemT, wx.Window]):
         """Move the drag window to this position."""
         if self._cur_slot is None:
             return
+        size = self._drag_win.GetSize()
         self._drag_win.SetPosition(wx.Point(
-            round(x - self.width // 2),
-            round(y - self.height // 2),
+            round(x - size.width // 2),
+            round(y - size.height // 2),
         ))
 
         if self._cur_slot.is_source:
