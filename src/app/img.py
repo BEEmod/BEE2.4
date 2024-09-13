@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from contextlib import aclosing
-from typing import Any, ClassVar, Final, override
+from typing import Any, ClassVar, Final, Literal, override
 from typing_extensions import Self
 from collections.abc import Mapping, Sequence, Iterator
 from pathlib import Path, PurePath
@@ -73,6 +73,8 @@ ROTATE_CCW: Final = Image.Transpose.ROTATE_90
 FLIP_LEFT_RIGHT: Final = Image.Transpose.FLIP_LEFT_RIGHT
 FLIP_TOP_BOTTOM: Final = Image.Transpose.FLIP_TOP_BOTTOM
 FLIP_ROTATE: Final = Image.Transpose.ROTATE_180
+
+type DefaultExt = Literal['png', 'vtf']
 
 
 def _load_special(path: str, theme: Theme) -> Image.Image:
@@ -139,6 +141,7 @@ def current_theme() -> Theme:
 def _find_file(
     fsys: FileSystem[Any],
     uri: utils.PackagePath,
+    default_ext: DefaultExt,
     check_other_packages: bool = False,
 ) -> tuple[FSFile | None, bool]:
     """Locate an image within the filesystem."""
@@ -146,7 +149,7 @@ def _find_file(
     if path[-4:-3] == '.':
         path, ext = path[:-4], path[-3:]
     else:
-        ext = "png"
+        ext = default_ext
 
     try:
         img_file = fsys[f'{path}.{_current_theme.value}.{ext}']
@@ -360,6 +363,7 @@ class Handle(User):
         width: int = 0, height: int = 0,
         *,
         subfolder: str = '',
+        default_ext: DefaultExt = 'png',
     ) -> Handle:
         """Parse a URI into an image handle.
 
@@ -423,7 +427,7 @@ class Handle(User):
         else:  # File item
             if subfolder:
                 uri = uri.in_folder(subfolder)
-            return cls.file(uri, width, height)
+            return cls.file(uri, width, height, default_ext)
 
     @classmethod
     def builtin(cls, path: utils.PackagePath | str, width: int = 0, height: int = 0) -> ImgBuiltin:
@@ -465,9 +469,14 @@ class Handle(User):
         return ImgStripAlpha._deduplicate(self.width, self.height, self)
 
     @classmethod
-    def file(cls, path: utils.PackagePath, width: int, height: int) -> ImgFile:
-        """Shortcut for getting a handle to file path."""
-        return ImgFile._deduplicate(width, height, path)
+    def file(
+        cls,
+        path: utils.PackagePath,
+        width: int, height: int,
+        default_ext: DefaultExt = 'png',
+    ) -> ImgFile:
+        """Shortcut for getting a handle to a file path."""
+        return ImgFile._deduplicate(width, height, path, default_ext)
 
     @classmethod
     def error(cls, width: int, height: int) -> ImgIcon:
@@ -788,6 +797,7 @@ class ImgFile(Handle):
     """An image loaded from a package."""
     uri: utils.PackagePath
     _uses_theme: bool = False
+    default_ext: DefaultExt = 'png'
 
     @override
     def _make_image(self) -> Image.Image:
@@ -798,7 +808,7 @@ class ImgFile(Handle):
             LOGGER.warning('Unknown package for loading images: "{}"!', self.uri)
             return Handle.error(self.width, self.height).get_pil()
 
-        file, uses_theme = _find_file(fsys, self.uri, True)
+        file, uses_theme = _find_file(fsys, self.uri, self.default_ext, True)
         if file is not None:
             img = _load_file(file, self.uri, self.width, self.height, Image.Resampling.LANCZOS)
         else:
@@ -831,7 +841,7 @@ class ImgFile(Handle):
             fsys = PACK_SYSTEMS[self.uri.package]
         except KeyError:
             return None
-        file, uses_theme = _find_file(fsys, self.uri, True)
+        file, uses_theme = _find_file(fsys, self.uri, self.default_ext, True)
         if uses_theme or file is None:
             return None
         path = PurePath(file.path)
@@ -853,7 +863,7 @@ class ImgBuiltin(Handle):
     @override
     def _make_image(self) -> Image.Image:
         """Load from the builtin UI resources."""
-        file, uses_theme = _find_file(FSYS_BUILTIN, self.uri)
+        file, uses_theme = _find_file(FSYS_BUILTIN, self.uri, 'png')
         if uses_theme:
             self._uses_theme = True
         if file is not None:
