@@ -190,6 +190,7 @@ async def gradual_iter[K, V](wdict: weakref.WeakKeyDictionary[K, V]) -> AsyncGen
         except KeyError:
             continue  # Was cleared in the meantime.
         yield key, value
+    await trio.lowlevel.checkpoint()
 
 
 class CallbackProto(Protocol):
@@ -524,9 +525,10 @@ async def load_aux_langs(
 async def get_package_tokens(packset: packages.PackagesSet) -> AsyncGenerator[TransTokenSource, None]:
     """Get all the tokens from all packages."""
     for pack in packset.packages.values():
-        yield pack.disp_name, 'package/name'
-        yield pack.desc, 'package/desc'
         await trio.lowlevel.checkpoint()
+        yield pack.disp_name, 'package/name'
+        await trio.lowlevel.checkpoint()
+        yield pack.desc, 'package/desc'
         for tok_id, tok in pack.additional_tokens.items():
             await trio.lowlevel.checkpoint()
             yield tok, f'package/cust/{tok_id}'
@@ -536,6 +538,7 @@ async def get_package_tokens(packset: packages.PackagesSet) -> AsyncGenerator[Tr
             for tup in obj.iter_trans_tokens():
                 await trio.lowlevel.checkpoint()
                 yield tup
+    await trio.lowlevel.checkpoint()
 
 
 def _get_children(tok: TransToken) -> Iterator[TransToken]:

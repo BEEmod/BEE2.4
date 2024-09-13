@@ -92,26 +92,26 @@ class ScreenStage:
 
     async def set_length(self, num: int) -> None:
         """Change the current length of this stage."""
+        await trio.lowlevel.checkpoint()
         self._max = num
         for screen in list(self._bound):
             _QUEUE_SEND_LOAD.put(ipc_types.Load2Daemon_SetLength(screen.id, self.id, num))
-        await trio.sleep(0)
 
     async def step(self, info: object = None) -> None:
         """Increment one step."""
+        await trio.lowlevel.checkpoint()
         self._current += 1
         self._skipped = False
         for screen in list(self._bound):
             _QUEUE_SEND_LOAD.put(ipc_types.Load2Daemon_Set(screen.id, self.id, self._current))
-        await trio.sleep(0)
 
     async def skip(self) -> None:
         """Skip this stage."""
+        await trio.lowlevel.checkpoint()
         self._current = 0
         self._skipped = True
         for screen in list(self._bound):
             _QUEUE_SEND_LOAD.put(ipc_types.Load2Daemon_Skip(screen.id, self.id))
-        await trio.sleep(0)
 
     async def iterate[T](self, seq: Collection[T]) -> AsyncGenerator[T, None]:
         """Tie the progress of a stage to a sequence of some kind."""
