@@ -2,20 +2,21 @@
 from __future__ import annotations
 from typing_extensions import NoReturn
 
-from collections.abc import Callable
 from tkinter import ttk
 import tkinter as tk
+from collections.abc import Callable
+from exceptiongroup import ExceptionGroup
 import pprint
 
-from exceptiongroup import ExceptionGroup
 from srctools import logger
 import attrs
 import trio
-import trio_util
 
-from .img import TK_IMG, label_to_user
-from . import tk_tools, wid_transtoken, TK_ROOT
+import trio_util
 import utils
+
+from . import TK_ROOT, tk_tools, wid_transtoken
+from .img import TK_IMG, label_to_user
 
 
 LOGGER = logger.get_logger(__name__)

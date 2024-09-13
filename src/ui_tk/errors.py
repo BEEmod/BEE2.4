@@ -1,5 +1,6 @@
 """Handler for app.errors."""
 from __future__ import annotations
+
 from tkinter import ttk
 import tkinter as tk
 import math
@@ -8,8 +9,9 @@ import trio
 
 from app.errors import ErrorUI
 from transtoken import AppError, TransToken
-from .wid_transtoken import set_text, set_win_title
+
 from . import TK_ROOT, tk_tools
+from .wid_transtoken import set_text, set_win_title
 
 
 type ChannelValue = tuple[TransToken, TransToken, list[AppError], trio.Event]

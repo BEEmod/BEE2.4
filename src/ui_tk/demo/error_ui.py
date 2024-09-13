@@ -2,9 +2,9 @@ from tkinter import ttk
 
 import trio
 
-from ui_tk import TK_ROOT
 from app.errors import ErrorUI
 from transtoken import AppError, TransToken
+from ui_tk import TK_ROOT
 
 
 async def test(core_nursery: trio.Nursery) -> None:

@@ -1,32 +1,34 @@
 """Tk-specific code for the window that shows item information."""
 from __future__ import annotations
 from typing import override
+
 from tkinter import ttk
 import tkinter as tk
 from contextlib import aclosing
 import functools
 
-from trio_util import AsyncValue
 from srctools.logger import get_logger
 import trio
 
-from app import img, sound, UI
-from async_util import EdgeTrigger
+from app import UI, img, sound
 from app.contextWin import (
-    ChangeVersionFunc, ContextWinBase, IMG_ALPHA, IconFunc, OpenMatchingFunc, SPR, TRANS_ENT_COUNT,
-    TRANS_NO_VERSIONS,
+    IMG_ALPHA, SPR, TRANS_ENT_COUNT, TRANS_NO_VERSIONS, ChangeVersionFunc,
+    ContextWinBase, IconFunc, OpenMatchingFunc,
 )
-from app.mdown import MarkdownData
 from app.item_properties import PropertyWindow
+from app.mdown import MarkdownData
+from async_util import EdgeTrigger
 from packages import PakRef, Style
 from packages.item import Item
 from transtoken import TransToken
+from trio_util import AsyncValue
+import utils
+
 from . import TK_ROOT, tk_tools, tooltip
 from .dialogs import TkDialogs
-from .wid_transtoken import set_text
 from .img import TKImages
 from .rich_textbox import RichText
-import utils
+from .wid_transtoken import set_text
 
 
 LOGGER = get_logger(__name__)
@@ -198,7 +200,7 @@ class ContextWin(ContextWinBase['UI.PalItem']):
 
     def _evt_version_changed(self, _: object) -> None:
         """Callback for the version combobox. Set the item variant."""
-        from app import itemconfig, UI
+        from app import UI, itemconfig
         assert self.selected is not None
         version_id = self.version_lookup[self.wid_variant.current()]
         item_id = self.selected.item.id

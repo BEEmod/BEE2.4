@@ -2,9 +2,8 @@
 from typing import Final, assert_never
 from typing_extensions import override
 
-from tkinter import ttk, font as tk_font
+from tkinter import font as tk_font, ttk
 import tkinter as tk
-
 from collections.abc import Callable, Mapping
 from contextlib import aclosing
 import math
@@ -14,8 +13,8 @@ import trio
 from app import WidgetCache, img
 from app.mdown import MarkdownData
 from app.selector_win import (
-    DispFont, GroupHeaderBase, SelectorWinBase, AttrDef, Options, NavKeys,
     TRANS_ATTR_DESC, TRANS_SUGGESTED, TRANS_SUGGESTED_MAC, TRANS_WINDOW_TITLE,
+    AttrDef, DispFont, GroupHeaderBase, NavKeys, Options, SelectorWinBase,
 )
 from consts import SEL_ICON_SIZE
 from packages import AttrTypes
@@ -24,7 +23,9 @@ from ui_tk import tk_tools
 from ui_tk.img import TK_IMG
 from ui_tk.rich_textbox import RichText
 from ui_tk.tooltip import add_tooltip, set_tooltip
-from ui_tk.wid_transtoken import set_stringvar, set_text, set_win_title, set_menu_text
+from ui_tk.wid_transtoken import (
+    set_menu_text, set_stringvar, set_text, set_win_title,
+)
 import utils
 
 

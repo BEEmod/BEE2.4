@@ -1,7 +1,7 @@
 from __future__ import annotations
+
 from tkinter import messagebox, ttk
 import tkinter as tk
-
 from contextlib import aclosing
 
 import trio
@@ -10,9 +10,9 @@ from app import img, sound
 from app.dragdrop import DragInfo
 from app.errors import ErrorUI
 from transtoken import TransToken
+from ui_tk import TK_ROOT
 from ui_tk.dragdrop import DragDrop
 from ui_tk.img import TK_IMG
-from ui_tk import TK_ROOT
 import app
 import BEE2_config
 import config

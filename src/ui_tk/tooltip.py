@@ -4,6 +4,7 @@ Call add_tooltip with a widget to add all the events automatically.
 """
 from __future__ import annotations
 from typing import Callable
+
 import tkinter as tk
 import warnings
 import weakref
@@ -12,11 +13,11 @@ import attr
 
 from app import img
 from transtoken import TransToken
-from .img import TK_IMG
-# Don't import set_text directly, could be confused with tooltip setter.
-from . import wid_transtoken
-from . import TK_ROOT
 import utils
+
+# Don't import set_text directly, could be confused with tooltip setter.
+from . import TK_ROOT, wid_transtoken
+from .img import TK_IMG
 
 
 __all__ = ['set_tooltip', 'add_tooltip']

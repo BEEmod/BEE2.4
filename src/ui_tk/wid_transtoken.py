@@ -6,11 +6,13 @@ import tkinter as tk
 from contextlib import aclosing
 from weakref import WeakKeyDictionary
 
-from app.localisation import gradual_iter
-from transtoken import TransToken, CURRENT_LANG
 import trio.lowlevel
 
+from app.localisation import gradual_iter
+from transtoken import CURRENT_LANG, TransToken
+
 from . import TK_ROOT
+
 
 __all__ = [
     'TransToken', 'CURRENT_LANG',  # Re-exports

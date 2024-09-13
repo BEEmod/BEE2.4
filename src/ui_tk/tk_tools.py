@@ -3,38 +3,37 @@ General code used for tkinter portions.
 
 """
 from __future__ import annotations
-
 from typing import (
-    Any, Protocol, Callable, Literal, NoReturn, TypedDict, Unpack, overload, cast, override,
+    Any, Callable, Literal, NoReturn, Protocol, TypedDict, Unpack, cast,
+    overload, override,
 )
 
+from tkinter import commondialog, filedialog, font as _tk_font, ttk
+import tkinter as tk
+from collections.abc import Awaitable, Iterable, Sequence
 from contextlib import aclosing
 from enum import Enum, StrEnum
-from collections.abc import Awaitable, Iterable, Sequence
-from tkinter import filedialog, commondialog
-from tkinter import font as _tk_font
-from tkinter import ttk
+from idlelib.redirector import (
+    WidgetRedirector,  # type: ignore[import-not-found]
+)
 import functools
 import inspect
 import os.path
 import sys
-import tkinter as tk
 
-from idlelib.redirector import WidgetRedirector  # type: ignore[import-not-found]
 from srctools import logger
-
-from trio_util import AsyncValue
-import trio_util
 import trio
 
-from app import BaseEnumButton, ICO_PATH, background_run
+from app import ICO_PATH, BaseEnumButton, background_run
 from config.gen_opts import GenOptions
 from transtoken import CURRENT_LANG, TransToken
+from trio_util import AsyncValue
 import config
+import trio_util
 import utils
 
-from .wid_transtoken import set_text
 from . import TK_ROOT, tooltip
+from .wid_transtoken import set_text
 
 
 LOGGER = logger.get_logger(__name__)

@@ -11,16 +11,14 @@ import attrs
 
 from app import img
 from app.dragdrop import (
-    SLOT_DRAG, DragWin, FlexiCB, InfoCB, ManagerBase,
-    Slot, in_bbox,
-    # Re-export.
-    DragInfo as DragInfo,
+    SLOT_DRAG, DragInfo, DragWin, FlexiCB, InfoCB, ManagerBase, Slot, in_bbox,
 )
 from transtoken import TransToken
+import utils
+
 from . import tk_tools
 from .img import TK_IMG
 from .wid_transtoken import set_text
-import utils
 
 
 __all__ = ["CanvasPositioner", "DragDrop", "DragInfo", "InfoCB", "Slot"]

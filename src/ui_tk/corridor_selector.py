@@ -10,25 +10,24 @@ import trio
 
 from app import WidgetCache, img
 from app.corridor_selector import (
-    TRANS_GROUP_ATTACH, TRANS_GROUP_DIR, TRANS_GROUP_MODE, WIDTH, HEIGHT, IMG_ARROW_LEFT,
-    IMG_ARROW_RIGHT,
-    IMG_CORR_BLANK, Icon,
-    OPTS_DIR, OPTS_MODE, OPTS_ATTACH, OptionRow, Selector,
-    TRANS_HELP, TRANS_NO_OPTIONS, TRANS_ONLY_THIS, TRANS_RAND_OPTION, TRANS_TITLE,
+    HEIGHT, IMG_ARROW_LEFT, IMG_ARROW_RIGHT, IMG_CORR_BLANK, OPTS_ATTACH,
+    OPTS_DIR, OPTS_MODE, TRANS_GROUP_ATTACH, TRANS_GROUP_DIR, TRANS_GROUP_MODE,
+    TRANS_HELP, TRANS_NO_OPTIONS, TRANS_ONLY_THIS, TRANS_RAND_OPTION,
+    TRANS_TITLE, WIDTH, Icon, OptionRow, Selector,
 )
 from app.mdown import MarkdownData
 from config.corridors import UIState
 from corridor import Option
 from transtoken import TransToken
-from .dragdrop import CanvasPositioner
 import config
 import packages
 import utils
 
-from .img import TKImages
-from .wid_transtoken import set_text, set_win_title
-from .rich_textbox import RichText
 from . import TK_ROOT, tk_tools, tooltip
+from .dragdrop import CanvasPositioner
+from .img import TKImages
+from .rich_textbox import RichText
+from .wid_transtoken import set_text, set_win_title
 
 
 ICON_CHECK_PADDING: Final = 2 if utils.WIN else 0

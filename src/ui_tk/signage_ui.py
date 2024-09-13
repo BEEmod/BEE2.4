@@ -5,14 +5,16 @@ from tkinter import ttk
 import tkinter as tk
 
 from app import img
+from app.signage_ui import (
+    IMG_BLANK, TRANS_SELECTED, TRANS_TITLE, SignageUIBase, SignSlot,
+)
 from packages import PakRef, Signage
 from transtoken import TransToken
+
 from . import TK_ROOT, tk_tools
 from .dragdrop import CanvasPositioner, DragDrop, Slot
 from .img import TKImages
 from .wid_transtoken import set_text, set_win_title
-
-from app.signage_ui import IMG_BLANK, SignSlot, SignageUIBase, TRANS_TITLE, TRANS_SELECTED
 
 
 class SignageUI(SignageUIBase[tk.Misc]):

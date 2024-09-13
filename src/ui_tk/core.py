@@ -1,31 +1,34 @@
 """Connect Trio and TK together, then run the application."""
 from __future__ import annotations
 from typing import Any
+
 from collections.abc import Awaitable, Callable
 import collections
 
-from outcome import Outcome, Error
+from outcome import Error, Outcome
+import srctools.logger
 import trio
 
-import async_util
-import exporting
-from app import CompilerPane, localisation, sound, img, gameMan, UI, logWindow, lifecycle
-from config.windows import WindowState
-from trio_debug import Tracer
-from ui_tk.dialogs import DIALOG
-from ui_tk.errors import display_errors
-from ui_tk import wid_transtoken, route_callback_exceptions
-from ui_tk.img import TK_IMG
-from ui_tk import TK_ROOT
+from app import (
+    UI, CompilerPane, gameMan, img, lifecycle, localisation, logWindow, sound,
+)
 from config.gen_opts import GenOptions
 from config.last_sel import LastSelected
-import config
+from config.windows import WindowState
+from trio_debug import Tracer
+from ui_tk import TK_ROOT, route_callback_exceptions, wid_transtoken
+from ui_tk.dialogs import DIALOG
+from ui_tk.errors import display_errors
+from ui_tk.img import TK_IMG
 import app
+import async_util
+import BEE2_config
+import config
+import exporting
 import loadScreen
 import packages
 import utils
-import BEE2_config
-import srctools.logger
+
 
 LOGGER = srctools.logger.get_logger('BEE2')
 _TRACER = Tracer() if utils.CODE_DEV_MODE else None

@@ -1,7 +1,7 @@
 """Image integrations for TKinter."""
 from __future__ import annotations
-
 from typing import override
+
 from tkinter import ttk
 import tkinter as tk
 import os

@@ -1,29 +1,30 @@
 """Parse Markdown and display it in Tkinter widgets."""
 from __future__ import annotations
 from typing import Never
+
 from tkinter.font import Font as tkFont, nametofont
 from tkinter.messagebox import askokcancel
 import tkinter
-
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from contextvars import ContextVar
-import urllib.parse
-import itertools
 import enum
+import itertools
+import urllib.parse
 import webbrowser
 
-from mistletoe import block_token as btok, span_token as stok, base_renderer
+from mistletoe import base_renderer, block_token as btok, span_token as stok
 from mistletoe.token import Token
-import mistletoe
 import attrs
+import mistletoe
 import srctools.logger
 
-from app.img import Handle as ImgHandle
 from app import mdown
+from app.img import Handle as ImgHandle
 from transtoken import TransToken
-from ui_tk.tk_tools import Cursors
 from ui_tk.img import TK_IMG
+from ui_tk.tk_tools import Cursors
 import utils
+
 
 LOGGER = srctools.logger.get_logger(__name__)
 TRANS_WEBBROWSER = TransToken.ui('Open "{url}" in the default browser?')

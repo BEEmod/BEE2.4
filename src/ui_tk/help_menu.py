@@ -3,24 +3,23 @@ from typing import override
 
 from tkinter import ttk
 import tkinter as tk
-
 from contextlib import aclosing
 import functools
 
 import trio
 
 from app.helpMenu import (
-    TRANS_CREDITS_BUTTON, TRANS_CREDITS_TITLE, TRANS_CLOSE_BUTTON,
-    ICONS, WEB_RESOURCES, SEPERATOR,
-    CreditsWindowBase, open_url,
+    ICONS, SEPERATOR, TRANS_CLOSE_BUTTON, TRANS_CREDITS_BUTTON,
+    TRANS_CREDITS_TITLE, WEB_RESOURCES, CreditsWindowBase, open_url,
 )
 from app.mdown import MarkdownData
+import utils
+
 from . import TK_ROOT, tk_tools
 from .dialogs import DIALOG
 from .img import TKImages
-from .wid_transtoken import set_menu_text, set_text, set_win_title
 from .rich_textbox import RichText
-import utils
+from .wid_transtoken import set_menu_text, set_text, set_win_title
 
 
 class CreditsWindow(CreditsWindowBase):

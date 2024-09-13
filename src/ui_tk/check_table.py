@@ -7,17 +7,17 @@ via tooltips
 """
 from __future__ import annotations
 from typing import overload
-from tkinter import ttk, font
-import tkinter as tk
 
+from tkinter import font, ttk
+import tkinter as tk
 from collections.abc import Iterable, Iterator
 import functools
 
 import attrs
 
+from . import tk_tools
 from .tooltip import add_tooltip, set_tooltip
 from .wid_transtoken import TransToken, set_text
-from . import tk_tools
 
 
 UP_ARROW = '\u25B3'

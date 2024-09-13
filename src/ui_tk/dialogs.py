@@ -2,9 +2,9 @@
 from __future__ import annotations
 from typing_extensions import override
 
-from collections.abc import Callable
-from tkinter import simpledialog, ttk, commondialog, filedialog
+from tkinter import commondialog, filedialog, simpledialog, ttk
 import tkinter as tk
+from collections.abc import Callable
 
 import trio
 
@@ -13,7 +13,7 @@ from loadScreen import suppress_screens
 from transtoken import AppError, TransToken
 
 from . import TK_ROOT
-from .tk_tools import set_window_icon, center_onscreen
+from .tk_tools import center_onscreen, set_window_icon
 from .wid_transtoken import set_text
 
 

@@ -5,8 +5,8 @@ from async_util import EdgeTrigger
 from ui_tk.corridor_selector import TkSelector
 from ui_tk.dialogs import DIALOG
 from ui_tk.img import TK_IMG
-import exporting
 import config
+import exporting
 import loadScreen
 import packages
 

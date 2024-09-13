@@ -2,9 +2,11 @@ import tkinter.constants
 
 import trio
 
-from app.dialogs import test_generic_msg, test_generic_prompt, test_generic_files
-from ui_tk.dialogs import DIALOG
+from app.dialogs import (
+    test_generic_files, test_generic_msg, test_generic_prompt,
+)
 from ui_tk import TK_ROOT
+from ui_tk.dialogs import DIALOG
 
 
 async def test(core_nursery: trio.Nursery) -> None:

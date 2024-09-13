@@ -1,9 +1,10 @@
 """This package contains UI code specific to TKinter."""
 from __future__ import annotations
-from types import TracebackType, GenericAlias
-import tkinter as tk
 
+import tkinter as tk
 from exceptiongroup import BaseExceptionGroup
+from types import GenericAlias, TracebackType
+
 import trio
 
 import app
