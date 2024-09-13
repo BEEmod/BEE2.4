@@ -258,8 +258,8 @@ class SelitemData:
 
         if small_icon is None:
             if large_icon is not None:
-                small_icon = large_icon.crop(
-                    consts.SEL_ICON_CROP_SHRINK,
+                small_icon = large_icon.transform(
+                    (1, 1),
                     width=consts.SEL_ICON_SIZE, height=consts.SEL_ICON_SIZE,
                 )
             else:

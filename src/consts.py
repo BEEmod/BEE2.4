@@ -352,7 +352,6 @@ TIMER_INFINITE: Final = '99999999999'
 
 SEL_ICON_SIZE: Final = 96  # Size of the selector win icons
 SEL_ICON_SIZE_LRG: Final = (256, 192)  # Size of the larger icon shown in description.
-SEL_ICON_CROP_SHRINK: Final = (32, 0, 256 - 32, 192)  # Bounds required to crop from lrg to small.
 
 # Palette UUIDs
 PALETTE_NS = UUID('91001b81-60ee-494d-9d2a-6371397b2240')

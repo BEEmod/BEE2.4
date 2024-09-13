@@ -443,14 +443,14 @@ class Handle(User):
 
         return ImgComposite._deduplicate(width, height, children)
 
-    def crop(
+    def transform(
         self,
-        bounds: tuple[int, int, int, int] | None = None,
+        ratio: tuple[int, int] | None = None,
         transpose: Image.Transpose | None = None,
         width: int = 0, height: int = 0,
-    ) -> ImgCrop:
-        """Wrap a handle to crop it into a smaller size."""
-        return ImgCrop._deduplicate(width, height, self, bounds, transpose)
+    ) -> ImgTransform:
+        """Wrap a handle to change the ratio, or do flips."""
+        return ImgTransform._deduplicate(width, height, self, ratio, transpose)
 
     def with_alpha_stripped(self) -> ImgStripAlpha:
         """Wrap a handle to strip alpha."""
@@ -943,11 +943,12 @@ class ImgComposite(Handle):
 
 
 @attrs.define(eq=False)
-class ImgCrop(Handle):
+class ImgTransform(Handle):
     """An image that crops another down to only show part."""
     alpha_result: ClassVar[bool] = True
     source: Handle
-    bounds: tuple[int, int, int, int] | None  # left, top, right, bottom coords.
+    # The target aspect ratio to produce
+    ratio: tuple[int, int] | None
     transpose: Image.Transpose | None
 
     @override
@@ -958,9 +959,9 @@ class ImgCrop(Handle):
     @override
     def _to_key(
         cls,
-        args: tuple[Handle, tuple[int, int, int, int] | None, Image.Transpose | None],
+        args: tuple[Handle, tuple[int, int] | None, Image.Transpose | None],
         /,
-    ) -> tuple[int, tuple[int, int, int, int] | None, Image.Transpose | None]:
+    ) -> tuple[int, tuple[int, int] | None, Image.Transpose | None]:
         """Handles aren't hashable, so we need to use identity."""
         [child, bounds, transpose] = args
         return (id(child), bounds, transpose)
@@ -973,32 +974,59 @@ class ImgCrop(Handle):
     def uses_packsys(self) -> bool:
         return self.source.uses_packsys()
 
+    def _crop(self, image: Image.Image) -> Image.Image:
+        # Alter the image to have the specified ratio.
+        width = image.width
+        height = image.height
+        targ_ratio = Fraction(*self.ratio)
+        if targ_ratio == Fraction(width, height):
+            return image
+
+        # One direction requires expanding,
+        # the other requires cropping. We use the latter.
+        crop_width = (width - (height * targ_ratio)) / 2
+        crop_height = (height - (width / targ_ratio)) / 2
+        # First, we might need to scale up to keep the pixel counts.
+        # That could cause extreme sizes, so guard against that.
+        scale = max(crop_width, crop_height).denominator
+        if scale != 1:
+            width *= scale
+            height *= scale
+            if width > 512 or height > 512:
+                LOGGER.warning('Cropped image too big at {}x{}!', width, height)
+                # Just give up, rescale to the target ratio.
+                return image.resize((384, int(384 * targ_ratio)))
+
+            image = image.resize(
+                (width, height),
+                Image.NEAREST if self.source.resize_pixel else Image.LANCZOS,
+            )
+            crop_width *= scale
+            crop_height *= scale
+
+        if crop_width > crop_height:
+            crop_dist = crop_width.numerator * crop_width.denominator
+            return image.crop((crop_dist, 0, width - crop_dist, height))
+        else:
+            crop_dist = crop_height.numerator * crop_height.denominator
+            return image.crop((0, crop_dist, width, height - crop_dist))
+
     @override
     def _make_image(self) -> Image.Image:
         """Crop this image down to part of the source."""
-        src_w = self.source.width
-        src_h = self.source.height
 
         image = self.source._load_pil()
-        # Shrink down the source to the final source so the bounds apply.
-        # TODO: Rescale bounds to actual source size to improve result?
-        if src_w > 0 and src_h > 0 and (src_w, src_h) != image.size:
-            image = image.resize((src_w, src_h), resample=Image.Resampling.LANCZOS)
-
-        if self.bounds is not None:
-            image = image.crop(self.bounds)
+        if self.ratio is not None:
+            image = self._crop(image)
 
         if self.transpose is not None:
             image = image.transpose(self.transpose)
-
-        if self.width > 0 and self.height > 0 and (self.width, self.height) != image.size:
-            image = image.resize((self.width, self.height), resample=Image.Resampling.LANCZOS)
         return image
 
     @override
-    def resize(self, width: int, height: int) -> ImgCrop:
+    def resize(self, width: int, height: int) -> ImgTransform:
         """Return a copy with a different size."""
-        return self._deduplicate(width, height, self.source, self.bounds, self.transpose)
+        return self._deduplicate(width, height, self.source, self.ratio, self.transpose)
 
 
 @attrs.define(eq=False)
