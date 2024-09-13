@@ -19,13 +19,17 @@ from app.corridor_selector import (
 from app.mdown import MarkdownData
 from config.corridors import UIState
 from corridor import Option
+from packages.corridor import IMG_HEIGHT_LRG, IMG_WIDTH_LRG
 from transtoken import TransToken
 import config
 import packages
 import utils
 
 from .img import ImageSlot, WXImages
-from . import MARKDOWN, PEN_SLOT_BORDER, PEN_SLOT_BORDER_SEL, MAIN_WINDOW, discretise_scrollwheel
+from . import (
+    MARKDOWN, PEN_SLOT_BORDER, PEN_SLOT_BORDER_SEL, MAIN_WINDOW, discretise_scrollwheel,
+    set_fixed_size,
+)
 from .wid_transtoken import set_text, set_tooltip, set_win_title
 from .widgets import EnumButton
 
@@ -45,6 +49,7 @@ class IconUI(Icon):
         self.check_bounds = wx.Rect()
 
         self.widget.SetMinSize((WIDTH, HEIGHT))
+        self.widget.SetMaxSize((WIDTH, HEIGHT))
         self.widget.Bind(wx.EVT_ENTER_WINDOW, self._evt_hover_enter)
         self.widget.Bind(wx.EVT_LEAVE_WINDOW, self._evt_hover_exit)
         self.widget.Bind(wx.EVT_MOTION, self._evt_mousedown)
@@ -71,13 +76,18 @@ class IconUI(Icon):
     def _on_paint(self, evt: wx.PaintEvent) -> None:
         """Draw the icon."""
         dc = wx.PaintDC(self.widget)
+        gc = wx.GraphicsContext.Create(dc)
         native = wx.RendererNative.Get()
         wid_size = self.widget.GetSize()
         check_size = native.GetCheckBoxSize(self.widget)
 
         dc.SetPen(PEN_SLOT_BORDER_SEL if self._highlight else PEN_SLOT_BORDER)
         dc.DrawRectangle(wx.Rect(wid_size))
-        self.img.draw(dc, ICON_INSET, ICON_INSET)
+        self.img.draw_sized(
+            gc,
+            ICON_INSET, ICON_INSET,
+            wid_size.Width - 2 * ICON_INSET, wid_size.Height - 2 * ICON_INSET,
+        )
 
         self.check_bounds = wx.Rect(
             ICON_INSET,
@@ -223,11 +233,14 @@ class WxSelector(Selector[IconUI, OptionRowUI]):
         sizer_right.Add(sizer_img, wx.SizerFlags().CenterHorizontal())
 
         self.btn_image_left = wx.Button(self.pane_right, style=wx.BU_EXACTFIT)
-        self.wid_image = wx.StaticBitmap(self.pane_right)
+        self.wid_image = wx.GenericStaticBitmap(self.pane_right)
         self.btn_image_right = wx.Button(self.pane_right, style=wx.BU_EXACTFIT)
         sizer_img.Add(self.btn_image_left, 0, wx.EXPAND, 0)
         sizer_img.Add(self.wid_image, 1, wx.EXPAND, 0)
         sizer_img.Add(self.btn_image_right, 0, wx.EXPAND, 0)
+
+        self.wid_image.SetScaleMode(wx.GenericStaticBitmap.Scale_AspectFit)
+        set_fixed_size(self.wid_image, IMG_WIDTH_LRG * 0.75, IMG_HEIGHT_LRG * 0.75)
 
         wx_img.apply(self.btn_image_left, IMG_ARROW_LEFT)
         wx_img.apply(self.wid_image, IMG_CORR_BLANK)

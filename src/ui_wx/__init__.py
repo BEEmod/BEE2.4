@@ -134,3 +134,10 @@ def _make_radio_icon() -> wx.Bitmap:
 # TODO: Can't change the button design on other platforms, unfortunately.
 #       They only allow a single icon for both checked/unchecked.
 RADIO_MENU_BITMAP: Final = _make_radio_icon() if utils.WIN else wx.NullBitmap
+
+
+def set_fixed_size(widget: wx.Window, width: float, height: float) -> None:
+    """Set the min and max sizes to the same (DIP) size."""
+    size = widget.FromDIP(wx.Size(round(width), round(height)))
+    widget.SetMinSize(size)
+    widget.SetMaxSize(size)

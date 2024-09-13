@@ -1,7 +1,7 @@
 """Image integrations for WxWidgets."""
 from __future__ import annotations
 
-from typing import Final, override
+from typing import Final, overload, override
 from weakref import ReferenceType as WeakRef, WeakKeyDictionary
 import wx
 import os
@@ -14,7 +14,7 @@ from app import img
 
 
 # Widgets with an image attribute that can be set.
-type WxImgWidgets = wx.StaticBitmap | wx.Button | wx.BitmapButton
+type WxImgWidgets = wx.StaticBitmap | wx.GenericStaticBitmap | wx.Button | wx.BitmapButton
 
 LOGGER = get_logger(__name__)
 basic_users: WeakKeyDictionary[WxImgWidgets, BasicUser] = WeakKeyDictionary()
@@ -90,14 +90,15 @@ class MenuUser(WxUser):
 
 
 # noinspection PyProtectedMember
-@attrs.define(eq=False)
 class ImageSlot(WxUser):
     """A slot which holds an image that can be retrieved for drawing operations."""
     widget: Final[wx.Window]
-    _handle: img.Handle | None = attrs.field(init=False, default=None)
-    _bitmap: wx.Bitmap | None = attrs.field(init=False, default=None)
+    _handle: img.Handle | None
+    _bitmap: wx.Bitmap | None
 
-    def __attrs_post_init__(self) -> None:
+    def __init__(self, widget: wx.Window) -> None:
+        self.widget = widget
+        self._handle = self._bitmap = None
         self.widget.Bind(wx.EVT_WINDOW_DESTROY, self._destroyed)
 
     def set_handle(self, handle: img.Handle | None) -> None:
@@ -113,6 +114,16 @@ class ImageSlot(WxUser):
         """Draw the image at the specified point."""
         if self._bitmap is not None:
             dc.DrawBitmap(self._bitmap, x, y, mask)
+
+    def draw_sized(
+        self, gc: wx.GraphicsContext,
+        x1: int, y1: int,
+        width: int, height: int,
+    ) -> None:
+        """Draw the image inside the specified rectangle."""
+        if self._bitmap is None:
+            return
+        gc.DrawBitmap(self._bitmap, x1, y1, width, height)
 
     @override
     def _set_img(self, handle: img.Handle, image: wx.Bitmap) -> None:
@@ -243,7 +254,7 @@ class WXImages(img.UIImage):
                 res = bg.convert('RGB')
                 handle._bg_composited = True
             if image is None:
-                image = self.wx_img[handle] = wx.Bitmap(res.width or 16, res.height or 16)
+                image = self.wx_img[handle] = wx.Bitmap(res.width, res.height)
             match res.mode:
                 case 'RGBA':
                     image.CopyFromBuffer(res.tobytes(), wx.BitmapBufferFormat_RGBA)
