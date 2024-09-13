@@ -137,7 +137,7 @@ class GroupHeader(GroupHeaderBase):
         self.panel.Bind(wx.EVT_PAINT, self._on_paint)
 
         self.panel.Bind(wx.EVT_LEFT_DOWN, self._evt_mouse_down)
-        self.panel.Bind(wx.EVT_LEFT_UP, self._evt_toggle)
+        self.panel.Bind(wx.EVT_LEFT_UP, self._evt_mouse_up)
         self.panel.SetCursor(wx.Cursor(wx.CURSOR_HAND))
         self.panel.Bind(wx.EVT_ENTER_WINDOW, self._evt_hover_start)
         self.panel.Bind(wx.EVT_LEAVE_WINDOW, self._evt_hover_end)
@@ -153,6 +153,12 @@ class GroupHeader(GroupHeaderBase):
     def _evt_mouse_down(self, evt: wx.MouseEvent) -> None:
         self._pressed = True
         self.panel.Refresh()
+
+    def _evt_mouse_up(self, evt: wx.MouseEvent) -> None:
+        """The button can only be pressed if we started inside it."""
+        if self._pressed:
+            self._pressed = False
+            self._evt_toggle()
 
     @override
     def _ui_reassign(self, group_id: str, title: TransToken) -> None:
