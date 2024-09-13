@@ -7,12 +7,14 @@ they are loaded in the background, then unloaded if removed from all widgets.
 """
 from __future__ import annotations
 
+import math
 from abc import abstractmethod
 from contextlib import aclosing
 from typing import Any, ClassVar, Final, Literal, override
 from typing_extensions import Self
 from collections.abc import Mapping, Sequence, Iterator
 from pathlib import Path, PurePath
+from fractions import Fraction
 import abc
 import functools
 import itertools
@@ -184,25 +186,12 @@ def _load_file(
     file: FSFile,
     uri: utils.PackagePath,
     width: int, height: int,
-    resize_algo: Image.Resampling,
 ) -> Image.Image:
     """Load an image, given the filesystem reference."""
     try:
         with file.open_bin() as stream:
             if file.path.endswith('.vtf'):
-                vtf = VTF.read(stream)
-                mipmap = 0
-                # If resizing, pick the mipmap equal to or slightly larger than
-                # the desired size. With powers of two, most cases we don't
-                # need to resize at all.
-                if width > 0 and height > 0 and VTFFlags.NO_MIP not in vtf.flags:
-                    for mipmap in range(vtf.mipmap_count):
-                        mip_width = max(vtf.width >> mipmap, 1)
-                        mip_height = max(vtf.height >> mipmap, 1)
-                        if mip_width < width or mip_height < height:
-                            mipmap = max(0, mipmap - 1)
-                            break
-                image = vtf.get(mipmap=mipmap).to_PIL()
+                image = VTF.read(stream).get().to_PIL()
             else:
                 image = Image.open(stream)
                 image.load()
@@ -215,9 +204,6 @@ def _load_file(
             exc_info=True,
         )
         return Handle.error(width, height).get_pil()
-
-    if width > 0 and height > 0 and (width, height) != image.size:
-        image = image.resize((width, height), resample=resize_algo)
     return image
 
 
@@ -255,6 +241,8 @@ class Handle(User):
     # If set, assigning this handle to a widget preserves the alpha. This is only set on UI icons
     # and the like, not packages.
     alpha_result: ClassVar[bool] = False
+    # If image needs to be scaled, whether to use nearest-neighbour.
+    resize_pixel: ClassVar[bool] = False
     # Track how many are loading.
     _currently_loading: ClassVar[int] = 0
 
@@ -810,7 +798,7 @@ class ImgFile(Handle):
 
         file, uses_theme = _find_file(fsys, self.uri, self.default_ext, True)
         if file is not None:
-            img = _load_file(file, self.uri, self.width, self.height, Image.Resampling.LANCZOS)
+            img = _load_file(file, self.uri, self.width, self.height)
         else:
             img = Handle.error(self.width, self.height).get_pil()
         if uses_theme:
@@ -857,7 +845,6 @@ class ImgBuiltin(Handle):
     uri: utils.PackagePath
     allow_raw: ClassVar[bool] = True
     alpha_result: ClassVar[bool] = True
-    resize_mode: ClassVar[Image.Resampling] = Image.Resampling.LANCZOS
     _uses_theme: bool = False
 
     @override
@@ -867,7 +854,7 @@ class ImgBuiltin(Handle):
         if uses_theme:
             self._uses_theme = True
         if file is not None:
-            return _load_file(file, self.uri, self.width, self.height, self.resize_mode)
+            return _load_file(file, self.uri, self.width, self.height)
         else:
             return Handle.error(self.width, self.height).get_pil()
 
@@ -889,7 +876,7 @@ class ImgBuiltin(Handle):
 
 class ImgSprite(ImgBuiltin):
     """An image loaded from builtin UI resources, with nearest-neighbour resizing."""
-    resize_mode: ClassVar[Image.Resampling] = Image.Resampling.NEAREST
+    resize_pixel: ClassVar[bool] = True
 
 
 @attrs.define(eq=False)
@@ -922,18 +909,28 @@ class ImgComposite(Handle):
     @override
     def _make_image(self) -> Image.Image:
         """Combine several images into one."""
-        width = self.width or self.layers[0].width
-        height = self.height or self.layers[0].height
-        img = Image.new('RGBA', (width, height))
-        for part in self.layers:
-            if part.width != img.width or part.height != img.height:
-                raise ValueError(f'Mismatch in image sizes: {width}x{height} != {self.layers}')
+        children = [
+            layer._load_pil() for layer in self.layers
+        ]
+        size = (
+            max(child.width for child in children),
+            max(child.height for child in children)
+        )
+        ratio = Fraction(*size)
+        img = Image.new('RGBA', size)
+        for layer, child in zip(self.layers, children, strict=True):
+            if Fraction(child.width, child.height) != ratio:
+                LOGGER.warning(
+                    'Mismatch in layered image ratios: target={}x{}, '
+                    'layer={}x{} for {!r}',
+                    *size, *child.size, layer,
+                )
+                return Handle.error(self.width, self.height).get_pil()
             # noinspection PyProtectedMember
-            child = part._load_pil()
             if child.mode != 'RGBA':
-                LOGGER.warning('Image {} did not use RGBA mode!', child)
+                LOGGER.warning('Layered image does not have alpha: {!r}', layer)
                 child = child.convert('RGBA')
-            img.alpha_composite(child)
+            img.alpha_composite(child.resize(size, Image.NEAREST if layer.resize_pixel else Image.LANCZOS))
         return img
 
     @override
