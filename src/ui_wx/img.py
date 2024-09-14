@@ -1,7 +1,7 @@
 """Image integrations for WxWidgets."""
 from __future__ import annotations
 
-from typing import Final, overload, override
+from typing import Final, override
 from weakref import ReferenceType as WeakRef, WeakKeyDictionary
 import wx
 import os

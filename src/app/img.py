@@ -7,7 +7,6 @@ they are loaded in the background, then unloaded if removed from all widgets.
 """
 from __future__ import annotations
 
-import math
 from abc import abstractmethod
 from contextlib import aclosing
 from typing import Any, ClassVar, Final, Literal, override
@@ -24,7 +23,7 @@ import weakref
 from PIL import Image, ImageColor, ImageDraw, ImageFont
 from srctools import Keyvalues, Vec
 from srctools.filesys import FileSystem, FileSystemChain, RawFileSystem, File as FSFile
-from srctools.vtf import VTF, VTFFlags
+from srctools.vtf import VTF
 import attrs
 import srctools.logger
 import trio
