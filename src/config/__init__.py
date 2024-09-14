@@ -371,7 +371,6 @@ class ConfigSpec:
         """
         if cls not in self._registered:
             raise ValueError(f'Unregistered data type {cls!r}')
-        info = cls.get_conf_info()
         data: DataT | None = None
         try:
             return self._current.get(cls, data_id)
@@ -384,6 +383,7 @@ class ConfigSpec:
                 except KeyError:
                     pass
 
+        info = cls.get_conf_info()
         if data is None:
             # Return a default value.
             if isinstance(default, type) and issubclass(default, Exception):
