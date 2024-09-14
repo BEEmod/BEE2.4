@@ -98,7 +98,7 @@ class ItemSlot(wx.Panel):
             4, y, SEL_ICON_SIZE + 8, y + SEL_ICON_SIZE + 20,
         )
         y += 8
-        self.slot.draw_sized(gc, 8, y, SEL_ICON_SIZE, SEL_ICON_SIZE)
+        self.slot.draw(gc, 8, y, SEL_ICON_SIZE, SEL_ICON_SIZE)
         y += SEL_ICON_SIZE + 8
 
         label = str(self.label)

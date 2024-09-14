@@ -83,11 +83,8 @@ class IconUI(Icon):
 
         dc.SetPen(PEN_SLOT_BORDER_SEL if self._highlight else PEN_SLOT_BORDER)
         dc.DrawRectangle(wx.Rect(wid_size))
-        self.img.draw_sized(
-            gc,
-            ICON_INSET, ICON_INSET,
-            wid_size.Width - 2 * ICON_INSET, wid_size.Height - 2 * ICON_INSET,
-        )
+        self.img.draw(gc, ICON_INSET, ICON_INSET, wid_size.Width - 2 * ICON_INSET,
+                      wid_size.Height - 2 * ICON_INSET)
 
         self.check_bounds = wx.Rect(
             ICON_INSET,

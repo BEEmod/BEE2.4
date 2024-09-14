@@ -110,12 +110,7 @@ class ImageSlot(WxUser):
             handle._incref(self)
             self._bitmap = WX_IMG._load_wx(handle, False)
 
-    def draw(self, dc: wx.DC, x: int, y: int, mask: bool = False) -> None:
-        """Draw the image at the specified point."""
-        if self._bitmap is not None:
-            dc.DrawBitmap(self._bitmap, x, y, mask)
-
-    def draw_sized(
+    def draw(
         self, gc: wx.GraphicsContext,
         x1: int, y1: int,
         width: int, height: int,
