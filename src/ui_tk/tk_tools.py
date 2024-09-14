@@ -13,9 +13,7 @@ import tkinter as tk
 from collections.abc import Awaitable, Iterable, Sequence
 from contextlib import aclosing
 from enum import Enum, StrEnum
-from idlelib.redirector import (
-    WidgetRedirector,  # type: ignore[import-not-found]
-)
+from idlelib.redirector import WidgetRedirector  # type: ignore[import-not-found]
 import functools
 import inspect
 import os.path

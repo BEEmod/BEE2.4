@@ -33,7 +33,7 @@ HEIGHT: Final = corridor.IMG_HEIGHT_SML + 16
 
 IMG_CORR_BLANK: Final = img.Handle.background(corridor.IMG_WIDTH_LRG, corridor.IMG_HEIGHT_LRG)
 IMG_ARROW_LEFT: Final = img.Handle.builtin('BEE2/switcher_arrow', 17, 64)
-IMG_ARROW_RIGHT: Final = IMG_ARROW_LEFT.crop(transpose=img.FLIP_LEFT_RIGHT)
+IMG_ARROW_RIGHT: Final = IMG_ARROW_LEFT.transform(transpose=img.FLIP_LEFT_RIGHT)
 
 
 # If no groups are defined for a style, use this.

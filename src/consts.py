@@ -22,7 +22,7 @@ __all__ = [
     'FixupVars', 'DefaultItems',
     'COUNTER_AND_ON', 'COUNTER_AND_OFF',
     'COUNTER_OR_ON', 'COUNTER_OR_OFF',
-    'SEL_ICON_SIZE', 'SEL_ICON_SIZE_LRG', 'SEL_ICON_CROP_SHRINK',
+    'SEL_ICON_SIZE', 'SEL_ICON_SIZE_LRG',
     'PALETTE_FORCE_SHOWN', 'PALETTE_NS',
     'UUID_BLANK', 'UUID_EXPORT', 'UUID_PORTAL2',
 ]
@@ -352,7 +352,6 @@ TIMER_INFINITE: Final = '99999999999'
 
 SEL_ICON_SIZE: Final = 96  # Size of the selector win icons
 SEL_ICON_SIZE_LRG: Final = (256, 192)  # Size of the larger icon shown in description.
-SEL_ICON_CROP_SHRINK: Final = (32, 0, 256 - 32, 192)  # Bounds required to crop from lrg to small.
 
 # Palette UUIDs
 PALETTE_NS = UUID('91001b81-60ee-494d-9d2a-6371397b2240')

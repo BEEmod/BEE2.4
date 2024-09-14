@@ -286,11 +286,6 @@ class TKImages(img.UIImage):
 
     def _get_img(self, width: int, height: int) -> ImageTk.PhotoImage:
         """Recycle an old image, or construct a new one."""
-        if not width:
-            width = 16
-        if not height:
-            height = 16
-
         # Use setdefault and pop so each step is atomic.
         img_list = self.unused_img.setdefault((width, height), [])
         try:
@@ -323,8 +318,17 @@ class TKImages(img.UIImage):
                 bg.alpha_composite(res)
                 res = bg.convert('RGB')
                 handle._bg_composited = True
+            width = handle.width or res.width
+            height = handle.height or res.height
+            if width != res.width or height != res.height:
+                LOGGER.info('Resize {} -> {}', res.size, handle)
+                res = res.resize(
+                    (width, height),
+                    Image.NEAREST if handle.resize_pixel else Image.LANCZOS,
+                )
+
             if image is None:
-                image = self.tk_img[handle] = self._get_img(res.width, res.height)
+                image = self.tk_img[handle] = self._get_img(width, height)
             image.paste(res)
         return image
 
