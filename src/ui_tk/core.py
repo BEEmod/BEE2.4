@@ -79,7 +79,7 @@ async def init_app(core_nursery: trio.Nursery) -> None:
         core_nursery.start_soon(img.init, TK_IMG)
         core_nursery.start_soon(localisation.load_aux_langs, gameMan.all_games, packset)
 
-        await async_util.run_as_task(UI.load_packages, core_nursery, packset, TK_IMG)
+        await async_util.run_as_task(UI.load_packages, core_nursery, packset)
         await loadScreen.MAIN_UI.step('package_load')
         LOGGER.info('Done!')
 

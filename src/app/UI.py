@@ -468,7 +468,6 @@ class PalItem:
 async def load_packages(
     core_nursery: trio.Nursery,
     packset: packages.PackagesSet,
-    tk_img: TKImages,
 ) -> None:
     """Import in the list of items and styles from the packages.
 
