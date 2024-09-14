@@ -245,6 +245,11 @@ class Handle(User):
     # Track how many are loading.
     _currently_loading: ClassVar[int] = 0
 
+    @property
+    def resampling_algo(self) -> Image.Resampling:
+        """The appropriate resampling mode to use."""
+        return Image.Resampling.NEAREST if self.resize_pixel else Image.Resampling.LANCZOS
+
     # Subclass methods
     def _children(self) -> Iterator[Handle]:
         """Yield all the handles this depends on."""
@@ -287,6 +292,7 @@ class Handle(User):
 
     @classmethod
     def _deduplicate(cls, width: int | tuple[int, int], height: int, *args: Any) -> Self:
+        """Reuse an existing handle instance if possible. Args are passed to the constructor."""
         if isinstance(width, tuple):
             width, height = width
         key = cls._to_key(args)
@@ -929,7 +935,7 @@ class ImgComposite(Handle):
             if child.mode != 'RGBA':
                 LOGGER.warning('Layered image does not have alpha: {!r}', layer)
                 child = child.convert('RGBA')
-            img.alpha_composite(child.resize(size, Image.NEAREST if layer.resize_pixel else Image.LANCZOS))
+            img.alpha_composite(child.resize(size, layer.resampling_algo))
         return img
 
     @override
@@ -995,10 +1001,7 @@ class ImgTransform(Handle):
                 # Just give up, rescale to the target ratio.
                 return image.resize((384, int(384 * ratio)))
 
-            image = image.resize(
-                (width, height),
-                Image.NEAREST if self.source.resize_pixel else Image.LANCZOS,
-            )
+            image = image.resize((width, height), self.source.resampling_algo)
             crop_width *= scale
             crop_height *= scale
 

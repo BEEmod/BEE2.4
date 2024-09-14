@@ -30,9 +30,60 @@ def get_app_icon(path: os.PathLike[str]) -> wx.Bitmap:
         return bitmap
 
 
+class Bundle(wx.BitmapBundleImpl):
+    """A dynamic image wrapper which creates sizes just in time.
+
+    This way we can use PIL's better resizing instead of the builtin WX ones.
+    """
+    _bitmaps: dict[tuple[int, int], wx.Bitmap]
+    def __init__(
+        self,
+        width: int,
+        height: int,
+        source: Image.Image,
+        resize: Image.Resampling,
+    ) -> None:
+        super().__init__()
+        self.source = source
+        self.resize = resize
+        self.size = wx.Size(width, height)
+        self._bitmaps = {}
+
+    def GetDefaultSize(self) -> wx.Size:
+        """Prefer to produce the size set for the handle."""
+        return wx.Size(self.size)
+
+    def GetPreferredBitmapSizeAtScale(self, scale: float) -> wx.Size:
+        """We can produce any scale."""
+        return wx.Size(self.size).Scale(scale, scale)
+
+    def GetBitmap(self, size: wx.Size) -> wx.Bitmap:
+        if size.width <= 0 or size.height <= 0:
+            # Sometimes get nonsense sizes if never onscreen.
+            # Just return a dummy, don't cache it.
+            return wx.Bitmap(1, 1)
+
+        size_tup = size.width, size.height
+        try:
+            return self._bitmaps[size_tup]
+        except KeyError:
+            pass
+
+        bitmap = self._bitmaps[size_tup] = wx.Bitmap(size)
+        sized = self.source.resize(size_tup, self.resize)
+        match sized.mode:
+            case 'RGBA':
+                bitmap.CopyFromBuffer(sized.tobytes(), wx.BitmapBufferFormat_RGBA)
+            case 'RGB':
+                bitmap.CopyFromBuffer(sized.tobytes(), wx.BitmapBufferFormat_RGB)
+            case _:
+                raise ValueError(f'Unknown PIL mode: {sized.mode}!')
+        return bitmap
+
+
 class WxUser(img.User):
     """Common methods."""
-    def _set_img(self, handle: img.Handle, image: wx.Bitmap) -> None:
+    def _set_img(self, handle: img.Handle, image: wx.BitmapBundle) -> None:
         """Apply this Wx image to users of it."""
 
 
@@ -48,7 +99,7 @@ class BasicUser(WxUser):
         self.cur_handle = None
 
     @override
-    def _set_img(self, handle: img.Handle, image: wx.Bitmap) -> None:
+    def _set_img(self, handle: img.Handle, image: wx.BitmapBundle) -> None:
         """Set the image for the basic widget."""
         if (wid := self.widget()) is not None:
             wid.SetBitmap(image)
@@ -71,7 +122,7 @@ class MenuUser(WxUser):
         self.handle_to_ids = {}
 
     @override
-    def _set_img(self, handle: img.Handle, image: wx.Bitmap) -> None:
+    def _set_img(self, handle: img.Handle, image: wx.BitmapBundle) -> None:
         """Set this image for menu options that use this handle."""
         menu = self.menu()
         if menu is None:
@@ -94,11 +145,11 @@ class ImageSlot(WxUser):
     """A slot which holds an image that can be retrieved for drawing operations."""
     widget: Final[wx.Window]
     _handle: img.Handle | None
-    _bitmap: wx.Bitmap | None
+    _bundle: wx.BitmapBundle | None
 
     def __init__(self, widget: wx.Window) -> None:
         self.widget = widget
-        self._handle = self._bitmap = None
+        self._handle = self._bundle = None
         self.widget.Bind(wx.EVT_WINDOW_DESTROY, self._destroyed)
 
     def set_handle(self, handle: img.Handle | None) -> None:
@@ -108,7 +159,7 @@ class ImageSlot(WxUser):
         self._handle = handle
         if handle is not None:
             handle._incref(self)
-            self._bitmap = WX_IMG._load_wx(handle, False)
+            self._bundle = WX_IMG._load_wx(handle, False)
 
     def draw(
         self, gc: wx.GraphicsContext,
@@ -116,14 +167,15 @@ class ImageSlot(WxUser):
         width: int, height: int,
     ) -> None:
         """Draw the image inside the specified rectangle."""
-        if self._bitmap is None:
+        if self._bundle is None:
             return
-        gc.DrawBitmap(self._bitmap, x1, y1, width, height)
+        bitmap = self._bundle.GetBitmap(wx.Size(width, height))
+        gc.DrawBitmap(bitmap, x1, y1, width, height)
 
     @override
-    def _set_img(self, handle: img.Handle, image: wx.Bitmap) -> None:
+    def _set_img(self, handle: img.Handle, image: wx.BitmapBundle) -> None:
         """Set the image used."""
-        self._bitmap = image
+        self._bundle = image
         self.widget.Refresh()
 
     def _destroyed(self, event: wx.WindowDestroyEvent) -> None:
@@ -135,12 +187,18 @@ class ImageSlot(WxUser):
 class WXImages(img.UIImage):
     """Wx-specific image code."""
     # Maps a handle to the current image used for it.
-    wx_img: dict[img.Handle, wx.Bitmap]
+    wx_img: dict[img.Handle, wx.BitmapBundle]
 
     def __init__(self) -> None:
         """Set up the WX code."""
         self.wx_img = {}
-        self.empty = wx.Bitmap()
+        # When empty, just use pure alpha. Resize nearest-neighbour from 1x1, should
+        # be fairly efficient.
+        self.empty = wx.BitmapBundle.FromImpl(Bundle(
+            16, 16,
+            Image.new('RGBA', (1, 1)),
+            Image.Resampling.NEAREST,
+        ))
 
     def sync_load(self, handle: img.Handle) -> wx.Bitmap:
         """Load the WX image if required immediately, then return it.
@@ -236,10 +294,10 @@ class WXImages(img.UIImage):
         """Clear cached WX images for this handle."""
         self.wx_img.pop(handle, None)
 
-    def _load_wx(self, handle: img.Handle, force: bool) -> wx.Bitmap:
+    def _load_wx(self, handle: img.Handle, force: bool) -> wx.BitmapBundle:
         """Load the WX image if required, then return it."""
-        image = self.wx_img.get(handle)
-        if image is None or force:
+        bundle = self.wx_img.get(handle)
+        if bundle is None or force:
             # LOGGER.debug('Loading {}', self)
             res = handle._load_pil()
             # Except for builtin types (icons), composite onto the PeTI BG.
@@ -248,16 +306,10 @@ class WXImages(img.UIImage):
                 bg.alpha_composite(res)
                 res = bg.convert('RGB')
                 handle._bg_composited = True
-            if image is None:
-                image = self.wx_img[handle] = wx.Bitmap(res.width, res.height)
-            match res.mode:
-                case 'RGBA':
-                    image.CopyFromBuffer(res.tobytes(), wx.BitmapBufferFormat_RGBA)
-                case 'RGB':
-                    image.CopyFromBuffer(res.tobytes(), wx.BitmapBufferFormat_RGB)
-                case _:
-                    raise ValueError(f'Unknown PIL mode: {res}!')
-        return image
+            bundle = self.wx_img[handle] = wx.BitmapBundle.FromImpl(Bundle(
+                res.width, res.height, res, handle.resampling_algo,
+            ))
+        return bundle
 
     @override
     def ui_apply_load(self, handle: img.ImgLoading, frame_handle: img.ImgLoading, frame_pil: Image.Image) -> None:
