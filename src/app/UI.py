@@ -24,6 +24,7 @@ from BEE2_config import GEN_OPTS
 from app.dialogs import Dialogs
 from loadScreen import MAIN_UI as LOAD_UI
 import packages
+from packages import PakRef
 from packages.item import ItemVariant, InheritKind, SubItemRef
 from packages.widgets import mandatory_unlocked
 import utils
@@ -183,19 +184,16 @@ class Item:
 
     def load_data(self) -> None:
         """Reload data from the item."""
-        version = self.item.selected_version()
-        try:
-            self.data = version.styles[selected_style]
-        except KeyError:
-            self.data = self.item.def_ver.def_style
+        self.data = self.item.selected_version().get(PakRef(packages.Style, selected_style))
 
     def get_tags(self, subtype: int) -> Iterator[str]:
         """Return all the search keywords for this item/subtype."""
+        variant = self.item.selected_version().get(PakRef(packages.Style, selected_style))
         yield self.pak_name
-        yield from self.data.tags
-        yield from self.data.authors
+        yield from variant.tags
+        yield from variant.authors
         try:
-            name = self.data.editor.subtypes[subtype].name
+            name = variant.editor.subtypes[subtype].name
         except IndexError:
             LOGGER.warning(
                 'No subtype number {} for {} in {} style!',
@@ -218,19 +216,23 @@ class Item:
             item.id == self.id
             for item in pal_picked
         )
-        return self.get_raw_icon(subKey, allow_single and num_picked <= single_num)
+        return self.get_raw_icon(
+            PakRef(packages.Style, selected_style),
+            subKey,
+            allow_single and num_picked <= single_num,
+        )
 
-    def get_raw_icon(self, sub_key: int, use_grouping: bool) -> img.Handle:
+    def get_raw_icon(self, style: PakRef[packages.Style], sub_key: int, use_grouping: bool) -> img.Handle:
         """Get an icon for the given subkey, directly indicating if it should be grouped."""
-        icon = self._get_raw_icon(sub_key, use_grouping)
+        icon = self._get_raw_icon(style, sub_key, use_grouping)
         if self.item.unstyled or not config.APP.get_cur_conf(GenOptions).visualise_inheritance:
             return icon
-        inherit_kind = self.item.selected_version().inherit_kind.get(selected_style, InheritKind.UNSTYLED)
+        inherit_kind = self.item.selected_version().inherit_kind.get(style.id, InheritKind.UNSTYLED)
         if inherit_kind is not InheritKind.DEFINED:
             icon = icon.overlay_text(inherit_kind.value.title(), 12)
         return icon
 
-    def _get_raw_icon(self, subKey: int, use_grouping: bool) -> img.Handle:
+    def _get_raw_icon(self, style: PakRef[packages.Style], subKey: int, use_grouping: bool) -> img.Handle:
         """Get the raw icon, which may be overlaid if required."""
         icons = self.data.icons
         if use_grouping and self.data.can_group():
@@ -253,13 +255,13 @@ class Item:
         except IndexError:
             LOGGER.warning(
                 'No subtype number {} for {} in {} style!',
-                subKey, self.id, selected_style,
+                subKey, self.id, style,
             )
             return img.Handle.error(64, 64)
         if subtype.pal_icon is None:
             LOGGER.warning(
                 'No palette icon for {} subtype {} in {} style!',
-                self.id, subKey, selected_style,
+                self.id, subKey, style,
             )
             return img.Handle.error(64, 64)
 
@@ -425,6 +427,7 @@ class PalItem:
             TK_IMG.apply(self.label, self.item.get_icon(self.subKey, True))
         else:
             TK_IMG.apply(self.label, self.item.get_raw_icon(
+                PakRef(packages.Style, selected_style),
                 self.subKey,
                 config.APP.get_cur_conf(FilterConf, default=FilterConf()).compress,
             ))
@@ -478,6 +481,7 @@ async def load_packages(
     await trio.lowlevel.checkpoint()
 
     for item in packset.all_obj(packages.Item):
+        await trio.lowlevel.checkpoint()
         item_list[item.id] = Item(item)
 
     # Defaults match Clean Style, if not found it uses the first item.
@@ -1504,6 +1508,7 @@ async def init_windows(
         tool_img='icons/win_palette',
         tool_col=10,
     )
+    await trio.lowlevel.checkpoint()
 
     pal_frame = ttk.Frame(windows['pal'], name='pal_frame')
     pal_frame.grid(row=0, column=0, sticky='NSEW')
@@ -1514,6 +1519,7 @@ async def init_windows(
         """Pass along the reflow-picker function to set_palette."""
         await set_palette(pal, flow_picker)
 
+    await trio.lowlevel.checkpoint()
     pal_ui = paletteUI.PaletteUI(
         pal_frame, menu_bar.pal_menu,
         tk_img=tk_img,
@@ -1527,6 +1533,7 @@ async def init_windows(
         },
         set_items=set_items,
     )
+    await trio.lowlevel.checkpoint()
 
     TK_ROOT.bind_all(tk_tools.KEY_SAVE, lambda e: pal_ui.event_save(DIALOG))
     TK_ROOT.bind_all(tk_tools.KEY_SAVE_AS, lambda e: pal_ui.event_save_as(DIALOG))

@@ -473,6 +473,10 @@ class Version:
     def_style: ItemVariant = attrs.field(repr=False)
     inherit_kind: dict[str, InheritKind]
 
+    def get(self, style: PakRef[Style]) -> ItemVariant:
+        """Fetch the variant for this style."""
+        return self.styles.get(style.id, self.def_style)
+
 
 class Item(PakObject, needs_foreground=True):
     """An item in the editor..."""
