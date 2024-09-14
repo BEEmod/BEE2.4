@@ -57,13 +57,17 @@ class Bundle(wx.BitmapBundleImpl):
         """We can produce any scale."""
         return wx.Size(self.size).Scale(scale, scale)
 
-    def GetBitmap(self, size: wx.Size) -> wx.Bitmap:
-        if size.width <= 0 or size.height <= 0:
+    def GetBitmap(self, size: tuple[int, int] | wx.Size) -> wx.Bitmap:
+        if isinstance(size, tuple):
+            width, height = size_tup = size
+        else:
+            width, height = size_tup = size.width, size.height
+
+        if width <= 0 or height <= 0:
             # Sometimes get nonsense sizes if never onscreen.
             # Just return a dummy, don't cache it.
             return wx.Bitmap(1, 1)
 
-        size_tup = size.width, size.height
         try:
             return self._bitmaps[size_tup]
         except KeyError:
@@ -199,15 +203,6 @@ class WXImages(img.UIImage):
             Image.new('RGBA', (1, 1)),
             Image.Resampling.NEAREST,
         ))
-
-    def sync_load(self, handle: img.Handle) -> wx.Bitmap:
-        """Load the WX image if required immediately, then return it.
-
-        Only available on BUILTIN type images since they cannot then be
-        reloaded.
-        """
-        handle.force_load()
-        return self._load_wx(handle, force=False)
 
     # noinspection PyProtectedMember
     def apply[Widget: WxImgWidgets](self, widget: Widget, image: img.Handle | None, /) -> Widget:
