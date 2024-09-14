@@ -146,7 +146,8 @@ def res_track_plat(vmf: VMF, res: Keyvalues) -> object:
         ))
         del track_set
 
-        if multi_sizes:
+        # Combining instances shouldn't be done for single tracks.
+        if multi_sizes and len(track_list) > 1:
             # Adjust positions to be the ends, not voxel centers. If keep ends is false, ignore the ends.
             adjust = (-64.0 if multi_overlap_ends(plat_inst) else +64.0) * track_dir
             pos_a = Vec.from_str(track_list[0]['origin']) + adjust
