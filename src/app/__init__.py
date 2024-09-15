@@ -195,20 +195,20 @@ class WidgetCache[Widget]:
 class ReflowWindow:
     """Base class which handles the logic for a window that reflows contents to fit."""
     # Event set whenever the items need to be redrawn/re-flowed.
-    items_dirty: trio.Event
+    item_pos_dirty: trio.Event
     # The current number of columns per row, always >= 1.
     column_count: int
 
     def __init__(self) -> None:
         super().__init__()
-        self.items_dirty = trio.Event()
+        self.item_pos_dirty = trio.Event()
         self.column_count = 1
 
-    async def refresh_items_task(self) -> None:
+    async def reposition_items_task(self) -> None:
         """Calls refresh_items whenever they're marked dirty."""
         while True:
-            await self.items_dirty.wait()
-            self.items_dirty = trio.Event()
+            await self.item_pos_dirty.wait()
+            self.item_pos_dirty = trio.Event()
             await run_as_task(self._ui_reposition_items)
 
     def evt_window_resized(self, event: object) -> None:
@@ -218,7 +218,7 @@ class ReflowWindow:
             columns = 1  # We got way too small, prevent division by zero
         if columns != self.column_count:
             self.column_count = columns
-            self.items_dirty.set()
+            self.item_pos_dirty.set()
 
     @abstractmethod
     def _ui_calc_columns(self) -> int:

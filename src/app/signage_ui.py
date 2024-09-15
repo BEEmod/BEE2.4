@@ -124,7 +124,7 @@ class SignageUIBase[ParentT](ReflowWindow):
         async with trio.open_nursery() as nursery:
             nursery.start_soon(self._apply_config_task)
             nursery.start_soon(self._hovering_task)
-            nursery.start_soon(self.refresh_items_task)
+            nursery.start_soon(self.reposition_items_task)
             nursery.start_soon(self._update_picker_items_task)
 
             while True:
@@ -177,7 +177,7 @@ class SignageUIBase[ParentT](ReflowWindow):
                         if not sign.hidden:
                             self.picker_slots.fetch().contents = PakRef(Signage, utils.obj_id(sign.id))
                     self.picker_slots.hide_unused()
-                    self.items_dirty.set()
+                    self.item_pos_dirty.set()
 
     async def _apply_config_task(self) -> None:
         """Apply saved signage info to the UI."""

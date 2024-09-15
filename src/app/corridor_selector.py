@@ -191,7 +191,7 @@ class Selector[IconT: Icon, OptionRowT: OptionRow](ReflowWindow):
         async with trio.open_nursery() as nursery:
             nursery.start_soon(self._window_task)
             nursery.start_soon(self._display_task)
-            nursery.start_soon(self.refresh_items_task)
+            nursery.start_soon(self.reposition_items_task)
             nursery.start_soon(self._save_config_task)
             nursery.start_soon(self._mode_switch_task)
             nursery.start_soon(self.ui_task)
@@ -322,7 +322,7 @@ class Selector[IconT: Icon, OptionRowT: OptionRow](ReflowWindow):
         self.sticky_corr = None
         self.displayed_corr.value = None
         # Items must be repositioned.
-        self.items_dirty.set()
+        self.item_pos_dirty.set()
 
     @override
     def evt_window_resized(self, event: object) -> None:

@@ -153,7 +153,7 @@ class GroupHeaderBase:
     def _evt_toggle(self, _: object = None) -> None:
         """Toggle the header on or off."""
         self.parent.group_visible[self.id] = vis = not self.parent.group_visible.get(self.id)
-        self.parent.items_dirty.set()
+        self.parent.item_pos_dirty.set()
         self._ui_set_arrow(vis, True)
 
     def _evt_hover_start(self, _: object | None = None) -> None:
@@ -320,7 +320,7 @@ class SelectorWinBase[ButtonT, GroupHeaderT: GroupHeaderBase](ReflowWindow):
             nursery.start_soon(self._ui_task)
             nursery.start_soon(self._load_data_task)
             nursery.start_soon(self._rollover_suggest_task)
-            nursery.start_soon(self.refresh_items_task)
+            nursery.start_soon(self.reposition_items_task)
             if self.sampler is not None:
                 nursery.start_soon(self._update_sampler_task)
             if self.store_last_selected:
@@ -643,7 +643,7 @@ class SelectorWinBase[ButtonT, GroupHeaderT: GroupHeaderBase](ReflowWindow):
         self._ui_win_show()
         self._visible = True
         self.sel_item(self.chosen.value)
-        self.items_dirty.set()
+        self.item_pos_dirty.set()
         return None
 
     def sel_suggested(self) -> None:
@@ -944,7 +944,7 @@ class SelectorWinBase[ButtonT, GroupHeaderT: GroupHeaderBase](ReflowWindow):
         self.set_disp()  # Update the textbox if necessary.
         # Reposition all our items, but only if we're visible.
         if self._visible:
-            self.items_dirty.set()
+            self.item_pos_dirty.set()
 
     async def _ui_task(self) -> None:
         """Executed by task() to allow updating the UI."""
