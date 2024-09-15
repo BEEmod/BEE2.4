@@ -7,9 +7,11 @@ from collections.abc import Callable
 import srctools.logger
 from pygtrie import CharTrie
 
+import packages
 from app import UI, localisation
 from packages import PakRef, Style
-from packages.item import SubItemRef
+from packages.item import Item, SubItemRef
+from trio_util import AsyncValue
 from ui_tk.wid_transtoken import set_text
 
 
@@ -19,7 +21,7 @@ word_to_ids: 'CharTrie[Filter]' = CharTrie()
 _type_cback: Callable[[], None] | None = None
 
 
-def init(frm: ttk.Frame, refresh_cback: Callable[[Filter | None], None]) -> None:
+def init(frm: ttk.Frame, refresh_val: AsyncValue[Filter | None]) -> None:
     """Initialise the UI objects.
 
     The callback is triggered whenever the UI changes, passing along
@@ -35,7 +37,7 @@ def init(frm: ttk.Frame, refresh_cback: Callable[[Filter | None], None]) -> None
         text = search_var.get().casefold()
         words = text.split()
         if not words:
-            refresh_cback(None)
+            refresh_val.value = None
             return
 
         found: Filter = set()
@@ -63,7 +65,7 @@ def init(frm: ttk.Frame, refresh_cback: Callable[[Filter | None], None]) -> None
         """Trigger the callback, after the user paused the UI."""
         nonlocal refresh_tim, result
         refresh_tim = None
-        refresh_cback(result)
+        refresh_val.value = result
         result = None
 
     frm.columnconfigure(1, weight=1)
@@ -88,12 +90,12 @@ def rebuild_database() -> None:
 
     selected_style = PakRef(Style, UI.selected_style)
 
-    for item in UI.item_list.values():
-        for subtype_ind in item.item.visual_subtypes:
-            for tag in item.item.get_tags(selected_style, subtype_ind):
+    for item in packages.LOADED.value.all_obj(Item):
+        for subtype_ind in item.visual_subtypes:
+            for tag in item.get_tags(selected_style, subtype_ind):
                 for word in tag.split():
                     word_set = word_to_ids.setdefault(word.casefold(), set())
-                    word_set.add(SubItemRef(item.ref, subtype_ind))
+                    word_set.add(SubItemRef(item.reference(), subtype_ind))
 
     LOGGER.info('Computed {} tags.', sum(1 for _ in word_to_ids.iterkeys()))
     if _type_cback is not None:

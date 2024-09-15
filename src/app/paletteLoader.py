@@ -28,16 +28,15 @@ CUR_VERSION: Final = 3
 
 type HorizInd = Literal[0, 1, 2, 3]
 type VertInd = Literal[0, 1, 2, 3, 4, 5, 6, 7]
+type Coord = tuple[HorizInd, VertInd]
 # TODO: Switch item ID here to ObjectID
-type ItemPos = dict[tuple[HorizInd, VertInd], tuple[str, int]]
+type ItemPos = dict[Coord, tuple[str, int]]
 type BuiltinPal = list[list[
     tuple[DefaultItems | utils.ObjectID, int],
 ]]
 HORIZ: Final[Sequence[HorizInd]] = cast(Sequence[HorizInd], range(4))
 VERT: Final[Sequence[VertInd]] = cast(Sequence[VertInd], range(8))
-COORDS: Sequence[tuple[HorizInd, VertInd]] = [
-    (x, y) for y in VERT for x in HORIZ
-]
+COORDS: Sequence[Coord] = [(x, y) for y in VERT for x in HORIZ]
 
 # Allow translating the names of the built-in palettes
 TRANS_NAMES: dict[str, TransToken] = {

@@ -1,4 +1,6 @@
 """Main UI module, brings everything together."""
+# TODO: Remove once done?
+from __future__ import annotations
 from typing import TypedDict, cast, assert_never
 
 from tkinter import ttk
@@ -55,6 +57,7 @@ from app import (
 )
 from app.errors import Result as ErrorResult
 from app.menu_bar import MenuBar
+from ui_tk.item_picker import ItemPicker, ItemsBG
 from ui_tk.selector_win import SelectorWin, AttrDef as SelAttr, Options as SelectorOptions
 from ui_tk.context_win import ContextWin
 from ui_tk.corridor_selector import TkSelector
@@ -67,7 +70,6 @@ import consts
 
 LOGGER = srctools.logger.get_logger(__name__)
 
-ItemsBG = "#CDD0CE"  # Colour of the main background to match the menu image
 
 # Icon shown while items are being moved elsewhere.
 ICO_MOVING = img.Handle.builtin('BEE2/item_moving', 64, 64)
@@ -89,33 +91,10 @@ elev_win: SelectorWin
 suggest_windows: dict[type[packages.SelPakObject], SelectorWin] = {}
 
 context_win: ContextWin
-
-# Items chosen for the palette.
-pal_picked: list['PalItem'] = []
-# Array of the "all items" icons
-pal_items: list['PalItem'] = []
-# Labels used for the empty palette positions
-pal_picked_fake = WidgetCache(
-    lambda ind: TK_IMG.apply(ttk.Label(UI['preview_frame'], name=f'fake_item_{ind}'), IMG_BLANK),
-    ttk.Label.place_forget,
-)
-# Labels used for empty picker positions, to continue the grid.
-pal_items_fake = WidgetCache(
-    lambda ind: TK_IMG.apply(ttk.Label(frmScroll, name=f'fake_item_{ind}'), IMG_BLANK),
-    ttk.Label.place_forget,
-)
-# The current filtering state.
-cur_filter: set[SubItemRef] | None = None
+sign_ui: SignageUI
+item_picker: ItemPicker
 
 selected_style: utils.ObjectID = packages.CLEAN_STYLE
-
-# Maps item IDs to our wrapper for the object.
-item_list: dict[str, 'Item'] = {}
-
-# Piles of global widgets, should be made local...
-frmScroll: ttk.Frame  # Frame holding the item list.
-pal_canvas: tk.Canvas  # Canvas for the item list to scroll.
-sign_ui: SignageUI
 
 DATA_NO_VOICE = packages.SelitemData.build(
     short_name=TransToken.BLANK,
@@ -131,71 +110,16 @@ DATA_RAND_ELEV = packages.SelitemData.build(
 )
 
 
-class DragWin(tk.Toplevel):
-    """Todo: use dragdrop module instead."""
-    passed_over_pal: bool  # Has the cursor passed over the palette
-    from_pal: bool  # Are we dragging a palette item?
-    drag_item: 'PalItem | None'  # The item currently being moved
-
-
 class _WindowsDict(TypedDict):
     """TODO: Remove."""
-    drag_win: DragWin
     opt: SubPane.SubPane
     pal: SubPane.SubPane
 
 
-class _UIDict(TypedDict):
-    """TODO: Remove."""
-    drag_lbl: ttk.Label
-    pre_bg_img: tk.Label
-    pre_disp_name: ttk.Label
-    pre_moving: ttk.Label
-    pre_sel_line: tk.Label
-    preview_frame: tk.Frame
-    picker_frame: ttk.Frame
-
-
 # Holds the TK Toplevels, frames, widgets and menus
 windows: _WindowsDict = cast(_WindowsDict, {})
-UI: _UIDict = cast(_UIDict, {})
 
 
-def change_item_version(item_ref: PakRef[packages.Item], version: str) -> None:
-    """Set the version of this item."""
-    old_conf = config.APP.get_cur_conf(ItemDefault, item_ref.id)
-    config.APP.store_conf(attrs.evolve(old_conf, version=version), item_ref.id)
-    for pal_item in itertools.chain(pal_picked, pal_items):
-        if pal_item.ref.item == item_ref:
-            pal_item.load_data()
-
-
-class Item:
-    """Represents an item that can appear on the list."""
-    __slots__ = ['item', 'id', 'ref']
-
-    def __init__(self, item: packages.Item) -> None:
-        self.item = item
-        self.ref = PakRef.of(item)
-        self.id = self.ref.id
-
-    def get_icon(self, subKey: int, allow_single: bool = False, single_num: int = 1) -> img.Handle:
-        """Get an icon for the given subkey.
-
-        If allow_single is true, the grouping icon can be returned
-        instead if only one item is on the palette.
-        Drag-icons have different rules for what counts as 'single', so
-        they use the single_num parameter to control the output.
-        """
-        num_picked = sum(
-            item.id == self.id
-            for item in pal_picked
-        )
-        return self.item.get_icon(
-            PakRef(packages.Style, selected_style),
-            subKey,
-            allow_single and num_picked <= single_num,
-        )
 
 
 class PalItem:
@@ -362,27 +286,6 @@ class PalItem:
                 found = True
         return found
 
-    def kill(self) -> None:
-        """Hide and destroy this widget."""
-        for i, item in enumerate(pal_picked):
-            if item is self:
-                del pal_picked[i]
-                break
-        self.label.place_forget()
-
-    def on_pal(self) -> bool:
-        """Determine if this item is on the palette."""
-        for item in pal_picked:
-            if self.id == item.id and self.subKey == item.subKey:
-                return True
-        return False
-
-    def copy(self, frame: tk.Misc) -> 'PalItem':
-        return PalItem(frame, self.item, self.subKey, self.is_pre)
-
-    def __repr__(self) -> str:
-        return f'<{self.id}:{self.subKey}>'
-
 
 async def load_packages(
     core_nursery: trio.Nursery,
@@ -395,10 +298,6 @@ async def load_packages(
     """
     global skybox_win, voice_win, style_win, elev_win
     await trio.lowlevel.checkpoint()
-
-    for item in packset.all_obj(packages.Item):
-        await trio.lowlevel.checkpoint()
-        item_list[item.id] = Item(item)
 
     # Defaults match Clean Style, if not found it uses the first item.
     skybox_win = SelectorWin(TK_ROOT, SelectorOptions(
@@ -547,10 +446,8 @@ def fetch_export_info() -> exporting.ExportInfo | None:
     """Fetch the required information for performing an export."""
 
     # The chosen items on the palette.
-    pal_data: paletteUI.ItemPos = {
-        pos: (it.id, it.subKey)
-        for pos, it in zip(paletteUI.COORDS, pal_picked, strict=False)
-    }
+    # TODO: Make ItemPos use SubItemRef
+    pal_data: paletteUI.ItemPos = item_picker.get_items()
     # Group palette data by each item ID, so it can easily determine which items are actually
     # on the palette at all.
     pal_by_item: dict[str, dict[int, tuple[paletteUI.HorizInd, paletteUI.VertInd]]] = {}
@@ -673,208 +570,28 @@ def clear_disp_name(e: object = None) -> None:
     wid_transtoken.set_text(UI['pre_disp_name'], TransToken.BLANK)
 
 
-def conv_screen_to_grid(x: float, y: float) -> tuple[int, int]:
-    """Returns the location of the item hovered over on the preview pane."""
-    return (
-        round(x-UI['pre_bg_img'].winfo_rootx()-8) // 65,
-        round(y-UI['pre_bg_img'].winfo_rooty()-32) // 65,
-    )
-
-
-def drag_start(drag_item: PalItem, e: tk.Event[tk.Misc]) -> None:
-    """Start dragging a palette item."""
-    drag_win = windows['drag_win']
-    drag_win.drag_item = drag_item
-    set_disp_name(drag_item)
-    snd.fx('config')
-    drag_win.passed_over_pal = False
-    if drag_item.is_pre:  # is the cursor over the preview pane?
-        drag_item.kill()
-        UI['pre_moving'].place(
-            x=drag_item.pre_x*65 + 4,
-            y=drag_item.pre_y*65 + 32,
-        )
-        drag_win.from_pal = True
-
-        for item in pal_picked:
-            if item.id == drag_win.drag_item.id:
-                item.load_data()
-
-        # When dragging off, switch to the single-only icon
-        TK_IMG.apply(UI['drag_lbl'], drag_item.item.get_icon(
-            drag_item.subKey,
-            allow_single=False,
-        ))
-    else:
-        drag_win.from_pal = False
-        TK_IMG.apply(UI['drag_lbl'], drag_item.item.get_icon(
-            drag_item.subKey,
-            allow_single=True,
-            single_num=0,
-        ))
-    drag_win.deiconify()
-    drag_win.lift()
-    # grab makes this window the only one to receive mouse events, so
-    # it is guaranteed that it'll drop when the mouse is released.
-    drag_win.grab_set_global()
-    # NOTE: _global means no other programs can interact, make sure
-    # it's released eventually or you won't be able to quit!
-    drag_move(e)  # move to correct position
-    drag_win.bind(tk_tools.EVENTS['LEFT_MOVE'], drag_move)
-    UI['pre_sel_line'].lift()
-
-
-def drag_stop(e: tk.Event[tk.Misc]) -> None:
-    """User released the mouse button, complete the drag."""
-    drag_win: DragWin = windows['drag_win']
-
-    if drag_win.drag_item is None:
-        # We aren't dragging, ignore the event.
-        return
-
-    drag_win.withdraw()
-    drag_win.unbind("<B1-Motion>")
-    drag_win.grab_release()
-    clear_disp_name()
-    UI['pre_sel_line'].place_forget()
-    UI['pre_moving'].place_forget()
-    snd.fx('config')
-
-    pos_x, pos_y = conv_screen_to_grid(e.x_root, e.y_root)
-    ind = pos_x + pos_y * 4
-
-    # this prevents a single click on the picker from clearing items
-    # off the palette
-    if drag_win.passed_over_pal:
-        # is the cursor over the preview pane?
-        if 0 <= pos_x < 4 and 0 <= pos_y < 8:
-            drag_win.drag_item.clear()  # wipe duplicates off the palette first
-            new_item = drag_win.drag_item.copy(UI['preview_frame'])
-            new_item.is_pre = True
-            if ind >= len(pal_picked):
-                pal_picked.append(new_item)
-            else:
-                pal_picked.insert(ind, new_item)
-            # delete the item - it's fallen off the palette
-            if len(pal_picked) > 32:
-                pal_picked.pop().kill()
-        else:  # drop the item
-            if drag_win.from_pal:
-                # Only remove if we started on the palette
-                drag_win.drag_item.clear()
-            snd.fx('delete')
-
-        flow_preview()  # always refresh
-    drag_win.drag_item = None
-
-
-def drag_move(e: tk.Event[tk.Misc]) -> None:
-    """Update the position of dragged items as they move around."""
-    drag_win: DragWin = windows['drag_win']
-
-    if drag_win.drag_item is None:
-        # We aren't dragging, ignore the event.
-        return
-
-    set_disp_name(drag_win.drag_item)
-    drag_win.geometry('+'+str(e.x_root-32)+'+'+str(e.y_root-32))
-    pos_x, pos_y = conv_screen_to_grid(e.x_root, e.y_root)
-    if 0 <= pos_x < 4 and 0 <= pos_y < 8:
-        drag_win['cursor'] = tk_tools.Cursors.MOVE_ITEM
-        UI['pre_sel_line'].place(x=pos_x*65+3, y=pos_y*65+33)
-        if not drag_win.passed_over_pal:
-            # If we've passed over the palette, replace identical items
-            # with movement icons to indicate they will move to the new location
-            for item in pal_picked:
-                if item.id == drag_win.drag_item.id and item.subKey == drag_win.drag_item.subKey:
-                    # We haven't removed the original, so we don't need the
-                    # special label for this.
-                    # The group item refresh will return this if nothing
-                    # changes.
-                    TK_IMG.apply(item.label, ICO_MOVING)
-                    break
-
-        drag_win.passed_over_pal = True
-    else:
-        if drag_win.from_pal and drag_win.passed_over_pal:
-            drag_win['cursor'] = tk_tools.Cursors.DESTROY_ITEM
-        else:
-            drag_win['cursor'] = tk_tools.Cursors.INVALID_DRAG
-        UI['pre_sel_line'].place_forget()
-
-
-def drag_fast(drag_item: PalItem, e: tk.Event[tk.Misc]) -> None:
-    """Implement shift-clicking.
-
-     When shift-clicking, an item will be immediately moved to the
-     palette or deleted from it.
-    """
-    pos_x, pos_y = conv_screen_to_grid(e.x_root, e.y_root)
-    drag_item.clear()
-    # Is the cursor over the preview pane?
-    if 0 <= pos_x < 4:
-        snd.fx('delete')
-    else:  # over the picker
-        if len(pal_picked) < 32:  # can't copy if there isn't room
-            snd.fx('config')
-            new_item = drag_item.copy(UI['preview_frame'])
-            new_item.is_pre = True
-            pal_picked.append(new_item)
-        else:
-            snd.fx('error')
-    flow_preview()
-
-
-async def set_palette(chosen_pal: paletteUI.Palette, flow_picker: Callable[[], object]) -> None:
+async def set_palette(chosen_pal: paletteUI.Palette) -> None:
     """Select a palette."""
-    pal_clear()
     await trio.lowlevel.checkpoint()
     for coord in paletteUI.COORDS:
         await trio.lowlevel.checkpoint()
+        slot = item_picker.slots_pal[coord]
+
         try:
             item, sub = chosen_pal.items[coord]
         except KeyError:
-            break  # TODO: Handle gaps.
-        try:
-            item_group = item_list[item.upper()]
-        except KeyError:
-            LOGGER.warning('Unknown item "{}" for palette!', item)
-            continue
-
-        if sub not in item_group.item.visual_subtypes:
-            LOGGER.warning(
-                'Palette had incorrect subtype {} for "{}"! Valid subtypes: {}!',
-                item, sub, item_group.item.visual_subtypes,
+            slot.contents = None
+        else:
+            slot.contents = SubItemRef(
+                PakRef(packages.Item, utils.obj_id(item)),
+                sub,
             )
-            continue
-
-        pal_picked.append(PalItem(
-            UI['preview_frame'],
-            item_group,
-            sub,
-            is_pre=True,
-        ))
-
-    old_mandatory = mandatory_unlocked()
-
-    if chosen_pal.settings is not None:
-        conf = await packages.get_loaded_packages().migrate_conf(chosen_pal.settings)
-        LOGGER.info('Settings: {}', conf)
-        await config.APP.apply_multi(conf)
-
-    await trio.lowlevel.checkpoint()
-    flow_preview()
-    if old_mandatory is not mandatory_unlocked():
-        await trio.lowlevel.checkpoint()
-        # Changed, update the preview.
-        flow_picker()
 
 
 def pal_clear() -> None:
     """Empty the palette."""
-    for item in pal_picked[:]:
-        item.kill()
-    flow_preview()
+    for slot in item_picker.slots_pal.values():
+        slot.contents = None
 
 
 def pal_shuffle() -> None:
@@ -1068,222 +785,6 @@ async def init_option(
                 sugg_btn.state(['!disabled'])
 
 
-def flow_preview() -> None:
-    """Position all the preview icons based on the array.
-
-    Run to refresh if items are moved around.
-    """
-    label: tk.Label | ttk.Label
-    item_count = len(pal_picked)
-    pal_picked_fake.reset()
-    for i in range(32):
-        if i < item_count:
-            item = pal_picked[i]
-            # These can be used to figure out where it is
-            item.pre_x = i % 4
-            item.pre_y = i // 4
-            label = item.label
-            # Check to see if this should use the single-icon
-            item.load_data()
-        else:
-            label = pal_picked_fake.fetch()
-        label.place(x=(i % 4*65 + 4), y=(i // 4*65 + 32))
-        label.lift()
-    pal_picked_fake.hide_unused()
-    UI['pre_sel_line'].lift()
-
-
-def init_preview(tk_img: TKImages, f: tk.Frame | ttk.Frame) -> None:
-    """Generate the preview pane.
-
-     This shows the items that will export to the palette.
-    """
-    UI['pre_bg_img'] = tk.Label(f, bg=ItemsBG)
-    UI['pre_bg_img'].grid(row=0, column=0)
-    tk_img.apply(UI['pre_bg_img'], img.Handle.builtin('BEE2/menu', 271, 573))
-
-    UI['pre_disp_name'] = ttk.Label(
-        f,
-        text="",
-        style='BG.TLabel',
-        )
-    UI['pre_disp_name'].place(x=10, y=554)
-
-    UI['pre_sel_line'] = tk.Label(
-        f,
-        bg="#F0F0F0",
-        borderwidth=0,
-        relief="solid",
-        )
-    tk_img.apply(UI['pre_sel_line'], img.Handle.builtin('BEE2/sel_bar', 4, 64))
-
-    UI['pre_moving'] = ttk.Label(f)
-    tk_img.apply(UI['pre_moving'], ICO_MOVING)
-
-    flow_preview()
-
-
-async def init_picker(
-    f: tk.Frame | ttk.Frame,
-    *,
-    task_status: trio.TaskStatus[Callable[[], None]] = trio.TASK_STATUS_IGNORED,
-) -> None:
-    """Construct the frame holding all the items."""
-    await trio.lowlevel.checkpoint()
-    global frmScroll, pal_canvas
-    wid_transtoken.set_text(
-        ttk.Label(f, anchor="center"),
-        TransToken.ui("All Items: "),
-    ).grid(row=0, column=0, sticky="EW")
-    UI['picker_frame'] = cframe = ttk.Frame(f, borderwidth=4, relief="sunken")
-    cframe.grid(row=1, column=0, sticky="NSEW")
-    f.rowconfigure(1, weight=1)
-    f.columnconfigure(0, weight=1)
-
-    pal_canvas = tk.Canvas(cframe)
-    # need to use a canvas to allow scrolling
-    pal_canvas.grid(row=0, column=0, sticky="NSEW")
-    cframe.rowconfigure(0, weight=1)
-    cframe.columnconfigure(0, weight=1)
-
-    scroll = tk_tools.HidingScroll(
-        cframe,
-        orient=tk.VERTICAL,
-        command=pal_canvas.yview,
-    )
-    scroll.grid(column=1, row=0, sticky="NS")
-    pal_canvas['yscrollcommand'] = scroll.set
-
-    # add another frame inside to place labels on
-    frmScroll = ttk.Frame(pal_canvas)
-    pal_canvas.create_window(1, 1, window=frmScroll, anchor="nw")
-
-    # Create the items in the palette.
-    # Sort by item ID, and then group by package ID.
-    # Reverse sort packages so 'Valve' appears at the top..
-    items = sorted(item_list.values(), key=operator.attrgetter('id'))
-    items.sort(key=operator.attrgetter('pak_id'), reverse=True)
-
-    for item in items:
-        await trio.lowlevel.checkpoint()
-        for i in item.item.visual_subtypes:
-            pal_items.append(PalItem(frmScroll, item, sub=i, is_pre=False))
-
-    reflow_event = trio.Event()
-    conf = config.APP.get_cur_conf(FilterConf)
-    await trio.lowlevel.checkpoint()
-
-    async def wait_filter() -> None:
-        """Trigger whenever the filter configuration changes."""
-        nonlocal conf
-        with config.APP.get_ui_channel(FilterConf) as channel:
-            async for conf in channel:
-                reflow_event.set()
-
-    async with trio.open_nursery() as nursery:
-        await trio.lowlevel.checkpoint()
-        nursery.start_soon(wait_filter)
-
-        # Late-binding!
-        f.bind("<Configure>", lambda e: reflow_event.set())
-        task_status.started(lambda: reflow_event.set())  # noqa: PLW0108
-        while True:
-            await _flow_picker(conf)
-            await reflow_event.wait()
-            reflow_event = trio.Event()
-
-
-async def _flow_picker(filter_conf: FilterConf) -> None:
-    """Update the picker box so all items are positioned corrctly.
-
-    Should only be triggered by the above init_picker() task, so reentrancy issues don't
-    occur.
-    """
-    frmScroll['width'] = pal_canvas.winfo_width()
-    hide_mandatory = not mandatory_unlocked()
-
-    width = (pal_canvas.winfo_width() - 10) // 65
-    if width < 1:
-        width = 1  # we got way too small, prevent division by zero
-
-    i = 0
-    # If cur_filter is None, it's blank and so show all of them.
-    for pal_item, should_checkpoint in zip(pal_items, itertools.cycle('YNNNN')):
-        if hide_mandatory and pal_item.item.item.needs_unlock:
-            visible = False
-        elif filter_conf.compress:
-            # Show if this is the first, and any in this item are visible.
-            # Visual subtypes should not be empty if we're here, but if so just hide.
-            visual_subtypes = pal_item.item.item.visual_subtypes  # This is very silly.
-            if visual_subtypes and pal_item.subKey == visual_subtypes[0]:
-                visible = any(
-                    pal_item.ref in cur_filter
-                    for subKey in visual_subtypes
-                ) if cur_filter is not None else True
-            else:
-                visible = False
-        else:
-            # Uncompressed, check each individually.
-            visible = cur_filter is None or pal_item.ref in cur_filter
-
-        if should_checkpoint == 'Y':
-            # Checkpoint often, to let other code run.
-            await trio.lowlevel.checkpoint()
-
-        if visible:
-            pal_item.is_pre = False
-            pal_item.load_data()
-            pal_item.label.place(
-                x=((i % width) * 65 + 1),
-                y=((i // width) * 65 + 1),
-                )
-            i += 1
-        else:
-            pal_item.label.place_forget()
-
-    await trio.lowlevel.checkpoint()
-    num_items = i
-
-    height = int(math.ceil(num_items / width)) * 65 + 2
-    pal_canvas['scrollregion'] = (0, 0, width * 65, height)
-    frmScroll['height'] = height
-
-    # Now, add extra blank items on the end to finish the grid nicely.
-    # pal_items_fake allows us to recycle existing icons.
-    last_row = num_items % width
-    # Special case, don't add a full row if it's exactly the right count.
-    extra_items = (width - last_row) if last_row != 0 else 0
-    pal_items_fake.reset()
-
-    y = (num_items // width)*65 + 1
-    for i in range(extra_items):
-        await trio.lowlevel.checkpoint()
-        pal_items_fake.fetch().place(x=((i + last_row) % width)*65 + 1, y=y)
-    pal_items_fake.hide_unused()
-
-
-def init_drag_icon() -> None:
-    """Create the window for rendering held items."""
-    drag_win = DragWin(TK_ROOT, name='pal_drag')
-    # this prevents stuff like the title bar, normal borders etc from
-    # appearing in this window.
-    drag_win.overrideredirect(True)
-    drag_win.resizable(False, False)
-    if utils.LINUX:
-        drag_win.wm_attributes('-type', 'dnd')
-    drag_win.transient(master=TK_ROOT)
-    drag_win.withdraw()  # starts hidden
-    drag_win.bind(tk_tools.EVENTS['LEFT_RELEASE'], drag_stop)
-    UI['drag_lbl'] = ttk.Label(drag_win)
-    TK_IMG.apply(UI['drag_lbl'], IMG_BLANK)
-    UI['drag_lbl'].grid(row=0, column=0)
-    windows['drag_win'] = drag_win
-
-    drag_win.passed_over_pal = False
-    drag_win.from_pal = False
-    drag_win.drag_item = None
-
-
 async def on_game_changed() -> None:
     """Callback for when the game is changed.
 
@@ -1300,8 +801,6 @@ async def on_game_changed() -> None:
 
 def refresh_palette_icons() -> None:
     """Refresh all displayed palette icons."""
-    for pal_item in itertools.chain(pal_picked, pal_items):
-        pal_item.load_data()
 
 
 async def init_windows(
@@ -1314,7 +813,7 @@ async def init_windows(
     """Initialise all windows and panes.
 
     """
-    global sign_ui, context_win
+    global sign_ui, context_win, item_picker
 
     def export() -> None:
         """Export the palette."""
@@ -1341,13 +840,12 @@ async def init_windows(
     style.configure('Preview.TLabel', background='#F4F5F5')
 
     await trio.lowlevel.checkpoint()
-    UI['preview_frame'] = preview_frame = tk.Frame(ui_bg, bg=ItemsBG, name='preview')
+    preview_frame = tk.Frame(ui_bg, bg=ItemsBG, name='preview')
     preview_frame.grid(
         row=0, column=3,
         sticky="NW",
         padx=(2, 5), pady=5,
     )
-    init_preview(tk_img, preview_frame)
     await tk_tools.wait_eventloop()
     TK_ROOT.minsize(
         width=preview_frame.winfo_reqwidth()+200,
@@ -1377,7 +875,9 @@ async def init_windows(
     picker_frame.grid(row=1, column=0, sticky="NSEW")
     picker_split_frame.rowconfigure(1, weight=1)
     picker_split_frame.columnconfigure(0, weight=1)
-    flow_picker = await core_nursery.start(init_picker, picker_frame)
+
+    item_picker = ItemPicker(preview_frame, picker_frame, style_win.chosen)
+    core_nursery.start_soon(item_picker.task)
 
     await LOAD_UI.step('picker')
 
@@ -1394,13 +894,7 @@ async def init_windows(
 
     await LOAD_UI.step('filter')
 
-    def update_filter(new_filter: set[SubItemRef] | None) -> None:
-        """Refresh filtered items whenever it's changed."""
-        global cur_filter
-        cur_filter = new_filter
-        flow_picker()
-
-    item_search.init(search_frame, update_filter)
+    item_search.init(search_frame, item_picker.cur_filter)
 
     toolbar_frame = tk.Frame(
         preview_frame,
@@ -1430,10 +924,6 @@ async def init_windows(
     windows['pal'].columnconfigure(0, weight=1)
     windows['pal'].rowconfigure(0, weight=1)
 
-    async def set_items(pal: paletteUI.Palette) -> None:
-        """Pass along the reflow-picker function to set_palette."""
-        await set_palette(pal, flow_picker)
-
     await trio.lowlevel.checkpoint()
     pal_ui = paletteUI.PaletteUI(
         pal_frame, menu_bar.pal_menu,
@@ -1442,11 +932,8 @@ async def init_windows(
         dialog_window=TkDialogs(windows['pal']),
         cmd_clear=pal_clear,
         cmd_shuffle=pal_shuffle,
-        get_items=lambda: {
-            pos: (it.id, it.subKey)
-            for pos, it in zip(paletteUI.COORDS, pal_picked, strict=False)
-        },
-        set_items=set_items,
+        get_items=item_picker.get_items,
+        set_items=set_palette,
     )
     await trio.lowlevel.checkpoint()
 
@@ -1520,9 +1007,6 @@ async def init_windows(
         TransToken.ui('Fill empty spots in the palette with random items.'),
     )
 
-    # Make scrollbar work globally
-    tk_tools.add_mousewheel(pal_canvas, TK_ROOT)
-
     await trio.lowlevel.checkpoint()
     await core_nursery.start(backup_win.init_toplevel, tk_img)
     await LOAD_UI.step('backup')
@@ -1532,7 +1016,8 @@ async def init_windows(
         tk_img,
         change_ver_func=PalItem.change_pal_subtype,
         open_match_func=PalItem.open_menu_at_sub,
-        icon_func=lambda ref: item_list[ref.item.id].get_icon(ref.subtype),
+        icon_func=lambda ref: IMG_BLANK,  # TODO
+        # icon_func=lambda ref: item_list[ref.item.id].get_icon(ref.subtype),
     )
     await core_nursery.start(context_win.init_widgets, signage_trigger)
     await LOAD_UI.step('contextwin')
@@ -1542,8 +1027,6 @@ async def init_windows(
         reset_all_win=reset_panes,
     ))
     await LOAD_UI.step('optionwindow')
-    init_drag_icon()
-    await LOAD_UI.step('drag_icon')
     await trio.lowlevel.checkpoint()
 
     # When clicking on any window, hide the context window
@@ -1651,6 +1134,6 @@ async def init_windows(
     async with trio.open_nursery() as nursery:
         nursery.start_soon(style_select_callback)
         await first_select.wait()
-        await set_palette(pal_ui.selected, flow_picker)
+        await set_palette(pal_ui.selected)
         pal_ui.is_dirty.set()
         task_status.started()

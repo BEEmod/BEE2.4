@@ -4,7 +4,7 @@ from typing import Unpack, assert_never, override
 
 from tkinter import ttk
 import tkinter as tk
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Iterator
 from enum import Enum
 
 import attrs
@@ -102,6 +102,12 @@ class CanvasPositioner[T]:
             self.current += 1
             if self.current >= self.columns:
                 self.advance_row()
+
+    def remainder(self, xoff: int = 0) -> Iterator[tuple[int, int]]:
+        """If the current row is incomplete, yield any remaining positions."""
+        for pos in range(self.current, self.columns):
+            x = xoff + self.spacing + self.current * self.item_width
+            yield x, self.yoff
 
 
 @attrs.define
