@@ -25,7 +25,7 @@ from app.dialogs import Dialogs
 from loadScreen import MAIN_UI as LOAD_UI
 import packages
 from packages import PakRef
-from packages.item import ItemVariant, InheritKind, SubItemRef
+from packages.item import InheritKind, SubItemRef
 from packages.widgets import mandatory_unlocked
 import utils
 from config.filters import FilterConf
@@ -163,28 +163,13 @@ UI: _UIDict = cast(_UIDict, {})
 
 class Item:
     """Represents an item that can appear on the list."""
-    __slots__ = [
-        'item',
-        'data',
-        'visual_subtypes',
-        'id',
-        'pak_id',
-        'pak_name',
-        'names',
-        ]
-    data: ItemVariant
+    __slots__ = ['item', 'id', 'pak_id', 'pak_name']
 
     def __init__(self, item: packages.Item) -> None:
         self.item = item
         self.id = item.id
         self.pak_id = item.pak_id
         self.pak_name = item.pak_name
-
-        self.load_data()
-
-    def load_data(self) -> None:
-        """Reload data from the item."""
-        self.data = self.item.selected_version().get(PakRef(packages.Style, selected_style))
 
     def get_tags(self, subtype: int) -> Iterator[str]:
         """Return all the search keywords for this item/subtype."""
@@ -234,24 +219,24 @@ class Item:
 
     def _get_raw_icon(self, style: PakRef[packages.Style], subKey: int, use_grouping: bool) -> img.Handle:
         """Get the raw icon, which may be overlaid if required."""
-        icons = self.data.icons
-        if use_grouping and self.data.can_group():
+        variant = self.item.selected_version().get(PakRef(packages.Style, selected_style))
+        if use_grouping and variant.can_group():
             # If only 1 copy of this item is on the palette, use the
             # special icon
             try:
-                return icons['all']
+                return variant.icons['all']
             except KeyError:
                 return img.Handle.file(utils.PackagePath(
-                    self.pak_id, str(self.data.all_icon)
+                    variant.pak_id, str(variant.all_icon)
                 ), 64, 64)
 
         try:
-            return icons[str(subKey)]
+            return variant.icons[str(subKey)]
         except KeyError:
             # Read from editoritems.
             pass
         try:
-            subtype = self.data.editor.subtypes[subKey]
+            subtype = variant.editor.subtypes[subKey]
         except IndexError:
             LOGGER.warning(
                 'No subtype number {} for {} in {} style!',
@@ -266,14 +251,13 @@ class Item:
             return img.Handle.error(64, 64)
 
         return img.Handle.file(utils.PackagePath(
-            self.data.pak_id, str(subtype.pal_icon)
+            variant.pak_id, str(subtype.pal_icon)
         ), 64, 64)
 
     def change_version(self, version: str) -> None:
         """Set the version of this item."""
         old_conf = config.APP.get_cur_conf(ItemDefault, self.id)
         config.APP.store_conf(attrs.evolve(old_conf, version=version), self.id)
-        self.load_data()
         for item in itertools.chain(pal_picked, pal_items):
             if item.id == self.id:
                 item.load_data()
@@ -336,8 +320,9 @@ class PalItem:
     @property
     def name(self) -> TransToken:
         """Get the current name for this subtype."""
+        variant = self.item.item.selected_version().get(PakRef(packages.Style, selected_style))
         try:
-            return self.item.data.editor.subtypes[self.subKey].name
+            return variant.editor.subtypes[self.subKey].name
         except IndexError:
             LOGGER.warning(
                 'Item <{}> in <{}> style has mismatched subtype count!',
@@ -1710,8 +1695,6 @@ async def init_windows(
                 ref = packages.PakRef(packages.Style, selected_style)
 
                 style_obj = ref.resolve(packset)
-                for item in item_list.values():
-                    item.load_data()
                 refresh_palette_icons()
 
                 context_win.cur_style = ref
