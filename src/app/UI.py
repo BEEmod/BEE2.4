@@ -205,10 +205,7 @@ class PalItem:
         self.item = item
         self.subKey = sub
         self.id = item.id
-        self.ref = SubItemRef(
-            packages.PakRef(packages.Item, utils.obj_id(item.id)),
-            sub,
-        )
+        self.ref = SubItemRef(PakRef.of(item.item), sub)
         # Used to distinguish between picker and palette items
         self.is_pre = is_pre
 
