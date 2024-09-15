@@ -216,7 +216,6 @@ class SubPane(tk.Toplevel):
         except KeyError:
             pass  # No configured state.
         else:
-            LOGGER.error('Load: {} = {}', self.win_name, state)
             width = state.width if self.can_resize_x and state.width > 0 else self.winfo_reqwidth()
             height = state.height if self.can_resize_y and state.height > 0 else self.winfo_reqheight()
             self.deiconify()

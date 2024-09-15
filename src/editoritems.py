@@ -812,6 +812,7 @@ class SubType:
                         subtype.pal_icon = FSPath(tok.expect(Token.STRING)).with_suffix('.vtf')
                     elif subkey == 'position':
                         points = tok.expect(Token.STRING).split()
+                        # The "Z" axis is not used.
                         if len(points) in (2, 3):
                             try:
                                 x = int(points[0])

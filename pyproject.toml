@@ -184,7 +184,7 @@ disallow_untyped_calls = false
 
 [[tool.mypy.overrides]]
 # No stubs yet.
-module = ['pyglet.*', 'mistletoe.*']
+module = ['pyglet.*', 'mistletoe.*', 'wx.lib.inspection']
 ignore_missing_imports = true
 
 # Dead code, needs to be rewritten.
