@@ -559,6 +559,11 @@ class PakRef[PakT: PakObject]:
     id: utils.ObjectID
 
     @classmethod
+    def of(cls, obj: PakT) -> PakRef[PakT]:
+        """Return a reference to an existing object."""
+        return cls(type(obj), utils.obj_id(obj.id))
+
+    @classmethod
     def parse(cls, type: type[PakT], value: str) -> PakRef[PakT]:
         """Parse the object ID, producing appropriate error messages."""
         return cls(type, utils.obj_id(value, type.__name__))

@@ -733,6 +733,24 @@ class Item(PakObject, needs_foreground=True):
             config.APP.store_conf(attrs.evolve(conf, version=self.def_ver.id), self.id)
             return self.def_ver
 
+    def get_tags(self, style: PakRef[Style], subtype: int) -> Iterator[str]:
+        """Return all the search keywords for this subtype and style."""
+        variant = self.selected_version().get(style)
+        yield self.pak_name
+        yield from variant.tags
+        yield from variant.authors
+        try:
+            name = variant.editor.subtypes[subtype].name
+        except IndexError:
+            LOGGER.warning(
+                'No subtype number {} for {} in {} style!',
+                subtype, self.id, style,
+            )
+        else:  # Include both the original and translated versions.
+            if not name.is_game:
+                yield name.token
+            yield str(name)
+
     def get_version_names(self, cur_style: PakRef[Style]) -> tuple[list[str], list[str]]:
         """Get a list of the names and corresponding IDs for the item."""
         # item folders are reused, so we can find duplicates.

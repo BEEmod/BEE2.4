@@ -8,17 +8,18 @@ import srctools.logger
 from pygtrie import CharTrie
 
 from app import UI, localisation
+from packages import PakRef, Style
+from packages.item import SubItemRef
 from ui_tk.wid_transtoken import set_text
 
 
 LOGGER = srctools.logger.get_logger(__name__)
-# A set of id/subtype pairs.
-type FoundItems = set[tuple[str, int]]
-word_to_ids: 'CharTrie[FoundItems]' = CharTrie()
+type Filter = set[SubItemRef]
+word_to_ids: 'CharTrie[Filter]' = CharTrie()
 _type_cback: Callable[[], None] | None = None
 
 
-def init(frm: ttk.Frame, refresh_cback: Callable[[set[tuple[str, int]] | None], None]) -> None:
+def init(frm: ttk.Frame, refresh_cback: Callable[[Filter | None], None]) -> None:
     """Initialise the UI objects.
 
     The callback is triggered whenever the UI changes, passing along
@@ -26,7 +27,7 @@ def init(frm: ttk.Frame, refresh_cback: Callable[[set[tuple[str, int]] | None], 
     """
     global _type_cback
     refresh_tim: str | None = None
-    result: FoundItems | None = None
+    result: Filter | None = None
 
     def on_type(*args: object) -> None:
         """Re-search whenever text is typed."""
@@ -37,7 +38,7 @@ def init(frm: ttk.Frame, refresh_cback: Callable[[set[tuple[str, int]] | None], 
             refresh_cback(None)
             return
 
-        found: FoundItems = set()
+        found: Filter = set()
         *words, last = words
         for word in words:
             try:
@@ -82,15 +83,17 @@ def rebuild_database() -> None:
     """Rebuild the search database."""
     LOGGER.info('Updating search database...')
     # Clear and reset.
-    word_set: FoundItems
+    word_set: Filter
     word_to_ids.clear()
+
+    selected_style = PakRef(Style, UI.selected_style)
 
     for item in UI.item_list.values():
         for subtype_ind in item.item.visual_subtypes:
-            for tag in item.get_tags(subtype_ind):
+            for tag in item.item.get_tags(selected_style, subtype_ind):
                 for word in tag.split():
                     word_set = word_to_ids.setdefault(word.casefold(), set())
-                    word_set.add((item.item.id, subtype_ind))
+                    word_set.add(SubItemRef(item.ref, subtype_ind))
 
     LOGGER.info('Computed {} tags.', sum(1 for _ in word_to_ids.iterkeys()))
     if _type_cback is not None:

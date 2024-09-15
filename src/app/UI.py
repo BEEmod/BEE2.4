@@ -4,7 +4,7 @@ from typing import TypedDict, cast, assert_never
 from tkinter import ttk
 import tkinter as tk
 
-from collections.abc import Callable, Iterator
+from collections.abc import Callable
 from contextlib import aclosing
 import itertools
 import operator
@@ -105,7 +105,7 @@ pal_items_fake = WidgetCache(
     ttk.Label.place_forget,
 )
 # The current filtering state.
-cur_filter: set[tuple[str, int]] | None = None
+cur_filter: set[SubItemRef] | None = None
 
 selected_style: utils.ObjectID = packages.CLEAN_STYLE
 
@@ -172,31 +172,14 @@ def change_item_version(item_ref: PakRef[packages.Item], version: str) -> None:
 
 class Item:
     """Represents an item that can appear on the list."""
-    __slots__ = ['item', 'id', 'pak_id', 'pak_name']
+    __slots__ = ['item', 'id', 'ref', 'pak_id', 'pak_name']
 
     def __init__(self, item: packages.Item) -> None:
         self.item = item
-        self.id = item.id
+        self.ref = PakRef.of(item)
+        self.id = self.ref.id
         self.pak_id = item.pak_id
         self.pak_name = item.pak_name
-
-    def get_tags(self, subtype: int) -> Iterator[str]:
-        """Return all the search keywords for this item/subtype."""
-        variant = self.item.selected_version().get(PakRef(packages.Style, selected_style))
-        yield self.item.pak_name
-        yield from variant.tags
-        yield from variant.authors
-        try:
-            name = variant.editor.subtypes[subtype].name
-        except IndexError:
-            LOGGER.warning(
-                'No subtype number {} for {} in {} style!',
-                subtype, self.item.id, selected_style,
-            )
-        else:  # Include both the original and translated versions.
-            if not name.is_game:
-                yield name.token
-            yield str(name)
 
     def get_icon(self, subKey: int, allow_single: bool = False, single_num: int = 1) -> img.Handle:
         """Get an icon for the given subkey.
@@ -967,7 +950,7 @@ def pal_shuffle() -> None:
         for item in pal_items
         if item.id not in palette_set
         if include_mandatory or not item.needs_unlock
-        if cur_filter is None or (item.id, item.subKey) in cur_filter
+        if cur_filter is None or item.ref in cur_filter
         if len(item_list[item.id].item.visual_subtypes)  # Check there's actually sub-items to show.
     })
 
@@ -1287,14 +1270,14 @@ async def _flow_picker(filter_conf: FilterConf) -> None:
             visual_subtypes = pal_item.item.item.visual_subtypes  # This is very silly.
             if visual_subtypes and pal_item.subKey == visual_subtypes[0]:
                 visible = any(
-                    (pal_item.item.id, subKey) in cur_filter
+                    pal_item.ref in cur_filter
                     for subKey in visual_subtypes
                 ) if cur_filter is not None else True
             else:
                 visible = False
         else:
             # Uncompressed, check each individually.
-            visible = cur_filter is None or (pal_item.item.id, pal_item.subKey) in cur_filter
+            visible = cur_filter is None or pal_item.ref in cur_filter
 
         if should_checkpoint == 'Y':
             # Checkpoint often, to let other code run.
@@ -1464,7 +1447,7 @@ async def init_windows(
 
     await LOAD_UI.step('filter')
 
-    def update_filter(new_filter: set[tuple[str, int]] | None) -> None:
+    def update_filter(new_filter: set[SubItemRef] | None) -> None:
         """Refresh filtered items whenever it's changed."""
         global cur_filter
         cur_filter = new_filter
