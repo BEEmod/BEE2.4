@@ -26,13 +26,13 @@ import trio
 from app import img, lazy_conf, DEV_MODE
 from app.mdown import MarkdownData
 from config.item_defaults import DEFAULT_VERSION, ItemDefault
+from config.gen_opts import GenOptions
 from connections import Config as ConnConfig
 from editoritems import Item as EditorItem, InstCount
 from packages import PackagesSet, PakObject, PakRef, ParseData, Style, sep_values, desc_parse, get_config
 from transtoken import TransToken, TransTokenSource
 import collisions
 import config
-import config.gen_opts
 import editoritems_vmf
 import async_util
 import utils
@@ -769,6 +769,53 @@ class Item(PakObject, needs_foreground=True):
             for ver_id in versions
         ]
 
+    def get_icon(self, style: PakRef[Style], sub_key: int, use_grouping: bool) -> img.Handle:
+        """Get an icon for the given subkey."""
+        icon = self._get_icon(style, sub_key, use_grouping)
+        if self.unstyled or not config.APP.get_cur_conf(GenOptions).visualise_inheritance:
+            return icon
+        inherit_kind = self.selected_version().inherit_kind.get(style.id, InheritKind.UNSTYLED)
+        if inherit_kind is not InheritKind.DEFINED:
+            icon = icon.overlay_text(inherit_kind.value.title(), 12)
+        return icon
+
+    def _get_icon(self, style: PakRef[Style], subKey: int, use_grouping: bool) -> img.Handle:
+        """Get the raw icon, which may be overlaid if required."""
+        variant = self.selected_version().get(style)
+        if use_grouping and variant.can_group():
+            # If only 1 copy of this item is on the palette, use the
+            # special icon
+            try:
+                return variant.icons['all']
+            except KeyError:
+                return img.Handle.file(utils.PackagePath(
+                    variant.pak_id, str(variant.all_icon)
+                ), 64, 64)
+
+        try:
+            return variant.icons[str(subKey)]
+        except KeyError:
+            # Read from editoritems.
+            pass
+        try:
+            subtype = variant.editor.subtypes[subKey]
+        except IndexError:
+            LOGGER.warning(
+                'No subtype number {} for {} in {} style!',
+                subKey, self.id, style,
+            )
+            return img.Handle.error(64, 64)
+        if subtype.pal_icon is None:
+            LOGGER.warning(
+                'No palette icon for {} subtype {} in {} style!',
+                self.id, subKey, style,
+            )
+            return img.Handle.error(64, 64)
+
+        return img.Handle.file(utils.PackagePath(
+            variant.pak_id, str(subtype.pal_icon)
+        ), 64, 64)
+
 
 class ItemConfig(PakObject, allow_mult=True):
     """Allows adding additional configuration for items.
@@ -1001,7 +1048,7 @@ async def parse_item_folder(
         ),
     )
 
-    if not variant.ent_count and config.APP.get_cur_conf(config.gen_opts.GenOptions).log_missing_ent_count:
+    if not variant.ent_count and config.APP.get_cur_conf(GenOptions).log_missing_ent_count:
         LOGGER.warning(
             '"{}:{}" has missing entity count!',
             data.pak_id,
@@ -1155,7 +1202,7 @@ async def assign_styled_items(packset: PackagesSet, all_styles: Iterable[Style],
                     styles[sty_id] = styles[base_style_id]
                     vers.inherit_kind[sty_id] = InheritKind.INHERIT
                     # If requested, log this.
-                    if not item.unstyled and config.APP.get_cur_conf(config.gen_opts.GenOptions).log_item_fallbacks:
+                    if not item.unstyled and config.APP.get_cur_conf(GenOptions).log_item_fallbacks:
                         LOGGER.warning(
                             'Item "{}" using parent "{}" for "{}"!',
                             item.id, base_style.id, style.id,
@@ -1163,7 +1210,7 @@ async def assign_styled_items(packset: PackagesSet, all_styles: Iterable[Style],
                     break
             else:
                 # No parent matches!
-                if not item.unstyled and config.APP.get_cur_conf(config.gen_opts.GenOptions).log_missing_styles:
+                if not item.unstyled and config.APP.get_cur_conf(GenOptions).log_missing_styles:
                     LOGGER.warning(
                         'Item "{}"{} using inappropriate style for "{}"!',
                         item.id, vers_desc, style.id,

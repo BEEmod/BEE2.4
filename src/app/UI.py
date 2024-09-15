@@ -25,11 +25,11 @@ from app.dialogs import Dialogs
 from loadScreen import MAIN_UI as LOAD_UI
 import packages
 from packages import PakRef
-from packages.item import InheritKind, SubItemRef
+from packages.item import SubItemRef
 from packages.widgets import mandatory_unlocked
 import utils
 from config.filters import FilterConf
-from config.gen_opts import GenOptions, AfterExport
+from config.gen_opts import AfterExport
 from config.last_sel import LastSelected
 from config.windows import WindowState
 from config.item_defaults import ItemDefault
@@ -178,8 +178,6 @@ class Item:
         self.item = item
         self.ref = PakRef.of(item)
         self.id = self.ref.id
-        self.pak_id = item.pak_id
-        self.pak_name = item.pak_name
 
     def get_icon(self, subKey: int, allow_single: bool = False, single_num: int = 1) -> img.Handle:
         """Get an icon for the given subkey.
@@ -193,58 +191,11 @@ class Item:
             item.id == self.id
             for item in pal_picked
         )
-        return self.get_raw_icon(
+        return self.item.get_icon(
             PakRef(packages.Style, selected_style),
             subKey,
             allow_single and num_picked <= single_num,
         )
-
-    def get_raw_icon(self, style: PakRef[packages.Style], sub_key: int, use_grouping: bool) -> img.Handle:
-        """Get an icon for the given subkey, directly indicating if it should be grouped."""
-        icon = self._get_raw_icon(style, sub_key, use_grouping)
-        if self.item.unstyled or not config.APP.get_cur_conf(GenOptions).visualise_inheritance:
-            return icon
-        inherit_kind = self.item.selected_version().inherit_kind.get(style.id, InheritKind.UNSTYLED)
-        if inherit_kind is not InheritKind.DEFINED:
-            icon = icon.overlay_text(inherit_kind.value.title(), 12)
-        return icon
-
-    def _get_raw_icon(self, style: PakRef[packages.Style], subKey: int, use_grouping: bool) -> img.Handle:
-        """Get the raw icon, which may be overlaid if required."""
-        variant = self.item.selected_version().get(PakRef(packages.Style, selected_style))
-        if use_grouping and variant.can_group():
-            # If only 1 copy of this item is on the palette, use the
-            # special icon
-            try:
-                return variant.icons['all']
-            except KeyError:
-                return img.Handle.file(utils.PackagePath(
-                    variant.pak_id, str(variant.all_icon)
-                ), 64, 64)
-
-        try:
-            return variant.icons[str(subKey)]
-        except KeyError:
-            # Read from editoritems.
-            pass
-        try:
-            subtype = variant.editor.subtypes[subKey]
-        except IndexError:
-            LOGGER.warning(
-                'No subtype number {} for {} in {} style!',
-                subKey, self.id, style,
-            )
-            return img.Handle.error(64, 64)
-        if subtype.pal_icon is None:
-            LOGGER.warning(
-                'No palette icon for {} subtype {} in {} style!',
-                self.id, subKey, style,
-            )
-            return img.Handle.error(64, 64)
-
-        return img.Handle.file(utils.PackagePath(
-            variant.pak_id, str(subtype.pal_icon)
-        ), 64, 64)
 
 
 class PalItem:
@@ -395,7 +346,7 @@ class PalItem:
         if self.is_pre:
             TK_IMG.apply(self.label, self.item.get_icon(self.subKey, True))
         else:
-            TK_IMG.apply(self.label, self.item.get_raw_icon(
+            TK_IMG.apply(self.label, self.item.item.get_icon(
                 PakRef(packages.Style, selected_style),
                 self.subKey,
                 config.APP.get_cur_conf(FilterConf, default=FilterConf()).compress,
