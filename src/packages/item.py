@@ -769,9 +769,8 @@ class Item(PakObject, needs_foreground=True):
             for ver_id in versions
         ]
 
-    def get_icon(self, style: PakRef[Style], sub_key: int, use_grouping: bool) -> img.Handle:
-        """Get an icon for the given subkey."""
-        icon = self._get_icon(style, sub_key, use_grouping)
+    def _inherit_overlay(self, style: PakRef[Style], icon: img.Handle) -> img.Handle:
+        """Add the inheritance overlay, if enabled."""
         if self.unstyled or not config.APP.get_cur_conf(GenOptions).visualise_inheritance:
             return icon
         inherit_kind = self.selected_version().inherit_kind.get(style.id, InheritKind.UNSTYLED)
@@ -779,19 +778,26 @@ class Item(PakObject, needs_foreground=True):
             icon = icon.overlay_text(inherit_kind.value.title(), 12)
         return icon
 
-    def _get_icon(self, style: PakRef[Style], subKey: int, use_grouping: bool) -> img.Handle:
+    def get_icon(self, style: PakRef[Style], sub_key: int) -> img.Handle:
+        """Get an icon for the given subkey."""
+        return self._inherit_overlay(style, self._get_icon(style, sub_key))
+
+    def get_all_icon(self, style: PakRef[Style]) -> img.Handle | None:
+        """Get the 'all' group icon for the specified style."""
+        variant = self.selected_version().get(style)
+        if not variant.can_group():
+            return None
+        try:
+            icon = variant.icons['all']
+        except KeyError:
+            icon = img.Handle.file(utils.PackagePath(
+                variant.pak_id, str(variant.all_icon)
+            ), 64, 64)
+        return self._inherit_overlay(style, icon)
+
+    def _get_icon(self, style: PakRef[Style], subKey: int) -> img.Handle:
         """Get the raw icon, which may be overlaid if required."""
         variant = self.selected_version().get(style)
-        if use_grouping and variant.can_group():
-            # If only 1 copy of this item is on the palette, use the
-            # special icon
-            try:
-                return variant.icons['all']
-            except KeyError:
-                return img.Handle.file(utils.PackagePath(
-                    variant.pak_id, str(variant.all_icon)
-                ), 64, 64)
-
         try:
             return variant.icons[str(subKey)]
         except KeyError:
