@@ -203,14 +203,14 @@ class ContextWin(ContextWinBase['UI.PalItem']):
         from app import UI, itemconfig
         assert self.selected is not None
         version_id = self.version_lookup[self.wid_variant.current()]
-        item_id = self.selected.item.id
-        UI.item_list[item_id].change_version(version_id)
+        item_ref = self.selected.item
+        UI.change_item_version(item_ref, version_id)
         # Refresh our data.
         self.load_item_data()
 
         # Refresh itemconfig combo-boxes to match us.
-        for conf_item_id, func in itemconfig.ITEM_VARIANT_LOAD:
-            if item_id == conf_item_id:
+        for conf_item_ref, func in itemconfig.ITEM_VARIANT_LOAD:
+            if conf_item_ref == item_ref:
                 func(self.cur_style)
 
     @override

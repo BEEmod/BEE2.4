@@ -7,10 +7,6 @@ from contextlib import AbstractContextManager, aclosing
 import itertools
 
 from srctools import EmptyMapping, Keyvalues, Vec, bool_as_int, conv_bool, logger
-
-from config import Config
-from packages import PackagesSet
-
 from trio_util import AsyncValue, wait_any
 import attrs
 import trio
@@ -22,9 +18,10 @@ from config.widgets import (
 )
 from config.stylevar import State as StyleVarState
 from transtoken import TransToken, TransTokenSource
-import config
 import BEE2_config
+import config
 import packages
+import utils
 
 
 class ConfigProto(Protocol):
@@ -388,7 +385,7 @@ class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):
 
     @classmethod
     @override
-    async def migrate_config(cls, packset: PackagesSet, conf: Config) -> Config:
+    async def migrate_config(cls, packset: packages.PackagesSet, conf: config.Config) -> config.Config:
         """Update configs to migrate stylevars."""
         await packset.ready(cls).wait()
 
@@ -440,12 +437,12 @@ def parse_color(color: str) -> tuple[int, int, int]:
 @attrs.frozen
 class ItemVariantConf:
     """Configuration for the special widget."""
-    item_id: str
+    item_ref: packages.PakRef[packages.Item]
 
     @classmethod
     def parse(cls, data: packages.ParseData, conf: Keyvalues) -> Self:
         """Parse from configs."""
-        return cls(conf['ItemID'])
+        return cls(packages.PakRef(packages.Item, utils.obj_id(conf['ItemID'])))
 
 
 @register('dropdown')

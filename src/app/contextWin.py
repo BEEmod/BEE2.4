@@ -279,7 +279,7 @@ class ContextWinBase[TargetT]:
 
         self.ui_set_defaults_enabled(PropertyWindow.can_edit(variant.editor))
 
-        if item_id == SIGNAGE_ITEM_ID:
+        if self.selected.item == SIGNAGE_ITEM_ID:
             self.ui_show_sign_config()
         else:
             self.ui_show_variants(item)
@@ -291,7 +291,7 @@ class ContextWinBase[TargetT]:
             if variant.editor.has_sec_input():
                 self.set_sprite(SPR.INPUT, 'in_dual')
                 # Real funnels work slightly differently.
-                if self.selected.item.id == DefaultItems.funnel.id:
+                if item_id == DefaultItems.funnel.id:
                     self.ui_set_sprite_tool(SPR.INPUT, TRANS_TOOL_TBEAM)
             else:
                 self.set_sprite(SPR.INPUT, 'in_norm')
@@ -329,7 +329,7 @@ class ContextWinBase[TargetT]:
             # This doesn't seem right - this item won't be placeable at all...
             LOGGER.warning(
                 "Item <{}> disallows all orientations. Is this right?",
-                item_id,
+                self.selected.item,
             )
             face_spr += "_none"
 

@@ -105,7 +105,10 @@ TIMER_NUM_TRANS[TIMER_STR_INF] = INF
 TRANS_COLON = TransToken.untranslated('{text}: ')
 TRANS_GROUP_HEADER = TransToken.ui('{name} ({page}/{count})')  # i18n: Header layout for Item Properties pane.
 # For the item-variant widget, we need to refresh on style changes.
-ITEM_VARIANT_LOAD: list[tuple[str, Callable[[packages.PakRef[packages.Style]], object]]] = []
+ITEM_VARIANT_LOAD: list[tuple[
+    packages.PakRef[packages.Item],
+    Callable[[packages.PakRef[packages.Style]], object],
+]] = []
 
 window: SubPane | None = None
 
@@ -225,7 +228,7 @@ async def create_group(
             create_func = _UI_IMPL_SINGLE[s_wid.kind]
 
             conf = s_wid.config
-            if isinstance(conf, ItemVariantConf) and conf.item_id == SIGNAGE_ITEM_ID:
+            if isinstance(conf, ItemVariantConf) and conf.item_ref == SIGNAGE_ITEM_ID:
                 # Special case. This is a trigger to display the "Configure Signage" button.
                 # Replace the config with the edge trigger, signalling the creation func below
                 # to handle this.
@@ -602,23 +605,23 @@ async def widget_item_variant(
         task_status.started(show_btn)
         await tk_tools.apply_bool_enabled_state_task(conf.ready, show_btn)
 
-    try:
-        item = packages.get_loaded_packages().obj_by_id(packages.Item, conf.item_id)
-        ui_item = UI.item_list[conf.item_id]
-    except KeyError:
-        raise ValueError(f'Unknown item "{conf.item_id}"!') from None
+    item_ref = conf.item_ref
+    item = item_ref.resolve(packages.get_loaded_packages())
+    if item is None:
+        raise ValueError(f'Unknown item "{conf.item_ref}"!')
 
     version_lookup: list[str] = []
 
     def update_data(cur_style: packages.PakRef[packages.Style]) -> None:
         """Refresh the data in the list."""
+        assert item is not None
         nonlocal version_lookup
         version_lookup = context_win.set_version_combobox(combobox, item, cur_style)
 
     def change_callback(e: object = None) -> None:
         """Change the item version."""
         if version_lookup is not None:
-            ui_item.change_version(version_lookup[combobox.current()])
+            UI.change_item_version(item_ref, version_lookup[combobox.current()])
 
     combobox = ttk.Combobox(
         parent,
@@ -629,7 +632,7 @@ async def widget_item_variant(
     update_data(packages.PakRef(packages.Style, UI.selected_style))
     combobox.bind('<<ComboboxSelected>>', change_callback)
 
-    load = (item.id, update_data)
+    load = (item_ref, update_data)
     ITEM_VARIANT_LOAD.append(load)
     try:
         task_status.started(combobox)

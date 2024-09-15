@@ -161,6 +161,15 @@ windows: _WindowsDict = cast(_WindowsDict, {})
 UI: _UIDict = cast(_UIDict, {})
 
 
+def change_item_version(item_ref: PakRef[packages.Item], version: str) -> None:
+    """Set the version of this item."""
+    old_conf = config.APP.get_cur_conf(ItemDefault, item_ref.id)
+    config.APP.store_conf(attrs.evolve(old_conf, version=version), item_ref.id)
+    for pal_item in itertools.chain(pal_picked, pal_items):
+        if pal_item.ref.item == item_ref:
+            pal_item.load_data()
+
+
 class Item:
     """Represents an item that can appear on the list."""
     __slots__ = ['item', 'id', 'pak_id', 'pak_name']
@@ -174,7 +183,7 @@ class Item:
     def get_tags(self, subtype: int) -> Iterator[str]:
         """Return all the search keywords for this item/subtype."""
         variant = self.item.selected_version().get(PakRef(packages.Style, selected_style))
-        yield self.pak_name
+        yield self.item.pak_name
         yield from variant.tags
         yield from variant.authors
         try:
@@ -182,7 +191,7 @@ class Item:
         except IndexError:
             LOGGER.warning(
                 'No subtype number {} for {} in {} style!',
-                subtype, self.id, selected_style,
+                subtype, self.item.id, selected_style,
             )
         else:  # Include both the original and translated versions.
             if not name.is_game:
@@ -253,14 +262,6 @@ class Item:
         return img.Handle.file(utils.PackagePath(
             variant.pak_id, str(subtype.pal_icon)
         ), 64, 64)
-
-    def change_version(self, version: str) -> None:
-        """Set the version of this item."""
-        old_conf = config.APP.get_cur_conf(ItemDefault, self.id)
-        config.APP.store_conf(attrs.evolve(old_conf, version=version), self.id)
-        for item in itertools.chain(pal_picked, pal_items):
-            if item.id == self.id:
-                item.load_data()
 
 
 class PalItem:
