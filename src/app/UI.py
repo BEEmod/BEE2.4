@@ -172,7 +172,7 @@ def change_item_version(item_ref: PakRef[packages.Item], version: str) -> None:
 
 class Item:
     """Represents an item that can appear on the list."""
-    __slots__ = ['item', 'id', 'ref', 'pak_id', 'pak_name']
+    __slots__ = ['item', 'id', 'ref']
 
     def __init__(self, item: packages.Item) -> None:
         self.item = item
@@ -211,7 +211,6 @@ class PalItem:
         )
         # Used to distinguish between picker and palette items
         self.is_pre = is_pre
-        self.needs_unlock = item.item.needs_unlock
 
         # Location this item was present at previously when dragging it.
         self.pre_x = self.pre_y = -1
@@ -895,14 +894,14 @@ def pal_shuffle() -> None:
 
     # Use a set to eliminate duplicates.
     shuff_items = list({
-        item.id
+        pal_item.id
         # Only consider items not already on the palette,
         # obey the mandatory item lock and filters.
-        for item in pal_items
-        if item.id not in palette_set
-        if include_mandatory or not item.needs_unlock
-        if cur_filter is None or item.ref in cur_filter
-        if len(item_list[item.id].item.visual_subtypes)  # Check there's actually sub-items to show.
+        for pal_item in pal_items
+        if pal_item.id not in palette_set
+        if include_mandatory or not pal_item.item.item.needs_unlock
+        if cur_filter is None or pal_item.ref in cur_filter
+        if len(pal_item.item.item.visual_subtypes)  # Check there's actually sub-items to show.
     })
 
     random.shuffle(shuff_items)
@@ -1213,7 +1212,7 @@ async def _flow_picker(filter_conf: FilterConf) -> None:
     i = 0
     # If cur_filter is None, it's blank and so show all of them.
     for pal_item, should_checkpoint in zip(pal_items, itertools.cycle('YNNNN')):
-        if hide_mandatory and pal_item.needs_unlock:
+        if hide_mandatory and pal_item.item.item.needs_unlock:
             visible = False
         elif filter_conf.compress:
             # Show if this is the first, and any in this item are visible.
