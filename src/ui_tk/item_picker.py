@@ -4,6 +4,7 @@ import tkinter as tk
 
 from app.img import PETI_ITEM_BG_HEX
 from app.paletteLoader import COORDS
+from transtoken import TransToken
 from trio_util import AsyncValue
 
 from app.item_picker import ItemPickerBase, ItemSlot, IMG_MENU, TRANS_ITEMS_TITLE
@@ -96,17 +97,20 @@ class ItemPicker(ItemPickerBase[tk.Misc]):
     async def _ui_task(self) -> None:
         pass
 
-    def ui_picker_create(self, index: int) -> ItemSlot:
+    def _ui_picker_create(self, index: int) -> ItemSlot:
         """Create a source slot, likely by calling dragdrop.slot_source."""
         return self.drag_man.slot_source(self.picker_canv)
 
-    def ui_picker_hide(self, slot: ItemSlot) -> None:
+    def _ui_picker_hide(self, slot: ItemSlot) -> None:
         """Hide the specified slot widget."""
         slot.contents = None
         self.drag_man.slot_hide(slot)
 
     def _ui_calc_columns(self) -> int:
         return self.canv_pos.calc_columns()
+
+    def _ui_set_sel_name(self, name: TransToken) -> None:
+        wid_transtoken.set_text(self.pal_name, name)
 
     async def _ui_reposition_items(self) -> None:
         """Position all the items."""
@@ -118,6 +122,7 @@ class ItemPicker(ItemPickerBase[tk.Misc]):
                 x, y,
                 x + 64, y + 64,
                 fill=PETI_ITEM_BG_HEX,
+                width=0,
                 tags="fake_slots",
             )
         self.canv_pos.resize_canvas()

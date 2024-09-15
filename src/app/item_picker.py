@@ -1,4 +1,5 @@
 """Implements the selected palette and list of items."""
+from contextlib import aclosing
 from typing import Final
 
 from abc import ABC, abstractmethod
@@ -28,6 +29,7 @@ IMG_MENU = img.Handle.builtin('BEE2/menu', 271, 573)
 INFO_ERROR: Final[DragInfo] = DragInfo(img.Handle.error(64, 64))
 
 TRANS_ITEMS_TITLE = TransToken.ui("All Items: ")
+TRANS_ERROR = TransToken.untranslated('???')
 
 
 class ItemPickerBase[ParentT](ReflowWindow, ABC):
@@ -68,7 +70,7 @@ class ItemPickerBase[ParentT](ReflowWindow, ABC):
         self.slots_pal = {}
         self._all_items = []
         self.items_dirty = trio.Event()
-        self.slots_picker = WidgetCache(self.ui_picker_create, self.ui_picker_hide)
+        self.slots_picker = WidgetCache(self._ui_picker_create, self._ui_picker_hide)
 
     def _cur_style(self) -> PakRef[Style]:
         """Fetch the current style."""
@@ -77,7 +79,7 @@ class ItemPickerBase[ParentT](ReflowWindow, ABC):
             return PakRef(Style, style)
         else:
             LOGGER.warning('Invalid style {}!', style)
-            return CLEAN_STYLE
+            return PakRef(Style, CLEAN_STYLE)
 
     async def task(self) -> None:
         """Operate the picker."""
@@ -87,8 +89,9 @@ class ItemPickerBase[ParentT](ReflowWindow, ABC):
             nursery.start_soon(self._style_changed_task)
             nursery.start_soon(self._filter_conf_changed_task)
             nursery.start_soon(self._filter_search_changed_task)
-            nursery.start_soon(self.reload_items_task)
+            nursery.start_soon(self._reload_items_task)
             nursery.start_soon(self.reposition_items_task)
+            nursery.start_soon(self._update_name_task)
 
     def change_version(self, item_ref: PakRef[Item], version: str) -> None:
         """Set the version of an item."""
@@ -111,9 +114,8 @@ class ItemPickerBase[ParentT](ReflowWindow, ABC):
 
     def _drag_info(self, ref: SubItemRef) -> DragInfo:
         """Compute the info for an item."""
-        try:
-            item = ref.item.resolve(self.packset)
-        except KeyError:
+        item = ref.item.resolve(self.packset)
+        if item is None:
             LOGGER.warning('Unknown item "{}"!', ref)
             return INFO_ERROR
         style = self._cur_style()
@@ -124,12 +126,11 @@ class ItemPickerBase[ParentT](ReflowWindow, ABC):
         else:
             return DragInfo(icon)
 
-    async def reload_items_task(self) -> None:
+    async def _reload_items_task(self) -> None:
         """Update all the items."""
         while True:
             await self.items_dirty.wait()
             self.items_dirty = trio.Event()
-            LOGGER.info('Reloading items list.')
 
             hide_mandatory = not mandatory_unlocked()
             cur_filter = self.cur_filter.value
@@ -190,16 +191,46 @@ class ItemPickerBase[ParentT](ReflowWindow, ABC):
             async for self.filter_cont in channel:
                 self.items_dirty.set()
 
+    async def _update_name_task(self) -> None:
+        """Update the name of the selected item."""
+        hovered: SubItemRef | None
+        async with aclosing(self.drag_man.hovered_item.eventual_values()) as agen:
+            async for hovered in agen:
+                if hovered is None:
+                    self._ui_set_sel_name(TransToken.BLANK)
+                    continue
+                item = hovered.item.resolve(self.packset)
+                if item is None:
+                    LOGGER.warning('No such item "{}"!', hovered)
+                    self._ui_set_sel_name(TransToken.untranslated(str(hovered)))
+                    continue
+                style = self._cur_style()
+                variant = item.selected_version().get(style)
+                try:
+                    name = variant.editor.subtypes[hovered.subtype].name
+                except IndexError:
+                    LOGGER.warning(
+                        'Item {} in <{}> style has mismatched subtype count!',
+                        hovered, style,
+                    )
+                    self._ui_set_sel_name(TRANS_ERROR)
+                else:
+                    self._ui_set_sel_name(name)
+
     @abstractmethod
     async def _ui_task(self) -> None:
         """Update the UI."""
 
     @abstractmethod
-    def ui_picker_create(self, index: int) -> ItemSlot:
+    def _ui_picker_create(self, index: int) -> ItemSlot:
         """Create a source slot, likely by calling dragdrop.slot_source."""
         raise NotImplementedError
 
     @abstractmethod
-    def ui_picker_hide(self, slot: ItemSlot) -> None:
+    def _ui_picker_hide(self, slot: ItemSlot) -> None:
         """Hide the specified slot widget."""
         raise NotImplementedError
+
+    @abstractmethod
+    def _ui_set_sel_name(self, name: TransToken) -> None:
+        """Set the name for the currently selected item."""

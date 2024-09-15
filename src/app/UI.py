@@ -80,7 +80,6 @@ IMG_BLANK = img.Handle.background(64, 64)
 TRANS_EXPORTED = TransToken.ui('Selected Items and Style successfully exported!')
 TRANS_EXPORTED_TITLE = TransToken.ui('BEE2 - Export Complete')
 TRANS_MAIN_TITLE = TransToken.ui('BEEMOD {version} - {game}')
-TRANS_ERROR = TransToken.untranslated('???')
 
 
 # These panes and a dict mapping object type to them.
@@ -118,8 +117,6 @@ class _WindowsDict(TypedDict):
 
 # Holds the TK Toplevels, frames, widgets and menus
 windows: _WindowsDict = cast(_WindowsDict, {})
-
-
 
 
 class PalItem:
@@ -172,19 +169,6 @@ class PalItem:
         except AttributeError:
             pass
 
-    @property
-    def name(self) -> TransToken:
-        """Get the current name for this subtype."""
-        variant = self.item.item.selected_version().get(PakRef(packages.Style, selected_style))
-        try:
-            return variant.editor.subtypes[self.subKey].name
-        except IndexError:
-            LOGGER.warning(
-                'Item <{}> in <{}> style has mismatched subtype count!',
-                self.id, selected_style,
-            )
-            return TRANS_ERROR
-
     def show_context(self, _: tk.Event) -> None:
         """Show the context window."""
         sound.fx('expand')
@@ -193,24 +177,6 @@ class PalItem:
         else:
             pos = None
         context_win.show_prop(self, self.ref, pos)
-
-    def rollover(self, _: tk.Event) -> None:
-        """Show the name of a subitem and info button when moused over."""
-        set_disp_name(self)
-        self.label.lift()
-        self.label['relief'] = 'ridge'
-        padding = 2 if utils.WIN else 0
-        self.info_btn.place(
-            x=self.label.winfo_width() - padding,
-            y=self.label.winfo_height() - padding,
-            anchor='se',
-        )
-
-    def rollout(self, _: tk.Event) -> None:
-        """Reset the item name display and hide the info button when the mouse leaves."""
-        clear_disp_name()
-        self.label['relief'] = 'flat'
-        self.info_btn.place_forget()
 
     @classmethod
     def change_pal_subtype(cls, pos: tuple[int, int], ref: SubItemRef) -> None:
@@ -558,16 +524,6 @@ async def export_complete_task(
             if pal_ui.selected.items != pal_data:
                 pal_ui.select_palette(paletteUI.UUID_EXPORT, False)
                 pal_ui.is_dirty.set()
-
-
-def set_disp_name(item: PalItem, e: object = None) -> None:
-    """Callback to display the name of the item."""
-    wid_transtoken.set_text(UI['pre_disp_name'], item.name)
-
-
-def clear_disp_name(e: object = None) -> None:
-    """Callback to reset the item name."""
-    wid_transtoken.set_text(UI['pre_disp_name'], TransToken.BLANK)
 
 
 async def set_palette(chosen_pal: paletteUI.Palette) -> None:
