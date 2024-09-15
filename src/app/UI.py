@@ -1250,9 +1250,8 @@ async def init_picker(
 
     for item in items:
         await trio.lowlevel.checkpoint()
-        for i, subtype in enumerate(item.data.editor.subtypes):
-            if subtype.pal_icon or subtype.pal_name:
-                pal_items.append(PalItem(frmScroll, item, sub=i, is_pre=False))
+        for i in item.item.visual_subtypes:
+            pal_items.append(PalItem(frmScroll, item, sub=i, is_pre=False))
 
     reflow_event = trio.Event()
     conf = config.APP.get_cur_conf(FilterConf)

@@ -321,7 +321,6 @@ class TKImages(img.UIImage):
             width = handle.width or res.width
             height = handle.height or res.height
             if width != res.width or height != res.height:
-                LOGGER.info('Resize {} -> {}', res.size, handle)
                 res = res.resize(
                     (width, height),
                     Image.NEAREST if handle.resize_pixel else Image.LANCZOS,
