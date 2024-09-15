@@ -57,7 +57,7 @@ async def test(core_nursery: trio.Nursery) -> None:
         name: str,
         pak_id: utils.ObjectID,
         icon: str,
-        group: str | None = None,
+        group: utils.SpecialID | None = None,
         group_icon: str | None = None,
     ) -> str:
         """Simple implementation of the DND protocol."""
@@ -83,6 +83,8 @@ async def test(core_nursery: trio.Nursery) -> None:
 
     PAK_CLEAN = utils.obj_id('BEE2_CLEAN_STYLE')
     PAK_ELEM = utils.obj_id('VALVE_TEST_ELEM')
+    GROUP_CUBE = utils.obj_id('ITEM_CUBE')
+    GROUP_SPLAT = utils.obj_id('ITEM_CUBE')
     items = [
         demo_item('Dropper', PAK_CLEAN, 'dropper'),
         demo_item('Entry', PAK_CLEAN, 'entry_door'),
@@ -90,17 +92,17 @@ async def test(core_nursery: trio.Nursery) -> None:
         demo_item('Large Obs', PAK_CLEAN, 'large_obs_room'),
         demo_item('Faith Plate', PAK_ELEM, 'faithplate'),
 
-        demo_item('Standard Cube', PAK_ELEM, 'cube', 'ITEM_CUBE', 'cubes'),
-        demo_item('Companion Cube', PAK_ELEM, 'companion_cube', 'ITEM_CUBE', 'cubes'),
-        demo_item('Reflection Cube', PAK_ELEM, 'reflection_cube', 'ITEM_CUBE', 'cubes'),
-        demo_item('Edgeless Cube', PAK_ELEM, 'edgeless_safety_cube', 'ITEM_CUBE', 'cubes'),
-        demo_item('Franken Cube', PAK_ELEM, 'frankenturret', 'ITEM_CUBE', 'cubes'),
+        demo_item('Standard Cube', PAK_ELEM, 'cube', GROUP_CUBE, 'cubes'),
+        demo_item('Companion Cube', PAK_ELEM, 'companion_cube', GROUP_CUBE, 'cubes'),
+        demo_item('Reflection Cube', PAK_ELEM, 'reflection_cube', GROUP_CUBE, 'cubes'),
+        demo_item('Edgeless Cube', PAK_ELEM, 'edgeless_safety_cube', GROUP_CUBE, 'cubes'),
+        demo_item('Franken Cube', PAK_ELEM, 'frankenturret', GROUP_CUBE, 'cubes'),
 
-        demo_item('Repulsion Gel', PAK_ELEM, 'paintsplat_bounce', 'ITEM_PAINT_SPLAT', 'paints'),
-        demo_item('Propulsion Gel', PAK_ELEM, 'paintsplat_speed', 'ITEM_PAINT_SPLAT', 'paints'),
-        demo_item('Reflection Gel', PAK_ELEM, 'paintsplat_reflection', 'ITEM_PAINT_SPLAT', 'paints'),
-        demo_item('Conversion Gel', PAK_ELEM, 'paintsplat_portal', 'ITEM_PAINT_SPLAT', 'paints'),
-        demo_item('Cleansing Gel', PAK_ELEM, 'paintsplat_water', 'ITEM_PAINT_SPLAT', 'paints'),
+        demo_item('Repulsion Gel', PAK_ELEM, 'paintsplat_bounce', GROUP_SPLAT, 'paints'),
+        demo_item('Propulsion Gel', PAK_ELEM, 'paintsplat_speed', GROUP_SPLAT, 'paints'),
+        demo_item('Reflection Gel', PAK_ELEM, 'paintsplat_reflection', GROUP_SPLAT, 'paints'),
+        demo_item('Conversion Gel', PAK_ELEM, 'paintsplat_portal', GROUP_SPLAT, 'paints'),
+        demo_item('Cleansing Gel', PAK_ELEM, 'paintsplat_water', GROUP_SPLAT, 'paints'),
     ]
 
     for y in range(8):

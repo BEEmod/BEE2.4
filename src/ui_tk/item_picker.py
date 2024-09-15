@@ -26,7 +26,7 @@ class ItemPicker(ItemPickerBase[tk.Misc]):
     def __init__(
         self,
         pal_frame: tk.Frame,
-        picker_frame: tk.Frame,
+        picker_frame: ttk.Frame,
         selected_style: AsyncValue[utils.SpecialID],
     ) -> None:
         super().__init__(selected_style)

@@ -8,12 +8,14 @@ from enum import Enum
 import abc
 
 from srctools.logger import get_logger
+
 from trio_util import AsyncValue, RepeatedEvent
 import attrs
 
 from app import img, sound
 from async_util import EdgeTrigger
 from transtoken import TransToken
+import utils
 
 
 __all__ = [
@@ -21,13 +23,14 @@ __all__ = [
     'InfoCB', 'DragWin', 'FlexiCB', 'in_bbox',
 ]
 LOGGER = get_logger(__name__)
+type Group = utils.SpecialID
 
 
 @attrs.frozen
 class DragInfo:
     """The information required to display drag/drop items."""
     icon: img.Handle
-    group: str | None = None
+    group: Group | None = None
     # Set to the same as icon if not passed.
     group_icon: img.Handle = attrs.Factory(lambda self: self.icon, takes_self=True)
 
@@ -318,14 +321,14 @@ class ManagerBase[ItemT, ParentT]:
             image = self._info_cb(item).icon
         self._ui_set_icon(slot, image)
 
-    def _group_update(self, group: str | None) -> None:
+    def _group_update(self, slot_type: SlotType, group: Group | None) -> None:
         """Update all target items with this group."""
         if group is None:
             # None to do.
             return
         group_slots = [
             slot for slot in self._slots
-            if not slot.is_source
+            if slot.kind is slot_type
             if slot.contents_group == group
         ]
 
@@ -480,7 +483,7 @@ class Slot[ItemT]:
     _contents: ItemT | None
 
     # The kind of slot.
-    type: SlotType
+    kind: SlotType
     man: ManagerBase[ItemT, Any]  # Our drag/drop controller.
 
     def __init__(self, man: ManagerBase[ItemT, Any], kind: SlotType) -> None:
@@ -535,17 +538,14 @@ class Slot[ItemT]:
         # Then set us.
         self._contents = value
 
-        if self.is_target:
-            # Update items in the previous group, so they gain the group icon
-            # if only one now exists.
-            if old_cont is not None:
-                self.man._group_update(self.man._info_cb(old_cont).group)
-            if value is not None:
-                new_group = self.man._info_cb(value).group
-            else:
-                new_group = None
+        # Update items in the previous group, so they gain the group icon
+        # if only one now exists.
+        if old_cont is not None:
+            self.man._group_update(self.kind, self.man._info_cb(old_cont).group)
+
+        if value is not None:
+            new_group = self.man._info_cb(value).group
         else:
-            # Source pickers never group items.
             new_group = None
 
         if self.is_flexi and (old_cont is None) != (value is None):
@@ -555,13 +555,13 @@ class Slot[ItemT]:
         if new_group is not None:
             # Update myself and the entire group to get the group
             # icon if required.
-            self.man._group_update(new_group)
+            self.man._group_update(self.kind, new_group)
         else:
             # Just update myself.
             self.man._display_item(self, value)
 
     @property
-    def contents_group(self) -> str | None:
+    def contents_group(self) -> Group | None:
         """If the item in this slot has a group, return it."""
         if self._contents is not None:
             return self.man._info_cb(self._contents).group
