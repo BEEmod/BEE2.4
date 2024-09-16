@@ -38,7 +38,7 @@ TRANS_UNKNOWN_ID = TransToken.ui('Unknown: <{id}>')
 class ItemPickerBase[ParentT](ReflowWindow, ABC):
     """The picker window."""
     # Style ID, referenced from the style window.
-    selected_style: AsyncValue[utils.SpecialID]
+    selected_style: AsyncValue[PakRef[Style]]
     # The current filtering state.
     cur_filter: AsyncValue[set[SubItemRef] | None]
     filter_conf: FilterConf
@@ -65,7 +65,7 @@ class ItemPickerBase[ParentT](ReflowWindow, ABC):
         """
         ...
 
-    def __init__(self, selected_style: AsyncValue[utils.SpecialID]) -> None:
+    def __init__(self, selected_style: AsyncValue[PakRef[Style]]) -> None:
         super().__init__()
         self.cur_filter = AsyncValue(None)
         self.selected_style = selected_style
@@ -78,12 +78,7 @@ class ItemPickerBase[ParentT](ReflowWindow, ABC):
 
     def cur_style(self) -> PakRef[Style]:
         """Fetch the current style."""
-        style = self.selected_style.value
-        if utils.not_special_id(style):
-            return PakRef(Style, style)
-        else:
-            LOGGER.warning('Invalid style {}!', style)
-            return PakRef(Style, CLEAN_STYLE)
+        return self.selected_style.value
 
     async def task(self) -> None:
         """Operate the picker."""
@@ -219,7 +214,7 @@ class ItemPickerBase[ParentT](ReflowWindow, ABC):
         item = ref.item.resolve(self.packset)
         if item is None:
             return INFO_ERROR
-        style = self.cur_style()
+        style = self.selected_style.value
         icon = item.get_icon(style, ref.subtype)
         all_icon = item.get_all_icon(style)
         if all_icon is not None:
@@ -304,7 +299,7 @@ class ItemPickerBase[ParentT](ReflowWindow, ABC):
                 if item is None:
                     self._ui_set_sel_name(TRANS_UNKNOWN_ID.format(id=hovered))
                     continue
-                style = self.cur_style()
+                style = self.selected_style.value
                 variant = item.selected_version().get(style)
                 try:
                     name = variant.editor.subtypes[hovered.subtype].name

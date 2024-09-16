@@ -580,7 +580,7 @@ async def init_windows(
     """Initialise all windows and panes.
 
     """
-    global selected_style, sign_ui, context_win, item_picker
+    global sign_ui, context_win, item_picker
 
     # This is updated at the end
     cur_style = AsyncValue(PakRef(packages.Style, utils.obj_id(style_win.chosen.value)))
@@ -646,7 +646,7 @@ async def init_windows(
     picker_split_frame.rowconfigure(1, weight=1)
     picker_split_frame.columnconfigure(0, weight=1)
 
-    item_picker = ItemPicker(preview_frame, picker_frame, style_win.chosen)
+    item_picker = ItemPicker(preview_frame, picker_frame, cur_style)
     core_nursery.start_soon(item_picker.task)
 
     await LOAD_UI.step('picker')

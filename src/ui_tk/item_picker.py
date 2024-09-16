@@ -3,17 +3,19 @@ from tkinter import ttk
 import tkinter as tk
 
 from app.img import PETI_ITEM_BG_HEX
+from app.item_picker import (
+    IMG_MENU, TRANS_ITEMS_TITLE, ItemPickerBase, ItemSlot,
+)
 from app.paletteLoader import COORDS
+from packages import PakRef, Style
+from packages.item import SubItemRef
 from transtoken import TransToken
 from trio_util import AsyncValue
 
-from app.item_picker import ItemPickerBase, ItemSlot, IMG_MENU, TRANS_ITEMS_TITLE
-from packages.item import SubItemRef
-import utils
-
 from . import TK_ROOT, tk_tools, wid_transtoken
-from .img import TK_IMG
 from .dragdrop import CanvasPositioner, DragDrop
+from .img import TK_IMG
+
 
 ItemsBG = "#CDD0CE"  # Colour of the main background to match the menu image
 
@@ -27,7 +29,7 @@ class ItemPicker(ItemPickerBase[tk.Misc]):
         self,
         pal_frame: tk.Frame,
         picker_frame: ttk.Frame,
-        selected_style: AsyncValue[utils.SpecialID],
+        selected_style: AsyncValue[PakRef[Style]],
     ) -> None:
         super().__init__(selected_style)
         self.drag_man = DragDrop(
@@ -91,12 +93,6 @@ class ItemPicker(ItemPickerBase[tk.Misc]):
             self.drag_man.width, self.drag_man.height,
             spacing=1,
         )
-
-    def evt_window_resized(self, event: object) -> None:
-        super().evt_window_resized(event)
-
-    async def _ui_task(self) -> None:
-        pass
 
     def _ui_picker_create(self, index: int) -> ItemSlot:
         """Create a source slot, likely by calling dragdrop.slot_source."""

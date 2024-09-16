@@ -630,7 +630,7 @@ async def widget_item_variant(
         values=[''],
         state='readonly',  # Prevent directly typing in values
     )
-    update_data(packages.PakRef(packages.Style, UI.selected_style))
+    update_data(item_picker.selected_style.value)
     combobox.bind('<<ComboboxSelected>>', change_callback)
 
     load = (item_ref, update_data)
