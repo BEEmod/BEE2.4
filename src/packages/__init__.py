@@ -681,7 +681,7 @@ class PackagesSet:
 
     # Objects we've warned about not being present. Since this is stored
     # here it'll automatically clear when reloading.
-    _unknown_obj_warnings: set[type[PakObject], utils.ObjectID] = set()
+    _unknown_obj_warnings: set[tuple[type[PakObject], str]] = set()
 
     # In dev mode, all lazy files are sent here to be syntax checked.
     # The other end is implemented in lifecycle.

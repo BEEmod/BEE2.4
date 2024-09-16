@@ -115,7 +115,7 @@ class Item[UserT]:
         self.check: ttk.Checkbutton | None = None
         self.locked = lock_check
         self.hover_text = hover_text  # Readonly.
-        self.val_widgets: list[tk.Label] = []
+        self.val_widgets: list[ttk.Label] = []
         if user is not None:
             self.user = user
 
