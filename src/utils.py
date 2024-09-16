@@ -18,7 +18,6 @@ import itertools
 import copyreg
 import logging
 import os
-import shutil
 import stat
 import sys
 import zipfile
@@ -37,7 +36,7 @@ __all__ = [
     'obj_id', 'special_id', 'obj_id_optional', 'special_id_optional',
     'is_special_id', 'not_special_id',
     'check_shift', 'fit', 'group_runs', 'restart_app', 'quit_app', 'set_readonly',
-    'unset_readonly', 'merge_tree', 'write_lang_pot',
+    'unset_readonly', 'write_lang_pot',
 ]
 
 
@@ -195,10 +194,6 @@ def conf_location(path: str) -> Path:
     # Create folders if needed.
     folder.mkdir(parents=True, exist_ok=True)
     return loc
-
-
-# Location of a message shown when user errors occur.
-COMPILE_USER_ERROR_PAGE = conf_location('error.html')
 
 
 def fix_cur_directory() -> None:
@@ -745,58 +740,6 @@ def unset_readonly(file: str | bytes | os.PathLike[str] | os.PathLike[bytes]) ->
     flags = os.stat(file).st_mode
     # Make it writeable
     os.chmod(file, flags | _flag_writeable)
-
-
-def merge_tree(
-    src: str,
-    dst: str,
-    copy_function: Callable[[str, str], None] = shutil.copy2,
-) -> None:
-    """Recursively copy a directory tree to a destination, which may exist.
-
-    This is a modified version of shutil.copytree(), with the difference that
-    if the directory exists new files will overwrite existing ones.
-
-    If exception(s) occur, a shutil.Error is raised with a list of reasons.
-
-    The optional copy_function argument is a callable that will be used
-    to copy each file. It will be called with the source path and the
-    destination path as arguments. By default, shutil.copy2() is used, but any
-    function that supports the same signature (like shutil.copy()) can be used.
-    """
-    names = os.listdir(src)
-
-    os.makedirs(dst, exist_ok=True)
-    errors: list[tuple[str, str, str]] = []
-    for name in names:
-        srcname = os.path.join(src, name)
-        dstname = os.path.join(dst, name)
-        try:
-            if os.path.islink(srcname):
-                # Let the copy occur. copy2 will raise an error.
-                if os.path.isdir(srcname):
-                    merge_tree(srcname, dstname, copy_function)
-                else:
-                    copy_function(srcname, dstname)
-            elif os.path.isdir(srcname):
-                merge_tree(srcname, dstname, copy_function)
-            else:
-                # Will raise a SpecialFileError for unsupported file types
-                copy_function(srcname, dstname)
-        # catch the Error from the recursive copytree so that we can
-        # continue with other files
-        except shutil.Error as err:
-            errors.extend(err.args[0])
-        except OSError as why:
-            errors.append((srcname, dstname, str(why)))
-    try:
-        shutil.copystat(src, dst)
-    except OSError as why:
-        # Copying file access times may fail on Windows
-        if getattr(why, 'winerror', None) is None:
-            errors.append((src, dst, str(why)))
-    if errors:
-        raise shutil.Error(errors)
 
 
 def write_lang_pot(path: Path, new_contents: bytes) -> bool:
