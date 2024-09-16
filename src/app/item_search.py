@@ -3,22 +3,26 @@
 from tkinter import ttk
 import tkinter as tk
 from collections.abc import Callable
+from contextlib import aclosing
 
-import srctools.logger
 from pygtrie import CharTrie
+import srctools.logger
+import trio
 
-import packages
-from app import UI, localisation
-from packages import PakRef, Style
+from app import localisation
+from async_util import iterval_cancelling
+from packages import PackagesSet, PakRef, Style
 from packages.item import Item, SubItemRef
 from trio_util import AsyncValue
 from ui_tk.wid_transtoken import set_text
+import packages
 
 
 LOGGER = srctools.logger.get_logger(__name__)
 type Filter = set[SubItemRef]
 word_to_ids: 'CharTrie[Filter]' = CharTrie()
 _type_cback: Callable[[], None] | None = None
+searchbar_wid: ttk.Entry
 
 
 def init(frm: ttk.Frame, refresh_val: AsyncValue[Filter | None]) -> None:
@@ -27,7 +31,7 @@ def init(frm: ttk.Frame, refresh_val: AsyncValue[Filter | None]) -> None:
     The callback is triggered whenever the UI changes, passing along
     the visible items or None if no filter is specified.
     """
-    global _type_cback
+    global _type_cback, searchbar_wid
     refresh_tim: str | None = None
     result: Filter | None = None
 
@@ -77,25 +81,68 @@ def init(frm: ttk.Frame, refresh_val: AsyncValue[Filter | None]) -> None:
 
     searchbar = ttk.Entry(frm, textvariable=search_var)
     searchbar.grid(row=0, column=1, sticky='EW')
+    searchbar_wid = searchbar
 
     _type_cback = on_type
 
 
-def rebuild_database() -> None:
-    """Rebuild the search database."""
-    LOGGER.info('Updating search database...')
-    # Clear and reset.
+async def update_task(cur_style: AsyncValue[PakRef[Style]]) -> None:
+    """Whenever styles or packages change, reload."""
+    scope = trio.CancelScope()
+    style = cur_style.value
+    packset = packages.PackagesSet.blank()
+
+    async def wait_packset() -> None:
+        """Reload if the package changes, making sure items are ready first."""
+        nonlocal packset
+        new_packset: PackagesSet
+        async with iterval_cancelling(packages.LOADED) as aiterable:
+            async for load_scope in aiterable:
+                with load_scope as new_packset:
+                    await new_packset.ready(Item).wait()
+                    packset = new_packset
+                    scope.cancel()
+
+    async def wait_style() -> None:
+        """Reload if the style changes."""
+        nonlocal style
+        async with aclosing(cur_style.eventual_values()) as agen:
+            async for style in agen:
+                scope.cancel()
+
+    async with trio.open_nursery() as nursery:
+        nursery.start_soon(wait_packset)
+        nursery.start_soon(wait_style)
+        while True:
+            searchbar_wid.state(('disabled', ))
+            with trio.CancelScope() as scope:
+                await _rebuild_database(packset, style)
+                searchbar_wid.state(('!disabled',))
+                await trio.sleep_forever()
+            LOGGER.info('End scope.')
+
+
+def _build_words(packset: PackagesSet, style: PakRef[Style]) -> 'CharTrie[Filter]':
+    """Build the full filters, for this package set and style."""
+    word_to_ids: 'CharTrie[Filter]' = CharTrie()
     word_set: Filter
-    word_to_ids.clear()
-
-    selected_style = PakRef(Style, UI.selected_style)
-
-    for item in packages.LOADED.value.all_obj(Item):
+    for item in packset.all_obj(Item):
         for subtype_ind in item.visual_subtypes:
-            for tag in item.get_tags(selected_style, subtype_ind):
+            trio.from_thread.check_cancelled()
+            for tag in item.get_tags(style, subtype_ind):
                 for word in tag.split():
                     word_set = word_to_ids.setdefault(word.casefold(), set())
                     word_set.add(SubItemRef(item.reference(), subtype_ind))
+    return word_to_ids
+
+
+async def _rebuild_database(packset: PackagesSet, style: PakRef[Style]) -> None:
+    """Rebuild the search database."""
+    global word_to_ids
+    LOGGER.info('Updating search database...')
+
+    new_words = await trio.to_thread.run_sync(_build_words, packset, style)
+    word_to_ids = new_words
 
     LOGGER.info('Computed {} tags.', sum(1 for _ in word_to_ids.iterkeys()))
     if _type_cback is not None:

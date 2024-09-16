@@ -665,6 +665,7 @@ async def init_windows(
     await LOAD_UI.step('filter')
 
     item_search.init(search_frame, item_picker.cur_filter)
+    core_nursery.start_soon(item_search.update_task, cur_style)
 
     toolbar_frame = tk.Frame(
         preview_frame,
@@ -878,7 +879,6 @@ async def init_windows(
             elev_win.readonly = not style_obj.has_video
 
             sign_ui.style_changed(selected_style)
-            item_search.rebuild_database()
 
             for sugg_cls, win in suggest_windows.items():
                 win.set_suggested(style_obj.suggested[sugg_cls])
