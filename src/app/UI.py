@@ -14,6 +14,7 @@ import functools
 import srctools.logger
 import trio
 import trio_util
+from srctools import EmptyMapping
 
 import exporting
 from app import lifecycle, quit_app
@@ -401,47 +402,6 @@ async def set_palette(chosen_pal: paletteUI.Palette) -> None:
             )
 
 
-def pal_clear() -> None:
-    """Empty the palette."""
-    for slot in item_picker.slots_pal:
-        slot.contents = None
-
-
-def pal_shuffle() -> None:
-    """Set the palette to a list of random items."""
-    include_mandatory = mandatory_unlocked()
-
-    empty_slots = [
-        slot for slot in item_picker.slots_pal
-        if slot.contents is None
-    ]
-    if not empty_slots:
-        return
-
-    existing_items = {
-        subitem.item
-        for slot in item_picker.slots_pal
-        if (subitem := slot.contents) is not None
-    }
-
-    # Use a set to eliminate duplicates.
-    # We don't actually have to handle filters, just look at the current item list.
-    shuff_items: list[PakRef[packages.Item]] = list({
-        subitem.item
-        for slot in item_picker.slots_picker.placed
-        if (subitem := slot.contents) is not None
-    })
-
-    random.shuffle(shuff_items)
-    packset = packages.get_loaded_packages()
-
-    for slot, item_ref in zip(empty_slots, shuff_items, strict=False):
-        item = item_ref.resolve(packset)
-        if item is not None:
-            # Pick a random available palette icon.
-            slot.contents = SubItemRef(item_ref, random.choice(item.visual_subtypes))
-
-
 async def init_option(
     core_nursery: trio.Nursery,
     pane: SubPane.SubPane,
@@ -786,7 +746,7 @@ async def init_windows(
     btn_clear = SubPane.make_tool_button(
         toolbar_frame, tk_img,
         img='icons/clear_pal',
-        command=pal_clear,
+        command=item_picker.clear_palette,
     )
     btn_clear.grid(row=0, column=0, padx=2)
     tooltip.add_tooltip(
@@ -797,7 +757,7 @@ async def init_windows(
     btn_shuffle = SubPane.make_tool_button(
         toolbar_frame, tk_img,
         img='icons/shuffle_pal',
-        command=pal_shuffle,
+        command=item_picker.fill_palette,
     )
     btn_shuffle.grid(
         row=0,

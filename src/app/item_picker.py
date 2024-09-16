@@ -1,9 +1,10 @@
 """Implements the selected palette and list of items."""
-from collections.abc import Callable, Mapping
-from contextlib import aclosing
 from typing import Final
 
 from abc import ABC, abstractmethod
+from collections.abc import Callable, Mapping
+from contextlib import aclosing
+import random
 
 import attrs
 import trio
@@ -159,6 +160,45 @@ class ItemPickerBase[ParentT](ReflowWindow, ABC):
                 slot.contents = None
             else:
                 slot.contents = SubItemRef(PakRef.parse(Item, item_id), subtype)
+
+    def clear_palette(self) -> None:
+        """Clear the palette."""
+        for slot in self.slots_pal:
+            slot.contents = None
+
+    def fill_palette(self) -> None:
+        """Fill the palette with random items."""
+        include_mandatory = mandatory_unlocked()
+
+        empty_slots = [
+            slot for slot in self.slots_pal
+            if slot.contents is None
+        ]
+        if not empty_slots:
+            return
+
+        existing_items = {
+            subitem.item
+            for slot in self.slots_pal
+            if (subitem := slot.contents) is not None
+        }
+
+        # Use a set to eliminate duplicates.
+        # We don't actually have to handle filters, just look at the current item list.
+        shuff_items: list[PakRef[Item]] = list({
+            subitem.item
+            for slot in self.slots_picker.placed
+            if (subitem := slot.contents) is not None
+            if subitem.item not in existing_items
+        })
+
+        random.shuffle(shuff_items)
+
+        for slot, item_ref in zip(empty_slots, shuff_items, strict=False):
+            item = item_ref.resolve(self.packset)
+            if item is not None:
+                # Pick a random available palette icon.
+                slot.contents = SubItemRef(item_ref, random.choice(item.visual_subtypes))
 
     async def open_contextwin_task(
         self, open_func: Callable[[ItemSlot, Coord | None], None],

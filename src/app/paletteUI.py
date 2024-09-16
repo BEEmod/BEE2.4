@@ -1,27 +1,29 @@
 """Handles the UI required for saving and loading palettes."""
 from __future__ import annotations
-from uuid import UUID, uuid4
 
 from tkinter import ttk
 import tkinter as tk
+from uuid import UUID, uuid4
 
 from srctools import EmptyMapping
 import srctools.logger
 import trio
-import trio_util
 
+from app import background_run, img, paletteLoader
 from app.dialogs import Dialogs
 from app.item_picker import ItemPickerBase
-from app.paletteLoader import Palette, ItemPos, VertInd, HorizInd, COORDS, VERT, HORIZ
-from app import background_run, paletteLoader, img
-from consts import PALETTE_FORCE_SHOWN, UUID_BLANK, UUID_EXPORT, UUID_PORTAL2
+from app.paletteLoader import (
+    COORDS, HORIZ, VERT, HorizInd, ItemPos, Palette, VertInd,
+)
 from config.palette import PaletteState
-from ui_tk import tk_tools
-from ui_tk.img import TkImg, TKImages
-from ui_tk.wid_transtoken import set_menu_text, set_text
+from consts import PALETTE_FORCE_SHOWN, UUID_BLANK, UUID_EXPORT, UUID_PORTAL2
 from transtoken import CURRENT_LANG, TransToken
+from ui_tk import tk_tools
+from ui_tk.img import TKImages, TkImg
+from ui_tk.wid_transtoken import set_menu_text, set_text
 from utils import not_none
 import config
+import trio_util
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -190,11 +192,11 @@ class PaletteUI:
 
         menu.add_separator()
 
-        menu.add_command(command=lambda: item_picker.set_items(EmptyMapping))
+        menu.add_command(command=item_picker.clear_palette)
         set_menu_text(menu, TransToken.ui('Clear'))
 
-        # menu.add_command(command=item_picker.cmd_shuffle)
-        # set_menu_text(menu, TransToken.ui('Fill Palette'))
+        menu.add_command(command=item_picker.fill_palette)
+        set_menu_text(menu, TransToken.ui('Fill Palette'))
 
         menu.add_separator()
 
