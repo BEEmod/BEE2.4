@@ -193,7 +193,7 @@ class ContextWinBase:
         self.picker = item_picker
         self.current_style = current_style
         self.props_open = False
-        self.packset = packages.PackagesSet()
+        self.packset = packages.PackagesSet.blank()
 
         # The current URL in the more-info button, if available.
         self.moreinfo_url = AsyncValue(None)

@@ -287,7 +287,7 @@ class SelectorWinBase[ButtonT, GroupHeaderT: GroupHeaderBase](ReflowWindow):
         self.selected = prev_state.id
         self.chosen = trio_util.AsyncValue(self.selected)
 
-        self._packset = packages.PackagesSet()
+        self._packset = packages.PackagesSet.blank()
 
         self.item_list = []
         self._item_buttons = []

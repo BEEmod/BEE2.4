@@ -653,6 +653,14 @@ def set_cond_source(kv: Keyvalues, source: str) -> None:
             cond['__src__'] = source
 
 
+def _obj_dict() -> dict[type[PakObject], dict[str, Any]]:
+    """Make empty dicts for PackagesSet, with all types present."""
+    return {
+        typ: {}
+        for typ in OBJ_TYPES.values()
+    }
+
+
 @attrs.define
 class PackagesSet:
     """Holds all the data parsed from packages.
@@ -662,8 +670,8 @@ class PackagesSet:
     packages: dict[utils.ObjectID, Package] = attrs.Factory(dict)
     # type -> id -> object
     # The object data before being parsed, and the final result.
-    unparsed: dict[type[PakObject], dict[str, ObjData]] = attrs.field(factory=dict, repr=False)
-    objects: dict[type[PakObject], dict[str, PakObject]] = attrs.Factory(dict)
+    unparsed: dict[type[PakObject], dict[str, ObjData]] = attrs.field(factory=_obj_dict, repr=False)
+    objects: dict[type[PakObject], dict[str, PakObject]] = attrs.Factory(_obj_dict)
     # For overrides, a type/ID pair to the list of overrides.
     overrides: dict[tuple[type[PakObject], str], list[ParseData]] = attrs.Factory(lambda: defaultdict(list))
 
@@ -680,12 +688,23 @@ class PackagesSet:
     tag_music_fsys: FileSystem | None = None
 
     # Objects we've warned about not being present. Since this is stored
-    # here it'll automatically clear when reloading.
-    _unknown_obj_warnings: set[tuple[type[PakObject], str]] = set()
+    # here it'll automatically clear when reloading. If None, it's suppressed instead.
+    _unknown_obj_warnings: set[tuple[type[PakObject], str]] | None = set()
 
     # In dev mode, all lazy files are sent here to be syntax checked.
     # The other end is implemented in lifecycle.
     devmode_filecheck_chan: trio.MemorySendChannel[tuple[utils.PackagePath, File]] | None = None
+
+    @classmethod
+    def blank(cls) -> Self:
+        """Create an empty set, with all types marked as finished."""
+        pakset = cls()
+        event = trio.Event()
+        event.set()
+        pakset._parsed.update(OBJ_TYPES.values())
+        pakset._type_ready = dict.fromkeys(pakset._parsed, event)
+        pakset._unknown_obj_warnings = None
+        return pakset
 
     @property
     def has_mel_music(self) -> bool:
@@ -734,7 +753,10 @@ class PackagesSet:
         try:
             return obj_dict[obj_id.casefold()]
         except KeyError:
-            if (key := (cls, obj_id)) not in self._unknown_obj_warnings:
+            if (
+                self._unknown_obj_warnings is not None
+                and (key := (cls, obj_id)) not in self._unknown_obj_warnings
+            ):
                 self._unknown_obj_warnings.add(key)
                 LOGGER.warning('Unknown {} "{}"!', cls.__name__, obj_id)
             raise

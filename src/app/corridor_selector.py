@@ -181,7 +181,7 @@ class Selector[IconT: Icon, OptionRowT: OptionRow](ReflowWindow):
         super().__init__()
         self.sticky_corr = None
         self.displayed_corr = AsyncValue(None)
-        self.packset = PackagesSet()
+        self.packset = PackagesSet.blank()
         self.cur_style = cur_style
         self.state_attach = AsyncValue(conf.last_attach)
         self.state_dir = AsyncValue(conf.last_direction)

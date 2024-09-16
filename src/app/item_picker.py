@@ -69,7 +69,7 @@ class ItemPickerBase[ParentT](ReflowWindow, ABC):
         super().__init__()
         self.cur_filter = AsyncValue(None)
         self.selected_style = selected_style
-        self.packset = PackagesSet()
+        self.packset = PackagesSet.blank()
         self.filter_conf = FilterConf()
         self.slots_pal = {}
         self._all_items = []
