@@ -32,6 +32,7 @@ INFO_ERROR: Final[DragInfo] = DragInfo(img.Handle.error(64, 64))
 
 TRANS_ITEMS_TITLE = TransToken.ui("All Items: ")
 TRANS_ERROR = TransToken.untranslated('???')
+TRANS_UNKNOWN_ID = TransToken.ui('Unknown: <{id}>')
 
 
 class ItemPickerBase[ParentT](ReflowWindow, ABC):
@@ -301,8 +302,7 @@ class ItemPickerBase[ParentT](ReflowWindow, ABC):
                     continue
                 item = hovered.item.resolve(self.packset)
                 if item is None:
-                    LOGGER.warning('No such item "{}"!', hovered)
-                    self._ui_set_sel_name(TransToken.untranslated(str(hovered)))
+                    self._ui_set_sel_name(TRANS_UNKNOWN_ID.format(id=hovered))
                     continue
                 style = self.cur_style()
                 variant = item.selected_version().get(style)
@@ -313,7 +313,7 @@ class ItemPickerBase[ParentT](ReflowWindow, ABC):
                         'Item {} in <{}> style has mismatched subtype count!',
                         hovered, style,
                     )
-                    self._ui_set_sel_name(TRANS_ERROR)
+                    self._ui_set_sel_name(TRANS_UNKNOWN_ID.format(id=hovered))
                 else:
                     self._ui_set_sel_name(name)
 
