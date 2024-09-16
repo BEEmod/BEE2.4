@@ -595,6 +595,7 @@ async def widget_item_variant(
 
     The config is alternatively an EdgeTrigger instance for the special Configure Signage button.
     """
+    from app.UI import item_picker
     from ui_tk import context_win
 
     if isinstance(conf, EdgeTrigger):
@@ -621,7 +622,7 @@ async def widget_item_variant(
     def change_callback(e: object = None) -> None:
         """Change the item version."""
         if version_lookup is not None:
-            UI.change_item_version(item_ref, version_lookup[combobox.current()])
+            item_picker.change_version(item_ref, version_lookup[combobox.current()])
 
     combobox = ttk.Combobox(
         parent,
