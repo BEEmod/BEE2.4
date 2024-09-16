@@ -529,9 +529,8 @@ async def export_complete_task(
 async def set_palette(chosen_pal: paletteUI.Palette) -> None:
     """Select a palette."""
     await trio.lowlevel.checkpoint()
-    for coord in paletteUI.COORDS:
+    for slot, coord in item_picker.slots_pal.items():
         await trio.lowlevel.checkpoint()
-        slot = item_picker.slots_pal[coord]
 
         try:
             item, sub = chosen_pal.items[coord]
@@ -546,7 +545,7 @@ async def set_palette(chosen_pal: paletteUI.Palette) -> None:
 
 def pal_clear() -> None:
     """Empty the palette."""
-    for slot in item_picker.slots_pal.values():
+    for slot in item_picker.slots_pal:
         slot.contents = None
 
 

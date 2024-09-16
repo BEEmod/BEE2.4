@@ -41,8 +41,9 @@ class ItemPickerBase[ParentT](ReflowWindow, ABC):
     filter_conf: FilterConf
     packset: PackagesSet
 
-    # Items on the palette.
-    slots_pal: dict[Coord, ItemSlot]
+    # Items on the palette. Dict is backwards because
+    # we only need to do pos -> slot when iterating all of them.
+    slots_pal: dict[ItemSlot, Coord]
     # Slots used for the full items list.
     slots_picker: WidgetCache[ItemSlot]
 
@@ -104,7 +105,7 @@ class ItemPickerBase[ParentT](ReflowWindow, ABC):
         """Return the currently selected items."""
         return {
             pos: (ref.item.id, ref.subtype)
-            for pos, slot in self.slots_pal.items()
+            for slot, pos in self.slots_pal.items()
             if (ref := slot.contents) is not None
         }
 
