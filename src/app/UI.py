@@ -86,6 +86,7 @@ context_win: ContextWin
 sign_ui: SignageUI
 item_picker: ItemPicker
 
+# TODO: Pass around selector's AsyncValue
 selected_style: utils.ObjectID = packages.CLEAN_STYLE
 
 DATA_NO_VOICE = packages.SelitemData.build(
@@ -286,7 +287,7 @@ def fetch_export_info() -> exporting.ExportInfo | None:
         LOGGER.warning('Could not export: No game set?')
         return None
     try:
-        chosen_style = packset.obj_by_id(packages.Style, selected_style)
+        chosen_style = packset.obj_by_id(packages.Style, style_win.chosen.value)
     except KeyError:
         LOGGER.warning('Could not export: Style "{style}" does not exist?')
         return None
@@ -579,7 +580,7 @@ async def init_windows(
     """Initialise all windows and panes.
 
     """
-    global sign_ui, context_win, item_picker
+    global selected_style, sign_ui, context_win, item_picker
 
     def export() -> None:
         """Export the palette."""
@@ -848,41 +849,36 @@ async def init_windows(
         pane.load_conf()
         await trio.lowlevel.checkpoint()
 
-    async def style_select_callback() -> None:
-        """Callback whenever a new style is chosen."""
-        async with aclosing(style_win.chosen.eventual_values()) as agen:
-            async for style_id in agen:
-                packset = packages.get_loaded_packages()
-                global selected_style
-                if style_id == utils.ID_NONE:
-                    LOGGER.warning('Style ID is None??')
-                    style_win.choose_item(style_win.item_list[0])
-                    continue
+    item_picker.set_items(pal_ui.selected.items)
+    pal_ui.is_dirty.set()
+    task_status.started()
 
-                selected_style = utils.obj_id(style_id)
-                ref = packages.PakRef(packages.Style, selected_style)
+    async with aclosing(style_win.chosen.eventual_values()) as agen:
+        async for style_id in agen:
+            packset = packages.get_loaded_packages()
+            if style_id == utils.ID_NONE:
+                LOGGER.warning('Style ID is None??')
+                style_win.choose_item(style_win.item_list[0])
+                continue
 
-                style_obj = ref.resolve(packset)
-                context_win.hide_context()
+            selected_style = utils.obj_id(style_id)
+            ref = packages.PakRef(packages.Style, selected_style)
 
-                # Update variant selectors on the itemconfig pane
-                for item_id, func in itemconfig.ITEM_VARIANT_LOAD:
-                    func(ref)
+            style_obj = ref.resolve(packset)
+            context_win.hide_context()
 
-                # Disable this if the style doesn't have elevators
-                elev_win.readonly = not style_obj.has_video
+            # Update variant selectors on the itemconfig pane
+            for item_id, func in itemconfig.ITEM_VARIANT_LOAD:
+                func(ref)
 
-                sign_ui.style_changed(selected_style)
-                item_search.rebuild_database()
+            # Disable this if the style doesn't have elevators
+            elev_win.readonly = not style_obj.has_video
 
-                for sugg_cls, win in suggest_windows.items():
-                    win.set_suggested(style_obj.suggested[sugg_cls])
-                StyleVarPane.refresh(packset, style_obj)
-                corridor.load_corridors(packset, selected_style)
-                await corridor.refresh()
+            sign_ui.style_changed(selected_style)
+            item_search.rebuild_database()
 
-    async with trio.open_nursery() as nursery:
-        nursery.start_soon(style_select_callback)
-        item_picker.set_items(pal_ui.selected.items)
-        pal_ui.is_dirty.set()
-        task_status.started()
+            for sugg_cls, win in suggest_windows.items():
+                win.set_suggested(style_obj.suggested[sugg_cls])
+            StyleVarPane.refresh(packset, style_obj)
+            corridor.load_corridors(packset, selected_style)
+            await corridor.refresh()
