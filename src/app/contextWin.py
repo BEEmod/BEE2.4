@@ -9,6 +9,7 @@ various item properties.
 """
 from __future__ import annotations
 
+from contextlib import aclosing
 from enum import Enum
 import webbrowser
 
@@ -185,6 +186,7 @@ class ContextWinBase:
         self.dialog = dialog
         self.picker = item_picker
         self.props_open = False
+        self.packset = packages.PackagesSet()
 
         # The current URL in the more-info button, if available.
         self.moreinfo_url = AsyncValue(None)
@@ -206,8 +208,16 @@ class ContextWinBase:
         async with trio.open_nursery() as nursery:
             nursery.start_soon(self.ui_task, signage_trigger)
             nursery.start_soon(self._moreinfo_task)
+            nursery.start_soon(self._packset_changed_task)
             nursery.start_soon(self.picker.open_contextwin_task, self.show_prop)
             task_status.started()
+
+    async def _packset_changed_task(self) -> None:
+        """Whenever packages change, force-close."""
+        async with aclosing(packages.LOADED.eventual_values()) as agen:
+            async for self.packset in agen:
+                self.hide_context()
+                await trio.lowlevel.checkpoint()
 
     def get_current(self) -> tuple[
         packages.PakRef[packages.Style],
@@ -215,8 +225,9 @@ class ContextWinBase:
     ]:
         """Fetch the tree representing the selected subtype."""
         assert self.selected is not None
-        item = self.selected.item.resolve(packages.get_loaded_packages())
-        assert item is not None, self.selected
+        item = self.selected.item.resolve(self.packset)
+        if item is None:
+            raise LookupError
         version = item.selected_version()
         style_ref = self.picker.cur_style()
         try:
@@ -236,8 +247,12 @@ class ContextWinBase:
 
     def load_item_data(self) -> None:
         """Refresh the window to use the selected item's data."""
-        assert self.selected is not None
-        style_ref, item, version, variant, subtype = self.get_current()
+        if self.selected is None:
+            return
+        try:
+            style_ref, item, version, variant, subtype = self.get_current()
+        except LookupError:  # Not defined?
+            return
         item_id = self.selected.item.id
 
         sel_pos = pos_for_item(item, self.selected.subtype)
@@ -381,7 +396,7 @@ class ContextWinBase:
         if self.is_visible:
             self.ui_hide_window()
             sound.fx('contract')
-            self.selected = self.selected_slot = None
+            self.selected = self.selected_slot = self.selected_pal_pos = None
 
     def show_prop(
         self,
@@ -403,7 +418,14 @@ class ContextWinBase:
         self.selected = slot.contents
         if self.selected is None:
             LOGGER.warning('Selected empty slot?')
+            self.hide_context()
             return
+        # Check to see if it's actually a valid item too.
+        if self.selected.item.resolve(self.packset) is None:
+            LOGGER.info('Item not defined, nothing to show.')
+            self.hide_context()
+            return
+
         self.selected_slot = slot
         self.selected_pal_pos = pal_pos
 
