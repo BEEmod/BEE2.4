@@ -10,7 +10,7 @@ import functools
 from srctools.logger import get_logger
 import trio
 
-from app import UI, img, sound
+from app import img, sound
 from app.contextWin import IMG_ALPHA, SPR, TRANS_ENT_COUNT, TRANS_NO_VERSIONS, ContextWinBase
 from app.item_picker import ItemPickerBase
 from app.item_properties import PropertyWindow
@@ -57,7 +57,12 @@ class ContextWin(ContextWinBase):
     wid_sprite: dict[SPR, ttk.Label]
     version_lookup: list[str]
 
-    def __init__(self, item_picker: ItemPickerBase, tk_img: TKImages) -> None:
+    def __init__(
+        self,
+        item_picker: ItemPickerBase,
+        tk_img: TKImages,
+        cur_style: AsyncValue[PakRef[Style]],
+    ) -> None:
         self.window = tk.Toplevel(TK_ROOT, name='contextWin')
         self.window.overrideredirect(True)
         self.window.resizable(False, False)
@@ -66,7 +71,7 @@ class ContextWin(ContextWinBase):
             self.window.wm_attributes('-type', 'popup_menu')
         self.window.withdraw()  # starts hidden
 
-        super().__init__(item_picker, TkDialogs(self.window))
+        super().__init__(item_picker, TkDialogs(self.window), cur_style)
 
         self.tk_img = tk_img
         self.wid_subitem = []
@@ -244,7 +249,7 @@ class ContextWin(ContextWinBase):
         while True:
             await self.defaults_trigger.wait()
 
-            style_ref, item, version, variant, subtype = self.get_current()
+            item, version, variant, subtype = self.get_current()
 
             sound.fx('expand')
             was_temp_hidden = self.is_visible

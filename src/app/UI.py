@@ -779,7 +779,7 @@ async def init_windows(
     await LOAD_UI.step('backup')
     voiceEditor.init_widgets()
     await LOAD_UI.step('voiceline')
-    context_win = ContextWin(item_picker, tk_img)
+    context_win = ContextWin(item_picker, tk_img, cur_style)
     await core_nursery.start(context_win.init_widgets, signage_trigger)
     await LOAD_UI.step('contextwin')
     await core_nursery.start(functools.partial(
@@ -870,7 +870,6 @@ async def init_windows(
             cur_style.value = ref = packages.PakRef(packages.Style, selected_style)
 
             style_obj = ref.resolve(packset)
-            context_win.hide_context()
 
             # Update variant selectors on the itemconfig pane
             for item_id, func in itemconfig.ITEM_VARIANT_LOAD:

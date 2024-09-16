@@ -172,6 +172,7 @@ class ContextWinBase:
 
     dialog: Dialogs
     picker: ItemPickerBase
+    current_style: AsyncValue[packages.PakRef[packages.Style]]
     # If set, the item properties window is open and suppressing us.
     props_open: bool
 
@@ -179,12 +180,18 @@ class ContextWinBase:
     moreinfo_trigger: EdgeTrigger[str]
     defaults_trigger: EdgeTrigger[()]
 
-    def __init__(self, item_picker: ItemPickerBase, dialog: Dialogs) -> None:
+    def __init__(
+        self,
+        item_picker: ItemPickerBase,
+        dialog: Dialogs,
+        current_style: AsyncValue[packages.PakRef[packages.Style]],
+    ) -> None:
         self.selected = None
         self.selected_slot = None
         self.selected_pal_pos = None
         self.dialog = dialog
         self.picker = item_picker
+        self.current_style = current_style
         self.props_open = False
         self.packset = packages.PackagesSet()
 
@@ -219,17 +226,22 @@ class ContextWinBase:
                 self.hide_context()
                 await trio.lowlevel.checkpoint()
 
-    def get_current(self) -> tuple[
-        packages.PakRef[packages.Style],
-        Item, Version, ItemVariant, SubType,
-    ]:
+    async def _style_changed_task(self) -> None:
+        """Whenever styles change, reload data."""
+        while True:
+            await self.current_style.wait_transition()
+            if self.is_visible:
+                self.load_item_data()
+            await trio.lowlevel.checkpoint()
+
+    def get_current(self) -> tuple[Item, Version, ItemVariant, SubType]:
         """Fetch the tree representing the selected subtype."""
         assert self.selected is not None
         item = self.selected.item.resolve(self.packset)
         if item is None:
             raise LookupError
         version = item.selected_version()
-        style_ref = self.picker.cur_style()
+        style_ref = self.current_style.value
         try:
             variant = version.styles[style_ref.id]
         except KeyError:
@@ -243,17 +255,18 @@ class ContextWinBase:
             self.selected = self.selected.with_subtype(first)
             subtype = variant.editor.subtypes[first]
 
-        return style_ref, item, version, variant, subtype
+        return item, version, variant, subtype
 
     def load_item_data(self) -> None:
         """Refresh the window to use the selected item's data."""
         if self.selected is None:
             return
         try:
-            style_ref, item, version, variant, subtype = self.get_current()
+            item, version, variant, subtype = self.get_current()
         except LookupError:  # Not defined?
             return
         item_id = self.selected.item.id
+        style_ref = self.current_style.value
 
         sel_pos = pos_for_item(item, self.selected.subtype)
         for ind, pos in enumerate(SUBITEM_POS[len(item.visual_subtypes)]):
