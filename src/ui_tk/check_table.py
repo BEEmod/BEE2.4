@@ -142,7 +142,7 @@ class Item[UserT]:
 
         self.val_widgets = []
         for value in self.values:
-            wid = tk.Label(
+            wid = ttk.Label(
                 master.wid_frame,
                 justify=tk.LEFT,
                 anchor=tk.W,

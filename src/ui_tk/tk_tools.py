@@ -430,7 +430,7 @@ else:
         wid.bind(EVENTS['RIGHT'], func, add=add)
 
 
-def link_checkmark(check: ttk.Checkbutton, widget: tk.Widget) -> None:
+def link_checkmark(check: ttk.Checkbutton, widget: ttk.Widget) -> None:
     """Link up a checkbutton with something else, so it can also be clicked to toggle.
 
     This replicates the native behaviour - if the mouse is held down and moved off of the widget,
@@ -443,14 +443,12 @@ def link_checkmark(check: ttk.Checkbutton, widget: tk.Widget) -> None:
         """Check if the mouse is hovering over the label, or the checkmark."""
         # identify-element returns the component name under the specified position,
         # or an empty string if the widget isn't there.
-        return bool(str(widget.tk.call(
-            widget, 'identify', 'element',
-            event.x, event.y,
-        )) or str(check.tk.call(
-            check, 'identify', 'element',
+        return bool(widget.identify(
+            event.x, event.y
+        ) or check.identify(
             event.x_root - check.winfo_rootx(),
             event.y_root - check.winfo_rooty(),
-        )))
+        ))
 
     def on_press(event: tk.Event[tk.Widget]) -> None:
         """When pressed, highlight the checkmark."""
