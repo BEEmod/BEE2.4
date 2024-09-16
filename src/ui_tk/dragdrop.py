@@ -187,6 +187,13 @@ class DragDrop[ItemT](ManagerBase[ItemT, tk.Misc]):
         )
 
     @override
+    def _ui_slot_coords(self, slot: Slot[ItemT]) -> tuple[int, int]:
+        slot_ui = self._slot_ui[slot]
+        if slot_ui.pos_type is None:
+            raise ValueError('Slot not positioned!')
+        return slot_ui.lbl.winfo_rootx(), slot_ui.lbl.winfo_rooty()
+
+    @override
     def _ui_slot_create(
         self,
         slot: Slot[ItemT],

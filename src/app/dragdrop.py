@@ -284,6 +284,14 @@ class ManagerBase[ItemT, ParentT]:
         raise NotImplementedError
 
     @abc.abstractmethod
+    def _ui_slot_coords(self, slot: Slot[ItemT]) -> tuple[int, int]:
+        """Return the screen position for this slot.
+
+        :raises ValueError: if the slot is not placed.
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
     def _ui_dragwin_show(self, x: float, y: float) -> None:
         """Show the drag window."""
         raise NotImplementedError
@@ -569,3 +577,10 @@ class Slot[ItemT]:
 
     def __repr__(self) -> str:
         return f'<{self.kind.name} Slot @ {id(self):016x}: {self._contents!r}>'
+
+    def get_coords(self) -> tuple[int, int]:
+        """Return the screen location of this slot.
+
+        :raises ValueError: if the slot is not placed.
+        """
+        return self.man._ui_slot_coords(self)

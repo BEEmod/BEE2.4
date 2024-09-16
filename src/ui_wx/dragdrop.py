@@ -89,6 +89,15 @@ class DragDrop[ItemT](ManagerBase[ItemT, wx.Window]):
         return label.GetClientRect().Contains(x, y)
 
     @override
+    def _ui_slot_coords(self, slot: Slot[ItemT]) -> tuple[int, int]:
+        label = self._slot_ui[slot].lbl
+        if label.IsShown():
+            rect = label.GetClientRect()
+            return rect.x, rect.y
+        else:
+            raise ValueError('Slot not placed!')
+
+    @override
     def _ui_slot_create(
         self,
         slot: Slot[ItemT],
