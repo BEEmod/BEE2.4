@@ -145,6 +145,8 @@ class ManagerBase[ItemT, ParentT]:
     def slot_target(
         self,
         parent: ParentT,
+        *,
+        desc: str = '',
         label: TransToken = TransToken.BLANK,
     ) -> Slot[ItemT]:
         """Add a slot to this group, which can have items added/removed.
@@ -152,8 +154,9 @@ class ManagerBase[ItemT, ParentT]:
         :param parent: Parent widget for the slot.
         :param label: Set to a short string to be displayed in the lower-left.
               Intended for numbers.
+        :param desc: If set, a description to use to identify the slot in logs etc.
         """
-        slot: Slot[ItemT] = Slot(self, SlotType.TARGET)
+        slot: Slot[ItemT] = Slot(self, SlotType.TARGET, desc or str(label))
         self._ui_slot_create(slot, parent, label)
         self._slots.append(slot)
         return slot
@@ -161,6 +164,8 @@ class ManagerBase[ItemT, ParentT]:
     def slot_source(
         self,
         parent: ParentT,
+        *,
+        desc: str = '',
         label: TransToken = TransToken.BLANK,
     ) -> Slot[ItemT]:
         """Add a readonly slot to this group which the user can fetch copies from.
@@ -168,8 +173,9 @@ class ManagerBase[ItemT, ParentT]:
         :param parent: Parent widget for the slot.
         :param label: Set to a short string to be displayed in the lower-left.
               Intended for numbers.
+        :param desc: If set, a description to use to identify the slot in logs etc.
         """
-        slot: Slot[ItemT] = Slot(self, SlotType.SOURCE)
+        slot: Slot[ItemT] = Slot(self, SlotType.SOURCE, desc or str(label))
         self._ui_slot_create(slot, parent, label)
         self._slots.append(slot)
         return slot
@@ -178,6 +184,7 @@ class ManagerBase[ItemT, ParentT]:
         self,
         parent: ParentT,
         *,
+        desc: str = '',
         label: TransToken = TransToken.BLANK,
     ) -> Slot[ItemT]:
         """Add a 'flexible' slot to this group.
@@ -189,10 +196,11 @@ class ManagerBase[ItemT, ParentT]:
         :param parent: Parent widget for the slot.
         :param label: Set to a short string to be displayed in the lower-left.
               Intended for numbers.
+        :param desc: If set, a description to use to identify the slot in logs etc.
         """
         if self._pick_flexi_group is None:
             raise ValueError('Flexi callback missing!')
-        slot: Slot[ItemT] = Slot(self, SlotType.FLEXI)
+        slot: Slot[ItemT] = Slot(self, SlotType.FLEXI, desc or str(label))
         self._ui_slot_create(slot, parent, label)
         self._slots.append(slot)
         return slot
@@ -493,13 +501,16 @@ class Slot[ItemT]:
     # The kind of slot.
     kind: SlotType
     man: ManagerBase[ItemT, Any]  # Our drag/drop controller.
+    # Used to identify the slot in logs etc.
+    desc: str
 
-    def __init__(self, man: ManagerBase[ItemT, Any], kind: SlotType) -> None:
+    def __init__(self, man: ManagerBase[ItemT, Any], kind: SlotType, desc: str) -> None:
         """Internal only, use Manager.slot_*()."""
         self.man = man
         self.kind = kind
         self._contents = None
         self._pos_type = None
+        self.desc = desc
 
         self.flexi_group = ''
 
@@ -576,7 +587,8 @@ class Slot[ItemT]:
         return None
 
     def __repr__(self) -> str:
-        return f'<{self.kind.name} Slot @ {id(self):016x}: {self._contents!r}>'
+        desc = f'"{self.desc}"' if self.desc else f'@ {id(self):016x}'
+        return f'<{self.kind.name} Slot {desc}: {self._contents!r}>'
 
     def get_coords(self) -> tuple[int, int]:
         """Return the screen location of this slot.

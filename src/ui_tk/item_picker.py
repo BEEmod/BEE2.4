@@ -50,7 +50,7 @@ class ItemPicker(ItemPickerBase[tk.Misc]):
 
         # Place the slots.
         for x, y in COORDS:
-            self.slots_pal[x, y] = slot = self.drag_man.slot_target(pal_frame)
+            self.slots_pal[x, y] = slot = self.drag_man.slot_target(pal_frame, desc=f'{x}-{y}')
             self.drag_man.slot_place(
                 slot,
                 x=x * 65 + 4,
