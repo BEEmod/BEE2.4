@@ -1,16 +1,17 @@
 """Handles the UI required for saving and loading palettes."""
 from __future__ import annotations
-from collections.abc import Awaitable, Callable
 from uuid import UUID, uuid4
 
 from tkinter import ttk
 import tkinter as tk
 
+from srctools import EmptyMapping
 import srctools.logger
 import trio
 import trio_util
 
 from app.dialogs import Dialogs
+from app.item_picker import ItemPickerBase
 from app.paletteLoader import Palette, ItemPos, VertInd, HorizInd, COORDS, VERT, HORIZ
 from app import background_run, paletteLoader, img
 from consts import PALETTE_FORCE_SHOWN, UUID_BLANK, UUID_EXPORT, UUID_PORTAL2
@@ -53,8 +54,6 @@ class PaletteUI:
     hidden_defaults: set[UUID]
     var_save_settings: tk.BooleanVar
     var_pal_select: tk.StringVar
-    get_items: Callable[[], ItemPos]
-    set_items: Callable[[Palette], Awaitable[None]]
 
     ui_btn_save: ttk.Button
     ui_remove: ttk.Button
@@ -67,24 +66,13 @@ class PaletteUI:
     ui_menu_palettes_index: int
 
     def __init__(
-        self, f: ttk.Frame, menu: tk.Menu,
+        self, f: ttk.Frame, menu: tk.Menu, item_picker: ItemPickerBase,
         *,
         tk_img: TKImages,
         dialog_menu: Dialogs,
         dialog_window: Dialogs,
-        cmd_clear: Callable[[], None],
-        cmd_shuffle: Callable[[], None],
-        get_items: Callable[[], ItemPos],
-        set_items: Callable[[Palette], Awaitable[None]],
     ) -> None:
-        """Initialises the palette pane.
-
-        The parameters are used to communicate with the item list:
-        - cmd_clear and cmd_shuffle are called to do those actions to the list.
-        - get_items is called to retrieve the current list of selected items.
-        - save_btn_state is the .state() method on the save button.
-        - set_items is called to apply a palette to the list of items.
-        """
+        """Initialises the palette pane."""
         self.palettes: dict[UUID, Palette] = {
             pal.uuid: pal
             for pal in paletteLoader.load_palettes()
@@ -94,8 +82,7 @@ class PaletteUI:
         self.hidden_defaults = set(prev_state.hidden_defaults)
         self.var_save_settings = tk.BooleanVar(value=prev_state.save_settings)
         self.var_pal_select = tk.StringVar(value=self.selected_uuid.hex)
-        self.get_items = get_items
-        self.set_items = set_items
+        self.picker = item_picker
 
         f.rowconfigure(2, weight=1)
         f.columnconfigure(0, weight=1)
@@ -203,11 +190,11 @@ class PaletteUI:
 
         menu.add_separator()
 
-        menu.add_command(command=cmd_clear)
+        menu.add_command(command=lambda: item_picker.set_items(EmptyMapping))
         set_menu_text(menu, TransToken.ui('Clear'))
 
-        menu.add_command(command=cmd_shuffle)
-        set_menu_text(menu, TransToken.ui('Fill Palette'))
+        # menu.add_command(command=item_picker.cmd_shuffle)
+        # set_menu_text(menu, TransToken.ui('Fill Palette'))
 
         menu.add_separator()
 
@@ -382,7 +369,7 @@ class PaletteUI:
             await self.event_save_as(dialogs)
             return
         else:
-            self.selected.items = self.get_items()
+            self.selected.items = self.picker.get_items()
             if self.var_save_settings.get():
                 self.selected.settings = config.APP.get_full_conf(config.PALETTE)
             else:
@@ -396,7 +383,7 @@ class PaletteUI:
         if name is None:
             # Cancelled...
             return
-        pal = Palette(name, self.get_items())
+        pal = Palette(name, self.picker.get_items())
         while pal.uuid in self.palettes:  # Should never occur, but check anyway.
             pal.uuid = uuid4()
 
@@ -454,7 +441,7 @@ class PaletteUI:
         """Called when the menu buttons are clicked."""
         uuid_hex = self.var_pal_select.get()
         self.select_palette(UUID(hex=uuid_hex), True)
-        await self.set_items(self.selected)
+        self.picker.set_items(self.selected.items)
         self.is_dirty.set()
 
     async def event_select_tree(self) -> None:
@@ -465,7 +452,7 @@ class PaletteUI:
             return
         self.var_pal_select.set(uuid_hex)
         self.select_palette(UUID(hex=uuid_hex), True)
-        await self.set_items(self.selected)
+        self.picker.set_items(self.selected.items)
         self.is_dirty.set()
 
     def treeview_reselect(self) -> None:

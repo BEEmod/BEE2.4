@@ -1,4 +1,5 @@
 """Implements the selected palette and list of items."""
+from collections.abc import Callable, Mapping
 from contextlib import aclosing
 from typing import Final
 
@@ -7,7 +8,7 @@ from abc import ABC, abstractmethod
 import attrs
 import trio
 
-from app import LOGGER, ReflowWindow, WidgetCache, dragdrop, img
+from app import LOGGER, ReflowWindow, WidgetCache, dragdrop, img, sound
 from app.dragdrop import DragInfo
 from app.paletteLoader import Coord, ItemPos, Palette
 from async_util import iterval_cancelling
@@ -73,7 +74,7 @@ class ItemPickerBase[ParentT](ReflowWindow, ABC):
         self.items_dirty = trio.Event()
         self.slots_picker = WidgetCache(self._ui_picker_create, self._ui_picker_hide)
 
-    def _cur_style(self) -> PakRef[Style]:
+    def cur_style(self) -> PakRef[Style]:
         """Fetch the current style."""
         style = self.selected_style.value
         if utils.not_special_id(style):
@@ -85,7 +86,6 @@ class ItemPickerBase[ParentT](ReflowWindow, ABC):
     async def task(self) -> None:
         """Operate the picker."""
         async with trio.open_nursery() as nursery:
-            nursery.start_soon(self._ui_task)
             nursery.start_soon(self._packset_changed_task)
             nursery.start_soon(self._style_changed_task)
             nursery.start_soon(self._filter_conf_changed_task)
@@ -101,6 +101,47 @@ class ItemPickerBase[ParentT](ReflowWindow, ABC):
         self.item_pos_dirty.set()
         self.drag_man.load_icons()
 
+    def change_pal_subtype(self, slot: ItemSlot, ref: SubItemRef) -> bool:
+        """Change the subtype of a slot, then reopen the context window.
+
+        This removes duplicates from the palette if needed.
+        """
+        if slot.contents is None:
+            LOGGER.warning('No item for {!r}', slot)
+            return False
+        if slot.contents.item != ref.item:
+            LOGGER.warning('Slot {!r} does not have a "{}"', slot, ref)
+            return False
+        slot.contents = ref
+
+        for other_slot in self.slots_pal:
+            if other_slot is slot:
+                continue
+            match other_slot.contents:
+                case SubItemRef(item=ref.item):
+                    other_slot.contents = None
+        return True
+
+    def find_matching_slot(
+        self, ref: SubItemRef, check_palette: bool,
+    ) -> tuple[ItemSlot | None, Coord | None]:
+        """Find a slot which contains the specified subitem.
+
+        Optionally, check the palette first.
+        """
+        pass
+
+        if check_palette:
+            for slot, coord in self.slots_pal.items():
+                if slot.contents == ref:
+                    return slot, coord
+
+        # Fall back to the picker.
+        for slot in self.slots_picker.placed:
+            if slot.contents == ref:
+                return slot, None
+        return None, None
+
     def get_items(self) -> ItemPos:
         """Return the currently selected items."""
         return {
@@ -109,9 +150,28 @@ class ItemPickerBase[ParentT](ReflowWindow, ABC):
             if (ref := slot.contents) is not None
         }
 
-    async def set_items(self, new_items: Palette) -> None:
+    def set_items(self, palette: Mapping[Coord, tuple[str, int]]) -> None:
         """Change the selected items."""
-        pass
+        for slot, coord in self.slots_pal.items():
+            try:
+                item_id, subtype = palette[coord]
+            except KeyError:
+                slot.contents = None
+            else:
+                slot.contents = SubItemRef(PakRef.parse(Item, item_id), subtype)
+
+    async def open_contextwin_task(
+        self, open_func: Callable[[ItemSlot, Coord | None], None],
+    ) -> None:
+        """Monitors rightclicks, then triggers the window.
+
+        This is started by the context window, not us.
+        """
+        while True:
+            slot = await self.drag_man.on_config.wait()
+            if slot.contents is not None:
+                sound.fx('expand')
+                open_func(slot, self.slots_pal.get(slot))
 
     def _drag_info(self, ref: SubItemRef) -> DragInfo:
         """Compute the info for an item."""
@@ -119,7 +179,7 @@ class ItemPickerBase[ParentT](ReflowWindow, ABC):
         if item is None:
             LOGGER.warning('Unknown item "{}"!', ref)
             return INFO_ERROR
-        style = self._cur_style()
+        style = self.cur_style()
         icon = item.get_icon(style, ref.subtype)
         all_icon = item.get_all_icon(style)
         if all_icon is not None:
@@ -205,7 +265,7 @@ class ItemPickerBase[ParentT](ReflowWindow, ABC):
                     LOGGER.warning('No such item "{}"!', hovered)
                     self._ui_set_sel_name(TransToken.untranslated(str(hovered)))
                     continue
-                style = self._cur_style()
+                style = self.cur_style()
                 variant = item.selected_version().get(style)
                 try:
                     name = variant.editor.subtypes[hovered.subtype].name
@@ -217,10 +277,6 @@ class ItemPickerBase[ParentT](ReflowWindow, ABC):
                     self._ui_set_sel_name(TRANS_ERROR)
                 else:
                     self._ui_set_sel_name(name)
-
-    @abstractmethod
-    async def _ui_task(self) -> None:
-        """Update the UI."""
 
     @abstractmethod
     def _ui_picker_create(self, index: int) -> ItemSlot:
@@ -235,3 +291,4 @@ class ItemPickerBase[ParentT](ReflowWindow, ABC):
     @abstractmethod
     def _ui_set_sel_name(self, name: TransToken) -> None:
         """Set the name for the currently selected item."""
+        raise NotImplementedError

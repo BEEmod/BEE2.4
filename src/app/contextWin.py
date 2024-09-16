@@ -9,7 +9,6 @@ various item properties.
 """
 from __future__ import annotations
 
-from collections.abc import Callable
 from enum import Enum
 import webbrowser
 
@@ -19,10 +18,13 @@ import trio
 
 from . import sound, img, DEV_MODE
 from async_util import EdgeTrigger
+from .dragdrop import Slot
+from .item_picker import ItemPickerBase
 from .item_properties import PropertyWindow
 from .mdown import MarkdownData
 from .dialogs import Dialogs
 from consts import DefaultItems
+from .paletteLoader import Coord
 from packages.item import Item, ItemVariant, SubItemRef, Version
 from packages.signage import ITEM_ID as SIGNAGE_ITEM_ID
 import packages
@@ -33,13 +35,6 @@ from transtoken import TransToken
 
 
 LOGGER = get_logger(__name__)
-# Function called to change the version of the highlighted palette item.
-type ChangeVersionFunc = Callable[[tuple[int, int], SubItemRef], object]
-# Re-open the context window by finding an item matching this reference. The bool indicates if the
-# existing item is on the palette already.
-type OpenMatchingFunc = Callable[[SubItemRef, bool], object]
-# Given an item + subtype, return the icon to show.
-type IconFunc = Callable[[SubItemRef], img.Handle]
 
 SUBITEM_POS = {
     # Positions of subitems depending on the number of subitems that exist
@@ -164,36 +159,31 @@ def get_description(
         return MarkdownData.BLANK  # No description
 
 
-class ContextWinBase[TargetT]:
+class ContextWinBase:
     """Shared logic for item context windows.
 
     TargetT: The widget representing palette icons.
     """
     # If we are open, info about the selected widget.
     selected: SubItemRef | None
-    selected_widget: TargetT | None  # The widget object itself, so we can lock to it.
-    selected_pal_pos: tuple[int, int] | None  # Palette position, if from there. Allows changing version.
+    selected_slot: Slot[SubItemRef] | None  # The slot we're opening on.
+    selected_pal_pos: Coord | None  # Palette position, if from there. Allows changing version.
+
+    dialog: Dialogs
+    picker: ItemPickerBase
+    # If set, the item properties window is open and suppressing us.
+    props_open: bool
 
     moreinfo_url: AsyncValue[str | None]
     moreinfo_trigger: EdgeTrigger[str]
     defaults_trigger: EdgeTrigger[()]
 
-    def __init__(
-        self,
-        dialog: Dialogs,
-        change_ver_func: ChangeVersionFunc,
-        open_match_func: OpenMatchingFunc,
-        icon_func: IconFunc,
-    ) -> None:
+    def __init__(self, item_picker: ItemPickerBase, dialog: Dialogs) -> None:
         self.selected = None
-        self.selected_widget = None
+        self.selected_slot = None
         self.selected_pal_pos = None
-        # TODO: Pass this in...
-        self.cur_style = packages.PakRef(packages.Style, packages.CLEAN_STYLE)
         self.dialog = dialog
-        self.change_ver_func = change_ver_func
-        self.open_match_func = open_match_func
-        self.icon_func = icon_func
+        self.picker = item_picker
         self.props_open = False
 
         # The current URL in the more-info button, if available.
@@ -216,33 +206,38 @@ class ContextWinBase[TargetT]:
         async with trio.open_nursery() as nursery:
             nursery.start_soon(self.ui_task, signage_trigger)
             nursery.start_soon(self._moreinfo_task)
+            nursery.start_soon(self.picker.open_contextwin_task, self.show_prop)
             task_status.started()
 
-    def get_current(self) -> tuple[Item, Version, ItemVariant, SubType]:
+    def get_current(self) -> tuple[
+        packages.PakRef[packages.Style],
+        Item, Version, ItemVariant, SubType,
+    ]:
         """Fetch the tree representing the selected subtype."""
         assert self.selected is not None
         item = self.selected.item.resolve(packages.get_loaded_packages())
         assert item is not None, self.selected
         version = item.selected_version()
+        style_ref = self.picker.cur_style()
         try:
-            variant = version.styles[self.cur_style.id]
+            variant = version.styles[style_ref.id]
         except KeyError:
-            LOGGER.warning('No {} style for {}!', self.cur_style, self.selected)
+            LOGGER.warning('No {} style for {}!', style_ref, self.selected)
             variant = version.def_style
         try:
             subtype = variant.editor.subtypes[self.selected.subtype]
         except KeyError:
-            LOGGER.warning('No subtype {} in style {}!', self.selected, self.cur_style)
+            LOGGER.warning('No subtype {} in style {}!', self.selected, style_ref)
             first = item.visual_subtypes[0]
             self.selected = self.selected.with_subtype(first)
             subtype = variant.editor.subtypes[first]
 
-        return item, version, variant, subtype
+        return style_ref, item, version, variant, subtype
 
     def load_item_data(self) -> None:
         """Refresh the window to use the selected item's data."""
         assert self.selected is not None
-        item, version, variant, subtype = self.get_current()
+        style_ref, item, version, variant, subtype = self.get_current()
         item_id = self.selected.item.id
 
         sel_pos = pos_for_item(item, self.selected.subtype)
@@ -250,7 +245,7 @@ class ContextWinBase[TargetT]:
             if pos == -1:
                 icon = IMG_ALPHA
             else:
-                icon = self.icon_func(self.selected.with_subtype(item.visual_subtypes[pos]))
+                icon = item.get_icon(style_ref, item.visual_subtypes[pos])
             self.ui_set_props_icon(ind, icon, ind == sel_pos)
 
         desc = get_description(
@@ -386,15 +381,15 @@ class ContextWinBase[TargetT]:
         if self.is_visible:
             self.ui_hide_window()
             sound.fx('contract')
-            self.selected = self.selected_widget = None
+            self.selected = self.selected_slot = None
 
     def show_prop(
         self,
-        widget: TargetT, item: SubItemRef,
-        pal_pos: tuple[int, int] | None,
+        slot: Slot[SubItemRef],
+        pal_pos: Coord | None,
         warp_cursor: bool = False,
     ) -> None:
-        """Show the properties window for an item.
+        """Show the properties window for an item in a slot.
 
         - widget should be the widget that represents the item.
         - If warp_cursor is true, the cursor will be moved relative to this window so that
@@ -405,11 +400,14 @@ class ContextWinBase[TargetT]:
             offset = self.ui_get_cursor_offset()
         else:
             offset = None
-        self.selected = item
-        self.selected_widget = widget
+        self.selected = slot.contents
+        if self.selected is None:
+            LOGGER.warning('Selected empty slot?')
+            return
+        self.selected_slot = slot
         self.selected_pal_pos = pal_pos
 
-        x, y = self.ui_get_target_pos(widget)
+        x, y = slot.get_coords()
         self.ui_show_window(x, y)
         self.adjust_position()
 
@@ -448,7 +446,7 @@ class ContextWinBase[TargetT]:
 
     def sub_sel(self, pos: int, e: object = None) -> None:
         """Change the currently-selected sub-item."""
-        if self.selected is None:
+        if self.selected is None or self.selected_slot is None:
             return
         item = self.selected.item.resolve(packages.get_loaded_packages())
         if item is None:
@@ -458,7 +456,9 @@ class ContextWinBase[TargetT]:
         if self.selected_pal_pos is not None and ind is not None:
             sound.fx('config')
             ref = self.selected.with_subtype(ind)
-            self.change_ver_func(self.selected_pal_pos, ref)
+            if self.picker.change_pal_subtype(self.selected_slot, ref):
+                # Redisplay the window to refresh data and move it to match
+                self.show_prop(self.selected_slot, self.selected_pal_pos, warp_cursor=True)
 
     def sub_open(self, pos: int, e: object = None) -> None:
         """Move the context window to apply to the given item."""
@@ -468,7 +468,12 @@ class ContextWinBase[TargetT]:
             ind = ind_for_pos(item, pos)
             if ind is not None:
                 sound.fx('expand')
-                self.open_match_func(self.selected.with_subtype(ind), self.selected_pal_pos is not None)
+                slot, pal_pos = self.picker.find_matching_slot(
+                    self.selected.with_subtype(ind),
+                    check_palette=self.selected_pal_pos is not None,
+                )
+                if slot is not None:
+                    self.show_prop(slot, pal_pos)
 
     def adjust_position(self, e: object = None) -> None:
         """Move the properties window onto the selected item.
@@ -476,7 +481,7 @@ class ContextWinBase[TargetT]:
         We call this constantly, so the property window will not go outside
         the screen, and snap back to the item when the main window returns.
         """
-        if not self.is_visible or self.selected is None or self.selected_widget is None:
+        if not self.is_visible or self.selected is None or self.selected_slot is None:
             return
         if (item := self.selected.item.resolve(packages.get_loaded_packages())) is None:
             return
@@ -486,7 +491,7 @@ class ContextWinBase[TargetT]:
         # Calculate the pixel offset between the window and the subitem in
         # the properties dialog, and shift if needed to keep it inside the
         # window
-        targ_x, targ_y = self.ui_get_target_pos(self.selected_widget)
+        targ_x, targ_y = self.selected_slot.get_coords()
         icon_x, icon_y = self.ui_get_icon_offset(pos)
 
         self.ui_show_window(targ_x - icon_x, targ_y - icon_y)
@@ -523,10 +528,6 @@ class ContextWinBase[TargetT]:
 
     def ui_get_icon_offset(self, ind: int) -> tuple[int, int]:
         """Get the offset of this palette icon widget."""
-        raise NotImplementedError
-
-    def ui_get_target_pos(self, widget: TargetT) -> tuple[int, int]:
-        """Get the screen position of the icon we're right-clicking on."""
         raise NotImplementedError
 
     def ui_hide_window(self) -> None:

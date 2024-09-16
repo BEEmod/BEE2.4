@@ -119,7 +119,8 @@ async def apply_config() -> None:
             loadScreen.set_force_ontop(conf.force_load_ontop)
             DEV_MODE.value = conf.dev_mode
             # We don't propagate compact splash, that isn't important after the UI loads.
-            UI.refresh_palette_icons()
+            # TODO: What is this refreshing?
+            # UI.refresh_palette_icons()
 
 
 async def clear_caches(dialogs: Dialogs) -> None:

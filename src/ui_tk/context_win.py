@@ -11,10 +11,8 @@ from srctools.logger import get_logger
 import trio
 
 from app import UI, img, sound
-from app.contextWin import (
-    IMG_ALPHA, SPR, TRANS_ENT_COUNT, TRANS_NO_VERSIONS, ChangeVersionFunc,
-    ContextWinBase, IconFunc, OpenMatchingFunc,
-)
+from app.contextWin import IMG_ALPHA, SPR, TRANS_ENT_COUNT, TRANS_NO_VERSIONS, ContextWinBase
+from app.item_picker import ItemPickerBase
 from app.item_properties import PropertyWindow
 from app.mdown import MarkdownData
 from async_util import EdgeTrigger
@@ -53,19 +51,13 @@ def set_version_combobox(box: ttk.Combobox, item: Item, cur_style: PakRef[Style]
     return ver_lookup
 
 
-class ContextWin(ContextWinBase['UI.PalItem']):
+class ContextWin(ContextWinBase):
     """Tk-specific item context window."""
     wid_subitem: list[ttk.Label]
     wid_sprite: dict[SPR, ttk.Label]
     version_lookup: list[str]
 
-    def __init__(
-        self,
-        tk_img: TKImages,
-        change_ver_func: ChangeVersionFunc,
-        open_match_func: OpenMatchingFunc,
-        icon_func: IconFunc,
-    ) -> None:
+    def __init__(self, item_picker: ItemPickerBase, tk_img: TKImages) -> None:
         self.window = tk.Toplevel(TK_ROOT, name='contextWin')
         self.window.overrideredirect(True)
         self.window.resizable(False, False)
@@ -74,7 +66,7 @@ class ContextWin(ContextWinBase['UI.PalItem']):
             self.window.wm_attributes('-type', 'popup_menu')
         self.window.withdraw()  # starts hidden
 
-        super().__init__(TkDialogs(self.window), change_ver_func, open_match_func, icon_func)
+        super().__init__(item_picker, TkDialogs(self.window))
 
         self.tk_img = tk_img
         self.wid_subitem = []
@@ -200,18 +192,19 @@ class ContextWin(ContextWinBase['UI.PalItem']):
 
     def _evt_version_changed(self, _: object) -> None:
         """Callback for the version combobox. Set the item variant."""
-        from app import UI, itemconfig
+        from app import itemconfig
         assert self.selected is not None
         version_id = self.version_lookup[self.wid_variant.current()]
         item_ref = self.selected.item
-        UI.change_item_version(item_ref, version_id)
+        self.picker.change_version(item_ref, version_id)
         # Refresh our data.
         self.load_item_data()
 
         # Refresh itemconfig combo-boxes to match us.
+        style_ref = self.picker.cur_style()
         for conf_item_ref, func in itemconfig.ITEM_VARIANT_LOAD:
             if conf_item_ref == item_ref:
-                func(self.cur_style)
+                func(style_ref)
 
     @override
     async def ui_task(self, signage_trigger: EdgeTrigger[()]) -> None:
@@ -251,7 +244,7 @@ class ContextWin(ContextWinBase['UI.PalItem']):
         while True:
             await self.defaults_trigger.wait()
 
-            item, version, variant, subtype = self.get_current()
+            style_ref, item, version, variant, subtype = self.get_current()
 
             sound.fx('expand')
             was_temp_hidden = self.is_visible
@@ -267,11 +260,6 @@ class ContextWin(ContextWinBase['UI.PalItem']):
             if was_temp_hidden:
                 # Restore the context window if we hid it earlier.
                 self.window.deiconify()
-
-    @override
-    def ui_get_target_pos(self, widget: UI.PalItem) -> tuple[int, int]:
-        """Get the screen position of our target widget."""
-        return widget.label.winfo_rootx(), widget.label.winfo_rooty()
 
     @override
     def ui_get_icon_offset(self, ind: int) -> tuple[int, int]:
@@ -362,7 +350,7 @@ class ContextWin(ContextWinBase['UI.PalItem']):
         self.wid_variant.grid()
         self.wid_signage_configure.grid_remove()
 
-        self.version_lookup = set_version_combobox(self.wid_variant, item, self.cur_style)
+        self.version_lookup = set_version_combobox(self.wid_variant, item, self.picker.cur_style())
 
     @override
     def ui_set_defaults_enabled(self, enable: bool) -> None:

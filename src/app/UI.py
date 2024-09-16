@@ -8,19 +8,15 @@ import tkinter as tk
 
 from collections.abc import Callable
 from contextlib import aclosing
-import itertools
-import operator
 import random
 import functools
-import math
 
 import srctools.logger
-import attrs
 import trio
 import trio_util
 
 import exporting
-from app import lifecycle, quit_app, sound
+from app import lifecycle, quit_app
 from async_util import EdgeTrigger, run_as_task
 from BEE2_config import GEN_OPTS
 from app.dialogs import Dialogs
@@ -30,17 +26,14 @@ from packages import PakRef
 from packages.item import SubItemRef
 from packages.widgets import mandatory_unlocked
 import utils
-from config.filters import FilterConf
 from config.gen_opts import AfterExport
 from config.last_sel import LastSelected
 from config.windows import WindowState
-from config.item_defaults import ItemDefault
 import config
 from transtoken import TransToken
 from app import (
     img,
     itemconfig,
-    sound as snd,
     SubPane,
     voiceEditor,
     gameMan,
@@ -53,7 +46,6 @@ from app import (
     signage_ui,
     paletteUI,
     music_conf,
-    WidgetCache,
 )
 from app.errors import Result as ErrorResult
 from app.menu_bar import MenuBar
@@ -117,140 +109,6 @@ class _WindowsDict(TypedDict):
 
 # Holds the TK Toplevels, frames, widgets and menus
 windows: _WindowsDict = cast(_WindowsDict, {})
-
-
-class PalItem:
-    """The icon and associated data for a single subitem."""
-    def __init__(self, frame: tk.Misc, item: Item, sub: int, is_pre: bool) -> None:
-        """Create a label to show an item onscreen."""
-        self.item = item
-        self.subKey = sub
-        self.id = item.id
-        self.ref = SubItemRef(PakRef.of(item.item), sub)
-        # Used to distinguish between picker and palette items
-        self.is_pre = is_pre
-
-        # Location this item was present at previously when dragging it.
-        self.pre_x = self.pre_y = -1
-
-        self.label = lbl = tk.Label(frame)
-
-        lbl.bind(tk_tools.EVENTS['LEFT'], functools.partial(drag_start, self))
-        lbl.bind(tk_tools.EVENTS['LEFT_SHIFT'], functools.partial(drag_fast, self))
-        lbl.bind("<Enter>", self.rollover)
-        lbl.bind("<Leave>", self.rollout)
-
-        self.info_btn = tk.Label(
-            lbl,
-            relief='ridge',
-            width=12,
-            height=12,
-        )
-        TK_IMG.apply(self.info_btn, ICO_GEAR)
-
-        show_context = self.show_context
-        tk_tools.bind_rightclick(lbl, show_context)
-
-        @tk_tools.bind_leftclick(self.info_btn)
-        def info_button_click(e: tk.Event[tk.Misc]) -> object:
-            """When clicked, show the context window."""
-            show_context(e)
-            # Cancel the event sequence, so it doesn't travel up to the main
-            # window and hide the window again.
-            return 'break'
-
-        # Right-click does the same as the icon.
-        tk_tools.bind_rightclick(self.info_btn, show_context)
-
-    def __del__(self) -> None:
-        """When destroyed, clean up the label."""
-        try:
-            self.label.destroy()
-        except AttributeError:
-            pass
-
-    def show_context(self, _: tk.Event) -> None:
-        """Show the context window."""
-        sound.fx('expand')
-        if self.is_pre:
-            pos = (self.pre_x, self.pre_y)
-        else:
-            pos = None
-        context_win.show_prop(self, self.ref, pos)
-
-    @classmethod
-    def change_pal_subtype(cls, pos: tuple[int, int], ref: SubItemRef) -> None:
-        """Change the subtype of this icon, then reopen the context window.
-
-        This removes duplicates from the palette if needed.
-        """
-        x, y = pos
-        try:
-            target = pal_picked[y * 4 + x]
-        except IndexError:
-            LOGGER.warning('No item for {} at ({}, {})', ref, x, y)
-            return
-        if target.ref.item != ref.item:
-            LOGGER.warning('Item at {},{} = {} is not a {}', x, y, target.ref, ref)
-            return
-
-        for item in pal_picked[:]:
-            if item is not target and item.ref == ref:
-                item.kill()
-        target.ref = ref
-        target.subKey = ref.subtype
-        target.load_data()
-        target.label.master.update()  # Update the frame
-        flow_preview()
-
-        # Redisplay the window to refresh data and move it to match
-        context_win.show_prop(target, ref, pos, warp_cursor=True)
-
-    @classmethod
-    def open_menu_at_sub(cls, ref: SubItemRef, on_preview: bool) -> None:
-        """Make the contextWin open itself at the indicated subitem."""
-        if on_preview:
-            items_list = pal_picked
-        else:
-            items_list = []
-        # Prefer opening on the palette if it was on the palette, but fall back to the picker.
-        for item in itertools.chain(items_list, pal_items):
-            if item.ref != ref:
-                continue
-            if item.is_pre:
-                pos = (item.pre_x, item.pre_y)
-            else:
-                pos = None
-            context_win.show_prop(item, item.ref, pos, warp_cursor=True)
-            break
-
-    def load_data(self) -> None:
-        """Refresh our icon and name.
-
-        Call whenever the style changes, so the icons update.
-        """
-        if self.is_pre:
-            TK_IMG.apply(self.label, self.item.get_icon(self.subKey, True))
-        else:
-            TK_IMG.apply(self.label, self.item.item.get_icon(
-                PakRef(packages.Style, selected_style),
-                self.subKey,
-                config.APP.get_cur_conf(FilterConf, default=FilterConf()).compress,
-            ))
-
-    def clear(self) -> bool:
-        """Remove any items matching ourselves from the palette.
-
-        This prevents adding two copies.
-        """
-        found = False
-        for item in pal_picked[:]:
-            # remove the item off of the palette if it's on there, this
-            # lets you delete items and prevents having the same item twice.
-            if self.id == item.id and self.subKey == item.subKey:
-                item.kill()
-                found = True
-        return found
 
 
 async def load_packages(
@@ -553,38 +411,35 @@ def pal_shuffle() -> None:
     """Set the palette to a list of random items."""
     include_mandatory = mandatory_unlocked()
 
-    if len(pal_picked) == 32:
+    empty_slots = [
+        slot for slot in item_picker.slots_pal
+        if slot.contents is None
+    ]
+    if not empty_slots:
         return
 
-    palette_set = {
-        item.id
-        for item in pal_picked
+    existing_items = {
+        subitem.item
+        for slot in item_picker.slots_pal
+        if (subitem := slot.contents) is not None
     }
 
     # Use a set to eliminate duplicates.
-    shuff_items = list({
-        pal_item.id
-        # Only consider items not already on the palette,
-        # obey the mandatory item lock and filters.
-        for pal_item in pal_items
-        if pal_item.id not in palette_set
-        if include_mandatory or not pal_item.item.item.needs_unlock
-        if cur_filter is None or pal_item.ref in cur_filter
-        if len(pal_item.item.item.visual_subtypes)  # Check there's actually sub-items to show.
+    # We don't actually have to handle filters, just look at the current item list.
+    shuff_items: list[PakRef[packages.Item]] = list({
+        subitem.item
+        for slot in item_picker.slots_picker.placed
+        if (subitem := slot.contents) is not None
     })
 
     random.shuffle(shuff_items)
+    packset = packages.get_loaded_packages()
 
-    for item_id in shuff_items[:32-len(pal_picked)]:
-        item = item_list[item_id]
-        pal_picked.append(PalItem(
-            UI['preview_frame'],
-            item,
+    for slot, item_ref in zip(empty_slots, shuff_items, strict=False):
+        item = item_ref.resolve(packset)
+        if item is not None:
             # Pick a random available palette icon.
-            sub=random.choice(item.item.visual_subtypes),
-            is_pre=True,
-        ))
-    flow_preview()
+            slot.contents = SubItemRef(item_ref, random.choice(item.visual_subtypes))
 
 
 async def init_option(
@@ -754,10 +609,6 @@ async def on_game_changed() -> None:
             config.APP.store_conf(LastSelected(utils.obj_id(game.name)), 'game')
 
 
-def refresh_palette_icons() -> None:
-    """Refresh all displayed palette icons."""
-
-
 async def init_windows(
     core_nursery: trio.Nursery,
     tk_img: TKImages,
@@ -881,14 +732,10 @@ async def init_windows(
 
     await trio.lowlevel.checkpoint()
     pal_ui = paletteUI.PaletteUI(
-        pal_frame, menu_bar.pal_menu,
+        pal_frame, menu_bar.pal_menu, item_picker,
         tk_img=tk_img,
         dialog_menu=TkDialogs(TK_ROOT),
         dialog_window=TkDialogs(windows['pal']),
-        cmd_clear=pal_clear,
-        cmd_shuffle=pal_shuffle,
-        get_items=item_picker.get_items,
-        set_items=set_palette,
     )
     await trio.lowlevel.checkpoint()
 
@@ -967,13 +814,7 @@ async def init_windows(
     await LOAD_UI.step('backup')
     voiceEditor.init_widgets()
     await LOAD_UI.step('voiceline')
-    context_win = ContextWin(
-        tk_img,
-        change_ver_func=PalItem.change_pal_subtype,
-        open_match_func=PalItem.open_menu_at_sub,
-        icon_func=lambda ref: IMG_BLANK,  # TODO
-        # icon_func=lambda ref: item_list[ref.item.id].get_icon(ref.subtype),
-    )
+    context_win = ContextWin(item_picker, tk_img)
     await core_nursery.start(context_win.init_widgets, signage_trigger)
     await LOAD_UI.step('contextwin')
     await core_nursery.start(functools.partial(
@@ -1064,9 +905,6 @@ async def init_windows(
                 ref = packages.PakRef(packages.Style, selected_style)
 
                 style_obj = ref.resolve(packset)
-                refresh_palette_icons()
-
-                context_win.cur_style = ref
                 context_win.hide_context()
 
                 # Update variant selectors on the itemconfig pane
@@ -1089,6 +927,6 @@ async def init_windows(
     async with trio.open_nursery() as nursery:
         nursery.start_soon(style_select_callback)
         await first_select.wait()
-        await set_palette(pal_ui.selected)
+        item_picker.set_items(pal_ui.selected.items)
         pal_ui.is_dirty.set()
         task_status.started()
