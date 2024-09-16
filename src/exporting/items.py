@@ -1,5 +1,6 @@
 """Export item definitions."""
 from __future__ import annotations
+
 from collections.abc import Mapping
 from pathlib import PurePosixPath as FSPath
 import copy
@@ -15,9 +16,10 @@ from config.gen_opts import GenOptions
 from config.item_defaults import ItemDefault
 from connections import INDICATOR_CHECK_ID
 from consts import DefaultItems
-from editoritems import InstCount, Item as EditorItem, DesiredFacing
+from editoritems import DesiredFacing, InstCount, Item as EditorItem
+from packages import TRANS_OBJ_NOT_FOUND
 from packages.item import Item, ItemConfig
-from transtoken import TransToken
+from transtoken import AppError, TransToken
 import config
 import utils
 
@@ -163,6 +165,16 @@ async def step_write_items(exp_data: ExportData) -> None:
     """
     vbsp_config = exp_data.vbsp_conf
     pal_list: dict[str, dict[int, tuple[int, int]]] = exp_data.selected[Item]
+
+    missing = []
+    # Check all palette items actually exist, otherwise fail.
+    for item_id in pal_list:
+        try:
+            exp_data.packset.obj_by_id(Item, item_id)
+        except KeyError:
+            missing.append(AppError(TRANS_OBJ_NOT_FOUND.format(object='Item', id=item_id.upper())))
+    if missing:
+        raise ExceptionGroup('Item Export', missing)
 
     # Originally indicator items were in the style config, now they're default items.
     # Check to prevent overlaps.
