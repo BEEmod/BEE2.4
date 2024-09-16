@@ -569,7 +569,10 @@ class PakRef[PakT: PakObject]:
         return cls(type, utils.obj_id(value, type.__name__))
 
     def resolve(self, packset: PackagesSet) -> PakT | None:
-        """Look up this object, or return None if missing."""
+        """Look up this object, or return None if missing.
+
+        If missing this has already logged a warning.
+        """
         try:
             return packset.obj_by_id(self.obj, self.id)
         except KeyError:
@@ -652,7 +655,7 @@ def set_cond_source(kv: Keyvalues, source: str) -> None:
 
 @attrs.define
 class PackagesSet:
-    """Holds all the data pared from packages.
+    """Holds all the data parsed from packages.
 
     This is swapped out to reload packages.
     """
@@ -675,6 +678,10 @@ class PackagesSet:
     # If found, the folders where the music is present.
     mel_music_fsys: FileSystem | None = None
     tag_music_fsys: FileSystem | None = None
+
+    # Objects we've warned about not being present. Since this is stored
+    # here it'll automatically clear when reloading.
+    _unknown_obj_warnings: set[type[PakObject], utils.ObjectID] = set()
 
     # In dev mode, all lazy files are sent here to be syntax checked.
     # The other end is implemented in lifecycle.
@@ -709,14 +716,28 @@ class PackagesSet:
     def all_obj[PakT: PakObject](self, cls: type[PakT]) -> Collection[PakT]:
         """Get the list of objects parsed."""
         if cls not in self._parsed:
-            raise ValueError(cls.__name__ + ' has not been parsed yet!')
+            raise ValueError(f'{cls.__name__} has not been parsed yet!')
         return cast('dict[str, PakT]', self.objects[cls]).values()
 
-    def obj_by_id[PakT: PakObject](self, cls: type[PakT], object_id: str) -> PakT:
-        """Return the object with a given ID."""
+    def obj_by_id[PakT: PakObject](
+        self,
+        cls: type[PakT],
+        obj_id: str,
+    ) -> PakT:
+        """Return the object with a given ID.
+
+        If not found, a warning is printed refrerencing the parent.
+        """
         if cls not in self._parsed:
-            raise ValueError(cls.__name__ + ' has not been parsed yet!')
-        return cast('dict[str, PakT]', self.objects[cls])[object_id.casefold()]
+            raise ValueError(f'{cls.__name__} has not been parsed yet!')
+        obj_dict = cast('dict[str, PakT]', self.objects[cls])
+        try:
+            return obj_dict[obj_id.casefold()]
+        except KeyError:
+            if (key := (cls, obj_id)) not in self._unknown_obj_warnings:
+                self._unknown_obj_warnings.add(key)
+                LOGGER.warning('Unknown {} "{}"!', cls.__name__, obj_id)
+            raise
 
     def add(self, obj: PakObject, pak_id: utils.SpecialID, pak_name: str) -> None:
         """Add an object to our dataset later, with the given package name."""

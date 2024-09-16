@@ -217,7 +217,6 @@ class ItemPickerBase[ParentT](ReflowWindow, ABC):
         """Compute the info for an item."""
         item = ref.item.resolve(self.packset)
         if item is None:
-            LOGGER.warning('Unknown item "{}"!', ref)
             return INFO_ERROR
         style = self.cur_style()
         icon = item.get_icon(style, ref.subtype)
