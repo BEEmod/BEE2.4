@@ -24,6 +24,7 @@ from transtoken import TransToken
 import config
 import packages
 import utils
+from trio_util import AsyncValue
 
 from .img import ImageSlot, WXImages
 from . import (
@@ -200,10 +201,10 @@ class OptionRowUI(OptionRow):
 
 class WxSelector(Selector[IconUI, OptionRowUI]):
     """Wx implementation of the corridor selector."""
-    def __init__(self, packset: packages.PackagesSet, wx_img: WXImages, cur_style: utils.ObjectID) -> None:
+    def __init__(self, wx_img: WXImages, cur_style: AsyncValue[packages.PakRef[packages.Style]]) -> None:
         self_ref = self
         conf = config.APP.get_cur_conf(UIState)
-        super().__init__(conf)
+        super().__init__(conf, cur_style)
 
         self.wx_img = wx_img
         self.win = wx.Frame(
@@ -314,8 +315,6 @@ class WxSelector(Selector[IconUI, OptionRowUI]):
         self.panel_items.SetScrollRate(0, 10)
 
         self.icons = WidgetCache(lambda ind: IconUI(self_ref, ind), lambda icon: icon.widget.Hide())
-
-        self.load_corridors(packset, cur_style)
 
     @override
     async def ui_task(self) -> None:

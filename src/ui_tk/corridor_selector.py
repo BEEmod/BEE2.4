@@ -22,6 +22,7 @@ from transtoken import TransToken
 import config
 import packages
 import utils
+from trio_util import AsyncValue
 
 from . import TK_ROOT, tk_tools, tooltip
 from .dragdrop import CanvasPositioner
@@ -150,9 +151,13 @@ class TkSelector(Selector[IconUI, OptionRowUI]):
     wid_authors: ttk.Label
     wid_desc: RichText
 
-    def __init__(self, packset: packages.PackagesSet, tk_img: TKImages, cur_style: utils.ObjectID) -> None:
+    def __init__(
+        self,
+        tk_img: TKImages,
+        cur_style: AsyncValue[packages.PakRef[packages.Style]],
+    ) -> None:
         conf = config.APP.get_cur_conf(UIState)
-        super().__init__(conf)
+        super().__init__(conf, cur_style)
         self.tk_img = tk_img
         self_ref = self
         self.icons = WidgetCache(lambda ind: IconUI(self_ref), lambda ico: ico.set_image(None))
@@ -294,7 +299,6 @@ class TkSelector(Selector[IconUI, OptionRowUI]):
 
         tk_tools.add_mousewheel(self.canvas, frm_left)
         tk_tools.add_mousewheel(right_canv, frm_right)
-        self.load_corridors(packset, cur_style)
 
     @override
     async def ui_task(self) -> None:

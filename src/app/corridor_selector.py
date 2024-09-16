@@ -1,30 +1,30 @@
 """Implements UI for selecting corridors."""
 from __future__ import annotations
 from typing import Final
+from typing_extensions import override
 
-from collections.abc import Sequence
 from abc import abstractmethod
+from collections.abc import Sequence
+from contextlib import aclosing
 import itertools
 import random
 
-from typing_extensions import override
-
-from trio_util import AsyncValue, RepeatedEvent
 import attrs
 import srctools.logger
 import trio
-import trio_util
 
 from app import DEV_MODE, ReflowWindow, WidgetCache, img
-from async_util import EdgeTrigger
 from app.mdown import MarkdownData
-from config.corridors import UIState, Config, Options
-from corridor import Attachment, GameMode, Direction, Option
-from packages import corridor
+from async_util import EdgeTrigger, iterval_cancelling
+from config.corridors import Config, Options, UIState
+from corridor import Attachment, Direction, GameMode, Option
+from packages import PackagesSet, PakRef, CorridorGroup, Style, corridor
 from transtoken import TransToken
-import utils
+from trio_util import AsyncValue, RepeatedEvent
 import config
 import packages
+import trio_util
+import utils
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -152,6 +152,8 @@ class Selector[IconT: Icon, OptionRowT: OptionRow](ReflowWindow):
     close_event: RepeatedEvent
     # Triggered by the UI to indicate a corridor was (de)selected
     select_trigger: EdgeTrigger[()]
+    # Triggered when we need to refresh the corridor list.
+    corridors_dirty: trio.Event
 
     # The widgets for each corridor.
     icons: WidgetCache[IconT]
@@ -163,6 +165,10 @@ class Selector[IconT: Icon, OptionRowT: OptionRow](ReflowWindow):
     corr_group: corridor.CorridorGroup
     conf_id: str
 
+    # Currently loaded packages/style.
+    packset: PackagesSet
+    cur_style: AsyncValue[PakRef[Style]]
+
     # The rows created for options. These are hidden if no longer used.
     option_rows: list[OptionRowT]
 
@@ -171,36 +177,44 @@ class Selector[IconT: Icon, OptionRowT: OptionRow](ReflowWindow):
     state_dir: AsyncValue[Direction]
     state_mode: AsyncValue[GameMode]
 
-    def __init__(self, conf: UIState) -> None:
+    def __init__(self, conf: UIState, cur_style: AsyncValue[PakRef[Style]]) -> None:
         super().__init__()
         self.sticky_corr = None
         self.displayed_corr = AsyncValue(None)
-        self.img_ind = 0
-        self.cur_images = None
-        self.corr_list = []
-        self.option_rows = []
+        self.packset = PackagesSet()
+        self.cur_style = cur_style
         self.state_attach = AsyncValue(conf.last_attach)
         self.state_dir = AsyncValue(conf.last_direction)
         self.state_mode = AsyncValue(conf.last_mode)
         self.show_trigger = EdgeTrigger()
         self.select_trigger = EdgeTrigger()
         self.close_event = RepeatedEvent()
+        self.corridors_dirty = trio.Event()
+        # Dummy values used until we fully load.
+        self.img_ind = 0
+        self.cur_images = None
+        self.corr_group = FALLBACK
+        self.conf_id = ''
+        self.corr_list = []
+        self.option_rows = []
 
     async def task(self) -> None:
         """Main task handling interaction with the corridor."""
         async with trio.open_nursery() as nursery:
             nursery.start_soon(self._window_task)
             nursery.start_soon(self._display_task)
+            nursery.start_soon(self._packages_changed_task)
             nursery.start_soon(self.reposition_items_task)
             nursery.start_soon(self._save_config_task)
             nursery.start_soon(self._mode_switch_task)
+            nursery.start_soon(self._reload_task)
             nursery.start_soon(self.ui_task)
 
     async def _window_task(self) -> None:
         """Run to allow opening/closing the window."""
         while True:
             await self.show_trigger.wait()
-            await self.refresh()
+            self.corridors_dirty.set()
             self.ui_win_show()
 
             await self.close_event.wait()
@@ -225,7 +239,24 @@ class Selector[IconT: Icon, OptionRowT: OptionRow](ReflowWindow):
                 self.state_dir.wait_transition,
             )
             self.store_conf()
-            await self.refresh()
+            self.corridors_dirty.set()
+
+    async def _packages_changed_task(self) -> None:
+        """When packages or styles change, reload."""
+        packset: PackagesSet
+        async with iterval_cancelling(packages.LOADED) as aiterator:
+            async for scope in aiterator:
+                # This scope is cancelled if new packages load.
+                async with scope as packset:
+                    # Only use the packages once styles and corridors are ready for
+                    # us.
+                    await packset.ready(Style).wait()
+                    await packset.ready(CorridorGroup).wait()
+                    self.packset = packset
+                    async with aclosing(self.cur_style.eventual_values()) as agen:
+                        async for style in agen:
+                            self.load_corridors(style)
+                            self.corridors_dirty.set()
 
     def prevent_deselection(self) -> None:
         """Ensure at least one widget is selected."""
@@ -259,20 +290,30 @@ class Selector[IconT: Icon, OptionRowT: OptionRow](ReflowWindow):
 
         config.APP.store_conf(Config(enabled), self.conf_id)
 
-    def load_corridors(self, packset: packages.PackagesSet, style_id: utils.ObjectID) -> None:
+    def load_corridors(self, cur_style: PakRef[Style]) -> None:
         """Fetch the current set of corridors from this style."""
         try:
-            self.corr_group = packset.obj_by_id(corridor.CorridorGroup, style_id)
+            self.corr_group = self.packset.obj_by_id(corridor.CorridorGroup, cur_style.id)
         except KeyError:
-            LOGGER.warning('No corridors defined for style "{}"', style_id)
+            LOGGER.warning('No corridors defined for style "{}"', cur_style)
             self.corr_group = FALLBACK
         self.conf_id = Config.get_id(
-            style_id,
+            cur_style.id,
             self.state_mode.value, self.state_dir.value, self.state_attach.value,
         )
 
-    async def refresh(self, _: object = None) -> None:
-        """Called to update the slots with new items if the corridor set changes."""
+    async def _reload_task(self) -> None:
+        """Manages calls to _refresh()."""
+        while True:
+            await self._refresh()
+            await self.corridors_dirty.wait()
+            self.corridors_dirty = trio.Event()
+
+    async def _refresh(self) -> None:
+        """Called to update the slots with new items if the corridor set changes.
+
+        Should only be called by _reload_task.
+        """
         mode = self.state_mode.value
         direction = self.state_dir.value
         attach = self.state_attach.value

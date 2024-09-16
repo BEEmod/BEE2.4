@@ -25,7 +25,6 @@ from loadScreen import MAIN_UI as LOAD_UI
 import packages
 from packages import PakRef
 from packages.item import SubItemRef
-from packages.widgets import mandatory_unlocked
 import utils
 from config.gen_opts import AfterExport
 from config.last_sel import LastSelected
@@ -727,7 +726,7 @@ async def init_windows(
         tool_img='icons/win_options',
         tool_col=11,
     )
-    corridor = TkSelector(packages.get_loaded_packages(), tk_img, selected_style)
+    corridor = TkSelector(tk_img, cur_style)
     await core_nursery.start(init_option, core_nursery, windows['opt'], tk_img, export, export_trig.ready, corridor)
     core_nursery.start_soon(corridor.task)
     await LOAD_UI.step('options')
@@ -884,5 +883,3 @@ async def init_windows(
             for sugg_cls, win in suggest_windows.items():
                 win.set_suggested(style_obj.suggested[sugg_cls])
             StyleVarPane.refresh(packset, style_obj)
-            corridor.load_corridors(packset, selected_style)
-            await corridor.refresh()
