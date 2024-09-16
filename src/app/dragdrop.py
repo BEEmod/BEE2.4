@@ -389,13 +389,13 @@ class ManagerBase[ItemT, ParentT]:
         self._ui_dragwin_hide()
         dest = self._pos_slot(x, y)
 
+        sound.fx('config')
+
         if dest is self._cur_slot:
             # Dropped on itself, just put the item back.
             dest.contents = self._cur_drag
             self._cur_drag = self._cur_slot = None
             return
-
-        sound.fx('config')
 
         if self._cur_slot.is_flexi:
             # It's a flexi slot, lookup the group and drop.
