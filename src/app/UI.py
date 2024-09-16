@@ -50,6 +50,7 @@ from app import (
 )
 from app.errors import Result as ErrorResult
 from app.menu_bar import MenuBar
+from trio_util import AsyncValue
 from ui_tk.item_picker import ItemPicker, ItemsBG
 from ui_tk.selector_win import SelectorWin, AttrDef as SelAttr, Options as SelectorOptions
 from ui_tk.context_win import ContextWin
@@ -582,6 +583,9 @@ async def init_windows(
     """
     global selected_style, sign_ui, context_win, item_picker
 
+    # This is updated at the end
+    cur_style = AsyncValue(PakRef(packages.Style, utils.obj_id(style_win.chosen.value)))
+
     def export() -> None:
         """Export the palette."""
         info = fetch_export_info()
@@ -856,13 +860,14 @@ async def init_windows(
     async with aclosing(style_win.chosen.eventual_values()) as agen:
         async for style_id in agen:
             packset = packages.get_loaded_packages()
-            if style_id == utils.ID_NONE:
-                LOGGER.warning('Style ID is None??')
+            try:
+                selected_style = utils.obj_id(style_id, 'Style')
+            except ValueError as exc:
+                LOGGER.warning(str(exc))
                 style_win.choose_item(style_win.item_list[0])
                 continue
 
-            selected_style = utils.obj_id(style_id)
-            ref = packages.PakRef(packages.Style, selected_style)
+            cur_style.value = ref = packages.PakRef(packages.Style, selected_style)
 
             style_obj = ref.resolve(packset)
             context_win.hide_context()
