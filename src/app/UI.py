@@ -848,8 +848,6 @@ async def init_windows(
         pane.load_conf()
         await trio.lowlevel.checkpoint()
 
-    first_select = trio.Event()
-
     async def style_select_callback() -> None:
         """Callback whenever a new style is chosen."""
         async with aclosing(style_win.chosen.eventual_values()) as agen:
@@ -882,11 +880,9 @@ async def init_windows(
                 StyleVarPane.refresh(packset, style_obj)
                 corridor.load_corridors(packset, selected_style)
                 await corridor.refresh()
-                first_select.set()  # Only set the palette after the first iteration runs.
 
     async with trio.open_nursery() as nursery:
         nursery.start_soon(style_select_callback)
-        await first_select.wait()
         item_picker.set_items(pal_ui.selected.items)
         pal_ui.is_dirty.set()
         task_status.started()
