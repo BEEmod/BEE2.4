@@ -120,6 +120,16 @@ class ScreenStage:
             yield item
             await self.step()
 
+    def warn_if_incomplete(self, owner: object) -> None:
+        """Check to see if this finished loading, and warn if not."""
+
+        if self._current < self._max and not self._skipped:
+            LOGGER.warning(
+                'Incomplete stage: "{}"."{}": {} < {}',
+                owner, self.title,
+                self._current, self._max,
+            )
+
 
 class LoadScreen:
     """LoadScreens show a loading screen for items.
@@ -183,9 +193,10 @@ class LoadScreen:
             self.active = False
             _QUEUE_SEND_LOAD.put(ipc_types.Load2Daemon_Reset(self.id))
             for stage in self.stages:
+                stage.warn_if_incomplete(self.title)
                 stage._bound.discard(self)
         finally:
-            # Always call __exit__(), but only return if reset() didn't raise.
+            # Always call scope's __exit__(), but just raise if our code errors.
             res = scope.__exit__(exc_type, exc_val, exc_tb)
         return res
 
@@ -225,6 +236,7 @@ class LoadScreen:
         self.active = False
         _QUEUE_SEND_LOAD.put(ipc_types.Load2Daemon_Destroy(self.id))
         for stage in self.stages:
+            stage.warn_if_incomplete(self.title)
             stage._bound.discard(self)
         del _ALL_SCREENS[self.id]
 

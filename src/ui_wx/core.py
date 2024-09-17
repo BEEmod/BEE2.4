@@ -37,7 +37,7 @@ async def init_app(core_nursery: trio.Nursery) -> None:
     conf = config.APP.get_cur_conf(GenOptions)
 
     LOGGER.debug('Starting loading screen...')
-    await loadScreen.MAIN_UI.set_length(16)
+    await loadScreen.MAIN_UI.set_length(13)
     loadScreen.set_force_ontop(conf.force_load_ontop)
     loadScreen.show_main_loader(conf.compact_splash)
 

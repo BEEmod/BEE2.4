@@ -109,15 +109,8 @@ class _WindowsDict(TypedDict):
 windows: _WindowsDict = cast(_WindowsDict, {})
 
 
-async def load_packages(
-    core_nursery: trio.Nursery,
-    packset: packages.PackagesSet,
-) -> None:
-    """Import in the list of items and styles from the packages.
-
-    A lot of our other data is initialised here too.
-    This must be called before initMain() can run.
-    """
+async def create_selectors(core_nursery: trio.Nursery) -> None:
+    """Create the main selector windows."""
     global skybox_win, voice_win, style_win, elev_win
     await trio.lowlevel.checkpoint()
 
@@ -578,7 +571,9 @@ async def init_windows(
     """
     global sign_ui, context_win, item_picker
 
-    # This is updated at the end
+    await run_as_task(create_selectors, core_nursery)
+
+    # This is updated at the end.
     cur_style = AsyncValue(PakRef(packages.Style, utils.obj_id(style_win.chosen.value)))
 
     def export() -> None:
