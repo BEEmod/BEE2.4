@@ -253,6 +253,8 @@ class DragDrop[ItemT](ManagerBase[ItemT, tk.Misc]):
         # Add border, but only if either icon exists or we contain an item.
         if slot_ui.text_lbl is not None or slot.contents is not None:
             slot_ui.lbl['relief'] = 'ridge'
+            # Lift above neighbours.
+            slot_ui.lbl.lift()
 
         # Show configure icon for items.
         if slot_ui.info_btn is not None and slot.contents is not None:
