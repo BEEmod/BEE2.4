@@ -36,18 +36,20 @@ class Opt[OptionT: OptionType]:
         opt_id: str,
         kind: type[OptionT],
         doc: str,
-        fallback: str | None = None,
+        fallback: Opt[OptionT] | None = None,
         hidden: bool = False,
     ) -> None:
         self.type = kind
         self.id = opt_id.casefold()
         self.name = opt_id
-        self.fallback = fallback
         self.hidden = hidden
         # Remove indentation, and trailing carriage return
         self.doc = inspect.cleandoc(doc).rstrip().splitlines()
         if fallback is not None:
+            self.fallback = fallback.id
             self.doc.append(f'If unset, the default is read from `{fallback}`.')
+        else:
+            self.fallback = None
 
     @classmethod
     def string_or_none(
@@ -63,7 +65,7 @@ class Opt[OptionT: OptionType]:
     def int_or_none(
         cls, opt_id: str, doc: str,
         *,
-        fallback: str | None = None,
+        fallback: Opt[int] | None = None,
         hidden: bool = False,
     ) -> Opt[int]:
         """An integer option, which can be unset."""
@@ -73,7 +75,7 @@ class Opt[OptionT: OptionType]:
     def float_or_none(
         cls, opt_id: str, doc: str,
         *,
-        fallback: str | None = None,
+        fallback: Opt[float] | None = None,
         hidden: bool = False,
     ) -> Opt[float]:
         """A float option, which can be unset."""
@@ -83,7 +85,7 @@ class Opt[OptionT: OptionType]:
     def bool_or_none(
         cls, opt_id: str, doc: str,
         *,
-        fallback: str | None = None,
+        fallback: Opt[bool] | None = None,
         hidden: bool = False,
     ) -> Opt[bool]:
         """A boolean option, which can be unset."""
@@ -93,7 +95,7 @@ class Opt[OptionT: OptionType]:
     def vec_or_none(
         cls, opt_id: str, doc: str,
         *,
-        fallback: str | None = None,
+        fallback: Opt[Vec] | None = None,
         hidden: bool = False,
     ) -> Opt[Vec]:
         """A boolean option, which can be unset."""
@@ -103,7 +105,7 @@ class Opt[OptionT: OptionType]:
     def string(
         cls, opt_id: str, default: str, doc: str,
         *,
-        fallback: str | None = None,
+        fallback: Opt[str] | None = None,
         hidden: bool = False,
     ) -> OptWithDefault[str]:
         """A string option, with a default value."""
@@ -113,7 +115,7 @@ class Opt[OptionT: OptionType]:
     def integer(
         cls, opt_id: str, default: int, doc: str,
         *,
-        fallback: str | None = None,
+        fallback: Opt[int] | None = None,
         hidden: bool = False,
     ) -> OptWithDefault[int]:
         """An integer option, with a default value."""
@@ -123,7 +125,7 @@ class Opt[OptionT: OptionType]:
     def float_num(
         cls, opt_id: str, default: float, doc: str,
         *,
-        fallback: str | None = None,
+        fallback: Opt[float] | None = None,
         hidden: bool = False,
     ) -> OptWithDefault[float]:
         """A float option, with a default value."""
@@ -133,7 +135,7 @@ class Opt[OptionT: OptionType]:
     def boolean(
         cls, opt_id: str, default: bool, doc: str,
         *,
-        fallback: str | None = None,
+        fallback: Opt[bool] | None = None,
         hidden: bool = False,
     ) -> OptWithDefault[bool]:
         """A bool option, with a default value."""
@@ -143,7 +145,7 @@ class Opt[OptionT: OptionType]:
     def vector(
         cls, opt_id: str, default: Vec, doc: str,
         *,
-        fallback: str | None = None,
+        fallback: Opt[Vec] | None = None,
         hidden: bool = False,
     ) -> OptWithDefault[Vec]:
         """A vector option, with a default value."""
@@ -210,7 +212,7 @@ class OptWithDefault[OptionT: OptionType](Opt[OptionT]):
         opt_id: str,
         default: OptionT,
         doc: str,
-        fallback: str | None = None,
+        fallback: Opt[OptionT] | None = None,
         hidden: bool = False,
     ) -> None:
         super().__init__(opt_id, type(default), doc, fallback, hidden)
