@@ -86,7 +86,8 @@ ALLOWED_SIZES: dict[TileType, list[TileSize]] = {
 
     TileType.WHITE_4x4: [TileSize.TILE_4x4],
     TileType.BLACK_4x4: [TileSize.TILE_4x4],
-    TileType.GOO_SIDE: [TileSize.GOO_SIDE],
+    TileType.GOO_SIDE_WHITE: [TileSize.GOO_SIDE],
+    TileType.GOO_SIDE_BLACK: [TileSize.GOO_SIDE],
 }
 
 
@@ -456,8 +457,8 @@ def calculate_bottom_trim(
                     continue
 
             match subtile.type:
-                # Restart the pattern above goo tiles..
-                case TileType.GOO_SIDE:
+                # Restart the pattern above goo tiles.
+                case TileType.GOO_SIDE_BLACK:
                     v += 1
                     count = 0
                     continue

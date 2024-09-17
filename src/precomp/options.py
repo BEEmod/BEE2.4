@@ -31,6 +31,13 @@ TYPE_NAMES = {
 
 class Opt[OptionT: OptionType]:
     """A type of option that can be chosen, which may also be unset."""
+    kind: type[OptionT]
+    fallback: str | None
+    id: str
+    name: str
+    hidden: bool
+    doc: list[str]
+
     def __init__(
         self,
         opt_id: str,
@@ -55,7 +62,7 @@ class Opt[OptionT: OptionType]:
     def string_or_none(
         cls, opt_id: str, doc: str,
         *,
-        fallback: str | None = None,
+        fallback: Opt[str] | None = None,
         hidden: bool = False,
     ) -> Opt[str]:
         """A string option, which can be unset."""
@@ -587,6 +594,10 @@ GOO_WALL_SCALE_TEMP = Opt.string_or_none(
     It should be a single brush cube - the wall is set to the same
     rotation as the matching side. (The bottom is ignored).
     """)
+GOO_WHITE_WALLS = Opt.boolean(
+    'goo_white_walls', False,
+    """Use white walls for the side of goo, when the tiles above are also white."""
+)
 GENERATE_TIDELINES = Opt.boolean(
     'generate_tidelines', False,
     """Generate tideline overlays around the outside of goo pits.

@@ -287,7 +287,7 @@ def res_set_texture(inst: Entity, res: Keyvalues) -> None:
         gen, name = texturing.parse_name(tex[1:-1])
         mat_conf = gen.get(pos - 64 * norm, name)
     else:
-        mat_conf = MaterialConf(tex, scale, rotation)
+        mat_conf = MaterialConf(tex, scale=scale, rotation=rotation)
 
     tile.override = (mat_conf, temp)
 
@@ -864,6 +864,7 @@ def res_set_tile(inst: Entity, res: Keyvalues) -> None:
     - `B`: Black tile.
     - `b`: Black 4x4 only tile.
     - `g`: The side/bottom of goo pits.
+    - `G`: White goo side, if available.
     - `n`: Nodraw surface.
     - `i`: Invert the tile surface, if black/white.
     - `1`: Convert to a 1x1 only tile, if a black/white tile.
@@ -947,23 +948,24 @@ def res_set_tile(inst: Entity, res: Keyvalues) -> None:
                     norm,
                 )
                 continue
+            existing = tile[u, v]
 
             if size is None:
                 # Invert the tile.
-                tile[u, v] = tile[u, v].inverted
+                tile[u, v] = existing.inverted
                 continue
 
-            # Unless forcing is enabled don't alter the size of GOO_SIDE.
-            if tile[u, v].is_tile and tile[u, v] is not tiling.TileType.GOO_SIDE:
+            # Goo tiles and non-tiles must be forced to be changed.
+            # If forcing, keep goo colour, non-tiles become black.
+            if existing.is_tile and not existing.is_goo_side:
                 tile[u, v] = tiling.TileType.with_color_and_size(
                     size,
-                    tile[u, v].color
+                    existing.color
                 )
             elif force_tile:
-                # If forcing, make it black. Otherwise, no need to change.
                 tile[u, v] = tiling.TileType.with_color_and_size(
                     size,
-                    tiling.Portalable.BLACK
+                    existing.color if existing.is_goo_side else tiling.Portalable.BLACK,
                 )
 
 

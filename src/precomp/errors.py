@@ -48,7 +48,7 @@ def load_tiledefs(tiles: Iterable[TileDef], grid: BrushLoc) -> None:
         if not block_type.inside_map:
             continue
         # Tint the area underneath goo, by just using two textures with the appropriate tints.
-        if tile.base_type is TileType.GOO_SIDE:
+        if tile.base_type.is_goo_side:
             if block_type.is_top and tile.normal.z < 0.9:
                 tile_list = tiles_goo_partial
             else:

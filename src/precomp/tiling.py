@@ -150,7 +150,9 @@ class TileType(Enum):
     BLACK = 2
     BLACK_4x4 = 3
 
-    GOO_SIDE = 4  # Black sides of goo pits.
+    # Side of goo pits. White only occurs if users request it.
+    GOO_SIDE_WHITE = 4
+    GOO_SIDE_BLACK = 5
 
     NODRAW = 10  # Covered, so it should be set to nodraw
 
@@ -201,11 +203,16 @@ class TileType(Enum):
         return '4x4' in self.name
 
     @property
+    def is_goo_side(self) -> bool:
+        """Is this a special tile for the side of goo?"""
+        return 'GOO_SIDE' in self.name
+
+    @property
     def color(self) -> texturing.Portalable:
         """The portalability of the tile."""
         if 'WHITE' in self.name:
             return texturing.Portalable.WHITE
-        elif 'BLACK' in self.name or self is TileType.GOO_SIDE:
+        elif 'BLACK' in self.name:
             return texturing.Portalable.BLACK
         raise ValueError('No colour for ' + self.name + '!')
 
@@ -224,22 +231,16 @@ class TileType(Enum):
     @property
     def as_white(self) -> TileType:
         """Force to the white version."""
-        if self is TileType.GOO_SIDE:
-            return TileType.WHITE_4x4
-        if self.name.startswith('BLACK'):
-            tile = getattr(TileType, f'WHITE{self.name.removeprefix('BLACK')}')
-            assert isinstance(tile, TileType)
-            return tile
-        return self
+        tile = getattr(TileType, self.name.replace('WHITE', 'BLACK'))
+        assert isinstance(tile, TileType)
+        return tile
 
     @property
     def as_black(self) -> TileType:
         """Force to the black version."""
-        if self.is_white:
-            tile = getattr(TileType, f'BLACK{self.name.removeprefix('WHITE')}')
-            assert isinstance(tile, TileType)
-            return tile
-        return self
+        tile = getattr(TileType, self.name.replace('BLACK', 'WHITE'))
+        assert isinstance(tile, TileType)
+        return tile
 
     @property
     def as_4x4(self) -> TileType:
@@ -269,6 +270,8 @@ _tiletype_tiles = {
     (TileSize.TILE_1x1, texturing.Portalable.WHITE): TileType.WHITE,
     (TileSize.TILE_4x4, texturing.Portalable.BLACK): TileType.BLACK_4x4,
     (TileSize.TILE_4x4, texturing.Portalable.WHITE): TileType.WHITE_4x4,
+    (TileSize.GOO_SIDE, texturing.Portalable.WHITE): TileType.GOO_SIDE_WHITE,
+    (TileSize.GOO_SIDE, texturing.Portalable.BLACK): TileType.GOO_SIDE_BLACK,
 }
 
 # Symbols that represent TileSize values.
@@ -277,7 +280,8 @@ TILETYPE_TO_CHAR = {
     TileType.WHITE_4x4: 'w',
     TileType.BLACK: 'B',
     TileType.BLACK_4x4: 'b',
-    TileType.GOO_SIDE: 'g',
+    TileType.GOO_SIDE_WHITE: 'g',
+    TileType.GOO_SIDE_BLACK: 'G',
     TileType.NODRAW: 'n',
     TileType.VOID: '.',
     TileType.CUTOUT_TILE_BROKEN: 'x',
@@ -1350,19 +1354,18 @@ class TileDef:
                 tile_center += vec_offset
 
             if tile_type.is_tile:
-                if tile_type is TileType.GOO_SIDE:
-                    # This forces a specific size.
+                # These types force a specific grid size.
+                if tile_type.is_4x4:
+                    grid_size = TileSize.TILE_4x4
+                    u_size = v_size = 1
+                elif tile_type.is_goo_side:
+                    grid_size = TileSize.GOO_SIDE
                     u_size = v_size = 4
-                    mat_conf = texturing.gen(
-                        gen_cat, orient, Portalable.BLACK
-                    ).get(tile_center, TileSize.GOO_SIDE, antigel=False)
                 else:
-                    if tile_type.is_4x4:
-                        grid_size = TileSize.TILE_4x4
                     u_size, v_size = grid_size.size
-                    mat_conf = texturing.gen(
-                        gen_cat, orient, tile_type.color,
-                    ).get(tile_center, grid_size, antigel=is_antigel)
+                mat_conf = texturing.gen(
+                    gen_cat, orient, tile_type.color,
+                ).get(tile_center, grid_size, antigel=is_antigel)
 
                 template: template_brush.ScalingTemplate | None
                 if self.override is not None:
@@ -1379,8 +1382,8 @@ class TileDef:
                     height=(vmax - vmin) * 32,
                     bevels=tile_bevels,
                     back_surf=texturing.SPECIAL.get(tile_center, 'behind', antigel=is_antigel),
-                    u_align=u_size * 128,
-                    v_align=v_size * 128,
+                    u_align=u_size * (32 * 4),  # Pixel counts.
+                    v_align=v_size * (32 * 4),
                     thickness=thickness,
                     panel_edge=is_panel,
                     antigel=is_antigel,
@@ -1575,11 +1578,9 @@ def edit_quarter_tile(
     if old_tile is TileType.NODRAW and tile_type.is_tile:
         return
 
-    # Don't regress goo sides to other types of black tile.
-    if old_tile is TileType.GOO_SIDE and (
-        tile_type is TileType.BLACK or tile_type is TileType.BLACK_4x4
-    ):
-        return
+    # Don't regress goo sides to other types of tile.
+    if old_tile.is_goo_side and tile_type.is_tile:
+        tile_type = TileType.with_color_and_size(TileSize.GOO_SIDE, tile_type.color)
 
     tile[u, v] = tile_type
 
@@ -1632,7 +1633,6 @@ def make_tile(
     axis_u, axis_v = Vec.INV_AXIS[normal.axis()]
 
     top_side = template['front'].copy(vmf_file=vmf)
-    top_surf.apply(top_side)
     top_side.translate(origin - recess_dist * normal)
 
     block_min = round_grid(origin) - (64, 64, 64)
@@ -1643,6 +1643,7 @@ def make_tile(
     top_side.vaxis.offset = 4 * (
         block_min[axis_v] - (origin[axis_v] - height/2)
     ) % v_align
+    top_surf.apply(top_side)
 
     back_side = template['back'].copy(vmf_file=vmf)
     # The offset was set to zero in the original we copy from.
@@ -1880,7 +1881,9 @@ def analyse_map(vmf_file: VMF, side_to_ant_seg: dict[int, list[antlines.Segment]
 
     # Now look at all the blocklocs in the map, applying goo sides.
     # Don't override white surfaces, they can only appear on panels.
-    goo_replaceable = [TileType.BLACK, TileType.BLACK_4x4]
+    goo_replaceable_black = [TileType.BLACK, TileType.BLACK_4x4]
+    goo_replaceable_white = goo_replaceable_black + [TileType.WHITE, TileType.WHITE_4x4]
+    goo_white_walls = options.GOO_WHITE_WALLS()
     for fpos, block in BLOCK_POS.items():
         if block.is_goo:
             for fnorm in NORMALS:
@@ -1890,9 +1893,22 @@ def analyse_map(vmf_file: VMF, side_to_ant_seg: dict[int, list[antlines.Segment]
                 except KeyError:
                     continue
 
+                dest_type = TileType.GOO_SIDE_BLACK
+                goo_replaceable = goo_replaceable_black
+                if goo_white_walls and fnorm.z == 0:
+                    try:
+                        above_tile = TILES[(grid_pos + (0, 0, 128)).as_tuple(), fnorm.as_tuple()]
+                    except KeyError:
+                        pass
+                    else:
+                        LOGGER.info('Base type: {}, {}', grid_pos, above_tile.base_type)
+                        if above_tile.base_type.is_white:
+                            dest_type = TileType.GOO_SIDE_WHITE
+                            goo_replaceable = goo_replaceable_white
+
                 for u, v, tile_type in tile:
                     if tile_type in goo_replaceable:
-                        tile[u, v] = TileType.GOO_SIDE
+                        tile[u, v] = dest_type
 
 
 def tiledefs_from_cube(face_to_tile: dict[int, TileDef], brush: Solid, grid_pos: Vec) -> None:
@@ -2168,21 +2184,19 @@ def generate_brushes(vmf: VMF) -> None:
             pos = tile.pos + 64 * tile.normal
             is_antigel = tile.is_antigel()
 
-            if tile_type is TileType.GOO_SIDE:
-                # This forces a specific size.
-                mat_conf = texturing.gen(
-                    texturing.GenCat.NORMAL,
-                    normal,
-                    Portalable.BLACK
-                ).get(pos, TileSize.GOO_SIDE, antigel=False)
-            elif tile_type is TileType.NODRAW:
+            if tile_type is TileType.NODRAW:
                 mat_conf = NODRAW_MAT
             else:
+                if tile_type.is_goo_side:
+                    # This forces a specific size.
+                    tile_size = TileSize.GOO_SIDE
+                else:
+                    tile_size = tile_type.tile_size
                 mat_conf = texturing.gen(
                     texturing.GenCat.NORMAL,
                     normal,
-                    tile.base_type.color
-                ).get(pos, tile.base_type.tile_size, antigel=is_antigel)
+                    tile_type.color
+                ).get(pos, tile_size, antigel=is_antigel)
 
             u_pos = int((pos[u_axis] - bbox_min[u_axis]) // 128)
             v_pos = int((pos[v_axis] - bbox_min[v_axis]) // 128)
@@ -2209,7 +2223,7 @@ def generate_brushes(vmf: VMF) -> None:
                 # For now, convert any tiles which happen to be multiples of 256 into double
                 # tiles, if we have any.
                 if (
-                    subtile_type is not TileType.GOO_SIDE
+                    not subtile_type.is_goo_side
                     and TileSize.TILE_DOUBLE in gen
                     and width % 2 == height % 2 == 0
                 ):
