@@ -1,21 +1,19 @@
 """A widget for allowing selecting a colour."""
-from contextlib import aclosing
-from collections.abc import Mapping
-
 from tkinter import ttk
 from tkinter.colorchooser import askcolor
 import tkinter as tk
+from collections.abc import Mapping
+from contextlib import aclosing
 
 from trio_util import AsyncValue
 import trio
 
-from packages.widgets import KIND_COLOR, parse_color
-from app import img
-from ui_tk import tk_tools
-from app import itemconfig
-from ui_tk.tooltip import add_tooltip
+from app import img, itemconfig
 from app.localisation import TransToken
+from packages.widgets import KIND_COLOR, parse_color
+from ui_tk import tk_tools
 from ui_tk.img import TKImages
+from ui_tk.tooltip import add_tooltip
 
 
 TRANS_SELECT_TITLE = TransToken.ui('Choose a Color')

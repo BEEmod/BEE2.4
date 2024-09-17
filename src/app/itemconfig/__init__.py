@@ -1,27 +1,33 @@
 """Customizable configuration for specific items or groups of them."""
 from __future__ import annotations
-
-from contextlib import aclosing
 from typing import Any, Protocol
 
-from collections.abc import Awaitable, Callable, Mapping, Iterator
-from datetime import timedelta
 from tkinter import ttk
 import tkinter as tk
+from collections.abc import Awaitable, Callable, Iterator, Mapping
+from contextlib import aclosing
+from datetime import timedelta
 import functools
 
 from srctools import logger
-
 from trio_util import AsyncValue
 import trio
 
-from app import UI, sound, StyleVarPane
-from app.SubPane import SubPane
+from app import UI, StyleVarPane, sound
 from app.mdown import MarkdownData
+from app.SubPane import SubPane
 from async_util import EdgeTrigger, run_as_task
 from config.filters import FilterConf
+from config.widgets import (
+    TIMER_NUM as TIMER_NUM, TIMER_STR_INF as TIMER_STR_INF,
+    TimerNum as TimerNum, WidgetConfig,
+)
 from packages.signage import ITEM_ID as SIGNAGE_ITEM_ID
-from transtoken import TransToken, CURRENT_LANG
+from packages.widgets import (
+    CLS_TO_KIND, UNLOCK_DEFAULT_ID, ConfigGroup, ConfigProto, ItemVariantConf,
+    WidgetType, WidgetTypeWithConf,
+)
+from transtoken import CURRENT_LANG, TransToken
 from ui_tk import TK_ROOT, tk_tools
 from ui_tk.img import TKImages
 from ui_tk.tooltip import add_tooltip
@@ -29,16 +35,6 @@ from ui_tk.wid_transtoken import set_text
 import config
 import packages
 
-# Re-export.
-from config.widgets import (
-    WidgetConfig, TimerNum as TimerNum, TIMER_NUM as TIMER_NUM,
-    TIMER_STR_INF as TIMER_STR_INF,
-)
-from packages.widgets import (
-    CLS_TO_KIND, ConfigGroup, ConfigProto, ItemVariantConf,
-    UNLOCK_DEFAULT_ID,
-    WidgetType, WidgetTypeWithConf,
-)
 
 LOGGER = logger.get_logger(__name__)
 

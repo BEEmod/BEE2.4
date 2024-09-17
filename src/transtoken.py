@@ -6,16 +6,18 @@ We take care not to directly import gettext and babel, so the compiler can omit 
 """
 from __future__ import annotations
 from typing import (
-    Any, ClassVar, Final, Never, NoReturn, Protocol, cast, final,  LiteralString, override
+    Any, ClassVar, Final, LiteralString, Never, NoReturn, Protocol, cast, final,
+    override,
 )
+
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from enum import Enum
 from html import escape as html_escape
 from pathlib import Path
 import string
 
-from trio_util import AsyncValue
 from srctools import EmptyMapping, logger
+from trio_util import AsyncValue
 import attrs
 
 import utils

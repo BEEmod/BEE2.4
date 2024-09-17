@@ -17,8 +17,8 @@ import srctools.logger
 import trio
 import trio_util
 
-from ui_tk import TK_ROOT
 from config.gen_opts import GenOptions
+from ui_tk import TK_ROOT
 import config
 import utils
 

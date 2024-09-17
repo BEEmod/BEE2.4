@@ -9,22 +9,23 @@ from contextlib import aclosing
 import itertools
 import random
 
+from trio_util import AsyncValue, RepeatedEvent
 import attrs
 import srctools.logger
 import trio
+import trio_util
 
-from app import DEV_MODE, ReflowWindow, WidgetCache, img
-from app.mdown import MarkdownData
 from async_util import EdgeTrigger, iterval_cancelling
 from config.corridors import Config, Options, UIState
 from corridor import Attachment, Direction, GameMode, Option
-from packages import PackagesSet, PakRef, CorridorGroup, Style, corridor
+from packages import CorridorGroup, PackagesSet, PakRef, Style, corridor
 from transtoken import TransToken
-from trio_util import AsyncValue, RepeatedEvent
 import config
 import packages
-import trio_util
 import utils
+
+from . import DEV_MODE, ReflowWindow, WidgetCache, img
+from .mdown import MarkdownData
 
 
 LOGGER = srctools.logger.get_logger(__name__)

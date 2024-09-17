@@ -2,13 +2,12 @@
 from __future__ import annotations
 from typing import Any, Final
 
-from collections.abc import Callable, Iterator
 from collections import defaultdict
+from collections.abc import Callable, Iterator
 from enum import Enum
 import abc
 
 from srctools.logger import get_logger
-
 from trio_util import AsyncValue, RepeatedEvent
 import attrs
 

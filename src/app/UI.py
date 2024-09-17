@@ -1,6 +1,4 @@
 """Main UI module, brings everything together."""
-# TODO: Remove once done?
-from __future__ import annotations
 from typing import TypedDict, cast, assert_never
 
 from tkinter import ttk
@@ -8,13 +6,11 @@ import tkinter as tk
 
 from collections.abc import Callable
 from contextlib import aclosing
-import random
 import functools
 
 import srctools.logger
 import trio
 import trio_util
-from srctools import EmptyMapping
 
 import exporting
 from app import lifecycle, quit_app

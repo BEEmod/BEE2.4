@@ -1,5 +1,5 @@
 """API for dialog boxes."""
-from typing import ClassVar, Protocol, Literal
+from typing import ClassVar, Literal, Protocol
 
 from collections.abc import Callable
 from enum import Enum

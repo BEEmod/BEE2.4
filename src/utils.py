@@ -1,27 +1,26 @@
 """Various functions shared among the compiler and application."""
 from __future__ import annotations
-
 from typing import (
-    Final, NewType, Protocol, TYPE_CHECKING, Any, NoReturn, SupportsInt, Literal, TypeGuard,
-    overload,
+    TYPE_CHECKING, Any, Final, Literal, NewType, NoReturn, Protocol,
+    SupportsInt, TypeGuard, overload,
 )
 from typing_extensions import deprecated
-from collections.abc import (
-    Callable, Collection, Generator, Iterable,
-    Iterator, Mapping, Sequence,
-)
+
 from collections import deque
+from collections.abc import (
+    Callable, Collection, Generator, Iterable, Iterator, Mapping, Sequence,
+)
 from enum import Enum
 from pathlib import Path
+import copyreg
 import functools
 import itertools
-import copyreg
 import logging
+import math
 import os
 import stat
 import sys
 import zipfile
-import math
 
 from srctools import Angle, conv_bool
 import trio_util
@@ -131,8 +130,7 @@ def get_git_version(inst_path: Path | str) -> str:
 try:
     # This module is generated when the app is compiled.
     from _compiled_version import (  # type: ignore
-        BEE_VERSION as BEE_VERSION,
-        HA_VERSION as HA_VERSION,
+        BEE_VERSION as BEE_VERSION, HA_VERSION as HA_VERSION,
     )
 except ImportError:
     # We're running from src/, so data is in the folder above that.

@@ -8,10 +8,13 @@ from contextlib import aclosing
 import functools
 
 from srctools.logger import get_logger
+from trio_util import AsyncValue
 import trio
 
 from app import img, sound
-from app.contextWin import IMG_ALPHA, SPR, TRANS_ENT_COUNT, TRANS_NO_VERSIONS, ContextWinBase
+from app.contextWin import (
+    IMG_ALPHA, SPR, TRANS_ENT_COUNT, TRANS_NO_VERSIONS, ContextWinBase,
+)
 from app.item_picker import ItemPickerBase
 from app.item_properties import PropertyWindow
 from app.mdown import MarkdownData
@@ -19,7 +22,6 @@ from async_util import EdgeTrigger
 from packages import PakRef, Style
 from packages.item import Item
 from transtoken import TransToken
-from trio_util import AsyncValue
 import utils
 
 from . import TK_ROOT, tk_tools, tooltip

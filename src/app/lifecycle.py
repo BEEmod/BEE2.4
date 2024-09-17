@@ -1,20 +1,20 @@
 """Manages the core package loading/export lifecycle."""
 from typing import overload
 
-import srctools.logger
-import trio
 from srctools import KeyValError, Keyvalues
 from srctools.filesys import File
+import srctools.logger
+import trio
 
-import exporting
-from app import gameMan, quit_app, DEV_MODE
-from async_util import EdgeTrigger, run_as_task
+from app import DEV_MODE, gameMan, quit_app
 from app.errors import ErrorUI, Result as ErrorResult
+from async_util import EdgeTrigger, run_as_task
 from exporting import ExportInfo, mod_support
 from transtoken import TransToken
-import BEE2_config
-import packages
 from utils import PackagePath
+import BEE2_config
+import exporting
+import packages
 
 
 LOGGER = srctools.logger.get_logger(__name__)

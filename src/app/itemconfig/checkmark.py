@@ -1,17 +1,17 @@
 """A simple widget that configures a boolean value."""
-from contextlib import aclosing
-from collections.abc import Mapping
 from tkinter import ttk
 import tkinter as tk
+from collections.abc import Mapping
+from contextlib import aclosing
 
 from srctools import conv_bool
 from trio_util import AsyncValue
 import trio
 
 from app import itemconfig
-from ui_tk.tooltip import add_tooltip
 from packages.widgets import KIND_CHECKMARK
 from ui_tk.img import TKImages
+from ui_tk.tooltip import add_tooltip
 
 
 @itemconfig.ui_single_no_conf(KIND_CHECKMARK)

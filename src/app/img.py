@@ -6,14 +6,14 @@ filename/options, so are cheap to create. Once applied to a UI widget,
 they are loaded in the background, then unloaded if removed from all widgets.
 """
 from __future__ import annotations
-
-from abc import abstractmethod
-from contextlib import aclosing
 from typing import Any, ClassVar, Final, Literal, override
 from typing_extensions import Self
-from collections.abc import Mapping, Sequence, Iterator
-from pathlib import Path, PurePath
+
+from abc import abstractmethod
+from collections.abc import Iterator, Mapping, Sequence
+from contextlib import aclosing
 from fractions import Fraction
+from pathlib import Path, PurePath
 import abc
 import functools
 import itertools
@@ -22,7 +22,9 @@ import weakref
 
 from PIL import Image, ImageColor, ImageDraw, ImageFont
 from srctools import Keyvalues, Vec
-from srctools.filesys import FileSystem, FileSystemChain, RawFileSystem, File as FSFile
+from srctools.filesys import (
+    File as FSFile, FileSystem, FileSystemChain, RawFileSystem,
+)
 from srctools.vtf import VTF
 import attrs
 import srctools.logger

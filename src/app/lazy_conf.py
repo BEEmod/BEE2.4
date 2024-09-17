@@ -1,6 +1,7 @@
 """Implements callables which lazily parses and combines config files."""
 from __future__ import annotations
 from typing import Final, Pattern
+
 from collections.abc import Awaitable, Callable
 import functools
 

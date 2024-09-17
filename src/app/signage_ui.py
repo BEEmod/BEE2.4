@@ -2,7 +2,7 @@
 from __future__ import annotations
 from typing import Final, TypeGuard
 
-from collections.abc import Sequence, Iterator
+from collections.abc import Iterator, Sequence
 from datetime import timedelta
 import abc
 
@@ -11,12 +11,12 @@ import trio
 import trio_util
 
 from app import ReflowWindow, WidgetCache, dragdrop, img
-from async_util import iterval_cancelling, EdgeTrigger
+from async_util import EdgeTrigger, iterval_cancelling
 from config.signage import DEFAULT_IDS, Layout
-from packages import Signage, Style, PakRef
-import packages
+from packages import PakRef, Signage, Style
 from transtoken import TransToken
 import config
+import packages
 import utils
 
 

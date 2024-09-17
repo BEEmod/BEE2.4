@@ -13,26 +13,26 @@ from contextlib import aclosing
 from enum import Enum
 import webbrowser
 
-from trio_util import AsyncValue
 from srctools.logger import get_logger
+from trio_util import AsyncValue
 import trio
 
-from . import sound, img, DEV_MODE
 from async_util import EdgeTrigger
+from consts import DefaultItems
+from editoritems import Handle as RotHandle, ItemClass, SubType, Surface
+from editoritems_props import prop_timer_delay
+from packages.item import Item, ItemVariant, SubItemRef, Version
+from packages.signage import ITEM_ID as SIGNAGE_ITEM_ID
+from transtoken import TransToken
+import packages
+
+from . import DEV_MODE, img, sound
+from .dialogs import Dialogs
 from .dragdrop import Slot
 from .item_picker import ItemPickerBase
 from .item_properties import PropertyWindow
 from .mdown import MarkdownData
-from .dialogs import Dialogs
-from consts import DefaultItems
 from .paletteLoader import Coord
-from packages.item import Item, ItemVariant, SubItemRef, Version
-from packages.signage import ITEM_ID as SIGNAGE_ITEM_ID
-import packages
-
-from editoritems import Handle as RotHandle, SubType, Surface, ItemClass
-from editoritems_props import prop_timer_delay
-from transtoken import TransToken
 
 
 LOGGER = get_logger(__name__)

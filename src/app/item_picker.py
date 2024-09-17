@@ -6,24 +6,21 @@ from collections.abc import Callable, Mapping
 from contextlib import aclosing
 import random
 
+from trio_util import AsyncValue
 import attrs
 import trio
 
 from app import LOGGER, ReflowWindow, WidgetCache, dragdrop, img, sound
 from app.dragdrop import DragInfo
-from app.paletteLoader import Coord, ItemPos, Palette
+from app.paletteLoader import Coord, ItemPos
 from async_util import iterval_cancelling
 from config.filters import FilterConf
 from config.item_defaults import ItemDefault
-from packages import (
-    CLEAN_STYLE, LOADED as PAK_LOADED, PackagesSet, PakRef, Style,
-)
+from packages import LOADED as PAK_LOADED, PackagesSet, PakRef, Style
 from packages.item import Item, SubItemRef
 from packages.widgets import mandatory_unlocked
 from transtoken import TransToken
-from trio_util import AsyncValue
 import config
-import utils
 
 
 type ItemSlot = dragdrop.Slot[SubItemRef]

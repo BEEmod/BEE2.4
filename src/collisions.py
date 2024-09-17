@@ -1,15 +1,17 @@
 """Defines the region of space items occupy and computes collisions."""
 from __future__ import annotations
-from typing import Self, Literal, override, overload
+from typing import Literal, Self, overload, override
 
 from collections.abc import Iterable, Iterator, Sequence
 from enum import Flag
 import functools
 import operator
 
-from srctools.vmf import VMF, Entity, Solid, Side
-from srctools.math import AnyAngle, AnyMatrix, FrozenVec, Matrix, Vec, to_matrix, lerp
 from srctools import conv_bool, logger
+from srctools.math import (
+    AnyAngle, AnyMatrix, FrozenVec, Matrix, Vec, lerp, to_matrix,
+)
+from srctools.vmf import VMF, Entity, Side, Solid
 import attrs
 
 import consts

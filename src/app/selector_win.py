@@ -8,32 +8,31 @@ from __future__ import annotations
 from typing import Final, Literal, assert_never
 
 from abc import abstractmethod
-
-from contextlib import aclosing
-from collections.abc import Awaitable, Callable, Container, Iterable, Iterator
 from collections import defaultdict
+from collections.abc import Awaitable, Callable, Container, Iterable, Iterator
+from contextlib import aclosing
 from enum import Enum, auto as enum_auto
 import functools
 import math
 import random
 
-from srctools import Vec, EmptyMapping
+from srctools import EmptyMapping, Vec
 from srctools.filesys import FileSystemChain
 import attrs
 import srctools.logger
 import trio
 import trio_util
 
+from app import DEV_MODE, ReflowWindow, WidgetCache, img, sound
 from app.mdown import MarkdownData
-from app import ReflowWindow, WidgetCache, sound, img, DEV_MODE
-from packages import SelitemData, AttrTypes, AttrDef as AttrDef, AttrMap
-from transtoken import TransToken
 from config.last_sel import LastSelected
 from config.windows import SelectorState
-import utils
+from packages import AttrDef as AttrDef, AttrMap, AttrTypes, SelitemData
+from transtoken import TransToken
 import async_util
 import config
 import packages
+import utils
 
 
 LOGGER = srctools.logger.get_logger(__name__)

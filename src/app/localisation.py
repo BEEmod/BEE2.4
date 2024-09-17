@@ -3,47 +3,44 @@
 The widgets tokens are applied to are stored, so changing language can update the UI.
 """
 from __future__ import annotations
+from typing import TYPE_CHECKING, Any, Protocol, override
 
-from typing import Any, Protocol, TYPE_CHECKING, override
-
-from collections.abc import AsyncGenerator, Callable, Iterable, Iterator
 from collections import defaultdict
+from collections.abc import AsyncGenerator, Callable, Iterable, Iterator
 from contextlib import aclosing
-import weakref
+from pathlib import Path
 import datetime
 import functools
+import gettext as gettext_mod
 import io
 import itertools
-import string
-
-from pathlib import Path
-import gettext as gettext_mod
 import locale
+import string
 import sys
+import weakref
 
-from srctools.filesys import RawFileSystem
-from srctools import FileSystem, logger
-from babel.messages.pofile import read_po, write_po
-from babel.messages.mofile import write_mo
-from babel.messages import Catalog
-from babel.numbers import format_decimal
 from babel.dates import format_date, format_datetime, format_skeleton
-from babel.localedata import load as load_cldr
 from babel.lists import format_list
+from babel.localedata import load as load_cldr
+from babel.messages import Catalog
+from babel.messages.mofile import write_mo
+from babel.messages.pofile import read_po, write_po
+from babel.numbers import format_decimal
+from srctools import FileSystem, logger
+from srctools.filesys import RawFileSystem
+import attrs
 import babel
 import trio
-import attrs
 
 from config.gen_opts import GenOptions
+from transtoken import (
+    DUMMY, NS_UI, PETI_KEY_PREFIX, Language, PluralTransToken, TransToken,
+    TransTokenSource,
+)
 import config
 import packages
-import utils
-
-from transtoken import (
-    NS_UI, PETI_KEY_PREFIX, DUMMY,
-    TransToken, TransTokenSource, PluralTransToken, Language,
-)
 import transtoken
+import utils
 
 
 # Circular import issues.
