@@ -12,7 +12,9 @@ import abc
 import attrs
 import trio
 
-from srctools import FrozenMatrix, FrozenVec, Keyvalues, Matrix, Vec, conv_bool
+from srctools import (
+    FrozenMatrix, FrozenVec, Keyvalues, Matrix, Vec, conv_bool, conv_float,
+)
 from srctools.game import Game
 from srctools.tokenizer import TokenSyntaxError
 from srctools.vmf import Entity, UVAxis, VisGroup, VMF, Side, Solid
@@ -311,14 +313,16 @@ BOTTOM_TRIM_CHAR = {
 class MaterialConf:
     """Texture, rotation, scale to apply."""
     mat: str
-    scale: float = 1.0
-    rotation: QuarterRot = QuarterRot.NONE
+    scale: float = attrs.field(kw_only=True, default=1.0)
+    off_x: float = attrs.field(kw_only=True, default=0.0)
+    off_y: float = attrs.field(kw_only=True, default=0.0)
+    rotation: QuarterRot = attrs.field(kw_only=True, default=QuarterRot.NONE)
     # If set, determines the maximum number of times this tile can be repeated before a new
     # one must be calculated.
-    repeat_limit: int = 8
+    repeat_limit: int = attrs.field(kw_only=True, default=8)
     # For tile materials, the original size of the surface.
     # This is used for aligning UVs correctly.
-    tile_size: TileSize = TileSize.TILE_4x4
+    tile_size: TileSize = attrs.field(kw_only=True, default=TileSize.TILE_4x4)
 
     @classmethod
     def parse(cls, kv: Keyvalues, tile_size: TileSize = TileSize.TILE_4x4) -> MaterialConf:
@@ -329,6 +333,19 @@ class MaterialConf:
             material = kv['material']
         except LookupError:
             raise ValueError('Material definition must have "material" key!') from None
+        off_x = off_y = 0.0
+        try:
+            offset_str = kv['offset']
+        except LookupError:
+            pass
+        else:
+            match offset_str.split():
+                case [x_str, y_str]:
+                    off_x = conv_float(x_str)
+                    off_y = conv_float(y_str)
+                case _:
+                    LOGGER.warning('Invalid offset "{}" - must be two numbers.', offset_str)
+
         scale = kv.float('scale', 1.0)
         if scale <= 0.0:
             LOGGER.warning('Material scale should be positive, not {}!', scale)
@@ -341,7 +358,15 @@ class MaterialConf:
             rotation = QuarterRot.parse(kv['rotation'])
         except LookupError:
             rotation = QuarterRot.NONE
-        return cls(material, scale, rotation, repeat_limit, tile_size)
+        return cls(
+            material,
+            scale=scale,
+            off_x=off_x,
+            off_y=off_y,
+            rotation=rotation,
+            repeat_limit=repeat_limit,
+            tile_size=tile_size,
+        )
 
     def __bool__(self) -> bool:
         """Blank materials are falsey."""
@@ -358,6 +383,8 @@ class MaterialConf:
         """
         face.mat = self.mat
         uaxis, vaxis = face.uaxis, face.vaxis
+        uaxis.offset += self.off_x
+        vaxis.offset += self.off_y
 
         uaxis.scale *= self.scale
         vaxis.scale *= self.scale
