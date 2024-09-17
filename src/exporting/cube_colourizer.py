@@ -30,9 +30,13 @@ async def make_cube_colourizer_legend(exp_data: ExportData) -> None:
     # Find the colourizer group, and grab its values. If not currently present,
     # we don't need to generate.
     try:
-        config = exp_data.packset.obj_by_id(ConfigGroup, 'BEE2_CUBE_COLORISER')
+        config = exp_data.packset.obj_by_id(
+            ConfigGroup,
+            'BEE2_CUBE_COLORISER',
+            optional=True,
+        )
     except KeyError:
-        LOGGER.debug('No cube colorizer config group!')
+        LOGGER.info('Cube colouriser not installed, skipping legend generation.')
         return
     for wid in config.multi_widgets:
         if wid.id == 'color':

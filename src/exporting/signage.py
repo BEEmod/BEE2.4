@@ -12,16 +12,20 @@ import srctools.logger
 import trio.to_thread
 
 from app.img import Handle as ImgHandle
-from packages import CLEAN_STYLE, PackagesSet, PakRef, Style
+from packages import CLEAN_STYLE, PackagesSet, PakRef, Style, TRANS_OBJ_NOT_FOUND
 from packages.signage import (
     CELL_SIZE, LEGEND_SIZE, Signage, SignageLegend, SignStyle,
 )
+from transtoken import AppError, TransToken
 
 from . import STEPS, ExportData, StepResource
 
 
 LOGGER = srctools.logger.get_logger(__name__)
 SIGN_LOC: Final = 'bee2/materials/bee2/models/props_map_editor/signage/signage.vtf'
+
+TRANS_MISSING_SELECTED = TransToken.ui('Selected signage "{id}" does not exist.')
+TRANS_MISSING_CHILD = TransToken.ui('Signage "{id}"\'s {child} "{sub_id}" does not exist.')
 
 
 def serialise(sign: Signage, parent: Keyvalues, style: Style) -> SignStyle | None:
@@ -61,12 +65,13 @@ async def step_signage(exp_data: ExportData) -> None:
     sel_icons: dict[int, ImgHandle] = {}
 
     conf = Keyvalues('Signage', [])
+    errors = []
 
     for tim_id, sign_id in sel_ids:
         try:
             sign = exp_data.packset.obj_by_id(Signage, sign_id)
         except KeyError:
-            LOGGER.warning('Signage "{}" does not exist!', sign_id)
+            errors.append(AppError(TRANS_MISSING_SELECTED.format(id=sign_id)))
             continue
         prop_block = Keyvalues(str(tim_id), [])
 
@@ -80,9 +85,11 @@ async def step_signage(exp_data: ExportData) -> None:
                 try:
                     sub_sign = exp_data.packset.obj_by_id(Signage, sub_id)
                 except KeyError:
-                    LOGGER.warning(
-                        'Signage "{}"\'s {} "{}" '
-                        'does not exist!', sign_id, sub_name, sub_id)
+                    errors.append(AppError(TRANS_MISSING_SELECTED.format(
+                        id=sign_id,
+                        child=sub_name,
+                        sub_id=sub_id,
+                    )))
                 else:
                     sub_block = Keyvalues(sub_name, [])
                     serialise(sub_sign, sub_block, exp_data.selected_style)
@@ -95,6 +102,9 @@ async def step_signage(exp_data: ExportData) -> None:
         # Valid timer number, store to be placed on the texture.
         if tim_id.isdigit() and sty_sign is not None:
             sel_icons[int(tim_id)] = sty_sign.icon
+
+    if errors:
+        raise ExceptionGroup('Signage Export', errors)
 
     exp_data.vbsp_conf.append(conf)
     sign_path = Path(exp_data.game.abs_path(SIGN_LOC))
@@ -129,7 +139,7 @@ def make_legend(
     num_step = num_x = num_y = 0
     for style in sel_style.bases:
         try:
-            legend_info = packset.obj_by_id(SignageLegend, style.id)
+            legend_info = packset.obj_by_id(SignageLegend, style.id, optional=True)
         except KeyError:
             pass
         else:

@@ -307,7 +307,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
         await packset.ready(packages.Style).wait()
         for item_id, (mode, direction) in ID_TO_CORR.items():
             try:
-                item = packset.obj_by_id(packages.Item, item_id)
+                item = packset.obj_by_id(packages.Item, item_id, optional=True)
             except KeyError:
                 continue
             count = CORRIDOR_COUNTS[mode, direction]
@@ -318,7 +318,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                     except KeyError:
                         continue
                     try:
-                        corridor_group = packset.obj_by_id(cls, style_id)
+                        corridor_group = packset.obj_by_id(cls, style_id, optional=True)
                     except KeyError:
                         # Synthesise a new group to match.
                         corridor_group = cls(id=style_id, corridors={})
@@ -390,8 +390,9 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
         for corridor_group in packset.all_obj(cls):
             for inherit in corridor_group.inherit:
                 try:
-                    parent_group = packset.obj_by_id(cls, inherit)
+                    parent_group = packset.obj_by_id(cls, inherit, optional=True)
                 except KeyError:
+                    # TODO: Make this an AppError warning for package authors.
                     LOGGER.warning(
                         'Corridor Group "{}" is trying to inherit from nonexistent group "{}"!',
                         corridor_group.id, inherit,
@@ -400,6 +401,7 @@ class CorridorGroup(packages.PakObject, allow_mult=True):
                 if parent_group.inherit:
                     # Disable recursive inheritance for simplicity, can add later if it's actually
                     # useful.
+                    # TODO: Make this also an AppError warning.
                     LOGGER.warning(
                         'Corridor Groups "{}" cannot inherit from a group that '
                         'itself inherits ("{}"). If you need this, ask for '

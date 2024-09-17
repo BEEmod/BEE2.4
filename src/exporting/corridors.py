@@ -13,6 +13,7 @@ from corridor import (
     CorrKind, Corridor, OptionGroup, Direction, GameMode, Attachment, ExportedConf,
     CORRIDOR_COUNTS, ID_TO_CORR,
 )
+from transtoken import AppError, TransToken
 from . import ExportData, STEPS, StepResource
 from packages.corridor import CorridorGroup
 import config
@@ -24,6 +25,9 @@ ALL_OPTION_KINDS: list[OptionGroup] = [
     (mode, direction)
     for mode in GameMode for direction in Direction
 ]
+TRANS_MISSING_GROUP = TransToken.ui(
+    'No corridor definitions found for style "{id}"!'
+)
 
 
 @STEPS.add_step(prereq=[StepResource.EI_ITEMS], results=[StepResource.EI_DATA, StepResource.VCONF_DATA])
@@ -33,7 +37,9 @@ async def step_corridor_conf(exp_data: ExportData) -> None:
     try:
         group = exp_data.packset.obj_by_id(CorridorGroup, style_id)
     except KeyError:
-        raise Exception(f'No corridor group for style "{style_id}"!') from None
+        raise AppError(TRANS_MISSING_GROUP.format(
+            id=style_id,
+        )) from None
 
     export: dict[CorrKind, list[Corridor]] = {}
     for mode, direction, attach in itertools.product(GameMode, Direction, Attachment):

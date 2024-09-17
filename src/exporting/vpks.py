@@ -17,7 +17,7 @@ from srctools import VPK, logger
 
 from transtoken import AppError, TransToken
 from . import ExportData, STEPS, StepResource
-from packages import StyleVPK
+from packages import StyleVPK, TRANS_OBJ_NOT_FOUND
 import utils
 
 
@@ -234,7 +234,7 @@ async def step_gen_vpk(exp_data: ExportData) -> None:
         try:
             sel_vpk = exp_data.packset.obj_by_id(StyleVPK, sel_vpk_name)
         except KeyError:
-            sel_vpk = None
+            raise AppError(TRANS_OBJ_NOT_FOUND.format(object='Style VPK', id=sel_vpk_name))
     else:
         sel_vpk = None
 
