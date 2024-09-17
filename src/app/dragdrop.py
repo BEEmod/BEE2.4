@@ -551,7 +551,7 @@ class Slot[ItemT]:
         if value is not None and self.is_target:
             # Make sure this isn't already present.
             for slot in self.man._slots:
-                if slot.is_target and slot.contents is value:
+                if slot.is_target and slot.contents == value:
                     slot.contents = None
         # Then set us.
         self._contents = value
