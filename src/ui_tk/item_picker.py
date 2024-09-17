@@ -116,7 +116,7 @@ class ItemPicker(ItemPickerBase[tk.Misc]):
         self.canv_pos.place_slots(self.slots_picker.placed, "real_slots", xoff=1)
         for x, y in self.canv_pos.remainder(xoff=1):
             self.picker_canv.create_rectangle(
-                x, y,
+                x + 1.5, y + 1.5,
                 x + 64, y + 64,
                 fill=PETI_ITEM_BG_HEX,
                 width=0,

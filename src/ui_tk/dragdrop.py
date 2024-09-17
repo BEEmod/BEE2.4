@@ -106,7 +106,7 @@ class CanvasPositioner[T]:
     def remainder(self, xoff: int = 0) -> Iterator[tuple[int, int]]:
         """If the current row is incomplete, yield any remaining positions."""
         for pos in range(self.current, self.columns):
-            x = xoff + self.spacing + self.current * self.item_width
+            x = xoff + self.spacing + pos * self.item_width
             yield x, self.yoff
 
 
