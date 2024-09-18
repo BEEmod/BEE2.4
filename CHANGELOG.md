@@ -17,10 +17,13 @@
 ### UCP-Relevant changes:
 * Add `SweepTrace` mode to `Collisions` result. This allows creating collisions 
   which extend until impacting a surface.
-* Add `multi_track` to `TrackPlatform` result. This allows replacing the instances
-  with multi-voxel long ones for better efficiency.
+* `TrackPlatform` result changes:
+  * Add `multi_track`, which allows replacing the instances with multi-voxel 
+  long ones for better efficiency.
+  * The "bottom grate" instance will now inherit platform fixup variables.
 * Fixed `TemplateBrush` 's `invertVar` option not working properly if `colorVar = <editor>`.
 * Allow fixup values in many more `TemplateBrush` options - `force`, `colorVar`, `forceVisVar`, `senseOffset`, `outputs` and `pickerVars`.
+
 
 ------------------------------------------
 

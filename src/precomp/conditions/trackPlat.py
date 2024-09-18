@@ -1,6 +1,7 @@
 """Conditions relating to track platforms."""
 
 from srctools import FrozenVec, Matrix, Vec, Keyvalues, Entity, VMF, conv_int, logger
+import attrs
 
 from precomp import instanceLocs, conditions
 from precomp.lazy_value import LazyValue
@@ -15,6 +16,18 @@ FACINGS = {
     (+1.0, 0.0): 'E',
     (-1.0, 0.0): 'W',
 }
+
+
+@attrs.define
+class PlatformInstances:
+    """Instances used by track platforms, in the order defined in editoritems."""
+    bottom_grate: str
+    track_bottom: str
+    track_mid: str
+    track_top: str
+    platform: str
+    plat_oscil: str
+    track_single: str
 
 
 @conditions.make_result('trackPlatform')
@@ -45,24 +58,29 @@ def res_track_plat(vmf: VMF, res: Keyvalues) -> object:
     * `track_var`: If set, save `N`, `S`, `E`, or `W` to the provided $fixup
       variable to indicate the relative direction the top faces.
     """
-    # Get the instances from editoritems
-    (
-        inst_bot_grate, inst_bottom, inst_middle,
-        inst_top, inst_plat, inst_plat_oscil, inst_single
-    ) = map(str.casefold, instanceLocs.resolve(res['orig_item']))
+    # Since this runs once, there isn't actually any point to caching the parsed values.
+
+    # Get the instances from editoritems.
+    fnames = PlatformInstances(*map(lambda s: s.casefold(), instanceLocs.resolve(res['orig_item'])))
     single_plat_inst = instanceLocs.resolve_one(res['single_plat', ''], error=False)
     track_targets = res['track_name', '']
 
-    track_files = [inst_bottom, inst_middle, inst_top, inst_single]
-    platforms = [inst_plat, inst_plat_oscil]
-
-    # All the track_set in the map, indexed by origin
-    track_instances: dict[FrozenVec, Entity] = {
-        FrozenVec.from_str(inst['origin']): inst
-        for inst in
-        vmf.by_class['func_instance']
-        if inst['file'].casefold() in track_files
-    }
+    # All the tracks in the map, indexed by origin.
+    track_instances: dict[FrozenVec, Entity] = {}
+    # Same with grates, needs to be separate because it overlaps the main track.
+    track_grate_instances: dict[FrozenVec, Entity] = {}
+    # And while we're looking collect the platforms.
+    platforms = []
+    for inst in vmf.by_class['func_instance']:
+        match inst['file'].casefold():
+            case fnames.track_bottom | fnames.track_mid | fnames.track_top:
+                track_instances[FrozenVec.from_str(inst['origin'])] = inst
+            case fnames.bottom_grate:
+                track_grate_instances[FrozenVec.from_str(inst['origin'])] = inst
+            case fnames.plat_oscil | fnames.plat_oscil:
+                platforms.append(inst)
+            case _:
+                pass  # Unrelated.
 
     multi_sizes = {
         conv_int(kv.name): instanceLocs.resolve_one(kv.value, error=True)
@@ -87,10 +105,7 @@ def res_track_plat(vmf: VMF, res: Keyvalues) -> object:
 
     # Now we loop through all platforms in the map, and then locate their
     # track_set
-    for plat_inst in vmf.by_class['func_instance']:
-        if plat_inst['file'].casefold() not in platforms:
-            continue  # Not a platform!
-
+    for plat_inst in platforms:
         LOGGER.debug('Modifying "{}"!', plat_inst['targetname'])
 
         plat_loc = Vec.from_str(plat_inst['origin'])
@@ -106,7 +121,7 @@ def res_track_plat(vmf: VMF, res: Keyvalues) -> object:
             raise Exception(f'Platform "{plat_inst["targetname"]}" has no track!')
 
         track_type = first_track['file'].casefold()
-        if track_type == inst_single and single_plat_inst:
+        if track_type == fnames.track_single and single_plat_inst:
             # Track is one block long, use a single-only instance and
             # remove track!
             plat_inst['file'] = single_plat_inst
@@ -115,22 +130,22 @@ def res_track_plat(vmf: VMF, res: Keyvalues) -> object:
             continue  # Next platform
 
         track_set = {first_track}
-        if track_type == inst_top or track_type == inst_middle:
+        if track_type == fnames.track_top or track_type == fnames.track_mid:
             # search left
             track_scan(
                 track_set,
                 track_instances,
                 first_track,
-                middle_file=inst_middle,
+                middle_file=fnames.track_mid,
                 x_dir=-1,
             )
-        if track_type == inst_bottom or track_type == inst_middle:
+        if track_type == fnames.track_bottom or track_type == fnames.track_mid:
             # search right
             track_scan(
                 track_set,
                 track_instances,
                 first_track,
-                middle_file=inst_middle,
+                middle_file=fnames.track_mid,
                 x_dir=+1,
             )
 
@@ -202,8 +217,15 @@ def res_track_plat(vmf: VMF, res: Keyvalues) -> object:
         if track_var:
             plat_inst.fixup[track_var] = FACINGS[local_facing.x, local_facing.y]
 
+        # Copy fixups over to every track. If we also have a grate, do that too.
         for track in track_list:
             track.fixup.update(plat_inst.fixup)
+            try:
+                grate = track_grate_instances[FrozenVec.from_str(track['origin'])]
+            except KeyError:
+                pass
+            else:
+                grate.fixup.update(plat_inst.fixup)
 
     return conditions.RES_EXHAUSTED  # Don't re-run
 
