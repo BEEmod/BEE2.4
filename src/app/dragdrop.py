@@ -2,10 +2,11 @@
 from __future__ import annotations
 from typing import Any, Final
 
-from collections import defaultdict
+from collections import Counter
 from collections.abc import Callable, Iterator
 from enum import Enum
 import abc
+import itertools
 
 from srctools.logger import get_logger
 from trio_util import AsyncValue, RepeatedEvent
@@ -82,7 +83,7 @@ class ManagerBase[ItemT, ParentT]:
     _info_cb: InfoCB[ItemT]
     _pick_flexi_group: FlexiCB | None
 
-    _slots: list[Slot[ItemT]]
+    _slots: dict[SlotType, list[Slot[ItemT]]]
     _img_blank: img.Handle  # Image for an empty slot.
 
     # If dragging, the item we are dragging.
@@ -127,7 +128,7 @@ class ManagerBase[ItemT, ParentT]:
         self._info_cb = info_cb
         self._pick_flexi_group = pick_flexi_group
 
-        self._slots = []
+        self._slots = {kind: [] for kind in SlotType}
         self._img_blank = img.Handle.color(img.PETI_ITEM_BG, *size)
         self._cur_drag = self._cur_slot = None
 
@@ -157,7 +158,7 @@ class ManagerBase[ItemT, ParentT]:
         """
         slot: Slot[ItemT] = Slot(self, SlotType.TARGET, desc or str(label))
         self._ui_slot_create(slot, parent, label)
-        self._slots.append(slot)
+        self._slots[SlotType.TARGET].append(slot)
         return slot
 
     def slot_source(
@@ -176,7 +177,7 @@ class ManagerBase[ItemT, ParentT]:
         """
         slot: Slot[ItemT] = Slot(self, SlotType.SOURCE, desc or str(label))
         self._ui_slot_create(slot, parent, label)
-        self._slots.append(slot)
+        self._slots[SlotType.SOURCE].append(slot)
         return slot
 
     def slot_flexi(
@@ -201,7 +202,7 @@ class ManagerBase[ItemT, ParentT]:
             raise ValueError('Flexi callback missing!')
         slot: Slot[ItemT] = Slot(self, SlotType.FLEXI, desc or str(label))
         self._ui_slot_create(slot, parent, label)
-        self._slots.append(slot)
+        self._slots[SlotType.FLEXI].append(slot)
         return slot
 
     def load_icons(self) -> None:
@@ -210,18 +211,14 @@ class ManagerBase[ItemT, ParentT]:
 
         # Count the number of items in each group to find
         # which should have group icons.
-        groups: dict[str | None, int] = defaultdict(int)
-        for slot in self._slots:
-            if not slot.is_source:
+        for kind in SlotType:
+            groups: dict[str | None, int] = Counter()
+            for slot in self._slots[kind]:
                 groups[slot.contents_group] += 1
 
-        groups[None] = 2  # This must always be ungrouped.
+            groups[None] = 2  # This must always be ungrouped.
 
-        for slot in self._slots:
-            if slot.is_source:
-                # These are never grouped.
-                self._display_item(slot, slot.contents)
-            else:
+            for slot in self._slots[kind]:
                 self._display_item(
                     slot,
                     slot.contents,
@@ -233,31 +230,25 @@ class ManagerBase[ItemT, ParentT]:
 
     def unload_icons(self) -> None:
         """Reset all icons to blank. This way they can be destroyed."""
-        for slot in self._slots:
+        for slot in self.all_slots():
             self._ui_set_icon(slot, self._img_blank)
         self._ui_set_icon(SLOT_DRAG, self._img_blank)
 
     def sources(self) -> Iterator[Slot[ItemT]]:
         """Yield all source slots."""
-        for slot in self._slots:
-            if slot.is_source:
-                yield slot
+        return iter(self._slots[SlotType.SOURCE])
 
     def targets(self) -> Iterator[Slot[ItemT]]:
         """Yield all target slots."""
-        for slot in self._slots:
-            if slot.is_target:
-                yield slot
+        return iter(self._slots[SlotType.TARGET])
 
     def flexi_slots(self) -> Iterator[Slot[ItemT]]:
         """Yield all flexible slots."""
-        for slot in self._slots:
-            if slot.is_flexi:
-                yield slot
+        return iter(self._slots[SlotType.FLEXI])
 
     def all_slots(self) -> Iterator[Slot[ItemT]]:
         """Yield all slots."""
-        return iter(self._slots)
+        return itertools.chain.from_iterable(self._slots.values())
 
     # Methods subclasses must override:
     @abc.abstractmethod
@@ -315,8 +306,11 @@ class ManagerBase[ItemT, ParentT]:
 
     def _pos_slot(self, x: float, y: float) -> Slot[ItemT] | None:
         """Find the slot under this X,Y (if any). Sources are ignored."""
-        for slot in self._slots:
-            if not slot.is_source and self._ui_slot_in_bbox(slot, x, y):
+        for slot in self._slots[SlotType.TARGET]:
+            if self._ui_slot_in_bbox(slot, x, y):
+                return slot
+        for slot in self._slots[SlotType.FLEXI]:
+            if self._ui_slot_in_bbox(slot, x, y):
                 return slot
         return None
 
@@ -342,8 +336,7 @@ class ManagerBase[ItemT, ParentT]:
             # None to do.
             return
         group_slots = [
-            slot for slot in self._slots
-            if slot.kind is slot_type
+            slot for slot in self._slots[slot_type]
             if slot.contents_group == group
         ]
 
@@ -367,8 +360,8 @@ class ManagerBase[ItemT, ParentT]:
             # pulling from the items, we hold a group icon.
             group = self._info_cb(self._cur_drag).group
             if group is not None:
-                for other_slot in self._slots:
-                    if other_slot.is_target and other_slot.contents_group == group:
+                for other_slot in self._slots[SlotType.TARGET]:
+                    if other_slot.contents_group == group:
                         break
                 else:
                     # None present.
@@ -417,8 +410,8 @@ class ManagerBase[ItemT, ParentT]:
             if self._pick_flexi_group is None:
                 raise ValueError('No pick_flexi_group function!')
             group = self._pick_flexi_group(x, y)
-            for slot in self._slots:
-                if slot.is_flexi and slot.contents is None and group is not None:
+            for slot in self._slots[SlotType.FLEXI]:
+                if slot.contents is None and group is not None:
                     slot.contents = self._cur_drag
                     slot.flexi_group = group
                     self.on_modified.set()
@@ -446,9 +439,7 @@ class ManagerBase[ItemT, ParentT]:
         if slot.is_source:
             # Add this item to the first free position.
             item = slot.contents
-            for free in slot.man._slots:
-                if not free.is_target:
-                    continue
+            for free in slot.man._slots[SlotType.TARGET]:
                 if free.contents is None:
                     free.contents = item
                     sound.fx('config')
@@ -498,7 +489,7 @@ class Slot[ItemT]:
     _contents: ItemT | None
 
     # The kind of slot.
-    kind: SlotType
+    kind: Final[SlotType]
     man: ManagerBase[ItemT, Any]  # Our drag/drop controller.
     # Used to identify the slot in logs etc.
     desc: str
@@ -550,8 +541,8 @@ class Slot[ItemT]:
 
         if value is not None and self.is_target:
             # Make sure this isn't already present.
-            for slot in self.man._slots:
-                if slot.is_target and slot.contents == value:
+            for slot in self.man._slots[SlotType.TARGET]:
+                if slot.contents == value:
                     slot.contents = None
         # Then set us.
         self._contents = value
