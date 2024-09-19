@@ -1,21 +1,25 @@
 """Implements Glass and Grating."""
 from __future__ import annotations
-
 from typing import Final, Literal, Self, assert_never, override
 
-from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from collections import defaultdict
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from enum import Enum, Flag, auto as enum_auto
 import math
 
 from srctools import EmptyMapping, Keyvalues
-from srctools.math import AnyMatrix, to_matrix, FrozenMatrix, Vec, FrozenVec, Angle, Matrix
-from srctools.vmf import Side, VMF, Solid, Entity
-import srctools.logger
+from srctools.math import (
+    Angle, AnyMatrix, FrozenMatrix, FrozenVec, Matrix, Vec, to_matrix,
+)
+from srctools.vmf import VMF, Entity, Side, Solid
 import attrs
+import srctools.logger
 
-from plane import PlaneKey, PlaneGrid
-from precomp import instanceLocs, options, template_brush, conditions, collisions, connections
+from plane import PlaneGrid, PlaneKey
+from precomp import (
+    brushLoc, collisions, conditions, connections, instanceLocs, options,
+    template_brush,
+)
 from precomp.grid_optim import optimise as grid_optimise
 from precomp.rand import seed as rand_seed
 from transtoken import TransToken
@@ -312,6 +316,9 @@ class BarrierType:
     # Sorta a hack, force frame brushwork to be world brushes, so they don't get carved.
     # Tinted Glass needs this due to its nodraw clip.
     frame_world_brush: bool = False
+
+    def __repr__(self) -> str:
+        return f'<BarrierType "{self.id}">'
 
     @classmethod
     def parse(cls, kv: Keyvalues, barrier_id: utils.ObjectID) -> BarrierType:
@@ -1178,6 +1185,8 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
             filterclass='prop_paint_bomb',
         )
 
+    wall_goo_extend = options.get_itemconf('VALVE_TEST_ELEM:ExtendGooBarrier', False)
+
     debug_skin: dict[utils.ObjectID | utils.BlankID, int] = {
         GLASS_ID: 5,
         GRATE_ID: 0,
@@ -1190,6 +1199,9 @@ def make_barriers(vmf: VMF, coll: collisions.Collisions) -> None:
         hole_plane = HOLES[plane_slice]
         for barrier, group_plane in find_plane_groups(plane):
             group_id += 1
+
+            if wall_goo_extend and not is_flat:
+                extend_goo_walls(vmf, plane_slice, barrier, group_plane)
 
             borders = calc_borders(group_plane)
 
@@ -1437,6 +1449,32 @@ def place_concave_corner(
                 32. * v + 16. * off_v + 16.0,
                 orient, barrier.type.frame_world_brush,
             )
+
+
+def extend_goo_walls(
+    vmf: VMF,
+    plane_slice: PlaneKey,
+    barrier: Barrier,
+    group_plane: PlaneGrid[Barrier],
+) -> None:
+    """Fill the gap right underneath walls close to goo."""
+    min_u, min_v = group_plane.mins
+    max_u, max_v = group_plane.maxes
+    # Calculate all the voxels where goo could be.
+    voxel_min = brushLoc.w2g(plane_slice.plane_to_world(32. * min_u, 32. * min_v, 64.))
+    voxel_min.z -= 1
+    voxel_max = brushLoc.w2g(plane_slice.plane_to_world(32. * max_u, 32. * max_v, 64.))
+    for voxel_pos in Vec.iter_grid(*Vec.bbox(voxel_min, voxel_max)):
+        voxel = brushLoc.POS[voxel_pos]
+        if not voxel.is_goo or not voxel.is_top:
+            continue
+        # Found a surface, check all 4 sub-voxels for a barrier.
+        plane_pos = plane_slice.world_to_plane(brushLoc.grid_to_world(voxel_pos)) + (-64., 32., 0.)
+        u_min = round(plane_pos.x / 32)
+        v = round(plane_pos.y / 32)
+        for u in range(u_min, u_min + 4):
+            if (u, v) not in group_plane and (u, v + 1) in group_plane:
+                group_plane[u, v] = barrier
 
 
 def try_place_hole(
