@@ -61,7 +61,7 @@ def res_track_plat(vmf: VMF, res: Keyvalues) -> object:
     # Since this runs once, there isn't actually any point to caching the parsed values.
 
     # Get the instances from editoritems.
-    fnames = PlatformInstances(*map(lambda s: s.casefold(), instanceLocs.resolve(res['orig_item'])))
+    fnames = PlatformInstances(*(s.casefold() for s in instanceLocs.resolve(res['orig_item'])))
     single_plat_inst = instanceLocs.resolve_one(res['single_plat', ''], error=False)
     track_targets = res['track_name', '']
 

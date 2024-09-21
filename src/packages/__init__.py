@@ -689,7 +689,7 @@ class PackagesSet:
 
     # Objects we've warned about not being present. Since this is stored
     # here it'll automatically clear when reloading. If None, it's suppressed instead.
-    _unknown_obj_warnings: set[tuple[type[PakObject], str]] | None = set()
+    _unknown_obj_warnings: set[tuple[type[PakObject], str]] | None = attrs.Factory(set)
 
     # In dev mode, all lazy files are sent here to be syntax checked.
     # The other end is implemented in lifecycle.
@@ -974,7 +974,7 @@ async def _load_templates(packset: PackagesSet) -> None:
     async def find_temp(pack: Package) -> None:
         """Find templates for a package."""
         for template in pack.fsys.walk_folder('templates'):
-            await trio.sleep(0)
+            await trio.lowlevel.checkpoint()
             if template.path.casefold().endswith('.vmf'):
                 nursery.start_soon(template_brush.parse_template, packset, pack.id, template)
 
@@ -1026,7 +1026,7 @@ async def parse_package(
     desc: list[str] = []
 
     for obj in pack.info:
-        await trio.sleep(0)
+        await trio.lowlevel.checkpoint()
         if obj.name in ['prerequisites', 'id', 'name']:
             # Not object IDs.
             continue
@@ -1129,7 +1129,7 @@ async def parse_object(packset: PackagesSet, obj_class: type[PakObject], obj_id:
                     False,
                 )
             )
-            await trio.sleep(0)
+            await trio.lowlevel.checkpoint()
     except (NoKeyError, IndexError) as e:
         reraise_keyerror(e, obj_id)
     except TokenSyntaxError as e:
@@ -1150,7 +1150,7 @@ async def parse_object(packset: PackagesSet, obj_class: type[PakObject], obj_id:
     object_.pak_id = obj_data.pak_id
     object_.pak_name = str(obj_data.disp_name)
     for override_data in packset.overrides[obj_class, obj_id.casefold()]:
-        await trio.sleep(0)
+        await trio.lowlevel.checkpoint()
         try:
             with srctools.logger.context(f'override {override_data.pak_id}:{obj_id}'):
                 override = await obj_class.parse(override_data)
@@ -1167,7 +1167,7 @@ async def parse_object(packset: PackagesSet, obj_class: type[PakObject], obj_id:
                 f'from package {override_data.pak_id}!'
             ) from e
 
-        await trio.sleep(0)
+        await trio.lowlevel.checkpoint()
         object_.add_over(override)
     assert obj_id.casefold() not in packset.objects[obj_class], f'{obj_class}("{obj_id}") = {object_}'
     packset.objects[obj_class][obj_id.casefold()] = object_

@@ -9,7 +9,7 @@ from srctools import FrozenVec, Vec, VMF, AtomicWriter, logger
 import attrs
 
 from user_errors import DATA_LOC, UserError, TOK_VBSP_LEAK
-from precomp.tiling import TileDef, TileType
+from precomp.tiling import TileDef
 from precomp.brushLoc import Grid as BrushLoc
 from precomp import options, barriers, grid_optim
 from plane import PlaneKey, PlaneGrid

@@ -40,7 +40,7 @@ class EdgeTrigger[*Args]:
     @overload
     async def wait[T](self: EdgeTrigger[T]) -> T: ...
     @overload  # Ignore spurious warnings about the above overloads being impossible.
-    async def wait(self) -> tuple[*Args]: ...  # type: ignore[misc]
+    async def wait(self) -> tuple[*Args]: ...  # type: ignore[overload-cannot-match]
     async def wait(self) -> object:
         """Wait for the trigger to fire, then return the parameters.
 

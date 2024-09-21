@@ -12,7 +12,7 @@ import srctools.logger
 import trio.to_thread
 
 from app.img import Handle as ImgHandle
-from packages import CLEAN_STYLE, PackagesSet, PakRef, Style, TRANS_OBJ_NOT_FOUND
+from packages import CLEAN_STYLE, PackagesSet, PakRef, Style
 from packages.signage import (
     CELL_SIZE, LEGEND_SIZE, Signage, SignageLegend, SignStyle,
 )

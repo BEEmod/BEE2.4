@@ -13,7 +13,7 @@ from srctools import logger
 from trio_util import AsyncValue
 import trio
 
-from app import UI, StyleVarPane, sound
+from app import StyleVarPane, sound
 from app.mdown import MarkdownData
 from app.SubPane import SubPane
 from async_util import EdgeTrigger, run_as_task

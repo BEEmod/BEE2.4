@@ -858,6 +858,7 @@ async def init_windows(
                 style_win.choose_item(style_win.item_list[0])
                 continue
 
+            ref: packages.PakRef[packages.Style]
             cur_style.value = ref = packages.PakRef(packages.Style, selected_style)
 
             style_obj = ref.resolve(packset)
@@ -867,10 +868,11 @@ async def init_windows(
                 func(ref)
 
             # Disable this if the style doesn't have elevators
-            elev_win.readonly = not style_obj.has_video
+            elev_win.readonly = style_obj is not None and not style_obj.has_video
 
             sign_ui.style_changed(selected_style)
 
-            for sugg_cls, win in suggest_windows.items():
-                win.set_suggested(style_obj.suggested[sugg_cls])
-            StyleVarPane.refresh(packset, style_obj)
+            if style_obj is not None:
+                for sugg_cls, win in suggest_windows.items():
+                    win.set_suggested(style_obj.suggested[sugg_cls])
+                StyleVarPane.refresh(packset, style_obj)

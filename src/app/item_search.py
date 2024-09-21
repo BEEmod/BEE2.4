@@ -20,7 +20,8 @@ import packages
 
 LOGGER = srctools.logger.get_logger(__name__)
 type Filter = set[SubItemRef]
-word_to_ids: 'CharTrie[Filter]' = CharTrie()
+type FilterTrie = CharTrie[Filter]
+word_to_ids: FilterTrie = CharTrie()
 _type_cback: Callable[[], None] | None = None
 searchbar_wid: ttk.Entry
 
@@ -122,9 +123,9 @@ async def update_task(cur_style: AsyncValue[PakRef[Style]]) -> None:
             LOGGER.info('End scope.')
 
 
-def _build_words(packset: PackagesSet, style: PakRef[Style]) -> 'CharTrie[Filter]':
+def _build_words(packset: PackagesSet, style: PakRef[Style]) -> FilterTrie:
     """Build the full filters, for this package set and style."""
-    word_to_ids: 'CharTrie[Filter]' = CharTrie()
+    word_to_ids: FilterTrie = CharTrie()
     word_set: Filter
     for item in packset.all_obj(Item):
         for subtype_ind in item.visual_subtypes:

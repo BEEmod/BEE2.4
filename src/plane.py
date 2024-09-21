@@ -141,6 +141,17 @@ class PlaneGrid[ValT](MutableMapping[tuple[int, int], ValT]):
     def __repr__(self) -> str:
         return f'Plane({dict(self.items())!r})'
 
+    def range_x(self) -> range:
+        """Iterate over all valid X positions."""
+        return range(self._min_x, self._max_x + 1)
+
+    def range_y(self) -> range:
+        """Iterate over all valid Y positions."""
+        return range(self._min_y, self._max_y + 1)
+
+    range_u = range_x
+    range_v = range_y
+
     @classmethod
     def fromkeys(
         cls: type[PlaneGrid[ValT]],

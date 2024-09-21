@@ -234,7 +234,9 @@ async def step_gen_vpk(exp_data: ExportData) -> None:
         try:
             sel_vpk = exp_data.packset.obj_by_id(StyleVPK, sel_vpk_name)
         except KeyError:
-            raise AppError(TRANS_OBJ_NOT_FOUND.format(object='Style VPK', id=sel_vpk_name))
+            raise AppError(TRANS_OBJ_NOT_FOUND.format(
+                object='Style VPK', id=sel_vpk_name,
+            )) from None
     else:
         sel_vpk = None
 

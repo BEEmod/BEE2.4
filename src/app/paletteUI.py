@@ -5,7 +5,6 @@ from tkinter import ttk
 import tkinter as tk
 from uuid import UUID, uuid4
 
-from srctools import EmptyMapping
 import srctools.logger
 import trio
 
