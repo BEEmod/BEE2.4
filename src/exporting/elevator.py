@@ -1,4 +1,6 @@
 """Export selected elevator videos."""
+import trio.lowlevel
+
 from transtoken import AppError
 from . import ExportData, STEPS, StepResource
 from packages import Elevator, TRANS_OBJ_NOT_FOUND
@@ -8,6 +10,7 @@ import utils
 @STEPS.add_step(prereq=[], results=[StepResource.VCONF_DATA])
 async def step_elevator_video(exp_data: ExportData) -> None:
     """Export the chosen video into the configs."""
+    await trio.lowlevel.checkpoint()
     elevator: Elevator | None
     sel_id: utils.SpecialID = exp_data.selected[Elevator]
     if sel_id == utils.ID_NONE:
@@ -17,6 +20,7 @@ async def step_elevator_video(exp_data: ExportData) -> None:
             elevator = exp_data.packset.obj_by_id(Elevator, sel_id)
         except KeyError:
             raise AppError(TRANS_OBJ_NOT_FOUND.format(object="Elevator", id=sel_id)) from None
+    await trio.lowlevel.checkpoint()
 
     if exp_data.selected_style.has_video:
         if elevator is None:

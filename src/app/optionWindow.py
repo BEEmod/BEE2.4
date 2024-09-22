@@ -320,6 +320,7 @@ async def init_gen_tab(
         variable=AFTER_EXPORT_ACTION,
         value=AfterExport.QUIT.value,
     )
+    await trio.lowlevel.checkpoint()
 
     set_text(exp_nothing, TransToken.ui('Do Nothing'))
     set_text(exp_minimise, TransToken.ui('Minimise BEE2'))
@@ -339,6 +340,7 @@ async def init_gen_tab(
         desc=TransToken.ui('Launch Game'),
         tooltip=TransToken.ui('After exporting, launch the selected game automatically.'),
     ).grid(row=3, column=0, sticky='W', pady=(10, 0))
+    await trio.lowlevel.checkpoint()
 
     lang_frm = ttk.Frame(f, name='lang_frm')
     lang_frm.grid(row=0, column=1, sticky='EW')
@@ -349,6 +351,7 @@ async def init_gen_tab(
     lang_box.state(['readonly'])
     lang_frm.columnconfigure(1, weight=1)
     lang_box.grid(row=0, column=1)
+    await trio.lowlevel.checkpoint()
 
     lang_order: list[localisation.Language] = []
     lang_code_to_ind: dict[str, int] = {}
@@ -397,6 +400,7 @@ async def init_gen_tab(
                 _load_langs()
 
     lang_box.bind('<<ComboboxSelected>>', tk_tools.make_handler(language_changed))
+    await trio.lowlevel.checkpoint()
 
     mute_desc = TransToken.ui('Play Sounds')
     if sound.has_sound():
@@ -409,6 +413,7 @@ async def init_gen_tab(
             TransToken.ui('Pyglet is either not installed or broken.\nSound effects have been disabled.')
         )
     mute.grid(row=1, column=1, sticky='W')
+    await trio.lowlevel.checkpoint()
 
     compress_items = ttk.Checkbutton(f, variable=VAR_COMPRESS_ITEMS, name='check_compress_items')
     set_text(compress_items, TransToken.ui('Compress Items'))
@@ -425,6 +430,7 @@ async def init_gen_tab(
         reset_palette,
         TransToken.ui('Show all builtin palettes that you may have hidden.'),
     )
+    await trio.lowlevel.checkpoint()
 
     reset_cache = ttk.Button(f, command=lambda: background_run(clear_caches,  dialogs))
     set_text(reset_cache, TransToken.ui('Reset Package Caches'))
@@ -439,7 +445,7 @@ async def init_win_tab(
     f: ttk.Frame,
     reset_all_win: Callable[[], object],
 ) -> None:
-    """Optionsl relevant to specific windows."""
+    """Options relevant to specific windows."""
 
     make_checkbox(
         f, 'force_load_ontop',
@@ -471,6 +477,7 @@ async def init_win_tab(
         ttk.Button(f, command=reset_all_win),
         TransToken.ui('Reset All Window Positions'),
     ).grid(row=1, column=1, sticky='E')
+    await trio.lowlevel.checkpoint()
 
     if not utils.FROZEN:  # Temporary button for testing.
         ttk.Button(
@@ -487,6 +494,7 @@ async def init_win_tab(
 
 async def init_dev_tab(f: ttk.Frame) -> None:
     """Various options useful for development."""
+    await trio.lowlevel.checkpoint()
     f.columnconfigure(0, weight=1)
     frm_check = ttk.Frame(f)
     frm_check.grid(row=0, column=0, sticky='ew')
@@ -512,6 +520,7 @@ async def init_dev_tab(f: ttk.Frame) -> None:
             'will look very bad.'
         ),
     ).grid(row=1, column=0, sticky='W')
+    await trio.lowlevel.checkpoint()
 
     make_checkbox(
         frm_check, 'log_item_fallbacks',
@@ -530,6 +539,7 @@ async def init_dev_tab(f: ttk.Frame) -> None:
             'have no applicable style.'
         ),
     ).grid(row=3, column=0, sticky='W')
+    await trio.lowlevel.checkpoint()
 
     make_checkbox(
         frm_check, 'dev_mode',
@@ -548,6 +558,7 @@ async def init_dev_tab(f: ttk.Frame) -> None:
             "Only enable if you're developing new content, to ensure it is not overwritten."
         ),
     ).grid(row=1, column=1, sticky='W')
+    await trio.lowlevel.checkpoint()
 
     make_checkbox(
         frm_check, 'preserve_fgd',
@@ -563,6 +574,7 @@ async def init_dev_tab(f: ttk.Frame) -> None:
         desc=TransToken.ui('Show Log Window'),
         tooltip=TransToken.ui('Show the log file in real-time.'),
     ).grid(row=3, column=1, sticky='W')
+    await trio.lowlevel.checkpoint()
 
     make_checkbox(
         frm_check, 'force_all_editor_models',
@@ -573,6 +585,7 @@ async def init_dev_tab(f: ttk.Frame) -> None:
         ),
     ).grid(row=4, column=1, sticky='W')
 
+    await trio.lowlevel.checkpoint()
     frm_btn1 = ttk.Frame(f)
     frm_btn1.grid(row=2, column=0, sticky='ew')
     frm_btn1.columnconfigure(0, weight=1)
@@ -587,6 +600,7 @@ async def init_dev_tab(f: ttk.Frame) -> None:
         ttk.Button(frm_btn1, command=report_items),
         TransToken.ui('Dump Items List'),
     ).grid(row=0, column=1)
+    await trio.lowlevel.checkpoint()
 
     set_text(
         ttk.Button(frm_btn1, command=lambda: background_run(report_editor_models)),
@@ -599,11 +613,13 @@ async def init_dev_tab(f: ttk.Frame) -> None:
         'Reload all images in the app. Expect the app to freeze momentarily.'
     ))
     reload_img.grid(row=0, column=2)
+    await trio.lowlevel.checkpoint()
 
     frm_btn2 = ttk.Frame(f)
     frm_btn2.grid(row=3, column=0, sticky='ew')
     frm_btn2.columnconfigure(0, weight=1)
     frm_btn2.columnconfigure(1, weight=1)
+    await trio.lowlevel.checkpoint()
 
     async def rebuild_app_langs() -> None:
         """Rebuild application languages, then notify the user."""
@@ -617,6 +633,7 @@ async def init_dev_tab(f: ttk.Frame) -> None:
         "downloaded from the source repo."
     ))
     build_app_trans_btn.grid(row=0, column=0, sticky='w')
+    await trio.lowlevel.checkpoint()
 
     async def rebuild_pack_langs() -> None:
         """Rebuild package languages, then notify the user."""

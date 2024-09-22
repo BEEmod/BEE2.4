@@ -1,25 +1,26 @@
 """The code for performing an export to the game folder."""
 from __future__ import annotations
+from typing import TYPE_CHECKING, Any
 
-from typing import Any, TYPE_CHECKING
+from collections.abc import Callable
 from enum import Enum, auto
 from pathlib import PurePath
-from collections.abc import Callable
 import os
 
+from srctools import Keyvalues
 import attrs
 import srctools.logger
-from srctools import Keyvalues
+import trio
 
-import loadScreen
-import packages
-import config as config_mod
 from app import DEV_MODE
 from app.errors import ErrorUI, Result as ErrorResult, WarningExc
 from editoritems import Item as EditorItem, Renderable, RenderableType
 from packages import PackagesSet, PakObject, Style
 from step_order import StepOrder
 from transtoken import TransToken
+import config as config_mod
+import loadScreen
+import packages
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -192,13 +193,14 @@ async def step_style(exp: ExportData) -> None:
 @STEPS.add_step(prereq=[], results=[StepResource.VCONF_DATA])
 async def step_add_core_info(exp: ExportData) -> None:
     """Add some core options to the config."""
+    await trio.lowlevel.checkpoint()
     exp.vbsp_conf.set_key(('Options', 'Game_ID'), exp.game.steamID)
     exp.vbsp_conf.set_key(('Options', 'dev_mode'), srctools.bool_as_int(DEV_MODE.value))
 
 
 # Register everything.
 from exporting import (  # noqa: E402
-    compiler, corridors, cube_colourizer, editor_sound, elevator, fgd, files, fizzler,  # noqa: F401
-    gameinfo, items, music, pack_list, quote_pack, signage, skybox, stylevar, template_brush,  # noqa: F401
-    translations, vpks, barrier_hole,  # noqa: F401
+    barrier_hole, compiler, corridors, cube_colourizer, editor_sound, elevator,  # noqa: F401
+    fgd, files, fizzler, gameinfo, items, music, pack_list, quote_pack, signage,  # noqa: F401
+    skybox, stylevar, template_brush, translations, vpks,  # noqa: F401
 )
