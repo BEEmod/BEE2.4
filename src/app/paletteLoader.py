@@ -505,8 +505,8 @@ def load_palettes() -> Iterator[Palette]:
                     prop_file = io.TextIOWrapper(zip_file.open('properties.txt'), encoding='ascii', errors='ignore')
             elif os.path.isdir(path):
                 # Open from the subfolder
-                pos_file = open(os.path.join(path, 'positions.txt'))
-                prop_file = open(os.path.join(path, 'properties.txt'))
+                pos_file = open(os.path.join(path, 'positions.txt'), encoding='ascii', errors='ignore')
+                prop_file = open(os.path.join(path, 'properties.txt'), encoding='ascii', errors='ignore')
             else:  # A non-palette file, skip it.
                 LOGGER.debug('Skipping "{}"', name)
                 continue
