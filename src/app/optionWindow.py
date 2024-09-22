@@ -184,6 +184,18 @@ def make_checkbox(
     return widget
 
 
+async def rebuild_app_langs() -> None:
+    """Rebuild application languages, then notify the user."""
+    await localisation.rebuild_app_langs()
+    await DIALOG.show_info(TRANS_REBUILT_APP_LANG)
+
+
+async def rebuild_pack_langs() -> None:
+    """Rebuild package languages, then notify the user."""
+    await localisation.rebuild_package_langs(packages.get_loaded_packages())
+    await DIALOG.show_info(TRANS_REBUILD_PACK_LANG)
+
+
 async def init_widgets(
     *,
     unhide_palettes: Callable[[], object],
@@ -240,14 +252,6 @@ async def init_widgets(
         warning_lbl.grid(row=0, column=0)
         warning_btn.grid(row=1, column=0)
 
-    async with trio.open_nursery() as nursery:
-        nursery.start_soon(init_gen_tab, fr_general, unhide_palettes)
-        nursery.start_soon(init_win_tab, fr_win, reset_all_win)
-        nursery.start_soon(init_dev_tab, fr_dev_options)
-
-    ok_cancel = ttk.Frame(win)
-    ok_cancel.grid(row=1, column=0, padx=5, pady=5, sticky='E')
-
     def ok() -> None:
         """Close and apply changes."""
         save()
@@ -267,6 +271,9 @@ async def init_widgets(
             nbook.tab(2, text=str(TRANS_TAB_DEV))
             await CURRENT_LANG.wait_transition()
 
+    ok_cancel = ttk.Frame(win)
+    ok_cancel.grid(row=1, column=0, padx=5, pady=5, sticky='E')
+
     set_text(
         ttk.Button(ok_cancel, command=ok),
         TransToken.ui('OK'),
@@ -276,11 +283,16 @@ async def init_widgets(
         TransToken.ui('Cancel'),
     ).grid(row=0, column=1)
 
-    win.protocol("WM_DELETE_WINDOW", cancel)
-
-    load()  # Load the existing config
-
     async with trio.open_nursery() as nursery:
+        async with trio.open_nursery() as start_nursery:
+            start_nursery.start_soon(init_gen_tab, fr_general, unhide_palettes)
+            start_nursery.start_soon(init_win_tab, fr_win, reset_all_win)
+            start_nursery.start_soon(nursery.start, init_dev_tab, fr_dev_options)
+
+        win.protocol("WM_DELETE_WINDOW", cancel)
+
+        load()  # Load the existing config
+
         nursery.start_soon(update_translations)
         nursery.start_soon(apply_config)
         task_status.started()
@@ -492,7 +504,11 @@ async def init_win_tab(
         ).grid(row=2, column=1, sticky='EW')
 
 
-async def init_dev_tab(f: ttk.Frame) -> None:
+async def init_dev_tab(
+    f: ttk.Frame,
+    *,
+    task_status: trio.TaskStatus = trio.TASK_STATUS_IGNORED,
+) -> None:
     """Various options useful for development."""
     await trio.lowlevel.checkpoint()
     f.columnconfigure(0, weight=1)
@@ -592,27 +608,25 @@ async def init_dev_tab(f: ttk.Frame) -> None:
     frm_btn1.columnconfigure(2, weight=1)
 
     set_text(
-        ttk.Button(frm_btn1,  command=report_all_obj),
+        btn_report_obj := ttk.Button(frm_btn1),
         TransToken.ui('Dump All Objects'),
     ).grid(row=0, column=0)
 
     set_text(
-        ttk.Button(frm_btn1, command=report_items),
+        btn_report_items := ttk.Button(frm_btn1),
         TransToken.ui('Dump Items List'),
     ).grid(row=0, column=1)
-    await trio.lowlevel.checkpoint()
 
     set_text(
-        ttk.Button(frm_btn1, command=lambda: background_run(report_editor_models)),
+        btn_report_editor_mdl := ttk.Button(frm_btn1),
         TransToken.ui('Dump Editor Models'),
     ).grid(row=1, column=0)
 
-    reload_img = ttk.Button(frm_btn1, command=img.refresh_all)
-    set_text(reload_img, TransToken.ui('Reload Images'))
-    add_tooltip(reload_img, TransToken.ui(
-        'Reload all images in the app. Expect the app to freeze momentarily.'
-    ))
-    reload_img.grid(row=0, column=2)
+    set_text(
+        btn_reload_img := ttk.Button(frm_btn1),
+        TransToken.ui('Reload Images'),
+    ).grid(row=0, column=2)
+
     await trio.lowlevel.checkpoint()
 
     frm_btn2 = ttk.Frame(f)
@@ -621,29 +635,34 @@ async def init_dev_tab(f: ttk.Frame) -> None:
     frm_btn2.columnconfigure(1, weight=1)
     await trio.lowlevel.checkpoint()
 
-    async def rebuild_app_langs() -> None:
-        """Rebuild application languages, then notify the user."""
-        await localisation.rebuild_app_langs()
-        await DIALOG.show_info(TRANS_REBUILT_APP_LANG)
+    set_text(
+        btn_build_app_trans := ttk.Button(frm_btn2),
+        TransToken.ui('Build UI Translations'),
+    ).grid(row=0, column=0, sticky='w')
 
-    build_app_trans_btn = ttk.Button(frm_btn2, command=lambda: background_run(rebuild_app_langs))
-    set_text(build_app_trans_btn, TransToken.ui('Build UI Translations'))
-    add_tooltip(build_app_trans_btn, TransToken.ui(
+    set_text(
+        btn_build_pack_trans := ttk.Button(frm_btn2),
+        TransToken.ui('Build Package Translations'),
+    ).grid(row=0, column=1, sticky='e')
+
+    await trio.lowlevel.checkpoint()
+
+    add_tooltip(btn_reload_img, TransToken.ui(
+        'Reload all images in the app. Expect the app to freeze momentarily.'
+    ))
+    add_tooltip(btn_build_app_trans, TransToken.ui(
         "Compile '.po' UI translation files into '.mo'. This requires those to have been "
         "downloaded from the source repo."
     ))
-    build_app_trans_btn.grid(row=0, column=0, sticky='w')
-    await trio.lowlevel.checkpoint()
-
-    async def rebuild_pack_langs() -> None:
-        """Rebuild package languages, then notify the user."""
-        await localisation.rebuild_package_langs(packages.get_loaded_packages())
-        await DIALOG.show_info(TRANS_REBUILD_PACK_LANG)
-
-    build_pack_trans_btn = ttk.Button(frm_btn2, command=lambda: background_run(rebuild_pack_langs))
-    set_text(build_pack_trans_btn, TransToken.ui('Build Package Translations'))
-    add_tooltip(build_pack_trans_btn, TransToken.ui(
+    add_tooltip(btn_build_pack_trans, TransToken.ui(
         "Export translation files for all unzipped packages. This will update existing "
         "localisations, creating them for packages that don't have any."
     ))
-    build_pack_trans_btn.grid(row=0, column=1, sticky='e')
+
+    async with trio.open_nursery() as nursery:
+        nursery.start_soon(tk_tools.button_command_task, btn_report_obj, report_all_obj)
+        nursery.start_soon(tk_tools.button_command_task, btn_report_items, report_items)
+        nursery.start_soon(tk_tools.button_command_task, btn_report_editor_mdl, report_editor_models)
+        nursery.start_soon(tk_tools.button_command_task, btn_build_app_trans, rebuild_app_langs)
+        nursery.start_soon(tk_tools.button_command_task, btn_build_pack_trans, rebuild_pack_langs)
+        task_status.started()

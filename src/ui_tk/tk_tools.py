@@ -499,6 +499,30 @@ async def apply_bool_enabled_menu_task(value: AsyncValue[bool], menu: tk.Menu, i
         raise AssertionError('eventual_values() should be infinite!')
 
 
+async def button_command_task(
+    button: ttk.Button,
+    func: Callable[[], Awaitable[object]],
+) -> None:
+    """Spawn a task to start the specified func whenever pressed, disabling the button as required."""
+    event = trio.Event()
+
+    def set_event() -> None:
+        """Set the event."""
+        event.set()
+
+    button['command'] = set_event
+    default_cursor = button['cursor']
+
+    while True:
+        await event.wait()
+        button.state(('disabled', ))
+        button['cursor'] = Cursors.WAIT
+        event = trio.Event()
+        await func()
+        button['cursor'] = default_cursor
+        button.state(('!disabled', ))
+
+
 def adjust_inside_screen(
     x: int,
     y: int,
