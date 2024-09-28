@@ -889,9 +889,14 @@ async def init_application(nursery: trio.Nursery) -> None:
     set_menu_text(bar, TransToken.ui('Game'))
     gameMan.game_menu = game_menu
 
+    # Using this name displays this correctly in OS X
+    help_menu = tk.Menu(bar, name='help')
+    bar.add_cascade(menu=help_menu)
+    set_menu_text(bar, TransToken.ui("Help"))
+
     # Add the 'Help' menu here too.
-    from ui_tk import help_menu
-    await nursery.start(help_menu.create, bar, TK_IMG)
+    from ui_tk.help_menu import create as create_help_menu
+    await nursery.start(create_help_menu, help_menu, TK_IMG)
 
     window['menu'] = bar
 
