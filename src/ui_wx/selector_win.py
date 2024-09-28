@@ -55,6 +55,7 @@ FONT_ITEM_NAME = [
     wx.Font(wx.FontInfo(i))
     for i in range(10, 5, -1)
 ]
+ERROR_COLOUR = wx.Colour(255, 0, 0)
 
 
 class ItemSlot(wx.Panel):
@@ -736,7 +737,7 @@ class SelectorWin(SelectorWinBase[ItemSlot, GroupHeader]):
             return  # Nothing to do.
 
         match font:
-            case 'normal':
+            case 'normal' | 'error':
                 font_obj = self.norm_font
             case 'suggested':
                 font_obj = self.sugg_font
@@ -746,6 +747,7 @@ class SelectorWin(SelectorWinBase[ItemSlot, GroupHeader]):
                 assert_never(font)
 
         self.display.SetFont(font_obj)
+        self.display.SetForegroundColour(ERROR_COLOUR if font == 'error' else wx.NullColour)
         wid_transtoken.set_entry_value(self.display, text)
         wid_transtoken.set_tooltip(self.display, tooltip)
         self.display.Enabled = self.disp_btn.Enabled = enabled

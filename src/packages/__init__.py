@@ -114,6 +114,7 @@ TRANS_DUPLICATE_OBJ_ID = TransToken.ui(
     'The ID "{obj_id}" was used twice for a {obj_type} in the packages "{pak1}" and "{pak2}"!'
 )
 TRANS_CORR_OPTS = TransToken.ui_plural('{n} option', '{n} options')  # i18n: Corridor options count
+TRANS_MISSING_ITEM_DESC = TransToken.ui('The object {id} is missing from loaded packages. Exporting it will fail.')
 
 
 @utils.freeze_enum_props
@@ -366,10 +367,10 @@ SEL_DATA_NONE = SelitemData.build(
     desc=TransToken.ui('Do not add anything.'),
 )
 SEL_DATA_MISSING = SelitemData.build(
-    long_name=TransToken.ui('Unknown Item'),
+    long_name=TransToken.ui('Unknown Object'),
     short_name=TransToken.ui('???'),
     small_icon=img.Handle.error(consts.SEL_ICON_SIZE, consts.SEL_ICON_SIZE),
-    desc=TransToken.ui('This item is missing from loaded packages. Exporting it will fail.'),
+    desc=TransToken.ui('This object is missing from loaded packages. Exporting it will fail.'),
 )
 
 

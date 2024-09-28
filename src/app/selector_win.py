@@ -63,8 +63,8 @@ class NavKeys(Enum):
 # Callbacks used to get the info for items in the window.
 type GetterFunc[T] = Callable[[packages.PackagesSet, utils.SpecialID], T]
 
-# The three kinds of font for the display textbox.
-type DispFont = Literal['suggested', 'mouseover', 'normal']
+# The kinds of font for the display textbox.
+type DispFont = Literal['suggested', 'mouseover', 'normal', 'error']
 
 TRANS_ATTR_DESC = TransToken.untranslated('{desc}: ')
 TRANS_ATTR_COLOR = TransToken.ui('Color: R={r}, G={g}, B={b}')  # i18n: Tooltip for colour swatch.
@@ -556,11 +556,13 @@ class SelectorWinBase[ButtonT, GroupHeaderT: GroupHeaderBase](ReflowWindow):
         if text is None:
             # No override for the text is set, use the
             # suggested-rollover one, or the selected item.
-            if self._suggested_rollover is not None:
-                data = self._get_data(self._suggested_rollover)
-            else:
-                data = self._get_data(self.chosen.value)
+            item_id = self._suggested_rollover or self.chosen.value
+            data = self._get_data(item_id)
             text = data.context_lbl
+            if data is packages.SEL_DATA_MISSING:
+                # Override tooltip to highlight the issue.
+                tooltip = packages.TRANS_MISSING_ITEM_DESC.format(id=item_id)
+                font = 'error'
 
         self._ui_display_set(enabled=enabled, text=text, tooltip=tooltip, font=font)
 

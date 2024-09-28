@@ -819,7 +819,7 @@ class SelectorWin(SelectorWinBase[ttk.Button, GroupHeader]):
             return  # Nothing to do.
 
         match font:
-            case 'normal':
+            case 'normal' | 'error':
                 font_obj = self.norm_font
             case 'suggested':
                 font_obj = self.sugg_font
@@ -832,6 +832,7 @@ class SelectorWin(SelectorWinBase[ttk.Button, GroupHeader]):
             # Changing the font causes a flicker, so only set it
             # when the font is actually different.
             self.display['font'] = font_obj
+        self.display['foreground'] = 'red' if font == 'error' else ''
         set_tooltip(self.display, tooltip)
         set_stringvar(self.disp_label, text)
 
