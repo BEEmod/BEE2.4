@@ -69,20 +69,22 @@ def set_suggested(packset: PackagesSet, music_id: utils.SpecialID) -> None:
 
     If sel_item is true, select the suggested item as well.
     """
-    if music_id == utils.ID_NONE:
-        # No music, special.
-        for channel in MusicChannel:
-            if channel is MusicChannel.BASE:
-                continue
-            WINDOWS[channel].set_suggested()
-    else:
-        music = packset.obj_by_id(Music, music_id)
-        for channel in MusicChannel:
-            if channel is MusicChannel.BASE:
-                continue
+    music: Music | None = None
+    if music_id != utils.ID_NONE:
+        try:
+            music = packset.obj_by_id(Music, music_id)
+        except KeyError:
+            # Base doesn't exist, just unlock all and don't suggest anything.
+            pass
 
+    for channel in MusicChannel:
+        if channel is MusicChannel.BASE:
+            continue
+        if music is not None:
             sugg = music.get_suggestion(packset, channel)
             WINDOWS[channel].set_suggested([sugg] if sugg != utils.ID_NONE else ())
+        else:
+            WINDOWS[channel].set_suggested()
 
 
 def export_data(packset: PackagesSet) -> dict[MusicChannel, utils.SpecialID]:
