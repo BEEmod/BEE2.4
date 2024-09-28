@@ -157,16 +157,18 @@ def res_piston_plat(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
             packing.pack_files(vmf, snd_stop, file_type='sound')
             init_script += f'; STOP_SND <- `{snd_stop}`'
 
+        origin = Vec.from_str(inst['origin'])
+        orient = Matrix.from_angstr(inst['angles'])
+
+        script_pos = origin + orient.up(-64)
         script_ent = vmf.create_ent(
             classname='info_target',
             targetname=conditions.local_name(inst, 'script'),
             vscripts='BEE2/piston/common.nut',
             vscript_init_code=init_script,
-            origin=inst['origin'],
+            thinkfunction='Think',
+            origin=script_pos,
         )
-
-        if has_dn_fizz:
-            script_ent['thinkfunction'] = 'FizzThink'
 
         if start_up:
             st_pos, end_pos = max_pos, min_pos
@@ -177,9 +179,6 @@ def res_piston_plat(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
             Output('OnUser1', '!self', 'RunScriptCode', f'moveto({st_pos})'),
             Output('OnUser2', '!self', 'RunScriptCode', f'moveto({end_pos})'),
         )
-
-        origin = Vec.from_str(inst['origin'])
-        orient = Matrix.from_angstr(inst['angles'])
         off = orient.up(128)
         move_ang = off.to_angle()
 
@@ -282,16 +281,19 @@ def res_piston_plat(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
             static_ent.remove()
 
         if snd_loop:
-            script_ent['classname'] = 'ambient_generic'
+            # Using ambient_generic doesn't stop properly, func_rotating does...
+            script_ent['classname'] = 'func_rotating'
             script_ent['message'] = snd_loop
             script_ent['health'] = 10  # Volume
-            script_ent['pitch'] = 100
-            script_ent['spawnflags'] = 16  # Start silent, looped.
-            script_ent['radius'] = 1024
+            script_ent['spawnflags'] = 64  # Not solid
+
+            script_ent.solids.append(vmf.make_prism(
+                script_pos - 4, script_pos + 4,
+                'BEE2/nodraw_nonsolid',
+            ).solid)
 
             if source_ent:
-                # Parent is irrelevant for actual entity locations, but it
-                # survives for the script to read.
-                script_ent['SourceEntityName'] = script_ent['parentname'] = conditions.local_name(inst, source_ent)
+                # Store this off for the ent to read.
+                script_ent['parentname'] = conditions.local_name(inst, source_ent)
 
     return modify_platform
