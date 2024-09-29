@@ -1,10 +1,15 @@
 """Build commands for VBSP and VRAD."""
+from collections.abc import Iterator
 from pathlib import Path
-from PyInstaller.utils.hooks import collect_dynamic_libs, collect_submodules, get_module_file_attribute
 import contextlib
-import pkgutil
 import os
+import shutil
 import sys
+
+from PyInstaller.utils.hooks import (
+    collect_dynamic_libs, collect_submodules, get_module_file_attribute,
+)
+
 
 # Injected by PyInstaller.
 workpath: str
@@ -15,6 +20,8 @@ sys.path.append(SPECPATH)
 
 
 import utils
+
+
 if utils.MAC:
     suffix = '_osx'
 elif utils.LINUX:
@@ -68,10 +75,11 @@ INCLUDES = [
     *collect_submodules('hammeraddons'),
 ]
 
+import logging.config
 # These also aren't required by logging really, but by default
 # they're imported unconditionally. Check to see if it's modified first.
 import logging.handlers
-import logging.config
+
 
 if not hasattr(logging.handlers, 'socket') and not hasattr(logging.config, 'socket'):
     EXCLUDES.append('socket')
@@ -133,8 +141,52 @@ if version_val:
     with open(version_filename, 'w') as f:
         f.write(version_val)
 
+
+def copy_transforms() -> Iterator[str]:
+    """Copy across the transforms into the postcomp package."""
+    # Force the BSP transforms to be included in their own location.
+    # Map package -> module.
+    names: 'dict[str, list[str]]' = {}
+    transform_loc = hammeraddons / 'transforms'
+    transforms_dir = Path(SPECPATH, 'postcomp', '_ha_transforms').resolve()
+    shutil.rmtree(transforms_dir, ignore_errors=True)
+    for mod in transform_loc.rglob('*.py'):
+        rel_path = mod.relative_to(transform_loc)
+        dest = transforms_dir / rel_path
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy(mod, dest)
+
+        if rel_path.name.casefold() == '__init__.py':
+            rel_path = rel_path.parent
+        mod_name = rel_path.with_suffix('')
+        dotted = 'postcomp._ha_transforms.' + str(mod_name).replace('\\', '.').replace('/', '.')
+        package, module = dotted.rsplit('.', 1)
+        names.setdefault(package, []).append(module)
+        yield dotted
+        # vbsp_vrad_an.pure.append((dotted, str(mod), 'PYMODULE'))
+
+    # The package's __init__, where we add the names of all the transforms.
+    # Build up a bunch of import statements to import them all.
+    transforms_stub = Path(transforms_dir, '__init__.py')
+    yield 'postcomp._ha_transforms'
+    with transforms_stub.open('w') as f:
+        f.write('# This module is copied from Hammer Addons, edit there!\n')
+        # Sort long first, then by name.
+        for pack, modnames in sorted(names.items(), key=lambda t: (-len(t[1]), t[0])):
+            if pack:
+                f.write(f'from {pack} import ')
+            else:
+                f.write('import ')
+            modnames.sort()
+            f.write(', '.join(modnames))
+            f.write('\n')
+
+
+INCLUDES.extend(copy_transforms())
+
 # Finally, run the PyInstaller analysis process.
-from PyInstaller.building.build_main import Analysis, PYZ, EXE, COLLECT
+from PyInstaller.building.build_main import COLLECT, EXE, PYZ, Analysis
+
 
 vbsp_vrad_an = Analysis(
     ['compiler_launch.py'],
@@ -145,38 +197,6 @@ vbsp_vrad_an = Analysis(
     excludes=EXCLUDES,
     noarchive=False,
 )
-
-# Force the BSP transforms to be included in their own location.
-# Map package -> module.
-names: 'dict[str, list[str]]' = {}
-transform_loc = hammeraddons / 'transforms'
-for mod in transform_loc.rglob('*.py'):
-    rel_path = mod.relative_to(transform_loc)
-
-    if rel_path.name.casefold() == '__init__.py':
-        rel_path = rel_path.parent
-    mod_name = rel_path.with_suffix('')
-    dotted = 'postcomp.transforms.' + str(mod_name).replace('\\', '.').replace('/', '.')
-    package, module = dotted.rsplit('.', 1)
-    names.setdefault(package, []).append(module)
-    vbsp_vrad_an.pure.append((dotted, str(mod), 'PYMODULE'))
-
-# The package's __init__, where we add the names of all the transforms.
-# Build up a bunch of import statements to import them all.
-transforms_stub = Path(workpath, 'transforms_stub.py')
-with transforms_stub.open('w') as f:
-    f.write(f'__path__ = []\n')  # Make it a package.
-    # Sort long first, then by name.
-    for pack, modnames in sorted(names.items(), key=lambda t: (-len(t[1]), t[0])):
-        if pack:
-            f.write(f'from {pack} import ')
-        else:
-            f.write('import ')
-        modnames.sort()
-        f.write(', '.join(modnames))
-        f.write('\n')
-
-vbsp_vrad_an.pure.append(('postcomp.transforms', str(transforms_stub), 'PYMODULE'))
 
 pyz = PYZ(
     vbsp_vrad_an.pure,
