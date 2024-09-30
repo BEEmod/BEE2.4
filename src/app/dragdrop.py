@@ -420,8 +420,8 @@ class ManagerBase[ItemT, ParentT]:
             sound.fx('config')
             self.on_modified.set()
         elif dest:  # We have a target.
-            if self._cur_slot.is_target and dest.is_target:
-                # Both targets, swap the items.
+            if self._cur_slot.is_target and dest.is_target and dest.contents is not None:
+                # Both targets with items, swap them.
                 self._cur_slot.contents = dest.contents
                 sound.fx('swap')
             else:
