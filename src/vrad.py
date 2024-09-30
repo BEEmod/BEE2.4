@@ -9,7 +9,7 @@ from pathlib import Path
 import os
 import sys
 
-
+from srctools import Vec
 from srctools.bsp import BSP, BSP_LUMPS
 from srctools.filesys import RawFileSystem, ZipFileSystem, FileSystem
 from srctools.packlist import PackList
@@ -28,6 +28,18 @@ import utils
 
 
 LOGGER = get_logger()
+
+TEX_INVISIBLE_TOOLS = 'tools/toolsinvisible'
+TEX_INVISIBLE_PATCHED = 'bee2/invisible_noportal'
+
+
+def swap_material(bsp: BSP, src: str, dest: str) -> None:
+    """Swap material in the BSP, skipping if not present."""
+    for info in bsp.texinfo:
+        if info.mat == src:
+            LOGGER.info('Swapping to {} for {}', dest, info)
+            # These are tools mats, details don't matter.
+            info.set(bsp, dest, Vec(0.5, 0.5, 0.5), 1, 1)
 
 
 def load_transforms() -> None:
@@ -253,6 +265,11 @@ async def main(argv: list[str]) -> None:
     else:
         LOGGER.warning('Packing disabled!')
 
+    # Replace tools/toolsinvisible temporarily, the original blocks light annoyingly.
+    # Do it after packing, so it isn't packed. We'll swap back to the original,
+    # so it's not necessary.
+    swap_material(bsp_file, TEX_INVISIBLE_TOOLS, TEX_INVISIBLE_PATCHED)
+
     # We need to disallow Valve folders.
     pack_whitelist: set[FileSystem] = set()
     pack_blacklist: set[FileSystem] = {pakfile_fs}
@@ -308,6 +325,8 @@ async def main(argv: list[str]) -> None:
         blacklist=pack_blacklist,
         dump_loc=dump_loc,
     )
+    # Put this back.
+    swap_material(bsp_file, TEX_INVISIBLE_PATCHED, TEX_INVISIBLE_TOOLS)
 
     LOGGER.info('Writing BSP...')
     bsp_file.save()
