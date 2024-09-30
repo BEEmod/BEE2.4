@@ -397,12 +397,11 @@ class ManagerBase[ItemT, ParentT]:
         self._ui_dragwin_hide()
         dest = self._pos_slot(x, y)
 
-        sound.fx('config')
-
         if dest is self._cur_slot:
             # Dropped on itself, just put the item back.
             dest.contents = self._cur_drag
             self._cur_drag = self._cur_slot = None
+            sound.fx('config')
             return
 
         if self._cur_slot.is_flexi:
@@ -414,13 +413,19 @@ class ManagerBase[ItemT, ParentT]:
                 if slot.contents is None and group is not None:
                     slot.contents = self._cur_drag
                     slot.flexi_group = group
-                    self.on_modified.set()
                     break
             else:
                 LOGGER.warning('Ran out of FLEXI slots for "{}", restored item: {}', group, self._cur_drag)
                 self._cur_slot.contents = self._cur_drag
-                self.on_modified.set()
+            sound.fx('config')
+            self.on_modified.set()
         elif dest:  # We have a target.
+            if self._cur_slot.is_target and dest.is_target:
+                # Both targets, swap the items.
+                self._cur_slot.contents = dest.contents
+                sound.fx('swap')
+            else:
+                sound.fx('config')
             dest.contents = self._cur_drag
             self.on_modified.set()
         # No target, and we dragged off an existing target, delete.
