@@ -106,7 +106,7 @@ ITEM_VARIANT_LOAD: list[tuple[
     Callable[[packages.PakRef[packages.Style]], object],
 ]] = []
 
-window: SubPane | None = None
+window: SubPane
 
 
 def ui_single_wconf[ConfT: ConfigProto](

@@ -164,7 +164,7 @@ class Unsatisfiable(Exception):
 
     For example, an instance result when that instance currently isn't present.
     """
-    pass
+
 
 # Flag to indicate a result doesn't need to be executed any more,
 # and can be cleaned up - adding a global instance, for example.

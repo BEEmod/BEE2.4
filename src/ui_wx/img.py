@@ -36,6 +36,7 @@ class Bundle(wx.BitmapBundleImpl):
     This way we can use PIL's better resizing instead of the builtin WX ones.
     """
     _bitmaps: dict[tuple[int, int], wx.Bitmap]
+
     def __init__(
         self,
         width: int,

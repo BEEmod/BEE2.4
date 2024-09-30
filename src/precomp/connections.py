@@ -375,6 +375,7 @@ class Connection:
     """Represents a connection between two items."""
 
     __slots__ = ['_to', '_from', 'type', 'outputs']
+
     def __init__(
         self,
         to_item: Item,   # Item this is triggering

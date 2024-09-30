@@ -68,6 +68,7 @@ async def console_handler(title: TransToken, desc: TransToken, errors: list[AppE
         title, desc,
         exc_info=ExceptionGroup('', errors),
     )
+    await trio.lowlevel.checkpoint()
 
 
 @final

@@ -401,12 +401,14 @@ class Barrier:
     original_voxels: Sequence[tuple[PlaneKey, int, int]] = ()
 
     def __eq__(self, other: object) -> bool:
-        """Two barriers are equal if are for the same instance or if mergable. The type must always match."""
+        """Two barriers are equal if they are for the same instance or if mergable. The type must always match."""
         if isinstance(other, Barrier):
             if self.type is not other.type:
                 return False
             return self.type.mergeable or self.name == other.name
         return NotImplemented
+
+    __hash__ = None
 
 
 @attrs.frozen(eq=False, kw_only=True)

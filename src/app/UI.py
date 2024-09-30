@@ -552,6 +552,8 @@ async def on_game_changed() -> None:
     """
     async with aclosing(gameMan.selected_game.eventual_values()) as agen:
         async for game in agen:
+            if game is None:
+                continue
             wid_transtoken.set_win_title(
                 TK_ROOT,
                 TRANS_MAIN_TITLE.format(version=utils.BEE_VERSION, game=game.name),

@@ -4,7 +4,8 @@ include = [
 	"hammeraddons/src/",
 	]
 exclude = [
-	"**/__pycache__"
+	"**/__pycache__",
+	"src/postcomp/_ha_transforms/",
 	]
 venv = "BEE2-12"
 stubPath = "src/"   # Use our module for stubs.
@@ -37,6 +38,7 @@ target-version = "py312"
 exclude = [
 	"src/perlin.py",
 	"src/precomp/conditions/cutoutTile.py",
+	"src/postcomp/_ha_transforms/",
 ]
 
 [tool.ruff.lint]
@@ -169,7 +171,6 @@ enable_error_code = [
 # TODO: make these pass strict checks.
 module = [
 	'app.backup',
-	'app.UI',
 	'precomp.conditions._scaffold_compat',
 	'precomp.bottomlessPit',
 	'precomp.fizzler',
@@ -187,7 +188,8 @@ disallow_untyped_calls = false
 module = ['pyglet.*', 'mistletoe.*', 'wx.lib.inspection']
 ignore_missing_imports = true
 
-# Dead code, needs to be rewritten.
+# cutoutTile is dead code, needs to be rewritten.
+# _ha_transforms is copied from HA, should be checked with settings from there.
 [[tool.mypy.overrides]]
-module = 'precomp.conditions.cutoutTile'
+module = ['precomp.conditions.cutoutTile', 'postcomp._ha_transforms.*']
 ignore_errors = true

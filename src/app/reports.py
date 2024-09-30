@@ -1,6 +1,6 @@
 """Various reports that can be triggered from the options menu."""
 from collections import defaultdict, Counter
-from pathlib import Path, PurePosixPath
+from pathlib import PurePosixPath
 
 import srctools.logger
 import trio

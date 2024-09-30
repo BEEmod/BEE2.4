@@ -5,7 +5,7 @@ from typing import ClassVar, TYPE_CHECKING, Any, Iterable
 
 from collections.abc import Sequence
 from pathlib import Path
-from enum import Enum
+from enum import Enum, StrEnum
 import itertools
 import abc
 
@@ -230,7 +230,7 @@ class QuarterRot(Enum):
 
 
 @utils.freeze_enum_props
-class TileSize(str, Enum):
+class TileSize(StrEnum):
     """Types of textures that can exist, for tile-type generators."""
     TILE_1x1 = '1x1'  # Full block
     TILE_4x4 = '4x4'  # 1/4 of a block
@@ -247,8 +247,6 @@ class TileSize(str, Enum):
     CLUMP_GAP = 'gap'  # For clumping, spaces without a clump.
 
     GOO_SIDE = 'goo'  # For on sides of goo.
-
-    def __str__(self) -> str: return self.value
 
     @property
     def size(self) -> tuple[int, int]:
