@@ -5,6 +5,7 @@ If pyglet fails to load, all fx() calls will fail silently.
 (Sounds are not critical to the app, so they just won't play.)
 """
 from __future__ import annotations
+from typing import Literal
 from typing_extensions import override
 
 from collections.abc import Callable
@@ -33,7 +34,12 @@ _nursery: trio.Nursery | None = None
 _playing_count = trio_util.AsyncValue(0)
 _playing: set[object] = set()
 
-SOUNDS: dict[str, str] = {
+type SoundName = Literal[
+    'select', 'add', 'config', 'subtract', 'connect', 'disconnect', 'expand', 'delete',
+    'error', 'contract', 'raise_1', 'raise_2', 'raise_3', 'lower_1', 'lower_2', 'lower_3',
+    'move', 'swap',
+]
+SOUNDS: dict[SoundName, str] = {
     'select': 'rollover',
     'add': 'increment',
     'config': 'reconfig',
@@ -53,8 +59,6 @@ SOUNDS: dict[str, str] = {
     'move': 'reconfig',
     'swap': 'extrude',
 }
-# Gradually load sounds in the background.
-_todo = list(SOUNDS)
 is_positive: Callable[[int], bool] = (0).__lt__
 is_zero: Callable[[int], bool] = (0).__eq__
 
@@ -88,11 +92,11 @@ class NullSound:
         finally:
             self._block_count -= 1
 
-    async def load(self, name: str) -> Source | None:
+    async def load(self, name: SoundName) -> Source | None:
         """Load and do nothing."""
         return None
 
-    async def fx_blockable(self, sound: str) -> None:
+    async def fx_blockable(self, sound: SoundName) -> None:
         """Play a sound effect.
 
         This waits for a certain amount of time between retriggering sounds
@@ -105,7 +109,7 @@ class NullSound:
             finally:
                 self._block_count -= 1
 
-    async def fx(self, sound: str) -> None:
+    async def fx(self, sound: SoundName) -> None:
         """Play a sound effect, sleeping for the duration."""
         await trio.lowlevel.checkpoint()
 
@@ -117,7 +121,7 @@ class PygletSound(NullSound):
         self.sources: dict[str, Source] = {}
 
     @override
-    async def load(self, name: str) -> Source | None:
+    async def load(self, name: SoundName) -> Source | None:
         """Load the given UI sound into a source."""
         global sounds
         fname = SOUNDS[name]
@@ -142,7 +146,7 @@ class PygletSound(NullSound):
             return src
 
     @override
-    async def fx(self, sound: str) -> None:
+    async def fx(self, sound: SoundName) -> None:
         """Play a sound effect, sleeping for the duration."""
         global sounds
         if play_fx():
@@ -205,7 +209,7 @@ async def sound_task() -> None:
                     await trio.sleep(0.1)
 
 
-async def _load_bg(sound: str) -> None:
+async def _load_bg(sound: SoundName) -> None:
     """Load the FX sounds gradually in the background."""
     try:
         await sounds.load(sound)
@@ -215,13 +219,13 @@ async def _load_bg(sound: str) -> None:
             _nursery.cancel_scope.cancel()
 
 
-def fx(name: str) -> None:
+def fx(name: SoundName) -> None:
     """Play a sound effect stored in the sounds{} dict."""
     if _nursery is not None and not _nursery.cancel_scope.cancel_called:
         _nursery.start_soon(sounds.fx, name)
 
 
-def fx_blockable(sound: str) -> None:
+def fx_blockable(sound: SoundName) -> None:
     """Play a sound effect.
 
     This waits for a certain amount of time between retriggering sounds,
