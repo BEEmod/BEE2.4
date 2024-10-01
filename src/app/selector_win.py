@@ -578,7 +578,7 @@ class SelectorWinBase[ButtonT, GroupHeaderT: GroupHeaderBase](ReflowWindow):
         if item_id == self.selected:
             self.save()
         else:
-            self.sel_item_id(item_id)
+            self.sel_item(item_id)
 
     async def _load_selected_task(self) -> None:
         """When configs change, load new items."""
