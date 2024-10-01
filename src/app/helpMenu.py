@@ -34,7 +34,7 @@ class ResIcon(Enum):
     APERTURE = 'ap_black'
     BUGS = 'menu_github'
     DISCORD = 'menu_discord'
-    MUSIC_CHANGER = 'menu_music_changer'
+    MUSIC_CREATOR = 'menu_music_package_creator'
     PORTAL2 = 'menu_p2'
 
 
@@ -65,7 +65,7 @@ WEB_RESOURCES = [
     WebResource(TransToken.ui('Original Items...'), "wiki_peti", ResIcon.PORTAL2),
     # i18n: The chat program.
     WebResource(TransToken.ui('Discord Server...'), "discord_bee2", ResIcon.DISCORD),
-    WebResource(TransToken.ui("aerond's Music Changer..."), "music_changer", ResIcon.MUSIC_CHANGER),
+    WebResource(TransToken.ui("aerond's Music Package Creator..."), "aerond_music_creator", ResIcon.MUSIC_CREATOR),
     WebResource(TransToken.ui('Purchase Portal 2'), "store_portal2", ResIcon.PORTAL2),
     SEPERATOR,
     WebResource(TransToken.ui('Application Repository...'), "repo_bee2", ResIcon.GITHUB),
