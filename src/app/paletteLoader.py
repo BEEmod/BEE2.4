@@ -29,8 +29,7 @@ CUR_VERSION: Final = 3
 type HorizInd = Literal[0, 1, 2, 3]
 type VertInd = Literal[0, 1, 2, 3, 4, 5, 6, 7]
 type Coord = tuple[HorizInd, VertInd]
-# TODO: Switch item ID here to ObjectID
-type ItemPos = dict[Coord, tuple[str, int]]
+type ItemPos = dict[Coord, tuple[utils.ObjectID, int]]
 type BuiltinPal = list[list[
     tuple[DefaultItems | utils.ObjectID, int],
 ]]
@@ -557,7 +556,7 @@ def parse_legacy(posfile: IO[str], propfile: IO[str], path: str) -> Palette:
                     item_id = val[0][1:]
                     subtype = int(val[1])
                     try:
-                        pos[next(coords)] = (item_id, subtype)
+                        pos[next(coords)] = (utils.obj_id(item_id), subtype)
                     except StopIteration:
                         raise ValueError('Too many items!') from None
                 else:

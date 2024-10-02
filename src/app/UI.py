@@ -315,7 +315,7 @@ async def export_complete_task(
             # Recompute, in case the trigger was busy with another export?
             pal_by_item = info.selected(packages.Item.export_info)
             pal_data = {
-                pos: (item_id, subkey)
+                pos: (utils.obj_id(item_id), subkey)
                 for item_id, item_data in pal_by_item.items()
                 for subkey, pos in item_data.items()
             }
