@@ -2,7 +2,7 @@
 from typing import Final
 
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Mapping
+from collections.abc import Awaitable, Callable, Mapping
 from contextlib import aclosing
 import random
 
@@ -203,7 +203,6 @@ class ItemPickerBase[ParentT](ReflowWindow, ABC):
         while True:
             slot = await self.drag_man.on_config.wait()
             if slot.contents is not None:
-                sound.fx('expand')
                 open_func(slot, self.slots_pal.get(slot))
 
     def _drag_info(self, ref: SubItemRef) -> DragInfo:

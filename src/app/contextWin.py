@@ -110,6 +110,10 @@ TRANS_TOOL_FIZZOUT = TransToken.ui(
     'This fizzler has an output. Due to an editor bug, this cannot be used directly. Instead '
     'the Fizzler Output Relay item should be placed on top of this fizzler.'
 )
+TRANS_URL_FAIL = TransToken.ui(
+    'Failed to open a web browser. Do you wish for the URL '
+    'to be copied to the clipboard instead?'
+)
 TRANS_TOOL_FIZZOUT_TIMED = TransToken.ui(
     'This fizzler has a timed output. Due to an editor bug, this cannot be used directly. Instead '
     'the Fizzler Output Relay item should be placed on top of this fizzler.'
@@ -119,6 +123,11 @@ TRANS_ENT_COUNT = TransToken.ui(
     'The number of entities used for this item. The Source engine '
     'limits this to 2048 in total. This provides a guide to how many of '
     'these items can be placed in a map at once.'
+)
+TRANS_MISSING_ITEM = TransToken.ui(
+    'The item <{id}> is missing from package definitions. Check for missing packages. '
+    'Alternatively, this item may have been replaced or merged into another.\n\n'
+    'Export is not possible while this is present on the palette.'
 )
 
 
@@ -175,6 +184,8 @@ class ContextWinBase:
     current_style: AsyncValue[packages.PakRef[packages.Style]]
     # If set, the item properties window is open and suppressing us.
     props_open: bool
+    # If set, a special warning is visible for items that are not defined.
+    missing_item_visible: bool
 
     moreinfo_url: AsyncValue[str | None]
     moreinfo_trigger: EdgeTrigger[str]
@@ -193,6 +204,7 @@ class ContextWinBase:
         self.picker = item_picker
         self.current_style = current_style
         self.props_open = False
+        self.missing_item_visible = False
         self.packset = packages.PackagesSet.blank()
 
         # The current URL in the more-info button, if available.
@@ -404,12 +416,16 @@ class ContextWinBase:
                 blurb = ('Output force-enabled!\n' + blurb).strip()
             self.ui_set_sprite_tool(SPR.OUTPUT, TransToken.untranslated(blurb))
 
-    def hide_context(self, e: object = None) -> None:
+    def hide_context(self, _: object = None, /) -> None:
         """Hide the properties window, if it's open."""
         if self.is_visible:
             self.ui_hide_window()
             sound.fx('contract')
             self.selected = self.selected_slot = self.selected_pal_pos = None
+        if self.missing_item_visible:
+            self.ui_hide_missing_win()
+            sound.fx('contract')
+            self.missing_item_visible = False
 
     def show_prop(
         self,
@@ -424,25 +440,35 @@ class ContextWinBase:
           it stays on top of the selected subitem.
         - If from the palette, pal_pos is the position.
         """
+        self.ui_hide_missing_win()
         if warp_cursor and self.is_visible:
             offset = self.ui_get_cursor_offset()
         else:
             offset = None
-        self.selected = slot.contents
-        if self.selected is None:
+        selected = slot.contents
+        if selected is None:
             LOGGER.warning('Selected empty slot?')
             self.hide_context()
             return
+
+        x, y = slot.get_coords()
+
         # Check to see if it's actually a valid item too.
-        if self.selected.item.resolve(self.packset) is None:
-            LOGGER.info('Item not defined, nothing to show.')
+        if selected.item.resolve(self.packset) is None:
+            LOGGER.info('Item {} not defined!', selected.item)
             self.hide_context()
+            self.missing_item_visible = True
+            self.ui_show_missing_win(
+                x, y,
+                TRANS_MISSING_ITEM.format(id=selected.item),
+            )
             return
 
+        self.selected = selected
         self.selected_slot = slot
         self.selected_pal_pos = pal_pos
 
-        x, y = slot.get_coords()
+        sound.fx('expand')
         self.ui_show_window(x, y)
         self.adjust_position()
 
@@ -460,10 +486,7 @@ class ContextWinBase:
             except webbrowser.Error:
                 if await self.dialog.ask_yes_no(
                     title=TransToken.ui("BEE2 - Error"),
-                    message=TransToken.ui(
-                        'Failed to open a web browser. Do you wish for the URL '
-                        'to be copied to the clipboard instead?'
-                    ),
+                    message=TRANS_URL_FAIL,
                     icon=self.dialog.ERROR,
                     detail=f'"{url}"',
                 ):
@@ -479,7 +502,7 @@ class ContextWinBase:
         self.ui_set_sprite_img(pos, img.Handle.sprite('icons/' + sprite, 32, 32))
         self.ui_set_sprite_tool(pos, SPRITE_TOOL[sprite])
 
-    def sub_sel(self, pos: int, e: object = None) -> None:
+    def sub_sel(self, pos: int, _: object = None, /) -> None:
         """Change the currently-selected sub-item."""
         if self.selected is None or self.selected_slot is None:
             return
@@ -495,7 +518,7 @@ class ContextWinBase:
                 # Redisplay the window to refresh data and move it to match
                 self.show_prop(self.selected_slot, self.selected_pal_pos, warp_cursor=True)
 
-    def sub_open(self, pos: int, e: object = None) -> None:
+    def sub_open(self, pos: int, _: object = None, /) -> None:
         """Move the context window to apply to the given item."""
         assert self.selected is not None
         item = self.selected.item.resolve(packages.get_loaded_packages())
@@ -510,7 +533,7 @@ class ContextWinBase:
                 if slot is not None:
                     self.show_prop(slot, pal_pos)
 
-    def adjust_position(self, e: object = None) -> None:
+    def adjust_position(self, _: object = None, /) -> None:
         """Move the properties window onto the selected item.
 
         We call this constantly, so the property window will not go outside
@@ -571,6 +594,14 @@ class ContextWinBase:
 
     def ui_show_window(self, x: int, y: int) -> None:
         """Show the window, at the specified position."""
+        raise NotImplementedError
+
+    def ui_show_missing_win(self, x: int, y: int, text: TransToken) -> None:
+        """Show an error window identifying missing items."""
+        raise NotImplementedError
+
+    def ui_hide_missing_win(self) -> None:
+        """Hide the missing-item window."""
         raise NotImplementedError
 
     def ui_get_cursor_offset(self) -> tuple[int, int]:

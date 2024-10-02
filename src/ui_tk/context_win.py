@@ -191,6 +191,20 @@ class ContextWin(ContextWinBase):
         # When the main window moves, move the context window also.
         TK_ROOT.bind("<Configure>", self.adjust_position, add='+')
 
+        self.missing_item_win = tk.Toplevel(TK_ROOT, name='contextWin_missing')
+        self.missing_item_win.overrideredirect(True)
+        self.missing_item_win.resizable(False, False)
+        self.missing_item_win.transient(master=TK_ROOT)
+        if utils.LINUX:
+            self.missing_item_win.wm_attributes('-type', 'popup_menu')
+        self.missing_item_win.withdraw()  # starts hidden
+
+        missing_win_frame = ttk.Frame(self.missing_item_win, relief="raised", borderwidth="4")
+        missing_win_frame.grid()
+        self.wid_missing_lbl = ttk.Label(missing_win_frame)
+        self.wid_missing_lbl.grid()
+        self.wid_missing_lbl['wraplength'] = 300
+
     def _evt_moreinfo_clicked(self) -> None:
         """Handle the more-info button being clicked."""
         url = self.moreinfo_url.value
@@ -286,10 +300,29 @@ class ContextWin(ContextWinBase):
     @override
     def ui_show_window(self, x: int, y: int) -> None:
         """Show the window."""
-        loc_x, loc_y = tk_tools.adjust_inside_screen(x=x, y=y, win=self.window)
+        x, y = tk_tools.adjust_inside_screen(x, y, self.window)
         self.window.deiconify()
         self.window.lift()
-        self.window.geometry(f'+{loc_x!s}+{loc_y!s}')
+        self.window.geometry(f'+{x!s}+{y!s}')
+
+    @override
+    def ui_show_missing_win(self, x: int, y: int, label: TransToken) -> None:
+        """Show the missing-item window."""
+        set_text(self.wid_missing_lbl, label)
+        self.missing_item_win.deiconify()
+        self.missing_item_win.lift()
+        self.missing_item_win.update_idletasks()
+        self.missing_item_win.bell()
+
+        x += (IMG_ALPHA.width - self.missing_item_win.winfo_width()) // 2
+        y += IMG_ALPHA.height // 4
+        x, y = tk_tools.adjust_inside_screen(x, y, self.missing_item_win)
+        self.missing_item_win.geometry(f'+{x!s}+{y!s}')
+
+    @override
+    def ui_hide_missing_win(self) -> None:
+        """Hide the missing-item window."""
+        self.missing_item_win.withdraw()
 
     @override
     def ui_get_cursor_offset(self) -> tuple[int, int]:
