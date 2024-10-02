@@ -83,7 +83,7 @@ def apply_replacements(conf: Keyvalues, item_id: str) -> Keyvalues:
 
 def get_export_data(
     item: Item,
-    pal_list: dict[str, dict[int, tuple[int, int]]],
+    pal_list: Item.ExportInfo,
     style_id: utils.ObjectID,
     prop_conf: ItemDefault,
 ) -> tuple[list[EditorItem], lazy_conf.LazyConf]:
@@ -164,7 +164,7 @@ async def step_write_items(exp_data: ExportData) -> None:
     palette.
     """
     vbsp_config = exp_data.vbsp_conf
-    pal_list: dict[str, dict[int, tuple[int, int]]] = exp_data.selected[Item]
+    pal_list = exp_data.selected(Item.export_info)
 
     missing = []
     # Check all palette items actually exist, otherwise fail.

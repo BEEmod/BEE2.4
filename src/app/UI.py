@@ -282,20 +282,18 @@ def fetch_export_info() -> exporting.ExportInfo | None:
         return None
 
     return exporting.ExportInfo(
-        game,
-        packset,
-        style=chosen_style,
-        selected_objects={
-            # Specify the 'chosen item' for each object type
-            packages.Music: music_conf.export_data(packset),
-            packages.Skybox: skybox_win.chosen.value,
-            packages.QuotePack: voice_win.chosen.value,
-            packages.Elevator: elev_win.chosen.value,
+        # Specify the 'chosen item' for each object type
+        packages.Music.export_info(music_conf.export_data(packset)),
+        packages.Skybox.export_info(skybox_win.chosen.value),
+        packages.QuotePack.export_info(voice_win.chosen.value),
+        packages.Elevator.export_info(elev_win.chosen.value),
+        packages.Item.export_info(pal_by_item),
+        packages.StyleVar.export_info(StyleVarPane.export_data(chosen_style)),
+        packages.Signage.export_info(signage_ui.export_data()),
 
-            packages.Item: pal_by_item,
-            packages.StyleVar: StyleVarPane.export_data(chosen_style),
-            packages.Signage: signage_ui.export_data(),
-        },
+        game=game,
+        packset=packset,
+        style=chosen_style,
         should_refresh=not conf.preserve_resources,
     )
 
@@ -307,13 +305,15 @@ async def export_complete_task(
 ) -> None:
     """Run actions after an export completes.
     """
+    info: exporting.ExportInfo
+    result: ErrorResult
     async with export_rec:
         async for info, result in export_rec:
             if result is ErrorResult.FAILED:
                 continue
 
             # Recompute, in case the trigger was busy with another export?
-            pal_by_item = info.selected_objects[packages.Item]
+            pal_by_item = info.selected(packages.Item.export_info)
             pal_data = {
                 pos: (item_id, subkey)
                 for item_id, item_data in pal_by_item.items()

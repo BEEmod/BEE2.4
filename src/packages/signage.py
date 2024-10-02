@@ -2,13 +2,16 @@
 from __future__ import annotations
 from typing import Final
 
+from collections.abc import Sequence
+
 import attrs
 import srctools.logger
 import trio
 
-from packages import PakObject, PakRef, ParseData, Style, Item
 from app.img import Handle as ImgHandle
+from packages import ExportKey, Item, PakObject, PakRef, ParseData, Style
 import utils
+
 
 __all__ = ['LEGEND_SIZE', 'CELL_SIZE', 'ITEM_ID', 'Signage', 'SignageLegend', 'SignStyle']
 LOGGER = srctools.logger.get_logger(__name__)
@@ -83,6 +86,9 @@ class SignageLegend(PakObject):
 
 class Signage(PakObject, allow_mult=True, needs_foreground=True):
     """Defines different square signage overlays."""
+    type ExportInfo = Sequence[tuple[str, utils.ObjectID]]
+    export_info: Final[ExportKey[ExportInfo]] = ExportKey()
+
     def __init__(
         self,
         sign_id: str,

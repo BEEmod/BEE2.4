@@ -7,34 +7,35 @@ Unparsed style IDs can be <special>, used usually for unstyled items.
 Those are only relevant for default styles or explicit inheritance.
 """
 from __future__ import annotations
+from typing import Final, Self, override
 
-from typing import Self, override
-
-from collections.abc import Sequence, Iterable, Iterator
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 from enum import Enum
 from pathlib import PurePosixPath as FSPath
-import re
 import copy
-
-from srctools import FileSystem, Keyvalues, VMF, logger
-from srctools.tokenizer import Tokenizer, Token
+import re
 
 from aioresult import ResultCapture
+from srctools import VMF, FileSystem, Keyvalues, logger
+from srctools.tokenizer import Token, Tokenizer
 import attrs
 import trio
 
-from app import img, lazy_conf, DEV_MODE
+from app import DEV_MODE, img, lazy_conf, paletteLoader
 from app.mdown import MarkdownData
-from config.item_defaults import DEFAULT_VERSION, ItemDefault
 from config.gen_opts import GenOptions
+from config.item_defaults import DEFAULT_VERSION, ItemDefault
 from connections import Config as ConnConfig
-from editoritems import Item as EditorItem, InstCount
-from packages import PackagesSet, PakObject, PakRef, ParseData, Style, sep_values, desc_parse, get_config
+from editoritems import InstCount, Item as EditorItem
+from packages import (
+    ExportKey, PackagesSet, PakObject, PakRef, ParseData, Style, desc_parse,
+    get_config, sep_values,
+)
 from transtoken import TransToken, TransTokenSource
+import async_util
 import collisions
 import config
 import editoritems_vmf
-import async_util
 import utils
 
 
@@ -493,6 +494,10 @@ class Item(PakObject, needs_foreground=True):
     def_ver: Version
     # Subtypes which have palette icons, and therefore should be shown in the UI.
     visual_subtypes: Sequence[int]
+
+    # The type required to export items.
+    type ExportInfo = Mapping[str, Mapping[int, tuple[paletteLoader.HorizInd, paletteLoader.VertInd]]]
+    export_info: Final[ExportKey[ExportInfo]] = ExportKey()
 
     def __init__(
         self,

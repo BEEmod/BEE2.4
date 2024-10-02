@@ -1,15 +1,21 @@
 from __future__ import annotations
+from typing import Final
+
 from collections.abc import Iterator
 
-import utils
-from quote_pack import Line, Quote, QuoteEvent, Group, QuoteInfo, Response, Monitor, RESPONSE_NAMES
-from transtoken import AppError, TransToken, TransTokenSource
-from packages import (
-    AttrMap, PackagesSet, SelPakObject, set_cond_source, ParseData, get_config,
-    SelitemData,
-)
 from srctools import Angle, Keyvalues, NoKeyError, logger
 import srctools
+
+from packages import (
+    AttrMap, ExportKey, PackagesSet, ParseData, SelitemData, SelPakObject,
+    get_config, set_cond_source,
+)
+from quote_pack import (
+    RESPONSE_NAMES, Group, Line, Monitor, Quote, QuoteEvent, QuoteInfo,
+    Response,
+)
+from transtoken import AppError, TransToken, TransTokenSource
+import utils
 
 
 LOGGER = logger.get_logger('packages.quote_pack')
@@ -20,6 +26,8 @@ NONE_SELECTOR_ATTRS: AttrMap = {
 
 class QuotePack(SelPakObject, needs_foreground=True, style_suggest_key='quote'):
     """Adds lists of voice lines which are automatically chosen."""
+    export_info: Final[ExportKey[utils.SpecialID]] = ExportKey()
+
     def __init__(
         self,
         quote_id: str,

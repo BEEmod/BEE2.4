@@ -1,8 +1,8 @@
 """The code for performing an export to the game folder."""
 from __future__ import annotations
-from typing import TYPE_CHECKING, Any
+from typing import NewType, TYPE_CHECKING, Any
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterable, Mapping
 from enum import Enum, auto
 from pathlib import PurePath
 import os
@@ -12,10 +12,12 @@ import attrs
 import srctools.logger
 import trio
 
+import utils
 from app import DEV_MODE
 from app.errors import ErrorUI, Result as ErrorResult, WarningExc
 from editoritems import Item as EditorItem, Renderable, RenderableType
-from packages import PackagesSet, PakObject, Style
+# noinspection PyProtectedMember
+from packages import PackagesSet, ExportKey, _ExportValue, Style
 from step_order import StepOrder
 from transtoken import TransToken
 import config as config_mod
@@ -81,7 +83,7 @@ class ExportData:
     packset: PackagesSet = attrs.field(repr=lambda pack: f'<PackagesSet @ {id(pack):x}>')
     game: Game  # The current game.
     # Usually str, but some items pass other things.
-    selected: dict[type[PakObject], Any]
+    _selected: Mapping[ExportKey[Any], Any]
     # Some items need to know which style is selected
     selected_style: Style
     # If refreshing resources is enabled.
@@ -102,6 +104,10 @@ class ExportData:
     # Can be called to indicate a non-fatal error.
     warn: Callable[[WarningExc | TransToken], None]
 
+    def selected[T](self, key: ExportKey[T]) -> T:
+        """Fetch the value for this key."""
+        return self._selected[key]  # type: ignore
+
 
 STEPS = StepOrder(ExportData, StepResource)
 TRANS_EXP_TITLE = TransToken.ui("BEE2 Export - {game}")
@@ -115,16 +121,32 @@ TRANS_WARN = TransToken.ui_plural(
 )
 
 
-@attrs.frozen
+@attrs.frozen(init=False)
 class ExportInfo:
     """Parameters required for exporting."""
     game: Game
     packset: packages.PackagesSet
     style: packages.Style
-    selected_objects: dict[type[packages.PakObject], Any]
-    should_refresh: bool = False
+    _selected: Mapping[ExportKey[Any], Any]
+    should_refresh: bool
+
+    def __init__(
+        self,
+        *values: _ExportValue,
+        game: Game,
+        packset: packages.PackagesSet,
+        style: packages.Style,
+        should_refresh: bool,
+    ) -> None:
+        # noinspection PyUnresolvedReferences
+        self.__attrs_init__(game, packset, style, dict(values), should_refresh)
+
+    def selected[T](self, key: ExportKey[T]) -> T:
+        """Fetch the value for this key."""
+        return self._selected[key]  # type: ignore
 
 
+# noinspection PyProtectedMember
 async def export(info: ExportInfo) -> ErrorResult:
     """Export configuration to the specified game.
 
@@ -134,8 +156,8 @@ async def export(info: ExportInfo) -> ErrorResult:
     LOGGER.info('Exporting Items and Style for "{}"!', info.game.name)
 
     LOGGER.info('Style = {}', info.style.id)
-    for obj_type, selected in info.selected_objects.items():
-        LOGGER.info('{} = {}', obj_type, selected)
+    for exp_key, selected in info._selected.items():
+        LOGGER.info('{} = {}', exp_key.cls, selected)
 
     with load_screen:
         async with ErrorUI(
@@ -159,7 +181,7 @@ async def export(info: ExportInfo) -> ErrorResult:
 
             exp_data = ExportData(
                 game=info.game,
-                selected=info.selected_objects,
+                selected=info._selected,
                 packset=info.packset,
                 selected_style=info.style,
                 config=config_mod.APP.get_full_conf(config_mod.COMPILER),

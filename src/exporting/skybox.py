@@ -11,7 +11,7 @@ import utils
 @STEPS.add_step(prereq=[], results=[StepResource.VCONF_DATA])
 async def step_skybox(exp_data: ExportData) -> None:
     """Export the selected skybox."""
-    sel_id: utils.SpecialID = exp_data.selected[Skybox]
+    sel_id = exp_data.selected(Skybox.export_info)
     if sel_id == utils.ID_NONE:
         return  # No skybox..
 

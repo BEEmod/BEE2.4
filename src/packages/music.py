@@ -1,6 +1,6 @@
 """Definitions for background music used in the map."""
 from __future__ import annotations
-from typing import Iterator, Mapping
+from typing import ClassVar, Final, Iterator, Mapping
 
 from collections.abc import Awaitable, Callable, Iterable
 
@@ -10,7 +10,10 @@ import srctools.logger
 import utils
 from app import lazy_conf
 from consts import MusicChannel
-from packages import AttrMap, PackagesSet, SelPakObject, ParseData, SelitemData, get_config
+from packages import (
+    AttrMap, ExportKey, PackagesSet, SelPakObject, ParseData, SelitemData,
+    get_config,
+)
 from transtoken import TransTokenSource
 
 
@@ -19,6 +22,9 @@ LOGGER = srctools.logger.get_logger(__name__)
 
 class Music(SelPakObject, needs_foreground=True, style_suggest_key='music'):
     """Allows specifying background music for the map."""
+    type ExportInfo = Mapping[MusicChannel, utils.SpecialID]
+    export_info: Final[ExportKey[ExportInfo]] = ExportKey()
+
     def __init__(
         self,
         music_id: str,

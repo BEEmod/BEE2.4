@@ -4,7 +4,7 @@ Handles scanning through the zip packages to find all items, styles, etc.
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any, NoReturn, ClassVar, Self, cast
+from typing import Any, NewType, NoReturn, ClassVar, Self, cast
 
 from collections.abc import Awaitable, Callable, Collection, Iterable, Iterator, Mapping
 from collections import defaultdict
@@ -53,8 +53,10 @@ __all__ = [
     'Skybox', 'Music', 'QuotePack', 'PackList', 'CorridorGroup', 'ConfigGroup', 'BarrierHole',
 
     # Mainly intended for package object code.
-    'ParseData', 'reraise_keyerror', 'get_config', 'set_cond_source',
+    'ParseData', 'ExportKey', 'reraise_keyerror', 'get_config', 'set_cond_source',
     'parse_multiline_key', 'desc_parse', 'sep_values',
+    # For exporting module only.
+    '_ExportValue',
 
     'TRANS_OBJ_NOT_FOUND',
 ]
@@ -582,6 +584,26 @@ class PakRef[PakT: PakObject]:
     def __str__(self) -> str:
         """The string form is the ID itself."""
         return self.id
+
+
+@attrs.define(eq=False)
+class ExportKey[T]:
+    """Keys which define the types required to export different package objects.
+
+    These are defined as a constant on each PakObject, called to get values to accumulate,
+    then ExportData allows retrieving.
+    """
+    cls: type[PakObject] | None = None
+
+    def __set_name__(self, owner: type[PakObject], name: str) -> None:
+        """Store the associated object for reference purposes."""
+        self.cls = owner
+
+    def __call__(self, value: T) -> _ExportValue:
+        return _ExportValue((self, value))
+
+# Only for instantiation in ExportKey.
+_ExportValue = NewType('_ExportValue', tuple[ExportKey[Any], Any])
 
 
 def reraise_keyerror(err: NoKeyError | IndexError, obj_id: str) -> NoReturn:

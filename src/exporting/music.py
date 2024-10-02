@@ -11,7 +11,7 @@ import utils
 @STEPS.add_step(prereq=[], results=[StepResource.VCONF_DATA])
 async def step_music_conf(exp_data: ExportData) -> None:
     """Export the selected music."""
-    selected: dict[MusicChannel, utils.SpecialID] = exp_data.selected[Music]
+    selected = exp_data.selected(Music.export_info)
 
     vbsp_config = exp_data.vbsp_conf
 

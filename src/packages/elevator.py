@@ -2,9 +2,9 @@
 
 We can't pack BIKs, so this is mainly for Valve's existing ones.
 """
-from typing import Iterator, Optional
+from typing import Final, Iterator, Optional
 
-from packages import PackagesSet, SelPakObject, ParseData, SelitemData, AttrMap
+from packages import ExportKey, PackagesSet, SelPakObject, ParseData, SelitemData, AttrMap
 from transtoken import TransTokenSource
 import utils
 
@@ -14,6 +14,8 @@ class Elevator(SelPakObject, needs_foreground=True, style_suggest_key='elev'):
 
     This is mainly defined just for Valve's items - you can't pack BIKs.
     """
+    export_info: Final[ExportKey[utils.SpecialID]] = ExportKey()
+
     def __init__(
         self,
         elev_id: str,

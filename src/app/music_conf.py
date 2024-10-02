@@ -87,7 +87,7 @@ def set_suggested(packset: PackagesSet, music_id: utils.SpecialID) -> None:
             WINDOWS[channel].set_suggested()
 
 
-def export_data(packset: PackagesSet) -> dict[MusicChannel, utils.SpecialID]:
+def export_data(packset: PackagesSet) -> Music.ExportInfo:
     """Return the data used to export this."""
     base_id = WINDOWS[MusicChannel.BASE].chosen.value
     if base_id == utils.ID_NONE:

@@ -41,7 +41,7 @@ def is_full(value: SignRef | None) -> TypeGuard[SignRef]:
     return value is not None
 
 
-def export_data() -> list[tuple[str, utils.ObjectID]]:
+def export_data() -> Signage.ExportInfo:
     """Returns selected items, for Signage.export() to use."""
     conf: Layout = config.APP.get_cur_conf(Layout)
     return [

@@ -1,13 +1,17 @@
 """Style specific features which can be enabled or disabled."""
 from __future__ import annotations
-from typing import Iterator
+from typing import Final, Iterator
 
-from packages import PackagesSet, PakObject, ParseData, Style
+from collections.abc import Mapping
+
+from packages import ExportKey, PackagesSet, PakObject, ParseData, Style
 from transtoken import TransToken, TransTokenSource
 
 
 class StyleVar(PakObject, allow_mult=True, needs_foreground=True):
     """Style specific features which can be enabled or disabled."""
+    export_info: Final[ExportKey[Mapping[str, bool]]] = ExportKey()
+
     def __init__(
         self,
         var_id: str,

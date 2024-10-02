@@ -12,7 +12,7 @@ async def step_elevator_video(exp_data: ExportData) -> None:
     """Export the chosen video into the configs."""
     await trio.lowlevel.checkpoint()
     elevator: Elevator | None
-    sel_id: utils.SpecialID = exp_data.selected[Elevator]
+    sel_id: utils.SpecialID = exp_data.selected(Elevator.export_info)
     if sel_id == utils.ID_NONE:
         elevator = None
     else:

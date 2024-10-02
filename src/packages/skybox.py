@@ -1,11 +1,16 @@
 from __future__ import annotations
+from typing import Final
+
 from collections.abc import Iterator
 
 from srctools import Keyvalues
 
-from transtoken import TransTokenSource
-from packages import AttrMap, PackagesSet, SelPakObject, ParseData, SelitemData, get_config
 from app import lazy_conf
+from packages import (
+    AttrMap, ExportKey, PackagesSet, ParseData, SelitemData, SelPakObject,
+    get_config,
+)
+from transtoken import TransTokenSource
 import utils
 
 
@@ -15,6 +20,8 @@ class Skybox(
     style_suggest_key='skybox', suggest_default='SKY_BLACK',
 ):
     """Configures skybox and fog settings."""
+    export_info: Final[ExportKey[utils.SpecialID]] = ExportKey()
+
     def __init__(
         self,
         sky_id: str,

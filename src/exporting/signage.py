@@ -57,7 +57,7 @@ async def step_signage(exp_data: ExportData) -> None:
     """Export the selected signage to the config, and produce the legend."""
     # Timer value -> sign ID.
     sel_ids: list[tuple[str, str]] = [
-        *exp_data.selected[Signage],
+        *exp_data.selected(Signage.export_info),
         # Special case, arrow is never selectable, but must always be exported.
         ('arrow', 'SIGN_ARROW'),
     ]

@@ -11,11 +11,8 @@ from . import STEPS, ExportData, StepResource
 
 @STEPS.add_step(prereq=[], results=[StepResource.VCONF_DATA])
 async def step_add_stylevars(exp_data: ExportData) -> None:
-    """Export style var selections into the config.
-
-    The .selected attribute is a dict mapping ids to the boolean value.
-    """
-    style_vars: dict[str, bool] = exp_data.selected[StyleVar]
+    """Export style var selections into the config."""
+    style_vars = exp_data.selected(StyleVar.export_info)
     # Add the StyleVars block, containing each style_var.
     block = Keyvalues('StyleVars', [
         Keyvalues(key, bool_as_int(val))
