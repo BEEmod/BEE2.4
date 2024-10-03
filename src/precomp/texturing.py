@@ -403,7 +403,8 @@ class MaterialConf:
 
     def apply_over(self, over: Entity) -> None:
         """Apply the config to an overlay."""
-        over['material'] = self.mat
+        # TODO: Can remove str() after srctools 2.4.0+
+        over['material'] = str(self.mat)
         # TODO: Rotation, scale
 
     def as_antigel(self) -> MaterialConf:
