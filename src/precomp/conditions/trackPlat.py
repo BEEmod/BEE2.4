@@ -77,7 +77,7 @@ def res_track_plat(vmf: VMF, res: Keyvalues) -> object:
                 track_instances[FrozenVec.from_str(inst['origin'])] = inst
             case fnames.bottom_grate:
                 track_grate_instances[FrozenVec.from_str(inst['origin'])] = inst
-            case fnames.plat_oscil | fnames.plat_oscil:
+            case fnames.platform | fnames.plat_oscil:
                 platforms.append(inst)
             case _:
                 pass  # Unrelated.
