@@ -674,7 +674,7 @@ def set_cond_source(kv: Keyvalues, source: str) -> None:
     """
     for cond in kv.find_all('Conditions', 'Condition'):
         if '__src__' not in cond:
-            cond['__src__'] = source
+            cond['__src__'] = f'{source}:{cond.line_num}' if source else f'{cond.line_num}'
 
 
 def _obj_dict() -> dict[type[PakObject], dict[str, Any]]:
