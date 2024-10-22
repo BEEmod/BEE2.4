@@ -602,6 +602,7 @@ class ExportKey[T]:
     def __call__(self, value: T) -> _ExportValue:
         return _ExportValue((self, value))
 
+
 # Only for instantiation in ExportKey.
 _ExportValue = NewType('_ExportValue', tuple[ExportKey[Any], Any])
 

@@ -1,8 +1,8 @@
 """The code for performing an export to the game folder."""
 from __future__ import annotations
-from typing import NewType, TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any
 
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Mapping
 from enum import Enum, auto
 from pathlib import PurePath
 import os
@@ -12,7 +12,6 @@ import attrs
 import srctools.logger
 import trio
 
-import utils
 from app import DEV_MODE
 from app.errors import ErrorUI, Result as ErrorResult, WarningExc
 from editoritems import Item as EditorItem, Renderable, RenderableType

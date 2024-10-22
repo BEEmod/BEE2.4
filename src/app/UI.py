@@ -82,9 +82,6 @@ context_win: ContextWin
 sign_ui: SignageUI
 item_picker: ItemPicker
 
-# TODO: Pass around selector's AsyncValue
-selected_style: utils.ObjectID = packages.CLEAN_STYLE
-
 DATA_NO_VOICE = packages.SelitemData.build(
     short_name=TransToken.BLANK,
     long_name=packages.TRANS_NONE_NAME,

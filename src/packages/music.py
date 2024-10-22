@@ -1,6 +1,6 @@
 """Definitions for background music used in the map."""
 from __future__ import annotations
-from typing import ClassVar, Final, Iterator, Mapping
+from typing import Final, Iterator, Mapping
 
 from collections.abc import Awaitable, Callable, Iterable
 

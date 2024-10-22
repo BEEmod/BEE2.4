@@ -2,7 +2,7 @@
 from typing import Final
 
 from abc import ABC, abstractmethod
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Callable, Mapping
 from contextlib import aclosing
 import random
 
@@ -10,7 +10,7 @@ from trio_util import AsyncValue
 import attrs
 import trio
 
-from app import LOGGER, ReflowWindow, WidgetCache, dragdrop, img, sound
+from app import LOGGER, ReflowWindow, WidgetCache, dragdrop, img
 from app.dragdrop import DragInfo
 from app.paletteLoader import Coord, ItemPos
 from async_util import iterval_cancelling
