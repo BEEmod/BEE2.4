@@ -92,7 +92,7 @@ async def test_direct_cycle(autojump_clock: trio.abc.Clock) -> None:
         await trio.lowlevel.checkpoint()
         pytest.fail("Shouldn't run.")
 
-    with RaisesGroup(CycleError, strict=False):
+    with RaisesGroup(CycleError):
         await order.run(None)
 
     assert log == ['step 1', 'step 2']  # These still ran.
