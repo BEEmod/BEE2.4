@@ -1,5 +1,5 @@
 """Handles displaying errors to the user that occur during operations."""
-from typing import ClassVar, Protocol, Self, final
+from typing import ClassVar, Literal, Protocol, Self, final
 
 from collections.abc import Awaitable, Generator, Iterator
 from contextlib import contextmanager
@@ -31,6 +31,7 @@ class Result(Enum):
     SUCCEEDED = auto()  # No errors at all.
     PARTIAL = auto()  # add() was called, no exceptions = was partially successful.
     FAILED = auto()  # An exception was raised, complete failure.
+    CANCELLED = auto()  # User aborted, not an error but not success.
 
     @property
     def failed(self) -> bool:
@@ -79,6 +80,7 @@ class ErrorUI:
     warn_desc: TransToken
     _errors: list[AppError]
     _fatal_error: bool  # If set, error was caught in __aexit__
+    _cancelled: bool  # If set, we observed a Cancelled exception passing through the block.
 
     _handler: ClassVar[Handler | None] = None
 
@@ -109,6 +111,7 @@ class ErrorUI:
         self.error_desc = error_desc
         self.warn_desc = warn_desc
         self._errors = []
+        self._cancelled = False
         self._fatal_error = False
 
     def __repr__(self) -> str:
@@ -121,6 +124,9 @@ class ErrorUI:
             return Result.FAILED
         if self._errors:
             return Result.PARTIAL
+        if self._cancelled:
+            # Overrides fatal.
+            return Result.CANCELLED
         return Result.SUCCEEDED
 
     def add(self, error: WarningExc | TransToken) -> None:
@@ -152,35 +158,43 @@ class ErrorUI:
         exc_val: BaseException | None,
         exc_tb: types.TracebackType | None,
     ) -> bool:
+        exc_wrapped = False
         if exc_val is not None:
-            # Any exception getting here means we failed.
-            self._fatal_error = True
+            if not isinstance(exc_val, BaseExceptionGroup):
+                # For simplicity, wrap so we can treat them the same.
+                exc_val = BaseExceptionGroup('', [exc_val])
+                exc_wrapped = True
 
-        if isinstance(exc_val, AppError):
-            self._errors.append(exc_val)
-            exc_val.fatal = True
-            exc_val = None
-        elif isinstance(exc_val, BaseExceptionGroup):
             matching, rest = exc_val.split(AppError)
-            # We only handle if it's all AppError. If not, re-raise it unchanged.
+
+            # We only suppress if it's all AppError. If not, re-raise it unchanged.
             if rest is None:
-                # Swallow.
-                exc_val = None
                 # Matching may be recursively nested exceptions, collapse all that.
                 if matching is not None:
                     self._errors.extend(_collapse_excgroup(matching, True))
+                    self._fatal_error = True
+            else:
+                # Check what we got.
+                # If only trio.Cancelled is present, we were cancelled,
+                # otherwise a fatal error occurred. We still need to re-raise these.
+                cancels, errors = rest.split(trio.Cancelled)
 
-        if exc_val is not None:
-            # Caught something else, don't suppress.
-            if self._errors:
-                # Combine both in an exception group.
-                raise BaseExceptionGroup(
-                    "ErrorUI block raised",
-                    [*self._errors, exc_val],
-                )
-
-            # Just some other exception, leave it unaltered.
-            return False
+                if errors is not None:
+                    self._fatal_error = True
+                elif cancels is not None:
+                    self._cancelled = True
+                # Now, re-raise.
+                if self._errors:
+                    # Raise any errors in add(), so they get preserved in traceback.
+                    errors = list(self._errors)
+                    if exc_wrapped:  # Unwrap, we added the group.
+                        errors.extend(exc_val.exceptions)
+                    else:
+                        errors.append(exc_val)
+                    raise BaseExceptionGroup("ErrorUI block raised", errors)
+                else:
+                    # We do have an error, don't change the exceptions.
+                    return False
 
         if self._errors:
             desc = self.error_desc if self._fatal_error else self.warn_desc

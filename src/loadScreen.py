@@ -152,6 +152,7 @@ class LoadScreen:
         self.stages: list[ScreenStage] = list(stages)
         self.title = title_text
         self._scope: trio.CancelScope | None = None
+        self.cancelled = False
 
         # Order the daemon to make this screen. We pass translated text in for the splash screen.
         _QUEUE_SEND_LOAD.put(ipc_types.Load2Daemon_Init(
@@ -174,6 +175,7 @@ class LoadScreen:
         if self._scope is not None:
             raise ValueError('Cannot re-enter loading screens!')
         self._scope = trio.CancelScope().__enter__()
+        self.cancelled = False
         self._show()
         return self
 
@@ -186,6 +188,7 @@ class LoadScreen:
         """Hide the loading screen. If the Cancelled exception was raised, swallow that.
         """
         scope = self._scope
+        self.cancelled = scope.cancelled_caught
         if scope is None:
             raise ValueError('Already exited?')
         self._scope = None
@@ -283,6 +286,7 @@ async def _listen_to_process() -> None:
                 except KeyError:
                     pass
                 else:
+                    LOGGER.info('Cancelling load screen {!r}', screen.title)
                     if screen._scope is not None:
                         screen._scope.cancel()
             case _:

@@ -192,6 +192,7 @@ async def export(info: ExportInfo) -> ErrorResult:
 
             info.game.exported_style = info.style.id
             info.game.save()
+    LOGGER.debug('Export result: {}', error_ui.result)
     return error_ui.result
 
 

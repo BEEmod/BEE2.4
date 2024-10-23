@@ -86,7 +86,6 @@ async def test_nonfatal() -> None:
     unrelated = BufferError("Whatever")
 
     task: list[str] = []
-    success = False
     with ErrorUI.install_handler(catch):
         async with ErrorUI(title=orig_title, error_desc=orig_error, warn_desc=orig_warn) as error_block:
             assert error_block.result is Result.SUCCEEDED
@@ -205,3 +204,38 @@ async def test_fatal_group() -> None:
     assert group_catch.value.message == "ErrorUI block raised"
     assert group_catch.value.exceptions == (exc1, group)
     # No special handling, exc2 doesn't make it in.
+
+
+async def test_cancel() -> None:
+    """Test cancelling the error handler is detected."""
+    with ErrorUI.install_handler(handler_fail), trio.CancelScope() as scope:
+        async with ErrorUI() as error_block:
+            assert error_block.result is Result.SUCCEEDED
+            scope.cancel()
+            await trio.lowlevel.checkpoint()
+            raise AssertionError('Not cancelled?')
+    assert error_block.result is Result.CANCELLED
+
+
+async def test_multi_cancel(autojump_clock: trio.abc.Clock) -> None:
+    """Test a cancellation while another exception is raised."""
+    with (
+        pytest.raises(BaseExceptionGroup) as group,
+        ErrorUI.install_handler(handler_fail),
+        trio.CancelScope() as scope,
+    ):
+        async with ErrorUI() as error_block:
+            assert error_block.result is Result.SUCCEEDED
+            scope.cancel()
+            try:
+                await trio.lowlevel.checkpoint()
+            except trio.Cancelled as cancelled:
+                # Simulate exception group.
+                raise BaseExceptionGroup('Combined', [
+                    BufferError(),
+                    BaseExceptionGroup('Child', [cancelled, ZeroDivisionError()])
+                ])
+            raise AssertionError('Not cancelled?')
+    assert error_block.result is Result.FAILED
+    assert group.group_contains(BufferError)
+    assert group.group_contains(ZeroDivisionError)

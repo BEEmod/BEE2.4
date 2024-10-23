@@ -306,7 +306,7 @@ async def export_complete_task(
     result: ErrorResult
     async with export_rec:
         async for info, result in export_rec:
-            if result is ErrorResult.FAILED:
+            if result is ErrorResult.FAILED or result is ErrorResult.CANCELLED:
                 continue
 
             # Recompute, in case the trigger was busy with another export?
