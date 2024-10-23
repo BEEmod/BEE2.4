@@ -277,7 +277,7 @@ async def step_gen_vpk(exp_data: ExportData) -> None:
     try:
         with vpk_file:
             await fill_vpk(exp_data, vpk_file, sel_vpk)
-    except Exception:
+    except BaseException:
         # Failed to write, remove the VPK so future exports don't error.
         # Shield against cancellation, it's fine if this takes too long.
         with trio.CancelScope(shield=True, deadline=math.inf):
