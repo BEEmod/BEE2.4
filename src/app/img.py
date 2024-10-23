@@ -80,6 +80,19 @@ FLIP_ROTATE: Final = Image.Transpose.ROTATE_180
 type DefaultExt = Literal['png', 'vtf']
 
 
+TRANSPOSES: dict[str, Image.Transpose | None] = {
+    '': None,
+    'none': None,
+    '90': ROTATE_CW,
+    '180': FLIP_ROTATE,
+    '270': ROTATE_CCW,
+    'cw': ROTATE_CW,
+    'ccw': ROTATE_CCW,
+    'flip_vert': FLIP_TOP_BOTTOM,
+    'flip_horiz': FLIP_LEFT_RIGHT,
+}
+
+
 def _load_special(path: str, theme: Theme) -> Image.Image:
     """Various special images we have to load."""
     img: Image.Image
@@ -345,9 +358,26 @@ class Handle(User):
                         width, height,
                         subfolder=subfolder,
                     ))
+                elif child.name == 'transform':
+                    try:
+                        orient = TRANSPOSES[child['orient'].casefold()]
+                    except KeyError:
+                        raise ValueError(f'Invalid transform type "{child['orient']}"') from None
+                    orig = cls.parse(
+                        child,
+                        pack, width, height, subkey='child',
+                        subfolder=subfolder,
+                    )
+                    children.append(orig.transform(transpose=orient))
                 else:
                     raise ValueError(f'Unknown compound type "{child.real_name}"!')
-            return cls.composite(children, width, height)
+            match children:
+                case []:
+                    return cls.blank(width, height)
+                case [single]:
+                    return single
+                case _:
+                    return cls.composite(children, width, height)
 
         return cls.parse_uri(utils.PackagePath.parse(kv.value, pack), width, height, subfolder=subfolder)
 
