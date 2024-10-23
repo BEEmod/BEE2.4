@@ -11,6 +11,7 @@ import sys
 
 from srctools import Vec
 from srctools.bsp import BSP, BSP_LUMPS
+from srctools.const import SurfFlags
 from srctools.filesys import RawFileSystem, ZipFileSystem, FileSystem
 from srctools.packlist import PackList
 from srctools.game import find_gameinfo
@@ -40,6 +41,7 @@ def swap_material(bsp: BSP, src: str, dest: str) -> None:
             LOGGER.info('Swapping to {} for {}', dest, info)
             # These are tools mats, details don't matter.
             info.set(bsp, dest, Vec(0.5, 0.5, 0.5), 1, 1)
+            info.flags |= SurfFlags.NOPORTAL
 
 
 def load_transforms() -> None:

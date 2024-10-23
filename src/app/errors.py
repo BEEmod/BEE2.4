@@ -186,12 +186,12 @@ class ErrorUI:
                 # Now, re-raise.
                 if self._errors:
                     # Raise any errors in add(), so they get preserved in traceback.
-                    errors = list(self._errors)
+                    to_raise: list[BaseException] = list(self._errors)
                     if exc_wrapped:  # Unwrap, we added the group.
-                        errors.extend(exc_val.exceptions)
+                        to_raise.extend(exc_val.exceptions)
                     else:
-                        errors.append(exc_val)
-                    raise BaseExceptionGroup("ErrorUI block raised", errors)
+                        to_raise.append(exc_val)
+                    raise BaseExceptionGroup("ErrorUI block raised", to_raise)
                 else:
                     # We do have an error, don't change the exceptions.
                     return False

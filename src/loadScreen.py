@@ -188,10 +188,10 @@ class LoadScreen:
         """Hide the loading screen. If the Cancelled exception was raised, swallow that.
         """
         scope = self._scope
-        self.cancelled = scope.cancelled_caught
         if scope is None:
             raise ValueError('Already exited?')
         self._scope = None
+        self.cancelled = scope.cancelled_caught
         try:
             self.active = False
             _QUEUE_SEND_LOAD.put(ipc_types.Load2Daemon_Reset(self.id))
