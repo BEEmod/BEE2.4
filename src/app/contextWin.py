@@ -228,6 +228,7 @@ class ContextWinBase:
             nursery.start_soon(self.ui_task, signage_trigger)
             nursery.start_soon(self._moreinfo_task)
             nursery.start_soon(self._packset_changed_task)
+            nursery.start_soon(self._style_changed_task)
             nursery.start_soon(self.picker.open_contextwin_task, self.show_prop)
             task_status.started()
 
