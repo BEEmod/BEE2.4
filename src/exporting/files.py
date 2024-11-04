@@ -11,6 +11,7 @@ from srctools.dmx import Element
 from srctools.filesys import File
 import trio
 
+from app import DEV_MODE
 from . import STAGE_RESOURCES, STAGE_AUTO_BACKUP, ExportData, STEPS, StepResource
 import config
 import editoritems
@@ -87,14 +88,24 @@ async def step_write_configs(exp: ExportData) -> None:
 
     def write(element: Element, filename: str) -> None:
         """Write to disk."""
+        # In dev mode, write in text form so it's easy to debug.
+        # Non-dev mode can be more compact.
         with AtomicWriter(filename, is_bytes=True) as file:
-            element.export_kv2(
-                file,
-                fmt_name=config.DMX_NAME,
-                fmt_ver=config.DMX_VERSION,
-                unicode='format',
-                cull_uuid=True,
-            )
+            if DEV_MODE.value:
+                element.export_kv2(
+                    file,
+                    fmt_name=config.DMX_NAME,
+                    fmt_ver=config.DMX_VERSION,
+                    unicode='format',
+                    cull_uuid=True,
+                )
+            else:
+                element.export_binary(
+                    file,
+                    fmt_name=config.DMX_NAME,
+                    fmt_ver=config.DMX_VERSION,
+                    unicode='format',
+                )
 
     dmx = await trio.to_thread.run_sync(config.COMPILER.build_dmx, exp.config)
     await trio.to_thread.run_sync(write, dmx, exp.game.abs_path('bin/bee2/config.dmx'))
