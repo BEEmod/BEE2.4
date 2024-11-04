@@ -3,6 +3,7 @@
 UserError is imported all over, so this needs to have minimal imports to avoid cycles.
 """
 from typing import ClassVar, Literal, TypedDict
+
 from collections.abc import Collection, Iterable
 from pathlib import Path
 

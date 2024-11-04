@@ -1,6 +1,8 @@
 # Use a stub file to avoid editing the original.
-from collections.abc import Iterable
 from typing import Final
+
+from collections.abc import Iterable
+
 
 __version__: Final[str]
 

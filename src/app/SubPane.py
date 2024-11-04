@@ -1,4 +1,5 @@
 from typing import Any
+
 from tkinter import ttk
 import tkinter as tk
 from collections.abc import Callable

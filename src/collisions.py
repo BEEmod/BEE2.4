@@ -622,7 +622,10 @@ class Plane:
 
 @attrs.frozen(init=False)  # __attrs_init__() is incompatible with the superclass.
 class Volume(BBox):  # type: ignore[override]
-    """A bounding box with additional clipping planes, allowing it to be an arbitary polyhedron."""
+    """A bounding box with additional clipping planes, allowing it to be an arbitary polyhedron.
+
+    The planes do include ones for each bounding box side, if that is a valid face.
+    """
     planes: Sequence[Plane]
 
     # noinspection PyMissingConstructor

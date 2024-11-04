@@ -7,6 +7,7 @@ The id() of the main-process object is used to identify loadscreens.
 """
 from __future__ import annotations
 from typing import Self, assert_never
+
 from collections.abc import (
     AsyncGenerator, Collection, Generator, MutableMapping,
 )

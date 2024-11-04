@@ -1,6 +1,7 @@
 """The Style Properties tab, for configuring style-specific properties."""
 from __future__ import annotations
 from typing import TypedDict, cast
+
 from tkinter import IntVar, ttk
 import itertools
 import operator

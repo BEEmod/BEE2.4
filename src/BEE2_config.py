@@ -4,6 +4,7 @@ It only saves if the values are modified.
 Most functions are also altered to allow defaults instead of erroring.
 """
 from typing import Any
+
 from collections.abc import Iterator, Mapping
 from configparser import ConfigParser, NoOptionError, ParsingError, SectionProxy
 from pathlib import Path

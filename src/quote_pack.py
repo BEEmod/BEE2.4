@@ -1,6 +1,7 @@
 """Data structures for quote packs."""
 from __future__ import annotations
 from typing import Self, assert_never
+
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 import enum
 

@@ -1,6 +1,7 @@
 """Instrumentation which outputs statistics about Trio tasks."""
-from typing_extensions import override
 from typing import Any
+from typing_extensions import override
+
 import pprint
 import time
 

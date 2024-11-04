@@ -4,6 +4,7 @@ This is useful to allow using the same code for reading folders or zips of data.
 """
 from __future__ import annotations
 from typing import IO, Any, Literal, Self, overload
+
 from collections.abc import Iterator
 from zipfile import ZIP_STORED, ZipFile
 import io
