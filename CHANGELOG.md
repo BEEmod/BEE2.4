@@ -14,6 +14,7 @@
 * #4431: Fix elevator videos not appearing.
 * Fix initial state for "variant" dropdown boxes on item properties pane.
 * Automatically patch `tools/toolsinvisible` to allow light to pass through.
+* Fix app not quitting when initial loading screen is closed.
 
 ### UCP-Relevant changes:
 * Add `SweepTrace` mode to `Collisions` result. This allows creating collisions 

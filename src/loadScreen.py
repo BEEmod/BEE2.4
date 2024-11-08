@@ -54,10 +54,15 @@ TRANSLATIONS = {
 }
 
 
-def show_main_loader(is_compact: bool) -> None:
-    """Special function, which sets the splash screen compactness."""
+def show_main_loader(is_compact: bool, app_scope: trio.CancelScope) -> None:
+    """Special function for showing the main load/splash screen.
+
+    This sets the splash screen compactness, and also passes in the main app's cancel scope,
+    so we can cancel the whole thing if this is quit.
+    """
     _QUEUE_SEND_LOAD.put(ipc_types.Load2Daemon_SetIsCompact(main_loader.id, is_compact))
     main_loader._show()
+    main_loader._scope = app_scope
 
 
 def set_force_ontop(ontop: bool) -> None:
@@ -152,6 +157,7 @@ class LoadScreen:
         self.id = ipc_types.ScreenID(id(self))
         self.stages: list[ScreenStage] = list(stages)
         self.title = title_text
+        # For the main load screen, this is app._APP_QUIT_SCOPE!
         self._scope: trio.CancelScope | None = None
         self.cancelled = False
 
@@ -173,8 +179,11 @@ class LoadScreen:
         Inside the block, the screen will be visible. Cancelling will exit
         to the end of the with block.
         """
+        # Main loadscreen is handled specially.
+        assert self is not main_loader
         if self._scope is not None:
             raise ValueError('Cannot re-enter loading screens!')
+        LOGGER.debug('Entering screen {!r}', self.title)
         self._scope = trio.CancelScope().__enter__()
         self.cancelled = False
         self._show()
@@ -188,11 +197,14 @@ class LoadScreen:
     ) -> bool:
         """Hide the loading screen. If the Cancelled exception was raised, swallow that.
         """
+        # Main loadscreen is closed manually.
+        assert self is not main_loader
         scope = self._scope
         if scope is None:
             raise ValueError('Already exited?')
         self._scope = None
         self.cancelled = scope.cancelled_caught
+        LOGGER.debug('Exiting screen {!r}, cancelled={}', self.title, self.cancelled)
         try:
             self.active = False
             _QUEUE_SEND_LOAD.put(ipc_types.Load2Daemon_Reset(self.id))
@@ -287,7 +299,7 @@ async def _listen_to_process() -> None:
                 except KeyError:
                     pass
                 else:
-                    LOGGER.info('Cancelling load screen {!r}', screen.title)
+                    LOGGER.info('Cancelling load screen {!r}, scope={}', screen.title, screen._scope)
                     if screen._scope is not None:
                         screen._scope.cancel()
             case _:

@@ -36,26 +36,25 @@ _TRACER = Tracer() if utils.CODE_DEV_MODE else None
 
 async def init_app(core_nursery: trio.Nursery) -> None:
     """Initialise the application."""
-    conf = config.APP.get_cur_conf(GenOptions)
-
-    LOGGER.debug('Starting loading screen...')
-    await loadScreen.MAIN_UI.set_length(13)
-    loadScreen.set_force_ontop(conf.force_load_ontop)
-    loadScreen.show_main_loader(conf.compact_splash)
-
-    # OS X starts behind other windows, fix that.
-    if utils.MAC:
-        TK_ROOT.lift()
-
-    logWindow.HANDLER.set_visible(conf.show_log_win)
-    logWindow.HANDLER.setLevel(conf.log_win_level)
-    core_nursery.start_soon(logWindow.loglevel_bg)
-
-    LOGGER.debug('Loading settings...')
-
     # This is cancelled when the quit button is pressed.
     # noinspection PyProtectedMember
     with app._APP_QUIT_SCOPE:
+        conf = config.APP.get_cur_conf(GenOptions)
+
+        LOGGER.debug('Starting loading screen...')
+        await loadScreen.MAIN_UI.set_length(13)
+        loadScreen.set_force_ontop(conf.force_load_ontop)
+        loadScreen.show_main_loader(conf.compact_splash, app._APP_QUIT_SCOPE)
+
+        # OS X starts behind other windows, fix that.
+        if utils.MAC:
+            TK_ROOT.lift()
+
+        logWindow.HANDLER.set_visible(conf.show_log_win)
+        logWindow.HANDLER.setLevel(conf.log_win_level)
+        core_nursery.start_soon(logWindow.loglevel_bg)
+
+        LOGGER.debug('Loading settings...')
         await gameMan.load(DIALOG)
         try:
             last_game = config.APP.get_cur_conf(LastSelected, 'game')
@@ -83,16 +82,15 @@ async def init_app(core_nursery: trio.Nursery) -> None:
         await core_nursery.start(UI.init_windows, core_nursery, TK_IMG, export_trig, export_rec)
         LOGGER.info('UI initialised!')
 
+        # If the loading screen was quit, we will cancel here, before the try: below.
+        # So configs will not get saved - we might have half-loaded them.
+        await trio.lowlevel.checkpoint()
         loadScreen.main_loader.destroy()
+
         # Delay this until the loop has actually run.
         # Directly run TK_ROOT.lift() in TCL, instead
         # of building a callable.
         TK_ROOT.tk.call('after', 10, 'raise', TK_ROOT)
-
-        confs = [
-            BEE2_config.GEN_OPTS,
-            CompilerPane.COMPILE_CFG,
-        ]
 
         try:
             await trio.sleep_forever()
@@ -113,7 +111,10 @@ async def init_app(core_nursery: trio.Nursery) -> None:
                 config.APP.write_file(config.APP_LOC)
             except Exception:
                 LOGGER.exception('Saving main conf:')
-            for conf_file in confs:
+            for conf_file in [
+                BEE2_config.GEN_OPTS,
+                CompilerPane.COMPILE_CFG,
+            ]:
                 try:
                     conf_file.save_check()
                 except Exception:
