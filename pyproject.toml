@@ -94,6 +94,8 @@ extend-ignore = [
 	# Flake8-bugbear:
 	# Loop control var not used, triggers on unpackings.
 	"B007",
+	# Modification to loop var during iteration, do it on purpose often.
+	"B909",
 
 	# Flake8-pie:
 	# Prefer to use pass in empty functions, even if docstring is present

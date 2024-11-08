@@ -234,7 +234,7 @@ async def test_multi_cancel(autojump_clock: trio.abc.Clock) -> None:
                 raise BaseExceptionGroup('Combined', [
                     BufferError(),
                     BaseExceptionGroup('Child', [cancelled, ZeroDivisionError()])
-                ])
+                ]) from None
             raise AssertionError('Not cancelled?')
     assert error_block.result is Result.FAILED
     assert group.group_contains(BufferError)
