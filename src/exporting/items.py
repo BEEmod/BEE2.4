@@ -29,7 +29,7 @@ from . import STEPS, ExportData, StepResource
 # Finds names surrounded by %s
 RE_PERCENT_VAR = re.compile(r'%(\w*)%')
 LOGGER = srctools.logger.get_logger(__name__)
-TRANS_OLD_STYLE_DEF = TransToken.ui(
+TRANS_OLD_STYLE_DEF = TransToken.untranslated(
     'Style includes old definition for {item}. Override the item package object instead.'
 )
 

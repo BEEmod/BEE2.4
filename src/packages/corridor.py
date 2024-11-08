@@ -45,7 +45,7 @@ ICON_GENERIC_LRG = img.Handle.builtin('BEE2/corr_generic', IMG_WIDTH_LRG, IMG_HE
 ALL_MODES: Final[Sequence[GameMode]] = list(GameMode)
 ALL_DIRS: Final[Sequence[Direction]] = list(Direction)
 
-TRANS_DUPLICATE_OPTION = TransToken.ui(
+TRANS_DUPLICATE_OPTION = TransToken.untranslated(
     'Duplicate corridor option ID "{option}" in corridor group for style "{group}"!'
 )
 

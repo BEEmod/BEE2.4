@@ -83,13 +83,13 @@ class QuotePack(SelPakObject, needs_foreground=True, style_suggest_key='quote'):
         try:
             quotes_kv = config.find_key('Quotes')
         except NoKeyError:
-            raise AppError(TransToken.ui(
+            raise AppError(TransToken.untranslated(
                 'No "Quotes" key in config for quote pack {id}!'
             ).format(id=data.id)) from None
         else:
             del config['Quotes']
         if 'Quotes' in config:
-            raise AppError(TransToken.ui(
+            raise AppError(TransToken.untranslated(
                 'Multiple "Quotes" keys found in config for quote pack {id}!'
             ).format(id=data.id))
 
@@ -129,7 +129,7 @@ class QuotePack(SelPakObject, needs_foreground=True, style_suggest_key='quote'):
             try:
                 resp = RESPONSE_NAMES[resp_kv.name]
             except KeyError:
-                raise AppError(TransToken.ui(
+                raise AppError(TransToken.untranslated(
                     'Invalid response kind "{name}" in config for quote pack {id}!'
                 ).format(name=resp_kv.real_name, id=data.id)) from None
             response_dings = resp_kv.bool('use_dings', response_dings)

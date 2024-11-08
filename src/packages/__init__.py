@@ -93,17 +93,17 @@ TRANS_MISSING_REQUIRED_GAME = TransToken.ui(
 TRANS_MISSING_REQUIRED_PACK = TransToken.ui(
     'Package "{pak_id}" could not be enabled - required package "{req}" not installed.',
 )
-TRANS_UNKNOWN_OBJ_TYPE = TransToken.ui(
+TRANS_UNKNOWN_OBJ_TYPE = TransToken.untranslated(
     'Unknown object type "{obj_type}" with ID "{obj_id}" in package "{pak_id}"!'
 )
-TRANS_OLD_TEMPLATEBRUSH = TransToken.ui(
+TRANS_OLD_TEMPLATEBRUSH = TransToken.untranslated(
     'TemplateBrush "{id}" in package "{pak_id}" no longer needs to be defined in info.txt. '
     'Use a bee2_template_conf entity instead.'
 )
-TRANS_NO_OBJ_ID = TransToken.ui(
+TRANS_NO_OBJ_ID = TransToken.untranslated(
     'No ID defined for "{obj_type}" object type in "{pak_id}" package!'
 )
-TRANS_OBJ_NOT_FOUND = TransToken.ui(
+TRANS_OBJ_NOT_FOUND = TransToken.untranslated(
     'Definition for {object} object "{id}" was not found. Check for missing packages.'
 )
 TRANS_DUPLICATE_PAK_ID = TransToken.ui(
@@ -112,7 +112,7 @@ TRANS_DUPLICATE_PAK_ID = TransToken.ui(
     'Package 1: {path1}\n'
     'Package 2: {path2}'
 )
-TRANS_DUPLICATE_OBJ_ID = TransToken.ui(
+TRANS_DUPLICATE_OBJ_ID = TransToken.untranslated(
     'The ID "{obj_id}" was used twice for a {obj_type} in the packages "{pak1}" and "{pak2}"!'
 )
 TRANS_CORR_OPTS = TransToken.ui_plural('{n} option', '{n} options')  # i18n: Corridor options count
