@@ -1,5 +1,5 @@
 """Handles displaying errors to the user that occur during operations."""
-from typing import ClassVar, Literal, Protocol, Self, final
+from typing import ClassVar, Protocol, Self, final
 
 from collections.abc import Awaitable, Generator, Iterator
 from contextlib import contextmanager
@@ -58,7 +58,7 @@ def _collapse_excgroup(group: BaseExceptionGroup[AppError], fatal: bool) -> Iter
         if isinstance(exc, BaseExceptionGroup):
             yield from _collapse_excgroup(exc, fatal)
         else:
-            exc.fatal = fatal
+            exc.fatal |= fatal
             yield exc
 
 

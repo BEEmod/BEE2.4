@@ -4,7 +4,7 @@ Handles scanning through the zip packages to find all items, styles, etc.
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any, NewType, NoReturn, ClassVar, Self, cast
+from typing import Any, NewType, NoReturn, ClassVar, Self, cast, overload
 
 from collections.abc import Awaitable, Callable, Collection, Iterable, Iterator, Mapping
 from collections import defaultdict
@@ -30,7 +30,7 @@ from editoritems import Item as EditorItem, Renderable, RenderableType
 from corridor import CORRIDOR_COUNTS, GameMode, Direction
 from loadScreen import MAIN_PAK as LOAD_PAK, MAIN_OBJ as LOAD_OBJ
 from BEE2_config import ConfigFile
-from app import img, lazy_conf
+from app import DEV_MODE, img, lazy_conf
 import utils
 import consts
 
@@ -389,14 +389,72 @@ class ObjData:
 
 
 @attrs.define
-class ParseData:
+class PackErrorInfo:
+    """Object to pass to various methods, with a packset and errorUI object.
+
+    Has methods to warn/error only for development packages.
+    """
+    # The entire loaded packages set. The repr is massive, just show the ID.
+    packset: PackagesSet = attrs.field(repr=lambda pack: f'<PackagesSet @ {id(pack):x}>')
+    errors: ErrorUI
+
+    def warn(self, warning: AppError | TransToken) -> None:
+        """Emit a non-fatal warning, shortcut for errors.add()."""
+        self.errors.add(warning)
+
+    def warn_auth(self, package: utils.SpecialID, warning: AppError | TransToken, /) -> None:
+        """If the specified package is a developer package, emit a warning."""
+        try:
+            # If it's a special ID, this will fail to find.
+            is_dev = self.packset.packages[utils.ObjectID(package)].is_dev()
+        except KeyError:
+            LOGGER.warning('Trying to warn about package "{}" which does not exist?', package)
+            is_dev = True  # Missing, warn about it?
+        if DEV_MODE.value or is_dev:
+            self.errors.add(warning)
+
+    def warn_auth_fatal(self, package: utils.SpecialID, warning: AppError | TransToken, /) -> None:
+        """If the specified package is a developer package, emit a fatal warning."""
+        if not isinstance(warning, AppError):
+            warning = AppError(warning)
+        warning.fatal = True
+        self.warn_auth(package, warning)
+
+
+@attrs.define
+class ParseData(PackErrorInfo):
     """The arguments for pak_object.parse()."""
-    packset: PackagesSet
     fsys: FileSystem
     id: str
     info: Keyvalues = attrs.field(repr=False)
     pak_id: utils.ObjectID
     is_override: bool
+
+    @overload
+    def warn_auth(self, warning: AppError | TransToken, /) -> None: ...
+    @overload
+    def warn_auth(self, package: utils.SpecialID, warning: AppError | TransToken) -> None: ...
+    def warn_auth(self, package: utils.SpecialID | AppError | TransToken, warning: AppError | TransToken | None = None) -> None:
+        """If this package/the specified package is a developer one, emit a warning."""
+        if isinstance(package, str):
+            if warning is None:
+                raise TypeError("warn_auth() missing warning parameter.")
+            super().warn_auth(package, warning)
+        else:
+            super().warn_auth(self.pak_id, package)
+
+    @overload
+    def warn_auth_fatal(self, warning: AppError | TransToken, /) -> None: ...
+    @overload
+    def warn_auth_fatal(self, package: utils.SpecialID, warning: AppError | TransToken) -> None: ...
+    def warn_auth_fatal(self, package: utils.SpecialID | AppError | TransToken, warning: AppError | TransToken | None = None) -> None:
+        """If this package/the specified package is a developer one, emit a fatal warning."""
+        if isinstance(package, str):
+            if warning is None:
+                raise TypeError("warn_auth() missing warning parameter.")
+            super().warn_auth_fatal(package, warning)
+        else:
+            super().warn_auth_fatal(self.pak_id, package)
 
 
 @attrs.define
@@ -966,7 +1024,7 @@ async def _load_packages(
     LOGGER.debug('Parsed packages.')
 
 
-async def _load_objects(packset: PackagesSet) -> None:
+async def _load_objects(packset: PackagesSet, errors: ErrorUI) -> None:
     """Parse all the objects in a packset."""
     LOGGER.debug('Parsing objects...')
 
@@ -987,7 +1045,7 @@ async def _load_objects(packset: PackagesSet) -> None:
         for obj_class, objs in packset.unparsed.items():
             nursery.start_soon(
                 parse_type,
-                packset, obj_class, objs,
+                packset, errors, obj_class, objs,
             )
 
 
@@ -1008,13 +1066,18 @@ async def _load_templates(packset: PackagesSet) -> None:
     LOGGER.info('Loaded all templates.')
 
 
-async def parse_type[PakT: PakObject](packset: PackagesSet, obj_class: type[PakT], objs: Iterable[str]) -> None:
+async def parse_type[PakT: PakObject](
+    packset: PackagesSet,
+    errors: ErrorUI,
+    obj_class: type[PakT],
+    objs: Iterable[str]
+) -> None:
     """Parse all of a specific object type."""
     async with trio.open_nursery() as nursery:
         for obj_id in objs:
             nursery.start_soon(
                 parse_object,
-                packset, obj_class, obj_id,
+                packset, errors, obj_class, obj_id,
             )
     LOGGER.info('Post-process {} objects...', obj_class.__name__)
     # Tricky, we want to let post_parse() call all_obj() etc, but not let other blocked tasks
@@ -1094,7 +1157,7 @@ async def parse_package(
                 except LookupError:
                     raise AppError(TRANS_NO_OBJ_ID.format(obj_type=obj_type, pak_id=pack.id)) from None
                 packset.overrides[obj_type, obj_id.casefold()].append(
-                    ParseData(packset, pack.fsys, obj_id, over_prop, pack.id, True)
+                    ParseData(packset, errors, pack.fsys, obj_id, over_prop, pack.id, True)
                 )
         else:
             try:
@@ -1115,7 +1178,7 @@ async def parse_package(
                 if obj_type.allow_mult:
                     # Pretend this is an override, but don't actually set the bool.
                     packset.overrides[obj_type, obj_id.casefold()].append(
-                        ParseData(packset, pack.fsys, obj_id, obj, pack.id, False)
+                        ParseData(packset, errors, pack.fsys, obj_id, obj, pack.id, False)
                     )
                 else:
                     raise AppError(TRANS_DUPLICATE_OBJ_ID.format(
@@ -1138,7 +1201,12 @@ async def parse_package(
     await LOAD_PAK.step(pack.id)
 
 
-async def parse_object(packset: PackagesSet, obj_class: type[PakObject], obj_id: str) -> None:
+async def parse_object(
+    packset: PackagesSet,
+    errors: ErrorUI,
+    obj_class: type[PakObject],
+    obj_id: str
+) -> None:
     """Parse through the object and store the resultant class."""
     obj_data = packset.unparsed[obj_class][obj_id]
     try:
@@ -1146,11 +1214,12 @@ async def parse_object(packset: PackagesSet, obj_class: type[PakObject], obj_id:
             object_ = await obj_class.parse(
                 ParseData(
                     packset,
+                    errors,
                     obj_data.fsys,
                     obj_id,
                     obj_data.info_block,
                     obj_data.pak_id,
-                    False,
+                    is_override=False,
                 )
             )
             await trio.lowlevel.checkpoint()
@@ -1262,10 +1331,17 @@ class Package:
 
         PACK_CONFIG[self.id]['Enabled'] = srctools.bool_as_int(value)
 
+    def is_dev(self) -> bool:
+        """Check to see whether this is an unzipped package.
+
+        These are treated as development versions, so extra warnings are enabled.
+        """
+        return isinstance(self.fsys, RawFileSystem)
+
     def is_stale(self, mod_time: int) -> bool:
         """Check to see if this package has been modified since the last run."""
-        if isinstance(self.fsys, RawFileSystem):
-            # unzipped packages are for development, so always extract.
+        if self.is_dev():
+            # Always extract, it's hard to detect if a folder changed anyway.
             LOGGER.info('Need to extract resources - {} is unzipped!', self.id)
             return True
 

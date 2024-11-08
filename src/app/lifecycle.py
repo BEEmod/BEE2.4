@@ -101,7 +101,7 @@ async def lifecycle(
             # else: The channels will just be left unused.
 
             # noinspection PyProtectedMember
-            load_nursery.start_soon(packages._load_objects, packset)
+            load_nursery.start_soon(packages._load_objects, packset, error_ui)
             # noinspection PyProtectedMember
             load_nursery.start_soon(packages._load_templates, packset)
 

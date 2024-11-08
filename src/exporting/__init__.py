@@ -76,10 +76,8 @@ load_screen = loadScreen.LoadScreen(
 
 
 @attrs.define(kw_only=True)
-class ExportData:
+class ExportData(packages.PackErrorInfo):
     """The arguments to pak_object.export()."""
-    # The entire loaded packages set. The repr is massive, just show the ID.
-    packset: PackagesSet = attrs.field(repr=lambda pack: f'<PackagesSet @ {id(pack):x}>')
     game: Game  # The current game.
     # Usually str, but some items pass other things.
     _selected: Mapping[ExportKey[Any], Any]
@@ -100,8 +98,6 @@ class ExportData:
     resources: set[PurePath] = attrs.Factory(set)
     # Flag set to indicate that the error server may be running.
     maybe_error_server_running: bool = True
-    # Can be called to indicate a non-fatal error.
-    warn: Callable[[WarningExc | TransToken], None]
 
     def selected[T](self, key: ExportKey[T]) -> T:
         """Fetch the value for this key."""
@@ -179,13 +175,13 @@ async def export(info: ExportInfo) -> ErrorResult:
             os.makedirs(info.game.abs_path('bin/bee2/'), exist_ok=True)
 
             exp_data = ExportData(
+                errors=error_ui,
                 game=info.game,
                 selected=info._selected,
                 packset=info.packset,
                 selected_style=info.style,
                 config=config_mod.APP.get_full_conf(config_mod.COMPILER),
                 copy_resources=should_refresh,
-                warn=error_ui.add,
             )
 
             await STEPS.run(exp_data, STAGE_STEPS)

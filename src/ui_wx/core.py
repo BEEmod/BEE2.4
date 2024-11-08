@@ -42,7 +42,7 @@ async def init_app(core_nursery: trio.Nursery) -> None:
         LOGGER.debug('Starting loading screen...')
         await loadScreen.MAIN_UI.set_length(13)
         loadScreen.set_force_ontop(conf.force_load_ontop)
-        loadScreen.show_main_loader(conf.compact_splash)
+        loadScreen.show_main_loader(conf.compact_splash, app._APP_QUIT_SCOPE)
 
         logWindow.HANDLER.set_visible(conf.show_log_win)
         logWindow.HANDLER.setLevel(conf.log_win_level)
