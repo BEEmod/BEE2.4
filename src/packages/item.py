@@ -41,6 +41,11 @@ import utils
 
 LOGGER = logger.get_logger(__name__)
 
+TRANS_EXTRA_PALETTES = TransToken.untranslated(
+    '"{filename}" has palette set for extra item blocks. Deleting.'
+)
+TRANS_INCOMPLETE_GROUPING = TransToken.untranslated('"{filename}" has incomplete grouping icon definition!')
+
 
 class InheritKind(Enum):
     """Defines how an item variant was specified for this item."""
@@ -998,10 +1003,9 @@ async def parse_item_folder(
         extra_item.generate_collisions()
         for subtype in extra_item.subtypes:
             if subtype.pal_pos is not None:
-                LOGGER.warning(
-                    f'"{data.pak_id}:items/{fold}/editoritems.txt has '
-                    f'palette set for extra item blocks. Deleting.'
-                )
+                data.warn_auth(data.pak_id, TRANS_EXTRA_PALETTES.format(
+                    filename=f'{data.pak_id}:items/{fold}/editoritems.txt'
+                ))
                 subtype.pal_icon = subtype.pal_pos = None
                 subtype.pal_name = TransToken.BLANK
 
@@ -1071,12 +1075,9 @@ async def parse_item_folder(
     has_name = bool(variant.all_name)
     has_icon = variant.all_icon is not None
     if (has_name or has_icon or 'all' in variant.icons) and (not has_name or not has_icon):
-        LOGGER.warning(
-            'Warning: "{}:{}" has incomplete grouping icon '
-            'definition!',
-            data.pak_id,
-            prop_path,
-        )
+        data.warn_auth(data.pak_id, TRANS_INCOMPLETE_GROUPING.format(
+            filename=f'{data.pak_id}:{prop_path}'
+        ))
     return variant
 
 

@@ -1111,6 +1111,7 @@ async def parse_package(
             return
 
     desc: list[str] = []
+    should_warn = DEV_MODE.value or pack.is_dev()
 
     for obj in pack.info:
         await trio.lowlevel.checkpoint()
@@ -1128,20 +1129,22 @@ async def parse_package(
             continue
 
         if obj.name in ('templatebrush', 'brushtemplate'):
-            errors.add(TRANS_OLD_TEMPLATEBRUSH.format(
-                id=obj['id', '<NO ID>'],
-                pak_id=pack.id,
-            ))
+            if should_warn:
+                errors.add(TRANS_OLD_TEMPLATEBRUSH.format(
+                    id=obj['id', '<NO ID>'],
+                    pak_id=pack.id,
+                ))
         elif obj.name == 'transtoken':
             # Special case for now, since it's package-specific.
             parse_pack_transtoken(pack, obj)
         elif obj.name == 'overrides':
             for over_prop in obj:
                 if over_prop.name in ('templatebrush', 'brushtemplate'):
-                    errors.add(TRANS_OLD_TEMPLATEBRUSH.format(
-                        id=over_prop['id', '<NO ID>'],
-                        pak_id=pack.id,
-                    ))
+                    if should_warn:
+                        errors.add(TRANS_OLD_TEMPLATEBRUSH.format(
+                            id=over_prop['id', '<NO ID>'],
+                            pak_id=pack.id,
+                        ))
                     continue
                 try:
                     obj_type = OBJ_TYPES[over_prop.name]

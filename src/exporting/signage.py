@@ -26,6 +26,10 @@ SIGN_LOC: Final = 'bee2/materials/bee2/models/props_map_editor/signage/signage.v
 
 TRANS_MISSING_SELECTED = TransToken.ui('Selected signage "{id}" does not exist.')
 TRANS_MISSING_CHILD = TransToken.ui('Signage "{id}"\'s {child} "{sub_id}" does not exist.')
+TRANS_INVALID_NUMBERS_WIDTH = TransToken.untranslated(
+    'Signage legend number texture width must be divisible by ten!'
+)
+TRANS_NO_OVERLAY = TransToken.untranslated('No Signage style overlay defined.')
 
 
 def serialise(sign: Signage, parent: Keyvalues, style: Style) -> SignStyle | None:
@@ -85,7 +89,7 @@ async def step_signage(exp_data: ExportData) -> None:
                 try:
                     sub_sign = exp_data.packset.obj_by_id(Signage, sub_id)
                 except KeyError:
-                    errors.append(AppError(TRANS_MISSING_SELECTED.format(
+                    errors.append(AppError(TRANS_MISSING_CHILD.format(
                         id=sign_id,
                         child=sub_name,
                         sub_id=sub_id,
@@ -112,7 +116,7 @@ async def step_signage(exp_data: ExportData) -> None:
     exp_data.resources.add(sign_path)
     await trio.to_thread.run_sync(
         make_legend,
-        sign_path, exp_data.packset, exp_data.selected_style, sel_icons,
+        exp_data, sign_path, sel_icons,
     )
 
 
@@ -126,9 +130,8 @@ def iter_cells() -> Iterator[tuple[int, int, int]]:
 
 
 def make_legend(
+    exp: ExportData,
     sign_path: Path,
-    packset: PackagesSet,
-    sel_style: Style,
     icons: dict[int, ImgHandle],
 ) -> None:
     """Construct the legend texture for the signage."""
@@ -137,9 +140,9 @@ def make_legend(
     blank_img: Image.Image | None = None
     num_sheet: Image.Image | None = None
     num_step = num_x = num_y = 0
-    for style in sel_style.bases:
+    for style in exp.selected_style.bases:
         try:
-            legend_info = packset.obj_by_id(SignageLegend, style.id, optional=True)
+            legend_info = exp.packset.obj_by_id(SignageLegend, style.id, optional=True)
         except KeyError:
             pass
         else:
@@ -153,10 +156,10 @@ def make_legend(
                 num_x, num_y = legend_info.num_off
                 num_step, num_rem = divmod(num_sheet.width, 10)
                 if num_rem != 0:
-                    LOGGER.warning('Signage legend number texture width must be divisible by ten!')
+                    exp.warn_auth(legend_info.pak_id, TRANS_INVALID_NUMBERS_WIDTH)
             break
     else:
-        LOGGER.warning('No Signage style overlay defined.')
+        exp.warn_auth(exp.selected_style.pak_id, TRANS_NO_OVERLAY)
         overlay = None
 
     for num, x, y in iter_cells():

@@ -12,6 +12,7 @@ from srctools.filesys import File
 import trio
 
 from app import DEV_MODE
+from transtoken import TransToken
 from . import STAGE_RESOURCES, STAGE_AUTO_BACKUP, ExportData, STEPS, StepResource
 import config
 import editoritems
@@ -21,6 +22,8 @@ LOGGER = logger.get_logger(__name__)
 
 # The location of all the instances in the game directory
 INST_PATH: Final = 'sdk_content/maps/instances/BEE2'
+
+TRANS_ROOT_RESOURCE = TransToken.untranslated('File in resources root: "{file}"!')
 
 
 @STEPS.add_step(prereq=[StepResource.VCONF_DATA], results=[StepResource.VCONF_FILE])
@@ -153,7 +156,7 @@ async def step_copy_resources(exp: ExportData) -> None:
                 try:
                     res, start_folder, pathstr = file.path.split('/', 2)
                 except ValueError:
-                    LOGGER.warning('File in resources root: "{}"!', file.path)
+                    exp.warn_auth(pack.id, TRANS_ROOT_RESOURCE.format(file=file.path))
                     continue
                 assert res.casefold() == 'resources', file.path
 

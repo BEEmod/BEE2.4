@@ -86,7 +86,7 @@ def get_export_data(
     pal_list: Item.ExportInfo,
     style_id: utils.ObjectID,
     prop_conf: ItemDefault,
-) -> tuple[list[EditorItem], lazy_conf.LazyConf]:
+) -> tuple[utils.ObjectID, list[EditorItem], lazy_conf.LazyConf]:
     """Get the data for an exported item."""
 
     # Build a dictionary of this item's palette positions,
@@ -129,6 +129,7 @@ def get_export_data(
             except KeyError:
                 pass
     return (
+        item_data.pak_id,
         [new_item] + item_data.editor_extra,
         # Add all_conf first so it's conditions run first by default
         lazy_conf.concat(item.all_conf, item_data.vbsp_config),
@@ -188,11 +189,11 @@ async def step_write_items(exp_data: ExportData) -> None:
     for item in sorted(exp_data.packset.all_obj(Item), key=operator.attrgetter('id')):
         prop_conf = config.APP.get_cur_conf(ItemDefault, item.id)
 
-        (items, config_part) = get_export_data(item, pal_list, style_id, prop_conf)
+        (pak_id, items, config_part) = get_export_data(item, pal_list, style_id, prop_conf)
 
         for editor_def in items:
             if editor_def.id in style_items:
-                exp_data.warn(TRANS_OLD_STYLE_DEF.format(item=editor_def.id))
+                exp_data.warn_auth(pak_id, TRANS_OLD_STYLE_DEF.format(item=editor_def.id))
                 # Pop so we warn only once.
                 exp_data.all_items.remove(style_items.pop(editor_def.id))
             exp_data.all_items.append(editor_def)
