@@ -102,12 +102,5 @@ async def make_cube_colourizer_legend(exp_data: ExportData) -> None:
     await vtf_loc.parent.mkdir(parents=True, exist_ok=True)
     LOGGER.info('Exporting "{}"...', vtf_loc)
     buf = io.BytesIO()
-    try:
-        await trio.to_thread.run_sync(vtf.save, buf)
-    except NotImplementedError:
-        LOGGER.warning('No DXT compressor, using RGB888.')
-        # No libsquish, so DXT compression doesn't work.
-        vtf.format = vtf.low_format = ImageFormats.RGB888
-        buf = io.BytesIO()
-        await trio.to_thread.run_sync(vtf.save, buf)
+    await trio.to_thread.run_sync(vtf.save, buf)
     await vtf_loc.write_bytes(buf.getvalue())
