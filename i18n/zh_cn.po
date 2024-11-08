@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: https://github.com/BEEmod/BEE2.4/issues\n"
-"POT-Creation-Date: 2024-05-28 11:53+1000\n"
+"POT-Creation-Date: 2024-11-08 16:23+1000\n"
 "PO-Revision-Date: 2019-11-22 10:47+1000\n"
 "Last-Translator: Antecer <antecer@outlook.com>\n"
 "Language: zh\n"
@@ -12,7 +12,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.12.1\n"
+"Generated-By: Babel 2.15.0\n"
 
 #: loadScreen.py
 msgid "Skipped!"
@@ -23,7 +23,7 @@ msgstr "跳过！"
 msgid "Version: {ver}"
 msgstr "版本："
 
-#: app/optionWindow.py app/packageMan.py app/selector_win.py loadScreen.py
+#: app/optionWindow.py app/packageMan.py loadScreen.py ui_tk/selector_win.py
 msgid "Cancel"
 msgstr "取消"
 
@@ -253,7 +253,7 @@ msgstr ""
 
 #. i18n: Reference to the stylevar
 #. This uses HTML syntax.
-#: app/StyleVarPane.py user_errors.py
+#: user_errors.py
 msgid "Unlock Default Items"
 msgstr "允许编辑默认物品"
 
@@ -277,14 +277,14 @@ msgid ""
 msgstr ""
 
 #. This uses HTML syntax.
-#: ui_tk/corridor_selector.py user_errors.py
+#: app/corridor_selector.py user_errors.py
 #, fuzzy
 msgid "Entry"
 msgstr "Bendy（纸片人小黑）"
 
 #. i18n: Entry door
 #. This uses HTML syntax.
-#: ui_tk/corridor_selector.py user_errors.py
+#: app/corridor_selector.py user_errors.py
 msgid "Exit"
 msgstr ""
 
@@ -506,6 +506,20 @@ msgstr "地图设置"
 msgid "Compile Settings"
 msgstr "编译设置"
 
+#: app/CompilerPane.py
+#, fuzzy
+msgid ""
+"Use a custom image for the map preview image. Click the screenshot to "
+"select.\n"
+"Images will be converted to JPEGs if necessary."
+msgstr ""
+"将自定义图片用作地图预览图片，点击快照窗口选择图片。\n"
+"如果需要，图片将转换为JPEG格式。"
+
+#: app/CompilerPane.py
+msgid "Filename: {path}"
+msgstr ""
+
 #. i18n: Tooltip format for compiler limit bars.
 #: app/CompilerPane.py
 msgid ""
@@ -555,15 +569,6 @@ msgstr ""
 #: app/CompilerPane.py
 msgid "Use the normal editor view for the map preview image."
 msgstr "使用默认编辑器视图作为地图预览图像。"
-
-#: app/CompilerPane.py
-msgid ""
-"Use a custom image for the map preview image. Click the screenshot to "
-"select.\n"
-"Images will be converted to JPEGs if needed."
-msgstr ""
-"将自定义图片用作地图预览图片，点击快照窗口选择图片。\n"
-"如果需要，图片将转换为JPEG格式。"
 
 #: app/CompilerPane.py
 msgid ""
@@ -794,14 +799,6 @@ msgid "Disable all voicelines other than entry and exit lines."
 msgstr "禁用在入口通道和出口通道以外的地区播放电脑语音。"
 
 #: app/StyleVarPane.py
-msgid ""
-"Allow placing and deleting the mandatory Entry/Exit Doors and Large "
-"Observation Room. Use with caution, this can have weird results!"
-msgstr ""
-"允许放置和删除强制性的进/出门和大型观察室。\n"
-"谨慎使用，可能会产生奇怪的结果！"
-
-#: app/StyleVarPane.py
 msgid "Allow Adding Goo Mist"
 msgstr "允许为致命酸液添加雾气效果"
 
@@ -916,10 +913,16 @@ msgid "BEEMOD {version} - {game}"
 msgstr ""
 
 #: app/UI.py
-#, fuzzy
-msgid "{n} option"
-msgid_plural "{n} options"
-msgstr[0] "没有选项！"
+msgid "Add no extra voice lines, only Multiverse Cave if enabled."
+msgstr "不添加额外的声线，仅使用Cave关于多元宇宙的谈话。（如果它被勾选）"
+
+#: app/UI.py
+msgid "Random"
+msgstr "随机"
+
+#: app/UI.py
+msgid "Choose a random video."
+msgstr "随机选择一个影像。"
 
 #: app/UI.py
 msgid "Select Skyboxes"
@@ -954,14 +957,6 @@ msgstr ""
 "选择玩家进入或离开实验室时播放旁白的语音声线。\n"
 "它们会根据地图中存在哪些物品来选择播放哪一段语音。\n"
 "附加的“Cave谈论平行宇宙”的语音在“风格属性”中单独控制。"
-
-#: app/UI.py
-msgid "Add no extra voice lines, only Multiverse Cave if enabled."
-msgstr "不添加额外的声线，仅使用Cave关于多元宇宙的谈话。（如果它被勾选）"
-
-#: app/UI.py
-msgid "<Multiverse Cave only>"
-msgstr "<仅使用平行宇宙的凯文>"
 
 #: app/UI.py
 msgid "Characters"
@@ -1019,14 +1014,6 @@ msgid "<Not Present>"
 msgstr ""
 
 #: app/UI.py
-msgid "Random"
-msgstr "随机"
-
-#: app/UI.py
-msgid "Choose a random video."
-msgstr "随机选择一个影像。"
-
-#: app/UI.py
 msgid "Multiple Orientations"
 msgstr "多种方向"
 
@@ -1071,10 +1058,6 @@ msgid "Select"
 msgstr "所选风格"
 
 #: app/UI.py
-msgid "All Items: "
-msgstr "所有物品："
-
-#: app/UI.py
 msgid "Palettes"
 msgstr "模板列表"
 
@@ -1102,11 +1085,6 @@ msgid ""
 "This has been copied to the clipboard."
 msgstr ""
 
-#: app/backup.py
-#, fuzzy
-msgid "Backup Puzzles"
-msgstr "备份/恢复 谜题"
-
 #: app/backup.py app/packageMan.py
 #, fuzzy
 msgid "Name"
@@ -1120,11 +1098,11 @@ msgstr ""
 msgid "Date"
 msgstr ""
 
-#: app/backup.py ui_tk/corridor_selector.py
+#: app/backup.py app/corridor_selector.py
 msgid "SP"
 msgstr "单人模式"
 
-#: app/backup.py ui_tk/corridor_selector.py
+#: app/backup.py app/corridor_selector.py
 msgid "Coop"
 msgstr "合作模式"
 
@@ -1258,6 +1236,10 @@ msgstr "删除游戏"
 msgid "Game"
 msgstr "游戏"
 
+#: app/backup.py app/menu_bar.py
+msgid "Help"
+msgstr "帮助"
+
 #: app/backup.py
 msgid "Automatic Backup After Export"
 msgstr "导出后自动备份"
@@ -1390,6 +1372,12 @@ msgstr ""
 
 #: app/contextWin.py
 msgid ""
+"Failed to open a web browser. Do you wish for the URL to be copied to the"
+" clipboard instead?"
+msgstr "无法打开浏览器。你希望将网址复制到剪贴板吗？"
+
+#: app/contextWin.py
+msgid ""
 "This fizzler has a timed output. Due to an editor bug, this cannot be "
 "used directly. Instead the Fizzler Output Relay item should be placed on "
 "top of this fizzler."
@@ -1401,10 +1389,6 @@ msgid "No Alternate Versions"
 msgstr "无替代版本！"
 
 #: app/contextWin.py
-msgid "Properties:"
-msgstr "物品属性:"
-
-#: app/contextWin.py
 msgid ""
 "The number of entities used for this item. The Source engine limits this "
 "to 2048 in total. This provides a guide to how many of these items can be"
@@ -1412,38 +1396,20 @@ msgid ""
 msgstr "用于此物品的实体数量。起源引擎将其限制为2048。这里提供了一篇可以一次性放置多少物品在地图里的指南。"
 
 #: app/contextWin.py
-msgid "Description:"
-msgstr "描述："
+msgid ""
+"The item <{id}> is missing from package definitions. Check for missing "
+"packages. Alternatively, this item may have been replaced or merged into "
+"another.\n"
+"\n"
+"Export is not possible while this is present on the palette."
+msgstr ""
 
 #: app/contextWin.py
 msgid "BEE2 - Error"
 msgstr ""
 
-#: app/contextWin.py
-msgid ""
-"Failed to open a web browser. Do you wish for the URL to be copied to the"
-" clipboard instead?"
-msgstr "无法打开浏览器。你希望将网址复制到剪贴板吗？"
-
-#: app/contextWin.py
-msgid "More Info>>"
-msgstr "更多信息>>"
-
-#: app/contextWin.py
-msgid "Change Defaults..."
-msgstr "更改默认值..."
-
-#: app/contextWin.py
-msgid "Change the default settings for this item when placed."
-msgstr "修改该物品在放置时的默认设置。"
-
-#: app/contextWin.py
-#, fuzzy
-msgid "Select Signage..."
-msgstr "建议"
-
-#: app/contextWin.py
-msgid "Change which signs are specified by each timer value."
+#: app/corridor_selector.py
+msgid "BEEmod - Select Corridor"
 msgstr ""
 
 #: app/corridor_selector.py app/selector_win.py
@@ -1491,6 +1457,35 @@ msgstr "没有选项！"
 #, fuzzy
 msgid "Randomise"
 msgstr "随机"
+
+#: app/corridor_selector.py
+msgid "Use Only This"
+msgstr ""
+
+#: app/corridor_selector.py
+#, fuzzy
+msgid "Game Mode"
+msgstr "游戏"
+
+#: app/corridor_selector.py
+msgid "Corridor Type"
+msgstr ""
+
+#: app/corridor_selector.py
+msgid "Attachment Surface"
+msgstr ""
+
+#: app/corridor_selector.py
+msgid "Flat"
+msgstr ""
+
+#: app/corridor_selector.py
+msgid "Floor"
+msgstr ""
+
+#: app/corridor_selector.py
+msgid "Ceiling"
+msgstr ""
 
 #: app/dialogs.py
 #, fuzzy
@@ -1613,7 +1608,8 @@ msgid "Discord Server..."
 msgstr "Discord服务器..."
 
 #: app/helpMenu.py
-msgid "aerond's Music Changer..."
+#, fuzzy
+msgid "aerond's Music Package Creator..."
 msgstr "BEEMod音乐转换器..."
 
 #: app/helpMenu.py
@@ -1646,6 +1642,14 @@ msgstr "反馈物品Bug..."
 msgid "Submit Music Bugs..."
 msgstr "反馈物品Bug..."
 
+#: app/helpMenu.py
+msgid "BEE2 Credits"
+msgstr "BEE2 声明"
+
+#: app/helpMenu.py
+msgid "Credits..."
+msgstr "声明..."
+
 #: app/helpMenu.py app/item_properties.py ui_tk/corridor_selector.py
 #: ui_tk/errors.py
 msgid "Close"
@@ -1673,17 +1677,14 @@ msgstr ""
 msgid "Do you wish to open the following URL?"
 msgstr ""
 
-#: app/helpMenu.py
-msgid "Help"
-msgstr "帮助"
+#: app/item_picker.py
+msgid "All Items: "
+msgstr "所有物品："
 
-#: app/helpMenu.py
-msgid "BEE2 Credits"
-msgstr "BEE2 声明"
-
-#: app/helpMenu.py
-msgid "Credits..."
-msgstr "声明..."
+#: app/item_picker.py
+#, fuzzy
+msgid "Unknown: <{id}>"
+msgstr "指示标志: {name}"
 
 #: app/item_properties.py
 msgid "BEE2 - {item}"
@@ -1720,6 +1721,16 @@ msgstr "没有可用的属性！"
 
 #: app/item_search.py
 msgid "Search:"
+msgstr ""
+
+#: app/lifecycle.py
+#, fuzzy
+msgid "An error occurred when loading packages:"
+msgid_plural "Multiple errors occurred when loading packages:"
+msgstr[0] ""
+
+#: app/lifecycle.py
+msgid "Loading packages was partially successful:"
 msgstr ""
 
 #: app/menu_bar.py
@@ -1786,11 +1797,29 @@ msgstr "音乐选择："
 msgid "Base:"
 msgstr "基础音乐"
 
+#: app/music_conf.py ui_wx/demo/selector_win.py
+msgid ""
+"Add no music to the map at all. Testing Element-specific music may still "
+"be added."
+msgstr "不添在地图内加任何背景音乐。某些特定试验元素的声音仍然可能被添加。"
+
 #: app/music_conf.py
+msgid "The regular base track will continue to play normally."
+msgstr ""
+
+#: app/music_conf.py
+msgid "Add no music when jumping on Repulsion Gel."
+msgstr "玩家跳上斥力凝胶时不播放音效。"
+
+#: app/music_conf.py
+msgid "Add no music while running fast."
+msgstr "玩家在加速凝胶上移动时不播放音效。"
+
+#: app/music_conf.py ui_wx/demo/selector_win.py
 msgid "Select Background Music - Base"
 msgstr "选择背景音乐 - 基础"
 
-#: app/music_conf.py
+#: app/music_conf.py ui_wx/demo/selector_win.py
 msgid ""
 "This controls the background music used for a map. Expand the dropdown to"
 " set tracks for specific test elements."
@@ -1798,25 +1827,19 @@ msgstr ""
 "这控制用于地图的背景音乐。\n"
 "展开下拉菜单以设置特定试验元素的声音。"
 
-#: app/music_conf.py
-msgid ""
-"Add no music to the map at all. Testing Element-specific music may still "
-"be added."
-msgstr "不添在地图内加任何背景音乐。某些特定试验元素的声音仍然可能被添加。"
-
-#: app/music_conf.py
+#: app/music_conf.py ui_wx/demo/selector_win.py
 msgid "Propulsion Gel SFX"
 msgstr "加速凝胶的音效"
 
-#: app/music_conf.py
+#: app/music_conf.py ui_wx/demo/selector_win.py
 msgid "Repulsion Gel SFX"
 msgstr "斥力凝胶的音效"
 
-#: app/music_conf.py
+#: app/music_conf.py ui_wx/demo/selector_win.py
 msgid "Excursion Funnel Music"
 msgstr "牵引光束的音效"
 
-#: app/music_conf.py
+#: app/music_conf.py ui_wx/demo/selector_win.py
 msgid "Synced Funnel Music"
 msgstr "同步牵引光束的音效"
 
@@ -1829,20 +1852,12 @@ msgid "Set the music used while inside Excursion Funnels."
 msgstr "设置玩家处于牵引光束内部时的音效。"
 
 #: app/music_conf.py
-msgid "The regular base track will continue to play normally."
-msgstr ""
-
-#: app/music_conf.py
 msgid "Select Repulsion Gel Music"
 msgstr "选择斥力凝胶的音效"
 
 #: app/music_conf.py
 msgid "Select the music played when players jump on Repulsion Gel."
 msgstr "选择当玩家跳上斥力凝胶时的音效。"
-
-#: app/music_conf.py
-msgid "Add no music when jumping on Repulsion Gel."
-msgstr "玩家跳上斥力凝胶时不播放音效。"
 
 #: app/music_conf.py
 msgid "Select Propulsion Gel Music"
@@ -1853,10 +1868,6 @@ msgid ""
 "Select music played when players have large amounts of horizontal "
 "velocity."
 msgstr "选择玩家在加速凝胶上奔跑时的音效。"
-
-#: app/music_conf.py
-msgid "Add no music while running fast."
-msgstr "玩家在加速凝胶上移动时不播放音效。"
 
 #: app/music_conf.py
 msgid "Funnel:"
@@ -1955,7 +1966,7 @@ msgstr ""
 msgid "Enable development options"
 msgstr "开发者选项"
 
-#: app/optionWindow.py app/packageMan.py app/selector_win.py
+#: app/optionWindow.py app/packageMan.py ui_tk/selector_win.py
 msgid "OK"
 msgstr "确定"
 
@@ -2191,21 +2202,21 @@ msgid "Reload Images"
 msgstr ""
 
 #: app/optionWindow.py
-msgid "Reload all images in the app. Expect the app to freeze momentarily."
+msgid "Build UI Translations"
 msgstr ""
 
 #: app/optionWindow.py
-msgid "Build UI Translations"
+msgid "Build Package Translations"
+msgstr ""
+
+#: app/optionWindow.py
+msgid "Reload all images in the app. Expect the app to freeze momentarily."
 msgstr ""
 
 #: app/optionWindow.py
 msgid ""
 "Compile '.po' UI translation files into '.mo'. This requires those to "
 "have been downloaded from the source repo."
-msgstr ""
-
-#: app/optionWindow.py
-msgid "Build Package Translations"
 msgstr ""
 
 #: app/optionWindow.py
@@ -2344,11 +2355,6 @@ msgstr "重置模板"
 msgid "Enter the name of the group for this palette, or \"\" to ungroup."
 msgstr ""
 
-#: app/richTextBox.py
-#, fuzzy
-msgid "Open \"{url}\" in the default browser?"
-msgstr "在默认浏览器中打开 \"{url}\" ？"
-
 #: app/selector_win.py
 msgid "Color: R={r}, G={g}, B={b}"
 msgstr "颜色: R={r}, G={g}, B={b}"
@@ -2372,24 +2378,9 @@ msgstr "建议"
 msgid "Other"
 msgstr "其它"
 
-#. i18n: 'None' item description
-#: app/selector_win.py
-msgid "Do not add anything."
-msgstr "不要添加任何东西。"
-
-#. i18n: 'None' item name.
-#: app/selector_win.py
-msgid "<None>"
-msgstr "<无>"
-
-#: app/selector_win.py
-msgid "Play a sample of this item."
-msgstr "播放该物品的示例"
-
-#: app/selector_win.py
-#, fuzzy
-msgid "Select Suggested"
-msgstr "建议"
+#: app/itemconfig/__init__.py app/selector_win.py
+msgid "Loading..."
+msgstr ""
 
 #: app/signage_ui.py
 #, fuzzy
@@ -2455,10 +2446,6 @@ msgstr "风格/物品 属性"
 msgid "Style/Item Properties"
 msgstr "风格/物品 属性"
 
-#: app/itemconfig/__init__.py
-msgid "Loading..."
-msgstr ""
-
 #: app/itemconfig/color.py
 msgid "Choose a Color"
 msgstr "选择一种颜色"
@@ -2474,6 +2461,11 @@ msgstr ""
 #: exporting/__init__.py
 msgid "Backup Original Files"
 msgstr ""
+
+#: exporting/__init__.py
+#, fuzzy
+msgid "Backup Puzzles"
+msgstr "备份/恢复 谜题"
 
 #: exporting/__init__.py
 msgid "Copy Compiler"
@@ -2532,10 +2524,16 @@ msgstr ""
 msgid "No compiler files were found in \"{folder}\"."
 msgstr ""
 
-#: exporting/items.py
-msgid ""
-"Style includes old definition for {item}. Override the item package "
-"object instead."
+#: exporting/corridors.py
+msgid "No corridor definitions found for style \"{id}\"!"
+msgstr ""
+
+#: exporting/signage.py
+msgid "Selected signage \"{id}\" does not exist."
+msgstr ""
+
+#: exporting/signage.py
+msgid "Signage \"{id}\"'s {child} \"{sub_id}\" does not exist."
 msgstr ""
 
 #: exporting/vpks.py
@@ -2552,6 +2550,12 @@ msgstr ""
 msgid ""
 "The VPK \"{filename}\" could not be parsed. If this was made by BEE, "
 "delete it, otherwise check if it is corrupt."
+msgstr ""
+
+#: exporting/vpks.py
+msgid ""
+"The vpk_override VPK \"{filename}\" could not be parsed. Contents was "
+"skipped."
 msgstr ""
 
 #: packages/__init__.py
@@ -2593,22 +2597,6 @@ msgstr ""
 
 #: packages/__init__.py
 msgid ""
-"Unknown object type \"{obj_type}\" with ID \"{obj_id}\" in package "
-"\"{pak_id}\"!"
-msgstr ""
-
-#: packages/__init__.py
-msgid ""
-"TemplateBrush \"{id}\" in package \"{pak_id}\" no longer needs to be "
-"defined in info.txt. Use a bee2_template_conf entity instead."
-msgstr ""
-
-#: packages/__init__.py
-msgid "No ID defined for \"{obj_type}\" object type in \"{pak_id}\" package!"
-msgstr ""
-
-#: packages/__init__.py
-msgid ""
 "Duplicate package with id \"{pak_id}\"!\n"
 "If you just updated the mod, delete any old files in packages/.\n"
 "Package 1: {path1}\n"
@@ -2616,9 +2604,35 @@ msgid ""
 msgstr ""
 
 #: packages/__init__.py
-msgid ""
-"The ID \"{obj_id}\" was used twice for a {obj_type} in the packages "
-"\"{pak1}\" and \"{pak2}\"!"
+#, fuzzy
+msgid "{n} option"
+msgid_plural "{n} options"
+msgstr[0] "没有选项！"
+
+#. i18n: Corridor options count
+#: packages/__init__.py
+msgid "The object {id} is missing from loaded packages. Exporting it will fail."
+msgstr ""
+
+#: packages/__init__.py
+msgid "<None>"
+msgstr "<无>"
+
+#: packages/__init__.py
+msgid "Do not add anything."
+msgstr "不要添加任何东西。"
+
+#: packages/__init__.py
+#, fuzzy
+msgid "Unknown Object"
+msgstr "正在载入对象"
+
+#: packages/__init__.py
+msgid "???"
+msgstr ""
+
+#: packages/__init__.py
+msgid "This object is missing from loaded packages. Exporting it will fail."
 msgstr ""
 
 #: packages/__init__.py
@@ -2628,9 +2642,12 @@ msgstr "资源包"
 
 #: packages/__init__.py
 msgid ""
-"No Clean Style package! This is required for some essential resources and"
-" objects."
-msgstr ""
+"Critical package missing: {pack}These are required for some essential "
+"resources and objects."
+msgid_plural ""
+"Critical packages missing: {pack}These are required for some essential "
+"resources and objects."
+msgstr[0] ""
 
 #: packages/__init__.py
 msgid ""
@@ -2650,57 +2667,56 @@ msgstr ""
 msgid "No description!"
 msgstr "描述："
 
-#: packages/corridor.py
-msgid ""
-"Duplicate corridor option ID \"{option}\" in corridor group for style "
-"\"{group}\"!"
-msgstr ""
-
 #: packages/quote_pack.py
-msgid "No \"Quotes\" key in config for quote pack {id}!"
-msgstr ""
-
-#: packages/quote_pack.py
-msgid "Multiple \"Quotes\" keys found in config for quote pack {id}!"
-msgstr ""
-
-#: packages/quote_pack.py
-msgid "Invalid response kind \"{name}\" in config for quote pack {id}!"
-msgstr ""
+msgid "<Multiverse Cave only>"
+msgstr "<仅使用平行宇宙的凯文>"
 
 #: ui_tk/check_table.py
 msgid "Toggle all checkboxes."
 msgstr "反选所有复选框"
 
-#: ui_tk/core.py
+#: ui_tk/context_win.py
+msgid "Properties:"
+msgstr "物品属性:"
+
+#: ui_tk/context_win.py
+msgid "Description:"
+msgstr "描述："
+
+#: ui_tk/context_win.py
+msgid "More Info>>"
+msgstr "更多信息>>"
+
+#: ui_tk/context_win.py
+msgid "Change Defaults..."
+msgstr "更改默认值..."
+
+#: ui_tk/context_win.py
+msgid "Change the default settings for this item when placed."
+msgstr "修改该物品在放置时的默认设置。"
+
+#: ui_tk/context_win.py
 #, fuzzy
-msgid "An error occurred when loading packages:"
-msgid_plural "Multiple errors occurred when loading packages:"
-msgstr[0] ""
+msgid "Select Signage..."
+msgstr "建议"
 
-#: ui_tk/core.py
-msgid "Loading packages was partially successful:"
+#: ui_tk/context_win.py
+msgid "Change which signs are specified by each timer value."
 msgstr ""
 
-#: ui_tk/corridor_selector.py
-msgid "BEEmod - Select Corridor"
-msgstr ""
+#: ui_tk/rich_textbox.py
+#, fuzzy
+msgid "Open \"{url}\" in the default browser?"
+msgstr "在默认浏览器中打开 \"{url}\" ？"
 
-#: ui_tk/corridor_selector.py
-msgid "Use Only This"
-msgstr ""
+#: ui_tk/selector_win.py
+msgid "Play a sample of this item."
+msgstr "播放该物品的示例"
 
-#: ui_tk/corridor_selector.py
-msgid "Flat"
-msgstr ""
-
-#: ui_tk/corridor_selector.py
-msgid "Upward"
-msgstr ""
-
-#: ui_tk/corridor_selector.py
-msgid "Downward"
-msgstr ""
+#: ui_tk/selector_win.py ui_wx/selector_win.py
+#, fuzzy
+msgid "Select Suggested"
+msgstr "建议"
 
 #~ msgid "Door Cameras"
 #~ msgstr "门前摄像机"
@@ -2819,4 +2835,13 @@ msgstr ""
 #~ msgstr ""
 #~ "找不到光圈科技附加传送枪的实例！\n"
 #~ "传送器将不起作用 - 校验缓存以修复此问题。"
+
+#~ msgid ""
+#~ "Allow placing and deleting the mandatory"
+#~ " Entry/Exit Doors and Large Observation "
+#~ "Room. Use with caution, this can "
+#~ "have weird results!"
+#~ msgstr ""
+#~ "允许放置和删除强制性的进/出门和大型观察室。\n"
+#~ "谨慎使用，可能会产生奇怪的结果！"
 

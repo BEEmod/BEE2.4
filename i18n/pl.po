@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: https://github.com/BEEmod/BEE2.4/issues\n"
-"POT-Creation-Date: 2024-05-28 11:53+1000\n"
+"POT-Creation-Date: 2024-11-08 16:23+1000\n"
 "PO-Revision-Date: 2021-06-07 15:18+0200\n"
 "Last-Translator: \n"
 "Language: pl\n"
@@ -13,7 +13,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.12.1\n"
+"Generated-By: Babel 2.15.0\n"
 
 #: loadScreen.py
 msgid "Skipped!"
@@ -24,7 +24,7 @@ msgstr "Pominięto!"
 msgid "Version: {ver}"
 msgstr "Wersja: "
 
-#: app/optionWindow.py app/packageMan.py app/selector_win.py loadScreen.py
+#: app/optionWindow.py app/packageMan.py loadScreen.py ui_tk/selector_win.py
 msgid "Cancel"
 msgstr "Anuluj"
 
@@ -254,7 +254,7 @@ msgstr ""
 
 #. i18n: Reference to the stylevar
 #. This uses HTML syntax.
-#: app/StyleVarPane.py user_errors.py
+#: user_errors.py
 msgid "Unlock Default Items"
 msgstr "Odblokuj domyślne przedmioty"
 
@@ -278,14 +278,14 @@ msgid ""
 msgstr ""
 
 #. This uses HTML syntax.
-#: ui_tk/corridor_selector.py user_errors.py
+#: app/corridor_selector.py user_errors.py
 #, fuzzy
 msgid "Entry"
 msgstr "Bendy"
 
 #. i18n: Entry door
 #. This uses HTML syntax.
-#: ui_tk/corridor_selector.py user_errors.py
+#: app/corridor_selector.py user_errors.py
 msgid "Exit"
 msgstr ""
 
@@ -507,6 +507,21 @@ msgstr "Ustawienia mapy:"
 msgid "Compile Settings"
 msgstr "Ustawienia kompilatora:"
 
+#: app/CompilerPane.py
+#, fuzzy
+msgid ""
+"Use a custom image for the map preview image. Click the screenshot to "
+"select.\n"
+"Images will be converted to JPEGs if necessary."
+msgstr ""
+"Użyj własnego obrazu jako miniaturę mapy. Kliknij na podgląd poniżej, aby"
+" wybrać.\n"
+"Obrazy będą w razie potrzeby konwertowane do formatu JPEG."
+
+#: app/CompilerPane.py
+msgid "Filename: {path}"
+msgstr ""
+
 #. i18n: Tooltip format for compiler limit bars.
 #: app/CompilerPane.py
 msgid ""
@@ -558,16 +573,6 @@ msgstr ""
 #: app/CompilerPane.py
 msgid "Use the normal editor view for the map preview image."
 msgstr "Użyj domyślnego widoku edytora jako miniaturę mapy."
-
-#: app/CompilerPane.py
-msgid ""
-"Use a custom image for the map preview image. Click the screenshot to "
-"select.\n"
-"Images will be converted to JPEGs if needed."
-msgstr ""
-"Użyj własnego obrazu jako miniaturę mapy. Kliknij na podgląd poniżej, aby"
-" wybrać.\n"
-"Obrazy będą w razie potrzeby konwertowane do formatu JPEG."
 
 #: app/CompilerPane.py
 msgid ""
@@ -806,15 +811,6 @@ msgid "Disable all voicelines other than entry and exit lines."
 msgstr "Wyłącza wszystkie ścieżki głosowe inne niż ścieżki wejścia i wyjścia."
 
 #: app/StyleVarPane.py
-msgid ""
-"Allow placing and deleting the mandatory Entry/Exit Doors and Large "
-"Observation Room. Use with caution, this can have weird results!"
-msgstr ""
-"Umożliwia umieszczanie i usuwanie niezbędnych drzwi wejściowych i "
-"wyjściowych oraz dużego pokoju obserwacyjnego. Używaj z ostrożnością, "
-"może to powodować dziwne rezultaty!"
-
-#: app/StyleVarPane.py
 msgid "Allow Adding Goo Mist"
 msgstr "Dodaj mgłę nad mazią"
 
@@ -934,12 +930,16 @@ msgid "BEEMOD {version} - {game}"
 msgstr ""
 
 #: app/UI.py
-#, fuzzy
-msgid "{n} option"
-msgid_plural "{n} options"
-msgstr[0] "Brak opcji!"
-msgstr[1] ""
-msgstr[2] ""
+msgid "Add no extra voice lines, only Multiverse Cave if enabled."
+msgstr "Nie dodaje żadnych ścieżek, jedynie Cave z multiwersum, jeżeli włączone."
+
+#: app/UI.py
+msgid "Random"
+msgstr "Losuj"
+
+#: app/UI.py
+msgid "Choose a random video."
+msgstr "Wybierz dowolny film."
 
 #: app/UI.py
 msgid "Select Skyboxes"
@@ -979,14 +979,6 @@ msgstr ""
 "Wybierane są na podstawie elementów testowych obecnych na mapie. "
 "Dodatkowe ścieżki Cave'a Johnsona z \"Multiwersum\" są wybierane osobno "
 "we właściwościach stylu."
-
-#: app/UI.py
-msgid "Add no extra voice lines, only Multiverse Cave if enabled."
-msgstr "Nie dodaje żadnych ścieżek, jedynie Cave z multiwersum, jeżeli włączone."
-
-#: app/UI.py
-msgid "<Multiverse Cave only>"
-msgstr "<Tylko Cave z multiwersum>"
 
 #: app/UI.py
 msgid "Characters"
@@ -1051,14 +1043,6 @@ msgid "<Not Present>"
 msgstr ""
 
 #: app/UI.py
-msgid "Random"
-msgstr "Losuj"
-
-#: app/UI.py
-msgid "Choose a random video."
-msgstr "Wybierz dowolny film."
-
-#: app/UI.py
 msgid "Multiple Orientations"
 msgstr "Wiele orientacji"
 
@@ -1103,10 +1087,6 @@ msgid "Select"
 msgstr "Wybrane"
 
 #: app/UI.py
-msgid "All Items: "
-msgstr "Wszystkie przedmioty: "
-
-#: app/UI.py
 msgid "Palettes"
 msgstr "Palety"
 
@@ -1134,11 +1114,6 @@ msgid ""
 "This has been copied to the clipboard."
 msgstr ""
 
-#: app/backup.py
-#, fuzzy
-msgid "Backup Puzzles"
-msgstr "Kopia zapasowa map"
-
 #: app/backup.py app/packageMan.py
 #, fuzzy
 msgid "Name"
@@ -1152,11 +1127,11 @@ msgstr ""
 msgid "Date"
 msgstr ""
 
-#: app/backup.py ui_tk/corridor_selector.py
+#: app/backup.py app/corridor_selector.py
 msgid "SP"
 msgstr "1-os."
 
-#: app/backup.py ui_tk/corridor_selector.py
+#: app/backup.py app/corridor_selector.py
 msgid "Coop"
 msgstr "Koop."
 
@@ -1287,6 +1262,10 @@ msgstr "Usuń grę"
 #: app/backup.py
 msgid "Game"
 msgstr "Gra"
+
+#: app/backup.py app/menu_bar.py
+msgid "Help"
+msgstr "Pomoc"
 
 #: app/backup.py
 msgid "Automatic Backup After Export"
@@ -1426,6 +1405,14 @@ msgstr ""
 
 #: app/contextWin.py
 msgid ""
+"Failed to open a web browser. Do you wish for the URL to be copied to the"
+" clipboard instead?"
+msgstr ""
+"Nie udało się otworzyć przeglądarki. Czy chcesz w zamian skopiować link "
+"do schowka?"
+
+#: app/contextWin.py
+msgid ""
 "This fizzler has a timed output. Due to an editor bug, this cannot be "
 "used directly. Instead the Fizzler Output Relay item should be placed on "
 "top of this fizzler."
@@ -1434,10 +1421,6 @@ msgstr ""
 #: app/contextWin.py
 msgid "No Alternate Versions"
 msgstr "Brak wersji alteratywnych"
-
-#: app/contextWin.py
-msgid "Properties:"
-msgstr "Właściwości"
 
 #: app/contextWin.py
 msgid ""
@@ -1450,40 +1433,20 @@ msgstr ""
 " być umieszczonych na mapie."
 
 #: app/contextWin.py
-msgid "Description:"
-msgstr "Opis:"
+msgid ""
+"The item <{id}> is missing from package definitions. Check for missing "
+"packages. Alternatively, this item may have been replaced or merged into "
+"another.\n"
+"\n"
+"Export is not possible while this is present on the palette."
+msgstr ""
 
 #: app/contextWin.py
 msgid "BEE2 - Error"
 msgstr ""
 
-#: app/contextWin.py
-msgid ""
-"Failed to open a web browser. Do you wish for the URL to be copied to the"
-" clipboard instead?"
-msgstr ""
-"Nie udało się otworzyć przeglądarki. Czy chcesz w zamian skopiować link "
-"do schowka?"
-
-#: app/contextWin.py
-msgid "More Info>>"
-msgstr "Więcej informacji>>"
-
-#: app/contextWin.py
-msgid "Change Defaults..."
-msgstr "Zmień domyślne wartości..."
-
-#: app/contextWin.py
-msgid "Change the default settings for this item when placed."
-msgstr "Zmienia domyślne wartości dla tego przedmiotu w edytorze."
-
-#: app/contextWin.py
-#, fuzzy
-msgid "Select Signage..."
-msgstr "Sugerowane"
-
-#: app/contextWin.py
-msgid "Change which signs are specified by each timer value."
+#: app/corridor_selector.py
+msgid "BEEmod - Select Corridor"
 msgstr ""
 
 #: app/corridor_selector.py app/selector_win.py
@@ -1533,6 +1496,35 @@ msgstr "Brak opcji!"
 #, fuzzy
 msgid "Randomise"
 msgstr "Losuj"
+
+#: app/corridor_selector.py
+msgid "Use Only This"
+msgstr ""
+
+#: app/corridor_selector.py
+#, fuzzy
+msgid "Game Mode"
+msgstr "Gra"
+
+#: app/corridor_selector.py
+msgid "Corridor Type"
+msgstr ""
+
+#: app/corridor_selector.py
+msgid "Attachment Surface"
+msgstr ""
+
+#: app/corridor_selector.py
+msgid "Flat"
+msgstr ""
+
+#: app/corridor_selector.py
+msgid "Floor"
+msgstr ""
+
+#: app/corridor_selector.py
+msgid "Ceiling"
+msgstr ""
 
 #: app/dialogs.py
 #, fuzzy
@@ -1659,7 +1651,8 @@ msgid "Discord Server..."
 msgstr "Serwer Discord..."
 
 #: app/helpMenu.py
-msgid "aerond's Music Changer..."
+#, fuzzy
+msgid "aerond's Music Package Creator..."
 msgstr "Własna muzyka..."
 
 #: app/helpMenu.py
@@ -1692,6 +1685,14 @@ msgstr "Zgłoś błędy przedmiotów..."
 msgid "Submit Music Bugs..."
 msgstr "Zgłoś błędy przedmiotów..."
 
+#: app/helpMenu.py
+msgid "BEE2 Credits"
+msgstr "Podziękowania BEE2"
+
+#: app/helpMenu.py
+msgid "Credits..."
+msgstr "Podziękowania"
+
 #: app/helpMenu.py app/item_properties.py ui_tk/corridor_selector.py
 #: ui_tk/errors.py
 msgid "Close"
@@ -1719,17 +1720,14 @@ msgstr ""
 msgid "Do you wish to open the following URL?"
 msgstr ""
 
-#: app/helpMenu.py
-msgid "Help"
-msgstr "Pomoc"
+#: app/item_picker.py
+msgid "All Items: "
+msgstr "Wszystkie przedmioty: "
 
-#: app/helpMenu.py
-msgid "BEE2 Credits"
-msgstr "Podziękowania BEE2"
-
-#: app/helpMenu.py
-msgid "Credits..."
-msgstr "Podziękowania"
+#: app/item_picker.py
+#, fuzzy
+msgid "Unknown: <{id}>"
+msgstr "Symbol: {name}"
 
 #: app/item_properties.py
 msgid "BEE2 - {item}"
@@ -1767,6 +1765,18 @@ msgstr "Brak dostępnych właściwości!"
 #: app/item_search.py
 msgid "Search:"
 msgstr "Szukaj:"
+
+#: app/lifecycle.py
+#, fuzzy
+msgid "An error occurred when loading packages:"
+msgid_plural "Multiple errors occurred when loading packages:"
+msgstr[0] ""
+msgstr[1] ""
+msgstr[2] ""
+
+#: app/lifecycle.py
+msgid "Loading packages was partially successful:"
+msgstr ""
 
 #: app/menu_bar.py
 msgid "{game} Puzzle Folder"
@@ -1832,19 +1842,7 @@ msgstr "Muzyka: "
 msgid "Base:"
 msgstr "Baza: "
 
-#: app/music_conf.py
-msgid "Select Background Music - Base"
-msgstr "Wybierz muzykę - Główna"
-
-#: app/music_conf.py
-msgid ""
-"This controls the background music used for a map. Expand the dropdown to"
-" set tracks for specific test elements."
-msgstr ""
-"Ta opcja kontroluje muzykę w tle użytą do mapy. Rozwiń to menu, aby "
-"zobaczyć ścieżki dla konkretnych elementów testowych."
-
-#: app/music_conf.py
+#: app/music_conf.py ui_wx/demo/selector_win.py
 msgid ""
 "Add no music to the map at all. Testing Element-specific music may still "
 "be added."
@@ -1853,18 +1851,42 @@ msgstr ""
 "testowych wciąż może być dodana."
 
 #: app/music_conf.py
+msgid "The regular base track will continue to play normally."
+msgstr ""
+
+#: app/music_conf.py
+msgid "Add no music when jumping on Repulsion Gel."
+msgstr "Nie dodawaj żadnej muzyki podczas skakania na żelu repulsyjnym."
+
+#: app/music_conf.py
+msgid "Add no music while running fast."
+msgstr "Nie graj muzyki przy dużych prędkościach."
+
+#: app/music_conf.py ui_wx/demo/selector_win.py
+msgid "Select Background Music - Base"
+msgstr "Wybierz muzykę - Główna"
+
+#: app/music_conf.py ui_wx/demo/selector_win.py
+msgid ""
+"This controls the background music used for a map. Expand the dropdown to"
+" set tracks for specific test elements."
+msgstr ""
+"Ta opcja kontroluje muzykę w tle użytą do mapy. Rozwiń to menu, aby "
+"zobaczyć ścieżki dla konkretnych elementów testowych."
+
+#: app/music_conf.py ui_wx/demo/selector_win.py
 msgid "Propulsion Gel SFX"
 msgstr "Dźwięk żelu przyspieszającego"
 
-#: app/music_conf.py
+#: app/music_conf.py ui_wx/demo/selector_win.py
 msgid "Repulsion Gel SFX"
 msgstr "Dźwięk żelu repulsyjnego"
 
-#: app/music_conf.py
+#: app/music_conf.py ui_wx/demo/selector_win.py
 msgid "Excursion Funnel Music"
 msgstr "Muzyka w Tubie Transportowej"
 
-#: app/music_conf.py
+#: app/music_conf.py ui_wx/demo/selector_win.py
 msgid "Synced Funnel Music"
 msgstr "Zsynchronizowana muzyka w Tubie"
 
@@ -1877,20 +1899,12 @@ msgid "Set the music used while inside Excursion Funnels."
 msgstr "Wybierz muzykę graną podczas podróży Tubą Transportową."
 
 #: app/music_conf.py
-msgid "The regular base track will continue to play normally."
-msgstr ""
-
-#: app/music_conf.py
 msgid "Select Repulsion Gel Music"
 msgstr "Wybierz muzykę żelu repulsyjnego"
 
 #: app/music_conf.py
 msgid "Select the music played when players jump on Repulsion Gel."
 msgstr "Wybierz muzykę graną podczas podczas skakania na żelu repulsyjnym."
-
-#: app/music_conf.py
-msgid "Add no music when jumping on Repulsion Gel."
-msgstr "Nie dodawaj żadnej muzyki podczas skakania na żelu repulsyjnym."
 
 #: app/music_conf.py
 msgid "Select Propulsion Gel Music"
@@ -1901,10 +1915,6 @@ msgid ""
 "Select music played when players have large amounts of horizontal "
 "velocity."
 msgstr "Wybierz muzykę graną, gdy gracz ma duże wartości prędkości poziomej."
-
-#: app/music_conf.py
-msgid "Add no music while running fast."
-msgstr "Nie graj muzyki przy dużych prędkościach."
 
 #: app/music_conf.py
 msgid "Funnel:"
@@ -2016,7 +2026,7 @@ msgstr ""
 msgid "Enable development options"
 msgstr "Tryb dewelopera"
 
-#: app/optionWindow.py app/packageMan.py app/selector_win.py
+#: app/optionWindow.py app/packageMan.py ui_tk/selector_win.py
 msgid "OK"
 msgstr "OK"
 
@@ -2267,21 +2277,21 @@ msgid "Reload Images"
 msgstr "Ładowanie obrazów"
 
 #: app/optionWindow.py
-msgid "Reload all images in the app. Expect the app to freeze momentarily."
+msgid "Build UI Translations"
 msgstr ""
 
 #: app/optionWindow.py
-msgid "Build UI Translations"
+msgid "Build Package Translations"
+msgstr ""
+
+#: app/optionWindow.py
+msgid "Reload all images in the app. Expect the app to freeze momentarily."
 msgstr ""
 
 #: app/optionWindow.py
 msgid ""
 "Compile '.po' UI translation files into '.mo'. This requires those to "
 "have been downloaded from the source repo."
-msgstr ""
-
-#: app/optionWindow.py
-msgid "Build Package Translations"
 msgstr ""
 
 #: app/optionWindow.py
@@ -2418,11 +2428,6 @@ msgstr "Wypełnij paletę"
 msgid "Enter the name of the group for this palette, or \"\" to ungroup."
 msgstr ""
 
-#: app/richTextBox.py
-#, fuzzy
-msgid "Open \"{url}\" in the default browser?"
-msgstr "Otworzyć \"{url}\" w domyślnej przeglądarce?"
-
 #: app/selector_win.py
 msgid "Color: R={r}, G={g}, B={b}"
 msgstr "Kolory: R={r}, G={g}, B={b}"
@@ -2446,24 +2451,9 @@ msgstr "Sugerowane"
 msgid "Other"
 msgstr "Inne"
 
-#. i18n: 'None' item description
-#: app/selector_win.py
-msgid "Do not add anything."
-msgstr "Nie dodawaj niczego."
-
-#. i18n: 'None' item name.
-#: app/selector_win.py
-msgid "<None>"
-msgstr "<Brak>"
-
-#: app/selector_win.py
-msgid "Play a sample of this item."
-msgstr "Odtwórz próbkę tego przedmiotu"
-
-#: app/selector_win.py
-#, fuzzy
-msgid "Select Suggested"
-msgstr "Sugerowane"
+#: app/itemconfig/__init__.py app/selector_win.py
+msgid "Loading..."
+msgstr ""
 
 #: app/signage_ui.py
 #, fuzzy
@@ -2529,10 +2519,6 @@ msgstr "Właściwości stylów i przedmiotów"
 msgid "Style/Item Properties"
 msgstr "Właściwości stylów i przedmiotów"
 
-#: app/itemconfig/__init__.py
-msgid "Loading..."
-msgstr ""
-
 #: app/itemconfig/color.py
 msgid "Choose a Color"
 msgstr "Wybierz kolor"
@@ -2548,6 +2534,11 @@ msgstr ""
 #: exporting/__init__.py
 msgid "Backup Original Files"
 msgstr ""
+
+#: exporting/__init__.py
+#, fuzzy
+msgid "Backup Puzzles"
+msgstr "Kopia zapasowa map"
 
 #: exporting/__init__.py
 msgid "Copy Compiler"
@@ -2615,10 +2606,16 @@ msgstr ""
 msgid "No compiler files were found in \"{folder}\"."
 msgstr ""
 
-#: exporting/items.py
-msgid ""
-"Style includes old definition for {item}. Override the item package "
-"object instead."
+#: exporting/corridors.py
+msgid "No corridor definitions found for style \"{id}\"!"
+msgstr ""
+
+#: exporting/signage.py
+msgid "Selected signage \"{id}\" does not exist."
+msgstr ""
+
+#: exporting/signage.py
+msgid "Signage \"{id}\"'s {child} \"{sub_id}\" does not exist."
 msgstr ""
 
 #: exporting/vpks.py
@@ -2636,6 +2633,12 @@ msgstr ""
 msgid ""
 "The VPK \"{filename}\" could not be parsed. If this was made by BEE, "
 "delete it, otherwise check if it is corrupt."
+msgstr ""
+
+#: exporting/vpks.py
+msgid ""
+"The vpk_override VPK \"{filename}\" could not be parsed. Contents was "
+"skipped."
 msgstr ""
 
 #: packages/__init__.py
@@ -2677,22 +2680,6 @@ msgstr ""
 
 #: packages/__init__.py
 msgid ""
-"Unknown object type \"{obj_type}\" with ID \"{obj_id}\" in package "
-"\"{pak_id}\"!"
-msgstr ""
-
-#: packages/__init__.py
-msgid ""
-"TemplateBrush \"{id}\" in package \"{pak_id}\" no longer needs to be "
-"defined in info.txt. Use a bee2_template_conf entity instead."
-msgstr ""
-
-#: packages/__init__.py
-msgid "No ID defined for \"{obj_type}\" object type in \"{pak_id}\" package!"
-msgstr ""
-
-#: packages/__init__.py
-msgid ""
 "Duplicate package with id \"{pak_id}\"!\n"
 "If you just updated the mod, delete any old files in packages/.\n"
 "Package 1: {path1}\n"
@@ -2700,9 +2687,37 @@ msgid ""
 msgstr ""
 
 #: packages/__init__.py
-msgid ""
-"The ID \"{obj_id}\" was used twice for a {obj_type} in the packages "
-"\"{pak1}\" and \"{pak2}\"!"
+#, fuzzy
+msgid "{n} option"
+msgid_plural "{n} options"
+msgstr[0] "Brak opcji!"
+msgstr[1] ""
+msgstr[2] ""
+
+#. i18n: Corridor options count
+#: packages/__init__.py
+msgid "The object {id} is missing from loaded packages. Exporting it will fail."
+msgstr ""
+
+#: packages/__init__.py
+msgid "<None>"
+msgstr "<Brak>"
+
+#: packages/__init__.py
+msgid "Do not add anything."
+msgstr "Nie dodawaj niczego."
+
+#: packages/__init__.py
+#, fuzzy
+msgid "Unknown Object"
+msgstr "Ładowanie obiektów"
+
+#: packages/__init__.py
+msgid "???"
+msgstr ""
+
+#: packages/__init__.py
+msgid "This object is missing from loaded packages. Exporting it will fail."
 msgstr ""
 
 #: packages/__init__.py
@@ -2712,9 +2727,14 @@ msgstr "Reset paczek"
 
 #: packages/__init__.py
 msgid ""
-"No Clean Style package! This is required for some essential resources and"
-" objects."
-msgstr ""
+"Critical package missing: {pack}These are required for some essential "
+"resources and objects."
+msgid_plural ""
+"Critical packages missing: {pack}These are required for some essential "
+"resources and objects."
+msgstr[0] ""
+msgstr[1] ""
+msgstr[2] ""
 
 #: packages/__init__.py
 msgid ""
@@ -2734,59 +2754,56 @@ msgstr ""
 msgid "No description!"
 msgstr "Opis:"
 
-#: packages/corridor.py
-msgid ""
-"Duplicate corridor option ID \"{option}\" in corridor group for style "
-"\"{group}\"!"
-msgstr ""
-
 #: packages/quote_pack.py
-msgid "No \"Quotes\" key in config for quote pack {id}!"
-msgstr ""
-
-#: packages/quote_pack.py
-msgid "Multiple \"Quotes\" keys found in config for quote pack {id}!"
-msgstr ""
-
-#: packages/quote_pack.py
-msgid "Invalid response kind \"{name}\" in config for quote pack {id}!"
-msgstr ""
+msgid "<Multiverse Cave only>"
+msgstr "<Tylko Cave z multiwersum>"
 
 #: ui_tk/check_table.py
 msgid "Toggle all checkboxes."
 msgstr "Zaznacz wszystkie pola."
 
-#: ui_tk/core.py
+#: ui_tk/context_win.py
+msgid "Properties:"
+msgstr "Właściwości"
+
+#: ui_tk/context_win.py
+msgid "Description:"
+msgstr "Opis:"
+
+#: ui_tk/context_win.py
+msgid "More Info>>"
+msgstr "Więcej informacji>>"
+
+#: ui_tk/context_win.py
+msgid "Change Defaults..."
+msgstr "Zmień domyślne wartości..."
+
+#: ui_tk/context_win.py
+msgid "Change the default settings for this item when placed."
+msgstr "Zmienia domyślne wartości dla tego przedmiotu w edytorze."
+
+#: ui_tk/context_win.py
 #, fuzzy
-msgid "An error occurred when loading packages:"
-msgid_plural "Multiple errors occurred when loading packages:"
-msgstr[0] ""
-msgstr[1] ""
-msgstr[2] ""
+msgid "Select Signage..."
+msgstr "Sugerowane"
 
-#: ui_tk/core.py
-msgid "Loading packages was partially successful:"
+#: ui_tk/context_win.py
+msgid "Change which signs are specified by each timer value."
 msgstr ""
 
-#: ui_tk/corridor_selector.py
-msgid "BEEmod - Select Corridor"
-msgstr ""
+#: ui_tk/rich_textbox.py
+#, fuzzy
+msgid "Open \"{url}\" in the default browser?"
+msgstr "Otworzyć \"{url}\" w domyślnej przeglądarce?"
 
-#: ui_tk/corridor_selector.py
-msgid "Use Only This"
-msgstr ""
+#: ui_tk/selector_win.py
+msgid "Play a sample of this item."
+msgstr "Odtwórz próbkę tego przedmiotu"
 
-#: ui_tk/corridor_selector.py
-msgid "Flat"
-msgstr ""
-
-#: ui_tk/corridor_selector.py
-msgid "Upward"
-msgstr ""
-
-#: ui_tk/corridor_selector.py
-msgid "Downward"
-msgstr ""
+#: ui_tk/selector_win.py ui_wx/selector_win.py
+#, fuzzy
+msgid "Select Suggested"
+msgstr "Sugerowane"
 
 #~ msgid "Corridor"
 #~ msgstr "Korytarz"
@@ -2890,4 +2907,16 @@ msgstr ""
 #~ "Portal-gun i Paint-gun nie będą"
 #~ " tam działały - zweryfikuj cache, aby"
 #~ " to naprawić."
+
+#~ msgid ""
+#~ "Allow placing and deleting the mandatory"
+#~ " Entry/Exit Doors and Large Observation "
+#~ "Room. Use with caution, this can "
+#~ "have weird results!"
+#~ msgstr ""
+#~ "Umożliwia umieszczanie i usuwanie niezbędnych"
+#~ " drzwi wejściowych i wyjściowych oraz "
+#~ "dużego pokoju obserwacyjnego. Używaj z "
+#~ "ostrożnością, może to powodować dziwne "
+#~ "rezultaty!"
 
