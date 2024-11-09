@@ -1741,7 +1741,3 @@ async def main(argv: list[str]) -> None:
             )
 
     LOGGER.info("BEE2 VBSP hook finished!")
-
-
-if __name__ == '__main__':
-    trio.run(main)

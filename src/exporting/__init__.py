@@ -2,7 +2,7 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
-from collections.abc import Callable, Mapping
+from collections.abc import Mapping
 from enum import Enum, auto
 from pathlib import PurePath
 import os
@@ -13,10 +13,10 @@ import srctools.logger
 import trio
 
 from app import DEV_MODE
-from app.errors import ErrorUI, Result as ErrorResult, WarningExc
+from app.errors import ErrorUI, Result as ErrorResult
 from editoritems import Item as EditorItem, Renderable, RenderableType
 # noinspection PyProtectedMember
-from packages import PackagesSet, ExportKey, _ExportValue, Style
+from packages import ExportKey, _ExportValue, Style
 from step_order import StepOrder
 from transtoken import TransToken
 import config as config_mod

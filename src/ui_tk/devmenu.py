@@ -29,7 +29,7 @@ def dump_widgets() -> None:
         """Dump em."""
         f.write(f'{indent}{widget} ({type(widget).__qualname__})')
         if widget in label_to_user:
-            f.write(f'.img = {label_to_user[widget].cur_handle!r}')
+            f.write(f'.img = {label_to_user[widget].cur_handle!r}')  # type: ignore
         children = widget.winfo_children()
         if children:
             indent += '\t'

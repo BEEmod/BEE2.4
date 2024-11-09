@@ -434,7 +434,11 @@ class ParseData(PackErrorInfo):
     def warn_auth(self, warning: AppError | TransToken, /) -> None: ...
     @overload
     def warn_auth(self, package: utils.SpecialID, warning: AppError | TransToken) -> None: ...
-    def warn_auth(self, package: utils.SpecialID | AppError | TransToken, warning: AppError | TransToken | None = None) -> None:
+    def warn_auth(
+        self,
+        package: utils.SpecialID | AppError | TransToken,
+        warning: AppError | TransToken | None = None,
+    ) -> None:
         """If this package/the specified package is a developer one, emit a warning."""
         if isinstance(package, str):
             if warning is None:
@@ -447,7 +451,11 @@ class ParseData(PackErrorInfo):
     def warn_auth_fatal(self, warning: AppError | TransToken, /) -> None: ...
     @overload
     def warn_auth_fatal(self, package: utils.SpecialID, warning: AppError | TransToken) -> None: ...
-    def warn_auth_fatal(self, package: utils.SpecialID | AppError | TransToken, warning: AppError | TransToken | None = None) -> None:
+    def warn_auth_fatal(
+        self,
+        package: utils.SpecialID | AppError | TransToken,
+        warning: AppError | TransToken | None = None,
+    ) -> None:
         """If this package/the specified package is a developer one, emit a fatal warning."""
         if isinstance(package, str):
             if warning is None:
