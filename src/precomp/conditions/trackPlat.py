@@ -73,7 +73,7 @@ def res_track_plat(vmf: VMF, res: Keyvalues) -> object:
     platforms = []
     for inst in vmf.by_class['func_instance']:
         match inst['file'].casefold():
-            case fnames.track_bottom | fnames.track_mid | fnames.track_top:
+            case fnames.track_bottom | fnames.track_mid | fnames.track_top | fnames.track_single:
                 track_instances[FrozenVec.from_str(inst['origin'])] = inst
             case fnames.bottom_grate:
                 track_grate_instances[FrozenVec.from_str(inst['origin'])] = inst
