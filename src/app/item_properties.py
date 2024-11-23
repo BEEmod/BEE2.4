@@ -318,7 +318,7 @@ class PistonPropGroup(PropGroup):
         super().__init__(parent, tk_img, TransToken.ui('Position: '))
         self.platform = 0
         self.destination = 1
-        self.cur_drag: Literal['plat', 'dest', None] = None
+        self.cur_drag: Literal['plat', 'dest'] | None = None
         self.readonly = False
 
         self.canvas = tk.Canvas(self.frame, width=250, height=66)
@@ -410,7 +410,7 @@ class PistonPropGroup(PropGroup):
         pos = round((x - self.BASE_OFF) / self.MOVE_DIST)
         return max(0, min(4, pos))
 
-    def get_hit(self, x: int) -> Literal['plat', 'dest', None]:
+    def get_hit(self, x: int) -> Literal['plat', 'dest'] | None:
         """Figure out which sprite is being clicked on."""
         pist_pos = self._pos2x(self.platform)
         dest_pos = self._pos2x(self.destination)

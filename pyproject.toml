@@ -47,7 +47,7 @@ select = [
 	"PLC", "PLE", "PLW",  # Pylint.
 	"YTT",
 
-	"TCH005",  # Empty type-checking block.
+	"TC005",  # Empty type-checking block.
 ]
 allowed-confusables = [
 	"×",  # Multiplication sign
@@ -62,9 +62,6 @@ extend-ignore = [
 	"F841",  # Unused local triggers on partial unpacks.
 
 	# Flake8-annotations.
-	# Type annotations for self & cls are not important.
-	"ANN101",
-	"ANN102",
 	"ANN401",  # Allow typing.Any
 
 	# Ruff:

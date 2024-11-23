@@ -3,7 +3,7 @@
 """
 from __future__ import annotations
 
-from typing import Protocol
+from typing import NewType, Protocol
 import decimal
 import operator
 
@@ -373,8 +373,9 @@ def res_replace_instance(vmf: VMF, inst: Entity, res: Keyvalues) -> None:
     new_ent['targetname'] = inst['targetname']
 
 
-GLOBAL_INPUT_ENTS: dict[str | None | object, Entity] = {}
-ON_LOAD = object()
+OnLoad = NewType('OnLoad', object)
+GLOBAL_INPUT_ENTS: dict[str | OnLoad | None, Entity] = {}
+ON_LOAD = OnLoad(object())
 
 
 @conditions.make_result('GlobalInput')
