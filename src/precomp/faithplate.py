@@ -85,7 +85,7 @@ def associate_faith_plates(vmf: VMF) -> None:
         # Conveniently, we can determine what sort of catapult was made by
         # examining the local name used.
         if name.endswith('-helperTrigger'):
-            name = name.removesuffix('helperTrigger')
+            name = name.removesuffix('-helperTrigger')
             helper_trigs[name] = trig
             # Also store None in the main trigger if no key is there,
             # so we can detect missing main triggers...
@@ -192,7 +192,7 @@ def associate_faith_plates(vmf: VMF) -> None:
         try:
             pos = target_to_pos[name]
         except KeyError:
-            LOGGER.warning('Faith plate "{}" has no position or helper trig?')
+            LOGGER.warning('Faith plate "{}" has no position or helper trig?', name)
         else:
             PLATES[name] = AngledPlate(
                 inst=instances[name],
