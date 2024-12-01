@@ -16,6 +16,7 @@ utils.fix_cur_directory()
 # prompt.
 LOGGER = srctools.logger.init_logging(main_logger=__name__)
 
+import abc
 import os
 import sys
 import logging
@@ -25,20 +26,78 @@ from typing import List, Optional
 
 from srctools import AtomicWriter
 from srctools.filesys import RawFileSystem
+from async_util import EdgeTrigger
+from trio_util import AsyncBool
 import trio
 
 from BEE2_config import GEN_OPTS, get_package_locs
 from packages import (
-    get_loaded_packages, find_packages,
-    LOGGER as packages_logger
+    get_loaded_packages, find_packages, Package,
+    LOGGER as packages_logger,
 )
 from app.errors import ErrorUI, console_handler
-import utils
+from app import ReflowWindow
 
 # If true, user said * for packages - use last for all.
 PACKAGE_REPEAT: Optional[RawFileSystem] = None
 SKIPPED_FILES: List[str] = []
 CONF = utils.conf_location('last_package_sync.txt')
+
+
+class SyncUIBase(ReflowWindow, abc.ABC):
+    """Interface to the GUI portion.."""
+    def __init__(self) -> None:
+        """Setup async values used to store configuration."""
+        super().__init__()
+        # First file -> package selector.
+        self.pack_sort_by_id = AsyncBool()
+        self.applies_to_all = AsyncBool()
+        # Packages to pick from, in order.
+        self.packages: list[Package] = []
+        self.selected_pack: EdgeTrigger[Package | None] = EdgeTrigger()
+
+        # Then final confirm dialog.
+        self.files: list[tuple[Path, Path]] = []
+        self.confirmed = trio.Event()
+
+    async def pack_btn_task(self) -> None:
+        """Handles marking buttons dirty whenever sorting changes."""
+        async with self.pack_sort_by_id.eventual_values() as agen:
+            async for sort_id in agen:
+                if sort_id:
+                    self.packages.sort(key=lambda pack: pack.id)
+                else:
+                    self.packages.sort(key=lambda pack: str(pack.disp_name))
+                self.item_pos_dirty.set()
+
+    async def ask_package(self, src: Path, dest: Path) -> Package | None:
+        """Ask for the package this file should use."""
+        self.applies_to_all.value = False
+        self.ui_set_ask_pack(src, dest)
+        return await self.selected_pack.wait()
+
+    async def ask_confirm(self, files: list[tuple[Path, Path]]) -> list[tuple[Path, Path]]:
+        """Confirm the files are correct."""
+        self.files = files
+        self.confirmed = trio.Event()
+        self.ui_set_confirm_files()
+        await self.confirmed.wait()
+        return self.ui_get_files()
+
+    @abc.abstractmethod
+    def ui_set_ask_pack(self, src: Path, des: Path) -> None:
+        """Set the displayed filenames for asked packages."""
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def ui_set_confirm_files(self) -> None:
+        """Set the files in the big confirm list."""
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def ui_get_files(self) -> list[tuple[Path, Path]]:
+        """Get the list of selected files."""
+        raise NotImplementedError
 
 
 class SkipPackage(Exception):
