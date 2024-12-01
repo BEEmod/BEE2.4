@@ -219,7 +219,7 @@ async def main(files: List[str]) -> int:
 
     print_package_ids()
 
-    package_loc = Path('..', GEN_OPTS['Directories']['package']).resolve()
+    package_loc = Path('../..', GEN_OPTS['Directories']['package']).resolve()
 
     file_list: List[Path] = []
 
