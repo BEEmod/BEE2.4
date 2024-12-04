@@ -7,15 +7,17 @@ from collections.abc import Iterable, Iterator, ItemsView, MutableMapping
 from collections import deque
 from typing import Any
 from enum import Enum
+import math
 
 from srctools import FrozenVec, Vec, Matrix, VMF
 
 import srctools.logger
 from typing_extensions import Self
 
+import consts
+import editoritems
 import user_errors
 import utils
-import editoritems
 
 
 LOGGER = srctools.logger.get_logger(__name__)
@@ -132,6 +134,12 @@ BLOCK_LOOKUP['pit'] = {
 
 type _GridKeys = Vec | FrozenVec | tuple[float, float, float] | slice
 
+# The largest distance you could possibly move is along the diagonal, plus a little more
+# for embeds etc.
+MAX_CAST: int = math.ceil(math.hypot(
+    consts.MAX_CHAMBER_VOXELS, consts.MAX_CHAMBER_VOXELS, consts.MAX_CHAMBER_VOXELS,
+) + 16)
+
 
 def _conv_key(pos: _GridKeys) -> FrozenVec:
     """Convert the key given in [] to a grid-position, as an x,y,z tuple."""
@@ -199,9 +207,7 @@ class Grid(MutableMapping[_GridKeys, Block]):
         start_pos = pos = Vec(*_conv_key(pos))
         direction_v = Vec(direction)
         collide_set = frozenset(collide)
-        # 50x50x50 diagonal = 86, so that's the largest distance
-        # you could possibly move.
-        for _ in range(90):
+        for _ in range(MAX_CAST):
             next_pos = pos + direction_v
             block = super().get(next_pos.freeze(), Block.VOID)
             if block is Block.VOID:
@@ -213,7 +219,7 @@ class Grid(MutableMapping[_GridKeys, Block]):
                 return pos
             pos = next_pos
         # We should always hit VOID at some point before this.
-        raise ValueError('Moved too far! (> 90)')
+        raise ValueError(f'Moved too far! (> {MAX_CAST})')
 
     def raycast_world(
         self,
@@ -279,6 +285,11 @@ class Grid(MutableMapping[_GridKeys, Block]):
 
         has_attr: set[str] = set()
 
+        # Exclude entities outside the main area - elevators mainly.
+        # The border should never be set to air!
+        ENT_MIN = Vec(0, 0, 0)
+        ENT_MAX = Vec(consts.MAX_CHAMBER_VOXELS, consts.MAX_CHAMBER_VOXELS, consts.MAX_CHAMBER_VOXELS)
+
         for ent in vmf.entities:
             str_pos = ent['origin', None]
             if str_pos is None:
@@ -286,9 +297,7 @@ class Grid(MutableMapping[_GridKeys, Block]):
 
             pos = world_to_grid(Vec.from_str(str_pos))
 
-            # Exclude entities outside the main area - elevators mainly.
-            # The border should never be set to air!
-            if not ((0, 0, 0) <= pos <= (25, 25, 25)):
+            if not (ENT_MIN <= pos <= ENT_MAX):
                 continue
 
             # We need to manually set EmbeddedVoxel locations.

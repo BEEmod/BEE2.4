@@ -339,6 +339,8 @@ class DefaultItems(Enum):
     extent_piston = 'ITEM_PISTON_PLATFORM_EXTENT'
     extent_track = 'ITEM_RAIL_PLATFORM_EXTENT'
 
+# Maximum number of chamber voxels. It can be larger, if embed spaces extend further.
+MAX_CHAMBER_VOXELS: Final = 25
 
 # Outputs we need to use to make a math_counter act like
 # the specified logic gate.
