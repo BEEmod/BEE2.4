@@ -1,6 +1,7 @@
 """UI implementation for the packages-sync tool."""
+import contextlib
 from collections.abc import Callable
-from pathlib import Path
+from pathlib import Path, PurePath
 from typing import Awaitable
 
 import trio
@@ -29,7 +30,7 @@ class WxUI(SyncUIBase):
         self.pan_pack = wx.Panel(self.frm_pack)
         pan_pack_header = wx.Panel(self.pan_pack, style=wx.BORDER_RAISED)
         sizer_pack_vert = wx.BoxSizer(wx.VERTICAL)
-        sizer_pack_vert.Add(pan_pack_header, 0, wx.EXPAND | wx.FIXED_MINSIZE, 0)
+        sizer_pack_vert.Add(pan_pack_header, 0, wx.EXPAND, 0)
 
         sizer_pan_header = wx.BoxSizer(wx.HORIZONTAL)
         sizer_actions = wx.BoxSizer(wx.VERTICAL)
@@ -116,31 +117,48 @@ class WxUI(SyncUIBase):
         """Run the WX loop."""
         async def init(nursery: trio.Nursery) -> None:
             """Run the app."""
+            nursery.start_soon(ui._can_confirm_task)
             await func(ui, nursery, files)
         ui = cls()
         start_main(init)
 
-    def ui_set_ask_pack(self, src: Path, des: Path) -> None:
-        self.lbl_file_src.LabelText = str(src)
-        self.lbl_file_dest.LabelText = str(src)
-        self.dialog_confirm.Show()
+    async def _applies_to_all_task(self) -> None:
+        """Update the checkbox when the value changes."""
+        async with contextlib.aclosing(self.applies_to_all.eventual_values()) as agen:
+            async for self.check_apply_all.Value in agen:
+                pass
 
-    def evt_confirm_ok(self, event: wx.Event) -> None:
-        """Files were confirmed, continue."""
-        self.dialog_confirm.Hide()
-        self.confirmed.set()
+    async def _can_confirm_task(self) -> None:
+        """Disable the confirm button when files flow in."""
+        async with contextlib.aclosing(self.can_confirm.eventual_values()) as agen:
+            async for self.button_ok.Enabled in agen:
+                pass
+
+    def ui_set_ask_pack(self, src: Path, dest: PurePath, /) -> None:
+        self.lbl_file_src.LabelText = str(src)
+        self.lbl_file_dest.LabelText = str(dest)
+        self.frm_pack.Show()
+
+    def evt_skip(self, event: wx.Event) -> None:
+        """Skip the specified file."""
+        self.selected_pack.trigger(None)
+        self.frm_pack.Hide()
+
+    def evt_confirm_ok(self, event: wx.Event, /) -> None:
+        """Files were confirmed, process them."""
+        if self.can_confirm.value:
+            self.confirmed.set()
 
     def evt_confirm_cancel(self, event: wx.Event) -> None:
         """Confirm screen was hidden, abort all."""
         for i in range(self.check_confirm.Count):
             self.check_confirm.Check(i, False)
-        self.dialog_confirm.Hide()
         self.confirmed.set()
 
-    def _ui_calc_columns(self) -> int:
+    def _ui_calc_columns(self, /) -> int:
         return 0  # Not used
 
-    async def _ui_reposition_items(self) -> None:
+    async def _ui_reposition_items(self, /) -> None:
         def make_func(pack: Package) -> Callable[[wx.CommandEvent], None]:
             """Create the event handler."""
             def func(evt: wx.CommandEvent):
@@ -155,14 +173,19 @@ class WxUI(SyncUIBase):
             btn = wx.Button(self.pan_pack, wx.ID_ANY, f"{pack.disp_name}\n<{pack.id}>")
             btn.Bind(wx.EVT_BUTTON, make_func(pack))
             self.sizer_packages.Add(btn, flags)
+        self.frm_pack.Layout()
 
-    def ui_set_confirm_files(self) -> None:
+    def ui_reset(self, /) -> None:
+        """Reset the list of confirmed items, and the 'applies to all' checkbox."""
         self.check_confirm.Clear()
-        for tup in self.files:
-            src, dest = tup
-            self.check_confirm.Append(f'{src}\n->{dest}', tup)
+        self.applies_to_all.value = False
 
-    def ui_get_files(self) -> list[tuple[Path, Path]]:
+    def ui_add_confirm_file(self, src: trio.Path, dest: trio.Path, /) -> None:
+        self.check_confirm.Append(f'{src}\n->{dest}', (src, dest))
+        self.dialog_confirm.Layout()
+        self.dialog_confirm.Show()
+
+    def ui_get_files(self, /) -> list[tuple[trio.Path, trio.Path]]:
         """Get selected files."""
         return [
             self.check_confirm.GetClientData(ind)
