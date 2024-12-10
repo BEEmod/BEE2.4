@@ -154,7 +154,7 @@ def res_python_setup(res: Keyvalues) -> conditions.ResultCallable:
             ast.arg(var_name)
             for var_name in variable_order
         ],
-        kw_defaults=[], 
+        kw_defaults=[None] * len(variable_order),
         kwarg=None, 
         defaults=[],
         posonlyargs=[],
@@ -183,7 +183,7 @@ def res_python_setup(res: Keyvalues) -> conditions.ResultCallable:
 
     def apply_operation(inst: Entity) -> None:
         """Run the operation."""
-        result = compiled_func({
+        result = compiled_func(**{
             var_name: conv_func(inst.fixup[var_name])
             for var_name, conv_func in variables.items()
         })
