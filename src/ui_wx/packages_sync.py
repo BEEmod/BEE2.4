@@ -7,10 +7,15 @@ from typing import Awaitable
 import trio
 import wx
 
+import app
 from app.packages_sync import SyncUIBase
 from packages import Package
 from . import MAIN_WINDOW
 from .core import start_main
+
+
+def quit(evt: wx.Event):
+    app.quit_app()
 
 
 class WxUI(SyncUIBase):
@@ -76,43 +81,35 @@ class WxUI(SyncUIBase):
         # -----------------------
         # Now the confirm window.
         # -----------------------
-        self.dialog_confirm = wx.Dialog(
-            MAIN_WINDOW,
-            title="Confirm File",
-            style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER,
-        )
+        MAIN_WINDOW.SetTitle("BEE2 Packages Sync")
         sizer_confirm = wx.BoxSizer(wx.VERTICAL)
 
-        label_confirm = wx.StaticText(self.dialog_confirm, wx.ID_ANY, "Confirm copying files:")
+        label_confirm = wx.StaticText(MAIN_WINDOW, wx.ID_ANY, "Confirm copying files:")
         sizer_confirm.Add(label_confirm)
 
         self.check_confirm = wx.CheckListBox(
-            self.dialog_confirm, wx.ID_ANY,
+            MAIN_WINDOW, wx.ID_ANY,
             choices=[], style=wx.LB_ALWAYS_SB | wx.LB_MULTIPLE,
         )
         sizer_confirm.Add(self.check_confirm, wx.SizerFlags(1).Expand())
 
-        sizer_confirm_btn = wx.StdDialogButtonSizer()
+        sizer_confirm_btn = wx.BoxSizer(wx.HORIZONTAL)
         sizer_confirm.Add(sizer_confirm_btn, wx.SizerFlags().CenterHorizontal().Border(wx.ALL, 4))
 
-        self.button_ok = wx.Button(self.dialog_confirm, wx.ID_OK, "")
+        self.button_ok = wx.Button(MAIN_WINDOW, wx.ID_OK, "")
         self.button_ok.SetDefault()
-        sizer_confirm_btn.AddButton(self.button_ok)
+        sizer_confirm_btn.Add(self.button_ok)
 
-        self.button_skip = wx.Button(self.dialog_confirm, label="Skip")
-        sizer_confirm_btn.AddButton(self.button_skip)
+        self.button_skip = wx.Button(MAIN_WINDOW, label="Skip")
+        sizer_confirm_btn.Add(self.button_skip)
 
-        sizer_confirm_btn.Realize()
-
-        self.dialog_confirm.SetSizer(sizer_confirm)
-        sizer_confirm.Fit(self.dialog_confirm)
-        self.dialog_confirm.Bind(wx.EVT_CLOSE, self.evt_confirm_skip)
+        MAIN_WINDOW.SetSizer(sizer_confirm)
+        sizer_confirm.Fit(MAIN_WINDOW)
+        MAIN_WINDOW.Bind(wx.EVT_CLOSE, lambda evt: app.quit_app())
         self.button_skip.Bind(wx.EVT_BUTTON, self.evt_confirm_skip)
         self.button_ok.Bind(wx.EVT_BUTTON, self.evt_confirm_ok)
 
-        self.dialog_confirm.SetAffirmativeId(self.button_ok.GetId())
-        self.dialog_confirm.SetEscapeId(self.button_skip.GetId())
-        self.dialog_confirm.Layout()
+        MAIN_WINDOW.Layout()
 
     @classmethod
     def run_loop(
@@ -194,8 +191,6 @@ class WxUI(SyncUIBase):
 
     def ui_add_confirm_file(self, src: trio.Path, dest: trio.Path, /) -> None:
         self.check_confirm.Append(f'{src}\n->{dest}', (src, dest))
-        self.dialog_confirm.Layout()
-        self.dialog_confirm.Show()
 
     def ui_get_files(self, /) -> list[tuple[trio.Path, trio.Path]]:
         """Get selected files."""

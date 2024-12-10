@@ -24,6 +24,7 @@ from srctools.filesys import RawFileSystem
 import trio_util
 from srctools.mdl import MDL_EXTS
 
+import app
 from async_util import EdgeTrigger
 from trio_util import AsyncBool
 import trio
@@ -431,8 +432,11 @@ async def start_server(ui: SyncUIBase, core_nursery: trio.Nursery, files: list[s
         # Prime with our own file list.
         for file in files:
             await send_file.send(Path(file))
-        # Now start the GUI
-        await main_gui(ui, core_nursery, rec_file)
+        # Now start the GUI.
+        with app.QUIT_SCOPE:
+            await main_gui(ui, core_nursery, rec_file)
+        # Quit, shut down the server.
+        nursery.cancel_scope.cancel()
 
 
 if __name__ == '__main__':
