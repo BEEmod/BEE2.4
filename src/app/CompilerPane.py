@@ -807,14 +807,14 @@ async def init_application(nursery: trio.Nursery) -> None:
     """Initialise when standalone."""
     global window
     from ui_tk.img import TK_IMG
-    from app import _APP_QUIT_SCOPE
+    from app import QUIT_SCOPE
     window = cast(SubPane.SubPane, TK_ROOT)
     wid_transtoken.set_win_title(window, TransToken.ui(
         'Compiler Options - {ver}',
     ).format(ver=utils.BEE_VERSION))
     window.resizable(True, False)
 
-    with _APP_QUIT_SCOPE:
+    with QUIT_SCOPE:
         await nursery.start(make_widgets, TK_IMG)
 
         TK_ROOT.deiconify()
