@@ -1,12 +1,15 @@
 """UI implementation for the packages-sync tool."""
 from collections.abc import Callable
 from pathlib import Path
+from typing import Awaitable
 
+import trio
 import wx
 
 from app.packages_sync import SyncUIBase
 from packages import Package
 from . import MAIN_WINDOW
+from .core import start_main
 
 
 class WxUI(SyncUIBase):
@@ -23,8 +26,8 @@ class WxUI(SyncUIBase):
                   | wx.CLOSE_BOX | wx.RESIZE_BORDER
                   | wx.STAY_ON_TOP | wx.SYSTEM_MENU,
         )
-        self.pan_pack = wx.Panel(self, wx.ID_ANY)
-        pan_pack_header = wx.Panel(self.pan_pack, wx.ID_ANY, style=wx.BORDER_RAISED)
+        self.pan_pack = wx.Panel(self.frm_pack)
+        pan_pack_header = wx.Panel(self.pan_pack, style=wx.BORDER_RAISED)
         sizer_pack_vert = wx.BoxSizer(wx.VERTICAL)
         sizer_pack_vert.Add(pan_pack_header, 0, wx.EXPAND | wx.FIXED_MINSIZE, 0)
 
@@ -32,26 +35,26 @@ class WxUI(SyncUIBase):
         sizer_actions = wx.BoxSizer(wx.VERTICAL)
         sizer_pan_header.Add(sizer_actions, 0, wx.ALL, 4)
 
-        self.btn_skip = wx.Button(pan_pack_header, wx.ID_ANY, "Skip")
+        self.btn_skip = wx.Button(pan_pack_header, label="Skip")
         sizer_actions.Add(self.btn_skip, 0, 0, 0)
 
-        self.check_apply_all = wx.CheckBox(pan_pack_header, wx.ID_ANY, "Apply To All")
+        self.check_apply_all = wx.CheckBox(pan_pack_header, label="Apply To All")
         sizer_actions.Add(self.check_apply_all, 0, 0, 0)
 
         sizer_paths = wx.BoxSizer(wx.VERTICAL)
         sizer_pan_header.Add(sizer_paths, 1, wx.EXPAND, 0)
 
-        self.lbl_file_src = wx.StaticText(pan_pack_header, wx.ID_ANY, "")
+        self.lbl_file_src = wx.StaticText(pan_pack_header)
         sizer_paths.Add(self.lbl_file_src, 0, wx.ALIGN_CENTER_HORIZONTAL, 0)
 
-        lbl_arrow_down = wx.StaticText(pan_pack_header, wx.ID_ANY, "VVV")
+        lbl_arrow_down = wx.StaticText(pan_pack_header, label="VVV")
         sizer_paths.Add(lbl_arrow_down, 0, wx.ALIGN_CENTER_HORIZONTAL, 0)
 
-        self.lbl_file_dest = wx.StaticText(pan_pack_header, wx.ID_ANY, "")
+        self.lbl_file_dest = wx.StaticText(pan_pack_header)
         sizer_paths.Add(self.lbl_file_dest, 0, wx.ALIGN_CENTER_HORIZONTAL, 0)
 
         self.radio_sort_order = wx.RadioBox(
-            pan_pack_header, wx.ID_ANY, "Sort Order",
+            pan_pack_header, label="Sort Order",
             choices=["Name", "ID"], majorDimension=2,
             style=wx.RA_SPECIFY_ROWS,
         )
@@ -83,7 +86,7 @@ class WxUI(SyncUIBase):
         sizer_confirm.Add(self.check_confirm, wx.SizerFlags(1).Expand())
 
         sizer_confirm_btn = wx.StdDialogButtonSizer()
-        sizer_confirm.Add(sizer_confirm_btn, wx.SizerFlags().CenterHorizontal().Border(4))
+        sizer_confirm.Add(sizer_confirm_btn, wx.SizerFlags().CenterHorizontal().Border(wx.ALL, 4))
 
         self.button_ok = wx.Button(self.dialog_confirm, wx.ID_OK, "")
         self.button_ok.SetDefault()
@@ -103,6 +106,19 @@ class WxUI(SyncUIBase):
         self.dialog_confirm.SetAffirmativeId(self.button_ok.GetId())
         self.dialog_confirm.SetEscapeId(self.button_cancel.GetId())
         self.dialog_confirm.Layout()
+
+    @classmethod
+    def run_loop(
+        cls,
+        func: Callable[['SyncUIBase', trio.Nursery, list[str]], Awaitable[object]],
+        files: list[str],
+    ) -> None:
+        """Run the WX loop."""
+        async def init(nursery: trio.Nursery) -> None:
+            """Run the app."""
+            await func(ui, nursery, files)
+        ui = cls()
+        start_main(init)
 
     def ui_set_ask_pack(self, src: Path, des: Path) -> None:
         self.lbl_file_src.LabelText = str(src)

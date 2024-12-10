@@ -8,13 +8,6 @@ they will be copied to any packages with those resources.
 The destination will be 'Portal 2/bee2_dev/' if that exists, or 'Portal 2/bee2/'
 otherwise.
 """
-import utils
-import srctools.logger
-
-utils.fix_cur_directory()
-# Don't write to a log file, users of this should be able to handle a command
-# prompt.
-LOGGER = srctools.logger.init_logging(main_logger=__name__)
 
 import abc
 import os
@@ -22,11 +15,12 @@ import sys
 import logging
 import shutil
 import math
-from contextlib import AsyncExitStack
+from collections.abc import Awaitable, Callable
+from contextlib import ExitStack
 from pathlib import Path
 from typing import List, Optional
 
-from srctools import AtomicWriter
+from srctools import AtomicWriter, logger
 from srctools.filesys import RawFileSystem
 from async_util import EdgeTrigger
 from trio_util import AsyncBool
@@ -37,16 +31,18 @@ from packages import (
     get_loaded_packages, find_packages, Package,
     LOGGER as packages_logger,
 )
-from app.errors import ErrorUI, console_handler
+from app.errors import ErrorUI
 from app import ReflowWindow
+import utils
 
 # If true, user said * for packages - use last for all.
 PACKAGE_REPEAT: Optional[RawFileSystem] = None
 SKIPPED_FILES: List[str] = []
+LOGGER = logger.get_logger(__name__)
 CONF = utils.conf_location('last_package_sync.txt')
 
-FILE_MUTEX = trio.Path(utils.install_path('package_sync_mutex'))
-FILE_SERVER = trio.Path(utils.install_path('package_sync_server.json'))
+FILE_MUTEX = utils.install_path('package_sync_mutex')
+FILE_SERVER = utils.install_path('package_sync_server.json')
 
 
 class SyncUIBase(ReflowWindow, abc.ABC):
@@ -88,6 +84,16 @@ class SyncUIBase(ReflowWindow, abc.ABC):
         self.ui_set_confirm_files()
         await self.confirmed.wait()
         return self.ui_get_files()
+
+    @classmethod
+    @abc.abstractmethod
+    def run_loop(
+        cls,
+        func: Callable[['SyncUIBase', trio.Nursery, list[str]], Awaitable[object]],
+        files: list[str],
+    ) -> None:
+        """Start the main loop for the GUI."""
+        raise NotImplementedError
 
     @abc.abstractmethod
     def ui_set_ask_pack(self, src: Path, des: Path) -> None:
@@ -245,8 +251,12 @@ def print_package_ids() -> None:
     print()
 
 
-async def main(files: trio.MemoryReceiveChannel[str]) -> int:
-    """Run the transfer."""
+async def main_gui(
+    files: trio.MemoryReceiveChannel[str],
+    scope: trio.CancelScope,
+    ui: SyncUIBase,
+) -> int:
+    """Run the main GUI."""
     try:
         portal2_loc = Path(os.environ['PORTAL_2_LOC'])
     except KeyError:
@@ -263,15 +273,14 @@ async def main(files: trio.MemoryReceiveChannel[str]) -> int:
 
     # Disable logging of package info.
     packages_logger.setLevel(logging.ERROR)
-    with ErrorUI.install_handler(console_handler):
-        async with ErrorUI() as errors, trio.open_nursery() as nursery:
-            for loc in get_package_locs():
-                nursery.start_soon(
-                    find_packages,
-                    errors,
-                    get_loaded_packages(),
-                    loc,
-                )
+    async with ErrorUI() as errors, trio.open_nursery() as nursery:
+        for loc in get_package_locs():
+            nursery.start_soon(
+                find_packages,
+                errors,
+                get_loaded_packages(),
+                loc,
+            )
     packages_logger.setLevel(logging.INFO)
 
     LOGGER.info('Done!')
@@ -317,46 +326,70 @@ async def main(files: trio.MemoryReceiveChannel[str]) -> int:
     return 0
 
 
-async def init(args: list[str]) -> int:
+async def communicate(stack: ExitStack, files: list[str]) -> bool:
     """Determine if an existing instance is present, or spawn a new one."""
-    async with AsyncExitStack() as stack:
-        # Eventually time out if we fail to find anything.
-        with trio.fail_after(5.0):
-            while True:
-                # First, try to open the mutex file. If we succeed, we're definitely the server.
+    # Eventually time out if we fail to find anything.
+    with trio.fail_after(5.0):
+        while True:
+            # First, try to open the mutex file. If we succeed, we're definitely the server.
+            try:
+                # TODO: use os.O_TEMPORARY?
+                stack.enter_context(open(FILE_MUTEX, 'x'))
+                return False  # We're the server.
+            except FileExistsError:
+                # It exists, try to delete - will fail if still alive.
                 try:
-                    file = await stack.enter_async_context(await FILE_MUTEX.open('x'))
-                except FileExistsError:
-                    # It exists, try to delete - will fail if still alive.
+                    FILE_MUTEX.unlink()
+                except PermissionError:
+                    # Server is alive. Read and try to connect.
                     try:
-                        await FILE_MUTEX.unlink()
-                    except PermissionError:
-                        # Server is alive. Read and try to connect.
-                        try:
-                            port = int(await FILE_SERVER.read_text())
-                            stream = await trio.open_tcp_stream('localhost', port)
-                        except (IOError, OSError, ValueError):
-                            # Might be starting up, try again
-                            await trio.sleep(0.1)
-                        else:
-                            # Connected, send our files and quit.
-                            print(f'Connected to server with port {port}')
-                            async with stream:
-                                for file in args:
-                                    await stream.send_all((file + '\n').encode('utf8'))
-                            return 0
+                        port = int(FILE_SERVER.read_text())
+                        stream = await trio.open_tcp_stream('localhost', port)
+                    except (IOError, OSError, ValueError):
+                        # Might be starting up, try again
+                        await trio.sleep(0.1)
                     else:
-                        # Might be dead, try to become it ourselves.
-                        continue
+                        # Connected, send our files and quit.
+                        print(f'Connected to server with port {port}')
+                        async with stream:
+                            for file in files:
+                                await stream.send_all((file + '\n').encode('utf8'))
+                        return True
                 else:
-                    break
-        # We have the mutex.
+                    # Might be dead, try to become it ourselves.
+                    continue
+
+
+def main(args: list[str]) -> int:
+    """Run the program."""
+    def cleanup() -> None:
+        """Try and remove our files once we quit."""
+        try:
+            FILE_SERVER.unlink(missing_ok=True)
+        except PermissionError:
+            pass
+        try:
+            FILE_MUTEX.unlink(missing_ok=True)
+        except PermissionError:
+            pass
+
+    with ExitStack() as stack:
+        # Run this in a non-GUI event loop.
+        if trio.run(communicate, stack, args):
+            # Is a client, don't run the GUI.
+            return 0
+        # Otherwise we have the mutex, start the server in a GUI loop.
         print('Starting server!')
-        await start_server(args)
-        return 0
+        stack.callback(cleanup)
+        if utils.USE_WX or True:
+            from ui_wx.packages_sync import WxUI as InterfaceImpl
+        else:
+            from ui_tk.packages_sync import TkUI as InterfaceImpl
+        InterfaceImpl.run_loop(start_server, args)
+    return 0
 
 
-async def start_server(files: list[str]) -> None:
+async def start_server(ui: SyncUIBase, core_nursery: trio.Nursery, files: list[str]) -> None:
     """Start our server, then process in the GUI."""
     async def listen(nursery: trio.Nursery, listener: trio.SocketListener) -> None:
         """Listen to our open socket for messages."""
@@ -384,16 +417,16 @@ async def start_server(files: list[str]) -> None:
         for listener in listeners:
             nursery.start_soon(listen, nursery, listener)
         address = listeners[0].socket.getsockname()[1]
-        await FILE_SERVER.write_text(str(address))
+        await trio.Path(FILE_SERVER).write_text(str(address))
 
         # Prime with our own file list.
         for file in files:
             await send_file.send(file)
-        async with rec_file:
-            async for file in rec_file:
-                print(f'Server got: {file}')
+        # Now start the GUI
+        with trio.CancelScope() as gui_scope, rec_file:
+            await main_gui(rec_file, gui_scope, ui)
 
 
 if __name__ == '__main__':
     LOGGER.info('BEE{} packages syncer, args={}', utils.BEE_VERSION, sys.argv[1:])
-    sys.exit(trio.run(init, sys.argv[1:]))
+    main(sys.argv[1:])
