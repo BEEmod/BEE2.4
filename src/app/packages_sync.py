@@ -66,7 +66,6 @@ class SyncUIBase(ReflowWindow, abc.ABC):
                     self.packages.sort(key=lambda pack: pack.id)
                 else:
                     self.packages.sort(key=lambda pack: str(pack.disp_name))
-                LOGGER.info('Positions dirty')
                 self.item_pos_dirty.set()
 
     async def ask_package(self, src: Path, dest: PurePath, /) -> Package | None:
@@ -267,7 +266,7 @@ async def main_gui(
     packages_logger.setLevel(logging.INFO)
 
     LOGGER.info('Done!')
-    ui.packages = list(get_loaded_packages().packages.values())
+    ui.packages = list(packset.packages.values())
     core_nursery.start_soon(ui.pack_btn_task)
 
     package_loc = Path('../..', GEN_OPTS['Directories']['package']).resolve()

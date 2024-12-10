@@ -27,6 +27,7 @@ class WxUI(SyncUIBase):
                   | wx.CLOSE_BOX | wx.RESIZE_BORDER
                   | wx.STAY_ON_TOP | wx.SYSTEM_MENU,
         )
+        self.frm_pack.Bind(wx.EVT_CLOSE, self.evt_skip)
         self.pan_pack = wx.Panel(self.frm_pack)
         pan_pack_header = wx.Panel(self.pan_pack, style=wx.BORDER_RAISED)
         sizer_pack_vert = wx.BoxSizer(wx.VERTICAL)
@@ -38,6 +39,7 @@ class WxUI(SyncUIBase):
 
         self.btn_skip = wx.Button(pan_pack_header, label="Skip")
         sizer_actions.Add(self.btn_skip, 0, 0, 0)
+        self.btn_skip.Bind(wx.EVT_BUTTON, self.evt_skip)
 
         self.check_apply_all = wx.CheckBox(pan_pack_header, label="Apply To All")
         sizer_actions.Add(self.check_apply_all, 0, 0, 0)
@@ -61,6 +63,7 @@ class WxUI(SyncUIBase):
         )
         self.radio_sort_order.SetSelection(0)
         sizer_pan_header.Add(self.radio_sort_order, 0, wx.ALL, 4)
+        self.radio_sort_order.Bind(wx.EVT_RADIOBOX, self.evt_set_sort)
 
         self.sizer_packages = wx.WrapSizer(wx.HORIZONTAL)
         sizer_pack_vert.Add(self.sizer_packages, 0, wx.EXPAND, 0)
@@ -73,8 +76,11 @@ class WxUI(SyncUIBase):
         # -----------------------
         # Now the confirm window.
         # -----------------------
-
-        self.dialog_confirm = wx.Dialog(MAIN_WINDOW, title="Confirm File")
+        self.dialog_confirm = wx.Dialog(
+            MAIN_WINDOW,
+            title="Confirm File",
+            style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER,
+        )
         sizer_confirm = wx.BoxSizer(wx.VERTICAL)
 
         label_confirm = wx.StaticText(self.dialog_confirm, wx.ID_ANY, "Confirm copying files:")
@@ -93,19 +99,19 @@ class WxUI(SyncUIBase):
         self.button_ok.SetDefault()
         sizer_confirm_btn.AddButton(self.button_ok)
 
-        self.button_cancel = wx.Button(self.dialog_confirm, wx.ID_CANCEL, "")
-        sizer_confirm_btn.AddButton(self.button_cancel)
+        self.button_skip = wx.Button(self.dialog_confirm, label="Skip")
+        sizer_confirm_btn.AddButton(self.button_skip)
 
         sizer_confirm_btn.Realize()
 
         self.dialog_confirm.SetSizer(sizer_confirm)
         sizer_confirm.Fit(self.dialog_confirm)
-        self.dialog_confirm.Bind(wx.EVT_CLOSE, self.evt_confirm_cancel)
-        self.button_cancel.Bind(wx.EVT_BUTTON, self.evt_confirm_cancel)
+        self.dialog_confirm.Bind(wx.EVT_CLOSE, self.evt_confirm_skip)
+        self.button_skip.Bind(wx.EVT_BUTTON, self.evt_confirm_skip)
         self.button_ok.Bind(wx.EVT_BUTTON, self.evt_confirm_ok)
 
         self.dialog_confirm.SetAffirmativeId(self.button_ok.GetId())
-        self.dialog_confirm.SetEscapeId(self.button_cancel.GetId())
+        self.dialog_confirm.SetEscapeId(self.button_skip.GetId())
         self.dialog_confirm.Layout()
 
     @classmethod
@@ -118,6 +124,8 @@ class WxUI(SyncUIBase):
         async def init(nursery: trio.Nursery) -> None:
             """Run the app."""
             nursery.start_soon(ui._can_confirm_task)
+            nursery.start_soon(ui.reposition_items_task)
+            nursery.start_soon(ui._applies_to_all_task)
             await func(ui, nursery, files)
         ui = cls()
         start_main(init)
@@ -139,6 +147,10 @@ class WxUI(SyncUIBase):
         self.lbl_file_dest.LabelText = str(dest)
         self.frm_pack.Show()
 
+    def evt_set_sort(self, evt: wx.CommandEvent) -> None:
+        """Apply the radio's selections."""
+        self.pack_sort_by_id.value = self.radio_sort_order.Selection == 1
+
     def evt_skip(self, event: wx.Event) -> None:
         """Skip the specified file."""
         self.selected_pack.trigger(None)
@@ -149,8 +161,8 @@ class WxUI(SyncUIBase):
         if self.can_confirm.value:
             self.confirmed.set()
 
-    def evt_confirm_cancel(self, event: wx.Event) -> None:
-        """Confirm screen was hidden, abort all."""
+    def evt_confirm_skip(self, event: wx.Event) -> None:
+        """Skip the current set of files."""
         for i in range(self.check_confirm.Count):
             self.check_confirm.Check(i, False)
         self.confirmed.set()
@@ -173,7 +185,7 @@ class WxUI(SyncUIBase):
             btn = wx.Button(self.pan_pack, wx.ID_ANY, f"{pack.disp_name}\n<{pack.id}>")
             btn.Bind(wx.EVT_BUTTON, make_func(pack))
             self.sizer_packages.Add(btn, flags)
-        self.frm_pack.Layout()
+        self.sizer_packages.Layout()
 
     def ui_reset(self, /) -> None:
         """Reset the list of confirmed items, and the 'applies to all' checkbox."""
