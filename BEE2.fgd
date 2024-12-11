@@ -12,6 +12,7 @@
 	realign_faces(sidelist): "Realign Faces" : : "Rotate and realign these faces to world." +
 	"This should be used on axis-aligned tile surfaces, to make texturing match in different templates. " +
 	"The faces must be axis-aligned."
+	auto_realign(boolean) : "Auto Realign" : 0 : "If set, all 0.25 scale tile faces will be realigned to world, in addition to those in Realign Faces."
 	vertical_faces(sidelist): "Rotate Faces to Vertical" : : "Rotate these faces in 90 degree increments until they point upwards."
 	skip_faces(sidelist): "Don't Retexture these faces" : : "Do not change textures on these faces."
 	overlay_faces(sidelist): "Overlay Transfer Faces" : : "Apply overlays on the base surface to this, when using BindOverlay."

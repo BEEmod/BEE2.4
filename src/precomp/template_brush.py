@@ -13,7 +13,7 @@ import os
 import trio
 import attrs
 
-from srctools import Keyvalues
+from srctools import Keyvalues, conv_bool
 from srctools.filesys import FileSystem, ZipFileSystem, RawFileSystem, VPKFileSystem
 from srctools.math import AnyAngle, AnyMatrix, FrozenVec, Vec, Angle, Matrix, to_matrix
 from srctools.vmf import Entity, EntityGroup, Solid, Side, VMF, UVAxis, ValidKVs, VisGroup
@@ -242,6 +242,11 @@ TEMPLATE_RETEXTURE: dict[str, tuple[GenCat, str, None] | tuple[GenCat, TileSize,
     consts.Goo.CHEAP: (GenCat.SPECIAL, 'goo_cheap', None),
 }
 del B, W
+TEMPLATE_AUTO_REALIGN = {
+    mat
+    for mat, (cat, _, _) in TEMPLATE_RETEXTURE.items()
+    if cat is GenCat.NORMAL
+}
 
 TEMP_TILE_PIX_SIZE = {
     # The width in texture pixels of each tile size.
@@ -747,6 +752,19 @@ def _parse_template(loc: UnparsedTemplate) -> Template:
         for bbox in collisions.Volume.from_ent(ent):
             coll.append(CollisionDef(bbox, visgroup_set))
 
+    realign = set(conf['realign_faces'].split())
+    if conv_bool(conf['auto_realign']):
+        # Automatically realign all 0.25 scale tile faces.
+        for brush_list in itertools.chain(world_ents.values(), detail_ents.values()):
+            for brush in brush_list:
+                for face in brush:
+                    if (
+                        face.uaxis.scale == 0.25
+                        and face.vaxis.scale == 0.25
+                        and face.mat.casefold() in TEMPLATE_AUTO_REALIGN
+                    ):
+                        realign.add(str(face.id))
+
     return Template(
         temp_id=loc.id,
         visgroup_names=set(visgroup_names.values()),
@@ -754,7 +772,7 @@ def _parse_template(loc: UnparsedTemplate) -> Template:
         detail=detail_ents,
         overlays=overlay_ents,
         skip_faces=conf['skip_faces'].split(),
-        realign_faces=conf['realign_faces'].split(),
+        realign_faces=realign,
         overlay_transfer_faces=conf['overlay_faces'].split(),
         vertical_faces=conf['vertical_faces'].split(),
         color_pickers=color_pickers,

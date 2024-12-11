@@ -25,6 +25,7 @@
   * Add `track_len_var`, set to the length of each track instance.
   * The "bottom grate" instance will now inherit platform fixup variables.
 * Fixed `TemplateBrush` 's `invertVar` option not working properly if `colorVar = <editor>`.
+* Templates may have "auto realign" enabled, which automatically realigns all 0.25-scale tile faces.
 * Allow fixup values in many more `TemplateBrush` options - `force`, `colorVar`, `forceVisVar`, `senseOffset`, `outputs` and `pickerVars`.
 * Allow fixup values in `MapInstVar` values.
 
