@@ -26,6 +26,7 @@
   * The "bottom grate" instance will now inherit platform fixup variables.
 * Fixed `TemplateBrush` 's `invertVar` option not working properly if `colorVar = <editor>`.
 * Allow fixup values in many more `TemplateBrush` options - `force`, `colorVar`, `forceVisVar`, `senseOffset`, `outputs` and `pickerVars`.
+* Allow fixup values in `MapInstVar` values.
 
 
 ------------------------------------------

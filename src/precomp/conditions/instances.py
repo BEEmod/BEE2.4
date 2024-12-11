@@ -296,17 +296,17 @@ def res_map_inst_var(res: Keyvalues) -> conditions.ResultCallable:
 
     The first value is the in -> out var, and all following are values to map.
     """
-    table: dict[str, str] = {}
+    table: dict[str, LazyValue] = {}
     res_iter = iter(res)
     first_prop = next(res_iter)
     in_name, out_name = first_prop.name, first_prop.value
     for prop in res_iter:
-        table[prop.real_name] = prop.value
+        table[prop.real_name] = LazyValue.parse(prop.value)
 
     def modify_inst(inst: Entity) -> None:
         """Map the variables on an instance."""
         try:
-            inst.fixup[out_name] = table[inst.fixup[in_name]]
+            inst.fixup[out_name] = table[inst.fixup[in_name]](inst)
         except KeyError:
             pass
     return modify_inst
