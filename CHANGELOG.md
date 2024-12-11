@@ -22,6 +22,7 @@
 * `TrackPlatform` result changes:
   * Add `multi_track`, which allows replacing the instances with multi-voxel 
   long ones for better efficiency.
+  * Add `track_len_var`, set to the length of each track instance.
   * The "bottom grate" instance will now inherit platform fixup variables.
 * Fixed `TemplateBrush` 's `invertVar` option not working properly if `colorVar = <editor>`.
 * Allow fixup values in many more `TemplateBrush` options - `force`, `colorVar`, `forceVisVar`, `senseOffset`, `outputs` and `pickerVars`.

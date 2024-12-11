@@ -48,6 +48,8 @@ def res_track_plat(vmf: VMF, res: Keyvalues) -> object:
        Each sub-key should be the length of the piece, with the value the instance to use instead.
     * `multi_overlap_ends`: If true, the multi-instances will include the space spanned by the
        top/bottom tracks (but those instances will remain).
+    * `track_len_var`: If defined, track instances will set this $fixup variable to the length
+       of the instance.
     * `track_name`: If set, rename track instances following the pattern
       `plat_name-track_nameXX`. Otherwise, all tracks will receive the name
       of the platform.
@@ -161,6 +163,12 @@ def res_track_plat(vmf: VMF, res: Keyvalues) -> object:
         ))
         del track_set
 
+        track_len_var = res['track_len_var', '']
+        if track_len_var and track_list:
+            # Ensure end/single instances get set.
+            track_list[0].fixup[track_len_var] = "128"
+            track_list[-1].fixup[track_len_var] = "128"
+
         # Combining instances shouldn't be done for single tracks.
         if multi_sizes and len(track_list) > 1:
             # Adjust positions to be the ends, not voxel centers. If keep ends is false, ignore the ends.
@@ -175,12 +183,15 @@ def res_track_plat(vmf: VMF, res: Keyvalues) -> object:
                     track.remove()
                 last_track = track_list.pop()
                 for size in multi_fitter(length):
-                    track_list.append(conditions.add_inst(
+                    track = conditions.add_inst(
                         vmf,
                         file=multi_sizes[size],
                         origin=pos_a + (offset + size / 2) * track_dir,
                         angles=track_ang,
-                    ))
+                    )
+                    track_list.append(track)
+                    if track_len_var:
+                        track.fixup[track_len_var] = size
                     offset += size
                 track_list.append(last_track)
 
