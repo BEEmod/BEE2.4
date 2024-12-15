@@ -1345,7 +1345,7 @@ def res_timed_relay(vmf: VMF, res: Keyvalues) -> Callable[[Entity], None]:
 
         delay = srctools.conv_float(inst.fixup.substitute(delay_var))
 
-        for off in range(int(math.ceil(delay))):
+        for off in range(math.ceil(delay)):
             for out in rep_outs:
                 new_out = out.copy()
                 new_out.target = local_name(inst, new_out.target)

@@ -113,15 +113,15 @@ def _build_icons() -> dict[tuple[str, Theme], Image.Image]:
     }
     # The icon has 8 parts, with the gap in the 1 pos. So mirror/rotate to
     # derive the others.
-    for _theme in Theme:
-        icons['load_0', _theme] = _load_icon = icons['load', _theme]
-        icons['load_7', _theme] = _load_icon_flip = _load_icon.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
-        icons['load_1', _theme] = _load_icon_flip.transpose(Image.Transpose.ROTATE_270)
-        icons['load_2', _theme] = _load_icon.transpose(Image.Transpose.ROTATE_270)
-        icons['load_3', _theme] = _load_icon.transpose(Image.Transpose.FLIP_TOP_BOTTOM)
-        icons['load_4', _theme] = _load_icon.transpose(Image.Transpose.ROTATE_180)
-        icons['load_5', _theme] = _load_icon_flip.transpose(Image.Transpose.ROTATE_90)
-        icons['load_6', _theme] = _load_icon.transpose(Image.Transpose.ROTATE_90)
+    for theme in Theme:
+        icons['load_0', theme] = load_icon = icons['load', theme]
+        icons['load_7', theme] = load_icon_flip = load_icon.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
+        icons['load_1', theme] = load_icon_flip.transpose(Image.Transpose.ROTATE_270)
+        icons['load_2', theme] = load_icon.transpose(Image.Transpose.ROTATE_270)
+        icons['load_3', theme] = load_icon.transpose(Image.Transpose.FLIP_TOP_BOTTOM)
+        icons['load_4', theme] = load_icon.transpose(Image.Transpose.ROTATE_180)
+        icons['load_5', theme] = load_icon_flip.transpose(Image.Transpose.ROTATE_90)
+        icons['load_6', theme] = load_icon.transpose(Image.Transpose.ROTATE_90)
     return icons
 
 
