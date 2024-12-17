@@ -202,6 +202,15 @@ def fix_cur_directory() -> None:
     os.chdir(os.path.abspath(os.path.dirname(sys.argv[0])))
 
 
+def display_directory(path: Path) -> None:
+    """Try and open a window with this directory."""
+    if WIN:
+        os.startfile(path)
+    else:
+        # TODO: Other OSes?
+        raise NotImplementedError("Can't display directory on this platform?")
+
+
 if TYPE_CHECKING:
     from bg_daemon import run_background as run_bg_daemon
 else:

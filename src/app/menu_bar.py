@@ -6,7 +6,6 @@ import tkinter as tk
 from collections.abc import Awaitable, Callable, Iterable
 from contextlib import aclosing
 from pathlib import Path
-import os
 
 import trio
 
@@ -199,9 +198,6 @@ class MenuBar:
             game = gameMan.selected_game.value
             if game is None:
                 return
-            paths = path_getter(game)
-            if utils.WIN:
-                for path in paths:
-                    os.startfile(path)
-            # TODO: Other OSes.
+            for path in path_getter(game):
+                utils.display_directory(path)
         return handler
