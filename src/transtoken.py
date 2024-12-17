@@ -33,6 +33,11 @@ NS_UNTRANSLATED: Final = utils.special_id('<NOTRANSLATE>')  # Legacy values whic
 # The prefix for all Valve's editor keys.
 PETI_KEY_PREFIX: Final = 'PORTAL2_PuzzleEditor'
 
+try:
+    from markupsafe import Markup
+except ImportError:  # App doesn't need this, doesn't use Jinja.
+    Markup = str  # type: ignore
+
 
 class ListStyle(Enum):
     """Kind of comma-separated list to produce."""
@@ -270,16 +275,16 @@ class TransToken:
         else:
             return text
 
-    def translate_html(self) -> str:
+    def translate_html(self) -> Markup:
         """Translate to text, escaping parameters for HTML.
 
         Any non-token parameters will have HTML syntax escaped.
         """
         text = self._convert_token(CURRENT_LANG.value)
         if self.parameters:
-            return HTML_FORMAT.vformat(text, (), self.parameters)
+            return Markup(HTML_FORMAT.vformat(text, (), self.parameters))
         else:
-            return text
+            return Markup(text)
 
 
 TransToken.BLANK = TransToken.untranslated('')
@@ -389,7 +394,7 @@ class JoinTransToken(TransToken):
         return sep.join(items)
 
     @override
-    def translate_html(self) -> str:
+    def translate_html(self) -> Markup:
         """Translate to text, escaping parameters for HTML.
 
         Any non-token parameters in children will have HTML syntax escaped.
@@ -400,7 +405,7 @@ class JoinTransToken(TransToken):
         items = [child.translate_html() for child in self.children]
         if self.sort:
             items.sort()
-        return sep.join(items)
+        return Markup(sep.join(items))
 
 
 @attrs.frozen(eq=False)

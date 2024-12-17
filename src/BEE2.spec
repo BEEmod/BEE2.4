@@ -249,6 +249,8 @@ EXCLUDES = [
     # Pulls in all of pytest etc, not required.
     'trio.testing',
 
+    'markupsafe',  # Used by TransToken.translate_html(), only relevant for Jinja.
+
     'unittest',  # Imported in __name__==__main__..
     'doctest',
     'optparse',
