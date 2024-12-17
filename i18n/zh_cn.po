@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: https://github.com/BEEmod/BEE2.4/issues\n"
-"POT-Creation-Date: 2024-11-08 16:23+1000\n"
+"POT-Creation-Date: 2024-12-17 18:35+1000\n"
 "PO-Revision-Date: 2019-11-22 10:47+1000\n"
 "Last-Translator: Antecer <antecer@outlook.com>\n"
 "Language: zh\n"
@@ -144,6 +144,19 @@ msgstr ""
 msgid ""
 "Compile Error. Open the following URL\n"
 "in a browser on this computer to see:"
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid ""
+"If submitting a bug report, please include this map archive. It contains "
+"your level, the displayed preview, relevant log files and configs to help"
+" with identifying the issue. "
+msgstr ""
+
+#. This uses HTML syntax.
+#: user_errors.py
+msgid "Open Archive Folder"
 msgstr ""
 
 #. This uses HTML syntax.

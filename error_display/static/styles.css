@@ -33,3 +33,13 @@ details pre {
     color: black;
     white-space: pre-wrap;
 }
+
+aside {
+    margin-top: 16px;
+}
+
+#archive-btn {
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+}

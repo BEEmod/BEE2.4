@@ -10,8 +10,9 @@ This has 3 endpoints:
 """
 from __future__ import annotations
 
-
 from typing_extensions import override
+
+from zipfile import ZIP_DEFLATED, ZipFile
 import functools
 import gettext
 import http
@@ -32,7 +33,8 @@ import trio
 
 from user_errors import (
     ErrorInfo, DATA_LOC, SERVER_INFO_FILE, ServerInfo, PackageTranslations,
-    TOK_ERR_FAIL_LOAD, TOK_ERR_MISSING, TOK_COOP_SHOWURL,
+    TOK_ERR_FAIL_LOAD, TOK_ERR_MISSING, TOK_COOP_SHOWURL, TOK_WEBPAGE_ARCHIVE_INFO,
+    TOK_WEBPAGE_ARCHIVE_BTN,
 )
 import utils
 import transtoken
@@ -55,6 +57,7 @@ DELAY = 5 * 60  # After 5 minutes of no response, quit.
 # That happens either if Portal 2 is detected to quit, or if no response is heard from clients
 # for DELAY seconds. It starts with an infinite deadline, to ensure there's time to boot the server.
 SHUTDOWN_SCOPE = trio.CancelScope(deadline=math.inf)
+ARCHIVE_LOC = utils.conf_location('error_dump/map_dump.zip')
 
 current_error = ErrorInfo(message=TOK_ERR_MISSING)
 
@@ -69,6 +72,7 @@ async def route_display_errors() -> str:
         context=current_error.context,
         log_vbsp=LOGS['vbsp'],
         log_vrad=LOGS['vrad'],
+        archive_url=ARCHIVE_LOC.as_uri(),
         # Start the render visible if it has annotations.
         start_render_open=bool(
             current_error.points
@@ -76,6 +80,8 @@ async def route_display_errors() -> str:
             or current_error.lines
             or current_error.barrier_holes
         ),
+        trans_archive_info=TOK_WEBPAGE_ARCHIVE_INFO,
+        trans_archive_btn=TOK_WEBPAGE_ARCHIVE_BTN,
     )
 
 
@@ -132,6 +138,51 @@ async def route_shutdown() -> quart.ResponseReturnValue:
     SHUTDOWN_SCOPE.cancel()
     await trio.lowlevel.checkpoint()
     return 'DONE'
+
+
+@app.route('/open_archive')
+async def route_open_archive() -> quart.ResponseReturnValue:
+    """The overlay browser doesn't allow downloads, so open a file explorer window with the file."""
+    LOGGER.info('Opening map archive.')
+    utils.display_directory(ARCHIVE_LOC.parent)
+    return 'OPENED'
+
+
+async def generate_archive() -> None:
+    """Generate a zip containing data useful for solving a compile error."""
+    with ZipFile(ARCHIVE_LOC, 'w', compression=ZIP_DEFLATED) as archive:
+        vmf_name: trio.Path | None = None
+        styled_name: trio.Path | None = None
+        name_stem = 'unknown_map'
+        if current_error.vmf_fname_orig is not None:
+            vmf_name = trio.Path(current_error.vmf_fname_orig)
+            name_stem = vmf_name.stem
+        if current_error.vmf_fname_new is not None:
+            styled_name = trio.Path(current_error.vmf_fname_new)
+
+        for file, dest in [
+            (vmf_name, f'{name_stem}_orig.vmf'),
+            (styled_name, f'{name_stem}_styled.vmf'),
+            (trio.Path(DATA_LOC), 'user_error.pickle'),
+            (trio.Path('bee2/config.dmx'), 'export_config.dmx'),
+            (trio.Path(utils.conf_location('config/config.vdf')), 'app_config.vdf'),
+        ]:
+            if file is None:
+                LOGGER.debug('No file defined for {}', dest)
+                continue
+            try:
+                data = await file.read_bytes()
+            except FileNotFoundError:
+                LOGGER.debug('Missing file: {}', file)
+            else:
+                await trio.to_thread.run_sync(archive.writestr, dest, data)
+        for log_key, log_data in LOGS.items():
+            if data:
+                await trio.to_thread.run_sync(archive.writestr, log_key + '.log', log_data)
+        LOGGER.info(
+            'Generated dump with files:\n{}',
+            '\n'.join(f'- {info.filename}' for info in archive.filelist),
+        )
 
 
 async def check_portal2_running(allow_exit: trio.Event) -> None:
@@ -267,8 +318,10 @@ async def main(argv: list[str]) -> None:
     allow_exit = trio.Event()
 
     SERVER_INFO_FILE.unlink(missing_ok=True)
+    ARCHIVE_LOC.unlink(missing_ok=True)
     try:
         async with trio.open_nursery() as nursery:
+            nursery.start_soon(generate_archive)
             nursery.start_soon(check_portal2_running, allow_exit)
             await trio.lowlevel.checkpoint()
             binds = await nursery.start(functools.partial(

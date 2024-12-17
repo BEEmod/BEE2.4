@@ -186,6 +186,13 @@ TOK_COOP_SHOWURL = TransToken.ui(
     'in a browser on this computer to see:'
 )
 
+# Used to format the webpage
+TOK_WEBPAGE_ARCHIVE_INFO = TransToken.ui(
+    'If submitting a bug report, please include this map archive. It contains your level, '
+    'the displayed preview, relevant log files and configs to help with identifying the issue. '
+)
+TOK_WEBPAGE_ARCHIVE_BTN = TransToken.ui('Open Archive Folder')
+
 # Generic tokens:
 TOK_INVALID_PARAM = TransToken.ui(
     'Invalid <code>{option}=</code>"<code>{value}</code>" for {kind} "<var>{id}</var>"!'

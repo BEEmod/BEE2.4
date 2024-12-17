@@ -15,6 +15,10 @@
 		{% if context %}
 			<aside>{{ context }}</aside>
 		{% endif %}
+		<aside>
+			{{ trans_archive_info }}
+			<button type=button id="archive-btn">{{ trans_archive_btn }}</button>
+		</aside>
 	</article>
 	<details{{ " open" if start_render_open else "" }} id="render-details">
 		<summary>Chamber Preview</summary>

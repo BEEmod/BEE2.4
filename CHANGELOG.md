@@ -7,6 +7,8 @@
 * The app is now able to handle having music, voicelines etc selected that 
   aren't defined in loaded packages. Exporting will fail, but no crash will
   occur and the selection will still be saved.
+* If an error occurs, the compiler will now prepare a zip containing all the
+  relevant files for debugging the error.
 
 ### Bugfixes:
 * The case where no voicelines are set is once again handled correctly.
