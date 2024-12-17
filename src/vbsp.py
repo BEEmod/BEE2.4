@@ -9,15 +9,17 @@ import shutil
 import logging
 import pickle
 
-import async_util
+
 from aioresult import ResultCapture
 from srctools import AtomicWriter, Keyvalues, Vec, FrozenVec, Angle
 from srctools.dmx import Element
-from srctools.vmf import VMF, Entity, Output
 from srctools.game import Game
+from srctools.vmf import VMF, Entity, Output
+import async_util
+import attrs
 import srctools
-import srctools.run
 import srctools.logger
+import srctools.run
 import trio
 
 from BEE2_config import ConfigFile
@@ -1717,12 +1719,17 @@ async def main(argv: list[str]) -> None:
             raise
         LOGGER.error('"User" error detected, aborting compile: ', exc_info=True)
 
+        error.info = attrs.evolve(error.info, vmf_fname_orig=path)
+
         # Try to preserve the current map.
         if vmf is not None:
+            error_fname = new_path[:-4] + '.error.vmf'
             try:
-                save(vmf, new_path[:-4] + '.error.vmf')  # noqa
+                save(vmf, error_fname)  # noqa
             except Exception:
                 pass
+            else:
+                error.info = attrs.evolve(error.info, vmf_fname_new=error_fname)
 
         vmf = errors.make_map(error)
 

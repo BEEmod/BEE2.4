@@ -52,6 +52,12 @@ class BarrierHole(TypedDict):
 class ErrorInfo:
     """Data to display to the user."""
     message: TransToken
+
+    # Map name, allowing error server to dump this for the user to report with.
+    vmf_fname_orig: str | None = None
+    vmf_fname_new: str | None = None
+
+    # Language file to use to translate things.
     language_file: Path | None = None
     # Logging context
     context: str = ''
