@@ -21,18 +21,18 @@
 		</aside>
 	</article>
 	<details{{ " open" if start_render_open else "" }} id="render-details">
-		<summary>Chamber Preview</summary>
+		<summary>{{ trans_title_preview }}</summary>
 		<section id="render"></section>
 	</details>
 	{% if log_vbsp %}
 	<details>
-		<summary>Geometry Compile Log</summary>
+		<summary>{{ trans_title_vbsp }}</summary>
 		<pre>{{ log_vbsp }}</pre>
 	</details>
 	{% endif %}
 	{% if log_vrad %}
 	<details>
-		<summary>Lighting / Packing Compile Log</summary>
+		<summary>{{ trans_title_vrad }}</summary>
 		<pre>{{ log_vrad }}</pre>
 	</details>
 	{% endif %}

@@ -192,6 +192,9 @@ TOK_WEBPAGE_ARCHIVE_INFO = TransToken.ui(
     'the displayed preview, relevant log files and configs to help with identifying the issue. '
 )
 TOK_WEBPAGE_ARCHIVE_BTN = TransToken.ui('Open Archive Folder')
+TOK_WEBPAGE_TITLE_PREVIEW = TransToken.ui('Chamber Preview')
+TOK_WEBPAGE_TITLE_VBSP = TransToken.ui('Geometry Compile Log')
+TOK_WEBPAGE_TITLE_VRAD = TransToken.ui('Lighting / Packing Compile Log')
 
 # Generic tokens:
 TOK_INVALID_PARAM = TransToken.ui(

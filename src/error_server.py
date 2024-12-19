@@ -33,8 +33,9 @@ import trio
 
 from user_errors import (
     ErrorInfo, DATA_LOC, SERVER_INFO_FILE, ServerInfo, PackageTranslations,
-    TOK_ERR_FAIL_LOAD, TOK_ERR_MISSING, TOK_COOP_SHOWURL, TOK_WEBPAGE_ARCHIVE_INFO,
-    TOK_WEBPAGE_ARCHIVE_BTN,
+    TOK_ERR_FAIL_LOAD, TOK_ERR_MISSING, TOK_COOP_SHOWURL,
+    TOK_WEBPAGE_ARCHIVE_INFO, TOK_WEBPAGE_ARCHIVE_BTN,
+    TOK_WEBPAGE_TITLE_PREVIEW, TOK_WEBPAGE_TITLE_VBSP, TOK_WEBPAGE_TITLE_VRAD,
 )
 import utils
 import transtoken
@@ -82,6 +83,9 @@ async def route_display_errors() -> str:
         ),
         trans_archive_info=TOK_WEBPAGE_ARCHIVE_INFO,
         trans_archive_btn=TOK_WEBPAGE_ARCHIVE_BTN,
+        trans_title_preview=TOK_WEBPAGE_TITLE_PREVIEW,
+        trans_title_vbsp=TOK_WEBPAGE_TITLE_VBSP,
+        trans_title_vrad=TOK_WEBPAGE_TITLE_VRAD,
     )
 
 
