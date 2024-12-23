@@ -8,6 +8,7 @@ import math
 import trio
 
 from app.errors import ErrorUI
+from app import quit_app
 from transtoken import AppError, TransToken
 
 from . import TK_ROOT, tk_tools
@@ -85,9 +86,16 @@ async def display_errors(
 
     await trio.lowlevel.checkpoint()
 
-    wid_close = ttk.Button(frame, command=lambda: close_event.set(), name='close_btn')
-    wid_close.grid(row=2, column=0, padx=4, pady=2)
-    set_text(wid_close, TransToken.ui("Close"))
+    btn_frame = ttk.Frame(frame)
+    btn_frame.grid(row=2, column=0, pady=2)
+
+    wid_quit = ttk.Button(btn_frame, command=quit_app, name='quit_btn')
+    wid_quit.grid(row=0, column=0, padx=4)
+    set_text(wid_quit, TransToken.ui("Quit"))
+
+    wid_close = ttk.Button(btn_frame, command=lambda: close_event.set(), name='close_btn')
+    wid_close.grid(row=0, column=1, padx=4)
+    set_text(wid_close, TransToken.ui("Continue"))
 
     # Cache the labels and separators.
     error_widgets: list[tuple[tk.Label, ttk.Separator]] = []
