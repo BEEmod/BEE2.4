@@ -84,6 +84,9 @@ TRANS_INVALID_PAK_BAD_FORMAT = TransToken.ui(
 TRANS_INVALID_PAK_NO_INFO = TransToken.ui(
     'Potential package file has no info.txt: {path}'
 )
+TRANS_INVALID_PAK_BAD_INFO = TransToken.ui(
+    'Package has invalid info.txt file: {path}'
+)
 TRANS_INVALID_PAK_NO_ID = TransToken.ui(
     'Package has no ID defined: {path}'
 )
@@ -931,13 +934,18 @@ async def find_packages(errors: ErrorUI, packset: PackagesSet, pak_dir: Path) ->
                         errors, packset, name,
                     ))
                 else:
+                    # Just a warning, could be something else.
                     errors.add(TRANS_INVALID_PAK_NO_INFO.format(path=name))
                 # Don't continue to parse this "package"
+                continue
+            except TokenSyntaxError as exc:
+                LOGGER.exception('Invalid info: {}:info.txt', filesys.path, exc_info=exc)
+                errors.add(TRANS_INVALID_PAK_BAD_INFO.format(path=f'{filesys.path}:info.txt'))
                 continue
             try:
                 pak_id = utils.obj_id(info['ID'])
             except LookupError:
-                errors.add(TRANS_INVALID_PAK_NO_ID.format(path=Path(filesys.path, 'info.txt')))
+                errors.add(TRANS_INVALID_PAK_NO_ID.format(path=f'{filesys.path}:info.txt'))
                 continue  # Skip this.
 
             if pak_id in packset.packages:
