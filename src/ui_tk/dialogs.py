@@ -1,8 +1,10 @@
 """A consistent interface for dialog boxes."""
 from __future__ import annotations
+
 from typing_extensions import override
 
 from tkinter import commondialog, filedialog, simpledialog, ttk
+from tkinter.font import Font
 import tkinter as tk
 from collections.abc import Callable
 
@@ -23,6 +25,9 @@ __all__ = ['Dialogs', 'TkDialogs', 'DIALOG']
 # so patching .show() will fix them all.
 # contextlib managers can also be used as decorators.
 commondialog.Dialog.show = suppress_screens()(commondialog.Dialog.show)  # type: ignore
+
+TRANS_OK = TransToken.ui('OK')
+TRANS_CANCEL = TransToken.ui('Cancel')
 
 
 async def _messagebox(
@@ -119,42 +124,125 @@ class BasicQueryValidator(simpledialog.Dialog):
             return True
 
 
-try:
-    from idlelib.query import Query  # type: ignore[import-not-found]
-except ImportError:
-    QueryValidator = BasicQueryValidator
-else:
-    class QueryValidator(Query):  # type: ignore[no-redef]
-        """Implement using IDLE's better code for this."""
-        def __init__(
-            self,
-            parent: tk.Misc,
-            title: str, message: str, initial: str,
-            validator: Callable[[str], str],
-        ) -> None:
-            self.__validator = validator
-            super().__init__(parent, title, message, text0=initial)
-            self.__has_closed = trio.Event()
+class QueryValidator(tk.Toplevel):
+    """Copied from idlelib, a better query window compared to BasicQueryValidator"""
+    result: str | None
 
-        def wait_window(self, window: object = None) -> None:
-            """Block this method call, to prevent the Tk loop from being frozen."""
+    entryvar: tk.StringVar
+    entry: ttk.Entry
+    error_font: Font
+    entry_error: ttk.Label
+    button_ok: ttk.Button
+    button_cancel: ttk.Button
+    def __init__(
+        self,
+        parent: tk.Toplevel | tk.Tk,
+        title: TransToken, message: TransToken, initial: TransToken,
+        validator: Callable[[str], str],
+    ) -> None:
+        """Create modal popup, return when destroyed."""
+        self.parent = parent  # Needed for Font call.
+        self.message = message
+        self.initial = initial
 
-        def destroy(self) -> None:
-            """Called when the window is either canceled or submitted."""
-            self.__has_closed.set()
-            super().destroy()
+        self.validator = validator  # Added
+        self.has_closed = trio.Event()
+        self.result = None
 
-        async def wait(self) -> None:
-            """Wait for the query to close."""
-            await self.__has_closed.wait()
+        super().__init__(parent)
+        self.withdraw()  # Hide while configuring, especially geometry.
+        self.title(str(title))
+        self.transient(parent)
+        self.grab_set()
 
-        def entry_ok(self) -> str | None:
-            """Return non-blank entry or None."""
-            try:
-                return self.__validator(self.entry.get())
-            except AppError as exc:
-                self.showerror(str(exc.message))
-                return None
+        simpledialog._setup_dialog(self)
+        if self._windowingsystem == 'aqua':
+            self.bind("<Command-.>", self.cancel)
+        self.bind('<Key-Escape>', self.cancel)
+        self.protocol("WM_DELETE_WINDOW", self.cancel)
+        self.bind('<Key-Return>', self.ok)
+        self.bind("<KP_Enter>", self.ok)
+
+        self.create_widgets()
+        self.update_idletasks()  # Need here for winfo_reqwidth below.
+        self.geometry(  # Center dialog over parent (or below htest box).
+                "+%d+%d" % (
+                    parent.winfo_rootx() +
+                    (parent.winfo_width()/2 - self.winfo_reqwidth()/2),
+                    parent.winfo_rooty() +
+                    (parent.winfo_height()/2 - self.winfo_reqheight()/2)
+                ))
+        self.resizable(height=False, width=False)
+
+        self.deiconify()  # Unhide now that geometry set.
+        self.entry.focus_set()
+        # Removed wait_window() call.
+
+    def create_widgets(self) -> None:
+        """Create entry (rows, extras, buttons.
+
+        Entry stuff on rows 0-2, spanning cols 0-2.
+        Buttons on row 99, cols 1, 2.
+        """
+        # Bind to self the widgets needed for entry_ok or unittest.
+        self.frame = frame = ttk.Frame(self, padding=10)
+        frame.grid(column=0, row=0, sticky='news')
+        frame.grid_columnconfigure(0, weight=1)
+
+        entrylabel = ttk.Label(frame, anchor='w', justify='left', text=str(self.message))
+        self.entryvar = tk.StringVar(self, str(self.initial))
+        self.entry = ttk.Entry(frame, width=30, textvariable=self.entryvar)
+        self.error_font = Font(name='TkCaptionFont', exists=True, root=self.parent)
+        self.entry_error = ttk.Label(frame, text=' ', foreground='red', font=self.error_font)
+        # Display or blank error by setting ['text'] =.
+        entrylabel.grid(column=0, row=0, columnspan=3, padx=5, sticky='W')
+        self.entry.grid(column=0, row=1, columnspan=3, padx=5, sticky='EW', pady=(10,0))
+        self.entry_error.grid(column=0, row=2, columnspan=3, padx=5, sticky='EW')
+
+        self.button_ok = ttk.Button(frame, text=str(TRANS_OK), default='active', command=self.ok)
+        self.button_cancel = ttk.Button(frame, text=str(TRANS_CANCEL), command=self.cancel)
+
+        self.button_ok.grid(column=1, row=99, padx=5)
+        self.button_cancel.grid(column=2, row=99, padx=5)
+
+    def entry_ok(self) -> str | None:
+        """Changed, use our validator and AppError."""
+        try:
+            return self.validator(self.entry.get())
+        except AppError as exc:
+            self.entry_error['text'] = str(exc.message)
+            return None
+
+    def ok(self, event: object = None) -> None:
+        """If entry is valid, bind it to 'result' and destroy tk widget.
+
+        Otherwise leave dialog open for user to correct entry or cancel.
+        """
+        try:
+            self.result = self.validator(self.entry.get())
+        except AppError as exc:
+            self.entry_error['text'] = str(exc.message)
+            # [Ok] moves focus.  (<Return> does not.)  Move it back.
+            self.entry.focus_set()
+            return None
+        else:
+            self.entry_error['text'] = ''
+            self.destroy()
+
+    def cancel(self, event: object = None) -> None:
+        """Set dialog result to None and destroy tk widget."""
+        self.result = None
+        self.destroy()
+
+    def destroy(self) -> None:
+        self.grab_release()
+        self.has_closed.set()
+        super().destroy()
+
+    async def wait(self) -> str | None:
+        """Wait for the query to close."""
+        await self.has_closed.wait()
+        return self.result
 
 
 class TkDialogs(Dialogs):
@@ -242,14 +330,7 @@ class TkDialogs(Dialogs):
     ) -> str | None:
         """Ask the user to enter a string."""
         with suppress_screens():
-            # If the main loop isn't running, this doesn't work correctly.
-            # Probably also if it's not visible. So swap back to the old style.
-            # It's also only a problem on Windows.
-            if Query is None:
-                query_cls = BasicQueryValidator
-            else:
-                query_cls = QueryValidator
-            win = query_cls(self.parent, title, message, initial_value, validator)
+            win = QueryValidator(self.parent, title, message, initial_value, validator)
 
             if self.parent is TK_ROOT:
                 # Force to be centered and visible - the root might be hidden if doing an early add-game.
