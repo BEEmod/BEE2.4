@@ -13,7 +13,6 @@ import tkinter as tk
 from collections.abc import Awaitable, Iterable, Sequence
 from contextlib import aclosing
 from enum import Enum, StrEnum
-from idlelib.redirector import WidgetRedirector  # type: ignore[import-not-found]
 import functools
 import inspect
 import os.path
@@ -590,18 +589,33 @@ class HidingScroll(ttk.Scrollbar):
 class ReadOnlyEntry(ttk.Entry):
     """A modified Entry widget which prevents editing the text.
 
-    See http://tkinter.unpythonic.net/wiki/ReadOnlyText
+    Based on idlelib.redirector.WidgetRedirector.
     """
     def __init__(self, master: tk.Misc, **opt: Any) -> None:
         opt['exportselection'] = 0  # Don't let it write to clipboard
         opt['takefocus'] = 0  # Ignore when tabbing
         super().__init__(master, **opt)
 
-        self.redirector = redir = WidgetRedirector(self)
-        # These two TK commands are used for all text operations,
-        # so cancelling them stops anything from happening.
-        self.insert = redir.register('insert', event_cancel)  # type: ignore[method-assign]
-        self.delete = redir.register('delete', event_cancel)  # type: ignore[method-assign]
+        w = str(self)  # widget's (full) Tk pathname
+        self.orig = w + "_orig"
+        # Rename the Tcl command within Tcl:
+        self.tk.call("rename", w, self.orig)
+        # Create a new Tcl command whose name is the widget's pathname, and
+        # whose action is to dispatch on the operation passed to the widget:
+        self.tk.createcommand(w, self.dispatch)
+
+    def dispatch(self, operation: str, *args: Any) -> str:
+        """Callback from Tcl which runs when the widget is referenced.
+
+        The insert and remove commands are used for all text operations,
+        so cancelling them stops anything from happening.
+        """
+        if operation in ['insert', 'remove']:
+            return 'break'
+        try:
+            return self.tk.call((self.orig, operation) + args)
+        except tk.TclError:
+            return ""
 
 
 # Widget and Spinbox have conflicting identify() definitions, not important.
