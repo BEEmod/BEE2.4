@@ -912,7 +912,7 @@ async def init_application(nursery: trio.Nursery) -> None:
         await trio.sleep_forever()
 
 
-def init_backup_settings() -> None:
+async def init_backup_settings(*, task_status: trio.TaskStatus[None] = trio.TASK_STATUS_IGNORED) -> None:
     """Initialise the auto-backup settings widget."""
     from BEE2_config import GEN_OPTS
     check_var = tk.IntVar(
@@ -951,7 +951,7 @@ def init_backup_settings() -> None:
         text='Directory',
     ).grid(row=0, column=0)
 
-    UI['auto_dir'] = tk_tools.FileField(
+    UI['auto_dir'] = auto_field = tk_tools.FileField(
         dir_frame,
         loc=back_dir,
         is_dir=True,
@@ -970,6 +970,8 @@ def init_backup_settings() -> None:
     )
     count.grid(row=1, column=0)
     count.value = count_value
+    task_status.started()
+    await auto_field.task()
 
 
 async def init_toplevel(
@@ -1019,7 +1021,7 @@ async def init_toplevel(
 
     async with trio.open_nursery() as nursery:
         await nursery.start(init, tk_img)
-        init_backup_settings()
+        await nursery.start(init_backup_settings)
         ui_new_backup()
         task_status.started()
 

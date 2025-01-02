@@ -22,6 +22,7 @@ from srctools import logger
 import trio
 
 from app import ICO_PATH, BaseEnumButton, background_run
+from async_util import EdgeTrigger
 from config.gen_opts import GenOptions
 from transtoken import CURRENT_LANG, TransToken
 from trio_util import AsyncValue
@@ -469,11 +470,6 @@ def link_checkmark(check: ttk.Checkbutton, widget: ttk.Widget) -> None:
     widget.bind(EVENTS['LEFT_RELEASE'], on_release, add=True)
 
 
-def event_cancel(*args: Any, **kwargs: Any) -> str:
-    """Bind to an event to cancel it, and prevent it from propagating."""
-    return 'break'
-
-
 async def apply_bool_enabled_state_task(value: AsyncValue[bool], *widgets: ttk.Widget) -> NoReturn:
     """Apply an AsyncValue's state to one or more widgets.
 
@@ -676,6 +672,7 @@ async def _folderbrowse_powershell() -> str | None:
     result = await trio.run_process(
         [
             "powershell", "-NoProfile",
+            "-NonInteractive", "-NoLogo",
             "-command", "-",  # Run from stdin.
         ],
         shell=True,
@@ -683,6 +680,8 @@ async def _folderbrowse_powershell() -> str | None:
         capture_stderr=True,
         stdin=BROWSE_DIR_PS,
     )
+    if not result.stdout:
+        return None
     # An Ok or Cancel from ShowDialog, then the path.
     [btn, poss_path] = result.stdout.splitlines()
     if btn == b'Cancel':
@@ -726,6 +725,7 @@ class FileField(ttk.Frame):
 
         self._location = loc
         self.is_dir = is_dir
+        self.browse_trig = EdgeTrigger[()]()
 
         self._text_var = tk.StringVar(master=self, value='')
         if is_dir:
@@ -749,16 +749,15 @@ class FileField(ttk.Frame):
         )
         self.textbox.grid(row=0, column=0, sticky='ew')
         self.columnconfigure(0, weight=1)
-        bind_leftclick(self.textbox, lambda e: background_run(self.browse))
+
+        trig = self.browse_trig.maybe_trigger
+
+        bind_leftclick(self.textbox, lambda e: trig())
         # The full location is displayed in a tooltip.
         tooltip.add_tooltip(self.textbox, TransToken.untranslated(self._location))
         self.textbox.bind('<Configure>', self._text_configure)
 
-        self.browse_btn = ttk.Button(
-            self,
-            text="...",
-            command=lambda: background_run(self.browse),
-        )
+        self.browse_btn = ttk.Button(self, text="...", command=trig)
         self.browse_btn.grid(row=0, column=1)
         # It should be this narrow, but perhaps this doesn't accept floats?
         try:
@@ -768,7 +767,15 @@ class FileField(ttk.Frame):
 
         self._text_var.set(self._truncate(loc))
 
-    async def browse(self) -> None:
+    async def task(self) -> None:
+        """Operates the field."""
+        async with trio.open_nursery() as nursery:
+            nursery.start_soon(apply_bool_enabled_state_task, self.browse_trig.ready, self.browse_btn)
+            while True:
+                await self.browse_trig.wait()
+                await self._browse()
+
+    async def _browse(self) -> None:
         """Browse for a file."""
         if utils.WIN and self.is_dir:
             try:

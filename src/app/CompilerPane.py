@@ -392,7 +392,7 @@ async def make_widgets(
     async with trio.open_nursery() as nursery:
         async with trio.open_nursery() as start_nursery:
             start_nursery.start_soon(nursery.start, make_map_widgets, map_frame)
-            start_nursery.start_soon(make_comp_widgets, comp_frame, tk_img)
+            start_nursery.start_soon(nursery.start, make_comp_widgets, comp_frame, tk_img)
 
         window.bind('<Configure>', update_label, add='+')
         task_status.started()
@@ -403,7 +403,11 @@ async def make_widgets(
             await CURRENT_LANG.wait_transition()
 
 
-async def make_comp_widgets(frame: ttk.Frame, tk_img: TKImages) -> None:
+async def make_comp_widgets(
+    frame: ttk.Frame, tk_img: TKImages,
+    *,
+    task_status: trio.TaskStatus[None] = trio.TASK_STATUS_IGNORED,
+) -> None:
     """Create widgets for the compiler settings pane.
 
     These are generally things that are aesthetic, and to do with the file and
@@ -418,9 +422,11 @@ async def make_comp_widgets(frame: ttk.Frame, tk_img: TKImages) -> None:
     thumb_frame.grid(row=0, column=0, sticky=tk.EW)
     thumb_frame.columnconfigure(0, weight=1)
 
+    screen_event = trio.Event()
+
     def set_screen() -> None:
         """Event handler when radio buttons are clicked."""
-        app.background_run(set_screen_type)
+        screen_event.set()
 
     UI['thumb_auto'] = wid_transtoken.set_text(ttk.Radiobutton(
         thumb_frame,
@@ -661,6 +667,13 @@ async def make_comp_widgets(frame: ttk.Frame, tk_img: TKImages) -> None:
 
     await trio.lowlevel.checkpoint()
     refresh_counts(count_brush, count_entity, count_overlay)
+    task_status.started()
+    async with trio.open_nursery() as nursery:
+        nursery.start_soon(packfile_filefield.task)
+        while True:
+            await screen_event.wait()
+            screen_event = trio.Event()
+            await set_screen_type()
 
 
 async def make_map_widgets(
