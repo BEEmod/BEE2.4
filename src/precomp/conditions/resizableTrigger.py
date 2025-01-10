@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 from contextlib import suppress
-from typing import Optional
 
 from srctools import Keyvalues, Vec, Output, VMF
 import srctools.logger
@@ -72,7 +71,7 @@ def res_resizeable_trigger(vmf: VMF, info: conditions.MapInfo, res: Keyvalues) -
 
     # For Coop, we add a logic_coop_manager in the mix so both players can
     # be handled.
-    coop_var: Optional[str]
+    coop_var: str | None
     try:
         coop_var = res['coopVar']
     except LookupError:
@@ -87,8 +86,8 @@ def res_resizeable_trigger(vmf: VMF, info: conditions.MapInfo, res: Keyvalues) -
         )
 
     # Display preview overlays if it's preview mode, and the config is true
-    pre_act: Optional[Output] = None
-    pre_deact: Optional[Output] = None
+    pre_act: Output | None = None
+    pre_deact: Output | None = None
     if not info.is_publishing and options.get_itemconf(res['previewConf', ''], False):
         preview_mat = res['previewMat', '']
         preview_inst_file = res['previewInst', '']

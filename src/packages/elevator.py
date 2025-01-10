@@ -2,7 +2,7 @@
 
 We can't pack BIKs, so this is mainly for Valve's existing ones.
 """
-from typing import Final, Iterator, Optional
+from typing import Final, Iterator
 
 from packages import ExportKey, PackagesSet, SelPakObject, ParseData, SelitemData, AttrMap
 from transtoken import TransTokenSource
@@ -21,7 +21,7 @@ class Elevator(SelPakObject, needs_foreground=True, style_suggest_key='elev'):
         elev_id: str,
         selitem_data: SelitemData,
         video: str,
-        vert_video: Optional[str] = None,
+        vert_video: str | None = None,
     ) -> None:
         self.id = elev_id
 

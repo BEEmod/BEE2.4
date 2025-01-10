@@ -1,6 +1,4 @@
 """Handles generating Piston Platforms with specific logic."""
-from typing import Dict, Optional
-
 from precomp import packing, template_brush, conditions
 import srctools.logger
 from consts import FixupVars
@@ -183,7 +181,7 @@ def res_piston_plat(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
         move_ang = off.to_angle()
 
         # Index -> func_movelinear.
-        pistons: Dict[int, Entity] = {}
+        pistons: dict[int, Entity] = {}
 
         static_ent = vmf.create_ent('func_brush', origin=origin)
 
@@ -259,7 +257,7 @@ def res_piston_plat(vmf: VMF, res: Keyvalues) -> conditions.ResultCallable:
 
         # Associate any set panel with the same entity, if it's present.
         tile_pos = origin - orient.up(128)
-        panel: Optional[Panel] = None
+        panel: Panel | None = None
         try:
             tiledef = TILES[tile_pos.as_tuple(), off.norm().as_tuple()]
         except KeyError:

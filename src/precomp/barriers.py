@@ -408,8 +408,6 @@ class Barrier:
             return self.type.mergeable or self.name == other.name
         return NotImplemented
 
-    __hash__ = None
-
 
 @attrs.frozen(eq=False, kw_only=True)
 class Surface:
