@@ -138,7 +138,10 @@ class Config:
         cls: type[D],
         data_id: str = '',
     ) -> D:
-        """Fetch the value defined for a specific ID."""
+        """Fetch the value defined for a specific ID.
+
+        :raises KeyError: if not present.
+        """
         info = cls.get_conf_info()
         if data_id and not info.uses_id:
             raise ValueError(f'Data type "{info.name}" does not support IDs!')

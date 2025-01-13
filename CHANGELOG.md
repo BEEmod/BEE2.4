@@ -17,6 +17,7 @@
 * Fix initial state for "variant" dropdown boxes on item properties pane.
 * Automatically patch `tools/toolsinvisible` to allow light to pass through.
 * Fix app not quitting when initial loading screen is closed.
+* Fix default values not being used for items like Cube Colourisers and Corridors.
 
 ### UCP-Relevant changes:
 * Add `SweepTrace` mode to `Collisions` result. This allows creating collisions 

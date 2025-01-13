@@ -8,7 +8,7 @@ from srctools import Vec
 import srctools.logger
 import trio
 
-from config.corridors import Config
+from config.corridors import Config, Options
 from corridor import (
     CorrKind, Corridor, OptionGroup, Direction, GameMode, Attachment, ExportedConf,
     CORRIDOR_COUNTS, ID_TO_CORR,
@@ -79,8 +79,26 @@ async def step_corridor_conf(exp_data: ExportData) -> None:
             # Use default setup, don't warn.
             chosen = group.defaults(mode, direction, attach)
 
+        opt_id = Options.get_id(style_id, mode, direction)
+        options_changed = False
+        try:
+            exported_options = exp_data.config.get(Options, opt_id).options
+        except KeyError:
+            exported_options = {}
+            options_changed = True
+
         for corr in chosen:
             exp_data.vbsp_conf.extend(await corr.config())
+            for option in group.get_options(mode, direction, corr):
+                # If an option is not present in the config, add it.
+                if option.id not in exported_options:
+                    LOGGER.debug('Applying default {}[{!r}] = {!r}', opt_id, option.id, option.default)
+                    exported_options[option.id] = option.default
+                    options_changed = True
+
+        if options_changed:
+            exp_data.config = exp_data.config.with_value(Options(exported_options), opt_id)
+
         export[mode, direction, attach] = [corr.strip_ui() for corr in chosen]
 
     result = ExportedConf(
