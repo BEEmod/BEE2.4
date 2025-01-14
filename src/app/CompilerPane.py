@@ -70,6 +70,7 @@ PLAYER_MODELS = {
     'SP': TransToken.ui('Chell'),
     'ATLAS': TransToken.ui('ATLAS'),
     'PBODY': TransToken.ui('P-Body'),
+    'CHELL_P1': TransToken.ui('Chell (P1)'),
 }
 assert PLAYER_MODELS.keys() == set(PLAYER_MODEL_ORDER)
 

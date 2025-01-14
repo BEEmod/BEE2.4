@@ -12,7 +12,7 @@ import config
 
 
 LOGGER = logger.get_logger(__name__, 'conf.comp_pane')
-PLAYER_MODEL_ORDER: Sequence[str] = ['PETI', 'SP', 'ATLAS', 'PBODY']
+PLAYER_MODEL_ORDER: Sequence[str] = ['PETI', 'SP', 'ATLAS', 'PBODY', 'CHELL_P1']
 
 
 @config.PALETTE.register
