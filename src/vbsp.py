@@ -354,6 +354,7 @@ PLAYER_MODELS = {
     'sp': ('player/chell/player', 0),
     'atlas': ('player/ballbot/ballbot', 1),
     'pbody': ('player/eggbot/eggbot', 2),
+    'chell_p1': ('bee2/player/chell_p1', 0),
 }
 
 

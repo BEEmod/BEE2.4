@@ -434,8 +434,8 @@ def add_voice(
         LineCriteria.ATLAS: info.is_coop or player_model == 'atlas',
         LineCriteria.PBODY: info.is_coop or player_model == 'pbody',
         LineCriteria.BENDY: info.is_sp and player_model == 'peti',
-        LineCriteria.CHELL: info.is_sp and player_model == 'sp',
-        LineCriteria.HUMAN: info.is_sp and player_model in ('peti', 'sp'),
+        LineCriteria.CHELL: info.is_sp and player_model in ('sp', 'chell_p1'),
+        LineCriteria.HUMAN: info.is_sp and player_model in ('peti', 'sp', 'chell_p1'),
         LineCriteria.ROBOT: info.is_coop or player_model in ('atlas', 'pbody'),
     }
     # All which are True.
