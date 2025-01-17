@@ -690,5 +690,5 @@ COMPILER: ConfigSpec = ConfigSpec()
 # Import submodules, so they're registered.
 from config import (  # noqa: E402
     compile_pane, corridors, filters, gen_opts, item_defaults,  last_sel, palette,   # noqa: F401
-    signage,  stylevar, widgets, windows,  # noqa: F401
+    signage,  stylevar, widgets, windows, player, # noqa: F401
 )

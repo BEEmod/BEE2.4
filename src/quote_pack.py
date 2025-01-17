@@ -57,6 +57,15 @@ class LineCriteria(enum.Enum):
         else:
             assert_never(self)
 
+# Criteria the player model can set.
+PLAYER_CRITERIA = [
+    LineCriteria.CHELL,
+    LineCriteria.BENDY,
+    LineCriteria.ATLAS,
+    LineCriteria.PBODY,
+    LineCriteria.HUMAN,
+    LineCriteria.ROBOT,
+]
 
 @utils.freeze_enum_props
 class Response(enum.Enum):

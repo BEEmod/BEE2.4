@@ -4,26 +4,16 @@ from collections.abc import Iterator
 
 import trio.lowlevel
 
-from config import Config
-from packages import PackagesSet, PakObject, ParseData
-from quote_pack import LineCriteria
+from packages import PakObject, ParseData
+from quote_pack import LineCriteria, PLAYER_CRITERIA
 from transtoken import TransToken, TransTokenSource
 import utils
-
-# Criteria the model can set.
-CRITERIA = [
-    LineCriteria.CHELL,
-    LineCriteria.BENDY,
-    LineCriteria.ATLAS,
-    LineCriteria.PBODY,
-    LineCriteria.HUMAN,
-    LineCriteria.ROBOT,
-]
 
 
 class PlayerModel(PakObject):
     """Specifies a possible player."""
     id: utils.ObjectID
+    name: TransToken
     model: str
     pgun_skin: int
 
@@ -42,7 +32,7 @@ class PlayerModel(PakObject):
         self.name = name
         self.pgun_skin = pgun_skin
         self.voice_options = voice_options
-        for criteria in CRITERIA:
+        for criteria in PLAYER_CRITERIA:
             voice_options.setdefault(criteria, False)
 
     @classmethod
@@ -55,7 +45,7 @@ class PlayerModel(PakObject):
         voice_block = data.info.find_block('voice', or_blank=True)
         voice_options = {
             criteria: voice_block.bool(criteria.name)
-            for criteria in CRITERIA
+            for criteria in PLAYER_CRITERIA
         }
         return cls(utils.obj_id(data.id), model, name, pgun_skin, voice_options)
 
