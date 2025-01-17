@@ -14,6 +14,7 @@ from app.item_picker import ItemPickerBase
 from app.paletteLoader import (
     COORDS, HORIZ, VERT, HorizInd, ItemPos, Palette, VertInd,
 )
+from packages import LOADED as LOADED_PACKAGES
 from config.palette import PaletteState
 from consts import PALETTE_FORCE_SHOWN, UUID_BLANK, UUID_EXPORT, UUID_PORTAL2
 from transtoken import CURRENT_LANG, TransToken
@@ -444,6 +445,7 @@ class PaletteUI:
         self.select_palette(UUID(hex=uuid_hex), True)
         self.picker.set_items(self.selected.items)
         self.is_dirty.set()
+        await self._apply_settings()
 
     async def event_select_tree(self) -> None:
         """Called when palettes are selected on the treeview."""
@@ -455,6 +457,7 @@ class PaletteUI:
         self.select_palette(UUID(hex=uuid_hex), True)
         self.picker.set_items(self.selected.items)
         self.is_dirty.set()
+        await self._apply_settings()
 
     def treeview_reselect(self) -> None:
         """When a group item is selected on the tree, reselect the palette."""
@@ -462,3 +465,12 @@ class PaletteUI:
         uuid_hex = 'pal_' + self.selected.uuid.hex
         if self.ui_treeview.exists(uuid_hex):
             self.ui_treeview.selection_set(uuid_hex)
+
+    async def _apply_settings(self) -> None:
+        """If enabled, apply saved settings."""
+        conf = self.selected.settings
+        if conf is None:
+            return
+        conf = await LOADED_PACKAGES.value.migrate_conf(conf)
+        LOGGER.info('Settings: {}', conf)
+        await config.APP.apply_multi(conf)

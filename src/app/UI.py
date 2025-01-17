@@ -372,23 +372,6 @@ async def export_complete_task(
                 pal_ui.is_dirty.set()
 
 
-async def set_palette(chosen_pal: paletteUI.Palette) -> None:
-    """Select a palette."""
-    await trio.lowlevel.checkpoint()
-    for slot, coord in item_picker.slots_pal.items():
-        await trio.lowlevel.checkpoint()
-
-        try:
-            item, sub = chosen_pal.items[coord]
-        except KeyError:
-            slot.contents = None
-        else:
-            slot.contents = SubItemRef(
-                PakRef(packages.Item, utils.obj_id(item)),
-                sub,
-            )
-
-
 async def init_option(
     core_nursery: trio.Nursery,
     pane: SubPane.SubPane,
