@@ -123,6 +123,10 @@ class Widget:
         """Return the config key used for this widget."""
         return f'{self.group_id}:{self.id}'
 
+    def create_conf(self) -> WidgetConfig:
+        """Create a copy of the current configuration."""
+        raise NotImplementedError
+
 
 @attrs.define
 class SingleWidget(Widget):
@@ -130,6 +134,9 @@ class SingleWidget(Widget):
     holder: AsyncValue[str]
     # Used for some configs ported from stylevars.
     stylevar_id: str
+
+    def create_conf(self) -> WidgetConfig:
+        return WidgetConfig(self.holder.value)
 
     async def load_conf_task(
         self, cm: AbstractContextManager[trio.MemoryReceiveChannel[WidgetConfig]],
@@ -151,6 +158,7 @@ class SingleWidget(Widget):
         data_id = self.conf_id()
         async with aclosing(self.holder.eventual_values()) as agen:
             async for value in agen:
+                # Don't use create_conf(), we already have the current value.
                 config.APP.store_conf(WidgetConfig(value), data_id)
                 # Make sure the old ID is no longer present whenever saving.
                 if self.stylevar_id:
@@ -162,6 +170,12 @@ class MultiWidget(Widget):
     """Represents a group of multiple widgets for all the timer values."""
     use_inf: bool  # For timer, is infinite valid?
     holders: dict[TimerNum, AsyncValue[str]]
+
+    def create_conf(self) -> WidgetConfig:
+        return WidgetConfig({
+            num: holder.value
+            for num, holder in self.holders.items()
+        })
 
     async def load_conf_task(
         self, cm: AbstractContextManager[trio.MemoryReceiveChannel[WidgetConfig]],
@@ -191,10 +205,7 @@ class MultiWidget(Widget):
                 holder.wait_transition
                 for holder in self.holders.values()
             ])
-            config.APP.store_conf(WidgetConfig({
-                num: holder.value
-                for num, holder in self.holders.items()
-            }), data_id)
+            config.APP.store_conf(self.create_conf(), data_id)
 
 
 class ConfigGroup(packages.PakObject, allow_mult=True, needs_foreground=True):

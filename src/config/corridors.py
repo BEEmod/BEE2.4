@@ -263,12 +263,7 @@ class UIState(config.Data, conf_name='CorridorUIState'):
         try:
             last_attach = Attachment(data['attach'].val_string)
         except (LookupError, ValueError):
-            try:
-                last_orient = Orient(data['orient'].val_string)
-            except (LookupError, ValueError):
-                last_attach = Attachment.HORIZONTAL
-            else:
-                last_attach = ORIENT_TO_ATTACH[last_direction, last_orient]
+            last_attach = ORIENT_TO_ATTACH[last_direction, last_orient]
 
         try:
             width = data['width'].val_int

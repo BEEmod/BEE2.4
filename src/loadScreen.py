@@ -111,6 +111,13 @@ class ScreenStage:
         for screen in list(self._bound):
             _QUEUE_SEND_LOAD.put(ipc_types.Load2Daemon_Set(screen.id, self.id, self._current))
 
+    def reset(self) -> None:
+        """Reset the current value."""
+        self._current = 0
+        self._skipped = False
+        for screen in list(self._bound):
+            _QUEUE_SEND_LOAD.put(ipc_types.Load2Daemon_Set(screen.id, self.id, self._current))
+
     async def skip(self) -> None:
         """Skip this stage."""
         await trio.lowlevel.checkpoint()
@@ -173,6 +180,11 @@ class LoadScreen:
         ))
         _ALL_SCREENS[self.id] = self
 
+    def reset(self) -> None:
+        """Reset all counts for this screen."""
+        for stage in self.stages:
+            stage.reset()
+
     def __enter__(self) -> Self:
         """LoadScreen can be used as a context manager.
 
@@ -187,6 +199,7 @@ class LoadScreen:
         self._scope = trio.CancelScope().__enter__()
         self.cancelled = False
         self._show()
+        self.reset()
         return self
 
     def __exit__(

@@ -1,5 +1,5 @@
 """Test classes in the plane module."""
-from typing import List, Optional, Tuple, no_type_check
+from typing import no_type_check
 from collections import Counter
 
 import pytest
@@ -40,7 +40,7 @@ def test_grid_insertion(dx: int, dy: int) -> None:
                 assert grid.get((x, y), 'hi') == 'hi'
 
 
-def _points(*pattern: str) -> List[Tuple[int, int]]:
+def _points(*pattern: str) -> list[tuple[int, int]]:
     """Return each coordinate in order in the string map."""
     points = [
         (x, y)
@@ -84,7 +84,7 @@ def _points(*pattern: str) -> List[Tuple[int, int]]:
         '54..0',
     ),
 ], ids=['order', 'patA', 'patB', 'patC', 'patD'])
-def test_grid_insertion_complex(pattern: List[Tuple[int, int]], off_x: int, off_y: int) -> None:
+def test_grid_insertion_complex(pattern: list[tuple[int, int]], off_x: int, off_y: int) -> None:
     """Insert in various patterns, to test the dynamic resizing."""
     grid = PlaneGrid[object]()
     backup = {}
@@ -119,7 +119,7 @@ def test_grid_insertion_complex(pattern: List[Tuple[int, int]], off_x: int, off_
 
 def test_grid_views() -> None:
     """Test the view objects."""
-    grid: PlaneGrid[Optional[int]] = PlaneGrid()
+    grid: PlaneGrid[int | None] = PlaneGrid()
     grid[0, 4] = 1
     grid[2, -5] = None
     grid[0, 5] = 3

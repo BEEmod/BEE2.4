@@ -1,7 +1,7 @@
 """Original result used to generate unstationary scaffolds, kept for backwards compatibility."""
 from __future__ import annotations
 
-from typing import Dict, List, Tuple, Optional, Any, Union
+from typing import Any
 from enum import Enum
 import math
 
@@ -24,8 +24,8 @@ LOGGER = srctools.logger.get_logger(__name__, alias='cond._scaffold_compat')
 
 
 def get_config(
-    node: item_chain.Node[Dict[str, Any]],
-) -> Tuple[str, Vec]:
+    node: item_chain.Node[dict[str, Any]],
+) -> tuple[str, Vec]:
     """Compute the config values for a node."""
 
     orient = ('floor' if abs(node.orient.up().z) > 0.9 else 'wall')
@@ -44,7 +44,7 @@ def get_config(
     return orient, offset
 
 
-def resolve_optional(kv: Keyvalues, key: str) -> Optional[str]:
+def resolve_optional(kv: Keyvalues, key: str) -> str | None:
     """Resolve the given instance, or return None if not defined."""
     try:
         file = kv[key]
@@ -57,9 +57,9 @@ def resolve_optional(kv: Keyvalues, key: str) -> Optional[str]:
 SCAFF_PATTERN = '{name}_group{group}_part{index}'
 
 # Store the configs for scaffold items, so we can join them up later
-SCAFFOLD_CONFIGS: Dict[str, Tuple[
-    Dict[str, Dict[str, Union[bool, str, Vec, None]]],
-    Dict[str, Dict[str, Optional[str]]],
+SCAFFOLD_CONFIGS: dict[str, tuple[
+    dict[str, dict[str, bool | str | Vec | None]],
+    dict[str, dict[str, str | None]],
 ]] = {}
 
 
@@ -80,7 +80,7 @@ def res_old_unst_scaffold(res: Keyvalues) -> None:
         targ_inst, links = SCAFFOLD_CONFIGS[group]
 
     for block in res.find_all("Instance"):
-        conf: Dict[str, Union[bool, str, Vec, None]] = {
+        conf: dict[str, bool | str | Vec | None] = {
             # If set, adjusts the offset appropriately
             'is_piston': srctools.conv_bool(block['isPiston', '0']),
             'rotate_logic': srctools.conv_bool(block['AlterAng', '1'], True),
@@ -143,7 +143,7 @@ def legacy_scaffold_link(vmf: VMF) -> None:
 
     for inst_to_config, LINKS in SCAFFOLD_CONFIGS.values():
         # Don't bother typechecking this dict, legacy code.
-        nodes: List[item_chain.Node[Dict[str, Any]]] = []
+        nodes: list[item_chain.Node[dict[str, Any]]] = []
         for inst in vmf.by_class['func_instance']:
             try:
                 conf = inst_to_config[inst['file'].casefold()]

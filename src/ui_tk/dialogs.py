@@ -15,7 +15,7 @@ from loadScreen import suppress_screens
 from transtoken import AppError, TransToken
 
 from . import TK_ROOT
-from .tk_tools import center_onscreen, set_window_icon
+from .tk_tools import center_onscreen, center_win, set_window_icon
 from .wid_transtoken import set_text
 
 
@@ -155,9 +155,13 @@ class QueryValidator(tk.Toplevel):
         self.transient(parent)
         self.grab_set()
 
-        simpledialog._setup_dialog(self)
-        if self._windowingsystem == 'aqua':
+        # Aside from bind, these inlined from simpledialog._setup_dialog
+        if self._windowingsystem == "aqua":
+            self.tk.call("::tk::unsupported::MacWindowStyle", "style", self, "moveableModal", "")
             self.bind("<Command-.>", self.cancel)
+        elif self._windowingsystem == "x11":
+            self.wm_attributes("type", "dialog")
+
         self.bind('<Key-Escape>', self.cancel)
         self.protocol("WM_DELETE_WINDOW", self.cancel)
         self.bind('<Key-Return>', self.ok)
@@ -165,13 +169,7 @@ class QueryValidator(tk.Toplevel):
 
         self.create_widgets()
         self.update_idletasks()  # Need here for winfo_reqwidth below.
-        self.geometry(  # Center dialog over parent (or below htest box).
-                "+%d+%d" % (
-                    parent.winfo_rootx() +
-                    (parent.winfo_width()/2 - self.winfo_reqwidth()/2),
-                    parent.winfo_rooty() +
-                    (parent.winfo_height()/2 - self.winfo_reqheight()/2)
-                ))
+        center_win(self, parent)
         self.resizable(height=False, width=False)
 
         self.deiconify()  # Unhide now that geometry set.
@@ -184,8 +182,7 @@ class QueryValidator(tk.Toplevel):
         Entry stuff on rows 0-2, spanning cols 0-2.
         Buttons on row 99, cols 1, 2.
         """
-        # Bind to self the widgets needed for entry_ok or unittest.
-        self.frame = frame = ttk.Frame(self, padding=10)
+        frame = ttk.Frame(self, padding=10)
         frame.grid(column=0, row=0, sticky='news')
         frame.grid_columnconfigure(0, weight=1)
 

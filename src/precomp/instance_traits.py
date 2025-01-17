@@ -1,5 +1,5 @@
 """Adds various traits to instances, based on item classes."""
-from typing import List, MutableMapping, Optional, Dict, Set, Union
+from collections.abc import MutableMapping
 from weakref import WeakKeyDictionary
 
 import attrs
@@ -19,7 +19,7 @@ LOGGER = srctools.logger.get_logger(__name__)
 SKIP_COLL = '_skip_coll'
 
 # Special case - specific attributes...
-ID_ATTRS: Dict[utils.ObjectID, List[Set[str]]] = {
+ID_ATTRS: dict[utils.ObjectID, list[set[str]]] = {
     DefaultItems.placement_helper.id: [
         {'placement_helper'},
     ],
@@ -46,7 +46,7 @@ ID_ATTRS: Dict[utils.ObjectID, List[Set[str]]] = {
     ]
 }
 
-CLASS_ATTRS: Dict[ItemClass, List[Set[str]]] = {
+CLASS_ATTRS: dict[ItemClass, list[set[str]]] = {
     ItemClass.FLOOR_BUTTON: [
         {'white', 'weighted', 'floor_button'},
         {'black', 'weighted', 'floor_button'},
@@ -145,15 +145,15 @@ CLASS_ATTRS: Dict[ItemClass, List[Set[str]]] = {
 class TraitInfo:
     """The info associated for each instance."""
     item_class: ItemClass = ItemClass.UNCLASSED
-    item_id: Optional[utils.ObjectID] = None
-    traits: Set[str] = attrs.Factory(set)
+    item_id: utils.ObjectID | None = None
+    traits: set[str] = attrs.Factory(set)
 
 
 # Maps entities to their traits.
 ENT_TO_TRAITS: MutableMapping[Entity, TraitInfo] = WeakKeyDictionary()
 
 
-def get(inst: Entity) -> Set[str]:
+def get(inst: Entity) -> set[str]:
     """Return the traits for an instance.
 
     Modify to set values.
@@ -165,7 +165,7 @@ def get(inst: Entity) -> Set[str]:
         return info.traits
 
 
-def get_class(inst: Entity) -> Optional[ItemClass]:
+def get_class(inst: Entity) -> ItemClass | None:
     """If known, return the item class for this instance.
 
     It must be the original entity placed by the PeTI.
@@ -176,7 +176,7 @@ def get_class(inst: Entity) -> Optional[ItemClass]:
         return None
 
 
-def get_item_id(inst: Entity) -> Optional[utils.ObjectID]:
+def get_item_id(inst: Entity) -> utils.ObjectID | None:
     """If known, return the item ID for this instance.
 
     It must be the original entity placed by the PeTI.
@@ -187,19 +187,19 @@ def get_item_id(inst: Entity) -> Optional[utils.ObjectID]:
         return None
 
 
-def set_traits(vmf: VMF, id_to_item: Dict[utils.ObjectID, Item], coll: Collisions) -> Set[str]:
+def set_traits(vmf: VMF, id_to_item: dict[utils.ObjectID, Item], coll: Collisions) -> set[str]:
     """Scan through the map, apply traits to instances, and set initial collisions.
 
     This returns a set of strings listing the used instances, for debugging purposes.
     """
-    used_inst: Set[str] = set()
+    used_inst: set[str] = set()
 
     for inst in vmf.by_class['func_instance']:
         inst_file = inst['file'].casefold()
         if not inst_file:
             continue
 
-        item_ind: Union[str, int]
+        item_ind: str | int
         # Special case, corridors.
         corr_info = parse_corr_filename(inst_file)
         if corr_info is not None:
@@ -219,7 +219,7 @@ def set_traits(vmf: VMF, id_to_item: Dict[utils.ObjectID, Item], coll: Collision
             LOGGER.warning('<{}:bee2_{}> found in original map?', item_id, item_ind)
             continue
 
-        item: Optional[Item]
+        item: Item | None
         try:
             item = id_to_item[item_id]
         except (KeyError, ValueError):

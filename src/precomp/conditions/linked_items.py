@@ -1,6 +1,5 @@
 """Implements a condition which allows linking items into a sequence."""
 from __future__ import annotations
-from typing import Optional, Callable
 from enum import Enum
 import itertools
 import math
@@ -28,10 +27,10 @@ class AntlineHandling(Enum):
 class Config:
     """Configuration for linked items."""
     group: str  # For reporting.
-    logic_start: Optional[str]
-    logic_mid: Optional[str]
-    logic_end: Optional[str]
-    logic_loop: Optional[str]
+    logic_start: str | None
+    logic_mid: str | None
+    logic_end: str | None
+    logic_loop: str | None
 
     antline: AntlineHandling
     transfer_io: bool
@@ -43,7 +42,7 @@ class Config:
 
     # Special feature for unstationary scaffolds. This is rotated to face
     # the next track!
-    scaff_endcap: Optional[str]
+    scaff_endcap: str | None
     # If it's allowed to point any direction, not just 90 degrees.
     scaff_endcap_free_rot: bool
 
@@ -65,7 +64,7 @@ ITEMS_TO_LINK: dict[str, list[item_chain.Node[Config]]] = {}
     'LinkedItem',
     valid_before=conditions.MetaCond.LinkedItems,
 )
-def res_linked_item(res: Keyvalues) -> Callable[[Entity], None]:
+def res_linked_item(res: Keyvalues) -> conditions.ResultCallable:
     """Marks the current instance for linkage together into a chain.
 
     At priority level <PRIORITY>, the sequence of similarly-marked items this links
@@ -230,7 +229,7 @@ def link_item(vmf: VMF, group: list[item_chain.Node[Config]]) -> None:
                     conn.to_item = node_list[0].item
 
             # If start/end, the other node.
-            other_node: Optional[item_chain.Node[Config]] = None
+            other_node: item_chain.Node[Config] | None = None
             if is_looped:
                 node.inst.fixup['$type'] = 'loop'
                 logic_fname = conf.logic_loop

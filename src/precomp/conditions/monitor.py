@@ -4,7 +4,7 @@ from precomp import instanceLocs, connections, conditions, faithplate
 from srctools import FrozenVec, Matrix, Keyvalues, Vec, Entity, VMF, Output, Angle
 import srctools.logger
 
-from typing import List, NamedTuple, Literal, Optional
+from typing import NamedTuple, Literal
 
 from quote_pack import QuoteInfo
 
@@ -20,14 +20,14 @@ class Camera(NamedTuple):
     cam_angles: Angle
 
 
-ALL_CAMERAS: List[Camera] = []
+ALL_CAMERAS: list[Camera] = []
 
 # Do any monitors exist?
 HAS_MONITOR: bool = False
 
 # ai_relationships used for monitors.
 # If non-emtpy we have monitors to shoot by turrets.
-MONITOR_RELATIONSHIP_ENTS: List[Entity] = []
+MONITOR_RELATIONSHIP_ENTS: list[Entity] = []
 
 # The location of arrival_departure_transition_ents, which has toolsblack.
 BLACK_SCREEN_LOC = FrozenVec(-2500, -2500, 0)
@@ -52,7 +52,7 @@ def scriptvar_set(
         'const', 'string', 'bool', 'inv_bool', 'name', 'handle', 'keyvalue',
         'pos', 'ang', 'off', 'dist', 'x', 'y', 'z', 'pos_x', 'pos_y', 'pos_z',
     ] = 'const',
-    index: Optional[int] = None,
+    index: int | None = None,
     angles: object = '0 0 0',
 ) -> None:
     """Add in a comp_scriptvar_setter entity."""
