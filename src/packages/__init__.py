@@ -567,7 +567,7 @@ class PakObject:
         pass
 
     @classmethod
-    async def migrate_config(cls, packset: PackagesSet, conf: Config) -> Config:
+    async def migrate_config(cls, packset: PackagesSet, conf: Config, /) -> Config:
         """Update configs based on the loaded packages."""
         return conf
 
@@ -1644,16 +1644,17 @@ def sep_values(string: str, delimiters: Iterable[str] = ',;/') -> list[str]:
 
 
 # Load all the package object classes, registering them in the process.
-from packages.item import Item
-from packages.stylevar import StyleVar
-from packages.elevator import Elevator
-from packages.editor_sound import EditorSound
-from packages.style_vpk import StyleVPK
-from packages.signage import Signage
-from packages.skybox import Skybox
-from packages.music import Music
-from packages.quote_pack import QuotePack
-from packages.pack_list import PackList
-from packages.corridor import CorridorGroup
-from packages.widgets import ConfigGroup
-from packages.barrier_hole import BarrierHole
+from .barrier_hole import BarrierHole
+from .corridor import CorridorGroup
+from .editor_sound import EditorSound
+from .elevator import Elevator
+from .item import Item
+from .music import Music
+from .pack_list import PackList
+from .player import PlayerModel
+from .quote_pack import QuotePack
+from .signage import Signage
+from .skybox import Skybox
+from .style_vpk import StyleVPK
+from .stylevar import StyleVar
+from .widgets import ConfigGroup
