@@ -20,10 +20,6 @@ CRITERIA = [
     LineCriteria.ROBOT,
 ]
 
-LEGACY_IDS = {
-
-}
-
 
 class PlayerModel(PakObject):
     """Specifies a possible player."""
@@ -65,8 +61,3 @@ class PlayerModel(PakObject):
 
     def iter_trans_tokens(self) -> Iterator[TransTokenSource]:
         yield self.name
-
-    @classmethod
-    async def migrate_config(cls, packset: PackagesSet, conf: Config) -> Config:
-        """Convert from old non-package-based definitions."""
-        return conf

@@ -9,16 +9,25 @@ from srctools.dmx import Element
 import attrs
 
 import config
+from consts import DEFAULT_PLAYER
+import utils
 
 
 LOGGER = logger.get_logger(__name__, 'conf.comp_pane')
-PLAYER_MODEL_ORDER: Sequence[str] = ['PETI', 'SP', 'ATLAS', 'PBODY', 'CHELL_P1']
+
+# Hardcoded IDs to corresponding package IDs
+PLAYER_MODEL_LEGACY_IDS = {
+    'PETI': DEFAULT_PLAYER,
+    'SP': utils.obj_id('VALVE_CHELL'),
+    'ATLAS': utils.obj_id('VALVE_ATLAS'),
+    'PBODY': utils.obj_id('VALVE_PBODY'),
+}
 
 
 @config.PALETTE.register
 @config.APP.register
 @attrs.frozen
-class CompilePaneState(config.Data, conf_name='CompilerPane'):
+class CompilePaneState(config.Data, conf_name='CompilerPane', version=2):
     """State saved in palettes.
 
     Note: We specifically do not save/load the following:
@@ -31,7 +40,7 @@ class CompilePaneState(config.Data, conf_name='CompilerPane'):
     sshot_cust_fname: str = ''
     sshot_cust: bytes = attrs.field(repr=False, default=b'')
     spawn_elev: bool = False
-    player_mdl: str = 'PETI'
+    player_mdl: utils.ObjectID = DEFAULT_PLAYER
     use_voice_priority: bool = False
 
     @classmethod
@@ -48,8 +57,8 @@ class CompilePaneState(config.Data, conf_name='CompilerPane'):
     @override
     def parse_kv1(cls, data: Keyvalues, version: int) -> CompilePaneState:
         """Parse Keyvalues1 format data."""
-        if version != 1:
-            raise config.UnknownVersion(version, '1')
+        if version not in (1, 2):
+            raise config.UnknownVersion(version, '1-2')
         if 'sshot_data' in data:
             screenshot_parts = b'\n'.join([
                 prop.value.encode('ascii')
@@ -65,10 +74,15 @@ class CompilePaneState(config.Data, conf_name='CompilerPane'):
             LOGGER.warning('Unknown screenshot type "{}"!', sshot_type)
             sshot_type = 'AUTO'
 
-        player_mdl = data['player_model', 'PETI'].upper()
-        if player_mdl not in PLAYER_MODEL_ORDER:
-            LOGGER.warning('Unknown player model "{}"!', player_mdl)
-            player_mdl = 'PETI'
+        if version == 1:
+            legacy_mdl = data['player_model', 'PETI'].upper()
+            try:
+                player_mdl = PLAYER_MODEL_LEGACY_IDS[legacy_mdl]
+            except KeyError:
+                LOGGER.warning('Unknown legacy player model "{}"!', legacy_mdl)
+                player_mdl = DEFAULT_PLAYER
+        else:
+            player_mdl = utils.obj_id(data['player_model', DEFAULT_PLAYER])
 
         return CompilePaneState(
             sshot_type=sshot_type,
@@ -110,8 +124,8 @@ class CompilePaneState(config.Data, conf_name='CompilerPane'):
     @override
     def parse_dmx(cls, data: Element, version: int) -> CompilePaneState:
         """Parse DMX format data."""
-        if version != 1:
-            raise config.UnknownVersion(version, '1')
+        if version not in (1, 2):
+            raise config.UnknownVersion(version, '1-2')
 
         try:
             sshot_type = data['sshot_type'].val_str.upper()
@@ -135,14 +149,18 @@ class CompilePaneState(config.Data, conf_name='CompilerPane'):
             screenshot_data = b''
             screenshot_fname = ''
 
-        try:
-            player_mdl = data['player_model'].val_str.upper()
-        except KeyError:
-            player_mdl = 'PETI'
+        if version == 1:
+            legacy_mdl = data['player_model'].val_str.upper()
+            try:
+                player_mdl = PLAYER_MODEL_LEGACY_IDS[legacy_mdl]
+            except KeyError:
+                LOGGER.warning('Unknown legacy player model "{}"!', legacy_mdl)
+                player_mdl = DEFAULT_PLAYER
         else:
-            if player_mdl not in PLAYER_MODEL_ORDER:
-                LOGGER.warning('Unknown player model "{}"!', player_mdl)
-                player_mdl = 'PETI'
+            try:
+                player_mdl = utils.obj_id(data['player_model'].val_str)
+            except KeyError:
+                player_mdl = DEFAULT_PLAYER
 
         try:
             sshot_cleanup = data['sshot_cleanup'].val_bool

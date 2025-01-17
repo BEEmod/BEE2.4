@@ -26,6 +26,7 @@ __all__ = [
     'SEL_ICON_SIZE', 'SEL_ICON_SIZE_LRG',
     'PALETTE_FORCE_SHOWN', 'PALETTE_NS',
     'UUID_BLANK', 'UUID_EXPORT', 'UUID_PORTAL2',
+    'DEFAULT_PLAYER',
 ]
 
 
@@ -363,5 +364,8 @@ UUID_PORTAL2 = uuid5(PALETTE_NS, 'PORTAL2')
 UUID_EXPORT = uuid5(PALETTE_NS, 'LAST_EXPORT')
 UUID_BLANK = uuid5(PALETTE_NS, 'EMPTY')
 
-# These may not be hidden.
+# This palette is not allowed to be hidden.
 PALETTE_FORCE_SHOWN: frozenset[UUID] = frozenset({UUID_PORTAL2})
+
+# Default player model ID.
+DEFAULT_PLAYER = utils.obj_id('VALVE_BENDY')
