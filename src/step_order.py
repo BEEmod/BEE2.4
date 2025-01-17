@@ -61,7 +61,7 @@ class StepOrder[CtxT, ResourceT]:
         self._locked = False
 
     def add_step(
-        self,
+        self, *,
         prereq: Collection[ResourceT],
         results: Collection[ResourceT],
     ) -> Callable[[Func[CtxT]], Func[CtxT]]:

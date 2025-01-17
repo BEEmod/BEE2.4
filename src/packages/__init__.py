@@ -49,7 +49,7 @@ __all__ = [
     'SelitemData', 'AttrDef', 'AttrTypes', 'AttrValues', 'AttrMap',
 
     # Package objects.
-    'Style', 'Item', 'StyleVar', 'Elevator', 'EditorSound', 'StyleVPK', 'Signage',
+    'Style', 'Item', 'StyleVar', 'Elevator', 'EditorSound', 'StyleVPK', 'Signage', 'PlayerModel',
     'Skybox', 'Music', 'QuotePack', 'PackList', 'CorridorGroup', 'ConfigGroup', 'BarrierHole',
 
     # Mainly intended for package object code.

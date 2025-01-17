@@ -1,6 +1,6 @@
 """Objects defining which player models are available."""
 from typing import Self
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 
 import trio.lowlevel
 
@@ -17,7 +17,7 @@ class PlayerModel(PakObject):
     model: str
     pgun_skin: int
 
-    voice_options: dict[LineCriteria, bool]
+    voice_options: Mapping[LineCriteria, bool]
 
     def __init__(
         self,
@@ -50,4 +50,4 @@ class PlayerModel(PakObject):
         return cls(utils.obj_id(data.id), model, name, pgun_skin, voice_options)
 
     def iter_trans_tokens(self) -> Iterator[TransTokenSource]:
-        yield self.name
+        yield (self.name, 'disp_name')

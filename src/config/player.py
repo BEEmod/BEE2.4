@@ -1,4 +1,5 @@
 """Exported configuration storing the current player model."""
+from collections.abc import Mapping
 from typing import Self, override
 
 import attrs
@@ -53,7 +54,7 @@ class ExportPlayer(config.Data, conf_name='PlayerModel', version=1, uses_id=True
     model: str = ''
     pgun_skin: int = 0
 
-    voice_options: dict[LineCriteria, bool] = attrs.Factory(dict.fromkeys(PLAYER_CRITERIA, False).copy)
+    voice_options: Mapping[LineCriteria, bool] = dict.fromkeys(PLAYER_CRITERIA, False)
 
     @classmethod
     @override
