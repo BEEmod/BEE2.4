@@ -349,15 +349,6 @@ def anti_fizz_bump(vmf: VMF) -> None:
     LOGGER.info('Done!')
 
 
-# The paths for player models and the portalgun skin
-PLAYER_MODELS = {
-    'sp': ('player/chell/player', 0),
-    'atlas': ('player/ballbot/ballbot', 1),
-    'pbody': ('player/eggbot/eggbot', 2),
-    'chell_p1': ('bee2/player/chell_p1', 0),
-}
-
-
 @conditions.MetaCond.PlayerModel.register
 def set_player_model(vmf: VMF, info: corridor.Info) -> None:
     """Set the player model in SinglePlayer."""
@@ -370,19 +361,31 @@ def set_player_model(vmf: VMF, info: corridor.Info) -> None:
 
     loc = options.GLOBAL_ENTS_LOC()
     assert loc is not None
-    chosen_model = BEE2_config.get_val('General', 'player_model', 'PETI').casefold()
+    model_id = BEE2_config.get_val(
+        'General', 'player_model_id',
+        consts.DEFAULT_PLAYER,
+    )
+    try:
+        chosen_model = utils.obj_id(model_id)
+    except ValueError:
+        LOGGER.warning('Invalid player model ID "{}"!', model_id)
+        return
 
-    if chosen_model == 'peti':
+    if chosen_model == consts.DEFAULT_PLAYER:
         # The default model..
         return
 
-    model_path, pgun_skin = PLAYER_MODELS[chosen_model]
+    try:
+        player = config.COMPILER.get_cur_conf(config.player.ExportPlayer, chosen_model, LookupError)
+    except LookupError:
+        LOGGER.warning('Unknown player model ID "{}"!', chosen_model)
+        return
 
     # Precache the model, so we can switch to it.
     vmf.create_ent(
         classname='comp_precache_model',
         origin=loc,
-        model='models/' + model_path + '.mdl',
+        model=f'models/{player.model}.mdl',
     )
 
     auto = vmf.create_ent(
@@ -397,7 +400,7 @@ def set_player_model(vmf: VMF, info: corridor.Info) -> None:
         'OnMapSpawn',
         '@command',
         'Command',
-        'setmodel ' + model_path,
+        f'setmodel {player.model}',
         delay=0.1,
     ))
 
@@ -406,18 +409,18 @@ def set_player_model(vmf: VMF, info: corridor.Info) -> None:
         'OnLoadGame',
         '@command',
         'Command',
-        'setmodel ' + model_path,
+        f'setmodel {player.model}',
         delay=0.1,
     ))
 
-    if pgun_skin and options.GAME_ID() == utils.STEAM_IDS['PORTAL2']:
+    if player.pgun_skin and options.GAME_ID() == utils.STEAM_IDS['PORTAL2']:
         # Only change portalgun skins in Portal 2 - this is the vanilla
         # portalgun weapon/viewmodel.
         auto.add_out(Output(
             'OnMapSpawn',
             'viewmodel',  # Classname of the viewmodel.
             'Skin',
-            str(pgun_skin),
+            player.pgun_skin,
             delay=0.1,
         ))
         auto.add_out(Output(
@@ -427,7 +430,7 @@ def set_player_model(vmf: VMF, info: corridor.Info) -> None:
             # but that's fine.
             'weapon_portalgun',
             'Skin',
-            str(pgun_skin),
+            player.pgun_skin,
             delay=0,
         ))
 

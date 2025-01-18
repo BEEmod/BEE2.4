@@ -15,6 +15,8 @@ from precomp import corridor, conditions, rand
 from precomp.collisions import Collisions
 from precomp.conditions.monitor import make_voice_studio
 from quote_pack import Line, Quote, QuoteInfo, LineCriteria, Response, MIDCHAMBER_ID
+import config.player
+import utils
 import vbsp
 
 
@@ -423,21 +425,43 @@ def add_voice(
             ind += 1
 
     # Determine the flags that enable/disable specific lines based on which
-    # players are used.
-    player_model = vbsp.BEE2_config.get_val(
-        'General', 'player_model', 'PETI',
-    ).casefold()
-
+    # players are used. Silently ignore if this isn't found, the player-model-setter
+    # has already warned.
     player_flags = {
         LineCriteria.SP: info.is_sp,
         LineCriteria.COOP: info.is_coop,
-        LineCriteria.ATLAS: info.is_coop or player_model == 'atlas',
-        LineCriteria.PBODY: info.is_coop or player_model == 'pbody',
-        LineCriteria.BENDY: info.is_sp and player_model == 'peti',
-        LineCriteria.CHELL: info.is_sp and player_model in ('sp', 'chell_p1'),
-        LineCriteria.HUMAN: info.is_sp and player_model in ('peti', 'sp', 'chell_p1'),
-        LineCriteria.ROBOT: info.is_coop or player_model in ('atlas', 'pbody'),
     }
+    if info.is_coop:
+        # No player model setting for coop, so this is hardcoded.
+        player_flags |= {
+            LineCriteria.ATLAS: True,
+            LineCriteria.PBODY: True,
+            LineCriteria.ROBOT: True,
+
+            LineCriteria.BENDY: False,
+            LineCriteria.CHELL: False,
+            LineCriteria.HUMAN: False,
+        }
+    else:
+        try:
+            player_id = utils.obj_id(vbsp.BEE2_config.get_val(
+                'General', 'player_model_id', 'PETI',
+            ))
+            player = config.COMPILER.get_cur_conf(config.player.ExportPlayer, player_id, ValueError)
+        except ValueError:
+            # Not found, hardcode SP defaults.
+            player_flags |= {
+                LineCriteria.BENDY: True,
+                LineCriteria.HUMAN: True,
+
+                LineCriteria.ATLAS: False,
+                LineCriteria.PBODY: False,
+                LineCriteria.CHELL: False,
+                LineCriteria.ROBOT: False,
+            }
+        else:
+            player_flags |= player.voice_options
+    LOGGER.info('Player voice flags: {}', player_flags)
     # All which are True.
     player_flag_set = {val for val, flag in player_flags.items() if flag}
 

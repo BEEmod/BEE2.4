@@ -90,7 +90,11 @@ def _read_player_model() -> utils.ObjectID:
     """Read the current player model from the config."""
     model_id = COMPILE_CFG.get_val('General', 'player_model_id', '')
     if model_id:
-        return utils.obj_id(model_id)
+        try:
+            return utils.obj_id(model_id, 'Player Model')
+        except ValueError as exc:
+            LOGGER.exception('Invalid player model ID:', exc_info=exc)
+            return consts.DEFAULT_PLAYER
     legacy = COMPILE_CFG.get_val('General', 'player_model', 'PETI')
     try:
         return PLAYER_MODEL_LEGACY_IDS[legacy.upper()]
@@ -774,16 +778,20 @@ async def make_map_widgets(
 
     # Load an initial set of models from saved config. If standalone this is all we'll ever have.
     initial_models = config.APP.get_cur_conf_type(AvailablePlayer)
-    if len(initial_models) == 0:
+
+    models = []
+    for conf_id, model in initial_models:
+        try:
+            model_id =  utils.obj_id(conf_id, 'Player Model')
+        except ValueError as exc:
+            LOGGER.exception('Invalid player model ID:', exc_info=exc)
+        else:
+            # The name here was translated from the last save.
+            models.append((model_id, TransToken.untranslated(model.name)))
+    if not models:
         # No conf, hardcode just the PeTI model. This should be immediately replaced and
         # then will never happen again, so don't bother translating.
-        models = [(consts.DEFAULT_PLAYER, TransToken.untranslated('Bendy'))]
-    else:
-        models = [
-            # The name here was translated from the last save.
-            (utils.obj_id(conf_id, 'Player Model'), TransToken.untranslated(model.name))
-            for conf_id, model in initial_models
-        ]
+        models.append((consts.DEFAULT_PLAYER, TransToken.untranslated('Bendy')))
 
     player_mdl_combo = tk_tools.ComboBoxMap(
         model_frame,
@@ -819,7 +827,7 @@ async def load_player_task(model_combo: ComboBoxMap[utils.ObjectID]) -> None:
     async with async_util.iterval_cancelling(packages.LOADED) as iterval:
         async for packset_wrapper in iterval:
             async with packset_wrapper as packset:
-                # If standalone, this will stall forever since it never loads.
+                # If standalone, this will stall forever since packages never load.
                 await packset.ready(packages.PlayerModel).wait()
                 model_combo.update(
                     (model.id, model.name)
