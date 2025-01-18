@@ -219,6 +219,6 @@ async def step_add_core_info(exp: ExportData) -> None:
 # Register everything.
 from exporting import (  # noqa: E402
     barrier_hole, compiler, corridors, cube_colourizer, editor_sound, elevator,  # noqa: F401
-    fgd, files, fizzler, gameinfo, items, music, pack_list, quote_pack, signage,  # noqa: F401
-    skybox, stylevar, template_brush, translations, vpks, widget_conf,  # noqa: F401
+    fgd, files, fizzler, gameinfo, items, music, pack_list, player, quote_pack,  # noqa: F401
+    signage,  skybox, stylevar, template_brush, translations, vpks, widget_conf,  # noqa: F401
 )

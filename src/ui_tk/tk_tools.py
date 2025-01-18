@@ -863,11 +863,15 @@ class EnumButton[EnumT: Enum](BaseEnumButton[ttk.Button, EnumT]):
 
 
 class ComboBoxMap[StrKeyT: str]:
-    """A Combobox which displays TransTokens, mapping them to internal IDs."""
+    """A Combobox which displays TransTokens, mapping them to internal IDs.
+
+    If the current value is not present, it is temporarily added to the start.
+    """
     _ordered_tokens: list[TransToken]
     _index_to_key: list[StrKeyT]
     _key_to_index: dict[StrKeyT, int]
     current: AsyncValue[StrKeyT]
+    _missing_value: StrKeyT | None
 
     def __init__(
         self,
@@ -879,8 +883,9 @@ class ComboBoxMap[StrKeyT: str]:
         self._index_to_key = []
         self._key_to_index = {}
         self._ordered_tokens = []
-        self._build_values(values)
         self.current = current
+        self._missing_value = None
+        self._build_values(values)
         self.widget = ttk.Combobox(
             parent,
             name=name,
@@ -907,22 +912,32 @@ class ComboBoxMap[StrKeyT: str]:
 
     def _build_values(self, values: Iterable[tuple[StrKeyT, TransToken]]) -> None:
         """Rebuild our dicts from a new set of values."""
+        values = list(values)
+        if not values:
+            raise ValueError('Values are empty!')
+
         self._index_to_key.clear()
         self._key_to_index.clear()
         self._ordered_tokens.clear()
+        current = self.current.value
+        # If the current key is not present, add it manually.
+        if not any(key == current for key, token in values):
+            values.insert(0, (current, TransToken.untranslated(f'<{current}>')))
+            self._missing_value = current
         for i, (key, token) in enumerate(values):
             self._index_to_key.append(key)
             self._key_to_index[key] = i
             self._ordered_tokens.append(token)
-        if not self._ordered_tokens:
-            raise ValueError('Values are empty!')
 
     def _evt_selected(self, event: tk.Event[ttk.Combobox]) -> None:
         """A new value was selected."""
         index = self.widget.current()
         if index == -1:
             return  # No item selected?
-        self.current.value = self._index_to_key[index]
+        self.current.value = current = self._index_to_key[index]
+        if self._missing_value is not None and current != self._missing_value:
+            # Moved away from the missing value, strip that and rebuild
+            self._build_values(zip(self._index_to_key[1:], self._ordered_tokens[1:]))
 
     def update(self, values: Iterable[tuple[StrKeyT, TransToken]]) -> None:
         """Change the set of values displayed in the box.

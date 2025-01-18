@@ -13,22 +13,26 @@ import io
 import random
 
 from PIL import Image, ImageTk
-import attrs
-import trio
-
 from srctools import AtomicWriter, bool_as_int
 from srctools.logger import get_logger
 from trio_util import AsyncValue
+import attrs
+import trio
 
-import app
 from app import SubPane
-from ui_tk.tooltip import add_tooltip, set_tooltip
+from config.compile_pane import CompilePaneState, PLAYER_MODEL_LEGACY_IDS
+from config.player import AvailablePlayer
 from transtoken import TransToken, CURRENT_LANG
-from ui_tk.img import TKImages
 from ui_tk import tk_tools, wid_transtoken, TK_ROOT
-from config.compile_pane import CompilePaneState, PLAYER_MODEL_ORDER
-import config
+from ui_tk.img import TKImages
+from ui_tk.tk_tools import ComboBoxMap
+from ui_tk.tooltip import add_tooltip, set_tooltip
 import BEE2_config
+import app
+import async_util
+import config
+import consts
+import packages
 import utils
 
 
@@ -65,16 +69,6 @@ COMPILE_DEFAULTS: dict[str, dict[str, str]] = {
     'CorridorNames': {},
 }
 
-PLAYER_MODELS = {
-    'PETI': TransToken.ui('Bendy'),
-    'SP': TransToken.ui('Chell'),
-    'ATLAS': TransToken.ui('ATLAS'),
-    'PBODY': TransToken.ui('P-Body'),
-    'CHELL_P1': TransToken.ui('Chell (P1)'),
-}
-assert PLAYER_MODELS.keys() == set(PLAYER_MODEL_ORDER)
-
-
 class _WidgetsDict(TypedDict):
     """TODO: Remove."""
     refresh_counts: ttk.Button
@@ -92,6 +86,19 @@ class _WidgetsDict(TypedDict):
     light_full: ttk.Radiobutton
 
 
+def _read_player_model() -> utils.ObjectID:
+    """Read the current player model from the config."""
+    model_id = COMPILE_CFG.get_val('General', 'player_model_id', '')
+    if model_id:
+        return utils.obj_id(model_id)
+    legacy = COMPILE_CFG.get_val('General', 'player_model', 'PETI')
+    try:
+        return PLAYER_MODEL_LEGACY_IDS[legacy.upper()]
+    except KeyError:
+        LOGGER.warning('Unknown legacy player model "{}"', legacy)
+        return consts.DEFAULT_PLAYER
+
+
 COMPILE_CFG = BEE2_config.ConfigFile('compile.cfg')
 COMPILE_CFG.set_defaults(COMPILE_DEFAULTS)
 window: SubPane.SubPane
@@ -107,7 +114,9 @@ SCREENSHOT_LOC = str(utils.conf_location('screenshot.jpg'))
 
 VOICE_PRIORITY_VAR = tk.IntVar(value=COMPILE_CFG.get_bool('General', 'voiceline_priority', False))
 
-player_model = AsyncValue(COMPILE_CFG.get_val('General', 'player_model', 'PETI'))
+player_model = AsyncValue(_read_player_model())
+del _read_player_model
+
 start_in_elev = tk.IntVar(value=COMPILE_CFG.get_bool('General', 'spawn_elev'))
 cust_file_loc = COMPILE_CFG.get_val('Screenshot', 'Loc', '')
 cust_file_loc_var = tk.StringVar(value='')
@@ -163,7 +172,7 @@ async def apply_state_task() -> None:
             start_in_elev.set(state.spawn_elev)
             player_model.value = state.player_mdl
             COMPILE_CFG['General']['spawn_elev'] = bool_as_int(state.spawn_elev)
-            COMPILE_CFG['General']['player_model'] = state.player_mdl
+            COMPILE_CFG['General']['player_model_id'] = state.player_mdl
             COMPILE_CFG['General']['voiceline_priority'] = bool_as_int(state.use_voice_priority)
 
             COMPILE_CFG.save_check()
@@ -763,30 +772,72 @@ async def make_map_widgets(
     wid_transtoken.set_text(model_frame, TransToken.ui('Player Model (SP):'))
     model_frame.grid(row=4, column=0, sticky='ew')
 
-    if player_model.value not in PLAYER_MODEL_ORDER:
-        LOGGER.warning('Invalid player model "{}"!', player_model.value)
-        player_model.value = 'PETI'
+    # Load an initial set of models from saved config. If standalone this is all we'll ever have.
+    initial_models = config.APP.get_cur_conf_type(AvailablePlayer)
+    if len(initial_models) == 0:
+        # No conf, hardcode just the PeTI model. This should be immediately replaced and
+        # then will never happen again, so don't bother translating.
+        models = [(consts.DEFAULT_PLAYER, TransToken.untranslated('Bendy'))]
+    else:
+        models = [
+            # The name here was translated from the last save.
+            (utils.obj_id(conf_id, 'Player Model'), TransToken.untranslated(model.name))
+            for conf_id, model in initial_models
+        ]
 
     player_mdl_combo = tk_tools.ComboBoxMap(
         model_frame,
         name='model_combo',
         current=player_model,
-        values=PLAYER_MODELS.items(),
+        values=models,
     )
     player_mdl_combo.widget['width'] = 20
     player_mdl_combo.grid(row=0, column=0, sticky=tk.EW)
 
+    async def save_player_task() -> None:
+        """Save changes whenever they occur."""
+        async with aclosing(player_model.eventual_values()) as agen:
+            async for model in agen:
+                config.APP.store_conf(attrs.evolve(
+                    config.APP.get_cur_conf(CompilePaneState),
+                    player_mdl=model,
+                ))
+                COMPILE_CFG['General']['player_model_id'] = model
+                COMPILE_CFG.save()
+
     model_frame.columnconfigure(0, weight=1)
     task_status.started()
-    async with trio.open_nursery() as nursery, aclosing(player_model.eventual_values()) as agen:
+    async with trio.open_nursery() as nursery:
         nursery.start_soon(player_mdl_combo.task)
-        async for model in agen:
-            config.APP.store_conf(attrs.evolve(
-                config.APP.get_cur_conf(CompilePaneState),
-                player_mdl=model,
-            ))
-            COMPILE_CFG['General']['player_model'] = model
-            COMPILE_CFG.save()
+        nursery.start_soon(save_player_task)
+        nursery.start_soon(load_player_task, player_mdl_combo)
+
+
+async def load_player_task(model_combo: ComboBoxMap[utils.ObjectID]) -> None:
+    """Load player model definitions from packages."""
+    packset: packages.PackagesSet
+    async with async_util.iterval_cancelling(packages.LOADED) as iterval:
+        async for packset_wrapper in iterval:
+            async with packset_wrapper as packset:
+                # If standalone, this will stall forever since it never loads.
+                await packset.ready(packages.PlayerModel).wait()
+                model_combo.update(
+                    (model.id, model.name)
+                    for model in sorted(
+                        packset.all_obj(packages.PlayerModel),
+                        key=lambda model: str(model.name),
+                   )
+                )
+                LOGGER.debug('Updated player model list.')
+                while True:
+                    # Store the translated versions, discard extras, then wait for translation change.
+                    to_discard = set(dict(config.APP.get_cur_conf_type(AvailablePlayer)))
+                    for mdl in packset.all_obj(packages.PlayerModel):
+                        config.APP.store_conf(AvailablePlayer(str(mdl.name)), mdl.id)
+                        to_discard.discard(mdl.id)
+                    for mdl_id in to_discard:
+                        config.APP.discard_conf(AvailablePlayer, mdl_id)
+                    await CURRENT_LANG.wait_transition()
 
 
 async def make_pane(

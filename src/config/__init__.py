@@ -12,7 +12,7 @@ import abc
 import contextlib
 import os
 
-from srctools import AtomicWriter, KeyValError, Keyvalues, logger
+from srctools import AtomicWriter, EmptyMapping, KeyValError, Keyvalues, logger
 from srctools.dmx import Element, ValueType as DMXTypes
 import attrs
 import trio
@@ -400,6 +400,21 @@ class ConfigSpec:
 
         assert isinstance(data, cls), info
         return data
+
+    def get_cur_conf_type[DataT: Data](self, cls: type[DataT]) -> ItemsView[str, DataT]:
+        """Get a view over the values set for the specified data type.
+
+        May not be called for data with no ID (just use get_cur_conf for that).
+        """
+        if cls not in self._registered:
+            raise ValueError(f'Unregistered data type {cls!r}')
+        info = cls.get_conf_info()
+        if not info.uses_id:
+            raise ValueError(f'Data type "{info.name}" does not support IDs!')
+        try:
+            return self._current.items_cls(cls)
+        except KeyError:
+            return EmptyMapping.items()
 
     def store_conf(self, data: Data, data_id: str = '') -> None:
         """Update the current data for this ID. """
