@@ -28,14 +28,17 @@ only parsing configuration options once, and is expected to be used with a
 closure.
 """
 from __future__ import annotations
+
 from typing import Protocol, Any, Final, overload, cast, get_type_hints
 from collections.abc import Callable, Iterable, Mapping, MutableMapping
 from collections import defaultdict
 from decimal import Decimal
 from enum import Enum
+import decimal
 import functools
 import inspect
 import math
+import operator
 import pkgutil
 import sys
 import types
@@ -1022,6 +1025,78 @@ def dump_func_docs(func: Callable[..., object]) -> str:
     """Extract the documentation for a function."""
     import inspect
     return inspect.getdoc(func) or '**No documentation!'
+
+
+class CompareProto(Protocol):
+    """Operator functions are Any, define a valid signature for how we use them."""
+    def __call__[Number: (float, decimal.Decimal, str)](self, a: Number, b: Number, /) -> bool: ...
+
+
+INSTVAR_COMP: dict[str, CompareProto] = {
+    '=': operator.eq,
+    '==': operator.eq,
+
+    '!=': operator.ne,
+    '<>': operator.ne,
+    '=/=': operator.ne,
+
+    '<': operator.lt,
+    '>': operator.gt,
+
+    '>=': operator.ge,
+    '=>': operator.ge,
+    '<=': operator.le,
+    '=<': operator.le,
+}
+INSTVAR_COMP_DEFAULT: CompareProto = operator.eq
+
+
+def instvar_comp(inst: Entity, val_a: str, op: str | None, val_b: str) -> bool:
+    """Compare two instance variables using a variety of operators.
+
+    op can be none, if the comparison operator is being omitted.
+    If values are numeric, compare that way.
+    """
+    if op is None:
+        # Only two values provided, need to figure out what it means.
+        if val_b in INSTVAR_COMP:
+            # User did "$var ==", treat as comparing against an empty string.
+            op = val_b
+            val_b = ""
+        else:
+            # With just two vars, assume equality.
+            op = '=='
+    else:
+        op = inst.fixup.substitute(op)
+
+    if '$' not in val_a and '$' not in val_b:
+        # Handle pre-substitute() behaviour, where val_a is always a var.
+        LOGGER.warning(
+            'Comparison "{} {} {}" has no $var, assuming first value. '
+            'Please use $ when referencing vars.',
+            val_a, op, val_b,
+        )
+        val_a = '$' + val_a
+
+    comp_func = INSTVAR_COMP.get(op, INSTVAR_COMP_DEFAULT)
+    val_a = inst.fixup.substitute(val_a, default='')
+    val_b = inst.fixup.substitute(val_b, default='')
+    try:
+        # Convert to numbers if possible, otherwise handle both as strings.
+        # That ensures we normalise different number formats (1 vs 1.0)
+        comp_a, comp_b = decimal.Decimal(val_a), decimal.Decimal(val_b)
+    except decimal.InvalidOperation:
+        try:
+            return comp_func(val_a, val_b)
+        except (TypeError, ValueError) as e:
+            LOGGER.warning('InstVar comparison failed: {} {} {}', val_a, op, val_b, exc_info=e)
+            return False
+    else:
+        try:
+            return comp_func(comp_a, comp_b)
+        except (TypeError, ValueError, decimal.DecimalException) as e:
+            LOGGER.warning('InstVar comparison failed: {} {} {}', val_a, op, val_b, exc_info=e)
+            return False
 
 
 def add_inst(

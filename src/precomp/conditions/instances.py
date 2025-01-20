@@ -3,8 +3,7 @@
 """
 from __future__ import annotations
 
-from typing import NewType, Protocol
-import decimal
+from typing import NewType
 import operator
 
 import srctools.logger
@@ -108,30 +107,6 @@ def check_has_trait(inst: Entity, kv: Keyvalues) -> bool:
     return kv.value.casefold() in instance_traits.get(inst)
 
 
-class CompareProto(Protocol):
-    """Operator functions are Any, define a valid signature for how we use them."""
-    def __call__[Number: (float, decimal.Decimal, str)](self, a: Number, b: Number, /) -> bool: ...
-
-
-INSTVAR_COMP: dict[str, CompareProto] = {
-    '=': operator.eq,
-    '==': operator.eq,
-
-    '!=': operator.ne,
-    '<>': operator.ne,
-    '=/=': operator.ne,
-
-    '<': operator.lt,
-    '>': operator.gt,
-
-    '>=': operator.ge,
-    '=>': operator.ge,
-    '<=': operator.le,
-    '=<': operator.le,
-}
-INSTVAR_COMP_DEFAULT: CompareProto = operator.eq
-
-
 @conditions.make_test('instVar')
 def test_instvar(inst: Entity, kv: Keyvalues) -> bool:
     """Checks if the $replace value matches the given value.
@@ -142,54 +117,17 @@ def test_instvar(inst: Entity, kv: Keyvalues) -> bool:
     If omitted, the operation is assumed to be `==`.
     If only a single value is present, it is tested as a boolean.
     """
-    values = kv.value.split(' ', 3)
-    comp_func: CompareProto
-    if len(values) == 3:
-        val_a, op, val_b = values
-        op = inst.fixup.substitute(op)
-        comp_func = INSTVAR_COMP.get(op, INSTVAR_COMP_DEFAULT)
-    elif len(values) == 2:
-        val_a, val_b = values
-        if val_b in INSTVAR_COMP:
-            # User did "$var ==", treat as comparing against an empty string.
-            comp_func = INSTVAR_COMP[val_b]
-            op = val_b
-            val_b = ""
-        else:
-            # With just two vars, assume equality.
-            op = '=='
-            comp_func = INSTVAR_COMP_DEFAULT
-    else:
-        # For just a name.
-        return conv_bool(inst.fixup.substitute(values[0]))
-
-    if '$' not in val_a and '$' not in val_b:
-        # Handle pre-substitute behaviour, where val_a is always a var.
-        LOGGER.warning(
-            'Comparison "{}" has no $var, assuming first value. '
-            'Please use $ when referencing vars.',
-            kv.value,
-        )
-        val_a = '$' + val_a
-
-    val_a = inst.fixup.substitute(val_a, default='')
-    val_b = inst.fixup.substitute(val_b, default='')
-    try:
-        # Convert to numbers if possible, otherwise handle both as strings.
-        # That ensures we normalise different number formats (1 vs 1.0)
-        comp_a, comp_b = decimal.Decimal(val_a), decimal.Decimal(val_b)
-    except decimal.InvalidOperation:
-        try:
-            return comp_func(val_a, val_b)
-        except (TypeError, ValueError) as e:
-            LOGGER.warning('InstVar comparison failed: {} {} {}', val_a, op, val_b, exc_info=e)
-            return False
-    else:
-        try:
-            return comp_func(comp_a, comp_b)
-        except (TypeError, ValueError, decimal.DecimalException) as e:
-            LOGGER.warning('InstVar comparison failed: {} {} {}', val_a, op, val_b, exc_info=e)
-            return False
+    match kv.value.split(' ', 2):
+        case [val_a, op, val_b]:
+            return conditions.instvar_comp(inst, val_a, op, val_b)
+        case [val_a, val_b]:
+            # Might be omitted operand, or value is blank. instvar_comp will check.
+            return conditions.instvar_comp(inst, val_a, None, val_b)
+        case [var]:
+            # Single name, treat as boolean.
+            return conv_bool(inst.fixup.substitute(var))
+        case err:  # Only 1 - 3 values are possible.
+            raise AssertionError(err)
 
 
 @conditions.make_test('offsetDist')
@@ -216,7 +154,7 @@ def check_offset_distance(inst: Entity, kv: Keyvalues) -> bool:
     except ValueError:
         return False
 
-    func = INSTVAR_COMP.get(op, operator.eq)
+    func = conditions.INSTVAR_COMP.get(op, operator.eq)
 
     try:
         return bool(func(offset, value))
