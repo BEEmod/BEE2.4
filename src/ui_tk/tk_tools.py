@@ -911,11 +911,11 @@ class ComboBoxMap[StrKeyT: str]:
             self.widget.current(self._key_to_index[self.current.value])
 
     def _build_values(self, values: Iterable[tuple[StrKeyT, TransToken]]) -> None:
-        """Rebuild our dicts from a new set of values."""
-        values = list(values)
-        if not values:
-            raise ValueError('Values are empty!')
+        """Rebuild our dicts from a new set of values.
 
+        Empty values are allowed, in that case only the current value can be chosen.
+        """
+        values = list(values)
         self._index_to_key.clear()
         self._key_to_index.clear()
         self._ordered_tokens.clear()
