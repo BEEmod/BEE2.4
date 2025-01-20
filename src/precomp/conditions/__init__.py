@@ -268,8 +268,13 @@ class Condition:
         coll: Collisions, info: MapInfo, voice_data: QuoteInfo,
         inst: Entity,
         res: Keyvalues,
-    ) -> bool | object:
+    ) -> object:
         """Execute the given result."""
+        if res.name.startswith('$'):
+            # Direct fixup assignment.
+            inst.fixup[res.real_name] = inst.fixup.substitute(res.value, allow_invert=True)
+            return None
+
         try:
             cond_call = RESULT_LOOKUP[res.name]
         except KeyError:
@@ -845,16 +850,28 @@ def check_test(
 ) -> bool:
     """Determine the result for a condition test.
 
-    If can_skip is true, testd raising Unsatifiable will pass the exception through.
+    If can_skip is true, tests raising Unsatifiable will pass the exception through.
     """
     name = test.name
     # If starting with '!', invert the result.
-    if name[:1] == '!':
+    if name.startswith('!'):
         desired_result = False
         can_skip = False  # This doesn't work.
         name = name[1:]
     else:
         desired_result = True
+    if name.startswith('$'):
+        # Not a test, a fixup check.
+        if test.has_children():
+            LOGGER.warning('Test "{}" may not have a block!', name)
+            return False
+        match test.value.split(' ', 1):
+            case [op, val2]:
+                return instvar_comp(inst, name, op, val2) is desired_result
+            case [val2]:
+                return instvar_comp(inst, name, None, val2) is desired_result
+            case err:  # Only 1 or 2 values are possible.
+                raise AssertionError(err)
     try:
         func = TEST_LOOKUP[name]
     except KeyError:
@@ -1221,7 +1238,7 @@ def fetch_debug_visgroup(
     if force is None:
         force = utils.DEV_MODE
     if not force:
-        def func(target: str | Entity | Solid, /, **kwargs: ValidKVs) -> Entity | Solid:
+        def func(target: str | Entity | Solid, /, **_: object) -> Entity | Solid:
             """Do nothing."""
             if isinstance(target, str):
                 # Create a dummy entity, which will be discarded.

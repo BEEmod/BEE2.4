@@ -22,6 +22,8 @@
 ### UCP-Relevant changes:
 * Add `SweepTrace` mode to `Collisions` result. This allows creating collisions 
   which extend until impacting a surface.
+* `$fixup` variables may now be used directly in condition tests/results, behaving
+  like the `instvar`/`setinstvar` tests/results respectively.
 * `TrackPlatform` result changes:
   * Add `multi_track`, which allows replacing the instances with multi-voxel 
   long ones for better efficiency.
