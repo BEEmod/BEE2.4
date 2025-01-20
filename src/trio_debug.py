@@ -4,6 +4,7 @@ from typing_extensions import override
 
 import pprint
 import time
+import types
 
 from aioresult import ResultCapture
 import srctools.logger
@@ -49,18 +50,25 @@ class Tracer(trio.abc.Instrument):
         self.args: dict[trio.lowlevel.Task, dict[str, object]] = {}
         self.formatter = SmallRepr(compact=True)
 
+    @staticmethod
+    def _get_coro(task: trio.lowlevel.Task) -> types.CoroutineType:
+        """Assert that the task's coroutine is a Python coroutine."""
+        assert isinstance(task.coro, types.CoroutineType)
+        return task.coro
+
     def _get_linenum(self, task: trio.lowlevel.Task) -> int:
-        if (frame := task.coro.cr_frame) is not None:
+        coro = self._get_coro(task)
+        if (frame := coro.cr_frame) is not None:
             return frame.f_lineno
         else:
-            return task.coro.cr_code.co_firstlineno
+            return coro.cr_code.co_firstlineno
 
     @override
     def task_spawned(self, task: trio.lowlevel.Task) -> None:
         """Setup vars when a task is spawned."""
         self.elapsed[task] = 0.0
-        if task.coro.cr_frame is not None:
-            self.args[task] = task.coro.cr_frame.f_locals.copy()
+        if (frame := self._get_coro(task).cr_frame) is not None:
+            self.args[task] = frame.f_locals.copy()
         else:
             self.args[task] = {'???': '???'}
 
