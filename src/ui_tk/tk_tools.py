@@ -598,7 +598,7 @@ class ReadOnlyEntry(ttk.Entry):
         self.tk.call("rename", w, self.orig)
         # Create a new Tcl command whose name is the widget's pathname, and
         # whose action is to dispatch on the operation passed to the widget:
-        self.tk.createcommand(w, self.dispatch)
+        self.tk.createcommand(w, self.dispatch)  # type: ignore[no-untyped-call]
 
     def dispatch(self, operation: str, *args: Any) -> str:
         """Callback from Tcl which runs when the widget is referenced.
@@ -609,7 +609,7 @@ class ReadOnlyEntry(ttk.Entry):
         if operation in ['insert', 'remove']:
             return 'break'
         try:
-            return self.tk.call((self.orig, operation) + args)
+            return self.tk.call((self.orig, operation) + args)  # type: ignore[no-any-return]
         except tk.TclError:
             return ""
 
