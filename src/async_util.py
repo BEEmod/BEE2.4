@@ -1,11 +1,9 @@
 """Various utilities for async code."""
 from __future__ import annotations
-from typing import (
-    AsyncGenerator, AsyncIterator, Awaitable, Callable,
-    Protocol, overload,
-)
+from typing import Protocol, overload
 from typing_extensions import AsyncContextManager
 
+from collections.abc import AsyncGenerator, AsyncIterator, Awaitable, Callable
 import types
 
 from srctools.logger import get_logger

@@ -1,7 +1,6 @@
 """Items dealing with antlines - Antline Corners and Antlasers."""
-from __future__ import annotations
+from collections.abc import Callable
 from enum import Enum
-from typing import Callable, Union
 import attrs
 
 from precomp import instanceLocs, connections, conditions, antlines
@@ -77,10 +76,7 @@ class RopeState(Enum):
     LINKED = 'linked'  # Rope ent, with target already.
 
     @staticmethod
-    def from_node(
-        points: dict[Node, Union[Entity, str]],
-        node: Node,
-    ) -> tuple[RopeState, Union[Entity, str]]:
+    def from_node(points: dict[Node, Entity | str], node: Node) -> tuple['RopeState', Entity | str]:
         """Compute the state and ent/name from the points data."""
         try:
             ent = points[node]
@@ -407,7 +403,7 @@ def res_antlaser(vmf: VMF, res: Keyvalues) -> object:
         # So this dict is either a targetname to indicate cables with an
         # outgoing connection, or the entity for endpoints without an outgoing
         # connection.
-        cable_points: dict[Node, Union[Entity, str]] = {}
+        cable_points: dict[Node, Entity | str] = {}
 
         for i, node in enumerate(group.nodes, start=1):
             indexes[node] = i
@@ -518,7 +514,7 @@ def res_antlaser(vmf: VMF, res: Keyvalues) -> object:
 def build_cables(
     vmf: VMF,
     group: Group,
-    cable_points: dict[Node, Union[Entity, str]],
+    cable_points: dict[Node, Entity | str],
     base_name: str,
     beam_conf: Keyvalues,
     conf_rope_off: Vec,
@@ -538,10 +534,7 @@ def build_cables(
     # LU | Flip, do UL
     # LL | Make A, link A to B. Both are linked.
     rope_ind = 0  # Uniqueness value.
-    node_a: Node
-    node_b: Node
-    rope_a: Entity
-    rope_b: Entity
+    name_b: str
     for node_a, node_b in group.links:
         state_a, ent_a = RopeState.from_node(cable_points, node_a)
         state_b, ent_b = RopeState.from_node(cable_points, node_b)

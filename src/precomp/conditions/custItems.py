@@ -1,8 +1,7 @@
 """Results for customising the behaviour of certain items - antlines, faith plates,
 
 """
-from __future__ import annotations
-from typing import Callable
+from collections.abc import Callable
 from srctools import Keyvalues, Entity
 
 from precomp import connections, antlines, conditions

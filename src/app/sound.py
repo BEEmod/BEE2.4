@@ -4,9 +4,7 @@ To use, call sound.fx() with one of the dict keys.
 If pyglet fails to load, all fx() calls will fail silently.
 (Sounds are not critical to the app, so they just won't play.)
 """
-from __future__ import annotations
-from typing import Literal
-from typing_extensions import override
+from typing import Literal, override
 
 from collections.abc import Callable
 import functools
@@ -33,6 +31,7 @@ _nursery: trio.Nursery | None = None
 # Use a set to ensure double-calling doesn't break anything.
 _playing_count = trio_util.AsyncValue(0)
 _playing: set[object] = set()
+type PygletSource = Source  # Forward ref
 
 type SoundName = Literal[
     'select', 'add', 'config', 'subtract', 'connect', 'disconnect', 'expand', 'delete',
@@ -92,7 +91,7 @@ class NullSound:
         finally:
             self._block_count -= 1
 
-    async def load(self, name: SoundName) -> Source | None:
+    async def load(self, name: SoundName) -> PygletSource | None:
         """Load and do nothing."""
         return None
 
@@ -118,16 +117,16 @@ class PygletSound(NullSound):
     """Sound implementation using Pyglet."""
     def __init__(self) -> None:
         super().__init__()
-        self.sources: dict[str, Source] = {}
+        self.sources: dict[str, PygletSource] = {}
 
     @override
-    async def load(self, name: SoundName) -> Source | None:
+    async def load(self, name: SoundName) -> PygletSource | None:
         """Load the given UI sound into a source."""
         global sounds
         fname = SOUNDS[name]
         path = str(utils.install_path(f'sounds/{fname}.ogg'))
         try:
-            src: pyglet.media.Source = await trio.to_thread.run_sync(functools.partial(
+            src: PygletSource = await trio.to_thread.run_sync(functools.partial(
                 decoder.decode,
                 file=None,
                 filename=path,

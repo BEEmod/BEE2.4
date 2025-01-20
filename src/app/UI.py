@@ -20,7 +20,6 @@ from app.dialogs import Dialogs
 from loadScreen import MAIN_UI as LOAD_UI
 import packages
 from packages import PakRef
-from packages.item import SubItemRef
 import utils
 from config.gen_opts import AfterExport
 from config.last_sel import LastSelected

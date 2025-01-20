@@ -1,6 +1,5 @@
 """Test the StepOrder system."""
 from enum import Enum
-from typing import List
 
 from trio.testing import RaisesGroup
 import pytest
@@ -20,7 +19,7 @@ class Resource(Enum):
 async def test_basic(autojump_clock: trio.abc.Clock) -> None:
     """Test that steps are run."""
     order = StepOrder(object, Resource)
-    log: List[str] = []
+    log: list[str] = []
     data = object()
 
     @order.add_step(prereq=[], results=[Resource.A])
@@ -68,7 +67,7 @@ async def test_basic(autojump_clock: trio.abc.Clock) -> None:
 async def test_direct_cycle(autojump_clock: trio.abc.Clock) -> None:
     """Test that a direct cycle causes an error."""
     order = StepOrder(object, Resource)
-    log: List[str] = []
+    log: list[str] = []
 
     @order.add_step(prereq=[], results=[Resource.A])
     async def step_1(ctx: object) -> None:

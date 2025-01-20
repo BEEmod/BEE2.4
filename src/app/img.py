@@ -6,8 +6,7 @@ filename/options, so are cheap to create. Once applied to a UI widget,
 they are loaded in the background, then unloaded if removed from all widgets.
 """
 from __future__ import annotations
-from typing import Any, ClassVar, Final, Literal, override
-from typing_extensions import Self
+from typing import Any, ClassVar, Final, Literal, override, Self
 
 from abc import abstractmethod
 from collections.abc import Iterator, Mapping, Sequence

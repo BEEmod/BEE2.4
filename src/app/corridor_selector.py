@@ -1,7 +1,6 @@
 """Implements UI for selecting corridors."""
 from __future__ import annotations
-from typing import Final
-from typing_extensions import override
+from typing import Final,  override
 
 from abc import abstractmethod
 from collections.abc import Sequence

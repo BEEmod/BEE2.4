@@ -4,7 +4,7 @@ This allows checking which items are connected to what, and also regenerates
 the outputs with optimisations and custom settings.
 """
 from __future__ import annotations
-from typing_extensions import assert_never
+from typing import assert_never
 from collections import defaultdict
 from collections.abc import Iterable, Iterator, Sequence
 

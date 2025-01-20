@@ -1,5 +1,5 @@
 """Various conditions related to the position/orientation of items."""
-from typing import Iterable, Tuple, Dict, Set
+from collections.abc import Iterable
 import math
 
 from editoritems_props import PanelAnimation
@@ -15,7 +15,7 @@ LOGGER = get_logger(__name__, alias='cond.positioning')
 
 # Predicates for tiles.
 # We optimise to a lookup table.
-TILE_PREDICATES: Dict[str, Set[tiling.TileType]] = {}
+TILE_PREDICATES: dict[str, set[tiling.TileType]] = {}
 
 
 def parse_orient(direction: str) -> FrozenVec:
@@ -85,7 +85,7 @@ def check_angles(kv: Keyvalues) -> conditions.TestCallable:
 def brush_at_loc(
     inst: Entity,
     kv: Keyvalues,
-) -> Tuple[tiling.TileType, bool, Set[tiling.TileType]]:
+) -> tuple[tiling.TileType, bool, set[tiling.TileType]]:
     """Common code for posIsSolid and ReadSurfType.
 
     This returns the average tiletype, if both colors were found,
@@ -113,7 +113,7 @@ def brush_at_loc(
     # RemoveBrush is the pre-tiling name.
     should_remove = kv.bool('RemoveTile', kv.bool('RemoveBrush', False))
 
-    tile_types: Set[tiling.TileType] = set()
+    tile_types: set[tiling.TileType] = set()
     both_colors = False
 
     # Place info_targets to mark where we're checking.

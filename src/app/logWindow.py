@@ -2,14 +2,13 @@
 
 The implementation is in bg_daemon, to ensure it remains responsive.
 """
-from __future__ import annotations
+from typing import override
 import logging
 import queue
 
 import attrs
 import srctools.logger
 import trio
-from typing_extensions import override
 
 from config.gen_opts import GenOptions
 from loadScreen import _QUEUE_SEND_LOGGING, _QUEUE_REPLY_LOGGING  # noqa: PLC2701

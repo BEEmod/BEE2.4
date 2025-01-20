@@ -1,6 +1,4 @@
 """A result which causes a custom error to be raised."""
-from typing import Dict, List
-
 from srctools import Keyvalues, Entity, Vec
 import srctools.logger
 
@@ -37,8 +35,8 @@ def res_user_error(inst: Entity, res: Keyvalues) -> None:
         raise ValueError('No colon in token ID "{}"!', token_id) from None
     package_id = utils.obj_id(tok_package)
 
-    points: List[Vec] = []
-    voxels: List[Vec] = []
+    points: list[Vec] = []
+    voxels: list[Vec] = []
 
     for kv in res.find_all('Marker'):
         mark_type = kv['type', 'point'].casefold()
@@ -49,7 +47,7 @@ def res_user_error(inst: Entity, res: Keyvalues) -> None:
         else:
             points.append(pos)
 
-    params: Dict[str, str] = {
+    params: dict[str, str] = {
         kv.real_name: inst.fixup.substitute(kv.value)
         for kv in res.find_children('Parameters')
     }

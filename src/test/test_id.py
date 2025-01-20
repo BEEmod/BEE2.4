@@ -136,9 +136,9 @@ def test_bad_bracket_combos(left: str, right: str) -> None:
 
     bad = f'{left}some_id{right}'
 
-    with pytest.raises(ValueError, match='Invalid thing ID .+ may not start/end'):
+    with pytest.raises(ValueError, match=r'Invalid thing ID .+ may not start/end'):
         obj_id(bad, kind='thing')
-    with pytest.raises(ValueError, match='Invalid thing ID .+ may not start/end'):
+    with pytest.raises(ValueError, match=r'Invalid thing ID .+ may not start/end'):
         obj_id_optional(bad, kind='thing')
     with pytest.raises(ValueError, match='Invalid thing ID'):
         special_id(bad, kind='thing')

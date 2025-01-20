@@ -1,9 +1,10 @@
 """Implements callables which lazily parses and combines config files."""
 from __future__ import annotations
-from typing import Final, Pattern
+from typing import Final
 
 from collections.abc import Awaitable, Callable
 import functools
+import re
 
 from srctools import KeyValError, Keyvalues, logger
 import trio
@@ -110,7 +111,7 @@ def concat(a: LazyConf, b: LazyConf) -> LazyConf:
 	return concat_inner
 
 
-def replace(base: LazyConf, replacements: list[tuple[Pattern[str], str]]) -> LazyConf:
+def replace(base: LazyConf, replacements: list[tuple[re.Pattern[str], str]]) -> LazyConf:
 	"""Replace occurances of values in the base config."""
 	rep_funcs = [
 		functools.partial(pattern.sub, repl)

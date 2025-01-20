@@ -1,9 +1,9 @@
 """Manages the list of textures used for brushes, and how they are applied."""
 from __future__ import annotations
 
-from typing import ClassVar, TYPE_CHECKING, Any, Iterable
+from typing import ClassVar, TYPE_CHECKING, Any
 
-from collections.abc import Sequence
+from collections.abc import Sequence, Iterable
 from pathlib import Path
 from enum import Enum, StrEnum
 import itertools

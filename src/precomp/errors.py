@@ -1,8 +1,9 @@
 """Handles user errors found, displaying a friendly interface to the user."""
 from __future__ import annotations
+from typing import Final, Literal
 
 from pathlib import Path
-from typing import Iterable, Mapping, Final, Literal
+from collections.abc import Iterable, Mapping
 import pickle
 
 from srctools import FrozenVec, Vec, VMF, AtomicWriter, logger

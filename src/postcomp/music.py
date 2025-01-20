@@ -1,7 +1,6 @@
 """Generates the soundscript for background music."""
-import itertools
-from typing import Dict, List
 from io import StringIO
+import itertools
 
 
 from srctools.sndscript import SND_CHARS
@@ -241,8 +240,8 @@ def generate(bsp: VMF, pack_list: PackList) -> None:
     # We also pack the filenames used for the tracks - that way funnel etc
     # only get packed when needed. Stock sounds are in VPKS or in aperturetag/,
     # we don't check there.
-    tracks: Dict[Channel, List[str]] = {}
-    volume: Dict[Channel, float] = dict.fromkeys(Channel, 1.0)
+    tracks: dict[Channel, list[str]] = {}
+    volume: dict[Channel, float] = dict.fromkeys(Channel, 1.0)
     sync_funnel = False
 
     for conf_ent in bsp.by_class['bee2_music_channel']:
@@ -336,7 +335,7 @@ def generate(bsp: VMF, pack_list: PackList) -> None:
 
 def write_sound(
     file: StringIO,
-    snds: List[str],
+    snds: list[str],
     pack_list: PackList,
     snd_prefix: str = '*',
 ) -> None:
