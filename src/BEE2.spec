@@ -205,6 +205,9 @@ EXCLUDES = [
 
     # Pulls in all of pytest etc, not required.
     'trio.testing',
+    # Trio -> CFFI -> uses setuptools for C compiler in some modes, but
+    # trio doesn't use those.
+    'setuptools',
 
     'markupsafe',  # Used by TransToken.translate_html(), only relevant for Jinja.
 

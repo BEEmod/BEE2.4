@@ -55,6 +55,9 @@ EXCLUDES = [
     'versioningit',
     # Pulls in all of pytest etc, not required.
     'trio.testing',
+    # Trio -> CFFI -> uses setuptools for C compiler in some modes, but
+    # trio doesn't use those.
+    'setuptools',
 ]
 
 # The modules made available for plugins to use.
