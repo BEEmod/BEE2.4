@@ -27,7 +27,7 @@ def timer_values(min_value: int, max_value: int) -> tuple[str, ...]:
     )
 
 
-@itemconfig.ui_multi_wconf(TimerOptions)
+@itemconfig.TK_IMPL.register_ui_multi_wconf(TimerOptions)
 async def widget_minute_seconds_multi(
     parent: tk.Widget, tk_img: TKImages,
     holders: Mapping[itemconfig.TimerNum, AsyncValue[str]],
@@ -44,7 +44,7 @@ async def widget_minute_seconds_multi(
         task_status.started()
 
 
-@itemconfig.ui_single_wconf(TimerOptions)
+@itemconfig.TK_IMPL.register_ui_single_wconf(TimerOptions)
 async def widget_minute_seconds(
     parent: tk.Widget, tk_img: TKImages,
     holder: AsyncValue[str],

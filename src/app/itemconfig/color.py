@@ -19,7 +19,7 @@ from ui_tk.tooltip import add_tooltip
 TRANS_SELECT_TITLE = TransToken.ui('Choose a Color')
 
 
-@itemconfig.ui_single_no_conf(KIND_COLOR)
+@itemconfig.TK_IMPL.register_ui_single_no_conf(KIND_COLOR)
 async def widget_color_single(
     parent: tk.Widget, tk_img: TKImages,
     holder: AsyncValue[str],
@@ -37,7 +37,7 @@ async def widget_color_single(
         task_status.started(swatch)
 
 
-@itemconfig.ui_multi_no_conf(KIND_COLOR)
+@itemconfig.TK_IMPL.register_ui_multi_no_conf(KIND_COLOR)
 async def widget_color_multi(
     parent: tk.Widget, tk_img: TKImages,
     holders: Mapping[itemconfig.TimerNum, AsyncValue[str]],

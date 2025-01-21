@@ -14,7 +14,7 @@ from ui_tk.img import TKImages
 LOGGER = srctools.logger.get_logger(__name__)
 
 
-@itemconfig.ui_single_wconf(DropdownOptions)
+@itemconfig.TK_IMPL.register_ui_single_wconf(DropdownOptions)
 async def dropdown(
     parent: tk.Widget, tk_img: TKImages,
     holder: AsyncValue[str],

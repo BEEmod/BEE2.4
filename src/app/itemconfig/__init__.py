@@ -13,7 +13,7 @@ from srctools import logger
 from trio_util import AsyncValue
 import trio
 
-from app import StyleVarPane, sound
+from app import StyleVarPane, sound, img
 from app.mdown import MarkdownData
 from app.SubPane import SubPane
 from async_util import EdgeTrigger, run_as_task
@@ -39,58 +39,53 @@ import packages
 LOGGER = logger.get_logger(__name__)
 
 
-class SingleCreateTask[ConfT: ConfigProto | None](Protocol):
+class SingleCreateTask[WidgetT, ImageT: img.UIImage, ConfT: ConfigProto | None](Protocol):
     """A task which creates a widget. 
     
-    It is passed a parent frame, the configuration object, and the async value involved.
+    It is passed a parent widget, the configuration object, and the async value involved.
     The widget to be installed should be passed to started().
     """
     def __call__(
-        self, parent: tk.Widget, tk_img: TKImages,
-        holder: AsyncValue[str],
-        config: ConfT,
-        /, *, task_status: trio.TaskStatus[tk.Widget] = ...,
+        self, parent: WidgetT, image: ImageT,
+        holder: AsyncValue[str], config: ConfT,
+        /, *, task_status: trio.TaskStatus[WidgetT] = ...,
     ) -> Awaitable[None]: ...
 
 
-class SingleCreateNoConfTask(Protocol):
+class SingleCreateNoConfTask[WidgetT, ImageT: img.UIImage](Protocol):
     """Variant protocol for a widget that needs no configuration."""
     def __call__(
-        self, parent: tk.Widget, tk_img: TKImages,
+        self, parent: WidgetT, image: ImageT,
         holder: AsyncValue[str],
-        /, *, task_status: trio.TaskStatus[tk.Widget] = ...,
+        /, *, task_status: trio.TaskStatus[WidgetT] = ...,
     ) -> Awaitable[None]: ...
 
 
 # Override for timer-type widgets to be more compact - passed a list of timer numbers instead.
 # The widgets should insert themselves into the parent frame.
 # It then yields timer_val, update-func pairs.
-class MultiCreateTask[ConfT: ConfigProto | None](Protocol):
+class MultiCreateTask[WidgetT, ImageT: img.UIImage, ConfT: ConfigProto | None](Protocol):
     """Override for timer-type widgets to be more compact.
 
     It is passed a parent frame, the configuration object, and the async value involved.
     The widgets should insert themselves into the parent frame.
     """
     def __call__(
-        self, parent: tk.Widget, tk_img: TKImages,
+        self, parent: WidgetT, image: ImageT,
         holders: Mapping[TimerNum, AsyncValue[str]],
         config: ConfT,
         /, *, task_status: trio.TaskStatus[None] = ...,
     ) -> Awaitable[None]: ...
 
 
-class MultiCreateNoConfTask(Protocol):
+class MultiCreateNoConfTask[WidgetT, ImageT: img.UIImage](Protocol):
     """Variant protocol for a timer-type widget set that needs no configuration."""
     def __call__(
-        self, parent: tk.Widget, tk_img: TKImages,
+        self, parent: WidgetT, image: ImageT,
         holders: Mapping[TimerNum, AsyncValue[str]],
         /, *, task_status: trio.TaskStatus[None] = ...,
     ) -> Awaitable[None]: ...
 
-
-# The functions registered for each.
-_UI_IMPL_SINGLE: dict[WidgetType, SingleCreateTask[Any]] = {}
-_UI_IMPL_MULTI: dict[WidgetType, MultiCreateTask[Any]] = {}
 
 INF = TransToken.untranslated('∞')
 TIMER_NUM_TRANS: dict[TimerNum, TransToken] = {
@@ -109,72 +104,85 @@ ITEM_VARIANT_LOAD: list[tuple[
 window: SubPane
 
 
-def ui_single_wconf[ConfT: ConfigProto](
-    cls: type[ConfT],
-) -> Callable[[SingleCreateTask[ConfT]], SingleCreateTask[ConfT]]:
-    """Register the UI function used for singular widgets with configs."""
-    kind = CLS_TO_KIND[cls]
+class ItemConfigBase[WidgetT, ImgT: img.UIImage]:
+    """Common implementation for the item config pane."""
+    # The functions registered for each.
+    impl_single: dict[WidgetType, SingleCreateTask[WidgetT, ImgT, Any]] = {}
+    impl_multi: dict[WidgetType, MultiCreateTask[WidgetT, ImgT, Any]] = {}
 
-    def deco(func: SingleCreateTask[ConfT]) -> SingleCreateTask[ConfT]:
-        """Do the registration."""
-        _UI_IMPL_SINGLE[kind] = func
-        return func
-    return deco
+    def __init__(self) -> None:
+        self.impl_single = {}
+        self.impl_multi = {}
 
+    def register_ui_single_wconf[ConfT: ConfigProto](
+        self, cls: type[ConfT],
+    ) -> Callable[[SingleCreateTask[WidgetT, ImgT, ConfT]], SingleCreateTask[WidgetT, ImgT, ConfT]]:
+        """Register the UI function used for singular widgets with configs."""
+        kind = CLS_TO_KIND[cls]
 
-def ui_single_no_conf(kind: WidgetType) -> Callable[[SingleCreateNoConfTask], SingleCreateNoConfTask]:
-    """Register the UI function used for singular widgets without configs."""
-    def deco(func: SingleCreateNoConfTask) -> SingleCreateNoConfTask:
-        """Do the registration."""
-        def wrapper(
-            parent: tk.Widget, tk_img: TKImages,
-            holder: AsyncValue[str],
-            config: None,
-            /, *, task_status: trio.TaskStatus[tk.Widget] = trio.TASK_STATUS_IGNORED,
-        ) -> Awaitable[None]:
-            """Don't pass the config through to the UI function."""
-            assert config is None
-            return func(parent, tk_img, holder, task_status=task_status)
+        def deco(func: SingleCreateTask[WidgetT, ImgT, ConfT]) -> SingleCreateTask[WidgetT, ImgT, ConfT]:
+            """Do the registration."""
+            self.impl_single[kind] = func
+            return func
+        return deco
 
-        if isinstance(kind, WidgetTypeWithConf):
-            raise TypeError('Widget type has config, but singular function does not!')
-        _UI_IMPL_SINGLE[kind] = wrapper
-        return func
-    return deco
+    def register_ui_single_no_conf(self, kind: WidgetType) -> Callable[
+        [SingleCreateNoConfTask[WidgetT, ImgT]], SingleCreateNoConfTask[WidgetT, ImgT]
+    ]:
+        """Register the UI function used for singular widgets without configs."""
+        def deco(func: SingleCreateNoConfTask[WidgetT, ImgT]) -> SingleCreateNoConfTask[WidgetT, ImgT]:
+            """Do the registration."""
+            def wrapper(
+                parent: WidgetT, image: ImgT,
+                holder: AsyncValue[str],
+                config: None,
+                /, *, task_status: trio.TaskStatus[WidgetT] = trio.TASK_STATUS_IGNORED,
+            ) -> Awaitable[None]:
+                """Don't pass the config through to the UI function."""
+                assert config is None
+                return func(parent, image, holder, task_status=task_status)
 
+            if isinstance(kind, WidgetTypeWithConf):
+                raise TypeError('Widget type has config, but singular function does not!')
+            self.impl_single[kind] = wrapper
+            return func
+        return deco
 
-def ui_multi_wconf[ConfT: ConfigProto](
-    cls: type[ConfT],
-) -> Callable[[MultiCreateTask[ConfT]], MultiCreateTask[ConfT]]:
-    """Register the UI function used for multi widgets with configs."""
-    kind = CLS_TO_KIND[cls]
+    def register_ui_multi_wconf[ConfT: ConfigProto](
+        self, cls: type[ConfT],
+    ) -> Callable[[MultiCreateTask[WidgetT, ImgT, ConfT]], MultiCreateTask[WidgetT, ImgT, ConfT]]:
+        """Register the UI function used for multi widgets with configs."""
+        kind = CLS_TO_KIND[cls]
 
-    def deco(func: MultiCreateTask[ConfT]) -> MultiCreateTask[ConfT]:
-        """Do the registration."""
-        _UI_IMPL_MULTI[kind] = func
-        return func
-    return deco
+        def deco(func: MultiCreateTask[WidgetT, ImgT, ConfT]) -> MultiCreateTask[WidgetT, ImgT, ConfT]:
+            """Do the registration."""
+            self.impl_multi[kind] = func
+            return func
+        return deco
 
+    def register_ui_multi_no_conf(self, kind: WidgetType) -> Callable[
+        [MultiCreateNoConfTask[WidgetT, ImgT]], MultiCreateNoConfTask[WidgetT, ImgT]
+    ]:
+        """Register the UI function used for multi widgets without configs."""
+        def deco(func: MultiCreateNoConfTask[WidgetT, ImgT]) -> MultiCreateNoConfTask[WidgetT, ImgT]:
+            """Do the registration."""
+            def wrapper(
+                parent: WidgetT, image: ImgT,
+                holders: Mapping[TimerNum, AsyncValue[str]],
+                config: None,
+                /, *, task_status: trio.TaskStatus[None] = trio.TASK_STATUS_IGNORED,
+            ) -> Awaitable[None]:
+                """Don't pass the config through to the UI function."""
+                assert config is None
+                return func(parent, image, holders, task_status=task_status)
 
-def ui_multi_no_conf(kind: WidgetType) -> Callable[[MultiCreateNoConfTask], MultiCreateNoConfTask]:
-    """Register the UI function used for multi widgets without configs."""
-    def deco(func: MultiCreateNoConfTask) -> MultiCreateNoConfTask:
-        """Do the registration."""
-        def wrapper(
-            parent: tk.Widget, tk_img: TKImages,
-            holders: Mapping[TimerNum, AsyncValue[str]],
-            config: None,
-            /, *, task_status: trio.TaskStatus[None] = trio.TASK_STATUS_IGNORED,
-        ) -> Awaitable[None]:
-            """Don't pass the config through to the UI function."""
-            assert config is None
-            return func(parent, tk_img, holders, task_status=task_status)
+            if isinstance(kind, WidgetTypeWithConf):
+                raise TypeError('Widget type has config, but multi function does not!')
+            self.impl_multi[kind] = wrapper
+            return func
+        return deco
 
-        if isinstance(kind, WidgetTypeWithConf):
-            raise TypeError('Widget type has config, but multi function does not!')
-        _UI_IMPL_MULTI[kind] = wrapper
-        return func
-    return deco
+TK_IMPL: ItemConfigBase[tk.Widget, TKImages] = ItemConfigBase()  # TODO
 
 
 async def unlock_default_ui_listener(holder: AsyncValue[str]) -> None:
@@ -221,7 +229,7 @@ async def create_group(
                     label = ttk.Label(wid_frame)
                     set_text(label, TRANS_COLON.format(text=s_wid.name))
                     label.grid(row=0, column=0)
-            create_func = _UI_IMPL_SINGLE[s_wid.kind]
+            create_func = TK_IMPL.impl_single[s_wid.kind]
 
             conf = s_wid.config
             if isinstance(conf, ItemVariantConf) and conf.item_ref == SIGNAGE_ITEM_ID:
@@ -276,9 +284,9 @@ async def create_group(
             )
 
         try:
-            multi_func = _UI_IMPL_MULTI[m_wid.kind]
+            multi_func = TK_IMPL.impl_multi[m_wid.kind]
         except KeyError:
-            multi_func = widget_timer_generic(_UI_IMPL_SINGLE[m_wid.kind])
+            multi_func = widget_timer_generic(TK_IMPL.impl_single[m_wid.kind])
 
         wid_frame.grid(row=row, column=0, sticky='ew', pady=5)
         try:
@@ -526,7 +534,9 @@ async def make_pane(
         await trio.sleep_forever()
 
 
-def widget_timer_generic[ConfT: ConfigProto](widget_func: SingleCreateTask[ConfT]) -> MultiCreateTask[ConfT]:
+def widget_timer_generic[ConfT: ConfigProto](
+    widget_func: SingleCreateTask[tk.Widget, TKImages, ConfT]
+) -> MultiCreateTask[tk.Widget, TKImages, ConfT]:
     """For widgets without a multi version, do it generically."""
     async def generic_func(
         parent: tk.Widget,
@@ -576,7 +586,7 @@ def widget_sfx(*args: object) -> None:
     sound.fx_blockable('config')
 
 
-@ui_single_wconf(ItemVariantConf)
+@TK_IMPL.register_ui_single_wconf(ItemVariantConf)
 async def widget_item_variant(
     parent: tk.Widget, tk_img: TKImages,
     holder: AsyncValue[str],

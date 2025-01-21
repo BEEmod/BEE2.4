@@ -28,7 +28,7 @@ def decimal_points(num: float) -> int:
         return 0
 
 
-@itemconfig.ui_single_wconf(SliderOptions)
+@itemconfig.TK_IMPL.register_ui_single_wconf(SliderOptions)
 async def widget_slider(
     parent: tk.Widget, tk_img: TKImages,
     holder: AsyncValue[str],

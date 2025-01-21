@@ -12,7 +12,7 @@ from app import itemconfig
 from ui_tk.img import TKImages
 
 
-@itemconfig.ui_single_no_conf(KIND_STRING)
+@itemconfig.TK_IMPL.register_ui_single_no_conf(KIND_STRING)
 async def widget_string(
     parent: tk.Widget, tk_img: TKImages,
     holder: AsyncValue[str],

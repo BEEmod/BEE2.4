@@ -14,7 +14,7 @@ from ui_tk.img import TKImages
 from ui_tk.tooltip import add_tooltip
 
 
-@itemconfig.ui_single_no_conf(KIND_CHECKMARK)
+@itemconfig.TK_IMPL.register_ui_single_no_conf(KIND_CHECKMARK)
 async def widget_checkmark(
     parent: tk.Widget, tk_img: TKImages,
     holder: AsyncValue[str],
@@ -42,7 +42,7 @@ async def widget_checkmark(
             var.set(conv_bool(value))
 
 
-@itemconfig.ui_multi_no_conf(KIND_CHECKMARK)
+@itemconfig.TK_IMPL.register_ui_multi_no_conf(KIND_CHECKMARK)
 async def widget_checkmark_multi(
     parent: tk.Widget, tk_img: TKImages,
     holders: Mapping[itemconfig.TimerNum, AsyncValue[str]],
