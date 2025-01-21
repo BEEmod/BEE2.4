@@ -110,20 +110,18 @@ class Music(SelPakObject, needs_foreground=True, style_suggest_key='music'):
         snd_length_str = data.info['loop_len', '0']
         # Allow specifying lengths as [hour:]min:sec.
         if ':' in snd_length_str:
-            parts = snd_length_str.split(':')
-            if len(parts) == 3:
-                hour, minute, second = parts
-                snd_length = srctools.conv_int(second)
-                snd_length += 60 * srctools.conv_int(minute)
-                snd_length += 60 * 60 * srctools.conv_int(hour)
-            elif len(parts) == 2:
-                minute, second = parts
-                snd_length = 60 * srctools.conv_int(minute) + srctools.conv_int(second)
-            else:
-                raise ValueError(
-                    f'Unknown music duration "{snd_length_str}". '
-                    'Valid durations are "hours:min:sec", "min:sec" or just seconds.'
-                )
+            match snd_length_str.split(':'):
+                case [hour, minute, second]:
+                    snd_length = srctools.conv_int(second)
+                    snd_length += 60 * srctools.conv_int(minute)
+                    snd_length += 60 * 60 * srctools.conv_int(hour)
+                case [minute, second]:
+                    snd_length = 60 * srctools.conv_int(minute) + srctools.conv_int(second)
+                case _:
+                    raise ValueError(
+                        f'Unknown music duration "{snd_length_str}". '
+                        'Valid durations are "hours:min:sec", "min:sec" or just seconds.'
+                    )
         else:
             snd_length = srctools.conv_int(snd_length_str)
 

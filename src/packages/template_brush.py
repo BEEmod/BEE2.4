@@ -13,24 +13,29 @@ from utils import ObjectID, PackagePath
 LOGGER = srctools.logger.get_logger(__name__)
 
 
+def read_vmf(file: File) -> VMF:
+    """Read a file and parse as a VMF."""
+    with file.open_str() as f:
+        props = Keyvalues.parse(f)
+    return VMF.parse(props)
+
+
 async def parse_template(packset: PackagesSet, pak_id: ObjectID, file: File) -> None:
     """Parse the specified template file, extracting its ID."""
     path = f'{pak_id}:{file.path}'
     temp_id = await trio.to_thread.run_sync(parse_template_fast, file, path, abandon_on_cancel=True)
     if not temp_id:
         LOGGER.warning('Fast-parse failure on {}!', path)
-        with file.open_str() as f:
-            props = await trio.to_thread.run_sync(Keyvalues.parse, f, abandon_on_cancel=True)
-        vmf = await trio.to_thread.run_sync(VMF.parse, props, abandon_on_cancel=True)
-        del props
-        conf_ents = list(vmf.by_class['bee2_template_conf'])
-        if len(conf_ents) > 1:
-            raise KeyValError('Multiple configuration entities in template!', path, None)
-        elif not conf_ents:
-            raise KeyValError('No configration entity for template!', path, None)
-        temp_id = conf_ents[0]['template_id']
-        if not temp_id:
-            raise KeyValError('No template ID for template!', path, None)
+        vmf = await trio.to_thread.run_sync(read_vmf, file, abandon_on_cancel=True)
+        match list(vmf.by_class['bee2_template_conf']):
+            case [conf_ent]:
+                temp_id = conf_ent['template_id']
+                if not temp_id:
+                    raise KeyValError('No template ID for template!', path, None)
+            case []:
+                raise KeyValError('No configration entity for template!', path, None)
+            case _:
+                raise KeyValError('Multiple configuration entities in template!', path, None)
     packset.templates[temp_id.casefold()] = PackagePath(pak_id, file.path)
 
 
