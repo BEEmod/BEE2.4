@@ -82,7 +82,7 @@ async def step_corridor_conf(exp_data: ExportData) -> None:
         opt_id = Options.get_id(style_id, mode, direction)
         options_changed = False
         try:
-            exported_options = exp_data.config.get(Options, opt_id).options
+            exported_options = dict(exp_data.config.get(Options, opt_id).options)
         except KeyError:
             exported_options = {}
             options_changed = True
