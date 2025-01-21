@@ -5,6 +5,7 @@ import tkinter as tk
 from collections.abc import Callable
 
 from srctools.logger import get_logger
+import attrs
 import trio
 
 from app import sound
@@ -44,6 +45,54 @@ def make_tool_button(
     return button
 
 
+@attrs.frozen(kw_only=True)
+class PaneConf:
+    """Configuration for a pane."""
+    tool_img: str
+    tool_col: int
+    title: TransToken
+    resize_x: bool = False
+    resize_y: bool = False
+    name: str = ''
+    legacy_name: str = ''
+
+CONF_PALETTE = PaneConf(
+    title=TransToken.ui('Palettes'),
+    name='pal',
+    resize_x=True,
+    resize_y=True,
+    tool_img='icons/win_palette',
+    tool_col=10,
+)
+
+CONF_EXPORT_OPTS = PaneConf(
+    title=TransToken.ui('Export Options'),
+    name='opt',
+    resize_x=True,
+    tool_img='icons/win_options',
+    tool_col=11,
+)
+
+CONF_ITEMCONFIG = PaneConf(
+    title=TransToken.ui('Style/Item Properties'),
+    name='item',
+    legacy_name='style',
+    resize_x=False,
+    resize_y=True,
+    tool_img='icons/win_itemvar',
+    tool_col=12,
+)
+
+CONF_COMPILER = PaneConf(
+    title=TransToken.ui('Compile Options'),
+    name='compiler',
+    resize_x=True,
+    resize_y=False,
+    tool_img='icons/win_compiler',
+    tool_col=13,
+)
+
+
 class SubPane(tk.Toplevel):
     """A Toplevel window that can be shown/hidden.
 
@@ -53,52 +102,46 @@ class SubPane(tk.Toplevel):
         self,
         parent: tk.Toplevel | tk.Tk,
         tk_img: TKImages,
+        conf: PaneConf,
         *,
         tool_frame: tk.Frame | ttk.Frame,
-        tool_img: str,
         menu_bar: tk.Menu,
-        tool_col: int,
-        title: TransToken,
-        resize_x: bool = False,
-        resize_y: bool = False,
-        name: str = '',
-        legacy_name: str = '',
     ) -> None:
         self.visible = tk.BooleanVar(parent, True)
-        self.win_name = name
-        self.legacy_name = legacy_name
+        self.win_name = conf.name
+        self.legacy_name = conf.legacy_name
         self.allow_snap = False
         self.can_save = False
         self.parent = parent
         self.relX = 0
         self.relY = 0
-        self.can_resize_x = resize_x
-        self.can_resize_y = resize_y
-        super().__init__(parent, name='pane_' + name)
+        self.can_resize_x = conf.resize_x
+        self.can_resize_y = conf.resize_y
+        super().__init__(parent, name=f'pane_{conf.name}')
         self.withdraw()  # Hide by default
         if utils.LINUX:
             self.wm_attributes('-type', 'utility')
 
         self.tool_button = make_tool_button(
             tool_frame, tk_img,
-            img=tool_img,
+            img=conf.tool_img,
             command=self._toggle_win,
         )
         self.tool_button.state(('pressed',))
         self.tool_button.grid(
             row=0,
-            column=tool_col,
+            column=conf.tool_col,
             # Contract the spacing to allow the icons to fit.
             padx=(2 if utils.MAC else (5, 2)),
         )
-        tooltip.add_tooltip(self.tool_button, text=TOOL_BTN_TOOLTIP.format(window=title))
+        tooltip.add_tooltip(self.tool_button, text=TOOL_BTN_TOOLTIP.format(window=conf.title))
 
         menu_bar.add_checkbutton(variable=self.visible, command=self._set_state_from_menu)
-        wid_transtoken.set_menu_text(menu_bar, title)
+        wid_transtoken.set_menu_text(menu_bar, conf.title)
 
         self.transient(master=parent)
-        self.resizable(resize_x, resize_y)
-        wid_transtoken.set_win_title(self, title)
+        self.resizable(conf.resize_x, conf.resize_y)
+        wid_transtoken.set_win_title(self, conf.title)
         tk_tools.set_window_icon(self)
 
         self.protocol("WM_DELETE_WINDOW", self.hide_win)

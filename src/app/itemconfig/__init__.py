@@ -15,7 +15,7 @@ import trio
 
 from app import StyleVarPane, sound, img
 from app.mdown import MarkdownData
-from app.SubPane import SubPane
+from app.SubPane import SubPane, CONF_ITEMCONFIG as PANE_CONF
 from async_util import EdgeTrigger, run_as_task
 from config.filters import FilterConf
 from config.widgets import (
@@ -334,15 +334,9 @@ async def make_pane(
     global window
 
     window = SubPane(
-        TK_ROOT, tk_img,
-        title=TransToken.ui('Style/Item Properties'),
-        name='item',
-        legacy_name='style',
+        TK_ROOT, tk_img, PANE_CONF,
         menu_bar=menu_bar,
-        resize_y=True,
         tool_frame=tool_frame,
-        tool_img='icons/win_itemvar',
-        tool_col=12,
     )
 
     ordered_conf: list[ConfigGroup] = sorted(

@@ -858,15 +858,9 @@ async def make_pane(
     """Initialise when part of the BEE2."""
     global window
     window = SubPane.SubPane(
-        TK_ROOT, tk_img,
-        title=TransToken.ui('Compile Options'),
-        name='compiler',
+        TK_ROOT, tk_img, SubPane.CONF_COMPILER,
         menu_bar=menu_bar,
-        resize_x=True,
-        resize_y=False,
         tool_frame=tool_frame,
-        tool_img='icons/win_compiler',
-        tool_col=13,
     )
     window.columnconfigure(0, weight=1)
     window.rowconfigure(0, weight=1)

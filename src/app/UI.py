@@ -650,15 +650,9 @@ async def init_windows(
     toolbar_frame.place(x=73, y=2)
 
     windows['pal'] = SubPane.SubPane(
-        TK_ROOT, tk_img,
-        title=TransToken.ui('Palettes'),
-        name='pal',
+        TK_ROOT, tk_img, SubPane.CONF_PALETTE,
         menu_bar=menu_bar.view_menu,
-        resize_x=True,
-        resize_y=True,
         tool_frame=toolbar_frame,
-        tool_img='icons/win_palette',
-        tool_col=10,
     )
     await trio.lowlevel.checkpoint()
 
@@ -690,14 +684,9 @@ async def init_windows(
     await LOAD_UI.step('packageman')
 
     windows['opt'] = SubPane.SubPane(
-        TK_ROOT, tk_img,
-        title=TransToken.ui('Export Options'),
-        name='opt',
+        TK_ROOT, tk_img, SubPane.CONF_EXPORT_OPTS,
         menu_bar=menu_bar.view_menu,
-        resize_x=True,
         tool_frame=toolbar_frame,
-        tool_img='icons/win_options',
-        tool_col=11,
     )
     corridor = TkSelector(tk_img, cur_style)
     await core_nursery.start(init_option, core_nursery, windows['opt'], tk_img, export, export_trig.ready, corridor)
