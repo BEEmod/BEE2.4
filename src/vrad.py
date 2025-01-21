@@ -237,9 +237,10 @@ async def main(argv: list[str]) -> None:
 
     # We need to add all soundscripts in scripts/bee2_snd/
     # This way we can pack those, if required.
-    for soundscript in fsys.walk_folder('scripts/bee2_snd/'):
-        if soundscript.path.endswith('.txt'):
-            packlist.load_soundscript(soundscript, always_include=False)
+    for folder in ['scripts/bee2_snd/', 'scripts/bee_snd/']:
+        for soundscript in fsys.walk_folder(folder):
+            if soundscript.path.endswith('.txt'):
+                packlist.load_soundscript(soundscript, always_include=False)
 
     LOGGER.info('Reading particles....')
     packlist.load_particle_manifest(root_folder / 'bin/bee2/particle_cache.dmx')
