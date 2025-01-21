@@ -5,6 +5,7 @@ import tkinter as tk
 from collections.abc import Callable
 
 from srctools.logger import get_logger
+import trio
 
 from app import sound
 from app.img import Handle as ImgHandle
@@ -101,7 +102,6 @@ class SubPane(tk.Toplevel):
         tk_tools.set_window_icon(self)
 
         self.protocol("WM_DELETE_WINDOW", self.hide_win)
-        parent.bind('<Configure>', self.follow_main, add=True)
         self.bind('<Configure>', self.snap_win)
         self.bind('<FocusIn>', self.enable_snap)
 
@@ -209,7 +209,7 @@ class SubPane(tk.Toplevel):
                 height=self.winfo_height() if self.can_resize_y else -1,
             ), self.win_name)
 
-    def load_conf(self) -> None:
+    async def load_conf(self) -> None:
         """Load configuration from our config file."""
         hide = False
         try:
@@ -220,6 +220,7 @@ class SubPane(tk.Toplevel):
             width = state.width if self.can_resize_x and state.width > 0 else self.winfo_reqwidth()
             height = state.height if self.can_resize_y and state.height > 0 else self.winfo_reqheight()
             self.deiconify()
+            await tk_tools.wait_eventloop()
 
             self.geometry(f'{width}x{height}')
 
@@ -229,10 +230,9 @@ class SubPane(tk.Toplevel):
             if not state.visible:
                 hide = True
 
-        def set_can_save() -> None:
-            """Only allow saving after the window has stabilised in its position."""
-            self.can_save = True
-            if hide:
-                self.hide_win(False)
-
-        self.after(150, set_can_save)
+        # Only allow saving after the window has stabilised in its position.
+        await trio.sleep(0.15)
+        self.parent.bind('<Configure>', self.follow_main, add=True)
+        self.can_save = True
+        if hide:
+            self.hide_win(False)

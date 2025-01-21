@@ -231,7 +231,7 @@ def reposition_panes() -> None:
     )
     comp_win.move(
         x=pal_x,
-        y=pal_win.winfo_rooty() + pal_win.winfo_reqheight(),
+        y=pal_win.winfo_y() + pal_win.winfo_reqheight(),
     )
     opt_win.move(
         x=xpos,
@@ -818,12 +818,12 @@ async def init_windows(
     # positions.
     reposition_panes()
     await tk_tools.wait_eventloop()
-    for pane in [
-        itemconfig.window, CompilerPane.window,
-        windows['opt'], windows['pal'],
-    ]:
-        pane.load_conf()
-        await trio.lowlevel.checkpoint()
+    async with trio.open_nursery() as nursery:
+        for pane in [
+            itemconfig.window, CompilerPane.window,
+            windows['opt'], windows['pal'],
+        ]:
+            nursery.start_soon(pane.load_conf)
 
     item_picker.set_items(pal_ui.selected.items)
     pal_ui.is_dirty.set()
