@@ -1,7 +1,9 @@
-import tkinter as tk
+"""Implements a sub-window which follows the main, saves state and can be hidden/shown."""
+from contextlib import aclosing
 import abc
 
 from srctools.logger import get_logger
+from trio_util import AsyncBool
 import attrs
 import trio
 
@@ -69,7 +71,7 @@ class SubPaneBase:
      This follows the main window when moved.
     """
     def __init__(self, conf: PaneConf) -> None:
-        self.visible = tk.BooleanVar(value=True)
+        self.visible = AsyncBool(True)
         self.win_name = conf.name
         self.legacy_name = conf.legacy_name
         self.allow_snap = False
@@ -79,40 +81,26 @@ class SubPaneBase:
         self.can_resize_x = conf.resize_x
         self.can_resize_y = conf.resize_y
 
-    def evt_window_hidden(self, play_snd: bool = True) -> None:
-        """Hide the window."""
-        if play_snd:
-            sound.fx('config')
-        self._ui_hide()
-        self.visible.set(False)
-        self.save_conf()
-
-    def show_win(self, play_snd: bool = True) -> None:
-        """Show the window."""
-        if play_snd:
-            sound.fx('config')
-        self._ui_show()
-        self.visible.set(True)
-        self.save_conf()
-        self.follow_main()
+    async def task(self) -> None:
+        """Show/hide the window when the value changes."""
+        async with aclosing(self.visible.eventual_values()) as agen:
+            async for visible in agen:
+                if visible:
+                    self._ui_show()
+                    self.follow_main()
+                else:
+                    self._ui_hide()
+                self.save_conf()
 
     def _toggle_win(self) -> None:
         """Toggle the window between shown and hidden."""
-        if self.visible.get():
-            self.evt_window_hidden()
-        else:
-            self.show_win()
+        sound.fx('config')
+        self.visible.value = not self.visible.value
 
-    def _set_state_from_menu(self) -> None:
-        """Called when the menu bar button is pressed.
-
-        This has already toggled the variable, so we just need to read
-        from it.
-        """
-        if self.visible.get():
-            self.show_win()
-        else:
-            self.evt_window_hidden()
+    def evt_window_closed(self, _: object = None, /) -> None:
+        """Window was closed, update."""
+        sound.fx('config')
+        self.visible.value = False
 
     def evt_window_focused(self, _: object = None, /) -> None:
         """Allow the window to snap."""
@@ -128,7 +116,7 @@ class SubPaneBase:
             self._rel_x, self._rel_y = self._ui_get_pos()
             self.save_conf()
 
-    def follow_main(self, e: object = None) -> None:
+    def follow_main(self, _: object = None) -> None:
         """When the main window moves, sub-windows should move with it."""
         self.allow_snap = False
         self._ui_apply_relative()
@@ -138,7 +126,7 @@ class SubPaneBase:
         if self.can_save:
             width, height = self._ui_get_size()
             config.APP.store_conf(WindowState(
-                visible=self.visible.get(),
+                visible=self.visible.value,
                 x=self._rel_x,
                 y=self._rel_y,
                 width=width if self.can_resize_x else -1,
@@ -163,6 +151,7 @@ class SubPaneBase:
             self._rel_x, self._rel_y = state.x, state.y
 
             self.follow_main()
+            self._ui_bind_parent()
             if not state.visible:
                 hide = True
 

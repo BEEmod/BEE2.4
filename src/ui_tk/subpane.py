@@ -3,6 +3,7 @@ from tkinter import ttk
 import tkinter as tk
 
 import utils
+from app import sound
 from app.SubPane import PaneConf, SubPaneBase, TOOL_BTN_TOOLTIP
 from ui_tk import tk_tools, tooltip, wid_transtoken
 from ui_tk.img import TKImages
@@ -23,6 +24,7 @@ class SubPane(SubPaneBase):
 
         self.parent = parent
         self.win = tk.Toplevel(parent, name=f'pane_{conf.name}')
+        self.vis_var = tk.BooleanVar(self.win, True)
         self.win.withdraw()  # Hide by default
         if utils.LINUX:
             self.win.wm_attributes('-type', 'utility')
@@ -41,7 +43,7 @@ class SubPane(SubPaneBase):
         )
         tooltip.add_tooltip(self.tool_button, text=TOOL_BTN_TOOLTIP.format(window=conf.title))
 
-        menu_bar.add_checkbutton(variable=self.visible, command=self._set_state_from_menu)
+        menu_bar.add_checkbutton(variable=self.vis_var, command=self._set_state_from_menu)
         wid_transtoken.set_menu_text(menu_bar, conf.title)
 
         self.win.transient(master=parent)
@@ -49,9 +51,20 @@ class SubPane(SubPaneBase):
         wid_transtoken.set_win_title(self.win, conf.title)
         tk_tools.set_window_icon(self.win)
 
-        self.win.protocol("WM_DELETE_WINDOW", self.evt_window_hidden)
+        self.win.protocol("WM_DELETE_WINDOW", self.evt_window_closed)
         self.win.bind('<Configure>', self.evt_window_moved)
         self.win.bind('<FocusIn>', self.evt_window_focused)
+
+    def _set_state_from_menu(self) -> None:
+        """Called when the menu bar button is pressed.
+
+        This has already toggled the variable, so we just need to read
+        from it.
+        """
+        visible = self.vis_var.get()
+        if self.visible.value is not visible:
+            sound.fx('config')
+            self.visible.value = visible
 
     def move(
         self,
@@ -94,10 +107,12 @@ class SubPane(SubPaneBase):
     def _ui_show(self) -> None:
         self.win.deiconify()
         self.tool_button.state(('pressed',))
+        self.vis_var.set(True)
 
     def _ui_hide(self) -> None:
         self.win.withdraw()
         self.tool_button.state(('!pressed',))
+        self.vis_var.set(False)
 
     def _ui_get_pos(self) -> tuple[int, int]:
         return (

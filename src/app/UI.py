@@ -775,6 +775,7 @@ async def init_windows(
         windows['pal'], windows['opt'],
         itemconfig.PANE, CompilerPane.PANE,
     ]:
+        core_nursery.start_soon(pane.task)
         await trio.lowlevel.checkpoint()
         pane.win.deiconify()  # show it once we've loaded everything
 
