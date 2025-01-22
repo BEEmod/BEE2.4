@@ -22,6 +22,8 @@ from srctools import logger
 import trio
 
 from app import ICO_PATH, BaseEnumButton, background_run
+from app.img import Handle as ImgHandle
+from ui_tk.img import TKImages
 from async_util import EdgeTrigger
 from config.gen_opts import GenOptions
 from transtoken import CURRENT_LANG, TransToken
@@ -566,6 +568,31 @@ def center_onscreen(window: tk.Tk | tk.Toplevel) -> None:
     y = (window.winfo_screenheight() - window.winfo_height()) // 2
 
     window.geometry(f'+{x}+{y}')
+
+
+# This is a bit of an ugly hack. On OSX the buttons are set to have
+# default padding on the left and right, spreading out the toolbar
+# icons too much. This retracts the padding so they are more square
+# around the images instead of wasting space.
+style = ttk.Style()
+style.configure('Toolbar.TButton', padding='-20',)
+
+
+def make_tool_button(
+    frame: tk.Misc, tk_img: TKImages,
+    img: str,
+    command: Callable[[], Any],
+) -> ttk.Button:
+    """Make a toolbar icon."""
+    button = ttk.Button(
+        frame,
+        style=('Toolbar.TButton' if utils.MAC else 'BG.TButton'),
+        command=command,
+    )
+    tk_img.apply(button, ImgHandle.builtin(img, 16, 16))
+
+    return button
+
 
 
 class HidingScroll(ttk.Scrollbar):

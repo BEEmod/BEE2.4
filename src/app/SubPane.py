@@ -29,22 +29,6 @@ TOOL_BTN_TOOLTIP = TransToken.ui('Hide/Show the "{window}" window.')
 LOGGER = get_logger(__name__)
 
 
-def make_tool_button(
-    frame: tk.Misc, tk_img: TKImages,
-    img: str,
-    command: Callable[[], Any],
-) -> ttk.Button:
-    """Make a toolbar icon."""
-    button = ttk.Button(
-        frame,
-        style=('Toolbar.TButton' if utils.MAC else 'BG.TButton'),
-        command=command,
-    )
-    tk_img.apply(button, ImgHandle.builtin(img, 16, 16))
-
-    return button
-
-
 @attrs.frozen(kw_only=True)
 class PaneConf:
     """Configuration for a pane."""

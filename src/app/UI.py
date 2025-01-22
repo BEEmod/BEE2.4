@@ -709,7 +709,7 @@ async def init_windows(
     )
     await LOAD_UI.step('compiler')
 
-    btn_clear = SubPane.make_tool_button(
+    btn_clear = tk_tools.make_tool_button(
         toolbar_frame, tk_img,
         img='icons/clear_pal',
         command=item_picker.clear_palette,
@@ -720,7 +720,7 @@ async def init_windows(
         TransToken.ui('Remove all items from the palette.'),
     )
 
-    btn_shuffle = SubPane.make_tool_button(
+    btn_shuffle = tk_tools.make_tool_button(
         toolbar_frame, tk_img,
         img='icons/shuffle_pal',
         command=item_picker.fill_palette,
