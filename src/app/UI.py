@@ -14,6 +14,7 @@ import trio_util
 
 import exporting
 from app import lifecycle, quit_app
+from app.SubPane import CONF_EXPORT_OPTS, CONF_PALETTE
 from async_util import EdgeTrigger, run_as_task
 from BEE2_config import GEN_OPTS
 from app.dialogs import Dialogs
@@ -29,7 +30,6 @@ from transtoken import TransToken
 from app import (
     img,
     itemconfig,
-    SubPane,
     voiceEditor,
     gameMan,
     packageMan,
@@ -53,6 +53,7 @@ from ui_tk.dialogs import DIALOG, TkDialogs
 from ui_tk.img import TKImages, TK_IMG
 from ui_tk import tk_tools, tooltip, wid_transtoken, TK_ROOT
 from ui_tk.signage_ui import SignageUI
+from ui_tk.subpane import SubPane
 import consts
 
 
@@ -97,8 +98,8 @@ DATA_RAND_ELEV = packages.SelitemData.build(
 
 class _WindowsDict(TypedDict):
     """TODO: Remove."""
-    opt: SubPane.SubPane
-    pal: SubPane.SubPane
+    opt: SubPane
+    pal: SubPane
 
 
 # Holds the TK Toplevels, frames, widgets and menus
@@ -373,7 +374,7 @@ async def export_complete_task(
 
 async def init_option(
     core_nursery: trio.Nursery,
-    pane: SubPane.SubPane,
+    pane: SubPane,
     tk_img: TKImages,
     export: Callable[[], object],
     export_ready: trio_util.AsyncValue[bool],
@@ -649,8 +650,8 @@ async def init_windows(
         )
     toolbar_frame.place(x=73, y=2)
 
-    windows['pal'] = SubPane.SubPane(
-        TK_ROOT, tk_img, SubPane.CONF_PALETTE,
+    windows['pal'] = SubPane(
+        TK_ROOT, tk_img, CONF_PALETTE,
         menu_bar=menu_bar.view_menu,
         tool_frame=toolbar_frame,
     )
@@ -683,8 +684,8 @@ async def init_windows(
 
     await LOAD_UI.step('packageman')
 
-    windows['opt'] = SubPane.SubPane(
-        TK_ROOT, tk_img, SubPane.CONF_EXPORT_OPTS,
+    windows['opt'] = SubPane(
+        TK_ROOT, tk_img, CONF_EXPORT_OPTS,
         menu_bar=menu_bar.view_menu,
         tool_frame=toolbar_frame,
     )

@@ -19,14 +19,15 @@ from trio_util import AsyncValue
 import attrs
 import trio
 
-from app import SubPane
 from config.compile_pane import CompilePaneState, PLAYER_MODEL_LEGACY_IDS
 from config.player import AvailablePlayer
 from transtoken import TransToken, CURRENT_LANG
 from ui_tk import tk_tools, wid_transtoken, TK_ROOT
 from ui_tk.img import TKImages
-from ui_tk.tk_tools import ComboBoxMap
+from ui_tk.subpane import SubPane
+from ui_tk.tk_tools import ComboBoxMap, make_tool_button
 from ui_tk.tooltip import add_tooltip, set_tooltip
+from app.SubPane import CONF_COMPILER as PANE_CONF
 import BEE2_config
 import app
 import async_util
@@ -106,7 +107,7 @@ def _read_player_model() -> utils.ObjectID:
 
 COMPILE_CFG = BEE2_config.ConfigFile('compile.cfg')
 COMPILE_CFG.set_defaults(COMPILE_DEFAULTS)
-PANE: SubPane.SubPane
+PANE: SubPane
 window: tk.Toplevel | tk.Tk
 UI: _WidgetsDict = cast(_WidgetsDict, {})
 
@@ -653,7 +654,7 @@ async def make_comp_widgets(
     count_overlay.bar.grid(row=3, column=0, sticky='ew', padx=5)
 
     await trio.lowlevel.checkpoint()
-    UI['refresh_counts'] = SubPane.make_tool_button(
+    UI['refresh_counts'] = make_tool_button(
         count_frame, tk_img,
         'icons/tool_sub',
         lambda: refresh_counts(count_brush, count_entity, count_overlay),
@@ -859,8 +860,8 @@ async def make_pane(
 ) -> None:
     """Initialise when part of the BEE2."""
     global PANE, window
-    PANE = SubPane.SubPane(
-        TK_ROOT, tk_img, SubPane.CONF_COMPILER,
+    PANE = SubPane(
+        TK_ROOT, tk_img, PANE_CONF,
         menu_bar=menu_bar,
         tool_frame=tool_frame,
     )

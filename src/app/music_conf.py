@@ -9,13 +9,13 @@ import attrs
 import srctools.logger
 import trio
 
-from app.SubPane import SubPane
 from config.gen_opts import GenOptions
 from consts import MusicChannel
 from packages import PackagesSet, Music, SelitemData, AttrDef
 from transtoken import TransToken
 from ui_tk.selector_win import SelectorWin, Options as SelectorOptions
 from ui_tk.wid_transtoken import set_text
+from ui_tk.subpane import SubPane
 from ui_tk import TK_ROOT
 import config
 import packages
@@ -243,7 +243,7 @@ async def make_widgets(
         for wid in exp_widgets:
             wid.grid()
         pane.win.update_idletasks()  # TODO replace by async
-        pane.move()
+        pane.resize()
 
     def toggle(event: tkinter.Event[ttk.Label]) -> None:
         if is_collapsed:
@@ -251,7 +251,7 @@ async def make_widgets(
         else:
             set_collapsed()
         pane.win.update_idletasks()  # TODO replace by async
-        pane.move()
+        pane.resize()
 
     await trio.lowlevel.checkpoint()
 

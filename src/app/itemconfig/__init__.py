@@ -15,7 +15,7 @@ import trio
 
 from app import StyleVarPane, sound, img
 from app.mdown import MarkdownData
-from app.SubPane import SubPane, CONF_ITEMCONFIG as PANE_CONF
+from app.SubPane import CONF_ITEMCONFIG as PANE_CONF
 from async_util import EdgeTrigger, run_as_task
 from config.filters import FilterConf
 from config.widgets import (
@@ -32,6 +32,7 @@ from ui_tk import TK_ROOT, tk_tools
 from ui_tk.img import TKImages
 from ui_tk.tooltip import add_tooltip
 from ui_tk.wid_transtoken import set_text
+from ui_tk.subpane import SubPane
 import config
 import packages
 
