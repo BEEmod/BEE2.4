@@ -93,7 +93,7 @@ CONF_COMPILER = PaneConf(
 )
 
 
-class SubPane(tk.Toplevel):
+class SubPane:
     """A Toplevel window that can be shown/hidden.
 
      This follows the main window when moved.
@@ -117,10 +117,10 @@ class SubPane(tk.Toplevel):
         self.relY = 0
         self.can_resize_x = conf.resize_x
         self.can_resize_y = conf.resize_y
-        super().__init__(parent, name=f'pane_{conf.name}')
-        self.withdraw()  # Hide by default
+        self.win = tk.Toplevel(parent, name=f'pane_{conf.name}')
+        self.win.withdraw()  # Hide by default
         if utils.LINUX:
-            self.wm_attributes('-type', 'utility')
+            self.win.wm_attributes('-type', 'utility')
 
         self.tool_button = make_tool_button(
             tool_frame, tk_img,
@@ -139,20 +139,20 @@ class SubPane(tk.Toplevel):
         menu_bar.add_checkbutton(variable=self.visible, command=self._set_state_from_menu)
         wid_transtoken.set_menu_text(menu_bar, conf.title)
 
-        self.transient(master=parent)
-        self.resizable(conf.resize_x, conf.resize_y)
-        wid_transtoken.set_win_title(self, conf.title)
-        tk_tools.set_window_icon(self)
+        self.win.transient(master=parent)
+        self.win.resizable(conf.resize_x, conf.resize_y)
+        wid_transtoken.set_win_title(self.win, conf.title)
+        tk_tools.set_window_icon(self.win)
 
-        self.protocol("WM_DELETE_WINDOW", self.hide_win)
-        self.bind('<Configure>', self.snap_win)
-        self.bind('<FocusIn>', self.enable_snap)
+        self.win.protocol("WM_DELETE_WINDOW", self.hide_win)
+        self.win.bind('<Configure>', self.snap_win)
+        self.win.bind('<FocusIn>', self.enable_snap)
 
     def hide_win(self, play_snd: bool = True) -> None:
         """Hide the window."""
         if play_snd:
             sound.fx('config')
-        self.withdraw()
+        self.win.withdraw()
         self.visible.set(False)
         self.save_conf()
         self.tool_button.state(('!pressed',))
@@ -161,7 +161,7 @@ class SubPane(tk.Toplevel):
         """Show the window."""
         if play_snd:
             sound.fx('config')
-        self.deiconify()
+        self.win.deiconify()
         self.visible.set(True)
         self.save_conf()
         self.tool_button.state(('pressed',))
@@ -200,16 +200,16 @@ class SubPane(tk.Toplevel):
         # If we're resizable, keep the current size. Otherwise, autosize to
         # contents.
         if width is None:
-            width = self.winfo_width() if self.can_resize_x else self.winfo_reqwidth()
+            width = self.win.winfo_width() if self.can_resize_x else self.win.winfo_reqwidth()
         if height is None:
-            height = self.winfo_height() if self.can_resize_y else self.winfo_reqheight()
+            height = self.win.winfo_height() if self.can_resize_y else self.win.winfo_reqheight()
         if x is None:
-            x = self.winfo_x()
+            x = self.win.winfo_x()
         if y is None:
-            y = self.winfo_y()
+            y = self.win.winfo_y()
 
-        x, y = tk_tools.adjust_inside_screen(x, y, win=self)
-        self.geometry(f'{max(10, width)!s}x{max(10, height)!s}+{x!s}+{y!s}')
+        x, y = tk_tools.adjust_inside_screen(x, y, win=self.win)
+        self.win.geometry(f'{max(10, width)!s}x{max(10, height)!s}+{x!s}+{y!s}')
 
         self.relX = x - self.parent.winfo_x()
         self.relY = y - self.parent.winfo_y()
@@ -226,8 +226,8 @@ class SubPane(tk.Toplevel):
         """
         # TODO: Actually snap to edges of main window
         if self.allow_snap:
-            self.relX = self.winfo_x() - self.parent.winfo_x()
-            self.relY = self.winfo_y() - self.parent.winfo_y()
+            self.relX = self.win.winfo_x() - self.parent.winfo_x()
+            self.relY = self.win.winfo_y() - self.parent.winfo_y()
             self.save_conf()
 
     def follow_main(self, e: object = None) -> None:
@@ -236,9 +236,9 @@ class SubPane(tk.Toplevel):
         x, y = tk_tools.adjust_inside_screen(
             x=self.parent.winfo_x()+self.relX,
             y=self.parent.winfo_y()+self.relY,
-            win=self,
+            win=self.win,
         )
-        self.geometry(f'+{x}+{y}')
+        self.win.geometry(f'+{x}+{y}')
         self.parent.focus()
 
     def save_conf(self) -> None:
@@ -248,8 +248,8 @@ class SubPane(tk.Toplevel):
                 visible=self.visible.get(),
                 x=self.relX,
                 y=self.relY,
-                width=self.winfo_width() if self.can_resize_x else -1,
-                height=self.winfo_height() if self.can_resize_y else -1,
+                width=self.win.winfo_width() if self.can_resize_x else -1,
+                height=self.win.winfo_height() if self.can_resize_y else -1,
             ), self.win_name)
 
     async def load_conf(self) -> None:
@@ -260,12 +260,12 @@ class SubPane(tk.Toplevel):
         except KeyError:
             pass  # No configured state.
         else:
-            width = state.width if self.can_resize_x and state.width > 0 else self.winfo_reqwidth()
-            height = state.height if self.can_resize_y and state.height > 0 else self.winfo_reqheight()
-            self.deiconify()
+            width = state.width if self.can_resize_x and state.width > 0 else self.win.winfo_reqwidth()
+            height = state.height if self.can_resize_y and state.height > 0 else self.win.winfo_reqheight()
+            self.win.deiconify()
             await tk_tools.wait_eventloop()
 
-            self.geometry(f'{width}x{height}')
+            self.win.geometry(f'{width}x{height}')
 
             self.relX, self.relY = state.x, state.y
 

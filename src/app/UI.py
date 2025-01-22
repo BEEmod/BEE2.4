@@ -204,43 +204,43 @@ async def create_selectors(core_nursery: trio.Nursery) -> None:
 
 def reposition_panes() -> None:
     """Position all the panes in the default places around the main window."""
-    comp_win = CompilerPane.window
+    comp_win = CompilerPane.PANE
     opt_win = windows['opt']
     pal_win = windows['pal']
     # The x-pos of the right side of the main window
     xpos = min(
         TK_ROOT.winfo_screenwidth()
-        - itemconfig.window.winfo_reqwidth(),
+        - itemconfig.PANE.win.winfo_reqwidth(),
 
         TK_ROOT.winfo_rootx()
         + TK_ROOT.winfo_reqwidth()
         + 25
         )
     # The x-pos for the palette and compiler panes
-    pal_x = TK_ROOT.winfo_rootx() - comp_win.winfo_reqwidth() - 25
+    pal_x = TK_ROOT.winfo_rootx() - comp_win.win.winfo_reqwidth() - 25
     pal_win.move(
         x=pal_x,
         y=(TK_ROOT.winfo_rooty() - 50),
         height=max(
             TK_ROOT.winfo_reqheight() -
-            comp_win.winfo_reqheight() -
+            comp_win.win.winfo_reqheight() -
             25,
             30,
         ),
-        width=comp_win.winfo_reqwidth(),
+        width=comp_win.win.winfo_reqwidth(),
     )
     comp_win.move(
         x=pal_x,
-        y=pal_win.winfo_y() + pal_win.winfo_reqheight(),
+        y=pal_win.win.winfo_y() + pal_win.win.winfo_reqheight(),
     )
     opt_win.move(
         x=xpos,
         y=TK_ROOT.winfo_rooty()-40,
-        width=itemconfig.window.winfo_reqwidth(),
+        width=itemconfig.PANE.win.winfo_reqwidth(),
     )
-    itemconfig.window.move(
+    itemconfig.PANE.move(
         x=xpos,
-        y=TK_ROOT.winfo_rooty() + opt_win.winfo_reqheight() + 25,
+        y=TK_ROOT.winfo_rooty() + opt_win.win.winfo_reqheight() + 25,
     )
 
 
@@ -249,8 +249,8 @@ def reset_panes() -> None:
     reposition_panes()
     windows['pal'].save_conf()
     windows['opt'].save_conf()
-    itemconfig.window.save_conf()
-    CompilerPane.window.save_conf()
+    itemconfig.PANE.save_conf()
+    CompilerPane.PANE.save_conf()
 
 
 def fetch_export_info() -> exporting.ExportInfo | None:
@@ -381,10 +381,10 @@ async def init_option(
     task_status: trio.TaskStatus[None] = trio.TASK_STATUS_IGNORED,
 ) -> None:
     """Initialise the export options pane."""
-    pane.columnconfigure(0, weight=1)
-    pane.rowconfigure(0, weight=1)
+    pane.win.columnconfigure(0, weight=1)
+    pane.win.rowconfigure(0, weight=1)
 
-    frame = ttk.Frame(pane)
+    frame = ttk.Frame(pane.win)
     frame.grid(row=0, column=0, sticky='nsew')
     frame.columnconfigure(0, weight=1)
 
@@ -656,17 +656,17 @@ async def init_windows(
     )
     await trio.lowlevel.checkpoint()
 
-    pal_frame = ttk.Frame(windows['pal'], name='pal_frame')
+    pal_frame = ttk.Frame(windows['pal'].win, name='pal_frame')
     pal_frame.grid(row=0, column=0, sticky='NSEW')
-    windows['pal'].columnconfigure(0, weight=1)
-    windows['pal'].rowconfigure(0, weight=1)
+    windows['pal'].win.columnconfigure(0, weight=1)
+    windows['pal'].win.rowconfigure(0, weight=1)
 
     await trio.lowlevel.checkpoint()
     pal_ui = paletteUI.PaletteUI(
         pal_frame, menu_bar.pal_menu, item_picker,
         tk_img=tk_img,
         dialog_menu=TkDialogs(TK_ROOT),
-        dialog_window=TkDialogs(windows['pal']),
+        dialog_window=TkDialogs(windows['pal'].win),
     )
     await trio.lowlevel.checkpoint()
 
@@ -754,11 +754,11 @@ async def init_windows(
     # When clicking on any window, hide the context window
     hide_ctx_win = context_win.hide_context
     tk_tools.bind_leftclick(TK_ROOT, hide_ctx_win)
-    tk_tools.bind_leftclick(itemconfig.window, hide_ctx_win)
+    tk_tools.bind_leftclick(itemconfig.PANE.win, hide_ctx_win)
     tk_tools.bind_leftclick(CompilerPane.window, hide_ctx_win)
     tk_tools.bind_leftclick(corridor.win, hide_ctx_win)
-    tk_tools.bind_leftclick(windows['opt'], hide_ctx_win)
-    tk_tools.bind_leftclick(windows['pal'], hide_ctx_win)
+    tk_tools.bind_leftclick(windows['opt'].win, hide_ctx_win)
+    tk_tools.bind_leftclick(windows['pal'].win, hide_ctx_win)
 
     # Load to properly apply config settings, then save to ensure
     # the file has any defaults applied.
@@ -770,12 +770,12 @@ async def init_windows(
     await trio.lowlevel.checkpoint()
     TK_ROOT.deiconify()
 
-    for window in [
+    for pane in [
         windows['pal'], windows['opt'],
-        itemconfig.window, CompilerPane.window,
+        itemconfig.PANE, CompilerPane.PANE,
     ]:
         await trio.lowlevel.checkpoint()
-        window.deiconify()  # show it once we've loaded everything
+        pane.win.deiconify()  # show it once we've loaded everything
 
     if utils.MAC:
         TK_ROOT.lift()  # Raise to the top of the stack
@@ -788,9 +788,9 @@ async def init_windows(
     except KeyError:
         # We don't have a config, position the window ourselves
         # move the main window if needed to allow room for palette
-        if TK_ROOT.winfo_rootx() < windows['pal'].winfo_reqwidth() + 50:
+        if TK_ROOT.winfo_rootx() < windows['pal'].win.winfo_reqwidth() + 50:
             TK_ROOT.geometry(
-                f'+{windows["pal"].winfo_reqwidth() + 50}+{TK_ROOT.winfo_rooty()}'
+                f'+{windows["pal"].win.winfo_reqwidth() + 50}+{TK_ROOT.winfo_rooty()}'
             )
         else:
             TK_ROOT.geometry(f'+{TK_ROOT.winfo_rootx()}+{TK_ROOT.winfo_rooty()}')
@@ -809,7 +809,7 @@ async def init_windows(
     await tk_tools.wait_eventloop()
     async with trio.open_nursery() as nursery:
         for pane in [
-            itemconfig.window, CompilerPane.window,
+            itemconfig.PANE, CompilerPane.PANE,
             windows['opt'], windows['pal'],
         ]:
             nursery.start_soon(pane.load_conf)

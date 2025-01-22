@@ -101,7 +101,7 @@ ITEM_VARIANT_LOAD: list[tuple[
     Callable[[packages.PakRef[packages.Style]], object],
 ]] = []
 
-window: SubPane
+PANE: SubPane
 
 
 class ItemConfigBase[WidgetT, ImgT: img.UIImage]:
@@ -331,13 +331,14 @@ async def make_pane(
     *, task_status: trio.TaskStatus[None] = trio.TASK_STATUS_IGNORED,
 ) -> None:
     """Create the item properties pane, with the widgets it uses."""
-    global window
+    global PANE
 
-    window = SubPane(
+    PANE = SubPane(
         TK_ROOT, tk_img, PANE_CONF,
         menu_bar=menu_bar,
         tool_frame=tool_frame,
     )
+    window = PANE.win
 
     ordered_conf: list[ConfigGroup] = sorted(
         packages.get_loaded_packages().all_obj(ConfigGroup),

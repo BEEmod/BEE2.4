@@ -69,6 +69,7 @@ COMPILE_DEFAULTS: dict[str, dict[str, str]] = {
     'CorridorNames': {},
 }
 
+
 class _WidgetsDict(TypedDict):
     """TODO: Remove."""
     refresh_counts: ttk.Button
@@ -105,7 +106,8 @@ def _read_player_model() -> utils.ObjectID:
 
 COMPILE_CFG = BEE2_config.ConfigFile('compile.cfg')
 COMPILE_CFG.set_defaults(COMPILE_DEFAULTS)
-window: SubPane.SubPane
+PANE: SubPane.SubPane
+window: tk.Toplevel | tk.Tk
 UI: _WidgetsDict = cast(_WidgetsDict, {})
 
 chosen_thumb = tk.StringVar(
@@ -856,12 +858,13 @@ async def make_pane(
     task_status: trio.TaskStatus[None] = trio.TASK_STATUS_IGNORED,
 ) -> None:
     """Initialise when part of the BEE2."""
-    global window
-    window = SubPane.SubPane(
+    global PANE, window
+    PANE = SubPane.SubPane(
         TK_ROOT, tk_img, SubPane.CONF_COMPILER,
         menu_bar=menu_bar,
         tool_frame=tool_frame,
     )
+    window = PANE.win
     window.columnconfigure(0, weight=1)
     window.rowconfigure(0, weight=1)
     async with trio.open_nursery() as nursery:
@@ -875,7 +878,7 @@ async def init_application(nursery: trio.Nursery) -> None:
     global window
     from ui_tk.img import TK_IMG
     from app import _APP_QUIT_SCOPE
-    window = cast(SubPane.SubPane, TK_ROOT)
+    window = TK_ROOT
     wid_transtoken.set_win_title(window, TransToken.ui(
         'Compiler Options - {ver}',
     ).format(ver=utils.BEE_VERSION))

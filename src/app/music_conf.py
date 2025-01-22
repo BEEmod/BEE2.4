@@ -242,7 +242,7 @@ async def make_widgets(
         toggle_btn['text'] = BTN_CONTRACT_HOVER if btn_hover else BTN_CONTRACT
         for wid in exp_widgets:
             wid.grid()
-        pane.update_idletasks()
+        pane.win.update_idletasks()  # TODO replace by async
         pane.move()
 
     def toggle(event: tkinter.Event[ttk.Label]) -> None:
@@ -250,7 +250,7 @@ async def make_widgets(
             set_expanded()
         else:
             set_collapsed()
-        pane.update_idletasks()
+        pane.win.update_idletasks()  # TODO replace by async
         pane.move()
 
     await trio.lowlevel.checkpoint()
