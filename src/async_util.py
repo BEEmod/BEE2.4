@@ -8,7 +8,7 @@ import types
 
 from srctools.logger import get_logger
 from trio_util import AsyncBool, AsyncValue
-import trio
+import trio.lowlevel
 import trio_util
 import aioresult
 
@@ -29,7 +29,7 @@ class EdgeTrigger[*Args]:
     not be set.
     """
     def __init__(self) -> None:
-        self._event: trio.Event | None = None
+        self._lot = trio.lowlevel.ParkingLot()
         self._result: tuple[*Args] | None = None
         self.ready = AsyncBool()
 
@@ -44,13 +44,12 @@ class EdgeTrigger[*Args]:
 
         Only one task can wait at a time.
         """
-        if self._event is not None:
+        if self._lot:
             raise ValueError('Only one task may wait() at a time!')
         try:
-            self._event = trio.Event()
             self._result = None
             self.ready.value = True
-            await self._event.wait()
+            await self._lot.park()
             match self._result:
                 case None:
                     raise AssertionError(f'{self!r} was not set!')
@@ -61,7 +60,7 @@ class EdgeTrigger[*Args]:
                 case multiple:
                     return multiple
         finally:
-            self._event = self._result = None
+            self._result = None
             self.ready.value = False
 
     def trigger(self, *args: *Args) -> None:
@@ -70,19 +69,20 @@ class EdgeTrigger[*Args]:
         Raises a ValueError if no task is blocked.
         If triggered multiple times, the last result wins.
         """
-        if self._event is None:
+        # Don't check the lock itself, another trigger might have already woken.
+        if not self.ready.value:
             raise CannotTrigger('No task is blocked on wait()!')
         self._result = args
-        self._event.set()
+        self._lot.unpark()
 
     def maybe_trigger(self: EdgeTrigger[()]) -> None:
         """Wake up a task blocked on wait(), but do nothing if not currently blocked.
 
         This is only available if no arguments are specified, since then all calls are identical.
         """
-        if self._event is not None:
+        if self.ready.value:
             self._result = ()
-            self._event.set()
+            self._lot.unpark()
         else:
             LOGGER.debug('EdgeTrigger.maybe_trigger() ignored!')
 
