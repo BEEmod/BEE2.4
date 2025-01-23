@@ -129,8 +129,8 @@ def load_connectionpoint(item: Item, ent: Entity) -> None:
             origin, ent['skin'],
         )
         return
-    ant_pos = Coord(round(center.x + offset.x), round(center.y - offset.y), 0)
-    sign_pos = Coord(round(center.x - offset.x), round(center.y + offset.y), 0)
+    ant_pos = Coord(round(center.x + offset.x), round(center.y + offset.y), 0)
+    sign_pos = Coord(round(center.x - offset.x), round(center.y - offset.y), 0)
 
     group_str = ent['group_id']
 
