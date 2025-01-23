@@ -1,12 +1,14 @@
 """Tk-specific implementation for the togglable sub-panes."""
+from typing import override
+
 from tkinter import ttk
 import tkinter as tk
 
-import utils
 from app import sound
 from app.SubPane import PaneConf, SubPaneBase, TOOL_BTN_TOOLTIP
 from ui_tk import tk_tools, tooltip, wid_transtoken
 from ui_tk.img import TKImages
+import utils
 
 
 class SubPane(SubPaneBase):
@@ -104,22 +106,26 @@ class SubPane(SubPaneBase):
         self.win.geometry(f'{max(10, width)!s}x{max(10, height)!s}')
         self.save_conf()
 
+    @override
     def _ui_show(self) -> None:
         self.win.deiconify()
         self.tool_button.state(('pressed',))
         self.vis_var.set(True)
 
+    @override
     def _ui_hide(self) -> None:
         self.win.withdraw()
         self.tool_button.state(('!pressed',))
         self.vis_var.set(False)
 
+    @override
     def _ui_get_pos(self) -> tuple[int, int]:
         return (
             self.win.winfo_x() - self.parent.winfo_x(),
             self.win.winfo_y() - self.parent.winfo_y(),
         )
 
+    @override
     def _ui_apply_relative(self) -> None:
         """Apply rel_x/rel_y."""
         x, y = tk_tools.adjust_inside_screen(
@@ -130,9 +136,11 @@ class SubPane(SubPaneBase):
         self.win.geometry(f'+{x}+{y}')
         self.parent.focus()
 
+    @override
     def _ui_get_size(self) -> tuple[int, int]:
         return self.win.winfo_width(), self.win.winfo_height()
 
+    @override
     def _ui_set_size(self, width: int | None, height: int | None) -> None:
         if width is None:
             width = self.win.winfo_reqwidth()
@@ -140,5 +148,6 @@ class SubPane(SubPaneBase):
             height = self.win.winfo_reqheight()
         self.win.geometry(f'{width}x{height}')
 
+    @override
     def _ui_bind_parent(self) -> None:
         self.parent.bind('<Configure>', self.follow_main, add=True)

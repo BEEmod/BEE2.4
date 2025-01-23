@@ -159,7 +159,7 @@ class SubPaneBase:
         await trio.sleep(0.15)
         self.can_save = True
         if hide:
-            self.evt_window_hidden(False)
+            self._ui_hide()
 
     @abc.abstractmethod
     def _ui_show(self) -> None:
