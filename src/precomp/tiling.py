@@ -297,7 +297,15 @@ TILETYPE_FROM_CHAR: dict[str, TileType] = {
 
 @utils.freeze_enum_props
 class PanelType(Enum):
-    """Special functionality for tiling panels."""
+    """Special functionality for tiling panels.
+
+    - Flip types generate a second copy with inverted tiles, rotated on
+     the backside.
+    - Angle types are angled to match angled panels, and clip their base to not overlap
+     the voxel below.
+    - Dynamic-angled also rotate, but then set `angles` keyvalues so they spawn in the normal
+      orientation. VBSP ignores rotation, so they end up with the correct lighting.
+    """
     NORMAL = 'normal'
     FLIP_BLACK = 'flip_black'
     FLIP_INVERT = 'flip_invert'
@@ -305,6 +313,11 @@ class PanelType(Enum):
     ANGLE_45 = 'angle_45'
     ANGLE_60 = 'angle_60'
     ANGLE_90 = 'angle_90'
+
+    ANGLE_30_DYNAMIC = 'angle_30_dynamic'
+    ANGLE_45_DYNAMIC = 'angle_60_dynamic'
+    ANGLE_60_DYNAMIC = 'angle_45_dynamic'
+    ANGLE_90_DYNAMIC = 'angle_90_dynamic'
 
     @staticmethod
     def from_panel(inst: Entity) -> PanelType:
@@ -317,18 +330,25 @@ class PanelType(Enum):
     @property
     def is_angled(self) -> bool:
         """Check if this is an ANGLE panel type."""
-        return self.value[:5] == 'angle'
+        return self.value.startswith('angle')
 
     @property
     def is_flip(self) -> bool:
         """Check if this is a FLIP panel type."""
-        return self.value[:4] == 'flip'
+        return self.value.startswith('flip')
+
+    @property
+    def is_angled_dynamic(self) -> bool:
+        if self.value.startswith('angle'):
+            return self.value.endswith('dynamic')
+        else:
+            raise ValueError(f'PanelType.{self.name} is not angled!')
 
     @property
     def angle(self) -> int:
         """Return the angle, if is_angled is True."""
         try:
-            return int(self.value[6:])
+            return int(self.value[6:8])
         except ValueError:
             raise ValueError(
                 f"PanelType.{self.name} "
@@ -733,7 +753,14 @@ class Panel:
                 # Move to put 0 0 0 at the hinge point, then rotate and return.
                 brush.localise(-panel_offset)
                 brush.localise(panel_offset, rotation)
-                if clip_face is not None:
+                if self.pan_type.is_angled_dynamic:
+                    # Adjust the offset and angles to cause it to return to the normal
+                    # position at runtime, ready for animating.
+                    if self.brush_ent is not None:
+                        self.brush_ent['origin'] = panel_offset
+                        self.brush_ent['angles'] = rotation.transpose()
+                    # Clipping is disabled for dynamic panels, since they should be bevelled.
+                elif clip_face is not None:
                     # Figure out the appropriate face info. We don't really
                     # care about texture scaling etc.
                     clip_face.uaxis = UVAxis(*orient.left())

@@ -10,6 +10,7 @@
 * If an error occurs, the compiler will now prepare a zip containing all the
   relevant files for debugging the error.
 * Flip Panels will now have correct lighting in all positions.
+* Dynamic Angled Panels set to start deployed will be lit for that position.
 
 ### Bugfixes:
 * The case where no voicelines are set is once again handled correctly.
