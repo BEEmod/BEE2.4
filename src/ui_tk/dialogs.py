@@ -1,7 +1,6 @@
 """A consistent interface for dialog boxes."""
 from __future__ import annotations
-
-from typing_extensions import override
+from typing import override
 
 from tkinter import commondialog, filedialog, simpledialog, ttk
 from tkinter.font import Font

@@ -8,9 +8,7 @@ This has 3 endpoints:
 - /refresh causes it to reload the error from a text file on disk, if a new compile runs.
 - /ping is triggered by the webpage repeatedly while open, to ensure the server stays alive.
 """
-from __future__ import annotations
-
-from typing_extensions import override
+from typing import override
 
 from zipfile import ZIP_DEFLATED, ZipFile
 import functools

@@ -504,7 +504,7 @@ class PakObject:
     If `style_suggest_key` is set, this is the keyvalue in Style definitions containing IDs to suggest.
     `suggest_default` is then the default item to provide if none are specified.
     """
-    # ID of the object
+    # ID of the object - TODO: Make it ReadOnly[SpecialID] (most subclasses will just be ObjectID).
     id: str
     # ID of the package.
     pak_id: utils.SpecialID

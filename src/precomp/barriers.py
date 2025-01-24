@@ -300,7 +300,7 @@ class FloorbeamConf:
         return brush
 
 
-@attrs.frozen(eq=False, kw_only=True)
+@attrs.frozen(eq=False, repr=False, kw_only=True)
 class BarrierType:
     """Type of barrier."""
     id: utils.ObjectID | utils.BlankID
@@ -351,11 +351,10 @@ class BarrierType:
         if 'error_tex' in kv:
             error_tex = kv['error_tex'].casefold()
             if error_tex in user_errors.TEX_SET:
-                error_disp = error_tex
+                error_disp = error_tex  # type: ignore
 
         if 'floorbeam' in kv:
             floorbeam = FloorbeamConf.parse(barrier_id, kv.find_key('floorbeam'))
-            LOGGER.info('Floorbeam: {}', floorbeam)
         else:
             floorbeam = None
 

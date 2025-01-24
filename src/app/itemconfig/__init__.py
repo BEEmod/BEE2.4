@@ -108,8 +108,8 @@ PANE: SubPane
 class ItemConfigBase[WidgetT, ImgT: img.UIImage]:
     """Common implementation for the item config pane."""
     # The functions registered for each.
-    impl_single: dict[WidgetType, SingleCreateTask[WidgetT, ImgT, Any]] = {}
-    impl_multi: dict[WidgetType, MultiCreateTask[WidgetT, ImgT, Any]] = {}
+    impl_single: dict[WidgetType, SingleCreateTask[WidgetT, ImgT, Any]]
+    impl_multi: dict[WidgetType, MultiCreateTask[WidgetT, ImgT, Any]]
 
     def __init__(self) -> None:
         self.impl_single = {}

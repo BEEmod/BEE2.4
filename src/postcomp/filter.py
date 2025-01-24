@@ -1,6 +1,5 @@
 """Transformations related to entity filters."""
 from io import BytesIO
-from typing import Dict
 
 from hammeraddons.bsp_transform import Context, trans
 import srctools.logger
@@ -31,7 +30,7 @@ def cube_filter(ctx: Context) -> None:
     """Generate and pack scripts duplicating the filter functionality for VScript."""
     # Build it up as a binary buffer, since we don't need to do difficult
     # encoding.
-    script_buffers: Dict[str, BytesIO] = {}
+    script_buffers: dict[str, BytesIO] = {}
 
     for ent in ctx.vmf.by_class['bee2_cube_filter_script']:
         ent.remove()

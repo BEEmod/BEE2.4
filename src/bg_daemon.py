@@ -5,7 +5,7 @@ We do this in another process to sidestep the GIL, and ensure the screen
 remains responsive. This is a separate module to reduce the required dependencies.
 """
 from __future__ import annotations
-from typing_extensions import assert_never, override
+from typing import assert_never, override
 
 from collections.abc import Callable
 from tkinter import ttk

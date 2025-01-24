@@ -1,8 +1,8 @@
 """Conditions related to global properties - stylevars, music, which game, etc."""
-from __future__ import annotations
+from typing import NoReturn
 
+from collections.abc import Collection
 import re
-from typing import Collection, NoReturn
 
 from srctools import Keyvalues, Entity, conv_bool, VMF
 import srctools.logger

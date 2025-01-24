@@ -1,5 +1,5 @@
 """Objects defining which player models are available."""
-from typing import Self
+from typing import Final, Self
 from collections.abc import Iterator, Mapping
 
 import trio.lowlevel
@@ -12,7 +12,7 @@ import utils
 
 class PlayerModel(PakObject):
     """Specifies a possible player."""
-    id: utils.ObjectID
+    id: utils.ObjectID  # type: ignore[mutable-override]  # Should be ReadOnly[] + parent.
     name: TransToken
     model: str
     pgun_skin: int

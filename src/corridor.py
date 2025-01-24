@@ -1,7 +1,7 @@
 """Data structure for specifying custom corridors."""
 from __future__ import annotations
+from typing import Final, Literal
 
-from typing_extensions import Final, Literal
 from collections.abc import Sequence, Mapping
 from enum import Enum
 
