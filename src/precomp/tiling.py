@@ -231,14 +231,14 @@ class TileType(Enum):
     @property
     def as_white(self) -> TileType:
         """Force to the white version."""
-        tile = getattr(TileType, self.name.replace('WHITE', 'BLACK'))
+        tile = getattr(TileType, self.name.replace('BLACK', 'WHITE'))
         assert isinstance(tile, TileType)
         return tile
 
     @property
     def as_black(self) -> TileType:
         """Force to the black version."""
-        tile = getattr(TileType, self.name.replace('BLACK', 'WHITE'))
+        tile = getattr(TileType, self.name.replace('WHITE', 'BLACK'))
         assert isinstance(tile, TileType)
         return tile
 
