@@ -13,8 +13,9 @@ from collections.abc import Callable, Iterator, MutableMapping
 from collections import defaultdict, Counter
 from enum import Enum, Flag
 from weakref import WeakKeyDictionary
-import operator
+import itertools
 import math
+import operator
 
 from srctools import FrozenMatrix, FrozenVec, Vec, Angle, Matrix
 from srctools.vmf import VMF, Entity, Side, Solid, Output, UVAxis
@@ -600,31 +601,23 @@ class Panel:
 
             # Now, we need to flip this across the appropriate axis to
             # replicate rotation.
-            u_ax, v_ax = Vec.INV_AXIS[tile.normal.axis()]
-            rot_flag = srctools.conv_int(self.brush_ent['spawnflags']) if self.brush_ent is not None else 0
-            if rot_flag & 64:
-                rot_axis = 'x'
-            elif rot_flag & 128:
-                rot_axis = 'y'
+            # This should be +y local, but better to check spawnflags in case puzzlemaker generated
+            # the door differently.
+            # Since we're rotating 180 degrees the direction doesn't matter.
+            if self.brush_ent['classname'] == 'func_door_rotating':
+                rot_flag = srctools.conv_int(self.brush_ent['spawnflags']) if self.brush_ent is not None else 0
+                if rot_flag & 64:
+                    rot_axis = Vec(1, 0, 0)
+                elif rot_flag & 128:
+                    rot_axis = Vec(0, 1, 0)
+                else:
+                    rot_axis = Vec(0, 0, 1)
             else:
-                rot_axis = 'z'
-            if rot_axis == v_ax:
-                back_subtiles = {
-                    (3-u, v): tile_type
-                    for (u, v), tile_type in back_subtiles.items()
-                }
-            elif rot_axis == u_ax:
-                back_subtiles = {
-                    (u, 3-v): tile_type
-                    for (u, v), tile_type in back_subtiles.items()
-                }
-            else:
-                LOGGER.warning(
-                    'Flip panel "{}" rotates on normal axis??',
-                    self.brush_ent['targetname'] if self.brush_ent is not None else '<world>',
-                )
+                # It's not a door, base on the instance orientation.
+                rot_axis = orient.left()
         else:  # Should never be needed, but makes typecheck happy.
             back_subtiles = sub_tiles
+            rot_axis = Vec(0, 0, 1)
 
         faces, brushes = tile.gen_multitile_pattern(
             vmf,
@@ -636,6 +629,7 @@ class Panel:
             is_panel=True,
             add_bullseye=use_bullseye and not is_static,
             interior_bevel=False,  # User must specify this themselves.
+            nodraw_back=self.pan_type.is_flip,  # Don't show in-between the two ents.
         )
         all_brushes += brushes
 
@@ -653,20 +647,42 @@ class Panel:
                         side.scale = 0.25
 
         if self.pan_type.is_flip:
-            back_faces, brushes = tile.gen_multitile_pattern(
+            back_faces, back_brushes = tile.gen_multitile_pattern(
                 vmf,
                 back_subtiles,
                 is_wall,
                 self.bevels,
-                -tile.normal,
+                tile.normal,
                 thickness=self.thickness,
-                offset=64 - 2*self.thickness,
                 is_panel=True,
                 add_bullseye=use_bullseye and not is_static,
                 interior_bevel=False,  # User must specify this themselves.
+                nodraw_back=True,  # Don't show in-between the two ents.
             )
-            all_brushes += brushes
-            inset_flip_panel(all_brushes, front_pos, tile.normal)
+
+            if self.brush_ent is not None:
+                back_ent = vmf.create_ent(
+                    'func_brush',
+                    targetname=self.inst['targetname'] + '-flipping_panel_reverse',
+                    parentname=self.brush_ent['targetname'],
+                    origin=self.brush_ent['origin'],
+                    # We're taking advantage of a VBSP bug. After compile, this will
+                    # rotate the brushes to face backward, but VRAD doesn't check angles.
+                    # It'll end up calculating lighting facing forwards, which is what we want.
+                    angles=Matrix.axis_angle(rot_axis, 180),
+                )
+                # No longer required, this technique means it's lit correctly on both sides.
+                del self.brush_ent['_minlight']
+                back_ent.solids = back_brushes
+            else:
+                # For some reason we're doing a world brush flip panel?
+                vmf.add_brushes(back_brushes)
+
+            # Shift edge brushes inwards slightly so the border fits.
+            inset_flip_panel(
+                itertools.chain(all_brushes, back_brushes),
+                front_pos, tile.normal,
+            )
 
         if self.template:
             template = template_brush.import_template(
@@ -922,7 +938,7 @@ class TileDef:
         """Return the direction of the 'top' of the portal helper."""
         if isinstance(self._portal_helper, Vec):
             return self._portal_helper
-        elif self.normal.z == 0:
+        elif abs(self.normal.z) < 1e-6:
             # Wall, upward.
             return Vec(0, 0, 1)
         else:
@@ -1288,6 +1304,7 @@ class TileDef:
         is_wall: bool,
         bevels: set[tuple[int, int]],
         normal: Vec,
+        *,
         offset: int = 64,
         thickness: int = 4,
         vec_offset: Vec | FrozenVec = FrozenVec(),
@@ -1295,6 +1312,7 @@ class TileDef:
         add_bullseye: bool = False,
         face_output: dict[tuple[int, int], Side] | None = None,
         interior_bevel: bool = True,
+        nodraw_back: bool = False,
     ) -> tuple[list[Side], list[Solid]]:
         """Generate a bunch of tiles, and return the front faces.
 
@@ -1381,7 +1399,10 @@ class TileDef:
                     width=(umax - umin) * 32,
                     height=(vmax - vmin) * 32,
                     bevels=tile_bevels,
-                    back_surf=texturing.SPECIAL.get(tile_center, 'behind', antigel=is_antigel),
+                    back_surf=(
+                        NODRAW_MAT if nodraw_back else
+                        texturing.SPECIAL.get(tile_center, 'behind', antigel=is_antigel)
+                    ),
                     u_align=u_size * (32 * 4),  # Pixel counts.
                     v_align=v_size * (32 * 4),
                     thickness=thickness,
@@ -1415,7 +1436,10 @@ class TileDef:
                     width=(umax - umin) * 32,
                     height=(vmax - vmin) * 32,
                     bevels=tile_bevels,
-                    back_surf=texturing.SPECIAL.get(tile_center, 'behind', antigel=is_antigel),
+                    back_surf=(
+                        NODRAW_MAT if nodraw_back else
+                        texturing.SPECIAL.get(tile_center, 'behind', antigel=is_antigel)
+                    ),
                     panel_edge=is_panel,
                     antigel=is_antigel,
                 )
@@ -2071,7 +2095,7 @@ def find_front_face(
     raise Exception(f'Malformed wall brush at {grid_pos}, {norm}')
 
 
-def inset_flip_panel(panel: list[Solid], pos: Vec, normal: Vec) -> None:
+def inset_flip_panel(panel: Iterable[Solid], pos: Vec, normal: Vec) -> None:
     """Inset the sides of a flip panel, to not hit the borders."""
     norm_axis = normal.axis()
     for brush in panel:
