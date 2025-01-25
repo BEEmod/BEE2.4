@@ -322,6 +322,9 @@ def res_antlaser(vmf: VMF, res: Keyvalues) -> object:
 
         group.item.enable_cmd = tuple(out_enable)
         group.item.disable_cmd = tuple(out_disable)
+        inp_styles = {conn.from_item.ind_style for conn in group.item.inputs}
+        if len(inp_styles) == 1:  # Common style, switch to that.
+            [group.item.ind_style] = inp_styles
 
         if group.type is NodeType.LASER and conf_toggle_targ:
             # Make the group info_target into a texturetoggle.

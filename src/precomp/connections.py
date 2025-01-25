@@ -28,6 +28,8 @@ __all__ = [
     'ITEMS', 'ShapeSignage', 'Item', 'Connection',
     'read_configs', 'calc_connections', 'gen_item_outputs'
 ]
+
+
 COND_MOD_NAME = "Item Connections"
 LOGGER = srctools.logger.get_logger(__name__)
 ITEM_TYPES: dict[utils.ObjectID, Config] = {}
@@ -321,6 +323,32 @@ class Item:
         self.antlines.clear()
         self.ind_panels.clear()
         self.shape_signs.clear()
+
+    def walk_nonlogic_outputs(self) -> Iterator[tuple[Sequence[Item], Connection]]:
+        """Iterate over all items this outputs to, passing through logic item connections.
+
+        This yields the connection to the final item, plus any logic gates in-between.
+        Raises a UserError if loops are found.
+        """
+        todo: list[tuple[list[Item], Connection]] = [
+            ([], conn)
+            for conn in self.outputs
+        ]
+        while todo:
+            path, conn = todo.pop()
+            if conn.to_item in path:
+                raise user_errors.UserError(user_errors.TOK_CHAINING_LOOP, points=[
+                    Vec.from_str(item.inst['origin'])
+                    for item in path
+                ])
+            dest = conn.to_item
+            if dest.is_logic and len(dest.inputs) == 1:
+                # Collapsable, search through this.
+                subpath = [*path, dest]
+                for subitem in dest.outputs:
+                    todo.append((subpath, subitem))
+            else:
+                yield path, conn
 
     def add_io_command(
         self,
