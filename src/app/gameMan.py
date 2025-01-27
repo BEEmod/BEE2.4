@@ -1,5 +1,6 @@
 """Keeps track of which games are known, and allows adding/removing them."""
 from __future__ import annotations
+from typing_extensions import TypeIs
 from typing import Self
 
 from collections.abc import Iterator, Mapping
@@ -213,6 +214,11 @@ class Game:
             return appman.find_key('AppState').find_key('UserConfig')['language']
         except LookupError:
             return ''
+
+
+def is_valid_game(game: Game | None) -> TypeIs[Game]:
+    """Predicate checking the game is not None."""
+    return game is not None
 
 
 async def update_export_text() -> None:
