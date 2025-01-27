@@ -1,14 +1,25 @@
 """Allows searching and selecting various resources."""
-import abc
+from typing import Literal
+
 from abc import ABC
-from typing import TypeGuard
+from collections.abc import Mapping
+import abc
+import enum
 
+from srctools import FileSystemChain, KeyValError, Keyvalues
+from srctools.filesys import File
+from srctools.sndscript import Sound
+from trio_util import AsyncBool
+import srctools.logger
 import trio
-
 import trio_util
-from app.gameMan import Game, selected_game, is_valid_game
+
+from app.gameMan import Game, is_valid_game, selected_game
 from async_util import EdgeTrigger
-from trio_util import AsyncBool, AsyncValue
+from packages import LOADED, PackagesSet
+
+
+LOGGER = srctools.logger.get_logger(__name__)
 
 
 class Browser(ABC):
@@ -17,6 +28,7 @@ class Browser(ABC):
         self._ready = AsyncBool(False)
         self._wants_open = AsyncBool(False)
         self.result: EdgeTrigger[str | None] = EdgeTrigger()
+        self.initial: str | None = None
         # If non-none, a user is trying to browse.
         self._close_event: trio.Event | None = None
 
@@ -26,8 +38,12 @@ class Browser(ABC):
             self._ready.value = False
             self._ui_hide_window()
             game = await selected_game.wait_value(is_valid_game)
-            async with trio_util.move_on_when(selected_game.wait_transition):
-                await self._reload(game)
+            async with trio_util.move_on_when(
+                trio_util.wait_any,
+                selected_game.wait_transition,
+                LOADED.wait_transition,
+            ):
+                await self._reload(LOADED.value, game)
                 self._ready.value = True
                 while True:
                     await self.result.ready.wait_value(True)
@@ -35,7 +51,7 @@ class Browser(ABC):
                     await self.result.ready.wait_value(False)
                     self._ui_hide_window()
 
-    async def browse(self, existing: str) -> str | None:
+    async def browse(self, initial: str) -> str | None:
         """Browse for a value."""
         await self._ready.wait_value(True)
         while self.result.ready.value:
@@ -52,8 +68,8 @@ class Browser(ABC):
         """Successfully select a value."""
         self.result.trigger(value)
 
-    async def _reload(self, game: Game) -> None:
-        """Reload data for the new game."""
+    async def _reload(self, packset: PackagesSet, game: Game) -> None:
+        """Reload data for a new game or packages."""
 
     @abc.abstractmethod
     def _ui_show_window(self) -> None:
@@ -66,11 +82,92 @@ class Browser(ABC):
         raise NotImplementedError
 
 
+class AllowedSounds(enum.Flag):
+    """Types of sounds allowed."""
+    SOUNDSCRIPT = enum.auto()
+    RAW_SOUND = enum.auto()
+    CHOREO = enum.auto()
+
+    # Not necessary, but makes sure type checkers know there's other members possible.
+    ALL = SOUNDSCRIPT | RAW_SOUND | CHOREO
+
+# A single sound.
+type SoundMode = Literal[AllowedSounds.SOUNDSCRIPT, AllowedSounds.RAW_SOUND, AllowedSounds.CHOREO]
+
+
 class SoundBrowser(Browser, ABC):
     """Browses for soundscripts, raw sounds or choreo scenes, like Hammer's."""
     def __init__(self) -> None:
         super().__init__()
-        self.mode = ...
+        self.mode: SoundMode = AllowedSounds.SOUNDSCRIPT
+        self.allowed: AllowedSounds = AllowedSounds.ALL
 
-    async def task(self) -> None:
-        """Reloads """
+        self._fsys = FileSystemChain()
+        self._soundscripts: dict[str, Sound] = {}
+
+    async def browse(
+        self,
+        initial: str,
+        allowed: AllowedSounds = AllowedSounds.ALL,
+    ) -> str | None:
+        self.allowed = allowed
+        return await super().browse(initial)
+
+    async def _reload(self, packset: PackagesSet, game: Game) -> None:
+        self._fsys = await trio.to_thread.run_sync(game.get_filesystem)
+        async with trio.open_nursery() as nursery:
+            nursery.start_soon(self._load_soundscripts, packset)
+
+    async def _load_soundscripts(self, packset: PackagesSet) -> None:
+        LOGGER.info('Reloading soundscripts for browser...')
+        self._soundscripts.clear()
+        try:
+            sounds_manifest = await trio.to_thread.run_sync(self._fsys.read_kv1, 'scripts/game_sounds_manifest.txt', 'cp1252')
+        except FileNotFoundError:
+            LOGGER.warning('No soundscript manifest?')
+            return
+
+        # We need to preserve the order, in case any override each other.
+        # So fill parsed with EmptyMapping of the same length, have each task
+        # insert into the correct slot.
+        script_files: list[File] = []
+        parsed: list[Mapping[str, Sound]] = []
+        file: File
+
+        for prop in sounds_manifest.find_children('game_sounds_manifest'):
+            if not prop.name.endswith('_file'):
+                continue
+            try:
+                file = self._fsys[prop.value]
+            except FileNotFoundError:
+                LOGGER.warning('Soundscript "{}" does not exist!', prop.value)
+            else:
+                script_files.append(file)
+                parsed.append(srctools.EmptyMapping)
+        for pack in packset.packages.values():
+            for folder in ['resources/scripts/bee2_snd/', 'resources/scripts/bee_snd/']:
+                for file in pack.fsys.walk_folder(folder):
+                    if file.path.endswith('.txt'):
+                        script_files.append(file)
+                        parsed.append(srctools.EmptyMapping)
+
+        async def parse_script(file: File, i: int) -> None:
+            """Parse a soundscript then add it to the list of scripts."""
+            try:
+                with file.open_str(encoding='cp1252') as f:
+                    kv = Keyvalues.parse(f, file.path, allow_escapes=False)
+                parsed[i] = Sound.parse(kv)
+            except (KeyValError, ValueError) as exc:
+                LOGGER.warning('Invalid soundscript: {}', file.path, exc_info=exc)
+
+        LOGGER.info('{} soundscript files', len(script_files))
+        assert len(script_files) == len(parsed)
+
+        async with trio.open_nursery() as nursery:
+            for pos, file in enumerate(script_files):
+                LOGGER.debug('Parsing {}...', file.path)
+                nursery.start_soon(parse_script, file, pos)
+        # Merge everything together.
+        for sounds in parsed:
+            self._soundscripts.update(sounds)
+        LOGGER.info('{} soundscripts loaded.', len(self._soundscripts))
