@@ -10,6 +10,7 @@ from srctools import FileSystemChain, KeyValError, Keyvalues, choreo
 from srctools.filesys import File
 from srctools.sndscript import Sound
 from srctools.tokenizer import Tokenizer, TokenSyntaxError
+
 from trio_util import AsyncBool
 import srctools.logger
 import trio
@@ -18,9 +19,18 @@ import trio_util
 from app.gameMan import Game, is_valid_game, selected_game
 from async_util import EdgeTrigger
 from packages import LOADED, PackagesSet
+from transtoken import TransToken
 
 
 LOGGER = srctools.logger.get_logger(__name__)
+
+TRANS_SND_HEADING = TransToken.ui("Sounds:")
+TRANS_SND_NAME = TransToken.ui("Sound Name:")
+TRANS_SND_SOUND = TransToken.ui("Sound File:")
+TRANS_SND_FILTER = TransToken.ui("Filter:")
+TRANS_SND_AUTOPLAY = TransToken.ui("Autoplay Sounds")
+TRANS_SND_RAW = TransToken.ui("Raw sounds")
+TRANS_SND_PREVIEW = TransToken.ui("Preview")
 
 
 class Browser(ABC):
@@ -103,7 +113,7 @@ def parse_soundscript(file: File) -> dict[str, Sound]:
     return Sound.parse(kv)
 
 
-class SoundBrowser(Browser, ABC):
+class SoundBrowserBase(Browser, ABC):
     """Browses for soundscripts, raw sounds or choreo scenes, like Hammer's."""
     def __init__(self) -> None:
         super().__init__()
