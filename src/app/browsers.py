@@ -6,9 +6,10 @@ from collections.abc import Mapping
 import abc
 import enum
 
-from srctools import FileSystemChain, KeyValError, Keyvalues
+from srctools import FileSystemChain, KeyValError, Keyvalues, choreo
 from srctools.filesys import File
 from srctools.sndscript import Sound
+from srctools.tokenizer import Tokenizer, TokenSyntaxError
 from trio_util import AsyncBool
 import srctools.logger
 import trio
@@ -95,6 +96,13 @@ class AllowedSounds(enum.Flag):
 type SoundMode = Literal[AllowedSounds.SOUNDSCRIPT, AllowedSounds.RAW_SOUND, AllowedSounds.CHOREO]
 
 
+def parse_soundscript(file: File) -> dict[str, Sound]:
+    """Parse a soundscript file."""
+    with file.open_str(encoding='cp1252') as f:
+        kv = Keyvalues.parse(f, file.path, allow_escapes=False)
+    return Sound.parse(kv)
+
+
 class SoundBrowser(Browser, ABC):
     """Browses for soundscripts, raw sounds or choreo scenes, like Hammer's."""
     def __init__(self) -> None:
@@ -104,6 +112,7 @@ class SoundBrowser(Browser, ABC):
 
         self._fsys = FileSystemChain()
         self._soundscripts: dict[str, Sound] = {}
+        self._scenes: dict[str, choreo.Entry] = {}
 
     async def browse(
         self,
@@ -116,13 +125,14 @@ class SoundBrowser(Browser, ABC):
     async def _reload(self, packset: PackagesSet, game: Game) -> None:
         self._fsys = await trio.to_thread.run_sync(game.get_filesystem)
         async with trio.open_nursery() as nursery:
-            nursery.start_soon(self._load_soundscripts, packset)
+            nursery.start_soon(self._load_soundscripts, self._fsys, packset)
+            nursery.start_soon(self._load_choreo, self._fsys)
 
-    async def _load_soundscripts(self, packset: PackagesSet) -> None:
+    async def _load_soundscripts(self, fsys: FileSystemChain, packset: PackagesSet) -> None:
         LOGGER.info('Reloading soundscripts for browser...')
         self._soundscripts.clear()
         try:
-            sounds_manifest = await trio.to_thread.run_sync(self._fsys.read_kv1, 'scripts/game_sounds_manifest.txt', 'cp1252')
+            sounds_manifest = await trio.to_thread.run_sync(fsys.read_kv1, 'scripts/game_sounds_manifest.txt', 'cp1252')
         except FileNotFoundError:
             LOGGER.warning('No soundscript manifest?')
             return
@@ -138,7 +148,7 @@ class SoundBrowser(Browser, ABC):
             if not prop.name.endswith('_file'):
                 continue
             try:
-                file = self._fsys[prop.value]
+                file = fsys[prop.value]
             except FileNotFoundError:
                 LOGGER.warning('Soundscript "{}" does not exist!', prop.value)
             else:
@@ -154,9 +164,7 @@ class SoundBrowser(Browser, ABC):
         async def parse_script(file: File, i: int) -> None:
             """Parse a soundscript then add it to the list of scripts."""
             try:
-                with file.open_str(encoding='cp1252') as f:
-                    kv = Keyvalues.parse(f, file.path, allow_escapes=False)
-                parsed[i] = Sound.parse(kv)
+                parsed[i] = await trio.to_thread.run_sync(parse_soundscript, file, abandon_on_cancel=True)
             except (KeyValError, ValueError) as exc:
                 LOGGER.warning('Invalid soundscript: {}', file.path, exc_info=exc)
 
@@ -171,3 +179,56 @@ class SoundBrowser(Browser, ABC):
         for sounds in parsed:
             self._soundscripts.update(sounds)
         LOGGER.info('{} soundscripts loaded.', len(self._soundscripts))
+
+    async def _load_choreo(self, fsys: FileSystemChain) -> None:
+        """Parse all VCD files."""
+        self._scenes.clear()
+        LOGGER.info('Reloading choreo scenes...')
+        # Load scenes.image, if it's there that lets us skip parsing the VCDs. But we need to
+        # still look for those, since otherwise we don't have filenames.
+        try:
+            image_file = fsys['scenes/scenes.image']
+        except FileNotFoundError:
+            LOGGER.warning('No scenes.image file found.')
+            image = {}
+        else:
+            with image_file.open_bin() as f:
+                image = await trio.to_thread.run_sync(choreo.parse_scenes_image, f, abandon_on_cancel=True)
+
+        async def choreo_worker(channel: trio.MemoryReceiveChannel[File]) -> None:
+            """Parse each choreo scene. Ideally this is in the image."""
+            file: File
+            with channel:
+                async for file in channel:
+                    crc = choreo.checksum_filename(file.path)
+                    try:
+                        entry = image[crc]
+                    except KeyError:
+                        pass
+                    else:
+                        self._scenes[file.path] = entry
+                        entry.filename = file.path
+                        continue
+                    # Not here, need to parse.
+                    LOGGER.debug('Scene "{}" is not in scenes.image, parsing', file.path)
+                    try:
+                        with file.open_str() as f:
+                            scene = await trio.to_thread.run_sync(
+                                choreo.Scene.parse_text, Tokenizer(f),
+                            )
+                    except TokenSyntaxError as exc:
+                        LOGGER.warning('Could not parse choreo scene "{}"!', file.path, exc_info=exc)
+                    else:
+                        self._scenes[file.path] = choreo.Entry.from_scene(file.path, scene)
+
+        send_file: trio.MemorySendChannel[File]
+        rec_file: trio.MemoryReceiveChannel[File]
+        send_file, rec_file = trio.open_memory_channel(0)
+        async with trio.open_nursery() as nursery, send_file:
+            for _ in range(16):
+                nursery.start_soon(choreo_worker, rec_file.clone())
+            rec_file.close()
+            for file in fsys.walk_folder('scenes'):
+                if file.path.casefold().endswith('.vcd'):
+                    await send_file.send(file)
+        LOGGER.info('Loaded {} choreo scenes', len(self._scenes))
