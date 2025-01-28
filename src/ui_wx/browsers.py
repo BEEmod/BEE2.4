@@ -17,9 +17,27 @@ class SoundsList(wx.ListCtrl):
 
     def update(self, data: SoundSeq) -> None:
         """Set the data list used."""
+        prev_sel: Sound | str | choreo.Entry | None = None
+        sel_ind = self.GetFirstSelected()
+        if sel_ind != -1:
+            try:
+                prev_sel = self.data[self.GetFirstSelected()]
+            except IndexError:
+                pass
+
         self.data = data
         self.SetItemCount(len(data))
         self.RefreshItems(0, len(data))
+        # Try and restore selection.
+        if prev_sel is not None:
+            try:
+                new_ind = self.data.index(prev_sel)
+            except ValueError:
+                self.Select(0)
+            else:
+                self.Select(new_ind)
+        elif data:
+            self.Select(0)
 
     @override
     def OnGetItemText(self, item: int, column: int) -> str:
