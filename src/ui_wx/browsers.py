@@ -1,19 +1,14 @@
 """Windows to allow browsing for sounds and other files."""
 from typing import assert_never, override
 
-from collections.abc import Sequence
-
-from wx.dataview import DataViewCtrl, DataViewItem, DataViewModel
 import wx.dataview
 from srctools import choreo
 from srctools.sndscript import Sound
 
-from app.browsers import SoundBrowserBase
+from app.browsers import AllowedSounds, SoundBrowserBase, SoundSeq
 from app.gameMan import Game
 from packages import PackagesSet
 from ui_wx import MAIN_WINDOW
-
-type SoundSeq = Sequence[Sound | str | choreo.Entry]
 
 
 class SoundsList(wx.ListCtrl):

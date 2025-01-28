@@ -7,7 +7,7 @@ import abc
 import enum
 
 from srctools import FileSystemChain, KeyValError, Keyvalues, choreo
-from srctools.filesys import File
+from srctools.filesys import File, FileSystem
 from srctools.sndscript import Sound
 from srctools.tokenizer import Tokenizer, TokenSyntaxError
 
@@ -112,6 +112,8 @@ def parse_soundscript(file: File) -> dict[str, Sound]:
         kv = Keyvalues.parse(f, file.path, allow_escapes=False)
     return Sound.parse(kv)
 
+type SoundSeq = Sequence[Sound | str | choreo.Entry]
+
 
 class SoundBrowserBase(Browser, ABC):
     """Browses for soundscripts, raw sounds or choreo scenes, like Hammer's."""
@@ -124,6 +126,7 @@ class SoundBrowserBase(Browser, ABC):
         # Make these final so references can be passed out.
         self._soundscripts: Final[list[Sound]] = []
         self._scenes: Final[list[choreo.Entry]] = []
+        self._raw: Final[list[str]] = []
 
     async def browse(
         self,
@@ -138,12 +141,16 @@ class SoundBrowserBase(Browser, ABC):
         async with trio.open_nursery() as nursery:
             nursery.start_soon(self._load_soundscripts, self._fsys, packset)
             nursery.start_soon(self._load_choreo, self._fsys)
+            nursery.start_soon(self._load_raw, self._fsys, packset)
 
     async def _load_soundscripts(self, fsys: FileSystemChain, packset: PackagesSet) -> None:
         LOGGER.info('Reloading soundscripts for browser...')
         self._soundscripts.clear()
         try:
-            sounds_manifest = await trio.to_thread.run_sync(fsys.read_kv1, 'scripts/game_sounds_manifest.txt', 'cp1252')
+            sounds_manifest = await trio.to_thread.run_sync(
+                fsys.read_kv1,
+                'scripts/game_sounds_manifest.txt', 'cp1252',
+            )
         except FileNotFoundError:
             LOGGER.warning('No soundscript manifest?')
             return
@@ -193,6 +200,24 @@ class SoundBrowserBase(Browser, ABC):
         self._soundscripts.extend(soundscripts.values())
         self._soundscripts.sort(key=lambda snd: snd.name)
         LOGGER.info('{} soundscripts loaded.', len(self._soundscripts))
+
+    async def _load_raw(self, fsys: FileSystemChain, packset: PackagesSet) -> None:
+        """Locate all raw sound files."""
+        self._raw.clear()
+
+        def check_fsys(fs: FileSystem, path: str) -> None:
+            """Crawl the sounds in this filesystem."""
+            for file in fs.walk_folder(path):
+                if file.path.endswith(('.mp3', '.wav')):
+                    self._raw.append('sound/' + file.path)
+
+        async with trio.open_nursery() as nursery:
+            nursery.start_soon(trio.to_thread.run_sync, check_fsys, fsys, 'sound')
+            for pack in packset.packages.values():
+                nursery.start_soon(trio.to_thread.run_sync, check_fsys, pack.fsys, 'resources/sound')
+
+        self._raw.sort()
+        LOGGER.info('{} raw sounds loaded.', len(self._raw))
 
     async def _load_choreo(self, fsys: FileSystemChain) -> None:
         """Parse all VCD files."""
