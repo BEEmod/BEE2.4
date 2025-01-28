@@ -1,5 +1,5 @@
 """Allows searching and selecting various resources."""
-from typing import Literal
+from typing import Final, Literal
 
 from abc import ABC
 from collections.abc import Mapping
@@ -121,8 +121,9 @@ class SoundBrowserBase(Browser, ABC):
         self.allowed: AllowedSounds = AllowedSounds.ALL
 
         self._fsys = FileSystemChain()
-        self._soundscripts: dict[str, Sound] = {}
-        self._scenes: dict[str, choreo.Entry] = {}
+        # Make these final so references can be passed out.
+        self._soundscripts: Final[list[Sound]] = []
+        self._scenes: Final[list[choreo.Entry]] = []
 
     async def browse(
         self,
@@ -186,8 +187,11 @@ class SoundBrowserBase(Browser, ABC):
                 LOGGER.debug('Parsing {}...', file.path)
                 nursery.start_soon(parse_script, file, pos)
         # Merge everything together.
+        soundscripts = {}
         for sounds in parsed:
-            self._soundscripts.update(sounds)
+            soundscripts.update(sounds)
+        self._soundscripts.extend(soundscripts.values())
+        self._soundscripts.sort(key=lambda snd: snd.name)
         LOGGER.info('{} soundscripts loaded.', len(self._soundscripts))
 
     async def _load_choreo(self, fsys: FileSystemChain) -> None:
@@ -205,6 +209,8 @@ class SoundBrowserBase(Browser, ABC):
             with image_file.open_bin() as f:
                 image = await trio.to_thread.run_sync(choreo.parse_scenes_image, f, abandon_on_cancel=True)
 
+        scenes = {}
+
         async def choreo_worker(channel: trio.MemoryReceiveChannel[File]) -> None:
             """Parse each choreo scene. Ideally this is in the image."""
             file: File
@@ -216,7 +222,7 @@ class SoundBrowserBase(Browser, ABC):
                     except KeyError:
                         pass
                     else:
-                        self._scenes[file.path] = entry
+                        scenes[file.path] = entry
                         entry.filename = file.path
                         continue
                     # Not here, need to parse.
@@ -229,7 +235,7 @@ class SoundBrowserBase(Browser, ABC):
                     except TokenSyntaxError as exc:
                         LOGGER.warning('Could not parse choreo scene "{}"!', file.path, exc_info=exc)
                     else:
-                        self._scenes[file.path] = choreo.Entry.from_scene(file.path, scene)
+                        scenes[file.path] = choreo.Entry.from_scene(file.path, scene)
 
         send_file: trio.MemorySendChannel[File]
         rec_file: trio.MemoryReceiveChannel[File]
@@ -241,4 +247,6 @@ class SoundBrowserBase(Browser, ABC):
             for file in fsys.walk_folder('scenes'):
                 if file.path.casefold().endswith('.vcd'):
                     await send_file.send(file)
+        self._scenes.extend(scenes.values())
+        self._scenes.sort(key=lambda entry: entry.filename)
         LOGGER.info('Loaded {} choreo scenes', len(self._scenes))
