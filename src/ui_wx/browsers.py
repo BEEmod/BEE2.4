@@ -5,9 +5,7 @@ import wx.dataview
 from srctools import choreo
 from srctools.sndscript import Sound
 
-from app.browsers import AllowedSounds, SoundBrowserBase, SoundSeq
-from app.gameMan import Game
-from packages import PackagesSet
+from app.browsers import AllowedSounds, SOUND_TYPES, SoundBrowserBase, SoundSeq
 from ui_wx import MAIN_WINDOW
 
 
@@ -72,28 +70,22 @@ class SoundBrowser(SoundBrowserBase):
         self.wid_text_sound.Enable(False)
         sizer_info.Add(self.wid_text_sound, 0, wx.EXPAND, 0)
 
-        lbl_source = wx.StaticText(panel_main, wx.ID_ANY, "Source File: ")
-        sizer_info.Add(lbl_source, 0, wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT, 0)
+        lbl_type = wx.StaticText(panel_main, wx.ID_ANY, "Sound Type: ")
+        sizer_info.Add(lbl_type, 0, wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT, 0)
 
-        self.wid_text_source = wx.TextCtrl(panel_main, wx.ID_ANY, "")
-        self.wid_text_source.Enable(False)
-        sizer_info.Add(self.wid_text_source, 0, wx.ALL | wx.EXPAND, 0)
+        self.wid_type = wx.Choice(panel_main)
+        self.wid_type.Bind(wx.EVT_CHOICE, self._evt_set_type)
+        sizer_info.Add(self.wid_type, 0, wx.ALL | wx.EXPAND, 0)
 
         lbl_filter = wx.StaticText(panel_main, wx.ID_ANY, "Filter: ")
         sizer_info.Add(lbl_filter, 0, wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT, 0)
 
-        self.wid_text_filter = wx.TextCtrl(panel_main, wx.ID_ANY, "")
+        self.wid_text_filter = wx.TextCtrl(panel_main, wx.ID_ANY)
+        self.wid_text_filter.Bind(wx.EVT_TEXT, self._evt_filter_changed)
         sizer_info.Add(self.wid_text_filter, 0, wx.EXPAND, 0)
 
-        sizer_checks = wx.BoxSizer(wx.HORIZONTAL)
-        sizer_main.Add(sizer_checks, 0, wx.ALIGN_CENTER_HORIZONTAL | wx.ALL, 0)
-
         self.wid_chk_autoplay = wx.CheckBox(panel_main, wx.ID_ANY, "Autoplay Sounds")
-        sizer_checks.Add(self.wid_chk_autoplay, 0, wx.ALL, 4)
-
-        self.wid_chk_raw = wx.CheckBox(panel_main, wx.ID_ANY, "Raw sounds")
-        sizer_checks.Add(self.wid_chk_raw, 0, wx.ALL, 4)
-        self.wid_chk_raw.Bind(wx.EVT_CHECKBOX, self._evt_change_raw)
+        sizer_main.Add(self.wid_chk_autoplay, 0, wx.ALIGN_CENTER_HORIZONTAL | wx.ALL, 0)
 
         sizer_btn = wx.BoxSizer(wx.HORIZONTAL)
         sizer_main.Add(sizer_btn, 0, wx.ALIGN_CENTER_HORIZONTAL | wx.BOTTOM, 8)
@@ -119,17 +111,27 @@ class SoundBrowser(SoundBrowserBase):
     def _ui_hide_window(self) -> None:
         self.win.Hide()
 
-    def _evt_change_raw(self, event: wx.Event) -> None:
-        self.wid_soundlist.update(
-            self._scenes if self.wid_chk_raw.IsChecked() else self._soundscripts
-        )
+    def _ui_set_allowed(self, allowed: AllowedSounds) -> None:
+        self.wid_type.Clear()
+        i = 0
+        for kind, token in SOUND_TYPES:
+            if kind in allowed:
+                self.wid_type.Append(str(token), kind)
+                if self.mode.value is kind:
+                    self.wid_type.SetSelection(i)
+                i += 1
+
+    def _evt_set_type(self, event: wx.CommandEvent) -> None:
+        chosen = self.wid_type.GetClientData(self.wid_type.GetSelection())
+        self.mode.value = chosen
+
+    def _evt_filter_changed(self, event: wx.Event):
+        self.filter.value = self.wid_text_filter.Value
 
     def _evt_resize_soundlist(self, event: wx.SizeEvent) -> None:
         """Update column size when the listbox changes."""
         self.wid_soundlist.SetColumnWidth(0, wx.LIST_AUTOSIZE_USEHEADER)
         event.Skip(True)  # Continue propagating.
 
-    async def _reload(self, packset: PackagesSet, game: Game) -> None:
-        await super()._reload(packset, game)
-        # Indicate both have been completely changed.
-        self.wid_soundlist.update(self._scenes if self.wid_chk_raw.IsChecked() else self._soundscripts)
+    async def _ui_set_items(self, items: SoundSeq) -> None:
+        self.wid_soundlist.update(items)

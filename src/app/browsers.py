@@ -1,8 +1,8 @@
 """Allows searching and selecting various resources."""
-from typing import Final, Literal
+from typing import Final, Literal, assert_never
 
 from abc import ABC
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 import abc
 import enum
 
@@ -11,7 +11,7 @@ from srctools.filesys import File, FileSystem
 from srctools.sndscript import Sound
 from srctools.tokenizer import Tokenizer, TokenSyntaxError
 
-from trio_util import AsyncBool
+from trio_util import AsyncBool, AsyncValue
 import srctools.logger
 import trio
 import trio_util
@@ -29,7 +29,6 @@ TRANS_SND_NAME = TransToken.ui("Sound Name:")
 TRANS_SND_SOUND = TransToken.ui("Sound File:")
 TRANS_SND_FILTER = TransToken.ui("Filter:")
 TRANS_SND_AUTOPLAY = TransToken.ui("Autoplay Sounds")
-TRANS_SND_RAW = TransToken.ui("Raw sounds")
 TRANS_SND_PREVIEW = TransToken.ui("Preview")
 
 
@@ -94,13 +93,19 @@ class Browser(ABC):
 
 
 class AllowedSounds(enum.Flag):
-    """Types of sounds allowed."""
+    """Types of sounds allowed. The order is what we'd prefer to select."""
+    CHOREO = enum.auto()
     SOUNDSCRIPT = enum.auto()
     RAW_SOUND = enum.auto()
-    CHOREO = enum.auto()
 
     # Not necessary, but makes sure type checkers know there's other members possible.
     ALL = SOUNDSCRIPT | RAW_SOUND | CHOREO
+
+SOUND_TYPES = [
+    (AllowedSounds.SOUNDSCRIPT, TransToken.ui("Soundscript")),
+    (AllowedSounds.RAW_SOUND, TransToken.ui("Raw Sounds")),
+    (AllowedSounds.CHOREO, TransToken.ui("Choreo Scenes")),
+]
 
 # A single sound.
 type SoundMode = Literal[AllowedSounds.SOUNDSCRIPT, AllowedSounds.RAW_SOUND, AllowedSounds.CHOREO]
@@ -119,7 +124,8 @@ class SoundBrowserBase(Browser, ABC):
     """Browses for soundscripts, raw sounds or choreo scenes, like Hammer's."""
     def __init__(self) -> None:
         super().__init__()
-        self.mode: SoundMode = AllowedSounds.SOUNDSCRIPT
+        self.mode: AsyncValue[SoundMode] = AsyncValue(AllowedSounds.SOUNDSCRIPT)
+        self.filter = AsyncValue('')
         self.allowed: AllowedSounds = AllowedSounds.ALL
 
         self._fsys = FileSystemChain()
@@ -128,12 +134,55 @@ class SoundBrowserBase(Browser, ABC):
         self._scenes: Final[list[choreo.Entry]] = []
         self._raw: Final[list[str]] = []
 
+    async def filter_task(self) -> None:
+        """When the filter changes, find the items, filter and display."""
+        while True:
+            async with trio_util.move_on_when(
+                trio_util.wait_any,
+                self.mode.wait_transition,
+                self.filter.wait_transition,
+            ):
+                await trio.sleep(0.1)
+                filter_text = self.filter.value.casefold()
+                match self.mode.value:
+                    case AllowedSounds.SOUNDSCRIPT:
+                        result = [
+                            sound for sound in self._soundscripts
+                            if filter_text in sound.name.casefold()
+                        ] if filter_text else self._soundscripts
+                    case AllowedSounds.RAW_SOUND:
+                        result = [
+                            raw for raw in self._raw
+                            if filter_text in raw.casefold()
+                        ] if filter_text else self._raw
+                    case AllowedSounds.CHOREO:
+                        result = [
+                            scene for scene in self._scenes
+                            if filter_text in scene.filename.casefold()
+                        ] if filter_text else self._scenes
+                    case err:
+                        assert_never(err)
+                await self._ui_set_items(result)
+                await trio.sleep_forever()
+
+    async def task(self) -> None:
+        async with trio.open_nursery() as nursery:
+            nursery.start_soon(super().task)
+            nursery.start_soon(self.filter_task)
+
     async def browse(
         self,
         initial: str,
         allowed: AllowedSounds = AllowedSounds.ALL,
     ) -> str | None:
+        for snd_type in AllowedSounds:
+            if snd_type in allowed:
+                self.mode.value = snd_type
+                break
+        else:
+            raise ValueError('No sound types provided!')
         self.allowed = allowed
+        self._ui_set_allowed(allowed)
         return await super().browse(initial)
 
     async def _reload(self, packset: PackagesSet, game: Game) -> None:
@@ -275,3 +324,11 @@ class SoundBrowserBase(Browser, ABC):
         self._scenes.extend(scenes.values())
         self._scenes.sort(key=lambda entry: entry.filename)
         LOGGER.info('Loaded {} choreo scenes', len(self._scenes))
+
+    def _ui_set_allowed(self, allowed: AllowedSounds) -> None:
+        """Set the allowed sound modes."""
+        raise NotImplementedError
+
+    async def _ui_set_items(self, items: SoundSeq) -> None:
+        """Update the items displayed."""
+        raise NotImplementedError
