@@ -24,6 +24,9 @@ from transtoken import TransToken
 
 LOGGER = srctools.logger.get_logger(__name__)
 
+# If only choreo, be more specific.
+TRANS_SND_TITLE = TransToken.ui("Sounds Browser")
+TRANS_SND_TITLE_CHOREO = TransToken.ui("Choreographed Scene Browser")
 TRANS_SND_HEADING = TransToken.ui("Sounds:")
 TRANS_SND_NAME = TransToken.ui("Sound Name:")
 TRANS_SND_SOUND = TransToken.ui("Sound File:")
@@ -133,6 +136,19 @@ class SoundBrowserBase(Browser, ABC):
         self._soundscripts: Final[list[Sound]] = []
         self._scenes: Final[list[choreo.Entry]] = []
         self._raw: Final[list[str]] = []
+
+    @staticmethod
+    def path_for(value: Sound | choreo.Entry | str) -> str:
+        """Get the filename/path for this sound."""
+        match value:
+            case Sound() as sndscript:
+                return sndscript.name
+            case choreo.Entry() as scene:
+                return scene.filename
+            case str() as raw:
+                return raw
+            case err:
+                assert_never(err)
 
     async def filter_task(self) -> None:
         """When the filter changes, find the items, filter and display."""
@@ -258,7 +274,7 @@ class SoundBrowserBase(Browser, ABC):
             """Crawl the sounds in this filesystem."""
             for file in fs.walk_folder(path):
                 if file.path.endswith(('.mp3', '.wav')):
-                    self._raw.append('sound/' + file.path)
+                    self._raw.append(file.path.replace('\\', '/').removeprefix('resources/'))
 
         async with trio.open_nursery() as nursery:
             nursery.start_soon(trio.to_thread.run_sync, check_fsys, fsys, 'sound')

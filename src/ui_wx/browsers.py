@@ -5,8 +5,11 @@ import wx.dataview
 from srctools import choreo
 from srctools.sndscript import Sound
 
-from app.browsers import AllowedSounds, SOUND_TYPES, SoundBrowserBase, SoundSeq
-from ui_wx import MAIN_WINDOW
+from app.browsers import (
+    AllowedSounds, SOUND_TYPES, SoundBrowserBase, SoundSeq, TRANS_SND_TITLE,
+    TRANS_SND_TITLE_CHOREO,
+)
+from ui_wx import MAIN_WINDOW, wid_transtoken
 
 
 class SoundsList(wx.ListCtrl):
@@ -41,15 +44,7 @@ class SoundsList(wx.ListCtrl):
 
     @override
     def OnGetItemText(self, item: int, column: int) -> str:
-        match self.data[item]:
-            case Sound() as sndscript:
-                return sndscript.name
-            case choreo.Entry() as scene:
-                return scene.filename
-            case str() as raw:
-                return raw
-            case err:
-                assert_never(err)
+        return SoundBrowser.path_for(self.data[item])
 
 
 class SoundBrowser(SoundBrowserBase):
@@ -103,7 +98,7 @@ class SoundBrowser(SoundBrowserBase):
         sizer_info.Add(self.wid_text_filter, 0, wx.EXPAND, 0)
 
         self.wid_chk_autoplay = wx.CheckBox(panel_main, wx.ID_ANY, "Autoplay Sounds")
-        sizer_main.Add(self.wid_chk_autoplay, 0, wx.ALIGN_CENTER_HORIZONTAL | wx.ALL, 0)
+        sizer_main.Add(self.wid_chk_autoplay, 0, wx.ALIGN_CENTER_HORIZONTAL | wx.ALL, 8)
 
         sizer_btn = wx.BoxSizer(wx.HORIZONTAL)
         sizer_main.Add(sizer_btn, 0, wx.ALIGN_CENTER_HORIZONTAL | wx.BOTTOM, 8)
@@ -117,10 +112,18 @@ class SoundBrowser(SoundBrowserBase):
         self.btn_preview = wx.Button(panel_main, wx.ID_ANY, "Preview")
         sizer_btn.Add(self.btn_preview, 0, wx.LEFT | wx.RIGHT, 8)
 
+        self.btn_cancel.Bind(wx.EVT_BUTTON, self._evt_cancel)
+        self.btn_ok.Bind(wx.EVT_BUTTON, self._evt_btn_ok)
+        self.win.Bind(wx.EVT_CLOSE, self._evt_cancel)
+
         sizer_info.AddGrowableCol(1)
 
         panel_main.SetSizer(sizer_main)
         self.win.Layout()
+        # Set min size to ensure some items are visible.
+        win_size = self.win.GetEffectiveMinSize()
+        win_size.height += 150
+        self.win.SetMinSize(win_size)
 
     def _ui_show_window(self) -> None:
         self.win.Show()
@@ -134,10 +137,24 @@ class SoundBrowser(SoundBrowserBase):
         i = 0
         for kind, token in SOUND_TYPES:
             if kind in allowed:
+                # TODO update translation, though it's transient.
                 self.wid_type.Append(str(token), kind)
                 if self.mode.value is kind:
                     self.wid_type.SetSelection(i)
                 i += 1
+        wid_transtoken.set_win_title(
+            self.win,
+            TRANS_SND_TITLE_CHOREO
+            if allowed is AllowedSounds.CHOREO
+            else TRANS_SND_TITLE
+        )
+
+    def _evt_btn_ok(self, event: wx.CommandEvent) -> None:
+        sel_ind = self.wid_soundlist.GetFirstSelected()
+        if sel_ind == -1:
+            self._evt_ok('')
+        else:
+            self._evt_ok(SoundBrowser.path_for(self.wid_soundlist.data[sel_ind]))
 
     def _evt_set_type(self, event: wx.CommandEvent) -> None:
         chosen = self.wid_type.GetClientData(self.wid_type.GetSelection())
