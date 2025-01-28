@@ -1,13 +1,14 @@
 """Windows to allow browsing for sounds and other files."""
-from typing import assert_never, override
+from typing import override
 
-import wx.dataview
 from srctools import choreo
 from srctools.sndscript import Sound
+import wx
 
 from app.browsers import (
-    AllowedSounds, SOUND_TYPES, SoundBrowserBase, SoundSeq, TRANS_SND_TITLE,
-    TRANS_SND_TITLE_CHOREO,
+    SOUND_TYPES, TRANS_SND_AUTOPLAY, TRANS_SND_FILTER, TRANS_SND_HEADING,
+    TRANS_SND_NAME, TRANS_SND_TITLE, TRANS_SND_TITLE_CHOREO, TRANS_SND_TYPE,
+    AllowedSounds, SoundBrowserBase, SoundSeq, TRANS_SND_FIlE,
 )
 from ui_wx import MAIN_WINDOW, wid_transtoken
 
@@ -56,48 +57,54 @@ class SoundBrowser(SoundBrowserBase):
         panel_main = wx.Panel(self.win, wx.ID_ANY)
         sizer_main = wx.BoxSizer(wx.VERTICAL)
 
-        lbl_header = wx.StaticText(panel_main, wx.ID_ANY, "Sounds:")
+        lbl_header = wx.StaticText(panel_main)
+        wid_transtoken.set_text(lbl_header, TRANS_SND_HEADING)
         sizer_main.Add(lbl_header, 0, wx.LEFT | wx.RIGHT, 7)
 
         self.wid_soundlist = SoundsList(
             panel_main,
             style=wx.LC_SINGLE_SEL | wx.LC_HRULES | wx.LC_NO_HEADER,
         )
-        self.wid_soundlist.AppendColumn('Sound', wx.LIST_FORMAT_LEFT)
+        self.wid_soundlist.AppendColumn('', wx.LIST_FORMAT_LEFT)
         sizer_main.Add(self.wid_soundlist, 1, wx.BOTTOM | wx.EXPAND | wx.LEFT | wx.RIGHT, 8)
         self.wid_soundlist.Bind(wx.EVT_SIZE, self._evt_resize_soundlist)
 
-        sizer_info = wx.FlexGridSizer(4, 2, 0, 0)
+        sizer_info = wx.FlexGridSizer(4, 2, 0, 4)
         sizer_main.Add(sizer_info, 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 32)
 
-        lbl_snd_name = wx.StaticText(panel_main, wx.ID_ANY, "Sound Name: ")
+        lbl_snd_name = wx.StaticText(panel_main)
+        wid_transtoken.set_text(lbl_snd_name, TRANS_SND_NAME)
         sizer_info.Add(lbl_snd_name, 0, wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT | wx.ALL, 0)
 
-        self.wid_text_name = wx.TextCtrl(panel_main, wx.ID_ANY, "")
+        self.wid_text_name = wx.TextCtrl(panel_main)
         sizer_info.Add(self.wid_text_name, 0, wx.EXPAND, 0)
 
-        lbl_snd_file = wx.StaticText(panel_main, wx.ID_ANY, "Sound File: ", style=wx.ALIGN_RIGHT)
+        lbl_snd_file = wx.StaticText(panel_main, style=wx.ALIGN_RIGHT)
+        wid_transtoken.set_text(lbl_snd_file, TRANS_SND_FIlE)
         sizer_info.Add(lbl_snd_file, 0, wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT, 0)
 
-        self.wid_text_sound = wx.TextCtrl(panel_main, wx.ID_ANY, "")
+        self.wid_text_sound = wx.TextCtrl(panel_main)
         self.wid_text_sound.Enable(False)
         sizer_info.Add(self.wid_text_sound, 0, wx.EXPAND, 0)
 
-        lbl_type = wx.StaticText(panel_main, wx.ID_ANY, "Sound Type: ")
+        lbl_type = wx.StaticText(panel_main)
+        wid_transtoken.set_text(lbl_type, TRANS_SND_TYPE)
         sizer_info.Add(lbl_type, 0, wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT, 0)
 
         self.wid_type = wx.Choice(panel_main)
         self.wid_type.Bind(wx.EVT_CHOICE, self._evt_set_type)
         sizer_info.Add(self.wid_type, 0, wx.ALL | wx.EXPAND, 0)
 
-        lbl_filter = wx.StaticText(panel_main, wx.ID_ANY, "Filter: ")
+        lbl_filter = wx.StaticText(panel_main)
+        wid_transtoken.set_text(lbl_filter, TRANS_SND_FILTER)
         sizer_info.Add(lbl_filter, 0, wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT, 0)
 
-        self.wid_text_filter = wx.TextCtrl(panel_main, wx.ID_ANY)
+        self.wid_text_filter = wx.TextCtrl(panel_main)
         self.wid_text_filter.Bind(wx.EVT_TEXT, self._evt_filter_changed)
         sizer_info.Add(self.wid_text_filter, 0, wx.EXPAND, 0)
 
-        self.wid_chk_autoplay = wx.CheckBox(panel_main, wx.ID_ANY, "Autoplay Sounds")
+        self.wid_chk_autoplay = wx.CheckBox(panel_main)
+        wid_transtoken.set_text(self.wid_chk_autoplay, TRANS_SND_AUTOPLAY)
         sizer_main.Add(self.wid_chk_autoplay, 0, wx.ALIGN_CENTER_HORIZONTAL | wx.ALL, 8)
 
         sizer_btn = wx.BoxSizer(wx.HORIZONTAL)
