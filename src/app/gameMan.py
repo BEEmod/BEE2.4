@@ -271,30 +271,29 @@ async def find_steam_info(game_dir: str) -> tuple[str | None, str | None]:
     """
     game_id: str | None = None
     name: str | None = None
-    found_name = False
-    found_id = False
-    for folder in os.listdir(game_dir):
-        info_path = os.path.join(game_dir, folder, 'gameinfo.txt')
+    for entry in os.scandir(game_dir):
+        if not entry.is_dir():
+            continue
+        info_path = os.path.join(entry, 'gameinfo.txt')
         try:
             file = await trio.open_file(info_path, encoding='utf8', errors='replace')
         except FileNotFoundError:
             continue
         async with file:
+            LOGGER.debug('Checking gameinfo at "{}"', info_path)
             line: str
             async for line in file:
                 clean_line = srctools.clean_line(line).replace('\t', ' ')
-                if not found_id and 'steamappid' in clean_line.casefold():
+                if game_id is None and 'steamappid' in clean_line.casefold():
                     raw_id = clean_line.casefold().replace('steamappid', '').strip()
                     if raw_id.isdigit():
                         game_id = raw_id
-                elif not found_name and 'game ' in clean_line.casefold():
-                    found_name = True
+                elif name is None and 'game ' in clean_line.casefold():
                     ind = clean_line.casefold().rfind('game') + 4
                     name = clean_line[ind:].strip().strip('"')
-                if found_name and found_id:
-                    break
-        if found_name and found_id:
-            break
+                if name is not None and game_id is not None:
+                    LOGGER.debug('Found valid gameinfo at "{}"', info_path)
+                    return game_id, name
     return game_id, name
 
 
@@ -367,6 +366,7 @@ async def add_game(dialogs: Dialogs) -> bool:
     if exe_loc:
         folder = os.path.dirname(exe_loc)
         gm_id, name = await find_steam_info(folder)
+        LOGGER.info('Game at "{}" has appid {}, name={!r}', folder, gm_id, name)
         if name is None or gm_id is None:
             await dialogs.show_info(
                 TransToken.ui('This does not appear to be a valid game folder!'),
