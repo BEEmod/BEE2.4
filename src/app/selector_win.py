@@ -602,7 +602,7 @@ class SelectorWinBase[ButtonT, GroupHeaderT: GroupHeaderBase](ReflowWindow):
 
     def open_win(self) -> None:
         """Display the window."""
-        if self._readonly:
+        if self._readonly or self._loading:
             return
 
         for item_id, button in zip(self.item_list, self._item_buttons, strict=False):

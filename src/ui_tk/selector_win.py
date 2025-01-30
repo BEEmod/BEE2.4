@@ -13,7 +13,7 @@ import trio
 from app import WidgetCache, img
 from app.mdown import MarkdownData
 from app.selector_win import (
-    TRANS_ATTR_DESC, TRANS_SUGGESTED, TRANS_SUGGESTED_MAC, TRANS_WINDOW_TITLE,
+    LOGGER, TRANS_ATTR_DESC, TRANS_SUGGESTED, TRANS_SUGGESTED_MAC, TRANS_WINDOW_TITLE,
     AttrDef, DispFont, GroupHeaderBase, NavKeys, Options, SelectorWinBase,
 )
 from consts import SEL_ICON_SIZE
@@ -166,13 +166,13 @@ class SelectorWin(SelectorWinBase[ttk.Button, GroupHeader]):
         super().__init__(opt)
 
         self.parent = parent
-        self.win = tk.Toplevel(parent, name='selwin_' + opt.save_id)
+        self.win = tk.Toplevel(parent, name=f'selwin_{opt.save_id}')
         self.win.withdraw()
         self.win.transient(master=parent)
         set_win_title(self.win, TRANS_WINDOW_TITLE.format(subtitle=opt.title))
 
         # Variable associated with self.display.
-        self.disp_label = tk.StringVar()
+        self.disp_label = tk.StringVar(self.win, name=f'selwin_dispvar_{opt.save_id}')
         self.display = self.disp_btn = None
 
         # Allow resizing in X and Y.
@@ -816,6 +816,7 @@ class SelectorWin(SelectorWinBase[ttk.Button, GroupHeader]):
     ) -> None:
         """Set the state of the display textbox and button."""
         if self.display is None or self.disp_btn is None:
+            LOGGER.debug('Setting display for {} with no display', self.save_id)
             return  # Nothing to do.
 
         match font:
