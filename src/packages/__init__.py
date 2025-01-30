@@ -1127,7 +1127,13 @@ async def parse_package(
             return
 
     desc: list[str] = []
-    should_warn = DEV_MODE.value or pack.is_dev()
+    # If this package is unzipped, show warnings about extra values directly to the user.
+    if DEV_MODE.value or pack.is_dev():
+        pack_warn = errors.add
+    else:
+        def pack_warn(token: TransToken) -> None:
+            """Just put warnings in the console."""
+            LOGGER.warning('Package "{}": {}', pack.id, token)
 
     for obj in pack.info:
         await trio.lowlevel.checkpoint()
@@ -1145,27 +1151,25 @@ async def parse_package(
             continue
 
         if obj.name in ('templatebrush', 'brushtemplate'):
-            if should_warn:
-                errors.add(TRANS_OLD_TEMPLATEBRUSH.format(
-                    id=obj['id', '<NO ID>'],
-                    pak_id=pack.id,
-                ))
+            pack_warn(TRANS_OLD_TEMPLATEBRUSH.format(
+                id=obj['id', '<NO ID>'],
+                pak_id=pack.id,
+            ))
         elif obj.name == 'transtoken':
             # Special case for now, since it's package-specific.
             parse_pack_transtoken(pack, obj)
         elif obj.name == 'overrides':
             for over_prop in obj:
                 if over_prop.name in ('templatebrush', 'brushtemplate'):
-                    if should_warn:
-                        errors.add(TRANS_OLD_TEMPLATEBRUSH.format(
-                            id=over_prop['id', '<NO ID>'],
-                            pak_id=pack.id,
-                        ))
+                    pack_warn(TRANS_OLD_TEMPLATEBRUSH.format(
+                        id=over_prop['id', '<NO ID>'],
+                        pak_id=pack.id,
+                    ))
                     continue
                 try:
                     obj_type = OBJ_TYPES[over_prop.name]
                 except KeyError:
-                    errors.add(TRANS_UNKNOWN_OBJ_TYPE.format(
+                    pack_warn(TRANS_UNKNOWN_OBJ_TYPE.format(
                         obj_type=over_prop.real_name,
                         obj_id=over_prop['id', '<NO ID>'],
                         pak_id=pack.id,
@@ -1182,7 +1186,7 @@ async def parse_package(
             try:
                 obj_type = OBJ_TYPES[obj.name]
             except KeyError:
-                errors.add(TRANS_UNKNOWN_OBJ_TYPE.format(
+                pack_warn(TRANS_UNKNOWN_OBJ_TYPE.format(
                     obj_type=obj.real_name,
                     obj_id=obj['id', '<NO ID>'],
                     pak_id=pack.id,
@@ -1191,15 +1195,18 @@ async def parse_package(
             try:
                 obj_id = obj['id']
             except LookupError:
+                # Always fatal, this is just invalid.
                 raise AppError(TRANS_NO_OBJ_ID.format(obj_type=obj_type, pak_id=pack.id)) from None
             if obj_id in packset.unparsed[obj_type]:
                 existing = packset.unparsed[obj_type][obj_id]
                 if obj_type.allow_mult:
-                    # Pretend this is an override, but don't actually set the bool.
+                    # Pretend this is an override, but don't actually set the bool so parsing
+                    # will still require all fields.
                     packset.overrides[obj_type, obj_id.casefold()].append(
                         ParseData(packset, errors, pack.fsys, obj_id, obj, pack.id, False)
                     )
                 else:
+                    # Duplicates and neither takes precedence, this is a problem.
                     raise AppError(TRANS_DUPLICATE_OBJ_ID.format(
                         obj_id=obj_id,
                         obj_type=obj_type.__name__,
