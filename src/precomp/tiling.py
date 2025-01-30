@@ -624,8 +624,8 @@ class Panel:
             # This should be +y local, but better to check spawnflags in case puzzlemaker generated
             # the door differently.
             # Since we're rotating 180 degrees the direction doesn't matter.
-            if self.brush_ent['classname'] == 'func_door_rotating':
-                rot_flag = srctools.conv_int(self.brush_ent['spawnflags']) if self.brush_ent is not None else 0
+            if self.brush_ent is not None and self.brush_ent['classname'] == 'func_door_rotating':
+                rot_flag = srctools.conv_int(self.brush_ent['spawnflags'])
                 if rot_flag & 64:
                     rot_axis = Vec(1, 0, 0)
                 elif rot_flag & 128:
