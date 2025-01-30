@@ -1387,6 +1387,7 @@ class TileDef:
             gen_cat = (
                 texturing.GenCat.BULLSEYE
                 if tile_is_bullseye else
+                # TODO: Apply Panel category for panels here.
                 texturing.GenCat.NORMAL
             )
 
