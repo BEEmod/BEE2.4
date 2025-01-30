@@ -244,6 +244,7 @@ class ItemPickerBase[ParentT](ReflowWindow, ABC):
                 if compress:
                     visible = visible[:1]
                 for ref in visible:
+                    await trio.lowlevel.checkpoint()
                     self.slots_picker.fetch().contents = ref
             self.slots_picker.hide_unused()
             self.item_pos_dirty.set()
