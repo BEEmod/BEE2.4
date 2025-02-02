@@ -1,12 +1,12 @@
 """The different properties defineable for items."""
 from __future__ import annotations
-from enum import Enum
-from typing import Any
-from collections.abc import Callable, Sequence
+from typing import Any, Self
 
-import attrs
+from collections.abc import Callable, Sequence
+from enum import Enum
+
 from srctools import Angle, bool_as_int, conv_bool, conv_float, conv_int
-from typing_extensions import Self
+import attrs
 
 from transtoken import TransToken
 

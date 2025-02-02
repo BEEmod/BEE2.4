@@ -1,7 +1,6 @@
 """Tk implementation of the corridor selector."""
 from __future__ import annotations
-from typing import Final
-from typing_extensions import override
+from typing import Final, override
 
 from tkinter import ttk
 import tkinter as tk

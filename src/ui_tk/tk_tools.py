@@ -4,13 +4,13 @@ General code used for tkinter portions.
 """
 from __future__ import annotations
 from typing import (
-    Any, Callable, Literal, NoReturn, Protocol, TypedDict, Unpack, cast,
-    overload, override,
+    Any, Literal, NoReturn, Protocol, TypedDict, Unpack, cast, overload,
+    override,
 )
 
 from tkinter import commondialog, filedialog, font as _tk_font, ttk
 import tkinter as tk
-from collections.abc import Awaitable, Iterable, Sequence
+from collections.abc import Awaitable, Callable, Iterable, Sequence
 from contextlib import aclosing
 from enum import Enum, StrEnum
 import functools
@@ -19,17 +19,17 @@ import os.path
 import sys
 
 from srctools import logger
+from trio_util import AsyncValue
 import trio
+import trio_util
 
 from app import ICO_PATH, BaseEnumButton, background_run
 from app.img import Handle as ImgHandle
-from ui_tk.img import TKImages
 from async_util import EdgeTrigger
 from config.gen_opts import GenOptions
 from transtoken import CURRENT_LANG, TransToken
-from trio_util import AsyncValue
+from ui_tk.img import TKImages
 import config
-import trio_util
 import utils
 
 from . import TK_ROOT, tooltip
@@ -594,7 +594,6 @@ def make_tool_button(
     return button
 
 
-
 class HidingScroll(ttk.Scrollbar):
     """A scrollbar variant which auto-hides when not needed.
 
@@ -964,7 +963,7 @@ class ComboBoxMap[StrKeyT: str]:
         self.current.value = current = self._index_to_key[index]
         if self._missing_value is not None and current != self._missing_value:
             # Moved away from the missing value, strip that and rebuild
-            self._build_values(zip(self._index_to_key[1:], self._ordered_tokens[1:]))
+            self._build_values(zip(self._index_to_key[1:], self._ordered_tokens[1:], strict=True))
 
     def update(self, values: Iterable[tuple[StrKeyT, TransToken]]) -> None:
         """Change the set of values displayed in the box.

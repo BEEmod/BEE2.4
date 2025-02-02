@@ -1,28 +1,29 @@
 """Allows enabling and disabling specific voicelines."""
 from __future__ import annotations
-import functools
+from typing import TypedDict, cast
+
+from tkinter import ttk
+from tkinter.font import nametofont as tk_nametofont
+import tkinter as tk
+from collections.abc import Iterable
+from configparser import SectionProxy
 from decimal import Decimal
 from enum import Enum
-from typing import Iterable, TypedDict, cast
-from configparser import SectionProxy
-
-import tkinter as tk
-from tkinter.font import nametofont as tk_nametofont
-from tkinter import ttk
+import functools
 
 from srctools import Keyvalues
-import srctools.logger
 import attrs
+import srctools.logger
 
+from app import img
 from BEE2_config import ConfigFile
 from packages import QuotePack
 from quote_pack import Line, LineCriteria
 from transtoken import TransToken
-from ui_tk.tooltip import add_tooltip
-from app import img
-from ui_tk.img import TKImages
-from ui_tk.wid_transtoken import set_text, set_win_title
 from ui_tk import TK_ROOT, tk_tools
+from ui_tk.img import TKImages
+from ui_tk.tooltip import add_tooltip
+from ui_tk.wid_transtoken import set_text, set_win_title
 
 
 LOGGER = srctools.logger.get_logger(__name__)

@@ -1,6 +1,5 @@
 """A consistent interface for dialog boxes."""
-from __future__ import annotations
-from typing_extensions import override
+from typing import override
 
 from collections.abc import Callable
 
@@ -66,7 +65,7 @@ class TextValidator(wx.Validator):
         self.done_event = done_event
         self.result = value
 
-    def Clone(self) -> TextValidator:
+    def Clone(self) -> 'TextValidator':
         copy = TextValidator(self.done_event, self.error_label, self.func, self.show_error, self.result)
         return copy
 

@@ -1,5 +1,3 @@
-from typing import List
-
 import srctools.logger
 
 from packages import PakObject, ParseData
@@ -10,7 +8,7 @@ LOGGER = srctools.logger.get_logger(__name__)
 
 class PackList(PakObject, allow_mult=True):
     """Specifies a group of resources which can be packed together."""
-    def __init__(self, pak_id: str, files: List[str]) -> None:
+    def __init__(self, pak_id: str, files: list[str]) -> None:
         self.id = pak_id
         self.files = files
 

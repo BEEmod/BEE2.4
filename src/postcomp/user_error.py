@@ -1,19 +1,16 @@
 """Inject VScript if a user error occurs."""
-import json
-
-from typing import Tuple
-
-import subprocess
-
-import trio
-import sys
 from urllib.request import urlopen
+import json
+import subprocess
+import sys
 
-import srctools.logger
-
-import utils
 from hammeraddons.bsp_transform import Context, trans
+import srctools.logger
+import trio
+
 from user_errors import SERVER_INFO_FILE, ServerInfo
+import utils
+
 
 # Repeatedly show the URL whenever the user switches to the page.
 # If it returns true, it has popped up the Steam Overlay.
@@ -87,7 +84,7 @@ async def start_error_server(ctx: Context) -> None:
             webbrowser.get('chrome').open(f'http://127.0.0.1:{port}/')
 
 
-async def load_server() -> Tuple[int, str]:
+async def load_server() -> tuple[int, str]:
     """Load the webserver, then return the port and the localised error text."""
     # We need to boot the web server.
     try:

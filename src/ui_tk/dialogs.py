@@ -133,6 +133,7 @@ class QueryValidator(tk.Toplevel):
     entry_error: ttk.Label
     button_ok: ttk.Button
     button_cancel: ttk.Button
+
     def __init__(
         self,
         parent: tk.Toplevel | tk.Tk,
@@ -192,7 +193,7 @@ class QueryValidator(tk.Toplevel):
         self.entry_error = ttk.Label(frame, text=' ', foreground='red', font=self.error_font)
         # Display or blank error by setting ['text'] =.
         entrylabel.grid(column=0, row=0, columnspan=3, padx=5, sticky='W')
-        self.entry.grid(column=0, row=1, columnspan=3, padx=5, sticky='EW', pady=(10,0))
+        self.entry.grid(column=0, row=1, columnspan=3, padx=5, sticky='EW', pady=(10, 0))
         self.entry_error.grid(column=0, row=2, columnspan=3, padx=5, sticky='EW')
 
         self.button_ok = ttk.Button(frame, text=str(TRANS_OK), default='active', command=self.ok)

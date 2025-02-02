@@ -147,6 +147,7 @@ async def route_open_archive() -> quart.ResponseReturnValue:
     """The overlay browser doesn't allow downloads, so open a file explorer window with the file."""
     LOGGER.info('Opening map archive.')
     utils.display_directory(ARCHIVE_LOC.parent)
+    await trio.lowlevel.checkpoint()
     return 'OPENED'
 
 

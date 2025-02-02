@@ -1,5 +1,5 @@
 """Tk-specific implementation of the signage UI."""
-from typing_extensions import override
+from typing import override
 
 from tkinter import ttk
 import tkinter as tk

@@ -16,7 +16,7 @@ type SaveFunc = Callable[[Item, VMF], None]
 LOGGER = logger.get_logger(__name__)
 LOAD_FUNCS: dict[str, LoadFunc] = {}
 SAVE_FUNCS: list[SaveFunc] = []
-RE_NUMBER = re.compile('[0-9]+|[^0-9]+')
+RE_NUMBER = re.compile(r'[0-9]+|[^0-9]+')
 
 
 def numeric_sort(text: str) -> list[str | int]:

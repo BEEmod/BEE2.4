@@ -183,6 +183,7 @@ class ItemConfigBase[WidgetT, ImgT: img.UIImage]:
             return func
         return deco
 
+
 TK_IMPL: ItemConfigBase[tk.Widget, TKImages] = ItemConfigBase()  # TODO
 
 

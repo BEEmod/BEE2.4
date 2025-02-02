@@ -1,8 +1,8 @@
 """Style specific features which can be enabled or disabled."""
 from __future__ import annotations
-from typing import Final, Iterator
+from typing import Final
 
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
 
 from packages import ExportKey, PackagesSet, PakObject, ParseData, Style
 from transtoken import TransToken, TransTokenSource

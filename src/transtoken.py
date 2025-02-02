@@ -6,8 +6,7 @@ We take care not to directly import gettext and babel, so the compiler can omit 
 """
 from __future__ import annotations
 from typing import (
-    Any, ClassVar, Final, LiteralString, Never, NoReturn, Protocol, cast, final,
-    override,
+    Any, ClassVar, Final, LiteralString, Never, NoReturn, Protocol, cast, override,
 )
 
 from collections.abc import Callable, Iterable, Mapping, Sequence
@@ -446,7 +445,6 @@ class ListTransToken(JoinTransToken):
 
 # TODO: Move this back to app.errors when that can be imported in compiler safely.
 
-@final
 @attrs.define(init=False)
 class AppError(Exception):
     """An error that occurs when using the app, that should be displayed to the user."""

@@ -1,6 +1,5 @@
 """Tk-specific implementation of the selector window."""
-from typing import Final, assert_never
-from typing_extensions import override
+from typing import Final, assert_never, override
 
 from tkinter import font as tk_font, ttk
 import tkinter as tk

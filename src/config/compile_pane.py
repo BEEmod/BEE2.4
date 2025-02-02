@@ -1,7 +1,6 @@
 from __future__ import annotations
 from typing import override
 
-from collections.abc import Sequence
 import base64
 
 from srctools import Keyvalues, bool_as_int, logger

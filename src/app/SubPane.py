@@ -28,6 +28,7 @@ class PaneConf:
     name: str = ''
     legacy_name: str = ''
 
+
 CONF_PALETTE = PaneConf(
     title=TransToken.ui('Palettes'),
     name='pal',

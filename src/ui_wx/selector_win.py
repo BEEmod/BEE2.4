@@ -1,8 +1,5 @@
 """Wx-specific implementation of the selector window."""
-from __future__ import annotations
-
-from typing import Final, assert_never
-from typing_extensions import override
+from typing import Final, assert_never, override
 
 
 from contextlib import aclosing
@@ -123,7 +120,7 @@ class GroupHeader(GroupHeaderBase):
     """The widget used for group headers."""
     menu_item: wx.MenuItem | None
 
-    def __init__(self, win: SelectorWin) -> None:
+    def __init__(self, win: 'SelectorWin') -> None:
         super().__init__(win)
         self.parent_menu = win.context_menu
         self.panel = wx.Panel(win.wid_itemlist)

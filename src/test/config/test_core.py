@@ -1,11 +1,12 @@
 """Test the main config logic."""
-import attrs
-from typing_extensions import override
+from typing import override
+
 import io
 import uuid
 
 from pytest_regressions.file_regression import FileRegressionFixture
 from srctools import Keyvalues, bool_as_int
+import attrs
 import pytest
 
 import config
