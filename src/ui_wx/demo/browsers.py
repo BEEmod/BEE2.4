@@ -50,3 +50,4 @@ async def test(core_nursery: trio.Nursery) -> None:
         MAIN_WINDOW.Layout()
         MAIN_WINDOW.Bind(wx.EVT_CLOSE, lambda evt: nursery.cancel_scope.cancel())
         MAIN_WINDOW.CenterOnScreen()
+        browser.start_loading()

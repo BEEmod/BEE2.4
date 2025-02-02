@@ -71,17 +71,18 @@ class SoundBrowser(SoundBrowserBase):
 
         sizer_info = wx.FlexGridSizer(4, 2, 0, 4)
         sizer_main.Add(sizer_info, 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 32)
+        flags_info_lbl = wx.SizerFlags(0).Left().CentreHorizontal()
 
         lbl_snd_name = wx.StaticText(panel_main)
         wid_transtoken.set_text(lbl_snd_name, TRANS_SND_NAME)
-        sizer_info.Add(lbl_snd_name, 0, wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT | wx.ALL, 0)
+        sizer_info.Add(lbl_snd_name, flags_info_lbl)
 
         self.wid_text_name = wx.TextCtrl(panel_main)
         sizer_info.Add(self.wid_text_name, 0, wx.EXPAND, 0)
 
         lbl_snd_file = wx.StaticText(panel_main, style=wx.ALIGN_RIGHT)
         wid_transtoken.set_text(lbl_snd_file, TRANS_SND_FIlE)
-        sizer_info.Add(lbl_snd_file, 0, wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT, 0)
+        sizer_info.Add(lbl_snd_file, flags_info_lbl)
 
         self.wid_text_sound = wx.TextCtrl(panel_main)
         self.wid_text_sound.Enable(False)
@@ -89,7 +90,7 @@ class SoundBrowser(SoundBrowserBase):
 
         lbl_type = wx.StaticText(panel_main)
         wid_transtoken.set_text(lbl_type, TRANS_SND_TYPE)
-        sizer_info.Add(lbl_type, 0, wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT, 0)
+        sizer_info.Add(lbl_type, flags_info_lbl)
 
         self.wid_type = wx.Choice(panel_main)
         self.wid_type.Bind(wx.EVT_CHOICE, self._evt_set_type)
@@ -97,7 +98,7 @@ class SoundBrowser(SoundBrowserBase):
 
         lbl_filter = wx.StaticText(panel_main)
         wid_transtoken.set_text(lbl_filter, TRANS_SND_FILTER)
-        sizer_info.Add(lbl_filter, 0, wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT, 0)
+        sizer_info.Add(lbl_filter, flags_info_lbl)
 
         self.wid_text_filter = wx.TextCtrl(panel_main)
         self.wid_text_filter.Bind(wx.EVT_TEXT, self._evt_filter_changed)
@@ -109,15 +110,16 @@ class SoundBrowser(SoundBrowserBase):
 
         sizer_btn = wx.BoxSizer(wx.HORIZONTAL)
         sizer_main.Add(sizer_btn, 0, wx.ALIGN_CENTER_HORIZONTAL | wx.BOTTOM, 8)
+        flags_btn = wx.SizerFlags(0).Border(wx.LEFT | wx.RIGHT, 8)
 
         self.btn_ok = wx.Button(panel_main, wx.ID_OK, "")
-        sizer_btn.Add(self.btn_ok, 0, wx.LEFT | wx.RIGHT, 8)
+        sizer_btn.Add(self.btn_ok, flags_btn)
 
         self.btn_cancel = wx.Button(panel_main, wx.ID_CANCEL, "")
-        sizer_btn.Add(self.btn_cancel, 0, wx.LEFT | wx.RIGHT, 8)
+        sizer_btn.Add(self.btn_cancel, flags_btn)
 
         self.btn_preview = wx.Button(panel_main, wx.ID_ANY, "Preview")
-        sizer_btn.Add(self.btn_preview, 0, wx.LEFT | wx.RIGHT, 8)
+        sizer_btn.Add(self.btn_preview, flags_btn)
 
         self.btn_cancel.Bind(wx.EVT_BUTTON, self._evt_cancel)
         self.btn_ok.Bind(wx.EVT_BUTTON, self._evt_btn_ok)
@@ -132,13 +134,16 @@ class SoundBrowser(SoundBrowserBase):
         win_size.height += 150
         self.win.SetMinSize(win_size)
 
+    @override
     def _ui_show_window(self) -> None:
         self.win.Show()
         self.win.CentreOnScreen()
 
+    @override
     def _ui_hide_window(self) -> None:
         self.win.Hide()
 
+    @override
     def _ui_set_allowed(self, allowed: AllowedSounds) -> None:
         self.wid_type.Clear()
         i = 0
@@ -175,5 +180,6 @@ class SoundBrowser(SoundBrowserBase):
         self.wid_soundlist.SetColumnWidth(0, wx.LIST_AUTOSIZE_USEHEADER)
         event.Skip(True)  # Continue propagating.
 
+    @override
     async def _ui_set_items(self, items: SoundSeq) -> None:
         self.wid_soundlist.update(items)

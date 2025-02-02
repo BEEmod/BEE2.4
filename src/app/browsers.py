@@ -45,9 +45,17 @@ class Browser(ABC):
         self.initial: str | None = None
         # If non-none, a user is trying to browse.
         self._close_event: trio.Event | None = None
+        # Should be set when something exposes a browse button to the user,
+        # so it can begin loading.
+        self.init_event = trio.Event()
+
+    def start_loading(self) -> None:
+        """Begin loading data in the background."""
+        self.init_event.set()
 
     async def task(self) -> None:
         """Handles main flow."""
+        await self.init_event.wait()
         while True:
             self._ready.value = False
             self._ui_hide_window()
@@ -67,6 +75,8 @@ class Browser(ABC):
 
     async def browse(self, initial: str) -> str | None:
         """Browse for a value."""
+        if not self.init_event.is_set():
+            raise ValueError("Browser must start loading before we can browse!")
         await self._ready.wait_value(True)
         while self.result.ready.value:
             self.result.trigger(None)
