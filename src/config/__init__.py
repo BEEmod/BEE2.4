@@ -5,7 +5,8 @@ They can then fetch the current state and store new state.
 """
 from __future__ import annotations
 
-from typing import ClassVar, Self, cast, override
+import sys
+from typing import ClassVar, Literal, Protocol, Self, assert_never, cast, override
 from collections.abc import Generator, ItemsView, Iterator, KeysView, Mapping
 from pathlib import Path
 import abc
@@ -18,6 +19,7 @@ import attrs
 import trio
 
 import utils
+from transtoken import TransToken
 
 
 LOGGER = logger.get_logger(__name__)
@@ -48,6 +50,77 @@ class ConfInfo[DataT: 'Data']:
     version: int
     uses_id: bool  # If we manage individual configs for each of these IDs.
     default: DataT | None  # If non-None, the class can be called with no args, so a default is present.
+
+
+# List of mismatched sections produced when parsing.
+type VersionMismatchList = list[tuple[ConfInfo | str, int]]
+type VersionMismatchResult = Literal['skip', 'discard', 'quit']
+TRANS_MISMATCH_TITLE = TransToken.ui('Version Mismatch')
+TRANS_MISMATCH_BTN_SKIP = TransToken.ui('Skip')
+TRANS_MISMATCH_BTN_DISCARD = TransToken.ui('Discard')
+TRANS_MISMATCH_BTN_QUIT = TransToken.ui('QUIT')
+TRANS_MISMATCH_PAL_MESSAGE = TransToken.ui(
+    'The palette "{name}" has unknown config versions for the following sections:'
+)
+TRANS_MISMATCH_CONF_MESSAGE = TransToken.ui(
+    'The primary config has unknon versions for the following sections:'
+)
+TRANS_MISMATCH_PAL_SKIP_PROMPT = TransToken.ui(
+    'Either discard this data to load the rest of the palette, skip it tempoarily, '
+    'or quit the app to leave it unchanged.'
+)
+TRANS_MISMATCH_PAL_PROMPT = TransToken.ui(
+    'Either discard this data to load the rest of the palette, '
+    'or quit the app to leave it unchanged.'
+)
+TRANS_MISMATCH_CONF_PROMPT = TransToken.ui(
+    'Continue (discarding these sections), or quit and leave it unchanged?'
+)
+
+
+class VersionMismatchPrompt(Protocol):
+    """Interface for a specialised dialog which asks users to continue if new/unknown sections are found.
+
+    This should display the description, list of unknown sections, then error.
+    """
+    async def __call__(
+        self,
+        message: TransToken,
+        prompt: TransToken,
+        sections: list[str],
+        can_skip: bool,
+    ) -> VersionMismatchResult: ...
+
+
+async def ask_version_mismatch(
+    func: VersionMismatchPrompt,
+    sections: VersionMismatchList,
+    can_skip: bool,
+    pal_name: str | None,
+) -> bool:
+    """Check whether this config should continue to be used."""
+    sections = [
+        (info.name if isinstance(info, ConfInfo) else info)
+        for info, version in sections
+    ]
+    if pal_name is not None:
+        msg = TRANS_MISMATCH_PAL_MESSAGE.format(name=pal_name)
+        prompt = TRANS_MISMATCH_PAL_SKIP_PROMPT if can_skip else TRANS_MISMATCH_PAL_PROMPT
+    else:
+        msg = TRANS_MISMATCH_CONF_MESSAGE
+        prompt = TRANS_MISMATCH_CONF_PROMPT
+        assert not can_skip, "Primary config can't be skipped?"
+    match await func(msg, prompt, sections, can_skip):
+        case 'skip':
+            assert can_skip, 'Skipped but not allowed to.'
+            return False
+        case 'discard':
+            return True
+        case 'quit':
+            LOGGER.info('Quitting due to config mismatch.')
+            sys.exit()
+        case err:
+            assert_never(err)
 
 
 class Data(abc.ABC):
