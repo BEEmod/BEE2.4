@@ -17,14 +17,14 @@ from . import MAIN_WINDOW
 __all__ = ['Dialogs', 'WxDialogs', 'DIALOG']
 
 
-async def _messagebox(
+def _messagebox(
     style: int,
     parent: wx.TopLevelWindow,
     message: TransToken,
     title: TransToken,
     icon: Icon,
     detail: str,
-) -> int:
+) -> wx.RichMessageDialog | wx.MessageDialog:
     """Common logic for message dialogs"""
     match icon:
         case Icon.INFO:
@@ -36,14 +36,12 @@ async def _messagebox(
         case Icon.ERROR:
             style |= wx.ICON_ERROR
     style |= wx.CENTRE
-    box: wx.RichMessageDialog | wx.MessageDialog
     if detail:
         box = wx.RichMessageDialog(parent, str(message), str(title), style)
         box.ShowDetailedText(detail)
+        return box
     else:
-        box = wx.MessageDialog(parent, str(message), str(title), style)
-    await trio.lowlevel.checkpoint()
-    return box.ShowModal()
+        return wx.MessageDialog(parent, str(message), str(title), style)
 
 
 class TextValidator(wx.Validator):
@@ -183,7 +181,9 @@ class WxDialogs(Dialogs):
         detail: str = '',
     ) -> None:
         """Show a message box with some information."""
-        await _messagebox(wx.OK | wx.ICON_INFORMATION, self.parent, message, title, icon, detail)
+        await trio.lowlevel.checkpoint()
+        box = _messagebox(wx.OK | wx.ICON_INFORMATION, self.parent, message, title, icon, detail)
+        box.ShowModal()
 
     @override
     async def ask_ok_cancel(
@@ -194,13 +194,15 @@ class WxDialogs(Dialogs):
         detail: str = '',
     ) -> bool:
         """Show a message box with "OK" and "Cancel" buttons."""
-        res = await _messagebox(wx.OK | wx.CANCEL, self.parent, message, title, icon, detail)
-        if res == wx.ID_OK:
-            return True
-        elif res == wx.ID_CANCEL:
-            return False
-        else:
-            raise ValueError(res)
+        await trio.lowlevel.checkpoint()
+        box = _messagebox(wx.OK | wx.CANCEL, self.parent, message, title, icon, detail)
+        match box.ShowModal():
+            case wx.ID_OK:
+                return True
+            case wx.ID_CANCEL:
+                return False
+            case res:
+                raise ValueError(res)
 
     @override
     async def ask_yes_no(
@@ -211,13 +213,15 @@ class WxDialogs(Dialogs):
         detail: str = '',
     ) -> bool:
         """Show a message box with "Yes" and "No" buttons."""
-        res = await _messagebox(wx.YES_NO, self.parent, message, title, icon, detail)
-        if res == wx.ID_YES:
-            return True
-        elif res == wx.ID_NO:
-            return False
-        else:
-            raise ValueError(res)
+        await trio.lowlevel.checkpoint()
+        box = _messagebox(wx.YES_NO, self.parent, message, title, icon, detail)
+        match box.ShowModal():
+            case wx.ID_YES:
+                return True
+            case wx.ID_NO:
+                return False
+            case error:
+                raise ValueError(error)
 
     @override
     async def ask_yes_no_cancel(
@@ -228,15 +232,17 @@ class WxDialogs(Dialogs):
         detail: str = '',
     ) -> bool | None:
         """Show a message box with "Yes", "No" and "Cancel" buttons."""
-        res = await _messagebox(wx.YES_NO | wx.CANCEL, self.parent, message, title, icon, detail)
-        if res == wx.ID_YES:
-            return True
-        elif res == wx.ID_NO:
-            return False
-        elif res == wx.ID_CANCEL:
-            return None
-        else:
-            raise ValueError(res)
+        await trio.lowlevel.checkpoint()
+        box = _messagebox(wx.YES_NO | wx.CANCEL, self.parent, message, title, icon, detail)
+        match box.ShowModal():
+            case wx.ID_YES:
+                return True
+            case wx.ID_NO:
+                return False
+            case wx.ID_CANCEL:
+                return None
+            case error:
+                raise ValueError(error)
 
     @override
     async def prompt(
